@@ -50,6 +50,8 @@
 #define EMPTYSCRIPT    "unlit: No definitions in file (perhaps you forgot the '>'s?)"
 #define USAGE          "usage: unlit [-q] [-n] [-c] file1 file2\n"
 #define CANNOTOPEN     "unlit: cannot open \"%s\"\n"
+#define CANNOTWRITE    "unlit: error writing \"%s\"\n"
+#define CANNOTWRITESTDOUT "unlit: error writing standard output\n"
 #define DISTINCTNAMES  "unlit: input and output filenames must differ\n"
 #define MISSINGENDCODE "unlit: missing \\end{code}\n"
 
@@ -78,6 +80,8 @@ static int ignore_shebang = 1; /* Leave out shebang (#!) lines */
 
 static char* prefix_str = NULL; /* Prefix output with a string */
 
+static char *ofilename = NULL;
+
 /* complain(file,line,what)
  *
  * print error message `what' for `file' at `line'.  The error is suppressed
@@ -94,6 +98,24 @@ int lin; {
         fprintf(stderr,"line %d: %s\n",lin,what);
         errors++;
     }
+}
+
+writeerror()
+{
+    if (!strcmp(ofilename,"-")) {
+	fprintf(stderr, CANNOTWRITESTDOUT);
+    } else {
+	fprintf(stderr, CANNOTWRITE, ofilename);
+    }
+    exit(1);
+}
+
+myputc(c, ostream)
+char c;
+FILE *ostream; {
+    if (putc(c,ostream) == EOF) {
+	writeerror();
+    }	
 }
 
 #define TABPOS 8
@@ -167,28 +189,28 @@ FILE *istream, *ostream; {
            while (c=egetc(istream), !isLineTerm(c)) ;
            return SHEBANG;
 	 }
-	 putc(c, ostream);
+	 myputc(c, ostream);
 	 c=c1;
       }
       if ( leavecpp ) {
-	putc(c, ostream);
+	myputc(c, ostream);
         while (c=egetc(istream), !isLineTerm(c))
-            putc(c,ostream);
-        putc('\n',ostream);
+            myputc(c,ostream);
+        myputc('\n',ostream);
         return HASH;
       }
     }
 
     if (c==DEFNCHAR) {
-/*	putc(' ',ostream);*/
+/*	myputc(' ',ostream);*/
         while (c=egetc(istream), !isLineTerm(c))
-            putc(c,ostream);
-        putc('\n',ostream);
+            myputc(c,ostream);
+        myputc('\n',ostream);
         return DEFN;
     }
 
     if (!crunchnl)
-	putc('\n',ostream);
+	myputc('\n',ostream);
 
     while (isWhitespace(c))
         c=egetc(istream);
@@ -251,7 +273,7 @@ FILE *ostream; {
 		}
 		linesread++;
 		if (strncmp(lineb,ENDCODE,LENENDCODE) == 0) {
-		    putc('\n', ostream);
+		    myputc('\n', ostream);
 		    break;
 		}
 		fputs(lineb, ostream);
@@ -267,7 +289,7 @@ FILE *ostream; {
 		    exit(1);
 		}
 		linesread++;
-		putc('\n', ostream);
+		myputc('\n', ostream);
 		if (strncmp(lineb,ENDPSEUDOCODE,LENENDPSEUDOCODE) == 0) {
 		    break;
 		}
@@ -340,6 +362,7 @@ char **argv; {
             exit(1);
         }
 
+    ofilename=argv[1];
     if (strcmp(argv[1], "-")==0) 
         ostream = stdout; 
     else
@@ -362,8 +385,12 @@ char **argv; {
 
     unlit(file, istream, ostream);
 
-    if (istream != stdin)  fclose(istream);
-    if (ostream != stdout) fclose(ostream);
+    if (istream != stdin) fclose(istream);
+    if (ostream != stdout) {
+	if (fclose(ostream) == EOF) {
+	    writeerror();
+	}
+    }
 
     exit(errors==0 ? 0 : 1);
 }
