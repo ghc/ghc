@@ -1,14 +1,6 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SCRIPT_PROG=db2html
-SCRIPT_OBJS=db2html.sh
-SCRIPT_SUBST_VARS=HTML_DIR
-INTERP=$(SHELL)
-
-HTML_DIR=$(FPTOOLS_TOP_ABS)/glafp-utils/docbook
-
-CLEAN_FILES += $(SCRIPT_PROG)
-DESTDIR=$(INSTSCRIPTDIR)
+SUBDIRS = db2dvi.dir db2html.dir db2pdf.dir db2ps.dir db2rtf.dir
 
 include $(TOP)/mk/target.mk

@@ -1,7 +1,5 @@
 #! /bin/sh
 
-output=db2rtf.rtf
-
 # Dave Mason's option to specify a different stylesheet
 case $1 in
     -d) DB_STYLESHEET=$2
@@ -26,17 +24,23 @@ then
   fi
   if echo $1 | egrep -i '\.sgml$|\.sgm$' >/dev/null 2>&1
   then
-    output="`echo $1 | sed 's,\.sgml$,.rtf,;s,\.sgm$,.rtf,'`"
+    output="`echo $1 | sed 's,\.sgml$,.dvi,;s,\.sgm$,.dvi,'`"
   fi
 fi
 
-cat $* | jade -t rtf -d ${DB_STYLESHEET}\#print
+echo OUTPUT FILE NAME IS $output
 
-if [ $# -eq 1 ]
+TMPFN=`echo $1 | sed 's/\.sgml//'`
+
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1
+
+jadetex ${TMPFN}.tex
+
+# if there are unresolved references, re-run jadetex, twice 
+if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
 then
-  mv jade-out.rtf $output
-else
-  cat jade-out.rtf
+    jadetex ${TMPFN}.tex
+    jadetex ${TMPFN}.tex
 fi
 
 exit 0

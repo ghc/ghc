@@ -1,5 +1,3 @@
-#! /bin/sh
-
 TMPFN=db2pstmp$$
 
 if [ $# -gt 2 ]

@@ -1,4 +1,4 @@
-#! /bin/sh
+TMPFN=`echo $1 | sed 's/\.sgml//'`
 
 # Dave Mason's option to specify a different stylesheet
 case $1 in
@@ -24,23 +24,18 @@ then
   fi
   if echo $1 | egrep -i '\.sgml$|\.sgm$' >/dev/null 2>&1
   then
-    output="`echo $1 | sed 's,\.sgml$,.dvi,;s,\.sgm$,.dvi,'`"
+    output="`echo $1 | sed 's,\.sgml$,.pdf,;s,\.sgm$,.pdf,'`"
   fi
 fi
 
-echo OUTPUT FILE NAME IS $output
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1
 
-TMPFN=`echo $1 | sed 's/\.sgml//'`
+pdf$JADEtex $TMPFN
 
-jade -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1
-
-jadetex ${TMPFN}.tex
-
-# if there are unresolved references, re-run jadetex, twice 
 if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
 then
-    jadetex ${TMPFN}.tex
-    jadetex ${TMPFN}.tex
+  pdfjadetex $TMPFN
+  pdfjadetex $TMPFN
 fi
 
 exit 0

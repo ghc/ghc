@@ -1,6 +1,4 @@
-#! /bin/sh
-
-TMPFN=`echo $1 | sed 's/\.sgml//'`
+output=db2rtf.rtf
 
 # Dave Mason's option to specify a different stylesheet
 case $1 in
@@ -26,18 +24,17 @@ then
   fi
   if echo $1 | egrep -i '\.sgml$|\.sgm$' >/dev/null 2>&1
   then
-    output="`echo $1 | sed 's,\.sgml$,.pdf,;s,\.sgm$,.pdf,'`"
+    output="`echo $1 | sed 's,\.sgml$,.rtf,;s,\.sgm$,.rtf,'`"
   fi
 fi
 
-jade -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1
+cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print
 
-pdfjadetex $TMPFN
-
-if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
+if [ $# -eq 1 ]
 then
-  pdfjadetex $TMPFN
-  pdfjadetex $TMPFN
+  mv $JADE-out.rtf $output
+else
+  cat $JADE-out.rtf
 fi
 
 exit 0
