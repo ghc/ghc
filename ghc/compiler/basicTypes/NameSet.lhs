@@ -9,7 +9,7 @@ module NameSet (
 	NameSet,
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, 
-	delFromNameSet, delListFromNameSet, isEmptyNameSet,
+	delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet
     ) where
 
 #include "HsVersions.h"
@@ -40,6 +40,7 @@ nameSetToList	   :: NameSet -> [Name]
 isEmptyNameSet	   :: NameSet -> Bool
 delFromNameSet	   :: NameSet -> Name -> NameSet
 delListFromNameSet :: NameSet -> [Name] -> NameSet
+foldNameSet	   :: (Name -> b -> b) -> b -> NameSet -> b
 
 isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet
@@ -53,6 +54,7 @@ minusNameSet	  = minusUniqSet
 elemNameSet       = elementOfUniqSet
 nameSetToList     = uniqSetToList
 delFromNameSet    = delOneFromUniqSet
+foldNameSet	  = foldUniqSet
 
 delListFromNameSet set ns = foldl delFromNameSet set ns
 \end{code}

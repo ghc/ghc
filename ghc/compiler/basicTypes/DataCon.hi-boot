@@ -1,5 +1,6 @@
 _interface_ DataCon 1
 _exports_
-DataCon DataCon ;
+DataCon DataCon dataConType ;
 _declarations_
 1 data DataCon ;
+1 dataConType _:_ DataCon -> Type.Type ;;

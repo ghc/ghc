@@ -50,7 +50,6 @@ import Module		( isDynamicModule )
 import Const		( Con(..), Literal(..), isLitLitLit )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..) )
-import BasicTypes	( TopLevelFlag(..) )
 import Util
 import Panic		( assertPanic, trace )
 \end{code}

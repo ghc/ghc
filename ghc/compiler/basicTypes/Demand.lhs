@@ -8,7 +8,7 @@ module Demand(
 	Demand(..),
 
 	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
-	isStrict, isLazy, 
+	isStrict, isLazy, isPrim,
 
 	pprDemands
      ) where
@@ -80,6 +80,10 @@ isStrict WwStrict = True
 isStrict WwEnum	  = True
 isStrict WwPrim	  = True
 isStrict _	  = False
+
+isPrim :: Demand -> Bool
+isPrim WwPrim = True
+isPrim other  = False
 \end{code}
 
 \begin{code}

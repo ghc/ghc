@@ -28,10 +28,9 @@ import OccName	( NameSpace, tcName,
 		  mkSrcOccFS, mkSrcVarOcc,
 		  isDataOcc, isTvOcc
 		)
-import Module   ( Module, IfaceFlavour, mkSysModuleFS,
-		  mkSrcModuleFS, pprModuleSep
+import Module   ( ModuleName,
+		  mkSysModuleFS, mkSrcModuleFS
 		)
-import PrelMods	( pRELUDE )
 import Outputable
 import Util	( thenCmp )
 \end{code}
@@ -47,7 +46,7 @@ import Util	( thenCmp )
 data RdrName = RdrName Qual OccName
 
 data Qual = Unqual
-	  | Qual Module
+	  | Qual ModuleName	-- The (encoded) module name
 \end{code}
 
 
@@ -58,7 +57,7 @@ data Qual = Unqual
 %************************************************************************
 
 \begin{code}
-rdrNameModule :: RdrName -> Module
+rdrNameModule :: RdrName -> ModuleName
 rdrNameModule (RdrName (Qual m) _) = m
 
 rdrNameOcc :: RdrName -> OccName
@@ -70,13 +69,13 @@ rdrNameOcc (RdrName _ occ) = occ
 mkRdrUnqual :: OccName -> RdrName
 mkRdrUnqual occ = RdrName Unqual occ
 
-mkRdrQual :: Module -> OccName -> RdrName
+mkRdrQual :: ModuleName -> OccName -> RdrName
 mkRdrQual mod occ = RdrName (Qual mod) occ
 
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
 mkSrcUnqual :: NameSpace -> FAST_STRING -> RdrName
-mkSrcUnqual sp n   = RdrName Unqual (mkSrcOccFS sp n)
+mkSrcUnqual sp n = RdrName Unqual (mkSrcOccFS sp n)
 
 mkSrcQual :: NameSpace -> FAST_STRING -> FAST_STRING -> RdrName
 mkSrcQual sp m n = RdrName (Qual (mkSrcModuleFS m)) (mkSrcOccFS sp n)
@@ -84,15 +83,15 @@ mkSrcQual sp m n = RdrName (Qual (mkSrcModuleFS m)) (mkSrcOccFS sp n)
 	-- These two are used when parsing interface files
 	-- They do not encode the module and occurrence name
 mkSysUnqual :: NameSpace -> FAST_STRING -> RdrName
-mkSysUnqual sp n         = RdrName Unqual (mkSysOccFS sp n)
+mkSysUnqual sp n = RdrName Unqual (mkSysOccFS sp n)
 
-mkSysQual :: NameSpace -> (FAST_STRING, FAST_STRING, IfaceFlavour) -> RdrName
-mkSysQual sp (m,n,hif) = RdrName (Qual (mkSysModuleFS m hif)) (mkSysOccFS sp n)
+mkSysQual :: NameSpace -> (FAST_STRING, FAST_STRING) -> RdrName
+mkSysQual sp (m,n) = RdrName (Qual (mkSysModuleFS m)) (mkSysOccFS sp n)
 
-mkPreludeQual :: NameSpace -> Module -> FAST_STRING -> RdrName
+mkPreludeQual :: NameSpace -> ModuleName -> FAST_STRING -> RdrName
 mkPreludeQual sp mod n = RdrName (Qual mod) (mkSrcOccFS sp n)
 
-qualifyRdrName :: Module -> RdrName -> RdrName
+qualifyRdrName :: ModuleName -> RdrName -> RdrName
 qualifyRdrName mod (RdrName Unqual occ) = RdrName (Qual mod) occ
 qualifyRdrName mod rdr_name		= rdr_name 
 \end{code}
@@ -130,7 +129,7 @@ instance Outputable RdrName where
     ppr (RdrName qual occ) = pp_qual qual <> ppr occ
 			   where
 				pp_qual Unqual = empty
-				pp_qual (Qual mod) = ppr mod <> pprModuleSep mod
+				pp_qual (Qual mod) = ppr mod <> dot
 
 instance Eq RdrName where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }

@@ -10,7 +10,12 @@ Haskell. [WDP 94/11])
 module IdInfo (
 	IdInfo,		-- Abstract
 
-	noIdInfo,
+	vanillaIdInfo, mkIdInfo,
+
+	-- Flavour
+	IdFlavour(..), flavourInfo, 
+	setNoDiscardInfo, zapSpecPragInfo, copyIdInfo,
+	ppFlavourInfo,
 
 	-- Arity
 	ArityInfo(..),
@@ -39,7 +44,7 @@ module IdInfo (
 	inlinePragInfo, setInlinePragInfo, notInsideLambda,
 
 	-- Specialisation
-	IdSpecEnv, specInfo, setSpecInfo,
+	specInfo, setSpecInfo,
 
 	-- Update
 	UpdateInfo, UpdateSpec,
@@ -51,29 +56,47 @@ module IdInfo (
         -- Constructed Product Result Info
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
 
+	-- Zapping
+ 	zapLamIdInfo, zapFragileIdInfo,
+
         -- Lambda-bound variable info
-        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo,
+        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo
     ) where
 
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
-import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
+import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding, hasUnfolding )
+import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCoreRules )
+import {-# SOURCE #-} Const	 ( Con )
 
 import Var              ( Id )
-import SpecEnv	        ( SpecEnv, emptySpecEnv )
-import Demand		( Demand,  isLazy, wwLazy, pprDemands )
+import FieldLabel	( FieldLabel )
+import Demand		( Demand, isStrict, isLazy, wwLazy, pprDemands )
 import Type             ( UsageAnn )
 import Outputable	
-
 import Maybe            ( isJust )
 
+infixl 	1 `setUpdateInfo`,
+	  `setDemandInfo`,
+	  `setStrictnessInfo`,
+	  `setSpecInfo`,
+	  `setArityInfo`,
+	  `setInlinePragInfo`,
+	  `setUnfoldingInfo`,
+	  `setCprInfo`,
+	  `setWorkerInfo`,
+	  `setCafInfo`
+	-- infixl so you can say (id `set` a `set` b)
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
 present it never lies, but it may not be present, in which case there
 is always a conservative assumption which can be made.
+
+	There is one exception: the 'flavour' is *not* optional.
+	You must not discard it.
+	It used to be in Var.lhs, but that seems unclean.
 
 Two @Id@s may have different info even though they have the same
 @Unique@ (and are hence the same @Id@); for example, one might lack
@@ -87,52 +110,137 @@ case.  KSW 1999-04).
 \begin{code}
 data IdInfo
   = IdInfo {
-	arityInfo :: ArityInfo,			-- Its arity
-	demandInfo :: Demand,			-- Whether or not it is definitely demanded
-	specInfo :: IdSpecEnv,			-- Specialisations of this function which exist
-	strictnessInfo :: StrictnessInfo,	-- Strictness properties
-        workerInfo :: WorkerInfo,               -- Pointer to Worker Function
-	unfoldingInfo :: Unfolding,		-- Its unfolding
-	updateInfo :: UpdateInfo,		-- Which args should be updated
-	cafInfo :: CafInfo,
-	cprInfo :: CprInfo,                     -- Function always constructs a product result
-        lbvarInfo :: LBVarInfo,			-- Info about a lambda-bound variable
-	inlinePragInfo :: !InlinePragInfo	-- Inline pragmas
+	flavourInfo	:: IdFlavour,		-- NOT OPTIONAL
+	arityInfo 	:: ArityInfo,		-- Its arity
+	demandInfo 	:: Demand,		-- Whether or not it is definitely demanded
+	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
+	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
+        workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
+	unfoldingInfo	:: Unfolding,		-- Its unfolding
+	updateInfo	:: UpdateInfo,		-- Which args should be updated
+	cafInfo		:: CafInfo,
+	cprInfo 	:: CprInfo,             -- Function always constructs a product result
+        lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
+	inlinePragInfo	:: !InlinePragInfo	-- Inline pragmas
     }
 \end{code}
 
 Setters
 
 \begin{code}
-setUpdateInfo	  ud info = info { updateInfo = ud }
-setDemandInfo	  dd info = info { demandInfo = dd }
-setStrictnessInfo st info = info { strictnessInfo = st }
-setWorkerInfo     wk info = info { workerInfo = wk }
-setSpecInfo 	  sp info = info { specInfo = sp }
-setArityInfo	  ar info = info { arityInfo = ar  }
-setInlinePragInfo pr info = info { inlinePragInfo = pr }
-setUnfoldingInfo  uf info = info { unfoldingInfo = uf }
-setCafInfo        cf info = info { cafInfo = cf }
-setCprInfo        cp info = info { cprInfo = cp }
-setLBVarInfo      lb info = info { lbvarInfo = lb }
+setUpdateInfo	  info ud = info { updateInfo = ud }
+setDemandInfo	  info dd = info { demandInfo = dd }
+setStrictnessInfo info st = info { strictnessInfo = st }
+setWorkerInfo     info wk = info { workerInfo = wk }
+setSpecInfo 	  info sp = info { specInfo = sp }
+setArityInfo	  info ar = info { arityInfo = ar  }
+setInlinePragInfo info pr = info { inlinePragInfo = pr }
+setUnfoldingInfo  info uf = info { unfoldingInfo = uf }
+setCafInfo        info cf = info { cafInfo = cf }
+setCprInfo        info cp = info { cprInfo = cp }
+setLBVarInfo      info lb = info { lbvarInfo = lb }
+
+setNoDiscardInfo  info = case flavourInfo info of
+				VanillaId -> info { flavourInfo = NoDiscardId }
+				other	  -> info
+zapSpecPragInfo   info = case flavourInfo info of
+				SpecPragmaId -> info { flavourInfo = VanillaId }
+				other	     -> info
+
+copyIdInfo :: IdInfo	-- From
+  	   -> IdInfo	-- To
+	   -> IdInfo	-- To updated with stuff from From; except flavour unchanged
+-- copyIdInfo is used when shorting out a top-level binding
+--	f_local = BIG
+--	f = f_local
+-- where f is exported.  We are going to swizzle it around to
+--	f = BIG
+--	f_local = f
+-- but we must be careful to combine their IdInfos right.
+-- The fact that things can go wrong here is a bad sign, but I can't see
+-- how to make it 'patently right', so copyIdInfo is derived (pretty much) by trial and error
+--
+-- Here 'from' is f_local, 'to' is f.
+
+copyIdInfo from to = from { flavourInfo = flavourInfo to,
+			    specInfo = specInfo to
+			  }
+	-- It's important to propagate the inline pragmas from bndr
+	-- to exportd_id.  Ditto strictness etc.  This "bites" when we use an INLNE pragma:
+	--	{-# INLINE f #-}
+	--	f x = (x,x)
+	--
+	-- This becomes (where the "*" means INLINE prag)
+	--
+	--	M.f = /\a -> let mf* = \x -> (x,x) in mf
+	--
+	-- Now the mf floats out and we end up with the trivial binding
+	--
+	--	mf* = /\a -> \x -> (x,x)
+	--	M.f = mf
+	--
+	-- Now, when we short out the M.f = mf binding we must preserve the inline
+	-- pragma on the mf binding.
+	--
+	-- On the other hand, transformation rules may be attached to the 
+	-- 'to' Id, and we want to preserve them.  
 \end{code}
 
 
 \begin{code}
-noIdInfo = IdInfo {
-		arityInfo	= UnknownArity,
-		demandInfo	= wwLazy,
-		specInfo	= emptySpecEnv,
-		strictnessInfo	= NoStrictnessInfo,
-		workerInfo	= noWorkerInfo,
-		unfoldingInfo	= noUnfolding,
-		updateInfo	= NoUpdateInfo,
-		cafInfo		= MayHaveCafRefs,
-		cprInfo		= NoCPRInfo,
-                lbvarInfo       = NoLBVarInfo,
-		inlinePragInfo  = NoInlinePragInfo
+vanillaIdInfo :: IdInfo
+vanillaIdInfo = mkIdInfo VanillaId
+
+mkIdInfo :: IdFlavour -> IdInfo
+mkIdInfo flv = IdInfo {
+		    flavourInfo		= flv,
+		    arityInfo		= UnknownArity,
+		    demandInfo		= wwLazy,
+		    specInfo		= emptyCoreRules,
+		    workerInfo		= Nothing,
+		    strictnessInfo	= NoStrictnessInfo,
+		    unfoldingInfo	= noUnfolding,
+		    updateInfo		= NoUpdateInfo,
+		    cafInfo		= MayHaveCafRefs,
+		    cprInfo		= NoCPRInfo,
+		    lbvarInfo		= NoLBVarInfo,
+		    inlinePragInfo 	= NoInlinePragInfo
 	   }
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Flavour}
+%*									*
+%************************************************************************
+
+\begin{code}
+data IdFlavour
+  = VanillaId 				-- Most Ids are like this
+  | ConstantId Con			-- The Id for a constant (data constructor or primop)
+  | RecordSelId FieldLabel		-- The Id for a record selector
+  | SpecPragmaId			-- Don't discard these
+  | NoDiscardId				-- Don't discard these either
+
+ppFlavourInfo :: IdFlavour -> SDoc
+ppFlavourInfo VanillaId       = empty
+ppFlavourInfo (ConstantId _)  = ptext SLIT("[Constr]")
+ppFlavourInfo (RecordSelId _) = ptext SLIT("[RecSel]")
+ppFlavourInfo SpecPragmaId    = ptext SLIT("[SpecPrag]")
+ppFlavourInfo NoDiscardId     = ptext SLIT("[NoDiscard]")
+\end{code}
+
+The @SpecPragmaId@ exists only to make Ids that are
+on the *LHS* of bindings created by SPECIALISE pragmas; 
+eg:		s = f Int d
+The SpecPragmaId is never itself mentioned; it
+exists solely so that the specialiser will find
+the call to f, and make specialised version of it.
+The SpecPragmaId binding is discarded by the specialiser
+when it gathers up overloaded calls.
+Meanwhile, it is not discarded as dead code.
+
 
 %************************************************************************
 %*									*
@@ -175,9 +283,6 @@ ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("__AL"), int arity]
 data InlinePragInfo
   = NoInlinePragInfo
 
-  | IAmASpecPragmaId	-- Used for spec-pragma Ids; don't discard or inline
-
-  | IWantToBeINLINEd	-- User INLINE pragma
   | IMustNotBeINLINEd	-- User NOINLINE pragma
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
@@ -202,35 +307,19 @@ data InlinePragInfo
 instance Outputable InlinePragInfo where
   ppr NoInlinePragInfo  	= empty
   ppr IMustBeINLINEd    	= ptext SLIT("__UU")
-  ppr IWantToBeINLINEd  	= ptext SLIT("__U")
   ppr IMustNotBeINLINEd 	= ptext SLIT("__Unot")
   ppr IAmALoopBreaker   	= ptext SLIT("__Ux")
   ppr IAmDead			= ptext SLIT("__Ud")
   ppr (ICanSafelyBeINLINEd InsideLam _) = ptext SLIT("__Ul")
   ppr (ICanSafelyBeINLINEd _ _) = ptext SLIT("__Us")
-  ppr IAmASpecPragmaId 		= ptext SLIT("__US")
 
 instance Show InlinePragInfo where
   showsPrec p prag = showsPrecSDoc p (ppr prag)
 \end{code}
 
-The @IMustNotBeDiscarded@ exists only to make Ids that are
-on the *LHS* of bindings created by SPECIALISE pragmas; 
-eg:		s = f Int d
-The SpecPragmaId is never itself mentioned; it
-exists solely so that the specialiser will find
-the call to f, and make specialised version of it.
-The SpecPragmaId binding is discarded by the specialiser
-when it gathers up overloaded calls.
-Meanwhile, it is not discarded as dead code.
-
 \begin{code}
 data OccInfo
-  = StrictOcc		-- Occurs syntactically strictly;
-			-- i.e. in a function position or case scrutinee
-
-  | LazyOcc		-- Not syntactically strict (*even* that of a strict function)
-			-- or in a case branch where there's more than one alternative
+  = NotInsideLam
 
   | InsideLam		-- Inside a non-linear lambda (that is, a lambda which
 			-- is sure to be instantiated only once).
@@ -238,54 +327,14 @@ data OccInfo
 			-- dangerous because it might duplicate work.
 
 instance Outputable OccInfo where
-  ppr StrictOcc = text "s"
-  ppr LazyOcc   = empty
-  ppr InsideLam = text "l"
+  ppr NotInsideLam = empty
+  ppr InsideLam    = text "l"
 
 
 notInsideLambda :: OccInfo -> Bool
-notInsideLambda StrictOcc = True
-notInsideLambda LazyOcc   = True
-notInsideLambda InsideLam = False
+notInsideLambda NotInsideLam = True
+notInsideLambda InsideLam    = False
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[specialisation-IdInfo]{Specialisation info about an @Id@}
-%*									*
-%************************************************************************
-
-A @IdSpecEnv@ holds details of an @Id@'s specialisations. 
-
-\begin{code}
-type IdSpecEnv = SpecEnv CoreExpr
-\end{code}
-
-For example, if \tr{f}'s @SpecEnv@ contains the mapping:
-\begin{verbatim}
-	[List a, b]  ===>  (\d -> f' a b)
-\end{verbatim}
-then when we find an application of f to matching types, we simply replace
-it by the matching RHS:
-\begin{verbatim}
-	f (List Int) Bool ===>  (\d -> f' Int Bool)
-\end{verbatim}
-All the stuff about how many dictionaries to discard, and what types
-to apply the specialised function to, are handled by the fact that the
-SpecEnv contains a template for the result of the specialisation.
-
-There is one more exciting case, which is dealt with in exactly the same
-way.  If the specialised value is unboxed then it is lifted at its
-definition site and unlifted at its uses.  For example:
-
-	pi :: forall a. Num a => a
-
-might have a specialisation
-
-	[Int#] ===>  (case pi' of Lift pi# -> pi#)
-
-where pi' :: Lift Int# is the specialised version of pi.
-
 
 %************************************************************************
 %*									*
@@ -431,6 +480,86 @@ data CafInfo
 ppCafInfo NoCafRefs = ptext SLIT("__C")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[CAF-IdInfo]{CAF-related information}
+%*									*
+%************************************************************************
+
+zapFragileIdInfo is used when cloning binders, mainly in the
+simplifier.  We must forget about used-once information because that
+isn't necessarily correct in the transformed program.
+Also forget specialisations and unfoldings because they would need
+substitution to be correct.  (They get pinned back on separately.)
+
+\begin{code}
+zapFragileIdInfo :: IdInfo -> Maybe IdInfo
+zapFragileIdInfo info@(IdInfo {inlinePragInfo	= inline_prag, 
+			       specInfo		= rules, 
+			       unfoldingInfo	= unfolding})
+  |  not is_fragile_inline_prag 
+        -- We must forget about whether it was marked safe-to-inline,
+	-- because that isn't necessarily true in the simplified expression.
+	-- This is important because expressions may  be re-simplified
+
+  && isEmptyCoreRules rules
+	-- Specialisations would need substituting.  They get pinned
+	-- back on separately.
+
+  && not (hasUnfolding unfolding)
+	-- This is very important; occasionally a let-bound binder is used
+	-- as a binder in some lambda, in which case its unfolding is utterly
+	-- bogus.  Also the unfolding uses old binders so if we left it we'd
+	-- have to substitute it. Much better simply to give the Id a new
+	-- unfolding each time, which is what the simplifier does.
+  = Nothing
+
+  | otherwise
+  = Just (info {inlinePragInfo	= safe_inline_prag, 
+		specInfo	= emptyCoreRules,
+		unfoldingInfo	= noUnfolding})
+
+  where
+    is_fragile_inline_prag = case inline_prag of
+				ICanSafelyBeINLINEd _ _ -> True
+
+-- We used to say the dead-ness was fragile, but I don't
+-- see why it is.  Furthermore, deadness is a pain to lose;
+-- see Simplify.mkDupableCont (Select ...)
+--				IAmDead			-> True
+
+				other			-> False
+
+	-- Be careful not to destroy real 'pragma' info
+    safe_inline_prag | is_fragile_inline_prag = NoInlinePragInfo
+		     | otherwise	      = inline_prag
+\end{code}
+
+
+@zapLamIdInfo@ is used for lambda binders that turn out to to be
+part of an unsaturated lambda
+
+\begin{code}
+zapLamIdInfo :: IdInfo -> Maybe IdInfo
+zapLamIdInfo info@(IdInfo {inlinePragInfo = inline_prag, demandInfo = demand})
+  | is_safe_inline_prag && not (isStrict demand)
+  = Nothing
+  | otherwise
+  = Just (info {inlinePragInfo = safe_inline_prag,
+		demandInfo = wwLazy})
+  where
+    is_safe_inline_prag = case inline_prag of
+			 	ICanSafelyBeINLINEd dup_danger nalts -> notInsideLambda dup_danger
+				other				     -> True
+
+    safe_inline_prag    = case inline_prag of
+			 	ICanSafelyBeINLINEd _ nalts
+				      -> ICanSafelyBeINLINEd InsideLam nalts
+				other -> inline_prag
+\end{code}
+
 
 %************************************************************************
 %*									*

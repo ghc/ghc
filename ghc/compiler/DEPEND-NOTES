@@ -1,3 +1,15 @@
+add types/InstEnv, InstEnv.hi-boot
+add coreSyn/CoreRules.*
+add coreSyn/CoreTidy.lhs
+add coreSyn/CoreFVs.lhs
+remove coreSyn/FreeVars.lhs
+add coreSyn/Subst.*
+remove simplCore/MagicUFs.*
+
+remove specialise/SpecEnv.*
+
+
+
 ToDo
 ~~~~
 * Test effect of eta-expanding past (case x of ..)
@@ -62,45 +74,43 @@ ToDo
 		~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Name/Var/Type group is a bit complicated. Here's the deal
+Things in brackets are what the module *uses*.
+A 'loop' indicates a use from a module compiled later
 
-	Name, PrimRep, FieldLabel (uses Type.Type)
+	Name, PrimRep, FieldLabel (loop Type.Type)
 then
-	Var (uses Const.Con, IdInfo.IdInfo, Type.GenType, Type.Kind)
+	Var (loop Const.Con, loop IdInfo.IdInfo, 
+	     loop Type.GenType, loop Type.Kind)
 then
-	VarEnv, VarSet
+	VarEnv, VarSet, ThinAir
 then
-	Class (uses TyCon.TyCon, Type.Type, SpecEnv.SpecEnv)
+	Class (loop TyCon.TyCon, loop Type.Type, loop InstEnv.InstEnv)
 then
-	TyCon (uses Type.Type, Type.Kind, DataCon.DataCon)
+	TyCon (loop Type.Type, loop Type.Kind, loop DataCon.DataCon)
 then
-	Type (uses [DataCon.DataCon])
+	Type (loop DataCon.DataCon, loop Subst.substTy)
 then
-	DataCon, TysPrim, Unify, SpecEnv, PprType
+	DataCon, TysPrim, Unify, PprType
 then
-	IdInfo, TysWiredIn (uses DataCon.mkDataCon, [MkId.mkDataConId])
+	InstEnv (Unify)
 then
-	PrimOp (uses PprType, TysWiredIn)
+	IdInfo (loop CoreRules.CoreRules) 
+	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId)
 then
-	Const (needs PrimOp, [TysWiredIn.stringTy])
+	PrimOp (PprType, TysWiredIn, IdInfo.StrictnessInfo)
 then
-	Id (needs Const.Con(..)), CoreSyn
+	Const (PrimOp.PrimOp, TysWiredIn.stringTy)
 then
-	CoreUtils, OccurAnal
+	Id (Const.Con(..)), CoreSyn
 then
-	CoreUnfold (uses OccurAnal)
+	CoreUtils (loop PprCore.pprCoreExpr), CoreFVs
+then	
+	OccurAnal (ThinAir.noRepStrs -- an awkward dependency)
 then
-	MkId (uses CoreUnfold)
-	
+	CoreUnfold (loop OccurAnal.globalOccurAnalyse)
+then
+	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding)
+then
+	MkId (CoreUnfold.mkUnfolding, Subst)
 
-PrimOp uses TysWiredIn
 
-
-Add
-~~~
-basicTypes/DataCon.lhs
-basicTypes/DataCon.hi-boot
-
-Remove
-~~~~~~
-specialise/SpecUtils.lhs
-basicTypes/IdUtils.lhs

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.30 1999/05/13 17:30:56 simonm Exp $
+% $Id: CgClosure.lhs,v 1.31 1999/05/18 15:03:47 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -22,7 +22,6 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import CgMonad
 import AbsCSyn
 import StgSyn
-import BasicTypes	( TopLevelFlag(..) )
 
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgBindery	( getCAddrMode, getArgAmodes,

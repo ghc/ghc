@@ -11,18 +11,23 @@ module DataCon (
 	dataConType, dataConSig, dataConName, dataConTag,
 	dataConOrigArgTys, dataConArgTys, dataConRawArgTys, dataConTyCon,
 	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
-	dataConNumFields, dataConNumInstArgs, dataConId,
+	dataConNumFields, dataConNumInstArgs, dataConId, dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
-	isExistentialDataCon
+	isExistentialDataCon,
+
+	StrictnessMark(..), 	-- Representation visible to MkId only
+	markedStrict, notMarkedStrict, markedUnboxed, maybeMarkedUnboxed
     ) where
 
 #include "HsVersions.h"
+
+import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
 import TysPrim
 import Type		( Type, ThetaType, TauType,
 			  mkSigmaTy, mkFunTys, mkTyConApp, 
-			  mkTyVarTys, mkDictTy, substTy,
+			  mkTyVarTys, mkDictTy,
 			  splitAlgTyConApp_maybe
 			)
 import PprType
@@ -31,9 +36,9 @@ import TyCon		( TyCon, tyConDataCons, isDataTyCon,
 import Class		( classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, isLocallyDefinedName )
 import Var		( TyVar, Id )
-import VarEnv
 import FieldLabel	( FieldLabel )
-import BasicTypes	( StrictnessMark(..), Arity )
+import BasicTypes	( Arity )
+import Demand		( Demand, wwStrict, wwLazy )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
@@ -136,6 +141,32 @@ but the rep type is
 Actually, the unboxed part isn't implemented yet!
 
 
+%************************************************************************
+%*									*
+\subsection{Strictness indication}
+%*									*
+%************************************************************************
+
+\begin{code}
+data StrictnessMark = MarkedStrict
+		    | MarkedUnboxed DataCon [Type]
+		    | NotMarkedStrict
+
+markedStrict    = MarkedStrict
+notMarkedStrict = NotMarkedStrict
+markedUnboxed   = MarkedUnboxed (panic "markedUnboxed1") (panic "markedUnboxed2")
+
+maybeMarkedUnboxed (MarkedUnboxed dc tys) = Just (dc,tys)
+maybeMarkedUnboxed other		  = Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Instances}
+%*									*
+%************************************************************************
+
 \begin{code}
 instance Eq DataCon where
     a == b = getUnique a == getUnique b
@@ -160,6 +191,13 @@ instance Outputable DataCon where
 instance Show DataCon where
     showsPrec p con = showsPrecSDoc p (ppr con)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Consruction}
+%*									*
+%************************************************************************
 
 \begin{code}
 mkDataCon :: Name
@@ -307,6 +345,17 @@ dataConSourceArity :: DataCon -> Arity
 	-- Source-level arity of the data constructor
 dataConSourceArity dc = length (dcOrigArgTys dc)
 
+dataConRepStrictness :: DataCon -> [Demand]
+	-- Give the demands on the arguments of a 
+	-- Core constructor application (Con dc args)
+dataConRepStrictness dc
+  = go (dcRealStricts dc) 
+  where
+    go []			  = []
+    go (MarkedStrict        : ss) = wwStrict : go ss
+    go (NotMarkedStrict     : ss) = wwLazy   : go ss
+    go (MarkedUnboxed con _ : ss) = go (dcRealStricts con ++ ss)
+
 dataConSig :: DataCon -> ([TyVar], ThetaType, 
 			  [TyVar], ThetaType, 
 			  [TauType], TyCon)
@@ -325,12 +374,12 @@ dataConArgTys, dataConOrigArgTys :: DataCon
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
 		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
- = map (substTy (zipVarEnv (tyvars ++ ex_tyvars) inst_tys)) 
+ = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
        ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
 
 dataConOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, 
 		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
- = map (substTy (zipVarEnv (tyvars ++ ex_tyvars) inst_tys)) 
+ = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
        ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
 \end{code}
 

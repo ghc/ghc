@@ -12,7 +12,7 @@ module Name (
 	Name,					-- Abstract
 	mkLocalName, mkImportedLocalName, mkSysLocalName, 
 	mkTopName,
-	mkDerivedName, mkGlobalName,
+	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName,   mkWiredInTyConName,
 	maybeWiredInIdName, maybeWiredInTyConName,
 	isWiredInName,
@@ -21,7 +21,7 @@ module Name (
 	tidyTopName, 
 	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule,
 
-	isExportedName,	nameSrcLoc,
+	isUserExportedName, nameSrcLoc,
 	isLocallyDefinedName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
@@ -34,7 +34,6 @@ module Name (
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	isExported, 
 	getSrcLoc, isLocallyDefined, getOccString
     ) where
 
@@ -44,8 +43,8 @@ import {-# SOURCE #-} Var   ( Id, setIdName )
 import {-# SOURCE #-} TyCon ( TyCon, setTyConName )
 
 import OccName		-- All of it
-import Module
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual )
+import Module		( Module, moduleName, pprModule, mkVanillaModule )
+import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
@@ -108,6 +107,12 @@ mkGlobalName :: Unique -> Module -> OccName -> Provenance -> Name
 mkGlobalName uniq mod occ prov = Name { n_uniq = uniq, n_sort = Global mod,
 					n_occ = occ, n_prov = prov }
 				
+
+mkKnownKeyGlobal :: (RdrName, Unique) -> Name
+mkKnownKeyGlobal (rdr_name, uniq)
+  = mkGlobalName uniq (mkVanillaModule (rdrNameModule rdr_name))
+		      (rdrNameOcc rdr_name)
+		      systemProvenance
 
 mkSysLocalName :: Unique -> FAST_STRING -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
@@ -213,9 +218,7 @@ are exported.  But also:
 \begin{code}
 tidyTopName :: Module -> TidyOccEnv -> Name -> (TidyOccEnv, Name)
 tidyTopName mod env name
-  | isExported name = (env, name)	-- Don't fiddle with an exported name
-					-- It should be in the TidyOccEnv already
-  | otherwise       = (env', name')
+  = (env', name')
   where
     (env', occ') = tidyOccName env (n_occ name)
 
@@ -365,7 +368,7 @@ nameOccName		:: Name -> OccName
 nameModule		:: Name -> Module
 nameSrcLoc		:: Name -> SrcLoc
 isLocallyDefinedName	:: Name -> Bool
-isExportedName		:: Name -> Bool
+isUserExportedName	:: Name -> Bool
 isWiredInName		:: Name -> Bool
 isLocalName		:: Name -> Bool
 isGlobalName		:: Name -> Bool
@@ -387,16 +390,16 @@ nameSortModule (WiredInTyCon mod _) = mod
 
 nameRdrName :: Name -> RdrName
 nameRdrName (Name { n_sort = Local, n_occ = occ }) = mkRdrUnqual occ
-nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (nameSortModule sort) occ
+nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (moduleName (nameSortModule sort)) occ
 
-isExportedName (Name { n_prov = LocalDef _ Exported }) = True
-isExportedName other				       = False
+isUserExportedName (Name { n_prov = LocalDef _ Exported }) = True
+isUserExportedName other			           = False
 
 nameSrcLoc name = provSrcLoc (n_prov name)
 
 provSrcLoc (LocalDef loc _)         	        = loc        
 provSrcLoc (NonLocalDef (UserImport _ loc _) _) = loc
-provSrcLoc SystemProv				= noSrcLoc   
+provSrcLoc other				= noSrcLoc   
   
 isLocallyDefinedName (Name {n_sort = Local})        = True	-- Local (might have SystemProv)
 isLocallyDefinedName (Name {n_prov = LocalDef _ _}) = True	-- Global, but defined here
@@ -517,7 +520,7 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ, n_prov = prov})
 
     pp_mod_dot sty
       = case prov of
-    	   SystemProv	  			     -> pp_qual mod  pp_sep    user_sty
+    	   SystemProv	  			     -> pp_qual mod user_sty
 		-- Hack alert!  Omit the qualifier on SystemProv things in user style
                 -- I claim such SystemProv things will also be WiredIn things.
 		-- We can't get the omit flag right
@@ -525,24 +528,20 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ, n_prov = prov})
 		-- and hope that leaving it out isn't too consfusing.
 		-- (e.g. if the programmer hides Bool and  redefines it.  If so, use -dppr-debug.)
 
-    	   LocalDef _ _				     -> pp_qual mod  dot    (user_sty || iface_sty)
+    	   LocalDef _ _				     -> pp_qual mod (user_sty || iface_sty)
 
     	   NonLocalDef (UserImport imp_mod _ _) omit 
-		| user_sty			     -> pp_qual imp_mod pp_sep omit
-		| otherwise			     -> pp_qual mod     pp_sep False
-    	   NonLocalDef ImplicitImport		omit -> pp_qual mod	pp_sep (user_sty && omit)
+		| user_sty			     -> pp_qual imp_mod omit
+		| otherwise			     -> pp_qual mod     False
+    	   NonLocalDef ImplicitImport		omit -> pp_qual mod	(user_sty && omit)
       where
         user_sty  = userStyle sty
         iface_sty = ifaceStyle sty
     
-    pp_qual mod sep omit_qual
+    pp_qual mod omit_qual
         | omit_qual  = empty
-        | otherwise  = pprModule mod <> sep
+        | otherwise  = pprModule mod <> dot
     
-    pp_sep | bootFlavour (moduleIfaceFlavour mod) = text "!"	-- M!t indicates a name imported 
-								-- from a .hi-boot interface
-	   | otherwise				  = dot		-- Vanilla case
-   
     pp_global_debug sty uniq prov
       | debugStyle sty = hcat [text "{-", pprUnique uniq, prov_p prov, text "-}"]
       | otherwise      = empty
@@ -576,10 +575,8 @@ class NamedThing a where
 \begin{code}
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
-isExported	    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
 
-isExported	    = isExportedName 	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
 getOccString x	    = occNameString (getOccName x)

@@ -8,7 +8,8 @@ module Const (
 	Con(..),
 	conType, conPrimRep,
 	conOkForApp, conOkForAlt, isWHNFCon, isDataCon,
-	conIsTrivial, conIsCheap,
+	conIsTrivial, conIsCheap, conIsDupable, conStrictness, 
+	conOkForSpeculation,
 
 	DataCon, PrimOp,	-- For completeness
 
@@ -26,12 +27,14 @@ module Const (
 import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
-import PrimOp		( PrimOp, primOpType, primOpIsCheap )
+import PrimOp		( PrimOp, primOpType, primOpIsDupable,
+			  primOpIsCheap, primOpStrictness, primOpOkForSpeculation )
 import PrimRep		( PrimRep(..) )
-import DataCon		( DataCon, dataConType, dataConTyCon, isNullaryDataCon )
+import DataCon		( DataCon, dataConType, dataConTyCon, isNullaryDataCon, dataConRepStrictness )
 import TyCon		( isNewTyCon )
 import Type		( Type, typePrimRep )
 import PprType		( pprParendType )
+import Demand		( Demand )
 import CStrings		( stringToC, charToC, charToEasyHaskell )
 
 import Outputable
@@ -74,6 +77,11 @@ conType (DataCon dc)  = dataConType dc
 conType (Literal lit) = literalType lit
 conType (PrimOp op)   = primOpType op
 
+conStrictness :: Con -> ([Demand], Bool)
+conStrictness (DataCon dc)  = (dataConRepStrictness dc, False)
+conStrictness (PrimOp op)   = primOpStrictness op
+conStrictness (Literal lit) = ([], False)
+
 conPrimRep :: Con -> PrimRep	-- Only data valued constants
 conPrimRep (DataCon dc)  = ASSERT( isNullaryDataCon dc) PtrRep
 conPrimRep (Literal lit) = literalPrimRep lit
@@ -113,6 +121,18 @@ conIsTrivial con	   = True
 conIsCheap (Literal lit) = not (isNoRepLit lit)
 conIsCheap (DataCon con) = True
 conIsCheap (PrimOp op)   = primOpIsCheap op
+
+-- conIsDupable is true for constants whose applications we are willing
+-- to duplicate in different case branches; i.e no issue about loss of
+-- work, just space
+conIsDupable (Literal lit) = not (isNoRepLit lit)
+conIsDupable (DataCon con) = True
+conIsDupable (PrimOp op)   = primOpIsDupable op
+
+-- Similarly conOkForSpeculation
+conOkForSpeculation (Literal lit) = True
+conOkForSpeculation (DataCon con) = True
+conOkForSpeculation (PrimOp op)   = primOpOkForSpeculation op
 \end{code}
 
 

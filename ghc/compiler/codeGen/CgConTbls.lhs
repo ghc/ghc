@@ -26,7 +26,6 @@ import Name		( getOccString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep, Type )
-import BasicTypes	( TopLevelFlag(..) )
 import Outputable	
 \end{code}
 
@@ -72,15 +71,10 @@ closures predeclared.
 \begin{code}
 genStaticConBits :: CompilationInfo 	-- global info about the compilation
 		 -> [TyCon]		-- tycons to generate
-	  	 -> FiniteMap TyCon [(Bool, [Maybe Type])]
-					-- tycon specialisation info
 		 -> AbstractC		-- output
 
-genStaticConBits comp_info gen_tycons tycon_specs
-  = ASSERT( null (fmToList tycon_specs) )
-	-- We don't do specialised type constructors any more
-
-    -- for each type constructor:
+genStaticConBits comp_info gen_tycons
+  = -- for each type constructor:
     --	 grab all its data constructors;
     --	    for each one, generate an info table
     -- for each specialised type constructor

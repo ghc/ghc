@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.28 1999/05/13 17:30:55 simonm Exp $
+% $Id: CgCase.lhs,v 1.29 1999/05/18 15:03:46 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -11,8 +11,8 @@
 
 \begin{code}
 module CgCase (	cgCase, saveVolatileVarsAndRegs, 
-		restoreCurrentCostCentre, freeCostCentreSlot,
-		splitTyConAppThroughNewTypes ) where
+		restoreCurrentCostCentre, freeCostCentreSlot
+	) where
 
 #include "HsVersions.h"
 
@@ -25,7 +25,6 @@ import AbsCSyn
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
 			  getAmodeRep, nonemptyAbsC
 			)
-import CoreSyn		( isDeadBinder )
 import CgUpdate		( reserveSeqFrame )
 import CgBindery	( getVolatileRegs, getArgAmodes, getArgAmode,
 			  bindNewToReg, bindNewToTemp,
@@ -51,6 +50,7 @@ import CLabel		( CLabel, mkVecTblLabel, mkReturnPtLabel,
 import ClosureInfo	( mkLFArgument )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( CostCentre )
+import CoreSyn		( isDeadBinder )
 import Id		( Id, idPrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag,
 			  isUnboxedTupleCon, dataConType )
@@ -63,8 +63,7 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
 			  tyConDataCons, tyConFamilySize )
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
-			  splitTyConApp_maybe,
-			   splitFunTys, applyTys )
+			  splitTyConApp_maybe, splitRepTyConApp_maybe )
 import Unique           ( Unique, Uniquable(..), mkBuiltinUnique )
 import Maybes		( maybeToBool )
 import Util
@@ -238,10 +237,8 @@ cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
        two bindings pointing at the same stack locn doesn't work (it
        confuses nukeDeadBindings).  Hence, use a new temp.
     -}
-    (if (isDeadBinder bndr)
-	then nopC
-	else bindNewToTemp bndr  `thenFC`  \deflt_amode ->
-	     absC (CAssign deflt_amode amode)) `thenC`
+    bindNewToTemp bndr  		`thenFC`  \deflt_amode ->
+    absC (CAssign deflt_amode amode)	`thenC`
 
     cgPrimAlts NoGC amode alts deflt []
 \end{code}
@@ -448,9 +445,7 @@ cgEvalAlts cc_slot bndr srt alts
       (StgAlgAlts ty alts deflt) ->
 
 	   -- bind the default binder (it covers all the alternatives)
-    	(if (isDeadBinder bndr)
-		then nopC
-		else bindNewToReg bndr node mkLFArgument) `thenC`
+    	bindNewToReg bndr node mkLFArgument	 `thenC`
 
 	-- Generate sequel info for use downstream
 	-- At the moment, we only do it if the type is vector-returnable.
@@ -757,9 +752,7 @@ cgPrimEvalAlts bndr ty alts deflt
 
 cgPrimAltsWithDefault bndr gc_flag scrutinee alts deflt regs
   = 	-- first bind the default if necessary
-    (if isDeadBinder bndr 
-	then nopC
-	else bindNewPrimToAmode bndr scrutinee) 	`thenC`
+    bindNewPrimToAmode bndr scrutinee	 	`thenC`
     cgPrimAlts gc_flag scrutinee alts deflt regs
 
 cgPrimAlts gc_flag scrutinee alts deflt regs
@@ -988,41 +981,14 @@ possibleHeapCheck NoGC	_ _ tags lbl code
   = code
 \end{code}
 
-splitTyConAppThroughNewTypes is like splitTyConApp_maybe except
-that it looks through newtypes in addition to synonyms.  It's
-useful in the back end where we're not interested in newtypes
-anymore.
-
-Sometimes, we've thrown away the constructors during pruning in the
-renamer.  In these cases, we emit a warning and fall back to using a
-SEQ_FRAME to evaluate the case scrutinee.
-
 \begin{code}
 getScrutineeTyCon :: Type -> Maybe TyCon
 getScrutineeTyCon ty =
-   case (splitTyConAppThroughNewTypes ty) of
+   case splitRepTyConApp_maybe ty of
 	Nothing -> Nothing
 	Just (tc,_) -> 
 		if isFunTyCon tc  then Nothing else     -- not interested in funs
 		if isPrimTyCon tc then Just tc else	-- return primitive tycons
 			-- otherwise (algebraic tycons) check the no. of constructors
-		case (tyConFamilySize tc) of
-			0 -> pprTrace "Warning" (hcat [
-				text "constructors for ",
-				ppr tc,
-				text " not available.\n\tUse -fno-prune-tydecls to fix."
-				]) Nothing
-			_ -> Just tc
-
-splitTyConAppThroughNewTypes  :: Type -> Maybe (TyCon, [Type])
-splitTyConAppThroughNewTypes ty
-  = case splitTyConApp_maybe ty of
-      Just (tc, tys)
-	| isNewTyCon tc ->  splitTyConAppThroughNewTypes ty
-	| otherwise     ->  Just (tc, tys)
-	where
-	  ([ty], _) = splitFunTys (applyTys (dataConType (head (tyConDataCons tc))) tys)
-
-      other  -> Nothing
-
+		Just tc
 \end{code}

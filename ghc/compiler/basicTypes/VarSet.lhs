@@ -8,10 +8,10 @@ module VarSet (
 	VarSet, IdSet, TyVarSet, IdOrTyVarSet,
 	emptyVarSet, unitVarSet, mkVarSet,
 	extendVarSet,
-	elemVarSet, varSetElems,
+	elemVarSet, varSetElems, subVarSet,
 	unionVarSet, unionVarSets,
 	intersectVarSet, intersectsVarSet,
-	isEmptyVarSet, delVarSet,
+	isEmptyVarSet, delVarSet, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet,
 	lookupVarSet, mapVarSet,
 
@@ -20,9 +20,11 @@ module VarSet (
 
 #include "HsVersions.h"
 
+import CmdLineOpts	( opt_PprStyle_Debug )
 import Var		( Var, Id, TyVar, IdOrTyVar, setVarUnique )
-import Unique		( Uniquable(..), incrUnique )
+import Unique		( Unique, Uniquable(..), incrUnique )
 import UniqSet
+import UniqFM		( delFromUFM_Directly )
 import Outputable
 \end{code}
 
@@ -57,6 +59,9 @@ lookupVarSet	:: VarSet -> Var -> Maybe Var
 			-- (==) to the argument, but not the same as
 mapVarSet 	:: (Var -> Var) -> VarSet -> VarSet
 filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
+subVarSet	:: VarSet -> VarSet -> Bool
+
+delVarSetByKey	:: VarSet -> Unique -> VarSet
 
 emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
@@ -75,15 +80,24 @@ foldVarSet	= foldUniqSet
 lookupVarSet	= lookupUniqSet
 mapVarSet	= mapUniqSet
 filterVarSet	= filterUniqSet
+a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
+delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
 \end{code}
 
 \begin{code}
 uniqAway :: VarSet -> Var -> Var
 -- Give the Var a new unique, different to any in the VarSet
 uniqAway set var
+  | not (var `elemVarSet` set) = var	-- Nothing to do
+
+  | otherwise
   = try 1 (incrUnique (getUnique var))
   where
     try n uniq | uniq `elemUniqSet_Directly` set = try ((n+1)::Int) (incrUnique uniq)
-	       | otherwise = {- pprTrace "uniqAway:" (ppr n <+> text "tries") -}
-			     setVarUnique var uniq
+#ifdef DEBUG
+	       | opt_PprStyle_Debug && n > 3
+	       = pprTrace "uniqAway:" (ppr n <+> text "tries" <+> ppr var) 
+		 setVarUnique var uniq
+#endif			    
+	       | otherwise = setVarUnique var uniq
 \end{code}

@@ -16,55 +16,71 @@ module MkId (
 	mkSpecPragmaId,	mkWorkerId,
 
 	mkDictFunId, mkDefaultMethodId,
-	mkMethodSelId, mkSuperDictSelId, 
+	mkDictSelId,
 
 	mkDataConId,
 	mkRecordSelId,
 	mkNewTySelId,
-	mkPrimitiveId
+	mkPrimitiveId,
+
+	-- And some particular Ids; see below for why they are wired in
+	wiredInIds,
+	unsafeCoerceId, realWorldPrimId,
+	eRROR_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
+	rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID,
+	nO_METHOD_BINDING_ERROR_ID, aBSENT_ERROR_ID, pAR_ERROR_ID
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 
-import TysWiredIn	( boolTy )
+import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
+			  intPrimTy, realWorldStatePrimTy
+			)
+import TysWiredIn	( boolTy, charTy, mkListTy )
+import PrelMods		( pREL_ERR, pREL_GHC )
 import Type		( Type, ThetaType,
 			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
-			  mkForAllTys, isUnLiftedType, substTopTheta,
-			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp, unUsgTy,
+			  isUnLiftedType, mkForAllTys, mkTyVarTy, 
+			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
+			  splitFunTys, splitForAllTys, unUsgTy,
+			  mkUsgTy, UsageAnn(..)
 			)
+import Module		( Module )
+import CoreUnfold 	( mkUnfolding )
+import Subst		( mkTopTyVarSubst, substTheta )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
 import Class		( Class, classBigSig, classTyCon )
-import Var		( Id, TyVar, VarDetails(..), mkId )
+import Var		( Id, TyVar )
 import VarEnv		( zipVarEnv )
 import Const		( Con(..) )
-import Name		( mkDerivedName, mkWiredInIdName, 
+import Name		( mkDerivedName, mkWiredInIdName, mkLocalName, 
 			  mkWorkerOcc, mkSuperDictSelOcc,
 			  Name, NamedThing(..),
 			)
-import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpUniq )
-import DataCon		( DataCon, dataConStrictMarks, dataConFieldLabels, 
+import OccName		( mkSrcVarOcc )
+import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
+import Demand		( wwStrict )
+import DataCon		( DataCon, StrictnessMark(..), dataConStrictMarks, dataConFieldLabels, 
 			  dataConArgTys, dataConSig, dataConRawArgTys
 			)
-import Id		( idType,
-			  mkUserLocal, mkVanillaId, mkTemplateLocals,
+import Id		( idType, mkId,
+			  mkVanillaId, mkTemplateLocals,
 			  mkTemplateLocal, setInlinePragma
 			)
-import IdInfo		( noIdInfo,
-			  exactArity, setUnfoldingInfo, 
+import IdInfo		( vanillaIdInfo, mkIdInfo,
+			  exactArity, setUnfoldingInfo, setCafInfo,
 			  setArityInfo, setInlinePragInfo,
-			  InlinePragInfo(..), IdInfo
+			  mkStrictnessInfo, setStrictnessInfo,
+			  IdFlavour(..), InlinePragInfo(..), CafInfo(..), IdInfo
 			)
 import FieldLabel	( FieldLabel, FieldLabelTag, mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags
 			)
 import CoreSyn
-import PrelVals		( rEC_SEL_ERROR_ID )
-import PrelMods		( pREL_GHC )
 import Maybes
-import BasicTypes	( Arity, StrictnessMark(..) )
-import Unique		( Unique )
+import BasicTypes	( Arity )
+import Unique
 import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )
@@ -74,13 +90,46 @@ import List		( nub )
 
 %************************************************************************
 %*									*
+\subsection{Wired in Ids}
+%*									*
+%************************************************************************
+
+\begin{code}
+wiredInIds
+  = [ 	-- These error-y things are wired in because we don't yet have
+	-- a way to express in an interface file that the result type variable
+	-- is 'open'; that is can be unified with an unboxed type
+	-- 
+	-- [The interface file format now carry such information, but there's
+	--  no way yet of expressing at the definition site for these error-reporting
+	--  functions that they have an 'open' result type. -- sof 1/99]
+
+      aBSENT_ERROR_ID
+    , eRROR_ID
+    , iRREFUT_PAT_ERROR_ID
+    , nON_EXHAUSTIVE_GUARDS_ERROR_ID
+    , nO_METHOD_BINDING_ERROR_ID
+    , pAR_ERROR_ID
+    , pAT_ERROR_ID
+    , rEC_CON_ERROR_ID
+    , rEC_UPD_ERROR_ID
+
+	-- These two can't be defined in Haskell
+    , realWorldPrimId
+    , unsafeCoerceId
+    , getTagId
+    ]
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Easy ones}
 %*									*
 %************************************************************************
 
 \begin{code}
 mkSpecPragmaId occ uniq ty loc
-  = mkUserLocal occ uniq ty loc `setInlinePragma` IAmASpecPragmaId
+  = mkId (mkLocalName uniq occ loc) ty (mkIdInfo SpecPragmaId)
 	-- Maybe a SysLocal?  But then we'd lose the location
 
 mkDefaultMethodId dm_name rec_c ty
@@ -101,7 +150,6 @@ mkDataConId :: DataCon -> Id
 mkDataConId data_con
   = mkId (getName data_con)
 	 id_ty
-	 (ConstantId (DataCon data_con))
 	 (dataConInfo data_con)
   where
     (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon) = dataConSig data_con
@@ -129,21 +177,29 @@ Notice that
 * We have to check that we can construct Data dictionaries for
   the types a and Int.  Once we've done that we can throw d1 away too.
 
-* We use (case p of ...) to evaluate p, rather than "seq" because
+* We use (case p of q -> ...) to evaluate p, rather than "seq" because
   all that matters is that the arguments are evaluated.  "seq" is 
   very careful to preserve evaluation order, which we don't need
   to be here.
+
+  You might think that we could simply give constructors some strictness
+  info, like PrimOps, and let CoreToStg do the let-to-case transformation.
+  But we don't do that because in the case of primops and functions strictness
+  is a *property* not a *requirement*.  In the case of constructors we need to
+  do something active to evaluate the argument.
+
+  Making an explicit case expression allows the simplifier to eliminate
+  it in the (common) case where the constructor arg is already evaluated.
 
 \begin{code}
 dataConInfo :: DataCon -> IdInfo
 
 dataConInfo data_con
-  = setInlinePragInfo IMustBeINLINEd $ -- Always inline constructors
-    setArityInfo (exactArity (n_dicts + n_ex_dicts + n_id_args)) $
-    setUnfoldingInfo unfolding $
-    noIdInfo
+  = mkIdInfo (ConstantId (DataCon data_con))
+    `setArityInfo` exactArity (n_dicts + n_ex_dicts + n_id_args)
+    `setUnfoldingInfo` unfolding
   where
-        unfolding = mkUnfolding con_rhs
+        unfolding = mkUnfolding (Note InlineMe con_rhs)
 
 	(tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) 
 	   = dataConSig data_con
@@ -226,12 +282,12 @@ mkRecordSelId field_label selector_ty
   = ASSERT( null theta && isDataTyCon tycon )
     sel_id
   where
-    sel_id = mkId (fieldLabelName field_label) selector_ty
-		  (RecordSelId field_label) info
+    sel_id = mkId (fieldLabelName field_label) selector_ty info
 
-    info = exactArity 1	`setArityInfo` (
-	   unfolding	`setUnfoldingInfo`
-	   noIdInfo)
+    info = mkIdInfo (RecordSelId field_label)
+	   `setArityInfo`	exactArity 1
+	   `setUnfoldingInfo`	unfolding	
+	   
 	-- ToDo: consider adding further IdInfo
 
     unfolding = mkUnfolding sel_rhs
@@ -278,12 +334,13 @@ Possibly overkill to do it this way:
 \begin{code}
 mkNewTySelId field_label selector_ty = sel_id
   where
-    sel_id = mkId (fieldLabelName field_label) selector_ty
-		  (RecordSelId field_label) info
+    sel_id = mkId (fieldLabelName field_label) selector_ty info
+		  
 
-    info = exactArity 1	`setArityInfo` (
-	   unfolding	`setUnfoldingInfo`
-	   noIdInfo)
+    info = mkIdInfo (RecordSelId field_label)
+	   `setArityInfo`	exactArity 1	
+	   `setUnfoldingInfo`	unfolding
+	   
 	-- ToDo: consider adding further IdInfo
 
     unfolding = mkUnfolding sel_rhs
@@ -297,7 +354,6 @@ mkNewTySelId field_label selector_ty = sel_id
     [data_id] = mkTemplateLocals [data_ty]
     sel_rhs   = mkLams tyvars $ Lam data_id $
 		Note (Coerce rhs_ty data_ty) (Var data_id)
-
 \end{code}
 
 
@@ -307,25 +363,6 @@ mkNewTySelId field_label selector_ty = sel_id
 %*									*
 %************************************************************************
 
-\begin{code}
-mkSuperDictSelId :: Unique -> Class -> FieldLabelTag -> Type -> Id
-	-- The FieldLabelTag says which superclass is selected
-	-- So, for 
-	--	class (C a, C b) => Foo a b where ...
-	-- we get superclass selectors
-	--	Foo_sc1, Foo_sc2
-
-mkSuperDictSelId uniq clas index ty
-  = mkDictSelId name clas ty
-  where
-    name   = mkDerivedName (mkSuperDictSelOcc index) (getName clas) uniq
-
-	-- For method selectors the clean thing to do is
-	-- to give the method selector the same name as the class op itself.
-mkMethodSelId name clas ty
-  = mkDictSelId name clas ty
-\end{code}
-
 Selecting a field for a dictionary.  If there is just one field, then
 there's nothing to do.
 
@@ -333,15 +370,15 @@ there's nothing to do.
 mkDictSelId name clas ty
   = sel_id
   where
-    sel_id    = mkId name ty (RecordSelId field_lbl) info
+    sel_id    = mkId name ty info
     field_lbl = mkFieldLabel name ty tag
     tag       = assoc "MkId.mkDictSelId" ((sc_sel_ids ++ op_sel_ids) `zip` allFieldLabelTags) sel_id
 
-    info      = setInlinePragInfo IMustBeINLINEd $
-		setUnfoldingInfo  unfolding noIdInfo
-	-- The always-inline thing means we don't need any other IdInfo
-	-- We need "Must" inline because we don't create any bindigs for
-	-- the selectors.
+    info      = mkIdInfo (RecordSelId field_lbl)
+		`setUnfoldingInfo`  unfolding
+		
+	-- We no longer use 'must-inline' on record selectors.  They'll
+	-- inline like crazy if they scrutinise a constructor
 
     unfolding = mkUnfolding rhs
 
@@ -370,39 +407,29 @@ mkDictSelId name clas ty
 %*									*
 %************************************************************************
 
-
 \begin{code}
 mkPrimitiveId :: PrimOp -> Id
 mkPrimitiveId prim_op 
   = id
   where
-    occ_name = primOpOcc  prim_op
-    key	     = primOpUniq prim_op
     (tyvars,arg_tys,res_ty) = primOpSig prim_op
-    ty       = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
-    name    = mkWiredInIdName key pREL_GHC occ_name id
-    id      = mkId name ty (ConstantId (PrimOp prim_op)) info
+    ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
+    name = mkPrimOpIdName prim_op id
+    id   = mkId name ty info
 		
-    info = setUnfoldingInfo unfolding $
-	   setInlinePragInfo IMustBeINLINEd $
+    info = mkIdInfo (ConstantId (PrimOp prim_op))
+	   `setUnfoldingInfo`	unfolding
+	   `setInlinePragInfo`	IMustBeINLINEd
 		-- The pragma @IMustBeINLINEd@ says that this Id absolutely 
 		-- must be inlined.  It's only used for primitives, 
 		-- because we don't want to make a closure for each of them.
-	   noIdInfo
+	   
 
     unfolding = mkUnfolding rhs
 
     args = mkTemplateLocals arg_tys
     rhs =  mkLams tyvars $ mkLams args $
 	   mkPrimApp prim_op (map Type (mkTyVarTys tyvars) ++ map Var args)
-\end{code}
-
-\end{code}
-
-\begin{code}
-dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
-monadic_fun_ty ty = ty `mkFunTy` ty
-compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 \end{code}
 
 
@@ -424,7 +451,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = mkVanillaId dfun_name dfun_ty
   where
     (class_tyvars, sc_theta, _, _, _) = classBigSig clas
-    sc_theta' = substTopTheta (zipVarEnv class_tyvars inst_tys) sc_theta
+    sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
 
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't
@@ -443,3 +470,164 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Un-definable}
+%*									*
+%************************************************************************
+
+These two can't be defined in Haskell.
+
+unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
+just gets expanded into a type coercion wherever it occurs.  Hence we
+add it as a built-in Id with an unfolding here.
+
+The type variables we use here are "open" type variables: this means
+they can unify with both unlifted and lifted types.  Hence we provide
+another gun with which to shoot yourself in the foot.
+
+\begin{code}
+unsafeCoerceId
+  = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
+  where
+    info = vanillaIdInfo
+	   `setUnfoldingInfo`	mkUnfolding rhs
+	   `setInlinePragInfo`	IMustBeINLINEd 
+	   
+
+    ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
+		      (mkFunTy openAlphaTy openBetaTy)
+    [x] = mkTemplateLocals [openAlphaTy]
+    rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
+	  Note (Coerce openBetaTy openAlphaTy) (Var x)
+\end{code}
+
+
+@getTag#@ is another function which can't be defined in Haskell.  It needs to
+evaluate its argument and call the dataToTag# primitive.
+
+\begin{code}
+getTagId
+  = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
+  where
+    info = vanillaIdInfo
+	   `setUnfoldingInfo`	mkUnfolding rhs
+	   `setInlinePragInfo`	IMustBeINLINEd 
+	-- We don't provide a defn for this; you must inline it
+
+    ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
+    [x,y] = mkTemplateLocals [alphaTy,alphaTy]
+    rhs = mkLams [alphaTyVar,x] $
+	  Case (Var x) y [ (DEFAULT, [], 
+		   Con (PrimOp DataToTagOp) [Type alphaTy, Var y]) ]
+\end{code}
+
+@realWorld#@ used to be a magic literal, \tr{void#}.  If things get
+nasty as-is, change it back to a literal (@Literal@).
+
+\begin{code}
+realWorldPrimId	-- :: State# RealWorld
+  = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
+		 realWorldStatePrimTy
+		 noCafIdInfo
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[PrelVals-error-related]{@error@ and friends; @trace@}
+%*									*
+%************************************************************************
+
+GHC randomly injects these into the code.
+
+@patError@ is just a version of @error@ for pattern-matching
+failures.  It knows various ``codes'' which expand to longer
+strings---this saves space!
+
+@absentErr@ is a thing we put in for ``absent'' arguments.  They jolly
+well shouldn't be yanked on, but if one is, then you will get a
+friendly message from @absentErr@ (rather than a totally random
+crash).
+
+@parError@ is a special version of @error@ which the compiler does
+not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
+templates, but we don't ever expect to generate code for it.
+
+\begin{code}
+eRROR_ID
+  = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
+rEC_SEL_ERROR_ID
+  = generic_ERROR_ID recSelErrIdKey SLIT("patError")
+pAT_ERROR_ID
+  = generic_ERROR_ID patErrorIdKey SLIT("patError")
+rEC_CON_ERROR_ID
+  = generic_ERROR_ID recConErrorIdKey SLIT("recConError")
+rEC_UPD_ERROR_ID
+  = generic_ERROR_ID recUpdErrorIdKey SLIT("recUpdError")
+iRREFUT_PAT_ERROR_ID
+  = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError")
+nON_EXHAUSTIVE_GUARDS_ERROR_ID
+  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError")
+nO_METHOD_BINDING_ERROR_ID
+  = generic_ERROR_ID noMethodBindingErrorIdKey SLIT("noMethodBindingError")
+
+aBSENT_ERROR_ID
+  = pc_bottoming_Id absentErrorIdKey pREL_ERR SLIT("absentErr")
+	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
+
+pAR_ERROR_ID
+  = pcMiscPrelId parErrorIdKey pREL_ERR SLIT("parError")
+    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafIdInfo
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Utilities}
+%*									*
+%************************************************************************
+
+\begin{code}
+pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
+pcMiscPrelId key mod str ty info
+  = let
+	name = mkWiredInIdName key mod (mkSrcVarOcc str) imp
+	imp  = mkId name ty info -- the usual case...
+    in
+    imp
+    -- We lie and say the thing is imported; otherwise, we get into
+    -- a mess with dependency analysis; e.g., core2stg may heave in
+    -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
+    -- being compiled, then it's just a matter of luck if the definition
+    -- will be in "the right place" to be in scope.
+
+pc_bottoming_Id key mod name ty
+ = pcMiscPrelId key mod name ty bottoming_info
+ where
+    bottoming_info = noCafIdInfo 
+		     `setStrictnessInfo` mkStrictnessInfo ([wwStrict], True)
+		     
+	-- these "bottom" out, no matter what their arguments
+
+generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy
+
+-- Very useful...
+noCafIdInfo = vanillaIdInfo `setCafInfo` NoCafRefs
+
+(openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
+openAlphaTy  = mkTyVarTy openAlphaTyVar
+openBetaTy   = mkTyVarTy openBetaTyVar
+
+errorTy  :: Type
+errorTy  = mkUsgTy UsMany $
+           mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkUsgTy UsOnce (mkListTy charTy)] 
+                                                   (mkUsgTy UsMany openAlphaTy))
+    -- Notice the openAlphaTyVar.  It says that "error" can be applied
+    -- to unboxed as well as boxed types.  This is OK because it never
+    -- returns, so the return type is irrelevant.
+\end{code}
+

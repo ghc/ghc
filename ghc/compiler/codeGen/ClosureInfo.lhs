@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.37 1999/05/11 16:44:02 keithw Exp $
+% $Id: ClosureInfo.lhs,v 1.38 1999/05/18 15:03:50 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -88,7 +88,7 @@ import PprType		( getTyDescription )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import Type		( isUnLiftedType, Type )
-import BasicTypes	( TopLevelFlag(..) )
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel )
 import Util		( mapAccumL )
 import Outputable
 \end{code}
@@ -543,7 +543,7 @@ nodeMustPointToIt lf_info
   = case lf_info of
 	LFReEntrant ty top arity no_fvs _ _ -> returnFC (
 	    not no_fvs ||   -- Certainly if it has fvs we need to point to it
-	    case top of { TopLevel -> False; _ -> True }
+	    isNotTopLevel top
 		    -- If it is not top level we will point to it
 		    --   We can have a \r closure with no_fvs which
 		    --   is not top level as special case cgRhsClosure
@@ -835,7 +835,7 @@ staticClosureRequired
 	-> Bool
 staticClosureRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _)
 		      (LFReEntrant _ top_level _ _ _ _)	-- It's a function
-  = ASSERT( case top_level of { TopLevel -> True; other -> False } )
+  = ASSERT( isTopLevel top_level )
 	-- Assumption: it's a top-level, no-free-var binding
     arg_occ 		-- There's an argument occurrence
     || unsat_occ	-- There's an unsaturated call
@@ -865,7 +865,7 @@ funInfoTableRequired
 	-> Bool
 funInfoTableRequired  binder (StgBinderInfo arg_occ unsat_occ _ _ _)
 		     (LFReEntrant _ top_level _ _ _ _)
-  = (case top_level of { NotTopLevel -> True; TopLevel -> False })
+  =    isNotTopLevel top_level
     || arg_occ 		-- There's an argument occurrence
     || unsat_occ	-- There's an unsaturated call
     || isExternallyVisibleName binder

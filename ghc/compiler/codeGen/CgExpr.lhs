@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.24 1999/05/07 13:44:00 simonm Exp $
+% $Id: CgExpr.lhs,v 1.25 1999/05/18 15:03:49 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -24,8 +24,7 @@ import CLabel		( mkClosureTblLabel )
 import SMRep		( fixedHdrSize )
 import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, nukeDeadBindings)
 import CgCase		( cgCase, saveVolatileVarsAndRegs, 
-			  restoreCurrentCostCentre, freeCostCentreSlot,
-			  splitTyConAppThroughNewTypes )
+			  restoreCurrentCostCentre, freeCostCentreSlot )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
@@ -48,7 +47,7 @@ import PrimOp		( primOpOutOfLine,
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, splitTyConApp_maybe )
+import Type		( Type, typePrimRep, splitTyConApp_maybe, splitRepTyConApp_maybe )
 import Maybes		( assocMaybe, maybeToBool )
 import Unique		( mkBuiltinUnique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
@@ -463,7 +462,7 @@ primRetUnboxedTuple op args res_ty
       allocate some temporaries for the return values.
     -}
     let
-      (tc,ty_args)      = case splitTyConAppThroughNewTypes res_ty of
+      (tc,ty_args)      = case splitRepTyConApp_maybe res_ty of
 			    Nothing -> pprPanic "primRetUnboxedTuple" (ppr res_ty)
 			    Just pr -> pr
       prim_reps          = map typePrimRep ty_args

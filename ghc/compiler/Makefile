@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.57 1999/05/14 11:23:47 simonm Exp $
+# $Id: Makefile,v 1.58 1999/05/18 15:03:34 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -182,6 +182,7 @@ parser/U_literal_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_match_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_maybe_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+parser/U_rulevar_HC_OPTS	= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 

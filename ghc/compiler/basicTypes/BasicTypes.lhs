@@ -16,14 +16,14 @@ types that
 module BasicTypes(
 	Version, Arity, 
 	Unused, unused,
-	Fixity(..), FixityDirection(..), StrictnessMark(..),
-	NewOrData(..), TopLevelFlag(..), RecFlag(..)
+	Fixity(..), FixityDirection(..), defaultFixity,
+	NewOrData(..), 
+	RecFlag(..), isRec, isNonRec,
+	TopLevelFlag(..), isTopLevel, isNotTopLevel
    ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon ( DataCon )
-import {-# SOURCE #-} Type    ( Type )
 import Outputable
 \end{code}
 
@@ -86,6 +86,9 @@ instance Outputable FixityDirection where
 
 instance Eq Fixity where		-- Used to determine if two fixities conflict
   (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
+
+
+defaultFixity = Fixity 9 InfixL
 \end{code}
 
 
@@ -113,6 +116,14 @@ data NewOrData
 data TopLevelFlag
   = TopLevel
   | NotTopLevel
+
+isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
+
+isNotTopLevel NotTopLevel = True
+isNotTopLevel TopLevel    = False
+
+isTopLevel TopLevel	= True
+isTopLevel NotTopLevel  = False
 \end{code}
 
 %************************************************************************
@@ -124,16 +135,12 @@ data TopLevelFlag
 \begin{code} 
 data RecFlag = Recursive 
 	     | NonRecursive
-\end{code}
 
-%************************************************************************
-%*									*
-\subsection{Strictness indication}
-%*									*
-%************************************************************************
+isRec :: RecFlag -> Bool
+isRec Recursive    = True
+isRec NonRecursive = False
 
-\begin{code}
-data StrictnessMark = MarkedStrict
-		    | MarkedUnboxed DataCon [Type]
-		    | NotMarkedStrict
+isNonRec :: RecFlag -> Bool
+isNonRec Recursive    = False
+isNonRec NonRecursive = True
 \end{code}

@@ -152,6 +152,7 @@ module Unique (
 	recSelErrIdKey,
 	recUpdErrorIdKey,
 	returnMClassOpKey,
+	runSTRepIdKey,
 	showClassKey,
 	ioTyConKey,
 	ioDataConKey,
@@ -241,7 +242,9 @@ mkUniqueGrimily x = MkUnique x
 {-# INLINE getKey #-}
 getKey (MkUnique x) = x
 
-incrUnique (MkUnique i) = MkUnique (i +# 1#)
+incrUnique (MkUnique i) = MkUnique (i +# 100#)
+-- Bump the unique by a lot, to get it out of the neighbourhood
+-- of its friends
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -640,4 +643,5 @@ mapIdKey		      = mkPreludeMiscIdUnique 120
 
 \begin{code}
 assertIdKey		      = mkPreludeMiscIdUnique 121
+runSTRepIdKey		      = mkPreludeMiscIdUnique 122
 \end{code}

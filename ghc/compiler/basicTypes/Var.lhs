@@ -5,10 +5,9 @@
 
 \begin{code}
 module Var (
-	Var, IdOrTyVar,		-- Abstract
-	VarDetails(..), 	-- Concrete
-	varName, varUnique, varDetails, varInfo, varType,
-	setVarName, setVarUnique, setVarType,  setVarOcc,
+	Var, IdOrTyVar, VarDetails,		-- Abstract
+	varName, varUnique, varInfo, varType,
+	setVarName, setVarUnique, setVarType, setVarOcc,
 
 
 	-- TyVars
@@ -26,18 +25,16 @@ module Var (
 
 	-- Ids
 	Id, DictId,
-	idDetails, idName, idType, idUnique, idInfo, modifyIdInfo,
+	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
 	setIdName, setIdUnique, setIdInfo,
-	mkId, isId, externallyVisibleId
+	mkIdVar, isId, externallyVisibleId
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	Type( Type, Kind )
 import {-# SOURCE #-}	IdInfo( IdInfo )
-import {-# SOURCE #-}	Const( Con )
 
-import FieldLabel	( FieldLabel )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
@@ -78,9 +75,7 @@ data Var
     }
 
 data VarDetails
-  = VanillaId 				-- Most Ids are like this
-  | ConstantId Con			-- The Id for a constant (data constructor or primop)
-  | RecordSelId FieldLabel		-- The Id for a record selector
+  = AnId
   | TyVar
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
 	     Bool			-- True <=> this is a type signature variable, which
@@ -164,7 +159,7 @@ mkTyVar name kind = Var { varName    = name
 			, varType    = kind
 			, varDetails = TyVar
 #ifdef DEBUG
-			, varInfo = pprPanic "mkTyVar" (ppr name)
+			, varInfo = pprPanic "looking at IdInfo of a tyvar" (ppr name)
 #endif
 			}
 
@@ -264,7 +259,6 @@ idName    = varName
 idType    = varType
 idUnique  = varUnique
 idInfo	  = varInfo
-idDetails = varDetails
 
 setIdUnique :: Id -> Unique -> Id
 setIdUnique = setVarUnique
@@ -275,24 +269,27 @@ setIdName = setVarName
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo var info = var {varInfo = info}
 
-modifyIdInfo :: Id -> (IdInfo -> IdInfo) -> Id
-modifyIdInfo var@(Var {varInfo = info}) fn = var {varInfo = fn info}
+modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
+modifyIdInfo fn var@(Var {varInfo = info}) = var {varInfo = fn info}
+
+-- maybeModifyIdInfo tries to avoid unnecesary thrashing
+maybeModifyIdInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id
+maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
+						Nothing       -> var
+						Just new_info -> var {varInfo = new_info}
 \end{code}
 
 \begin{code}
-mkId :: Name -> Type -> VarDetails -> IdInfo -> Id
-mkId name ty details info
+mkIdVar :: Name -> Type -> IdInfo -> Id
+mkIdVar name ty info
   = Var {varName = name, realUnique = getKey (nameUnique name), varType = ty, 
-	 varDetails = details, varInfo = info}
+	 varDetails = AnId, varInfo = info}
 \end{code}
 
 \begin{code}
 isId :: Var -> Bool
-isId (Var {varDetails = details}) = case details of
-					VanillaId     -> True
-					ConstantId _  -> True
-					RecordSelId _ -> True
-					other	      -> False
+isId (Var {varDetails = AnId}) = True
+isId other		       = False
 \end{code}
 
 @externallyVisibleId@: is it true that another module might be

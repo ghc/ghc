@@ -24,73 +24,90 @@ import CgMonad
 import AbsCSyn
 import CLabel		( CLabel, mkSRTLabel, mkClosureLabel )
 
-import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
+import PprAbsC		( dumpRealC )
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts, flattenAbsC )
 import CgBindery	( CgIdInfo )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC, 
-					      opt_SccGroup
+			  opt_D_dump_absC,    opt_SccGroup
 			)
 import CostCentre       ( CostCentre, CostCentreStack )
 import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
-import Module           ( Module, moduleString )
+import Module           ( Module, moduleString, ModuleName, moduleNameString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
-import TyCon            ( TyCon )
+import TyCon            ( TyCon, isDataTyCon )
+import Class		( Class, classTyCon )
 import BasicTypes	( TopLevelFlag(..) )
+import UniqSupply	( mkSplitUniqSupply )
+import ErrUtils		( dumpIfSet )
 import Util
 import Panic		( assertPanic )
 \end{code}
 
 \begin{code}
-codeGen :: Module		-- module name
-	-> ([CostCentre],	-- local cost-centres needing declaring/registering
+
+
+codeGen :: Module		-- Module name
+	-> [ModuleName]		-- Import names
+	-> ([CostCentre],	-- Local cost-centres needing declaring/registering
 	    [CostCentre],	-- "extern" cost-centres needing declaring
-	    [CostCentreStack])  -- pre-defined "singleton" cost centre stacks
-	-> [Module]		-- import names
-	-> [TyCon]		-- tycons with data constructors to convert
-	-> FiniteMap TyCon [(Bool, [Maybe Type])]
-				-- tycon specialisation info
-	-> [(StgBinding,[Id])]	-- bindings to convert, with SRTs
-	-> AbstractC		-- output
+	    [CostCentreStack])  -- Pre-defined "singleton" cost centre stacks
+	-> [TyCon] -> [Class]	-- Local tycons and classes
+	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
+	-> IO AbstractC		-- Output
 
-codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs) 
-	import_names gen_tycons tycon_specs stg_pgm
-  = let
-	maybe_split       = if opt_EnsureSplittableC 
-				then CSplitMarker 
-				else AbsCNop
-	cinfo             = MkCompInfo mod_name
+codeGen mod_name imported_modules cost_centre_info
+	tycons classes stg_binds
+  = mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
+    let
+	datatype_stuff 	  = genStaticConBits cinfo data_tycons
+	code_stuff     	  = initC cinfo (cgTopBindings maybe_split stg_binds)
+	cost_centre_stuff = mkCostCentreStuff mod_name imported_modules cost_centre_info
+
+	abstractC = mkAbstractCs [ cost_centre_stuff, 
+				   datatype_stuff,
+				   code_stuff ]
+
+	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
-    let 
-	module_code = mkAbstractCs [
-	    genStaticConBits cinfo gen_tycons tycon_specs,
-	    initC cinfo (cgTopBindings maybe_split stg_pgm) ]
+    dumpIfSet opt_D_dump_absC "Abstract C" (dumpRealC abstractC)	>>
+    return flat_abstractC
 
-	 -- Cost-centre profiling:
-	 -- Besides the usual stuff, we must produce:
-	 --
-    	 -- * Declarations for the cost-centres defined in this module;
-	 -- * Code to participate in "registering" all the cost-centres
-	 --   in the program (done at startup time when the pgm is run).
-	 --
-	 -- (The local cost-centres involved in this are passed
-	 -- into the code-generator, as are the imported-modules' names.)
-	 --
-	 --
-	cost_centre_stuff 
-		| not opt_SccProfilingOn = AbsCNop
-		| otherwise = mkAbstractCs (
+  where
+    data_tycons = filter isDataTyCon (tycons ++ map classTyCon classes)
+			-- Generate info tables  for the data constrs arising
+			-- from class decls as well
+
+    maybe_split = if opt_EnsureSplittableC 
+		  then CSplitMarker 
+		  else AbsCNop
+    cinfo       = MkCompInfo mod_name
+\end{code}
+
+Cost-centre profiling:
+Besides the usual stuff, we must produce:
+
+* Declarations for the cost-centres defined in this module;
+* Code to participate in "registering" all the cost-centres
+  in the program (done at startup time when the pgm is run).
+
+(The local cost-centres involved in this are passed
+into the code-generator, as are the imported-modules' names.)
+
+\begin{code}
+mkCostCentreStuff mod_name import_names (local_CCs, extern_CCs, singleton_CCSs)
+  | not opt_SccProfilingOn = AbsCNop
+  | otherwise = mkAbstractCs (
 		    map (CCostCentreDecl True)   local_CCs ++
 		    map (CCostCentreDecl False)  extern_CCs ++
 		    map CCostCentreStackDecl     singleton_CCSs ++
 		    mkCcRegister local_CCs singleton_CCSs import_names
-		   )
-   in
-   mkAbstractCs [ cost_centre_stuff, module_code ]
+		)
 
   where
     mkCcRegister ccs cc_stacks import_names
@@ -117,7 +134,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
 
 	mk_import_register import_name
 	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") 
-	      [CLitLit (_PK_ ("_reg" ++ moduleString import_name)) AddrRep]
+	      [CLitLit (_PK_ ("_reg" ++ moduleNameString import_name)) AddrRep]
 \end{code}
 
 %************************************************************************

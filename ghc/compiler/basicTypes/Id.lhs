@@ -8,16 +8,17 @@ module Id (
 	Id, DictId,
 
 	-- Simple construction
-	mkVanillaId, mkImportedId, mkSysLocal, mkUserLocal,
-	mkTemplateLocals, mkTemplateLocal, mkWildId, mkUserId,
+	mkId, mkVanillaId, mkSysLocal, mkUserLocal,
+	mkTemplateLocals, mkWildId, mkTemplateLocal,
 
 	-- Taking an Id apart
-	idName, idType, idUnique, idInfo, idDetails,
+	idName, idType, idUnique, idInfo,
 	idPrimRep, isId,
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, setIdType, setIdInfo,
+	setIdName, setIdUnique, setIdType, setIdNoDiscard, 
+	setIdInfo, modifyIdInfo, maybeModifyIdInfo,
 
 	-- Predicates
 	omitIfaceSigForId,
@@ -26,14 +27,12 @@ module Id (
 
 	-- Inline pragma stuff
 	getInlinePragma, setInlinePragma, modifyInlinePragma, 
-	idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
-	isSpecPragmaId,
-	
+	idMustBeINLINEd, idMustNotBeINLINEd,
 
-	isRecordSelector,
+	isSpecPragmaId,	isRecordSelector,
 	isPrimitiveId_maybe, isDataConId_maybe,
-	isConstantId,
-	isBottomingId, idAppIsBottom,
+	isConstantId, isBottomingId, idAppIsBottom,
+	isExportedId, isUserExportedId,
 
 	-- IdInfo stuff
 	setIdUnfolding,
@@ -61,20 +60,22 @@ module Id (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding )
+import {-# SOURCE #-} CoreSyn    ( CoreRules )
 
-import Var		( Id, DictId, VarDetails(..), 
-			  isId, mkId, 
-			  idName, idType, idUnique, idInfo, idDetails,
-			  setIdName, setVarType, setIdUnique, setIdInfo, modifyIdInfo,
+import Var		( Id, DictId,
+			  isId, mkIdVar,
+			  idName, idType, idUnique, idInfo,
+			  setIdName, setVarType, setIdUnique, 
+			  setIdInfo, modifyIdInfo, maybeModifyIdInfo,
 			  externallyVisibleId
 			)
 import VarSet
 import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars )
 import IdInfo
-import Demand		( Demand )
+import Demand		( Demand, isStrict, wwLazy )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  isWiredInName
+			  isWiredInName, isUserExportedName
 			) 
 import Const		( Con(..) )
 import PrimRep		( PrimRep )
@@ -106,15 +107,22 @@ infixl 	1 `setIdUnfolding`,
 %*									*
 %************************************************************************
 
+Absolutely all Ids are made by mkId.  It 
+	a) Pins free-tyvar-info onto the Id's type, 
+	   where it can easily be found.
+	b) Ensures that exported Ids are 
+
+\begin{code}
+mkId :: Name -> Type -> IdInfo -> Id
+mkId name ty info = mkIdVar name (addFreeTyVars ty) info'
+		  where
+		    info' | isUserExportedName name = setNoDiscardInfo info
+			  | otherwise		    = info
+\end{code}
+
 \begin{code}
 mkVanillaId :: Name -> Type -> Id
-mkVanillaId name ty = mkId name (addFreeTyVars ty) VanillaId noIdInfo
-
-mkImportedId :: Name -> Type -> IdInfo -> Id
-mkImportedId name ty info = mkId name (addFreeTyVars ty) VanillaId info
-
-mkUserId :: Name -> Type -> Id
-mkUserId name ty = mkVanillaId name ty
+mkVanillaId name ty = mkId name ty vanillaIdInfo
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
@@ -163,6 +171,59 @@ idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Special Ids}
+%*									*
+%************************************************************************
+
+\begin{code}
+idFlavour :: Id -> IdFlavour
+idFlavour id = flavourInfo (idInfo id)
+
+setIdNoDiscard :: Id -> Id
+setIdNoDiscard id	-- Make an Id into a NoDiscardId, unless it is already
+  = modifyIdInfo setNoDiscardInfo id
+
+recordSelectorFieldLabel :: Id -> FieldLabel
+recordSelectorFieldLabel id = case idFlavour id of
+				RecordSelId lbl -> lbl
+
+isRecordSelector id = case idFlavour id of
+			RecordSelId lbl -> True
+			other	  	-> False
+
+isPrimitiveId_maybe id = case idFlavour id of
+			    ConstantId (PrimOp op) -> Just op
+			    other		   -> Nothing
+
+isDataConId_maybe id = case idFlavour id of
+			  ConstantId (DataCon con) -> Just con
+			  other		           -> Nothing
+
+isConstantId id = case idFlavour id of
+		    ConstantId _ -> True
+		    other	 -> False
+
+isSpecPragmaId id = case idFlavour id of
+			SpecPragmaId -> True
+			other	     -> False
+
+-- Don't drop a binding for an exported Id,
+-- if it otherwise looks dead.  
+isExportedId :: Id -> Bool
+isExportedId id = case idFlavour id of
+			VanillaId -> False
+			other	  -> True	-- All the others are no-discard
+
+-- Say if an Id was exported by the user
+-- Implies isExportedId (see mkId above)
+isUserExportedId :: Id -> Bool
+isUserExportedId id = isUserExportedName (idName id)
+\end{code}
+
+
 omitIfaceSigForId tells whether an Id's info is implied by other declarations,
 so we don't need to put its signature in an interface file, even if it's mentioned
 in some other interface unfolding.
@@ -174,7 +235,7 @@ omitIfaceSigForId id
   = True
 
   | otherwise
-  = case idDetails id of
+  = case idFlavour id of
 	RecordSelId _  -> True	-- Includes dictionary selectors
         ConstantId _   -> True
 		-- ConstantIds are implied by their type or class decl;
@@ -185,33 +246,6 @@ omitIfaceSigForId id
 	other	       -> False	-- Don't omit!
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Special Ids}
-%*									*
-%************************************************************************
-
-\begin{code}
-recordSelectorFieldLabel :: Id -> FieldLabel
-recordSelectorFieldLabel id = case idDetails id of
-				RecordSelId lbl -> lbl
-
-isRecordSelector id = case idDetails id of
-			RecordSelId lbl -> True
-			other	  	-> False
-
-isPrimitiveId_maybe id = case idDetails id of
-			    ConstantId (PrimOp op) -> Just op
-			    other		   -> Nothing
-
-isDataConId_maybe id = case idDetails id of
-			  ConstantId (DataCon con) -> Just con
-			  other		           -> Nothing
-
-isConstantId id = case idDetails id of
-		    ConstantId _ -> True
-		    other	 -> False
-\end{code}
 
 
 %************************************************************************
@@ -227,7 +261,7 @@ getIdArity :: Id -> ArityInfo
 getIdArity id = arityInfo (idInfo id)
 
 setIdArity :: Id -> ArityInfo -> Id
-setIdArity id arity = modifyIdInfo id (arity `setArityInfo`)
+setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 
 	---------------------------------
 	-- STRICTNESS
@@ -235,7 +269,7 @@ getIdStrictness :: Id -> StrictnessInfo
 getIdStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictnessInfo -> Id
-setIdStrictness id strict_info = modifyIdInfo id (strict_info `setStrictnessInfo`)
+setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
 
 -- isBottomingId returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
@@ -250,7 +284,7 @@ getIdWorkerInfo :: Id -> WorkerInfo
 getIdWorkerInfo id = workerInfo (idInfo id)
 
 setIdWorkerInfo :: Id -> WorkerInfo -> Id
-setIdWorkerInfo id work_info = modifyIdInfo id (work_info `setWorkerInfo`)
+setIdWorkerInfo id work_info = modifyIdInfo (`setWorkerInfo` work_info) id
 
 	---------------------------------
 	-- UNFOLDING
@@ -258,7 +292,7 @@ getIdUnfolding :: Id -> Unfolding
 getIdUnfolding id = unfoldingInfo (idInfo id)
 
 setIdUnfolding :: Id -> Unfolding -> Id
-setIdUnfolding id unfolding = modifyIdInfo id (unfolding `setUnfoldingInfo`)
+setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
 	---------------------------------
 	-- DEMAND
@@ -266,7 +300,7 @@ getIdDemandInfo :: Id -> Demand
 getIdDemandInfo id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
-setIdDemandInfo id demand_info = modifyIdInfo id (demand_info `setDemandInfo`)
+setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
 
 	---------------------------------
 	-- UPDATE INFO
@@ -274,15 +308,15 @@ getIdUpdateInfo :: Id -> UpdateInfo
 getIdUpdateInfo id = updateInfo (idInfo id)
 
 setIdUpdateInfo :: Id -> UpdateInfo -> Id
-setIdUpdateInfo id upd_info = modifyIdInfo id (upd_info `setUpdateInfo`)
+setIdUpdateInfo id upd_info = modifyIdInfo (`setUpdateInfo` upd_info) id
 
 	---------------------------------
 	-- SPECIALISATION
-getIdSpecialisation :: Id -> IdSpecEnv
+getIdSpecialisation :: Id -> CoreRules
 getIdSpecialisation id = specInfo (idInfo id)
 
-setIdSpecialisation :: Id -> IdSpecEnv -> Id
-setIdSpecialisation id spec_info = modifyIdInfo id (spec_info `setSpecInfo`)
+setIdSpecialisation :: Id -> CoreRules -> Id
+setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 
 	---------------------------------
 	-- CAF INFO
@@ -290,7 +324,7 @@ getIdCafInfo :: Id -> CafInfo
 getIdCafInfo id = cafInfo (idInfo id)
 
 setIdCafInfo :: Id -> CafInfo -> Id
-setIdCafInfo id caf_info = modifyIdInfo id (caf_info `setCafInfo`)
+setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
 	---------------------------------
 	-- CPR INFO
@@ -298,8 +332,7 @@ getIdCprInfo :: Id -> CprInfo
 getIdCprInfo id = cprInfo (idInfo id)
 
 setIdCprInfo :: Id -> CprInfo -> Id
-setIdCprInfo id cpr_info = modifyIdInfo id (cpr_info `setCprInfo`)
-
+setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id
 \end{code}
 
 
@@ -313,28 +346,17 @@ getInlinePragma :: Id -> InlinePragInfo
 getInlinePragma id = inlinePragInfo (idInfo id)
 
 setInlinePragma :: Id -> InlinePragInfo -> Id
-setInlinePragma id prag = modifyIdInfo id (setInlinePragInfo prag)
+setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
 modifyInlinePragma :: Id -> (InlinePragInfo -> InlinePragInfo) -> Id
-modifyInlinePragma id fn = modifyIdInfo id (\info -> setInlinePragInfo (fn (inlinePragInfo info)) info)
-
-idWantsToBeINLINEd :: Id -> Bool
-idWantsToBeINLINEd id = case getInlinePragma id of
-			  IWantToBeINLINEd -> True
-			  IMustBeINLINEd   -> True
-			  other		   -> False
+modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id
 
 idMustNotBeINLINEd id = case getInlinePragma id of
 			  IMustNotBeINLINEd -> True
-			  IAmASpecPragmaId  -> True
 			  IAmALoopBreaker   -> True
 			  other		    -> False
 
 idMustBeINLINEd id =  case getInlinePragma id of
 			IMustBeINLINEd -> True
 			other	       -> False
-
-isSpecPragmaId id = case getInlinePragma id of
-			IAmASpecPragmaId -> True
-			other		 -> False
 \end{code}
