@@ -405,33 +405,36 @@ filterImports :: ModIface
 	      -> ImportSpec			-- The span for the entire import decl
 	      -> Maybe (Bool, [Located (IE RdrName)])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
-	      -> RnM (AvailEnv,			-- What's imported
-		      GlobalRdrEnv)		-- ...in two forms
+	      -> RnM (AvailEnv,			-- What's imported (qualified or unqualified)
+		      GlobalRdrEnv)		-- Same again, but in GRE form
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
-mkGenericRdrEnv imp_spec avails
-  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
-		   | avail <- avails, name <- availNames avail ]
 			
 filterImports iface imp_spec Nothing total_avails
-  = returnM (mkAvailEnv total_avails, mkGenericRdrEnv imp_spec total_avails)
+  = returnM (mkAvailEnv total_avails, 
+	     mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
+			    | avail <- total_avails, name <- availNames avail ])
 
 filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
-  = mapAndUnzipM (addLocM get_item) import_items 	`thenM` \ (avails, gres) ->
+  = mapAndUnzipM (addLocM get_item) import_items 	`thenM` \ (avails_s, gres) ->
     let
-	all_avails = foldr plusAvailEnv     emptyAvailEnv     avails
-	rdr_env    = foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
+	avails = concat avails_s
+	rdr_env | not want_hiding 
+		= foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
+		| otherwise	-- Hiding; qualified-only import of hidden things
+		= mkGlobalRdrEnv [ GRE { gre_name = name, 
+					 gre_prov = Imported [mk_imp_spec name] False }
+				 | avail <- total_avails, name <- availNames avail ]
+	hidden = availsToNameSet avails
+	mk_imp_spec n 
+	  | n `elemNameSet` hidden = imp_spec { is_qual = True }
+	  | otherwise		   = imp_spec
     in
-    if not want_hiding then
-	returnM (all_avails, rdr_env)
-    else
-    let	-- Hide stuff in all_avails
-	   hidden = availsToNameSet (availEnvElts all_avails)
-	   keep n = not (n `elemNameSet` hidden)
-	   pruned_avails = pruneAvails keep total_avails
-    in
-    returnM (mkAvailEnv pruned_avails, mkGenericRdrEnv imp_spec pruned_avails)
+    returnM (mkAvailEnv avails, rdr_env)
+ 	-- Hiding still imports everything qualified, so 'avails' is not 
+	-- conditional on hiding.  But the rdrenv is modified to 
+
   where
     import_fm :: OccEnv AvailInfo
     import_fm = mkOccEnv [ (nameOccName name, avail) 
@@ -442,12 +445,12 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 	-- in an import list map to TcOccs, not VarOccs.
 
     bale_out item = addErr (badImportItemErr iface imp_spec item)	`thenM_`
-		    returnM (emptyAvailEnv, emptyGlobalRdrEnv)
+		    returnM ([], emptyGlobalRdrEnv)
 
-    succeed_with :: Bool -> AvailInfo -> RnM (AvailEnv, GlobalRdrEnv)
+    succeed_with :: Bool -> AvailInfo -> RnM ([AvailInfo], GlobalRdrEnv)
     succeed_with all_explicit avail
       = do { loc <- getSrcSpanM
-	   ; returnM (unitAvailEnv avail, 
+	   ; returnM ([avail], 
 		      mkGlobalRdrEnv (map (mk_gre loc) (availNames avail))) }
       where
 	mk_gre loc name = GRE { gre_name = name, 
@@ -456,7 +459,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 	explicit name = all_explicit || name == main_name
 	main_name = availName avail
 
-    get_item :: IE RdrName -> RnM (AvailEnv, GlobalRdrEnv)
+    get_item :: IE RdrName -> RnM ([AvailInfo], GlobalRdrEnv)
 	-- Empty result for a bad item.
 	-- Singleton result is typical case.
 	-- Can have two when we are hiding, and mention C which might be
@@ -476,10 +479,11 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 
     get_item item@(IEThingAbs n)
       | want_hiding	-- hiding( C ) 
-			-- Here the 'C' can be a data constructor *or* a type/class
+			-- Here the 'C' can be a data constructor 
+			-- *or* a type/class, or even both
       = case catMaybes [check_item item, check_item (IEVar data_n)] of
 	  []     -> bale_out item
-	  avails -> returnM (mkAvailEnv avails, emptyGlobalRdrEnv)
+	  avails -> returnM (avails, emptyGlobalRdrEnv)
 			-- The GlobalRdrEnv result is irrelevant when hiding
       where
 	data_n = setRdrNameSpace n srcDataName
