@@ -1,11 +1,10 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+
 * don't link to M.x if M.x is re-exported via a 'module N' from module M.
 
 * Pick the preferred export names as per the paper.
-
-* instances: need to construct instances for deriving clauses, somehow.
 
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
@@ -23,8 +22,30 @@
 
 * Document new labelling feature
 
+* For a module with no documentation section, include a "synopsis" header?
+
+* Parent button should be removed if there isn't a parent.
+
+* a paragraph like
+
+	> text
+	more text
+
+  is interpreted strangely: the second line is interpreted as part of the
+  code block, but the second line is non-literal (and markup within it
+  is interpreted normally).  Rewrite the lexer using Alex, and fix this
+  at the same time.
+
+* derived instance support isn't quite right (doing it properly is 
+  hard, though).
+
 -----------------------------------------------------------------------------
 -- features
+
+* merge the indices, adding annotations to distinguish types/classes/functions/
+  constructors as necessary.
+
+* nested itemized and enumerated lists.
 
 * There ought to be a way to include some structure in the "description"
   (section headings, etc.) and possibly in other comments.  (suggseted
@@ -63,6 +84,8 @@
 
 * Allow individual function arguments to be documented when the function
   type is a record element?
+
+* hiding instances?
 
 -----------------------------------------------------------------------------
 -- cosmetic
