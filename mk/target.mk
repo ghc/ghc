@@ -795,11 +795,13 @@ install:: $(INSTALL_INCLUDES)
 endif
 
 ifneq "$(INSTALL_DOCS)" ""
+ifneq "$(SGMLDocWays)" ""
 install-docs:: $(INSTALL_DOCS)
 	@$(INSTALL_DIR) $(datadir)	
 	for i in $(INSTALL_DOCS); do \
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
 	done
+endif
 endif
 
 ifneq "$(INSTALL_SGML_DOC)" ""

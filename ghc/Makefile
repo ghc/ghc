@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2003/10/17 17:52:33 panne Exp $
+# $Id: Makefile,v 1.24 2004/02/12 02:11:34 mthomas Exp $
 #
 
 TOP=.
@@ -20,14 +20,24 @@ include $(TOP)/mk/boilerplate.mk
 # If we're booting from .hc files, swap the order
 # we descend into subdirs - to boot utils must be before driver.
 #
+
+# First - check whether we should build the docs directory.
+# On Windows, the tools to build docs are not always available.
+
+ifneq "$(SGMLDocWays)" ""
+DOCS_DIR = docs
+else
+DOCS_DIR =
+endif
+
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS = includes rts docs compiler utils driver
+SUBDIRS = includes rts $(DOCS_DIR) compiler utils driver
 else
 ifneq "$(ILXized)" "YES"
-SUBDIRS = includes utils driver docs compiler rts
+SUBDIRS = includes utils driver $(DOCS_DIR) compiler rts
 else
 # No RTS for ILX
-SUBDIRS = includes utils driver docs compiler
+SUBDIRS = includes utils driver $(DOCS_DIR) compiler
 endif
 endif
 
