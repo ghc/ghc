@@ -13,13 +13,14 @@ module CoreLint (
 
 IMP_Ubiq()
 
+import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 
 import Bag
 import Kind		( hasMoreBoxityInfo, Kind{-instance-}, 
 			  isTypeKind, isBoxedTypeKind {- TEMP --SOF -} )
 import Literal		( literalType, Literal{-instance-} )
-import Id		( idType, isBottomingId, dataConRepType,
+import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet, intersectIdSets,
 			  unionIdSets, elementOfIdSet, SYN_IE(IdSet),
@@ -28,9 +29,8 @@ import Id		( idType, isBottomingId, dataConRepType,
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 			  NamedThing(..) )
-import Outputable	( Outputable(..){-instance * []-} )
 import PprCore
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
 import PrimOp		( primOpType, PrimOp(..) )
@@ -42,9 +42,8 @@ import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 			  isPrimType,typeKind,instantiateTy,splitSigmaTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
 			  maybeAppDataTyConExpandingDicts, eqTy, SYN_IE(Type)
---			  ,expandTy -- ToDo:rm
 			)
-import TyCon		( isPrimTyCon )
+import TyCon		( isPrimTyCon, isDataTyCon )
 import TyVar		( tyVarKind, GenTyVar{-instances-} )
 import Unique		( Unique )
 import Usage		( GenUsage, SYN_IE(Usage) )
@@ -128,7 +127,7 @@ lintUnfolding locn expr
       Nothing  -> Just expr
       Just msg ->
         pprTrace "WARNING: Discarded bad unfolding from interface:\n"
-	(vcat [msg PprForUser,
+	(vcat [msg (PprForUser opt_PprUserLength),
 		   ptext SLIT("*** Bad unfolding ***"),
 		   ppr PprDebug expr,
 		   ptext SLIT("*** End unfolding ***")])
@@ -189,8 +188,9 @@ lintCoreExpr :: CoreExpr -> LintM (Maybe Type)	-- Nothing if error found
 lintCoreExpr (Var var) = checkInScope var `seqL` returnL (Just (idType var))
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
 lintCoreExpr (SCC _ expr) = lintCoreExpr expr
-lintCoreExpr (Coerce _ ty expr)
-  = lintCoreExpr expr `seqL` returnL (Just ty)
+lintCoreExpr e@(Coerce coercion ty expr)
+  = lintCoercion e coercion 	`seqL`
+    lintCoreExpr expr `seqL` returnL (Just ty)
 
 lintCoreExpr (Let binds body)
   = lintCoreBinding binds `thenL` \binders ->
@@ -201,7 +201,8 @@ lintCoreExpr (Let binds body)
 	(addInScopeVars binders (lintCoreExpr body))
 
 lintCoreExpr e@(Con con args)
-  = lintCoreArgs {-False-} e (dataConRepType con) args
+  = checkL (isDataCon con) (mkConErrMsg e)	`seqL`
+    lintCoreArgs {-False-} e (dataConRepType con) args
     -- Note: we don't check for primitive types in these arguments
 
 lintCoreExpr e@(Prim op args)
@@ -287,8 +288,7 @@ lintCoreArg e ty a@(TyArg arg_ty)
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
 	in
-	if argty_kind `hasMoreBoxityInfo` tyvar_kind || -- Should the args be swapped here?
-	   (isTypeKind argty_kind && isBoxedTypeKind tyvar_kind) -- (hackily) added SOF
+	if argty_kind `hasMoreBoxityInfo` tyvar_kind
 		-- Arg type might be boxed for a function with an uncommitted
 		-- tyvar; notably this is used so that we can give
 		-- 	error :: forall a:*. String -> a
@@ -358,11 +358,9 @@ lintCoreAlts whole_alts@(PrimAlts alts deflt) ty --tycon
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
-lintAlgAlt scrut_ty {-tycon-ToDo: use it!-} (con,args,rhs)
+lintAlgAlt scrut_ty (con,args,rhs)
   = (case maybeAppDataTyConExpandingDicts scrut_ty of
-      Nothing ->
-	 addErrL (mkAlgAltMsg1 scrut_ty)
-      Just (tycon, tys_applied, cons) ->
+      Just (tycon, tys_applied, cons) | isDataTyCon tycon ->
 	 let
 	   arg_tys = dataConArgTys con tys_applied
 	 in
@@ -371,6 +369,8 @@ lintAlgAlt scrut_ty {-tycon-ToDo: use it!-} (con,args,rhs)
 								 `seqL`
 	 mapL check (zipEqual "lintAlgAlt" arg_tys args)	 `seqL`
 	 returnL ()
+
+      other -> addErrL (mkAlgAltMsg1 scrut_ty)
     )								 `seqL`
     addInScopeVars args 	(
 	 lintCoreExpr rhs
@@ -393,6 +393,21 @@ lintDeflt deflt@(BindDefault binder rhs) ty
   = checkTys (idType binder) ty (mkDefltMsg deflt) `seqL`
     addInScopeVars [binder] (lintCoreExpr rhs)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[lint-coercion]{Coercion}
+%*									*
+%************************************************************************
+
+\begin{code}
+lintCoercion e (CoerceIn  con) = check_con e con
+lintCoercion e (CoerceOut con) = check_con e con
+
+check_con e con = checkL (isNewCon con)
+		         (mkCoerceErrMsg e)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -555,6 +570,15 @@ checkTys ty1 ty2 msg spec loc scope errs
 \end{code}
 
 \begin{code}
+mkConErrMsg e sty
+  = ($$) (ptext SLIT("Application of newtype constructor:"))
+	    (ppr sty e)
+
+mkCoerceErrMsg e sty
+  = ($$) (ptext SLIT("Coercion using a datatype constructor:"))
+	 (ppr sty e)
+
+
 mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts sty
   = ($$) (ptext SLIT("Type of case alternatives not the same:"))
