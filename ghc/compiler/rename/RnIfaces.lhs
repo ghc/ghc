@@ -917,6 +917,7 @@ getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
   = new_name var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name)
 
+getDeclBinders new_name (ForD _)  = returnRn NotAvailable
 getDeclBinders new_name (DefD _)  = returnRn NotAvailable
 getDeclBinders new_name (InstD _) = returnRn NotAvailable
 

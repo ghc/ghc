@@ -20,9 +20,10 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
-			  newDfunName, checkDupOrQualNames, checkDupNames,
+			  newDfunName, checkDupOrQualNames, checkDupNames, lookupGlobalOccRn,
 			  newLocallyDefinedGlobalName, newImportedGlobalName, ifaceFlavour,
-			  listType_RDR, tupleType_RDR )
+			  listType_RDR, tupleType_RDR, addImplicitOccRn
+			)
 import RnMonad
 
 import Name		( Name, OccName(..), occNameString, prefixOccName,
@@ -296,6 +297,28 @@ rnDecl (DefD (DefaultDecl tys src_loc))
     mapRn rnHsType tys 			`thenRn` \ tys' ->
     lookupImplicitOccRn numClass_RDR	`thenRn_` 
     returnRn (DefD (DefaultDecl tys' src_loc))
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Foreign declarations}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
+  = pushSrcLocRn src_loc $
+    lookupBndrRn name		        `thenRn` \ name' ->
+    (if is_export then
+        addImplicitOccRn name'
+     else
+	returnRn name')			`thenRn_`
+    rnHsSigType fo_decl_msg ty		`thenRn` \ ty' ->
+    returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc))
+ where
+  fo_decl_msg = ptext SLIT("a foreign declaration")
+  is_export   = not (maybeToBool imp_exp) && not (isDynamic ext_nm)
+
 \end{code}
 
 %*********************************************************

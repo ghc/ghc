@@ -31,6 +31,7 @@ type RenamedContext		= Context 		Name
 type RenamedHsDecl		= HsDecl		Unused Name RenamedPat
 type RenamedSpecDataSig		= SpecDataSig		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
+type RenamedForeignDecl		= ForeignDecl		Name
 type RenamedFixityDecl		= FixityDecl		Name
 type RenamedGRHS		= GRHS			Unused Name RenamedPat
 type RenamedGRHSsAndBinds	= GRHSsAndBinds		Unused Name RenamedPat

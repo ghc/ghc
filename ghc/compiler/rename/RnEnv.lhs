@@ -709,7 +709,7 @@ fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
 		 ppr how_in_scope2])
 
 shadowedNameWarn shadow
-  = hcat [ptext SLIT("This binding for"), 
+  = hsep [ptext SLIT("This binding for"), 
 	       quotes (ppr shadow),
 	       ptext SLIT("shadows an existing binding")]
 

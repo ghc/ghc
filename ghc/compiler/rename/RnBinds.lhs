@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, lookupGlobalOccRn,
-			  newLocalNames, isUnboundName, warnUnusedBinds
+			  isUnboundName, warnUnusedBinds
 			)
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp, SCC(..) )
