@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.26 2001/03/16 09:07:41 qrczak Exp $
+-- $Id: Main.hs,v 1.27 2001/03/29 00:01:18 qrczak Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -45,7 +45,7 @@ options = [
     Option "I" []             (ReqArg (CompFlag . ("-I"++))
                                                  "DIR")  "passed to the C compiler",
     Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *.hs_make.c",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing HsMake*.c",
     Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
     Option ""  ["version"]    (NoArg  Version)           "output version information and exit"]
@@ -381,23 +381,43 @@ cString quote = do
         _:_              -> do anyCharC_; cString quote
 
 ------------------------------------------------------------------------
--- Output the output files.
+-- Write the output files.
+
+splitName :: String -> (String, String)
+splitName name =
+    case break (== '/') name of
+        (file, [])       -> ([], file)
+        (dir,  sep:rest) -> (dir++sep:restDir, restFile)
+            where
+            (restDir, restFile) = splitName rest
+
+splitExt :: String -> (String, String)
+splitExt name =
+    case break (== '.') name of
+        (base, [])         -> (base, [])
+        (base, sepRest@(sep:rest))
+            | null restExt -> (base,               sepRest)
+            | otherwise    -> (base++sep:restBase, restExt)
+            where
+            (restBase, restExt) = splitExt rest
 
 output :: [Flag] -> String -> [Token] -> IO ()
 output flags name toks = let
-    baseName = case reverse name of
-        'c':base -> reverse base
-        _        -> name++".hs"
-    cProgName = baseName++"_make.c"
-    oProgName = baseName++"_make.o"
-    progName  = baseName++"_make"
-    outHsName = baseName
-    outHName  = baseName++".h"
-    outCName  = baseName++".c"
+    (dir,  file) = splitName name
+    (base, ext)  = splitExt  file
+    cProgName    = dir++"HsMake"++base++".c"
+    oProgName    = dir++"HsMake"++base++".o"
+    progName     = dir++"HsMake"++base
+    outHsName
+        | not (null ext) && last ext == 'c' = dir++base++init ext
+        | ext == ".hs"                      = dir++base++"_out.hs"
+        | otherwise                         = dir++base++".hs"
+    outHName     = dir++"Hs"++base++".h"
+    outCName     = dir++"Hs"++base++".c"
     
-    execProgName = case progName of
-        '/':_ -> progName
-        _     -> "./"++progName
+    execProgName
+        | null dir  = "./"++progName
+        | otherwise = progName
     
     specials = [(pos, key, arg) | Special pos key arg <- toks]
     
@@ -632,17 +652,12 @@ conditional _         = False
 
 outCLine :: SourcePos -> String
 outCLine (SourcePos name line) =
-    "# "++show line++" \""++showCString (basename name)++"\"\n"
+    "# "++show line++" \""++showCString (snd (splitName name))++"\"\n"
 
 outHsLine :: SourcePos -> String
 outHsLine (SourcePos name line) =
     "    hsc_line ("++show (line + 1)++", \""++
-    showCString (basename name)++"\");\n"
-
-basename :: String -> String
-basename s = case break (== '/') s of
-    (name, [])      -> name
-    (_,     _:rest) -> basename rest
+    showCString (snd (splitName name))++"\");\n"
 
 showCString :: String -> String
 showCString = concatMap showCChar

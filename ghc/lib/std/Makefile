@@ -93,8 +93,8 @@ CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 CLEAN_FILES +=  \
 	$(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
-	$(patsubst %.hsc, %.hs.c, $(HSC_SRCS)) \
-	$(patsubst %.hsc, %.hs.h, $(HSC_SRCS))
+	$(patsubst %.hsc, Hs%.c, $(HSC_SRCS)) \
+	$(patsubst %.hsc, Hs%.h, $(HSC_SRCS))
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

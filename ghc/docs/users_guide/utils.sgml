@@ -201,21 +201,21 @@ tags:
       </variablelist>
 
       <para>The input file should end with .hsc. Output files get
-      names with the <literal>.hsc</literal> suffix replaced:</para>
+      names with the <literal>*.hsc</literal> pattern replaced:</para>
 
       <informaltable>
 	<tgroup cols=2>
 	  <tbody>
 	    <row>
-	      <entry><literal>.hs</literal></entry>
+	      <entry><literal>*.hs</literal></entry>
 	      <entry>Haskell file</entry>
 	    </row>
 	    <row>
-	      <entry><literal>.hs.h</literal></entry>
+	      <entry><literal>Hs*.h</literal></entry>
 	      <entry>C header</entry>
 	    </row>
 	    <row>
-	      <entry><literal>.hs.c</literal></entry>
+	      <entry><literal>Hs*.c</literal></entry>
 	      <entry>C file</entry>
 	    </row>
 	  </tbody>
