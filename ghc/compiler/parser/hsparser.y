@@ -281,7 +281,7 @@ BOOLEAN pat_check=TRUE;
 
 %type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd foreignd
-		  decl decls fixdecl fix_op fix_ops valdef
+		  decl decls non_empty_decls fixdecl fix_op fix_ops valdef
  		  maybe_where where_body type_and_maybe_id
 
 %type <uttype>    polytype
@@ -546,6 +546,20 @@ decls	: /* empty */		{ $$ = mknullbind(); }
 	| decl
 	| decls SEMI		{ $$ = $1; }
 	| decls SEMI decl
+		{
+		  if(SAMEFN)
+		    {
+		      extendfn($1,$3);
+		      $$ = $1;
+		    }
+		  else
+		    $$ = mkabind($1,$3);
+		}
+	;
+
+non_empty_decls	: decl
+	        | non_empty_decls SEMI	    { $$ = $1; }
+	        | non_empty_decls SEMI decl
 		{
 		  if(SAMEFN)
 		    {
@@ -915,10 +929,11 @@ gdrhs	:  gd EQUAL get_line_no exp		{ $$ = lsing(mkpgdexp($1,$3,$4)); }
 
 maybe_where: /* empty */			{ $$ = mknullbind(); }
 	   | WHERE where_body			{ $$ = $2; }
+	   | WHERE 				{ $$ = mknullbind(); }
 	   ;
 
 where_body : ocurly  decls ccurly		{ $$ = $2; }
-	   | vocurly decls vccurly		{ $$ = $2; }
+	   | vocurly non_empty_decls vccurly	{ $$ = $2; }
 	   ;
 
 gd	:  VBAR quals				{ $$ = $2; }
