@@ -101,6 +101,7 @@ VERSION_SYMLINKS_FOR=ghc
 # local setup/install information prepended.
 #
 PACKAGE_SCRIPTS=ghc stat2resid hstags mkdependHS
+PACKAGE_LIB_SCRIPTS=hscpp
 
 # Binaries to install
 PACKAGE_BINS=$(PACKAGE_SCRIPTS) hp2ps
@@ -140,6 +141,19 @@ config-pkgs ::
 	   echo $$"datadir='$(real_datadir)';"                            >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl              >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
+	   echo "Done."; \
+	done
+	@for i in $(PACKAGE_LIB_SCRIPTS); do \
+	   echo "Creating a configured version of $$i .."; \
+	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
+	   test -f lib/$(platform)/$(package)-$(version)/$$i && $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"         > lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo "      if $$""running_under_some_shell;"                  >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo $$"bindir='$(bindir)';"                                   >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo $$"libdir='$(real_libdir)';"                              >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo $$"datadir='$(real_datadir)';"                            >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   cat lib/$(platform)/$(package)-$(version)/$$i.prl              >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
 	done
 
