@@ -299,7 +299,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
     let
 	-- simplLetBndr doesn't deal with the IdInfo, so we must
 	-- do so here (c.f. simplLazyBind)
-	bndr''  = bndr' `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
+	bndr''  = simplIdInfo (getSubst env) (idInfo bndr) bndr'
 	env1	= modifyInScope env bndr'' bndr''
     in
     simplStrictArg AnRhs env1 rhs rhs_se (idType bndr') cont_ty	$ \ env rhs1 ->
@@ -447,7 +447,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	--
 	-- NB: does no harm for non-recursive bindings
     let
-	bndr''       	  = bndr' `setIdInfo` simplIdInfo (getSubst rhs_se) (idInfo bndr)
+	bndr''       	  = simplIdInfo (getSubst rhs_se) (idInfo bndr) bndr'
 	env1	     	  = modifyInScope env bndr'' bndr''
 	rhs_env      	  = setInScope rhs_se env1
  	is_top_level	  = isTopLevel top_lvl
