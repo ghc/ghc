@@ -15,9 +15,9 @@ import CmdLineOpts	( DynFlag(..) )
 
 import Generics		( mkTyConGenericBinds )
 import TcRnMonad
-import TcEnv		( newDFunName, 
+import TcEnv		( newDFunName, pprInstInfoDetails, 
 			  InstInfo(..), InstBindings(..),
-			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
+			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( simpleDFunClassTyCon, extendInstEnv )
@@ -53,7 +53,7 @@ import VarSet		( mkVarSet, subVarSet )
 import PrelNames
 import SrcLoc		( srcLocSpan, Located(..) )
 import Util		( zipWithEqual, sortLt, notNull )
-import ListSetOps	( removeDups,  assoc )
+import ListSetOps	( removeDups,  assocMaybe )
 import Outputable
 import Bag
 \end{code}
@@ -301,7 +301,6 @@ makeDerivEqns tycl_decls
     ------------------------------------------------------------------
     derive_these :: [(NewOrData, Name, LHsPred Name)]
 	-- Find the (nd, TyCon, Pred) pairs that must be `derived'
-	-- NB: only source-language decls have deriving, no imported ones do
     derive_these = [ (nd, tycon, pred) 
 		   | L _ (TyData { tcdND = nd, tcdLName = L _ tycon, 
 			          tcdDerivs = Just (L _ preds) }) <- tycl_decls,
@@ -327,34 +326,10 @@ makeDerivEqns tycl_decls
     ------------------------------------------------------------------
     mk_eqn_help gla_exts DataType tycon clas tys
       | Just err <- checkSideConditions gla_exts clas tycon tys
-      = bale_out (derivingThingErr clas tys tycon tyvars err)
+      = bale_out (derivingThingErr clas tys tycon (tyConTyVars tycon) err)
       | otherwise 
-      = new_dfun_name clas tycon	 `thenM` \ dfun_name ->
-	returnM (Just (dfun_name, clas, tycon, tyvars, constraints), Nothing)
-      where
-	tyvars      = tyConTyVars tycon
-	constraints = extra_constraints ++ ordinary_constraints
-		 -- "extra_constraints": see note [Data decl contexts] above
-	extra_constraints = tyConTheta tycon
-
-	ordinary_constraints
-	  | clas `hasKey` typeableClassKey	-- For the Typeable class, the constraints
-						-- don't involve the constructor ags, only 
-						-- the tycon tyvars
-						-- e.g.   data T a b = ...
-						-- we want
-						-- 	instance (Typeable a, Typable b)
-						--		 => Typeable (T a b) where
-	  = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
-	  | otherwise
-	  = [ mkClassPred clas [arg_ty] 
-	    | data_con <- tyConDataCons tycon,
-	      arg_ty   <- dataConOrigArgTys data_con,
-			-- Use the same type variables
-			-- as the type constructor,
-			-- hence no need to instantiate
-	      not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
-	    ]
+      = do { eqn <- mkDataTypeEqn tycon clas
+	   ; returnM (Just eqn, Nothing) }
 
     mk_eqn_help gla_exts NewType tycon clas tys
       | can_derive_via_isomorphism && (gla_exts || std_class_via_iso clas)
@@ -526,6 +501,42 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
+
+------------------------------------------------------------------
+mkDataTypeEqn :: TyCon -> Class -> TcM DerivEqn
+mkDataTypeEqn tycon clas
+  | clas `hasKey` typeableClassKey
+  =	-- The Typeable class is special in several ways
+	-- 	  data T a b = ... deriving( Typeable )
+	-- gives
+	--	  instance Typeable2 T where ...
+	-- 1. There are no constraints in the instance
+	-- 2. There are no type variables either
+	-- 2. The actual class we want to generate isn't necessarily
+	--	Typeable; it depends on the arity of the type
+    do	{ real_clas <- tcLookupClass (typeableClassNames !! tyConArity tycon)
+	; dfun_name <- new_dfun_name real_clas tycon
+  	; return (dfun_name, real_clas, tycon, [], []) }
+
+  | otherwise
+  = do	{ dfun_name <- new_dfun_name clas tycon
+  	; return (dfun_name, clas, tycon, tyvars, constraints) }
+  where
+    tyvars            = tyConTyVars tycon
+    constraints       = extra_constraints ++ ordinary_constraints
+    extra_constraints = tyConTheta tycon
+	 -- "extra_constraints": see note [Data decl contexts] above
+
+    ordinary_constraints
+      = [ mkClassPred clas [arg_ty] 
+        | data_con <- tyConDataCons tycon,
+          arg_ty   <- dataConOrigArgTys data_con,
+    		-- Use the same type variables
+    		-- as the type constructor,
+    		-- hence no need to instantiate
+          not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
+        ]
+
 
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
@@ -766,8 +777,7 @@ genInst dfun
 	(tyvars,_,clas,[ty]) 	= tcSplitDFunTy (idType dfun)
 	clas_nm			= className clas
 	tycon  	      	     	= tcTyConAppTyCon ty 
-    	(meth_binds, aux_binds) = assoc "gen_bind:bad derived class"
-	 			  gen_list (getUnique clas) fix_env tycon
+    	(meth_binds, aux_binds) = genDerivBinds clas fix_env tycon
     in
 	-- Bring the right type variables into 
 	-- scope, and rename the method binds
@@ -778,22 +788,31 @@ genInst dfun
     returnM (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
 	     aux_binds)
 
-gen_list :: [(Unique, FixityEnv -> TyCon -> (LHsBinds RdrName, LHsBinds RdrName))]
-gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))
- 	   ,(ordClassKey,     no_aux_binds (ignore_fix_env gen_Ord_binds))
- 	   ,(enumClassKey,    no_aux_binds (ignore_fix_env gen_Enum_binds))
- 	   ,(boundedClassKey, no_aux_binds (ignore_fix_env gen_Bounded_binds))
- 	   ,(ixClassKey,      no_aux_binds (ignore_fix_env gen_Ix_binds))
-	   ,(typeableClassKey,no_aux_binds (ignore_fix_env gen_Typeable_binds))
- 	   ,(showClassKey,    no_aux_binds gen_Show_binds)
- 	   ,(readClassKey,    no_aux_binds gen_Read_binds)
-	   ,(dataClassKey,    gen_Data_binds)
- 	   ]
+genDerivBinds clas fix_env tycon
+  | className clas `elem` typeableClassNames
+  = (gen_Typeable_binds tycon, emptyBag)
 
-  -- no_aux_binds is used for generators that don't 
-  -- need to produce any auxiliary bindings
-no_aux_binds f fix_env tc = (f fix_env tc, emptyBag)
-ignore_fix_env f fix_env tc = f tc
+  | otherwise
+  = case assocMaybe gen_list (getUnique clas) of
+	Just gen_fn -> gen_fn fix_env tycon
+	Nothing	    -> pprPanic "genDerivBinds: bad derived class" (ppr clas)
+  where
+    gen_list :: [(Unique, FixityEnv -> TyCon -> (LHsBinds RdrName, LHsBinds RdrName))]
+    gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))
+ 	       ,(ordClassKey,     no_aux_binds (ignore_fix_env gen_Ord_binds))
+ 	       ,(enumClassKey,    no_aux_binds (ignore_fix_env gen_Enum_binds))
+ 	       ,(boundedClassKey, no_aux_binds (ignore_fix_env gen_Bounded_binds))
+ 	       ,(ixClassKey,      no_aux_binds (ignore_fix_env gen_Ix_binds))
+	       ,(typeableClassKey,no_aux_binds (ignore_fix_env gen_Typeable_binds))
+ 	       ,(showClassKey,    no_aux_binds gen_Show_binds)
+ 	       ,(readClassKey,    no_aux_binds gen_Read_binds)
+	       ,(dataClassKey,    gen_Data_binds)
+ 	       ]
+
+      -- no_aux_binds is used for generators that don't 
+      -- need to produce any auxiliary bindings
+    no_aux_binds f fix_env tc = (f fix_env tc, emptyBag)
+    ignore_fix_env f fix_env tc = f tc
 \end{code}
 
 

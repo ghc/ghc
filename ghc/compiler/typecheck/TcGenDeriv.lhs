@@ -50,7 +50,7 @@ import TysWiredIn
 import MkId		( eRROR_ID )
 import PrimOp		( PrimOp(..) )
 import SrcLoc		( Located(..), noLoc, srcLocSpan )
-import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
+import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, tyConArity,
 			  maybeTyConSingleCon, tyConFamilySize, tyConTyVars, tyConName
 			)
 import TcType		( isUnLiftedType, tcEqType, Type )
@@ -993,27 +993,30 @@ From the data type
 
 we generate
 
-	instance (Typeable a, Typeable b) => Typeable (T a b) where
-		typeOf _ = mkTypeRep (mkTyConRep "T")
-				     [typeOf (undefined::a),
-				      typeOf (undefined::b)]
+	instance Typeable2 T where
+		typeOf2 _ = mkAppTy (mkTyConRep "T") []
 
-Notice the use of lexically scoped type variables.
+We are passed the Typeable2 class as well as T
 
 \begin{code}
 gen_Typeable_binds :: TyCon -> LHsBinds RdrName
 gen_Typeable_binds tycon
   = unitBag $
-	mk_easy_FunBind tycon_loc typeOf_RDR [wildPat] emptyBag
-		(nlHsApps mkTypeRep_RDR [tycon_rep, arg_reps])
+	mk_easy_FunBind tycon_loc 
+		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
+		[wildPat] emptyBag
+		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
   where
     tycon_loc = getSrcSpan tycon
-    tyvars    = tyConTyVars tycon
     tycon_rep = nlHsVar mkTyConRep_RDR `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
-    arg_reps  = nlList (map mk tyvars)
-    mk tyvar  = nlHsApp (nlHsVar typeOf_RDR) 
-		      (noLoc (ExprWithTySig (nlHsVar undefined_RDR)
-				     	    (nlHsTyVar (getRdrName tyvar))))
+
+mk_typeOf_RDR :: TyCon -> RdrName
+-- Use the arity of the TyCon to make the right typeOfn function
+mk_typeOf_RDR tycon = varQual_RDR tYPEABLE_Name (mkFastString ("typeOf" ++ suffix))
+		where
+		  arity = tyConArity tycon
+		  suffix | arity == 0 = ""
+			 | otherwise  = show arity
 \end{code}
 
 

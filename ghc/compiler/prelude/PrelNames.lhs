@@ -123,6 +123,7 @@ basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
  ++ monadNames
+ ++ typeableClassNames
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runIOName,
@@ -151,7 +152,6 @@ basicKnownKeyNames
 	realFracClassName,		-- numeric
 	realFloatClassName,		-- numeric
 	dataClassName, 
-	typeableClassName,
 
 	-- Numeric stuff
 	negateName, minusName, 
@@ -554,11 +554,24 @@ floatingClassName  = clsQual  pREL_FLOAT FSLIT("Floating") floatingClassKey
 realFloatClassName = clsQual  pREL_FLOAT FSLIT("RealFloat") realFloatClassKey
 
 -- Class Ix
-ixClassName	   = clsQual pREL_ARR FSLIT("Ix") ixClassKey
+ixClassName = clsQual pREL_ARR FSLIT("Ix") ixClassKey
 
--- Class Typeable and Data
+-- Class Typeable
 typeableClassName = clsQual tYPEABLE FSLIT("Typeable") typeableClassKey
-dataClassName     = clsQual gENERICS FSLIT("Data")     dataClassKey
+typeable1ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable1ClassKey
+typeable2ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable2ClassKey
+typeable3ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable3ClassKey
+typeable4ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable4ClassKey
+typeable5ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable5ClassKey
+typeable6ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable6ClassKey
+typeable7ClassName = clsQual tYPEABLE FSLIT("Typeable") typeable7ClassKey
+
+typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName
+		 	, typeable3ClassName, typeable4ClassName, typeable5ClassName
+			, typeable6ClassName, typeable7ClassName ]
+
+-- Class Data
+dataClassName = clsQual gENERICS FSLIT("Data") dataClassKey
 
 -- Error module
 assertErrorName	  = varQual pREL_ERR FSLIT("assertError") assertErrorIdKey
@@ -705,7 +718,6 @@ methName cls occ uniq
 boundedClassKey		= mkPreludeClassUnique 1 
 enumClassKey		= mkPreludeClassUnique 2 
 eqClassKey		= mkPreludeClassUnique 3 
-typeableClassKey	= mkPreludeClassUnique 4
 floatingClassKey	= mkPreludeClassUnique 5 
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
@@ -719,7 +731,16 @@ realClassKey		= mkPreludeClassUnique 14
 realFloatClassKey	= mkPreludeClassUnique 15
 realFracClassKey	= mkPreludeClassUnique 16
 showClassKey		= mkPreludeClassUnique 17
-ixClassKey		= mkPreludeClassUnique 20
+ixClassKey		= mkPreludeClassUnique 18
+
+typeableClassKey	= mkPreludeClassUnique 20
+typeable1ClassKey	= mkPreludeClassUnique 21
+typeable2ClassKey	= mkPreludeClassUnique 22
+typeable3ClassKey	= mkPreludeClassUnique 23
+typeable4ClassKey	= mkPreludeClassUnique 24
+typeable5ClassKey	= mkPreludeClassUnique 25
+typeable6ClassKey	= mkPreludeClassUnique 26
+typeable7ClassKey	= mkPreludeClassUnique 27
 \end{code}
 
 %************************************************************************
