@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.15 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: StgProf.h,v 1.16 2001/12/12 14:59:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -34,6 +34,8 @@ typedef struct _CostCentreStack {
   CostCentre *cc;
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
+
+  unsigned int selected;
 
   unsigned long long scc_count;
 
@@ -180,6 +182,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    cc 			: cc_ident,			\
 	    prevStack 		: NULL,				\
 	    indexTable 		: NULL,				\
+            selected            : 0,				\
 	    scc_count 		: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
@@ -194,8 +197,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 /* -----------------------------------------------------------------------------
  * Time / Allocation Macros
  * ---------------------------------------------------------------------------*/
-
-#define CCS_TICK(ccs)  (ccs)->time_ticks++
 
 /* eliminate profiling overhead from allocation costs */
 #define CCS_ALLOC(ccs, size) (ccs)->mem_alloc += ((size)-sizeofW(StgProfHeader))
