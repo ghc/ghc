@@ -166,7 +166,7 @@ instance Read BufferMode where
 Computation @hReady hdl@ indicates whether at least
 one item is available for input from handle {\em hdl}.
 
-@hWaitForInput@ is the generalisation, wait for \tr{n} seconds
+@hWaitForInput@ is the generalisation, wait for \tr{n} milliseconds
 before deciding whether the Handle has run dry or not.
 
 \begin{code}
@@ -174,9 +174,9 @@ before deciding whether the Handle has run dry or not.
 hReady h = hWaitForInput h 0
 
 --hWaitForInput :: Handle -> Int -> IO Bool 
-hWaitForInput handle nsecs = do
+hWaitForInput handle msecs = do
     hdl   <- wantReadableHandle handle
-    rc    <- _ccall_ inputReady (filePtr hdl) nsecs
+    rc    <- _ccall_ inputReady (filePtr hdl) msecs
     writeHandle handle (markHandle hdl)
     case rc of
       0 -> return False

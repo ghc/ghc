@@ -36,9 +36,9 @@
 #endif
 
 StgInt
-inputReady(fp, nsecs)
+inputReady(fp, msecs)
 StgForeignObj fp;
-StgInt nsecs;
+StgInt msecs;
 {
     int flags, c, fd, maxfd, ready;
     fd_set rfd;
@@ -75,8 +75,8 @@ StgInt nsecs;
     FD_SET(fd, &rfd);
     /* select() will consider the descriptor set in the range of 0 to (maxfd-1) */
     maxfd = fd + 1;
-    tv.tv_usec = 0;
-    tv.tv_sec  = nsecs;
+    tv.tv_sec  = msecs / 1000;
+    tv.tv_usec = msecs % 1000;
     while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
       if (errno != EINTR ) {
 		cvtErrno();
