@@ -4285,40 +4285,20 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
       be put anywhere its type signature could be put.</para>
 
-<para>A <literal>SPECIALIZE</literal> has the effect of generating (a) a specialised
-version of the function and (b) a rewrite rule (see <xref linkend="rules">) that 
-rewrites a call to the un-specialised function into a call to the specialised
-one. You can, instead, provide your own specialised function and your own rewrite rule.
-For example, suppose that:
-<programlisting>
-  genericLookup :: Ord a => Table a b   -> a   -> b
-  intLookup     ::          Table Int b -> Int -> b
-</programlisting>
-where <literal>intLookup</literal> is an implementation of <literal>genericLookup</literal>
-that works very fast for keys of type <literal>Int</literal>.  Then you can write the rule
-<programlisting>
-  {-# RULES "intLookup" genericLookup = intLookup #-}
-</programlisting>
-(see <xref linkend="rule-spec">). It is <emphasis>Your
-      Responsibility</emphasis> to make sure that
-      <function>intLookup</function> really behaves as a specialised
-      version of <function>genericLookup</function>!!!</para>
+      <para>A <literal>SPECIALIZE</literal> has the effect of generating
+      (a) a specialised version of the function and (b) a rewrite rule
+      (see <xref linkend="rewrite-rules">) that rewrites a call to the
+      un-specialised function into a call to the specialised one.</para>
 
-      <para>An example in which using <literal>RULES</literal> for
-      specialisation will Win Big:
+      <para>In earlier versions of GHC, it was possible to provide your own
+      specialised function for a given type:
 
 <programlisting>
-  toDouble :: Real a => a -> Double
-  toDouble = fromRational . toRational
-
-  {-# RULES "toDouble/Int" toDouble = i2d #-}
-  i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
+{-# SPECIALIZE hammeredLookup :: [(Int, value)] -> Int -> value = intLookup #-}
 </programlisting>
 
-      The <function>i2d</function> function is virtually one machine
-      instruction; the default conversion&mdash;via an intermediate
-      <literal>Rational</literal>&mdash;is obscenely expensive by
-      comparison.</para>
+      This feature has been removed, as it is now subsumed by the
+      <literal>RULES</literal> pragma (see <xref linkend="rule-spec">).</para>
 
     </sect2>
 
@@ -4904,41 +4884,60 @@ Prelude definitions of the above functions to see how to do so.
 
 <para>
 Rewrite rules can be used to get the same effect as a feature
-present in earlier version of GHC:
+present in earlier versions of GHC.
+For example, suppose that:
 
 <programlisting>
-  {-# SPECIALIZE fromIntegral :: Int8 -> Int16 = int8ToInt16 #-}
+genericLookup :: Ord a => Table a b   -> a   -> b
+intLookup     ::          Table Int b -> Int -> b
 </programlisting>
 
-This told GHC to use <function>int8ToInt16</function> instead of <function>fromIntegral</function> whenever
-the latter was called with type <literal>Int8 -&gt; Int16</literal>.  That is, rather than
-specialising the original definition of <function>fromIntegral</function> the programmer is
-promising that it is safe to use <function>int8ToInt16</function> instead.
+where <function>intLookup</function> is an implementation of
+<function>genericLookup</function> that works very fast for
+keys of type <literal>Int</literal>.  You might wish
+to tell GHC to use <function>intLookup</function> instead of
+<function>genericLookup</function> whenever the latter was called with
+type <literal>Table Int b -&gt; Int -&gt; b</literal>.
+It used to be possible to write
+
+<programlisting>
+{-# SPECIALIZE genericLookup :: Table Int b -> Int -> b = intLookup #-}
+</programlisting>
+
+This feature is no longer in GHC, but rewrite rules let you do the same thing:
+
+<programlisting>
+{-# RULES "genericLookup/Int" genericLookup = intLookup #-}
+</programlisting>
+
+This slightly odd-looking rule instructs GHC to replace
+<function>genericLookup</function> by <function>intLookup</function>
+<emphasis>whenever the types match</emphasis>.
+What is more, this rule does not need to be in the same
+file as <function>genericLookup</function>, unlike the
+<literal>SPECIALIZE</literal> pragmas which currently do (so that they
+have an original definition available to specialise).
 </para>
 
-<para>
-This feature is no longer in GHC.  But rewrite rules let you do the
-same thing:
+<para>It is <emphasis>Your Responsibility</emphasis> to make sure that
+<function>intLookup</function> really behaves as a specialised version
+of <function>genericLookup</function>!!!</para>
+
+<para>An example in which using <literal>RULES</literal> for
+specialisation will Win Big:
 
 <programlisting>
-{-# RULES
-  "fromIntegral/Int8/Int16" fromIntegral = int8ToInt16
-#-}
+toDouble :: Real a => a -> Double
+toDouble = fromRational . toRational
+
+{-# RULES "toDouble/Int" toDouble = i2d #-}
+i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
 </programlisting>
 
-This slightly odd-looking rule instructs GHC to replace <function>fromIntegral</function>
-by <function>int8ToInt16</function> <emphasis>whenever the types match</emphasis>.  Speaking more operationally,
-GHC adds the type and dictionary applications to get the typed rule
-
-<programlisting>
-forall (d1::Integral Int8) (d2::Num Int16) .
-        fromIntegral Int8 Int16 d1 d2 = int8ToInt16
-</programlisting>
-
-What is more,
-this rule does not need to be in the same file as fromIntegral,
-unlike the <literal>SPECIALISE</literal> pragmas which currently do (so that they
-have an original definition available to specialise).
+The <function>i2d</function> function is virtually one machine
+instruction; the default conversion&mdash;via an intermediate
+<literal>Rational</literal>&mdash;is obscenely expensive by
+comparison.
 </para>
 
 </sect2>
