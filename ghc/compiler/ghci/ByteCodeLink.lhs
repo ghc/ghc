@@ -4,6 +4,9 @@
 \section[ByteCodeLink]{Bytecode assembler and linker}
 
 \begin{code}
+
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+
 module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 		      ClosureEnv, HValue, filterNameMap,
 		      linkIModules, linkIExpr,

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: VisCallbacks.c,v 1.1 2000/11/01 11:41:47 simonmar Exp $
+ * $Id: VisCallbacks.c,v 1.2 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -8,8 +8,6 @@
  * ---------------------------------------------------------------------------*/
 
 #ifdef RTS_GTK_FRONTPANEL
-
-#define NON_POSIX_SOURCE
 
 #include "Rts.h"
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.4 2001/01/19 11:08:05 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.5 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -9,7 +9,8 @@
 
 #ifdef RTS_GTK_FRONTPANEL
 
-#define NON_POSIX_SOURCE
+/* Alas, not Posix. */
+/* #include "PosixSource.h" */
 
 #include "Rts.h"
 #include "RtsUtils.h"

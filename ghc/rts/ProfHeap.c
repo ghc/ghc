@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.24 2001/08/07 19:34:01 ken Exp $
+ * $Id: ProfHeap.c,v 1.25 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -15,6 +15,7 @@
 
 #if defined(PROFILING) || defined(DEBUG_HEAP_PROF)
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

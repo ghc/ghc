@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.5 2001/06/27 11:29:10 sewardj Exp $
+ * $Id: Hash.c,v 1.6 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -9,6 +9,7 @@
  * pp. 446 -- 457.
  * -------------------------------------------------------------------------- */
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "Hash.h"
 #include "RtsUtils.h"

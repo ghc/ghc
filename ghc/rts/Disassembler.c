@@ -5,12 +5,13 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.23 $
- * $Date: 2001/08/09 11:19:16 $
+ * $Revision: 1.24 $
+ * $Date: 2001/08/14 13:40:09 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "RtsUtils.h"

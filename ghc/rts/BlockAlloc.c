@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.9 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.10 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -16,6 +16,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"

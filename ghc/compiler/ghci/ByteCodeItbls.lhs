@@ -4,6 +4,9 @@
 \section[ByteCodeItbls]{Generate infotables for interpreter-made bytecodes}
 
 \begin{code}
+
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+
 module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
 
 #include "HsVersions.h"

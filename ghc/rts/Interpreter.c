@@ -5,10 +5,11 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.29 $
- * $Date: 2001/08/09 11:23:19 $
+ * $Revision: 1.30 $
+ * $Date: 2001/08/14 13:40:09 $
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "RtsUtils.h"

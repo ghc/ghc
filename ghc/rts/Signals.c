@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.20 2001/07/26 03:24:01 ken Exp $
+ * $Id: Signals.c,v 1.21 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,8 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#define NON_POSIX_SOURCE
-
+/* This is non=Posix compliant.
+   #include "PosixSource.h" 
+*/
 #include "Rts.h"
 #include "SchedAPI.h"
 #include "Schedule.h"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.19 2001/07/24 06:31:36 ken Exp $
+ * $Id: RtsUtils.c,v 1.20 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 /* gettimeofday isn't POSIX */
-#define NON_POSIX_SOURCE
+/* #include "PosixSource.h" */
 
 #include "Rts.h"
 #include "RtsTypes.h"

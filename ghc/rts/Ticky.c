@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.12 1999/11/11 17:50:48 simonpj Exp $
+ * $Id: Ticky.c,v 1.13 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -10,6 +10,7 @@
 #if defined(TICKY_TICKY)
 
 #define TICKY_C			/* define those variables */
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Ticky.h"

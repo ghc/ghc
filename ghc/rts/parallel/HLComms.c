@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  * Time-stamp: <Wed Mar 21 2001 16:34:41 Stardate: [-30]6363.45 hwloidl>
- * $Id: HLComms.c,v 1.5 2001/05/28 07:13:54 sof Exp $
+ * $Id: HLComms.c,v 1.6 2001/08/14 13:40:10 sewardj Exp $
  *
  * High Level Communications Routines (HLComms.lc)
  *
@@ -31,9 +31,8 @@
 //@node Macros etc, Includes, High Level Communications Routines, High Level Communications Routines
 //@subsection Macros etc
 
-# ifndef _AIX
-# define NON_POSIX_SOURCE /* so says Solaris */
-# endif
+/* Evidently not Posix */
+/* #include "PosixSource.h" */
 
 //@node Includes, GUM Message Sending and Unpacking Functions, Macros etc, High Level Communications Routines
 //@subsection Includes

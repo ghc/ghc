@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.99 2001/07/30 09:47:13 simonmar Exp $
+ * $Id: Schedule.c,v 1.100 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -74,6 +74,7 @@
 //@node Includes, Variables and Data structures, Main scheduling code, Main scheduling code
 //@subsection Includes
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "SchedAPI.h"
 #include "RtsUtils.h"

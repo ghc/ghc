@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPIDeprec.c,v 1.1 2001/01/11 17:25:56 simonmar Exp $
+ * $Id: RtsAPIDeprec.c,v 1.2 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -7,6 +7,7 @@
  *
  * --------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "Storage.h"

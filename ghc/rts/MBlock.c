@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.22 2001/07/24 06:31:36 ken Exp $
+ * $Id: MBlock.c,v 1.23 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -9,7 +9,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#define NON_POSIX_SOURCE
+/* This is non-posix compliant. */
+/* #include "PosixSource.h" */
 
 #include "Rts.h"
 #include "RtsUtils.h"

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  * Time-stamp: <Mon Mar 19 2001 22:10:38 Stardate: [-30]6354.62 hwloidl>
- * $Id: LLComms.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
+ * $Id: LLComms.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
  *
  * GUM Low-Level Inter-Task Communication
  *
@@ -43,7 +43,9 @@
 //@node Macros etc, Includes, GUM Low-Level Inter-Task Communication, GUM Low-Level Inter-Task Communication
 //@subsection Macros etc
 
-#define NON_POSIX_SOURCE /* so says Solaris */
+/* Evidently not Posix */
+/* #include "PosixSource.h" */
+
 #define UNUSED           /* nothing */
 
 //@node Includes, Auxiliary functions, Macros etc, GUM Low-Level Inter-Task Communication

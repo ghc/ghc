@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.16 2001/02/28 14:23:55 sewardj Exp $
+ * $Id: Select.c,v 1.17 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 /* we're outside the realms of POSIX here... */
-#define NON_POSIX_SOURCE
+/* #include "PosixSource.h" */
 
 #include "Rts.h"
 #include "Schedule.h"

@@ -8,7 +8,7 @@ of bytes (character strings). Used by the interface lexer input
 subsystem, mostly.
 
 \begin{code}
-{-# OPTIONS -fvia-C -monly-3-regs #-}
+{-# OPTIONS -monly-3-regs -optc-DNON_POSIX_SOURCE #-}
 module PrimPacked
        (
         strLength,          -- :: _Addr -> Int

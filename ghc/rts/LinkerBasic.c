@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerBasic.c,v 1.2 2001/02/12 13:03:17 sewardj Exp $
+ * $Id: LinkerBasic.c,v 1.3 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "Hash.h"
 #include "StoragePriv.h"

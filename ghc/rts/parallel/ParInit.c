@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
    Time-stamp: <Wed Mar 21 2001 16:37:16 Stardate: [-30]6363.46 hwloidl>
-   $Id: ParInit.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
+   $Id: ParInit.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
 
    Initialising the parallel RTS
 
@@ -14,8 +14,6 @@
 
 #ifdef PAR /* whole file */
 
-#define NON_POSIX_SOURCE /* so says Solaris */
-
 //@menu
 //* Includes::			
 //* Global variables::		
@@ -24,6 +22,9 @@
 
 //@node Includes, Global variables
 //@subsection Includes
+
+/* Evidently not Posix */
+/* #include "PosixSource.h" */
 
 #include <setjmp.h>
 #include "Rts.h"

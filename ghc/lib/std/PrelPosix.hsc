@@ -1,14 +1,17 @@
-{-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.10 2001/08/10 11:02:00 simonmar Exp $
+-- $Id: PrelPosix.hsc,v 1.11 2001/08/14 13:40:08 sewardj Exp $
 --
 -- POSIX support layer for the standard libraries
 --
--- NON_POSIX_SOURCE needed for the following features:
+-- Non-posix compliant in order to support the following features:
 --	* S_ISSOCK (no sockets in POSIX)
 
 module PrelPosix where
+
+-- See above comment for non-Posixness reasons.
+-- #include "PosixSource.h"
 
 #include "HsStd.h"
 

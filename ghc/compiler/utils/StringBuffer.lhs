@@ -7,7 +7,7 @@ Buffers for scanning string input stored in external arrays.
 
 \begin{code}
 
-{-# OPTIONS -fvia-C #-}
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module StringBuffer
        (

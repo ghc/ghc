@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.3 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Sparks.c,v 1.4 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -20,6 +20,7 @@
 //@node Includes, GUM code, Spark Management Routines, Spark Management Routines
 //@subsection Includes
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "Schedule.h"
 #include "SchedAPI.h"

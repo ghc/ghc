@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.25 2001/08/07 20:06:41 ken Exp $
+ * $Id: StgCRun.c,v 1.26 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -32,6 +32,8 @@
  * variables.  
  *
  * -------------------------------------------------------------------------- */
+
+#include "PosixSource.h"
 
 
 /*
@@ -78,19 +80,6 @@ register double fake_f9 __asm__("$f9");
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
 	
-/* The static @jmp_environment@ variable allows @miniInterpret@ to
- * communicate with @StgReturn@.
- * 
- * Because @StgRun@ may be used recursively, we carefully
- * save and restore the whole of @jmp_environment@.
- */
-#include <setjmp.h>
-#include <string.h> /* for memcpy */
-
-static jmp_buf jmp_environment;
-
-#if 1
-
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
    while (f) {
@@ -108,144 +97,6 @@ EXTFUN(StgReturn)
 {
    return 0;
 }
-
-#else
-
-#define CHECK_STACK   0
-#define STACK_DETAILS 0
-
-static int enters = 0;
-
-static void scanStackSeg ( W_* ptr, int nwords )
-{
-   W_ w;
-#if CHECK_STACK
-   int nwords0 = nwords;
-#if STACK_DETAILS
-   while (nwords > 0) {
-      w = *ptr;
-      if (IS_ARG_TAG(w)) {
-         fprintf ( stderr, "%d",w ); nwords--; ptr++;
-	 while (w) { fprintf(stderr, "_"); w--; nwords--; ptr++; }
-      }
-      else {
-         fprintf(stderr, "p"); 
-         nwords--; ptr++;
-      }
-   }
-   if (nwords < 0) fprintf(stderr, "erk: nwords < 0\n");
-#endif
-   checkStackChunk ( ptr, ptr-nwords0 );
-#endif
-}
-
-extern StgFunPtr stg_enterStackTop;
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
-{
-    char* nm;
-    while (1) {
-
-#if CHECK_STACK
-   {
-   int i;
-   StgTSO*  tso = basereg->rCurrentTSO;
-   StgWord* sb  = tso->stack + tso->stack_size;
-   StgWord* sp;
-   StgWord* su;
-   int ws;
-
-   if (f == &stg_enterStackTop) {
-      sp = tso->sp;
-      su = tso->su;
-   } else {
-      sp  = basereg->rSp;
-      su  = basereg->rSu;
-   }
-
-#if STACK_DETAILS
-   fprintf(stderr, 
-           "== SB = %p   SP = %p(%p)   SU = %p   SpLim = %p(%p)\n", 
-           sb, sp, tso->sp,   su, basereg->rSpLim, tso->stack + RESERVED_STACK_WORDS);
-#endif
-
-   if (su >= sb) goto postloop;
-   if (!sp || !su) goto postloop;
-
-   printStack ( sp, sb, su);
-
-   while (1) {
-      ws = su - sp;
-      switch (get_itbl((StgClosure*)su)->type) {
-         case STOP_FRAME: 
-            scanStackSeg(sp,ws);
-#if STACK_DETAILS
-            fprintf(stderr, "S%d ",ws); 
-            fprintf(stderr, "\n");
-#endif
-            goto postloop;
-         case UPDATE_FRAME: 
-            scanStackSeg(sp,ws);
-#if STACK_DETAILS
-            fprintf(stderr,"U%d ",ws); 
-#endif
-            sp = su + sizeofW(StgUpdateFrame);
-            su = ((StgUpdateFrame*)su)->link;
-            break;
-         case SEQ_FRAME: 
-            scanStackSeg(sp,ws);
-#if STACK_DETAILS
-            fprintf(stderr,"Q%d ",ws); 
-#endif
-            sp = su + sizeofW(StgSeqFrame);
-            su = ((StgSeqFrame*)su)->link;
-            break;
-         case CATCH_FRAME: 
-            scanStackSeg(sp,ws);
-#if STACK_DETAILS
-            fprintf(stderr,"C%d ",ws); 
-#endif
-            sp = su + sizeofW(StgCatchFrame);
-            su = ((StgCatchFrame*)su)->link;
-            break;
-         default:
-            fprintf(stderr, "?\nweird record on stack\n");
-            assert(0);
-            goto postloop;
-      }
-   }
-   postloop:
-   }
-#endif
-#if STACK_DETAILS
-       fprintf(stderr,"\n");
-#endif
-#if 1
-       fprintf(stderr,"-- enter %p ", f);
-       nm = nameFromOPtr ( f );
-          if (nm) fprintf(stderr, "%s", nm); else
-          printPtr((P_)f);
-       fprintf ( stderr, "\n");
-#endif
-#if STACK_DETAILS
-       fprintf(stderr,"\n");
-#endif
-    zzz:
-       if (enters % 1000 == 0) fprintf(stderr, "%d enters\n",enters);
-       enters++;
-       f = (StgFunPtr) (f)();
-       if (!f) break;
-    }
-    fprintf (stderr, "miniInterpreter: bye!\n\n" );
-    return (StgThreadReturnCode)R1.i;
-}
-
-EXTFUN(StgReturn)
-{
-   return 0;
-}
-#endif
-
-
 
 #else /* !USE_MINIINTERPRETER */
 

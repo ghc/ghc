@@ -1,13 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.17 2001/08/07 08:18:15 rrt Exp $
+ * $Id: system.c,v 1.18 2001/08/14 13:40:08 sewardj Exp $
  *
  * system Runtime Support
  */
 
 /* The itimer stuff in this module is non-posix */
-#define NON_POSIX_SOURCE
+/* #include "PosixSource.h" */
 
 #include "HsStd.h"
 

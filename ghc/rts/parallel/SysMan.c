@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
    Time-stamp: <Wed Mar 21 2001 17:16:28 Stardate: [-30]6363.59 hwloidl>
-   $Id: SysMan.c,v 1.4 2001/03/22 03:51:12 hwloidl Exp $
+   $Id: SysMan.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
 
    GUM System Manager Program
    Handles startup, shutdown and global synchronisation of the parallel system.
@@ -99,6 +99,9 @@ o Begins execution.
 //@node Includes, Macros etc, General docu, GUM System Manager Program
 //@subsection Includes
 
+/* Evidently not Posix */
+/* #include "PosixSource.h" */
+
 #include "Rts.h"
 #include "ParTypes.h"
 #include "LLC.h"
@@ -107,8 +110,6 @@ o Begins execution.
 
 //@node Macros etc, Variables, Includes, GUM System Manager Program
 //@subsection Macros etc
-
-#define NON_POSIX_SOURCE /* so says Solaris */
 
 /* SysMan is put on top of the GHC routine that does the RtsFlags handling.
    So, we cannot use the standard macros. For the time being we use a macro
@@ -294,7 +295,7 @@ main (int argc, char **argv) {
 
   IF_PAR_DEBUG(verbose,
 	       fprintf(stderr,
-	               "==== RFP: GdH enabled SysMan reporting for duty ($Revision: 1.4 $)\n"));
+	               "==== RFP: GdH enabled SysMan reporting for duty ($Revision: 1.5 $)\n"));
   
   if (argc > 1) {
     if (*argv[1] == '-') {

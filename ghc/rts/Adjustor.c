@@ -36,6 +36,7 @@ and C resources. Failure to do so result in memory leaks on both the C and
 Haskell side.
 
 */
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

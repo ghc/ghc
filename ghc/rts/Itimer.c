@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.22 2001/03/02 10:52:15 simonmar Exp $
+ * $Id: Itimer.c,v 1.23 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -18,9 +18,8 @@
  * to support.  So much for standards.
  */
 
-#if !defined(_AIX)
-# define NON_POSIX_SOURCE
-#endif
+/* This is not posix compliant. */
+/* #include "PosixSource.h" */
 
 #include "Rts.h"
 #include "RtsFlags.h"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.48 2001/08/13 12:34:37 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.49 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -21,6 +21,7 @@
 //@node Includes, Constants
 //@subsection Includes
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"

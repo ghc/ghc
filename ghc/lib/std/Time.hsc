@@ -1,9 +1,6 @@
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
--- JRS 010117: we had to say NON_POSIX_SOURCE to get the resulting .hc
--- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.19 2001/07/24 05:53:27 ken Exp $
+-- $Id: Time.hsc,v 1.20 2001/08/14 13:40:08 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --

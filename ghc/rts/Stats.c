@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.31 2001/07/23 17:23:20 simonmar Exp $
+ * $Id: Stats.c,v 1.32 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,7 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#define NON_POSIX_SOURCE
+/* Alas, no.  This source is non-posix.
+   #include "PosixSource.h" 
+*/
 
 #include "Rts.h"
 #include "RtsFlags.h"

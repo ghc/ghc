@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.21 2001/07/23 23:37:35 andy Exp $
+ * $Id: Profiling.c,v 1.22 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -9,6 +9,7 @@
 
 #ifdef PROFILING
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

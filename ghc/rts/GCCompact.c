@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.8 2001/08/10 09:40:11 simonmar Exp $
+ * $Id: GCCompact.c,v 1.9 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.29 2001/08/07 20:10:30 ken Exp $
+ * $Id: Main.c,v 1.30 2001/08/14 13:40:09 sewardj Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -9,6 +9,7 @@
 
 #define COMPILING_RTS_MAIN
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "SchedAPI.h"

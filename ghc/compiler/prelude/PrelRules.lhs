@@ -12,6 +12,9 @@ ToDo:
    (i1 + i2) only if it results	in a valid Float.
 
 \begin{code}
+
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+
 module PrelRules ( primOpRule, builtinRules ) where
 
 #include "HsVersions.h"
