@@ -21,7 +21,7 @@ import VarEnv
 import VarSet
 import Var		( Id, IdOrTyVar )
 import Id		( idType, idInfo, idName, 
-			  mkVanillaId, mkId, isUserExportedId,
+			  mkVanillaId, mkId, exportWithOrigOccName,
 			  getIdStrictness, setIdStrictness,
 			  getIdDemandInfo, setIdDemandInfo,
 			) 
@@ -94,7 +94,7 @@ tidyCorePgm us module_name binds_in rules
 	-- decl.  tidyTopId then does a no-op on exported binders.
     init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
     avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
-				       isUserExportedId bndr]
+				       exportWithOrigOccName bndr]
 
 tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> TidyEnv
@@ -207,8 +207,8 @@ tidyTopId :: Module -> TidyEnv -> TidyEnv -> Id -> (TidyEnv, Id)
 tidyTopId mod env@(tidy_env, var_env) env_idinfo id
   =	-- Top level variables
     let
-	(tidy_env', name') | isUserExportedId id = (tidy_env, idName id)
-			   | otherwise	         = tidyTopName mod tidy_env (idName id)
+	(tidy_env', name') | exportWithOrigOccName id = (tidy_env, idName id)
+			   | otherwise	              = tidyTopName mod tidy_env (idName id)
 	ty'	           = tidyTopType (idType id)
 	idinfo'		   = tidyIdInfo env_idinfo (idInfo id)
 	id'		   = mkId name' ty' idinfo'
