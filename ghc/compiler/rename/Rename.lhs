@@ -20,9 +20,10 @@ import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, mkImportInfo, 
 			  getInterfaceExports,
-			  getImportedRules, getSlurped, removeContext,
+			  getImportedRules, getSlurped,
 			  ImportDeclResult(..)
 			)
+import RnHiFiles	( removeContext )
 import RnEnv		( availName, availsToNameSet, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, sortAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
@@ -35,7 +36,6 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameUnique, nameModule,
-			  isUserExportedName, 
 			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
 import OccName		( occNameFlavour )
@@ -913,142 +913,6 @@ dupFixityDecl rdr_name loc1 loc2
 badDeprec d
   = sep [ptext SLIT("Illegal deprecation when whole module is deprecated"),
 	 nest 4 (ppr d)]
-\end{code}
-
-
-%********************************************************
-%*							*
-\subsection{Checking usage information}
-%*							*
-%********************************************************
-
-\begin{code}
-{-
-checkEarlyExit mod_name
-  = traceRn (text "Considering whether compilation is required...")	`thenRn_`
-
-	-- Read the old interface file, if any, for the module being compiled
-    findAndReadIface doc_str mod_name False {- Not hi-boot -}	`thenRn` \ maybe_iface ->
-
-	-- CHECK WHETHER WE HAVE IT ALREADY
-    case maybe_iface of
-	Left err -> 	-- Old interface file not found, so we'd better bail out
-		    traceRn (vcat [ptext SLIT("No old interface file for") <+> ppr mod_name,
-				   err])			`thenRn_`
-		    returnRn (outOfDate, Nothing)
-
-	Right iface
-	  | panic "checkEarlyExit: ???: not opt_SourceUnchanged"
-	  -> 	-- Source code changed
-	     traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
-	     returnRn (False, Just iface)
-
-	  | otherwise
-	  -> 	-- Source code unchanged and no errors yet... carry on 
-	     checkModUsage (pi_usages iface)	`thenRn` \ up_to_date ->
-	     returnRn (up_to_date, Just iface)
-  where
-	-- Only look in current directory, with suffix .hi
-    doc_str = sep [ptext SLIT("need usage info from"), ppr mod_name]
-\end{code}
-	
-\begin{code}
-upToDate  = True
-outOfDate = False
-
-checkModUsage :: [ImportVersion OccName] -> RnMG Bool
--- Given the usage information extracted from the old
--- M.hi file for the module being compiled, figure out
--- whether M needs to be recompiled.
-
-checkModUsage [] = returnRn upToDate		-- Yes!  Everything is up to date!
-
-checkModUsage ((mod_name, _, _, NothingAtAll) : rest)
-	-- If CurrentModule.hi contains 
-	--	import Foo :: ;
-	-- then that simply records that Foo lies below CurrentModule in the
-	-- hierarchy, but CurrentModule doesn't depend in any way on Foo.
-	-- In this case we don't even want to open Foo's interface.
-  = traceRn (ptext SLIT("Nothing used from:") <+> ppr mod_name)	`thenRn_`
-    checkModUsage rest	-- This one's ok, so check the rest
-
-checkModUsage ((mod_name, _, _, whats_imported)  : rest)
-  = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
-    case maybe_err of {
-	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
-				      ppr mod_name]) ;
-		-- Couldn't find or parse a module mentioned in the
-		-- old interface file.  Don't complain -- it might just be that
-		-- the current module doesn't need that import and it's been deleted
-
-	Nothing -> 
-    let
-	(_, new_mod_vers, new_fix_vers, new_rule_vers, _, _) 
-		= case lookupFM (iImpModInfo ifaces) mod_name of
-			   Just (_, _, Just stuff) -> stuff
-
-        old_mod_vers = case whats_imported of
-			 Everything v 	     -> v
-			 Specifically v _ _ _ -> v
-			 -- NothingAtAll case dealt with by previous eqn for checkModUsage
-    in
-	-- If the module version hasn't changed, just move on
-    if new_mod_vers == old_mod_vers then
-	traceRn (sep [ptext SLIT("Module version unchanged:"), ppr mod_name])
-	`thenRn_` checkModUsage rest
-    else
-    traceRn (sep [ptext SLIT("Module version has changed:"), ppr mod_name])
-    `thenRn_`
-	-- Module version changed, so check entities inside
-
-	-- If the usage info wants to say "I imported everything from this module"
-	--     it does so by making whats_imported equal to Everything
-	-- In that case, we must recompile
-    case whats_imported of {	-- NothingAtAll dealt with earlier
-	
-      Everything _ 
-	-> out_of_date (ptext SLIT("...and I needed the whole module")) ;
-
-      Specifically _ old_fix_vers old_rule_vers old_local_vers ->
-
-    if old_fix_vers /= new_fix_vers then
-	out_of_date (ptext SLIT("Fixities changed"))
-    else if old_rule_vers /= new_rule_vers then
-	out_of_date (ptext SLIT("Rules changed"))
-    else	
-	-- Non-empty usage list, so check item by item
-    checkEntityUsage mod_name (iDecls ifaces) old_local_vers	`thenRn` \ up_to_date ->
-    if up_to_date then
-	traceRn (ptext SLIT("...but the bits I use haven't."))	`thenRn_`
-	checkModUsage rest	-- This one's ok, so check the rest
-    else
-	returnRn outOfDate	-- This one failed, so just bail out now
-    }}
-  where
-    doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
-
-
-checkEntityUsage mod decls [] 
-  = returnRn upToDate	-- Yes!  All up to date!
-
-checkEntityUsage mod decls ((occ_name,old_vers) : rest)
-  = newGlobalName mod occ_name 	`thenRn` \ name ->
-    case lookupNameEnv decls name of
-
-	Nothing       -> 	-- We used it before, but it ain't there now
-			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
-
-	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
-		| new_vers == old_vers
-			-- Up to date, so check the rest
-		-> checkEntityUsage mod decls rest
-
-		| otherwise
-			-- Out of date, so bale out
-		-> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
-
-out_of_date msg = traceRn msg `thenRn_` returnRn outOfDate
--}
 \end{code}
 
 

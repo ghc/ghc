@@ -18,8 +18,8 @@ import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
 			)
-import RnIfaces		( getInterfaceExports, getDeclBinders, 
-			  recordLocalSlurps )
+import RnIfaces		( getInterfaceExports, recordLocalSlurps )
+import RnHiFiles	( getDeclBinders )
 import RnEnv
 import RnMonad
 

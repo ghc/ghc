@@ -10,7 +10,7 @@ module HscTypes (
 	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
 	HomeIfaceTable, PackageIfaceTable, 
-	lookupTable,
+	lookupTable, lookupTableByModName,
 
 	IfaceDecls(..), 
 
@@ -49,7 +49,8 @@ import Name		( Name, NameEnv, NamedThing,
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
-			  lookupModuleEnv )
+			  lookupModuleEnv, lookupModuleEnvByName
+			)
 import VarSet		( TyVarSet )
 import VarEnv		( emptyVarEnv )
 import Id		( Id )
@@ -191,6 +192,11 @@ lookupTable ht pt name
   = lookupModuleEnv ht mod `seqMaybe` lookupModuleEnv pt mod
   where
     mod = nameModule name
+
+lookupTableByModName :: ModuleEnv a -> ModuleEnv a -> ModuleName -> Maybe a
+-- We often have two Symbol- or IfaceTables, and want to do a lookup
+lookupTableByModName ht pt mod
+  = lookupModuleEnvByName ht mod `seqMaybe` lookupModuleEnvByName pt mod
 \end{code}
 
 
