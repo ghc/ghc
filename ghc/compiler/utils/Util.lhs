@@ -15,7 +15,7 @@ module Util (
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipEqual,
 	mapAndUnzip, mapAndUnzip3,
-	nOfThem, lengthExceeds, isSingleton,
+	nOfThem, lengthExceeds, isSingleton, only,
 	snocView,
 	isIn, isn'tIn,
 
@@ -188,6 +188,13 @@ isSingleton :: [a] -> Bool
 
 isSingleton [x] = True
 isSingleton  _  = False
+
+only :: [a] -> a
+#ifdef DEBUG
+only [a] = a
+#else
+only (a:_) = a
+#endif
 \end{code}
 
 \begin{code}

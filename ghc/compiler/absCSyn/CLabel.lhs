@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.24 1999/03/02 16:44:26 sof Exp $
+% $Id: CLabel.lhs,v 1.25 1999/04/27 12:34:49 simonm Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -173,6 +173,7 @@ data CLabelType
   = InfoTblType
   | ClosureType
   | VecTblType
+  | ClosureTblType
   | CodeType
   | DataType
 \end{code}
@@ -248,9 +249,9 @@ needsCDecl (IdLabel _ _)		= True
 needsCDecl (CaseLabel _ CaseReturnPt)	= True
 needsCDecl (DataConLabel _ _)		= True
 needsCDecl (CaseLabel _ _)		= False
+needsCDecl (TyConLabel _)		= True
 
 needsCDecl (AsmTempLabel _)		= False
-needsCDecl (TyConLabel _)		= False
 needsCDecl (RtsLabel _)			= False
 needsCDecl (CC_Label _)			= False
 needsCDecl (CCS_Label _)		= False
@@ -304,6 +305,7 @@ labelType (RtsLabel (RtsApInfoTbl _ _))       = InfoTblType
 labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType
+labelType (TyConLabel _)		      = ClosureTblType
 
 labelType (IdLabel _ info) = 
   case info of

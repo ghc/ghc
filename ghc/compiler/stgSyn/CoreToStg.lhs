@@ -21,8 +21,10 @@ import CoreUtils	( coreExprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
 import Id		( Id, mkSysLocal, idType,
-			  externallyVisibleId, setIdUnique, idName
+			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo
 			)
+import Var		( modifyIdInfo )
+import IdInfo		( setDemandInfo )
 import DataCon		( DataCon, dataConName, dataConId )
 import Name	        ( Name, nameModule, isLocallyDefinedName )
 import Module		( isDynamicModule )
@@ -32,6 +34,7 @@ import Const		( Con(..), isWHNFCon, Literal(..) )
 import PrimOp		( PrimOp(..) )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type )
 import TysPrim		( intPrimTy )
+import Demand
 import Unique		( Unique, Uniquable(..) )
 import UniqSupply	-- all of it, really
 import Outputable
@@ -451,7 +454,7 @@ coreExprToStgFloat env expr@(Con con args)
 \begin{code}
 coreExprToStgFloat env expr@(Case scrut bndr alts)
   = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
-    newLocalId env bndr				`thenUs` \ (env', bndr') ->
+    newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
     alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
     returnUs (binds, mkStgCase scrut' bndr' alts')
   where
@@ -530,6 +533,18 @@ newLocalId env id
     getUniqueUs			`thenUs` \ uniq ->
     let
       id'     = setIdUnique id uniq
+      new_env = extendVarEnv env id id'
+    in
+    returnUs (new_env, id')
+
+-- we overload the demandInfo field of an Id to indicate whether the Id is definitely
+-- evaluated or not (i.e. whether it is a case binder).  This can be used to eliminate
+-- some redundant cases (c.f. dataToTag# above).
+
+newEvaldLocalId env id
+  = getUniqueUs			`thenUs` \ uniq ->
+    let
+      id'     = setIdUnique id uniq `modifyIdInfo` setDemandInfo wwStrict
       new_env = extendVarEnv env id id'
     in
     returnUs (new_env, id')

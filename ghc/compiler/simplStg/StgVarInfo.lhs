@@ -16,7 +16,9 @@ import StgSyn
 import Id		( setIdArity, getIdArity, Id )
 import VarSet
 import VarEnv
-import IdInfo		( ArityInfo(..) )
+import Var
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), 
+			  setInlinePragInfo )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
 import BasicTypes       ( Arity )
@@ -287,6 +289,11 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
     vars_alts alts		  `thenLne` \ (alts2, alts_fvs, alts_escs) ->
     lookupLiveVarsForSet alts_fvs `thenLne` \ alts_lvs ->
     let
+	-- determine whether the default binder is dead or not
+	bndr'= if (bndr `elementOfFVInfo` alts_fvs) 
+		  then bndr `modifyIdInfo` (setInlinePragInfo NoInlinePragInfo)
+		  else bndr `modifyIdInfo` (setInlinePragInfo IAmDead)
+
 	-- don't consider the default binder as being 'live in alts',
 	-- since this is from the point of view of the case expr, where
 	-- the default binder is not free.
@@ -303,7 +310,7 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 	live_in_whole_case = live_in_alts `unionVarSet` scrut_lvs
     in
     returnLne (
-      StgCase scrut2 live_in_whole_case live_in_alts bndr srt alts2,
+      StgCase scrut2 live_in_whole_case live_in_alts bndr' srt alts2,
       (scrut_fvs `unionFVInfo` alts_fvs) 
 	  `minusFVBinders` [bndr],
       (alts_escs `unionVarSet` (getFVSet scrut_fvs))

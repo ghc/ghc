@@ -211,7 +211,7 @@ tcDeriving modname fixs rn_name_supply inst_decl_infos_in
 	-- Now augment the InstInfos, adding in the rather boring
 	-- actual-code-to-do-the-methods binds.  We may also need to
 	-- generate extra not-one-inst-decl-specific binds, notably
-	-- "con2tag" and/or "tag2con" functions.  We do these
+	-- the "con2tag" function.  We do these
 	-- separately.
 
     gen_taggery_Names new_inst_infos		`thenTc` \ nm_alist_etc ->
@@ -540,10 +540,6 @@ The examples under the different sections below will make this
 clearer.
 
 \item
-Much less often (really just for deriving @Ix@), we use a
-@_tag2con_<tycon>@ function.  See the examples.
-
-\item
 We use the renamer!!!  Reason: we're supposed to be
 producing @RenamedMonoBinds@ for the methods, but that means
 producing correctly-uniquified code on the fly.  This is entirely
@@ -605,7 +601,7 @@ gen_inst_info modname
 
 %************************************************************************
 %*									*
-\subsection[TcDeriv-taggery-Names]{What con2tag/tag2con functions are available?}
+\subsection[TcDeriv-taggery-Names]{What con2tag functions are available?}
 %*									*
 %************************************************************************
 
@@ -613,7 +609,6 @@ gen_inst_info modname
 data Foo ... = ...
 
 con2tag_Foo :: Foo ... -> Int#
-tag2con_Foo :: Int -> Foo ...	-- easier if Int, not Int#
 maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
 
 
@@ -627,14 +622,6 @@ Or: we're deriving @Ord@ (unless single-constructor), @Enum@, @Ix@
 (enum type only????)
 \end{itemize}
 
-We have a @tag2con@ function for a tycon if:
-\begin{itemize}
-\item
-We're deriving @Enum@, or @Ix@ (enum type only???)
-\end{itemize}
-
-If we have a @tag2con@ function, we also generate a @maxtag@ constant.
-
 \begin{code}
 gen_taggery_Names :: [InstInfo]
 		  -> TcM s [(RdrName,	-- for an assoc list
@@ -644,7 +631,7 @@ gen_taggery_Names :: [InstInfo]
 gen_taggery_Names inst_infos
   = --pprTrace "gen_taggery:\n" (vcat [hsep [ppr c, ppr t] | (c,t) <- all_CTs]) $
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
-    foldlTc do_tag2con names_so_far tycons_of_interest
+    foldlTc do_maxtag names_so_far tycons_of_interest
   where
     all_CTs = [ (c, get_tycon ty) | (InstInfo c _ [ty] _ _ _ _ _) <- inst_infos ]
 		    
@@ -667,12 +654,11 @@ gen_taggery_Names inst_infos
       | otherwise
       = returnTc acc_Names
 
-    do_tag2con acc_Names tycon
+    do_maxtag acc_Names tycon
       | isDataTyCon tycon &&
          (we_are_deriving enumClassKey tycon ||
 	  we_are_deriving ixClassKey   tycon)
-      = returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
-		 : (maxtag_RDR  tycon, tycon, GenMaxTag)
+      = returnTc ( (maxtag_RDR  tycon, tycon, GenMaxTag)
 		 : acc_Names)
       | otherwise
       = returnTc acc_Names

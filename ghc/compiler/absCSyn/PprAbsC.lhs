@@ -227,15 +227,15 @@ pprAbsC stmt@(COpStmt results op args vol_regs) _
     	the_op = ppr_op_call non_void_results non_void_args
 		-- liveness mask is *in* the non_void_args
     in
-    case (ppr_vol_regs vol_regs) of { (pp_saves, pp_restores) ->
     if primOpNeedsWrapper op then
+    	case (ppr_vol_regs vol_regs) of { (pp_saves, pp_restores) ->
     	vcat [  pp_saves,
     	    	the_op,
     	    	pp_restores
     	     ]
+	}
     else
     	the_op
-    }
   where
     ppr_op_call results args
       = hcat [ pprPrimOp op, lparen,
@@ -555,10 +555,11 @@ ppLocalnessMacro include_dyn_prefix clabel =
         visiblity_prefix,
 	dyn_prefix,
         case label_type of
-	  ClosureType -> ptext SLIT("C_")
-	  CodeType    -> ptext SLIT("F_")
-	  InfoTblType -> ptext SLIT("I_")
-	  DataType    -> ptext SLIT("D_") <>
+	  ClosureType    -> ptext SLIT("C_")
+	  CodeType       -> ptext SLIT("F_")
+	  InfoTblType    -> ptext SLIT("I_")
+	  ClosureTblType -> ptext SLIT("CP_")
+	  DataType       -> ptext SLIT("D_") <>
 				   if isReadOnly clabel 
 				      then ptext SLIT("RO_") 
 				      else empty 

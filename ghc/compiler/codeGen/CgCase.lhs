@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.26 1999/04/23 13:53:28 simonm Exp $
+% $Id: CgCase.lhs,v 1.27 1999/04/27 12:34:52 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -65,8 +65,9 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe,
 			   splitFunTys, applyTys )
-import Unique           ( Unique, Uniquable(..) )
+import Unique           ( Unique, Uniquable(..), mkBuiltinUnique )
 import Maybes		( maybeToBool )
+import Util
 import Outputable
 \end{code}
 
@@ -127,27 +128,71 @@ cgCase	:: StgExpr
 	-> Code
 \end{code}
 
-Several special cases for inline primitive operations.
+Special case #1:  PrimOps returning enumeration types.
+
+For enumeration types, we invent a temporary (builtin-unique 1) to
+hold the tag, and cross our fingers that this doesn't clash with
+anything else.  Builtin-unique 0 is used for a similar reason when
+compiling enumerated-type primops in CgExpr.lhs.  We can't use the
+unique from the case binder, because this is used to hold the actual
+closure (when the case binder is live, that is).
+
+There is an extra special case for
+
+	case tagToEnum# x of
+		...
+
+which generates no code for the primop, unless x is used in the
+alternatives (in which case we lookup the tag in the relevant closure
+table to get the closure).
 
 \begin{code}
-cgCase (StgCon (PrimOp TagToEnumOp) [arg] res_ty)
-         live_in_whole_case live_in_alts bndr srt alts
+cgCase (StgCon (PrimOp op) args res_ty)
+         live_in_whole_case live_in_alts bndr srt (StgAlgAlts ty alts deflt)
   | isEnumerationTyCon tycon
-  = getArgAmode arg `thenFC` \amode ->
-    let
-	[res] = getPrimAppResultAmodes (getUnique bndr) alts
+  = getArgAmodes args `thenFC` \ arg_amodes ->
+
+    let tag_amode = case op of 
+			TagToEnumOp -> only arg_amodes
+			_ -> CTemp (mkBuiltinUnique 1) IntRep
+
+	closure = CTableEntry (CLbl (mkClosureTblLabel tycon) PtrRep) tag_amode PtrRep
     in
-    absC (CAssign res (CTableEntry 
-		     	(CLbl (mkClosureTblLabel tycon) PtrRep)
-		      	amode PtrRep)) `thenC`
 
-	-- Scrutinise the result
-    cgInlineAlts bndr alts
+    case op of {
+	TagToEnumOp -> nopC;  -- no code!
 
-  | otherwise = panic "cgCase: tagToEnum# of non-enumerated type"
+	_ -> 	-- Perform the operation
+	       getVolatileRegs live_in_alts     `thenFC` \ vol_regs ->
+
+ 	       absC (COpStmt [tag_amode] op
+		 arg_amodes -- note: no liveness arg
+		 vol_regs)
+    } 						`thenC`
+
+ 	-- bind the default binder if necessary
+    (if (isDeadBinder bndr)
+	then nopC
+	else bindNewToTemp bndr 		`thenFC` \ bndr_amode ->
+	     absC (CAssign bndr_amode closure))
+						`thenC`
+
+	-- compile the alts
+    cgAlgAlts NoGC uniq Nothing{-cc_slot-} False{-no semi-tagging-}
+		False{-not poly case-} alts deflt
+                False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
+
+	-- Do the switch
+    absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
+
    where
 	(Just (tycon,_)) = splitTyConApp_maybe res_ty
+	uniq = getUnique bndr
+\end{code}
 
+Special case #2: inline PrimOps.
+
+\begin{code}
 cgCase (StgCon (PrimOp op) args res_ty) 
 	live_in_whole_case live_in_alts bndr srt alts
   | not (primOpOutOfLine op)
@@ -348,43 +393,8 @@ getPrimAppResultAmodes
 	:: Unique
 	-> StgCaseAlts
 	-> [CAddrMode]
-\end{code}
 
-If there's an StgBindDefault which does use the bound
-variable, then we can only handle it if the type involved is
-an enumeration type.   That's important in the case
-of comparisions:
-
-	case x ># y of
-	  r -> f r
-
-The only reason for the restriction to *enumeration* types is our
-inability to invent suitable temporaries to hold the results;
-Elaborating the CTemp addr mode to have a second uniq field
-(which would simply count from 1) would solve the problem.
-Anyway, cgInlineAlts is now capable of handling all cases;
-it's only this function which is being wimpish.
-
-\begin{code}
-getPrimAppResultAmodes uniq (StgAlgAlts ty alts 
-				(StgBindDefault rhs))
-  | isEnumerationTyCon spec_tycon = [tag_amode]
-  | otherwise		          = pprPanic "getPrimAppResultAmodes: non-enumeration algebraic alternatives with default" (ppr uniq <+> ppr rhs)
-  where
-    -- A temporary variable to hold the tag; this is unaffected by GC because
-    -- the heap-checks in the branches occur after the switch
-    tag_amode     = CTemp uniq IntRep
-    (spec_tycon, _, _) = splitAlgTyConApp ty
-\end{code}
-
-If we don't have a default case, we could be scrutinising an unboxed
-tuple, or an enumeration type...
-
-\begin{code}
-getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
-	-- Default is either StgNoDefault or StgBindDefault with unused binder
-
-  | isEnumerationTyCon tycon = [CTemp uniq IntRep]
+getPrimAppResultAmodes uniq (StgAlgAlts ty alts some_default)
 
   | isUnboxedTupleTyCon tycon = 
 	case alts of 
@@ -395,12 +405,10 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
   | otherwise = panic ("getPrimAppResultAmodes: case of primop has strange type: " ++ showSDoc (ppr ty))
 
   where (tycon, _, _) = splitAlgTyConApp ty
-\end{code}
 
-The situation is simpler for primitive results, because there is only
-one!
+-- The situation is simpler for primitive results, because there is only
+-- one!
 
-\begin{code}
 getPrimAppResultAmodes uniq (StgPrimAlts ty _ _)
   = [CTemp uniq (typePrimRep ty)]
 \end{code}
@@ -536,56 +544,12 @@ cgInlineAlts bndr (StgAlgAlts ty [alt@(con,args,use_mask,rhs)] StgNoDefault)
   = panic "cgInlineAlts: single alternative, not an unboxed tuple"
 \end{code}
 
-Hack: to deal with 
-
-	case <# x y of z {
-	   DEFAULT -> ...
-        }
-
-\begin{code}
-cgInlineAlts bndr (StgAlgAlts ty [] (StgBindDefault rhs))
-  = bindNewToTemp bndr			`thenFC` \amode ->
-    let
-    	(tycon, _, _) = splitAlgTyConApp ty
-	closure_lbl = CTableEntry (CLbl (mkClosureTblLabel tycon) PtrRep) amode PtrRep
-    in
-    absC (CAssign amode closure_lbl) 	`thenC`
-    cgExpr rhs
-\end{code}
-
-Second case: algebraic case, several alternatives.
-Tag is held in a temporary.
-
-\begin{code}
-cgInlineAlts bndr (StgAlgAlts ty alts deflt)
-  =	   -- bind the default binder (it covers all the alternatives)
-
-	-- ToDo: BUG! bndr isn't bound in the alternatives
-	-- Shows up when compiling Word.lhs
-	--	case cmp# a b of r {
-	--		True  -> f1 r
-	--		False -> f2 r
-
-    cgAlgAlts NoGC uniq Nothing{-cc_slot-} False{-no semi-tagging-}
-		False{-not poly case-} alts deflt
-                False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
-
-	-- Do the switch
-    absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
- where
-    -- A temporary variable to hold the tag; this is unaffected by GC because
-    -- the heap-checks in the branches occur after the switch
-    tag_amode = CTemp uniq IntRep
-    uniq = getUnique bndr
-\end{code}
-
 Third (real) case: primitive result type.
 
 \begin{code}
 cgInlineAlts bndr (StgPrimAlts ty alts deflt)
   = cgPrimInlineAlts bndr ty alts deflt
 \end{code}
-
 
 %************************************************************************
 %*									*

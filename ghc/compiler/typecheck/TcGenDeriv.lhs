@@ -1081,17 +1081,9 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
 	pat    = ConPatIn var_RDR (nOfThem (argFieldCount var) WildPatIn)
 	var_RDR = qual_orig_name var
 
-
-
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
-  = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon) ++ 
-							     [([WildPatIn], impossible_Expr)])
-  where
-    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
-    mk_stuff var = ([lit_pat], HsVar var_RDR)
-      where
-	lit_pat = ConPatIn mkInt_RDR [LitPatIn (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG)))]
-	var_RDR  = qual_orig_name var
+  = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
+	([([VarPatIn a_RDR], HsApp tagToEnum_Expr a_Expr)])
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
   = mk_easy_FunMonoBind (getSrcLoc tycon) 
@@ -1362,6 +1354,7 @@ false_Expr	= HsVar false_RDR
 true_Expr	= HsVar true_RDR
 
 getTag_Expr  	= HsVar getTag_RDR
+tagToEnum_Expr 	= HsVar tagToEnumH_RDR
 con2tag_Expr tycon = HsVar (con2tag_RDR tycon)
 
 a_Pat		= VarPatIn a_RDR
@@ -1369,7 +1362,7 @@ b_Pat		= VarPatIn b_RDR
 c_Pat		= VarPatIn c_RDR
 d_Pat		= VarPatIn d_RDR
 
-tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
+con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 
 con2tag_RDR tycon = varUnqual (_PK_ ("con2tag_" ++ occNameString (getOccName tycon) ++ "#"))
 tag2con_RDR tycon = varUnqual (_PK_ ("tag2con_" ++ occNameString (getOccName tycon) ++ "#"))
