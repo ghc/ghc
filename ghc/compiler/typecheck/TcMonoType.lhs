@@ -25,7 +25,7 @@ import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, 
-			  --tcLookup, tcLookupGlobal,
+			  tcLookupGlobal, tcLookup,
 			  tcEnvTcIds, tcEnvTyVars,
 			  tcGetGlobalTyVars, 
 		 	  TyThing(..), TcTyThing(..)
@@ -51,8 +51,8 @@ import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
-import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar, tyVarKind )
+import Id		( Id, mkVanillaId, idName, idType, idFreeTyVars )
+import Var		( Var, TyVar, mkTyVar, tyVarKind )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
@@ -776,13 +776,20 @@ checkSigTyVars sig_tyvars free_tyvars
 		   returnNF_Tc (tidy_env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
 
 	    else 	-- All OK
-	    returnNF_Tc (env, extendVarEnv acc tv sig_tyvar, msgs)
+	    returnNF_Tc (tidy_env, extendVarEnv acc tv sig_tyvar, msgs)
 	    }}
 
 -- find_globals looks at the value environment and finds values
 -- whose types mention the offending type variable.  It has to be 
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
+
+find_globals :: Var 
+             -> TidyEnv 
+             -> [(Name,Type)] 
+             -> [Id] 
+             -> NF_TcM (TidyEnv,[(Name,Type)])
+
 find_globals tv tidy_env acc []
   = returnNF_Tc (tidy_env, acc)
 

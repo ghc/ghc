@@ -13,12 +13,12 @@ module TcEnv(
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
 	tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
-	tcLookupGlobal_maybe,
+	tcLookupGlobal_maybe, tcLookupGlobal,
 
 	-- Local environment
 	tcExtendKindEnv, 
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, 
-	tcExtendLocalValEnv,
+	tcExtendLocalValEnv, tcLookup,
 
 	-- Global type variables
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
