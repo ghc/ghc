@@ -171,8 +171,13 @@ regUsage instr = case instr of
     JXX    cond lbl	-> mkRU [] []
     JMP    op		-> mkRU (use_R op) []
     JMP_TBL op ids      -> mkRU (use_R op) []
+#if i386_TARGET_ARCH
     CALL   (Left imm)	-> mkRU [] callClobberedRegs
     CALL   (Right reg)	-> mkRU [reg] callClobberedRegs
+#else
+    CALL   (Left imm)	-> mkRU params callClobberedRegs
+    CALL   (Right reg)	-> mkRU (reg:params) callClobberedRegs
+#endif
     CLTD   sz		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
 
@@ -222,6 +227,12 @@ regUsage instr = case instr of
     _other		-> panic "regUsage: unrecognised instr"
 
  where
+#if x86_64_TARGET_ARCH
+	-- call parameters: include %eax, because it is used
+	-- to pass the number of SSE reg arguments to varargs fns.
+    params = eax : allArgRegs ++ allFPArgRegs
+#endif
+
     -- 2 operand form; first operand Read; second Written
     usageRW :: Operand -> Operand -> RegUsage
     usageRW op (OpReg reg) = mkRU (use_R op) [reg]
@@ -706,7 +717,9 @@ mkSpillInstr reg delta slot
     let off_w = (off-delta) `div` 8
     in case regClass reg of
 	   RcInteger -> MOV I64 (OpReg reg) (OpAddr (spRel off_w))
-	   _         -> panic "mkSpillInstr: ToDo"
+	   RcDouble  -> MOV F64 (OpReg reg) (OpAddr (spRel off_w))
+		-- ToDo: will it work to always spill as a double?
+		-- does that cause a stall if the data was a float?
 #endif
 #ifdef sparc_TARGET_ARCH
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
@@ -748,7 +761,7 @@ mkLoadInstr reg delta slot
 	let off_w = (off-delta) `div` 8
         in case regClass reg of
               RcInteger -> MOV I64 (OpAddr (spRel off_w)) (OpReg reg)
-              _         -> panic "mkLoadInstr: ToDo"
+              _         -> MOV F64 (OpAddr (spRel off_w)) (OpReg reg)
 #endif
 #if sparc_TARGET_ARCH
         let{off_w = 1 + (off `div` 4);
