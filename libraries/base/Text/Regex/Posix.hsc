@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.4 2002/02/13 11:52:42 simonmar Exp $
+-- $Id: Posix.hsc,v 1.5 2002/02/14 14:08:50 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
 -- ToDo: should have an interface using PackedStrings.
@@ -145,12 +145,12 @@ unpack string p_match = do
 type CRegex    = ()
 type CRegMatch = ()
 
-foreign import "regcomp" unsafe
+foreign import ccall unsafe "regcomp"
   c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
 
-foreign import "regfree" unsafe
+foreign import ccall  unsafe "regfree"
   c_regfree :: Ptr CRegex -> IO ()
 
-foreign import "regexec" unsafe
+foreign import ccall unsafe "regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
