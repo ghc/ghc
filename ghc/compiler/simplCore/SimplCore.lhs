@@ -20,7 +20,7 @@ import HscTypes		( PersistentCompilerState(..),
 			)
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
-			  extendRuleBaseList, addRuleBaseFVs )
+			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase )
 import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
@@ -205,12 +205,9 @@ prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
 		    [IdCoreRule],	-- Orphan rules
 		    IdSet) 		-- RHS free vars of all rules
 
-prepareRules dflags pkg_rule_base hst us binds rules
+prepareRules dflags pkg_rule_base hst us binds local_rules
   = do	{ let (better_rules,_) = initSmpl dflags sw_chkr us local_ids black_list_all 
-		                          (mapSmpl simplRule rules)
-
-	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		        (vcat (map pprIdCoreRule better_rules))
+		                          (mapSmpl simplRule local_rules)
 
 	; let (local_rules, orphan_rules) = partition (isLocalId . fst) better_rules
 	      rule_rhs_fvs		  = unionVarSets (map (ruleRhsFreeVars . snd) better_rules)
@@ -220,6 +217,12 @@ prepareRules dflags pkg_rule_base hst us binds rules
 	      rule_base			  = extendRuleBaseList imp_rule_base orphan_rules
 	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
 		-- The last step black-lists the free vars of local rules too
+
+	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
+		(vcat [text "Local rules", pprRuleBase local_rule_base,
+		       text "",
+		       text "Imported rules", pprRuleBase final_rule_base])
+
 	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
     }
   where
