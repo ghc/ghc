@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.80 2001/12/20 11:19:08 simonpj Exp $
+$Id: Parser.y,v 1.81 2001/12/21 10:24:24 simonmar Exp $
 
 Haskell grammar.
 
@@ -635,6 +635,7 @@ context :: { RdrNameContext }
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkVanillaCon $1 []		    }
 	| btype '!' atype satypes	{% mkVanillaCon $1 (BangType MarkedUserStrict $3 : $4) }
+	| gtycon '{' '}' 		{% mkRecCon $1 [] }
 	| gtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
 
