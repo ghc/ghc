@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2001/01/12 18:49:25 qrczak Exp $
+# $Id: Makefile,v 1.5 2001/01/12 20:17:35 qrczak Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -33,7 +33,7 @@ HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
 endif # BIN_DIST
 else
 HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
-HSC2HS_EXTRA="--cc=$(CC) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+HSC2HS_EXTRA="--cc=$(CC) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
 
 $(SCRIPT_PROG) : Makefile
