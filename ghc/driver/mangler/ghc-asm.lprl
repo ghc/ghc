@@ -435,7 +435,7 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'literal';
 	    $chksymb[$i] = $1;
 
-	} elsif ( /^$TUS[@]?__stg_split_marker(\d+)$TPOSTLBL[@]?$/o ) {
+	} elsif ( /^$TUS[@]?__stg_split_marker(\d*)$TPOSTLBL[@]?$/o ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'splitmarker';
 	    $chksymb[$i] = $1;
@@ -734,7 +734,7 @@ sub mangle_asm {
 		# HWL HACK: dont die, just print a warning
 		#print stderr "HWL: this should die! Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
 		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
-		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
+		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.\n]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
