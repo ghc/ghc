@@ -123,7 +123,7 @@ These sub-directories have the following general structure:
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>libHS.a</Literal> etc:</Term>
+<Term><Literal>libHSstd.a</Literal> etc:</Term>
 <ListItem>
 <Para>
 supporting library archives.

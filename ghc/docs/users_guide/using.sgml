@@ -704,9 +704,6 @@ sanity, not yours.)
 <IndexTerm><Primary>separate compilation</Primary></IndexTerm>
 <IndexTerm><Primary>recompilation checker</Primary></IndexTerm>
 <IndexTerm><Primary>make and recompilation</Primary></IndexTerm>
-</Para>
-
-<Para>
 This section describes how GHC supports separate compilation.
 </Para>
 
@@ -990,39 +987,73 @@ sight!
 </Para>
 
 <Para>
-GHC <Emphasis>only</Emphasis> keeps detailed dependency information
-for &ldquo;user&rdquo; modules, not for &ldquo;Prelude&rdquo; modules.
-It distinguishes Prelude modules because their names start with
-"Prel", so don't start your modules that way!
-
-<!--       April 2000: hack disabled.  Now we use a different hack!
-
-It distinguishes the two by a hack: a module whose
-<Filename>.hi</Filename> file has an absolute path name is considered
-a library module, while a relative path name indicates a user module.
-So if you have a multi-directory application, use
-<Emphasis>relative</Emphasis> path names in your <Option>-i</Option>
-path, to force GHC to record detailed dependency information.  Use
-absolute path names only for directories containing slowly-changing
-library modules.
-</Para>
-
-<Para>
-A path is considered &ldquo;absolute&rdquo; if it starts with
-&ldquo;<Filename>/</Filename>&rdquo;, or
-&ldquo;<Filename>A:/</Filename>&rdquo;, or
-&ldquo;<Filename>A:\</Filename>&rdquo; (or
-&ldquo;<Filename>B:/</Filename>&rdquo;,
-&ldquo;<Filename>B:\</Filename>&rdquo; etc).
-</Para>
--->
-
-<Para>
 Patrick Sansom had a workshop paper about how all this is done (though
 the details have changed quite a bit). <ULink URL="mailto:sansom@dcs.gla.ac.uk">Ask him</ULink> if you want a copy.
 </Para>
 
+<Sect3 id="packages">
+<Title>Packages</Title>
+
+<Para>
+<IndexTerm><Primary>packages</Primary></IndexTerm>
+To simplify organisation and compilation, GHC keeps libraries in <Emphasis>packages</Emphasis>. Packages are also compiled into single libraries on Unix, and DLLs on Windows. The term ``package'' can be used pretty much synonymously with ``library'', except that an application also forms a package, the Main package.
+</Para>
+
+<ItemizedList>
+<ListItem>
+<Para>
+A package is a group of modules. It may span many directories, or many packages may exist in a single directory. Packages may not be mutually recursive.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+A package has a name (e.g. <Filename>std</Filename>)
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Each package is built into a single library (Unix; e.g. <Filename>libHSfoo.a</Filename>), or a single DLL (Windows; e.g. <Filename>HSfoo.dll</Filename>)
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Option>-package-name foo</Option> flag tells GHC that the module being compiled is destined for package <Filename>foo</Filename>. If this is omitted, the default package, <Filename>Main</Filename>, is assumed.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Option>-package foo</Option> flag tells GHC to make available modules 
+from package <Filename>foo</Filename>.  It replaces <Option>-syslib foo</Option>, which is now deprecated.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+GHC does not maintain detailed cross-package dependency information.
+It does remember which modules in other packages the current module
+depends on, but not which things within those imported things.
+</Para>
+</ListItem>
+</ItemizedList>
+
+<Para>
+All of this tidies up the Prelude enormously.  The Prelude and
+Standard Libraries are built into a single package called <Filename>std</Filename>.  (This
+is a change; the library is now called <Filename>libHSstd.a</Filename> instead of <Filename>libHS.a</Filename>).
+</Para>
+
+<Para>
+It is worth noting that on Windows, because each package is built as a DLL, and a reference to a DLL costs an extra indirection, intra-package references are cheaper than inter-package references. Of course, this applies to the <Filename>Main</Filename> package as well. This is not normally the case on most Unices.
+</Para>
+
+</Sect3>
+
 </Sect2>
+
 
 <Sect2 id="using-make">
 <Title>Using <Command>make</Command>
