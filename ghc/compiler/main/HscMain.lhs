@@ -86,6 +86,7 @@ data HscResult
 
 hscMain
   :: DynFlags
+  -> Bool	      -- source unchanged?
   -> ModSummary       -- summary, including source filename
   -> Maybe ModIface   -- old interface, if available
   -> HomeSymbolTable		-- for home module ModDetails
@@ -93,11 +94,11 @@ hscMain
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags summary maybe_old_iface hst hit pcs
+hscMain dflags source_unchanged summary maybe_old_iface hst hit pcs
  = do {
       -- ????? source_unchanged :: Bool -- extracted from summary?
-      let source_unchanged = trace "WARNING: source_unchanged?!" False
-      ;
+      --let source_unchanged = trace "WARNING: source_unchanged?!" False
+      --;
       putStrLn "checking old iface ...";
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs (ms_mod summary)

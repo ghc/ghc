@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.10 2000/10/27 13:50:25 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.11 2000/10/30 11:18:14 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -413,7 +413,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- only do this if we're eventually going to generate a .o file.
   -- (ToDo: do when generating .hc files too?)
   --
-  -- Setting source_unchanged to "-fsource_unchanged" means that M.o seems
+  -- Setting source_unchanged to "-fsource-unchanged" means that M.o seems
   -- to be up to date wrt M.hs; so no need to recompile unless imports have
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to "" tells the compiler that M.o is out of
@@ -448,6 +448,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- run the compiler!
         pcs <- initPersistentCompilerState
 	result <- hscMain dyn_flags{ hscOutName = output_fn }
+			  (source_unchanged == "-fsource-unchanged")
 			  summary 
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
@@ -749,6 +750,7 @@ compile summary old_iface hst hit pcs = do
 
    -- run the compiler
    hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
+			 (panic "compile:source_unchanged")
                          summary old_iface hst hit pcs
 
    case hsc_result of {
