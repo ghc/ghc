@@ -158,7 +158,9 @@ repTopDs group
 
 	decl_ty <- lookupType declTyConName ;
 	let { core_list = coreList' decl_ty decls } ;
-	q_decs  <- repSequenceQ decl_ty core_list ;
+
+	dec_ty <- lookupType decTyConName ;
+	q_decs  <- repSequenceQ dec_ty core_list ;
 
 	wrapNongenSyms ss q_decs
 	-- Do *not* gensym top-level binders
