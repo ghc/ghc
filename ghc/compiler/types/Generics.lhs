@@ -4,7 +4,7 @@ module Generics ( mkTyConGenInfo, mkGenericRhs,
     ) where
 
 
-import CmdLineOpts	( opt_GlasgowExts )
+import CmdLineOpts	( opt_Generics )
 import RnHsSyn		( RenamedHsExpr )
 import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 
@@ -231,7 +231,7 @@ mkTyConGenInfo :: TyCon -> Name -> Name -> Maybe (EP Id)
 -- for the fromT and toT conversion functions.
 
 mkTyConGenInfo tycon from_name to_name
-  | True -- not opt_GlasgowExts
+  | not opt_Generics
   = Nothing
 
   | null datacons 	-- Abstractly imported types don't have
