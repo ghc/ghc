@@ -34,8 +34,10 @@ instance Object LinuxObject LinuxObjectId
 data LinuxSecurityModel =
     LinuxSecurityModel { lsmObjectSet   :: FiniteMap LinuxObjectId LinuxObject }
 
-instance (Show a, Show b) => Show (FiniteMap a b) where
-    show fm = show (fmToList fm)
+
+-- Now defined in Data.FiniteMap, don't think this affects the bug:
+-- instance (Show a, Show b) => Show (FiniteMap a b) where
+--     show fm = show (fmToList fm)
 
 instance Show LinuxSecurityModel where
     show lsm = "LSM:" ++ "\tObjects:  " ++ show (lsmObjectSet lsm)
