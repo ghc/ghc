@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2002/03/25 05:25:27 sof Exp $
+# $Id: Makefile,v 1.22 2002/03/25 15:49:26 sof Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -87,9 +87,12 @@ endif # TARGETPLATFORM = i386-unknown-mingw32
 # -----------------------------------------------------------------------------
 
 include $(TOP)/mk/target.mk
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HSbase.o : $(GHCI_LIBOBJS)
 	$(LD) -r $(LD_X) -o HSbase1.o $(filter     GHC/%, $(GHCI_LIBOBJS))
 	$(LD) -r $(LD_X) -o HSbase2.o $(filter-out GHC/%, $(GHCI_LIBOBJS))
 	@touch HSbase.o
+endif # TARGETPLATFORM = i386-unknown-mingw32
 
 
