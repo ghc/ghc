@@ -43,6 +43,8 @@ module Foo (
 
 	-- $aux4
 
+	-- $aux5
+
 	-- | This is some inline documentation in the export list
 	--
 	-- > a code block using bird-tracks
@@ -54,6 +56,11 @@ module Foo (
 
 	-- * A visible module
 	module Visible,
+
+	{-| nested-style doc comments -}
+
+	-- * Existential / Universal types
+	Ex(..),
    ) where
 
 
@@ -125,26 +132,30 @@ data R =
 -- ** This is a section header (level 2)
 -- *** This is a section header (level 3)
 
--- | In a comment string we can refer to identifiers in scope with
--- single quotes like this: 'T', and we can refer to modules by
--- using double quotes: "Foo".  We can add emphasis /like this/.
---
---   * This is a bulleted list
---
---   - This is the next item (different kind of bullet)
---
---   (1) This is an ordered list
--- 
---   2. This is the next item (different kind of bullet)
---
--- [
---     This is a block of code, which can include other markup: 'R'
---     formatting
---               is
---                 significant
--- ]
---
--- We can also include URLs in documentation: <http://www.haskell.org/>.
+{-|
+In a comment string we can refer to identifiers in scope with
+single quotes like this: 'T', and we can refer to modules by
+using double quotes: "Foo".  We can add emphasis /like this/.
+
+   * This is a bulleted list
+
+   - This is the next item (different kind of bullet)
+
+   (1) This is an ordered list
+ 
+   2. This is the next item (different kind of bullet)
+
+@
+     This is a block of code, which can include other markup: 'R'
+     formatting
+               is
+                 significant
+@
+
+> this is another block of code
+
+We can also include URLs in documentation: <http://www.haskell.org/>.
+-}
 
 f :: C a => Int -> Int
 
@@ -161,13 +172,28 @@ h = 42
 -- rather than a source declaration.  The documentation may be
 -- referred to in the export list using its name.
 --
--- [ code block in named doc ]
+-- @ code block in named doc @
 
 -- $aux2 This is some documentation that is attached to a name ($aux2)
 
 -- $aux3
--- [ code block on its own in named doc ]
+-- @ code block on its own in named doc @
 
 -- $aux4
 --
--- [ code block on its own in named doc (after newline) ]
+-- @ code block on its own in named doc (after newline) @
+
+{- $aux5 a nested, named doc comment
+
+   with a paragraph,
+
+   @ and a code block @
+-}
+
+-- | A data-type using existential/universal types
+data Ex a 
+  = forall b . C b => Ex1 b
+  | forall b . Ex2 b
+  | C a => Ex3 b
+  | Ex4 (forall a . a -> a)
+
