@@ -16,7 +16,7 @@ import Outputable
 import Name		( Name, getName )
 import Id		( Id, idType, isDataConId_maybe )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
-			  nilOL, toOL, concatOL )
+			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM, 
 			  addToFM, lookupFM, fmToList )
 import CoreSyn
@@ -50,7 +50,7 @@ data BCInstr
    = ARGCHECK Int
    | PUSH_L Int{-size-} Int{-offset-}
    | PUSH_G Name
-   | PUSH_ALTS Name{-labels the alt BCO; derived from case binder-}
+--   | PUSH_ALTS Name{-labels the alt BCO; derived from case binder-}
    | PUSH_I Integer
    | SLIDE Int{-this many-} Int{-down by this much-}
    -- To do with the heap
@@ -66,10 +66,37 @@ data BCInstr
    -- To Infinity And Beyond
    | ENTER
 
+instance Outputable BCInstr where
+   ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
+   ppr (PUSH_L sz offset)    = text "PUSH_L  " <+> int sz <+> int offset
+   ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
+   ppr (PUSH_I i)            = text "PUSH_I  " <+> integer i
+   ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
+   ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
+   ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
+   ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
+   ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
+   ppr (CASE_PTR altcode)    = text "CASE_P" $$ nest 3 (pprAltCode altcode)
+   ppr (CASE_INT altcode)    = text "CASE_P" $$ nest 3 (pprAltCode altcode)
+   ppr (CASE_FLOAT altcode)  = text "CASE_P" $$ nest 3 (pprAltCode altcode)
+   ppr (CASE_DOUBLE altcode) = text "CASE_P" $$ nest 3 (pprAltCode altcode)
+   ppr ENTER                 = text "ENTER"
+
+pprAltCode discrs_n_codes
+   = vcat (map f discrs_n_codes)
+     where f (discr, code) = ppr discr <> colon <+> vcat (map ppr (fromOL code))
+
 
 type BCInstrList = OrdList BCInstr
 
 data BCO a = BCO a BCInstrList
+
+instance Outputable a => Outputable (BCO a) where
+   ppr (BCO name instrs)
+      = (text "BCO" <+> ppr name <> colon)
+        $$ nest 6 (vcat (map ppr (fromOL instrs)))
+
+
 
 
 type Sequel = Int	-- back off to this depth before ENTER
@@ -96,6 +123,14 @@ data Discr
    | DiscrD Rational
    | DiscrP Int
    | NoDiscr
+
+instance Outputable Discr where
+   ppr (DiscrI i) = int i
+   ppr (DiscrF r) = rational r
+   ppr (DiscrD r) = rational r
+   ppr (DiscrP i) = int i
+   ppr NoDiscr    = text "DEF"
+
 
 -- Hmm.  This isn't really right (ie on Alpha, idSizeW Double -> 2)
 -- There must be an Officially Approved way to do this somewhere.
@@ -222,7 +257,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
 
      emitBc alt_bco 					`thenBc_`
-     returnBc (PUSH_ALTS alt_bco_name `consOL` scrut_code)
+     returnBc (PUSH_G alt_bco_name `consOL` scrut_code)
 
 
 -- Compile code to do a tail call.  Doesn't need to be monadic.
