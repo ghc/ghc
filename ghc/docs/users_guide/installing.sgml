@@ -700,10 +700,9 @@ call to find the directory in which the running GHC executable lives, and derive
 
 <sect2> <title>Layout of the library directory</title>
 
-<para>
-The layout of the library directory is almost identical on Windows and Unix, 
-as follows:
-layout:</para>
+<para>The layout of the library directory is almost identical on
+Windows and Unix, as follows: layout:</para>
+
 <programlisting>
   $(libdir)/
     package.conf           GHC package configuration
@@ -713,17 +712,16 @@ layout:</para>
          ghc.exe
          ghci.bat
 
-    extra-bin/             Support binaries
-	 unlit             Remove literate markup
+    unlit                  Remove literate markup
     
-	 touchy.exe        [Win32 only]
-	 perl.exe          [Win32 only]
-	 gcc.exe           [Win32 only]
-    
-         ghc               [Unix only]
-
-	 ghc-split         Asm code splitter
-	 ghc-asm	   Asm code mangler
+    touchy.exe             [Win32 only]
+    perl.exe               [Win32 only]
+    gcc.exe                [Win32 only]
+   
+    ghc-x.xx               GHC executable [Unix only]
+   
+    ghc-split              Asm code splitter
+    ghc-asm	           Asm code mangler
 
     gcc-lib/               [Win32 only] Support files for gcc
         specs              gcc configuration
@@ -775,41 +773,45 @@ and <filename>cmd.exe</filename> (which executes <filename>.bat</filename> files
 truncates them.  [We assume people won't invoke ghci with very long
 command lines.]</para>
 
-<para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/extra-bin/ghc</filename>,
+<para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/ghc-<replaceable>version</replaceable></filename>,
 passing a suitable <option>-B</option> flag. 
 </para>
 </listitem>
 
-<listitem>
-<para>  <filename>$(libdir)/extra-bin/</filename> contains support binaries.  These
-are <emphasis>not</emphasis> expected to be on the user's <filename>PATH</filename>, but
-and are invoked directly by GHC.  In the Makefile system, this directory is called 
-<filename>$(libexecdir)</filename>, but <emphasis>you aren't free to change it</emphasis>.  It must
-be <filename>$(libdir)/extra-bin/</filename>.
-</para>
-</listitem>
+	<listitem>
+	  <para><filename>$(libdir)</filename> also contains support
+          binaries.  These are <emphasis>not</emphasis> expected to be
+          on the user's <filename>PATH</filename>, but and are invoked
+          directly by GHC.  In the Makefile system, this directory is
+          also called <filename>$(libexecdir)</filename>, but
+          <emphasis>you are not free to change it</emphasis>.  It must
+          be the same as <filename>$(libdir)</filename>.</para>
+	</listitem>
 
 <listitem>
-<para> We distribute <filename>gcc</filename> with the Win32 distribution of GHC, so that users
+<para>We distribute <filename>gcc</filename> with the Win32 distribution of GHC, so that users
 don't need to install <filename>gcc</filename>, nor need to care about which version it is.
 All <filename>gcc</filename>'s support files are kept in  <filename>$(libdir)/gcc-lib/</filename>.
 </para> 
 </listitem>
 
 <listitem>
-<para> Similarly, we distribute <filename>perl</filename> and a <filename>touch</filename> 
+<para>Similarly, we distribute <filename>perl</filename> and a <filename>touch</filename> 
 replacement (<filename>touchy.exe</filename>)
 with the Win32 distribution of GHC. </para> 
 </listitem>
 
-<listitem> <para> The support programs <filename>ghc-split</filename> and <filename>ghc-asm</filename>
-are Perl scripts.  The first line says <literal>#!/bin/perl</literal>; on Unix, the script is
-indeed invoked as a shell script, which invokes Perl; on Windows, GHC invokes 
-<filename>$(libdir)/extra-bin/perl</filename> directly,
-which treats the <literal>#!/bin/perl</literal> as a comment.  Reason: on Windows we want
-to invoke the Perl distributed with GHC, rather than assume some installed one.
-</para> 
-</listitem>
+	<listitem>
+	  <para>The support programs <filename>ghc-split</filename>
+          and <filename>ghc-asm</filename> are Perl scripts.  The
+          first line says <literal>#!/bin/perl</literal>; on Unix, the
+          script is indeed invoked as a shell script, which invokes
+          Perl; on Windows, GHC invokes
+          <filename>$(libdir)/perl.exe</filename> directly, which
+          treats the <literal>#!/bin/perl</literal> as a comment.
+          Reason: on Windows we want to invoke the Perl distributed
+          with GHC, rather than assume some installed one.  </para>
+	</listitem>
 </itemizedlist>
 
 </sect2>
@@ -820,21 +822,19 @@ to invoke the Perl distributed with GHC, rather than assume some installed one.
 <Sect1 id="building-docs">
 <Title>Building the documentation</Title>
 
-<Para>
-We use the DocBook DTD, which is widely used. Most shrink-wrapped
+<Para>We use the DocBook DTD, which is widely used. Most shrink-wrapped
 distributions seem to be broken in one way or another; thanks to
 heroic efforts by Sven Panne and Manuel Chakravarty, we now support
 most of them, plus properly installed versions.
 </Para>
 
-<Para>
-Instructions on installing and configuring the DocBook tools follow.
+<Para>Instructions on installing and configuring the DocBook tools follow.
 </Para>
 
 <Sect2>
 <Title>Installing the DocBook tools from RPMs</Title>
 
-<Para> If you're using a system that can handle RedHat RPM packages,
+<Para>If you're using a system that can handle RedHat RPM packages,
 you can probably use the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we
@@ -872,8 +872,7 @@ to <Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
 <Sect2>
 <Title>Installing from binaries on Windows</Title>
 
-<Para>
-It's a good idea to use Norman Walsh's <ULink
+<Para>It's a good idea to use Norman Walsh's <ULink
 URL="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
 notes</ULink> as a guide. You should get version 3.1 of DocBook, and note
 that his file <Filename>test.sgm</Filename> won't work, as it needs version
@@ -892,8 +891,7 @@ end up in <Filename>\docbook\stylesheets\docbook</Filename>).
 <Sect3>
 <Title>Jade</Title>
 
-<Para>
-Install <ULink URL="http://openjade.sourceforge.net/">OpenJade</ULink> (Windows binaries are available as well as sources). If you want DVI, PS, or PDF then install JadeTeX from the <Filename>dsssl</Filename>
+<Para>Install <ULink URL="http://openjade.sourceforge.net/">OpenJade</ULink> (Windows binaries are available as well as sources). If you want DVI, PS, or PDF then install JadeTeX from the <Filename>dsssl</Filename>
 subdirectory. (If you get the error:
 
 <Screen>
@@ -909,8 +907,7 @@ straight to <Command>make install</Command>, or enter them as
 <Filename>../</Filename><Emphasis>filename</Emphasis>.)
 </Para>
 
-<Para>
-Make links from <Filename>virtex</Filename> to <Filename>jadetex</Filename>
+<Para>Make links from <Filename>virtex</Filename> to <Filename>jadetex</Filename>
 and <Filename>pdfvirtex</Filename> to <Filename>pdfjadetex</Filename>
 (otherwise DVI, PostScript and PDF output will not work). Copy
 <Filename>dsssl/*.{dtd,dsl}</Filename> and <Filename>catalog</Filename> to <Filename>/usr/[local/]lib/sgml</Filename>.
@@ -921,21 +918,18 @@ and <Filename>pdfvirtex</Filename> to <Filename>pdfjadetex</Filename>
 <Sect3>
 <Title>DocBook and the DocBook stylesheets</Title>
 
-<Para>
-Get a Zip of <ULink
+<Para>Get a Zip of <ULink
 URL="http://www.oasis-open.org/docbook/sgml/3.1/index.html">DocBook</ULink> 
 and install the contents in <Filename>/usr/[local/]/lib/sgml</Filename>.
 </Para>
 
-<Para>
-Get the <ULink URL="http://nwalsh.com/docbook/dsssl/">DocBook
+<Para>Get the <ULink URL="http://nwalsh.com/docbook/dsssl/">DocBook
 stylesheets</ULink> and install in
 <Filename>/usr/[local/]lib/sgml/stylesheets</Filename> (thereby creating a
 subdirectory docbook). For indexing, copy or link <Filename>collateindex.pl</Filename> from the DocBook stylesheets archive in <Filename>bin</Filename> into a directory on your <Constant>PATH</Constant>.
 </Para>
 
-<Para>
-Download the <ULink
+<Para>Download the <ULink
 URL="http://www.oasis-open.org/cover/ISOEnts.zip">ISO
 entities</ULink> into <Filename>/usr/[local/]lib/sgml</Filename>.
 </Para>
@@ -947,8 +941,7 @@ entities</ULink> into <Filename>/usr/[local/]lib/sgml</Filename>.
 <Sect2>
 <Title>Configuring the DocBook tools</Title>
 
-<Para>
-Once the DocBook tools are installed, the configure script will detect them and set up the build system accordingly. If you have a system that isn't supported, let us know, and we'll try to help.
+<Para>Once the DocBook tools are installed, the configure script will detect them and set up the build system accordingly. If you have a system that isn't supported, let us know, and we'll try to help.
 </Para>
 
 </Sect2>
@@ -956,8 +949,7 @@ Once the DocBook tools are installed, the configure script will detect them and 
 <Sect2>
 <Title>Remaining problems</Title>
 
-<Para>
-If you install from source, you'll get a pile of warnings of the form
+<Para>If you install from source, you'll get a pile of warnings of the form
 
 <Screen>DTDDECL catalog entries are not supported</Screen>
 
