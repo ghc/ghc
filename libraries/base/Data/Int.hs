@@ -37,6 +37,7 @@ import Hugs.Int ( Int8, Int16, Int32, Int64 )
 import Prelude
 import Prelude (Int)
 import NHC.FFI (Int8, Int16, Int32, Int64)
+import NHC.SizedTypes (Int8, Int16, Int32, Int64)	-- instances of Bits
 #endif
 
 {- $notes
