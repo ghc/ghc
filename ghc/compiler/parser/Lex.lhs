@@ -665,12 +665,16 @@ lex_string cont exts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
 	   let buf' = incCurrentPos buf
-               s' = mkFastString (map chr (reverse s)) 
            in case currentChar# buf' of
-		'#'# | glaExtsEnabled exts -> if all (<= 0xFF) s
-                    then cont (ITprimstring s') (incCurrentPos buf')
-                    else lexError "primitive string literal must contain only characters <= \'\\xFF\'" buf'
-		_                   -> cont (ITstring s') buf'
+		'#'# | glaExtsEnabled exts -> 
+		   if any (> 0xFF) s
+                    then lexError "primitive string literal must contain only characters <= \'\\xFF\'" buf'
+                    else let s' = mkFastStringNarrow (map chr (reverse s)) in
+			 -- always a narrow string/byte array
+			 cont (ITprimstring s') (incCurrentPos buf')
+
+		_other -> let s' = mkFastString (map chr (reverse s)) 
+		          in cont (ITstring s') buf'
 
 	-- ignore \& in a string, deal with string gaps
 	'\\'# | next_ch `eqChar#` '&'# 
