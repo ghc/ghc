@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.5 1999/01/23 17:44:40 sof Exp $
+ * $Id: openFile.c,v 1.6 1999/02/04 12:13:15 sof Exp $
  *
  * openFile Runtime Support
  */
@@ -27,6 +27,10 @@
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
+
+#ifdef mingw32_TARGET_OS
+#define O_NOCTTY 0
 #endif
 
 IOFileObject*
@@ -63,7 +67,7 @@ StgInt flags;
     FILE *fp;
     int fd;
     int oflags;
-    int exclusive;
+    int for_writing;
     int created = 0;
     struct stat sb;
     IOFileObject* fo;
@@ -76,19 +80,19 @@ StgInt flags;
     switch (how) {
       case OPENFILE_APPEND:
         oflags = O_WRONLY | O_NOCTTY | O_APPEND; 
-	exclusive = 1;
+	for_writing = 1;
 	break;
       case OPENFILE_WRITE:
 	oflags = O_WRONLY | O_NOCTTY;
-	exclusive = 1;
+	for_writing = 1;
 	break;
     case OPENFILE_READ_ONLY:
         oflags = O_RDONLY | O_NOCTTY;
-	exclusive = 0;
+	for_writing = 0;
 	break;
     case OPENFILE_READ_WRITE:
 	oflags = O_RDWR | O_NOCTTY;
-	exclusive = 0;
+	for_writing = 1;
 	break;
     default:
 	fprintf(stderr, "openFile: unknown mode `%d'\n", how);
@@ -110,12 +114,14 @@ StgInt flags;
 		return NULL;
 	    } else {
 		/* If it is a dangling symlink, break off now, too. */
+#ifndef mingw32_TARGET_OS
 		struct stat st;
 		if ( lstat(file,&st) == 0) {
 		   ghc_errtype = ERR_NOSUCHTHING;
 		   ghc_errstr = "dangling symlink";
 		   return NULL;
 		}
+#endif
             }
 	    /* Now try to create it */
 	    while ((fd = open(file, oflags | O_CREAT | O_EXCL, 0666)) < 0) {
@@ -186,7 +192,7 @@ StgInt flags;
     }
     /* Use our own personal locking */
 
-    if (lockFile(fd, exclusive) < 0) {
+    if (lockFile(fd, for_writing, 1/*enforce single-writer, if needs be.*/) < 0) {
 	cvtErrno();
 	switch (ghc_errno) {
 	default:
@@ -268,11 +274,13 @@ StgInt fd;
 StgInt oflags;
 StgInt flags;
 {
-    int exclusive;
+    int for_writing;
     FILE* fp;
     IOFileObject* fo;
 
-    if (lockFile(fd, exclusive) < 0) {
+    for_writing = ( ((oflags & O_WRONLY) || (oflags & O_RDWR)) ? 1 : 0);
+
+    if (lockFile(fd, for_writing, 1/* enforce single-writer */ ) < 0) {
 	cvtErrno();
 	switch (ghc_errno) {
 	default:

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: stgio.h,v 1.9 1999/01/15 17:54:23 sof Exp $
+ * $Id: stgio.h,v 1.10 1999/02/04 12:13:16 sof Exp $
  *
  * Helper code for GHC's IO subsystem.
  */
@@ -146,7 +146,7 @@ StgAddr getCurrentDirectory(void);
 StgAddr getDirectoryContents (StgByteArray);
 
 /* getLock.c */
-int     lockFile    (int, int);
+int     lockFile    (int, int, int);
 int     unlockFile  (int);
 StgInt	getLock	    (StgInt, StgInt);
 

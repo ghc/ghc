@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getLock.c,v 1.3 1998/12/02 13:27:41 simonm Exp $
+ * $Id: getLock.c,v 1.4 1999/02/04 12:13:15 sof Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -42,8 +42,9 @@ static int readLocks = 0;
 static int writeLocks = 0;
 
 int
-lockFile(fd, exclusive)
+lockFile(fd, for_writing, exclusive)
 int fd;
+int for_writing;
 int exclusive;
 {
     int i;
@@ -59,31 +60,55 @@ int exclusive;
     if (!S_ISREG(sb.st_mode))
 	return 0;
     
-    for (i = 0; i < writeLocks; i++)
+    if (for_writing) {
+      /* opening a file for writing, check to see whether
+         we don't have any read locks on it already.. */
+      for (i = 0; i < readLocks; i++) {
+	 if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev) {
+	    errno = EAGAIN;
+	    return -1;
+	 }	    
+      }
+      /* If we're determined that there is only a single
+         writer to the file, check to see whether the file
+	 hasn't already been opened for writing..
+      */
+      if (exclusive) {
+	for (i = 0; i < writeLocks; i++) {
+	  if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
+	     errno = EAGAIN;
+	     return -1;
+	  }
+        }
+      }
+      /* OK, everything is cool lock-wise, record it and leave. */
+      i = writeLocks++;
+      writeLock[i].device = sb.st_dev;
+      writeLock[i].inode = sb.st_ino;
+      writeLock[i].fd = fd;
+      return 0;
+    } else { 
+      /* For reading, it's simpler - just check to see
+         that there's no-one writing to the underlying file. */
+      for (i = 0; i < writeLocks; i++) {
 	if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
 	    errno = EAGAIN;
 	    return -1;
-	}
-
-    if (!exclusive) {
-	i = readLocks++;
-	readLock[i].device = sb.st_dev;
-	readLock[i].inode = sb.st_ino;
-	readLock[i].fd = fd;
-	return 0;
+        }
+      }
+      /* Fit in new entry, reusing an existing table entry, if possible. */
+      for (i = 0; i < readLocks; i++) {
+	 if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev) {
+	   return 0;
+	 }
+      }
+      i = readLocks++;
+      readLock[i].device = sb.st_dev;
+      readLock[i].inode = sb.st_ino;
+      readLock[i].fd = fd;
+      return 0;
     }
 
-    for (i = 0; i < readLocks; i++)
-	if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev) {
-	    errno = EAGAIN;
-	    return -1;
-	}	    
-
-    i = writeLocks++;
-    writeLock[i].device = sb.st_dev;
-    writeLock[i].inode = sb.st_ino;
-    writeLock[i].fd = fd;
-    return 0;
 }
 
 int
@@ -111,12 +136,13 @@ int fd;
     return 1;
 }
 
+/* getLock() is used when opening the standard file descriptors */
 StgInt
-getLock(fd, exclusive)
+getLock(fd, for_writing)
 StgInt fd;
-StgInt exclusive;
+StgInt for_writing;
 {
-    if (lockFile(fd, exclusive) < 0) {
+    if (lockFile(fd, for_writing, 0) < 0) {
 	if (errno == EBADF)
 	    return 0;
 	else {
