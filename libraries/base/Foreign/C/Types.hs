@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Mapping of C types to corresponding Haskell types. A cool hack...
+-- Mapping of C types to corresponding Haskell types.
 --
 -----------------------------------------------------------------------------
 
