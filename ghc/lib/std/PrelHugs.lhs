@@ -18,7 +18,8 @@ module PrelHugs (
    fromDouble,
    hugsprimMkIO,
    hugsprimCreateAdjThunk,
-   hugsprimUnpackString
+   hugsprimUnpackString,
+   hugsprimPmFail
 )
 where
 import PrelGHC
@@ -81,6 +82,10 @@ hugsprimPmLe x y         = x <= y
 
 hugsprimUnpackString :: Addr -> String
 hugsprimUnpackString a = unpackCString a
+
+-- ToDo: make the message more informative.
+hugsprimPmFail       :: a
+hugsprimPmFail        = error "Pattern Match Failure"
 
 
 -- used when Hugs invokes top level function
