@@ -14,7 +14,7 @@ where
 
 import List 		( nub )
 import Char		( ord, isAlphaNum )
-import Finder
+import HscTypes		( ModuleLocation(..) )
 import FastTypes
 
 import Module
