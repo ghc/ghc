@@ -1,0 +1,14 @@
+# List of the modules in this package that aren't to be used with Hugs.
+# Only the first word on each line counts; the rest can be explanation.
+#
+Control.Parallel.Strategies	unused by GHC too
+Data.Array.Diff
+Data.Array.Unboxed		GHC-specific implementation
+Data.Generics			GHC-specific
+Data.PackedString		uses Data.Array.Unboxed
+Debug.QuickCheck.Batch		needs pre-emptive concurrency
+System.Info
+System.Posix.Signals
+Text.ParserCombinators.ReadP	ReadS clashes with Prelude
+Text.ParserCombinators.ReadPrec	uses ReadP
+Text.Read.Lex			uses ReadP
