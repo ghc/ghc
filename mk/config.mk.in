@@ -681,12 +681,20 @@ ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
 SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
-HAPPY			= @HappyCmd@
-HAPPY_VERSION		= @HappyVersion@		
 LX			= @LxCmd@
 GREENCARD	        = $(FPTOOLS_TOP)/green-card/src/green-card
 
 BLD_DLL			= dllwrap
+
+#
+# Happy
+#
+HAPPY			= @HappyCmd@
+HAPPY_VERSION		= @HappyVersion@		
+#
+# Options to pass to Happy when we're going to compile the output with GHC
+#
+GHC_HAPPY_OPTS		= $(shell if expr $(HAPPY_VERSION) \< "1.8" >/dev/null; then echo -g; else echo -agc; fi)
 
 #
 # Stuff from fptools/literate

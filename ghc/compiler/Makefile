@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.83 2000/07/14 08:17:36 simonpj Exp $
+# $Id: Makefile,v 1.84 2000/07/17 11:15:08 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -147,10 +147,8 @@ parser/Lex_HC_OPTS		= -fvia-C -K2m -H16m
 parser/Ctype_HC_OPTS		= -K2m -fvia-C
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
-rename/ParseIface_HAPPY_OPTS    += -g
 
 parser/Parser_HC_OPTS 		+= -Onot -H80m -optCrts-M80m -K2m -fno-warn-incomplete-patterns
-parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
@@ -235,16 +233,16 @@ parser/hschooks.o : parser/hschooks.c
 
 
 # Interface-file parser uses Happy
-SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS
+SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS  $(GHC_HAPPY_OPTS)
 
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	$(HAPPY) $(HAPPY_OPTS) -g rename/ParseIface.y
+	$(HAPPY) $(HAPPY_OPTS) rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
 
 parser/Parser.hs : parser/Parser.y
 	@$(RM) parser/Parser.hs parser/ParseIface.hinfo
-	$(HAPPY) $(HAPPY_OPTS) -g parser/Parser.y
+	$(HAPPY) $(HAPPY_OPTS) parser/Parser.y
 	@chmod 444 parser/Parser.hs
 
 #-----------------------------------------------------------------------------
