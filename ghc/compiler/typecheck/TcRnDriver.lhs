@@ -788,12 +788,15 @@ tcTopSrcDecls
 \begin{code}
 #ifdef GHCI
 mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
- 	    -> IO (Maybe GlobalRdrEnv)
+ 	    -> IO GlobalRdrEnv
 
 mkExportEnv hsc_env exports
-  = initTc hsc_env iNTERACTIVE $ do {
-    export_envs <- mappM getModuleExports exports ;
-    returnM (foldr plusGlobalRdrEnv emptyGlobalRdrEnv export_envs)
+  = do	{ mb_envs <- initTc hsc_env iNTERACTIVE $
+		     mappM getModuleExports exports 
+	; case mb_envs of
+	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
+	     Nothing   -> return emptyGlobalRdrEnv
+			     -- Some error; initTc will have printed it
     }
 
 getModuleExports :: ModuleName -> TcM GlobalRdrEnv

@@ -69,6 +69,7 @@ import Module		( Module, ModuleName, moduleName, mkModuleName, isHomeModule,
 			  extendModuleEnvList, extendModuleEnv,
 			  moduleNameUserString,
 			  ModLocation(..) )
+import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import GetImports
 import UniqFM
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
@@ -179,17 +180,25 @@ cmSetContext
 	-> [String]		-- and the just the exports from these
 	-> IO CmState
 cmSetContext cmstate toplevs exports = do 
-  let old_ic = cm_ic cmstate
+  let old_ic  = cm_ic cmstate
+      hsc_env = cm_hsc cmstate
+      hpt     = hsc_HPT hsc_env
 
-  mb_export_env <- mkExportEnv (cm_hsc cmstate) 
-			       (map mkModuleName exports)
+  export_env  <- mkExportEnv hsc_env (map mkModuleName exports)
+  toplev_envs <- mapM (mkTopLevEnv hpt) toplevs
 
-  case mb_export_env of
-    Nothing -> return cmstate	-- Error already reported; do a no-op
-    Just export_env -> 
-	  return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
-			     		   ic_exports = exports,
-				       	   ic_rn_gbl_env = export_env } }
+  let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
+  return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
+		     		   ic_exports      = exports,
+			       	   ic_rn_gbl_env   = all_env } }
+
+mkTopLevEnv :: HomePackageTable -> String -> IO GlobalRdrEnv
+mkTopLevEnv hpt mod
+ = case lookupModuleEnvByName hpt (mkModuleName mod) of
+      Nothing      -> throwDyn (ProgramError ("mkTopLevEnv: not a home module " ++ mod))
+      Just details -> case hm_globals details of
+			Nothing  -> throwDyn (ProgramError ("mkTopLevEnv: not interpreted " ++ mod))
+			Just env -> return env
 
 cmGetContext :: CmState -> IO ([String],[String])
 cmGetContext CmState{cm_ic=ic} = 
