@@ -12,6 +12,7 @@ module Packages ( PackageConfig(..),
 where
 
 #include "HsVersions.h"
+
 import Pretty
 
 import CmdLineOpts	( dynFlag, verbosity )
@@ -22,7 +23,9 @@ import Outputable	( docToSDoc )
 
 \begin{code}
 #define WANT_PRETTY
--- Yes, do generate pretty-printing stuff for packages
+#define INTERNAL_PRETTY
+-- Yes, do generate pretty-printing stuff for packages, and use our
+-- own Pretty library rather than Text.PrettyPrint
 
 -- There's a blob of code shared with ghc-pkg, 
 -- so we just include it from there 
