@@ -76,8 +76,8 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 writeRealC :: Handle -> AbstractC -> IO ()
 writeRealC handle absC = printDoc LeftMode handle (pprAbsC PprForC absC (costs absC))
 
-dumpRealC :: AbstractC -> String
-dumpRealC absC = show (pprAbsC PprForC absC (costs absC))
+dumpRealC :: AbstractC -> Doc
+dumpRealC absC = pprAbsC PprForC absC (costs absC)
 \end{code}
 
 This emits the macro,  which is used in GrAnSim  to compute the total costs
