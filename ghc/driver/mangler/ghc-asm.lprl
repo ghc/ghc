@@ -632,6 +632,11 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.symbol_stub/ )
+	{
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.lazy_symbol_pointer/ )
 	{
 	    $chk[++$i]   = $_;
@@ -762,6 +767,12 @@ sub mangle_asm {
   		    $p =~ s/^\tbcl 20,31,L\d+\$pb\n//;
   		    $p =~ s/^L\d+\$pb:\n//;
   		    $p =~ s/^\tmflr r31\n//;
+
+		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
+		    # under some circumstances, only when generating position dependent code.
+		    # I have no idea why, and I don't think it is necessary, so let's toss it.
+		    $p =~ s/^\tli r\d+,0\n//g;
+		    $p =~ s/^\tstw r\d+,\d+\(r1\)\n//g;
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
@@ -1112,11 +1123,37 @@ sub mangle_asm {
 			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n\tnop\n//;
 			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n//;
 		    } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ ) {
-			$c =~ s/^\taddis r9,r31,ha16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\n\tlwz r9,lo16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\(r9\)\n\tmtctr r9\n\tbctr\n//;
-				#	addis r9,r31,ha16(L_XXXX_fast3$non_lazy_ptr-L32$pb)
-				#	lwz r9,lo16(L_XXXX_fast3$non_lazy_ptr-L32$pb)(r9)
+			if ( $c =~ s/^\taddis r9,r31,ha16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\n\tlwz r9,lo16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\(r9\)\n\tmtctr r9\n\tbctr$// ) {
+				#	for Position-Independent Code, GCC 2:
+				#	addis r9,r31,ha16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)
+				#	lwz r9,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
 				#	mtctr r9
 				#	bctr
+			
+			} elsif ( $c =~ s/^\taddis r9,r31,ha16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\n\tlwz r29,lo16\(L_${symb}_fast\d*\$non_lazy_ptr-L\d+\$pb\)\(r9\)\nL(\d+):\n\tmtctr r29\n\tbctr$// ) {
+				#	for Position-Independent Code, GCC 3:
+				#	addis r9,r31,ha16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)
+				#	lwz r29,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
+				# Lyyy:
+				#	mtctr r29
+				#	bctr
+			    $label = $1;
+			    $c =~ s/^\tb L${label}\n/\tmtctr r29\n\tbctr\n/g;
+			} elsif ( $c =~ s/^\tlis r9,ha16\(L_${symb}_fast\d*\$non_lazy_ptr\)\n\tlwz r31,lo16\(L_${symb}_fast\d*\$non_lazy_ptr\)\(r9\)\nL(\d+):\n\tmtctr r31\n\tbctr$// ) {
+				#	for -mdynamic-no-pic Code, GCC 3:
+				#	lis r9,ha16(L_XXXX_fast3$non_lazy_ptr)
+				#	lwz r31,lo16(L_XXXX_fast3$non_lazy_ptr-Lxxx$pb)(r9)
+				# Lyyy:
+				#	mtctr r31
+				#	bctr
+			    $label = $1;
+			    $c =~ s/^\tb L${label}\n/\tmtctr r31\n\tbctr\n/g;
+			} else {
+			    
+			    print STDERR "slow-fast dropthrough not mangled\n";
+			    print STDERR $c;
+			    print STDERR "\n\n";
+			}
 		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
 			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n\t\s*nop\n//;
 			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n(\t\s*[a-z].*\n)/$1/;
