@@ -43,6 +43,8 @@ import PrelList
 import PrelTup
 import PrelBase
 import PrelMaybe ( Maybe(..) )
+
+infixr 1 =<<
 \end{code}
 
 %*********************************************************
