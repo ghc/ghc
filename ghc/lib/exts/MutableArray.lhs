@@ -64,25 +64,25 @@ module MutableArray
      -- the sizes are reported back are *in bytes*.
     sizeofMutableByteArray, -- :: Ix ix => MutableByteArray s ix -> Int
 
-    readWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Word8
-    readWord16Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Word16
-    readWord32Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Word32
-    readWord64Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Word64
+    readWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Word8
+    readWord16Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Word16
+    readWord32Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Word32
+    readWord64Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Word64
 
-    writeWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Word8  -> IO ()
-    writeWord16Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Word16 -> IO ()
-    writeWord32Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Word32 -> IO ()
-    writeWord64Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Word64 -> IO ()
+    writeWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Word8  -> ST s ()
+    writeWord16Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Word16 -> ST s ()
+    writeWord32Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Word32 -> ST s ()
+    writeWord64Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Word64 -> ST s ()
 
-    readInt8Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Int8
-    readInt16Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Int16
-    readInt32Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Int32
-    readInt64Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Int64
+    readInt8Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Int8
+    readInt16Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Int16
+    readInt32Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Int32
+    readInt64Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> ST s Int64
 
-    writeInt8Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Int8  -> IO ()
-    writeInt16Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Int16 -> IO ()
-    writeInt32Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> Int32 -> IO ()
-    writeInt64Array	    -- :: Ix ix => MutableByteArray s ix -> Int -> Int64 -> IO ()
+    writeInt8Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Int8  -> ST s ()
+    writeInt16Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Int16 -> ST s ()
+    writeInt32Array,	    -- :: Ix ix => MutableByteArray s ix -> ix -> Int32 -> ST s ()
+    writeInt64Array	    -- :: Ix ix => MutableByteArray s ix -> ix -> Int64 -> ST s ()
 
     ) where
 
@@ -170,38 +170,34 @@ Reminder: indexing an array at some base type is done in units
 of the size of the type being; *not* in bytes.
 
 \begin{code}
-readWord8Array  :: MutableByteArray RealWorld Int -> Int -> IO Word8
-readWord16Array :: MutableByteArray RealWorld Int -> Int -> IO Word16
-readWord32Array :: MutableByteArray RealWorld Int -> Int -> IO Word32
-readWord64Array :: MutableByteArray RealWorld Int -> Int -> IO Word64
+readWord8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word8
+readWord16Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word16
+readWord32Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word32
 
-readWord8Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# -# 1#) -> ioError (userError ("readWord8Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case readCharArray# arr# n# s#  of 
-           (# s2# , r# #) -> (# s2# , intToWord8 (I# (ord# r#)) #) 
+readWord8Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n)	    	    of { I# n# ->
+    case readCharArray# arr# n# s#  of { (# s2# , r# #) ->
+    (# s2# , intToWord8 (I# (ord# r#)) #) }}
 
-readWord16Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 2# -# 1#) -> ioError (userError ("readWord16Array: index out of bounds "++show n))
-       | otherwise                         -> IO $ \ s# ->
-         case readWordArray# arr# (n# `quotInt#` 2#) s#  of 
-           (# s2# , w# #) -> 
-		case n# `remInt#` 2# of
-		   0# -> (# s2# , wordToWord16 (W# w#) #)              -- the double byte hides in the lower half of the wrd.
-		   1# -> (# s2# , wordToWord16 (W# (shiftRL# w# 16#)) #)  -- take the upper 16 bits.
 
-readWord32Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 4# -# 1#) -> ioError (userError ("readWord32Array: index out of bounds "++show n))
-       | otherwise                         -> IO $ \ s# ->
-         case readWordArray# arr# n# s#  of 
-           (# s2# , w# #) -> (# s2# , wordToWord32 (W# w#) #)
+readWord16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n)	    	                    of { I# n# ->
+    case readWordArray# arr# (n# `quotInt#` 2#) s#  of { (# s2# , w# #) -> 
+    case n# `remInt#` 2# of
+      0# -> (# s2# , wordToWord16 (W# w#) #)           
+              -- the double byte hides in the lower half of the wrd.
+      1# -> (# s2# , wordToWord16 (W# (shiftRL# w# 16#)) #)  
+              -- take the upper 16 bits.
+    }}
 
+readWord32Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n)	    	        of { I# n# ->
+    case readWordArray# arr# n# s#      of { (# s2# , w# #) ->
+    (# s2# , wordToWord32 (W# w#) #) }}
+
+
+  -- FIXME, Num shouldn't be required, but it makes my life easier.
+readWord64Array :: (Num ix, Ix ix) => MutableByteArray s ix -> ix -> ST s Word64
 readWord64Array mb n = do
   l <- readWord32Array mb (2*n)
   h <- readWord32Array mb (2*n + 1)
@@ -211,50 +207,45 @@ readWord64Array mb n = do
   return ( word32ToWord64 l + word32ToWord64 h * word32ToWord64 (maxBound::Word32))  
 #endif
 
-writeWord8Array  :: MutableByteArray RealWorld Int -> Int -> Word8  -> IO ()
-writeWord16Array :: MutableByteArray RealWorld Int -> Int -> Word16 -> IO ()
-writeWord32Array :: MutableByteArray RealWorld Int -> Int -> Word32 -> IO ()
-writeWord64Array :: MutableByteArray RealWorld Int -> Int -> Word64 -> IO ()
+writeWord8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> Word8  -> ST s ()
+writeWord16Array :: (Ix ix) => MutableByteArray s ix -> ix -> Word16 -> ST s ()
+writeWord32Array :: (Ix ix) => MutableByteArray s ix -> ix -> Word32 -> ST s ()
 
-writeWord8Array (MutableByteArray ixs arr#) n@(I# n#) w =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# -# 1#) -> ioError (userError ("writeWord8Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case writeCharArray# arr# n# (chr# (word2Int# (word8ToWord# w))) s#  of 
-           s2# -> (# s2# , () #) 
+writeWord8Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
+    case (index ixs n) of 
+      I# n# -> case writeCharArray# arr# n# (chr# (word2Int# (word8ToWord# w))) s#  of 
+                    s2# -> (# s2# , () #)
 
-writeWord16Array (MutableByteArray ixs arr#) n@(I# n#) w =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 2# -# 1#) -> ioError (userError ("writeWord16Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
+writeWord16Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
+    case (index ixs n) of 
+      I# n# -> 
+	 let
+          w# = 
+            let w' = word16ToWord# w in
+            case n# `remInt#` 2# of
+              0# -> w'
+	      1# -> shiftL# w' 16#
+   
+          mask =
+            case n# `remInt#` 2# of
+              0# -> case ``0xffff0000'' of W# x -> x   -- writing to the lower half of the word.
+              1# -> int2Word# 0x0000ffff#
+         in
          case readWordArray# arr# (n# `quotInt#` 2#) s#  of 
            (# s2# , v# #) -> 
               case writeWordArray# arr# (n# `quotInt#` 2#) (w# `or#` (v# `and#` mask )) s2#  of 
                s3# -> (# s3# , () #) 
-  where
-   w# = 
-     let w' = word16ToWord# w in
-     case n# `remInt#` 2# of
-        0# -> w'
-	1# -> shiftL# w' 16#
-   
-   mask =
-     case n# `remInt#` 2# of
-       0# -> case ``0xffff0000'' of W# x -> x   -- writing to the lower half of the word.
-       1# -> int2Word# 0x0000ffff#
 
-writeWord32Array (MutableByteArray ixs arr#) n@(I# n#) w =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 4# -# 1#) -> ioError (userError ("writeWord32Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case writeWordArray# arr# n# w# s#  of 
-           s2# -> (# s2# , () #) 
+writeWord32Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
+    case (index ixs n) of 
+      I# n# ->
+        case writeWordArray# arr# n# w# s#  of 
+          s2# -> (# s2# , () #) 
   where
    w# = word32ToWord# w
 
+  -- FIXME, Num shouldn't be required, but it makes my life easier.
+writeWord64Array :: (Num ix, Ix ix) => MutableByteArray s ix -> ix -> Word64 -> ST s ()
 writeWord64Array mb n w = do
 #ifdef WORDS_BIGENDIAN
    writeWord32Array mb (n*2) h
@@ -272,38 +263,30 @@ writeWord64Array mb n w = do
 \end{code}
 
 \begin{code}
-readInt8Array  :: MutableByteArray RealWorld Int -> Int -> IO Int8
-readInt16Array :: MutableByteArray RealWorld Int -> Int -> IO Int16
-readInt32Array :: MutableByteArray RealWorld Int -> Int -> IO Int32
-readInt64Array :: MutableByteArray RealWorld Int -> Int -> IO Int64
+readInt8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int8
+readInt16Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int16
+readInt32Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int32
 
-readInt8Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# -# 1#) -> ioError (userError ("readInt8Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case readCharArray# arr# n# s#  of 
-           (# s2# , r# #) -> (# s2# , intToInt8 (I# (ord# r#)) #)
+readInt8Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n)	    	    of { I# n# ->
+    case readCharArray# arr# n# s#  of { (# s2# , r# #) ->
+    (# s2# , intToInt8 (I# (ord# r#)) #) }}
 
-readInt16Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 2# -# 1#) -> ioError (userError ("readInt16Array: index out of bounds "++show n))
-       | otherwise                         -> IO $ \ s# ->
-         case readIntArray# arr# (n# `quotInt#` 2#) s#  of 
-           (# s2# , i# #) -> 
-		    case n# `remInt#` 2# of
-		      0# -> (# s2# , intToInt16 (I# i#) #)
-		      1# -> (# s2# , intToInt16 (I# i#) #) -- FIXME.
+readInt16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n) of 
+     I# n# ->
+       case readIntArray# arr# (n# `quotInt#` 2#) s#  of 
+        (# s2# , i# #) -> 
+          case n# `remInt#` 2# of
+	     0# -> (# s2# , intToInt16 (I# i#) #)
+	     1# -> (# s2# , intToInt16 (I# (word2Int# (shiftRL# (int2Word# i#) 16# ))) #)
 
-readInt32Array (MutableByteArray ixs arr#) n@(I# n#) =
-    case sizeofMutableByteArray# arr#   of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 4# -# 1#) -> ioError (userError ("readInt32Array: index out of bounds "++show n))
-       | otherwise                         -> IO $ \ s# ->
-         case readIntArray# arr# n# s#  of 
-           (# s2# , i# #) -> (# s2# , intToInt32 (I# i#) #)
+readInt32Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
+    case (index ixs n) of 
+      I# n# -> case readIntArray# arr# n# s# of
+                 (# s2# , i# #) -> (# s2# , intToInt32 (I# i#) #)
 
+readInt64Array :: (Num ix, Ix ix) => MutableByteArray s ix -> ix -> ST s Int64
 readInt64Array mb n = do
   l <- readInt32Array mb (2*n)
   h <- readInt32Array mb (2*n + 1)
@@ -313,54 +296,49 @@ readInt64Array mb n = do
   return ( int32ToInt64 l + int32ToInt64 h * int32ToInt64 (maxBound::Int32))  
 #endif
 
-writeInt8Array  :: MutableByteArray RealWorld Int -> Int -> Int8  -> IO ()
-writeInt16Array :: MutableByteArray RealWorld Int -> Int -> Int16 -> IO ()
-writeInt32Array :: MutableByteArray RealWorld Int -> Int -> Int32 -> IO ()
-writeInt64Array :: MutableByteArray RealWorld Int -> Int -> Int64 -> IO ()
+writeInt8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> Int8  -> ST s ()
+writeInt16Array :: (Ix ix) => MutableByteArray s ix -> ix -> Int16 -> ST s ()
+writeInt32Array :: (Ix ix) => MutableByteArray s ix -> ix -> Int32 -> ST s ()
 
-writeInt8Array (MutableByteArray ixs arr#) n@(I# n#) i =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# -# 1#) -> ioError (userError ("writeInt8Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case writeCharArray# arr# n# ch s#  of 
+writeInt8Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
+    case (index ixs n) of
+      I# n# ->
+        case writeCharArray# arr# n# ch s#  of 
            s2# -> (# s2# , () #) 
   where
    ch = chr# (int8ToInt# i)
 
-writeInt16Array (MutableByteArray ixs arr#) n@(I# n#) i =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 2# -# 1#) -> ioError (userError ("writeInt16Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
+writeInt16Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
+    case (index ixs n) of
+      I# n# ->
+	 let
+          i# = 
+            let i' = int16ToInt# i in
+            case n# `remInt#` 2# of
+              0# -> i'
+	      1# -> iShiftL# i' 16#
+   
+          mask =
+            case n# `remInt#` 2# of
+              0# -> case ``0xffff0000'' of W# x -> x   -- writing to the lower half of the word.
+              1# -> int2Word# 0x0000ffff#
+	 in
          case readIntArray# arr# (n# `quotInt#` 2#) s#  of 
            (# s2# , v# #) ->
 	      let w' = word2Int# (int2Word# i# `or#` (int2Word# v# `and#` mask))
 	      in
               case writeIntArray# arr# (n# `quotInt#` 2#) w' s#  of
                 s2# -> (# s2# , () #) 
-  where
-   i# = 
-     let i' = int16ToInt# i in
-     case n# `remInt#` 2# of
-        0# -> i'
-	1# -> iShiftL# i' 16#
-   
-   mask =
-     case n# `remInt#` 2# of
-       0# -> case ``0xffff0000'' of W# x -> x   -- writing to the lower half of the word.
-       1# -> int2Word# 0x0000ffff#
 
-writeInt32Array (MutableByteArray ixs arr#) n@(I# n#) i =
-    case sizeofMutableByteArray# arr#  of 
-      bytes# 
-       | n# ># (bytes# `quotInt#` 4# -# 1#) -> ioError (userError ("writeInt32Array: index out of bounds "++show n))
-       | otherwise            -> IO $ \ s# ->
-         case writeIntArray# arr# n# i# s#  of 
-           s2# -> (# s2# , () #) 
+writeInt32Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
+   case (index ixs n) of
+     I# n# ->
+        case writeIntArray# arr# n# i# s#  of 
+          s2# -> (# s2# , () #) 
   where
    i# = int32ToInt# i
 
+writeInt64Array :: (Num ix, Ix ix) => MutableByteArray s ix -> ix -> Int64 -> ST s ()
 writeInt64Array mb n w = do
 #ifdef WORDS_BIGENDIAN
    writeInt32Array mb (n*2) h
