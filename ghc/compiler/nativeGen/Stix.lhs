@@ -22,11 +22,14 @@ module Stix (
         uniqOfNatM_State, deltaOfNatM_State,
 
 	getUniqLabelNCG, getNatLabelNCG,
+        ncgPrimopMoan
     ) where
 
 #include "HsVersions.h"
 
 import Ratio		( Rational )
+import IOExts		( unsafePerformIO )
+import IO		( hPutStrLn, stderr )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
 import ForeignCall	( CCallConv )
@@ -403,4 +406,24 @@ getDeltaNat st@(NatM_State us delta)
 setDeltaNat :: Int -> NatM ()
 setDeltaNat delta (NatM_State us _)
    = ((), NatM_State us delta)
+\end{code}
+
+Giving up in a not-too-inelegant way.
+
+\begin{code}
+ncgPrimopMoan :: String -> SDoc -> a
+ncgPrimopMoan msg pp_rep
+   = unsafePerformIO (
+        hPutStrLn stderr (
+        "\n" ++
+        "You've fallen across an unimplemented case in GHC's native code generation\n" ++
+        "machinery.  You can work around this for the time being by compiling\n" ++ 
+        "this module via the C route, by giving the flag -fvia-C.\n" ++
+        "The panic below contains information, intended for the GHC implementors,\n" ++
+        "about the exact place where GHC gave up.  Please send it to us\n" ++
+        "at glasgow-haskell-bugs@haskell.org, so as to encourage us to fix this.\n"
+        )
+     )
+     `seq`
+     pprPanic msg pp_rep
 \end{code}

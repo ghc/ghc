@@ -110,7 +110,7 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
                         other     -> IntRep
 
 foreignCallCode lhs call rhs
-  = pprPanic "Native code generator can't handle foreign call" (ppr call)
+  = ncgPrimopMoan "Native code generator can't handle foreign call" (ppr call)
 \end{code}
 
 
@@ -598,10 +598,7 @@ Now look for something more conventional.
 
 \begin{code}
 simplePrim pk [lhs] op rest  = StAssign pk lhs (StPrim op rest)
-simplePrim pk as    op bs    = simplePrim_error op
-
-simplePrim_error op
-    = error ("ERROR: primitive operation `"++show op++"'cannot be handled\nby the native-code generator.  Workaround: use -fvia-C.\n(Perhaps you should report it as a GHC bug, also.)\n")
+simplePrim pk as    op bs    = ncgPrimopMoan "simplPrim(all targets)" (ppr op)
 \end{code}
 
 %---------------------------------------------------------------------

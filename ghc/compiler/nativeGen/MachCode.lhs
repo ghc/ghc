@@ -33,7 +33,8 @@ import Stix		( getNatLabelNCG, StixTree(..),
                           pprStixTree, 
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
-                          getDeltaNat, setDeltaNat
+                          getDeltaNat, setDeltaNat,
+                          ncgPrimopMoan
 			)
 import Outputable
 import CmdLineOpts	( opt_Static )
@@ -705,8 +706,8 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
 
               other
-                 -> pprPanic "getRegister(x86,unary primop)" 
-                             (pprStixTree (StPrim primop [x]))
+                 -> ncgPrimopMoan "getRegister(x86,unary primop)" 
+                                  (pprStixTree (StPrim primop [x]))
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -797,8 +798,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [x, y])
       other
-         -> pprPanic "getRegister(x86,dyadic primop)" 
-                     (pprStixTree (StPrim primop [x, y]))
+         -> ncgPrimopMoan "getRegister(x86,dyadic primop)" 
+                          (pprStixTree (StPrim primop [x, y]))
   where
 
     --------------------
@@ -967,7 +968,7 @@ getRegister leaf
     in
     	returnNat (Any PtrRep code)
   | otherwise
-  = pprPanic "getRegister(x86)" (pprStixTree leaf)
+  = ncgPrimopMoan "getRegister(x86)" (pprStixTree leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -1074,8 +1075,8 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
 
               other
-                 -> pprPanic "getRegister(sparc,monadicprimop)" 
-                             (pprStixTree (StPrim primop [x]))
+                 -> ncgPrimopMoan "getRegister(sparc,monadicprimop)" 
+                                  (pprStixTree (StPrim primop [x]))
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -1164,8 +1165,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
                                            [x, y])
 
       other
-         -> pprPanic "getRegister(sparc,dyadic primop)" 
-                     (pprStixTree (StPrim primop [x, y]))
+         -> ncgPrimopMoan "getRegister(sparc,dyadic primop)" 
+                          (pprStixTree (StPrim primop [x, y]))
 
   where
     imul_div fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
@@ -1197,7 +1198,7 @@ getRegister leaf
     in
     	returnNat (Any PtrRep code)
   | otherwise
-  = pprPanic "getRegister(sparc)" (pprStixTree leaf)
+  = ncgPrimopMoan "getRegister(sparc)" (pprStixTree leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
