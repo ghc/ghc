@@ -58,7 +58,7 @@
           the parser specifications.  If you don't want to alter the
           parser then this saves you having to find and install
           <command>happy</command>. You will still need a working
-          version of GHC (preferably version 4.08+) on your machine in
+          version of GHC (version 5.x or later) on your machine in
           order to compile (most of) the sources, however.</para>
 	</listitem>
       </varlistentry>
