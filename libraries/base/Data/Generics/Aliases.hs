@@ -336,6 +336,15 @@ gunfoldR c f = gmapM (const f) $ fromConstr c
 ------------------------------------------------------------------------------
 
 
+
+-- | Flexible type extension
+ext1 :: (Data a, Typeable1 t)
+     => c a
+     -> (forall a. Data a => c (t a))
+     -> c a
+ext1 def ext = maybe def id (cast0to1 ext)
+
+
 -- | Type extension of transformations for unary type constructors
 ext1T :: (Data d, Typeable1 t)
       => (forall d. Data d => d -> d)

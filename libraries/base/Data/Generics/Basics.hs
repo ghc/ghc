@@ -25,8 +25,8 @@ module Data.Generics.Basics (
 		toConstr, 	-- :: a -> Constr
 		fromConstr,	-- :: Constr -> a
 		dataTypeOf,	-- :: a -> DataType
-		ext1,		-- type extension for unary type constructors
-		ext2		-- type extension for binary type constructors
+		cast0to1,	-- mediate types and unary type constructors
+		cast0to2	-- mediate types and binary type constructors
             ),
 
 	-- * Constructor representations
@@ -145,24 +145,22 @@ fold.
 
 ------------------------------------------------------------------------------
 --
--- Type extension for unary and binary type constructors
+-- Mediate types and type constructors
 --
 ------------------------------------------------------------------------------
 
-  -- | Type extension for unary type constructors
-  ext1 :: Typeable1 t
-       => c a
-       -> (forall a. Data a => c (t a))
-       -> c a
+  -- | Mediate types and unary type constructors
+  cast0to1 :: Typeable1 t
+           => (forall a. Data a => c (t a))
+           -> Maybe (c a)
+  cast0to1 _ = Nothing
 
-  ext1 def ext = def
+  -- | Mediate types and binary type constructors
+  cast0to2 :: Typeable2 t
+           => (forall a b. (Data a, Data b) => c (t a b))
+           -> Maybe (c a)
+  cast0to2 _ = Nothing
 
-
-  -- | Type extension for binary type constructors
-  ext2 :: Typeable2 t
-       => c a
-       -> (forall a b. (Data a, Data b) => c (t a b)) -> c a
-  ext2 def ext = def
 
 
 ------------------------------------------------------------------------------
@@ -578,8 +576,7 @@ instance Data a => Data [a] where
                    1 -> []
                    2 -> undefined:undefined
   dataTypeOf _ = listDataType
-  ext1 def ext = maybe def id (cast1 ext)
-
+  cast0to1     = cast1
 
 --
 -- The gmaps are given as an illustration.
@@ -611,7 +608,7 @@ instance Data a => Data (Maybe a) where
                    1 -> Nothing
                    2 -> Just undefined
   dataTypeOf _ = maybeDataType
-  ext1 def ext = maybe def id (cast1 ext)
+  cast0to1     = cast1
 
 
 --
@@ -628,7 +625,7 @@ instance (Data a, Data b) => Data (a,b) where
   fromConstr c = case conIndex c of
                    1 -> (undefined,undefined)
   dataTypeOf _ = productDataType
-  ext2 def ext = maybe def id (cast2 ext)
+  cast0to2     = cast2
 
 
 --
@@ -675,7 +672,7 @@ instance (Data a, Data b) => Data (Either a b) where
                    1 -> Left undefined
                    2 -> Right undefined
   dataTypeOf _ = eitherDataType
-  ext2 def ext = maybe def id (cast2 ext)
+  cast0to2     = cast2
 
 
 {-
@@ -703,4 +700,4 @@ instance (Data a, Data b) => Data (a -> b) where
   toConstr _   = FunConstr
   fromConstr _ = undefined
   dataTypeOf _ = FunType
-  ext2 def ext = maybe def id (cast2 ext)
+  cast0to2     = cast2
