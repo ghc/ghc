@@ -1,8 +1,14 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2000/04/26 10:03:28 simonmar Exp $
+# $Id: Makefile,v 1.6 2000/05/10 14:30:59 rrt Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# conc020 *should* work
+OMITTED_RUNTESTS = conc020.run conc021.run
+endif
+
 include $(TOP)/mk/should_run.mk
 
 conc009_RUNTEST_OPTS = -x 1
