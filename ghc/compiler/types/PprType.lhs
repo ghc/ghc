@@ -1,7 +1,7 @@
 %
 % (c) The AQUA Project, Glasgow University, 1996
 %
-\section[PprType]{Printing Types, TyVars, Classes, ClassOps, TyCons}
+\section[PprType]{Printing Types, TyVars, Classes, TyCons}
 
 \begin{code}
 #include "HsVersions.h"
@@ -17,11 +17,8 @@ module PprType(
 	specMaybeTysSuffix,
 	getTyDescription,
 	GenClass, 
-	GenClassOp, pprGenClassOp,
 
-	addTyVar{-ToDo:don't export-}, nmbrTyVar,
-	addUVar,  nmbrUsage,
-	nmbrType, nmbrTyCon, nmbrClass
+	nmbrType, nmbrGlobalType
  ) where
 
 IMP_Ubiq()
@@ -36,26 +33,28 @@ import {-# SOURCE #-} Id
 -- (PprType can see all the representations it's trying to print)
 import Type		( GenType(..), maybeAppTyCon, Type(..), splitFunTy,
 			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTys )
-import TyVar		( GenTyVar(..), TyVar(..) )
+import TyVar		( GenTyVar(..), TyVar(..), cloneTyVar )
 import TyCon		( TyCon(..), NewOrData )
-import Class		( SYN_IE(Class), GenClass(..),
-			  SYN_IE(ClassOp), GenClassOp(..) )
+import Class		( SYN_IE(Class), GenClass(..) )
 import Kind		( Kind(..), isBoxedTypeKind, pprParendKind )
-import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar) )
+import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar), cloneUVar )
 
 -- others:
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_PprUserLength )
 import Maybes		( maybeToBool )
-import Name	{-	(  nameString, Name{-instance Outputable-}, 
-			   OccName, pprOccName, getOccString
-			) -}
+import Name		(  nameString, Name{-instance Outputable-}, 
+			   OccName, pprOccName, getOccString, NamedThing(..)
+			)
 import Outputable	( PprStyle(..), codeStyle, userStyle, ifaceStyle,
-			  ifPprShowAll, interpp'SP, Outputable(..) )
+			  ifPprShowAll, interpp'SP, Outputable(..)
+			)
 import PprEnv
 import Pretty
-import UniqFM		( addToUFM_Directly, lookupUFM_Directly )
-import Unique		( Uniquable(..), pprUnique10, pprUnique, incrUnique, listTyConKey )
+import UniqFM		( UniqFM, addToUFM, emptyUFM, lookupUFM  )
+import Unique		( Unique, Uniquable(..), pprUnique10, pprUnique, 
+			  incrUnique, listTyConKey, initTyVarUnique 
+			)
 import Util
 \end{code}
 
@@ -70,10 +69,7 @@ instance Outputable TyCon where
 
 instance Outputable (GenClass tyvar uvar) where
     -- we use pprIfaceClass for printing in interfaces
-    ppr sty (Class u n _ _ _ _ _ _ _ _) = ppr sty n
-
-instance Outputable ty => Outputable (GenClassOp ty) where
-    ppr sty clsop = pprGenClassOp sty clsop
+    ppr sty (Class u n _ _ _ _ _ _ _) = ppr sty n
 
 instance Outputable (GenTyVar flexi) where
     ppr PprQuote ty = quotes (pprGenTyVar (PprForUser opt_PprUserLength) ty)
@@ -270,22 +266,24 @@ ppr_class  env clas  = ppr (pStyle env) clas
 %************************************************************************
 
 \begin{code}
-pprGenTyVar sty (TyVar uniq kind name usage)
-  | codeStyle sty
-  = pp_u
-  | otherwise
-  = case sty of
-      PprInterface -> pp_u
-      _		   -> hcat [pp_name, text "{-", pp_u, text "-}"]
-   where
-    pp_u    = pprUnique uniq
-    pp_name = case name of
-		Just n  -> pprOccName sty (getOccName n)
-		Nothing -> case kind of
-				TypeKind        -> char 'o'
-				BoxedTypeKind   -> char 't'
-				UnboxedTypeKind -> char 'u'
-				ArrowKind _ _   -> char 'a'
+pprGenTyVar sty (TyVar uniq kind maybe_name usage)
+  = case maybe_name of
+      	-- If the tyvar has a name we can safely use just it, I think
+	Just n  -> pprOccName sty (getOccName n) <> debug_extra
+	Nothing -> pp_kind <> pprUnique uniq
+  where
+    pp_kind = case kind of
+		TypeKind        -> char 'o'
+		BoxedTypeKind   -> char 't'
+		UnboxedTypeKind -> char 'u'
+		ArrowKind _ _   -> char 'a'
+
+    debug_extra = case sty of
+		     PprDebug   -> pp_debug
+		     PprShowAll -> pp_debug
+		     other      -> empty
+
+    pp_debug = text "_" <> pp_kind <> pprUnique uniq
 \end{code}
 
 We print type-variable binders with their kinds in interface files.
@@ -315,28 +313,6 @@ pprTyCon :: PprStyle -> TyCon -> Doc
 pprTyCon sty tycon = ppr sty (getName tycon)
 \end{code}
 
-
-
-%************************************************************************
-%*									*
-\subsection[Class]{@Class@}
-%*									*
-%************************************************************************
-
-\begin{code}
-pprGenClassOp :: Outputable ty => PprStyle -> GenClassOp ty -> Doc
-
-pprGenClassOp sty op = ppr_class_op sty [] op
-
-ppr_class_op sty tyvars (ClassOp op_name i ty)
-  = case sty of
-      PprInterface  -> pp_sigd
-      PprShowAll    -> pp_sigd
-      _		    -> pp_other
-  where
-    pp_other = ppr sty op_name
-    pp_sigd = hsep [pp_other, ptext SLIT("::"), ppr sty ty]
-\end{code}
 
 
 %************************************************************************
@@ -407,167 +383,144 @@ getTyDescription ty
     fun_result other	       = getTyDescription other
 \end{code}
 
-ToDo: possibly move:
-\begin{code}
-nmbrType :: Type -> NmbrM Type
 
-nmbrType (TyVarTy tv)
-  = nmbrTyVar tv    `thenNmbr` \ new_tv ->
+
+%************************************************************************
+%*									*
+\subsection{Renumbering types}
+%*									*
+%************************************************************************
+
+We tend to {\em renumber} everything before printing, so that we get
+consistent Uniques on everything from run to run.
+
+
+\begin{code}
+nmbrGlobalType :: Type -> Type		-- Renumber a top-level type
+nmbrGlobalType ty = nmbrType (\tyvar -> tyvar) (\uvar -> uvar) initTyVarUnique ty
+
+nmbrType :: (TyVar -> TyVar) -> (UVar  -> UVar)		-- Mapping for free vars
+	 -> Unique
+	 -> Type
+	 -> Type
+
+nmbrType tyvar_env uvar_env uniq ty
+  = initNmbr tyvar_env uvar_env uniq (nmbrTy ty)
+
+nmbrTy :: Type -> NmbrM Type
+
+nmbrTy (TyVarTy tv)
+  = lookupTyVar tv    `thenNmbr` \ new_tv ->
     returnNmbr (TyVarTy new_tv)
 
-nmbrType (AppTy t1 t2)
-  = nmbrType t1	    `thenNmbr` \ new_t1 ->
-    nmbrType t2	    `thenNmbr` \ new_t2 ->
+nmbrTy (AppTy t1 t2)
+  = nmbrTy t1	    `thenNmbr` \ new_t1 ->
+    nmbrTy t2	    `thenNmbr` \ new_t2 ->
     returnNmbr (AppTy new_t1 new_t2)
 
-nmbrType (TyConTy tc use)
-  = --nmbrTyCon tc    `thenNmbr` \ new_tc ->
-    nmbrUsage use   `thenNmbr` \ new_use ->
+nmbrTy (TyConTy tc use)
+  = nmbrUsage use   `thenNmbr` \ new_use ->
     returnNmbr (TyConTy tc new_use)
 
-nmbrType (SynTy tc args expand)
-  = --nmbrTyCon tc	    `thenNmbr` \ new_tc ->
-    mapNmbr nmbrType args   `thenNmbr` \ new_args ->
-    nmbrType expand	    `thenNmbr` \ new_expand ->
+nmbrTy (SynTy tc args expand)
+  = mapNmbr nmbrTy args   `thenNmbr` \ new_args ->
+    nmbrTy expand	    `thenNmbr` \ new_expand ->
     returnNmbr (SynTy tc new_args new_expand)
 
-nmbrType (ForAllTy tv ty)
-  = addTyVar tv		`thenNmbr` \ new_tv ->
-    nmbrType ty		`thenNmbr` \ new_ty ->
+nmbrTy (ForAllTy tv ty)
+  = addTyVar tv		$ \ new_tv ->
+    nmbrTy ty		`thenNmbr` \ new_ty ->
     returnNmbr (ForAllTy new_tv new_ty)
 
-nmbrType (ForAllUsageTy u us ty)
-  = addUVar u		    `thenNmbr` \ new_u  ->
-    mapNmbr nmbrUVar us     `thenNmbr` \ new_us ->
-    nmbrType ty		    `thenNmbr` \ new_ty ->
+nmbrTy (ForAllUsageTy u us ty)
+  = addUVar u			$ \ new_u  ->
+    mapNmbr lookupUVar us	`thenNmbr` \ new_us ->
+    nmbrTy ty			`thenNmbr` \ new_ty ->
     returnNmbr (ForAllUsageTy new_u new_us new_ty)
 
-nmbrType (FunTy t1 t2 use)
-  = nmbrType t1	    `thenNmbr` \ new_t1 ->
-    nmbrType t2	    `thenNmbr` \ new_t2 ->
+nmbrTy (FunTy t1 t2 use)
+  = nmbrTy t1	    `thenNmbr` \ new_t1 ->
+    nmbrTy t2	    `thenNmbr` \ new_t2 ->
     nmbrUsage use   `thenNmbr` \ new_use ->
     returnNmbr (FunTy new_t1 new_t2 new_use)
 
-nmbrType (DictTy c ty use)
-  = --nmbrClass c	    `thenNmbr` \ new_c   ->
-    nmbrType  ty    `thenNmbr` \ new_ty  ->
+nmbrTy (DictTy c ty use)
+  = nmbrTy  ty    `thenNmbr` \ new_ty  ->
     nmbrUsage use   `thenNmbr` \ new_use ->
     returnNmbr (DictTy c new_ty new_use)
-\end{code}
 
-\begin{code}
-addTyVar, nmbrTyVar :: TyVar -> NmbrM TyVar
 
-addTyVar tv@(TyVar u k maybe_name use) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = --pprTrace "addTyVar:" (hsep [pprUnique u, pprUnique ut]) $
-    case (lookupUFM_Directly tvenv u) of
-      Just xx -> -- pprTrace "addTyVar: already in map!" (ppr PprDebug tv) $
-		 -- (It gets triggered when we do a datatype: first we
-		 -- "addTyVar" the tyvars for the datatype as a whole;
-		 -- we will subsequently "addId" the data cons, including
-		 -- the type for each of them -- each of which includes
-		 -- _forall_ ...tvs..., which we will addTyVar.
-		 -- Harmless, if that's all that happens....
-		 (nenv, xx)
-      Nothing ->
-	let
-	    nenv_plus_tv     = NmbrEnv ui (incrUnique ut) uu
-				       idenv
-				       (addToUFM_Directly tvenv u new_tv)
-				       uvenv
 
-	    (nenv2, new_use) = nmbrUsage use nenv_plus_tv
-
-	    new_tv = TyVar ut k maybe_name new_use
-	in
-	(nenv2, new_tv)
-
-nmbrTyVar tv@(TyVar u _ _ _) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly tvenv u) of
-      Just xx -> (nenv, xx)
-      Nothing ->
-	--pprTrace "nmbrTyVar: lookup failed:" (hsep (ppr PprDebug u : [hsep [ppr PprDebug x, ptext SLIT("=>"), ppr PprDebug tv] | (x,tv) <- ufmToList tvenv])) $
-	(nenv, tv)
-\end{code}
-
-nmbrTyCon : only called from ``top-level'', if you know what I mean.
-\begin{code}
-nmbrTyCon tc@FunTyCon		  = returnNmbr tc
-nmbrTyCon tc@(TupleTyCon _ _ _)	  = returnNmbr tc
-nmbrTyCon tc@(PrimTyCon  _ _ _ _) = returnNmbr tc
-
-nmbrTyCon (DataTyCon u n k tvs theta cons clss nod)
-  = --pprTrace "nmbrDataTyCon:" (hsep (map (ppr PprDebug) tvs)) $
-    mapNmbr addTyVar   tvs	`thenNmbr` \ new_tvs   ->
-    mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
-    mapNmbr nmbrId     cons	`thenNmbr` \ new_cons  ->
-    returnNmbr (DataTyCon u n k new_tvs new_theta new_cons clss nod)
+lookupTyVar tyvar (NmbrEnv tv_fn tv_env _ _) uniq
+  = (uniq, tyvar')
   where
-    nmbr_theta (c,t)
-      = --nmbrClass c	`thenNmbr` \ new_c ->
-        nmbrType  t	`thenNmbr` \ new_t ->
-	returnNmbr (c, new_t)
+    tyvar' = case lookupUFM tv_env tyvar of
+		Just tyvar' -> tyvar'
+		Nothing     -> tv_fn tyvar
 
-nmbrTyCon (SynTyCon u n k a tvs expand)
-  = mapNmbr addTyVar   tvs	`thenNmbr` \ new_tvs ->
-    nmbrType	       expand	`thenNmbr` \ new_expand ->
-    returnNmbr (SynTyCon u n k a new_tvs new_expand)
-
-nmbrTyCon (SpecTyCon tc specs)
-  = mapNmbr nmbrMaybeTy specs	`thenNmbr` \ new_specs ->
-    returnNmbr (SpecTyCon tc new_specs)
-
------------
-nmbrMaybeTy Nothing  = returnNmbr Nothing
-nmbrMaybeTy (Just t) = nmbrType t `thenNmbr` \ new_t ->
-		       returnNmbr (Just new_t)
-\end{code}
-
-\begin{code}
-nmbrClass (Class u n tv supers ssels ops osels odefms instenv isupers)
-  = addTyVar tv		`thenNmbr` \ new_tv  ->
-    mapNmbr nmbr_op ops	`thenNmbr` \ new_ops ->
-    returnNmbr (Class u n new_tv supers ssels new_ops osels odefms instenv isupers)
+addTyVar tv m (NmbrEnv f_tv tv_ufm f_uv uv_ufm) u
+  = m tv' nenv u'
   where
-    nmbr_op (ClassOp n tag ty)
-      = nmbrType ty	`thenNmbr` \ new_ty ->
-	returnNmbr (ClassOp n tag new_ty)
+    nenv    = NmbrEnv f_tv tv_ufm' f_uv uv_ufm
+    tv_ufm' = addToUFM tv_ufm tv tv'
+    tv'	    = cloneTyVar tv u
+    u'      = incrUnique u
 \end{code}
 
+Usage stuff
+
 \begin{code}
-nmbrUsage :: Usage -> NmbrM Usage
+nmbrUsage (UsageVar v)
+  = lookupUVar v	`thenNmbr` \ v' ->
+    returnNmbr (UsageVar v)
 
 nmbrUsage u = returnNmbr u
-{- LATER:
-nmbrUsage u@UsageOne   = returnNmbr u
-nmbrUsage u@UsageOmega = returnNmbr u
-nmbrUsage (UsageVar u)
-  = nmbrUVar u	`thenNmbr` \ new_u ->
-    returnNmbr (UsageVar new_u)
--}
+
+
+lookupUVar uvar (NmbrEnv _ _ uv_fn uv_env) uniq
+  = (uniq, uvar')
+  where
+    uvar' = case lookupUFM uv_env uvar of
+		Just uvar' -> uvar'
+		Nothing     -> uv_fn uvar
+
+addUVar uv m (NmbrEnv f_tv tv_ufm f_uv uv_ufm) u
+  = m uv' nenv u'
+  where
+    nenv    = NmbrEnv f_tv tv_ufm f_uv uv_ufm'
+    uv_ufm' = addToUFM uv_ufm uv uv'
+    uv'	    = cloneUVar uv u
+    u'      = incrUnique u
 \end{code}
 
+Monad stuff
+
 \begin{code}
-addUVar, nmbrUVar :: UVar -> NmbrM UVar
+data NmbrEnv
+  = NmbrEnv	(TyVar -> TyVar) (UniqFM TyVar)		-- Global and local map for tyvars
+		(UVar  -> UVar)  (UniqFM UVar)		-- ... for usage vars
 
-addUVar u nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly uvenv u) of
-      Just xx -> trace "addUVar: already in map!" $
-		 (nenv, xx)
-      Nothing ->
-	let
-	    nenv_plus_uv     = NmbrEnv ui ut (incrUnique uu)
-				       idenv
-				       tvenv
-				       (addToUFM_Directly uvenv u new_uv)
-	    new_uv = uu
-	in
-	(nenv_plus_uv, new_uv)
+type NmbrM a = NmbrEnv -> Unique -> (Unique, a)		-- Unique is name supply
 
-nmbrUVar u nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly uvenv u) of
-      Just xx -> (nenv, xx)
-      Nothing ->
-	trace "nmbrUVar: lookup failed" $
-	(nenv, u)
+initNmbr :: (TyVar -> TyVar) -> (UVar -> UVar) -> Unique -> NmbrM a -> a
+initNmbr tyvar_env uvar_env uniq m
+  = let
+	init_nmbr_env  = NmbrEnv tyvar_env emptyUFM uvar_env emptyUFM
+    in
+    snd (m init_nmbr_env uniq)
+
+returnNmbr x nenv u = (u, x)
+
+thenNmbr m k nenv u
+  = let
+	(u', res) = m nenv u
+    in
+    k res nenv u'
+
+
+mapNmbr f []     = returnNmbr []
+mapNmbr f (x:xs)
+  = f x		    `thenNmbr` \ r  ->
+    mapNmbr f xs    `thenNmbr` \ rs ->
+    returnNmbr (r:rs)
 \end{code}
