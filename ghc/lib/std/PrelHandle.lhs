@@ -388,7 +388,7 @@ sent to the operating system are flushed as for $flush$.
 
 %*********************************************************
 %*							*
-\subsection[EOF]{Detecting the End of Input}
+\subsection[FileSize]{Detecting the size of a file}
 %*							*
 %*********************************************************
 
@@ -429,6 +429,13 @@ hFileSize handle =
 		   constructErrorAndFail "hFileSize"
 #endif
 \end{code}
+
+%*********************************************************
+%*							*
+\subsection[EOF]{Detecting the End of Input}
+%*							*
+%*********************************************************
+
 
 For a readable handle {\em hdl}, @hIsEOF hdl@ returns
 @True@ if no further input can be taken from @hdl@ or for a
