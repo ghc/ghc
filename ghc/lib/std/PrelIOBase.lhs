@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.26 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.27 2000/07/08 18:17:40 panne Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -450,11 +450,12 @@ instance Show Exception where
   showsPrec _ (RecConError err)	         = showString err
   showsPrec _ (RecUpdError err)	         = showString err
   showsPrec _ (AssertionFailed err)      = showString err
-  showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
+  showsPrec _ (UserError err)            = showString err
 \end{code}
 
 %*********************************************************
