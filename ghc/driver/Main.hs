@@ -166,7 +166,7 @@ GLOBAL_VAR(keep_tmp_files, False, Bool)
 cleanTempFiles :: IO ()
 cleanTempFiles = do
   forget_it <- readIORef keep_tmp_files
-  if forget_it then return () else do
+  unless forget_it $ do
 
   fs <- readIORef files_to_clean
   verb <- readIORef verbose
@@ -589,9 +589,8 @@ checkConfigAccess :: IO ()
 checkConfigAccess = do
   conf_file <- readIORef package_config
   access <- fileAccess conf_file True True False
-  if not access
-	then throwDyn (OtherError "you don't have permission to modify the package configuration file")
-	else return ()
+  unless access $
+	throwDyn (OtherError "you don't have permission to modify the package configuration file")
 
 maybeRestoreOldConfig :: String -> IO () -> IO ()
 maybeRestoreOldConfig conf_file io
@@ -634,11 +633,10 @@ addPackage package
 	  Nothing -> throwDyn (UnknownPackage package)
 	  Just details -> do
 	    ps <- readIORef packages
-	    if package `elem` ps 
-		then return ()
-		else do mapM_ addPackage (package_deps details)
-			ps <- readIORef packages
-			writeIORef packages (package:ps)
+	    unless (package `elem` ps) $ do
+		mapM_ addPackage (package_deps details)
+		ps <- readIORef packages
+		writeIORef packages (package:ps)
 
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
@@ -1162,9 +1160,8 @@ main =
 
    o_files <- mapM compileFile phase_srcs
 
-   if do_linking
-	then do_link o_files unknown_srcs
-	else return ()
+   when do_linking $
+	do_link o_files unknown_srcs
 
 
 -- The following compilation pipeline algorithm is fairly hacky.  A
@@ -1269,10 +1266,9 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 
 	-- sadly, ghc -E is supposed to write the file to stdout.  We
 	-- generate <file>.cpp, so we also have to cat the file here.
-     if (next_phase > last_phase && last_phase == Cpp)
-	then run_something "Dump pre-processed file to stdout"
-		("cat " ++ output_fn)
-	else return ()
+     when (next_phase > last_phase && last_phase == Cpp) $
+	run_something "Dump pre-processed file to stdout"
+		      ("cat " ++ output_fn)
 
      run_pipeline last_phase do_linking use_ofile 
 	  orig_basename (next_phase, output_fn)
@@ -1665,16 +1661,14 @@ do_link o_files unknown_srcs = do
 run_something phase_name cmd
  = do
    verb <- readIORef verbose
-   if verb then do
+   when verb $ do
 	putStr phase_name
 	putStrLn ":"
 	putStrLn cmd
-     else
-	return ()
 
    -- test for -n flag
    n <- readIORef dry_run
-   if n then return () else do 
+   unless n $ do 
 
    -- and run it!
    exit_code <- system cmd  `catchAllIO` 
@@ -1867,8 +1861,11 @@ opts =
   ,  ( "fmax-simplifier-iterations", 
 		Prefix (writeIORef opt_MaxSimplifierIterations . read) )
 
-  ,  ( "fusagesp",		NoArg (do writeIORef opt_UsageSPInf True
-					  add opt_C "-fusagesp-on") )
+  ,  ( "fusagesp"	   , NoArg (do writeIORef opt_UsageSPInf True
+				       add opt_C "-fusagesp-on") )
+
+  ,  ( "fstrictfp"	   , NoArg (do add opt_C "-fstrictfp"
+				       add opt_c "-ffloat-store"))
 
 	-- flags that are "active negatives"
   ,  ( "fno-implicit-prelude"	, PassFlag (add opt_C) )
@@ -1961,9 +1958,8 @@ sizeOpt ref str
 writeSizeOpt :: IORef Integer -> Integer -> IO ()
 writeSizeOpt ref new = do
   current <- readIORef ref
-  if (new > current) 
-	then writeIORef ref new
-	else return ()
+  when (new > current) $
+	writeIORef ref new
 
 floatOpt :: IORef Double -> String -> IO ()
 floatOpt ref str
@@ -2031,8 +2027,10 @@ global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
 
 split_filename :: String -> (String,String)
-split_filename f = (reverse rev_basename, reverse rev_ext)
-  where (rev_ext, '.':rev_basename) = span ('.' /=) (reverse f)
+split_filename f = (reverse (stripDot rev_basename), reverse rev_ext)
+  where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
+        stripDot ('.':xs) = xs
+        stripDot xs       = xs
 
 split :: Char -> String -> [String]
 split c s = case rest of
@@ -2048,7 +2046,7 @@ add var x = do
 addNoDups :: Eq a => IORef [a] -> a -> IO ()
 addNoDups var x = do
   xs <- readIORef var
-  if x `elem` xs then return () else writeIORef var (x:xs)
+  unless (x `elem` xs) $ writeIORef var (x:xs)
 
 remove_suffix :: String -> Char -> String
 remove_suffix s c 
