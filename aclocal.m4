@@ -4,6 +4,30 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+# FP_PROG_CONTEXT_DIFF
+# --------------------
+# Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
+# NB: NeXTStep thinks diff'ing a file against itself is "trouble".
+# Used by ghc, glafp-utils/ltx, and glafp-utils/runstdtest
+AC_DEFUN([FP_PROG_CONTEXT_DIFF],
+[AC_CACHE_CHECK([for a working context diff], [fp_cv_context_diff],
+[echo foo > conftest1
+echo foo > conftest2
+fp_cv_context_diff=no
+for fp_var in '-C 1' '-c1'
+do
+  if diff $fp_var conftest1 conftest2 > /dev/null 2>&1; then
+    fp_cv_context_diff="diff $fp_var"
+    break
+  fi
+done])
+if test x"$fp_cv_context_diff" = xno; then
+   AC_MSG_ERROR([cannot figure out how to do context diffs])
+fi
+AC_SUBST(ContextDiffCmd, [$fp_cv_context_diff])
+])# FP_PROG_CONTEXT_DIFF
+
+
 # FP_ALTZONE
 # -------------------
 # Defines HAVE_DECL_ALTZONE to 1 if declared, 0 otherwise.
@@ -270,31 +294,6 @@ AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
 
-dnl
-dnl What's the best way of doing context diffs?
-dnl
-dnl (NB: NeXTStep thinks diff'ing a file against itself is "trouble")
-dnl
-AC_DEFUN(FPTOOLS_PROG_DIFF,
-[AC_CACHE_CHECK([for ok way to do context diffs], fptools_cv_context_diffs,
-[echo foo > conftest1
-echo foo > conftest2
-if diff -C 1 conftest1 conftest2 > /dev/null 2>&1 ; then
-    fptools_cv_context_diffs='diff -C 1'
-else
-    if diff -c1 conftest1 conftest2 > /dev/null 2>&1 ; then
-        fptools_cv_context_diffs='diff -c1'
-    else
-        echo "Can't figure out how to do context diffs."
-        echo "Neither \`diff -C 1' nor \`diff -c1' works."
-        exit 1
-    fi
-fi
-rm -f conftest1 conftest2
-])
-ContextDiffCmd=$fptools_cv_context_diffs
-AC_SUBST(ContextDiffCmd)
-])
 
 dnl
 dnl Check whether ld supports -x

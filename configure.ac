@@ -651,7 +651,7 @@ fi
 AC_SUBST(SRC_CC_OPTS)
 
 dnl ** figure out how to do context diffs
-FPTOOLS_PROG_DIFF
+FP_PROG_CONTEXT_DIFF
 
 dnl ** Find find command (for Win32's benefit)
 FPTOOLS_FIND_FIND
