@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.153 2002/08/28 13:02:51 simonmar Exp $
+ * $Id: Schedule.c,v 1.154 2002/09/17 12:20:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2472,6 +2472,9 @@ GetRoots(evac_fn evac)
 #if defined(PAR) || defined(GRAN)
   markSparkQueue(evac);
 #endif
+
+  // mark the signal handlers (signals should be already blocked)
+  markSignalHandlers(evac);
 }
 
 /* -----------------------------------------------------------------------------
