@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.7 2001/03/13 12:50:31 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.8 2001/05/04 15:18:00 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -75,7 +75,7 @@ phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
 
-haskellish_suffix = (`elem` [ "hs", "hspp", "lhs", "hc" ])
+haskellish_suffix = (`elem` [ "hs", "hspp", "lhs", "hc", "raw_s" ])
 cish_suffix       = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
 
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
