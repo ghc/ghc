@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.121 2003/05/21 02:48:56 igloo Exp $
+-- $Id: Main.hs,v 1.122 2003/05/21 12:38:36 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -195,6 +195,9 @@ main =
 	-- Leftover ones are presumably files
    fileish_args <- processArgs dynamic_flags (extra_non_static ++ non_static) []
 
+	-- save the "initial DynFlags" away
+   saveDynFlags
+
 	-- We split out the object files (.o, .dll) and add them
 	-- to v_Ld_inputs for use by the linker
    let (objs, srcs) = partition objish_file fileish_args
@@ -208,8 +211,8 @@ main =
 
 	---------------- Do the business -----------
    case mode of
-	DoMake 	       -> do { saveDynFlags ;
-			       doMake srcs }
+	DoMake 	       -> doMake srcs
+			       
 	DoMkDependHS   -> do { beginMkDependHS ; 
 			       compileFiles mode srcs; 
 			       endMkDependHS }
@@ -219,19 +222,24 @@ main =
 	DoLink	       -> do { o_files <- compileFiles mode srcs; 
 			       omit_linking <- readIORef v_NoLink;
 			       when (not omit_linking)
-				    (staticLink o_files [basePackage, haskell98Package]) }
-				-- We always link in the base package in one-shot linking.
-				-- Any other packages required must be given using -package
-				-- options on the command-line.
+				    (staticLink o_files 
+					[basePackage, haskell98Package]) }
+			-- We always link in the base package in
+			-- one-shot linking.  Any other packages
+			-- required must be given using -package
+			-- options on the command-line.
+
 #ifndef GHCI
 	DoInteractive -> throwDyn (CmdLineError "not built for interactive use")
 #else
 	DoInteractive -> interactiveUI srcs
 #endif
 
---------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- Option sanity checks
+
 checkOptions :: GhcMode -> [String] -> [String] -> IO ()
-     -- Final sanity checking before kicking of a compilation (pipeline).
+     -- Final sanity checking before kicking off a compilation (pipeline).
 checkOptions mode srcs objs = do
 	-- -ohi sanity check
    ohi <- readIORef v_Output_hi
@@ -246,7 +254,8 @@ checkOptions mode srcs objs = do
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
-	-- Check that there are some input files (except in the interactive case)
+	-- Check that there are some input files (except in the interactive 
+	-- case)
    if null srcs && null objs && mode /= DoInteractive
 	then throwDyn (UsageError "no input files")
 	else do
@@ -259,16 +268,14 @@ checkOptions mode srcs objs = do
    verifyOutputFiles
 
 
---------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- Compile files in one-shot mode.
+
 compileFiles :: GhcMode 
 	     -> [String]	-- Source files
 	     -> IO [String]	-- Object files
 compileFiles mode srcs = do
    stop_flag <- readIORef v_GhcModeFlag
-
-	-- Do the business; save the DynFlags at the
-	-- start, so we can restore them before each file
-   saveDynFlags
    mapM (compileFile mode stop_flag) srcs
 
 
@@ -282,7 +289,7 @@ compileFile mode stop_flag src = do
    -- We compile in two stages, because the file may have an
    -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
    let (basename, suffix) = splitFilename src
-   
+
    -- just preprocess (Haskell source only)
    let src_and_suff = (src, getFileSuffix src)
    let not_hs_file  = not (haskellish_src_file src)
@@ -302,7 +309,9 @@ compileFile mode stop_flag src = do
    return r
 
 
---------------------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- Run --make mode
+
 doMake :: [String] -> IO ()
 doMake []    = throwDyn (UsageError "no input files")
 doMake srcs  = do 
@@ -313,9 +322,9 @@ doMake srcs  = do
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
 
+-- ---------------------------------------------------------------------------
+-- Various banners and verbosity output.
 
-
---------------------------------------------------------------------------------------
 showBanners :: GhcMode -> FilePath -> [String] -> IO ()
 showBanners mode conf_file static_opts = do
    verb <- dynFlag verbosity

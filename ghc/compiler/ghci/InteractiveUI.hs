@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.153 2003/05/19 15:39:17 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.154 2003/05/21 12:38:37 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -157,8 +157,7 @@ helpText = "\
 interactiveUI :: [FilePath] -> IO ()
 interactiveUI srcs = do
    dflags <- getDynFlags
-   saveDynFlags 	-- Save the dynamic flags, so that 
-			-- the later restore will find them
+
    cmstate <- cmInit Interactive;
 
    hFlush stdout
