@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/24 17:32:41 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/25 10:19:16 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -604,32 +604,39 @@ String path; {
  * New path handling stuff for the Combined System (tm)
  * ------------------------------------------------------------------------*/
 
-#define N_DEFAULT_LIBDIR 1000
-char defaultLibDir[N_DEFAULT_LIBDIR];
+char installDir[N_INSTALLDIR];
 
-/* Assumes that getcwd()++argv[0] is the absolute path to the
-   executable.  Basically wrong.
+/* Sets installDir to $STGHUGSDIR, and ensures there is a trailing
+   slash at the end.
 */
-void setDefaultLibDir ( String argv_0 )
+void setInstallDir ( String argv_0 )
 {
-   int i;
-   if (argv_0[0] != SLASH) {
-      if (!getcwd(defaultLibDir,N_DEFAULT_LIBDIR-strlen(argv_0)-10)) {
-         ERRMSG(0) "Can't get current working directory"
-         EEND;
-      }
-      i = strlen(defaultLibDir);
-      if (defaultLibDir[i-1] != SLASH) defaultLibDir[i++] = SLASH;
-   } else {
-      i = 0;
+   int   i;
+   char* r = getenv("STGHUGSDIR");
+   if (!r) {
+      fprintf(stderr, 
+          "%s: installation error: environment variable STGHUGSDIR is not set.\n",
+          argv_0 );
+      fprintf(stderr, 
+          "%s: pls set it to be the directory where STGHugs98 is installed.\n\n",
+          argv_0 );
+      exit(2);
+
    }
-   strcpy(&defaultLibDir[i],argv_0);
-   i += strlen(argv_0);
-   while (defaultLibDir[i] != SLASH) i--;
-   i++;
-   strcpy(&defaultLibDir[i], "lib");
-   /* fprintf ( stderr, "default lib dir = %s\n", defaultLibDir );  */
+
+   if (strlen(r) > N_INSTALLDIR-30 ) {
+      fprintf(stderr, 
+          "%s: environment variable STGHUGSDIR is suspiciously long; pls remedy\n\n",
+          argv_0 );
+      exit(2);
+   }
+
+   strcpy ( installDir, r );
+   i = strlen(installDir);
+   if (installDir[i-1] != SLASH) installDir[i++] = SLASH;
+   installDir[i] = 0;
 }
+
 
 Bool findFilesForModule ( 
         String  modName,
@@ -653,13 +660,13 @@ Bool findFilesForModule (
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
-   String augdPath;       /* .:hugsPath:defaultLibDir */
+   String augdPath;       /* .:hugsPath:installDir/lib */
 
    *path = *sExt = NULL;
    *sAvail = *iAvail = *oAvail = FALSE;
    *sSize  = *iSize  = *oSize  = 0;
 
-   augdPath = malloc(4+strlen(defaultLibDir)+strlen(hugsPath));
+   augdPath = malloc(4+3+strlen(installDir)+strlen(hugsPath));
    if (!augdPath)
       internal("moduleNameToFileNames: malloc failed(2)");
    augdPath[0] = '.';
@@ -668,7 +675,8 @@ Bool findFilesForModule (
    strcat ( augdPath, hugsPath );
    augdPath[2+strlen(hugsPath)] = PATHSEP;
    augdPath[3+strlen(hugsPath)] = 0;
-   strcat(augdPath,defaultLibDir);
+   strcat(augdPath,installDir);
+   strcat(augdPath,"lib");
 
    peEnd = augdPath-1;
    while (1) {

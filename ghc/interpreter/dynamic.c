@@ -9,14 +9,15 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/29 13:41:23 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/25 10:19:15 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "errors.h"
 #include "dynamic.h"
+#include "connect.h"
 
 #if HAVE_WINDOWS_H && !defined(__MSDOS__)
 
@@ -31,11 +32,13 @@ String symbol0; {
     char       symbol[100];
     ObjectFile instance;
 
-    if (strlen(dll0) > 996) {
+    if (strlen(dll0) > 996-strlen(installDir)) {
        ERRMSG(line) "Excessively long library name:\n%s\n",dll0
        EEND;
     }
-    strcpy(dll,dll0);
+    dll[0] = 0;
+    if (strcmp("nHandle",dll0)==0) strcat(dll,installDir);
+    strcat(dll,dll0);
     strcat(dll, ".dll");
 
     if (strlen(symbol0) > 96) {
@@ -79,11 +82,13 @@ String symbol; {
     void*      sym;
     char       dll[1000];
     ObjectFile instance;
-    if (strlen(dll0) > 996) {
+    if (strlen(dll0) > 996-strlen(installDir)) {
        ERRMSG(line) "Excessively long library name:\n%s\n",dll0
        EEND;
     }
-    strcpy(dll,dll0);
+    dll[0] = 0;
+    if (strcmp("nHandle",dll0)==0) strcat(dll,installDir);
+    strcat(dll,dll0);
     strcat(dll, ".so");
 #ifdef RTLD_NOW
     instance = dlopen(dll,RTLD_NOW);

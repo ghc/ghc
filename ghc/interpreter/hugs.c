@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.23 $
- * $Date: 1999/11/23 15:12:09 $
+ * $Revision: 1.24 $
+ * $Date: 1999/11/25 10:19:16 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -224,12 +224,6 @@ char *argv[]; {
 
     CStackBase = &argc;                 /* Save stack base for use in gc   */
 
-    /* Try and figure out an absolute path to the executable, so
-       we can make a reasonable guess about where the default
-       libraries (Prelude etc) are.
-    */
-    setDefaultLibDir ( argv[0] );
-
     /* If first arg is +Q or -Q, be entirely silent, and automatically run
        main after loading scripts.  Useful for running the nofib suite.    */
     if (argc > 1 && (strcmp(argv[1],"+Q") == 0 || strcmp(argv[1],"-Q")==0)) {
@@ -245,6 +239,13 @@ char *argv[]; {
     Printf("||---||         ___||           World Wide Web: http://haskell.org/hugs\n");
     Printf("||   ||                         Report bugs to: hugs-bugs@haskell.org\n");
     Printf("||   || Version: %s _________________________________________\n\n",HUGS_VERSION);
+
+    /* Get the absolute path to the directory containing the hugs 
+       executable, so that we know where the Prelude and nHandle.so/.dll are.
+       We do this by reading env var STGHUGSDIR.  This needs to succeed, so
+       setInstallDir won't return unless it succeeds.
+    */
+    setInstallDir ( argv[0] );
 
 #if SYMANTEC_C
     Printf("   Ported to Macintosh by Hans Aberg, compiled " __DATE__ ".\n\n");
@@ -319,7 +320,12 @@ String argv[]; {
     }
 
 #if DEBUG
-    DEBUG_LoadSymbols(argv_0_orig);
+    { 
+       char exe_name[N_INSTALLDIR + 6];
+       strcpy(exe_name, installDir);
+       strcat(exe_name, "hugs");
+       DEBUG_LoadSymbols(exe_name);
+    }
 #endif
 
 

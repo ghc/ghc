@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/23 15:12:10 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/25 10:19:15 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -377,6 +377,9 @@ String 	readRegString  Args((String var, String def));
 Int 	readRegInt     Args((String var, Int def));
 Bool 	writeRegInt    Args((String var, Int val));
 #endif
+
+#define N_INSTALLDIR 200
+extern char installDir[N_INSTALLDIR];
 
 /*---------------------------------------------------------------------------
  * File operations:
