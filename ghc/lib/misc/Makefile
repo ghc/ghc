@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 1998/05/19 10:35:32 simonm Exp $
+# $Id: Makefile,v 1.9 1998/08/11 21:40:34 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -54,14 +54,14 @@ endif
 #
 # Specific flags
 #
-BSD_HC_OPTS        += -syslib posix -optc-DNON_POSIX_SOURCE
+BSD_HC_OPTS        += -optc-DNON_POSIX_SOURCE
 Socket_HC_OPTS     += -I../std/cbits -syslib posix -optc-DNON_POSIX_SOURCE
-SocketPrim_HC_OPTS += -I../std/cbits -H10m -syslib posix -optc-DNON_POSIX_SOURCE
+SocketPrim_HC_OPTS += -I../std/cbits -H10m -optc-DNON_POSIX_SOURCE
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
 
-SRC_MKDEPENDHS_OPTS += -syslib posix -I$(GHC_INCLUDE_DIR)
+SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

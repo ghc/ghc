@@ -79,7 +79,7 @@ import Foreign
 import Addr
 import PackedString ( cByteArrayToPS, unpackPS, unpackCStringIO )
   
-import PosixUtil  ( unvectorize )
+import Util  ( unvectorize )
 import SocketPrim
 
 \end{code}
@@ -473,5 +473,6 @@ unvectorizeHostAddrs ptr n  = do
 	 else do
 	   xs <- unvectorizeHostAddrs ptr (n+1)
 	   return (x : xs)
+
 
 \end{code}

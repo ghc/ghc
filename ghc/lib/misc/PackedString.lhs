@@ -1098,7 +1098,9 @@ unpackCString# addr
 	ch = indexCharOffAddr# addr nh
 
 unpackCStringIO :: Addr -> IO String
-unpackCStringIO addr = unpack 0#
+unpackCStringIO addr
+ | addr == ``NULL'' = return ""
+ | otherwise        = unpack 0#
   where
     unpack nh = do
        ch <- readCharOffAddr addr (I# nh)

@@ -83,8 +83,6 @@ import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
 import Foreign
 
-import Posix
-import PosixUtil
 import IO
 import IOExts	    ( IORef, newIORef, readIORef, writeIORef )
 import PackedString ( unpackNBytesPS, byteArrayToPS, 
