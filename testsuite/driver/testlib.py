@@ -15,6 +15,14 @@ from testutil import *
 # -----------------------------------------------------------------------------
 # Configuration info
 
+# There is a single global instance of this structure, stored in the
+# variable config below.  The fields of the structure are filled in by
+# the appropriate config script(s) for this compiler/platform, in
+# ../config.
+# 
+# Bits of the structure may also be filled in from the command line,
+# via the build system, using the '-e' option to runtests.
+
 class TestConfig:
     def __init__(self):
 
@@ -390,13 +398,17 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 def compile_and_run( name, way, extra_hc_opts ):
     # print 'Compile and run, extra args = ', extra_hc_opts
     pretest_cleanup(name)
-    result = simple_build( name, way, extra_hc_opts, 0, '', 1 )
 
-    if result != 0:
-        return 'fail'
+    if way == 'ghci': # interpreted...
+        return interpreter_run( name, way, extra_hc_opts, 0 )
+    else: # compiled...
+        result = simple_build( name, way, extra_hc_opts, 0, '', 1 )
 
-    # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name )
+        if result != 0:
+            return 'fail'
+
+        # we don't check the compiler's stderr for a compile-and-run test
+        return simple_run( name )
 
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
@@ -499,6 +511,87 @@ def simple_run( name ):
    else:
        return 'fail'
 
+# -----------------------------------------------------------------------------
+# Run a program in the interpreter and check its output
+
+def interpreter_run( name, way, extra_hc_opts, compile_only ):
+    outname = add_suffix(name, 'interp.stdout')
+    errname = add_suffix(name, 'interp.stderr')
+    rm_no_fail(outname)
+    rm_no_fail(errname)
+    rm_no_fail(name)
+    
+    srcname = add_suffix(name, 'hs')
+
+    scriptname = add_suffix(name, 'script')
+    qscriptname = in_testdir(scriptname)
+    rm_no_fail(qscriptname)
+
+    delimiter = '===== program output begins here\n'
+
+    script = open(qscriptname, 'w')
+    if not compile_only:
+        # set the prog name and command-line args to match the compiled
+        # environment.
+        script.write(':set prog ' + name + '\n')
+        script.write(':set args ' + testopts.extra_run_opts + '\n')
+        # Add marker lines to the stdout and stderr output files, so we
+        # can separate GHCi's output from the program's.
+        script.write(':! echo ' + delimiter)
+        script.write(':! echo 1>&2 ' + delimiter)
+        # wrapping in GHC.TopHandler.runIO ensures we get the same output
+        # in the event of an exception as for the compiled program.
+        script.write('GHC.TopHandler.runIO Main.main\n')
+    script.write(':q\n')
+    script.close()
+
+    cmd = 'cd ' + testdir + " && '" \
+          + config.compiler + "' " \
+          + join(config.compiler_always_flags,' ') + ' ' \
+          + srcname + ' ' \
+          + join(config.way_flags[way],' ') + ' ' \
+          + extra_hc_opts + ' ' \
+          + testopts.extra_hc_opts + ' ' \
+          + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
+
+    result = runCmd(cmd)
+
+#    if result != 0 and not should_fail:
+#        actual_stderr = qualify(name, 'interp.stderr')
+#        if_verbose(1,'Compile failed (status ' + `result` + ') errors were:')
+#        if_verbose(1,open(actual_stderr).read())
+
+    # split the stdout into compilation/program output
+    split_file(in_testdir(outname), delimiter,
+               qualify(name, 'comp.stdout'),
+               qualify(name, 'run.stdout'))
+    split_file(in_testdir(errname), delimiter,
+               qualify(name, 'comp.stderr'),
+               qualify(name, 'run.stderr'))
+
+    # ToDo: if the sub-shell was killed by ^C, then exit
+
+    if check_stdout_ok(name) and check_stderr_ok(name):
+        return 'pass'
+    else:
+        return 'fail'
+
+
+def split_file(in_fn, delimiter, out1_fn, out2_fn):
+    infile = open(in_fn)
+    out1 = open(out1_fn, 'w')
+    out2 = open(out2_fn, 'w')
+
+    line = infile.readline()
+    while (line != delimiter and line != ''):
+        out1.write(line)
+        line = infile.readline()
+
+    line = infile.readline()
+    while (line != ''):
+        out2.write(line)
+        line = infile.readline()
+    
 # -----------------------------------------------------------------------------
 # Utils
 

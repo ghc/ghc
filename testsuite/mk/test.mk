@@ -44,6 +44,12 @@ else
 RUNTEST_OPTS += -e ghc_with_profiling=0
 endif
 
+ifeq "$(GhcWithInterpreter)" "YES"
+RUNTEST_OPTS += -e ghc_with_interpreter=1
+else
+RUNTEST_OPTS += -e ghc_with_interpreter=0
+endif
+
 RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
 	-e config.compiler=\"$(TEST_HC)\" \

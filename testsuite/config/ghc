@@ -20,9 +20,14 @@ if (ghc_with_profiling == 1):
 	config.compile_ways.append('prof')
 	config.run_ways.append('prof')
 
+if (ghc_with_interpreter == 1):
+	config.compile_ways.append('ghci')
+	config.run_ways.append('ghci')
+
 config.way_flags = { 'normal' : [],
 		     'opt'    : ['-O'],
 		     'optasm' : ['-O -fasm'],
 	  	     'prof'   : ['-O -prof -auto-all'],
-		     'unreg'  : ['-unreg']
+		     'unreg'  : ['-unreg'],
+		     'ghci'   : ['--interactive', '-v0']
 		   }
