@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.70 2005/01/28 16:28:56 ross Exp $
+-- $Id: Main.hs,v 1.71 2005/01/29 12:15:33 ross Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -724,7 +724,7 @@ outHeaderHs flags inH toks =
 	"    printf (\"{-# OPTIONS %s #-}\\n\", \""++
                   showCString s++"\");\n"++
 	"#else\n"++
-	"    printf (\"{-# GHC_OPTIONS %s #-}\\n\", \""++
+	"    printf (\"{-# OPTIONS_GHC %s #-}\\n\", \""++
                   showCString s++"\");\n"++
 	"#endif\n"
     outInclude s =
