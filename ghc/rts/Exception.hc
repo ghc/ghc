@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.1 1999/12/01 14:34:38 simonmar Exp $
+ * $Id: Exception.hc,v 1.2 1999/12/02 09:52:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,7 @@
 #include "StgRun.h"
 #include "Storage.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 
 /* -----------------------------------------------------------------------------
    Exception Primitives
