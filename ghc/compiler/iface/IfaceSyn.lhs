@@ -185,8 +185,10 @@ data IfaceInfoItem
   | HsStrictness StrictSig
   | HsUnfold	 Activation IfaceExpr
   | HsNoCafRefs
-  | HsWorker	 OccName Arity	-- Worker, if any see IdInfo.WorkerInfo
-				-- for why we want arity here.
+  | HsWorker	 IfaceExtName Arity	-- Worker, if any see IdInfo.WorkerInfo
+					-- for why we want arity here.
+	-- NB: we need IfaceExtName (not just OccName) because the worker
+	--     can simplify to a function in another module.
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
 
@@ -566,7 +568,7 @@ toIfaceIdInfo ext id_info
     has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
     wrkr_hsinfo = case work_info of
 		    HasWorker work_id wrap_arity -> 
-			Just (HsWorker (getOccName work_id) wrap_arity)
+			Just (HsWorker (ext (idName work_id)) wrap_arity)
 		    NoWorker -> Nothing
 
     ------------  Unfolding  --------------
@@ -586,7 +588,7 @@ coreRuleToIfaceRule mod ext (id, BuiltinRule _ _)
 coreRuleToIfaceRule mod ext (id, Rule name act bndrs args rhs)
   = IfaceRule { ifRuleName = name, ifActivation = act, 
 		ifRuleBndrs = map (toIfaceBndr ext) bndrs,
-		ifRuleHead = ext (getName id), 
+		ifRuleHead = ext (idName id), 
 		ifRuleArgs = map (toIfaceExpr (mkLhsNameFn mod)) args,
 			-- Use LHS name-fn for the args
 		ifRuleRhs = toIfaceExpr ext rhs }
@@ -804,7 +806,7 @@ eq_item (HsArity a1)	   (HsArity a2)	      = bool (a1 == a2)
 eq_item (HsStrictness s1)  (HsStrictness s2)  = bool (s1 == s2)
 eq_item (HsUnfold a1 u1)   (HsUnfold a2 u2)   = bool (a1 == a2) &&& eq_ifaceExpr emptyEqEnv u1 u2
 eq_item HsNoCafRefs        HsNoCafRefs	      = Equal
-eq_item (HsWorker occ1 a1) (HsWorker occ2 a2) = bool (a1==a2 && occ1==occ2)
+eq_item (HsWorker wkr1 a1) (HsWorker wkr2 a2) = bool (a1==a2) &&& (wkr1 `eqIfExt` wkr2)
 eq_item _ _ = NotEqual
 
 -----------------

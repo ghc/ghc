@@ -880,8 +880,8 @@ tcIdInfo name ty (HasInfo info) = foldlM tcPrag init_info info
 \end{code}
 
 \begin{code}
-tcWorkerInfo ty info wkr_name arity
-  = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId (LocalTop wkr_name))
+tcWorkerInfo ty info wkr arity
+  = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
 
 	-- We return without testing maybe_wkr_id, but as soon as info is
 	-- looked at we will test it.  That's ok, because its outside the
@@ -894,7 +894,7 @@ tcWorkerInfo ty info wkr_name arity
 		     Nothing     -> info
 		     Just wkr_id -> add_wkr_info us wkr_id info) }
   where
-    doc = text "Worker for" <+> ppr wkr_name
+    doc = text "Worker for" <+> ppr wkr
     add_wkr_info us wkr_id info
 	= info `setUnfoldingInfoLazily`  mk_unfolding us wkr_id
 	       `setWorkerInfo`           HasWorker wkr_id arity
@@ -905,7 +905,7 @@ tcWorkerInfo ty info wkr_name arity
 	-- before worker info,  fingers crossed ....
     strict_sig = case newStrictnessInfo info of
 		   Just sig -> sig
-		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr_name)
+		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr)
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
