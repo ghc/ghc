@@ -253,7 +253,7 @@ problems, so I'm turing on the warnings -- SDM 4/5/98)
 \begin{code}
 $CcRegd	 	= $GHC_OPT_HILEV_ASM;
 @CcBoth_flags	= ('-S','-Wimplicit');   # flags for *any* C compilation
-@CcInjects	= ("#include \"Stg.h\"\n", "#include \"HsStd.h\"\n");
+@CcInjects	= ();
 
 # GCC flags: 
 #    those for all files, 
@@ -1119,7 +1119,6 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelException_NonTermination_closure"
           ,'-u', "${uscore}PrelException_PutFullMVar_closure"
           ,'-u', "${uscore}PrelException_BlockedOnDeadMVar_closure"
-          ,'-u', "${uscore}PrelWeak_runFinalizzerBatch_closure"
           ,'-u', "${uscore}__init_Prelude"
           ,'-u', "${uscore}__init_PrelMain"
 	));
@@ -1687,7 +1686,7 @@ sub runHscAndProcessInterfaces {
    # See if it bailed out early, saying nothing needed doing.  
    # We work this out by seeing if it created an output .hi file
 
-    if ( ! -f $hsc_out ) {
+    if ( ! -f $hsc_hi && $ProduceHi !~ /-nohifile=/ ) {
 	# Doesn't exist, so we bailed out early.
 	# Tell the C compiler and assembler not to run
 	$do_cc = 0; $do_as = 0;
@@ -1724,14 +1723,10 @@ sub runHscAndProcessInterfaces {
 
 
 	# Interface-handling is important enough to live off by itself
-	if ( -f $hsc_hi ) {
-		# print STDERR "Aha! A new hi file\n" ;
-		&run_something( "mv $hsc_hi $hifile_target", "Copy hi file" ) ;
- 	} else {
-		# print STDERR "Oh ho! Hi file unchanged\n" ;
+        if ( $ProduceHi !~ /-nohifile=/ ) { # If we've produced one, process it.
+	   require('ghc-iface.prl') || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
+	   &postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
 	}
-
-
 	# if we're going to split up object files,
 	# we inject split markers into the .hc file now
 	if ( $HscLang eq 'C' && $SplitObjFiles ) {
@@ -2123,7 +2118,11 @@ sub runGcc {
     # a tmp .c file which #include's the needful.
     open(TMP, "> $cc_help") || &tidy_up_and_die(1,"$Pgm: failed to open `$cc_help' (to write)\n");
     if ( $is_hc_file ) {
-	print TMP @CcInjects;
+	print TMP <<EOINCL;
+#include "Stg.h"
+EOINCL
+	# user may have asked for #includes to be injected...
+	print TMP @CcInjects if $#CcInjects >= 0;
     } else {
 	# Straight .c files may want to know that they're being used
 	# with a particular version of GHC, so we define __GLASGOW_HASKELL__ for their benefit.
@@ -2675,13 +2674,30 @@ sub add_syslib {
 	       ? "$InstLibDirGhc"
 	       : "$TopPwd/hslibs/win32/src"
 	  )
-	, ''
-	, 'lang' # Syslib dependencies
+	, ''     # No cbits archive
+	, 'lang greencard' # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, '-luser32 -lgdi32'     # extra ld opts
 	],
 
+       greencard,
+        [  # where to slurp interface files from
+          ( $INSTALLING
+               ? "$InstLibDirGhc/imports/greencard"
+               : "$TopPwd/green-card/lib/ghc"
+          )
+        , # where to find the archive to use when linking
+          ( $INSTALLING
+               ? "$InstLibDirGhc"
+               : "$TopPwd/green-card/lib/ghc"
+          )
+        , ''     # No cbits archive
+        , 'lang' # Syslib dependencies
+        , ''     # extra ghc opts
+        , ''     # extra cc opts
+        , ''     # extra ld opts
+        ],
        com,
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
