@@ -42,6 +42,18 @@ $(TOP)/configure : $(TOP)/configure.in $(TOP)/aclocal.m4
 	@( cd $(FPTOOLS_TOP) && $(MAKE) -f Makefile.config ./configure )
 
 # -----------------------------------------------------------------------------
+# Misc bits
+
+# If $(way) is set then we define $(way_) and $(_way) from it in the
+# obvious fashion.  This must be done before suffix.mk is included,
+# because the pattern rules in that file depend on these variables.
+
+ifneq "$(way)" ""
+  way_ := $(way)_
+  _way := _$(way)
+endif
+
+# -----------------------------------------------------------------------------
 # 	Now follow the pieces of boilerplate
 #	The "-" signs tell make not to complain if they don't exist
 
@@ -73,4 +85,3 @@ ifndef FAST
 -include .depend
 endif
 # The dependencies file from the current directory
-
