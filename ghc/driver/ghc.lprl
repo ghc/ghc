@@ -379,6 +379,7 @@ $Haskell1Version = 5; # i.e., Haskell 1.4
 @HsSourceCppOpts = 
 	( "-D__HASKELL1__=$Haskell1Version"
 	, "-D__GLASGOW_HASKELL__=$ProjectVersionInt"
+	, "-D__HASKELL98__"
 	# not yet -- SDM
 	# , "-D__CONCURRENT_HASKELL__"
 	);
@@ -2078,6 +2079,8 @@ sub runGcc {
     local($s_output);
     local($c_flags) = "@CcBoth_flags";
     local($ddebug_flag) = ( $DEBUGging ) ? '-DDEBUG' : '';
+
+    $c_flags .= "-mno-cygwin" if ( $TargetPlatform =~ /-mingw32$/ );
 
     # "input" files to use that are not in some weird directory;
     # to help C compilers grok .hc files [ToDo: de-hackify]
