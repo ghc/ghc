@@ -213,3 +213,10 @@ test062:
 	@$(RM) Hello.hi Hello.o Hello.hc
 	$(TEST_HC) --make -main-is Hello.hello Hello -o hello
 	./hello
+
+# Test that -i deletes the list of search paths.
+# The compilation will fail, but we ignore the failure and just
+# compare the output, because make might give us a different exit code.
+test063:
+	@$(RM) A.hi A.o A.hc D.hi D.o D.hc
+	-@$(TEST_HC) --make -i -v0 D.hs
