@@ -946,6 +946,17 @@ ghc -M -optdep-f -optdep.depend ...
 	  </varlistentry>
 
 	  <varlistentry>
+	    <term><option>-v2</option></term>
+	    <listitem>
+	      <para>Print a full list of the module depenencies to stdout.
+	            (This is the standard verbosity flag, so the list will
+	      also be displayed with <option>-v3</option> and
+	      <option>-v4</option>;
+	      <xref linkend ="options-help"/>.)</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
 	    <term><option>-f</option> <replaceable>file</replaceable></term>
 	    <listitem>
 	      <para>Use <replaceable>file</replaceable> as the makefile,
