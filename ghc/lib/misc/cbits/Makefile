@@ -3,7 +3,12 @@
 #
 TOP=../../..
 include $(TOP)/mk/boilerplate.mk
+
+ifeq "$(filter dll,$(WAYS))" "dll"
+override WAYS=dll
+else
 override WAYS=
+endif
 
 CC:=$(GHC)
 
@@ -25,13 +30,17 @@ endif
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_LIB_DIR)/std/cbits
 
-LIBRARY=libHSmisc_cbits.a
+LIBRARY=libHSmisc_cbits$(_way).a
 LIBOBJS=$(C_OBJS)
 INSTALL_LIBS += $(LIBRARY)
 
 DLL_NAME = HSmisc_cbits.dll
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc_cbits.def
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc_cbits.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHScbits_imp -lgmp -L. -L../../../rts/gmp -L../../../rts -L../../std/cbits
+
+ifeq "$(way)" "dll"
+all :: DllVersionInfo.o
+endif
 
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS  += $(DLL_NAME)

@@ -63,8 +63,12 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w $
 
 DLL_NAME = HSexts.dll
 DLL_IMPLIB_NAME = libHSexts_imp.a
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSexts.def
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSexts.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
+
+ifeq "$(way)" "dll"
+all :: DllVersionInfo.o
+endif
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 1999/10/05 10:30:27 simonmar Exp $
+# $Id: Makefile,v 1.9 1999/10/29 13:55:40 sof Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -48,8 +48,12 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 DLL_NAME = HSconc.dll
 DLL_IMPLIB_NAME = libHSconcurrent_imp.a
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSconc.def
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSconc.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
+
+ifeq "$(way)" "dll"
+all :: DllVersionInfo.o
+endif
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

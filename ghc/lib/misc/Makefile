@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.19 1999/10/05 10:30:28 simonmar Exp $
+# $Id: Makefile,v 1.20 1999/10/29 13:57:52 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -83,9 +83,12 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 DLL_NAME = HSmisc.dll
 DLL_IMPLIB_NAME = libHSmisc_imp.a
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc.def
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHScbits_imp -lHSmisc_cbits_imp -lHS_imp -lHSexts_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits -L../exts -Lcbits
 
+ifeq "$(way)" "dll"
+all :: DllVersionInfo.o
+endif
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
