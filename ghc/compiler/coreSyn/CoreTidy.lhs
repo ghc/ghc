@@ -14,7 +14,7 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
+import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
 import PprCore		( pprIdCoreRule )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprArity )
@@ -137,6 +137,11 @@ tidyCorePgm dflags mod pcs cg_info_env
 
 	; let ext_ids   = findExternalSet   binds_in orphans_in
 	; let ext_rules = findExternalRules binds_in orphans_in ext_ids
+		-- findExternalRules filters ext_rules to avoid binders that 
+		-- aren't externally visible; but the externally-visible binders 
+		-- are computed (by findExternalSet) assuming that all orphan
+		-- rules are exported.  So in fact we may export more than we
+		-- need.  (It's a sort of mutual recursion.)
 
 	-- We also make sure to avoid any exported binders.  Consider
 	--	f{-u1-} = 1	-- Local decl
@@ -248,17 +253,25 @@ findExternalRules :: [CoreBind]
 findExternalRules binds orphan_rules ext_ids
   | opt_OmitInterfacePragmas = []
   | otherwise
-  = orphan_rules ++ local_rules
+  = filter needed_rule (orphan_rules ++ local_rules)
   where
     local_rules  = [ (id, rule)
  		   | id <- bindersOfBinds binds,
 		     id `elemVarEnv` ext_ids,
-		     rule <- rulesRules (idSpecialisation id),
-		     not (isBuiltinRule rule)
-			-- We can't print builtin rules in interface files
-			-- Since they are built in, an importing module
-			-- will have access to them anyway
+		     rule <- rulesRules (idSpecialisation id)
 		 ]
+    needed_rule (id, rule)
+	=  not (isBuiltinRule rule)
+	 	-- We can't print builtin rules in interface files
+		-- Since they are built in, an importing module
+		-- will have access to them anyway
+
+	&& not (any internal_id (varSetElems (ruleLhsFreeIds rule)))
+		-- Don't export a rule whose LHS mentions an Id that
+		-- is completely internal (i.e. not visible to an
+		-- importing module)
+
+    internal_id id = isLocalId id && not (id `elemVarEnv` ext_ids)
 \end{code}
 
 %************************************************************************
@@ -276,7 +289,7 @@ findExternalSet binds orphan_rules
   = foldr find init_needed binds
   where
     orphan_rule_ids :: IdSet
-    orphan_rule_ids = unionVarSets [ ruleSomeFreeVars isLocalId rule 
+    orphan_rule_ids = unionVarSets [ ruleRhsFreeVars rule 
 				   | (_, rule) <- orphan_rules]
     init_needed :: IdEnv Bool
     init_needed = mapUFM (\_ -> False) orphan_rule_ids

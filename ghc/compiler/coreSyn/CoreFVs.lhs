@@ -11,8 +11,7 @@ module CoreFVs (
 	exprSomeFreeVars, exprsSomeFreeVars,
 
 	idRuleVars, idFreeVars, idFreeTyVars,
-	ruleSomeFreeVars, ruleRhsFreeVars,
-	ruleLhsFreeNames, ruleLhsFreeIds, 
+	ruleRhsFreeVars, ruleLhsFreeNames, ruleLhsFreeIds, 
 
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
 	CoreBindWithFVs,	-- = AnnBind Id VarSet
@@ -206,14 +205,6 @@ ruleRhsFreeVars (Rule str _ tpl_vars tpl_args rhs)
   = rule_fvs isLocalVar emptyVarSet
   where
     rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
-
-ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> VarSet
-ruleSomeFreeVars interesting (BuiltinRule _ _) = noFVs
-ruleSomeFreeVars interesting (Rule _ _ tpl_vars tpl_args rhs)
-  = rule_fvs interesting emptyVarSet
-  where
-    rule_fvs = addBndrs tpl_vars $
-	       foldr (union . expr_fvs) (expr_fvs rhs) tpl_args
 
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- This finds all the free Ids on the LHS of the rule
