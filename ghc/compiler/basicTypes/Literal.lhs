@@ -340,6 +340,7 @@ hashLiteral (MachWord i)   	= hashInteger i
 hashLiteral (MachWord64 i) 	= hashInteger i
 hashLiteral (MachFloat r)   	= hashRational r
 hashLiteral (MachDouble r)  	= hashRational r
+hashLiteral (MachLabel s)       = hashFS s
 hashLiteral (MachLitLit s _)    = hashFS s
 
 hashRational :: Rational -> Int
