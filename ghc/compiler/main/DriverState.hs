@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.68 2002/02/12 15:17:15 simonmar Exp $
+-- $Id: DriverState.hs,v 1.69 2002/02/13 15:45:25 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -440,12 +440,13 @@ readPackageConf conf_file = do
   top_dir <- getTopDir
   let pkg_details    = mungePackagePaths top_dir proto_pkg_details
   old_pkg_details <- readIORef v_Package_details
-  let intersection = filter (`elem` map name old_pkg_details) 
-				(map name pkg_details)
-  if (not (null intersection))
-	then throwDyn (InstallationError ("package `" ++ head intersection ++ "' is already defined"))
-	else do
-  writeIORef v_Package_details (pkg_details ++ old_pkg_details)
+
+  let -- new package override old ones
+      new_pkg_names = map name pkg_details
+      filtered_old_pkg_details = 
+	 filter (\p -> name p `notElem` new_pkg_names) old_pkg_details
+
+  writeIORef v_Package_details (pkg_details ++ filtered_old_pkg_details)
 
 addPackage :: String -> IO ()
 addPackage package
