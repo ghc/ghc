@@ -125,30 +125,39 @@ because it exposes the boxing to the call site.
 \begin{code}
 dsFImport :: Id
 	  -> Type		-- Type of foreign import.
-	  -> Bool		-- True <=> might cause Haskell GC
+	  -> Bool		-- True <=> cannot re-enter the Haskell RTS
 	  -> ExtName
 	  -> CallConv
 	  -> DsM [Binding]
-dsFImport fn_id ty may_not_gc ext_name cconv 
+dsFImport fn_id ty unsafe ext_name cconv 
   = let
 	(tvs, fun_ty)        = splitForAllTys ty
 	(arg_tys, io_res_ty) = splitFunTys fun_ty
     in
     newSysLocalsDs arg_tys  			`thenDs` \ args ->
     mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
-    boxResult io_res_ty				`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
-    getUniqueDs						`thenDs` \ ccall_uniq ->
-    getUniqueDs						`thenDs` \ work_uniq ->
+    let
+	work_arg_ids  = [v | Var v <- val_args]	-- All guaranteed to be vars
+
+	-- these are the ids we pass to boxResult, which are used to decide
+	-- whether to touch# an argument after the call (used to keep
+	-- ForeignObj#s live across a 'safe' foreign import).
+	maybe_arg_ids | unsafe    = []
+		      | otherwise = work_arg_ids
+    in
+    boxResult work_arg_ids io_res_ty   		`thenDs` \ (ccall_result_ty, res_wrapper) ->
+
+    getUniqueDs					`thenDs` \ ccall_uniq ->
+    getUniqueDs					`thenDs` \ work_uniq ->
     let
 	lbl = case ext_name of
 		Dynamic	     -> dynamicTarget
 	        ExtName fs _ -> StaticTarget fs
 
 	-- Build the worker
-	work_arg_ids  = [v | Var v <- val_args]		-- All guaranteed to be vars
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-	the_ccall     = CCall lbl False (not may_not_gc) cconv
+	the_ccall     = CCall lbl False (not unsafe) cconv
  	the_ccall_app = mkCCall ccall_uniq the_ccall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
 	work_id       = mkSysLocal SLIT("$wccall") work_uniq worker_ty

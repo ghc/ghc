@@ -19,8 +19,8 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils	( exprType, mkCoerce )
-import Id		( mkWildId )
-import MkId		( mkCCallOpId, realWorldPrimId )
+import Id		( Id, mkWildId, idType )
+import MkId		( mkCCallOpId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
 import PrimOp		( CCall(..), CCallTarget(..) )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
@@ -30,8 +30,10 @@ import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
 			  Type
 			)
+import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon, intPrimTy
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
+			  intPrimTy, foreignObjPrimTy
 			)
 import TysWiredIn	( unitDataConId,
 			  unboxedSingletonDataCon, unboxedPairDataCon,
@@ -91,7 +93,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 
 dsCCall lbl args may_gc is_asm result_ty
   = mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
-    boxResult result_ty		`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			`thenDs` \ uniq ->
     let
 	the_ccall    = CCall (StaticTarget lbl) is_asm may_gc cCallConv
@@ -191,7 +193,7 @@ unboxArg arg
 
 
 \begin{code}
-boxResult :: Type -> DsM (Type, CoreExpr -> CoreExpr)
+boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 
 -- Takes the result of the user-level ccall: 
 --	either (IO t), 
@@ -204,20 +206,28 @@ boxResult :: Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the result type will be 
 --	State# RealWorld -> (# State# RealWorld #)
 
-boxResult result_ty
+-- Here is where we arrange that ForeignPtrs which are passed to a 'safe'
+-- foreign import don't get finalized until the call returns.  For each
+-- argument of type ForeignObj# we arrange to touch# the argument after
+-- the call.  The arg_ids passed in are the Ids passed to the actual ccall.
+
+boxResult arg_ids result_ty
   = case splitAlgTyConApp_maybe result_ty of
 
 	-- The result is IO t, so wrap the result in an IO constructor
 	Just (io_tycon, [io_res_ty], [io_data_con]) | io_tycon `hasKey` ioTyConKey
 		-> mk_alt return_result 
 			  (resultWrapper io_res_ty)	`thenDs` \ (ccall_res_ty, the_alt) ->
-		   newSysLocalDs realWorldStatePrimTy	 `thenDs` \ state_id ->
+		   newSysLocalDs  realWorldStatePrimTy	 `thenDs` \ state_id ->
 		   let
-			wrap = \ the_call -> mkApps (Var (dataConWrapId io_data_con))
-						    [Type io_res_ty, Lam state_id $
-								     Case (App the_call (Var state_id))
-									  (mkWildId ccall_res_ty)
-									  [the_alt]]
+			wrap = \ the_call -> 
+				 mkApps (Var (dataConWrapId io_data_con))
+					   [ Type io_res_ty, 
+					     Lam state_id $
+					      Case (App the_call (Var state_id))
+						   (mkWildId ccall_res_ty)
+						   [the_alt]
+					   ]
 		   in
 		   returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
 		where
@@ -228,7 +238,7 @@ boxResult result_ty
 	-- It isn't, so do unsafePerformIO
 	-- It's not conveniently available, so we inline it
 	other -> mk_alt return_result
-			(resultWrapper result_ty) 	`thenDs` \ (ccall_res_ty, the_alt) ->
+			(resultWrapper result_ty) `thenDs` \ (ccall_res_ty, the_alt) ->
 		 let
 		    wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
 					      (mkWildId ccall_res_ty)
@@ -240,9 +250,13 @@ boxResult result_ty
   where
     mk_alt return_result (Nothing, wrap_result)
 	= 	-- The ccall returns ()
-	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
-		the_rhs      = return_result (Var state_id) (wrap_result (panic "boxResult"))
+		rhs_fun state_id = return_result (Var state_id) 
+					(wrap_result (panic "boxResult"))
+	  in
+	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+	  mkTouches arg_ids state_id rhs_fun	`thenDs` \ the_rhs ->
+	  let
 		ccall_res_ty = mkTyConApp unboxedSingletonTyCon [realWorldStatePrimTy]
 		the_alt      = (DataAlt unboxedSingletonDataCon, [state_id], the_rhs)
 	  in
@@ -250,15 +264,29 @@ boxResult result_ty
 
     mk_alt return_result (Just prim_res_ty, wrap_result)
 	=	-- The ccall returns a non-() value
-	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
 	  let
-		the_rhs      = return_result (Var state_id) (wrap_result (Var result_id))
+		rhs_fun state_id = return_result (Var state_id) 
+					(wrap_result (Var result_id))
+	  in
+	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+	  mkTouches arg_ids state_id rhs_fun	`thenDs` \ the_rhs ->
+	  let
 		ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
 		the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
 	  in
 	  returnDs (ccall_res_ty, the_alt)
 
+touchzh = mkPrimOpId TouchOp
+
+mkTouches []     s cont = returnDs (cont s)
+mkTouches (v:vs) s cont
+  | idType v /= foreignObjPrimTy = mkTouches vs s cont
+  | otherwise = newSysLocalDs realWorldStatePrimTy `thenDs` \s' -> 
+		mkTouches vs s' cont `thenDs` \ rest ->
+	        returnDs (Case (mkApps (Var touchzh) [Type foreignObjPrimTy, 
+						      Var v, Var s]) s' 
+				[(DEFAULT, [], rest)])
 
 resultWrapper :: Type
    	      -> (Maybe Type,		-- Type of the expected result, if any
