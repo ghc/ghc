@@ -293,11 +293,12 @@ sub init_TARGET_STUFF {
     $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
     $T_DOT_GLOBAL   = '\.globl';
     $T_HDR_toc      = "\.toc\n";
-    $T_HDR_literal  = "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_literal  = "\t\.const\n\t\.align 2\n";
     $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
-    $T_HDR_rodata   = "\t\.const_data\n\t\.align 2\n";
-    $T_HDR_closure  = "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_rodata   = "\t\.const\n\t\.align 2\n";
+    $T_HDR_relrodata= "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
     $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
@@ -423,6 +424,12 @@ sub init_TARGET_STUFF {
     } else {
 	print STDERR "$Pgm: don't know how to mangle assembly language for: $TargetPlatform\n";
 	exit 1;
+    }
+
+    if($T_HDR_relrodata eq "") {
+            # default values:
+            # relrodata defaults to rodata.
+        $T_HDR_relrodata = $T_HDR_rodata;
     }
 
 if ( 0 ) {
@@ -670,7 +677,7 @@ sub mangle_asm {
 		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
                 )
             {
-                $chkcat[$i] = 'rodata';
+                $chkcat[$i] = 'relrodata';
             } else
             {
 	        print STDERR "Warning: retaining unknown function \`$thing' in output from C compiler\n";
@@ -1185,7 +1192,7 @@ sub mangle_asm {
 
 	    # SRT
 	    if ( defined($srtchk{$symb}) ) {
-		print OUTASM $T_HDR_rodata;
+		print OUTASM $T_HDR_relrodata;
 		print OUTASM $chk[$srtchk{$symb}];
 		$chkcat[$srtchk{$symb}] = 'DONE ALREADY';
 	    }
@@ -1245,7 +1252,10 @@ sub mangle_asm {
 		print OUTASM $T_HDR_rodata;
 		print OUTASM $chk[$i];
 		$chkcat[$i] = 'DONE ALREADY';
-
+ 	} elsif ( $chkcat[$i] eq 'relrodata' ) {
+		print OUTASM $T_HDR_relrodata;
+		print OUTASM $chk[$i];
+		$chkcat[$i] = 'DONE ALREADY';
  	} elsif ( $chkcat[$i] eq 'toc' ) {
             # silly optimisation to print tocs, since they come in groups...
  	    print OUTASM $T_HDR_toc;
