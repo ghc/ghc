@@ -41,7 +41,9 @@ import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePr
 			  bottomIsGuaranteed, workerExists, 
 			)
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
-import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
+import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding,
+			  okToUnfoldInHiFile
+			)
 import FreeVars		( exprFreeVars )
 import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
@@ -304,14 +306,15 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     unfolding_is_ok
 	= case inline_pragma of
-	    IMustBeINLINEd       -> True
-	    IWantToBeINLINEd     -> True
+	    IMustBeINLINEd       -> definitely_ok_to_unfold
+	    IWantToBeINLINEd     -> definitely_ok_to_unfold
 	    IDontWantToBeINLINEd -> False
 	    IMustNotBeINLINEd    -> False
 	    NoPragmaInfo         -> case guidance of
 					UnfoldNever -> False	-- Too big
-					other       -> True
+					other       -> definitely_ok_to_unfold
 
+    definitely_ok_to_unfold =  okToUnfoldInHiFile rhs
     guidance = calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs
 
     ------------  Specialisations --------------

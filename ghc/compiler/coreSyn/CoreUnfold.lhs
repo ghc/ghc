@@ -23,6 +23,7 @@ module CoreUnfold (
 
 	smallEnoughToInline, couldBeSmallEnoughToInline, 
 	certainlySmallEnoughToInline, inlineUnconditionally, okToInline,
+	okToUnfoldInHiFile,
 
 	calcUnfoldingGuidance
     ) where
@@ -51,10 +52,10 @@ import CoreUtils	( coreExprType )
 import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
 			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
 			  IdSet )
-import PrimOp		( fragilePrimOp, primOpCanTriggerGC )
+import PrimOp		( fragilePrimOp, primOpCanTriggerGC, PrimOp(..) )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..) )
 import Name		( isExported )
-import Literal		( isNoRepLit )
+import Literal		( isNoRepLit, isLitLitLit )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
 import Unique           ( Unique )
@@ -237,7 +238,6 @@ calcUnfoldingGuidance
 	:: Int		    	-- bomb out if size gets bigger than this
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
-
 calcUnfoldingGuidance bOMB_OUT_SIZE expr
   = case collectBinders expr of { (ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
@@ -548,4 +548,52 @@ okToInline id whnf small binder_info
   | otherwise
 #endif
   = isInlinableOcc whnf small binder_info
+\end{code}
+
+@okToUnfoldInHifile@ is used when emitting unfolding info into an interface
+file to determine whether an unfolding candidate really should be unfolded.
+The predicate is needed to prevent @_casm_@s (+ lit-lits) from being emitted
+into interface files. 
+
+The reason for inlining expressions containing _casm_s into interface files
+is that these fragments of C are likely to mention functions/#defines that
+will be out-of-scope when inlined into another module. This is not an
+unfixable problem for the user (just need to -#include the approp. header
+file), but turning it off seems to the simplest thing to do.
+
+\begin{code}
+okToUnfoldInHiFile :: CoreExpr -> Bool
+okToUnfoldInHiFile e = go e
+ where
+    -- Race over an expression looking for CCalls..
+    go (Var _)   = True
+    go (Lit lit) = not (isLitLitLit lit)
+    go (Note _ body)  = go body
+    go (App fun arg)  = go fun
+    go (Con con args) = True
+    go (Prim op args) = okToUnfoldPrimOp op
+    go (Lam _ body) = go body
+    go (Let (NonRec binder rhs) body) = go rhs && go body
+    go (Let (Rec pairs) body) = and (map go (body:rhses))
+      where
+        rhses = [ rhs | (_, rhs) <- pairs ]
+    go (Case scrut alts) = and (map go (scrut:rhses))
+      where
+        rhses = getAltRhs alts
+
+        getAltRhs (PrimAlts alts deflt) =
+	    let ls = map snd alts  in
+	    case deflt of
+	      NoDefault -> ls
+	      BindDefault _ rhs -> rhs:ls
+        getAltRhs (AlgAlts alts deflt) =
+	    let ls = map (\ (_,_,r) -> r) alts  in
+	    case deflt of
+	      NoDefault -> ls
+	      BindDefault _ rhs -> rhs:ls
+
+    -- ok to unfold a PrimOp as long as it's not a _casm_
+    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _) = not is_casm
+    okToUnfoldPrimOp _                         = True
+     
 \end{code}
