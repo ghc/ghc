@@ -1145,13 +1145,7 @@ staticLink o_files = do
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_libs <- getPackageLibraries
-    let imp	     = if static then "" else "_imp"
-        pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
-
-    libs <- readIORef v_Cmdline_libraries
-    let lib_opts = map ("-l"++) (reverse libs)
-	 -- reverse because they're added in reverse order from the cmd line
+    pkg_link_opts <- getPackageLinkOpts
 
 #ifdef darwin_TARGET_OS
     pkg_framework_paths <- getPackageFrameworkPath
@@ -1168,12 +1162,10 @@ staticLink o_files = do
 	 -- reverse because they're added in reverse order from the cmd line
 #endif
 
-    pkg_extra_ld_opts <- getPackageExtraLdOpts
-
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-	-- opts from -optl-<blah>
+	-- opts from -optl-<blah> (including -l<blah> options)
     extra_ld_opts <- getStaticOpts v_Opt_l
 
     [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, basePackage]
@@ -1194,19 +1186,17 @@ staticLink o_files = do
 		      ++ extra_os
 		      ++ extra_ld_inputs
 	 	      ++ lib_path_opts
-	 	      ++ lib_opts
+	 	      ++ extra_ld_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ framework_path_opts
 	 	      ++ framework_opts
 #endif
 	 	      ++ pkg_lib_path_opts
-	 	      ++ pkg_lib_opts
+	 	      ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ pkg_framework_path_opts
 	 	      ++ pkg_framework_opts
 #endif
-	 	      ++ pkg_extra_ld_opts
-	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then
 			    [ "-u", prefixUnderscore "Main_zdmain_closure"] 
 			 else []))
@@ -1236,15 +1226,7 @@ doMkDLL o_files = do
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_libs <- getPackageLibraries
-    let imp = if static then "" else "_imp"
-        pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
-
-    libs <- readIORef v_Cmdline_libraries
-    let lib_opts = map ("-l"++) (reverse libs)
-	 -- reverse because they're added in reverse order from the cmd line
-
-    pkg_extra_ld_opts <- getPackageExtraLdOpts
+    pkg_link_opts <- getPackageLinkOpts
 
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
@@ -1272,12 +1254,10 @@ doMkDLL o_files = do
 	 ++ [ "--target=i386-mingw32" ]
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
-	 ++ lib_opts
+	 ++ extra_ld_opts
 	 ++ pkg_lib_path_opts
-	 ++ pkg_lib_opts
-	 ++ pkg_extra_ld_opts
+	 ++ pkg_link_opts
          ++ (if "--def" `elem` (concatMap words extra_ld_opts)
 	       then [ "" ]
                else [ "--export-all" ])
-	 ++ extra_ld_opts
 	))

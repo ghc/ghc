@@ -30,8 +30,8 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Cmdline_libraries, 
-			  getPackageConfigMap )
+import DriverState	( v_Library_paths, v_Opt_l, getPackageConfigMap,
+			  getStaticOpts )
 import Finder		( findModule, findLinkable )
 import HscTypes
 import Name		( Name,  nameModule, isExternalName )
@@ -384,7 +384,8 @@ linkLibraries :: DynFlags
 -- specified on the command line. 
 linkLibraries dflags objs
    = do	{ lib_paths <- readIORef v_Library_paths
-	; minus_ls  <- readIORef v_Cmdline_libraries
+	; opt_l  <- getStaticOpts v_Opt_l
+	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
         ; let cmdline_lib_specs = map Object objs ++ map DLL minus_ls
 	
 	; if (null cmdline_lib_specs) then return () 
@@ -671,6 +672,7 @@ linkPackage dflags pkg
    = do 
         let dirs      =  Packages.library_dirs pkg
         let libs      =  Packages.hs_libraries pkg ++ extra_libraries pkg
+				++ [ lib | '-':'l':lib <- extra_ld_opts pkg ]
         classifieds   <- mapM (locateOneObj dirs) libs
 #ifdef darwin_TARGET_OS
         let fwDirs    =  Packages.framework_dirs pkg

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.85 2002/10/25 16:54:58 simonpj Exp $
+-- $Id: DriverState.hs,v 1.86 2002/12/12 17:36:19 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -380,8 +380,6 @@ GLOBAL_VAR(v_Import_paths,  ["."], [String])
 GLOBAL_VAR(v_Include_paths, ["."], [String])
 GLOBAL_VAR(v_Library_paths, [],	 [String])
 
-GLOBAL_VAR(v_Cmdline_libraries,   [], [String])
-
 #ifdef darwin_TARGET_OS
 GLOBAL_VAR(v_Framework_paths, [], [String])
 GLOBAL_VAR(v_Cmdline_frameworks, [], [String])
@@ -535,14 +533,19 @@ getPackageLibraryPath = do
   ps <- getPackageInfo
   return (nub (filter notNull (concatMap library_dirs ps)))
 
-getPackageLibraries    :: IO [String]
-getPackageLibraries = do
+getPackageLinkOpts :: IO [String]
+getPackageLinkOpts = do
   ps <- getPackageInfo
   tag <- readIORef v_Build_tag
-  let suffix = if null tag then "" else '_':tag
-  return (concat (
-	map (\p -> map (++suffix) (hACK (hs_libraries p)) ++ extra_libraries p) ps
-     ))
+  static <- readIORef v_Static
+  let 
+	imp        = if static then "" else "_imp"
+	suffix     = if null tag then "" else '_':tag
+      	libs p     = map (++suffix) (hACK (hs_libraries p)) ++ extra_libraries p
+	imp_libs p = map (++imp) (libs p)
+	all_opts p = map ("-l" ++) (imp_libs p) ++ extra_ld_opts p
+
+  return (concat (map all_opts ps))
   where
      -- This is a totally horrible (temporary) hack, for Win32.  Problem is
      -- that package.conf for Win32 says that the main prelude lib is 
@@ -583,11 +586,6 @@ getPackageExtraCcOpts  :: IO [String]
 getPackageExtraCcOpts = do
   ps <- getPackageInfo
   return (concatMap extra_cc_opts ps)
-
-getPackageExtraLdOpts  :: IO [String]
-getPackageExtraLdOpts = do
-  ps <- getPackageInfo
-  return (concatMap extra_ld_opts ps)
 
 #ifdef darwin_TARGET_OS
 getPackageFrameworkPath  :: IO [String]

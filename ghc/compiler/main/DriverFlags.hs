@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.106 2002/11/20 09:37:48 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.107 2002/12/12 17:36:18 simonmar Exp $
 --
 -- Driver flags
 --
@@ -261,7 +261,7 @@ static_flags =
 
 	------- Libraries ---------------------------------------------------
   ,  ( "L"		, Prefix (addToDirList v_Library_paths) )
-  ,  ( "l"		, Prefix (add v_Cmdline_libraries) )
+  ,  ( "l"		, AnySuffix (\s -> add v_Opt_l s >> add v_Opt_dll s) )
 
 #ifdef darwin_TARGET_OS
 	------- Frameworks --------------------------------------------------
