@@ -498,6 +498,7 @@ mkUsageInfo hsc_env eps
   where
     usages = catMaybes [ mkUsage mod_name 
 		       | (mod_name,_) <- moduleEnvElts dep_mods]
+	-- ToDo: do we need to sort into canonical order?
 
     hpt = hsc_HPT hsc_env
     pit = eps_PIT eps
@@ -557,6 +558,7 @@ mkUsageInfo hsc_env eps
         ent_vers = [(n, lookupVersion version_env n) 
     	           | n <- sortLt lt_occ used_names ]
         lt_occ n1 n2 = nameOccName n1 < nameOccName n2
+	-- ToDo: is '<' on OccNames the right thing; may differ between runs?
 \end{code}
 
 \begin{code}
