@@ -299,6 +299,10 @@ ioe_notSeekable_notBin = ioException
       "seek operations on text-mode handles are not allowed on this platform" 
         Nothing)
  
+ioe_finalizedHandle fp = throw (IOException
+   (IOError Nothing IllegalOperation "" 
+	"handle is finalized" (Just fp)))
+
 ioe_bufsiz :: Int -> IO a
 ioe_bufsiz n = ioException 
    (IOError Nothing InvalidArgument "hSetBuffering"
@@ -314,13 +318,21 @@ ioe_bufsiz n = ioException
 -- The finalizer is then placed on the write side, and the handle only gets
 -- finalized once, when both sides are no longer required.
 
-stdHandleFinalizer :: MVar Handle__ -> IO ()
-stdHandleFinalizer m = do
+-- NOTE about finalized handles: It's possible that a handle can be
+-- finalized and then we try to use it later, for example if the
+-- handle is referenced from another finalizer, or from a thread that
+-- has become unreferenced and then resurrected (arguably in the
+-- latter case we shouldn't finalize the Handle...).  Anyway,
+-- we try to emit a helpful message which is better than nothing.
+
+stdHandleFinalizer :: FilePath -> MVar Handle__ -> IO ()
+stdHandleFinalizer fp m = do
   h_ <- takeMVar m
   flushWriteBufferOnly h_
+  putMVar m (ioe_finalizedHandle fp)
 
-handleFinalizer :: MVar Handle__ -> IO ()
-handleFinalizer m = do
+handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
+handleFinalizer fp m = do
   handle_ <- takeMVar m
   case haType handle_ of 
       ClosedHandle -> return ()
@@ -329,6 +341,7 @@ handleFinalizer m = do
 		-- descriptor anyway...
 	      hClose_handle_ handle_
 	      return ()
+  putMVar m (ioe_finalizedHandle fp)
 
 -- ---------------------------------------------------------------------------
 -- Grimy buffer operations
@@ -513,7 +526,7 @@ readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
 	    (read_rawBuffer fd buf off len)
-	    (threadWaitRead fd)
+	    (threadWaitRead (fromIntegral fd))
 
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock loc fd is_stream buf off len = 
@@ -525,19 +538,19 @@ readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
 	    (read_off fd buf off len)
-	    (threadWaitRead fd)
+	    (threadWaitRead (fromIntegral fd))
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
 		(write_rawBuffer (fromIntegral fd) buf off len)
-		(threadWaitWrite fd)
+		(threadWaitWrite (fromIntegral fd))
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
 		(write_off (fromIntegral fd) buf off len)
-		(threadWaitWrite fd)
+		(threadWaitWrite (fromIntegral fd))
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
    read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
@@ -869,7 +882,7 @@ mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
 	-> IO Handle
 mkStdHandle fd filepath ha_type buf bmode = do
    spares <- newIORef BufferListNil
-   newFileHandle filepath stdHandleFinalizer
+   newFileHandle filepath (stdHandleFinalizer filepath)
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
@@ -884,7 +897,7 @@ mkFileHandle :: FD -> Bool -> FilePath -> HandleType -> Bool -> IO Handle
 mkFileHandle fd is_stream filepath ha_type binary = do
   (buf, bmode) <- getBuffer fd (initBufferState ha_type)
   spares <- newIORef BufferListNil
-  newFileHandle filepath handleFinalizer
+  newFileHandle filepath (handleFinalizer filepath)
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = binary,
@@ -925,7 +938,7 @@ mkDuplexHandle fd is_stream filepath binary = do
 		      }
   read_side <- newMVar r_handle_
 
-  addMVarFinalizer write_side (handleFinalizer write_side)
+  addMVarFinalizer write_side (handleFinalizer filepath write_side)
   return (DuplexHandle filepath read_side write_side)
    
 
