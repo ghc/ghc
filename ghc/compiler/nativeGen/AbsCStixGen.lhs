@@ -44,10 +44,7 @@ import TyCon		( tyConDataCons )
 import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
-
-#ifdef REALLY_HASKELL_1_3
-ord = fromEnum :: Char -> Int
-#endif
+import Char		( ord )
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
@@ -160,8 +157,9 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     : StData IntRep [StInt 0]
 	     : StSegment TextSegment
 	     : StLabel lbl
-	     : StCondJump tmp_lbl (StPrim IntNeOp [StCLbl moduleRegdLabel, 
-						   StInt 0])
+	     : StCondJump tmp_lbl (StPrim IntNeOp 	
+				     [StInd IntRep StCLbl moduleRegdLabel, 
+				      StInt 0])
 	     : StAssign IntRep (StInd IntRep (StCLbl moduleRegdLabel)) (StInt 1)
 	     : code 
 	     [ StLabel tmp_lbl
