@@ -9,8 +9,8 @@
 &license;
 &intro;
 &installing;
-&using;
 &ghci;
+&using;
 &prof;
 &sooner;
 &lang-features;
