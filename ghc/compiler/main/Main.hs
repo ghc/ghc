@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.17 2000/11/03 10:42:39 simonmar Exp $
+-- $Id: Main.hs,v 1.18 2000/11/08 15:25:25 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -228,9 +228,11 @@ main =
    pipelines <- mapM (genPipeline mode stop_flag) srcs
    let src_pipelines = zip srcs pipelines
 
+	-- sanity checking
    o_file <- readIORef v_Output_file
-   if isJust o_file && mode /= DoLink && length srcs > 1
-	then throwDyn (UsageError "can't apply -o option to multiple source files")
+   ohi    <- readIORef v_Output_hi
+   if length srcs > 1 && (isJust ohi || (isJust o_file && mode /= DoLink))
+	then throwDyn (UsageError "can't apply -o or -ohi options to multiple source files")
 	else do
 
    if null srcs then throwDyn (UsageError "no input files") else do

@@ -20,6 +20,7 @@ import Module
 import FiniteMap
 import Util
 import Panic		( panic )
+import Config
 
 import IOExts
 import Directory
@@ -110,9 +111,25 @@ maybeHomeModule mod_name = do
 
    case lookupFM home_map lhs of {
 	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) lhs;
-	Nothing -> return Nothing
+	Nothing -> do
 
-   }}
+   -- can't find a source file anywhere, check for a lone .hi file.
+   hisuf <- readIORef v_Hi_suf
+   let hi = basename ++ '.':hisuf
+   case lookupFM home_map hi of {
+	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) hs;
+	Nothing -> do
+
+   -- last chance: .hi-boot and .hi-boot-<ver>
+   let hi_boot = basename ++ ".hi-boot"
+   let hi_boot_ver = basename ++ ".hi-boot-" ++ cHscIfaceFileVersion
+   case lookupFM home_map hi_boot of {
+	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) hs;
+	Nothing -> do
+   case lookupFM home_map hi_boot_ver of {
+	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) hs;
+	Nothing -> return Nothing
+   }}}}}
 
 mkHomeModuleLocn mod_name basename source_fn = do
 

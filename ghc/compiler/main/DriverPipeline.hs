@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.15 2000/11/02 13:58:45 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.16 2000/11/08 15:25:25 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -134,6 +134,7 @@ genPipeline todo stop_flag filename
    keep_hc    <- readIORef v_Keep_hc_files
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
+   osuf       <- readIORef v_Object_suf
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -195,6 +196,10 @@ genPipeline todo stop_flag filename
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
+      myPhaseInputExt Ln = case osuf of Nothing -> phaseInputExt Ln
+					Just s  -> s
+      myPhaseInputExt other = phaseInputExt other
+
       annotatePipeline
 	 :: [Phase]		-- raw pipeline
 	 -> Phase		-- phase to stop before
@@ -202,7 +207,7 @@ genPipeline todo stop_flag filename
       annotatePipeline []     _    = []
       annotatePipeline (Ln:_) _    = []
       annotatePipeline (phase:next_phase:ps) stop = 
-     	  (phase, keep_this_output, phaseInputExt next_phase)
+     	  (phase, keep_this_output, myPhaseInputExt next_phase)
 	     : annotatePipeline (next_phase:ps) stop
      	  where
      		keep_this_output
@@ -276,8 +281,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
    		       Just s  -> return s
    		       Nothing -> error "outputFileName"
    	       else if keep == Persistent
-   			   then do f <- odir_ify (orig_basename ++ '.':suffix)
-   				   osuf_ify f
+   			   then odir_ify (orig_basename ++ '.':suffix)
    			   else newTempName suffix
 
 -------------------------------------------------------------------------------
@@ -342,9 +346,9 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 
    deps <- mapM (findDependency basename) imports
 
-   osuf_opt <- readIORef v_Output_suf
+   osuf_opt <- readIORef v_Object_suf
    let osuf = case osuf_opt of
-			Nothing -> "o"
+			Nothing -> phaseInputExt Ln
 			Just s  -> s
 
    extra_suffixes <- readIORef v_Dep_suffixes

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.10 2000/10/27 15:40:01 simonpj Exp $
+-- $Id: DriverState.hs,v 1.11 2000/11/08 15:25:25 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -161,7 +161,7 @@ GLOBAL_VAR(v_Hsc_Lang, if cGhcWithNativeCodeGen == "YES" &&
 	   HscLang)
 
 GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
-GLOBAL_VAR(v_Output_suf,  Nothing, Maybe String)
+GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
 GLOBAL_VAR(v_Output_file, Nothing, Maybe String)
 GLOBAL_VAR(v_Output_hi,   Nothing, Maybe String)
 
@@ -176,7 +176,7 @@ odir_ify f = do
 
 osuf_ify :: String -> IO String
 osuf_ify f = do
-  osuf_opt <- readIORef v_Output_suf
+  osuf_opt <- readIORef v_Object_suf
   case osuf_opt of
 	Nothing -> return f
 	Just s  -> return (newsuf s f)
