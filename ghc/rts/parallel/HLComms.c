@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  * Time-stamp: <Wed Mar 21 2001 16:34:41 Stardate: [-30]6363.45 hwloidl>
- * $Id: HLComms.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
+ * $Id: HLComms.c,v 1.5 2001/05/28 07:13:54 sof Exp $
  *
  * High Level Communications Routines (HLComms.lc)
  *
@@ -56,7 +56,7 @@
 #ifdef DIST
 #include "SchedAPI.h" //for createIOThread
 extern unsigned int context_switch; 
-#endif DIST
+#endif /* DIST */
 
 //@node GUM Message Sending and Unpacking Functions, Message-Processing Functions, Includes, High Level Communications Routines
 //@subsection GUM Message Sending and Unpacking Functions
@@ -510,7 +510,7 @@ void FinishReval(StgTSO *t)
     belch("@;~) Reval Finished"));
 }
 
-#endif DIST
+#endif /* DIST */
 
 //@node Message-Processing Functions, GUM Message Processor, GUM Message Sending and Unpacking Functions, High Level Communications Routines
 //@subsection Message-Processing Functions

@@ -1,6 +1,6 @@
 /* 
    Time-stamp: <Wed Mar 21 2001 16:32:47 Stardate: [-30]6363.44 hwloidl>
-   $Id: Pack.c,v 1.6 2001/03/22 03:51:11 hwloidl Exp $
+   $Id: Pack.c,v 1.7 2001/05/28 07:13:54 sof Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -822,7 +822,7 @@ PackRemoteRef(StgClosure *closure)
   
   unpacked_size += PACK_FETCHME_SIZE;
 }
-#endif DIST
+#endif /* DIST */
 
 //@node Packing Closures,  , Packing Sections of Nearby Graph, Packing Functions
 //@subsubsection Packing Closures
@@ -2230,7 +2230,7 @@ SetGAandCommonUp(globalAddr *ga, StgClosure *closure, rtsBool hasGA)
     ga->weight=0;
 // ***************************************************************************
 // ***************************************************************************
-#endif DIST
+#endif /* DIST */
     
     /* Two closures, one global name.  Someone loses */
     oldip = get_itbl(existing);

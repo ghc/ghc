@@ -1002,7 +1002,7 @@ get_closure_info(StgClosure* node, nat *size, nat *ptrs, nat *nonptrs,
     strcpy(info_hdr_ty, "REMOTE_REF");
 #endif
     return info; 
-#endif DIST
+#endif /* DIST */
     
   case FETCH_ME_BQ:
     *size = sizeofW(StgFetchMeBlockingQueue);
