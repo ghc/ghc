@@ -48,7 +48,7 @@ codeOutput mod_name tycons classes stg_binds c_code h_code flat_abstractC ncg_un
 #ifndef OMIT_NATIVE_CODEGEN
     let
 	(stix_final, ncg_output_d) = nativeCodeGen flat_absC_ncg ncg_uniqs
-	ncg_output_w = (\ f -> printForUser f ncg_output_d)
+	ncg_output_w = (\ f -> printForAsm f ncg_output_d)
     in
     dumpIfSet opt_D_dump_stix "Final stix code" stix_final	>>
     dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d 		>>
