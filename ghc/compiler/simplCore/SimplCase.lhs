@@ -116,7 +116,13 @@ simplCase env (Case inner_scrut inner_alts) (subst_envs, outer_alts) rhs_c resul
 	   rhs_c' = \env rhs -> simplExpr env rhs [] result_ty
 	in
 	simplCase env inner_scrut (getSubstEnvs env, inner_alts)
-		  (\env rhs -> simplCase env rhs (emptySubstEnvs, outer_alts') rhs_c' result_ty)
+		  (\env rhs -> simplCase env rhs (subst_envs, outer_alts') rhs_c' result_ty)
+			-- We used to have "emptySubstEnvs" instead of subst_envs here,
+			-- but that is *wrong*.  The outer_alts' still have the old
+			-- binders from outer_alts, with un-substituted types,
+			-- so we must keep their subst_envs with them.  It does
+			-- no harm to the freshly-manufactured part of outer_alts',
+			-- because it'll have nothing in the domain of subst_envs anyway
 		  result_ty
 						`thenSmpl` \ case_expr ->
 	returnSmpl (mkCoLetsNoUnboxed extra_bindings case_expr)
