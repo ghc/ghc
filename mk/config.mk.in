@@ -168,6 +168,11 @@ ProjectsDontInstall = glafp-utils nofib
 IncludeTestDirsInBuild=NO
 
 #
+# Should the various project example directories be built?
+#
+IncludeExampleDirsInBuild=NO
+
+#
 # Which ways should SGML documents be built?
 # options are: dvi ps pdf html rtf
 #
