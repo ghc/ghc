@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.9 2000/05/22 13:09:29 simonmar Exp $
+ * $Id: Prelude.h,v 1.10 2000/05/23 15:31:48 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -109,7 +109,7 @@ extern const StgInfoTable *ind_StablePtr_con_info;
 #define True_closure           ind_True_closure
 #define False_closure          ind_False_closure
 #define unpackCString_closure  ind_unpackCString_closure
-#define runFinalizerBatch_closure ind_runFinalizerBatch_closure;
+#define runFinalizerBatch_closure ind_runFinalizerBatch_closure
 
 #define stackOverflow_closure  ind_stackOverflow_closure
 #define heapOverflow_closure   ind_heapOverflow_closure
