@@ -323,6 +323,7 @@ qualifyImports this_mod qual_imp unqual_imp as_mod hides
 
     add_avail :: GlobalNameEnv -> AvailInfo -> RnMG GlobalNameEnv
     add_avail env avail = foldlRn add_name env (availNames avail)
+
     add_name env name   = add qual_imp   env  (Qual qual_mod occ err_hif) `thenRn` \ env1 ->
 			  add unqual_imp env1 (Unqual occ)
 			where
@@ -398,8 +399,8 @@ addAvailEnv warn_dups ie env NotAvailable   = returnRn env
 addAvailEnv warn_dups ie env (AvailTC _ []) = returnRn env
 addAvailEnv warn_dups ie env avail
   | warn_dups = mapMaybeRn (addErrRn  . availClashErr) () conflict `thenRn_`
-                returnRn (addToFM_C add_avail env key elt)
-  | otherwise = returnRn (addToFM_C add_avail env key elt)
+                returnRn (addToFM_C addAvail env key elt)
+  | otherwise = returnRn (addToFM_C addAvail env key elt)
   where
    key  = nameOccName (availName avail)
    elt  = (ie,avail,reports_on)
@@ -421,7 +422,7 @@ bad_avail  (ie1,avail1,r1) (ie2,avail2,r2)
 dup_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
    = availName avail1 == availName avail2 -- Same OccName & avail.
 
-add_avail (ie1,a1,r1) (ie2,a2,r2) = (ie1, a1 `plusAvail` a2, r1 + r2)
+addAvail (ie1,a1,r1) (ie2,a2,r2) = (ie1, a1 `plusAvail` a2, r1 + r2)
 \end{code}
 
 Processing the export list.

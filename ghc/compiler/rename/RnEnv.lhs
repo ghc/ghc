@@ -19,7 +19,7 @@ import RnMonad
 import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
 			  occNameString, occNameFlavour, getSrcLoc,
 			  NameSet, emptyNameSet, addListToNameSet, nameSetToList,
-			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
+			  mkLocalName, mkGlobalName, modAndOcc,
 			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
 			  pprProvenance, pprOccName, pprModule, pprNameProvenance,
 			  isLocalName
@@ -447,16 +447,16 @@ addOneToGlobalNameEnv env rdr_name name
 delOneFromGlobalNameEnv :: GlobalNameEnv -> RdrName -> GlobalNameEnv 
 delOneFromGlobalNameEnv env rdr_name = delFromFM env rdr_name
 
-conflicting_name (n1,h1) (n2,h2) 
-  = (n1 /= n2) || 
-    (isLocallyDefinedName n1 && isLocallyDefinedName n2)
+conflicting_name :: (Name, HowInScope) -> (Name, HowInScope) -> Bool
+conflicting_name (n1, FromLocalDefn _) (n2, FromLocalDefn _) = True
+conflicting_name (n1,h1) 	       (n2,h2) 		     = n1 /= n2
 	-- We complain of a conflict if one RdrName maps to two different Names,
 	-- OR if one RdrName maps to the same *locally-defined* Name.  The latter
 	-- case is to catch two separate, local definitions of the same thing.
 	--
 	-- If a module imports itself then there might be a local defn and an imported
 	-- defn of the same name; in this case the names will compare as equal, but
-	-- will still have different provenances.
+	-- will still have different HowInScope fields
 
 lookupNameEnv :: NameEnv -> RdrName -> Maybe Name
 lookupNameEnv = lookupFM

@@ -619,9 +619,11 @@ lookupGlobalNameRn rdr_name rn_down (SDown (RnEnv global_env fixity_env) local_e
 -- Look in both local and global env
 lookupNameRn :: RdrName -> RnMS s (Maybe Name)
 lookupNameRn rdr_name rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
-  = case lookupFM global_env rdr_name of
-	  Just (name, _) -> returnSST (Just name)
-	  Nothing 	 -> returnSST (lookupFM local_env rdr_name)
+  = case lookupFM local_env rdr_name of
+	  Just name -> returnSST (Just name)
+	  Nothing   -> case lookupFM global_env rdr_name of
+			  Just (name, _) -> returnSST (Just name)
+			  Nothing        -> returnSST Nothing
 
 getNameEnvs :: RnMS s (GlobalNameEnv, NameEnv)
 getNameEnvs rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)

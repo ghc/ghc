@@ -1,3 +1,16 @@
+--------------------------------------------------------
+[Jan 98]
+There's a known bug in here:
+
+	If an interface file ends prematurely, Lex tries to
+	do headFS of an empty FastString.
+
+An example that provokes the error is
+
+	f _:_ _forall_ [a] <<<END OF FILE>>>
+--------------------------------------------------------
+
+
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %

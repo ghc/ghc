@@ -567,7 +567,7 @@ sig_doc (InlineSig  _     loc) 	    = (SLIT("INLINE pragma"),loc)
 sig_doc (MagicUnfoldingSig _ _ loc) = (SLIT("MAGIC_UNFOLDING pragma"),loc)
 
 missingSigErr var
-  = sep [ptext SLIT("a definition but no type signature for"), quotes (ppr var)]
+  = sep [ptext SLIT("Definition but no type signature for"), quotes (ppr var)]
 
 methodBindErr mbind
  =  hang (ptext SLIT("Can't handle multiple methods defined by one pattern binding"))
