@@ -1054,7 +1054,7 @@ because the scsel will mess up matching.  Instead we want
 	forall dIntegralInt, dNumInt.
 	fromIntegral Int Int dIntegralInt dNumInt = id Int
 
-Hence "DontReduce NoSCs"
+Hence "WithoutSCs"
 
 \begin{code}
 tcSimplifyToDicts :: [Inst] -> TcM (TcDictBinds)
@@ -1070,7 +1070,7 @@ tcSimplifyToDicts wanteds
     doc = text "tcSimplifyToDicts"
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
-    try_me inst	| isDict inst = DontReduce NoSCs	-- See notes above for why NoSCs
+    try_me inst	| isDict inst = KeepDictWithoutSCs	-- See notes above re "WithoutSCs"
 		| otherwise   = ReduceMe
 \end{code}
 
@@ -1214,7 +1214,8 @@ data WhatToDo
 			-- produce an error message of any kind.
 			-- It might be quite legitimate such as (Eq a)!
 
- | DontReduce WantSCs		-- Return as irreducible
+ | KeepDictWithoutSCs	-- Return as irreducible; don't add its superclasses
+			-- Rather specialised: see notes with tcSimplifyToDicts
 
  | DontReduceUnlessConstant	-- Return as irreducible unless it can
 				-- be reduced to a constant in one step
@@ -1617,7 +1618,7 @@ reduce stack try_me wanted avails
   | otherwise
   = case try_me wanted of {
 
-      DontReduce want_scs -> addIrred want_scs avails wanted
+      KeepDictWithoutSCs -> addIrred NoSCs avails wanted
 
     ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
   				     -- First, see if the inst can be reduced to a constant in one step
