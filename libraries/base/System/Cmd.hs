@@ -100,6 +100,8 @@ foreign import ccall unsafe "rawSystem"
 -- a single string.  Command-line parsing is done by the executable
 -- itself.
 rawSystem cmd args = do
+	-- NOTE: 'cmd' is assumed to contain the application to run _only_,
+	-- as it'll be quoted surrounded in quotes here.
   let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
   withCString cmdline $ \pcmdline -> do
     status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
@@ -108,6 +110,7 @@ rawSystem cmd args = do
        n  -> return (ExitFailure n)
 
 translate :: String -> String
+translate str@('"':_) = str -- already escaped.
 translate str = '"' : foldr escape "\"" str
   where escape '"'  str = '\\' : '"'  : str
 	escape '\\' str = '\\' : '\\' : str
