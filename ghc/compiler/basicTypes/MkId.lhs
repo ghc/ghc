@@ -22,7 +22,7 @@ module MkId (
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
-	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId,
+	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
 	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID,
 	rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID,
 	nON_EXHAUSTIVE_GUARDS_ERROR_ID,	nO_METHOD_BINDING_ERROR_ID,

@@ -35,7 +35,8 @@ import HscTypes		( AvailEnv, emptyAvailEnv, lookupType,
 			  PersistentCompilerState(..), GlobalRdrEnv, 
 			  LocalRdrEnv,
 			  HomeIfaceTable, PackageIfaceTable )
-import BasicTypes	( Version, defaultFixity )
+import BasicTypes	( Version, defaultFixity, 
+			  Fixity(..), FixityDirection(..) )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  Message, Messages, errorsFound, warningsFound,
 			  printErrorsAndWarnings
@@ -44,14 +45,16 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
 			  addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
+import Id		( idName )
+import MkId		( seqId )
 import Name		( Name, OccName, NamedThing(..), 
-			  nameOccName,
+			  nameOccName, nameRdrName,
 			  decode, mkLocalName, mkKnownKeyGlobal
 			)
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv,
 			  extendNameEnvList )
 import Module		( Module, ModuleName, ModuleSet, emptyModuleSet,
-			  PackageName )
+			  PackageName, preludePackage )
 import PrelInfo		( ghcPrimExports, 
 			  cCallableClassDecl, cReturnableClassDecl, assertDecl )
 import PrelNames	( mkUnboundName, gHC_PRIM_Name )
@@ -238,7 +241,7 @@ data ParsedIface
 ghcPrimIface :: ParsedIface
 ghcPrimIface = ParsedIface {
       pi_mod	 = gHC_PRIM_Name,
-      pi_pkg     = FSLIT("base"),
+      pi_pkg     = preludePackage,
       pi_vers    = 1,
       pi_orphan  = False,
       pi_usages  = [],
@@ -246,7 +249,8 @@ ghcPrimIface = ParsedIface {
       pi_decls   = [(1,cCallableClassDecl), 
 		    (1,cReturnableClassDecl), 
 		    (1,assertDecl)],
-      pi_fixity  = [],
+      pi_fixity  = [(nameRdrName (idName seqId), Fixity 0 InfixR)],
+		-- seq is infixr 0
       pi_insts   = [],
       pi_rules   = (1,[]),
       pi_deprecs = Nothing
