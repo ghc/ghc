@@ -17,6 +17,7 @@ module TcGenDeriv (
 	gen_Ord_binds,
 	gen_Read_binds,
 	gen_Show_binds,
+	gen_Typeable_binds,
 	gen_tag_n_con_monobind,
 
 	con2tag_RDR, tag2con_RDR, maxtag_RDR,
@@ -65,6 +66,7 @@ import Panic		( panic, assertPanic )
 import Char		( ord, isAlpha )
 import Constants
 import List		( partition, intersperse )
+import Outputable
 import FastString
 import OccName
 \end{code}
@@ -1000,6 +1002,42 @@ isLRAssoc get_fixity nm =
        Fixity _ InfixR -> (False, True)
        Fixity _ InfixL -> (True,  False)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Typeable}
+%*									*
+%************************************************************************
+
+From the data type
+
+	data T a b = ....
+
+we generate
+
+	instance (Typeable a, Typeable b) => Typeable (T a b) where
+		typeOf _ = mkTypeRep (mkTyConRep "T")
+				     [typeOf (undefined::a),
+				      typeOf (undefined::b)]
+
+Notice the use of lexically scoped type variables.
+
+\begin{code}
+gen_Typeable_binds :: TyCon -> RdrNameMonoBinds
+gen_Typeable_binds tycon
+  = mk_easy_FunMonoBind tycon_loc typeOf_RDR [WildPat placeHolderType] []
+	(mkHsApps mkTypeRep_RDR [tycon_rep, arg_reps])
+  where
+    tycon_loc = getSrcLoc tycon
+    tyvars    = tyConTyVars tycon
+    tycon_rep = HsVar mkTyConRep_RDR `HsApp` HsLit (mkHsString (showSDoc (ppr tycon)))
+    arg_reps  = ExplicitList placeHolderType (map mk tyvars)
+    mk tyvar  = HsApp (HsVar typeOf_RDR) 
+		      (ExprWithTySig (HsVar undefined_RDR)
+				     (HsTyVar (getRdrName tyvar)))
+\end{code}
+
 
 
 %************************************************************************

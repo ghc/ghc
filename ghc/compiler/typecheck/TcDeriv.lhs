@@ -27,7 +27,7 @@ import TcMonoType	( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( bindLocalsFV )
+import RnEnv		( bindLocalsFV, extendTyVarEnvFVRn )
 import TcRnMonad	( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId )
 
@@ -47,9 +47,9 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
-			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcEqTypes, tcSplitAppTys, mkAppTys )
-import Var		( TyVar, tyVarKind )
+			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, isTypeKind,
+			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
+import Var		( TyVar, tyVarKind, idType, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
 import Util		( zipWithEqual, sortLt, notNull )
@@ -248,32 +248,30 @@ deriveOrdinaryStuff eqns
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
 	mbinders	 = collectMonoBinders extra_mbinds
     in
-    mappM gen_bind new_dfuns		`thenM` \ method_binds_s ->
+    mappM gen_bind new_dfuns		`thenM` \ rdr_name_inst_infos ->
 	
-    traceTc (text "tcDeriv" <+> ppr method_binds_s)	`thenM_`
-    getModule						`thenM` \ this_mod ->
+    traceTc (text "tcDeriv" <+> vcat (map ppr rdr_name_inst_infos))	`thenM_`
+    getModule				`thenM` \ this_mod ->
     initRn (InterfaceMode this_mod) (
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope 
 	-- over the method bindings for the instances.
 	bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, dus) ->
-	mapAndUnzipM rn_meths method_binds_s		`thenM` \ (rn_method_binds_s, fvs_s) ->
-	returnM ((rn_method_binds_s, rn_extra_binds), 
+	mapAndUnzipM rn_inst_info rdr_name_inst_infos	`thenM` \ (rn_inst_infos, fvs_s) ->
+	returnM ((rn_inst_infos, rn_extra_binds), 
 		  duUses dus `plusFV` plusFVs fvs_s)
-    )				`thenM` \ ((rn_method_binds_s, rn_extra_binds), fvs) ->
-    let
-	new_inst_infos = zipWith gen_inst_info new_dfuns rn_method_binds_s
-    in
-    returnM (new_inst_infos, rn_extra_binds, fvs)
+    )				`thenM` \ ((rn_inst_infos, rn_extra_binds), fvs) ->
+   returnM (rn_inst_infos, rn_extra_binds, fvs)
 
   where
-	-- Make a Real dfun instead of the dummy one we have so far
-    gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
-    gen_inst_info dfun binds
-      = InstInfo { iDFunId = dfun, iBinds = VanillaInst binds [] }
-
-    rn_meths (cls, meths) = rnMethodBinds cls [] meths
+    rn_inst_info (dfun, binds) 
+	= extendTyVarEnvFVRn (map varName tyvars)	$
+		-- Bring the right type variables into scope
+	  rnMethodBinds (className cls) [] binds	`thenM` \ (rn_binds, fvs) ->
+	  return (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_binds [] }, fvs)
+	where
+	  (tyvars, _, cls, _) = tcSplitDFunTy (idType dfun)
 \end{code}
 
 
@@ -329,11 +327,12 @@ makeDerivEqns tycl_decls
         tcHsPred pred				`thenM` \ pred' ->
 	case getClassPredTys_maybe pred' of
 	   Nothing 	    -> bale_out (malformedPredErr tycon pred)
-	   Just (clas, tys) -> mk_eqn_help new_or_data tycon clas tys
+	   Just (clas, tys) -> doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
+        		       mk_eqn_help gla_exts new_or_data tycon clas tys
 
     ------------------------------------------------------------------
-    mk_eqn_help DataType tycon clas tys
-      | Just err <- chk_out clas tycon tys
+    mk_eqn_help gla_exts DataType tycon clas tys
+      | Just err <- chk_out gla_exts clas tycon tys
       = bale_out (derivingThingErr clas tys tycon tyvars err)
       | otherwise 
       = new_dfun_name clas tycon	 `thenM` \ dfun_name ->
@@ -354,25 +353,21 @@ makeDerivEqns tycl_decls
 	 -- "extra_constraints": see note [Data decl contexts] above
 	extra_constraints = tyConTheta tycon
 
-    mk_eqn_help NewType tycon clas tys
-      =	doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
-        if can_derive_via_isomorphism && (gla_exts || standard_instance) then
-		-- Go ahead and use the isomorphism
+    mk_eqn_help gla_exts NewType tycon clas tys
+      | can_derive_via_isomorphism && (gla_exts || standard_class gla_exts clas)
+      =		-- Go ahead and use the isomorphism
 	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
 	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
 					      iBinds = NewTypeDerived rep_tys }))
-	else
-	if standard_instance then
-		mk_eqn_help DataType tycon clas []	-- Go via bale-out route
-	else
-	-- Non-standard instance
-	if gla_exts then
-		-- Too hard
-	   	bale_out cant_derive_err
-	else
-		-- Just complain about being a non-std instance
-		bale_out non_std_err
+      | standard_class gla_exts clas
+      = mk_eqn_help gla_exts DataType tycon clas tys	-- Go via bale-out route
+
+      | otherwise 				-- Non-standard instance
+      = bale_out (if gla_exts then	
+		   	cant_derive_err	-- Too hard
+		  else
+			non_std_err)	-- Just complain about being a non-std instance
       where
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = T (t ak...an) deriving (.., C s1 .. sm, ...)
@@ -457,12 +452,12 @@ makeDerivEqns tycl_decls
 	-------------------------------------------------------------------
 	--  Figuring out whether we can only do this newtype-deriving thing
 
-	standard_instance = null tys && classKey clas `elem` derivableClassKeys
 	right_arity = length tys + 1 == classArity clas
 
 	can_derive_via_isomorphism
-	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show this way
+	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show,Typeable this way 
 	   && not (clas `hasKey` showClassKey)
+	   && not (clas `hasKey` typeableClassKey)
 	   && right_arity 			-- Well kinded;
 						-- eg not: newtype T ... deriving( ST )
 						--	because ST needs *2* type params
@@ -506,14 +501,19 @@ makeDerivEqns tycl_decls
 
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
 
+    standard_class gla_exts clas =  key `elem` derivableClassKeys
+				 || (gla_exts && (key == typeableClassKey || key == traverseClassKey))
+	where
+	  key = classKey clas
     ------------------------------------------------------------------
-    chk_out :: Class -> TyCon -> [TcType] -> Maybe SDoc
-    chk_out clas tycon tys
+    chk_out :: Bool -> Class -> TyCon -> [TcType] -> Maybe SDoc
+    chk_out gla_exts clas tycon tys
 	| notNull tys						        = Just ty_args_why
-	| not (getUnique clas `elem` derivableClassKeys)		= Just (non_std_why clas)
+	| not (standard_class gla_exts clas)				= Just (non_std_why clas)
 	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
 	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why
 	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = Just single_nullary_why
+        | clas `hasKey` typeableClassKey && not all_type_kind		= Just not_type_kind_why
 	| null data_cons		    			 	= Just no_cons_why
 	| any isExistentialDataCon data_cons 				= Just existential_why     
 	| otherwise			     				= Nothing
@@ -522,12 +522,14 @@ makeDerivEqns tycl_decls
 	    is_enumeration = isEnumerationTyCon tycon
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
+	    all_type_kind = all (isTypeKind . tyVarKind) (tyConTyVars tycon)
 
 	    single_nullary_why = ptext SLIT("one constructor data type or type with all nullary constructors expected")
 	    nullary_why        = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
 	    no_cons_why	       = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
 	    ty_args_why	       = quotes (ppr pred) <+> ptext SLIT("is not a class")
 	    existential_why    = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
+	    not_type_kind_why  = quotes (ppr tycon) <+> ptext SLIT("is parameterised over arguments of kind other than `*'")
 
 	    pred = mkClassPred clas tys
 
@@ -677,28 +679,27 @@ the renamer.  What a great hack!
 
 \begin{code}
 -- Generate the method bindings for the required instance
--- (paired with class name, as we need that when renaming
+-- (paired with DFunId, as we need that when renaming
 --  the method binds)
-gen_bind :: DFunId -> TcM (Name, RdrNameMonoBinds)
+gen_bind :: DFunId -> TcM (DFunId, RdrNameMonoBinds)
 gen_bind dfun
   = getFixityEnv		`thenM` \ fix_env -> 
-    returnM (cls_nm, gen_binds_fn fix_env cls_nm tycon)
-  where
-    cls_nm	  = className clas
-    (clas, tycon) = simpleDFunClassTyCon dfun
-
-gen_binds_fn fix_env cls_nm
-  = assoc "gen_bind:bad derived class"
-	  gen_list (nameUnique cls_nm)
-  where
-    gen_list = [(eqClassKey,      gen_Eq_binds)
-	       ,(ordClassKey,     gen_Ord_binds)
-	       ,(enumClassKey,    gen_Enum_binds)
-	       ,(boundedClassKey, gen_Bounded_binds)
-	       ,(ixClassKey,      gen_Ix_binds)
-	       ,(showClassKey,    gen_Show_binds fix_env)
-	       ,(readClassKey,    gen_Read_binds fix_env)
-	       ]
+    let
+        (clas, tycon) = simpleDFunClassTyCon dfun
+    	gen_binds_fn  = assoc "gen_bind:bad derived class"
+ 			      gen_list (getUnique clas)
+    
+    	gen_list = [(eqClassKey,      gen_Eq_binds)
+ 		   ,(ordClassKey,     gen_Ord_binds)
+ 		   ,(enumClassKey,    gen_Enum_binds)
+ 		   ,(boundedClassKey, gen_Bounded_binds)
+ 		   ,(ixClassKey,      gen_Ix_binds)
+ 		   ,(showClassKey,    gen_Show_binds fix_env)
+ 		   ,(readClassKey,    gen_Read_binds fix_env)
+		   ,(typeableClassKey,gen_Typeable_binds)
+ 		   ]
+    in
+    returnM (dfun, gen_binds_fn tycon)
 \end{code}
 
 

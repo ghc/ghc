@@ -157,6 +157,8 @@ basicKnownKeyNames
 	realFloatClassName,		-- numeric
 	cCallableClassName,		-- mentioned, ccallish
 	cReturnableClassName,		-- mentioned, ccallish
+	traverseClassName, 
+	typeableClassName,
 
 	-- Numeric stuff
 	negateName, minusName, 
@@ -253,6 +255,8 @@ pREL_REAL_Name    = mkModuleName "GHC.Real"
 pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
+dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
+tRAVERSE_Name	  = mkModuleName "Data.Traverse"
 
 rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
 lEX_Name       = mkModuleName "Text.Read.Lex"
@@ -418,6 +422,17 @@ showsPrec_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showsPrec")
 showString_RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showString")
 showSpace_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showSpace") 
 showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen") 
+
+typeOf_RDR     = varQual_RDR dYNAMIC_Name FSLIT("typeOf")
+mkTypeRep_RDR  = varQual_RDR dYNAMIC_Name FSLIT("mkAppTy")
+mkTyConRep_RDR = varQual_RDR dYNAMIC_Name FSLIT("mkTyCon")
+
+undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
+
+gmapQ_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapQ")
+gmapT_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapT")
+gmapM_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapM")
+gfoldl_RDR = varQual_RDR tRAVERSE_Name FSLIT("gfoldl")
 \end{code}
 
 
@@ -571,6 +586,10 @@ realFloatClassName = clsQual  pREL_FLOAT_Name FSLIT("RealFloat") realFloatClassK
 -- Class Ix
 ixClassName	   = clsQual pREL_ARR_Name FSLIT("Ix") ixClassKey
 
+-- Class Typeable and Traverse
+typeableClassName = clsQual dYNAMIC_Name FSLIT("Typeable")  typeableClassKey
+traverseClassName = clsQual tRAVERSE_Name FSLIT("Traverse") traverseClassKey
+
 -- Enum module (Enum, Bounded)
 enumClassName 	   = clsQual pREL_ENUM_Name FSLIT("Enum") enumClassKey
 enumFromName	   = varQual pREL_ENUM_Name FSLIT("enumFrom") enumFromClassOpKey
@@ -720,10 +739,12 @@ kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) noSrcLoc
 boundedClassKey		= mkPreludeClassUnique 1 
 enumClassKey		= mkPreludeClassUnique 2 
 eqClassKey		= mkPreludeClassUnique 3 
+typeableClassKey	= mkPreludeClassUnique 4
 floatingClassKey	= mkPreludeClassUnique 5 
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
 monadClassKey		= mkPreludeClassUnique 8 
+traverseClassKey	= mkPreludeClassUnique 9
 functorClassKey		= mkPreludeClassUnique 10
 numClassKey		= mkPreludeClassUnique 11
 ordClassKey		= mkPreludeClassUnique 12
@@ -732,10 +753,8 @@ realClassKey		= mkPreludeClassUnique 14
 realFloatClassKey	= mkPreludeClassUnique 15
 realFracClassKey	= mkPreludeClassUnique 16
 showClassKey		= mkPreludeClassUnique 17
-
 cCallableClassKey	= mkPreludeClassUnique 18
 cReturnableClassKey	= mkPreludeClassUnique 19
-
 ixClassKey		= mkPreludeClassUnique 20
 \end{code}
 
