@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.4 2001/05/21 14:04:15 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.5 2001/05/29 11:38:14 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -11,6 +11,7 @@ module CPUTime
         ) where
 
 import PrelMarshalAlloc
+import PrelMarshalUtils ( toBool )
 import PrelCTypesISO
 import PrelCTypes
 import PrelStorable
@@ -81,50 +82,32 @@ foreign import unsafe times :: Ptr CTms -> CClock
 #endif
 
 #else /* _WIN32 */
+    allocaBytes (#const sizeof(FILETIME)) $ \ p_creationTime -> do
+    allocaBytes (#const sizeof(FILETIME)) $ \ p_exitTime -> do
+    allocaBytes (#const sizeof(FILETIME)) $ \ p_kernelTime -> do
+    allocaBytes (#const sizeof(FILETIME)) $ \ p_userTime -> do
+    pid <- getCurrentProcess
+    ok <- getProcessTimes pid p_creationTime p_exitTime p_kernelTime p_userTime
+    if toBool ok then do
+      ut <- ft2usecs p_userTime
+      kt <- ft2usecs p_kernelTime
+      return (fromIntegral (ut + kt))
+     else return 0
+  where ft2usecs ft = do
+          high <- (#peek FILETIME,dwHighDateTime) ft :: IO CLong
+          low <- (#peek FILETIME,dwLowDateTime) ft :: IO CLong
+          return (high * (2^32) + low)
 
-#error ToDo!!!
+    -- ToDo: pin down elapsed times to just the OS thread(s) that
+    -- are evaluating/managing Haskell code.
 
-#ifdef _WIN32
-/* 100ns units per sec, really */
-#define NS_PER_SEC 10000000LL
-#define FT2usecs(ll,ft)    \
-    (ll)=(ft).dwHighDateTime; \
-    (ll) <<= 32;              \
-    (ll) |= (ft).dwLowDateTime;
+type FILETIME = ()
+type HANDLE = ()
+-- need proper Haskell names (initial lower-case character)
+foreign import "GetCurrentProcess" unsafe getCurrentProcess :: IO (Ptr HANDLE)
+foreign import "GetProcessTimes" unsafe getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 
-#endif
-
-/* cygwin32 or mingw32 version */
-StgInt
-getCPUTime(StgByteArray cpuStruct)
-{
-    FILETIME creationTime, exitTime, kernelTime, userTime;
-    StgInt *cpu=(StgInt *)cpuStruct;
-    unsigned long long uT, kT;
- 
-    /* ToDo: pin down elapsed times to just the OS thread(s) that
-       are evaluating/managing Haskell code.
-    */
-    if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
-		          &exitTime, &kernelTime, &userTime)) {
-	/* Probably on a Win95 box..*/
-        cpu[0]=0;
-        cpu[1]=0;
-        cpu[2]=0;
-        cpu[3]=0;
-	return 1;
-    }
-
-    FT2usecs(uT, userTime);
-    FT2usecs(kT, kernelTime);
-
-    cpu[0] = (unsigned int)(uT / NS_PER_SEC);
-    cpu[1] = (unsigned int)((uT - cpu[0] * NS_PER_SEC) * 100);
-    cpu[2] = (unsigned int)(kT / NS_PER_SEC);
-    cpu[3] = (unsigned int)((kT - cpu[2] * NS_PER_SEC) * 100);
-    return 1;
-}
-#endif /* WIN32 */
+#endif /* not _WIN32 */
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % fromIntegral (clockTicks))
