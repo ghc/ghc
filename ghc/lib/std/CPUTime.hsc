@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.1 2001/05/08 08:55:17 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.2 2001/05/08 17:33:57 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -94,14 +94,20 @@ getCPUTime = do
     return ((fromIntegral u_sec * 1000000 + fromIntegral u_usec + 
              fromIntegral s_sec * 1000000 + fromIntegral s_usec) 
 		* 1000000)
+
+type CRUsage = ()
+foreign import unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 #else
 # if defined(HAVE_TIMES)
-    allocaBytes (#const sizeof(struct tms)) $ \ p_tms ->
+    allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
     times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
     return (( (fromIntegral u_ticks + fromIntegral s_ticks) * 1000000000000) 
 			`div` clockTicks)
+
+type CTms = ()
+foreign import unsafe times :: Ptr CTms -> CClock
 # else
     ioException (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
@@ -165,8 +171,5 @@ clockTicks =
     (#const CLK_TCK)
 #else
     unsafePerformIO (sysconf (#const _SC_CLK_TCK) >>= return . fromIntegral)
+foreign import unsafe sysconf :: CInt -> IO CLong
 #endif
-
-type CRUsage = ()
-foreign import unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
-foreign import unsafe sysconf   :: CInt -> IO CLong
