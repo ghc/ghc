@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.40 2000/11/07 16:24:25 simonmar Exp $
+# $Id: Makefile,v 1.41 2000/11/14 10:56:08 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -74,17 +74,15 @@ endif
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
 
+SRCS_RTS_C :=  $(filter-out Vis%.c, $(SRCS_RTS_C))
+
 # we need GTK+ for the front panel
 ifneq "$(GTK_CONFIG)" ""
-
 ifeq "$(GhcRtsWithFrontPanel)" "YES"
-SRC_HC_OPTS += `$(GTK_CONFIG) --cflags` -optc-DRTS_GTK_FRONTPANEL
-else
-SRCS_RTS_C :=  $(filter-out Vis%.c, $(SRCS_RTS_C))
-endif
-
-VisCallbacks_CC_OPTS = -optc-Wno-unused
-
+SRC_HC_OPTS 		+= `$(GTK_CONFIG) --cflags` -optc-DRTS_GTK_FRONTPANEL
+SRCS_RTS_C 		:= $(SRCS_RTS_C) $(wildcard Vis*.c)
+VisCallbacks_CC_OPTS 	+= -optc-Wno-unused
+endif # GhcRtsWithFrontPanel
 endif # GTK_CONFIG
 
 #-----------------------------------------------------------------------------
