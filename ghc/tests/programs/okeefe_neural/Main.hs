@@ -1,4 +1,4 @@
-{-# OPTIONS -syslib exts #-}
+{-# OPTIONS -syslib lang #-}
 
 module Main(main) where
 
