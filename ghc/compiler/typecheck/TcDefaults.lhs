@@ -53,7 +53,7 @@ tcDefaults [DefaultDecl mono_tys locn]
     
     	returnM tau_tys
 
-tc_defaults decls@(DefaultDecl _ loc : _) =
+tcDefaults decls@(DefaultDecl _ loc : _) =
     addSrcLoc loc $
     failWithTc (dupDefaultDeclErr decls)
 
