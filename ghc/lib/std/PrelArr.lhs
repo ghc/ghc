@@ -24,21 +24,22 @@ infixl 9  !, //
 \end{code}
 
 \begin{code}
-{-# GENERATE_SPECS array a{~,Int,IPr} b{} #-}
+{-# SPECIALISE array :: (Int,Int) -> [(Int,b)] -> Array Int b #-}
 array		      :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
 
-{-# GENERATE_SPECS (!) a{~,Int,IPr} b{} #-}
+{-# SPECIALISE (!) :: Array Int b -> Int -> b #-}
 (!)		      :: (Ix a) => Array a b -> a -> b
 
+{-# SPECIALISE bounds :: Array Int b -> (Int,Int) #-}
 bounds		      :: (Ix a) => Array a b -> (a,a)
 
-{-# GENERATE_SPECS (//) a{~,Int,IPr} b{} #-}
+{-# SPECIALISE (//) :: Array Int b -> [(Int,b)] -> Array Int b #-}
 (//)		      :: (Ix a) => Array a b -> [(a,b)] -> Array a b
 
-{-# GENERATE_SPECS accum a{~,Int,IPr} b{} c{} #-}
+{-# SPECIALISE accum  :: (b -> c -> b) -> Array Int b -> [(Int,c)] -> Array Int b #-}
 accum		      :: (Ix a) => (b -> c -> b) -> Array a b -> [(a,c)] -> Array a b
 
-{-# GENERATE_SPECS accumArray a{~,Int,IPr} b{} c{} #-}
+{-# SPECIALISE accumArray :: (b -> c -> b) -> b -> (Int,Int) -> [(Int,c)] -> Array Int b #-}
 accumArray	      :: (Ix a) => (b -> c -> b) -> b -> (a,a) -> [(a,c)] -> Array a b
 \end{code}
 
