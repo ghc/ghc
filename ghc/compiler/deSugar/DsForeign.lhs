@@ -158,7 +158,7 @@ dsFImport fn_id ty may_not_gc ext_name cconv
 	wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
     in
-    returnDs [NonRec fn_id wrap_rhs, NonRec work_id work_rhs]
+    returnDs [NonRec work_id work_rhs, NonRec fn_id wrap_rhs]
 \end{code}
 
 Foreign labels 
