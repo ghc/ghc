@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.15 2001/02/27 12:43:45 rrt Exp $
+ * $Id: Select.c,v 1.16 2001/02/28 14:23:55 sewardj Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -26,7 +26,7 @@
 # endif
 
 # ifdef mingw32_TARGET_OS
-#  include <w32api/windows.h>
+#  include <windows.h>
 # endif
 
 /* last timestamp */
