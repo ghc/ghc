@@ -720,6 +720,17 @@ $ cvs checkout nofib/spectral
 
     <variablelist>
       <varlistentry>
+	<term><literal>alex</literal></term>
+	<indexterm><primary><literal>alex</literal></primary>
+	<secondary>project</secondary></indexterm>
+	<listitem>
+	  <para>The <ulink
+	  url="http://www.haskell.org/alex/">Alex</ulink> lexical
+	  analyser generator for Haskell.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><literal>ghc</literal></term>
 	<indexterm><primary><literal>ghc</literal></primary>
 	<secondary>project</secondary></indexterm>
@@ -1075,6 +1086,15 @@ $ cvs checkout nofib/spectral
 	</varlistentry>
 
 	<varlistentry>
+	  <term>x86_64-unknown-linux</term>
+	  <indexterm><primary>x86_64-unknown-linux</primary></indexterm>
+	  <listitem>
+	    <para>GHC currently works unregisterised.  A registerised
+	    port is in progress.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term>mips-sgi-irix5</term>
 	  <indexterm><primary>mips-sgi-irix[5-6]</primary></indexterm>
 	  <listitem>
@@ -1101,8 +1121,8 @@ $ cvs checkout nofib/spectral
 	  <term>powerpc-apple-darwin</term>
 	  <indexterm><primary>powerpc-apple-darwin</primary></indexterm> 
 	  <listitem>
-	    <para>Supported registerised.  No native code
-	    generator.</para>
+	    <para>Supported registerised.  Native code generator is
+	    almost working.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1203,12 +1223,9 @@ $ cvs checkout nofib/spectral
 	  <para>GCC 3.2 is currently known to have problems building
 	  GHC on Sparc, but is stable on x86.</para>
 	  
-	  <para>GCC 3.3 currently cannot be used to build GHC, due to
-	  some problems with the new C preprocessor.</para>
-
 	  <para>If your GCC dies with &ldquo;internal error&rdquo; on
           some GHC source file, please let us know, so we can report
-          it and get things improved.  (Exception: on iX86
+          it and get things improved.  (Exception: on x86
           boxes&mdash;you may need to fiddle with GHC's
           <option>-monly-N-regs</option> option; see the User's
           Guide)</para>
@@ -3601,17 +3618,16 @@ $ make install-docs
       target machine, and compiling them using gcc to get a working
       GHC.</para>
 
-      <para><emphasis>NOTE: GHC versions 5.xx and later are
-      significantly harder to bootstrap from C than earlier versions.
-      We recommend starting from version 4.08.2 if you need to
-      bootstrap in this way.</emphasis></para>
+      <para><emphasis>NOTE: GHC versions 5.xx were hard to bootstrap
+      from C.  We recommend using GHC 6.0.1 or
+      later.</emphasis></para>
 
-      <para>HC files are architecture-dependent (but not
-      OS-dependent), so you have to get a set that were generated on
-      similar hardware.  There may be some supplied on the GHC
-      download page, otherwise you'll have to compile some up
-      yourself, or start from <emphasis>unregisterised</emphasis> HC
-      files - see <xref linkend="unregisterised-porting">.</para>
+      <para>HC files are platform-dependent, so you have to get a set
+      that were generated on similar hardware.  There may be some
+      supplied on the GHC download page, otherwise you'll have to
+      compile some up yourself, or start from
+      <emphasis>unregisterised</emphasis> HC files - see <xref
+      linkend="unregisterised-porting">.</para>
 
       <para>The following steps should result in a working GHC build
       with full libraries:</para>
@@ -3696,44 +3712,239 @@ foo% make install
       way to a full registerised port, we don't mind too much.</para>
 
       <sect3>
-	<title>Building an unregisterised port</title>
-	
-	<para>The first step is to get some unregisterised HC files.
-	Either (a)&nbsp;download them from the GHC site (if there are
-	some available for the right version of GHC), or
-	(b)&nbsp;build them yourself on any machine with a working
-	GHC.  If at all possible this should be a machine with the
-	same word size as the target.</para>
+	<title>Cross-compiling to produce an unregisterised GHC</title>
 
-	<para>There is a script available which should automate the
-	process of doing the 2-stage bootstrap necessary to get the
-	unregisterised HC files - it's available in <ulink
-	url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/distrib/cross-port"><filename>fptools/distrib/cross-port</filename></ulink>
-	in CVS.</para>
+	<para>In this section, we explain how to bootstrap GHC on a
+	new platform, using unregisterised intermediate C files.  We
+	haven't put a great deal of effort into automating this
+	process, for two reasons: it is done very rarely, and the
+	process usually requires human intervention to cope with minor
+	porting issues anyway.</para>
 
-	<para>Now take these unregisterised HC files to the target
-	platform and bootstrap a compiler from them as per the
-	instructions in <xref linkend="sec-booting-from-hc">.  In
-	<filename>build.mk</filename>, you need to tell the build
-	system that the compiler you're building is
-	(a)&nbsp;unregisterised itself, and (b)&nbsp;builds
-	unregisterised binaries.  This varies depending on the GHC
-	version you're bootstraping:</para>
+	<para>The following step-by-step instructions should result in
+	a fully working, albeit unregisterised, GHC.  Firstly, you
+	need a machine that already has a working GHC (we'll call this
+	the <firstterm>host</firstterm> machine), in order to
+	cross-compile the intermediate C files that we will use to
+	bootstrap the compiler on the <firstterm>target</firstterm>
+	machine.</para>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>On the target machine:</para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>Unpack a source tree (preferably a released
+	      version).  We will call the path to the root of this
+	      tree <replaceable>T</replaceable>.</para>
+	    </listitem>
+
+	    <listitem>
+<screen>
+$ ./configure --enable-hc-boot --enable-hc-boot-unregisterised
+</screen>
+
+	      <para>You might need to update
+              <filename>configure.in</filename> to recognise the new
+              architecture, and re-generate
+              <filename>configure</filename> with
+              <literal>autoreconf</literal>.</para>
+	    </listitem>
+  
+	    <listitem>
+<screen>
+$ cd <replaceable>T</replaceable>/ghc/includes
+$ make config.h
+</screen>
+	    </listitem>
+	  </itemizedlist>
+	  </listitem>
+
+	  <listitem>
+	    <para>On the host machine:</para>
+	      
+	  <itemizedlist>
+	    <listitem>
+	      <para>Unpack a source tree (same released version).  Call
+              this directory <replaceable>H</replaceable>.</para>
+	    </listitem>
+ 
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>
+$ ./configure
+</screen>
+	    </listitem>
+
+	    <listitem>
+	      <para>Create
+	      <filename><replaceable>H</replaceable>/mk/build.mk</filename>,
+	      with the following contents:</para>
 
 <programlisting>
-# build.mk for GHC 4.08.x
-GhcWithRegisterised=NO
+GhcUnregisterised = YES
+GhcLibHcOpts = -O -H32m -keep-hc-files
+GhcLibWays =
+SplitObjs = NO
+GhcWithNativeCodeGen = NO
+GhcWithInterpreter = NO
+GhcStage1HcOpts = -O -H32m -fasm
+GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 </programlisting>
+	    </listitem>
+
+	    <listitem>
+	      <para>Copy
+	      <filename><replaceable>T</replaceable>/ghc/includes/config.h</filename>
+	      to
+	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
+	      Note that we are building on the host machine, using the
+	      target machine's <literal>config.h</literal> file.  This
+	      is so that the intermediate C files generated here will
+	      be suitable for compiling on the target system.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>Edit
+	      <filename><replaceable>H</replaceable>/mk/config.mk</filename>:</para>
+	      <itemizedlist>
+		<listitem>
+		  <para>change <literal>TARGETPLATFORM</literal>
+                  appropriately.</para>
+		</listitem>
+		<listitem>
+		  <para>copy <literal>LeadingUnderscore</literal>
+		  setting from target.</para>
+		</listitem>
+	      </itemizedlist>
+	    </listitem>
+	    
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>/glafp-utils && make boot && make
+</screen>
+	    </listitem>
+	    
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>/ghc && make boot && make
+</screen>
+
+	      <para>Don't worry if the build falls over in the RTS, we
+              don't need the RTS yet.</para>
+	    </listitem>
+
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>/libraries
+$& make boot && make
+</screen>
+	    </listitem>
+
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>/ghc
+$ make boot stage=2 && make stage=2
+</screen>
+	    </listitem>
+	    
+	    <listitem>
+	      <screen>
+$ cd <replaceable>H</replaceable>/ghc/utils
+$ make clean
+$ make -k HC=<replaceable>H</replaceable>/ghc/compiler/stage1/ghc-inplace \
+		EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
+</screen>
+	    </listitem>
+	    
+	    <listitem>
+<screen>
+$ cd <replaceable>H</replaceable>
+$ make hc-file-bundle Project=Ghc
+</screen>
+	    </listitem>
+
+	    <listitem>
+	      <para>copy
+	      <filename><replaceable>H</replaceable>/*-hc.tar.gz</filename>
+	      to <filename><replaceable>T</replaceable>/..</filename>.</para>
+	    </listitem>
+	  </itemizedlist>
+	  </listitem>
+
+	  <listitem>
+	    <para>On the target machine:</para>
+
+	  <para>At this stage we simply need to bootstrap a compiler
+	  from the intermediate C files we generated above.  It is
+	  possible to follow the instructions for bootstrapping from C
+	  files in <xref linkend="sec-booting-from-hc">, but we find
+	  that the script <literal>hc-build</literal> is more suited
+	  to booting a registerised compiler on an already-working
+	  platform.  The following instructions duplicate some of what
+	  the <literal>hc-build</literal> script does, but the process
+	  is made simpler by just aiming to get a working compiler,
+	  then using this to bootstrap a completely fresh tree.</para>
+
+	  <itemizedlist>
+	    <listitem>
+<screen>
+$ cd <replaceable>T</replaceable>/.. && tar xvzf ghc-*-hc.tar.gz
+</screen>
+	    </listitem>
+
+	    <listitem>
+	      <para>Create
+	      <filename><replaceable>T</replaceable>/mk/build.mk</filename>,
+	      with the following contents:</para>
 
 <programlisting>
-# build.mk for GHC 5.xx and 6.x
-GhcUnregisterised=YES
+GhcUnregisterised = YES
+GhcLibWays =
+SplitObjs = NO
+GhcWithNativeCodeGen = NO
+GhcWithInterpreter = NO
 </programlisting>
+	    </listitem>
 
-	<para>Versions 5.xx and 6.x only: use the option
-	<option>--enable-hc-boot-unregisterised</option> instead of
-	<option>--enable-hc-boot</option> when running
-	<filename>./configure</filename>.</para>
+	    <listitem>
+	      <para>Bootstrap GHC from the .hc files:</para>
+
+<screen>
+$ ./configure --enable-hc-boot --enable-hc-boot-unregisterised
+$ make -C glafp-utils boot all
+$ make -C ghc boot
+$ make -C libraries boot all
+$ make -C ghc all
+</screen>
+	    </listitem>
+
+	    <listitem>
+	      <para>You should now have a working GHC binary.  You
+              might want to try using this GHC to compile a Hello
+              World, to make sure it's doing something
+              reasonable:</para>
+
+<screen>
+$ cat >hello.hs
+main = putStrLn "Hello World!\n"
+^D
+$ <replaceable>T</replaceable>/ghc/compiler/ghc-inplace hello.hs -o hello
+$ ./hello
+Hello World!\n
+</screen>
+	    </listitem>
+
+	    <listitem>
+	      <para>Now, use this compiler
+	      (<filename><replaceable>T</replaceable>/ghc/compiler/ghc-inplace</filename>)
+	      to build another GHC tree from scratch, as
+	      normal.</para>
+	    </listitem>
+	  </itemizedlist>
+	  </listitem>
+	</itemizedlist>
 
 	<para>The build may not go through cleanly.  We've tried to
 	stick to writing portable code in most parts of the compiler,
