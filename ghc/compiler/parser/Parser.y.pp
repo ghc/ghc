@@ -941,7 +941,7 @@ deriving :: { Located (Maybe [LHsType RdrName]) }
 
 decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 	: sigdecl			{ $1 }
-	| infixexp opt_sig rhs		{% do { r <- checkValDef $1 $2 (unLoc $3);
+	| infixexp opt_sig rhs		{% do { r <- checkValDef $1 $2 $3;
 						return (LL $ unitOL (LL $ ValD r)) } }
 
 rhs	:: { Located (GRHSs RdrName) }

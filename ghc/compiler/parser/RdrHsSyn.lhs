@@ -762,17 +762,16 @@ patFail loc = parseError loc "Parse error in pattern"
 checkValDef 
 	:: LHsExpr RdrName
 	-> Maybe (LHsType RdrName)
-	-> GRHSs RdrName
+	-> Located (GRHSs RdrName)
 	-> P (HsBind RdrName)
 
-checkValDef lhs opt_sig grhss
+checkValDef lhs opt_sig (L rhs_span grhss)
   | Just (f,inf,es)  <- isFunLhs lhs []
   = if isQual (unLoc f)
 	then parseError (getLoc f) ("Qualified name in function definition: "  ++ 
 					showRdrName (unLoc f))
 	else do ps <- checkPatterns es
-		return (FunBind f inf [L (getLoc f) (Match ps opt_sig grhss)])
-			-- TODO: span is wrong
+		return (FunBind f inf [L rhs_span (Match ps opt_sig grhss)])
   | otherwise = do
 	lhs <- checkPattern lhs
 	return (PatBind lhs grhss)
