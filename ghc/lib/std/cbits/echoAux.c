@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: echoAux.c,v 1.2 1998/12/02 13:27:18 simonm Exp $
+ * $Id: echoAux.c,v 1.3 1999/03/01 09:02:04 sof Exp $
  *
  * Support functions for changing echoing
  */
@@ -36,6 +36,7 @@ StgInt on;
 
    fd = fo->fd;
 
+#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -57,6 +58,7 @@ StgInt on;
 	    return -1;
 	}
    }
+#endif
   return 0;
 }
 
@@ -70,6 +72,7 @@ StgForeignPtr ptr;
 
    fd = fo->fd;
 
+#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -78,6 +81,9 @@ StgForeignPtr ptr;
 	}
    }
    return (tios.c_cflag & ECHO ? 1 : 0);
+#else
+   return 0;
+#endif
 }
 
 StgInt
@@ -90,6 +96,7 @@ StgForeignPtr ptr;
 
    fd = fo -> fd;
 
+#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
         if (errno == ENOTTY) return 0;
 	if (errno != EINTR) {
@@ -99,4 +106,7 @@ StgForeignPtr ptr;
 	}
    }
    return 1;
+#else
+   return 0;
+#endif
 }
