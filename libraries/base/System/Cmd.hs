@@ -142,9 +142,27 @@ BOTTOM LINE:
 
 Steps 1,2 are done by the function 'translate' below.
 
-Question: how do you get the string \" into an argument?  Turns out that
-the argument "\\"" does not do the job.  (This turns into a single \.)
-Puzzling but probably not important in practice.
+The exact rules used by the C runtime to unscramble quoted argumets
+are quite complex.  For example, how do you get the string \" into an
+argument?  You can find the rules in MSDN, here:
+    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
+
+Here are some pages that give informations on Windows-related 
+limitations and deviations from Unix conventions:
+
+    http://support.microsoft.com/default.aspx?scid=kb;en-us;830473
+    Command lines and environment variables effectively limited to 8191 
+    characters on Win XP, 2047 on NT/2000 (probably even less on Win 9x):
+
+    http://www.microsoft.com/windowsxp/home/using/productdoc/en/default.asp?url=/WINDOWSXP/home/using/productdoc/en/percent.asp
+    Command-line substitution under Windows XP. IIRC these facilities (or at 
+    least a large subset of them) are available on Win NT and 2000. Some 
+    might be available on Win 9x.
+
+    http://www.microsoft.com/windowsxp/home/using/productdoc/en/default.asp?url=/WINDOWSXP/home/using/productdoc/en/Cmd.asp
+    How CMD.EXE processes command lines.
+
+
 
 Note: CreateProcess does have a separate argument (lpApplicationName)
 with which you can specify the command, but we have to slap the
