@@ -28,7 +28,7 @@
    UNIX versions
    ------------------------------------------------------------------------- */
 
-int
+ProcHandle
 runProcess (char *const args[], char *workingDirectory, char **environment, 
 	    int fdStdInput, int fdStdOutput, int fdStdError)
 {
