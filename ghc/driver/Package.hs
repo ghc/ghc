@@ -6,12 +6,12 @@ data Package = Package {
 		import_dirs    :: [String],
       		library_dirs   :: [String],
       		libraries      :: [String],
-      		include_dir    :: String,
-		c_include      :: String,
+      		include_dirs   :: [String],
+		c_includes     :: [String],
       		package_deps   :: [String],
-      		extra_ghc_opts :: String,
-      		extra_cc_opts  :: String,
-      		extra_ld_opts  :: String
+      		extra_ghc_opts :: [String],
+      		extra_cc_opts  :: [String],
+      		extra_ld_opts  :: [String]
      		}
   deriving (Read, Show)
 
@@ -22,30 +22,26 @@ dumpPackages :: [(String,Package)] -> String
 dumpPackages pkgs = 
    render (brackets (vcat (punctuate comma (map dumpPkg pkgs))))
 
-dumpPkg (name, pkg) = parens (hang (text (show name) <> comma) 
-				2 (dumpPkgGuts pkg))
+dumpPkg :: (String,Package) -> Doc
+dumpPkg (name, pkg) =
+   parens (hang (text (show name) <> comma) 2 (dumpPkgGuts pkg))
 
-dumpPkgGuts (Package
-	{ import_dirs    = import_dirs    
-      	, library_dirs   = library_dirs   
-      	, libraries      = libraries      
-      	, include_dir    = include_dir    
-	, c_include      = c_include      
-      	, package_deps   = package_deps   
-      	, extra_ghc_opts = extra_ghc_opts 
-      	, extra_cc_opts  = extra_cc_opts  
-      	, extra_ld_opts  = extra_ld_opts   })
-   = text "Package" $$ nest 3 (braces (
-   	sep (punctuate comma [
-   	   hang (text "import_dirs ="     ) 2 (pprStrs import_dirs),
-   	   hang (text "library_dirs = "   ) 2 (pprStrs library_dirs),
-   	   hang (text "libraries = "      ) 2 (pprStrs libraries),
-   	   hang (text "include_dir = "    ) 2 (text (show include_dir)),
-   	   hang (text "c_include = "      ) 2 (text (show c_include)),
-   	   hang (text "package_deps = "   ) 2 (pprStrs package_deps),
-   	   hang (text "extra_ghc_opts = " ) 2 (text (show extra_ghc_opts)),
-   	   hang (text "extra_cc_opts = "  ) 2 (text (show extra_cc_opts)),
-   	   hang (text "extra_ld_opts = "  ) 2 (text (show extra_ld_opts))
-   	])))
+dumpPkgGuts :: Package -> Doc
+dumpPkgGuts pkg =
+   text "Package" $$ nest 3 (braces (
+      sep (punctuate comma [
+         dumpField "import_dirs"    (import_dirs    pkg),
+         dumpField "library_dirs"   (library_dirs   pkg),
+         dumpField "libraries"      (libraries      pkg),
+         dumpField "include_dirs"   (include_dirs   pkg),
+         dumpField "c_includes"     (c_includes     pkg),
+         dumpField "package_deps"   (package_deps   pkg),
+         dumpField "extra_ghc_opts" (extra_ghc_opts pkg),
+         dumpField "extra_cc_opts"  (extra_cc_opts  pkg),
+         dumpField "extra_ld_opts"  (extra_ld_opts  pkg)
+      ])))
 
-pprStrs strs = brackets (sep (punctuate comma (map (text . show) strs)))
+dumpField :: String -> [String] -> Doc
+dumpField name val =
+   hang (text name <+> equals) 2
+        (brackets (sep (punctuate comma (map (text . show) val))))

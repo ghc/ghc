@@ -645,14 +645,14 @@ getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
   ps <- readIORef packages
   ps' <- getPackageDetails ps
-  return (nub (filter (not.null) (map include_dir ps')))
+  return (nub (filter (not.null) (concatMap include_dirs ps')))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes   :: IO [String]
 getPackageCIncludes = do
   ps <- readIORef packages
   ps' <- getPackageDetails ps
-  return (reverse (nub (filter (not.null) (map c_include ps'))))
+  return (reverse (nub (filter (not.null) (concatMap c_includes ps'))))
 
 getPackageLibraryPath  :: IO [String]
 getPackageLibraryPath = do
@@ -672,26 +672,24 @@ getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
   ps <- readIORef packages
   ps' <- getPackageDetails ps
-  return (map extra_ghc_opts ps')
+  return (concatMap extra_ghc_opts ps')
 
 getPackageExtraCcOpts  :: IO [String]
 getPackageExtraCcOpts = do
   ps <- readIORef packages
   ps' <- getPackageDetails ps
-  return (map extra_cc_opts ps')
+  return (concatMap extra_cc_opts ps')
 
 getPackageExtraLdOpts  :: IO [String]
 getPackageExtraLdOpts = do
   ps <- readIORef packages
   ps' <- getPackageDetails ps
-  return (map extra_ld_opts ps')
+  return (concatMap extra_ld_opts ps')
 
+getPackageDetails :: [String] -> IO [Package]
 getPackageDetails ps = do
   pkg_details <- readIORef package_details
-  let getDetails p =  case lookup p pkg_details of
-			Just details -> return details
-			Nothing -> error "getPackageDetails"
-  mapM getDetails ps
+  return [ pkg | p <- ps, Just pkg <- [ lookup p pkg_details ] ]
 
 GLOBAL_VAR(package_details, (error "package_details"), [(String,Package)])
 
