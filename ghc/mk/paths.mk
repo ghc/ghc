@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.15 2000/01/07 17:22:09 simonmar Exp $
+# $Id: paths.mk,v 1.16 2000/01/10 11:08:04 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -37,9 +37,9 @@ GHC_HSC_DIR 		:= $(GHC_COMPILER_DIR)
 GHC_SYSMAN    		:= $(GHC_RUNTIME_DIR)/gum/SysMan
 GHC_SYSMAN_DIR 		:= $(GHC_RUNTIME_DIR)/gum
 
+GHC_UNLIT_DIR 		:= $(GHC_UTILS_DIR)/unlit
 UNLIT	 		:= $(GHC_UNLIT_DIR)/unlit
 GHC_UNLIT		:= $(GHC_UNLIT_DIR)/unlit
-GHC_UNLIT_DIR 		:= $(GHC_UTILS_DIR)/unlit
 
 #-----------------------------------------------------------------------------
 # Stuff for the C-compiling phase in particular...
