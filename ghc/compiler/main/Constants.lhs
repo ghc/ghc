@@ -20,7 +20,6 @@ module Constants (
 	sTD_HDR_SIZE,
 	pROF_HDR_SIZE,
 	gRAN_HDR_SIZE,
-	tICKY_HDR_SIZE,
 	aRR_WORDS_HDR_SIZE,
 	aRR_PTRS_HDR_SIZE,
         rESERVED_C_STACK_BYTES,
@@ -192,7 +191,6 @@ Closure header sizes.
 sTD_HDR_SIZE       = (STD_HDR_SIZE       :: Int)
 pROF_HDR_SIZE      = (PROF_HDR_SIZE      :: Int)
 gRAN_HDR_SIZE      = (GRAN_HDR_SIZE      :: Int)
-tICKY_HDR_SIZE     = (TICKY_HDR_SIZE     :: Int)
 aRR_WORDS_HDR_SIZE = (ARR_WORDS_HDR_SIZE :: Int)
 aRR_PTRS_HDR_SIZE  = (ARR_PTRS_HDR_SIZE  :: Int)
 \end{code}

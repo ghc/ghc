@@ -50,10 +50,10 @@ module SMRep (
 
 import CmdLineOpts
 import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE,
-			  gRAN_HDR_SIZE, tICKY_HDR_SIZE, 
+			  gRAN_HDR_SIZE, tICKY_ITBL_SIZE, 
                           aRR_WORDS_HDR_SIZE, aRR_PTRS_HDR_SIZE,
 			  sTD_ITBL_SIZE, pROF_ITBL_SIZE,
-			  gRAN_ITBL_SIZE, tICKY_ITBL_SIZE )
+			  gRAN_ITBL_SIZE )
 import Outputable
 \end{code}
 
@@ -94,7 +94,7 @@ Size of a closure header.
 
 \begin{code}
 fixedHdrSize :: Int{-words-}
-fixedHdrSize = sTD_HDR_SIZE + profHdrSize + granHdrSize + tickyHdrSize
+fixedHdrSize = sTD_HDR_SIZE + profHdrSize + granHdrSize
 
 profHdrSize  :: Int{-words-}
 profHdrSize  | opt_SccProfilingOn   = pROF_HDR_SIZE
@@ -102,10 +102,6 @@ profHdrSize  | opt_SccProfilingOn   = pROF_HDR_SIZE
 
 granHdrSize  :: Int{-words-}
 granHdrSize  | opt_GranMacros	    = gRAN_HDR_SIZE
-	     | otherwise	    = 0
-
-tickyHdrSize :: Int{-words-}
-tickyHdrSize | opt_DoTickyProfiling = tICKY_HDR_SIZE
 	     | otherwise	    = 0
 
 arrWordsHdrSize   :: Int{-words-}
