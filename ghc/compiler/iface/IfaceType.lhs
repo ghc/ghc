@@ -338,7 +338,7 @@ toIfaceType ext (FunTy t1 t2)    	     = IfaceFunTy (toIfaceType ext t1) (toIfac
 toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (mkIfaceTc ext tc) (toIfaceTypes ext tys)
 toIfaceType ext (ForAllTy tv t)  	     = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType ext t)
 toIfaceType ext (PredTy st)     	     = IfacePredTy (toIfacePred ext st)
-toIfaceType ext (NoteTy (SynNote tc_app) ty) = toIfaceType ext tc_app
+toIfaceType ext (NoteTy (SynNote tc_app) ty) = toIfaceType ext tc_app	-- Retain synonyms
 toIfaceType ext (NoteTy other_note ty)	     = toIfaceType ext ty
 
 ----------------

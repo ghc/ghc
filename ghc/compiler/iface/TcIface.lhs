@@ -14,23 +14,23 @@ module TcIface (
 
 import IfaceSyn
 import LoadIface	( loadHomeInterface, loadInterface, predInstGates,
-			  discardDeclPrags, loadDecls )
-import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, lookupOrig,
+			  loadDecls )
+import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId,
 			  newIfaceName, newIfaceNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
-import Type		( liftedTypeKind, splitTyConApp, 
+import TcType		( hoistForAllTys )	-- TEMPORARY HACK
+import Type		( liftedTypeKind, splitTyConApp, mkSynTy, mkTyConApp,
 			  mkTyVarTys, mkGenTyConApp, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName )
+import TyCon		( TyCon, tyConName, isSynTyCon )
 import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
-			  HscEnv, TyThing(..), implicitTyThings, tyThingClass, tyThingTyCon, 
+			  HscEnv, TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), ModGuts,
-			  mkTypeEnv, extendTypeEnv, 
-			  lookupTypeEnv, lookupType, typeEnvIds )
+			  extendTypeEnv, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( extendInstEnvList )
 import CoreSyn
 import PprCore		( pprIdRules )
@@ -61,7 +61,7 @@ import Outputable
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual, dropList, equalLength, zipLazy )
+import Util		( zipWithEqual, dropList, equalLength )
 import CmdLineOpts	( DynFlag(..) )
 \end{code}
 
@@ -583,11 +583,20 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
 tcIfaceType (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
-tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkGenTyConApp tc' ts') }
+tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkIfTcApp tc' ts') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
 tcIfaceType (IfacePredTy st)      = do { st' <- tcIfacePredType st; return (PredTy st') }
 
 tcIfaceTypes tys = mapM tcIfaceType tys
+
+mkIfTcApp :: TyCon -> [Type] -> Type
+-- In interface files we retain type synonyms (for brevity and better error
+-- messages), but type synonyms can expand into non-hoisted types (ones with
+-- foralls to the right of an arrow), so we must be careful to hoist them here.
+-- This hack should go away when we get rid of hoisting.
+mkIfTcApp tc tys
+  | isSynTyCon tc = hoistForAllTys (mkSynTy tc tys)
+  | otherwise	  = mkTyConApp tc tys
 
 -----------------------------------------
 tcIfacePredType :: IfacePredType -> IfL PredType
