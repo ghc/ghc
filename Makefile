@@ -56,14 +56,14 @@ extraclean::
 # make sure it gets built early on.
 #
 ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
-build : $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
+build :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
 
 $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace : glafp-utils
 	$(MAKE) -C happy boot all
 endif
 
 # Build all projects that we know about
-build :
+build ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	   if [ -d $$i ]; then \
