@@ -148,6 +148,15 @@ findPackageMod mod_name hiOnly = do
   let imp_dirs = concatMap (\ pkg -> map ((,) pkg) (import_dirs pkg)) pkgs
       mod_str  = moduleNameUserString mod_name 
       basename = map (\c -> if c == '.' then '/' else c) mod_str
+
+      mkPackageModule mod_name pkg mbFName path =
+        return ( mkModule mod_name (mkFastString (name pkg))
+               , ModuleLocation{ ml_hspp_file = Nothing
+		 	       , ml_hs_file   = mbFName
+			       , ml_hi_file   = path ++ '.':package_hisuf
+			       , ml_obj_file  = Nothing
+			       })
+
   searchPathExts
   	imp_dirs basename
         ((package_hisuf,\ pkg fName path -> mkPackageModule mod_name pkg Nothing path) :
@@ -157,13 +166,6 @@ findPackageMod mod_name hiOnly = do
 	  , ("lhs", \ pkg fName path -> mkPackageModule mod_name pkg (Just fName) path)
 	  ]))
  where
-  mkPackageModule mod_name pkg mbFName path =
-    return ( mkModule mod_name (mkFastString (name pkg))
-           , ModuleLocation{ ml_hspp_file = Nothing
-		 	   , ml_hs_file   = mbFName
-			   , ml_hi_file   = path ++".hi"
-			   , ml_obj_file  = Nothing
-			   })
 
 findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findPackageModule mod_name = findPackageMod mod_name True
