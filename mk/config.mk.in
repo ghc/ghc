@@ -292,7 +292,7 @@ StripLibraries=NO
 
 # For an optimised RTS:
 GhcRtsHcOpts=-O2
-GhcRtsCcOpts=-O2 -fomit-frame-pointer
+GhcRtsCcOpts=-fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
