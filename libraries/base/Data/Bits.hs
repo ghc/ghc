@@ -54,15 +54,10 @@ import GHC.Real
 import GHC.Base
 #endif
 
---ADR: The fixity for .|. conflicts with that for .|. in Fran.
---     Removing all fixities is a fairly safe fix; fixing the "one fixity
---     per symbol per program" limitation in Hugs would take a lot longer.
-#ifndef __HUGS__
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
-#endif
 
 {-| 
 The 'Bits' class defines bitwise operations over integral types.
