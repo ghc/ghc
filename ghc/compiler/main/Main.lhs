@@ -88,21 +88,21 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppSourceStats rdr_module)) 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
-    _scc_     "spl-rn"
+--    _scc_     "spl-rn"
     mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
-    _scc_     "spl-tc"
+--    _scc_     "spl-tc"
     mkSplitUniqSupply 'a'	>>= \ tc_uniqs 	-> -- typechecker
-    _scc_     "spl-ds"
+--    _scc_     "spl-ds"
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
-    _scc_     "spl-sm"
+--    _scc_     "spl-sm"
     mkSplitUniqSupply 's'	>>= \ sm_uniqs 	-> -- core-to-core simplifier
-    _scc_     "spl-c2s"
+--    _scc_     "spl-c2s"
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
-    _scc_     "spl-st"
+--    _scc_     "spl-st"
     mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
-    _scc_     "spl-absc"
+--    _scc_     "spl-absc"
     mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
-    _scc_     "spl-ncg"
+--    _scc_     "spl-ncg"
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
     -- ******* RENAMER
@@ -165,7 +165,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ddump_deriv pprStyle))	>>
 
     -- ******* DESUGARER
-    show_pass "DeSugar " 			>>
+    show_pass "DeSugar" 			>>
     _scc_     "DeSugar"
     let
 	(desugared,ds_warnings)
@@ -303,7 +303,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     doDump switch hdr string
       = if switch
-	then hPutStr stderr ("\n\n--" ++ (take 80 $ repeat '=')) >>
+	then hPutStr stderr ("\n\n" ++ (take 80 $ repeat '=')) >>
 	     hPutStr stderr ('\n': hdr)	    >>
 	     hPutStr stderr ('\n': string)  >>
 	     hPutStr stderr "\n"
@@ -424,7 +424,7 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
     sig_info (InlineSig _ _)      = (0,0,0,1)
     sig_info _                    = (0,0,0,0)
 
-    import_info (ImportDecl _ qual as spec _)
+    import_info (ImportDecl _ qual _ as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1
