@@ -39,7 +39,7 @@ import HscTypes		( VersionInfo(..), ModIface(..),
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo )
-import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
@@ -224,6 +224,7 @@ we miss them out of the accumulating parameter here.
 
 \begin{code}
 ifaceTyThing_acc :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
+-- Don't put implicit things into the result
 ifaceTyThing_acc (ADataCon dc) so_far 		      = so_far
 ifaceTyThing_acc (AnId   id) so_far | isImplicitId id = so_far
 ifaceTyThing_acc (ATyCon id) so_far | isClassTyCon id = so_far
@@ -380,6 +381,11 @@ ifaceTyThing (AnId id) = iface_sig
     unfold_hsinfo |  neverUnfold unfold_info 
 		  || has_worker = Nothing
 		  | otherwise	= Just (HsUnfold inline_prag (toUfExpr rhs))
+
+
+ifaceTyThing (ADataCon dc) = ifaceTyThing (AnId (dataConWrapId dc))
+	-- This case only happens in the call to ifaceThing in InteractiveUI
+	-- Otherwise DataCons are filtered out in ifaceThing_acc
 \end{code}
 
 \begin{code}
