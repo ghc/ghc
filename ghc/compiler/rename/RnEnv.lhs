@@ -30,7 +30,7 @@ module RnEnv (
 
 #include "HsVersions.h"
 
-import LoadIface	( loadSrcInterface )
+import LoadIface	( loadHomeInterface, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
 import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
@@ -338,6 +338,8 @@ lookupQualifiedName rdr_name
        mod = rdrNameModule rdr_name
        occ = rdrNameOcc rdr_name
    in
+   -- Note: we want to behave as we would for a source file import here,
+   -- and respect hiddenness of modules/packages, hence loadSrcInterface.
    loadSrcInterface doc mod False	`thenM` \ iface ->
 
    case  [ (mod,occ) | 
@@ -423,11 +425,13 @@ lookupFixityRn name
       -- nothing from B will be used).  When we come across a use of
       -- 'f', we need to know its fixity, and it's then, and only
       -- then, that we load B.hi.  That is what's happening here.
-        loadSrcInterface doc name_mod False	`thenM` \ iface ->
+      --
+      -- loadHomeInterface will find B.hi even if B is a hidden module,
+      -- and that's what we want.
+        initIfaceTcRn (loadHomeInterface doc name)	`thenM` \ iface ->
 	returnM (mi_fix_fn iface (nameOccName name))
   where
     doc      = ptext SLIT("Checking fixity for") <+> ppr name
-    name_mod = nameModule name
 
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
