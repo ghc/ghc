@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.53 1999/03/16 13:20:13 simonm Exp $
+ * $Id: GC.c,v 1.54 1999/03/17 16:28:34 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1656,7 +1656,6 @@ scavenge(step *step)
     case STABLE_NAME:
     case IND_PERM:
     case IND_OLDGEN_PERM:
-    case CAF_UNENTERED:
       {
 	StgPtr end;
 
@@ -1665,6 +1664,21 @@ scavenge(step *step)
 	  (StgClosure *)*p = evacuate((StgClosure *)*p);
 	}
 	p += info->layout.payload.nptrs;
+	break;
+      }
+
+    case CAF_UNENTERED:
+      {
+	StgCAF *caf = (StgCAF *)p;
+
+	caf->body = evacuate(caf->body);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordOldToNewPtrs((StgMutClosure *)p);
+	} else {
+	  caf->mut_link = NULL;
+	}
+        p += sizeofW(StgCAF);
 	break;
       }
 
@@ -1677,6 +1691,8 @@ scavenge(step *step)
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
 	  recordOldToNewPtrs((StgMutClosure *)p);
+	} else {
+	  caf->mut_link = NULL;
 	}
         p += sizeofW(StgCAF);
 	break;
@@ -2040,6 +2056,8 @@ scavenge_mut_once_list(generation *gen)
 	  failed_to_evac = rtsFalse;
 	  p->mut_link = new_list;
 	  new_list = p;
+	} else {
+	  p->mut_link = NULL;
 	}
       }
       continue;
@@ -2052,7 +2070,9 @@ scavenge_mut_once_list(generation *gen)
 	  failed_to_evac = rtsFalse;
 	  p->mut_link = new_list;
 	  new_list = p;
-	}
+	} else {
+          p->mut_link = NULL;
+        }
       }
       continue;
 
