@@ -63,6 +63,9 @@ instance Show (Ptr a) where
        -- word2Integer :: Word# -> Integer (stolen from Word.lhs)
        word2Integer w = case word2Integer# w of
 			(# s, d #) -> J# s d
+
+instance Show (FunPtr a) where
+   showsPrec p = showsPrec p . castFunPtrToPtr
 #endif
 #endif
 
