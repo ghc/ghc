@@ -1040,7 +1040,7 @@ find. You need all the RPMs except for psgml (i.e.
 <Filename>stylesheets</Filename>). Note that most of these RPMs are
 architecture neutral, so are likely to be found in a
 <Filename>noarch</Filename> directory. The SuSE RPMs also work; the RedHat
-ones <Emphasis>don't</Emphasis> at the moment, but they are easy to fix:
+ones <Emphasis>don't</Emphasis> as of version 6.2, but they are easy to fix:
 just make a symlink from
 <Filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</Filename> to
 <Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
