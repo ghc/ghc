@@ -1,10 +1,32 @@
-dnl $Id: aclocal.m4,v 1.37 1999/01/26 09:59:18 sof Exp $
+dnl $Id: aclocal.m4,v 1.38 1999/02/08 11:16:17 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
 dnl To be a good autoconf citizen, names of local macros have
 dnl prefixed with FPTOOLS_ to ensure we don't clash
 dnl with any pre-supplied autoconf ones.
+
+dnl
+dnl Is timezone around? (in a header file)
+dnl 
+AC_DEFUN(FPTOOLS_HAVE_TIMEZONE,
+[AC_CACHE_CHECK([timezone], fptools_cv_have_timezone,
+[AC_TRY_COMPILE([#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
+], [return timezone;], 
+fptools_cv_have_timezone=yes, fptools_cv_have_timezone=no)])
+if test "$fptools_cv_have_timezone" = yes; then
+  AC_DEFINE(HAVE_TIMEZONE)
+fi
+])
 
 dnl
 dnl Has timezone the type time_t or long (HP-UX 10.20 apparently
@@ -23,7 +45,7 @@ AC_DEFUN(FPTOOLS_TYPE_TIMEZONE,
 # endif
 #endif
 
-extern time_t timezone;
+extern time_t timezone;	
 ],
 [int i;], fptools_cv_type_timezone=time_t, fptools_cv_type_timezone=long)])
 AC_DEFINE_UNQUOTED(TYPE_TIMEZONE, $fptools_cv_type_timezone)

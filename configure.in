@@ -470,6 +470,7 @@ dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
 
 dnl ** what's the type of timezone?
+FPTOOLS_HAVE_TIMEZONE
 FPTOOLS_TYPE_TIMEZONE
 
 dnl ** do we have altzone?

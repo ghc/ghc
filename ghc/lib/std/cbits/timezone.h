@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.h,v 1.4 1999/02/05 14:34:05 sof Exp $
+ * $Id: timezone.h,v 1.5 1999/02/08 11:16:20 sof Exp $
  *
  * Time-zone support header
  */
@@ -57,7 +57,7 @@ extern char *tzname[2];
 # endif /* ! HAVE_TZNAME */
 /* Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
 
-#ifndef cygwin32_TARGET_OS
+#ifndef HAVE_TIMEZONE
 extern TYPE_TIMEZONE timezone;
 #endif
 

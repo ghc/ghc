@@ -105,6 +105,9 @@
 /* Define if compiler supports prototypes. */
 #define HAVE_PROTOTYPES 0
 
+/* Define if time.h or sys/time.h define the timezone variable */
+#undef HAVE_TIMEZONE
+
 /* Define if you have the WinExec function.  */
 #define HAVE_WINEXEC 0
 
