@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.30 2001/02/14 12:43:24 rrt Exp $
+ * $Id: Linker.c,v 1.31 2001/02/14 13:56:50 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -105,6 +105,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(newMVarzh_fast)			\
       SymX(takeMVarzh_fast)			\
       SymX(tryTakeMVarzh_fast)			\
+      SymX(tryPutMVarzh_fast)			\
       SymX(catchzh_fast)			\
       SymX(raisezh_fast)			\
       SymX(forkzh_fast)				\
