@@ -208,11 +208,14 @@ better code than \tr{-O}.
 
 \item[\tr{-fvia-C}:]
 \index{-fvia-C option}
+\index{-fvia-c option}
 Compile via C, and don't use the native-code generator.
 (There are many cases when GHC does this on its own.)  You might
 pick up a little bit of speed by compiling via C.  If you use
 \tr{_ccall_}s or \tr{_casm_}s, you probably {\em have to} use
-\tr{-fvia-C}.
+\tr{-fvia-C}. 
+
+The lower-case incantation, \tr{-fvia-c}, is synonymous.
 
 \item[\tr{-O2-for-C}:]
 \index{-O2-for-C option}
@@ -488,7 +491,9 @@ The compiler does not overwrite an existing \tr{.hi} interface file if
 the new one is byte-for-byte the same as the old one; this is friendly to
 \tr{make}.  When an interface does change, it is often enlightening to
 be informed.  The \tr{-hi-diffs}\index{-hi-diffs option} option will
-make \tr{ghc} run \tr{diff} on the old and new \tr{.hi} files.
+make \tr{ghc} run \tr{diff} on the old and new \tr{.hi} files. You can
+also record the difference in the interface file itself, the
+\tr{-keep-hi-diffs}\index{-keep-hi-diffs} option takes care of that.
 
 The \tr{.hi} files from GHC 2.xx contain ``usage'' information which
 changes often and uninterestingly.  If you really want to see these
@@ -1239,7 +1244,7 @@ trademark of Peyton Jones Enterprises, plc.)
 \index{source-file options}
 
 Sometimes it is useful to make the connection between a source file
-and the command-line options it requires, quite tight. For instance,
+and the command-line options it requires quite tight. For instance,
 if a (Glasgow) Haskell source file uses \tr{casm}s, the C back-end
 often needs to be told about which header files to include. Rather than
 maintaining the list of files the source depends on in a
@@ -1261,6 +1266,10 @@ that your command shell does not get to the source file options, they
 are just included literally in the array of command-line arguments
 the compiler driver maintains internally, so you'll be desperately
 disappointed if you try to glob etc. inside \tr{OPTIONS}.
+
+NOTE: the contents of OPTIONS are prepended to the command-line
+options, so you *do* have the ability to override OPTIONS settings
+via the command line.
 
 It is not recommended to move all the contents of your Makefiles into
 your source files, but in some circumstances, the \tr{OPTIONS} pragma
