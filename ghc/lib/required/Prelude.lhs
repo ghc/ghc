@@ -73,13 +73,24 @@ import GHCerr
 strict      :: Eval a => (a -> b) -> a -> b
 strict f x  = x `seq` f x
 
+
+-- "seq" is defined a bit wierdly (see below)
+--
+-- The reason for the strange "0# -> parError" case is that
+-- it fools the compiler into thinking that seq is non-strict in
+-- its second argument (even if it inlines seq at the call site).
+-- If it thinks seq is strict in "y", then it often evaluates
+-- "y" before "x", which is totally wrong.  
+--
+-- Just before converting from Core to STG there's a bit of magic
+-- that recognises the seq# and eliminates the duff case.
+
 {-# INLINE seq  #-}
 seq :: Eval a => a -> b -> b
-#ifdef __CONCURRENT_HASKELL__
-seq  x y = case (seq#  x) of { 0# -> parError; _ -> y }
-#else
-seq  x y = y		-- WRONG!
-#endif
+seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
+
+seqError :: a
+seqError = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 
