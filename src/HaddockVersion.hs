@@ -14,5 +14,4 @@ projectUrl = "http://www.haskell.org/haddock/"
 
 -- The version comes in via CPP from mk/version.mk
 projectVersion :: String
-projectVersion = tail "\ 
-  \ HADDOCK_VERSION"
+projectVersion = HADDOCK_VERSION

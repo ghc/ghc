@@ -33,7 +33,7 @@ endif
 
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
-HaddockVersion_HC_OPTS = -DHADDOCK_VERSION=$(ProjectVersion)
+HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION="$(ProjectVersion)"'
 
 HaddockVersion : ../mk/version.mk
 
