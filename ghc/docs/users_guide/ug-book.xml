@@ -22,3 +22,9 @@
 &bugs;
 &faq;
 
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: xml ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book") ***
+     ;;; End: ***
+ -->
