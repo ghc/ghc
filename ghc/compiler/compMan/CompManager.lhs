@@ -9,19 +9,19 @@ module CompManager (
 
     CmState, 		-- abstract
 
-    cmInit, 	   -- :: GhciMode -> DynFlags -> IO CmState
+    cmInit, 	   -- :: GhciMode -> IO CmState
 
-    cmDepAnal,	   -- :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
+    cmDepAnal,	   -- :: CmState -> [FilePath] -> IO ModuleGraph
 
-    cmLoadModules, -- :: CmState -> DynFlags -> ModuleGraph
+    cmLoadModules, -- :: CmState -> ModuleGraph
 		   --	 -> IO (CmState, Bool, [String])
 
-    cmUnload,	   -- :: CmState -> DynFlags -> IO CmState
+    cmUnload,	   -- :: CmState -> IO CmState
 
 #ifdef GHCI
     cmModuleIsInterpreted, -- :: CmState -> String -> IO Bool
 
-    cmSetContext,  -- :: CmState -> DynFlags -> [String] -> [String] -> IO CmState
+    cmSetContext,  -- :: CmState -> [String] -> [String] -> IO CmState
     cmGetContext,  -- :: CmState -> IO ([String],[String])
 
     cmGetInfo,    -- :: CmState -> String -> IO (CmState, [(TyThing,Fixity)])
@@ -29,22 +29,16 @@ module CompManager (
     cmBrowseModule, -- :: CmState -> IO [TyThing]
 
     CmRunResult(..),
-    cmRunStmt,	   -- :: CmState -> DynFlags -> String
-		   --	 -> IO (CmState, CmRunResult)
+    cmRunStmt,		-- :: CmState -> String -> IO (CmState, CmRunResult)
 
-    cmTypeOfExpr,  -- :: CmState -> DynFlags -> String
-		   -- 	-> IO (CmState, Maybe String)
-
-    cmKindOfType,  -- :: CmState -> DynFlags -> String
-		   -- 	-> IO (CmState, Maybe String)
-
-    cmTypeOfName,  -- :: CmState -> Name -> IO (Maybe String)
+    cmTypeOfExpr,	-- :: CmState -> String -> IO (CmState, Maybe String)
+    cmKindOfType,	-- :: CmState -> String -> IO (CmState, Maybe String)
+    cmTypeOfName,	-- :: CmState -> Name -> IO (Maybe String)
 
     HValue,
-    cmCompileExpr, -- :: CmState -> DynFlags -> String 
-		   --	-> IO (CmState, Maybe HValue)
+    cmCompileExpr,	-- :: CmState -> String -> IO (CmState, Maybe HValue)
 
-    cmGetModInfo,		-- :: CmState -> (ModuleGraph, HomePackageTable)
+    cmGetModInfo	-- :: CmState -> (ModuleGraph, HomePackageTable)
 
     cmSetDFlags,
     cmGetBindings, 	-- :: CmState -> [TyThing]
