@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.48 2001/02/13 18:01:23 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.49 2001/02/13 18:37:53 qrczak Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -258,8 +258,8 @@ doCommand expr
         when expr_ok (rememberExpr expr_expanded)
         return False
 
--- Returned Maybe indicates whether or not the expr was successfully
--- parsed, renamed and typechecked.
+-- Returns True if the expr was successfully parsed, renamed and
+-- typechecked.
 evalExpr :: String -> GHCi Bool
 evalExpr expr
  | null (filter (not.isSpace) expr)
