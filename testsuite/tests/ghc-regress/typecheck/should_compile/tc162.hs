@@ -12,7 +12,12 @@ newtype Bug s a = Bug a
 runBug :: (forall s. Bug s a) -> a
 runBug (Bug _) = undefined
 
+newtype BugN s a = BugN a
+
+runBugN :: (forall s. BugN s a) -> a
+runBugN (BugN _) = undefined
+
 data Foo a b = Foo { foo :: a -> b }
 
-foo :: String -> (forall a b . Foo a b) -> IO ()
-foo s (Foo { foo = foo }) = putStrLn s
+baz :: String -> (forall a b . Foo a b) -> IO ()
+baz s (Foo { foo = foo }) = putStrLn s
