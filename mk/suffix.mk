@@ -143,6 +143,8 @@ endif
 #-----------------------------------------------------------------------------
 # C-related suffix rules
 
+ifeq "$(UseGhcForCc)" ""
+
 %.$(way_)o : %.$(way_)s
 	@$(RM) $@
 	$(AS) $(AS_OPTS) -o $@ $< || ( $(RM) $@ && exit 1 )
@@ -155,9 +157,36 @@ endif
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -c $< -o $@
 
-#%.$(way_)s : %.c
-#	@$(RM) $@
-#	$(CC) $(CC_OPTS) -S $< -o $@
+%.$(way_)s : %.c
+	@$(RM) $@
+	$(CC) $(CC_OPTS) -S $< -o $@
+
+else
+
+%.$(way_)o : %.$(way_)s
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)o : %.c
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)o : %.S
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+%.$(way_)s : %.c
+	@$(RM) $@
+	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+
+endif
+
+# stubs are automatically generated and compiled by GHC
+%_stub.$(way_)o: %.o
+	@:
+
+# -----------------------------------------------------------------------------
+# Flex/lex
 
 %.c : %.flex
 	@$(RM) $@
@@ -165,10 +194,6 @@ endif
 %.c : %.lex
 	@$(RM) $@
 	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
-
-# stubs are automatically generated and compiled by GHC
-%_stub.$(way_)o: %.o
-	@:
 
 #-----------------------------------------------------------------------------
 # Yacc stuff
