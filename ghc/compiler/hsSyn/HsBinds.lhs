@@ -259,6 +259,7 @@ data Sig name
 
   | DeprecSig	name		-- DEPRECATED
 		DeprecTxt
+		SrcLoc
 
 
 data FixitySig name  = FixitySig name Fixity SrcLoc
@@ -278,7 +279,7 @@ sigsForMe f sigs
     sig_for_me (NoInlineSig n _   _)  	  = f n  
     sig_for_me (SpecInstSig _ _)      	  = False
     sig_for_me (FixSig (FixitySig n _ _)) = f n
-    sig_for_me (DeprecSig n _)		  = f n
+    sig_for_me (DeprecSig n _ _)	  = f n
 
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
@@ -294,7 +295,7 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig   _ _ _) = True
 isPragSig (NoInlineSig _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
-isPragSig (DeprecSig _ _)     = True
+isPragSig (DeprecSig _ _ _)   = True
 isPragSig other		      = False
 \end{code}
 
@@ -328,7 +329,7 @@ ppr_sig (SpecInstSig ty _)
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
 
-ppr_sig (DeprecSig n txt)
+ppr_sig (DeprecSig n txt _)
       = hsep [text "{-# DEPRECATED", ppr n, doubleQuotes(ppr txt), text "#-}"]
 
 ppr_phase Nothing = empty

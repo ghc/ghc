@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.21 2000/02/15 22:18:34 panne Exp $
+$Id: Parser.y,v 1.22 2000/02/17 14:47:26 panne Exp $
 
 Haskell grammar.
 
@@ -482,15 +482,15 @@ deprecations :: { RdrBinding }
 
 deprecation :: { RdrBinding }
 	: deprecated_names STRING
-		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig n $2) | n <- $1 ] }
+		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig n $2 l) | (l,n) <- $1 ] }
 
-deprecated_names :: { [RdrName] }
+deprecated_names :: { [(SrcLoc,RdrName)] }
 	: deprecated_names ',' deprecated_name	{ $3 : $1 }
 	| deprecated_name			{ [$1] }
 
-deprecated_name :: { RdrName }
-	: var					{ $1 }
-	| tycon					{ $1 }
+deprecated_name :: { (SrcLoc,RdrName) }
+	: srcloc var				{ ($1, $2) }
+	| srcloc tycon				{ ($1, $2) }
 
 -----------------------------------------------------------------------------
 -- Foreign import/export

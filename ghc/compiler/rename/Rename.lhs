@@ -90,7 +90,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ l
 
 
 \begin{code}
-rename this_mod@(HsModule mod_name vers _ imports local_decls _ loc)
+rename this_mod@(HsModule mod_name vers _ imports local_decls deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -146,7 +146,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls _ loc)
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
 				  rn_all_decls
-			          Nothing
+			          deprec
 			          loc
     in
     rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->
