@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.89 2002/05/01 15:46:14 simonmar Exp $
+ * $Id: Linker.c,v 1.90 2002/06/04 19:21:28 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -7,7 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#if 0
 #include "PosixSource.h"
+#endif
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "HsFFI.h"
@@ -28,6 +30,22 @@
 
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
+#endif
+
+#if defined(cygwin32_TARGET_OS)
+#ifdef HAVE_DIRENT_H
+#include <dirent.h>
+#endif
+
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <regex.h>
+#include <sys/fcntl.h>
+#include <sys/termios.h>
+#include <sys/utime.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 #endif
 
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
@@ -73,19 +91,110 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #if !defined (mingw32_TARGET_OS)
-
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymX(stg_sig_install)			\
       Sym(nocldstop)
+#endif
+
+#if defined (cygwin32_TARGET_OS)
 #define RTS_MINGW_ONLY_SYMBOLS /**/
+/* Don't have the ability to read import libs / archives, so
+ * we have to stupidly list a lot of what libcygwin.a
+ * exports; sigh. 
+ */
+#define RTS_CYGWIN_ONLY_SYMBOLS                 \
+      SymX(regfree)                             \
+      SymX(regexec)                             \
+      SymX(regerror)                            \
+      SymX(regcomp)                             \
+      SymX(__errno)                             \
+      SymX(access)                              \
+      SymX(chmod)                               \
+      SymX(chdir)                               \
+      SymX(close)                               \
+      SymX(creat)                               \
+      SymX(dup)                                 \
+      SymX(dup2)                                \
+      SymX(fstat)                               \
+      SymX(fcntl)                               \
+      SymX(getcwd)                              \
+      SymX(getenv)                              \
+      SymX(lseek)                               \
+      SymX(open)                                \
+      SymX(fpathconf)                           \
+      SymX(pathconf)                            \
+      SymX(stat)                                \
+      SymX(pow)                                 \
+      SymX(tanh)                                \
+      SymX(cosh)                                \
+      SymX(sinh)                                \
+      SymX(atan)                                \
+      SymX(acos)                                \
+      SymX(asin)                                \
+      SymX(tan)                                 \
+      SymX(cos)                                 \
+      SymX(sin)                                 \
+      SymX(exp)                                 \
+      SymX(log)                                 \
+      SymX(sqrt)                                \
+      SymX(localtime_r)                         \
+      SymX(gmtime_r)                            \
+      SymX(mktime)                              \
+      Sym(_imp___tzname)                        \
+      SymX(gettimeofday)                        \
+      SymX(timezone)                            \
+      SymX(tcgetattr)                           \
+      SymX(tcsetattr)                           \
+      SymX(memcpy)                              \
+      SymX(memmove)                             \
+      SymX(realloc)                             \
+      SymX(malloc)                              \
+      SymX(free)                                \
+      SymX(fork)                                \
+      SymX(lstat)                               \
+      SymX(isatty)                              \
+      SymX(mkdir)                               \
+      SymX(opendir)                             \
+      SymX(readdir)                             \
+      SymX(rewinddir)                           \
+      SymX(closedir)                            \
+      SymX(link)                                \
+      SymX(mkfifo)                              \
+      SymX(pipe)                                \
+      SymX(read)                                \
+      SymX(rename)                              \
+      SymX(rmdir)                               \
+      SymX(select)                              \
+      SymX(system)                              \
+      SymX(write)                               \
+      SymX(strcmp)                              \
+      SymX(strcpy)                              \
+      SymX(strncpy)                             \
+      SymX(strerror)                            \
+      SymX(sigaddset)                           \
+      SymX(sigemptyset)                         \
+      SymX(sigprocmask)                         \
+      SymX(umask)                               \
+      SymX(uname)                               \
+      SymX(unlink)                              \
+      SymX(utime)                               \
+      SymX(waitpid)                             \
+      Sym(__divdi3)                             \
+      Sym(__udivdi3)                            \
+      Sym(__moddi3)                             \
+      Sym(__umoddi3)
 
-#else
-
-#define RTS_POSIX_ONLY_SYMBOLS
+#elif !defined(mingw32_TARGET_OS)
+#define RTS_MINGW_ONLY_SYMBOLS /**/
+#define RTS_CYGWIN_ONLY_SYMBOLS /**/
+#else /* defined(mingw32_TARGET_OS) */
+#define RTS_POSIX_ONLY_SYMBOLS  /**/
+#define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
+      SymX(memset)                              \
       SymX(memset)                              \
       SymX(inet_ntoa)                           \
       SymX(inet_addr)                           \
@@ -365,6 +474,7 @@ RTS_SYMBOLS
 RTS_LONG_LONG_SYMS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
+RTS_CYGWIN_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
 
@@ -383,6 +493,7 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_LONG_LONG_SYMS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
+      RTS_CYGWIN_ONLY_SYMBOLS
       { 0, 0 } /* sentinel */
 };
 
