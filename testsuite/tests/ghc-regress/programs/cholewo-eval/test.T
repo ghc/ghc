@@ -1,4 +1,10 @@
 # Expect failure when running the optasm way, due to floating-point
-# differences.
-test('cholewo-eval', expect_fail_for(['optasm']), multimod_compile_and_run, ['Main', ''])
+# differences. No fp failures on openbsd, for some reason.
+
+if config.platform == 'i386-unknown-openbsd':
+	ways = normal
+else:
+	ways = expect_fail_for(['optasm'])
+
+test('cholewo-eval', ways, multimod_compile_and_run, ['Main', ''])
 clean_o_hi()
