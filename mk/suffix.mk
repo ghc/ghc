@@ -103,7 +103,7 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 .PRECIOUS: %.hs
 
 %.hs : %.ly
-	$(HAPPY) $(HAPPY_OPTS) -g $<
+	$(HAPPY) $(HAPPY_OPTS) $<
 
 #-----------------------------------------------------------------------------
 # Lx Suffix Rules

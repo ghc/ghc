@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.37 1998/03/08 22:44:44 simonpj Exp $
+# $Id: Makefile,v 1.38 1998/04/16 10:04:12 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -165,6 +165,7 @@ reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C -DPROJECTVERSION=$(GhcProjectVersionInt
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H30m -fno-warn-incomplete-patterns
+rename/ParseIface_HAPPY_OPTS    += -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
