@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.16 2000/04/25 14:57:39 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.17 2000/04/26 10:17:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -384,11 +384,19 @@ rts_evalNothing(unsigned int stack_size)
 
 /* Convenience function for decoding the returned status. */
 
-void rts_checkSchedStatus ( char* site, SchedulerStatus rc )
+void
+rts_checkSchedStatus ( char* site, SchedulerStatus rc )
 {
-  if ( rc == Success ) {
-     return;
-  } else {
-     barf("%s: Return code (%d) not ok",(site),(rc));
-  }
+    switch (rc) {
+    case Success:
+	return;
+    case Killed:
+	barf("%s: uncaught exception",site);
+    case Interrupted:
+	barf("%s: interrupted", site);
+    case Deadlock:
+	barf("%s: no threads to run:  infinite loop or deadlock?", site);
+    default:
+	barf("%s: Return code (%d) not ok",(site),(rc));	
+    }
 }
