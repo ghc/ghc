@@ -29,13 +29,12 @@ import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
-import PrelNames	( hasKey, assertIdKey, minusName, negateName, fromIntegerName,
+import PrelNames	( hasKey, assertIdKey, 
 			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
 			  cCallableClass_RDR, cReturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, assertErr_RDR,
 			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR,
-			  fromInteger_RDR, fromRational_RDR,
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -47,8 +46,7 @@ import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet )
 import List		( intersectBy )
-import ListSetOps	( unionLists, removeDups )
-import Maybes		( maybeToBool )
+import ListSetOps	( removeDups )
 import Outputable
 \end{code}
 
