@@ -227,6 +227,7 @@ mkBits findLabel st proto_insns
        doInstr :: AsmState -> BCInstr -> IO AsmState
        doInstr st i
           = case i of
+               SWIZZLE   stkoff n -> instr3 st i_SWIZZLE stkoff n
                ARGCHECK  n        -> instr2 st i_ARGCHECK n
                STKCHECK  n        -> instr2 st i_STKCHECK n
                PUSH_L    o1       -> instr2 st i_PUSH_L o1
@@ -617,8 +618,10 @@ i_STKCHECK = (bci_STKCHECK :: Int)
 i_JMP      = (bci_JMP :: Int)
 #ifdef bci_CCALL
 i_CCALL    = (bci_CCALL :: Int)
+i_SWIZZLE  = (bci_SWIZZLE :: Int)
 #else
 i_CCALL    = error "Sorry pal, you need to bootstrap to use i_CCALL."
+i_SWIZZLE  = error "Sorry pal, you need to bootstrap to use i_SWIZZLE."
 #endif
 
 iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)

@@ -43,6 +43,8 @@ import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..) )
 import Panic		( GhcException(..) )
 import PprType		( pprType )
+import SMRep		( arrWordsHdrSize, arrPtrsHdrSize )
+import Constants	( wORD_SIZE )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
@@ -660,11 +662,38 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                                          ]
                           in  pargs d_now az 		`thenBc` \ rest ->
                               returnBc ((code, AddrRep) : rest)
+
+                    ArrayRep
+                       -> pargs (d + addr_tsizeW) az	`thenBc` \ rest ->
+                          parg_ArrayishRep arrPtrsHdrSize d p a
+							`thenBc` \ code ->
+                          returnBc ((code,AddrRep):rest)
+
+                    ByteArrayRep
+                       -> pargs (d + addr_tsizeW) az	`thenBc` \ rest ->
+                          parg_ArrayishRep arrWordsHdrSize d p a
+							`thenBc` \ code ->
+                          returnBc ((code,AddrRep):rest)
+
                     -- Default case: push taggedly, but otherwise intact.
                     other
                        -> pushAtom True d p a		`thenBc` \ (code_a, sz_a) ->
                           pargs (d+sz_a) az		`thenBc` \ rest ->
                           returnBc ((code_a, rep_arg) : rest)
+
+         -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
+         -- the stack but then advance it over the headers, so as to
+         -- point to the payload.
+         parg_ArrayishRep hdrSizeW d p a
+            = pushAtom False{-irrel-} d p a `thenBc` \ (push_fo, _) ->
+              -- The ptr points at the header.  Advance it over the
+              -- header and then pretend this is an Addr# (push a tag).
+              returnBc (push_fo `snocOL` 
+                        SWIZZLE 0 (hdrSizeW * untaggedSizeW PtrRep
+                                            * wORD_SIZE) 
+                        `snocOL`
+                        PUSH_TAG addr_usizeW)
+
      in
          pargs d0 args_r_to_l				`thenBc` \ code_n_reps ->
      let
