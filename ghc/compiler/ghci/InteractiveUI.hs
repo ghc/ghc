@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.115 2002/02/13 15:56:18 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.116 2002/02/28 10:15:47 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1152,7 +1152,7 @@ printTimes allocs psecs
 looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
 
-isAlphaNumEx c = isAlphaNum c || c == '_'
+isAlphaNumEx c = isAlphaNum c || c == '_' || c == '.'
 
 maybePutStr dflags s | verbosity dflags > 0 = putStr s
 		     | otherwise	    = return ()
