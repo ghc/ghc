@@ -39,7 +39,7 @@ import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..),
 
 import Bag		( Bag, isEmptyBag, unionBags, listToBag )
 import Class		( classKey, GenClass, SYN_IE(Class) )
-import ErrUtils		( pprBagOfErrors, addErrLoc, SYN_IE(Error) )
+import ErrUtils		( addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
