@@ -1,4 +1,4 @@
 
 tcfail021.hs:8:4:
-    Can't handle multiple methods defined by one pattern binding
+    Pattern bindings (except simple variables) not allowed in instance declarations
 	(==, /=) = (\ x -> \ y -> ..., \ x -> \ y -> ...)
