@@ -694,30 +694,37 @@ sub mangle_asm {
 		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
 		    $p =~ s/__FRAME__/$FRAME/;
 		} elsif ($TargetPlatform =~ /^powerpc-apple-.*/) {
- 		    $p =~ s/^\tmflr r0\n//;
+		    $pcrel_label = $p;
+		    $pcrel_label =~ s/(.|\n)*^(L\d+\$pb):\n(.|\n)*/$2/ or $pcrel_label = "";
+
+		    $p =~ s/^\tmflr r0\n//;
  		    $p =~ s/^\tbl saveFP # f\d+\n//;
+ 		    $p =~ s/^\tbl saveFP ; save f\d+-f\d+\n//;
+		    $p =~ s/^L\d+\$pb:\n//;
  		    $p =~ s/^\tstmw r\d+,-\d+\(r1\)\n//;
    		    $p =~ s/^\tstfd f\d+,-\d+\(r1\)\n//g;
  		    $p =~ s/^\tstw r0,\d+\(r1\)\n//g;
   		    $p =~ s/^\tstwu r1,-\d+\(r1\)\n//; 
   		    $p =~ s/^\tstw r\d+,-\d+\(r1\)\n//g; 
+  		    $p =~ s/^\tbcl 20,31,L\d+\$pb\n//;
+  		    $p =~ s/^L\d+\$pb:\n//;
+  		    $p =~ s/^\tmflr r31\n//;
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
-
-		if ($TargetPlatform =~ /^powerpc-apple-.*/) {
-			# on PowerPC, we have to keep a part of the prologue
-			# (which loads the current instruction pointer into register r31)
-		    $u_p = $p;	# $u_p is for unexpected prologue
-		    $u_p =~ s/^\tbcl 20,31,L\d+\$pb\n//;
-		    $u_p =~ s/^L\d+\$pb:\n//;
-		    $u_p =~ s/^\tmflr r31\n//;
-		    die "Prologue junk?: $u_p\n" if $u_p =~ /^\t[^\.]/
-		} else {
-		    # HWL HACK: dont die, just print a warning
-		    #print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
-		    die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+		
+		# HWL HACK: dont die, just print a warning
+		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+		
+		if ($TargetPlatform =~ /^powerpc-apple-.*/ && $pcrel_label ne "") {
+		    # on PowerPC, we have to keep a part of the prologue
+		    # (which loads the current instruction pointer into register r31)
+		    $p .= "bcl 20,31,$pcrel_label\n";
+		    $p .= "$pcrel_label:\n";
+		    $p .= "\tmflr r31";
 		}
+		
 		# glue together what's left
 		$c = $p . $r;
 		$c =~ s/\n\t\n/\n/; # junk blank line

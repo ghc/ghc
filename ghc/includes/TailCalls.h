@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.8 2002/03/26 10:30:44 simonmar Exp $
+ * $Id: TailCalls.h,v 1.9 2002/05/28 09:22:08 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -161,19 +161,29 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
     { 					\
       void *target;			\
       target = (void *)(cont);    	\
+      __DISCARD__();			\
       goto *target; 	    	    	\
     }
 
 /*
+	The __DISCARD__ is there because Apple's April 2002 Beta of GCC 3.1
+	sometimes generates incorrect code otherwise.
+	It tends to "forget" to update global register variables in the presence
+	of decrement/increment operators:
+	JMP_(*(--Sp)) is wrongly compiled as JMP_(Sp[-1]).
+	Calling __DISCARD__ in between works around this problem.
+*/
+
+/*
 	I would _love_ to use the following instead,
-	but GCC fails to generate code for it if it is called for a casted
-	data pointer - which is exactly what we are going to do...
+	but some versions of Apple's GCC fail to generate code for it
+	if it is called for a casted data pointer - which is exactly what
+	we are going to do...
 
 	#define JMP_(cont)	((F_) (cont))()
 */
 
-
-#endif /* sparc_TARGET_ARCH */
+#endif /* powerpc_TARGET_ARCH */
 
 /* -----------------------------------------------------------------------------
   FUNBEGIN and FUNEND.
