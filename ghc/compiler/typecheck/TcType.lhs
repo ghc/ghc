@@ -54,7 +54,7 @@ module TcType (
 import PprType		( pprType )
 import Type		( Type(..), Kind, ThetaType, TyNote(..), 
 			  mkAppTy, mkTyConApp,
-			  splitDictTy_maybe, splitForAllTys,
+			  splitDictTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			  fullSubstTy, substTopTy, 
 			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
@@ -371,7 +371,7 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
     mk_void_tycon tv kind	-- Make a new TyCon with the same kind as the 
 				-- type variable tv.  Same name too, apart from
 				-- making it start with a colon (sigh)
-	= mkPrimTyCon tc_name kind 0 VoidRep
+	= mkPrimTyCon tc_name kind 0 [] VoidRep
 	where
 	  tc_name = mkDerivedName mkDerivedTyConOcc (getName tv) (getUnique tv)
 
@@ -433,6 +433,9 @@ zonkType unbound_var_fn ty
 
     go (NoteTy (FTVNote _) ty2)   = go ty2	-- Discard free-tyvar annotations
 
+    go (NoteTy (UsgNote usg) ty2) = go ty2		`thenNF_Tc` \ ty2' ->
+				    returnNF_Tc (NoteTy (UsgNote usg) ty2')
+
     go (FunTy arg res)      	  = go arg		`thenNF_Tc` \ arg' ->
 				    go res		`thenNF_Tc` \ res' ->
 				    returnNF_Tc (FunTy arg' res')
@@ -463,7 +466,8 @@ zonkTyVar unbound_var_fn tyvar
   =  tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
      case maybe_ty of
 	  Nothing	-> unbound_var_fn tyvar			-- Mutable and unbound
-	  Just other_ty	-> zonkType unbound_var_fn other_ty	-- Bound
+	  Just other_ty	-> ASSERT( isNotUsgTy other_ty )
+                           zonkType unbound_var_fn other_ty	-- Bound
 \end{code}
 
 %************************************************************************

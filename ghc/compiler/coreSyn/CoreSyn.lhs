@@ -31,7 +31,7 @@ import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, isDupdCC, noCostCentre )
 import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
 import Id		( mkWildId, getInlinePragma )
-import Type		( Type, mkTyVarTy, isUnLiftedType )
+import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType )
 import IdInfo		( InlinePragInfo(..) )
 import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
@@ -79,6 +79,9 @@ data Note
 
   | InlineCall		-- Instructs simplifier to inline
 			-- the enclosed call
+
+  | TermUsg             -- A term-level usage annotation
+        UsageAnn        -- (should not be a variable except during UsageSP inference)
 \end{code}
 
 

@@ -150,7 +150,9 @@ pAR_ERROR_ID
 openAlphaTy = mkTyVarTy openAlphaTyVar
 
 errorTy  :: Type
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+errorTy  = mkUsgTy UsMany $
+           mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkUsgTy UsOnce (mkListTy charTy)] 
+                                                   (mkUsgTy UsMany openAlphaTy))
     -- Notice the openAlphaTyVar.  It says that "error" can be applied
     -- to unboxed as well as boxed types.  This is OK because it never
     -- returns, so the return type is irrelevant.

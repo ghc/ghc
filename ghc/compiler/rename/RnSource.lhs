@@ -618,6 +618,10 @@ rnHsType doc (MonoDictTy clas tys)
     rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->
     returnRn (MonoDictTy clas' tys', fvs `addOneFV` clas')
 
+rnHsType doc (MonoUsgTy usg ty)
+  = rnHsType doc ty             `thenRn` \ (ty', fvs) ->
+    returnRn (MonoUsgTy usg ty', fvs)
+
 rnHsTypes doc tys
   = mapAndUnzipRn (rnHsType doc) tys	`thenRn` \ (tys, fvs_s) ->
     returnRn (tys, plusFVs fvs_s)

@@ -261,6 +261,13 @@ ppr_expr pe (Note (Coerce to_ty from_ty) expr)
 ppr_expr pe (Note InlineCall expr)
   = ptext SLIT("__inline") <+> ppr_parend_expr pe expr
 
+ppr_expr pe (Note (TermUsg u) expr)
+  = \ sty ->
+    if ifaceStyle sty then
+      ppr_expr pe expr sty
+    else
+      (ppr u <+> ppr_expr pe expr) sty
+
 ppr_case_pat pe con@(DataCon dc) args
   | isTupleCon dc
   = parens (hsep (punctuate comma (map ppr_bndr args))) <+> arrow

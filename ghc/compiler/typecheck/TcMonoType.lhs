@@ -29,7 +29,7 @@ import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
 import Type		( Type, ThetaType, 
-			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, zipFunTys,
+			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy, zipFunTys,
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
@@ -151,6 +151,10 @@ tc_type_kind (MonoTyApp ty1 ty2)
 tc_type_kind (MonoDictTy class_name tys)
   = tcClassAssertion (class_name, tys)	`thenTc` \ (clas, arg_tys) ->
     returnTc (boxedTypeKind, mkDictTy clas arg_tys)
+
+tc_type_kind (MonoUsgTy usg ty)
+  = tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
+    returnTc (kind, mkUsgTy usg tc_ty)
 
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ tyvars -> 

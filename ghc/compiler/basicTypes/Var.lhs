@@ -1,4 +1,4 @@
-
+%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{@Vars@: Variables}
@@ -18,6 +18,11 @@ module Var (
 	mkTyVar, mkSysTyVar, isTyVar, isSigTyVar,
 	newMutTyVar, newSigTyVar,
 	readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
+
+        -- UVars
+        UVar,
+        isUVar,
+        mkUVar,
 
 	-- Ids
 	Id, DictId,
@@ -80,6 +85,7 @@ data VarDetails
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
 	     Bool			-- True <=> this is a type signature variable, which
 					--	    should not be unified with a non-tyvar type
+  | UVar                                -- Usage variable
 
 -- For a long time I tried to keep mutable Vars statically type-distinct
 -- from immutable Vars, but I've finally given up.   It's just too painful.
@@ -198,9 +204,7 @@ writeMutTyVar (Var {varDetails = MutTyVar loc _}) val = writeIORef loc val
 
 makeTyVarImmutable :: TyVar -> TyVar
 makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
-\end{code}
 
-\begin{code}
 isTyVar :: Var -> Bool
 isTyVar (Var {varDetails = details}) = case details of
 					TyVar        -> True
@@ -219,11 +223,36 @@ isSigTyVar other			          = False
 
 %************************************************************************
 %*									*
+\subsection{Usage variables}
+%*									*
+%************************************************************************
+
+\begin{code}
+type UVar = Var
+\end{code}
+
+\begin{code}
+mkUVar :: Unique -> UVar
+mkUVar unique = Var { varName    = mkSysLocalName unique SLIT("u"),
+		      realUnique = getKey unique,
+		      varDetails = UVar }
+\end{code}
+
+\begin{code}
+isUVar :: Var -> Bool
+isUVar (Var {varDetails = details}) = case details of
+					UVar	   -> True
+					other	   -> False
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Id Construction}
 %*									*
 %************************************************************************
 
-	Most Id-related functions are in Id.lhs and MkId.lhs
+Most Id-related functions are in Id.lhs and MkId.lhs
 
 \begin{code}
 type Id     = Var

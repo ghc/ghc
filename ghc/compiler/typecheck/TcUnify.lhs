@@ -18,6 +18,7 @@ module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 import TcMonad
 import Type	( Type(..), tyVarsOfType, funTyCon,
 		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
+                  isNotUsgTy,
 		  Kind, boxedTypeKind, typeCon, anyBoxCon, anyBoxKind,
 		  splitAppTy_maybe,
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
@@ -126,6 +127,7 @@ uTys :: TcTauType -> TcTauType	-- Error reporting ty1 and real ty1
      -> TcM s ()
 
 	-- Always expand synonyms (see notes at end)
+        -- (this also throws away FTVs and usage annots)
 uTys ps_ty1 (NoteTy _ ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (NoteTy _ ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
 
@@ -250,7 +252,7 @@ uVar swapped tv1 ps_ty2 ty2
 		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
 	other       -> uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
 
-	-- Expand synonyms
+	-- Expand synonyms; ignore FTVs; ignore usage annots
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 (NoteTy _ ty2)
   = uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
 
@@ -275,6 +277,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 			tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
 			returnTc ()
 		   else
+                        ASSERT( isNotUsgTy ps_ty2 )
 			tcPutTyVar tv1 ps_ty2			`thenNF_Tc_`
 			returnTc ()
   where
@@ -292,6 +295,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
   | otherwise
   = checkKinds swapped tv1 non_var_ty2			`thenTc_`
     occur_check non_var_ty2				`thenTc_`
+    ASSERT( isNotUsgTy ps_ty2 )
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
     tcPutTyVar tv1 ps_ty2				`thenNF_Tc_`

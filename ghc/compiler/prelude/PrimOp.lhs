@@ -7,7 +7,7 @@
 module PrimOp (
 	PrimOp(..), allThePrimOps,
 	tagOf_PrimOp, -- ToDo: rm
-	primOpType,
+	primOpType, primOpSig, primOpUsg,
 	primOpUniq, primOpOcc,
 
 	commutableOp,
@@ -33,14 +33,14 @@ import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
 import OccName		( OccName, pprOccName, mkSrcVarOcc )
 import TyCon		( TyCon, tyConArity )
-import Type		( mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
+import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
 			  mkTyConTy, mkTyConApp, typePrimRep,
-			  splitAlgTyConApp, Type, isUnboxedTupleType, 
-			  splitAlgTyConApp_maybe
+			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp_maybe,
+                          UsageAnn(..), mkUsgTy
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable
-import Util		( assoc )
+import Util		( assoc, zipWithEqual )
 import GlaExts		( Int(..), Int#, (==#) )
 \end{code}
 
@@ -1214,6 +1214,11 @@ primOpInfo DoubleDecodeOp
 %*									*
 %************************************************************************
 
+\begin{verbatim}
+newArray#    :: Int# -> a -> State# s -> (# State# s, MutArr# s a #)
+newFooArray# :: Int# -> State# s -> (# State# s, MutByteArr# s #)
+\end{verbatim}
+
 \begin{code}
 primOpInfo NewArrayOp
   = let {
@@ -1237,6 +1242,11 @@ primOpInfo (NewByteArrayOp kind)
 
 ---------------------------------------------------------------------------
 
+{-
+sameMutableArray#     :: MutArr# s a -> MutArr# s a -> Bool
+sameMutableByteArray# :: MutByteArr# s -> MutByteArr# s -> Bool
+-}
+
 primOpInfo SameMutableArrayOp
   = let {
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
@@ -1255,6 +1265,12 @@ primOpInfo SameMutableByteArrayOp
 
 ---------------------------------------------------------------------------
 -- Primitive arrays of Haskell pointers:
+
+{-
+readArray#  :: MutArr# s a -> Int# -> State# s -> (# State# s, a #)
+writeArray# :: MutArr# s a -> Int# -> a -> State# s -> State# s
+indexArray# :: Array# a -> Int# -> (# a #)
+-}
 
 primOpInfo ReadArrayOp
   = let {
@@ -1336,6 +1352,13 @@ primOpInfo (WriteOffAddrOp kind)
 	(mkStatePrimTy s)
 
 ---------------------------------------------------------------------------
+{-
+unsafeFreezeArray#     :: MutArr# s a -> State# s -> (# State# s, Array# a #)
+unsafeFreezeByteArray# :: MutByteArr# s -> State# s -> (# State# s, ByteArray# #)
+unsafeThawArray#       :: Array# a -> State# s -> (# State# s, MutArr# s a #)
+unsafeThawByteArray#   :: ByteArray# -> State# s -> (# State# s, MutByteArr# s #)
+-}
+
 primOpInfo UnsafeFreezeArrayOp
   = let {
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
@@ -1437,8 +1460,8 @@ primOpInfo SameMutVarOp
 %*									*
 %************************************************************************
 
-catch :: IO a -> (IOError -> IO a) -> IO a
-catch :: a  -> (b -> a) -> a
+catch  :: IO a -> (IOError -> IO a) -> IO a
+catch# :: a  -> (b -> a) -> a
 
 \begin{code}
 primOpInfo CatchOp   
@@ -1549,7 +1572,7 @@ primOpInfo ForkOp
 	[alphaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, threadIdPrimTy])
 
--- killThread# :: ThreadId# -> State# RealWorld -> State# RealWorld
+-- killThread# :: ThreadId# -> exception -> State# RealWorld -> State# RealWorld
 primOpInfo KillThreadOp
   = mkGenPrimOp SLIT("killThread#") [alphaTyVar] 
 	[threadIdPrimTy, alphaTy, realWorldStatePrimTy]
@@ -1665,7 +1688,7 @@ it is safe to pass a stable pointer to external systems such as C
 routines.
 
 \begin{verbatim}
-makeStablePtr#  :: a -> State# RealWorld -> (# State# RealWorld, a #)
+makeStablePtr#  :: a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
 freeStablePtr   :: StablePtr# a -> State# RealWorld -> State# RealWorld
 deRefStablePtr# :: StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
 eqStablePtr#    :: StablePtr# a -> StablePtr# a -> Int#
@@ -1810,29 +1833,31 @@ primOpInfo ParOp	-- par# :: a -> Int#
 -- HWL: The first 4 Int# in all par... annotations denote:
 --   name, granularity info, size of result, degree of parallelism
 --      Same  structure as _seq_ i.e. returns Int#
+-- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
+--   `the processor containing the expression v'; it is not evaluated
 
-primOpInfo ParGlobalOp	-- parGlobal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
+primOpInfo ParGlobalOp	-- parGlobal# :: a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
-primOpInfo ParLocalOp	-- parLocal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
+primOpInfo ParLocalOp	-- parLocal# :: a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
-primOpInfo ParAtOp	-- parAt# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
+primOpInfo ParAtOp	-- parAt# :: a -> v -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
 
-primOpInfo ParAtAbsOp	-- parAtAbs# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
+primOpInfo ParAtAbsOp	-- parAtAbs# :: a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
-primOpInfo ParAtRelOp	-- parAtRel# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
+primOpInfo ParAtRelOp	-- parAtRel# :: a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
-primOpInfo ParAtForNowOp	-- parAtForNow# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
+primOpInfo ParAtForNowOp -- parAtForNow# :: a -> v -> Int# -> Int# -> Int# -> Int# -> b -> Int#
   = mkGenPrimOp SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
 
-primOpInfo CopyableOp	-- copyable# :: a -> a
+primOpInfo CopyableOp	-- copyable# :: a -> Int#
   = mkGenPrimOp SLIT("copyable#")	[alphaTyVar] [alphaTy] intPrimTy
 
-primOpInfo NoFollowOp	-- noFollow# :: a -> a
+primOpInfo NoFollowOp	-- noFollow# :: a -> Int#
   = mkGenPrimOp SLIT("noFollow#")	[alphaTyVar] [alphaTy] intPrimTy
 \end{code}
 
@@ -2089,7 +2114,7 @@ primOpOcc op
 primOpUniq :: PrimOp -> Unique
 primOpUniq op = mkPrimOpIdUnique (IBOX(tagOf_PrimOp op))
 
-primOpType :: PrimOp -> Type
+primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case (primOpInfo op) of
       Dyadic occ ty ->	    dyadic_fun_ty ty
@@ -2098,6 +2123,119 @@ primOpType op
 
       GenPrimOp occ tyvars arg_tys res_ty -> 
 	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
+
+-- primOpSig is like primOpType but gives the result split apart:
+-- (type variables, argument types, result type)
+
+primOpSig :: PrimOp -> ([TyVar],[Type],Type)
+primOpSig op
+  = case (primOpInfo op) of
+      Monadic   occ ty -> ([],     [ty],    ty    )
+      Dyadic    occ ty -> ([],     [ty,ty], ty    )
+      Compare   occ ty -> ([],     [ty,ty], boolTy)
+      GenPrimOp occ tyvars arg_tys res_ty
+                       -> (tyvars, arg_tys, res_ty)
+
+-- primOpUsg is like primOpSig but the types it yields are the
+-- appropriate sigma (i.e., usage-annotated) types,
+-- as required by the UsageSP inference.
+
+primOpUsg :: PrimOp -> ([TyVar],[Type],Type)
+primOpUsg op
+  = case op of
+
+      -- Refer to comment by `otherwise' clause; we need consider here
+      -- *only* primops that have arguments or results containing Haskell
+      -- pointers (things that are pointed).  Unpointed values are
+      -- irrelevant to the usage analysis.  The issue is whether pointed
+      -- values may be entered or duplicated by the primop.
+
+      -- Remember that primops are *never* partially applied.
+
+      NewArrayOp           -> mangle [mkP, mkM, mkP     ] mkM
+      SameMutableArrayOp   -> mangle [mkP, mkP          ] mkM
+      ReadArrayOp          -> mangle [mkM, mkP, mkP     ] mkM
+      WriteArrayOp         -> mangle [mkM, mkP, mkM, mkP] mkR
+      IndexArrayOp         -> mangle [mkM, mkP          ] mkM
+      UnsafeFreezeArrayOp  -> mangle [mkM, mkP          ] mkM
+      UnsafeThawArrayOp    -> mangle [mkM, mkP          ] mkM
+
+      NewMutVarOp          -> mangle [mkM, mkP          ] mkM
+      ReadMutVarOp         -> mangle [mkM, mkP          ] mkM
+      WriteMutVarOp        -> mangle [mkM, mkM, mkP     ] mkR
+      SameMutVarOp         -> mangle [mkP, mkP          ] mkM
+
+      CatchOp              -> --     [mkO, mkO . (inFun mkM mkO)] mkO
+                              mangle [mkM, mkM . (inFun mkM mkM)] mkM
+                              -- might use caught action multiply
+      RaiseOp              -> mangle [mkM               ] mkM
+
+      NewMVarOp            -> mangle [mkP               ] mkR
+      TakeMVarOp           -> mangle [mkM, mkP          ] mkM
+      PutMVarOp            -> mangle [mkM, mkM, mkP     ] mkR
+      SameMVarOp           -> mangle [mkP, mkP          ] mkM
+      IsEmptyMVarOp        -> mangle [mkP, mkP          ] mkM
+
+      ForkOp               -> mangle [mkO, mkP          ] mkR
+      KillThreadOp         -> mangle [mkP, mkM, mkP     ] mkR
+
+      MkWeakOp             -> mangle [mkZ, mkM, mkM, mkP] mkM
+      DeRefWeakOp          -> mangle [mkM, mkP          ] mkM
+      FinalizeWeakOp       -> mangle [mkM, mkP          ] (mkR . (inUB [id,id,inFun mkR mkM]))
+
+      MakeStablePtrOp      -> mangle [mkM, mkP          ] mkM
+      DeRefStablePtrOp     -> mangle [mkM, mkP          ] mkM
+      EqStablePtrOp        -> mangle [mkP, mkP          ] mkR
+      MakeStableNameOp     -> mangle [mkZ, mkP          ] mkR
+      EqStableNameOp       -> mangle [mkP, mkP          ] mkR
+      StableNameToIntOp    -> mangle [mkP               ] mkR
+
+      ReallyUnsafePtrEqualityOp -> mangle [mkZ, mkZ     ] mkR
+
+      SeqOp                -> mangle [mkO               ] mkR
+      ParOp                -> mangle [mkO               ] mkR
+      ParGlobalOp          -> mangle [mkO, mkP, mkP, mkP, mkP, mkM] mkM
+      ParLocalOp           -> mangle [mkO, mkP, mkP, mkP, mkP, mkM] mkM
+      ParAtOp              -> mangle [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM
+      ParAtAbsOp           -> mangle [mkO, mkP, mkP, mkP, mkP, mkM] mkM
+      ParAtRelOp           -> mangle [mkO, mkP, mkP, mkP, mkP, mkM] mkM
+      ParAtForNowOp        -> mangle [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM
+      CopyableOp           -> mangle [mkZ               ] mkR
+      NoFollowOp           -> mangle [mkZ               ] mkR
+
+      CCallOp _ _ _ _      -> mangle [                  ] mkM
+
+      -- Things with no Haskell pointers inside: in actuality, usages are
+      -- irrelevant here (hence it doesn't matter that some of these
+      -- apparently permit duplication; since such arguments are never 
+      -- ENTERed anyway, the usage annotation they get is entirely irrelevant
+      -- except insofar as it propagates to infect other values that *are*
+      -- pointed.
+
+      otherwise            -> nomangle
+                                    
+  where mkZ          = mkUsgTy UsOnce  -- pointed argument used zero
+        mkO          = mkUsgTy UsOnce  -- pointed argument used once
+        mkM          = mkUsgTy UsMany  -- pointed argument used multiply
+        mkP          = mkUsgTy UsOnce  -- unpointed argument
+        mkR          = mkUsgTy UsMany  -- unpointed result
+  
+        (tyvars, arg_tys, res_ty)
+                     = primOpSig op
+
+        nomangle     = (tyvars, map mkP arg_tys, mkR res_ty)
+
+        mangle fs g  = (tyvars, zipWithEqual "primOpUsg" ($) fs arg_tys, g res_ty)
+
+        inFun f g ty = case splitFunTy_maybe ty of
+                         Just (a,b) -> mkFunTy (f a) (g b)
+                         Nothing    -> pprPanic "primOpUsg:inFun" (ppr op <+> ppr ty)
+
+        inUB fs ty  = case splitTyConApp_maybe ty of
+                        Just (tc,tys) -> ASSERT( tc == unboxedTupleTyCon (length fs) )
+                                         mkUnboxedTupleTy (length fs) (zipWithEqual "primOpUsg"
+                                                                         ($) fs tys)
+                        Nothing       -> pprPanic "primOpUsg:inUB" (ppr op <+> ppr ty)
 \end{code}
 
 \begin{code}

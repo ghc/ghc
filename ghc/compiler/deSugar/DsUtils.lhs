@@ -41,7 +41,7 @@ import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConStrictMarks, dataConArgTys )
 import BasicTypes	( StrictnessMark(..) )
-import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
+import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
 			  Type
 			)
 import TysWiredIn	( unitDataCon, tupleCon, stringTy, unitTy, unitDataCon )
@@ -276,7 +276,8 @@ mkErrorAppDs err_id ty msg
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
     in
-    returnDs (mkApps (Var err_id) [Type ty, mkStringLit full_msg])
+    returnDs (mkApps (Var err_id) [(Type . unUsgTy) ty, mkStringLit full_msg])
+    -- unUsgTy *required* -- KSW 1999-04-07
 \end{code}
 
 %************************************************************************
@@ -363,7 +364,8 @@ mkSelectorBinds pat val_expr
 
 
 @mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
-has only one element, it is the identity function.
+has only one element, it is the identity function.  Notice we must
+throw out any usage annotation on the outside of an Id. 
 
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
@@ -371,7 +373,7 @@ mkTupleExpr :: [Id] -> CoreExpr
 mkTupleExpr []	 = mkConApp unitDataCon []
 mkTupleExpr [id] = Var id
 mkTupleExpr ids	 = mkConApp (tupleCon (length ids))
-			    (map (Type . idType) ids ++ [ Var i | i <- ids ])
+			    (map (Type . unUsgTy . idType) ids ++ [ Var i | i <- ids ])
 \end{code}
 
 

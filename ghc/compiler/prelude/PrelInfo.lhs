@@ -60,6 +60,8 @@ module PrelInfo (
 	monadClass_RDR, enumClass_RDR, ordClass_RDR,
 	ioDataCon_RDR,
 
+        main_RDR,
+
 	mkTupConRdrName, mkUbxTupConRdrName
 
     ) where

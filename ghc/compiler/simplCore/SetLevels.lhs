@@ -32,7 +32,7 @@ import VarSet
 import Type		( isUnLiftedType, mkTyVarTys, mkForAllTys, Type )
 import VarSet
 import VarEnv
-import UniqSupply	( initUs, thenUs, returnUs, mapUs, mapAndUnzipUs, getUniqueUs,
+import UniqSupply	( initUs_, thenUs, returnUs, mapUs, mapAndUnzipUs, getUniqueUs,
 			  mapAndUnzip3Us, UniqSM, UniqSupply )
 import Maybes		( maybeToBool )
 import Util		( zipWithEqual, zipEqual )
@@ -597,7 +597,7 @@ decideRecFloatLevel ctxt_lvl env ids rhss
 \begin{code}
 type LvlM result = UniqSM result
 
-initLvl		= initUs
+initLvl		= initUs_
 thenLvl		= thenUs
 returnLvl	= returnUs
 mapLvl		= mapUs

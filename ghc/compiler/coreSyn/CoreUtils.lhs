@@ -32,19 +32,20 @@ import Id		( Id, idType, setIdType, idUnique, idAppIsBottom,
 			  getIdArity, idFreeTyVars,
 			  getIdSpecialisation, setIdSpecialisation,
 			  getInlinePragma, setInlinePragma,
-			  getIdUnfolding, setIdUnfolding
+			  getIdUnfolding, setIdUnfolding, idInfo
 			)
-import IdInfo		( arityLowerBound, InlinePragInfo(..) )
+import IdInfo		( arityLowerBound, InlinePragInfo(..), lbvarInfo, LBVarInfo(..) )
 import SpecEnv		( emptySpecEnv, specEnvToList, isEmptySpecEnv )
 import CostCentre	( CostCentre )
 import Const		( Con, conType )
 import Type		( Type, TyVarSubst, mkFunTy, mkForAllTy,
 			  splitFunTy_maybe, applyTys, tyVarsOfType, tyVarsOfTypes,
+                          isNotUsgTy, mkUsgTy, unUsgTy, UsageAnn(..),
 			  fullSubstTy, substTyVar )
 import Unique		( buildIdKey, augmentIdKey )
 import Util		( zipWithEqual, mapAccumL )
 import Outputable
-import TysPrim		( alphaTy )	-- Debgging only
+import TysPrim		( alphaTy )	-- Debugging only
 \end{code}
 
 
@@ -75,11 +76,15 @@ coreExprType (Var var)		    = idType var
 coreExprType (Let _ body)	    = coreExprType body
 coreExprType (Case _ _ alts)        = coreAltsType alts
 coreExprType (Note (Coerce ty _) e) = ty
+coreExprType (Note (TermUsg u) e)   = mkUsgTy u (unUsgTy (coreExprType e))
 coreExprType (Note other_note e)    = coreExprType e
 coreExprType e@(Con con args)       = applyTypeToArgs e (conType con) args
 
 coreExprType (Lam binder expr)
-  | isId binder    = idType binder `mkFunTy` coreExprType expr
+  | isId binder    = (case (lbvarInfo . idInfo) binder of
+                       IsOneShotLambda -> mkUsgTy UsOnce
+                       otherwise       -> id) $
+                     idType binder `mkFunTy` coreExprType expr
   | isTyVar binder = mkForAllTy binder (coreExprType expr)
 
 coreExprType e@(App _ _)
@@ -99,6 +104,7 @@ applyTypeToArgs e op_ty [] = op_ty
 
 applyTypeToArgs e op_ty (Type ty : args)
   =	-- Accumulate type arguments so we can instantiate all at once
+    ASSERT2( all isNotUsgTy tys, ppr e <+> text "of" <+> ppr op_ty <+> text "to" <+> ppr (Type ty : args) <+> text "i.e." <+> ppr tys )
     applyTypeToArgs e (applyTys op_ty tys) rest_args
   where
     (tys, rest_args)        = go [ty] args

@@ -1,6 +1,11 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1998
+%
+\section[Type]{Type}
+
 \begin{code}
 module Type (
-	Type(..), TyNote(..), 		-- Representation visible to friends
+	Type(..), TyNote(..), UsageAnn(..),		-- Representation visible to friends
 	Kind, TyVarSubst,
 
 	superKind, superBoxity,				-- :: SuperKind
@@ -28,6 +33,8 @@ module Type (
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
 	mkSynTy, isSynTy, deNoteType,
+
+        mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy,
@@ -63,8 +70,8 @@ import {-# SOURCE #-}	DataCon( DataCon )
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 
 -- friends:
-import Var	( Id, TyVar, IdOrTyVar,
-		  tyVarKind, tyVarName, isId, idType, setTyVarName
+import Var	( Id, TyVar, IdOrTyVar, UVar,
+		  tyVarKind, tyVarName, isId, idType, setTyVarName, setVarOcc
 		)
 import VarEnv
 import VarSet
@@ -119,7 +126,6 @@ A type is
 			with "data" or "newtype".   
 			An algebraic type is one that can be deconstructed
 			with a case expression.  
-
 			*NOT* the same as lifted types,  because we also 
 			include unboxed tuples in this classification.
 
@@ -185,6 +191,12 @@ data Type
 data TyNote
   = SynNote Type	-- The unexpanded version of the type synonym; always a TyConApp
   | FTVNote TyVarSet	-- The free type variables of the noted expression
+  | UsgNote UsageAnn    -- The usage annotation at this node
+
+data UsageAnn
+  = UsOnce		-- Used at most once
+  | UsMany		-- Used possibly many times (no info; this annotation can be omitted)
+  | UsVar UVar		-- Annotation is variable (should only happen inside analysis)
 \end{code}
 
 
@@ -348,7 +360,8 @@ invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
 
 \begin{code}
-mkAppTy orig_ty1 orig_ty2 = mk_app orig_ty1
+mkAppTy orig_ty1 orig_ty2 = ASSERT2( isNotUsgTy orig_ty1 && isNotUsgTy orig_ty2, pprType orig_ty1 <+> text "to" <+> pprType orig_ty2 )
+                            mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
@@ -361,11 +374,13 @@ mkAppTys orig_ty1 []	    = orig_ty1
 	-- For example: mkAppTys Rational []
 	--   returns to (Ratio Integer), which has needlessly lost
 	--   the Rational part.
-mkAppTys orig_ty1 orig_tys2 = mk_app orig_ty1
+mkAppTys orig_ty1 orig_tys2 = ASSERT2( isNotUsgTy orig_ty1, pprType orig_ty1 )
+                              mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-    mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
+    mk_app ty1		     = ASSERT2( all isNotUsgTy orig_tys2, pprType orig_ty1 <+> text "to" <+> hsep (map pprType orig_tys2) )
+                               foldl AppTy orig_ty1 orig_tys2
 
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
 splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
@@ -433,7 +448,6 @@ funResultTy (FunTy arg res) = res
 funResultTy (NoteTy _ ty)   = funResultTy ty
 funResultTy ty		    = pprPanic "funResultTy" (pprType ty)
 \end{code}
-
 
 
 ---------------------------------------------------------------------
@@ -519,7 +533,8 @@ isDictTy other		= False
 
 \begin{code}
 mkSynTy syn_tycon tys
-  = ASSERT(isSynTyCon syn_tycon)
+  = ASSERT( isSynTyCon syn_tycon )
+    ASSERT( isNotUsgTy body )
     NoteTy (SynNote (TyConApp syn_tycon tys))
 	   (substTopTy (zipVarEnv tyvars tys) body)
   where
@@ -556,19 +571,104 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
 ---------------------------------------------------------------------
+				UsgNote
+				~~~~~~~
+
+NB: Invariant: if present, usage note is at the very top of the type.
+This should be carefully preserved.
+
+In some parts of the compiler, comments use the _Once Upon a
+Polymorphic Type_ (POPL'99) usage of "sigma = usage-annotated type;
+tau = un-usage-annotated type"; unfortunately this conflicts with the
+rho/tau/theta/sigma usage in the rest of the compiler.
+(KSW 1999-04)
+
+\begin{code}
+mkUsgTy :: UsageAnn -> Type -> Type
+#ifndef USMANY
+mkUsgTy UsMany ty = ASSERT2( isNotUsgTy ty, pprType ty )
+                    ty
+#endif
+mkUsgTy usg    ty = ASSERT2( isNotUsgTy ty, pprType ty )
+                    NoteTy (UsgNote usg) ty
+
+-- The isUsgTy function is utterly useless if UsManys are omitted.
+-- Be warned!  KSW 1999-04.
+isUsgTy :: Type -> Bool
+#ifndef USMANY
+isUsgTy _ = True
+#else
+isUsgTy (NoteTy (UsgNote _) _) = True
+isUsgTy other                  = False
+#endif
+
+-- The isNotUsgTy function may return a false True if UsManys are omitted;
+-- in other words, A SSERT( isNotUsgTy ty ) may be useful but
+-- A SSERT( not (isNotUsg ty) ) is asking for trouble.  KSW 1999-04.
+isNotUsgTy :: Type -> Bool
+isNotUsgTy (NoteTy (UsgNote _) _) = False
+isNotUsgTy other                  = True
+
+-- splitUsgTy_maybe is not exported, since it is meaningless if
+-- UsManys are omitted.  It is used in several places in this module,
+-- however.  KSW 1999-04.
+splitUsgTy_maybe :: Type -> Maybe (UsageAnn,Type)
+splitUsgTy_maybe (NoteTy (UsgNote usg) ty2) = ASSERT( isNotUsgTy ty2 )
+                                              Just (usg,ty2)
+splitUsgTy_maybe ty                         = Nothing
+
+splitUsgTy :: Type -> (UsageAnn,Type)
+splitUsgTy ty = case splitUsgTy_maybe ty of
+                  Just ans -> ans
+                  Nothing  -> 
+#ifndef USMANY
+                              (UsMany,ty)
+#else
+                              pprPanic "splitUsgTy: no usage annot:" $ pprType ty
+#endif
+
+tyUsg :: Type -> UsageAnn
+tyUsg = fst . splitUsgTy
+
+unUsgTy :: Type -> Type
+-- strip outer usage annotation if present
+unUsgTy ty = case splitUsgTy_maybe ty of
+               Just (_,ty1) -> ASSERT2( isNotUsgTy ty1, pprType ty )
+                               ty1
+               Nothing      -> ty
+\end{code}
+
+
+
+---------------------------------------------------------------------
 				ForAllTy
 				~~~~~~~~
 
+We need to be clever here with usage annotations; they need to be
+lifted or lowered through the forall as appropriate.
+
 \begin{code}
-mkForAllTy = ForAllTy
+mkForAllTy :: TyVar -> Type -> Type
+mkForAllTy tyvar ty = case splitUsgTy_maybe ty of
+                        Just (usg,ty') -> NoteTy (UsgNote usg)
+						 (ForAllTy tyvar ty')
+                        Nothing        -> ForAllTy tyvar ty
 
 mkForAllTys :: [TyVar] -> Type -> Type
-mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+mkForAllTys tyvars ty = case splitUsgTy_maybe ty of
+                          Just (usg,ty') -> NoteTy (UsgNote usg)
+						   (foldr ForAllTy ty' tyvars)
+                          Nothing        -> foldr ForAllTy ty tyvars
 
 splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
-splitForAllTy_maybe (NoteTy _ ty)       = splitForAllTy_maybe ty
-splitForAllTy_maybe (ForAllTy tyvar ty) = Just(tyvar, ty)
-splitForAllTy_maybe _		        = Nothing
+splitForAllTy_maybe ty = case splitUsgTy_maybe ty of
+                           Just (usg,ty') -> do (tyvar,ty'') <- splitFAT_m ty'
+					        return (tyvar, NoteTy (UsgNote usg) ty'')
+			   Nothing        -> splitFAT_m ty
+  where
+    splitFAT_m (NoteTy _ ty)       = splitFAT_m ty
+    splitFAT_m (ForAllTy tyvar ty) = Just(tyvar, ty)
+    splitFAT_m _		   = Nothing
 
 isForAllTy :: Type -> Bool
 isForAllTy (NoteTy _ ty)       = isForAllTy ty
@@ -576,7 +676,10 @@ isForAllTy (ForAllTy tyvar ty) = True
 isForAllTy _		     = False
 
 splitForAllTys :: Type -> ([TyVar], Type)
-splitForAllTys ty = split ty ty []
+splitForAllTys ty = case splitUsgTy_maybe ty of
+                      Just (usg,ty') -> let (tvs,ty'') = split ty' ty' []
+					in  (tvs, NoteTy (UsgNote usg) ty'')
+		      Nothing        -> split ty ty []
    where
      split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
      split orig_ty (NoteTy _ ty)    tvs = split orig_ty ty tvs
@@ -589,25 +692,33 @@ it is given a type variable or a term variable.
 \begin{code}
 mkPiType :: IdOrTyVar -> Type -> Type	-- The more polymorphic version doesn't work...
 mkPiType v ty | isId v    = mkFunTy (idType v) ty
-	      | otherwise = ForAllTy v ty
+	      | otherwise = mkForAllTy v ty
 \end{code}
 
 \begin{code}
 applyTy :: Type -> Type -> Type
-applyTy (NoteTy _ fun)   arg = applyTy fun arg
-applyTy (ForAllTy tv ty) arg = substTy (mkVarEnv [(tv,arg)]) ty
-applyTy other		 arg = panic "applyTy"
+applyTy (NoteTy note@(UsgNote _) fun) arg = NoteTy note (applyTy fun arg)
+applyTy (NoteTy _ fun)                arg = applyTy fun arg
+applyTy (ForAllTy tv ty)              arg = ASSERT( isNotUsgTy arg )
+                                            substTy (mkVarEnv [(tv,arg)]) ty
+applyTy other		              arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 applyTys fun_ty arg_tys
  = go [] fun_ty arg_tys
  where
    go env ty               []         = substTy (mkVarEnv env) ty
+   go env (NoteTy note@(UsgNote _) fun)
+                           args       = NoteTy note (go env fun args)
    go env (NoteTy _ fun)   args       = go env fun args
-   go env (ForAllTy tv ty) (arg:args) = go ((tv,arg):env) ty args
+   go env (ForAllTy tv ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat ((map pprType arg_tys) ++ [text "in application of" <+> pprType fun_ty]) )
+                                        go ((tv,arg):env) ty args
    go env other            args       = panic "applyTys"
 \end{code}
 
+Note that we allow applications to be of usage-annotated- types, as an
+extension: we handle them by lifting the annotation outside.  The
+argument, however, must still be unannotated.
 
 %************************************************************************
 %*									*
@@ -710,6 +821,7 @@ tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
+tyVarsOfType (NoteTy (UsgNote _) ty)	= tyVarsOfType ty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
@@ -718,9 +830,11 @@ tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
 
 -- Add a Note with the free tyvars to the top of the type
+-- (but under a usage if there is one)
 addFreeTyVars :: Type -> Type
-addFreeTyVars ty@(NoteTy (FTVNote _) _) = ty
-addFreeTyVars ty			= NoteTy (FTVNote (tyVarsOfType ty)) ty
+addFreeTyVars (NoteTy note@(UsgNote _) ty) = NoteTy note (addFreeTyVars ty)
+addFreeTyVars ty@(NoteTy (FTVNote _) _)    = ty
+addFreeTyVars ty			   = NoteTy (FTVNote (tyVarsOfType ty)) ty
 
 -- Find the free names of a type, including the type constructors and classes it mentions
 namesOfType :: Type -> NameSet
@@ -795,8 +909,9 @@ subst_ty tenv tset ty
 				     in  args `seqList` TyConApp tc args
     go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
-    go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)
-    go (AppTy fun arg)   	   = mkAppTy (go fun) $! (go arg)
+    go (NoteTy (UsgNote usg) ty2)  = (NoteTy $! (UsgNote usg)) $! (go ty2)  -- Keep usage annot
+    go (FunTy arg res)   	   = FunTy (go arg) (go res)
+    go (AppTy fun arg)   	   = mkAppTy (go fun) (go arg)
     go ty@(TyVarTy tv)   	   = case (lookupVarEnv tenv tv) of
 	       			      Nothing  -> ty
        				      Just ty' -> ty'
@@ -875,6 +990,7 @@ tidyType env@(tidy_env, subst) ty
 
     go_note (SynNote ty)        = SynNote $! (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
+    go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
 
 tidyTypes  env tys    = map (tidyType env) tys
 \end{code}

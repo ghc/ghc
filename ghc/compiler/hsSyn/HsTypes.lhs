@@ -21,7 +21,7 @@ module HsTypes (
 
 #include "HsVersions.h"
 
-import Type		( Kind )
+import Type		( Kind, UsageAnn(..) )
 import PprType		( {- instance Outputable Kind -} )
 import Outputable
 import Util		( thenCmp, cmpList )
@@ -54,9 +54,12 @@ data HsType name
   | MonoTupleTy		[HsType name]	-- Element types (length gives arity)
 			Bool		-- boxed?
 
-  -- these next two are only used in unfoldings in interfaces
+  -- these next two are only used in interfaces
   | MonoDictTy		name	-- Class
 			[HsType name]
+
+  | MonoUsgTy           UsageAnn
+                        (HsType name)
 
 mkHsForAllTy []  []   ty = ty
 mkHsForAllTy tvs ctxt ty = HsForAllTy (Just tvs) ctxt ty
@@ -152,6 +155,10 @@ ppr_mono_ty ctxt_prec (MonoTyApp fun_ty arg_ty)
 
 ppr_mono_ty ctxt_prec (MonoDictTy clas tys)
   = ppr clas <+> hsep (map (ppr_mono_ty pREC_CON) tys)
+
+ppr_mono_ty ctxt_prec (MonoUsgTy u ty)
+  = maybeParen (ctxt_prec >= pREC_CON) $
+    ppr u <+> ppr_mono_ty pREC_CON ty
 \end{code}
 
 
@@ -205,6 +212,9 @@ cmpHsType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
 cmpHsType cmp (MonoDictTy c1 tys1)   (MonoDictTy c2 tys2)
   = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
+cmpHsType cmp (MonoUsgTy u1 ty1) (MonoUsgTy u2 ty2)
+  = cmpUsg u1 u2 `thenCmp` cmpHsType cmp ty1 ty2
+
 cmpHsType cmp ty1 ty2 -- tags must be different
   = let tag1 = tag ty1
 	tag2 = tag ty2
@@ -217,6 +227,7 @@ cmpHsType cmp ty1 ty2 -- tags must be different
     tag (MonoTyApp tc1 tys1)		= ILIT(4)
     tag (MonoFunTy a1 b1)		= ILIT(5)
     tag (MonoDictTy c1 tys1)		= ILIT(7)
+    tag (MonoUsgTy c1 tys1)		= ILIT(6)
     tag (HsForAllTy _ _ _)		= ILIT(8)
 
 -------------------
@@ -225,6 +236,14 @@ cmpContext cmp a b
   where
     cmp_ctxt (c1, tys1) (c2, tys2)
       = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
+
+-- Should be in Type, perhaps
+cmpUsg UsOnce UsOnce = EQ
+cmpUsg UsOnce UsMany = LT
+cmpUsg UsMany UsOnce = GT
+cmpUsg UsMany UsMany = EQ
+cmpUsg u1     u2     = pprPanic "cmpUsg:" $
+                         ppr u1 <+> ppr u2
 
 -- Should be in Maybes, I guess
 cmpMaybe cmp Nothing  Nothing  = EQ

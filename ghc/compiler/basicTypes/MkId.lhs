@@ -31,9 +31,8 @@ import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 import TysWiredIn	( boolTy )
 import Type		( Type, ThetaType,
 			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
-			  isUnLiftedType, substTopTheta,
-			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
-			  splitFunTys, splitForAllTys
+			  mkForAllTys, isUnLiftedType, substTopTheta,
+			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp, unUsgTy,
 			)
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
 import Class		( Class, classBigSig, classTyCon )
@@ -44,7 +43,7 @@ import Name		( mkDerivedName, mkWiredInIdName,
 			  mkWorkerOcc, mkSuperDictSelOcc,
 			  Name, NamedThing(..),
 			)
-import PrimOp		( PrimOp, primOpType, primOpOcc, primOpUniq )
+import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpUniq )
 import DataCon		( DataCon, dataConStrictMarks, dataConFieldLabels, 
 			  dataConArgTys, dataConSig, dataConRawArgTys
 			)
@@ -262,7 +261,8 @@ mkRecordSelId field_label selector_ty
 	    field_lbls	     = dataConFieldLabels data_con
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_label
 
-    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type rhs_ty, mkStringLit full_msg]
+    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy rhs_ty), mkStringLit full_msg]
+       -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 \end{code}
 
@@ -378,7 +378,8 @@ mkPrimitiveId prim_op
   where
     occ_name = primOpOcc  prim_op
     key	     = primOpUniq prim_op
-    ty	     = primOpType prim_op
+    (tyvars,arg_tys,res_ty) = primOpSig prim_op
+    ty       = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
     name    = mkWiredInIdName key pREL_GHC occ_name id
     id      = mkId name ty (ConstantId (PrimOp prim_op)) info
 		
@@ -390,9 +391,6 @@ mkPrimitiveId prim_op
 	   noIdInfo
 
     unfolding = mkUnfolding rhs
-
-    (tyvars, tau) = splitForAllTys ty
-    (arg_tys, _)  = splitFunTys tau
 
     args = mkTemplateLocals arg_tys
     rhs =  mkLams tyvars $ mkLams args $

@@ -53,7 +53,7 @@ import SrcLoc		( SrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
 import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
-			  splitTyConApp_maybe, splitDictTy_maybe,
+			  splitTyConApp_maybe, splitDictTy_maybe, unUsgTy,
 			  splitAlgTyConApp_maybe,
 			  tyVarsOfTypes, substTopTheta
 			)
@@ -440,7 +440,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	    HsApp (TyApp (HsVar eRROR_ID) [idType this_dict_id])
+	    HsApp (TyApp (HsVar eRROR_ID) [(unUsgTy . idType) this_dict_id])
 		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case

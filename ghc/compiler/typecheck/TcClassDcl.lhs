@@ -61,6 +61,7 @@ import TyCon		( mkAlgTyCon )
 import Unique		( Unique, Uniquable(..) )
 import Util
 import Maybes		( seqMaybe )
+import FiniteMap        ( lookupWithDefaultFM )
 
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
@@ -142,7 +143,7 @@ kcClassDecl (ClassDecl	context class_name
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 rec_env rec_inst_mapper
+tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
       	     (ClassDecl context class_name
 			tyvar_names class_sigs def_methods pragmas 
 			tycon_name datacon_name src_loc)
@@ -186,10 +187,15 @@ tcClassDecl1 rec_env rec_inst_mapper
 		      	   tycon dict_con_id
 	dict_con_id = mkDataConId dict_con
 
+        argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcClassDecl1: argvrcs:" $
+                                                         ppr tycon_name)
+                                      tycon_name
+
 	tycon = mkAlgTyCon tycon_name
 			    class_kind
 			    tyvars
 			    []			-- No context
+                            argvrcs
 			    [dict_con]		-- Constructors
 			    []			-- No derivings
 			    (Just clas)		-- Yes!  It's a dictionary 

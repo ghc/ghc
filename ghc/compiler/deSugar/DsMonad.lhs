@@ -38,7 +38,7 @@ import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat )
 import TcEnv		( ValueEnv )
 import Type             ( Type )
-import UniqSupply	( initUs, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
+import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
 import UniqFM		( lookupWithDefaultUFM )
@@ -182,7 +182,7 @@ the @SrcLoc@ being carried around.
 uniqSMtoDsM :: UniqSM a -> DsM a
 
 uniqSMtoDsM u_action us genv loc mod_and_grp warns
-  = (initUs us u_action, warns)
+  = (initUs_ us u_action, warns)
 
 getSrcLocDs :: DsM SrcLoc
 getSrcLocDs us genv loc mod_and_grp warns

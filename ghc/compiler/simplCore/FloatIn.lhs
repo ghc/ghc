@@ -199,6 +199,11 @@ fiExpr to_drop (_, AnnNote InlineCall expr)
 fiExpr to_drop (_, AnnNote note@(Coerce _ _) expr)
   = 	-- Just float in past coercion
     Note note (fiExpr to_drop expr)
+
+fiExpr to_drop (_, AnnNote note@(TermUsg _) expr)
+  =     -- Float in past term usage annotation
+        -- (for now; not sure if this is correct: KSW 1999-05)
+    Note note (fiExpr to_drop expr)
 \end{code}
 
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}

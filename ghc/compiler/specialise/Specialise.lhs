@@ -32,7 +32,7 @@ import PprCore		()	-- Instances
 import SpecEnv		( addToSpecEnv )
 
 import UniqSupply	( UniqSupply,
-			  UniqSM, initUs, thenUs, thenUs_, returnUs, getUniqueUs, 
+			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
 			  getUs, setUs, uniqFromSupply, splitUniqSupply, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
@@ -1139,7 +1139,7 @@ getUniqSM = getUniqueUs
 getUniqSupplySM = getUs
 setUniqSupplySM = setUs
 mapSM     = mapUs
-initSM	  = initUs
+initSM	  = initUs_
 
 mapAndCombineSM f []     = returnSM ([], emptyUDs)
 mapAndCombineSM f (x:xs) = f x	`thenSM` \ (y, uds1) ->

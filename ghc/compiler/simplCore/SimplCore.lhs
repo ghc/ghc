@@ -15,7 +15,8 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			  opt_D_simplifier_stats,
 			  opt_D_dump_simpl,
 			  opt_D_verbose_core2core,
-			  opt_D_dump_occur_anal
+			  opt_D_dump_occur_anal,
+                          opt_UsageSPOn,
 			)
 import CoreLint		( beginPass, endPass )
 import CoreSyn
@@ -58,6 +59,7 @@ import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
 import SpecEnv		( specEnvToList, specEnvFromList )
+import UsageSPInf       ( doUsageSPInf )
 import StrictAnal	( saBinds )
 import WorkWrap	        ( wwTopBinds )
 import CprAnalyse       ( cprAnalyse )
@@ -88,7 +90,8 @@ core2core :: [CoreToDo]		-- Spec of what core-to-core passes to do
 
 core2core core_todos module_name classes us binds
   = do
-	let (us1, us2) = splitUniqSupply us
+	let (us1, us23) = splitUniqSupply us
+            (us2, us3 ) = splitUniqSupply us23
 
 	-- Do the main business
 	processed_binds <- doCorePasses us1 binds core_todos
@@ -97,7 +100,7 @@ core2core core_todos module_name classes us binds
 	post_simpl_binds <- doPostSimplification us2 processed_binds
 
 	-- Do the final tidy-up
-	final_binds <- tidyCorePgm module_name classes post_simpl_binds
+	final_binds <- tidyCorePgm us3 module_name classes post_simpl_binds
 
 	-- Return results
 	return final_binds
@@ -119,10 +122,19 @@ doCorePass us binds CoreDoStaticArgs	     = _scc_ "CoreStaticArgs" doStaticArgs 
 doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saBinds binds
 doCorePass us binds CoreDoWorkerWrapper	     = _scc_ "CoreWorkWrap"   wwTopBinds us binds
 doCorePass us binds CoreDoSpecialising	     = _scc_ "Specialise"     specProgram us binds
+doCorePass us binds CoreDoUSPInf
+  = _scc_ "CoreUsageSPInf" 
+    if opt_UsageSPOn then
+      doUsageSPInf us binds
+    else
+      trace "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on" $
+        return binds
 doCorePass us binds CoreDoCPResult	     = _scc_ "CPResult"       cprAnalyse binds
-doCorePass us binds CoreDoPrintCore	     = _scc_ "PrintCore"      do
-                                                                       putStr (showSDoc $ pprCoreBindings binds)
-								       return binds
+doCorePass us binds CoreDoPrintCore
+  = _scc_ "PrintCore"
+    do
+      putStr (showSDoc $ pprCoreBindings binds)
+      return binds
 \end{code}
 
 
@@ -231,13 +243,18 @@ Several tasks are done by @tidyCorePgm@
    change the uniques, because the code generator makes global labels
    from the uniques for local thunks etc.]
 
+3. If @opt_UsageSPOn@ then compute usage information (which is
+   needed by Core2Stg).  ** NOTE _scc_ HERE **
 
 \begin{code}
-tidyCorePgm :: Module -> [Class] -> [CoreBind] -> IO [CoreBind]
-tidyCorePgm mod local_classes binds_in
+tidyCorePgm :: UniqSupply -> Module -> [Class] -> [CoreBind] -> IO [CoreBind]
+tidyCorePgm us mod local_classes binds_in
   = do
 	beginPass "Tidy Core"
-	let (_, binds_out) = mapAccumL (tidyBind (Just mod)) init_tidy_env binds_in
+	let (_, binds_tidy) = mapAccumL (tidyBind (Just mod)) init_tidy_env binds_in
+        binds_out <- if opt_UsageSPOn
+                     then _scc_ "CoreUsageSPInf" doUsageSPInf us binds_tidy
+                     else return binds_tidy
 	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
   where
 	-- Make sure to avoid the names of class operations

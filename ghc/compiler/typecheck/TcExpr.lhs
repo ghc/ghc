@@ -47,7 +47,7 @@ import Id		( idType, recordSelectorFieldLabel,
 import DataCon		( dataConFieldLabels, dataConSig, dataConId )
 import Name		( Name )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
-			  splitFunTy_maybe, splitFunTys,
+			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
 			  mkTyConApp,
 			  splitForAllTys, splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
@@ -55,6 +55,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  boxedTypeKind, mkArrowKind,
 			  substTopTheta, tidyOpenType
 			)
+import UsageSPUtils     ( unannotTy )
 import VarEnv		( zipVarEnv )
 import VarSet		( elemVarSet, mkVarSet )
 import TyCon		( tyConDataCons )
@@ -529,7 +530,8 @@ tcMonoExpr (RecordUpd record_expr rbinds) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 	(Just sel_id : _)	  = maybe_sel_ids
-	(_, tau)	      	  = splitForAllTys (idType sel_id)
+	(_, tau)	      	  = ASSERT( isNotUsgTy (idType sel_id) )
+                                    splitForAllTys (idType sel_id)
 	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
 	(tycon, _, data_cons) 	  = splitAlgTyConApp data_ty
 	(con_tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
@@ -795,6 +797,12 @@ tcArg the_fun (arg, expected_arg_ty, arg_no)
 %*									*
 %************************************************************************
 
+Between the renamer and the first invocation of the UsageSP inference,
+identifiers read from interface files will have usage information in
+their types, whereas other identifiers will not.  The unannotTy here
+in @tcId@ prevents this information from pointlessly propagating
+further prior to the first usage inference.
+
 \begin{code}
 tcId :: Name -> NF_TcM s (TcExpr, LIE, TcType)
 
@@ -803,7 +811,7 @@ tcId name
     tcLookupValueMaybe name	`thenNF_Tc` \ maybe_local ->
 
     case maybe_local of
-      Just tc_id -> instantiate_it tc_id (idType tc_id)
+      Just tc_id -> instantiate_it tc_id (unannotTy (idType tc_id))
 
       Nothing ->    tcLookupValue name		`thenNF_Tc` \ id ->
 		    tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
@@ -858,7 +866,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
        ListComp -> unifyListTy res_ty `thenTc_` returnTc ()
        _	-> returnTc ())					`thenTc_`
 
-    tcStmts do_or_lc (mkAppTy m) stmts elt_ty		 	`thenTc`   \ (stmts', stmts_lie) ->
+    tcStmts do_or_lc (mkAppTy m) stmts elt_ty	`thenTc`   \ (stmts', stmts_lie) ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,

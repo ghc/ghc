@@ -120,6 +120,7 @@ extract_ty (MonoListTy ty)	acc = extract_ty ty acc
 extract_ty (MonoTupleTy tys _)  acc = foldr extract_ty acc tys
 extract_ty (MonoFunTy ty1 ty2)	acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (MonoDictTy cls tys)	acc = foldr extract_ty acc tys
+extract_ty (MonoUsgTy usg ty)	acc = extract_ty ty acc
 extract_ty (MonoTyVar tv)       acc = insertTV tv acc
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 
 				acc = acc ++

@@ -26,7 +26,7 @@ import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  InlinePragInfo(..), CprInfo(..) )
 import Demand           ( wwLazy )
 import SaLib
-import UniqSupply	( UniqSupply, initUs, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import UniqSet
 import WwLib
 import Outputable
@@ -82,7 +82,7 @@ wwTopBinds us binds
 workersAndWrappers :: UniqSupply -> [CoreBind] -> [CoreBind]
 
 workersAndWrappers us top_binds
-  = initUs us $
+  = initUs_ us $
     mapUs (wwBind True{-top-level-}) top_binds `thenUs` \ top_binds2 ->
     let
 	top_binds3 = map make_top_binding top_binds2

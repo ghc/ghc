@@ -14,7 +14,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
-import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
+import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, UsageAnn(..) )
 import IdInfo           ( ArityInfo, exactArity, CprInfo(..) )
 import Lex		
 
@@ -92,6 +92,9 @@ import Ratio ( (%) )
  '__ccall'	{ ITccall $$ }
  '__scc' 	{ ITscc }
  '__sccC'       { ITsccAllCafs }
+
+ '__o'		{ ITonce }
+ '__m'		{ ITmany }
 
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
@@ -388,6 +391,8 @@ types2		:  type ',' type			{ [$1,$3] }
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
 		|  btype atype				{ MonoTyApp $1 $2 }
+                |  '__o' atype				{ MonoUsgTy UsOnce $2 }
+                |  '__m' atype				{ MonoUsgTy UsMany $2 }
 
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ MonoTyVar $1 }

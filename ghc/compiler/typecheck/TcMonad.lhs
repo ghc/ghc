@@ -56,7 +56,7 @@ import Var		( TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TyVarEnv, emptyVarEnv, TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
-			  UniqSM, initUs )
+			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import FiniteMap	( FiniteMap, emptyFM )
 import UniqFM		( UniqFM, emptyUFM )
@@ -507,7 +507,7 @@ uniqSMToTcM m down env
   = do	uniq_supply <- readIORef u_var
 	let (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
 	writeIORef u_var new_uniq_supply
-	return (initUs uniq_s m)
+	return (initUs_ uniq_s m)
   where
     u_var = getUniqSupplyVar down
 \end{code}

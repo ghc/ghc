@@ -11,7 +11,7 @@ module UniqSupply (
 	uniqFromSupply, uniqsFromSupply,	-- basic ops
 
 	UniqSM,		-- type: unique supply monad
-	initUs, thenUs, thenUs_, returnUs, fixUs, getUs, setUs,
+	initUs, initUs_, thenUs, thenUs_, returnUs, fixUs, getUs, setUs,
 	getUniqueUs, getUniquesUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
@@ -113,11 +113,12 @@ uniqsFromSupply (I# i) supply = i `get_from` supply
 \begin{code}
 type UniqSM result = UniqSupply -> (result, UniqSupply)
 
--- the initUs function also returns the final UniqSupply
+-- the initUs function also returns the final UniqSupply; initUs_ drops it
+initUs :: UniqSupply -> UniqSM a -> (a,UniqSupply)
+initUs init_us m = case m init_us of { (r,us) -> (r,us) }
 
-initUs :: UniqSupply -> UniqSM a -> a
-
-initUs init_us m = case m init_us of { (r,_) -> r }
+initUs_ :: UniqSupply -> UniqSM a -> a
+initUs_ init_us m = case m init_us of { (r,us) -> r }
 
 {-# INLINE thenUs #-}
 {-# INLINE returnUs #-}

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.54 1999/04/13 08:55:52 kglynn Exp $
+# $Id: Makefile,v 1.55 1999/05/11 16:37:29 keithw Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -49,7 +49,7 @@ $(HS_PROG) :: $(HS_SRCS)
 DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  reader profiling parser cprAnalysis
+  reader profiling parser usageSP cprAnalysis
 
 
 ifeq ($(GhcWithNativeCodeGen),YES)
@@ -191,7 +191,7 @@ reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 # Heap was 6m with 2.10
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -dcore-lint -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"

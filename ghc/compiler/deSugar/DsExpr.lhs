@@ -40,7 +40,7 @@ import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
 import Type		( splitFunTys, mkTyConApp,
-			  splitAlgTyConApp, splitTyConApp_maybe,
+			  splitAlgTyConApp, splitTyConApp_maybe, isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
 import TysWiredIn	( tupleCon, unboxedTupleCon,
@@ -398,6 +398,7 @@ dsExpr (ExplicitListOut ty xs)
     go []     = returnDs (mkNilExpr ty)
     go (x:xs) = dsExpr x				`thenDs` \ core_x ->
 		go xs					`thenDs` \ core_xs ->
+                ASSERT( isNotUsgTy ty )
 		returnDs (mkConApp consDataCon [Type ty, core_x, core_xs])
 
 dsExpr (ExplicitTuple expr_list boxed)
@@ -405,18 +406,20 @@ dsExpr (ExplicitTuple expr_list boxed)
     returnDs (mkConApp ((if boxed 
 			    then tupleCon 
 			    else unboxedTupleCon) (length expr_list))
-	    	(map (Type . coreExprType) core_exprs ++ core_exprs))
+	    	(map (Type . unUsgTy . coreExprType) core_exprs ++ core_exprs))
+                -- the above unUsgTy is *required* -- KSW 1999-04-07
 
 dsExpr (HsCon con_id [ty] [arg])
   | isNewTyCon tycon
   = dsExpr arg		     `thenDs` \ arg' ->
-    returnDs (Note (Coerce result_ty (coreExprType arg')) arg')
+    returnDs (Note (Coerce result_ty (unUsgTy (coreExprType arg'))) arg')
   where
     result_ty = mkTyConApp tycon [ty]
     tycon     = dataConTyCon con_id
 
 dsExpr (HsCon con_id tys args)
   = mapDs dsExpr args	 	  `thenDs` \ args2  ->
+    ASSERT( all isNotUsgTy tys )
     returnDs (mkConApp con_id (map Type tys ++ args2))
 
 dsExpr (ArithSeqOut expr (From from))
@@ -614,7 +617,8 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	go (GuardStmt expr locn : stmts)
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
-	    let msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
+	    let msg = ASSERT( isNotUsgTy b_ty )
+                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
 	    returnDs (mkIfThenElse expr2 
 				   rest 
 				   (App (App (Var fail_id) 
@@ -644,7 +648,9 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	    let
 		(_, a_ty)  = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty]) (HsLitOut (HsString (_PK_ msg)) stringTy)
-	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+	        msg = ASSERT2( isNotUsgTy a_ty, ppr a_ty )
+                      ASSERT2( isNotUsgTy b_ty, ppr b_ty )
+                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
 					   (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty locn)
 					   (Just result_ty) locn

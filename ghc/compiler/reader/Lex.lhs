@@ -135,6 +135,8 @@ data IfaceToken
   | ITlit_lit
   | ITstring_lit
   | ITtypeapp
+  | ITonce			-- usage annotations
+  | ITmany
   | ITarity 
   | ITspecialise
   | ITnocaf
@@ -617,6 +619,8 @@ ifaceKeywordsFM = listToUFM $
 	("__litlit",		ITlit_lit),
 	("__string",		ITstring_lit),
 	("__a",			ITtypeapp),
+	("__o",			ITonce),
+	("__m",			ITmany),
 	("__A",			ITarity),
 	("__P",			ITspecialise),
 	("__C",			ITnocaf),

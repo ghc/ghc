@@ -11,7 +11,7 @@ module VarEnv (
 	extendVarEnv, extendVarEnvList,
 	plusVarEnv, plusVarEnv_C,
 	delVarEnvList, delVarEnv,
-	lookupVarEnv, lookupVarEnv_NF,
+	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
 	mapVarEnv, zipVarEnv,
 	modifyVarEnv, modifyVarEnv_Directly,
 	isEmptyVarEnv, foldVarEnv,
@@ -72,6 +72,7 @@ rngVarEnv	  :: VarEnv a -> [a]
 isEmptyVarEnv	  :: VarEnv a -> Bool
 lookupVarEnv	  :: VarEnv a -> Var -> Maybe a
 lookupVarEnv_NF   :: VarEnv a -> Var -> a
+lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv	  :: Var -> VarEnv a -> Bool
 foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \end{code}
@@ -84,6 +85,7 @@ delVarEnvList	 = delListFromUFM
 delVarEnv	 = delFromUFM
 plusVarEnv	 = plusUFM
 lookupVarEnv	 = lookupUFM
+lookupWithDefaultVarEnv = lookupWithDefaultUFM
 mapVarEnv	 = mapUFM
 mkVarEnv	 = listToUFM
 emptyVarEnv	 = emptyUFM

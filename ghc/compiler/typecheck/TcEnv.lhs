@@ -5,7 +5,7 @@ module TcEnv(
 
 	TcEnv, ValueEnv, TcTyThing(..),
 
-	initEnv, getEnvTyCons, getEnvClasses,
+	initEnv, getEnvTyCons, getEnvClasses, getAllEnvTyCons,
 	
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
 
@@ -46,9 +46,10 @@ import Type	( Kind, superKind,
 		  splitForAllTys, splitRhoTy, splitFunTys, substTopTy,
 		  splitAlgTyConApp_maybe, getTyVar
 		)
+import UsageSPUtils ( unannotTy )
 import DataCon	( DataCon )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
-import Class	( Class )
+import Class	( Class, classTyCon )
 
 import TcMonad
 
@@ -64,7 +65,7 @@ import UniqFM
 import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
 import Bag		( bagToList )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, catMaybes )
 import SrcLoc		( SrcLoc )
 import FastString	( FastString )
 import Outputable
@@ -106,7 +107,7 @@ tcInstId :: Id
 		      TcType)		--
 tcInstId id
   = let
-      (tyvars, rho) = splitForAllTys (idType id)
+      (tyvars, rho) = splitForAllTys (unannotTy (idType id))
     in
     tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
     let
@@ -115,6 +116,12 @@ tcInstId id
     in
     returnNF_Tc (tyvars', theta', tau')
 \end{code}
+
+Between the renamer and the first invocation of the UsageSP inference,
+identifiers read from interface files will have usage information in
+their types, whereas other identifiers will not.  The unannotTy here
+in @tcInstId@ prevents this information from pointlessly propagating
+further prior to the first usage inference.
 
 
 %************************************************************************
@@ -152,6 +159,11 @@ initEnv mut = TcEnv emptyUFM emptyUFM (emptyVarSet, mut)
 
 getEnvTyCons  (TcEnv te _ _) = [tc | (_, _, ATyCon tc) <- eltsUFM te]
 getEnvClasses (TcEnv te _ _) = [cl | (_, _, AClass cl) <- eltsUFM te]
+getAllEnvTyCons (TcEnv te _ _) = catMaybes (map gettc (eltsUFM te))
+    where                          
+      gettc (_,_, ATyCon tc) = Just tc
+      gettc (_,_, AClass cl) = Just (classTyCon cl)
+      gettc _                = Nothing
 \end{code}
 
 The TypeEnv
