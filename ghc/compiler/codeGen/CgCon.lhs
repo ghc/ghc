@@ -68,8 +68,9 @@ import Outputable
 cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> DataCon		-- Id
 	    -> [StgArg]		-- Args
+	    -> SRT
 	    -> FCode (Id, CgIdInfo)
-cgTopRhsCon id con args
+cgTopRhsCon id con args srt
   = ASSERT( not (isDllConApp con args) )	-- checks for litlit args too
     ASSERT( args `lengthIs` dataConRepArity con )
 
@@ -89,8 +90,12 @@ cgTopRhsCon id con args
 	    closure_info
 	    dontCareCCS			-- because it's static data
 	    (map fst amodes_w_offsets)  -- Sorted into ptrs first, then nonptrs
-	    (mayHaveCafRefs (idCafInfo id))
+	    (nonEmptySRT srt)		-- has CAF refs
 	  )					`thenC`
+		-- NOTE: can't use idCafInfo instead of nonEmptySRT above,
+		-- because top-level constructors that were floated by
+		-- CorePrep don't have CafInfo attached.  The SRT is more
+		-- reliable.
 
 	-- RETURN
     returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)

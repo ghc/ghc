@@ -233,11 +233,10 @@ cgTopRhs :: Id -> StgRhs -> SRT -> FCode (Id, CgIdInfo)
 	-- It's already been globalised if necessary
 
 cgTopRhs bndr (StgRhsCon cc con args) srt
-  = forkStatics (cgTopRhsCon bndr con args)
+  = forkStatics (cgTopRhsCon bndr con args srt)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
-  =     -- There should be no free variables
-    ASSERT(null fvs)
+  = ASSERT(null fvs)    -- There should be no free variables
     let 
 	lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
     in
