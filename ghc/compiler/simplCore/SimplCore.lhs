@@ -32,7 +32,7 @@ import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, isDataConWrapId, setIdNoDiscard, isLocalId, isImplicitId )
+import Id		( idName, isDataConWrapId, setIdNoDiscard, isImplicitId )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -210,7 +210,17 @@ prepareRules dflags pkg_rule_base hst us binds local_rules
   = do	{ let (better_rules,_) = initSmpl dflags sw_chkr us local_ids black_list_all 
 		                          (mapSmpl simplRule local_rules)
 
-	; let (local_rules, orphan_rules) = partition (isLocalId . fst) better_rules
+	; let (local_rules, orphan_rules) = partition ((`elemVarSet` local_ids) . fst) better_rules
+		-- We use (`elemVarSet` local_ids) rather than isLocalId because
+		-- isLocalId isn't true of class methods.
+		-- If we miss any rules for Ids defined here, then we end up
+		-- giving the local decl a new Unique (because the in-scope-set is the
+		-- same as the rule-id set), and now the binding for the class method 
+		-- doesn't have the same Unique as the one in the Class and the tc-env
+		--	Example:	class Foo a where
+		--			  op :: a -> a
+		--			{-# RULES "op" op x = x #-}
+
 	      rule_rhs_fvs		  = unionVarSets (map (ruleRhsFreeVars . snd) better_rules)
 	      local_rule_base		  = extendRuleBaseList emptyRuleBase local_rules
 	      local_rule_ids		  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
@@ -235,8 +245,6 @@ prepareRules dflags pkg_rule_base hst us binds local_rules
     add_rules rule_base mds = extendRuleBaseList rule_base (md_rules mds)
 
 	-- Boringly, we need to gather the in-scope set.
-	-- Typically this thunk won't even be forced, but the test in
-	-- simpVar fails if it isn't right, and it might conceiveably matter
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
