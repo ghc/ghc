@@ -2410,7 +2410,7 @@ genCCall fn cconv kind args
         if   (case sz of DF -> True; F -> True; _ -> False)
         then returnNat (size,
                         code `appOL`
-                        toOL [SUB L (OpImm (ImmInt 8)) (OpReg esp),
+                        toOL [SUB L (OpImm (ImmInt size)) (OpReg esp),
                               DELTA (delta-size),
                               GST sz reg (AddrBaseIndex (Just esp) 
                                                         Nothing 
