@@ -80,7 +80,7 @@ all :: PrelPrimopWrappers.hs
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 
 ifeq "$(DLLized)" "YES"
-HS_SRCS := $(filter-out PrelMain.lhs PrelHugs.lhs, $(HS_SRCS))
+HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
 # PrelMain.dll_o isn't to be included in the final .a, 
 # but it needs to be generated
 all :: PrelMain.dll_o
@@ -112,8 +112,5 @@ INSTALL_LIBS  += PrelMain.dll_o
 endif
 
 INSTALL_DATAS += PrelGHC.$(way_)hi
-ifeq "$(DLLized)" "YES"
-INSTALL_DATAS := $(filter-out PrelHugs.$(way_)hi,$(INSTALL_DATAS))
-endif
 
 include $(TOP)/mk/target.mk
