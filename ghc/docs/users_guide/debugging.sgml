@@ -697,7 +697,7 @@ disappointed if you try to glob etc. inside <Literal>OPTIONS</Literal>.
 
 <Para>
 NOTE: the contents of OPTIONS are prepended to the command-line
-options, so you *do* have the ability to override OPTIONS settings
+options, so you <Emphasis>do</Emphasis> have the ability to override OPTIONS settings
 via the command line.
 </Para>
 
