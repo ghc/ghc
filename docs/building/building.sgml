@@ -4495,7 +4495,7 @@ don't do this you get very weird messages when you type
 </listitem>
 
 <listitem><para> Set <constant>SHELL</constant> to
-<Filename>c:/cygwin/bin/sh</Filename>. When you invoke a shell in Emacs, this
+<Filename>c:/cygwin/bin/bash</Filename>. When you invoke a shell in Emacs, this
 <constant>SHELL</constant> is what you get.
 </para></listitem>
 
