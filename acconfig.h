@@ -13,32 +13,6 @@
    Leave the following blank line there!!  Autoheader needs it.  */
 
 
-/* The following definitions will only work on Linux.
-   I (ADR) make no apology for this because we SHOULD NOT
-   be using system based tests and I want to get this puppy running
-   tonight.  I'm forced to define these values here because the
-   current system contains 2 (two) config.h files - both of
-   which are needed.  Will someone at Glasgow please fix this mess. */
-#define HostPlatform_TYPE   i386_unknown_linux
-#define TargetPlatform_TYPE i386_unknown_linux
-#define BuildPlatform_TYPE  i386_unknown_linux
-
-#define i386_unknown_linux_HOST		1
-#define i386_unknown_linux_TARGET	1
-#define i386_unknown_linux_BUILD  	1
-
-#define i386_HOST_ARCH	1
-#define i386_TARGET_ARCH	1
-#define i386_BUILD_ARCH  	1
-
-#define linux_HOST_OS		1
-#define linux_TARGET_OS		1
-#define linux_BUILD_OS 		1
-
-#define unknown_HOST_VENDOR	1
-#define unknown_TARGET_VENDOR  1
-#define unknown_BUILD_VENDOR 	1
-
 @TOP@
 
 /* Define if we're have GNU libc. */
@@ -64,6 +38,9 @@
 
 /* Define to alignment constraint on floats or on unsigned int - whichever is the greater */
 #undef ALIGNMENT_FLOAT
+
+/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_LONG
 
 /* Define to alignment constraint on unsigned int - whichever is the greater */
 #undef ALIGNMENT_UNSIGNED_INT
