@@ -174,7 +174,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 	tyvars_in_pats = extractPatsTyVars pats
 	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
 	doc_sig        = text "a pattern type-signature"
-	doc_pats       = text "in a pattern match"
+	doc_pats       = text "a pattern match"
     in
     bindNakedTyVarsFVRn doc_sig forall_tyvars	$ \ sig_tyvars ->
 
