@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: QSem.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: QSem.hs,v 1.2 2001/07/04 11:30:52 simonmar Exp $
 --
 -- General semaphores
 --
@@ -21,6 +21,7 @@ module Control.Concurrent.QSem
 	  signalQSem	-- :: QSem -> IO ()
 	) where
 
+import Prelude
 import Control.Concurrent.MVar
 
 -- General semaphores are also implemented readily in terms of shared

@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: GetOpt.hs,v 1.1 2001/07/04 10:48:39 simonmar Exp $
+-- $Id: GetOpt.hs,v 1.2 2001/07/04 11:30:52 simonmar Exp $
 --
 -- A Haskell port of GNU's getopt library 
 --
@@ -42,6 +42,7 @@ module System.Console.GetOpt (
 			--        -> ([a],[String],[String])
   ) where
 
+import Prelude
 import Data.List 	( isPrefixOf )
 
 data ArgOrder a                -- what to do with options following non-options:
