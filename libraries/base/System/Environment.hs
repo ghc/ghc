@@ -126,7 +126,7 @@ foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
 
 {-|
-@withArgs args act@ - while executing action @act@, have 'System.getArgs'
+'withArgs' @args act@ - while executing action @act@, have 'getArgs'
 return @args@.
 -}
 withArgs :: [String] -> IO a -> IO a
@@ -135,8 +135,8 @@ withArgs xs act = do
    withArgv (p:xs) act
 
 {-|
-@withProgName name act@ - while executing action @act@,
-have 'System.getProgName' return @name@.
+'withProgName' @name act@ - while executing action @act@,
+have 'getProgName' return @name@.
 -}
 withProgName :: String -> IO a -> IO a
 withProgName nm act = do
