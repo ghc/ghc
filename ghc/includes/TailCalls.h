@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.18 2005/01/28 12:55:54 simonmar Exp $
+ * $Id: TailCalls.h,v 1.19 2005/03/08 08:59:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -65,9 +65,32 @@ extern void __DISCARD__(void);
 
 #if x86_64_HOST_ARCH
 
+/*
+  NOTE about __DISCARD__():
+
+  On x86_64 this is necessary to work around bugs in the register
+  variable support in gcc.  Without the __DISCARD__() call, gcc will
+  silently throw away assignements to global register variables that
+  happen before the jump.
+
+  Here's the example:
+
+  extern void g(void);
+  static void f(void) {
+    R1 = g;
+    __DISCARD__()
+    goto *R1;
+  }
+
+  without the dummy function call, gcc throws away the assignment to R1
+  (gcc 3.4.3) gcc bug #
+
+*/
+
 #define JMP_(cont)			\
     { 					\
       void *__target;			\
+      __DISCARD__();			\
       __target = (void *)(cont);    	\
       goto *__target; 	    	    	\
     }
