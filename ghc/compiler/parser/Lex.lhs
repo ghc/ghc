@@ -182,7 +182,6 @@ data Token
   | ITdot
 
   | ITbiglam			-- GHC-extension symbols
-  | IThash
 
   | ITocurly  			-- special symbols
   | ITccurly
