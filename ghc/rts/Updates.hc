@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.29 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: Updates.hc,v 1.30 2000/11/14 12:47:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,15 +102,15 @@
 	}
 #endif
 
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_entry,ENTRY_CODE(Sp[0]));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_0_entry,RET_VEC(Sp[0],0));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_1_entry,RET_VEC(Sp[0],1));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_2_entry,RET_VEC(Sp[0],2));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_3_entry,RET_VEC(Sp[0],3));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_4_entry,RET_VEC(Sp[0],4));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_5_entry,RET_VEC(Sp[0],5));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_6_entry,RET_VEC(Sp[0],6));
-UPD_FRAME_ENTRY_TEMPLATE(upd_frame_7_entry,RET_VEC(Sp[0],7));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_entry,ENTRY_CODE(Sp[0]));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_0_entry,RET_VEC(Sp[0],0));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_1_entry,RET_VEC(Sp[0],1));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_2_entry,RET_VEC(Sp[0],2));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_3_entry,RET_VEC(Sp[0],3));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_4_entry,RET_VEC(Sp[0],4));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_5_entry,RET_VEC(Sp[0],5));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_6_entry,RET_VEC(Sp[0],6));
+UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_entry,RET_VEC(Sp[0],7));
 
 /*
   Make sure this table is big enough to handle the maximum vectored
@@ -128,7 +128,7 @@ UPD_FRAME_ENTRY_TEMPLATE(upd_frame_7_entry,RET_VEC(Sp[0],7));
  * there's a cost-centre-stack in there too).
  */
 
-VEC_POLY_INFO_TABLE(upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, UPDATE_FRAME,, EF_);
+VEC_POLY_INFO_TABLE(stg_upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, UPDATE_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
    Entry Code for a PAP.
