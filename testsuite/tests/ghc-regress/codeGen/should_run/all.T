@@ -53,3 +53,8 @@ test('cg053', normal, compile_and_run, [''])
 test('cg054', normal, compile_and_run, [''])
 test('cg055', normal, compile_and_run, [''])
 test('cg056', normal, compile_and_run, [''])
+
+test('cg057', compose( only_ways(['prof','profasm']), 
+		       extra_run_opts('+RTS -xc') ),
+	 compile_and_run, [''])
+
