@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.4 2000/11/20 15:54:27 sewardj Exp $
+-- $Id: GetImports.hs,v 1.5 2001/04/20 10:42:46 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -34,6 +34,11 @@ getImports s
            = f ((mkMN m):si) ni me ws
         f si ni me ("tropmi" : "#-{" : "ECRUOS" : "}-#" : m : ws) 
            = f ((mkMN m):si) ni me ws
+
+        -- skip other contents of pragma comments
+        f si ni me ("#-{" : ws)
+           = f si ni me (drop 1 (dropWhile (/= "}-#") ws))
+
         f si ni me ("tropmi" : "deifilauq" : m : ws) 
            = f si ((mkMN m):ni) me ws
         f si ni me ("tropmi" : m : ws) 
@@ -53,15 +58,13 @@ clean s
      where
         -- running through text we want to keep
         keep acc []                   = cons acc []
-        keep acc (c:cs) | isSpace c
-                        = cons acc (keep "" cs)
+        keep acc (c:cs) | isSpace c   = cons acc (keep "" cs)
 
         keep acc ('"':cs)             = cons acc (dquote cs)		-- "
 
-	-- try to eliminate single quotes when they're part of
-	-- an identifier...
+	-- don't be fooled by single quotes which are part of an identifier
 	keep acc (c:'\'':cs) 
-           | isAlphaNum c || c == '_' = keep acc (c:cs)
+           | isAlphaNum c || c == '_' = keep ('\'':c:acc) (c:cs)
 
         keep acc ('\'':cs)            = cons acc (squote cs)
         keep acc ('-':'-':cs)         = cons acc (linecomment cs)
