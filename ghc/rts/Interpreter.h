@@ -1,12 +1,19 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.9 2000/12/14 15:19:47 sewardj Exp $
+ * $Id: Interpreter.h,v 1.1 2000/12/19 13:09:52 sewardj Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000.
  *
- * Prototypes for functions in Evaluator.c
+ * Prototypes for functions in Interpreter.c
  *
  * ---------------------------------------------------------------------------*/
 
+#ifdef GHCI
+
+extern StgThreadReturnCode interpretBCO ( Capability* cap );
+
+#endif
+
+#if 0
 /* --------------------------------------------------------------------------
  * Sizes of objects it constructs
  * (used by Assembler)
@@ -26,7 +33,6 @@
  * 
  * ------------------------------------------------------------------------*/
 
-extern StgThreadReturnCode interpretBCO ( Capability* cap );
 
 extern nat marshall   ( char arg_ty, void* arg );
 extern nat unmarshall ( char res_ty, void* res );
@@ -70,4 +76,5 @@ typedef struct _CallInfo {
   char          data[MAX_CALL_VALUES+2];  
 } CallInfo;
 
+#endif
 #endif
