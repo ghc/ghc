@@ -28,12 +28,10 @@
 #ifdef COMPILING_RTS
 #define DLL_IMPORT DLLIMPORT
 #define DLL_IMPORT_RTS
-#define DLL_IMPORT_DATA
 #define DLL_IMPORT_DATA_VAR(x) x
 #else
 #define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
-#define DLL_IMPORT_DATA DLLIMPORT
 # ifdef ENABLE_WIN32_DLL_SUPPORT
 #  define DLL_IMPORT_DATA_VAR(x) _imp__##x
 # else

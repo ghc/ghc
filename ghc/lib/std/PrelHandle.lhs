@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.62 2000/09/14 14:24:02 simonmar Exp $
+% $Id: PrelHandle.lhs,v 1.63 2000/11/07 10:42:56 simonmar Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -62,7 +62,7 @@ mkBuffer__ fo sz_in_bytes = do
   case sz_in_bytes of
     0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
     _ -> do
-     chunk <- allocMemory__ sz_in_bytes
+     chunk <- malloc sz_in_bytes
      if chunk == nullAddr
       then ioException (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
       else return chunk
@@ -162,15 +162,6 @@ mkClosedHandle__ =
 	     haFilePath__   = "closed file",
 	     haBuffers__    = []
 	   }
-
-mkErrorHandle__ :: IOException -> Handle__
-mkErrorHandle__ ioe =
-  Handle__ { haFO__         =  nullFile__,
-	     haType__       = (ErrorHandle ioe),
-	     haBufferMode__ = NoBuffering,
-	     haFilePath__   = "error handle",
-	     haBuffers__    = []
-	   }
 \end{code}
 
 %*********************************************************
@@ -251,8 +242,7 @@ stdout = unsafePerformIO (do
 #endif
 	    return hdl
 
-       _ -> do ioError <- constructError "stdout"
-               newHandle (mkErrorHandle__ ioError)
+       _ -> constructErrorAndFail "stdout"
   )
 
 stdin = unsafePerformIO (do
@@ -277,8 +267,7 @@ stdin = unsafePerformIO (do
 #endif
 	    hConnectTerms stdout hdl
 	    return hdl
-       _ -> do ioError <- constructError "stdin"
-               newHandle (mkErrorHandle__ ioError)
+       _ -> constructErrorAndFail "stdin"
   )
 
 
@@ -303,8 +292,7 @@ stderr = unsafePerformIO (do
 	    hConnectTo stdout hdl
 	    return hdl
 
-       _ -> do ioError <- constructError "stderr"
-               newHandle (mkErrorHandle__ ioError)
+       _ -> constructErrorAndFail "stderr"
   )
 \end{code}
 
@@ -395,7 +383,6 @@ hClose :: Handle -> IO ()
 hClose handle =
     withHandle__ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> return handle_
       _ -> do
           rc      <- closeFile (haFO__ handle_)
@@ -439,7 +426,6 @@ hFileSize :: Handle -> IO Integer
 hFileSize handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError 	-> ioException theError
       ClosedHandle 		-> ioe_closedHandle "hFileSize" handle
       SemiClosedHandle 		-> ioe_closedHandle "hFileSize" handle
 #ifdef __HUGS__
@@ -539,7 +525,6 @@ hSetBuffering handle mode =
       _ ->
           withHandle__ handle $ \ handle_ -> do
           case haType__ handle_ of
-	     ErrorHandle theError -> ioException theError
              ClosedHandle 	  -> ioe_closedHandle "hSetBuffering" handle
              _ -> do
 	        {- Note:
@@ -713,7 +698,6 @@ hIsOpen :: Handle -> IO Bool
 hIsOpen handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle         -> return False
       SemiClosedHandle     -> return False
       _ 		   -> return True
@@ -722,7 +706,6 @@ hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> return True
       _ 		   -> return False
 
@@ -740,7 +723,6 @@ hIsReadable :: Handle -> IO Bool
 hIsReadable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
       htype 		   -> return (isReadable htype)
@@ -753,7 +735,6 @@ hIsWritable :: Handle -> IO Bool
 hIsWritable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
       htype 		   -> return (isWritable htype)
@@ -785,7 +766,6 @@ hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hGetBuffering" handle
       _ -> 
 	  {-
@@ -800,7 +780,6 @@ hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
       AppendHandle 	   -> return False
@@ -831,7 +810,6 @@ hSetEcho handle on = do
      else
       withHandle_ handle $ \ handle_ -> do
       case haType__ handle_ of 
-         ErrorHandle theError -> ioException theError
          ClosedHandle	      -> ioe_closedHandle "hSetEcho" handle
          _ -> do
             rc <- setTerminalEcho (haFO__ handle_) (if on then 1 else 0)  -- ConcHask: SAFE, won't block
@@ -847,7 +825,6 @@ hGetEcho handle = do
      else
        withHandle_ handle $ \ handle_ -> do
        case haType__ handle_ of 
-         ErrorHandle theError -> ioException theError
          ClosedHandle	      -> ioe_closedHandle "hGetEcho" handle
          _ -> do
             rc <- getTerminalEcho (haFO__ handle_)  -- ConcHask: SAFE, won't block
@@ -860,7 +837,6 @@ hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
     withHandle_ handle $ \ handle_ -> do
      case haType__ handle_ of 
-       ErrorHandle theError -> ioException theError
        ClosedHandle	    -> ioe_closedHandle "hIsTerminalDevice" handle
        _ -> do
           rc <- isTerminalDevice (haFO__ handle_)   -- ConcHask: SAFE, won't block
@@ -914,7 +890,7 @@ slurpFile fname = do
     ioError (userError "slurpFile: file too big")
    else do
      let sz_i = fromInteger sz
-     chunk <- allocMemory__ sz_i
+     chunk <- malloc sz_i
      if chunk == nullAddr 
       then do
         hClose handle
@@ -939,7 +915,6 @@ getHandleFd :: Handle -> IO Int
 getHandleFd handle =
     withHandle_ handle $ \ handle_ -> do
     case (haType__ handle_) of
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "getHandleFd" handle
       _ -> do
           fd <- getFileFd (haFO__ handle_)
@@ -1038,7 +1013,6 @@ wantReadableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle fun handle act = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       AppendHandle 	   -> ioException not_readable_error
@@ -1061,7 +1035,6 @@ wantWriteableHandle_ fun handle act =
 
 checkWriteableHandle fun handle handle_ act
   = case haType__ handle_ of 
-      ErrorHandle theError -> ioError (IOException theError)
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       ReadHandle 	   -> ioError not_writeable_error
@@ -1075,7 +1048,6 @@ wantRWHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantRWHandle fun handle act = 
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_
@@ -1084,7 +1056,6 @@ wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =
     withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_

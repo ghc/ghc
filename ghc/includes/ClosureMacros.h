@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.26 2000/10/06 15:38:06 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.27 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,16 @@
 
 #ifndef CLOSUREMACROS_H
 #define CLOSUREMACROS_H
+
+/* Say whether the code comes before the heap; on mingwin this may not be the
+   case, not because of another random MS pathology, but because the static
+   program may reside in a DLL
+*/
+
+#undef TEXT_BEFORE_HEAP
+#ifndef mingw32_TARGET_OS
+#define TEXT_BEFORE_HEAP 1
+#endif
 
 /* -----------------------------------------------------------------------------
    Fixed Header Size
@@ -116,11 +126,11 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #endif
 
 
-#ifdef ENABLE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
-   extern int is_heap_alloced(const void* x);
-#  define HEAP_ALLOCED(x)  (is_heap_alloced(x))
+#ifdef TEXT_BEFORE_HEAP
+# define HEAP_ALLOCED(x)  IS_USER_PTR(x)
 #else
-#  define HEAP_ALLOCED(x)  IS_USER_PTR(x)
+extern int is_heap_alloced(const void* x);
+# define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #endif
 
 /* When working with Win32 DLLs, static closures are identified by
@@ -182,11 +192,11 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #  define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
 #endif
 
-#ifdef ENABLE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
+#ifdef TEXT_BEFORE_HEAP /* needed for mingw DietHEP */
+# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
+#else
 #  define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
                                      && !LOOKS_LIKE_STATIC_CLOSURE(info))
-#else
-#  define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
 #endif
 
 /* -----------------------------------------------------------------------------

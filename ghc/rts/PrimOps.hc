@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.55 2000/09/26 16:45:35 simonpj Exp $
+ * $Id: PrimOps.hc,v 1.56 2000/11/07 10:42:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -649,6 +649,35 @@ FN_(name)								\
   FE_									\
 }
 
+#define GMP_TAKE1_RET1(name,mp_fun)					\
+FN_(name)								\
+{									\
+  MP_INT arg1, result;							\
+  I_ s1;								\
+  StgArrWords* d1;							\
+  FB_									\
+									\
+  /* call doYouWantToGC() */						\
+  MAYBE_GC(R2_PTR, name);						\
+									\
+  d1 = (StgArrWords *)R2.p;						\
+  s1 = R1.i;								\
+									\
+  arg1._mp_alloc	= d1->words;					\
+  arg1._mp_size		= (s1);						\
+  arg1._mp_d		= (unsigned long int *) (BYTE_ARR_CTS(d1));	\
+									\
+  STGCALL1(mpz_init,&result);						\
+									\
+  /* Perform the operation */						\
+  STGCALL2(mp_fun,&result,&arg1);					\
+									\
+  TICK_RET_UNBOXED_TUP(2);						\
+  RET_NP(result._mp_size,						\
+         result._mp_d-sizeofW(StgArrWords));				\
+  FE_									\
+}
+
 #define GMP_TAKE2_RET2(name,mp_fun)					\
 FN_(name)								\
 {									\
@@ -694,6 +723,10 @@ GMP_TAKE2_RET1(gcdIntegerzh_fast,      mpz_gcd);
 GMP_TAKE2_RET1(quotIntegerzh_fast,     mpz_tdiv_q);
 GMP_TAKE2_RET1(remIntegerzh_fast,      mpz_tdiv_r);
 GMP_TAKE2_RET1(divExactIntegerzh_fast, mpz_divexact);
+GMP_TAKE2_RET1(andIntegerzh_fast,      mpz_and);
+GMP_TAKE2_RET1(orIntegerzh_fast,       mpz_ior);
+GMP_TAKE2_RET1(xorIntegerzh_fast,      mpz_xor);
+GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com);
 
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr);
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr);

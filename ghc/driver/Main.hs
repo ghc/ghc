@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.68 2000/10/11 16:06:38 simonmar Exp $
+-- $Id: Main.hs,v 1.69 2000/11/07 10:42:55 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -12,6 +12,8 @@
 #include "../includes/config.h"
 
 module Main (main) where
+
+import Utils
 
 import GetImports
 import Package
@@ -773,7 +775,6 @@ GLOBAL_VAR(build_tag, "", String)
 data WayName
   = WayProf
   | WayUnreg
-  | WayDll
   | WayTicky
   | WayPar
   | WayGran
@@ -800,12 +801,9 @@ data WayName
 
 GLOBAL_VAR(ways, [] ,[WayName])
 
--- ToDo: allow WayDll with any other allowed combination
-
-allowed_combinations = 
-   [  [WayProf,WayUnreg],
-      [WayProf,WaySMP]	   -- works???
-   ]
+allowed_combination ways = ways `elem` combs
+  where  -- the sub-lists must be ordered according to WayName, because findBuildTag sorts them
+    combs                = [ [WayProf,WayUnreg], [WayProf,WaySMP] ]
 
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
@@ -818,7 +816,7 @@ findBuildTag = do
 	       writeIORef build_tag (wayTag details)
 	       return (wayOpts details)
 
-     ws  -> if  ws `notElem` allowed_combinations
+     ws  -> if  allowed_combination ws
 		then throwDyn (OtherError $
 				"combination not supported: "  ++
    				foldr1 (\a b -> a ++ '/':b) 
@@ -861,9 +859,6 @@ way_details =
 	, "-fno-asm-mangling"
 	, "-funregisterised"
 	, "-fvia-C" ]),
-
-    (WayDll, Way  "dll" "DLLized"
-        [ ]),
 
     (WayPar, Way  "mp" "Parallel" 
 	[ "-fparallel"
@@ -952,9 +947,10 @@ machdepCCOpts
       --   the fp (%ebp) for our register maps.
 	= do n_regs <- readState stolen_x86_regs
 	     sta    <- readIORef static
-	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "" ],
+	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "",
+			if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
-	                "-DSTOLEN_X86_REGS="++show n_regs ]
+	                "-DSTOLEN_X86_REGS="++show n_regs]
 		    )
 
    | prefixMatch "mips"    cTARGETPLATFORM
@@ -1190,7 +1186,7 @@ main =
 -----------------------------------------------------------------------------
 -- Which phase to stop at
 
-data ToDo = DoMkDependHS | DoMkDLL | StopBefore Phase | DoLink
+data ToDo = DoMkDependHS | StopBefore Phase | DoLink
   deriving (Eq)
 
 GLOBAL_VAR(v_todo, error "todo", ToDo)
@@ -1785,7 +1781,8 @@ run_phase Hsc	basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef recomp
 	todo <- readIORef v_todo
-        o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
+        o_file' <- odir_ify (basename ++ '.':phase_input_ext Ln)
+        o_file <- osuf_ify o_file'
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return ""
@@ -1843,7 +1840,7 @@ run_phase Hsc	basename suff input_fn output_fn
 		run_something "Copy stub .c file" 
 		    (unwords [ 
 			"rm -f", stub_c, "&&",
-			"echo \'#include \""++stub_h++"\"\' >"++stub_c, " &&",
+			"echo \'#include \"Stg.h\"\n#include \""++stub_h++"\"\' >"++stub_c, " &&",
 			"cat", tmp_stub_c, ">> ", stub_c
 			])
 
@@ -1922,9 +1919,6 @@ run_phase cc_phase _basename _suff input_fn output_fn
 		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
 		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		   ++ cc_opts
-#ifdef mingw32_TARGET_OS
-                   ++ [" -mno-cygwin"]
-#endif
 		   ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
@@ -2027,10 +2021,15 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 -----------------------------------------------------------------------------
 -- Linking
 
+GLOBAL_VAR(no_hs_main, False, Bool)
+
 do_link :: [String] -> IO ()
 do_link o_files = do
     ln <- readIORef pgm_l
     verb <- is_verbose
+    static <- readIORef static
+    let imp = if static then "" else "_imp"
+    no_hs_main <- readIORef no_hs_main
     o_file <- readIORef output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
@@ -2041,7 +2040,7 @@ do_link o_files = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
-    let pkg_lib_opts = map (\lib -> "-l"++lib) pkg_libs
+    let pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
 
     libs <- readIORef cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
@@ -2055,10 +2054,23 @@ do_link o_files = do
 	-- opts from -optl-<blah>
     extra_ld_opts <- getOpts opt_l
 
+    rts_pkg <- getPackageDetails ["rts"]
+    std_pkg <- getPackageDetails ["std"]
+#ifdef mingw32_TARGET_OS
+    let extra_os = if static || no_hs_main
+                   then []
+                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
+                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+#endif
+    (md_c_flags, _) <- machdepCCOpts
     run_something "Linker"
-       (unwords 
+       (unwords
 	 ([ ln, verb, "-o", output_fn ]
+	 ++ md_c_flags
 	 ++ o_files
+#ifdef mingw32_TARGET_OS
+	 ++ extra_os
+#endif
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ lib_opts
@@ -2066,6 +2078,11 @@ do_link o_files = do
 	 ++ pkg_lib_opts
 	 ++ pkg_extra_ld_opts
 	 ++ extra_ld_opts
+#ifdef mingw32_TARGET_OS
+         ++ if static then [ "-u _PrelMain_mainIO_closure" , "-u ___init_PrelMain"] else []
+#else
+	 ++ [ "-u PrelMain_mainIO_closure" , "-u __init_PrelMain"]
+#endif
 	)
        )
 
@@ -2095,7 +2112,7 @@ run_something phase_name cmd
    hPutStrLn h cmd
    hClose h
    exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
    removeFile tmp
 #endif
 
@@ -2144,7 +2161,6 @@ driver_opts =
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addNoDups ways	WayProf) )
   ,  ( "unreg"		, NoArg (addNoDups ways	WayUnreg) )
-  ,  ( "dll"            , NoArg (addNoDups ways WayDll) )
   ,  ( "ticky"		, NoArg (addNoDups ways	WayTicky) )
   ,  ( "parallel"	, NoArg (addNoDups ways	WayPar) )
   ,  ( "gransim"	, NoArg (addNoDups ways	WayGran) )
@@ -2177,6 +2193,7 @@ driver_opts =
   ,  ( "cpp"		, NoArg (updateState (\s -> s{ cpp_flag = True })) )
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
+  ,  ( "no-hs-main"     , NoArg (writeIORef no_hs_main True) )
 
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef output_dir  . Just) )
@@ -2254,6 +2271,7 @@ driver_opts =
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef static True) )
+  ,  ( "rdynamic"	, NoArg (return ()) ) -- ignored for compat w/ gcc
 
         ------ Compiler RTS options -----------------------------------------
   ,  ( "H"                 , HasArg (newHeapSize  . decodeSize) )
@@ -2433,15 +2451,6 @@ my_prefix_match (_:_) [] = Nothing
 my_prefix_match (p:pat) (r:rest)
   | p == r    = my_prefix_match pat rest
   | otherwise = Nothing
-
-prefixMatch :: Eq a => [a] -> [a] -> Bool
-prefixMatch [] _str = True
-prefixMatch _pat [] = False
-prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
-			  | otherwise = False
-
-postfixMatch :: String -> String -> Bool
-postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
 
 later = flip finally
 

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.44 2000/09/05 10:16:41 simonmar Exp $
+# $Id: Makefile,v 1.45 2000/11/07 10:42:56 simonmar Exp $
 #
 
 TOP=..
@@ -22,8 +22,8 @@ SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
 HS_PROG = ghc-$(ProjectVersion)
-HS_SRCS = Config.hs Package.hs GetImports.hs Main.hs
-MKDEPENDHS_SRCS = Config.hs Main.hs GetImports.hs PackageSrc.hs
+HS_SRCS = Config.hs Package.hs GetImports.hs Main.hs Utils.hs
+MKDEPENDHS_SRCS = Config.hs Main.hs GetImports.hs PackageSrc.hs Utils.hs
 LINK = ghc
 
 SUBDIRS = mangler split stats
@@ -58,7 +58,7 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> Config.hs
 	@echo "cGHC_STATS            = \"$(GHC_STATS)\"" >> Config.hs
 	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> Config.hs
-	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> Config.hs
+	@echo "cDLLized              = \"$(DLLized)\"" >> Config.hs
 	@echo "cCP                   = \"$(CP)\"" >> Config.hs
 	@echo "cRM                   = \"$(RM)\"" >> Config.hs
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> Config.hs
@@ -95,8 +95,8 @@ CLEAN_FILES += ghc-inplace
 
 all :: package.conf package.conf.inplace
 
-pkgconf : Config.o Package.o PackageSrc.o
-	$(HC) $(HC_OPTS) $(LD_OPTS) Config.o Package.o PackageSrc.o -o pkgconf
+pkgconf : Config.o Package.o PackageSrc.o Utils.o
+	$(HC) $(HC_OPTS) $(LD_OPTS) Config.o Package.o PackageSrc.o Utils.o -o pkgconf
 
 package.conf.inplace : pkgconf
 	./pkgconf in-place >$@
@@ -120,8 +120,12 @@ INSTALL_DATAS += ghc-usage.txt
 
 include $(TOP)/mk/target.mk
 
-# we need the driver for generating dependencies...
-boot :: all
+# We need the driver for generating dependencies...  so build it as
+# part of make boot.  We need to do this using a recursive invocation
+# of $(MAKE), so that dependencies we just generated for the driver
+# itself are picked up.
+boot ::
+	$(MAKE) $(MFLAGS) all
 
 # -----------------------------------------------------------------------------
 # Create link to from ghc-x.xx to ghc...

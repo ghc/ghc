@@ -205,7 +205,11 @@ __export PrelGHC
   integerToWord64zh
   int64ToIntegerzh
   word64ToIntegerzh
-  
+  andIntegerzh
+  orIntegerzh
+  xorIntegerzh
+  complementIntegerzh
+
   Arrayzh
   ByteArrayzh
   MutableArrayzh

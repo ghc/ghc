@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.7 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelStable.lhs,v 1.8 2000/11/07 10:42:57 simonmar Exp $
 %
 % (c) The GHC Team, 1992-2000
 %
@@ -11,7 +11,7 @@
 
 module PrelStable 
 	( StablePtr(..)
-	, makeStablePtr	  -- :: a -> IO (StablePtr a)    
+	, newStablePtr    -- :: a -> IO (StablePtr a)    
 	, deRefStablePtr  -- :: StablePtr a -> a
 	, freeStablePtr   -- :: StablePtr a -> IO ()
    ) where
@@ -27,11 +27,11 @@ data StablePtr  a = StablePtr  (StablePtr#  a)
 instance CCallable   (StablePtr a)
 instance CReturnable (StablePtr a)
 
-makeStablePtr  :: a -> IO (StablePtr a)
+newStablePtr   :: a -> IO (StablePtr a)
 deRefStablePtr :: StablePtr a -> IO a
-foreign import "freeStablePtr" unsafe freeStablePtr :: StablePtr a -> IO ()
+foreign import unsafe freeStablePtr :: StablePtr a -> IO ()
 
-makeStablePtr a = IO $ \ s ->
+newStablePtr a = IO $ \ s ->
     case makeStablePtr# a s of (# s', sp #) -> (# s', StablePtr sp #)
 
 deRefStablePtr (StablePtr sp) = IO $ \s -> deRefStablePtr# sp s

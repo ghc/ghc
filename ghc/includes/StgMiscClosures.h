@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.20 2000/10/12 15:50:14 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.21 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -128,14 +128,14 @@ extern const vec_info_8 ret_bco_info;
 
 /* closures */
 
-extern DLL_IMPORT_DATA StgClosure END_TSO_QUEUE_closure;
-extern DLL_IMPORT_DATA StgClosure END_MUT_LIST_closure;
-extern DLL_IMPORT_DATA StgClosure NO_FINALIZER_closure;
-extern DLL_IMPORT_DATA StgClosure dummy_ret_closure;
-extern DLL_IMPORT_DATA StgClosure forceIO_closure;
+extern DLL_IMPORT_RTS StgClosure END_TSO_QUEUE_closure;
+extern DLL_IMPORT_RTS StgClosure END_MUT_LIST_closure;
+extern DLL_IMPORT_RTS StgClosure NO_FINALIZER_closure;
+extern DLL_IMPORT_RTS StgClosure dummy_ret_closure;
+extern DLL_IMPORT_RTS StgClosure forceIO_closure;
 
-extern DLL_IMPORT_DATA StgIntCharlikeClosure CHARLIKE_closure[];
-extern DLL_IMPORT_DATA StgIntCharlikeClosure INTLIKE_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure CHARLIKE_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure INTLIKE_closure[];
 
 /* standard entry points */
 

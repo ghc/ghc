@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelAddr.lhs,v 1.17 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelAddr.lhs,v 1.18 2000/11/07 10:42:56 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -11,11 +11,10 @@
 
 module PrelAddr (
 	  Addr(..)
-	, AddrOff(..)
 	, nullAddr		-- :: Addr
-	, alignAddr		-- :: Addr -> Int -> Addr
-	, plusAddr		-- :: Addr -> AddrOff -> Addr
-	, minusAddr		-- :: Addr -> Addr -> AddrOff
+	, alignAddr		-- :: Addr -> Int  -> Addr
+	, plusAddr		-- :: Addr -> Int  -> Addr
+	, minusAddr		-- :: Addr -> Addr -> Int
 
 	, indexAddrOffAddr	-- :: Addr -> Int -> Addr
 
@@ -37,8 +36,6 @@ infixl 5 `plusAddr`, `minusAddr`
 data Addr = A# Addr# 	deriving (Eq, Ord)
 data Word = W# Word# 	deriving (Eq, Ord)
 
-newtype AddrOff = AddrOff# Int
-
 nullAddr :: Addr
 nullAddr = A# (int2Addr# 0#)
 
@@ -49,11 +46,11 @@ alignAddr addr@(A# a) (I# i)
       0# -> addr;
       n  -> A# (int2Addr# (ai +# (i -# n))) }}
 
-plusAddr :: Addr -> AddrOff -> Addr
-plusAddr (A# addr) (AddrOff# (I# off)) = A# (int2Addr# (addr2Int# addr +# off))
+plusAddr :: Addr -> Int -> Addr
+plusAddr (A# addr) (I# off) = A# (int2Addr# (addr2Int# addr +# off))
 
-minusAddr :: Addr -> Addr -> AddrOff
-minusAddr (A# a1) (A# a2) = AddrOff# (I# (addr2Int# a1 -# addr2Int# a2))
+minusAddr :: Addr -> Addr -> Int
+minusAddr (A# a1) (A# a2) = I# (addr2Int# a1 -# addr2Int# a2)
 
 instance CCallable Addr
 instance CReturnable Addr

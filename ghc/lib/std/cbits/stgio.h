@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.23 2000/08/24 10:27:01 simonmar Exp $
+ * $Id: stgio.h,v 1.24 2000/11/07 10:42:57 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -9,6 +9,8 @@
 
 #ifndef STGIO_H
 #define STGIO_H
+
+#include "StgDLL.h"  /* for DLL_IMPORT_STDLIB */
 
 #include "stgerror.h"
 #include "fileObject.h"
@@ -57,9 +59,9 @@ int	_setenv		(char *);
 int	delenv		(char *);
 
 /* errno.c */
-extern	int ghc_errno;
-extern	int ghc_errtype;
-extern	char* ghc_errstr;
+DLL_IMPORT_STDLIB extern	int ghc_errno;
+DLL_IMPORT_STDLIB extern	int ghc_errtype;
+DLL_IMPORT_STDLIB extern	char* ghc_errstr;
 
 void	cvtErrno(void);
 void	stdErrno(void);

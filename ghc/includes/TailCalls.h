@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.5 2000/04/05 14:26:31 panne Exp $
+ * $Id: TailCalls.h,v 1.6 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,13 @@ extern void __DISCARD__(void);
    stack that GCC hasn't popped yet.  Also possibly to fool any
    optimisations (a function call often acts as a barrier).  Not sure
    if any of this is necessary now -- SDM
+
+   Comment to above note: I don't think the __DISCARD__() in JMP_ is 
+   necessary.  Arguments should be popped from the C stack immediately
+   after returning from a function, as long as we pass -fno-defer-pop
+   to gcc.  Moreover, a goto to a first-class label acts as a barrier 
+   for optimisations in the same way a function call does. 
+   -= chak
    */
 
 /* The goto here seems to cause gcc -O2 to delete all the code after
@@ -110,8 +117,17 @@ register void *_procedure __asm__("$27");
   function and these markers is shredded by the mangler.
   -------------------------------------------------------------------------- */
 
+/*  The following __DISCARD__() has become necessary with gcc 2.96 on x86.
+ *  It prevents gcc from moving stack manipulation code from the function
+ *  body (aka the Real Code) into the function prologue, ie, from moving it
+ *  over the --- BEGIN --- marker.  It should be noted that (like some
+ *  other black magic in GHC's code), there is no essential reason why gcc
+ *  could not move some stack manipulation code across the __DISCARD__() -
+ *  it just doesn't choose to do it at the moment.
+ *  -= chak
+ */
 #ifndef FB_
-#define FB_    __asm__ volatile ("--- BEGIN ---");
+#define FB_    __asm__ volatile ("--- BEGIN ---"); __DISCARD__ ();
 #endif
 
 #ifndef FE_

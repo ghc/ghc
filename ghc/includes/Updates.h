@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.18 2000/05/15 14:38:11 simonmar Exp $
+ * $Id: Updates.h,v 1.19 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -172,7 +172,7 @@ extern void awakenBlockedQueue(StgTSO *q);
 #define PUSH_STD_CCCS(frame)
 #endif
 
-extern DLL_IMPORT_DATA const StgPolyInfoTable upd_frame_info; 
+extern DLL_IMPORT_RTS const StgPolyInfoTable upd_frame_info; 
 
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
@@ -234,14 +234,14 @@ extern void newCAF_made_by_Hugs(StgCAF*);
 
 DLL_IMPORT_RTS extern STGFUN(upd_frame_entry);
 
-extern DLL_IMPORT_DATA const StgInfoTable PAP_info;
+extern DLL_IMPORT_RTS const StgInfoTable PAP_info;
 DLL_IMPORT_RTS STGFUN(PAP_entry);
 
 EXTFUN_RTS(stg_update_PAP);
 
-extern DLL_IMPORT_DATA const StgInfoTable AP_UPD_info;
+extern DLL_IMPORT_RTS const StgInfoTable AP_UPD_info;
 DLL_IMPORT_RTS STGFUN(AP_UPD_entry);
 
-extern DLL_IMPORT_DATA const StgInfoTable raise_info;
+extern DLL_IMPORT_RTS const StgInfoTable raise_info;
 
 #endif /* UPDATES_H */

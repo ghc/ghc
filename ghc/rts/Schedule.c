@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.79 2000/10/10 09:12:19 simonmar Exp $
+ * $Id: Schedule.c,v 1.80 2000/11/07 10:42:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -213,6 +213,12 @@ Capability MainRegTable;       /* for non-SMP, we have one global capability */
 #if defined(GRAN)
 StgTSO *CurrentTSO;
 #endif
+
+/*  This is used in `TSO.h' and gcc 2.96 insists that this variable actually 
+ *  exists - earlier gccs apparently didn't.
+ *  -= chak
+ */
+StgTSO dummy_tso;
 
 rtsBool ready_to_gc;
 

@@ -17,6 +17,7 @@ test = do
    testIntlike "Word8"  (0::Word8)    
    testIntlike "Word16" (0::Word16)   
    testIntlike "Word32" (0::Word32)   
+   testInteger
 
 testIntlikeNoBits :: (Bounded a, Integral a, Ix a, Read a) => String -> a -> IO ()
 testIntlikeNoBits name zero = do
@@ -32,11 +33,24 @@ testIntlikeNoBits name zero = do
   testReal     zero
   testIntegral zero
 
+testInteger  = do
+  let zero = 0 :: Integer
+  putStrLn $ "--------------------------------"
+  putStrLn $ "--Testing Integer
+  putStrLn $ "--------------------------------"
+  testEnum     zero
+  testReadShow zero
+  testEq       zero
+  testOrd      zero
+  testNum      zero
+  testReal     zero
+  testIntegral zero
+  testBits     zero False
 
 testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
 testIntlike name zero = do
   testIntlikeNoBits name zero
-  testBits     zero
+  testBits     zero True
 
 
 -- In all these tests, zero is a dummy element used to get
@@ -125,7 +139,7 @@ testIntegral zero = do
  where
   (xs,ys) = samples zero
 
-testBits zero = do
+testBits zero do_bitsize = do
   putStrLn "testBits"
   table2 ".&.  "            (.&.)         xs ys
   table2 ".|.  "            (.|.)         xs ys
@@ -139,7 +153,7 @@ testBits zero = do
   table2 "`clearBit`"       clearBit      xs ([0..3] ++ [32])
   table2 "`complementBit`"  complementBit xs ([0..3] ++ [32])
   table2 "`testBit`"        testBit       xs ([0..3] ++ [32])
-  table1 "bitSize"          bitSize       xs
+  if do_bitsize then table1 "bitSize" bitSize xs else return ()
   table1 "isSigned"         isSigned      xs
  where
   (xs,ys) = samples zero

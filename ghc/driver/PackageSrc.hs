@@ -1,4 +1,8 @@
+#include "../includes/config.h"
+
 module Main (main) where
+
+import Utils
 
 import IO
 import System
@@ -52,37 +56,41 @@ package_details installing =
         extra_cc_opts  = [],
                 -- the RTS forward-references to a bunch of stuff in the prelude,
                 -- so we force it to be included with special options to ld.
-        extra_ld_opts  = [
-           "-u PrelMain_mainIO_closure"
-         , "-u PrelBase_Izh_static_info"
-         , "-u PrelBase_Czh_static_info"
-         , "-u PrelFloat_Fzh_static_info"
-         , "-u PrelFloat_Dzh_static_info"
-         , "-u PrelAddr_Azh_static_info"
-         , "-u PrelAddr_Wzh_static_info"
-         , "-u PrelAddr_I64zh_static_info"
-         , "-u PrelAddr_W64zh_static_info"
-         , "-u PrelStable_StablePtr_static_info"
-         , "-u PrelBase_Izh_con_info"
-         , "-u PrelBase_Czh_con_info"
-         , "-u PrelFloat_Fzh_con_info"
-         , "-u PrelFloat_Dzh_con_info"
-         , "-u PrelAddr_Azh_con_info"
-         , "-u PrelAddr_Wzh_con_info"
-         , "-u PrelAddr_I64zh_con_info"
-         , "-u PrelAddr_W64zh_con_info"
-         , "-u PrelStable_StablePtr_con_info"
-         , "-u PrelBase_False_closure"
-         , "-u PrelBase_True_closure"
-         , "-u PrelPack_unpackCString_closure"
-         , "-u PrelIOBase_stackOverflow_closure"
-         , "-u PrelIOBase_heapOverflow_closure"
-         , "-u PrelIOBase_NonTermination_closure"
-         , "-u PrelIOBase_PutFullMVar_closure"
-         , "-u PrelIOBase_BlockedOnDeadMVar_closure"
-         , "-u PrelWeak_runFinalizzerBatch_closure"
-         , "-u __init_Prelude"
-         , "-u __init_PrelMain"
+        extra_ld_opts  = map (
+#ifndef LEADING_UNDERSCORE
+		          "-u "
+#else
+			  "-u _"
+#endif
+                          ++ ) [
+           "PrelBase_Izh_static_info"
+         , "PrelBase_Czh_static_info"
+         , "PrelFloat_Fzh_static_info"
+         , "PrelFloat_Dzh_static_info"
+         , "PrelAddr_Azh_static_info"
+         , "PrelAddr_Wzh_static_info"
+         , "PrelAddr_I64zh_static_info"
+         , "PrelAddr_W64zh_static_info"
+         , "PrelStable_StablePtr_static_info"
+         , "PrelBase_Izh_con_info"
+         , "PrelBase_Czh_con_info"
+         , "PrelFloat_Fzh_con_info"
+         , "PrelFloat_Dzh_con_info"
+         , "PrelAddr_Azh_con_info"
+         , "PrelAddr_Wzh_con_info"
+         , "PrelAddr_I64zh_con_info"
+         , "PrelAddr_W64zh_con_info"
+         , "PrelStable_StablePtr_con_info"
+         , "PrelBase_False_closure"
+         , "PrelBase_True_closure"
+         , "PrelPack_unpackCString_closure"
+         , "PrelIOBase_stackOverflow_closure"
+         , "PrelIOBase_heapOverflow_closure"
+         , "PrelIOBase_NonTermination_closure"
+         , "PrelIOBase_PutFullMVar_closure"
+         , "PrelIOBase_BlockedOnDeadMVar_closure"
+         , "PrelWeak_runFinalizzerBatch_closure"
+         , "__init_Prelude"
          ]
         },
 
@@ -104,7 +112,11 @@ package_details installing =
         package_deps   = [ "rts" ],
         extra_ghc_opts = [],
         extra_cc_opts  = [],
-        extra_ld_opts  = [ "-lm" ]
+        extra_ld_opts  = [ "-lm"
+#ifdef mingw32_TARGET_OS
+			 , "-lwsock32"
+#endif
+			 ]
         },
 
          Package { 
@@ -191,7 +203,7 @@ package_details installing =
          package_deps   = [ "lang", "text" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = if postfixMatch "solaris2" cTARGETPLATFORM
+         extra_ld_opts  = if suffixMatch "solaris2" cTARGETPLATFORM
                              then [ "-lnsl",  "-lsocket" ]
                              else []
         },
@@ -257,7 +269,11 @@ package_details installing =
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits" ],
          c_includes     = [ "HsUtil.h" ],
-         package_deps   = [ "lang", "concurrent", "posix" ],
+         package_deps   = [ "lang", "concurrent"
+#ifndef mingw32_TARGET_OS
+			    , "posix"
+#endif
+			  ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
@@ -322,12 +338,3 @@ package_details installing =
 
 ghc_src_dir :: String -> String
 ghc_src_dir path = cFPTOOLS_TOP_ABS ++ '/':cCURRENT_DIR ++ '/':path
-
-prefixMatch :: Eq a => [a] -> [a] -> Bool
-prefixMatch [] _str = True
-prefixMatch _pat [] = False
-prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
-                          | otherwise = False
-
-postfixMatch :: String -> String -> Bool
-postfixMatch pat str = prefixMatch (reverse pat) (reverse str)

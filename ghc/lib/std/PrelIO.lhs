@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIO.lhs,v 1.15 2000/07/25 15:20:10 simonmar Exp $
+% $Id: PrelIO.lhs,v 1.16 2000/11/07 10:42:56 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -26,7 +26,7 @@ import PrelNum
 import PrelRead         ( Read(..), readIO )
 import PrelShow
 import PrelMaybe	( Maybe(..) )
-import PrelAddr		( Addr(..), AddrOff(..), nullAddr, plusAddr )
+import PrelAddr		( Addr(..), nullAddr, plusAddr )
 import PrelList		( concat, reverse, null )
 import PrelPack		( unpackNBytesST, unpackNBytesAccST )
 import PrelException    ( ioError, catch, catchException, throw )
@@ -229,7 +229,6 @@ hGetContents handle =
 	-- the handle.
     withHandle handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> ioException theError
       ClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
       SemiClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
       AppendHandle 	   -> ioException not_readable_error
@@ -379,7 +378,7 @@ getBuffer handle_ = do
    case mode of
 	NoBuffering -> return (handle_, (mode, nullAddr, 0))
 	_ -> case bufs of
-		[] -> do  buf <- allocMemory__ sz
+		[] -> do  buf <- malloc sz
 			  return (handle_, (mode, buf, sz))
 		(b:bs) -> return (handle_{ haBuffers__ = bs }, (mode, b, sz))
 
@@ -481,7 +480,7 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 
 		-- not flushing, and there's enough room in the buffer:
 		-- just copy the data in and update bufWPtr.
-	    else do memcpy (plusAddr fo_buf (AddrOff# fo_wptr)) buf count
+	    else do memcpy (plusAddr fo_buf fo_wptr) buf count
 		    setBufWPtr fo (fo_wptr + count)
 		    handle_ <- freeBuffer handle_ buf sz
 		    ok handle_
@@ -535,7 +534,7 @@ commitBuffer handle buf sz count flush = do
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
 			        else return ()
 
-	    else do memcpy (plusAddr fo_buf (AddrOff# new_wptr)) buf count
+	    else do memcpy (plusAddr fo_buf new_wptr) buf count
 		    setBufWPtr fo (new_wptr + count)
 		    return ()
 

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.28 2000/09/25 12:58:39 simonpj Exp $
+% $Id: PrelIOBase.lhs,v 1.29 2000/11/07 10:42:56 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -23,7 +23,7 @@ import PrelST
 import PrelBase
 import PrelNum	  ( fromInteger )	-- Integer literals
 import PrelMaybe  ( Maybe(..) )
-import PrelAddr	  ( Addr(..) )
+import PrelAddr	  ( Addr(..), nullAddr )
 import PrelShow
 import PrelList
 import PrelDynamic
@@ -223,8 +223,7 @@ data Handle__
   of the following:
 -}
 data Handle__Type
- = ErrorHandle  IOException
- | ClosedHandle
+ = ClosedHandle
  | SemiClosedHandle
  | ReadHandle
  | WriteHandle
@@ -251,7 +250,6 @@ type FilePath = String
 instance Show Handle__Type where
   showsPrec p t =
     case t of
-      ErrorHandle iot   -> showString "error " . showsPrec p iot
       ClosedHandle      -> showString "closed"
       SemiClosedHandle  -> showString "semi-closed"
       ReadHandle        -> showString "readable"
@@ -287,7 +285,6 @@ instance Show Handle where
     showHdl ht cont = 
        case ht of
         ClosedHandle  -> showsPrec p ht . showString "}\n"
-        ErrorHandle _ -> showsPrec p ht . showString "}\n"
 	_ -> cont
        
     showBufMode :: FILE_OBJECT -> BufferMode -> ShowS
@@ -360,9 +357,16 @@ Foreign import declarations to helper routines:
 foreign import "libHS_cbits" "getErrStr__"  unsafe getErrStr__  :: IO Addr 
 foreign import "libHS_cbits" "getErrNo__"   unsafe getErrNo__   :: IO Int  
 foreign import "libHS_cbits" "getErrType__" unsafe getErrType__ :: IO Int  
+  
+malloc :: Int -> IO Addr
+malloc sz = do
+  a <- _malloc sz
+  if (a == nullAddr)
+	then ioException (IOError Nothing ResourceExhausted "malloc" "")
+	else return a
 
-foreign import "libHS_cbits" "allocMemory__" unsafe
-           allocMemory__    :: Int -> IO Addr
+foreign import "malloc" unsafe _malloc :: Int -> IO Addr
+
 foreign import "libHS_cbits" "getBufSize"  unsafe
            getBufSize       :: FILE_OBJECT -> IO Int
 foreign import "libHS_cbits" "setBuf" unsafe

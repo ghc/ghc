@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.38 2000/11/01 11:41:47 simonmar Exp $
+# $Id: Makefile,v 1.39 2000/11/07 10:42:57 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -26,7 +26,7 @@ SRCS_RTS_C  = $(wildcard *.c) $(wildcard hooks/*.c) $(filter-out parallel/SysMan
 SRCS_RTS_S  = $(wildcard *.S)
 SRCS_RTS_HC = $(wildcard *.hc) $(wildcard parallel/*.hc)
 
-ifneq "$(way)" "dll"
+ifneq "$(DLLized)" "YES"
 SRCS_RTS_C  := $(filter-out RtsDllMain.c, $(SRCS_RTS_C))
 else
 SRCS_RTS_C  := $(filter-out Main.c, $(SRCS_RTS_C))
@@ -35,7 +35,6 @@ endif
 #-----------------------------------------------------------------------------
 # creating and installing libHSrts.a (in its many flavors)
 #
-LIBRARY = libHSrts$(_way).a
 LIBOBJS = $(patsubst %.c,%.$(way_)o,$(SRCS_RTS_C)) \
           $(patsubst %.hc,%.$(way_)o,$(SRCS_RTS_HC)) \
           $(patsubst %.S,%.$(way_)o,$(SRCS_RTS_S))
@@ -63,7 +62,7 @@ WARNING_OPTS += -optc-Wbad-function-cast
 SRC_HC_OPTS += -I../includes -I. -Iparallel $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
 SRC_CC_OPTS = $(GhcRtsCcOpts)
 
-ifneq "$(way)" "dll"
+ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
 endif
 # SRC_HC_OPTS += -optc-fPIC
@@ -112,15 +111,15 @@ unexport CC
 # -----------------------------------------------------------------------------
 #
 #  Building DLLs is only supported on mingw32 at the moment.
-# 
-DLL_NAME          = HSrts.dll
-ifeq "$(way)" "dll"
-DLL_IMPLIB_NAME   = libHSrts_imp.a
-
-SRC_BLD_DLL_OPTS += --output-def=HSrts.def --export-all -L. -Lgmp -lwinmm \
-                    -lHS_imp_stub -lgmp_imp
-
 #
+HSLIB             = rts
+
+ifeq "$(DLLized)" "YES"
+SRC_BLD_DLL_OPTS += -lHS_imp_stub -lgmp_imp
+
+# It's not included in the DLL, but we need to compile it up separately.
+all :: Main.dll_o
+
 # Need an import library containing the symbols the RTS uses from the Prelude.
 # So, to avoid bootstrapping trouble, we build one containing just the syms
 # we need. Weirdly named to avoid clashing later on when compiling the contents
@@ -129,13 +128,10 @@ SRC_BLD_DLL_OPTS += --output-def=HSrts.def --export-all -L. -Lgmp -lwinmm \
 # Note: if you do change the name of the Prelude DLL, the "--dllname <nm>.dll"
 # below will need to be updated as well.
 
-$(DLL_PEN)/$(DLL_NAME) :: libHS_imp_stub.a
+$(DLL_PEN)/HSrts$(_way).dll :: libHS_imp_stub.a
 
 libHS_imp_stub.a :
 	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSstd.dll
-
-# It's not included in the DLL, but we need to compile it up separately.
-all :: Main.dll_o
 
 endif
 
@@ -153,7 +149,7 @@ boot ::
 
 all :: gmp/libgmp.a
 
-ifeq "$(way)" "dll"
+ifeq "$(DLLized)" "YES"
 all :: $(DLL_PEN)/gmp.dll
 
 $(DLL_PEN)/gmp.dll:
@@ -204,13 +200,10 @@ endif
 # Just libHSrts is installed uniformly across ways
 #
 INSTALL_LIBS += $(LIBRARY)
-ifeq "$(EnableWin32DLLs)" "YES"
+ifeq "$(DLLized)" "YES"
 INSTALL_PROGS += $(DLL_NAME) gmp/gmp.dll
-ifneq "$(way)" "dll"
-INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBARY))
-endif
+INSTALL_LIBS += $(patsubst %.a,%_imp.a,$(LIBARY))
 INSTALL_LIBS += gmp/libgmp_imp.a Main.dll_o
 endif
 
 include $(TOP)/mk/target.mk
-

@@ -25,15 +25,15 @@ endif
 HC 	   = $(GHC_INPLACE)
 MKDEPENDHS = $(GHC_INPLACE)
 
-ifneq "$(way)" "dll"
+ifneq "$(DLLized)" "YES"
 PACKAGE = -package-name std
 else
 # Hack by SPJ to delay if-then-else until the pattern rule when we have $*
 PACKAGE = $(subst ~, ,$(word $(words dummy $(findstring $(notdir $*), PrelMain )), -package-name~std))
 endif
-LIBRARY = libHSstd$(_way).a
 
-LIBOBJS = $(HS_OBJS)
+HSLIB = std
+
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 LIBOBJS = $(filter-out PrelHugs.$(way_)o,$(HS_OBJS))
 endif
@@ -42,7 +42,7 @@ endif
 # 	Setting the GHC compile options
 
 SRC_HC_OPTS += -recomp -cpp -fglasgow-exts-no-lang -fvia-C -Rghc-timing $(GhcLibHcOpts) $(PACKAGE)
-ifneq "$(way)" "dll"
+ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
 endif
 
@@ -87,21 +87,16 @@ PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 
 boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
-DLL_NAME = HSstd.dll
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
-DLL_IMPLIB_NAME = libHSstd_imp.a
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSstd.def DllVersionInfo.o
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHSstd_cbits_imp -lgmp_imp -L. -L../../rts/gmp -L../../rts -Lcbits
 
-ifeq "$(way)" "dll"
+ifeq "$(DLLized)" "YES"
 HS_SRCS := $(filter-out PrelMain.lhs PrelHugs.lhs, $(HS_SRCS))
 endif
 
 # PrelMain.dll_o isn't to be included in the final .a, 
 # but it needs to be generated
-ifeq "$(way)" "dll"
-all :: PrelMain.dll_o DllVersionInfo.o
-
+ifeq "$(DLLized)" "YES"
+all :: PrelMain.dll_o
 endif
 
 CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
@@ -133,17 +128,12 @@ override datadir:=$(libdir)/imports/std
 #
 # Files to install from here
 # 
-INSTALL_LIBS  += $(LIBRARY)
-ifeq "$(way)" "dll"
-INSTALL_PROGS += $(DLL_NAME)
+ifeq "$(DLLized)" "YES"
 INSTALL_LIBS  += PrelMain.dll_o
-else
-ifeq "$(EnableWin32Dlls)" "YES"
-$(patsubst %.a,%_imp.a, $(LIBRARY))
 endif
-endif
-INSTALL_DATAS += $(HS_IFACES) PrelGHC.$(way_)hi
-ifeq "$(way)" "dll"
+
+INSTALL_DATAS += PrelGHC.$(way_)hi
+ifeq "$(DLLized)" "YES"
 INSTALL_DATAS := $(filter-out PrelHugs.$(way_)hi,$(INSTALL_DATAS))
 endif
 

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHugs.lhs,v 1.13 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelHugs.lhs,v 1.14 2000/11/07 10:42:56 simonmar Exp $
 %
 % (c) The University of Glasgow, 2000
 %
@@ -41,7 +41,7 @@ import PrelRead(Read,ReadS,lex,reads)
 import PrelFloat(Double)
 import PrelReal(Fractional,fromRational,toRational)
 import PrelAddr(Addr(..),nullAddr)
-import PrelStable(StablePtr,makeStablePtr)
+import PrelStable(StablePtr,newStablePtr)
 import PrelErr(error)
 import PrelPack(unpackCString)
 import List(length)
@@ -87,7 +87,7 @@ foreign import "malloc" unsafe malloc
         :: Int -> IO Addr
 hugsprimCreateAdjThunk :: (a -> b) -> String -> Char -> IO Addr
 hugsprimCreateAdjThunk fun typestr callconv
-   = do sp <- makeStablePtr fun
+   = do sp <- newStablePtr fun
         p  <- copy_String_to_cstring typestr  -- is never freed
         a  <- hugsCreateAdjThunk sp p callconv
         return a

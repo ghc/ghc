@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.64 2000/10/12 15:49:34 simonmar Exp $
+ * $Id: PrimOps.h,v 1.65 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -435,6 +435,12 @@ EXTFUN_RTS(word2Integerzh_fast);
 /* Floating-point decodings */
 EXTFUN_RTS(decodeFloatzh_fast);
 EXTFUN_RTS(decodeDoublezh_fast);
+
+/* Bit operations */
+EXTFUN_RTS(andIntegerzh_fast);
+EXTFUN_RTS(orIntegerzh_fast);
+EXTFUN_RTS(xorIntegerzh_fast);
+EXTFUN_RTS(complementIntegerzh_fast);
 
 /* -----------------------------------------------------------------------------
    Word64 PrimOps.

@@ -6,6 +6,7 @@ ifneq "$(BIN_DIST_NAME)" ""
 SUBDIRS = hp2ps stat2resid unlit
 else
 SUBDIRS = hp2ps		\
+	  hsc2hs	\
 	  parallel      \
 	  stat2resid	\
 	  prof          \

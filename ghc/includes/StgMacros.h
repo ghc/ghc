@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.34 2000/08/15 14:22:24 simonmar Exp $
+ * $Id: StgMacros.h,v 1.35 2000/11/07 10:42:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -617,7 +617,7 @@ static inline StgInt64 PK_Int64(W_ p_src[])
    Catch frames
    -------------------------------------------------------------------------- */
 
-extern DLL_IMPORT_DATA const StgPolyInfoTable catch_frame_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable catch_frame_info;
 
 /* -----------------------------------------------------------------------------
    Seq frames
@@ -626,7 +626,7 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable catch_frame_info;
    an update...
    -------------------------------------------------------------------------- */
 
-extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable seq_frame_info;
 
 #define PUSH_SEQ_FRAME(sp)					\
 	{							\
@@ -643,7 +643,11 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
    -------------------------------------------------------------------------- */
 
 #if defined(USE_SPLIT_MARKERS)
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
+#define __STG_SPLIT_MARKER __asm__("\n___stg_split_marker:");
+#else
 #define __STG_SPLIT_MARKER __asm__("\n__stg_split_marker:");
+#endif
 #else
 #define __STG_SPLIT_MARKER /* nothing */
 #endif
