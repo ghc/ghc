@@ -11,7 +11,8 @@ module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
 	DefaultDecl(..), ForeignDecl(..), ForKind(..),
 	ExtName(..), isDynamicExtName, extNameStatic,
-	ConDecl(..), ConDetails(..), BangType(..),
+	ConDecl(..), ConDetails(..), 
+	BangType(..), getBangType,
 	IfaceSig(..),  SpecDataSig(..), 
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule
@@ -313,12 +314,6 @@ data ConDetails name
 		(HsType name)
 		(Maybe name)	-- Just x => labelled field 'x'
 
-data BangType name
-  = Banged   (HsType name)	-- HsType: to allow Haskell extensions
-  | Unbanged (HsType name)	-- (MonoType only needed for straight Haskell)
-  | Unpacked (HsType name)	-- Field is strict and to be unpacked if poss.
-
-
 eq_ConDecl env (ConDecl n1 _ tvs1 cxt1 cds1 _)
 	       (ConDecl n2 _ tvs2 cxt2 cds2 _)
   = n1 == n2 &&
@@ -337,6 +332,16 @@ eq_ConDetails env (NewCon t1 mn1) (NewCon t2 mn2)
 eq_ConDetails env _ _ = False
 
 eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
+
+  
+data BangType name
+  = Banged   (HsType name)	-- HsType: to allow Haskell extensions
+  | Unbanged (HsType name)	-- (MonoType only needed for straight Haskell)
+  | Unpacked (HsType name)	-- Field is strict and to be unpacked if poss.
+
+getBangType (Banged ty)   = ty
+getBangType (Unbanged ty) = ty
+getBangType (Unpacked ty) = ty
 
 eq_btype env (Banged t1)   (Banged t2)   = eq_hsType env t1 t2
 eq_btype env (Unbanged t1) (Unbanged t2) = eq_hsType env t1 t2

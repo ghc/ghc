@@ -66,6 +66,7 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn
+import HsPat		( collectSigTysFromPats )
 import Name		( mkClassTyConOcc, mkClassDataConOcc )
 import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc
@@ -144,7 +145,7 @@ extractHsTyRdrTyVars	 :: RdrNameHsType -> [RdrName]
 extractHsTyRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
 
 extractHsTysRdrTyVars	  :: [RdrNameHsType] -> [RdrName]
-extractHsTysRdrTyVars tys =  filter isRdrTyVar (nub (extract_tys tys []))
+extractHsTysRdrTyVars tys =  filter isRdrTyVar (nub (extract_tys tys))
 
 extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
 extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
@@ -162,7 +163,7 @@ extract_ctxt ctxt acc = foldr extract_pred acc ctxt
 extract_pred (HsPClass cls tys) acc	= foldr extract_ty (cls : acc) tys
 extract_pred (HsPIParam n ty) acc	= extract_ty ty acc
 
-extract_tys tys acc = foldr extract_ty acc tys
+extract_tys tys = foldr extract_ty [] tys
 
 extract_ty (HsAppTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsListTy ty)              acc = extract_ty ty acc
@@ -178,26 +179,14 @@ extract_ty (HsForAllTy (Just tvs) ctxt ty)
                                       (filter (`notElem` locals) $
 				       extract_ctxt ctxt (extract_ty ty []))
 				    where
-				      locals = map getTyVarName tvs
+				      locals = hsTyVarNames tvs
 
 
 extractPatsTyVars :: [RdrNamePat] -> [RdrName]
-extractPatsTyVars pats = filter isRdrTyVar (nub (foldr extract_pat [] pats))
-
-extract_pat (SigPatIn pat ty)	   acc = extract_ty ty acc
-extract_pat WildPatIn	      	   acc = acc
-extract_pat (VarPatIn var)         acc = acc
-extract_pat (LitPatIn _)	   acc = acc
-extract_pat (LazyPatIn pat)        acc = extract_pat pat acc
-extract_pat (AsPatIn a pat)        acc = extract_pat pat acc
-extract_pat (NPlusKPatIn n _)      acc = acc
-extract_pat (ConPatIn c pats)      acc = foldr extract_pat acc pats
-extract_pat (ConOpPatIn p1 c f p2) acc = extract_pat p1 (extract_pat p2 acc)
-extract_pat (NegPatIn  pat)        acc = extract_pat pat acc
-extract_pat (ParPatIn  pat)        acc = extract_pat pat acc
-extract_pat (ListPatIn pats)       acc = foldr extract_pat acc pats
-extract_pat (TuplePatIn pats _)    acc = foldr extract_pat acc pats
-extract_pat (RecPatIn c fields)    acc = foldr (\ (f,pat,_) acc -> extract_pat pat acc) acc fields
+extractPatsTyVars = filter isRdrTyVar . 
+		    nub . 
+		    extract_tys .
+		    collectSigTysFromPats
 \end{code}
 
 mkClassDecl builds a RdrClassDecl, filling in the names for tycon and datacon

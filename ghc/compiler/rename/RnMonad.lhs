@@ -47,9 +47,7 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc,
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  isLocallyDefinedName, nameModule, nameOccName,
 			  decode, mkLocalName, mkUnboundName,
-			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnv,
-			  addToNameEnv_C, plusNameEnv_C, nameEnvElts, 
-			  elemNameEnv, addToNameEnv, addListToNameEnv
+			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList
 			)
 import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
 			  mkModuleHiMaps, moduleName, mkSearchPath
@@ -696,7 +694,7 @@ extendFixityEnv :: [(Name, RenamedFixitySig)] -> RnMS a -> RnMS a
 extendFixityEnv fixes enclosed_scope
 	        rn_down l_down@(SDown {rn_fixenv = fixity_env})
   = let
-	new_fixity_env = extendNameEnv fixity_env fixes
+	new_fixity_env = extendNameEnvList fixity_env fixes
     in
     enclosed_scope rn_down (l_down {rn_fixenv = new_fixity_env})
 \end{code}

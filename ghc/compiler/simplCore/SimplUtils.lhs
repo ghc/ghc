@@ -444,7 +444,6 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
-    main_tyvar_set = mkVarSet tyvars
 
     go fn (Let bind@(NonRec var rhs) body) | exprIsTrivial rhs
       = go (fn . Let bind) body
@@ -455,6 +454,8 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 	returnSmpl (Let (NonRec var' (mkLams tyvars_here (fn rhs))) body')
       where
 	tyvars_here = tyvars
+		--	main_tyvar_set = mkVarSet tyvars
+		--	var_ty = idType var
 		-- varSetElems (main_tyvar_set `intersectVarSet` tyVarsOfType var_ty)
 		-- tyvars_here was an attempt to reduce the number of tyvars
 		-- wrt which the new binding is abstracted.  But the naive
@@ -472,8 +473,6 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- abstracting wrt *all* the tyvars.  We'll see if that
 		-- gives rise to problems.   SLPJ June 98
 
-	var_ty = idType var
-
     go fn (Let (Rec prs) body)
        = mapAndUnzipSmpl (mk_poly tyvars_here) vars	`thenSmpl` \ (vars', rhss') ->
 	 let
@@ -485,9 +484,9 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 	 (vars,rhss) = unzip prs
 	 tyvars_here = tyvars
 		-- varSetElems (main_tyvar_set `intersectVarSet` tyVarsOfTypes var_tys)
+		-- 	 var_tys     = map idType vars
 		-- See notes with tyvars_here above
 
-	 var_tys     = map idType vars
 
     go fn body = returnSmpl (mkLams tyvars (fn body))
 
@@ -589,7 +588,7 @@ tryEtaExpansion rhs
 	-- and we are going to make extra term binders (y_bndrs) from the type
 	-- which will be processed with the rhs substitution environment.
 	-- This only went wrong in a mind bendingly complicated case.
-    (potential_extra_arg_tys, inner_ty) = splitFunTys (exprType body)
+    (potential_extra_arg_tys, _) = splitFunTys (exprType body)
 	
     y_tys :: [InType]
     y_tys  = take no_extras_wanted potential_extra_arg_tys

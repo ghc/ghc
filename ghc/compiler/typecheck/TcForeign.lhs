@@ -27,8 +27,8 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( newLocalId )
-import TcType		( typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
-import TcMonoType	( tcHsTopBoxedType )
+import TcType		( tcSplitRhoTy, zonkTcTypeToType )
+import TcMonoType	( tcHsBoxedSigType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
@@ -84,7 +84,7 @@ tcFImport :: RenamedForeignDecl -> TcM s (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
-   tcHsTopBoxedType hs_ty	     `thenTc`	\ sig_ty ->
+   tcHsBoxedSigType hs_ty	     `thenTc`	\ sig_ty ->
    let
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
@@ -99,7 +99,7 @@ tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
 tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
-   tcHsTopBoxedType hs_ty	    `thenTc`	\ sig_ty ->
+   tcHsBoxedSigType hs_ty	    `thenTc`	\ sig_ty ->
    let
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
@@ -113,7 +113,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsTopBoxedType hs_ty	     `thenTc` \ ty ->
+   tcHsBoxedSigType hs_ty	     `thenTc` \ ty ->
     -- Check that the type has the right shape
     -- and that the argument and result types are acceptable.
    let
@@ -132,9 +132,8 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsTopBoxedType hs_ty	       `thenTc`	\ sig_ty ->
-   let sig_tc_ty = typeToTcType sig_ty in
-   tcPolyExpr (HsVar nm) sig_tc_ty     `thenTc`    \ (rhs, lie, _, _, _) ->
+   tcHsBoxedSigType hs_ty	       `thenTc`	\ sig_ty ->
+   tcPolyExpr (HsVar nm) sig_ty     `thenTc`    \ (rhs, lie, _, _, _) ->
 
    let
       -- drop the foralls before inspecting the structure
@@ -148,7 +147,7 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 	  -- than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
-	newLocalId (nameOccName nm) sig_tc_ty src_loc	`thenNF_Tc` \ i ->
+	newLocalId (nameOccName nm) sig_ty src_loc	`thenNF_Tc` \ i ->
 	let
 	    bind  = VarMonoBind i rhs
 	in

@@ -37,7 +37,8 @@ import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
 import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
 		  isLocallyDefined, setNameProvenance,
-		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance
+		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance,
+		  nameEnvElts
 		)
 import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
 import OccName	( setOccNameSpace, dataName )

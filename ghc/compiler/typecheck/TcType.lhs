@@ -12,9 +12,6 @@ module TcType (
   newTyVarTy,		-- Kind -> NF_TcM s TcType
   newTyVarTys,		-- Int -> Kind -> NF_TcM s [TcType]
 
-  newTyVarTy_OpenKind,	-- NF_TcM s TcType
-  newOpenTypeKind,	-- NF_TcM s TcKind
-
   -----------------------------------------
   TcType, TcTauType, TcThetaType, TcRhoType,
 
@@ -29,21 +26,15 @@ module TcType (
   tcInstSigVar,
   tcInstTcType,
 
-  typeToTcType,
-
-  tcTypeKind,		-- :: TcType -> NF_TcM s TcKind
   --------------------------------
   TcKind,
-  newKindVar, newKindVars,
-  kindToTcKind,
-  zonkTcKind,
+  newKindVar, newKindVars, newBoxityVar,
 
   --------------------------------
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarBndr,
+  zonkTcTyVar, zonkTcTyVars, zonkTcSigTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
 
-  zonkTcTypeToType, zonkTcTyVarToTyVar,
-  zonkTcKindToKind
+  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkKindEnv
 
   ) where
 
@@ -51,13 +42,14 @@ module TcType (
 
 
 -- friends:
-import TypeRep		( Type(..), Kind, TyNote(..), 
-			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
-			)  -- friend
+import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
 import Type		( ThetaType, PredType(..),
-			  mkAppTy, mkTyConApp,
+			  getTyVar, mkAppTy, mkTyConApp,
 			  splitPredTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
+			  openTypeKind, boxedTypeKind, 
+			  superKind, superBoxity, 
+			  defaultKind, boxedBoxity
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( tyConKind, mkPrimTyCon )
@@ -68,7 +60,7 @@ import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
 import TcMonad
 import TysWiredIn	( voidTy )
 
-import Name		( NamedThing(..), setNameUnique, mkSysLocalName,
+import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
 			  mkDerivedName, mkDerivedTyConOcc
 			)
 import Unique		( Unique, Uniquable(..) )
@@ -76,19 +68,6 @@ import Util		( nOfThem )
 import Outputable
 \end{code}
 
-
-
-Coercions
-~~~~~~~~~~
-Type definitions are in TcMonad.lhs
-
-\begin{code}
-typeToTcType :: Type -> TcType
-typeToTcType ty =  ty
-
-kindToTcKind :: Kind -> TcKind
-kindToTcKind kind = kind
-\end{code}
 
 Utility functions
 ~~~~~~~~~~~~~~~~~
@@ -146,16 +125,11 @@ newKindVar
 newKindVars :: Int -> NF_TcM s [TcKind]
 newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 
--- Returns a type variable of kind (Type bv) where bv is a new boxity var
--- Used when you need a type variable that's definitely a , but you don't know
--- what kind of type (boxed or unboxed).
-newTyVarTy_OpenKind :: NF_TcM s TcType
-newTyVarTy_OpenKind = newOpenTypeKind	`thenNF_Tc` \ kind -> 
-		      newTyVarTy kind
-
-newOpenTypeKind :: NF_TcM s TcKind
-newOpenTypeKind = newTyVarTy superBoxity	`thenNF_Tc` \ bv ->
-	   	  returnNF_Tc (mkTyConApp typeCon [bv])
+newBoxityVar :: NF_TcM s TcKind
+newBoxityVar
+  = tcGetUnique 						`thenNF_Tc` \ uniq ->
+    tcNewMutTyVar (mkSysLocalName uniq SLIT("bx")) superBoxity	`thenNF_Tc` \ kv ->
+    returnNF_Tc (TyVarTy kv)
 \end{code}
 
 
@@ -191,26 +165,8 @@ tcInstTyVar tyvar
 	-- in an error message.  -dppr-debug will show up the difference
 	-- Better watch out for this.  If worst comes to worst, just
 	-- use mkSysLocalName.
-
-	kind = tyVarKind tyvar
     in
-
-	-- Hack alert!  Certain system functions (like error) are quantified
-	-- over type variables with an 'open' kind (a :: ?).  When we instantiate
-	-- these tyvars we want to make a type variable whose kind is (Type bv)
-	-- where bv is a boxity variable.  This makes sure it's a type, but 
-	-- is open about its boxity.  We *don't* want to give the thing the
-	-- kind '?' (= Type AnyBox).  
-	--
-	-- This is all a hack to avoid giving error it's "proper" type:
-	--	 error :: forall bv. forall a::Type bv. String -> a
-
-    (if kind == openTypeKind then
-	newOpenTypeKind	
-     else
-	returnNF_Tc kind)	`thenNF_Tc` \ kind' ->
-
-    tcNewMutTyVar name kind'
+    tcNewMutTyVar name (tyVarKind tyvar)
 
 tcInstSigVar tyvar	-- Very similar to tcInstTyVar
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
@@ -307,16 +263,16 @@ short_out other_ty = returnNF_Tc other_ty
 zonkTcTyVars :: [TcTyVar] -> NF_TcM s [TcType]
 zonkTcTyVars tyvars = mapNF_Tc zonkTcTyVar tyvars
 
-zonkTcTyVarBndr :: TcTyVar -> NF_TcM s TcTyVar
-zonkTcTyVarBndr tyvar
-  = zonkTcTyVar tyvar	`thenNF_Tc` \ ty ->
-    case ty of
-	TyVarTy tyvar' -> returnNF_Tc tyvar'
-	_	       -> pprTrace "zonkTcTyVarBndr" (ppr tyvar <+> ppr ty) $
-			  returnNF_Tc tyvar
-	
 zonkTcTyVar :: TcTyVar -> NF_TcM s TcType
 zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnNF_Tc (TyVarTy tv)) tyvar
+
+zonkTcSigTyVars :: [TcTyVar] -> NF_TcM s [TcTyVar]
+-- This guy is to zonk the tyvars we're about to feed into tcSimplify
+-- Usually this job is done by checkSigTyVars, but in a couple of places
+-- that is overkill, so we use this simpler chap
+zonkTcSigTyVars tyvars
+  = zonkTcTyVars tyvars	`thenNF_Tc` \ tys ->
+    returnNF_Tc (map (getTyVar "zonkTcSigTyVars") tys)
 \end{code}
 
 -----------------  Types
@@ -343,42 +299,40 @@ zonkTcPredType (Class c ts) =
 zonkTcPredType (IParam n t) =
     zonkTcType t	`thenNF_Tc` \ new_t ->
     returnNF_Tc (IParam n new_t)
-
-zonkTcKind :: TcKind -> NF_TcM s TcKind
-zonkTcKind = zonkTcType
 \end{code}
 
 -------------------  These ...ToType, ...ToKind versions
 		     are used at the end of type checking
 
 \begin{code}
-zonkTcKindToKind :: TcKind -> NF_TcM s Kind
-zonkTcKindToKind kind = zonkType zonk_unbound_kind_var kind
-  where
-	-- Zonk a mutable but unbound kind variable to
-	--	(Type Boxed) 	if it has kind superKind
-	--	Boxed		if it has kind superBoxity
-    zonk_unbound_kind_var kv
-	| super_kind == superKind = tcPutTyVar kv boxedTypeKind
-	| otherwise 		  = ASSERT( super_kind == superBoxity )
-				    tcPutTyVar kv boxedKind
-	where
-	  super_kind = tyVarKind kv
-			
+zonkKindEnv :: [(Name, TcKind)] -> NF_TcM s [(Name, Kind)]
+zonkKindEnv pairs 
+  = mapNF_Tc zonk_it pairs
+ where
+    zonk_it (name, tc_kind) = zonkType zonk_unbound_kind_var tc_kind `thenNF_Tc` \ kind ->
+			      returnNF_Tc (name, kind)
 
+	-- When zonking a kind, we want to
+	--	zonk a *kind* variable to (Type *)
+	--	zonk a *boxity* variable to *
+    zonk_unbound_kind_var kv | tyVarKind kv == superKind   = tcPutTyVar kv boxedTypeKind
+			     | tyVarKind kv == superBoxity = tcPutTyVar kv boxedBoxity
+			     | otherwise		   = pprPanic "zonkKindEnv" (ppr kv)
+			
 zonkTcTypeToType :: TcType -> NF_TcM s Type
 zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
   where
 	-- Zonk a mutable but unbound type variable to
-	--	Void		if it has kind (Type Boxed)
-	--	Voidxxx		otherwise
+	--	Void		if it has kind Boxed
+	--	:Void		otherwise
     zonk_unbound_tyvar tv
-	= zonkTcKindToKind (tyVarKind tv)	`thenNF_Tc` \ kind ->
-	  if kind == boxedTypeKind then
-		tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
-					-- this vastly common case
-	  else
-		tcPutTyVar tv (TyConApp (mk_void_tycon tv kind) [])
+	| kind == boxedTypeKind
+	= tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
+				-- this vastly common case
+	| otherwise
+	= tcPutTyVar tv (TyConApp (mk_void_tycon tv kind) [])
+	where
+	  kind = tyVarKind tv
 
     mk_void_tycon tv kind	-- Make a new TyCon with the same kind as the 
 				-- type variable tv.  Same name too, apart from
@@ -388,18 +342,19 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 	  tc_name = mkDerivedName mkDerivedTyConOcc (getName tv) (getUnique tv)
 
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
--- of a type variable, at the *end* of type checking.
--- It zonks the type variable, to get a mutable, but unbound, tyvar, tv;
--- zonks its kind, and then makes an immutable version of tv and binds tv to it.
+-- of a type variable, at the *end* of type checking.  It changes
+-- the *mutable* type variable into an *immutable* one.
+-- 
+-- It does this by making an immutable version of tv and binds tv to it.
 -- Now any bound occurences of the original type variable will get 
 -- zonked to the immutable version.
 
 zonkTcTyVarToTyVar :: TcTyVar -> NF_TcM s TyVar
 zonkTcTyVarToTyVar tv
-  = zonkTcKindToKind (tyVarKind tv)	`thenNF_Tc` \ kind ->
-    let
-		-- Make an immutable version
-	immut_tv    = mkTyVar (tyVarName tv) kind
+  = let
+		-- Make an immutable version, defaulting 
+		-- the kind to boxed if necessary
+	immut_tv    = mkTyVar (tyVarName tv) (defaultKind (tyVarKind tv))
 	immut_tv_ty = mkTyVarTy immut_tv
 
         zap tv = tcPutTyVar tv immut_tv_ty
@@ -408,7 +363,8 @@ zonkTcTyVarToTyVar tv
 	-- If the type variable is mutable, then bind it to immut_tv_ty
 	-- so that all other occurrences of the tyvar will get zapped too
     zonkTyVar zap tv		`thenNF_Tc` \ ty2 ->
-    ASSERT2( immut_tv_ty == ty2, ppr tv $$ ppr immut_tv $$ ppr ty2 )
+
+    WARN( immut_tv_ty /= ty2, ppr tv $$ ppr immut_tv $$ ppr ty2 )
 
     returnNF_Tc immut_tv
 \end{code}
@@ -463,12 +419,11 @@ zonkType unbound_var_fn ty
 				    returnNF_Tc (mkAppTy fun' arg')
 
 	-- The two interesting cases!
-    go (TyVarTy tyvar)  	  = zonkTyVar unbound_var_fn tyvar
+    go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn tyvar
 
-    go (ForAllTy tyvar ty)
-	= zonkTcTyVarToTyVar tyvar	`thenNF_Tc` \ tyvar' ->
-	  go ty				`thenNF_Tc` \ ty' ->
-	  returnNF_Tc (ForAllTy tyvar' ty')
+    go (ForAllTy tyvar ty) = zonkTcTyVarToTyVar tyvar	`thenNF_Tc` \ tyvar' ->
+			     go ty			`thenNF_Tc` \ ty' ->
+			     returnNF_Tc (ForAllTy tyvar' ty')
 
 
 zonkTyVar :: (TcTyVar -> NF_TcM s Type)		-- What to do for an unbound mutable variable
@@ -488,49 +443,3 @@ zonkTyVar unbound_var_fn tyvar
                            zonkType unbound_var_fn other_ty	-- Bound
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{tcTypeKind}
-%*									*
-%************************************************************************
-
-Sadly, we need a Tc version of typeKind, that looks though mutable
-kind variables.  See the notes with Type.typeKind for the typeKindF nonsense
-
-This is pretty gruesome.
-
-\begin{code}
-tcTypeKind :: TcType -> NF_TcM s TcKind
-
-tcTypeKind (TyVarTy tyvar)	= returnNF_Tc (tyVarKind tyvar)
-tcTypeKind (TyConApp tycon tys)	= foldlTc (\k _ -> tcFunResultTy k) (tyConKind tycon) tys
-tcTypeKind (NoteTy _ ty)	= tcTypeKind ty
-tcTypeKind (AppTy fun arg)	= tcTypeKind fun	`thenNF_Tc` \ fun_kind ->
-				  tcFunResultTy fun_kind
-tcTypeKind (FunTy fun arg)	= tcTypeKindF arg
-tcTypeKind (ForAllTy _ ty)	= tcTypeKindF ty
-
-tcTypeKindF :: TcType -> NF_TcM s TcKind
-tcTypeKindF (NoteTy _ ty)   = tcTypeKindF ty
-tcTypeKindF (FunTy _ ty)    = tcTypeKindF ty
-tcTypeKindF (ForAllTy _ ty) = tcTypeKindF ty
-tcTypeKindF other	    = tcTypeKind other	`thenNF_Tc` \ kind ->
-			      fix_up kind
-  where
-    fix_up (TyConApp kc _) | kc == typeCon = returnNF_Tc boxedTypeKind
-		-- Functions at the type level are always boxed
-    fix_up (NoteTy _ kind)   = fix_up kind
-    fix_up kind@(TyVarTy tv) = tcGetTyVar tv	`thenNF_Tc` \ maybe_ty ->
-			       case maybe_ty of
-				  Just kind' -> fix_up kind'
-				  Nothing  -> returnNF_Tc kind
-    fix_up kind              = returnNF_Tc kind
-
-tcFunResultTy (NoteTy _ ty)   = tcFunResultTy ty
-tcFunResultTy (FunTy arg res) = returnNF_Tc res
-tcFunResultTy (TyVarTy tv)    = tcGetTyVar tv	`thenNF_Tc` \ maybe_ty ->
-			        case maybe_ty of
-				  Just ty' -> tcFunResultTy ty'
-	-- The Nothing case, and the other cases for tcFunResultTy
-	-- should never happen... pattern match failure
-\end{code}

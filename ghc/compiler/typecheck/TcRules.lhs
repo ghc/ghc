@@ -14,7 +14,7 @@ import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
-import TcType		( zonkTcTypes, newTyVarTy_OpenKind )
+import TcType		( zonkTcTypes, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, tcHsTyVar, checkSigTyVars )
 import TcExpr		( tcExpr )
@@ -24,7 +24,7 @@ import TcEnv		( tcExtendLocalValEnv, newLocalId,
 import Inst		( LIE, emptyLIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
 import VarSet
-import Type		( tyVarsOfTypes )
+import Type		( tyVarsOfTypes, openTypeKind )
 import Bag		( bagToList )
 import Outputable
 import Util
@@ -51,7 +51,7 @@ tcRule (IfaceRuleOut fun rule)
 tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
-    newTyVarTy_OpenKind					`thenNF_Tc` \ rule_ty ->
+    newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
 	-- Yuk to the UserTyVar
@@ -106,7 +106,7 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
 				(mkHsLet rhs_binds rhs')
 				src_loc)
   where
-    new_id (RuleBndr var) 	   = newTyVarTy_OpenKind	`thenNF_Tc` \ ty ->
+    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
 		          	     returnNF_Tc (mkVanillaId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType rn_ty	`thenTc` \ ty ->
 				     returnNF_Tc (mkVanillaId var ty)

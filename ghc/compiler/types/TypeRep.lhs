@@ -8,16 +8,12 @@ module TypeRep (
 	Type(..), TyNote(..), UsageAnn(..),		-- Representation visible to friends
 	Kind, TyVarSubst,
 
-	superKind, superBoxity,				-- :: SuperKind
-
-	boxedKind,					-- :: Kind :: BX
-	anyBoxKind,					-- :: Kind :: BX
-	typeCon,					-- :: KindCon :: BX -> KX
-	anyBoxCon,					-- :: KindCon :: BX
-
-	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- Kind :: superKind
-
-	mkArrowKind, mkArrowKinds,
+	superKind, superBoxity,				-- KX and BX respectively
+	boxedBoxity, unboxedBoxity, 			-- :: BX
+	openKindCon, 					-- :: KX
+	typeCon,					-- :: BX -> KX
+	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- :: KX
+	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon
     ) where
@@ -150,27 +146,41 @@ data UsageAnn
 
 Kinds
 ~~~~~
-k::K = Type bx
-     | k -> k
-     | kv
+kind :: KX = kind -> kind
+           | Type boxity	-- (Type *) is printed as just *
+				-- (Type #) is printed as just #
 
-kv :: KX is a kind variable
+           | OpenKind		-- Can be boxed or unboxed
+				-- Printed '?'
 
-Type :: BX -> KX
+           | kv			-- A kind variable; *only* happens during kind checking
 
-bx::BX = Boxed 
-      |  Unboxed
-      |  AnyBox		-- Used *only* for special built-in things
-			-- like error :: forall (a::*?). String -> a
-			-- Here, the 'a' can be instantiated to a boxed or
-			-- unboxed type.
-      |  bv
+boxity :: BX = *	-- Boxed
+	     | #	-- Unboxed
+	     | bv	-- A boxity variable; *only* happens during kind checking
 
-bxv :: BX is a boxity variable
+There's a little subtyping at the kind level:  
+	forall b. Type b <: OpenKind
 
-sk = KX		-- A kind
-   | BX		-- A boxity
-   | sk -> sk	-- In ptic (BX -> KX)
+That is, a type of kind (Type b) OK in a context requiring an AnyBox.
+
+OpenKind, written '?', is used as the kind for certain type variables,
+in two situations:
+
+1.  The universally quantified type variable(s) for special built-in 
+    things like error :: forall (a::?). String -> a. 
+    Here, the 'a' can be instantiated to a boxed or unboxed type.  
+
+2.  Kind '?' is also used when the typechecker needs to create a fresh
+    type variable, one that may very well later be unified with a type.
+    For example, suppose f::a, and we see an application (f x).  Then a
+    must be a function type, so we unify a with (b->c).  But what kind
+    are b and c?  They can be boxed or unboxed types, so we give them kind '?'.
+
+    When the type checker generalises over a bunch of type variables, it
+    makes any that still have kind '?' into kind '*'.  So kind '?' is never
+    present in an inferred type.
+
 
 \begin{code}
 mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str)
@@ -181,7 +191,9 @@ mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str)
 	-- It's used for both Kinds and Boxities
 \end{code}
 
-Define KX, BX.
+------------------------------------------
+Define  KX, the type of a kind
+	BX, the type of a boxity
 
 \begin{code}
 superKind :: SuperKind 		-- KX, the type of all kinds
@@ -193,38 +205,41 @@ superBoxityName = mk_kind_name boxityConKey SLIT("BX")
 superBoxity = TyConApp (mkSuperKindCon superBoxityName) []
 \end{code}
 
-Define Boxed, Unboxed, AnyBox
+------------------------------------------
+Define boxities: @*@ and @#@
 
 \begin{code}
-boxedKind, unboxedKind, anyBoxKind :: Kind	-- Of superkind superBoxity
+boxedBoxity, unboxedBoxity :: Kind		-- :: BX
 
 boxedConName = mk_kind_name boxedConKey SLIT("*")
-boxedKind    = TyConApp (mkKindCon boxedConName superBoxity) []
+boxedBoxity  = TyConApp (mkKindCon boxedConName superBoxity) []
 
 unboxedConName = mk_kind_name unboxedConKey SLIT("#")
-unboxedKind    = TyConApp (mkKindCon unboxedConName superBoxity) []
-
-anyBoxConName = mk_kind_name anyBoxConKey SLIT("?")
-anyBoxCon     = mkKindCon anyBoxConName superBoxity	-- A kind of wild card
-anyBoxKind    = TyConApp anyBoxCon []
+unboxedBoxity  = TyConApp (mkKindCon unboxedConName superBoxity) []
 \end{code}
 
-Define Type
+------------------------------------------
+Define kinds: Type, Type *, Type #, and OpenKind
 
 \begin{code}
-typeCon :: KindCon
+typeCon :: KindCon	-- :: BX -> KX
 typeConName = mk_kind_name typeConKey SLIT("Type")
 typeCon     = mkKindCon typeConName (superBoxity `FunTy` superKind)
+
+boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
+
+boxedTypeKind   = TyConApp typeCon [boxedBoxity]
+unboxedTypeKind = TyConApp typeCon [unboxedBoxity]
+
+openKindConName = mk_kind_name anyBoxConKey SLIT("?")
+openKindCon     = mkKindCon openKindConName superKind
+openTypeKind    = TyConApp openKindCon []
 \end{code}
 
-Define (Type Boxed), (Type Unboxed), (Type AnyBox)
+------------------------------------------
+Define arrow kinds
 
 \begin{code}
-boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind
-boxedTypeKind   = TyConApp typeCon [boxedKind]
-unboxedTypeKind = TyConApp typeCon [unboxedKind]
-openTypeKind	= TyConApp typeCon [anyBoxKind]
-
 mkArrowKind :: Kind -> Kind -> Kind
 mkArrowKind k1 k2 = k1 `FunTy` k2
 

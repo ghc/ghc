@@ -41,6 +41,7 @@ type RenamedMatch		= Match			Name RenamedPat
 type RenamedMonoBinds		= MonoBinds		Name RenamedPat
 type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
+type RenamedHsPred		= HsPred		Name
 type RenamedRecordBinds		= HsRecordBinds		Name RenamedPat
 type RenamedSig			= Sig			Name
 type RenamedStmt		= Stmt			Name RenamedPat
@@ -87,7 +88,7 @@ extractHsTyNames ty
     get (HsForAllTy (Just tvs) 
 		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
-				    mkNameSet (map getTyVarName tvs)
+				    mkNameSet (hsTyVarNames tvs)
     get ty@(HsForAllTy Nothing _ _) = pprPanic "extractHsTyNames" (ppr ty)
 
 extractHsTyNames_s  :: [RenamedHsType] -> NameSet

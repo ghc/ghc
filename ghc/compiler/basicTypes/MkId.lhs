@@ -321,8 +321,8 @@ mkDataConWrapId data_con
 		MarkedUnboxed con tys ->
 		   Case (Var arg) arg [(DataAlt con, con_args,
 					body i' (reverse con_args++rep_args))]
-		   where n_tys = length tys
-			 (con_args,i') = mkLocals i tys
+		   where 
+			(con_args,i') = mkLocals i tys
 \end{code}
 
 
@@ -381,7 +381,6 @@ mkRecordSelId tycon field_label unpack_id
     sel_id     = mkId (fieldLabelName field_label) selector_ty info
 
     field_ty   = fieldLabelType field_label
-    field_name = fieldLabelName field_label
     data_cons  = tyConDataCons tycon
     tyvars     = tyConTyVars tycon	-- These scope over the types in 
 					-- the FieldLabels of constructors of this type
@@ -573,15 +572,15 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = mkVanillaId dfun_name dfun_ty
   where
-    (class_tyvars, sc_theta, _, _) = classBigSig clas
-    sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
-
     dfun_theta = classesToPreds inst_decl_theta
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.
     See `types/InstEnv' for a discussion related to this.
 
+    (class_tyvars, sc_theta, _, _) = classBigSig clas
+    not_const (clas, tys) = not (isEmptyVarSet (tyVarsOfTypes tys))
+    sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't
 				-- want to have any dict arguments, so that we can
@@ -603,8 +602,6 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 				-- Now sc_theta' has Foo T
 -}
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-
-    not_const (clas, tys) = not (isEmptyVarSet (tyVarsOfTypes tys))
 \end{code}
 
 

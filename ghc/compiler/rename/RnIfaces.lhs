@@ -41,7 +41,8 @@ import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocallyDefined, 
-			  isWiredInName, nameUnique, NamedThing(..)
+			  isWiredInName, nameUnique, NamedThing(..),
+			  elemNameEnv, extendNameEnv
 			 )
 import Module		( Module, moduleString, pprModule,
 			  mkVanillaModule, pprModuleName,
@@ -300,7 +301,7 @@ loadDecl mod decls_map (version, decl)
 				       | name <- availNames full_avail]
 	add_decl decls_map (name, stuff)
 	  = WARN( name `elemNameEnv` decls_map, ppr name )
-	    addToNameEnv decls_map name stuff
+	    extendNameEnv decls_map name stuff
     in
     returnRn new_decls_map
     }
@@ -343,7 +344,7 @@ loadFixDecls mod_name fixity_env (version, decls)
 
   | otherwise
   = mapRn (loadFixDecl mod_name) decls	`thenRn` \ to_add ->
-    returnRn (addListToNameEnv fixity_env to_add)
+    returnRn (extendNameEnvList fixity_env to_add)
 
 loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
   = mkImportedGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
@@ -438,7 +439,7 @@ loadDeprec mod deprec_env (Deprecation ie txt _)
   = setModuleRn (moduleName mod) $
     mapRn mkImportedGlobalFromRdrName (ieNames ie) `thenRn` \ names ->
     traceRn (text "loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
-    returnRn (extendNameEnv deprec_env (zip names (repeat txt)))
+    returnRn (extendNameEnvList deprec_env (zip names (repeat txt)))
 \end{code}
 
 

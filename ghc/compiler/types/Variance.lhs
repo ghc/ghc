@@ -40,21 +40,19 @@ tycons as a whole.  It returns a list of @tyconVrcInfo@ data, ready to
 be (knot-tyingly?) stuck back into the appropriate fields.
 
 \begin{code}
-calcTyConArgVrcs :: [TyCon]
-		 -> FiniteMap Name ArgVrcs
+calcTyConArgVrcs :: [TyCon] -> FiniteMap TyCon ArgVrcs
 
 calcTyConArgVrcs tycons
-  = let oi           = foldl (\fm tc -> addToFM fm tc (initial tc)) emptyFM tycons
-        initial tc   = if isAlgTyCon tc && null (tyConDataConsIfAvailable tc) then
+  = tcaoFix initial_oi
+  where
+
+    initial_oi :: FiniteMap TyCon ArgVrcs
+    initial_oi   = foldl (\fm tc -> addToFM fm tc (initial tc)) emptyFM tycons
+    initial tc   = if isAlgTyCon tc && null (tyConDataConsIfAvailable tc) then
                          -- make pessimistic assumption (and warn)
                          take (tyConArity tc) abstractVrcs
                        else
                          replicate (tyConArity tc) (False,False)
-        oi''         = tcaoFix oi
-        go (tc,vrcs) = (getName tc,vrcs)
-    in  listToFM (map go (fmToList oi''))
-        
-  where
 
     tcaoFix :: FiniteMap TyCon ArgVrcs   -- initial ArgVrcs per tycon
 	    -> FiniteMap TyCon ArgVrcs   -- fixpointed ArgVrcs per tycon

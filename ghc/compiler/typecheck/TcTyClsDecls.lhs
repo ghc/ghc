@@ -14,37 +14,49 @@ import HsSyn		( HsDecl(..), TyClDecl(..),
 			  HsType(..), HsTyVarBndr,
 			  ConDecl(..), ConDetails(..), BangType(..),
 			  Sig(..), HsPred(..), HsTupCon(..),
-			  tyClDeclName, isClassDecl, isSynDecl
+			  tyClDeclName, hsTyVarNames, isClassDecl, isSynDecl, isClassOpSig, getBangType
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
 import BasicTypes	( RecFlag(..), NewOrData(..), Arity )
 
 import TcMonad
-import TcClassDcl	( kcClassDecl, tcClassDecl1 )
-import TcEnv		( ValueEnv, TcTyThing(..),
-			  tcExtendTypeEnv, getEnvAllTyCons
+import TcEnv		( ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind,
+			  tcExtendTypeEnv, tcExtendKindEnv, tcLookupTy
 			)
-import TcTyDecls	( tcTyDecl, kcTyDecl )
-import TcMonoType	( kcHsTyVar )
-import TcType		( TcKind, newKindVar, newKindVars, kindToTcKind, zonkTcKindToKind )
+import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
+import TcClassDcl	( tcClassDecl1 )
+import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
+import TcType		( TcKind, newKindVar, newKindVars, zonkKindEnv )
 
-import Type		( mkArrowKind, boxedTypeKind )
-
+import TcUnify		( unifyKind )
+import Type		( Kind, mkArrowKind, boxedTypeKind, zipFunTys )
+import Variance         ( calcTyConArgVrcs )
+import Class		( Class, mkClass, classTyCon )
+import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), mkSynTyCon, mkAlgTyCon, mkClassTyCon )
+import DataCon		( isNullaryDataCon )
+import Var		( TyVar, tyVarKind, varName )
+import VarEnv
 import FiniteMap
 import Bag	
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, NamedThing(..), getSrcLoc, isTvOcc, nameOccName )
+import Name		( Name, NamedThing(..), NameEnv, getSrcLoc, isTvOcc, nameOccName,
+			  mkNameEnv, lookupNameEnv_NF
+			)
 import Outputable
-import Maybes		( mapMaybe, catMaybes, expectJust )
+import Maybes		( mapMaybe, catMaybes )
 import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import ErrUtils		( Message )
-import TyCon		( TyCon, ArgVrcs )
-import Variance         ( calcTyConArgVrcs )
 import Unique		( Unique, Uniquable(..) )
-import UniqFM		( listToUFM, lookupUFM )
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Type checking for type and class declarations}
+%*									*
+%************************************************************************
 
 The main function
 ~~~~~~~~~~~~~~~~~
@@ -70,98 +82,124 @@ tcGroups unf_env (group:groups)
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
 
-The knot-tying parameters: @rec_tyclss@ is an alist mapping @Name@s to
-@TcTyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
+Consider a mutually-recursive group, binding 
+a type constructor T and a class C.
+
+Step 1: 	getInitialKind
+	Construct a KindEnv by binding T and C to a kind variable 
+
+Step 2: 	kcTyClDecl
+	In that environment, do a kind check
+
+Step 3: Zonk the kinds
+
+Step 4: 	buildTyConOrClass
+	Construct an environment binding T to a TyCon and C to a Class.
+	a) Their kinds comes from zonking the relevant kind variable
+	b) Their arity (for synonyms) comes direct from the decl
+	c) The funcional dependencies come from the decl
+	d) The rest comes a knot-tied binding of T and C, returned from Step 4
+	e) The variances of the tycons in the group is calculated from 
+		the knot-tied stuff
+
+Step 5: 	tcTyClDecl1
+	In this environment, walk over the decls, constructing the TyCons and Classes.
+	This uses in a strict way items (a)-(c) above, which is why they must
+	be constructed in Step 4.
+	Feed the results back to Step 4.
+	
+The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
+@TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
 tcGroup :: ValueEnv -> SCC RenamedTyClDecl -> TcM s TcEnv
 tcGroup unf_env scc
-  = 	-- Do kind checking
-    mapNF_Tc getTyBinding1 decls 			`thenNF_Tc` \ ty_env_stuff1 ->
-    tcExtendTypeEnv ty_env_stuff1 (mapTc kcDecl decls)	`thenTc_`
+  = 	-- Step 1
+    mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
+
+	-- Step 2
+    tcExtendKindEnv initial_kinds (mapTc kcTyClDecl decls)	`thenTc_`
+
+	-- Step 3
+    zonkKindEnv initial_kinds			`thenNF_Tc` \ final_kinds ->
 
 	-- Tie the knot
---  traceTc (ppr (map fst ty_env_stuff1))		`thenTc_`
-    fixTc ( \ ~(rec_tyclss,  _) ->
-	let
-	    rec_env    = listToUFM rec_tyclss
-	    rec_tycons = getEnvAllTyCons rec_tyclss
-            rec_vrcs   = calcTyConArgVrcs rec_tycons
-	in
-	
-		-- Do type checking
-	mapNF_Tc (getTyBinding2 rec_env) ty_env_stuff1	`thenNF_Tc` \ ty_env_stuff2 ->
-	tcExtendTypeEnv ty_env_stuff2				$
-	mapTc (tcDecl is_rec_group unf_env rec_vrcs) decls	`thenTc` \ tyclss ->
+    fixTc ( \ ~(rec_details_list,  _) ->
+		-- Step 4 
+ 	let
+	    kind_env    = mkNameEnv final_kinds
+	    rec_details = mkNameEnv rec_details_list
 
-	tcGetEnv						`thenTc` \ env -> 
-	returnTc (tyclss, env)
+	    tyclss, all_tyclss :: [(Name, TyThing)]
+	    tyclss      = map (buildTyConOrClass is_rec kind_env rec_vrcs rec_details) decls
+
+		-- Add the tycons that come from the classes
+		-- We want them in the environment because 
+		-- they are mentioned in interface files
+	    all_tyclss  = [ (getName tycon, ATyCon tycon) | (_, AClass clas) <- tyclss,
+							    let tycon = classTyCon clas
+			  ] ++ tyclss
+
+		-- Calculate variances, and (yes!) feed back into buildTyConOrClass.
+            rec_vrcs    = calcTyConArgVrcs [tc | (_, ATyCon tc) <- all_tyclss]
+	in
+		-- Step 5
+	tcExtendTypeEnv all_tyclss		$
+	mapTc (tcTyClDecl1 unf_env) decls	`thenTc` \ tycls_details ->
+	tcGetEnv				`thenNF_Tc` \ env -> 
+	returnTc (tycls_details, env)
     )								`thenTc` \ (_, env) ->
---  traceTc (text "done" <+> ppr (map fst ty_env_stuff1))	`thenTc_`
     returnTc env
   where
-    is_rec_group = case scc of
-			AcyclicSCC _ -> NonRecursive
-			CyclicSCC _  -> Recursive
+    is_rec = case scc of
+		AcyclicSCC _ -> NonRecursive
+		CyclicSCC _  -> Recursive
 
     decls = case scc of
 		AcyclicSCC decl -> [decl]
 		CyclicSCC decls -> decls
+
+tcTyClDecl1  :: ValueEnv -> RenamedTyClDecl -> TcM s (Name, TyThingDetails)
+
+tcTyClDecl1 unf_env decl
+  | isClassDecl decl = tcClassDecl1 unf_env decl
+  | otherwise	     = tcTyDecl1 decl
 \end{code}
 
-Dealing with one decl
-~~~~~~~~~~~~~~~~~~~~~
+
+%************************************************************************
+%*									*
+\subsection{Step 1: Initial environment}
+%*									*
+%************************************************************************
+
 \begin{code}
-kcDecl decl
-  = tcAddDeclCtxt decl		$
-    if isClassDecl decl then
-	kcClassDecl decl
-    else
-	kcTyDecl    decl
+getInitialKind :: RenamedTyClDecl -> NF_TcM s (Name, TcKind)
+getInitialKind (TySynonym name tyvars _ _)
+ = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
+   newKindVar		`thenNF_Tc` \ result_kind  ->
+   returnNF_Tc (name, mk_kind arg_kinds result_kind)
 
-tcDecl  :: RecFlag 			-- True => recursive group
-	 -> ValueEnv -> FiniteMap Name ArgVrcs
-	 -> RenamedTyClDecl -> TcM s (Name, TcTyThing)
+getInitialKind (TyData _ _ name tyvars _ _ _ _ _)
+ = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
+   returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
 
-tcDecl is_rec_group unf_env vrcs_env decl
-  = tcAddDeclCtxt decl		$
-    if isClassDecl decl then
-	tcClassDecl1 unf_env vrcs_env decl
-    else
-	tcTyDecl is_rec_group vrcs_env decl
-		
+getInitialKind (ClassDecl _ name tyvars _ _ _ _ _ _ _ _ _)
+ = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
+   returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
 
-tcAddDeclCtxt decl thing_inside
-  = tcAddSrcLoc loc 	$
-    tcAddErrCtxt ctxt 	$
-    thing_inside
-  where
-     (name, loc, thing)
-	= case decl of
-	    (ClassDecl _ name _ _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
-	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
-	    (TyData NewType  _ name _ _ _ _ _ loc)   -> (name, loc, "data type")
-	    (TyData DataType _ name _ _ _ _ _ loc)   -> (name, loc, "newtype")
-
-     ctxt = hsep [ptext SLIT("In the"), text thing, 
-		  ptext SLIT("declaration for"), quotes (ppr name)]
+mk_kind tvs_w_kinds res_kind = foldr (mkArrowKind . snd) res_kind tvs_w_kinds
 \end{code}
 
 
-getTyBinders
-~~~~~~~~~~~
-Extract *binding* names from type and class decls.  Type variables are
-bound in type, data, newtype and class declarations, 
-	*and* the polytypes in the class op sigs.
-	*and* the existentially quantified contexts in datacon decls
+%************************************************************************
+%*									*
+\subsection{Step 2: Kind checking}
+%*									*
+%************************************************************************
 
-Why do we need to grab all these type variables at once, including
-those locally-quantified type variables in class op signatures?
-
-   [Incidentally, this only works because the names are all unique by now.]
-
-Because we can only commit to the final kind of a type variable when
-we've completed the mutually recursive group. For example:
+We need to kind check all types in the mutually recursive group
+before we know the kind of the type variables.  For example:
 
 class C a where
    op :: D b => a -> b -> b
@@ -173,35 +211,131 @@ Here, the kind of the locally-polymorphic type variable "b"
 depends on *all the uses of class D*.  For example, the use of
 Monad c in bop's type signature means that D must have kind Type->Type.
 
-    [April 00: looks as if we've dropped this subtlety; I'm not sure when]
+\begin{code}
+kcTyClDecl :: RenamedTyClDecl -> TcM s ()
+
+kcTyClDecl decl@(TySynonym tycon_name hs_tyvars rhs loc)
+  = tcAddDeclCtxt decl			$
+    kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
+    kcHsType rhs			`thenTc` \ rhs_kind ->
+    unifyKind result_kind rhs_kind
+
+kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ _ loc)
+  = tcAddDeclCtxt decl			$
+    kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
+    kcHsContext context			`thenTc_` 
+    mapTc_ kc_con_decl con_decls
+  where
+    kc_con_decl (ConDecl _ _ ex_tvs ex_ctxt details loc)
+      = tcAddSrcLoc loc			$
+	kcHsTyVars ex_tvs		`thenNF_Tc` \ kind_env ->
+	tcExtendKindEnv kind_env	$
+	kcConDetails ex_ctxt details
+
+kcTyClDecl decl@(ClassDecl context class_name
+			   hs_tyvars fundeps class_sigs
+		      	   _ _ _ _ _ _ loc)
+  = tcAddDeclCtxt decl			$
+    kcTyClDeclBody class_name hs_tyvars	$ \ result_kind ->
+    kcHsContext context			`thenTc_`
+    mapTc_ kc_sig (filter isClassOpSig class_sigs)
+  where
+    kc_sig (ClassOpSig _ _ _ op_ty loc) = tcAddSrcLoc loc (kcHsBoxedSigType op_ty)
+
+kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its tyvars
+	       -> (Kind -> TcM s a)		-- Thing inside
+	       -> TcM s a
+-- Extend the env with bindings for the tyvars, taken from
+-- the kind of the tycon/class.  Give it to the thing inside, and 
+-- check the result kind matches
+kcTyClDeclBody tc_name hs_tyvars thing_inside
+  = tcLookupTy tc_name		`thenNF_Tc` \ tc ->
+    let
+	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames hs_tyvars) (tyThingKind tc)
+    in
+    tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Step 4: Building the tycon/class}
+%*									*
+%************************************************************************
 
 \begin{code}
-getTyBinding1 :: RenamedTyClDecl -> NF_TcM s (Name, (TcKind, TcTyThing))
-getTyBinding1 (TySynonym name tyvars _ _)
- = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
-   newKindVar				`thenNF_Tc` \ result_kind  ->
-   returnNF_Tc (name, (foldr mkArrowKind result_kind arg_kinds, 
-		       ASynTyCon (pprPanic "ATyCon: syn" (ppr name)) (length tyvars)))
+buildTyConOrClass 
+	:: RecFlag -> NameEnv Kind
+	-> FiniteMap TyCon ArgVrcs -> NameEnv TyThingDetails
+	-> RenamedTyClDecl -> (Name, TyThing)
+	-- Can't fail; the only reason it's in the monad 
+	-- is so it can zonk the kinds
 
-getTyBinding1 (TyData _ _ name tyvars _ _ _ _ _)
- = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
-   returnNF_Tc (name, (foldr mkArrowKind boxedTypeKind arg_kinds, 
-		       ADataTyCon (error "ATyCon: data")))
-
-getTyBinding1 (ClassDecl _ name tyvars _ _ _ _ _ _ _ _ _)
- = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
-   returnNF_Tc (name, (foldr mkArrowKind boxedTypeKind arg_kinds, 
-		       AClass (pprPanic "AClass" (ppr name)) (length tyvars)))
-
--- Zonk the kind to its final form, and lookup the 
--- recursive tycon/class
-getTyBinding2 rec_env (name, (tc_kind, thing))
-  = zonkTcKindToKind tc_kind		`thenNF_Tc` \ kind ->
-    returnNF_Tc (name, (kind, mk_thing thing (lookupUFM rec_env name)))
+buildTyConOrClass is_rec kenv rec_vrcs rec_details
+	          (TySynonym tycon_name tyvar_names rhs src_loc)
+  = (tycon_name, ATyCon tycon)
   where
-    mk_thing (ADataTyCon _)      ~(Just (ADataTyCon tc))  = ADataTyCon tc
-    mk_thing (ASynTyCon _ arity) ~(Just (ASynTyCon tc _)) = ASynTyCon tc arity
-    mk_thing (AClass _ arity)    ~(Just (AClass cls _))   = AClass cls arity
+	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
+	tycon_kind	    = lookupNameEnv_NF kenv tycon_name
+	arity		    = length tyvar_names
+	tyvars		    = mkTyClTyVars tycon_kind tyvar_names
+	SynTyDetails rhs_ty = lookupNameEnv_NF rec_details tycon_name
+        argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
+
+buildTyConOrClass is_rec kenv rec_vrcs  rec_details
+	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ _ src_loc)
+  = (tycon_name, ATyCon tycon)
+  where
+	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
+			   data_cons nconstrs
+			   derived_classes
+			   flavour is_rec
+
+	DataTyDetails ctxt data_cons derived_classes = lookupNameEnv_NF rec_details tycon_name
+
+	tycon_kind = lookupNameEnv_NF kenv tycon_name
+	tyvars	   = mkTyClTyVars tycon_kind tyvar_names
+        argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
+
+	flavour = case data_or_new of
+			NewType -> NewTyCon (mkNewTyConRep tycon)
+			DataType | all isNullaryDataCon data_cons -> EnumTyCon
+				 | otherwise			  -> DataTyCon
+
+buildTyConOrClass is_rec kenv rec_vrcs  rec_details
+                  (ClassDecl context class_name
+		             tyvar_names fundeps class_sigs def_methods pragmas 
+		             tycon_name datacon_name datacon_wkr_name sc_sel_names src_loc)
+  = (class_name, AClass clas)
+  where
+ 	clas = mkClass class_name tyvars fds
+		       sc_theta sc_sel_ids op_items
+		       tycon
+
+	tycon = mkClassTyCon tycon_name class_kind tyvars
+                             argvrcs dict_con
+			     clas 		-- Yes!  It's a dictionary 
+			     flavour
+
+	ClassDetails sc_theta sc_sel_ids op_items dict_con = lookupNameEnv_NF rec_details class_name
+
+	class_kind = lookupNameEnv_NF kenv class_name
+	tyvars	   = mkTyClTyVars class_kind tyvar_names
+        argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
+	n_fields   = length sc_sel_ids + length op_items
+
+ 	flavour | n_fields == 1 = NewTyCon (mkNewTyConRep tycon)
+		| otherwise	= DataTyCon
+
+	-- We can find the functional dependencies right away, 
+	-- and it is vital to do so. Why?  Because in the next pass
+	-- we check for ambiguity in all the type signatures, and we
+	-- need the functional dependcies to be done by then
+	fds	   = [(map lookup xs, map lookup ys) | (xs,ys) <- fundeps]
+	tyvar_env  = mkNameEnv [(varName tv, tv) | tv <- tyvars]
+	lookup     = lookupNameEnv_NF tyvar_env
+
+bogusVrcs = panic "Bogus tycon arg variances"
 \end{code}
 
 
@@ -296,9 +430,7 @@ get_con_details (NewCon ty _)        = get_ty ty
 get_con_details (RecCon nbtys)       = unionManyUniqSets (map (get_bty.snd) nbtys)
 
 ----------------------------------------------------
-get_bty (Banged ty)   = get_ty ty
-get_bty (Unbanged ty) = get_ty ty
-get_bty (Unpacked ty) = get_ty ty
+get_bty bty = get_ty (getBangType bty)
 
 ----------------------------------------------------
 get_ty (HsTyVar name) | isTvOcc (nameOccName name) = emptyUniqSet 
@@ -329,6 +461,29 @@ set_name name = unitUniqSet (getUnique name)
 set_to_bag set = listToBag (uniqSetToList set)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Error management
+%*									*
+%************************************************************************
+
+\begin{code}
+tcAddDeclCtxt decl thing_inside
+  = tcAddSrcLoc loc 	$
+    tcAddErrCtxt ctxt 	$
+    thing_inside
+  where
+     (name, loc, thing)
+	= case decl of
+	    (ClassDecl _ name _ _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
+	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
+	    (TyData NewType  _ name _ _ _ _ _ loc)   -> (name, loc, "data type")
+	    (TyData DataType _ name _ _ _ _ _ loc)   -> (name, loc, "newtype")
+
+     ctxt = hsep [ptext SLIT("In the"), text thing, 
+		  ptext SLIT("declaration for"), quotes (ppr name)]
+\end{code}
 
 \begin{code}
 typeCycleErr, classCycleErr :: [[RenamedTyClDecl]] -> Message

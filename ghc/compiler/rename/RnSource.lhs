@@ -11,7 +11,7 @@ module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType ) where
 import RnExpr
 import HsSyn
 import HsPragmas
-import HsTypes		( getTyVarName, pprHsContext )
+import HsTypes		( hsTyVarNames, pprHsContext )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar, mkRdrNameWkr )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
@@ -570,7 +570,7 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	mentioned_in_tau		= extractHsTyRdrTyVars tau
 	mentioned_in_ctxt		= extractHsCtxtRdrTyVars ctxt
 	mentioned			= nub (mentioned_in_tau ++ mentioned_in_ctxt)
-	forall_tyvar_names		= map getTyVarName forall_tyvars
+	forall_tyvar_names		= hsTyVarNames forall_tyvars
 
 	-- Explicitly quantified but not mentioned in ctxt or tau
 	warn_guys			= filter (`notElem` mentioned) forall_tyvar_names

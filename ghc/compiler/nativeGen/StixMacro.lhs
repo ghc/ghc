@@ -74,7 +74,6 @@ macroCode UPD_CAF args
 	[cafptr,bhptr] = map amodeToStix args
     	w0 = StInd PtrRep cafptr
 	w1 = StInd PtrRep (StIndex PtrRep cafptr fixedHS)
-	blocking_queue = StInd PtrRep (StIndex PtrRep bhptr fixedHS)
 	a1 = StAssign PtrRep w0 ind_static_info
 	a2 = StAssign PtrRep w1 bhptr
 	a3 = StCall SLIT("newCAF") cCallConv VoidRep [cafptr]

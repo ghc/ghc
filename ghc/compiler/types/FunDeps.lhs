@@ -21,8 +21,10 @@ import Type		( Type, tyVarsOfTypes )
 import Outputable	( Outputable, SDoc, interppSP, ptext, empty, hsep, punctuate, comma )
 import UniqSet
 import VarSet
+import VarEnv
 import Unique		( Uniquable )
 import List		( elemIndex )
+import Util		( zipEqual )
 \end{code}
 
 
@@ -64,23 +66,20 @@ ounion (x:xs) ys
     where
 	(ys', b) = ounion xs ys
 
-instantiateFdClassTys :: Class -> [a] -> [([a], [a])]
+instantiateFdClassTys :: Class -> [Type] -> [FunDep Type]
 -- Get the FDs of the class, and instantiate them
-instantiateFdClassTys clas ts
-  = map (lookupInstFundep tyvars ts) fundeps
+instantiateFdClassTys clas tys
+  = [(map lookup us, map lookup vs) | (us,vs) <- fundeps]
   where
     (tyvars, fundeps) = classTvsFds clas
-    lookupInstFundep tyvars ts (us, vs)
-	= (lookupInstTys tyvars ts us, lookupInstTys tyvars ts vs)
-
-lookupInstTys tyvars ts = map (lookupInstTy tyvars ts)
-lookupInstTy tyvars ts u = ts !! i
-    where Just i = elemIndex u tyvars
+    env       = mkVarEnv (zipEqual "instantiateFdClassTys" tyvars tys)
+    lookup tv = lookupVarEnv_NF env tv
 
 tyVarFunDep :: [FunDep Type] -> [FunDep TyVar]
 tyVarFunDep fdtys 
   = [(getTyvars xs, getTyvars ys) | (xs, ys) <- fdtys]
-  where getTyvars = varSetElems . tyVarsOfTypes
+  where 
+    getTyvars = varSetElems . tyVarsOfTypes
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps [] = empty

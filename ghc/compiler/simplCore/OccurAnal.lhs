@@ -74,8 +74,8 @@ occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
 		-- Add occ info to tpl_vars, rhs
   = Rule str tpl_vars' tpl_args rhs'
   where
-    (rhs_uds, rhs')	  = occurAnalyseExpr isLocallyDefined rhs
-    (rhs_uds1, tpl_vars') = tagBinders rhs_uds tpl_vars
+    (rhs_uds, rhs') = occurAnalyseExpr isLocallyDefined rhs
+    (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
 \end{code}
 
 
@@ -286,8 +286,6 @@ It isn't easy to do a perfect job in one blow.  Consider
 occAnalBind env (Rec pairs) body_usage
   = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
   where
-    pp_item (_, bndr, _)     = ppr bndr
-
     binders = map fst pairs
     rhs_env = env `addNewCands` binders
 
@@ -613,8 +611,8 @@ occAnal env expr@(Lam _ _)
     (really_final_usage,
      mkLams tagged_binders body') }
   where
-    (binders, body)    = collectBinders expr
-    (linear, env_body, binders') = oneShotGroup env binders
+    (binders, body)       = collectBinders expr
+    (linear, env_body, _) = oneShotGroup env binders
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 

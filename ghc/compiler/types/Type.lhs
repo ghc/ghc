@@ -9,21 +9,17 @@ module Type (
 	Type,
 	Kind, TyVarSubst,
 
-	superKind, superBoxity,				-- :: SuperKind
-
-	boxedKind,					-- :: Kind :: BX
-	anyBoxKind,					-- :: Kind :: BX
-	typeCon,					-- :: KindCon :: BX -> KX
-	anyBoxCon,					-- :: KindCon :: BX
-
-	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- Kind :: superKind
-
-	mkArrowKind, mkArrowKinds, -- mentioned below: hasMoreBoxityInfo,
+	superKind, superBoxity,				-- KX and BX respectively
+	boxedBoxity, unboxedBoxity, 			-- :: BX
+	openKindCon, 					-- :: KX
+	typeCon,					-- :: BX -> KX
+	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- :: KX
+	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon,
 
         -- exports from this module:
-        hasMoreBoxityInfo,
+        hasMoreBoxityInfo, defaultKind,
 
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
@@ -122,13 +118,13 @@ import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \begin{code}
 hasMoreBoxityInfo :: Kind -> Kind -> Bool
 hasMoreBoxityInfo k1 k2
-  | k2 == openTypeKind = ASSERT( is_type_kind k1) True
+  | k2 == openTypeKind = True
   | otherwise	       = k1 == k2
-  where
-	-- Returns true for things of form (Type x)
-    is_type_kind k = case splitTyConApp_maybe k of
-			Just (tc,[_]) -> tc == typeCon
-			Nothing	      -> False
+
+defaultKind :: Kind -> Kind
+-- Used when generalising: default kind '?' to '*'
+defaultKind kind | kind == openTypeKind = boxedTypeKind
+	         | otherwise	 	= kind
 \end{code}
 
 
@@ -710,9 +706,8 @@ ipName_maybe _		  = Nothing
 
 classesToPreds cts = map (uncurry Class) cts
 
-classesOfPreds theta = concatMap cvt theta
-    where cvt (Class clas tys) = [(clas, tys)]
-	  cvt (IParam _   _  ) = []
+classesOfPreds :: ThetaType -> ClassContext
+classesOfPreds theta = [(clas,tys) | Class clas tys <- theta]
 \end{code}
 
 @isTauTy@ tests for nested for-alls.
@@ -785,9 +780,15 @@ typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) 
 typeKind (NoteTy _ ty)		= typeKind ty
 typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
 
-typeKind (FunTy arg res)	= boxedTypeKind	-- A function is boxed regardless of its result type
-						-- No functions at the type level, hence we don't need
-						-- to say (typeKind res).
+typeKind (FunTy arg res)	= fix_up (typeKind res)
+				where
+				  fix_up kind = case splitTyConApp_maybe kind of
+						  Just (tycon, [_]) | tycon == typeCon	-> boxedTypeKind
+						  other					-> kind
+		-- The basic story is 
+		-- 	typeKind (FunTy arg res) = typeKind res
+		-- But a function is boxed regardless of its result type
+		-- Hencd the strange fix-up
 
 typeKind (ForAllTy tv ty)	= typeKind ty
 \end{code}

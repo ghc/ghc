@@ -177,14 +177,12 @@ unboxArg arg
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty     = exprType arg
-    arg_rep_ty = repType arg_ty
-
-    maybe_product_type 			   	  = splitProductType_maybe arg_ty
-    is_product_type			   	  = maybeToBool maybe_product_type
-    Just (tycon, _, data_con, data_con_arg_tys)   = maybe_product_type
-    data_con_arity				  = dataConSourceArity data_con
-    (data_con_arg_ty1 : _)			  = data_con_arg_tys
+    arg_ty  					= exprType arg
+    maybe_product_type 			   	= splitProductType_maybe arg_ty
+    is_product_type			   	= maybeToBool maybe_product_type
+    Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
+    data_con_arity				= dataConSourceArity data_con
+    (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
     maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
@@ -299,8 +297,8 @@ resultWrapper result_ty
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
-    maybe_product_type 					    = splitProductType_maybe result_ty
-    is_product_type					    = maybeToBool maybe_product_type
-    Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) = maybe_product_type
-    data_con_arity					    = dataConSourceArity data_con
+    maybe_product_type 					= splitProductType_maybe result_ty
+    is_product_type					= maybeToBool maybe_product_type
+    Just (_, tycon_arg_tys, data_con, data_con_arg_tys) = maybe_product_type
+    data_con_arity					= dataConSourceArity data_con
 \end{code}

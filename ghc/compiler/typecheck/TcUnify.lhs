@@ -9,29 +9,27 @@ updatable substitution).
 \begin{code}
 module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
 	         unifyFunTy, unifyListTy, unifyTupleTy,
-	 	 unifyKind, unifyKinds, unifyTypeKind
+	 	 unifyKind, unifyKinds, unifyOpenTypeKind
  ) where
 
 #include "HsVersions.h"
 
 -- friends: 
 import TcMonad
-import TypeRep	( Type(..), funTyCon,
-		  Kind, boxedTypeKind, typeCon, anyBoxCon, anyBoxKind,
-		)  -- friend
-import Type	( tyVarsOfType,
-		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
-                  isNotUsgTy,
-		  splitAppTy_maybe,
+import TypeRep	( Type(..) )  -- friend
+import Type	( funTyCon, Kind, unboxedTypeKind, boxedTypeKind, openTypeKind, 
+		  superBoxity, typeCon, openKindCon, hasMoreBoxityInfo, 
+		  tyVarsOfType, typeKind,
+		  mkTyVarTy, mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
+                  isNotUsgTy, splitAppTy_maybe, mkTyConApp, 
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
 import Name	( hasBetterProv )
 import Var	( TyVar, tyVarKind, varName, isSigTyVar )
 import VarSet	( varSetElems )
-import TcType	( TcType, TcTauType, TcTyVar, TcKind, 
-		  newTyVarTy, newOpenTypeKind, newTyVarTy_OpenKind,
-		  tcGetTyVar, tcPutTyVar, zonkTcType, tcTypeKind
+import TcType	( TcType, TcTauType, TcTyVar, TcKind, newBoxityVar,
+		  newTyVarTy, newTyVarTys, tcGetTyVar, tcPutTyVar, zonkTcType
 		)
 
 -- others:
@@ -60,6 +58,27 @@ unifyKinds []       []       = returnTc ()
 unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenTc_`
 			       unifyKinds ks1 ks2
 unifyKinds _ _ = panic "unifyKinds: length mis-match"
+\end{code}
+
+\begin{code}
+unifyOpenTypeKind :: TcKind -> TcM s ()	
+-- Ensures that the argument kind is of the form (Type bx)
+-- for some boxity bx
+
+unifyOpenTypeKind ty@(TyVarTy tyvar)
+  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	Just ty' -> unifyOpenTypeKind ty'
+	other	 -> unify_open_kind_help ty
+
+unifyOpenTypeKind ty
+  = case splitTyConApp_maybe ty of
+	Just (tycon, [_]) | tycon == typeCon -> returnTc ()
+	other				     -> unify_open_kind_help ty
+
+unify_open_kind_help ty	-- Revert to ordinary unification
+  = newBoxityVar 	`thenNF_Tc` \ boxity ->
+    unifyKind ty (mkTyConApp typeCon [boxity])
 \end{code}
 
 
@@ -122,7 +141,10 @@ We call the first one \tr{ps_ty1}, \tr{ps_ty2} for ``possible synomym''.
 
 \begin{code}
 uTys :: TcTauType -> TcTauType	-- Error reporting ty1 and real ty1
+				-- ty1 is the *expected* type
+
      -> TcTauType -> TcTauType	-- Error reporting ty2 and real ty2
+				-- ty2 is the *actual* type
      -> TcM s ()
 
 	-- Always expand synonyms (see notes at end)
@@ -141,14 +163,18 @@ uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
 
 	-- Type constructors must match
 uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
-  = checkTcM (cons_match && length tys1 == length tys2) 
-	     (unifyMisMatch ps_ty1 ps_ty2)			`thenTc_`
-    unifyTauTyLists tys1 tys2
-  where
-	-- The AnyBox wild card matches anything
-    cons_match =  con1 == con2 
-	       || con1 == anyBoxCon
-	       || con2 == anyBoxCon
+  | con1 == con2 && length tys1 == length tys2
+  = unifyTauTyLists tys1 tys2
+
+  | con1 == openKindCon
+	-- When we are doing kind checking, we might match a kind '?' 
+	-- against a kind '*' or '#'.  Notably, CCallable :: ? -> *, and
+	-- (CCallable Int) and (CCallable Int#) are both OK
+  = unifyOpenTypeKind ps_ty2
+
+  | otherwise
+  = unifyMisMatch ps_ty1 ps_ty2
+
 
 	-- Applications need a bit of care!
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
@@ -270,34 +296,37 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
     case maybe_ty2 of
 	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
 
-	Nothing -> checkKinds swapped tv1 ty2			`thenTc_`
+	Nothing | tv1_dominates_tv2 
 
-		   if tv1 `dominates` tv2 then
-			tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
-			returnTc ()
-		   else
-                        ASSERT( isNotUsgTy ps_ty2 )
-			tcPutTyVar tv1 ps_ty2			`thenNF_Tc_`
-			returnTc ()
+		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
+		   tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
+		   returnTc ()
+		|  otherwise
+
+		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
+                   (ASSERT( isNotUsgTy ps_ty2 )
+		    tcPutTyVar tv1 ps_ty2		`thenNF_Tc_`
+	  	    returnTc ())
   where
-    tv1 `dominates` tv2 =  isSigTyVar tv1 
+    k1 = tyVarKind tv1
+    k2 = tyVarKind tv2
+    tv1_dominates_tv2 =    isSigTyVar tv1 
 				-- Don't unify a signature type variable if poss
+			|| k2 == openTypeKind
+				-- Try to get rid of open type variables as soon as poss
 			|| varName tv1 `hasBetterProv` varName tv2 
 				-- Try to update sys-y type variables in preference to sig-y ones
 
 	-- Second one isn't a type variable
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
-  | non_var_ty2 == anyBoxKind
-	-- If the 
-  = returnTc ()
-
-  | otherwise
   = checkKinds swapped tv1 non_var_ty2			`thenTc_`
     occur_check non_var_ty2				`thenTc_`
     ASSERT( isNotUsgTy ps_ty2 )
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 
+    WARN( not (typeKind non_var_ty2 `hasMoreBoxityInfo` tyVarKind tv1), (ppr tv1 <+> ppr (tyVarKind tv1)) $$
+									(ppr non_var_ty2 <+> ppr (typeKind non_var_ty2)) )
     tcPutTyVar tv1 non_var_ty2				`thenNF_Tc_`
 	-- This used to say "ps_ty2" instead of "non_var_ty2"
 
@@ -334,20 +363,21 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
 		other	  -> returnTc ()
 
 checkKinds swapped tv1 ty2
+-- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
+-- We need to check that we don't unify a boxed type variable with an
+-- unboxed type: e.g.  (id 3#) is illegal
+  | tk1 == boxedTypeKind && tk2 == unboxedTypeKind
   = tcAddErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
-
-	-- We have to use tcTypeKind not just typeKind to get the
-	-- kind of ty2, because there might be mutable kind variables
-	-- in the way.  For example, suppose that ty2 :: (a b), and
-	-- the kind of 'a' is a kind variable 'k' that has (presumably)
-	-- been unified with 'k1 -> k2'.
-    tcTypeKind ty2		`thenNF_Tc` \ k2 ->
-
-    if swapped then
-	unifyKind k2 (tyVarKind tv1)
-    else
-	unifyKind (tyVarKind tv1) k2
+    unifyMisMatch k1 k2
+  | otherwise
+  = returnTc ()
+  where
+    (k1,k2) | swapped   = (tk2,tk1)
+	    | otherwise = (tk1,tk2)
+    tk1 = tyVarKind tv1
+    tk2 = typeKind ty2
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -373,8 +403,8 @@ unifyFunTy ty
 	Nothing 	 -> unify_fun_ty_help ty
 
 unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
-  = newTyVarTy_OpenKind		`thenNF_Tc` \ arg ->
-    newTyVarTy_OpenKind		`thenNF_Tc` \ res ->
+  = newTyVarTy openTypeKind	`thenNF_Tc` \ arg ->
+    newTyVarTy openTypeKind	`thenNF_Tc` \ res ->
     unifyTauTy ty (mkFunTy arg res)	`thenTc_`
     returnTc (arg,res)
 \end{code}
@@ -418,32 +448,12 @@ unifyTupleTy boxity arity ty
 	other -> unify_tuple_ty_help boxity arity ty
 
 unify_tuple_ty_help boxity arity ty
-  = mapNF_Tc new_tyvar [1..arity]			`thenNF_Tc` \ arg_tys ->
+  = newTyVarTys arity kind				`thenNF_Tc` \ arg_tys ->
     unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenTc_`
     returnTc arg_tys
   where
-    new_tyvar _ | isBoxed boxity = newTyVarTy boxedTypeKind
-	        | otherwise      = newTyVarTy_OpenKind
-\end{code}
-
-Make sure a kind is of the form (Type b) for some boxity b.
-
-\begin{code}
-unifyTypeKind  :: TcKind -> TcM s ()
-unifyTypeKind kind@(TyVarTy kv)
-  = tcGetTyVar kv 	`thenNF_Tc` \ maybe_kind ->
-    case maybe_kind of
-	Just kind' -> unifyTypeKind kind'
-	Nothing    -> unify_type_kind_help kind
-
-unifyTypeKind kind
-  = case splitTyConApp_maybe kind of
-	Just (tycon, [_]) | tycon == typeCon -> returnTc ()
-	other				     -> unify_type_kind_help kind
-
-unify_type_kind_help kind
-  = newOpenTypeKind	`thenNF_Tc` \ expected_kind ->
-    unifyKind expected_kind kind
+    kind | isBoxed boxity = boxedTypeKind
+	 | otherwise      = openTypeKind
 \end{code}
 
 
@@ -472,15 +482,19 @@ unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
 		    (env1, [tidy_ty1,tidy_ty2]) = tidyOpenTypes tidy_env [ty1,ty2]
 
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
-  = returnNF_Tc (env2, ptext SLIT("When matching types") <+> 
-		       sep [quotes pp_expected, ptext SLIT("and"), quotes pp_actual])
+	-- tv1 is zonked already
+  = zonkTcType ty2	`thenNF_Tc` \ ty2' ->
+    returnNF_Tc (err ty2')
   where
-    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
-			     | otherwise = (pp1, pp2)
-    (env1, tv1') = tidyTyVar tidy_env tv1
-    (env2, ty2') = tidyOpenType  env1     ty2
-    pp1 = ppr tv1'
-    pp2 = ppr ty2'
+    err ty2 = (env2, ptext SLIT("When matching types") <+> 
+		     sep [quotes pp_expected, ptext SLIT("and"), quotes pp_actual])
+	    where
+	      (pp_expected, pp_actual) | swapped   = (pp2, pp1)
+				       | otherwise = (pp1, pp2)
+	      (env1, tv1') = tidyTyVar tidy_env tv1
+	      (env2, ty2') = tidyOpenType  env1 ty2
+	      pp1 = ppr tv1'
+	      pp2 = ppr ty2'
 
 unifyMisMatch ty1 ty2
   = zonkTcType ty1	`thenNF_Tc` \ ty1' ->

@@ -142,6 +142,7 @@ foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \begin{code}
 elemVarEnv       = elemUFM
 extendVarEnv	 = addToUFM
+extendVarEnvList = addListToUFM
 plusVarEnv_C	 = plusUFM_C
 delVarEnvList	 = delListFromUFM
 delVarEnv	 = delFromUFM
@@ -156,8 +157,7 @@ unitVarEnv	 = unitUFM
 isEmptyVarEnv	 = isNullUFM
 foldVarEnv	 = foldUFM
 
-zipVarEnv tyvars tys       = listToUFM (zipEqual "zipVarEnv" tyvars tys)
-extendVarEnvList env pairs = plusUFM env (listToUFM pairs)
+zipVarEnv tyvars tys       = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
 lookupVarEnv_NF env id     = case (lookupVarEnv env id) of { Just xx -> xx }
 \end{code}
 

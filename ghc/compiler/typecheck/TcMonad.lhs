@@ -8,7 +8,7 @@ module TcMonad(
 	TcM, NF_TcM, TcDown, TcEnv, 
 
 	initTc,
-	returnTc, thenTc, thenTc_, mapTc, listTc,
+	returnTc, thenTc, thenTc_, mapTc, mapTc_, listTc,
 	foldrTc, foldlTc, mapAndUnzipTc, mapAndUnzip3Tc,
 	mapBagTc, fixTc, tryTc, tryTc_, getErrsTc, 
 	traceTc, ioToTc,
@@ -166,11 +166,14 @@ listTc (x:xs) = x			`thenTc` \ r ->
 		returnTc (r:rs)
 
 mapTc    :: (a -> TcM s b)    -> [a] -> TcM s [b]
+mapTc_   :: (a -> TcM s b)    -> [a] -> TcM s ()
 mapNF_Tc :: (a -> NF_TcM s b) -> [a] -> NF_TcM s [b]
 mapTc f []     = returnTc []
 mapTc f (x:xs) = f x		`thenTc` \ r ->
 		 mapTc f xs	`thenTc` \ rs ->
 		 returnTc (r:rs)
+mapTc_ f xs = mapTc f xs  `thenTc_` returnTc ()
+
 
 foldrTc    :: (a -> b -> TcM s b)    -> b -> [a] -> TcM s b
 foldrNF_Tc :: (a -> b -> NF_TcM s b) -> b -> [a] -> NF_TcM s b

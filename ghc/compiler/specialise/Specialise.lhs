@@ -820,10 +820,10 @@ specDefn subst calls (fn, rhs)
 	-- It's role as a holder for a call instance is o'er
 	-- But it might be alive for some other reason by now.
 
-    fn_type		 = idType fn
-    (tyvars, theta, tau) = splitSigmaTy fn_type
-    n_tyvars		 = length tyvars
-    n_dicts		 = length theta
+    fn_type	       = idType fn
+    (tyvars, theta, _) = splitSigmaTy fn_type
+    n_tyvars	       = length tyvars
+    n_dicts	       = length theta
 
     (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
     rhs_dicts = take n_dicts rhs_ids
@@ -985,10 +985,10 @@ mkCallUDs subst f args
 	  calls      = singleCall f spec_tys dicts
     }
   where
-    (tyvars, theta, tau) = splitSigmaTy (idType f)
-    constrained_tyvars   = tyVarsOfTheta theta 
-    n_tyvars		 = length tyvars
-    n_dicts		 = length theta
+    (tyvars, theta, _) = splitSigmaTy (idType f)
+    constrained_tyvars = tyVarsOfTheta theta 
+    n_tyvars	       = length tyvars
+    n_dicts	       = length theta
 
     spec_tys = [mk_spec_ty tv ty | (tv, Type ty) <- tyvars `zip` args]
     dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]

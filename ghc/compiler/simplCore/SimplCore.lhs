@@ -65,8 +65,7 @@ core2core :: [CoreToDo]		-- Spec of what core-to-core passes to do
 core2core core_todos binds rules
   = do
 	us <-  mkSplitUniqSupply 's'
-	let (cp_us, us1)   = splitUniqSupply us
-	    (ru_us, ps_us) = splitUniqSupply us1
+	let (cp_us, ru_us) = splitUniqSupply us
 
         let (local_rules, imported_rules) = partition localRule rules
 
@@ -257,9 +256,6 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
   where
     max_iterations = getSimplIntSwitch sw_chkr MaxSimplifierIterations
     black_list_fn  = blackListed rule_lhs_fvs (intSwitchSet sw_chkr SimplInlinePhase)
-
-    core_iter_dump binds | opt_D_verbose_core2core = pprCoreBindings binds
-		         | otherwise		   = empty
 
     iteration us iteration_no counts binds
       -- Try and force thunks off the binds; significantly reduces

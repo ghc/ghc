@@ -13,17 +13,17 @@ import {-# SOURCE #-}	TcExpr( tcExpr )
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), StmtCtxt(..), Stmt(..),
 			  pprMatch, getMatchLoc, consLetStmt,
-			  mkMonoBind
+			  mkMonoBind, collectSigTysFromPats
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 
 import TcMonad
-import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsSigType, sigPatCtxt )
+import TcMonoType	( kcHsSigType, kcTyVarScope, checkSigTyVars, tcHsTyVar, tcHsSigType, sigPatCtxt )
 import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
-import TcEnv		( tcExtendLocalValEnv, tcExtendGlobalTyVars, tcExtendTyVarEnv, tcGetGlobalTyVars )
+import TcEnv		( tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars, tcGetGlobalTyVars )
 import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
-import TcType		( TcType, newTyVarTy, newTyVarTy_OpenKind, zonkTcTyVars )
+import TcType		( TcType, newTyVarTy )
 import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcUnify		( unifyFunTy, unifyTauTy )
@@ -31,7 +31,7 @@ import Name		( Name )
 import TysWiredIn	( boolTy )
 
 import BasicTypes	( RecFlag(..) )
-import Type		( Kind, tyVarsOfType, isTauTy, mkFunTy, boxedTypeKind )
+import Type		( Kind, tyVarsOfType, isTauTy, mkFunTy, boxedTypeKind, openTypeKind )
 import VarSet
 import Var		( Id )
 import Bag
@@ -88,7 +88,7 @@ tcMatchesCase :: [RenamedMatch]		-- The case alternatives
 			LIE)
 
 tcMatchesCase matches expr_ty
-  = newTyVarTy_OpenKind 					`thenNF_Tc` \ scrut_ty ->
+  = newTyVarTy openTypeKind 					`thenNF_Tc` \ scrut_ty ->
     tcMatches [] matches (mkFunTy scrut_ty expr_ty) CaseAlt	`thenTc` \ (matches', lie) ->
     returnTc (scrut_ty, matches', lie)
 
@@ -138,12 +138,12 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- If there are sig tvs we must be careful *not* to use
 	-- expected_ty right away, else we'll unify with tyvars free
 	-- in the envt.  So invent a fresh tyvar and use that instead
-	newTyVarTy_OpenKind		`thenNF_Tc` \ tyvar_ty ->
+	newTyVarTy openTypeKind		`thenNF_Tc` \ tyvar_ty ->
 
 	-- Extend the tyvar env and check the match itself
-	mapNF_Tc tcHsTyVar sig_tvs 	`thenNF_Tc` \ sig_tyvars ->
+	kcTyVarScope sig_tvs (mapTc_ kcHsSigType sig_tys)	`thenTc` \ sig_tyvars ->
 	tcExtendTyVarEnv sig_tyvars (
-		tc_match tyvar_ty
+		tc_match tyvar_ty	
 	)				`thenTc` \ (pat_ids, match_and_lie) ->
 
 	-- Check that the scoped type variables from the patterns
@@ -158,6 +158,9 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	returnTc match_and_lie
 
   where
+    sig_tys = case maybe_rhs_sig of { Just t -> [t]; Nothing -> [] }
+	      ++ collectSigTysFromPats pats
+	      
     tc_match expected_ty 	-- Any sig tyvars are in scope by now
       = -- STEP 1: Typecheck the patterns
 	tcMatchPats pats expected_ty	`thenTc` \ (rhs_ty, pats', lie_req1, ex_tvs, pat_bndrs, lie_avail) ->
@@ -174,7 +177,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- STEP 3: Unify with the rhs type signature if any
 	(case maybe_rhs_sig of
 	    Nothing  -> returnTc ()
-	    Just sig -> tcHsSigType sig	`thenTc` \ sig_ty ->
+	    Just sig -> tcHsSigType sig		`thenTc` \ sig_ty ->
 
 			-- Check that the signature isn't a polymorphic one, which
 			-- we don't permit (at present, anyway)
@@ -288,7 +291,7 @@ tcStmts do_or_lc m (stmt@(ExprStmt exp src_loc) : stmts) elt_ty
     tcAddSrcLoc src_loc 		(
 	tcSetErrCtxt (stmtCtxt do_or_lc stmt)	$
 	    -- exp has type (m tau) for some tau (doesn't matter what)
-  	newTyVarTy_OpenKind			`thenNF_Tc` \ any_ty ->
+  	newTyVarTy openTypeKind		`thenNF_Tc` \ any_ty ->
   	tcExpr exp (m any_ty)
     )					`thenTc` \ (exp', exp_lie) ->
     tcStmts do_or_lc m stmts elt_ty	`thenTc` \ (stmts', stmts_lie) ->

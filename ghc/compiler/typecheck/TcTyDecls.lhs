@@ -5,8 +5,8 @@
 
 \begin{code}
 module TcTyDecls (
-	tcTyDecl, kcTyDecl, 
-	tcConDecl,
+	tcTyDecl1, 
+	kcConDetails, 
 	mkImplicitDataBinds, mkNewTyConRep
     ) where
 
@@ -14,23 +14,21 @@ module TcTyDecls (
 
 import HsSyn		( MonoBinds(..), 
 			  TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
-			  andMonoBindList
+			  andMonoBindList, getBangType
 			)
-import RnHsSyn		( RenamedTyClDecl, RenamedConDecl )
+import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
-import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope, 
-			  tcHsTypeKind, kcHsType, tcHsTopType, tcHsTopBoxedType,
-			  tcContext, tcHsTopTypeKind
+import TcMonoType	( tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
+			  kcHsContext, kcHsSigType
 			)
-import TcType		( zonkTcTyVarToTyVar, zonkTcClassConstraints )
-import TcEnv		( tcLookupTy, tcLookupValueByKey, TcTyThing(..) )
+import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
 import TcMonad
 import TcUnify		( unifyKind )
 
-import Class		( Class )
-import DataCon		( DataCon, mkDataCon, isNullaryDataCon,
+import Class		( Class, ClassContext )
+import DataCon		( DataCon, mkDataCon, 
 			  dataConFieldLabels, dataConId, dataConWrapId,
 			  markedStrict, notMarkedStrict, markedUnboxed, dataConRepType
 			)
@@ -59,106 +57,41 @@ import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
 
 %************************************************************************
 %*									*
-\subsection{Kind checking}
-%*									*
-%************************************************************************
-
-\begin{code}
-kcTyDecl :: RenamedTyClDecl -> TcM s ()
-
-kcTyDecl (TySynonym name tyvar_names rhs src_loc)
-  = tcLookupTy name				`thenNF_Tc` \ (kind, _) ->
-    tcExtendTopTyVarScope kind tyvar_names	$ \ _ result_kind ->
-    tcHsTypeKind rhs				`thenTc` \ (rhs_kind, _) ->
-    unifyKind result_kind rhs_kind
-
-kcTyDecl (TyData _ context tycon_name tyvar_names con_decls _ _ _ src_loc)
-  = tcLookupTy tycon_name			`thenNF_Tc` \ (kind, _) ->
-    tcExtendTopTyVarScope kind tyvar_names	$ \ result_kind _ ->
-    tcContext context				`thenTc_` 
-    mapTc kcConDecl con_decls			`thenTc_`
-    returnTc ()
-
-kcConDecl (ConDecl _ _ ex_tvs ex_ctxt details loc)
-  = tcAddSrcLoc loc			(
-    tcExtendTyVarScope ex_tvs		( \ tyvars -> 
-    tcContext ex_ctxt			`thenTc_`
-    kc_con details			`thenTc_`
-    returnTc ()
-    ))
-  where
-    kc_con (VanillaCon btys)    = mapTc kc_bty btys		`thenTc_` returnTc ()
-    kc_con (InfixCon bty1 bty2) = mapTc kc_bty [bty1,bty2]	`thenTc_` returnTc ()
-    kc_con (NewCon ty _)        = kcHsType ty
-    kc_con (RecCon flds)        = mapTc kc_field flds		`thenTc_` returnTc ()
-
-    kc_bty (Banged ty)   = kcHsType ty
-    kc_bty (Unbanged ty) = kcHsType ty
-    kc_bty (Unpacked ty) = kcHsType ty
-
-    kc_field (_, bty)    = kc_bty bty
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Type checking}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcTyDecl :: RecFlag -> FiniteMap Name ArgVrcs -> RenamedTyClDecl -> TcM s (Name, TcTyThing)
-
-tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
-  = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, ASynTyCon _ arity) ->
-    tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
-    tcHsTopTypeKind rhs					`thenTc` \ (_, rhs_ty) ->
+tcTyDecl1 :: RenamedTyClDecl -> TcM s (Name, TyThingDetails)
+tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
+  = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
+    tcExtendTyVarEnv (tyConTyVars tycon)	$
+    tcHsSigType rhs				`thenTc` \ rhs_ty ->
 	-- If the RHS mentions tyvars that aren't in scope, we'll 
 	-- quantify over them.  With gla-exts that's right, but for H98
-	-- we should complain. We can't do that here without falling into
-	-- a black hole, so we do it in rnDecl (TySynonym case)
+	-- we should complain. We can now do that here without falling into
+	-- a black hole, we still do it in rnDecl (TySynonym case)
+    returnTc (tycon_name, SynTyDetails rhs_ty)
+
+tcTyDecl1 (TyData _ context tycon_name _ con_decls _ derivings _  src_loc)
+  = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
     let
-	-- Construct the tycon
-        argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
-                                      tycon_name
-	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
+	tyvars = tyConTyVars tycon
     in
-    returnTc (tycon_name, ASynTyCon tycon arity)
-
-
-tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_decls nconstrs derivings pragmas src_loc)
-  = 	-- Lookup the pieces
-    tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, ADataTyCon rec_tycon) ->
-    tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
+    tcExtendTyVarEnv tyvars				$
 
 	-- Typecheck the pieces
-    tcContext context					`thenTc` \ ctxt ->
-    let ctxt' = classesOfPreds ctxt in
-    mapTc (tcConDecl rec_tycon tyvars ctxt') con_decls	`thenTc` \ data_cons ->
+    tcClassContext context				`thenTc` \ ctxt ->
     tc_derivs derivings					`thenTc` \ derived_classes ->
+    mapTc (tcConDecl tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
 
-    let
-	-- Construct the tycon
-	flavour = case data_or_new of
-			NewType -> NewTyCon (mkNewTyConRep tycon)
-			DataType | all isNullaryDataCon data_cons -> EnumTyCon
-				 | otherwise			  -> DataTyCon
-
-        argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
-                                      tycon_name
-
-	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt' argvrcs
-			   data_cons nconstrs
-			   derived_classes
-			   flavour is_rec
-    in
-    returnTc (tycon_name, ADataTyCon tycon)
+    returnTc (tycon_name, DataTyDetails ctxt data_cons derived_classes)
   where
-	tc_derivs Nothing   = returnTc []
-	tc_derivs (Just ds) = mapTc tc_deriv ds
+    tc_derivs Nothing   = returnTc []
+    tc_derivs (Just ds) = mapTc tc_deriv ds
 
-	tc_deriv name = tcLookupTy name `thenTc` \ (_, AClass clas _) ->
-			returnTc clas
+    tc_deriv name = tcLookupTy name `thenTc` \ (AClass clas) ->
+		    returnTc clas
 \end{code}
 
 \begin{code}
@@ -185,39 +118,48 @@ mkNewTyConRep tc
 
 %************************************************************************
 %*									*
-\subsection{Type check constructors}
+\subsection{Kind and type check constructors}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcConDecl :: TyCon -> [TyVar] -> [(Class,[Type])] -> RenamedConDecl -> TcM s DataCon
+kcConDetails :: RenamedContext -> ConDetails Name -> TcM s ()
+kcConDetails ex_ctxt details
+  = kcHsContext ex_ctxt		`thenTc_`
+    kc_con_details details
+  where
+    kc_con_details (VanillaCon btys)    = mapTc_ kc_bty btys
+    kc_con_details (InfixCon bty1 bty2) = mapTc_ kc_bty [bty1,bty2]
+    kc_con_details (NewCon ty _)        = kcHsSigType ty
+    kc_con_details (RecCon flds)        = mapTc_ kc_field flds
+
+    kc_field (_, bty) = kc_bty bty
+
+    kc_bty bty = kcHsSigType (getBangType bty)
+
+tcConDecl :: TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM s DataCon
 
 tcConDecl tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
-  = tcAddSrcLoc src_loc			$
-    tcExtendTyVarScope ex_tvs		$ \ ex_tyvars -> 
-    tcContext ex_ctxt			`thenTc` \ ex_theta ->
-    let 
-	ex_ctxt' = classesOfPreds ex_theta
-    in
-    tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_ctxt' details
-
-tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_theta details
-  = case details of
-	VanillaCon btys    -> tc_datacon btys
-	InfixCon bty1 bty2 -> tc_datacon [bty1,bty2]
-	NewCon ty mb_f	   -> tc_newcon ty mb_f
-	RecCon fields	   -> tc_rec_con fields
+  = tcAddSrcLoc src_loc					$
+    kcTyVarScope ex_tvs (kcConDetails ex_ctxt details)	`thenTc` \ ex_tyvars -> 
+    tcExtendTyVarEnv ex_tyvars				$
+    tcClassContext ex_ctxt				`thenTc` \ ex_theta ->
+    case details of
+	VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
+	InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
+	NewCon ty mb_f	   -> tc_newcon  ex_tyvars ex_theta ty mb_f
+	RecCon fields	   -> tc_rec_con ex_tyvars ex_theta fields
   where
-    tc_datacon btys
+    tc_datacon ex_tyvars ex_theta btys
       = let
-	    arg_stricts = map get_strictness btys
-	    tys	        = map get_pty btys
+	    arg_stricts = map getBangStrictness btys
+	    tys	        = map getBangType btys
         in
-	mapTc tcHsTopType tys `thenTc` \ arg_tys ->
-	mk_data_con arg_stricts arg_tys []
+	mapTc tcHsSigType tys 	`thenTc` \ arg_tys ->
+	mk_data_con ex_tyvars ex_theta arg_stricts arg_tys []
 
-    tc_newcon ty mb_f
-      = tcHsTopBoxedType ty	`thenTc` \ arg_ty ->
+    tc_newcon ex_tyvars ex_theta ty mb_f
+      = tcHsBoxedSigType ty	`thenTc` \ arg_ty ->
 	    -- can't allow an unboxed type here, because we're effectively
 	    -- going to remove the constructor while coercing it to a boxed type.
 	let
@@ -226,39 +168,33 @@ tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_theta details
 	      Nothing -> []
 	      Just f  -> [mkFieldLabel (getName f) tycon arg_ty (head allFieldLabelTags)]
         in	      
-	mk_data_con [notMarkedStrict] [arg_ty] field_label
+	mk_data_con ex_tyvars ex_theta [notMarkedStrict] [arg_ty] field_label
 
-    tc_rec_con fields
-      = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
-	mapTc tc_field fields	`thenTc` \ field_label_infos_s ->
+    tc_rec_con ex_tyvars ex_theta fields
+      = checkTc (null ex_tyvars) (exRecConErr name)	`thenTc_`
+	mapTc tc_field (fields `zip` allFieldLabelTags)	`thenTc` \ field_labels_s ->
 	let
-	    field_label_infos = concat field_label_infos_s
-	    arg_stricts       = [strict | (_, _, strict) <- field_label_infos]
-	    arg_tys	      = [ty     | (_, ty, _)     <- field_label_infos]
-
-	    field_labels      = [ mkFieldLabel (getName name) tycon ty tag 
-			      | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
+	    field_labels = concat field_labels_s
+	    arg_stricts = [str | (ns, bty) <- fields, 
+				  let str = getBangStrictness bty, 
+				  n <- ns		-- One for each.  E.g   x,y,z :: !Int
+			  ]
 	in
-	mk_data_con arg_stricts arg_tys field_labels
+	mk_data_con ex_tyvars ex_theta arg_stricts 
+		    (map fieldLabelType field_labels) field_labels
 
-    tc_field (field_label_names, bty)
-      = tcHsTopType (get_pty bty)	`thenTc` \ field_ty ->
-	returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
+    tc_field ((field_label_names, bty), tag)
+      = tcHsSigType (getBangType bty)	`thenTc` \ field_ty ->
+	returnTc [mkFieldLabel (getName name) tycon field_ty tag | name <- field_label_names]
 
-    mk_data_con arg_stricts arg_tys fields
-      = 	-- Now we've checked all the field types we must
-		-- zonk the existential tyvars to finish the kind
-		-- inference on their kinds, and commit them to being
-		-- immutable type variables.  (The top-level tyvars are
-		-- already fixed, by the preceding kind-inference pass.)
-	mapNF_Tc zonkTcTyVarToTyVar ex_tyvars	`thenNF_Tc` \ ex_tyvars' ->
-	zonkTcClassConstraints	ex_theta	`thenNF_Tc` \ ex_theta' ->
-	let
+    mk_data_con ex_tyvars ex_theta arg_stricts arg_tys fields
+      = let
 	   data_con = mkDataCon name arg_stricts fields
 		      	   tyvars (thinContext arg_tys ctxt)
-			   ex_tyvars' ex_theta'
+			   ex_tyvars ex_theta
 		      	   arg_tys
 		      	   tycon data_con_id data_con_wrap_id
+
 	   data_con_id      = mkDataConId wkr_name data_con
 	   data_con_wrap_id = mkDataConWrapId data_con
 	in
@@ -272,14 +208,10 @@ thinContext arg_tys ctxt
       arg_tyvars = tyVarsOfTypes arg_tys
       in_arg_tys (clas,tys) = not $ isEmptyVarSet $ 
 			      tyVarsOfTypes tys `intersectVarSet` arg_tyvars
-  
-get_strictness (Banged   _) = markedStrict
-get_strictness (Unbanged _) = notMarkedStrict
-get_strictness (Unpacked _) = markedUnboxed
 
-get_pty (Banged ty)   = ty
-get_pty (Unbanged ty) = ty
-get_pty (Unpacked ty) = ty
+getBangStrictness (Banged   _) = markedStrict
+getBangStrictness (Unbanged _) = notMarkedStrict
+getBangStrictness (Unpacked _) = markedUnboxed
 \end{code}
 
 

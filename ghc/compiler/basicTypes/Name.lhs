@@ -30,11 +30,11 @@ module Name (
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	
 	-- Environment
-	NameEnv,
+	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
-	addToNameEnv_C, addToNameEnv, addListToNameEnv,
-	plusNameEnv, plusNameEnv_C, extendNameEnv, 
-	lookupNameEnv, delFromNameEnv, elemNameEnv, 
+	extendNameEnv_C, extendNameEnv, 
+	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
+	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, elemNameEnv, 
 
 
 	-- Provenance
@@ -59,6 +59,7 @@ import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas,
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, Unique, Uniquable(..), hasKey, unboundKey, u2i )
+import Maybes		( expectJust )
 import UniqFM
 import Outputable
 import GlaExts
@@ -552,30 +553,33 @@ instance NamedThing Name where
 type NameEnv a = UniqFM a	-- Domain is Name
 
 emptyNameEnv   	 :: NameEnv a
+mkNameEnv	 :: [(Name,a)] -> NameEnv a
 nameEnvElts    	 :: NameEnv a -> [a]
-addToNameEnv_C 	 :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
-addToNameEnv   	 :: NameEnv a -> Name -> a -> NameEnv a
-addListToNameEnv :: NameEnv a -> [(Name,a)] -> NameEnv a
+extendNameEnv_C  :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
+extendNameEnv  	 :: NameEnv a -> Name -> a -> NameEnv a
 plusNameEnv    	 :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C  	 :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
-extendNameEnv  	 :: NameEnv a -> [(Name,a)] -> NameEnv a
-lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
+extendNameEnvList:: NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv 	 :: NameEnv a -> Name -> NameEnv a
 elemNameEnv    	 :: Name -> NameEnv a -> Bool
 unitNameEnv    	 :: Name -> a -> NameEnv a
+lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
+lookupNameEnv_NF :: NameEnv a -> Name -> a
 
 emptyNameEnv   	 = emptyUFM
+mkNameEnv	 = listToUFM
 nameEnvElts    	 = eltsUFM
-addToNameEnv_C 	 = addToUFM_C
-addToNameEnv   	 = addToUFM
-addListToNameEnv = addListToUFM
+extendNameEnv_C  = addToUFM_C
+extendNameEnv  	 = addToUFM
 plusNameEnv    	 = plusUFM
 plusNameEnv_C  	 = plusUFM_C
-extendNameEnv  	 = addListToUFM
-lookupNameEnv  	 = lookupUFM
+extendNameEnvList= addListToUFM
 delFromNameEnv 	 = delFromUFM
 elemNameEnv    	 = elemUFM
 unitNameEnv    	 = unitUFM
+
+lookupNameEnv  	       = lookupUFM
+lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupUFM env n)
 \end{code}
 
 

@@ -47,7 +47,7 @@ import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
 
 import TcMonad
 import TcType	( TcType, TcTyVar,
-		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcTyVarBndr, zonkTcType
+		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
 		)
 import Name	( isLocallyDefined )
 import CoreSyn  ( Expr )
@@ -276,9 +276,11 @@ zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
 		 new_globals)
   where
     zonkExport (tyvars, global, local)
-	= mapNF_Tc zonkTcTyVarBndr tyvars	`thenNF_Tc` \ new_tyvars ->
-	  zonkIdBndr global			`thenNF_Tc` \ new_global ->
-	  zonkIdOcc local			`thenNF_Tc` \ new_local -> 
+	= zonkTcSigTyVars tyvars	`thenNF_Tc` \ new_tyvars ->
+		-- This isn't the binding occurrence of these tyvars
+		-- but they should *be* tyvars.  Hence zonkTcSigTyVars.
+	  zonkIdBndr global		`thenNF_Tc` \ new_global ->
+	  zonkIdOcc local		`thenNF_Tc` \ new_local -> 
 	  returnNF_Tc (new_tyvars, new_global, new_local)
 \end{code}
 

@@ -4,9 +4,14 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsType, tcHsSigType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsTopTypeKind,
-		    tcContext, tcHsTyVar, kcHsTyVar, kcHsType,
-		    tcExtendTyVarScope, tcExtendTopTyVarScope,
+module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType, 
+		    tcContext, tcClassContext, tcHsTyVar, 
+
+			-- Kind checking
+		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
+		    kcHsType, kcHsSigType, kcHsBoxedSigType, kcHsContext,
+		    kcTyVarScope, 
+
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
 	          ) where
@@ -14,41 +19,44 @@ module TcMonoType ( tcHsType, tcHsSigType, tcHsTypeKind, tcHsTopType, tcHsTopBox
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), HsTyVarBndr(..), HsUsageAnn(..),
-                          Sig(..), HsPred(..), pprParendHsType, HsTupCon(..) )
-import RnHsSyn		( RenamedHsType, RenamedContext, RenamedSig )
+                          Sig(..), HsPred(..), pprParendHsType, HsTupCon(..), hsTyVarNames )
+import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
                           tcExtendUVarEnv, tcLookupUVar,
-			  tcGetGlobalTyVars, valueEnvIds, TcTyThing(..)
+			  tcGetGlobalTyVars, valueEnvIds, 
+		 	  TyThing(..), tyThingKind, tcExtendKindEnv
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
-			  typeToTcType, kindToTcKind,
 			  newKindVar, tcInstSigVar,
-			  zonkTcKindToKind, zonkTcTypeToType, zonkTcTyVars, zonkTcType, zonkTcTyVar
+			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
 			  instFunDeps, instFunDepsOfTheta )
 import FunDeps		( tyVarFunDep, oclose )
-import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
-import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
+import TcUnify		( unifyKind, unifyKinds, unifyOpenTypeKind )
+import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
                           mkUsForAllTy, zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
-			  boxedTypeKind, unboxedTypeKind, 
-			  mkArrowKinds, getTyVar_maybe, getTyVar,
+			  boxedTypeKind, unboxedTypeKind, mkArrowKind,
+			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, mkForAllTys
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, mkForAllTys,
+			  classesOfPreds
 			)
 import PprType		( pprConstraint, pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar, mkNamedUVar, varName )
+import Var		( TyVar, mkTyVar, tyVarKind, mkNamedUVar, varName )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
+import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
+import Class		( ClassContext, classArity, classTyCon )
 import Name		( Name, OccName, isLocallyDefined )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import UniqFM		( elemUFM, foldUFM )
@@ -65,68 +73,170 @@ import Outputable
 %*									*
 %************************************************************************
 
+\begin{code}
+
+kcHsTyVar  :: HsTyVarBndr name   -> NF_TcM s (name, TcKind)
+kcHsTyVars :: [HsTyVarBndr name] -> NF_TcM s [(name, TcKind)]
+
+kcHsTyVar (UserTyVar name)       = newKindVar	`thenNF_Tc` \ kind ->
+				   returnNF_Tc (name, kind)
+kcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (name, kind)
+
+kcHsTyVars tvs = mapNF_Tc kcHsTyVar tvs
+
+---------------------------
+kcBoxedType :: RenamedHsType -> TcM s ()
+	-- The type ty must be a *boxed* *type*
+kcBoxedType ty
+  = kcHsType ty				`thenTc` \ kind ->
+    tcAddErrCtxt (typeKindCtxt ty)	$
+    unifyKind boxedTypeKind kind
+    
+---------------------------
+kcTypeType :: RenamedHsType -> TcM s ()
+	-- The type ty must be a *type*, but it can be boxed or unboxed.
+kcTypeType ty
+  = kcHsType ty				`thenTc` \ kind ->
+    tcAddErrCtxt (typeKindCtxt ty)	$
+    unifyOpenTypeKind kind
+
+---------------------------
+kcHsSigType, kcHsBoxedSigType :: RenamedHsType -> TcM s ()
+	-- Used for type signatures
+kcHsSigType  	 = kcTypeType
+kcHsBoxedSigType = kcBoxedType
+
+---------------------------
+kcHsType :: RenamedHsType -> TcM s TcKind
+kcHsType (HsTyVar name)	      
+  = tcLookupTy name	`thenTc` \ thing ->
+    case thing of
+	ATyVar tv -> returnTc (tyVarKind tv)
+	ATyCon tc -> returnTc (tyConKind tc)
+	AThing k  -> returnTc k
+	other	  -> failWithTc (wrongThingErr "type" thing name)
+
+kcHsType (HsUsgTy _ ty)       = kcHsType ty
+kcHsType (HsUsgForAllTy _ ty) = kcHsType ty
+
+kcHsType (HsListTy ty)
+  = kcBoxedType ty		`thenTc` \ tau_ty ->
+    returnTc boxedTypeKind
+
+kcHsType (HsTupleTy (HsTupCon _ Boxed) tys)
+  = mapTc kcBoxedType tys	`thenTc_` 
+    returnTc boxedTypeKind
+
+kcHsType (HsTupleTy (HsTupCon _ Unboxed) tys)
+  = mapTc kcTypeType tys	`thenTc_` 
+    returnTc unboxedTypeKind
+
+kcHsType (HsFunTy ty1 ty2)
+  = kcTypeType ty1	`thenTc_`
+    kcTypeType ty2	`thenTc_`
+    returnTc boxedTypeKind
+
+kcHsType (HsPredTy pred)
+  = kcHsPred pred		`thenTc_`
+    returnTc boxedTypeKind
+
+kcHsType ty@(HsAppTy ty1 ty2)
+  = kcHsType ty1		`thenTc` \ tc_kind ->
+    kcHsType ty2		`thenTc` \ arg_kind ->
+
+    tcAddErrCtxt (appKindCtxt (ppr ty))	$
+    case splitFunTy_maybe tc_kind of 
+	Just (arg_kind', res_kind)
+		-> unifyKind arg_kind arg_kind'	`thenTc_`
+		   returnTc res_kind
+
+	Nothing -> newKindVar 						`thenNF_Tc` \ res_kind ->
+		   unifyKind tc_kind (mkArrowKind arg_kind res_kind)	`thenTc_`
+		   returnTc res_kind
+
+kcHsType (HsForAllTy (Just tv_names) context ty)
+  = kcHsTyVars tv_names			`thenNF_Tc` \ kind_env ->
+    tcExtendKindEnv kind_env		$
+    kcHsContext context		`thenTc_`
+    kcHsType ty			`thenTc` \ kind ->
+ 
+		-- Context behaves like a function type
+		-- This matters.  Return-unboxed-tuple analysis can
+		-- give overloaded functions like
+		--	f :: forall a. Num a => (# a->a, a->a #)
+		-- And we want these to get through the type checker
+    returnTc (if null context then
+		 kind
+	      else
+		  boxedTypeKind)
+
+---------------------------
+kcHsContext ctxt = mapTc_ kcHsPred ctxt
+
+kcHsPred :: RenamedHsPred -> TcM s ()
+kcHsPred pred@(HsPIParam name ty)
+  = tcAddErrCtxt (appKindCtxt (ppr pred))	$
+    kcBoxedType ty
+
+kcHsPred pred@(HsPClass cls tys)
+  = tcAddErrCtxt (appKindCtxt (ppr pred))	$
+    tcLookupTy cls 				`thenNF_Tc` \ thing -> 
+    (case thing of
+	AClass cls  -> returnTc (tyConKind (classTyCon cls))
+	AThing kind -> returnTc kind
+	other -> failWithTc (wrongThingErr "class" thing cls))	`thenTc` \ kind ->
+    mapTc kcHsType tys						`thenTc` \ arg_kinds ->
+    unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)
+\end{code}
+
+\begin{code}
+kcTyVarScope :: [HsTyVarBndr Name] 
+	     -> TcM s a				-- The kind checker
+	     -> TcM s [TyVar]
+	-- Do a kind check to find out the kinds of the type variables
+	-- Then return the type variables
+
+kcTyVarScope [] kind_check = returnTc []
+	-- A useful short cut for a common case!
+  
+kcTyVarScope tv_names kind_check 
+  = kcHsTyVars tv_names 				`thenNF_Tc` \ tv_names_w_kinds ->
+    tcExtendKindEnv tv_names_w_kinds kind_check		`thenTc_`
+    zonkKindEnv tv_names_w_kinds			`thenNF_Tc` \ zonked_pairs ->
+    returnTc (map mk_tyvar zonked_pairs)
+\end{code}
+    
+
+%************************************************************************
+%*									*
+\subsection{Checking types}
+%*									*
+%************************************************************************
+
 tcHsType and tcHsTypeKind
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-tcHsType checks that the type really is of kind Type!
+tcHsSigType and tcHsBoxedSigType are used for type signatures written by the programmer
+
+  * We hoist any inner for-alls to the top
+
+  * Notice that we kind-check first, because the type-check assumes
+	that the kinds are already checked.
+  * They are only called when there are no kind vars in the environment
+  	so the kind returned is indeed a Kind not a TcKind
 
 \begin{code}
-kcHsType :: RenamedHsType -> TcM c ()
-  -- Kind-check the type
-kcHsType ty = tc_type ty	`thenTc_`
-	      returnTc ()
-
 tcHsSigType :: RenamedHsType -> TcM s TcType
-  -- Used for type sigs written by the programmer
-  -- Hoist any inner for-alls to the top
 tcHsSigType ty
-  = tcHsType ty		`thenTc` \ ty' ->
+  = kcTypeType ty	`thenTc_`
+    tcHsType ty		`thenTc` \ ty' ->
     returnTc (hoistForAllTys ty')
 
-tcHsType :: RenamedHsType -> TcM s TcType
-tcHsType ty
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_type ty
-
-tcHsTypeKind    :: RenamedHsType -> TcM s (TcKind, TcType)
-tcHsTypeKind ty 
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_type_kind ty
-
--- Type-check a type, *and* then lazily zonk it.  The important
--- point is that this zonks all the uncommitted *kind* variables
--- in kinds of any any nested for-all tyvars.
--- There won't be any mutable *type* variables at all.
---
--- NOTE the forkNF_Tc.  This makes the zonking lazy, which is
--- absolutely necessary.  During the type-checking of a recursive
--- group of tycons/classes (TcTyClsDecls.tcGroup) we use an
--- environment in which we aren't allowed to look at the actual
--- tycons/classes returned from a lookup. Because tc_app does
--- look at the tycon to build the type, we can't look at the type
--- either, until we get out of the loop.   The fork delays the
--- zonking till we've completed the loop.  Sigh.
-
-tcHsTopType :: RenamedHsType -> TcM s Type
-tcHsTopType ty
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_type ty				`thenTc` \ ty' ->
-    forkNF_Tc (zonkTcTypeToType ty')	`thenTc` \ ty'' ->
-    returnTc (hoistForAllTys ty'')
-
-tcHsTopBoxedType :: RenamedHsType -> TcM s Type
-tcHsTopBoxedType ty
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_boxed_type ty			`thenTc` \ ty' ->
-    forkNF_Tc (zonkTcTypeToType ty')	`thenTc` \ ty'' ->
-    returnTc (hoistForAllTys ty'')
-
-tcHsTopTypeKind :: RenamedHsType -> TcM s (TcKind, Type)
-tcHsTopTypeKind ty
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_type_kind ty				`thenTc` \ (kind, ty') ->
-    forkNF_Tc (zonkTcTypeToType ty')		`thenTc` \ zonked_ty ->
-    returnNF_Tc (kind, hoistForAllTys zonked_ty)
+tcHsBoxedSigType :: RenamedHsType -> TcM s Type
+tcHsBoxedSigType ty
+  = kcBoxedType ty	`thenTc_`
+    tcHsType ty		`thenTc` \ ty' ->
+    returnTc (hoistForAllTys ty')
 \end{code}
 
 
@@ -134,83 +244,58 @@ The main work horse
 ~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tc_boxed_type :: RenamedHsType -> TcM s Type
-tc_boxed_type ty
-  = tc_type_kind ty					`thenTc` \ (actual_kind, tc_ty) ->
-    tcAddErrCtxt (typeKindCtxt ty)
-		 (unifyKind boxedTypeKind actual_kind)	`thenTc_`
-    returnTc tc_ty
-
-tc_type :: RenamedHsType -> TcM s Type
-tc_type ty
-	-- The type ty must be a *type*, but it can be boxed
-	-- or unboxed.  So we check that is is of form (Type bv)
-	-- using unifyTypeKind
-  = tc_type_kind ty				`thenTc` \ (actual_kind, tc_ty) ->
-    tcAddErrCtxt (typeKindCtxt ty)
-		 (unifyTypeKind actual_kind)	`thenTc_`
-    returnTc tc_ty
-
-tc_type_kind :: RenamedHsType -> TcM s (TcKind, Type)
-tc_type_kind ty@(HsTyVar name)
+tcHsType :: RenamedHsType -> TcM s Type
+tcHsType ty@(HsTyVar name)
   = tc_app ty []
 
-tc_type_kind (HsListTy ty)
-  = tc_boxed_type ty		`thenTc` \ tau_ty ->
-    returnTc (boxedTypeKind, mkListTy tau_ty)
+tcHsType (HsListTy ty)
+  = tcHsType ty		`thenTc` \ tau_ty ->
+    returnTc (mkListTy tau_ty)
 
-tc_type_kind (HsTupleTy (HsTupCon _ Boxed) tys)
-  = mapTc tc_boxed_type tys	`thenTc` \ tau_tys ->
-    returnTc (boxedTypeKind, mkTupleTy Boxed (length tys) tau_tys)
+tcHsType (HsTupleTy (HsTupCon _ boxity) tys)
+  = mapTc tcHsType tys	`thenTc` \ tau_tys ->
+    returnTc (mkTupleTy boxity (length tys) tau_tys)
 
-tc_type_kind (HsTupleTy (HsTupCon _ Unboxed) tys)
-  = mapTc tc_type tys			`thenTc` \ tau_tys ->
-    returnTc (unboxedTypeKind, mkTupleTy Unboxed (length tys) tau_tys)
+tcHsType (HsFunTy ty1 ty2)
+  = tcHsType ty1	`thenTc` \ tau_ty1 ->
+    tcHsType ty2	`thenTc` \ tau_ty2 ->
+    returnTc (mkFunTy tau_ty1 tau_ty2)
 
-tc_type_kind (HsFunTy ty1 ty2)
-  = tc_type ty1	`thenTc` \ tau_ty1 ->
-    tc_type ty2	`thenTc` \ tau_ty2 ->
-    returnTc (boxedTypeKind, mkFunTy tau_ty1 tau_ty2)
-
-tc_type_kind (HsAppTy ty1 ty2)
+tcHsType (HsAppTy ty1 ty2)
   = tc_app ty1 [ty2]
 
-tc_type_kind (HsPredTy pred)
+tcHsType (HsPredTy pred)
   = tcClassAssertion True pred	`thenTc` \ pred' ->
-    returnTc (boxedTypeKind, mkPredTy pred')
+    returnTc (mkPredTy pred')
 
-tc_type_kind (HsUsgTy usg ty)
-  = newUsg usg                          `thenTc` \ usg' ->
-    tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
-    returnTc (kind, mkUsgTy usg' tc_ty)
+tcHsType (HsUsgTy usg ty)
+  = newUsg usg			`thenTc` \ usg' ->
+    tcHsType ty			`thenTc` \ tc_ty ->
+    returnTc (mkUsgTy usg' tc_ty)
   where
     newUsg usg = case usg of
                    HsUsOnce        -> returnTc UsOnce
                    HsUsMany        -> returnTc UsMany
                    HsUsVar uv_name -> tcLookupUVar uv_name `thenTc` \ uv ->
-                                        returnTc (UsVar uv)
+                                      returnTc (UsVar uv)
 
-tc_type_kind (HsUsgForAllTy uv_name ty)
+tcHsType (HsUsgForAllTy uv_name ty)
   = let
         uv = mkNamedUVar uv_name
     in
     tcExtendUVarEnv uv_name uv $
-      tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
-      returnTc (kind, mkUsForAllTy uv tc_ty)
+    tcHsType ty                     `thenTc` \ tc_ty ->
+    returnTc (mkUsForAllTy uv tc_ty)
 
-tc_type_kind full_ty@(HsForAllTy (Just tv_names) context ty)
-  = tcExtendTyVarScope tv_names		$ \ forall_tyvars ->
+tcHsType full_ty@(HsForAllTy (Just tv_names) context ty)
+  = let
+	kind_check = kcHsContext context `thenTc_` kcHsType ty
+    in
+    kcTyVarScope tv_names kind_check 	`thenTc` \ forall_tyvars ->
+    tcExtendTyVarEnv forall_tyvars	$
     tcContext context			`thenTc` \ theta ->
-    tc_type_kind ty			`thenTc` \ (kind, tau) ->
+    tcHsType ty				`thenTc` \ tau ->
     let
-	body_kind | null theta = kind
-		  | otherwise  = boxedTypeKind
-		-- Context behaves like a function type
-		-- This matters.  Return-unboxed-tuple analysis can
-		-- give overloaded functions like
-		--	f :: forall a. Num a => (# a->a, a->a #)
-		-- And we want these to get through the type checker
-
 	-- Check for ambiguity
 	--   forall V. P => tau
 	-- is ambiguous if P contains generic variables
@@ -263,7 +348,7 @@ tc_type_kind full_ty@(HsForAllTy (Just tv_names) context ty)
 				other		  -> False
     in
     mapTc check_pred theta		`thenTc_`
-    returnTc (body_kind, mkSigmaTy forall_tyvars theta tau)
+    returnTc (mkSigmaTy forall_tyvars theta tau)
 \end{code}
 
 Help functions for type applications
@@ -274,79 +359,74 @@ tc_app (HsAppTy ty1 ty2) tys
   = tc_app ty1 (ty2:tys)
 
 tc_app ty tys
-  | null tys
-  = tc_fun_type ty []
-
-  | otherwise
   = tcAddErrCtxt (appKindCtxt pp_app)	$
-    mapAndUnzipTc tc_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
-    tc_fun_type ty arg_tys		`thenTc` \ (fun_kind, result_ty) ->
-
-	-- Check argument compatibility
-    newKindVar					`thenNF_Tc` \ result_kind ->
-    unifyKind fun_kind (mkArrowKinds arg_kinds result_kind)
-					`thenTc_`
-    returnTc (result_kind, result_ty)
+    mapTc tcHsType tys			`thenTc` \ arg_tys ->
+    tc_fun_type ty arg_tys
   where
     pp_app = ppr ty <+> sep (map pprParendHsType tys)
 
--- (tc_fun_type ty arg_tys) returns (kind-of ty, mkAppTys ty arg_tys)
+-- (tc_fun_type ty arg_tys) returns (mkAppTys ty arg_tys)
 -- But not quite; for synonyms it checks the correct arity, and builds a SynTy
 -- 	hence the rather strange functionality.
 
 tc_fun_type (HsTyVar name) arg_tys
-  = tcLookupTy name			`thenTc` \ (tycon_kind, thing) ->
+  = tcLookupTy name			`thenTc` \ thing ->
     case thing of
-	ATyVar tv     -> returnTc (tycon_kind, mkAppTys (mkTyVarTy tv) arg_tys)
-	AClass clas _ -> failWithTc (classAsTyConErr name)
+	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
-	ADataTyCon tc ->  -- Data or newtype
-			  returnTc (tycon_kind, mkTyConApp tc arg_tys)
+	ATyCon tc | isSynTyCon tc ->  checkTc arity_ok err_msg	`thenTc_`
+				      returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
+							 (drop arity arg_tys))
 
-	ASynTyCon tc arity ->  	-- Type synonym
-			          checkTc (arity <= n_args) err_msg	`thenTc_`
-	  		          returnTc (tycon_kind, result_ty)
-			   where
-				-- It's OK to have an *over-applied* type synonym
-				--	data Tree a b = ...
-				--	type Foo a = Tree [a]
-				--	f :: Foo a b -> ...
-			      result_ty = mkAppTys (mkSynTy tc (take arity arg_tys))
-						   (drop arity arg_tys)
-			      err_msg = arityErr "type synonym" name arity n_args
-			      n_args  = length arg_tys
+		  | otherwise	  ->  returnTc (mkTyConApp tc arg_tys)
+		  where
+
+		    arity_ok = arity <= n_args 
+		    arity = tyConArity tc
+			-- It's OK to have an *over-applied* type synonym
+			--	data Tree a b = ...
+			--	type Foo a = Tree [a]
+			--	f :: Foo a b -> ...
+		    err_msg = arityErr "type synonym" name arity n_args
+		    n_args  = length arg_tys
+
+	other -> failWithTc (wrongThingErr "type constructor" thing name)
 
 tc_fun_type ty arg_tys
-  = tc_type_kind ty		`thenTc` \ (fun_kind, fun_ty) ->
-    returnTc (fun_kind, mkAppTys fun_ty arg_tys)
+  = tcHsType ty		`thenTc` \ fun_ty ->
+    returnNF_Tc (mkAppTys fun_ty arg_tys)
 \end{code}
 
 
 Contexts
 ~~~~~~~~
 \begin{code}
+tcClassContext :: RenamedContext -> TcM s ClassContext
+	-- Used when we are expecting a ClassContext (i.e. no implicit params)
+tcClassContext context
+  = tcContext context 	`thenTc` \ theta ->
+    returnTc (classesOfPreds theta)
 
 tcContext :: RenamedContext -> TcM s ThetaType
 tcContext context = mapTc (tcClassAssertion False) context
 
 tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
-    mapAndUnzipTc tc_type_kind tys		`thenTc` \ (arg_kinds, arg_tys) ->
-    tcLookupTy class_name			`thenTc` \ (kind, thing) ->
+    mapTc tcHsType tys				`thenTc` \ arg_tys ->
+    tcLookupTy class_name			`thenTc` \ thing ->
     case thing of
-	AClass clas arity ->
-		    	-- Check with kind mis-match
-		checkTc (arity == n_tys) err				`thenTc_`
-		unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)	`thenTc_`
-		returnTc (Class clas arg_tys)
+	AClass clas -> checkTc (arity == n_tys) err				`thenTc_`
+		       returnTc (Class clas arg_tys)
 	    where
+		arity = classArity clas
 		n_tys = length tys
 		err   = arityErr "Class" class_name arity n_tys
-	other -> failWithTc (tyVarAsClassErr class_name)
+
+	other -> failWithTc (wrongThingErr "class" thing class_name)
 
 tcClassAssertion ccall_ok assn@(HsPIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
-    tc_type_kind ty	`thenTc` \ (arg_kind, arg_ty) ->
+    tcHsType ty					`thenTc` \ arg_ty ->
     returnTc (IParam name arg_ty)
 \end{code}
 
@@ -358,38 +438,24 @@ tcClassAssertion ccall_ok assn@(HsPIParam name ty)
 %************************************************************************
 
 \begin{code}
-tcExtendTopTyVarScope :: TcKind -> [HsTyVarBndr Name]
-		      -> ([TcTyVar] -> TcKind -> TcM s a)
-		      -> TcM s a
-tcExtendTopTyVarScope kind tyvar_names thing_inside
-  = let
-	(tyvars_w_kinds, result_kind) = zipFunTys tyvar_names kind
-	tyvars 			      = map mk_tv tyvars_w_kinds
-    in
-    tcExtendTyVarEnv tyvars (thing_inside tyvars result_kind)	
-  where
-    mk_tv (UserTyVar name,    kind) = mkTyVar name kind
-    mk_tv (IfaceTyVar name _, kind) = mkTyVar name kind
-	-- NB: immutable tyvars, but perhaps with mutable kinds
+mk_tyvar (tv_bndr, kind) = mkTyVar tv_bndr kind
 
-tcExtendTyVarScope :: [HsTyVarBndr Name] 
-		   -> ([TcTyVar] -> TcM s a) -> TcM s a
-tcExtendTyVarScope tv_names thing_inside
-  = mapNF_Tc tcHsTyVar tv_names 	`thenNF_Tc` \ tyvars ->
-    tcExtendTyVarEnv tyvars		$
-    thing_inside tyvars
-    
+mkTyClTyVars :: Kind 			-- Kind of the tycon or class
+	     -> [HsTyVarBndr Name]
+	     -> [TyVar]
+mkTyClTyVars kind tyvar_names
+  = map mk_tyvar tyvars_w_kinds
+  where
+    (tyvars_w_kinds, _) = zipFunTys (hsTyVarNames tyvar_names) kind
+
 tcHsTyVar :: HsTyVarBndr Name -> NF_TcM s TcTyVar
 tcHsTyVar (UserTyVar name)       = newKindVar		`thenNF_Tc` \ kind ->
 			           tcNewMutTyVar name kind
 	-- NB: mutable kind => mutable tyvar, so that zonking can bind
 	-- the tyvar to its immutable form
 
-tcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (mkTyVar name (kindToTcKind kind))
+tcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (mkTyVar name kind)
 
-kcHsTyVar :: HsTyVarBndr name -> NF_TcM s TcKind
-kcHsTyVar (UserTyVar name)       = newKindVar
-kcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (kindToTcKind kind)
 \end{code}
 
 
@@ -707,7 +773,7 @@ sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
     let
 	(env1, tidy_sig_tyvars)  = tidyTyVars tidy_env sig_tyvars
 	(env2, tidy_sig_rho)	 = tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
-	(env3, tidy_actual_tau)  = tidyOpenType env1 actual_tau
+	(env3, tidy_actual_tau)  = tidyOpenType env2 actual_tau
 	msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tyvars tidy_sig_rho),
 		    ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau,
 		    when
@@ -748,14 +814,13 @@ typeKindCtxt ty = sep [ptext SLIT("When checking that"),
 appKindCtxt :: SDoc -> Message
 appKindCtxt pp = ptext SLIT("When checking kinds in") <+> quotes pp
 
-classAsTyConErr name
-  = ptext SLIT("Class used as a type constructor:") <+> ppr name
-
-tyConAsClassErr name
-  = ptext SLIT("Type constructor used as a class:") <+> ppr name
-
-tyVarAsClassErr name
-  = ptext SLIT("Type variable used as a class:") <+> ppr name
+wrongThingErr expected actual name
+  = pp_actual actual <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
+  where
+    pp_actual (ATyCon _) = ptext SLIT("Type constructor")
+    pp_actual (AClass _) = ptext SLIT("Class")
+    pp_actual (ATyVar _) = ptext SLIT("Type variable")
+    pp_actual (AThing _) = ptext SLIT("Utterly bogus")
 
 ambigErr pred ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),

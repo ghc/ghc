@@ -10,7 +10,7 @@ module HsTypes (
 	, HsTupCon(..), hsTupParens, mkHsTupCon,
 
 	, mkHsForAllTy, mkHsUsForAllTy, mkHsDictTy, mkHsIParamTy
-	, getTyVarName, replaceTyVarName
+	, hsTyVarName, hsTyVarNames, replaceTyVarName
 
 	-- Printing
 	, pprParendHsType, pprHsForAll, pprHsContext, pprHsTyVarBndr
@@ -128,8 +128,10 @@ data HsTyVarBndr name
 	-- for-alls in it, (mostly to do with dictionaries).  These
 	-- must be explicitly Kinded.
 
-getTyVarName (UserTyVar n)    = n
-getTyVarName (IfaceTyVar n _) = n
+hsTyVarName (UserTyVar n)    = n
+hsTyVarName (IfaceTyVar n _) = n
+
+hsTyVarNames tvs = map hsTyVarName tvs
 
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
 replaceTyVarName (UserTyVar n)    n' = UserTyVar n'

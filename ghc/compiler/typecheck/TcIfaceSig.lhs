@@ -10,12 +10,11 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 import HsSyn		( HsDecl(..), IfaceSig(..), HsTupCon(..) )
 import TcMonad
-import TcMonoType	( tcHsType, tcHsTypeKind, 
+import TcMonoType	( tcHsType )
 				-- NB: all the tyars in interface files are kinded,
 				-- so tcHsType will do the Right Thing without
 				-- having to mess about with zonking
-			  tcExtendTyVarScope
-			)
+
 import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetValueEnv,
 			  tcLookupValueMaybe,
@@ -186,7 +185,7 @@ UfCore expressions.
 tcCoreExpr :: UfExpr Name -> TcM s CoreExpr
 
 tcCoreExpr (UfType ty)
-  = tcHsTypeKind ty	`thenTc` \ (_, ty') ->
+  = tcHsType ty		`thenTc` \ ty' ->
 	-- It might not be of kind type
     returnTc (Type ty')
 

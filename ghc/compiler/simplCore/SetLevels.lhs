@@ -250,7 +250,6 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
     mapLvl (lvl_alt alts_env) alts	`thenLvl` \ alts' ->
     returnLvl (Case expr' (case_bndr, incd_lvl) alts')
   where
-      expr_type = exprType (deAnnotate expr)
       incd_lvl  = incMinorLvl ctxt_lvl
 
       lvl_alt alts_env (con, bs, rhs)

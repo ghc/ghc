@@ -392,7 +392,7 @@ tcConstructor pat con_name pat_ty
 
 	-- Instantiate it
     let 
-	(tvs, theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
+	(tvs, _, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
 	     -- Ignore the theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.

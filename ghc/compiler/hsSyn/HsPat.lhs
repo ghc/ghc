@@ -12,7 +12,8 @@ module HsPat (
 	failureFreePat, isWildPat,
 	patsAreAllCons, isConPat,
 	patsAreAllLits,	isLitPat,
-	collectPatBinders, collectPatsBinders
+	collectPatBinders, collectPatsBinders,
+	collectSigTysFromPats
     ) where
 
 #include "HsVersions.h"
@@ -329,4 +330,25 @@ collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
 collect (ListPatIn pats)    	 bndrs = foldr collect bndrs pats
 collect (TuplePatIn pats _)  	 bndrs = foldr collect bndrs pats
 collect (RecPatIn c fields) 	 bndrs = foldr (\ (f,pat,_) bndrs -> collect pat bndrs) bndrs fields
+\end{code}
+
+
+\begin{code}
+collectSigTysFromPats :: [InPat name] -> [HsType name]
+collectSigTysFromPats pats = foldr collect_pat [] pats
+
+collect_pat (SigPatIn pat ty)	   acc = collect_pat pat (ty:acc)
+collect_pat WildPatIn	      	   acc = acc
+collect_pat (VarPatIn var)         acc = acc
+collect_pat (LitPatIn _)	   acc = acc
+collect_pat (LazyPatIn pat)        acc = collect_pat pat acc
+collect_pat (AsPatIn a pat)        acc = collect_pat pat acc
+collect_pat (NPlusKPatIn n _)      acc = acc
+collect_pat (ConPatIn c pats)      acc = foldr collect_pat acc pats
+collect_pat (ConOpPatIn p1 c f p2) acc = collect_pat p1 (collect_pat p2 acc)
+collect_pat (NegPatIn  pat)        acc = collect_pat pat acc
+collect_pat (ParPatIn  pat)        acc = collect_pat pat acc
+collect_pat (ListPatIn pats)       acc = foldr collect_pat acc pats
+collect_pat (TuplePatIn pats _)    acc = foldr collect_pat acc pats
+collect_pat (RecPatIn c fields)    acc = foldr (\ (f,pat,_) acc -> collect_pat pat acc) acc fields
 \end{code}

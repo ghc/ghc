@@ -11,9 +11,9 @@ module Unify ( unifyTysX, unifyTyListsX,
 	       match, matchTy, matchTys
   ) where 
 
-import TypeRep	( Type(..), funTyCon
-		)  -- friend
-import Type	( typeKind, tyVarsOfType, splitAppTy_maybe
+import TypeRep	( Type(..) )	 -- friend
+import Type	( Kind, funTyCon, 
+		  typeKind, tyVarsOfType, splitAppTy_maybe
 		)
 
 import PprType	()	-- Instances
@@ -28,7 +28,6 @@ import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv,
 		)
 
 import Outputable( panic )
-import Util	( snocView )
 \end{code}
 
 %************************************************************************
@@ -231,4 +230,5 @@ match_list []         tys2       tmpls k senv = k (senv, tys2)
 match_list (ty1:tys1) []         tmpls k senv = Nothing	-- Not enough arg tys => failure
 match_list (ty1:tys1) (ty2:tys2) tmpls k senv = match ty1 ty2 tmpls (match_list tys1 tys2 tmpls k) senv
 \end{code}
+
 

@@ -3,13 +3,14 @@ module TcEnv(
 	TcId, TcIdSet, tcInstId,
 	tcLookupDataCon,
 
-	TcEnv, ValueEnv, TcTyThing(..),
+	TcEnv, ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind, 
 
-	initEnv, getEnvTyCons, getEnvClasses, getEnvAllTyCons,
+	initEnv, getEnvTyCons, getEnvClasses, 
 	
         tcExtendUVarEnv, tcLookupUVar,
 
-	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
+	tcExtendKindEnv, tcExtendTyVarEnv, 
+	tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
 
 	tcLookupTy,
 	tcLookupTyConByKey, 
@@ -43,11 +44,11 @@ import Var	( TyVar, Id, setVarName,
 		)
 import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 		  tcInstTyVars, zonkTcTyVars,
-		  TcKind, kindToTcKind
+		  TcKind, 
 		)
 import VarSet
 import Type	( Kind, Type, superKind,
-		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy,
+		  tyVarsOfType, tyVarsOfTypes,
 		  splitForAllTys, splitRhoTy, splitFunTys,
 		  splitAlgTyConApp_maybe, getTyVar
 		)
@@ -55,7 +56,7 @@ import Subst	( substTy )
 import UsageSPUtils ( unannotTy )
 import DataCon	( DataCon )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
-import Class	( Class, classTyCon )
+import Class	( Class, ClassOpItem, ClassContext, classTyCon )
 
 import TcMonad
 
@@ -64,8 +65,8 @@ import IdInfo		( vanillaIdInfo )
 import Name		( Name, OccName, nameOccName, getSrcLoc,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..), 
-			  NameEnv, emptyNameEnv, addToNameEnv, 
-				   extendNameEnv, lookupNameEnv, nameEnvElts
+			  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
+				   extendNameEnv, extendNameEnvList
 			)
 import Unify		( unifyTyListsX, matchTys )
 import Unique		( pprUnique10, Unique, Uniquable(..) )
@@ -153,40 +154,39 @@ data TcEnv = TcEnv
 					-- Includes the in-scope tyvars
 
 type UsageEnv   = NameEnv UVar
-type TypeEnv	= NameEnv (TcKind, TcTyThing)
+type TypeEnv	= NameEnv TyThing
 type ValueEnv	= NameEnv Id	
 
 valueEnvIds :: ValueEnv -> [Id]
 valueEnvIds ve = nameEnvElts ve
 
-data TcTyThing = ATyVar TcTyVar		-- Mutable only so that the kind can be mutable
-					-- if the kind is mutable, the tyvar must be so that
-					-- zonking works
-	       | ADataTyCon TyCon
-	       | ASynTyCon TyCon Arity
-	       | AClass Class Arity
+data TyThing = ATyVar TyVar
+	     | ATyCon TyCon
+	     | AClass Class
+	     | AThing TcKind	-- Used temporarily, during kind checking
+-- For example, when checking (forall a. T a Int):
+--	1. We first bind (a -> AThink kv), where kv is a kind variable. 
+--	2. Then we kind-check the (T a Int) part.
+--	3. Then we zonk the kind variable.
+--	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
+tyThingKind :: TyThing -> TcKind
+tyThingKind (ATyVar tv) = tyVarKind tv
+tyThingKind (ATyCon tc) = tyConKind tc
+tyThingKind (AClass cl) = tyConKind (classTyCon cl)	-- For some odd reason, 
+							-- a class doesn't include its kind
+tyThingKind (AThing k)  = k
+
+data TyThingDetails = SynTyDetails Type
+		    | DataTyDetails ClassContext [DataCon] [Class]
+		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
 
 initEnv :: TcRef TcTyVarSet -> TcEnv
 initEnv mut = TcEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyInstEnv (emptyVarSet, mut)
 
-getEnvClasses (TcEnv _ te _ _ _) = [cl | (_, AClass cl _) <- nameEnvElts te]
-
-getEnvTyCons  (TcEnv _ te _ _ _) = catMaybes (map get_tc (nameEnvElts te))
-    where
-      get_tc (_, ADataTyCon tc)  = Just tc
-      get_tc (_, ASynTyCon tc _) = Just tc
-      get_tc other		 = Nothing
-
-getEnvAllTyCons te_list = catMaybes (map get_tc te_list)
-	-- The 'all' means 'including the tycons from class decls'
-    where                          
-      get_tc (_, ADataTyCon tc)  = Just tc
-      get_tc (_, ASynTyCon tc _) = Just tc
-      get_tc (_, AClass cl _)    = Just (classTyCon cl)
-      get_tc other               = Nothing
+getEnvClasses (TcEnv _ te _ _ _) = [cl | AClass cl <- nameEnvElts te]
+getEnvTyCons  (TcEnv _ te _ _ _) = [tc | ATyCon tc <- nameEnvElts te]
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -200,7 +200,7 @@ Extending the usage environment
 tcExtendUVarEnv :: Name -> UVar -> TcM s r -> TcM s r
 tcExtendUVarEnv uv_name uv scope
   = tcGetEnv                 `thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    tcSetEnv (TcEnv (addToNameEnv ue uv_name uv) te ve ie gtvs) scope
+    tcSetEnv (TcEnv (extendNameEnv ue uv_name uv) te ve ie gtvs) scope
 \end{code}
 
 Looking up in the environments.
@@ -222,14 +222,20 @@ tcLookupUVar uv_name
 %************************************************************************
 
 \begin{code}
+tcExtendKindEnv :: [(Name,TcKind)] -> TcM s r -> TcM s r
+tcExtendKindEnv pairs scope
+  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
+    let
+ 	te' = extendNameEnvList te [(n, AThing k) | (n,k) <- pairs]
+	-- No need to extend global tyvars for kind checking
+    in
+    tcSetEnv (TcEnv ue te' ve ie gtvs) scope
+    
 tcExtendTyVarEnv :: [TyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnv tyvars scope
   = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs, gtvs)) ->
     let
-	extend_list = [ (getName tv, (kindToTcKind (tyVarKind tv), ATyVar tv))
-		      | tv <- tyvars
-		      ]
- 	te'           = extendNameEnv te extend_list
+ 	te'           = extendNameEnvList te [ (getName tv, ATyVar tv) | tv <- tyvars]
 	new_tv_set    = mkVarSet tyvars
 	in_scope_tvs' = in_scope_tvs `unionVarSet` new_tv_set
     in
@@ -252,11 +258,11 @@ tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
   = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     let
-	te' = extendNameEnv te stuff
+	te' = extendNameEnvList te stuff
     in
     tcSetEnv (TcEnv ue te' ve ie gtvs) thing_inside
   where
-    stuff = [ (getName sig_tv, (kindToTcKind (tyVarKind inst_tv), ATyVar inst_tv))
+    stuff = [ (getName sig_tv, ATyVar inst_tv)
 	    | (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
 	    ]
 
@@ -299,13 +305,13 @@ tcGetInScopeTyVars
 Type constructors and classes
 
 \begin{code}
-tcExtendTypeEnv :: [(Name, (TcKind, TcTyThing))] -> TcM s r -> TcM s r
+tcExtendTypeEnv :: [(Name, TyThing)] -> TcM s r -> TcM s r
 tcExtendTypeEnv bindings scope
-  = ASSERT( null [tv | (_, (_,ATyVar tv)) <- bindings] )
+  = ASSERT( null [tv | (_, ATyVar tv) <- bindings] )
 	-- Not for tyvars; use tcExtendTyVarEnv
-    tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
+    tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     let
-	te' = extendNameEnv te bindings
+	te' = extendNameEnvList te bindings
     in
     tcSetEnv (TcEnv ue te' ve ie gtvs) scope
 \end{code}
@@ -314,7 +320,7 @@ tcExtendTypeEnv bindings scope
 Looking up in the environments.
 
 \begin{code}
-tcLookupTy :: Name ->  NF_TcM s (TcKind, TcTyThing)
+tcLookupTy :: Name ->  NF_TcM s TyThing
 tcLookupTy name
   = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupNameEnv te name of {
@@ -322,8 +328,7 @@ tcLookupTy name
  	Nothing    -> 
 
     case maybeWiredInTyConName name of
-	Just tc | isSynTyCon tc -> returnNF_Tc (kindToTcKind (tyConKind tc), ASynTyCon tc (tyConArity tc))
-		| otherwise     -> returnNF_Tc (kindToTcKind (tyConKind tc), ADataTyCon tc)
+	Just tc -> returnNF_Tc (ATyCon tc)
 
 	Nothing -> 	-- This can happen if an interface-file
 			-- unfolding is screwed up
@@ -334,23 +339,22 @@ tcLookupClassByKey :: Unique -> NF_TcM s Class
 tcLookupClassByKey key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, AClass cl _) -> returnNF_Tc cl
-	other		      -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
+	Just (AClass cl) -> returnNF_Tc cl
+	other		 -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
 
 tcLookupClassByKey_maybe :: Unique -> NF_TcM s (Maybe Class)
 tcLookupClassByKey_maybe key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, AClass cl _) -> returnNF_Tc (Just cl)
-	other		      -> returnNF_Tc Nothing
+	Just (AClass cl) -> returnNF_Tc (Just cl)
+	other		 -> returnNF_Tc Nothing
 
 tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
 tcLookupTyConByKey key
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
-	Just (_, ADataTyCon tc)  -> returnNF_Tc tc
-	Just (_, ASynTyCon tc _) -> returnNF_Tc tc
-	other		         -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
+	Just (ATyCon tc)  -> returnNF_Tc tc
+	other		  -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
 \end{code}
 
 
@@ -376,7 +380,7 @@ tcExtendLocalValEnv names_w_ids scope
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs,gtvs)) ->
     tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
     let
-	ve'		    = extendNameEnv ve names_w_ids
+	ve'		    = extendNameEnvList ve names_w_ids
 	extra_global_tyvars = tyVarsOfTypes (map (idType . snd) names_w_ids)
     in
     tc_extend_gtvs gtvs extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
@@ -445,8 +449,7 @@ tcAddImportedIdInfo unf_env id
   = id `lazySetIdInfo` new_info
 	-- The Id must be returned without a data dependency on maybe_id
   where
-    new_info = -- pprTrace "tcAdd" (ppr id) $
-	       case explicitLookupValue unf_env (getName id) of
+    new_info = case explicitLookupValue unf_env (getName id) of
 		     Nothing	      -> vanillaIdInfo
 		     Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same

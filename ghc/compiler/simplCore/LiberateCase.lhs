@@ -237,10 +237,10 @@ libCase env (Let bind body)
 libCase env (Case scrut bndr alts)
   = Case (libCase env scrut) bndr (map (libCaseAlt env_alts) alts)
   where
-    env_alts = addBinders env [bndr]
+    env_alts = addBinders env_with_scrut [bndr]
     env_with_scrut = case scrut of
 		  	Var scrut_var -> addScrutedVar env scrut_var
-			other		  -> env
+			other	      -> env
 
 libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 \end{code}

@@ -1023,8 +1023,6 @@ gen_Show_binds fixity_env tycon
 				 (map show_label labels) 
 				 real_show_thingies
 			       
-	     (con_left_assoc, con_right_assoc) = isLRAssoc fixity_env dc_nm
-
 	      {-
 	        c.f. Figure 16 and 17 in Haskell 1.1 report
 	      -}  

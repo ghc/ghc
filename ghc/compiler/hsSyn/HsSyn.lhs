@@ -92,9 +92,6 @@ instance (Outputable name, Outputable pat)
 
 	pp_nonnull [] = empty
 	pp_nonnull xs = vcat (map ppr xs)
-
-	pp_iface_version Nothing  = empty
-	pp_iface_version (Just n) = hsep [text "{-# INTERFACE", int n, text "#-}"]
 \end{code}
 
 

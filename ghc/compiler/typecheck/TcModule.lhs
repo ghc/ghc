@@ -27,9 +27,9 @@ import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  getEnvTyCons, getEnvClasses, tcLookupValueByKeyMaybe,
-			  explicitLookupValueByKey, tcSetValueEnv, tcSetInstEnv,
+			  tcSetValueEnv, tcSetInstEnv,
 			  initEnv, 
-			  ValueEnv, TcTyThing(..)
+			  ValueEnv, 
 			)
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -39,10 +39,7 @@ import TcInstUtil	( buildInstanceEnv, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
-import TcType		( TcType, typeToTcType,
-			  TcKind, kindToTcKind,
-			  newTyVarTy
-			)
+import TcType		( TcType, TcKind )
 
 import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
@@ -171,14 +168,6 @@ tcModule rn_name_supply fixities
     	tcDefaults decls		`thenTc` \ defaulting_tys ->
     	tcSetDefaultTys defaulting_tys 	$
     	
-	-- Extend the TyCon envt with the tycons corresponding to
-	-- the classes.
-	--  They are mentioned in types in interface files.
-        tcExtendTypeEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), ADataTyCon tycon))
-		        | clas <- classes,
-			  let tycon = classTyCon clas
-		        ]				$
-
 	-- Interface type signatures
 	-- We tie a knot so that the Ids read out of interfaces are in scope
 	--   when we read their pragmas.

@@ -37,7 +37,7 @@ import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcType, TcThetaType,
 			  TcTyVar,
-			  newTyVarTy, newTyVar, newTyVarTy_OpenKind, tcInstTcType,
+			  newTyVarTy, newTyVar, tcInstTcType,
 			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
@@ -50,7 +50,7 @@ import NameSet
 import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, 
 			  mkPredTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
-			  isUnboxedType, unboxedTypeKind, boxedTypeKind
+			  isUnboxedType, unboxedTypeKind, boxedTypeKind, openTypeKind
 			)
 import FunDeps		( tyVarFunDep, oclose )
 import Var		( TyVar, tyVarKind )
@@ -680,7 +680,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		  lie_avail1 `plusLIE` lie_avail2)
 
     tc_mb_pats (FunMonoBind name inf matches locn)
-      = new_lhs_ty 			`thenNF_Tc` \ bndr_ty ->
+      = newTyVarTy kind 		`thenNF_Tc` \ bndr_ty -> 
 	tc_pat_bndr name bndr_ty	`thenTc` \ bndr_id ->
 	let
 	   complete_it xve = tcAddSrcLoc locn				$
@@ -691,7 +691,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 
     tc_mb_pats bind@(PatMonoBind pat grhss locn)
       = tcAddSrcLoc locn	 	$
-	new_lhs_ty			`thenNF_Tc` \ pat_ty -> 
+	newTyVarTy kind 		`thenNF_Tc` \ pat_ty -> 
 
 		-- 	Now typecheck the pattern
 		-- We don't support binding fresh type variables in the
@@ -715,9 +715,9 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 
 	-- Figure out the appropriate kind for the pattern,
 	-- and generate a suitable type variable 
-    new_lhs_ty = case is_rec of
-		     Recursive    -> newTyVarTy boxedTypeKind	-- Recursive, so no unboxed types
-		     NonRecursive -> newTyVarTy_OpenKind 	-- Non-recursive, so we permit unboxed types
+    kind = case is_rec of
+		Recursive    -> boxedTypeKind	-- Recursive, so no unboxed types
+		NonRecursive -> openTypeKind 	-- Non-recursive, so we permit unboxed types
 \end{code}
 
 %************************************************************************

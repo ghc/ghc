@@ -28,9 +28,9 @@ import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
 			  tcAddImportedIdInfo, tcInstId
 			)
 import TcInstUtil	( InstInfo(..), classDataCon )
-import TcMonoType	( tcHsTopType )
+import TcMonoType	( tcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcTyVar, zonkTcTyVarBndr )
+import TcType		( TcTyVar, zonkTcSigTyVars )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  foldBag, Bag
@@ -169,7 +169,7 @@ tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
     tcAddSrcLoc src_loc			$
 
 	-- Type-check all the stuff before the "where"
-    tcHsTopType poly_ty			`thenTc` \ poly_ty' ->
+    tcHsSigType poly_ty			`thenTc` \ poly_ty' ->
     let
 	(tyvars, theta, dict_ty) = splitSigmaTy poly_ty'
 	constr			 = classesOfPreds theta
@@ -365,8 +365,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 
 	-- tcMethodBind has checked that the class_tyvars havn't
 	-- been unified with each other or another type, but we must
-	-- still zonk them
-    mapNF_Tc zonkTcTyVarBndr inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
+	-- still zonk them before passing them to tcSimplifyAndCheck
+    zonkTcSigTyVars inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
     let
         inst_tyvars_set = mkVarSet zonked_inst_tyvars
 

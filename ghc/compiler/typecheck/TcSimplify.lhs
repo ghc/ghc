@@ -146,7 +146,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv,
 			  InstEnv, lookupInstEnv, InstLookupResult(..) 
 			)
-import TcType		( TcType, TcTyVarSet, typeToTcType )
+import TcType		( TcType, TcTyVarSet )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
 import Class		( Class, classBigSig )
@@ -1141,10 +1141,7 @@ disambigGroup dicts
     try_default default_tys		 	`thenTc` \ chosen_default_ty ->
 
 	-- Bind the type variable and reduce the context, for real this time
-    let
-	chosen_default_tc_ty = typeToTcType chosen_default_ty	-- Tiresome!
-    in
-    unifyTauTy chosen_default_tc_ty (mkTyVarTy tyvar)	`thenTc_`
+    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
     reduceContext (text "disambig" <+> ppr dicts)
 		  try_me [] dicts			`thenTc` \ (binds, frees, ambigs) ->
     ASSERT( null frees && null ambigs )

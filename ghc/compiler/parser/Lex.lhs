@@ -1006,7 +1006,6 @@ mk_var_token pk_str
   | otherwise		= ITvarsym pk_str
   where
       (C# f) = _HEAD_ pk_str
-      tl     = _TAIL_ pk_str
 
 mk_qvar_token m token =
  case mk_var_token token of

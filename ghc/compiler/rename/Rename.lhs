@@ -39,7 +39,8 @@ import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameUnique, nameModule, maybeUserImportedFrom,
 			  isUserImportedExplicitlyName, isUserImportedName,
 			  maybeWiredInTyConName, maybeWiredInIdName,
-			  isUserExportedName, toRdrName
+			  isUserExportedName, toRdrName,
+			  nameEnvElts, extendNameEnv
 			)
 import OccName		( occNameFlavour, isValOcc )
 import Id		( idType )
@@ -489,7 +490,7 @@ getGates source_fvs (SigD (IfaceSig _ ty _ _))
 
 getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _ _))
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
-		       (map getTyVarName tvs)
+		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
     `plusFV` maybe_double
   where
@@ -509,12 +510,12 @@ getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _ _))
 
 getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
   = delListFromNameSet (extractHsTyNames ty)
-		       (map getTyVarName tvs)
+		       (hsTyVarNames tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
 getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
-		       (map getTyVarName tvs)
+		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon
   where
     get (ConDecl n _ tvs ctxt details _)
@@ -522,7 +523,7 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
 		-- If the constructor is method, get fvs from all its fields
 	= delListFromNameSet (get_details details `plusFV` 
 		  	      extractHsCtxtTyNames ctxt)
-			     (map getTyVarName tvs)
+			     (hsTyVarNames tvs)
     get (ConDecl n _ tvs ctxt (RecCon fields) _)
 		-- Even if the constructor isn't mentioned, the fields
 		-- might be, as selectors.  They can't mention existentially
@@ -540,9 +541,7 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
     get_field (fs,t) | any (`elemNameSet` source_fvs) fs = get_bang t
 		     | otherwise			 = emptyFVs
 
-    get_bang (Banged   t) = extractHsTyNames t
-    get_bang (Unbanged t) = extractHsTyNames t
-    get_bang (Unpacked t) = extractHsTyNames t
+    get_bang bty = extractHsTyNames (getBangType bty)
 
 getGates source_fvs other_decl = emptyFVs
 \end{code}
@@ -612,7 +611,7 @@ fixitiesFromLocalDecls gbl_env decls
 	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')
 					 `thenRn_` returnRn acc ;
 
-	    Nothing -> returnRn (addToNameEnv acc name (FixitySig name fixity loc))
+	    Nothing -> returnRn (extendNameEnv acc name (FixitySig name fixity loc))
 	  }}
 \end{code}
 

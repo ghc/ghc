@@ -569,7 +569,6 @@ switchOffInlining m env us sc
 	-- may as well do the same here.
   where
     subst	   = seSubst env
-    old_black_list = seBlackList env
 \end{code}
 
 

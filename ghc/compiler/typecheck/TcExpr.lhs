@@ -42,7 +42,7 @@ import TcImprove	( tcImprove )
 import TcType		( TcType, TcTauType,
 			  tcInstTyVars,
 			  tcInstTcType, tcSplitRhoTy,
-			  newTyVarTy, newTyVarTy_OpenKind, zonkTcType )
+			  newTyVarTy, newTyVarTys, zonkTcType )
 
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector,
@@ -59,7 +59,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  isSigmaTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
-			  boxedTypeKind, mkArrowKind,
+			  boxedTypeKind, openTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
 import TyCon		( TyCon, tyConTyVars )
@@ -371,7 +371,7 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	tv_idxs | n_args == 0 = []
 		| otherwise   = [1..n_args]
     in
-    mapNF_Tc (\ _ -> newTyVarTy_OpenKind) tv_idxs	`thenNF_Tc` \ arg_tys ->
+    newTyVarTys (length tv_idxs) openTypeKind		`thenNF_Tc` \ arg_tys ->
     tcMonoExprs args arg_tys		   		`thenTc`    \ (args', args_lie) ->
 
 	-- The argument types can be unboxed or boxed; the result
@@ -747,7 +747,7 @@ tcMonoExpr (HsWith expr binds) res_ty
 	revBinds b = b
 
 tcIPBinds ((name, expr) : binds)
-  = newTyVarTy_OpenKind		`thenTc` \ ty ->
+  = newTyVarTy openTypeKind	`thenTc` \ ty ->
     tcGetSrcLoc			`thenTc` \ loc ->
     let id = ipToId name ty loc in
     tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
@@ -782,7 +782,7 @@ tcExpr_id id_expr
  = case id_expr of
 	HsVar name -> tcId name			`thenNF_Tc` \ stuff -> 
 		      returnTc stuff
-	other	   -> newTyVarTy_OpenKind	`thenNF_Tc` \ id_ty ->
+	other	   -> newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
 		      tcMonoExpr id_expr id_ty	`thenTc`    \ (id_expr', lie_id) ->
 		      returnTc (id_expr', lie_id, id_ty) 
 \end{code}

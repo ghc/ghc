@@ -16,7 +16,7 @@ import RnHsSyn		( RenamedHsType )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 			  mkRdrUnqual, qualifyRdrName
 			)
-import HsTypes		( getTyVarName, replaceTyVarName )
+import HsTypes		( hsTyVarName, hsTyVarNames, replaceTyVarName )
 
 import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
@@ -25,7 +25,8 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  mkIPName, isWiredInName, hasBetterProv,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
-			  setNameProvenance, getNameProvenance, pprNameProvenance
+			  setNameProvenance, getNameProvenance, pprNameProvenance,
+			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
 			)
 import NameSet
 import OccName		( OccName,
@@ -351,7 +352,7 @@ extendTyVarEnvFVRn :: [HsTyVarBndr Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeV
 extendTyVarEnvFVRn tyvars enclosed_scope
   = getLocalNameEnv		`thenRn` \ env ->
     let
-	tyvar_names = map getTyVarName tyvars
+	tyvar_names = hsTyVarNames tyvars
 	new_env = addListToRdrEnv env [ (mkRdrUnqual (getOccName name), name) 
 				      | name <- tyvar_names
 				      ]
@@ -373,7 +374,7 @@ bindTyVars2Rn :: SDoc -> [HsTyVarBndr RdrName]
 bindTyVars2Rn doc_str tyvar_names enclosed_scope
   = getSrcLocRn					`thenRn` \ loc ->
     let
-	located_tyvars = [(getTyVarName tv, loc) | tv <- tyvar_names] 
+	located_tyvars = [(hsTyVarName tv, loc) | tv <- tyvar_names] 
     in
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope names (zipWith replaceTyVarName tyvar_names names)
@@ -633,7 +634,7 @@ plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [pprAvail a1,pprAvail a2])
 #endif
 
 addAvail :: AvailEnv -> AvailInfo -> AvailEnv
-addAvail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
+addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
 
 emptyAvailEnv = emptyNameEnv
 unitAvailEnv :: AvailInfo -> AvailEnv

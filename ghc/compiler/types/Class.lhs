@@ -7,7 +7,7 @@
 module Class (
 	Class, ClassOpItem, ClassPred, ClassContext, FunDep,
 
-	mkClass, classTyVars,
+	mkClass, classTyVars, classArity,
 	classKey, className, classSelIds, classTyCon,
 	classBigSig, classExtraBigSig, classTvsFds
     ) where
@@ -19,6 +19,7 @@ import {-# SOURCE #-} TypeRep	( Type )
 
 import Var		( Id, TyVar )
 import Name		( NamedThing(..), Name )
+import BasicTypes	( Arity )
 import Unique		( Unique, Uniquable(..) )
 import Outputable
 import Util
@@ -69,7 +70,7 @@ The @mkClass@ function fills in the indirect superclasses.
 mkClass :: Name -> [TyVar]
 	-> [([TyVar], [TyVar])]
 	-> [(Class,[Type])] -> [Id]
-	-> [(Id, Id, Bool)]
+	-> [ClassOpItem]
 	-> TyCon
 	-> Class
 
@@ -94,6 +95,10 @@ mkClass name tyvars fds super_classes superdict_sels
 The rest of these functions are just simple selectors.
 
 \begin{code}
+classArity :: Class -> Arity
+classArity clas = length (classTyVars clas)
+	-- Could memoise this
+
 classSelIds (Class {classSCSels = sc_sels, classOpStuff = op_stuff})
   = sc_sels ++ [op_sel | (op_sel, _, _) <- op_stuff]
 

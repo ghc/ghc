@@ -587,11 +587,6 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Int2DoubleOp -> coerceInt2FP DoubleRep x
 
       other_op ->
-        let
-	    fixed_x = if   is_float_op  -- promote to double
-		      then StPrim Float2DoubleOp [x]
-		      else x
-	in
 	getRegister (StCall fn cCallConv DoubleRep [x])
        where
 	(is_float_op, fn)
@@ -955,6 +950,8 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
       FloatNegOp     -> trivialUFCode FloatRep (FNEG F) x
       DoubleNegOp    -> trivialUFCode DoubleRep (FNEG DF) x
+
+      DoubleNegOp -> trivialUFCode DoubleRep (FNEG DF) x
 
       Double2FloatOp -> trivialUFCode FloatRep  (FxTOy DF F) x
       Float2DoubleOp -> trivialUFCode DoubleRep (FxTOy F DF) x
@@ -1555,7 +1552,6 @@ condFltCode cond x y
     	code1 = registerCode register1 tmp1
     	src1  = registerName register1 tmp1
 
-    	pk2   = registerRep register2
     	code2 = registerCode register2 tmp2
     	src2  = registerName register2 tmp2
 
