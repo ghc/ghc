@@ -2019,6 +2019,8 @@ extern I_ required_thread_count;
 }
 
 #endif  /* GRAN */ 
+
+#endif	/* CONCURRENT */
 \end{code}
 
 The following seq# code should only be used in unoptimized code.
@@ -2053,7 +2055,6 @@ ED_RO_(vtbl_seq);
     r = 1; /* Should be unnecessary */	    \
   })
 
-#endif	/* CONCURRENT */
 \end{code}
 
 %************************************************************************
