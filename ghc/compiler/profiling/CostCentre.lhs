@@ -34,7 +34,6 @@ import Name		( OccName, getOccString, moduleString )
 import Outputable	
 import Util	        ( panic, panic#, assertPanic, thenCmp )
 
-pprIdInUnfolding = panic "Whoops"
 \end{code}
 
 \begin{code}
@@ -351,36 +350,37 @@ uppCostCentre print_as_string OverheadCC
 uppCostCentre print_as_string cc
   = getPprStyle $ \ sty ->
     let
-        friendly_sty = userStyle sty || debugStyle sty    -- i.e. probably for human consumption
 	prefix_CC	   = ptext SLIT("CC_")
-	basic_thing        = do_cc friendly_sty cc
+	basic_thing        = do_cc sty cc
 	basic_thing_string = stringToC basic_thing
     in
     if print_as_string then
     	hcat [char '"', text basic_thing_string, char '"']
 
-    else if friendly_sty then
+    else if (friendly_sty sty) then
 	text basic_thing
     else
 	hcat [prefix_CC, identToC (_PK_ basic_thing)]
   where
-    do_cc friendly_sty DontCareCC	  = "DONT_CARE"
-    do_cc friendly_sty (AllCafsCC  m _)   = if print_as_string
-					    then "CAFs_in_..."
-					    else "CAFs." ++ _UNPK_ m
-    do_cc friendly_sty (AllDictsCC m _ d) = do_dupd friendly_sty d (
-				            if print_as_string
-					    then "DICTs_in_..."
-			       		    else "DICTs." ++ _UNPK_ m)
-    do_cc friendly_sty PreludeCafsCC	  = if print_as_string
-					    then "CAFs_in_..."
-					    else "CAFs"
-    do_cc friendly_sty (PreludeDictsCC d) = do_dupd friendly_sty d (
-				            if print_as_string
-					    then "DICTs_in_..."
-					    else "DICTs")
+    friendly_sty sty = userStyle sty || debugStyle sty    -- i.e. probably for human consumption
 
-    do_cc friendly_sty (NormalCC kind mod_name grp_name is_dupd is_caf)
+    do_cc sty DontCareCC	  = "DONT_CARE"
+    do_cc sty (AllCafsCC  m _)   = if print_as_string
+				    then "CAFs_in_..."
+				    else "CAFs." ++ _UNPK_ m
+    do_cc sty (AllDictsCC m _ d) = do_dupd sty d (
+			            if print_as_string
+				    then "DICTs_in_..."
+				    else "DICTs." ++ _UNPK_ m)
+    do_cc sty PreludeCafsCC	  = if print_as_string
+				    then "CAFs_in_..."
+				    else "CAFs"
+    do_cc sty (PreludeDictsCC d) = do_dupd sty d (
+				    if print_as_string
+				    then "DICTs_in_..."
+				    else "DICTs")
+
+    do_cc sty (NormalCC kind mod_name grp_name is_dupd is_caf)
       = let
             basic_kind  = do_kind kind
 	    module_kind = do_caf is_caf (moduleString mod_name ++ '/':
@@ -391,17 +391,23 @@ uppCostCentre print_as_string cc
 			  ('/' : _UNPK_ grp_str) ++ 
 			  ('/' : basic_kind))
 	in
-        if friendly_sty then
-	   do_dupd friendly_sty is_dupd full_kind
-	else
-	    module_kind
+        if (friendly_sty sty) then
+	   do_dupd sty is_dupd full_kind
+	else if codeStyle sty && print_as_string then
+	        {-
+	         drop the module name when printing
+	         out SCC label in CC declaration
+	        -}
+	        basic_kind
+	     else
+                module_kind
       where
 	do_caf IsCafCC ls = "CAF:" ++ ls
 	do_caf _       ls = ls
 
     	do_kind (UserCC name) = _UNPK_ name
-	do_kind (AutoCC id)   = do_id id ++ (if friendly_sty then "/AUTO" else "")
-	do_kind (DictCC id)   = do_id id ++ (if friendly_sty then "/DICT" else "")
+	do_kind (AutoCC id)   = do_id id ++ (if (friendly_sty sty) then "/AUTO" else "")
+	do_kind (DictCC id)   = do_id id ++ (if (friendly_sty sty) then "/DICT" else "")
 
         {-
 	 do_id is only applied in a (not print_as_string) context for local ids,
@@ -411,8 +417,8 @@ uppCostCentre print_as_string cc
 	do_id id = getOccString id
 
     ---------------
-    do_dupd friendly_sty ADupdCC str = if friendly_sty then str ++ "/DUPD" else str
-    do_dupd _	         _       str = str
+    do_dupd sty ADupdCC str = if (friendly_sty sty) then str ++ "/DUPD" else str
+    do_dupd _   _       str = str
 \end{code}
 
 Printing unfoldings is sufficiently weird that we do it separately.
@@ -422,6 +428,7 @@ This should only apply to CostCentres that can be ``set to'' (cf
 Dict \tr{_scc_}s may cross module boundaries to show ``scope'' info;
 even if we won't ultimately do a \tr{SET_CCC} from it.
 \begin{code}
+{- UNUSED
 upp_cc_uf (PreludeDictsCC d)
   = hsep [ptext SLIT("_PRELUDE_DICTS_CC_"), upp_dupd d]
 upp_cc_uf (AllDictsCC m g d)
@@ -450,8 +457,11 @@ upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
 upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre True other))
 #endif
 
+pprIdInUnfolding = panic "Whoops"
+
 upp_dupd AnOriginalCC = ptext SLIT("_N_")
 upp_dupd ADupdCC      = ptext SLIT("_D_")
+-}
 \end{code}
 
 \begin{code}
