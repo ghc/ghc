@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.5 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: FrontPanel.c,v 1.6 2001/08/16 05:30:27 chak Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -404,20 +404,9 @@ updateFrontPanel( void )
 		if (bd->free == (void *)-1) {
 		    colorBlock( a, &free_color, 
 				block_width, block_height, blocks_per_line );
-		} else if (bd->gen != NULL) {
-		    colorBlock( a, &gen_colors[bd->gen->no],
+		} else {
+		    colorBlock( a, &gen_colors[bd->gen_no],
 				block_width, block_height, blocks_per_line );
-		} else if (bd->link != NULL) {
-		    if (bd->link->free == (void *)-1) {
-			colorBlock( a, &free_color, 
-				    block_width, block_height, blocks_per_line );
-			
-		    } else if (bd->link->gen != NULL) {
-			colorBlock( a, &gen_colors[bd->link->gen->no],
-				    block_width, block_height, blocks_per_line );
-		    } else {
-			belch("block at %p: can't indentify", bd->start);
-		    }
 		}
 	    }
 	}
@@ -616,7 +605,7 @@ residencyCensus( void )
 		g == 0 && s == 0) continue;
 
 	    if (RtsFlags.GcFlags.generations == 1) {
-		bd = generations[g].steps[s].to_space;
+		bd = generations[g].steps[s].to_blocks;
 	    } else {
 		bd = generations[g].steps[s].blocks;
 	    }
