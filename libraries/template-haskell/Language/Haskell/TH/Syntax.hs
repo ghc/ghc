@@ -409,7 +409,7 @@ mk_tup_name n_commas space
   = Name occ (NameG space tup_mod)
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
-    tup_mod = mkModName "GHC.Tuple"
+    tup_mod = mkModName "Data.Tuple"
 
 
 

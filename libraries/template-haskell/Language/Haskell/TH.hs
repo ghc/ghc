@@ -35,7 +35,7 @@ module Language.Haskell.TH(
 	fromR, fromThenR, fromToR, fromThenToR, 
 	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
 	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
-	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, 
+	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, appsE,
 	fromE, fromThenE, fromToE, fromThenToE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
