@@ -51,23 +51,34 @@ emitExternalCore _ _
 
 
 mkExternalCore :: ModGuts -> C.Module
+-- The ModGuts has been tidied, but the implicit bindings have
+-- not been injected, so we have to add them manually here
+-- We don't include the strange data-con *workers* because they are
+-- implicit in the data type declaration itself
 mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = binds})
-  = C.Module mname tdefs vdefs
+  = C.Module mname tdefs (map make_vdef all_binds)
   where
     mname  = make_mid this_mod
     tdefs  = foldr collect_tdefs [] tycons
-    vdefs  = map make_vdef (implicit_binds ++ binds)
+
+    all_binds  = implicit_con_wrappers ++ other_implicit_binds ++ binds
+		-- Put the constructor wrappers first, because
+		-- other implicit bindings (notably the fromT functions arising 
+		-- from generics) use the constructor wrappers.
+
     tycons = map classTyCon (typeEnvClasses type_env) ++ typeEnvTyCons type_env
 
-	-- Don't forget to include the implicit bindings!
-    implicit_binds = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
+    implicit_con_wrappers = map get_defn (concatMap implicit_con_ids   (typeEnvElts type_env))
+    other_implicit_binds  = map get_defn (concatMap other_implicit_ids (typeEnvElts type_env))
 
-implicit_ids :: TyThing -> [Id]
--- C.f. HscTypes.mkImplicitBinds, but we do not include constructor workers
-implicit_ids (ATyCon tc) = map dataConWrapId (tyConDataCons_maybe tc `orElse` [])
-				 ++ tyConSelIds tc ++ tyConGenIds tc
-implicit_ids (AClass cl) = classSelIds cl
-implicit_ids other       = []
+implicit_con_ids :: TyThing -> [Id]
+implicit_con_ids (ATyCon tc) = map dataConWrapId (tyConDataCons_maybe tc `orElse` [])
+implicit_con_ids other       = []
+
+other_implicit_ids :: TyThing -> [Id]
+other_implicit_ids (ATyCon tc) = tyConSelIds tc ++ tyConGenIds tc
+other_implicit_ids (AClass cl) = classSelIds cl
+other_implicit_ids other       = []
 
 get_defn :: Id -> CoreBind
 get_defn id = NonRec id rhs
