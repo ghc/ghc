@@ -14,8 +14,8 @@
     layer over a C library.</para>
 
     <para>GHC comes with several packages (see <xref
-    linkend="book-hslibs">), and packages can be added/removed from an
-    existing GHC installation, using the supplied
+    linkend="book-hslibs">), and packages can be added to or removed
+    from an existing GHC installation, using the supplied
     <literal>ghc-pkg</literal><indexterm><primary><literal>ghc-pkg</literal></primary>
     </indexterm> tool, described in <xref
     linkend="package-management">.</para>
@@ -48,6 +48,39 @@
       takes care of all these dependencies, so that when you say
       <literal>-package text</literal> on the command line, you
       automatically get <literal>-package lang</literal> too.</para>
+    </sect2>
+
+    <sect2>
+      <title>Maintaining a local set of packages</title>
+      
+      <para>When GHC starts up, it automatically reads the default set
+      of packages from a configuration file, normally named
+      <filename>package.conf</filename> in your GHC installation
+      directory.</para>
+
+      <para>You can load in additional package configuration files
+      using the <option>-package-conf</option> option:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-package-conf <replaceable>file</replaceable></option></term>
+	  <indexterm><primary><option>-package-conf <replaceable>file</replaceable></option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Read in the package configuration file
+	    <replaceable>file</replaceable> in addition to the system
+	    default file.  This allows the user to have a local set of
+	    packages in addition to the system-wide ones.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>To create your own package configuration file, just create
+      a new file and put the string
+      <quote><literal>[]</literal></quote> in it.  Packages can be
+      added to the new configuration file using the
+      <literal>ghc-pkg</literal> tool, described in <xref
+      linkend="package-management">.</para>
     </sect2>
 
     <sect2 id="building-packages">
@@ -142,13 +175,45 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
       <indexterm><primary>packages</primary>
 	<secondary>management</secondary></indexterm>
       
-      <para>GHC uses a package configuration file, called
-      <literal>packages.conf</literal>, which can be found in your GHC
-      install directory.  This file isn't intended to be edited
-      directly, instead packages can be added or removed using GHC's
-      package management tool, <literal>ghc-pkg</literal>.</para>
+      <para>The <literal>ghc-pkg</literal> tool allows packages to be
+      added or removed from a package configuration file.  By default,
+      the system-wide configuration file is used, but alternatively
+      packages can be added or removed from a user-specified
+      configuration file using the <option>--config-file</option>
+      option.  An empty package configuration file consists of the
+      string <quote><literal>[]</literal></quote>.</para>
+
+      <para>The <literal>ghc-pkg</literal> program accepts the
+      following options:</para>
 
       <variablelist>
+	<varlistentry>
+	  <term><option>--add-package</option></term>
+	  <term><option>-a</option></term>
+	  <indexterm><primary><option>--add-package</option></primary>
+	      </indexterm>
+	  <listitem>
+	    <para>Reads a package specification (see below) on stdin,
+	    and adds it to the database of installed packages.  The
+	    package specification must be a package that isn't already
+	    installed.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--config-file <replaceable>file</replaceable></option></term>
+	  <term><option>-f <replaceable>file</replaceable></option></term>
+	  <indexterm><primary><option>--config-file</option></primary>
+	      </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>file</replaceable> instead of the
+	    default package configuration file.  This, in conjunction
+	    with GHC's <option>-package-conf</option> option, allows
+	    a user to have a local set of packages in addition to the
+	    system-wide installed set.</para>
+	  </listitem>
+	</varlistentry>
+
 	<varlistentry>
 	  <term><option>--list-packages</option></term>
 	  <term><option>-l</option></term>
@@ -176,19 +241,6 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--add-package</option></term>
-	  <term><option>-a</option></term>
-	  <indexterm><primary><option>--add-package</option></primary>
-	      </indexterm>
-	  <listitem>
-	    <para>Reads a package specification (see below) on stdin,
-	    and adds it to the database of installed packages.  The
-	    package specification must be a package that isn't already
-	    installed.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><option>--remove-package <replaceable>foo</replaceable></option></term>
 	  <term><option>-r <replaceable>foo</replaceable></option></term>
 	  <indexterm><primary><option>--delete-package</option></primary>
@@ -200,11 +252,11 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
 	</varlistentry>
       </variablelist>
 
-      <para>In both cases, the old package configuration file is saved
-      in <literal>packages.conf.old</literal> in your GHC install
-      directory, so in an emergency you can always copy this file into
-      <literal>package.conf</literal> to restore the old
-      settings.</para>
+      <para>When modifying the configuration file
+      <replaceable>file</replaceable>, a copy of the original file is
+      saved in <replaceable>file</replaceable><literal>.old</literal>,
+      so in an emergency you can always restore the old settings by
+      copying the old file back again.</para>
 
       <para>A package specification looks like this:</para>
 
