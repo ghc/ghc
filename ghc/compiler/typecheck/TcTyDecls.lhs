@@ -56,8 +56,8 @@ import Name		( nameSrcLoc, isLocallyDefined, getSrcLoc,
 			)
 import Outputable	( Outputable(..), interpp'SP )
 import Pretty
-import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, isDataTyCon, 
-			  isNewTyCon, isSynTyCon, tyConDataCons
+import TyCon		( TyCon, NewOrData, mkSynTyCon, mkDataTyCon, isAlgTyCon, 
+			  isSynTyCon, tyConDataCons
 			)
 import Type		( GenType, -- instances
 			  typeKind, getTyVar, tyVarsOfTypes, eqTy, splitSigmaTy,
@@ -177,7 +177,7 @@ mkDataBinds (tycon : tycons)
 		       returnTc (ids1++ids2, b1 `ThenBinds` b2)
 
 mkDataBinds_one tycon
-  = ASSERT( isDataTyCon tycon || isNewTyCon tycon )
+  = ASSERT( isAlgTyCon tycon )
     mapTc checkConstructorContext data_cons	`thenTc_` 
     mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
     let
