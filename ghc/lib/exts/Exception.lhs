@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.4 1999/01/14 18:15:29 sof Exp $
+% $Id: Exception.lhs,v 1.5 1999/01/19 09:57:12 sof Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -192,17 +192,21 @@ a `finally` sequel = do
    tryAllIO a
    sequel
 
-bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
+bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
 bracket before after thing = do
   a <- before 
   c <- tryAllIO (thing a)
   after a
-  return ()
+  case c of
+    Right r -> return r
+    Left  e -> throw e
 
-bracket_ :: IO a -> IO b -> IO c -> IO ()
+bracket_ :: IO a -> IO b -> IO c -> IO c
 bracket_ before after thing = do
   before 
   c <- tryAllIO thing
   after
-  return ()
+  case c of
+    Right r -> return r
+    Left  e -> throw e
 \end{code}
