@@ -13,9 +13,10 @@ module ArrBase where
 
 import {-# SOURCE #-}	IOBase	( error )
 import Ix
-import PrelList
+import PrelList (foldl)
 import STBase
 import PrelBase
+import Foreign
 import GHC
 
 infixl 9  !, //
@@ -54,6 +55,12 @@ data Ix ix => Array ix elt		= Array     	   (ix,ix) (Array# elt)
 data Ix ix => ByteArray ix      	= ByteArray	   (ix,ix) ByteArray#
 data Ix ix => MutableArray     s ix elt = MutableArray     (ix,ix) (MutableArray# s elt)
 data Ix ix => MutableByteArray s ix     = MutableByteArray (ix,ix) (MutableByteArray# s)
+
+instance CCallable (MutableByteArray s ix)
+instance CCallable (MutableByteArray# s)
+
+instance CCallable (ByteArray ix)
+instance CCallable ByteArray#
 
 -- A one-element mutable array:
 type MutableVar s a = MutableArray s Int a
@@ -182,54 +189,35 @@ newCharArray, newIntArray, newAddrArray, newFloatArray, newDoubleArray
 {-# SPECIALIZE newFloatArray  :: IPr -> ST s (MutableByteArray s Int) #-}
 {-# SPECIALIZE newDoubleArray :: IPr -> ST s (MutableByteArray s Int) #-}
 
-newArray ixs@(ix_start, ix_end) init = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else (index ixs ix_end) + 1) of { I# x -> x }
-	-- size is one bigger than index of last elem
-    in
+newArray ixs init = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newArray# n# init s#)     of { StateAndMutableArray# s2# arr# ->
-    (MutableArray ixs arr#, S# s2#)}
+    (MutableArray ixs arr#, S# s2#)}}
 
-newCharArray ixs@(ix_start, ix_end) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+newCharArray ixs = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newCharArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray ixs barr#, S# s2#)}
+    (MutableByteArray ixs barr#, S# s2#)}}
 
-newIntArray ixs@(ix_start, ix_end) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+newIntArray ixs = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newIntArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray ixs barr#, S# s2#)}
+    (MutableByteArray ixs barr#, S# s2#)}}
 
-newAddrArray ixs@(ix_start, ix_end) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+newAddrArray ixs = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newAddrArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray ixs barr#, S# s2#)}
+    (MutableByteArray ixs barr#, S# s2#)}}
 
-newFloatArray ixs@(ix_start, ix_end) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+newFloatArray ixs = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newFloatArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray ixs barr#, S# s2#)}
+    (MutableByteArray ixs barr#, S# s2#)}}
 
-newDoubleArray ixs@(ix_start, ix_end) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+newDoubleArray ixs = ST $ \ (S# s#) ->
+    case rangeSize ixs              of { I# n# ->
     case (newDoubleArray# n# s#)  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray ixs barr#, S# s2#)}
+    (MutableByteArray ixs barr#, S# s2#)}}
 
 boundsOfArray     :: Ix ix => MutableArray s ix elt -> (ix, ix)  
 boundsOfByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
@@ -424,13 +412,10 @@ freezeDoubleArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
   #-}
 {-# SPECIALISE freezeCharArray :: MutableByteArray s Int -> ST s (ByteArray Int) #-}
 
-freezeArray (MutableArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else (index ixs ix_end) + 1) of { I# x -> x }
-    in
+freezeArray (MutableArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndArray# s2# frozen# ->
-    (Array ixs frozen#, S# s2#)}
+    (Array ixs frozen#, S# s2#)}}
   where
     freeze  :: MutableArray# s ele	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -459,13 +444,10 @@ freezeArray (MutableArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-freezeCharArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+freezeCharArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray ixs frozen#, S# s2#) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -492,13 +474,10 @@ freezeCharArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) 
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-freezeIntArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+freezeIntArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray ixs frozen#, S# s2#) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -525,13 +504,10 @@ freezeIntArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) -
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-freezeAddrArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+freezeAddrArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray ixs frozen#, S# s2#) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -558,13 +534,10 @@ freezeAddrArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) 
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-freezeFloatArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray ixs frozen#, S# s2#) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -591,13 +564,10 @@ freezeFloatArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#)
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-freezeDoubleArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else ((index ixs ix_end) + 1)) of { I# x -> x }
-    in
+freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray ixs frozen#, S# s2#) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -647,13 +617,10 @@ unsafeFreezeByteArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
   #-}
 
 thawArray :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
-thawArray (Array ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
-    let n# = case (if null (range ixs)
-		  then 0
-		  else (index ixs ix_end) + 1) of { I# x -> x }
-    in
+thawArray (Array ixs arr#) = ST $ \ (S# s#) ->
+    case rangeSize ixs     of { I# n# ->
     case thaw arr# n# s# of { StateAndMutableArray# s2# thawed# ->
-    (MutableArray ixs thawed#, S# s2#)}
+    (MutableArray ixs thawed#, S# s2#)}}
   where
     thaw  :: Array# ele			-- the thing
 	    -> Int#			-- size of thing to be thawed
