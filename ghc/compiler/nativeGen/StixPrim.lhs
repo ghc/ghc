@@ -24,8 +24,6 @@ import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
 
-import Char	       	( ord, isAlpha, isDigit )
-
 #include "NCG.h"
 \end{code}
 
@@ -334,6 +332,19 @@ primCode [rr] ReadMutVarOp [aa]
          assign    = StAssign PtrRep rr_s (StInd PtrRep var_field)
      in
      returnUs (\xs -> assign : xs)
+\end{code}
+
+ForeignObj# primops.
+
+\begin{code}
+primCode [rr] ForeignObjToAddrOp [fo]
+  = let code =  StAssign AddrRep (amodeToStix rr)
+		   (StInd AddrRep 
+			(StIndex PtrRep (amodeToStix fo) fixedHS))
+    in
+    returnUs (\xs -> code : xs)
+
+primCode [] TouchOp [_] = returnUs id
 \end{code}
 
 Now the more mundane operations.
