@@ -126,7 +126,7 @@ instance Arrow (->) where
 
 -- | Kleisli arrows of a monad.
 
-newtype Kleisli m a b = Kleisli (a -> m b)
+newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
 instance Monad m => Arrow (Kleisli m) where
 	arr f = Kleisli (return . f)
