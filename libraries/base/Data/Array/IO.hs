@@ -19,9 +19,7 @@ module Data.Array.IO (
 
    -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
-#ifdef __GLASGOW_HASKELL__
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
-#endif
 
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
@@ -47,7 +45,6 @@ import Foreign.C
 import Data.Array.Base
 
 import GHC.Arr
-import GHC.ST		( ST(..) )
 import GHC.IOBase
 import GHC.Handle
 #endif
@@ -115,22 +112,11 @@ unsafeThawIOUArray arr = stToIO $ do
 "unsafeThaw/IOUArray" unsafeThaw = unsafeThawIOUArray
     #-}
 
-castSTUArray :: STUArray s ix a -> ST s (STUArray s ix b)
-castSTUArray (STUArray l u marr#) = return (STUArray l u marr#)
-
--- | Casts an 'IOUArray' with one element type into one with a
--- different element type.  All the elements of the resulting array
--- are undefined (unless you know what you\'re doing...).
-castIOUArray :: IOUArray ix a -> IO (IOUArray ix b)
-castIOUArray (IOUArray marr) = stToIO $ do
-    marr' <- castSTUArray marr
-    return (IOUArray marr')
-
 -- ---------------------------------------------------------------------------
 -- hGetArray
 
 -- | Reads a number of 'Word8's from the specified 'Handle' directly
--- into an array.
+-- into an array (GHC only).
 hGetArray
  	:: Handle		-- ^ Handle to read from
 	-> IOUArray Int Word8	-- ^ Array in which to place the values
@@ -185,7 +171,7 @@ readChunk fd is_stream ptr init_off bytes = loop init_off bytes
 -- ---------------------------------------------------------------------------
 -- hPutArray
 
--- | Writes an array of 'Word8' to the specified 'Handle'.
+-- | Writes an array of 'Word8' to the specified 'Handle' (GHC only).
 hPutArray
 	:: Handle			-- ^ Handle to write to
 	-> IOUArray Int Word8		-- ^ Array to write from

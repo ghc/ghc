@@ -16,6 +16,7 @@
 module Data.Array.IO.Internals (
    IOArray(..),		-- instance of: Eq, Typeable
    IOUArray(..),	-- instance of: Eq, Typeable
+   castIOUArray,	-- :: IOUArray ix a -> IO (IOUArray ix b)
  ) where
 
 import Prelude
@@ -27,16 +28,14 @@ import Data.Dynamic
 
 #ifdef __HUGS__
 import Hugs.IOArray
-import Hugs.IOExts		( unsafeCoerce )
-import Data.Array.Storable
 #endif
 
-#ifdef __GLASGOW_HASKELL__
+import Control.Monad.ST		( RealWorld, stToIO )
 import Foreign.Ptr		( Ptr, FunPtr )
 import Foreign.StablePtr	( StablePtr )
 import Data.Array.Base
 
-import GHC.Arr    		( STArray )
+#ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 import GHC.Base
 #endif /* __GLASGOW_HASKELL__ */
@@ -67,14 +66,6 @@ instance MArray IOArray e IO where
     unsafeRead  = unsafeReadIOArray
     unsafeWrite = unsafeWriteIOArray
 
-
-#ifdef __HUGS__
-type IOUArray = StorableArray
-#endif
-
-#ifdef __GLASGOW_HASKELL__
--- GHC only to the end of file
-
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (IO monad)
 
@@ -86,7 +77,7 @@ type IOUArray = StorableArray
 --  * @e@: the element type of the array.  Only certain element types
 --    are supported: see 'MArray' for a list of instances.
 --
-newtype IOUArray i e = IOUArray (STUArray RealWorld i e) deriving Eq
+newtype IOUArray i e = IOUArray (STUArray RealWorld i e)
 
 iOUArrayTc :: TyCon
 iOUArrayTc = mkTyCon "IOUArray"
@@ -135,6 +126,7 @@ instance MArray IOUArray Int IO where
     {-# INLINE unsafeWrite #-}
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
+#ifdef __GLASGOW_HASKELL__
 instance MArray IOUArray Word IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
@@ -146,6 +138,7 @@ instance MArray IOUArray Word IO where
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
+#endif
 
 instance MArray IOUArray (Ptr a) IO where
     {-# INLINE newArray #-}
@@ -303,4 +296,10 @@ instance MArray IOUArray Word64 IO where
     {-# INLINE unsafeWrite #-}
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
-#endif /* __GLASGOW_HASKELL__ */
+-- | Casts an 'IOUArray' with one element type into one with a
+-- different element type.  All the elements of the resulting array
+-- are undefined (unless you know what you\'re doing...).
+castIOUArray :: IOUArray ix a -> IO (IOUArray ix b)
+castIOUArray (IOUArray marr) = stToIO $ do
+    marr' <- castSTUArray marr
+    return (IOUArray marr')

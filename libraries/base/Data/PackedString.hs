@@ -23,7 +23,7 @@ module Data.PackedString (
 	packString,  -- :: String -> PackedString
 	unpackPS,    -- :: PackedString -> String
 
-#ifndef __NHC__
+#ifdef __GLASGOW_HASKELL__
 	-- * I\/O with @PackedString@s	
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
 	hGetPS,      -- :: Handle -> Int -> IO PackedString
@@ -260,10 +260,11 @@ first_pos_that_satisfies pred ps len n =
 substrPS :: PackedString -> Int -> Int -> PackedString
 substrPS (PS ps) begin end = packString [ ps ! i | i <- [begin..end] ]
 
+#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- hPutPS
 
--- | Outputs a 'PackedString' to the specified 'Handle'.  
+-- | Outputs a 'PackedString' to the specified 'Handle' (GHC only).
 --
 -- NOTE: the representation of the 'PackedString' in the file is assumed to
 -- be in the ISO-8859-1 encoding.  In other words, only the least signficant
@@ -278,8 +279,8 @@ hPutPS h (PS ps) = do
 -- -----------------------------------------------------------------------------
 -- hGetPS
 
--- | Read a 'PackedString' directly from the specified 'Handle'.  This
--- is far more efficient than reading the characters into a 'String'
+-- | Read a 'PackedString' directly from the specified 'Handle' (GHC only).
+-- This is far more efficient than reading the characters into a 'String'
 -- and then using 'packString'.  
 --
 -- NOTE: as with 'hPutPS', the string representation in the file is 
@@ -290,6 +291,7 @@ hGetPS h i = do
   l <- hGetArray h arr i
   chars <- mapM (\i -> readArray arr i >>= return.chr.fromIntegral) [0..l-1]
   return (packString chars)
+#endif /* __GLASGOW_HASKELL__ */
 
 #else	/* __NHC__ */
 
