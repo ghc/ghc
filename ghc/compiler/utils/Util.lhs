@@ -47,6 +47,12 @@ module Util (
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
 	unzipWith
+
+	-- I/O
+#if __GLASGOW_HASKELL__ < 402
+	, bracket
+#endif
+
     ) where
 
 #include "HsVersions.h"
