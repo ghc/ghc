@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.47 2002/07/16 14:56:08 simonmar Exp $
+ * $Id: StgMacros.h,v 1.48 2002/08/16 13:28:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -148,7 +148,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
-	if (Sp - stk_headroom < SpLim || (Hp += hp_headroom) > HpLim) {	\
+	if ((Hp += hp_headroom) > HpLim || Sp - stk_headroom < SpLim) {	\
             HpAlloc = (hp_headroom);				\
 	    tag_assts						\
 	    (r) = (P_)ret;	                               	\
@@ -198,7 +198,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
         DO_GRAN_ALLOCATE(hp_headroom)                              \
-	if ((Sp - (stk_headroom)) < SpLim || (Hp += (hp_headroom)) > HpLim) { \
+	if ((Hp += (hp_headroom)) > HpLim || (Sp - (stk_headroom)) < SpLim) { \
             HpAlloc = (hp_headroom);				\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);			   	\
