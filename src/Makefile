@@ -5,6 +5,7 @@ INSTALLING=1
 
 ghc_ge_504 := $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 ghc_ge_603 := $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
+ghc_le_600 := $(shell if (test $(GhcCanonVersion) -le 600); then echo YES; else echo NO; fi)
 
 SRC_HC_OPTS += -fglasgow-exts -cpp
 
@@ -33,8 +34,11 @@ endif
 
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
+ifeq "$(HOSTPLATFORM)$(ghc_le_600)" "i386-unknown-mingw32YES"
+HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION=\"$(ProjectVersion)\"'
+else
 HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION="$(ProjectVersion)"'
-
+endif
 HaddockVersion : ../mk/version.mk
 
 ifeq "$(INSTALLING)" "1"
