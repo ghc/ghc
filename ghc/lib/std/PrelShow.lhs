@@ -32,7 +32,11 @@ module PrelShow
 import {-# SOURCE #-} PrelErr ( error )
 import PrelBase
 import PrelMaybe
-import PrelList	( (!!), break, dropWhile )
+import PrelList	( (!!), break, dropWhile
+#ifdef USE_REPORT_PRELUDE
+                , concatMap, foldr1
+#endif
+                )
 \end{code}
 
 

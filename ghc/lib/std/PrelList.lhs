@@ -22,9 +22,15 @@ module PrelList (
    maximum, minimum, concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
 
+#ifdef USE_REPORT_PRELUDE
+
+#else
+
    -- non-standard, but hidden when creating the Prelude
    -- export list.
    takeUInt_append
+
+#endif
 
  ) where
 
@@ -241,20 +247,20 @@ dropWhile p xs@(x:xs')
 take                   :: Int -> [a] -> [a]
 take 0 _               =  []
 take _ []              =  []
-take n (x:xs) | n > 0  =  x : take (n-1) xs
+take n (x:xs) | n > 0  =  x : take (minusInt n 1) xs
 take _     _           =  errorNegativeIdx "take"
 
 drop                   :: Int -> [a] -> [a]
 drop 0 xs              =  xs
 drop _ []              =  []
-drop n (_:xs) | n > 0  =  drop (n-1) xs
+drop n (_:xs) | n > 0  =  drop (minusInt n 1) xs
 drop _     _           =  errorNegativeIdx "drop"
 
 
 splitAt                   :: Int -> [a] -> ([a],[a])
 splitAt 0 xs              =  ([],xs)
 splitAt _ []              =  ([],[])
-splitAt n (x:xs) | n > 0  =  (x:xs',xs'') where (xs',xs'') = splitAt (n-1) xs
+splitAt n (x:xs) | n > 0  =  (x:xs',xs'') where (xs',xs'') = splitAt (minusInt n 1) xs
 splitAt _     _           =  errorNegativeIdx "splitAt"
 
 #else /* hack away */
@@ -429,7 +435,7 @@ concat = foldr (++) []
 (!!)                    :: [a] -> Int -> a
 #ifdef USE_REPORT_PRELUDE
 (x:_)  !! 0             =  x
-(_:xs) !! n | n > 0     =  xs !! (n-1)
+(_:xs) !! n | n > 0     =  xs !! (minusInt n 1)
 (_:_)  !! _             =  error "Prelude.(!!): negative index"
 []     !! _             =  error "Prelude.(!!): index too large"
 #else

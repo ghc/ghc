@@ -569,7 +569,11 @@ prR n r e0
 	s@(h:t) = show ((round (r * 10^n))::Integer)
 	e       = e0+1
 	
+#ifdef USE_REPORT_PRELUDE
+        takeN n ls rs = take n ls ++ rs
+#else
 	takeN (I# n#) ls rs = takeUInt_append n# ls rs
+#endif
 
 drop0 :: String -> String -> String
 drop0     [] rs = rs
