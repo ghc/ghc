@@ -1,0 +1,4 @@
+
+tcfail126.hs:20:14:
+    Couldn't match `forall (m :: * -> *). (Monad m) => Bar m' against `Bar m'
+    In the definition of `runProg': runProg (Foo (Bar run op)) = run (prog op)
