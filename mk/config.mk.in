@@ -208,6 +208,9 @@ else
 GhcWithNativeCodeGen=NO
 endif
 
+# Include support for generating Java
+GhcWithJavaGen=NO
+
 HaveLibDL = @HaveLibDL@
 
 # Include GHCi in the compiler.  Default to NO for the time being.
@@ -451,15 +454,15 @@ FPTOOLS_TOP_ABS_UNIX    = @hardtop@
 prefix			= @prefix@
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
-datadir			= @datadir@
+datadir0		= @datadir@
 
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
 #localstatedir		= @localstatedir@
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-libdir			= @libdir@
+libdir0			= @libdir@
 else
-libdir                  = @prefix@
+libdir0                 = @prefix@
 endif
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
@@ -473,8 +476,11 @@ mandir			= @mandir@
 # a subdirectory with the version number included.
 #
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-libdir     := $(if $(ProjectNameShort),$(libdir)/$(ProjectNameShort)-$(ProjectVersion),$(libdir))
-datadir    := $(if $(ProjectNameShort),$(datadir)/$(ProjectNameShort)-$(ProjectVersion),$(datadir))
+libdir     = $(if $(ProjectNameShort),$(libdir0)/$(ProjectNameShort)-$(ProjectVersion),$(libdir0))
+datadir    = $(if $(ProjectNameShort),$(datadir0)/$(ProjectNameShort)-$(ProjectVersion),$(datadir0))
+else
+libdir	   = $(libdir0)
+datadir    = $(datadir0)
 endif
 
 # 
