@@ -17,6 +17,11 @@ SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 HC_BOOT_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR)
 HC_BOOT_LIBS += -lghccompat
 
+# This is required because libghccompat.a must be built with
+# $(GhcHcOpts) because it is linked to the compiler, and hence
+# we must also build with $(GhcHcOpts) here:
+SRC_HC_OPTS += $(GhcHcOpts)
+
 ifeq "$(Windows)" "YES"
 # not very nice, but required for -lghccompat on Windows
 SRC_LD_OPTS += -lshell32

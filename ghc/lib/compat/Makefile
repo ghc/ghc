@@ -17,6 +17,10 @@ MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 UseGhcForCc = YES
 
+# This library is linked to the compiler, at least in stage1, so we
+# better make sure it is built the same "way":
+SRC_HC_OPTS += $(GhcHcOpts)
+
 ifeq "$(ghc_ge_603)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \

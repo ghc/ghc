@@ -13,6 +13,11 @@ INSTALLING=1
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
+# This is required because libghccompat.a must be built with
+# $(GhcHcOpts) because it is linked to the compiler, and hence
+# we must also build with $(GhcHcOpts) here:
+SRC_HC_OPTS += $(GhcHcOpts)
+
 HS_PROG           = hsc2hs-bin
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs$(exeext)
