@@ -44,3 +44,18 @@ ghcpkg01 :
 
 	@: # registering test3.pkg should fail now, its dependency has gone
 	if $(GHC_PKG) register test3.pkg; then false; else true; fi
+
+# -----------------------------------------------------------------------------
+# Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
+# every package we know about.  This is for testing the pretty printing/parsing
+# of InstalledPackageInfo.
+
+COPY_PACKAGE_CONF = package.conf.copy
+GHC_PKG_COPY = $(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace --global-conf=$(COPY_PACKAGE_CONF)
+
+ghcpkg02 :
+	cp $(FPTOOLS_TOP)/ghc/driver/package.conf.inplace $(COPY_PACKAGE_CONF)
+	for i in `$(GHC_PKG_COPY) list | sed 's/^.*://;s/[,()]//g'`; do \
+		$(GHC_PKG_COPY) describe $$i | $(GHC_PKG_COPY) update --force -; \
+	done
+
