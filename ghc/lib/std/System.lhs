@@ -137,10 +137,9 @@ exitWith (ExitFailure n)
     primExit n
     ioError (IOError Nothing OtherError "exitWith" "exit should not return")
 
--- SUP: Although shutdownHaskellAndExit is declared "unsafe" below, it *can*
--- re-enter Haskell land through finalizers. But this is probably not a problem,
--- because it never returns.
-foreign import ccall "shutdownHaskellAndExit" unsafe primExit :: Int -> IO ()
+-- SUP: Although shutdownHaskellAndExit must be called "safe", because it *can*
+-- re-enter Haskell land through finalizers
+foreign import ccall "shutdownHaskellAndExit" primExit :: Int -> IO ()
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
