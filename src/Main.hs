@@ -328,7 +328,7 @@ mkInterface no_implicit_prelude mod_map filename
      instances = [ d | d@HsInstDecl{} <- final_decls ]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mod decl_map
+  orig_export_list <- mkExportItems mod_map mod orig_env decl_map
 			 		final_decls options orig_exports
 
   let
@@ -386,49 +386,54 @@ mkInterface no_implicit_prelude mod_map filename
 mkExportItems
 	:: ModuleMap
 	-> Module			-- this module
+	-> FiniteMap HsQName HsQName	-- the orig env
 	-> FiniteMap HsName HsDecl	-- maps local names to declarations
 	-> [HsDecl]			-- decls in the current module
 	-> [DocOption]
 	-> Maybe [HsExportSpec]
 	-> ErrMsgM [ExportItem]
 
-mkExportItems mod_map mod decl_map decls options maybe_exps
+mkExportItems mod_map mod orig_env decl_map decls options maybe_exps
   | Nothing <- maybe_exps	    = everything_local_exported
   | OptIgnoreExports `elem` options = everything_local_exported
   | Just specs <- maybe_exps = do 
 	exps <- mapM lookupExport specs
         return (concat exps)
   where
-
     everything_local_exported =
 	return (fullContentsOfThisModule mod decl_map) -- everything exported
 
-    lookupExport (HsEVar x) 
-	| Just decl <- findDecl x
-	= return [ ExportDecl x (extractDecl (nameOfQName x) x_mod decl) ]
-        where x_mod | Qual m _ <- x = m
-	  -- ToDo: cope with record selectors here
-    lookupExport (HsEAbs t)
-	| Just decl <- findDecl t
-	= return [ ExportDecl t (restrictTo [] decl) ]
-    lookupExport (HsEThingAll t)
-	| Just decl <- findDecl t
-	= return [ ExportDecl t decl ]
-    lookupExport (HsEThingWith t cs)
-	| Just decl <- findDecl t
-	= return [ ExportDecl t (restrictTo (map nameOfQName cs) decl) ]
+    lookupExport (HsEVar x)            = declWith x (Just [])
+    lookupExport (HsEAbs t)            = declWith t (Just [])
+    lookupExport (HsEThingAll t)       = declWith t Nothing
+    lookupExport (HsEThingWith t cs)   = declWith t (Just cs)
     lookupExport (HsEModuleContents m) = fullContentsOf m
-    lookupExport (HsEGroup lev doc)
-	= return [ ExportGroup lev "" doc ]
-    lookupExport (HsEDoc doc)
-	= return [ ExportDoc doc ]
+    lookupExport (HsEGroup lev doc)    = return [ ExportGroup lev "" doc ]
+    lookupExport (HsEDoc doc)          = return [ ExportDoc doc ]
     lookupExport (HsEDocNamed str)
 	= do r <- findNamedDoc str decls
 	     case r of
 		Nothing -> return []
 		Just found -> return [ ExportDoc found ]
 	
-    lookupExport _ = return [] -- didn't find it?
+    in_scope = eltsFM orig_env
+
+    declWith :: HsQName -> Maybe [HsQName] -> ErrMsgM [ ExportItem ]
+    declWith (UnQual x)     mb_subs = return []
+    declWith t@(Qual mod x) mb_subs
+	| Just decl <- findDecl t
+	= return [ ExportDecl t (restrictTo subs (extractDecl x mod decl)) ]
+	| otherwise
+	= return []
+	where 
+	      subs = 
+		case mb_subs of
+		  Nothing -> in_scope_subs
+	      	  Just xs -> filter (`elem` map nameOfQName xs) in_scope_subs
+
+	      in_scope_subs = map nameOfQName in_scope_subs_qnames
+	      in_scope_subs_qnames = filter (`elem` in_scope) all_subs_qnames
+	      all_subs_qnames = map (Qual mod) (all_subs_of_qname mod_map t)
 
     fullContentsOf m
 	| m == mod  = return (fullContentsOfThisModule mod decl_map)
