@@ -111,7 +111,7 @@ renameExpr :: DynFlags
                  )
 
 renameExpr dflags hit hst pcs this_module expr
-  = do	{ renameSource dflags hit hst pcs this_module $
+  = renameSource dflags hit hst pcs this_module $
 	  tryLoadInterface doc (moduleName this_module) ImportByUser 
 						`thenRn` \ (iface, maybe_err) ->
 	  case maybe_err of {
@@ -146,7 +146,7 @@ renameExpr dflags hit hst pcs this_module expr
 
 	  doDump e decls  `thenRn_`
 	  returnRn (Just (print_unqual, (e, decls)))
-	}}
+	}
   where
      doc = text "context for compiling expression"
 
@@ -448,14 +448,19 @@ checkOldIface :: GhciMode
 				-- True <=> errors happened
 
 checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_iface
+    = runRn dflags hit hst pcs (panic "Bogus module") $
 
-  -- If the source has changed and we're in interactive mode, avoid reading
-  -- an interface; just return the one we might have been supplied with.
-  | ghci_mode == Interactive && not source_unchanged
-  = return (pcs, False, (outOfDate, maybe_iface))
+	-- CHECK WHETHER THE SOURCE HAS CHANGED
+    ( if not source_unchanged then
+	traceHiDiffsRn (nest 4 (text "Source file changed or recompilation check turned off"))    
+      else returnRn () )   `thenRn_`
 
-  | otherwise
-  = runRn dflags hit hst pcs (panic "Bogus module") $
+     -- If the source has changed and we're in interactive mode, avoid reading
+     -- an interface; just return the one we might have been supplied with.
+    if ghci_mode == Interactive && not source_unchanged then
+         returnRn (outOfDate, maybe_iface)
+    else
+
     case maybe_iface of
        Just old_iface -> -- Use the one we already have
                          setModuleRn (mi_module old_iface) (check_versions old_iface)
@@ -464,7 +469,7 @@ checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_ifa
           -> readIface iface_path	`thenRn` \ read_result ->
              case read_result of
                Left err -> -- Old interface file not found, or garbled; give up
-			   traceRn (text "Bad old interface file" $$ nest 4 err) 	`thenRn_`
+			   traceRn (text "Bad old interface file" $$ nest 4 err) `thenRn_`
 	                   returnRn (outOfDate, Nothing)
 
                Right parsed_iface
@@ -474,9 +479,11 @@ checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_ifa
     where
        check_versions :: ModIface -> RnMG (RecompileRequired, Maybe ModIface)
        check_versions iface
+ 	  | not source_unchanged
+          = returnRn (outOfDate, Just iface)
+          | otherwise
           = -- Check versions
-            recompileRequired iface_path source_unchanged iface
-	 						`thenRn` \ recompile ->
+            recompileRequired iface_path iface	`thenRn` \ recompile ->
             returnRn (recompile, Just iface)
 \end{code}
 

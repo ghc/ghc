@@ -656,17 +656,10 @@ upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
 recompileRequired :: FilePath		-- Only needed for debug msgs
-		  -> Bool 		-- Source unchanged
 		  -> ModIface 		-- Old interface
 		  -> RnMG RecompileRequired
-recompileRequired iface_path source_unchanged iface
+recompileRequired iface_path iface
   = traceHiDiffsRn (text "Considering whether compilation is required for" <+> text iface_path <> colon)	`thenRn_`
-
-	-- CHECK WHETHER THE SOURCE HAS CHANGED
-    if not source_unchanged then
-	traceHiDiffsRn (nest 4 (text "Source file changed or recompilation check turned off"))	`thenRn_` 
-	returnRn outOfDate
-    else
 
 	-- Source code unchanged and no errors yet... carry on 
     checkList [checkModUsage u | u <- mi_usages iface]
