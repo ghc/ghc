@@ -15,8 +15,7 @@ module PrelRules ( primOpRule, builtinRules ) where
 import CoreSyn
 import Rules		( ProtoCoreRule(..) )
 import Id		( idUnfolding, mkWildId, isDataConId_maybe )
-import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
-			, inIntRange, inWordRange, literalType
+import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord, literalType
 			, word2IntLit, int2WordLit, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
@@ -197,12 +196,12 @@ cmpOp cmp name l1 l2
 
 negOp name (MachFloat f)  = Just (name, mkFloatVal (-f))
 negOp name (MachDouble d) = Just (name, mkDoubleVal (-d))
-negOp name l@(MachInt i)  = intResult name (ppr l) (-i)
+negOp name l@(MachInt i)  = intResult name (-i)
 negOp name l		  = Nothing
 
 --------------------------
 intOp2 op name l1@(MachInt i1) l2@(MachInt i2)
-  = intResult name (ppr l1 <+> ppr l2) (i1 `op` i2)
+  = intResult name (i1 `op` i2)
 intOp2 op name l1 l2 = Nothing		-- Could find LitLit
 
 intOp2Z op name (MachInt i1) (MachInt i2)
@@ -212,8 +211,7 @@ intOp2Z op name l1 l2 = Nothing		-- LitLit or zero dividend
 --------------------------
 -- Integer is not an instance of Bits, so we operate on Word64
 wordBitOp2 op name l1@(MachWord w1) l2@(MachWord w2)
-  = wordResult name (ppr l1 <+> ppr l2)
-                    ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2))
+  = Just (name, mkWordVal ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2)))
 wordBitOp2 op name l1 l2 = Nothing		-- Could find LitLit
 
 wordOp2Z op name (MachWord w1) (MachWord w2)
@@ -276,31 +274,14 @@ do_lit_eq is_eq name lit expr
     val_if_neq | is_eq     = falseVal
 	       | otherwise = trueVal
 
--- TODO: Merge intResult/wordResult
-intResult name pp_args result
-  | not (inIntRange result)
-	-- Better tell the user that we've overflowed...
-	-- ..not that it stops us from actually folding!
-  
-  = pprTrace "Warning:" (text "Integer overflow in:" <+> ppr name <+> pp_args)
-    Just (name, mkIntVal (squashInt result))
-
-  | otherwise
-  = Just (name, mkIntVal result)
-
-wordResult name pp_args result
-  | not (inWordRange result)
-	-- Better tell the user that we've overflowed...
-	-- ..not that it stops us from actually folding!
-  
-  = pprTrace "Warning:" (text "Word overflow in:" <+> ppr name <+> pp_args)
-    Just (name, mkWordVal (squashInt result))
-
-  | otherwise
-  = Just (name, mkWordVal result)
-
-squashInt :: Integer -> Integer	-- Squash into Int range
-squashInt i = toInteger ((fromInteger i)::Int)
+-- Note that we *don't* warn the user about overflow. It's not done at
+-- runtime either, and compilation of completely harmless things like
+--    ((124076834 :: Word32) + (2147483647 :: Word32))
+-- would yield a warning. Instead we simply squash the value into the
+-- Int range, but not in a way suitable for cross-compiling... :-(
+intResult :: RuleName -> Integer -> Maybe (RuleName, CoreExpr)
+intResult name result
+  = Just (name, mkIntVal (toInteger ((fromInteger result)::Int)))
 \end{code}
 
 
