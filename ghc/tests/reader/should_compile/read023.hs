@@ -10,10 +10,9 @@ f  = Just.let x=id in x
 -- f' = Just.\1 where (.\) = ($)
 
 -- -----------------------------------------------------
--- M.{as,hiding,qualified} *are* qualified identifiers,
--- but GHC deviates from the Haskell report here.
+-- M.{as,hiding,qualified} *are* qualified identifiers:
 
--- g  = ShouldCompile.as
+g  = ShouldCompile.as
 
 -- ---------------------------------------------------------------------------
 -- special symbols (!, -) can be qualified to make varids.

@@ -1,7 +1,3 @@
 
-drvfail001.hs:11:
-    No instance for `Show (f (f a))'
-    When deriving classes for `SM'
-
-Compilation had errors
-
+No instance for `Show (f a)'
+When deriving classes for `Cons'

@@ -1,6 +1,3 @@
 
 read009.hs:5:
     `do' statements must end in expression: do let foo = True
-
-Compilation had errors
-

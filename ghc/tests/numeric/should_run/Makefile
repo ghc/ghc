@@ -1,16 +1,16 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2000/06/12 17:01:58 panne Exp $
+# $Id: Makefile,v 1.8 2000/12/12 17:21:41 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
 
 SRC_HC_OPTS += -dcore-lint
-arith006_HC_OPTS += -fglasgow-exts
-arith010_HC_OPTS += -fglasgow-exts
-arith011_HC_OPTS += -fglasgow-exts
-arith012_HC_OPTS += -fglasgow-exts
-num006_HC_OPTS += -fglasgow-exts
+arith006_HC_OPTS +=  -package lang
+arith010_HC_OPTS +=  -package lang
+arith011_HC_OPTS +=  -package lang
+arith012_HC_OPTS +=  -package lang
+num006_HC_OPTS +=  -package lang
 
 .PRECIOUS: %.bin %.o
 

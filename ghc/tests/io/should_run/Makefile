@@ -10,12 +10,11 @@ endif
 include $(TOP)/mk/should_run.mk
 
 SRC_HC_OPTS += -dcore-lint
-io022_HC_OPTS += -fglasgow-exts
 io010_HC_OPTS += -fglasgow-exts
-io011_HC_OPTS += -fglasgow-exts
-io018_HC_OPTS += -fglasgow-exts
-io030_HC_OPTS += -fglasgow-exts
-io032_HC_OPTS += -fglasgow-exts
+io011_HC_OPTS += -fglasgow-exts -package lang
+io018_HC_OPTS += -fglasgow-exts -package lang
+io022_HC_OPTS += -fglasgow-exts -package lang
+io032_HC_OPTS += -fglasgow-exts -package lang
 
 io004_RUNTEST_OPTS += -x 42
 io016_RUNTEST_OPTS += io016.hs io016.out

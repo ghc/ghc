@@ -1,7 +1,4 @@
 
 tcfail057.hs:5:
-    Class used as a type constructor: RealFrac
-    When checking kinds in `RealFrac a'
-
-Compilation had errors
-
+    Class `RealFrac' used as a type
+    In a type signature for `f'

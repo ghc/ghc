@@ -1,28 +1,27 @@
 
 tcfail067.hs:60:
-    Could not deduce `Show (SubRange a)' from the context: (Num a)
-    Probable cause: missing `Show (SubRange a)'
-		    in instance declaration context
-		    or missing instance declaration for `Show (SubRange a)'
+    Could not deduce `Show (SubRange a)' from the context (Num a1)
+    Probable fix:
+	Add `Show (SubRange a)' to the instance declaration context
+	Or add an instance declaration for `Show (SubRange a)'
     arising from an instance declaration at tcfail067.hs:60
 
 tcfail067.hs:61:
     Could not deduce `Ord a'
-	from the context: (Num (SubRange a),
-			   Num a,
-			   Eq (SubRange a),
-			   Show (SubRange a))
-    Probable cause: missing `Ord a' in instance declaration context
+	from the context (Num (SubRange a1),
+			  Num a1,
+			  Eq (SubRange a1),
+			  Show (SubRange a1))
+    Probable fix:
+	Add `Ord a' to the instance declaration context
     arising from use of `numSubRangeNegate' at tcfail067.hs:61
-    In the right-hand side of a pattern binding: numSubRangeNegate
+    In the right-hand side of an equation for `negate':
+	numSubRangeNegate
 
 tcfail067.hs:74:
-    Could not deduce `Ord a' from the context: (Num a)
-    Probable cause: missing `Ord a'
-		    in type signature for `numSubRangeBinOp'
+    Could not deduce `Ord a' from the context (Num a)
+    Probable fix:
+	Add `Ord a' to the type signature for `numSubRangeBinOp'
     arising from use of `SubRange' at tcfail067.hs:74
     In the right-hand side of an equation for `numSubRangeBinOp':
 	SubRange (result, result) result
-
-Compilation had errors
-

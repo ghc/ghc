@@ -1,9 +1,0 @@
-__interface Rn016 1 0 where
-__export Rn016 K{op1 op2};
-instance {K PrelBase.Int} = _f1;
-instance {K PrelBase.Bool} = _f2;
-instance __forall [a] => {K [a]} = _f3;
-1 _f1 :: {K PrelBase.Int} ;
-1 _f2 :: {K PrelBase.Bool} ;
-1 _f3 :: __forall [a] => {K [a]} ;
-1 class K a :: (* -> *) where { op1 :: a -> a ; op2 :: a -> a ; } ;

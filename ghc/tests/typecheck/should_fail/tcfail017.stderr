@@ -1,9 +1,7 @@
 
 tcfail017.hs:10:
-    Could not deduce `C [a]' from the context: (B a)
-    Probable cause: missing `C [a]' in instance declaration context
-		    or missing instance declaration for `C [a]'
+    Could not deduce `C [a]' from the context (B a)
+    Probable fix:
+	Add `C [a]' to the instance declaration context
+	Or add an instance declaration for `C [a]'
     arising from an instance declaration at tcfail017.hs:10
-
-Compilation had errors
-

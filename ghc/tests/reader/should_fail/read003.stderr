@@ -4,6 +4,3 @@ read003.hs:4:
 	Expected type: (t, [a], t1)
 	Inferred type: t
     In the right-hand side of a pattern binding: a
-
-Compilation had errors
-

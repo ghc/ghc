@@ -1,5 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
-
 -- !!! multi-dimensional arrays
 
 module Main ( main ) where

@@ -2,16 +2,18 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_compile.mk
 
-SRC_HC_OPTS += -dcore-lint -fno-warn-incomplete-patterns 
+SRC_HC_OPTS += -dcore-lint -fno-warn-incomplete-patterns
 # -hi-with-declarations -hi-with-instances -hi-with-exports
 
 tc019_HC_OPTS = -fglasgow-exts
 tc065_HC_OPTS = -package lang -package data
+tc085_HC_OPTS = -package lang
 tc087_HC_OPTS = -fglasgow-exts
 tc088_HC_OPTS = -package lang
 tc089_HC_OPTS = -H12m
 tc097_HC_OPTS = -fglasgow-exts
 tc100_HC_OPTS = -O
+tc108_HC_OPTS = -fglasgow-exts
 
 # mkdependHS doesn't understand OPTIONS pragmas...
 SRC_MKDEPENDHS_OPTS += -fglasgow-exts

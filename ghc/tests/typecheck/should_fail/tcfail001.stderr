@@ -9,6 +9,3 @@ tcfail001.hs:9:
 	Inferred type: t -> t1
     In an equation for function `op': op [] = []
     In the definition for method `op'
-
-Compilation had errors
-

@@ -8,6 +8,3 @@ cc005.hs:10:
     Unacceptable result type in foreign declaration: Int#
     When checking declaration:
 	foreign export _ccall "bar" bar :: Int -> Int#
-
-Compilation had errors
-

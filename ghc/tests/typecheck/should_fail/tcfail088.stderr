@@ -7,6 +7,3 @@ tcfail088.hs:14:
     Illegal polymorphic type as argument: forall b. b
     When checking kinds in `T s (forall b. b)'
     In a type signature for `g'
-
-Compilation had errors
-

@@ -8,6 +8,3 @@ tcfail072.hs:23:
     Ambiguous type variable(s) `q' in the constraint `Ord q'
     arising from use of `g' at tcfail072.hs:23
     In the right-hand side of an equation for `g': g A
-
-Compilation had errors
-

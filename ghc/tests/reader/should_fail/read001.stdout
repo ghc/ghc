@@ -26,12 +26,13 @@ f _
   ((n+42))
     = y
 expr a b c d
-       = ((((((((a + (: a b)) + (a : b)) + (((1 - 'c') - "abc") - 1.293))
+       = ((((((((a + ((:) a b)) + (a : b))
+	       + (((1 - 'c') - "abc") - 1.293))
 	      + ((\ x y z -> x) 42))
 	     + ((9 *)))
 	    + ((* 8)))
 	   + (case x of
-		Prelude.[]
+		PrelBase.[]
 		  | null x -> 99
 		  | otherwise -> 98
 		  | True -> 97
@@ -72,9 +73,12 @@ type Pair a b = (a, b)
 data FooData = FooCon Int
 data FooDataB = FooConB Double
 data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
-class (Eq a) => EqClass a where { eqc :: a -> Char; eqc x = '?' }
+class (Eq a) => EqClass a where {
+    eqc = :: a -> Char; Just eqc x = '?' }
 class (Ord a) => OrdClass a where {
-    orda :: a -> Char; ordb :: a -> Char; ordc :: a -> Char; }
+    orda = :: a -> Char; ordb = :: a -> Char; ordc = :: a -> Char;
+    Just
+    }
 instance (Eq a) => {EqClass (EqTree a)} where
     []
     eqc x = 'a'

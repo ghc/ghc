@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
-module ShouldCompile
+module ShouldCompile where
 
 -- This accepted by Hugs, but not by GHC 4.08.1
 -- Reported by Thomas Hallgren Nov 00

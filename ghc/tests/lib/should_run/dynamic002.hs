@@ -47,7 +47,6 @@ main = do
    print (typeOf (undefined :: Ordering))
 
    print (typeOf (undefined :: Addr))
-   print (typeOf (undefined :: AddrOff))
    print (typeOf (undefined :: Dynamic))
    print (typeOf (undefined :: ForeignObj))
    print (typeOf (undefined :: (IORef ())))

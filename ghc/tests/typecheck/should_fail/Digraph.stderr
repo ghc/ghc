@@ -30,6 +30,3 @@ Digraph.hs:19:
 					   | otherwise = span_tree r (vs', (x : ns') : ns) xs
 					   where
 					       (vs', ns') = dfs r (x : vs, []) (r x)
-
-Compilation had errors
-

@@ -1,1 +1,4 @@
- 
+
+tc108.hs:15:
+    Too many parameters for class `HasConfigValue'
+    In the class declaration for `HasConfigValue'

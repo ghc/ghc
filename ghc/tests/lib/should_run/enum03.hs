@@ -40,7 +40,7 @@ testEnumWord8 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Word8)..]))
   printTest ((take 7 [((maxBound::Word8)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Word8),2..]))
   printTest ((take 7 [(1::Word8),7..]))
@@ -261,11 +261,4 @@ testEnumWord64 = do
 --
 
 
-mayBomb x = catchAllIO x errorHandler
-
-errorHandler :: Exception -> IO ()
-errorHandler e =
-  case justErrors e of
-    Just t -> putStrLn ("error " ++ show t)
-    _	   -> return ()
- 
+mayBomb x = catchJust errorCalls x (\e -> putStrLn ("error " ++ show e))

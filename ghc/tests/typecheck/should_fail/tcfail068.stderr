@@ -49,13 +49,9 @@ tcfail068.hs:35:
 	It unifies with `s1', which is mentioned in the environment
 	The following variables in the environment mention `s1'
 	  itrapstate' :: Int
-			 -> Int
-			 -> c
-			 -> ST s1 (c, STArray s1 (Int, Int) b)
+			 -> Int -> c -> ST s1 (c, STArray s1 (Int, Int) b)
 	  itrapstatesnd :: Int
-			   -> Int
-			   -> c
-			   -> ST s1 (c, STArray s1 (Int, Int) b)
+			   -> Int -> c -> ST s1 (c, STArray s1 (Int, Int) b)
 	  arr :: IndTree s1 b
     Signature type:     forall s. ST s a
     Type to generalise: ST s1 (c, IndTree s1 b)
@@ -63,6 +59,3 @@ tcfail068.hs:35:
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the right-hand side of an equation for `itrapstate':
 	runST (itrapstate' i k s)
-
-Compilation had errors
-

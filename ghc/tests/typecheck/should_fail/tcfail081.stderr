@@ -1,9 +1,5 @@
 
-tcfail081.hs:2:
-    Cannot unify the type-signature variable `a' with the type `IO t'
-	Expected type: IO t
-	Inferred type: a
-    When checking that `main' has the required type
-
-Compilation had errors
-
+Cannot unify the type-signature variable `a' with the type `IO t'
+    Expected type: IO t
+    Inferred type: a
+When checking that `main' has the required type

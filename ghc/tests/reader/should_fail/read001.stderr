@@ -3,6 +3,8 @@ read001.hs:5: Unknown module in export list: module `OneC'
 
 read001.hs:5: Type constructor or class not in scope: `FooDataC'
 
+read001.hs:25: Variable not in scope: `+#'
+
 read001.hs:38: Type constructor or class not in scope: `EqLeaf'
 
 read001.hs:38: Type constructor or class not in scope: `EqLeaf'
@@ -20,6 +22,3 @@ read001.hs:107: Data constructor not in scope: `Foo'
 read001.hs:107: Data constructor not in scope: `Bar'
 
 read001.hs:112: Type constructor or class not in scope: `Foo'
-
-Compilation had errors
-

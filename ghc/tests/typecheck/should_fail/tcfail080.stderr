@@ -5,6 +5,3 @@ tcfail080.hs:11:
     In the first argument of `isempty', namely `(singleton x)'
     In the right-hand side of an equation for `q':
 	isempty (singleton x)
-
-Compilation had errors
-

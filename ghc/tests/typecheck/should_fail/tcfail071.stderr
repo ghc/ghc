@@ -11,6 +11,3 @@ tcfail071.hs:10:
 	Inferred type: c
     In the first argument of `f', namely `c'
     In the first argument of `foldr', namely `(f c)'
-
-Compilation had errors
-

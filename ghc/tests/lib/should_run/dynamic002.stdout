@@ -19,7 +19,6 @@ IO ()
 Maybe ()
 Ordering
 Addr
-AddrOff
 Dynamic
 ForeignObj
 IORef ()

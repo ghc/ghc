@@ -2,7 +2,4 @@
 tcfail084.hs:10:
     Constructor `F' does not have field `y'
     In the record construction: F {y = 2}
-    In the right-hand side of a pattern binding: F {y = 2}
-
-Compilation had errors
-
+    In the right-hand side of an equation for `z': F {y = 2}

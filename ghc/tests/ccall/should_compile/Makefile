@@ -1,8 +1,12 @@
+# -----------------------------------------------------------------------------
+# $Id: Makefile,v 1.12 2000/12/12 17:21:40 simonmar Exp $
+
 TOP = ../..
+HCOnly = YES
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_compile.mk
 
-SRC_HC_OPTS += -dcore-lint -fglasgow-exts
+SRC_HC_OPTS += -dcore-lint -fglasgow-exts -package lang
 
 # Note that these tests are still in a state of flux... don't believe errors
 # they report. In fact, these aren't really very good tests at all...

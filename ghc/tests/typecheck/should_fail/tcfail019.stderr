@@ -1,15 +1,14 @@
 
 tcfail019.hs:18:
-    Could not deduce `C [a]' from the context: ()
-    Probable cause: missing `C [a]' in instance declaration context
-		    or missing instance declaration for `C [a]'
+    Could not deduce `C [a]' from the context ()
+    Probable fix:
+	Add `C [a]' to the instance declaration context
+	Or add an instance declaration for `C [a]'
     arising from an instance declaration at tcfail019.hs:18
 
 tcfail019.hs:18:
-    Could not deduce `B [a]' from the context: ()
-    Probable cause: missing `B [a]' in instance declaration context
-		    or missing instance declaration for `B [a]'
+    Could not deduce `B [a]' from the context ()
+    Probable fix:
+	Add `B [a]' to the instance declaration context
+	Or add an instance declaration for `B [a]'
     arising from an instance declaration at tcfail019.hs:18
-
-Compilation had errors
-
