@@ -332,7 +332,7 @@ instance  Show Double  where
 %*********************************************************
 
 \begin{code}
-{- SPECIALIZE fromIntegral ::
+{-# SPECIALIZE fromIntegral ::
     Int		-> Rational,
     Integer	-> Rational,
     Int  	-> Int,
@@ -346,7 +346,7 @@ instance  Show Double  where
 fromIntegral	:: (Integral a, Num b) => a -> b
 fromIntegral	=  fromInteger . toInteger
 
-{- SPECIALIZE realToFrac ::
+{-# SPECIALIZE realToFrac ::
     Double	-> Rational, 
     Rational	-> Double,
     Float	-> Rational,
