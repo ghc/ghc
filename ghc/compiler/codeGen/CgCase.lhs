@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.63 2003/07/02 13:12:35 simonpj Exp $
+% $Id: CgCase.lhs,v 1.64 2003/07/02 13:18:24 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -144,9 +144,7 @@ cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
     getCAddrMode v			`thenFC` \ amode ->
     bindNewToTemp bndr			`thenFC` \ tmp_amode ->
     absC (CAssign tmp_amode amode)	`thenC`
-    cgPrimAlts NoGC amode alts alt_type
-	-- TEMP Should be tmp_amode, not amode
-	-- but for line-by-line comparison with old stuff, we pass amode too
+    cgPrimAlts NoGC tmp_amode alts alt_type
 \end{code}	
 
 Special case #3: inline PrimOps.

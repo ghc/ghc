@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.21 2003/07/02 13:12:37 simonpj Exp $
+% $Id: CgLetNoEscape.lhs,v 1.22 2003/07/02 13:19:29 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -167,8 +167,7 @@ cgLetNoEscapeClosure
 
 	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
 	 forkAbsC (
--- TEMP omit for line-by-line compatibility
---	    restoreCurrentCostCentre cc_slot	`thenC`
+	    restoreCurrentCostCentre cc_slot	`thenC`
 	    cgLetNoEscapeBody bndr cc args body
 	 )					`thenFC` \ abs_c ->
 	 mkRetDirectTarget bndr abs_c srt

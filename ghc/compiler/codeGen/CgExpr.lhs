@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.54 2003/07/02 13:12:36 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.56 2003/07/02 13:19:28 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -25,7 +25,7 @@ import SMRep		( fixedHdrSize )
 import CoreSyn		( AltCon(..) )
 import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, 
 			  nukeDeadBindings, addBindC, addBindsC )
-import CgCase		( cgCase, saveVolatileVarsAndRegs, restoreCurrentCostCentre )
+import CgCase		( cgCase, saveVolatileVarsAndRegs )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
@@ -233,11 +233,6 @@ cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
     nukeDeadBindings live_in_whole_let	`thenC`
     saveVolatileVarsAndRegs live_in_rhss
     	    `thenFC` \ (save_assts, rhs_eob_info, maybe_cc_slot) ->
-
-	-- TEMP: put back in for line-by-line compatibility
-	-- Doesn't look right; surely should restore in the branch!
-	-- And the code isn't used....
-    restoreCurrentCostCentre maybe_cc_slot `thenFC` \ restore_cc ->
 
 	-- Save those variables right now!
     absC save_assts				`thenC`
