@@ -1,101 +1,25 @@
 --!!! Testing IEEE Float and Double extremity predicates.
 module Main(main) where
 
-printLn :: Show a => a -> IO ()
-printLn v = putStrLn (show v)
-
+main :: IO ()
 main = do
  sequence (map putStrLn double_tests)
  sequence (map putStrLn float_tests)
   where
-    -- dummy arg used to resolve what
-    -- instance of RealFloat we're interested in.
    double_tests = run_tests double_numbers
    float_tests  = run_tests float_numbers  
 
    run_tests nums =
-     let atTy = (undefined `asTypeOf` (head nums))  in
-     [ denorm   atTy nums
-     , pos_inf  atTy nums
-     , neg_inf  atTy nums
-     , nan      atTy nums
-     , neg_zero atTy nums
-     , pos_zero atTy nums
-     ]
+    map ($nums)
+        [ denorm
+        , pos_inf
+        , neg_inf
+        , nan
+        , neg_zero
+        , pos_zero
+        ]
 
-denorm :: RealFloat a => a -> [a] -> String
-denorm atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("Denormalised numbers: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (isDenormalized) "isDenormalised"
-
-pos_inf :: RealFloat a => a -> [a] -> String
-pos_inf atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("Positive Infinity: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (isInfinite) "isInfinite"
-
-neg_inf :: RealFloat a => a -> [a] -> String
-neg_inf atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("Negative Infinity: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (\ x -> isInfinite x && x < 0) "isNegInfinite"
-
-nan :: RealFloat a => a -> [a] -> String
-nan atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("NaN: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (isNaN) "isNaN"
-
-pos_zero :: RealFloat a => a -> [a] -> String
-pos_zero atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("Positive zero: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (==0) "isPosZero"
-
-neg_zero :: RealFloat a => a -> [a] -> String
-neg_zero atType numbers =
-  unlines
-     ( ""
-     : "*********************************"
-     : ("Negative zero: " ++ doubleOrFloat atType)
-     : ""
-     : map showPerform numbers)
- where
-   showPerform = showAndPerform (isNegativeZero) "isNegativeZero"
-
--- what a hack.
-doubleOrFloat :: RealFloat a => a -> String
-doubleOrFloat atType
- | (floatDigits atType) == (floatDigits (0::Double)) = "Double"
- | (floatDigits atType) == (floatDigits (0::Float))  = "Float"
- | otherwise = "unknown RealFloat type"
-
+-------------
 double_numbers :: [Double]
 double_numbers =
       [ 0
@@ -154,6 +78,85 @@ float_numbers =
 	    x = encodeFloat (floatRadix x ^ d - 1) (u - d)
 	in x
       ]
+
+-------------
+
+denorm :: RealFloat a => [a] -> String
+denorm numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("Denormalised numbers: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (isDenormalized) "isDenormalised"
+
+pos_inf :: RealFloat a => [a] -> String
+pos_inf numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("Positive Infinity: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (isInfinite) "isInfinite"
+
+neg_inf :: RealFloat a => [a] -> String
+neg_inf numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("Negative Infinity: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (\ x -> isInfinite x && x < 0) "isNegInfinite"
+
+nan :: RealFloat a => [a] -> String
+nan numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("NaN: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (isNaN) "isNaN"
+
+pos_zero :: RealFloat a => [a] -> String
+pos_zero numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("Positive zero: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (==0) "isPosZero"
+
+neg_zero :: RealFloat a => [a] -> String
+neg_zero numbers =
+  unlines
+     ( ""
+     : "*********************************"
+     : ("Negative zero: " ++ doubleOrFloat numbers)
+     : ""
+     : map showPerform numbers)
+ where
+   showPerform = showAndPerform (isNegativeZero) "isNegativeZero"
+
+-- what a hack.
+doubleOrFloat :: RealFloat a => [a] -> String
+doubleOrFloat ls
+ | (floatDigits atType) == (floatDigits (0::Double)) = "Double"
+ | (floatDigits atType) == (floatDigits (0::Float))  = "Float"
+ | otherwise = "unknown RealFloat type"
+ where
+   atType = undefined `asTypeOf` (head ls)
+
+
 
 showAndPerform :: (Show a, Show b)
 	       => (a -> b)
