@@ -20,8 +20,8 @@ foreign export dynamic mkCounter :: (IO Int) -> IO Addr
 main :: IO ()
 main = do
   x  <- createCounter
-  v1 <- _casm_GC_ `` do { typedef int (*f)(); %r=(int)((f)%0)();} while (0); '' x
+  v1 <- _casm_GC_ `` do { typedef HsInt (*f)(); %r=(HsInt)((f)%0)();} while (0); '' x
   print (v1::Int)
-  v2 <- _casm_GC_ `` do { typedef int (*f)(); %r=(int)((f)%0)();} while (0); '' x
+  v2 <- _casm_GC_ `` do { typedef HsInt (*f)(); %r=(HsInt)((f)%0)();} while (0); '' x
   print (v2::Int)
 
