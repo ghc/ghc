@@ -277,7 +277,7 @@ lazyReadLine  :: Handle -> PrimIO String
 lazyReadChar  :: Handle -> PrimIO String
 
 lazyReadBlock handle =
-    ioToST (readHandle handle)		    >>= \ htype ->
+    ioToST (readHandle handle)                  >>= \ htype ->
     case htype of 
       -- There cannae be an ErrorHandle here
       ClosedHandle ->
@@ -305,7 +305,7 @@ lazyReadBlock handle =
 	      returnPrimIO (unpackPS some ++ more)
 
 lazyReadLine handle =
-    ioToST (readHandle handle) >>= \ htype ->
+    ioToST (readHandle handle)                      >>= \ htype ->
     case htype of 
       -- There cannae be an ErrorHandle here
       ClosedHandle ->
@@ -333,7 +333,7 @@ lazyReadLine handle =
 	      returnPrimIO (unpackPS some ++ more)
 
 lazyReadChar handle =
-    ioToST (readHandle handle) >>= \ htype ->
+    ioToST (readHandle handle)                      >>= \ htype ->
     case htype of 
       -- There cannae be an ErrorHandle here
       ClosedHandle ->
@@ -355,6 +355,7 @@ lazyReadChar handle =
               unsafeInterleavePrimIO (lazyReadChar handle)
 						    >>= \ more ->
 	      returnPrimIO (chr char : more)
+
 \end{code}
 
 
@@ -417,10 +418,21 @@ hPutStr handle str =
 	  writeHandle handle htype		    >>
 	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
       other -> 
+          {-
+           The code below is not correct for line-buffered terminal streams,
+           as the output stream is not flushed when terminal input is requested
+           again, just upon seeing a newline character. A temporary fix for the
+           most common line-buffered output stream, stdout, is to assume the
+           buffering it was given when created (no buffering). This is not
+           as bad as it looks, since stdio buffering sits underneath this.
+
+	   ToDo: fix me
+	  -}
           getBufferMode other			    `thenIO_Prim` \ other ->
           (case bufferMode other of
             Just LineBuffering ->
-		writeLines (filePtr other) str
+	        writeChars (filePtr other) str
+		--writeLines (filePtr other) str
             Just (BlockBuffering (Just size)) ->
 	        writeBlocks (filePtr other) size str
             Just (BlockBuffering Nothing) ->
@@ -486,8 +498,8 @@ hPutStr handle str =
          ((C# x):xs) ->
 	   write_char arr# n x	>>
 	   
-	   {- Flushing lines - should we bother? -}
-	   if n ==# bufLen {- || (chopOnNewLine && (x `eqChar#` '\n'#)) -} then
+	   {- Flushing lines - should we bother? Yes, for line-buffered output. -}
+	   if n ==# bufLen || (chopOnNewLine && (x `eqChar#` '\n'#)) then
 	      _ccall_ writeFile arr fp (I# (n +# 1#)) >>= \ rc ->
 	      if rc == 0 then
 		 shoveString 0# xs
