@@ -1,9 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.10 2001/12/03 20:59:08 sof Exp $
- *
- * hReady Runtime Support
+ * hWaitForInput Runtime Support
  */
 
 /* select and supporting types is not Posix */
@@ -51,8 +49,11 @@ inputReady(int fd, int msecs, int isSock)
       DWORD rc;
       HANDLE hFile = (HANDLE)_get_osfhandle(fd);
     
-      rc = WaitForSingleObject( hFile,
-			        msecs /*millisecs*/);
+      rc = MsgWaitForMultipleObjects( 1,
+				      &hFile,
+				      FALSE, /* wait all */
+			              msecs, /*millisecs*/
+				      QS_ALLEVENTS);
     
       /* 1 => Input ready, 0 => not ready, -1 => error */
       switch (rc) {
