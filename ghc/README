@@ -39,17 +39,18 @@ problem.
 Current GHC team:
 
     Simon Peyton Jones	( simonpj@microsoft.com)    [our Fearless Leader]
-    Sigbjorn Finne	(v-sfinne@microsoft.com)    [hired hand]
     Simon Marlow	(simonmar@microsoft.com)    [hired hand]
     Julian Seward       (v-julsew@microsoft.com)    [hired hand]
+    Reuben Thomas	(v-reubth@microsoft.com)    [hired hand]
 
 Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
 
+    Sigbjorn Finne	(v-sfinne@microsoft.com)    [hired hand]
     Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
     Hans Wolfgang Loidl (hwloidl)   [PhD student]
     Patrick Sansom	(sansom)    [hired hand, Bidirectional Analyses]
     Phil Trinder	(trinder)   [hired hand, Parade]
-    Andy Gill		(andy)	    [PhD student; at HP]
+    Andy Gill		(andy)	    [ex-PhD student; at OGI]
     Cordy Hall		(cvh) 	    [GRASP]
     Kevin Hammond	(kh)	    [GRASP; at St. Andrews]
     John Launchbury	(jl)	    [AQUA; at OGI]
