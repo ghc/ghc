@@ -3,6 +3,7 @@
 // This file isn't really preprocessed, but it's kept as a .pp file
 // because .ilx files aren't precious, and may be deleted
 
+.module 'PrelGHC.i_o'
 .module extern 'PrelBase.i_o'
 .classunion import [.module 'PrelBase.i_o']PrelBase_Bool {.alternative 'PrelBase_False' ()
 .alternative 'PrelBase_True' ()}
@@ -24,7 +25,7 @@
          ldc.i4 1
          ret
       }
-      .method public static value class PrelGHC_Z1H<int32,int32> IntSubCOp(int32 a,int32 b)    {
+      .method public static value class PrelGHC_Z2H<int32,int32> IntSubCOp(int32 a,int32 b)    {
               .locals(int32 r, int32 c)
              ldstr "WARNING: IntSubCOp called (warning! not yet tested properly)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
               //r=a-b
@@ -32,14 +33,14 @@
               //c = ((a^r) & (a^b)) >> 31
               ldloc r ldarg a xor ldarg a ldarg b xor and ldc.i4 31 shr.un stloc c
               //
-             ldloc r ldloc c newobj void value class PrelGHC_Z1H<int32, int32 >::.ctor(!0,!1)
+             ldloc r ldloc c newobj void value class PrelGHC_Z2H<int32, int32 >::.ctor(!0,!1)
              ldstr "a = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg a   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "b = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg b   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "r = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldloc r   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "c = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldloc c   call void ['mscorlib']System.Console::WriteLine(int32)
               ret
        }
-      .method public static value class PrelGHC_Z1H<int32,int32> IntAddCOp(int32 a,int32 b)    {
+      .method public static value class PrelGHC_Z2H<int32,int32> IntAddCOp(int32 a,int32 b)    {
               .locals(int32 r, int32 c)
              ldstr "WARNING: IntAddCOp called (warning! not yet tested properly)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
               //r=a+b
@@ -47,7 +48,7 @@
               //c = ((a^r) & ~(a^b)) >> 31
               ldloc r ldarg a xor ldarg a ldarg b xor not and ldc.i4 31 shr.un stloc c
               //
-             ldloc r ldloc c  newobj void value class PrelGHC_Z1H<int32, int32 >::.ctor(!0,!1)
+             ldloc r ldloc c  newobj void value class PrelGHC_Z2H<int32, int32 >::.ctor(!0,!1)
              ldstr "a = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg a   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "b = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg b   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "r = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldloc r   call void ['mscorlib']System.Console::WriteLine(int32)
@@ -56,7 +57,7 @@
        }
 
       // TODO: check me!!! test me!!!!
-      .method public static value class PrelGHC_Z1H<int32,int32> IntMulCOp(int32 a,int32 b)    {
+      .method public static value class PrelGHC_Z2H<int32,int32> IntMulCOp(int32 a,int32 b)    {
               .locals(int64 l, int32 r, int32 c)
 
              ldstr "WARNING: IntMulCOp called (warning! not yet tested properly)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
@@ -70,7 +71,7 @@
              ldloc l ldc.i8 0x80000000 rem conv.i4 stloc r
               ldloc l ldc.i8 0x80000000 div conv.i4 stloc c
 
-             ldloc r ldloc c newobj void value class PrelGHC_Z1H<int32, int32 >::.ctor(!0,!1)
+             ldloc r ldloc c newobj void value class PrelGHC_Z2H<int32, int32 >::.ctor(!0,!1)
              ldstr "a = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg a   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "b = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldarg b   call void ['mscorlib']System.Console::WriteLine(int32)
              ldstr "r = "   call void ['mscorlib']System.Console::Write(class ['mscorlib']System.String) ldloc r   call void ['mscorlib']System.Console::WriteLine(int32)
@@ -158,12 +159,12 @@
        }
 
       // Enter, if (null(Read)) Wait Exit
-      .method public static value class PrelGHC_Z1H<int32,  !!0> 'tryTakeMVar'<any>(class PrelGHC_MVarzh<!!0> mvar)
+      .method public static value class PrelGHC_Z2H<int32,  !!0> 'tryTakeMVar'<any>(class PrelGHC_MVarzh<!!0> mvar)
        {
              ldstr "WARNING: tryTakeMVar called (locking not yet implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 1
              ldarg mvar ldfld !0 class PrelGHC_MVarzh<!!0>::contents
-             newobj void value class PrelGHC_Z1H<int32,!!0>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32,!!0>::.ctor(!0,!1)
              ret
        }
 
@@ -186,10 +187,10 @@
        }
 
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerAddOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerAddOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerAddOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
@@ -203,56 +204,56 @@
              ldc.i4 0 
              ret
        }
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerSubOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerSubOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerSubOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerMulOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerMulOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerMulOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z3H<int32, unsigned int8[],int32, unsigned int8[]> IntegerQuotRemOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z4H<int32, unsigned int8[],int32, unsigned int8[]> IntegerQuotRemOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerQuotRemOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z3H<int32, unsigned int8[],int32, unsigned int8[]>::.ctor(!0,!1,!2,!3)
+             newobj void value class PrelGHC_Z4H<int32, unsigned int8[],int32, unsigned int8[]>::.ctor(!0,!1,!2,!3)
              ret
        }
 
-      .method public static value class PrelGHC_Z3H<int32, unsigned int8[],int32, unsigned int8[]> IntegerDivModOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z4H<int32, unsigned int8[],int32, unsigned int8[]> IntegerDivModOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerDivModOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z3H<int32, unsigned int8[],int32, unsigned int8[]>::.ctor(!0,!1,!2,!3)
+             newobj void value class PrelGHC_Z4H<int32, unsigned int8[],int32, unsigned int8[]>::.ctor(!0,!1,!2,!3)
              ret
        }
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerDivExactOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerDivExactOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerDivExactOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull 
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerQuotOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerQuotOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerQuotOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull 
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerAndOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerAndOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerAndOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerRemOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerRemOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerRemOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
@@ -281,38 +282,38 @@
              ret
        }
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> Int2IntegerOp(int32) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> Int2IntegerOp(int32) {
              ldstr "WARNING: Integer2IntOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-       .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> Word2IntegerOp(unsigned int32) {
+       .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> Word2IntegerOp(unsigned int32) {
              ldstr "WARNING: Word2IntegerOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-        .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> Word64ToIntegerOp(unsigned int64) {
+        .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> Word64ToIntegerOp(unsigned int64) {
              ldstr "WARNING: Word64ToIntegerOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-        .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> Int64ToIntegerOp(int64) {
+        .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> Int64ToIntegerOp(int64) {
              ldstr "WARNING: Int64ToIntegerOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-    .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerOrOp(int32, unsigned int8[], int32, unsigned int8[]) {
+    .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerOrOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerOrOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
@@ -321,40 +322,40 @@
              ldc.i4 0 
              ret
        }
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerXorOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerXorOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerXorOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerGcdOp(int32, unsigned int8[], int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerGcdOp(int32, unsigned int8[], int32, unsigned int8[]) {
              ldstr "WARNING: IntegerGcdOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z1H<int32, unsigned int8[]> IntegerComplementOp(int32, unsigned int8[]) {
+      .method public static value class PrelGHC_Z2H<int32, unsigned int8[]> IntegerComplementOp(int32, unsigned int8[]) {
              ldstr "WARNING: IntegerComplementOp called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z1H<int32, unsigned int8[]>::.ctor(!0,!1)
+             newobj void value class PrelGHC_Z2H<int32, unsigned int8[]>::.ctor(!0,!1)
              ret
        }
 
-      .method public static value class PrelGHC_Z2H<int32,int32,  unsigned int8[]> decodeFloat(float32 f) {
+      .method public static value class PrelGHC_Z3H<int32,int32,  unsigned int8[]> decodeFloat(float32 f) {
              ldstr "WARNING: decodeFloat called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldarg f conv.r8 call float64 [mscorlib]System.Math::Abs(float64) call float64 [mscorlib]System.Math::Log(float64) conv.i4 
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z2H<int32,int32,  unsigned int8[]>::.ctor(!0,!1,!2)
+             newobj void value class PrelGHC_Z3H<int32,int32,  unsigned int8[]>::.ctor(!0,!1,!2)
              ret
        }
 
-      .method public static value class PrelGHC_Z2H<int32,int32,  unsigned int8[]> decodeDouble(float64 f) {
+      .method public static value class PrelGHC_Z3H<int32,int32,  unsigned int8[]> decodeDouble(float64 f) {
              ldstr "WARNING: decodeDouble called (not implemented)"   call void ['mscorlib']System.Console::WriteLine(class ['mscorlib']System.String)
              ldarg f  call float64 [mscorlib]System.Math::Abs(float64) call float64 [mscorlib]System.Math::Log(float64) conv.i4 
              ldc.i4 0 ldnull
-             newobj void value class PrelGHC_Z2H<int32,int32,  unsigned int8[]>::.ctor(!0,!1,!2)
+             newobj void value class PrelGHC_Z3H<int32,int32,  unsigned int8[]>::.ctor(!0,!1,!2)
              ret
        }
 
@@ -445,16 +446,16 @@ end:
        ldarg 0 ldarg f stfld thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)> class PrelGHC_Weakzh<!0>::_finalizer
        ret 
     }
-   .method public static  value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)>> finalizer<any>(class PrelGHC_Weakzh<!!0>) { 
+   .method public static  value class PrelGHC_Z2H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)>> finalizer<any>(class PrelGHC_Weakzh<!!0>) { 
        ldc.i4 1
        ldarg 0 ldfld thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)> class PrelGHC_Weakzh<!!0>::_finalizer
-         newobj void value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)>>::.ctor(!0,!1)
+         newobj void value class PrelGHC_Z2H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)>>::.ctor(!0,!1)
        ret
    }
-   .method public static value class PrelGHC_Z1H<int32,!!0> deref<any>(class PrelGHC_Weakzh<!!0>) { 
+   .method public static value class PrelGHC_Z2H<int32,!!0> deref<any>(class PrelGHC_Weakzh<!!0>) { 
        ldc.i4 1
        ldarg 0 ldfld !0 class PrelGHC_Weakzh<!!0>::contents
-       newobj void  value class PrelGHC_Z1H<int32,!!0>::.ctor(!0,!1)
+       newobj void  value class PrelGHC_Z2H<int32,!!0>::.ctor(!0,!1)
        ret
    }
    .method public  static  
@@ -489,29 +490,29 @@ end:
 //------------------------------------------------------------
 // Builtin Unboxed Tuple Types
 
-.class value sealed  'PrelGHC_Z0H' <any>  extends ['mscorlib']System.ValueType { 
+.class value sealed  'PrelGHC_Z1H' <any>  extends ['mscorlib']System.ValueType { 
     .method public rtspecialname specialname instance void .ctor(!0) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z0H<!0>::fld0
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z1H<!0>::fld0
        ret 
     }
    .field public !0 fld0
 }
 
-.class value sealed 'PrelGHC_Z1H' <any,any> extends ['mscorlib']System.ValueType  { 
+.class value sealed 'PrelGHC_Z2H' <any,any> extends ['mscorlib']System.ValueType  { 
     .method public rtspecialname specialname instance void .ctor(!0,!1) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z1H<!0,!1>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z1H<!0,!1>::fld1
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z2H<!0,!1>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z2H<!0,!1>::fld1
        ret 
     }
    .field public !0 fld0
    .field public !1 fld1
 }
 
-.class value sealed 'PrelGHC_Z2H' <any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z3H' <any,any,any>  extends ['mscorlib']System.ValueType { 
     .method public rtspecialname specialname instance void .ctor(!0,!1,!2) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z2H<!0,!1,!2>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z2H<!0,!1,!2>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z2H<!0,!1,!2>::fld2
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z3H<!0,!1,!2>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z3H<!0,!1,!2>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z3H<!0,!1,!2>::fld2
        ret 
     }
    .field public !0 fld0
@@ -519,12 +520,12 @@ end:
    .field public !2 fld2
 }
 
-.class value sealed 'PrelGHC_Z3H' <any,any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z4H' <any,any,any,any>  extends ['mscorlib']System.ValueType { 
     .method public rtspecialname specialname instance void .ctor(!0,!1,!2,!3) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z3H<!0,!1,!2,!3>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z3H<!0,!1,!2,!3>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z3H<!0,!1,!2,!3>::fld2
-       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z3H<!0,!1,!2,!3>::fld3
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z4H<!0,!1,!2,!3>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z4H<!0,!1,!2,!3>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z4H<!0,!1,!2,!3>::fld2
+       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z4H<!0,!1,!2,!3>::fld3
        ret 
     }
    .field public !0 fld0
@@ -533,13 +534,13 @@ end:
    .field public !3 fld3
 }
 
-.class value sealed 'PrelGHC_Z4H' <any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z5H' <any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
     .method public rtspecialname specialname instance void .ctor(!0,!1,!2,!3,!4) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z4H<!0,!1,!2,!3,!4>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z4H<!0,!1,!2,!3,!4>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z4H<!0,!1,!2,!3,!4>::fld2
-       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z4H<!0,!1,!2,!3,!4>::fld3
-       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z4H<!0,!1,!2,!3,!4>::fld4
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z5H<!0,!1,!2,!3,!4>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z5H<!0,!1,!2,!3,!4>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z5H<!0,!1,!2,!3,!4>::fld2
+       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z5H<!0,!1,!2,!3,!4>::fld3
+       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z5H<!0,!1,!2,!3,!4>::fld4
        ret 
     }
    .field public !0 fld0
@@ -549,14 +550,14 @@ end:
    .field public !4 fld4
 }
 
-.class value sealed 'PrelGHC_Z5H' <any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z6H' <any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
    .method public rtspecialname specialname instance void .ctor(!0,!1,!2,!3,!4,!5) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld2
-       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld3
-       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld4
-       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z5H<!0,!1,!2,!3,!4,!5>::fld5
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld2
+       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld3
+       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld4
+       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5>::fld5
        ret 
     }
    .field public !0 fld0
@@ -567,15 +568,15 @@ end:
    .field public !5 fld5
 }
 
-.class value sealed 'PrelGHC_Z6H' <any,any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z7H' <any,any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
    .method public rtspecialname specialname instance void .ctor(!0,!1,!2,!3,!4,!5,!6) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld2
-       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld3
-       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld4
-       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld5
-       ldarg 0 ldarg 7 stfld !6 class PrelGHC_Z6H<!0,!1,!2,!3,!4,!5,!6>::fld6
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld2
+       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld3
+       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld4
+       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld5
+       ldarg 0 ldarg 7 stfld !6 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6>::fld6
        ret 
     }
    .field public !0 fld0
@@ -587,16 +588,16 @@ end:
    .field public !6 fld6
 }
 
-.class value sealed 'PrelGHC_Z7H' <any,any,any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
+.class value sealed 'PrelGHC_Z8H' <any,any,any,any,any,any,any,any>  extends ['mscorlib']System.ValueType { 
    .method public rtspecialname specialname instance void .ctor(!0,!1,!2,!3,!4,!5,!6,!7) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld0
-       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld1
-       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld2
-       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld3
-       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld4
-       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld5
-       ldarg 0 ldarg 7 stfld !6 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld6
-       ldarg 0 ldarg 8 stfld !7 class PrelGHC_Z7H<!0,!1,!2,!3,!4,!5,!6,!7>::fld7
+       ldarg 0 ldarg 1 stfld !0 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld0
+       ldarg 0 ldarg 2 stfld !1 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld1
+       ldarg 0 ldarg 3 stfld !2 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld2
+       ldarg 0 ldarg 4 stfld !3 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld3
+       ldarg 0 ldarg 5 stfld !4 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld4
+       ldarg 0 ldarg 6 stfld !5 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld5
+       ldarg 0 ldarg 7 stfld !6 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld6
+       ldarg 0 ldarg 8 stfld !7 class PrelGHC_Z8H<!0,!1,!2,!3,!4,!5,!6,!7>::fld7
        ret 
     }
    .field public !0 fld0
