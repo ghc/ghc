@@ -1750,10 +1750,10 @@ opts =
   
 
       ------- version ----------------------------------------------------
-  ,  ( "-version"	 , NoArg (do hPutStrLn stderr (cProjectName
+  ,  ( "-version"	 , NoArg (do hPutStrLn stdout (cProjectName
 				      ++ ", version " ++ version_str)
 				     exitWith ExitSuccess))
-  ,  ( "-numeric-version", NoArg (do hPutStrLn stderr version_str
+  ,  ( "-numeric-version", NoArg (do hPutStrLn stdout version_str
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
