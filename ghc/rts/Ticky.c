@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.7 1999/05/11 16:49:44 keithw Exp $
+ * $Id: Ticky.c,v 1.8 1999/06/24 13:10:32 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -272,9 +272,7 @@ PrintTickyInfo(void)
   fprintf(tf,"\nTotal bytes copied during GC: %ld\n",
 	  GC_WORDS_COPIED_ctr * sizeof(W_));
 
-#if 0
   printRegisteredCounterInfo(tf);
-#endif
 
   fprintf(tf,"\n**************************************************\n");
 
@@ -534,10 +532,9 @@ PrintTickyInfo(void)
   PR_CTR(GC_WORDS_COPIED_ctr);
 }
 
-#if 0
 /* Data structure used in ``registering'' one of these counters. */
 
-struct ent_counter *ListOfEntryCtrs = NULL; /* root of list of them */
+struct ent_counter *ticky_entry_ctrs = NULL; /* root of list of them */
 
 /* To print out all the registered-counter info: */
 
@@ -546,31 +543,22 @@ printRegisteredCounterInfo (FILE *tf)
 {
     struct ent_counter *p;
 
-    if ( ListOfEntryCtrs != NULL ) {
+    if ( ticky_entry_ctrs != NULL ) {
     	fprintf(tf,"\n**************************************************\n");
     }
 
-    for (p = ListOfEntryCtrs; p != NULL; p = p->link) {
-	/* common stuff first; then the wrapper info if avail */
-	fprintf(tf, "%-40s%u\t%u\t%u\t%-16s%ld",
+    for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
+	fprintf(tf, "%-40s%u\t%u\t%-16s%ld",
 		p->f_str,
 		p->arity,
-		p->Astk_args,
-		p->Bstk_args,
+		p->stk_args,
 		p->f_arg_kinds,
 		p->ctr);
 
-	if ( p->wrap_str == NULL ) {
-	    fprintf(tf, "\n");
+	fprintf(tf, "\n");
 
-	} else {
-	    fprintf(tf, "\t%s\t%s\n",
-		p->wrap_str,
-		p->wrap_arg_kinds);
-	}
     }
 }
-#endif
 
 #endif /* TICKY_TICKY */
 

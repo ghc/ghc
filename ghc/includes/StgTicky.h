@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.4 1999/05/11 16:47:42 keithw Exp $
+ * $Id: StgTicky.h,v 1.5 1999/06/24 13:10:31 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -126,7 +126,37 @@
 
 #define TICK_ENT_THK()		ENT_THK_ctr++         /* thunk */
 #define TICK_ENT_FUN_STD()	ENT_FUN_STD_ctr++     /* std entry pt */
-#define TICK_ENT_FUN_DIRECT(n) 	ENT_FUN_DIRECT_ctr++  /* fast entry pt */
+
+struct ent_counter {
+    unsigned	registeredp:16,	/* 0 == no, 1 == yes */
+    		arity:16,	/* arity (static info) */
+    		stk_args:16;	/* # of args off stack */
+				/* (rest of args are in registers) */
+    StgChar	*f_str;		/* name of the thing */
+    StgChar	*f_arg_kinds;	/* info about the args types */
+    I_		ctr;		/* the actual counter */
+    struct ent_counter *link;	/* link to chain them all together */
+};
+
+#define TICK_ENT_FUN_DIRECT(f_ct, f_str, f_arity, f_args, f_arg_kinds) \
+	{							\
+	static struct ent_counter f_ct				\
+	  = { 0,						\
+	      (f_arity), (f_args), (f_str), (f_arg_kinds),	\
+	      0, NULL };					\
+	if ( ! f_ct.registeredp ) {				\
+	    /* hook this one onto the front of the list */	\
+	    f_ct.link = ticky_entry_ctrs;			\
+	    ticky_entry_ctrs = & (f_ct);			\
+								\
+	    /* mark it as "registered" */			\
+	    f_ct.registeredp = 1;				\
+	}							\
+	f_ct.ctr += 1;						\
+	}							\
+	ENT_FUN_DIRECT_ctr++ /* the old boring one */
+
+extern struct ent_counter *ticky_entry_ctrs;
 
 #define TICK_ENT_CON(n)		ENT_CON_ctr++	      /* enter constructor */
 #define TICK_ENT_IND(n)		ENT_IND_ctr++	      /* enter indirection */
