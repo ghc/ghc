@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.9 2002/02/22 22:20:25 panne Exp $
+# $Id: package.mk,v 1.10 2002/04/12 03:52:31 sof Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -91,7 +91,7 @@ endif
 # Dependencies
 
 MKDEPENDHS = $(GHC_INPLACE)
-SRC_MKDEPENDC_OPTS += $(patsubst %,-I%,$(ALL_DIRS)) -I$(GHC_INCLUDE_DIR)
+SRC_MKDEPENDC_OPTS += $(addprefix -I,$(ALL_DIRS)) -I$(GHC_INCLUDE_DIR)
 
 endif # $(PACKAGE) /= ""
 
