@@ -44,7 +44,7 @@ import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import Maybes		( orElse )
 import ListSetOps	( assoc )
-import Util		( zipEqual, zipWithEqual, equalLength, notNull )
+import Util		( zipEqual, zipWithEqual, notNull )
 \end{code}
 
 

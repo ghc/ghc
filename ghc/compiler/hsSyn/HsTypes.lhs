@@ -38,7 +38,7 @@ import TcType		( Type, Kind, ThetaType, SourceType(..),
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, isNewTyCon, getSynTyConDefn )
-import RdrName		( RdrName, mkUnqual )
+import RdrName		( mkUnqual )
 import Name		( Name, getName, mkInternalName )
 import OccName		( NameSpace, mkVarOcc, tvName )
 import Var		( TyVar, tyVarKind )

@@ -23,7 +23,7 @@ import DsMonad
 import DsMeta		( dsBracket, dsReify )
 #endif
 
-import HsSyn		( HsExpr(..), Pat(..), HsLit(..), ArithSeqInfo(..),
+import HsSyn		( HsExpr(..), Pat(..), ArithSeqInfo(..),
 			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
 			  Match(..), HsBinds(..), MonoBinds(..), HsConDetails(..),
 			  mkSimpleMatch, isDoExpr
@@ -40,7 +40,6 @@ import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
 			  mkAppTy )
 import Type		( splitFunTys )
 import CoreSyn
-import Literal		( Literal(..) )
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import FieldLabel	( FieldLabel, fieldLabelTyCon )
