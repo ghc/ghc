@@ -1077,3 +1077,9 @@
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
+
+/* Define if <unistd.h> defines _SC_GETGR_R_SIZE_MAX */
+#undef HAVE_SC_GETGR_R_SIZE_MAX
+
+/* Define if <unistd.h> defines _SC_GETPW_R_SIZE_MAX */
+#undef HAVE_SC_GETPW_R_SIZE_MAX
