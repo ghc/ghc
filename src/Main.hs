@@ -443,8 +443,8 @@ mkInterface no_implicit_prelude verbose mod_map filename package
 
   when (not (null name_strings)) $
 	  tell ["Warning: " ++ show mdl ++ 
-		": the following names could not be resolved:\n\ 
-		\   " ++ concat (map (' ':) name_strings)
+		": the following names could not be resolved:\n"++
+		"   " ++ concat (map (' ':) name_strings)
 		]
 
   return (mdl, Interface { 
