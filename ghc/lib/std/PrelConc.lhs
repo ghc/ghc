@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelConc.lhs,v 1.21 2000/10/02 11:06:19 simonmar Exp $
+% $Id: PrelConc.lhs,v 1.22 2001/02/13 15:23:33 rrt Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -78,7 +78,7 @@ yield :: IO ()
 yield = IO $ \s -> 
    case (yield# s) of s1 -> (# s1, () #)
 
--- "seq" is defined a bit wierdly (see below)
+-- "seq" is defined a bit weirdly (see below)
 --
 -- The reason for the strange "0# -> parError" case is that
 -- it fools the compiler into thinking that seq is non-strict in

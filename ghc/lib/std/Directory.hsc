@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.4 2001/01/15 20:55:14 qrczak Exp $
+-- $Id: Directory.hsc,v 1.5 2001/02/13 15:23:33 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -207,7 +207,7 @@ removeFile path = do
       throwErrnoIfMinus1Retry_ "removeFile" (unlink s)
 
 {-
-@renameDirectory old@ {\em new} changes the name of an existing
+@renameDirectory@ {\em old} {\em new} changes the name of an existing
 directory from {\em old} to {\em new}.  If the {\em new} directory
 already exists, it is atomically replaced by the {\em old} directory.
 If the {\em new} directory is neither the {\em old} directory nor an
