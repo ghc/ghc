@@ -44,7 +44,8 @@ This should be a stable release.  Major changes since 4.08.2 are:
      Combinations of compiled and interpreted modules may be used.
      All the GHC libraries are available in interactive mode, as are
      most of the Glasgow extensions to Haskell 98.  Compilation in
-     interactive mode is fast enough to be useful.
+     interactive mode (to bytecode) is about three times faster than
+     compiling to object code.
 
    - Batch compilation of multiple modules at once, with automatic
      dependency chasing.  For large programs this can halve compilation
@@ -64,10 +65,11 @@ This should be a stable release.  Major changes since 4.08.2 are:
    - Support for the latest Foreign Function Interface (FFI)
      proposals.  Marcin Kowalczyk's hsc2hs tool is included.
 
-   - A language extension: parallel list comprehensions.
+   - Language extensions: parallel list comprehensions and functional
+     dependencies.
 
-   - The usual vast stack of bug fixes.  Most reported bugs have been
-     fixed.
+   - The usual huge collection of bug fixes.  Most reported bugs have
+     been fixed.
 
 For full details see the release notes:
 

@@ -54,6 +54,10 @@
 	linkend="parallel-list-comprehensions">.</para>
       </listitem>
       <listitem>
+	<para>Functional dependencies are now fully implemented.
+	</para>
+      </listitem>
+      <listitem>
 	<para>Profiling: please use 
               <literal>{-# SCC ".." #-}</literal> 
               rather than <literal>_scc_ "..."</literal>.  The latter
