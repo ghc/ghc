@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.20 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: TSO.h,v 1.21 2001/04/02 07:24:12 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -267,7 +267,7 @@ typedef struct StgTSO_ {
 extern StgTSO dummy_tso;
 
 #define TSO_STRUCT_SIZE \
-   ((int)&(dummy_tso).stack - (int)&(dummy_tso).header)
+   ((char *)&dummy_tso.stack - (char *)&dummy_tso.header)
 
 #define TSO_STRUCT_SIZEW (TSO_STRUCT_SIZE / sizeof(W_))
 
