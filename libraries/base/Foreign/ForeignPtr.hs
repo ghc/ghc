@@ -73,7 +73,7 @@ import GHC.ForeignPtr
 import Foreign.Marshal.Alloc	( malloc, mallocBytes, finalizerFree )
 import Data.Dynamic
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
 instance Eq (ForeignPtr a) where 

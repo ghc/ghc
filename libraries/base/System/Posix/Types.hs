@@ -62,7 +62,7 @@ import GHC.Show
 import Control.Monad
 #endif
 
-#include "Dynamic.h"
+#include "Typeable.h"
 #include "CTypes.h"
 
 NUMERIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)

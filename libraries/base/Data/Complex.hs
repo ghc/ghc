@@ -95,7 +95,7 @@ phase (x:+y)	 = atan2 y x
 -- Instances of Complex
 
 #ifndef __NHC__
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(Complex,complexTc,"Complex")
 #endif
 

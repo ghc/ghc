@@ -78,7 +78,7 @@ import Control.Monad
 import Foreign.Ptr
 #endif
 
-#include "Dynamic.h"
+#include "Typeable.h"
 #include "CTypes.h"
 
 INTEGRAL_TYPE(CChar,tyConCChar,"CChar",HTYPE_CHAR)

@@ -69,7 +69,7 @@ instance Ord (ForeignPtr a) where
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
 -- |A Finaliser is represented as a pointer to a foreign function that, at

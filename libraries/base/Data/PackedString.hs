@@ -94,7 +94,7 @@ instance Ord PackedString where
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE0(PackedString,packedStringTc,"PackedString")
 
 -- -----------------------------------------------------------------------------

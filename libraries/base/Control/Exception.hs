@@ -124,7 +124,7 @@ import System.IO.Error	hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
 INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")

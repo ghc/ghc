@@ -110,5 +110,5 @@ instance Eq (StableName a) where
 
 #endif /* __GLASGOW_HASKELL__ */
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(StableName,stableNameTc,"StableName")

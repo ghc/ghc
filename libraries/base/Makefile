@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.44 2003/07/23 15:39:54 simonmar Exp $
+# $Id: Makefile,v 1.45 2003/07/24 12:19:57 ralf Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -14,6 +14,7 @@ ALL_DIRS = \
 	Control/Monad \
 	Control/Monad/ST \
 	Data \
+	Data/Generics \
 	Data/Array \
 	Data/Array/IO \
 	Data/STRef \

@@ -64,6 +64,6 @@ import Array		-- Haskell'98 arrays
 #endif
 
 #ifndef __NHC__
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
 #endif

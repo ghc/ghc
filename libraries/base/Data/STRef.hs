@@ -34,7 +34,7 @@ import Hugs.ST
 
 import Data.Dynamic
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 
 -- |Mutate the contents of an 'STRef'

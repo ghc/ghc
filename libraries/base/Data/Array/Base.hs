@@ -49,7 +49,7 @@ import Hugs.ByteArray
 #endif
 
 import Data.Dynamic
-#include "Dynamic.h"
+#include "Typeable.h"
 
 #include "MachDeps.h"
 

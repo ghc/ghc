@@ -119,7 +119,7 @@ addFinalizer key finalizer = do
 mkWeakPair :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
 mkWeakPair key val finalizer = mkWeak key (key,val) finalizer
 
-#include "Dynamic.h"
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 
 {- $precise
