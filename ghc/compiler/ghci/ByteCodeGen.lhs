@@ -1109,13 +1109,13 @@ pushAtom d p (AnnVar v)
 
 pushAtom d p (AnnLit lit)
    = case lit of
-        MachLabel fs -> code CodePtrRep
-        MachWord w   -> code WordRep
-        MachInt i    -> code IntRep
-        MachFloat r  -> code FloatRep
-        MachDouble r -> code DoubleRep
-        MachChar c   -> code CharRep
-        MachStr s    -> pushStr s
+        MachLabel fs _ -> code CodePtrRep
+        MachWord w     -> code WordRep
+        MachInt i      -> code IntRep
+        MachFloat r    -> code FloatRep
+        MachDouble r   -> code DoubleRep
+        MachChar c     -> code CharRep
+        MachStr s      -> pushStr s
      where
         code rep
            = let size_host_words = getPrimRepSize rep

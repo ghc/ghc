@@ -117,6 +117,11 @@ data Literal
 	-- string argument is the name of a symbol.  This literal
 	-- refers to the *address* of the label.
   | MachLabel   FastString		-- always an Addr#
+  		(Maybe Int)             -- the size (in bytes) of the arguments
+					-- the label expects. Only applicable with
+					-- 'stdcall' labels.
+					-- Just x => "@<x>" will be appended to label
+					--           name when emitting asm.
 
 	-- lit-lits only work for via-C compilation, hence they
 	-- are deprecated.  The string is emitted verbatim into
@@ -139,7 +144,7 @@ instance Binary Literal where
     put_ bh (MachWord64 ag)   = do putByte bh 6; put_ bh ag
     put_ bh (MachFloat ah)    = do putByte bh 7; put_ bh ah
     put_ bh (MachDouble ai)   = do putByte bh 8; put_ bh ai
-    put_ bh (MachLabel aj)    = do putByte bh 9; put_ bh aj
+    put_ bh (MachLabel aj mb) = do putByte bh 9; put_ bh aj ; put_ bh mb
     put_ bh (MachLitLit ak _) = do putByte bh 10; put_ bh ak
     get bh = do
 	    h <- getByte bh
@@ -173,7 +178,8 @@ instance Binary Literal where
 		    return (MachDouble ai)
 	      9 -> do
 		    aj <- get bh
-		    return (MachLabel aj)
+		    mb <- get bh
+		    return (MachLabel aj mb)
 	      10 -> do
 		    ak <- get bh
 		    return (MachLitLit ak (error "MachLitLit: no type"))
@@ -319,7 +325,7 @@ literalType (MachInt64  _)	  = int64PrimTy
 literalType (MachWord64  _)	  = word64PrimTy
 literalType (MachFloat _)	  = floatPrimTy
 literalType (MachDouble _)	  = doublePrimTy
-literalType (MachLabel _)	  = addrPrimTy
+literalType (MachLabel _ _)	  = addrPrimTy
 literalType (MachLitLit _ ty)	  = ty
 \end{code}
 
@@ -335,7 +341,7 @@ literalPrimRep (MachInt64 _)	  = Int64Rep
 literalPrimRep (MachWord64 _)	  = Word64Rep
 literalPrimRep (MachFloat _)	  = FloatRep
 literalPrimRep (MachDouble _)	  = DoubleRep
-literalPrimRep (MachLabel _)	  = AddrRep
+literalPrimRep (MachLabel _ _)	  = AddrRep
 literalPrimRep (MachLitLit _ ty)  = typePrimRep ty
 \end{code}
 
@@ -352,7 +358,7 @@ cmpLit (MachInt64     a)   (MachInt64	   b)   = a `compare` b
 cmpLit (MachWord64    a)   (MachWord64	   b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
-cmpLit (MachLabel     a)   (MachLabel      b)   = a `compare` b
+cmpLit (MachLabel     a _) (MachLabel      b _) = a `compare` b
 cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `tcCmpType` d)
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		       = GT
@@ -366,8 +372,8 @@ litTag (MachInt64     _)   = _ILIT(6)
 litTag (MachWord64    _)   = _ILIT(7)
 litTag (MachFloat     _)   = _ILIT(8)
 litTag (MachDouble    _)   = _ILIT(9)
-litTag (MachLabel     _)   = _ILIT(10)
-litTag (MachLitLit    _ _) = _ILIT(11)
+litTag (MachLabel   _ _)   = _ILIT(10)
+litTag (MachLitLit  _ _)   = _ILIT(11)
 \end{code}
 
 	Printing
@@ -413,8 +419,12 @@ pprLit lit
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
 
-      MachLabel l | code_style -> ptext SLIT("(&") <> ftext l <> char ')'
-		  | otherwise  -> ptext SLIT("__label") <+> pprHsString l
+      MachLabel l mb
+         | code_style -> ptext SLIT("(&") <> ftext l <> char ')'
+	 | otherwise  -> ptext SLIT("__label") <+> 
+	     case mb of
+	       Nothing -> pprHsString l
+	       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
       MachLitLit s ty | code_style  -> ftext s
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
@@ -465,7 +475,7 @@ hashLiteral (MachWord i)   	= hashInteger i
 hashLiteral (MachWord64 i) 	= hashInteger i
 hashLiteral (MachFloat r)   	= hashRational r
 hashLiteral (MachDouble r)  	= hashRational r
-hashLiteral (MachLabel s)       = hashFS s
+hashLiteral (MachLabel s _)     = hashFS s
 hashLiteral (MachLitLit s _)    = hashFS s
 
 hashRational :: Rational -> Int

@@ -113,14 +113,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
-    checkCg (if cconv == StdCallConv
-		then checkC
-		else checkCOrAsmOrInterp)		`thenM_`
-	-- the native code gen can't handle foreign import stdcall "wrapper",
-	-- because it doesn't emit the '@n' suffix on the label of the
-	-- C stub function.  Infrastructure changes are required to make this
-	-- happen; MachLabel will need to carry around information about
-	-- the arity of the foreign call.
+    checkCg checkCOrAsmOrInterp `thenM_`
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenM_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenM_`

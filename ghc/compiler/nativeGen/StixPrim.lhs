@@ -29,6 +29,7 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
 			  CCallConv(..), playSafe, playThreadSafe )
 import Outputable
 import Util             ( notNull )
+import FastString
 import FastTypes
 
 #include "NCG.h"
@@ -187,7 +188,9 @@ amodeToStix (CLit core)
       MachInt i      -> StInt i
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
       MachLitLit s _ -> litLitErr
-      MachLabel l    -> StCLbl (mkForeignLabel l False{-ToDo: dynamic-})
+                                                       -- dreadful, but rare.
+      MachLabel l (Just x) -> StCLbl (mkForeignLabel (mkFastString (unpackFS l ++ '@':show x)) False)
+      MachLabel l _        -> StCLbl (mkForeignLabel l False{-ToDo: dynamic-})
       MachFloat d    -> StFloat d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"

@@ -24,7 +24,7 @@ import Literal		( Literal(..) )
 import Module		( moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
-import Type		( repType, eqType )
+import Type		( repType, eqType, typePrimRep )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, 
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
@@ -39,7 +39,8 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			)
 import CStrings		( CLabelString )
 import TysWiredIn	( unitTy, stablePtrTyCon )
-import TysPrim		( addrPrimTy )
+import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
+import PrimRep          ( getPrimRepSizeInBytes )
 import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName )
 import BasicTypes	( Activation( NeverActive ) )
 import Outputable
@@ -84,7 +85,7 @@ dsForeigns fos
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) depr loc)
     = dsFExport id (idType id) 
-		ext_nm cconv False                 `thenDs` \(h, c) ->
+		ext_nm cconv False                 `thenDs` \(h, c, _) ->
       warnDepr depr loc				   `thenDs` \_              ->
       returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
 		acc_f)
@@ -153,7 +154,7 @@ dsCImport id (CLabel cid) _ _ no_hdrs
    returnDs ([(setImpInline no_hdrs id, rhs)], empty, empty)
  where
    (resTy, foRhs) = resultWrapper (idType id)
-   rhs		  = foRhs (mkLit (MachLabel cid))
+   rhs		  = foRhs (mkLit (MachLabel cid Nothing))
 dsCImport id (CFunction target) cconv safety no_hdrs
   = dsFCall id (CCall (CCallSpec target cconv safety)) no_hdrs
 dsCImport id CWrapper cconv _ _
@@ -256,6 +257,7 @@ dsFExport :: Id			-- Either the exported Id,
 				-- 	   the first argument's stable pointer
 	  -> DsM ( SDoc		-- contents of Module_stub.h
 		 , SDoc		-- contents of Module_stub.c
+		 , [Type]       -- arguments expected by stub function.
 		 )
 
 dsFExport fn_id ty ext_name cconv isDyn
@@ -285,13 +287,10 @@ dsFExport fn_id ty ext_name cconv isDyn
      )
 					`thenDs` \ (res_ty,		-- t
 						    is_IO_res_ty) ->	-- Bool
-     let
-      	(h_stub, c_stub) 
-           = mkFExportCBits ext_name 
-                            (if isDyn then Nothing else Just fn_id)
-                            fe_arg_tys res_ty is_IO_res_ty cconv
-     in
-     returnDs (h_stub, c_stub)
+     returnDs $
+       mkFExportCBits ext_name 
+                      (if isDyn then Nothing else Just fn_id)
+                      fe_arg_tys res_ty is_IO_res_ty cconv
 \end{code}
 
 @foreign export dynamic@ lets you dress up Haskell IO actions
@@ -327,7 +326,7 @@ dsFExportDynamic id cconv
         -- hack: need to get at the name of the C stub we're about to generate.
        fe_nm	   = mkFastString (moduleString mod_name ++ "_" ++ toCName fe_id)
      in
-     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
+     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code, stub_args) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
      dsLookupGlobalId newStablePtrName	`thenDs` \ newStablePtrId ->
      let
@@ -353,11 +352,16 @@ dsFExportDynamic id cconv
        -}
       adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
 		      , Var stbl_value
-		      , mkLit (MachLabel fe_nm)
+		      , mkLit (MachLabel fe_nm mb_sz_args)
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
       adjustor	    = FSLIT("createAdjustor")
+      
+      mb_sz_args =
+        case cconv of
+	  StdCallConv -> Just (sum (map (getPrimRepSizeInBytes . typePrimRep) stub_args))
+	  _ -> Nothing
      in
      dsCCall adjustor adj_args PlayRisky False io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -403,9 +407,9 @@ mkFExportCBits :: FastString
 	       -> Type 
                -> Bool		-- True <=> returns an IO type
 	       -> CCallConv 
-	       -> (SDoc, SDoc)
+	       -> (SDoc, SDoc, [Type])
 mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
- = (header_bits, c_bits)
+ = (header_bits, c_bits, all_arg_tys)
  where
   -- Create up types and names for the real args
   arg_cnames, arg_ctys :: [SDoc]
@@ -414,18 +418,21 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   -- and also for auxiliary ones; the stable ptr in the dynamic case, and
   -- a slot for the dummy return address in the dynamic + ccall case
-  extra_cnames_and_ctys
+  extra_cnames_and_tys
      = case maybe_target of
-          Nothing -> [(text "the_stableptr", text "StgStablePtr")]
+          Nothing -> [((text "the_stableptr", text "StgStablePtr"), mkStablePtrPrimTy alphaTy)]
           other   -> []
        ++
        case (maybe_target, cc) of
-          (Nothing, CCallConv) -> [(text "original_return_addr", text "void*")]
+          (Nothing, CCallConv) -> [((text "original_return_addr", text "void*"), addrPrimTy)]
           other                -> []
 
   all_cnames_and_ctys :: [(SDoc, SDoc)]
   all_cnames_and_ctys 
-     = extra_cnames_and_ctys ++ zip arg_cnames arg_ctys
+     = map fst extra_cnames_and_tys ++ zip arg_cnames arg_ctys
+
+  all_arg_tys
+     = map snd extra_cnames_and_tys ++ arg_htys
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `eqType` unitTy	-- Look through any newtypes

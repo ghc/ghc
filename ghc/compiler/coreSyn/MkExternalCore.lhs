@@ -135,7 +135,7 @@ make_exp (Var v) =
     FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (varType v))
     FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
-make_exp (Lit (l@(MachLabel s))) = C.External (unpackFS s) (make_ty (literalType l))
+make_exp (Lit (l@(MachLabel s _))) = C.External (unpackFS s) (make_ty (literalType l))
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)

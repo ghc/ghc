@@ -343,15 +343,15 @@ mkBits findLabel st proto_insns
           = do st_I1 <- addToSS st_I0 (getName dcon)
                return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
 
-       literal st (MachLabel fs)  = litlabel st fs
-       literal st (MachWord w)    = int st (fromIntegral w)
-       literal st (MachInt j)     = int st (fromIntegral j)
-       literal st (MachFloat r)   = float st (fromRational r)
-       literal st (MachDouble r)  = double st (fromRational r)
-       literal st (MachChar c)    = int st c
-       literal st (MachInt64 ii)  = int64 st (fromIntegral ii)
-       literal st (MachWord64 ii) = int64 st (fromIntegral ii)
-       literal st other           = pprPanic "ByteCodeLink.literal" (ppr other)
+       literal st (MachLabel fs _) = litlabel st fs
+       literal st (MachWord w)     = int st (fromIntegral w)
+       literal st (MachInt j)      = int st (fromIntegral j)
+       literal st (MachFloat r)    = float st (fromRational r)
+       literal st (MachDouble r)   = double st (fromRational r)
+       literal st (MachChar c)     = int st c
+       literal st (MachInt64 ii)   = int64 st (fromIntegral ii)
+       literal st (MachWord64 ii)  = int64 st (fromIntegral ii)
+       literal st other            = pprPanic "ByteCodeLink.literal" (ppr other)
 
 
 push_alts WordRep   = bci_PUSH_ALTS_N
