@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.7 2002/08/21 12:58:56 simonmar Exp $
+-- $Id: Main.hs,v 1.8 2002/09/18 12:36:39 simonmar Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -99,6 +99,7 @@ per_prog_result_tab =
 	, SpecP	"Instructions" "instrs" instrs run_status always_ok
 	, SpecP	"Memory Reads" "mem-reads" mem_reads run_status always_ok
 	, SpecP	"Memory Writes" "mem-writes" mem_writes run_status always_ok
+	, SpecP	"Cache Misses" "cache-misses" cache_misses run_status always_ok
 	]
 
 per_module_result_tab =

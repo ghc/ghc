@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Slurp.hs,v 1.3 2002/02/28 18:50:42 keithw Exp $
+-- $Id: Slurp.hs,v 1.4 2002/09/18 12:36:40 simonmar Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -35,6 +35,7 @@ data Results = Results {
 	instrs          :: Maybe Integer,
 	mem_reads       :: Maybe Integer,
 	mem_writes      :: Maybe Integer,
+	cache_misses    :: Maybe Integer,
 	gc_work        	:: Maybe Integer,
 	gc_time        	:: Maybe Float,
 	allocs         	:: Maybe Integer,
@@ -52,6 +53,7 @@ emptyResults = Results {
 	instrs          = Nothing,
 	mem_reads       = Nothing,
 	mem_writes      = Nothing,
+	cache_misses    = Nothing,
 	gc_time        	= Nothing,
 	gc_work        	= Nothing,
 	allocs	       	= Nothing,
@@ -104,7 +106,7 @@ ghc2_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t
 
 ghc3_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
 
-ghc4_re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes :ghc-instrs>>"
+ghc4_re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes, ([0-9]+) L2 cache misses :ghc-instrs>>"
 
 wrong_exit_status = mkRegex "^\\**[ \t]*expected exit status ([0-9]+) not seen ; got ([0-9]+)"
 
@@ -131,6 +133,7 @@ combine_results = foldr f emptyFM
 		      module_size = ms1,
 		      run_time = rt1, mut_time = mt1, 
 		      instrs = is1, mem_reads = mr1, mem_writes = mw1,
+		      cache_misses = cm1,
 		      gc_time = gt1, gc_work = gw1,
 		      binary_size = bs1, allocs = al1, 
 		      run_status = rs1, compile_status = cs1 }
@@ -138,6 +141,7 @@ combine_results = foldr f emptyFM
 		      module_size = ms2,
 		      run_time = rt2, mut_time = mt2,
 		      instrs = is2, mem_reads = mr2, mem_writes = mw2,
+		      cache_misses = cm2,
 		      gc_time = gt2, gc_work = gw2,
 		      binary_size = bs2, allocs = al2, 
 		      run_status = rs2, compile_status = cs2 }
@@ -149,6 +153,7 @@ combine_results = foldr f emptyFM
 		      instrs         = combMaybes is1 is2,
 		      mem_reads      = combMaybes mr1 mr2,
 		      mem_writes     = combMaybes mw1 mw2,
+		      cache_misses   = combMaybes cm1 cm2,
 		      gc_time        = combMaybes gt1 gt2,
 		      gc_work        = combMaybes gw1 gw2,
 		      binary_size    = combMaybes bs1 bs2,
@@ -306,7 +311,7 @@ parse_run_time prog (l:ls) ex =
 	    Nothing ->
 	
 	case matchRegex ghc4_re l of {
-	   Just (allocs:_:_:_:_:gc_work:_:init:_:mut:_:gc:_:is:mem_rs:mem_ws:_) ->
+	   Just (allocs:_:_:_:_:gc_work:_:init:_:mut:_:gc:_:is:mem_rs:mem_ws:cache_misses:_) ->
 	      let 
 		  read_mut = read mut
 		  read_gc  = read gc
@@ -318,8 +323,9 @@ parse_run_time prog (l:ls) ex =
 				  gc_work    = Just read_gc_work,
 				  gc_time    = Just read_gc,
 				  instrs     = Just (read is),
-				  mem_writes = Just (read mem_ws),
 				  mem_reads  = Just (read mem_rs),
+				  mem_writes = Just (read mem_ws),
+				  cache_misses = Just (read cache_misses),
 				  allocs     = Just (read allocs),
 				  run_status = Success })];
 	    Nothing ->
