@@ -101,7 +101,7 @@ stronglyConnComp edges0
 -- | The strongly connected components of a directed graph, topologically
 -- sorted.  The function is the same as 'stronglyConnComp', except that
 -- all the information about each node retained.
--- The "R" interface is used when you expect to apply 'SCC' to
+-- This interface is used when you expect to apply 'SCC' to
 -- (some of) the result of 'SCC', so you don't want to lose the
 -- dependency information.
 stronglyConnCompR
