@@ -792,7 +792,8 @@ array.
 </para>
 
 <para>
-Immutable byte arrays are straightforward to index (all indices in bytes):
+Immutable byte arrays are straightforward to index (all indices are in
+units of the size of the object being read):
 
 <programlisting>
 indexCharArray#   :: ByteArray# -> Int# -> Char#
