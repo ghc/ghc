@@ -189,7 +189,6 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- RENAME
  	    -------------------
-        ; showPass dflags "Rename"
 	; (pcs_rn, maybe_rn_result) 
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
@@ -199,7 +198,6 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
-        ; showPass dflags "Typecheck"
 	; maybe_tc_result <- typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
@@ -341,7 +339,6 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
 
 dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
  = do --------------------------  Desugaring ----------------
-      showPass dflags "DeSugar"
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
          <- deSugar dflags pcs hst this_mod print_unqual tc_result
@@ -352,7 +349,6 @@ dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
          <- core2core dflags pcs hst is_exported desugared rules
 
       -- Do the final tidy-up
-      showPass dflags "TidyCore"
       (tidy_binds, tidy_orphan_rules) 
          <- tidyCorePgm dflags this_mod simplified orphan_rules
       
