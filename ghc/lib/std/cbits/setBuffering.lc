@@ -104,7 +104,7 @@ StgInt size;
 	      return -1;
 	   }
         }
-	size = sb->st_blksize;
+	size = sb.st_blksize;
 #else
 	size = BUFSIZ;
 #endif
