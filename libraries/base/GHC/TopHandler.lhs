@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: TopHandler.lhs,v 1.5 2002/02/11 12:28:57 simonmar Exp $
+-- $Id: TopHandler.lhs,v 1.6 2002/03/11 14:53:51 simonmar Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -77,19 +77,19 @@ reportError bombOut str = do
         else return ()
 
 #ifndef ILX
-foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
+foreign import ccall "&ErrorHdrHook" errorHdrHook :: Ptr ()
 #else
-foreign import "ErrorHdrHook" errorHdrHook :: Ptr ()
+foreign import ccall "ErrorHdrHook" errorHdrHook :: Ptr ()
 #endif
 
-foreign import ccall "writeErrString__" unsafe
+foreign import ccall unsafe "writeErrString__"
 	writeErrString :: Ptr () -> CString -> Int -> IO ()
 
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
-foreign import ccall "stackOverflow" unsafe
+foreign import ccall unsafe "stackOverflow"
 	callStackOverflowHook :: IO ()
 
-foreign import ccall "stg_exit" unsafe
+foreign import ccall unsafe "stg_exit"
 	stg_exit :: Int -> IO ()
 \end{code}
