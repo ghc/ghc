@@ -470,6 +470,29 @@ f0  = RealReg (fReg 0)
 f1  = RealReg (fReg 1)
 
 #endif
+
+-------------------------------
+callClobberedRegs :: [Reg]
+callClobberedRegs
+  =
+#if alpha_TARGET_ARCH
+    [0, 1, 2, 3, 4, 5, 6, 7, 8,
+     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+     fReg 0, fReg 1, fReg 10, fReg 11, fReg 12, fReg 13, fReg 14, fReg 15,
+     fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21, fReg 22, fReg 23,
+     fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
+#endif {- alpha_TARGET_ARCH -}
+#if i386_TARGET_ARCH
+    -- caller-saves registers
+    [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
+#endif {- i386_TARGET_ARCH -}
+#if sparc_TARGET_ARCH
+    map RealReg 
+        ( oReg 7 :
+          [oReg i | i <- [0..5]] ++
+          [gReg i | i <- [1..7]] ++
+          [fReg i | i <- [0..31]] )
+#endif {- sparc_TARGET_ARCH -}
 \end{code}
 
 Redefine the literals used for machine-registers with non-numeric
@@ -810,30 +833,6 @@ allocatableRegs
    = let isFree (RealReg (I# i)) = _IS_TRUE_(freeReg i)
      in  filter isFree (map RealReg allMachRegNos)
 
-
--------------------------------
-callClobberedRegs :: [Reg]
-callClobberedRegs
-  =
-#if alpha_TARGET_ARCH
-    [0, 1, 2, 3, 4, 5, 6, 7, 8,
-     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-     fReg 0, fReg 1, fReg 10, fReg 11, fReg 12, fReg 13, fReg 14, fReg 15,
-     fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21, fReg 22, fReg 23,
-     fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
-#endif {- alpha_TARGET_ARCH -}
-#if i386_TARGET_ARCH
-    -- caller-saves registers
-    [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
-#endif {- i386_TARGET_ARCH -}
-#if sparc_TARGET_ARCH
-    map RealReg 
-        ( oReg 7 :
-          [oReg i | i <- [0..5]] ++
-          [gReg i | i <- [1..7]] ++
-          [fReg i | i <- [0..31]] )
-#endif {- sparc_TARGET_ARCH -}
-
 -------------------------------
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
@@ -881,7 +880,7 @@ allArgRegs :: [Reg]
 allArgRegs = map RealReg [oReg i | i <- [0..5]]
 #endif {- sparc_TARGET_ARCH -}
 
-#if linux_TARGET_ARCH
+#if i386_TARGET_ARCH
 allArgRegs :: [Reg]
 allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 #endif
