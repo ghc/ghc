@@ -1403,6 +1403,8 @@ esac
 AC_SUBST(LdCmd)
 FPTOOLS_LD_X
 
+FP_EMPTY_STRUCTS
+
 AC_MSG_CHECKING([for SIGPOLL])
 AC_EGREP_CPP(we_have_sigpoll,
 [#include <signal.h>

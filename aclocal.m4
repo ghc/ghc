@@ -1109,4 +1109,22 @@ dnl and we don't want to be global namespace polluters.
   AC_LANG_RESTORE
 ])
 
+
+dnl @synopsis FP_EMPTY_STRUCTS
+dnl 
+dnl Check whether empty structs is accepted by CC.
+dnl
+AC_DEFUN(FP_EMPTY_STRUCTS,
+[AC_CACHE_CHECK(empty struct support, fptools_cv_empty_structs,
+[AC_TRY_COMPILE([
+typedef struct { /*empty*/ } StgFoo;
+],
+[int i;], 
+fptools_cv_empty_structs=yes,
+fptools_cv_empty_structs=no)])
+if test "$fptools_cv_empty_structs" = yes; then
+AC_DEFINE([SUPPORTS_EMPTY_STRUCTS], [1], [Define to 1 if C compiler supports declaration of empty structure types.])
+fi
+])
+
 # LocalWords:  fi
