@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.9 2000/04/14 14:07:18 simonmar Exp $
+ * $Id: RtsUtils.h,v 1.10 2000/05/18 11:32:21 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,7 +17,6 @@ extern void prog_belch(char *s, ...);
 
 extern void _stgAssert (char *filename, unsigned int linenum);
 
-extern void stackOverflow(void);
 extern void heapOverflow(void);
 
 void resetNonBlockingFd(int fd);

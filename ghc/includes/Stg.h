@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.29 2000/04/14 15:10:20 sewardj Exp $
+ * $Id: Stg.h,v 1.30 2000/05/18 11:32:21 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -184,6 +184,8 @@ DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell *
 DLL_IMPORT_RTS extern int    prog_argc;
 
 extern char **environ;
+
+extern void stackOverflow(void);
 
 /* Creating and destroying an adjustor thunk.
    I cannot make myself create a separate .h file
