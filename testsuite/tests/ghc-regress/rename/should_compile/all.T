@@ -22,7 +22,6 @@ test "rn026" { vtc("") }
 test "rn027" { vtc("") }
 test "rn028" { vtc("") }
 test "rn029" { vtc("") }
-test "rn030" { vtc("") }
 test "rn031" { vtc("") }
 test "rn032" { vtc("") }
 test "rn033" { vtc("") }
