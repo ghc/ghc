@@ -18,7 +18,7 @@
 module Foreign.ForeignPtr
         ( 
 	-- * Finalised data pointers
-	  ForeignPtr             -- abstract, instance of: Eq
+	  ForeignPtr             -- abstract, instance of: Eq, Ord, Show
         , newForeignPtr          -- :: Ptr a -> IO () -> IO (ForeignPtr a)
         , addForeignPtrFinalizer -- :: ForeignPtr a -> IO () -> IO ()
 	, withForeignPtr         -- :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
@@ -94,6 +94,9 @@ data ForeignPtr a
 
 instance Eq (ForeignPtr a) where 
     p == q  =  foreignPtrToPtr p == foreignPtrToPtr q
+
+instance Ord (ForeignPtr a) where 
+    compare p q  =  compare (foreignPtrToPtr p) (foreignPtrToPtr q)
 
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (foreignPtrToPtr f)
