@@ -16,9 +16,7 @@ module Panic
      showException, showGhcException, tryMost,
      installSignalHandlers,
 
-#if __GLASGOW_HASKELL__ <= 408
-     catchJust, ioErrors, throwTo,
-#endif
+     catchJust, tryJust, ioErrors, throwTo,
    ) where
 
 #include "HsVersions.h"
@@ -42,6 +40,10 @@ import EXCEPTION        ( raiseInThread )
 import EXCEPTION	( throwTo )
 # endif /* GHC < 500 */
 #endif /* mingw32_HOST_OS */
+
+#if __GLASGOW_HASKELL__ > 408
+import EXCEPTION	( catchJust, tryJust, ioErrors )
+#endif
 
 import DYNAMIC
 import qualified EXCEPTION as Exception
@@ -173,6 +175,7 @@ Compatibility stuff:
 \begin{code}
 #if __GLASGOW_HASKELL__ <= 408
 catchJust = Exception.catchIO
+tryJust   = Exception.tryIO
 ioErrors  = Exception.justIoErrors
 throwTo   = Exception.raiseInThread
 #endif

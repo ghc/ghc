@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.35 2002/10/17 14:26:18 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.36 2003/03/04 10:39:58 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -16,7 +16,8 @@ import Util
 import Panic
 import Config		( cLeadingUnderscore )
 
-import EXCEPTION as Exception
+import EXCEPTION	( Exception, finally, throwDyn, catchDyn )
+import qualified EXCEPTION as Exception
 import DYNAMIC
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 

@@ -75,10 +75,11 @@ import Outputable
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
-import EXCEPTION	( Exception(..), tryJust )
+import EXCEPTION	( Exception(..) )
 import IO		( isUserError )
 import Maybe		( mapMaybe )
 import ListSetOps	( unionLists )
+import Panic		( tryJust )
 \end{code}
 
 
@@ -160,7 +161,7 @@ tryM :: TcRn m r -> TcRn m (Either Exception r)
 -- Reflect exception into TcRn monad
 tryM (TcRn thing) = TcRn (\ env -> tryJust tc_errors (thing env))
   where 
-#if __GLASGOW_HASKELL__ > 504
+#if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
 	tc_errors e@(IOException ioe) | isUserError ioe = Just e
 #else
 	tc_errors e@(IOException _) | isUserError e = Just e
