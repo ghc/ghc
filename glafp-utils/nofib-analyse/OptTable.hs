@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: OptTable.hs,v 1.1 1999/11/12 11:54:17 simonmar Exp $
+-- $Id: OptTable.hs,v 1.2 2000/07/10 16:15:34 rrt Exp $
 --
 -- 	OGI_Table : Class for combinators used in building 2D tables.
 --

@@ -1,6 +1,7 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = db2dvi.dir db2html.dir db2pdf.dir db2ps.dir db2rtf.dir
+SUBDIRS = db2dvi.dir db2html.dir db2pdf.dir db2ps.dir db2rtf.dir \
+          dbindex.dir
 
 include $(TOP)/mk/target.mk
