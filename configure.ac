@@ -586,7 +586,7 @@ AC_ARG_ENABLE(dotnet,
 [  --enable-dotnet
         Build .NET interop layer.
 ],
-[DotnetSupport=YES; AC_DEFINE(WANT_DOTNET_SUPPORT)],
+[DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])],
 [DotnetSupport=NO]
 )
 AC_SUBST(DotnetSupport)
@@ -663,7 +663,7 @@ dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
 dnl If you can run configure, you certainly have /bin/sh
-AC_DEFINE(HAVE_BIN_SH)
+AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
 
 dnl ** how to invoke `ar' and `ranlib'
 FPTOOLS_PROG_AR_AND_RANLIB
@@ -800,10 +800,10 @@ AC_CHECK_HEADER(readline/history.h, [HaveReadlineHistoryH=YES], [HaveReadlineHis
 
 if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
   HaveReadlineHeaders=YES
-  AC_DEFINE(HAVE_READLINE_HEADERS,1)
+  AC_DEFINE([HAVE_READLINE_HEADERS], [1], [Define to 1 if readline/readline.h and readline/history.h exist.])
 else
   HaveReadlineHeaders=NO
-  AC_DEFINE(HAVE_READLINE_HEADERS,0)
+  AC_DEFINE([HAVE_READLINE_HEADERS], [0], [Define to 1 if readline/readline.h and readline/history.h exist.])
 fi
 AC_SUBST(HaveReadlineHeaders)
 
@@ -969,7 +969,7 @@ main() {
 [have_winexec=1],
 [have_winexec=0])
 if test "$have_winexec" = "1"; then
-AC_DEFINE(HAVE_WINEXEC)
+  AC_DEFINE([HAVE_WINEXEC], [1], [Define to 1 if you have the WinExec function.])
 fi
 
 FPTOOLS_TRY_LINK_NOWARN(,[
@@ -985,7 +985,7 @@ main() {
 [have_getmodulefilename=1],
 [have_getmodulefilename=0])
 if test "$have_getmodulefilename" = "1"; then
-AC_DEFINE(HAVE_GETMODULEFILENAME)
+AC_DEFINE([HAVE_GETMODULEFILENAME], [1], [Define to 1 if you have the GetModuleFileName function.])
 fi
 
 dnl ** check return type of signal handlers
@@ -1009,7 +1009,7 @@ dnl fi
 dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
 AC_TYPE_SIGNAL
 if test "$ac_cv_type_signal" = void; then
-AC_DEFINE(VOID_INT_SIGNALS)
+  AC_DEFINE([VOID_INT_SIGNALS], [1], [Define to 1 if signal handlers have type void (*)(int). Otherwise, they're assumed to have type int (*)(void).])
 fi
 
 dnl ** check for more functions
@@ -1051,7 +1051,7 @@ if test $HostPlatform = "powerpc-apple-darwin"; then
  LIBS="-framework HaskellSupport"
  AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkHaskellSupport=YES,)
  if test $HaveFrameworkHaskellSupport = YES; then
-  AC_DEFINE(HAVE_FRAMEWORK_HASKELLSUPPORT)
+  AC_DEFINE([HAVE_FRAMEWORK_HASKELLSUPPORT], [1], [Define to 1 if the HaskellSupport.framework is installed (Mac OS X only).])
  fi;
  LIBS="$save_libs"
  AC_MSG_RESULT([$HaveFrameworkHaskellSupport])
@@ -1063,7 +1063,7 @@ AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
 AC_SUBST(HaveLibMingwEx)
 
 if test $HaveLibMingwEx = YES ; then
-  AC_DEFINE(HAVE_MINGWEX)
+  AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
 fi
 
 if test "$HaveLibGmp" = "NO"; then
@@ -1091,24 +1091,24 @@ if test $HaveLibTermcap = YES ; then
 fi
 
 if test $HaveLibTermcap = YES && test x"$HaveLibReadline" = xYES ; then
-  AC_DEFINE(HAVE_READLINE_LIBS,1)
+  AC_DEFINE([HAVE_READLINE_LIBS], [1], [Define to 1 if readline plus any additional libs needed for it exist.])
   LibsReadline="readline $LibTermcap"
 else
-  AC_DEFINE(HAVE_READLINE_LIBS,0)
+  AC_DEFINE([HAVE_READLINE_LIBS], [0], [Define to 1 if readline plus any additional libs needed for it exist.])
   LibsReadline=
 fi
 AC_SUBST(LibsReadline)
 
 if test "$HaveLibReadline"; then
   AC_CHECK_LIB(readline, rl_erase_empty_line,
-    [AC_DEFINE(HAVE_READLINE_4, 1)],
-    [AC_DEFINE(HAVE_READLINE_4, 0)])
+    [AC_DEFINE([HAVE_READLINE_4], [1], [Define to 1 if readline has version >= 4.0.])],
+    [AC_DEFINE([HAVE_READLINE_4], [0], [Define to 1 if readline has version >= 4.0.])])
   AC_CHECK_LIB(readline, rl_free_undo_list,
-    [AC_DEFINE(HAVE_READLINE_4_2, 1)],
-    [AC_DEFINE(HAVE_READLINE_4_2, 0)])
+    [AC_DEFINE([HAVE_READLINE_4_2], [1], [Define to 1 if readline has version >= 4.2.])],
+    [AC_DEFINE([HAVE_READLINE_4_2], [0], [Define to 1 if readline has version >= 4.2.])])
 else
-  AC_DEFINE(HAVE_READLINE_4, 0)
-  AC_DEFINE(HAVE_READLINE_4_2, 0)
+  AC_DEFINE([HAVE_READLINE_4], [0], [Define to 1 if readline has version >= 4.0.])
+  AC_DEFINE([HAVE_READLINE_4_2], [0], [Define to 1 if readline has version >= 4.2.])
 fi
 
 dnl ** check for math library
@@ -1147,11 +1147,11 @@ if test $HaveFrameworkHaskellSupport = YES; then
     HaveLibDL=NO
     HaveRtldNext=NO
     HaveRtldLocal=YES
-    AC_DEFINE(HAVE_RTLDLOCAL)
+    AC_DEFINE([HAVE_RTLDLOCAL], [1], [Define to 1 if RTLD_LOCAL is available.])
     HaveRtldGlobal=YES
-    AC_DEFINE(HAVE_RTLDGLOBAL)
+    AC_DEFINE([HAVE_RTLDGLOBAL], [1], [Define to 1 if RTLD_GLOBAL is available.])
     HaveRtldNow=YES
-    AC_DEFINE(HAVE_RTLDNOW)
+    AC_DEFINE([HAVE_RTLDNOW], [1], [Define to 1 if we can see RTLD_NOW in dlfcn.h.])
     AC_SUBST(HaveLibDL)
     AC_SUBST(HaveRtldNext)
     AC_SUBST(HaveRtldLocal)
@@ -1160,7 +1160,7 @@ if test $HaveFrameworkHaskellSupport = YES; then
 else
     AC_CHECK_LIB(dl, dlopen, 
     	[HaveLibDL=YES
-    	 AC_DEFINE(HAVE_LIBDL)
+    	 AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
     	 LIBS="$LIBS -ldl"], 
     	[HaveLibDL=NO])
     AC_CHECK_FUNCS(dlopen)
@@ -1176,7 +1176,7 @@ else
      #endif
     ], [
       AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_RTLDNEXT)
+      AC_DEFINE([HAVE_RTLDNEXT], [1], [Define to 1 if we can see RTLD_NEXT in dlfcn.h.])
       HaveRtldNext=YES
     ], [
       AC_MSG_RESULT(no)
@@ -1254,8 +1254,7 @@ AC_CACHE_CHECK([return type of usleep], cv_func_usleep_return_type,
                    [cv_func_usleep_return_type=int])])
 case "$cv_func_usleep_return_type" in
   "void" )
-    AC_DEFINE(USLEEP_RETURNS_VOID, 1,
-      [Define if the system headers declare usleep to return void.])
+    AC_DEFINE([USLEEP_RETURNS_VOID], [1], [Define if the system headers declare usleep to return void.])
   ;;
 esac
 
@@ -1264,7 +1263,7 @@ dnl * test for in_addr_t
 dnl --------------------------------------------------
 AC_MSG_CHECKING(for in_addr_t in netinet/in.h)
 AC_EGREP_HEADER(in_addr_t, netinet/in.h,
- [ AC_DEFINE(HAVE_IN_ADDR_T) AC_MSG_RESULT(yes) ],
+ [ AC_DEFINE([HAVE_IN_ADDR_T], [1], [Define to 1 if in_addr_t is available.]) AC_MSG_RESULT(yes) ],
  AC_MSG_RESULT(no))
 
 dnl --------------------------------------------------
@@ -1272,7 +1271,7 @@ dnl * test for Linux sendfile(2)
 dnl --------------------------------------------------
 AC_MSG_CHECKING(for sendfile in sys/sendfile.h)
 AC_EGREP_HEADER(sendfile, sys/sendfile.h,
- [ AC_DEFINE(HAVE_LINUX_SENDFILE) AC_MSG_RESULT(yes) ],
+ [ AC_DEFINE([HAVE_LINUX_SENDFILE], [1], [Define to 1 if you have a Linux sendfile(2) implementation.]) AC_MSG_RESULT(yes) ],
  AC_MSG_RESULT(no))
 
 dnl --------------------------------------------------
@@ -1280,7 +1279,7 @@ dnl * test for BSD sendfile(2)
 dnl --------------------------------------------------
 AC_MSG_CHECKING(for sendfile in sys/socket.h)
 AC_EGREP_HEADER(sendfile, sys/socket.h,
- [ AC_DEFINE(HAVE_BSD_SENDFILE) AC_MSG_RESULT(yes) ],
+ [ AC_DEFINE([HAVE_BSD_SENDFILE], [1], [Define to 1 if you have a BSDish sendfile(2) implementation.]) AC_MSG_RESULT(yes) ],
  AC_MSG_RESULT(no))
 
 dnl --------------------------------------------------
@@ -1343,7 +1342,7 @@ AC_EGREP_CPP(we_have_sigpoll,
 #ifdef SIGPOLL
 we_have_sigpoll
 #endif
-], AC_DEFINE(HAVE_SIGPOLL) haveSIGPOLL=yes, haveSIGPOLL=no)
+], AC_DEFINE([HAVE_SIGPOLL], [1], [Define to 1 if you have the sigpoll() function.]) haveSIGPOLL=yes, haveSIGPOLL=no)
 AC_MSG_RESULT([$haveSIGPOLL])
 
 AC_MSG_CHECKING([for _SC_GETGR_R_SIZE_MAX])
@@ -1355,7 +1354,7 @@ we_have_that_sysconf_thing
 #endif
 ],
 [AC_MSG_RESULT([yes])
-AC_DEFINE(HAVE_SC_GETGR_R_SIZE_MAX)],
+AC_DEFINE([HAVE_SC_GETGR_R_SIZE_MAX], [1], [Define to 1 if <unistd.h> defines _SC_GETGR_R_SIZE_MAX.])],
 [AC_MSG_RESULT([no])])
 
 AC_MSG_CHECKING([for _SC_GETPW_R_SIZE_MAX])
@@ -1367,7 +1366,7 @@ we_have_that_sysconf_thing
 #endif
 ],
 [AC_MSG_RESULT([yes])
-AC_DEFINE(HAVE_SC_GETPW_R_SIZE_MAX)],
+AC_DEFINE([HAVE_SC_GETPW_R_SIZE_MAX], [1], [Define to 1 if <unistd.h> defines _SC_GETPW_R_SIZE_MAX.])],
 [AC_MSG_RESULT([no])])
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )

@@ -68,6 +68,9 @@ the documentation is available online at
 
 %changelog
 
+* Tue Aug 19 2003 Sven Panne
+- use autoreconf
+
 * Wed Sep 26 2001 Manuel Chakravarty
 - small changes for 5.04
 
@@ -123,9 +126,9 @@ SRC_HAPPY_OPTS += -agc
 GhcWithInterpreter=YES
 END
 
-# run autoconf if necessary
+# run autoheader and autoconf if necessary
 #
-[ ! -x configure ] && autoconf && cd ghc && autoconf
+test -f configure || autoreconf
 
 %build
 ./configure --prefix=%{prefix}

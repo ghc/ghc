@@ -146,7 +146,7 @@ esac);
 LeadingUnderscore=`echo $fptools_cv_lead_uscore | sed 'y/yesno/YESNO/'`
 AC_SUBST(LeadingUnderscore)
 case $LeadingUnderscore in
-YES) AC_DEFINE(LEADING_UNDERSCORE);;
+YES) AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.]);;
 esac
 ])
 
@@ -450,7 +450,7 @@ AC_DEFUN(FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR,
      fptools_cv_gcc_needs_no_omit_lfptr='yes')
 ])
 if test "$fptools_cv_gcc_needs_no_omit_lfptr" = "yes"; then
-   AC_DEFINE(HAVE_GCC_MNO_OMIT_LFPTR)
+   AC_DEFINE([HAVE_GCC_MNO_OMIT_LFPTR], [1], [Define to 1 if gcc supports -mno-omit-leaf-frame-pointer.])
 fi
 ])
 
@@ -649,7 +649,7 @@ main() {
 ifelse([$2], , AC_CV_NAME=NotReallyAType,      AC_CV_NAME=$2),
 ifelse([$3], , AC_CV_NAME=NotReallyATypeCross, AC_CV_NAME=$3))]) dnl
 AC_MSG_RESULT($AC_CV_NAME)
-AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
+AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME, [Define to Haskell type for $1])
 undefine([AC_TYPE_NAME])dnl
 undefine([AC_CV_NAME])dnl
 ])
@@ -679,15 +679,26 @@ eval "$cv_name=-1",
 eval "$cv_name=-1")])dnl
 eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
 AC_MSG_RESULT($fptools_check_cconst_result)
-AC_DEFINE_UNQUOTED(CCONST_$1, $fptools_check_cconst_result)
+AC_DEFINE_UNQUOTED(CCONST_$1, $fptools_check_cconst_result, [The value of $1.])
 unset fptools_check_cconst_result
 ])
+
+
+# FP_CHECK_CCONSTS_TEMPLATE(CONST...)
+# -----------------------------------
+m4_define([FP_CHECK_CCONSTS_TEMPLATE],
+[AC_FOREACH([FP_Const], [$1],
+  [AH_TEMPLATE(AS_TR_CPP(CCONST_[]FP_Const),
+               [The value of ]FP_Const[.])])[]dnl
+])# FP_CHECK_CCONSTS_TEMPLATE
+
 
 dnl ** Invoke AC_CHECK_CCONST on each argument (which have to separate with 
 dnl    spaces)
 dnl
 AC_DEFUN(FPTOOLS_CHECK_CCONSTS,
-[for ac_const_name in $1
+[FP_CHECK_CCONSTS_TEMPLATE([$1])dnl
+for ac_const_name in $1
 do
 FPTOOLS_CHECK_CCONST($ac_const_name)dnl
 done
@@ -715,7 +726,7 @@ AC_LANG_RESTORE
 ])
 AC_MSG_RESULT($fptools_cv_have_o_binary)
 if test "$fptools_cv_have_o_binary" = yes; then
-AC_DEFINE(HAVE_O_BINARY)
+  AC_DEFINE([HAVE_O_BINARY], [1], [Define to 1 if fcntl.h defines O_BINARY.])
 fi
 ])
 
@@ -1103,7 +1114,7 @@ AC_DEFUN(FPTOOLS_MSGHDR_MSG_CONTROL,
 #include <sys/socket.h>], [struct msghdr m; m.msg_control;],
 fptools_cv_struct_msghdr_msg_control=yes, fptools_cv_struct_msghdr_msg_control=no)])
 if test $fptools_cv_struct_msghdr_msg_control = yes; then
-  AC_DEFINE(HAVE_MSGHDR_MSG_CONTROL)
+  AC_DEFINE([HAVE_MSGHDR_MSG_CONTROL], [1], [Define if struct msghdr contains msg_control field.])
 fi
 AC_SUBST(HAVE_MSGHDR_MSG_CONTROL)dnl
 ])
@@ -1118,7 +1129,7 @@ AC_DEFUN(FPTOOLS_MSGHDR_MSG_ACCRIGHTS,
 #include <sys/socket.h>], [struct msghdr m; m.msg_accrights;],
 fptools_cv_struct_msghdr_msg_accrights=yes, fptools_cv_struct_msghdr_msg_accrights=no)])
 if test $fptools_cv_struct_msghdr_msg_accrights = yes; then
-  AC_DEFINE(HAVE_MSGHDR_MSG_ACCRIGHTS)
+  AC_DEFINE([HAVE_MSGHDR_MSG_ACCRIGHTS], [1], [Define to 1 if struct msghdr contains msg_accrights field.])
 fi
 AC_SUBST(HAVE_MSGHDR_MSG_ACCRIGHTS)dnl
 ])
