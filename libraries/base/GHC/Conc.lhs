@@ -90,14 +90,14 @@ This misfeature will hopefully be corrected at a later date.
 not implemented in Hugs).  Any work already done by the thread isn\'t
 lost: the computation is suspended until required by another thread.
 The memory used by the thread will be garbage collected if it isn\'t
-referenced from anywhere.  The 'killThread' function may be defined in
+referenced from anywhere.  The 'killThread' function is defined in
 terms of 'throwTo':
 
->   killThread tid = throwTo tid (AsyncException ThreadKilled)
+> killThread tid = throwTo tid (AsyncException ThreadKilled)
+
 -}
 killThread :: ThreadId -> IO ()
-killThread (ThreadId id) = IO $ \ s ->
-   case (killThread# id (AsyncException ThreadKilled) s) of s1 -> (# s1, () #)
+killThread tid = throwTo tid (AsyncException ThreadKilled)
 
 {- | 'throwTo' raises an arbitrary exception in the target thread.
 
