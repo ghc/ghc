@@ -67,15 +67,12 @@ scrub (c:cs)           = c : scrub cs
 
 
 data Opt
- = OptTool           String
- | OptConfig         String
+ = OptConfig         String
  | OptRootDir        String
  | OptSaveSummary    String
  | OptCompareSummary String
 
 option_descrs = [
-  Option "" ["tool"]        (ReqArg OptTool "PATH")
-	"compiler to test",
   Option "" ["config"]      (ReqArg OptConfig "FILE")
 	"config file",
   Option "" ["rootdir"]     (ReqArg OptRootDir "DIR")
@@ -94,7 +91,6 @@ extra_info
      "         command line:\n" ++
      concatMap (\w -> "            $" ++ w ++ "\n") special_var_names
 
-getToolOpt      os = exactlyOne "-tool"         [ t | OptTool    t <- os ]
 getConfigOpt    os = exactlyOne "-config"       [ t | OptConfig  t <- os ]
 getRootOpt      os = upToOne    "-rootdir"      [ t | OptRootDir t <- os ]
 getSaveSuOpt    os = upToOne "-save-summary"    [ t | OptSaveSummary t <- os ]
@@ -113,7 +109,7 @@ main
 imain arg_str
    = main_really (words arg_str)
 test
-   = imain ("--tool=ghc --config=../config/msrc/cam-02-unx.T " 
+   = imain ("tool=ghc --config=../config/msrc/cam-02-unx.T " 
             ++ "--rootdir=../tests/codeGen")
 
 main_really arg_ws0
@@ -123,8 +119,7 @@ main_really arg_ws0
 	    (_, _, errs)     -> die (concat errs ++ usage)
 
 got_args opts args start_time
-  = do   tool <- getToolOpt opts
-	 conf <- getConfigOpt opts
+  = do   conf <- getConfigOpt opts
  	 maybe_root <- getRootOpt opts
  	 maybe_save_su <- getSaveSuOpt opts
  	 maybe_cmp_su <- getCompareSuOpt opts
@@ -144,9 +139,8 @@ got_args opts args start_time
 
               (confdir, conffile) = splitPathname conf
 
-              base_genv = [("tool", tool), 
-                           ("confdir", confdir), 
-                           ("conffilename", conffile)]
+              base_genv = [("confdir", confdir), 
+                           ("conffilename", conffile)] ++ cmd_binds
 
               tests_to_run
                  = if null not_binds then Nothing{-all of them-}
@@ -383,8 +377,7 @@ getBinds args = f args [] []
 -- These vars have special meanings and may not be set from the
 -- command line.
 special_var_names
-   = ["testfilename", "testdir", "conffilename", "confdir", 
-      "tool", "testname"]
+   = ["testfilename", "testdir", "conffilename", "confdir", "testname"]
 
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")
 --splitPathname3 full
