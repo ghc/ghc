@@ -27,7 +27,9 @@ import PrelList
 import ArrBase	( Array, array, (!) )
 import STBase   ( unsafePerformPrimIO )
 import Ix	( Ix(..) )
-import Numeric
+import Foreign	()		-- This import tells the dependency analyser to compile Foreign first.
+				-- There's an implicit dependency on Foreign because the ccalls in
+				-- PrelNum implicitly mention CCallable.
 
 infixr 8  ^, ^^, **
 infixl 7  /, %, `quot`, `rem`, `div`, `mod`
@@ -804,6 +806,13 @@ instance  (Integral a)  => Show (Ratio a)  where
 \end{code}
 
 \begin{code}
+--Exported from std library Numeric, defined here to
+--avoid mut. rec. between PrelNum and Numeric.
+showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+showSigned showPos p x = if x < 0 then showParen (p > 6)
+						 (showChar '-' . showPos (-x))
+				  else showPos x
+
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r
   = -- from HBC version; support code follows
@@ -822,6 +831,175 @@ jtos' n cs
 	chr (fromInteger (n + ord_0)) : cs
     else 
 	jtos' (n `quot` 10) (chr (fromInteger (n `rem` 10 + ord_0)) : cs)
+
+showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
+
+-- These are the format types.  This type is not exported.
+
+data FFFormat = FFExponent | FFFixed | FFGeneric --no need: deriving (Eq, Ord, Show)
+
+formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
+formatRealFloat fmt decs x = s
+ where 
+  base = 10
+  s = if isNaN x 
+      then "NaN"
+      else 
+       if isInfinite x then
+          if x < 0 then "-Infinity" else "Infinity"
+       else
+          if x < 0 || isNegativeZero x then
+            '-':doFmt fmt (floatToDigits (toInteger base) (-x))
+          else
+	    doFmt fmt (floatToDigits (toInteger base) x)
+
+  doFmt fmt (is, e) =
+    let ds = map intToDigit is in
+    case fmt of
+     FFGeneric ->
+      doFmt (if e <0 || e > 7 then FFExponent else FFFixed)
+	    (is,e)
+     FFExponent ->
+      case decs of
+       Nothing ->
+        let e' = if e==0 then 0 else e-1 in
+	(case ds of
+          [d]    -> d : ".0e"
+	  (d:ds) -> d : '.' : ds ++ "e") ++ show e'
+       Just dec ->
+        let dec' = max dec 1 in
+        case is of
+         [0] -> '0':'.':take dec' (repeat '0') ++ "e0"
+         _ ->
+          let
+	   (ei,is') = roundTo base (dec'+1) is
+	   d:ds = map intToDigit (if ei > 0 then init is' else is')
+          in
+	  d:'.':ds ++ 'e':show (e-1+ei)
+     FFFixed ->
+      let
+       mk0 ls = case ls of { "" -> "0" ; _ -> ls}
+      in
+      case decs of
+       Nothing ->
+         let
+	  f 0 s ds = mk0 (reverse s) ++ '.':mk0 ds
+	  f n s "" = f (n-1) ('0':s) ""
+	  f n s (d:ds) = f (n-1) (d:s) ds
+	 in
+	 f e "" ds
+       Just dec ->
+        let dec' = max dec 1 in
+	if e >= 0 then
+	 let
+	  (ei,is') = roundTo base (dec' + e) is
+	  (ls,rs)  = splitAt (e+ei) (map intToDigit is')
+	 in
+	 mk0 ls ++ (if null rs then "" else '.':rs)
+	else
+	 let
+	  (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
+	  d:ds = map intToDigit (if ei > 0 then is' else 0:is')
+	 in
+	 d : '.' : ds
+	 
+
+roundTo :: Int -> Int -> [Int] -> (Int,[Int])
+roundTo base d is =
+ let
+  v = f d is
+ in
+ case v of
+  (0,is) -> v
+  (1,is) -> (1, 1:is)
+ where
+  b2 = base `div` 2
+
+  f n [] = (0, replicate n 0)
+  f 0 (i:_) = (if i>=b2 then 1 else 0, [])
+  f d (i:is) =
+    let 
+     (c,ds) = f (d-1) is
+     i' = c + i
+    in
+    if i' == base then (1,0:ds) else (0,i':ds)
+
+--
+-- Based on "Printing Floating-Point Numbers Quickly and Accurately"
+-- by R.G. Burger and R.K. Dybvig in PLDI 96.
+-- This version uses a much slower logarithm estimator. It should be improved.
+
+-- This function returns a list of digits (Ints in [0..base-1]) and an
+-- exponent.
+--floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
+floatToDigits _ 0 = ([0], 0)
+floatToDigits base x =
+ let 
+  (f0, e0) = decodeFloat x
+  (minExp0, _) = floatRange x
+  p = floatDigits x
+  b = floatRadix x
+  minExp = minExp0 - p -- the real minimum exponent
+  -- Haskell requires that f be adjusted so denormalized numbers
+  -- will have an impossibly low exponent.  Adjust for this.
+  (f, e) = 
+   let n = minExp - e0 in
+   if n > 0 then (f0 `div` (b^n), e0+n) else (f0, e0)
+  (r, s, mUp, mDn) =
+   if e >= 0 then
+    let be = b^ e in
+    if f == b^(p-1) then
+      (f*be*b*2, 2*b, be*b, b)
+    else
+      (f*be*2, 2, be, be)
+   else
+    if e > minExp && f == b^(p-1) then
+      (f*b*2, b^(-e+1)*2, b, 1)
+    else
+      (f*2, b^(-e)*2, 1, 1)
+  k =
+   let 
+    k0 =
+     if b == 2 && base == 10 then
+        -- logBase 10 2 is slightly bigger than 3/10 so
+	-- the following will err on the low side.  Ignoring
+	-- the fraction will make it err even more.
+	-- Haskell promises that p-1 <= logBase b f < p.
+	(p - 1 + e0) * 3 `div` 10
+     else
+        ceiling ((log (fromInteger (f+1)) +
+	         fromInt e * log (fromInteger b)) /
+		  fromInt e * log (fromInteger b))
+
+    fixup n =
+      if n >= 0 then
+        if r + mUp <= expt base n * s then n else fixup (n+1)
+      else
+        if expt base (-n) * (r + mUp) <= s then n else fixup (n+1)
+   in
+   fixup k0
+
+  gen ds rn sN mUpN mDnN =
+   let
+    (dn, rn') = (rn * base) `divMod` sN
+    mUpN' = mUpN * base
+    mDnN' = mDnN * base
+   in
+   case (rn' < mDnN', rn' + mUpN' > sN) of
+    (True,  False) -> dn : ds
+    (False, True)  -> dn+1 : ds
+    (True,  True)  -> if rn' * 2 < sN then dn : ds else dn+1 : ds
+    (False, False) -> gen (dn:ds) rn' sN mUpN' mDnN'
+  
+  rds = 
+   if k >= 0 then
+      gen [] r (s * expt base k) mUp mDn
+   else
+     let bk = expt base (-k) in
+     gen [] (r * bk) s (mUp * bk) (mDn * bk)
+ in
+ (map toInt (reverse rds), k)
+
 \end{code}
 
 @showRational@ converts a Rational to a string that looks like a
@@ -871,6 +1049,125 @@ prR n r e0 =
 	    else
 	        head s : "."++ drop0 (tail s) ++ "e" ++ show e0
 \end{code}
+
+
+[In response to a request for documentation of how fromRational works,
+Joe Fasel writes:] A quite reasonable request!  This code was added to
+the Prelude just before the 1.2 release, when Lennart, working with an
+early version of hbi, noticed that (read . show) was not the identity
+for floating-point numbers.  (There was a one-bit error about half the
+time.)  The original version of the conversion function was in fact
+simply a floating-point divide, as you suggest above. The new version
+is, I grant you, somewhat denser.
+
+Unfortunately, Joe's code doesn't work!  Here's an example:
+
+main = putStr (shows (1.82173691287639817263897126389712638972163e-300::Double) "\n")
+
+This program prints
+	0.0000000000000000
+instead of
+	1.8217369128763981e-300
+
+Lennart's code follows, and it works...
+
+\begin{pseudocode}
+{-# GENERATE_SPECS fromRational__ a{Double#,Double} #-}
+fromRat :: (RealFloat a) => Rational -> a
+fromRat x = x'
+	where x' = f e
+
+--		If the exponent of the nearest floating-point number to x 
+--		is e, then the significand is the integer nearest xb^(-e),
+--		where b is the floating-point radix.  We start with a good
+--		guess for e, and if it is correct, the exponent of the
+--		floating-point number we construct will again be e.  If
+--		not, one more iteration is needed.
+
+	      f e   = if e' == e then y else f e'
+		      where y	   = encodeFloat (round (x * (1 % b)^^e)) e
+			    (_,e') = decodeFloat y
+	      b	    = floatRadix x'
+
+--		We obtain a trial exponent by doing a floating-point
+--		division of x's numerator by its denominator.  The
+--		result of this division may not itself be the ultimate
+--		result, because of an accumulation of three rounding
+--		errors.
+
+	      (s,e) = decodeFloat (fromInteger (numerator x) `asTypeOf` x'
+					/ fromInteger (denominator x))
+\end{pseudocode}
+
+Now, here's Lennart's code.
+
+\begin{code}
+--fromRat :: (RealFloat a) => Rational -> a
+fromRat x = 
+    if x == 0 then encodeFloat 0 0 		-- Handle exceptional cases
+    else if x < 0 then - fromRat' (-x)		-- first.
+    else fromRat' x
+
+-- Conversion process:
+-- Scale the rational number by the RealFloat base until
+-- it lies in the range of the mantissa (as used by decodeFloat/encodeFloat).
+-- Then round the rational to an Integer and encode it with the exponent
+-- that we got from the scaling.
+-- To speed up the scaling process we compute the log2 of the number to get
+-- a first guess of the exponent.
+
+fromRat' :: (RealFloat a) => Rational -> a
+fromRat' x = r
+  where b = floatRadix r
+        p = floatDigits r
+	(minExp0, _) = floatRange r
+	minExp = minExp0 - p		-- the real minimum exponent
+	xMin = toRational (expt b (p-1))
+	xMax = toRational (expt b p)
+	p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
+	f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
+	(x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
+	r = encodeFloat (round x') p'
+
+-- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
+scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
+scaleRat b minExp xMin xMax p x =
+    if p <= minExp then
+        (x, p)
+    else if x >= xMax then
+        scaleRat b minExp xMin xMax (p+1) (x/b)
+    else if x < xMin  then
+        scaleRat b minExp xMin xMax (p-1) (x*b)
+    else
+        (x, p)
+
+-- Exponentiation with a cache for the most common numbers.
+minExpt = 0::Int
+maxExpt = 1100::Int
+expt :: Integer -> Int -> Integer
+expt base n =
+    if base == 2 && n >= minExpt && n <= maxExpt then
+        expts!n
+    else
+        base^n
+expts :: Array Int Integer
+expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
+
+-- Compute the (floor of the) log of i in base b.
+-- Simplest way would be just divide i by b until it's smaller then b, but that would
+-- be very slow!  We are just slightly more clever.
+integerLogBase :: Integer -> Integer -> Int
+integerLogBase b i =
+     if i < b then
+        0
+     else
+	-- Try squaring the base first to cut down the number of divisions.
+        let l = 2 * integerLogBase (b*b) i
+	    doDiv :: Integer -> Int -> Int
+	    doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
+	in  doDiv (i `div` (b^l)) l
+\end{code}
+
 
 %*********************************************************
 %*							*
