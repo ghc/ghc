@@ -77,7 +77,7 @@ irrefutPatError
 
 noMethodBindingError     s = throw (NoMethodError (untangle s "No instance nor default method for class operation"))
 irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
-nonExhaustiveGuardsError s = throw (NonExhaustiveGuards (untangle s "Non-exhaustive guards in"))
+nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
 recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection"))
 recConError 		 s = throw (RecConError (untangle s "Missing field in record construction"))

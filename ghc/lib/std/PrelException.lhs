@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.19 2000/04/14 15:28:24 rrt Exp $
+% $Id: PrelException.lhs,v 1.20 2000/06/09 13:49:35 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -36,8 +36,7 @@ data Exception
   | ArrayException	ArrayException  -- Array-related exceptions
   | ErrorCall		String		-- Calls to 'error'
   | NoMethodError       String		-- A non-existent method was invoked
-  | PatternMatchFail	String		-- A pattern match failed
-  | NonExhaustiveGuards String		-- A guard match failed
+  | PatternMatchFail	String		-- A pattern match / guard failure
   | RecSelError		String		-- Selecting a non-existent field
   | RecConError		String		-- Field missing in record construction
   | RecUpdError		String		-- Record doesn't contain updated field
@@ -99,7 +98,6 @@ instance Show Exception where
   showsPrec _ (ErrorCall err)	         = showString err
   showsPrec _ (NoMethodError err)        = showString err
   showsPrec _ (PatternMatchFail err)     = showString err
-  showsPrec _ (NonExhaustiveGuards err)  = showString err
   showsPrec _ (RecSelError err)	         = showString err
   showsPrec _ (RecConError err)	         = showString err
   showsPrec _ (RecUpdError err)	         = showString err
