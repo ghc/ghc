@@ -49,6 +49,19 @@ data SrcLoc
 		FAST_INT
 
   | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
+
+instance Ord SrcLoc where
+  compare NoSrcLoc NoSrcLoc           = EQ
+  compare NoSrcLoc _	              = GT
+  compare (UnhelpfulSrcLoc _) (UnhelpfulSrcLoc _) = EQ
+  compare (UnhelpfulSrcLoc _) _       = GT
+  compare _ NoSrcLoc                  = LT
+  compare _ (UnhelpfulSrcLoc _)       = LT
+  compare (SrcLoc _ y1) (SrcLoc _ y2) = compare IBOX(y1) IBOX(y2) 
+
+instance Eq SrcLoc where
+  (==) x y = compare x y == EQ
+  
 \end{code}
 
 Note that an entity might be imported via more than one route, and

@@ -29,7 +29,7 @@ import RnMonad		( RnNameSupply,
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
-import ErrUtils		( ErrMsg, dumpIfSet )
+import ErrUtils		( dumpIfSet, Message )
 import MkId		( mkDictFunId )
 import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon )
@@ -681,7 +681,7 @@ gen_taggery_Names inst_infos
 \end{code}
 
 \begin{code}
-derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> ErrMsg
+derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> Message
 
 derivingThingErr thing why tycon
   = hang (hsep [ptext SLIT("Can't make a derived instance of"), ptext thing])

@@ -19,7 +19,7 @@ import DsUtils
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Name		( Module, moduleString )
-import Bag		( isEmptyBag )
+import Bag		( isEmptyBag, unionBags )
 import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet )
@@ -51,7 +51,7 @@ deSugar us global_val_env mod_name all_binds fo_decls = do
   	    ds_binds  = fi_binds ++ ds_binds' ++ fe_binds
 
 	 -- Display any warnings
-        doIfSet (not (isEmptyBag ds_warns))
+        doIfSet (not (isEmptyBag (ds_warns `unionBags` ds_warns2)))
 		(printErrs (pprDsWarnings ds_warns))
 
 	 -- Lint result if necessary

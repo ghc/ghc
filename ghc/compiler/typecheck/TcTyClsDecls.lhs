@@ -40,7 +40,7 @@ import Maybes		( mapMaybe )
 import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
-import ErrUtils		( ErrMsg )
+import ErrUtils		( Message )
 import SrcLoc		( SrcLoc )
 import TyCon		( TyCon )
 import Unique		( Unique, Uniquable(..) )
@@ -336,7 +336,7 @@ set_to_bag set = listToBag (uniqSetToList set)
 
 
 \begin{code}
-typeCycleErr, classCycleErr :: [[RenamedTyClDecl]] -> ErrMsg
+typeCycleErr, classCycleErr :: [[RenamedTyClDecl]] -> Message
 
 typeCycleErr syn_cycles
   = vcat (map (pp_cycle "Cycle in type declarations:") syn_cycles)

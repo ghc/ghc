@@ -44,7 +44,7 @@ import TcType		( TcType, typeToTcType,
 
 import RnMonad		( RnNameSupply )
 import Bag		( isEmptyBag )
-import ErrUtils		( ErrMsg, 
+import ErrUtils		( Message,
 			  pprBagOfErrors, dumpIfSet
 			)
 import Id		( Id, idType )
@@ -312,7 +312,7 @@ noMainErr
   = hsep [ptext SLIT("Module"), quotes (pprModule mAIN), 
 	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
 
-mainTyMisMatch :: TcType -> TcType -> ErrMsg
+mainTyMisMatch :: TcType -> TcType -> Message
 mainTyMisMatch expected actual
   = hang (hsep [ppr main_NAME, ptext SLIT("has the wrong type")])
 	 4 (vcat [

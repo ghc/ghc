@@ -41,6 +41,7 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  mkUnboxedTupleTy, unboxedTupleCon
 			)
 import UniqSet
+import ErrUtils		( addErrLocHdrLine, dontAddErrLoc )
 import Outputable
 \end{code}
 
@@ -93,32 +94,31 @@ dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
 dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn 
 	where
 	  warn | length qs > maximum_output
-               = hang (pp_context ctx (ptext SLIT("are overlapped")))
-                    12 ((vcat $ map (ppr_eqn kind) (take maximum_output qs))
-                        $$ ptext SLIT("..."))
+               = pp_context ctx (ptext SLIT("are overlapped"))
+		      8    (vcat (map (ppr_eqn kind) (take maximum_output qs)) $$
+			    ptext SLIT("..."))
 	       | otherwise
-               = hang (pp_context ctx (ptext SLIT("are overlapped")))
-                    12 (vcat $ map (ppr_eqn kind) qs)
+               = pp_context ctx (ptext SLIT("are overlapped"))
+	             8     (vcat $ map (ppr_eqn kind) qs)
+
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
 dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn 
 	where
 	  warn | length pats > maximum_output
-               = hang (pp_context ctx (ptext SLIT("are non-exhaustive")))
-                    12 (hang (ptext SLIT("Patterns not recognized:"))
-                       4 ((vcat $ map (ppr_incomplete_pats kind) (take maximum_output pats))
+               = pp_context ctx (ptext SLIT("are non-exhaustive"))
+                    8 (hang (ptext SLIT("Patterns not recognized:"))
+                        4 ((vcat $ map (ppr_incomplete_pats kind) (take maximum_output pats))
                           $$ ptext SLIT("...")))
 	       | otherwise
-               = hang (pp_context ctx (ptext SLIT("are non-exhaustive")))
-                    12 (hang (ptext SLIT("Patterns not recognized:"))
+               = pp_context ctx (ptext SLIT("are non-exhaustive"))
+                    8 (hang (ptext SLIT("Patterns not recognized:"))
                        4 (vcat $ map (ppr_incomplete_pats kind) pats))
 
-pp_context NoMatchContext msg = ptext SLIT("Some match(es)") <+> msg
+pp_context NoMatchContext msg ind rest_of_msg = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg ind rest_of_msg)
 
-pp_context (DsMatchContext kind pats loc) msg
-  = hang (hcat [ppr loc, ptext SLIT(": ")])
-	     4 (hang message
-		     4 (pp_match kind pats))
+pp_context (DsMatchContext kind pats loc) msg ind rest_of_msg
+  = addErrLocHdrLine loc message (hang (pp_match kind pats) ind rest_of_msg)
  where
     message = ptext SLIT("Pattern match(es)") <+> msg     
 

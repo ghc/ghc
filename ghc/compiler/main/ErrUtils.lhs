@@ -7,6 +7,7 @@
 module ErrUtils (
 	ErrMsg, WarnMsg, Message,
 	addShortErrLocLine, addShortWarnLocLine,
+	addErrLocHdrLine,
 	dontAddErrLoc,
 	pprBagOfErrors, pprBagOfWarnings,
 	ghcExit,
@@ -16,35 +17,57 @@ module ErrUtils (
 #include "HsVersions.h"
 
 import Bag		( Bag, bagToList )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
+import Util		( sortLt )
 import Outputable
 \end{code}
 
 \begin{code}
-type ErrMsg   = SDoc
-type WarnMsg = SDoc
+type MsgWithLoc = (SrcLoc, SDoc)
+
+type ErrMsg  = MsgWithLoc
+type WarnMsg = MsgWithLoc
 type Message = SDoc
 
-addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> ErrMsg -> ErrMsg
+addShortErrLocLine  :: SrcLoc -> Message -> ErrMsg
+addErrLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
+addShortWarnLocLine :: SrcLoc -> Message -> WarnMsg
 
 addShortErrLocLine locn rest_of_err_msg
-  = hang (ppr locn <> colon)
-	 4 rest_of_err_msg
+  = ( locn
+    , hang (ppr locn <> colon) 
+         4 rest_of_err_msg
+    )
+
+addErrLocHdrLine locn hdr rest_of_err_msg
+  = ( locn
+    , hang (ppr locn <> colon<+> hdr) 
+         4 rest_of_err_msg
+    )
 
 addShortWarnLocLine locn rest_of_err_msg
-  = hang (ppr locn <> ptext SLIT(": Warning:"))
-	 4 rest_of_err_msg
+  = ( locn
+    , hang (ppr locn <> ptext SLIT(": Warning:")) 
+        4 rest_of_err_msg
+    )
 
-dontAddErrLoc :: String -> ErrMsg -> ErrMsg
+dontAddErrLoc :: String -> Message -> ErrMsg
 dontAddErrLoc title rest_of_err_msg
-  = hang (hcat [text title, char ':'])
-    	 4 rest_of_err_msg
+ | null title = (noSrcLoc, rest_of_err_msg)
+ | otherwise  =
+    ( noSrcLoc, hang (hcat [text title, char ':'])
+		  4  rest_of_err_msg )
 
 pprBagOfErrors :: Bag ErrMsg -> SDoc
 pprBagOfErrors bag_of_errors
-  = vcat [space $$ p | p <- bagToList bag_of_errors]
+  = vcat [space $$ p | (_,p) <- sorted_errs ]
+    where
+      bag_ls	  = bagToList bag_of_errors
+      sorted_errs = sortLt occ'ed_before bag_ls
 
-pprBagOfWarnings :: Bag ErrMsg -> SDoc
+      occ'ed_before (a,_) (b,_) = LT == compare a b
+
+pprBagOfWarnings :: Bag WarnMsg -> SDoc
 pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
 \end{code}
 

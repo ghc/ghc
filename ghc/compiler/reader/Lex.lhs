@@ -47,7 +47,7 @@ import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile )
 
 import Maybes		( MaybeErr(..) )
-import ErrUtils		( ErrMsg )
+import ErrUtils		( Message )
 import Outputable
 
 import FastString
@@ -758,7 +758,7 @@ doDiscard inStr buf =
 \begin{code}
 type IfM a = StringBuffer	-- Input string
 	  -> SrcLoc
-	  -> MaybeErr a ErrMsg
+	  -> MaybeErr a {-error-}Message
 
 returnIf   :: a -> IfM a
 returnIf a s l = Succeeded a
@@ -801,7 +801,7 @@ checkVersion mb@Nothing  s l
 
 -----------------------------------------------------------------
 
-ifaceParseErr :: StringBuffer -> SrcLoc -> ErrMsg
+ifaceParseErr :: StringBuffer -> SrcLoc -> Message
 ifaceParseErr s l
   = hsep [ppr l, ptext SLIT("Interface-file parse error;"),
           ptext SLIT("current input ="), text first_bit]

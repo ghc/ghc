@@ -17,7 +17,7 @@ import DataCon		( DataCon, dataConArgTys, dataConType )
 import Const		( literalType, conType, Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
-import ErrUtils		( ErrMsg )
+import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
 			  isUnLiftedType, isTyVarTy, Type
 			)
@@ -260,16 +260,14 @@ data LintLocInfo
   | LambdaBodyOf [Id]	-- The lambda-binder
   | BodyOfLetRec [Id]	-- One of the binders
 
-instance Outputable LintLocInfo where
-    ppr (RhsOf v)
-      = hcat [ppr (getSrcLoc v), ptext SLIT(": [RHS of "), pp_binders [v], char ']']
+dumpLoc (RhsOf v) =
+  (getSrcLoc v, ptext SLIT(" [RHS of ") <> pp_binders [v] <> char ']' )
+dumpLoc (LambdaBodyOf bs) =
+  (getSrcLoc (head bs), ptext SLIT(" [in body of lambda with binders ") <> pp_binders bs <> char ']' )
 
-    ppr (LambdaBodyOf bs)
-      = hcat [ptext SLIT(": [in body of lambda with binders "), pp_binders bs, char ']']
+dumpLoc (BodyOfLetRec bs) =
+  (getSrcLoc (head bs), ptext SLIT(" [in body of letrec with binders ") <> pp_binders bs <> char ']' )
 
-    ppr (BodyOfLetRec bs)
-      = hcat [ppr (getSrcLoc (head bs)),
-		ptext SLIT(": [in body of letrec with binders "), pp_binders bs, char ']']
 
 pp_binders :: [Id] -> SDoc
 pp_binders bs
@@ -280,13 +278,13 @@ pp_binders bs
 \end{code}
 
 \begin{code}
-initL :: LintM a -> Maybe ErrMsg
+initL :: LintM a -> Maybe Message
 initL m
   = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
-	Just (foldBag ($$) (\ msg -> msg) empty errs)
+	Just (pprBagOfErrors errs)
     }
 
 returnL :: a -> LintM a
@@ -331,20 +329,20 @@ mapMaybeL f (x:xs)
 \end{code}
 
 \begin{code}
-checkL :: Bool -> ErrMsg -> LintM ()
+checkL :: Bool -> Message -> LintM ()
 checkL True  msg loc scope errs = ((), errs)
 checkL False msg loc scope errs = ((), addErr errs msg loc)
 
-addErrL :: ErrMsg -> LintM ()
+addErrL :: Message -> LintM ()
 addErrL msg loc scope errs = ((), addErr errs msg loc)
 
-addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
+addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
 
 addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
-    mk_msg (loc:_) = hang (ppr loc) 4 msg
-    mk_msg []      = msg
+    mk_msg (loc:_) = let (l,hdr) = dumpLoc loc in addErrLocHdrLine l hdr msg
+    mk_msg []      = dontAddErrLoc "" msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs
@@ -370,10 +368,10 @@ addInScopeVars ids m loc scope errs
 \end{code}
 
 \begin{code}
-checkFunApp :: Type 		-- The function type
-	    -> [Type] 	-- The arg type(s)
-	    -> ErrMsg 		-- Error messgae
-	    -> LintM (Maybe Type)	-- The result type
+checkFunApp :: Type 		    -- The function type
+	    -> [Type]		    -- The arg type(s)
+	    -> Message		    -- Error messgae
+	    -> LintM (Maybe Type)   -- The result type
 
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
@@ -408,7 +406,7 @@ checkInScope id loc scope errs
     else
 	((), errs)
 
-checkTys :: Type -> Type -> ErrMsg -> LintM ()
+checkTys :: Type -> Type -> Message -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
   = if (ty1 == ty2)
     then ((), errs)
@@ -416,52 +414,52 @@ checkTys ty1 ty2 msg loc scope errs
 \end{code}
 
 \begin{code}
-mkCaseAltMsg :: StgCaseAlts -> ErrMsg
+mkCaseAltMsg :: StgCaseAlts -> Message
 mkCaseAltMsg alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
 	    -- LATER: (ppr alts)
 	    (panic "mkCaseAltMsg")
 
-mkCaseDataConMsg :: StgExpr -> ErrMsg
+mkCaseDataConMsg :: StgExpr -> Message
 mkCaseDataConMsg expr
   = ($$) (ptext SLIT("A case scrutinee not a type-constructor type:"))
 	    (ppr expr)
 
-mkCaseAbstractMsg :: TyCon -> ErrMsg
+mkCaseAbstractMsg :: TyCon -> Message
 mkCaseAbstractMsg tycon
   = ($$) (ptext SLIT("An algebraic case on an abstract type:"))
 	    (ppr tycon)
 
-mkDefltMsg :: Id -> ErrMsg
+mkDefltMsg :: Id -> Message
 mkDefltMsg bndr
   = ($$) (ptext SLIT("Binder of a case expression doesn't match type of scrutinee:"))
 	    (panic "mkDefltMsg")
 
-mkFunAppMsg :: Type -> [Type] -> StgExpr -> ErrMsg
+mkFunAppMsg :: Type -> [Type] -> StgExpr -> Message
 mkFunAppMsg fun_ty arg_tys expr
   = vcat [text "In a function application, function type doesn't match arg types:",
 	      hang (ptext SLIT("Function type:")) 4 (ppr fun_ty),
 	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys)),
 	      hang (ptext SLIT("Expression:")) 4 (ppr expr)]
 
-mkRhsConMsg :: Type -> [Type] -> ErrMsg
+mkRhsConMsg :: Type -> [Type] -> Message
 mkRhsConMsg fun_ty arg_tys
   = vcat [text "In a RHS constructor application, con type doesn't match arg types:",
 	      hang (ptext SLIT("Constructor type:")) 4 (ppr fun_ty),
 	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys))]
 
-mkUnappTyMsg :: Id -> Type -> ErrMsg
+mkUnappTyMsg :: Id -> Type -> Message
 mkUnappTyMsg var ty
   = vcat [text "Variable has a for-all type, but isn't applied to any types.",
 	      (<>) (ptext SLIT("Var:      ")) (ppr var),
 	      (<>) (ptext SLIT("Its type: ")) (ppr ty)]
 
-mkAlgAltMsg1 :: Type -> ErrMsg
+mkAlgAltMsg1 :: Type -> Message
 mkAlgAltMsg1 ty
   = ($$) (text "In some case statement, type of scrutinee is not a data type:")
 	    (ppr ty)
 
-mkAlgAltMsg2 :: Type -> DataCon -> ErrMsg
+mkAlgAltMsg2 :: Type -> DataCon -> Message
 mkAlgAltMsg2 ty con
   = vcat [
 	text "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
@@ -469,7 +467,7 @@ mkAlgAltMsg2 ty con
 	ppr con
     ]
 
-mkAlgAltMsg3 :: DataCon -> [Id] -> ErrMsg
+mkAlgAltMsg3 :: DataCon -> [Id] -> Message
 mkAlgAltMsg3 con alts
   = vcat [
 	text "In some algebraic case alternative, number of arguments doesn't match constructor:",
@@ -477,7 +475,7 @@ mkAlgAltMsg3 con alts
 	ppr alts
     ]
 
-mkAlgAltMsg4 :: Type -> Id -> ErrMsg
+mkAlgAltMsg4 :: Type -> Id -> Message
 mkAlgAltMsg4 ty arg
   = vcat [
 	text "In some algebraic case alternative, type of argument doesn't match data constructor:",
@@ -485,12 +483,12 @@ mkAlgAltMsg4 ty arg
 	ppr arg
     ]
 
-mkPrimAltMsg :: (Literal, StgExpr) -> ErrMsg
+mkPrimAltMsg :: (Literal, StgExpr) -> Message
 mkPrimAltMsg alt
   = text "In a primitive case alternative, type of literal doesn't match type of scrutinee:"
     $$ ppr alt
 
-mkRhsMsg :: Id -> Type -> ErrMsg
+mkRhsMsg :: Id -> Type -> Message
 mkRhsMsg binder ty
   = vcat [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
 		     ppr binder],

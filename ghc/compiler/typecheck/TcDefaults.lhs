@@ -54,8 +54,9 @@ tc_defaults [DefaultDecl mono_tys locn]
 
 	returnTc tau_tys
 
-tc_defaults decls
-  = failWithTc (dupDefaultDeclErr decls)
+tc_defaults decls@(DefaultDecl _ loc : _) =
+    tcAddSrcLoc loc $
+    failWithTc (dupDefaultDeclErr decls)
 
 
 defaultDeclCtxt =  ptext SLIT("when checking that each type in a default declaration")
@@ -63,11 +64,8 @@ defaultDeclCtxt =  ptext SLIT("when checking that each type in a default declara
 
 
 dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things)
-  = vcat (item1 : map dup_item dup_things)
+  = hang (ptext SLIT("Multiple default declarations"))
+      4  (vcat (map pp dup_things))
   where
-    item1
-      = addShortErrLocLine locn1 (ptext SLIT("multiple default declarations"))
-
-    dup_item (DefaultDecl _ locn)
-      = addShortErrLocLine locn (ptext SLIT("here was another default declaration"))
+    pp (DefaultDecl _ locn) = ptext SLIT("here was another default declaration") <+> ppr locn
 \end{code}

@@ -30,7 +30,7 @@ import RnHsSyn		( RenamedFixitySig )
 import BasicTypes	( Version, IfaceFlavour(..) )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
-			  pprBagOfErrors, ErrMsg, WarnMsg
+			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
 import Name		( Module, Name, OccName, PrintUnqualified,
 			  isLocallyDefinedName, pprModule, 
@@ -586,7 +586,7 @@ mapMaybeRn f def (Just v) = f v
 ================  Errors and warnings =====================
 
 \begin{code}
-failWithRn :: a -> ErrMsg -> RnM s d a
+failWithRn :: a -> Message -> RnM s d a
 failWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST  errs_var  					`thenSST`  \ (warns,errs) ->
     writeMutVarSST errs_var (warns, errs `snocBag` err)		`thenSST_` 
@@ -594,7 +594,7 @@ failWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
   where
     err = addShortErrLocLine loc msg
 
-warnWithRn :: a -> WarnMsg -> RnM s d a
+warnWithRn :: a -> Message -> RnM s d a
 warnWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST  errs_var  				 	`thenSST`  \ (warns,errs) ->
     writeMutVarSST errs_var (warns `snocBag` warn, errs)	`thenSST_` 
@@ -602,18 +602,18 @@ warnWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
   where
     warn = addShortWarnLocLine loc msg
 
-addErrRn :: ErrMsg -> RnM s d ()
+addErrRn :: Message -> RnM s d ()
 addErrRn err = failWithRn () err
 
-checkRn :: Bool -> ErrMsg -> RnM s d ()	-- Check that a condition is true
+checkRn :: Bool -> Message -> RnM s d ()	-- Check that a condition is true
 checkRn False err = addErrRn err
 checkRn True  err = returnRn ()
 
-warnCheckRn :: Bool -> ErrMsg -> RnM s d ()	-- Check that a condition is true
+warnCheckRn :: Bool -> Message -> RnM s d ()	-- Check that a condition is true
 warnCheckRn False err = addWarnRn err
 warnCheckRn True  err = returnRn ()
 
-addWarnRn :: WarnMsg -> RnM s d ()
+addWarnRn :: Message -> RnM s d ()
 addWarnRn warn = warnWithRn () warn
 
 checkErrsRn :: RnM s d Bool		-- True <=> no errors so far

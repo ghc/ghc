@@ -26,9 +26,10 @@ import VarSet
 import VarEnv		( mkVarEnv )
 import Name		( isLocallyDefined, getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet, dumpIfSet, ghcExit )
+import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, 
+			  ErrMsg, addErrLocHdrLine, pprBagOfErrors )
 import PrimRep		( PrimRep(..) )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
 import Type		( Type, Kind, tyVarsOfType,
 			  splitFunTy_maybe, mkPiType, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
@@ -38,7 +39,6 @@ import Type		( Type, Kind, tyVarsOfType,
 			  hasMoreBoxityInfo
 			)
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
-import ErrUtils		( ErrMsg )
 import Outputable
 
 infixr 9 `thenL`, `seqL`, `thenMaybeL`
@@ -484,13 +484,13 @@ data LintLocInfo
 \end{code}
 
 \begin{code}
-initL :: LintM a -> Maybe ErrMsg
+initL :: LintM a -> Maybe Message
 initL m
   = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
-	Just (vcat (bagToList errs))
+	Just (pprBagOfErrors errs)
     }
 
 returnL :: a -> LintM a
@@ -519,18 +519,24 @@ mapL f (x:xs)
 \end{code}
 
 \begin{code}
-checkL :: Bool -> ErrMsg -> LintM ()
+checkL :: Bool -> Message -> LintM ()
 checkL True  msg loc scope errs = (Nothing, errs)
 checkL False msg loc scope errs = (Nothing, addErr errs msg loc)
 
-addErrL :: ErrMsg -> LintM a
+addErrL :: Message -> LintM a
 addErrL msg loc scope errs = (Nothing, addErr errs msg loc)
 
-addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
+addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
 
 addErr errs_so_far msg locs
   = ASSERT (not (null locs))
-    errs_so_far `snocBag` (hang (pprLoc (head locs)) 4 msg)
+    errs_so_far `snocBag` mk_msg msg
+  where
+   (loc, pref) = dumpLoc (head locs)
+
+   mk_msg msg
+     | isNoSrcLoc loc = (loc, hang pref 4 msg)
+     | otherwise      = addErrLocHdrLine loc pref msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs
@@ -564,7 +570,7 @@ checkInScope loc_msg id loc scope errs
   | otherwise
   = (Nothing,errs)
 
-checkTys :: Type -> Type -> ErrMsg -> LintM ()
+checkTys :: Type -> Type -> Message -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
   | ty1 == ty2 = (Nothing, errs)
   | otherwise  = (Nothing, addErr errs msg loc)
@@ -578,27 +584,23 @@ checkTys ty1 ty2 msg loc scope errs
 %************************************************************************
 
 \begin{code}
-pprLoc (RhsOf v)
-  = ppr (getSrcLoc v) <> colon <+> 
-	brackets (ptext SLIT("RHS of") <+> pp_binders [v])
+dumpLoc (RhsOf v)
+  = (getSrcLoc v, brackets (ptext SLIT("RHS of") <+> pp_binders [v]))
 
-pprLoc (LambdaBodyOf b)
-  = ppr (getSrcLoc b) <> colon <+>
-	brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b)
+dumpLoc (LambdaBodyOf b)
+  = (getSrcLoc b, brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b))
 
-pprLoc (BodyOfLetRec bs)
-  = ppr (getSrcLoc (head bs)) <> colon <+>
-	brackets (ptext SLIT("in body of letrec with binders") <+> pp_binders bs)
+dumpLoc (BodyOfLetRec bs)
+  = ( getSrcLoc (head bs), brackets (ptext SLIT("in body of letrec with binders") <+> pp_binders bs))
 
-pprLoc (AnExpr e)
-  = text "In the expression:" <+> ppr e
+dumpLoc (AnExpr e)
+  = (noSrcLoc, text "In the expression:" <+> ppr e)
 
-pprLoc (CaseAlt (con, args, rhs))
-  = text "In a case pattern:" <+> parens (ppr con <+> ppr args)
+dumpLoc (CaseAlt (con, args, rhs))
+  = (noSrcLoc, text "In a case pattern:" <+> parens (ppr con <+> ppr args))
 
-pprLoc (ImportedUnfolding locn)
-  = ppr locn <> colon <+>
-	brackets (ptext SLIT("in an imported unfolding"))
+dumpLoc (ImportedUnfolding locn)
+  = (locn, brackets (ptext SLIT("in an imported unfolding")))
 
 pp_binders :: [Id] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
@@ -611,47 +613,47 @@ pp_binder b = hsep [ppr b, dcolon, ppr (idType b)]
 ------------------------------------------------------
 --	Messages for case expressions
 
-mkConAppMsg :: CoreExpr -> ErrMsg 
+mkConAppMsg :: CoreExpr -> Message
 mkConAppMsg e
   = hang (text "Application of newtype constructor:")
 	 4 (ppr e)
 
-mkConAltMsg :: Con -> ErrMsg
+mkConAltMsg :: Con -> Message
 mkConAltMsg con
   = text "PrimOp in case pattern:" <+> ppr con
 
-mkNullAltsMsg :: CoreExpr -> ErrMsg 
+mkNullAltsMsg :: CoreExpr -> Message
 mkNullAltsMsg e 
   = hang (text "Case expression with no alternatives:")
 	 4 (ppr e)
 
-mkDefaultArgsMsg :: [IdOrTyVar] -> ErrMsg 
+mkDefaultArgsMsg :: [IdOrTyVar] -> Message
 mkDefaultArgsMsg args 
   = hang (text "DEFAULT case with binders")
 	 4 (ppr args)
 
-mkCaseAltMsg :: CoreExpr -> ErrMsg 
+mkCaseAltMsg :: CoreExpr -> Message
 mkCaseAltMsg e
   = hang (text "Type of case alternatives not the same:")
 	 4 (ppr e)
 
-mkScrutMsg :: Id -> Type -> ErrMsg
+mkScrutMsg :: Id -> Type -> Message
 mkScrutMsg var scrut_ty
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
 	  text "Result binder type:" <+> ppr (idType var),
 	  text "Scrutinee type:" <+> ppr scrut_ty]
 
-badAltsMsg :: CoreExpr -> ErrMsg
+badAltsMsg :: CoreExpr -> Message
 badAltsMsg e
   = hang (text "Case statement scrutinee is not a data type:")
 	 4 (ppr e)
 
-nonExhaustiveAltsMsg :: CoreExpr -> ErrMsg
+nonExhaustiveAltsMsg :: CoreExpr -> Message
 nonExhaustiveAltsMsg e
   = hang (text "Case expression with non-exhaustive alternatives")
 	 4 (ppr e)
 
-mkBadPatMsg :: Type -> Type -> ErrMsg
+mkBadPatMsg :: Type -> Type -> Message
 mkBadPatMsg con_result_ty scrut_ty
   = vcat [
 	text "In a case alternative, pattern result type doesn't match scrutinee type:",
@@ -662,13 +664,13 @@ mkBadPatMsg con_result_ty scrut_ty
 ------------------------------------------------------
 --	Other error messages
 
-mkAppMsg :: Type -> Type -> ErrMsg
+mkAppMsg :: Type -> Type -> Message
 mkAppMsg fun arg
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
 	      hang (ptext SLIT("Fun type:")) 4 (ppr fun),
 	      hang (ptext SLIT("Arg type:")) 4 (ppr arg)]
 
-mkKindErrMsg :: TyVar -> Type -> ErrMsg
+mkKindErrMsg :: TyVar -> Type -> Message
 mkKindErrMsg tyvar arg_ty
   = vcat [ptext SLIT("Kinds don't match in type application:"),
 	  hang (ptext SLIT("Type variable:"))
@@ -676,7 +678,7 @@ mkKindErrMsg tyvar arg_ty
 	  hang (ptext SLIT("Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-mkTyAppMsg :: Type -> Type -> ErrMsg
+mkTyAppMsg :: Type -> Type -> Message
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
 	      hang (ptext SLIT("Exp type:"))
@@ -684,7 +686,7 @@ mkTyAppMsg ty arg_ty
 	      hang (ptext SLIT("Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-mkRhsMsg :: Id -> Type -> ErrMsg
+mkRhsMsg :: Id -> Type -> Message
 mkRhsMsg binder ty
   = vcat
     [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
@@ -692,14 +694,14 @@ mkRhsMsg binder ty
      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)],
      hsep [ptext SLIT("Rhs type:"), ppr ty]]
 
-mkRhsPrimMsg :: Id -> CoreExpr -> ErrMsg
+mkRhsPrimMsg :: Id -> CoreExpr -> Message
 mkRhsPrimMsg binder rhs
   = vcat [hsep [ptext SLIT("The type of this binder is primitive:"),
 		     ppr binder],
 	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
 	     ]
 
-mkUnboxedTupleMsg :: Id -> ErrMsg
+mkUnboxedTupleMsg :: Id -> Message
 mkUnboxedTupleMsg binder
   = vcat [hsep [ptext SLIT("A variable has unboxed tuple type:"), ppr binder],
 	  hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]]

@@ -26,7 +26,7 @@ module DsMonad (
 #include "HsVersions.h"
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
-import ErrUtils 	( WarnMsg )
+import ErrUtils 	( WarnMsg, pprBagOfErrors )
 import HsSyn		( OutPat )
 import Id		( mkUserLocal, mkSysLocal, setIdUnique, Id )
 import Name		( Module, Name, maybeWiredInIdName )
@@ -236,5 +236,5 @@ data DsMatchKind
   deriving ()
 
 pprDsWarnings :: DsWarnings -> SDoc
-pprDsWarnings warns = vcat (bagToList warns)
+pprDsWarnings warns = pprBagOfErrors warns
 \end{code}

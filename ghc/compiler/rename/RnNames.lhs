@@ -41,7 +41,7 @@ import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Unique	( getUnique )
-import Util	( removeDups, equivClassesByUniq )
+import Util	( removeDups, equivClassesByUniq, sortLt )
 import List	( nubBy )
 \end{code}
 
@@ -660,9 +660,13 @@ exportClashErr occ_name ie1 ie2
 
 dupDeclErr (n:ns)
   = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
-	  nest 4 (vcat (map pp (n:ns)))]
+	  nest 4 (vcat (map pp sorted_ns))]
   where
-    pp n = pprProvenance (getNameProvenance n)
+    sorted_ns = sortLt occ'ed_before (n:ns)
+
+    occ'ed_before a b = LT == compare (getSrcLoc a) (getSrcLoc b)
+
+    pp n      = pprProvenance (getNameProvenance n)
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 
