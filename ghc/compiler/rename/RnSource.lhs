@@ -48,8 +48,10 @@ import PrelInfo		( derivingOccurrences, numClass_RDR,
 			  bindIO_NAME
 			)
 import Bag		( bagToList )
+import List		( partition )
 import Outputable
 import SrcLoc		( SrcLoc )
+import CmdLineOpts	( opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
 import UniqFM		( lookupUFM )
 import Maybes		( maybeToBool, catMaybes )
 import Util
@@ -540,12 +542,19 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt ty)
 	-- Explicit quantification.
 	-- Check that the forall'd tyvars are a subset of the
 	-- free tyvars in the tau-type part
+	-- That's only a warning... unless the tyvar is constrained by a 
+	-- context in which case it's an error
   = let
-	mentioned_tyvars   = extractHsTyVars ty
-	bad_guys	   = filter (`notElem` mentioned_tyvars) forall_tyvar_names
-	forall_tyvar_names = map getTyVarName forall_tyvars
+	mentioned_tyvars      = extractHsTyVars ty
+	constrained_tyvars    = [tv | (_,tys) <- ctxt,
+				      ty <- tys,
+				      tv <- extractHsTyVars ty]
+	dubious_guys	      = filter (`notElem` mentioned_tyvars) forall_tyvar_names
+	(bad_guys, warn_guys) = partition (`elem` constrained_tyvars) dubious_guys
+	forall_tyvar_names    = map getTyVarName forall_tyvars
     in
-    mapRn (forAllErr doc ty) bad_guys				`thenRn_`
+    mapRn (forAllErr doc ty) bad_guys 				`thenRn_`
+    mapRn (forAllWarn doc ty) warn_guys				`thenRn_`
     checkConstraints True doc forall_tyvar_names ctxt ty	`thenRn` \ ctxt' ->
     rnForAll doc forall_tyvars ctxt' ty
 
@@ -791,9 +800,18 @@ dupClassAssertWarn ctxt (assertion : dups)
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
+forAllWarn doc ty tyvar
+  | not opt_WarnUnusedMatches = returnRn ()
+  | otherwise
+  = addWarnRn (
+      sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
+      $$
+      (ptext SLIT("In") <+> doc))
+
 forAllErr doc ty tyvar
   = addErrRn (
-      sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+      sep [ptext SLIT("The constrained type variable") <+> quotes (ppr tyvar),
 	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
       $$
       (ptext SLIT("In") <+> doc))
