@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.108 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Schedule.c,v 1.109 2001/12/07 20:57:53 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1548,7 +1548,7 @@ createThread_(nat size, rtsBool have_lock)
   stack_size = size - TSO_STRUCT_SIZEW;
 
   tso = (StgTSO *)allocate(size);
-  TICK_ALLOC_TSO(size-TSO_STRUCT_SIZEW, 0);
+  TICK_ALLOC_TSO(stack_size, 0);
 
   SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 #if defined(GRAN)
@@ -1753,11 +1753,6 @@ activateSpark (rtsSpark spark)
 void
 scheduleThread(StgTSO *tso)
 {
-  if (tso==END_TSO_QUEUE){    
-    schedule();
-    return;
-  }
-
   ACQUIRE_LOCK(&sched_mutex);
 
   /* Put the new thread on the head of the runnable queue.  The caller
@@ -1786,7 +1781,7 @@ scheduleThread(StgTSO *tso)
 void
 taskStart(void) /*  ( void *arg STG_UNUSED)  */
 {
-  scheduleThread(END_TSO_QUEUE);
+  schedule();
 }
 #endif
 
@@ -2332,7 +2327,7 @@ threadStackOverflow(StgTSO *tso)
   IF_DEBUG(scheduler, fprintf(stderr,"== scheduler: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
-  TICK_ALLOC_TSO(new_tso_size-sizeofW(StgTSO),0);
+  TICK_ALLOC_TSO(new_stack_size,0);
 
   /* copy the TSO block and the old stack into the new area */
   memcpy(dest,tso,TSO_STRUCT_SIZE);
