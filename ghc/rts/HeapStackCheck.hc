@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.21 2002/01/26 17:58:47 rje Exp $
+ * $Id: HeapStackCheck.hc,v 1.22 2002/02/26 19:18:00 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -706,7 +706,7 @@ EXTFUN(stg_gc_unbx_r1)
   FB_
   Sp -= 2;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_gc_unbx_r1_ret;
+  Sp[0] = (W_)&stg_gc_unbx_r1_info;
   GC_GENERIC
   FE_
 }
