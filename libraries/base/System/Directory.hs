@@ -333,19 +333,23 @@ The path refers to an existing non-directory object.
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-   alloca $ \ ptr_dEnt -> do
-    p <- withCString path $ \s ->
-	  throwErrnoIfNullRetry "getDirectoryContents" (c_opendir s)
-    loop ptr_dEnt p
+   alloca $ \ ptr_dEnt ->
+     bracket
+	(withCString path $ \s -> 
+	   throwErrnoIfNullRetry desc (c_opendir s))
+	(\p -> throwErrnoIfMinus1_ desc (c_closedir p))
+	(\p -> loop ptr_dEnt p)
   where
+    desc = "getDirectoryContents"
+
     loop :: Ptr (Ptr CDirent) -> Ptr CDir -> IO [String]
     loop ptr_dEnt dir = do
       resetErrno
       r <- readdir dir ptr_dEnt
-      if (r == 0) 
+      if (r == 0)
 	 then do
 	         dEnt    <- peek ptr_dEnt
-		 if (dEnt == nullPtr) 
+		 if (dEnt == nullPtr)
 		   then return []
 		   else do
 	 	    entry   <- (d_name dEnt >>= peekCString)
@@ -354,11 +358,10 @@ getDirectoryContents path = do
 		    return (entry:entries)
 	 else do errno <- getErrno
 		 if (errno == eINTR) then loop ptr_dEnt dir else do
-		 throwErrnoIfMinus1_ "getDirectoryContents" $ c_closedir dir
 		 let (Errno eo) = errno
 		 if (eo == end_of_dir)
 		    then return []
-		    else throwErrno "getDirectoryContents"
+		    else throwErrno desc
 
 
 
