@@ -27,7 +27,7 @@ data Token
 
 isSpecial c     = c `elem` ['\"', '@', '/']
 isSingleQuote c = c `elem` ['\'', '`']
-isIdent c       = isAlphaNum c || c == '_'
+isIdent c       = isAlphaNum c || c == '_' || c == '.'
 
 -- simple finite-state machine for tokenising the doc string
 
