@@ -56,11 +56,13 @@ import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
 import System		( system, ExitCode(..), exitWith )
 import CString
+import Addr
+import Int
 
 #if __GLASGOW_HASKELL__ < 500
-import Addr
 import Storable
-import Int
+#else
+import MarshalArray
 #endif
 
 #include "../includes/config.h"
@@ -650,8 +652,9 @@ foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Win
 
 #if __GLASGOW_HASKELL__ >= 500
 foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
+foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectoryLen :: Int32 -> Addr -> IO Int32
 getExecDir :: IO (Maybe String)
-getExecDir = do len <- getCurrentDirectory 0 nullAddr
+getExecDir = do len <- getCurrentDirectoryLen 0 nullAddr
 		buf <- mallocArray (fromIntegral len)
 		ret <- getCurrentDirectory len buf
 		if ret == 0 then return Nothing
