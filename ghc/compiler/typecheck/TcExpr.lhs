@@ -344,8 +344,9 @@ tcExpr (ExplicitTuple exprs) res_ty
     where
      len = length exprs
 
-tcExpr (RecordCon (HsVar con) rbinds) res_ty
-  = tcId con				`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
+tcExpr (RecordCon con rbinds) res_ty
+  = tcLookupGlobalValue con		`thenNF_Tc` \ con_id ->
+    tcId con				`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
 	(_, record_ty) = splitFunTy con_tau
     in
@@ -354,7 +355,6 @@ tcExpr (RecordCon (HsVar con) rbinds) res_ty
     unifyTauTy record_ty res_ty         `thenTc_`
 
 	-- Check that the record bindings match the constructor
-    tcLookupGlobalValue con				`thenNF_Tc` \ con_id ->
     let
 	bad_fields = badFields rbinds con_id
     in
@@ -365,7 +365,7 @@ tcExpr (RecordCon (HsVar con) rbinds) res_ty
 	--  doesn't match the constructor.)
     tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
 
-    returnTc (RecordCon con_expr rbinds', con_lie `plusLIE` rbinds_lie)
+    returnTc (RecordConOut (RealId con_id) con_expr rbinds', con_lie `plusLIE` rbinds_lie)
 
 
 -- The main complication with RecordUpd is that we need to explicitly
@@ -836,7 +836,7 @@ tcStmt :: (RenamedHsExpr -> TcType s -> TcM s (TcExpr s, LIE s))	-- This is tcEx
        -> TcM s (thing, LIE s)
 
 tcStmt tc_expr do_or_lc m combine stmt@(ReturnStmt exp) do_next
-  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True; Guard -> True } )
     tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
         newTyVarTy mkTypeKind                `thenNF_Tc` \ exp_ty ->
 	tc_expr exp exp_ty		     `thenTc`    \ (exp', exp_lie) ->
@@ -847,7 +847,7 @@ tcStmt tc_expr do_or_lc m combine stmt@(ReturnStmt exp) do_next
   	      stmt_lie `plusLIE` thing_lie)
 
 tcStmt tc_expr do_or_lc m combine stmt@(GuardStmt exp src_loc) do_next
-  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True; Guard -> True } )
     newTyVarTy mkTypeKind                    `thenNF_Tc` \ exp_ty ->
     tcAddSrcLoc src_loc 		(
     tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
@@ -859,7 +859,7 @@ tcStmt tc_expr do_or_lc m combine stmt@(GuardStmt exp src_loc) do_next
   	      stmt_lie `plusLIE` thing_lie)
 
 tcStmt tc_expr do_or_lc m combine stmt@(ExprStmt exp src_loc) do_next
-  = ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False } )
+  = ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False; Guard -> False } )
     newTyVarTy mkTypeKind                    `thenNF_Tc` \ exp_ty ->
     tcAddSrcLoc src_loc 		(
     tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
@@ -1031,13 +1031,14 @@ funAppCtxt fun arg_no arg sty
 		    ppr sty fun <> text ", namely"])
 	 4 (ppr sty arg)
 
-stmtCtxt ListComp stmt sty
-  = hang (ptext SLIT("In a pattern guard/list-comprehension qualifier:")) 
+stmtCtxt do_or_lc stmt sty
+  = hang (ptext SLIT("In a") <+> whatever <> colon)
          4 (ppr sty stmt)
-
-stmtCtxt DoStmt stmt sty
-  = hang (ptext SLIT("In a do statement:")) 
-         4 (ppr sty stmt)
+  where
+    whatever = case do_or_lc of
+		 ListComp -> ptext SLIT("list-comprehension qualifier")
+		 DoStmt   -> ptext SLIT("do statement")
+		 Guard	  -> ptext SLIT("guard")
 
 tooManyArgsCtxt f sty
   = hang (ptext SLIT("Too many arguments in an application of the function"))
@@ -1049,9 +1050,7 @@ lurkingRank2Err fun fun_ty sty
 		      ptext SLIT("so that the result type has for-alls in it")])
 
 rank2ArgCtxt arg expected_arg_ty sty
-  = hang (ptext SLIT("In a polymorphic function argument:"))
-	 4 (sep [(<>) (ppr sty arg) (ptext SLIT(" ::")),
-		   ppr sty expected_arg_ty])
+  = ptext SLIT("In a polymorphic function argument") <+> ppr sty arg
 
 badFieldsUpd rbinds sty
   = hang (ptext SLIT("No constructor has all these fields:"))
