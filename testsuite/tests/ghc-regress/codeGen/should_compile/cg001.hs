@@ -2,7 +2,7 @@
 
 module ShouldCompile where
 
-import PrelGHC
+import GHC.Exts
 
 data STRef s a = STRef (MutVar# s a)
 
