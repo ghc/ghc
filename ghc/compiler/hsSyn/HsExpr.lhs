@@ -11,7 +11,12 @@ module HsExpr where
 IMP_Ubiq(){-uitous-}
 
 -- friends:
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(HsLoop) ( pprMatches, pprMatch, Match )
+#else
+import {-# SOURCE #-} HsMatches ( pprMatches, pprMatch, Match )
+#endif
+
 import HsBinds		( HsBinds )
 import HsBasic		( HsLit )
 import BasicTypes	( Fixity(..), FixityDirection(..) )
@@ -25,7 +30,6 @@ import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Usage		( GenUsage{-instance-} )
---import Util		( panic{-ToDo:rm eventually-} )
 #if __GLASGOW_HASKELL__ >= 202
 import Name
 #endif

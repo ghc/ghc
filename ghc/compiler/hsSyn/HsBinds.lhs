@@ -13,16 +13,22 @@ module HsBinds where
 IMP_Ubiq()
 
 -- friends:
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(HsLoop)	( pprMatches, pprGRHSsAndBinds,
 			  Match, GRHSsAndBinds,
-			  HsExpr, pprExpr )
+			  pprExpr, HsExpr )
+#else
+import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
+import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
+#endif
+
 import HsPragmas	( GenPragmas, ClassOpPragmas )
 import HsTypes		( HsType )
 import CoreSyn		( SYN_IE(CoreExpr) )
 
 --others:
 import Id		( SYN_IE(DictVar), SYN_IE(Id), GenId )
-import Name		( getOccName, OccName, NamedThing(..) )
+import Name		( OccName, NamedThing(..) )
 import Outputable	( interpp'SP, ifnotPprForUser, pprQuote,
 			  Outputable(..){-instance * (,)-}
 			)
