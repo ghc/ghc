@@ -3492,7 +3492,7 @@ static int relocateSection(
 		else if(reloc->r_type == PPC_RELOC_BR24)
 		{
 		    word = *wordPtr;
-		    word = (word & 0x03FFFFFC) | (word & 0x02000000) ? 0xFC000000 : 0;
+		    word = (word & 0x03FFFFFC) | ((word & 0x02000000) ? 0xFC000000 : 0);
 		}
 
 
@@ -3518,7 +3518,9 @@ static int relocateSection(
 
 		    if(reloc->r_pcrel)
                     {  
-                        ASSERT(word == 0);
+                            // In the .o file, this should be a relative jump to NULL
+                            // and we'll change it to a jump to a relative jump to the symbol
+                        ASSERT(-word == reloc->r_address);
                         word = symbolAddress;
                         jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,word);
 			word -= ((long)image) + sect->offset + reloc->r_address;
