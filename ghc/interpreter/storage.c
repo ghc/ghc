@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/17 16:57:46 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/25 12:12:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -965,7 +965,6 @@ Cell c; {
 static local Module findQualifier(t)    /* locate Module in import list   */
 Text t; {
     Module ms;
-printf ( "findQualifier %s\n", textToStr(t));
     for (ms=module(currentModule).qualImports; nonNull(ms); ms=tl(ms)) {
         if (textOf(fst(hd(ms)))==t)
             return snd(hd(ms));
