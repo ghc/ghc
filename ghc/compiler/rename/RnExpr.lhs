@@ -911,7 +911,7 @@ doStmtListErr do_or_lc e
 			other   -> "do"
 
 #ifdef GHCI 
-checkTH e what = returnRn ()	-- OK
+checkTH e what = returnM ()	-- OK
 #else
 checkTH e what 	-- Raise an error in a stage-1 compiler
   = addErr (vcat [ptext SLIT("Template Haskell") <+> text what <+>  
