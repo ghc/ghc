@@ -213,9 +213,11 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
  	-- Check the constructor itself
     tcConstructor pat name pat_ty	`thenTc` \ (data_con, ex_tvs, dicts, lie_avail1, arg_tys) ->
     let
-	field_tys = zipEqual "tcPat" 
-			     (map fieldLabelName (dataConFieldLabels data_con))
-			     arg_tys
+	-- not zipEqual: if the constructor isn't really a record, then
+	-- dataConFieldLabels will be empty (and each field in the pattern
+	-- will generate an error below).
+	field_tys = zip (map fieldLabelName (dataConFieldLabels data_con))
+			arg_tys
     in
 
 	-- Check the fields
