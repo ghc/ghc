@@ -1,2 +1,2 @@
 
-mod68.hs:4: Duplicate type signature: f :: Int -> Bool
+mod68.hs:3: Duplicate type signature: f :: Int -> Bool
