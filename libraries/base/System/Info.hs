@@ -1,4 +1,4 @@
------------------------------------------------------------------------------
+<-----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Info
 -- Copyright   :  (c) The University of Glasgow 2001
@@ -18,51 +18,38 @@ module System.Info
        os,		    -- :: String
        arch,		    -- :: String
        compilerName,	    -- :: String
-#ifdef __GLASGOW_HASKELL__
        compilerVersion	    -- :: Version
-#endif
    ) where
 
 import Prelude
 import Data.Version
 
-#ifndef __NHC__
+compilerVersion :: Version
+compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
+  where (maj,min) = compilerVersionRaw `divMod` 100
 
-#include "ghcplatform.h"
+os, arch, compilerName :: String
+compilerVersionRaw :: Int
 
-arch :: String
-arch = HOST_ARCH
-
-os :: String
-os = HOST_OS
-
-#else
-os,arch ::String
-#include "OSInfo.hs"
-#endif
-
-compilerName :: String
 #if defined(__NHC__)
+#include "OSInfo.hs"
 compilerName = "nhc98"
+compilerVersionRaw = __NHC__
+
 #elif defined(__GLASGOW_HASKELL__)
+#include "ghcplatform.h"
+os = HOST_OS
+arch = HOST_ARCH
 compilerName = "ghc"
+compilerVersionRaw = __GLASGOW_HASKELL__
+
 #elif defined(__HUGS__)
+#include "platform.h"
+os = HOST_OS
+arch = HOST_ARCH
 compilerName = "hugs"
+compilerVersionRaw = 0  -- ToDo
+
 #else
 #error Unknown compiler name
 #endif
-
-#ifdef __GLASGOW_HASKELL__
-compilerVersion :: Version
-compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
-  where (maj,min) = __GLASGOW_HASKELL__ `divMod` 100
-#endif
-
-#ifdef __NHC__
-compilerVersion :: Version
-compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
-  where version = __NHC__ `divMod` 100
-        maj = fst version
-        min = snd version
-#endif
-
