@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.68 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: PrimOps.h,v 1.69 2000/12/11 12:56:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -960,6 +960,13 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #endif
 
 /*  tagToEnum# is handled directly by the code generator. */
+
+/* -----------------------------------------------------------------------------
+   BCOs
+   -------------------------------------------------------------------------- */
+
+EXTFUN_RTS(newBCOzh_fast);
+#define getBCOPtrszh(r,bco) r=((StgBCO *)bco)->ptrs
 
 /* -----------------------------------------------------------------------------
    Signal processing.  Not really primops, but called directly from

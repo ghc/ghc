@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.60 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.61 2000/12/11 12:56:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1020,6 +1020,35 @@ FN_(makeStableNamezh_fast)
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(sn_obj);
+}
+
+/* -----------------------------------------------------------------------------
+   Bytecode object primitives
+   -------------------------------------------------------------------------  */
+
+FN_(newBCOzh_fast)
+{
+  /* R1.p = instrs
+     R2.p = literals
+     R3.p = ptrs
+  */
+  StgBCO *bco;
+  FB_
+
+  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR, newBCOzh_fast,);
+  TICK_ALLOC_PRIM(sizeofW(StgHeader), sizeofW(StgBCO)-sizeofW(StgHeader), 0);
+  CCS_ALLOC(CCCS,sizeofW(StgBCO)); /* ccs prof */
+
+  bco = (StgBCO *) (Hp + 1 - sizeof(StgBCO));
+  SET_HDR(w, &stg_BCO_info, CCCS);
+
+  w->instrs     = R1.cl;
+  w->literals   = R2.cl;
+  w->ptrs       = R3.cl;
+
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(w);
+  FE_
 }
 
 /* -----------------------------------------------------------------------------

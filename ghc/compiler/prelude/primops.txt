@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.7 2000/12/04 12:31:19 simonmar Exp $
+-- $Id: primops.txt,v 1.8 2000/12/11 12:56:14 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -998,49 +998,13 @@ primop TouchOp "touch#" GenPrimOp
 ------------------------------------------------------------------------
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   Int# -> Int# -> Int# -> a -> State# RealWorld -> (# State# RealWorld, BCO# #)
+   ByteArr# -> ByteArr# -> MutArr# s a -> State# s -> (# State# s, BCO# #)
    with
    has_side_effects = True
    out_of_line      = True
-   strictness       = { \ arity -> StrictnessInfo 
-                                   [wwPrim, wwPrim, wwPrim, wwLazy, wwPrim] False }
-   usage            = { mangle NewBCOOp [mkP, mkP, mkP, mkM, mkP] mkR }
 
-primop  WriteBCOPtrOp "writeBCOPtr#" GenPrimOp
-   BCO# -> Int# -> o -> State# RealWorld -> State# RealWorld
-   with
-   usage            = { mangle WriteBCOPtrOp [mkP, mkP, mkM, mkP] mkR }
-   strictness       = { \ arity -> StrictnessInfo 
-                                   [wwPrim, wwPrim, wwLazy, wwPrim] False }
-   has_side_effects = True
-
-primop  WriteBCONonPtrOp "writeBCONonPtr#" GenPrimOp
-   BCO# -> Int# -> Word# -> State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-
-primop  WriteBCOInstrOp "writeBCOInstr#" GenPrimOp
-   BCO# -> Int# -> Word# -> State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-
-primop  ReadBCOPtrOp "readBCOPtr#"  GenPrimOp
-   BCO# -> Int# -> State# RealWorld -> (# State# RealWorld, Word# #)
-   with
-   usage = { mangle ReadBCOPtrOp [mkP, mkP] mkM }
-
-primop  ReadBCONonPtrOp "readBCONonPtr#"  GenPrimOp
-   BCO# -> Int# -> State# RealWorld -> (# State# RealWorld, Word# #)
-
-primop  ReadBCOInstrOp "readBCOInstr#" GenPrimOp
-   BCO# -> Int# -> State# RealWorld -> (# State# RealWorld, Word# #)
-
-primop  SameBCOOp "sameBCO#" GenPrimOp
-   BCO# -> BCO# -> Bool
-   with
-   -- is this usage right?
-   usage = { mangle SameMutableArrayOp [mkP, mkP] mkM }
-
+primop  GetBCOPtrsOp "getBCOPtrs#" GenPrimOp
+   BCO# -> State# s -> (# State# s, MutArr# s a #)
 
 ------------------------------------------------------------------------
 --- Weak pointers                                                    ---
