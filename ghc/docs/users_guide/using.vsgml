@@ -501,6 +501,26 @@ other unpleasant happenings.
 
 %************************************************************************
 %*                                                                      *
+<sect2>File names and module names
+<label id="files-and-modules">
+<p>
+%*                                                                      *
+%************************************************************************
+
+Typically, a module @Foo@ will be contained in a file called @Foo.hs@
+or @Foo.lhs@.  But GHC does not require that to be the case.  You can put a module
+named @Foo@ in a file named @SomethingElse@.  In this case, <em>GHC will still
+write an interface file @Foo.hi@</em>, but it will write an object fild
+@SomethingElse.o@.  Any module that imports @Foo@ will
+of course look for @Foo.hi@, and it will find it.
+
+A useful consequence is that you can have many files, @A.hs@, @B.hs@, etc, containing
+the module @Main@.  This is useful if you want to build distinct programs
+in the same directory.
+
+
+%************************************************************************
+%*                                                                      *
 <sect2>Finding interface files
 <label id="options-finding-imports">
 <p>
@@ -560,17 +580,31 @@ option in the usual C-ish way.
 %*                                                                      *
 %************************************************************************
 
+GHC supports some other more exotic command-line options related to interface files.
+Most programmers should never need to use any of them.
+
+<descrip>
+
+<tag>@-ohi@ <filename></tag> 
+<nidx>-ohi &lt;file&gt; option</nidx> 
+
 The interface output may be directed to another file
-@bar2/Wurble.iface@ with the option @-ohi bar2/Wurble.iface@<nidx>-ohi
-&lt;file&gt; option</nidx> (not recommended).
+@bar2/Wurble.iface@ with the option @-ohi bar2/Wurble.iface@
+(not recommended).
 
-To avoid generating an interface file at all, use a @-nohi@
-option.<nidx>-nohi option</nidx>
+<tag>@-nohi@</tag>
+<nidx>-nohi option</nidx>
 
+Don't generate an interface file at all.
+
+<tag>@-hi-diffs@, @-hi-diffs-with-usages@, @-keep-hi-diffs@</tag>
+<nidx>-hi-diffs option</nidx> 
+<nidx>-hi-diffs-with-usages option</nidx> 
+<nidx>-keep-hi-diffs option</nidx> 
 The compiler does not overwrite an existing @.hi@ interface file if
 the new one is byte-for-byte the same as the old one; this is friendly
 to @make@.  When an interface does change, it is often enlightening to
-be informed.  The @-hi-diffs@<nidx>-hi-diffs option</nidx> option will
+be informed.  The @-hi-diffs@ option will
 make @ghc@ run @diff@ on the old and new @.hi@ files. You can also
 record the difference in the interface file itself, the
 @-keep-hi-diffs@<nidx>-keep-hi-diffs</nidx> option takes care of that.
@@ -581,20 +615,24 @@ reported, you need to use the
 @-hi-diffs-with-usages@<nidx>-hi-diffs-with-usages option</nidx>
 option.
 
+<tag>@-fignore-interface-pragmas@</tag>
+<nidx>-fignore-interface-pragmas option</nidx>
+
 Interface files are normally jammed full of compiler-produced
 <em>pragmas</em>, which record arities, strictness info, etc.  If you
 think these pragmas are messing you up (or you are doing some kind of
 weird experiment), you can tell GHC to ignore them with the
-@-fignore-interface-pragmas@<nidx>-fignore-interface-pragmas
-option</nidx> option.
+@-fignore-interface-pragmas@ option.
 
+<tag>@-fno-prune-tydecls@</tag>
+<nidx>-fno-prune-tydecls option</nidx>
 When compiling without optimisations on, the compiler is extra-careful
-about not slurping in data constructors and instance declarations that
-it will not need. If you believe it is getting it wrong and not
-importing stuff which you think it should, this optimisation can be
-turned off with @-fno-prune-tydecls@ and @-fno-prune-instdecls@.
-<nidx>-fno-prune-tydecls option</nidx><nidx>-fno-prune-instdecls
-option</nidx>
+about not slurping in data constructors that it will not need. 
+The @-fno-prune-tydecls@ flag lets you turn this cleverness off; the reason
+is to allow us to measure the effect of the cleverness.   (In earlier versions
+of GHC there was a bug that meant you <em>had</em> to turn it off sometimes,
+but that is no longer true.)
+</descrip>
 
 See also Section <ref name="Linking and consistency-checking"
 id="options-linker">, which describes how the linker finds standard
