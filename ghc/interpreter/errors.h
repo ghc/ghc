@@ -2,14 +2,15 @@
 /* --------------------------------------------------------------------------
  * Error handling support functions
  *
- * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
- * Haskell Group 1994-99, and is distributed as Open Source software
- * under the Artistic License; see the file "Artistic" that is included
- * in the distribution for details.
+ * The Hugs 98 system is Copyright (c) Mark P Jones, Alastair Reid, the
+ * Yale Haskell Group, and the Oregon Graduate Institute of Science and
+ * Technology, 1994-1999, All rights reserved.  It is distributed as
+ * free software under the license in the file "License", which is
+ * included in the distribution.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:28 $
+ * $Revision: 1.4 $
+ * $Date: 1999/10/15 21:41:05 $
  * ------------------------------------------------------------------------*/
 
 extern Void internal     Args((String)) HUGS_noreturn;

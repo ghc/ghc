@@ -2,13 +2,15 @@
 /* --------------------------------------------------------------------------
  * Code generator
  *
- * Copyright (c) The University of Nottingham and Yale University, 1994-1997.
- * All rights reserved. See NOTICE for details and conditions of use etc...
- * Hugs version 1.4, December 1997
+ * The Hugs 98 system is Copyright (c) Mark P Jones, Alastair Reid, the
+ * Yale Haskell Group, and the Oregon Graduate Institute of Science and
+ * Technology, 1994-1999, All rights reserved.  It is distributed as
+ * free software under the license in the file "License", which is
+ * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/07/06 15:24:36 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 21:41:02 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"

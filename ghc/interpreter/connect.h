@@ -1,14 +1,15 @@
 /* --------------------------------------------------------------------------
  * Connections between components of the Hugs system
  *
- * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
- * Haskell Group 1994-99, and is distributed as Open Source software
- * under the Artistic License; see the file "Artistic" that is included
- * in the distribution for details.
+ * The Hugs 98 system is Copyright (c) Mark P Jones, Alastair Reid, the
+ * Yale Haskell Group, and the Oregon Graduate Institute of Science and
+ * Technology, 1994-1999, All rights reserved.  It is distributed as
+ * free software under the license in the file "License", which is
+ * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/15 11:02:09 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 21:41:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -324,7 +325,8 @@ extern Bool  broken;                    /* indicates interrupt received    */
 /* On Win32 we can use the registry to supplement info in environment 
  * variables.
  */
-#define USE_REGISTRY (HAVE_WINDOWS_H && !__MSDOS__)
+/* AJG: Commented out for now for development */
+/* #define USE_REGISTRY (HAVE_WINDOWS_H && !__MSDOS__) */
 
 #ifdef USE_REGISTRY
 Bool 	writeRegString Args((String var, String val));

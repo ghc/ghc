@@ -2,14 +2,15 @@
 /* --------------------------------------------------------------------------
  * Part of the type checker dealing with predicates and entailment
  *
- * Hugs 98 is Copyright (c) Mark P Jones, Alastair Reid and the Yale
- * Haskell Group 1994-99, and is distributed as Open Source software
- * under the Artistic License; see the file "Artistic" that is included
- * in the distribution for details.
+ * The Hugs 98 system is Copyright (c) Mark P Jones, Alastair Reid, the
+ * Yale Haskell Group, and the Oregon Graduate Institute of Science and
+ * Technology, 1994-1999, All rights reserved.  It is distributed as
+ * free software under the license in the file "License", which is
+ * included in the distribution.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:06:59 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/15 21:40:54 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
