@@ -40,5 +40,5 @@ test "conc026" { myvtr("", "", "") }
 test "conc027" { myvtr("", "", "") }
 test "conc028" { myvtr("", "", "") }
 test "conc029" { myvtr("", "", "") }
-test "conc030" { myvtr("", "", "") }
+test "conc030" { myvtr("", "+RTS -K2M -RTS", "") }
 test "conc031" { myvtr("", "", "") }
