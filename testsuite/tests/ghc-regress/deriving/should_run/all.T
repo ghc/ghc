@@ -9,7 +9,7 @@ test "drvrun001" { vtr("", "", "") }
 test "drvrun002" { vtr("", "", "") }
 test "drvrun003" { vtr("", "", "") }
 test "drvrun004" { vtr("", "", "") }
-test "drvrun005" { vtr("", "", "2") }
+test "drvrun005" { vtr("", "", "") }
 test "drvrun006" { vtr("", "", "") }
 test "drvrun007" { vtr("", "", "") }
 test "drvrun008" { vtr("-funbox-strict-fields", "", "") }
