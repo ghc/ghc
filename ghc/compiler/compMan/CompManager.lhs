@@ -20,7 +20,7 @@ import HscTypes
 import Module		( ModuleName, moduleName,
 			  isHomeModule, moduleEnvElts,
 			  moduleNameUserString )
-import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
+import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
@@ -65,9 +65,9 @@ import Maybe		( catMaybes, fromMaybe, isJust )
 
 
 \begin{code}
-cmInit :: PackageConfigInfo -> GhciMode -> IO CmState
-cmInit raw_package_info gmode
-   = emptyCmState raw_package_info gmode
+cmInit :: GhciMode -> IO CmState
+cmInit gmode
+   = emptyCmState gmode
 
 #ifdef GHCI
 cmGetExpr :: CmState
@@ -116,15 +116,14 @@ data PersistentCMState
         hit   :: HomeIfaceTable,     -- home interface table
         ui    :: UnlinkedImage,      -- the unlinked images
         mg    :: ModuleGraph,        -- the module graph
-        pci   :: PackageConfigInfo,  -- NEVER CHANGES
         gmode :: GhciMode            -- NEVER CHANGES
      }
 
-emptyPCMS :: PackageConfigInfo -> GhciMode -> PersistentCMState
-emptyPCMS pci gmode
+emptyPCMS :: GhciMode -> PersistentCMState
+emptyPCMS gmode
   = PersistentCMState { hst = emptyHST, hit = emptyHIT,
                         ui  = emptyUI,  mg  = emptyMG, 
-                        pci = pci, gmode = gmode }
+                        gmode = gmode }
 
 emptyHIT :: HomeIfaceTable
 emptyHIT = emptyUFM
@@ -141,9 +140,9 @@ data CmState
         pls    :: PersistentLinkerState    -- link's persistent state
      }
 
-emptyCmState :: PackageConfigInfo -> GhciMode -> IO CmState
-emptyCmState pci gmode
-    = do let pcms = emptyPCMS pci gmode
+emptyCmState :: GhciMode -> IO CmState
+emptyCmState gmode
+    = do let pcms = emptyPCMS gmode
          pcs     <- initPersistentCompilerState
          pls     <- emptyPLS
          return (CmState { pcms   = pcms,
@@ -182,8 +181,7 @@ cmLoadModule cmstate1 rootname
         let hit1      = hit    pcms1
         let ui1       = ui     pcms1
    
-        let pcii      = pci   pcms1 -- this never changes
-        let ghci_mode = gmode pcms1 -- ToDo: fix!
+        let ghci_mode = gmode pcms1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
@@ -196,6 +194,8 @@ cmLoadModule cmstate1 rootname
         let verb = verbosity dflags
 
 	showPass dflags "Chasing dependencies"
+        when (verb >= 1 && ghci_mode == Batch) $
+           hPutStrLn stderr ("ghc: chasing modules from: " ++ rootname)
 
         mg2unsorted <- downsweep [rootname]
 
@@ -258,7 +258,7 @@ cmLoadModule cmstate1 rootname
                  LinkOK pls3 
                     -> do let pcms3 = PersistentCMState { hst=hst3, hit=hit3, 
                                                           ui=ui3, mg=modsDone, 
-                                                          pci=pcii, gmode=ghci_mode }
+                                                          gmode=ghci_mode }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
                           return (cmstate3, True, map name_of_summary modsDone)
@@ -293,7 +293,7 @@ cmLoadModule cmstate1 rootname
                  LinkOK pls4
                     -> do let pcms4 = PersistentCMState { hst=hst4, hit=hit4, 
                                                           ui=ui4, mg=mods_to_keep,
-                                                          pci=pcii, gmode=ghci_mode }
+                                                          gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
                           return (cmstate4, False, mods_to_keep_names)

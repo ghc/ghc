@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.30 2000/11/21 16:18:17 sewardj Exp $
+-- $Id: Main.hs,v 1.31 2000/11/21 16:31:51 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -244,8 +244,8 @@ main =
    when (mode == DoMkDependHS) beginMkDependHS
 
 	-- make/interactive require invoking the compilation manager
-   if (mode == DoMake)        then beginMake pkg_avails srcs        else do
-   if (mode == DoInteractive) then beginInteractive pkg_avails srcs else do
+   if (mode == DoMake)        then beginMake srcs        else do
+   if (mode == DoInteractive) then beginInteractive srcs else do
 
 	-- for each source file, find which phases to run
    let lang = hscLang init_dyn_flags
@@ -282,20 +282,22 @@ setTopDir args = do
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
-beginMake :: PackageConfigInfo -> [String] -> IO ()
-beginMake pkg_details mods
+beginMake :: [String] -> IO ()
+beginMake mods
   = do case mods of
 	 []    -> throwDyn (UsageError "no input files")
-	 [mod] -> do state <- cmInit pkg_details Batch
+	 [mod] -> do state <- cmInit Batch
 		     cmLoadModule state mod
 		     return ()
 	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
+
+beginInteractive :: [String] -> IO ()
 #ifndef GHCI
 beginInteractive = throwDyn (OtherError "not build for interactive use")
 #else
-beginInteractive pkg_details mods
-  = do state <- cmInit pkg_details Interactive
+beginInteractive mods
+  = do state <- cmInit Interactive
        case mods of
 	   []    -> return ()
 	   [mod] -> do cmLoadModule state mod; return ()
