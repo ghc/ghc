@@ -427,18 +427,18 @@ completeVar sw_chkr in_scope inline_call var cont
     has_unfolding = case unfolding of
 			CoreUnfolding _ _ _ -> True
 			other		    -> False
+    CoreUnfolding form guidance unf_template = unfolding
 
 	-- overrides cost-centre business
     must_be_unfolded = case getInlinePragma var of
 			  IMustBeINLINEd -> True
 			  _		 -> False
 
-    CoreUnfolding form guidance unf_template = unfolding
-
+    ok_to_inline	= okToInline sw_chkr in_scope var form guidance cont
     unfolding_is_constr = case unf_template of
 				  Con con _ -> conOkForAlt con
 				  other	    -> False
-    Con con con_args = unf_template
+    Con con con_args    = unf_template
 
     	---------- Specialisation stuff
     ty_args		      = initial_ty_args cont
@@ -455,7 +455,6 @@ completeVar sw_chkr in_scope inline_call var cont
     drop_ty_args other_cont		     = other_cont
 
 	---------- Switches
-    ok_to_inline	      = okToInline sw_chkr in_scope var form guidance cont
 
     var_is_case_scrutinee = case cont of
 				  Select _ _ _ _ _ -> True
@@ -573,10 +572,10 @@ simplRhs bndr bndr_se rhs
 
   | otherwise
   = 	-- Swizzle the inner lets past the big lambda (if any)
-    mkRhsTyLam rhs		`thenSmpl` \ rhs' ->
+    mkRhsTyLam rhs			`thenSmpl` \ swizzled_rhs ->
 
 	-- Simplify the swizzled RHS
-    simplRhs2 bndr bndr_se rhs	`thenSmpl` \ (floats, (in_scope, rhs', arity)) ->
+    simplRhs2 bndr bndr_se swizzled_rhs	`thenSmpl` \ (floats, (in_scope, rhs', arity)) ->
 
     if not (null floats) && exprIsWHNF rhs' then	-- Do the float
 	tick LetFloatFromLet	`thenSmpl_`
@@ -894,39 +893,67 @@ okToInline :: SwitchChecker
 -- so we can inline if it occurs once, or is small
 
 okToInline sw_chkr in_scope id form guidance cont
-  | essential_unfoldings_only
-  = idMustBeINLINEd id
+  | switchIsOn sw_chkr EssentialUnfoldingsOnly
+  =
+#ifdef DEBUG
+    if opt_D_dump_inlinings then
+	pprTrace "Considering inlining"
+		 (ppr id <+> vcat [text "essential inlinings only",
+				   text "inline prag:" <+> ppr inline_prag,
+				   text "ANSWER =" <+> if result then text "YES" else text "NO"])
+		 result
+    else
+#endif
+    result
+  where
+    inline_prag  = getInlinePragma id
+    result = idMustBeINLINEd id
 		-- If "essential_unfoldings_only" is true we do no inlinings at all,
 		-- EXCEPT for things that absolutely have to be done
 		-- (see comments with idMustBeINLINEd)
 
-  | otherwise
-  = case getInlinePragma id of
-	IAmDead		  -> pprTrace "okToInline: dead" (ppr id) False
 
-	IAmASpecPragmaId  -> False
-	IMustNotBeINLINEd -> False
-	IAmALoopBreaker   -> False
-	IMustBeINLINEd    -> True
-	IWantToBeINLINEd  -> True
+okToInline sw_chkr in_scope id form guidance cont
+	-- Essential unfoldings only not on
+  =
+#ifdef DEBUG
+    if opt_D_dump_inlinings then
+	pprTrace "Considering inlining"
+		 (ppr id <+> vcat [text "inline prag:" <+> ppr inline_prag,
+				   text "whnf" <+> ppr whnf,
+				   text "small enough" <+> ppr small_enough,
+				   text "some benefit" <+> ppr some_benefit,
+			  	   text "arg evals" <+> ppr arg_evals,
+				   text "result scrut" <+> ppr result_scrut,
+				   text "ANSWER =" <+> if result then text "YES" else text "NO"])
+		  result
+     else
+#endif
+    result
+  where
+    result = case inline_prag of
+		IAmDead		  -> pprTrace "okToInline: dead" (ppr id) False
 
-	ICanSafelyBeINLINEd inside_lam one_branch
-		-> --pprTrace "inline (occurs once): " (ppr id <+> ppr small_enough <+> ppr one_branch <+> ppr whnf <+> ppr some_benefit <+> ppr not_inside_lam) $
-		   (small_enough || one_branch) &&
-		   ((whnf && some_benefit) || not_inside_lam)
+		IAmASpecPragmaId  -> False
+		IMustNotBeINLINEd -> False
+		IAmALoopBreaker   -> False
+		IMustBeINLINEd    -> True
+		IWantToBeINLINEd  -> True
+	
+		ICanSafelyBeINLINEd inside_lam one_branch
+			-> (small_enough || one_branch) &&
+			   ((whnf && some_benefit) || not_inside_lam)
 		    
-		where
-		   not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}
+			where
+			   not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}
 
-	other   -> (if opt_PprStyle_Debug then
-			pprTrace "inline:" (ppr id <+> ppr small_enough <+> ppr whnf <+> ppr some_benefit) 
-		    else (\x -> x))
-		   whnf && small_enough && some_benefit
+		other   -> whnf && small_enough && some_benefit
 			-- We could consider using exprIsCheap here,
 			-- as in postInlineUnconditionally, but unlike the latter we wouldn't
 			-- necessarily eliminate a thunk; and the "form" doesn't tell
 			-- us that.
-  where
+
+    inline_prag  = getInlinePragma id
     whnf         = whnfOrBottom form
     small_enough = smallEnoughToInline id arg_evals result_scrut guidance
     (arg_evals, result_scrut) = get_evals cont
@@ -958,7 +985,6 @@ okToInline sw_chkr in_scope id form guidance cont
 			Just v' -> isEvaldUnfolding (getIdUnfolding v')
 			Nothing -> isEvaldUnfolding (getIdUnfolding v)
 
-    essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
 
 contIsInteresting :: SimplCont -> Bool
 contIsInteresting Stop			      = False
