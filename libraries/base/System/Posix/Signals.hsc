@@ -382,7 +382,7 @@ getSignalMask :: IO SignalSet
 getSignalMask = do
   fp <- mallocForeignPtrBytes sizeof_sigset_t
   withForeignPtr fp $ \p ->
-    throwErrnoIfMinus1_ "getSignalMask" (c_sigprocmask 0 p nullPtr)
+    throwErrnoIfMinus1_ "getSignalMask" (c_sigprocmask 0 nullPtr p)
   return (SignalSet fp)
    
 sigProcMask :: String -> CInt -> SignalSet -> IO ()
