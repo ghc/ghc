@@ -527,43 +527,64 @@ on...</para>
 
 <Sect1 id="sec-install-windows"><Title>Installing on Windows</Title>
 
-<Para>
-Getting the Glasgow Haskell Compiler (GHC) to run on Windows platforms can
-be a bit of a trying experience. It should be much easier now than in the
-past, since all the software required to use GHC is included in
-the InstallShield.
-</Para>
+<para>
+Getting the Glasgow Haskell Compiler (post 5.02) to run on Windows platforms is
+a snap: the Installshield does everything you need.  
+</para>
 
-<Para>
-An installation of GHC requires about 140M of disk space.
-To run GHC comfortably, your machine should have at least
-64M of memory.
-</Para>
+<Sect2><Title>Installing GHC on Windows</Title>
 
+<para>
+To install GHC, use the following steps:
+</para>
+<itemizedlist>
+<listitem><para>Download the Installshield <Filename>setup.exe</Filename>
+from the GHC download page
+<ULink
+URL="http://www.haskell.org/ghc">haskell.org</ULink>.
+</para></listitem>
 
-<Sect2><Title>Installing GHC</Title>
+<listitem><para>Run <Filename>setup.exe</Filename>.
+(If you have a previous version of GHC, Installshield will offer to "modify", 
+or "remove" GHC.  Choose "remove"; then run <Filename>setup.exe</Filename> a
+second time.  This time it should offer to install.)
+</para>
+<para>
+At this point you should find GHCi and the GHC documentation are 
+available in your Start menu under "Start/Programs/Glasgow Haskell Compiler".
+</para>
+</listitem>
 
-<Para>
-Download the latest GHC distribution (ghc-5.02 InstallShield installer, 27M)
-from <ULink
-URL="http://www.haskell.org/ghc/download_ghc_502.html">haskell.org</ULink>.
-</Para>
+<listitem><para>
+The final dialogue box from the install process tells you where GHC has
+been installed.  If you want to invoke GHC from a command line, add this 
+to your PATH environment variable.  Usually, GHC installs into
+<Filename>c:/ghc/ghc-5.02</Filename>, though the last part of this path
+depends on which version of GHC you are installing, of course. 
+You need to add <Filename>c:/ghc/ghc-5.02/bin</Filename> to your path if yo
+</para></listitem>
 
-<Para>
-When the installer has completed, make sure you add the location of the
-ghc <Filename>bin/</Filename> directory to your path, as directed in the
-final dialog of the installer. You need to do this in order to bring the
-various GHC binaries into scope.
-</Para>
+<listitem><para>
+GHC needs a directory in which to create, and later delete, temporary files.
+It uses the standard Windows procedure <literal>GetTempPath()</literal> to
+find a suitable directory.  This procedure returns:
+<itemizedlist>
+<listitem><para>The path in environment variable TMP, 
+if TMP is set.</para></listitem>
+<listitem><para>Otherwise, the path in environment variable TEMP, 
+if TEMP is set.</para></listitem>
+<listitem><para>Otherwise, there is a per-user default which varies
+between versions of Windows. On NT and XP-ish versions, it might 
+be:
+<Filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>
+</para></listitem>
+</litemizedlist>
+The main point is that if you don't do anything GHC will work fine;
+but if you want to control where the directory is, you can do so by
+setting TMP or TEMP.
+</para></listitem>
 
-<Para>
-You can freely move the GHC tree once you've installed it just by copying
-the <Filename>ghc-x.yy</Filename> directory. You might want to do this in
-order to use GHC with tools that don't like spaces in paths (GHC is
-installed in <Filename>&bsol;Program Files&bsol;Glasgow Haskell
-Compiler</Filename> by default.
-</Para>
-
+<listitem>
 <Para>
 To test the fruits of your labour, try now to compile a simple
 Haskell program:
@@ -579,23 +600,37 @@ bash$ ghc -o main main.hs
 bash$ ./main
 Hello, world!
 bash$ </Screen>
+</listitem>
+</itemizedlist>
 
-<Para>
-OK, assuming that worked, you're all set. Go forth and write useful
-Haskell programs :-) If not, consult the installation FAQ (<XRef LinkEnd="winfaq">); if that still doesn't help then please report the problems you're experiencing (see <Xref LinkEnd="wrong">).
 </Para>
-
+<para>
+You do <emphasis>not</emphasis> need the Cygwin toolchain, or anything
+else, to install and run GHC.
+</para>
 <Para>
-Further information on using GHC under Windows can be found in <ULink
-URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
-pages</ULink>. Note: ignore the installation instructions, which are rather
-out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of
-the page is of most interest, covering topics beyond the scope of this
-manual.
+An installation of GHC requires about 140M of disk space.
+To run GHC comfortably, your machine should have at least
+64M of memory.
 </Para>
+</sect2>
 
-</Sect2>
-
+<Sect2><title>Moving GHC around</title>
+<Para>
+At the moment, GHC installs in a fixed place (<Filename>c:/ghc/ghc-x.yy</Filename>,
+but once it is installed, you can freely move the entire GHC tree just by copying
+the <Filename>ghc-x.yy</Filename> directory.   (You may need to fix up 
+the links in "Start/Programs/Glasgow Haskell Compiler" if you do this.)
+</para>
+<para>
+It is OK to put GHC tree in a directory whose path involves spaces.  However,
+don't do this if you use want to use GHC with the Cygwin tools, 
+because Cygwin can get confused when this happpens.
+We havn't quite got to the bottom of this, but so far as we know it's not 
+a problem with GHC itself.  Nevertheless, just to keep life simple we usually
+put GHC in a place with a space-free path.
+</Para>
+</sect2>
 
 <Sect2 id="winfaq"><title>Installing ghc-win32 FAQ</title>
 
@@ -641,6 +676,14 @@ on or rebooting may be the quickest cure.
 
 </QandASet>
 
+<Para>
+Further information on using GHC under Windows can be found in <ULink
+URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
+pages</ULink>. Note: ignore the installation instructions, which are rather
+out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of
+the page is of most interest, covering topics beyond the scope of this
+manual.
+</Para>
 </Sect2>
 
 </Sect1>
