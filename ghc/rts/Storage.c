@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.51 2001/10/01 11:09:02 simonmar Exp $
+ * $Id: Storage.c,v 1.52 2001/10/18 14:41:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,6 +17,7 @@
 #include "MBlock.h"
 #include "Weak.h"
 #include "Sanity.h"
+#include "Arena.h"
 
 #include "Storage.h"
 #include "Schedule.h"
@@ -773,6 +774,9 @@ memInventory(void)
     total_blocks += bd->blocks;
   }
   
+  // count the blocks allocated by the arena allocator
+  total_blocks += arenaBlocks();
+
   /* count the blocks on the free list */
   free_blocks = countFreeList();
 

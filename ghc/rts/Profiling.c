@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.23 2001/10/18 13:46:47 simonmar Exp $
+ * $Id: Profiling.c,v 1.24 2001/10/18 14:41:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -18,6 +18,12 @@
 #include "Proftimer.h"
 #include "Itimer.h"
 #include "ProfHeap.h"
+#include "Arena.h"
+
+/*
+ * Profiling allocation arena.
+ */
+Arena *prof_arena;
 
 /*
  * Global variables used to assign unique IDs to cc's, ccs's, and 
@@ -153,6 +159,9 @@ static    void reportCCS_XML       ( CostCentreStack *ccs );
 void
 initProfiling1 (void)
 {
+  // initialise our arena
+  prof_arena = newArena();
+
   /* for the benefit of allocate()... */
   CCCS = CCS_SYSTEM;
   
@@ -226,7 +235,7 @@ static void
 initProfilingLogFile(void)
 {
     /* Initialise the log file name */
-    prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+    prof_filename = arenaAlloc(prof_arena, strlen(prog_argv[0]) + 6);
     sprintf(prof_filename, "%s.prof", prog_argv[0]);
 
     /* open the log file */
@@ -253,7 +262,7 @@ initProfilingLogFile(void)
     
     if (RtsFlags.ProfFlags.doHeapProfile) {
 	/* Initialise the log file name */
-	hp_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+	hp_filename = arenaAlloc(prof_arena, strlen(prog_argv[0]) + 6);
 	sprintf(hp_filename, "%s.hp", prog_argv[0]);
 	
 	/* open the log file */
@@ -415,7 +424,7 @@ ActualPush ( CostCentreStack *ccs, CostCentre *cc )
   CostCentreStack *new_ccs;
   
   /* allocate space for a new CostCentreStack */
-  new_ccs = (CostCentreStack *) stgMallocBytes(sizeof(CostCentreStack), "Error allocating space for CostCentreStack");
+  new_ccs = (CostCentreStack *) arenaAlloc(prof_arena, sizeof(CostCentreStack));
   
   return ActualPush_(ccs, cc, new_ccs);
 }
@@ -480,7 +489,7 @@ AddToIndexTable(IndexTable *it, CostCentreStack *new_ccs,
 {
   IndexTable *new_it;
   
-  new_it = stgMallocBytes(sizeof(IndexTable), "AddToIndexTable");
+  new_it = arenaAlloc(prof_arena, sizeof(IndexTable));
   
   new_it->cc = cc;
   new_it->ccs = new_ccs;
