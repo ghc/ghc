@@ -57,7 +57,7 @@ import VarSet
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
 import Class		( ClassContext, classArity, classTyCon )
-import Name		( Name, isLocallyDefined )
+import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import UniqFM		( elemUFM )
 import BasicTypes	( Boxity(..), RecFlag(..), isRec )
@@ -852,8 +852,7 @@ find_globals tv tidy_env acc []
   = returnNF_Tc (tidy_env, acc)
 
 find_globals tv tidy_env acc (id:ids) 
-  | not (isLocallyDefined id) ||
-    isEmptyVarSet (idFreeTyVars id)
+  | isEmptyVarSet (idFreeTyVars id)
   = find_globals tv tidy_env acc ids
 
   | otherwise

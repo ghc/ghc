@@ -24,7 +24,7 @@ module HscTypes (
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, GatedDecl,
+	IfaceInsts, IfaceRules, GatedDecl, IsExported,
 	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
@@ -45,8 +45,7 @@ module HscTypes (
 #include "HsVersions.h"
 
 import RdrName		( RdrNameEnv, emptyRdrEnv, rdrEnvToList )
-import Name		( Name, NamedThing, isLocallyDefined, 
-			  getName, nameModule, nameSrcLoc )
+import Name		( Name, NamedThing, getName, nameModule, nameSrcLoc )
 import Name -- Env
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
@@ -222,19 +221,16 @@ emptyIfaceTable = emptyModuleEnv
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupIface :: HomeIfaceTable -> PackageIfaceTable
-	    -> Module -> Name		-- The module is to use for locally-defined names
-	    -> Maybe ModIface
+lookupIface :: HomeIfaceTable -> PackageIfaceTable -> Name -> Maybe ModIface
 -- We often have two IfaceTables, and want to do a lookup
-lookupIface hit pit this_mod name
-  | isLocallyDefined name = lookupModuleEnv hit this_mod
-  | otherwise		  = lookupModuleEnv hit mod `seqMaybe` lookupModuleEnv pit mod
+lookupIface hit pit name
+  = lookupModuleEnv hit mod `seqMaybe` lookupModuleEnv pit mod
   where
     mod = nameModule name
 
-lookupIfaceByModName :: ModuleEnv a -> ModuleEnv a -> ModuleName -> Maybe a
--- We often have two Symbol- or IfaceTables, and want to do a lookup
-lookupIfaceByModName ht pt mod
+lookupIfaceByModName :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
+-- We often have two IfaceTables, and want to do a lookup
+lookupIfaceByModName hit pit mod
   = lookupModuleEnvByName ht mod `seqMaybe` lookupModuleEnvByName pt mod
 \end{code}
 
@@ -285,8 +281,7 @@ extendTypeEnvList env things
 \begin{code}
 lookupType :: HomeSymbolTable -> PackageTypeEnv -> Name -> Maybe TyThing
 lookupType hst pte name
-  = ASSERT2( not (isLocallyDefined name), ppr name )
-    case lookupModuleEnv hst (nameModule name) of
+  = case lookupModuleEnv hst (nameModule name) of
 	Just details -> lookupNameEnv (md_types details) name
 	Nothing	     -> lookupNameEnv pte name
 \end{code}
@@ -403,6 +398,8 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 	--	we imported the module without saying exactly what we imported
 	-- We need to recompile if the module exports changes, because we might
 	-- now have a name clash in the importing module.
+
+type IsExported = Name -> Bool		-- True for names that are exported from this module
 \end{code}
 
 

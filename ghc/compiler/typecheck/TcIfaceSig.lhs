@@ -29,13 +29,13 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
+import Id		( Id, mkId, mkImportedId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
 import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
 import Var		( mkTyVar, tyVarKind )
-import Name		( Name, isLocallyDefined )
+import Name		( Name )
 import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	
@@ -61,8 +61,6 @@ tcInterfaceSigs unf_env decls
 	   | TyClD (IfaceSig name ty id_infos src_loc) <- decls]
   where
     in_scope_vars = []	-- I think this will be OK
-			-- If so, don't pass it around
-			-- Was: filter isLocallyDefined (tcEnvIds unf_env)
 
     do_one name ty id_infos src_loc
       = tcAddSrcLoc src_loc 		 		$	
@@ -70,7 +68,7 @@ tcInterfaceSigs unf_env decls
 	tcHsType ty					`thenTc` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
 		 sigma_ty vanillaIdInfo id_infos	`thenTc` \ id_info ->
-	returnTc (mkId name sigma_ty id_info)
+	returnTc (mkImportedId name sigma_ty id_info)
 \end{code}
 
 \begin{code}

@@ -582,9 +582,10 @@ dataQual mod str uq = mkKnownKeyGlobal (dataQual_RDR mod str) uq
 tcQual   mod str uq = mkKnownKeyGlobal (tcQual_RDR   mod str) uq
 clsQual  mod str uq = mkKnownKeyGlobal (clsQual_RDR  mod str) uq
 
-kindQual str uq = mkKnownKeyGlobal (mkRdrOrig pREL_GHC_Name (mkKindOccFS tcName str)) uq
+kindQual str uq = mkLocalName (mkKindOccFS tcName str) uq
 	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
-	-- And they all come from PrelGHC
+	-- And they don't come from any particular module; indeed we always
+	-- want to print them unqualified.  Hence the LocalName
 
 varQual_RDR  mod str = mkOrig varName  mod str
 tcQual_RDR   mod str = mkOrig tcName   mod str

@@ -305,7 +305,7 @@ boxHigherOrderArgs almost_expr args
     ---------------
 
     do_arg ids bindings arg@(StgVarArg old_var)
-	|  (not (isLocallyDefined old_var) || elemVarSet old_var ids)
+	|  (not (isLocalVar old_var) || elemVarSet old_var ids)
 	&& isFunType var_type
       =     -- make a trivial let-binding for the top-level function
 	getUniqueMM		`thenMM` \ uniq ->

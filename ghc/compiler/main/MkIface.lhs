@@ -28,7 +28,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			)
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,
+import Id		( Id, idType, idInfo, omitIfaceSigForId, isExportedId, hasNoBinding,
 			  idSpecialisation, idName, setIdInfo
 			)
 import Var		( isId )
@@ -37,13 +37,11 @@ import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStr
 import IdInfo		-- Lots
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule, 
 			  isBuiltinRule, rulesRules, rulesRhsFreeVars, emptyCoreRules,
-			  bindersOfBinds
+			  bindersOfBinds, mustHaveLocalBinding
 			)
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
-import Name		( isLocallyDefined, getName, nameModule,
-			  Name, NamedThing(..)
-			)
+import Name		( getName, nameModule, Name, NamedThing(..) )
 import Name 	-- Env
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
@@ -328,7 +326,7 @@ bindsToIds needed_ids codegen_ids binds
 	-- The 'needed' set contains the Ids that are needed by earlier
 	-- interface file emissions.  If the Id isn't in this set, and isn't
 	-- exported, there's no need to emit anything
-    need_id needed_set id = id `elemVarSet` needed_set || isUserExportedId id 
+    need_id needed_set id = id `elemVarSet` needed_set || isExportedId id 
 
     go needed [] emitted
 	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
@@ -479,7 +477,7 @@ mkFinalId codegen_ids is_rec id rhs
 
     find_fvs expr = exprSomeFreeVars interestingId expr
 
-interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
+interestingId id = isId id && mustHaveLocalBinding id
 \end{code}
 
 

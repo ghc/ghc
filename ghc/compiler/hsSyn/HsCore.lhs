@@ -153,7 +153,8 @@ toUfApp (App f a) as = toUfApp f (a:as)
 toUfApp (Var v) as
   = case isDataConId_maybe v of
 	-- We convert the *worker* for tuples into UfTuples
-	Just dc | isTupleTyCon tc && saturated -> UfTuple (HsTupCon (getName dc) (tupleTyConBoxity tc)) tup_args
+	Just dc |  isTupleTyCon tc && saturated 
+		-> UfTuple (HsTupCon (getName dc) (tupleTyConBoxity tc)) tup_args
 	  where
 	    val_args  = dropWhile isTypeArg as
 	    saturated = length val_args == idArity v

@@ -44,7 +44,7 @@ import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool )
-import Name		( isLocallyDefined, NamedThing(..) )
+import Name		( isLocalName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
@@ -251,7 +251,7 @@ I {\em think} all looking-up is done through @getCAddrMode(s)@.
 getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
-  | not (isLocallyDefined name) || isDataConWrapId id
+  | not (isLocalName name) || isDataConWrapId id
 	-- Why the isDataConWrapId?  Because CoreToStg changes a call to 
 	-- a nullary constructor worker fn to a call to its wrapper,
 	-- which may not  be defined until later

@@ -1137,8 +1137,6 @@ newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->
     let 
 	-- Give the new Id a similar occurrence name to the old one
-	-- We used to add setIdNoDiscard if the old id was exported, to
-	-- avoid it being dropped as dead code, but that's not necessary any more.
 	name   = idName old_id
 	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcLoc name)
     in

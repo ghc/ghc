@@ -17,7 +17,7 @@ module IdInfo (
 
 	-- Flavour
 	IdFlavour(..), flavourInfo, 
-	setNoDiscardInfo,
+	setNoDiscardInfo, setFlavourInfo,
 	ppFlavourInfo,
 
 	-- Arity
@@ -164,6 +164,7 @@ megaSeqIdInfo info
 Setters
 
 \begin{code}
+setFlavourInfo    info fl = fl `seq` info { flavourInfo = wk }
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
@@ -236,7 +237,12 @@ mkIdInfo flv = IdInfo {
 
 \begin{code}
 data IdFlavour
-  = VanillaId 			-- Most Ids are like this
+  = VanillaId			-- Locally defined, not exported
+  | ExportedId			-- Locally defined, exported
+  | SpecPragmaId		-- Locally defined, RHS holds specialised call
+
+  | ImportedId 			-- Imported from elsewhere
+
   | DataConId DataCon		-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
 				-- [the only reasons we need to know is so that
@@ -245,17 +251,17 @@ data IdFlavour
 				--     Id back to the data con]
   | PrimOpId PrimOp		-- The Id for a primitive operator
   | RecordSelId FieldLabel	-- The Id for a record selector
-  | SpecPragmaId		-- Don't discard these
-  | NoDiscardId			-- Don't discard these either
+
 
 ppFlavourInfo :: IdFlavour -> SDoc
 ppFlavourInfo VanillaId         = empty
+ppFlavourInfo ExportedId        = ptext SLIT("[Exported]")
+ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
+ppFlavourInfo ImportedId        = ptext SLIT("[Imported]")
 ppFlavourInfo (DataConId _)     = ptext SLIT("[DataCon]")
 ppFlavourInfo (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
 ppFlavourInfo (PrimOpId _)    	= ptext SLIT("[PrimOp]")
 ppFlavourInfo (RecordSelId _) 	= ptext SLIT("[RecSel]")
-ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
-ppFlavourInfo NoDiscardId     	= ptext SLIT("[NoDiscard]")
 
 seqFlavour :: IdFlavour -> ()
 seqFlavour f = f `seq` ()

@@ -15,7 +15,8 @@ module CoreSyn (
 	mkConApp, 
 	varToCoreExpr,
 
-	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isTyVar, isId,
+	isTyVar, isId, isLocalVar, mustHaveLocalBinding,
+	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
 	collectArgs, collectBindersIgnoringNotes,
 	coreExprCc,
@@ -103,6 +104,29 @@ data Note
 
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{isLocalVar}
+%*									*
+%************************************************************************
+
+@isLocalVar@ returns True of all TyVars, and of Ids that are defined in 
+this module and are not constants like data constructors and record selectors.
+These are the variables that we need to pay attention to when finding free
+variables, or doing dependency analysis.
+
+\begin{code}
+isLocalVar :: Var -> Bool
+isLocalVar v = isTyVar v || isLocalId v
+\end{code}
+
+\begin{code}
+mustHaveLocalBinding :: Var -> Bool
+-- True <=> the variable must have a binding in this module
+mustHaveLocalBinding v = isTyVar v || (isLocalId v && not (hasNoBinding v))
 \end{code}
 
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.21 2000/11/13 17:12:37 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.22 2000/11/14 08:07:12 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -685,8 +685,9 @@ doLink o_files = do
 #ifdef mingw32_TARGET_OS
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
-                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+--                   else [ head (lib_paths (head rts_pkg)) ++ "/Main.dll_o",
+--                          head (lib_paths (head std_pkg)) ++ "/PrelMain.dll_o" ]
+		     else []
 #endif
     (md_c_flags, _) <- machdepCCOpts
     run_something "Linker"

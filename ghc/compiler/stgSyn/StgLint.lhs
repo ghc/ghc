@@ -11,13 +11,13 @@ module StgLint ( lintStgBindings ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
-import Id		( Id, idType )
+import Id		( Id, idType, isLocalId )
 import VarSet
 import DataCon		( DataCon, dataConArgTys, dataConRepType )
 import PrimOp		( primOpType )
 import Literal		( literalType, Literal )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, getSrcLoc )
+import Name		( getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
@@ -437,7 +437,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 \begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
-  = if isLocallyDefined id && not (id `elemVarSet` scope) then
+  = if isLocalId id && not (id `elemVarSet` scope) then
 	((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
     else
 	((), errs)

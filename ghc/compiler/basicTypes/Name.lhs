@@ -10,17 +10,16 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
-	mkLocalName, mkImportedLocalName, mkSysLocalName, mkCCallName,
+	mkLocalName, mkSysLocalName, mkCCallName,
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
-	nameUnique, setNameUnique, setLocalNameSort,
+	nameUnique, setNameUnique,
 	tidyTopName, 
 	nameOccName, nameModule, nameModule_maybe,
 	setNameOcc, nameRdrName, setNameModuleAndLoc, 
 	toRdrName, hashName,
 
-	isUserExportedName,
 	nameSrcLoc, nameIsLocallyDefined, isDllName, nameIsFrom, nameIsLocalOrFrom,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
@@ -36,7 +35,7 @@ module Name (
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, isLocallyDefined, getOccString, toRdrName,
+	getSrcLoc, getOccString, toRdrName,
 	isFrom, isLocalOrFrom
     ) where
 
@@ -70,11 +69,11 @@ data Name = Name {
 
 data NameSort
   = Global Module	-- (a) TyCon, Class, their derived Ids, dfun Id
-			-- (b) imported Id
+			-- (b) Imported Id
+			-- (c) Top-level Id in the original source, even if
+			--	locally defined
 
-  | Exported		-- An exported Ids defined in the module being compiled
-
-  | Local		-- A user-defined, but non-exported Id or TyVar,
+  | Local		-- A user-defined Id or TyVar
 			-- defined in the module being compiled
 
   | System		-- A system-defined Id or TyVar.  Typically the
@@ -83,17 +82,18 @@ data NameSort
 
 Notes about the NameSorts:
 
-1.  An Exported Id is changed to Global right at the
-    end in the tidyCore pass, so that an importer sees a Global
-    Similarly, Local Ids that are visible to an importer (e.g. when 
-    optimisation is on) are changed to Globals.
+1.  Initially, top-level Ids (including locally-defined ones) get Global names, 
+    and all other local Ids get Local names
 
 2.  Things with a @Global@ name are given C static labels, so they finally
     appear in the .o file's symbol table.  They appear in the symbol table
     in the form M.n.  If originally-local things have this property they
     must be made @Global@ first.
 
-3.  A System Name differs in the following ways:
+3.  In the tidy-core phase, a Global that is not visible to an importer
+    is changed to Local, and a Local that is visible is changed to Global
+
+4.  A System Name differs in the following ways:
 	a) has unique attached when printing dumps
 	b) unifier eliminates sys tyvars in favour of user provs where possible
 
@@ -124,7 +124,6 @@ nameModule_maybe name				= Nothing
 nameIsLocallyDefined	:: Name -> Bool
 nameIsFrom		:: Module -> Name -> Bool
 nameIsLocalOrFrom	:: Module -> Name -> Bool
-isUserExportedName	:: Name -> Bool
 isLocalName		:: Name -> Bool		-- Not globals
 isGlobalName		:: Name -> Bool
 isSystemName		:: Name -> Bool
@@ -145,14 +144,8 @@ nameIsFrom from other			     = pprPanic "nameIsFrom" (ppr other)
 
 -- Global names are by definition those that are visible
 -- outside the module, *as seen by the linker*.  Externally visible
--- does not mean visible at the source level (that's isUserExported).
+-- does not mean visible at the source level
 isExternallyVisibleName name = isGlobalName name
-
--- Constructors, selectors and suchlike Globals, and are all exported
--- Other Local things may or may not be exported
-isUserExportedName (Name { n_sort = Exported }) = True
-isUserExportedName (Name { n_sort = Global _ }) = True
-isUserExportedName other		        = False
 
 isSystemName (Name {n_sort = System}) = True
 isSystemName other		      = False
@@ -176,18 +169,6 @@ mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, n_
 	--	  uniques if you get confused
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
-
-mkImportedLocalName :: Unique -> OccName -> SrcLoc -> Name
-	-- Just the same as mkLocalName, except the provenance is different
-	-- Reason: this flags the name as one that came in from an interface 
-	-- file. This is useful when trying to decide which of two type
-	-- variables should 'win' when unifying them.
-	-- NB: this is only for non-top-level names, so we use ImplicitImport
-	--
-	-- Oct 00: now that Names lack Provenances, mkImportedLocalName doesn't make
-	--	   sense any more, so it's just the same as mkLocalName
-mkImportedLocalName uniq occ loc = mkLocalName uniq occ loc
-
 
 mkGlobalName :: Unique -> Module -> OccName -> SrcLoc -> Name
 mkGlobalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = Global mod,
@@ -244,11 +225,6 @@ setNameModuleAndLoc :: Name -> Module -> SrcLoc -> Name
 setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc}
 		       where
 			 set (Global _) = Global mod
-
-setLocalNameSort :: Name -> Bool -> Name
-  -- Set the name's sort to Local or Exported, depending on the boolean
-setLocalNameSort name is_exported = name { n_sort = if is_exported then Exported
-								   else Local }
 \end{code}
 
 
@@ -293,23 +269,18 @@ are exported.  But also:
     top-level defns externally visible
 
 \begin{code}
-tidyTopName :: Module -> TidyOccEnv -> Name -> (TidyOccEnv, Name)
-tidyTopName mod env
+tidyTopName :: Module -> TidyOccEnv -> Bool -> Name -> (TidyOccEnv, Name)
+tidyTopName mod env is_exported
 	    name@(Name { n_occ = occ, n_sort = sort, n_uniq = uniq, n_loc = loc })
   = case sort of
-	System   -> localise		-- System local Ids
-	Local    -> localise		-- User non-exported Ids
-	Exported -> globalise		-- User-exported things
-	Global _ -> no_op		-- Constructors, class selectors, default methods
+	Global _ | is_exported -> (env, name)
+		 | otherwise   -> (env, name { n_sort = new_sort })
 
+	other    | is_exported -> (env', name { n_sort = Global mod, n_occ = occ' })
+		 | otherwise   -> (env', name { n_sort = new_sort,   n_occ = occ' })
   where
-    no_op     = (env, name)
-
-    globalise = (env, name { n_sort = Global mod })	-- Don't change occurrence name
-
-    localise     = (env', name')
     (env', occ') = tidyOccName env occ
-    name'        = name { n_occ = occ', n_sort = mkLocalTopSort mod }
+    new_sort     = mkLocalTopSort mod
 
 mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- Make a top-level name; make it Global if top-level
@@ -359,7 +330,7 @@ nameRdrName (Name { n_occ = occ })			= mkRdrUnqual occ
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
-	       not (nameIsLocallyDefined nm) &&			-- isLocallyDefinedName test needed 'cos
+	       not (isLocalName nm) &&				-- isLocalName test needed 'cos
 	       not (isModuleInThisPackage (nameModule nm))	-- nameModule won't work on local names
 
 
@@ -460,13 +431,12 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
     case sort of
       Global mod -> pprGlobal sty name uniq mod occ
       System     -> pprSysLocal sty uniq occ
-      Local      -> pprLocal sty uniq occ empty
-      Exported   -> pprLocal sty uniq occ (char 'x')
+      Local      -> pprLocal sty uniq occ
 
-pprLocal sty uniq occ pp_export
+pprLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = pprOccName occ <> 
-		     text "{-" <> pp_export <+> pprUnique10 uniq <> text "-}"
+		     text "{-" <> pprUnique10 uniq <> text "-}"
   | otherwise      = pprOccName occ
 
 pprGlobal sty name uniq mod occ
@@ -500,20 +470,15 @@ class NamedThing a where
 
 \begin{code}
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
-isLocallyDefined    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
 toRdrName	    :: NamedThing a => a -> RdrName
 isFrom		    :: NamedThing a => Module -> a -> Bool
 isLocalOrFrom	    :: NamedThing a => Module -> a -> Bool
 
 getSrcLoc	    = nameSrcLoc	   . getName
-isLocallyDefined    = nameIsLocallyDefined . getName
 getOccString 	    = occNameString	   . getOccName
 toRdrName	    = nameRdrName	   . getName
 isFrom mod x	    = nameIsFrom mod (getName x)
 isLocalOrFrom mod x = nameIsLocalOrFrom mod ( getName x)
 \end{code}
 
-\begin{code}
-{-# SPECIALIZE isLocallyDefined :: Name -> Bool #-}
-\end{code}

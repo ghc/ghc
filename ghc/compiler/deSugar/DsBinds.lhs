@@ -26,7 +26,7 @@ import Match		( matchWrapper )
 
 import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
-import Id		( idType, idName, isUserExportedId, isSpecPragmaId, Id )
+import Id		( idType, idName, isExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarSet
 import Type		( mkTyVarTy )
@@ -188,7 +188,7 @@ addSccs NoSccs   exports = NoSccs
 addSccs TopLevel exports 
   = TopLevelAddSccs (\id -> case [ exp | (_,exp,loc) <- exports, loc == id ] of
 				(exp:_)  | opt_AutoSccsOnAllToplevs || 
-					    (isUserExportedId exp && 
+					    (isExportedId exp && 
 					     opt_AutoSccsOnExportedToplevs)
 					-> Just exp
 				_ -> Nothing)

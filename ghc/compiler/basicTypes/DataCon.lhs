@@ -36,7 +36,7 @@ import Type		( Type, TauType, ClassContext,
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
-import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
+import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity )
@@ -454,9 +454,8 @@ unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type
 unbox_strict_arg_ty tycon strict_mark ty
   | case strict_mark of
 	NotMarkedStrict   -> False
-	MarkedUnboxed _ _ -> True
-	MarkedStrict      -> opt_UnboxStrictFields &&
-			     isLocallyDefined tycon &&
+	MarkedUnboxed _ _ -> True				-- !! From interface file
+	MarkedStrict      -> opt_UnboxStrictFields &&		-- !  From source
 			     maybeToBool maybe_product &&
 			     not (isRecursiveTyCon tycon) &&
 			     isDataTyCon arg_tycon

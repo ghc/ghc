@@ -13,7 +13,7 @@ module StgVarInfo ( setStgVarInfo ) where
 
 import StgSyn
 
-import Id		( setIdArityInfo, idArity, setIdOccInfo, Id )
+import Id		( isLocalId, setIdArityInfo, idArity, setIdOccInfo, Id )
 import VarSet
 import VarEnv
 import Var
@@ -21,7 +21,7 @@ import IdInfo		( ArityInfo(..), OccInfo(..) )
 import PrimOp		( PrimOp(..), ccallMayGC )
 import TysWiredIn       ( isForeignObjTy )
 import Maybes		( maybeToBool, orElse )
-import Name		( isLocallyDefined, getOccName )
+import Name		( isLocalName, getOccName )
 import OccName		( occNameUserString )
 import BasicTypes       ( Arity )
 import Outputable
@@ -766,10 +766,10 @@ lookupLiveVarsForSet fvs sw env lvs_cont
 	      sw env lvs_cont
   where
     do_one v
-      = if isLocallyDefined v then
+      = if isLocalId v then
 	    case (lookupVarEnv env v) of
 	      Just (_, LetrecBound _ lvs) -> extendVarSet lvs v
-	      Just _		            -> unitVarSet v
+	      Just _		          -> unitVarSet v
 	      Nothing -> pprPanic "lookupVarEnv/do_one:" (ppr v)
 	else
 	    emptyVarSet

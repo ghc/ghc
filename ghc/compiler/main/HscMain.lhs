@@ -175,7 +175,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_rn);
-      	     Just (print_unqualified, new_iface, rn_hs_decls) -> do {
+      	     Just (print_unqualified, is_exported, new_iface, rn_hs_decls) -> do {
     
  	    -------------------
  	    -- TYPECHECK
@@ -196,7 +196,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
       	  -- We grab the the unfoldings at this point.
 	; simpl_result <- dsThenSimplThenTidy dflags (pcs_rules pcs_tc) this_mod 
- 					      print_unqualified tc_result hst
+ 					      print_unqualified is_exported tc_result hst
 	; let (tidy_binds, orphan_rules, foreign_stuff) = simpl_result
       	    
  	    -------------------
@@ -315,7 +315,7 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
                        (ppr nm)
 
 
-dsThenSimplThenTidy dflags rule_base this_mod print_unqual tc_result hst
+dsThenSimplThenTidy dflags rule_base this_mod print_unqual is_exported tc_result hst
  = do --------------------------  Desugaring ----------------
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
@@ -324,7 +324,7 @@ dsThenSimplThenTidy dflags rule_base this_mod print_unqual tc_result hst
       --------------------------  Main Core-language transformations ----------------
       -- _scc_     "Core2Core"
       (simplified, orphan_rules) 
-         <- core2core dflags rule_base hst desugared rules
+         <- core2core dflags rule_base hst is_exported desugared rules
 
       -- Do the final tidy-up
       (tidy_binds, tidy_orphan_rules) 

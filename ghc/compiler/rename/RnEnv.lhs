@@ -20,7 +20,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 import RnMonad
 import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
-			  mkLocalName, mkImportedLocalName, mkGlobalName,
+			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
 			  setNameModuleAndLoc
 			)
@@ -265,10 +265,6 @@ calls it at all I think).
 
   \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
 
-For List and Tuple types it's important to get the correct
-@isLocallyDefined@ flag, which is used in turn when deciding
-whether there are any instance decls in this module are ``special''.
-The name cache should have the correct provenance, though.
 
 \begin{code}
 lookupOrigNames :: [RdrName] -> RnM d NameSet
@@ -361,7 +357,7 @@ bindCoreLocalRn rdr_name enclosed_scope
     let
 	(us', us1) = splitUniqSupply us
 	uniq	   = uniqFromSupply us1
-	name	   = mkImportedLocalName uniq (rdrNameOcc rdr_name) loc
+	name	   = mkLocalName uniq (rdrNameOcc rdr_name) loc
     in
     setNameSupplyRn (us', cache, ipcache)	`thenRn_`
     let

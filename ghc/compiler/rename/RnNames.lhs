@@ -30,8 +30,7 @@ import UniqFM		( lookupUFM )
 import Bag		( bagToList )
 import Module		( ModuleName, moduleName, WhereFrom(..) )
 import NameSet
-import Name		( Name, nameSrcLoc,
-			  setLocalNameSort, nameOccName,  nameEnvElts )
+import Name		( Name, nameSrcLoc, nameOccName,  nameEnvElts )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual )
@@ -57,24 +56,13 @@ import List		( partition )
 getGlobalNames :: Module -> RdrNameHsModule
 	       -> RnMG (GlobalRdrEnv,	-- Maps all in-scope things
 			GlobalRdrEnv,	-- Maps just *local* things
-			Avails,		-- The exported stuff
-			AvailEnv)	-- Maps a name to its parent AvailInfo
-					-- Just for in-scope things only
+			ExportAvails)	-- The exported stuff
 
 getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
-  = 	-- These two fix-loops are to get the right
-	-- provenance information into a Name
-    fixRn ( \ ~(rec_gbl_env, _, rec_export_avails, _) ->
-
-	let
-	   rec_exp_fn :: Name -> Bool
-	   rec_exp_fn = mk_export_fn (availsToNameSet rec_export_avails)
-	in
-
-		-- PROCESS LOCAL DECLS
+  = 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets
 		-- into the global name cache.
-	importsFromLocalDecls this_mod rec_exp_fn decls		`thenRn` \ (local_gbl_env, local_mod_avails) ->
+	importsFromLocalDecls this_mod decls		`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
 		-- PROCESS IMPORT DECLS
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
@@ -101,21 +89,10 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 
 	    all_avails :: ExportAvails
 	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
-
-	    (_, global_avail_env) = all_avails
 	in
 
-		-- PROCESS EXPORT LIST (but not if we've had errors already)
-	checkErrsRn		`thenRn` \ no_errs_so_far ->
-	(if no_errs_so_far then
-	    exportsFromAvail this_mod_name exports all_avails gbl_env
-	 else
-	    returnRn []
-	)						`thenRn` \ export_avails ->
-	
 		-- ALL DONE
-	returnRn (gbl_env, local_gbl_env, export_avails, global_avail_env)
-   )
+	returnRn (gbl_env, local_gbl_env, all_avails)
   where
     this_mod_name = moduleName this_mod
 
@@ -193,8 +170,8 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 
 
 \begin{code}
-importsFromLocalDecls this_mod rec_exp_fn decls
-  = mapRn (getLocalDeclBinders this_mod rec_exp_fn) decls	`thenRn` \ avails_s ->
+importsFromLocalDecls this_mod decls
+  = mapRn (getLocalDeclBinders this_mod) decls	`thenRn` \ avails_s ->
 
     let
 	avails = concat avails_s
@@ -221,9 +198,8 @@ importsFromLocalDecls this_mod rec_exp_fn decls
 
 ---------------------------
 getLocalDeclBinders :: Module 
-		    -> (Name -> Bool)	-- Whether exported
 		    -> RdrNameHsDecl -> RnMG Avails
-getLocalDeclBinders mod rec_exp_fn (TyClD tycl_decl)
+getLocalDeclBinders mod (TyClD tycl_decl)
   =	-- For type and class decls, we generate Global names, with
 	-- no export indicator.  They need to be global because they get
 	-- permanently bound into the TyCons and Classes.  They don't need
@@ -231,14 +207,16 @@ getLocalDeclBinders mod rec_exp_fn (TyClD tycl_decl)
     getTyClDeclBinders mod tycl_decl	`thenRn` \ avail ->
     returnRn [avail]
 
-getLocalDeclBinders mod rec_exp_fn (ValD binds)
-  = mapRn (newLocalBinder mod rec_exp_fn) 
-	  (bagToList (collectTopBinders binds))
+getLocalDeclBinders mod (ValD binds)
+  = mapRn new (bagToList (collectTopBinders binds))
+  where
+    new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenRn` \ name ->
+			  returnRn (Avail name)
 
-getLocalDeclBinders mod rec_exp_fn (ForD (ForeignDecl nm kind _ ext_nm _ loc))
+getLocalDeclBinders mod (ForD (ForeignDecl nm kind _ ext_nm _ loc))
   | binds_haskell_name kind
-  = newLocalBinder mod rec_exp_fn (nm, loc)	    `thenRn` \ avail ->
-    returnRn [avail]
+  = newTopBinder mod nm loc	    `thenRn` \ name ->
+    returnRn [Avail name]
 
   | otherwise 		-- a foreign export
   = returnRn []
@@ -247,17 +225,11 @@ getLocalDeclBinders mod rec_exp_fn (ForD (ForeignDecl nm kind _ ext_nm _ loc))
     binds_haskell_name FoLabel      = True
     binds_haskell_name FoExport     = isDynamicExtName ext_nm
 
-getLocalDeclBinders mod rec_exp_fn (FixD _)    = returnRn []
-getLocalDeclBinders mod rec_exp_fn (DeprecD _) = returnRn []
-getLocalDeclBinders mod rec_exp_fn (DefD _)    = returnRn []
-getLocalDeclBinders mod rec_exp_fn (InstD _)   = returnRn []
-getLocalDeclBinders mod rec_exp_fn (RuleD _)   = returnRn []
-
----------------------------
-newLocalBinder mod rec_exp_fn (rdr_name, loc)
-  =	-- Generate a local name, and with a suitable export indicator
-    newTopBinder mod rdr_name loc 	`thenRn` \ name ->
-    returnRn (Avail (setLocalNameSort name (rec_exp_fn name)))
+getLocalDeclBinders mod (FixD _)    = returnRn []
+getLocalDeclBinders mod (DeprecD _) = returnRn []
+getLocalDeclBinders mod (DefD _)    = returnRn []
+getLocalDeclBinders mod (InstD _)   = returnRn []
+getLocalDeclBinders mod (RuleD _)   = returnRn []
 \end{code}
 
 
@@ -589,9 +561,6 @@ check_occs ie occs avail
 				failWithRn occs (exportClashErr name_occ ie ie')
       where
 	name_occ = nameOccName name
-	
-mk_export_fn :: NameSet -> (Name -> Bool)	-- True => exported
-mk_export_fn exported_names = \name ->  name `elemNameSet` exported_names
 \end{code}
 
 %************************************************************************

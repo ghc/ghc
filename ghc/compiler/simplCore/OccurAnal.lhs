@@ -24,7 +24,7 @@ import CoreUtils	( exprIsTrivial )
 import Id		( isDataConId, isOneShotLambda, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo,
-			  idSpecialisation, 
+			  idSpecialisation, isLocalId,
 			  idType, idUnique, Id
 			)
 import IdInfo		( OccInfo(..), shortableIdInfo, copyIdInfo )
@@ -32,7 +32,6 @@ import IdInfo		( OccInfo(..), shortableIdInfo, copyIdInfo )
 import VarSet
 import VarEnv
 
-import Name		( isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )
 import Digraph		( stronglyConnCompR, SCC(..) )
@@ -76,7 +75,7 @@ occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
 		-- Add occ info to tpl_vars, rhs
   = Rule str tpl_vars' tpl_args rhs'
   where
-    (rhs_uds, rhs') = occurAnalyseExpr isLocallyDefined rhs
+    (rhs_uds, rhs') = occurAnalyseExpr isLocalId rhs
     (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
 \end{code}
 
@@ -175,7 +174,7 @@ occurAnalyseBinds binds
 	    other -> 	-- Ho ho! The normal case
 		     (final_usage, ind_env, new_binds ++ binds')
 		   
-initialTopEnv = OccEnv isLocallyDefined	-- Anything local is interesting
+initialTopEnv = OccEnv isLocalId	-- Anything local is interesting
 		       emptyVarSet
 		       []
 
@@ -202,7 +201,7 @@ shortMeOut ind_env exported_id local_id
 -- how often I don't get shorting out becuase of IdInfo stuff
   = if isExportedId exported_id &&		-- Only if this is exported
 
-       isLocallyDefined local_id &&		-- Only if this one is defined in this
+       isLocalId local_id &&			-- Only if this one is defined in this
 						-- 	module, so that we *can* change its
 				 	 	-- 	binding to be the exported thing!
 

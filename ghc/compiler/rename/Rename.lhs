@@ -113,13 +113,12 @@ renameModule dflags hit hst old_pcs this_module rdr_module
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, ModIface, [RenamedHsDecl]))
+rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
 rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
  	-- FIND THE GLOBAL NAME ENVIRONMENT
-    getGlobalNames this_module contents 	`thenRn` \ (gbl_env, local_gbl_env, 
-							    export_avails, global_avail_env) ->
+    getGlobalNames this_module contents 	`thenRn` \ (gbl_env, local_gbl_env, all_avails@(_, global_avail_env)) ->
 
 	-- Exit if we've found any errors
     checkErrsRn				`thenRn` \ no_errs_so_far ->
@@ -128,6 +127,9 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	rnDump [] []		`thenRn_`
 	returnRn Nothing 
     else
+	
+		-- PROCESS EXPORT LIST (but not if we've had errors already)
+    exportsFromAvail mod_name exports all_avails gbl_env	`thenRn` \ export_avails ->
 	
     traceRn (text "Local top-level environment" $$ 
 	     nest 4 (pprGlobalRdrEnv local_gbl_env))	`thenRn_`
@@ -183,7 +185,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
-				mi_usages = my_usages,
+				mi_usages   = my_usages,
 				mi_boot	    = False,
 				mi_orphan   = is_orphan,
 				mi_exports  = my_exports,
@@ -194,6 +196,8 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 		    }
 
 	print_unqualified = unQualInScope gbl_env
+	is_exported name  = name `elemNameSet` exported_names
+	exported_names    = availsToNameSet export_avails
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
@@ -201,7 +205,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 		      imports global_avail_env
 		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
-    returnRn (Just (print_unqualified, mod_iface, final_decls))
+    returnRn (Just (print_unqualified, is_exported, mod_iface, final_decls))
   where
     mod_name = moduleName this_module
 \end{code}
@@ -676,7 +680,7 @@ warnDeprecations this_mod export_avails my_deprecs used_names
 	| nameIsLocalOrFrom this_mod n
 	= lookupDeprec my_deprecs n 
 	| otherwise
-	= case lookupIface hit pit this_mod n of
+	= case lookupIface hit pit n of
 		Just iface -> lookupDeprec (mi_deprecs iface) n
 		Nothing    -> pprPanic "warnDeprecations:" (ppr n)
 

@@ -32,7 +32,7 @@ module Id (
 	isDataConId, isDataConId_maybe, isDataConWrapId, 
 		isDataConWrapId_maybe,
 	isBottomingId,
-	isExportedId, isUserExportedId,
+	isExportedId, isLocalId, 
 	hasNoBinding,
 
 	-- Inline pragma stuff
@@ -91,7 +91,7 @@ import IdInfo
 import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  isUserExportedName, nameIsLocallyDefined,
+			  nameIsLocallyDefined,
 			  getOccName, isIPOcc
 			) 
 import OccName		( UserFS )
@@ -132,10 +132,10 @@ Absolutely all Ids are made by mkId.  It
 
 \begin{code}
 mkId :: Name -> Type -> IdInfo -> Id
-mkId name ty info = mkIdVar name (addFreeTyVars ty) info'
-		  where
-		    info' | isUserExportedName name = setNoDiscardInfo info
-			  | otherwise		    = info
+mkId name ty info = mkIdVar name (addFreeTyVars ty) info
+
+mkImportedId :: Name -> Type -> IdInfo -> Id
+mkImportedId name ty info = mkId name ty (info `setFlavourInfo` ImportedId)
 \end{code}
 
 \begin{code}
@@ -255,18 +255,21 @@ hasNoBinding id = case idFlavour id of
 
 -- Don't drop a binding for an exported Id,
 -- if it otherwise looks dead.  
+-- Perhaps a better name would be isDiscardableId
 isExportedId :: Id -> Bool
-isExportedId id = isUserExportedId id	-- Try this
-{-
-  case idFlavour id of
-			VanillaId -> False
-			other	  -> True	-- All the others are no-discard
--}
+isExportedId id = case idFlavour id of
+			VanillaId  -> False
+			other	   -> True
 
--- Say if an Id was exported by the user
--- Implies isExportedId (see mkId above)
-isUserExportedId :: Id -> Bool
-isUserExportedId id = isUserExportedName (idName id)
+isLocalId :: Id -> Bool
+-- True of Ids that are locally defined, but are not constants
+-- like data constructors, record selectors, and the like. 
+-- See comments with CoreSyn.isLocalVar
+isLocalId id = case idFlavour id of
+		 VanillaId    -> True
+		 ExportedId   -> True
+		 SpecPragmaId -> True
+		 other	      -> False
 \end{code}
 
 
@@ -302,7 +305,7 @@ omitIfaceSigForId' id
 -- these names are bound by either a class declaration or a data declaration
 -- or an explicit user export.
 exportWithOrigOccName :: Id -> Bool
-exportWithOrigOccName id = omitIfaceSigForId id || isUserExportedId id
+exportWithOrigOccName id = omitIfaceSigForId id || isExportedId id
 \end{code}
 
 \begin{code}

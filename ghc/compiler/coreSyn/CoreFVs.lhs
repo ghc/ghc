@@ -21,24 +21,9 @@ import CoreSyn
 import Id		( Id, idFreeTyVars, hasNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
-import Name		( isLocallyDefined )
 import Type		( tyVarsOfType )
 import Util		( mapAndUnzip )
 import Outputable
-\end{code}
-
-%************************************************************************
-%*									*
-\section{Utilities}
-%*									*
-%************************************************************************
-
-\begin{code}
-mustHaveLocalBinding :: Var -> Bool
--- True <=> the variable must have a binding in this module
-mustHaveLocalBinding v
-  | isId v    = isLocallyDefined v && not (hasNoBinding v)
-  | otherwise = True	-- TyVars etc must
 \end{code}
 
 
@@ -58,7 +43,7 @@ but not those that are free in the type of variable occurrence.
 
 \begin{code}
 exprFreeVars :: CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
-exprFreeVars = exprSomeFreeVars isLocallyDefined
+exprFreeVars = exprSomeFreeVars isLocalVar
 
 exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
@@ -166,7 +151,7 @@ rulesSomeFreeVars interesting (Rules rules _)
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule _) = noFVs
 ruleRhsFreeVars (Rule str tpl_vars tpl_args rhs)
-  = rule_fvs isLocallyDefined emptyVarSet
+  = rule_fvs isLocalVar emptyVarSet
   where
     rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
 
@@ -259,8 +244,8 @@ freeVars (Var v)
 	--	Actually [June 98] I don't think it's necessary
 	-- fvs = fvs_v `unionVarSet` idSpecVars v
 
-    fvs | isLocallyDefined v = aFreeVar v
-	| otherwise	     = noFVs
+    fvs | isLocalVar v = aFreeVar v
+	| otherwise    = noFVs
 
 freeVars (Lit lit) = (noFVs, AnnLit lit)
 freeVars (Lam b body)

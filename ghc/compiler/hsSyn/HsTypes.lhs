@@ -33,7 +33,7 @@ import Type		( Type, Kind, PredType(..), ClassContext,
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, getSynTyConDefn )
 import RdrName		( RdrName, mkUnqual )
-import Name		( Name, getName, setLocalNameSort )
+import Name		( Name, getName )
 import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
 import Subst		( mkTyVarSubst, substTy )
@@ -88,10 +88,8 @@ hsUsOnce = HsTyVar (mkUnqual tvName SLIT("."))  -- deep magic
 hsUsMany = HsTyVar (mkUnqual tvName SLIT("!"))  -- deep magic
 
 hsUsOnce_Name, hsUsMany_Name :: HsType Name
--- Fudge the TyConName so that it prints unqualified
--- I hate it! I hate it!
-hsUsOnce_Name = HsTyVar (setLocalNameSort usOnceTyConName False)
-hsUsMany_Name = HsTyVar (setLocalNameSort usManyTyConName False)
+hsUsOnce_Name = HsTyVar usOnceTyConName
+hsUsMany_Name = HsTyVar usManyTyConName
 
 -----------------------
 data HsTupCon name = HsTupCon name Boxity

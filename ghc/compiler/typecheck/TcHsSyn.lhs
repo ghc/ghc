@@ -48,7 +48,6 @@ import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
 import TcMonad
 import TcType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
 		)
-import Name	( isLocallyDefined )
 import CoreSyn  ( Expr )
 import CoreUnfold( unfoldingTemplate )
 import BasicTypes ( RecFlag(..) )
@@ -165,9 +164,8 @@ zonkIdBndr id
 
 zonkIdOcc :: TcId -> NF_TcM Id
 zonkIdOcc id 
-  | not (isLocallyDefined id) || omitIfaceSigForId id || isIP id
-	-- The omitIfaceSigForId thing may look wierd but it's quite
-	-- sensible really.  We're avoiding looking up superclass selectors
+  | not (isLocalId id) || isIP id
+	-- We're avoiding looking up superclass selectors
 	-- and constructors; zonking them is a no-op anyway, and the
 	-- superclass selectors aren't in the environment anyway.
   = returnNF_Tc id
