@@ -4538,7 +4538,7 @@ You don't need Cygwin or MSYS to <emphasis>use</emphasis> GHC,
 but you do need one or the other to <emphasis>build</emphasis> GHC.</para>
 
 
-<Sect2><Title>Installing and configuring MSYS</Title>
+<Sect2 id=msys-install><Title>Installing and configuring MSYS</Title>
 
 <para>
 MSYS is a lightweight alternative to Cygwin.  
@@ -4611,6 +4611,12 @@ before the MSYS one, because it's in the <emphasis>system</emphasis> <constant>P
 environment variable, whereas you have probably modified the <emphasis>user</emphasis> <constant>PATH</constant> 
 variable.  You can always invoke <command>find</command> with an absolute path, or rename it.
 </para></listitem>
+
+<listitem> <para>
+MSYS comes with <command>bzip</command>, and MSYS's <command>tar</command>'s <literal>-j</literal> 
+will bunzip an archive (e.g. <literal>tar xvjf foo.tar.bz2</literal>).  Useful when you get a
+bzip'd dump.</para></listitem>
+
 </itemizedlist>
 </para>
 </sect2>
@@ -4721,11 +4727,8 @@ they don't recognise symlinks.
 </para></listitem>
 
 <listitem> <para>
-Win32 has a <command>find</command> command which is not the same as Cygwin's find.
-You will probably discover that the Win32 <command>find</command> appears in your <constant>PATH</constant>
-before the Cygwin one, because it's in the <emphasis>system</emphasis> <constant>PATH</constant> 
-environment variable, whereas you have probably modified the <emphasis>user</emphasis> <constant>PATH</constant> 
-variable.  You can always invoke <command>find</command> with an absolute path, or rename it.
+See the notes in <xref linkend="msys-install"> about <command>find</command> and <command>bzip</command>,
+which apply to Cygwin too.
 </para></listitem>
 </itemizedlist>
 </para>
@@ -4824,14 +4827,23 @@ you need to add upon completion.
 <listitem>
 <para>
 Install an executable Happy, from <ulink url="http://www.haskell.org/happy">http://www.haskell.org/happy</ulink>.
-Happy is a parser generator used to compile the Haskell grammar.  Add it in your
+Happy is a parser generator used to compile the Haskell grammar.  Under MSYS or Cygwin you can easily
+build it from the source distribution using
+<programlisting>
+  ./configure
+  make
+  make install
+</programlisting>
+This should install it in <filename>/usr/local/bin</filename> (which maps to <filename>c:/msys/1.0/local/bin</filename>
+on MSYS).
+Make sure the installation directory is in your
 <constant>PATH</constant>.
 </para>
 </listitem>
 
 	  <listitem>
 	    <para>Install Alex.  This can be done by building from the
-	    source distribution in the usual way.  Sources are
+	    source distribution in the same way as Happy.  Sources are
 	    available from <ulink
 	    url="http://www.haskell.org/alex">http://www.haskell.org/alex</ulink>.</para>
 	  </listitem>
