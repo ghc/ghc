@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelFloat.lhs,v 1.12 2001/08/29 14:32:49 simonmar Exp $
+% $Id: PrelFloat.lhs,v 1.13 2001/09/14 15:45:53 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -538,13 +538,18 @@ roundTo base d is =
        (c,ds) = f (n-1) xs
        i'     = c + i
 
---
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
 -- by R.G. Burger and R.K. Dybvig in PLDI 96.
 -- This version uses a much slower logarithm estimator. It should be improved.
 
--- This function returns a list of digits (Ints in [0..base-1]) and an
--- exponent.
+-- floatToDigits takes a base and a non-negative RealFloat number,
+-- and returns a list of digits and an exponent. 
+-- In particular, if x>=0, and
+--	floatToDigits base x = ([d1,d2,...,dn], e)
+-- then
+--	(a) n >= 1
+--	(b) x = 0.d1d2...dn * (base**e)
+-- 	(c) 0 <= di <= base-1
 
 floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
