@@ -69,9 +69,7 @@ module Constants (
 	wORD_SIZE,
 
 	bLOCK_SIZE,
-	bLOCK_SIZE_W,
-
-	interfaceFileFormatVersion
+	bLOCK_SIZE_W
 
     ) where
 
@@ -214,15 +212,6 @@ Size of a double in StgWords.
 dOUBLE_SIZE    = (DOUBLE_SIZE   :: Int)
 wORD64_SIZE    = (WORD64_SIZE   :: Int)
 iNT64_SIZE     = (INT64_SIZE   :: Int)
-\end{code}
-
-The version of the interface file format we're using.  It's propagated
-here by a devious route from ghc/mk/version.mk.  See comments
-there for what it means.
-
-\begin{code}
-interfaceFileFormatVersion :: Int
-interfaceFileFormatVersion = HscIfaceFileVersion
 \end{code}
 
 This tells the native code generator the size of the spill
