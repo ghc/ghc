@@ -47,7 +47,10 @@ import GHC.Err
 import GHC.IOBase
 import GHC.Base
 #else
+import Data.Int
+import Data.Word
 import Foreign.Ptr
+import Foreign.StablePtr
 #endif
 
 #ifdef __HUGS__
