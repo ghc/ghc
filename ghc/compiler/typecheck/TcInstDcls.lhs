@@ -648,6 +648,8 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	      main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
 \end{code}
 
+Superclass loops
+~~~~~~~~~~~~~~~~
 We have to be very, very careful when generating superclasses, lest we
 accidentally build a loop. Here's an example:
 
@@ -699,6 +701,7 @@ tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
 
 	-- We must simplify this all the way down 
 	-- lest we build superclass loops
+	-- See notes about superclass loops above
     tcSimplifyTop sc_lie		`thenTc` \ sc_binds2 ->
 
     returnTc (zonked_inst_tyvars, sc_binds1, sc_binds2)
