@@ -3,7 +3,9 @@
 
 HS_SRCS = $(wildcard *.hs)
 
-SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 0
+SRC_RUNTEST_OPTS += -x 0 \
+	$(foreach i,$(wildcard $*.stdout),-o1 $(i)) \
+	$(foreach i,$(wildcard $*.stderr),-o2 $(i))
 
 %.o : %.hs
 	@echo ---- Testing for successful compilation of $<
