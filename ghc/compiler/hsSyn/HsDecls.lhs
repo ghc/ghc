@@ -4,7 +4,7 @@
 \section[HsDecls]{Abstract syntax: global declarations}
 
 Definitions for: @FixityDecl@, @TyDecl@ and @ConDecl@, @ClassDecl@,
-@InstDecl@, @DefaultDecl@.
+@InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 
 \begin{code}
 module HsDecls where
@@ -19,6 +19,7 @@ import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )
 import IdInfo		( ArgUsageInfo, FBTypeInfo, ArityInfo, UpdateInfo )
 import Demand		( Demand )
+import CallConv		( CallConv, pprCallConv )
 
 -- others:
 import Name		( getOccName, OccName, NamedThing(..) )
@@ -42,6 +43,7 @@ data HsDecl flexi name pat
   | DefD	(DefaultDecl name)
   | ValD	(HsBinds flexi name pat)
   | SigD	(IfaceSig name)
+  | ForD        (ForeignDecl name)
 \end{code}
 
 \begin{code}
@@ -54,6 +56,7 @@ hsDeclName (TyD (TySynonym name _ _ _))       	  = name
 hsDeclName (ClD (ClassDecl _ name _ _ _ _ _ _ _)) = name
 hsDeclName (SigD (IfaceSig name _ _ _))	      	  = name
 hsDeclName (InstD (InstDecl _ _ _ (Just name) _)) = name
+hsDeclName (ForD  (ForeignDecl name _ _ _ _ _))   = name
 -- Others don't make sense
 #ifdef DEBUG
 hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
@@ -70,6 +73,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
     ppr (ValD binds) = ppr binds
     ppr (DefD def)   = ppr def
     ppr (InstD inst) = ppr inst
+    ppr (ForD fd)    = ppr fd
 
 #ifdef DEBUG
 -- hsDeclName needs more context when DEBUG is on
@@ -338,6 +342,51 @@ instance (NamedThing name, Outputable name)
 
     ppr (DefaultDecl tys src_loc)
       = ptext SLIT("default") <+> parens (interpp'SP tys)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Foreign function interface declaration}
+%*									*
+%************************************************************************
+
+\begin{code}
+data ForeignDecl name = 
+   ForeignDecl 
+        name 
+	(Maybe Bool)   -- Nothing => foreign export; Just unsafe => foreign import unsafe
+	(HsType name)
+	ExtName
+	CallConv
+	SrcLoc
+
+instance (NamedThing name, Outputable name)
+	      => Outputable (ForeignDecl name) where
+
+    ppr (ForeignDecl nm imp_exp ty ext_name cconv src_loc)
+      = ptext SLIT("foreign") <+> ppr_imp_exp <+> pprCallConv cconv <+> 
+        ppr ext_name <+> ppr_unsafe <+> ppr nm <+> ptext SLIT("::")  <+> ppr ty
+        where
+         (ppr_imp_exp, ppr_unsafe) =
+	   case imp_exp of
+	     Nothing -> (ptext SLIT("export"), empty)
+	     Just us -> (ptext SLIT("import"), ptext SLIT("unsafe"))
+
+data ExtName
+ = Dynamic 
+ | ExtName FAST_STRING (Maybe FAST_STRING)
+
+isDynamic :: ExtName -> Bool
+isDynamic Dynamic = True
+isDynamic _	  = False
+
+
+instance Outputable ExtName where
+  ppr Dynamic	   = ptext SLIT("dynamic")
+  ppr (ExtName nm mb_mod) = 
+     case mb_mod of { Nothing -> empty; Just m -> doubleQuotes (ptext m) } <+> 
+     doubleQuotes (ptext nm)
+
 \end{code}
 
 %************************************************************************
