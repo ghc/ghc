@@ -135,25 +135,26 @@ comp.lang.functional FAQ  http://www.cs.nott.ac.uk/~gmh/faq.html
 
 System requirements
 ~~~~~~~~~~~~~~~~~~~
-To compile programs with GHC, you need a machine with 64+MB memory, GNU C
+To compile programs with GHC, you need a machine with 64+MB memory, GCC
 and perl. This release is known to work on the following platforms:
 
-  * i386-unknown-{linux,freebsd,mingw32}
+  * i386-unknown-{linux,*bsd,mingw32}
   * sparc-sun-solaris2
+  * alpha-dec-osf3
+  * powerpc-apple-darwin (MacOS/X)
 
 Ports to the following platforms should be relatively easy (for a
 wunderhacker), but haven't been tested due to lack of time/hardware:
 
   * hppa1.1-hp-hpux{9,10}
   * i386-unknown-solaris2
-  * alpha-dec-osf{2,3}
   * mips-sgi-irix{5,6}
   * {rs6000,powerpc}-ibm-aix
 
 The builder's guide included in distribution gives a complete
 run-down of what ports work; an on-line version can be found at
 
-   http://www.haskell.org/ghc/docs/5.02/building/building-guide.html
+   http://www.haskell.org/ghc/docs/latest/building/building-guide.html
 
 
 
