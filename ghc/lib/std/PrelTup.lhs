@@ -7,7 +7,7 @@
 This modules defines the typle data types.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelTup where
 

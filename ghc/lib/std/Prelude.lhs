@@ -3,7 +3,7 @@ special names such as () and -> shouldn't be resolved to Prelude.()
 and Prelude.-> (as they are normally). -- SDM 8/10/97
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module Prelude (
 

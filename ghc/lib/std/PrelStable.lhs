@@ -1,11 +1,11 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.3 1999/12/20 10:34:35 simonpj Exp $
+% $Id: PrelStable.lhs,v 1.4 2000/04/10 16:02:58 simonpj Exp $
 %
 % (c) The GHC Team, 1992-1999
 %
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelStable 
 	( StablePtr(..)

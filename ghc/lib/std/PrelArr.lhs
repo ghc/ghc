@@ -9,7 +9,7 @@ types and operations.
 For byte-arrays see @PrelByteArr@.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelArr where
 

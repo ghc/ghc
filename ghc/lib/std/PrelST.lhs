@@ -4,7 +4,7 @@
 \section[PrelST]{The @ST@ monad}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelST where
 

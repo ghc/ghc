@@ -12,7 +12,7 @@ We cannot define these functions in a module where they might be used
 with what the typechecker figures out.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 module PrelErr 
        (
          irrefutPatError

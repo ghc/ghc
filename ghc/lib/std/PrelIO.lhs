@@ -10,7 +10,7 @@ module IO.
 
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module PrelIO where
 

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.20 2000/04/07 13:45:48 simonpj Exp $
+% $Id: PrelIOBase.lhs,v 1.21 2000/04/10 16:02:58 simonpj Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -10,7 +10,7 @@ Definitions for the @IO@ monad and its friends.  Everything is exported
 concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 #include "cbits/stgerror.h"
 #include "config.h"
 

@@ -16,7 +16,7 @@ and the classes
 
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 #include "../includes/ieee-flpt.h"
 

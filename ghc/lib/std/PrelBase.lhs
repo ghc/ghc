@@ -71,7 +71,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelBase
 	(

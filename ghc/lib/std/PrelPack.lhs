@@ -11,7 +11,7 @@ The programmer level view of packed strings is provided by a GHC
 system library PackedString.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelPack
        (

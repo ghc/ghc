@@ -7,7 +7,7 @@
 Basic concurrency stuff
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelConc
 	( ThreadId(..)

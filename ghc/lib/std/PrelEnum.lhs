@@ -6,7 +6,7 @@
 Instances of Bounded for various datatypes.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
 
 module PrelEnum(
 	Bounded(..), Enum(..),
