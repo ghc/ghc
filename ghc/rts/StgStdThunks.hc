@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.12 2000/05/19 09:49:00 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.13 2000/11/14 12:51:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -41,9 +41,9 @@
 #endif
 
 #define SELECTOR_CODE_UPD(offset) \
-  IF_(__sel_ret_##offset##_upd_ret);					\
-  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_upd_info,__sel_ret_##offset##_upd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);			\
-  EF_(__sel_ret_##offset##_upd_ret) {					\
+  IF_(stg_sel_ret_##offset##_upd_ret);					\
+  INFO_TABLE_SRT_BITMAP(stg_sel_ret_##offset##_upd_info,stg_sel_ret_##offset##_upd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);			\
+  EF_(stg_sel_ret_##offset##_upd_ret) {					\
     FB_									\
       R1.p=(P_)R1.cl->payload[offset];					\
       GET_SAVED_CCCS;							\
@@ -52,16 +52,16 @@
     FE_									\
   }									\
 									\
-  EF_(__sel_##offset##_upd_entry);					\
-  INFO_TABLE_SELECTOR(__sel_##offset##_upd_info, __sel_##offset##_upd_entry, offset,, EF_, "__sel" #offset "_upd_entry", "__sel" #offset "_upd_entry");\
-  EF_(__sel_##offset##_upd_entry) {					\
+  EF_(stg_sel_##offset##_upd_entry);					\
+  INFO_TABLE_SELECTOR(stg_sel_##offset##_upd_info, stg_sel_##offset##_upd_entry, offset,, EF_, "stg_sel" #offset "_upd_entry", "stg_sel" #offset "_upd_entry");\
+  EF_(stg_sel_##offset##_upd_entry) {					\
     FB_									\
       STK_CHK_NP(UPD_FRAME_SIZE,1,);					\
-      UPD_BH_UPDATABLE(&__sel_##offset##_upd_info);			\
+      UPD_BH_UPDATABLE(&stg_sel_##offset##_upd_info);			\
       PUSH_UPD_FRAME(R1.p,0);						\
       ENTER_CCS(R1.p);							\
       SAVE_CCCS(UPD_FRAME_SIZE);					\
-      Sp[-UPD_FRAME_SIZE]=(W_)&__sel_ret_##offset##_upd_info;		\
+      Sp[-UPD_FRAME_SIZE]=(W_)&stg_sel_ret_##offset##_upd_info;		\
       R1.p = (P_)R1.cl->payload[0];					\
       Sp=Sp-UPD_FRAME_SIZE;						\
       JMP_(ENTRY_CODE(*R1.p));						\
@@ -86,9 +86,9 @@ SELECTOR_CODE_UPD(14);
 SELECTOR_CODE_UPD(15);
 
 #define SELECTOR_CODE_NOUPD(offset) \
-  IF_(__sel_ret_##offset##_noupd_ret); \
-  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_noupd_info, __sel_ret_##offset##_noupd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);	\
-  IF_(__sel_ret_##offset##_noupd_ret) {					\
+  IF_(stg_sel_ret_##offset##_noupd_ret); \
+  INFO_TABLE_SRT_BITMAP(stg_sel_ret_##offset##_noupd_info, stg_sel_ret_##offset##_noupd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);	\
+  IF_(stg_sel_ret_##offset##_noupd_ret) {					\
     FB_									\
       R1.p=(P_)R1.cl->payload[offset];					\
       GET_SAVED_CCCS;							\
@@ -97,15 +97,15 @@ SELECTOR_CODE_UPD(15);
     FE_									\
   }									\
 									\
-  EF_(__sel_##offset##_noupd_entry);					\
-  INFO_TABLE_SELECTOR(__sel_##offset##_noupd_info, __sel_##offset##_noupd_entry, offset,, EF_, "__sel" #offset "_noupd_entry", "__sel" #offset "_noupd_entry");\
-  EF_(__sel_##offset##_noupd_entry) {					\
+  EF_(stg_sel_##offset##_noupd_entry);					\
+  INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd_info, stg_sel_##offset##_noupd_entry, offset,, EF_, "stg_sel" #offset "_noupd_entry", "stg_sel" #offset "_noupd_entry");\
+  EF_(stg_sel_##offset##_noupd_entry) {					\
     FB_									\
       STK_CHK_NP(NOUPD_FRAME_SIZE,1,)					\
-      UPD_BH_SINGLE_ENTRY(&__sel_##offset##_noupd_info);		\
+      UPD_BH_SINGLE_ENTRY(&stg_sel_##offset##_noupd_info);		\
       ENTER_CCS(R1.p);							\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
-      Sp[-NOUPD_FRAME_SIZE]=(W_)&__sel_ret_##offset##_noupd_info;	\
+      Sp[-NOUPD_FRAME_SIZE]=(W_)&stg_sel_ret_##offset##_noupd_info;	\
       R1.p = (P_)R1.cl->payload[0];					\
       Sp=Sp-NOUPD_FRAME_SIZE;						\
       JMP_(ENTRY_CODE(*R1.p));						\
@@ -143,26 +143,26 @@ SELECTOR_CODE_NOUPD(15);
    works when profiling etc.
    -------------------------------------------------------------------------- */
 
-FN_(__ap_1_upd_entry);
-FN_(__ap_2_upd_entry);
-FN_(__ap_3_upd_entry);
-FN_(__ap_4_upd_entry);
-FN_(__ap_5_upd_entry);
-FN_(__ap_6_upd_entry);
-FN_(__ap_7_upd_entry);
-FN_(__ap_8_upd_entry);
+FN_(stg_ap_1_upd_entry);
+FN_(stg_ap_2_upd_entry);
+FN_(stg_ap_3_upd_entry);
+FN_(stg_ap_4_upd_entry);
+FN_(stg_ap_5_upd_entry);
+FN_(stg_ap_6_upd_entry);
+FN_(stg_ap_7_upd_entry);
+FN_(stg_ap_8_upd_entry);
 
 #define UF_SIZE (sizeofW(StgUpdateFrame))
 
-/* __ap_1_upd_info is a bit redundant, but there appears to be a bug
- * in the compiler that means __ap_1 is generated occasionally (ToDo)
+/* stg_ap_1_upd_info is a bit redundant, but there appears to be a bug
+ * in the compiler that means stg_ap_1 is generated occasionally (ToDo)
  */
 
-INFO_TABLE_SRT(__ap_1_upd_info,__ap_1_upd_entry,1,0,0,0,0,THUNK,,EF_,"__ap_1_upd_info","__ap_1_upd_info");
-FN_(__ap_1_upd_entry) {
+INFO_TABLE_SRT(stg_ap_1_upd_info,stg_ap_1_upd_entry,1,0,0,0,0,THUNK,,EF_,"stg_ap_1_upd_info","stg_ap_1_upd_info");
+FN_(stg_ap_1_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame),1,);
-  UPD_BH_UPDATABLE(&__ap_1_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_1_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   R1.p=(P_)(R1.cl->payload[0]);
@@ -171,11 +171,11 @@ FN_(__ap_1_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_2_upd_info,__ap_2_upd_entry,2,0,0,0,0,THUNK,,EF_,"__ap_2_upd_info","__ap_2_upd_info");
-FN_(__ap_2_upd_entry) {
+INFO_TABLE_SRT(stg_ap_2_upd_info,stg_ap_2_upd_entry,2,0,0,0,0,THUNK,,EF_,"stg_ap_2_upd_info","stg_ap_2_upd_info");
+FN_(stg_ap_2_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+1,1,);
-  UPD_BH_UPDATABLE(&__ap_2_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_2_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[1]);
@@ -185,11 +185,11 @@ FN_(__ap_2_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_3_upd_info,__ap_3_upd_entry,3,0,0,0,0,THUNK,,EF_,"__ap_3_upd_info","__ap_3_upd_info");
-FN_(__ap_3_upd_entry) {
+INFO_TABLE_SRT(stg_ap_3_upd_info,stg_ap_3_upd_entry,3,0,0,0,0,THUNK,,EF_,"stg_ap_3_upd_info","stg_ap_3_upd_info");
+FN_(stg_ap_3_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+2,1,);
-  UPD_BH_UPDATABLE(&__ap_3_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_3_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[2]);
@@ -200,11 +200,11 @@ FN_(__ap_3_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_4_upd_info,__ap_4_upd_entry,4,0,0,0,0,THUNK,,EF_,"__ap_4_upd_info","__ap_4_upd_info");
-FN_(__ap_4_upd_entry) {
+INFO_TABLE_SRT(stg_ap_4_upd_info,stg_ap_4_upd_entry,4,0,0,0,0,THUNK,,EF_,"stg_ap_4_upd_info","stg_ap_4_upd_info");
+FN_(stg_ap_4_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+3,1,);
-  UPD_BH_UPDATABLE(&__ap_4_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_4_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[3]);
@@ -216,11 +216,11 @@ FN_(__ap_4_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_5_upd_info,__ap_5_upd_entry,5,0,0,0,0,THUNK,,EF_,"__ap_5_upd_info","__ap_5_upd_info");
-FN_(__ap_5_upd_entry) {
+INFO_TABLE_SRT(stg_ap_5_upd_info,stg_ap_5_upd_entry,5,0,0,0,0,THUNK,,EF_,"stg_ap_5_upd_info","stg_ap_5_upd_info");
+FN_(stg_ap_5_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+4,1,);
-  UPD_BH_UPDATABLE(&__ap_5_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_5_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[4]);
@@ -233,11 +233,11 @@ FN_(__ap_5_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_6_upd_info,__ap_6_upd_entry,6,0,0,0,0,THUNK,,EF_,"__ap_6_upd_info","__ap_6_upd_info");
-FN_(__ap_6_upd_entry) {
+INFO_TABLE_SRT(stg_ap_6_upd_info,stg_ap_6_upd_entry,6,0,0,0,0,THUNK,,EF_,"stg_ap_6_upd_info","stg_ap_6_upd_info");
+FN_(stg_ap_6_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+5,1,);
-  UPD_BH_UPDATABLE(&__ap_6_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_6_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[5]);
@@ -251,11 +251,11 @@ FN_(__ap_6_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_7_upd_info,__ap_7_upd_entry,7,0,0,0,0,THUNK,,EF_,"__ap_7_upd_info","__ap_7_upd_info");
-FN_(__ap_7_upd_entry) {
+INFO_TABLE_SRT(stg_ap_7_upd_info,stg_ap_7_upd_entry,7,0,0,0,0,THUNK,,EF_,"stg_ap_7_upd_info","stg_ap_7_upd_info");
+FN_(stg_ap_7_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+6,1,);
-  UPD_BH_UPDATABLE(&__ap_7_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_7_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[6]);
@@ -270,11 +270,11 @@ FN_(__ap_7_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_8_upd_info,__ap_8_upd_entry,8,0,0,0,0,THUNK,,EF_,"__ap_8_upd_info","__ap_8_upd_info");
-FN_(__ap_8_upd_entry) {
+INFO_TABLE_SRT(stg_ap_8_upd_info,stg_ap_8_upd_entry,8,0,0,0,0,THUNK,,EF_,"stg_ap_8_upd_info","stg_ap_8_upd_info");
+FN_(stg_ap_8_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+7,1,);
-  UPD_BH_UPDATABLE(&__ap_8_upd_info);
+  UPD_BH_UPDATABLE(&stg_ap_8_upd_info);
   ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[7]);
