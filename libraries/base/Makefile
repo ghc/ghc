@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.41 2003/03/06 09:51:03 simonmar Exp $
+# $Id: Makefile,v 1.42 2003/05/23 10:12:28 ross Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -99,6 +99,7 @@ endif # OBJECT_FILEFORMAT = PEi
 
 EXCLUDED_HADDOCK_SRCS = \
 	Data/Generics.hs \
+	GHC/PrimopWrappers.hs \
 	GHC/PArr.hs
 
 SRC_HADDOCK_OPTS += -t "Haskell Core Libraries (base package)" \
