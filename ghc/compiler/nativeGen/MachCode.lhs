@@ -21,19 +21,20 @@ import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 import AbsCSyn		( MagicId )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv )
-import CLabel		( isAsmTemp, CLabel, pprCLabel_asm )
+import CLabel		( isAsmTemp, CLabel, pprCLabel_asm, labelDynamic )
 import Maybes		( maybeToBool, expectJust )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..), 
-                          pprStixTrees, ppStixReg,
+                          pprStixTree, ppStixReg,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat
 			)
 import Outputable
+import CmdLineOpts	( opt_Static )
 
 infixr 3 `bind`
 
@@ -68,13 +69,16 @@ stmt2Instrs stmt = case stmt of
 
     StLabel lab	   -> returnNat (unitOL (LABEL lab))
 
-    StJump arg		   -> genJump arg
-    StCondJump lab arg	   -> genCondJump lab arg
-    StCall fn cconv VoidRep args -> genCCall fn cconv VoidRep args
+    StJump arg		   -> genJump (derefDLL arg)
+    StCondJump lab arg	   -> genCondJump lab (derefDLL arg)
+
+    -- A call returning void, ie one done for its side-effects
+    StCall fn cconv VoidRep args -> genCCall fn
+                                             cconv VoidRep (map derefDLL args)
 
     StAssign pk dst src
-      | isFloatingRep pk -> assignFltCode pk dst src
-      | otherwise	 -> assignIntCode pk dst src
+      | isFloatingRep pk -> assignFltCode pk (derefDLL dst) (derefDLL src)
+      | otherwise	 -> assignIntCode pk (derefDLL dst) (derefDLL src)
 
     StFallThrough lbl
 	-- When falling through on the Alpha, we still have to load pv
@@ -89,11 +93,10 @@ stmt2Instrs stmt = case stmt of
       where
 	getData :: StixTree -> NatM (InstrBlock, Imm)
 
-	getData (StInt i)    = returnNat (nilOL, ImmInteger i)
-	getData (StDouble d) = returnNat (nilOL, ImmDouble d)
-	getData (StLitLbl s) = returnNat (nilOL, ImmLab s)
-	getData (StCLbl l)   = returnNat (nilOL, ImmCLbl l)
-	getData (StString s) =
+	getData (StInt i)        = returnNat (nilOL, ImmInteger i)
+	getData (StDouble d)     = returnNat (nilOL, ImmDouble d)
+	getData (StCLbl l)       = returnNat (nilOL, ImmCLbl l)
+	getData (StString s)     =
 	    getNatLabelNCG 	    	    `thenNat` \ lbl ->
 	    returnNat (toOL [LABEL lbl,
 			     ASCII True (_UNPK_ s)],
@@ -102,6 +105,35 @@ stmt2Instrs stmt = case stmt of
 	getData (StIndex rep (StCLbl lbl) (StInt off)) =
 		returnNat (nilOL, 
                            ImmIndex lbl (fromInteger (off * sizeOf rep)))
+
+-- Walk a Stix tree, and insert dereferences to CLabels which are marked
+-- as labelDynamic.  stmt2Instrs calls derefDLL selectively, because
+-- not all such CLabel occurrences need this dereferencing -- SRTs don't
+-- for one.
+derefDLL :: StixTree -> StixTree
+derefDLL tree
+   | opt_Static   -- short out the entire deal if not doing DLLs
+   = tree
+   | otherwise
+   = qq tree
+     where
+        qq t
+           = case t of
+                StCLbl lbl -> if   labelDynamic lbl
+                              then StInd PtrRep (StCLbl lbl)
+                              else t
+                -- all the rest are boring
+                StIndex pk base offset -> StIndex pk (qq base) (qq offset)
+                StPrim pk args         -> StPrim pk (map qq args)
+                StInd pk addr          -> StInd pk (qq addr)
+                StCall who cc pk args  -> StCall who cc pk (map qq args)
+                StInt    _             -> t
+                StDouble _             -> t
+                StString _             -> t
+                StReg    _             -> t
+                StScratchWord _        -> t
+                _                      -> pprPanic "derefDLL: unhandled case" 
+                                                   (pprStixTree t)
 \end{code}
 
 %************************************************************************
@@ -134,12 +166,10 @@ mangleIndexTree (StIndex pk base off)
 \begin{code}
 maybeImm :: StixTree -> Maybe Imm
 
-maybeImm (StLitLbl s) = Just (ImmLab s)
-maybeImm (StCLbl   l) = Just (ImmCLbl l)
-
-maybeImm (StIndex rep (StCLbl l) (StInt off)) = 
-	Just (ImmIndex l (fromInteger (off * sizeOf rep)))
-
+maybeImm (StCLbl l)       
+   = Just (ImmCLbl l)
+maybeImm (StIndex rep (StCLbl l) (StInt off)) 
+   = Just (ImmIndex l (fromInteger (off * sizeOf rep)))
 maybeImm (StInt i)
   | i >= toInteger minInt && i <= toInteger maxInt
   = Just (ImmInt (fromInteger i))
@@ -482,13 +512,11 @@ getRegister (StDouble d)
 
   | d == 0.0
   = let code dst = unitOL (GLDZ dst)
-    in trace "nativeGen: GLDZ" 
-       (returnNat (Any DoubleRep code))
+    in  returnNat (Any DoubleRep code)
 
   | d == 1.0
   = let code dst = unitOL (GLD1 dst)
-    in trace "nativeGen: GLD1" 
-       returnNat (Any DoubleRep code)
+    in  returnNat (Any DoubleRep code)
 
   | otherwise
   = getNatLabelNCG 	    	    `thenNat` \ lbl ->
@@ -578,7 +606,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
               other
                  -> pprPanic "getRegister(x86,unary primop)" 
-                             (pprStixTrees [StPrim primop [x]])
+                             (pprStixTree (StPrim primop [x]))
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -662,7 +690,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
                                            [x, y])
       other
          -> pprPanic "getRegister(x86,dyadic primop)" 
-                     (pprStixTrees [StPrim primop [x, y]])
+                     (pprStixTree (StPrim primop [x, y]))
   where
 
     --------------------
@@ -861,7 +889,7 @@ getRegister leaf
     in
     	returnNat (Any PtrRep code)
   | otherwise
-  = pprPanic "getRegister(x86)" (pprStixTrees [leaf])
+  = pprPanic "getRegister(x86)" (pprStixTree leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -2317,7 +2345,7 @@ genCCall fn cconv kind args
     -- ToDo:needed (WDP 96/03) ???
     fn__2 = case (_HEAD_ fn) of
 	      '.' -> ImmLit (ptext fn)
-	      _   -> ImmLab (ptext fn)
+	      _   -> ImmLab False (ptext fn)
 
     arg_size DF = 8
     arg_size F  = 8

@@ -22,7 +22,7 @@ import AsmRegAlloc	( runRegAllocate )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState, findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
-                          pprStixTrees, ppStixTree, CodeSegment(..),
+                          pprStixTrees, pprStixTree, CodeSegment(..),
                           stixCountTempUses, stixSubst,
                           NatM, initNat, mapNat,
                           NatM_State, mkNatM_State,
@@ -203,7 +203,7 @@ stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
          : ts )
    | stixCountTempUses u t2 == 1
      && sum (map (stixCountTempUses u) ts) == 0
-   = trace ("nativeGen: stixInline: " ++ showSDoc (ppStixTree rhs))
+   = trace ("nativeGen: stixInline: " ++ showSDoc (pprStixTree rhs))
            (stixPeep (stixSubst u rhs t2 : ts))
 
 stixPeep (t1:t2:ts) = t1 : stixPeep (t2:ts)

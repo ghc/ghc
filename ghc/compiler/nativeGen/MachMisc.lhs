@@ -20,8 +20,6 @@ module MachMisc (
 	fmtAsmLbl,
 	exactLog2,
 
-        stixFor_stdout, stixFor_stderr, stixFor_stdin,
-
 	Instr(..),  IF_ARCH_i386(Operand(..) COMMA,)
 	Cond(..),
 	Size(..),
@@ -80,53 +78,6 @@ fmtAsmLbl s
      ,{-otherwise-}
      '.':'L':s
      )
-
----------------------------
-stixFor_stdout, stixFor_stderr, stixFor_stdin :: StixTree
-#if i386_TARGET_ARCH
--- Linux glibc 2 / libc6
-stixFor_stdout  = StInd PtrRep (StLitLbl (text "stdout"))
-stixFor_stderr  = StInd PtrRep (StLitLbl (text "stderr"))
-stixFor_stdin   = StInd PtrRep (StLitLbl (text "stdin"))
-#endif
-
-#if alpha_TARGET_ARCH
-stixFor_stdout = error "stixFor_stdout: not implemented for Alpha"
-stixFor_stderr = error "stixFor_stderr: not implemented for Alpha"
-stixFor_stdin  = error "stixFor_stdin: not implemented for Alpha"
-#endif
-
-#if sparc_TARGET_ARCH
-stixFor_stdout = error "stixFor_stdout: not implemented for Sparc"
-stixFor_stderr = error "stixFor_stderr: not implemented for Sparc"
-stixFor_stdin  = error "stixFor_stdin: not implemented for Sparc"
-#endif
-
-#if 0
-Here's some old stuff from which it shouldn't be too hard to
-implement the above for Alpha/Sparc.
-
-cvtLitLit :: String -> String
-
---
--- Rather than relying on guessing, use FILE_SIZE to compute the
--- _iob offsets.
---
-cvtLitLit "stdin"  = IF_ARCH_alpha("_iob+0" {-probably OK...-}
-		    ,IF_ARCH_i386("stdin"
-		    ,IF_ARCH_sparc("__iob+0x0"{-probably OK...-}
-		    ,)))
-
-cvtLitLit "stdout" = IF_ARCH_alpha("_iob+"++show (``FILE_SIZE''::Int)
-		    ,IF_ARCH_i386("stdout"
-		    ,IF_ARCH_sparc("__iob+"++show (``FILE_SIZE''::Int)
-		    ,)))
-cvtLitLit "stderr" = IF_ARCH_alpha("_iob+"++show (2*(``FILE_SIZE''::Int))
-		    ,IF_ARCH_i386("stderr"
-		    ,IF_ARCH_sparc("__iob+"++show (2*(``FILE_SIZE''::Int))
-		    ,)))
-#endif
-
 \end{code}
 
 % ----------------------------------------------------------------

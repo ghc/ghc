@@ -24,7 +24,7 @@ import SMRep		( fixedItblSize,
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
-			  moduleRegdLabel )
+			  moduleRegdLabel, labelDynamic )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
@@ -45,6 +45,7 @@ import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
 import Char		( ord )
+import CmdLineOpts	( opt_Static )
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
@@ -84,7 +85,14 @@ Here we handle top-level things, like @CCodeBlock@s and
 
  gentopcode stmt@(CStaticClosure lbl _ _ _)
   = genCodeStaticClosure stmt			`thenUs` \ code ->
-    returnUs (StSegment DataSegment : StLabel lbl : code [])
+    returnUs (
+       if   opt_Static
+       then StSegment DataSegment 
+            : StLabel lbl : code []
+       else StSegment DataSegment 
+            : StData PtrRep [StInt 0] -- DLLised world, need extra zero word
+            : StLabel lbl : code []
+    )
 
  gentopcode stmt@(CRetVector lbl _ _ _)
   = genCodeVecTbl stmt				`thenUs` \ code ->
@@ -132,8 +140,15 @@ Here we handle top-level things, like @CCodeBlock@s and
  gentopcode stmt@(CSRT lbl closures)
   = returnUs [ StSegment TextSegment 
 	     , StLabel lbl 
-	     , StData DataPtrRep (map StCLbl closures)
+	     , StData DataPtrRep (map mk_StCLbl_for_SRT closures)
 	     ]
+    where
+       mk_StCLbl_for_SRT :: CLabel -> StixTree
+       mk_StCLbl_for_SRT label
+          | labelDynamic label
+          = StIndex CharRep (StCLbl label) (StInt 1)
+          | otherwise
+          = StCLbl label
 
  gentopcode stmt@(CBitmap lbl mask)
   = returnUs [ StSegment TextSegment 
@@ -152,18 +167,20 @@ Here we handle top-level things, like @CCodeBlock@s and
  gentopcode stmt@(CModuleInitBlock lbl absC)
   = gencode absC			`thenUs` \ code ->
     getUniqLabelNCG 	    	    	`thenUs` \ tmp_lbl ->
+    getUniqLabelNCG 	    	    	`thenUs` \ flag_lbl ->
     returnUs ( StSegment DataSegment
-	     : StLabel moduleRegdLabel
+	     : StLabel flag_lbl
 	     : StData IntRep [StInt 0]
 	     : StSegment TextSegment
 	     : StLabel lbl
 	     : StCondJump tmp_lbl (StPrim IntNeOp 	
-				     [StInd IntRep (StCLbl moduleRegdLabel),
+				     [StInd IntRep (StCLbl flag_lbl),
 				      StInt 0])
-	     : StAssign IntRep (StInd IntRep (StCLbl moduleRegdLabel)) (StInt 1)
+	     : StAssign IntRep (StInd IntRep (StCLbl flag_lbl)) (StInt 1)
 	     : code 
 	     [ StLabel tmp_lbl
-	     , StAssign PtrRep stgSp (StPrim IntSubOp [stgSp, StInt 4])
+	     , StAssign PtrRep stgSp
+                        (StIndex PtrRep stgSp (StInt (-1)))
 	     , StJump (StInd WordRep stgSp)
 	     ])
 

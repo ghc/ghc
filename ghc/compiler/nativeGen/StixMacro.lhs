@@ -21,6 +21,9 @@ import PrimRep		( PrimRep(..) )
 import Stix
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import Outputable
+import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
+			  mkIndInfoLabel, mkUpdInfoLabel, mkSeqInfoLabel,
+			  mkRtsGCEntryLabel, mkStgUpdatePAPLabel )
 \end{code}
 
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on
@@ -202,17 +205,17 @@ Let's make sure that these CAFs are lifted out, shall we?
 
 bh_info, ind_static_info, ind_info :: StixTree
 
-bh_info   	= sStLitLbl SLIT("BLACKHOLE_info")
-ind_static_info	= sStLitLbl SLIT("IND_STATIC_info")
-ind_info  	= sStLitLbl SLIT("IND_info")
-upd_frame_info	= sStLitLbl SLIT("upd_frame_info")
-seq_frame_info	= sStLitLbl SLIT("seq_frame_info")
-
+bh_info   	= StCLbl mkBlackHoleInfoTableLabel
+ind_static_info	= StCLbl mkIndStaticInfoLabel
+ind_info  	= StCLbl mkIndInfoLabel
+upd_frame_info	= StCLbl mkUpdInfoLabel
+seq_frame_info	= StCLbl mkSeqInfoLabel
+stg_update_PAP  = StCLbl mkStgUpdatePAPLabel
 -- Some common call trees
 
 updatePAP, stackOverflow :: StixTree
 
-updatePAP     = StJump (sStLitLbl SLIT("stg_update_PAP"))
+updatePAP     = StJump stg_update_PAP
 stackOverflow = StCall SLIT("StackOverflow") cCallConv VoidRep []
 \end{code}
 
@@ -335,21 +338,23 @@ checkCode macro args assts
 	
 -- Various canned heap-check routines
 
-gc_chk (StInt n)   = StJump (StLitLbl (ptext SLIT("stg_chk_") 
-                                       <> int (fromInteger n)))
-gc_enter (StInt n) = StJump (StLitLbl (ptext SLIT("stg_gc_enter_") 
-                                       <> int (fromInteger n)))
-gc_seq (StInt n)   = StJump (StLitLbl (ptext SLIT("stg_gc_seq_") 
-                                       <> int (fromInteger n)))
-gc_noregs          = StJump (StLitLbl (ptext SLIT("stg_gc_noregs")))
-gc_unpt_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unpt_r1")))
-gc_unbx_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unbx_r1")))
-gc_f1              = StJump (StLitLbl (ptext SLIT("stg_gc_f1")))
-gc_d1              = StJump (StLitLbl (ptext SLIT("stg_gc_d1")))
-gc_gen             = StJump (StLitLbl (ptext SLIT("stg_gen_chk")))
+mkStJump_to_GCentry :: String -> StixTree
+mkStJump_to_GCentry gcname
+--   | opt_Static
+   = StJump (StCLbl (mkRtsGCEntryLabel gcname))
+--   | otherwise -- it's in a different DLL
+--   = StJump (StInd PtrRep (StLitLbl True sdoc))
 
+gc_chk (StInt n)   = mkStJump_to_GCentry ("stg_chk_" ++ show n)
+gc_enter (StInt n) = mkStJump_to_GCentry ("stg_gc_enter_" ++ show n)
+gc_seq (StInt n)   = mkStJump_to_GCentry ("stg_gc_seq_" ++ show n)
+gc_noregs          = mkStJump_to_GCentry "stg_gc_noregs"
+gc_unpt_r1         = mkStJump_to_GCentry "stg_gc_unpt_r1"
+gc_unbx_r1         = mkStJump_to_GCentry "stg_gc_unbx_r1"
+gc_f1              = mkStJump_to_GCentry "stg_gc_f1"
+gc_d1              = mkStJump_to_GCentry "stg_gc_d1"
+gc_gen             = mkStJump_to_GCentry "stg_gen_chk"
 gc_ut (StInt p) (StInt np)
-                   = StJump (StLitLbl (ptext SLIT("stg_gc_ut_") 
-                                       <> int (fromInteger p) 
-                                       <> char '_' <> int (fromInteger np)))
+                   = mkStJump_to_GCentry ("stg_gc_ut_" ++ show p 
+                                          ++ "_" ++ show np)
 \end{code}

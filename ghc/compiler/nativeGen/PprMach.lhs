@@ -17,7 +17,7 @@ module PprMach ( pprInstr, pprSize, pprUserReg ) where
 import MachRegs		-- may differ per-platform
 import MachMisc
 
-import CLabel		( pprCLabel_asm, externallyVisibleCLabel )
+import CLabel		( pprCLabel_asm, externallyVisibleCLabel, labelDynamic )
 import CStrings		( charToC )
 import Maybes		( maybeToBool )
 import Stix		( CodeSegment(..), StixTree(..) )
@@ -260,12 +260,15 @@ pprImm :: Imm -> SDoc
 
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
-pprImm (ImmCLbl l)    = pprCLabel_asm l
-pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
+pprImm (ImmCLbl l)    = (if labelDynamic l then text "__imp_" else empty)
+                        <> pprCLabel_asm l
+pprImm (ImmIndex l i) = (if labelDynamic l then text "__imp_" else empty)
+                        <> pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmLab s) | underscorePrefix = (<>) (char '_') s
-		  | otherwise	     = s
+pprImm (ImmLab dll s) = (if underscorePrefix then char '_' else empty)
+                        <> (if dll then text "_imp__" else empty)
+                        <> s
 
 #if sparc_TARGET_ARCH
 pprImm (LO i)

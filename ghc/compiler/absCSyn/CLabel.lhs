@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.34 2000/05/15 15:03:36 simonmar Exp $
+% $Id: CLabel.lhs,v 1.35 2000/05/18 13:55:36 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -36,7 +36,20 @@ module CLabel (
 	mkModuleInitLabel,
 
 	mkErrorStdEntryLabel,
+
+	mkStgUpdatePAPLabel,
 	mkUpdInfoLabel,
+	mkSeqInfoLabel,
+	mkIndInfoLabel,
+	mkIndStaticInfoLabel,
+	mkRtsGCEntryLabel,
+        mkMainRegTableLabel,
+	mkCharlikeClosureLabel,
+	mkIntlikeClosureLabel,
+	mkTopClosureLabel,
+	mkErrorIO_innardsLabel,
+	mkMAP_FROZEN_infoLabel,
+
 	mkTopTickyCtrLabel,
 	mkBlackHoleInfoTableLabel,
         mkCAFBlackHoleInfoTableLabel,
@@ -160,7 +173,13 @@ data RtsLabelInfo
 
   | RtsBlackHoleInfoTbl FAST_STRING  -- black hole with info table name
 
-  | RtsUpdInfo
+  | RtsUpdInfo            	-- upd_frame_info
+  | RtsSeqInfo			-- seq_frame_info
+  | RtsGCEntryLabel String 	-- a heap check fail handler, eg  stg_chk_2
+  | RtsMainRegTable             -- MainRegTable (??? Capabilities wurble ???)
+  | Rts_Closure String		-- misc rts closures, eg CHARLIKE_closure
+  | Rts_Info String		-- misc rts itbls, eg MUT_ARR_PTRS_FROZEN_info
+  | Rts_Code String		-- misc rts code, eg ErrorIO_innards
 
   | RtsSelectorInfoTbl Bool{-updatable-} Int{-offset-}	-- Selector thunks
   | RtsSelectorEntry   Bool{-updatable-} Int{-offset-}
@@ -219,7 +238,20 @@ mkModuleInitLabel		= ModuleInitLabel
 	-- Some fixed runtime system labels
 
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
+
+mkStgUpdatePAPLabel		= RtsLabel (Rts_Code "stg_update_PAP")
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
+mkSeqInfoLabel			= RtsLabel RtsSeqInfo
+mkIndInfoLabel			= RtsLabel (Rts_Info "IND_info")
+mkIndStaticInfoLabel		= RtsLabel (Rts_Info "IND_STATIC_info")
+mkRtsGCEntryLabel str		= RtsLabel (RtsGCEntryLabel str)
+mkMainRegTableLabel		= RtsLabel RtsMainRegTable
+mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "CHARLIKE_closure")
+mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "INTLIKE_closure")
+mkTopClosureLabel		= RtsLabel (Rts_Closure "TopClosure")
+mkErrorIO_innardsLabel		= RtsLabel (Rts_Code "ErrorIO_innards")
+mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "MUT_ARR_PTRS_FROZEN_info")
+
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
 mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("BLACKHOLE_info"))
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
@@ -418,7 +450,13 @@ pprCLbl (CaseLabel u CaseBitmap)
 
 pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
-pprCLbl (RtsLabel RtsUpdInfo) = ptext SLIT("upd_frame_info")
+pprCLbl (RtsLabel RtsUpdInfo)            = ptext SLIT("upd_frame_info")
+pprCLbl (RtsLabel RtsSeqInfo)            = ptext SLIT("seq_frame_info")
+pprCLbl (RtsLabel RtsMainRegTable)       = ptext SLIT("MainRegTable")
+pprCLbl (RtsLabel (RtsGCEntryLabel str)) = text str
+pprCLbl (RtsLabel (Rts_Closure str))     = text str
+pprCLbl (RtsLabel (Rts_Info str))        = text str
+pprCLbl (RtsLabel (Rts_Code str))        = text str
 
 pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 

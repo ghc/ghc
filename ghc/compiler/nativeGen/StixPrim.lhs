@@ -21,6 +21,9 @@ import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, uF_UPDATEE, bLOCK_SIZE )
+import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
+			  mkTopClosureLabel, mkErrorIO_innardsLabel,
+			  mkMAP_FROZEN_infoLabel )
 import Outputable
 
 import Char	       	( ord, isAlphaNum )
@@ -406,17 +409,17 @@ amodeToStix (CLbl      lbl _) = StCLbl lbl
  -- For CharLike and IntLike, we attempt some trivial constant-folding here.
 
 amodeToStix (CCharLike (CLit (MachChar c)))
-  = StLitLbl ((<>) (ptext SLIT("CHARLIKE_closure+")) (int off))
+  = StIndex CharRep cHARLIKE_closure (StInt (toInteger off))
   where
     off = charLikeSize * ord c
 
 amodeToStix (CCharLike x)
-  = StIndex CharRep charLike off
+  = StIndex CharRep cHARLIKE_closure off
   where
     off = StPrim IntMulOp [amodeToStix x, StInt (toInteger charLikeSize)]
 
 amodeToStix (CIntLike (CLit (MachInt i)))
-  = StLitLbl ((<>) (ptext SLIT("INTLIKE_closure+")) (int off))
+  = StIndex CharRep{-yes,really-} iNTLIKE_closure (StInt (toInteger off))
   where
     off = intLikeSize * (fromInteger (i - mIN_INTLIKE))
 
@@ -457,17 +460,9 @@ amodeToStix (CMacroExpr _ macro [arg])
       UPD_FRAME_UPDATEE
          -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
                                          (StInt (toInteger uF_UPDATEE)))
--- XXX!!!
--- GET_TAG(info_ptr) is supposed to be  get_itbl(info_ptr)->srt_len,
--- which we've had to hand-code here.
-
-litLitToStix :: String -> StixTree
 litLitToStix nm
-  | all is_id nm = StLitLbl (text nm)
-  | otherwise    = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
-                           ++ "suggested workaround: use flag -fvia-C\n")
-
-  where is_id c = isAlphaNum c || c == '_'
+  = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
+            ++ "suggested workaround: use flag -fvia-C\n")
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays
@@ -476,25 +471,24 @@ in the data segment.  (These are in bytes.)
 \begin{code}
 -- The INTLIKE base pointer
 
-intLikePtr :: StixTree
-
-intLikePtr = StInd PtrRep (sStLitLbl SLIT("INTLIKE_closure"))
+iNTLIKE_closure :: StixTree
+iNTLIKE_closure = StCLbl mkIntlikeClosureLabel
 
 -- The CHARLIKE base
 
-charLike :: StixTree
-
-charLike = sStLitLbl SLIT("CHARLIKE_closure")
+cHARLIKE_closure :: StixTree
+cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
 
 -- Trees for the ErrorIOPrimOp
 
 topClosure, errorIO :: StixTree
 
-topClosure = StInd PtrRep (sStLitLbl SLIT("TopClosure"))
-errorIO = StJump (StInd PtrRep (sStLitLbl SLIT("ErrorIO_innards")))
+topClosure = StInd PtrRep (StCLbl mkTopClosureLabel)
+errorIO = StJump (StInd PtrRep (StCLbl mkErrorIO_innardsLabel))
 
-mutArrPtrsFrozen_info = sStLitLbl SLIT("MUT_ARR_PTRS_FROZEN_info")
+mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
+-- these are the sizes of charLike and intLike closures, in _bytes_.
 charLikeSize = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
 intLikeSize  = (fixedHdrSize + 1) * (fromInteger (sizeOf PtrRep))
 \end{code}

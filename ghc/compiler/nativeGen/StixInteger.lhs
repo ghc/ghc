@@ -23,7 +23,7 @@ import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SMRep		( arrWordsHdrSize )
-import Stix		( sStLitLbl, StixTree(..), StixTreeList, arrWordsHS )
+import Stix		( StixTree(..), StixTreeList, arrWordsHS )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 \end{code}
 

@@ -5,7 +5,7 @@
 \begin{code}
 module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
-	sStLitLbl, pprStixTrees, ppStixTree, ppStixReg,
+	pprStixTrees, pprStixTree, ppStixReg,
         stixCountTempUses, stixSubst,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
@@ -37,6 +37,7 @@ import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
+import CmdLineOpts	( opt_Static )
 import Outputable
 \end{code}
 
@@ -54,9 +55,6 @@ data StixTree
   | StInt	Integer	    -- ** add Kind at some point
   | StDouble	Rational
   | StString	FAST_STRING
-  | StLitLbl	SDoc    -- literal labels
-			    -- (will be _-prefixed on some machines)
-
   | StCLbl	CLabel	    -- labels that we might index into
 
     -- Abstract registers of various kinds
@@ -122,51 +120,47 @@ data StixTree
 
   | StComment FAST_STRING
 
-sStLitLbl :: FAST_STRING -> StixTree
-sStLitLbl s = StLitLbl (ptext s)
-
 
 pprStixTrees :: [StixTree] -> SDoc
 pprStixTrees ts 
   = vcat [
-       vcat (map ppStixTree ts),
+       vcat (map pprStixTree ts),
        char ' ',
        char ' '
     ]
 
 paren t = char '(' <> t <> char ')'
 
-ppStixTree :: StixTree -> SDoc
-ppStixTree t 
+pprStixTree :: StixTree -> SDoc
+pprStixTree t 
    = case t of
        StSegment cseg   -> paren (ppCodeSegment cseg)
        StInt i          -> paren (integer i)
        StDouble	rat     -> paren (text "Double" <+> rational rat)
        StString str     -> paren (text "Str" <+> ptext str)
        StComment str    -> paren (text "Comment" <+> ptext str)
-       StLitLbl sd      -> sd
        StCLbl lbl       -> pprCLabel lbl
        StReg reg        -> ppStixReg reg
-       StIndex k b o    -> paren (ppStixTree b <+> char '+' <> 
-                                  pprPrimRep k <+> ppStixTree o)
-       StInd k t        -> pprPrimRep k <> char '[' <> ppStixTree t <> char ']'
-       StAssign k d s   -> ppStixTree d <> text "  :=" <> pprPrimRep k 
-                                          <> text "  " <> ppStixTree s
+       StIndex k b o    -> paren (pprStixTree b <+> char '+' <> 
+                                  pprPrimRep k <+> pprStixTree o)
+       StInd k t        -> pprPrimRep k <> char '[' <> pprStixTree t <> char ']'
+       StAssign k d s   -> pprStixTree d <> text "  :=" <> pprPrimRep k 
+                                         <> text "  " <> pprStixTree s
        StLabel ll       -> pprCLabel ll <+> char ':'
        StFunBegin ll    -> char ' ' $$ paren (text "FunBegin" <+> pprCLabel ll)
        StFunEnd ll      -> paren (text "FunEnd" <+> pprCLabel ll)
-       StJump t         -> paren (text "Jump" <+> ppStixTree t)
+       StJump t         -> paren (text "Jump" <+> pprStixTree t)
        StFallThrough ll -> paren (text "FallThru" <+> pprCLabel ll)
        StCondJump l t   -> paren (text "JumpC" <+> pprCLabel l 
-                                               <+> ppStixTree t)
+                                               <+> pprStixTree t)
        StData k ds      -> paren (text "Data" <+> pprPrimRep k <+>
-                                  hsep (map ppStixTree ds))
+                                  hsep (map pprStixTree ds))
        StPrim op ts     -> paren (text "Prim" <+> pprPrimOp op <+> 
-                                  hsep (map ppStixTree ts))
+                                  hsep (map pprStixTree ts))
        StCall nm cc k args
                         -> paren (text "Call" <+> ptext nm <+>
                                   pprCallConv cc <+> pprPrimRep k <+> 
-                                  hsep (map ppStixTree args))
+                                  hsep (map pprStixTree args))
        StScratchWord i  -> text "ScratchWord" <> paren (int i)
 
 pprPrimRep = text . showPrimRep
@@ -276,7 +270,6 @@ stixCountTempUses u t
         StInt _          -> 0
         StDouble _       -> 0
         StString _       -> 0
-        StLitLbl _       -> 0
         StCLbl _         -> 0
         StLabel _        -> 0
         StFunBegin _     -> 0
@@ -320,7 +313,6 @@ stixMapUniques f t
         StInt _          -> t
         StDouble _       -> t
         StString _       -> t
-        StLitLbl _       -> t
         StCLbl _         -> t
         StLabel _        -> t
         StFunBegin _     -> t

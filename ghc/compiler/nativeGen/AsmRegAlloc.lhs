@@ -163,9 +163,9 @@ hairyRegAlloc regs reserve_regs instrs =
                     noFuture instrs_patched of
                   ((RH _ mloc2 _),_,instrs'') 
                      -- successfully allocated the patched code
-        	     | mloc2 == mloc1 -> trace (spillMsg True) (Just instrs'')
+        	     | mloc2 == mloc1 -> maybetrace (spillMsg True) (Just instrs'')
                      -- no; we have to give up
-                     | otherwise      -> trace (spillMsg False) Nothing 
+                     | otherwise      -> maybetrace (spillMsg False) Nothing 
                        -- instrs''
   where
     regs'  = regs `useMRegs` reserve_regs
@@ -182,6 +182,12 @@ hairyRegAlloc regs reserve_regs instrs =
                                 (reverse reserve_regs)))
          where
             toMappedReg (I# i) = MappedReg i
+#ifdef DEBUG
+    maybetrace msg x = trace msg x
+#else
+    maybetrace msg x = x
+#endif
+
 \end{code}
 
 Here we patch instructions that reference ``registers'' which are

@@ -61,10 +61,10 @@ module MachRegs (
 
 import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
-import CLabel           ( CLabel )
+import CLabel           ( CLabel, mkMainRegTableLabel )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
-import Stix		( sStLitLbl, StixTree(..), StixReg(..),
+import Stix		( StixTree(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Uniquable(..), Unique
@@ -80,7 +80,8 @@ data Imm
   = ImmInt	Int
   | ImmInteger	Integer	    -- Sigh.
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLab	SDoc    -- Simple string label (underscore-able)
+  | ImmLab	Bool SDoc    -- Simple string label (underscore-able)
+                             -- Bool==True ==> in a different DLL
   | ImmLit	SDoc    -- Simple string
   | ImmIndex    CLabel Int
   | ImmDouble	Rational
@@ -169,7 +170,9 @@ fits13Bits x = x >= -4096 && x < 4096
 
 -----------------
 largeOffsetError i
-  = error ("ERROR: SPARC native-code generator cannot handle large offset ("++show i++");\nprobably because of large constant data structures;\nworkaround: use -fvia-C on this module.\n")
+  = error ("ERROR: SPARC native-code generator cannot handle large offset ("
+           ++show i++");\nprobably because of large constant data structures;" ++ 
+           "\nworkaround: use -fvia-C on this module.\n")
 
 #endif {-sparc-}
 \end{code}
@@ -204,10 +207,10 @@ stgReg x
 
     baseLoc = case (magicIdRegMaybe BaseReg) of
       Just _  -> StReg (StixMagicId BaseReg)
-      Nothing -> sStLitLbl SLIT("MainRegTable")
+      Nothing -> StCLbl mkMainRegTableLabel
 
     nonReg = case x of
-      BaseReg		-> sStLitLbl SLIT("MainRegTable")
+      BaseReg -> StCLbl mkMainRegTableLabel
 
       _ -> StInd (magicIdPrimRep x)
 		 (StPrim IntAddOp [baseLoc,
