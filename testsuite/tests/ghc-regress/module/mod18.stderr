@@ -1,5 +1,5 @@
 
-mod18.hs:3:5:
+mod18.hs:2:5:
     Multiple declarations of `Main.T'
       other declarations at:
-	mod18.hs:2:5
+	mod18.hs:3:5
