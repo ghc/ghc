@@ -176,7 +176,6 @@ data IfaceToken
   | ITdata
   | ITtype
   | ITnewtype
-  | ITderiving
   | ITclass
   | ITwhere
   | ITinstance
@@ -760,7 +759,6 @@ haskellKeywordsFM = listToUFM $
        ,("of",			ITof)
        ,("in",			ITin)
        ,("let",			ITlet)
-       ,("deriving",		ITderiving)
 
        ,("->",			ITrarrow)
        ,("\\",			ITlam)

@@ -44,7 +44,6 @@ import Outputable
 	DATA		    { ITdata }
 	TYPE		    { ITtype }
 	NEWTYPE		    { ITnewtype }
-	DERIVING	    { ITderiving }
 	CLASS		    { ITclass }
 	WHERE		    { ITwhere }
 	INSTANCE	    { ITinstance }
@@ -233,10 +232,10 @@ version		:  INTEGER				{ fromInteger $1 }
 topdecl		:: { RdrNameHsDecl }
 topdecl		:  src_loc TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TySynonym $3 $4 $6 $1) }
-		|  src_loc DATA decl_context tc_name tv_bndrs constrs deriving SEMI
-			{ TyD (TyData DataType $3 $4 $5 $6 $7 noDataPragmas $1) }
-		|  src_loc NEWTYPE decl_context tc_name tv_bndrs newtype_constr deriving SEMI
-			{ TyD (TyData NewType $3 $4 $5 $6 $7 noDataPragmas $1) }
+		|  src_loc DATA decl_context tc_name tv_bndrs constrs SEMI
+			{ TyD (TyData DataType $3 $4 $5 $6 Nothing noDataPragmas $1) }
+		|  src_loc NEWTYPE decl_context tc_name tv_bndrs newtype_constr SEMI
+			{ TyD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
 		|  src_loc CLASS decl_context tc_name tv_bndrs csigs SEMI
 			{ ClD (mkClassDecl $3 $4 $5 $6 EmptyMonoBinds noClassPragmas $1) }
 		|  src_loc var_name TYPE_PART
@@ -294,10 +293,6 @@ constr		:  src_loc data_name batypes			{ ConDecl $2 [] (VanillaCon $3) $1 }
 newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
 newtype_constr	:  					{ [] }
 		| src_loc EQUAL data_name atype		{ [ConDecl $3 [] (NewCon $4) $1] }
-
-deriving	:: { Maybe [RdrName] }
-		: 					{ Nothing }
-		| DERIVING OPAREN tc_names1 CPAREN	{ Just $3 }
 
 batypes		:: { [RdrNameBangType] }
 batypes		:  					{ [] }
