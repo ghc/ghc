@@ -34,7 +34,7 @@ instance Show Addr where
    showsPrec p (A# a) = showsPrec p (I# (addr2Int# a))
 
 nullAddr :: Addr
-nullAddr = ``(W_)NULL''
+nullAddr = A# (int2Addr# 0#)
 
 plusAddr :: Addr -> Int -> Addr
 plusAddr (A# addr) (I# off) = A# (int2Addr# (addr2Int# addr +# off))
