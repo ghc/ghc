@@ -371,18 +371,20 @@ FPTOOLS_TOP_ABS		= @hardtop@
 # but since the configure script has them on offer while
 # passing through, we might as well set them.
 
-prefix                  = @prefix@
-exec_prefix             = @exec_prefix@
-bindir                  = @bindir@
-#UNUSED, see below: libexecdir              = @libexecdir@
-datadir                 = @datadir@
-#sysconfdir              = @datadir@
-#sharedstatedir          = @sharedstatedir@
-#localstatedir           = @localstatedir@
-libdir                  = @libdir@
-includedir              = @includedir@
-oldincludedir           = @oldincludedir@
+prefix			= @prefix@
+exec_prefix		= @exec_prefix@
+bindir			= @bindir@
+datadir			= @datadir@
+#sysconfdir		= @datadir@
+#sharedstatedir		= @sharedstatedir@
+#localstatedir		= @localstatedir@
+libdir			= @libdir@
+includedir		= @includedir@
+oldincludedir		= @oldincludedir@
 mandir			= @mandir@
+
+#UNUSED, see below: libexecdir              = @libexecdir@
+#UNUSED:infodir		= @infodir@
 #UNUSED:srcdir          = @srcdir@
 
 # 
