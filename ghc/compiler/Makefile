@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1997/03/17 20:34:30 simonpj Exp $
+# $Id: Makefile,v 1.10 1997/03/19 05:31:31 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -150,7 +150,7 @@ parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 prelude/PrimOp_HC_OPTS 		= -K3m
-reader/Lex_HC_OPTS		= -K2m
+reader/Lex_HC_OPTS		= -K2m -H16m
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 rename/ParseIface_HC_OPTS 	= -Onot -H16m
 rename/ParseType_HC_OPTS 	= -Onot -H16m
