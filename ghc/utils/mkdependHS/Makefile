@@ -2,18 +2,16 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 INSTALLING=0
 
-WAYS=
+override WAYS=
 
 boot :: all
 
 SCRIPT_PROG=mkdependHS
 SCRIPT_OBJS=mkdependHS.prl
 SCRIPT_SUBST_VARS= \
- RAWCPP TMPDIR UNLIT_PROG \
+ RAWCPP TMPDIR \
  TOP_PWD \
- INSTALL_LIB_DIR INSTALL_DATA_DIR \
- INSTALL_HSLIBS_DIR INSTALLING \
- PRELUDE_DIRS \
+ INSTALLING \
  PROJECTVERSION SED
 
 INTERP=perl
@@ -21,20 +19,26 @@ INTERP=perl
 #
 # install setup
 #
-INSTALL_PROGS += $(SCRIPT_PROG)
+INSTALL_SCRIPTS += $(SCRIPT_PROG)
 
-INSTALL_HSLIBS_DIR:=$(libdir)/../hslibs-$(ProjectVersion)
-INSTALL_LIB_DIR:=$(libdir)
-INSTALL_DATA_DIR:=$(datadir)
+ifneq "$(BIN_DIST)" "1"
+SCRIPT_SUBST_VARS += libdir datadir
+endif
+
+
+#
+# Prepend an infomercial if installing (binary-dist or the real thing).
+#
+ifeq "$(INSTALLING)" "1"
+ifeq "$(BIN_DIST)" "1"
+SCRIPT_PREFIX_FILES += prefix.txt
+endif
+endif
 
 ifeq "$(INSTALLING)" "1"
 TOP_PWD:=$(prefix)
-UNLIT_PROG:=$(libexecdir)/unlit
-PRELUDE_DIRS:=$(libdir)/imports
 else
 TOP_PWD:=$(FPTOOLS_TOP_ABS)
-UNLIT_PROG:=$(FPTOOLS_TOP_ABS)/ghc/utils/unlit/unlit
-PRELUDE_DIRS:="$(FPTOOLS_TOP_ABS)/ghc/lib/ghc:$(FPTOOLS_TOP_ABS)/ghc/lib/required:$(FPTOOLS_TOP_ABS)/ghc/lib/glaExts:$(FPTOOLS_TOP_ABS)/ghc/lib/concurrent"
 endif
 
 #
@@ -50,8 +54,10 @@ CLEAN_FILES += $(SCRIPT_PROG)
 
 include $(TOP)/mk/target.mk
 
+#
 # Hack to re-create the in-situ build tree script after 
-# having just installed it.
+# having just installed it (if you don't, confusion ensues
+# if you try to use the build tree copy afterwards..)
 #
 install ::
 	@$(RM) $(SCRIPT_PROG)
