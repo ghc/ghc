@@ -1,14 +1,12 @@
+{-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.98 2001/10/23 11:42:21 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.99 2001/10/23 17:18:38 sof Exp $
 --
 -- GHC Interactive User Interface
 --
 -- (c) The GHC Team 2000
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -#include "Linker.h" #-}
-{-# OPTIONS -#include "SchedAPI.h" #-}
 module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "../includes/config.h"
@@ -60,7 +58,7 @@ import CPUTime
 import Directory
 import IO
 import Char
-import Monad 		( when )
+import Monad 		( when, join )
 
 import PrelGHC 		( unsafeCoerce# )
 import Foreign		( nullPtr )
@@ -375,10 +373,8 @@ showTypeOfName cmstate n
 
 flushEverything :: GHCi ()
 flushEverything
-   = io $ do flush_so <- readIORef flush_stdout
-     	     flush_so
-     	     flush_se <- readIORef flush_stdout
-     	     flush_se
+   = io $ do Monad.join (readIORef flush_stdout)
+     	     Monad.join (readIORef flush_stderr)
              return ()
 
 specialCommand :: String -> GHCi Bool
