@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.75 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.76 2001/03/25 13:52:46 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1035,7 +1035,6 @@ FN_(tryPutMVarzh_fast)
     mvar->header.info = &stg_FULL_MVAR_info;
 #endif
 
-    /* HACK: we need a pointer to pass back, so we abuse NO_FINALIZER_closure */
     RET_N(0);
   }
   
