@@ -275,10 +275,8 @@ specified file descriptor is available for reading (just like select).
 -- (GHC only).
 --
 -- Note that the resolution used by the Haskell runtime system's
--- internal timer is 1\/50 second, and 'threadDelay' will round down
--- its argument to the nearest multiple of this resolution.  In
--- particular, to get the smallest non-zero delay, pass 20000 as the
--- parameter to 'threadDelay'.
+-- internal timer is 1\/50 second, and 'threadDelay' will round its
+-- argument up to the nearest multiple of this resolution.
 --
 -- There is no guarantee that the thread will be rescheduled promptly
 -- when the delay has expired, but the thread will never continue to
