@@ -994,7 +994,7 @@ From the data type
 we generate
 
 	instance Typeable2 T where
-		typeOf2 _ = mkAppTy (mkTyConRep "T") []
+		typeOf2 _ = mkTyConApp (mkTyConRep "T") []
 
 We are passed the Typeable2 class as well as T
 

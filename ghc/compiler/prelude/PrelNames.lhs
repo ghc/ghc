@@ -447,7 +447,7 @@ showSpace_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showSpace")
 showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen") 
 
 typeOf_RDR     = varQual_RDR tYPEABLE_Name FSLIT("typeOf")
-mkTypeRep_RDR  = varQual_RDR tYPEABLE_Name FSLIT("mkAppTy")
+mkTypeRep_RDR  = varQual_RDR tYPEABLE_Name FSLIT("mkTyConApp")
 mkTyConRep_RDR = varQual_RDR tYPEABLE_Name FSLIT("mkTyCon")
 
 undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
