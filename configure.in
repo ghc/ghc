@@ -443,12 +443,23 @@ dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
 
 # 
-dnl what's the type of timezone?
+dnl ** what's the type of timezone?
 AC_TYPE_TIMEZONE
 
 #
-dnl do we have altzone?
+dnl ** do we have altzone?
 AC_ALTZONE
+
+dnl ** what are the sizes of various types
+dnl    (these must come before GHC_CHECK_ALIGNMENT)
+AC_CHECK_SIZEOF(unsigned int,4)
+AC_CHECK_SIZEOF(float,4)
+AC_CHECK_SIZEOF(double,8)
+
+dnl ** what are alignment constraints on various types
+GHC_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
+GHC_CHECK_ALIGNMENT(float)
+GHC_CHECK_ALIGNMENT(double)
 
 #
 dnl ** check for specific library functions that we are interested in

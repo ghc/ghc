@@ -1,4 +1,4 @@
-# $Id: aclocal.m4,v 1.19 1998/03/03 04:45:07 reid Exp $
+# $Id: aclocal.m4,v 1.20 1998/03/03 19:04:48 reid Exp $
 #
 # Extra autoconf macros for the Glasgow fptools
 #
@@ -340,3 +340,45 @@ else
 fi
 rm -fr conftest*
 ])
+
+dnl ** figure out whether types can be word-aligned
+dnl    (test based on test in smalltalk-1.1.5 configuration)
+dnl    (required SIZEOF test but AC_CHECK_SIZEOF doesn't call PROVIDE
+dnl     so we can't call REQUIRE)
+
+dnl GHC_CHECK_ALIGNMENT(TYPE)
+AC_DEFUN(GHC_CHECK_ALIGNMENT,
+[changequote(<<, >>)dnl
+dnl The name to #define.
+define(<<AC_TYPE_NAME>>, translit(alignment_$1, [a-z *], [A-Z_P]))dnl
+dnl The cache variable name.
+define(<<AC_CV_NAME>>, translit(ac_cv_alignment_$1, [ *], [_p]))dnl
+dnl The name of the corresponding size.
+define(<<AC_CV_SIZEOF_NAME>>, translit(ac_cv_sizeof_$1, [ *], [_p]))dnl
+changequote([, ])dnl
+AC_MSG_CHECKING(alignment of $1)
+AC_CACHE_VAL(AC_CV_NAME,
+[AC_TRY_RUN([
+main()
+{
+    unsigned int vec[3];
+    $1 test, *testptr;
+
+    test = *($1 *)&vec[1];
+    testptr = ($1 *)&vec[1];
+    *testptr = test;
+
+    exit(0);
+}
+],
+AC_CV_NAME=$ac_cv_sizeof_unsigned_int,
+AC_CV_NAME=$AC_CV_SIZEOF_NAME,
+AC_CV_NAME=$AC_CV_SIZEOF_NAME)])
+AC_MSG_RESULT($AC_CV_NAME)
+AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
+AC_PROVIDE($AC_TYPE_NAME)
+undefine([AC_TYPE_NAME])dnl
+undefine([AC_CV_NAME])dnl
+undefine([AC_CV_SIZEOF_NAME])dnl
+])
+

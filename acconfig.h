@@ -59,6 +59,15 @@
 /* Define to unsigned long long int if <sys/types.h> doesn't define */
 #undef ullong
 
+/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_DOUBLE
+
+/* Define to alignment constraint on floats or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_FLOAT
+
+/* Define to alignment constraint on unsigned int - whichever is the greater */
+#undef ALIGNMENT_UNSIGNED_INT
+
 
 /* Leave that blank line there!!  Autoheader needs it.
    If you're adding to this file, keep in mind:
