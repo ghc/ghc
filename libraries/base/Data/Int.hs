@@ -45,15 +45,15 @@ import NHC.SizedTypes (Int8, Int16, Int32, Int64)	-- instances of Bits
 * All arithmetic is performed modulo 2^n, where @n@ is the number of
   bits in the type.
 
-* For coercing between any two integer types, use 'fromIntegral',
+* For coercing between any two integer types, use 'Prelude.fromIntegral',
   which is specialized for all the common cases so should be fast
   enough.  Coercing word types (see "Data.Word") to and from integer
   types preserves representation, not sign.
 
-* The rules that hold for 'Enum' instances over a
+* The rules that hold for 'Prelude.Enum' instances over a
   bounded type such as 'Int' (see the section of the
   Haskell report dealing with arithmetic sequences) also hold for the
-  'Enum' instances over the various
+  'Prelude.Enum' instances over the various
   'Int' types defined here.
 
 * Right and left shifts by amounts greater than or equal to the width
