@@ -134,9 +134,9 @@ mkMonoBindsAndSigs sf sig_cvtr fbs
 
     mangle_bind (b_acc, s_acc) (RdrFunctionBinding srcline patbindings)
 	    -- must be a function binding...
-      = case (cvFunMonoBind sf patbindings) of { (var, matches) ->
+      = case (cvFunMonoBind sf patbindings) of { (var, inf, matches) ->
 	(b_acc `AndMonoBinds`
-	 FunMonoBind var matches (mkSrcLoc2 sf srcline), s_acc)
+	 FunMonoBind var inf matches (mkSrcLoc2 sf srcline), s_acc)
 	}
 \end{code}
 
@@ -149,14 +149,21 @@ cvPatMonoBind sf (RdrMatch_NoGuard srcline srcfun pat expr binding)
 cvPatMonoBind sf (RdrMatch_Guards srcline srcfun pat guardedexprs binding)
   = (pat, map (cvGRHS sf srcline) guardedexprs, cvBinds sf cvValSig binding)
 
-cvFunMonoBind :: SrcFile -> [RdrMatch] -> (RdrName {-VarName-}, [RdrNameMatch])
+cvFunMonoBind :: SrcFile -> [RdrMatch] -> (RdrName {-VarName-}, Bool {-InfixDefn-}, [RdrNameMatch])
 
 cvFunMonoBind sf matches
-  = (srcfun {- cheating ... -}, cvMatches sf False matches)
+  = (head srcfuns, head infixdefs, cvMatches sf False matches)
   where
-    srcfun = case (head matches) of
-	       RdrMatch_NoGuard _ sfun _ _ _ -> sfun
-	       RdrMatch_Guards  _ sfun _ _ _ -> sfun
+    (srcfuns, infixdefs) = unzip (map get_mdef matches)
+    -- ToDo: Check for consistent srcfun and infixdef
+
+    get_mdef (RdrMatch_NoGuard _ sfun pat _ _) = get_pdef pat
+    get_mdef (RdrMatch_Guards  _ sfun pat _ _) = get_pdef pat
+
+    get_pdef (ConPatIn fn _)     = (fn, False)
+    get_pdef (ConOpPatIn _ op _) = (op, True)
+    get_pdef (ParPatIn pat)	 = get_pdef pat
+
 
 cvMatches :: SrcFile -> Bool -> [RdrMatch] -> [RdrNameMatch]
 cvMatch	  :: SrcFile -> Bool -> RdrMatch   -> RdrNameMatch
@@ -173,10 +180,11 @@ cvMatch sf is_case rdr_match
 	  -- we most certainly want to keep it!	 Hence the monkey busines...
 
 	  (if is_case then -- just one pattern: leave it untouched...
-	      [pat']
-	   else
-	      case pat' of
-		ConPatIn _ pats -> pats
+	      [pat]
+	   else		   -- function pattern; extract arg patterns...
+	      case pat of ConPatIn fn pats    -> pats
+			  ConOpPatIn p1 op p2 -> [p1,p2]
+			  ParPatIn pat	      -> panic "PrefixToHs.cvMatch:ParPatIn"
 	  )
   where
     (pat, binding, guarded_exprs)
@@ -184,17 +192,7 @@ cvMatch sf is_case rdr_match
 	  RdrMatch_NoGuard ln b c expr    d -> (c,d, [OtherwiseGRHS expr (mkSrcLoc2 sf ln)])
 	  RdrMatch_Guards  ln b c gd_exps d -> (c,d, map (cvGRHS sf ln) gd_exps)
 
-    ---------------------
-    pat' = doctor_pat pat
-
-    -- a ConOpPatIn in the corner may be handled by converting it to
-    -- ConPatIn...
-
-    doctor_pat (ConOpPatIn p1 op p2) = ConPatIn op [p1, p2]
-    doctor_pat other_pat	     = other_pat
-
 cvGRHS :: SrcFile -> SrcLine -> (RdrNameHsExpr, RdrNameHsExpr) -> RdrNameGRHS
-
 cvGRHS sf sl (g, e) = GRHS g e (mkSrcLoc2 sf sl)
 \end{code}
 

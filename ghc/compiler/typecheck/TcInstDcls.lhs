@@ -651,7 +651,7 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
     -- Renamer has reduced us to these two cases.
     let
 	(op,locn) = case mbind of
-		      FunMonoBind op _ locn	       -> (op, locn)
+		      FunMonoBind op _ _ locn	       -> (op, locn)
 		      PatMonoBind (VarPatIn op) _ locn -> (op, locn)
 
         occ    = getLocalName op
@@ -724,9 +724,9 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 tcMethodBind :: TcIdOcc s -> TcType s -> RenamedMonoBinds
 	     -> TcM s (TcMonoBinds s, LIE s)
 
-tcMethodBind meth_id meth_ty (FunMonoBind name matches locn)
+tcMethodBind meth_id meth_ty (FunMonoBind name inf matches locn)
   = tcMatchesFun name meth_ty matches `thenTc` \ (rhs', lie) ->
-    returnTc (FunMonoBind meth_id rhs' locn, lie)
+    returnTc (FunMonoBind meth_id inf rhs' locn, lie)
 
 tcMethodBind meth_id meth_ty pbind@(PatMonoBind pat grhss_and_binds locn)
   -- pat is sure to be a (VarPatIn op)

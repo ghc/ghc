@@ -245,9 +245,9 @@ BOOLEAN inpat;
 
 %type <utree>	exp oexp dexp kexp fexp aexp rbind texps
 		expL oexpL kexpL expLno oexpLno dexpLno kexpLno
-		qual gd leftexp
- 		apat bpat pat apatc conpat dpat fpat opat aapat
- 		dpatk fpatk opatk aapatk rpat
+		vallhs funlhs qual gd leftexp
+ 		pat bpat apat apatc conpat rpat
+ 		patk bpatk apatck conpatk
 
 
 %type <uid>	MINUS DARROW AS LAZY
@@ -835,7 +835,7 @@ instdef :
   	;
 
 
-valdef	:  opatk
+valdef	:  vallhs
 		{
 		  tree fn = function($1);
 		  PREVPATT = $1;
@@ -869,12 +869,22 @@ valdef	:  opatk
 		      FN = NULL;
 		      SAMEFN = 0;
 		    }
-		  else /* lhs is function */
+		  else
 		    $$ = mkfbind($3,startlineno);
 
 		  PREVPATT = NULL;
 		}
 	;
+
+vallhs  : patk					{ $$ = $1; }
+	| patk qvarop pat			{ $$ = mkinfixap($2,$1,$3); }
+	| funlhs				{ $$ = $1; }
+	;
+
+funlhs	:  qvark apat				{ $$ = mkap(mkident($1),$2); }
+	|  funlhs apat				{ $$ = mkap($1,$2); }
+	;
+
 
 valrhs	:  valrhs1 maybe_where			{ $$ = lsing(createpat($1, $2)); }
 	;
@@ -1154,90 +1164,6 @@ leftexp	:  LARROW exp				{ $$ = $2; }
 *                                                                     *
 **********************************************************************/
 
-/*
-	The xpatk business is to do with accurately recording
-	the starting line for definitions.
-*/
-
-opatk	:  dpatk
-	|  opatk qop opat %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
-	;
-
-opat	:  dpat
-	|  opat qop opat %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
-	;
-
-/*
-  This comes here because of the funny precedence rules concerning
-  prefix minus.
-*/
-
-
-dpat	:  MINUS fpat				{ $$ = mknegate($2); }
-	|  fpat
-	;
-
-	/* Function application */
-fpat	:  fpat aapat				{ $$ = mkap($1,$2); }
-	|  aapat
-	;
-
-dpatk	:  minuskey fpat			{ $$ = mknegate($2); }
-	|  fpatk
-	;
-
-	/* Function application */
-fpatk	:  fpatk aapat				{ $$ = mkap($1,$2); }
-	|  aapatk
-	;
-
-aapat	:  qvar		 			{ $$ = mkident($1); }
-	|  qvar AT apat			 	{ $$ = mkas($1,$3); }
-	|  gcon		 			{ $$ = mkident($1); }
-	|  qcon OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
-	|  lit_constant				{ $$ = mklit($1); }
-	|  WILDCARD				{ $$ = mkwildp(); }
-	|  OPAREN opat CPAREN			{ $$ = mkpar($2); }
-	|  OPAREN opat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
-	|  OBRACK pats CBRACK			{ $$ = mkllist($2); }
-	|  LAZY apat				{ $$ = mklazyp($2); }
-	;
-
-
-aapatk	:  qvark	 			{ $$ = mkident($1); }
-	|  qvark AT apat	 		{ $$ = mkas($1,$3); }
-	|  gconk	 			{ $$ = mkident($1); }
-	|  qconk OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
-	|  lit_constant				{ $$ = mklit($1); setstartlineno(); }
-	|  WILDCARD				{ $$ = mkwildp(); setstartlineno(); }
-	|  oparenkey opat CPAREN		{ $$ = mkpar($2); }
-	|  oparenkey opat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
-	|  obrackkey pats CBRACK		{ $$ = mkllist($2); }
-	|  lazykey apat				{ $$ = mklazyp($2); }
-	;
-
-gcon	:  qcon
-	|  OBRACK CBRACK			{ $$ = creategid(-1); }
-	|  OPAREN CPAREN			{ $$ = creategid(0); }
-	|  OPAREN commas CPAREN			{ $$ = creategid($2); }
-	;
-
-gconk	:  qconk		 		
-	|  obrackkey CBRACK			{ $$ = creategid(-1); }
-	|  oparenkey CPAREN			{ $$ = creategid(0); }
-	|  oparenkey commas CPAREN		{ $$ = creategid($2); }
-	;
-
-lampats	:  apat lampats				{ $$ = mklcons($1,$2); }
-	|  apat					{ $$ = lsing($1); }
-	/* right recursion? (WDP) */
-	;
-
-pats	:  pat COMMA pats			{ $$ = mklcons($1, $3); }
-	|  pat					{ $$ = lsing($1); }
-    	/* right recursion? (WDP) */
-	;
-
 pat	:  pat qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
 	|  bpat
 	;
@@ -1245,8 +1171,8 @@ pat	:  pat qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
 bpat	:  apatc
  	|  conpat
 	|  qcon OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
-	|  MINUS INTEGER			{ $$ = mklit(mkinteger(ineg($2))); }
-	|  MINUS FLOAT				{ $$ = mklit(mkfloatr(ineg($2))); }
+	|  MINUS INTEGER			{ $$ = mknegate(mklit(mkinteger($2))); }
+	|  MINUS FLOAT				{ $$ = mknegate(mklit(mkfloatr($2))); }
 	;
 
 conpat	:  gcon					{ $$ = mkident($1); }
@@ -1281,6 +1207,16 @@ lit_constant:
 	|  CLITLIT /* yurble yurble */		{ $$ = mkclitlit($1); }
 	;
 
+lampats	:  apat lampats				{ $$ = mklcons($1,$2); }
+	|  apat					{ $$ = lsing($1); }
+	/* right recursion? (WDP) */
+	;
+
+pats	:  pat COMMA pats			{ $$ = mklcons($1, $3); }
+	|  pat					{ $$ = lsing($1); }
+    	/* right recursion? (WDP) */
+	;
+
 rpats	: rpat					{ $$ = lsing($1); }
 	| rpats COMMA rpat			{ $$ = lapp($1,$3); }
 	;
@@ -1289,6 +1225,44 @@ rpat	:  qvar					{ $$ = mkrbind($1,mknothing()); }
 	|  qvar EQUAL pat			{ $$ = mkrbind($1,mkjust($3)); }
 	;
 
+
+patk	:  patk qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
+	|  bpatk
+	;
+
+bpatk	:  apatck
+ 	|  conpatk
+	|  qconk OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
+	|  minuskey INTEGER			{ $$ = mknegate(mklit(mkinteger($2))); }
+	|  minuskey FLOAT			{ $$ = mknegate(mklit(mkfloatr($2))); }
+	;
+
+conpatk	:  gconk				{ $$ = mkident($1); }
+	|  conpatk apat				{ $$ = mkap($1,$2); }
+	;
+
+apatck	:  qvark		 		{ $$ = mkident($1); }
+	|  qvark AT apat			{ $$ = mkas($1,$3); }
+	|  lit_constant				{ $$ = mklit($1); setstartlineno(); }
+	|  WILDCARD				{ $$ = mkwildp(); setstartlineno(); }
+	|  oparenkey pat CPAREN			{ $$ = mkpar($2); }
+	|  oparenkey pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
+	|  obrackkey pats CBRACK		{ $$ = mkllist($2); }
+	|  lazykey apat				{ $$ = mklazyp($2); }
+	;
+
+
+gcon	:  qcon
+	|  OBRACK CBRACK			{ $$ = creategid(-1); }
+	|  OPAREN CPAREN			{ $$ = creategid(0); }
+	|  OPAREN commas CPAREN			{ $$ = creategid($2); }
+	;
+
+gconk	:  qconk
+	|  obrackkey CBRACK			{ $$ = creategid(-1); }
+	|  oparenkey CPAREN			{ $$ = creategid(0); }
+	|  oparenkey commas CPAREN		{ $$ = creategid($2); }
+	;
 
 /**********************************************************************
 *                                                                     *
@@ -1355,9 +1329,6 @@ classkey:   CLASS	{ setstartlineno();
 			}
 	;
 
-minuskey:   MINUS	{ setstartlineno(); }
-	;
-
 modulekey:  MODULE	{ setstartlineno();
 			  if(etags)
 #if 1/*etags*/
@@ -1375,6 +1346,9 @@ obrackkey:  OBRACK	{ setstartlineno(); }
 	;
 
 lazykey	:   LAZY	{ setstartlineno(); }
+	;
+
+minuskey:   MINUS	{ setstartlineno(); }
 	;
 
 

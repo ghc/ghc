@@ -237,6 +237,7 @@ data MonoBinds tyvar uvar id pat
 		    (GRHSsAndBinds tyvar uvar id pat)
 		    SrcLoc
   | FunMonoBind     id
+		    Bool			-- True => infix declaration
 		    [Match tyvar uvar id pat]	-- must have at least one Match
 		    SrcLoc
   | VarMonoBind	    id			-- TRANSLATION
@@ -262,8 +263,9 @@ instance (NamedThing id, Outputable id, Outputable pat,
     ppr sty (PatMonoBind pat grhss_n_binds locn)
       = ppHang (ppr sty pat) 4 (pprGRHSsAndBinds sty False grhss_n_binds)
 
-    ppr sty (FunMonoBind fun matches locn)
+    ppr sty (FunMonoBind fun inf matches locn)
       = pprMatches sty (False, pprNonOp sty fun) matches
+      -- ToDo: print infix if appropriate
 
     ppr sty (VarMonoBind name expr)
       = ppHang (ppCat [pprNonOp sty name, ppEquals]) 4 (ppr sty expr)
@@ -302,7 +304,7 @@ collectBinders (RecBind monobinds)    = collectMonoBinders monobinds
 collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> [name]
 collectMonoBinders EmptyMonoBinds		     = []
 collectMonoBinders (PatMonoBind pat grhss_w_binds _) = collectPatBinders pat
-collectMonoBinders (FunMonoBind f matches _)	     = [f]
+collectMonoBinders (FunMonoBind f _ matches _)	     = [f]
 collectMonoBinders (VarMonoBind v expr) 	     = error "collectMonoBinders"
 collectMonoBinders (AndMonoBinds bs1 bs2)
  = collectMonoBinders bs1 ++ collectMonoBinders bs2
@@ -321,7 +323,7 @@ collectMonoBindersAndLocs (AndMonoBinds bs1 bs2)
 collectMonoBindersAndLocs (PatMonoBind pat grhss_w_binds locn)
   = collectPatBinders pat `zip` repeat locn
 
-collectMonoBindersAndLocs (FunMonoBind f matches locn) = [(f, locn)]
+collectMonoBindersAndLocs (FunMonoBind f _ matches locn) = [(f, locn)]
 
 #ifdef DEBUG
 collectMonoBindersAndLocs (VarMonoBind v expr)

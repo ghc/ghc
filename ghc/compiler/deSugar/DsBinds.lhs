@@ -470,7 +470,7 @@ dsMonoBinds is_rec tyvars dicts binder_subst (VarMonoBind var expr)
 \end{code}
 
 \begin{code}
-dsMonoBinds is_rec tyvars dicts binder_subst (FunMonoBind fun matches locn)
+dsMonoBinds is_rec tyvars dicts binder_subst (FunMonoBind fun _ matches locn)
   = putSrcLocDs locn	$
     let
 	new_fun      = binder_subst fun

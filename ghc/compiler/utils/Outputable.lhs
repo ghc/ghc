@@ -46,7 +46,7 @@ interppSP  sty xs = ppIntersperse ppSP (map (ppr sty) xs)
 
 interpp'SP :: Outputable a => PprStyle -> [a] -> Pretty
 interpp'SP sty xs
-  = ppInterleave sep (map (ppr sty) xs)
+  = ppIntersperse sep (map (ppr sty) xs)
   where
     sep = ppBeside ppComma ppSP
 

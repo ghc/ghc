@@ -51,7 +51,9 @@ import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 import PrelMods		( pRELUDE_BUILTIN )
 
 import Maybes
-import Name		( Name, RdrName(..), appendRdr, nameUnique )
+import Name		( Name, RdrName(..), appendRdr, nameUnique,
+			  mkTupleTyConName, mkFunTyConName
+			)
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
@@ -74,7 +76,10 @@ data TyCon
 		[Class]		-- Classes which have derived instances
 		NewOrData
 
-  | TupleTyCon	Arity	-- just a special case of DataTyCon
+  | TupleTyCon	Unique		-- cached
+		Name		-- again, we could do without this, but
+				-- it makes life somewhat easier
+		Arity	-- just a special case of DataTyCon
 			-- Kind = BoxedTypeKind
 			--      -> ... (n times) ...
 			--	-> BoxedTypeKind
@@ -113,8 +118,13 @@ data NewOrData
 
 \begin{code}
 mkFunTyCon   = FunTyCon
-mkTupleTyCon = TupleTyCon
 mkSpecTyCon  = SpecTyCon
+
+mkTupleTyCon arity
+  = TupleTyCon u n arity 
+  where
+    n = mkTupleTyConName arity
+    u = uniqueOf n
 
 mkDataTyCon name
   = DataTyCon (nameUnique name) name
@@ -160,7 +170,7 @@ tyConKind (SpecTyCon tc tys)
     spec kind (Nothing : tys) =
       argKind kind `mkArrowKind` spec (resultKind kind) tys
 
-tyConKind (TupleTyCon n)
+tyConKind (TupleTyCon _ _ n)
   = mkArrow n
    where
     mkArrow 0 = mkBoxedTypeKind
@@ -173,7 +183,7 @@ tyConKind (TupleTyCon n)
 tyConUnique :: TyCon -> Unique
 tyConUnique FunTyCon			   = funTyConKey
 tyConUnique (DataTyCon uniq _ _ _ _ _ _ _) = uniq
-tyConUnique (TupleTyCon a) 		   = mkTupleTyConUnique a
+tyConUnique (TupleTyCon uniq _ _)	   = uniq
 tyConUnique (PrimTyCon uniq _ _) 	   = uniq
 tyConUnique (SynTyCon uniq _ _ _ _ _)      = uniq
 tyConUnique (SpecTyCon _ _ )		   = panic "tyConUnique:SpecTyCon"
@@ -181,7 +191,7 @@ tyConUnique (SpecTyCon _ _ )		   = panic "tyConUnique:SpecTyCon"
 tyConArity :: TyCon -> Arity
 tyConArity FunTyCon			 = 2
 tyConArity (DataTyCon _ _ _ tvs _ _ _ _) = length tvs
-tyConArity (TupleTyCon arity)		 = arity
+tyConArity (TupleTyCon _ _ arity)	 = arity
 tyConArity (PrimTyCon _ _ _)		 = 0	-- ??
 tyConArity (SpecTyCon _ _)		 = 0
 tyConArity (SynTyCon _ _ _ arity _ _)    = arity
@@ -195,7 +205,7 @@ synTyConArity _				 = Nothing
 tyConTyVars :: TyCon -> [TyVar]
 tyConTyVars FunTyCon			  = [alphaTyVar,betaTyVar]
 tyConTyVars (DataTyCon _ _ _ tvs _ _ _ _) = tvs
-tyConTyVars (TupleTyCon arity)		  = take arity alphaTyVars
+tyConTyVars (TupleTyCon _ _ arity)	  = take arity alphaTyVars
 tyConTyVars (SynTyCon _ _ _ _ tvs _)      = tvs
 tyConTyVars (PrimTyCon _ _ _) 	     	  = panic "tyConTyVars:PrimTyCon"
 tyConTyVars (SpecTyCon _ _ ) 	     	  = panic "tyConTyVars:SpecTyCon"
@@ -206,14 +216,14 @@ tyConDataCons :: TyCon -> [Id]
 tyConFamilySize  :: TyCon -> Int
 
 tyConDataCons (DataTyCon _ _ _ _ _ data_cons _ _) = data_cons
-tyConDataCons (TupleTyCon a)			  = [mkTupleCon a]
+tyConDataCons (TupleTyCon _ _ a)		  = [mkTupleCon a]
 tyConDataCons other				  = []
 	-- You may think this last equation should fail,
 	-- but it's quite convenient to return no constructors for
 	-- a synonym; see for example the call in TcTyClsDecls.
 
 tyConFamilySize (DataTyCon _ _ _ _ _ data_cons _ _) = length data_cons
-tyConFamilySize (TupleTyCon a)			    = 1
+tyConFamilySize (TupleTyCon _ _ _)		    = 1
 \end{code}
 
 \begin{code}
@@ -229,14 +239,15 @@ getSynTyConDefn (SynTyCon _ _ _ _ tyvars ty) = (tyvars,ty)
 
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe Id
-maybeTyConSingleCon (TupleTyCon arity)	          = Just (mkTupleCon arity)
+
+maybeTyConSingleCon (TupleTyCon _ _ arity)        = Just (mkTupleCon arity)
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _) = Just c
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _) = Nothing
 maybeTyConSingleCon (PrimTyCon _ _ _)	          = Nothing
 maybeTyConSingleCon (SpecTyCon tc tys)            = panic "maybeTyConSingleCon:SpecTyCon"
 						  -- requires DataCons of TyCon
 
-isEnumerationTyCon (TupleTyCon arity)
+isEnumerationTyCon (TupleTyCon _ _ arity)
   = arity == 0
 isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _)
   = not (null data_cons) && all is_nullary data_cons
@@ -274,7 +285,7 @@ instance Ord3 TyCon where
   cmp FunTyCon		          FunTyCon		      = EQ_
   cmp (DataTyCon a _ _ _ _ _ _ _) (DataTyCon b _ _ _ _ _ _ _) = a `cmp` b
   cmp (SynTyCon a _ _ _ _ _)      (SynTyCon b _ _ _ _ _)      = a `cmp` b
-  cmp (TupleTyCon a)	          (TupleTyCon b)	      = a `cmp` b
+  cmp (TupleTyCon _ _ a)          (TupleTyCon _ _ b)	      = a `cmp` b
   cmp (PrimTyCon a _ _)		  (PrimTyCon b _ _)	      = a `cmp` b
   cmp (SpecTyCon tc1 mtys1)	  (SpecTyCon tc2 mtys2)
     = panic# "cmp on SpecTyCons" -- case (tc1 `cmp` tc2) of { EQ_ -> mtys1 `cmp` mtys2; xxx -> xxx }
@@ -288,7 +299,7 @@ instance Ord3 TyCon where
       tag2 = tag_TyCon other_2
       tag_TyCon FunTyCon    		    = ILIT(1)
       tag_TyCon (DataTyCon _ _ _ _ _ _ _ _) = ILIT(2)
-      tag_TyCon (TupleTyCon _)		    = ILIT(3)
+      tag_TyCon (TupleTyCon _ _ _)	    = ILIT(3)
       tag_TyCon (PrimTyCon  _ _ _)	    = ILIT(4)
       tag_TyCon (SpecTyCon  _ _) 	    = ILIT(5)
 
@@ -317,10 +328,8 @@ instance NamedThing TyCon where
     getName (PrimTyCon _ n _)		= n
     getName (SpecTyCon tc _)		= getName tc
     getName (SynTyCon _ n _ _ _ _)	= n
-{- LATER:
-    getName FunTyCon			= (pRELUDE_BUILTIN, SLIT("(->)"))
-    getName (TupleTyCon a)		= (pRELUDE_BUILTIN, _PK_ ("Tuple" ++ show a))
--}
+    getName FunTyCon			= mkFunTyConName
+    getName (TupleTyCon _ n _)		= n
     getName tc				= panic "TyCon.getName"
 
 {- LATER:

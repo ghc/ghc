@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcGenDeriv]{Generating derived instance declarations}
 
@@ -830,7 +830,7 @@ mk_easy_FunMonoBind :: RdrName -> [RdrNamePat]
 		    -> RdrNameMonoBinds
 
 mk_easy_FunMonoBind fun pats binds expr
-  = FunMonoBind fun [mk_easy_Match pats binds expr] mkGeneratedSrcLoc
+  = FunMonoBind fun False{-not infix-} [mk_easy_Match pats binds expr] mkGeneratedSrcLoc
 
 mk_easy_Match pats binds expr
   = foldr PatMatch
@@ -849,7 +849,7 @@ mk_FunMonoBind	:: RdrName
 
 mk_FunMonoBind fun [] = panic "TcGenDeriv:mk_FunMonoBind"
 mk_FunMonoBind fun pats_and_exprs
-  = FunMonoBind fun (map mk_match pats_and_exprs) mkGeneratedSrcLoc
+  = FunMonoBind fun False{-not infix-} (map mk_match pats_and_exprs) mkGeneratedSrcLoc
   where
     mk_match (pats, expr)
       = foldr PatMatch

@@ -27,7 +27,7 @@ import HsPragmas	( isNoGenPragmas, noGenPragmas )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
-import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat )
+import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecInfixBind )
 
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp )
@@ -169,13 +169,14 @@ rnMethodBinds class_name EmptyMonoBinds = returnRn EmptyMonoBinds
 
 rnMethodBinds class_name (AndMonoBinds mb1 mb2)
   = andRn AndMonoBinds (rnMethodBinds class_name mb1)
-			(rnMethodBinds class_name mb2)
+		       (rnMethodBinds class_name mb2)
 
-rnMethodBinds class_name (FunMonoBind occname matches locn)
-  = pushSrcLocRn locn			$
-    lookupClassOp class_name occname  	`thenRn` \ op_name ->
-    mapAndUnzipRn rnMatch matches	`thenRn` \ (new_matches, _) ->
-    returnRn (FunMonoBind op_name new_matches locn)
+rnMethodBinds class_name (FunMonoBind occname inf matches locn)
+  = pushSrcLocRn locn				$
+    lookupClassOp class_name occname  		`thenRn` \ op_name ->
+    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, _) ->
+--  checkPrecInfixBind inf op_name new_matches 	`thenRn_`
+    returnRn (FunMonoBind op_name inf new_matches locn)
 
 rnMethodBinds class_name (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
   = pushSrcLocRn locn			$
@@ -346,10 +347,11 @@ flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
 	 )]
     )
 
-flattenMonoBinds uniq sigs (FunMonoBind name matches locn)
-  = pushSrcLocRn locn			$
-    lookupValue name			`thenRn` \ name' ->
-    mapAndUnzipRn rnMatch matches	`thenRn` \ (new_matches, fv_lists) ->
+flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
+  = pushSrcLocRn locn				$
+    lookupValue name				`thenRn` \ name' ->
+    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, fv_lists) ->
+--  checkPrecInfixBind inf name' new_matches	`thenRn_`
     let
 	fvs = unionManyUniqSets fv_lists
 
@@ -362,7 +364,7 @@ flattenMonoBinds uniq sigs (FunMonoBind name matches locn)
       [(uniq,
 	unitUniqSet name',
 	fvs `unionUniqSets` sigs_fvs,
-	FunMonoBind name' new_matches locn,
+	FunMonoBind name' inf new_matches locn,
 	sigs_for_me
 	)]
     )

@@ -41,6 +41,11 @@ import IdLoop	 -- for paranoia checking
 import TyLoop	 -- for paranoia checking
 import PrelLoop  -- for paranoia checking
 
+-- ToDo:rm 
+--import PprType	( pprGenType ) -- ToDo: rm
+--import PprStyle ( PprStyle(..) )
+--import Util	( pprPanic )
+
 -- friends:
 import Class	( getClassSig, getClassOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind )
@@ -368,7 +373,7 @@ getAppDataTyCon ty
   = case maybeAppDataTyCon ty of
       Just stuff -> stuff
 #ifdef DEBUG
-      Nothing    -> panic "Type.getAppDataTyCon" -- (ppr PprShowAll ty)
+      Nothing    -> panic "Type.getAppDataTyCon: " -- (pprGenType PprShowAll ty)
 #endif
 
 

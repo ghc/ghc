@@ -231,10 +231,10 @@ zonkMonoBinds (VarMonoBind var expr)
     zonkExpr expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (VarMonoBind new_var new_expr)
 
-zonkMonoBinds (FunMonoBind name ms locn)
+zonkMonoBinds (FunMonoBind name inf ms locn)
   = zonkId name			`thenNF_Tc` \ new_name ->
     mapNF_Tc zonkMatch ms	`thenNF_Tc` \ new_ms ->
-    returnNF_Tc (FunMonoBind new_name new_ms locn)
+    returnNF_Tc (FunMonoBind new_name inf new_ms locn)
 \end{code}
 
 %************************************************************************

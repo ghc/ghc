@@ -421,11 +421,11 @@ tcMonoBinds bind@(PatMonoBind pat grhss_and_binds locn)
     returnTc (PatMonoBind pat2 grhss_and_binds2 locn,
 	      plusLIE lie_pat lie)
 
-tcMonoBinds (FunMonoBind name matches locn)
+tcMonoBinds (FunMonoBind name inf matches locn)
   = tcAddSrcLoc locn				$
     tcLookupLocalValueOK "tcMonoBinds" name	`thenNF_Tc` \ id ->
     tcMatchesFun name (idType id) matches	`thenTc` \ (matches', lie) ->
-    returnTc (FunMonoBind (TcId id) matches' locn, lie)
+    returnTc (FunMonoBind (TcId id) inf matches' locn, lie)
 \end{code}
 
 %************************************************************************

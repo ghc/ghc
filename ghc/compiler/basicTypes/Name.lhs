@@ -25,6 +25,8 @@ module Name (
 	mkImplicitName,	isImplicitName,
 	mkBuiltinName,
 
+	mkFunTyConName, mkTupleDataConName, mkTupleTyConName,
+
 	NamedThing(..), -- class
 	ExportFlag(..), isExported,
 
@@ -49,11 +51,13 @@ import Ubiq
 import CStrings		( identToC, cSEP )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle(..), codeStyle )
+import PrelMods		( pRELUDE, pRELUDE_BUILTIN )
 import Pretty
-import PrelMods		( pRELUDE )
 import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc )
-import Unique		( pprUnique, Unique )
-import Util		( thenCmp, _CMP_STRING_, panic )
+import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
+			  pprUnique, Unique
+			)
+import Util		( thenCmp, _CMP_STRING_, nOfThem, panic )
 \end{code}
 
 %************************************************************************
@@ -166,6 +170,21 @@ mkImplicitName u o = Global u o Implicit NotExported []
 
 mkBuiltinName :: Unique -> Module -> FAST_STRING -> Name
 mkBuiltinName u m n = Global u (Unqual n) Builtin NotExported []
+
+mkFunTyConName
+  = mkBuiltinName funTyConKey		       pRELUDE_BUILTIN SLIT("->")
+mkTupleDataConName arity
+  = mkBuiltinName (mkTupleDataConUnique arity) pRELUDE_BUILTIN (mk_tup_name arity)
+mkTupleTyConName   arity
+  = mkBuiltinName (mkTupleTyConUnique   arity) pRELUDE_BUILTIN (mk_tup_name arity)
+
+mk_tup_name 0 = SLIT("()")
+mk_tup_name 1 = panic "Name.mk_tup_name: 1 ???"
+mk_tup_name 2 = SLIT("(,)")   -- not strictly necessary
+mk_tup_name 3 = SLIT("(,,)")  -- ditto
+mk_tup_name 4 = SLIT("(,,,)") -- ditto
+mk_tup_name n
+  = _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")")
 
 	-- ToDo: what about module ???
 	-- ToDo: exported when compiling builtin ???

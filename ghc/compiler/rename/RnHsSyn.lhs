@@ -13,7 +13,9 @@ import Ubiq
 import HsSyn
 
 import Id		( GenId, Id(..) )
-import Name		( isLocalName, nameUnique, Name, RdrName )
+import Name		( isLocalName, nameUnique, Name, RdrName(..){-ToDo: rm ..-},
+			  mkLocalName{-ToDo:rm-}
+			)
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar, TyCon )
@@ -21,7 +23,7 @@ import Pretty
 import TyCon		( TyCon )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
-import Util		( panic, pprPanic )
+import Util		( panic, pprPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -100,7 +102,12 @@ instance NamedThing RnName where
     getName (RnClass n _)     = n
     getName (RnClassOp n _)   = n
     getName (RnImplicit n)    = n
-    getName (RnUnbound occ)   = pprPanic "getRnName:RnUnbound" (ppr PprDebug occ)
+    getName (RnUnbound occ)   = pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
+				(case occ of
+				   Unqual n -> mkLocalName bottom n bottom2
+				   Qual m n -> mkLocalName bottom n bottom2)
+			      where bottom = panic "getRnName: unique"
+				    bottom2 = panic "getRnName: srcloc"
 
 instance Outputable RnName where
 #ifdef DEBUG

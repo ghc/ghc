@@ -44,7 +44,7 @@ import Util		( panic, assertPanic )
 codeGen :: FAST_STRING		-- module name
 	-> ([CostCentre],	-- local cost-centres needing declaring/registering
 	    [CostCentre])	-- "extern" cost-centres needing declaring
-	-> Bag FAST_STRING	-- import names
+	-> [Module]		-- import names
 	-> [TyCon]		-- tycons with data constructors to convert
 	-> FiniteMap TyCon [(Bool, [Maybe Type])]
 				-- tycon specialisation info
@@ -98,7 +98,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
       = let
 	    register_ccs     = mkAbstractCs (map mk_register ccs)
 	    register_imports
-	      = foldBag mkAbsCStmts mk_import_register AbsCNop import_names
+	      = foldr (mkAbsCStmts . mk_import_register) AbsCNop import_names
 	in
 	mkAbstractCs [
 	    CCallProfCCMacro SLIT("START_REGISTER_CCS") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],

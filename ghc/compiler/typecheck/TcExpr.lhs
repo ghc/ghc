@@ -166,6 +166,10 @@ tcExpr (HsLit lit@(HsString str))
 %************************************************************************
 
 \begin{code}
+tcExpr (HsPar expr) = tcExpr expr
+
+tcExpr (NegApp expr) = panic "tcExpr:NegApp"
+
 tcExpr (HsLam match)
   = tcMatch match	`thenTc` \ (match',lie,ty) ->
     returnTc (HsLam match', lie, ty)

@@ -135,11 +135,17 @@ pprInPat sty (ConOpPatIn pat1 op pat2)
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
 
 pprInPat sty (NegPatIn pat)
-  = ppBeside (ppChar '-') (ppParens (pprInPat sty pat))
+  = let
+	pp_pat = pprInPat sty pat
+    in
+    ppBeside (ppChar '-') (
+    case pat of
+      LitPatIn _ -> pp_pat
+      _          -> ppParens pp_pat
+    )
 
 pprInPat sty (ParPatIn pat)
   = ppParens (pprInPat sty pat)
-
 
 pprInPat sty (ListPatIn pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
@@ -292,6 +298,8 @@ collectPatBinders (LazyPatIn pat)    = collectPatBinders pat
 collectPatBinders (AsPatIn a pat)    = a : collectPatBinders pat
 collectPatBinders (ConPatIn c pats)  = concat (map collectPatBinders pats)
 collectPatBinders (ConOpPatIn p1 c p2)= collectPatBinders p1 ++ collectPatBinders p2
+collectPatBinders (NegPatIn  pat)    = collectPatBinders pat
+collectPatBinders (ParPatIn  pat)    = collectPatBinders pat
 collectPatBinders (ListPatIn pats)   = concat (map collectPatBinders pats)
 collectPatBinders (TuplePatIn pats)  = concat (map collectPatBinders pats)
 collectPatBinders any_other_pat	     = [ {-no binders-} ]

@@ -56,11 +56,15 @@ module CoreSyn (
 
 import Ubiq{-uitous-}
 
+-- ToDo:rm:
+--import PprCore		( GenCoreExpr{-instance-} )
+--import PprStyle		( PprStyle(..) )
+
 import CostCentre	( showCostCentre, CostCentre )
 import Id		( idType, GenId{-instance Eq-} )
 import Type		( isUnboxedType )
 import Usage		( UVar(..) )
-import Util		( panic, assertPanic )
+import Util		( panic, assertPanic {-pprTrace:ToDo:rm-} )
 \end{code}
 
 %************************************************************************
@@ -495,8 +499,9 @@ collectArgs expr
 
     valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
     valvars fun vacc
-      = ASSERT(not (usage_app fun))
-	ASSERT(not (ty_app    fun))
+      = --ASSERT(not (usage_app fun))
+	--ASSERT(not (ty_app    fun))
+	(if (usage_app fun || ty_app fun) then trace "CoreSyn:valvars" {-(ppr PprDebug fun)-} else id) $
 	(fun, vacc)
 
     ---------------------------------------

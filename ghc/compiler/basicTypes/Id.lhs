@@ -103,7 +103,7 @@ import IdInfo
 import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
 			  isLocallyDefinedName, isPreludeDefinedName,
-			  nameOrigName,
+			  nameOrigName, mkTupleDataConName,
 			  isAvarop, isAconop, getLocalName,
 			  isLocallyDefined, isPreludeDefined,
 			  getOrigName, getOccName,
@@ -129,7 +129,7 @@ import TyVar		( alphaTyVars, isEmptyTyVarSet, TyVarEnv(..) )
 import UniqFM
 import UniqSet		-- practically all of it
 import UniqSupply	( getBuiltinUniques )
-import Unique		( mkTupleDataConUnique, pprUnique, showUnique,
+import Unique		( pprUnique, showUnique,
 			  Unique{-instance Ord3-}
 			)
 import Util		( mapAccumL, nOfThem, zipEqual,
@@ -1409,8 +1409,8 @@ mkTupleCon :: Arity -> Id
 mkTupleCon arity
   = Id unique ty (TupleConId n arity) NoPragmaInfo tuplecon_info 
   where
-    n		= panic "mkTupleCon: its Name (Id)"
-    unique      = mkTupleDataConUnique arity
+    n		= mkTupleDataConName arity
+    unique      = uniqueOf n
     ty 		= mkSigmaTy tyvars []
 		   (mkFunTys tyvar_tys (applyTyCon tycon tyvar_tys))
     tycon	= mkTupleTyCon arity

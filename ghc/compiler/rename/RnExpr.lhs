@@ -13,7 +13,8 @@ free variables.
 #include "HsVersions.h"
 
 module RnExpr (
-	rnMatch, rnGRHSsAndBinds, rnPat
+	rnMatch, rnGRHSsAndBinds, rnPat,
+	checkPrecInfixBind
    ) where
 
 import Ubiq
@@ -74,13 +75,14 @@ rnPat (ConOpPatIn pat1 name pat2)
 
 rnPat neg@(NegPatIn pat)
   = getSrcLocRn		`thenRn` \ src_loc ->
-    addErrIfRn (not (is_lit pat)) (negPatErr neg src_loc)
+    addErrIfRn (not (valid_neg_pat pat)) (negPatErr neg src_loc)
 			`thenRn_`
     rnPat pat		`thenRn` \ pat' ->
     returnRn (NegPatIn pat')
   where
-    is_lit (LitPatIn _) = True
-    is_lit _            = False
+    valid_neg_pat (LitPatIn (HsInt  _)) = True
+    valid_neg_pat (LitPatIn (HsFrac _)) = True
+    valid_neg_pat _                     = False
 
 rnPat (ParPatIn pat)
   = rnPat pat		`thenRn` \ pat' ->
@@ -200,7 +202,7 @@ rnExpr (HsVar v)
   where
     fv_set vname@(RnName n)
       | isLocallyDefinedName n = unitUniqSet vname
-      | otherwise	       = emptyUniqSet
+    fv_set _		       = emptyUniqSet
 
 rnExpr (HsLit lit)
   = returnRn (HsLit lit, emptyUniqSet)
@@ -483,7 +485,7 @@ precParsePat pat@(ConOpPatIn (ConOpPatIn p11 op1 p12) op p2)
 precParsePat pat = returnRn pat
 
 
-data INFIX = INFIXL | INFIXR | INFIXN
+data INFIX = INFIXL | INFIXR | INFIXN deriving Eq
 
 lookupFixity :: RnName -> RnM_Fixes s (INFIX, Int)
 lookupFixity op
@@ -493,6 +495,42 @@ lookupFixity op
       Just (InfixL _ n) -> returnRn (INFIXL, n)
       Just (InfixR _ n) -> returnRn (INFIXR, n)
       Just (InfixN _ n) -> returnRn (INFIXN, n)
+\end{code}
+
+\begin{code}
+checkPrecInfixBind :: Bool -> RnName -> [RenamedPat] -> RnM_Fixes s ()
+
+checkPrecInfixBind False fn pats
+  = returnRn ()
+checkPrecInfixBind True op [p1,p2]
+  = checkPrec op p1 False	`thenRn_`
+    checkPrec op p2 True
+
+checkPrec op (ConOpPatIn _ op1 _) right
+  = lookupFixity op	`thenRn` \ (op_fix, op_prec) ->
+    lookupFixity op1	`thenRn` \ (op1_fix, op1_prec) ->
+    getSrcLocRn 	`thenRn` \ src_loc ->
+    let
+	inf_ok = op1_prec > op_prec || 
+	         op1_prec == op_prec &&
+		 (op1_fix == INFIXR && op_fix == INFIXR && right ||
+		  op1_fix == INFIXL && op_fix == INFIXL && not right)
+
+	info  = (op,op_fix,op_prec)
+	info1 = (op1,op1_fix,op1_prec)
+	(infol, infor) = if right then (info, info1) else (info1, info)
+
+	inf_err = precParseErr infol infor src_loc
+    in
+    addErrIfRn (not inf_ok) inf_err
+
+checkPrec op (NegPatIn _) right
+  = lookupFixity op	`thenRn` \ (op_fix, op_prec) ->
+    getSrcLocRn 	`thenRn` \ src_loc ->
+    addErrIfRn (6 < op_prec) (precParseNegPatErr (op,op_fix,op_prec) src_loc)
+
+checkPrec op pat right
+  = returnRn ()
 \end{code}
 
 \begin{code}

@@ -570,13 +570,10 @@ mkAppMsg fun arg expr sty
 
 mkTyAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
 mkTyAppMsg ty arg expr sty
-  = panic "mkTyAppMsg"
-{-
   = ppAboves [ppStr "Illegal type application:",
-	      ppHang (ppStr "Exp type:") 4 (ppr sty exp),
-	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
+	      ppHang (ppStr "Exp type:")   4 (ppr sty ty),
+	      ppHang (ppStr "Arg type:")   4 (ppr sty arg),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
--}
 
 mkUsageAppMsg :: Type -> Usage -> CoreExpr -> ErrMsg
 mkUsageAppMsg ty u expr sty

@@ -170,9 +170,7 @@ escErrorMsg (x:xs)   = x : escErrorMsg xs
 
 For making @Apps@ and @Lets@, we must take appropriate evasive
 action if the thing being bound has unboxed type.  @mkCoApp@ requires
-a name supply to do its work.  Other-monad code will call @mkCoApp@
-through its own interface function (e.g., the desugarer uses
-@mkCoAppDs@).
+a name supply to do its work.
 
 @mkCoApp@, @mkCoCon@ and @mkCoPrim@ also handle the
 arguments-must-be-atoms constraint.
@@ -199,12 +197,18 @@ mkCoApp e1 e2
 \end{code}
 
 \begin{code}
-{-LATER
-mkCoCon  :: Id     -> [CoreExpr] -> UniqSM CoreExpr
-mkCoPrim :: PrimOp -> [CoreExpr] -> UniqSM CoreExpr
+{-
+data CoreArgOrExpr
+  = AnArg   CoreArg
+  | AnExpr  CoreExpr
 
-mkCoCon con args = mkCoThing (Con con) args
-mkCoPrim op args = mkCoThing (Prim op) args
+mkCoApps :: CoreExpr -> [CoreArgOrExpr] -> UniqSM CoreExpr
+mkCoCon  :: Id       -> [CoreArgOrExpr] -> UniqSM CoreExpr
+mkCoPrim :: PrimOp   -> [CoreArgOrExpr] -> UniqSM CoreExpr
+
+mkCoApps fun args = mkCoThing (Con con) args
+mkCoCon  con args = mkCoThing (Con con) args
+mkCoPrim  op args = mkCoThing (Prim op) args
 
 mkCoThing thing arg_exprs
   = mapAndUnzipUs expr_to_arg arg_exprs `thenUs` \ (args, maybe_binds) ->

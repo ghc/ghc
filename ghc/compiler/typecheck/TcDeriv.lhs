@@ -33,7 +33,7 @@ import TcSimplify	( tcSimplifyThetas )
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 --import RnBinds4		( rnMethodBinds, rnTopBinds )
 
-import Bag		( Bag, isEmptyBag, unionBags, listToBag )
+import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
 import Class		( GenClass, getClassKey )
 import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
@@ -162,7 +162,9 @@ tcDeriving  :: Module			-- name of module under scrutiny
 		      RenamedHsBinds,	-- Extra generated bindings
 		      PprStyle -> Pretty)  -- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
-tcDeriving = panic "tcDeriving: ToDo LATER"
+
+tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
+  = returnTc (trace "tcDeriving:ToDo" (emptyBag, EmptyBinds, \ x -> ppNil))
 {- LATER:
 
 tcDeriving modname renamer_name_funs inst_decl_infos_in fixities

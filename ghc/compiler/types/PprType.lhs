@@ -178,8 +178,9 @@ ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
   where
     (ty1:ty2:_) = arg_tys
 
-ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon a) usage) arg_tys
-  = ASSERT(length arg_tys == a)
+ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
+  = --ASSERT(length arg_tys == a)
+    (if (length arg_tys /= a) then pprTrace "ppr_corner:" (ppCat [ppInt a, ppInterleave ppComma (map (pprGenType PprDebug) arg_tys)]) else id) $
     ppBesides [ppLparen, arg_tys_w_commas, ppRparen]
   where
     arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty sty env tOP_PREC) arg_tys)
@@ -312,7 +313,7 @@ showTyCon sty tycon = ppShow 80 (pprTyCon sty tycon)
 pprTyCon :: PprStyle -> TyCon -> Pretty
 
 pprTyCon sty FunTyCon 		        = ppStr "(->)"
-pprTyCon sty (TupleTyCon arity)	        = ppBeside (ppPStr SLIT("Tuple")) (ppInt arity)
+pprTyCon sty (TupleTyCon _ name _)      = ppr sty name
 pprTyCon sty (PrimTyCon uniq name kind) = ppr sty name
 
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
@@ -524,9 +525,9 @@ pprTyCon sty@PprInterface this_tycon@(DataTyCon u n k vs ctxt cons derivings dat
 
     pp_NONE = ppPStr SLIT("_N_")
 
-pprTyCon PprInterface (TupleTyCon a) specs
+pprTyCon PprInterface (TupleTyCon _ name _) specs
   = ASSERT (null specs)
-    ppCat [ ppStr "{- Tuple", ppInt a, ppStr "-}" ]
+    ppCat [ ppStr "{- ", ppr PprForUser name, ppStr "-}" ]
 
 pprTyCon PprInterface (PrimTyCon k n a kind_fn) specs
   = ASSERT (null specs)

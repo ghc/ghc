@@ -72,9 +72,12 @@ tcPat pat_in@(AsPatIn name pat)
     unifyTauTy (idType id) ty		`thenTc_`
     returnTc (AsPat (TcId id) pat', lie, ty)
 
-tcPat (WildPatIn)
+tcPat WildPatIn
   = newTyVarTy mkTypeKind	`thenNF_Tc` \ tyvar_ty ->
     returnTc (WildPat tyvar_ty, emptyLIE, tyvar_ty)
+
+tcPat (ParPatIn parend_pat)
+  = tcPat parend_pat
 \end{code}
 
 %************************************************************************

@@ -227,7 +227,7 @@ pprExpr sty (OpApp e1 op e2)
       = ppSep [pp_e1, ppCat [pprOp sty v, pp_e2]]
 
 pprExpr sty (NegApp e)
-  = ppBeside (ppChar '-') (ppParens (pprExpr sty e))
+  = ppBeside (ppChar '-') (pprParendExpr sty e)
 
 pprExpr sty (HsPar e)
   = ppParens (pprExpr sty e)

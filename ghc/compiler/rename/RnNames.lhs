@@ -189,7 +189,7 @@ doBind (RecBind mbind)    = doMBinds mbind
 
 doMBinds EmptyMonoBinds 			= returnRn emptyBag
 doMBinds (PatMonoBind pat grhss_and_binds locn) = doPat locn pat
-doMBinds (FunMonoBind p_name _ locn) 	        = doName locn p_name
+doMBinds (FunMonoBind p_name _ _ locn) 	        = doName locn p_name
 doMBinds (AndMonoBinds mbinds1 mbinds2)
   = andRn unionBags (doMBinds mbinds1) (doMBinds mbinds2)
 
@@ -214,8 +214,7 @@ doPat locn (RecPatIn name fields)
   = mapRn (doField locn) fields `thenRn` \ fields_s ->
     returnRn (unionManyBags fields_s)
 
-doField locn (field, _, True{-pun-}) = doName locn field
-doField locn (field, pat, _)	     = doPat locn pat
+doField locn (_, pat, _) = doPat locn pat
 
 doName locn rdr
   = newGlobalName locn Nothing rdr `thenRn` \ name ->

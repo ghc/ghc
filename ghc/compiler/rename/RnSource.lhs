@@ -66,14 +66,14 @@ rnSource imp_mods imp_fixes (HsModule mod version exports _ fixes
     rnExports (mod:imp_mods) exports	`thenRn` \ exported_fn ->
     rnFixes fixes			`thenRn` \ src_fixes ->
     let
-	pair_name (InfixL n i) = (n, i)
-	pair_name (InfixR n i) = (n, i)
-	pair_name (InfixN n i) = (n, i)
+	pair_name inf@(InfixL n _) = (n, inf)
+	pair_name inf@(InfixR n _) = (n, inf)
+	pair_name inf@(InfixN n _) = (n, inf)
 
 	imp_fixes_fm = listToUFM (map pair_name (bagToList imp_fixes))
 	all_fixes_fm = addListToUFM imp_fixes_fm (map pair_name src_fixes)
     in
-    setExtraRn {-all_fixes_fm-}(panic "rnSource:all_fixes_fm") $
+    setExtraRn all_fixes_fm $
 
     mapRn rnTyDecl	ty_decls	`thenRn` \ new_ty_decls ->
     mapRn rnSpecDataSig specdata_sigs	`thenRn` \ new_specdata_sigs ->
@@ -87,8 +87,7 @@ rnSource imp_mods imp_fixes (HsModule mod version exports _ fixes
 
     returnRn (
 	      HsModule mod version
-		trashed_exports trashed_imports
-		{-new_fixes-}(panic "rnSource:new_fixes (Hi, Patrick!)")
+		trashed_exports trashed_imports	src_fixes
 		new_ty_decls new_specdata_sigs new_class_decls
 		new_inst_decls new_specinst_sigs new_defaults
 		new_binds [] src_loc,
@@ -96,8 +95,8 @@ rnSource imp_mods imp_fixes (HsModule mod version exports _ fixes
 	      occ_info
 	     )
   where
-    trashed_exports = panic "rnSource:trashed_exports"
-    trashed_imports = panic "rnSource:trashed_imports"
+    trashed_exports = trace "rnSource:trashed_exports" Nothing
+    trashed_imports = trace "rnSource:trashed_imports" []
 \end{code}
 
 %*********************************************************

@@ -110,7 +110,7 @@ import CmdLineOpts	( opt_HideBuiltinNames,
 import FiniteMap	( FiniteMap, emptyFM, listToFM )
 import Id		( mkTupleCon, GenId, Id(..) )
 import Maybes		( catMaybes )
-import Name		( mkBuiltinName, getOrigName )
+import Name		( getOrigName )
 import RnHsSyn		( RnName(..) )
 import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
 import Type

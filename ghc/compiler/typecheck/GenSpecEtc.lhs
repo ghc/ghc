@@ -312,7 +312,7 @@ is_elem v vs = isIn "isUnResMono" v vs
 isUnResMono sigs (PatMonoBind (VarPat (TcId v)) _ _)	= v `is_elem` sigs
 isUnResMono sigs (PatMonoBind other      _ _)		= False
 isUnResMono sigs (VarMonoBind (TcId v) _)		= v `is_elem` sigs
-isUnResMono sigs (FunMonoBind _ _ _)			= True
+isUnResMono sigs (FunMonoBind _ _ _ _)			= True
 isUnResMono sigs (AndMonoBinds mb1 mb2)			= isUnResMono sigs mb1 &&
 							  isUnResMono sigs mb2
 isUnResMono sigs EmptyMonoBinds				= True

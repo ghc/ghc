@@ -132,12 +132,15 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_rn "Renamer:"
 	(pp_show (ppr pprStyle rn_mod))		`thenMn_`
 
-    exitMn 0
-{- LATER ...
+--    exitMn 0
+{- LATER ... -}
 
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 			`thenMn_`
-    case (case (typecheckModule tc_uniqs idinfo_fm rn_info rn_mod) of
+    let
+	rn_info = trace "Main.rn_info" (\ x -> Nothing, \ x -> Nothing)
+    in
+    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_info rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
 	    Failed (errs, warns)
@@ -300,7 +303,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     exitMn 0
     } ) }
 
-LATER -}
+{- LATER -}
 
     }
   where
@@ -433,11 +436,11 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
     count_bind (NonRecBind b) = count_monobinds b
     count_bind (RecBind b)    = count_monobinds b
 
-    count_monobinds EmptyMonoBinds	 = (0,0)
-    count_monobinds (AndMonoBinds b1 b2) = count_monobinds b1 `add2` count_monobinds b2
+    count_monobinds EmptyMonoBinds	  = (0,0)
+    count_monobinds (AndMonoBinds b1 b2)  = count_monobinds b1 `add2` count_monobinds b2
     count_monobinds (PatMonoBind (VarPatIn n) r _) = (1,0)
-    count_monobinds (PatMonoBind p r _)  = (0,1)
-    count_monobinds (FunMonoBind f m _)  = (0,1)
+    count_monobinds (PatMonoBind p r _)   = (0,1)
+    count_monobinds (FunMonoBind f _ m _) = (0,1)
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
