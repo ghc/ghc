@@ -1,8 +1,3 @@
-def set_opts(opts):
-  opts.extra_hc_opts = '-package lang'
-
-setTestOpts(set_opts)
-
 test('echo001', set_stdin("echo001.hs"), compile_and_run, [''])
 
 test('hTell001', expect_fail_if_platform("i386-unknown-mingw32"), \
