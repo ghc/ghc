@@ -24,9 +24,14 @@ module PrelMods
 
 CHK_Ubiq() -- debugging consistency check
 
+import BasicTypes( SYN_IE(Module) )
 \end{code}
 
 \begin{code}
+gHC__, pRELUDE, pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP :: Module
+pACKED_STRING, cONC_BASE, iO_BASE, mONAD, rATIO, iX      :: Module
+sT_BASE, aRR_BASE, fOREIGN, mAIN, gHC_MAIN, gHC_ERR      :: Module	
+
 gHC__	     = SLIT("GHC")	   -- Primitive types and values
 
 pRELUDE	     = SLIT("Prelude")
@@ -48,7 +53,5 @@ fOREIGN	     = SLIT("Foreign")
 mAIN	     = SLIT("Main")
 gHC_MAIN     = SLIT("GHCmain")
 gHC_ERR	     = SLIT("GHCerr")
-
-
 
 \end{code}
