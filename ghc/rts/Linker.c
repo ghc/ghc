@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.83 2002/02/12 15:17:22 simonmar Exp $
+ * $Id: Linker.c,v 1.84 2002/03/25 05:21:19 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -144,6 +144,7 @@ typedef struct _RtsSymbolVal {
       Sym(gmtime)                               \
       Sym(opendir)                              \
       Sym(readdir)                              \
+      Sym(rewinddir)                            \
       Sym(closedir)                             \
       Sym(__divdi3)                             \
       Sym(__udivdi3)                            \
