@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.35 1999/03/11 11:32:27 simonm Exp $
+% $Id: ClosureInfo.lhs,v 1.36 1999/03/22 16:58:20 simonm Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -39,7 +39,7 @@ module ClosureInfo (
 	closureLabelFromCI,
 	entryLabelFromCI, 
 	closureLFInfo, closureSMRep, closureUpdReqd,
-	closureSingleEntry, closureSemiTag,
+	closureSingleEntry, closureReEntrant, closureSemiTag,
 	isStandardFormThunk,
 	GenStgArg,
 
@@ -891,7 +891,6 @@ closureLFInfo :: ClosureInfo -> LambdaFormInfo
 closureLFInfo (MkClosureInfo _ lf_info _) = lf_info
 
 closureUpdReqd :: ClosureInfo -> Bool
-
 closureUpdReqd (MkClosureInfo _ (LFThunk _ _ _ upd _ _ _) _) = upd
 closureUpdReqd (MkClosureInfo _ LFBlackHole _)         = True
 	-- Black-hole closures are allocated to receive the results of an
@@ -899,14 +898,16 @@ closureUpdReqd (MkClosureInfo _ LFBlackHole _)         = True
 closureUpdReqd other_closure			       = False
 
 closureSingleEntry :: ClosureInfo -> Bool
-
 closureSingleEntry (MkClosureInfo _ (LFThunk _ _ _ upd _ _ _) _) = not upd
 closureSingleEntry other_closure			   = False
+
+closureReEntrant :: ClosureInfo -> Bool
+closureReEntrant (MkClosureInfo _ (LFReEntrant _ _ _ _ _ _) _) = True
+closureReEntrant other_closure = False
 \end{code}
 
 \begin{code}
 closureSemiTag :: ClosureInfo -> Maybe Int
-
 closureSemiTag (MkClosureInfo _ lf_info _)
   = case lf_info of
       LFCon data_con _ -> Just (dataConTag data_con - fIRST_TAG)

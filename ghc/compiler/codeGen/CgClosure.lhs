@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.25 1999/03/11 11:32:25 simonm Exp $
+% $Id: CgClosure.lhs,v 1.26 1999/03/22 16:58:19 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -457,14 +457,16 @@ enterCostCentreCode closure_info ccs is_thunk
 	    costCentresC SLIT("ENTER_CCS_FSUB") []
 
 	else if isCurrentCCS ccs then 
-	    -- get CCC out of the closure, where we put it when we alloc'd
-	    case is_thunk of 
-		IsThunk    -> costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
-		IsFunction -> costCentresC SLIT("ENTER_CCS_FCL") [CReg node]
+	    if re_entrant 
+		then costCentresC SLIT("ENTER_CCS_FCL") [CReg node]
+		else costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
 
 	else if isCafCCS ccs && isToplevClosure closure_info then
 	    ASSERT(is_thunk == IsThunk)
-	    costCentresC SLIT("ENTER_CCS_CAF") c_ccs
+		-- might be a PAP, in which case we want to subsume costs
+	    if re_entrant
+		then costCentresC SLIT("ENTER_CCS_FSUB") []
+		else costCentresC SLIT("ENTER_CCS_CAF") c_ccs
 
 	else -- we've got a "real" cost centre right here in our hands...
 	    case is_thunk of 
@@ -474,6 +476,7 @@ enterCostCentreCode closure_info ccs is_thunk
 			      else costCentresC SLIT("ENTER_CCS_FLOAD") c_ccs
    where
 	c_ccs = [mkCCostCentreStack ccs]
+	re_entrant = closureReEntrant closure_info
 \end{code}
 
 %************************************************************************
