@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.124 2003/08/14 15:43:22 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.125 2003/08/18 09:23:09 dons Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -106,6 +106,8 @@ dnl a leading underscore sometimes (eg. FreeBSD).  We therefore have
 dnl to work around this by checking for *no* leading underscore first.
 dnl Sigh.  --SDM
 dnl
+dnl Similarly on OpenBSD, but this test doesn't help. -- dons
+dnl
 AC_DEFUN(FPTOOLS_UNDERSCORE,
 [AC_CHECK_LIB(elf, nlist, LIBS="-lelf $LIBS")dnl
 AC_CACHE_CHECK([leading underscore in symbol names], fptools_cv_lead_uscore,
@@ -119,6 +121,11 @@ dnl the underscoredness of that "platform"
 changequote(<<, >>)dnl
 <<
 case $HostPlatform in
+*openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
+    case $build in
+        i386-*2\.[[0-9]] | i386-*3\.[[0-3]] ) fptools_cv_lead_uscore='yes' ;;
+        *)      fptools_cv_lead_uscore='no' ;;
+    esac ;;
 alpha-dec-osf*) fptools_cv_lead_uscore='no';;
 *cygwin32) fptools_cv_lead_uscore='yes';;
 *mingw32) fptools_cv_lead_uscore='yes';;
