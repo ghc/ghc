@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.8 2000/02/24 17:20:46 simonmar Exp $
+ * $Id: Exception.hc,v 1.9 2000/03/17 10:24:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -144,7 +144,6 @@ FN_(blockAsyncExceptionszh_ret_entry)
   FE_
 }
 
-
 FN_(killThreadzh_fast)
 {
   FB_
@@ -158,20 +157,22 @@ FN_(killThreadzh_fast)
   }
 
   /* If the target thread is currently blocking async exceptions,
-   * we'll have to block until it's ready to accept them.
+   * we'll have to block until it's ready to accept them.  The
+   * exception is interruptible threads - ie. those that are blocked
+   * on some resource.
    */
-  if (R1.t->blocked_exceptions != NULL) {
+  if (R1.t->blocked_exceptions != NULL && !interruptible(R1.t) ) {
+    
+    /* ToDo (SMP): locking if destination thread is currently
+     * running...
+     */
+    CurrentTSO->link = R1.t->blocked_exceptions;
+    R1.t->blocked_exceptions = CurrentTSO;
 
-	/* ToDo (SMP): locking if destination thread is currently
-	 * running...
-	 */
-	CurrentTSO->link = R1.t->blocked_exceptions;
-	R1.t->blocked_exceptions = CurrentTSO;
-
-        CurrentTSO->why_blocked = BlockedOnException;
-        CurrentTSO->block_info.tso = R1.t;
-
-        BLOCK( R1_PTR | R2_PTR, killThreadzh_fast );
+    CurrentTSO->why_blocked = BlockedOnException;
+    CurrentTSO->block_info.tso = R1.t;
+    
+    BLOCK( R1_PTR | R2_PTR, killThreadzh_fast );
   }
 
   /* Killed threads turn into zombies, which might be garbage
