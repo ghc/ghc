@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.41 2003/11/17 14:41:03 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.42 2004/06/24 09:35:13 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -176,7 +176,7 @@ splitFilename3 str
 
 remove_suffix :: Char -> String -> Suffix
 remove_suffix c s
-  | null pre  = reverse suf
+  | null pre  = s
   | otherwise = reverse pre
   where (suf,pre) = break (==c) (reverse s)
 
