@@ -31,8 +31,7 @@ import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
 			  TyVarDetails(..)
 			)
-import Inst		( InstOrigin(..), newMethod, tcInstClassOp, 
-			  newDicts, instToId, showLIE )
+import Inst		( InstOrigin(..), tcInstClassOp, newDicts, instToId, showLIE )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, 
 			  tcLookupClass, tcExtendTyVarEnv2,
@@ -628,12 +627,12 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 -- Derived newtype instances
 tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (NewTypeDerived rep_tys)
-  = getInstLoc InstanceDeclOrigin			`thenM` \ inst_loc ->
-    getLIE (mapAndUnzipM (do_one inst_loc) op_items)	`thenM` \ ((meth_ids, meth_binds), lie) ->
+  = getInstLoc InstanceDeclOrigin		`thenM` \ inst_loc ->
+    mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
     
     tcSimplifyCheck
 	 (ptext SLIT("newtype derived instance"))
-	 inst_tyvars' avail_insts lie			`thenM` \ lie_binds ->
+	 inst_tyvars' avail_insts rhs_insts	`thenM` \ lie_binds ->
 
 	-- I don't think we have to do the checkSigTyVars thing
 
@@ -646,11 +645,11 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
 
 		-- Make the *occurrence on the rhs*
-	  newMethod InstanceDeclOrigin sel_id rep_tys'	`thenM` \ rhs_id ->
+	  tcInstClassOp inst_loc sel_id rep_tys'	`thenM` \ rhs_inst ->
 	  let
 	     meth_id = instToId meth_inst
 	  in
-	  return (meth_id, VarMonoBind meth_id (HsVar rhs_id))
+	  return (meth_id, VarMonoBind meth_id (HsVar (instToId rhs_inst)), rhs_inst)
 
 	-- Instantiate rep_tys with the relevant type variables
     rep_tys' = map (substTy subst) rep_tys

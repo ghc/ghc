@@ -12,11 +12,10 @@ module Inst (
 	Inst, 
 	pprInst, pprInsts, pprInstsInFull, tidyInsts, tidyMoreInsts,
 
-	newDictsFromOld, newDicts, cloneDict,
-	newMethod, newMethodFromName, newMethodWithGivenTy, 
-	newMethodWith, tcInstClassOp,
+	newDictsFromOld, newDicts, cloneDict, 
 	newOverloadedLit, newIPDict, 
-	tcInstCall, tcInstDataCon, tcSyntaxName,
+	newMethod, newMethodFromName, newMethodWithGivenTy, 
+	tcInstClassOp, tcInstCall, tcInstDataCon, tcSyntaxName,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
@@ -58,7 +57,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred, predHasFDs,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  isInheritablePred, isIPPred, tcSplitFunTy_maybe, tcSplitPredTy_maybe,
+		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
 		)
 import CoreFVs	( idFreeTyVars )
@@ -68,9 +67,7 @@ import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique 
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
 import PprType	( pprPred, pprParendType )	
-import Subst	( emptyInScopeSet, mkSubst, 
-		  substTy, substTyWith, substTheta, mkTyVarSubst, mkTopTyVarSubst
-		)
+import Subst	( emptyInScopeSet, mkSubst, substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
@@ -300,7 +297,6 @@ tcInstDataCon orig data_con
 
     returnM (ty_args', ex_dicts, arg_tys', result_ty, ex_tvs')
 
-
 newMethodFromName :: InstOrigin -> TcType -> Name -> TcM TcId
 newMethodFromName origin ty name
   = tcLookupId name		`thenM` \ id ->
@@ -308,29 +304,19 @@ newMethodFromName origin ty name
 	-- always a class op, but with -fno-implicit-prelude GHC is
 	-- meant to find whatever thing is in scope, and that may
 	-- be an ordinary function. 
-    newMethod origin id [ty]
-
-newMethod :: InstOrigin
-	  -> TcId
-	  -> [TcType]
-	  -> TcM Id
-newMethod orig id tys
-  =   	-- Get the Id type and instantiate it at the specified types
-    let
-	(tyvars, rho) = tcSplitForAllTys (idType id)
-	rho_ty	      = substTyWith tyvars tys rho
-	(pred, tau)   = tcSplitMethodTy rho_ty
-    in
-    newMethodWithGivenTy orig id tys [pred] tau
+    getInstLoc origin		`thenM` \ loc ->
+    tcInstClassOp loc id [ty]	`thenM` \ inst ->
+    extendLIE inst		`thenM_`
+    returnM (instToId inst)
 
 newMethodWithGivenTy orig id tys theta tau
   = getInstLoc orig			`thenM` \ loc ->
-    newMethodWith loc id tys theta tau	`thenM` \ inst ->
+    newMethod loc id tys theta tau	`thenM` \ inst ->
     extendLIE inst			`thenM_`
     returnM (instToId inst)
 
 --------------------------------------------
--- tcInstClassOp, and newMethodWith do *not* drop the 
+-- tcInstClassOp, and newMethod do *not* drop the 
 -- Inst into the LIE; they just returns the Inst
 -- This is important because they are used by TcSimplify
 -- to simplify Insts
@@ -346,17 +332,16 @@ tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
   -- This is really important in the use of tcInstClassOp in TcClassDcls.mkMethodBind
 tcInstClassOp inst_loc sel_id tys
   = let
-	(tyvars,rho)  	   = tcSplitForAllTys (idType sel_id)
-	rho_ty	      	   = ASSERT( equalLength tyvars tys )
-		 	     substTy (mkTopTyVarSubst tyvars tys) rho
-	Just (pred_ty,tau) = tcSplitFunTy_maybe rho_ty
-	Just pred	   = tcSplitPredTy_maybe pred_ty
+	(tyvars,rho) = tcSplitForAllTys (idType sel_id)
+	rho_ty	     = substTyWith tyvars tys rho
+	(pred,tau)   = tcSplitMethodTy rho_ty
 		-- Split off exactly one predicate (see the example above)
     in
     ASSERT( isClassPred pred )
-    newMethodWith inst_loc sel_id tys [pred] tau
+    newMethod inst_loc sel_id tys [pred] tau
 
-newMethodWith inst_loc@(_,loc,_) id tys theta tau
+---------------------------
+newMethod inst_loc@(_,loc,_) id tys theta tau
   = newUnique		`thenM` \ new_uniq ->
     let
 	meth_id	= mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
@@ -701,7 +686,7 @@ tcSyntaxName orig ty std_nm user_nm
     let	
 	-- C.f. newMethodAtLoc
 	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
- 	tau1		= substTy (mkTopTyVarSubst [tv] [ty]) tau
+ 	tau1		= substTyWith [tv] [ty] tau
     in
     addErrCtxtM (syntaxNameCtxt user_nm orig tau1)	$
     tcExpr (HsVar user_nm) tau1				`thenM` \ user_fn ->

@@ -40,7 +40,7 @@ import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcSplitFunTy_maybe, tcSplitForAllTys
 			)
-import Inst		( Inst, InstOrigin(..), newMethodWith, instToId )
+import Inst		( Inst, InstOrigin(..), newMethod, instToId )
 
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
@@ -622,9 +622,9 @@ mkTcSig poly_id src_loc
    tcInstType SigTv (idType poly_id)		`thenM` \ (tyvars', theta', tau') ->
 
    getInstLoc SignatureOrigin			`thenM` \ inst_loc ->
-   newMethodWith inst_loc poly_id
-		 (mkTyVarTys tyvars')
-		 theta' tau'			`thenM` \ inst ->
+   newMethod inst_loc poly_id
+	     (mkTyVarTys tyvars')
+	     theta' tau'			`thenM` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
 	-- But do not extend the LIE!  We're just making an Id.
 	
