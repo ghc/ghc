@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.2 2001/03/26 16:58:09 simonmar Exp $
+# $Id: bootstrap.mk,v 1.3 2001/03/27 09:38:26 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -46,7 +46,7 @@ endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
 
-HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(CC_OPTS)
+HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) -D__GLASGOW_HASKELL__=411 $(CC_OPTS)
 
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
 
@@ -59,6 +59,12 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits	\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent	\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent/cbits	\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/posix		\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits	\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/util		\
+   -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
    -u "PrelBase_Izh_static_info"		\
    -u "PrelBase_Czh_static_info"		\
@@ -93,7 +99,15 @@ HC_BOOT_LD_OPTS =				\
    -u "PrelMain_mainIO_closure"			\
    -u "__init_PrelMain"
 
-HC_BOOT_LIBS = -lHStext -lHSlang -lHSstd -lHSstd_cbits -lHSrts -lgmp $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS = -lHStext -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHSstd -lHSstd_cbits -lHSrts -lgmp $(EXTRA_HC_BOOT_LIBS)
+
+ifeq "$(GhcLibsWithReadline)" "YES"
+HC_BOOT_LIBS += $(LibsReadline)
+endif
+
+ifeq "$(HaveLibDL)" "YES"
+HC_BOOT_LIBS += -ldl
+endif
 
 # -----------------------------------------------------------------------------
 # suffix rules for building a .o from a .hc file.
