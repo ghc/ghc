@@ -1120,14 +1120,9 @@ findAndReadIface doc_str mod_name hi_boot_file
       -- one for 'normal' ones, the other for .hi-boot files,
       -- hence the need to signal which kind we're interested.
 
-    --getHiMaps			`thenRn` \ (search_path, hi_map, hiboot_map) ->
-    let
-        bomb = panic "findAndReadInterface: hi_maps: FIXME"
-        search_path = panic "findAndReadInterface: search_path: FIXME"
-	relevant_map | hi_boot_file = bomb --hiboot_map
-		     | otherwise    = bomb --hi_map
-    in	
-    case lookupFM relevant_map mod_name of
+    getFinderRn				`thenRn` \ finder ->
+    ioToRn (finder mod_name)		`thenRn` \ maybe_module ->
+    case maybe_module of
 	-- Found the file
       Just fpath -> traceRn (ptext SLIT("...reading from") <+> text fpath)	`thenRn_`
 		    readIface mod_name fpath

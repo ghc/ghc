@@ -115,9 +115,7 @@ data RnDown
 
 	rn_finder  :: Finder,
 	rn_dflags  :: DynFlags,
-	rn_gst     :: GlobalSymbolTable,	-- Both home modules and packages,
-						-- at the moment we started compiling 
-						-- this module
+	rn_hst     :: HomeSymbolTable,
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 	rn_ns      :: IORef (UniqSupply, OrigNameEnv),
@@ -200,11 +198,6 @@ data ParsedIface
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
     }
-
-
-type RdrNamePragma = ()				-- Fudge for now
--------------------
-
 \end{code}
 
 %************************************************************************
@@ -215,55 +208,55 @@ type RdrNamePragma = ()				-- Fudge for now
 
 \begin{code}
 data Ifaces = Ifaces {
+    -- PERSISTENT FIELDS
+	iPST :: PackageSymbolTable,	
+		-- The ModuleDetails for modules in other packages
+		-- whose interfaces we have opened
+		-- The contents of those interface files may be mostly
+		-- in the iDecls, iInsts, iRules (below), but what *will*
+		-- be in the PackageSymbolTable is:
+		--	* The Module 
+		--	* Version info
+		--	* Its exports
+		--	* Fixities
+		--	* Deprecations
+		-- This field is initialised from the compiler's persistent
+		-- package symbol table, and the renamer incrementally adds
+		-- to it.
 
-	-- PERSISTENT FIELDS
-		iImpModInfo :: ImportedModuleInfo,
-				-- Modules this one depends on: that is, the union 
-				-- of the modules its *direct* imports depend on.
-				-- NB: The direct imports have .hi files that enumerate *all* the
-				-- dependencies (direct or not) of the imported module.
+	iDecls :: DeclsMap,	
+		-- A single, global map of Names to unslurped decls
 
-		iDecls :: DeclsMap,	-- A single, global map of Names to decls
-					-- we can get away with importing them abstractly
-
-		iInsts :: IfaceInsts,
+	iInsts :: IfaceInsts,
 		-- The as-yet un-slurped instance decls; this bag is depleted when we
 		-- slurp an instance decl so that we don't slurp the same one twice.
 		-- Each is 'gated' by the names that must be available before
 		-- this instance decl is needed.
 
-		iRules :: IfaceRules,
+	iRules :: IfaceRules,
 		-- Similar to instance decls, only for rules
 
-	-- SEMI-EPHEMERAL FIELDS
-		-- iFixes and iDeprecs are accumulated here while one module
-		-- is compiled, but are transferred to the package symbol table
-		-- at the end.  We don't add them to the table as we encounter them
-		-- because doing so would require us to have a mutable symbol table
-		-- which is yukky.
+    -- EPHEMERAL FIELDS
+    -- These fields persist during the compilation of a single module only
+	iImpModInfo :: ImportedModuleInfo,
+			-- Modules this one depends on: that is, the union 
+			-- of the modules its *direct* imports depend on.
+			-- NB: The direct imports have .hi files that enumerate *all* the
+			-- dependencies (direct or not) of the imported module.
 
-		iFixes :: FixityEnv,		-- A single, global map of Names to fixities
-						-- See comments with RnIfaces.lookupFixity
-		iDeprecs :: DeprecationEnv,
-
-	-- EPHEMERAL FIELDS
-	-- These fields persist during the compilation of a single module only
-
-		iSlurp :: NameSet,
+	iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
 
-		iVSlurp :: [(Name,Version)]
+	iVSlurp :: [(Name,Version)]
 		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
 		-- names that have been slurped in so far, with their versions.
 		-- This is used to generate the "usage" information for this module.
 		-- Subset of the previous field.
-	}
+    }
 
 type ImportedModuleInfo 
-     = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface, 
-			     Maybe (Module, Version, Version, Version, WhereFrom, Avails))
-				-- The three Versions are module version, fixity version, rules version
+     = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
 
 		-- Suppose the domain element is module 'A'
 		--
@@ -293,23 +286,23 @@ type ImportedModuleInfo
 %************************************************************************
 
 \begin{code}
-initRn :: DynFlags -> Finder -> GlobalSymbolTable
-       -> PersistentRenamerState
+initRn :: DynFlags -> Finder -> HomeSymbolTable
+       -> PersistentCompilerState
        -> Module -> SrcLoc
        -> RnMG t
        -> IO (t, (Bag WarnMsg, Bag ErrMsg))
 
-initRn dflags finder gst prs mod loc do_rn
+initRn dflags finder hst pcs mod loc do_rn
   = do uniqs     <- mkSplitUniqSupply 'r'
        names_var <- newIORef (uniqs, prsOrig prs)
        errs_var  <- newIORef (emptyBag,emptyBag)
-       iface_var <- newIORef (initIfaces prs)
+       iface_var <- newIORef (initIfaces pcs)
        let rn_down = RnDown { rn_mod = mod,
 	   		      rn_loc = loc, 
     
 		   	      rn_finder = finder,
 		   	      rn_dflags = dflags,
-		   	      rn_gst    = gst,
+		   	      rn_hst    = hst,
 			 	     
 		   	      rn_ns     = names_var, 
 		   	      rn_errs   = errs_var, 
@@ -325,17 +318,14 @@ initRn dflags finder gst prs mod loc do_rn
        return (res, (warns, errs))
 
 
-initIfaces :: PersistentRenamerState -> Ifaces
-initIfaces prs
-  = Ifaces { iDecls = prsDecls prs,
+initIfaces :: PersistentCompilerState -> Ifaces
+initIfaces (PCS { pcsPST = pst, psrPRS = prs })
+  = Ifaces { iPST   = pst,
+	     iDecls = prsDecls prs,
 	     iInsts = prsInsts prs,
 	     iRules = prsRules prs,
 
-	     iFixes   = emptyNameEnv,
-	     iDeprecs = emptyNameEnv,
-
 	     iImpModInfo = emptyFM,
-	     --iDeferred   = emptyNameSet,
 	     iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
 			-- Pretend that the dummy unbound name has already been
 			-- slurped.  This is what's returned for an out-of-scope name,
@@ -555,7 +545,16 @@ getSrcLocRn down l_down
 \end{code}
 
 %================
-\subsubsection{  Name supply}
+\subsubsection{The finder}
+%=====================
+
+\begin{code}
+getFinderRn :: RnM d Finder
+getFinderRn down l_down = return (rn_finder down)
+\end{code}
+
+%================
+\subsubsection{Name supply}
 %=====================
 
 \begin{code}

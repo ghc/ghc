@@ -80,12 +80,13 @@ type RenameResult = ( Module		-- This module
 		    , FixityEnv		-- The fixity environment; for derivings
 		    , [Module])		-- Imported modules
 		   
-renameModule :: PersistentCompilerState -> RdrNameHsModule -> IO (Maybe RenameResult)
-renameModule pcs this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
+renameModule :: PersistentCompilerState -> GlobalSymbolTable
+	     -> RdrNameHsModule -> IO (Maybe RenameResult)
+renameModule pcs gst this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     do {
 	((maybe_rn_stuff, dump_action), msgs) 
-	   <- initRn pcs 
+	   <- initRn dflags finder gst prs
 		     (mkThisModule mod_name) 
 		     (mkSearchPath opt_HiMap) loc
 		     (rename this_mod) ;

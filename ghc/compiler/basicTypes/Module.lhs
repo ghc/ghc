@@ -21,7 +21,7 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module, mod_name, mod_kind
+      Module, moduleName, mod_kind
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
     , ModuleKind(..)
@@ -94,10 +94,15 @@ as the one being compiled, i.e. a home module.  @InPackage@ means one
 from a different package.
 
 \begin{code}
+data Module = Module ModuleName ModuleKind
+
 data ModuleKind
    = SourceOnly FilePath            -- .hs
    | ObjectCode FilePath FilePath   -- .o, .hi
    | InPackage  PackageName
+
+moduleName (Module m _) = m
+moduleKind (Module _ k) = k
 
 isLocalModuleKind (InPackage _) = False
 isLocalModuleKind _             = True
@@ -189,13 +194,6 @@ mkModuleNameFS s = ModuleName (encodeFS s)
 -- used to be called mkSysModuleFS
 mkSysModuleNameFS :: EncodedFS -> ModuleName
 mkSysModuleNameFS s = ModuleName s 
-\end{code}
-
-\begin{code}
-data Module = Module ModuleName ModuleKind
-
-mod_name (Module nm kind) = nm
-mod_kind (Module nm kind) = kind
 \end{code}
 
 \begin{code}
