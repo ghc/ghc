@@ -23,7 +23,7 @@ boot:
 	@echo "Make boot is not needed here"
 
 runtests: $(RUNTESTS_SRCS)
-	../../ghc/compiler/ghc-inplace --make Main -o runtests -i -ibasicRxLib -package lang -cpp
+	ghc-5.00.2 --make Main -o runtests -i -ibasicRxLib -package lang -cpp
 
 clean:
 	/bin/rm -f runtests *.o *.hi basicRxLib/*.o basicRxLib/*.hi
