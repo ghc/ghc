@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.75 2001/12/10 17:55:40 sewardj Exp $
+ * $Id: Linker.c,v 1.76 2001/12/10 17:59:54 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -151,6 +151,11 @@ typedef struct _RtsSymbolVal {
       Sym(__umoddi3)
 #endif
 
+#ifndef SMP
+# define MAIN_CAP_SYM SymX(MainCapability)
+#else
+# define MAIN_CAP_SYM
+#endif
 
 #define RTS_SYMBOLS				\
       Maybe_ForeignObj				\
@@ -174,7 +179,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_gen_chk)				\
       SymX(stg_yield_to_interpreter)		\
       SymX(ErrorHdrHook)			\
-      SymX(MainCapability)			\
+      MAIN_CAP_SYM                              \
       SymX(MallocFailHook)			\
       SymX(NoRunnableThreadsHook)		\
       SymX(OnExitHook)				\
