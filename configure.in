@@ -33,13 +33,11 @@ fi
 hardtop=`pwd`
 hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
 
-#OLD: hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/export/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
-
 echo ''
 echo "*** The top of your build tree is: $hardtop"
 AC_SUBST(hardtop)
 
-# -------------------------------------------------------------------------
+####--------------------------------------------------------------------
 dnl ** choose host(/target/build) platform
 #
 # Guess host/target/build platform(s) if necessary.
@@ -268,34 +266,11 @@ AC_SUBST(HostVendor_CPP)
 dnl AC_SUBST(BuildVendor_CPP)
 dnl AC_SUBST(TargetVendor_CPP)
 
-# -------------------------------------------------------------------------
+####--------------------------------------------------------------------
 dnl
 dnl * _GENERAL_ CONFIGURATION CHECKS
 #
-dnl ** are we at Glasgow?
-#
-# This stuff is in danger of going away..
-#
-if test -d /local/fp -a -d /users/fp/simonpj; then
-    echo "Brilliant!  You must be a Glaswegian."
-    AT_GLASGOW=1
-    if test "x$prefix" = xNONE; then
-        prefix=/local/fp
-        echo "Assuming installation prefix of $prefix"
-    fi
-    if test "x$exec_prefix" = xNONE; then
-        # Sigh: the defn of exec_prefix does not include the bin* bit...
-        # WDP 94/07
-        exec_prefix=/local/fp
-        echo "Assuming binary installation prefix of $exec_prefix"
-    fi
-else
-    AT_GLASGOW=0
-fi
-AC_SUBST(AT_GLASGOW)
-test -n "$verbose" && echo "    setting AT_GLASGOW to $AT_GLASGOW"
-#
-#
+
 #
 dnl ** does #! work?
 #
@@ -303,238 +278,91 @@ AC_SYS_INTERPRETER()
 #
 dnl ** look for `perl', but watch out for version 4.035
 #
-AC_CHECK_PROG(PerlCmd,perl,$ac_dir/$ac_word)
+AC_PATH_PROG(PerlCmd,perl)
 if test -z "$PerlCmd"; then
-    echo "You must install perl before you can continue"
-    echo "Perhaps it is already installed, but not in your PATH?"
-    exit 1
+   echo "You must install perl before you can continue"
+   echo "Perhaps it is already installed, but not in your PATH?"
+   exit 1
 else
-    $PerlCmd -v >conftest.out 2>&1
-    if egrep "version 4" conftest.out >/dev/null 2>&1; then
-        if egrep "Patch level: 35" conftest.out >/dev/null 2>&1; then
-            echo "
-************************************************************************
-Uh-oh...looks like you have Perl 4.035.
-
-Perl version 4.035 has a bug to do with recursion that will bite if
-you run the lit2texi script, when making Info files from
-literate files of various sorts.  Either use the current version
-(4.036), an older version (e.g., perl 4.019) or apply the patch in
-glafp-utils/perl-4.035-fixes to your 4.035 perl.
-************************************************************************
-"
-        fi
-    else
-	if egrep "version 5" conftest.out >/dev/null 2>&1; then
-	    :
-	else
-	    echo "I'm not sure if your version of perl will work,"
-	    echo "but it's worth a shot, eh?"
-	fi
-    fi
-    rm -fr conftest*
+AC_CHECK_PERL_VERSION
 fi
+
 #
 dnl ** does #!.../perl work? (sometimes it's too long...)
-echo "checking if \`#!$PerlCmd' works in shell scripts"
-echo "#!$PerlCmd"'
-exit $1;
-' > conftest
-chmod u+x conftest
-(SHELL=/bin/sh; export SHELL; ./conftest 69 > /dev/null)
-if test $? -ne 69; then
-   echo "It does!"
-else
-   echo "It doesn't!  Perhaps \`#!$PerlCmd' is too long (often 32 characters max)"
-   exit 1
-fi
-rm -f conftest
 #
-dnl ** check if perl library is properly installed
+AC_SHEBANG_PERL
+
+# Remove: we work around the problem in the single place
+# where we rely on something (getopts) from the libraries.
+#
+#dnl ** check if perl library is properly installed
+# 
 # (by seeing if a "do 'getopts.pl'" works...
-if $PerlCmd -e 'do "getopts.pl" || exit(1); exit(0);' > /dev/null 2>&1 ; then
-    :
-else
-    echo "I think your perl library is misinstalled:"
-    echo "The following script did not work:"
-    echo '      do "getopts.pl" || exit(1); exit(0);'
-    echo 'But, anyway, we will continue in our quest..'
-fi
+#if $PerlCmd -e 'do "getopts.pl" || exit(1); exit(0);' > /dev/null 2>&1 ; then
+#    :
+#else
+#    echo "I think your perl library is misinstalled:"
+#    echo "The following script did not work:"
+#    echo '      do "getopts.pl" || exit(1); exit(0);'
+#    echo 'But, anyway, we will continue in our quest..'
+#fi
 #
+
 #
 dnl ** look for GCC and find out which version
 # Figure out which C compiler to use.  Gcc is preferred.
 # If gcc, make sure it's at least 2.1
 #
 AC_PROG_CC
-if test -z "$GCC"; then
-    echo "You would be better off with gcc"
-    echo "Perhaps it is already installed, but not in your PATH?"
-    HaveGcc='NO'
-else
-    gcc -v > conftest.out 2>&1
-    echo '/version (\d+)\.(\d+)/ && $1*10+$2 > 20 && print "YES";' > conftest.pl
-    HaveGcc=`eval $PerlCmd -n conftest.pl conftest.out`
-    if test -z "$HaveGcc"; then
-        echo "I'm not sure if your version of gcc will work,"
-        echo "but it's worth a shot, eh?"
-        HaveGcc='YES'
-    fi
-    rm -fr conftest*
-fi
-AC_SUBST(HaveGcc)
+AC_HAVE_GCC
 
-# Deprecated (AC_PROG_CC does it): AC_C_CROSS
-#
-dnl ** figure out how to do context diffs
-# (NB: NeXTStep thinks diff'ing a file against itself is "trouble")
-#
-echo foo > conftest1
-echo foo > conftest2
-if diff -C 1 conftest1 conftest2 > /dev/null 2>&1 ; then
-    ContextDiffCmd='diff -C 1'
-else
-    if diff -c1 conftest1 conftest2 > /dev/null 2>&1 ; then
-        ContextDiffCmd='diff -c1'
-    else
-        echo "Can't figure out how to do context diffs."
-        echo "Neither \`diff -C 1' nor \`diff -c1' works."
-        exit 1
-    fi
-fi
-rm -f conftest1 conftest2
-AC_SUBST(ContextDiffCmd)
-#
-dnl ** look for a decent parser generator (bison preferred)
-#
-#
-AC_CHECK_PROG(YaccCmd, bison, bison -y)
-if test -z "$YaccCmd"; then
-    echo "Can't find bison out there..."
-    AC_CHECK_PROG(WhatCmd, what, what, :)
-    AC_CHECK_PROG(YaccCmd, yacc, $ac_dir/$ac_word)
-    if test -z "$YaccCmd"; then
-        echo "But that's okay...I can't find yacc either."
-        YaccCmd=:
-    else
-        $WhatCmd $YaccCmd > conftest.out
-        if egrep 'y1\.c 1\..*SMI' conftest.out >/dev/null 2>&1; then
-            echo "I don't trust your $YaccCmd; it looks like an old Sun yacc"
-            if test -f /usr/lang/yacc; then
-                echo "I'm going to use /usr/lang/yacc instead"
-                YaccCmd=/usr/lang/yacc
-            else
-                echo "I'm assuming the worst...no parser generator at all"
-                YaccCmd=:
-            fi
-        elif egrep 'y1\.c.*Revision: 4\.2\.6\.3.*DEC' conftest.out >/dev/null 2>&1; then
-            echo "I don't trust your $YaccCmd; it looks like a lame DEC yacc"
-            echo "I'm assuming the worst...no parser generator at all"
-            YaccCmd=:
-        else
-            echo "But that's okay...as far as I know, your yacc will work."
-        fi
-        rm -fr conftest*
-    fi
-fi
-
-dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
-#
-AC_PROG_LEX
-
-# -------------------------------------------------------------------------
 #
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 #
 AC_PROG_CPP
-if echo $CPP | egrep gcc >/dev/null 2>&1; then
-    echo > conftest.c
-    gcc -v -E conftest.c >/dev/null 2>conftest.out
-    echo '/(\S+\/cpp)/ && print "$1";' > conftest.pl
-    # GNUCPP: used in jmake.c (GnuCppCmd) and in mkdependC
-    # (where we could do with the usual pre-#defines)
-    GNUCPP="`eval $PerlCmd -n conftest.pl conftest.out`"
-    test -n "$verbose" && echo "        setting GNUCPP to $GNUCPP"
-    # RAWCPP: we do not want *any* pre-#defines...
-    # (e.g., hscpp, mkdependHS)
-    RAWCPP="`eval $PerlCmd -n conftest.pl conftest.out` -traditional"
-    test -n "$verbose" && echo "        setting RAWCPP to $RAWCPP"
-    rm -fr conftest*
-fi
-# ToDo: what are GNUCPP and RAWCPP if the above if didn't fire? WDP 95/02
-AC_SUBST(GNUCPP)
-AC_SUBST(RAWCPP)
+AC_PROG_GNUCPP
+
+#
+dnl ** figure out how to do context diffs
+#
+AC_PROG_DIFF
+
+#
+dnl ** look for a decent parser generator (bison preferred)
+#
+# (AC_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
+# on the suitability of the 'yacc' returned.)
+AC_PROG_YACCY
+
+#
+dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
+#
+AC_PROG_LEX
+
 #
 dnl ** figure out how to do a BSD-ish install
 #
 AC_PROG_INSTALL
 #
-dnl ** figure out what arguments to feed to `ar'
+dnl ** how to invoke `ar' and `ranlib'
 #
-AC_CHECK_PROG(ArCmd,ar,$ac_dir/$ac_word)
-if test -z "$ArCmd"; then
-    echo "You don't seem to have ar...I have no idea how to make a library"
-    exit 1;
-fi
-if $ArCmd clqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd clqs"
-    NeedRanLib=''
-elif $ArCmd cqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cqs"
-    NeedRanLib=''
-elif $ArCmd clq conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd clq"
-    NeedRanLib='YES'
-elif $ArCmd cq conftest.a >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cq"
-    NeedRanLib='YES'
-elif $ArCmd cq conftest.a 2>&1 | grep 'no archive members specified' >/dev/null 2>/dev/null; then
-    ArCmd="$ArCmd cq"
-    NeedRanLib='YES'
-else
-    echo "I can't figure out how to use your $ArCmd"
-    exit 1
-fi
-rm -rf conftest*
-test -n "$ArCmd" && test -n "$verbose" && echo "        setting ArCmd to $ArCmd"
-AC_SUBST(ArCmd)
-#
-dnl ** figure out if we need `ranlib'
-#
-if test -z "$NeedRanLib"; then
-    # we hackily override a few platforms on a case-by-case basis
-    case $HostPlatform in
-    i386-*-linuxaout)
-	NeedRanLib='YES'
-	;;
-    *)	RANLIB=':'
-	;;
-    esac
-    test -n "$verbose" && echo "        setting RANLIB to $RANLIB"
-fi
-if test -n "$NeedRanLib"; then
-    AC_PROG_RANLIB
-fi
-AC_SUBST(RANLIB)
+AC_PROG_AR_AND_RANLIB
+
 #
 #
 dnl ** Check to see whether ln -s works
 #
-AC_PROG_LN_S()
-AC_SUBST(LN_S)
+AC_PROG_LN_S
+
 #
 dnl ** Find the path to sed **
-AC_PATH_PROG(SedCmd,sed,$ac_dir/$ac_word)
-# 
-# It better be around somewhere (we wouldn't
-# exec this script properly if it wasn't!)
 #
-AC_SUBST(SedCmd)
+AC_PATH_PROG(SedCmd,sed)
+
 #
 dnl ** check for time command **
-AC_PATH_PROG(TimeCmd,time,$ac_dir/$ac_word)
-# 
-AC_SUBST(TimeCmd)
+AC_PATH_PROG(TimeCmd,time)
+
 #
 dnl ** check for tar **
 #
@@ -542,13 +370,11 @@ dnl ** check for tar **
 #
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
-
 #
 dnl ** check for gzip/compress **
 AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
 
 compress_nm=`basename $CompressCmd`
-
 if test x"$compress_nm" = xgzip; then
   CompressCmd="$CompressCmd -d"
   CompressSuffix="gz"
@@ -557,10 +383,11 @@ else
 fi
 AC_SUBST(CompressCmd)
 AC_SUBST(CompressSuffix)
+
 #
-dnl ** check for installed happy binary
+dnl ** check for installed happy binary + version
 #
-AC_PATH_PROG(HappyCmd,happy)
+AC_HAPPY
 
 #
 #
@@ -573,6 +400,12 @@ dnl ** check for installed green-card binary
 #
 AC_PATH_PROG(GreencardCmd,green-card)
 
+#### program checking section ends here ####
+
+####--------------------------------------------------
+#### checking the state of the local header files and syscalls ####
+
+#
 dnl ** check for full ANSI header (.h) files
 #
 AC_HEADER_STDC
@@ -621,22 +454,9 @@ AC_UNDERSCORE
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
-#
-# It'll break soon enough if it didn't, but we perform a sanity
-# check here on the generated config.mk file to see if the
-# sed that was used is of the well-behaved sort.
-#
-#grep @ mk/config.mk > conftest.out
-#if grep -v '#	   enclosed in @at-signs@.' conftest.out >/dev/null 2>&1; then
-#   :
-#else
-#   echo 'Hmm..suspicious, did the configure script perform all the @..@ substitutions in mk/config.mk?..';
-#   grep -v '#	   enclosed in @at-signs@.' conftest.out /dev/null
-#fi
-#rm -f conftest*
-
 echo ''
 echo '************************************************'
 echo '*** NOW DO: gmake boot followed by gmake all'
+echo '***         (where gmake == GNU make)'
 echo '************************************************'
 exit 0
