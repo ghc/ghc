@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.10 2001/01/19 09:53:58 simonmar Exp $
+ * $Id: Linker.c,v 1.11 2001/01/19 17:31:24 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -25,7 +25,7 @@
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
 #endif
-
+  
 #ifdef GHCI /* endif is right at end of file */
 
 /* A bucket in the symbol hash-table.  Primarily, maps symbol names to
@@ -134,7 +134,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stg_sel_12_upd_info)			\
       SymX(stg_upd_frame_info)			\
       SymX(stg_seq_frame_info)			\
-      SymX(stg_BLACKHOLE_STATIC_info)		\
+      SymX(stg_CAF_BLACKHOLE_info)		\
       SymX(stg_IND_STATIC_info)			\
       SymX(stg_EMPTY_MVAR_info)			\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
