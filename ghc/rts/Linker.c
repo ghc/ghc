@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.109 2002/12/27 10:32:59 panne Exp $
+ * $Id: Linker.c,v 1.110 2003/01/13 14:02:07 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -330,7 +330,6 @@ typedef struct _RtsSymbolVal {
       SymX(ErrorHdrHook)			\
       MAIN_CAP_SYM                              \
       SymX(MallocFailHook)			\
-      SymX(NoRunnableThreadsHook)		\
       SymX(OnExitHook)				\
       SymX(OutOfHeapHook)			\
       SymX(PatErrorHdrHook)			\
