@@ -22,11 +22,10 @@ import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion, findAlt,
 			)
 import Var		( mkSysTyVar, tyVarKind )
 import VarEnv
-import VarSet		( elemVarSet )
-import Id		( Id, idType, idInfo, isDataConId,
+import Id		( Id, idType, idInfo, isDataConId, hasNoBinding,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
 			  idDemandInfo, setIdInfo,
-			  idOccInfo, setIdOccInfo,
+			  idOccInfo, setIdOccInfo, 
 			  zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
@@ -40,7 +39,7 @@ import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			)
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreFVs		( mustHaveLocalBinding, exprFreeVars )
+import CoreFVs		( mustHaveLocalBinding )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			  callSiteInline
 			)
@@ -364,8 +363,12 @@ completeLam rev_bndrs body cont
 	Nothing	      -> rebuild (foldl (flip Lam) body' rev_bndrs) cont
   where
 	-- We don't use CoreUtils.etaReduce, because we can be more
-	-- efficient here: (a) we already have the binders, (b) we can do
-	-- the triviality test before computing the free vars
+	-- efficient here:
+	--  (a) we already have the binders,
+	--  (b) we can do the triviality test before computing the free vars
+	--	[in fact I take the simple path and look for just a variable]
+	--  (c) we don't want to eta-reduce a data con worker or primop
+	--      because we only have to eta-expand them later when we saturate
     try_eta body | not opt_SimplDoEtaReduction = Nothing
 		 | otherwise		       = go rev_bndrs body
 
@@ -373,8 +376,9 @@ completeLam rev_bndrs body cont
     go []       body          | ok_body body = Just body	-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_body body = exprIsTrivial body && not (any (`elemVarSet` exprFreeVars body) rev_bndrs)
-    ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
+    ok_body (Var v) = not (v `elem` rev_bndrs) && not (hasNoBinding v)
+    ok_body other   = False
+    ok_arg b arg    = varToCoreExpr b `cheapEqExpr` arg
 
 mkLamBndrZapper :: CoreExpr 	-- Function
 		-> SimplCont	-- The context

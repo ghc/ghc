@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.44 2001/02/20 11:04:42 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.45 2001/02/20 15:44:26 simonpj Exp $
 --
 -- Driver flags
 --
@@ -408,6 +408,7 @@ dynamic_flags = [
   ,  ( "ddump-worker-wrapper",   NoArg (setDynFlag Opt_D_dump_worker_wrapper) )
   ,  ( "dshow-passes",           NoArg (setVerbosity "2") )
   ,  ( "ddump-rn-trace",         NoArg (setDynFlag Opt_D_dump_rn_trace) )
+  ,  ( "ddump-tc-trace",         NoArg (setDynFlag Opt_D_dump_tc_trace) )
   ,  ( "ddump-rn-stats",         NoArg (setDynFlag Opt_D_dump_rn_stats) )
   ,  ( "ddump-stix",             NoArg (setDynFlag Opt_D_dump_stix) )
   ,  ( "ddump-simpl-stats",      NoArg (setDynFlag Opt_D_dump_simpl_stats) )

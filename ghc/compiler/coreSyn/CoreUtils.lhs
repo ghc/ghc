@@ -44,13 +44,13 @@ import Var		( Var, isId, isTyVar )
 import VarSet
 import VarEnv
 import Name		( hashName )
-import Literal		( hashLiteral, literalType, litSize, litIsDupable )
+import Literal		( hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )
 import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, 
-			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal
+			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal, hasNoBinding
 			)
 import IdInfo		( LBVarInfo(..),  
 			  IdFlavour(..),
@@ -258,7 +258,17 @@ mkIfThenElse guard then_expr else_expr
 
 \begin{code}
 exprIsTrivial (Var v)
-  | Just op <- isPrimOpId_maybe v      = primOpIsDupable op
+  | hasNoBinding v		       = idArity v == 0
+	-- WAS: | Just op <- isPrimOpId_maybe v      = primOpIsDupable op
+	-- The idea here is that a constructor worker, like $wJust, is
+	-- really short for (\x -> $wJust x), becuase $wJust has no binding.
+	-- So it should be treated like a lambda.
+	-- Ditto unsaturated primops.
+	-- This came up when dealing with eta expansion/reduction for
+	-- 	x = $wJust
+	-- Here we want to eta-expand.  This looks like an optimisation,
+	-- but it's important (albeit tiresome) that CoreSat doesn't increase 
+	-- anything's arity
   | otherwise                          = True
 exprIsTrivial (Type _)	      	       = True
 exprIsTrivial (Lit lit)       	       = True

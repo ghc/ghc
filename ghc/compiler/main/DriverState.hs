@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.27 2001/02/20 11:04:42 simonmar Exp $
+-- $Id: DriverState.hs,v 1.28 2001/02/20 15:44:26 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -144,6 +144,10 @@ hsc_minusNoO_flags =
        [ 
  	"-fignore-interface-pragmas",
 	"-fomit-interface-pragmas",
+	"-fdo-lambda-eta-expansion",	-- This one is important for a tiresome reason:
+					-- we want to make sure that the bindings for data 
+					-- constructors are eta-expanded.  This is probably
+					-- a good thing anyway, but it seems fragile.
 	"-flet-no-escape"
 	]
 
