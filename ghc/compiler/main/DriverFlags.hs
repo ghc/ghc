@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.114 2003/02/24 12:39:26 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.115 2003/05/27 12:40:19 simonmar Exp $
 --
 -- Driver flags
 --
@@ -356,19 +356,8 @@ dynamic_flags = [
 #endif
 
 	------ HsCpp opts ---------------------------------------------------
-	-- With a C compiler whose system() doesn't use a UNIX shell (i.e.
-	-- mingwin gcc), -D and -U args must *not* be quoted, as the quotes
-	-- will be interpreted as part of the arguments, and not stripped;
-	-- on all other systems, quoting is necessary, to avoid interpretation
-	-- of shell metacharacters in the arguments (e.g. green-card's
-	-- -DBEGIN_GHC_ONLY='}-' trick).
-#ifndef mingw32_HOST_OS
-  ,  ( "D",		Prefix (\s -> addOpt_P ("-D'"++s++"'") ) )
-  ,  ( "U",		Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
-#else
-  ,  ( "D",		Prefix (\s -> addOpt_P ("-D"++s) ) )
-  ,  ( "U",		Prefix (\s -> addOpt_P ("-U"++s) ) )
-#endif
+  ,  ( "D",		AnySuffix addOpt_P )
+  ,  ( "U",		AnySuffix addOpt_P )
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
