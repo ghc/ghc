@@ -34,7 +34,9 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkSrcUnqual )
 import RnMonad		( Fixities )
-import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..) )
+import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
+			, maxPrecedence, defaultFixity
+			)
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
@@ -57,7 +59,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
 import Util		( mapAccumL, zipEqual, zipWithEqual,
-			  zipWith3Equal, nOfThem )
+			  zipWith3Equal, nOfThem, assocDefault )
 import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool, assocMaybe )
 import Constants
@@ -897,7 +899,7 @@ gen_Read_binds fixities tycon
 						    then d_Expr 
 						    else HsVar (last bs_needed)] True
 
-           [lp,rp] = getLRPrecs fixities dc_nm
+           [lp,rp] = getLRPrecs is_infix fixities dc_nm
 
            quals
 	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
@@ -905,8 +907,11 @@ gen_Read_binds fixities tycon
 
 	   stmts = quals ++ [ReturnStmt result_expr]
 		
+	    {-
+	      c.f. Figure 18 in Haskell 1.1 report.
+	    -}
 	   paren_prec_limit
-	     | not is_infix  = 9
+	     | not is_infix  = fromInt maxPrecedence
 	     | otherwise     = getFixity fixities dc_nm
 
 	   read_paren_arg   -- parens depend on precedence...
@@ -939,7 +944,7 @@ gen_Show_binds fixs_assoc tycon
 	     ([wildPat, con_pat], show_con)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
-		  showParen_Expr (HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit))))
+		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt paren_prec_limit))))
 				 (HsPar (nested_compose_Expr show_thingies)))
 	    where
 	     data_con_RDR = qual_orig_name data_con
@@ -994,7 +999,7 @@ gen_Show_binds fixs_assoc tycon
              mk_showString_app str = HsApp (HsVar showString_RDR)
 					   (HsLit (mkHsString str))
 
-             prec_cons = getLRPrecs fixs_assoc dc_nm
+             prec_cons = getLRPrecs is_infix fixs_assoc dc_nm
 
              real_show_thingies
 		| is_infix  = 
@@ -1017,41 +1022,51 @@ gen_Show_binds fixs_assoc tycon
 			       
 	     (con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc dc_nm
 
+	      {-
+	        c.f. Figure 16 and 17 in Haskell 1.1 report
+	      -}  
 	     paren_prec_limit
-		| not is_infix = 9
-		| otherwise    = getFixity fixs_assoc dc_nm
+		| not is_infix = fromInt maxPrecedence + 1
+		| otherwise    = getFixity fixs_assoc dc_nm + 1
 
 \end{code}
 
 \begin{code}
-getLRPrecs :: Fixities -> Name -> [Integer]
-getLRPrecs fixs_assoc nm = [lp, rp]
+getLRPrecs :: Bool -> Fixities -> Name -> [Integer]
+getLRPrecs is_infix fixs_assoc nm = [lp, rp]
     where
-     ( con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc nm
-     paren_prec_limit = 9
+     {-
+	Figuring out the fixities of the arguments to a constructor,
+	cf. Figures 16-18 in Haskell 1.1 report.
+     -}
+     (con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc nm
+     paren_con_prec = getFixity fixs_assoc nm
+     maxPrec	    = fromInt maxPrecedence
 
      lp
-      | con_left_assoc = paren_prec_limit
-      | otherwise      = paren_prec_limit + 1
+      | not is_infix   = maxPrec + 1
+      | con_left_assoc = paren_con_prec
+      | otherwise      = paren_con_prec + 1
 		  
      rp
-      | con_right_assoc = paren_prec_limit
-      | otherwise       = paren_prec_limit + 1
+      | not is_infix    = maxPrec + 1
+      | con_right_assoc = paren_con_prec
+      | otherwise       = paren_con_prec + 1
 		  
-
 getFixity :: Fixities -> Name -> Integer
 getFixity fixs_assoc nm =
-  case assocMaybe fixs_assoc nm of
-     Nothing	       -> 9
-     Just (Fixity x _) -> fromInt x + 1
+  case lookupFixity fixs_assoc nm of
+     Fixity x _ -> fromInt x
 
 isLRAssoc :: Fixities -> Name -> (Bool, Bool)
 isLRAssoc fixs_assoc nm =
-     case assocMaybe fixs_assoc nm of
-       Just (Fixity _ InfixL) -> (True, False)
-       Just (Fixity _ InfixR) -> (False, True)
-       Just (Fixity _ _)      -> (False, False)
-       _		      -> (True, False)
+     case lookupFixity fixs_assoc nm of
+       Fixity _ InfixN -> (False, False)
+       Fixity _ InfixR -> (False, True)
+       Fixity _ InfixL -> (True,  False)
+
+lookupFixity :: Fixities -> Name -> Fixity
+lookupFixity fixs_assoc nm = assocDefault defaultFixity fixs_assoc nm
 
 \end{code}
 
