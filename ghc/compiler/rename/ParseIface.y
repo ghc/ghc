@@ -519,6 +519,7 @@ core_expr :: { UfExpr RdrName }
 
 fexpr   :: { UfExpr RdrName }
 fexpr   : fexpr core_arg				{ UfApp $1 $2 }
+	| fexpr ATSIGN atype				{ UfApp $1 (UfTyArg  $3) }
         | aexpr						{ $1 }
 
 aexpr	:: { UfExpr RdrName }
@@ -550,7 +551,6 @@ core_arg	:: { UfArg RdrName }
 		: qvar_name					{ UfVarArg $1 }
 		| qdata_name					{ UfVarArg $1 }
 		| core_lit					{ UfLitArg $1 }
-		| ATSIGN atype					{ UfTyArg  $2 }
 
 core_args	:: { [UfArg RdrName] }
 		:						{ [] }
@@ -559,11 +559,10 @@ core_args	:: { [UfArg RdrName] }
 data_args	:: { [UfArg RdrName] }
 		: 						{ [] }
 		| core_arg data_args				{ $1 : $2 }
-
-{-		| ATSIGN atype data_args			{ UfTyArg $2 : $3 } -}
+		| ATSIGN atype data_args			{ UfTyArg $2 : $3 }
 
 core_lit	:: { Literal }
-core_lit	: INTEGER			{ MachInt $1 True }
+core_lit	: INTEGER			{ mkMachInt_safe $1 }
 		| CHAR				{ MachChar $1 }
 		| STRING			{ MachStr $1 }
 		| STRING_LIT STRING		{ NoRepStr $2 }
