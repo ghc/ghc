@@ -115,30 +115,92 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       let tc_pcs = tc_pcs tc_result
       let tc_env = tc_env tc_result
       let tc_binds = tc_binds tc_result
+      let local_tycons = tc_tycons tc_result
+      let local_classes = tc_classes tc_result
 
       -- desugar, simplify and tidy, to create the unfoldings
       -- why is this IO-typed?
-      (core_binds, orphan_rules) 
-         <- dsThenSimplThenTidy dflags mod tc_binds rule_base
+      (tidy_binds, orphan_rules, fe_binders, h_code, c_code)   -- return modDetails?
+         <- dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
 
       -- convert to Stg; needed for binders
-      let (stg_binds, top_level_ids) = myCoreToStg core_binds
-      					-- myCoreToStg does occurAnalyseBinds, 
-					-- `seq`, topCoreBindsToStg
+      (stg_binds, cost_centre_info, top_level_ids) 
+         <- myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 
       -- cook up a new ModDetails now we (finally) have all the bits
-      let new_details = completeModDetails tc_env core_binds top_level_ids orphan_rules
+      let new_details = completeModDetails tc_env tidy_binds top_level_ids orphan_rules
 
       -- and possibly create a new ModIface
       let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
 
       -- do the rest of code generation/emission
-      (unlinkeds, stub_h_filename, stub_c_filename) <- restOfCodeGeneration stg_binds
+      -- this is obviously nonsensical: FIX
+      (unlinkeds, stub_h_filename, stub_c_filename) 
+         <- restOfCodeGeneration this_mod imported_modules cost_centre_info 
+                                 fe_binders local_tycons local_classes stg_binds
 
       -- and the answer is ...
       return (HscOK new_details maybe_final_iface stub_h_filename stub_c_filename
                     unlinkeds tc_pcs (unionBags rn_warns tc_warns))
 
+
+restOfCodeGeneration this_mod imported_modules cost_centre_info 
+                     fe_binders local_tycons local_classes stg_binds
+ = do --------------------------  Code generation -------------------------------
+      show_pass "CodeGen"
+      -- _scc_     "CodeGen"
+      abstractC <- codeGen this_mod imported_modules
+                           cost_centre_info fe_binders
+                           local_tycons local_classes stg_binds
+
+      --------------------------  Code output -------------------------------
+      show_pass "CodeOutput"
+      -- _scc_     "CodeOutput"
+      (maybe_stub_h_name, maybe_stub_c_name)
+         <- codeOutput this_mod local_tycons local_classes
+                       occ_anal_tidy_binds stg_binds2
+                       c_code h_code abstractC ncg_uniqs
+
+      -- this is obviously nonsensical: FIX
+      return (maybe_stub_h_name, maybe_stub_c_name, [])
+
+
+dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
+ = do --------------------------  Desugaring ----------------
+      -- _scc_     "DeSugar"
+      (desugared, rules, h_code, c_code, fe_binders) 
+         <- deSugar this_mod ds_uniqs tc_results
+
+      --------------------------  Main Core-language transformations ----------------
+      -- _scc_     "Core2Core"
+      (simplified, orphan_rules)  <- core2core core_cmds desugared rules
+
+      -- Do the final tidy-up
+      (tidy_binds, tidy_orphan_rules) 
+         <- tidyCorePgm this_mod simplified orphan_rules
+      
+      return (tidy_binds, tidy_orphan_rules, fe_binders, h_code, c_code)
+
+
+
+myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
+ = do let occ_anal_tidy_binds = occurAnalyseBinds tidy_binds
+
+      () <- coreBindsSize occ_anal_tidy_binds `seq` return ()
+      -- TEMP: the above call zaps some space usage allocated by the
+      -- simplifier, which for reasons I don't understand, persists
+      -- thoroughout code generation
+
+      show_pass "Core2Stg"
+      -- _scc_     "Core2Stg"
+      let stg_binds   = topCoreBindsToStg c2s_uniqs occ_anal_tidy_binds
+
+      show_pass "Stg2Stg"
+      -- _scc_     "Stg2Stg"
+      (stg_binds2, cost_centre_info) <- stg2stg stg_cmds this_mod st_uniqs stg_binds
+      let final_ids = collectFinalStgBinders (map fst stg_binds2)
+
+      return (stg_binds2, cost_centre_info, final_ids)
 
 #if 0
 -- BEGIN old stuff
