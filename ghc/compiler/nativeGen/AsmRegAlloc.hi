@@ -1,0 +1,94 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface AsmRegAlloc where
+import CLabelInfo(CLabel)
+import FiniteMap(FiniteMap)
+import OrdList(OrdList)
+import Outputable(NamedThing)
+import PrimKind(PrimKind)
+import UniqFM(UniqFM)
+import UniqSet(UniqSet(..))
+import Unique(Unique)
+class MachineCode a where
+	regUsage :: a -> RegUsage
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(SAAAA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> RegUsage) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> RegUsage, u0 -> RegLiveness -> RegLiveness, u0 -> (Reg -> Reg) -> u0, Reg -> Reg -> OrdList u0, Reg -> Reg -> OrdList u0)) -> case u1 of { _ALG_ _TUP_5 (u2 :: u0 -> RegUsage) (u3 :: u0 -> RegLiveness -> RegLiveness) (u4 :: u0 -> (Reg -> Reg) -> u0) (u5 :: Reg -> Reg -> OrdList u0) (u6 :: Reg -> Reg -> OrdList u0) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{MachineCode u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> RegUsage) } [ _NOREP_S_ "%DAsmRegAlloc.MachineCode.regUsage\"", u2 ] _N_ #-}
+	regLiveness :: a -> RegLiveness -> RegLiveness
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(ASAAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> RegLiveness -> RegLiveness) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> RegUsage, u0 -> RegLiveness -> RegLiveness, u0 -> (Reg -> Reg) -> u0, Reg -> Reg -> OrdList u0, Reg -> Reg -> OrdList u0)) -> case u1 of { _ALG_ _TUP_5 (u2 :: u0 -> RegUsage) (u3 :: u0 -> RegLiveness -> RegLiveness) (u4 :: u0 -> (Reg -> Reg) -> u0) (u5 :: Reg -> Reg -> OrdList u0) (u6 :: Reg -> Reg -> OrdList u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineCode u0}}) (u2 :: u0) (u3 :: RegLiveness) -> _APP_  _TYAPP_  patError# { (u0 -> RegLiveness -> RegLiveness) } [ _NOREP_S_ "%DAsmRegAlloc.MachineCode.regLiveness\"", u2, u3 ] _N_ #-}
+	patchRegs :: a -> (Reg -> Reg) -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AASAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> (Reg -> Reg) -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> RegUsage, u0 -> RegLiveness -> RegLiveness, u0 -> (Reg -> Reg) -> u0, Reg -> Reg -> OrdList u0, Reg -> Reg -> OrdList u0)) -> case u1 of { _ALG_ _TUP_5 (u2 :: u0 -> RegUsage) (u3 :: u0 -> RegLiveness -> RegLiveness) (u4 :: u0 -> (Reg -> Reg) -> u0) (u5 :: Reg -> Reg -> OrdList u0) (u6 :: Reg -> Reg -> OrdList u0) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineCode u0}}) (u2 :: u0) (u3 :: Reg -> Reg) -> _APP_  _TYAPP_  patError# { (u0 -> (Reg -> Reg) -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineCode.patchRegs\"", u2, u3 ] _N_ #-}
+	spillReg :: Reg -> Reg -> OrdList a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAASA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: Reg -> Reg -> OrdList u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> RegUsage, u0 -> RegLiveness -> RegLiveness, u0 -> (Reg -> Reg) -> u0, Reg -> Reg -> OrdList u0, Reg -> Reg -> OrdList u0)) -> case u1 of { _ALG_ _TUP_5 (u2 :: u0 -> RegUsage) (u3 :: u0 -> RegLiveness -> RegLiveness) (u4 :: u0 -> (Reg -> Reg) -> u0) (u5 :: Reg -> Reg -> OrdList u0) (u6 :: Reg -> Reg -> OrdList u0) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineCode u0}}) (u2 :: Reg) (u3 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> Reg -> OrdList u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineCode.spillReg\"", u2, u3 ] _N_ #-}
+	loadReg :: Reg -> Reg -> OrdList a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAAAS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: Reg -> Reg -> OrdList u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> RegUsage, u0 -> RegLiveness -> RegLiveness, u0 -> (Reg -> Reg) -> u0, Reg -> Reg -> OrdList u0, Reg -> Reg -> OrdList u0)) -> case u1 of { _ALG_ _TUP_5 (u2 :: u0 -> RegUsage) (u3 :: u0 -> RegLiveness -> RegLiveness) (u4 :: u0 -> (Reg -> Reg) -> u0) (u5 :: Reg -> Reg -> OrdList u0) (u6 :: Reg -> Reg -> OrdList u0) -> u6; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineCode u0}}) (u2 :: Reg) (u3 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> Reg -> OrdList u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineCode.loadReg\"", u2, u3 ] _N_ #-}
+class MachineRegisters a where
+	mkMRegs :: [Int] -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(SAAAAA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: [Int] -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: [Int]) -> _APP_  _TYAPP_  patError# { ([Int] -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.mkMRegs\"", u2 ] _N_ #-}
+	possibleMRegs :: PrimKind -> a -> [Int]
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(ASAAAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: PrimKind -> u0 -> [Int]) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: PrimKind) (u3 :: u0) -> _APP_  _TYAPP_  patError# { (PrimKind -> u0 -> [Int]) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.possibleMRegs\"", u2, u3 ] _N_ #-}
+	useMReg :: a -> Int# -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> Int# -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: u0) (u3 :: Int#) -> _APP_  _TYAPP_  patError# { (u0 -> Int# -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.useMReg\"", u2, u3 ] _N_ #-}
+	useMRegs :: a -> [Int] -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAASAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> [Int] -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: u0) (u3 :: [Int]) -> _APP_  _TYAPP_  patError# { (u0 -> [Int] -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.useMRegs\"", u2, u3 ] _N_ #-}
+	freeMReg :: a -> Int# -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAAASA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> Int# -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u6; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: u0) (u3 :: Int#) -> _APP_  _TYAPP_  patError# { (u0 -> Int# -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.freeMReg\"", u2, u3 ] _N_ #-}
+	freeMRegs :: a -> [Int] -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAAAAS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> [Int] -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ([Int] -> u0, PrimKind -> u0 -> [Int], u0 -> Int# -> u0, u0 -> [Int] -> u0, u0 -> Int# -> u0, u0 -> [Int] -> u0)) -> case u1 of { _ALG_ _TUP_6 (u2 :: [Int] -> u0) (u3 :: PrimKind -> u0 -> [Int]) (u4 :: u0 -> Int# -> u0) (u5 :: u0 -> [Int] -> u0) (u6 :: u0 -> Int# -> u0) (u7 :: u0 -> [Int] -> u0) -> u7; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{MachineRegisters u0}}) (u2 :: u0) (u3 :: [Int]) -> _APP_  _TYAPP_  patError# { (u0 -> [Int] -> u0) } [ _NOREP_S_ "%DAsmRegAlloc.MachineRegisters.freeMRegs\"", u2, u3 ] _N_ #-}
+data CLabel 
+data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}
+data FutureLive   = FL (UniqFM Reg) (FiniteMap CLabel (UniqFM Reg))
+data OrdList a 	{-# GHC_PRAGMA SeqList (OrdList a) (OrdList a) | ParList (OrdList a) (OrdList a) | OrdObj a | NoObj #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data Reg   = FixedReg Int# | MappedReg Int# | MemoryReg Int PrimKind | UnmappedReg Unique PrimKind
+data RegLiveness   = RL (UniqFM Reg) FutureLive
+data RegUsage   = RU (UniqFM Reg) (UniqFM Reg)
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+type UniqSet a = UniqFM a
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+extractMappedRegNos :: [Reg] -> [Int]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mkReg :: Unique -> PrimKind -> Reg
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Unique) (u1 :: PrimKind) -> _!_ _ORIG_ AsmRegAlloc UnmappedReg [] [u0, u1] _N_ #-}
+runRegAllocate :: (MachineRegisters a, MachineCode b) => a -> [Int] -> OrdList b -> [b]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22221 _N_ _S_ "LLLLS" _N_ _SPECIALISE_ [ AlphaRegs, AlphaInstr ] 2 { _A_ 0 _U_ 221 _N_ _N_ _N_ _N_ } #-}
+instance Eq Reg
+	{-# GHC_PRAGMA _M_ AsmRegAlloc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Reg -> Reg -> Bool), (Reg -> Reg -> Bool)] [_CONSTM_ Eq (==) (Reg), _CONSTM_ Eq (/=) (Reg)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord Reg
+	{-# GHC_PRAGMA _M_ AsmRegAlloc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Reg}}, (Reg -> Reg -> Bool), (Reg -> Reg -> Bool), (Reg -> Reg -> Bool), (Reg -> Reg -> Bool), (Reg -> Reg -> Reg), (Reg -> Reg -> Reg), (Reg -> Reg -> _CMP_TAG)] [_DFUN_ Eq (Reg), _CONSTM_ Ord (<) (Reg), _CONSTM_ Ord (<=) (Reg), _CONSTM_ Ord (>=) (Reg), _CONSTM_ Ord (>) (Reg), _CONSTM_ Ord max (Reg), _CONSTM_ Ord min (Reg), _CONSTM_ Ord _tagCmp (Reg)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance NamedThing Reg
+	{-# GHC_PRAGMA _M_ AsmRegAlloc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(Reg -> ExportFlag), (Reg -> Bool), (Reg -> (_PackedString, _PackedString)), (Reg -> _PackedString), (Reg -> [_PackedString]), (Reg -> SrcLoc), (Reg -> Unique), (Reg -> Bool), (Reg -> UniType), (Reg -> Bool)] [_CONSTM_ NamedThing getExportFlag (Reg), _CONSTM_ NamedThing isLocallyDefined (Reg), _CONSTM_ NamedThing getOrigName (Reg), _CONSTM_ NamedThing getOccurrenceName (Reg), _CONSTM_ NamedThing getInformingModules (Reg), _CONSTM_ NamedThing getSrcLoc (Reg), _CONSTM_ NamedThing getTheUnique (Reg), _CONSTM_ NamedThing hasType (Reg), _CONSTM_ NamedThing getType (Reg), _CONSTM_ NamedThing fromPreludeCore (Reg)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> ExportFlag) } [ _NOREP_S_ "%DOutputable.NamedThing.getExportFlag\"", u0 ] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.isLocallyDefined\"", u0 ] _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> (_PackedString, _PackedString)) } [ _NOREP_S_ "%DOutputable.NamedThing.getOrigName\"", u0 ] _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> _PackedString) } [ _NOREP_S_ "%DOutputable.NamedThing.getOccurrenceName\"", u0 ] _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> SrcLoc) } [ _NOREP_S_ "%DOutputable.NamedThing.getSrcLoc\"", u0 ] _N_,
+	 getTheUnique = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Reg) -> _APP_  _TYAPP_  patError# { (Reg -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.fromPreludeCore\"", u0 ] _N_ #-}
+instance Text Reg
+	{-# GHC_PRAGMA _M_ AsmRegAlloc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Reg, [Char])]), (Int -> Reg -> [Char] -> [Char]), ([Char] -> [([Reg], [Char])]), ([Reg] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Reg), _CONSTM_ Text showsPrec (Reg), _CONSTM_ Text readList (Reg), _CONSTM_ Text showList (Reg)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(Reg, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 2 _U_ 012 _N_ _S_ "AS" {_A_ 1 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

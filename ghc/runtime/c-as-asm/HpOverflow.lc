@@ -1,0 +1,679 @@
+\section[PerformGC]{Wrapper for heap overflow}
+
+\begin{code}
+#include "rtsdefs.h"
+\end{code}
+
+@PerformGC@ is the wrapper for calls to @collectHeap@ in the
+storage manager. It performs the following actions:
+\begin{enumerate}
+\item Save live registers.
+\item If black holing is required before garbage collection we must
+black hole the update frames on the B stack and any live registers
+pointing at updatable closures --- possibly R1, if live and in update? --JSM
+\item Call the garbage collector.
+\item Restore registers.
+\end{enumerate}
+They either succeed or crash-and-burn; hence, they don't return
+anything.
+
+@PerformGC@ saves the fixed STG registers. and calls the garbage
+collector. It also black holes the B Stack if this is required at
+garbage collection time.
+
+There's also a function @PerformGCIO@ which does all the above and is
+used to force a full collection.
+
+\begin{code}
+#if defined(CONCURRENT)
+EXTFUN(EnterNodeCode);		/* For reentering node after GC */
+EXTFUN(CheckHeapCode);		/* For returning to thread after a context switch */
+extern P_ AvailableStack;
+# if defined(PAR)
+EXTDATA_RO(FetchMe_info);
+# endif
+#else
+static void BlackHoleUpdateStack(STG_NO_ARGS);
+#endif /* CONCURRENT */
+
+extern smInfo StorageMgrInfo;
+extern void PrintRednCountInfo(STG_NO_ARGS);
+extern I_   showRednCountStats;
+extern I_   SM_word_heap_size;
+extern I_   squeeze_upd_frames;
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+extern W_ debug;
+#endif
+#ifdef GRAN
+extern FILE *main_statsfile;         /* Might be of general interest  HWL */
+#endif       
+
+/* the real work is done by this function --- see wrappers at end */
+
+void
+RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
+  W_ liveness;
+  W_ reqsize;
+  W_  always_reenter_node;
+  rtsBool do_full_collection;
+{
+    I_ num_ptr_roots = 0; /* we bump this counter as we
+			         store roots; de-bump it
+			         as we re-store them. */
+#if defined(USE_COST_CENTRES)
+    CostCentre Save_CCC;
+#endif
+
+    /* stop the profiling timer --------------------- */
+#if defined(USE_COST_CENTRES)
+/*    STOP_TIME_PROFILER; */
+#endif
+
+#ifdef CONCURRENT
+
+    SAVE_Liveness = liveness;
+
+    /* 
+       Even on a uniprocessor, we may have to reenter node after a 
+       context switch.  Though it can't turn into a FetchMe, its shape
+       may have changed (e.g. from a thunk to a data object).
+     */
+    if (always_reenter_node) {
+    	/* Avoid infinite loops at the same heap check */
+    	if (SAVE_Hp <= SAVE_HpLim && TSO_SWITCH(CurrentTSO) == TSO_PC2(CurrentTSO)) {
+    	    TSO_SWITCH(CurrentTSO) = NULL;
+    	    return;
+    	}
+	/* Set up to re-enter Node, so as to be sure it's really there. */
+    	assert(liveness & LIVENESS_R1);
+    	TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO);
+	TSO_PC2(CurrentTSO) = EnterNodeCode;
+    }
+
+    SAVE_Hp -= reqsize;
+
+    if (context_switch && !do_full_collection
+# if defined(USE_COST_CENTRES)
+       && !interval_expired
+# endif
+      ) {
+    	/* We're in a GC callWrapper, so the thread state is safe */
+    	TSO_ARG1(CurrentTSO) = reqsize;
+    	TSO_PC1(CurrentTSO) = CheckHeapCode;
+# ifdef PAR
+	if (do_gr_profile) {
+	    TSO_EXECTIME(CurrentTSO) += CURRENT_TIME - TSO_BLOCKEDAT(CurrentTSO);
+	}
+# endif
+# if defined(GRAN)
+    	ReSchedule(9 /*i.e. error; was SAME_THREAD*/);
+# else
+    	ReSchedule(1);
+# endif
+    }
+
+    /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
+# if defined(USE_COST_CENTRES)
+    Save_CCC = CCC;
+# endif
+    CCC = (CostCentre)STATIC_CC_REF(CC_GC);
+    CCC->scc_count++;
+
+    ReallyPerformThreadGC(reqsize, do_full_collection);
+
+#else	/* !CONCURRENT */
+
+# if defined(USE_COST_CENTRES)
+    /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
+    Save_CCC = CCC;
+    CCC = (CostCentre)STATIC_CC_REF(CC_GC);
+    CCC->scc_count++;
+# endif
+
+    /* root saving ---------------------------------- */
+
+# define __ENROOT_PTR_REG(cond,n) /* n == 1 <=> R1 */	\
+	do { if ( cond ) {				\
+	StorageMgrInfo.roots[num_ptr_roots] = CAT2(MAIN_R,n).p; \
+	num_ptr_roots++;				\
+	}} while (0)
+
+    __ENROOT_PTR_REG(IS_LIVE_R1(liveness),1);
+    __ENROOT_PTR_REG(IS_LIVE_R2(liveness),2);
+    __ENROOT_PTR_REG(IS_LIVE_R3(liveness),3);
+    __ENROOT_PTR_REG(IS_LIVE_R4(liveness),4);
+    __ENROOT_PTR_REG(IS_LIVE_R5(liveness),5);
+    __ENROOT_PTR_REG(IS_LIVE_R6(liveness),6);
+    __ENROOT_PTR_REG(IS_LIVE_R7(liveness),7);
+    __ENROOT_PTR_REG(IS_LIVE_R8(liveness),8);
+
+    /* 
+     * Before we garbage collect we may have to squeeze update frames and/or
+     * black hole the update stack 
+    */
+    if (squeeze_upd_frames) {
+	/* Squeeze and/or black hole update frames */
+	I_ displacement;
+
+	displacement = SqueezeUpdateFrames(stackInfo.botB + BREL(1), MAIN_SpB, MAIN_SuB);
+
+	MAIN_SuB += BREL(displacement);
+	MAIN_SpB += BREL(displacement);
+	/* fprintf(stderr, "B size %d, squeezed out %d\n", MAIN_SpB - stackInfo.botB,
+                displacement); */
+    }	/* note the conditional else clause below */
+# if defined(SM_DO_BH_UPDATE)
+    else
+	BlackHoleUpdateStack();    	
+# endif	/* SM_DO_BH_UPDATE */
+
+    assert(num_ptr_roots <= SM_MAXROOTS);
+    StorageMgrInfo.rootno = num_ptr_roots;
+
+    SAVE_Hp -= reqsize;
+	/* Move (SAVE_)Hp back to where it was */
+	/* (heap is known to grow upwards) */
+	/* we *do* have to do this, so reported stats will be right! */
+
+    /* the main business ---------------------------- */
+
+    blockUserSignals();
+    
+    {
+      int GC_result;
+
+      /* Restore hpLim to its "correct" setting */
+      StorageMgrInfo.hplim += StorageMgrInfo.hardHpOverflowSize;
+
+      GC_result = collectHeap(reqsize, &StorageMgrInfo, do_full_collection);
+
+      if ( GC_result == GC_HARD_LIMIT_EXCEEDED ) {
+	OutOfHeapHook(reqsize * sizeof(W_), SM_word_heap_size * sizeof(W_)); /*msg*/
+	shutdownHaskell();
+	EXIT(EXIT_FAILURE);
+
+      } else if ( GC_result == GC_SOFT_LIMIT_EXCEEDED ) {
+	/* Allow ourselves to use emergency space */
+	/* Set hplim so that we'll GC when we hit the soft limit */
+	StorageMgrInfo.hplim -= StorageMgrInfo.hardHpOverflowSize;
+	raiseError( softHeapOverflowHandler );
+
+      } else if ( GC_result == GC_SUCCESS ) {
+	/* Set hplim so that we'll GC when we hit the soft limit */
+	StorageMgrInfo.hplim -= StorageMgrInfo.hardHpOverflowSize;
+
+      } else { /* This should not happen */
+	fprintf(stderr, "Panic: garbage collector returned %d please report it as a bug to glasgow-haskell-bugs@dcs.gla.ac.uk\n", GC_result );
+
+# if defined(DO_REDN_COUNTING)
+	if (showRednCountStats) {
+	   PrintRednCountInfo();
+	}
+# endif
+	abort();
+      }
+    }
+
+    StorageMgrInfo.rootno = 0;	/* reset */
+
+    SAVE_Hp += reqsize;
+    /* Semantics of GC ensures that a block of
+	`reqsize' is now available (and allocated) [NB: sequential only] */
+
+    /* root restoring ------------------------------- */
+    /* must do all the restoring exactly backwards to the storing! */
+
+    /* now the general regs, in *backwards* order */
+
+# define __DEROOT_PTR_REG(cond,n) /* n == 1 <=> R1 */	\
+	do { if ( cond ) {				\
+	num_ptr_roots--;				\
+	CAT2(MAIN_R,n).p = StorageMgrInfo.roots[num_ptr_roots]; \
+	}} while (0)
+
+    __DEROOT_PTR_REG(IS_LIVE_R8(liveness),8);
+    __DEROOT_PTR_REG(IS_LIVE_R7(liveness),7);
+    __DEROOT_PTR_REG(IS_LIVE_R6(liveness),6);
+    __DEROOT_PTR_REG(IS_LIVE_R5(liveness),5);
+    __DEROOT_PTR_REG(IS_LIVE_R4(liveness),4);
+    __DEROOT_PTR_REG(IS_LIVE_R3(liveness),3);
+    __DEROOT_PTR_REG(IS_LIVE_R2(liveness),2);
+    __DEROOT_PTR_REG(IS_LIVE_R1(liveness),1);
+
+    assert(num_ptr_roots == 0); /* we have put it all back */
+
+    unblockUserSignals();
+
+#endif	/* !CONCURRENT */
+
+#if defined(USE_COST_CENTRES)
+    CCC = Save_CCC;
+
+    RESTART_TIME_PROFILER;
+#endif
+}
+\end{code}
+
+This is a wrapper used for all standard, non-threaded, non-parallel GC
+purposes.
+\begin{code}
+#ifdef HEAP_CHK_HYGIENE
+I_ doHygieneCheck = 0;
+#endif
+
+void
+PerformGC(args)
+  W_ args;
+{
+    W_ liveness = HEAP_OVERFLOW_LIVENESS(args);
+    W_ reqsize = HEAP_OVERFLOW_REQSIZE(args);
+    W_ always_reenter_node = HEAP_OVERFLOW_REENTER(args);
+
+#ifdef HEAP_CHK_HYGIENE
+    if (doHygieneCheck) {
+	checkHygiene();
+	return;
+    }
+#endif
+    RealPerformGC(liveness, reqsize, always_reenter_node, rtsFalse);
+}
+
+#if defined(CONCURRENT) && defined(GRAN)
+/* This is directly called from the macro GRAN_RESCHEDULE out of the */
+/* threaded world. -- HWL */
+
+void
+PerformReschedule(liveness, always_reenter_node)
+  W_ liveness;
+  W_  always_reenter_node;
+
+{
+    I_ need_to_reschedule;
+
+    /* Reset the global NeedToReSchedule -- 
+       this is used only to communicate the fact that we should schedule
+       a new thread rather than the existing one following a fetch.
+    */
+    need_to_reschedule = NeedToReSchedule;
+    NeedToReSchedule = rtsFalse;
+
+    SAVE_Liveness = liveness;
+
+    if (always_reenter_node) {
+      /* Avoid infinite loops at the same context switch */
+    	if ((TSO_SWITCH(CurrentTSO) == TSO_PC2(CurrentTSO)) &&
+	    !need_to_reschedule) {
+    	    TSO_SWITCH(CurrentTSO) = NULL;
+    	    return;
+    	}
+
+      /* Set up to re-enter Node, so as to be sure it's really there. */
+      assert(liveness & LIVENESS_R1);
+      TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO);
+      TSO_PC2(CurrentTSO) = (void *) EnterNodeCode;
+    }
+
+    /* We're in a GC callWrapper, so the thread state is safe */
+    TSO_ARG1(CurrentTSO) = 0;
+    TSO_PC1(CurrentTSO) = EnterNodeCode;
+    ReSchedule( (need_to_reschedule && !DoReScheduleOnFetch) ? 
+	        CHANGE_THREAD : SAME_THREAD );
+}
+#endif
+
+#ifndef PAR
+/* this is a wrapper used when we want to do a full GC.  
+
+   One reason might be that we're about to enter a time-critical piece
+   of code and want to reduce the risk of a GC during the run.  The
+   motivating reason is that we want to force the GC to report any
+   dead Malloc Pointers to us.
+
+   Note: this should only be called using _ccall_GC_ which saves all
+   registers in the usual place (ie the global save area) before the
+   call and restores them afterwards.
+
+   ToDo: put in a runtime check that _ccall_GC_ is in action. */
+
+void
+StgPerformGarbageCollection()
+{
+# if ! defined(__STG_GCC_REGS__)
+    SaveAllStgRegs();	/* unregisterised case */
+# endif
+
+    RealPerformGC(0,0,0,rtsTrue);
+
+# if ! defined(__STG_GCC_REGS__)
+    RestoreAllStgRegs();    /* unregisterised case */
+# endif
+}
+#endif /* !PAR */
+
+#ifdef CONCURRENT
+
+# if defined(GRAN)
+
+/* Jim's spark pools are very similar to our processors, except that
+   he uses a hard-wired constant.  This would be a mistake for us,
+   since we won't always need this many pools.
+*/
+void 
+PruneSparks(STG_NO_ARGS)
+{
+    sparkq spark, prev, next;
+    I_ proc, pool, prunedSparks;
+
+    for(proc=0; proc<max_proc; ++proc) {
+    prev = NULL;
+
+    for (pool = 0; pool < SPARK_POOLS; pool++) {
+    prunedSparks=0;
+
+    for(spark = PendingSparksHd[proc][pool]; 
+	spark != NULL; 
+	spark = next) {
+        next = SPARK_NEXT(spark);
+
+	/* HACK! The first clause should actually never happen  HWL */
+
+	if ( (SPARK_NODE(spark) == NULL) || 
+	     (SPARK_NODE(spark) == Nil_closure) ) {
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	      if ( debug & 0x40 ) 
+		fprintf(main_statsfile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Nil_closure\n", spark);
+#  endif
+    	    if (do_qp_prof)
+    	    	QP_Event0(threadId++, SPARK_NODE(spark));
+
+	    if(do_sp_profile)
+	      DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark);
+
+	    DisposeSpark(spark);
+	    prunedSparks++;
+	    }
+    	else if (SHOULD_SPARK(SPARK_NODE(spark))) {
+    	    /* Keep it */
+    	    if (prev == NULL)
+    	    	PendingSparksHd[proc][pool] = spark;
+    	    else
+    	    	SPARK_NEXT(prev) = spark;
+    	    SPARK_PREV(spark) = prev;
+    	    prev = spark;
+    	} else {
+    	    if (do_qp_prof)
+    	    	QP_Event0(threadId++, SPARK_NODE(spark));
+
+	    if(do_sp_profile)
+	      DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark);
+
+	    DisposeSpark(spark);
+	    prunedSparks++;
+        }
+    }  /* forall spark ... */
+    if (prev == NULL)
+    	PendingSparksHd[proc][pool] = NULL;
+    else
+    	SPARK_NEXT(prev) = NULL;
+    PendingSparksTl[proc][pool] = prev;
+    if (prunedSparks>0) 
+      fprintf(main_statsfile,"Pruning and disposing %lu excess sparks (> %lu) on proc %ld in PruneSparks\n",
+	      prunedSparks,(W_) MAX_SPARKS,proc);
+   }  /* forall pool ... */
+  }   /* forall proc ... */
+}
+
+# else  /* !GRAN */
+
+void
+PruneSparks(STG_NO_ARGS)
+{
+    I_ pool;
+
+    PP_ old;
+    PP_ new;
+
+    for (pool = 0; pool < SPARK_POOLS; pool++) {
+	new = PendingSparksBase[pool];
+	for (old = PendingSparksHd[pool]; old < PendingSparksTl[pool]; old++) {
+	    if (SHOULD_SPARK(*old)) {
+		/* Keep it */
+		*new++ = *old;
+	    } else {
+		if (DO_QP_PROF)
+		    QP_Event0(threadId++, *old);
+#  ifdef PAR
+	        if(do_sp_profile)
+		    DumpSparkGranEvent(SP_PRUNED, threadId++);
+#  endif
+	    }
+	}
+	PendingSparksHd[pool] = PendingSparksBase[pool];
+	PendingSparksTl[pool] = new;
+    }
+}
+
+# endif  /* !GRAN */
+
+\end{code}
+
+This is the real GC wrapper for the threaded world.  No context
+switching or other nonsense... just set up StorageMgrInfo and perform
+a garbage collection.
+
+\begin{code}
+
+void 
+ReallyPerformThreadGC(reqsize, do_full_collection)
+W_ reqsize;
+rtsBool do_full_collection;
+{
+# if defined(GRAN)
+    I_ proc;
+#endif
+
+    I_ num_ptr_roots = 0;   	 /* we bump this counter as we store roots; de-bump it
+			            as we re-store them. */
+    P_ stack, tso, next;
+
+    /* Discard the saved stack and TSO space */
+
+    for(stack = AvailableStack; stack != Nil_closure; stack = next) {
+	next = STKO_LINK(stack);
+	FREEZE_MUT_HDR(stack, ImMutArrayOfPtrs_info);
+	MUTUPLE_CLOSURE_SIZE(stack) = MUTUPLE_VHS;
+    }
+
+    for(tso = AvailableTSO; tso != Nil_closure; tso = next) {
+	next = TSO_LINK(tso);
+	FREEZE_MUT_HDR(tso, ImMutArrayOfPtrs_info);
+	MUTUPLE_CLOSURE_SIZE(tso) = MUTUPLE_VHS;
+    }
+
+    AvailableStack = AvailableTSO = Nil_closure;
+
+    PruneSparks();
+
+# if defined(GRAN)
+    for(proc = 0; proc < max_proc; ++proc) {
+
+#  if 0
+    for(i = 0; i < SPARK_POOLS; i++) {
+      if (PendingSparksHd[proc][i] != NULL)
+        StorageMgrInfo.roots[num_ptr_roots++] = PendingSparksHd[proc][i];
+      if ( PendingSparksTl[proc][i] != NULL)
+        StorageMgrInfo.roots[num_ptr_roots++] = PendingSparksTl[proc][i];
+     }
+#  endif /* 0 */
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	      if ( debug & 0x40 ) 
+		fprintf(main_statsfile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
+			num_ptr_roots,proc,RunnableThreadsHd[proc]);
+#  endif
+
+    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[proc];
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	      if ( debug & 0x40 ) 
+		fprintf(main_statsfile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
+			num_ptr_roots,proc,RunnableThreadsTl[proc]);
+#  endif       
+    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
+    }  /* forall proc ... */
+
+    num_ptr_roots = SaveSparkRoots(num_ptr_roots);
+    num_ptr_roots = SaveEventRoots(num_ptr_roots);
+
+# else /* !GRAN */
+
+    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd;
+    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl;
+    StorageMgrInfo.roots[num_ptr_roots++] = WaitingThreadsHd;
+    StorageMgrInfo.roots[num_ptr_roots++] = WaitingThreadsTl;
+
+# endif /* !GRAN */
+
+# if defined(GRAN_CHECK) && defined(GRAN)
+    if ( debug & 0x40 ) 
+      fprintf(main_statsfile,"Saving CurrentTSO %d -- 0x%lx\n",
+	      num_ptr_roots,CurrentTSO);
+# endif
+
+    StorageMgrInfo.roots[num_ptr_roots++] = CurrentTSO;
+
+#  ifdef PAR
+    StorageMgrInfo.roots[num_ptr_roots++] = PendingFetches;
+#  endif
+
+    StorageMgrInfo.rootno = num_ptr_roots;
+
+    blockUserSignals();
+    
+    if (collectHeap(reqsize, &StorageMgrInfo, do_full_collection) != GC_SUCCESS) { 
+
+	OutOfHeapHook(reqsize * sizeof(W_), SM_word_heap_size * sizeof(W_)); /*msg*/
+
+# if defined(DO_REDN_COUNTING)
+	if (showRednCountStats) {
+	    PrintRednCountInfo();
+	}
+# endif
+	EXIT(EXIT_FAILURE);
+    }
+
+    StorageMgrInfo.rootno = 0;	/* reset */
+
+    /* root restoring ------------------------------- */
+    /* must do all the restoring exactly backwards to the storing! */
+
+# if defined(GRAN_CHECK) && defined(GRAN)
+	  if ( debug & 0x40 ) 
+	    fprintf(main_statsfile,"Restoring CurrentTSO %d -- new: 0x%lx\n",
+		    num_ptr_roots-1,StorageMgrInfo.roots[num_ptr_roots-1]);
+# endif
+
+# ifdef PAR
+    PendingFetches = StorageMgrInfo.roots[--num_ptr_roots];
+# endif
+    CurrentTSO = StorageMgrInfo.roots[--num_ptr_roots];
+    CurrentRegTable = TSO_INTERNAL_PTR(CurrentTSO);
+
+# if !defined(GRAN)
+
+    WaitingThreadsTl = StorageMgrInfo.roots[--num_ptr_roots];
+    WaitingThreadsHd = StorageMgrInfo.roots[--num_ptr_roots];
+
+    RunnableThreadsTl = StorageMgrInfo.roots[--num_ptr_roots];
+    RunnableThreadsHd = StorageMgrInfo.roots[--num_ptr_roots];
+
+# else /* GRAN */
+
+    num_ptr_roots = RestoreEventRoots(num_ptr_roots);
+    num_ptr_roots = RestoreSparkRoots(num_ptr_roots);
+
+    /* NB: PROC is unsigned datatype i.e. (PROC)-1 == (PROC)255  */
+
+    for(proc = max_proc - 1; (proc >= 0) && (proc < max_proc) ; --proc) {
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	  if ( debug & 0x40 ) 
+	    fprintf(main_statsfile,"Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
+		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
+#  endif
+
+    RunnableThreadsTl[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	  if ( debug & 0x40 ) 
+	    fprintf(main_statsfile,"Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
+		    num_ptr_roots,proc,StorageMgrInfo.roots[num_ptr_roots]);
+#  endif
+
+    RunnableThreadsHd[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+
+#  if 0
+    for(i = SPARK_POOLS - 1; i >= 0; --i) {
+      if (PendingSparksTl[proc][i] != NULL)
+        PendingSparksTl[proc][i] =  StorageMgrInfo.roots[--num_ptr_roots];
+      if (PendingSparksHd[proc][i] != NULL)
+        PendingSparksHd[proc][i] =  StorageMgrInfo.roots[--num_ptr_roots];
+     }
+#  endif
+    }
+
+# endif /* GRAN */
+
+    /* Semantics of GC ensures that a block of `reqsize' is now available */
+    SAVE_Hp += reqsize;
+
+    unblockUserSignals();
+}
+
+#endif /* CONCURRENT */
+
+\end{code}
+
+This routine rattles down the B stack, black-holing any
+pending updates to avoid space leaks from them.
+
+\begin{code}
+#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+
+static
+void
+BlackHoleUpdateStack(STG_NO_ARGS)
+{
+    P_ PtrToUpdateFrame;
+
+    if (noBlackHoles)
+    	return;
+
+    PtrToUpdateFrame = MAIN_SuB;
+
+    /* ToDo: There may be an optimisation here which stops at the first
+	     BHed closure on the stack as all below must have been BHed */
+
+    while (SUBTRACT_B_STK(PtrToUpdateFrame, stackInfo.botB) > 0) {
+
+	UPD_BH(GRAB_UPDATEE(PtrToUpdateFrame), BH_UPD_info);
+
+        /* Move PtrToUpdateFrame down B Stack */
+	PtrToUpdateFrame = GRAB_SuB(PtrToUpdateFrame);
+    }
+}
+#endif	/* CONCURRENT && SM_DO_BH_UPDATE */
+\end{code}
+
+
+\begin{code}
+#if defined(CONCURRENT) && !defined(GRAN)
+void
+PerformReschedule(liveness, always_reenter_node)
+  W_ liveness;
+  W_  always_reenter_node;
+
+{ }
+#endif
+\end{code}

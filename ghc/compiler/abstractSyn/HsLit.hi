@@ -1,0 +1,13 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface HsLit where
+import Outputable(Outputable)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import UniType(UniType)
+data Literal   = CharLit Char | CharPrimLit Char | StringLit _PackedString | StringPrimLit _PackedString | IntLit Integer | FracLit (Ratio Integer) | LitLitLitIn _PackedString | LitLitLit _PackedString UniType | IntPrimLit Integer | FloatPrimLit (Ratio Integer) | DoublePrimLit (Ratio Integer)
+negLiteral :: Literal -> Literal
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+instance Outputable Literal
+	{-# GHC_PRAGMA _M_ HsLit {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Literal) _N_
+	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

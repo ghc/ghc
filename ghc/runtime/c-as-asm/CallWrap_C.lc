@@ -1,0 +1,246 @@
+%************************************************************************
+%*									*
+\section[CallWrap_C.lc]{``callWrapper'' stuff that can be written in C}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define MAIN_REG_MAP	    /* These routines are all a bit special */
+#define CALLWRAPPER_C	    /* Don't give standard declarations for wrappers */
+#include "rtsdefs.h"
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[call-wrapping]{Routines to ``wrap'' special calls to C}
+%*									*
+%************************************************************************
+
+In most cases, this requires some assembly-language hacking (see the
+discussion in @COptWraps.lh@.)
+
+\begin{code}
+#if defined(__STG_GCC_REGS__)
+
+# if defined(CALLER_SAVES_SYSTEM) || defined(CALLER_SAVES_USER)
+void
+callWrapper(STG_NO_ARGS)
+{
+    MAGIC_CALL_SETUP
+
+    CALLER_SAVE_Base
+    CALLER_SAVE_StkO
+    CALLER_SAVE_R1
+    CALLER_SAVE_R2
+    CALLER_SAVE_R3
+    CALLER_SAVE_R4
+    CALLER_SAVE_R5
+    CALLER_SAVE_R6
+    CALLER_SAVE_R7
+    CALLER_SAVE_R8
+    CALLER_SAVE_FltReg1
+    CALLER_SAVE_FltReg2
+    CALLER_SAVE_FltReg3
+    CALLER_SAVE_FltReg4
+    CALLER_SAVE_DblReg1
+    CALLER_SAVE_DblReg2
+    CALLER_SAVE_Tag
+    CALLER_SAVE_SpA
+    CALLER_SAVE_SuA
+    CALLER_SAVE_SpB
+    CALLER_SAVE_SuB
+    CALLER_SAVE_Hp
+    CALLER_SAVE_HpLim
+    CALLER_SAVE_Liveness
+    CALLER_SAVE_Activity
+    CALLER_SAVE_Ret
+
+    MAGIC_CALL
+
+    CALLER_RESTORE_Base	    /* has to be first! */
+
+    CALLER_RESTORE_StkO
+    CALLER_RESTORE_R1
+    CALLER_RESTORE_R2
+    CALLER_RESTORE_R3
+    CALLER_RESTORE_R4
+    CALLER_RESTORE_R5
+    CALLER_RESTORE_R6
+    CALLER_RESTORE_R7
+    CALLER_RESTORE_R8
+    CALLER_RESTORE_FltReg1
+    CALLER_RESTORE_FltReg2
+    CALLER_RESTORE_FltReg3
+    CALLER_RESTORE_FltReg4
+    CALLER_RESTORE_DblReg1
+    CALLER_RESTORE_DblReg2
+    CALLER_RESTORE_Tag
+    CALLER_RESTORE_SpA
+    CALLER_RESTORE_SuA
+    CALLER_RESTORE_SpB
+    CALLER_RESTORE_SuB
+    CALLER_RESTORE_Hp
+    CALLER_RESTORE_HpLim
+    CALLER_RESTORE_Liveness
+    CALLER_RESTORE_Activity
+    CALLER_RESTORE_Ret
+    
+    /* These next two are restore-only */
+    CALLER_RESTORE_StdUpdRetVec
+    CALLER_RESTORE_StkStub
+
+    MAGIC_RETURN
+}
+# endif /* defined(CALLER_SAVES_SYSTEM) || defined(CALLER_SAVES_USER) */
+
+# if defined(CALLER_SAVES_SYSTEM)
+void
+callWrapper_safe(STG_NO_ARGS)
+{
+    MAGIC_CALL_SETUP
+
+    CALLER_SAVE_Base
+    CALLER_SAVE_StkO
+    CALLER_SAVE_SpA
+    CALLER_SAVE_SuA
+    CALLER_SAVE_SpB
+    CALLER_SAVE_SuB
+    CALLER_SAVE_Hp
+    CALLER_SAVE_HpLim
+    CALLER_SAVE_Liveness
+    CALLER_SAVE_Activity
+    CALLER_SAVE_Ret
+
+    MAGIC_CALL
+
+    CALLER_RESTORE_Base	/* has to be first! */
+
+    CALLER_RESTORE_StkO
+    CALLER_RESTORE_SpA
+    CALLER_RESTORE_SuA
+    CALLER_RESTORE_SpB
+    CALLER_RESTORE_SuB
+    CALLER_RESTORE_Hp
+    CALLER_RESTORE_HpLim
+    CALLER_RESTORE_Liveness
+    CALLER_RESTORE_Activity
+    CALLER_RESTORE_Ret
+    
+    /* These next two are restore-only */
+    CALLER_RESTORE_StdUpdRetVec
+    CALLER_RESTORE_StkStub
+
+    MAGIC_RETURN
+}
+# endif /* defined(CALLER_SAVES_SYSTEM) */
+
+/* 
+Nota Bene: 
+
+Anyone changing the definition of @callWrapper_GC@ should make
+appropriate changes in the compiler (absCSyn/PprAbsC.lhs :: pprCCall).
+
+The reason is that \tr{_ccall_GC_} and \tr{_casm_GC_} generate code like this:
+\begin{verbatim}
+   { R _ccall_result;
+     SaveAllStgRegs();
+     inCCallGC+=1;
+     _ccall_result = << do the call/asm>>;
+     inCCallGC-=1;
+     RestoreAllStgRegs();
+   }
+\end{verbatim}
+
+This avoids limiting _ccall_GC_ to 6 arguments and makes it possible
+to implement _ccall_GC_.  (The local variable avoids the need for some
+of the deeper magic hidden inside @GC_SETUP@, @GC_CCALL@ and
+@GC_RETURN@.)
+
+ADR */
+
+EXTFUN(EnterNodeCode);
+
+void PerformGC_wrapper PROTO((W_))	    WRAPPER_NAME(PerformGC);
+void PerformGC_wrapper(args)
+W_ args;
+{
+    WRAPPER_SETUP(PerformGC)
+    PerformGC(args);
+    WRAPPER_RETURN(0)
+}
+
+# ifdef CONCURRENT
+
+void StackOverflow_wrapper PROTO((W_,W_))   WRAPPER_NAME(StackOverflow);
+void StackOverflow_wrapper(args1,args2)
+W_ args1, args2;
+{
+    WRAPPER_SETUP(StackOverflow)
+    if(StackOverflow(args1,args2)) {
+	WRAPPER_RETURN(1)
+    }
+    WRAPPER_RETURN(0)
+}
+
+void Yield_wrapper PROTO((W_))		    WRAPPER_NAME(Yield);
+void Yield_wrapper(args)
+W_ args;
+{
+    WRAPPER_SETUP(Yield)
+    Yield(args);
+    WRAPPER_RETURN(0)
+}
+
+# endif
+
+# ifdef GRAN
+
+void PerformReschedule_wrapper PROTO((W_, W_))	    WRAPPER_NAME(PerformReschedule);
+void PerformReschedule_wrapper(liveness, always_reenter_node)
+  W_ liveness;
+  W_  always_reenter_node;
+{
+    WRAPPER_SETUP(PerformReschedule)
+    PerformReschedule(liveness, always_reenter_node);
+    WRAPPER_RETURN(0)
+}
+
+# endif /* GRAN */
+
+/* 
+ * In the threaded world, context switches may occur during one of these
+ * wrapped calls, and when we come back, our stack will have been trashed.
+ * If gcc, in all of its cleverness, tries to store any temporary values on
+ * the stack, we need to separate the restoration function.  See the sparc
+ * code for an example.
+ */
+
+SEPARATE_WRAPPER_RESTORE
+
+#endif /* defined(__STG_GCC_REGS__) */
+
+/* We can perform a runtime check that we have used @_ccall_GC_@ when
+   appropriate using this flag. */
+StgInt inCCallGC = 0;
+
+void
+checkInCCallGC()
+{
+  if (inCCallGC == 0) {
+    fprintf(stderr, "Error: entering a closure from C without using _ccall_GC_\n");
+    EXIT(EXIT_FAILURE);
+  }
+}
+\end{code}
+
+Hack for -UGRAN setup. % HWL
+
+\begin{code}
+#ifndef GRAN
+void PerformReschedule_wrapper PROTO((W_, W_));
+void PerformReschedule_wrapper(liveness, always_reenter_node)
+  W_ liveness;
+  W_  always_reenter_node;
+{ }
+#endif
+\end{code}

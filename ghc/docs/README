@@ -1,0 +1,71 @@
+Herein are bits of documentation for, or related to, the Glorious
+Glasgow Haskell compilation system.  Unless specified otherwise, they
+are nestled in the ghc/docs directory of the distribution.
+
+== semi-proper documentation ==========================================
+
+install_guide/*
+	A step-by-step guide on how to configure, build, and install
+	the system.
+
+users_guide/*
+	The User's Guide for the system.  Describes how to "drive" the
+	system, how to deal with common problems, how to use the
+	profiling tools, what is Known to be Broken, how to use the
+	Glasgow extensions, etc.
+
+release_notes/*
+	Release notes for the system. What's new in each release, and
+	what's coming Real Soon Now.
+
+io-1.3/*
+	The *draft* Haskell 1.3 I/O proposal at December 1994.  In
+	HTML format.  Unstructured.html gives you the whole thing in
+	one big wad.
+
+state-interface.dvi
+	"GHC prelude: types and operations", an addendum to the Peyton
+	Jones/Launchbury "state" paper, is the definitive reference
+	(bar the compiler source :-) of GHC's lowest-level interfaces
+	(primitive ops, etc.).
+
+add_to_compiler/paper.dvi
+	An overview of how to add a piece to the compiler.
+
+simple-monad.lhs
+	A *simple* introduction to the common use of monads in Haskell
+	programming.  No fancy stuff whatsoever.  By Will Partain.
+
+../../mkworld/docs/mkworld_guide/*
+	A guide to the ``make world'' configuration system ... ``for
+	the brave.''  The "configure" script (versions 0.22ff) make
+	this a little less visible than before.
+
+../../literate/doc/*
+	The documentation for the ``literate programming'' stuff, if
+	you're interested.
+
+== relevant papers and abstracts ======================================
+
+Consult ghc/docs/abstracts/abstracts<year>.tex for information about
+Glasgow work related to the GHC system.  Other relevant material is
+listed here.  All of it is available by FTP.
+
+Haskell report, version 1.2 (the latest)
+	It was in your May, 1992, SIGPLAN Notices.  Not in the
+	distribution but in ~ftp/pub/haskell/report/ (the usual
+	places).
+
+Haskell tutorial, by Paul Hudak and Joe Fasel
+	Ditto.  In ~ftp/pub/haskell/tutorial/; usual places.
+
+== notes and things ===================================================
+
+NOTES.* Random collections of notes on topics *.  Check the
+	modification dates to see what's new...  Don't believe
+	everything you read.
+
+MAIL*	Files holding some relevant correspondence.
+
+README files
+	A few of these actually exist and tell the truth.

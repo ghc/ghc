@@ -1,0 +1,84 @@
+%
+% (c) The AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*                                                                      *
+\section[Itimer.lc]{Interval Timer}
+%*									*
+%************************************************************************
+
+The interval timer is used for profiling and for context switching in the
+threaded build.  Though POSIX 1003.4 includes a standard interface for
+such things, no one really seems to be implementing them yet.  Even 
+Solaris 2.3 only seems to provide support for @CLOCK_REAL@, whereas we're
+keen on getting access to @CLOCK_VIRTUAL@.
+
+Hence, we use the old-fashioned @setitimer@ that just about everyone seems
+to support.  So much for standards.
+
+\begin{code}
+
+#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+
+# include "platform.h"
+
+# define NON_POSIX_SOURCE
+
+# include "rtsdefs.h"
+
+/* As recommended in the autoconf manual */
+# ifdef TIME_WITH_SYS_TIME
+#  include <sys/time.h>
+#  include <time.h>
+# else
+#  ifdef HAVE_SYS_TIME_H
+#   include <sys/time.h>
+#  else
+#   include <time.h>
+#  endif
+# endif
+
+int
+initialize_virtual_timer(ms)
+int ms;
+{
+# ifndef HAVE_SETITIMER
+    fprintf(stderr, "No virtual timer on this system\n");
+    return -1;
+# else
+    struct itimerval it;
+
+    it.it_value.tv_sec = ms / 1000;
+    it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
+    it.it_interval = it.it_value;
+    return (setitimer(ITIMER_VIRTUAL, &it, NULL));
+# endif
+}
+
+# if 0
+/* This is a potential POSIX version */
+int
+initialize_virtual_timer(ms)
+int ms;
+{
+    struct sigevent se;
+    struct itimerspec it;
+    timer_t tid;
+
+    se.sigev_notify = SIGEV_SIGNAL;
+    se.sigev_signo = SIGVTALRM;
+    se.sigev_value.sival_int = SIGVTALRM;
+    if (timer_create(CLOCK_VIRTUAL, &se, &tid)) {
+	fprintf(stderr, "Can't create virtual timer.\n");
+	EXIT(EXIT_FAILURE);
+    }
+    it.it_value.tv_sec = ms / 1000;
+    it.it_value.tv_nsec = 1000000 * (ms - 1000 * it.it_value.tv_sec);
+    it.it_interval = it.it_value;
+    timer_settime(tid, TIMER_RELTIME, &it, NULL);
+}
+# endif
+
+#endif	/* USE_COST_CENTRES || CONCURRENT */
+
+\end{code}

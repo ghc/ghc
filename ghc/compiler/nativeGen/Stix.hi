@@ -1,0 +1,63 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Stix where
+import AbsCSyn(MagicId)
+import CLabelInfo(CLabel)
+import CharSeq(CSeq)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SplitUniq(SUniqSM(..), SplitUniqSupply)
+import UniType(UniType)
+import Unique(Unique)
+data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
+data CLabel 
+data CodeSegment   = DataSegment | TextSegment
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data PrimOp
+	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
+type SUniqSM a = SplitUniqSupply -> a
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data StixReg   = StixMagicId MagicId | StixTemp Unique PrimKind
+data StixTree   = StSegment CodeSegment | StInt Integer | StDouble (Ratio Integer) | StString _PackedString | StLitLbl CSeq | StLitLit _PackedString | StCLbl CLabel | StReg StixReg | StIndex PrimKind StixTree StixTree | StInd PrimKind StixTree | StAssign PrimKind StixTree StixTree | StLabel CLabel | StFunBegin CLabel | StFunEnd CLabel | StJump StixTree | StFallThrough CLabel | StCondJump CLabel StixTree | StData PrimKind [StixTree] | StPrim PrimOp [StixTree] | StCall _PackedString PrimKind [StixTree] | StComment _PackedString
+type StixTreeList = [StixTree] -> [StixTree]
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+getUniqLabelNCG :: SplitUniqSupply -> CLabel
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sStLitLbl :: _PackedString -> StixTree
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+stgActivityReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgBaseReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgHp :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgHpLim :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgLivenessReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgNode :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgRetReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgSpA :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgSpB :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgStdUpdRetVecReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgStkOReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgStkStubReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgSuA :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgSuB :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stgTagReg :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Eq CodeSegment
+	{-# GHC_PRAGMA _M_ Stix {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(CodeSegment -> CodeSegment -> Bool), (CodeSegment -> CodeSegment -> Bool)] [_CONSTM_ Eq (==) (CodeSegment), _CONSTM_ Eq (/=) (CodeSegment)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+

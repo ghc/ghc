@@ -1,0 +1,36 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{Glasgow Haskell compiler: basicTypes}
+\author{The GRASP team}
+\date{August 1993}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\pagebreak
+\end{rawlatex}
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[basicTypes]{Basic types in GHC (alphabetically)}
+\downsection
+\end{onlypartofdoc}
+
+\input{CLabelInfo.lhs}
+\input{BasicLit.lhs}
+\input{Id.lhs}
+\input{IdInfo.lhs}
+\input{Inst.lhs}
+\input{NameTypes.lhs}
+\input{ProtoName.lhs}
+\input{SrcLoc.lhs}
+\input{Unique.lhs}
+
+\upsection
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

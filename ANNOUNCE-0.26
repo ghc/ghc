@@ -1,0 +1,153 @@
+	     The Glasgow Haskell Compiler -- version 0.26
+	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We are proud to announce a new public release of the Glasgow Haskell
+Compiler (GHC, version 0.26). Sources and binaries are freely
+available by anonymous FTP and on the World-Wide Web; details below.
+
+Haskell is "the" standard lazy functional programming language [see
+SIGPLAN Notices, May 1992].  The current language version is 1.2.  GHC
+provides some proposed features of 1.3, notably monadic I/O.
+
+The Glasgow Haskell project seeks to bring the power and elegance of
+functional programming to bear on real-world problems.  To that end,
+GHC lets you call C (including cross-system garbage collection),
+provides good profiling tools, supports ever richer I/O, and (with
+this release) adds concurrency.  Our goal is to make it the "tool of
+choice for real-world applications".
+
+Highlights of what's new in GHC 0.26 since 0.24 (March 1995):
+
+  * Concurrent Haskell: with this, you can build programs out of many
+    I/O-performing, interacting `threads'.  We have a draft paper
+    about Concurrent Haskell, and our forthcoming Haggis GUI toolkit
+    uses it.
+
+  * Parallel Haskell, running on top of PVM (Parallel Virtual Machine)
+    and hence portable to pretty much any parallel architecture,
+    whether shared memory or distributed memory.  With this, your
+    Haskell program runs on multiple processors, guided by `par` and
+    `seq` annotations.  The first pretty-much-everyone-can-try-it
+    parallel functional programming system!  NB: The parallel stuff is
+    "research-tool quality"... consider this an alpha release.
+
+  * "Foldr/build" deforestation (by Andy Gill) is in, as are
+    "SPECIALIZE instance" pragmas (by Patrick Sansom).
+
+  * The LibPosix library provides an even richer I/O interface than
+    the standard 1.3 I/O library.  A program like a shell or an FTP
+    client can be written in Haskell -- examples included.
+
+  * Yet more cool libraries: Readline (GNU command-line editing),
+    Socket (BSD sockets), Regex and MatchPS (GNU regular expressions).
+    By Darren Moffat and Sigbjorn Finne.
+
+  * New ports -- Linux (a.out) and MIPS (Silicon Graphics).
+
+  * NB: configuration has changed yet again -- for the better, of
+    course :-)
+
+Please see the release notes for a complete discussion of What's New.
+
+To run this release, you need a machine with 16+MB memory, GNU C
+(`gcc'), and `perl'.  We have seen GHC 0.26 work on these platforms:
+alpha-dec-osf2, hppa1.1-hp-hpux9, i386-unknown-linuxaout,
+m68k-sun-sunos4, mips-sgi-irix5, and sparc-sun-{sunos4,solaris2}.
+Similar platforms should work with minimal hacking effort.
+The installer's guide give a full what-ports-work report.
+
+Binaries are now distributed in `bundles', e.g. a "profiling bundle"
+or a "concurrency bundle" for your platform.  Just grab the ones you
+need.
+
+Once you have the distribution, please follow the pointers in
+ghc/README to find all of the documentation about this release.  NB:
+preserve modification times when un-tarring the files (no `m' option
+for tar, please)!
+
+We run mailing lists for GHC users and bug reports; to subscribe, send
+mail to glasgow-haskell-{users,bugs}-request@dcs.glasgow.ac.uk.
+Please send bug reports to glasgow-haskell-bugs.
+
+Particular thanks to: Jim Mattson (author of much of the code) who has
+now moved to HP in California; and the Turing Institute who donated a
+lot of SGI cycles for the SGI port.
+
+Simon Peyton Jones and Will Partain
+
+Dated: 95/07/24
+
+Relevant URLs on the World-Wide Web:
+
+GHC home page    	  http://www.dcs.glasgow.ac.uk/fp/software/ghc.html
+Glasgow FP group page     http://www.dcs.glasgow.ac.uk/fp/
+comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
+
+======================================================================
+How to get GHC 0.26:
+
+This release is available by anonymous FTP from the main Haskell
+archive sites, in the directory pub/haskell/glasgow:
+
+	ftp.dcs.glasgow.ac.uk  (130.209.240.50)
+	ftp.cs.chalmers.se     (129.16.227.140)
+	haskell.cs.yale.edu    (128.36.11.43)
+
+The Glasgow site is mirrored by src.doc.ic.ac.uk (146.169.43.1), in
+computing/programming/languages/haskell/glasgow.
+
+These are the available files (.gz files are gzipped) -- some are `on
+demand', ask if you don't see them:
+
+ghc-0.26-src.tar.gz	The source distribution; about 3MB.
+
+ghc-0.26.ANNOUNCE	This file.
+
+ghc-0.26.{README,RELEASE-NOTES} From the distribution; for those who
+			want to peek before FTPing...
+
+ghc-0.26-ps-docs.tar.gz	Main GHC documents in PostScript format; in
+			case your TeX setup doesn't agree with our
+			DVI files...
+
+ghc-0.26-<platform>.tar.gz Basic binary distribution for a particular
+			<platform>.  Unpack and go: you can compile
+			and run Haskell programs with nothing but one
+			of these files.  NB: does *not* include
+			profiling (see below).
+
+	<platform> ==>	alpha-dec-osf2
+			hppa1.1-hp-hpux9
+			i386-unknown-linuxaout
+			i386-unknown-solaris2
+			m68k-sun-sunos4
+			mips-sgi-irix5
+			sparc-sun-sunos4
+			sparc-sun-solaris2
+
+ghc-0.26-<bundle>-<platform>.tar.gz
+
+	<platform> ==>	as above
+	<bundle>   ==>  prof (profiling)
+			conc (concurrent Haskell)
+			par  (parallel)
+			gran (GranSim parallel simulator)
+			ticky (`ticky-ticky' counts -- for implementors)
+			prof-conc (profiling for "conc[urrent]")
+			prof-ticky (ticky for "conc[urrent]")
+
+ghc-0.26-hc-files.tar.gz Basic set of intermediate C (.hc) files for the
+			 compiler proper, the prelude, and `Hello,
+			 world'.  Used for bootstrapping the system.
+			 About 4MB.
+
+ghc-0.26-<bundle>-hc-files.tar.gz Further sets of .hc files, for
+			building other "bundles", e.g., profiling.
+
+ghc-0.26-hi-files-<blah>.tar.gz Sometimes it's more convenient to
+			use a different set of interface files than
+			the ones in *-src.tar.gz.  (The installation
+			guide will advise you of this.)
+
+We could provide diffs from previous versions of GHC, should you
+require them.  A full set would be very large (7MB).

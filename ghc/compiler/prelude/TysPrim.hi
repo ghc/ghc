@@ -1,0 +1,67 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TysPrim where
+import TyCon(TyCon)
+import UniType(UniType)
+addrPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+addrPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+arrayPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+byteArrayPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+byteArrayPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+charPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+charPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+doublePrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+doublePrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+floatPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+floatPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+intPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+intPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mallocPtrPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mkArrayPrimTy :: UniType -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+mkMutableArrayPrimTy :: UniType -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+mkMutableByteArrayPrimTy :: UniType -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+mkStablePtrPrimTy :: UniType -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+mkStatePrimTy :: UniType -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+mkSynchVarPrimTy :: UniType -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+mutableArrayPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mutableByteArrayPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+realWorldStatePrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _APP_  _ORIG_ TysPrim mkStatePrimTy [ _ORIG_ TysPrim realWorldTy ] _N_ #-}
+realWorldTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+realWorldTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stablePtrPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+statePrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+synchVarPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+voidPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+wordPrimTy :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+wordPrimTyCon :: TyCon
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+

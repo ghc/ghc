@@ -1,0 +1,12 @@
+Typechecked:
+AbsBinds [ot4] [] [(f.t1, ShouldSucceed.f)]
+    {- rec -}
+    f.t1 :: Bool -> ot4 -> ot4
+    f.t1 x.r56 y.r57
+		 = if x.r56 then y.r57 else f.t1 x.r56 y.r57
+AbsBinds [] [] [(g.t6, ShouldSucceed.g)]
+    {- nonrec -}
+    g.t6 :: Bool -> Bool
+    g.t6 x.r55 = (ShouldSucceed.f Bool)
+		     ((ShouldSucceed.f Bool) True x.r55) x.r55
+

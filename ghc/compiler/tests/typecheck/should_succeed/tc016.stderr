@@ -1,0 +1,7 @@
+Typechecked:
+AbsBinds [ot5, ot3] [] [(f.t1, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t1 :: ot3 -> ot5 -> ot3
+    f.t1 (x.r54@_) (y.r55@_)
+		 = x.r54
+

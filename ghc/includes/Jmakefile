@@ -1,0 +1,110 @@
+LH_FILES = \
+rtsTypes.lh	/* runtime system */ \
+\
+SMinterface.lh	/* storage-management related */ \
+SMClosures.lh \
+SMInfoTables.lh \
+SMupdate.lh \
+SMcopying.lh \
+SMcompact.lh \
+SMmark.lh \
+\
+StgMacros.lh \
+StgTypes.lh \
+MachRegs.lh \
+StgRegs.lh \
+COptJumps.lh \
+COptRegs.lh \
+COptWraps.lh \
+\
+GhcConstants.lh \
+\
+RednCounts.lh 	/* "ticky-ticky" profiling */ \
+\
+Info.lh		/* Info pointer definitions */ \
+\
+CostCentre.lh   /* for cost centre profiling */ \
+AgeProfile.lh	/* age stuff for heap and lifetime profiling */ \
+Force_GC.lh	/* for forcing GC */ \
+\
+GranSim.lh  \
+Parallel.lh 	/* for PAR build */ \
+Threads.lh   	/* for threads, parallel or not */
+
+H_FILES_FROM_LH_FILES = $(LH_FILES:.lh=.h)
+
+MOST_H_FILES = $(H_FILES_FROM_LH_FILES) \
+stgdefs.h /* top-level including file */ \
+rtsdefs.h	\
+\
+StgDirections.h /* other basic STG things */ \
+StgMachDeps.h 	\
+\
+error.h 	\
+ieee-flpt.h	\
+\
+gmp.h		\
+\
+LLC.h	    /* for PAR build */ \
+HLC.h	    /* ditto */
+
+#if GhcWithNativeCodeGen == YES
+#define __native_h $(TARGETPLATFORM).h
+#else
+#define __native_h /*no*/
+#endif
+
+H_FILES = $(MOST_H_FILES) \
+__native_h /* Must be constructed last */
+
+/* $(TARGETPLATFORM).h should probably be installed in LIB, not DATA (WDP 94/07) */
+
+PLAT_H_FILES = config.h platform.h
+
+#undef __native_h
+
+/* Literate-pgmming suffix rules used herein */
+LitSuffixRule(.lh,.h)
+LitSuffixRule(.lc,.c)
+
+all :: /* so it is first */
+	@:
+
+#if GhcWithNativeCodeGen == YES
+
+GhcDriverNeededHere(depend all mkNativeHdr.o) /* we use its C-compiling know-how */
+
+$(TARGETPLATFORM).h : mkNativeHdr
+	$(RM) $@
+	./mkNativeHdr > $@ || ( rm $@ && exit 1 )
+
+mkNativeHdr.c : mkNativeHdr.lc
+
+mkNativeHdr :: mkNativeHdr.c $(MOST_H_FILES)
+	$(RM) mkNativeHdr mkNativeHdr.o
+	$(GHC) -c mkNativeHdr.c
+	$(CC) -o mkNativeHdr mkNativeHdr.o
+
+#endif /* NativeCodeGen */
+
+all depend :: $(H_FILES)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTDATADIR_GHC)/includes $(INSTLIBDIR_GHC)/includes)
+includestuff:: /* nothing */
+InstallTarget(includestuff)
+InstallMultNonExecTargets(includestuff, $(H_FILES), $(INSTDATADIR_GHC)/includes)
+InstallMultNonExecTargets(includestuff, $(PLAT_H_FILES), $(INSTLIBDIR_GHC)/includes)
+#endif
+
+ExtraStuffToClean( $(H_FILES_FROM_LH_FILES) )
+
+EtagsNeededHere(tags) /* need this to do "make tags" */
+ClearTagsFile()
+CTagsTarget( $(H_FILES) )
+
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+
+LitDocRootTargetWithNamedOutput(root,lit,root-standalone)
+LitDocRootTargetWithNamedOutput(c-as-asm,lit,c-as-asm-standalone)

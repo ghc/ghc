@@ -1,0 +1,31 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_ttype where
+import UgenUtil
+import Util
+
+import U_list
+%}}
+type ttype;
+	tname	: < gtypeid	: unkId;
+		    gtypel	: list; >;
+	namedtvar : < gnamedtvar : unkId; >;
+	tllist	: < gtlist	: ttype; >;
+	ttuple	: < gttuple	: list; >;
+	tfun	: < gtfun	: ttype;
+		    gtarg	: ttype; >;
+	context	: < gtcontextl	: list;
+		    gtcontextt	: ttype; >;
+
+	unidict :   < gunidict_clas : unkId;
+		      gunidict_ty   : ttype; >;
+	unityvartemplate: <gunityvartemplate : unkId; >;
+	uniforall : < guniforall_tv : list;
+		      guniforall_ty : ttype; >;
+
+	ty_maybe_nothing : < >;
+	ty_maybe_just	 : < gty_maybe : ttype; >;
+end;
+

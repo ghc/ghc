@@ -1,0 +1,906 @@
+Only have cost centres etc if @USE_COST_CENTRES@ defined
+
+\begin{code}
+/* 
+   Some of the code in here is pretty hairy for the compiler to deal
+   with after we've swiped all of the useful registers.  I don't believe
+   any STG registers are live here, but I'm not completely certain.  
+
+   Any specific routines that require the preservation of caller-saves
+   STG registers should be pulled out into another file and compiled
+   with the the appropriate register map.  (Presumably one of the GC
+   register mappings?) --JSM
+ */
+
+#define NULL_REG_MAP
+#include "../storage/SMinternal.h"  /* for xmalloc */
+
+#if defined (USE_COST_CENTRES)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[heap-profiling]{Heap Profiling}
+%*									*
+%************************************************************************
+
+The heap profiling reports the amount of heap space occupied by live
+closures pressent in the heap during a garbage collection. This
+profile may be broken down in a number of ways:
+\begin{itemize}
+\item {\bf Cost Centre:} The cost centres responsible for building the
+various closures in the heap.
+\item {\bf Module:} Aggregation of all the cost centres declared in a module.
+\item {\bf Group:}  Aggregation of all the cost centres declared in a group.
+\item {\bf Closure Description:} The heap occupied by closures with a particular description (normally the data constructor).
+\item {\bf Type Description:} The heap occupied by closures with a particular type (normally the type constructor).
+\item {\bf Production time stamp:} The heap occupied by closures of produced during a particular time interval.
+\end{itemize}
+
+Relevant closures may be selected by the Cost Centre (label, module
+and group), by Closure Category (description, type, and kind) and/or
+by age.  A cost centre will be selected if its label, module or group
+is selected (default is all). A closure category will be selected if
+its description, type or kind is selected (default is all).  A closure
+will be selected if both its cost centre, closure category and age are
+selected.
+
+When recording the size of the heap objects the additional profiling
+etc words are disregarded. The profiling itself is considered an
+idealised process which should not affect the statistics gathered.
+
+\begin{code}
+
+#define MAX_SELECT 10
+
+I_ heap_profiling_req
+    = HEAP_NO_PROFILING; /* type of heap profiling */
+
+static char heap_profiling_char[]           /* indexed by heap_profiling_req */
+    = {'?', CCchar, MODchar, GRPchar, DESCRchar, TYPEchar, TIMEchar};
+
+static I_  cc_select = 0;                  /* are we selecting on Cost Centre */
+static I_  clcat_select = 0;               /* are we selecting on Closure Category*/
+
+static I_   cc_select_no = 0;
+static char *cc_select_strs[MAX_SELECT];
+static char *ccmod_select_strs[MAX_SELECT];
+
+static I_   mod_select_no = 0;
+static char *mod_select_strs[MAX_SELECT];
+static I_   grp_select_no = 0;
+static char *grp_select_strs[MAX_SELECT];
+
+static I_   descr_select_no = 0;
+static char *descr_select_strs[MAX_SELECT];
+static I_   type_select_no = 0;
+static char *type_select_strs[MAX_SELECT];
+static I_   kind_select_no = 0;
+static I_   kind_selected[]    = {0, 0, 0, 0, 0, 0};
+static char *kind_select_strs[] = {"","CON","FN","PAP","THK","BH",0};
+
+static I_   age_select = 0;       /* select ages greater than this */
+                                  /* 0 indicates survived to the end of alloced interval */
+
+I_ *resid = 0;                    /* residencies indexed by hashed feature */
+
+/* For production times we have a resid table of time_intervals */
+/* And a seperate resid counter stuff produced earlier & later  */
+
+I_ resid_earlier = 0;
+I_ resid_later = 0;
+I_ resid_max = 0;            /* Max residency -- used for aux file */
+
+I_ earlier_ticks = 0;     /* No of earlier ticks grouped together */
+hash_t time_intervals = 18;   /* No of time_intervals, also earlier & later */
+
+static hash_t earlier_intervals;     /* No of earlier intervals grouped together + 1*/
+
+hash_t dummy_index_time()
+{
+    return time_intervals;
+}
+
+hash_t (* init_index_fns[])() = {
+    0,
+    init_index_cc,
+    init_index_mod,
+    init_index_grp,
+    init_index_descr,
+    init_index_type,
+    dummy_index_time
+};
+
+static char heap_filename[STATS_FILENAME_MAXLEN]; /* heap log file name = <program>.hp */
+static FILE *heap_file = NULL;
+
+extern I_ SM_force_gc; /* Set here if we force 2-space GC */
+
+I_
+heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
+		  descr_select_str, type_select_str, kind_select_str,
+		  select_age, argv) 
+    I_ prof;
+    char *cc_select_str;
+    char *mod_select_str;
+    char *grp_select_str;
+    char *descr_select_str;
+    char *type_select_str;
+    char *kind_select_str;
+    I_  select_age;
+    char *argv[];
+{
+    hash_t count, max, first;
+
+    heap_profiling_req = prof;
+
+    if (heap_profiling_req == HEAP_NO_PROFILING)
+	return 0;
+
+    /* for now, if using a generational collector and trying
+	to heap-profile, just force the GC to be used in two-space mode.
+	WDP 94/07
+    */
+#if defined(GCap) || defined(GCgn)
+    SM_force_gc = USE_2s;
+#endif
+
+#if ! defined(HEAP_PROF_WITH_AGE)
+    if (heap_profiling_req == HEAP_BY_TIME || select_age) {
+	fprintf(stderr, "heap_profile_init: Heap Profiling not built with AGE field in closures\n");
+	return 1;
+    }
+#endif /* ! HEAP_PROF_WITH_AGE */
+
+    /* process select strings -- will break them into bits */
+    
+    if (cc_select_str) {
+	char *comma, *colon;
+	while (cc_select_str && cc_select_no < MAX_SELECT) {
+            if ((comma = strchr(cc_select_str, ',')) != 0) {
+		*comma = '\0';
+	    }
+            if ((colon = strchr(cc_select_str, ':')) != 0) {
+                *colon = '\0';
+	        ccmod_select_strs[cc_select_no] = cc_select_str;
+	        cc_select_strs[cc_select_no++]  = colon + 1;
+	    } else {
+                ccmod_select_strs[cc_select_no] = (char *)0;
+	        cc_select_strs[cc_select_no++]  = cc_select_str;
+	    }
+	    if (comma) {
+		cc_select_str = comma + 1;
+	    } else {
+		cc_select_str = (char *)0;
+	    }
+	}
+	if (cc_select_str && cc_select_no >= MAX_SELECT) {
+	    fprintf(stderr, "heap_profile_init: Too many Cost Centres selected\n   %ld used %s remaining\n",
+		    cc_select_no, cc_select_str);
+	    return 1;
+	}
+	cc_select |= cc_select_no > 0;
+    }
+    if (mod_select_str) {
+	char *comma;
+	while ((comma = strchr(mod_select_str, ',')) && mod_select_no < MAX_SELECT) {
+	    mod_select_strs[mod_select_no++] = mod_select_str;
+	    *comma = '\0';
+	    mod_select_str = comma + 1;
+	}
+	if (mod_select_no < MAX_SELECT) {
+	    mod_select_strs[mod_select_no++] = mod_select_str;
+	} else {
+	    fprintf(stderr, "heap_profile_init: Too many Modules selected\n   %ld used %s remaining\n",
+		    mod_select_no, mod_select_str);
+	    return 1;
+	}
+	cc_select |= mod_select_no > 0;
+    }
+    if (grp_select_str) {
+	char *comma;
+	while ((comma = strchr(grp_select_str, ',')) && grp_select_no < MAX_SELECT) {
+	    grp_select_strs[grp_select_no++] = grp_select_str;
+	    *comma = '\0';
+	    grp_select_str = comma + 1;
+	}
+	if (grp_select_no < MAX_SELECT) {
+	    grp_select_strs[grp_select_no++] = grp_select_str;
+	} else {
+	    fprintf(stderr, "heap_profile_init: Too many Groups selected\n   %ld used %s remaining\n",
+		    grp_select_no, grp_select_str);
+	    return 1;
+	}
+	cc_select |= grp_select_no > 0;
+    }
+    
+    if (descr_select_str) {
+	char *comma;
+	while ((comma = strchr(descr_select_str, ',')) && descr_select_no < MAX_SELECT) {
+	    descr_select_strs[descr_select_no++] = descr_select_str;
+	    *comma = '\0';
+	    descr_select_str = comma + 1;
+	}
+	if (descr_select_no < MAX_SELECT) {
+	    descr_select_strs[descr_select_no++] = descr_select_str;
+	} else {
+	    fprintf(stderr, "heap_profile_init: Too many Closure Descriptions selected\n   %ld used %s remaining\n",
+		    descr_select_no, descr_select_str);
+	    return 1;
+	}
+	clcat_select |= descr_select_no > 0;
+    }
+    if (type_select_str) {
+	char *comma;
+	while ((comma = strchr(type_select_str, ',')) && type_select_no < MAX_SELECT) {
+	    type_select_strs[type_select_no++] = type_select_str;
+	    *comma = '\0';
+	    type_select_str = comma + 1;
+	}
+	if (type_select_no < MAX_SELECT) {
+	    type_select_strs[type_select_no++] = type_select_str;
+	} else {
+	    fprintf(stderr, "heap_profile_init: Too many Closure Types selected\n   %ld used %s remaining\n",
+		    type_select_no, type_select_str);
+	    return 1;
+	}
+	clcat_select |= type_select_no > 0;
+    }
+    if (kind_select_str) {
+	char *comma;
+	while ((comma = strchr(kind_select_str, ',')) != 0) {
+	    *comma = '\0';
+	    for (count = 1; kind_select_strs[count]; count++) {
+		if (strcmp(kind_select_strs[count],kind_select_str) == 0) {
+		    kind_selected[count] = 1;
+		    kind_select_no++;
+		    break;
+		}
+	    }
+	    if (! kind_select_strs[count]) {
+		fprintf(stderr, "heap_profile_init: Invalid Kind: %s\n", kind_select_str);
+		return 1;
+	    }
+	    kind_select_str = comma + 1;
+	}
+	for (count = 1; kind_select_strs[count]; count++) {
+	    if (strcmp(kind_select_strs[count],kind_select_str) == 0) {
+		kind_selected[count] = 1;
+		kind_select_no++;
+		break;
+	    }
+	}
+	if (! kind_select_strs[count]) {
+	    fprintf(stderr, "heap_profile_init: Invalid Kind: %s\n", kind_select_str);
+	    return 1;
+	}
+	clcat_select |= kind_select_no > 0;
+    }
+    age_select = select_age;
+
+    
+    /* open heap profiling log file */
+    
+    sprintf(heap_filename, HP_FILENAME_FMT, argv[0]);
+    if ( (heap_file = fopen(heap_filename,"w")) == NULL ) {
+	fprintf(stderr, "Can't open heap log file %s\n", heap_filename);
+	return 1;
+    }
+    
+    /* write start of log file */
+    
+    fprintf(heap_file, "JOB \"%s", argv[0]);
+    fprintf(heap_file, " +RTS -h%c", heap_profiling_char[heap_profiling_req]);
+    if (heap_profiling_req == HEAP_BY_TIME) {
+	fprintf(heap_file, "%ld", time_intervals);
+	if (earlier_ticks) {
+	    fprintf(heap_file, ",%3.1f",
+		    earlier_ticks / (StgFloat)TICK_FREQUENCY);
+	}
+    }
+    if (cc_select_no) {
+	fprintf(heap_file, " -c{%s:%s",
+		ccmod_select_strs[0], 
+		cc_select_strs[0]);
+	for (count = 1; count < cc_select_no; count++) {
+	    fprintf(heap_file, ",%s:%s",
+		    ccmod_select_strs[count],
+		    cc_select_strs[count]);
+	}
+	fprintf(heap_file, "}");
+    }
+    if (mod_select_no) {
+	fprintf(heap_file, " -m{%s", mod_select_strs[0]);
+	for (count = 1; count < mod_select_no; count++)
+	    fprintf(heap_file, ",%s", mod_select_strs[count]);
+	fprintf(heap_file, "}");
+    }
+    if (grp_select_no) {
+	fprintf(heap_file, " -g{%s", grp_select_strs[0]);
+	for (count = 1; count < grp_select_no; count++)
+	    fprintf(heap_file, ",%s", grp_select_strs[count]);
+	fprintf(heap_file, "}");
+    }
+    if (descr_select_no) {
+	fprintf(heap_file, " -d{%s", descr_select_strs[0]);
+	for (count = 1; count < descr_select_no; count++)
+	    fprintf(heap_file, ",%s", descr_select_strs[count]);
+	fprintf(heap_file, "}");
+    }
+    if (type_select_no) {
+	fprintf(heap_file, " -t{%s", type_select_strs[0]);
+	for (count = 1; count < type_select_no; count++)
+	    fprintf(heap_file, ",%s", type_select_strs[count]);
+	fprintf(heap_file, "}");
+    }
+    if (kind_select_no) {
+	fprintf(heap_file, " -k{");
+	for (count = 1, first = 1; kind_select_strs[count]; count++)
+	    if (kind_selected[count]) {
+		fprintf(heap_file, "%s%s", first?"":",", kind_select_strs[count]);
+		first = 0;
+	    }
+	fprintf(heap_file, "}");
+    }
+    if (select_age) {
+	fprintf(heap_file, " -a%ld", age_select);
+    }
+    fprintf(heap_file, " -i%4.2f -RTS", interval_ticks/(StgFloat)TICK_FREQUENCY);
+    for(count = 1; argv[count]; count++)
+	fprintf(heap_file, " %s", argv[count]);
+    fprintf(heap_file, "\"\n");
+
+    fprintf(heap_file, "DATE \"%s\"\n", time_str());
+    
+    fprintf(heap_file, "SAMPLE_UNIT \"seconds\"\n");
+    fprintf(heap_file, "VALUE_UNIT \"bytes\"\n");
+    
+    fprintf(heap_file, "BEGIN_SAMPLE 0.00\n");
+    fprintf(heap_file, "END_SAMPLE 0.00\n");
+
+    
+    /* initialise required heap profiling data structures & hashing */
+    
+    earlier_intervals = (earlier_ticks / interval_ticks) + 1;
+    max = (* init_index_fns[heap_profiling_req])();
+    resid = (I_ *) xmalloc(max * sizeof(I_));
+    for (count = 0; count < max; count++) resid[count] = 0;
+    
+    return 0;
+}
+\end{code}
+
+Cost centre selection is set up before a heap profile by running
+through the list of registered cost centres and memoising the
+selection in the cost centre record. It is only necessary to memoise
+the cost centre selection if a selection profiling function is
+being called.
+
+Category selection is determined when each closure is encountered. It
+is memoised within the category record. We always have to check that
+the memoisation has been done as we do not have a list of categories
+we can process before hand.
+
+Age selection is done for every closure -- not memoised.
+
+\begin{code}
+void
+set_selected_ccs()            /* set selection before we profile heap */
+{
+    I_ x;
+    CostCentre cc;
+
+    if (cc_select) {
+	for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered) {
+	    for (x = 0; ! cc->selected && x < cc_select_no; x++)
+		cc->selected = (strcmp(cc->label, cc_select_strs[x]) == 0) &&
+		               (strcmp(cc->module, ccmod_select_strs[x]) == 0);
+	    for (x = 0; ! cc->selected && x < mod_select_no; x++)
+		cc->selected = (strcmp(cc->module, mod_select_strs[x]) == 0);
+	    for (x = 0; ! cc->selected && x < grp_select_no; x++)
+		cc->selected = (strcmp(cc->group, grp_select_strs[x]) == 0);
+	}
+    } else {
+	for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered)
+	    cc->selected = 1;      /* true if ! cc_select */
+    }
+}
+
+
+I_
+selected_clcat(clcat)
+    ClCategory clcat;
+{
+    I_ x;
+
+    if (clcat->selected == -1) {     /* if not memoised check selection */
+	if (clcat_select) {
+	    clcat->selected = 0;
+	    for (x = 0; ! clcat->selected && x < descr_select_no; x++)
+		clcat->selected = (strcmp(clcat->descr, descr_select_strs[x]) == 0);
+	    for (x = 0; ! clcat->selected && x < type_select_no; x++)
+		clcat->selected = (strcmp(clcat->type, type_select_strs[x]) == 0);
+	    if (kind_select_no) clcat->selected |= kind_selected[clcat->kind];
+	} else {
+	    clcat->selected = 1;
+	}
+    }
+    return clcat->selected;          /* return memoised selection */
+} 
+\end{code}
+
+
+Profiling functions called for each closure. The appropriate function
+is stored in @heap_profile_fn@ by @heap_profile_setup@.
+@heap_profile_fn@ is called for each live closure by the macros
+embedded in the garbage collector. They increment the appropriate
+resident space counter by the size of the closure (less any profiling
+words).
+
+\begin{code}
+#define NON_PROF_HS (FIXED_HS - PROF_FIXED_HDR - AGE_FIXED_HDR)
+
+void
+profile_closure_none(closure,size)
+  P_ closure;
+  I_ size;
+{
+    return;
+}
+
+void
+profile_closure_cc(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc = (CostCentre) CC_HDR(closure);
+    resid[index_cc(cc)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_cc_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                   /* selection determined before profile */
+	return;                           /* all selected if ! cc_select         */
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+	return;
+
+#if defined(HEAP_PROF_WITH_AGE)
+    if (age_select) {
+	I_ age, ts = AGE_HDR(closure);
+
+	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	    AGE_HDR(closure) = (W_)current_interval;
+	    age = - age_select;
+	}
+	else {
+	    age = current_interval - ts - age_select;
+	}
+	if (age < 0) return;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    resid[index_cc(cc)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_mod(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc = (CostCentre) CC_HDR(closure);
+    resid[index_mod(cc)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_mod_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                       /* selection determined before profile */
+	return;
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+	return;
+
+#if defined(HEAP_PROF_WITH_AGE)
+    if (age_select) {
+	I_ age, ts = AGE_HDR(closure);
+
+	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	    AGE_HDR(closure) = (W_)current_interval;
+	    age = - age_select;
+	}
+	else {
+	    age = current_interval - ts - age_select;
+	}
+	if (age < 0) return;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    resid[index_mod(cc)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_grp(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc = (CostCentre) CC_HDR(closure);
+    resid[index_grp(cc)] += size + NON_PROF_HS;
+    return;
+}
+void
+profile_closure_grp_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                       /* selection determined before profile */
+	return;
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+	return;
+
+#if defined(HEAP_PROF_WITH_AGE)
+    if (age_select) {
+	I_ age, ts = AGE_HDR(closure);
+
+	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	    AGE_HDR(closure) = (W_)current_interval;
+	    age = - age_select;
+	}
+	else {
+	    age = current_interval - ts - age_select;
+	}
+	if (age < 0) return;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    resid[index_grp(cc)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_descr(closure,size)
+  P_ closure;
+  I_ size;
+{
+    ClCategory clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    resid[index_descr(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_descr_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                     /* selection determined before profile */
+	return;                             /* all selected if ! cc_select         */
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
+	return;
+
+#if defined(HEAP_PROF_WITH_AGE)
+    if (age_select) {
+	I_ age, ts = AGE_HDR(closure);
+
+	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	    AGE_HDR(closure) = (W_)current_interval;
+	    age = - age_select;
+	}
+	else {
+	    age = current_interval - ts - age_select;
+	}
+	if (age < 0) return;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    resid[index_descr(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_type(closure,size)
+  P_ closure;
+  I_ size;
+{
+    ClCategory clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    resid[index_type(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_type_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                     /* selection determined before profile */
+	return;                             /* all selected if ! cc_select         */
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
+	return;
+
+#if defined(HEAP_PROF_WITH_AGE)
+    if (age_select) {
+	I_ age, ts = AGE_HDR(closure);
+
+	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	    AGE_HDR(closure) = (W_)current_interval;
+	    age = - age_select;
+	}
+	else {
+	    age = current_interval - ts - age_select;
+	}
+	if (age < 0) return;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    resid[index_type(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_time(closure,size)
+  P_ closure;
+  I_ size;
+{
+#if defined(HEAP_PROF_WITH_AGE)
+    I_ ts = AGE_HDR(closure);
+
+    if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	AGE_HDR(closure) = (W_)current_interval;
+	ts = current_interval;
+    }
+
+    ts -= earlier_intervals;
+
+    if (ts < 0) {
+	resid_earlier +=  size + NON_PROF_HS;
+    }
+    else if (ts < time_intervals) {
+	resid[ts] +=  size + NON_PROF_HS;
+    }
+    else {
+	resid_later +=  size + NON_PROF_HS;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    return;
+}
+
+void
+profile_closure_time_select(closure,size)
+  P_ closure;
+  I_ size;
+{
+#if defined(HEAP_PROF_WITH_AGE)
+    CostCentre cc; ClCategory clcat; I_ age, ts;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                     /* selection determined before profile */
+	return;                             /* all selected if ! cc_select         */
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
+	return;
+
+    ts = AGE_HDR(closure);
+    if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
+	AGE_HDR(closure) = (W_)current_interval;
+	ts = current_interval;
+	age = - age_select;
+    }
+    else {
+	age = current_interval - ts - age_select;
+    }
+    if (age < 0)
+	return;
+
+    ts -= earlier_intervals;
+
+    if (ts < 0) {
+	resid_earlier +=  size + NON_PROF_HS;
+    }
+    else if (ts < time_intervals) {
+	resid[ts] +=  size + NON_PROF_HS;
+    }
+    else {
+	resid_later +=  size + NON_PROF_HS;
+    }
+#endif /* HEAP_PROF_WITH_AGE */
+
+    return;
+}
+\end{code}
+
+@heap_profile_setup@ is called before garbage collection to initialise
+for the profile. It assigns the appropriate closure profiling function
+to @heap_profile_fn@ and memoises any cost centre selection. If no
+profile is required @profile_closure_none@ is assigned.
+
+On completion of garbage collection @heap_profile_done@ is called. It
+produces a heap profile report and resets the residency counts to 0.
+
+\begin{code}
+
+void (* heap_profile_fn) PROTO((P_,I_)) = profile_closure_none;
+
+void (* profiling_fns_select[]) PROTO((P_,I_)) = {
+    profile_closure_none,
+    profile_closure_cc_select,
+    profile_closure_mod_select,
+    profile_closure_grp_select,
+    profile_closure_descr_select,
+    profile_closure_type_select,
+    profile_closure_time_select
+};
+
+void (* profiling_fns[]) PROTO((P_,I_)) = {
+    profile_closure_none,
+    profile_closure_cc,
+    profile_closure_mod,
+    profile_closure_grp,
+    profile_closure_descr,
+    profile_closure_type,
+    profile_closure_time
+};
+
+void
+heap_profile_setup(STG_NO_ARGS)      /* called at start of heap profile */
+{
+    if (heap_profiling_req == HEAP_NO_PROFILING)
+	return;
+
+    if (cc_select || clcat_select || age_select) {
+	set_selected_ccs();               /* memoise cc selection */
+	heap_profile_fn = profiling_fns_select[heap_profiling_req];
+    } else {
+	heap_profile_fn = profiling_fns[heap_profiling_req];
+    }
+}
+
+void
+heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
+{
+    CostCentre cc; ClCategory clcat; hash_t ind, max;
+    StgFloat seconds;
+
+    if (heap_profiling_req == HEAP_NO_PROFILING)
+	return;
+
+    heap_profile_fn = profile_closure_none;
+
+    seconds = (previous_ticks + current_ticks) / (StgFloat)TICK_FREQUENCY;
+    fprintf(heap_file, "BEGIN_SAMPLE %0.2f\n", seconds);
+
+    max = (* init_index_fns[heap_profiling_req])();
+
+    switch (heap_profiling_req) {
+      case HEAP_BY_CC:
+	for (ind = 0; ind < max; ind++) {
+	    if ((cc = index_cc_table[ind]) != 0) {
+		fprintf(heap_file, "  %0.11s:%0.16s %ld\n", cc->module, cc->label, resid[ind] * sizeof(W_));
+	    }
+	    resid[ind] = 0;
+	}
+	break;
+
+      case HEAP_BY_MOD:
+	for (ind = 0; ind < max; ind++) {
+	    if ((cc = index_mod_table[ind]) != 0) {
+		fprintf(heap_file, "  %0.11s %ld\n", cc->module, resid[ind] * sizeof(W_));
+	    }
+	    resid[ind] = 0;
+	}
+	break;
+
+      case HEAP_BY_GRP:
+	for (ind = 0; ind < max; ind++) {
+	    if ((cc = index_grp_table[ind]) != 0) {
+		fprintf(heap_file, "  %0.11s %ld\n", cc->group, resid[ind] * sizeof(W_));
+	    }
+	    resid[ind] = 0;
+	}
+	break;
+
+      case HEAP_BY_DESCR:
+	for (ind = 0; ind < max; ind++) {
+	    if ((clcat = index_descr_table[ind]) != 0) {
+		fprintf(heap_file, "  %0.28s %ld\n", clcat->descr, resid[ind] * sizeof(W_));
+	    }
+	    resid[ind] = 0;
+	}
+	break;
+
+      case HEAP_BY_TYPE:
+	for (ind = 0; ind < max; ind++) {
+	    if ((clcat = index_type_table[ind]) != 0) {
+		fprintf(heap_file, "  %0.28s %ld\n", clcat->type, resid[ind] * sizeof(W_));
+	    }
+	    resid[ind] = 0;
+	}
+	break;
+
+#if defined(HEAP_PROF_WITH_AGE)
+      case HEAP_BY_TIME:
+	{ I_ resid_tot = 0;
+	  if (resid_earlier) {
+	      resid_tot += resid_earlier;
+	      fprintf(heap_file, "  before_%4.2fs %ld\n",
+		      (earlier_intervals-1)*interval_ticks/(StgFloat)TICK_FREQUENCY,
+		      resid_earlier * sizeof(StgWord));
+	      resid_earlier = 0;
+	  }
+	  for (ind = 0; ind < max; ind++) {
+	      if (resid[ind]) {
+		  resid_tot +=  resid[ind];
+		  fprintf(heap_file, "  before_%4.2fs %ld\n",
+			  (ind+earlier_intervals)*interval_ticks/(StgFloat)TICK_FREQUENCY,
+			  resid[ind] * sizeof(StgWord));
+		  resid[ind] = 0;
+	      }
+	  }
+	  if (resid_later) {
+	      resid_tot += resid_later;
+	      fprintf(heap_file, "  later %ld\n", resid_later * sizeof(StgWord));
+	      resid_later = 0;
+	  }
+
+	  if (resid_max < resid_tot) resid_max = resid_tot;
+	  break;
+        }
+#endif /* HEAP_PROF_WITH_AGE */
+    }
+
+    fprintf(heap_file, "END_SAMPLE %0.2f\n", seconds);
+    fflush(heap_file);
+}
+
+void
+heap_profile_finish(STG_NO_ARGS)     /* called at end of execution */
+{
+    StgFloat seconds;
+
+    if (heap_profiling_req == HEAP_NO_PROFILING)
+	return;
+
+    seconds = (previous_ticks + current_ticks) / (StgFloat)TICK_FREQUENCY;
+    fprintf(heap_file, "BEGIN_SAMPLE %0.2f\n", seconds);
+    fprintf(heap_file, "END_SAMPLE %0.2f\n", seconds);
+    fclose(heap_file);
+
+    return;
+}
+\end{code}
+
+\begin{code}
+#endif /* USE_COST_CENTRES */
+\end{code}

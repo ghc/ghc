@@ -1,0 +1,48 @@
+Renamer-pass4:
+module Test (
+	Test.., Rn017..
+    ) where
+infixl 7 PreludeRatio.%
+infixl 9 PreludeArray.//
+infixr 8 PreludeBasic.^
+infixr 8 PreludeBasic.^^
+infix  5 PreludeList.\\
+data Test.Foo
+    = Test.MkFoo
+data Bar.Wibble
+    = Bar.MkWibble Burf.Wobble
+data Burf.Wobble 
+class Test.FOO a where
+    op{op 1 cls Test.FOO} :: a -> Int
+instance Test.FOO Test.Foo where
+    op{op 1 cls Test.FOO}
+	x = 42
+{- nonrec -}
+Test.f
+    x = x
+PreludeRatio.% :: Integral a => a -> a -> Ratio a
+PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
+PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
+PreludeBasic.^ :: (Num b, Integral a) => b -> a -> b
+PreludeBasic.^^ :: (Fractional b, Integral a) => b -> a -> b
+Bar.a :: Int -> Int
+Bar.b :: Int -> Int
+Rn017.c :: Int -> Int
+interface Test where
+import Bar(Wibble(..), a, b)
+import Burf(Wobble(..))
+import Rn017(c)
+a :: Int -> Int
+b :: Int -> Int
+c :: Int -> Int
+f :: a -> a
+	{-# ARITY f = 1 #-}
+class FOO a where
+	op :: a -> Int
+		{-# ARITY op = 1 #-}
+data Foo = MkFoo
+data Wibble = MkWibble Wobble
+data Wobble 
+instance FOO Foo
+	{-# ARITY op = 1 #-}
+

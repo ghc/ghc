@@ -1,0 +1,25 @@
+Typechecked:
+{- nonrec -}
+(M.EQ.===) =
+    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> (===.t1)
+sdsel.M.EQ.M.ORD =
+    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> d.M.ORD.t2
+sdsel.M.EQ.Text =
+    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> d.Text.t3
+{- nonrec -}
+defm.M.EQ.=== =
+    /\ a.t4 ->
+	\{-dict-} d.M.EQ.t5 ->
+	    (error (a.t4 -> a.t4 -> Bool))
+		"No default method for \"M.EQ.defm.M.EQ.===\"\n"
+{- nonrec -}
+sdsel.M.ORD.Num = /\ a.t6 -> \{-classdict-} [d.Num.t7] [] -> d.Num.t7
+{- nonrec -}
+
+=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= M
+interface M where
+class (ORD a, Text a) => EQ a where (===) :: a -> a -> Bool
+class (Num a) => ORD a
+data NUM = ONE | TWO
+=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
+

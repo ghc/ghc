@@ -1,0 +1,127 @@
+\section[storage-manager-check]{Checking Consistency of Storage Manager}
+
+This code performs consistency/sanity checks on the stacks and heap.
+It can be called each time round the mini-interpreter loop.  Not
+required if we're tail-jumping (no mini-interpreter).
+
+\begin{code}
+
+#if ! ( defined(__STG_TAILJUMPS__) && defined(__GNUC__) )
+
+/* Insist on the declaration of STG-machine registers */
+#define MAIN_REG_MAP
+
+#include "SMinternal.h"
+
+#define isHeapPtr(p) \
+    ((p) >= heap_space && (p) < heap_space + SM_word_heap_size)
+
+#if nextstep2_TARGET_OS || nextstep3_TARGET_OS /* ToDo: use END_BY_FUNNY_MEANS or something */
+#define validInfoPtr(i) \
+    ((i) < (StgPtr) (get_end_result) /* && MIN_INFO_TYPE < INFO_TYPE(i) && INFO_TYPE(i) < MAX_INFO_TYPE */)
+        /* No Internal info tables allowed (type -1) */
+
+#else /* non-NeXT */
+#define validInfoPtr(i) \
+    ((i) < (P_) &end /* && MIN_INFO_TYPE < INFO_TYPE(i) && INFO_TYPE(i) < MAX_INFO_TYPE */)
+        /* No Internal info tables allowed (type -1) */
+
+#endif /* non-NeXT */
+
+#define suspectPtr(p) ((p) < (P_)256)
+
+#if defined(GC2s)
+#define validHeapPtr(p) \
+    ((p) >= semispaceInfo[semispace].base && (p) <= semispaceInfo[semispace].lim)
+#else
+#if defined(GC1s)
+#define validHeapPtr(p) \
+    ((p) >= compactingInfo.base && (p) <= compactingInfo.lim)
+#else
+#if defined(GCdu)
+#define validHeapPtr(p) \
+    ((p) >= dualmodeInfo.modeinfo[dualmodeInfo.mode].base && \
+     (p) <= dualmodeInfo.modeinfo[dualmodeInfo.mode].lim)
+
+#else
+#if defined(GCap)
+/* Two cases needed, depending on whether the 2-space GC is forced
+   SLPJ 17 June 93 */
+#define validHeapPtr(p)							\
+    (SM_force_gc == USE_2s ? 						\
+	    ((p) >= appelInfo.space[appelInfo.semi_space].base && 	\
+	     (p) <= appelInfo.space[appelInfo.semi_space].lim) :	\
+	    (((p) >= appelInfo.oldbase && (p) <= appelInfo.oldlim) ||	\
+	     ((p) >= appelInfo.newbase && (p) <= appelInfo.newlim))	\
+    )
+
+#else
+#if defined(GCgn)
+#define validHeapPtr(p) \
+    (((p) >= genInfo.oldbase && (p) <= genInfo.oldlim) || \
+     ((p) >= genInfo.newgen[genInfo.curnew].newbase && (p) <= genInfo.newgen[genInfo.curnew].newlim) || \
+     ((p) >= genInfo.allocbase && (p) <= genInfo.alloclim))
+#else
+#define validHeapPtr(p) 0
+#endif
+#endif
+#endif
+#endif
+#endif
+
+
+void checkAStack(STG_NO_ARGS)
+{
+    PP_	stackptr;
+    P_	closurePtr;
+    P_	infoPtr;
+    I_	error = 0;
+
+    if (SuB > SpB + 1) {
+	fprintf(stderr, "SuB (%lx) > SpB (%lx)\n", (W_) SuB, (W_) SpB);
+	error = 1;
+    }
+    if (SuA < SpA) {
+	fprintf(stderr, "SuA (%lx) < SpA (%lx)\n", (W_) SuA, (W_) SpA);
+	error = 1;
+    }
+
+    for (stackptr = SpA;
+	 SUBTRACT_A_STK(stackptr, stackInfo.botA) >= 0;
+	 stackptr = stackptr + AREL(1)) {
+
+	closurePtr = (P_) *stackptr;
+
+	if (suspectPtr(closurePtr)) {
+	    fprintf(stderr, "Suspect heap ptr on A stk; SpA %lx, sp %lx, ptr %lx\n",
+		    (W_) SpA, (W_) stackptr, (W_) closurePtr);
+	    error = 1;
+
+	} else if (isHeapPtr(closurePtr) && ! validHeapPtr(closurePtr)) {
+
+	    fprintf(stderr, "Bad heap ptr on A stk; SpA %lx, sp %lx, ptr %lx\n",
+		    (W_) SpA, (W_) stackptr, (W_) closurePtr);
+	    error = 1;
+
+	} else {
+	    infoPtr = (P_) *closurePtr;
+
+	    if (suspectPtr(infoPtr)) {
+		fprintf(stderr, "Suspect info ptr on A stk; SpA %lx, sp %lx, closure %lx info %lx\n",
+		    (W_) SpA, (W_) stackptr, (W_) closurePtr, (W_) infoPtr);
+		error = 1;
+
+	    } else if ( ! validInfoPtr(infoPtr)) {
+		fprintf(stderr, "Bad info ptr in A stk; SpA %lx, sp %lx, closure %lx, info %lx\n",
+			(W_) SpA, (W_) stackptr, (W_) closurePtr, (W_) infoPtr/* , INFO_TYPE(infoPtr) */);
+		error = 1;
+	    }
+	}
+    }
+
+    if (error) abort();
+}
+
+#endif /* ! ( defined(__STG_TAILJUMPS__) && defined(__GNUC__) ) */
+
+\end{code}

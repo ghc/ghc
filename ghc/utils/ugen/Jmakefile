@@ -1,0 +1,26 @@
+/* SRCS_C is for mkdependC's benefit */
+/* lex.c is from lex.l
+   syntax.tab.c is from syntax.y
+   tree.c is from tree.u (but a version is provided for bootstrapping)
+
+   if it tries to run "ugen tree.u" while trying to build here, then
+   you are what is technically known as "dead in the water".
+*/
+YFLAGS = -d
+
+SRCS_C = main.c gen.c lex.c syntax.tab.c id.c tree.c yyerror.c
+OBJS_C = main.o gen.o lex.o syntax.tab.o id.o tree.o yyerror.o
+
+SuffixRule_c_o()
+
+BuildPgmFromCFiles(ugen,$(OBJS_C),,)
+
+/* InstallBinaryTarget(ugen,$(INSTBINDIR)) */
+
+YaccRunWithExpectMsg(syntax,no,no)
+
+UgenTarget(tree)
+
+CDependTarget( $(SRCS_C) )
+
+ExtraStuffToBeVeryClean( $(STD_VERY_CLEAN) lex.c syntax.tab.c syntax.tab.h )

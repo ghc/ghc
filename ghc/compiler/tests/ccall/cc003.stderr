@@ -1,0 +1,15 @@
+Typechecked:
+AbsBinds [] [] [(fubar.t439, Main.fubar{-r79-})]
+    {- nonrec -}
+    fubar.t439 :: IoWorld -> (Int, IoWorld)
+    fubar.t439
+	= (thenIO_{-r99-} [bpv83, Int]) (ccall  f [bpv83] ) (ccall  b [Int] )
+{- nonrec -}
+{- nonrec -}
+Desugared:
+
+Fail: panic! (the `impossible' happened):
+	getBoxedPrimTypeInfo: bpv83
+
+Please report it as a compiler bug to glasgow-haskell-bugs@dcs.glasgow.ac.uk.
+

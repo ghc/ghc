@@ -1,0 +1,798 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface AbsSyn where
+import AbsSynFuns(cmpInstanceTypes, collectBinders, collectMonoBinders, collectMonoBindersAndLocs, collectPatBinders, collectQualBinders, collectTopLevelBinders, collectTypedBinders, collectTypedPatBinders, extractMonoTyNames, getNonPrelOuterTyCon, mkDictApp, mkDictLam, mkTyApp, mkTyLam)
+import Bag(Bag)
+import BasicLit(BasicLit)
+import BinderInfo(BinderInfo, DuplicationDanger, FunOrArg, InsideSCC)
+import CharSeq(CSeq)
+import Class(Class, ClassOp, cmpClass)
+import CmdLineOpts(GlobalSwitch)
+import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import FiniteMap(FiniteMap)
+import HsBinds(Bind(..), Binds(..), MonoBinds(..), ProtoNameBind(..), ProtoNameBinds(..), ProtoNameClassOpSig(..), ProtoNameMonoBinds(..), ProtoNameSig(..), RenamedBind(..), RenamedBinds(..), RenamedClassOpSig(..), RenamedMonoBinds(..), RenamedSig(..), Sig(..), TypecheckedBind(..), TypecheckedBinds(..), TypecheckedMonoBinds(..), nullBinds, nullMonoBinds)
+import HsCore(UfCostCentre, UfId, UnfoldingCoreAlts, UnfoldingCoreAtom, UnfoldingCoreBinding, UnfoldingCoreExpr, UnfoldingPrimOp)
+import HsDecls(ClassDecl(..), ConDecl(..), DataTypeSig(..), DefaultDecl(..), FixityDecl(..), InstDecl(..), ProtoNameClassDecl(..), ProtoNameConDecl(..), ProtoNameDataTypeSig(..), ProtoNameDefaultDecl(..), ProtoNameFixityDecl(..), ProtoNameInstDecl(..), ProtoNameSpecialisedInstanceSig(..), ProtoNameTyDecl(..), RenamedClassDecl(..), RenamedConDecl(..), RenamedDataTypeSig(..), RenamedDefaultDecl(..), RenamedFixityDecl(..), RenamedInstDecl(..), RenamedSpecialisedInstanceSig(..), RenamedTyDecl(..), SpecialisedInstanceSig(..), TyDecl(..), eqConDecls)
+import HsExpr(ArithSeqInfo(..), Expr(..), ProtoNameArithSeqInfo(..), ProtoNameExpr(..), ProtoNameQual(..), Qual(..), RenamedArithSeqInfo(..), RenamedExpr(..), RenamedQual(..), TypecheckedArithSeqInfo(..), TypecheckedExpr(..), TypecheckedQual(..))
+import HsImpExp(IE(..), IfaceImportDecl(..), ImExportListInfo(..), ImportedInterface(..), Interface(..), ProtoNameImportedInterface(..), ProtoNameInterface(..), RenamedImportedInterface(..), RenamedInterface(..), Renaming(..), getIEStrings, getRawIEStrings)
+import HsLit(Literal(..), negLiteral)
+import HsMatches(GRHS(..), GRHSsAndBinds(..), Match(..), ProtoNameGRHS(..), ProtoNameGRHSsAndBinds(..), ProtoNameMatch(..), RenamedGRHS(..), RenamedGRHSsAndBinds(..), RenamedMatch(..), TypecheckedGRHS(..), TypecheckedGRHSsAndBinds(..), TypecheckedMatch(..))
+import HsPat(InPat(..), ProtoNamePat(..), RenamedPat(..), TypecheckedPat(..), irrefutablePat, isConPat, isLitPat, patsAreAllCons, patsAreAllLits, typeOfPat, unfailablePat, unfailablePats)
+import HsPragmas(ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas, ImpStrictness, ImpUnfolding, InstancePragmas, ProtoNameClassOpPragmas(..), ProtoNameClassPragmas(..), ProtoNameDataPragmas(..), ProtoNameGenPragmas(..), ProtoNameInstancePragmas(..), RenamedClassOpPragmas(..), RenamedClassPragmas(..), RenamedDataPragmas(..), RenamedGenPragmas(..), RenamedInstancePragmas(..), TypePragmas)
+import HsTypes(ClassAssertion(..), Context(..), MonoType(..), PolyType(..), ProtoNameContext(..), ProtoNameMonoType(..), ProtoNamePolyType(..), RenamedContext(..), RenamedMonoType(..), RenamedPolyType(..), cmpPolyType, eqMonoType, pprContext)
+import Id(DictVar(..), Id, IdDetails)
+import IdEnv(IdEnv(..))
+import IdInfo(ArgUsage, ArgUsageInfo, ArityInfo, DeforestInfo, Demand, DemandInfo, FBConsum, FBProd, FBType, FBTypeInfo, IdInfo, OptIdInfo(..), SpecEnv, SpecInfo, StrictnessInfo, UpdateInfo)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import InstEnv(InstTemplate)
+import Maybes(Labda)
+import Name(Name(..))
+import NameTypes(FullName, Provenance, ShortName)
+import Outputable(ExportFlag, NamedThing(..), Outputable(..))
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp, pprPrimOp)
+import ProtoName(ProtoName)
+import RenameAuxFuns(PreludeNameFun(..))
+import SimplEnv(UnfoldingDetails, UnfoldingGuidance)
+import SrcLoc(SrcLoc)
+import TyCon(Arity(..), TyCon, cmpTyCon)
+import TyVar(TyVar, TyVarTemplate, cmpTyVar)
+import UniType(TauType(..), UniType, cmpUniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+class OptIdInfo a where
+	noInfo :: a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) -> _APP_  _TYAPP_  patError# { u0 } [ _NOREP_S_ "%DIdInfo.OptIdInfo.noInfo\"" ] _N_ #-}
+	getInfo :: IdInfo -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: IdInfo) -> _APP_  _TYAPP_  patError# { (IdInfo -> u0) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.getInfo\"", u2 ] _N_ #-}
+	addInfo :: IdInfo -> a -> IdInfo
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: IdInfo) (u3 :: u0) -> _APP_  _TYAPP_  patError# { (IdInfo -> u0 -> IdInfo) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.addInfo\"", u2, u3 ] _N_ #-}
+	ppInfo :: PprStyle -> (Id -> Id) -> a -> Int -> Bool -> PrettyRep
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122222 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 6 _U_ 022222 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 6 XXXXXX 7 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: PprStyle) (u3 :: Id -> Id) (u4 :: u0) (u5 :: Int) (u6 :: Bool) -> _APP_  _TYAPP_  patError# { (PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.ppInfo\"", u2, u3, u4, u5, u6 ] _N_ #-}
+class NamedThing a where
+	getExportFlag :: a -> ExportFlag
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> ExportFlag) } [ _NOREP_S_ "%DOutputable.NamedThing.getExportFlag\"", u2 ] _N_ #-}
+	isLocallyDefined :: a -> Bool
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.isLocallyDefined\"", u2 ] _N_ #-}
+	getOrigName :: a -> (_PackedString, _PackedString)
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> (_PackedString, _PackedString)) } [ _NOREP_S_ "%DOutputable.NamedThing.getOrigName\"", u2 ] _N_ #-}
+	getOccurrenceName :: a -> _PackedString
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> _PackedString) } [ _NOREP_S_ "%DOutputable.NamedThing.getOccurrenceName\"", u2 ] _N_ #-}
+	getInformingModules :: a -> [_PackedString]
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u6; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u2 ] _N_ #-}
+	getSrcLoc :: a -> SrcLoc
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u7; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> SrcLoc) } [ _NOREP_S_ "%DOutputable.NamedThing.getSrcLoc\"", u2 ] _N_ #-}
+	getTheUnique :: a -> Unique
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u8; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u2 ] _N_ #-}
+	hasType :: a -> Bool
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> u9; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u2 ] _N_ #-}
+	getType :: a -> UniType
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> ua; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u2 ] _N_ #-}
+	fromPreludeCore :: a -> Bool
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> ExportFlag, u0 -> Bool, u0 -> (_PackedString, _PackedString), u0 -> _PackedString, u0 -> [_PackedString], u0 -> SrcLoc, u0 -> Unique, u0 -> Bool, u0 -> UniType, u0 -> Bool)) -> case u1 of { _ALG_ _TUP_10 (u2 :: u0 -> ExportFlag) (u3 :: u0 -> Bool) (u4 :: u0 -> (_PackedString, _PackedString)) (u5 :: u0 -> _PackedString) (u6 :: u0 -> [_PackedString]) (u7 :: u0 -> SrcLoc) (u8 :: u0 -> Unique) (u9 :: u0 -> Bool) (ua :: u0 -> UniType) (ub :: u0 -> Bool) -> ub; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.fromPreludeCore\"", u2 ] _N_ #-}
+class Outputable a where
+	ppr :: PprStyle -> a -> Int -> Bool -> PrettyRep
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12222 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: PprStyle -> u0 -> Int -> Bool -> PrettyRep) -> u1 _N_
+		{-defm-} _A_ 5 _U_ 02222 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 5 XXXXX 6 _/\_ u0 -> \ (u1 :: {{Outputable u0}}) (u2 :: PprStyle) (u3 :: u0) (u4 :: Int) (u5 :: Bool) -> _APP_  _TYAPP_  patError# { (PprStyle -> u0 -> Int -> Bool -> PrettyRep) } [ _NOREP_S_ "%DOutputable.Outputable.ppr\"", u2, u3, u4, u5 ] _N_ #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
+data BinderInfo 	{-# GHC_PRAGMA DeadCode | ManyOcc Int | OneOcc FunOrArg DuplicationDanger InsideSCC Int Int #-}
+data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+data ClassOp 	{-# GHC_PRAGMA MkClassOp _PackedString Int UniType #-}
+data CoreAtom a 	{-# GHC_PRAGMA CoVarAtom a | CoLitAtom BasicLit #-}
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}
+data Bind a b   = EmptyBind | NonRecBind (MonoBinds a b) | RecBind (MonoBinds a b)
+data Binds a b   = EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b)
+data MonoBinds a b   = EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc
+type ProtoNameBind = Bind ProtoName (InPat ProtoName)
+type ProtoNameBinds = Binds ProtoName (InPat ProtoName)
+type ProtoNameClassOpSig = Sig ProtoName
+type ProtoNameMonoBinds = MonoBinds ProtoName (InPat ProtoName)
+type ProtoNameSig = Sig ProtoName
+type RenamedBind = Bind Name (InPat Name)
+type RenamedBinds = Binds Name (InPat Name)
+type RenamedClassOpSig = Sig Name
+type RenamedMonoBinds = MonoBinds Name (InPat Name)
+type RenamedSig = Sig Name
+data Sig a   = Sig a (PolyType a) (GenPragmas a) SrcLoc | ClassOpSig a (PolyType a) (ClassOpPragmas a) SrcLoc | SpecSig a (PolyType a) (Labda a) SrcLoc | InlineSig a UnfoldingGuidance SrcLoc | DeforestSig a SrcLoc | MagicUnfoldingSig a _PackedString SrcLoc
+type TypecheckedBind = Bind Id TypecheckedPat
+type TypecheckedBinds = Binds Id TypecheckedPat
+type TypecheckedMonoBinds = MonoBinds Id TypecheckedPat
+data UfCostCentre a 	{-# GHC_PRAGMA UfPreludeDictsCC Bool | UfAllDictsCC _PackedString _PackedString Bool | UfUserCC _PackedString _PackedString _PackedString Bool Bool | UfAutoCC (UfId a) _PackedString _PackedString Bool Bool | UfDictCC (UfId a) _PackedString _PackedString Bool Bool #-}
+data UnfoldingCoreAtom a 	{-# GHC_PRAGMA UfCoVarAtom (UfId a) | UfCoLitAtom BasicLit #-}
+data UnfoldingCoreExpr a 	{-# GHC_PRAGMA UfCoVar (UfId a) | UfCoLit BasicLit | UfCoCon a [PolyType a] [UnfoldingCoreAtom a] | UfCoPrim (UnfoldingPrimOp a) [PolyType a] [UnfoldingCoreAtom a] | UfCoLam [(a, PolyType a)] (UnfoldingCoreExpr a) | UfCoTyLam a (UnfoldingCoreExpr a) | UfCoApp (UnfoldingCoreExpr a) (UnfoldingCoreAtom a) | UfCoTyApp (UnfoldingCoreExpr a) (PolyType a) | UfCoCase (UnfoldingCoreExpr a) (UnfoldingCoreAlts a) | UfCoLet (UnfoldingCoreBinding a) (UnfoldingCoreExpr a) | UfCoSCC (UfCostCentre a) (UnfoldingCoreExpr a) #-}
+data UnfoldingPrimOp a 	{-# GHC_PRAGMA UfCCallOp _PackedString Bool Bool [PolyType a] (PolyType a) | UfOtherOp PrimOp #-}
+data ClassDecl a b   = ClassDecl [(a, a)] a a [Sig a] (MonoBinds a b) (ClassPragmas a) SrcLoc
+data ConDecl a   = ConDecl a [MonoType a] SrcLoc
+data DataTypeSig a   = AbstractTypeSig a SrcLoc | SpecDataSig a (MonoType a) SrcLoc
+data DefaultDecl a   = DefaultDecl [MonoType a] SrcLoc
+data FixityDecl a   = InfixL a Int | InfixR a Int | InfixN a Int
+data InstDecl a b   = InstDecl [(a, a)] a (MonoType a) (MonoBinds a b) Bool _PackedString _PackedString [Sig a] (InstancePragmas a) SrcLoc
+type ProtoNameClassDecl = ClassDecl ProtoName (InPat ProtoName)
+type ProtoNameConDecl = ConDecl ProtoName
+type ProtoNameDataTypeSig = DataTypeSig ProtoName
+type ProtoNameDefaultDecl = DefaultDecl ProtoName
+type ProtoNameFixityDecl = FixityDecl ProtoName
+type ProtoNameInstDecl = InstDecl ProtoName (InPat ProtoName)
+type ProtoNameSpecialisedInstanceSig = SpecialisedInstanceSig ProtoName
+type ProtoNameTyDecl = TyDecl ProtoName
+type RenamedClassDecl = ClassDecl Name (InPat Name)
+type RenamedConDecl = ConDecl Name
+type RenamedDataTypeSig = DataTypeSig Name
+type RenamedDefaultDecl = DefaultDecl Name
+type RenamedFixityDecl = FixityDecl Name
+type RenamedInstDecl = InstDecl Name (InPat Name)
+type RenamedSpecialisedInstanceSig = SpecialisedInstanceSig Name
+type RenamedTyDecl = TyDecl Name
+data SpecialisedInstanceSig a   = InstSpecSig a (MonoType a) SrcLoc
+data TyDecl a   = TyData [(a, a)] a [a] [ConDecl a] [a] (DataPragmas a) SrcLoc | TySynonym a [a] (MonoType a) TypePragmas SrcLoc
+data ArithSeqInfo a b   = From (Expr a b) | FromThen (Expr a b) (Expr a b) | FromTo (Expr a b) (Expr a b) | FromThenTo (Expr a b) (Expr a b) (Expr a b)
+data Expr a b   = Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id
+type ProtoNameArithSeqInfo = ArithSeqInfo ProtoName (InPat ProtoName)
+type ProtoNameExpr = Expr ProtoName (InPat ProtoName)
+type ProtoNameQual = Qual ProtoName (InPat ProtoName)
+data Qual a b   = GeneratorQual b (Expr a b) | FilterQual (Expr a b)
+type RenamedArithSeqInfo = ArithSeqInfo Name (InPat Name)
+type RenamedExpr = Expr Name (InPat Name)
+type RenamedQual = Qual Name (InPat Name)
+type TypecheckedArithSeqInfo = ArithSeqInfo Id TypecheckedPat
+type TypecheckedExpr = Expr Id TypecheckedPat
+type TypecheckedQual = Qual Id TypecheckedPat
+data IE   = IEVar _PackedString | IEThingAbs _PackedString | IEThingAll _PackedString | IEConWithCons _PackedString [_PackedString] | IEClsWithOps _PackedString [_PackedString] | IEModuleContents _PackedString
+data IfaceImportDecl   = IfaceImportDecl _PackedString [IE] [Renaming] SrcLoc
+type ImExportListInfo = (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())
+data ImportedInterface a b   = ImportAll (Interface a b) [Renaming] | ImportSome (Interface a b) [IE] [Renaming] | ImportButHide (Interface a b) [IE] [Renaming]
+data Interface a b   = MkInterface _PackedString [IfaceImportDecl] [FixityDecl a] [TyDecl a] [ClassDecl a b] [InstDecl a b] [Sig a] SrcLoc
+type ProtoNameImportedInterface = ImportedInterface ProtoName (InPat ProtoName)
+type ProtoNameInterface = Interface ProtoName (InPat ProtoName)
+type RenamedImportedInterface = ImportedInterface Name (InPat Name)
+type RenamedInterface = Interface Name (InPat Name)
+data Renaming   = MkRenaming _PackedString _PackedString
+data Literal   = CharLit Char | CharPrimLit Char | StringLit _PackedString | StringPrimLit _PackedString | IntLit Integer | FracLit (Ratio Integer) | LitLitLitIn _PackedString | LitLitLit _PackedString UniType | IntPrimLit Integer | FloatPrimLit (Ratio Integer) | DoublePrimLit (Ratio Integer)
+data GRHS a b   = GRHS (Expr a b) (Expr a b) SrcLoc | OtherwiseGRHS (Expr a b) SrcLoc
+data GRHSsAndBinds a b   = GRHSsAndBindsIn [GRHS a b] (Binds a b) | GRHSsAndBindsOut [GRHS a b] (Binds a b) UniType
+data Match a b   = PatMatch b (Match a b) | GRHSMatch (GRHSsAndBinds a b)
+type ProtoNameGRHS = GRHS ProtoName (InPat ProtoName)
+type ProtoNameGRHSsAndBinds = GRHSsAndBinds ProtoName (InPat ProtoName)
+type ProtoNameMatch = Match ProtoName (InPat ProtoName)
+type RenamedGRHS = GRHS Name (InPat Name)
+type RenamedGRHSsAndBinds = GRHSsAndBinds Name (InPat Name)
+type RenamedMatch = Match Name (InPat Name)
+type TypecheckedGRHS = GRHS Id TypecheckedPat
+type TypecheckedGRHSsAndBinds = GRHSsAndBinds Id TypecheckedPat
+type TypecheckedMatch = Match Id TypecheckedPat
+data InPat a   = WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal
+type ProtoNamePat = InPat ProtoName
+type RenamedPat = InPat Name
+data TypecheckedPat   = WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat)
+data ClassOpPragmas a 	{-# GHC_PRAGMA NoClassOpPragmas | ClassOpPragmas (GenPragmas a) (GenPragmas a) #-}
+data ClassPragmas a 	{-# GHC_PRAGMA NoClassPragmas | SuperDictPragmas [GenPragmas a] #-}
+data DataPragmas a 	{-# GHC_PRAGMA DataPragmas [ConDecl a] [[Labda (MonoType a)]] #-}
+data GenPragmas a 	{-# GHC_PRAGMA NoGenPragmas | GenPragmas (Labda Int) (Labda UpdateInfo) DeforestInfo (ImpStrictness a) (ImpUnfolding a) [([Labda (MonoType a)], Int, GenPragmas a)] #-}
+data InstancePragmas a 	{-# GHC_PRAGMA NoInstancePragmas | SimpleInstancePragma (GenPragmas a) | ConstantInstancePragma (GenPragmas a) [(a, GenPragmas a)] | SpecialisedInstancePragma (GenPragmas a) [([Labda (MonoType a)], Int, InstancePragmas a)] #-}
+type ProtoNameClassOpPragmas = ClassOpPragmas ProtoName
+type ProtoNameClassPragmas = ClassPragmas ProtoName
+type ProtoNameDataPragmas = DataPragmas ProtoName
+type ProtoNameGenPragmas = GenPragmas ProtoName
+type ProtoNameInstancePragmas = InstancePragmas ProtoName
+type RenamedClassOpPragmas = ClassOpPragmas Name
+type RenamedClassPragmas = ClassPragmas Name
+type RenamedDataPragmas = DataPragmas Name
+type RenamedGenPragmas = GenPragmas Name
+type RenamedInstancePragmas = InstancePragmas Name
+data TypePragmas 	{-# GHC_PRAGMA NoTypePragmas | AbstractTySynonym #-}
+type ClassAssertion a = (a, a)
+type Context a = [(a, a)]
+data MonoType a   = MonoTyVar a | MonoTyCon a [MonoType a] | FunMonoTy (MonoType a) (MonoType a) | ListMonoTy (MonoType a) | TupleMonoTy [PolyType a] | MonoTyVarTemplate a | MonoDict a (MonoType a)
+data PolyType a   = UnoverloadedTy (MonoType a) | OverloadedTy [(a, a)] (MonoType a) | ForAllTy [a] (MonoType a)
+type ProtoNameContext = [(ProtoName, ProtoName)]
+type ProtoNameMonoType = MonoType ProtoName
+type ProtoNamePolyType = PolyType ProtoName
+type RenamedContext = [(Name, Name)]
+type RenamedMonoType = MonoType Name
+type RenamedPolyType = PolyType Name
+type DictVar = Id
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type IdEnv a = UniqFM a
+data ArgUsage 	{-# GHC_PRAGMA ArgUsage Int | UnknownArgUsage #-}
+data ArgUsageInfo 	{-# GHC_PRAGMA NoArgUsageInfo | SomeArgUsageInfo [ArgUsage] #-}
+data ArityInfo 	{-# GHC_PRAGMA UnknownArity | ArityExactly Int #-}
+data DeforestInfo 	{-# GHC_PRAGMA Don'tDeforest | DoDeforest #-}
+data Demand 	{-# GHC_PRAGMA WwLazy Bool | WwStrict | WwUnpack [Demand] | WwPrim | WwEnum #-}
+data DemandInfo 	{-# GHC_PRAGMA UnknownDemand | DemandedAsPer Demand #-}
+data FBConsum 	{-# GHC_PRAGMA FBGoodConsum | FBBadConsum #-}
+data FBProd 	{-# GHC_PRAGMA FBGoodProd | FBBadProd #-}
+data FBType 	{-# GHC_PRAGMA FBType [FBConsum] FBProd #-}
+data FBTypeInfo 	{-# GHC_PRAGMA NoFBTypeInfo | SomeFBTypeInfo FBType #-}
+data IdInfo 	{-# GHC_PRAGMA IdInfo ArityInfo DemandInfo SpecEnv StrictnessInfo UnfoldingDetails UpdateInfo DeforestInfo ArgUsageInfo FBTypeInfo SrcLoc #-}
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name   = Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString
+data FullName 	{-# GHC_PRAGMA FullName _PackedString _PackedString Provenance ExportFlag Bool SrcLoc #-}
+data ExportFlag 	{-# GHC_PRAGMA ExportAll | ExportAbs | NotExported #-}
+data Module a b   = Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data PrimOp
+	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+type PreludeNameFun = _PackedString -> Labda Name
+type Arity = Int
+type ProtoNameModule = Module ProtoName (InPat ProtoName)
+type RenamedModule = Module Name (InPat Name)
+data SpecEnv 	{-# GHC_PRAGMA SpecEnv [SpecInfo] #-}
+data StrictnessInfo 	{-# GHC_PRAGMA NoStrictnessInfo | BottomGuaranteed | StrictnessInfo [Demand] (Labda Id) #-}
+data ShortName 	{-# GHC_PRAGMA ShortName _PackedString SrcLoc #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+type TauType = UniType
+type TypecheckedModule = Module Id TypecheckedPat
+data UpdateInfo 	{-# GHC_PRAGMA NoUpdateInfo | SomeUpdateInfo [Int] #-}
+data UnfoldingGuidance 	{-# GHC_PRAGMA UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+cmpInstanceTypes :: MonoType ProtoName -> MonoType ProtoName -> Int#
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+collectBinders :: Bind a (InPat a) -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectMonoBinders :: MonoBinds a (InPat a) -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectMonoBindersAndLocs :: MonoBinds a (InPat a) -> [(a, SrcLoc)]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectPatBinders :: InPat a -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectQualBinders :: [Qual Name (InPat Name)] -> [Name]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectTopLevelBinders :: Binds a (InPat a) -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectTypedBinders :: Bind Id TypecheckedPat -> [Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+collectTypedPatBinders :: TypecheckedPat -> [Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+extractMonoTyNames :: (a -> a -> Bool) -> MonoType a -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+getNonPrelOuterTyCon :: MonoType ProtoName -> Labda ProtoName
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 10 \ (u0 :: MonoType ProtoName) -> case u0 of { _ALG_ _ORIG_ HsTypes MonoTyCon (u1 :: ProtoName) (u2 :: [MonoType ProtoName]) -> _!_ _ORIG_ Maybes Ni [ProtoName] [u1]; (u3 :: MonoType ProtoName) -> _!_ _ORIG_ Maybes Hamna [ProtoName] [] } _N_ #-}
+mkDictApp :: Expr Id TypecheckedPat -> [Id] -> Expr Id TypecheckedPat
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _F_ _IF_ARGS_ 0 2 XC 6 \ (u0 :: Expr Id TypecheckedPat) (u1 :: [Id]) -> case u1 of { _ALG_ (:) (u2 :: Id) (u3 :: [Id]) -> _!_ _ORIG_ HsExpr DictApp [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u0; _NO_DEFLT_ } _N_ #-}
+mkDictLam :: [Id] -> Expr Id TypecheckedPat -> Expr Id TypecheckedPat
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 6 \ (u0 :: [Id]) (u1 :: Expr Id TypecheckedPat) -> case u0 of { _ALG_ (:) (u2 :: Id) (u3 :: [Id]) -> _!_ _ORIG_ HsExpr DictLam [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
+mkTyApp :: Expr Id TypecheckedPat -> [UniType] -> Expr Id TypecheckedPat
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _F_ _IF_ARGS_ 0 2 XC 6 \ (u0 :: Expr Id TypecheckedPat) (u1 :: [UniType]) -> case u1 of { _ALG_ (:) (u2 :: UniType) (u3 :: [UniType]) -> _!_ _ORIG_ HsExpr TyApp [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u0; _NO_DEFLT_ } _N_ #-}
+mkTyLam :: [TyVar] -> Expr Id TypecheckedPat -> Expr Id TypecheckedPat
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 6 \ (u0 :: [TyVar]) (u1 :: Expr Id TypecheckedPat) -> case u0 of { _ALG_ (:) (u2 :: TyVar) (u3 :: [TyVar]) -> _!_ _ORIG_ HsExpr TyLam [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
+cmpClass :: Class -> Class -> Int#
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+nullBinds :: Binds a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+nullMonoBinds :: MonoBinds a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+eqConDecls :: [ConDecl ProtoName] -> [ConDecl ProtoName] -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+getIEStrings :: [IE] -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+getRawIEStrings :: [IE] -> ([(_PackedString, ExportFlag)], [_PackedString])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+negLiteral :: Literal -> Literal
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+irrefutablePat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isConPat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isLitPat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+patsAreAllCons :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+patsAreAllLits :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+typeOfPat :: TypecheckedPat -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+unfailablePat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+unfailablePats :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+cmpPolyType :: (a -> a -> Int#) -> PolyType a -> PolyType a -> Int#
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
+eqMonoType :: MonoType ProtoName -> MonoType ProtoName -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+pprContext :: Outputable a => PprStyle -> [(a, a)] -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22122 _N_ _S_ "LLS" _N_ _N_ #-}
+pprPrimOp :: PprStyle -> PrimOp -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 2222 _N_ _S_ "LS" _N_ _N_ #-}
+cmpTyCon :: TyCon -> TyCon -> Int#
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+cmpTyVar :: TyVar -> TyVar -> Int#
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+cmpUniType :: Bool -> UniType -> UniType -> Int#
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
+instance Eq BasicLit
+	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool)] [_CONSTM_ Eq (==) (BasicLit), _CONSTM_ Eq (/=) (BasicLit)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq Class
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Class -> Class -> Bool), (Class -> Class -> Bool)] [_CONSTM_ Eq (==) (Class), _CONSTM_ Eq (/=) (Class)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ eqInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ Unique MkUnique (um :: Int#) -> case uc of { _ALG_ _ORIG_ Unique MkUnique (un :: Int#) -> _#_ eqInt# [] [um, un]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ eqInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> _APP_  _CONSTM_ Eq (/=) (Unique) [ u2, uc ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Eq ClassOp
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(ClassOp -> ClassOp -> Bool), (ClassOp -> ClassOp -> Bool)] [_CONSTM_ Eq (==) (ClassOp), _CONSTM_ Eq (/=) (ClassOp)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ eqInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ eqInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ eqInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ eqInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Eq Id
+	{-# GHC_PRAGMA _M_ Id {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Id -> Id -> Bool), (Id -> Id -> Bool)] [_CONSTM_ Eq (==) (Id), _CONSTM_ Eq (/=) (Id)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _APP_  _WRKR_ _ORIG_ Id cmpId [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_} _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Id) (u1 :: Id) -> case _APP_  _ORIG_ Id cmpId [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _APP_  _WRKR_ _ORIG_ Id cmpId [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_} _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Id) (u1 :: Id) -> case _APP_  _ORIG_ Id cmpId [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
+instance Eq Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Demand -> Demand -> Bool), (Demand -> Demand -> Bool)] [_CONSTM_ Eq (==) (Demand), _CONSTM_ Eq (/=) (Demand)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq FBConsum
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBConsum -> FBConsum -> Bool), (FBConsum -> FBConsum -> Bool)] [_CONSTM_ Eq (==) (FBConsum), _CONSTM_ Eq (/=) (FBConsum)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq FBProd
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBProd -> FBProd -> Bool), (FBProd -> FBProd -> Bool)] [_CONSTM_ Eq (==) (FBProd), _CONSTM_ Eq (/=) (FBProd)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq FBType
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBType -> FBType -> Bool), (FBType -> FBType -> Bool)] [_CONSTM_ Eq (==) (FBType), _CONSTM_ Eq (/=) (FBType)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(LL)U(LL)" {_A_ 4 _U_ 2121 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(LL)U(LL)" {_A_ 4 _U_ 2121 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Eq UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool)] [_CONSTM_ Eq (==) (UpdateInfo), _CONSTM_ Eq (/=) (UpdateInfo)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq Name
+	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Name -> Name -> Bool), (Name -> Name -> Bool)] [_CONSTM_ Eq (==) (Name), _CONSTM_ Eq (/=) (Name)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Name) (u1 :: Name) -> case _APP_  _ORIG_ Name cmpName [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Name) (u1 :: Name) -> case _APP_  _ORIG_ Name cmpName [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
+instance Eq PrimKind
+	{-# GHC_PRAGMA _M_ PrimKind {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(PrimKind -> PrimKind -> Bool), (PrimKind -> PrimKind -> Bool)] [_CONSTM_ Eq (==) (PrimKind), _CONSTM_ Eq (/=) (PrimKind)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq PrimOp
+	{-# GHC_PRAGMA _M_ PrimOps {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(PrimOp -> PrimOp -> Bool), (PrimOp -> PrimOp -> Bool)] [_CONSTM_ Eq (==) (PrimOp), _CONSTM_ Eq (/=) (PrimOp)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: PrimOp) (u1 :: PrimOp) -> case _APP_  _ORIG_ PrimOps tagOf_PrimOp [ u0 ] of { _PRIM_ (u2 :: Int#) -> case _APP_  _ORIG_ PrimOps tagOf_PrimOp [ u1 ] of { _PRIM_ (u3 :: Int#) -> _#_ eqInt# [] [u2, u3] } } _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Eq TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool)] [_CONSTM_ Eq (==) (TyCon), _CONSTM_ Eq (/=) (TyCon)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
+instance Eq TyVar
+	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool)] [_CONSTM_ Eq (==) (TyVar), _CONSTM_ Eq (/=) (TyVar)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyVar) (u1 :: TyVar) -> case _APP_  _ORIG_ TyVar cmpTyVar [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyVar) (u1 :: TyVar) -> case _APP_  _ORIG_ TyVar cmpTyVar [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
+instance Eq Unique
+	{-# GHC_PRAGMA _M_ Unique {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Unique -> Unique -> Bool), (Unique -> Unique -> Bool)] [_CONSTM_ Eq (==) (Unique), _CONSTM_ Eq (/=) (Unique)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ eqInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> _#_ eqInt# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ eqInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> case _#_ eqInt# [] [u2, u3] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance OptIdInfo ArgUsageInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [ArgUsageInfo, (IdInfo -> ArgUsageInfo), (IdInfo -> ArgUsageInfo -> IdInfo), (PprStyle -> (Id -> Id) -> ArgUsageInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (ArgUsageInfo), _CONSTM_ OptIdInfo getInfo (ArgUsageInfo), _CONSTM_ OptIdInfo addInfo (ArgUsageInfo), _CONSTM_ OptIdInfo ppInfo (ArgUsageInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoArgUsageInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAASAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ArgUsageInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u8; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo ArityInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [ArityInfo, (IdInfo -> ArityInfo), (IdInfo -> ArityInfo -> IdInfo), (PprStyle -> (Id -> Id) -> ArityInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (ArityInfo), _CONSTM_ OptIdInfo getInfo (ArityInfo), _CONSTM_ OptIdInfo addInfo (ArityInfo), _CONSTM_ OptIdInfo ppInfo (ArityInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo UnknownArity [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(SAAAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ArityInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u1; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo DeforestInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [DeforestInfo, (IdInfo -> DeforestInfo), (IdInfo -> DeforestInfo -> IdInfo), (PprStyle -> (Id -> Id) -> DeforestInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (DeforestInfo), _CONSTM_ OptIdInfo getInfo (DeforestInfo), _CONSTM_ OptIdInfo addInfo (DeforestInfo), _CONSTM_ OptIdInfo ppInfo (DeforestInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo Don'tDeforest [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAEAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: DeforestInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u7; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)E" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAE" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo DemandInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [DemandInfo, (IdInfo -> DemandInfo), (IdInfo -> DemandInfo -> IdInfo), (PprStyle -> (Id -> Id) -> DemandInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (DemandInfo), _CONSTM_ OptIdInfo getInfo (DemandInfo), _CONSTM_ OptIdInfo addInfo (DemandInfo), _CONSTM_ OptIdInfo ppInfo (DemandInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo UnknownDemand [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(ASAAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: DemandInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u2; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LALLLLLLLL)L" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 10122 _N_ _S_ "SAL" {_A_ 2 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo FBTypeInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [FBTypeInfo, (IdInfo -> FBTypeInfo), (IdInfo -> FBTypeInfo -> IdInfo), (PprStyle -> (Id -> Id) -> FBTypeInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (FBTypeInfo), _CONSTM_ OptIdInfo getInfo (FBTypeInfo), _CONSTM_ OptIdInfo addInfo (FBTypeInfo), _CONSTM_ OptIdInfo ppInfo (FBTypeInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoFBTypeInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: FBTypeInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u9; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20222 _N_ _S_ "SAS" {_A_ 2 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo SpecEnv
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [SpecEnv, (IdInfo -> SpecEnv), (IdInfo -> SpecEnv -> IdInfo), (PprStyle -> (Id -> Id) -> SpecEnv -> Int -> Bool -> PrettyRep)] [_ORIG_ IdInfo nullSpecEnv, _CONSTM_ OptIdInfo getInfo (SpecEnv), _CONSTM_ OptIdInfo addInfo (SpecEnv), _CONSTM_ OptIdInfo ppInfo (SpecEnv)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ IdInfo nullSpecEnv _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAU(L)AAAAAAA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [SpecInfo]) -> _!_ _ORIG_ IdInfo SpecEnv [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u3; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 11 _N_ _S_ "U(LLU(L)LLLLLLL)U(L)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 22122 _N_ _S_ "LLU(S)" {_A_ 3 _U_ 22122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo StrictnessInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [StrictnessInfo, (IdInfo -> StrictnessInfo), (IdInfo -> StrictnessInfo -> IdInfo), (PprStyle -> (Id -> Id) -> StrictnessInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (StrictnessInfo), _CONSTM_ OptIdInfo getInfo (StrictnessInfo), _CONSTM_ OptIdInfo addInfo (StrictnessInfo), _CONSTM_ OptIdInfo ppInfo (StrictnessInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoStrictnessInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAASAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: StrictnessInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u4; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 22122 _N_ _S_ "LLS" _N_ _N_ #-}
+instance OptIdInfo UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [UpdateInfo, (IdInfo -> UpdateInfo), (IdInfo -> UpdateInfo -> IdInfo), (PprStyle -> (Id -> Id) -> UpdateInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (UpdateInfo), _CONSTM_ OptIdInfo getInfo (UpdateInfo), _CONSTM_ OptIdInfo addInfo (UpdateInfo), _CONSTM_ OptIdInfo ppInfo (UpdateInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoUpdateInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAASAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UpdateInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u6; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord BasicLit
+	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq BasicLit}}, (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> BasicLit), (BasicLit -> BasicLit -> BasicLit), (BasicLit -> BasicLit -> _CMP_TAG)] [_DFUN_ Eq (BasicLit), _CONSTM_ Ord (<) (BasicLit), _CONSTM_ Ord (<=) (BasicLit), _CONSTM_ Ord (>=) (BasicLit), _CONSTM_ Ord (>) (BasicLit), _CONSTM_ Ord max (BasicLit), _CONSTM_ Ord min (BasicLit), _CONSTM_ Ord _tagCmp (BasicLit)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord Class
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Class}}, (Class -> Class -> Bool), (Class -> Class -> Bool), (Class -> Class -> Bool), (Class -> Class -> Bool), (Class -> Class -> Class), (Class -> Class -> Class), (Class -> Class -> _CMP_TAG)] [_DFUN_ Eq (Class), _CONSTM_ Ord (<) (Class), _CONSTM_ Ord (<=) (Class), _CONSTM_ Ord (>=) (Class), _CONSTM_ Ord (>) (Class), _CONSTM_ Ord max (Class), _CONSTM_ Ord min (Class), _CONSTM_ Ord _tagCmp (Class)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ ltInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ Unique MkUnique (um :: Int#) -> case uc of { _ALG_ _ORIG_ Unique MkUnique (un :: Int#) -> _#_ ltInt# [] [um, un]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ leInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ Unique MkUnique (um :: Int#) -> case uc of { _ALG_ _ORIG_ Unique MkUnique (un :: Int#) -> _#_ leInt# [] [um, un]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ ltInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> _APP_  _CONSTM_ Ord (>=) (Unique) [ u2, uc ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ leInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: Class) (u1 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u2 :: Unique) (u3 :: FullName) (u4 :: TyVarTemplate) (u5 :: [Class]) (u6 :: [Id]) (u7 :: [ClassOp]) (u8 :: [Id]) (u9 :: [Id]) (ua :: [(UniType, InstTemplate)]) (ub :: [(Class, [Class])]) -> case u1 of { _ALG_ _ORIG_ Class MkClass (uc :: Unique) (ud :: FullName) (ue :: TyVarTemplate) (uf :: [Class]) (ug :: [Id]) (uh :: [ClassOp]) (ui :: [Id]) (uj :: [Id]) (uk :: [(UniType, InstTemplate)]) (ul :: [(Class, [Class])]) -> _APP_  _CONSTM_ Ord (>) (Unique) [ u2, uc ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAAAAAAA)U(U(P)AAAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord ClassOp
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq ClassOp}}, (ClassOp -> ClassOp -> Bool), (ClassOp -> ClassOp -> Bool), (ClassOp -> ClassOp -> Bool), (ClassOp -> ClassOp -> Bool), (ClassOp -> ClassOp -> ClassOp), (ClassOp -> ClassOp -> ClassOp), (ClassOp -> ClassOp -> _CMP_TAG)] [_DFUN_ Eq (ClassOp), _CONSTM_ Ord (<) (ClassOp), _CONSTM_ Ord (<=) (ClassOp), _CONSTM_ Ord (>=) (ClassOp), _CONSTM_ Ord (>) (ClassOp), _CONSTM_ Ord max (ClassOp), _CONSTM_ Ord min (ClassOp), _CONSTM_ Ord _tagCmp (ClassOp)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ ltInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ ltInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ leInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ leInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ geInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ geInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(AU(P)A)U(AU(P)A)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ gtInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: ClassOp) (u1 :: ClassOp) -> case u0 of { _ALG_ _ORIG_ Class MkClassOp (u2 :: _PackedString) (u3 :: Int) (u4 :: UniType) -> case u1 of { _ALG_ _ORIG_ Class MkClassOp (u5 :: _PackedString) (u6 :: Int) (u7 :: UniType) -> case u3 of { _ALG_ I# (u8 :: Int#) -> case u6 of { _ALG_ I# (u9 :: Int#) -> _#_ gtInt# [] [u8, u9]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Ord Id
+	{-# GHC_PRAGMA _M_ Id {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Id}}, (Id -> Id -> Bool), (Id -> Id -> Bool), (Id -> Id -> Bool), (Id -> Id -> Bool), (Id -> Id -> Id), (Id -> Id -> Id), (Id -> Id -> _CMP_TAG)] [_DFUN_ Eq (Id), _CONSTM_ Ord (<) (Id), _CONSTM_ Ord (<=) (Id), _CONSTM_ Ord (>=) (Id), _CONSTM_ Ord (>) (Id), _CONSTM_ Ord max (Id), _CONSTM_ Ord min (Id), _CONSTM_ Ord _tagCmp (Id)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Demand}}, (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Demand), (Demand -> Demand -> Demand), (Demand -> Demand -> _CMP_TAG)] [_DFUN_ Eq (Demand), _CONSTM_ Ord (<) (Demand), _CONSTM_ Ord (<=) (Demand), _CONSTM_ Ord (>=) (Demand), _CONSTM_ Ord (>) (Demand), _CONSTM_ Ord max (Demand), _CONSTM_ Ord min (Demand), _CONSTM_ Ord _tagCmp (Demand)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq UpdateInfo}}, (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> UpdateInfo), (UpdateInfo -> UpdateInfo -> UpdateInfo), (UpdateInfo -> UpdateInfo -> _CMP_TAG)] [_DFUN_ Eq (UpdateInfo), _CONSTM_ Ord (<) (UpdateInfo), _CONSTM_ Ord (<=) (UpdateInfo), _CONSTM_ Ord (>=) (UpdateInfo), _CONSTM_ Ord (>) (UpdateInfo), _CONSTM_ Ord max (UpdateInfo), _CONSTM_ Ord min (UpdateInfo), _CONSTM_ Ord _tagCmp (UpdateInfo)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord Name
+	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Name}}, (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Name), (Name -> Name -> Name), (Name -> Name -> _CMP_TAG)] [_DFUN_ Eq (Name), _CONSTM_ Ord (<) (Name), _CONSTM_ Ord (<=) (Name), _CONSTM_ Ord (>=) (Name), _CONSTM_ Ord (>) (Name), _CONSTM_ Ord max (Name), _CONSTM_ Ord min (Name), _CONSTM_ Ord _tagCmp (Name)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord PrimKind
+	{-# GHC_PRAGMA _M_ PrimKind {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq PrimKind}}, (PrimKind -> PrimKind -> Bool), (PrimKind -> PrimKind -> Bool), (PrimKind -> PrimKind -> Bool), (PrimKind -> PrimKind -> Bool), (PrimKind -> PrimKind -> PrimKind), (PrimKind -> PrimKind -> PrimKind), (PrimKind -> PrimKind -> _CMP_TAG)] [_DFUN_ Eq (PrimKind), _CONSTM_ Ord (<) (PrimKind), _CONSTM_ Ord (<=) (PrimKind), _CONSTM_ Ord (>=) (PrimKind), _CONSTM_ Ord (>) (PrimKind), _CONSTM_ Ord max (PrimKind), _CONSTM_ Ord min (PrimKind), _CONSTM_ Ord _tagCmp (PrimKind)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Ord TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TyCon}}, (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> _CMP_TAG)] [_DFUN_ Eq (TyCon), _CONSTM_ Ord (<) (TyCon), _CONSTM_ Ord (<=) (TyCon), _CONSTM_ Ord (>=) (TyCon), _CONSTM_ Ord (>) (TyCon), _CONSTM_ Ord max (TyCon), _CONSTM_ Ord min (TyCon), _CONSTM_ Ord _tagCmp (TyCon)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord TyVar
+	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TyVar}}, (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> TyVar), (TyVar -> TyVar -> TyVar), (TyVar -> TyVar -> _CMP_TAG)] [_DFUN_ Eq (TyVar), _CONSTM_ Ord (<) (TyVar), _CONSTM_ Ord (<=) (TyVar), _CONSTM_ Ord (>=) (TyVar), _CONSTM_ Ord (>) (TyVar), _CONSTM_ Ord max (TyVar), _CONSTM_ Ord min (TyVar), _CONSTM_ Ord _tagCmp (TyVar)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord Unique
+	{-# GHC_PRAGMA _M_ Unique {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Unique}}, (Unique -> Unique -> Bool), (Unique -> Unique -> Bool), (Unique -> Unique -> Bool), (Unique -> Unique -> Bool), (Unique -> Unique -> Unique), (Unique -> Unique -> Unique), (Unique -> Unique -> _CMP_TAG)] [_DFUN_ Eq (Unique), _CONSTM_ Ord (<) (Unique), _CONSTM_ Ord (<=) (Unique), _CONSTM_ Ord (>=) (Unique), _CONSTM_ Ord (>) (Unique), _CONSTM_ Ord max (Unique), _CONSTM_ Ord min (Unique), _CONSTM_ Ord _tagCmp (Unique)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ ltInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> _#_ ltInt# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int#) (u1 :: Int#) -> _#_ leInt# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> _#_ leInt# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ ltInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> case _#_ ltInt# [] [u2, u3] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Int#) (u1 :: Int#) -> case _#_ leInt# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: Unique) (u1 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> case _#_ leInt# [] [u2, u3] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance NamedThing Class
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(Class -> ExportFlag), (Class -> Bool), (Class -> (_PackedString, _PackedString)), (Class -> _PackedString), (Class -> [_PackedString]), (Class -> SrcLoc), (Class -> Unique), (Class -> Bool), (Class -> UniType), (Class -> Bool)] [_CONSTM_ NamedThing getExportFlag (Class), _CONSTM_ NamedThing isLocallyDefined (Class), _CONSTM_ NamedThing getOrigName (Class), _CONSTM_ NamedThing getOccurrenceName (Class), _CONSTM_ NamedThing getInformingModules (Class), _CONSTM_ NamedThing getSrcLoc (Class), _CONSTM_ NamedThing getTheUnique (Class), _CONSTM_ NamedThing hasType (Class), _CONSTM_ NamedThing getType (Class), _CONSTM_ NamedThing fromPreludeCore (Class)] _N_
+	 getExportFlag = _A_ 1 _U_ 1 _N_ _S_ "U(AU(AAAEAA)AAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ExportFlag) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u1 :: Unique) (u2 :: FullName) (u3 :: TyVarTemplate) (u4 :: [Class]) (u5 :: [Id]) (u6 :: [ClassOp]) (u7 :: [Id]) (u8 :: [Id]) (u9 :: [(UniType, InstTemplate)]) (ua :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ NameTypes FullName (ub :: _PackedString) (uc :: _PackedString) (ud :: Provenance) (ue :: ExportFlag) (uf :: Bool) (ug :: SrcLoc) -> ue; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 isLocallyDefined = _A_ 1 _U_ 1 _N_ _S_ "U(AU(AASAAA)AAAAAAAA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(AU(LLAAAA)AAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: _PackedString) -> _!_ _TUP_2 [_PackedString, _PackedString] [u0, u1] _N_} _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u1 :: Unique) (u2 :: FullName) (u3 :: TyVarTemplate) (u4 :: [Class]) (u5 :: [Id]) (u6 :: [ClassOp]) (u7 :: [Id]) (u8 :: [Id]) (u9 :: [(UniType, InstTemplate)]) (ua :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ NameTypes FullName (ub :: _PackedString) (uc :: _PackedString) (ud :: Provenance) (ue :: ExportFlag) (uf :: Bool) (ug :: SrcLoc) -> _!_ _TUP_2 [_PackedString, _PackedString] [ub, uc]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(AU(ALSAAA)AAAAAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 1 _N_ _S_ "U(AU(AASAAA)AAAAAAAA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AU(AAAAAS)AAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: Class) -> case u0 of { _ALG_ _ORIG_ Class MkClass (u1 :: Unique) (u2 :: FullName) (u3 :: TyVarTemplate) (u4 :: [Class]) (u5 :: [Id]) (u6 :: [ClassOp]) (u7 :: [Id]) (u8 :: [Id]) (u9 :: [(UniType, InstTemplate)]) (ua :: [(Class, [Class])]) -> case u2 of { _ALG_ _ORIG_ NameTypes FullName (ub :: _PackedString) (uc :: _PackedString) (ud :: Provenance) (ue :: ExportFlag) (uf :: Bool) (ug :: SrcLoc) -> ug; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Class) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Class -> Unique) } [ _NOREP_S_ "NamedThing.Class.getTheUnique", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Class) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Class -> Bool) } [ _NOREP_S_ "NamedThing.Class.hasType", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Class) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Class -> UniType) } [ _NOREP_S_ "NamedThing.Class.getType", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AU(AASAAA)AAAAAAAA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance NamedThing a => NamedThing (InPat a)
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 1 _U_ 0 _N_ _N_ _N_ _N_ #-}
+instance NamedThing TypecheckedPat
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TypecheckedPat -> ExportFlag), (TypecheckedPat -> Bool), (TypecheckedPat -> (_PackedString, _PackedString)), (TypecheckedPat -> _PackedString), (TypecheckedPat -> [_PackedString]), (TypecheckedPat -> SrcLoc), (TypecheckedPat -> Unique), (TypecheckedPat -> Bool), (TypecheckedPat -> UniType), (TypecheckedPat -> Bool)] [_CONSTM_ NamedThing getExportFlag (TypecheckedPat), _CONSTM_ NamedThing isLocallyDefined (TypecheckedPat), _CONSTM_ NamedThing getOrigName (TypecheckedPat), _CONSTM_ NamedThing getOccurrenceName (TypecheckedPat), _CONSTM_ NamedThing getInformingModules (TypecheckedPat), _CONSTM_ NamedThing getSrcLoc (TypecheckedPat), _CONSTM_ NamedThing getTheUnique (TypecheckedPat), _CONSTM_ NamedThing hasType (TypecheckedPat), _ORIG_ HsPat typeOfPat, _CONSTM_ NamedThing fromPreludeCore (TypecheckedPat)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> ExportFlag) } [ _NOREP_S_ "%DOutputable.NamedThing.getExportFlag\"", u0 ] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.isLocallyDefined\"", u0 ] _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> (_PackedString, _PackedString)) } [ _NOREP_S_ "%DOutputable.NamedThing.getOrigName\"", u0 ] _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> _PackedString) } [ _NOREP_S_ "%DOutputable.NamedThing.getOccurrenceName\"", u0 ] _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> SrcLoc) } [ _NOREP_S_ "%DOutputable.NamedThing.getSrcLoc\"", u0 ] _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TypecheckedPat) -> _!_ True [] [] _N_,
+	 getType = _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ HsPat typeOfPat _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.fromPreludeCore\"", u0 ] _N_ #-}
+instance NamedThing Id
+	{-# GHC_PRAGMA _M_ Id {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(Id -> ExportFlag), (Id -> Bool), (Id -> (_PackedString, _PackedString)), (Id -> _PackedString), (Id -> [_PackedString]), (Id -> SrcLoc), (Id -> Unique), (Id -> Bool), (Id -> UniType), (Id -> Bool)] [_CONSTM_ NamedThing getExportFlag (Id), _CONSTM_ NamedThing isLocallyDefined (Id), _CONSTM_ NamedThing getOrigName (Id), _CONSTM_ NamedThing getOccurrenceName (Id), _CONSTM_ NamedThing getInformingModules (Id), _CONSTM_ NamedThing getSrcLoc (Id), _CONSTM_ NamedThing getTheUnique (Id), _CONSTM_ NamedThing hasType (Id), _CONSTM_ NamedThing getType (Id), _CONSTM_ NamedThing fromPreludeCore (Id)] _N_
+	 getExportFlag = _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 isLocallyDefined = _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(LAAS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(LAAS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Id) -> _APP_  _TYAPP_  _ORIG_ Util panic { [_PackedString] } [ _NOREP_S_ "getInformingModule:Id" ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AALS)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getTheUnique = _A_ 1 _U_ 1 _N_ _S_ "U(U(P)AAA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ _ORIG_ Unique MkUnique [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Id) -> case u0 of { _ALG_ _ORIG_ Id Id (u1 :: Unique) (u2 :: UniType) (u3 :: IdInfo) (u4 :: IdDetails) -> u1; _NO_DEFLT_ } _N_,
+	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Id) -> _!_ True [] [] _N_,
+	 getType = _A_ 1 _U_ 1 _N_ _S_ "U(ASAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UniType) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Id) -> case u0 of { _ALG_ _ORIG_ Id Id (u1 :: Unique) (u2 :: UniType) (u3 :: IdInfo) (u4 :: IdDetails) -> u2; _NO_DEFLT_ } _N_,
+	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance NamedThing Name
+	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(Name -> ExportFlag), (Name -> Bool), (Name -> (_PackedString, _PackedString)), (Name -> _PackedString), (Name -> [_PackedString]), (Name -> SrcLoc), (Name -> Unique), (Name -> Bool), (Name -> UniType), (Name -> Bool)] [_CONSTM_ NamedThing getExportFlag (Name), _CONSTM_ NamedThing isLocallyDefined (Name), _CONSTM_ NamedThing getOrigName (Name), _CONSTM_ NamedThing getOccurrenceName (Name), _CONSTM_ NamedThing getInformingModules (Name), _CONSTM_ NamedThing getSrcLoc (Name), _CONSTM_ NamedThing getTheUnique (Name), _CONSTM_ NamedThing hasType (Name), _CONSTM_ NamedThing getType (Name), _CONSTM_ NamedThing fromPreludeCore (Name)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Name) -> _APP_  _TYAPP_  _ORIG_ Util panic { [_PackedString] } [ _NOREP_S_ "getInformingModule:Name" ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Name) -> _!_ False [] [] _N_,
+	 getType = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Name) -> _APP_  _TYAPP_  _ORIG_ Util panic { UniType } [ _NOREP_S_ "NamedThing.Name.getType" ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+instance NamedThing FullName
+	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(FullName -> ExportFlag), (FullName -> Bool), (FullName -> (_PackedString, _PackedString)), (FullName -> _PackedString), (FullName -> [_PackedString]), (FullName -> SrcLoc), (FullName -> Unique), (FullName -> Bool), (FullName -> UniType), (FullName -> Bool)] [_CONSTM_ NamedThing getExportFlag (FullName), _CONSTM_ NamedThing isLocallyDefined (FullName), _CONSTM_ NamedThing getOrigName (FullName), _CONSTM_ NamedThing getOccurrenceName (FullName), _CONSTM_ NamedThing getInformingModules (FullName), _CONSTM_ NamedThing getSrcLoc (FullName), _CONSTM_ NamedThing getTheUnique (FullName), _CONSTM_ NamedThing hasType (FullName), _CONSTM_ NamedThing getType (FullName), _CONSTM_ NamedThing fromPreludeCore (FullName)] _N_
+	 getExportFlag = _A_ 1 _U_ 1 _N_ _S_ "U(AAAEAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ExportFlag) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> u4; _NO_DEFLT_ } _N_,
+	 isLocallyDefined = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 11 \ (u0 :: Provenance) -> case u0 of { _ALG_ _ORIG_ NameTypes ThisModule  -> _!_ True [] []; _ORIG_ NameTypes InventedInThisModule  -> _!_ True [] []; _ORIG_ NameTypes HereInPreludeCore  -> _!_ True [] []; (u1 :: Provenance) -> _!_ False [] [] } _N_} _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(LLAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: _PackedString) -> _!_ _TUP_2 [_PackedString, _PackedString] [u0, u1] _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> _!_ _TUP_2 [_PackedString, _PackedString] [u1, u2]; _NO_DEFLT_ } _N_,
+	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(ALSAAA)" {_A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 2 XC 10 \ (u0 :: _PackedString) (u1 :: Provenance) -> case u1 of { _ALG_ _ORIG_ NameTypes OtherPrelude (u2 :: _PackedString) -> u2; _ORIG_ NameTypes OtherModule (u3 :: _PackedString) (u4 :: [_PackedString]) -> u3; (u5 :: Provenance) -> u0 } _N_} _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> u6; _NO_DEFLT_ } _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 10 \ (u0 :: Provenance) -> case u0 of { _ALG_ _ORIG_ NameTypes ExportedByPreludeCore  -> _!_ True [] []; _ORIG_ NameTypes HereInPreludeCore  -> _!_ True [] []; (u1 :: Provenance) -> _!_ False [] [] } _N_} _N_ _N_ #-}
+instance NamedThing ShortName
+	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(ShortName -> ExportFlag), (ShortName -> Bool), (ShortName -> (_PackedString, _PackedString)), (ShortName -> _PackedString), (ShortName -> [_PackedString]), (ShortName -> SrcLoc), (ShortName -> Unique), (ShortName -> Bool), (ShortName -> UniType), (ShortName -> Bool)] [_CONSTM_ NamedThing getExportFlag (ShortName), _CONSTM_ NamedThing isLocallyDefined (ShortName), _CONSTM_ NamedThing getOrigName (ShortName), _CONSTM_ NamedThing getOccurrenceName (ShortName), _CONSTM_ NamedThing getInformingModules (ShortName), _CONSTM_ NamedThing getSrcLoc (ShortName), _CONSTM_ NamedThing getTheUnique (ShortName), _CONSTM_ NamedThing hasType (ShortName), _CONSTM_ NamedThing getType (ShortName), _CONSTM_ NamedThing fromPreludeCore (ShortName)] _N_
+	 getExportFlag = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ Outputable NotExported [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ShortName) -> _!_ _ORIG_ Outputable NotExported [] [] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ShortName) -> _!_ True [] [] _N_,
+	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(LA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: _PackedString) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> u1; _NO_DEFLT_ } _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> u2; _NO_DEFLT_ } _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AA)" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> _!_ False [] []; _NO_DEFLT_ } _N_ #-}
+instance NamedThing ProtoName
+	{-# GHC_PRAGMA _M_ ProtoName {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(ProtoName -> ExportFlag), (ProtoName -> Bool), (ProtoName -> (_PackedString, _PackedString)), (ProtoName -> _PackedString), (ProtoName -> [_PackedString]), (ProtoName -> SrcLoc), (ProtoName -> Unique), (ProtoName -> Bool), (ProtoName -> UniType), (ProtoName -> Bool)] [_CONSTM_ NamedThing getExportFlag (ProtoName), _CONSTM_ NamedThing isLocallyDefined (ProtoName), _CONSTM_ NamedThing getOrigName (ProtoName), _CONSTM_ NamedThing getOccurrenceName (ProtoName), _CONSTM_ NamedThing getInformingModules (ProtoName), _CONSTM_ NamedThing getSrcLoc (ProtoName), _CONSTM_ NamedThing getTheUnique (ProtoName), _CONSTM_ NamedThing hasType (ProtoName), _CONSTM_ NamedThing getType (ProtoName), _CONSTM_ NamedThing fromPreludeCore (ProtoName)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> ExportFlag) } [ _NOREP_S_ "%DOutputable.NamedThing.getExportFlag\"", u0 ] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.isLocallyDefined\"", u0 ] _N_,
+	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 7 \ (u0 :: ProtoName) -> case u0 of { _ALG_ _ORIG_ ProtoName Unk (u1 :: _PackedString) -> u1; _ORIG_ ProtoName Imp (u2 :: _PackedString) (u3 :: _PackedString) (u4 :: [_PackedString]) (u5 :: _PackedString) -> u5; _ORIG_ ProtoName Prel (u6 :: Name) -> _APP_  _CONSTM_ NamedThing getOccurrenceName (Name) [ u6 ]; _NO_DEFLT_ } _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> SrcLoc) } [ _NOREP_S_ "%DOutputable.NamedThing.getSrcLoc\"", u0 ] _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ProtoName) -> _!_ False [] [] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ProtoName) -> _APP_  _TYAPP_  patError# { (ProtoName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.fromPreludeCore\"", u0 ] _N_ #-}
+instance NamedThing TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TyCon -> ExportFlag), (TyCon -> Bool), (TyCon -> (_PackedString, _PackedString)), (TyCon -> _PackedString), (TyCon -> [_PackedString]), (TyCon -> SrcLoc), (TyCon -> Unique), (TyCon -> Bool), (TyCon -> UniType), (TyCon -> Bool)] [_CONSTM_ NamedThing getExportFlag (TyCon), _CONSTM_ NamedThing isLocallyDefined (TyCon), _CONSTM_ NamedThing getOrigName (TyCon), _CONSTM_ NamedThing getOccurrenceName (TyCon), _CONSTM_ NamedThing getInformingModules (TyCon), _CONSTM_ NamedThing getSrcLoc (TyCon), _CONSTM_ NamedThing getTheUnique (TyCon), _CONSTM_ NamedThing hasType (TyCon), _CONSTM_ NamedThing getType (TyCon), _CONSTM_ NamedThing fromPreludeCore (TyCon)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getTheUnique = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { Unique } [ _NOREP_S_ "NamedThing.TyCon.getTheUnique" ] _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> Bool) } [ _NOREP_S_ "NamedThing.TyCon.hasType", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> UniType) } [ _NOREP_S_ "NamedThing.TyCon.getType", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+instance NamedThing TyVar
+	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TyVar -> ExportFlag), (TyVar -> Bool), (TyVar -> (_PackedString, _PackedString)), (TyVar -> _PackedString), (TyVar -> [_PackedString]), (TyVar -> SrcLoc), (TyVar -> Unique), (TyVar -> Bool), (TyVar -> UniType), (TyVar -> Bool)] [_CONSTM_ NamedThing getExportFlag (TyVar), _CONSTM_ NamedThing isLocallyDefined (TyVar), _CONSTM_ NamedThing getOrigName (TyVar), _CONSTM_ NamedThing getOccurrenceName (TyVar), _CONSTM_ NamedThing getInformingModules (TyVar), _CONSTM_ NamedThing getSrcLoc (TyVar), _CONSTM_ NamedThing getTheUnique (TyVar), _CONSTM_ NamedThing hasType (TyVar), _CONSTM_ NamedThing getType (TyVar), _CONSTM_ NamedThing fromPreludeCore (TyVar)] _N_
+	 getExportFlag = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ Outputable NotExported [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ _ORIG_ Outputable NotExported [] [] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ True [] [] _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyVar) -> _APP_  _TYAPP_  _ORIG_ Util panic { [_PackedString] } [ _NOREP_S_ "getInformingModule:TyVar" ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 7 \ (u0 :: TyVar) -> case u0 of { _ALG_ _ORIG_ TyVar UserTyVar (u1 :: Unique) (u2 :: ShortName) -> case u2 of { _ALG_ _ORIG_ NameTypes ShortName (u3 :: _PackedString) (u4 :: SrcLoc) -> u4; _NO_DEFLT_ }; (u5 :: TyVar) -> _ORIG_ SrcLoc mkUnknownSrcLoc } _N_,
+	 getTheUnique = _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 8 \ (u0 :: TyVar) -> case u0 of { _ALG_ _ORIG_ TyVar PolySysTyVar (u1 :: Unique) -> u1; _ORIG_ TyVar PrimSysTyVar (u2 :: Unique) -> u2; _ORIG_ TyVar OpenSysTyVar (u3 :: Unique) -> u3; _ORIG_ TyVar UserTyVar (u4 :: Unique) (u5 :: ShortName) -> u4; _NO_DEFLT_ } _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyVar) -> _APP_  _TYAPP_  patError# { (TyVar -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyVar) -> _APP_  _TYAPP_  patError# { (TyVar -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ False [] [] _N_ #-}
+instance (Outputable a, Outputable b) => Outputable (a, b)
+	{-# GHC_PRAGMA _M_ Outputable {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _N_ _N_ #-}
+instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c)
+	{-# GHC_PRAGMA _M_ Outputable {-dfun-} _A_ 5 _U_ 222 _N_ _S_ "LLLLU(LLL)" _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Module a b)
+	{-# GHC_PRAGMA _M_ AbsSyn {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable BasicLit
+	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (BasicLit) _N_
+	 ppr = _A_ 0 _U_ 2122 _N_ _N_ _N_ _N_ #-}
+instance Outputable Bool
+	{-# GHC_PRAGMA _M_ Outputable {-dfun-} _A_ 4 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Bool) _N_
+	 ppr = _A_ 4 _U_ 0120 _N_ _S_ "AELA" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable Class
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Class) _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "SU(AU(LLLLAA)AAAAAAAA)" {_A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable ClassOp
+	{-# GHC_PRAGMA _M_ Class {-dfun-} _A_ 2 _N_ _N_ _S_ "SU(LAL)" {_A_ 3 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "SU(LAL)" {_A_ 3 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable a => Outputable (FiniteMap a b)
+	{-# GHC_PRAGMA _M_ FiniteMap {-dfun-} _A_ 3 _U_ 2 _N_ _S_ "LLS" _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Bind a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Binds a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (MonoBinds a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (Sig a)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (UnfoldingCoreAtom a)
+	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (UnfoldingCoreExpr a)
+	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (UnfoldingPrimOp a)
+	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ClassDecl a b)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (ConDecl a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (DataTypeSig a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (DefaultDecl a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (FixityDecl a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (InstDecl a b)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (SpecialisedInstanceSig a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a) => Outputable (TyDecl a)
+	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ArithSeqInfo a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Expr a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Qual a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable IE
+	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (IE) _N_
+	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable IfaceImportDecl
+	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (IfaceImportDecl) _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LU(LLLA)" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ImportedInterface a b)
+	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Interface a b)
+	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable Renaming
+	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Renaming) _N_
+	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AU(LL)" {_A_ 2 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable Literal
+	{-# GHC_PRAGMA _M_ HsLit {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Literal) _N_
+	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (GRHS a b)
+	{-# GHC_PRAGMA _M_ HsMatches {-dfun-} _A_ 8 _U_ 2222 _N_ _S_ _!_ _F_ _IF_ARGS_ 2 8 XXXXXXXX 4 _/\_ u0 u1 -> \ (u2 :: {{NamedThing u0}}) (u3 :: {{Outputable u0}}) (u4 :: {{NamedThing u1}}) (u5 :: {{Outputable u1}}) (u6 :: PprStyle) (u7 :: GRHS u0 u1) (u8 :: Int) (u9 :: Bool) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Int -> Bool -> PrettyRep) } [ _NOREP_S_ "ppr: GRHSs", u8, u9 ] _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (GRHSsAndBinds a b)
+	{-# GHC_PRAGMA _M_ HsMatches {-dfun-} _A_ 8 _U_ 2222 _N_ _S_ _!_ _F_ _IF_ARGS_ 2 8 XXXXXXXX 4 _/\_ u0 u1 -> \ (u2 :: {{NamedThing u0}}) (u3 :: {{Outputable u0}}) (u4 :: {{NamedThing u1}}) (u5 :: {{Outputable u1}}) (u6 :: PprStyle) (u7 :: GRHSsAndBinds u0 u1) (u8 :: Int) (u9 :: Bool) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Int -> Bool -> PrettyRep) } [ _NOREP_S_ "ppr:GRHSsAndBinds", u8, u9 ] _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Match a b)
+	{-# GHC_PRAGMA _M_ HsMatches {-dfun-} _A_ 8 _U_ 2222 _N_ _S_ _!_ _F_ _IF_ARGS_ 2 8 XXXXXXXX 4 _/\_ u0 u1 -> \ (u2 :: {{NamedThing u0}}) (u3 :: {{Outputable u0}}) (u4 :: {{NamedThing u1}}) (u5 :: {{Outputable u1}}) (u6 :: PprStyle) (u7 :: Match u0 u1) (u8 :: Int) (u9 :: Bool) -> _APP_  _TYAPP_  _ORIG_ Util panic { (Int -> Bool -> PrettyRep) } [ _NOREP_S_ "ppr: Match", u8, u9 ] _N_ #-}
+instance Outputable a => Outputable (InPat a)
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable TypecheckedPat
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (ClassOpPragmas a)
+	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (ClassPragmas a)
+	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (GenPragmas a)
+	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (InstancePragmas a)
+	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (MonoType a)
+	{-# GHC_PRAGMA _M_ HsTypes {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (PolyType a)
+	{-# GHC_PRAGMA _M_ HsTypes {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable Id
+	{-# GHC_PRAGMA _M_ Id {-dfun-} _A_ 2 _N_ _N_ _N_ _N_ _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Demand) _N_
+	 ppr = _A_ 2 _U_ 0220 _N_ _S_ "AL" {_A_ 1 _U_ 220 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable Inst
+	{-# GHC_PRAGMA _M_ Inst {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Inst) _N_
+	 ppr = _A_ 2 _U_ 1222 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable Name
+	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Name) _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+instance Outputable FullName
+	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (FullName) _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "SU(LLLLAA)" {_A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable ShortName
+	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 4 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (ShortName) _N_
+	 ppr = _A_ 4 _U_ 0120 _N_ _S_ "AU(LA)LA" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable PrimKind
+	{-# GHC_PRAGMA _M_ PrimKind {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (PrimKind) _N_
+	 ppr = _A_ 2 _U_ 0120 _N_ _S_ "AL" {_A_ 1 _U_ 120 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Outputable PrimOp
+	{-# GHC_PRAGMA _M_ PrimOps {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PrimOps pprPrimOp _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PrimOps pprPrimOp _N_ #-}
+instance Outputable ProtoName
+	{-# GHC_PRAGMA _M_ ProtoName {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (ProtoName) _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+instance Outputable SrcLoc
+	{-# GHC_PRAGMA _M_ SrcLoc {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (SrcLoc) _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (TyCon) _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable TyVar
+	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (TyVar) _N_
+	 ppr = _A_ 2 _U_ 1122 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable a => Outputable [a]
+	{-# GHC_PRAGMA _M_ Outputable {-dfun-} _A_ 3 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Text Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Demand, [Char])]), (Int -> Demand -> [Char] -> [Char]), ([Char] -> [([Demand], [Char])]), ([Demand] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Demand), _CONSTM_ Text showsPrec (Demand), _CONSTM_ Text readList (Demand), _CONSTM_ Text showList (Demand)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(Demand, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 3 _U_ 222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: Demand) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> Demand -> [Char] -> [Char]) } [ _NOREP_S_ "%DPreludeCore.Text.showsPrec\"", u0, u1, u2 ] _N_,
+	 readList = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 showList = _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+instance Text UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(UpdateInfo, [Char])]), (Int -> UpdateInfo -> [Char] -> [Char]), ([Char] -> [([UpdateInfo], [Char])]), ([UpdateInfo] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (UpdateInfo), _CONSTM_ Text showsPrec (UpdateInfo), _CONSTM_ Text readList (UpdateInfo), _CONSTM_ Text showList (UpdateInfo)] _N_
+	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AS" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 3 _U_ 222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: UpdateInfo) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> UpdateInfo -> [Char] -> [Char]) } [ _NOREP_S_ "%DPreludeCore.Text.showsPrec\"", u0, u1, u2 ] _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Text Unique
+	{-# GHC_PRAGMA _M_ Unique {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Unique, [Char])]), (Int -> Unique -> [Char] -> [Char]), ([Char] -> [([Unique], [Char])]), ([Unique] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Unique), _CONSTM_ Text showsPrec (Unique), _CONSTM_ Text readList (Unique), _CONSTM_ Text showList (Unique)] _N_
+	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  _ORIG_ Util panic { ([Char] -> [(Unique, [Char])]) } [ _NOREP_S_ "no readsPrec for Unique", u1 ] _N_,
+	 showsPrec = _A_ 3 _U_ 010 _N_ _S_ "AU(P)A" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: Unique) (u2 :: [Char]) -> let {(u3 :: _PackedString) = _APP_  _ORIG_ Unique showUnique [ u1 ]} in _APP_  _ORIG_ PreludePS _unpackPS [ u3 ] _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

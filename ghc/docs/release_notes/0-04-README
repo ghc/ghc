@@ -1,0 +1,15 @@
+Version 0.04 of the new Glasgow Haskell compiler was yet another
+unannounced release for our friends at York (and elswhere).
+
+----------------------------------------------------------------
+91/11/01:
+
+2 notes: [1] "main" should no longer have the non-std type "Int"; instead,
+it should have the non-std type "IOPrim"!  (We're creeping towards
+real Haskell I/O.)  compiler/tests/codeGen/cg001/Main.hs is a New
+Improved "main", I believe.  docs/io-design may also be useful.
+[2] The old "import MiniPrel" trick has changed (and will change
+again).  Because we're in the middle of trying to get full/original
+names going, you have to use one or more MODULE-SPECIFIC
+"MiniPrel*.hi" files; they're in lib/prelude.
+

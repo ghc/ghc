@@ -1,0 +1,58 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq'.deq = /\ a.t38 -> \{-classdict-} [] [deq.t39] -> deq.t39
+{- nonrec -}
+defm.ShouldSucceed.Eq'.deq =
+    /\ a.t40 ->
+	\{-dict-} d.ShouldSucceed.Eq'.t41 ->
+	    (error (a.t40 -> a.t40 -> Bool))
+		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.deq\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq'.Int = ({-dict-} [] [const.ShouldSucceed.Eq'.Int.deq])
+const.ShouldSucceed.Eq'.Int.deq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq'.Int.deq
+    x.r30 y.r31
+	    = True
+AbsBinds
+[a.t22]
+[d.ShouldSucceed.Eq'.t23]
+[(d.ShouldSucceed.Eq'.t24, dfun.ShouldSucceed.Eq'.List)]
+    (d.ShouldSucceed.Eq'.t36, d.ShouldSucceed.Eq'.t24)
+    (ShouldSucceed.f.t35, ShouldSucceed.f [a.t22] d.ShouldSucceed.Eq'.t36)
+    (d.ShouldSucceed.Eq'.t37, d.ShouldSucceed.Eq'.t23)
+    (ShouldSucceed.f.t33, ShouldSucceed.f a.t22 d.ShouldSucceed.Eq'.t37)
+    {- rec -}
+    d.ShouldSucceed.Eq'.t24 = ({-dict-} [] [deq.t25])
+    deq.t25 :: [a.t22] -> [a.t22] -> Bool
+    deq.t25
+	(a.r33 : as.r34) (b.r35 : bs.r36)
+		= ShouldSucceed.dand
+		      (ShouldSucceed.f.t33 a.r33 b.r35)
+		      (ShouldSucceed.f.t35 as.r34 bs.r36)
+lit.t17 = MkInt 2#
+lit.t15 = MkInt 1#
+d.ShouldSucceed.Eq'.t43 = dfun.ShouldSucceed.Eq'.Int
+d.ShouldSucceed.Eq'.t42 =
+    dfun.ShouldSucceed.Eq'.List Int d.ShouldSucceed.Eq'.t43
+ShouldSucceed.Eq'.deq.t13 = ShouldSucceed.Eq'.deq [Int] d.ShouldSucceed.Eq'.t42
+AbsBinds [] [] [(dand.t1, ShouldSucceed.dand)]
+    {- nonrec -}
+    dand.t1 :: Bool -> Bool -> Bool
+    dand.t1
+	True True
+		= True
+    dand.t1
+	x.r65 y.r66
+		= False
+AbsBinds [a.t10] [d.ShouldSucceed.Eq'.t7] [(f.t5, ShouldSucceed.f)]
+    (d.ShouldSucceed.Eq'.t19, d.ShouldSucceed.Eq'.t7)
+    (ShouldSucceed.Eq'.deq.t11,
+	ShouldSucceed.Eq'.deq a.t10 d.ShouldSucceed.Eq'.t19)
+    {- nonrec -}
+    f.t5 :: a.t10 -> a.t10 -> Bool
+    f.t5 p.r67 q.r68
+		 = ShouldSucceed.dand
+		       (ShouldSucceed.Eq'.deq.t11 p.r67 q.r68)
+		       (ShouldSucceed.Eq'.deq.t13
+			    ([lit.t15] (Int)) ([lit.t17] (Int)))
+

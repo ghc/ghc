@@ -1,0 +1,30 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcPragmas where
+import Bag(Bag)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import HsDecls(ConDecl)
+import HsPragmas(ClassOpPragmas, DataPragmas, GenPragmas, InstancePragmas, TypePragmas)
+import Id(Id)
+import IdInfo(IdInfo, SpecEnv, SpecInfo)
+import Maybes(Labda)
+import Name(Name)
+import Pretty(PprStyle, PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import TcMonad(Baby_TcResult)
+import TyCon(TyCon)
+import TyVar(TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+tcClassOpPragmas :: E -> UniType -> Id -> Id -> SpecEnv -> ClassOpPragmas Name -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult (IdInfo, IdInfo)
+	{-# GHC_PRAGMA _A_ 6 _U_ 2022212222 _N_ _S_ "LALLLS" {_A_ 5 _U_ 222212222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+tcDataPragmas :: UniqFM TyCon -> UniqFM UniType -> TyCon -> [TyVarTemplate] -> DataPragmas Name -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult ([ConDecl Name], [SpecInfo])
+	{-# GHC_PRAGMA _A_ 5 _U_ 200112222 _N_ _S_ "LAALU(LS)" {_A_ 4 _U_ 21212122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+tcDictFunPragmas :: E -> UniType -> Id -> InstancePragmas Name -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult IdInfo
+	{-# GHC_PRAGMA _A_ 4 _U_ 22222222 _N_ _S_ "LLLS" _N_ _N_ #-}
+tcGenPragmas :: E -> Labda UniType -> Id -> GenPragmas Name -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult IdInfo
+	{-# GHC_PRAGMA _A_ 4 _U_ 22212222 _N_ _S_ "LLLS" _N_ _N_ #-}
+tcTypePragmas :: TypePragmas -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "E" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: TypePragmas) -> case u0 of { _ALG_ _ORIG_ HsPragmas NoTypePragmas  -> _!_ False [] []; _ORIG_ HsPragmas AbstractTySynonym  -> _!_ True [] []; _NO_DEFLT_ } _N_ #-}
+

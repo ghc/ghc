@@ -1,0 +1,137 @@
+\chapter{Introduction}
+
+Documents, such as papers for publication, often include sections
+of program code.  These have to be specially typeset, as default
+typesetting modes are generally intended for plain prose.
+It is therefore useful to have a special-purpose system for typesetting
+programs for inserting into documents.
+Haskell \cite{Haskell-report} is a fairly new functional programming language and does not
+yet have a full range of tools available to use with the language,
+including one to do typesetting.
+The goal of this project, therefore, is to provide a tool to automatically
+typeset Haskell programs.
+
+Many people use the \LaTeX\ system \cite{LaTeX-book}
+for typesetting.  This uses
+embedded typesetting commands in the input to arrange the typesetting.
+The typeset result has variable-width characters with a choice of
+font styles and sizes available.  The page-size, margins and layout
+are also controllable by the user.  Because \LaTeX\ is so widely used and
+so flexible, the tool to be created will be
+for use with the \LaTeX\ system.
+
+Haskell programs are generally written with editors that produce ASCII
+text.  This has fixed-width characters and one plain font.
+Indentation and vertical alignment are simple because
+fixed-width characters line up in columns, one below the other.  
+Haskell avoids having compulsory expression terminators 
+by using such indentation to delimit expressions.  It is thus crucial 
+that this indentation is retained when the text is typeset.
+
+The \LaTeX\ system, however, uses variable-width characters, so the indentation
+level becomes dependent on the characters under which the text is aligned.
+The tabs and spaces that went to make
+up the indentation in the original file have to be replaced with a 
+suitable amount of space to make the text line up with the position 
+it is aligned with in the original file. 
+
+It is also desirable to have formatting improvements, such as 
+highlighting keywords and identifiers, as well as to have
+proper mathematical characters inserted in place of the 
+Haskell ASCII approximations.  A tool could do this as well.
+
+Currently the only way of typesetting Haskell program code is to 
+labouriously insert formatting
+commands into the text by hand.  The alternative is to print out the programs
+verbatim with a plain ASCII-style fixed-width font, but it would be far better
+if there were a tool to do the proper typesetting.
+
+\subsection*{Goals}
+
+The proposed tool is required to comply to the following requirements:
+\begin{itemize}
+\item The program must take a file with a Haskell program in it and produce
+\LaTeX\ code to stdout.  This code must produce the input Haskell program in
+typeset style when run through
+the \LaTeX\ program.  The typeset result must be recognisable as having the same
+layout as the input file's Haskell program had.
+
+\item The typeset result must preserve the parse of the program.
+
+\item The input file will contain only Haskell code.  Any documentation in the file
+will be in the form of comments.
+
+\item The input file will not have any embedded typesetting commands, so
+the program must analyse the input and decide for itself what needs to be 
+done to produce the correct \LaTeX\ code.
+
+\item The \LaTeX\ code produced must be easy to incorporate into a \LaTeX\
+document such as a paper or book.  Thus the produced code must be able 
+to be incorporated into documents of different page and font sizes.
+
+\item Keywords and identifiers must be highlightable so as to distinguish
+them from the rest of the Haskell program.
+The user should be allowed some choice in the typeface used for
+highlighting.
+
+\item Proper mathematical symbols must replace ASCII approximations in the
+typeset output.
+
+\item The program must accept as input
+a file of any name and thus not use an inflexible built-in filename.
+
+\item The program must be in keeping with conventional UNIX style to fit in with
+Haskell and \LaTeX , which are also run under UNIX.
+\end{itemize}
+
+\noindent This report describes a program written to satisfy these needs.
+
+\subsection*{Background}
+
+Haskell, being a functional programming language, uses functions as its
+sole means of programming.  This is unlike traditional programming
+languages such as C or Pascal, where assignments and procedures are also used. 
+Haskell also does not normally use expression terminators, such as semi-colons, 
+but instead relies on the layout of the
+program and, in particular, the indentation to determine the context of
+lines of code.  Lines of code are positioned so they are aligned under particular
+points on preceding lines, and this delimits expressions.  It is thus
+imperative that this indentation be replicated in any attempt to pretty-print
+the program code.
+
+\LaTeX\ is a typesetting program that takes a file with embedded typesetting
+commands and produces a file containing typeset text.  This is commonly used when
+writing documents such as papers and books for publication.  Users of \LaTeX\
+can do many things, but anything fancy requires lots of typesetting commands to
+be embedded into the input file.  Thus typesetting a Haskell program in the
+desired way is a considerable task.  More simply, a
+Haskell program can be displayed in \LaTeX's verbatim mode, but this uses a fixed-width
+typewriter font.  Verbatim mode does not recognise tab characters, however these can be
+replaced with spaces.
+
+It will be assumed that the user is familiar with Haskell and at least familiar with
+preparing basic textual documents with \LaTeX, although it is not required for the
+user to understand many of the more involved parts of typesetting with \LaTeX.
+
+Already in existence is a program called `Phinew' written by Phil Wadler.
+This can be found in {\tt \char'176 wadler/bin}.  This required the user to supply 
+typesetting commands embedded in their Haskell programs, meaning that the
+user would have to manually pre-process their Haskell code before using
+Phinew.  Although simpler
+than typesetting in \LaTeX, it is still better to have a program 
+to do all the typesetting automatically, taking an unprepared Haskell
+program as input.
+
+\subsection*{Outline}
+
+In the remaining sections of this report the functionality of the program written
+are discussed; in particular, how all the various layout arrangements are dealt with.  The way
+in which the program goes about working out what to do is explained,
+along with descriptions of the algorithm and data-structures used.  Examples
+of the input and resulting output are used to illustrate the capabilities
+of the program.  The various possibilities for the user to decide what happens
+are explained, along with details on how to exploit them.  The user will
+need to know how to incorporate the results into a document so this
+is also explained.  Finally, the limitations and deficiencies of the
+program are detailed complete with an outline of further possible work
+which could rectify these problems and make the program more complete.

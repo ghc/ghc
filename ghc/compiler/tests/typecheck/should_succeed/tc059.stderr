@@ -1,0 +1,70 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq2.deq =
+    /\ a.t38 -> \{-classdict-} [] [deq.t39 foo.t40] -> deq.t39
+ShouldSucceed.Eq2.foo =
+    /\ a.t38 -> \{-classdict-} [] [deq.t39 foo.t40] -> foo.t40
+{- nonrec -}
+defm.ShouldSucceed.Eq2.deq =
+    /\ a.t41 ->
+	\{-dict-} d.ShouldSucceed.Eq2.t42 ->
+	    (error (a.t41 -> a.t41 -> Bool))
+		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.deq\"\n"
+defm.ShouldSucceed.Eq2.foo =
+    /\ a.t43 ->
+	\{-dict-} d.ShouldSucceed.Eq2.t44 ->
+	    (error (a.t43 -> a.t43))
+		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.foo\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq2.Int =
+    ({-dict-}
+    []
+    [const.ShouldSucceed.Eq2.Int.deq, const.ShouldSucceed.Eq2.Int.foo])
+const.ShouldSucceed.Eq2.Int.deq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq2.Int.deq
+    x.r29 y.r30
+	    = True
+const.ShouldSucceed.Eq2.Int.foo :: Int -> Int
+const.ShouldSucceed.Eq2.Int.foo
+    x.r31 = x.r31
+AbsBinds
+[a.t14]
+[d.ShouldSucceed.Eq2.t15]
+[(d.ShouldSucceed.Eq2.t16, dfun.ShouldSucceed.Eq2.List)]
+    (d.ShouldSucceed.Eq2.t34, d.ShouldSucceed.Eq2.t16)
+    (ShouldSucceed.Eq2.foo.t32,
+	ShouldSucceed.Eq2.foo [a.t14] d.ShouldSucceed.Eq2.t34)
+    (d.ShouldSucceed.Eq2.t35, d.ShouldSucceed.Eq2.t34)
+    (ShouldSucceed.Eq2.deq.t30,
+	ShouldSucceed.Eq2.deq [a.t14] d.ShouldSucceed.Eq2.t35)
+    (d.ShouldSucceed.Eq2.t36, d.ShouldSucceed.Eq2.t15)
+    (ShouldSucceed.Eq2.foo.t28,
+	ShouldSucceed.Eq2.foo a.t14 d.ShouldSucceed.Eq2.t36)
+    (d.ShouldSucceed.Eq2.t37, d.ShouldSucceed.Eq2.t36)
+    (ShouldSucceed.Eq2.deq.t26,
+	ShouldSucceed.Eq2.deq a.t14 d.ShouldSucceed.Eq2.t37)
+    {- rec -}
+    d.ShouldSucceed.Eq2.t16 = ({-dict-} [] [deq.t17, foo.t18])
+    deq.t17 :: [a.t14] -> [a.t14] -> Bool
+    deq.t17
+	(a.r33 : as.r34) (b.r35 : bs.r36)
+		= if ShouldSucceed.Eq2.deq.t26
+			 a.r33 (ShouldSucceed.Eq2.foo.t28 b.r35) then
+		      ShouldSucceed.Eq2.deq.t30
+			  as.r34 (ShouldSucceed.Eq2.foo.t32 bs.r36)
+		  else
+		      False
+    foo.t18 :: [a.t14] -> [a.t14]
+    foo.t18
+	x.r37 = x.r37
+AbsBinds [tt5] [d.Num.t8, d.ShouldSucceed.Eq2.t10] [(f.t1, ShouldSucceed.f)]
+    (fromInt.t7, fromInt tt5 d.Num.t8)
+    (lit.t6, fromInt.t7 (MkInt 1#))
+    (d.ShouldSucceed.Eq2.t9,
+	dfun.ShouldSucceed.Eq2.List tt5 d.ShouldSucceed.Eq2.t10)
+    (ShouldSucceed.Eq2.deq.t4,
+	ShouldSucceed.Eq2.deq [tt5] d.ShouldSucceed.Eq2.t9)
+    {- nonrec -}
+    f.t1 :: [tt5] -> Bool
+    f.t1 x.r65 = ShouldSucceed.Eq2.deq.t4 x.r65 ([lit.t6] (tt5))
+

@@ -1,0 +1,65 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Util where
+applyToFst :: (a -> b) -> (a, c) -> (b, c)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LU(LL)" {_A_ 3 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 3 3 XXX 6 _/\_ u0 u1 u2 -> \ (u3 :: u0 -> u1) (u4 :: u0) (u5 :: u2) -> let {(u6 :: u1) = _APP_  u3 [ u4 ]} in _!_ _TUP_2 [u1, u2] [u6, u5] _N_} _F_ _ALWAYS_ _/\_ u0 u1 u2 -> \ (u3 :: u0 -> u1) (u4 :: (u0, u2)) -> case u4 of { _ALG_ _TUP_2 (u5 :: u0) (u6 :: u2) -> let {(u7 :: u1) = _APP_  u3 [ u5 ]} in _!_ _TUP_2 [u1, u2] [u7, u6]; _NO_DEFLT_ } _N_ #-}
+applyToPair :: (a -> c, b -> d) -> (a, b) -> (c, d)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LL)U(LL)" {_A_ 4 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+applyToSnd :: (a -> c) -> (b, a) -> (b, c)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LU(LL)" {_A_ 3 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 3 3 XXX 6 _/\_ u0 u1 u2 -> \ (u3 :: u0 -> u2) (u4 :: u1) (u5 :: u0) -> let {(u6 :: u2) = _APP_  u3 [ u5 ]} in _!_ _TUP_2 [u1, u2] [u4, u6] _N_} _F_ _ALWAYS_ _/\_ u0 u1 u2 -> \ (u3 :: u0 -> u2) (u4 :: (u1, u0)) -> case u4 of { _ALG_ _TUP_2 (u5 :: u1) (u6 :: u0) -> let {(u7 :: u2) = _APP_  u3 [ u6 ]} in _!_ _TUP_2 [u1, u2] [u5, u7]; _NO_DEFLT_ } _N_ #-}
+assoc :: Eq a => [Char] -> [(a, b)] -> a -> b
+	{-# GHC_PRAGMA _A_ 4 _U_ 1212 _N_ _S_ "LLSL" _N_ _N_ #-}
+cfst :: b -> a -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 10 _N_ _S_ "SA" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 2 1 X 1 _/\_ u0 u1 -> \ (u2 :: u1) -> u2 _N_} _F_ _IF_ARGS_ 2 2 XX 1 _/\_ u0 u1 -> \ (u2 :: u1) (u3 :: u0) -> u2 _N_ #-}
+cmpString :: [Char] -> [Char] -> _CMP_TAG
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+equivClasses :: (a -> a -> _CMP_TAG) -> [a] -> [[a]]
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+exists :: (a -> Bool) -> [a] -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+foldPair :: (a -> a -> a, b -> b -> b) -> (a, b) -> [(a, b)] -> (a, b)
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
+forall :: (a -> Bool) -> [a] -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+hasNoDups :: Eq a => [a] -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
+isSingleton :: [a] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+lengthExceeds :: [a] -> Int -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+mapAccumB :: (b -> c -> a -> (b, c, d)) -> b -> c -> [a] -> (b, c, [d])
+	{-# GHC_PRAGMA _A_ 4 _U_ 2221 _N_ _S_ "LLLS" _N_ _N_ #-}
+mapAccumL :: (b -> a -> (b, c)) -> b -> [a] -> (b, [c])
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
+mapAccumR :: (b -> a -> (b, c)) -> b -> [a] -> (b, [c])
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
+mergeSort :: Ord a => [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: {{Ord u0}}) -> let {(ua :: u0 -> u0 -> Bool) = case u1 of { _ALG_ _TUP_8 (u2 :: {{Eq u0}}) (u3 :: u0 -> u0 -> Bool) (u4 :: u0 -> u0 -> Bool) (u5 :: u0 -> u0 -> Bool) (u6 :: u0 -> u0 -> Bool) (u7 :: u0 -> u0 -> u0) (u8 :: u0 -> u0 -> u0) (u9 :: u0 -> u0 -> _CMP_TAG) -> u4; _NO_DEFLT_ }} in _APP_  _TYAPP_  _ORIG_ Util mergeSortLe { u0 } [ ua ] _N_ #-}
+mergeSortLe :: (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ #-}
+mergesort :: (a -> a -> _CMP_TAG) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+nOfThem :: Int -> a -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+naturalMergeSort :: Ord a => [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: {{Ord u0}}) -> let {(ua :: u0 -> u0 -> Bool) = case u1 of { _ALG_ _TUP_8 (u2 :: {{Eq u0}}) (u3 :: u0 -> u0 -> Bool) (u4 :: u0 -> u0 -> Bool) (u5 :: u0 -> u0 -> Bool) (u6 :: u0 -> u0 -> Bool) (u7 :: u0 -> u0 -> u0) (u8 :: u0 -> u0 -> u0) (u9 :: u0 -> u0 -> _CMP_TAG) -> u4; _NO_DEFLT_ }} in _APP_  _TYAPP_  _ORIG_ Util naturalMergeSortLe { u0 } [ ua ] _N_ #-}
+naturalMergeSortLe :: (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 22 _N_ _N_ _N_ _N_ #-}
+quicksort :: (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+removeDups :: (a -> a -> _CMP_TAG) -> [a] -> ([a], [[a]])
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+runs :: (a -> a -> Bool) -> [a] -> [[a]]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+sortLt :: (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+stableSortLt :: (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ Util sortLt _N_ #-}
+substr :: [Char] -> Int -> Int -> [Char]
+	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "LU(P)U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+transitiveClosure :: (a -> [a]) -> (a -> a -> Bool) -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
+unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+zipEqual :: [a] -> [b] -> [(a, b)]
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
+

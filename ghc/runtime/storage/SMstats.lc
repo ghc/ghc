@@ -1,0 +1,468 @@
+*********************************************************************
+
+                 Stuff for printing out GC statistics
+
+usertime()    -- The current user time in seconds
+elapsedtime() -- The current elapsed time in seconds
+
+stat_init
+stat_startGC
+stat_endGC
+stat_exit
+
+*********************************************************************
+
+\begin{code}
+#ifdef hpux_TARGET_OS
+#define _INCLUDE_HPUX_SOURCE
+#endif
+
+#define NULL_REG_MAP
+#include "SMinternal.h"
+#include "RednCounts.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_TIMES_H
+#include <sys/times.h>
+#endif
+
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+
+#if defined(HAVE_SYS_RESOURCE_H) && ! irix_TARGET_OS
+#include <sys/resource.h>
+#endif
+
+#ifdef HAVE_SYS_TIMEB_H
+#include <sys/timeb.h>
+#endif
+
+#ifdef hpux_TARGET_OS
+#include <sys/syscall.h>
+#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
+#define HAVE_GETRUSAGE
+#endif
+
+static StgDouble GC_start_time,  GC_tot_time = 0;  /* User GC Time */
+static StgDouble GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
+
+#if defined(GCap) || defined(GCgn)
+static StgDouble GC_min_time = 0;
+static StgDouble GCe_min_time = 0;
+
+static I_ GC_min_no = 0;
+static I_ GC_min_since_maj = 0;
+static I_ GC_live_maj = 0;         /* Heap live at last major collection */
+static I_ GC_alloc_since_maj = 0;  /* Heap alloc since collection major */
+#endif
+
+static I_ GC_maj_no = 0;
+static ullong GC_tot_alloc = 0;        /* Total heap allocated -- 64 bits? */
+
+static I_ GC_start_faults = 0, GC_end_faults = 0;
+
+char *
+#ifdef __STDC__ 
+ullong_format_string(ullong x, char *s, rtsBool with_commas)
+#else
+ullong_format_string(x, s, with_commas)
+    ullong x;
+    char  *s;
+    rtsBool with_commas;
+#endif
+{
+    if (x < (ullong)1000) 
+	sprintf(s, "%ld", (I_)x);
+    else if (x < (ullong)1000000)
+	sprintf(s, (with_commas) ? "%ld,%3.3ld" : "%ld%3.3ld",
+		(I_)((x)/(ullong)1000),
+		(I_)((x)%(ullong)1000));
+    else if (x < (ullong)1000000000)
+	sprintf(s, (with_commas) ? "%ld,%3.3ld,%3.3ld" :  "%ld%3.3ld%3.3ld",
+		(I_)((x)/(ullong)1000000),
+		(I_)((x)/(ullong)1000%(ullong)1000),
+		(I_)((x)%(ullong)1000));
+    else
+	sprintf(s, (with_commas) ? "%ld,%3.3ld,%3.3ld,%3.3ld" : "%ld%3.3ld%3.3ld%3.3ld",
+		(I_)((x)/(ullong)1000000000),
+		(I_)((x)/(ullong)1000000%(ullong)1000),
+		(I_)((x)/(ullong)1000%(ullong)1000), 
+		(I_)((x)%(ullong)1000));
+    return s;
+}
+
+/* "constants" for "usertime" and "elapsedtime" */
+
+static StgDouble ElapsedTimeStart = 0.0; /* setup when beginning things */
+static StgDouble TicksPerSecond   = 0.0; /* ditto */
+
+/* usertime() -- The current user time in seconds */
+
+StgDouble
+usertime()
+{
+#if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
+    /* We will #ifdef around the fprintf for machines
+       we *know* are unsupported. (WDP 94/05)
+    */
+    fprintf(stderr, "NOTE: `usertime' does nothing!\n");
+    return 0.0;
+
+#else /* not stumped */
+
+/* "times" is the more standard, but we prefer "getrusage"
+    (because we are old worn-out BSD hackers)
+*/
+# if defined(HAVE_GETRUSAGE) && ! irix_TARGET_OS
+    struct rusage t;
+
+    getrusage(RUSAGE_SELF, &t);
+    return(t.ru_utime.tv_sec + 1e-6*t.ru_utime.tv_usec);
+
+# else /* HAVE_TIMES */
+    struct tms t;
+
+    times(&t);
+    return(((StgDouble)(t.tms_utime))/TicksPerSecond);
+
+# endif /* HAVE_TIMES */
+#endif /* not stumped */
+}
+
+
+/* elapsedtime() -- The current elapsed time in seconds */
+
+StgDouble
+elapsedtime()
+{
+#if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
+    /* We will #ifdef around the fprintf for machines
+       we *know* are unsupported. (WDP 94/05)
+    */
+    fprintf(stderr, "NOTE: `elapsedtime' does nothing!\n");
+    return 0.0;
+
+#else /* not stumped */
+
+/* "ftime" may be nicer, but "times" is more standard;
+   but, on a Sun, if you do not get the SysV one, you are *hosed*...
+ */
+
+# if defined(HAVE_TIMES) && ! sunos4_TARGET_OS
+    struct tms t;
+
+    return (((StgDouble) times(&t))/TicksPerSecond - ElapsedTimeStart);
+
+# else /* HAVE_FTIME */
+    struct timeb t;
+
+    ftime(&t);
+    return t.time + 1e-3*t.millitm - ElapsedTimeStart;
+
+# endif /* HAVE_FTIME */
+#endif /* not stumped */
+}
+
+void
+start_time(STG_NO_ARGS)
+{
+    long ticks;
+
+    /* Determine TicksPerSecond ... */
+#ifdef HAVE_SYSCONF
+    ticks = sysconf(_SC_CLK_TCK);
+    if ( ticks == -1 ) {
+	fprintf(stderr, "stat_init: bad call to 'sysconf'!\n");
+    	EXIT(EXIT_FAILURE);
+    }
+    TicksPerSecond = (StgDouble) ticks;
+
+#else /* no "sysconf"; had better guess */
+# ifdef HZ
+    TicksPerSecond = (StgDouble) (HZ);
+
+# else /* had better guess wildly */
+    /* We will #ifdef around the fprintf for machines
+       we *know* are unsupported. (WDP 94/05)
+    */
+    fprintf(stderr, "NOTE: Guessing `TicksPerSecond = 60'!\n");
+    TicksPerSecond = 60.0;
+    return;
+# endif
+#endif
+    ElapsedTimeStart = elapsedtime();
+}
+
+static StgDouble InitUserTime = 0.0; /* user time taken for initialization */
+static StgDouble InitElapsedTime = 0.0; /* elapsed time taken for initialization */
+
+void end_init(STG_NO_ARGS)
+{
+    InitUserTime = usertime();
+    InitElapsedTime = elapsedtime();
+}
+
+static I_
+pagefaults(STG_NO_ARGS)
+{
+#if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS
+    return 0;
+#else
+    struct rusage t;
+
+    getrusage(RUSAGE_SELF, &t);
+    return(t.ru_majflt);
+#endif
+}
+
+/* Called at the beginning of execution of the program */
+/* Writes the command line and inits stats header */
+
+void stat_init(collector, comment1, comment2)
+char *collector, *comment1, *comment2;
+{
+    if (SM_statsfile != NULL) {
+	char temp[BIG_STRING_LEN];
+	ullong_format_string( (ullong)SM_word_heap_size*sizeof(W_), temp, rtsTrue/*commas*/);
+	fprintf(SM_statsfile, "\nCollector: %s  HeapSize: %s (bytes)\n\n", collector, temp);
+	if (SM_stats_verbose) {
+#if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS
+	    fprintf(SM_statsfile, "NOTE: `pagefaults' does nothing!\n");
+#endif
+	    fprintf(SM_statsfile,
+/*######## ####### #######  ##.#  ##.## ##.## ####.## ####.## #### ####*/
+ "  Alloc  Collect   Live   Resid   GC    GC     TOT     TOT  Page Flts  %s\n",
+		    comment1);
+	    fprintf(SM_statsfile,
+ "  bytes   bytes    bytes   ency  user  elap    user    elap   GC  MUT  %s\n",
+		    comment2);
+	}
+
+#if defined(GCap) || defined(GCgn)
+        else {
+	    fprintf(SM_statsfile,
+/*######## #######  ##.#  #######  ##.#   ###  ##.## ##.## ##.## ##.## ####.## ####.## #### ####*/
+ "  Alloc  Promote  Promo   Live   Resid Minor Minor Minor Major Major    TOT     TOT  Page Flts\n");
+	    fprintf(SM_statsfile,
+ "  bytes   bytes    ted    bytes   ency   No   user  elap  user  elap    user    elap  MUT Major\n");
+	}
+#endif /* generational */
+
+	fflush(SM_statsfile);
+    }
+}
+
+
+/* Called at the beginning of each GC */
+static I_ rub_bell = 0;
+
+void
+stat_startGC(alloc)
+  I_ alloc;
+{
+#if defined(GCap) || defined(GCgn)
+    I_ bell = alloc == 0 ? SM_ring_bell : 0;
+#else  /* ! generational */
+    I_ bell = SM_ring_bell;
+#endif /* ! generational */
+
+    if (bell) {
+	if (bell > 1) {
+	    fprintf(stderr, " GC ");
+	    rub_bell = 1;
+	} else {
+	    fprintf(stderr, "\007");
+	}
+    }
+
+    if (SM_statsfile != NULL) {
+	GC_start_time = usertime();
+	GCe_start_time = elapsedtime();
+	
+#if defined(GCap) || defined(GCgn)
+        if (SM_stats_verbose || alloc == 0) {
+	    GC_start_faults = pagefaults();
+	}
+#else  /* ! generational */
+	if (SM_stats_verbose) {
+	    GC_start_faults = pagefaults();
+	}
+#endif /* ! generational */
+
+    }
+}
+
+
+/* Called at the end of each GC */
+
+void
+stat_endGC(alloc, collect, live, comment)
+  I_ alloc, collect, live;
+  char *comment;
+{
+    if (SM_statsfile != NULL) {
+	StgDouble time = usertime();
+	StgDouble etime = elapsedtime();
+
+	if (SM_stats_verbose){
+	    I_ faults = pagefaults();
+
+	    fprintf(SM_statsfile, "%8ld %7ld %7ld %5.1f%%",
+		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_), collect == 0 ? 0.0 : (live / (StgFloat) collect * 100));
+	    fprintf(SM_statsfile, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  %s\n", 
+		    (time-GC_start_time), 
+		    (etime-GCe_start_time), 
+		    time,
+		    etime,
+		    faults - GC_start_faults,
+		    GC_start_faults - GC_end_faults,
+		    comment);
+
+	    GC_end_faults = faults;
+	    fflush(SM_statsfile);
+	}
+
+#if defined(GCap) || defined(GCgn)
+        else if(alloc == 0 && collect != 0) {
+	    I_ faults = pagefaults();
+
+	    fprintf(SM_statsfile, "%8ld %7ld %5.1f%% %7ld %5.1f%%",
+		    GC_alloc_since_maj*sizeof(W_), (collect - GC_live_maj)*sizeof(W_),
+		    (collect - GC_live_maj) / (StgFloat) GC_alloc_since_maj * 100,
+		    live*sizeof(W_), live / (StgFloat) SM_word_heap_size * 100);
+	    fprintf(SM_statsfile, "  %3ld  %5.2f %5.2f %5.2f %5.2f %7.2f %7.2f %4ld %4ld\n",
+		    GC_min_since_maj, GC_min_time, GCe_min_time,
+		    (time-GC_start_time), 
+		    (etime-GCe_start_time), 
+		    time,
+		    etime,
+		    faults - GC_start_faults,
+		    GC_start_faults - GC_end_faults
+		    );
+
+	    GC_end_faults = faults;
+	    fflush(SM_statsfile);
+	}
+#endif /* generational */
+
+#if defined(GCap) || defined(GCgn)
+	if (alloc == 0 && collect != 0) {
+	    GC_maj_no++;
+	    GC_live_maj = live;
+	    GC_min_no += GC_min_since_maj;
+	    GC_min_since_maj = 0;
+	    GC_tot_alloc += (ullong) GC_alloc_since_maj;
+	    GC_alloc_since_maj = 0;
+	    GC_tot_time  += time-GC_start_time + GC_min_time;
+	    GC_min_time = 0;
+	    GCe_tot_time += etime-GCe_start_time + GCe_min_time;
+	    GCe_min_time = 0;
+	} else {
+	    GC_min_since_maj++;
+	    GC_alloc_since_maj += alloc;
+	    GC_min_time += time-GC_start_time;
+	    GCe_min_time += etime-GCe_start_time;
+	}
+#else /* ! generational */
+	GC_maj_no++;
+	GC_tot_alloc += (ullong) alloc;
+	GC_tot_time  += time-GC_start_time;
+	GCe_tot_time += etime-GCe_start_time;
+#endif /* ! generational */
+
+    }
+
+    if (rub_bell) {
+	fprintf(stderr, "\b\b\b  \b\b\b");
+	rub_bell = 0;
+    }
+}
+
+
+/* Called at the end of execution -- to print a summary of statistics */
+
+void
+stat_exit(alloc)
+  I_ alloc;
+{
+    if (SM_statsfile != NULL){
+	char temp[BIG_STRING_LEN];
+	StgDouble time = usertime();
+	StgDouble etime = elapsedtime();
+
+	if (SM_stats_verbose) {
+	    fprintf(SM_statsfile, "%8ld\n\n", alloc*sizeof(W_));
+	}
+
+#if defined(GCap) || defined (GCgn)
+	else {
+	    fprintf(SM_statsfile, "%8ld %7.7s %6.6s %7.7s %6.6s",
+		    (GC_alloc_since_maj + alloc)*sizeof(W_), "", "", "", "");
+	    fprintf(SM_statsfile, "  %3ld  %5.2f %5.2f\n\n",
+		    GC_min_since_maj, GC_min_time, GCe_min_time);
+	}
+	GC_min_no    += GC_min_since_maj;
+	GC_tot_time  += GC_min_time;
+	GCe_tot_time += GCe_min_time;
+	GC_tot_alloc += (ullong) (GC_alloc_since_maj + alloc);
+	ullong_format_string(GC_tot_alloc*sizeof(W_), temp, rtsTrue/*commas*/);
+	fprintf(SM_statsfile, "%11s bytes allocated in the heap\n", temp);
+	if ( ResidencySamples > 0 ) {
+	    ullong_format_string(MaxResidency*sizeof(W_), temp, rtsTrue/*commas*/);
+	    fprintf(SM_statsfile, "%11s bytes maximum residency (%.1f%%, %ld sample(s))\n",
+			      temp,
+			      MaxResidency / (StgFloat) SM_word_heap_size * 100,
+			      ResidencySamples);
+	}
+	fprintf(SM_statsfile, "%11ld garbage collections performed (%ld major, %ld minor)\n\n",
+		GC_maj_no + GC_min_no, GC_maj_no, GC_min_no);
+
+#else  /* ! generational */
+
+	GC_tot_alloc += (ullong) alloc;
+	ullong_format_string(GC_tot_alloc*sizeof(W_), temp, rtsTrue/*commas*/);
+	fprintf(SM_statsfile, "%11s bytes allocated in the heap\n", temp);
+	if ( ResidencySamples > 0 ) {
+	    ullong_format_string(MaxResidency*sizeof(W_), temp, rtsTrue/*commas*/);
+	    fprintf(SM_statsfile, "%11s bytes maximum residency (%.1f%%, %ld sample(s))\n",
+			      temp,
+			      MaxResidency / (StgFloat) SM_word_heap_size * 100,
+			      ResidencySamples);
+	}
+	fprintf(SM_statsfile, "%11ld garbage collections performed\n\n", GC_maj_no);
+
+#endif /* ! generational */
+
+	fprintf(SM_statsfile, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
+		InitUserTime, InitElapsedTime);
+	fprintf(SM_statsfile, "  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
+		time - GC_tot_time - InitUserTime, 
+                etime - GCe_tot_time - InitElapsedTime);
+	fprintf(SM_statsfile, "  GC    time  %6.2fs  (%6.2fs elapsed)\n",
+		GC_tot_time, GCe_tot_time);
+	fprintf(SM_statsfile, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
+		time, etime);
+
+	fprintf(SM_statsfile, "  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
+		GC_tot_time*100./time, GCe_tot_time*100./etime);
+
+	ullong_format_string((ullong)(GC_tot_alloc*sizeof(W_)/(time - GC_tot_time)), temp, rtsTrue/*commas*/);
+	fprintf(SM_statsfile, "  Alloc rate    %s bytes per MUT second\n\n", temp);
+
+	fprintf(SM_statsfile, "  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
+		(time - GC_tot_time - InitUserTime) * 100. / time, 
+                (time - GC_tot_time - InitUserTime) * 100. / etime);
+	fflush(SM_statsfile);
+	fclose(SM_statsfile);
+    }
+}
+
+\end{code}

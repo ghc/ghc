@@ -1,0 +1,51 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface HsBinds where
+import HsExpr(Expr)
+import HsMatches(GRHSsAndBinds, Match)
+import HsPat(InPat, TypecheckedPat)
+import HsPragmas(ClassOpPragmas, GenPragmas)
+import HsTypes(PolyType)
+import Id(Id)
+import Inst(Inst)
+import Maybes(Labda)
+import Name(Name)
+import Outputable(NamedThing, Outputable)
+import PreludePS(_PackedString)
+import ProtoName(ProtoName)
+import SimplEnv(UnfoldingGuidance)
+import SrcLoc(SrcLoc)
+import TyVar(TyVar)
+data Bind a b   = EmptyBind | NonRecBind (MonoBinds a b) | RecBind (MonoBinds a b)
+data Binds a b   = EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b)
+data MonoBinds a b   = EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc
+type ProtoNameBind = Bind ProtoName (InPat ProtoName)
+type ProtoNameBinds = Binds ProtoName (InPat ProtoName)
+type ProtoNameClassOpSig = Sig ProtoName
+type ProtoNameMonoBinds = MonoBinds ProtoName (InPat ProtoName)
+type ProtoNameSig = Sig ProtoName
+type RenamedBind = Bind Name (InPat Name)
+type RenamedBinds = Binds Name (InPat Name)
+type RenamedClassOpSig = Sig Name
+type RenamedMonoBinds = MonoBinds Name (InPat Name)
+type RenamedSig = Sig Name
+data Sig a   = Sig a (PolyType a) (GenPragmas a) SrcLoc | ClassOpSig a (PolyType a) (ClassOpPragmas a) SrcLoc | SpecSig a (PolyType a) (Labda a) SrcLoc | InlineSig a UnfoldingGuidance SrcLoc | DeforestSig a SrcLoc | MagicUnfoldingSig a _PackedString SrcLoc
+type TypecheckedBind = Bind Id TypecheckedPat
+type TypecheckedBinds = Binds Id TypecheckedPat
+type TypecheckedMonoBinds = MonoBinds Id TypecheckedPat
+bindIsRecursive :: Bind Id TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: Bind Id TypecheckedPat) -> case u0 of { _ALG_ _ORIG_ HsBinds EmptyBind  -> _!_ False [] []; _ORIG_ HsBinds NonRecBind (u1 :: MonoBinds Id TypecheckedPat) -> _!_ False [] []; _ORIG_ HsBinds RecBind (u2 :: MonoBinds Id TypecheckedPat) -> _!_ True [] []; _NO_DEFLT_ } _N_ #-}
+nullBind :: Bind a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+nullBinds :: Binds a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+nullMonoBinds :: MonoBinds a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Bind a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Binds a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (MonoBinds a b)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance Outputable a => Outputable (Sig a)
+	{-# GHC_PRAGMA _M_ HsBinds {-dfun-} _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
+

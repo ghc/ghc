@@ -1,0 +1,253 @@
+Release~0.23 is the fifth public release of Glasgow Haskell.
+It incorporates our new work for the second half of 1994.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-0.23}
+in the top-level directory.
+
+%************************************************************************
+%*									*
+\subsection[0-23-ports]{What machines GHC~0.23 runs on}
+%*									*
+%************************************************************************
+
+NOTE: the porting situation is essentially unchanged between 0.22 and
+0.23, except for adding the native-code generator for DEC Alphas.
+
+We use Sun4s running SunOS~4.1.3 and DEC~Alphas running OSF/1~V2.0, so
+those are the ``fully-supported'' platforms, unsurprisingly.  Both
+have native-code generators, for quicker compilations.
+
+The GHC hierarchy of Porting Goodness: (a)~Best is a native-code
+generator; (b)~next best is a ``registerised''
+port; (c)~the bare minimum is an ``unregisterised'' port.
+``Unregisterised'' Haskell programs are much bigger and slower,
+but the port is much easier to get going.
+
+Here's everything that's known about GHC ports, as of 0.23:
+\begin{description}
+%-------------------------------------------------------------------
+\item[Sun4 running SunOS~4.1.3 (\tr{sparc-sun-sunos4}):]
+Fully supported, including native-code generator.
+
+%-------------------------------------------------------------------
+\item[Sun4 running Solaris 2.x (\tr{sparc-sun-solaris2}):]
+Fully supported, including native-code generator.
+(NB: not tested before release.)
+
+%-------------------------------------------------------------------
+\item[DEC Alpha running OSF/1 V2.0 (\tr{alpha-dec-osf1}):]
+Fully supported, including native-code generator.
+
+%-------------------------------------------------------------------
+\item[Sun3 running SunOS~4.1.3 (\tr{m68k-sun-sunos4}):]
+GHC~0.23 works registerised.  No native-code generator.
+
+%-------------------------------------------------------------------
+\item[HP-PA box running HP/UX 9.x:]
+An unregisterised port of 0.21 (last ``internal'' release before 0.23)
+seems to work, except that floating-point is definitely busted.
+0.23~should be the same.
+
+%-------------------------------------------------------------------
+\item[Silicon Graphics box running IRIX 5.x:]
+An unregisterised port of 0.21
+seemed to work.  0.23~should be the same.
+
+%-------------------------------------------------------------------
+\item[DECstation (MIPS-based):]
+An unregisterised port back around the time of 0.17 seemed to work;
+0.23~should be the same, modulo a little bit-rot.
+
+%-------------------------------------------------------------------
+\item[x86 PCs running Linux/NetBSD/FreeBSD:]
+This really needs a native-code generator to be viable.  No
+recent progress.
+
+%-------------------------------------------------------------------
+\item[GRIP multiprocessor:]
+GRIP is a 68020-based multiprocessor for running parallel Haskell
+programs; too bad we have the only machine!  We run GHC~0.16 on it,
+with no plans to upgrade.
+
+We are working on other parallel stuff.  Stay tuned.
+
+%-------------------------------------------------------------------
+\item[NeXT box running whatever NeXTs run:]
+Carsten Schultz succeeded with a ``registerised'' port of GHC~0.19.
+There's probably a little bit-rot since then, but otherwise it should
+still be fine.  Had a report that things were basically OK at 0.22.
+
+%-------------------------------------------------------------------
+\item[Macintosh, using MPW:]
+As mind-blowing at it may seem, David Wright in Tasmania has actually
+gotten GHC to run on a Macintosh.  Ditto James Thomson here at Glasgow.
+You may be able to get Thomson's from here.  (Not sure that it will
+excite you to death, but...)
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-23-config]{New configuration things in 0.23}
+%*									*
+%************************************************************************
+
+Essentially, upgraded to Autoconf~2.  Probably the easiest way to see
+what all the options are now is to type \tr{./configure --help} and
+look at the stuff near the end.
+
+%************************************************************************
+%*									*
+\subsection[0-23-user-visible]{User-visible changes in 0.23, including incompatibilities}
+%*									*
+%************************************************************************
+
+You'll need to recompile everything if you're switching from a
+previous version of GHC.  (If you don't, you'll get ``consistency
+errors''.)  Some day, we will stop doing this to you :-)
+
+Monadic I/O has taken yet another shake-up; that is outlined in the
+next section.
+
+To use the 1.3-DRAFT I/O features, you use a \tr{-fhaskell-1.3} flag.
+This also nets you, from your Prelude, the \tr{Maybe} and \tr{Either}
+types, and the functions \tr{thenMaybe}, \tr{curry}, and \tr{uncurry}.
+
+The driver supports a heap-and-stack-sizes scaling flag.  For example,
+\tr{-Rscale-sizes2} would cause the driver to use twice as much
+heap/stack space as it would otherwise.  This is a convenient way to
+move between machines with differing memory setups (e.g., 32-bit vs
+64-bit) without changing millions of -H flags in a Makefile.  Note:
+something like \tr{-Rscale-sizes1.5} is OK, too.
+
+``Lit-lit'' literals are now overloaded.  They can be any
+\tr{_CCallable} type, not just \tr{_Addrs}.  The price of this extra
+convenience is that you sometimes have to insert a type signature.
+
+The shift-right primitive-operation, \tr{shiftR#}, has been renamed
+and clarified to \tr{shiftRA#} (arithmetic).  A new prim-op
+\tr{shiftRL#} (logical) has been added.
+
+Comparable shift primitive-ops on \tr{Int#s} (rather than \tr{Word#s})
+have been added: \tr{iShiftL#}, \tr{iShiftRA#}, and \tr{iShiftRL#}.
+Long live high-level languages!
+
+%************************************************************************
+%*									*
+\subsection[0-23-io]{New in I/O, esp. ``monadic,'' esp. ``1.3''}
+%*									*
+%************************************************************************
+
+GHC~0.23 is still a Haskell~1.2 compiler.  Do nothing weird, and it
+should work exactly as before.
+
+If you give GHC a \tr{-fhaskell-1.3} flag (both compile and link time,
+please!), it will use a VERY EARLY, LARGELY UNTESTED implementation of
+the DRAFT 1.3 I/O PROPOSAL.
+
+The \tr{PreludeGlaIO} interface, which was based on a long-ago 1.3 I/O
+proposal, is DEAD.  It was in a pretty bad state, anyway.
+Putting \tr{PreludeGlaIO} code through as 1.3 code, I got pretty
+far with just these few impedance-matching definitions:
+\begin{verbatim}
+> type Void = ()
+> returnIO = return
+> thenIO = (>>=)
+> mapIO	 :: (a -> IO b) -> [a] -> IO [b]
+> mapIO f =  accumulate {-was:listIO-} . map f
+\end{verbatim}
+
+We supply the DRAFT 1.3 I/O PROPOSAL in \tr{ghc/docs/io-1.3/}.
+It is in HTML format.
+
+We still give access to our underlying \tr{PrimIO} monad, via the
+\tr{PreludePrimIO} interface.  This is the level at which \tr{_ccall_s}
+operate.  It should still be quite solid, and counts as a good fall-back
+position when the 1.3-DRAFT stuff dies on you.  See the User's Guide.
+
+%************************************************************************
+%*									*
+\subsection[0-23-support]{New in support tools (e.g., profiling)}
+%*									*
+%************************************************************************
+
+The reports from profiling should be a bit tidier.  The ``automagic''
+cost-centres for, e.g., ``all the CAFs in module X'', will now be
+reported against \tr{CAFs_in_... X}.  Which seems fair enough.
+
+GHCI---an INTERPRETER for Glasgow Haskell!  The brainchild and work of
+Alastair Reid, before he defected to the Enemy at Yale.  Accepts full
+Glasgow Haskell, including many extensions.  Can mix interpreted and
+compiled code, the Prelude being a notably case of the latter.
+MASSIVE HACK VALUE!  The problem is it doesn't quite compile under
+0.23 (I ran out of time), and some of its dodgy bits (used to mix
+interpreted and compiled code) need upgrading to work with the new
+info tables.  It lives in \tr{ghc/compiler} and below, notably the
+\tr{interpreter} subdirectory.  Don't be shy now---roll up your
+sleeves and strut your hacking stuff!
+
+%************************************************************************
+%*									*
+\subsection[0-23-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+The compiler is quite a bit faster at compiling, {\em without}
+\tr{-O}.  We are in the HBC league now.  I don't remember all the
+HACKs that we threw in to make this happen :-)
+
+New-format ``info tables'' (work by Bryan O'Sullivan and friends).
+Essentially, static info used by the garbage-collector has been moved
+one indirection further away, into a ``rep table,'' of which there are
+a fixed number.  So the same GC info isn't replicated over and over
+again.  This is our main space-savings gain in 0.23.
+
+A native-code generator for the DEC Alpha.  Jim Mattson did it in one
+weekend.  What a great system!
+
+Rather than have a separate Yacc-parser process that spews a long
+``prefix form'' string into the compiler, the compiler now just does a
+\tr{_ccall_ yyparse} and then walks the resulting parse tree directly.
+(Not quite {\em that} simple, but... still pretty cool.)
+
+A {\em selective} lambda-lifter.  (Simon is very excited about its
+selectiveness.)  That means it only does lambda-lifting if there is a
+benefit in doing so.  It's done on the STG syntax (quite late in the
+compilation).
+
+%************************************************************************
+%*									*
+\subsection[0-23-new-in-libraries]{In the prelude and runtime support}
+%*									*
+%************************************************************************
+
+PackedStrings (now called \tr{_PackedString}s) are now a built-in
+type, just like \tr{Int}s, say.  Their interface is described with the
+Glasgow extensions in the User's Guide.  There is also a
+``extensions-free'' interface (no underscores on the front of names)
+which you can get at as a system library (\tr{-syslib ghc}).
+
+The pretty-printing code that we use in GHC is now available in the
+GHC system library (\tr{-syslib ghc} and \tr{import Pretty}).  We
+would claim it is more ``industrial strength'' than the one in the HBC
+system library...
+
+Because of name-grabbing by the DRAFT-1.3-I/O, two functions in the
+HBC library's \tr{Parse} module have been renamed: \tr{(>>)} is now
+\tr{act}, and \tr{fail} is now \tr{failP}.  (We will change these
+again if Lennart does something differently.)
+
+%************************************************************************
+%*									*
+\subsection[0-23-new-elsewhere]{Other new stuff}
+%*									*
+%************************************************************************
+
+We've added a new utility, \tr{pphs}, for pretty-printing Haskell code
+in LaTeX documents.  It was written by Andrew Preece, a student at
+Glasgow.  The code is in \tr{ghc/CONTRIB/pphs}.
+
+Over in literate-land, we've hidden a copy of a slightly-tweaked
+\tr{texi2html} script (in \tr{literate/texi2html/texi2html}).  This is
+probably the most painless way to turn ``literate'' things into
+Webbable HTML documents.  (Use our literate stuff to make Texinfo
+files, then convert with \tr{texi2html}.)  NB: not really tested.

@@ -1,0 +1,292 @@
+\documentstyle[11pt,slpj,abstracts]{article}
+\begin{document}
+
+% ======================================================
+
+\title{Abstracts of GRIP/GRASP-related papers and reports, 1992
+}
+
+\author{The GRASP team \\ Department of Computing Science \\
+University of Glasgow G12 8QQ
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP 
+and GRASP projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by FTP.  Connect to {\tt ftp.dcs.glasgow.ac.uk},
+and look in {\tt pub/glasgow-fp/papers}, {\tt pub/glasgow-fp/drafts}, {\tt pub/glasgow-fp/tech\_reports},
+or {\tt pub/glasgow-fp/grasp-and-aqua-docs}.
+
+They can also be obtained by writing to 
+Alexa Stewart, Department of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+alexa@dcs.glasgow.ac.uk.
+\end{abstract}
+
+\section{Book}
+
+\reference{Simon Peyton Jones and David Lester}
+{Implementing functional languages}
+{Prentice Hall, 1992}
+{
+This book gives a practical approach to understanding implementations
+of non-strict functional languages using lazy graph reduction.
+
+An unusual feature of the book is that the text of each chapter is
+itself a directly-executable Miranda(TM) program, constituting a
+minimal but complete compiler and interpreter for a particular
+abstract machine.  The complete source code for the book, and a
+Tutor's Guide containing solutions to the exercises, is available in
+machine-readable form by network file transfer (FTP).
+
+Written to allow the reader to modify, extend and experiment with the
+implementations provided in the text, this book will help to make a
+course on functional-langauge implementation "come alive".
+
+{\bf Contents}.  The Core Language.  Template instantiation.  The G-machine.
+The Three Instruction Machine.  A parallel G-machine.  Lambda lifting
+and full laziness.  Appendices.  Bibliography.  Index.
+}
+
+
+\section{Published papers}
+
+\reference{Simon L Peyton Jones}
+{Implementing lazy functional languages on stock hardware: 
+the Spineless Tagless G-machine}
+{Journal of Functional Programming 2(2) (Apr 1992)}
+{The Spineless Tagless G-machine is an abstract machine designed
+to support non-strict higher-order 
+functional languages.  This presentation of the machine
+falls into three parts.  Firstly, we give a general discussion of
+the design issues involved in implementing non-strict functional
+languages.
+
+Next, we present the {\em STG language},
+an austere but recognisably-functional language, which as well as
+a {\em denotational} meaning has a well-defined {\em operational} semantics.
+The STG language is the ``abstract machine code'' for the Spineless
+Tagless G-machine.
+
+Lastly, we discuss the mapping of the STG language onto stock hardware.
+The success of an abstract machine model depends largely on how efficient
+this mapping can be made, though this topic is often relegated to a short
+section.  Instead, we give a detailed discussion of the design issues and
+the choices we have made.  Our principal target is the C language, treating
+the C compiler as a portable assembler.
+
+This paper used to be called ``The Spineless Tagless G-machine: a second
+attempt'', but has been retitled and substantially expanded with new
+material which tries to set the machine in the context of compiler
+technology for other languages.  The paper is very long (65 pages) and
+has an index.
+}
+
+\reference{Philip Wadler}
+{The essence of functional programming}
+{Invited talk, 19'th Annual Symposium on Principles of
+Programming Languages, Santa Fe, New Mexico, Jan 1992}
+{
+This paper explores the use monads to structure functional programs.
+No prior knowledge of monads or category theory is required.
+
+Monads increase the ease with which programs may be modified.  They can
+mimic the effect of impure features such as exceptions, state, and
+continuations; and also provide effects not easily achieved with such
+features.  The types of a program reflect which effects occur.
+
+The first section is an extended example of the use of monads.  A
+simple interpreter is modified to support various extra features: error
+messages, state, output, and non-deterministic choice.  The second
+section describes the relation between monads and continuation-passing
+style.  The third section sketches how monads are used in a compiler
+for Haskell that is written in Haskell.
+}
+
+\reference{A Santos and SL Peyton Jones}
+{On program transformation and the Glasgow Haskell compiler}
+{\GlasgowNinetyTwo{}, pp240-251}
+{We describe a series of program transformations that are implemented
+in the Glasgow Haskell Compiler.  They are semantics preserving
+transformations and suitable for automatic application by a compier.
+We describe the transformations, how they interact, and their impact
+on the time/space behaviour of some programs.}
+
+\reference{P Sansom and SL Peyton Jones}
+{Profiling lazy functional languages}
+{\GlasgowNinetyTwo{}, pp227-239}
+{Profiling tools, which measure and display the dynamic space
+and time behaviour of programs, are essential for identifying
+execution bottlenecks.  A variety of such tools exist for conventional
+languages, but almost none for non-strict functional languages.  There
+is a good reason for this: lazy evaluation means that the program is
+executed in an order which is not immediately apparent from the source
+code, so it is difficult to relate dynamically-gathered statistics
+back to the original source.
+
+We present a new technique which solves this problem.  The framework is
+general enough to profile both space and time behaviour.  Better still,
+it is cheap to implement, and we describe how to do so in the
+context of the Spineless Tagless G-machine.
+}
+
+\reference{CV Hall, K Hammond, WD Partain, SL Peyton Jones, and PL Wadler}
+{The Glasgow Haskell Compiler: a retrospective}
+{\GlasgowNinetyTwo{}, pp62-71}
+{We've spent much of our time over the last
+two years implementing a new compiler for the functional language Haskell
+In this effort, we've been joined by Andy Gill, who has implemented a
+strictness analyser, Andre Santos, who has contributed a `simplifier', and
+Patrick Sansom, who wrote garbage collectors for our runtime system.
+
+This paper describes some of the things we have learned, what we might 
+do differently, and where we go from here.
+}
+
+\reference{D King and PL Wadler}
+{Combining monads}
+{\GlasgowNinetyTwo{}, pp134-143}
+{Monads provide a way of structuring functional programs.
+Most real applications require a combination of primitive monads.
+Here we describe how some monads may be combined with others to
+yield a {\em combined monad}.}
+
+\reference{J Launchbury, A Gill, RJM Hughes, S Marlow, SL Peyton Jones, and PL Wadler}
+{Avoiding unnecessary updates}
+{\GlasgowNinetyTwo{}, pp144-153}
+{Graph reduction underlies most implementations of lazy functional
+languages, allowing separate computations to share results when
+sub-terms are evaluated. Once a term is evaluated, the node of the
+graph representing the computation is {\em updated} with the value of
+the term. However, in many cases, no other computation requires this
+value, so the update is unnecessary. In this paper we take some steps
+towards an analysis for determining when these updates may be omitted.
+}
+
+\reference{S Marlow and PL Wadler}
+{Deforestation for higher-order functions}
+{\GlasgowNinetyTwo{}, pp154-165}
+{Deforestation is an automatic transformation scheme for functional
+programs which attempts to remove unnecessary intermediate data
+structures. The algorithm presented here is a variant of the original,
+adapted for a higher order language. A detailed description of how
+this may be implemented in an optimising compiler is also given.
+}
+
+\reference{WD Partain}
+{The nofib benchmark suite of Haskell programs}
+{\GlasgowNinetyTwo{}, pp195-202}
+{This position paper describes the need for, make-up of, and
+``rules of the game'' for a benchmark suite of Haskell programs.  (It
+does not include results from running the suite.) Those of us working
+on the Glasgow Haskell compiler hope this suite will encourage sound,
+quantitative assessment of lazy functional programming systems.  This
+version of this paper reflects the state of play at the initial
+pre-release of the suite.
+}
+
+\reference{PL Wadler}
+{Monads for functional programming}
+{Proceedings of the Marktoberdorf Summer School on Programming Calculi, 
+ed M Broy, July-August 1992, Springer Verlag}
+{The use of monads to structure functional programs is
+described.  Monads provide a convenient framework for simulating
+effects found in other languages, such as global state, exception
+handling, output, or non-determinism.  Three case studies are looked at
+in detail: how monads ease the modification of a simple evaluator;
+how monads act as the basis of a datatype of arrays subject to in-place
+update; and how monads can be used to build parsers.
+}
+
+\reference{K Hammond, P Trinder, P Sansom and D McNally}
+{Improving persistent data manipulation for functional languages}
+{\GlasgowNinetyTwo{}, pp72-85}
+{Although there is a great deal of academic interest in
+functional languages, there are very few large-scale functional
+applications. The poor interface to the file system seems to be a
+major factor preventing functional languages being used for
+large-scale programming tasks. The interfaces provided by some
+widely-used languages are described and some problems encountered with
+using these interfaces to access persistent data are discussed. Three
+means of improving the persistent data manipulation facilities of
+functional languages are considered: an improved interface to the file
+system, including a good binary file implementation; an interface to a
+database; and the provision of orthogonal persistence.  Concrete
+examples are given using the functional programming language, Haskell.
+}
+
+\reference{Kevin Hammond and Simon Peyton Jones}
+{Profiling scheduling strategies on the GRIP parallel reducer}
+{Proc 1992 Workshop on Parallel Implementations of Functional Languages, Aachen,
+ed Kuchen, Sept 1992}
+{It is widely claimed that functional languages are particularly
+suitable for programming parallel computers.  A claimed advantage is
+that the programmer is not burdened with details of task creation,
+placement, scheduling, and synchronisation, these decisions being
+taken by the system instead.
+
+Leaving aside the question of whether a pure functional language is
+expressive enough to encompass all the parallel algorithms we might
+wish to program, there remains the question of how effectively the
+compiler and run-time system map the program onto a real parallel
+system, a task usually carried out mostly by the programmer.  This is
+the question we address in our paper.
+
+We first introduce the system architecture of GRIP, a shared-memory
+parallel machine supporting an implementation of the functional
+language Haskell.  GRIP executes functional programs in parallel using
+compiled supercombinator graph reduction, a form of 
+declarative rule system.
+
+We then to describe several strategies for run-time resource
+control which we have tried, presenting comprehensive measurements of
+their effectiveness.  We are particularly concerned with strategies
+controlling task creation, in order to improve task granularity and
+minimise communication overheads.  This is, so far as we know, one of
+the first attempts to make a systematic study of task-control
+strategies in a high-performance parallel functional-language system.
+GRIP's high absolute performance render these results credible for
+real applications.
+}
+
+\section{Technical reports}
+
+\reference{CV Hall, K Hammond, SL Peyton Jones, PL Wadler}
+{Type classes in Haskell}
+{Department of Computing Science, University of Glasgow}
+{This paper defines a set of type inference rules for resolving
+overloading introduced by type classes.  Programs including type
+classes are transformed into ones which may be typed by the
+Hindley-Milner inference rules.  In contrast to an other work on type
+classes, the rules presented here relate directly to user programs.  An
+innovative aspect of this work is the use of second-order lambda
+calculus to record type information in the program.
+}
+
+\shortreference{CV Hall}
+{A transformed life: introducing optimised lists automatically}
+{submitted to FPCA 93}
+{}
+
+\shortreference{K Hammond}
+{The Spineless Tagless G-machine --- NOT!}
+{submitted to FPCA 93}
+
+\shortreference{CV Hall}
+{An optimists view of Life}
+{submitted to Journal of Functional Programming, 1993}
+{}
+% ~cvh/Public/Papers/An_Optimists_View.dvi
+
+\end{document}
+
+
+
+
+

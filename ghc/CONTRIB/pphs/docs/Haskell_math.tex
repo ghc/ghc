@@ -1,0 +1,5 @@
+\begin{verbatim}
+-- list concatenation (right-associative)
+(++)                    :: [a] -> [a] -> [a]
+xs ++ ys                =  foldr (:) ys xs
+\end{verbatim}

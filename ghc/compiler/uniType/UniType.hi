@@ -1,0 +1,74 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface UniType where
+import Class(Class, ClassOp)
+import Id(Id)
+import InstEnv(InstTemplate)
+import Maybes(Labda)
+import NameTypes(FullName, ShortName)
+import Outputable(Outputable)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import Unique(Unique)
+data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+type InstTyEnv = [(TyVarTemplate, UniType)]
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+type RhoType = UniType
+type SigmaType = UniType
+type TauType = UniType
+type ThetaType = [(Class, UniType)]
+data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data TyVarTemplate 	{-# GHC_PRAGMA SysTyVarTemplate Unique _PackedString | UserTyVarTemplate Unique ShortName #-}
+data UniType   = UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType
+alpha :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVarTemplate [] [_ORIG_ TyVar alpha_tv] _N_ #-}
+alpha_ty :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVar [] [_ORIG_ TyVar alpha_tyvar] _N_ #-}
+beta :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVarTemplate [] [_ORIG_ TyVar beta_tv] _N_ #-}
+beta_ty :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVar [] [_ORIG_ TyVar beta_tyvar] _N_ #-}
+cmpUniType :: Bool -> UniType -> UniType -> Int#
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
+delta :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVarTemplate [] [_ORIG_ TyVar delta_tv] _N_ #-}
+delta_ty :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVar [] [_ORIG_ TyVar delta_tyvar] _N_ #-}
+epsilon :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVarTemplate [] [_ORIG_ TyVar epsilon_tv] _N_ #-}
+epsilon_ty :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVar [] [_ORIG_ TyVar epsilon_tyvar] _N_ #-}
+gamma :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVarTemplate [] [_ORIG_ TyVar gamma_tv] _N_ #-}
+gamma_ty :: UniType
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ UniType UniTyVar [] [_ORIG_ TyVar gamma_tyvar] _N_ #-}
+instantiateTauTy :: [(TyVarTemplate, UniType)] -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniType instantiateTy _N_ #-}
+instantiateThetaTy :: [(TyVarTemplate, UniType)] -> [(Class, UniType)] -> [(Class, UniType)]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+instantiateTy :: [(TyVarTemplate, UniType)] -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SS" _N_ _N_ #-}
+mkDictTy :: Class -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Class) (u1 :: UniType) -> _!_ _ORIG_ UniType UniDict [] [u0, u1] _N_ #-}
+mkForallTy :: [TyVarTemplate] -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+mkRhoTy :: [(Class, UniType)] -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+mkSigmaTy :: [TyVarTemplate] -> [(Class, UniType)] -> UniType -> UniType
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "SLL" _N_ _N_ #-}
+mkTyVarTemplateTy :: TyVarTemplate -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyVarTemplate) -> _!_ _ORIG_ UniType UniTyVarTemplate [] [u0] _N_ #-}
+mkTyVarTy :: TyVar -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyVar) -> _!_ _ORIG_ UniType UniTyVar [] [u0] _N_ #-}
+quantifyTy :: [TyVar] -> UniType -> ([TyVarTemplate], UniType)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+instance Eq UniType
+	{-# GHC_PRAGMA _M_ UniType {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(UniType -> UniType -> Bool), (UniType -> UniType -> Bool)] [_CONSTM_ Eq (==) (UniType), _CONSTM_ Eq (/=) (UniType)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable UniType
+	{-# GHC_PRAGMA _M_ UniType {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniTyFuns pprUniType _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniTyFuns pprUniType _N_ #-}
+

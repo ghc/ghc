@@ -1,0 +1,47 @@
+#define IHaveSubdirs
+
+MsubNeededHere( ./glue_TAGS_files )
+
+/* order in SUBDIRS is not supposed to be important but ...
+	"compiler" must be before "lib", because we use
+	the compiler just built to compile pieces of "lib".
+
+	"includes" also needs to be v early, to ensure that
+	GhcConstants.h is made before needed.
+
+	if we're building from .hc files, we do the libraries
+	first, then the compiler; otherwise the other way around
+
+*/
+#if HaskellCompilerType == HC_USE_HC_FILES
+#define __compiler_and_lib lib compiler
+#else
+#define __compiler_and_lib compiler lib
+#endif
+
+SUBDIRS = includes \
+	  utils \
+	  driver \
+	  runtime \
+	  docs \
+	  __compiler_and_lib
+
+/*OUT:	  parsers */
+
+#undef __compiler_and_lib
+
+/* "CONTRIB" is also a SUBDIR, but there is nothing to build there.
+ */
+
+/* the standard "whoami" target will give the basic info. */
+/* this target adds to it. */
+whoami::
+	@echo using a \`$(BUILDPLATFORM)\' host to build a Haskell compiler to run on a
+	@echo \`$(HOSTPLATFORM)\' host that will generate \`C\' target code
+
+fulltags : ./glue_TAGS_files
+	$(RM) ./TAGS
+	./glue_TAGS_files `find . -type f -name TAGS -print`
+
+/* this line makes sure perl gets picked up from the right place */
+MsubProgramScriptTarget(PerlCmd,./glue_TAGS_files,./glue_TAGS_files.prl,,)

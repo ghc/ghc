@@ -1,0 +1,123 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[setBuffering.lc]{hSetBuffering Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
+#define SB_NB (0)
+#define SB_LB (-1)
+#define SB_BB (-2)
+
+StgInt
+setBuffering(fp, size)
+StgAddr fp;
+StgInt size;
+{
+    int flags;
+    int input;
+    struct termios tio;
+
+    while ((flags = fcntl(fileno((FILE *) fp), F_GETFL)) < 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    flags &= O_ACCMODE;
+    input = flags == O_RDONLY || flags == O_RDWR;
+
+    switch (size) {
+    case SB_NB:
+	if (setvbuf((FILE *) fp, NULL, _IONBF, 0L) != 0) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+	if (input && isatty(fileno((FILE *) fp))) {
+
+	    /*
+	     * Try to switch to CBREAK mode, or whatever they call it these days.
+	     */
+
+	    if (tcgetattr(fileno((FILE *) fp), &tio) < 0) {
+		cvtErrno();
+		stdErrno();
+		return -1;
+	    }
+	    tio.c_lflag &= ~ICANON;
+	    tio.c_cc[VMIN] = 1;
+	    tio.c_cc[VTIME] = 0;
+	    if (tcsetattr(fileno((FILE *) fp), TCSANOW, &tio) < 0) {
+		cvtErrno();
+		stdErrno();
+		return -1;
+	    }
+	}
+	return 0;
+	break;
+    case SB_LB:
+	if (setvbuf((FILE *) fp, NULL, _IOLBF, BUFSIZ) != 0) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+	break;
+    case SB_BB:
+
+	/*
+	 * We should actually peek at the buffer size in the stat struct, if there
+	 * is one.  Something to occupy us later, when we're bored.
+	 */
+	size = BUFSIZ;
+	/* fall through */
+    default:
+	if (setvbuf((FILE *) fp, NULL, _IOFBF, size) != 0) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+	break;
+    }
+    if (input && isatty(fileno((FILE *) fp))) {
+
+	/*
+	 * Try to switch back to cooked mode.
+	 */
+
+	if (tcgetattr(fileno((FILE *) fp), &tio) < 0) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+	tio.c_lflag |= ICANON;
+	if (tcsetattr(fileno((FILE *) fp), TCSANOW, &tio) < 0) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+\end{code}

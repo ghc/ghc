@@ -1,0 +1,39 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CgRetConv where
+import AbsCSyn(AbstractC, CAddrMode, MagicId)
+import CLabelInfo(CLabel)
+import Class(Class)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda)
+import NameTypes(FullName)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import TyCon(TyCon)
+import TyVar(TyVarTemplate)
+import UniType(UniType)
+import Unique(Unique)
+data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
+data CLabel 
+data CtrlReturnConvention   = VectoredReturn Int | UnvectoredReturn Int
+data DataReturnConvention   = ReturnInHeap | ReturnInRegs [MagicId]
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
+assignPrimOpResultRegs :: PrimOp -> [MagicId]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+assignRegs :: [MagicId] -> [PrimKind] -> ([MagicId], [PrimKind])
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+dataReturnConvAlg :: Id -> DataReturnConvention
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+dataReturnConvPrim :: PrimKind -> MagicId
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "E" _N_ _N_ #-}
+makePrimOpArgsRobust :: PrimOp -> [CAddrMode] -> ([CAddrMode], Int, AbstractC)
+	{-# GHC_PRAGMA _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+mkLiveRegsBitMask :: [MagicId] -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+noLiveRegsMask :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
+

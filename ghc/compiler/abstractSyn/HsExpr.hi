@@ -1,0 +1,38 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface HsExpr where
+import HsBinds(Binds)
+import HsLit(Literal)
+import HsMatches(Match)
+import HsPat(InPat, TypecheckedPat)
+import HsTypes(PolyType)
+import Id(Id)
+import Name(Name)
+import Outputable(NamedThing, Outputable)
+import PreludePS(_PackedString)
+import Pretty(PprStyle, PrettyRep)
+import ProtoName(ProtoName)
+import TyVar(TyVar)
+import UniType(UniType)
+data ArithSeqInfo a b   = From (Expr a b) | FromThen (Expr a b) (Expr a b) | FromTo (Expr a b) (Expr a b) | FromThenTo (Expr a b) (Expr a b) (Expr a b)
+data Expr a b   = Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id
+type ProtoNameArithSeqInfo = ArithSeqInfo ProtoName (InPat ProtoName)
+type ProtoNameExpr = Expr ProtoName (InPat ProtoName)
+type ProtoNameQual = Qual ProtoName (InPat ProtoName)
+data Qual a b   = GeneratorQual b (Expr a b) | FilterQual (Expr a b)
+type RenamedArithSeqInfo = ArithSeqInfo Name (InPat Name)
+type RenamedExpr = Expr Name (InPat Name)
+type RenamedQual = Qual Name (InPat Name)
+type TypecheckedArithSeqInfo = ArithSeqInfo Id TypecheckedPat
+type TypecheckedExpr = Expr Id TypecheckedPat
+type TypecheckedQual = Qual Id TypecheckedPat
+pprExpr :: (NamedThing a, Outputable a, NamedThing b, Outputable b) => PprStyle -> Expr a b -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 22222222 _N_ _N_ _N_ _N_ #-}
+pprParendExpr :: (NamedThing a, Outputable a, NamedThing b, Outputable b) => PprStyle -> Expr a b -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 22222222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ArithSeqInfo a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Expr a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Qual a b)
+	{-# GHC_PRAGMA _M_ HsExpr {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+

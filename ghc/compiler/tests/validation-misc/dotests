@@ -1,0 +1,27 @@
+#! /usr/local/bin/perl
+#
+@Make_args = ();
+@Range_args = ();
+
+while ($_ = $ARGV[0]) {
+    shift;
+    if (/^-/ || /^[A-Z_]+=/) {
+    	push(@Make_args, $_);
+    } else {
+	push(@Range_args,$_);
+    }
+}
+
+if ($#Range_args != 1) {
+    print STDERR "usage: dotest [make-args] from-test to-test\n";
+    exit(1);
+}
+$test = $Range_args[0];
+$last_test = $Range_args[1];
+if ($test gt $last_test) {
+    print STDERR "_from_ test $test _to_ test $last_test?\n";
+}
+while ($test le $last_test) {
+    system("make @Make_args runtest_$test");
+    $test++; # string incr
+}

@@ -1,0 +1,13 @@
+Typechecked:
+AbsBinds [] [] [(g.t1, ShouldSucceed.g)]
+    {- nonrec -}
+    g.t1 :: Bool -> Bool
+    g.t1 x.r54 = (f.r55 Bool) ((f.r55 Bool) True x.r54) x.r54
+	       where
+		   AbsBinds [ot7] [] [(f.t4, f.r55)]
+		       {- rec -}
+		       f.t4 :: Bool -> ot7 -> ot7
+		       f.t4 x.r56 y.r57
+				    = if x.r56 then y.r57 else f.t4 x.r56 y.r57
+		   {- nonrec -}
+

@@ -1,0 +1,50 @@
+\section[Force_GC.lc]{Code for Forcing Garbage Collections}
+
+\begin{code}
+#include "rtsdefs.h"
+\end{code}
+
+Only have GC forcing if @FORCE_GC@ defined
+
+- currently only works with appel GC
+- in normal appel GC, if the force_gc flag is set *major* GC occurs
+  at the next scheduled minor GC if at least GCInterval word allocations have happened
+  since the last major GC.
+  (It also occurs when the normal conditions for a major GC is met)
+- if the force2s and force_gc flags are set 
+  (forcing appel GC to work as a 2 space GC) GC occurs
+  at least at every GCInterval word allocations 
+  (it also occurs when the semi-space limit is reached).
+  Therefore it has no effect if the interval specified is >= semi-space.
+    
+
+\begin{code}
+#if defined(FORCE_GC)
+\end{code}
+
+\begin{code}
+I_ force_GC = 0;     /* Global Flag */
+I_ GCInterval = DEFAULT_GC_INTERVAL;    /* words alloced */
+I_ alloc_since_last_major_GC = 0;    /* words alloced since last major GC */
+
+
+#endif /* FORCE_GC */
+\end{code}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

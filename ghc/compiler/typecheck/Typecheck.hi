@@ -1,0 +1,64 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Typecheck where
+import AbsSyn(Module)
+import Bag(Bag)
+import CE(CE(..))
+import CharSeq(CSeq)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import ErrUtils(Error(..))
+import FiniteMap(FiniteMap)
+import HsBinds(Bind, Binds, MonoBinds, Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, FixityDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsExpr(ArithSeqInfo, Expr, Qual)
+import HsImpExp(IE, ImportedInterface)
+import HsLit(Literal)
+import HsMatches(Match)
+import HsPat(InPat, RenamedPat(..), TypecheckedPat)
+import HsTypes(PolyType)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import Maybes(Labda, MaybeErr)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import ProtoName(ProtoName)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import TcInstDcls(InstInfo)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data Module a b 	{-# GHC_PRAGMA Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+type CE = UniqFM Class
+data GlobalSwitch
+	{-# GHC_PRAGMA ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats #-}
+data E 	{-# GHC_PRAGMA MkE (UniqFM TyCon) (UniqFM Id) (UniqFM Id) (UniqFM Class) #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
+data FixityDecl a 	{-# GHC_PRAGMA InfixL a Int | InfixR a Int | InfixN a Int #-}
+data Expr a b 	{-# GHC_PRAGMA Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id #-}
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+type RenamedPat = InPat Name
+data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data MaybeErr a b 	{-# GHC_PRAGMA Succeeded a | Failed b #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data InstInfo 	{-# GHC_PRAGMA InstInfo Class [TyVarTemplate] UniType [(Class, UniType)] [(Class, UniType)] Id [Id] (MonoBinds Name (InPat Name)) Bool _PackedString SrcLoc [Sig Name] #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+typecheckModule :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Module Name (InPat Name) -> MaybeErr ((Binds Id TypecheckedPat, Binds Id TypecheckedPat, Binds Id TypecheckedPat, [(Inst, Expr Id TypecheckedPat)]), ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo), FiniteMap TyCon [[Labda UniType]], E, PprStyle -> Int -> Bool -> PrettyRep) (Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _S_ "LLLU(LAALSLLLLLLLL)" _N_ _N_ #-}
+

@@ -1,0 +1,47 @@
+Desugared:
+Tests.f :: for all a, d, e. [a] -> d -> [e] -> [e]
+Tests.f =
+    /\ a o86 t97 -> \ x.119 y.120 z.121 ->
+	let
+	  ds.122 =
+	      (++ a) x.119 ((++ a) x.119 ((++ a) x.119 ((++ a) x.119 x.119))) in
+	let
+	  fail.123 =
+	      (error [t97])
+		  "\"ds016.hs\", line 17: pattern-matching failed in case\n"S
+	in 
+	  case ds.122 of {
+	    Nil -> Nil! t97
+	    (:) a.124 ds.125 ->
+		let
+		  fail.128 =
+		      let bs.126 = ds.125 in
+		      let a.127 = a.124 in  (error [t97]) "4"S
+		in 
+		  case ds.125 of {
+		    Nil -> (error [t97]) "2"S
+		    (:) b.129 ds.130 ->
+			case ds.130 of {
+			  (:) c.131 ds.132 ->
+			      case ds.132 of {
+				Nil ->
+				    let a.133 = a.124 in
+				    let
+				      ds.134 =
+					  MkTuple4!
+					      o86
+					      [t97]
+					      o86
+					      [t97]
+					      y.120
+					      z.121
+					      y.120
+					      z.121
+				    in  z.121
+				_ ->  fail.128
+			      }
+			  _ ->  fail.128
+			}
+		  }
+	  }
+

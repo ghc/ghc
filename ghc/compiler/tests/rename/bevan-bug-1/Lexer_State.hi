@@ -1,0 +1,22 @@
+interface Lexer_State where
+import Lexer_Buffer(Lexer_Buffer)
+import Source_Position(Source_Position)
+i_buffer :: Lexer_Buffer -> Lexer_State -> ((), Lexer_State)
+	{-# ARITY i_buffer = 2 #-}
+i_input :: [Char] -> Lexer_State -> ((), Lexer_State)
+	{-# ARITY i_input = 2 #-}
+i_source_pos :: Source_Position -> Lexer_State -> ((), Lexer_State)
+	{-# ARITY i_source_pos = 2 #-}
+initial_state :: [Char] -> Lexer_State
+	{-# ARITY initial_state = 1 #-}
+make :: [Char] -> Source_Position -> Lexer_Buffer -> Lexer_State
+	{-# ARITY make = 3 #-}
+p_buffer :: Lexer_State -> (Lexer_Buffer, Lexer_State)
+	{-# ARITY p_buffer = 1 #-}
+p_input :: Lexer_State -> ([Char], Lexer_State)
+	{-# ARITY p_input = 1 #-}
+p_source_pos :: Lexer_State -> (Source_Position, Lexer_State)
+	{-# ARITY p_source_pos = 1 #-}
+type Lexer_Action a = Lexer_State -> (a, Lexer_State)
+data Lexer_State = Lexer_State [Char] Source_Position Lexer_Buffer
+

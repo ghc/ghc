@@ -1,0 +1,42 @@
+Typechecked:
+{- nonrec -}
+Main.Foo.op1 = /\ a.t7 -> \{-classdict-} [] [op1.t8 op2.t9] -> op1.t8
+Main.Foo.op2 =
+    /\ a.t7 b.t10 -> \{-classdict-} [] [op1.t8 op2.t9] -> op2.t9 b.t10
+{- nonrec -}
+defm.Main.Foo.op1 =
+    let
+      AbsBinds [a.t11] [d.Main.Foo.t12] [(op1.t13, op1.t14)]
+	  {- nonrec -}
+	  op1.t13 :: a.t11 -> Bool
+	  op1.t13
+	      x.r11 = True
+    in op1.t14
+defm.Main.Foo.op2 =
+    let
+      AbsBinds [a.t16, b.t17] [d.Main.Foo.t18, d.Ord.t19] [(op2.t20, op2.t21)]
+	  (d.Ord.t31, d.Ord.t19)
+	  (<.t28, (<) b.t17 d.Ord.t31)
+	  (d.Main.Foo.t32, d.Main.Foo.t18)
+	  (Main.Foo.op1.t26, Main.Foo.op1 a.t16 d.Main.Foo.t32)
+	  {- nonrec -}
+	  op2.t20 :: a.t16 -> b.t17 -> b.t17 -> b.t17
+	  op2.t20
+	      x.r12 y.r13 z.r14
+		      = if (Main.Foo.op1.t26 x.r12) && (y.r13 <.t28 z.r14) then
+			    y.r13
+			else
+			    z.r14
+    in op2.t21
+{- rec -}
+dfun.Main.Foo.Int =
+    ({-dict-} [] [const.Main.Foo.Int.op1, const.Main.Foo.Int.op2])
+const.Main.Foo.Int.op1 = defm.Main.Foo.op1 Int dfun.Main.Foo.Int
+const.Main.Foo.Int.op2 =
+    /\ b.t0 -> defm.Main.Foo.op2 [Int, b.t0] dfun.Main.Foo.Int
+AbsBinds [a.t1] [d.Main.Foo.t2] [(d.Main.Foo.t3, dfun.Main.Foo.List)]
+    {- rec -}
+    d.Main.Foo.t3 = ({-dict-} [] [op1.t4, op2.t5])
+    op1.t4 = defm.Main.Foo.op1 [a.t1] d.Main.Foo.t3
+    op2.t5 = /\ b.t6 -> defm.Main.Foo.op2 [[a.t1], b.t6] d.Main.Foo.t3
+

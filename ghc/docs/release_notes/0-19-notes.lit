@@ -1,0 +1,187 @@
+Release~0.19 was the third public release of this compilation system.
+It incorporates our new work for the last half of 1993.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-0.19}
+in the top-level directory.
+
+%************************************************************************
+%*									*
+\subsection[0-19-user-visible]{User-visible changes in 0.19, including incompatibilities}
+%*									*
+%************************************************************************
+
+You'll need to recompile everything if you're switching from a
+previous version of GHC.  (If you don't, you'll get ``consistency
+errors''.)
+
+Default declarations: in.
+
+Derived instances of \tr{Ix} and \tr{readsPrec} (\tr{Text} class): in.
+(Random Prelude instances of weird things: in.)  You can avoid the
+\tr{readsPrec} methods by using the \tr{-fomit-derived-read} option.
+
+Should be {\em faster}, for two reasons: (1)~A native-code generator
+for the SPARC architecture (avoids C compilation time); (2)~an
+array-based [vs naive list-based...] substitution mechanism in the
+typechecker.  Using \tr{-O2} or \tr{-fvia-C} avoids the native-code
+generator.
+
+(Shouldn't be too much faster, because we spent a lot of the winnings
+:-()
+
+\tr{MkInt} and friends {\em renamed}: \tr{MkInt}, \tr{MkChar},
+\tr{MkFloat}, \tr{MkDouble}, and \tr{MkInteger} are now \tr{I#},
+\tr{C#}, \tr{F#}, \tr{D#}, and \tr{J#}, respectively.
+We won't change them again, we promise.
+
+\tr{-i}/\tr{-I} flags changed: You used to specify directories to
+search for interface files with \tr{-I <dir>}; now you do it with
+\tr{-i<dir>} [{\em no space after the \tr{-i}}] (same as HBC).
+\tr{-I} is reserved for when doing \tr{-cpp} and for the C compiler,
+when it is run.
+
+Renaming, feature horribilis that it is, is more-or-less fully
+implemented.  The User's Guide lists one or two exceptions.
+
+Specialised versions of overloaded functions: these are created
+automagically with \tr{-O}, and also when you ask for them with
+\tr{SPECIALIZE} pragmas.  See the User's Guide for how to do this
+(same as HBC).  (We don't have specialised instance declarations yet.)
+
+GHC tries hard to do inlining (or ``unfolding'') across module
+boundaries; just look at \tr{-O}-produced interface files.  You can
+enliven this process with \tr{INLINE} pragmas.
+
+The \tr{__GLASGOW_HASKELL__} CPP directive is only set when
+pre-processing Haskell source (and not when pre-processing generated
+C).
+
+Revised scheme for using system-provided libraries (e.g., the HBC
+library).  Just use a \tr{-syslib <name>} option when compiling and
+linking.  See the User's Guide for details.
+
+%************************************************************************
+%*									*
+\subsection[0-19-new-docs]{New documentation}
+%*									*
+%************************************************************************
+
+See \tr{ghc/docs/README} for a full list of documentation.
+
+The updated User's Guide has new sections including: (a)~advice for
+creating smaller and faster programs more quickly, and (b)~about the
+HBC library [stolen documentation].
+
+We've dropped papers from the distribution (they're big, and you can
+get them easily anyway); instead, we provide abstracts of all
+documents about all relevant work at Glasgow; see
+\tr{ghc/docs/abstracts}.
+
+New: ``A Simple Country Boy's Guide to Monadic-Style Programming'' (Will
+Partain).  In \tr{ghc/docs/simple-monad.lhs}.
+
+%************************************************************************
+%*									*
+\subsection[0-19-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+Strictness analyser: produces/handles ``nested'' strictness -- e.g.,
+\tr{U(SLL)} means ``this single-constructor argument is strict, and it
+is also strict in its first component.''  There's also ``absence
+analysis'' in there: \tr{U(ASA)} means ``strict in the second
+component, and the first/third are not used at all.''
+
+New simplifier: the program-transformation engine in the middle of the
+compiler.  The ``old simplifier,'' primarily the work of Andr\'e
+Santos, has retired to an Old Simplifier's Home on the coast of
+Brazil, where it is collecting a well-deserved monadic pension.
+
+%************************************************************************
+%*									*
+\subsection[0-19-new-in-libraries]{In the prelude and runtime support}
+%*									*
+%************************************************************************
+
+A couple of new functions in the @PackedString@ module that comes with
+the system.  Mentioned in the User's Guide.
+
+The HBC library has been upgraded to match the latest HBC release
+(0.999.5).  We now support the \tr{Native} and \tr{NameSupply}
+modules, which we didn't before.
+
+Alastair Reid's implementation of ``stable pointers,'' which he uses
+to do callbacks with the X Window System (yow!), is in.  I (WDP) don't
+know about documentation.... send mail if you need to know.
+
+%************************************************************************
+%*									*
+\subsection[0-19-new-ports]{In the porting department}
+%*									*
+%************************************************************************
+
+We use Sun4s running SunOS~4.1.3, so those are the best-supported
+machines.  For these, we have a native-code generator (the best); next
+best is a ``registerised'' port; the bare minimum is an
+``unregisterised'' port.
+
+The 0.19 infrastructure for ``stealing'' registers for a registerised port
+(using a GCC extension) is much more robust---take note, brave porters.
+
+Here's everying that's known about the porting world:
+\begin{description}
+%-------------------------------------------------------------------
+\item[Sun3 running SunOS~4.1.3:]
+A registerised port is done; could be made available.
+
+%-------------------------------------------------------------------
+\item[GRIP multiprocessor:]
+68020-based multiprocessor for running parallel Haskell programs.
+A registerised port is done; too bad we have the only machine!
+If you have something parallel you {\em really} wanted to run on it,
+please get in touch with us.
+
+%-------------------------------------------------------------------
+\item[HP-PA box running HP/UX:]
+An unregisterised port of 0.17 (0.16+portability fixes) seems to
+work, except that floating-point is definitely busted.  0.19~should be
+no worse.
+
+%-------------------------------------------------------------------
+\item[DECstation (MIPS-based):]
+An unregisterised port of 0.17 works; 0.19~should be the same.
+
+%-------------------------------------------------------------------
+\item[DEC Alpha running OSF/1:]
+We've done an unregisterised port (unreleased), and a registerised
+port is not far off.
+
+%-------------------------------------------------------------------
+\item[Sun running Solaris 2.x:]
+We've started on this ourselves and foresee no obstacle to a
+``registerised'' port.  Not sure about native-code...
+
+%-------------------------------------------------------------------
+\item[x86 PCs running Linux:]
+This really needs a native-code generator to be viable.  We hope the
+elves will give us one for Christmas!
+
+%-------------------------------------------------------------------
+\item[Macintosh, using MPW:]
+As mind-blowing at it may seem, David Wright in Tasmania has actually
+gotten GHC to run on a Macintosh.  I believe it's still in the ``you
+can do it, but you don't want to'' stage.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-19-new-elsewhere]{New elsewhere}
+%*									*
+%************************************************************************
+
+In the ``literate programming'' stuff that happens to come with GHC: a
+few bug fixes, plus a significant contribution from Chris Toshok
+(\tr{toshok@cs.uidaho.edu}) of ``lit2html'' stuff; i.e., to convert
+your literate programs into HTML, the Hypertext Markup Language used
+on the World-Wide Web.  I (WDP) am not sure it's completely finished,
+or exactly what you invoke to do what, but it seems Way Cool.

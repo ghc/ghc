@@ -1,0 +1,722 @@
+%************************************************************************
+%*                                                                      *
+\section[glasgow-exts]{Glasgow extensions to Haskell}
+\index{Haskell, Glasgow extensions}
+\index{extensions, Glasgow Haskell}
+%*                                                                      *
+%************************************************************************
+
+As with all known Haskell systems, GHC implements some extensions to
+the language.
+To use them, you'll need to give
+a \tr{-fglasgow-exts}%
+\index{-fglasgow-exts option} option.
+
+Virtually all of the Glasgow extensions serve to give you access to the
+underlying facilities with which we implement Haskell.  Thus, you can
+get at the Raw Iron, if you are willing to write some non-standard
+code at a more primitive level.  You need not be ``stuck'' on
+performance because of the implementation costs of Haskell's
+``high-level'' features---you can always code ``under'' them.  In an
+extreme case, you can write all your time-critical code in C, and then
+just glue it together with Haskell!
+
+Executive summary of our extensions:
+\begin{description}
+\item[Unboxed types and primitive operations:] You can get right down
+to the raw machine types and operations; included in this are
+``primitive arrays'' (direct access to Big Wads of Bytes).
+Please see \Sectionref{glasgow-unboxed} and following.
+
+%\item[Synchronising variables---\tr{_IVar}s, \tr{_MVar}s:]
+%These are used when reads and writes need to be coordinated,
+%e.g., if the readers and writers are different concurrent threads.
+%Please see \Sectionref{ivars-mvars}.
+
+\item[Calling out to C:] Just what it sounds like.  We provide {\em
+lots} of rope that you can dangle around your neck.
+Please see \Sectionref{glasgow-ccalls}.
+
+\item[``Monadic I/O:''] This stuff will be coming to you For Real
+with Haskell~1.3, whenever that is.
+Please see \Sectionref{io-1-3} (the ``1.3 I/O'' section).
+
+\item[``HBC-ish'' extensions:] Extensions implemented because people said,
+``HBC does Y.  Could you teach GHC to do the same?''  Please see
+\Sectionref{glasgow-hbc-exts} for a quick list.
+\end{description}
+
+Before you get too carried away working at the lowest level (e.g.,
+sloshing \tr{MutableByteArray#}s around your program), you may wish to
+check if there are system libraries that provide a ``Haskellised
+veneer'' over the features you want.  See \Sectionref{syslibs}.
+
+The definitive guide for many of the low-level facilities in GHC is
+the ``state interface document'' (distributed in
+\tr{ghc/docs/state-interface.dvi}).  We do not repeat its details here.
+
+%Pieter Hartel led an interesting comparison-of-many-compilers (and
+%many languages) in which GHC got to show off its extensions.  We did
+%very well!  For the full details, check out
+%\tr{pub/computer-systems/functional/packages/pseudoknot.tar.Z} on \tr{ftp.fwi.uva.nl}.
+%Good clean fun!
+
+%************************************************************************
+%*                                                                      *
+\subsection[glasgow-unboxed]{Unboxed types}
+\index{Unboxed types (Glasgow extension)}
+%*                                                                      *
+%************************************************************************
+
+These types correspond to the ``raw machine'' types you would use in
+C: \tr{Int#} (long int), \tr{Double#} (double),
+\tr{Addr#} (void *), etc.  The {\em primitive
+operations} (PrimOps) on these types are what you might expect; e.g.,
+\tr{(+#)} is addition on \tr{Int#}s, and is the machine-addition that
+we all know and love---usually one instruction.
+
+A numerically-intensive program using unboxed types can go a {\em lot}
+faster than its ``standard'' counterpart---we saw a threefold speedup
+on one example.
+
+Please see the very first part of the ``state interface document''
+(distributed in \tr{ghc/docs/state-interface.dvi}) for the details of
+unboxed types and the operations on them.
+
+%************************************************************************
+%*                                                                      *
+\subsection[glasgow-ST-monad]{Primitive state-transformer monad}
+\index{state transformers (Glasgow extensions)}
+%*                                                                      *
+%************************************************************************
+
+This monad underlies our implementation of arrays, mutable and immutable,
+and our implementation of I/O, including ``C calls''.
+
+You probably won't use the monad directly, but you might use all those
+other things!
+
+The ``state interface document'' defines the state-related types in
+sections~1.4 and~1.5, and the monad itself in section~2.1.
+
+%************************************************************************
+%*                                                                      *
+\subsection[glasgow-prim-arrays]{Primitive arrays, mutable and otherwise}
+\index{primitive arrays (Glasgow extension)}
+\index{arrays, primitive (Glasgow extension)}
+%*                                                                      *
+%************************************************************************
+
+GHC knows about quite a few flavours of Large Swathes of Bytes.
+
+First, GHC distinguishes between primitive arrays of (boxed) Haskell
+objects (type \tr{Array# obj}) and primitive arrays of bytes (type
+\tr{ByteArray#}).
+
+Second, it distinguishes between...
+\begin{description}
+\item[Immutable:]
+Arrays that do not change (as with ``standard'' Haskell arrays); you
+can only read from them.  Obviously, they do not need the care and
+attention of the state-transformer monad.
+
+\item[Mutable:]
+Arrays that may be changed or ``mutated.''  All the operations on them
+live within the state-transformer monad and the updates happen {\em
+in-place}.
+
+\item[``Static'' (in C land):]
+A C~routine may pass an \tr{Addr#} pointer back into Haskell land.
+There are then primitive operations with which you may merrily grab
+values over in C land, by indexing off the ``static'' pointer.
+
+\item[``Stable'' pointers:]
+If, for some reason, you wish to hand a Haskell pointer (i.e., {\em
+not} an unboxed value) to a C~routine, you first make the pointer
+``stable,'' so that the garbage collector won't forget that it exists.
+That is, GHC provides a safe way to pass Haskell pointers to C.
+
+Please see \Sectionref{glasgow-stablePtrs} for more details.
+
+\item[``Malloc'' pointers:]
+A ``malloc'' pointer is a safe way to pass a C~pointer to Haskell and
+have Haskell do the Right Thing when it no longer references the
+object.  So, for example, C could pass a large bitmap over to Haskell
+and say ``please free this memory when you're done with it.''
+
+Please see \Sectionref{glasgow-mallocPtrs} for more details.
+\end{description}
+
+See sections~1.4 and~1.6 of the ``state interface document'' for the
+details of all these ``primitive array'' types and the operations on
+them.
+
+
+%************************************************************************
+%*                                                                      *
+\subsection[glasgow-ccalls]{Calling~C directly from Haskell}
+\index{C calls (Glasgow extension)}
+\index{_ccall_ (Glasgow extension)}
+\index{_casm_ (Glasgow extension)}
+%*                                                                      *
+%************************************************************************
+
+%Besides using a \tr{-fglasgow-exts} flag, your modules need to include...
+%\begin{verbatim}
+%import PreludePrimIO
+%\end{verbatim}
+
+SINCE VERSION 0.22: ``Literal-literals'', e.g., \tr{``NULL''}, can now
+be any `boxed-primitive' type---they are not automatically taken to be
+\tr{_Addr}s.  This is cool, except you may sometimes have to put in
+a type signature to force the desired type.
+
+SINCE VERSION 0.19: \tr{ccall} and \tr{casm} have been renamed to
+\tr{_ccall_} and \tr{_casm_} and \tr{veryDangerousCcall} and
+\tr{veryDangerousCasm} have been removed.  It is no longer necessary
+(nor legal!) to unbox/rebox the arguments and results to @_ccall_@.
+GHC does the unboxing/reboxing for you.
+
+GOOD ADVICE: Because this stuff is not Entirely Stable as far as names
+and things go, you would be well-advised to keep your C-callery
+corraled in a few modules, rather than sprinkled all over your code.
+It will then be quite easy to update later on.
+
+WARNING AS OF 0.26: Yes, the \tr{_ccall_} stuff probably {\em will
+change}, to something better, of course!  We are only at the
+musing-about-it stage, however.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[ccall-intro]{\tr{_ccall_} and \tr{_casm_}: an introduction}
+%*                                                                      *
+%************************************************************************
+
+The simplest way to use a simple C function
+\begin{verbatim}
+double fooC( FILE *in, char c, int i, double d, unsigned int u )
+\end{verbatim}
+is to provide a Haskell wrapper
+\begin{verbatim}
+fooH :: Char -> Int -> Double -> _Word -> PrimIO Double
+fooH c i d w = _ccall_ fooC ``stdin'' c i d w
+\end{verbatim}
+The function @fooH@ will unbox all of its arguments, call the C
+function \tr{fooC} and box the corresponding arguments.
+
+So, if you want to do C-calling, you have to confront the underlying
+Glasgow I/O system.  It's just your typical monad whatnot.
+
+%The code in \tr{ghc/lib/glaExts/*.lhs} is not too obtuse.
+%That code, plus \tr{lib/prelude/Builtin.hs}, give examples
+%of its use.  The latter includes the implementations of \tr{error} and
+%\tr{trace}.
+
+One of the annoyances about \tr{_ccall_}s is when the C types don't quite
+match the Haskell compiler's ideas.  For this, the \tr{_casm_} variant
+may be just the ticket (NB: {\em no chance} of such code going through
+a native-code generator):
+\begin{verbatim}
+oldGetEnv name
+  = _casm_ ``%r = getenv((char *) %0);'' name `thenPrimIO` \ litstring@(A# str#) ->
+    returnPrimIO (
+        if (litstring == ``NULL'') then
+            Failure (SearchError ("GetEnv:"++name))
+        else
+            Str (unpackCString# str#)
+    )
+\end{verbatim}
+
+The first literal-literal argument to a \tr{_casm_} is like a
+\tr{printf} format: \tr{%r} is replaced with the ``result,''
+\tr{%0}--\tr{%n-1} are replaced with the 1st--nth arguments.  As you
+can see above, it is an easy way to do simple C~casting.  Everything
+said about \tr{_ccall_} goes for \tr{_casm_} as well.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[glasgow-foreign-headers]{Using function headers}
+\index{C calls---function headers}
+%*                                                                      *
+%************************************************************************
+
+When generating C (using the \tr{-fvia-C} directive), one can assist
+the C compiler in detecting type errors by using the \tr{-#include}
+directive to provide \tr{.h} files containing function headers.
+
+For example,
+\begin{verbatim}
+typedef unsigned long *StgMallocPtr;
+typedef long StgInt;
+
+extern void          initialiseEFS PROTO( (StgInt size) );
+extern StgInt        terminateEFS ();
+extern StgMallocPtr  emptyEFS();
+extern StgMallocPtr  updateEFS PROTO( (StgMallocPtr a, StgInt i, StgInt x) );
+extern StgInt        lookupEFS PROTO( (StgMallocPtr a, StgInt i) );
+\end{verbatim}
+
+You can find appropriate definitions for \tr{StgInt},
+\tr{StgMallocPtr}, etc using \tr{gcc} on your architecture by
+consulting \tr{ghc/includes/StgTypes.lh}.  The following table
+summarises the relationship between Haskell types and C types.
+
+\begin{tabular}{ll}
+C type name      & Haskell Type \\ \hline
+%-----           & ---------------     
+\tr{StgChar}          & \tr{Char#}\\               
+\tr{StgInt}           & \tr{Int#}\\                
+\tr{StgWord}          & \tr{Word#}\\               
+\tr{StgAddr}          & \tr{Addr#}\\               
+\tr{StgFloat}         & \tr{Float#}\\              
+\tr{StgDouble}        & \tr{Double#}\\             
+                            
+\tr{StgArray}         & \tr{Array#}\\              
+\tr{StgByteArray}     & \tr{ByteArray#}\\          
+\tr{StgArray}         & \tr{MutableArray#}\\       
+\tr{StgByteArray}     & \tr{MutableByteArray#}\\   
+                                    
+\tr{StgStablePtr}     & \tr{StablePtr#}\\          
+\tr{StgMallocPtr}     & \tr{MallocPtr#}
+\end{tabular}
+
+Note that this approach is only {\em essential\/} for returning
+\tr{float}s (or if \tr{sizeof(int) != sizeof(int *)} on your
+architecture) but is a Good Thing for anyone who cares about writing
+solid code.  You're crazy not to do it.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[glasgow-stablePtrs]{Subverting automatic unboxing with ``stable pointers''}
+\index{stable pointers (Glasgow extension)}
+%*                                                                      *
+%************************************************************************
+
+The arguments of a \tr{_ccall_} are automatically unboxed before the
+call.  There are two reasons why this is usually the Right Thing to do:
+\begin{itemize}
+\item
+C is a strict language: it would be excessively tedious to pass
+unevaluated arguments and require the C programmer to force their
+evaluation before using them.
+
+\item Boxed values are stored on the Haskell heap and may be moved
+within the heap if a garbage collection occurs --- that is, pointers
+to boxed objects are not {\em stable\/}.
+\end{itemize}
+
+It is possible to subvert the unboxing process by creating a ``stable
+pointer'' to a value and passing the stable pointer instead.  (To use
+stable pointers, you must \tr{import PreludeGlaMisc}.) For example, to
+pass/return an integer lazily to C functions \tr{storeC} and
+\tr{fetchC}, one might write:
+\begin{verbatim}
+storeH :: Int -> PrimIO ()
+storeH x = makeStablePtr x              `thenPrimIO` \ stable_x ->
+           _ccall_ storeC stable_x
+
+fetchH :: PrimIO Int
+fetchH x = _ccall_ fetchC               `thenPrimIO` \ stable_x ->
+           deRefStablePtr stable_x      `thenPrimIO` \ x ->
+           freeStablePtr stable_x       `seqPrimIO`
+           returnPrimIO x
+\end{verbatim}
+
+The garbage collector will refrain from throwing a stable pointer away
+until you explicitly call one of the following from C or Haskell.
+\begin{verbatim}
+void freeStablePointer( StgStablePtr stablePtrToToss )
+freeStablePtr :: _StablePtr a -> PrimIO ()
+\end{verbatim}
+
+As with the use of \tr{free} in C programs, GREAT CARE SHOULD BE
+EXERCISED to ensure these functions are called at the right time: too
+early and you get dangling references (and, if you're lucky, an error
+message from the runtime system); too late and you get space leaks.
+
+%Doesn't work in ghc-0.23 - best to just keep quiet about them.
+%
+%And to force evaluation of the argument within \tr{fooC}, one would
+%call one of the following C functions (according to type of argument).
+%
+%\begin{verbatim}
+%void     performIO  ( StgStablePtr stableIndex /* _StablePtr s (PrimIO ()) */ );
+%StgInt   enterInt   ( StgStablePtr stableIndex /* _StablePtr s Int */ );
+%StgFloat enterFloat ( StgStablePtr stableIndex /* _StablePtr s Float */ );
+%\end{verbatim}
+%
+%ToDo ADR: test these functions!
+%
+%Note Bene: \tr{_ccall_GC_} must be used if any of these functions are used.
+
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[glasgow-mallocPtrs]{Pointing outside the Haskell heap}
+\index{malloc pointers (Glasgow extension)}
+%*                                                                      *
+%************************************************************************
+
+There are two types that \tr{ghc} programs can use to reference
+(heap-allocated) objects outside the Haskell world: \tr{_Addr} and
+\tr{_MallocPtr}.  (You must import \tr{PreludeGlaMisc} to use
+\tr{_MallocPtr}.)
+
+If you use \tr{_Addr}, it is up to you to the programmer to arrange
+allocation and deallocation of the objects.
+
+If you use \tr{_MallocPtr}, \tr{ghc}'s garbage collector will
+call the user-supplied C function
+\begin{verbatim}
+void FreeMallocPtr( StgMallocPtr garbageMallocPtr )
+\end{verbatim}
+when the Haskell world can no longer access the object.  Since
+\tr{_MallocPtr}s only get released when a garbage collection occurs,
+we provide ways of triggering a garbage collection from within C and
+from within Haskell.
+\begin{verbatim}
+void StgPerformGarbageCollection()
+performGC :: PrimIO ()
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[glasgow-avoiding-monads]{Avoiding monads}
+\index{C calls to `pure C'}
+\index{unsafePerformPrimIO (PreludeGlaST)}
+%*                                                                      *
+%************************************************************************
+
+The \tr{_ccall_} construct is part of the \tr{PrimIO} monad because 9
+out of 10 uses will be to call imperative functions with side effects
+such as \tr{printf}.  Use of the monad ensures that these operations
+happen in a predictable order in spite of laziness and compiler
+optimisations.
+
+There are three situations where one might like to use
+@unsafePerformPrimIO@ to avoid the monad:
+\begin{itemize}
+\item
+Calling a function with no side-effects:
+\begin{verbatim}
+atan2d :: Double -> Double -> Double
+atan2d y x = unsafePerformPrimIO (_ccall_ atan2d y x)
+
+sincosd :: Double -> (Double, Double)
+sincosd x = unsafePerformPrimIO (
+        newDoubleArray (0, 1)           `thenPrimIO` \ da ->
+        _casm_ ``sincosd( %0, &((double *)%1[0]), &((double *)%1[1]) );'' x da
+                                        `seqPrimIO`
+        readDoubleArray da 0            `thenPrimIO` \ s ->
+        readDoubleArray da 1            `thenPrimIO` \ c ->
+        returnPrimIO (s, c)
+        )
+\end{verbatim}
+
+\item Calling a set of functions which have side-effects but which can
+be used in a purely functional manner.
+
+For example, an imperative implementation of a purely functional
+lookup-table might be accessed using the following functions.
+
+\begin{verbatim}
+empty :: EFS x
+update :: EFS x -> Int -> x -> EFS x
+lookup :: EFS a -> Int -> a
+
+empty = unsafePerformPrimIO (_ccall_ emptyEFS)
+
+update a i x = unsafePerformPrimIO (
+        makeStablePtr x         `thenPrimIO` \ stable_x ->
+        _ccall_ updateEFS a i stable_x
+        )
+
+lookup a i = unsafePerformPrimIO (
+        _ccall_ lookupEFS a i   `thenPrimIO` \ stable_x ->
+        deRefStablePtr stable_x
+        )
+\end{verbatim}
+
+You will almost always want to use \tr{_MallocPtr}s with this.
+
+\item Calling a side-effecting function even though the results will
+be unpredictable.  For example the \tr{trace} function is defined by:
+
+\begin{verbatim}
+trace :: String -> a -> a
+trace string expr = unsafePerformPrimIO (
+                  appendChan# ``stderr'' "Trace On:\n"          `seqPrimIO`
+                  appendChan# ``stderr'' string                 `seqPrimIO`
+                  appendChan# ``stderr'' "\nTrace Off.\n"       `seqPrimIO`
+                  returnPrimIO expr )
+\end{verbatim}
+
+(This kind of use is not highly recommended --- it is only really
+useful in debugging code.)
+
+\end{itemize}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[ccall-gotchas]{C-calling ``gotchas'' checklist}
+\index{C call dangers}
+%*                                                                      *
+%************************************************************************
+
+And some advice, too.
+
+\begin{itemize}
+\item
+\tr{_ccall_} is part of the \tr{PrimIO} monad --- not the 1.3 \tr{IO} Monad.
+Use the function 
+\begin{verbatim}
+primIOToIO :: PrimIO a -> IO a
+\end{verbatim}
+to promote a \tr{_ccall_} to the \tr{IO} monad.
+
+\item
+For modules that use \tr{_ccall_}s, etc., compile with \tr{-fvia-C}.\index{-fvia-C option}
+You don't have to, but you should.
+
+Also, use the \tr{-#include "prototypes.h"} flag (hack) to inform the
+C compiler of the fully-prototyped types of all the C functions you
+call.  (\Sectionref{glasgow-foreign-headers} says more about this...)
+
+This scheme is the {\em only} way that you will get {\em any}
+typechecking of your \tr{_ccall_}s.  (It shouldn't be that way,
+but...)
+
+\item
+Try to avoid \tr{_ccall_}s to C~functions that take \tr{float}
+arguments or return \tr{float} results.  Reason: if you do, you will
+become entangled in (ANSI?) C's rules for when arguments/results are
+promoted to \tr{doubles}.  It's a nightmare and just not worth it.
+Use \tr{doubles} if possible.
+
+If you do use \tr{floats}, check and re-check that the right thing is
+happening.  Perhaps compile with \tr{-keep-hc-file-too} and look at
+the intermediate C (\tr{.hc} file).
+
+\item
+The compiler uses two non-standard type-classes when
+type-checking the arguments and results of \tr{_ccall_}: the arguments
+(respectively result) of \tr{_ccall_} must be instances of the class
+\tr{_CCallable} (respectively \tr{_CReturnable}.  (Neither class
+defines any methods --- their only function is to keep the
+type-checker happy.)
+
+The type checker must be able to figure out just which of the
+C-callable/returnable types is being used.  If it can't, you have to
+add type signatures. For example,
+\begin{verbatim}
+f x = _ccall_ foo x
+\end{verbatim}
+is not good enough, because the compiler can't work out what type @x@ is, nor 
+what type the @_ccall_@ returns.  You have to write, say:
+\begin{verbatim}
+f :: Int -> PrimIO Double
+f x = _ccall_ foo x
+\end{verbatim}
+
+This table summarises the standard instances of these classes.
+
+% ToDo: check this table against implementation!
+
+\begin{tabular}{llll}
+Type                &CCallable&CReturnable & Which is probably... \\ \hline
+%------            ----------  ------------    -------------
+\tr{Char}              & Yes  & Yes   & \tr{unsigned char} \\
+\tr{Int}               & Yes  & Yes   & \tr{long int} \\
+\tr{_Word}             & Yes  & Yes   & \tr{unsigned long int} \\
+\tr{_Addr}             & Yes  & Yes   & \tr{char *} \\
+\tr{Float}             & Yes  & Yes   & \tr{float} \\
+\tr{Double}            & Yes  & Yes   & \tr{double} \\
+\tr{()}                & No   & Yes   & \tr{void} \\
+\tr{[Char]}            & Yes  & No    & \tr{char *} (null-terminated) \\
+                                      
+\tr{Array}             & Yes  & No    & \tr{unsigned long *}\\
+\tr{_ByteArray}        & Yes  & No    & \tr{unsigned long *}\\
+\tr{_MutableArray}     & Yes  & No    & \tr{unsigned long *}\\
+\tr{_MutableByteArray} & Yes  & No    & \tr{unsigned long *}\\
+                                      
+\tr{_State}            & Yes  & Yes   & nothing!\\
+                                      
+\tr{_StablePtr}        & Yes  & Yes   & \tr{unsigned long *}\\
+\tr{_MallocPtr}        & Yes  & Yes   & see later\\
+\end{tabular}
+
+The brave and careful programmer can add their own instances of these
+classes for the following types:
+\begin{itemize}
+\item
+A {\em boxed-primitive} type may be made an instance of both
+\tr{_CCallable} and \tr{_CReturnable}.  
+
+A boxed primitive type is any data type with a
+single unary constructor with a single primitive argument.  For
+example, the following are all boxed primitive types:
+
+\begin{verbatim}
+Int
+Double
+data XDisplay = XDisplay Addr#
+data EFS a = EFS# MallocPtr#
+\end{verbatim}
+
+\begin{verbatim}
+instance _CCallable   (EFS a)
+instance _CReturnable (EFS a)
+\end{verbatim}
+
+\item Any datatype with a single nullary constructor may be made an
+instance of \tr{_CReturnable}.  For example:
+
+\begin{verbatim}
+data MyVoid = MyVoid
+instance _CReturnable MyVoid
+\end{verbatim}
+
+\item As at version 0.26, \tr{String} (i.e., \tr{[Char]}) is still
+not a \tr{_CReturnable} type.
+
+Also, the now-builtin type \tr{_PackedString} is neither
+\tr{_CCallable} nor \tr{_CReturnable}.  (But there are functions in
+the PackedString interface to let you get at the necessary bits...)
+\end{itemize}
+
+\item
+The code-generator will complain if you attempt to use \tr{%r}
+in a \tr{_casm_} whose result type is \tr{PrimIO ()}; or if you don't
+use \tr{%r} {\em precisely\/} once for any other result type.  These
+messages are supposed to be helpful and catch bugs---please tell us
+if they wreck your life.
+
+\item
+If you call out to C code which may trigger the Haskell garbage
+collector (examples of this later...), then you must use the
+\tr{_ccall_GC_} or \tr{_casm_GC_} variant of C-calls.  (This does not
+work with the native code generator - use \tr{\fvia-C}.) This stuff is
+hairy with a capital H!
+\end{itemize}
+
+%************************************************************************
+%*                                                                      *
+%\subsubsection[ccall-good-practice]{C-calling ``good practice'' checklist}
+%*                                                                      *
+%************************************************************************
+
+%************************************************************************
+%*                                                                      *
+\subsection[glasgow-hbc-exts]{``HBC-ish'' extensions implemented by GHC}
+\index{HBC-like Glasgow extensions}
+\index{extensions, HBC-like}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[@fromInt@ method in class @Num@:]
+It's there.  Converts from an \tr{Int} to the type.
+
+%-------------------------------------------------------------------
+\item[@toInt@ method in class @Integral@:]
+Converts from type type to an \tr{Int}.
+
+%-------------------------------------------------------------------
+\item[Overlapping instance declarations:]
+\index{overlapping instances}
+\index{instances, overlapping}
+
+In \tr{instance <context> => Class (T x1 ... xn)}, the \tr{xi}s can be
+{\em types}, rather than just {\em type variables}.
+
+Thus, you can have an instance \tr{instance Foo [Char]}, as well as
+the more general \tr{instance Foo [a]}; the former will be used in
+preference to the latter, where applicable.
+
+As Lennart says, ``This is a dubious feature and should not be used
+carelessly.''
+
+See also: \tr{SPECIALIZE instance} pragmas, in \Sectionref{faster}.
+
+%-------------------------------------------------------------------
+\item[Signal-handling I/O request:]
+\index{signal handling (extension)}
+\index{SigAction I/O request}
+The Haskell-1.2 I/O request \tr{SigAction n act} installs a signal handler for signal
+\tr{n :: Int}.  The number is the usual UNIX signal number.  The action
+is of this type:
+\begin{verbatim}
+data SigAct
+  = SAIgnore
+  | SADefault
+  | SACatch Dialogue
+\end{verbatim}
+
+The corresponding continuation-style I/O function is the unsurprising:
+\begin{verbatim}
+sigAction :: Int -> SigAct -> FailCont -> SuccCont -> Dialogue
+\end{verbatim}
+
+When a signal handler is installed with \tr{SACatch}, receipt of the
+signal causes the current top-level computation to be abandoned, and
+the specified dialogue to be executed instead.  The abandoned
+computation may leave some partially evaluated expressions in a
+non-resumable state.  If you believe that your top-level computation
+and your signal handling dialogue may share subexpressions, you should
+execute your program with the \tr{-N} RTS option, to prevent
+black-holing.
+
+The \tr{-N} option is not available with concurrent/parallel programs,
+so great care should be taken to avoid shared subexpressions between
+the top-level computation and any signal handlers when using threads.
+
+%-------------------------------------------------------------------
+%\item[Simple time-out mechanism, in ``monadic I/O'':]
+%\index{time-outs (extension)}
+%
+%This function is available: 
+%\begin{verbatim} 
+%timeoutIO :: Int -> IO Void -> IO (IO Void) 
+%\end{verbatim} 
+%
+%Wait that many seconds, then abandon the current computation and
+%perform the given I/O operation (second argument).  Uses the
+%signal-handling, so it returns the previous signal-handler (in case
+%you want to re-install it).  As above, you may need to execute your
+%program with the RTS flag \tr{-N}, to prevent black-holing.
+%
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+%\subsection[glasgow-compiler-namespace]{Fiddlings the compiler's built-in namespaces}
+%*                                                                      *
+%************************************************************************
+
+%This is really only used for compiling the prelude.  It's turgid and
+%will probably change.
+
+% \begin{description}
+% \item[\tr{-no-implicit-prelude}:]
+% \index{-no-implicit-prelude option}
+% 
+% ???? (Tells the parser not to read \tr{Prelude.hi}).
+% 
+% \item[\tr{-fhide-builtin-names}:]
+% \index{-fhide-builtin-names option}
+% This hides {\em all} Prelude names built-in to the compiler.
+% 
+% \item[\tr{-fmin-builtin-names}:]
+% \index{-fmin-builtin-names option}
+% This hides all but a few of the Prelude names that are built-in to the
+% compiler.  @:@ (cons) is an example of one that would remain visible.
+% 
+% \item[\tr{-fhide-builtin-instances}:]
+% \index{-fhide-builtin-instances option}
+% This suppresses the compiler's own ideas about what instances already
+% exist (e.g., \tr{instance Eq Int}).
+% 
+% This flag is used when actually compiling the various instance
+% declarations in the Prelude.
+% \end{description}

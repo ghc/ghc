@@ -1,0 +1,48 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\subsection[getCurrentDirectory.lc]{getCurrentDirectory Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifndef PATH_MAX
+#ifdef  MAXPATHLEN
+#define PATH_MAX MAXPATHLEN
+#else
+#define PATH_MAX 1024
+#endif
+#endif
+
+StgAddr
+getCurrentDirectory(STG_NO_ARGS)
+{
+    char *pwd;
+    int alloc;
+
+    alloc = PATH_MAX;
+    if ((pwd = malloc(alloc)) == NULL) {
+	ghc_errtype = ERR_RESOURCEEXHAUSTED;
+	ghc_errstr = "not enough virtual memory";
+	return NULL;
+    }
+    while (getcwd(pwd, alloc) == NULL) {
+	if (errno == ERANGE) {
+	    alloc += PATH_MAX;
+	    if ((pwd = realloc(pwd, alloc)) == NULL) {
+		ghc_errtype = ERR_RESOURCEEXHAUSTED;
+		ghc_errstr = "not enough virtual memory";
+		return NULL;
+	    }
+	} else if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return NULL;
+	}
+    }
+    return (StgAddr) pwd;
+}
+
+\end{code}

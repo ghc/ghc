@@ -1,0 +1,70 @@
+Desugared:
+Test.f :: for all d, e. <Ord e> -> <Num e> -> d -> e
+Test.f =
+    /\ o79 t102 -> \ dict.103 dict.104 x.107 ->
+	let
+	  ds.124 =
+	      /\ t108 -> \ dict.109 dict.110 ->
+		  let dict.111 = dict.110 in
+		  let dict.112 = dict.111 in
+		  let dict.113 = dict.112 in
+		  let dict.114 = dict.113 in
+		  let dict.115 = dict.114 in
+		  let dict.116 = dict.109
+		  in 
+		    let
+		      {- CoRec -}
+		      ds.117 =
+			  case ((< t108) dict.116 y.118 z.119) of {
+			    True ->
+				MkTuple2!
+				    t108
+				    t108
+				    ((fromInteger t108)
+					 dict.115 (MkInteger! 0##))
+				    ((fromInteger t108)
+					 dict.114 (MkInteger! 1##))
+			    False ->
+				case ((> t108) dict.109 y.118 z.119) of {
+				  True ->
+				      MkTuple2!
+					  t108
+					  t108
+					  ((fromInteger t108)
+					       dict.113 (MkInteger! 1##))
+					  ((fromInteger t108)
+					       dict.112 (MkInteger! 2##))
+				  False ->
+				      MkTuple2!
+					  t108
+					  t108
+					  ((fromInteger t108)
+					       dict.111 (MkInteger! 2##))
+					  ((fromInteger t108)
+					       dict.110 (MkInteger! 3##))
+				}
+			  }
+		      y.118 =
+			  case ds.117 of {
+			    MkTuple2 y.120 z.121 -> y.120
+			  }
+		      z.119 =
+			  case ds.117 of {
+			    MkTuple2 y.122 z.123 -> z.123
+			  }
+		      {- end CoRec -}
+		    in  MkTuple2! t108 t108 y.118 z.119 in
+	let
+	  y.130 =
+	      /\ t125 -> \ dict.126 dict.127 ->
+		  case ((ds.124 t125) dict.126 dict.127) of {
+		    MkTuple2 y.128 z.129 -> y.128
+		  } in
+	let
+	  z.136 =
+	      /\ t131 -> \ dict.132 dict.133 ->
+		  case ((ds.124 t131) dict.132 dict.133) of {
+		    MkTuple2 y.134 z.135 -> z.135
+		  }
+	in  (y.130 t102) dict.103 dict.104
+

@@ -1,0 +1,19 @@
+Desugared:
+Test.v :: for all d. <Num d> -> d
+Test.v =
+    /\ t78 -> \ dict.79 ->
+	let dict.77 = dict.79
+	in 
+	  let
+	    {- CoRec -}
+	    v.75 =
+		let
+		  fail.81 =
+		      (error t78)
+			  "\"ds006.hs\", line 6: pattern-matching failure [function binding]\n"S
+		in 
+		  (+ t78)
+		      dict.77 v.75 ((fromInteger t78) dict.79 (MkInteger! 1##))
+	    {- end CoRec -}
+	  in  v.75
+

@@ -1,0 +1,7 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface UpdAnal where
+import Id(Id)
+import StgSyn(StgBinding)
+updateAnalyse :: [StgBinding Id Id] -> [StgBinding Id Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+

@@ -1,0 +1,54 @@
+
+Boxed structure of BigInts
+
+
+---->	Info1	Pointer
+		|		Pointer passed to BigNum package
+	   	|		|
+	  	\/		\/
+	 	Info2	Size	Integer ....
+
+			(size excludes info ptr & size field)
+
+Unboxed (Compiler must place on pointer stack not data stack
+	 Must also tell GC if it is in a register when GC invoked)
+
+---->	Info2	Size	Integer
+
+
+
+Info1:
+	SPEC_INFO_TABLE(Info1, BigNum_entry, 1, 1);	(Min Size 2 ?)
+
+	Entering this returns the BigNum using agreed return convention
+
+Info2:
+	DATA_INFO_TABLE(Info2, Dummy_entry);
+
+	This never actually entered -- just required for GC.
+
+------------------------------------------------------------------------------
+
+Boxed structure of BigInts (the alternative one)
+
+			Pointer passed to BigNum package
+	   		|
+	  		\/
+---->	Info	Size	Integer ....
+
+		(size excludes info ptr & size field)
+
+Unboxed (Compiler must place on pointer stack not data stack
+	 Must also tell GC if it is in a register when GC invoked)
+
+
+Info:
+	DATA_INFO_TABLE(Info, BigNum_entry);
+
+	Entering this returns the BigNum using agreed return convention
+
+
+
+Note that the Boxed and Unboxed representation are identical !!!
+
+(unboxing represents evaluationhood, not pointerhood)

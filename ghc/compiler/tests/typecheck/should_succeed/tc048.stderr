@@ -1,0 +1,31 @@
+Typechecked:
+AbsBinds [tt8, tt4] [] [(map.t1, ShouldSucceed.map)]
+    {- rec -}
+    map.t1 :: (tt8 -> tt4) -> [tt8] -> [tt4]
+    map.t1
+	f.r75 [] = [] (tt4)
+    map.t1
+	f.r76 (x.r77 : xs.r78)
+		= ((:) tt4) (f.r76 x.r77) (map.t1 f.r76 xs.r78)
+AbsBinds [tt17, tt18] [] [(snd.t14, ShouldSucceed.snd)]
+    {- nonrec -}
+    snd.t14 :: (tt17, tt18) -> tt18
+    snd.t14
+	(f.r79, s.r80)
+		= s.r80
+AbsBinds [a.t21, v.t22] [] [(ranOAL.t20, ShouldSucceed.ranOAL)]
+    {- nonrec -}
+    ranOAL.t20 :: ShouldSucceed.OL (a.t21, v.t22) -> [v.t22]
+    ranOAL.t20
+	(ShouldSucceed.MkOL xs.r74)
+		= (ShouldSucceed.map [(a.t21, v.t22), v.t22])
+		      (ShouldSucceed.snd [a.t21, v.t22]) xs.r74
+AbsBinds [a.t38, a.t36, b.t37] [] [(ranAFE.t30, ShouldSucceed.ranAFE)]
+    {- nonrec -}
+    ranAFE.t30 ::
+	ShouldSucceed.AFE a.t38 a.t36 b.t37 -> [ShouldSucceed.FG a.t36 b.t37]
+    ranAFE.t30
+	(ShouldSucceed.MkAFE nfs.r81)
+		= (ShouldSucceed.ranOAL [a.t38, ShouldSucceed.FG a.t36 b.t37])
+		      nfs.r81
+

@@ -1,0 +1,55 @@
+\begin{figure} \fbox{
+$\begin{array}{lrcll}
+%\mbox{Program} & prog & \rightarrow & binds & \\
+%\\
+\mbox{Bindings} & binds & \rightarrow 
+	& bind_1 @;@ \ldots @;@~ bind_n & n \geq 1 \\
+& bind & \rightarrow &  var ~@=@~ vars_f ~@\@ upd~ vars_a ~@->@~expr
+			& \mbox{Closure} \\
+			&&&& (vars_f = \freevars{expr} \setminus vars_a) \\
+\\
+\mbox{Update flag} & upd & \rightarrow & @u@ & \mbox{Updatable} \\
+	&& | & @n@				& \mbox{Not updatable} \\
+\\
+\mbox{Expression} & expr 
+	& \rightarrow & @let@~binds~@in@~ expr
+		& \mbox{Local definition} \\
+	&& | & @letrec@~binds~@in@~expr
+		& \mbox{Local recursive definition} \\
+	&& | & @case@~expr~@of@~alts 
+		& \mbox{Case expression} \\
+	&& | & var~vars & \mbox{Application}\\
+	&& | & con~vars 
+		& \mbox{Saturated constructor} \\
+	&& | & prim~vars 
+		& \mbox{Saturated primitive}   \\
+	&& | & literal & \\
+\\
+
+\mbox{Alternatives} & alts & \rightarrow 
+	& calt_1@;@ \ldots @;@~calt_n@; default ->@~ expr 
+		& n \geq 0~\mbox{(Boxed)}	\\
+	&& | & lalt_1@;@ \ldots @;@~lalt_n@;@~var ~@->@~ expr 
+		& n \geq 0~\mbox{(Unboxed)}	\\
+\\
+\mbox{Constructor alt}	
+	& calt & \rightarrow & con~vars~@->@~expr &  \\
+\mbox{Literal alt}	
+	& lalt & \rightarrow & literal~@->@~expr &  \\
+\\
+\mbox{Literals} & literal 
+	& \rightarrow & integer			& \\
+	&& | & \ldots & \\
+\\
+\mbox{Primitives} & prim
+	& \rightarrow & @+@ ~|~ @-@ ~|~ @*@ ~|~ @/@ \\
+	&& | & \ldots & \\
+\\
+\mbox{Variable lists} & vars & \rightarrow & 
+		@[@var_1@,@ \ldots @,@~var_n@]@			& n \geq 0 \\
+\\
+\end{array}$
+}
+\caption{Syntax of the STG language}
+\label{fig:stg-syntax}
+\end{figure}

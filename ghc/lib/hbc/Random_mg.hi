@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Random where
+normalRandomDoubles :: Int -> Int -> [Double]
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+randomDoubles :: Int -> Int -> [Double]
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+randomInts :: Int -> Int -> [Int]
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

@@ -1,0 +1,4 @@
+XCOMM a renamer bug sent in by Stephen Bevan;
+XCOMM going as far as -ddump-tc guarantees that renaming was happy.
+
+RunStdTest(bevan-bug-1,$(GHC), -noC -ddump-tc Lexer_Ops.lhs -o2 bevan-bug-1.stderr)

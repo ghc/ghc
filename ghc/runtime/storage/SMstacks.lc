@@ -1,0 +1,57 @@
+\section[SMstacks.lc]{Stack allocation (sequential)}
+
+Routine that allocates the A and B stack (sequential only).
+
+\begin{code}
+#ifndef PAR
+# define NULL_REG_MAP
+# include "SMinternal.h"
+
+stackData stackInfo;
+
+P_ stks_space = 0;
+
+#ifdef CONCURRENT
+EXTDATA_RO(StkO_static_info);
+P_ MainStkO;
+#endif
+
+I_
+initStacks(sm)
+smInfo *sm;
+{
+    /*
+     * Allocate them if they don't exist. One space does for both stacks, since they
+     * grow towards each other
+     */
+    if (stks_space == 0) {
+#ifdef CONCURRENT
+	MainStkO = (P_) xmalloc((STKO_HS + SM_word_stk_size) * sizeof(W_));
+	stks_space = MainStkO + STKO_HS;
+        SET_STKO_HDR(MainStkO, StkO_static_info, CC_SUBSUMED);
+        STKO_SIZE(MainStkO) = SM_word_stk_size + STKO_VHS;
+        STKO_LINK(MainStkO) = Nil_closure;
+    	STKO_RETURN(MainStkO) = NULL;
+#else
+	stks_space = (P_) xmalloc(SM_word_stk_size * sizeof(W_));
+#endif
+    }
+# if STACK_CHECK_BY_PAGE_FAULT
+    unmapMiddleStackPage((char *) stks_space, SM_word_stk_size * sizeof(W_));
+# endif
+
+    /* Initialise Stack Info and pointers */
+    stackInfo.botA = STK_A_FRAME_BASE(stks_space, SM_word_stk_size);
+    stackInfo.botB = STK_B_FRAME_BASE(stks_space, SM_word_stk_size);
+
+    MAIN_SuA = MAIN_SpA = stackInfo.botA + AREL(1);
+    MAIN_SuB = MAIN_SpB = stackInfo.botB + BREL(1);
+
+    if (SM_trace)
+	fprintf(stderr, "STACK init: botA, spa: 0x%lx, 0x%lx\n            botB, spb: 0x%lx, 0x%lx\n",
+	  (W_) stackInfo.botA, (W_) MAIN_SpA, (W_) stackInfo.botB, (W_) MAIN_SpB);
+
+    return 0;
+}
+#endif /* not parallel */
+\end{code}

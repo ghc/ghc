@@ -1,0 +1,5 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Main where
+mainPrimIO :: _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _N_ _N_ _N_ _N_ _N_ #-}
+

@@ -1,0 +1,38 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[writeFile.lc]{hPutStr Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+writeFile(buf, fp, bytes)
+StgAddr buf;
+StgAddr fp;
+StgInt bytes;
+{
+    int count;
+    char *p = (char *) buf;
+
+    if (bytes == 0)
+	return 0;
+
+    /* Disallow short writes */
+    while ((count = fwrite(p, 1, bytes, (FILE *) fp)) < bytes) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+	bytes -= count;
+	p += count;
+	clearerr((FILE *) fp);
+    }
+
+    return 0;
+}
+
+\end{code}

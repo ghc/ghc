@@ -1,0 +1,205 @@
+Release~0.22 is the fourth public release of Glasgow Haskell.
+It incorporates our new work for the first half of 1994.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-0.22}
+in the top-level directory.
+
+%************************************************************************
+%*									*
+\subsection[0-22-ports]{What machines GHC~0.22 runs on}
+%*									*
+%************************************************************************
+
+We use Sun4s running SunOS~4.1.3 and DEC~Alphas running OSF/1~V2.0, so
+those are the ``fully-supported'' platforms, unsurprisingly.  For
+Sun4s, we have a native-code generator, which makes for somewhat
+quicker compilations.  (We actually produce better code by compiling
+intermediate C with GCC.)
+
+The GHC hierarchy of Porting Goodness: (a)~Best is a native-code
+generator [only for Sun4s, now]; (b)~next best is a ``registerised''
+port; (c)~the bare minimum is an ``unregisterised'' port.
+``Unregisterised'' Haskell programs are much bigger and slower,
+but the port is much easier to get going.
+
+Here's everything that's known about GHC ports, as of 0.22:
+\begin{description}
+%-------------------------------------------------------------------
+\item[Sun4 running SunOS~4.1.3:]
+Fully supported, including native-code generator.
+
+%-------------------------------------------------------------------
+\item[DEC Alpha running OSF/1 V2.0:]
+Fully supported, but no native-code generator (none planned).
+
+%-------------------------------------------------------------------
+\item[Sun3 running SunOS~4.1.3:]
+GHC~0.22 should work, registerised.  (0.21 did work.)
+
+%-------------------------------------------------------------------
+\item[Sun4 running Solaris 2.x:]
+We expect to finish a ``registerised'' port ourselves, in the
+foreseeable future.  Feel free to ask about it, if interested.  Not
+sure about native-code...
+
+%-------------------------------------------------------------------
+\item[HP-PA box running HP/UX 9.x:]
+An unregisterised port of 0.21 (last ``internal'' release before 0.22)
+seems to work, except that floating-point is definitely busted.
+0.22~should be the same.
+
+%-------------------------------------------------------------------
+\item[Silicon Graphics box running IRIX 5.x:]
+An unregisterised port of 0.21
+seemed to work.  0.22~should be the same.
+
+%-------------------------------------------------------------------
+\item[DECstation (MIPS-based):]
+An unregisterised port back around the time of 0.17 seemed to work;
+0.22~should be the same, modulo a little bit-rot.
+
+%-------------------------------------------------------------------
+\item[x86 PCs running Linux/NetBSD/FreeBSD:]
+This really needs a native-code generator to be viable.  No
+recent progress.
+
+%-------------------------------------------------------------------
+\item[GRIP multiprocessor:]
+GRIP is a 68020-based multiprocessor for running parallel Haskell
+programs; too bad we have the only machine!  We run GHC~0.16 on it,
+with no plans to upgrade.
+
+We are working on other parallel stuff.  Stay tuned.
+
+%-------------------------------------------------------------------
+\item[NeXT box running whatever NeXTs run:]
+Carsten Schultz succeeded with a ``registerised'' port of GHC~0.19.
+There's probably a little bit-rot since then, but otherwise it should
+still be fine.
+
+%-------------------------------------------------------------------
+\item[Macintosh, using MPW:]
+As mind-blowing at it may seem, David Wright in Tasmania has actually
+gotten GHC to run on a Macintosh.  Ditto James Thomson here at Glasgow.
+You may be able to get Thomson's from here.  (Not sure that it will
+excite you to death, but...)
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-22-user-visible]{User-visible changes in 0.22, including incompatibilities}
+%*									*
+%************************************************************************
+
+You'll need to recompile everything if you're switching from a
+previous version of GHC.  (If you don't, you'll get ``consistency
+errors''.)
+
+Lazy pattern-matching (e.g., \tr{let (x,y) = ... in ...}) no longer
+carries with it the threat of a space leak.  (It used to be that, as
+long as {\em either} of \tr{x} or \tr{y} was ``live,'' the storage
+manager would hang onto {\em both} chunks of graph.)  No longer.
+
+We've done a complete overhaul of the state-transformer stuff which
+underlies our array, I/O, and C-calling support.  The ``state
+interface document,'' distributed in \tr{ghc/docs/state-interface.dvi}
+defines what we have done.  You may wish to check our abstracts
+(\tr{ghc/docs/abstracts/}) to find papers about this stuff.  If you've
+written code that grovels around in GHC innards (e.g., uses
+``primitive operations'' directly), it will probably need updating.
+
+We do {\em not} support Haskell~1.3 monadic I/O (any draft version),
+but we will once the dust settles.  We still support the
+\tr{PreludeGlaIO} interface that we have had for some time.
+
+You can now build GHC to support ``threaded'' execution.  (Configure
+\tr{--with-threads=yes}, then use GHC with a \tr{-threads} option.)
+Using the \tr{_seq_} and \tr{_par_} constructs,
+
+GHC does a better job of not stealing from the user's name space (for
+its own extensions, etc.).  For example, the ``set cost-centre''
+keyword is now \tr{_scc_}, rather than \tr{scc} (though the latter
+will continue to be accepted for a while).  With the
+\tr{-fglasgow-exts} flag on, names may begin with an underscore
+(\tr{_}).
+
+We have friendly interaction between ``Haskell land'' and ``C land''
+via (a)~{\em stable pointers} (pass Haskell pointers to C and have the
+garbage-collector not forget about them); and (b)~{\em malloc
+pointers} (return C pointers to Haskell and tell Haskell ``throw this
+away when you're finished with it'').  See the User's Guide for more
+info.
+
+%************************************************************************
+%*									*
+\subsection[0-22-support]{New in support tools (e.g., profiling)}
+%*									*
+%************************************************************************
+
+The profiling system of GHC has been improved in version~0.22 in the
+following ways:
+\begin{description}
+\item[Now uses the ``hybrid scheme'':] (Rather than pure ``lexical
+scoping'') What this means for you: ``CAF'' cost-centres will no
+longer be blamed for gigantic chunks of the time in your program.
+
+\item[Uses the generational garbage-collector:] (At least when doing
+time profiling)  It used to use a two-space copying GC; it still does
+when space profiling.  You should be able to profile larger programs.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-22-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+The ``simplifier''---the program-transformation engine in the middle
+of the compiler---has settled down (at least until Simon has another
+Brain Wave).  We've made ``per-simplification'' flags, so that each
+run of the simplifier can be controlled separately---this allows very
+precise control.  (But makes it pretty hard to exercise any control
+from the command-line.)  More in the docs.
+
+Related to simplifier stuff was a revision of the ``unfoldery''
+machinery.  We try very hard to find and exploit unfolding (or
+inlining), including across module boundaries.
+
+%************************************************************************
+%*									*
+\subsection[0-22-new-in-libraries]{In the prelude and runtime support}
+%*									*
+%************************************************************************
+
+We've introduced a ``GHC system library,'' similar to the ``HBC system
+library'' which we have supported for some time.  Just say
+\tr{-syslib ghc} and the GHC library stuff is at your fingertips.
+See the User's Guide for exactly what's on offer (not a lot right now,
+but more will show up).
+
+The @PackedString@ module that comes with the system is even beefier
+than before; see the User's Guide.  (This module really should be
+in the GHC library.)
+
+%************************************************************************
+%*									*
+\subsection[0-22-new-elsewhere]{Other new stuff}
+%*									*
+%************************************************************************
+
+We have two new mailing lists about Glasgow Haskell.
+\begin{description}
+\item[glasgow-haskell-users:]
+This list is for GHC users to chat among themselves.  Subscribe by
+sending mail to \tr{glasgow-haskell-users-request@dcs.glasgow.ac.uk}.
+Messages for the list go to \tr{glasgow-haskell-users}.
+
+\item[glasgow-haskell-bugs:]
+This used to be an address for some lonely person who received bug
+reports.  It is now a mailing list for the sort of people who discuss,
+well, bug reports when they go to a party.
+
+Subscribe via \tr{glasgow-haskell-bugs-request@dcs.glasgow.ac.uk};
+send bug reports and rumination thereupon go to
+\tr{glasgow-haskell-bugs}.
+\end{description}

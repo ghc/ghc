@@ -1,0 +1,35 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq2.deq = /\ a.t18 -> \{-classdict-} [] [deq.t19] -> deq.t19
+{- nonrec -}
+defm.ShouldSucceed.Eq2.deq =
+    /\ a.t20 ->
+	\{-dict-} d.ShouldSucceed.Eq2.t21 ->
+	    (error (a.t20 -> a.t20 -> Bool))
+		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.deq\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq2.Int = ({-dict-} [] [const.ShouldSucceed.Eq2.Int.deq])
+const.ShouldSucceed.Eq2.Int.deq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq2.Int.deq
+    x.r28 y.r29
+	    = True
+AbsBinds
+[a.t2]
+[d.ShouldSucceed.Eq2.t3]
+[(d.ShouldSucceed.Eq2.t4, dfun.ShouldSucceed.Eq2.List)]
+    (d.ShouldSucceed.Eq2.t16, d.ShouldSucceed.Eq2.t4)
+    (ShouldSucceed.Eq2.deq.t15,
+	ShouldSucceed.Eq2.deq [a.t2] d.ShouldSucceed.Eq2.t16)
+    (d.ShouldSucceed.Eq2.t17, d.ShouldSucceed.Eq2.t3)
+    (ShouldSucceed.Eq2.deq.t13,
+	ShouldSucceed.Eq2.deq a.t2 d.ShouldSucceed.Eq2.t17)
+    {- rec -}
+    d.ShouldSucceed.Eq2.t4 = ({-dict-} [] [deq.t5])
+    deq.t5 :: [a.t2] -> [a.t2] -> Bool
+    deq.t5
+	(a.r31 : as.r32) (b.r33 : bs.r34)
+		= if ShouldSucceed.Eq2.deq.t13 a.r31 b.r33 then
+		      ShouldSucceed.Eq2.deq.t15 as.r32 bs.r34
+		  else
+		      False
+

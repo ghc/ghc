@@ -1,0 +1,18 @@
+interface Lexeme where
+import Oberon_Id(Oberon_Id)
+import Oberon_Integer(Oberon_Integer)
+import Oberon_Real(Oberon_Real)
+import Oberon_String(Oberon_String)
+import Symbol(Symbol)
+show_lexeme :: Lexeme -> [Char] -> [Char]
+	{-# ARITY show_lexeme = 0 #-}
+data Lexeme = Symbol_Lexeme Symbol | Id_Lexeme Oberon_Id | Int_Lexeme Oberon_Integer | Real_Lexeme Oberon_Real | Long_Real_Lexeme Oberon_Real | String_Lexeme Oberon_String | Char_Lexeme Oberon_Integer | Error_Lexeme Char | EOF_Lexeme | Unterminated_String_Lexeme | Unterminated_Comment_Lexeme | Malformed_Hex_Integer | Malformed_Real_Number
+instance Eq Lexeme
+	{-# ARITY (==) = 2 #-}
+	{-# ARITY (/=) = 0 #-}
+instance Text Lexeme
+	{-# ARITY readsPrec = 0 #-}
+	{-# ARITY showsPrec = 2 #-}
+	{-# ARITY readList = 0 #-}
+	{-# ARITY showList = 0 #-}
+

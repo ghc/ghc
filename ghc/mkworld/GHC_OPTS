@@ -1,0 +1,32 @@
+/* included in ghc/{lib,runtime}/Jmakefile so that
+   each build is compiled consistently
+*/
+
+GHC_OPTS_norm=-O /*-fsemi-tagging*/ -darity-checks-C-only rts_or_lib(-optc-DGCap,)
+GHC_OPTS_p =-hisuf _p.hi  -O /*-fsemi-tagging*/ -prof -GPrelude rts_or_lib(-optc-DGCap,)
+GHC_OPTS_t =-hisuf _t.hi  -O /*-fsemi-tagging*/ -ticky rts_or_lib(-optc-DGCap,)
+GHC_OPTS_u =-hisuf _u.hi  -O -unregisterised ???? /*-fsemi-tagging*/ -ticky rts_or_lib(-optc-DGCap,)
+GHC_OPTS_mc=-hisuf _mc.hi -O -concurrent rts_or_lib(-optc-DGCap,)
+GHC_OPTS_mr=-hisuf _mr.hi -O -concurrent -prof -GPrelude rts_or_lib(-optc-DGCap,)
+GHC_OPTS_mt=-hisuf _mt.hi -O -concurrent -ticky rts_or_lib(-optc-DGCap,)
+GHC_OPTS_mp=-hisuf _mp.hi -O -parallel rts_or_lib(-optc-DGCap,)
+GHC_OPTS_mg=-hisuf _mg.hi -O -gransim rts_or_lib(-optc-DGCap,)
+GHC_OPTS_2s=-hisuf _2s.hi -O -gc-2s rts_or_lib(-optc-DGC2s,)
+GHC_OPTS_1s=-hisuf _1s.hi -O -gc-1s rts_or_lib(-optc-DGC1s,)
+GHC_OPTS_du=-hisuf _du.hi -O -gc-du rts_or_lib(-optc-DGCdu,)
+/* ToDo: mkworld-ify these user-way opts */
+GHC_OPTS_a =-hisuf _a.hi -user-setup-a rts_or_lib(-optc-DGCap,)
+GHC_OPTS_b =-hisuf _b.hi -user-setup-b rts_or_lib(-optc-DGCap,)
+GHC_OPTS_c =-hisuf _c.hi -user-setup-c rts_or_lib(-optc-DGCap,)
+GHC_OPTS_d =-hisuf _d.hi -user-setup-d rts_or_lib(-optc-DGCap,)
+GHC_OPTS_e =-hisuf _e.hi -user-setup-e rts_or_lib(-optc-DGCap,)
+GHC_OPTS_f =-hisuf _f.hi -user-setup-f rts_or_lib(-optc-DGCap,)
+GHC_OPTS_g =-hisuf _g.hi -user-setup-g rts_or_lib(-optc-DGCap,)
+GHC_OPTS_h =-hisuf _h.hi -user-setup-h rts_or_lib(-optc-DGCap,)
+GHC_OPTS_i =-hisuf _i.hi -user-setup-i rts_or_lib(-optc-DGCap,)
+GHC_OPTS_j =-hisuf _j.hi -user-setup-j rts_or_lib(-optc-DGCap,)
+GHC_OPTS_k =-hisuf _k.hi -user-setup-k rts_or_lib(-optc-DGCap,)
+GHC_OPTS_l =-hisuf _l.hi -user-setup-l rts_or_lib(-optc-DGCap,)
+GHC_OPTS_m =-hisuf _m.hi -user-setup-m rts_or_lib(-optc-DGCap,)
+GHC_OPTS_n =-hisuf _n.hi -user-setup-n rts_or_lib(-optc-DGCap,)
+GHC_OPTS_o =-hisuf _o.hi -user-setup-o rts_or_lib(-optc-DGCap,)

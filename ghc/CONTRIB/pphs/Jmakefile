@@ -1,0 +1,16 @@
+SuffixRule_c_o()
+
+BuildPgmFromOneCFile(pphs)
+
+InstallBinaryTarget(pphs,$(INSTBINDIR_GHC))
+
+/* These .dvi-ish rules are not right, but so what? [WDP 94/09] */
+
+docs/UserGuide.dvi: docs/UserGuide.tex
+	$(RM) $@
+	(cd docs && ../$(LTX) UserGuide.tex)
+
+/* Student project final report */
+docs/Report.dvi: docs/Report.tex
+	$(RM) $@
+	(cd docs && ../$(LTX) Report.tex)

@@ -1,0 +1,8 @@
+Typechecked:
+AbsBinds [tt3] [] [(f.t1, ShouldSucc.f)]
+    {- rec -}
+    f.t1 :: [tt3] -> [tt3]
+    f.t1 [] = [] (tt3)
+    f.t1 (x.r54 : xs.r55)
+		 = ((:) tt3) x.r54 (f.t1 xs.r55)
+

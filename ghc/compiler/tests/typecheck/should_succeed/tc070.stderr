@@ -1,0 +1,7 @@
+Typechecked:
+AbsBinds [] [] [(idb.t1, Main.idb)]
+    {- nonrec -}
+    idb.t1 :: Main.Boolean -> Main.Boolean
+    idb.t1
+	x.r57 = x.r57
+

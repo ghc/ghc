@@ -1,0 +1,48 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SaLib where
+import BasicLit(BasicLit)
+import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import Id(Id, IdDetails)
+import IdEnv(IdEnv(..))
+import IdInfo(Demand, IdInfo, StrictnessInfo)
+import Maybes(Labda)
+import Outputable(Outputable)
+import PlainCore(PlainCoreExpr(..))
+import PrimOps(PrimOp)
+import TyVar(TyVar)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data AbsVal   = AbsTop | AbsBot | AbsProd [AbsVal] | AbsFun [Id] (CoreExpr Id Id) AbsValEnv | AbsApproxFun [Demand]
+data AbsValEnv 	{-# GHC_PRAGMA AbsValEnv Bool (UniqFM AbsVal) #-}
+type AbsenceEnv = AbsValEnv
+data AnalysisKind   = StrAnal | AbsAnal
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type IdEnv a = UniqFM a
+data Demand 	{-# GHC_PRAGMA WwLazy Bool | WwStrict | WwUnpack [Demand] | WwPrim | WwEnum #-}
+type PlainCoreExpr = CoreExpr Id Id
+type StrictEnv = AbsValEnv
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+absValFromStrictness :: AnalysisKind -> StrictnessInfo -> AbsVal
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "LS" _N_ _N_ #-}
+addOneToAbsValEnv :: AbsValEnv -> Id -> AbsVal -> AbsValEnv
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "U(LL)LL" {_A_ 4 _U_ 2212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+growAbsValEnvList :: AbsValEnv -> [(Id, AbsVal)] -> AbsValEnv
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LL)L" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+lookupAbsValEnv :: AbsValEnv -> Id -> Labda AbsVal
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(EL)L" {_A_ 3 _U_ 121 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+nullAbsValEnv :: Bool -> AbsValEnv
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable AbsVal
+	{-# GHC_PRAGMA _M_ SaLib {-dfun-} _A_ 2 _N_ _N_ _N_ _N_ _N_
+	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+instance Text AnalysisKind
+	{-# GHC_PRAGMA _M_ SaLib {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(AnalysisKind, [Char])]), (Int -> AnalysisKind -> [Char] -> [Char]), ([Char] -> [([AnalysisKind], [Char])]), ([AnalysisKind] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (AnalysisKind), _CONSTM_ Text showsPrec (AnalysisKind), _CONSTM_ Text readList (AnalysisKind), _CONSTM_ Text showList (AnalysisKind)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(AnalysisKind, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LE" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

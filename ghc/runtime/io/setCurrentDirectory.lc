@@ -1,0 +1,25 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\subsection[setCurrentDirectory.lc]{setCurrentDirectory Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+setCurrentDirectory(path)
+StgByteArray path;
+{
+    while (chdir(path) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+\end{code}

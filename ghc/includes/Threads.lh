@@ -1,0 +1,843 @@
+%
+% (c) The GRASP Project, Glasgow University, 1994-1995
+%
+\section[Thread]{Thread support macros used in \tr{.hc} files}
+
+\begin{code}
+#ifndef THREADS_H
+#define THREADS_H
+\end{code}
+
+\begin{code}
+#ifndef GRAN 
+#define GRAN_ALLOC_HEAP(n,liveness) 			/* nothing */
+#define GRAN_UNALLOC_HEAP(n,liveness) 			/* nothing */
+#define GRAN_FETCH()					/* nothing */
+#define GRAN_FETCH_AND_RESCHEDULE(liveness)		/* nothing */
+#define GRAN_RESCHEDULE(liveness, reenter)		/* nothing */
+#define GRAN_EXEC(arith,branch,loads,stores,floats)	/* nothing */
+#define GRAN_SPARK()					/* nothing */
+#endif
+\end{code}
+
+\begin{code}
+#ifndef CONCURRENT
+
+#define OR_CONTEXT_SWITCH
+
+#else
+
+#define	DEFAULT_MAX_THREADS    	    	(32)
+
+extern I_ do_gr_sim;	    	    	    	/* Are we simulating granularity? */
+extern FILE *gr_file;
+
+extern I_ do_qp_prof;	    	    	    	/* Are we quasi-parallel profiling? */
+extern FILE *qp_file;
+
+#ifdef PAR
+#define DO_QP_PROF 0
+#else
+#define DO_QP_PROF do_qp_prof
+#endif
+
+extern I_ MaxThreads;
+
+extern I_ context_switch;	    	    	/* Flag set by signal handler */
+extern I_ contextSwitchTime;
+#if defined(USE_COST_CENTRES) || defined(GUM)
+extern I_ contextSwitchTicks;
+#endif
+
+#define CS_MAX_FREQUENCY	100		  	/* context switches per second */
+#define CS_MIN_MILLISECS	(1000/CS_MAX_FREQUENCY)	/* milliseconds per slice */
+
+#ifdef __STG_GCC_REGS__
+#define OR_CONTEXT_SWITCH || context_switch
+#else
+#define OR_CONTEXT_SWITCH /* in miniInterpret */
+#endif
+
+#define REQUIRED_POOL 	0
+#define ADVISORY_POOL 	1
+#define SPARK_POOLS 	2
+
+#ifndef GRAN
+
+extern PP_ PendingSparksBase[SPARK_POOLS], PendingSparksLim[SPARK_POOLS];
+extern PP_ PendingSparksHd[SPARK_POOLS], PendingSparksTl[SPARK_POOLS];
+
+extern I_ SparkLimit[SPARK_POOLS];
+
+extern P_ RunnableThreadsHd, RunnableThreadsTl;
+extern P_ WaitingThreadsHd, WaitingThreadsTl;
+
+#define DEFAULT_MAX_LOCAL_SPARKS 100
+
+extern I_ MaxLocalSparks;
+
+IF_RTS(extern void AwaitEvent(I_);)
+
+#else /* GRAN */
+
+extern sparkq PendingSparksHd[][SPARK_POOLS], PendingSparksTl[][SPARK_POOLS];
+extern P_ RunnableThreadsHd[], RunnableThreadsTl[],
+          WaitThreadsHd[], WaitThreadsTl[];
+
+#define SparkQueueHd	PendingSparksHd[CurrentProc][ADVISORY_POOL]
+#define SparkQueueTl	PendingSparksTl[CurrentProc][ADVISORY_POOL]
+#define ThreadQueueHd	RunnableThreadsHd[CurrentProc]
+#define ThreadQueueTl	RunnableThreadsTl[CurrentProc]
+#define WaitingThreadsHd  WaitThreadsHd[CurrentProc]
+#define WaitingThreadsTl  WaitThreadsTl[CurrentProc]
+
+#endif  /* GRAN */
+
+IF_RTS(extern void PruneSparks(STG_NO_ARGS);)
+
+#ifdef GRAN
+
+/* Codes that can be used as params for ReSchedule */
+/* I distinguish them from the values 0/1 in the -UGRAN setup for security */
+/* reasons */
+#define FIND_THREAD	10
+#define SAME_THREAD	11
+#define NEW_THREAD	SAME_THREAD
+#define CHANGE_THREAD	13
+
+#define MAX_PROC (BITS_IN(W_))			/* Maximum number of PEs that can be simulated */
+extern W_ max_proc;
+
+extern W_ IdleProcs, Idlers; 
+
+extern unsigned CurrentProc;
+extern W_ CurrentTime[];
+extern W_ SparksAvail, SurplusThreads;
+
+/* Processor numbers to bitmasks and vice-versa */
+#define MainProc	     0
+
+#define PE_NUMBER(n)          (1l << (long)n)
+#define ThisPE		      PE_NUMBER(CurrentProc)
+#define MainPE		      PE_NUMBER(MainProc)
+
+#define IS_LOCAL_TO(ga,proc)  ((1l << (long) proc) & ga)
+
+/* These constants should eventually be program parameters */
+
+/* Communication Cost Model (EDS-like), max_proc > 2. */
+
+#define LATENCY		           1000	/* Latency for single packet */
+#define ADDITIONAL_LATENCY	    100	/* Latency for additional packets */
+#define BASICBLOCKTIME	    	     10
+#define FETCHTIME	  	(LATENCY*2+MSGUNPACKTIME)
+#define LOCALUNBLOCKTIME  	     10
+#define GLOBALUNBLOCKTIME 	(LATENCY+MSGUNPACKTIME)
+
+extern W_ gran_latency, gran_additional_latency, gran_fetchtime, 
+          gran_lunblocktime, gran_gunblocktime;
+
+#define	MSGPACKTIME		     0  /* Cost of creating a packet */
+#define	MSGUNPACKTIME		     0  /* Cost of receiving a packet */
+
+extern W_ gran_mpacktime, gran_mtidytime, gran_munpacktime;
+
+/* Thread cost model */
+#define THREADCREATETIME	   (25+THREADSCHEDULETIME)
+#define THREADQUEUETIME		    12  /* Cost of adding a thread to the running/runnable queue */
+#define THREADDESCHEDULETIME	    75  /* Cost of descheduling a thread */
+#define THREADSCHEDULETIME	    75  /* Cost of scheduling a thread */
+#define THREADCONTEXTSWITCHTIME	    (THREADDESCHEDULETIME+THREADSCHEDULETIME)
+
+extern W_ gran_threadcreatetime, gran_threadqueuetime, 
+          gran_threadscheduletime, gran_threaddescheduletime, 
+          gran_threadcontextswitchtime;
+
+/* Instruction Cost model (SPARC, including cache misses) */
+#define ARITH_COST	     	   1
+#define BRANCH_COST	     	   2
+#define LOAD_COST	  	   4
+#define STORE_COST	  	   4
+#define FLOAT_COST		   1 /* ? */
+
+extern W_ gran_arith_cost, gran_branch_cost, 
+          gran_load_cost, gran_store_cost, gran_float_cost,
+          gran_heapalloc_cost;
+
+/* Miscellaneous Parameters */
+extern I_ DoFairSchedule;
+extern I_ DoReScheduleOnFetch;
+extern I_ SimplifiedFetch;
+extern I_ DoStealThreadsFirst;
+extern I_ DoAlwaysCreateThreads;
+extern I_ DoThreadMigration;
+extern I_ DoGUMMFetching;
+extern I_ FetchStrategy;
+extern I_ PreferSparksOfLocalNodes;
+/* These come from debug options -bD? */
+extern I_ NoForward;
+extern I_ PrintFetchMisses, fetch_misses;
+#if defined(COUNT)
+extern I_ nUPDs, nUPDs_old, nUPDs_new, nUPDs_BQ, nPAPs, BQ_lens;
+#endif
+
+extern I_ do_gr_binary;
+extern I_ do_gr_profile;
+extern I_ no_gr_profile;
+extern I_ do_sp_profile;
+
+extern I_ NeedToReSchedule;
+
+extern void GranSimAllocate                PROTO((I_, P_, W_));
+extern void GranSimUnAllocate              PROTO((I_, P_, W_));
+extern I_   GranSimFetch                   PROTO((P_));
+extern void GranSimExec                    PROTO((W_,W_,W_,W_,W_));
+extern void GranSimSpark                   PROTO((W_,P_));
+extern void GranSimBlock                   PROTO(());
+extern void PerformReschedule              PROTO((W_, W_));
+
+#if 0   /* 'ngo Dochmey */
+
+#define GRAN_ALLOC_HEAP(n,liveness)	   STGCALL3(void,(),GranSimAllocate,n,0,0)
+#define GRAN_UNALLOC_HEAP(n,liveness)	   STGCALL3(void,(),GranSimUnallocate,n,0,0)
+
+#define GRAN_FETCH()			   STGCALL1(I_,(),GranSimFetch,Node)
+
+#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask)	\
+	do { if(liveness_mask&LIVENESS_R1)  \
+             STGCALL1(I_,(),GranSimFetch,Node); \
+	     GRAN_RESCHEDULE(liveness_mask,1);	\
+	   } while(0)
+
+#define GRAN_RESCHEDULE(liveness_mask,reenter)	\
+        STGCALL2_GC(void,(),     \
+	         PerformReschedule,liveness_mask,reenter)
+
+#define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
+        do { \
+	if (context_switch /* OR_INTERVAL_EXPIRED */) {	\
+          GRAN_RESCHEDULE(liveness_mask,reenter); \
+        } }while(0)
+
+#define GRAN_EXEC(arith,branch,load,store,floats)	\
+					STGCALL5(void,(),GranSimExec,arith,branch,load,store,floats)
+
+
+#else  /* 1 */ /* chu' Dochmey */
+
+#define GRAN_ALLOC_HEAP(n,liveness)	   \
+	SaveAllStgRegs();		   \
+	GranSimAllocate(n,0,0);            \
+	RestoreAllStgRegs();
+
+#define GRAN_UNALLOC_HEAP(n,liveness)	   \
+	SaveAllStgRegs();		   \
+	GranSimUnallocate(n,0,0); 	   \
+	RestoreAllStgRegs();
+
+#define GRAN_FETCH()			   \
+	SaveAllStgRegs();		   \
+	GranSimFetch(Node);		   \
+	RestoreAllStgRegs();
+
+#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask)	\
+	do { if(liveness_mask&LIVENESS_R1)  		\
+	     SaveAllStgRegs();		   	\
+             GranSimFetch(Node); 			\
+	     RestoreAllStgRegs();			\
+	     GRAN_RESCHEDULE(liveness_mask,1);		\
+	   } while(0)
+
+#define GRAN_RESCHEDULE(liveness_mask,reenter)	\
+        PerformReschedule_wrapper(liveness_mask,reenter)
+
+#define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
+        do { \
+	if (context_switch /* OR_INTERVAL_EXPIRED */) {	\
+          GRAN_RESCHEDULE(liveness_mask,reenter); \
+        } }while(0)
+
+#define GRAN_EXEC(arith,branch,load,store,floats)	\
+	SaveAllStgRegs();		   		\
+	GranSimExec(arith,branch,load,store,floats); 	\
+	RestoreAllStgRegs();
+
+#endif
+	
+
+#define ADD_TO_SPARK_QUEUE(spark)			\
+    SPARK_NEXT(spark) = NULL;				\
+    SPARK_PREV(spark) = PendingSparksTl[CurrentProc][ADVISORY_POOL];	\
+    if (PendingSparksHd[CurrentProc][ADVISORY_POOL] == NULL)		\
+	PendingSparksHd[CurrentProc][ADVISORY_POOL] = spark;		\
+    else						\
+	SPARK_NEXT(PendingSparksTl[CurrentProc][ADVISORY_POOL]) = spark;	\
+    PendingSparksTl[CurrentProc][ADVISORY_POOL] = spark;		\
+
+#endif     /* GRAN */
+
+extern P_ CurrentTSO;	    	    	    	/* thread state object now in use */
+
+extern P_ AvailableStack;
+extern P_ AvailableTSO;
+
+extern I_ threadId;
+
+void ScheduleThreads PROTO((P_ topClosure));
+#if defined(GRAN)
+void ReSchedule PROTO((int what_next)) STG_NORETURN;
+#else
+void ReSchedule PROTO((int again)) STG_NORETURN;
+#endif
+void EndThread(STG_NO_ARGS) STG_NORETURN;
+
+void QP_Event0 PROTO((I_, P_));
+void QP_Event1 PROTO((char *, P_));
+void QP_Event2 PROTO((char *, P_, P_));
+long qp_elapsed_time(STG_NO_ARGS);
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[thread-heap-objs]{Special threads-only heap objects (`closures')}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsubsection[TSO-closures]{@TSO@ (thread state object) heap objects}
+%*									*
+%************************************************************************
+
+We now enter the realm of the Deeply Magical.
+
+Reduction threads come and go, resume and suspend, etc., in the threaded
+world.  Obviously, there must be a place to squirrel away state information
+when a thread is suspended.  Hence these {\em thread state objects} (TSOs).
+
+Rather than manage TSOs' alloc/dealloc, etc., in some {\em ad hoc} way, we
+instead alloc/dealloc/etc them in the heap; then we can use all the
+standard garbage-collection/fetching/flushing/etc machinery on them.
+So that's why TSOs are ``heap objects,'' albeit very special ones.
+
+We use all the standard heap-object/closure jargon... (e.g.,
+@SET_TSO_HDR@, fixed headers, variable-hdr size, ...).
+
+A TSO is a fixed-size object with (post-header) words arranged like
+the main register table, and enough slop so that the register table
+can be properly aligned.  The last header word of the TSO is
+a pointer to the (internal) start of the interesting data.
+
+Note that the heap and stack pointers in the TSO are only valid while
+the thread is executing, and only if the corresponding values are not
+stored in machine registers (i.e. the TSO becomes the backing register
+table for those values).
+
+\begin{code}
+#define TSO_INFO_WORDS 10
+
+#ifdef DO_REDN_COUNTING
+#define TSO_REDN_WORDS 2
+#else
+#define TSO_REDN_WORDS 0
+#endif
+
+#if defined(GRAN) || defined(PAR)
+#define TSO_GRAN_WORDS 15
+#else
+#define TSO_GRAN_WORDS 0
+#endif
+
+#define TSO_VHS	\
+    	(GC_MUT_RESERVED_WORDS + TSO_INFO_WORDS + TSO_REDN_WORDS + TSO_GRAN_WORDS)
+
+#define TSO_HS		(FIXED_HS + TSO_VHS)
+#define TSO_CTS_SIZE	(BYTES_TO_STGWORDS(sizeof(STGRegisterTable) + sizeof(StgDouble)))
+
+#define TSO_PTRS	(MAX_VANILLA_REG + 2)
+
+/* std start-filling-in macro: */
+#define SET_TSO_HDR(closure,infolbl,cc)   	\
+{ SET_FIXED_HDR(closure,infolbl,cc);		\
+  SET_MUT_RESERVED_WORDS(closure); 	    	\
+}
+
+#define TSO_INFO_START		(FIXED_HS + GC_MUT_RESERVED_WORDS)
+#define TSO_LINK_LOCN	    	(TSO_INFO_START + 0)
+#define TSO_CCC_LOCN		(TSO_INFO_START + 1)
+#define TSO_NAME_LOCN	    	(TSO_INFO_START + 2)
+#define TSO_ID_LOCN 	    	(TSO_INFO_START + 3)
+#define TSO_TYPE_LOCN	    	(TSO_INFO_START + 4)
+#define TSO_PC1_LOCN	    	(TSO_INFO_START + 5)
+#define TSO_PC2_LOCN	    	(TSO_INFO_START + 6)
+#define TSO_ARG1_LOCN	    	(TSO_INFO_START + 7)
+#define TSO_EVENT_LOCN	    	(TSO_INFO_START + 8)
+#define TSO_SWITCH_LOCN	    	(TSO_INFO_START + 9)
+
+#define TSO_REDN_START		(TSO_INFO_START + TSO_INFO_WORDS)
+#ifdef DO_REDN_COUNTING
+#define TSO_AHWM_LOCN		(TSO_REDN_START + 0)
+#define TSO_BHWM_LOCN		(TSO_REDN_START + 1)
+#endif
+
+#define TSO_GRAN_START		(TSO_REDN_START + TSO_REDN_WORDS)
+#if defined(GRAN) || defined(PAR)
+#define TSO_LOCKED_LOCN		(TSO_GRAN_START + 0)
+#define TSO_SPARKNAME_LOCN   	(TSO_GRAN_START + 1)
+#define TSO_STARTEDAT_LOCN   	(TSO_GRAN_START + 2)
+#define TSO_EXPORTED_LOCN   	(TSO_GRAN_START + 3)
+#define TSO_BASICBLOCKS_LOCN   	(TSO_GRAN_START + 4)
+#define TSO_ALLOCS_LOCN	    	(TSO_GRAN_START + 5)
+#define TSO_EXECTIME_LOCN    	(TSO_GRAN_START + 6)
+#define TSO_FETCHTIME_LOCN    	(TSO_GRAN_START + 7)
+#define TSO_FETCHCOUNT_LOCN    	(TSO_GRAN_START + 8)
+#define TSO_BLOCKTIME_LOCN    	(TSO_GRAN_START + 9)
+#define TSO_BLOCKCOUNT_LOCN    	(TSO_GRAN_START + 10)
+#define TSO_BLOCKEDAT_LOCN    	(TSO_GRAN_START + 11)
+#define TSO_GLOBALSPARKS_LOCN  	(TSO_GRAN_START + 12)
+#define TSO_LOCALSPARKS_LOCN   	(TSO_GRAN_START + 13)
+#define TSO_QUEUE_LOCN   	(TSO_GRAN_START + 14)
+#endif
+
+#define TSO_LINK(closure)     	    (((PP_)closure)[TSO_LINK_LOCN])
+#define TSO_CCC(closure)     	    (((CostCentre *)closure)[TSO_CCC_LOCN])
+#define TSO_NAME(closure)   	    (((PP_)closure)[TSO_NAME_LOCN])
+#define TSO_ID(closure)   	    (((P_)closure)[TSO_ID_LOCN])
+#define TSO_TYPE(closure)     	    (((P_)closure)[TSO_TYPE_LOCN])
+#define TSO_PC1(closure)     	    (((FP_)closure)[TSO_PC1_LOCN])
+#define TSO_PC2(closure)     	    (((FP_)closure)[TSO_PC2_LOCN])
+#define TSO_ARG1(closure)     	    (((P_)closure)[TSO_ARG1_LOCN])
+#define TSO_EVENT(closure)     	    (((P_)closure)[TSO_EVENT_LOCN])
+#define TSO_SWITCH(closure)    	    (((FP_)closure)[TSO_SWITCH_LOCN])
+
+#define TSO_AHWM(closure)   	    (((I_ *)closure)[TSO_AHWM_LOCN])
+#define TSO_BHWM(closure)   	    (((I_ *)closure)[TSO_BHWM_LOCN])
+
+#define TSO_LOCKED(closure)         (((P_)closure)[TSO_LOCKED_LOCN])
+#define TSO_SPARKNAME(closure)      (((P_)closure)[TSO_SPARKNAME_LOCN])
+#define TSO_STARTEDAT(closure)      (((P_)closure)[TSO_STARTEDAT_LOCN])
+#define TSO_EXPORTED(closure)       (((P_)closure)[TSO_EXPORTED_LOCN])
+#define TSO_BASICBLOCKS(closure)    (((P_)closure)[TSO_BASICBLOCKS_LOCN])
+#define TSO_ALLOCS(closure)   	    (((P_)closure)[TSO_ALLOCS_LOCN])
+#define TSO_EXECTIME(closure)  	    (((P_)closure)[TSO_EXECTIME_LOCN])
+#define TSO_FETCHTIME(closure) 	    (((P_)closure)[TSO_FETCHTIME_LOCN])
+#define TSO_FETCHCOUNT(closure)	    (((P_)closure)[TSO_FETCHCOUNT_LOCN])
+#define TSO_BLOCKTIME(closure) 	    (((P_)closure)[TSO_BLOCKTIME_LOCN])
+#define TSO_BLOCKCOUNT(closure)	    (((P_)closure)[TSO_BLOCKCOUNT_LOCN])
+#define TSO_BLOCKEDAT(closure) 	    (((P_)closure)[TSO_BLOCKEDAT_LOCN])
+#define TSO_GLOBALSPARKS(closure)   (((P_)closure)[TSO_GLOBALSPARKS_LOCN])
+#define TSO_LOCALSPARKS(closure)    (((P_)closure)[TSO_LOCALSPARKS_LOCN])
+#define TSO_QUEUE(closure)	    (((P_)closure)[TSO_QUEUE_LOCN])
+
+#define TSO_INTERNAL_PTR(closure)	    \
+  ((STGRegisterTable *)(((W_)(((P_)closure) \
+    + TSO_HS + BYTES_TO_STGWORDS(sizeof(StgDouble)))) & ~(sizeof(StgDouble) - 1)))
+
+#if defined(CONCURRENT) && defined(GRAN)        /* HWL */
+/* Per definitionem a tso is really awake if it has met a first */
+/* GRAN_RESCHEDULE macro after having been rescheduled. */
+#define REALLY_AWAKE(tso)	(TSO_SWITCH(tso) != TSO_PC2(tso))
+#define SET_AWAKE_FLAG(tso)	TSO_SWITCH(tso) = NULL
+#define RESET_AWAKE_FLAG(tso)	TSO_SWITCH(tso) = TSO_PC2(tso)
+#endif
+
+\end{code}
+
+The types of threads (TSO_TYPE):
+\begin{code}
+#define	T_MAIN			0	/* Must be executed locally */
+#define	T_REQUIRED		1	/* A required thread  -- may be exported */
+#define	T_ADVISORY		2	/* An advisory thread -- may be exported */
+#define	T_FAIL			3	/* A failure thread   -- may be exported */
+\end{code}
+
+The total space required to start a new thread (See NewThread in
+Threads.lc):
+\begin{code}
+#define THREAD_SPACE_REQUIRED (TSO_HS + TSO_CTS_SIZE + STKO_HS + StkOChunkSize)
+\end{code}
+
+Here are the various queues for GrAnSim-type events.
+\begin{code}
+#define Q_RUNNING   'G'
+#define Q_RUNNABLE  'A'
+#define Q_BLOCKED   'R'
+#define Q_FETCHING  'Y'
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[spark-closures]{Pending Sparks}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GUM
+
+P_ FindLocalSpark PROTO((rtsBool forexport));
+
+void DisposeSpark PROTO((P_ spark));
+rtsBool Spark PROTO((P_ closure, rtsBool required));
+
+#endif /*GUM*/
+
+#ifdef GRAN   /* For GrAnSim sparks are currently mallocated -- HWL */
+
+void DisposeSpark PROTO((sparkq spark));
+
+# define MAX_SPARKS		2000  /* For GC Roots Purposes */
+# if defined(GRAN_TNG)
+extern sparkq NewSpark		PROTO((P_,I_,I_,I_));
+# else /* !GRAN_TNG */
+extern sparkq NewSpark		PROTO((P_,I_,I_));
+# endif  /* GRAN_TNG */
+
+# define SPARK_PREV(spark)	(spark->prev)
+# define SPARK_NEXT(spark)    	(sparkq)(spark->next)
+# define SPARK_NODE(spark)	(P_)(spark->node)
+# define SPARK_NAME(spark)	(spark->name)
+# if defined(GRAN_TNG)
+#  define SPARK_GRAN_INFO(spark) (spark->gran_info)
+# endif  /* GRAN_TNG */
+# define SPARK_GLOBAL(spark)	(spark->global)
+# define SPARK_EXPORTED(spark)	(SPARK_GLOBAL(spark) > 1)
+
+#endif      /* GRAN */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[STKO-closures]{@STKO@ (stack object) heap objects}
+%*									*
+%************************************************************************
+
+We linger in the Deeply Magical...
+
+Each reduction thread has to have its own stack space.  As there may
+be many such threads, and as any given one may need quite a big stack,
+a naive give-'em-a-big-stack-and-let-'em-run approach will cost a {\em
+lot} of memory.
+
+Our approach is to give a thread a small stack space, and then link
+on/off extra ``chunks'' as the need arises.  Again, this is a
+storage-management problem, and, yet again, we choose to graft the
+whole business onto the existing heap-management machinery.  So stack
+objects will live in the heap, be garbage collected, etc., etc..
+
+So, as with TSOs, we use the standard heap-object (`closure') jargon.
+
+Here is the picture of how a stack object is arranged:
+\begin{verbatim}
+    <-----  var hdr -------->			 v ---- FirstPtr --- v
+---------------------------------------------------------------------
+...|| SpB | SuB | SpA | SuA || B stk -> ... | ... <- A stk || PREV ||
+---------------------------------------------------------------------
+			      XX->                     <-YY 
+\end{verbatim}
+
+We keep the following state-of-stack info in the {\em variable-header}
+part of a STKO:
+\begin{tabular}{ll}
+SpB, SuB & their {\em offsets} from 1st non-hdr word (marked \tr{XX} above)\\
+SpA, SuA & their {\em offsets} from the next-to-last word (marked \tr{YY} above)\\
+ctr field??? & (GC\_GEN\_WHATNOT may serve instead)\\
+\end{tabular}
+
+The stack-pointer offsets are from the points indicated and are {\em
+non-negative} for pointers to this chunk of the stack space.
+
+At the {\em end} of the stack object, we have a {\em link} to the
+previous part of the overall stack.  The link is \tr{NULL} if this is
+the bottom of the overall stack.
+
+After the header, we have @STKO_CHUNK_SIZE-1@ words of actual stack
+stuff.  The B-stack part begins at the lowest address and grows
+upwards; the A-stack parts begins at the highest address and grows
+downwards.
+
+From a storage-manager point of view, these are {\em very special}
+objects.
+
+\begin{code}
+#ifdef DO_REDN_COUNTING
+#define STKO_VHS	(GC_MUT_RESERVED_WORDS + 9)
+#else
+#define STKO_VHS	(GC_MUT_RESERVED_WORDS + 7)
+#endif
+#define STKO_HS		(FIXED_HS + STKO_VHS)
+
+#define DEFAULT_STKO_CHUNK_SIZE	1024
+
+#define MIN_STKO_CHUNK_SIZE 16	/* Rather arbitrary */
+
+extern I_ StkOChunkSize;
+
+#define STKO_CLOSURE_SIZE(closure)	STKO_SIZE(closure)
+
+#define STKO_CLOSURE_CTS_SIZE(closure)	(STKO_CLOSURE_SIZE(closure) - STKO_VHS)
+#define STKO_CLOSURE_PTR(closure, no)	(*STKO_CLOSURE_ADDR(closure, no))
+
+#define STKO_CLOSURE_ADDR(s, n)     (((P_)(s)) + STKO_HS + (n) - 1)
+#define STKO_CLOSURE_OFFSET(s, p)   (((P_)(p) - (P_)(s)) - STKO_HS + 1)
+
+/* std start-filling-in macro: */
+#define SET_STKO_HDR(s,infolbl,cc)   	\
+	{ SET_FIXED_HDR(s,infolbl,cc);	\
+	  SET_MUT_RESERVED_WORDS(s); 	\
+	  /* the other header words filled in some other way */ }
+
+/* now we have the STKO-specific stuff 
+
+   Note: The S[pu][AB] registers are put in this order so that
+         they will appear in monotonically increasing order in
+         the StkO...just as an aid to the poor wee soul who has
+         to debug things.
+ */
+
+#ifdef DO_REDN_COUNTING
+#define STKO_ADEP_LOCN      (STKO_HS - 9)
+#define STKO_BDEP_LOCN      (STKO_HS - 8)
+#endif
+#define STKO_SIZE_LOCN      (STKO_HS - 7)
+#define STKO_RETURN_LOCN    (STKO_HS - 6)
+#define	STKO_LINK_LOCN	    (STKO_HS - 5)
+#define	STKO_SuB_LOCN	    (STKO_HS - 4)
+#define	STKO_SpB_LOCN	    (STKO_HS - 3)
+#define	STKO_SpA_LOCN	    (STKO_HS - 2)
+#define	STKO_SuA_LOCN	    (STKO_HS - 1)
+
+#define STKO_ADEP(s)	    (((I_ *)(s))[STKO_ADEP_LOCN])
+#define STKO_BDEP(s)	    (((I_ *)(s))[STKO_BDEP_LOCN])
+#define STKO_SIZE(s)	    (((P_)(s))[STKO_SIZE_LOCN])
+#define STKO_RETURN(s)	    (((StgRetAddr *)(s))[STKO_RETURN_LOCN])
+#define STKO_LINK(s)	    (((PP_)(s))[STKO_LINK_LOCN])
+#define STKO_SpB(s) 	    (((PP_)(s))[STKO_SpB_LOCN])
+#define STKO_SuB(s) 	    (((PP_)(s))[STKO_SuB_LOCN])
+#define STKO_SpA(s) 	    (((PP_ *)(s))[STKO_SpA_LOCN])
+#define STKO_SuA(s) 	    (((PP_ *)(s))[STKO_SuA_LOCN])
+
+#define STKO_BSTK_OFFSET(closure) (STKO_HS)
+#define STKO_ASTK_OFFSET(closure) (FIXED_HS + STKO_CLOSURE_SIZE(closure) - 1)
+#define STKO_BSTK_BOT(closure)    (((P_)(closure)) + STKO_BSTK_OFFSET(closure))
+#define STKO_ASTK_BOT(closure)    (((PP_)(closure)) + STKO_ASTK_OFFSET(closure))
+\end{code}
+
+These are offsets into the stack object proper (starting at 1 for
+the first word after the header).
+
+\begin{code}
+#define	STKO_SpA_OFFSET(s)  (STKO_CLOSURE_OFFSET(s,STKO_SpA(s)))
+#define	STKO_SuA_OFFSET(s)  (STKO_CLOSURE_OFFSET(s,STKO_SuA(s)))
+#define	STKO_SpB_OFFSET(s)  (STKO_CLOSURE_OFFSET(s,STKO_SpB(s)))
+#define	STKO_SuB_OFFSET(s)  (STKO_CLOSURE_OFFSET(s,STKO_SuB(s)))
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[BQ-closures]{@BQ@ (blocking queue) heap objects (`closures')}
+%*									*
+%************************************************************************
+
+Blocking queues are built in the parallel system when a local thread
+enters a non-global node.  They are similar to black holes, except
+that when they are updated, the blocking queue must be enlivened
+too.  A blocking queue closure thus has the following structure.
+
+\begin{onlylatex}
+\begin{center}
+\end{onlylatex}
+\begin{tabular}{||l|l|l|l||}\hline
+GA	&	Info ptr.	& $\ldots$ 		&	Blocking Queue	\\ \hline
+\end{tabular}
+\begin{onlylatex}
+\begin{center}
+\end{onlylatex}
+
+The blocking queue itself is a pointer to a list of blocking queue entries.
+The list is formed from TSO closures.  For the generational garbage collectors,
+the BQ must have the same structure as an IND, with the blocking queue hanging
+off of the indirection pointer.  (This has to do with treating the BQ as an old
+root if it gets updated while in the old generation.)
+
+\begin{code}
+#define BQ_VHS			    IND_VHS
+#define BQ_HS			    IND_HS
+
+#define BQ_CLOSURE_SIZE(closure)    IND_CLOSURE_SIZE(closure)
+#define BQ_CLOSURE_NoPTRS(closure)  IND_CLOSURE_NoPTRS(closure)
+#define BQ_CLOSURE_NoNONPTRS(closure)	IND_CLOSURE_NoNONPTRS(closure)
+#define BQ_CLOSURE_PTR(closure, no) (((P_)(closure))[BQ_HS + (no) - 1])
+\end{code}
+
+Blocking queues store a pointer to a list of blocking queue entries.
+
+\begin{code}
+#define BQ_ENTRIES(closure)  	    IND_CLOSURE_PTR(closure)
+#define BQ_LINK(closure)    	    IND_CLOSURE_LINK(closure)
+\end{code}
+
+We have only one kind of blocking queue closure, so we test the info pointer
+for a specific value rather than looking in the info table for a special bit.
+
+\begin{code}
+EXTDATA_RO(BQ_info);
+EXTFUN(BQ_entry);
+#define IS_BQ_CLOSURE(closure)	   (INFO_PTR(closure) == (W_) BQ_info)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[TSO_ITBL]{@TSO_ITBL@}
+%*									*
+%************************************************************************
+
+The special info table used for thread state objects (TSOs).
+
+\begin{code}
+
+#define TSO_ITBL()				    \
+    CAT_DECLARE(TSO,INTERNAL_KIND,"TSO","<TSO>")    \
+    EXTFUN(TSO_entry);				    \
+    EXTDATA_RO(MK_REP_LBL(TSO,,));		    \
+    const W_ TSO_info[] = {			    \
+        (W_) TSO_entry				    \
+	,(W_) INFO_OTHER_TAG			    \
+	,(W_) MK_REP_REF(TSO,,)			    \
+	INCLUDE_PROFILING_INFO(TSO)		    \
+	}
+
+#define TSO_RTBL() \
+    const W_ MK_REP_LBL(TSO,,)[] = { \
+	INCLUDE_TYPE_INFO(TSO)					\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
+	INCLUDE_PAR_INFO					\
+	INCLUDE_COPYING_INFO(_Evacuate_TSO,_Scavenge_TSO) 	\
+	INCLUDE_COMPACTING_INFO(_ScanLink_TSO,_PRStart_TSO,_ScanMove_TSO,_PRIn_TSO) \
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[STKO_ITBL]{@STKO_ITBL@}
+%*									*
+%************************************************************************
+
+The special info table used for stack objects (STKOs).
+
+\begin{code}
+#define STKO_ITBL()					\
+    CAT_DECLARE(StkO,INTERNAL_KIND,"STKO","<STKO>")	\
+    EXTFUN(StkO_entry);					\
+    EXTDATA_RO(MK_REP_LBL(StkO,,));			\
+    const W_ StkO_info[] = {				\
+        (W_) StkO_entry					\
+	,(W_) INFO_OTHER_TAG				\
+	,(W_) MK_REP_REF(StkO,,)			\
+	INCLUDE_PROFILING_INFO(StkO)			\
+    }
+
+#define STKO_RTBL() \
+    const W_ MK_REP_LBL(StkO,,)[] = { \
+	INCLUDE_TYPE_INFO(STKO_DYNAMIC)				\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
+	INCLUDE_PAR_INFO					\
+	INCLUDE_COPYING_INFO(_Evacuate_StkO,_Scavenge_StkO)	\
+	INCLUDE_COMPACTING_INFO(_ScanLink_StkO,_PRStart_StkO,_ScanMove_StkO,_PRIn_StkO) \
+    }
+
+#define STKO_STATIC_ITBL()				\
+    CAT_DECLARE(StkO_static,INTERNAL_KIND,"STKO","<STKO>")	\
+    EXTFUN(StkO_static_entry);				\
+    EXTDATA_RO(MK_REP_LBL(StkO_static,,));		\
+    const W_ StkO_static_info[] = {			\
+        (W_) StkO_static_entry				\
+	,(W_) INFO_OTHER_TAG				\
+	,(W_) MK_REP_REF(StkO_static,,)			\
+	INCLUDE_PROFILING_INFO(StkO_static)		\
+    }
+
+#define STKO_STATIC_RTBL() \
+    const W_ MK_REP_LBL(StkO_static,,)[] = { \
+	INCLUDE_TYPE_INFO(STKO_STATIC)				\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
+	INCLUDE_PAR_INFO					\
+	INCLUDE_COPYING_INFO(_Evacuate_Static,_Scavenge_Static) \
+	INCLUDE_COMPACTING_INFO(_Dummy_Static_entry,_PRStart_Static, \
+				_Dummy_Static_entry,_PRIn_Error)    \
+    }
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[BQ_ITBL]{@BQ_ITBL@}
+%*									*
+%************************************************************************
+
+Special info-table for local blocking queues.
+
+\begin{code}
+#define BQ_ITBL()				\
+    CAT_DECLARE(BQ,INTERNAL_KIND,"BQ","<BQ>") 	\
+    EXTFUN(BQ_entry);				\
+    EXTDATA_RO(MK_REP_LBL(BQ,,));		\
+    const W_ BQ_info[] = {			\
+        (W_) BQ_entry				\
+	,(W_) INFO_OTHER_TAG			\
+	,(W_) MK_REP_REF(BQ,,)			\
+	INCLUDE_PROFILING_INFO(BQ)		\
+    }
+
+#define BQ_RTBL() \
+    const W_ MK_REP_LBL(BQ,,)[] = {				\
+	INCLUDE_TYPE_INFO(BQ)		    			\
+	INCLUDE_SIZE_INFO(MIN_UPD_SIZE,INFO_UNUSED)		\
+	INCLUDE_PAR_INFO			    	    	\
+	INCLUDE_COPYING_INFO(_Evacuate_BQ,_Scavenge_BQ)     	\
+	SPEC_COMPACTING_INFO(_ScanLink_BQ,_PRStart_BQ,_ScanMove_BQ,_PRIn_BQ) \
+    }
+
+\end{code}
+
+\begin{code}
+#endif	/* CONCURRENT */
+\end{code}
+
+Even the sequential system gets to play with SynchVars, though it really
+doesn't make too much sense (if any).  Okay; maybe it makes some sense.
+(See the 1.3 I/O stuff.)
+
+%************************************************************************
+%*									*
+\subsubsection[SVar-closures]{@SynchVar@ heap objects}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define SVAR_HS			    (MUTUPLE_HS)
+
+#define SVAR_CLOSURE_SIZE(closure)  3
+
+#define SET_SVAR_HDR(closure,infolbl,cc)   \
+    SET_MUTUPLE_HDR(closure,infolbl,cc,MUTUPLE_VHS+3,3)
+
+/* The value must come first, because we shrink the other two fields off
+   when writing an IVar */
+
+#define SVAR_VALUE_LOCN	    	(SVAR_HS+0)
+#define SVAR_HEAD_LOCN	    	(SVAR_HS+1)
+#define SVAR_TAIL_LOCN		(SVAR_HS+2)
+
+#define SVAR_VALUE(closure)	((PP_)(closure))[SVAR_VALUE_LOCN]
+#define SVAR_HEAD(closure)    	((PP_)(closure))[SVAR_HEAD_LOCN]
+#define SVAR_TAIL(closure)    	((PP_)(closure))[SVAR_TAIL_LOCN]
+\end{code}
+
+End multi-slurp protection:
+
+\begin{code}
+#endif	/* THREADS_H */
+\end{code}
+
+

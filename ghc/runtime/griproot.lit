@@ -1,0 +1,57 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{GRIP Runtime Support}
+\author{Kevin Hammond, \\
+Department of Computing Science, \\
+University of Glasgow, \\
+Glasgow, G12 8QQ, UK. \\
+\\
+Email: glasgow-haskell-\{request,bugs\}\@dcs.glasgow.ac.uk}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\end{rawlatex}
+\clearpage
+\end{onlystandalone}
+
+This document describes the runtime support code for the GRIP Multiprocessor.
+Most of the code described here is in fact generic, and could be ported to
+many parallel architectures with some changes (notably to the message-passing
+primitives).
+
+\input{grip/Macros.lh}
+
+\input{grip/Flush.lc}
+\input{grip/Fetch.lc}
+\input{grip/MipOp.lc}
+
+\input{threadroot.lit}
+
+\input{grip/GlobalGc.lc}
+
+\input{grip/RTS_Stats.lc}
+
+\input{grip/Comms.lc}
+
+\section[GRIP_misc]{GRIP Emulation}
+\downsection
+
+The routines in this section emulate the operating system or
+hardware on a sequential system.  They should not be required in the final 
+GRIP runtime system.
+
+\input{grip/BIP_Sim.lc}
+\input{grip/IMU_Sim.lc}
+\input{grip/GRIP_Debug.lc}
+\input{grip/Name.lc}
+\input{grip/OpNames.lc}
+\input{grip/PEOp.lc}
+\upsection
+
+\input{grip/Statistics.lc}
+
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

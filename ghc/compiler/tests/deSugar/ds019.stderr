@@ -1,0 +1,34 @@
+Desugared:
+Test.f :: for all d, e, f, g, h, i, j. (d, e, f) -> (g, h) -> i -> [j]
+Test.f =
+    /\ o105 o106 o107 o112 o113 o114 t115 -> \ ds.121 i.122 o.123 ->
+	let
+	  fail.124 =
+	      (error [t115])
+		  "\"ds019.hs\", line 8: pattern-matching failure [function binding]\n"S in
+	let
+	  fail.140 =
+	      let
+		fail.135 =
+		    let
+		      fail.129 =
+			  case i.122 of {
+			    MkTuple2 m.125 n.126 ->
+				let r.127 = o.123 in
+				let h.128 = ds.121 in  Nil! t115
+			  }
+		    in 
+		      case ds.121 of {
+			MkTuple3 e.130 f.131 g.132 ->
+			    let q.133 = o.123 in let l.134 = i.122 in  Nil! t115
+		      }
+	      in 
+		case i.122 of {
+		  MkTuple2 j.136 k.137 ->
+		      let p.138 = o.123 in let d.139 = ds.121 in  Nil! t115
+		}
+	in 
+	  case ds.121 of {
+	    MkTuple3 a.141 b.142 c.143 -> Nil! t115
+	  }
+

@@ -1,0 +1,8 @@
+GNU regex package 0.12, hacked by Sigbjorn Finne
+<sof@dcs.glasgow.ac.uk>; see PerlSyntaxCaveats.
+
+Also note: regex.h moved to ghc/includes/ghcRegex.h
+
+Will Partain
+partain@dcs.gla.ac.uk
+95/03

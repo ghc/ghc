@@ -1,0 +1,15 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_atype where
+import UgenUtil
+import Util
+
+import U_list
+%}}
+type atype;
+	atc	: < gatcid	: unkId;
+		    gatctypel	: list;
+		    gatcline	: long; >;
+end;

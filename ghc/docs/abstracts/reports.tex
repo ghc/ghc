@@ -1,0 +1,111 @@
+\documentstyle[11pt,slpj]{article}
+
+\newcommand{\reference}[4]{	% authors, title, details, abstract
+\large
+#1, {\em #2}, #3.
+\normalsize
+\begin{quotation}
+#4
+\end{quotation}
+\vspace{0.2in}
+}
+
+\newcommand{\Haskell}[1]{{\sc Haskell}}
+
+\begin{document}
+
+\title{Abstracts of GRIP/GRASP-related design documents and manuals \\
+Dept of Computing Science \\
+University of Glasgow G12 8QQ}
+
+\author{
+Cordelia Hall (cvh@cs.glasgow.ac.uk) \and
+Kevin Hammond (kh@cs.glasgow.ac.uk) \and
+Will Partain (partain@cs.glasgow.ac.uk) \and
+Simon L Peyton Jones (simonpj@cs.glasgow.ac.uk) \and
+Phil Wadler (wadler@cs.glasgow.ac.uk) 
+}
+
+\maketitle
+
+\begin{abstract}
+This list covers internal design documents and manuals for the GRIP
+and GRASP projects.
+They are mainly intended for internal consumption, or for brave friends.
+
+Reports and papers designed for more general consumption are given in 
+a separate list.
+
+They of them can be obtained by writing to 
+Teresa Currie, Dept of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+teresa@uk.ac.glasgow.cs.
+\end{abstract}
+
+
+\section{Manuals, design documents and guides}
+
+\reference{Kevin Hammond and Simon L Peyton Jones}
+{Mail server guide}
+{Nov 1990}
+{
+A guide to the GRIP Mail Server
+}
+
+\reference{Kevin Hammond, Simon L Peyton Jones and Jon Salkild}
+{GLOS 2.0 - The GRIP Lightweight Operating System}
+{University College London, January 1989}
+{
+GLOS is a lightweight multitasking non-preemptive operating 
+for the GRIP multiprocessor.
+This paper describes the operating system from the programmer's point of
+view.
+}
+
+\reference{Simon L Peyton Jones and Jon Salkild}
+{GRIP system user manual}
+{University College London, January 1989}
+{
+This document describes how to configure, boot and run the GRIP system,
+using the sys2 system mangement program.
+}
+
+\reference{Simon L Peyton Jones}
+{The BIP front panel user manual}
+{University College London, January 1989}
+{
+This document describes {bsim} the program which runs on the GRIP host
+Unix machine, and provides a front-panel interface to the BIP.
+It assumes familiarity with the BIP architecture.
+}
+
+\reference{Chris Clack}
+{The GRIP Intelligent Memory Unit microprogrammer's guide}
+{University College London, January 1989}
+{
+This paper encapsulates the spectrum of knowledge required to microprogram
+the GRIP Intelligent Memory Units (IMUs). It gives a detailed 
+description of the IMU hardware and its microassembler, together with 
+the library of predefined microcode macros.
+An overview of the the Bus Interface 
+Processor (BIP) hardware and its interface protocols is also provided.
+}
+
+\reference{Chris Clack}
+{Diagnostic control and simulation of GRIP Intelligent Memory Units - the
+msH user guide}
+{University College London, January 1989}
+{
+Software has been written to facilitate interaction with the diagnostic
+hardware embedded in each GRIP Intelligent Memory Unit (IMU).
+The msS program precisely emulates an IMU, and can be used to help
+debug IMU microcode in the absence of real hardware.
+The msH program interfaces directly to the actual hardware.
+Both msS and msH are driven by the same interactive front panel, which 
+both acts a command interpreter and manages the display screen.
+
+The paper is mainly concerned with a description of the front-panel and
+how to use it, but also gives a brief overview of the IMU architecture.
+}
+
+\end{document}

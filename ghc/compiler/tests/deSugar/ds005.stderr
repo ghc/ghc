@@ -1,0 +1,65 @@
+Desugared:
+{- plain CoRec -}
+MapPairs.mappairs :: for all d, e, f. (d -> e -> f) -> [d] -> [e] -> [f]
+MapPairs.mappairs =
+    /\ t109 t112 t105 -> \ f.146 ds.147 ys.148 ->
+	let
+	  fail.149 =
+	      (error [t105])
+		  "\"ds005.hs\", line 10: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.147 of {
+	    Nil -> Nil! t105
+	    (:) x.150 xs.151 ->
+		case ys.148 of {
+		  Nil -> let f.152 = f.146 in  Nil! t105
+		  (:) y.153 ys.154 ->
+		      let xs.155 = xs.151 in
+		      let x.156 = x.150 in
+		      let f.157 = f.146
+		      in 
+			(: t105)
+			    (f.157 x.156 y.153)
+			    ((((MapPairs.mappairs t109) t112) t105)
+				 f.157 xs.155 ys.154)
+		}
+	  }
+{- end plain CoRec -}
+{- plain CoRec -}
+MapPairs.mappairs' :: for all d, e, f. (d -> e -> f) -> [d] -> [e] -> [f]
+MapPairs.mappairs' =
+    /\ t133 t136 t129 -> \ f.162 ds.163 ys.164 ->
+	let
+	  fail.165 =
+	      (error [t129])
+		  "\"ds005.hs\", line 15: pattern-matching failure [function binding]\n"S in
+	let
+	  fail.174 =
+	      let
+		fail.171 =
+		    case ds.163 of {
+		      (:) x.166 xs.167 ->
+			  case ys.164 of {
+			    (:) y.168 ys.169 ->
+				let f.170 = f.162
+				in 
+				  (: t129)
+				      (f.170 x.166 y.168)
+				      ((((MapPairs.mappairs' t133) t136) t129)
+					   f.170 xs.167 ys.169)
+			    _ ->  fail.165
+			  }
+		      _ ->  fail.165
+		    }
+	      in 
+		case ys.164 of {
+		  Nil -> let x.172 = ds.163 in let f.173 = f.162 in  Nil! t129
+		  _ ->  fail.171
+		}
+	in 
+	  case ds.163 of {
+	    Nil -> Nil! t129
+	    _ ->  fail.174
+	  }
+{- end plain CoRec -}
+

@@ -1,0 +1,33 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CgHeapery where
+import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelative, ReturnInfo)
+import BasicLit(BasicLit)
+import CLabelInfo(CLabel)
+import CgBindery(CgIdInfo)
+import CgMonad(CgInfoDownwards, CgState, StubFlag)
+import ClosureInfo(ClosureInfo, LambdaFormInfo)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SMRep(SMRep)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
+data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
+data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
+data ClosureInfo 	{-# GHC_PRAGMA MkClosureInfo Id LambdaFormInfo SMRep #-}
+data HeapOffset 
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+allocDynClosure :: ClosureInfo -> CAddrMode -> CAddrMode -> [(CAddrMode, HeapOffset)] -> CgInfoDownwards -> CgState -> (HeapOffset, CgState)
+	{-# GHC_PRAGMA _A_ 4 _U_ 222111 _N_ _N_ _N_ _N_ #-}
+allocHeap :: HeapOffset -> CgInfoDownwards -> CgState -> (CAddrMode, CgState)
+	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "LLU(LLU(LLU(LL)))" {_A_ 5 _U_ 21222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+heapCheck :: [MagicId] -> Bool -> (CgInfoDownwards -> CgState -> CgState) -> CgInfoDownwards -> CgState -> CgState
+	{-# GHC_PRAGMA _A_ 5 _U_ 22221 _N_ _S_ "LLLLU(LLU(LLL))" _N_ _N_ #-}
+

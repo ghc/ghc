@@ -1,0 +1,20 @@
+This is the root directory for functional-programming tools
+distributed by the Computing Science Department at Glasgow University.
+Simon Peyton Jones <simonpj@dcs.glasgow.ac.uk> is the ringleader
+of this effort.  The tools are:
+
+    ghc		the Glasgow Haskell compilation system
+    haggis	the Haggis GUI toolkit
+    happy	the Happy Haskell parser generator
+    nofib	the NoFib Haskell benchmarking suite
+    literate	the Glasgow "literate programming" system
+    mkworld	configuration system (derived from X11 imake)
+    glafp-utils shared utility programs
+
+The "literate" stuff is usually distributed *with* other systems, but
+not necessarily.  Components which are always part of a distribution
+(never stand-alone) are "glafp-utils" and "mkworld" (a configuration
+system).
+
+There is usually an ANNOUNCE* file with any distribution.  Please
+consult that, or the <piece>/README file, to find out how to proceed.

@@ -1,0 +1,186 @@
+eval "exec perl -S $0 $*"
+     if $running_under_some_random_shell;
+#
+# reads CPP output and turns #line things into appropriate Haskell
+# pragmas
+#
+# considered to be GHC-project specific
+#
+#
+# OPTIONALLY processes GENERATE_SPECS pragmas
+# when give flag -genSPECS
+#
+# EXAMPLE:
+#
+# {-# GENERATE_SPECS a b #-} 
+# fn :: type
+#
+#==>>
+#
+# fn :: type
+# {-# SPECIALIZE fn :: type[ a/a,u1/b] #-}
+# {-# SPECIALIZE fn :: type[ a/a,u2/b] #-}
+# {-# SPECIALIZE fn :: type[u1/a, b/b] #-}
+# {-# SPECIALIZE fn :: type[u1/a,u1/b] #-}
+# {-# SPECIALIZE fn :: type[u1/a,u2/b] #-}
+# {-# SPECIALIZE fn :: type[u2/a, b/b] #-}
+# {-# SPECIALIZE fn :: type[u2/a,u1/b] #-}
+# {-# SPECIALIZE fn :: type[u2/a,u2/b] #-}
+#
+# where the u's are extracted from a predetermined
+# set of unboxed types $SpecingString
+#
+# The types to substitute can be specified explicitly in { }s following
+# the type variable
+#
+# EXAMPLES:
+#
+# {-# GENERATE_SPECS a{ty1,ty2...} b{+,ty1,ty2...} c{~,ty1,ty2,...} d{~,+,ty1,ty2,...} #-} 
+# fn :: type
+#
+# where
+#    ~ indicates that no specialisations are to be left polymorhphic in this type variable
+#      (this is required for overloaded tyvars which must have ground specialisations)
+#    + indicates that the predetermined types are to be added to the list
+#
+# Note: There must be no white space between { }s
+#       Use ( )s around type names when separation is required
+#
+
+$Verbose = 0;
+while ($#ARGV >= 0 && $ARGV[0] eq '-v' || $ARGV[0] =~ /^-genSPECS/) {
+    if ($ARGV[0] eq '-v') {
+	$Verbose = 1;
+    } elsif ( $ARGV[0] eq '-genSPECS0' ) { # do it, but no SpecingString
+	$SpecingString = '';
+	@SpecingTypes = ();
+	$DoGenSpecs = 1;
+    } else {
+	shift(@ARGV);
+	$SpecingString = $ARGV[0];
+	@SpecingTypes = split(/,/, $SpecingString);
+	$DoGenSpecs = 1;
+    }
+    shift(@ARGV);
+}
+#ToDo: print a version number ?
+
+$OrigCpp = '$(RAWCPP)';
+
+if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
+    $cmd  = $1;
+    $rest = $2;
+    if ( -x $cmd ) { # cool
+	$Cpp = $OrigCpp;
+    } else { # oops; try to guess
+	$GccV = `gcc -v 2>&1`;
+	if ( $GccV =~ /Reading specs from (.*)\/specs/ ) {
+	    $Cpp = "$1/cpp $rest";
+	} else {
+	    die "hscpp: don't know how to run cpp: $OrigCpp\n";
+	}
+    }
+} else {
+    $Cpp = $OrigCpp;
+}
+
+print STDERR "hscpp:CPP invoked: $Cpp @ARGV\n" if $Verbose;
+
+open(INPIPE, "$Cpp @ARGV |") || die "Can't open C pre-processor pipe\n";
+
+while (<INPIPE>) {
+
+# line directives come in flavo[u]rs:
+#   s/^#\s*line\s+\d+$/\{\-# LINE \-\}/;   IGNORE THIS ONE FOR NOW
+    s/^#\s*line\s+(\d+)\s+(\".+\")$/\{\-# LINE \1 \2 \-\}/;
+    s/^#\s*(\d+)\s+(\".*\").*/\{\-# LINE \1 \2 \-\}/;
+
+# genSPEC processing:
+    if ( /^\s*\{-#\s*GENERATE_SPECS/ ) {
+	if ( $DoGenSpecs ) {
+	    $data_or_inst = 0;
+	    $data_inst_str = "";
+	    $remove_poly = 1;
+
+	    if ( /^\s*\{-#\s*GENERATE_SPECS\s+(data)\s+(\S.*)\s*::(.*)#-\}\s*$/ ) {
+		$data_or_inst = 1;
+		$data_inst_str = $1;
+		$vars = $2;
+		$type = $3;
+	    } elsif ( /^\s*\{-#\s*GENERATE_SPECS\s+(instance)\s+(\S.*)\s*::(.*)#-\}\s*$/ ) {
+		$data_or_inst = 1;
+		$data_inst_str = $1;
+		$vars = $2;
+		$type = $3;
+	    } elsif ( /^\s*\{-#\s*GENERATE_SPECS\s+(\S+)\s+(.*)\s*#-\}\s*$/ ) {
+	        $line = $_;
+	        $fun  = $1;
+	        $vars = $2;
+
+	        $tysig = <INPIPE>;
+	        while ( $tysig =~ /^\s*$/ ) {
+	            print $tysig;
+	            $tysig = <INPIPE>;
+	        }
+		$funpat = $fun;			# quote non alphanumeric characters in pattern
+		$funpat =~ s/(\W)/\\\1/g;	
+	        $tysig =~ /^\s*$funpat\s*::(.*)$/ || die "Error: GENERATE_SPECS not followed by type signature for $fun:\n$line$tysig\n";
+	        $type = $1;
+		$type =~ s/^(.*)=>//;		# remove context from type
+	    } else {
+		die "Error: invlaid GENERATE_SPECS pragma:\n  $_";
+	    }
+
+            @tyvars = split(/\s+/, $vars);
+	    @tospec = ($type);
+	    foreach $var (@tyvars) {
+   	        @specing = @tospec;
+
+		if ( $var =~ /^(\w+)\{(.*)\}$/ ) {
+		    $var = $1;
+		    @specing_types = split(/,/, $2);
+		    if ($specing_types[0] eq '~') {
+			shift(@specing_types);
+			@tospec = ();		# remove specs polymorphic in this tyvar
+			$remove_poly = 0;
+		    }
+		    if ($specing_types[0] eq '+') {
+			shift(@specing_types);
+		        unshift(@specing_types, @SpecingTypes);
+		    }
+		} else {
+		    @specing_types = @SpecingTypes;
+		}
+		
+	        foreach $uty (@specing_types) {
+		    @speced = @specing;
+		    foreach $i (0..$#speced) {
+		        $speced[$i] =~ s/\b$var\b/$uty/g ;
+		    }
+		    push(@tospec, @speced);
+	        }
+            }
+	    shift(@tospec) if $remove_poly; 	# remove fully polymorphic spec
+
+            if ($#tospec >= 0) {
+	        $specty = shift(@tospec);
+	        print ($data_or_inst ? "{-# SPECIALIZE $data_inst_str $specty #-}" : "{-# SPECIALIZE $fun :: $specty");
+	        while ($#tospec >= 0) {
+	            $specty = shift(@tospec);
+	            print ($data_or_inst ? "; {-# SPECIALIZE $data_inst_str $specty #-}" : ", $specty");
+	        }
+	        print ($data_or_inst ? "\n" : " #-}\n");
+	    } else {
+		print "{-# NO_SPECS_GENERATED ", $data_or_inst ? $specty : $fun, " #-}\n";
+	    }
+	    print $tysig if ! $data_or_inst;
+	} else {
+	    print STDERR "Warning: GENERATE_SPECS pre-processing pragma ignored:\n  $_";
+	    print $_;
+	}
+    } else {
+	print $_;
+    }
+}
+
+close(INPIPE) || exit(1); # exit is so we reflect any errors.

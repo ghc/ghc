@@ -1,0 +1,11 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Cyclic where
+import CoreSyn(CoreExpr)
+import DefSyn(DefBindee)
+import Id(Id)
+import SplitUniq(SplitUniqSupply)
+fixupFreeVars :: [Id] -> Id -> CoreExpr Id DefBindee -> ((Id, CoreExpr Id DefBindee), [(Id, CoreExpr Id DefBindee)])
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLS" _N_ _N_ #-}
+mkLoops :: CoreExpr Id DefBindee -> SplitUniqSupply -> ([(Id, CoreExpr Id DefBindee)], CoreExpr Id DefBindee)
+	{-# GHC_PRAGMA _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: CoreExpr Id DefBindee) (u1 :: SplitUniqSupply) -> _APP_  _TYAPP_  error { (SplitUniqSupply -> ([(Id, CoreExpr Id DefBindee)], CoreExpr Id DefBindee)) } [ _NOREP_S_ "mkLoops", u1 ] _N_ #-}
+

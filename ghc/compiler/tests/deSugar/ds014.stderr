@@ -1,0 +1,105 @@
+Desugared:
+Tests.a :: Char
+Tests.a = MkChar! 'a'#
+Tests.b :: [Char]
+Tests.b = "b"S
+Tests.c :: [Char]
+Tests.c = (: Char) Tests.a Tests.b
+Tests.d :: [Char]
+Tests.d = (++ Char) Tests.b Tests.b
+Tests.b1 :: [Char]
+Tests.b1 = Nil! Char
+Tests.b2 :: [Char]
+Tests.b2 = Nil! Char
+Tests.b3 :: [Char]
+Tests.b3 = (++ Char) "\SO\&H"S "\137\&9"S
+Tests.a000 :: Char
+Tests.a000 = MkChar! '\NUL'#
+Tests.a001 :: Char
+Tests.a001 = MkChar! '\SOH'#
+Tests.a002 :: Char
+Tests.a002 = MkChar! '\STX'#
+Tests.a003 :: Char
+Tests.a003 = MkChar! '\ETX'#
+Tests.a004 :: Char
+Tests.a004 = MkChar! '\EOT'#
+Tests.a005 :: Char
+Tests.a005 = MkChar! '\ENQ'#
+Tests.a006 :: Char
+Tests.a006 = MkChar! '\ACK'#
+Tests.a007 :: Char
+Tests.a007 = MkChar! '\a'#
+Tests.a010 :: Char
+Tests.a010 = MkChar! '\b'#
+Tests.a011 :: Char
+Tests.a011 = MkChar! '\t'#
+Tests.a012 :: Char
+Tests.a012 = MkChar! '\n'#
+Tests.a013 :: Char
+Tests.a013 = MkChar! '\v'#
+Tests.a014 :: Char
+Tests.a014 = MkChar! '\f'#
+Tests.a015 :: Char
+Tests.a015 = MkChar! '\r'#
+Tests.a016 :: Char
+Tests.a016 = MkChar! '\SO'#
+Tests.a017 :: Char
+Tests.a017 = MkChar! '\SI'#
+Tests.a020 :: Char
+Tests.a020 = MkChar! '\DLE'#
+Tests.a021 :: Char
+Tests.a021 = MkChar! '\DC1'#
+Tests.a022 :: Char
+Tests.a022 = MkChar! '\DC2'#
+Tests.a023 :: Char
+Tests.a023 = MkChar! '\DC3'#
+Tests.a024 :: Char
+Tests.a024 = MkChar! '\DC4'#
+Tests.a025 :: Char
+Tests.a025 = MkChar! '\NAK'#
+Tests.a026 :: Char
+Tests.a026 = MkChar! '\SYN'#
+Tests.a027 :: Char
+Tests.a027 = MkChar! '\ETB'#
+Tests.a030 :: Char
+Tests.a030 = MkChar! '\CAN'#
+Tests.a031 :: Char
+Tests.a031 = MkChar! '\EM'#
+Tests.a032 :: Char
+Tests.a032 = MkChar! '\SUB'#
+Tests.a033 :: Char
+Tests.a033 = MkChar! '\ESC'#
+Tests.a034 :: Char
+Tests.a034 = MkChar! '\FS'#
+Tests.a035 :: Char
+Tests.a035 = MkChar! '\GS'#
+Tests.a036 :: Char
+Tests.a036 = MkChar! '\RS'#
+Tests.a037 :: Char
+Tests.a037 = MkChar! '\US'#
+Tests.a040 :: Char
+Tests.a040 = MkChar! ' '#
+Tests.a042 :: Char
+Tests.a042 = MkChar! '"'#
+Tests.a047 :: Char
+Tests.a047 = MkChar! '\''#
+Tests.a134 :: Char
+Tests.a134 = MkChar! '\\'#
+Tests.a177 :: Char
+Tests.a177 = MkChar! '\DEL'#
+Tests.ascii :: [Char]
+Tests.ascii =
+    "\NUL\SOH\STX\ETX\EOT\ENQ\ACK\a\b\t\n\v\f\r\SO\SI\DLE\DC1\DC2\DC3\DC4\NAK\SYN\ETB\CAN\EM\SUB\ESC\FS\GS\RS\US !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\DEL"S
+Tests.na200 :: Char
+Tests.na200 = MkChar! '\128'#
+Tests.na250 :: Char
+Tests.na250 = MkChar! '¨'#
+Tests.na300 :: Char
+Tests.na300 = MkChar! 'À'#
+Tests.na350 :: Char
+Tests.na350 = MkChar! 'è'#
+Tests.na377 :: Char
+Tests.na377 = MkChar! 'ÿ'#
+Tests.eightbit :: [Char]
+Tests.eightbit = "\128¨Àèÿ"S
+

@@ -1,0 +1,5 @@
+ 
+"tcfail057.hs", line 5: undefined type constructor: RealFrac
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

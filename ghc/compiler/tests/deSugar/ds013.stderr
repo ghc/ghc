@@ -1,0 +1,89 @@
+Desugared:
+Tests.f :: for all d. <Fractional d> -> d
+Tests.f =
+    /\ t78 -> \ dict.97 ->
+	let dict.95 = dict.97 in
+	let dict.90 = dict.95 in
+	let dict.87 = dict.90 in
+	let dict.85 = dict.87 in
+	let dict.93 = (sdsel.Fractional.Num t78) dict.85 in
+	let dict.83 = dict.93 in
+	let dict.81 = dict.83 in
+	let dict.79 = dict.81 in
+	let
+	  f.77 =
+	      (+ t78)
+		  dict.79
+		  ((- t78)
+		       dict.81
+		       ((+ t78)
+			    dict.83
+			    ((fromRational t78)
+				 dict.85 (MkDouble! 1.5000000000000000##))
+			    ((fromRational t78)
+				 dict.87 (MkDouble! 2.0000000000000000##)))
+		       ((fromRational t78)
+			    dict.90 (MkDouble! 3.1415926500000002##)))
+		  ((* t78)
+		       dict.93
+		       ((fromRational t78)
+			    dict.95 (MkDouble! 4.2000000000000002##))
+		       ((fromRational t78)
+			    dict.97 (MkDouble! 5.1111111111111107##)))
+	in  f.77
+dict.103 :: <Num Float>
+dict.103 = dfun.Num.Float
+dict.105 :: <Num Float>
+dict.105 = dfun.Num.Float
+dict.107 :: <Num Float>
+dict.107 = dfun.Num.Float
+dict.109 :: <Fractional Float>
+dict.109 = dfun.Fractional.Float
+dict.111 :: <Fractional Float>
+dict.111 = dfun.Fractional.Float
+dict.114 :: <Fractional Float>
+dict.114 = dfun.Fractional.Float
+dict.117 :: <Num Float>
+dict.117 = dfun.Num.Float
+dict.119 :: <Fractional Float>
+dict.119 = dfun.Fractional.Float
+dict.121 :: <Fractional Float>
+dict.121 = dfun.Fractional.Float
+Tests.g :: Float
+Tests.g =
+    plusFloat
+	(minusFloat
+	     (plusFloat
+		  (MkFloat! 1.5000000000000000#) (MkFloat! 2.0000000000000000#))
+	     (MkFloat! 3.1415926500000002#))
+	(timesFloat
+	     (MkFloat! 4.2000000000000002#) (MkFloat! 5.1111111111111107#))
+dict.127 :: <Num Double>
+dict.127 = dfun.Num.Double
+dict.129 :: <Num Double>
+dict.129 = dfun.Num.Double
+dict.131 :: <Num Double>
+dict.131 = dfun.Num.Double
+dict.133 :: <Fractional Double>
+dict.133 = dfun.Fractional.Double
+dict.135 :: <Fractional Double>
+dict.135 = dfun.Fractional.Double
+dict.138 :: <Fractional Double>
+dict.138 = dfun.Fractional.Double
+dict.141 :: <Num Double>
+dict.141 = dfun.Num.Double
+dict.143 :: <Fractional Double>
+dict.143 = dfun.Fractional.Double
+dict.145 :: <Fractional Double>
+dict.145 = dfun.Fractional.Double
+Tests.h :: Double
+Tests.h =
+    plusDouble
+	(minusDouble
+	     (plusDouble
+		  (MkDouble! 1.5000000000000000##)
+		  (MkDouble! 2.0000000000000000##))
+	     (MkDouble! 3.1415926500000002##))
+	(timesDouble
+	     (MkDouble! 4.2000000000000002##) (MkDouble! 5.1111111111111107##))
+

@@ -1,0 +1,11 @@
+Typechecked:
+AbsBinds [tt4] [d.Num.t7] [(n.t1, ShouldSucceed.n)]
+    (fromInt.t6, fromInt tt4 d.Num.t7)
+    (lit.t3, fromInt.t6 (MkInt 1#))
+    (fromInt.t8, fromInt.t6)
+    (lit.t5, fromInt.t8 (MkInt 0#))
+    {- nonrec -}
+    n.t1 :: Bool -> tt4
+    n.t1 True = lit.t3
+    n.t1 False = lit.t5
+

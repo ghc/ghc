@@ -1,0 +1,63 @@
+This is version 0.18 of the Glasgow Haskell compiler.
+
+0.18 is an "internal" release intended *ONLY* for those actually
+hacking on the compiler source -- that is, those who *REALLY* know
+what they are doing.  Anyone else is crazy to use it; anyone who uses
+it without keeping a "real" GHC release (0.16 or 0.17) around is
+obviously demented.
+
+The chances of a "clean" build are near zero, no matter what Haskell
+compiler you build with.  Be prepared to utter magic incantations.
+(For example, `make reader/ReadPragmas.o
+EXTRA_HC_OPTS="-fno-strictness -fno-specialise -fno-case-of-case"'.)
+
+An incomplete "what's new" list:
+
+* Unfoldings across module boundaries.  Still v limited.
+
+* Specialisation of overloaded functions.  Instances -- not yet.
+
+* Strictness analyser that handles "nested" strictness and does
+  "absence analysis" as well.  Makes Prelude.hi fun to read.  Hints:
+  _N_ = nothing, _A_ = arity, _U_ = update analysis info, _S_ =
+  strictness (U = unpack, A = absent, L = lazy, S = strict, E = strict
+  & enumeration type, P = primitive).
+
+* Prelude info no longer horribly built into the compiler (as much).
+  Manipulating the prelude is not nearly so delicate as it once was.
+
+* Some names have changed: MkChar => C#, MkInt => I#, MkFloat => F#,
+  MkDouble => D#, MkInteger => J#.  (They won't change again...)
+
+* Includes Patrick Sansom's array-based substitution code (much faster
+  typechecking).  (You probably won't see the speedup, though, because
+  we've spent all the savings on fancier intermodule stuff.)
+
+* We've added a Core "lint" pass, which can be used to check
+  types/out-of-scope-errors/etc after every Core-to-Core pass.  It's
+  great!  -dcore-lint.
+
+* Initial "Native" class support; use "-syslib hbc".
+
+* Lots of compiler code hacked on, for better or worse.
+
+* Lots of gratuitous "trace" messages when running the compiler :-)
+
+Documentation is unchanged since 0.1[67].  There is not one word about
+any new features.
+
+We *hope* for a new public release before Christmas (1993).
+
+Will Partain
+Keeper of the Bits, AQUA Project
+
+Dated: 93/11/04
+
+E-mail contacts:
+    glasgow-haskell-bugs@dcs.glasgow.ac.uk	(bug reports)
+    glasgow-haskell-request@dcs.glasgow.ac.uk   (general queries)
+
+Anonymous FTP site: ftp.dcs.glasgow.ac.uk:pub/haskell/glasgow.  Mostly
+mirrored by ftp.cs.chalmers.se and nebula.cs.yale.edu (same
+directory).  Also: src.doc.ic.ac.uk, in
+computing/programming/languages/haskell/glasgow/.

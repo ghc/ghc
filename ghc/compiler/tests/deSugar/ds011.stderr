@@ -1,0 +1,10 @@
+Desugared:
+Tests.f :: for all d. d
+Tests.f = /\ t79 -> (error t79) (Nil! Char)
+Tests.g :: for all d. d
+Tests.g = /\ t83 -> (error t83) (Nil! Char)
+Tests.h :: for all d. d
+Tests.h = /\ t86 -> (error t86) "\""S
+Tests.i :: for all d. d
+Tests.i = /\ t89 -> (error t89) "foo"S
+

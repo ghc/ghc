@@ -1,0 +1,39 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide]{article}
+\begin{document}
+\title{Driver: @ghc@}
+\author{The GRASP team}
+\date{January 1993}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\end{rawlatex}
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[Driver-for-compilation-system]{@ghc@: Driver for the compilation system}
+\downsection
+\end{onlypartofdoc}
+
+\input{ghc.lprl}
+
+\section[Driver-support]{Support code for the @ghc@ driver}
+\downsection
+\input{ghc-asm-alpha.lprl}
+\input{ghc-asm-hppa.lprl}
+\input{ghc-asm-iX86.lprl}
+\input{ghc-asm-m68k.lprl}
+\input{ghc-asm-mips.lprl}
+\input{ghc-asm-solaris.lprl}
+\input{ghc-asm-sparc.lprl}
+\input{ghc-consist.lprl}
+\input{ghc-split.lprl}
+\upsection
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

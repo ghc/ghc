@@ -1,0 +1,157 @@
+%
+% (c) The AQUA/Parade Projects, Glasgow University, 1995
+%
+%************************************************************************
+%*                                                                      *
+\section[RBH.lc]{Revertible Black Hole Manipulation}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef PAR /* whole file */
+
+#include "rtsdefs.h"
+\end{code}
+
+Turn a closure into a revertable black hole.  After the conversion,
+the first two words of the closure will be a link to the mutables
+list (if appropriate for the garbage collector), and a pointer
+to the blocking queue.  The blocking queue is terminated by a 2-word
+SPEC closure which holds the original contents of the first two
+words of the closure.
+
+\begin{code}
+EXTFUN(RBH_Save_0_info);
+EXTFUN(RBH_Save_1_info);
+EXTFUN(RBH_Save_2_info);
+
+P_
+convertToRBH(closure)
+P_ closure;
+{
+    P_ infoPtr, newInfoPtr;
+    W_ size, ptrs, nonptrs, vhs;
+    P_	rbh_save;
+    int isSpec;
+
+    if ((rbh_save = AllocateHeap(SPEC_HS + 2)) == NULL)
+	return NULL;
+
+    infoPtr = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs);
+    ASSERT(size >= MIN_UPD_SIZE);
+
+    switch (BASE_INFO_TYPE(infoPtr)) {
+    case INFO_SPEC_TYPE:
+	isSpec = 1;
+	break;
+    case INFO_GEN_TYPE:
+	isSpec = 0;
+	break;
+    default:
+	fprintf(stderr, "Panic: turn %#lx (IP %#lx) into RBH\n", (W_)closure, (W_)infoPtr);
+	EXIT(EXIT_FAILURE);
+    }
+
+    /* Fill in the RBH_Save closure with the original data */
+    rbh_save[SPEC_HS] = closure[isSpec ? SPEC_HS : GEN_HS];
+    rbh_save[SPEC_HS + 1] = closure[(isSpec ? SPEC_HS : GEN_HS) + 1];
+
+    /*
+     * Set the info_ptr for the rbh_Save closure according to the number of pointers
+     * in the original
+     */
+
+    newInfoPtr = (P_) (ptrs == 0 ? RBH_Save_0_info :
+                       ptrs == 1 ? RBH_Save_1_info :
+                       RBH_Save_2_info);
+    SET_INFO_PTR(rbh_save, newInfoPtr);
+
+    /* Do some magic garbage collection mangling on the first word */
+
+#if defined(GCap) || defined(GCgn)
+
+    /*
+     * If the closure's in the old generation, we have to make sure it goes on the
+     * mutables list
+     */
+
+    if (closure <= StorageMgrInfo.OldLim) {
+	MUT_LINK(closure) = (W_) StorageMgrInfo.OldMutables;
+	StorageMgrInfo.OldMutables = closure;
+    } else
+	MUT_LINK(closure) = MUT_NOT_LINKED;
+#endif
+
+    /*
+     * Second word points to the RBH_Save closure with the original data. This may
+     * become a blocking queue terminated by the RBH_Save closure.
+     */
+    if (isSpec)
+        SPEC_RBH_BQ(closure) = (W_) rbh_save;
+    else
+	GEN_RBH_BQ(closure) = (W_) rbh_save;
+
+    /* OK, now actually turn it into a RBH (what a great system!) */
+    SET_INFO_PTR(closure, RBH_INFOPTR(INFO_PTR(closure)));
+
+    return closure;
+}
+
+\end{code}
+
+Converting a closure to a FetchMe is trivial, unless the closure has
+acquired a blocking queue.  If that has happened, we first have to
+awaken the blocking queue.  What a nuisance!  Fortunately,
+@AwakenBlockingQueue@ should now know what to do.
+
+\begin{code}
+EXTDATA_RO(FetchMe_info);
+
+void
+convertToFetchMe(closure, ga)
+P_ closure;
+globalAddr *ga;
+{
+    P_ ip = (P_) INFO_PTR(closure);
+    P_ bqe;
+#if defined(GCap) || defined(GCgn)    
+    rtsBool linked = IS_MUTABLE(ip) && MUT_LINK(closure) != MUT_NOT_LINKED;
+#endif
+
+    switch(INFO_TYPE(ip)) {
+    case INFO_SPEC_RBH_TYPE:
+	bqe = (P_) SPEC_RBH_BQ(closure);
+	break;
+    case INFO_GEN_RBH_TYPE:
+	bqe = (P_) GEN_RBH_BQ(closure);
+	break;
+    default:
+#ifdef DEBUG
+	fprintf(stderr, "Weird...just tried to convert %#lx (IP %#lx) to FetchMe\n",
+	  closure, ip);
+#endif
+	return;
+    }
+
+    SET_INFO_PTR(closure, FetchMe_info);
+
+#if defined(GCap) || defined(GCgn)
+    /* If we modify a fetchme in the old generation,
+       we have to make sure it goes on the mutables list */
+
+    if(closure <= StorageMgrInfo.OldLim) {
+	if (!linked) {
+	    MUT_LINK(closure) = (W_) StorageMgrInfo.OldMutables;
+            StorageMgrInfo.OldMutables = closure;
+	}
+    } else
+        MUT_LINK(closure) = MUT_NOT_LINKED;
+#endif
+    
+    FETCHME_GA(closure) = ga;
+    if (IS_MUTABLE(INFO_PTR(bqe)))
+	AwakenBlockingQueue(bqe);
+}
+
+#endif /* PAR -- whole file */
+\end{code}

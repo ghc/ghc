@@ -1,0 +1,127 @@
+/****************************************************************
+*     								*
+*	Spark Management Routines (Sparks.lc)		        *
+*     								*
+*  Contains the spark-management routines used by GUM           *
+*  (c) The Parade/AQUA Projects, Glasgow University, 1995       *
+*      Kevin Hammond, 27 February 1995			        *
+*     								*
+*****************************************************************/
+
+
+\begin{code}
+#if defined(PAR) || defined(GRAN) /* whole file */
+
+#include "rtsdefs.h"
+\end{code}
+
+This uses GranSim-style sparkqs rather than old-style sparks as used
+in the threaded world.  The problem with the latter is that they
+contain insufficient information (we also need to know whether a spark
+is local/global etc.).  Problem: at the moment GUMM uses threaded-style
+sparks (presumably).  ToDo: Fix this...
+
+\begin{code}
+P_ 
+FindLocalSpark(forexport)
+rtsBool forexport;
+{
+#ifdef PAR
+    P_ spark;
+
+    while (PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL]) {
+	spark = *PendingSparksHd[REQUIRED_POOL]++;
+	if (SHOULD_SPARK(spark))
+	    return spark;
+    }
+    while (PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL]) {
+	spark = *PendingSparksHd[ADVISORY_POOL]++;
+	if (SHOULD_SPARK(spark))
+	    return spark;
+    }
+    return NULL;
+
+#else
+
+    fprintf(stderr,"FindLocalSpark: under GRAN!\n");
+    abort();
+
+# if 0
+    sparkq spark, prev, next, thespark;
+
+    int pool, poolcount;
+
+    thespark = NULL;
+
+    for (poolcount = 0, pool = REQUIRED_POOL;
+      thespark == NULL && poolcount < 2;
+      ++poolcount, pool = ADVISORY_POOL) {
+	for (prev = NULL, spark = PendingSparksHd[pool];
+	  spark != NULL && thespark == NULL; spark = next) {
+	    next = SPARK_NEXT(spark);
+
+	    if (SHOULD_SPARK(SPARK_NODE(spark))) {
+		/* Don't Steal local sparks */
+		if (forexport && !SPARK_GLOBAL(spark)) {
+		    prev = spark;
+		    continue;
+		}
+		SPARK_NEXT(spark) = NULL;
+		thespark = spark;
+	    } else {
+		DisposeSpark(spark);
+	    }
+
+	    if (spark == PendingSparksHd[pool])
+		PendingSparksHd[pool] = next;
+
+	    if (prev != NULL)
+		SPARK_NEXT(prev) = next;
+	}
+
+	if (PendingSparksHd[pool] == NULL)
+	    PendingSparksTl[pool] = NULL;
+    }
+    return (thespark == NULL ? NULL : thespark);
+# endif /* 0 */
+
+#endif
+}
+
+#ifdef PAR
+void
+DisposeSpark(spark)
+P_ spark;
+{
+    /* Do nothing */
+}
+
+#else
+# ifndef GRAN
+void
+DisposeSpark(spark)
+sparkq spark;
+{
+  if(spark!=NULL)
+    free(spark);
+}
+# endif
+#endif
+
+rtsBool
+Spark(closure, required)
+P_ closure;
+rtsBool required;
+{
+#ifdef PAR
+    I_ pool = required ? REQUIRED_POOL : ADVISORY_POOL;
+
+    if (SHOULD_SPARK(closure) && PendingSparksTl[pool] < PendingSparksLim[pool]) {
+        *PendingSparksTl[pool]++ = closure;
+    }
+#endif
+    return rtsTrue;
+}
+
+#endif /* PAR or GRAN -- whole file */
+\end{code}

@@ -1,0 +1,662 @@
+%/****************************************************************
+%*								*
+%*   Basic Continuations required by the STG Machine runtime    *
+%*								*
+%****************************************************************/
+
+
+First continuation called by the mini-interpreter is
+evaluateTopClosure.  It has to set up return and jump to the user's
+@main@ closure.  If @errorIO@ is called, we will be back here, doing
+the same thing for the specified continuation.
+
+\begin{code}
+#define MAIN_REG_MAP	    /* STG world */
+#include "rtsdefs.h"
+
+#if 0
+#ifdef PAR
+#include "Statistics.h"
+#endif
+#endif
+
+/* ptr to the user's "main" closure (or "errorIO" arg closure),
+   to which we hope to be linked
+*/
+extern P_ TopClosure;
+
+EXTFUN(stopThreadDirectReturn);
+UNVECTBL(,vtbl_stopStgWorld,stopThreadDirectReturn)
+
+/* Well, we have to put the ArrayOfData and ArrayOfPtrs info tables
+   somewhere...
+*/
+
+/* Array of data -- mutable */
+STATICFUN(ArrayOfData_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered a primitive array (of data)---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+DATA_ITBL(ArrayOfData_info,ArrayOfData_entry,UpdErr,0,INFO_OTHER_TAG,,,const,IF_,ARR_K,"DATA-ARRAY","ARRAY");
+/* ToDo: could put a useful tag in there!!! */
+
+/* Array of pointers -- mutable */
+STATICFUN(ArrayOfPtrs_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered a primitive array (of pointers)---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+MUTUPLE_ITBL(ArrayOfPtrs_info,ArrayOfPtrs_entry,UpdErr,0,INFO_OTHER_TAG,,,const,IF_,ARR_K,"PTR-ARRAY(mut)","ARRAY");
+/* ToDo: could put a useful tag in there!!! */
+
+STATICFUN(FullSVar_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered a full SVar---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+MUTUPLE_ITBL(FullSVar_info,FullSVar_entry,UpdErr,0,INFO_OTHER_TAG,,,const,IF_,ARR_K,"FullSVar","ARRAY");
+/* ToDo: could put a useful tag in there!!! */
+
+STATICFUN(EmptySVar_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered an empty SVar---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+MUTUPLE_ITBL(EmptySVar_info,EmptySVar_entry,UpdErr,0,INFO_OTHER_TAG,,,const,IF_,ARR_K,"EmptySVar","ARRAY");
+/* ToDo: could put a useful tag in there!!! */
+
+/* Array of pointers -- immutable */
+STATICFUN(ImMutArrayOfPtrs_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered a primitive array (immutable, pointers)---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+IMMUTUPLE_ITBL(ImMutArrayOfPtrs_info,ImMutArrayOfPtrs_entry,UpdErr,0,INFO_OTHER_TAG,,,const,IF_,ARR_K,"PTR-ARRAY(immut)","ARRAY");
+/* ToDo: could put a useful tag in there!!! */
+
+/* (end of Array whatnot) */
+
+/* Question for Will: There seem to be a lot of these static things
+now - worth putting them in a file by themselves?? [ADR] */
+
+
+#ifndef PAR
+
+/* Ditto for Malloc Pointer entry point and info tables. [ADR]
+
+   BTW Will, I copied most of this blindly from above - what's with
+   this TAG stuff? And what kind of description/ type is wanted here?
+*/
+
+STATICFUN(MallocPtr_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Compiler bug: Entered a Malloc Pointer---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+MallocPtr_ITBL(MallocPtr_info,MallocPtr_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF_,MallocPtr_K,"MALLOC PTR","MallocPtr");
+
+/* End of MallocPtr stuff */
+
+/* Ditto for the unused Stable Pointer info table. [ADR]
+*/
+
+extern void raiseError PROTO((StgStablePtr));
+extern StgStablePtr errorHandler;
+
+/* Unused Stable Pointer (ie unused slot in a stable pointer table) */
+STATICFUN(UnusedSP_entry)
+{
+    FB_
+    (void) SAFESTGCALL1(I_,(void *, FILE *),fflush,stdout);
+    (void) SAFESTGCALL2(I_,(void *, FILE *, char *),fprintf,stderr, "Entered an unused Stable Pointer---this shouldn't happen!\n(This could be program error (using stable pointer after freeing) or compiler bug.)\n");
+
+    (void) STGCALL1(void,(void *, StgStablePtr), raiseError, errorHandler);
+    FE_
+}
+
+STATIC_ITBL(UnusedSP_static_info,UnusedSP_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,CON_K,"UNUSED STABLE PTR","USP");
+
+SET_STATIC_HDR(UnusedSP_closure,UnusedSP_static_info,CC_SUBSUMED,,ED_RO_)
+};
+
+/* Entry point and Info table for Stable Pointer Table. */
+
+STATICFUN(StablePointerTable_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered the stable pointer table---this shouldn't happen!\n");
+    abort();
+    FE_
+}
+
+STATIC_ITBL(EmptyStablePointerTable_static_info,StablePointerTable_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,SPT_K,"SP_TABLE","SP_TABLE");
+/* ToDo: could put a useful tag in there!!! */
+
+DYN_ITBL(StablePointerTable_info,StablePointerTable_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,SPT_K,"SP_TABLE","SP_TABLE");
+/* ToDo: could put a useful tag in there!!! */
+
+
+/* To ease initialisation of the heap, we start with an empty stable
+   pointer table.  When we try to create the first stable pointer, the
+   overflow will trigger creation of a table of useful size.
+*/
+
+SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_static_info,CC_SUBSUMED,,ED_RO_)
+, (W_) DYN_VHS + 0 + 1 + 0  /* size = DYN_VHS + n + 1 + n with n = 0 */
+, (W_) 0   /* number of ptrs */
+, (W_) 0   /* top of stack */
+};
+
+/* End of SP stuff */
+#endif /* !PAR */
+
+
+/* the IoWorld token to start the whole thing off */
+/* Question: this is just an amusing hex code isn't it
+   -- or does it mean something? ADR */
+P_ realWorldZh_closure = (P_) 0xbadbadbaL;
+
+SET_STATIC_HDR(WorldStateToken_closure,SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
+, (W_) 0xbadbadbaL
+};
+
+#ifndef CONCURRENT
+
+STGFUN(startStgWorld)
+{
+    FB_
+    /* At this point we are in the threaded-code world.
+
+       TopClosure points to a closure of type PrimIO (), which should be
+       performed (by applying it to the state of the world).
+
+       The smInfo storage-management info block is assumed to be
+       up to date, and is used to load the STG registers.
+    */
+
+#if defined (DO_SPAT_PROFILING)
+    SET_ACTIVITY(ACT_REDN); /* init: do this first, so we count the restore insns  */
+#endif
+
+    RestoreAllStgRegs();    /* inline! */
+
+    /* ------- STG registers are now valid! -------------------------*/
+
+    /* Put a suitable return address on the B stack */
+    RetReg = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld); 
+
+    /* Put an IoWorld token on the A stack */
+    SpA -= AREL(1);
+    *SpA = (P_) WorldStateToken_closure;
+
+    Node = (P_) TopClosure; /* Point to the closure for main/errorIO-arg */
+    ENT_VIA_NODE();
+    InfoPtr=(D_)(INFO_PTR(Node));
+    JMP_(ENTRY_CODE(InfoPtr));
+    FE_
+}
+#endif	/* ! CONCURRENT */
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[thread-return]{Polymorphic end-of-thread code}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+/* 
+   Here's the polymorphic return for the end of a thread.
+
+   NB: For direct returns to work properly, the name of the routine must be
+   the same as the name of the vector table with vtbl_ removed and DirectReturn
+   appended.  This is all the mangler understands.
+*/
+
+const W_
+vtbl_stopThread[] = {
+  /* at least "MAX_VECTORED_RTN" elements (see GhcConstants.lh) */
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn,
+  (W_) stopThreadDirectReturn
+};
+
+STGFUN(stopThreadDirectReturn)
+{
+    FB_
+    /* The final exit.
+
+       The top-top-level closures (e.g., "main") are of type "IO ()".
+       When entered, they perform an IO action and return a () --
+       essentially, TagReg is set to 1.  Here, we don't need to do
+       anything with that.
+
+       We just tidy up the register stuff (real regs in *_SAVE, then 
+       *_SAVE -> smInfo locs).
+    */
+
+#ifdef CONCURRENT
+    SET_TASK_ACTIVITY(ST_OVERHEAD);
+#endif
+
+    SaveAllStgRegs();	/* inline! */
+
+#ifdef CONCURRENT
+    EndThread();
+#else
+    RESUME_(miniInterpretEnd);
+#endif
+    FE_
+}
+
+\end{code}  
+
+\begin{code}
+I_ ErrorIO_call_count = 0;
+
+#ifdef CONCURRENT
+EXTFUN(EnterNodeCode);
+
+STGFUN(ErrorIO_innards)
+    /* Assumes that "TopClosure" has been set already */
+{
+    FB_
+    if (ErrorIO_call_count >= 16 /* MAGIC CONSTANT */ ) {
+        /* Don't wrap the calls; we're done with STG land */
+        fflush(stdout);
+	fprintf(stderr, "too many nested calls to `error'\n");
+	EXIT(EXIT_FAILURE);
+    }
+    ErrorIO_call_count++; /* NB: undo later if decide to let someone else handle it */
+
+    /* Unlock all global closures held by this thread! (ToDo) --JSM */
+
+    switch(TSO_TYPE(CurrentTSO)) {
+    case T_MAIN:
+    	/* Re-initialize stack pointers (cf. NewThread) */
+#ifdef PAR
+        SpB = SuB = STKO_BSTK_BOT(StkOReg) + BREL(1);
+        SuA = STKO_ASTK_BOT(StkOReg) + AREL(1);
+#else
+    	SuA = stackInfo.botA + AREL(1);
+    	SuB = stackInfo.botB + BREL(1);
+#endif
+    	break;
+
+    case T_REQUIRED:
+    	/* Re-initialize stack pointers (cf. NewThread) */
+        SpB = SuB = STKO_BSTK_BOT(StkOReg) + BREL(1);
+        SuA = STKO_ASTK_BOT(StkOReg) + AREL(1);
+    	break;
+
+    case T_ADVISORY:
+	ErrorIO_call_count--; /* undo the damage, as someone else will deal with it */
+    	/* Let the main thread eventually handle it */
+    	JMP_(stopThreadDirectReturn);
+
+    case T_FAIL:
+    	EXIT(EXIT_FAILURE);
+
+    default:
+        /* Don't wrap the calls; we're done with STG land */
+        fflush(stdout);
+	fprintf(stderr,"ErrorIO: %x unknown\n", TSO_TYPE(CurrentTSO));
+    	EXIT(EXIT_FAILURE);
+    }
+
+    /* Finish stack setup as if for a top-level task and enter the error node */
+
+    SpA = SuA - AREL(1);
+
+    *SpA = (P_) WorldStateToken_closure;
+
+    STKO_LINK(StkOReg) = Nil_closure;
+    STKO_RETURN(StkOReg) = NULL;
+
+#ifdef DO_REDN_COUNTING
+    STKO_ADEP(StkOReg) = STKO_BDEP(StkOReg) = 0;
+#endif
+
+    /* Go! */
+    Node = (P_) TopClosure;
+    RetReg = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld);
+    JMP_(EnterNodeCode);
+
+    FE_
+}
+\end{code}
+
+We cannot afford to call @error@ too many times
+(e.g., \tr{error x where x = error x}), so we keep count.
+
+\begin{code}
+#else	/* !CONCURRENT */
+
+StgFunPtr
+ErrorIO_innards(STG_NO_ARGS)
+    /* Assumes that "TopClosure" has been set already */
+{
+    FB_
+    if (ErrorIO_call_count >= 16 /* MAGIC CONSTANT */ ) {
+        /* Don't wrap the calls; we're done with STG land */
+        fflush(stdout);
+	fprintf(stderr, "too many nested calls to `error'\n");
+	EXIT(EXIT_FAILURE);
+    }
+    ErrorIO_call_count++;
+
+    /* Copy the heap-related registers into smInfo.  (Other registers get
+       saved in this process, but we aren't interested in them.)
+
+       Get a new stack (which re-initialises the smInfo stack stuff),
+       and start the world again.
+    */
+    /* ToDo: chk this has been handled in parallel world */
+
+    SaveAllStgRegs();	/* inline! */
+
+    if ( initStacks( &StorageMgrInfo ) != 0) {
+        /* Don't wrap the calls; we're done with STG land */
+        fflush(stdout);
+	fprintf(stderr, "initStacks failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+
+    JMP_( startStgWorld );
+    FE_
+}
+
+#endif	/* !CONCURRENT */
+\end{code}  
+
+\begin{code}
+#ifdef PAR
+
+STATICFUN(RBH_Save_0_entry)
+{
+  FB_
+  fprintf(stderr,"Oops, entered an RBH save\n");
+  EXIT(EXIT_FAILURE);
+  FE_
+}
+
+STATICFUN(RBH_Save_1_entry)
+{
+  FB_
+  fprintf(stderr,"Oops, entered an RBH save\n");
+  EXIT(EXIT_FAILURE);
+  FE_
+}
+
+STATICFUN(RBH_Save_2_entry)
+{
+  FB_
+  fprintf(stderr,"Oops, entered an RBH save\n");
+  EXIT(EXIT_FAILURE);
+  FE_
+}
+
+SPEC_N_ITBL(RBH_Save_0_info,RBH_Save_0_entry,UpdErr,0,INFO_OTHER_TAG,2,0,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_0");
+SPEC_N_ITBL(RBH_Save_1_info,RBH_Save_1_entry,UpdErr,0,INFO_OTHER_TAG,2,1,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_1");
+SPEC_N_ITBL(RBH_Save_2_info,RBH_Save_2_entry,UpdErr,0,INFO_OTHER_TAG,2,2,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_2");
+
+#endif /* PAR */
+\end{code}
+
+
+%/****************************************************************
+%*								*
+%*		Other Bits and Pieces                           *
+%*								*
+%****************************************************************/
+
+\begin{code}
+/* If we don't need the slow entry code for a closure, we put in a
+   pointer to this in the closure's slow entry code pointer instead.
+ */
+
+STGFUN(__std_entry_error__) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Called non-existent slow-entry code!!!\n");
+    abort();
+    JMP_(0);
+    FE_
+}
+
+/* entry code */
+STGFUN(STK_STUB_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered from a stubbed stack slot!\n");
+    abort();
+    JMP_(0);
+    FE_
+}
+
+/* info table */
+STATIC_ITBL(STK_STUB_static_info,STK_STUB_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,EF_,INTERNAL_KIND,"STK_STUB","STK_STUB");
+
+/* closure */
+SET_STATIC_HDR(STK_STUB_closure,STK_STUB_static_info,CC_SUBSUMED,,EXTDATA_RO)
+  , (W_)0, (W_)0
+};
+\end{code}
+
+\begin{code}
+#ifdef GRAN
+
+STGFUN(Event_Queue_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered from an event queue!\n");
+    abort();
+    JMP_(0);
+    FE_
+}
+
+GEN_N_ITBL(Event_Queue_info,Event_Queue_entry,UpdErr,0,INFO_OTHER_TAG,5,2,const,EF_,INTERNAL_KIND,"EventQ","EventQ");
+
+#endif /* GRAN */
+\end{code}
+
+
+
+%/****************************************************************
+%*								*
+%*		Some GC info tables                           *
+%*								*
+%****************************************************************/
+
+These have to be in a .lhc file, so they will be reversed correctly.
+
+\begin{code}
+#include "../storage/SMinternal.h"
+
+#if defined(_INFO_COPYING)
+
+STGFUN(Caf_Evac_Upd_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr,"Entered Caf_Evac_Upd %lx: Should never occur!\n", (W_) Node);
+    abort();
+    FE_
+}
+
+CAF_EVAC_UPD_ITBL(Caf_Evac_Upd_info,Caf_Evac_Upd_entry,const/*not static*/);
+
+#if defined(GCgn)
+
+STGFUN(Forward_Ref_New_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr,"Entered Forward_Ref_New %lx: Should never occur!\n", (W_) Node);
+    abort();
+    FE_
+}
+FORWARDREF_ITBL(Forward_Ref_New_info,Forward_Ref_New_entry,const/*not static*/,_Evacuate_Old_Forward_Ref);
+
+STGFUN(Forward_Ref_Old_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr,"Entered Forward_Ref_Old %lx: Should never occur!\n", (W_) Node);
+    abort();
+    FE_
+}
+FORWARDREF_ITBL(Forward_Ref_Old_info,Forward_Ref_Old_entry,const/*not static*/,_Evacuate_New_Forward_Ref);
+
+STGFUN(OldRoot_Forward_Ref_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr,"Entered OldRoot_Forward_Ref %lx: Should never occur!\n", (W_) Node);
+    abort();
+    FE_
+}
+FORWARDREF_ITBL(OldRoot_Forward_Ref_info,OldRoot_Forward_Ref_entry,const/*not static*/,_Evacuate_OldRoot_Forward);
+#else /* ! GCgn */
+
+STGFUN(Forward_Ref_entry) {
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr,"Entered Forward_Ref %lx: Should never occur!\n", (W_) Node);
+    abort();
+    FE_
+}
+FORWARDREF_ITBL(Forward_Ref_info,Forward_Ref_entry,const/*not static*/,_Evacuate_Forward_Ref);
+#endif /* ! GCgn */
+
+#endif /* _INFO_COPYING */
+
+#if defined(GCgn)
+OLDROOT_ITBL(OldRoot_info,Ind_Entry,const,EF_);
+#endif /* GCgn */
+\end{code}
+
+
+%/***************************************************************
+%*								*
+%*		Cost Centre stuff ...                           *
+%*								*
+%****************************************************************/
+
+For cost centres we need prelude cost centres and register routine.
+
+N.B. ALL prelude cost centres should be declared here as none will
+     be declared when the prelude is compiled.
+
+ToDo: Explicit cost centres in prelude for Input and Output costs.
+
+\begin{code}
+#if defined(USE_COST_CENTRES)
+
+STGFUN(startCcRegisteringWorld)
+{
+    FB_
+    /* 
+     * We used to push miniInterpretEnd on the register stack, but
+     * miniInterpretEnd must only be entered with the RESUME_ macro,
+     * whereas the other addresses on the register stack must only be
+     * entered with the JMP_ macro.  Now, we push NULL and test for 
+     * it explicitly at each pop.
+     */
+    PUSH_REGISTER_STACK(NULL);
+    JMP_(_regMain);
+    FE_
+}
+
+CC_DECLARE(CC_CAFs,  "CAFs_in_...",  "PRELUDE", "PRELUDE", CC_IS_CAF,/*not static*/);
+CC_DECLARE(CC_DICTs, "DICTs_in_...", "PRELUDE", "PRELUDE", CC_IS_DICT,/*not static*/);
+
+START_REGISTER_PRELUDE(_regPrelude);
+REGISTER_CC(CC_CAFs);
+REGISTER_CC(CC_DICTs);
+END_REGISTER_CCS()
+\end{code}
+
+We also need cost centre declarations and registering routines for other
+built-in prelude-like modules.
+
+ToDo: What built-in prelude-like modules exist ?
+
+\begin{code}
+START_REGISTER_PRELUDE(_regByteOps);    /* used in Glasgow tests only? */
+END_REGISTER_CCS()
+
+/* _regPrelude is above */
+
+START_REGISTER_PRELUDE(_regPreludeArray);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeCore);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeDialogueIO);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeGlaMisc);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeGlaST);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeIOError);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludePS);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludePrimIO);
+END_REGISTER_CCS()
+
+START_REGISTER_PRELUDE(_regPreludeStdIO);
+END_REGISTER_CCS()
+#endif
+\end{code}

@@ -1,0 +1,123 @@
+Typechecked:
+d.Num.t125 = dfun.Num.Integer
+d.Num.t133 = dfun.Num.Integer
+d.Eq.t130 = sdsel.Num.Eq tt105 d.Num.t125
+d.Eq.t138 = sdsel.Num.Eq tt121 d.Num.t133
+fromInt.t124 = fromInt tt105 d.Num.t125
+lit.t106 = fromInt.t124 (MkInt 2#)
+fromInt.t126 = fromInt.t124
+lit.t104 = fromInt.t126 (MkInt 1#)
+d.Eq.t131 = dfun.Eq.Bool
+d.Eq.t129 = dfun.Eq.Tuple2 [tt105, Bool] [d.Eq.t130, d.Eq.t131]
+(==.t128) = (==) (tt105, Bool) d.Eq.t129
+(==.t127) = eqList (tt105, Bool) ==.t128
+(==.t102) = eqList [(tt105, Bool)] ==.t127
+(==.t111) = eqString
+fromInt.t132 = fromInt tt121 d.Num.t133
+lit.t122 = fromInt.t132 (MkInt 3#)
+fromInt.t134 = fromInt.t132
+lit.t120 = fromInt.t134 (MkInt 2#)
+fromInt.t135 = fromInt.t134
+lit.t118 = fromInt.t135 (MkInt 1#)
+(==.t137) = (==) tt121 d.Eq.t138
+(==.t136) = eqList tt121 ==.t137
+(==.t116) = eqList [tt121] ==.t136
+AbsBinds [tt19] [d.Num.t24, d.Ord.t28] [(fib.t1, ShouldSucceed.fib)]
+    (fromInt.t23, fromInt tt19 d.Num.t24)
+    (lit.t20, fromInt.t23 (MkInt 2#))
+    (d.Num.t25, d.Num.t24)
+    (-.t18, (-) tt19 d.Num.t25)
+    (fromInt.t26, fromInt.t23)
+    (lit.t14, fromInt.t26 (MkInt 1#))
+    (-.t12, (-.t18))
+    (d.Num.t27, d.Num.t25)
+    (+.t9, (+) tt19 d.Num.t27)
+    (lit.t6, lit.t20)
+    (<=.t4, (<=) tt19 d.Ord.t28)
+    {- rec -}
+    fib.t1 :: tt19 -> tt19
+    fib.t1
+	n.r64 = if n.r64 <=.t4 lit.t6 then
+		    n.r64
+		else
+		    (fib.t1 (n.r64 -.t12 lit.t14))
+		    +.t9 (fib.t1 (n.r64 -.t18 lit.t20))
+AbsBinds [] [] [(oR.t30, ShouldSucceed.oR)]
+    {- nonrec -}
+    oR.t30 :: Bool -> Bool -> Bool
+    oR.t30
+	a.r69 b.r70
+		= if a.r69 then True else b.r70
+AbsBinds [tt41] [d.Eq.t46] [(mem.t34, ShouldSucceed.mem)]
+    (==.t42, (==) tt41 d.Eq.t46)
+    {- rec -}
+    mem.t34 :: tt41 -> [tt41] -> Bool
+    mem.t34
+	x.r65 [] = False
+    mem.t34
+	x.r66 (y.r67 : ys.r68)
+		= (x.r66 ==.t42 y.r67) `ShouldSucceed.oR` (mem.t34 x.r66 ys.r68)
+AbsBinds [] [] [(oR1.t48, ShouldSucceed.oR1)]
+    {- nonrec -}
+    oR1.t48 :: Bool -> Bool -> Bool
+    oR1.t48
+	a.r75 b.r76
+		= if a.r75 then True else b.r76
+AbsBinds
+[tt61]
+[d.Eq.t77]
+[(mem1.t53, ShouldSucceed.mem1), (mem2.t54, ShouldSucceed.mem2)]
+    (==.t62, (==) tt61 d.Eq.t77)
+    (==.t73, (==.t62))
+    {- rec -}
+    mem1.t53 :: tt61 -> [tt61] -> Bool
+    mem1.t53
+	x.r71 [] = False
+    mem1.t53
+	x.r72 (y.r73 : ys.r74)
+		= (x.r72 ==.t62 y.r73)
+		  `ShouldSucceed.oR1` (mem2.t54 x.r72 ys.r74)
+    mem2.t54 :: tt61 -> [tt61] -> Bool
+    mem2.t54
+	x.r77 [] = False
+    mem2.t54
+	x.r78 (y.r79 : ys.r80)
+		= (x.r78 ==.t73 y.r79)
+		  `ShouldSucceed.oR` (mem1.t53 x.r78 ys.r80)
+AbsBinds
+[tt87]
+[d.Eq.t98]
+[(mem3.t80, ShouldSucceed.mem3), (mem4.t81, ShouldSucceed.mem4)]
+    (==.t97, (==) tt87 d.Eq.t98)
+    (==.t89, eqList tt87 ==.t97)
+    {- rec -}
+    mem3.t80 :: tt87 -> [tt87] -> Bool
+    mem3.t80
+	x.r81 [] = False
+    mem3.t80
+	x.r82 (y.r83 : ys.r84)
+		= if ([x.r82] (tt87)) ==.t89 ([y.r83] (tt87)) then
+		      mem4.t81 x.r82 ys.r84
+		  else
+		      False
+    mem4.t81 :: tt87 -> [tt87] -> Bool
+    mem4.t81
+	y.r87 (x.r85 : xs.r86)
+		= mem3.t80 y.r87 xs.r86
+AbsBinds [] [] [(main1.t100, ShouldSucceed.main1)]
+    {- nonrec -}
+    main1.t100 :: Bool
+    main1.t100
+	= ([[(lit.t104, True)] ((tt105, Bool))] ([(tt105, Bool)]))
+	  ==.t102 ([[(lit.t106, False)] ((tt105, Bool))] ([(tt105, Bool)]))
+AbsBinds [] [] [(main2.t109, ShouldSucceed.main2)]
+    {- nonrec -}
+    main2.t109 :: Bool
+    main2.t109 = "Hello" ==.t111 "Goodbye"
+AbsBinds [] [] [(main3.t114, ShouldSucceed.main3)]
+    {- nonrec -}
+    main3.t114 :: Bool
+    main3.t114
+	= ([[lit.t118] (tt121), [lit.t120] (tt121)] ([tt121]))
+	  ==.t116 ([[lit.t122] (tt121)] ([tt121]))
+

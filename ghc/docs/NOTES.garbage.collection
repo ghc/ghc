@@ -1,0 +1,206 @@
+
+			GARBAGE COLLECTION
+			~~~~~~~~~~~~~~~~~~
+
+The following discussion outlines how the GC is organised and what C
+the compiler needs to produce to use it.
+
+The files associated with GC are:
+
+	StgGC.h			header file -- macros and externs
+	StgCreate.lc		GC init routines
+	StgOverflow.lhc		Overflow routines -- interface to GC
+	GC2s.lhc		}
+	GC1s.lhc		} GC control routines
+	GCdm.lhc		} for each particular GC
+	GCap.lhc		}
+	GCevac.lc		Evacuation code fragments (copying GC)
+	GCscav.lhc		Scavenging code fragments (copying GC)
+	GCcompact.lhc		Inplace Compacting GC code fragments
+	GCmark.lhc		Marking code fragments
+
+Other files:
+
+    In gctest/
+	gctest.c		GC Small detail test bed program
+
+    In gcstat/
+				Performance evaluation stuff
+
+
+Basic Requirements of the C code Produced by the Haskell Compiler
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two main aspects of the compiler generated code that
+interact with GC:
+
+1) Compiled haskell code calls the garbage collection routine when the
+   heap overflows by entering the appropriate _HEAP_OVERFLOW_... routine.
+   
+   These routines isolate register usage and calls the GC control
+   routine that was defined at compile time.
+
+   For a description of the heap overflow conventions see:
+
+	~grasp/ghc/compiler/absCSyn/RTSLabels.lhs
+
+
+   The following must be adhered to by the mutator:
+
+		REQUIREMENT				 COLLECTOR
+     SpA and SpB point to A and B stacks		  all
+
+     Hp must point to last word allocated		  dual,comp
+     All updated closures must "know" their original	  dual,comp
+	size
+
+     HpLim must point to one beyond top of root stack	  appel
+     Updated closures in the old generation must "know"	  appel
+	their original size
+
+   The GC Control routines have to know about the pointer stack and
+   Update Stack.
+
+2) The info tables that are pointed to by closures must have the
+   appropriate GC routines within them. This is achieved by using the
+   following C Macros to declare them:
+
+		table_name --  the name given to the info table
+		entry_code --  the name of the normal evaluation
+			       entry code required for the closure
+		size       --  the No of free var words in the closure
+		ptrs	   --  the number of pointers in the closure
+
+
+	SPEC_INFO_TABLE(table_name,entry_code,size,ptrs);
+
+	Declares an info table with specialiazed code fragments
+	These are currently available for the following closure
+	configurations: size, ptrs
+		1,0	2,0	3,0	4,0	5,0
+		1,1	2,1	3,1
+			2,2
+				3,3
+					4,4
+						5,5
+						    	...
+								11,11
+
+	GEN_INFO_TABLE(table_name,entry_code,size,ptrs);
+
+	Declares an info table that uses generic code fragments and
+	places data to drive these routines in the info table.
+	These are available for all combinations of size,ptrs (even
+	those for which SPEC routines are provided).
+	
+
+	STATIC_INFO_TABLE(table_name,entry_code);
+
+	Declares an info table suitable for a static closure.
+
+
+	DATA_INFO_TABLE(table_name,entry_code);
+
+	Declares an info table suitable for a data closure.
+	This closure contains no heap pointers and its size
+	(of data and size field) in its first word
+
+		See NOTES.arbitary-ints
+
+
+	IND_INFO_TABLE(table_name,ind_code);
+
+	Declares an info table suitable for an indirection.
+	But see below !! (ToDo)
+
+
+Using a Particular Garbage Collection Scheme
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deciding which collector to use there are two decision points.
+
+At compile time it must be decided which code fragments are going to
+be attached to closures. This will limit the possible choice of GC
+schemes at run time.
+
+To compile the GC code and compiler-produced C Code for a particular
+set of code fragments an appropriate define (-D) directive is given
+to the compiler.
+
+Possible directives are:
+
+			Code Fragments		GC Control Routines
+
+-DGC2s			Copying		   	Two Space Collection
+
+-DGC1s			Marking & Compacting	Inplace Compaction
+
+-DGCdm			Copying, Marking	DualMode Collection
+			 & Compaction		  (+ TwoSpace and Compaction)
+-DGCap	      		Copying, Marking	Appels Collector
+			 & Compaction		  (+ Compaction)
+
+If none of these are defined the result will be No Collection Schame.
+Heap will be allocated but the program will die if it is ever filled.
+
+Other Directives:
+
+-D_GC_DEBUG		Provides detailed GC debugging trace output
+			(if showGCTrace set)
+
+Note that the GC code will eventually be set up already compiled for
+the different schemes and all that will be required will be to link
+with the appropriate object files. The compiler produced C will still
+need to be compiled with the appropriate define.
+
+
+Trace and Statistics Info
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a couple of variables that can be set to provide info about
+GC.
+
+showGCTrace -- Provides detailed trace of GC and closure movement
+       TRUE -- Summary about GC invokation and heap location
+	& 2 -- Detailed trace of copying AND compacting collection
+	& 4 -- More detail about linked location lists during compaction
+	& 8 -- Detalied info about marking
+
+	The & options are only available if compiled with -D_GC_DEBUG
+
+showGCStats -- Provides summary statistics about GC performance
+      (ToDo)
+
+ToDo: These should eventually be able to be set by runtime flages
+
+
+Compiler Extensions Required for Compacting Collection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a number of additional requirements required of the STG
+machine and the resulting C code for Inplace Compaction to work.
+
+The most important and awkward arises from the fact that updated nodes
+will be scanned. This requires updated nodes (blackholes, indirections
+or inplace updates) to know how big the original closure was (so the
+location of the next closure can be determined).
+
+Implications (Suggestions -- Still to be done):
+
+   Need specialized black holes info pointers which know their size.
+
+   Code on the Update Stack needs to know the orig closure size. Either
+   record this size or have specialised update code fragments.
+
+   Updated closures need to know orig size. Possible solns are:
+
+	Create dummy garbage closures at the end to fill the hole.
+
+	Store size of closure in free space beyond and have GC
+	routines which look here for the size.
+
+	Specialised indirections that know their size.
+
+   May be able to search beyond the end of the closure for the next
+   info pointer. Possibly blanking out the unused portion of the
+   closure.

@@ -1,0 +1,6 @@
+ 
+"tcfail003.hs", line 3: No such instance:
+    class "Num", type "Char" (at an overloaded literal: 1)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

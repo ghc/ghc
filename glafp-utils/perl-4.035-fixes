@@ -1,0 +1,180 @@
+From mjeffery@reed.edu Sun Nov 29 14:07:23 1992
+From: mjeffery@reed.edu (Mark Jefferys)
+Newsgroups: comp.lang.perl
+Subject: Re: Recursion error in perl 4.035 ?
+Date: 28 Nov 92 23:31:14 GMT
+Organization: Reed College, Portland, OR
+
+In article <1f7uvvINN9tp@roundup.crhc.uiuc.edu> parkes@uiuc.edu writes:
+
+% In cons.c, change the code at or around 1423 from
+% 
+%     if (willsave)
+%         (void)apush(tosave,arg->arg_ptr.arg_str);
+% 
+% to
+% 
+%     if (willsave && arg->arg_ptr.arg_str )
+%         (void)apush(tosave,arg->arg_ptr.arg_str);
+
+This is half of my patch to which Larry gave a "Looks OK to me."
+It's been a few months, do I'll post it again.
+
+
+Mark
+
+
+Index: cons.c
+*** Orig/cons.c	Thu Jun 11 22:42:01 1992
+--- cons.c	Sun Jun 28 18:31:20 1992
+***************
+*** 1353,1359 ****
+  
+  		    /* in any event, save the iterator */
+  
+! 		    (void)apush(tosave,cmd->c_short);
+  		}
+  		shouldsave |= tmpsave;
+  	    }
+--- 1353,1360 ----
+  
+  		    /* in any event, save the iterator */
+  
+! 		    if (cmd->c_short)  /* Better safe than sorry */
+! 			(void)apush(tosave,cmd->c_short);
+  		}
+  		shouldsave |= tmpsave;
+  	    }
+***************
+*** 1420,1426 ****
+  	shouldsave = TRUE;
+  	break;
+      }
+!     if (willsave)
+  	(void)apush(tosave,arg->arg_ptr.arg_str);
+      return shouldsave;
+  }
+--- 1421,1427 ----
+  	shouldsave = TRUE;
+  	break;
+      }
+!     if (willsave && arg->arg_ptr.arg_str)
+  	(void)apush(tosave,arg->arg_ptr.arg_str);
+      return shouldsave;
+  }
+-- 
+Mark Jefferys		Internet: mjeffery@reed.edu
+
+From ezk@cs.columbia.edu Fri Dec  4 19:44:03 1992
+From: ezk@cs.columbia.edu (Erez "HWank1" Zadok)
+Newsgroups: comp.lang.perl
+Subject: REPOST: FIXES to perl/makewhatis (core dump on OW3 man pages)
+Date: 3 Dec 92 12:42:05 GMT
+
+[This is a repost... -Erez]
+
+I've found three small bugs in the the latest version of perl (4.035), which
+I fixed.
+
+The bugs only appeared when I got Tom Christiansen's man package, and ran
+the makewhatis script.  Furthermore, it only occurred for one particular set
+of manual pages -- SunOS's OpenWindows 3.
+
+Since it seemed related to DBM, I tried to recompile perl with several
+possible combinations of Sun's /bin/cc, gcc (2.2.2), ndbm, gdbm,
+- -DDEBUGGING, -traditional (for gcc), Perl's malloc, Sun's malloc, etc. to no
+avail.  Perl was still dumping core with a segmentation fault.  "make test"
+was ok.  I was running on various Sun 4 machines, running SunOS 4.1.2.
+
+After debugging I found out that perl was trying to dereference pointers
+that were not initialized.
+
+I fixed this by adding initialization to three declarations in perl.h.  The
+ones to rsfp and statstab were needed for non-compressed man pages.  When I
+started using compressed man pages I discovered I had to initialize fdpid as
+well.  Now everything works fine.  Here is the diff file:
+
+*** array.h.orig	Tue Nov 24 02:16:30 1992
+--- array.h	Mon Nov 23 14:31:16 1992
+***************
+*** 17,22 ****
+--- 17,33 ----
+   * 
+   */
+  
++ #ifdef NULL
++ #undef NULL
++ #endif
++ #ifndef I286
++ #  define NULL 0
++ #else
++ #  define NULL 0L
++ #endif
++ #define Null(type) ((type)NULL)
++ #define Nullarray Null(ARRAY*)
++ 
+  struct atbl {
+      STR	**ary_array;
+      STR **ary_alloc;
+*** perl.h.orig	Tue Nov 24 02:16:10 1992
+--- perl.h	Mon Nov 23 14:30:51 1992
+***************
+*** 868,874 ****
+  
+  EXT char *hexdigit INIT("0123456789abcdef0123456789ABCDEFx");
+  EXT char *origfilename;
+! EXT FILE * VOLATILE rsfp;
+  EXT char buf[1024];
+  EXT char *bufptr;
+  EXT char *oldbufptr;
+--- 868,874 ----
+  
+  EXT char *hexdigit INIT("0123456789abcdef0123456789ABCDEFx");
+  EXT char *origfilename;
+! EXT FILE * VOLATILE rsfp INIT(Nullfp);
+  EXT char buf[1024];
+  EXT char *bufptr;
+  EXT char *oldbufptr;
+***************
+*** 952,958 ****
+  EXT struct stat statbuf;
+  EXT struct stat statcache;
+  EXT STAB *statstab INIT(Nullstab);
+! EXT STR *statname;
+  #ifndef MSDOS
+  EXT struct tms timesbuf;
+  #endif
+--- 952,958 ----
+  EXT struct stat statbuf;
+  EXT struct stat statcache;
+  EXT STAB *statstab INIT(Nullstab);
+! EXT STR *statname INIT(Nullstr);
+  #ifndef MSDOS
+  EXT struct tms timesbuf;
+  #endif
+***************
+*** 1013,1019 ****
+  EXT ARRAY *lineary;		/* lines of script for debugger */
+  EXT ARRAY *dbargs;		/* args to call listed by caller function */
+  
+! EXT ARRAY *fdpid;		/* keep fd-to-pid mappings for mypopen */
+  EXT HASH *pidstatus;		/* keep pid-to-status mappings for waitpid */
+  
+  EXT int *di;			/* for tmp use in debuggers */
+--- 1013,1019 ----
+  EXT ARRAY *lineary;		/* lines of script for debugger */
+  EXT ARRAY *dbargs;		/* args to call listed by caller function */
+  
+! EXT ARRAY *fdpid INIT(Nullarray); /* keep fd-to-pid mappings for mypopen */
+  EXT HASH *pidstatus;		/* keep pid-to-status mappings for waitpid */
+  
+  EXT int *di;			/* for tmp use in debuggers */
+
+
+Erez Zadok.
+Central Research Facilities.
+Columbia University Department of Computer Science.
+- ---
+"A wank's morning starts one jiffy    | Arpa:   ezk@cs.columbia.edu
+ after midnight."                     | Usenet: ...!rutgers!columbia!cs!ezk
+ -HebrewWank #1 (US meaning, not UK!) | Bitnet: erzus@cuvmb.BITNET

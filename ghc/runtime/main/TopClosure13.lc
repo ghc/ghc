@@ -1,0 +1,8 @@
+/* this one will be linked in for Haskell 1.3 */
+\begin{code}
+#include "rtsdefs.h"
+
+EXTDATA(Main_mainPrimIO13_closure);
+
+P_ TopClosure = Main_mainPrimIO13_closure;
+\end{code}

@@ -1,0 +1,326 @@
+\documentstyle[11pt,slpj,abstracts]{article}
+
+\begin{document}
+
+% ======================================================
+
+\title{Abstracts of GRIP/GRASP/AQUA-related papers and reports, 1993
+}
+
+\author{The AQUA team \\ Department of Computing Science \\
+University of Glasgow G12 8QQ
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP, GRASP and AQUA projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by FTP.  Connect to {\tt ftp.dcs.glasgow.ac.uk},
+and look in {\tt pub/glasgow-fp/papers}, {\tt pub/glasgow-fp/drafts}, {\tt pub/glasgow-fp/tech\_reports},
+or {\tt pub/glasgow-fp/grasp-and-aqua-docs}.
+
+They can also be obtained by writing to 
+Alexa Stewart, Department of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+alexa@dcs.glasgow.ac.uk.
+\end{abstract}
+
+\section{Published papers}
+
+\reference{CV Hall}
+{Using overloading to express distinctions}
+{Information Processing Letters (to appear)}
+{
+Evaluators, also called ``interpreters'', play a variety of roles
+in the study of programming languages.  Given this, it's surprising
+that we don't have a better framework for developing evaluators and
+specifying their relationship to each other. This paper
+shows that type classes in Haskell provide an excellent 
+framework for exploring relationships between evaluators, using
+abstract interpretation as a motivating example.
+}
+
+\reference{A Gill, J Launchbury and SL Peyton Jones}
+{A short cut to deforestation}
+{ACM Conference on Functional Programming and Computer Architecture, Copenhagen, pp223-232}
+{Lists are often used as ``glue'' to connect
+separate parts of a program together.
+We propose an automatic technique for 
+improving the efficiency of such programs,
+by removing many of these intermediate lists,
+based on a single, simple, local transformation.
+We have implemented the method in the Glasgow Haskell compiler.
+}
+
+\reference{P Sansom and SL Peyton Jones}
+{Generational garbage collection for Haskell}
+{ACM Conference on Functional Programming and Computer Architecture, Copenhagen, pp106-116}
+{This paper examines the use of generational garbage collection
+techniques for a lazy implementation of a non-strict functional
+language. Detailed measurements which demonstrate that a generational
+garbage collector can substantially out-perform non-generational
+collectors, despite the frequency of write operations in the
+underlying implementation, are presented.
+
+Our measurements are taken from a state-of-the-art compiled
+implementation for Haskell, running substantial benchmark programs.
+We make measurements of dynamic properties (such as object lifetimes)
+which affect generational collectors, study their interaction with a
+simple generational scheme, make direct performance comparisons with
+simpler collectors, and quantify the interaction with a paging system.
+
+The generational collector is demonstrably superior.  At least for our
+benchmarks, it reduces the net storage management overhead, and it
+allows larger programs to be run on a given machine before thrashing
+ensues.}
+
+\reference{J Launchbury}
+{Lazy imperative programming}
+{Proc ACM Sigplan Workshop on State in Programming Languages, Copenhagen, June 1993 (available as
+YALEU/DCS/RR-968, Yale University), pp46-56}
+{
+In this paper we argue for the importance of lazy state, that is,
+sequences of imperative (destructive) actions in which the actions are
+delayed until their results are required. This enables state-based
+computations to take advantage of the control power of lazy evaluation.
+We provide some examples of its use, and describe an implementation
+within Glasgow Haskell.
+}
+
+\reference{G Akerholt, K Hammond, P Trinder and SL Peyton Jones}
+{Processing transactions on GRIP, a parallel graph reducer}
+{Proc Parallel Architectures and Languages Europe (PARLE), Munich, June 1993, pp634-647}
+{
+The GRIP architecture allows efficient execution of functional
+programs on a multi-processor built from standard hardware components.
+State-of-the-art compilation techniques are combined with
+sophisticated runtime resource-control to give good parallel
+performance.  This paper reports the results of running GRIP on an
+application which is apparently unsuited to the basic functional
+model: a database transaction manager incorporating updates as well as
+lookup transactions.  The results obtained show good relative speedups
+for GRIP, with real performance advantages over the same application
+executing on sequential machines.
+}
+
+\reference{SL Peyton Jones and  PL Wadler}
+{Imperative functional programming}
+{ACM conference on Principles of Programming Languages, Charleston, Jan 1993}
+{We present a new model, based on monads, for performing input/output
+in a non-strict, purely functional language.  It
+is composable, extensible, efficient, requires no extensions
+to the type system, and extends smoothly to incorporate mixed-language
+working and in-place array updates.
+}
+
+\reference{J Launchbury}
+{An operational semantics for lazy evaluation}
+{ACM conference on Principles of Programming Languages, Charleston, Jan 1993}
+{We define an operational semantics for lazy evaluation which provides
+an accurate model for sharing. The only computational structure
+we introduce is a set of bindings which corresponds closely to a
+heap. The semantics is set at a considerably higher level of abstraction
+than operational semantics for particular abstract machines, so is
+more suitable for a variety of proofs. Furthermore, because a heap
+is explicitly modelled, the semantics provides a suitable framework
+for studies about space behaviour of terms under lazy evaluation.
+}
+
+\reference{SL Peyton Jones, CV Hall, K Hammond, WD Partain, and PL Wadler}
+{The Glasgow Haskell compiler: a technical overview}
+{JFIT Technical Conference, Keele, March 1993}
+{We give an overview of the Glasgow Haskell compiler,
+focusing especially on way in which we have been able
+to exploit the rich theory of functional languages to give
+very practical improvements in the compiler.
+
+The compiler is portable, modular, generates good code, and is 
+freely available.
+}
+
+\reference{PL Wadler}
+{A syntax for linear logic}
+{Mathematical Foundations of 
+Programming Language Semantics, New Orleans, April 1993}
+{There is a standard syntax for Girard's linear logic, due
+to Abramsky, and a standard semantics, due to Seely.  Alas, the
+former is incoherent with the latter: different derivations of
+the same syntax may be assigned different semantics.  This paper
+reviews the standard syntax and semantics, and discusses the problem
+that arises and a standard approach to its solution.  A new solution
+is proposed, based on ideas taken from Girard's Logic of Unity.
+The new syntax is based on pattern matching, allowing for concise
+expression of programs.}
+
+\reference{SL Peyton Jones, J Hughes, J Launchbury}
+{How to give a good research talk}
+{SIGPLAN Notices 28(11), Nov 1993, 9-12}
+{
+Giving a good research talk is not easy. We try to identify some things
+which we have found helpful, in the hope that they may be useful to you. 
+}
+
+
+\section{Workshop papers and technical reports}
+
+The 1993 Glasgow Functional Programming Workshop papers exist in
+the draft proceedings at the moment.  They are being refereed, and will
+be published by Springer Verlag in due course.
+
+\reference{DJ King and J Launchbury}
+{Lazy Depth-First Search and Linear Graph Algorithms in Haskell}
+{\GlasgowNinetyThree{}}
+{
+Depth-first search is the key to a wide variety of graph algorithms.
+In this paper we explore the implementation of depth first search in a
+lazy functional language. For the first time in such languages we
+obtain a linear-time implementation.  But we go further.  Unlike
+traditional imperative presentations, algorithms are constructed from
+individual components, which may be reused to create new
+algorithms. Furthermore, the style of program is quite amenable to
+formal proof, which we exemplify through a calculational-style proof
+of a strongly-connected components algorithm.
+
+{\em This paper has been submitted to Lisp \& Functional Programming 1994.}
+}
+
+\reference{K Hammond, GL Burn and DB Howe}
+{Spiking your caches}
+{\GlasgowNinetyThree{}}
+{
+Despite recent advances, predicting the performance of functional
+programs on real machines remains something of a black art.  This
+paper reports on one particularly unexpected set of results where
+small variations in the size of a dynamic heap occasionally gave rise
+to 50\% differences in CPU performance.  These performance {\em
+spikes} can be traced to the cache architecture of the machine being
+benchmarked, the widely-used Sun Sparcstation~1.  A major contribution
+of our work is the provision of a tool which allows cache conflicts
+to be located by the type of access (heap, stack etc.).  This can
+be used to improve the functional language implementation, or to
+study the memory access patterns of a particular program.
+}
+
+\reference{S Marlow}
+{Update avoidance analysis}
+{\GlasgowNinetyThree{}}
+{
+A requirement  of lazy    evaluation  is that     the value  of    any
+subexpression in the program is calculated no more than once.  This is
+achieved by updating an expression with its value, once computed.  The
+problem is that  updating is a  costly operation,  and experimentation
+has shown that it is only necessary  in about 30\%  of cases (that is,
+70\% of expressions represent values that  are only ever required once
+during execution).  The aim of the analysis presented in this paper is
+to discover  expressions  that do not  need  to be  updated,  and thus
+reduce  the  execution time  of  the program.   The  analysis has been
+implemented in the Glasgow Haskell Compiler, and results are given.
+
+FTP: @pub/glasgow-fp/authors/Simon_Marlow/update-avoidance.ps.gz@
+}
+
+\reference{SL Peyton Jones and WD Partain}
+{Measuring the effectiveness of a simple strictness analyser}
+{\GlasgowNinetyThree{}}
+{
+A lot has been written about strictness analysis for non-strict
+functional programs, usually in the hope that the results of the
+analysis can be used to reduce runtime.  On the other hand, few papers
+present measurements of how well it works in practice.  Usually, all
+that is presented are the run-times of a variety of (usually small)
+programs, with and without strictness analysis enabled.  The goal of
+this paper is to provide detailed quantitative insight about the
+effectiveness of a simple strictness analyser, in the context of a
+state-of-the art compiler running serious application programs.
+}
+
+\reference{J Mattson}
+{Local speculative evaluation for distributed graph reduction}
+{\GlasgowNinetyThree{}}
+{
+Speculative evaluation attempts to increase parallelism by
+performing potentially useful computations before they are known to be
+necessary.  Speculative computations may be coded explicitly in a
+program, or they may be scheduled implicitly by the reduction system
+as idle processors become available.  A general approach to both kinds
+of speculation incurs a great deal of overhead which may outweigh the
+benefits of speculative evaluation for fine-grain speculative tasks.  
+
+Suppose that implicit speculative computations are restricted to
+execution on the local processor, with the hope of performing
+potentially useful work while the local mandatory tasks are all
+blocked.  This restriction greatly simplifies the problems of
+speculative task management, and it opens the door for fine-grain
+speculative tasks.  More complex mechanisms for distributing
+and managing coarse-grain speculative tasks can later be added on top of
+the basic foundation provided for local speculative evaluation.
+}
+
+\reference{PM Sansom}
+{Time profiling a lazy functional compiler}
+{\GlasgowNinetyThree{}}
+{
+Recent years has seen the development of profiling tools for lazy
+functional language implementations. This paper presents the results
+of using a time profiler to profile the Glasgow Haskell compiler.
+}
+
+\reference{D King and J Launchbury}
+{Functional graph algorithms with depth-first search}
+{\GlasgowNinetyThree{}}
+{Performing a depth-first search of a graph is one of the fundamental
+approaches for solving a variety of graph algorithms.  Implementing
+depth-first search efficiently in a pure functional language has only
+become possible with the advent of imperative functional programming.
+In this paper we mix the techniques of pure functional programming in
+the same cauldron as depth-first search, to yield a more lucid
+approach to viewing a variety of graph algorithms. This claim will be
+illustrated with several examples.}
+
+\reference{A Santos and SL Peyton Jones}
+{Tuning a compiler's allocation policy}
+{\GlasgowNinetyThree{}}
+{There are many different costs involved in the allocation of
+closures during the execution of functional programs.  Even more so
+for closures that are not in normal form, as they have to be
+allocated and then possibley entered and updated.  We compare several
+different policies for closure allocation, trying to minimise these
+costs.  The issues of laziness and full laziness are discussed.
+}
+
+\reference{CV Hall}
+{A framework for optimising abstract data types}
+{\GlasgowNinetyThree{}}
+{Two trends have been developing in functional programming language
+research. First, compilers are supporting optimisations of data
+types, such as unboxed types and parallel bags.  Second, functional
+programmers are increasingly writing code in a style that treats
+data types as if they were abstract. Abstract data types offer
+opportunities for optimisation because the representation of the
+type can be optimised without affecting the program, allowing the
+programmer to use operations on it and improve performance. At the
+same time, the original type is often required by some part of the
+program, and the programmer is left to figure out which to use
+where.
+
+This paper presents a general framework in which good functional
+style automatically supports the efficient implementation of data
+types.  It has been implemented in the Glasgow Haskell compiler
+specifically to introduce an optimised list representation, and
+this has been shown to cut execution time in half on a Sun
+SPARCstation-1 for a substantial program.  Recent tests show that
+it improves performance by more than a factor of 4 on the GRIP
+parallel processor for short tests, however more experiments will
+be necessary before we can assert that this speedup holds in
+general.
+}
+\end{document}
+
+
+
+
+

@@ -1,0 +1,109 @@
+
+
+
+Questions concerning the meaning of hiding in certain contexts:
+
+1) Suppose we have the interface
+   interface A where
+   data T = B | C
+
+   and the module
+   module H where
+   import A hiding T
+
+   Should this be an error (because T isn't an abstract type in the module)
+   or does it just mean the same thing as would 
+   import A hiding (T (B,C))
+   or
+   import A hiding (T (..))
+   (in other words, hide all of T)
+   Will require the user to be precise and flag it as an error - otherwise
+   the user may not know that the type is not abstract, thinking that it is.
+
+2) Clearly, we can't allow (assuming the interface above)
+   module H where
+   import A hiding (T (B))
+
+   since that means that a data type with a subset of the constructors is
+   exported - similarly for classes
+
+3) Suppose an interface exports an abstract type H. Can H be referred
+   to as H (..), or is that an error? Let's require precision and call it
+   an error.
+
+--------------- new design for renamer -------------------
+
+Changes to abstract syntax
+
+1) ClsSigs becomes Sigs
+
+2) Instances need new syntax (bool) distinguishing between those which
+come from an interface and those which come from a module. 
+
+The renamer is factored into four passes, as follows:
+
+1) FLATTEN INTERFACES -
+   insert original names into interfaces. All of the decls imported
+   from the interfaces are collected and returned, in an otherwise
+   unchanged module. No interfaces exist after this pass.
+
+2) Do consistency checks (equality). Return the module including the surviving declarations.
+
+3) build the global name function, which will maintain two separate
+   namespaces.
+
+4) assign names to the entire module, and do dependency analysis.
+
+As the prelude environments will yield names, the first pass will replace
+QuickStrings with constructors of the ProtoName type, defined as
+
+data ProtoName = Unknown QuickString
+			-- note that this is the name local to the module
+               | Imported QuickString QuickString QuickString
+               | Prelude Name
+
+The parser will initially make all QuickStrings Unknown.
+
+Modules must now include signatures for value decls at top level.
+
+The entire set of passes have the following types:
+
+type PrelNameFuns = (GlobalNameFun, GlobalNameFun)
+
+type GlobalNameFun = ProtoName -> Maybe Name
+
+renameModule :: PrelNameFuns -> ProtoNameModule -> RenameMonad RenamedModule
+
+renameModule1 :: PrelNameFuns -> ProtoNameModule -> RenameMonad ProtoNameModule
+
+processModImports1 :: PrelNameFuns -> ProtoNameImportDecls 
+                        -> RenameMonad (ProtoNameFixityDecls, ProtoNameTyDecls, 
+                                        ProtoNameClassDecls, ProtoNameInstDecls, 
+                                        ProtoNameSigDecls)
+
+renameModule2 :: ProtoNameModule -> RenameMonad ProtoNameModule
+
+renameModule3 :: PrelNameFuns -> ProtoNameModule -> GlobalNameFun
+
+renameModule4 ::  GlobalNameFun -> ProtoNameModule -> RenameMonad RenamedModule
+
+renameModule :: PrelNameFuns -> ProtoNameModule -> RenameMonad RenamedModule
+renameModule pnf mod 
+ = (renameModule1 pnf mod)	`thenRenameM` (\ mod_with_orig_interfaces ->
+   (renameModule2 mod_with_orig_interfaces) 
+                         `thenRenameM` (\ mod_minus_interfaces ->
+   (renameModule3 pnf mod_minus_interfaces)
+                         `thenRenameM` (\ global_name_fun ->
+   (renameModule4 mod_minus_interfaces global_name_fun))))
+
+Namespace confusion: According to the report (1.1), `An identifier must
+not be used as the name of a type constructor and a class in the same 
+scope.' This is apparently the only constraint on the namespace, other
+than those implied by the conventions for identifiers. So, what are the
+namespaces? 
+
+1) variables and class operations, constructors
+
+2) type constructors and classes (because of the statement above)
+
+

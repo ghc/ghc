@@ -1,0 +1,70 @@
+Renamed-pass4:
+module Test where
+infixl 9 PreludeArray.!
+infixl 9 PreludeList.!!
+infixl 7 PreludeRatio.%
+infixl 7 (*)
+infixl 6 (+)
+infixl 6 (-)
+infixl 7 (/)
+infixl 9 PreludeArray.//
+infixl 7 `div`
+infixl 7 `mod`
+infixl 7 `quot`
+infixl 7 `rem`
+infixr 0 $
+infixr 3 &&
+infixr 8 (**)
+infixr 9 .
+infixr 8 Prelude.^
+infixr 8 Prelude.^^
+infixr 2 ||
+infix  4 (/=)
+infix  6 :+
+infix  1 :=
+infix  4 (<)
+infix  4 (<=)
+infix  4 (==)
+infix  4 (>)
+infix  4 (>=)
+infix  5 PreludeList.\\
+instance (Eq a, Eq b) => Eq (a, b)
+instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
+instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
+instance (Ord a, Ord b) => Ord (a, b)
+instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
+instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
+instance (Ix a, Ix b) => Ix (a, b)
+instance (Ix a, Ix b, Ix c) => Ix (a, b, c)
+instance (Ix a, Ix b, Ix c, Ix d) => Ix (a, b, c, d)
+instance (Text a, Text b) => Text (a, b)
+instance (Text a, Text b, Text c) => Text (a, b, c)
+instance (Text a, Text b, Text c, Text d) => Text (a, b, c, d)
+instance (Binary a, Binary b) => Binary (a, b)
+instance (Binary a, Binary b, Binary c) => Binary (a, b, c)
+instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d)
+{- rec -}
+Test.a = Test.a
+{- rec -}
+((Test.f1@(Test.f2@(Test.f3@Test.f))), 1) = Test.g 1 1
+(*UNBOUND*Foo Test.g 1 2) = (Test.h, 1, 1, 2)
+(~~~~Test.h, 1, 2, 3) = Test.f 3
+{- rec -}
+((Test.i1@(Test.i2@(Test.i3@Test.i))), 1) = Test.j 1 1
+(*UNBOUND*Foo Test.j 1 2) = (Test.k, 1, 1, 2)
+(~~~~Test.k, 1, 2, 3) = Test.i 3
+PreludeArray.! :: Ix a => Array a b -> a -> b
+PreludeList.!! :: Integral a => [b] -> a -> b
+PreludeRatio.% :: Integral a => a -> a -> Ratio a
+PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
+PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
+Prelude.^ :: (Num b, Integral a) => b -> a -> b
+Prelude.^^ :: (Fractional b, Integral a) => b -> a -> b
+PreludeList.or :: [Bool] -> Bool
+
+ 
+"rn007.hs", line 16: undefined value: Foo
+"rn007.hs", line 17: undefined value: Foo
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

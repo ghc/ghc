@@ -1,0 +1,304 @@
+%************************************************************************
+%*									*
+\subsection{The front end of the compiler}
+\label{sec:front-end}
+%*									*
+%************************************************************************
+
+The previous section covered the main points about the front end of
+the compiler: it is dominated by a ``renamer'' and a typechecker
+working directly at the Haskell source level.  In this section, we
+will look at some basic datatypes used or introduced in the front
+end---ones that you may see as input to your optimisation pass.
+
+\subsubsection{``Abstract syntax'', a source-level datatype}
+\label{sec:AbsSyntax}
+
+As Figure~\ref{fig:overview} shows, the typechecker both reads and
+writes a collection of datatypes we call ``Abstract syntax.''
+This is misleading in that what
+goes into the typechecker is quite different from what comes out.
+
+Let's first consider this fragment of the abstract-syntax
+definition,\srcloc{abstractSyn/HsExpr.lhs} for Haskell explicit-list
+expressions (Haskell report, section~3.5
+\cite{hudak91a}):\nopagebreak[4]
+\begin{tightcode}
+data Expr var pat =
+  ...
+  | ExplicitList	[Expr var pat]
+  | ExplicitListOut	UniType [Expr var pat]
+  ...
+
+type ProtoNameExpr	= Expr ProtoName ProtoNamePat
+type RenamedExpr        = Expr Name RenamedPat
+type TypecheckedExpr	= Expr Id TypecheckedPat
+\end{tightcode}
+an @ExplicitList@ appears only in typechecker input; an @ExplicitListOut@
+is the corresponding construct that appears
+only in the output, with the inferred type information attached.
+
+The fragment above also shows how abstract syntax is {\em parameterised}
+with respect to variables and patterns.  The idea is the same for
+both; let's just consider variables.
+
+The renamer converts @ProtoNameExprs@ (expressions with
+@ProtoNames@\srcloc{basicTypes/ProtoName.lhs} as variables---little
+more than just strings) into @RenamedExprs@, which have all naming sorted out
+(using @Names@\srcloc{abstractSyn/Name.lhs}).  A @Name@ is known to be
+properly bound, isn't duplicated, etc.; it's known if it's bound to a
+built-in standard-prelude entity.
+
+(The renamer also does dependency analysis, which is required to
+maximise polymorphism in a Hindley-Milner type system.)
+
+The typechecker reads the @RenamedExprs@, sorts out the types, and
+spits out @TypecheckedExprs@, with variables represented by
+@Ids@\srcloc{basicTypes/Id.lhs}.  You can find out just about anything
+you want to know about a variable from its @Id@.
+
+To see what GHC makes of some Haskell, in a file @Foo.hs@, say:
+try @ghc -noC -ddump-rn4 Foo.hs@, to see what comes out of the renamer [pass~4];
+try @ghc -noC -ddump-tc Foo.hs@, to see what comes out of the typechecker.
+
+\subsubsection{Basic datatypes in the compiler}
+
+None of the internal datatypes in the example just given are
+particularly interesting except @Ids@.\srcloc{basicTypes/Id.lhs} A
+program variable, which enters the typechecker as a string, emerges as
+an @Id@.
+
+The important thing about @Id@---and the datatypes representing other
+basic program entities (type variables, type constructors, classes,
+etc.)---is that they often include {\em memoised} information that can
+be used throughout the rest of the compiler.
+
+Let us take a cursory look at @Ids@, as a representative example of
+these basic data types.  (Don't be too scared---@Ids@ are the hairiest
+entities in the whole compiler!)
+Here we go:
+\begin{tightcode}\codeallowbreaks{}
+data Id
+  = Id Unique	   {\dcd\rm-- key for fast comparison}
+       UniType	   {\dcd\rm-- Id's type; used all the time;}
+       IdInfo	   {\dcd\rm-- non-essential info about this Id;}
+       PragmaInfo  {\dcd\rm-- user-specified pragmas about this Id;}
+       IdDetails   {\dcd\rm-- stuff about individual kinds of Ids.}
+\end{tightcode}
+
+So, every @Id@ comes with:
+\begin{enumerate}
+\item
+A @Unique@,\srcloc{basicTypes/Unique.lhs} essentially a unique
+@Int@, for fast comparison;
+\item
+A @UniType@ (more on them below... section~\ref{sec:UniType}) giving the variable's
+type---this is the most useful memoised information.
+\item
+A @PragmaInfo@, which is pragmatic stuff the user specified for
+this @Id@; e.g., @INLINE@ it; GHC does not promise to honour these
+pragma requests, but this is where it keeps track of them.
+\item
+An @IdInfo@ (more on {\em them} below... section~\ref{sec:IdInfo}),
+which tells you all the extra things
+that the compiler doesn't {\em have} to know about an @Id@, but it's jolly nice...
+This corresponds pretty closely to the @GHC_PRAGMA@ cross-module info that you will
+see in any interface produced using @ghc -O@.
+An example of some @IdInfo@
+would be: that @Id@'s unfolding; or its arity.
+\end{enumerate}
+
+Then the fun begins with @IdDetails@...
+\begin{tightcode}\codeallowbreaks{}
+data IdDetails
+
+  {\dcd\rm---------------- Local values}
+
+  = LocalId	ShortName	{\dcd\rm-- mentioned by the user}
+
+  | SysLocalId	ShortName	{\dcd\rm-- made up by the compiler}
+
+  {\dcd\rm---------------- Global values}
+
+  | ImportedId	FullName	{\dcd\rm-- Id imported from an interface}
+
+  | PreludeId	FullName	{\dcd\rm-- Prelude things the compiler ``knows'' about}
+
+  | TopLevId	FullName	{\dcd\rm-- Top-level in the orig source pgm}
+				{\dcd\rm-- (not moved there by transformations).}
+
+  {\dcd\rm---------------- Data constructors}
+
+  | DataConId FullName
+	     ConTag
+             [TyVarTemplate] ThetaType [UniType] TyCon
+             {\dcd\rm-- split-up type: the constructor's type is:}
+             {\dcd\rm-- $\forall~tyvars . theta\_ty \Rightarrow$}
+             {\dcd\rm--    $unitype_1 \rightarrow~ ... \rightarrow~ unitype_n \rightarrow~ tycon tyvars$}
+
+  | TupleCon Int			 {\dcd\rm-- its arity}
+
+  {\dcd\rm-- There are quite a few more flavours of {\tt IdDetails}...}
+\end{tightcode}
+
+% A @ShortName@,\srcloc{basicTypes/NameTypes.lhs} which includes a name string
+% and a source-line location for the name's binding occurrence;
+
+In short: everything that later parts of the compiler might want to
+know about a local @Id@ is readily at hand.  The same principle holds
+true for imported-variable and data-constructor @Ids@ (tuples are an
+important enough case to merit special pleading), as well as for other
+basic program entities.  Here are a few further notes about the @Id@
+fragments above:
+\begin{itemize}
+\item
+A @FullName@\srcloc{basicTypes/NameTypes.lhs} is one that may be
+globally visible, with a module-name as well; it may have been
+renamed.
+\item
+@DataConKey@\srcloc{prelude/PrelUniqs.lhs} is a specialised
+fast-comparison key for data constructors; there are several of these
+kinds of things.
+\item
+The @UniType@ for @DataConIds@ is given in {\em two} ways: once, just as
+a plain type; secondly, split up into its component parts.  This is to
+save frequently re-splitting such types.
+\item
+Similarly, a @TupleCon@ has a type attached, even though we could
+construct it just from the arity.
+\end{itemize}
+
+\subsubsection{@UniTypes@, representing types in the compiler}
+\label{sec:UniType}
+
+Let us look further at @UniTypes@.\srcloc{uniType/} Their definition
+is:
+\begin{tightcode}\codeallowbreaks{}
+data UniType
+  = UniTyVar    TyVar
+
+  | UniFun      UniType		{\dcd\rm-- function type}
+		UniType
+
+  | UniData     TyCon           {\dcd\rm-- non-synonym datatype}
+                [UniType]
+
+  | UniSyn      TyCon           {\dcd\rm-- type synonym}
+                [UniType]       {\dcd\rm--\ \ unexpanded form}
+                UniType         {\dcd\rm--\ \ expanded form}
+
+  | UniDict     Class		{\dcd\rm-- for types with overloading}
+		UniType
+
+  {\dcd\rm-- The next two are to do with universal quantification.}
+  | UniTyVarTemplate TyVarTemplate
+
+  | UniForall   TyVarTemplate
+		UniType
+\end{tightcode}
+When the typechecker processes a source module, it adds @UniType@
+information to all the basic entities (e.g., @Ids@), among other
+places (see Section~\ref{sec:second-order} for more details).  These
+types are used throughout the compiler.
+
+The following example shows several things about @UniTypes@.
+If a programmer wrote @(Eq a) => a -> [a]@, it would be represented
+as:\footnote{The internal structures of @Ids@,
+@Classes@, @TyVars@, and @TyCons@ are glossed over here...}
+\begin{tightcode}\codeallowbreaks{}
+UniForall {\dcd$\alpha$}
+      (UniFun (UniDict {\dcd\em Eq} (UniTyVar {\dcd$\alpha$}))
+              (UniFun (UniTyVarTemplate {\dcd$\alpha$})
+                      (UniData {\dcd\em listTyCon}
+			       [UniTyVarTemplate {\dcd$\alpha$}])))
+\end{tightcode}
+From this example we see:
+\begin{itemize}
+\item
+The universal quantification of the type variable $\alpha$ is made explicit
+(with a @UniForall@).
+\item
+The class assertion @(Eq a)@ is represented with a @UniDict@ whose
+second component is a @UniType@---this
+reflects the fact that we expect @UniType@ to be used in a stylized
+way, avoiding nonsensical constructs (e.g.,
+@(UniDict f (UniDict g (UniDict h ...)))@).
+\item
+The ``double arrow'' (@=>@) of the Haskell source, indicating an
+overloaded type, is represented by the usual
+@UniFun@ ``single arrow'' (@->@), again in a stylized way.
+This change reflects the fact that each class assertion in a
+function's type is implemented by adding an extra dictionary argument.
+\item
+In keeping with the memoising tradition we saw with @Ids@, type
+synonyms (@UniSyns@) keep both the unexpanded and expanded forms handy.
+\end{itemize}
+
+\subsubsection{@IdInfo@: extra pragmatic info about an @Id@}
+\label{sec:IdInfo}
+
+[New in 0.16.]  All the nice-to-have-but-not-essential information
+about @Ids@ is now hidden in the
+@IdInfo@\srcloc{basicTypes/IdInfo.lhs} datatype.  It looks something
+like:
+\begin{tightcode}\codeallowbreaks{}
+data IdInfo
+  = NoIdInfo		 {\dcd\rm-- OK, we know nothing...}
+
+  | MkIdInfo
+      ArityInfo		 {\dcd\rm-- its arity}
+      DemandInfo	 {\dcd\rm-- whether or not it is definitely demanded}
+      InliningInfo	 {\dcd\rm-- whether or not we should inline it}
+      SpecialisationInfo {\dcd\rm-- specialisations of this overloaded}
+			 {\dcd\rm-- function which exist}
+      StrictnessInfo	 {\dcd\rm-- strictness properties, notably}
+			 {\dcd\rm-- how to conjure up ``worker'' functions}
+      WrapperInfo	 {\dcd\rm-- ({\em informational only}) if an Id is}
+			 {\dcd\rm-- a ``worker,'' this says what Id it's}
+			 {\dcd\rm-- a worker for, i.e., ``who is my wrapper''}
+			 {\dcd\rm-- (used to match up workers/wrappers)}
+      UnfoldingInfo	 {\dcd\rm-- its unfolding}
+      UpdateInfo	 {\dcd\rm-- which args should be updated}
+      SrcLocation	 {\dcd\rm-- source location of definition}
+\end{tightcode}
+As you can see, we may accumulate a lot of information about an Id!
+(The types for all the sub-bits are given in the same place...)
+
+\subsubsection{Introducing dictionaries for overloading}
+
+The major novel feature of the Haskell language is its systematic
+overloading using {\em type classes}; Wadler and Blott's paper is the
+standard reference \cite{wadler89a}.
+
+To implement type classes, the typechecker not only checks the Haskell
+source program, it also {\em translates} it---by inserting code to
+pass around in {\em dictionaries}.  These dictionaries
+are essentially tuples of functions, from which the correct code may
+be plucked at run-time to give the desired effect.  Kevin Hammond
+wrote and described the first working implementation of type
+classes \cite{hammond89a}, and the ever-growing static-semantics paper
+by Peyton Jones and Wadler is replete with the glories of dictionary
+handling \cite{peyton-jones90a}.  (By the way, the typechecker's
+structure closely follows the static semantics paper; inquirers into
+the former will become devoted students of the latter.)
+
+Much of the abstract-syntax datatypes are given
+over to output-only translation machinery.  Here are a few more
+fragments of the @Expr@ type, all of which appear only in typechecker
+output:
+\begin{tightcode}
+data Expr var pat =
+  ...
+  | DictLam    [DictVar]       (Expr var pat)
+  | DictApp    (Expr var pat)  [DictVar]
+  | Dictionary [DictVar]       [Id]
+  | SingleDict DictVar
+  ...
+\end{tightcode}
+You needn't worry about this stuff:
+After the desugarer gets through with such constructs, there's nothing
+left but @Ids@, tuples, tupling functions, etc.,---that is, ``plain
+simple stuff'' that should make the potential optimiser's heart throb.
+Optimisation passes don't deal with dictionaries explicitly but, in
+some cases, quite a bit of the code passed through to them will be for
+dictionary-handling.

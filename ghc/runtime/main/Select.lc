@@ -1,0 +1,123 @@
+%
+% (c) The AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*                                                                      *
+\section[Select.lc]{Select Available File Descriptors}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#ifdef CONCURRENT
+
+/* #define STK_CHK_DEBUG */
+
+#define NULL_REG_MAP
+#define NON_POSIX_SOURCE
+/* Should there be a POSIX alternative based on poll()? */
+#include "stgdefs.h"
+
+# if defined(HAVE_SYS_TYPES_H)
+#  include <sys/types.h>
+# endif
+
+# ifdef HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# endif
+
+void
+AwaitEvent(delta)
+I_ delta;
+{
+    P_ tso, prev, next;
+    rtsBool ready;
+    fd_set rfd;
+    I_ us;
+    I_ min;
+    struct timeval tv;
+
+    min = delta == 0 ? 0x7fffffff : 0;
+
+    /* 
+     * Collect all of the fd's that we're interested in, and capture
+     * the minimum waiting time for the delayed threads.
+     */
+    FD_ZERO(&rfd);
+    for(tso = WaitingThreadsHd; tso != Nil_closure; tso = TSO_LINK(tso)) {
+	us = (I_) TSO_EVENT(tso);
+	if (us > 0) {
+	    /* Looking at a delay event */
+	    if (us < min)
+		min = us;
+	} else {
+	    /* Looking at a wait event */
+	    FD_SET((-us), &rfd);
+	}
+    }
+
+    /* Check for any interesting events */
+
+    tv.tv_sec = min / 1000000;
+    tv.tv_usec = min % 1000000;
+
+    while (select(FD_SETSIZE, &rfd, NULL, NULL, &tv) < 0) {
+	if (errno != EINTR) {
+	    fflush(stdout);
+	    fprintf(stderr, "AwaitEvent: select failed\n");
+	    EXIT(EXIT_FAILURE);
+	}
+    }	
+
+    if (delta == 0)
+	delta = min;
+
+    prev = NULL;
+    for(tso = WaitingThreadsHd; tso != Nil_closure; tso = next) {
+	next = TSO_LINK(tso);
+	us = (I_) TSO_EVENT(tso);
+	if (us > 0) {
+	    /* Looking at a delay event */
+	    us -= delta;
+	    ready = (us <= 0);
+	    if (!ready)
+		TSO_EVENT(tso) = (W_) us;
+	} else {
+	    /* Looking at a wait event */
+	    ready = FD_ISSET((-us), &rfd);
+	}
+	if (ready) {
+
+#if defined(GRAN)
+            if (ThreadQueueTl == Nil_closure)
+		ThreadQueueHd = tso;
+            else
+		TSO_LINK(ThreadQueueTl) = tso;
+	    ThreadQueueTl = tso;
+	    TSO_LINK(tso) = Nil_closure;
+#else
+            if (RunnableThreadsTl == Nil_closure)
+		RunnableThreadsHd = tso;
+            else
+		TSO_LINK(RunnableThreadsTl) = tso;
+	    RunnableThreadsTl = tso;
+	    TSO_LINK(tso) = Nil_closure;
+#endif
+	} else {
+	    if (prev == NULL)
+		WaitingThreadsHd = tso;
+	    else
+		TSO_LINK(prev) = tso;
+	    prev = tso;
+	}
+    }
+    if (prev == NULL)
+	WaitingThreadsHd = WaitingThreadsTl = Nil_closure;
+    else {
+	TSO_LINK(prev) = Nil_closure;
+	WaitingThreadsTl = prev;
+    }
+}
+
+#endif /* CONCURRENT */
+\end{code}

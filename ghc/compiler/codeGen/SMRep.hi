@@ -1,0 +1,37 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SMRep where
+import Outputable(Outputable)
+data SMRep   = StaticRep Int Int | SpecialisedRep SMSpecRepKind Int Int SMUpdateKind | GenericRep Int Int SMUpdateKind | BigTupleRep Int | DataRep Int | DynamicRep | BlackHoleRep | PhantomRep | MuTupleRep Int
+data SMSpecRepKind   = SpecRep | ConstantRep | CharLikeRep | IntLikeRep
+data SMUpdateKind   = SMNormalForm | SMSingleEntry | SMUpdatable
+getSMInfoStr :: SMRep -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getSMInitHdrStr :: SMRep -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getSMUpdInplaceHdrStr :: SMRep -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+ltSMRepHdr :: SMRep -> SMRep -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq SMRep
+	{-# GHC_PRAGMA _M_ SMRep {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SMRep -> SMRep -> Bool), (SMRep -> SMRep -> Bool)] [_CONSTM_ Eq (==) (SMRep), _CONSTM_ Eq (/=) (SMRep)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Ord SMRep
+	{-# GHC_PRAGMA _M_ SMRep {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq SMRep}}, (SMRep -> SMRep -> Bool), (SMRep -> SMRep -> Bool), (SMRep -> SMRep -> Bool), (SMRep -> SMRep -> Bool), (SMRep -> SMRep -> SMRep), (SMRep -> SMRep -> SMRep), (SMRep -> SMRep -> _CMP_TAG)] [_DFUN_ Eq (SMRep), _CONSTM_ Ord (<) (SMRep), _CONSTM_ Ord (<=) (SMRep), _CONSTM_ Ord (>=) (SMRep), _CONSTM_ Ord (>) (SMRep), _CONSTM_ Ord max (SMRep), _CONSTM_ Ord min (SMRep), _CONSTM_ Ord _tagCmp (SMRep)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: SMRep) (u1 :: SMRep) -> _APP_  _CONSTM_ Ord (<=) (SMRep) [ u1, u0 ] _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: SMRep) (u1 :: SMRep) -> _APP_  _CONSTM_ Ord (<) (SMRep) [ u1, u0 ] _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Outputable SMRep
+	{-# GHC_PRAGMA _M_ SMRep {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (SMRep) _N_
+	 ppr = _A_ 2 _U_ 0220 _N_ _S_ "AL" {_A_ 1 _U_ 220 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Text SMRep
+	{-# GHC_PRAGMA _M_ SMRep {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(SMRep, [Char])]), (Int -> SMRep -> [Char] -> [Char]), ([Char] -> [([SMRep], [Char])]), ([SMRep] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (SMRep), _CONSTM_ Text showsPrec (SMRep), _CONSTM_ Text readList (SMRep), _CONSTM_ Text showList (SMRep)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(SMRep, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "ASL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

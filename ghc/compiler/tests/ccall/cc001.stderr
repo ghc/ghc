@@ -1,0 +1,188 @@
+Typechecked:
+lit.t444 = D# 2.0000000000000000##
+lit.t443 = F# 1.0000000000000000#
+AbsBinds [] [] [(a.t439, Test.a{-r79-})]
+    {- nonrec -}
+    a.t439 :: IoWorld -> (Int, IoWorld)
+    a.t439
+	= ccall  a [Int] 
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(b.t440, Test.b{-r80-})]
+    {- nonrec -}
+    b.t440 :: Int -> IoWorld -> (Int, IoWorld)
+    b.t440
+	x.r212 = ccall  b [Int, Int] x.r212
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(c.t441, Test.c{-r81-})]
+    {- nonrec -}
+    c.t441 :: Int -> Char -> Float -> Double -> IoWorld -> (Float, IoWorld)
+    c.t441
+	x1.r213 x2.r214 x3.r215 x4.r216
+		= ccall  c [Float, Int, Char, Float, Double]
+		      x1.r213 x2.r214 x3.r215 x4.r216
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(d.t442, Test.d{-r82-})]
+    {- nonrec -}
+    d.t442 :: IoWorld -> (Float, IoWorld)
+    d.t442
+	= (thenIO{-r102-} [Int, Float])
+	      Test.a{-r79-}
+	      (\ x.r217 -> (thenIO{-r102-} [Int, Float])
+			       (Test.b{-r80-} x.r217)
+			       (\ y.r218 -> Test.c{-r81-}
+						y.r218 'f' lit.t443 lit.t444))
+{- nonrec -}
+{- nonrec -}
+Desugared:
+{- plain CoRec -}
+lit.t444 :: Double
+_NI_
+lit.t444 = (\ tpl.d0# -> D#! tpl.d0#) 2.0000000000000000##
+lit.t443 :: Float
+_NI_
+lit.t443 = (\ tpl.d1# -> F#! tpl.d1#) 1.0000000000000000#
+Test.a{-r79-} :: IoWorld -> (Int, IoWorld)
+_NI_
+Test.a{-r79-} =
+    \ ds.d2 ->
+	case
+	    (case
+		 (case ds.d2 of {
+		    IoWorld ds.d3# -> ds.d3#
+		  })
+	     of {
+	       a.d8# -> ( _CCALL_ a [] Int# )! a.d8#
+	     })
+	of {
+	  IntPrimAndIoWorld ds.d4#  ds.d5# ->
+	      let {
+		a.d6 :: Int
+		_NI_
+		a.d6 = I#! ds.d4# } in
+	      let {
+		a.d7 :: IoWorld
+		_NI_
+		a.d7 = IoWorld! ds.d5#
+	      } in  Tup2! Int IoWorld a.d6 a.d7
+	}
+Test.b{-r80-} :: Int -> IoWorld -> (Int, IoWorld)
+_NI_
+Test.b{-r80-} =
+    \ x.r212  ds.d9 ->
+	case
+	    (case
+		 (case ds.d9 of {
+		    IoWorld ds.d10# -> ds.d10#
+		  })
+	     of {
+	       a.d16# ->
+		   case
+		       (case x.r212 of {
+			  I# ds.d11# -> ds.d11#
+			})
+		   of {
+		     a.d17# -> ( _CCALL_ b [Int#] Int# )! a.d16# a.d17#
+		   }
+	     })
+	of {
+	  IntPrimAndIoWorld ds.d12#  ds.d13# ->
+	      let {
+		a.d14 :: Int
+		_NI_
+		a.d14 = I#! ds.d12# } in
+	      let {
+		a.d15 :: IoWorld
+		_NI_
+		a.d15 = IoWorld! ds.d13#
+	      } in  Tup2! Int IoWorld a.d14 a.d15
+	}
+Test.c{-r81-} :: Int -> Char -> Float -> Double -> IoWorld -> (Float, IoWorld)
+_NI_
+Test.c{-r81-} =
+    \ x1.r213  x2.r214  x3.r215  x4.r216  ds.d18 ->
+	case
+	    (case
+		 (case ds.d18 of {
+		    IoWorld ds.d19# -> ds.d19#
+		  })
+	     of {
+	       a.d28# ->
+		   case
+		       (case x1.r213 of {
+			  I# ds.d20# -> ds.d20#
+			})
+		   of {
+		     a.d29# ->
+			 case
+			     (case x2.r214 of {
+				C# ds.d21# -> ds.d21#
+			      })
+			 of {
+			   a.d30# ->
+			       case
+				   (case x3.r215 of {
+				      F# ds.d22# -> ds.d22#
+				    })
+			       of {
+				 a.d31# ->
+				     case
+					 (case x4.r216 of {
+					    D# ds.d23# -> ds.d23#
+					  })
+				     of {
+				       a.d32# ->
+					   ( _CCALL_ c [Int#,
+							Char#,
+							Float#,
+							Double#] Float# )!
+					       a.d28#
+					       a.d29#
+					       a.d30#
+					       a.d31#
+					       a.d32#
+				     }
+			       }
+			 }
+		   }
+	     })
+	of {
+	  FloatPrimAndIoWorld ds.d24#  ds.d25# ->
+	      let {
+		a.d26 :: Float
+		_NI_
+		a.d26 = F#! ds.d24# } in
+	      let {
+		a.d27 :: IoWorld
+		_NI_
+		a.d27 = IoWorld! ds.d25#
+	      } in  Tup2! Float IoWorld a.d26 a.d27
+	}
+Test.d{-r82-} :: IoWorld -> (Float, IoWorld)
+_NI_
+Test.d{-r82-} =
+    let {
+      a.d36 :: Int -> IoWorld -> (Float, IoWorld)
+      _NI_
+      a.d36 =
+	  \ x.r217 ->
+	      let {
+		a.d35 :: Int -> IoWorld -> (Float, IoWorld)
+		_NI_
+		a.d35 =
+		    \ y.r218 ->
+			(let {
+			   a.d33 :: Char
+			   _NI_
+			   a.d33 = C#! 'f'#
+			 } in  Test.c{-r81-} y.r218 a.d33) lit.t443 lit.t444
+	      } in 
+		(let {
+		   a.d34 :: IoWorld -> (Int, IoWorld)
+		   _NI_
+		   a.d34 = Test.b{-r80-} x.r217
+		 } in  ((thenIO{-r102-} Int) Float) a.d34) a.d35
+    } in  ((thenIO{-r102-} Int) Float) Test.a{-r79-} a.d36
+{- end plain CoRec -}

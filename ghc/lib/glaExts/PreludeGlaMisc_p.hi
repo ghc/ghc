@@ -1,0 +1,23 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeGlaMisc where
+import PreludeBuiltin(Int(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
+import PreludeCore(Bool(..), Eq(..))
+addr2Int :: _Addr -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Addr#) -> case _#_ addr2Int# [] [u0] of { _PRIM_ (u1 :: Int#) -> _!_ I# [] [u1] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: _Addr) -> case u0 of { _ALG_ A# (u1 :: Addr#) -> case _#_ addr2Int# [] [u1] of { _PRIM_ (u2 :: Int#) -> _!_ I# [] [u2] }; _NO_DEFLT_ } _N_ #-}
+deRefStablePtr :: _StablePtr a -> _State _RealWorld -> (a, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: _StablePtr u0) (u2 :: _State _RealWorld) -> case u1 of { _ALG_ _StablePtr (u3 :: StablePtr# u0) -> case u2 of { _ALG_ S# (u4 :: State# _RealWorld) -> case _#_ deRefStablePtr# [u0] [u3, u4] of { _ALG_ StateAndPtr# (u5 :: State# _RealWorld) (u6 :: u0) -> let {(u7 :: _State _RealWorld) = _!_ S# [_RealWorld] [u5]} in _!_ _TUP_2 [u0, (_State _RealWorld)] [u6, u7]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+eqMallocPtr :: _MallocPtr -> _MallocPtr -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+freeStablePtr :: _StablePtr a -> _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: _StablePtr u0) (u2 :: _State _RealWorld) -> case u2 of { _ALG_ S# (u3 :: State# _RealWorld) -> case u1 of { _ALG_ _StablePtr (u4 :: StablePtr# u0) -> case _#_ (_ccall_ freeStablePointer { [(State# _RealWorld), (StablePtr# u0)] (_State _RealWorld) }) [] [u3, u4] of { _ALG_ S# (u5 :: State# _RealWorld) -> let {(u6 :: _State _RealWorld) = _!_ S# [_RealWorld] [u5]} in _!_ _TUP_2 [(), (_State _RealWorld)] [_TUP_0, u6]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+int2Addr :: Int -> _Addr
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Int#) -> case _#_ int2Addr# [] [u0] of { _PRIM_ (u1 :: Addr#) -> _!_ A# [] [u1] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Int) -> case u0 of { _ALG_ I# (u1 :: Int#) -> case _#_ int2Addr# [] [u1] of { _PRIM_ (u2 :: Addr#) -> _!_ A# [] [u2] }; _NO_DEFLT_ } _N_ #-}
+makeStablePtr :: a -> _State _RealWorld -> (_StablePtr a, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+performGC :: _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _ALWAYS_ \ (u0 :: _State _RealWorld) -> case u0 of { _ALG_ S# (u1 :: State# _RealWorld) -> case _#_ (_ccall_GC_ StgPerformGarbageCollection { [(State# _RealWorld)] (_State _RealWorld) }) [] [u1] of { _ALG_ S# (u2 :: State# _RealWorld) -> let {(u3 :: _State _RealWorld) = _!_ S# [_RealWorld] [u2]} in _!_ _TUP_2 [(), (_State _RealWorld)] [_TUP_0, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Eq _MallocPtr
+	{-# GHC_PRAGMA _M_ PreludeGlaMisc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(_MallocPtr -> _MallocPtr -> Bool), (_MallocPtr -> _MallocPtr -> Bool)] [_ORIG_ PreludeGlaMisc eqMallocPtr, _CONSTM_ Eq (/=) (_MallocPtr)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeGlaMisc eqMallocPtr _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

@@ -1,0 +1,113 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TyCon where
+import Class(Class, ClassOp)
+import Id(DataCon(..), Id, IdDetails)
+import IdInfo(IdInfo)
+import InstEnv(InstTemplate)
+import Maybes(Labda)
+import NameTypes(FullName, Provenance, ShortName)
+import Outputable(ExportFlag, NamedThing, Outputable)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import SrcLoc(SrcLoc)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import Unique(Unique)
+type Arity = Int
+data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+type DataCon = Id
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data FullName 	{-# GHC_PRAGMA FullName _PackedString _PackedString Provenance ExportFlag Bool SrcLoc #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data TyCon   = SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType]
+data TyVarTemplate 	{-# GHC_PRAGMA SysTyVarTemplate Unique _PackedString | UserTyVarTemplate Unique ShortName #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+cmpTyCon :: TyCon -> TyCon -> Int#
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+derivedFor :: Class -> TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _F_ _IF_ARGS_ 0 2 XC 9 \ (u0 :: Class) (u1 :: TyCon) -> case u1 of { _ALG_ _ORIG_ TyCon DataTyCon (u2 :: Unique) (u3 :: FullName) (u4 :: Int) (u5 :: [TyVarTemplate]) (u6 :: [Id]) (u7 :: [Class]) (u8 :: Bool) -> _APP_  _WRKR_ _SPEC_ _ORIG_ Util isIn [ (Class) ] [ u0, u7 ]; (u9 :: TyCon) -> _!_ False [] [] } _N_ #-}
+eqTyCon :: TyCon -> TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_ #-}
+getTyConArity :: TyCon -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getTyConDataCons :: TyCon -> [Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getTyConDerivings :: TyCon -> [Class]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 9 \ (u0 :: TyCon) -> case u0 of { _ALG_ _ORIG_ TyCon DataTyCon (u1 :: Unique) (u2 :: FullName) (u3 :: Int) (u4 :: [TyVarTemplate]) (u5 :: [Id]) (u6 :: [Class]) (u7 :: Bool) -> u6; _ORIG_ TyCon SpecTyCon (u8 :: TyCon) (u9 :: [Labda UniType]) -> _APP_  _TYAPP_  _ORIG_ Util panic { [Class] } [ _NOREP_S_ "getTyConDerivings:SpecTyCon" ]; (ua :: TyCon) -> _!_ _NIL_ [Class] [] } _N_ #-}
+getTyConFamilySize :: TyCon -> Labda Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getTyConKind :: TyCon -> [PrimKind] -> PrimKind
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 8 \ (u0 :: TyCon) (u1 :: [PrimKind]) -> case u0 of { _ALG_ _ORIG_ TyCon PrimTyCon (u2 :: Unique) (u3 :: FullName) (u4 :: Int) (u5 :: [PrimKind] -> PrimKind) -> _APP_  u5 [ u1 ]; (u6 :: TyCon) -> _!_ _ORIG_ PrimKind PtrKind [] [] } _N_ #-}
+getTyConTyVarTemplates :: TyCon -> [TyVarTemplate]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isBigTupleTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isBoxedTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isDataTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isEnumerationTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isLocalGenTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+isLocalSpecTyCon :: Bool -> TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "LS" _N_ _N_ #-}
+isPrimTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isSynTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 9 \ (u0 :: TyCon) -> case u0 of { _ALG_ _ORIG_ TyCon SynonymTyCon (u1 :: Unique) (u2 :: FullName) (u3 :: Int) (u4 :: [TyVarTemplate]) (u5 :: UniType) (u6 :: Bool) -> _!_ True [] []; _ORIG_ TyCon SpecTyCon (u7 :: TyCon) (u8 :: [Labda UniType]) -> _APP_  _TYAPP_  _ORIG_ Util panic { Bool } [ _NOREP_S_ "isSynTyCon: SpecTyCon" ]; (u9 :: TyCon) -> _!_ False [] [] } _N_ #-}
+isTupleTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isVisibleSynTyCon :: TyCon -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 8 \ (u0 :: TyCon) -> case u0 of { _ALG_ _ORIG_ TyCon SynonymTyCon (u1 :: Unique) (u2 :: FullName) (u3 :: Int) (u4 :: [TyVarTemplate]) (u5 :: UniType) (u6 :: Bool) -> u6; (u7 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { Bool } [ _NOREP_S_ "isVisibleSynTyCon" ] } _N_ #-}
+maybeCharLikeTyCon :: TyCon -> Labda Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+maybeDoubleLikeTyCon :: TyCon -> Labda Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+maybeFloatLikeTyCon :: TyCon -> Labda Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+maybeIntLikeTyCon :: TyCon -> Labda Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+maybeSingleConstructorTyCon :: TyCon -> Labda Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mkDataTyCon :: Unique -> FullName -> Int -> [TyVarTemplate] -> [Id] -> [Class] -> Bool -> TyCon
+	{-# GHC_PRAGMA _A_ 7 _U_ 2222222 _N_ _N_ _F_ _IF_ARGS_ 0 7 XXXXXXX 8 \ (u0 :: Unique) (u1 :: FullName) (u2 :: Int) (u3 :: [TyVarTemplate]) (u4 :: [Id]) (u5 :: [Class]) (u6 :: Bool) -> _!_ _ORIG_ TyCon DataTyCon [] [u0, u1, u2, u3, u4, u5, u6] _N_ #-}
+mkPrimTyCon :: Unique -> FullName -> Int -> ([PrimKind] -> PrimKind) -> TyCon
+	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: Unique) (u1 :: FullName) (u2 :: Int) (u3 :: [PrimKind] -> PrimKind) -> _!_ _ORIG_ TyCon PrimTyCon [] [u0, u1, u2, u3] _N_ #-}
+mkSpecTyCon :: TyCon -> [Labda UniType] -> TyCon
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: TyCon) (u1 :: [Labda UniType]) -> _!_ _ORIG_ TyCon SpecTyCon [] [u0, u1] _N_ #-}
+mkSynonymTyCon :: Unique -> FullName -> Int -> [TyVarTemplate] -> UniType -> Bool -> TyCon
+	{-# GHC_PRAGMA _A_ 6 _U_ 222222 _N_ _N_ _F_ _IF_ARGS_ 0 6 XXXXXX 7 \ (u0 :: Unique) (u1 :: FullName) (u2 :: Int) (u3 :: [TyVarTemplate]) (u4 :: UniType) (u5 :: Bool) -> _!_ _ORIG_ TyCon SynonymTyCon [] [u0, u1, u2, u3, u4, u5] _N_ #-}
+mkTupleTyCon :: Int -> TyCon
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int) -> _!_ _ORIG_ TyCon TupleTyCon [] [u0] _N_ #-}
+instance Eq TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool)] [_CONSTM_ Eq (==) (TyCon), _CONSTM_ Eq (/=) (TyCon)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
+instance Ord TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TyCon}}, (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> _CMP_TAG)] [_DFUN_ Eq (TyCon), _CONSTM_ Ord (<) (TyCon), _CONSTM_ Ord (<=) (TyCon), _CONSTM_ Ord (>=) (TyCon), _CONSTM_ Ord (>) (TyCon), _CONSTM_ Ord max (TyCon), _CONSTM_ Ord min (TyCon), _CONSTM_ Ord _tagCmp (TyCon)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance NamedThing TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TyCon -> ExportFlag), (TyCon -> Bool), (TyCon -> (_PackedString, _PackedString)), (TyCon -> _PackedString), (TyCon -> [_PackedString]), (TyCon -> SrcLoc), (TyCon -> Unique), (TyCon -> Bool), (TyCon -> UniType), (TyCon -> Bool)] [_CONSTM_ NamedThing getExportFlag (TyCon), _CONSTM_ NamedThing isLocallyDefined (TyCon), _CONSTM_ NamedThing getOrigName (TyCon), _CONSTM_ NamedThing getOccurrenceName (TyCon), _CONSTM_ NamedThing getInformingModules (TyCon), _CONSTM_ NamedThing getSrcLoc (TyCon), _CONSTM_ NamedThing getTheUnique (TyCon), _CONSTM_ NamedThing hasType (TyCon), _CONSTM_ NamedThing getType (TyCon), _CONSTM_ NamedThing fromPreludeCore (TyCon)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 getTheUnique = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { Unique } [ _NOREP_S_ "NamedThing.TyCon.getTheUnique" ] _N_,
+	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> Bool) } [ _NOREP_S_ "NamedThing.TyCon.hasType", u0 ] _N_,
+	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> UniType) } [ _NOREP_S_ "NamedThing.TyCon.getType", u0 ] _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+instance Outputable TyCon
+	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (TyCon) _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _S_ "SS" _N_ _N_ #-}
+

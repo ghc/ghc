@@ -1,0 +1,7 @@
+Desugared:
+ShouldSucceed.w :: for all d. [d]
+ShouldSucceed.w =
+    /\ t84 ->
+	let y.86 = /\ t85 -> Nil! t85 in
+	let a.88 = /\ t87 -> y.86 t87 in  a.88 t84
+

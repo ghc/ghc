@@ -1,0 +1,47 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\subsection[toUTCTime.lc]{toUTCTime Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+#include "timezone.h"
+
+StgAddr 
+toUTCTime(size, d)
+StgInt size;
+StgByteArray d;
+{
+    time_t t;
+    struct tm *tm;
+    static struct tm cache_tm;
+
+    switch(size) {
+	default:
+	    return NULL;
+	case 0:
+	    t = 0;
+	    break;
+	case -1:
+	    t = - (time_t) ((StgInt *)d)[0];
+	    if (t > 0) 
+		return NULL;
+	    break;
+	case 1:
+	    t = (time_t) ((StgInt *)d)[0];
+	    if (t < 0) 
+		return NULL;
+	    break;
+	}
+    tm = gmtime(&t);
+    
+    if (tm == NULL)
+	return NULL;
+
+    cache_tm = *tm;
+    return &cache_tm;
+}
+
+\end{code}

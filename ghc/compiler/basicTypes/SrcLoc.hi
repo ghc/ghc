@@ -1,0 +1,21 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SrcLoc where
+import Outputable(Outputable)
+import PreludePS(_PackedString)
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+mkBuiltinSrcLoc :: SrcLoc
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mkGeneratedSrcLoc :: SrcLoc
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mkSrcLoc :: _PackedString -> _PackedString -> SrcLoc
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: _PackedString) -> _!_ _ORIG_ SrcLoc SrcLoc [] [u0, u1] _N_ #-}
+mkSrcLoc2 :: _PackedString -> Int -> SrcLoc
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: Int#) -> _!_ _ORIG_ SrcLoc SrcLoc2 [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 XC 4 \ (u0 :: _PackedString) (u1 :: Int) -> case u1 of { _ALG_ I# (u2 :: Int#) -> _!_ _ORIG_ SrcLoc SrcLoc2 [] [u0, u2]; _NO_DEFLT_ } _N_ #-}
+mkUnknownSrcLoc :: SrcLoc
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+unpackSrcLoc :: SrcLoc -> (_PackedString, _PackedString)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+instance Outputable SrcLoc
+	{-# GHC_PRAGMA _M_ SrcLoc {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (SrcLoc) _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _S_ "SS" _N_ _N_ #-}
+

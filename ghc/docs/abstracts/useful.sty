@@ -1,0 +1,186 @@
+%****************************************************************
+%*								*
+%*		GENERALLY USEFUL MACROS				*
+%*								*
+%****************************************************************
+
+
+%****************************************************************
+%*								*
+%*	Some standard abbreviations				*
+%*								*
+%****************************************************************
+
+% Haskell name
+\newcommand{\Haskell}[1]{Haskell}
+
+% \ba \ea: Abbreviations for begin and end array
+%
+\newcommand{\ba}{\begin{array}}
+\newcommand{\ea}{\end{array}}
+
+
+%****************************************************************
+%*								*
+%*	Keeping text together					*
+%*								*
+%****************************************************************
+
+% Use \begin{together}	(or \bt)
+%     \end{together}	(or \et)
+%
+% to keep a paragraph together on a single page.
+
+\newenvironment{together}%
+	{\begin{flushleft}\begin{minipage}{\textwidth}}%
+	{\end{minipage}\end{flushleft}}
+
+\newcommand{\bt}{\begin{together}}
+\newcommand{\et}{\end{together}}
+
+
+%****************************************************************
+%*								*
+%*	ToDo macro (cf showtodo.sty)				*
+%*								*
+%****************************************************************
+
+\newcommand{\ToDo}[1]{}
+
+
+%****************************************************************
+%*								*
+%*	Making boxes round things				*
+%*								*
+%****************************************************************
+
+% \outline{text} typesets text in a centred framed box of the width
+% of the page.
+%
+\newcommand{\outline}[1]{
+  \begin{center}
+  \fbox{
+    \begin{minipage}{\linewidth}
+    #1
+    \end{minipage}
+  }
+  \end{center}
+}
+
+%****************************************************************
+%*								*
+%*			Math codes				*
+%*								*
+%****************************************************************
+
+% The mathcodes for the letters A, ..., Z, a, ..., z are changed to
+% generate text italic rather than math italic by default. This makes
+% multi-letter identifiers look better. The mathcode for character c
+% is set to "7000 (variable family) + "400 (text italic) + c.
+%
+
+
+%	Old Latex
+%
+%\def\@setmcodes#1#2#3{{\count0=#1 \count1=#3
+%        \loop \global\mathcode\count0=\count1 \ifnum \count0<#2
+%        \advance\count0 by1 \advance\count1 by1 \repeat}}
+%
+%\@setmcodes{`A}{`Z}{"7441}
+%\@setmcodes{`a}{`z}{"7461}
+
+
+% 	Should work with Latex 3.0 
+%
+%{\catcode`\= 11
+%    \gdef\mathrm{\use@mathgroup \=cmr \z@}
+%    %\gdef\mit{\use@mathgroup \=cmm \@ne}
+%    \gdef\mit{\use@mathgroup \=cmt \@ne}
+%    \gdef\cal{\use@mathgroup \=cmsy \tw@}
+%    }
+
+\@ifundefined{selectfont}
+  {}
+  {\newmathalphabet{\textit}
+   \addtoversion{normal}{\textit}{cmr}{m}{it}
+   \addtoversion{bold}{\textit}{cmr}{bx}{it}
+   \everymath{\textit}
+   \everydisplay{\textit}
+  }
+
+%****************************************************************
+%*                                                              *
+%*        Definitions for macros used in figures		*
+%*    These are produced by fig2dev, so we need defns for them	*
+%*                                                              *
+%****************************************************************
+
+%	These ones work for 11-pt typesetting
+
+\@ifundefined{selectfont} %DL is MS scheme present? 
+{}{
+\def\fiverm{\rm\tiny}		% Five pt
+\def\sevrm{\rm\scriptsize}	% Seven pt
+
+\def\nintt{\tt\footnotesize}
+\def\ninrm{\rm\footnotesize}
+
+\def\tenrm{\rm\small}		% Ten pt
+\def\tentt{\tt\small}		% Ten pt
+
+\def\elvrm{\rm\normalsize}	% Eleven pt
+\def\elvit{\em\normalsize}
+
+\def\twlbf{\bf\large}		% Twelve pt
+\def\twlit{\em\large}
+\def\twltt{\tt\large}
+\def\twlrm{\rm\large}
+\def\twfvtt{\tt\large}
+
+\def\frtnrm{\rm\Large}		% Fourteen pt
+\def\frtnbf{\bf\Large}
+\def\frtnit{\em\Large}
+\def\frtntt{\tt\Large}
+
+\def\svtnsf{\sf\huge}		% Seventeen pt
+
+
+% cant remember why I need these
+\def\egt{\size{8}{9} }
+\def\elv{\size{11}{12} }
+\def\five{\size{5}{7} }
+\def\fiv{\size{5}{6} }
+\def\frtn{\size{14}{15} }
+\def\nin{\size{9}{10} }
+\def\sev{\size{7}{8} }
+\def\six{\size{6}{7} }
+\def\svtn{\size{17}{18} }
+\def\ten{\size{10}{11} }
+\def\twfv{\size{25}{27} }
+\def\twl{\size{12}{14} }
+\def\twty{\size{20}{22} }
+}
+
+%****************************************************************
+%*								*
+%*	Useful symbols						*
+%*								*
+%****************************************************************
+
+
+% Semantic brackets
+%
+%	\leftsembrac	[[	left semantic bracket
+%	\rightsembrac	]]	right semantic bracket
+%	\sembrac{x}	[[x]]	enclose arg in semantic brackets
+%	\semfun{E}{x}	E[[x]]	make E curly
+%
+\newcommand{\leftsembrac}{[\![}
+\newcommand{\rightsembrac}{]\!]}
+\newcommand{\sembrac}[1]{\leftsembracb#1\rightsembrac}
+\newcommand{\semfun}[2]{{\cal #1}\db{#2}\,}	
+
+% 	\plusplus	++ run together
+%
+\def\plusplus{\mathrel{+\!\!\!+}}
+

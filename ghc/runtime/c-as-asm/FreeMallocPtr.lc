@@ -1,0 +1,21 @@
+\section[freemallocptr]{FreeMallocPtr}
+
+This is the default definition of FreeMallocPtr.  It is a file by
+itself so that the linker can choose to ignore it if it has already
+seen a definition of FreeMallocPtr.
+
+\begin{code}
+#ifndef PAR
+
+#include "rtsdefs.h"
+
+void
+FreeMallocPtr (mp)
+  StgMallocPtr mp;
+{
+    fprintf(stderr, "Error: No deallocation routine for MallocPtr %lx\n", (W_) mp);
+    EXIT(EXIT_FAILURE);
+}
+
+#endif /* not PAR */
+\end{code}

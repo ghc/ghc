@@ -1,0 +1,15 @@
+\section[SMcopying-header]{Header file for SMcopying}
+
+\begin{code}
+extern void SetCAFInfoTables PROTO(( P_ CAFlist ));
+extern void EvacuateRoots PROTO(( P_ roots[], I_ rootno ));
+extern void EvacuateAStack PROTO(( PP_ stackA, PP_ botA ));
+extern void EvacuateBStack PROTO(( P_ stackB, P_ botB, I_ *roots ));
+extern void Scavenge PROTO(());
+
+#ifdef GCdu
+extern void EvacuateCAFs PROTO(( P_ CAFlist ));
+#else /* !GCdu */
+extern void EvacAndScavengeCAFs PROTO(( P_ CAFlist, I_ *extra_words, I_ *roots ));
+#endif /* !GCdu */
+\end{code}

@@ -1,0 +1,54 @@
+#define IHaveSubdirs
+
+SUBDIRS = cvh-ds-unboxed
+
+runtests::
+	@echo '###############################################################'
+	@echo '# Validation tests for the desugarer.                         #'
+	@echo '###############################################################'
+
+FLAGS=-noC -ddump-ds -dcore-lint
+
+RunStdTest(ds001,$(GHC), $(FLAGS) ds001.hs -o2 ds001.stderr)
+RunStdTest(ds002,$(GHC), $(FLAGS) ds002.hs -o2 ds002.stderr)
+RunStdTest(ds003,$(GHC), $(FLAGS) ds003.hs -o2 ds003.stderr)
+RunStdTest(ds004,$(GHC), $(FLAGS) ds004.hs -o2 ds004.stderr)
+RunStdTest(ds005,$(GHC), $(FLAGS) ds005.hs -o2 ds005.stderr)
+RunStdTest(ds006,$(GHC), $(FLAGS) ds006.hs -o2 ds006.stderr)
+RunStdTest(ds007,$(GHC), $(FLAGS) ds007.hs -o2 ds007.stderr)
+RunStdTest(ds008,$(GHC), $(FLAGS) ds008.hs -o2 ds008.stderr)
+RunStdTest(ds009,$(GHC), $(FLAGS) ds009.hs -o2 ds009.stderr)
+RunStdTest(ds010,$(GHC), $(FLAGS) ds010.hs -o2 ds010.stderr)
+RunStdTest(ds011,$(GHC), $(FLAGS) ds011.hs -o2 ds011.stderr)
+RunStdTest(ds012,$(GHC), $(FLAGS) ds012.hs -o2 ds012.stderr)
+RunStdTest(ds013,$(GHC), $(FLAGS) ds013.hs -o2 ds013.stderr)
+
+RunStdTest(ds014,$(GHC), $(FLAGS) ds014.hs -o2 ds014.stderr)
+AsPartOfTest(ds014,@echo 'ds014a -- some things that should NOT go through -- not done yet')
+
+RunStdTest(ds015,$(GHC), $(FLAGS) ds015.hs -o2 ds015.stderr)
+RunStdTest(ds016,$(GHC), $(FLAGS) ds016.hs -o2 ds016.stderr)
+RunStdTest(ds017,$(GHC), $(FLAGS) ds017.hs -o2 ds017.stderr)
+RunStdTest(ds018,$(GHC), $(FLAGS) ds018.hs -o2 ds018.stderr)
+RunStdTest(ds019,$(GHC), $(FLAGS) ds019.hs -o2 ds019.stderr)
+RunStdTest(ds020,$(GHC), $(FLAGS) ds020.hs -o2 ds020.stderr)
+RunStdTest(ds021,$(GHC), $(FLAGS) ds021.hs -o2 ds021.stderr)
+RunStdTest(ds022,$(GHC), $(FLAGS) ds022.hs -o2 ds022.stderr)
+RunStdTest(ds023,$(GHC), $(FLAGS) ds023.hs -o2 ds023.stderr)
+RunStdTest(ds024,$(GHC), $(FLAGS) ds024.hs -o2 ds024.stderr)
+RunStdTest(ds025,$(GHC), $(FLAGS) ds025.hs -o2 ds025.stderr)
+RunStdTest(ds026,$(GHC), $(FLAGS) ds026.hs -o2 ds026.stderr)
+RunStdTest(ds027,$(GHC), $(FLAGS) ds027.hs -o2 ds027.stderr)
+RunStdTest(ds028,$(GHC), $(FLAGS) ds028.hs -o2 ds028.stderr)
+RunStdTest(ds029,$(GHC), $(FLAGS) ds029.hs -o2 ds029.stderr)
+RunStdTest(ds030,$(GHC), $(FLAGS) ds030.hs -dppr-all -o2 ds030.stderr)
+RunStdTest(ds031,$(GHC), $(FLAGS) ds031.hs -o2 ds031.stderr)
+RunStdTest(ds032,$(GHC), $(FLAGS) ds032.hs -o2 ds032.stderr)
+RunStdTest(ds033,$(GHC), $(FLAGS) ds033.hs -o2 ds033.stderr)
+RunStdTest(ds034,$(GHC), $(FLAGS) ds034.hs -o2 ds034.stderr)
+RunStdTest(ds035,$(GHC), -fglasgow-exts $(FLAGS) ds035.hs -o2 ds035.stderr)
+RunStdTest(ds036,$(GHC), $(FLAGS) ds036.hs -o2 ds036.stderr)
+RunStdTest(ds037,$(GHC), $(FLAGS) ds037.hs -o2 ds037.stderr)
+RunStdTest(ds038,$(GHC), $(FLAGS) ds038.hs -o2 ds038.stderr)
+RunStdTest(ds039,$(GHC), $(FLAGS) -dppr-all ds039.hs -o2 ds039.stderr)
+RunStdTest(ds040,$(GHC), $(FLAGS) ds040.hs -o2 ds040.stderr)

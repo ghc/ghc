@@ -1,0 +1,272 @@
+Parsed, Haskellised:
+module Print002 where
+infixr 9 .
+infixr 8 ^
+infixr 8 ^^
+infixr 3 &&
+infixr 2 ||
+infixr 0 $
+infixl 9 !
+infixl 9 //
+infix  1 :=
+infix  6 :+
+infixr 8 **
+infixl 7 *
+infixl 7 /
+infixl 7 `quot`
+infixl 7 `rem`
+infixl 7 `div`
+infixl 7 `mod`
+infixl 6 +
+infixl 6 -
+infix  4 ==
+infix  4 /=
+infix  4 <
+infix  4 <=
+infix  4 >=
+infix  4 >
+infixl 9 !!
+infix  5 \\
+infix  4 `elem`
+infix  4 `notElem`
+infixl 7 %
+data Foo a b c
+    = MkFoo1 a a
+    | (:##) b c
+    | MkFoo3 b b
+    | (:***) c c
+    deriving (Eq, Ord)
+class Bar a where
+    meth1 :: a -> a -> Bool
+    ///// :: a -> a -> Bool
+    meth2 :: a -> b -> Bool
+class Bar a => Bar2 a where
+f1 x y = x `MkFoo1` y
+f1a x y = MkFoo1 x y
+f2 x y = (:##) x y
+f2a x y = x :## y
+(....)
+    x y = MkFoo3 x y
+(.....)
+    x y = x `MkFoo3` y
+(<<<<)
+    x y = x :*** y
+(<<<<)
+    x y = (:***) x y
+f3a x y = meth1 x y
+f3b x y = x `meth1` y
+f3c x y = (/////) x y
+f3d x y = x ///// y
+
+Typechecked:
+meth1 = meth1
+(/////) = (/////)
+meth2 = meth2
+defm.Print002.Bar.meth1 =
+    (error) "No default method for \"Print002.Bar.defm.Print002.Bar.meth1\"\n"
+defm.Print002.Bar.///// =
+    (error) "No default method for \"Print002.Bar.defm.Print002.Bar./////\"\n"
+defm.Print002.Bar.meth2 =
+    (error) "No default method for \"Print002.Bar.defm.Print002.Bar.meth2\"\n"
+sdsel.Print002.Bar2.Print002.Bar = d.Print002.Bar.t443
+AbsBinds
+[a, b, c]
+[d.Eq.t192, d.Eq.t193, d.Eq.t194]
+[(d.Eq.t195, dfun.Eq.Print002.Foo)]
+    (d.Eq.t268, d.Eq.t192)
+    (==.t212, (==))
+    (==.t209, (==.t212))
+    (d.Eq.t269, d.Eq.t194)
+    (==.t229, (==))
+    (d.Eq.t270, d.Eq.t193)
+    (==.t226, (==))
+    (==.t246, (==.t226))
+    (==.t243, (==.t226))
+    (==.t263, (==.t229))
+    (==.t260, (==.t229))
+    d.Eq.t195 = ({-dict-} [] [==, /=])
+    (==) :: Foo a b c -> Foo a b c -> Bool
+    (==) (MkFoo1 a1 a2) (MkFoo1 b1 b2)
+		 = (a1 ==.t209 b1) && (a2 ==.t212 b2)
+    (==) (:## a1 a2) (:## b1 b2)
+		 = (a1 ==.t226 b1) && (a2 ==.t229 b2)
+    (==) (MkFoo3 a1 a2) (MkFoo3 b1 b2)
+		 = (a1 ==.t243 b1) && (a2 ==.t246 b2)
+    (==) (:*** a1 a2) (:*** b1 b2)
+		 = (a1 ==.t260 b1) && (a2 ==.t263 b2)
+    (==) a b = False
+    (/=) = defm./=
+AbsBinds
+[a, b, c]
+[d.Ord.t275, d.Ord.t276, d.Ord.t277, d.Eq.t274]
+[(d.Ord.t278, dfun.Ord.Print002.Foo)]
+    (d.Ord.t425, d.Ord.t278)
+    (cmp3.t290, cmp3)
+    (cmp3.t295, cmp3.t290)
+    (cmp3.t300, cmp3.t290)
+    (cmp3.t305, cmp3.t290)
+    (d.Ord.t426, d.Ord.t425)
+    (cmp3.t310, cmp3)
+    (cmp3.t315, cmp3.t310)
+    (d.Ord.t422, d.Ord.t275)
+    (d.Ord.t423, d.Ord.t276)
+    (d.Ord.t424, d.Ord.t277)
+    d.Ord.t278 = ({-dict-} [d.Eq.t274] [<, <=, >=, >, max, min, cmp3])
+    (<) :: Foo a b c -> Foo a b c -> Bool
+    (<) a b = cmp3.t290 True False False a b
+    (<=) :: Foo a b c -> Foo a b c -> Bool
+    (<=) a b = cmp3.t295 True True False a b
+    (>=) :: Foo a b c -> Foo a b c -> Bool
+    (>=) a b = cmp3.t300 False True True a b
+    (>) :: Foo a b c -> Foo a b c -> Bool
+    (>) a b = cmp3.t305 False False True a b
+    max :: Foo a b c -> Foo a b c -> Foo a b c
+    max a b = cmp3.t310 b a a a b
+    min :: Foo a b c -> Foo a b c -> Foo a b c
+    min a b = cmp3.t315 a a b a b
+    cmp3 =
+	let
+	  AbsBinds [tt316] [] [(cmp3, cmp3)]
+	      cmp3 :: tt316 -> tt316 -> tt316 -> Foo a b c -> Foo a b c -> tt316
+	      cmp3 lt eq gt a b
+			   = case (con2tag.Foo) a of
+			       a# -> case (con2tag.Foo) b of
+				       b# -> if a# `eqInt` b# then
+						 if a# `ltInt` b# then
+						     lt
+						 else
+						     gt
+					     else
+						 cmp3eq.t48.t419 lt eq gt a b
+			   where
+			       AbsBinds
+			       [a, b, c, tt400]
+			       [d.Ord.t402, d.Ord.t404, d.Ord.t403]
+			       [(cmp3eq, cmp3eq)]
+				   (cmp3.t344, cmp3)
+				   (cmp3.t341, cmp3.t344)
+				   (cmp3.t363, cmp3)
+				   (cmp3.t360, cmp3)
+				   (cmp3.t382, cmp3.t360)
+				   (cmp3.t379, cmp3.t360)
+				   (cmp3.t401, cmp3.t363)
+				   (cmp3.t398, cmp3.t363)
+				   cmp3eq ::
+				       tt400
+				       -> tt400
+					  -> tt400
+					     -> Foo a b c -> Foo a b c -> tt400
+				   cmp3eq
+				       lt eq gt (MkFoo1 a1 a2) (MkFoo1 b1 b2)
+					       = cmp3.t341
+						     lt
+						     (cmp3.t344 lt eq gt a2 b2)
+						     gt
+						     a1
+						     b1
+				   cmp3eq
+				       lt eq gt (:## a1 a2) (:## b1 b2)
+					       = cmp3.t360
+						     lt
+						     (cmp3.t363 lt eq gt a2 b2)
+						     gt
+						     a1
+						     b1
+				   cmp3eq
+				       lt eq gt (MkFoo3 a1 a2) (MkFoo3 b1 b2)
+					       = cmp3.t379
+						     lt
+						     (cmp3.t382 lt eq gt a2 b2)
+						     gt
+						     a1
+						     b1
+				   cmp3eq
+				       lt eq gt (:*** a1 a2) (:*** b1 b2)
+					       = cmp3.t398
+						     lt
+						     (cmp3.t401 lt eq gt a2 b2)
+						     gt
+						     a1
+						     b1
+			       cmp3eq.t48.t419 = cmp3eq
+	in cmp3
+AbsBinds [a, b, c] [] [(f1, f1)]
+    f1 :: a -> a -> Foo a b c
+    f1 x y = (MkFoo1) x y
+AbsBinds [a, b, c] [] [(f1a, f1a)]
+    f1a :: a -> a -> Foo a b c
+    f1a x y = (MkFoo1) x y
+AbsBinds [a, b, c] [] [(f2, f2)]
+    f2 :: b -> c -> Foo a b c
+    f2 x y = ((:##)) x y
+AbsBinds [a, b, c] [] [(f2a, f2a)]
+    f2a :: b -> c -> Foo a b c
+    f2a x y = ((:##)) x y
+AbsBinds [a, b, c] [] [(...., ....)]
+    (....) :: b -> b -> Foo a b c
+    (....)
+	x y = (MkFoo3) x y
+AbsBinds [a, b, c] [] [(....., .....)]
+    (.....) :: b -> b -> Foo a b c
+    (.....)
+	x y = (MkFoo3) x y
+AbsBinds [a, b, c] [] [(<<<<, <<<<)]
+    (<<<<) :: c -> c -> Foo a b c
+    (<<<<)
+	x y = ((:***)) x y
+    (<<<<)
+	x y = ((:***)) x y
+AbsBinds [a] [d.Print002.Bar.t143] [(f3a, f3a)]
+    (Print002.Bar.meth1.t142, meth1)
+    f3a :: a -> a -> Bool
+    f3a x y = Print002.Bar.meth1.t142 x y
+AbsBinds [a] [d.Print002.Bar.t151] [(f3b, f3b)]
+    (Print002.Bar.meth1.t149, meth1)
+    f3b :: a -> a -> Bool
+    f3b x y = x `Print002.Bar.meth1.t149` y
+AbsBinds [a] [d.Print002.Bar.t158] [(f3c, f3c)]
+    (Print002.Bar./////.t157, (/////))
+    f3c :: a -> a -> Bool
+    f3c x y = Print002.Bar./////.t157 x y
+AbsBinds [a] [d.Print002.Bar.t166] [(f3d, f3d)]
+    (Print002.Bar./////.t164, (/////))
+    f3d :: a -> a -> Bool
+    f3d x y = x `Print002.Bar./////.t164` y
+AbsBinds [a, b, c] [] [(con2tag.Foo, con2tag.Foo)]
+    con2tag.Foo :: Foo a b c -> IntPrim
+    con2tag.Foo
+	(MkFoo1 _ _)
+		= 0#
+    con2tag.Foo
+	(:## _ _)
+		= 1#
+    con2tag.Foo
+	(MkFoo3 _ _)
+		= 2#
+    con2tag.Foo
+	(:*** _ _)
+		= 3#
+
+=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= Print002
+interface Print002 where
+(....) :: b -> b -> Foo a b c {-# ARITY _ = 2 #-}
+(.....) :: b -> b -> Foo a b c {-# ARITY _ = 2 #-}
+(<<<<) :: c -> c -> Foo a b c {-# ARITY _ = 2 #-}
+f1 :: a -> a -> Foo a b c {-# ARITY _ = 2 #-}
+f1a :: a -> a -> Foo a b c {-# ARITY _ = 2 #-}
+f2 :: b -> c -> Foo a b c {-# ARITY _ = 2 #-}
+f2a :: b -> c -> Foo a b c {-# ARITY _ = 2 #-}
+f3a :: Bar a => a -> a -> Bool {-# ARITY _ = 1 #-}
+f3b :: Bar a => a -> a -> Bool {-# ARITY _ = 1 #-}
+f3c :: Bar a => a -> a -> Bool {-# ARITY _ = 1 #-}
+f3d :: Bar a => a -> a -> Bool {-# ARITY _ = 1 #-}
+class Bar a where
+    meth1 :: a -> a -> Bool
+    (/////) :: a -> a -> Bool
+    meth2 :: a -> b -> Bool
+class (Bar a) => Bar2 a
+data Foo a b c = MkFoo1 a a | (:##) b c | MkFoo3 b b | (:***) c c
+instance (Eq a, Eq b, Eq c) => Eq (Foo a b c)
+instance (Ord a, Ord b, Ord c) => Ord (Foo a b c)
+=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
+

@@ -1,0 +1,280 @@
+%
+% (c) Parade/AQUA Projects, Glasgow University, 1995
+%     Kevin Hammond, February 15th. 1995
+%
+%     This is for GUM only.
+%
+%************************************************************************
+%*                                                                      *
+\section[Unpack.lc]{Unpacking closures which have been exported to remote processors}
+%*									*
+%************************************************************************
+
+This module defines routines for unpacking closures in the parallel runtime
+system (GUM).
+
+\begin{code}
+#ifdef PAR /* whole file */
+
+#include "rtsdefs.h"
+EXTDATA_RO(FetchMe_info);
+\end{code}
+
+Local Definitions.
+
+\begin{code}
+static globalAddr PendingGABuffer[(PACK_BUFFER_SIZE-PACK_HDR_SIZE)*2];
+\end{code}
+
+@CommonUp@ commons up two closures which we have discovered to be
+variants of the same object.  One is made an indirection to the other.
+
+\begin{code}
+void
+CommonUp(src, dst)
+P_ src;
+P_ dst;
+{
+    P_ bqe;
+
+    ASSERT(src != dst);
+    switch (INFO_TYPE(INFO_PTR(src))) {
+    case INFO_SPEC_RBH_TYPE:
+	bqe = (P_) SPEC_RBH_BQ(src);
+	break;
+    case INFO_GEN_RBH_TYPE:
+	bqe = (P_) GEN_RBH_BQ(src);
+	break;
+    case INFO_FETCHME_TYPE:
+	bqe = Nil_closure;
+	break;
+    case INFO_FMBQ_TYPE:
+	bqe = (P_) FMBQ_ENTRIES(src);
+	break;
+    default:
+	/* Don't common up anything else */
+	return;
+
+    }
+    /* Note that UPD_IND does *not* awaken the bq */
+    UPD_IND(src, dst);
+    ASSERT(!IS_BIG_MOTHER(INFO_PTR(dst)));
+    if (IS_MUTABLE(INFO_PTR(bqe)))
+	AwakenBlockingQueue(bqe);
+}
+
+\end{code}
+
+@UnpackGraph@ unpacks the graph contained in a message buffer.  It
+returns a pointer to the new graph.  The @gamap@ parameter is set to
+point to an array of (oldGA,newGA) pairs which were created as a
+result of unpacking the buffer; @nGAs@ is set to the number of GA
+pairs which were created.
+
+The format of graph in the pack buffer is as defined in @Pack.lc@.
+
+\begin{code}
+P_
+UnpackGraph(buffer, gamap, nGAs)
+P_ buffer;
+globalAddr **gamap;
+W_ *nGAs;
+{
+    W_ size, ptrs, nonptrs, vhs;
+
+    P_ bufptr = buffer + PACK_HDR_SIZE;
+
+    P_ slotptr;
+
+    globalAddr ga;
+    P_ closure, existing;
+    P_ ip, oldip;
+
+    W_ bufsize;
+    P_ graphroot, graph, parent;
+    W_ pptr = 0, pptrs = 0, pvhs;
+
+    int i;
+
+    globalAddr *gaga = PendingGABuffer;
+
+    InitClosureQueue();
+
+    /* Unpack the header */
+    bufsize = buffer[0];
+
+    /* allocate heap */
+    if (bufsize > 0) {
+	graph = AllocateHeap(bufsize);
+        ASSERT(graph != NULL);
+    }
+
+    parent = NULL;
+
+    do {
+	/* This is where we will ultimately save the closure's address */
+	slotptr = bufptr;
+
+	/* First, unpack the next GA or PLC */
+	ga.weight = *bufptr++;
+
+	if (ga.weight > 0) {
+	    ga.loc.gc.gtid = *bufptr++;
+	    ga.loc.gc.slot = *bufptr++;
+	} else
+	    ga.loc.plc = (P_) *bufptr++;
+
+	/* Now unpack the closure body, if there is one */
+	if (isFixed(&ga)) {
+	  /* No more to unpack; just set closure to local address */
+#ifdef PACK_DEBUG
+	  fprintf(stderr, "Unpacked PLC at %x \n", ga.loc.plc); 
+#endif
+	  closure = ga.loc.plc;
+	} else if (isOffset(&ga)) {
+	    /* No more to unpack; just set closure to cached address */
+	    ASSERT(parent != NULL);
+	    closure = (P_) buffer[ga.loc.gc.slot];
+	} else {
+
+	    /* Now we have to build something. */
+
+	  ASSERT(bufsize > 0);
+
+	  /*
+	   * Close your eyes.  You don't want to see where we're looking. You
+	   * can't get closure info until you've unpacked the variable header,
+	   * but you don't know how big it is until you've got closure info.
+	   * So...we trust that the closure in the buffer is organized the
+	   * same way as they will be in the heap...at least up through the
+	   * end of the variable header.
+	   */
+	  ip = get_closure_info(bufptr, &size, &ptrs, &nonptrs, &vhs);
+	  
+	  /* Fill in the fixed header */
+	  for (i = 0; i < FIXED_HS; i++)
+	    graph[i] = *bufptr++;
+
+	  if (INFO_TYPE(ip) == INFO_FETCHME_TYPE)
+	    size = ptrs = nonptrs = vhs = 0;
+
+	  /* Fill in the packed variable header */
+	  for (i = 0; i < vhs; i++)
+	    graph[FIXED_HS + i] = *bufptr++;
+
+	  /* Pointers will be filled in later */
+
+	  /* Fill in the packed non-pointers */
+	  for (i = 0; i < nonptrs; i++)
+	    graph[FIXED_HS + i + vhs + ptrs] = *bufptr++;
+                
+	  /* Indirections are never packed */
+	  ASSERT(INFO_PTR(graph) != (W_) Ind_info);
+
+	  /* Add to queue for processing */
+	  QueueClosure(graph);
+	
+	  /*
+	   * Common up the new closure with any existing closure having the same
+	   * GA
+	   */
+
+	  if ((existing = GALAlookup(&ga)) == NULL) {
+	    globalAddr *newGA;
+	    /* Just keep the new object */
+#ifdef PACK_DEBUG
+	    fprintf(stderr, "Unpacking new (%x, %d, %x)\n", 
+		    ga.loc.gc.gtid, ga.loc.gc.slot, ga.weight);
+#endif
+	    closure = graph;
+	    newGA = setRemoteGA(graph, &ga, rtsTrue);
+	    if (INFO_TYPE(ip) == INFO_FETCHME_TYPE)
+	      FETCHME_GA(closure) = newGA;
+	  } else {
+	    /* Two closures, one global name.  Someone loses */
+	    oldip = (P_) INFO_PTR(existing);
+
+	    if ((INFO_TYPE(oldip) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(oldip)) &&
+		INFO_TYPE(ip) != INFO_FETCHME_TYPE) {
+
+	      /* What we had wasn't worth keeping */
+	      closure = graph;
+	      CommonUp(existing, graph);
+	    } else {
+
+	      /*
+	       * Either we already had something worthwhile by this name or
+	       * the new thing is just another FetchMe.  However, the thing we
+	       * just unpacked has to be left as-is, or the child unpacking
+	       * code will fail.  Remember that the way pointer words are
+	       * filled in depends on the info pointers of the parents being
+	       * the same as when they were packed.
+	       */
+#ifdef PACK_DEBUG
+	      fprintf(stderr, "Unpacking old (%x, %d, %x), keeping %#lx\n", 
+		      ga.loc.gc.gtid, ga.loc.gc.slot, ga.weight, existing);
+#endif
+	      closure = existing;
+	    }
+	    /* Pool the total weight in the stored ga */
+	    (void) addWeight(&ga);
+	  }
+
+	  /* Sort out the global address mapping */
+	  if ((IS_THUNK(ip) && IS_UPDATABLE(ip)) || 
+	      (IS_MUTABLE(ip) && INFO_TYPE(ip) != INFO_FETCHME_TYPE)) {
+	    /* Make up new GAs for single-copy closures */
+	    globalAddr *newGA = MakeGlobal(closure, rtsTrue);
+
+	    ASSERT(closure == graph);
+
+	    /* Create an old GA to new GA mapping */
+	    *gaga++ = ga;
+	    splitWeight(gaga, newGA);
+	    ASSERT(gaga->weight == 1L << (BITS_IN(unsigned) - 1));
+	    gaga++;
+	  }
+	  graph += FIXED_HS + (size < MIN_UPD_SIZE ? MIN_UPD_SIZE : size);
+	}
+
+	/*
+	 * Set parent pointer to point to chosen closure.  If we're at the top of
+	 * the graph (our parent is NULL), then we want to arrange to return the
+	 * chosen closure to our caller (possibly in place of the allocated graph
+	 * root.)
+	 */
+	if (parent == NULL)
+	    graphroot = closure;
+	else
+	    parent[FIXED_HS + pvhs + pptr] = (W_) closure;
+
+	/* Save closure pointer for resolving offsets */
+	*slotptr = (W_) closure;
+
+	/* Locate next parent pointer */
+	pptr++;
+	while (pptr + 1 > pptrs) {
+	    parent = DeQueueClosure();
+
+	    if (parent == NULL)
+		break;
+	    else {
+		(void) get_closure_info(parent, &size, &pptrs, &nonptrs, &pvhs);
+		pptr = 0;
+	    }
+	}
+    } while (parent != NULL);
+
+    ASSERT(bufsize == 0 || graph - 1 <= SAVE_Hp);
+
+    *gamap = PendingGABuffer;
+    *nGAs = (gaga - PendingGABuffer) / 2;
+
+    /* ToDo: are we *certain* graphroot has been set??? WDP 95/07 */
+    return (graphroot);
+}
+\end{code}
+
+\begin{code}
+#endif /* PAR -- whole file */
+\end{code}

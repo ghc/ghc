@@ -1,0 +1,52 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq'.doubleeq =
+    /\ a.t16 -> \{-classdict-} [] [doubleeq.t17] -> doubleeq.t17
+{- nonrec -}
+defm.ShouldSucceed.Eq'.doubleeq =
+    /\ a.t18 ->
+	\{-dict-} d.ShouldSucceed.Eq'.t19 ->
+	    (error (a.t18 -> a.t18 -> Bool))
+		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.doubleeq\"\n"
+{- nonrec -}
+ShouldSucceed.Ord'.lt =
+    /\ a.t20 -> \{-classdict-} [d.ShouldSucceed.Eq'.t22] [lt.t21] -> lt.t21
+sdsel.ShouldSucceed.Ord'.ShouldSucceed.Eq' =
+    /\ a.t20 ->
+	\{-classdict-} [d.ShouldSucceed.Eq'.t22] [lt.t21] ->
+	    d.ShouldSucceed.Eq'.t22
+{- nonrec -}
+defm.ShouldSucceed.Ord'.lt =
+    /\ a.t23 ->
+	\{-dict-} d.ShouldSucceed.Ord'.t24 ->
+	    (error (a.t23 -> a.t23 -> Bool))
+		"No default method for \"ShouldSucceed.Ord'.defm.ShouldSucceed.Ord'.lt\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq'.Int =
+    ({-dict-} [] [const.ShouldSucceed.Eq'.Int.doubleeq])
+const.ShouldSucceed.Eq'.Int.doubleeq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq'.Int.doubleeq
+    x.r22 y.r23
+	    = True
+{- rec -}
+dfun.ShouldSucceed.Ord'.Int =
+    ({-dict-} [d.ShouldSucceed.Eq'.t13] [const.ShouldSucceed.Ord'.Int.lt])
+const.ShouldSucceed.Ord'.Int.lt :: Int -> Int -> Bool
+const.ShouldSucceed.Ord'.Int.lt
+    x.r51 y.r52
+	    = True
+d.ShouldSucceed.Eq'.t13 = dfun.ShouldSucceed.Eq'.Int
+AbsBinds
+[a.t4, ot3]
+[d.Num.t9, d.ShouldSucceed.Ord'.t10]
+[(f.t1, ShouldSucceed.f)]
+    (fromInt.t8, fromInt a.t4 d.Num.t9)
+    (lit.t7, fromInt.t8 (MkInt 1#))
+    (ShouldSucceed.Ord'.lt.t5,
+	ShouldSucceed.Ord'.lt a.t4 d.ShouldSucceed.Ord'.t10)
+    {- nonrec -}
+    f.t1 :: a.t4 -> ot3 -> Bool
+    f.t1 x.r62 y.r63
+		 | ShouldSucceed.Ord'.lt.t5 x.r62 lit.t7 = True
+		 | otherwise = False
+

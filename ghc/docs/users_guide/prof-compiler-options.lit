@@ -1,0 +1,84 @@
+%
+% Included by  prof-options.lit  and  how_to_run.lit
+%
+
+To make use of the cost centre profiling system {\em all} modules must
+be compiled and linked with the \tr{-prof} option.\index{-prof option}
+Any \tr{_scc_} constructs you've put in your source will spring to life.
+
+Without a \tr{-prof} option, your \tr{_scc_}s are ignored; so you can
+compiled \tr{_scc_}-laden code without changing it.
+
+There are a few other profiling-related compilation options.  Use them
+{\em in addition to} \tr{-prof}.  These do not have to be used
+consistently for all modules in a program.
+
+\begin{description}
+\item[\tr{-auto}:]
+\index{-auto option}
+GHC will automatically add \tr{_scc_} constructs for
+all top-level, exported functions.
+
+\item[\tr{-auto-all}:]
+\index{-auto-all option}
+{\em All} top-level functions, exported or not, will be automatically
+\tr{_scc_}'d.
+
+% secret!
+%\item[\tr{-caf-all}:]
+%\index{-caf-all option}
+%The costs of all CAFs in a module are usually attributed to one
+%``big'' CAF cost-centre. With this option, all CAFs get their own cost-centre.
+
+%\item[\tr{-dict-all}:]
+%\index{-dict-all option}
+%Similarly, this option means that all ``dictionaries'' (internal
+%constructs to support Haskell overloading) should get their own
+%cost-centre.  (Again, the costs are usually attributed to one ``big''
+%DICT cost-centre.)
+%
+%Incidentally, something is probably Bad Wrong (i.e., a GHC bug) if you
+%see big costs attributed to dictionaries.
+
+\item[\tr{-ignore-scc}:]
+\index{-ignore-scc option}
+Ignore any \tr{_scc_} constructs,
+so a module which already has \tr{_scc_}s can be
+compiled for profiling with the annotations ignored.
+
+\item[\tr{-G<group>}:]
+\index{-G<group> option}
+Specifies the \pl{<group>} to be attached to all the cost-centres
+declared in the module. If no group is specified it defaults to the
+module name.
+\end{description}
+
+%Alternative profiling semantics have also been implemented. To use
+%these the runtime system and prelude libraries must have been built
+%for the alternative profiling setup. This is done using a particular
+%UserWay setup. If your system has this been built for this profiling
+%system the alternative profiling system will normally be invoked using
+%the options:
+%\begin{description}
+%\item[\tr{-lex}:]
+%\index{-eval option}
+%for lexical profiling.
+%\item[\tr{-eval}:]
+%\index{-eval option}
+%for evaluation profiling.
+%\end{description}
+%All modules must be consistently compiled with the \tr{-lex} or
+%\tr{-eval} option instead of the \tr{-prof} option. The other
+%profiling options are still applicable.
+%
+%Finally we note that the options which dump the program source during
+%compilation may be useful to determine exactly what code is being
+%profiled. Useful options are: 
+%\begin{description}
+%\item[\tr{-ddump-ds}:] dump after desugaring. Any automatic \tr{_scc_}
+%annotations will have been added. 
+%\item[\tr{-ddump-simpl}:] dump after simplification.
+%\item[\tr{-ddump-stg}:] dump the STG-code immediately before code
+%generation. 
+%\end{description}
+

@@ -1,0 +1,124 @@
+	     The Glasgow Haskell Compiler -- version 0.23
+	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new public release of the Glasgow Haskell Compiler is now available
+(GHC, version 0.23). Binaries and sources are freely available by
+anonymous FTP; details below.
+
+Haskell is "the" standard lazy functional programming language [see
+SIGPLAN Notices, May 1992].  The current language version is 1.2.
+
+GHC is a state-of-the-art batch compiler.  For some idea of how it
+compares against the competition, see Pieter Hartel's recent revision
+of his FPCA '93 paper.  Reference attached.  Summary: we win!
+
+Highlights of what's new in GHC 0.23 since 0.22 (July 1994):
+
+  * Faster compilation times (less than 10% slower than HBC if not
+    using -O [on a Sun4]).
+
+  * Produces 10-15% smaller executables. The main compiler binary is
+    1MB smaller than in 0.22.
+
+  * >>> USER-VISIBLE changes <<< to "monadic I/O", because we are
+    switching to the Haskell 1.3 *draft* I/O proposal.  Please see the
+    relevant bit of the User's Guide before doing monadic I/O things
+    with 0.23.
+
+  * Native-code generator for DEC Alphas.
+
+  * A _selective_ lambda lifter.
+
+  * The yacc-based parser is now called directly from Haskell.
+
+  * Configuration changed enough that "the same old thing" *won't* work.
+    Configuring binary distributions should be trivial now.
+
+  * Quite a few bugs fixed; the usual big wad of code added.
+
+Please see the release notes for a complete discussion of What's New.
+
+Should you upgrade to 0.23?  If you are a contented 0.22 user,
+probably not.  Otherwise, probably yes.
+
+To run this release, you need a machine with 16+MB memory, GNU C
+(`gcc'), and `perl'.  We have seen GHC work in *some* form or fashion
+on: Sun4s, DEC Alphas, Sun3s, NeXTs, DECstations, HP-PA and SGI boxes.
+Sun4s and Alphas, our development platforms, are fully supported; we
+distribute binaries for them.  The release notes give a full
+what-ports-work report.
+
+Once you have the distribution, please follow the pointers in
+ghc/README to find all of the documentation in and about this release.
+NB: preserve modification times when un-tarring (no `m' option for
+tar, please)!
+
+We run mailing lists for GHC users and bug reports; to subscribe, send
+mail to glasgow-haskell-{users,bugs}-request@dcs.glasgow.ac.uk.
+Please send bug reports to glasgow-haskell-bugs.
+
+Simon Peyton Jones
+
+Dated: 94/12/21
+
+======================================================================
+Hartel reference:
+
+@techreport{Har94g,
+	author = {P. H. Hartel},
+	title = {Benchmarking implementations of lazy functional
+		languages {II} -- Two years later},
+	institution = {Dept. of Comp. Sys, Univ. of Amsterdam},
+	type = {Technical report},
+	number = {Cs-94-21},
+	month = {Dec},
+	year = {1994}}
+
+The paper is available from ftp.fwi.uva.nl,
+file: pub/computer-systems/functional/reports/benchmarkII.ps.Z
+
+The programs are in file: pub/computer-systems/functional/packages/benchmark.tar.Z
+
+======================================================================
+How to get GHC:
+
+This release is available, in whole or in part, from the usual Haskell
+anonymous FTP sites, in the directory pub/haskell/glasgow:
+
+	ftp.dcs.glasgow.ac.uk  (130.209.240.50)
+	ftp.cs.chalmers.se     (129.16.227.140)
+	haskell.cs.yale.edu    (128.36.11.43)
+
+The Glasgow site is mirrored by src.doc.ic.ac.uk (155.198.191.4), in
+computing/programming/languages/haskell/glasgow.
+
+These are the available files (.gz files are gzipped) -- some are `on
+demand', ask if you don't see them:
+
+ghc-0.23-bin-sun4.tar.gz A binary distribution -- unpack & run!
+			For SunOS 4.1.x; assumes you have GNU C (gcc)
+
+ghc-0.23-bin-alpha.tar.gz A binary distribution -- unpack & run!
+			Built on OSF1 V2.0; assumes you have GNU C (gcc).
+
+ghc-0.23-bin-<other>.tar.gz Other binary distributions -- we will
+			make them available as we go along; they
+			will be announced on the Haskell mailing list
+			(not elsewhere).
+
+ghc-0.23-src.tar.gz	The basic source distribution; about 3MB.
+
+ghc-0.23-hc-files.tar.gz The intermediate C (.hc) files for the
+			 compiler proper, the prelude, and `Hello,
+			 world'.  About 4MB.
+
+ghc-0.23.ANNOUNCE	This file
+
+ghc-0.23.{README,RELEASE-NOTES} From the distribution; for those who
+			want to peek before FTPing...
+
+ghc-0.23-ps-docs.tar.gz	Main GHC documents in PostScript format; in
+			case your TeX setup doesn't agree with our
+			DVI files...
+			
+There are no diffs from version 0.22, as they would be monstrous.

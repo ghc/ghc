@@ -1,0 +1,27 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Rename2 where
+import AbsSyn(Module)
+import Bag(Bag)
+import CharSeq(CSeq)
+import CmdLineOpts(GlobalSwitch)
+import HsBinds(Binds, Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, FixityDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsImpExp(IE, ImportedInterface)
+import HsLit(Literal)
+import HsPat(InPat, ProtoNamePat(..))
+import Name(Name)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import ProtoName(ProtoName)
+import SrcLoc(SrcLoc)
+data Module a b 	{-# GHC_PRAGMA Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+type ProtoNamePat = InPat ProtoName
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+rnModule2 :: Module ProtoName (InPat ProtoName) -> _PackedString -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> (Module ProtoName (InPat ProtoName), Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(LLLSSSSSSLLSL)" _N_ _N_ #-}
+

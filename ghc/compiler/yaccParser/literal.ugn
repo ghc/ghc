@@ -1,0 +1,25 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_literal where
+import UgenUtil
+import Util
+%}}
+type literal;
+	integer	    : < ginteger    : stringId; >;
+	intprim	    : < gintprim    : stringId; >;
+	floatr	    : < gfloatr	    : stringId; >;
+	doubleprim  : < gdoubleprim : stringId; >;
+	floatprim   : < gfloatprim  : stringId; >;
+	charr	    : < gchar	    : hstring; >;
+	charprim    : < gcharprim   : hstring; >;
+	string	    : < gstring	    : hstring; >;
+	stringprim  : < gstringprim : hstring; >;
+	clitlit	    : < gclitlit    : stringId;
+			gclitlit_kind : stringId; >;
+	norepi	    : < gnorepi	    : stringId; >;
+	norepr	    : < gnorepr_n   : stringId; 
+			gnorepr_d   : stringId; >;
+	noreps	    : < gnoreps	    : hstring; >;
+end;

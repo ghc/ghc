@@ -1,0 +1,12 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.A.op1 = /\ a.t0 -> \{-classdict-} [d.Eq.t2] [op1.t1] -> op1.t1
+sdsel.ShouldSucceed.A.Eq =
+    /\ a.t0 -> \{-classdict-} [d.Eq.t2] [op1.t1] -> d.Eq.t2
+{- nonrec -}
+defm.ShouldSucceed.A.op1 =
+    /\ a.t3 ->
+	\{-dict-} d.ShouldSucceed.A.t4 ->
+	    (error (a.t3 -> a.t3))
+		"No default method for \"ShouldSucceed.A.defm.ShouldSucceed.A.op1\"\n"
+

@@ -1,0 +1,26 @@
+/* stuff to have before we get going */
+MsubNeededHere(stat2resid)
+
+DYN_LOADABLE_BITS = \
+	parse-gcstats.prl \
+	process-gcstats.prl
+
+MsubMakefileDependentProgramScriptTarget(PerlCmd,stat2resid,stat2resid.prl,/*no flags*/,/*Makefile*/)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTBINDIR_GHC) $(INSTLIBDIR_GHC))
+
+InstallMsubbedScriptTarget(PerlCmd,stat2resid-v-temp-name,stat2resid.prl,$(INSTBINDIR_GHC))
+/* and continuing ... */
+install::
+	$(MV) $(INSTBINDIR_GHC)/stat2resid-v-temp-name $(INSTBINDIR_GHC)/stat2resid
+	$(RM) $(INSTBINDIR_GHC)/stat2resid-v-temp-name
+
+dyn_loadable_bits : $(DYN_LOADABLE_BITS)
+
+InstallMultNonExecTargets(dyn_loadable_bits, $(DYN_LOADABLE_BITS), $(INSTLIBDIR_GHC))
+
+install :: install_dyn_loadable_bits
+
+#endif /* DoInstallGHCSystem */
+

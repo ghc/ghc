@@ -1,0 +1,26 @@
+%************************************************************************
+%*									*
+\section[ticky-ticky]{Using ``ticky-ticky'' profiling (for implementors)}
+\index{ticky-ticky profiling (implementors)}
+%*									*
+%************************************************************************
+
+(ToDo: document properly.)
+
+It is possible to compile Glasgow Haskell programs so that they will
+count lots and lots of interesting things, e.g., number of updates,
+number of data constructors entered, etc., etc.  We call this
+``ticky-ticky'' profiling,\index{ticky-ticky profiling}%
+\index{profiling, ticky-ticky} because that's the sound a Sun4 makes
+when it is running up all those counters ({\em slowly}).
+
+Ticky-ticky profiling is mainly intended for implementors; it is quite
+separate from the main ``cost-centre'' profiling system, intended for
+all users everywhere.
+
+To be able to use ticky-ticky profiling, you will need to have built
+appropriate libraries and things when you made the system.  See
+``Customising what libraries to build,'' in the installation guide.
+
+To get your compiled program to spit out the ticky-ticky numbers, use
+a \tr{-r} RTS option\index{-r RTS option}.

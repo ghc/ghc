@@ -1,0 +1,44 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.A.op1 = /\ a.t26 -> \{-classdict-} [] [op1.t27] -> op1.t27
+{- nonrec -}
+defm.ShouldSucceed.A.op1 =
+    /\ a.t28 ->
+	\{-dict-} d.ShouldSucceed.A.t29 ->
+	    (error a.t28)
+		"No default method for \"ShouldSucceed.A.defm.ShouldSucceed.A.op1\"\n"
+{- nonrec -}
+ShouldSucceed.B.op2 = /\ b.t30 -> \{-classdict-} [] [op2.t31] -> op2.t31
+{- nonrec -}
+defm.ShouldSucceed.B.op2 =
+    /\ b.t32 ->
+	\{-dict-} d.ShouldSucceed.B.t33 ->
+	    (error (b.t32 -> Int))
+		"No default method for \"ShouldSucceed.B.defm.ShouldSucceed.B.op2\"\n"
+{- rec -}
+dfun.ShouldSucceed.A.Int = ({-dict-} [] [const.ShouldSucceed.A.Int.op1])
+const.ShouldSucceed.A.Int.op1 :: Int
+const.ShouldSucceed.A.Int.op1 = lit.t7
+AbsBinds
+[a.t8]
+[d.ShouldSucceed.B.t9]
+[(d.ShouldSucceed.B.t10, dfun.ShouldSucceed.B.List)]
+    (d.ShouldSucceed.B.t25, d.ShouldSucceed.B.t10)
+    (ShouldSucceed.B.op2.t23, ShouldSucceed.B.op2 [a.t8] d.ShouldSucceed.B.t25)
+    (+.t19, plusInt)
+    {- rec -}
+    d.ShouldSucceed.B.t10 = ({-dict-} [] [op2.t11])
+    op2.t11 :: [a.t8] -> Int
+    op2.t11
+	[] = lit.t14
+    op2.t11
+	(x.r14 : xs.r15)
+		= lit.t21 +.t19 (ShouldSucceed.B.op2.t23 xs.r15)
+lit.t7 = MkInt 2#
+lit.t14 = MkInt 0#
+lit.t21 = MkInt 1#
+AbsBinds [ot2, a.t3] [d.ShouldSucceed.A.t5] [(f.t1, ShouldSucceed.f)]
+    (ShouldSucceed.A.op1.t4, ShouldSucceed.A.op1 a.t3 d.ShouldSucceed.A.t5)
+    {- nonrec -}
+    f.t1 :: ot2 -> a.t3
+    f.t1 x.r61 = ShouldSucceed.A.op1.t4

@@ -1,0 +1,657 @@
+\section[COptWraps]{Wrappers for calls to ``STG C'' routines}
+
+% this file is part of the C-as-assembler document
+
+\begin{code}
+#ifndef COPTWRAPS_H
+#define COPTWRAPS_H
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[COptWraps-portable]{Wrappers for ``portable~C''}
+%*									*
+%************************************************************************
+
+@STGCALL@ macros are used when we really have to be careful about saving
+any caller-saves STG registers.  @SAFESTGCALL@ macros are used
+when the caller has previously arranged to save/restore volatile user
+registers (vanilla, float, and double STG registers), and we only have to
+worry about the ``system'' registers (stack and heap pointers, @STK_STUB@,
+etc.).  @STGCALL_GC@ macros are used whenever the callee is going to
+need to access (and perhaps modify) some STG registers.  @ULTRASAFESTGCALL@
+is available for our own routines that we are absolutely certain will not
+damage any STG registers.
+
+In short,
+\begin{itemize}
+\item @STGCALL@ saves/restores all caller-saves STG registers.
+\item @SAFESTGCALL@ saves/restores only caller-saves STG ``system'' registers.
+\item @ULTRASAFECALL@ is a simple call, without a wrapper.
+\item @STGCALL_GC@ saves/restores {\em all} STG registers.
+\end{itemize}
+    
+Several macros are provided to handle outcalls to functions requiring from
+one to five arguments.  (If we could assume GCC, we could use macro varargs,
+but unfortunately, we have to cater to ANSI C as well.)
+
+\begin{code}
+
+#define ULTRASAFESTGCALL0(t,p,f)	    f()
+#define ULTRASAFESTGCALL1(t,p,f,a)	    f(a)
+#define ULTRASAFESTGCALL2(t,p,f,a,b)	    f(a,b)
+#define ULTRASAFESTGCALL3(t,p,f,a,b,c)	    f(a,b,c)
+#define ULTRASAFESTGCALL4(t,p,f,a,b,c,d)    f(a,b,c,d)
+#define ULTRASAFESTGCALL5(t,p,f,a,b,c,d,e)  f(a,b,c,d,e)
+
+#if ! (defined(__GNUC__) && defined(__STG_GCC_REGS__))
+
+#define STGCALL0(t,p,f)		    f()
+#define STGCALL1(t,p,f,a)	    f(a)
+#define STGCALL2(t,p,f,a,b)	    f(a,b)
+#define STGCALL3(t,p,f,a,b,c)	    f(a,b,c)
+#define STGCALL4(t,p,f,a,b,c,d)	    f(a,b,c,d)
+#define STGCALL5(t,p,f,a,b,c,d,e)   f(a,b,c,d,e)
+
+#define SAFESTGCALL0(t,p,f)	      f()
+#define SAFESTGCALL1(t,p,f,a)	      f(a)
+#define SAFESTGCALL2(t,p,f,a,b)	      f(a,b)
+#define SAFESTGCALL3(t,p,f,a,b,c)     f(a,b,c)
+#define SAFESTGCALL4(t,p,f,a,b,c,d)   f(a,b,c,d)
+#define SAFESTGCALL5(t,p,f,a,b,c,d,e) f(a,b,c,d,e)
+
+/* 
+ * Generic call_GC wrappers have gone away in favor of these partially
+ * evaluated versions.
+ */
+
+#define DO_GC(args)			    \
+    do {SaveAllStgRegs(); PerformGC(args); RestoreAllStgRegs();} while(0)
+#define DO_STACKOVERFLOW(headroom,args)	    \
+    do {SaveAllStgRegs(); StackOverflow(headroom,args); RestoreAllStgRegs();} while(0)
+#define DO_YIELD(args)		    \
+    do {SaveAllStgRegs(); Yield(args); RestoreAllStgRegs();} while(0)
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[COptWraps-optimised]{Wrappers in ``optimised~C''}
+%*									*
+%************************************************************************
+
+We {\em expect} the call-wrappery to be boring---the defaults shown
+herein will kick in--- but you never know.
+
+For example: Don't try an @STGCALL6@ on a SPARC!  That's because you
+cannot pass that many arguments to \tr{f} just by heaving them into
+\tr{%o*} registers; anything else is too painful to contemplate.
+
+\begin{code}
+#else /* __GNUC__ && __STG_GCC_REGS__ */
+
+#if !(defined(CALLER_SAVES_SYSTEM) || defined(CALLER_SAVES_USER))
+#define STGCALL0(t,p,f)		  f()
+#define STGCALL1(t,p,f,a)	  f(a)
+#define STGCALL2(t,p,f,a,b)	  f(a,b)
+#define STGCALL3(t,p,f,a,b,c)	  f(a,b,c)
+#define STGCALL4(t,p,f,a,b,c,d)	  f(a,b,c,d)
+#define STGCALL5(t,p,f,a,b,c,d,e) f(a,b,c,d,e)
+
+#else
+
+extern void callWrapper(STG_NO_ARGS);
+
+#define STGCALL0(t,p,f)	    	    \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f);})
+
+#define STGCALL1(t,p,f,a)   	    \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f,a);})
+
+#define STGCALL2(t,p,f,a,b) 	    \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f,a,b);})
+
+#define STGCALL3(t,p,f,a,b,c)	    \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f,a,b,c);})
+
+#define STGCALL4(t,p,f,a,b,c,d)	    \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f,a,b,c,d);})
+
+#define STGCALL5(t,p,f,a,b,c,d,e)   \
+    ({t (*_w)p = (t (*)p) callWrapper; (*_w)((void *)f,a,b,c,d,e);})
+
+#endif
+
+#if !defined(CALLER_SAVES_SYSTEM)
+#define SAFESTGCALL0(t,p,f)	      f()
+#define SAFESTGCALL1(t,p,f,a)	      f(a)
+#define SAFESTGCALL2(t,p,f,a,b)	      f(a,b)
+#define SAFESTGCALL3(t,p,f,a,b,c)     f(a,b,c)
+#define SAFESTGCALL4(t,p,f,a,b,c,d)   f(a,b,c,d)
+#define SAFESTGCALL5(t,p,f,a,b,c,d,e) f(a,b,c,d,e)
+
+#else
+
+extern void callWrapper_safe(STG_NO_ARGS);
+
+#define SAFESTGCALL0(t,p,f) 	    	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f);})
+
+#define SAFESTGCALL1(t,p,f,a)	    	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f,a);})
+
+#define SAFESTGCALL2(t,p,f,a,b)	    	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f,a,b);})
+
+#define SAFESTGCALL3(t,p,f,a,b,c)   	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f,a,b,c);})
+
+#define SAFESTGCALL4(t,p,f,a,b,c,d) 	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f,a,b,c,d);})
+
+#define SAFESTGCALL5(t,p,f,a,b,c,d,e)	\
+    ({t (*_w)p = (t (*)p) callWrapper_safe; (*_w)((void *)f,a,b,c,d,e);})
+
+#endif
+
+/* 
+ * Generic call_GC wrappers have gone away in favor of these partially
+ * evaluated versions.  These are only here so that we can avoid putting
+ * all of the STG register save/restore code at each call site.
+ */
+
+#ifndef CALLWRAPPER_C
+/* 
+ * We may have funny declarations in CallWrapper_C, to avoid sliding the
+ * register windows and other nastiness.
+ */
+void PerformGC_wrapper PROTO((W_));
+void StackOverflow_wrapper PROTO((W_, W_));
+void Yield_wrapper PROTO((W_));
+#endif
+
+#define DO_GC(args)			PerformGC_wrapper(args)
+#define DO_STACKOVERFLOW(headroom,args) StackOverflow_wrapper(headroom,args)
+#define DO_YIELD(args)			Yield_wrapper(args)
+
+#endif /* __GNUC__ && __STG_GCC_REGS__ */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[COptWraps-magic]{Magic assembly bits for call wrappers}
+%*									*
+%************************************************************************
+
+Call wrappers need to be able to call arbitrary functions, regardless of
+their arguments and return types.  (Okay, we actually only allow up to
+five arguments, because on the sparc it gets more complicated to handle
+any more.)  The nasty bit is that the return value can be in either an
+integer register or a floating point register, and we don't know which.
+(We {\em don't} handle structure returns, and we don't want to.)
+Still, we have to stash the result away while we restore caller-saves
+STG registers, and then we have to pass the result back to our caller
+in the end.
+
+Getting this right requires three extremely @MAGIC@ macros, no doubt
+chock full of assembly gook for the current platform.  These are
+@MAGIC_CALL_SETUP@, which gets ready for one of these magic calls,
+@MAGIC_CALL@, which performs the call and stashes away all possible
+results, and @MAGIC_RETURN@, which collects all possible results back
+up again.
+
+For example, in the sparc version, the @SETUP@ guarantees that we
+have enough space to store all of our argument registers for a wee
+bit, and it gives a `C' name to the register that we're going to use
+for the call.  (It helps to do the call in actual `C' fashion, so that
+gcc knows about register death.)  It also stashes the incoming arguments
+in the space  provided.  The @MAGIC_CALL@ then reloads the argument
+registers, rotated by one, so that the function to call is in \tr{%o5},
+calls the function in `C' fashion, and stashes away the possible return
+values (either \tr{%o0} or \tr{%f0}) on the stack.  Finally, @MAGIC_RETURN@
+ensures that \tr{%o0} and \tr{%f0} are both set to the values we stashed
+away.  Presumably, we then fall into a return instruction and our caller
+gets whatever it's after.
+
+%************************************************************************
+%*									*
+\subsubsection[alpha-magic]{Call-wrapper MAGIC for DEC Alpha}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if defined(__GNUC__) && defined(__STG_GCC_REGS__)
+
+#if alpha_dec_osf1_TARGET
+    /* Is this too specific */
+
+#define MAGIC_CALL_SETUP	\
+    long WeNeedThisSpace[7];  	\
+    double AndThisSpaceToo[6];	\
+    register void (*f)() __asm__("$21");\
+    __asm__ volatile (		\
+        "stq $16,8($30)\n"	\
+	"\tstq $17,16($30)\n"	\
+    	"\tstq $18,24($30)\n"	\
+    	"\tstq $19,32($30)\n"	\
+    	"\tstq $20,40($30)\n"	\
+    	"\tstq $21,48($30)\n"	\
+    	"\tstt $f16,56($30)\n"	\
+    	"\tstt $f17,64($30)\n"	\
+    	"\tstt $f18,72($30)\n"	\
+    	"\tstt $f19,80($30)\n"	\
+    	"\tstt $f20,88($30)\n"	\
+    	"\tstt $f21,96($30)");
+
+#define MAGIC_CALL		\
+    __asm__ volatile (		\
+	"ldq $21,8($30)\n"	\
+        "\tldq $16,16($30)\n"	\
+        "\tldq $17,24($30)\n"	\
+        "\tldq $18,32($30)\n"	\
+        "\tldq $19,40($30)\n"	\
+        "\tldq $20,48($30)\n"	\
+        "\tldt $f16,56($30)\n"	\
+        "\tldt $f17,64($30)\n"	\
+        "\tldt $f18,72($30)\n"	\
+        "\tldt $f19,80($30)\n"	\
+        "\tldt $f20,88($30)\n"	\
+        "\tldt $f21,96($30)");\
+    (*f)();   	    	    	\
+    __asm__ volatile (		\
+	"stq $0,8($30)\n"	\
+        "\tstt $f0,16($30)");
+
+#define MAGIC_RETURN		\
+    __asm__ volatile (		\
+	"ldq $0,8($30)\n"	\
+        "\tldt $f0,16($30)");
+
+#define WRAPPER_NAME(f)	  /* nothing */
+
+/* 
+   Threaded code needs to be able to grab the return address, in case we have
+   an intervening context switch.
+ */
+
+#define SET_RETADDR(loc)  { register StgFunPtrFunPtr ra __asm__ ("$26"); loc = ra; }
+
+#define WRAPPER_SETUP(f)  SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)   \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* __alpha */
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[hppa-magic]{Call-wrapper MAGIC for HP-PA}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if hppa1_1_hp_hpux_TARGET
+    /* Is this too specific */
+
+#define MAGIC_CALL_SETUP	    \
+    long SavedIntArgRegs[4];	    \
+    double SavedFltArgRegs[2];	    \
+    register void (*f)() __asm__("%r28");\
+    __asm__ volatile (		    \
+        "copy %r26,%r28\n"	    \
+	"\tstw %r25,8(0,%r3)\n"	    \
+	"\tstw %r24,12(0,%r3)\n"    \
+	"\tstw %r23,16(0,%r3)\n"    \
+	"\tldo 40(%r3),%r19\n"	    \
+        "\tfstds %fr5,-16(0,%r19)\n"\
+	"\tfstds %fr7, -8(0,%r19)\n");
+
+
+#define MAGIC_CALL		    \
+    __asm__ volatile (		    \
+	"ldw 8(0,%r3),%r26\n"	    \
+	"\tldw 12(0,%r3),%r25\n"    \
+	"\tldw 16(0,%r3),%r24\n"    \
+        "\tldw -52(0,%r3),%r23\n"   \
+        "\tldw -56(0,%r3),%r19\n"   \
+	"\tstw %r19,-52(0,%r30)\n"  \
+	"\tldo 40(%r3),%r19\n"	    \
+        "\tfldds -16(0,%r19),%fr5\n"\
+	"\tfldds -8(0,%r19),%fr7\n" \
+	"\tldo -64(%r3),%r19\n"	    \
+	"\tldo -64(%r30),%r20\n"    \
+        "\tfldds -16(0,%r19),%fr4\n"\
+        "\tfstds %fr4,-16(0,%r20)\n"\
+	"\tfldds -8(0,%r19)%fr4\n"  \
+	"\tfstds %fr4,-8(0,%r19)\n" \
+        "\tfldds 0(0,%r19),%fr4\n"  \
+        "\tfstds %fr4,0(0,%r19)\n"  \
+	"\tfldds 8(0,%r19),%fr4\n"  \
+	"\tfstds %fr4,8(0,%r19)\n");\
+    (*f)();			    \
+    __asm__ volatile (		    \
+	"stw %r28,8(0,%r3)\n"	    \
+        "\tfstds %fr4,16(0,%r3)");
+
+#define MAGIC_RETURN		    \
+    __asm__ volatile (		    \
+        "\tfldds 16(0,%r3),%fr4"    \
+	"ldw 8(0,%r3),%r28\n");
+
+#define WRAPPER_NAME(f)	  /* nothing */
+
+/* 
+   Threaded code needs to be able to grab the return address, in case we have
+   an intervening context switch.
+ */
+
+#define SET_RETADDR(loc)  __asm__ volatile ("stw %%r2, %0" : "=m" ((void *)(loc)));
+
+#define WRAPPER_SETUP(f)  SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)   \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* __hppa */
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[iX86-magic]{Call-wrapper MAGIC for iX86}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if i386_TARGET_ARCH || i486_TARGET_ARCH
+
+/* modelled loosely on SPARC stuff */
+
+/* NB: no MAGIC_CALL_SETUP, MAGIC_CALL, or MAGIC_RETURN! */
+
+#define WRAPPER_NAME(f)	  __asm__("L" #f "_wrapper")
+
+#define REAL_NAME(f)   "_" #f
+
+/* when we come into PerformGC_wrapper:
+
+    - %esp holds Hp (!); get it into 80(%ebx) -- quick!
+
+    - %esp needs to be bumped by (at least) 4, because
+      C thinks an argument was passed on the stack
+      (use 64 just for fun)
+
+    - %eax holds the argument for PerformGC
+
+    - 104(%ebx) hold the return address -- address we want to
+      go back to
+
+    - 100(%ebx) holds a %esp value that we can re-load with
+      if need be
+
+*/
+#define WRAPPER_SETUP(f)		    	\
+    __asm__ volatile (			    	\
+        ".globl " REAL_NAME(f) "_wrapper\n" 	\
+        REAL_NAME(f) "_wrapper:\n"	    	\
+        "\tmovl %%esp,80(%%ebx)\n"	    	\
+        "\tmovl 100(%%ebx),%%esp\n"		\
+        "\tmovl %%eax,%0" : "=r" (args));	\
+    __asm__ volatile (				\
+	"movl %%esp,%0\n"			\
+	"\tsubl $64,%%esp"			\
+	: "=r" (SP_stack[++SP_stack_ptr]));	\
+    SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)			\
+    do {P_ foo;					\
+	RestoreAllStgRegs();			\
+	if(x) JMP_(EnterNodeCode); /* never used? */ \
+	__asm__ volatile (			\
+	"movl %1,%0\n"				\
+	"\tmovl %0,_MainRegTable+100"		\
+	: "=r" (foo) : "m" (SP_stack[SP_stack_ptr--]) ); \
+	__asm__ volatile (			\
+	"movl 80(%ebx),%esp\n"			\
+	"\tjmp *104(%ebx)" );			\
+    } while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* iX86 */
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[m68k-magic]{Call-wrapper MAGIC for m68k}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if m68k_TARGET_ARCH
+
+#define MAGIC_CALL_SETUP  \
+    int WeNeedThisSpace[5];   	    	\
+    register void (*f)() __asm__("a0");	\
+    __asm__ volatile (			\
+    "movel a6@(8),a0\n"			\
+    "\tmovel a6@(12),a6@(-20)\n" 	\
+    "\tmovel a6@(16),a6@(-16)\n"	\
+    "\tmovel a6@(20),a6@(-12)\n" 	\
+    "\tmovel a6@(24),a6@(-8)\n"		\
+    "\tmovel a6@(28),a6@(-4)");
+
+#define MAGIC_CALL	\
+    (*f)();   	    	\
+     __asm__ volatile (	\
+    "movel d0, sp@-\n"  \
+    "\tmovel d1,sp@-");
+
+#define MAGIC_RETURN	\
+    __asm__ volatile (	\
+    "movel sp@+,d0\n"	\
+    "\tmovel sp@+,d1");
+
+#define WRAPPER_NAME(f)	  /* nothing */
+
+#define WRAPPER_SETUP(f)  SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)  \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* __mc680x0__ */
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[mips-magic]{Call-wrapper MAGIC for MIPS}
+%*									*
+%************************************************************************
+
+\begin{code}
+#if mipseb_TARGET_ARCH || mipsel_TARGET_ARCH
+
+/* shift 4 arg registers down one */
+
+#define MAGIC_CALL_SETUP  \
+    register void (*f)() __asm__("$2");	\
+    __asm__ volatile (			\
+    "move $2,$4\n"			\
+    "\tmove $4,$5\n"			\
+    "\tmove $5,$6\n"			\
+    "\tmove $6,$7\n"			\
+    "\tlw $7,16($sp)\n"			\
+    "\taddu $sp,$sp,4\n"		\
+    : : : "$2" );
+
+#define MAGIC_CALL		\
+    (*f)();   	    		\
+     __asm__ volatile (		\
+    "subu $sp,$sp,4\n"		\
+    "\ts.d $f0, -8($sp)\n"  	\
+    "\tsw  $2, -12($sp)");
+
+#define MAGIC_RETURN		\
+    __asm__ volatile (		\
+    "l.d $f0, -8($sp)\n"	\
+    "\tlw  $2, -12($sp)");
+
+#define WRAPPER_NAME(f)	  /* nothing */
+
+#define WRAPPER_SETUP(f)  SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)  \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* mips */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[sparc-magic]{Call-wrapper MAGIC for SPARC}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if sparc_TARGET_ARCH
+
+#define MAGIC_CALL_SETUP	\
+    int WeNeedThisSpace[6];   	\
+    register void (*f)() __asm__("%o5");\
+    __asm__ volatile (		\
+	"std %i0,[%fp-40]\n"	\
+	"\tstd %i2,[%fp-32]\n" 	\
+	"\tstd %i4,[%fp-24]");
+
+#define MAGIC_CALL		\
+    __asm__ volatile (		\
+        "ld [%%fp-40],%%o5\n"	\
+    	"\tld [%%fp-36],%%o0\n" \
+    	"\tld [%%fp-32],%%o1\n" \
+    	"\tld [%%fp-28],%%o2\n" \
+    	"\tld [%%fp-24],%%o3\n" \
+    	"\tld [%%fp-20],%%o4"	\
+        : : : "%o0", "%o1", "%o2", "%o3", "%o4", "%o5");\
+    (*f)();   	    	    	\
+    __asm__ volatile (		\
+	"std %f0,[%fp-40]\n"	\
+    	"\tstd %o0,[%fp-32]");
+
+#define MAGIC_RETURN		\
+    __asm__ volatile (		\
+        "ldd [%fp-40],%f0\n"	\
+        "\tldd [%fp-32],%i0");
+
+/* 
+   We rename the entry points for wrappers so that we can
+   introduce a new entry point after the prologue.  We want to ensure
+   that the register window does not slide!  However, we insert a 
+   call to abort() to make gcc _believe_ that the window slid.
+ */
+
+#define WRAPPER_NAME(f)	  __asm__("L" #f "_wrapper")
+
+#ifdef solaris2_TARGET_OS
+#define REAL_NAME(f)   #f
+#else
+#define REAL_NAME(f)   "_" #f
+#endif
+
+#define WRAPPER_SETUP(f)		    \
+    __asm__ volatile (			    \
+        ".global " REAL_NAME(f) "_wrapper\n"\
+        REAL_NAME(f) "_wrapper:\n"	    \
+        "\tstd %o0,[%sp-24]\n"		    \
+        "\tmov %o7,%i7");		    \
+    SaveAllStgContext();		    \
+    __asm__ volatile (			    \
+	"ldd [%sp-24],%i0\n"		    \
+	"\tmov %i0,%o0\n"		    \
+	"\tmov %i1,%o1");
+/* 
+ * In the above, we want to ensure that the arguments are both in the %i registers
+ * and the %o registers, with the assumption that gcc will expect them now to be in
+ * one or the other.  This is a terrible hack.
+ */
+
+/* 
+   Threaded code needs to be able to grab the return address, in case we have
+   an intervening context switch.  Note that we want the address of the next
+   instruction to be executed, so we add 8 to the link address.
+ */
+
+#define SET_RETADDR(loc)	\
+    __asm__ volatile (		\
+	"add %%i7,8,%%o7\n"	\
+    	"\tst %%o7,%0"		\
+    	: "=m" (loc) : : "%o7");
+
+
+#define WRAPPER_RETURN(x)		\
+    __asm__ volatile (			\
+        "call Lwrapper_restore" #x "\n" \
+        "\tnop");			\
+    abort();
+
+/* 
+   The sparc is a big nuisance.  We use a separate function for 
+   restoring STG registers so that gcc won't try to leave anything
+   (like the address of MainRegTable) in the stack frame that we
+   didn't build.  We also use a leaf return in a format that allows us 
+   to pass %o7 in as an argument known to gcc, in the hope that its
+   value will be preserved during the reloading of STG registers.
+   Note that the current gcc (2.5.6) does not use the delay slot
+   here (%#), but perhaps future versions will.
+ */
+
+#if defined(CONCURRENT)
+#define WRAPPER_REENTER    \
+void wrapper_restore_and_reenter_node(STG_NO_ARGS)  \
+{					\
+     __asm__("Lwrapper_restore1:");	\
+    RestoreAllStgRegs();		\
+    JMP_(EnterNodeCode);		\
+}
+#else
+#define WRAPPER_REENTER
+#endif
+
+#define SEPARATE_WRAPPER_RESTORE	\
+void wrapper_restore(STG_NO_ARGS)	\
+{   	    	    	    	    	\
+    register void *o7 __asm__("%o7");	\
+    __asm__ volatile (			\
+        "Lwrapper_restore0:\n"	    	\
+	"\tmov %%i7,%0" : "=r" (o7));	\
+    RestoreAllStgRegs();		\
+    __asm__ volatile ("jmp %0+8%#" : : "r" (o7));	\
+}					\
+WRAPPER_REENTER
+
+#endif /* __sparc__ */
+
+#endif /* __GNUC__ && __STG_GCC_REGS__ */
+
+\end{code}
+
+That's all, folks.
+\begin{code}
+#endif /* ! COPTWRAPS_H */
+\end{code}

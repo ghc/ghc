@@ -1,0 +1,12 @@
+Desugared:
+Test.f :: for all d. d -> d
+Test.f = /\ o88 -> \ x.104 -> x.104
+Test.g :: for all d, e, f. d -> e -> f -> f
+Test.g =
+    /\ o97 o98 t102 -> \ x.106 y.107 z.108 ->
+	let
+	  fail.109 =
+	      (error t102)
+		  "\"ds002.hs\", line 16: pattern-matching failure [function binding]\n"S
+	in  (Test.f t102) z.108
+

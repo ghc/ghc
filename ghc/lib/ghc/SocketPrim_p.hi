@@ -1,0 +1,125 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SocketPrim where
+import PreludeGlaST(_MutableArray, _MutableByteArray)
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+import PreludePrimIO(_MVar)
+import PreludeStdIO(_Handle)
+data Family   = AF_UNSPEC | AF_UNIX | AF_INET | AF_IMPLINK | AF_PUP | AF_CHAOS | AF_NS | AF_NBS | AF_ECMA | AF_DATAKIT | AF_CCITT | AF_SNA | AF_DECnet | AF_DLI | AF_LAT | AF_HYLINK | AF_APPLETALK | AF_NIT | AF_802 | AF_OSI | AF_X25 | AF_OSINET | AF_GOSSIP | AF_IPX
+type HostAddress = _Word
+data SockAddr   = SockAddrUnix [Char] | SockAddrInet Int _Word
+data Socket 
+data SocketType   = Stream | Datagram | Raw | RDM | SeqPacket
+aNY_PORT :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
+accept :: Socket -> _State _RealWorld -> (Either IOError13 (Socket, SockAddr), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LELLL)L" _N_ _N_ #-}
+bindSocket :: Socket -> SockAddr -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(LAAAL)LL" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+connect :: Socket -> SockAddr -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 0 _U_ 122 _N_ _N_ _N_ _N_ #-}
+getPeerName :: Socket -> _State _RealWorld -> (Either IOError13 SockAddr, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P)EAAA)U(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getSocketName :: Socket -> _State _RealWorld -> (Either IOError13 SockAddr, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P)EAAA)U(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+iNADDR_ANY :: _Word
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+inet_addr :: [Char] -> _Word
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+inet_ntoa :: _Word -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+listen :: Socket -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(LAAAL)LL" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+maxListenQueue :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+packFamily :: Family -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+packSockAddr :: SockAddr -> _State _RealWorld -> (_MutableByteArray _RealWorld Int, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+packSocketType :: SocketType -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "E" _N_ _N_ #-}
+readSocket :: Socket -> Int -> _State _RealWorld -> (Either IOError13 ([Char], Int), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 0 _U_ 122 _N_ _N_ _N_ _N_ #-}
+readSocketAll :: Socket -> _State _RealWorld -> (Either IOError13 [Char], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LAAAL)L" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sClose :: Socket -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(U(P)AAAA)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sIsBound :: Socket -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAL)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sIsConnected :: Socket -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAL)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sIsListening :: Socket -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAL)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sIsReadable :: Socket -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAL)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sIsWritable :: Socket -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ SocketPrim sIsReadable _N_ #-}
+sOMAXCONN :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+shutdown :: Socket -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "U(U(P)AAAA)U(P)L" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+socket :: Family -> SocketType -> Int -> _State _RealWorld -> (Either IOError13 Socket, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 2211 _N_ _S_ "EEU(P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+socketPort :: Socket -> _State _RealWorld -> (Either IOError13 Int, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LEAAA)U(P)" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+socketToHandle :: Socket -> _State _RealWorld -> (Either IOError13 (_MVar _Handle), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P)AAAA)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+unpackFamily :: Int -> Family
+	{-# GHC_PRAGMA _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
+unpackSockAddr :: _MutableByteArray _RealWorld Int -> _State _RealWorld -> (SockAddr, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AP)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+writeSocket :: Socket -> [Char] -> _State _RealWorld -> (Either IOError13 Int, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 0 _U_ 122 _N_ _N_ _N_ _N_ #-}
+instance Eq Family
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Family -> Family -> Bool), (Family -> Family -> Bool)] [_CONSTM_ Eq (==) (Family), _CONSTM_ Eq (/=) (Family)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq SockAddr
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SockAddr -> SockAddr -> Bool), (SockAddr -> SockAddr -> Bool)] [_CONSTM_ Eq (==) (SockAddr), _CONSTM_ Eq (/=) (SockAddr)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq SocketType
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool)] [_CONSTM_ Eq (==) (SocketType), _CONSTM_ Eq (/=) (SocketType)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Ix Family
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord Family}}, ((Family, Family) -> [Family]), ((Family, Family) -> Family -> Int), ((Family, Family) -> Family -> Bool)] [_DFUN_ Ord (Family), _CONSTM_ Ix range (Family), _CONSTM_ Ix index (Family), _CONSTM_ Ix inRange (Family)] _N_
+	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
+	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ix SocketType
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord SocketType}}, ((SocketType, SocketType) -> [SocketType]), ((SocketType, SocketType) -> SocketType -> Int), ((SocketType, SocketType) -> SocketType -> Bool)] [_DFUN_ Ord (SocketType), _CONSTM_ Ix range (SocketType), _CONSTM_ Ix index (SocketType), _CONSTM_ Ix inRange (SocketType)] _N_
+	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
+	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord Family
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Family}}, (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Family), (Family -> Family -> Family), (Family -> Family -> _CMP_TAG)] [_DFUN_ Eq (Family), _CONSTM_ Ord (<) (Family), _CONSTM_ Ord (<=) (Family), _CONSTM_ Ord (>=) (Family), _CONSTM_ Ord (>) (Family), _CONSTM_ Ord max (Family), _CONSTM_ Ord min (Family), _CONSTM_ Ord _tagCmp (Family)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Ord SocketType
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq SocketType}}, (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> SocketType), (SocketType -> SocketType -> SocketType), (SocketType -> SocketType -> _CMP_TAG)] [_DFUN_ Eq (SocketType), _CONSTM_ Ord (<) (SocketType), _CONSTM_ Ord (<=) (SocketType), _CONSTM_ Ord (>=) (SocketType), _CONSTM_ Ord (>) (SocketType), _CONSTM_ Ord max (SocketType), _CONSTM_ Ord min (SocketType), _CONSTM_ Ord _tagCmp (SocketType)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Text Family
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Family, [Char])]), (Int -> Family -> [Char] -> [Char]), ([Char] -> [([Family], [Char])]), ([Family] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Family), _CONSTM_ Text showsPrec (Family), _CONSTM_ Text readList (Family), _CONSTM_ Text showList (Family)] _N_
+	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LE" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Text SocketType
+	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(SocketType, [Char])]), (Int -> SocketType -> [Char] -> [Char]), ([Char] -> [([SocketType], [Char])]), ([SocketType] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (SocketType), _CONSTM_ Text showsPrec (SocketType), _CONSTM_ Text readList (SocketType), _CONSTM_ Text showList (SocketType)] _N_
+	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LE" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

@@ -1,0 +1,230 @@
+\section[0-02-limitations]{Limitations of Glasgow \Haskell{}, release~0.02}
+
+[Scribe for the 0.02 notes: Cordy Hall.]
+
+These are the current major limitations of release~0.02,
+and a way to get around each if there is one.
+
+\begin{enumerate}
+\item
+{\em Doesn't yet track version~1.1 of the \Haskell{} Report.} 
+If you are lucky, sections might work anyway...
+\item
+{\em No automatic importation of Prelude.} You can add an import of
+module @MiniPrel@, which is in \tr{lib/prelude/MiniPrel.hi}, and
+extend your own version of this file as you wish as long as you do not
+add anything currently built into the compiler. The following are
+already built in (see \tr{compiler/typecheck/PrelCoreEnv.lhs}):
+\begin{itemize}
+\item
+the boolean data type
+\item
+the string data type
+\item
+the primitive Haskell types, @Int@, @Char@, @Integer@, @Float@, @Double@
+\item
+function type
+\item
+list type
+\item
+tuple type (up to and including 5 tuples)
+\item
+random unboxed types (@IntPrim@, @StringPrim@, etc.)
+\item
+class @Eq@ with all operations, and the following instances:
+@Integer@, @Int@, @Rational@, @List@, @Char@, 2 tuple
+\item
+class @Ord@ with all operations, and the following instances:
+@Integer@, @Int@
+\item
+class @Num@ with all operations, and the following instances:
+@Integer@, @Int@, @Rational@
+\item
+class @Fractional@ with all operations, and the following instances:
+@Integer@, @Rational@
+\item
+cons @(:)@ and @[]@
+\end{itemize}
+\item
+{\em No renaming} 
+\item
+{\em No selective export} 
+\item
+{\em No re-export of imported entities}
+\item
+{\em No contexts in data declarations}
+\item
+{\em No ambiguity resolution for numeric types}
+\item
+{\em No overloaded numeric patterns or @n+k@ patterns}
+\item
+{\em No deriving clause on data type declarations.} You can get around this
+by creating explicit instances for the data type. For example, if you wanted
+to derive @Eq@ for the data type
+
+\begin{verbatim}
+data T a = D (B a) | C
+data B b = X | Y b
+\end{verbatim}
+
+then you would write 
+
+\begin{verbatim}
+import MiniPrel
+
+data T a = D (B a) | C
+data B b = X | Y b
+
+instance (Eq a) => Eq (T a) where
+ (D x) == (D y) = x == y
+ C == C = True
+ a == b = False
+
+ a /= b = not (a == b)
+
+instance (Eq b) => Eq (B b) where
+ X == X = True
+ (Y a) == (Y b) = a == b
+ a == b = False
+
+ a /= b = not (a == b)
+\end{verbatim}
+
+The reason that @MiniPrel@ is imported is that it provides a type for @not@.
+\item
+{\em No default methods in class declarations}
+\end{enumerate}
+
+So far, operations on @Int@s will have code generated for them 
+but more work needs to be done to handle other types
+in the code generator. However, all of the above should be handled by the
+typechecker.
+
+Other limitations:
+\begin{itemize}
+\item
+Error messages need lots of improvement.
+\item
+The generated code is inefficient, and it takes a long time to generate it.
+\item
+Documentation is minimal.
+\item
+The only programs that compile and run are those for which @main@ has
+type @Int@!!!  Examples in \tr{compiler/tests/codeGen}...
+\end{itemize}
+
+\section[0-02-new-tools]{New Tools}
+
+Programs with type errors can be difficult to correct
+without some help. Unfortunately, providing this help is a difficult research
+problem. Wand's recent POPL paper suggests an interesting approach, but it
+costs overhead even when the code typechecks. Instead, we've taken the 
+following approach:
+
+\begin{enumerate}
+\item
+People who program in functional languages like interpreters because they
+   can find out how a small function behaves, and then deduce how it will 
+   behave in a larger context.
+
+\item
+ Type checking is rather like debugging, so it would be nice to give the user
+   something that would allow probing of function and expression types
+   within the context of the rest of the program.
+
+\item
+ To do this, we allow the user to attach a special type variable as a 
+   signature to any function definition or expression of interest. The 
+   typechecker can then textually substitute the type of that expression for 
+   the signature, and print out the original program.
+\end{enumerate}
+
+For example, in the following program
+
+\begin{verbatim}
+f x = ((g :: tyreq1) 'a',(g :: tyreq2) True)
+      where
+      g x = x
+\end{verbatim}
+
+the type variables @tyreq1@ and @tyreq2@ are seen as special by the compiler.
+The program printed out is:
+
+\begin{verbatim}
+f x = ((g :: Char -> Char) 'a',(g :: Bool -> Bool) True)
+      where
+      g x = x
+\end{verbatim}
+
+If the program was instead
+
+\begin{verbatim}
+f x = (g 'a', True)
+      where
+      g :: tyreq1
+      g x = x
+\end{verbatim}
+
+then the program printed out would be
+
+\begin{verbatim}
+f x = (g 'a', g True)
+      where
+      g :: a -> a
+      g x = x
+\end{verbatim}
+
+A note about these `special type variables'---the user must guarantee
+(at present) that each is unique, and that each
+begins with the string @tyreq@.
+
+At present, the typechecker fails whenever there is a type error. Once
+it can be made to succeed on errors, handing control to something
+which can deal with this situation, then it will be easy to get some
+idea of what the typechecker thought about interesting expressions in
+the code, even though these types may not yet be fully defined. {\em For
+now, this tool is really only useful if you have a program that does
+typecheck (avoiding failure) but you wish to examine some of the types
+of the program's expressions.}
+
+To use this feature, the compiler must be built using the 
+\tr{-DTYPE_ERROR_HELP}
+flag (change \tr{compiler/Jmakefile} in the appropriate place). When
+invoking the driver \tr{driver/ghc}, use the \tr{-ddump-type-error}
+flag.
+
+If you do use this and/or have any comments to make, please email to
+cvh\@dcs.glasgow.ac.uk.
+
+\section[0-02-instabilities]{Known instabilities in the compiler internals}
+
+Here are some things we know we are going to change in the internals
+of the compiler.  Fellow developers may want to query these if they
+think that they may be adversely affected.
+
+\begin{enumerate}
+\item
+A modest revision to the basic data types for variables, constructors,
+and type variables (currently in \tr{compiler/names/{Local,Global}.lhs}
+and in \tr{compiler/absSyntax/UniType.lhs}).  See
+\tr{compiler/names/Id.lhs} for our notes on what to do.
+
+\item
+A major overhaul of the pretty-printing and error-reporting machinery.
+
+\item
+A major overhaul of the ``make world'' machinery.  Ideas welcome.
+
+\item
+A fairly significant module-renaming exercise.  A proposal, not yet
+agreed, is in \tr{docs/FILE-RENAMING}.
+\end{enumerate}
+
+\section[0-02-other-problems]{Other known problems in the distribution}
+
+The GNU Info-file reader (\tr{literate/info-utils/info.c}) is an
+unusually buggy version, for some reason.
+
+The tests files have been stripped out of this release, merely to
+reduce the sheer volume of the distribution.  Let us know if you want
+the test files.

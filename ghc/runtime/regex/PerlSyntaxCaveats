@@ -1,0 +1,40 @@
+
+Simple support for Perl-like syntax in GNU Regex:
+
+If Regex is compiled with PERLSYNTAX #defined, then the following
+operators can be used in a regexp:
+
+     \s	 -- matches whitespace
+     \S  -- matches non-whitespace
+     \w  -- matches alphanumeric (+ '_')
+     \W  -- matches non-alphanumeric
+     \d  -- matches numeric
+     \D  -- matches non-numeric char.
+     \A  -- is equal to beginning-of-buffer operator
+     \Z  -- is the same as end-of-buffer operator
+	     
+Also defined these
+
+     \n  -- matches newline
+     \f  -- matches formfeed
+     \r  -- matches carriage return
+     \t  -- matches (horisontal) tab
+     \v  -- matches a vertical tab
+     \a  -- matches the alarm bell
+     \e  -- matches escape (\033)
+
+
+Perl5 regexp features not supported
+===================================
+
+* At the moment there is no support for non-greedifying operators such as * by
+  appending a ?, i.e. (pat)*? will not match pat a minimal number of times,
+  * guzzles as many chars as possible.
+
+* Not possible to quote hex(\xhh) or octal(\ooo) values.
+
+* No support for \l \L \u \U to force matching of lower or upper case patterns
+  until a \E is seen. (Same goes for \Q to quote metachars.)
+
+* None of the regexp extension mechanisms of Perl5  (?...) is supported.
+  See perlre for details of what you are missing out on.

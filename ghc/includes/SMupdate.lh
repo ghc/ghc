@@ -1,0 +1,556 @@
+\section[SMupdate.h]{Update interface}
+
+This interface provides a second level of abstraction from the storage
+manager hiding all the nasties associated with updates, indirections,
+CAFs and black holes.
+
+\begin{code}
+#ifndef SMUPDATE_H
+#define SMUPDATE_H
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[update-frames]{Pushing Update Frames}
+%*									*
+%************************************************************************
+
+If a closure is to be updated with the result of the computation an
+update frame must be pushed onto the B stack.
+
+A {\em Standard update frame} contains (in order from the top of the
+frame):
+\begin{itemize}
+\item The return vector.
+\item The closure to be updated.
+\item Saved @SuB@ (points to the next update frame).
+\item Saved @SuA@.
+\end{itemize}
+
+Note: We used to keep the {\em offsets} smashed into one word, but the
+      introduction of strict evaluation meant we could overflow this.
+
+[Don't really believe this cost-centre stuff WDP 94/07]
+
+If we are keeping track of the current cost centre we have to make the
+following additions:
+\begin{enumerate}
+\item
+The current cost centre, @CCC@, is added as an additional field to the
+update frames described above. It is the last field in the frame.
+When the update is executed the cost centre is restored.
+
+\item
+A special restore cost centre frame is introduced which does not
+contain a closure to update, but just a cost centre to restore.
+\end{enumerate}
+
+The different update frame sizes, @STD_UF_SIZE@, @CON_UF_SIZE@ and
+optionally @RCC_UF_SIZE@, and the offsets within a frame (@UF_RET@,
+@UF_UPDATEE@, etc) are declared in \tr{GhcConstants.lh}.
+
+We now have the macros to push update frames. They are passed the
+update @target@ and the A and B stack offsets at which the current top
+of stack is found. E.g. @SpX + SpX_offset@ points to the top word on
+the stack. The update frame is pushed directly above this position on
+the B stack.  @SpB + SpB_offset + xxx_UF_SIZE@ gives the topmost word
+of the update frame, from which we subtract the offsets.
+
+``A picture is worth five thousand bytes.''
+\begin{verbatim}
+A stk |	|-----------------------|
+      v	|			|
+	|-----------------------|
+	|			|
+	|-----------------------|
+	|			|
+	|-----------------------|
+	|			|
+
+
+
+	|=======================| (new update frame)
+	|   upd code or vector	| <- new SuB
+	|-----------------------|
+	|   updatee (target)	|
+	|-----------------------|
+	|   SuB (grip: SuB_off)	| (SuX_off = abs ( new SuX - prev SuX );e.g., 7 for SuB
+	|-----------------------|
+	|   SuA (grip: SuA_off)	|
+	|-----------------------|
+	|   CCC			|
+	|=======================|
+	|			| <- SpB now [really (SpB + SpB_offset)]
+	|-----------------------|
+	|			|
+	|-----------------------|
+	|			|
+	|=======================| (prev update frame [e.g.])
+	|   upd code or vector	| <- prev SuB
+	|-----------------------|
+	|   its updatee		|
+	|-----------------------|
+	|         ...		|
+	|-----------------------|
+	|         ...		|
+	|-----------------------|
+	|    its cost-centre	|
+	|=======================|
+	|			|
+      ^	|-----------------------|
+B stk |	|			|
+\end{verbatim}
+
+\begin{code}
+I_ SqueezeUpdateFrames PROTO((P_, P_, P_));
+
+EXTDATA_RO(vtbl_StdUpdFrame);
+EXTFUN(StdUpdFrameDirectReturn);
+
+EXTFUN(StdErrorCode); /* Where should this go? */
+EXTFUN(UpdErr);
+EXTFUN(IndUpdRetV0);
+EXTFUN(IndUpdRetV1);
+EXTFUN(IndUpdRetV2);
+EXTFUN(IndUpdRetV3);
+EXTFUN(IndUpdRetV4);
+EXTFUN(IndUpdRetV5);
+EXTFUN(IndUpdRetV6);
+EXTFUN(IndUpdRetV7);
+EXTFUN(IndUpdRetDir);
+
+/* 
+   Note that UNVEC() is used to select whole statements (declarations) as
+   well as labels.  Please don't put parentheses around the expansion.
+ */
+
+#ifdef __STG_REV_TBLS__
+#define RVREL(offset) (-(offset)-1)
+#define DIRECT(target) (target)
+#define UNVEC(direct,vector) direct
+#else
+#define RVREL(offset) (offset)
+#define DIRECT(target) (*(target))
+#define UNVEC(direct,vector) vector
+#endif
+
+#ifdef CONCURRENT
+/* for stack chunking */
+extern const W_ vtbl_Underflow[];
+EXTFUN(UnderflowDirectReturn);
+EXTFUN(UnderflowVect0);
+EXTFUN(UnderflowVect1);
+EXTFUN(UnderflowVect2);
+EXTFUN(UnderflowVect3);
+EXTFUN(UnderflowVect4);
+EXTFUN(UnderflowVect5);
+EXTFUN(UnderflowVect6);
+EXTFUN(UnderflowVect7);
+EXTFUN(StackUnderflowEnterNode);
+EXTFUN(CommonUnderflow);
+EXTFUN(PrimUnderflow);
+#endif	/* CONCURRENT */
+
+/* Now, we always use pointers in update frame, even in the threaded world */
+
+#define PUSH_RET(frame, rv)	    	(frame)[BREL(UF_RET)] = (W_)(rv)
+#define PUSH_UPDATEE(frame, updatee)	(frame)[BREL(UF_UPDATEE)] = (W_)(updatee)
+#define PUSH_SuB(frame, sub)		(frame)[BREL(UF_SUB)] = (W_)(sub)
+#define PUSH_SuA(frame, sua)	    	(frame)[BREL(UF_SUA)] = (W_)(sua)
+
+#if defined(USE_COST_CENTRES)
+#define	PUSH_STD_CCC(frame) (frame)[BREL(UF_COST_CENTRE)] = (W_)(CCC)
+#else
+#define	PUSH_STD_CCC(frame)
+#endif
+
+/* When GRABing, "frame" pts to an update frame */
+
+#define GRAB_RET(frame)	    	((void *)((frame)[BREL(UF_RET)]))
+#define GRAB_SuB(frame)     	((P_)((frame)[BREL(UF_SUB)]))
+#define GRAB_SuA(frame)     	((PP_)((frame)[BREL(UF_SUA)]))
+#define GRAB_UPDATEE(frame) 	((P_)((frame)[BREL(UF_UPDATEE)]))
+#define GRAB_COST_CENTRE(frame)	((CostCentre)((frame)[BREL(UF_COST_CENTRE)]))
+
+#define PUSH_STD_UPD_FRAME(target, SpA_offset, SpB_offset)	\
+    do {							\
+    	P_ __frame;					  	\
+	UPDF_STD_PUSHED();	/* ticky-ticky, spat */		\
+	__frame = SpB - BREL(SpB_offset + STD_UF_SIZE);		\
+    	PUSH_RET(__frame, RetReg);  	    	    	    	\
+	PUSH_SuB(__frame, SuB); 		    	    	\
+	PUSH_SuA(__frame, SuA); 		    	    	\
+	PUSH_UPDATEE(__frame, target);	    	    	    	\
+	PUSH_STD_CCC(__frame);				    	\
+	SuB = __frame;					    	\
+	SuA = SpA - AREL(SpA_offset);				\
+    } while(0)
+
+#define POP_STD_UPD_FRAME() 	    	    	    	    	\
+    do {    	    	    	    	    	    	    	\
+    	RetReg = GRAB_RET(SpB);	    	    	    	    	\
+        SuB = GRAB_SuB(SpB);    	    	    	    	\
+        SuA = GRAB_SuA(SpB);    	    	    	    	\
+        SpB += BREL(STD_UF_SIZE);   	    	    	    	\
+    } while(0);
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[black-hole-overwrite]{Overwriting with Black Holes}
+%*									*
+%************************************************************************
+
+An updatable closure may be overwritten with a black hole so that
+the free variables in the closure being evaluated are not kept alive.
+This may be done on entering the closure or later by the garbage
+collector.
+
+\begin{code}
+EXTDATA_RO(BH_UPD_info);
+EXTFUN(BH_UPD_entry);
+EXTDATA_RO(BH_SINGLE_info);
+EXTFUN(BH_SINGLE_entry);
+
+#define UPD_BH(heapptr,infolbl)		INFO_PTR(heapptr) = (W_) infolbl
+\end{code}
+
+The following macros are actually planted by the code generator. They
+allow us to delay the decision about if/when we black hole. It should
+be noted that single entry closures do not have update frames which
+can be traced by the garbage collector. It is only possibly to
+overwrite with a black hole on entry.
+
+In the sequential system, updatable closures are not black-holed until GC.
+When GC occurs, the only active updatable closures are those with update
+frames on the stack, so the GC routine can walk the stack frames to find
+the updatable closures to black hole (primarily for plugging space leaks).
+This approach saves the overhead of black-holing every updatable closure on
+entry.
+
+In the parallel system, however, it is essential that updatable closures
+be black-holed immediately on entry, so that other local threads will
+block when attempting to enter a closure already under evaluation.
+
+\begin{code}
+#if defined(CONCURRENT)
+#define UPD_BH_UPDATABLE(heapptr)	UPD_BH(heapptr,BH_UPD_info)
+#else
+#define UPD_BH_UPDATABLE(heapptr)	/* nothing -- BHed by GC */
+#endif
+
+#define UPD_BH_SINGLE_ENTRY(heapptr) 	UPD_BH(heapptr,BH_SINGLE_info)
+					/* BHed on entry -- GC cant do it */
+\end{code}
+
+Finally we indicate to the storage manager if it is required to trace
+closures on the B stack and overwrite them with black holes.
+
+\begin{code}
+/* define SM_DO_BH_UPDATE if B stack closures to be BHed by GC */
+#if !defined(CONCURRENT)
+#define SM_DO_BH_UPDATE	   
+#endif
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[caf-update]{Entering CAFs}
+%*									*
+%************************************************************************
+
+When we enter a CAF we update it with an indirection to a heap
+allocated black hole. The @UPD_CAF@ macro updates the CAF with an
+@CAF@ indirection to the heap allocated closure and adds the updated
+CAF to the list of CAFs. It is up to the entry code to allocate the
+black hole.
+
+The @CAF@ info table used is the @Caf_Return@ table. It will be
+overwritten at the start of garbage collection with the @Caf_Evac_Upd@
+and then reset to @Caf_Return@ during garbage collection.
+
+In the parallel case, the new black hole will be a local node
+(with a GA of 0).  This means that the code to update indirections
+does not need to check whether it's updating a CAF: the situation
+simply never arises!  If you change how this code works (e.g. to
+update CAFs across the parallel machine), you should check @UPD_IND@
+etc.
+
+\begin{code}
+
+EXTDATA_RO(Caf_info);
+EXTFUN(Caf_entry);
+
+#define UPD_CAF(cafptr, bhptr)					\
+  do {								\
+  SET_INFO_PTR(cafptr, Caf_info);				\
+  IND_CLOSURE_PTR(cafptr) = (W_) (bhptr);			\
+  IND_CLOSURE_LINK(cafptr) = (W_) StorageMgrInfo.CAFlist;	\
+  StorageMgrInfo.CAFlist = (P_) (cafptr);			\
+  } while(0)
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[updating-closures]{Updating Closures}
+%*									*
+%************************************************************************
+
+We provide three macros:
+\begin{description}
+
+\item[@UPD_IND(updclosure, heapptr)@]\ \\
+Overwrites the updatable closure @updclosure@ with an indirection to
+@heapptr@.
+
+\item[@UPD_INPLACE_NOPTRS(updclosure, livemask)@]\ \\
+This prepares the closure pointed to by @updclosure@ to be updated in-place 
+with a closure of size @MIN_UPD_SIZE@ containing no pointers.
+
+\item[@UPD_INPLACE_PTRS(updclosure, livemask)@]\ \\
+This prepares the closure pointed to by @updclosure@ to be updated in-place 
+with a closure of size @MIN_UPD_SIZE@ which may contain pointers. It checks
+whether @updclosure@ is allowed to be updated inplace. If it is not
+it:
+\begin{enumerate}
+\item Allocates space for a new closure of size @MIN_UPD_SIZE@ (by
+calling @HEAP_CHK_RETRY@);
+\item Overwrites @updclosure@ with an indirection to this new closure;
+\item Modifies @updclosure@ to point to the newly-allocated closure.
+\end{enumerate}
+
+All the macros ensure that @updclosure@ points to a closure of size
+@MIN_UPD_SIZE@ ready to be filled in with the result of the update.
+
+The code following @UPDATE_INPLACE@ is responsible for filling it in.
+This requires the header to be set, with @INPLACE_UPD_HDR@, and the
+body to be filled out.
+\end{description}
+
+The @UPD_IND@ and @UPDATE_INPLACE@ macros may have different
+definitions depending on the garbage collection schemes in use.
+
+First we have the declarations which trace updates. These are calls to
+tracing routines inserted if @DO_RUNTIME_TRACE_UPDATES@ is defined and
+printed if @traceUpdates@ is true.
+
+\begin{code}
+#if defined(DO_RUNTIME_TRACE_UPDATES)
+
+extern I_ traceUpdates;
+extern void TRACE_UPDATE_Ind();
+extern void TRACE_UPDATE_Inplace_NoPtrs();
+extern void TRACE_UPDATE_Inplace_Ptrs();
+
+#define TRACE_UPDATE(_trace) _trace
+#else
+#define TRACE_UPDATE(_trace) /* nothing */
+#endif
+\end{code}
+
+Before describing the update macros we declare the partial application
+entry and update code (See \tr{StgUpdate.lhc}).
+
+\begin{code}
+EXTDATA_RO(PAP_info);
+EXTFUN(PAP_entry);
+EXTFUN(UpdatePAP);
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[updates-standard]{Implementation of Standard Updates}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef CONCURRENT
+
+#define ALREADY_LINKED(closure)	\
+    (IS_MUTABLE(INFO_PTR(closure)) && MUT_LINK(closure) != MUT_NOT_LINKED)
+
+#if defined(GRAN)
+extern I_ AwakenBlockingQueue PROTO((P_));
+#else
+extern void AwakenBlockingQueue PROTO((P_));
+#endif
+
+#ifdef MAIN_REG_MAP
+#define AWAKEN_BQ(updatee)						\
+do { if (IS_BQ_CLOSURE(updatee))					\
+ STGCALL1(void,(void *, P_), AwakenBlockingQueue, (P_) BQ_ENTRIES(updatee)); \
+} while(0);
+#endif
+
+#ifdef NULL_REG_MAP
+#define AWAKEN_BQ(updatee)			\
+do { if (IS_BQ_CLOSURE(updatee))		\
+ AwakenBlockingQueue((P_)BQ_ENTRIES(updatee));	\
+} while(0);
+#endif
+
+#define AWAKEN_INPLACE_BQ()
+
+#else
+
+#define ALREADY_LINKED(closure)	0
+
+#define AWAKEN_BQ(updatee)
+#define AWAKEN_INPLACE_BQ()
+
+#endif
+
+EXTDATA_RO(Ind_info);
+EXTFUN(Ind_entry);
+
+#if defined(GC2s) || defined(GC1s) || defined(GCdu)
+
+#define UPD_IND(updclosure, heapptr)   				\
+	TRACE_UPDATE(TRACE_UPDATE_Ind(updclosure,heapptr));	\
+	UPDATED_SET_UPDATED(updclosure); /* subs entry count */	\
+	UPDATE_PROFILE_CLOSURE((P_)updclosure);			\
+    	AWAKEN_BQ(updclosure);					\
+	SET_INFO_PTR(updclosure, Ind_info);			\
+	IND_CLOSURE_PTR(updclosure) = (W_)(heapptr)
+
+#define UPD_INPLACE_NOPTRS(livemask)				\
+	TRACE_UPDATE(TRACE_UPDATE_Inplace_NoPtrs(Node));	\
+	UPDATED_SET_UPDATED(Node); /* subs entry count */	\
+	UPDATE_PROFILE_CLOSURE(Node);				\
+	AWAKEN_BQ(Node);
+
+#define UPD_INPLACE_PTRS(livemask)				\
+	TRACE_UPDATE(TRACE_UPDATE_Inplace_Ptrs(Node,hp));	\
+	UPDATED_SET_UPDATED(Node); /* subs entry count */	\
+	UPDATE_PROFILE_CLOSURE(Node);				\
+	AWAKEN_BQ(Node);
+
+#define INPLACE_UPD_HDR(closure,infolbl,cc,size,ptrs) 		\
+	UPD_FIXED_HDR(closure,infolbl,cc)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[updates-appel]{Implementation of Appel's Updates}
+%*									*
+%************************************************************************
+
+Appel's updates require the identification of old generation closures
+which are updated. They must be updated with an indirection and linked
+onto the list of old generation closures.
+
+\begin{code}
+#else
+#if defined(GCap) || defined(GCgn)
+
+#define UPD_IND(updclosure, heapptr)				\
+{ TRACE_UPDATE(TRACE_UPDATE_Ind(updclosure,heapptr)); 		\
+  if ( ((P_)(updclosure)) <= StorageMgrInfo.OldLim) {		\
+      UPD_OLD_IND();                                      	\
+      if(!ALREADY_LINKED(updclosure)) {				\
+          MUT_LINK(updclosure)					\
+	      = (W_) StorageMgrInfo.OldMutables; 		\
+          StorageMgrInfo.OldMutables = (P_) (updclosure);	\
+      }	    	    	    	    	    	    	    	\
+  } else { 							\
+      UPD_NEW_IND();						\
+  }								\
+  AWAKEN_BQ(updclosure);					\
+  SET_INFO_PTR(updclosure, Ind_info);				\
+  IND_CLOSURE_PTR(updclosure) = (W_)(heapptr);	    	    	\
+}
+
+/* 
+ * In threaded-land, we have to do the same nonsense as UPD_INPLACE_PTRS if
+ * we were a blocking queue on the old mutables list.
+ */
+#define UPD_INPLACE_NOPTRS(live_regs_mask)	  	\
+  TRACE_UPDATE(TRACE_UPDATE_Inplace_NoPtrs(Node));	\
+  if ( Node <= StorageMgrInfo.OldLim) { 		\
+      UPD_OLD_IN_PLACE_NOPTRS(); 	                        \
+      if(ALREADY_LINKED(Node)) {				\
+          /* We are already on the old mutables list, so we	\
+	     can't update in place any more */			\
+          HEAP_CHK(live_regs_mask, _FHS+MIN_UPD_SIZE, 0);	\
+	    /* ticky-ticky (NB: was ALLOC_UPD_CON) */		\
+          ALLOC_CON(_FHS,1,MIN_UPD_SIZE-1,_FHS+MIN_UPD_SIZE);	\
+          CC_ALLOC(CCC,_FHS+MIN_UPD_SIZE,CON_K);		\
+	  /* must awaken after any possible GC */	\
+	  AWAKEN_BQ(Node);				\
+          SET_INFO_PTR(Node, Ind_info);			\
+          IND_CLOSURE_PTR(Node) =			\
+	    (W_)(Hp-(_FHS+MIN_UPD_SIZE-1));		\
+          Node = Hp-(_FHS+MIN_UPD_SIZE-1); 		\
+      }							\
+  } else {						\
+      UPD_NEW_IN_PLACE_NOPTRS(); 	                \
+      AWAKEN_BQ(Node);					\
+  }
+
+#define UPD_INPLACE_PTRS(live_regs_mask)		\
+  TRACE_UPDATE(TRACE_UPDATE_Inplace_Ptrs(Node,hp));	\
+  if ( Node <= StorageMgrInfo.OldLim) {			\
+      /* redirect update with indirection */			\
+      UPD_OLD_IN_PLACE_PTRS(); 	                                \
+      /* Allocate */						\
+      HEAP_CHK(live_regs_mask, _FHS+MIN_UPD_SIZE, 0); 		\
+	/* ticky-ticky (NB: was ALLOC_UPD_CON) */		\
+      ALLOC_CON(_FHS,1,MIN_UPD_SIZE-1,_FHS+MIN_UPD_SIZE);	\
+      CC_ALLOC(CCC,_FHS+MIN_UPD_SIZE,CON_K);			\
+								\
+      if (!ALREADY_LINKED(Node)) {			\
+          MUT_LINK(Node)				\
+	    = (W_) StorageMgrInfo.OldMutables; 		\
+          StorageMgrInfo.OldMutables = (P_) (Node);	\
+      }	    	    	    	    	    	    	\
+      /* must awaken after any possible GC */		\
+      AWAKEN_BQ(Node);					\
+      SET_INFO_PTR(Node, Ind_info);			\
+      IND_CLOSURE_PTR(Node)				\
+	= (W_)(Hp-(_FHS+MIN_UPD_SIZE-1)); 		\
+      Node = Hp-(_FHS+MIN_UPD_SIZE-1);			\
+  } else {						\
+      UPD_NEW_IN_PLACE_PTRS(); 	                        \
+      AWAKEN_BQ(Node);					\
+  } 	    	    	    	    	    	    	\
+
+
+/* same as before */
+#define INPLACE_UPD_HDR(closure,infolbl,cc,size,ptrs) 		\
+  UPD_FIXED_HDR(closure,infolbl,cc)
+
+#endif /* GCap || GCgn */
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[freezing-arrays]{Changing Mutable Pointer closures into Immutable Closures}
+%*									*
+%************************************************************************
+
+When freezing an array of pointers we change the info table to
+indicate it is now immutable to the garbage collector. The array will
+be removed from the old generation mutable array list by the garbage\
+collector.
+
+This is only required for generational garbage collectors but we always
+do it so better profiling information is provided.
+
+\begin{code}
+#ifdef GC_MUT_REQUIRED
+#define FREEZE_MUT_HDR(freezeclosure,immutinfo) \
+	SET_INFO_PTR(freezeclosure, immutinfo)
+#else
+#define FREEZE_MUT_HDR(freezeclosure,immutinfo) \
+	SET_INFO_PTR(freezeclosure, immutinfo)
+#endif
+
+
+#endif /* SMUPDATE_H */
+\end{code}

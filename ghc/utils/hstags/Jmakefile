@@ -1,0 +1,20 @@
+PROGRAMS = hstags hstags-help
+
+SuffixRule_c_o()
+
+all:: $(PROGRAMS)
+/* stuff to have before we get going */
+MsubNeededHere(hstags)
+
+MsubMakefileDependentProgramScriptTarget(PerlCmd,hstags,hstags.prl,/*no flags*/,/*Makefile*/)
+BuildPgmFromOneCFile(hstags-help)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC) $(INSTBINDIR_GHC))
+InstallMsubbedScriptTarget(PerlCmd,hstags,hstags.prl,$(INSTBINDIR_GHC))
+InstallBinaryTarget(hstags-help, $(INSTLIBDIR_GHC))
+#endif /* DoInstall... */
+
+ExtraStuffToClean($(PROGRAMS))
+ClearTagsFile()
+PerlTagsTarget( hstags.prl )

@@ -1,0 +1,24 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CgConTbls where
+import AbsCSyn(AbstractC, CAddrMode, CStmtMacro, MagicId, RegRelative, ReturnInfo)
+import BasicLit(BasicLit)
+import CLabelInfo(CLabel)
+import CgMonad(CompilationInfo)
+import ClosureInfo(ClosureInfo)
+import CmdLineOpts(GlobalSwitch)
+import CostCentre(CostCentre)
+import FiniteMap(FiniteMap)
+import Maybes(Labda)
+import PreludePS(_PackedString)
+import PrimOps(PrimOp)
+import TCE(TCE(..))
+import TyCon(TyCon)
+import UniType(UniType)
+import UniqFM(UniqFM)
+data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
+data CompilationInfo 	{-# GHC_PRAGMA MkCompInfo (GlobalSwitch -> Bool) _PackedString #-}
+type TCE = UniqFM TyCon
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+genStaticConBits :: CompilationInfo -> [TyCon] -> FiniteMap TyCon [[Labda UniType]] -> AbstractC
+	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _N_ _N_ _N_ #-}
+

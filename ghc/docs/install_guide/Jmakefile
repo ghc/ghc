@@ -1,0 +1,7 @@
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+
+LiterateSuffixRules()
+DocProcessingSuffixRules()
+
+LitDocRootTarget(installing,lit)

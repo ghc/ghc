@@ -1,0 +1,67 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Unpretty where
+import CharSeq(CSeq, cAppendFile, cInt)
+import CmdLineOpts(GlobalSwitch)
+import PreludePS(_PackedString)
+import Pretty(PprStyle(..))
+import Stdio(_FILE)
+data CSeq 	{-# GHC_PRAGMA CNil | CAppend CSeq CSeq | CIndent Int CSeq | CNewline | CStr [Char] | CCh Char | CInt Int | CPStr _PackedString #-}
+data GlobalSwitch
+	{-# GHC_PRAGMA ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats #-}
+data PprStyle   = PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char])
+type Unpretty = CSeq
+cAppendFile :: _FILE -> CSeq -> _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "U(P)SL" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+cInt :: Int -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int) -> _!_ _ORIG_ CharSeq CInt [] [u0] _N_ #-}
+uppAbove :: CSeq -> CSeq -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+uppAboves :: [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+uppAppendFile :: _FILE -> Int -> CSeq -> _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1022 _N_ _S_ "U(P)ASL" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+uppBeside :: CSeq -> CSeq -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: CSeq) (u1 :: CSeq) -> _!_ _ORIG_ CharSeq CAppend [] [u0, u1] _N_ #-}
+uppBesides :: [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+uppCat :: [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+uppChar :: Char -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Char) -> _!_ _ORIG_ CharSeq CCh [] [u0] _N_ #-}
+uppComma :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppEquals :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppInt :: Int -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int) -> _!_ _ORIG_ CharSeq CInt [] [u0] _N_ #-}
+uppInteger :: Integer -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
+uppInterleave :: CSeq -> [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+uppIntersperse :: CSeq -> [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+uppLbrack :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppLparen :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppNest :: Int -> CSeq -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 01 _N_ _S_ "AS" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: CSeq) -> u0 _N_} _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Int) (u1 :: CSeq) -> u1 _N_ #-}
+uppNil :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CharSeq CNil [] [] _N_ #-}
+uppPStr :: _PackedString -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: _PackedString) -> _!_ _ORIG_ CharSeq CPStr [] [u0] _N_ #-}
+uppRbrack :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppRparen :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppSP :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppSemi :: CSeq
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+uppSep :: [CSeq] -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ Unpretty uppBesides _N_ #-}
+uppShow :: Int -> CSeq -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 02 _N_ _S_ "AS" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ CharSeq cShow _N_} _F_ _IF_ARGS_ 0 2 XX 2 \ (u0 :: Int) (u1 :: CSeq) -> _APP_  _ORIG_ CharSeq cShow [ u1 ] _N_ #-}
+uppStr :: [Char] -> CSeq
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [Char]) -> _!_ _ORIG_ CharSeq CStr [] [u0] _N_ #-}
+

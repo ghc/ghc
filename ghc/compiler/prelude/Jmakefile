@@ -1,0 +1,19 @@
+/* this is a standalone Jmakefile; NOT part of ghc "make world" */
+
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+HaskellSuffixRules()
+
+LitSuffixRule(.lit,/*none*/)	/* no language really */
+LitSuffixRule(.lhs,.hs)		/* Haskell */
+LitSuffixRule(.lhc,.hc)		/* Haskell assembler (C) */
+LitSuffixRule(.lprl,.prl)	/* Perl */
+LitSuffixRule(.lsh,.sh)		/* Bourne shell */
+LitSuffixRule(.lc,.c)		/* C */
+LitSuffixRule(.lh,.h)
+LitSuffixRule(.llex,.lex)	/* Lex */
+LitSuffixRule(.lflex,.flex)	/* Flex */
+
+LIT2LATEX_OPTS=-ttgrind
+
+LitDocRootTarget(prelude,lit)

@@ -1,0 +1,8 @@
+Typechecked:
+AbsBinds [ot6, ot7] [] [(x.t2, ShouldSucceed.x), (y.t3, ShouldSucceed.y)]
+    {- nonrec -}
+    (x.t2, y.t3) :: (ot6 -> ot6, ot7 -> ot7)
+    (x.t2, y.t3)
+	= (\ p.r55 -> p.r55,
+	   \ q.r56 -> q.r56)
+

@@ -1,0 +1,145 @@
+Desugared:
+Test2.brack' :: for all a. <Eq a> -> a -> a -> Int -> [a] -> ([a], [a])
+Test2.brack' =
+    /\ a -> \ dict.124 ->
+	let dict.119 = dict.124 in
+	let dict.96 = dfun.Num.Int in
+	let dict.97 = dfun.Eq.Int in
+	let dict.104 = dfun.Num.Int in
+	let dict.105 = dfun.Ord.Int in
+	let dict.113 = dfun.Num.Int in
+	let dict.114 = dfun.Ord.Int in
+	let
+	  brack'.92 =
+	      \ open.64 close.63 ds.148 xs.65 ->
+		  let
+		    fail.149 =
+			(error ([a], [a]))
+			    "\"ds036.hs\", line 24: pattern-matching failure [function binding]\n"S in
+		  let
+		    fail.151 =
+			let n.150 = MkInt! 1#
+			in 
+			  case (geInt ds.148 (MkInt! 1#)) of {
+			    True ->
+				let n.67 = minusInt ds.148 (MkInt! 1#)
+				in 
+				  case xs.65 of {
+				    Nil ->
+					let close.66 = close.63 in
+					let open.68 = open.64
+					in  MkTuple2! [a] [a] (Nil! a) (Nil! a)
+				    (:) h.70 t.73 ->
+					let close.69 = close.63 in
+					let open.72 = open.64
+					in 
+					  case
+					      ((== a) dict.119 h.70 open.72)
+					  of {
+					    True ->
+						MkTuple2!
+						    [a] [a] (Nil! a) (Nil! a)
+					    False -> fail.149
+					  }
+				  }
+			    False -> fail.149
+			  }
+		  in 
+		    case ds.148 of {
+		      MkInt ds.152 ->
+			  case ds.152 of {
+			    0# -> MkTuple2! [a] [a] (Nil! a) xs.65
+			    _ ->  fail.151
+			  }
+		    }
+	in  brack'.92
+Test2.kh ::
+    for all d, e. <Ord e> -> <Num e> -> <Ord d> -> <Num d> -> d -> e -> e
+Test2.kh =
+    /\ t141 t145 -> \ dict.147 dict.146 dict.143 dict.142 ->
+	let dict.138 = dict.146 in
+	let dict.136 = dict.138 in
+	let dict.133 = dict.147 in
+	let dict.129 = dict.142 in
+	let dict.130 = dict.143 in
+	let
+	  kh.126 =
+	      \ n.74 x.75 ->
+		  let
+		    fail.154 =
+			(error t145)
+			    "\"ds036.hs\", line 45: pattern-matching failure [function binding]\n"S in
+		  let n.157 = (fromInteger t141) dict.129 (MkInteger! 2##)
+		  in 
+		    case
+			((>= t141)
+			     dict.130
+			     n.74
+			     ((fromInteger t141) dict.129 (MkInteger! 2##)))
+		    of {
+		      True ->
+			  let
+			    n.74 =
+				(- t141)
+				    dict.129
+				    n.74
+				    ((fromInteger t141)
+					 dict.129 (MkInteger! 2##))
+			  in 
+			    case ((> t145) dict.133 x.75 n.74) of {
+			      True ->
+				  (* t145)
+				      dict.136
+				      x.75
+				      ((fromInteger t145)
+					   dict.138 (MkInteger! 2##))
+			      False -> fail.154
+			    }
+		      False ->
+			  let
+			    x.156 = (fromInteger t141) dict.142 (MkInteger! 1##)
+			  in 
+			    case
+				((>= t141)
+				     dict.143
+				     n.74
+				     ((fromInteger t141)
+					  dict.142 (MkInteger! 1##)))
+			    of {
+			      True ->
+				  let
+				    x.77 =
+					(- t141)
+					    dict.142
+					    n.74
+					    ((fromInteger t141)
+						 dict.142 (MkInteger! 1##)) in
+				  let
+				    m.155 =
+					(fromInteger t145)
+					    dict.146 (MkInteger! 1##)
+				  in 
+				    case
+					((>= t145)
+					     dict.147
+					     x.75
+					     ((fromInteger t145)
+						  dict.146 (MkInteger! 1##)))
+				    of {
+				      True ->
+					  let
+					    m.76 =
+						(- t145)
+						    dict.146
+						    x.75
+						    ((fromInteger t145)
+							 dict.146
+							 (MkInteger! 1##))
+					  in  m.76
+				      False -> fail.154
+				    }
+			      False -> fail.154
+			    }
+		    }
+	in  kh.126
+

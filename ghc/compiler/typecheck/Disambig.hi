@@ -1,0 +1,32 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Disambig where
+import Bag(Bag)
+import CharSeq(CSeq)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import ErrUtils(Error(..))
+import Id(Id)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import Maybes(Labda)
+import PreludeGlaST(_MutableArray)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TcMonad(TcResult)
+import UniType(UniType)
+import Unique(Unique, UniqueSupply)
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+data TcResult a 	{-# GHC_PRAGMA TcSucceeded a Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) | TcFailed Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) #-}
+data UniqueSupply 	{-# GHC_PRAGMA MkUniqueSupply Int# | MkNewSupply SplitUniqSupply #-}
+disambiguateDicts :: [Inst] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ()
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
+

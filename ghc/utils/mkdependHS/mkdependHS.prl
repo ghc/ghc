@@ -1,0 +1,430 @@
+# *** MSUB does some substitutions here ***
+# *** grep for $( ***
+#
+# tries to work like mkdependC
+#
+# ToDo: strip out all the .h junk
+#
+($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
+$Usage  = "usage: $Pgm: not done yet\n";
+
+$Status  = 0; # just used for exit() status
+$Verbose = '';
+$Dashdashes_seen = 0;
+
+$OrigCpp = '$(RAWCPP)';
+if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
+    $cmd  = $1;
+    $rest = $2;
+    if ( -x $cmd ) { # cool
+	$Cpp = $OrigCpp;
+    } else { # oops; try to guess
+	$GccV = `gcc -v 2>&1`;
+	if ( $GccV =~ /Reading specs from (.*)\/specs/ ) {
+	    $Cpp = "$1/cpp $rest";
+	} else {
+	    die "hscpp: don't know how to run cpp: $OrigCpp\n";
+	}
+    }
+} else {
+    $Cpp = $OrigCpp;
+}
+
+$Tmp_prefix = (( $ENV{'TMPDIR'} ) # to make tmp file names
+		? ($ENV{'TMPDIR'} . "/mkdependHS$$")
+		: "$(TMPDIR)/mkdependHS$$" );
+
+#------------------------------------------------------------------------
+# If you are adjusting paths by hand for a binary GHC distribution,
+# de-commenting the line to set GLASGOW_HASKELL_ROOT should do.
+# Or you can leave it as is, and set the environment variable externally.
+#------------------------------------------------------------------------
+# $ENV{'GLASGOW_HASKELL_ROOT'} = '/some/absolute/path/name';
+
+if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
+    $TopPwd	    = '$(TOP_PWD)';
+    $InstLibDirGhc  = '$(INSTLIBDIR_GHC)';
+    $InstDataDirGhc = '$(INSTDATADIR_GHC)';
+} else {
+    $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
+
+    if ( '$(INSTLIBDIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
+	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
+    } else {
+	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTLIBDIR_GHC).\n(Installation error)\n";
+	exit(1);
+    }
+
+    if ( '$(INSTDATADIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
+	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
+    } else {
+	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTDATADIR_GHC).\n(Installation error)\n";
+	exit(1);
+    }
+}
+
+$Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
+			     : "$TopPwd/$(CURRENT_DIR)/$(GHC_UNLIT)";
+
+$Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
+$End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
+$Obj_suffix = '.o';
+$ghc_version_info = $(PROJECTVERSION) * 100;
+@Defines = ('-D__HASKELL1__=2', "-D__GLASGOW_HASKELL__=$ghc_version_info");
+
+$Import_dirs = '.';
+%Syslibs = ();
+%StableLibs = ();
+%PreludeIfaces = ( 'Prelude', '1',
+		   'PreludeGlaST', '1',
+		   'PreludeGlaMisc', '1',
+		   'Concurrent', '1',
+		   'Parallel', '1');
+%GhcLibIfaces = (  'Bag', '1',
+		   'BitSet', '1',
+		   # CharSeq not supposed to be used by user (I think. WDP)
+		   'FiniteMap', '1',
+		   'ListSetOps', '1',
+		   'Maybes', '1',
+		   'PackedString', '1',
+		   'Regex', '1',
+		   'MatchPS', '1',
+		   'Readline', '1',
+		   'Socket', '1',
+		   'SocketPrim', '1',
+		   'BSD', '1',
+		   'Pretty', '1',
+		   'Set', '1',
+		   'Util', '1' );
+%HbcLibIfaces = (  'Algebra', '1',
+		   'Hash', '1',
+		   'ListUtil', '1',
+		   'Miranda', '1',
+		   'NameSupply', '1',
+		   'Native', '1',
+		   'Number', '1',
+		   'Parse', '1',
+		   'Pretty', '1',
+		   'Printf', '1',
+		   'QSort', '1',
+		   'Random', '1',
+		   'SimpleLex', '1',
+		   'Time', '1',
+		   'Trace', '1',
+		   'Word', '1' );
+%IO13Ifaces = (    'LibSystem', '1',
+		   'LibCPUTime', '1',
+		   'LibDirectory', '1',
+		   'LibPosix', '1',
+		   'LibTime', '1' );
+
+$Haskell_1_3 = 0; # assume Haskell 1.2, still. Changed by -fhaskell-1.3
+$Include_dirs = '-I.';
+$Col_width = 78; # ignored
+$Makefile = '';
+@Src_files = ();
+
+&mangle_command_line_args();
+
+if ( ! $Makefile && -f 'makefile' ) {
+    $Makefile = 'makefile';
+} elsif ( ! $Makefile && -f 'Makefile') {
+    $Makefile = 'Makefile';
+} else {
+    die "$Pgm: no makefile or Makefile found\n";
+}
+
+@Depend_lines = ();
+
+print STDERR "CPP defines=@Defines\n" if $Verbose;
+print STDERR "Import_dirs=$Import_dirs\n" if $Verbose;
+print STDERR "Include_dirs=$Include_dirs\n" if $Verbose;
+
+foreach $sf (@Src_files) {
+    # just like lit-inputter
+    # except it puts each file through CPP and
+    # a de-commenter (not implemented);
+    # builds up @Depend_lines
+    print STDERR "Here we go for source file: $sf\n" if $Verbose;
+    ($of = $sf) =~ s/\.l?hs$/$Obj_suffix/;
+    push(@Depend_lines, "$of : $sf\n");
+
+    # if it's a literate file, .lhs, then we de-literatize it:
+    if ( $sf !~ /\.lhs$/ ) {
+	$file_to_read = $sf;
+    } else {
+    	$file_to_read = "$Tmp_prefix.hs";
+	local($to_do) = "$Unlit $sf $file_to_read";
+	&run_something($to_do, 'unlit');
+    }
+    &slurp_file_for_imports($file_to_read, $sf);
+
+    if ( $sf =~ /\.lhs$/ ) {
+	unlink "$Tmp_prefix.hs";
+    }
+}
+
+# OK, mangle the Makefile
+unlink("$Makefile.bak");
+rename($Makefile,"$Makefile.bak");
+# now copy Makefile.bak into Makefile, rm'ing old dependencies
+# and adding the new
+open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
+open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
+select(NMKF);
+$_ = <OMKF>;
+while ($_ && $_ ne $Begin_magic_str) { # copy through, 'til Begin_magic_str
+    print $_;
+    $_ = <OMKF>;
+}
+while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
+    $_ = <OMKF>;
+}
+# insert dependencies
+print $Begin_magic_str;
+print @Depend_lines;
+print $End_magic_str;
+while (<OMKF>) { # copy the rest through
+    print $_;
+}
+close(NMKF) || exit(1);
+close(OMKF) || exit(1);
+chmod 0444, 'Makefile';
+exit 0;
+
+sub mangle_command_line_args {
+    while($_ = $ARGV[0]) {
+	shift(@ARGV);
+
+	if ( /^--$/ ) {
+	    $Dashdashes_seen++;
+
+	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
+	    push(@Defines, $_);
+	} elsif ( /^-i(.*)/ ) {
+	    $Import_dirs .= ":$1";
+	} elsif ( /^-I/ ) {
+	    $Include_dirs .= " $_";
+	} elsif ( /^-syslib$/ ) {
+	    push(@Syslibs, &grab_arg_arg($_,''));
+	} elsif ( /^-fhaskell-1\.3/ ) {
+	    $Haskell_1_3 = 1;
+	} elsif ( /^-stable$/ ) { 
+	    # user-defined syslibs that she believes are stable.
+	    push(@StableLibs, &grab_arg_arg($_,''));
+
+	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
+	    if ( /^-v$/ ) {
+		$Verbose	= '-v';
+	    } elsif ( /^-f(.*)/ ) {
+		$Makefile	= &grab_arg_arg('-f',$1);
+	    } elsif ( /^-o(.*)/ ) {
+		$Obj_suffix	= &grab_arg_arg('-o',$1);
+	    } elsif ( /^-bs(.*)/ ) {
+		$Begin_magic_str = &grab_arg_arg('-bs',$1) . "\n";
+	    } elsif ( /^-es(.*)/ ) {
+		$End_magic_str = &grab_arg_arg('-es',$1) . "\n";
+	    } elsif ( /^-w(.*)/ ) {
+		$Width	= &grab_arg_arg('-w',$1);
+	    } elsif ( /^-/ ) {
+		print STDERR "$Pgm: unknown option ignored: $_\n";
+	    } else {
+		push(@Src_files, $_);
+	    }
+
+	} elsif ($Dashdashes_seen == 1) { # where we ignore unknown options
+	    push(@Src_files,$_) if ! /^-/;
+	}
+    }
+}
+
+sub grab_arg_arg {
+    local($option, $rest_of_arg) = @_;
+    
+    if ($rest_of_arg) {
+	return($rest_of_arg);
+    } elsif ($#ARGV >= 0) {
+	local($temp) = $ARGV[0]; shift(@ARGV); 
+	return($temp);
+    } else {
+	print STDERR "$Pgm: no argument following $option option\n";
+	$Status++;
+    }
+}
+
+sub slurp_file_for_imports {
+    local($file_to_read, $orig_src_file) = @_;
+    local($follow_file);
+
+    local($last_seen_dir) = $orig_src_file;
+    $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
+    $last_seen_dir = '.' if ($last_seen_dir eq $orig_src_file);
+
+    # we mangle #include's so they will also leave something
+    # behind to indicate the dependency on _them_
+
+    print STDERR "sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
+
+    open(SRCFILE, "sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
+	|| die "$Pgm: Can't open $file_to_read: $!\n";
+
+    while (<SRCFILE>) {
+        if (/^>?\s*import\s+([A-Z][A-Za-z0-9_']*)/ || /^!include\s+"(\S+)"/) {
+	    $modname = $1;
+	    if (/^>?\s*import/) {
+		$follow_file = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir);
+	    } else {
+		$follow_file = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
+	    }
+
+            if ($follow_file) { # it found something
+
+		if ($follow_file ne '__syslib__') {
+		    local($int_file);
+		    ($int_file = $follow_file) =~ s/\.l?hs$/\.hi/;
+
+		    push(@Depend_lines, "$of : $int_file\n");
+		}
+            } else {
+                die "$orig_src_file: Couldn't handle: $_\n";
+            }
+	}
+    }
+    close(SRCFILE) || exit(1);
+}
+
+# when we see something, we cache that fact ('y').
+# also, when we get a miss, we cache that (so we don't try later); ('n')
+%FileExists = ();
+
+sub find_in_Import_dirs {
+    local($orig_src_file, $modname, $last_seen_dir) = @_;
+    local($import_dir);
+    local($do_magical_check) = 0;
+    local($name_to_check);
+
+    # hop along Import_dir list
+    foreach $import_dir (split(/:/,$Import_dirs)) {
+	# handle . magically
+	if ($import_dir eq '.') {
+	    # record that we should do a SPECIAL try for a file in last_seen_dir (LAST)
+	    $do_magical_check = 1;
+	}
+
+	$name_to_check = "$import_dir/$modname.hi";
+	if ( $FileExists{$name_to_check} ne 'n' ) { # either 'y' or nothing
+	    print STDERR "trying $name_to_check...\n" if $Verbose;
+	    return($name_to_check) if $FileExists{$name_to_check} eq 'y';
+	    if (-f $name_to_check) {
+		$FileExists{$name_to_check} = 'y';
+		return($name_to_check) ;
+	    } else {
+		$FileExists{$name_to_check} = 'n';
+	    }
+    	}
+
+	$name_to_check = "$import_dir/$modname.hs";
+	print STDERR "trying... $name_to_check\n" if $Verbose;
+	return($name_to_check) if -f $name_to_check;
+
+	$name_to_check = "$import_dir/$modname.lhs";
+	print STDERR "trying... $name_to_check\n" if $Verbose;
+	return($name_to_check) if -f $name_to_check;
+    }
+    if ($do_magical_check == 1) {
+	$name_to_check = "$last_seen_dir/$modname.hi";
+
+	if ( $FileExists{$name_to_check} ne 'n' ) { # either 'y' or nothing
+	    print STDERR "trying $name_to_check...\n" if $Verbose;
+	    return($name_to_check) if $FileExists{$name_to_check} eq 'y';
+	    if (-f $name_to_check) {
+		$FileExists{$name_to_check} = 'y';
+		return($name_to_check) ;
+	    } else {
+		$FileExists{$name_to_check} = 'n';
+	    }
+    	}
+
+	$name_to_check = "$last_seen_dir/$modname.lhs";
+	print STDERR "trying... $name_to_check\n" if $Verbose;
+	return($name_to_check) if -f $name_to_check;
+
+	$name_to_check = "$last_seen_dir/$modname.hs";
+	print STDERR "trying... $name_to_check\n" if $Verbose;
+	return($name_to_check) if -f $name_to_check;
+    }
+    # OK, maybe it's referring to something in a system library
+    foreach $lib ( @Syslibs ) {
+	if ( $lib eq 'ghc' ) {
+	    return('__syslib__') if $GhcLibIfaces{$modname};
+	} elsif ( $lib eq 'hbc' ) {
+	    return('__syslib__') if $HbcLibIfaces{$modname};
+	} else {
+	    die "Unrecognised syslib: $lib\n";
+	}
+    }
+
+    # HACK HACK: Let the user define his own "stable" modules.
+    foreach $stableLib ( @StableLibs ) {
+	return('__syslib__') if ( $stableLib eq $modname );
+    }
+
+    # Might be a Haskell 1.3 Module (but only if we've said -fhaskell-1.3)
+    if ( $Haskell_1_3 == 1 ) {
+	return('__syslib__') if $IO13Ifaces{$modname};
+    }
+
+    # Last hope: referring to a Prelude interface
+    return('__syslib__') if $PreludeIfaces{$modname};
+
+    die "No file `$modname.hi', `$modname.lhs' or `$modname.hs' (reqd from file `$orig_src_file')\namong import directories:\n\t$Import_dirs\n";
+}
+
+sub find_in_Include_dirs {
+    local($orig_src_file, $name, $last_seen_dir) = @_;
+    local($include_dir);
+    local($do_magical_check) = 0;
+
+    # no funny name guessing here
+
+    # hop along Include_dir list
+    foreach $include_dir (split(/\s+/,$Include_dirs)) {
+	$include_dir =~ s/^-I//;
+
+	# handle . magically
+	if ($include_dir eq '.') {
+	    # record that we should do a SPECIAL try for a file in last_seen_dir (LAST)
+	    $do_magical_check = 1;
+	}
+	print STDERR "trying $include_dir/$name...\n" if $Verbose;
+	if (-f "$include_dir/$name") {
+	    return("$include_dir/$name");
+	}
+    }
+    if ($do_magical_check == 1) {
+	print STDERR "trying $last_seen_dir/$name...\n" if $Verbose;
+	if (-f "$last_seen_dir/$name") {
+	    return("$last_seen_dir/$name");
+	}
+    }
+    die "No file `$name' (reqd from file `$orig_src_file') among include directories: $Include_dirs\n";
+}
+
+# out of the driver, actually
+sub run_something {
+    local($str_to_do, $tidy_name) = @_;
+
+    print STDERR "\n$tidy_name:\n\t" if $Verbose;
+    print STDERR "$str_to_do\n" if $Verbose;
+
+    local($return_val) = system($str_to_do) >> 8;
+
+    if ($return_val != 0) {
+	local($die_msg) = "$Pgm: execution of the $tidy_name had trouble";
+	$die_msg .= " (program not found)" if $return_val == 255;
+	$die_msg .= " ($!)" if $Verbose && $! != 0;
+	$die_msg .= "\n";
+	print STDERR $die_msg;
+	exit $return_val;
+    }
+}

@@ -1,0 +1,10 @@
+SuffixRule_c_o()
+
+BuildPgmFromOneCFile(unlit)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC))
+InstallBinaryTarget(unlit, $(INSTLIBDIR_GHC))
+#endif /* DoInstall... */
+
+CDependTarget( $(SRCS_C) )

@@ -1,0 +1,187 @@
+\documentstyle[11pt,slpj,abstracts]{article}
+
+\begin{document}
+
+% ======================================================
+
+\title{Abstracts of GRIP/GRASP/AQUA-related papers and reports, 1994
+}
+
+\author{The AQUA team \\ Department of Computing Science \\
+University of Glasgow G12 8QQ
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP, GRASP and AQUA projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by FTP.  Connect to {\tt ftp.dcs.glasgow.ac.uk},
+and look in {\tt pub/glasgow-fp/papers}, {\tt pub/glasgow-fp/drafts}, {\tt pub/glasgow-fp/tech\_reports},
+or {\tt pub/glasgow-fp/grasp-and-aqua-docs}.
+
+Another useful place to look is on the Functional Programming Group WWW page:
+{\tt ftp://ftp.dcs.glasgow.ac.uk/pub/glasgow-fp/glasgow-fp.html}.
+
+They can also be obtained by writing to 
+Helen McNee, Department of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+helen@dcs.glasgow.ac.uk.
+\end{abstract}
+
+\section{Published papers}
+
+\reference{J Launchbury and SL Peyton Jones}
+{State in Haskell}
+{To appear in Lisp and Symbolic Computation (50 pages)}
+{
+Some algorithms make critical internal use of updatable state, even
+though their external specification is purely functional.  Based on
+earlier work on monads, we present a way of securely encapsulating
+stateful computations that manipulate multiple, named, mutable
+objects, in the context of a non-strict, purely-functional language.
+The security of the encapsulation is assured by the type system, using
+parametricity.  The same framework is also used to handle input/output
+operations (state changes on the external world) and calls to C.
+
+FTP: {\tt pub/glasgow-fp/drafts/state-lasc.ps.Z}
+}
+
+\reference{P Sansom and SL Peyton Jones}
+{Time and space profiling for non-strict higher-order functional languages}
+{To appear in POPL 95}
+{
+We present the first profiler for a compiled, non-strict, higher-order,
+purely functional language capable of measuring {\em time}
+as well as {\em space} usage.  Our profiler is implemented
+in a production-quality optimising compiler for Haskell, 
+has low overheads, and can successfully profile large applications.
+
+A unique feature of our approach is that we give a formal
+specification of the attribution of execution costs to cost centres.
+This specification enables us to discuss our design decisions in a
+precise framework.  Since it is not obvious how to map this
+specification onto a particular implementation, we also present an
+implementation-oriented operational semantics, and prove it equivalent
+to the specification.
+}
+
+
+% pub/glasgow-fp/authors/Philip_Wadler/monads-for-fp.dvi
+
+\reference{Philip Wadler}
+{Monads for functional programming}
+{in M. Broy (editor),
+{\em Program Design Calculi}, proceedings of the International
+Summer School directed by F. L. Bauer, M. Broy, E. W. Dijkstra, D.
+Gries, and C. A. R. Hoare.  Springer Verlag, NATO ASI series, Series
+F: Computer and System Sciences, Volume 118, 1994}
+{
+The use of monads to structure functional programs is
+described.  Monads provide a convenient framework for simulating
+effects found in other languages, such as global state, exception
+handling, output, or non-determinism.  Three case studies are looked at
+in detail: how monads ease the modification of a simple evaluator;
+how monads act as the basis of a datatype of arrays subject to in-place
+update; and how monads can be used to build parsers.
+}
+
+% pub/glasgow-fp/authors/Philip_Wadler/taste-of-linear-logic.dvi
+\reference{Philip Wadler}
+{A taste of linear logic}
+{{\em Mathematical Foundations of Computer Science},
+Gdansk, Poland, August 1993, Springer Verlag, LNCS 711}
+{This tutorial paper provides an introduction to intuitionistic logic
+and linear logic, and shows how they correspond to type systems for
+functional languages via the notion of `Propositions as Types'.  The
+presentation of linear logic is simplified by basing it on the Logic
+of Unity.  An application to the array update problem is briefly
+discussed.
+}
+
+% It's in
+% /local/grasp/docs/short-static-semantics/new-paper/kevins-latest-version
+
+\reference{Cordelia Hall, Kevin Hammond, Simon Peyton Jones and Philip Wadler}
+{Type classes in Haskell}
+{European Symposium on Programming, 1994}
+{
+This paper defines a set of type inference rules for resolving
+overloading introduced by type classes.  Programs including type
+classes are transformed into ones which may be typed by the
+Hindley-Milner inference rules.  In contrast to other work on type
+classes, the rules presented here relate directly to user programs.
+An innovative aspect of this work is the use of second-order lambda
+calculus to record type information in the program.
+}
+
+\reference{PL Wadler}
+{Monads and composable continuations}
+{Lisp and Symbolic Computation 7(1)}
+{Moggi's use of monads to factor semantics is used to model the
+composable continuations of Danvy and Filinski.  This yields some
+insights into the type systems proposed by Murthy and by Danvy and
+Filinski.  Interestingly, modelling some aspects of composable
+continuations requires a structure that is almost, but not quite, a
+monad.
+}
+
+\reference{J Launchbury and SL Peyton Jones}
+{Lazy Functional State Threads}
+{Programming Languages Design and Implementation, Orlando, June 1994}
+{
+Some algorithms make critical internal use of updatable state, even
+though their external specification is purely functional.  Based on
+earlier work on monads, we present a way of securely encapsulating
+such stateful computations, in the context of a non-strict,
+purely-functional language.  
+
+There are two main new developments in this paper.  First, we show how
+to use the type system to securely encapsulate stateful computations,
+including ones which manipulate multiple, named, mutable objects.
+Second, we give a formal semantics for our system.
+
+FTP: {\tt pub/glasgow-fp/papers/state.ps.Z}
+}
+
+\reference{K Hammond, JS Mattson Jr. and SL Peyton Jones}
+{Automatic spark strategies and granularity for a parallel functional language reducer}
+{CONPAR, Sept 1994}
+{
+This paper considers the issue of dynamic thread control in the context
+of a parallel Haskell implementation on the GRIP multiprocessor.
+For the first time we report the effect of our thread control strategies 
+on thread granularity, as measured by dynamic heap allocation.  This
+gives us a concrete means of measuring the effectiveness of these strategies,
+other than wall-clock timings which are notoriously uninformative.
+
+FTP: {\tt pub/glasgow-fp/papers/spark-strategies-and-granularity.ps.Z}
+}
+
+\reference{K Hammond}
+{Parallel Functional Programming: an Introduction}
+{PASCO '94, Sept. 1994 (Invited Paper)}
+
+This paper introduces the general area of parallel functional
+programming, surveying the current state of research and suggesting
+areas which could profitably be explored in the future.  No new
+results are presented.  The paper contains 97 references selected from
+the 500 or so publications in this field.
+
+FTP: {\tt pub/glasgow-fp/papers/parallel-introduction.ps.Z}
+
+% \section{Workshop papers and technical reports}
+
+% The 1994 Glasgow Functional Programming Workshop papers exist in
+% the draft proceedings at the moment.  They are being refereed, and will
+% be published by Springer Verlag in due course.
+
+\end{document}
+
+
+
+
+

@@ -1,0 +1,420 @@
+\documentstyle[11pt,literate,a4wide]{article}
+
+%--------------------
+\begin{rawlatex}
+%\input{transfig}
+
+%\newcommand{\folks}[1]{$\spadesuit$ {\em #1} $\spadesuit$}
+%\newcommand{\ToDo}[1]{$\spadesuit$ {\bf ToDo:} {\em #1} $\spadesuit$}
+
+% to avoid src-location marginpars, comment in/out this defn.
+%\newcommand{\srcloc}[1]{{\tt #1}}
+%\newcommand{\srclocnote}[1]{}
+%\newcommand{\srclocnote}[1]{\marginpar{\small\srcloc{#1}}}
+
+\setcounter{secnumdepth}{6}
+\setcounter{tocdepth}{6}
+\end{rawlatex}
+%--------------------
+
+\begin{document}
+\title{Basic types and the standard Prelude: OBSOLETE}
+\author{The AQUA team}
+\date{November 1992 (obsolete February 1994)}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\pagebreak
+\end{rawlatex}
+
+% added to keep DPH stuff happy:
+\begin{rawlatex}
+\def\DPHaskell{DPHaskell}
+\def\POD{POD}
+\end{rawlatex}
+
+This document describes how we deal with Haskell's standard prelude,
+notably what the compiler itself ``knows'' about it.  There's nothing
+intellectually difficult here---it's just vast and occasionally
+delicate.
+
+First, some introduction, mostly terminology.  Second, the actual
+compiler source code which defines what the compiler knows about the
+prelude.  Finally, something about how we compile the prelude code
+(with GHC, of course) to produce the executable bits for the prelude.
+
+%************************************************************************
+%*									*
+\section{Introduction and terminology}
+%*									*
+%************************************************************************
+
+The standard prelude is made of many, many pieces.  The GHC system
+must deal with these pieces in different ways.  For example, the
+compiler must obviously do different things for primitive operations
+(e.g., addition on machine-level @Ints@) and for plain
+written-in-Haskell functions (e.g., @tail@).
+
+In this section, the main thing we do is explain the various ways that
+we categorise prelude thingies, most notably types.
+
+%************************************************************************
+%*									*
+\subsection{Background information}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsubsection{Background terms: Heap objects}
+%*									*
+%************************************************************************
+
+A {\em heap object} (equivalently {\em closure}) is always a
+contiguous block of memory, starting with an info pointer.  {\em
+Dynamic} heap objects are allocated by a sequence of instructions in
+the usual way.
+
+In contrast, {\em static heap objects} are statically allocated at
+fixed, labelled locations outside the dynamic heap --- but we still
+call them heap objects!  Their GC code does not evacuate them, and
+they are never scavenged since they never appear in to-space.  Note:
+the ``staticness'' does {\em not} mean they are read-only; they may be
+updatable.
+
+(Much) more on this stuff in the STG paper.
+
+%************************************************************************
+%*									*
+\subsection{Categorising the prelude bits}
+%*									*
+%************************************************************************
+
+Here are four different ways in which we might categorise prelude
+things generally.  Note, also, the {\em simplifying assumptions} that
+we make so that we can have a ``Prelude onion,'' in which each
+``layer'' includes the preceding ones.
+
+\begin{description}
+%------------------------------------------------------------------
+\item[Primitive vs Haskell-able:]
+
+Some parts of the prelude cannot be expressed in Haskell ({\em
+primitive}), whereas most of it can be ({\em Haskell-able}).
+
+BIG NOTE: Because of our non-standard support for unboxed numbers and
+operations thereon, some of the things in @PreludeBuiltin@ in the
+report {\em are} Haskell-able.  For example, the @negate@ operation on
+an @Int@ is just:
+
+\begin{verbatim}
+negateInt i
+  = case i of MkInt i# -> case (negateInt# i#) of j# -> MkInt j#
+\end{verbatim}
+
+Of course, this just moves the goalposts: @negateInt#@ is now the
+primitive, non-Haskell-able thingy...
+
+So: something is ``primitive'' if we cannot define it in our
+GHC-extended Haskell.
+
+For more information, please see \sectionref{prelude-more-on-types}
+for further discussion about types in the Prelude.
+
+%------------------------------------------------------------------
+\item[From (exported by) PreludeCore or not:]
+The module @PreludeCore@ exports all the types, classes, and instances
+in the prelude.  These entities are ``immutable;'' they can't be
+hidden, renamed, or really fiddled in any way.
+
+(NB: The entities {\em exported by} @PreludeCore@ may {\em originally}
+be from another module.  For example, the @Complex@ datatype is
+defined in @PreludeComplex@; nonetheless, it is exported by
+@PreludeCore@ and falls into the category under discussion here.)
+
+{\em Simplifying assumption:} We take everything primitive (see
+previous classification) to be ``from PreludeCore''.
+
+{\em Simplifying assumption:} We take all {\em values} from
+@PreludeBuiltin@ to be ``from PreludeCore.''  This includes @error@
+and the various \tr{prim*} functions (which may or may not be
+``primitive'' in our system [because of our extensions for unboxery]).
+It shouldn't be hard to believe that something from @PreludeBuiltin@
+is (at least) slightly magic and not just another value...
+
+{\em Simplifying assumption:} The GHC compiler has ``wired in''
+information about {\em all} @fromPreludeCore@ things.  The fact that
+they are ``immutable'' means we don't have to worry about ``unwiring''
+them in the face of renaming, etc., (which would be pretty bizarre,
+anyway).
+
+Not-exported-by-PreludeCore things (non-@PreludeBuiltin@ values) can
+be renamed, hidden, etc.
+
+%------------------------------------------------------------------
+\item[Compiler-must-know vs compiler-chooses-to-know vs compiler-unknown:]
+
+There are some prelude things that the compiler has to ``know about.''
+For example, it must know about the @Bool@ data type, because (for one
+reason) it needs it to typecheck guards.
+
+{\em Simplifying assumption:} By decree, the compiler ``must know''
+about everything exported from @PreludeCore@ (see previous
+classification).  This is only slight overkill: there are a few types
+(e.g., @Request@), classes (e.g., @RealFrac@), and instances (e.g.,
+anything for @RealFrac@)---all @fromPreludeCore@---that the compiler
+could, strictly speaking, get away with not knowing about.  However,
+it is a {\em pain} to maintain the distinction...
+
+On the other hand, the compiler really {\em doesn't} need to know
+about the non-@fromPreludeCore@ stuff (as defined above).  It can read
+the relevant information out of a \tr{.hi} interface file, just as it
+would for a user-defined module (and, indeed, that's what it does).
+An example of something the compiler doesn't need to know about is the
+@tail@ function, defined in @PreludeList@, exported by @Prelude@.
+
+There are some non-@fromPreludeCore@ things that the compiler may {\em
+choose} to clutch to its bosom: this is so it can do unfolding on the
+use of a function.  For example, we always want to unfold uses of @&&@
+and @||@, so we wire info about them into the compiler.  (We won't
+need this when we are able to pass unfolding info via interface
+files.)
+
+%------------------------------------------------------------------
+\item[Per-report vs Glasgow-extension:]
+Some of our prelude stuff is not strictly as per the Haskell report,
+notably the support for monadic I/O, and our different notion of what
+is truly primitive in Haskell (c.f. @PreludeBuiltin@'s ideas).
+
+In this document, ``Haskell'' always means ``Glasgow-extended
+Haskell.''
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[prelude-more-on-types]{More about the Prelude datatypes}
+%*									*
+%************************************************************************
+
+The previous section explained how we categorise the prelude as a
+whole.  In this section, we home in on prelude datatypes.
+
+%************************************************************************
+%*									*
+\subsubsection{Boxed vs unboxed types}
+%*									*
+%************************************************************************
+
+Objects of a particular type are all represented the same way.
+We recognise two kinds of types:
+\begin{description}
+
+\item[Boxed types.]
+The domain of a boxed type includes bottom.  Values of boxed type are
+always represented by a pointer to a heap object, which may or may not
+be evaluated.  Anyone needing to scrutinise a value of boxed type must
+evaluate it first by entering it.  Value of boxed type can be passed
+to polymorphic functions.
+
+\item[Unboxed types.]
+The domain of an unboxed type does not include bottom, so values of
+unboxed type do not need a representation which accommodates the
+possibility that it is not yet evaluated.
+
+Unboxed values are represented by one or more words.  At present, if
+it is represented by more than one word then none of the words are
+pointers, but we plan to lift this restriction eventually.
+(At present, the only multi-word values are @Double#@s.)
+
+An unboxed value may be represented by a pointer to a heap object:
+primitive strings and arbitrary-precision integers are examples (see
+Section~\ref{sect-primitive}).
+\end{description}
+
+%************************************************************************
+%*									*
+\subsubsection{Primitive vs algebraic types}
+%*									*
+%************************************************************************
+
+There is a second classification of types, which is not quite orthogonal:
+\begin{description}
+
+\item[Primitive types.]
+A type is called {\em primitive} if it cannot be defined in
+(Glasgow-extended) Haskell, and the only operations which manipulate its
+representation are primitive ones.  It follows that the domain
+corresponding to a primitive type has no bottom element; that is, all
+primitive data types are unboxed.
+
+By convention, the names of all primitive types end with @#@.
+
+\item[Algebraic data types.]
+These are built with Haskell's @data@ declaration.  Currently, @data@
+declarations can {\em only} build boxed types (and hence {\em all
+unboxed types are also primitive}), but we plan to lift this
+restriction in due course.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[prelude-onion]{Summary of the ``Prelude onion''}
+%*									*
+%************************************************************************
+
+Summarizing:
+\begin{enumerate}
+\item
+{\em Primitive} types, and operations thereon (@PrimitiveOps@), are at
+the core of the onion.
+
+\item
+Everything exported @fromPreludeCore@ (w/ all noted provisos) makes up
+the next layer of the onion; and, by decree, the compiler has built-in
+knowledge of all of it.  All the primitive stuff is included in this
+category.
+
+\item
+The compiler {\em chooses to know} about a few of the
+non-@fromPreludeCore@ values in the @Prelude@.  This is (exclusively)
+for access to their unfoldings.
+
+\item
+The rest of the @Prelude@ is ``unknown'' to the compiler itself; it
+gets its information from a \tr{Prelude.hi} file, exactly as it does
+for user-defined modules.
+\end{enumerate}
+
+%************************************************************************
+%*									*
+\section{What the compiler knows about the prelude}
+%*									*
+%************************************************************************
+
+This is essentially the stuff in the directory \tr{ghc/compiler/prelude}.
+
+%************************************************************************
+%*									*
+\subsection{What the compiler knows about prelude types (and ops thereon)}
+%*									*
+%************************************************************************
+
+The compiler has wired into it knowledge of all the types in the
+standard prelude, all of which are exported by @PreludeCore@.
+Strictly speaking, it needn't know about some types (e.g., the
+@Request@ and @Response@ datatypes), but it's tidier in the end to
+wire in everything.
+
+Primitive types, and related stuff, are covered first.  Then the more
+ordinary prelude types.  The more turgid parts may be arranged
+alphabetically...
+
+\downsection
+\downsection
+% pretty ugly, no?
+%************************************************************************
+%*									*
+\section{Primitive types (and ``kinds'') {\em and} operations thereon}
+\label{sect-primitive}
+%*									*
+%************************************************************************
+
+There are the following primitive types.
+%partain:\begin{center}
+\begin{tabular}{|llll|}
+\hline
+Type & Represents & Size (32|64-bit words) & Pointer? \\
+\hline
+@Void#@		& zero-element type		& 1 & No \\
+@Char#@		& characters			& 1 & No \\
+@Int#@		& 32|64-bit integers 		& 1 & No \\
+@Float#@	& 32|64-bit floats 		& 1 & No \\
+@Double#@	& 64|128-bit floats 		& 2 & No \\
+@Arr#@		& array of pointers		& ? & Yes \\
+@Arr# Char#@	& array of @Char#@s		& ? & No \\
+@Arr# Int#@	& array of @Int#@s		& ? & No \\
+@Arr# Float#@	& array of @Float#@s		& ? & No \\
+@Arr# Double#@	& array of @Double#@s		& ? & No \\
+@Integer#@	& arbitrary-precision integers 	& 1 & Yes \\
+@LitString#@	& literal C-style strings	& 1 & No \\
+\hline
+\end{tabular}
+%partain:\end{center}
+
+Notes: (a)~@Integer#s@ have a pointer in them, to a @Arr# Int#@; see
+the discussion in @TyInteger@.  (b)~@LitString#@ is a magical type
+used {\em only} to handle literal C-strings; this is a convenience; we
+could use an @Arr# Char#@ instead.
+
+What the compiler knows about these primitive types is either
+(a)~given with the corresponding algebraic type (e.g., @Int#@ stuff is
+with @Int@ stuff), or (b)~in a module of its own (e.g., @Void#@).
+
+\downsection
+\input{PrimKind.lhs}
+
+\section{Details about ``Glasgow-special'' types}
+
+\downsection
+\input{TysPrim.lhs}
+\input{TyPod.lhs}
+\input{TyProcs.lhs}
+\upsection
+
+\input{PrimOps.lhs}
+\upsection
+
+%************************************************************************
+%*									*
+\section{Details (mostly) about non-primitive Prelude types}
+\label{sect-nonprim-tys}
+%*									*
+%************************************************************************
+
+\downsection
+\input{TysWiredIn.lhs}
+\upsection
+
+%************************************************************************
+%*									*
+%\subsection{What the compiler knows about prelude values}
+%*									*
+%************************************************************************
+\downsection
+\input{PrelVals.lhs}
+\upsection
+
+%************************************************************************
+%*									*
+\subsection{Uniquifiers and utility bits for this prelude stuff}
+%*									*
+%************************************************************************
+\downsection
+\downsection
+\input{PrelFuns.lhs}
+\upsection
+\upsection
+
+%************************************************************************
+%*									*
+%\subsection{The @AbsPrel@ interface to the compiler's prelude knowledge}
+%*									*
+%************************************************************************
+\downsection
+\input{AbsPrel.lhs}
+\upsection
+
+%************************************************************************
+%*									*
+\section{The executable code for prelude bits}
+%*									*
+%************************************************************************
+
+This essentially describes what happens in the directories
+\tr{ghc/lib/{io,prelude}}; the former is to support the (non-std)
+Glasgow I/O; the latter is regular prelude things.
+
+ToDo: more.
+
+\printindex
+\end{document}

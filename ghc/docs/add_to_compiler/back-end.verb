@@ -1,0 +1,41 @@
+%************************************************************************
+%*									*
+\subsection{The back end of the compiler}
+\label{sec:back-end}
+%*									*
+%************************************************************************
+
+The back end of the compiler begins once the typechecker's
+output has been desugared into the so-called Core syntax.  Core syntax
+is discussed in Section~\ref{sec:core-syntax}.
+
+We intend the back end to be a sequence of highly effective
+CoreSyntax-to-CoreSyntax and STGsyntax-to-STGsyntax transformation
+passes, making it possible for the
+CoreSyntax$\Rightarrow$StgSyntax$\Rightarrow$Abstract~C (and on to
+machine code) denouement to produce really good code.
+
+{\em It is with these transformation passes that we are hoping for
+your enthusiastic help!} There are also some examples in the
+GHC distribution, written by people other than the original compiler
+authors---so it can be done...
+
+We already have a pretty good {\em simplifier}\srcloc{simplCore/} to
+do local transformations, written mainly by Andr\'e Santos.  Among
+other things, it unfolds basic arithmetic operations and constants,
+exposing the underlying unboxed values.  Those interested in the
+merits of these transformations should consult Peyton Jones and
+Launchbury's paper, ``Unboxed values as first class citizens in a
+non-strict functional language'' \cite{peyton-jones91b}.
+
+The reader interested in the final code-generation parts of the
+compiler, from Core syntax to STG syntax\srcloc{stgSyn/CoreToStg.lhs}
+to Abstract~C,\srcloc{codeGen/} should consult Peyton Jones's recent
+paper, ``Implementing lazy functional languages on stock hardware: the
+Spineless Tagless G-machine'' \cite{peyton-jones92a}.
+
+Further note: We have found that the STG
+syntax\srcloc{stgSyn/StgSyn.lhs} is the better medium for a few
+transformations.\srcloc{stgSyn/SimplStg.lhs} This is fine---STG syntax
+is a just-as-manipulable functional language as Core syntax, even if
+it's a bit messier.

@@ -1,0 +1,30 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{Glasgow Haskell compiler: reader}
+\author{The GRASP team}
+\date{August 1993}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\pagebreak
+\end{rawlatex}
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[reader]{Reader}
+\downsection
+\end{onlypartofdoc}
+
+\input{PrefixSyn.lhs}
+\input{ReadPrefix.lhs}
+\input{PrefixToHs.lhs}
+
+\upsection
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

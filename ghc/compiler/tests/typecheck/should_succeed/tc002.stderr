@@ -1,0 +1,11 @@
+Typechecked:
+d.Num.t7 = dfun.Num.Integer
+fromInt.t6 = fromInt tt4 d.Num.t7
+lit.t5 = fromInt.t6 (MkInt 2#)
+fromInt.t8 = fromInt.t6
+lit.t3 = fromInt.t8 (MkInt 1#)
+AbsBinds [] [] [(b.t1, Main.b)]
+    {- nonrec -}
+    b.t1 :: tt4
+    b.t1 = if True then lit.t3 else lit.t5
+

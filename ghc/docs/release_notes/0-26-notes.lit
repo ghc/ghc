@@ -1,0 +1,244 @@
+Release~0.26 is a major public release of Glasgow Haskell.
+It incorporates our new work for the first half of 1995.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-0.26}
+in the top-level directory.
+
+You'll need to recompile everything if you're switching from a
+previous version of GHC.  (If you don't, you'll get ``consistency
+errors''.)  Some day, we will stop doing this to you :-)
+
+Information about ``what's ported to which machine'' is now given in
+the Installation Guide.
+The new ports since 0.23 are: \tr{hppa1.1-hp-hpux},
+\tr{i386-*-linuxaout}, and \tr{mips-sgi-irix5}.
+
+%************************************************************************
+%*									*
+\subsection[0-26-config]{New configuration things in 0.26}
+%*									*
+%************************************************************************
+
+We are moving towards one \tr{configure} script for all Glasgow
+functional-programming tools.  Consequently, the configure options
+have been tweaked.  Doing \tr{./configure --help} will show you the
+current state of play.
+
+%************************************************************************
+%*									*
+\subsection[0-26-user-visible]{User-visible changes in 0.26, including incompatibilities}
+%*									*
+%************************************************************************
+
+The names \tr{scc}, \tr{ccall}, and \tr{casm} are no longer stolen
+from the user's name space.  (The magical constructs they once were
+have been known as \tr{_scc_}, \tr{_ccall_}, and \tr{_casm_} for some
+time now...)
+
+Similarly, \tr{trace} is no longer built-in (so you can use the name
+if you want to).  You can get \tr{trace} either as \tr{_trace}
+(Glasgow extension), or as itself via \tr{import Trace} with
+\tr{-syslib hbc} (i.e., exactly like HBC).
+
+Lazy, or irrefutable, patterns with unboxed-type components are
+no longer allowed.  You'll need to rewrite \tr{let (I# x) = exp ...}
+as \tr{let x = case exp of { I# i -> i } in ... }.
+
+GHC now supports hexadecimal and octal numeric syntax for integer constants.
+(But \tr{read} doesn't grok it yet...)
+
+GHC now supports specialised instances (as in HBC); you can write:
+\begin{verbatim}
+instance Eq a => Eq (Foo a) where { ... }
+{-# SPECIALIZE instance Eq (Foo Bool) #-}
+\end{verbatim}
+
+GHC's pragmas for specialised values now have a magical \tr{= blah}
+form, in which you specify the code to be used for the specialised value.
+For example:
+\begin{verbatim}
+f :: Ord a => a -> Int -> a
+{-# SPECIALIZE f :: Double -> Int -> Double = f_Double #-}
+
+f_Double :: Double -> Int -> Double
+f_Double ...
+\end{verbatim}
+In some cases, the \tr{= blah} form can be a {\em big} win.
+
+What we used to call ``threaded'' Haskell, we now call ``Concurrent
+Haskell.''  And there's a paper about it.  Please see the User's Guide.
+
+``Parallel Haskell,'' running under PVM, is here.  Again, see the
+User's Guide.
+
+%************************************************************************
+%*									*
+\subsection[0-26-options]{New or changed GHC command-line options}
+%*									*
+%************************************************************************
+
+The \tr{-g}, \tr{-p}, \tr{-pg}, \tr{-fpic}, and \tr{-fPIC} are no
+longer passed straight through to GCC.  They probably buy you nothing,
+while potentially causing substantial mischief.  If you know what you're doing,
+you can still use them, via \tr{-optcO-...}.
+
+The main option for Concurrent Haskell is \tr{-concurrent}; for
+Parallel Haskell, it's \tr{-parallel}.
+
+The \tr{-dict-all} option, used with \tr{-prof}, has died.  It never
+did anything anyway.
+
+Besides the \tr{-fshow-specialisations} option to see what specialisations
+have occurred, you may also use the \tr{-fshow-import-specs} option
+to see what specialisations GHC would like to have had available.
+By then adding these ``desirable'' pragmas to your code, you can
+squash most of the overloading from your program.
+
+There are some new sanity-checking options.  Use
+\tr{-fsignatures-required} if you want to force all top-level
+definitions to have type signatures.  Use \tr{-fshadowing-not-ok}
+if you want to disallow name shadowing.  You can't use the latter on
+modules that include circular definitions.
+
+The \tr{-Rghc-timing} option gives a convenient one-line summary to
+GHC's runtime and heap allocation.
+
+The \tr{-odump} option may be used to save GHC's standard-error output
+to a file. (It normally shows up on your screen.)
+
+You can now use \tr{-H0} and \tr{-K0} to reset the heap and stack
+sizes.  As these sizes are normally ``maxxed up'' (\tr{-H32m -H16m}
+gets you a 32MB heap), you can use this form to decrease the size:
+\tr{-H6m -H0 -H250k} gives you a heap of 250KB.
+
+%************************************************************************
+%*									*
+\subsection[0-26-io]{New in monadic I/O}
+%*									*
+%************************************************************************
+
+GHC~0.26 is still a Haskell~1.2 compiler (and will remain so until
+there is a non-DRAFT 1.3 standard).
+
+We killed the \tr{PreludePrimIO} interface.  You can get all the same
+functions from \tr{PreludeGlaST}.
+
+All the \tr{_IVar} and \tr{_MVar} operations are now in the 1.3
+\tr{IO} monad, not the non-standard \tr{PrimIO} monad.  You now
+get them from \tr{Concurrent}, not from \tr{PreludeGlaST}.
+
+%************************************************************************
+%*									*
+\subsection[0-26-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+The main new things are ``foldr-build'' deforestation (by Andy Gill)
+and ever-more-glorious specialisation (by Patrick Sansom).
+
+And the usual few megabytes of gratuitous changes.
+
+%************************************************************************
+%*									*
+\subsection[0-26-new-in-libraries]{In the prelude and libraries}
+%*									*
+%************************************************************************
+
+All of the basic state-transformer stuff now comes from
+\tr{PreludeGlaST}.  The \tr{PreludePrimIO} interface no longer exists.
+
+The function \tr{foldrPrimIO} went away.  The function \tr{forkPrimIO}
+sprang to life.
+
+The what-you-need-for-Concurrent-Haskell interface is \tr{Concurrent}.
+The GHC option is \tr{-concurrent}.  Please see the User's Guide.  
+Note that the operations @threadDelay@ and @threadWait@ now come
+from \tr{Concurrent}, not \tr{PreludeGlaMisc}.
+
+I-Vars and M-Vars (synchronising variables) are now
+specifically I/O operations, not general state-transformer operations.
+They also come from the \tr{Concurrent} interface.
+
+Renamings: what used to be the \tr{newMVar} operation is now called
+\tr{newEmptyMVar}; what was \tr{initMVar} is now \tr{newMVar}.
+
+The what-you-need-for-Parallel-Haskell interface is \tr{Parallel}.
+The GHC option is \tr{-parallel}.  At the moment, the \tr{Parallel}
+interface just provides \tr{par} and \tr{seq}.  But that will change.
+
+\tr{LibPosix} now provides \tr{runProcess}, our candidate for the
+high-level OS-independent operation.
+
+NEW: The \tr{Regex} (\tr{-syslib ghc}) interface provides direct
+access to the GNU regexp (regular expressions on strings) package.
+The \tr{MatchPS} interface is higher-level, providing string-matching
+functions on \tr{_PackedStrings}.  (All by Sigbjorn Finne)
+
+NEW: The \tr{Readline} interface (also \tr{-syslib ghc}) provides
+access to the GNU readline package.  Instant command-line editing
+for your Haskell programs.  (By Darren Moffat)
+
+NEW: A ``network interface toolkit'' by Darren Moffat.  BSD sockets
+for Haskell---way cool.
+
+The \tr{FiniteMap} module has two new functions, \tr{isEmptyFM} and
+\tr{elemFM}.
+
+The \tr{Maybes} module now uses the Haskell~1.3 built-in \tr{Maybe}
+type; you should use \tr{-fhaskell-1.3} with this module now.
+
+The HBC library modules \tr{Maybe}, \tr{Either}, and \tr{Option} are
+{\em gone}.  Just use \tr{-fhaskell-1.3} and get the types directly
+from the Prelude.
+
+All system-library modules that use the \tr{Maybe} type now require
+\tr{-fhaskell-1.3}.  For the GHC library, that means \tr{FiniteMap},
+\tr{Maybes}, \tr{Util}, \tr{Set}, \tr{Regex}, and \tr{MatchPS}.  For
+the HBC library, that means \tr{ListUtil}, \tr{Native}, and
+\tr{Parse}.  (In some cases, you could avoid the \tr{-fhaskell-1.3}
+requirement by doing selective imports.)
+
+GHC now supports \tr{trace} exactly like HBC: \tr{import Trace} and
+do \tr{-syslib hbc}.  The built-in no-import-required version
+is now called \tr{_trace}.
+
+Instances for \tr{Shorts} and \tr{Bytes} have been added to the
+HBC library module \tr{Word}.
+
+As part of the GHC system library, we now provide an interface to the
+GNU regexp (regular-expression) library; the \tr{Regexp} interface.
+A higher-level interface, to do matches on \tr{_PackedString}s comes
+from the \tr{MatchPS} interface.
+
+We no longer provide specialisations of Prelude functions to the
+\tr{Float} type; only to \tr{Double}.  It saves space, and we want to
+discourage the use of single-precision floating-point.
+
+%************************************************************************
+%*									*
+\subsection[0-26-new-in-rts]{In the runtime system}
+%*									*
+%************************************************************************
+
+GHC now supplies some very simple ``hooks'' to let you change the
+failure messages for stack and heap overflow, \tr{error}, and
+pattern-matching failure.  Please see the User's Guide.
+
+You can now force garbage collection after every N bytes of allocation
+(presumably for stats collection, or something).  Use the \tr{-j} RTS
+option.
+
+``Squeezing out'' update frames at garbage-collection time is now {\em
+on} by default.  (You can turn it off with the \tr{-Z} RTS option, but
+I can't think why you would want to.)
+
+%************************************************************************
+%*									*
+\subsection[0-26-new-elsewhere]{Other new stuff}
+%*									*
+%************************************************************************
+
+The GHC distribution now includes an ``examples'' directory, including
+a simple shell (\tr{hsh} and quite a few to do with 1.3 I/O
+(\tr{ioNNN}) and \tr{LibPosix} (\tr{poNNN}).  All in
+\tr{ghc/misc/examples}...

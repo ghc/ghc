@@ -1,0 +1,25 @@
+Typechecked:
+d.Num.t19 = dfun.Num.Integer
+d.Num.t17 = dfun.Num.Integer
+fromInt.t16 = fromInt tt14 d.Num.t17
+lit.t15 = fromInt.t16 (MkInt 3#)
+fromInt.t18 = fromInt tt12 d.Num.t19
+lit.t13 = fromInt.t18 (MkInt 1#)
+fromInt.t20 = fromInt.t16
+lit.t11 = fromInt.t20 (MkInt 2#)
+lit.t9 = lit.t13
+AbsBinds
+[]
+[]
+[(c.t3, ShouldSucceed.c), (d.t4, ShouldSucceed.d), (e.t5, ShouldSucceed.e)]
+    {- nonrec -}
+    (c.t3@(d.t4, e.t5)) :: (tt12, tt14)
+    (c.t3@(d.t4, e.t5)) = if True then (lit.t9, lit.t11) else (lit.t13, lit.t15)
+
+=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= ShouldSucceed
+interface ShouldSucceed where
+c :: (tt12, tt14) {-# ARITY _ = 0 #-}
+d :: tt12 {-# ARITY _ = 0 #-}
+e :: tt14 {-# ARITY _ = 0 #-}
+=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
+

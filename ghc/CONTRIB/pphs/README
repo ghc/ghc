@@ -1,0 +1,18 @@
+"pphs" is a Haskell code pretty-printer, written by Andrew Preece as a
+senior honours project at Glasgow.
+
+== original README ========================================
+
+* * RELEASE directory * *
+
+To find out how to use pphs read the User Guide by
+typing xdvi User_Guide
+
+If you put the output of pphs into a file called Haskell.tex
+then you can use Wrapper.tex to produce a ``stand alone''
+dvi file of your program.  Just run latex on Wrapper.tex
+by typing latex Wrapper then view with xdvi Wrapper
+
+* * MAINTENANCE directory * *
+
+Code for pphs program, LaTeX file, report, Makefile, etc.

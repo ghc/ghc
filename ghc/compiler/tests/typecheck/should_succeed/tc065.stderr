@@ -1,0 +1,4 @@
+"tc065.hs", line 5: import directory list is:
+	.:/users/fp/grasp/ghc/imports:/users/fp/grasp/ghc/./driver/.././lib/prelude:/users/fp/grasp/ghc/./driver/.././runtimes/standard
+	Can't find .hi file for module `TheUtils'; on input: \n
+ghc2: execution of the Haskell parser had trouble

@@ -1,0 +1,27 @@
+\section[Info.lh]{Definitions for the Info Pointer Field}
+
+Multi-slurp protection:
+\begin{code}
+#ifndef Info_H
+#define Info_H
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[info-SM]{Storage-mgr interface things for the info ptr}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define	INFO_FIXED_HDR			1
+#define INFO_HDR_POSN			0
+#define AFTER_INFO_HDR			(INFO_HDR_POSN+INFO_FIXED_HDR)
+#define INFO_PTR(closure)       	(((P_)(closure))[INFO_HDR_POSN])
+#define SET_INFO_PTR(closure,wd)	INFO_PTR(closure) = (W_) wd
+#define SET_STATIC_INFO_PTR(wd)		(W_) wd
+\end{code}
+
+End multi-slurp protection:
+\begin{code}
+#endif /* Info_H */
+\end{code}

@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface U_ttype where
+import PreludePS(_PackedString)
+import ProtoName(ProtoName)
+import U_list(U_list)
+data U_ttype   = U_tname ProtoName U_list | U_namedtvar ProtoName | U_tllist U_ttype | U_ttuple U_list | U_tfun U_ttype U_ttype | U_context U_list U_ttype | U_unidict ProtoName U_ttype | U_unityvartemplate ProtoName | U_uniforall U_list U_ttype | U_ty_maybe_nothing | U_ty_maybe_just U_ttype
+rdU_ttype :: _Addr -> _PackedString -> _State _RealWorld -> (U_ttype, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

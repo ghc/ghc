@@ -1,0 +1,77 @@
+Installing a new compiler test
+==============================
+
+[If the test if for the driver, the parser, the runtime system, the
+std prelude, ... in short _not_ the compiler, it belongs elsewhere.]
+
+1.  Copy your Haskell program into an appropriately named file in the
+    appropriate directory, e.g., "typecheck/tc093.hs" for the 93rd
+    typechecker test.
+
+2.  Edit the Jmakefile in that dir to add your test: almost certainly
+    just a line of the form...
+
+RunStdTest(tc093,$(TESTGHC), "-ddump-tc tc093.hs", 0, /dev/null, tc093.stderr)
+           ^^^^^
+name of test||||
+                 ^^^^^^^^^^
+driver to use----||||||||||      	     	 
+                             ^^^^^^^^^^^^^^^^^^^^
+driver command line----------||||||||||||||||||||
+                                                  ^^
+expected exit status (0=success, 1=failure)-------||
+                                                     ^^^^^^^^^
+file holding expected standard output----------------|||||||||
+								^^^^^^^^^^^^^
+file holding expected output on standard error------------------|||||||||||||
+
+    The example above is typical.  The command-line stuff may vary,
+    but it's likely to be "dump pass <foo> output" (e.g., -ddump-tc)
+    and the input file name.  Dump output is on stderr, hence the
+    expected-output files.
+
+    The current best documentation of the flags to use is in
+    $(TOP)/driver/ghc (invoke w/ -help option).
+
+3.  Create the expected-output files.  I'm usually lazy and just
+    "touch" them (creating an empty file), then update them (section
+    below) after the test has "failed".
+
+4.  "make Makefile", to make a Makefile from the Jmakefile.
+
+5.  "make runtest_<testname>" (e.g., make runtest_tc093) to run the
+    one test.
+
+    IF "make" FALLS OVER, THEN IMMEDIATEDLY "mv Makefile.bak Makefile"!!
+    You probably had a typo in the Jmakefile; fix it and resume from
+    step 4.
+
+
+Running tests
+=============
+
+* You may run all tests by typing "make runtests" (or, if you expect
+  or don't mind errors, "make -k runtests").
+
+* You may run one test <foo> with "make runtest_<foo>".
+
+* You may run tests <foo> to <bar> with a simple script,
+  "dotests <foo> <bar>".  You may pass "make" arguments to it as well,
+  as in:
+    	dotests -k tc019 tc028
+
+
+Updating the "expected output" files
+====================================
+
+Sometimes, it will happen that the differences between expected and
+actual output of the tests will not mean failure but that the actual
+output is "more correct".
+
+If you save the output of "make runtests" (mainly from "diff"), you
+may automatically update the expected-output files by using
+
+    patch -p0 < saved-output
+
+(You should probably ^C out of the "patch" if it doesn't do exactly
+what you expect.)

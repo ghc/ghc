@@ -1,0 +1,471 @@
+\documentstyle[11pt,slpj]{article}
+
+\newcommand{\reference}[4]{     % authors, title, details, abstract
+\large
+#1, {\em #2}, #3.
+\normalsize
+\begin{quotation}
+#4
+\end{quotation}
+\vspace{0.2in}
+}
+
+\newcommand{\Haskell}[1]{{\sc Haskell}}
+
+\begin{document}
+
+\title{Abstracts of GRIP/GRASP-related papers and reports before 1990\\
+Dept of Computing Science \\
+University of Glasgow G12 8QQ}
+
+\author{
+Cordelia Hall (cvh@cs.glasgow.ac.uk) \and
+Kevin Hammond (kh@cs.glasgow.ac.uk) \and
+Will Partain (partain@cs.glasgow.ac.uk) \and
+Simon L Peyton Jones (simonpj@cs.glasgow.ac.uk) \and
+Phil Wadler (wadler@cs.glasgow.ac.uk) 
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP 
+and GRASP projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by writing to 
+Teresa Currie, Dept of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+teresa@uk.ac.glasgow.cs.
+
+Those marked ($\spadesuit$) can be obtained from the School of Information
+Systems, University of East Anglia, Norwich, UK.
+\end{abstract}
+
+\section{Published papers}
+%Nov
+\reference{Cordelia Hall and David Wise}
+{Generating Function Versions with Rational Strictness Patterns}
+{Science of Computer Programming 12 (1989)}
+{Expression evaluation in lazy applicative languages is usually implemented
+by an expensive mechanism requiring time and space which may be wasted
+if the expression eventually needs the values anyway. Strictness analysis,
+which has been successfully applied to flat domains and higher order functions,
+is used here to annotate programs in a first order language containing
+lazy list constructors so that they retain their original behavior, but
+run more efficiently. In practice, the strictness in fields within these
+constructors often follows regular patterns that can be finitely
+represented, especially in programs that manipulate such useful structures
+as finite or infinite trees. The approach presented here typically generates
+efficient, mutually recursive function versions for these programs.
+Weak and strong safety are defined and discussed, and the compiler
+is shown to be weakly safe. Termination is guaranteed by several factors,
+including a finite resource which controls the increase in code size,
+and a regularity constraint placed upon the strictness patterns
+propagated during compilation.}
+
+\reference{Kevin Hammond}
+{Exception Handling in a Parallel Functional Language: PSML}
+{Proc TENCON '89, Bombay, India, Nov 1989}
+{
+Handling exception occurrences during computation is a problem  in  most
+functional programming languages, even when the computation is eager and
+sequential.  This paper presents a version of  the  error  value  method
+which  allows lazy computation with deterministic semantics for parallel
+evaluation even in the presence of  errors.   The  realisation  of  this
+technique   is   illustrated  by  reference  to  PSML,  a  referentially
+transparent variant of Standard ML designed for parallel evaluation.
+}
+
+\reference
+{Phil Trinder and Philip Wadler}
+{Improving list comprehension database queries}
+{{\em TENCON '89\/} (IEEE Region 10 Conference),
+Bombay, India, November 1989.}
+{
+The task of increasing the efficiency of database queries has recieved
+considerable attention. In this paper we describe the improvement of
+queries expressed as list comprehensions in a lazy functional
+language. The database literature identifies four algebraic and two
+implementation-based improvement strategies. For each strategy we show
+an equivalent improvement for queries expressed as list
+comprehensions.  This means that well-developed database algorithms
+that improve queries using several of these strategies can be emulated
+to improve comprehension queries.  We are also able to improve queries
+which require greater power than that provided by the relational
+algebra.  Most of the improvements entail transforming a simple,
+inefficient query into a more complex, but more efficient form. We
+illustrate each improvement using examples drawn from the database
+literature.
+}
+
+%Sept
+
+
+\reference{Simon L Peyton Jones and Jon Salkild}
+{The Spineless Tagless G-machine}
+{Proc IFIP Symposium on Functional Programming Languages and Computer
+Architecture, London, Sept 1989}
+{
+The Spineless Tagless G-machine is an abstract machine based on graph
+reduction, designed as a target for compilers for non-strict functional
+languages.
+As its name implies, it is a development of earlier work, especially
+the G-machine and Tim.
+
+It has a number of unusual features: the abstract machine code is
+rather higher-level than is common, allowing better code generation;
+the representation of the graph eliminates most interpretive overheads;
+vectored returns from data structures give fast case-analysis;
+and the machine is readily extended for a parallel implementation.
+
+The resulting implementation runs at least 75\% faster 
+than the Chalmers G-machine.
+}
+
+\reference
+{Philip Wadler}
+{Theorems for free!}
+{{\em 4'th International Conference on Functional Programming
+Languages and Computer Architecture}, London, September 1989.}
+{
+From the type of a polymorphic function we can derive a theorem
+that it satisfies.  Every function of the same type satisfies the same
+theorem.  This provides a free source of useful theorems,
+courtesy of Reynolds' abstraction theorem for the polymorphic lambda
+calculus.
+}
+
+%Aug
+
+\reference{Kevin Hammond}
+{Implementing Type Classes for Haskell}
+{Proc Glasgow  Workshop  on  Functional  Programming,  Fraserburgh, Aug 1989}
+{
+This  paper describes the implementation of the type class mechanism for
+the functional language Haskell, which has been  undertaken  at  Glasgow
+University.  A simple introduction to type classes discusses the methods
+used to  select  operators  and  dictionaries  in  the  Glasgow  Haskell
+compiler.    A   solution   to  the  problem  of  selecting  super-class
+dictionaries, not considered by the original paper  on  type  class,  is
+also  presented.   The  modifications which must be made to the standard
+Hindley/Milner type-checking algorithm  to  permit  the  translation  of
+operators  are  described,  and  a  revised definition of algorithm W is
+provided. Finally, a set of performance figures  compares  the  run-time
+efficiency of Haskell and LML programs, indicating the overhead inherent
+in the original, naive method of operator selection, and the improvement
+which may be obtained through simple optimisations.
+}
+
+\reference{Simon L Peyton Jones}
+{FLIC - a functional language intermediate code}
+{SIGPLAN Notices 23(8) 1988, revised 1989}
+{
+FLIC is a Functional Language Intermediate Code, intended to
+provide a common intermediate language between diverse
+implementations of functional languages, including parallel
+ones.
+This paper gives a formal definition of FLIC's syntax and
+semantics, in the hope that its existence may encourage greater
+exchange of programs and benchmarks between research groups.
+}
+
+%July
+\reference{Simon L Peyton Jones, Chris Clack and Jon Salkild}
+{High-performance parallel graph reduction}
+{Proc Parallel Architectures and Languages Europe (PARLE), LNCS 365, pp193-207, 
+July 1989}
+{
+Parallel graph reduction is an attractive implementation for functional 
+programming languages because of its simplicity and inherently distributed
+nature.
+This paper outlines some of the issues raised by parallel compiled
+graph reduction, and presents the solutions we have adopted to produce an
+efficient implementation.
+
+We concentrate on two particular issues:
+the efficient control of parallelism, resulting in an ability to alter
+the granularity of parallelism 
+{\em dynamically};
+and the efficient use of the memory hierachy to improve locality.
+}
+%April
+
+\reference{Simon L Peyton Jones}
+{Parallel implementations of functional programming languages}
+{Computer Journal 32(2), pp175-186, April 1989}
+{
+It is now very nearly as easy to build a parallel computer
+as to build a sequential one, and there are strong incentives to do so:
+parallelism seems to offer the opportunity to improve both the 
+absolute performance level and the cost/performance ratio of our machines.
+
+One of the most attractive features of functional programming languages
+is their suitability for programming such parallel computers.
+This paper is devoted to a discussion of this claim.
+
+First of all, we discuss parallel functional programming
+from the programmer's point of view.
+Most parallel functional language implementations are based on graph reduction,
+we proceed to a discussion of some implementation issues raised by parallel 
+graph reduction.
+The paper concludes with a case study of a particular parallel graph reduction
+machine, GRIP, and a brief survey of other similar machines.
+}
+%Jan
+\reference
+{Philip Wadler and Stephen Blott}
+{How to make {\em ad-hoc\/} polymorphism less {\em ad hoc}}
+{{\em 16'th ACM Symposium on Principles of Programming Languages},
+Austin, Texas, January 1989.}
+{
+This paper presents {\em type classes}, a new approach to {\em
+ad-hoc\/} polymorphism.  Type classes permit overloading of arithmetic
+operators such as multiplication, and generalise the ``eqtype variables''
+of Standard ML.
+Type classes extend the Hindley\X Milner polymorphic type system, and
+provide a new approach to issues that arise in object-oriented
+programming, bounded type quantification, and abstract data types.
+This paper provides an informal introduction to type classes, and
+defines them formally by means of type inference rules.
+}
+%88
+
+\reference{Chris Hankin, Geoffrey Burn, and Simon L Peyton Jones}
+{A safe approach to parallel combinator reduction}
+{Theoretical Computer Science 56, pp17-36, North Holland, 1988}
+{
+In this paper we present the results of two pieces of work which, when
+combined, allow us to take a program text of a functional langauge and
+produce a parallel implementation of that program.
+We present the techniques for discovering sources of parallelism in 
+a program at compile time, and then show how this parallelism is
+naturally mapped onto a parallel combinator set that we will define.
+
+To discover sources of parallelism in a program, we use 
+{\em abstract interpretation} a compile-time technique which is used
+to gain information about a program which may then be used to optimise
+the program's execution.
+A particular use of abstract interpretation is in 
+{\em strictness analysis}
+of functional program.
+In a language that has lazy semantics, the main potential for parallelism
+arises in the evaluation of arguments of strict operators.
+
+Having identified the sources of parallelism at compile time, it is 
+necessary to communicate these to the run-time system.
+In the second part of the paper we introduce an extended set of combinators,
+including some parallel combinators, to achieve this purpose.
+}
+
+
+\reference{John T. O'Donnell and Cordelia Hall}
+{Debugging in Applicative Languages}
+{Lisp and Symbolic Computation, 1988}
+{Applicative programming languages have several properties that appear
+to make debugging difficult. First, the absence of assignment
+statements complicates the notion of changing a program while
+debugging. Second, the absence of imperative input and output
+makes it harder to obtain information about what the program is doing.
+Third, the presence of lazy evaluation prevents the user from
+knowing much about the order in which events occur. Some solutions to
+these problems involve nonapplicative extensions to the language.
+Fortunately, the same features of applicative languages that cause
+problems for traditional debugging also support an idiomatic 
+applicative style of programming, and effective debugging techniques
+can be implemented using that style. This paper shows how to implement
+tracing and interactive debugging tools in a purely applicative
+style. This approach is more flexible, extensive and portable
+than debugging tools that require modification to the language
+implementation.}
+
+\reference{Simon L Peyton Jones, Chris Clack, Jon Salkild, Mark Hardie}
+{Functional programming on the GRIP multiprocessor}
+{Proc IEE Seminar on Digital Parallel Processors, Lisbon, Portugal, 1988}
+{
+Most MIMD computer architectures can be classified as 
+tightly-coupled or loosely-coupled,
+depending on the relative latencies seen by a processor accessing different
+parts of its address space.
+
+By adding microprogrammable functionality to the memory units, we have
+developed a MIMD computer architecture which explores the middle region
+of this spectrum.
+This has resulted in an unusual and flexible bus-based multiprocessor,
+which we are using as a base for our research in parallel functional programming
+languages.
+
+In this paper we introduce parallel functional programming, and describe
+the architecture of the GRIP multiprocessor.
+}
+
+\reference{Geoffrey Burn, Simon L Peyton Jones, and John Robson}
+{The spineless G-machine}
+{Proc ACM Conference on Lisp and Functional Programming, Snowbird, pp244-258,
+August 1988}
+{
+Recent developments in functional language implementations have
+resulted in the G-machine, a programmed graph-reduction machine.
+Taking this as a basis, we introduce an optimised method of
+performing graph reduction, which does not need to build the
+spine of the expression being reduced.
+This Spineless G-machine only updates shared expressions, and
+then only when they have been reduced to weak head normal form.
+It is thus more efficient than the standard method of performing
+graph reduction.
+
+We begin by outlining the philosophy and key features of the
+Spineless G-machine, and comparing it with the standard
+G-machine.
+Simulation results for the two machines are then presented and
+discussed.
+
+The Spineless G-machine is also compared with Tim, giving a
+series of transformations by which they can be interconverted.
+These open up a wide design space for abstract graph reduction
+machines, which was previously unknown.
+
+A full specification of the machine is given in the appendix,
+together with compilation rules for a simple functional language.
+}
+%87
+
+\reference{Simon L Peyton Jones and Chris Clack}
+{Finding fixpoints in abstract interpretation} 
+{in Abstract Interpretation of Declarative Languages,
+ed Hankin \& Abramsky, Ellis Horwood, pp246-265, 1987.}
+{
+Abstract interpretation is normally used as the basis for
+a static, compile-time analysis of a program.
+For example, strictness analysis attempts to establish which
+functions in the program are strict (we will use strictness
+analysis as a running example).
+
+Using abstract interpretation in this way requires the
+compile-time evaluation of expressions in the abstract domain.
+It is obviously desirable that this evaluation should
+always terminate, since otherwise the compiler would risk
+non-termination.
+In the case of non-recursive functions there is no problem, and
+termination is guaranteed.
+Recursive functions, however, present more of a problem, and it
+is the purpose of this paper to explain the problem and to
+offer some practical solutions.
+}
+
+\reference{Simon L Peyton Jones}
+{GRIP - a parallel processor for functional languages}
+{Electronics and Power, pp633-636, Oct 1987;
+also in ICL Technical Journal 5(3), May 1987}
+{
+A brief 4-page article about the GRIP architecture.
+}
+
+\reference{Simon L Peyton Jones, Chris Clack, Jon Salkild, and Mark Hardie}
+{GRIP - a high-performance architecture for parallel graph reduction}
+{Proc IFIP conference on Functional Programming Languages and 
+Computer Architecture, Portland,
+ed Kahn, Springer Verlag LNCS 274, pp98-112, Sept 1987}
+{
+GRIP is a high-performance parallel machine designed to execute
+functional programs using supercombinator graph reduction.
+It uses a high-bandwidth bus to provide access to a
+large, distributed shared memory, using intelligent memory units and
+packet-switching protocols to increase the number of processors
+which the bus can support.
+GRIP is also being programmed to support parallel Prolog and
+DACTL.
+
+We outline GRIP's architecture and firmware, discuss the major design
+issues, and describe the current state of the project and
+our plans for the future.
+}
+%86
+\reference{Chris Clack and Simon L Peyton Jones}
+{The four-stroke reduction engine}
+{Proc ACM Conference on Lisp and Functional Programming,
+Boston, pp220-232, Aug 1986}
+{
+Functional languages are widely claimed to be amenable to concurrent
+execution by multiple processors.  This paper presents an algorithm for
+the parallel graph reduction of a functional program.
+The algorithm supports transparent management of parallel 
+tasks with no explicit
+communication between processors.
+}
+
+\reference{Simon L Peyton Jones}
+{Functional programming languages as a software engineering tool}
+{in Software Engineering - the critical decade D Ince,
+Peter Peregrinus, pp124-151, 1986}
+{
+It is the purpose of this paper to suggest that functional
+languages are an appropriate tool for supporting the activity
+of programming in the large, and to present a justification of
+this claim.
+}
+
+\reference{Simon L Peyton Jones}
+{Using Futurebus in a fifth generation computer architecture}
+{Microprocessors and Microsystems 10(2), March 1986}
+{
+Despite the bandwidth limitations of a bus, we present a design
+for a parallel computer (GRIP) based on Futurebus, which limits bus
+bandwidth requirements by using intelligent memories.
+
+Such a machine offers higher performance than a uniprocessor
+and lower cost than a more extensible multiprocessor, as well
+as serving as a vehicle for research in parallel architectures.
+}
+
+\section{Internal reports}
+
+
+\reference{Kevin Hammond}
+{A Proposal for an Implementation of Full Dactl on a Meiko Transputer Rack}
+{SYS-C89-02, University of East Anglia, 1989}
+{
+The  design  of  an  abstract  machine  instruction  set  for  Dactl  is
+described.   The  instruction set is sufficient to encapsulate all Dactl
+constructs; it will also permit  parallel  execution  where  applicable.
+The  paper  considers the difficulties involved in the implementation of
+this abstract instruction set on the  UEA  Meiko  M40  transputer  rack,
+using  a  ZAPP-style  kernel.  Part of the code for a simulation of this
+instruction set is included as an appendix to the report.
+}
+
+
+\reference{Kevin Hammond and John Glauert}
+{Implementing Pattern-Matching Functional Languages using Dactl}
+{University of Glasgow, 1989}
+{
+This paper describes the implementation of a family of  pattern-matching
+functional  languages  in  the  parallel graph-rewriting language Dactl.
+Attention  is   focussed   on   the   direct   implementation   of   the
+pattern-matching   constructs   in  the  context  of  various  reduction
+strategies: eager, lazy, and lazy with  strictness  analysis.   Two  new
+reduction  strategies  combining  lazy  evaluation  with a technique for
+compiling non-overlapping patterns are  also  illustrated.   The  latter
+strategies   provide   improved  termination  properties  compared  with
+conventional functional  language  implementations  for  non-overlapping
+patterns.  The implementations described here cover all pattern-matching
+constructs found in Standard  ML,  including  named  patterns  and  deep
+patterns.   The  use  of  Dactl  renders  explicit  the  complexities of
+pattern-matching which are obscured by implementation in a  conventional
+intermediate language or abstract machine.
+}
+
+\reference{Simon L Peyton Jones}
+{A practical technique for designing asynchronous finite-state machines}
+{Proc Glasgow Workshop on Functional Programming, Fraserburgh,Aug 1989}
+{
+The literature on asynchronous logic design is mostly of a fairly theoretical
+nature.   We present a practical technique for generating asynchronous finite-state
+machines from a description of their states and transitions.  The technique
+has been used successfully to design a number of state machines in
+the GRIP mulitprocessor.
+}
+
+\end{document}

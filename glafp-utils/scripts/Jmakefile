@@ -1,0 +1,72 @@
+PROGRAMS = lndir \
+	   mkdirhier \
+	   runstdtest \
+	   mkdependC \
+	   fastmake \
+	   zap-if-same \
+	   ltx \
+	   perltags
+
+all:: $(PROGRAMS)
+/* stuff to have before we get going */
+MsubNeededHere($(PROGRAMS))
+
+/* === BUILD STUFF (installation, etc., below) ========== */
+
+/* std X11 stuff */
+MsubProgramScriptTarget(BourneShell,mkdirhier,mkdirhier.sh,,)
+
+BuildPgmFromOneCFile(lndir)
+#if 0
+MsubProgramScriptTarget(BourneShell,lndir,lndir.sh,,)
+InstallScriptTarget(lndir,	  $(INSTSCRIPTDIR))
+#endif
+
+MsubMakefileDependentProgramScriptTarget(PerlCmd,runstdtest,runstdtest.prl,,)
+MsubMakefileDependentProgramScriptTarget(PerlCmd,ltx,ltx.prl,,)
+MsubProgramScriptTarget(PerlCmd,fastmake,fastmake.prl,,)
+MsubProgramScriptTarget(PerlCmd,zap-if-same,zap-if-same.prl,,)
+MsubProgramScriptTarget(PerlCmd,perltags,perltags.prl,,)
+
+/*
+mkdependC has to go in "bin" directory, because there may be
+machine-dependent ideas of what CC to use, etc.
+
+ltx, runstdtest: ditto, but only because of TMPDIR
+*/
+MsubMakefileDependentProgramScriptTarget(PerlCmd,mkdependC,mkdependC.prl,/*noflags*/,/*Makefile*/)
+
+#ifdef UseCCMakeDepend
+install::
+	@echo "install makedepend (in ${CURRENT_DIR}) by hand..."
+#endif
+/*
+	lobotomized... install by hand...
+#ifdef UseCCMakeDepend
+InstallProgramTarget(makedepend,$(BINDIR))
+#endif
+*/
+
+/* === INSTALLATION ======== */
+
+/* the rest of these vary from std/useful to hackish dans le extreme */
+
+MakeDirectories(install, $(INSTBINDIR) $(INSTSCRIPTDIR))
+InstallScriptTarget(fastmake,	  $(INSTSCRIPTDIR))
+InstallBinaryTarget(lndir,	  $(INSTBINDIR))
+InstallScriptTarget(ltx,	  $(INSTBINDIR))
+InstallScriptTarget(mkdependC,	  $(INSTBINDIR))
+InstallScriptTarget(mkdirhier,	  $(INSTSCRIPTDIR))
+InstallScriptTarget(perltags,	  $(INSTSCRIPTDIR))
+InstallScriptTarget(runstdtest,  $(INSTBINDIR))
+InstallScriptTarget(zap-if-same,  $(INSTSCRIPTDIR))
+
+InstallManPageTarget(lndir,$(INSTCOMMANDIR),$(COMMANSUFFIX))
+InstallManPageTarget(mkdirhier,$(INSTCOMMANDIR),$(COMMANSUFFIX))
+
+/* === OTHER STUFF ========= */
+
+ExtraStuffToClean($(PROGRAMS))
+
+ClearTagsFile()
+PerlTagsTarget( *.prl ) /* nothing for the Bourne shell scripts */

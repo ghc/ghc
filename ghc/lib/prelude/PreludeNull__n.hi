@@ -1,0 +1,4 @@
+interface Prelude where {
+    -- nothing here: slurped when "-fno-implicit-prelude"
+no_implicit_prelude____ :: Int
+}

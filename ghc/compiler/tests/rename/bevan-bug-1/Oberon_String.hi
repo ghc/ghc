@@ -1,0 +1,13 @@
+interface Oberon_String where
+from_string :: [Char] -> Oberon_String
+	{-# ARITY from_string = 1 #-}
+data Oberon_String 
+instance Eq Oberon_String
+	{-# ARITY (==) = 2 #-}
+	{-# ARITY (/=) = 0 #-}
+instance Text Oberon_String
+	{-# ARITY readsPrec = 0 #-}
+	{-# ARITY showsPrec = 2 #-}
+	{-# ARITY readList = 0 #-}
+	{-# ARITY showList = 0 #-}
+

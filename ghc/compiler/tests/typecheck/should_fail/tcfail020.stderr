@@ -1,0 +1,6 @@
+ 
+"tcfail020.hs", line 12: No such instance:
+    class "A", type "[a]" (at an instance declaration)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

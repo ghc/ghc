@@ -1,0 +1,22 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.H.op1 = /\ a.t8 -> \{-classdict-} [] [op1.t9] -> op1.t9
+{- nonrec -}
+defm.ShouldSucceed.H.op1 =
+    /\ a.t10 ->
+	\{-dict-} d.ShouldSucceed.H.t11 ->
+	    (error (a.t10 -> a.t10 -> a.t10))
+		"No default method for \"ShouldSucceed.H.defm.ShouldSucceed.H.op1\"\n"
+{- rec -}
+dfun.ShouldSucceed.H.Bool = ({-dict-} [] [const.ShouldSucceed.H.Bool.op1])
+const.ShouldSucceed.H.Bool.op1 :: Bool -> Bool -> Bool
+const.ShouldSucceed.H.Bool.op1
+    x.r29 y.r30
+	    = y.r30
+AbsBinds [] [] [(f.t1, ShouldSucceed.f)]
+    (ShouldSucceed.H.op1.t5, const.ShouldSucceed.H.Bool.op1)
+    {- nonrec -}
+    f.t1 :: Bool -> Int -> Bool
+    f.t1 x.r58 y.r59
+		 = ShouldSucceed.H.op1.t5 x.r58 x.r58
+

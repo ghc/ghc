@@ -1,0 +1,575 @@
+%************************************************************************
+%*                                                                      *
+\section[vs-Haskell-defn]{Haskell~1.2 vs.~Glasgow Haskell~0.26: language non-compliance}
+\index{GHC vs the Haskell 1.2 language}
+\index{Haskell 1.2 language vs GHC}
+%*                                                                      *
+%************************************************************************
+
+This section lists Glasgow Haskell infelicities in its implementation
+of Haskell~1.2.  See also the ``when things go wrong'' section
+(\sectionref{wrong}) for information about crashes, space leaks, and
+other undesirable phenomena.
+
+The limitations here are listed in Haskell-Report order (roughly).
+%Limitations related to Glasgow extensions (unboxed numbers, etc.) are
+%given thereafter (\sectionref{infelicities-Glasgow-exts}).
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-exprs-pats]{Expressions and patterns}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Some valid irrefutable patterns are rejected:]
+As syntax errors; just put parentheses around them.
+
+%-------------------------------------------------------------------
+\item[Very long @String@ constants:]
+May not go through.  If you add a ``string gap'' every
+few thousand characters, then the strings can be as long
+as you like.
+
+Bear in mind that string gaps and the \tr{-cpp}\index{-cpp option}
+option don't mix.  The C-preprocessor may munch the backslashes.
+
+%-------------------------------------------------------------------
+\item[Very long literal lists:]
+These may tickle a ``yacc stack overflow'' error in the parser.
+(It depends on the Yacc used to build your parser.)
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-decls]{Declarations and bindings}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Contexts on @data@ declarations are ignored:]
+Not that they do much, anyway...  This won't wreck your life.
+(We still [vaguely] plan to add them, however.)
+
+%-------------------------------------------------------------------
+\item[Location of instance declarations is unchecked:]
+We don't check that instance declarations occur either in the module
+where the class is declared or the module where the data type is
+declared.  This shouldn't hurt you.
+
+For better or worse, we {\em do} check if you try to declare a Prelude
+instance (Prelude class, Prelude type; e.g., \tr{instance Num Bool})
+in one of your own modules.  For some reason, people like to do this!
+(But it is not legal Haskell.)
+
+%-------------------------------------------------------------------
+\item[Derived instances of @Text@ for infix constructors:]
+All the carry-on about derived @readsPrec@ and @showsPrec@ for infix
+constructors---we don't do it (yet).  We treat them the same way as
+all other constructors.
+
+%-------------------------------------------------------------------
+\item[Derived instances of @Binary@:]
+We don't.  (We don't do anything @Binary@ish.)
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-Modules]{Module system and interface files}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Duplicates in a `renaming' list:]
+Are not reported.
+
+%-------------------------------------------------------------------
+\item[Duplicates in an `import' declaration:]
+These are reported as errors, which some might argue they shouldn't
+be.  We reckon it's a feature, not a bug.
+
+%-------------------------------------------------------------------
+\item[Export of `renamed' class methods:]
+Willnae work.  That is: you import a class, renaming one or more
+methods; then export that class---the renaming of the methods {\em
+will not} propagate.
+
+(Otherwise, `renaming'---disgusting though it may be---should work.)
+
+%-------------------------------------------------------------------
+\item[Fixities/precedences following `renamed' entities that are exported:]
+No chance.
+
+%-------------------------------------------------------------------
+\item[\tr{import Foo ()} vs \tr{import Foo}:]
+GHC cannot tell the difference (!).
+
+Given that the only module on which you might want to do the former is
+\tr{import Prelude ()}, there are probably much bigger gremlins that
+would jump out and bite you if the import {\em did} work.  Besides
+which, you can achieve the same result with
+\tr{-fno-implicit-prelude}.\index{-fno-implicit-prelude option}
+
+%-------------------------------------------------------------------
+\item[Some selective import/export checking not done:]
+On selective import and export of type-constructors/classes in
+which the data-constructors/methods are named explicitly:
+it'll work; it's just that every conceivable paranoia
+check won't be done.
+
+%-------------------------------------------------------------------
+\item[Some Prelude entities cannot be hidden:]
+For example, this doesn't work:
+\begin{verbatim}
+import Prelude hiding (readParen)
+\end{verbatim}
+That's because there are a few should-be-hideable Prelude entities
+which need to appear by magic for derived instances.  They are
+\tr{(&&)}, \tr{(.)}, \tr{lex}, \tr{map}, \tr{not}, \tr{readParen},
+\tr{showParen}, and \tr{showString}.  SIGH.
+
+%-------------------------------------------------------------------
+\item[\tr{M..} exports vs multiply-imported entities:]
+If an entity \tr{foo} is imported from several interfaces, as in...
+\begin{verbatim}
+import A1 (foo); import A2 (foo); import A3 (foo)
+\end{verbatim}
+... and you then do a ``dot dot'' export of \tr{A1} (for example), it
+will be {\em pure luck} if \tr{foo} gets exported.  This is very sad.
+
+Workaround: export \tr{foo} explicitly.
+
+%-------------------------------------------------------------------
+\item[\tr{M..} with Prelude interfaces:]
+Doing \tr{Prelude<something>..} in an export list; don't even think
+it.
+
+%-------------------------------------------------------------------
+\item[Export of Prelude types/classes must be explicit:]
+
+If you want to export a data type, type synonym or class from a
+Prelude module (its name starts with `Prelude'), then it must be
+listed explicitly in the export list.  If you say:
+
+\begin{verbatim}
+module PreludeMeGently ( PreludeMeGently.. , other_stuff ) where ..
+\end{verbatim}
+
+then the classes/types in \tr{PreludeMeGently} will {\em not} be
+exported; just add them to the export list.  (This shortcoming is only
+likely to affect people writing their own Prelude modules.)
+
+%-------------------------------------------------------------------
+\item[Can't export primitives types (e.g., \tr{Int#}):]
+
+Don't even try...
+
+%-------------------------------------------------------------------
+\item[Naming errors with \tr{-O} but not without:]
+
+Documentation by example---Consider a module with these imports:
+
+\begin{verbatim}
+... various imports ...
+import Prettyterm	-- desired import
+
+import Pretty		-- sadly-needed import
+\end{verbatim}
+
+The \tr{import Pretty} is required because it defines a type
+\tr{Pretty.Doc} which is mentioned in \tr{import Prettyterm}.
+(Extremely sad, but them's the rules.)
+
+But without \tr{-O}, GHC uses its \tr{-fuse-get-mentioned-vars} hack
+(for speed), trying to avoid looking at parts of interfaces that have
+no relevance to this module.  As it happens, the thing in
+\tr{Prettyterm} that mentions \tr{Pretty.Doc} is not used here, so
+this module will go through without \tr{import Pretty}.  Nice, but
+wrong.
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-numbers]{Numbers, basic types, and built-in classes}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+% now in glasgow_exts
+%\item[@fromInt@ method in class @Num@:]
+% (Non-standard.) We support it, as does HBC.
+
+%-------------------------------------------------------------------
+\item[Very large/small fractional constants:]
+(i.e., with a decimal point somewhere) GHC does not check that these
+are out of range (e.g., for a @Float@), and bad things will inevitably
+follow.  To be corrected.
+
+This problem does {\em not} exist for integral constants.
+
+For very large/small fractional constants near the limits of your
+floating-point precision, things may go wrong.  (It's better than it
+used to be.)  Please report any such bugs.
+
+%-------------------------------------------------------------------
+\item[Unchecked arithmetic:]
+Arguably {\em not} an infelicity, but... Bear in mind that operations
+on \tr{Int}, \tr{Float}, and \tr{Double} numbers are {\em unchecked}
+for overflow, underflow, and other sad occurrences.
+
+Use \tr{Integer}, \tr{Rational}, etc., numeric types if this stuff keeps you
+awake at night.
+
+%-------------------------------------------------------------------
+\item[Multiply-defined array elements---not checked:]
+This code fragment {\em should} elicit a fatal error, but it does not:
+\begin{verbatim}
+main = print (array (1,1) [ 1:=2, 1:=3 ])
+\end{verbatim}
+
+%-------------------------------------------------------------------
+\item[Support for @Binary@ whatnot:]
+We don't.
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-IO]{Dialogue I/O}
+%*                                                                      *
+%************************************************************************
+
+Dialogue-style I/O---still the default for GHC---is on its way out
+(see the stuff about ``monadic I/O for Haskell~1.3''), so we probably
+won't fix these shortcomings.
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Support for @Dialogue@ I/O:]
+We do not yet support all @Requests@, notably:
+@ReadBinFile@,
+@WriteBinFile@,
+@AppendBinFile@,
+@StatusFile@,
+@ReadBinChan@,
+@AppendBinChan@,
+@StatusChan@,
+@SetEnv@.  Also, we do not support the optional I/O @Requests@.
+
+\item[@AppendChan@ and @ReadChan@ requests:]
+The former only works for \tr{stdout} and \tr{stderr}; the
+latter only for \tr{stdin}.
+
+\item[@Echo@ request:]
+We don't do anything at all.
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[infelicities-Prelude]{In Prelude support}
+%*                                                                      *
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Arbitrary-sized tuples:]
+Plain old tuples of arbitrary size {\em do} work.
+Note that lots
+of overloading can give rise to large tuples ``under the hood'' of
+your program.
+
+HOWEVER: standard instances for tuples (@Eq@, @Ord@, @Ix@, and
+@Binary@) are available {\em only} up to 5-tuples; except @Binary@,
+which we don't do at all.
+
+These limitations are easily subvertible, so please ask if you get
+stuck on them.
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+%\subsection[infelicities-Glasgow-exts]{In Glasgow extensions}
+%*                                                                      *
+%************************************************************************
+
+%\begin{description}
+%-------------------------------------------------------------------
+%\item[Glasgow extensions not well ``packaged'':]
+%We would rather give you tidy interfaces to the primitive extensions
+%that GHC provides.  For example, instead of your having to muck around
+%with...
+%\begin{verbatim}
+%    ... _ccall_ fflush ``stderr'' `thenIO_Int_#` ...
+%\end{verbatim}
+%... (all very grimy); you should be able to import a \tr{LibC.hi}, and
+%pretend that @fflush@ is really a Haskell function!
+
+%This problem will be fixed when Haskell~1.3 comes into existence, and
+%we implement it.
+
+%-------------------------------------------------------------------
+%\item[@ArrRef@s of @Int#@s, @Float#@s, @Double#@s:]
+%Are not in yet, but will be.  (Easy to add if you're desperate.)
+%\end{description}
+
+%************************************************************************
+%*                                                                      *
+\section[vs-Haskell-1.3]{Haskell~1.3 DRAFT vs.~Glasgow Haskell~0.26}
+\index{GHC vs the DRAFT Haskell 1.3 language}
+\index{Haskell 1.3 language DRAFT vs GHC}
+%*                                                                      *
+%************************************************************************
+
+There is work afoot on ``Haskell~1.3,'' a substantial revision of
+the Haskell~1.2 language.
+
+Haskell 1.3 is NOT a standard; it is NOT even a DRAFT standard.  As of
+June 1995, there exists a 1.3 PROPOSAL, which will CERTAINLY change.
+Therefore, the ``1.3 things'' we ``support'' may change ARBITRARILY
+much, and we won't even be mildly apologetic about breaking programs
+that use ``1.3'' facilities.
+
+That said, there are two categories of ``1.3'' things that we commend
+to you.
+\begin{itemize}
+\item
+Things virtually certain to end up in any 1.3~standard.  An example is
+the \tr{Maybe} type.
+\item
+Wobblier things which are so much better than their 1.2 equivalents
+that you will want to use them.  We mean: monadic I/O.
+
+The basic I/O functions are ``unlikely'' to change and so are
+reasonably safe to adopt.  (But see WARNING above...)
+\end{itemize}
+
+To use our 1.3 code, you should compile {\em and link} using a
+\tr{-fhaskell-1.3}\index{-fhaskell-1.3 option} flag.
+
+%************************************************************************
+%*                                                                      *
+\subsection[duffer-1-3]{Duffer's guide for converting 1.2 I/O to 1.3 I/O}
+\index{I/O---converting 1.2 to 1.3}
+\index{Dialogue I/O--converting to 1.3}
+\index{1.2 I/O---converting to 1.3}
+%*                                                                      *
+%************************************************************************
+
+Here is our ``crib sheet'' for converting 1.2 I/O to 1.3.  In most cases,
+it's really easy.
+\begin{enumerate}
+\item
+Change \tr{readChan stdin} to \tr{hGetContents stdin}.
+\item
+Change \tr{appendChan stdout} to \tr{putStr}, which is equivalent to
+\tr{hPutStr stdout}.
+Change \tr{appendChan stderr} to \tr{hPutStr stderr}.
+\item
+You need to \tr{import LibSystem} if you used @getArgs@, @getEnv@,
+or @getProgName@.
+\item
+Assuming continuation-style @Dialogue@ code, change \tr{... exit done $}
+to \tr{... >>}.  Change \tr{... exit $ \ foo ->} to \tr{... >>= \ foo ->}.
+\item
+If you had any functions named \tr{(>>)}, \tr{(>>=)}, or \tr{return},
+change them to something else.
+\end{enumerate}
+
+%************************************************************************
+%*                                                                      *
+\subsection[nonio-1-3]{Non-I/O things from the 1.3-DRAFT proposal}
+%*                                                                      *
+%************************************************************************
+
+Besides the I/O stuff, you also get these things when you use the
+\tr{-fhaskell-1.3}\index{-fhaskell-1.3 option} flag.
+
+Once again: ANY of thing might CHANGE COMPLETELY before we have ``1.3
+for real.''
+
+\begin{verbatim}
+data Either a b = Left a | Right b deriving (Text, Eq, Ord)
+
+data Maybe a = Nothing | Just a deriving (Eq, Ord, Text)
+
+thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+thenMaybe Nothing _ = Nothing
+thenMaybe (Just x) f = f x
+
+curry   :: ((a,b) -> c) -> a -> b -> c
+curry f x y = f (x,y)
+
+uncurry :: (a -> b -> c) -> (a,b) -> c
+uncurry f (x,y) = f x y
+\end{verbatim}
+\index{Maybe type (Haskell 1.3)}
+\index{Either type (Haskell 1.3)}
+\index{curry function (Haskell 1.3)}
+\index{uncurry function (Haskell 1.3)}
+
+%************************************************************************
+%*                                                                      *
+\subsection[io-1-3]{Vs~1.3 monadic I/O}
+\index{GHC vs the DRAFT 1.3 I/O proposal}
+\index{DRAFT 1.3 I/O proposal vs GHC}
+%*                                                                      *
+%************************************************************************
+
+The most notable improvement in Haskell~1.3 is its I/O, with a shift to
+``monadic-style'' I/O.
+
+We still offer direct access to the so-called \tr{PrimIO} monad, via
+the \tr{PreludeGlaST} interface.  This is NON-STANDARD, an extension.
+This interface is described in \Sectionref{io-1-3-prim-interface}.
+
+The old \tr{PreludePrimIO} interface is DEAD.
+
+The even-older \tr{PreludeGlaIO} interface is DEADER.
+
+%************************************************************************
+%*									*
+\subsubsection[io-1-3-shortcomings]{Known shortcomings in monadic I/O}
+%*									*
+%************************************************************************
+
+Before you begin with ``1.3-style'' monadic I/O, you might as well
+know the known shortcomings of our implementation, as at 0.26.
+
+The error type is called \tr{IOError13}, rather than \tr{IOError}
+\index{IOError13 vs IOError}
+(which is still the 1.2 type).  (Prelude types cannot be renamed,
+so...)  You probably shouldn't be messing with \tr{IOError} much,
+anyway.
+
+Some of the 1.3 I/O code, notably the Extremely Cool \tr{LibPosix}
+stuff, is relatively untested.  Go for it, but be wary...
+\index{LibPosix bugs}
+\index{bugs, LibPosix}
+
+%************************************************************************
+%*									*
+\subsubsection[io-1-3-main-interface]{1.3-style monadic I/O}
+%*									*
+%************************************************************************
+
+To use our 1.3 I/O, you should compile {\em and link} using a
+\tr{-fhaskell-1.3}\index{-fhaskell-1.3 option} flag.
+
+You should consult the PROPOSED 1.3-I/O standard.  GHC~0.26 implements
+the ``December 1994'' draft, which we distribute in
+\tr{ghc/docs/io-1.3/}.
+
+Alternatively, you could grab the ``June 1995'' draft, from
+\tr{pub/haskell/report/}, on \tr{ftp.dcs.glasgow.ac.uk}.  The main
+December--June change that you need to know about is: many of the I/O
+functions have been removed from \tr{Prelude*} interfaces (no import
+required) and put into \tr{Lib*} interfaces (import required).
+
+GHC~0.26 still provides the I/O functions via \tr{Prelude.hi} (no
+import required).  Ignore the ``June draft'' pleadings for
+\tr{import LibIO}, and you'll be fine.
+
+{\em There is no guarantee that the final 1.3 proposal will look
+anything like the current DRAFT.}  It ain't a standard until the fat
+committee sings.
+
+For interaction with our non-standard \tr{PrimIO}, including
+\tr{_ccall_}s.  we also provide:
+\begin{verbatim}
+-- impedance matching stuff
+ioToPrimIO	:: IO a -> PrimIO a
+\end{verbatim}
+
+%************************************************************************
+%*									*
+\subsubsection[io-1-3-prim-interface]{Access to the \tr{PrimIO} monad}
+\index{PrimIO monad (Glasgow extension)}
+\index{I/O, primitive (Glasgow extension)}
+%*									*
+%************************************************************************
+
+In what we have implemented, \tr{PrimIO} is the
+handle-the-errors-yourself monad (NB: used for C-calls and such);
+whereas \tr{IO} is the 1.3-ish we-handle-errors-for-you monad.
+
+Should you may need to play with the \tr{PrimIO} monad directly, you
+can import \tr{PreludeGlaST}.
+
+NB: You used to get this stuff from the \tr{PreludePrimIO} interface,
+which is now deceased.  As of 0.26, you get all things
+state-transforming from the \tr{PreludeGlaST} interface.
+
+The usual monadic stuff for \tr{PrimIO}:
+\begin{verbatim}
+returnPrimIO    :: a -> PrimIO a
+thenPrimIO      :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
+seqPrimIO	:: PrimIO a -> PrimIO b -> PrimIO b
+fixPrimIO	:: (a -> PrimIO a) -> PrimIO a
+foldrPrimIO	:: (a -> b -> PrimIO b) -> PrimIO b -> [a] -> PrimIO b
+listPrimIO	:: [PrimIO a] -> PrimIO [a]
+mapPrimIO	:: (a -> PrimIO b) -> [a] -> PrimIO [b]
+mapAndUnzipPrimIO :: (a -> PrimIO (b,c)) -> [a] -> PrimIO ([b],[c])
+forkPrimIO	:: PrimIO a -> PrimIO a
+
+unsafePerformPrimIO	:: PrimIO a -> a
+unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
+  -- and they are not called "unsafe" for nothing!
+\end{verbatim}
+
+And some other stuff:
+\begin{verbatim}
+data _FILE  -- corresponds to a "FILE *" in C
+	    -- in classes Eq, _CCallable, and _CReturnable
+
+fclose  :: _FILE -> PrimIO Int
+fdopen  :: Int -> String -> PrimIO _FILE
+fflush  :: _FILE -> PrimIO Int
+fopen   :: String -> String -> PrimIO _FILE
+fread   :: Int -> Int -> _FILE -> PrimIO (Int, _ByteArray Int)
+freopen :: String -> String -> _FILE -> PrimIO _FILE
+fwrite  :: _ByteArray Int -> Int -> Int -> _FILE -> PrimIO Int
+
+-- please AVOID using these (They will probably die)
+appendChanPrimIO :: String -> String -> PrimIO ()
+appendFilePrimIO :: String -> String -> PrimIO ()
+getArgsPrimIO	 :: PrimIO [String]
+readChanPrimIO	 :: String -> PrimIO String
+\end{verbatim}
+
+%************************************************************************
+%*									*
+\subsubsection[own-mainPrimIO]{Using your own @mainPrimIO@}
+\index{mainPrimIO, rolling your own}
+%*									*
+%************************************************************************
+
+Normally, the GHC runtime system begins things by called an internal
+function @mainPrimIO :: PrimIO ()@ which, in turn, fires up
+@dialogueToIO :: Dialogue -> IO ()@, linking in {\em your} @Main.main@
+to provide the @Dialogue@.
+
+(If you give a \tr{-fhaskell-1.3} flag, then a {\em different}
+@mainPrimIO@ will be linked in---that's why it is important to link
+with \tr{-fhaskell-1.3}...)
+
+To subvert the above process, you need only provide
+a @mainPrimIO :: PrimIO ()@ of your own
+(in a module named \tr{Main}).  Do {\em not} use a \tr{-fhaskell-1.3} flag!
+
+Here's a little example, stolen from Alastair Reid:
+\begin{verbatim}
+module Main ( mainPrimIO ) where
+
+import PreludeGlaST
+
+mainPrimIO :: PrimIO ()
+mainPrimIO = 
+	 sleep 5				`seqPrimIO`
+	 _ccall_ printf "%d\n" (14::Int)
+
+sleep :: Int -> PrimIO ()
+sleep t = _ccall_ sleep t
+\end{verbatim}

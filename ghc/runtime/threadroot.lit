@@ -1,0 +1,24 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{GRIP Runtime Support for Threads}
+\author{Kevin Hammond, \\
+Department of Computing Science, \\
+University of Glasgow, \\
+Glasgow, G12 8QQ, UK. \\
+\\
+Email: glasgow-haskell-\{request,bugs\}\@dcs.glasgow.ac.uk}
+\maketitle
+\tableofcontents
+\clearpage
+\end{onlystandalone}
+
+\input{grip/Scheduler.lc}
+\input{grip/Spark.lc}
+\input{grip/Thread.lc}
+\input{grip/ParInit.lc}
+
+\begin{onlystandalone}
+%\printindex
+\end{document}
+\end{onlystandalone}

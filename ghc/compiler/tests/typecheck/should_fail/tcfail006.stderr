@@ -1,0 +1,6 @@
+ 
+"tcfail006.hs", line 5: No such instance:
+    class "Num", type "Bool" (at an overloaded literal: 1)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

@@ -1,0 +1,90 @@
+		Notes on imports
+		~~~~~~~~~~~~~~~~
+		SLPJ 15 March 91
+
+
+Distinguish three kinds of things in interfaces:
+
+	- type, data, class, instance, value decls at top level
+
+	- the same but imported.  Syntax
+		import B renaming C to D where
+			data C = ...
+
+	- imports, which serve just to attach original names
+		import B(X,Y)
+
+
+The third group are syntactically stuck at the beginning; the second two
+can be intermingled.
+
+Pass 1
+~~~~~~
+Process each imported interface, and the implementation being compiled,
+scanning *headers of*
+
+	type, data and class decls (incl imported ones in interfaces)
+
+giving the following environments for each
+
+	type/data info	{(ModStr,TyConStr) -> arity}
+	class info	{(ModStr,ClassStr)}
+
+These are filtered (*but not renamed*) by the imports specified in the
+impl (ignore dotdot parts and parts in parens), to give a grand
+environment E1 of the same shape.  It gives the original names of in-scope
+types and classes.
+
+Pass 2
+~~~~~~
+Process each imported interface and the implementation being compiled:
+	
+	- scan its imports and use them to filter and rename E1, to give
+
+			{TyConStr -> arity}
+			{ClassStr}
+
+	- scan type, data, class decls, headers of instance decls
+	  and value type sigs in interfaces
+
+giving for each:
+
+	class info (CE)		{ClassStr -> (ClassId, [ClassOpStr])}
+	inst info (GIE)		{(ClassId,TyConId) -> (Context, GlobalId)}
+		(info from both class and instance decls)
+
+	type/data info (TCE)	{TyConStr -> (TyConId, [ConstrStr])}
+
+
+	value info (GVE)	{ValStr -> GlobalId}
+		(info from value sigs, and constructors from data decls)
+
+Filter and rename the environments gotten from each import to make a grand
+environment E2. 
+
+Pass 3
+~~~~~~
+Check E2 for class cycles, and type synonym cycles.
+
+Pass 4
+~~~~~~
+Process the value decls in the impl, giving {ValStr -> GlobalId}, and some
+code.
+
+Pass 5
+~~~~~~
+Process the bodies of instance decls, to generate code for methods.
+
+
+
+
+
+
+		UNRESOLVED
+		~~~~~~~~~~
+1. Who generates the interface?
+
+2. Where is dependency analysis done?
+
+
+

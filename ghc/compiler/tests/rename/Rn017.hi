@@ -1,0 +1,8 @@
+interface Rn017 where
+import Bar (a, b, Wibble(..))
+import Burf(Wobble)
+a :: Int -> Int
+b :: Int -> Int
+c :: Int -> Int
+data Wibble = MkWibble Wobble
+data Wobble

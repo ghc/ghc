@@ -1,0 +1,43 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface MkIface where
+import Bag(Bag)
+import CE(CE(..))
+import CharSeq(CSeq)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import FiniteMap(FiniteMap)
+import HsBinds(MonoBinds, Sig)
+import HsDecls(FixityDecl)
+import HsPat(InPat)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludePS(_PackedString)
+import Pretty(Delay, PrettyRep)
+import SimplEnv(UnfoldingDetails)
+import SrcLoc(SrcLoc)
+import StgSyn(StgBinding, StgRhs)
+import TCE(TCE(..))
+import TcInstDcls(InstInfo)
+import TyCon(TyCon)
+import TyVar(TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+type CE = UniqFM Class
+data GlobalSwitch
+	{-# GHC_PRAGMA ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats #-}
+data FixityDecl a 	{-# GHC_PRAGMA InfixL a Int | InfixR a Int | InfixN a Int #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data StgBinding a b 	{-# GHC_PRAGMA StgNonRec a (StgRhs a b) | StgRec [(a, StgRhs a b)] #-}
+type TCE = UniqFM TyCon
+data InstInfo 	{-# GHC_PRAGMA InstInfo Class [TyVarTemplate] UniType [(Class, UniType)] [(Class, UniType)] Id [Id] (MonoBinds Name (InPat Name)) Bool _PackedString SrcLoc [Sig Name] #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+mkInterface :: (GlobalSwitch -> Bool) -> _PackedString -> (_PackedString -> Bool, _PackedString -> Bool) -> UniqFM UnfoldingDetails -> FiniteMap TyCon [[Labda UniType]] -> ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo) -> [StgBinding Id Id] -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 7 _U_ 222221122 _N_ _S_ "LLLLLU(LSSSL)L" _N_ _N_ #-}
+

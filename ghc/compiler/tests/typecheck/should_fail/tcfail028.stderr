@@ -1,0 +1,6 @@
+ 
+"tcfail028.hs", line 3: Type has too few arguments:
+    "A" should have 2 argument(s), but has been given 1 argument(s) instead
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

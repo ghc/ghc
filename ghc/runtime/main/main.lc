@@ -1,0 +1,1355 @@
+%/****************************************************************
+%*								*
+%*	This is where everything starts 			*
+%*								*
+%****************************************************************/
+
+\begin{code}
+#if defined(USE_COST_CENTRES) || defined(GUM) || defined(CONCURRENT)
+#define NON_POSIX_SOURCE /* time things on Solaris -- sigh */
+#endif
+
+#include "rtsdefs.h"
+#include <setjmp.h>
+
+#if defined(STDC_HEADERS) || defined(HAVE_STRING_H)
+# include <string.h>
+/* An ANSI string.h and pre-ANSI memory.h might conflict.  */
+# if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#  include <memory.h>
+# endif /* not STDC_HEADERS and HAVE_MEMORY_H */
+# define index strchr
+# define rindex strrchr
+# define bcopy(s, d, n) memcpy ((d), (s), (n))
+# define bcmp(s1, s2, n) memcmp ((s1), (s2), (n))
+# define bzero(s, n) memset ((s), 0, (n))
+#else /* not STDC_HEADERS and not HAVE_STRING_H */
+# include <strings.h>
+/* memory.h and strings.h conflict on some systems.  */
+#endif /* not STDC_HEADERS and not HAVE_STRING_H */
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+/* need some "time" things */
+
+/* ToDo: This is a mess! Improve ? */
+
+# ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+# endif
+
+# ifdef HAVE_SYS_TIMES_H
+#  include <sys/times.h>
+# endif
+
+# ifdef HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# endif
+#endif /* USE_COST_CENTRES || GUM */
+
+#ifndef PAR
+STGRegisterTable MainRegTable;
+#endif
+
+/* fwd decls */
+void setupRtsFlags PROTO((int *argc, char *argv[], I_ *rtsc, char *rtsv[]));
+void shutdownHaskell(STG_NO_ARGS);
+
+EXTFUN(startStgWorld);
+extern void PrintRednCountInfo(STG_NO_ARGS);
+extern void checkAStack(STG_NO_ARGS);
+
+/* a real nasty Global Variable */
+/* moved to main/TopClosure(13)?.lc -- *one* of them will get linked in
+P_ TopClosure = Main_mainPrimIO_closure;
+ */
+
+/* structure to carry around info about the storage manager */
+smInfo StorageMgrInfo;
+
+FILE *main_statsfile = NULL;
+#if defined(DO_REDN_COUNTING)
+FILE *tickyfile = NULL;
+#endif
+#if defined(SM_DO_BH_UPDATE)
+I_ noBlackHoles = 0;
+#endif
+I_ doSanityChks = 0;
+I_ showRednCountStats = 0;
+I_ traceUpdates = 0;
+extern I_ squeeze_upd_frames;
+
+#ifdef PAR
+extern I_ 	OkToGC, buckets, average_stats();
+extern rtsBool	TraceSparks, OutputDisabled, DelaySparks,
+    	    	DeferGlobalUpdates, ParallelStats;
+
+extern void RunParallelSystem PROTO((P_));
+extern void initParallelSystem(STG_NO_ARGS);
+extern void SynchroniseSystem(STG_NO_ARGS);
+
+extern void SetTrace PROTO((W_ address, I_ level/*?*/));
+#endif
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+extern W_ debug;
+extern W_ event_trace ;
+extern W_ event_trace_all ;
+#endif
+
+extern void *stgAllocForGMP   PROTO((size_t));
+extern void *stgReallocForGMP PROTO ((void *, size_t, size_t));
+extern void  stgDeallocForGMP PROTO ((void *, size_t));
+
+#if defined (DO_SPAT_PROFILING) && sparc_TARGET_ARCH
+    /* NOTE: I, WDP, do not use this in my SPAT profiling */
+W_ KHHP, KHHPLIM, KHSPA, KHSPB;
+#endif
+
+/* NeXTs can't just reach out and touch "end", to use in
+   distinguishing things in static vs dynamic (malloc'd) memory.
+*/
+#if nextstep2_TARGET_OS || nextstep3_TARGET_OS /* ToDo: use END_BY_FUNNY_MEANS or something */
+void *get_end_result;
+#endif
+
+I_    prog_argc;
+char  **prog_argv;
+I_    rts_argc;
+char *rts_argv[MAX_RTS_ARGS];
+
+#ifndef PAR
+jmp_buf restart_main;	    /* For restarting after a signal */
+#endif
+
+#if defined(PVM)
+unsigned nPEs = 0, nIMUs = 0;
+#endif
+
+#if defined(GUM)
+int nPEs = 0;
+#endif
+
+int /* return type of "main" is defined by the C standard */
+main(argc, argv)
+    int argc;
+    char *argv[];
+{
+\end{code}
+
+The very first thing we do is grab the start time...just in case we're
+collecting timing statistics.
+
+\begin{code}
+
+    start_time();
+
+\end{code}
+
+The parallel system needs to be initialised and synchronised before
+the program is run.  This is done {\em before} heap allocation, so we
+can grab all remaining heap without needing to consider the System
+Manager's requirements.
+
+\begin{code}
+#ifdef PAR
+    /* 
+     * Grab the number of PEs out of the argument vector, and eliminate it
+     * from further argument processing
+     */
+    nPEs = atoi(argv[1]);
+    argv[1] = argv[0];
+    argv++;
+    argc--;
+
+/*    fprintf(stderr, "I'm alive, nPEs = %d \n", nPEs);    */
+    SynchroniseSystem();
+#endif
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+    /* setup string indicating time of run -- only used for profiling */
+    (void) time_str();
+#endif
+
+#if nextstep2_TARGET_OS || nextstep3_TARGET_OS /* ToDo: use END_BY_FUNNY_MEANS or something */
+    get_end_result = get_end();
+#endif
+
+    /* 
+       divide the command-line args between pgm and RTS;
+       figure out what statsfile to use (if any);
+       [if so, write the whole cmd-line into it]
+       
+       This is unlikely to work well in parallel!  KH.
+    */
+    setupRtsFlags(&argc, argv, &rts_argc, rts_argv);
+    prog_argc = argc;
+    prog_argv = argv;
+
+#if defined(PAR)
+   /* Initialise the parallel system -- before initHeap! */
+   initParallelSystem();
+#endif	/* PAR */
+
+#if defined(LIFE_PROFILE)
+    if (life_profile_init(rts_argv, prog_argv) != 0) {
+        fflush(stdout);
+	fprintf(stderr, "life_profile_init failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+#endif
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+    if (init_cc_profiling(rts_argc, rts_argv, prog_argv) != 0) {
+        fflush(stdout);
+	fprintf(stderr, "init_cc_profiling failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+#endif
+
+#if defined(CONCURRENT) && defined(GRAN)
+    if (!no_gr_profile)
+      if (init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv) != 0) {
+	  fprintf(stderr, "init_gr_simulation failed!\n"); EXIT(EXIT_FAILURE);
+      }
+#endif
+
+#ifdef PAR
+    if (do_gr_profile)
+	init_gr_profiling(rts_argc, rts_argv, prog_argc, prog_argv);
+#endif
+
+    /* 
+       initialize the storage manager
+    */
+    if ( initSM(rts_argc, rts_argv, main_statsfile) != 0) {
+        fflush(stdout);
+	fprintf(stderr, "initSM failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+
+#ifndef PAR
+    if ( initStacks( &StorageMgrInfo ) != 0) {
+        fflush(stdout);
+	fprintf(stderr, "initStacks failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+#endif
+
+    if ( initHeap( &StorageMgrInfo ) != 0) {
+        fflush(stdout);
+	fprintf(stderr, "initHeap failed!\n"); EXIT(EXIT_FAILURE);
+    }
+
+#if defined(CONCURRENT) && !defined(GRAN)
+    if (!initThreadPools(MaxLocalSparks)) {
+        fflush(stdout);
+	fprintf(stderr, "initThreadPools failed!\n"); 
+        EXIT(EXIT_FAILURE);
+    }
+#endif
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+    /* call cost centre registering routine (after heap allocated) */
+    cc_register();
+#endif
+
+/* Information needed by runtime trace analysers -- don't even ask what it does! */
+  /* NOTE: I, WDP, do not use this in my SPAT profiling */
+#if defined (DO_SPAT_PROFILING) && sparc_TARGET_ARCH
+   KHHPLIM = (W_) StorageMgrInfo.hplim;
+   KHHP =    (W_) StorageMgrInfo.hp;
+   KHSPA =   (W_) SAVE_SpA,
+   KHSPB =   (W_) SAVE_SpB;
+
+/*  fprintf(stderr,"Hp = %lx, HpLim = %lx, SpA = %lx, SpB = %lx\n",KHHP,KHHPLIM,KHSPA,KHSPB); */
+
+/* NOT ME:
+  __asm__("sethi %%hi(_KHHP),%%o0\n\tld [%%o0+%%lo(_KHHP)],%%g0" : : : "%%o0");
+  __asm__("sethi %%hi(_KHHPLIM),%%o0\n\tld [%%o0+%%lo(_KHHPLIM)],%%g0" : : : "%%o0");
+  __asm__("sethi %%hi(_KHSPA),%%o0\n\tld [%%o0+%%lo(_KHSPA)],%%g0" : : : "%%o0");
+  __asm__("sethi %%hi(_KHSPB),%%o0\n\tld [%%o0+%%lo(_KHSPB)],%%g0" : : : "%%o0");
+*/
+#endif
+
+#if defined(DO_REDN_COUNTING)
+    max_SpA = MAIN_SpA; /* initial high-water marks */
+    max_SpB = MAIN_SpB;
+#endif
+
+    /* Tell GNU multi-precision pkg about our custom alloc functions */
+    mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
+
+    /* Record initialization times */
+    end_init();
+
+#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+    /* 
+     * Both the context-switcher and the cost-center profiler use 
+     * a virtual timer.
+     */
+    if (install_vtalrm_handler()) {
+	fflush(stdout);
+	fprintf(stderr, "Can't install VTALRM handler.\n");
+	EXIT(EXIT_FAILURE);
+    }
+#if (defined(CONCURRENT) && defined(USE_COST_CENTRES)) || defined(GUM)
+    if (time_profiling) {
+	if (contextSwitchTime % (1000/TICK_FREQUENCY) == 0)
+	    tick_millisecs = TICK_MILLISECS;
+	else
+	    tick_millisecs = CS_MIN_MILLISECS;
+
+	contextSwitchTicks = contextSwitchTime / tick_millisecs;
+	profilerTicks = TICK_MILLISECS / tick_millisecs;
+    } else
+	tick_millisecs = contextSwitchTime;
+#endif
+
+#ifndef CONCURRENT
+    START_TIME_PROFILER;
+#endif
+
+#endif	/* USE_COST_CENTRES || CONCURRENT */
+
+#ifndef PAR
+    setjmp(restart_main);
+    initUserSignals();
+#endif
+
+#ifdef CONCURRENT
+# if defined(GRAN)                                                 /* HWL */
+    /* RunnableThreadsHd etc. are init in ScheduleThreads */
+    /* 
+     * I'm not sure about this.  Note that this code is for re-initializing
+     * things when a longjmp to restart_main occurs.  --JSM
+     */
+
+# else                                                             /* !GRAN */
+    AvailableStack = AvailableTSO = Nil_closure;
+    RunnableThreadsHd = RunnableThreadsTl = Nil_closure;
+    WaitingThreadsHd = WaitingThreadsTl = Nil_closure;
+    PendingSparksHd[REQUIRED_POOL] = 
+      PendingSparksTl[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL];
+    PendingSparksHd[ADVISORY_POOL] = 
+      PendingSparksTl[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL];
+# endif
+
+    CurrentTSO = Nil_closure;
+
+# ifdef PAR
+    RunParallelSystem(TopClosure);
+# else
+    STKO_LINK(MainStkO) = Nil_closure;
+    ScheduleThreads(TopClosure);
+# endif	/* PAR */
+
+#else	/* not threaded (sequential) */
+
+# if defined(__STG_TAILJUMPS__)
+    miniInterpret((StgFunPtr)startStgWorld);
+# else
+    if (doSanityChks)
+	miniInterpret_debug((StgFunPtr)startStgWorld, checkAStack);
+    else
+	miniInterpret((StgFunPtr)startStgWorld);
+# endif /* not tail-jumping */
+#endif /* !CONCURRENT */
+
+    shutdownHaskell();
+    return(EXIT_SUCCESS);    /* don't use EXIT! :-) */
+}
+\end{code}
+
+It should be possible to call @shutdownHaskell@ whenever you want to
+shut a Haskell program down in an orderly way.
+
+Note that some of this code probably depends on the integrity of
+various internal data structures so this should not be called in
+response to detecting a catastrophic error.
+
+\begin{code}
+void
+shutdownHaskell(STG_NO_ARGS)
+{
+    STOP_TIME_PROFILER;
+
+    if (exitSM(&StorageMgrInfo) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "exitSM failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+#if defined(LIFE_PROFILE)
+    {
+	extern P_ hp_start;	/* from the SM -- Hack! */
+	life_profile_finish(StorageMgrInfo.hp - hp_start, prog_argv);
+    }
+#endif
+
+#if defined(USE_COST_CENTRES)
+    heap_profile_finish();
+#endif
+#if defined(USE_COST_CENTRES) || defined(GUM)
+    report_cc_profiling(1 /* final */ );
+#endif
+
+#if defined(DO_REDN_COUNTING)
+    if (showRednCountStats) {
+	PrintRednCountInfo();
+    }
+#endif
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+    if (PrintFetchMisses)
+      fprintf(stderr,"Number of fetch misses: %d\n",fetch_misses);
+
+# if defined(COUNT)
+    fprintf(stderr,"COUNT statistics:\n");
+    fprintf(stderr,"  Total number of updates: %u\n",nUPDs);
+    fprintf(stderr,"  Needed to awaken BQ: %u with avg BQ len of: %f\n",
+	    nUPDs_BQ,(float)BQ_lens/(float)nUPDs_BQ);
+    fprintf(stderr,"  Number of PAPs: %u\n",nPAPs);
+# endif
+
+    if (!no_gr_profile)
+      end_gr_simulation();
+#endif
+
+    fflush(stdout);
+    /* This fflush is important, because: if "main" just returns,
+       then we will end up in pre-supplied exit code that will close
+       streams and flush buffers.  In particular we have seen: it
+       will close fd 0 (stdin), then flush fd 1 (stdout), then <who
+       cares>...
+
+       But if you're playing with sockets, that "close fd 0" might
+       suggest to the daemon that all is over, only to be presented
+       with more stuff on "fd 1" at the flush.
+
+       The fflush avoids this sad possibility.
+    */
+}
+\end{code}
+
+%/****************************************************************
+%*								*
+%*	    Getting default settings for RTS parameters	        *
+%*								*
+%* +RTS indicates following arguments destined for RTS          *
+%* -RTS indicates following arguments destined for program      *
+%*                                                              *
+%****************************************************************/
+\begin{code}
+
+char *flagtext[] = {
+"",
+"Usage: <prog> <args> [+RTS <rtsopts> | -RTS <args>] ... --RTS <args>",
+"",
+"   +RTS    Indicates run time system options follow",
+"   -RTS    Indicates program arguments follow",
+"  --RTS    Indicates that ALL subsequent arguments will be given to the",
+"           program (including any of these RTS flags)",
+"",
+"The following run time system options are available:",
+"",
+"  -? -f    Prints this message and exits; the program is not executed",
+"",
+"  -K<size> Sets the stack size (default 64k)    Egs: -K32k   -K512k",
+"  -H<size> Sets the heap size  (default 4M)          -H512k  -H16M",
+"  -s<file> Summary GC statistics   (default file: <program>.stat)",
+"  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
+"",
+#if defined(GCap)
+"  -M<n>%   Sets minimum size of alloc area as % of heap (default 3%)",
+"  -A<size> Fixes size of alloc area, overriding any minimum (-A gives 64k)",
+"  -G<size> Fixes size of major generation (default is dynamic threshold)",
+"  -F2s     Forces program compiled for Appel gc to use 2s collection",
+#else
+# if defined(GCgn)
+"  -A<size> Specifies size of alloc area (default 64k)",
+"  -G<size> Fixes size of major generation (default is available heap)",
+"  -F2s     Forces program compiled for Gen gc to use 2s collection",
+# else
+"  -M<n>%   Minimum % of heap which must be available (default 3%)",
+"  -A<size> Fixes size of heap area allocated between GCs (-A gives 64k)",
+# endif
+#endif
+#if defined(FORCE_GC)
+"  -j<size>  Forces major GC at every <size> bytes allocated",
+#endif /* FORCE_GC */
+#if defined(GCdu)
+"  -u<percent> Fixes residency threshold at which mode switches (range 0.0..0.95)",
+#endif
+"",
+#if defined(SM_DO_BH_UPDATE)
+"  -N       No black-holing (for use when a signal handler is present)",
+#endif
+"  -Z       Don't squeeze out update frames on stack overflow",
+"  -B	    Sound the bell at the start of each (major) garbage collection",
+#if defined(USE_COST_CENTRES) || defined(GUM)
+"",
+"  -p<sort> Produce cost centre time profile  (output file <program>.prof)",
+"             sort: T = time (default), A = alloc, C = cost centre label",
+"  -P<sort> Produce serial time profile (output file <program>.time)",
+"             and a -p profile with detailed caf/enter/tick/alloc info",
+#if defined(USE_COST_CENTRES)
+"",
+"  -h<break-down> Heap residency profile      (output file <program>.hp)",
+"     break-down: C = cost centre (default), M = module, G = group",
+"                 D = closure description, Y = type description",
+"                 T<ints>,<start> = time closure created",
+"                    ints:  no. of interval bands plotted (default 18)",
+"                    start: seconds after which intervals start (default 0.0)",
+"  A subset of closures may be selected by the attached cost centre using:",
+"    -c{mod:lab,mod:lab...}, specific module:label cost centre(s)",
+"    -m{mod,mod...} all cost centres from the specified modules(s)",
+"    -g{grp,grp...} all cost centres from the specified group(s)",
+"  Selections can also be made by description, type, kind and age:",
+"    -d{des,des...} closures with specified closure descriptions",
+"    -y{typ,typ...} closures with specified type descriptions",
+"    -k{knd,knd...} closures of the specified kinds",
+"    -a<age>        closures which survived <age> complete intervals",
+"  The selection logic used is summarised as follows:",
+"    ([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]",
+"    where an option is true if not specified",
+#endif
+"",
+"  -z<tbl><size>  set hash table <size> for <tbl> (C, M, G, D or Y)",
+"",
+"  -i<secs> Number of seconds in a profiling interval (default 1.0):",
+"           heap profile (-h) and/or serial time profile (-P) frequency",
+#endif /* USE_COST_CENTRES */
+#if defined(LIFE_PROFILE)
+"",
+"  -l<res>  Produce liftime and update profile (output file <program>.life)",
+"              res: the age resolution in bytes allocated   (default 10,000)",
+#endif /* LIFE_PROFILE */
+"",
+#if defined(DO_REDN_COUNTING)
+"  -r<file>  Produce reduction profiling statistics (with -rstderr for stderr)",
+"",
+#endif
+"  -I	     Use debugging miniInterpret with stack and heap sanity-checking.",
+"  -T<level> Trace garbage collection execution (debugging)",
+#ifdef CONCURRENT
+"",
+# ifdef PAR
+"  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
+/* NB: the -N<n> is implemented by the driver!! */
+# endif
+"  -C<secs>  Context-switch interval in seconds",
+"                (0 or no argument means switch as often as possible)",
+"                the default is .01 sec; resolution is .01 sec",
+"  -e<size>        Size of spark pools (default 100)",
+# ifdef PAR
+"  -q        Enable activity profile (output files in ~/<program>*.gr)",
+"  -qb       Enable binary activity profile (output file /tmp/<program>.gb)",
+#else
+"  -q[v]     Enable quasi-parallel profile (output file <program>.qp)",
+# endif
+"  -t<num>   Set maximum number of advisory threads per PE (default 32)",
+"  -o<num>   Set stack chunk size (default 1024)",
+# ifdef PAR
+"  -d        Turn on PVM-ish debugging",
+"  -O        Disable output for performance measurement",
+# endif /* PAR */
+#endif /* CONCURRENT */
+"",
+"Other RTS options may be available for programs compiled a different way.",
+"The GHC User's Guide has full details.",
+"",
+0
+};
+
+#define RTS 1
+#define PGM 0
+
+#ifndef atof
+extern double atof();
+/* no proto because some machines use const and some do not */
+#endif
+
+void
+setupRtsFlags(argc, argv, rts_argc, rts_argv)
+int *argc;
+I_ *rts_argc;
+char *argv[], *rts_argv[];
+{
+    I_ error = 0;
+    I_ mode;
+    I_ arg, total_arg;
+    char *last_slash;
+
+    /* Remove directory from argv[0] -- default files in current directory */
+
+    if ((last_slash = (char *) rindex(argv[0], '/')) != NULL)
+	strcpy(argv[0], last_slash+1);
+
+    /* Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts */
+    /*   argv[0] must be PGM argument -- leave in argv                 */
+
+    total_arg = *argc;
+    arg = 1;
+
+    *argc = 1;
+    *rts_argc = 0;
+
+    for (mode = PGM; arg < total_arg && strcmp("--RTS", argv[arg]) != 0; arg++) {
+	if (strcmp("+RTS", argv[arg]) == 0) {
+	    mode = RTS;
+	}
+	else if (strcmp("-RTS", argv[arg]) == 0) {
+	    mode = PGM;
+	}
+	else if (mode == RTS && *rts_argc < MAX_RTS_ARGS-1) {
+	    rts_argv[(*rts_argc)++] = argv[arg];
+	}
+	else if (mode == PGM) {
+	    argv[(*argc)++] = argv[arg];
+	}
+	else {
+    	    fflush(stdout);
+	    fprintf(stderr, "setupRtsFlags: Too many RTS arguments (max %d)\n",
+		    MAX_RTS_ARGS-1);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    if (arg < total_arg) {
+	/* arg must be --RTS; process remaining program arguments */
+	while (++arg < total_arg) {
+	    argv[(*argc)++] = argv[arg];
+	}
+    }
+    argv[*argc] = (char *) 0;
+    rts_argv[*rts_argc] = (char *) 0;
+
+    /* Process RTS (rts_argv) part: mainly to determine statsfile */
+
+    for (arg = 0; arg < *rts_argc; arg++) {
+	if (rts_argv[arg][0] == '-') {
+	    switch(rts_argv[arg][1]) {
+	      case '?':
+	      case 'f':
+		error = 1;
+		break;
+
+	      case 'Z': /* Don't squeeze out update frames */
+    	    	    squeeze_upd_frames = 0;
+		break;
+
+#if defined(SM_DO_BH_UPDATE)
+	      case 'N':
+		noBlackHoles++;
+		break;
+#endif
+
+	      case 'I':
+		doSanityChks++;
+#if defined(__STG_TAILJUMPS__)
+		/* Blech -- too many errors if run in parallel -- KH */
+		fprintf(stderr, "setupRtsFlags: Using Tail Jumps: Sanity checks not possible: %s\n", rts_argv[arg]);
+		error = 1;
+#endif
+	        break;
+
+	      case 'U':
+		traceUpdates++;
+#if ! defined(DO_RUNTIME_TRACE_UPDATES)
+		fprintf(stderr, "setupRtsFlags: Update Tracing not compiled in: %s\n", rts_argv[arg]);
+		error = 1;
+#endif
+	        break;
+
+	      case 'r': /* Basic profiling stats */
+		showRednCountStats++;
+#if ! defined(DO_REDN_COUNTING)
+		fprintf(stderr, "setupRtsFlags: Reduction counting not compiled in: %s\n", rts_argv[arg]);
+		error = 1;
+
+#else /* ticky-ticky! */
+		if (strcmp(rts_argv[arg]+2, "stderr") == 0) /* use real stderr */
+		    tickyfile = stderr;
+		else if (rts_argv[arg][2] != '\0')	    /* ticky file specified */
+		    tickyfile = fopen(rts_argv[arg]+2,"w");
+		else {
+		    char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.ticky */
+		    sprintf(stats_filename, TICKY_FILENAME_FMT, argv[0]);
+		    tickyfile = fopen(stats_filename,"w");
+		}
+		if (tickyfile == NULL) {
+		    fprintf(stderr, "Can't open tickyfile %s (default %0.24s.ticky)\n",
+				rts_argv[arg]+2, argv[0]);
+		    error = 1;
+		} else {
+		    /* Write argv and rtsv into start of ticky file */
+		    I_ count;
+		    for(count = 0; count < *argc; count++)
+			fprintf(tickyfile, "%s ", argv[count]);
+		    fprintf(tickyfile, "+RTS ");
+		    for(count = 0; count < *rts_argc; count++)
+			fprintf(tickyfile, "%s ", rts_argv[count]);
+		    fprintf(tickyfile, "\n");
+		}
+#endif /* ticky-ticky! */
+	        break;
+
+	      case 's': /* Also used by GC -- open file here */
+	      case 'S':
+#ifdef PAR
+		/* Opening all those files would almost certainly fail... */
+		ParallelStats = rtsTrue;
+		main_statsfile = stderr; /* temporary; ToDo: rm */
+#else
+		if (strcmp(rts_argv[arg]+2, "stderr") == 0)       /* use real stderr */
+		    main_statsfile = stderr;
+		else if (rts_argv[arg][2] != '\0')                /* stats file specified */
+		    main_statsfile = fopen(rts_argv[arg]+2,"w");
+		else {
+		    char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.stat */
+		    sprintf(stats_filename, STAT_FILENAME_FMT, argv[0]);
+		    main_statsfile = fopen(stats_filename,"w");
+		}
+		if (main_statsfile == NULL) {
+		    fprintf(stderr, "Can't open statsfile %s (default %0.24s.stat)\n", rts_argv[arg]+2, argv[0]);
+		    error = 1;
+		} else {
+		    /* Write argv and rtsv into start of stats file */
+		    I_ count;
+		    for(count = 0; count < *argc; count++)
+			fprintf(main_statsfile, "%s ", argv[count]);
+		    fprintf(main_statsfile, "+RTS ");
+		    for(count = 0; count < *rts_argc; count++)
+			fprintf(main_statsfile, "%s ", rts_argv[count]);
+		    fprintf(main_statsfile, "\n");
+		}
+#endif
+		break;
+
+	      case 'P': /* detailed cost centre profiling (time/alloc) */
+	      case 'p': /* cost centre profiling (time/alloc) */
+	      case 'i': /* serial profiling -- initial timer interval */
+#if ! (defined(USE_COST_CENTRES) || defined(GUM))
+		fprintf(stderr, "setupRtsFlags: Not built for cost centre profiling: %s\n", rts_argv[arg]);
+		error = 1;
+#endif /* ! (USE_COST_CENTRES || GUM) */
+		break;
+	      case 'h': /* serial heap profile */
+	      case 'z': /* size of index tables */
+	      case 'c': /* cost centre label select */
+	      case 'm': /* cost centre module select */
+	      case 'g': /* cost centre group select */
+	      case 'd': /* closure descr select */
+	      case 'y': /* closure type select */
+	      case 'k': /* closure kind select */
+	      case 'a': /* closure age select */
+#if ! defined(USE_COST_CENTRES)
+		fprintf(stderr, "setupRtsFlags: Not built for cost centre profiling: %s\n", rts_argv[arg]);
+		error = 1;
+#endif /* ! USE_COST_CENTRES */
+		break;
+
+	      case 'j': /* force GC option */
+#if defined(FORCE_GC)
+		force_GC++;
+		if (rts_argv[arg][2]) {
+		    GCInterval = decode(rts_argv[arg]+2) / sizeof(W_);
+		}
+#else  /* ! FORCE_GC */
+		fprintf(stderr, "setupRtsFlags: Not built for forcing GC: %s\n", rts_argv[arg]);
+		error = 1;
+#endif /* ! FORCE_GC */
+		break;
+
+	      case 'l': /* life profile option */
+#if defined(LIFE_PROFILE)
+		do_life_prof++;
+		if (rts_argv[arg][2]) {
+		    LifeInterval = decode(rts_argv[arg]+2) / sizeof(W_);
+		}
+#else  /* ! LIFE_PROFILE */
+		fprintf(stderr, "setupRtsFlags: Not built for lifetime profiling: %s\n", rts_argv[arg]);
+		error = 1;
+#endif /* ! LIFE_PROFILE */
+		break;
+
+	      /* Flags for the threaded RTS */
+
+#ifdef CONCURRENT
+    	      case 'C':	/* context switch interval */
+		if (rts_argv[arg][2] != '\0') {
+		    /* Convert to milliseconds */
+		    contextSwitchTime = (I_) ((atof(rts_argv[arg]+2) * 1000));
+		    contextSwitchTime = (contextSwitchTime / CS_MIN_MILLISECS)
+					* CS_MIN_MILLISECS;
+		    if (contextSwitchTime < CS_MIN_MILLISECS)
+			contextSwitchTime = CS_MIN_MILLISECS;
+    	    	} else
+    	    	    contextSwitchTime = 0;
+    	    	break;
+#if !defined(GRAN)
+	      case 'e':
+		if (rts_argv[arg][2] != '\0') {
+		    MaxLocalSparks = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		    if (MaxLocalSparks <= 0) {
+			fprintf(stderr, "setupRtsFlags: bad value for -e\n");
+			error = 1;
+		    }
+		} else
+    	    	    MaxLocalSparks = DEFAULT_MAX_LOCAL_SPARKS;
+		break;
+#endif
+#ifdef PAR
+	      case 'q': /* activity profile option */
+    	    	if (rts_argv[arg][2] == 'b')
+		    do_gr_binary++;
+    	    	else
+    	    	    do_gr_profile++;
+		break;
+#else
+	      case 'q': /* quasi-parallel profile option */
+    	    	if (rts_argv[arg][2] == 'v')
+		    do_qp_prof = 2;
+    	    	else
+    	    	    do_qp_prof++;
+		break;
+#endif
+	      case 't':
+		if (rts_argv[arg][2] != '\0') {
+		    MaxThreads = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		} else {
+    	    	    fprintf(stderr, "setupRtsFlags: missing size for -t\n");
+    	    	    error = 1;
+    	    	}
+		break;
+
+	      case 'o':
+		if (rts_argv[arg][2] != '\0') {
+		    StkOChunkSize = decode(rts_argv[arg]+2);
+		    if (StkOChunkSize < MIN_STKO_CHUNK_SIZE)
+			StkOChunkSize = MIN_STKO_CHUNK_SIZE;
+		} else {
+    	    	    fprintf(stderr, "setupRtsFlags: missing size for -o\n");
+    	    	    error = 1;
+    	    	}
+		break;
+
+# ifdef PAR
+	      case 'O':
+		OutputDisabled = rtsTrue;
+		break;
+
+# else	/* PAR */
+
+#  if !defined(GRAN)
+    	      case 'b': /* will fall through to disaster */
+#  else
+    	      case 'b':
+		if (rts_argv[arg][2] != '\0') {
+
+		  /* Should we emulate hbcpp */
+		  if(strcmp((rts_argv[arg]+2),"roken")==0) {
+		    ++DoAlwaysCreateThreads;
+		    strcpy(rts_argv[arg]+2,"oring");
+		  }
+
+		  /* or a ridiculously idealised simulator */
+		  if(strcmp((rts_argv[arg]+2),"oring")==0) {
+		    gran_latency = gran_fetchtime = gran_additional_latency =
+		      gran_gunblocktime = gran_lunblocktime
+			= gran_threadcreatetime = gran_threadqueuetime
+			  = gran_threadscheduletime = gran_threaddescheduletime
+			    = gran_threadcontextswitchtime
+			      = 0;
+
+		    gran_mpacktime = gran_munpacktime = 0;
+
+		    gran_arith_cost = gran_float_cost = gran_load_cost
+		      = gran_store_cost = gran_branch_cost = 0;
+
+		    gran_heapalloc_cost = 1;
+
+		    /* ++DoFairSchedule; */
+		    ++DoStealThreadsFirst;
+		    ++DoThreadMigration;
+		    ++do_gr_profile;
+		  }
+
+		  /* or a ridiculously idealised simulator */
+		  if(strcmp((rts_argv[arg]+2),"onzo")==0) {
+		    gran_latency = gran_fetchtime = gran_additional_latency =
+		      gran_gunblocktime = gran_lunblocktime
+			= gran_threadcreatetime = gran_threadqueuetime
+			  = gran_threadscheduletime = gran_threaddescheduletime
+			    = gran_threadcontextswitchtime
+			      = 0;
+
+		    gran_mpacktime = gran_munpacktime = 0;
+
+		    /* Keep default values for these
+		    gran_arith_cost = gran_float_cost = gran_load_cost
+		      = gran_store_cost = gran_branch_cost = 0;
+		      */
+
+		    gran_heapalloc_cost = 1;
+
+		    /* ++DoFairSchedule; */       /* -b-R */
+		    /* ++DoStealThreadsFirst; */  /* -b-T */
+		    ++DoReScheduleOnFetch;        /* -bZ */
+		    ++DoThreadMigration;          /* -bM */
+		    ++do_gr_profile;              /* -bP */
+#   if defined(GRAN_CHECK) && defined(GRAN)
+		    debug = 0x20;       /* print event statistics   */
+#   endif
+		  }
+
+		  /* Communication and task creation cost parameters */
+		  else switch(rts_argv[arg][2]) {
+		    case 'l':
+		      if (rts_argv[arg][3] != '\0')
+			{
+			  gran_gunblocktime = gran_latency = decode(rts_argv[arg]+3);
+			  gran_fetchtime = 2* gran_latency;
+			}
+		      else
+			gran_latency = LATENCY;
+		      break;
+
+		    case 'a':
+		      if (rts_argv[arg][3] != '\0')
+			gran_additional_latency = decode(rts_argv[arg]+3);
+		      else
+			gran_additional_latency = ADDITIONAL_LATENCY;
+		      break;
+
+		    case 'm':
+		      if (rts_argv[arg][3] != '\0')
+			gran_mpacktime = decode(rts_argv[arg]+3);
+		      else
+			gran_mpacktime = MSGPACKTIME;
+		      break;
+
+		    case 'x':
+		      if (rts_argv[arg][3] != '\0')
+			gran_mtidytime = decode(rts_argv[arg]+3);
+		      else
+			gran_mtidytime = 0;
+		      break;
+
+		    case 'r':
+		      if (rts_argv[arg][3] != '\0')
+			gran_munpacktime = decode(rts_argv[arg]+3);
+		      else
+			gran_munpacktime = MSGUNPACKTIME;
+		      break;
+
+		    case 'f':
+		      if (rts_argv[arg][3] != '\0')
+			gran_fetchtime = decode(rts_argv[arg]+3);
+		      else
+			gran_fetchtime = FETCHTIME;
+		      break;
+
+		    case 'n':
+		      if (rts_argv[arg][3] != '\0')
+			gran_gunblocktime = decode(rts_argv[arg]+3);
+		      else
+			gran_gunblocktime = GLOBALUNBLOCKTIME;
+		      break;
+
+		    case 'u':
+		      if (rts_argv[arg][3] != '\0')
+			gran_lunblocktime = decode(rts_argv[arg]+3);
+		      else
+			gran_lunblocktime = LOCALUNBLOCKTIME;
+		      break;
+
+		    /* Thread-related metrics */
+		    case 't':
+		      if (rts_argv[arg][3] != '\0')
+			gran_threadcreatetime = decode(rts_argv[arg]+3);
+		      else
+			gran_threadcreatetime = THREADCREATETIME;
+		      break;
+
+		    case 'q':
+		      if (rts_argv[arg][3] != '\0')
+			gran_threadqueuetime = decode(rts_argv[arg]+3);
+		      else
+			gran_threadqueuetime = THREADQUEUETIME;
+		      break;
+
+		    case 'c':
+		      if (rts_argv[arg][3] != '\0')
+			gran_threadscheduletime = decode(rts_argv[arg]+3);
+		      else
+			gran_threadscheduletime = THREADSCHEDULETIME;
+
+		      gran_threadcontextswitchtime = gran_threadscheduletime
+			                           + gran_threaddescheduletime;
+		      break;
+
+		    case 'd':
+		      if (rts_argv[arg][3] != '\0')
+			gran_threaddescheduletime = decode(rts_argv[arg]+3);
+		      else
+			gran_threaddescheduletime = THREADDESCHEDULETIME;
+
+		      gran_threadcontextswitchtime = gran_threadscheduletime
+			                           + gran_threaddescheduletime;
+		      break;
+
+		    /* Instruction Cost Metrics */
+		    case 'A':
+		      if (rts_argv[arg][3] != '\0')
+			gran_arith_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_arith_cost = ARITH_COST;
+		      break;
+
+		    case 'F':
+		      if (rts_argv[arg][3] != '\0')
+			gran_float_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_float_cost = FLOAT_COST;
+		      break;
+		      
+		    case 'B':
+		      if (rts_argv[arg][3] != '\0')
+			gran_branch_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_branch_cost = BRANCH_COST;
+		      break;
+
+		    case 'L':
+		      if (rts_argv[arg][3] != '\0')
+			gran_load_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_load_cost = LOAD_COST;
+		      break;
+
+		    case 'S':
+		      if (rts_argv[arg][3] != '\0')
+			gran_store_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_store_cost = STORE_COST;
+		      break;
+
+		    case 'H':
+		      if (rts_argv[arg][3] != '\0')
+			gran_heapalloc_cost = decode(rts_argv[arg]+3);
+		      else
+			gran_heapalloc_cost = 0;
+		      break;
+
+		    case 'y':
+		      if (rts_argv[arg][3] != '\0')
+			FetchStrategy = decode(rts_argv[arg]+3);
+		      else
+			FetchStrategy = 4; /* default: fetch everything */
+		      break;
+
+		    /* General Parameters */
+		    case 'p':
+		      if (rts_argv[arg][3] != '\0')
+			{
+			  max_proc = decode(rts_argv[arg]+3);
+			  if(max_proc > MAX_PROC || max_proc < 1)
+			    {
+			      fprintf(stderr,"setupRtsFlags: no more than %u processors allowed\n", MAX_PROC);
+			      error = 1;
+			    }
+			}
+		      else
+			max_proc = MAX_PROC;
+		      break;
+
+		    case 'C':
+		      ++DoAlwaysCreateThreads;
+		      ++DoThreadMigration;
+		      break;
+
+		    case 'G':
+		      ++DoGUMMFetching;
+		      break;
+
+		    case 'M':
+		      ++DoThreadMigration;
+		      break;
+
+		    case 'R':
+		      ++DoFairSchedule;
+		      break;
+
+		    case 'T':
+		      ++DoStealThreadsFirst;
+		      ++DoThreadMigration;
+		      break;
+
+		    case 'Z':
+		      ++DoReScheduleOnFetch;
+		      break;
+
+		    case 'z':
+		      ++SimplifiedFetch;
+		      break;
+
+		    case 'N':
+		      ++PreferSparksOfLocalNodes;
+		      break;
+
+		    case 'b':
+		      ++do_gr_binary;
+		      break;
+
+		    case 'P':
+		      ++do_gr_profile;
+		      break;
+
+		    case 's':
+		      ++do_sp_profile;
+		      break;
+
+		    case '-':
+		      switch(rts_argv[arg][3]) {
+
+		       case 'C':
+			 DoAlwaysCreateThreads=0;
+			 DoThreadMigration=0;
+			 break;
+
+		       case 'G':
+			 DoGUMMFetching=0;
+			 break;
+
+		       case 'M':
+			 DoThreadMigration=0;
+			 break;
+
+		        case 'R':
+			 DoFairSchedule=0;
+			 break;
+
+		       case 'T':
+			 DoStealThreadsFirst=0;
+			 DoThreadMigration=0;
+			 break;
+
+		       case 'Z':
+			 DoReScheduleOnFetch=0;
+			 break;
+
+		       case 'N':
+			 PreferSparksOfLocalNodes=0;
+			 break;
+
+		       case 'P':
+			 do_gr_profile=0;
+			 no_gr_profile=1;
+			 break;
+
+		       case 's':
+			 do_sp_profile=0;
+			 break;
+
+		       case 'b':
+			 do_gr_binary=0;
+			 break;
+
+		       default:
+			 badoption( rts_argv[arg] );
+			 break;
+		       }
+		      break;
+
+#   if defined(GRAN_CHECK) && defined(GRAN)
+		    case 'D':
+		      switch(rts_argv[arg][3]) {
+			  case 'e':       /* event trace */
+			    fprintf(stderr,"Printing event trace.\n");
+			    ++event_trace;
+			    break;
+
+			  case 'f':
+			    fprintf(stderr,"Printing forwarding of FETCHNODES.\n");
+			    debug |= 0x2; /* print fwd messages */
+			    break;
+
+			  case 'z':
+			    fprintf(stderr,"Check for blocked on fetch.\n");
+			    debug |= 0x4; /* debug non-reschedule-on-fetch */
+			    break;
+
+			  case 't':
+			    fprintf(stderr,"Check for TSO asleep on fetch.\n");
+			    debug |= 0x10; /* debug TSO asleep for fetch  */
+			    break;
+
+			  case 'E':
+			    fprintf(stderr,"Printing event statistics.\n");
+			    debug |= 0x20; /* print event statistics   */
+			    break;
+
+			  case 'F':
+			    fprintf(stderr,"Prohibiting forward.\n");
+			    NoForward = 1; /* prohibit forwarding   */
+			    break;
+
+			  case 'm':
+			    fprintf(stderr,"Printing fetch misses.\n");
+			    PrintFetchMisses = 1; /* prohibit forwarding   */
+			    break;
+
+			  case 'd':
+			    fprintf(stderr,"Debug mode.\n");
+			    debug |= 0x40; 
+			    break;
+
+			  case 'D':
+			    fprintf(stderr,"Severe debug mode.\n");
+			    debug |= 0x80; 
+			    break;
+
+			  case '\0':
+			    debug = 1;
+			    break;
+
+			  default:
+			    badoption( rts_argv[arg] );
+			    break;
+			  }
+		      break;
+#   endif
+		    default:
+		      badoption( rts_argv[arg] );
+		      break;
+		    }
+		}
+		do_gr_sim++;
+		contextSwitchTime = 0;
+		break;
+#  endif
+	      case 'J':
+	      case 'Q':
+	      case 'D':
+	      case 'R':
+	      case 'L':
+	      case 'O':
+		fprintf(stderr, "setupRtsFlags: Not built for parallel execution: %s\n", rts_argv[arg]);
+		error = 1;
+# endif	/* PAR */
+#else	/* CONCURRENT */
+	      case 't':
+		fprintf(stderr, "setupRtsFlags: Not built for threaded execution: %s\n", rts_argv[arg]);
+		error = 1;
+
+#endif	/* CONCURRENT */
+	      case 'H': /* SM options -- ignore */
+	      case 'A':
+	      case 'G':
+	      case 'F':
+	      case 'K':
+	      case 'M':
+	      case 'B':
+	      case 'T':
+#ifdef GCdu
+	      case 'u': /* set dual mode threshold */
+#endif
+		break;
+
+	      default: /* Unknown option ! */
+		fprintf(stderr, "setupRtsFlags: Unknown RTS option: %s\n", rts_argv[arg]);
+		error = 1;
+		break;
+	    }
+	  }
+	else {
+	    fflush(stdout);
+	    fprintf(stderr, "setupRtsFlags: Unexpected RTS argument: %s\n",
+		    rts_argv[arg]);
+	    error = 1;
+	}
+    }
+    if (error == 1) {
+	char  **p;
+        fflush(stdout);
+	for (p = flagtext; *p; p++)
+	    fprintf(stderr, "%s\n", *p);
+	EXIT(EXIT_FAILURE);
+    }
+}
+\end{code}
+
+Sets up and returns a string indicating the date/time of the run.
+Successive calls simply return the same string again. Initially
+called by @main.lc@ to initialise the string at the start of the run.
+Only used for profiling.
+
+\begin{code}
+#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+# include <time.h>
+
+char *
+time_str(STG_NO_ARGS)
+{
+    static time_t now = 0;
+    static char nowstr[26];
+
+    if (now == 0) {
+	time(&now);
+	strcpy(nowstr, ctime(&now));
+	strcpy(nowstr+16,nowstr+19);
+	nowstr[21] = '\0';
+    }
+    return nowstr;
+}
+#endif /* profiling */
+\end{code}
+
+ToDo: Will this work under threads?
+
+\begin{code}
+StgStablePtr errorHandler = -1;
+
+StgInt getErrorHandler()
+{
+  return (StgInt) errorHandler;
+}
+
+#ifndef PAR
+
+void raiseError( handler )
+StgStablePtr handler;
+{
+  if (handler == -1) {
+    shutdownHaskell();
+  } else {
+    TopClosure = deRefStablePointer( handler );
+    longjmp(restart_main,1);
+  }
+}
+\end{code}
+
+\begin{code}
+StgInt
+catchError( newErrorHandler )
+StgStablePtr newErrorHandler;
+{
+  StgStablePtr oldErrorHandler = errorHandler;
+  errorHandler = newErrorHandler;
+  return oldErrorHandler;
+}
+
+#endif
+\end{code}
+
+If we have installed an error handler, we might want to
+indicate that we have successfully recovered from an error by
+decrementing the counter.
+
+\begin{code}
+void
+decrementErrorCount()
+{
+  ErrorIO_call_count-=1;	
+}
+
+\end{code}

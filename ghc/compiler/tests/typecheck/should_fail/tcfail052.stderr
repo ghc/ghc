@@ -1,0 +1,5 @@
+ 
+"tcfail052.hs", line 2: undefined type variable: c
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

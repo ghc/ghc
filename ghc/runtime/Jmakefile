@@ -1,0 +1,532 @@
+/* This is the Jmakefile for the runtime-system stuff.
+   This stuff is written in C (and cannot be written in Haskell).
+
+   Things are organised into exactly one level of subdirs.
+
+   At the moment, there are a few such subdirs:
+	c-as-asm	-- mini-interpreter & register hackery
+	gum		-- GUM-specific stuff
+	io		-- support for libPOSIX
+	main		-- "main", associated startup stuff, & MISC things
+	prims		-- code for primitives that must be written in C
+	profiling	-- cost-centre profiling
+	storage		-- the storage manager(s)
+
+   We create two libraries.  One, libHSrts<tag>.a, is built separately
+   for each "build".  The other, libHSclib.a is built once: it is just
+   .lc files that end up the same no matter what, i.e. completely
+   ordinary C.
+
+   Other sorta independent, compile-once subdirs are:
+
+	gmp		-- GNU multi-precision library (for Integer)
+	regex		-- GNU regexp package
+*/
+
+#define IHaveSubdirs
+
+SUBDIRS = gmp regex
+
+/****************************************************************
+*								*
+* Jmakefile preamble-y things					*
+*								*
+****************************************************************/
+
+GhcDriverNeededHere(depend all) /* we use its C-compiling know-how */
+EtagsNeededHere(tags)
+
+/****************************************************************
+*								*
+* options used for compiling/etc. things			*
+*								*
+****************************************************************/
+
+/*
+If you use EXTRA_HC_OPTS on the command line (which you shouldn't,
+strictly speaking), it will probably work -- it is pinned onto
+GHC_OPTS, just for fun.
+*/
+
+#if i386_TARGET_ARCH
+# define __plat_specific -mtoggle-sp-mangling
+#else
+# define __plat_specific /*none*/
+#endif
+
+GHC_OPTS = -O2-for-C -optc-DFORCE_GC \
+	   __plat_specific $(EXTRA_HC_OPTS)
+
+/* per-build options: shared with libraries */
+#define rts_or_lib(r,l) r
+#include "../mkworld/GHC_OPTS"
+
+MKDEPENDC_OPTS= \
+	-I$(TOP_PWD)/$(CURRENT_DIR)/$(GHC_INCLUDES)
+
+/****************************************************************
+*								*
+* what it is we are compiling;					*
+*   these are long and tedious lists, but c'est la guerre	*
+*								*
+****************************************************************/
+
+RTS_LH =				\
+	storage/SMmarkDefs.lh 		\
+	storage/SMcopying.lh		\
+	storage/SMcompacting.lh		\
+	storage/SMextn.lh		\
+	storage/SMinternal.lh
+
+RTS_LC = 				\
+	c-as-asm/CallWrap_C.lc		\
+	c-as-asm/FreeMallocPtr.lc	\
+	c-as-asm/HpOverflow.lc		\
+	c-as-asm/StablePtr.lc		\
+	c-as-asm/StablePtrOps.lc	\
+	c-as-asm/StgDebug.lc		\
+	c-as-asm/StgMiniInt.lc		\
+	gum/GlobAddr.lc			\
+	gum/HLComms.lc			\
+	gum/Hash.lc			\
+	gum/LLComms.lc			\
+	gum/Pack.lc			\
+	gum/ParInit.lc			\
+	gum/RBH.lc			\
+	gum/Sparks.lc			\
+	gum/Unpack.lc			\
+	main/GranSim.lc			\
+	main/Itimer.lc			\
+	main/RednCounts.lc		\
+	main/SMRep.lc			\
+	main/Select.lc			\
+	main/Signals.lc			\
+	main/StgOverflow.lc		\
+	main/StgTrace.lc		\
+	main/Threads.lc			\
+	main/main.lc			\
+	prims/PrimArith.lc		\
+	prims/PrimMisc.lc		\
+	profiling/CostCentre.lc		\
+	profiling/Hashing.lc		\
+	profiling/HeapProfile.lc	\
+	profiling/Indexing.lc		\
+	profiling/LifeProfile.lc	\
+	profiling/Timer.lc		\
+	storage/Force_GC.lc		\
+	storage/SM1s.lc			\
+	storage/SM2s.lc			\
+	storage/SMap.lc			\
+	storage/SMcheck.lc		\
+	storage/SMcompacting.lc 	\
+	storage/SMcopying.lc 		\
+	storage/SMdu.lc			\
+	storage/SMevac.lc 		\
+	storage/SMextn.lc		\
+	storage/SMinit.lc /*could clib except for GCdu option! */ \
+	storage/SMmarking.lc 		\
+	storage/SMscan.lc		\
+	storage/SMscav.lc		\
+	storage/SMstacks.lc		\
+	storage/SMstatic.lc		\
+	storage/SMstats.lc /*could clib except GCap affects printing*/ \
+	storage/mprotect.lc
+
+/*LATER?: storage/SMgen.lc */
+
+RTS_LHC = 				\
+	main/StgStartup.lhc		\
+	main/StgUpdate.lhc		\
+	main/StgThreads.lhc		\
+	c-as-asm/PerformIO.lhc		\
+	storage/SMmark.lhc		\
+	gum/FetchMe.lhc
+
+#if GhcWithReadline == YES
+# define __readline_cfile io/ghcReadline.lc
+#else
+# define __readline_cfile /*none*/
+#endif
+
+CLIB_LC = 				\
+	hooks/ErrorHdr.lc		\
+	hooks/OutOfHeap.lc		\
+	hooks/OutOfStk.lc		\
+	hooks/OutOfVM.lc		\
+	hooks/PatErrorHdr.lc		\
+	hooks/TraceHooks.lc		\
+	io/closeFile.lc			\
+	io/createDirectory.lc		\
+	io/env.lc			\
+	io/errno.lc			\
+	io/execvpe.lc			\
+	io/fileEOF.lc			\
+	io/fileGetc.lc			\
+	io/fileLookAhead.lc		\
+	io/filePosn.lc			\
+	io/filePutc.lc			\
+	io/fileSize.lc			\
+	io/flushFile.lc			\
+	io/getBufferMode.lc		\
+	io/getCPUTime.lc		\
+	io/getClockTime.lc		\
+	io/getCurrentDirectory.lc	\
+	io/getDirectoryContents.lc	\
+	io/getLock.lc			\
+	io/inputReady.lc		\
+	io/openFile.lc			\
+	io/readFile.lc			\
+	io/removeDirectory.lc		\
+	io/removeFile.lc		\
+	io/renameDirectory.lc		\
+	io/renameFile.lc		\
+	io/seekFile.lc			\
+	io/setBuffering.lc		\
+	io/setCurrentDirectory.lc	\
+	io/showTime.lc			\
+	io/system.lc			\
+	io/toClockSec.lc		\
+	io/toLocalTime.lc		\
+	io/toUTCTime.lc			\
+	io/writeFile.lc			\
+	prims/ByteOps.lc		\
+	storage/SMalloc.lc __readline_cfile
+
+H_FILES = $(RTS_LH:.lh=.h)
+C_FILES = $(RTS_LC:.lc=.c) $(RTS_LHC:.lhc=.hc) $(CLIB_LC:.lc=.c)
+
+/* Header files */
+
+all depend :: $(H_FILES)
+
+ExtraStuffToClean ( $(C_FILES) )
+
+/* Literate-pgmming suffix rules used herein */
+LitSuffixRule(.lhc,.hc)
+LitSuffixRule(.lc,.c)
+LitSuffixRule(.lh,.h)
+
+/****************************************************************
+*								*
+* interesting collections of .o files				*
+*								*
+****************************************************************/
+
+RTS_OBJS_norm = $(RTS_LC:.lc=.o)    $(RTS_LHC:.lhc=.o)
+RTS_OBJS_p    = $(RTS_LC:.lc=_p.o)  $(RTS_LHC:.lhc=_p.o)
+RTS_OBJS_t    = $(RTS_LC:.lc=_t.o)  $(RTS_LHC:.lhc=_t.o)
+RTS_OBJS_u    = $(RTS_LC:.lc=_u.o)  $(RTS_LHC:.lhc=_u.o)
+RTS_OBJS_mc   = $(RTS_LC:.lc=_mc.o) $(RTS_LHC:.lhc=_mc.o)
+RTS_OBJS_mr   = $(RTS_LC:.lc=_mr.o) $(RTS_LHC:.lhc=_mr.o)
+RTS_OBJS_mt   = $(RTS_LC:.lc=_mt.o) $(RTS_LHC:.lhc=_mt.o)
+RTS_OBJS_mp   = $(RTS_LC:.lc=_mp.o) $(RTS_LHC:.lhc=_mp.o)
+RTS_OBJS_mg   = $(RTS_LC:.lc=_mg.o) $(RTS_LHC:.lhc=_mg.o)
+RTS_OBJS_2s   = $(RTS_LC:.lc=_2s.o) $(RTS_LHC:.lhc=_2s.o)
+RTS_OBJS_1s   = $(RTS_LC:.lc=_1s.o) $(RTS_LHC:.lhc=_1s.o)
+RTS_OBJS_du   = $(RTS_LC:.lc=_du.o) $(RTS_LHC:.lhc=_du.o)
+RTS_OBJS_a    = $(RTS_LC:.lc=_a.o)  $(RTS_LHC:.lhc=_a.o)
+RTS_OBJS_b    = $(RTS_LC:.lc=_b.o)  $(RTS_LHC:.lhc=_b.o)
+RTS_OBJS_c    = $(RTS_LC:.lc=_c.o)  $(RTS_LHC:.lhc=_c.o)
+RTS_OBJS_d    = $(RTS_LC:.lc=_d.o)  $(RTS_LHC:.lhc=_d.o)
+RTS_OBJS_e    = $(RTS_LC:.lc=_e.o)  $(RTS_LHC:.lhc=_e.o)
+RTS_OBJS_f    = $(RTS_LC:.lc=_f.o)  $(RTS_LHC:.lhc=_f.o)
+RTS_OBJS_g    = $(RTS_LC:.lc=_g.o)  $(RTS_LHC:.lhc=_g.o)
+RTS_OBJS_h    = $(RTS_LC:.lc=_h.o)  $(RTS_LHC:.lhc=_h.o)
+RTS_OBJS_i    = $(RTS_LC:.lc=_i.o)  $(RTS_LHC:.lhc=_i.o)
+RTS_OBJS_j    = $(RTS_LC:.lc=_j.o)  $(RTS_LHC:.lhc=_j.o)
+RTS_OBJS_k    = $(RTS_LC:.lc=_k.o)  $(RTS_LHC:.lhc=_k.o)
+RTS_OBJS_l    = $(RTS_LC:.lc=_l.o)  $(RTS_LHC:.lhc=_l.o)
+RTS_OBJS_m    = $(RTS_LC:.lc=_m.o)  $(RTS_LHC:.lhc=_m.o)
+RTS_OBJS_n    = $(RTS_LC:.lc=_n.o)  $(RTS_LHC:.lhc=_n.o)
+RTS_OBJS_o    = $(RTS_LC:.lc=_o.o)  $(RTS_LHC:.lhc=_o.o)
+
+CLIB_OBJS     = $(CLIB_LC:.lc=.o)
+
+/****************************************************************
+*								*
+* knock the "clib" (completely ordinary C, compiled once)	*
+* stuff over the head first...					*
+*								*
+****************************************************************/
+
+#define CompileClibishly(file,flags)				@@\
+CAT2(file,.o) : CAT2(file,.c)					@@\
+	$(RM) $@						@@\
+	$(GHC) -c -o CAT2(file,.o) $(GHCFLAGS) flags CAT2(file,.c)
+
+NormalLibraryTarget(HSclib,$(CLIB_OBJS))
+ExtraStuffToClean($(CLIB_OBJS))
+#if DoInstallGHCSystem == YES
+InstallLibraryTarget(HSclib,$(INSTLIBDIR_GHC))
+#endif
+
+/* all .lc files, so far */
+CompileClibishly(hooks/ErrorHdr,)
+CompileClibishly(hooks/OutOfHeap,)
+CompileClibishly(hooks/OutOfStk,)
+CompileClibishly(hooks/OutOfVM,)
+CompileClibishly(hooks/PatErrorHdr,)
+CompileClibishly(hooks/TraceHooks,)
+CompileClibishly(io/closeFile,)
+CompileClibishly(io/createDirectory,)
+CompileClibishly(io/env,)
+CompileClibishly(io/errno,)
+CompileClibishly(io/execvpe,)
+CompileClibishly(io/fileEOF,)
+CompileClibishly(io/fileGetc,)
+CompileClibishly(io/fileLookAhead,)
+CompileClibishly(io/filePosn,)
+CompileClibishly(io/filePutc,)
+CompileClibishly(io/fileSize,)
+CompileClibishly(io/flushFile,)
+CompileClibishly(io/getBufferMode,)
+CompileClibishly(io/getCPUTime,)
+CompileClibishly(io/getClockTime,)
+CompileClibishly(io/getCurrentDirectory,)
+CompileClibishly(io/getDirectoryContents,)
+CompileClibishly(io/getLock,)
+CompileClibishly(io/inputReady,)
+CompileClibishly(io/openFile,)
+CompileClibishly(io/readFile,)
+CompileClibishly(io/removeDirectory,)
+CompileClibishly(io/removeFile,)
+CompileClibishly(io/renameDirectory,)
+CompileClibishly(io/renameFile,)
+CompileClibishly(io/seekFile,)
+CompileClibishly(io/setBuffering,)
+CompileClibishly(io/setCurrentDirectory,)
+CompileClibishly(io/showTime,)
+CompileClibishly(io/system,)
+CompileClibishly(io/toClockSec,)
+CompileClibishly(io/toLocalTime,)
+CompileClibishly(io/toUTCTime,)
+CompileClibishly(io/writeFile,)
+CompileClibishly(main/TopClosure,)	/* NB */
+CompileClibishly(main/TopClosure13,)	/* ditto */
+CompileClibishly(prims/ByteOps,)
+CompileClibishly(storage/SMalloc,)
+#if GhcWithReadline == YES
+CompileClibishly(io/ghcReadline,)
+#endif
+
+ExtraStuffToClean(main/TopClosure.o main/TopClosure13.o)
+
+all :: main/TopClosure.o main/TopClosure13.o
+
+install :: main/TopClosure.o main/TopClosure13.o
+	$(INSTALL) -c $(INSTLIBFLAGS) main/TopClosure.o   $(INSTLIBDIR_GHC)/TopClosure.o
+	$(INSTALL) -c $(INSTLIBFLAGS) main/TopClosure13.o $(INSTLIBDIR_GHC)/TopClosure13.o
+
+#if GhcBuild_mp == YES
+# if solaris2_TARGET_OS
+#  define __socket_libs -lsocket -lnsl
+# else
+#  define __socket_libs /*none*/
+# endif
+
+AllTarget(gum/SysMan)
+gum/SysMan : gum/SysMan_mp.o gum/LLComms_mp.o
+	$(RM) $@
+	$(CC) gum/SysMan_mp.o gum/LLComms_mp.o -o $@ -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 __socket_libs
+ExtraStuffToClean(gum/SysMan_mp.o gum/SysMan)
+# if DoInstallGHCSystem == YES
+install :: gum/SysMan
+	$(INSTALL) -c $(INSTBINFLAGS) gum/SysMan $(INSTLIBDIR_GHC)/SysMan
+# endif
+#endif
+
+/****************************************************************
+*								*
+* special local make-world macros				*
+*								*
+****************************************************************/
+
+/* to build and install the per-build rts stuff */
+
+#ifndef SpecialGhcRtsLibTarget
+#define SpecialGhcRtsLibTarget(tag,objs)					@@\
+AllTarget(CAT3(libHSrts,tag,.a))						@@\
+ExtraStuffToClean(objs CAT3(libHSrts,tag,.a))		 			@@\
+CAT3(libHSrts,tag,.a):: $(H_FILES) objs 					@@\
+	$(RM) $@								@@\
+	$(AR) $@ objs								@@\
+	$(RANLIB) $@
+#endif /* SpecialGhcRtsLibTarget */
+
+#ifndef SpecialGhcRtsLibInstallTarget
+#if DoInstallGHCSystem == YES
+#define SpecialGhcRtsLibInstallTarget(tag)					@@\
+install :: CAT3(libHSrts,tag,.a)						@@\
+	$(INSTALL) $(INSTLIBFLAGS) \						@@\
+		CAT3(libHSrts,tag,.a) \						@@\
+		$(INSTLIBDIR_GHC)/CAT3(libHSrts,tag,.a)				@@\
+	$(RANLIB) $(INSTLIBDIR_GHC)/CAT3(libHSrts,tag,.a)
+#else /* ! DoInstallGHC... */
+#define SpecialGhcRtsLibInstallTarget(tag) /*nothing*/
+#endif /* ! DoInstallGHC... */
+#endif /* SpecialGhcRtsLibInstallTarget */
+
+#define BigBuildTarget(tag,objs)	\
+SpecialGhcRtsLibTarget(tag,objs)	@@\
+SpecialGhcRtsLibInstallTarget(tag)
+
+/****************************************************************
+*								*
+* creating and installing libHSrts.a (in its many flavors)	*
+*								*
+****************************************************************/
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC))
+#endif /* DoInstallGHCSystem */
+
+IfGhcBuild_normal(BigBuildTarget(,$(RTS_OBJS_norm)))
+IfGhcBuild_p(BigBuildTarget(_p,   $(RTS_OBJS_p)))
+IfGhcBuild_t(BigBuildTarget(_t,   $(RTS_OBJS_t)))
+IfGhcBuild_u(BigBuildTarget(_u,   $(RTS_OBJS_u)))
+IfGhcBuild_mc(BigBuildTarget(_mc, $(RTS_OBJS_mc)))
+IfGhcBuild_mr(BigBuildTarget(_mr, $(RTS_OBJS_mr)))
+IfGhcBuild_mt(BigBuildTarget(_mt, $(RTS_OBJS_mt)))
+IfGhcBuild_mp(BigBuildTarget(_mp, $(RTS_OBJS_mp)))
+IfGhcBuild_mg(BigBuildTarget(_mg, $(RTS_OBJS_mg)))
+IfGhcBuild_2s(BigBuildTarget(_2s, $(RTS_OBJS_2s)))
+IfGhcBuild_1s(BigBuildTarget(_1s, $(RTS_OBJS_1s)))
+IfGhcBuild_du(BigBuildTarget(_du, $(RTS_OBJS_du)))
+IfGhcBuild_a(BigBuildTarget(_a,   $(RTS_OBJS_a)))
+IfGhcBuild_b(BigBuildTarget(_b,   $(RTS_OBJS_b)))
+IfGhcBuild_c(BigBuildTarget(_c,   $(RTS_OBJS_c)))
+IfGhcBuild_d(BigBuildTarget(_d,   $(RTS_OBJS_d)))
+IfGhcBuild_e(BigBuildTarget(_e,   $(RTS_OBJS_e)))
+IfGhcBuild_f(BigBuildTarget(_f,   $(RTS_OBJS_f)))
+IfGhcBuild_g(BigBuildTarget(_g,   $(RTS_OBJS_g)))
+IfGhcBuild_h(BigBuildTarget(_h,   $(RTS_OBJS_h)))
+IfGhcBuild_i(BigBuildTarget(_i,   $(RTS_OBJS_i)))
+IfGhcBuild_j(BigBuildTarget(_j,   $(RTS_OBJS_j)))
+IfGhcBuild_k(BigBuildTarget(_k,   $(RTS_OBJS_k)))
+IfGhcBuild_l(BigBuildTarget(_l,   $(RTS_OBJS_l)))
+IfGhcBuild_m(BigBuildTarget(_m,   $(RTS_OBJS_m)))
+IfGhcBuild_n(BigBuildTarget(_n,   $(RTS_OBJS_n)))
+IfGhcBuild_o(BigBuildTarget(_o,   $(RTS_OBJS_o)))
+
+
+/****************************************************************
+*								*
+* compile the individual RTS files				*
+*								*
+****************************************************************/
+
+#define DoRtsFile(file,isuf,way,flags)					 @@\
+CAT3(file,way,.o) : CAT2(file,isuf)					 @@\
+	$(RM) $@							 @@\
+	$(GHC) -c -o CAT3(file,way,.o) $(GHCFLAGS) flags CAT2(file,isuf)
+
+#define CompileRTSishly(file,isuf,flags)			@@\
+IfGhcBuild_normal(DoRtsFile(file,isuf,,flags $(GHC_OPTS_norm)))	\
+IfGhcBuild_p(DoRtsFile(file,isuf,_p,   flags $(GHC_OPTS_p)))	\
+IfGhcBuild_t(DoRtsFile(file,isuf,_t,   flags $(GHC_OPTS_t)))	\
+IfGhcBuild_u(DoRtsFile(file,isuf,_u,   flags $(GHC_OPTS_u)))	\
+IfGhcBuild_mc(DoRtsFile(file,isuf,_mc, flags $(GHC_OPTS_mc)))	\
+IfGhcBuild_mr(DoRtsFile(file,isuf,_mr, flags $(GHC_OPTS_mr)))	\
+IfGhcBuild_mt(DoRtsFile(file,isuf,_mt, flags $(GHC_OPTS_mt)))	\
+IfGhcBuild_mp(DoRtsFile(file,isuf,_mp, flags $(GHC_OPTS_mp)))	\
+IfGhcBuild_mg(DoRtsFile(file,isuf,_mg, flags $(GHC_OPTS_mg)))	\
+IfGhcBuild_2s(DoRtsFile(file,isuf,_2s, flags $(GHC_OPTS_2s)))	\
+IfGhcBuild_1s(DoRtsFile(file,isuf,_1s, flags $(GHC_OPTS_1s)))	\
+IfGhcBuild_du(DoRtsFile(file,isuf,_du, flags $(GHC_OPTS_du)))	\
+IfGhcBuild_a(DoRtsFile(file,isuf,_a,   flags $(GHC_OPTS_a)))	\
+IfGhcBuild_b(DoRtsFile(file,isuf,_b,   flags $(GHC_OPTS_b)))	\
+IfGhcBuild_c(DoRtsFile(file,isuf,_c,   flags $(GHC_OPTS_c)))	\
+IfGhcBuild_d(DoRtsFile(file,isuf,_d,   flags $(GHC_OPTS_d)))	\
+IfGhcBuild_e(DoRtsFile(file,isuf,_e,   flags $(GHC_OPTS_e)))	\
+IfGhcBuild_f(DoRtsFile(file,isuf,_f,   flags $(GHC_OPTS_f)))	\
+IfGhcBuild_g(DoRtsFile(file,isuf,_g,   flags $(GHC_OPTS_g)))	\
+IfGhcBuild_h(DoRtsFile(file,isuf,_h,   flags $(GHC_OPTS_h)))	\
+IfGhcBuild_i(DoRtsFile(file,isuf,_i,   flags $(GHC_OPTS_i)))	\
+IfGhcBuild_j(DoRtsFile(file,isuf,_j,   flags $(GHC_OPTS_j)))	\
+IfGhcBuild_k(DoRtsFile(file,isuf,_k,   flags $(GHC_OPTS_k)))	\
+IfGhcBuild_l(DoRtsFile(file,isuf,_l,   flags $(GHC_OPTS_l)))	\
+IfGhcBuild_m(DoRtsFile(file,isuf,_m,   flags $(GHC_OPTS_m)))	\
+IfGhcBuild_n(DoRtsFile(file,isuf,_n,   flags $(GHC_OPTS_n)))	\
+IfGhcBuild_o(DoRtsFile(file,isuf,_o,   flags $(GHC_OPTS_o)))
+
+/* here we go: */
+
+CompileRTSishly(c-as-asm/CallWrap_C,.c,)
+CompileRTSishly(c-as-asm/FreeMallocPtr,.c,)
+CompileRTSishly(c-as-asm/HpOverflow,.c,)
+CompileRTSishly(c-as-asm/PerformIO,.hc,-mtoggle-sp-mangling/*toggle it back*/)
+CompileRTSishly(c-as-asm/StablePtr,.c,)
+CompileRTSishly(c-as-asm/StablePtrOps,.c,)
+CompileRTSishly(c-as-asm/StgDebug,.c,)
+CompileRTSishly(c-as-asm/StgMiniInt,.c,)
+CompileRTSishly(gum/FetchMe,.hc,-mtoggle-sp-mangling/*toggle it back*/)
+CompileRTSishly(gum/GlobAddr,.c,)
+CompileRTSishly(gum/HLComms,.c,)
+CompileRTSishly(gum/Hash,.c,)
+CompileRTSishly(gum/LLComms,.c,)
+CompileRTSishly(gum/Pack,.c,)
+CompileRTSishly(gum/ParInit,.c,)
+CompileRTSishly(gum/RBH,.c,)
+CompileRTSishly(gum/Sparks,.c,)
+CompileRTSishly(gum/SysMan,.c,) /* NB: not in library */
+CompileRTSishly(gum/Unpack,.c,)
+CompileRTSishly(main/GranSim,.c,)
+CompileRTSishly(main/Itimer,.c,)
+CompileRTSishly(main/RednCounts,.c,)
+CompileRTSishly(main/SMRep,.c,)
+CompileRTSishly(main/Select,.c,)
+CompileRTSishly(main/Signals,.c,)
+CompileRTSishly(main/StgOverflow,.c,)
+CompileRTSishly(main/StgStartup,.hc,-mtoggle-sp-mangling/*toggle it back*/)
+CompileRTSishly(main/StgThreads,.hc,-mtoggle-sp-mangling/*toggle it back*/)
+CompileRTSishly(main/StgTrace,.c,)
+CompileRTSishly(main/StgUpdate,.hc,-mtoggle-sp-mangling/*toggle it back*/)
+CompileRTSishly(main/Threads,.c,)
+CompileRTSishly(main/main,.c,)
+CompileRTSishly(profiling/CostCentre,.c,)
+CompileRTSishly(profiling/Hashing,.c,)
+CompileRTSishly(profiling/HeapProfile,.c,)
+CompileRTSishly(profiling/Indexing,.c,)
+CompileRTSishly(profiling/LifeProfile,.c,)
+CompileRTSishly(profiling/Timer,.c,)
+CompileRTSishly(prims/PrimArith,.c,)
+CompileRTSishly(prims/PrimMisc,.c,)
+CompileRTSishly(storage/Force_GC,.c,)
+CompileRTSishly(storage/SM1s,.c,)
+CompileRTSishly(storage/SM2s,.c,)
+CompileRTSishly(storage/SMap,.c,)
+CompileRTSishly(storage/SMcheck,.c,)
+CompileRTSishly(storage/SMcompacting,.c,)
+CompileRTSishly(storage/SMcopying,.c,)
+CompileRTSishly(storage/SMdu,.c,)
+CompileRTSishly(storage/SMevac,.c,)
+CompileRTSishly(storage/SMextn,.c,)
+CompileRTSishly(storage/SMgen,.c,)
+CompileRTSishly(storage/SMinit,.c,)
+CompileRTSishly(storage/SMmark,.hc,-optc-DMARK_REG_MAP)
+CompileRTSishly(storage/SMmarking,.c,)
+CompileRTSishly(storage/SMscan,.c,)
+CompileRTSishly(storage/SMscav,.c,)
+CompileRTSishly(storage/SMstacks,.c,)
+CompileRTSishly(storage/SMstatic,.c,)
+CompileRTSishly(storage/SMstats,.c,)
+CompileRTSishly(storage/mprotect,.c,)
+
+/****************************************************************
+*								*
+* misc "make" targets -- depend, clean, tags			*
+*								*
+****************************************************************/
+
+ClearTagsFile()
+/* this is not the way we should do this [WDP [lazy] 94/09] */
+CTagsTarget( $(RTS_LC) $($RTS_LHC) $(CLIB_LC) )
+CTagsTarget( gmp/[a-z]*.c )
+CTagsTarget( regex/[a-z]*.c )
+
+CDependTarget( $(RTS_LC) $($RTS_LHC) $(CLIB_LC) )
+
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+
+/*LitDocRootTargetWithNamedOutput(threadroot,lit,threadroot-standalone)*/

@@ -1,0 +1,120 @@
+%
+% Included by  prof-options.lit  and  runtime_control.lit
+%
+
+It isn't enough to compile your program for profiling with \tr{-prof}!
+
+When you {\em run} your profiled program, you must tell the runtime system (RTS)
+what you want to profile (e.g., time and/or space), and how you wish
+the collected data to be reported.  You also may wish to set the
+sampling interval used in time profiling.
+
+Executive summary: \tr{./a.out +RTS -p} produces a time profile in
+\tr{a.out.prof}; \tr{./a.out +RTS -hC} produces space-profiling
+info which can be mangled by \tr{hp2ps} and viewed with \tr{ghostview}
+(or equivalent).
+
+Profiling runtime flags are passed to your program between the usual
+\tr{+RTS} and \tr{-RTS} options.
+
+\begin{description}
+\item[\tr{-p<sort>} or \tr{-P<sort>}:]
+\index{-p<sort> RTS option (profiling)}
+\index{-P<sort> RTS option (profiling)}
+\index{time profile}
+\index{serial time profile}
+The \tr{-p} option produces a standard {\em time profile} report.
+It is written into the file \pl{<program>}\tr{.prof}.
+
+The \tr{-P} option produces a more detailed report containing the
+actual time and allocation data as well.  (Not used much.)
+
+The \tr{-P} option also produces {\em serial time-profiling}
+information, in the file \pl{<program>}\tr{.time}. This can be
+converted into a (somewhat unsatisfactory) PostScript graph using
+\tr{hp2ps} (see \Sectionref{hp2ps}).
+
+???? -F2s needed for serial time profile??? ToDo
+
+The \pl{<sort>} indicates how the cost centres are to be sorted in the
+report. Valid \pl{<sort>} options are:
+\begin{description}
+\item[\tr{T}:] by time, largest first (the default);
+\item[\tr{A}:] by bytes allocated, largest first;
+\item[\tr{C}:] alphabetically by group, module and cost centre.
+\end{description}
+
+\item[\tr{-i<secs>}:]
+\index{-i<secs> RTS option (profiling)}
+Set the profiling (sampling) interval to \tr{<secs>} seconds (the
+default is 1~second).
+
+\item[\tr{-h<break-down>}:]
+\index{-h<break-down> RTS option (profiling)}
+\index{heap profile}
+Produce a detailed {\em space profile} of the heap occupied by live
+closures. The profile is written to the file \pl{<program>}\tr{.hp}
+from which a PostScript graph can be produced using \tr{hp2ps} (see
+\Sectionref{hp2ps}).
+
+The heap space profile may be broken down by different criteria:
+\begin{description}
+\item[\tr{-hC}:] cost centre which produced the closure (the default).
+\item[\tr{-hM}:] cost centre module which produced the closure.
+\item[\tr{-hG}:] cost centre group which produced the closure.
+\item[\tr{-hD}:] closure description --- a string describing the closure.
+\item[\tr{-hY}:] closure type --- a string describing the closure's type.
+\item[\tr{-hT<ints>,<start>}:] the time interval the closure was
+created. \tr{<ints>} specifies the no. of interval bands plotted
+(default 18) and \tr{<start>} the number of seconds after which the
+reported intervals start (default 0.0).
+\end{description}
+By default all live closures in the heap are profiled, but particular
+closures of interest can be selected (see below). 
+\end{description}
+
+
+Heap (space) profiling uses hash tables. If these tables
+should fill the run will abort. The
+\tr{-z<tbl><size>}\index{-z<tbl><size> RTS option (profiling)} option is used to
+increase the size of the relevant hash table (\tr{C}, \tr{M},
+\tr{G}, \tr{D} or \tr{Y}, defined as for \pl{<break-down>} above). The
+actual size used is the next largest power of 2.
+
+The heap profile can be restricted to particular closures of interest.
+The closures of interest can selected by the attached cost centre
+(module:label, module and group), closure category (description, type,
+and kind) and closure age using the following options:
+\begin{description}
+\item[\tr{-c{<mod>:<lab>,<mod>:<lab>...}}:]
+\index{-c{<lab>} RTS option (profiling)}
+Selects individual cost centre(s).
+\item[\tr{-m{<mod>,<mod>...}}:]
+\index{-m{<mod>} RTS option (profiling)}
+Selects all cost centres from the module(s) specified.
+\item[\tr{-g{<grp>,<grp>...}}:]
+\index{-g{<grp>} RTS option (profiling)}
+Selects all cost centres from the groups(s) specified.
+\item[\tr{-d{<des>,<des>...}}:]
+\index{-d{<des>} RTS option (profiling)}
+Selects closures which have one of the specified descriptions.
+\item[\tr{-y{<typ>,<typ>...}}:]
+\index{-y{<typ>} RTS option (profiling)}
+Selects closures which have one of the specified type descriptions.
+\item[\tr{-k{<knd>,<knd>...}}:]
+\index{-k{<knd>} RTS option (profiling)}
+Selects closures which are of one of the specified closure kinds.
+Valid closure kinds are \tr{CON} (constructor), \tr{FN} (manifest
+function), \tr{PAP} (partial application), \tr{BH} (black hole) and
+\tr{THK} (thunk).
+\item[\tr{-a<age>}:]
+\index{-a<age> RTS option (profiling)}
+Selects closures which have survived \pl{<age>} complete intervals.
+\end{description}
+The space occupied by a closure will be reported in the heap profile
+if the closure satisfies the following logical expression:
+\begin{display}
+([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]
+\end{display}
+where a particular option is true if the closure (or its attached cost
+centre) is selected by the option (or the option is not specified).

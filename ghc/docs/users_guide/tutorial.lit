@@ -1,0 +1,129 @@
+%
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/tutorial.lit,v 1.1 1996/01/08 20:25:11 partain Exp $
+%
+\section[compiler-tutorial]{Tutorial material about this compilation system}
+
+This guide assumes quite a bit of knowledge about UNIX compilers and
+their conventional use.  This section has a little extra information
+for those who are new at this racket.
+
+%************************************************************************
+%*                                                                      *
+\subsection[batch-system-parts]{The (batch) compilation system components}
+%*                                                                      *
+%************************************************************************
+
+The Glorious Haskell Compilation System, as with most UNIX (batch)
+compilation systems, has several interacting parts:
+\begin{enumerate}
+\item
+A {\em driver}\index{driver program} \tr{ghc}\index{ghc}---which you
+usually think of as ``the compiler''---is a program that merely
+invokes/glues-together the other pieces of the system (listed below),
+passing the right options to each, slurping in the right libraries,
+etc.
+
+\item
+A {\em literate pre-processor}
+\index{literate pre-processor}
+\index{pre-processor, literate}
+\tr{unlit}\index{unlit} that extracts Haskell
+code from a literate script; used if you believe in that sort of
+thing.
+
+\item
+The {\em Haskellised C pre-processor}
+\index{Haskellised C pre-processor}
+\index{C pre-processor, Haskellised}
+\index{pre-processor, Haskellised C}
+\tr{hscpp},\index{hscpp} only needed by people requiring conditional
+compilation, probably for large systems.  The ``Haskellised'' part
+just means that \tr{#line} directives in the output have been
+converted into proper Haskell \tr{{-# LINE ... -}} pragmas.
+
+You must give an explicit \tr{-cpp} option 
+\index{-cpp option} for the C pre-processor to be invoked.
+
+\item
+The {\em Haskell compiler}
+\index{Haskell compiler}
+\index{compiler, Haskell}
+\tr{hsc},\index{hsc}
+which---in normal use---takes its input from the C pre-processor
+and produces assembly-language output (sometimes: ANSI C output).
+
+\item
+The {\em ANSI~C Haskell high-level assembler :-)}
+\index{ANSI C compiler}
+\index{high-level assembler}
+\index{assembler, high-level}
+compiles \tr{hsc}'s C output into assembly language for a particular
+target architecture.  (It doesn't have to be an ANSI C compiler, but
+that's preferred; to go fastest, you need GNU C, version 2.x.)
+
+\item
+The {\em assembler}\index{assembler}---a standard UNIX one, probably
+\tr{as}\index{as}.
+
+\item
+The {\em linker}\index{linker}---a standard UNIX one, probably
+\tr{ld}.\index{ld}
+
+\item
+A {\em runtime system},\index{runtime system} including (most notably)
+a storage manager; the linker links in the code for this.
+
+\item
+The {\em Haskell standard prelude}\index{standard prelude}, a
+large library of standard functions, is linked in as well.
+
+\item
+Parts of other {\em installed libraries} that you have at your site
+may be linked in also.
+\end{enumerate}
+
+%************************************************************************
+%*                                                                      *
+\subsection[compile-what-really-happens]{What really happens when I ``compile'' a Haskell program?}
+%*                                                                      *
+%************************************************************************
+
+You invoke the Glasgow Haskell compilation system through the
+driver program \tr{ghc}.\index{ghc} For example, if you had typed a
+literate ``Hello, world!'' program into \tr{hello.lhs}, and you then
+invoked:
+\begin{verbatim}
+ghc hello.lhs
+\end{verbatim}
+
+the following would happen:
+\begin{enumerate}
+\item
+The file \tr{hello.lhs} is run through the literate-program
+code extractor \tr{unlit}\index{unlit}, feeding its output to
+
+\item
+The Haskell compiler proper \tr{hsc}\index{hsc}, which produces
+input for
+
+\item
+The assembler (or that ubiquitous ``high-level assembler,'' a C
+compiler), which produces an object file and passes it to
+
+\item
+The linker, which links your code with the appropriate libraries
+(including the standard prelude), producing an executable program in
+the default output file named \tr{a.out}.
+\end{enumerate}
+
+You have considerable control over the compilation process.  You feed
+command-line arguments (call them ``options,'' for short) to the
+driver, \tr{ghc}; the ``types'' of the input files (as encoded in
+their names' suffixes) also matter.
+
+Here's hoping this is enough background so that you can read the rest
+of this guide!
+
+% The ``style'' of the driver program \tr{ghc} follows that of the GNU C
+% compiler driver \tr{gcc}.  The use of environment variables to provide
+% defaults is more extensive in this compilation system.

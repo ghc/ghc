@@ -1,0 +1,266 @@
+The really new thing about release 0.06 is this: if you can get
+your program through the compiler, then it should actually work when you
+run it! 
+
+Another thing we have worked hard on recently is {\em documentation} (see
+next section).
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-docs]{New documentation, especially for hackers!}
+%*									*
+%************************************************************************
+
+See the file \tr{docs/README} for a full ``roadmap'' to all known
+documentation.
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[STG-machine paper.]
+A monster (70+-page) paper which gives a detailed description of the 
+Spineless Tagless G-machine, on which the back end of the compiler is based.
+Simon is Jolly Proud of this paper.
+
+This paper isn't in the distribution, but is available by asking
+Simon, or by FTP from \tr{ftp.dcs.glasgow.ac.uk:pub/glasgow-fp/stg.dvi}.
+%-------------------------------------------------------------------
+\item[\tr{imports/SMinterface.lh}.]
+The storage manager is carefully isolated from the rest of the runtime
+system behind a carefully identified interface.  This paper documents
+the interface, and says a little about the implementation.  NB:
+``literate'' \tr{.h} file!
+%-------------------------------------------------------------------
+\item[\tr{docs/C_optimisation}.]
+Lots of details about how we use C as a target language, and
+the tricks we use to make it go fast.  Still drafty.
+%-------------------------------------------------------------------
+\item[\tr{docs/runtime}.]
+The {\em beginnings} of a description of details of the runtime system
+which aren't covered by the STG paper above.
+%-------------------------------------------------------------------
+\item[\tr{docs/typecheck}.]
+The {\em beginnings} of a description of tricky corners of the type checker.
+%-------------------------------------------------------------------
+\item[\tr{docs/arrays}.]
+A work-in-progress on how to handle arrays properly.
+%-------------------------------------------------------------------
+\item[\tr{docs/core-overview}:]
+The beginnings of a description of the Core data type, plus the other
+data types you need to know about to write programs which manipulate
+the Core data type.
+
+The ``how to add to the compiler'' document
+(\tr{docs/add_to_compiler}) has some of this stuff in it, too.
+%-------------------------------------------------------------------
+\item[Type classes paper:]
+This is a short (20-page) form of the massive ``Static Semantics of
+Haskell'' paper.  We submitted it to Lisp and FP 1992, but they
+(unaccountably) rejected it.
+
+This paper isn't in the distribution; please ask for it.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-in-compiler]{To do with the compiler proper}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+\item[1.2 syntax:]
+The parser handles the Haskell syntax given in the Haskell report,
+version~1.2.  See \tr{parsers/hsp}.
+
+%-------------------------------------------------------------------
+\item[Graph reduction:]
+Updates are in and we're doing graph reduction!  (All the bells and
+whistles for doing a good job of [avoiding] updates are not
+in yet.)
+
+See \tr{compiler/codeGen/{CodeGen,CgClosure}.lhs} and
+\tr{runtime/main/Update.lhc} for the main bits.
+
+%-------------------------------------------------------------------
+\item[Closure layout less deeply wired into compiler:]
+Rather than knowing word-for-word how each closure is layed out in
+memory, the compiler emits C macro calls to access/fill-in the ``fixed
+header'' and ``variable header'' parts of each closure (all described
+in the storage-manager document).
+
+This means, for example, that the very same C code used on sequential
+machines can be used on GRIP as well, even though closures in GRIP
+have some extra fields---all that is required is suitable \tr{.h}
+files to define the header macros accordingly!
+
+Anyone whose efforts involve munging around in or pinning things onto
+closures should like this ``feature.''
+
+%-------------------------------------------------------------------
+\item[Statistics about program execution:]
+The compiler emits macro calls into the C output which, if expanded
+(use @-DDO_RUNTIME_PROFILING@, default: on), will accumulate
+statistics about program behaviour.  To have those statistics printed
+out (to @stderr@), give your program the @-p@ RTS flag, thusly:
+
+\begin{verbatim}
+% a.out +RTS -p
+\end{verbatim}
+
+We welcome any interesting profiles that you may churn up!
+
+See \tr{imports/StgProfile.h} and \tr{runtime/main/StgProfile.lc},
+plus insertions of those macro calls in
+\tr{compiler/codeGen}.
+
+%-------------------------------------------------------------------
+\item[New simplifier/transformation stuff:]
+Contributed by research students Andr\'e Santos and Andy Gill.  In
+\tr{compiler/simplify} and \tr{compiler/stranal-triv}; it's still
+thoroughly experimental.
+
+The old-but-reliable brain-damaged simplifier is now in
+\tr{compiler/simplify0} and is still the default.
+
+%-------------------------------------------------------------------
+%\item[Faster compiler:]
+% (NOT QUITE YET)  The compiler is again faster than the previous release
+% (version~0.05).  The C output is also smaller.
+
+%-------------------------------------------------------------------
+\item[Compiler is compilable with Chalmers's HBC or Glasgow prototype compiler:]
+The default set of \tr{compiler/*/*.hi} interface files in the
+distribution are for compiling with HBC (this seems to be the people's
+preference); version 0.997.3 or greater, please.
+
+A separate set of \tr{.hi} files are provided for those who use the
+Glasgow prototype compiler.  These are in the file
+\tr{ghc-0.06-proto-hi-files.tar.Z}, available wherever you got the
+basic distribution.  The installation document says how to deal with
+these various blobs of files.
+
+The possibility of using HBC means you can compile the Glasgow Haskell
+compiler on any machine supported for HBC (Sun3s, Sun4s, DEC 3100s
+[and one or two more flavours?]).
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-in-compiler-contrib]{In contributed bits of the compiler}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Semantique strictness analyser:]
+The one in the distribution now builds; in \tr{compiler/stranal-sem}.
+This would only be of interest to those who might want to play with
+it.  The rest of the compiler can't use its results.
+
+If you want to build this strictness analyser, you need to configure
+appropriately (see \tr{mkworld/Project-ghc-full.*}, when you get to
+that part of the installation instructions).
+\end{description}
+
+Please send us {\em your} bits for next time!
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-in-libraries]{In @Prelude@ and runtime support}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[``Binary bloat'' from the prelude, ameliorated:]
+The C files produced from compiling the prelude are chopped into
+some 400 separate C files, which are individually compiled and 
+banged into an archive.  Result is that you only get the bits you
+``need,'' and binary sizes have about halved.
+(There is more work to do in this department.)
+
+%-------------------------------------------------------------------
+\item[Naive implementation of Haskell I/O:]
+At least \tr{ReadChan stdin} and \tr{AppendChan stdout} requests work.
+It shouldn't be too hard to add support for other requests in
+\tr{lib/io/DialogueToIO.lhs}. (Only [extended] Haskell hacking needed!)
+
+%-------------------------------------------------------------------
+\item[Storage management moved behind a safe wall:]
+
+It's now in \tr{runtime/storage/.}  All four flavours of garbage
+collector (two-space copying, one-space compacting, dual-mode, and
+Appel-like generational) seem to work.
+
+Patrick Sansom, research student and hacker extraordinaire, did all
+of this.
+
+%-------------------------------------------------------------------
+\item[Flags-to-RTS machinery in place:]
+
+When your @ghc@-compiled Haskell program starts up, any command-line
+arguments bracketted by @+RTS@ and @-RTS@ (or the end of the arguments)
+are assumed to be flags for the runtime system.  These flags are used
+to alter the heap size, ask for garbage-collection stats, etc.
+
+To see what flags are available, try: \tr{myprog +RTS -f}.
+
+Patrick did this, too.
+
+%-------------------------------------------------------------------
+\item[C-optimisation sleaziness also better hidden:]
+
+It is in \tr{runtime/c-as-asm/}.  (It needs to be tidier, but...)
+
+We are still actively working on getting this right.  Please get in
+touch if you are interested.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-in-mkworld]{In distribution/build/installation machinery}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Better line numbers, and Emacs-able TAGS files:]
+(Yes, they're related!) Error messages should come out with better
+line numbers than before.
+
+The distribution now includes tags-making things: souped-up \tr{etags}
+program [for C], \tr{perltags} [for perl], and \tr{hstags} [for
+Haskell] (mostly in \tr{utils/scripts}).  The Haskell tags program
+uses the parser, so it Does It Right.
+
+\tr{make tags fulltags} at the top of the distribution tree will make a
+huge TAGS file for the whole compilation system.
+
+%-------------------------------------------------------------------
+\item[\tr{make install} might do something sensible:]
+Yes, it does.  But you'd be well advised to do a \tr{make -n install}
+just to check first!
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-06-new-misc]{Miscellaneous new things}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Consistency-checking for executables:]
+Given that our system can generate \tr{.o} object files which are
+seriously {\em incompatible} with each other, depending on choice of
+garbage collector, degree of optimisation, whether or not compiling
+for GRIP, etc., we have implemented a scheme (in the driver \tr{ghc})
+that checks that all the linked bits in an executable ``belong''
+together.
+
+%-------------------------------------------------------------------
+\item[Scripts from Denis Howe:]
+We have included his \tr{fptags} and \tr{mira2hs} scripts that he
+posted to \tr{comp.lang.functional}.
+\end{description}

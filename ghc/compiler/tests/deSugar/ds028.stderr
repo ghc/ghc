@@ -1,0 +1,30 @@
+Desugared:
+{- plain CoRec -}
+Main.map :: for all d, e. (d -> e) -> [d] -> [e]
+Main.map =
+    /\ t88 t84 -> \ f.100 ds.101 ->
+	let
+	  fail.102 =
+	      (error [t84])
+		  "\"ds028.hs\", line 7: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.101 of {
+	    Nil -> Nil! t84
+	    (:) x.103 xs.104 ->
+		let f.105 = f.100
+		in  (: t84) (f.105 x.103) (((Main.map t88) t84) f.105 xs.104)
+	  }
+{- end plain CoRec -}
+Main.|| :: Bool -> Bool -> Bool
+Main.|| =
+    \ ds.109 ds.110 ->
+	let
+	  fail.111 =
+	      (error Bool)
+		  "\"ds028.hs\", line 10: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.109 of {
+	    True -> True
+	    False -> let x.112 = ds.110 in  x.112
+	  }
+

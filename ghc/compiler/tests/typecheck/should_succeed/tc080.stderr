@@ -1,0 +1,303 @@
+Typechecked:
+{- nonrec -}
+Main.Parse.parseFile =
+    /\ a.t177 ->
+	\{-classdict-} [] [parseFile.t178
+			   parseLine.t179
+			   parse.t180
+			   parseType.t181
+			   forced.t182] -> parseFile.t178
+Main.Parse.parseLine =
+    /\ a.t177 ->
+	\{-classdict-} [] [parseFile.t178
+			   parseLine.t179
+			   parse.t180
+			   parseType.t181
+			   forced.t182] -> parseLine.t179
+Main.Parse.parse =
+    /\ a.t177 ->
+	\{-classdict-} [] [parseFile.t178
+			   parseLine.t179
+			   parse.t180
+			   parseType.t181
+			   forced.t182] -> parse.t180
+Main.Parse.parseType =
+    /\ a.t177 ->
+	\{-classdict-} [] [parseFile.t178
+			   parseLine.t179
+			   parse.t180
+			   parseType.t181
+			   forced.t182] -> parseType.t181
+Main.Parse.forced =
+    /\ a.t177 ->
+	\{-classdict-} [] [parseFile.t178
+			   parseLine.t179
+			   parse.t180
+			   parseType.t181
+			   forced.t182] -> forced.t182
+{- nonrec -}
+defm.Main.Parse.parseFile =
+    let
+      AbsBinds [a.t183] [d.Main.Parse.t184] [(parseFile.t185, parseFile.t186)]
+	  (d.Main.Parse.t197, d.Main.Parse.t184)
+	  (Main.Parse.parseLine.t193,
+	      Main.Parse.parseLine a.t183 d.Main.Parse.t197)
+	  (d.Main.Parse.t198, d.Main.Parse.t197)
+	  (Main.Parse.forced.t196, Main.Parse.forced a.t183 d.Main.Parse.t198)
+	  {- nonrec -}
+	  parseFile.t185 :: String -> [a.t183]
+	  parseFile.t185
+	      string.r23
+		      | (all a.t183) Main.Parse.forced.t196 x.r24 = x.r24
+		      where
+			  AbsBinds [] [] [(x.t189, x.r24)]
+			      {- nonrec -}
+			      x.t189 :: [a.t183]
+			      x.t189
+				  = (map [String, a.t183])
+					Main.Parse.parseLine.t193
+					(Main.lines' string.r23)
+			  {- nonrec -}
+    in parseFile.t186
+defm.Main.Parse.parseLine =
+    let
+      AbsBinds [a.t199] [d.Main.Parse.t200] [(parseLine.t201, parseLine.t202)]
+	  (d.Main.Parse.t217, d.Main.Parse.t200)
+	  (Main.Parse.parse.t215, Main.Parse.parse a.t199 d.Main.Parse.t217)
+	  {- nonrec -}
+	  parseLine.t201 :: String -> a.t199
+	  parseLine.t201
+	      = ((.) [String, (a.t199, String), a.t199])
+		    (pl.r25 [String, a.t199]) Main.Parse.parse.t215
+	   where
+	      AbsBinds [tt208, tt207] [] [(pl.t204, pl.r25)]
+		  {- nonrec -}
+		  pl.t204 :: (tt207, tt208) -> tt207
+		  pl.t204
+		      (a.r26, _)
+			      = a.r26
+	      {- nonrec -}
+    in parseLine.t202
+defm.Main.Parse.parse =
+    let
+      AbsBinds [a.t218] [d.Main.Parse.t219] [(parse.t220, parse.t221)]
+	  (d.Main.Parse.t228, d.Main.Parse.t219)
+	  (Main.Parse.parseType.t226,
+	      Main.Parse.parseType a.t218 d.Main.Parse.t228)
+	  {- nonrec -}
+	  parse.t220 :: String -> (a.t218, String)
+	  parse.t220
+	      = ((.) [String, String, (a.t218, String)])
+		    Main.Parse.parseType.t226 Main.whiteSpace
+    in parse.t221
+defm.Main.Parse.forced =
+    let
+      AbsBinds [a.t229] [d.Main.Parse.t230] [(forced.t231, forced.t232)]
+	  {- nonrec -}
+	  forced.t231 :: a.t229 -> Bool
+	  forced.t231
+	      x.r27 = True
+    in forced.t232
+defm.Main.Parse.parseType =
+    /\ a.t234 ->
+	\{-dict-} d.Main.Parse.t235 ->
+	    (error (String -> (a.t234, String)))
+		"No default method for \"Main.Parse.defm.Main.Parse.parseType\"\n"
+{- rec -}
+dfun.Main.Parse.Char =
+    ({-dict-}
+    []
+    [const.Main.Parse.Char.parseFile,
+     const.Main.Parse.Char.parseLine,
+     const.Main.Parse.Char.parse,
+     const.Main.Parse.Char.parseType,
+     const.Main.Parse.Char.forced])
+const.Main.Parse.Char.parseType :: String -> (Char, String)
+const.Main.Parse.Char.parseType
+    (ch.r64 : str.r65)
+	    = (ch.r64, str.r65)
+const.Main.Parse.Char.forced :: Char -> Bool
+const.Main.Parse.Char.forced
+    n.r66 = True
+const.Main.Parse.Char.parseFile =
+    defm.Main.Parse.parseFile Char dfun.Main.Parse.Char
+const.Main.Parse.Char.parseLine =
+    defm.Main.Parse.parseLine Char dfun.Main.Parse.Char
+const.Main.Parse.Char.parse = defm.Main.Parse.parse Char dfun.Main.Parse.Char
+{- rec -}
+dfun.Main.Parse.Int =
+    ({-dict-}
+    []
+    [const.Main.Parse.Int.parseFile,
+     const.Main.Parse.Int.parseLine,
+     const.Main.Parse.Int.parse,
+     const.Main.Parse.Int.parseType,
+     const.Main.Parse.Int.forced])
+const.Main.Parse.Int.parseType :: String -> (Int, String)
+const.Main.Parse.Int.parseType
+    str.r67 = (pl.r68 [Char]) ((Main.span' Char) isDigit str.r67)
+	    where
+		AbsBinds [tt135] [] [(pl.t131, pl.r68)]
+		    {- nonrec -}
+		    pl.t131 :: (String, tt135) -> (Int, tt135)
+		    pl.t131
+			(l.r69, r.r70)
+				= (Main.strToInt l.r69, r.r70)
+		{- nonrec -}
+const.Main.Parse.Int.forced :: Int -> Bool
+const.Main.Parse.Int.forced
+    n.r71 | n.r71 >=.t140 lit.t142 = True
+const.Main.Parse.Int.parseFile =
+    defm.Main.Parse.parseFile Int dfun.Main.Parse.Int
+const.Main.Parse.Int.parseLine =
+    defm.Main.Parse.parseLine Int dfun.Main.Parse.Int
+const.Main.Parse.Int.parse = defm.Main.Parse.parse Int dfun.Main.Parse.Int
+AbsBinds
+[a.t173]
+[d.Main.Parse.t145]
+[(d.Main.Parse.t146, dfun.Main.Parse.List)]
+    (/=.t163, neChar)
+    (d.Main.Parse.t175, d.Main.Parse.t145)
+    (Main.Parse.parseLine.t169, Main.Parse.parseLine a.t173 d.Main.Parse.t175)
+    (d.Main.Parse.t176, d.Main.Parse.t175)
+    (Main.Parse.forced.t174, Main.Parse.forced a.t173 d.Main.Parse.t176)
+    {- rec -}
+    d.Main.Parse.t146 =
+	({-dict-}
+	[]
+	[parseFile.t147, parseLine.t148, parse.t149, parseType.t150, forced.t151])
+    parseType.t150 :: String -> ([a.t173], String)
+    parseType.t150
+	more.r73 = ((map [String, a.t173])
+			Main.Parse.parseLine.t169
+			(Main.seperatedBy ',' (((++) Char) l.r74 ",")),
+		    out.r75)
+		 where
+		     AbsBinds [] [] [(l.t155, l.r74), (out.t156, out.r75)]
+			 {- nonrec -}
+			 (l.t155, (']' : out.t156)) :: ([Char], [Char])
+			 (l.t155, (']' : out.t156))
+			     = (Main.span' Char)
+				   (\ x.r76 -> x.r76 /=.t163 ']')
+				   ((tail Char) more.r73)
+		     {- nonrec -}
+    forced.t151 :: [a.t173] -> Bool
+    forced.t151 = (all a.t173) Main.Parse.forced.t174
+    parseFile.t147 = defm.Main.Parse.parseFile [a.t173] d.Main.Parse.t146
+    parseLine.t148 = defm.Main.Parse.parseLine [a.t173] d.Main.Parse.t146
+    parse.t149 = defm.Main.Parse.parse [a.t173] d.Main.Parse.t146
+lit.t87 = MkInt 0#
+lit.t100 = MkInt 10#
+lit.t122 = MkInt 1#
+lit.t142 = lit.t87
+(>=.t140) = geInt
+AbsBinds [a.t2] [] [(span'.t1, Main.span')]
+    {- rec -}
+    span'.t1 :: (a.t2 -> Bool) -> [a.t2] -> ([a.t2], [a.t2])
+    span'.t1
+	p.r95 [] = ([] (a.t2), [] (a.t2))
+    span'.t1
+	p.r96 (x.r97 : xs'.r98)
+		| p.r96 x.r97 =
+		    (fixLeak.r99 [a.t2, [a.t2]]) x.r97 (span'.t1 p.r96 xs'.r98)
+		where
+		    AbsBinds [tt18, tt17] [] [(fixLeak.t12, fixLeak.r99)]
+			{- nonrec -}
+			fixLeak.t12 :: tt18 -> ([tt18], tt17) -> ([tt18], tt17)
+			fixLeak.t12
+			    x.r100 (xs.r101, ys.r102)
+				    = (((:) tt18) x.r100 xs.r101, ys.r102)
+		    {- nonrec -}
+    span'.t1
+	_ xs.r103
+		= ([] (a.t2), xs.r103)
+AbsBinds [] [] [(seperatedBy.t28, Main.seperatedBy)]
+    (/=.t49, neChar)
+    {- rec -}
+    seperatedBy.t28 :: Char -> String -> [String]
+    seperatedBy.t28
+	ch.r87 []
+		= [] (String)
+    seperatedBy.t28
+	ch.r88 xs.r89
+		= twaddle.r90
+		      ch.r88
+		      ((Main.span' Char)
+			   (\ x.r94 -> x.r94 /=.t49 ch.r88)
+			   xs.r89)
+		where
+		    AbsBinds [] [] [(twaddle.t35, twaddle.r90)]
+			{- nonrec -}
+			twaddle.t35 :: Char -> (String, [Char]) -> [String]
+			twaddle.t35
+			    ch.r91 (l.r92, (_ : r.r93))
+				    = ((:) String)
+					  l.r92 (seperatedBy.t28 ch.r91 r.r93)
+		    {- nonrec -}
+AbsBinds [] [] [(whiteSpace.t52, Main.whiteSpace)]
+    {- nonrec -}
+    whiteSpace.t52 :: String -> String
+    whiteSpace.t52 = (dropWhile Char) isSpace
+AbsBinds [] [] [(lines'.t55, Main.lines')]
+    (/=.t72, neChar)
+    {- rec -}
+    lines'.t55 :: [Char] -> [[Char]]
+    lines'.t55
+	"" = [] ([Char])
+    lines'.t55
+	s.r104 = plumb.r105 ((Main.span' Char) ((/=.t72) '\n') s.r104)
+	       where
+		   AbsBinds [] [] [(plumb.t59, plumb.r105)]
+		       {- nonrec -}
+		       plumb.t59 :: ([Char], [Char]) -> [[Char]]
+		       plumb.t59
+			   (l.r106, s'.r107)
+				   = ((:) [Char])
+					 l.r106
+					 (if (null Char) s'.r107 then
+					      [] ([Char])
+					  else
+					      lines'.t55 ((tail Char) s'.r107))
+		   {- nonrec -}
+AbsBinds [] [] [(charToInt.t74, Main.charToInt)]
+    (-.t77, minusInt)
+    {- nonrec -}
+    charToInt.t74 :: Char -> Int
+    charToInt.t74
+	x.r113 = (ord x.r113) -.t77 (ord '0')
+AbsBinds [] [] [(strToInt.t80, Main.strToInt)]
+    (-.t119, minusInt)
+    (d.Integral.t124, dfun.Integral.Int)
+    {- nonrec -}
+    strToInt.t80 :: String -> Int
+    strToInt.t80
+	x.r108 = strToInt'.r109.t117
+		     (((length Char) x.r108) -.t119 lit.t122) x.r108
+	       where
+		   AbsBinds
+		   [a.t96]
+		   [d.Integral.t114]
+		   [(strToInt'.t83, strToInt'.r109)]
+		       (d.Real.t115, sdsel.Integral.Real a.t96 d.Integral.t114)
+		       (d.Num.t111, sdsel.Real.Num a.t96 d.Real.t115)
+		       (fromInt.t110, fromInt a.t96 d.Num.t111)
+		       (lit.t107, fromInt.t110 (MkInt 1#))
+		       (d.Num.t112, d.Num.t111)
+		       (-.t105, (-) a.t96 d.Num.t112)
+		       (d.Num.t113, dfun.Num.Int)
+		       (^.t98, (^) [a.t96, Int] [d.Num.t113, d.Integral.t114])
+		       (*.t95, timesInt)
+		       (+.t93, plusInt)
+		       {- rec -}
+		       strToInt'.t83 :: a.t96 -> [Char] -> Int
+		       strToInt'.t83
+			   _ [] = lit.t87
+		       strToInt'.t83
+			   x.r112 (a.r110 : l.r111)
+				   = ((Main.charToInt a.r110)
+				      *.t95 (lit.t100 ^.t98 x.r112))
+				     +.t93 (strToInt'.t83
+						(x.r112 -.t105 lit.t107) l.r111)
+		   {- nonrec -}
+		   strToInt'.r109.t117 = strToInt'.r109 Int d.Integral.t124
+

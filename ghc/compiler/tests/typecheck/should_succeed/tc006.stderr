@@ -1,0 +1,9 @@
+Typechecked:
+d.Num.t7 = dfun.Num.Integer
+fromInt.t6 = fromInt tt3 d.Num.t7
+lit.t4 = fromInt.t6 (MkInt 1#)
+AbsBinds [] [] [(h.t1, ShouldSucceed.h)]
+    {- rec -}
+    h.t1 :: [tt3]
+    h.t1 = ((:) tt3) lit.t4 h.t1
+

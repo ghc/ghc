@@ -1,0 +1,6 @@
+ 
+"tcfail021.hs", line 2: multiple declarations of variable in pattern:
+    x ( "tcfail021.hs", line 2,  "tcfail021.hs", line 2)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

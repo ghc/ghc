@@ -1,0 +1,23 @@
+Desugared:
+Test.f :: for all d, e. <Eq d> -> d -> d -> d -> [e]
+Test.f =
+    /\ t86 t91 -> \ dict.87 ->
+	let dict.83 = dict.87 in
+	let
+	  f.78 =
+	      \ x.61 y.62 z.63 ->
+		  let
+		    fail.92 =
+			(error [t91])
+			    "\"ds021.hs\", line 8: pattern-matching failure [function binding]\n"S
+		  in 
+		    case ((== t86) dict.83 x.61 y.62) of {
+		      True -> Nil! t91
+		      False ->
+			  case ((/= t86) dict.87 x.61 z.63) of {
+			    True -> Nil! t91
+			    False -> Nil! t91
+			  }
+		    }
+	in  f.78
+

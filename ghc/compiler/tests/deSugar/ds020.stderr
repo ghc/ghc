@@ -1,0 +1,464 @@
+Desugared:
+Test.a :: for all d, e, f, g. ([d], [e], [f]) -> [g]
+Test.a = /\ t118 t119 t120 t121 -> \ ds.314 -> Nil! t121
+Test.b :: for all d, e. [d] -> [e]
+Test.b =
+    /\ t134 t135 -> \ ds.323 ->
+	let
+	  x.328 =
+	      case ds.323 of {
+		(:) x.324 ds.325 ->
+		    case ds.325 of {
+		      (:) xs.326 ys.327 -> x.324
+		      _ -> 
+			  (error Char)
+			      "``impossible'' pattern-matching error!\n"S
+		    }
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      } in
+	let
+	  xs.333 =
+	      case ds.323 of {
+		(:) x.329 ds.330 ->
+		    case ds.330 of {
+		      (:) xs.331 ys.332 -> xs.331
+		      _ -> 
+			  (error Char)
+			      "``impossible'' pattern-matching error!\n"S
+		    }
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      } in
+	let
+	  ys.338 =
+	      case ds.323 of {
+		(:) x.334 ds.335 ->
+		    case ds.335 of {
+		      (:) xs.336 ys.337 -> ys.337
+		      _ -> 
+			  (error Char)
+			      "``impossible'' pattern-matching error!\n"S
+		    }
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	in  Nil! t135
+Test.c :: for all d, e, f, g. <Fractional f> -> <Num e> -> g -> d -> e -> f -> g
+Test.c =
+    /\ o139 t140 t143 o138 -> \ dict.144 dict.141 ->
+	let
+	  dict.145 = (sdsel.Num.Eq t143) ((sdsel.Fractional.Num t143) dict.144) in
+	let dict.142 = (sdsel.Num.Eq t140) dict.141 in
+	let c.137 = \ x.87 ds.339 ds.340 ds.341 -> let x.87 = x.87 in  x.87
+	in  c.137
+Test.d :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> d -> e
+Test.d =
+    /\ t171 t174 -> \ dict.175 dict.173 dict.172 ->
+	let dict.169 = dict.175 in
+	let dict.163 = dict.169 in
+	let dict.157 = dict.163 in
+	let dict.152 = dict.157 in
+	let dict.166 = dict.172 in
+	let dict.160 = dict.166 in
+	let dict.154 = dict.160 in
+	let dict.149 = dict.154 in
+	let dict.167 = dict.173 in
+	let dict.161 = dict.167 in
+	let dict.155 = (sdsel.Ord.Eq t171) dict.161 in
+	let dict.150 = dict.155 in
+	let
+	  d.147 =
+	      \ ds.344 ->
+		  let
+		    fail.345 =
+			(error t174)
+			    "\"ds020.hs\", line 17: pattern-matching failure [function binding]\n"S in
+		  let
+		    fail.349 =
+			let
+			  n.88 =
+			      let
+				n.346 =
+				    (fromInteger t171) dict.160 (MkInteger! 4##)
+			      in 
+				case
+				    ((>= t171)
+					 dict.161
+					 ds.344
+					 ((fromInteger t171)
+					      dict.160 (MkInteger! 4##)))
+				of {
+				  True ->
+				      let
+					n.88 =
+					    (- t171)
+						dict.160
+						ds.344
+						((fromInteger t171)
+						     dict.160 (MkInteger! 4##))
+				      in  n.88
+				  False ->
+				      (error Char)
+					  "``impossible'' pattern-matching error!\n"S
+				}
+			in  (fromInteger t174) dict.163 (MkInteger! 2##)
+		  in 
+		    case
+			((== t171)
+			     dict.150
+			     ((fromInteger t171) dict.149 (MkInteger! 11##))
+			     ds.344)
+		    of {
+		      True -> (fromInteger t174) dict.152 (MkInteger! 4##)
+		      False ->
+			  case
+			      ((== t171)
+				   dict.155
+				   ((fromInteger t171)
+					dict.154 (MkInteger! 12##))
+				   ds.344)
+			  of {
+			    True -> (fromInteger t174) dict.157 (MkInteger! 3##)
+			    False -> fail.349
+			  }
+		    }
+	in  d.147
+Test.f :: for all d, e. [d] -> [e]
+Test.f =
+    /\ t182 t183 -> \ x.352 ->
+	let
+	  x.353 =
+	      case x.352 of {
+		Nil -> x.352
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	in  Nil! t183
+Test.g :: for all d, e. [d] -> [e]
+Test.g = /\ t186 t187 -> \ ds.356 -> Nil! t187
+ds.357 :: ([t191], [t192], [t193])
+ds.357 = MkTuple3! [t191] [t192] [t193] (Nil! t191) (Nil! t192) (Nil! t193)
+ds.358 :: ([t197], [t198], [t199])
+ds.358 = MkTuple3! [t197] [t198] [t199] (Nil! t197) (Nil! t198) (Nil! t199)
+ds.359 :: [t208]
+ds.359 = /\ t208 -> Nil! t208
+Test.x1 :: for all d. d
+Test.x1 =
+    /\ t208 ->
+	case ds.359 of {
+	  (:) x1.363 ds.364 ->
+	      case ds.364 of {
+		(:) xs1.365 ys1.366 -> x1.363
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.xs1 :: for all d. d
+Test.xs1 =
+    /\ t208 ->
+	case ds.359 of {
+	  (:) x1.367 ds.368 ->
+	      case ds.368 of {
+		(:) xs1.369 ys1.370 -> xs1.369
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.ys1 :: for all d. [d]
+Test.ys1 =
+    /\ t208 ->
+	case ds.359 of {
+	  (:) x1.371 ds.372 ->
+	      case ds.372 of {
+		(:) xs1.373 ys1.374 -> ys1.374
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+ds.375 :: [t217]
+ds.375 = /\ t217 -> Nil! t217
+Test.x :: for all d. d
+Test.x =
+    /\ t217 ->
+	case ds.375 of {
+	  (:) x.379 ds.380 ->
+	      case ds.380 of {
+		(:) xs.381 ys.382 ->
+		    let ys.383 = ys.382 in
+		    let xs.384 = xs.381 in let x.385 = x.379 in  x.385
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.xs :: for all d. d
+Test.xs =
+    /\ t217 ->
+	case ds.375 of {
+	  (:) x.386 ds.387 ->
+	      case ds.387 of {
+		(:) xs.388 ys.389 ->
+		    let ys.390 = ys.389 in
+		    let xs.391 = xs.388 in let x.392 = x.386 in  xs.391
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.ys :: for all d. [d]
+Test.ys =
+    /\ t217 ->
+	case ds.375 of {
+	  (:) x.393 ds.394 ->
+	      case ds.394 of {
+		(:) xs.395 ys.396 ->
+		    let ys.397 = ys.396 in
+		    let xs.398 = xs.395 in let x.399 = x.393 in  ys.397
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+{- plain CoRec -}
+ds.406 :: [t254]
+ds.406 =
+    /\ t254 ->
+	let dict.410 = dfun.Eq.Int in
+	let
+	  eq2.413 =
+	      eqInt
+		  (let dict.411 = dfun.Num.Int in  MkInt! 2#)
+		  (let dict.412 = dfun.Num.Int in  MkInt! 4#) in
+	let dict.414 = dfun.Eq.Int in
+	let
+	  eq3.417 =
+	      eqInt
+		  (let dict.415 = dfun.Num.Int in  MkInt! 3#)
+		  (let dict.416 = dfun.Num.Int in  MkInt! 3#) in
+	let dict.418 = dfun.Eq.Int in
+	let
+	  eq4.421 =
+	      eqInt
+		  (let dict.419 = dfun.Num.Int in  MkInt! 4#)
+		  (let dict.420 = dfun.Num.Int in  MkInt! 2#)
+	in 
+	  case eq2.413 of {
+	    True -> Nil! t254
+	    False ->
+		case eq3.417 of {
+		  True -> :! t254 (Test.x2 t254) (Nil! t254)
+		  False ->
+		      case eq4.421 of {
+			True -> :! t254 (Test.x2 t254) (Nil! t254)
+			False -> Nil! t254
+		      }
+		}
+	  }
+Test.x2 :: for all d. d
+Test.x2 =
+    /\ t254 ->
+	case ds.406 of {
+	  (:) x2.422 ds.423 ->
+	      case ds.423 of {
+		(:) xs2.424 ys2.425 -> x2.422
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.xs2 :: for all d. d
+Test.xs2 =
+    /\ t254 ->
+	case ds.406 of {
+	  (:) x2.426 ds.427 ->
+	      case ds.427 of {
+		(:) xs2.428 ys2.429 -> xs2.428
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+Test.ys2 :: for all d. [d]
+Test.ys2 =
+    /\ t254 ->
+	case ds.406 of {
+	  (:) x2.430 ds.431 ->
+	      case ds.431 of {
+		(:) xs2.432 ys2.433 -> ys2.433
+		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	      }
+	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
+	}
+{- end plain CoRec -}
+ds.435 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> (d, e)
+ds.435 =
+    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
+	let dict.267 = dict.276 in
+	let dict.271 = dict.274 in
+	let dict.265 = dict.271 in
+	let dict.262 = dict.265 in
+	let dict.260 = dict.269
+	in 
+	  let
+	    {- CoRec -}
+	    ds.434 =
+		case
+		    ((> t273)
+			 dict.260
+			 x3.257
+			 ((fromInteger t273) dict.262 (MkInteger! 3##)))
+		of {
+		  True ->
+		      MkTuple2!
+			  t273
+			  t275
+			  ((fromInteger t273) dict.265 (MkInteger! 4##))
+			  ((fromInteger t275) dict.267 (MkInteger! 5##))
+		  False ->
+		      case
+			  ((<= t273)
+			       dict.269
+			       x3.257
+			       ((fromInteger t273) dict.271 (MkInteger! 3##)))
+		      of {
+			True ->
+			    MkTuple2!
+				t273
+				t275
+				((fromInteger t273) dict.274 (MkInteger! 2##))
+				((fromInteger t275) dict.276 (MkInteger! 3##))
+			False ->
+			    (error (t273, t275))
+				"\"ds020.hs\", line 42: pattern-matching failure [pat binding]\n"S
+		      }
+		}
+	    x3.257 =
+		case ds.434 of {
+		  MkTuple2 x3.257 y3.258 -> x3.257
+		}
+	    y3.258 =
+		case ds.434 of {
+		  MkTuple2 x3.257 y3.258 -> y3.258
+		}
+	    {- end CoRec -}
+	  in  MkTuple2! t273 t275 x3.257 y3.258
+Test.x3 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> d
+Test.x3 =
+    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
+	case (((ds.435 t273) t275) dict.276 dict.269 dict.274) of {
+	  MkTuple2 x3.257 y3.258 -> x3.257
+	}
+Test.y3 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> e
+Test.y3 =
+    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
+	case (((ds.435 t273) t275) dict.276 dict.269 dict.274) of {
+	  MkTuple2 x3.257 y3.258 -> y3.258
+	}
+ds.442 :: (Char, (Char, (Char, Char)))
+ds.442 =
+    let dict.451 = dfun.Eq.Int in
+    let
+      eq2.454 =
+	  eqInt
+	      (let dict.452 = dfun.Num.Int in  MkInt! 2#)
+	      (let dict.453 = dfun.Num.Int in  MkInt! 4#) in
+    let dict.455 = dfun.Eq.Int in
+    let
+      eq3.458 =
+	  eqInt
+	      (let dict.456 = dfun.Num.Int in  MkInt! 3#)
+	      (let dict.457 = dfun.Num.Int in  MkInt! 3#) in
+    let dict.459 = dfun.Eq.Int in
+    let
+      eq4.462 =
+	  eqInt
+	      (let dict.460 = dfun.Num.Int in  MkInt! 4#)
+	      (let dict.461 = dfun.Num.Int in  MkInt! 2#)
+    in 
+      case eq2.454 of {
+	True ->
+	    MkTuple2!
+		Char
+		(Char, (Char, Char))
+		(MkChar! 'a'#)
+		(MkTuple2!
+		     Char
+		     (Char, Char)
+		     (MkChar! 'a'#)
+		     (MkTuple2! Char Char (MkChar! 'a'#) (MkChar! 'a'#)))
+	False ->
+	    case eq3.458 of {
+	      True ->
+		  MkTuple2!
+		      Char
+		      (Char, (Char, Char))
+		      (MkChar! 'b'#)
+		      (MkTuple2!
+			   Char
+			   (Char, Char)
+			   (MkChar! 'b'#)
+			   (MkTuple2! Char Char (MkChar! 'b'#) (MkChar! 'b'#)))
+	      False ->
+		  case eq4.462 of {
+		    True ->
+			MkTuple2!
+			    Char
+			    (Char, (Char, Char))
+			    (MkChar! 'c'#)
+			    (MkTuple2!
+				 Char
+				 (Char, Char)
+				 (MkChar! 'c'#)
+				 (MkTuple2!
+				      Char Char (MkChar! 'c'#) (MkChar! 'c'#)))
+		    False ->
+			MkTuple2!
+			    Char
+			    (Char, (Char, Char))
+			    (MkChar! 'd'#)
+			    (MkTuple2!
+				 Char
+				 (Char, Char)
+				 (MkChar! 'd'#)
+				 (MkTuple2!
+				      Char Char (MkChar! 'd'#) (MkChar! 'd'#)))
+		  }
+	    }
+      }
+Test.x4 :: Char
+Test.x4 =
+    case ds.442 of {
+      MkTuple2 x4.463 ds.464 ->
+	  case ds.464 of {
+	    MkTuple2 y4.465 ds.466 ->
+		case ds.466 of {
+		  MkTuple2 z4.467 a4.468 -> x4.463
+		}
+	  }
+    }
+Test.y4 :: Char
+Test.y4 =
+    case ds.442 of {
+      MkTuple2 x4.469 ds.470 ->
+	  case ds.470 of {
+	    MkTuple2 y4.471 ds.472 ->
+		case ds.472 of {
+		  MkTuple2 z4.473 a4.474 -> y4.471
+		}
+	  }
+    }
+Test.z4 :: Char
+Test.z4 =
+    case ds.442 of {
+      MkTuple2 x4.475 ds.476 ->
+	  case ds.476 of {
+	    MkTuple2 y4.477 ds.478 ->
+		case ds.478 of {
+		  MkTuple2 z4.479 a4.480 -> z4.479
+		}
+	  }
+    }
+Test.a4 :: Char
+Test.a4 =
+    case ds.442 of {
+      MkTuple2 x4.481 ds.482 ->
+	  case ds.482 of {
+	    MkTuple2 y4.483 ds.484 ->
+		case ds.484 of {
+		  MkTuple2 z4.485 a4.486 -> a4.486
+		}
+	  }
+    }
+

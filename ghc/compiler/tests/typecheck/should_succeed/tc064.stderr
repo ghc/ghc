@@ -1,0 +1,7 @@
+Typechecked:
+AbsBinds [] [] [(idb.t1, ShouldSucceed.idb)]
+    {- nonrec -}
+    idb.t1 :: ShouldSucceed.Boolean -> ShouldSucceed.Boolean
+    idb.t1
+	x.r57 = x.r57
+

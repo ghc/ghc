@@ -1,0 +1,6 @@
+ 
+"tcfail025.hs", line 6: multiple declarations of type synonym:
+    A ( "tcfail025.hs", line 6,  "tcfail025.hs", line 2)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

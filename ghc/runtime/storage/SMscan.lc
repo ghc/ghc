@@ -1,0 +1,1695 @@
+/*************************************************************************
+                             SCANNING CODE
+
+This file contains the basic routines required for inplace compacting
+garbage collection. It is based on Jonkers's algorithm.
+
+There is a compacting routine as well as all the basic routines which
+are placed in the info tables of the appropriate closures.
+
+  ToDo: Remove Fillers -- Compiler
+	Remove Dummy Filler Macros -- SMupdate.lh
+        Remove special "shrinking" info_upd stuff -- Compiler
+	Remove special "shrinking" info_upd stuff -- SMinterface.lh
+
+	Updateable closure size can now be relaxed
+	  MinUpdSize is now 1
+	  May want to allocate larger closures to enable updates inplace
+	    eg  Int     1    MkInt etc fit
+	        List    2    Nil,List fit
+	        STree   3    Leaf(2) Branch(3) fit
+	        STree   2    Leaf(2) fits, Branch(3) fails
+		Tuple4  1    MkTuple4 fails
+
+	Need BHs of appropriate sizes (reserve BHed space for update)
+	For Appel will require BH_1 to grow to size 2 when collected.
+
+*************************************************************************/
+
+\begin{code}
+
+#define SCAN_REG_MAP
+#include "SMinternal.h"
+
+#if defined(_INFO_COMPACTING)
+
+/* Define appropriate global variables as potential register variables */
+/* Assume GC code saves and restores global registers used */
+
+RegisterTable ScanRegTable;
+
+#ifndef PAR
+/* As we perform compaction, those CHP's which are still alive get
+   added to this list. [ADR] */
+StgPtr NewMallocPtrList;
+#endif /* !PAR */
+
+P_
+Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
+#ifndef PAR
+, MallocPtrList
+#endif
+)
+    P_  base;
+    P_  lim;
+    P_  scanbase;
+    P_  scanlim;
+    BitWord *bit_array;
+    I_  bit_array_words;
+#ifndef PAR
+    StgPtr *MallocPtrList;
+#endif
+{
+    BitWord *bit_array_ptr, *bit_array_end;
+    P_ scan_w_start, info; I_ size;
+
+    LinkLim = lim;  /* Only checked for generational collection */
+
+#if defined(GCgn)
+
+    /* Scan collected new gen semi-space linking pointers to old gen */
+    /* No closures to unlink (no new ptrs will be linked)            */
+    /* Have to reset closure to unmarked if it has been marked       */
+    /* If not marked, we will still link (and unlink) as we need to  */
+    /*   get the size to find next closure.                          */
+    /*   It will be collected next minor collection as no root exists*/
+
+    DEBUG_SCAN("Scan Link Area: Base", scanbase, "Lim", scanlim);
+
+    Scan = scanbase;
+    New  = 0; /* unused -- except by debugging message */
+
+    while (Scan < scanlim) {
+	info = (P_) UNMARK_LOCATION(INFO_PTR(Scan));
+	    Scan += (*SCAN_LINK_CODE(info))();
+	}
+#endif /* GCgn */
+
+    DEBUG_SCAN("Scan Link Bits: Base", base, "Bits", bit_array);
+
+    bit_array_ptr = bit_array;
+    bit_array_end = bit_array + bit_array_words;
+    scan_w_start = base;
+    New = base; /* used to unwind */
+
+#ifndef PAR
+    NewMallocPtrList = NULL; /* initialise new MallocPtrList */
+             /* As we move MallocPtrs over, we'll add them to this list. */
+#endif /* !PAR */
+
+    while (bit_array_ptr < bit_array_end) {
+	BitWord w = *(bit_array_ptr++);
+
+	Scan = scan_w_start;
+	while (w) {
+
+	    if (! (w & 0x1)) { /* bit not set */
+		Scan++;        /* look at next bit */
+		w >>= 1;
+
+	    } else { /* Bit Set -- Enter ScanLink for closure */
+		info = (P_) INFO_PTR(Scan);
+		while (MARKED_LOCATION(info)) {
+		    P_ next;
+		    info = UNMARK_LOCATION(info);
+		    next = (P_) *info;
+		    DEBUG_UNLINK_LOCATION(info, Scan, New);
+		    *info = (W_) New;
+		    info = next;
+		}
+		INFO_PTR(Scan) = (W_) info;
+/*
+if (SM_trace & 8) {
+    fprintf(stderr, "  Marked: word %ld, val 0x%lx, cur 0x%lx, Scan_w 0x%lx, Scan 0x%lx, Info 0x%lx, Code 0x%lx\n",
+	    (bit_array_ptr-1) - bit_array, *(bit_array_ptr-1), w, scan_w_start, Scan, info,
+	    SCAN_LINK_CODE(info)); };
+*/
+
+		size = (*SCAN_LINK_CODE(info))();
+
+		ASSERT( size >= 0 );
+		New  += size;  /* set New address of next closure */
+
+		Scan += size;  /* skip size bits */ 
+
+		if (size >= BITS_IN(BitWord)) break;
+		    /* NOTA BENE: if size >= # bits in BitWord, then the result
+			of this operation is undefined!  Hence the need for
+			this break! */
+		w >>= size;
+	    }
+	}
+	scan_w_start += BITS_IN(BitWord);
+    }
+    DEBUG_SCAN("Scan Link Bits: End", Scan, "New", New);
+
+    bit_array_ptr = bit_array;
+    bit_array_end = bit_array + bit_array_words;
+    scan_w_start  = base;	/* Points to the heap word corresponding to the
+				   first bit of *bit_array_ptr */
+
+    New = base; /* used to unwind and move */
+
+    DEBUG_SCAN("Scan Move Bits: Base", base, "Bits", bit_array);
+    while (bit_array_ptr < bit_array_end) {
+
+	/* Grab bit word and clear (its the last scan) */
+	/* Dont need to clear for Appel or Generational major collection */
+	/* Why not???  I think it's because they have a pass which zaps all
+	   the bit array to zero.  But why do they need it?  Or, why
+	   doesn't dual-mode need it? 
+
+	   It's probably easier just to *always* to zap at the beginning of
+	   GC, and remove this conditional compilation here.  */
+#if defined(GCap) || defined(GCgn)
+	BitWord w = (I_) *(bit_array_ptr++);
+#else
+	BitWord w = (I_) *bit_array_ptr;
+	*(bit_array_ptr++) = 0;
+#endif
+
+	Scan = scan_w_start;
+	while (w) {
+	    if (! (w & 0x1)) { /* bit not set */
+		Scan++;        /* look at next bit */
+		w >>= 1;
+
+	    } else {	/* Bit Set -- Enter ScanMove for closure*/
+/*HACK	if (SM_trace&8) {fprintf(stderr,"Scan=%x\n",Scan);} */
+		info = (P_) INFO_PTR(Scan);
+/*HACK	if (SM_trace&8) {fprintf(stderr,"info=%x\n",info);} */
+		while (MARKED_LOCATION(info)) {
+		    P_ next;
+		    info = UNMARK_LOCATION(info);
+                    next = (P_) *info;
+/*HACK	    if (SM_trace&8) {fprintf(stderr,"next=%x\n",next);} */
+		    DEBUG_UNLINK_LOCATION(info, Scan, New);
+/*HACK	    if (SM_trace&8) {fprintf(stderr,"New=%x\n",New);} */
+		    *info = (W_) New;
+		    info = next;
+/*HACK	    if (SM_trace&8) {fprintf(stderr,"*info=%x,info=%x\n",*info,info);} */
+		}
+/*HACK	if (SM_trace&8) {fprintf(stderr,"preNew info=%x\n",info);} */
+		INFO_PTR(New) = (W_) info;
+
+/*
+if (SM_trace & 8) {
+    fprintf(stderr, "  Marked: word %ld, cur 0x%lx, Scan_w 0x%lx, Scan 0x%lx, Info 0x%lx, Code 0x%lx\n",
+	    (bit_array_ptr-1) - bit_array, w, scan_w_start, Scan, info, SCAN_MOVE_CODE(info)); };
+*/
+
+		size = (*SCAN_MOVE_CODE(info))();
+		New  += size;  /* set New address of next closure */
+		Scan += size;  /* skip size bits */  
+
+		if (size >= BITS_IN(BitWord)) break;
+		    /* NOTA BENE: if size >= # bits in BitWord, then the result
+			of this operation is undefined!  Hence the need for
+			this break! */
+		w   >>= size;  /* NB: comment above about shifts */
+	    }
+	}
+
+	/* At this point we've exhausted one word of mark bits */
+	/* Make scan_w_start point to the heap word corresponding to the
+	   first bit of the next word of mark bits */
+	scan_w_start += BITS_IN(BitWord);
+    }
+    DEBUG_SCAN("Scan Link Bits: End", Scan, "New", New);
+
+#ifdef PAR
+    RebuildLAGAtable();
+#else
+    VALIDATE_MallocPtrList( NewMallocPtrList );
+    *MallocPtrList = NewMallocPtrList;
+#endif /* PAR */
+
+    return(New);
+}
+
+\end{code}
+
+/*************************************************************************
+                   Basic SCAN LINK and SCAN MOVE Routines
+
+First Scan on Closures
+  _ScanLink_S_N
+
+  Retrieved using SCAN_LINK_CODE(infoptr)  (for a true unmarked infoptr)
+
+Links the closure's ptr locations to the info pointer of the closure's
+they actually point. Returns the size of the closure so New can be updated
+to point to next closure. This also allows sequential scan (if there are no
+holes i.e. it has already been collected).
+
+Must first unwind the locations linked to this closure updating with
+the new location of this closure before entering the code. The code
+can only be access from the info pointer at the end of this location
+list, which must be restored before entering.
+
+  Calling Conventions (After unwinding and updating locations pointed to):
+    Scan  -- points to this closure
+    LinkLim -- points to end of heap are requiring pointer to be linked
+
+    New (optional) -- points to the new location that this closure will reside
+                      this is only required for meaningful debugging meassge
+
+Second Scan on Closures
+  _ScanMove_S
+
+  Retrieved using SCAN_MOVE_CODE(infoptr)  (for a true unmarked infoptr)
+ 
+Slides the closure down to its new location, New. Returns the size of
+the closure so New can be updated to point to the next closure.
+
+Must first unwind the locations linked to this closure updating with
+the new location of this closure before entering the code. The code
+can only be access from the info pointer at the end of this location
+list, which must be restored before entering.
+
+  Calling Conventions (After unwinding and updating locations pointed to):
+    Scan  -- points to this closure
+    New   -- points to the new location that this closure will reside
+
+
+Will have  MARKING  routines in info tables as well:
+
+Marking A Closure: 
+  _PRStart_N
+
+  Retrieved using PRMARK_CODE(infoptr)
+
+Returning To A Closure Being Marked:
+  _PRIn_I
+  _PRInLast_N
+
+  Retrieved using PRRETURN_CODE(infoptr)
+
+
+
+May have  COPYING  routines in info tables as well:
+
+Evacuation code:  _Evacuate_S
+Scavenging code:  _Scavenge_S_N
+
+    See GCscav.lhc GCevac.lc
+
+
+
+The following registers are used by the Compacting collection:
+
+New	-- The new address of a closure
+Scan    -- The current address of a closure
+LinkLim -- The limit of the heap requiring to be linked & moved
+
+**************************************************************************/
+
+\begin{code}
+
+#if defined(GCgn)
+#define LINK_LOCATION(i) LINK_LOCATION_TO_CLOSURE((Scan+(i)),LinkLim)
+#else /* ! GCgn */
+#define LINK_LOCATION(i) LINK_LOCATION_TO_CLOSURE(Scan+(i))
+#endif /* ! GCgn */
+
+/* Link location of nth pointer in SPEC/STKO closure (starting at 1) */
+#define SPEC_LINK_LOCATION(ptr) LINK_LOCATION((SPEC_HS-1) + (ptr))
+#define STKO_LINK_LOCATION(ptr) LINK_LOCATION((STKO_HS-1) + (ptr))
+
+
+/* Slide the ith word (starting at 0) */
+#define SLIDE_WORD(position)    New[position] = Scan[position]
+
+/* Slide the ith ptr (starting at 0), adjusting by offset */
+#define ADJUST_WORD(pos,off)    ((PP_)New)[pos] += (off)
+
+/* Slide the nth free var word in a SPEC closure (starting at 1) */
+#define SPEC_SLIDE_WORD(n)      SLIDE_WORD((SPEC_HS-1) + (n))
+
+#ifndef PAR
+/* Don't slide the MallocPtr list link - instead link moved object into
+   @NewMallocPtrList@ */
+
+#define MallocPtr_SLIDE_DATA \
+        MallocPtr_CLOSURE_DATA(New) = MallocPtr_CLOSURE_DATA(Scan)
+#define MallocPtr_RELINK				\
+{							\
+	MallocPtr_CLOSURE_LINK(New) = NewMallocPtrList;	\
+        NewMallocPtrList = New;	                        \
+}
+#endif /* !PAR */
+
+/* The SLIDE_FIXED_HDR macro is dependent on the No of FIXED_HS */
+
+#if FIXED_HS == 1
+#define SLIDE_FIXED_HDR         /* Already Assigned INFO_PTR */
+#else
+#if FIXED_HS == 2
+#define SLIDE_FIXED_HDR         SLIDE_WORD(1)
+#else
+#if FIXED_HS == 3
+#define SLIDE_FIXED_HDR         SLIDE_WORD(1);SLIDE_WORD(2)
+#else
+/* I don't think this will be needed (ToDo: #error?) */
+#endif                               
+#endif                               
+#endif                               
+
+
+#if defined(_GC_DEBUG)
+
+#define DEBUG_SCAN_LINK(type, sizevar, ptrvar) \
+    if (SM_trace & 2)                  \
+        fprintf(stderr, "Scan Link (%s): 0x%lx -> 0x%lx, info 0x%lx, size %ld, ptrs %ld\n", \
+		type, Scan, New, INFO_PTR(Scan), sizevar, ptrvar)
+
+#define DEBUG_SCAN_MOVE(type, sizevar) \
+    if (SM_trace & 2)            \
+        fprintf(stderr, "Scan Move (%s): 0x%lx -> 0x%lx, info 0x%lx, size %ld\n", \
+		type, Scan, New, INFO_PTR(New), sizevar)
+
+
+#else
+
+#define DEBUG_SCAN_LINK(type, sizevar, ptrvar)
+#define DEBUG_SCAN_MOVE(type, sizevar)
+
+#endif
+
+/*** LINKING CLOSURES ***/
+
+I_
+_ScanLink_1_0(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 1, 0);
+    return(FIXED_HS + 1);	/* SPEC_VHS is defined to be 0, so "size" really is 1 */
+}
+I_
+_ScanLink_2_0(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 2, 0);
+    return(FIXED_HS + 2);
+}
+I_
+_ScanLink_3_0(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 3, 0);
+    return(FIXED_HS + 3);
+}
+I_
+_ScanLink_4_0(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 4, 0);
+    return(FIXED_HS + 4);
+}
+I_
+_ScanLink_5_0(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 5, 0);
+    return(FIXED_HS + 5);
+}
+
+I_
+_ScanLink_2_1(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 2, 1);
+    SPEC_LINK_LOCATION(1);
+    return(FIXED_HS + 2);
+}
+I_
+_ScanLink_3_1(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 3, 1);
+    SPEC_LINK_LOCATION(1);
+    return(FIXED_HS + 3);
+}
+I_
+_ScanLink_3_2(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 3, 2);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    return(FIXED_HS + 3);
+}
+
+I_
+_ScanLink_1_1(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 1, 1);
+    SPEC_LINK_LOCATION(1);
+    return(FIXED_HS + 1);
+}
+I_
+_ScanLink_2_2(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 2, 2);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    return(FIXED_HS + 2);
+}
+I_
+_ScanLink_3_3(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 3, 3);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    return(FIXED_HS + 3);
+}
+I_
+_ScanLink_4_4(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 4, 4);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    return(FIXED_HS + 4);
+}
+I_
+_ScanLink_5_5(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 5, 5);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    return(FIXED_HS + 5);
+}
+I_
+_ScanLink_6_6(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 6, 6);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    return(FIXED_HS + 6);
+}
+I_
+_ScanLink_7_7(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 7, 7);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    return(FIXED_HS + 7);
+}
+I_
+_ScanLink_8_8(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 8, 8);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    SPEC_LINK_LOCATION(8);
+    return(FIXED_HS + 8);
+}
+I_
+_ScanLink_9_9(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 9, 9);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    SPEC_LINK_LOCATION(8);
+    SPEC_LINK_LOCATION(9);
+    return(FIXED_HS + 9);
+}
+I_
+_ScanLink_10_10(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 10, 10);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    SPEC_LINK_LOCATION(8);
+    SPEC_LINK_LOCATION(9);
+    SPEC_LINK_LOCATION(10);
+    return(FIXED_HS + 10);
+}
+I_
+_ScanLink_11_11(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 11, 11);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    SPEC_LINK_LOCATION(8);
+    SPEC_LINK_LOCATION(9);
+    SPEC_LINK_LOCATION(10);
+    SPEC_LINK_LOCATION(11);
+    return(FIXED_HS + 11);
+}
+I_
+_ScanLink_12_12(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("SPEC", 12, 12);
+    SPEC_LINK_LOCATION(1);
+    SPEC_LINK_LOCATION(2);
+    SPEC_LINK_LOCATION(3);
+    SPEC_LINK_LOCATION(4);
+    SPEC_LINK_LOCATION(5);
+    SPEC_LINK_LOCATION(6);
+    SPEC_LINK_LOCATION(7);
+    SPEC_LINK_LOCATION(8);
+    SPEC_LINK_LOCATION(9);
+    SPEC_LINK_LOCATION(10);
+    SPEC_LINK_LOCATION(11);
+    SPEC_LINK_LOCATION(12);
+    return(FIXED_HS + 12);
+}
+\end{code}
+
+Scan-linking revertible black holes with underlying @SPEC@ closures.
+
+\begin{code}
+
+#ifdef PAR
+I_ 
+_ScanLink_RBH_2_1(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 2, 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    return(FIXED_HS + 2); /* ???? but SPEC_RBH_VHS is *not* zero! */
+}
+
+I_ 
+_ScanLink_RBH_3_1(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 3, 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    return(FIXED_HS + 3);
+}
+
+I_ 
+_ScanLink_RBH_3_3(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 3, 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    return(FIXED_HS + 3);
+}
+
+I_ 
+_ScanLink_RBH_4_1(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 4, 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    return(FIXED_HS + 4);
+}
+
+I_ 
+_ScanLink_RBH_4_4(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 4, 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    return(FIXED_HS + 4);
+}
+
+I_ 
+_ScanLink_RBH_5_1(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 5, 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    return(FIXED_HS + 5);
+}
+
+I_ 
+_ScanLink_RBH_5_5(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 5, 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    return(FIXED_HS + 5);
+}
+
+I_ 
+_ScanLink_RBH_6_6(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 6, 6);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    return(FIXED_HS + 6);
+}
+
+I_ 
+_ScanLink_RBH_7_7(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 7, 7);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    return(FIXED_HS + 7);
+}
+
+I_ 
+_ScanLink_RBH_8_8(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 8, 8);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 6);
+    return(FIXED_HS + 8);
+}
+
+I_ 
+_ScanLink_RBH_9_9(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 9, 9);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 6);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 7);
+    return(FIXED_HS + 9);
+}
+
+I_ 
+_ScanLink_RBH_10_10(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 10, 10);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 6);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 7);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 8);
+    return(FIXED_HS + 10);
+}
+
+I_ 
+_ScanLink_RBH_11_11(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 11, 11);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 6);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 7);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 8);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 9);
+    return(FIXED_HS + 11);
+}
+
+I_ 
+_ScanLink_RBH_12_12(STG_NO_ARGS)
+{
+    DEBUG_SCAN_LINK("SRBH", 12, 12);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 1);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 2);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 3);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 4);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 5);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 6);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 7);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 8);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 9);
+    LINK_LOCATION(SPEC_RBH_BQ_LOCN + 10);
+    return(FIXED_HS + 12);
+}
+#endif
+
+\end{code}
+
+Scan-linking a MallocPtr is straightforward: exactly the same as
+@_ScanLink_[MallocPtr_SIZE]_0@.
+
+\begin{code}
+#ifndef PAR
+StgInt
+_ScanLink_MallocPtr(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("MallocPtr", MallocPtr_SIZE, 0);
+    return(FIXED_HS + MallocPtr_SIZE);
+}
+#endif /* !PAR */
+\end{code}
+
+Back to the main feature...
+
+\begin{code}
+
+/*** MOVING CLOSURES ***/
+
+I_
+_ScanMove_1(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 1);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    return(FIXED_HS + 1); /* NB: SPEC_VHS defined to be zero, so 1 really is the "size" */
+}
+I_
+_ScanMove_2(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 2);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    return(FIXED_HS + 2);
+}
+I_
+_ScanMove_3(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 3);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    return(FIXED_HS + 3);
+}
+I_
+_ScanMove_4(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 4);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    return(FIXED_HS + 4);
+}
+I_
+_ScanMove_5(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 5);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    return(FIXED_HS + 5);
+}
+I_
+_ScanMove_6(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 6);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    return(FIXED_HS + 6);
+}
+I_
+_ScanMove_7(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 7);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    return(FIXED_HS + 7);
+}
+I_
+_ScanMove_8(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 8);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    SPEC_SLIDE_WORD(8);
+    return(FIXED_HS + 8);
+}
+I_
+_ScanMove_9(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 9);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    SPEC_SLIDE_WORD(8);
+    SPEC_SLIDE_WORD(9);
+    return(FIXED_HS + 9);
+}
+I_
+_ScanMove_10(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 10);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    SPEC_SLIDE_WORD(8);
+    SPEC_SLIDE_WORD(9);
+    SPEC_SLIDE_WORD(10);
+    return(FIXED_HS + 10);
+}
+I_
+_ScanMove_11(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 11);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    SPEC_SLIDE_WORD(8);
+    SPEC_SLIDE_WORD(9);
+    SPEC_SLIDE_WORD(10);
+    SPEC_SLIDE_WORD(11);
+    return(FIXED_HS + 11);
+}
+I_
+_ScanMove_12(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SPEC", 12);
+    SLIDE_FIXED_HDR;
+    SPEC_SLIDE_WORD(1);
+    SPEC_SLIDE_WORD(2);
+    SPEC_SLIDE_WORD(3);
+    SPEC_SLIDE_WORD(4);
+    SPEC_SLIDE_WORD(5);
+    SPEC_SLIDE_WORD(6);
+    SPEC_SLIDE_WORD(7);
+    SPEC_SLIDE_WORD(8);
+    SPEC_SLIDE_WORD(9);
+    SPEC_SLIDE_WORD(10);
+    SPEC_SLIDE_WORD(11);
+    SPEC_SLIDE_WORD(12);
+    return(FIXED_HS + 12);
+}
+
+#if defined(PAR) && defined(GC_MUT_REQUIRED)
+I_
+_ScanMove_RBH_2(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 2);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 2); /* ???? SPEC_RBH_VHS is *not* zero! */
+}
+I_
+_ScanMove_RBH_3(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 3);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 3);
+}
+I_
+_ScanMove_RBH_4(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 4);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 4);
+}
+I_
+_ScanMove_RBH_5(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 5);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 5);
+}
+I_
+_ScanMove_RBH_6(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 6);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 6);
+}
+I_
+_ScanMove_RBH_7(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 7);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 7);
+}
+I_
+_ScanMove_RBH_8(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 8);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+    SLIDE_WORD(SPEC_RBH_HS + 6);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 8);
+}
+I_
+_ScanMove_RBH_9(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 9);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+    SLIDE_WORD(SPEC_RBH_HS + 6);
+    SLIDE_WORD(SPEC_RBH_HS + 7);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 9);
+}
+I_
+_ScanMove_RBH_10(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 10);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+    SLIDE_WORD(SPEC_RBH_HS + 6);
+    SLIDE_WORD(SPEC_RBH_HS + 7);
+    SLIDE_WORD(SPEC_RBH_HS + 8);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 10);
+}
+I_
+_ScanMove_RBH_11(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 11);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+    SLIDE_WORD(SPEC_RBH_HS + 6);
+    SLIDE_WORD(SPEC_RBH_HS + 7);
+    SLIDE_WORD(SPEC_RBH_HS + 8);
+    SLIDE_WORD(SPEC_RBH_HS + 9);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 11);
+}
+I_
+_ScanMove_RBH_12(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("SRBH", 12);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(SPEC_RBH_HS + 0);
+    SLIDE_WORD(SPEC_RBH_HS + 1);
+    SLIDE_WORD(SPEC_RBH_HS + 2);
+    SLIDE_WORD(SPEC_RBH_HS + 3);
+    SLIDE_WORD(SPEC_RBH_HS + 4);
+    SLIDE_WORD(SPEC_RBH_HS + 5);
+    SLIDE_WORD(SPEC_RBH_HS + 6);
+    SLIDE_WORD(SPEC_RBH_HS + 7);
+    SLIDE_WORD(SPEC_RBH_HS + 8);
+    SLIDE_WORD(SPEC_RBH_HS + 9);
+    SLIDE_WORD(SPEC_RBH_HS + 10);
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + 12);
+}
+#endif
+\end{code}
+
+Moving a Malloc Pointer is a little tricky: we want to copy the actual
+pointer unchanged (easy) but we want to link the MallocPtr into the
+new MallocPtr list.
+
+\begin{code}
+#ifndef PAR
+StgInt
+_ScanMove_MallocPtr(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("MallocPtr", MallocPtr_SIZE);
+
+#if defined(_GC_DEBUG)
+    if (SM_trace & 16) {
+      printf("Moving MallocPtr(%x)=<%x,%x,%x>", Scan, Scan[0], Scan[1], Scan[2]);
+      printf(" Data = %x, Next = %x\n", 
+	     MallocPtr_CLOSURE_DATA(Scan), MallocPtr_CLOSURE_LINK(Scan) );
+    }
+#endif
+
+    SLIDE_FIXED_HDR;
+    MallocPtr_SLIDE_DATA;
+    MallocPtr_RELINK;
+
+#if defined(_GC_DEBUG)
+    if (SM_trace & 16) {
+      printf("Moved MallocPtr(%x)=<%x,_,%x,%x,%x>", New, New[0], New[1], New[2], New[3]);
+      printf(" Data = %x, Next = %x", 
+	     MallocPtr_CLOSURE_DATA(New), MallocPtr_CLOSURE_LINK(New) );
+      printf(", NewMallocPtrList = %x\n", NewMallocPtrList );
+    }
+#endif
+
+    return(FIXED_HS + MallocPtr_SIZE);
+}
+#endif /* !PAR */
+\end{code}
+
+Now back to the main feature...
+
+\begin{code}
+
+/*** GENERIC Linking and Marking Routines */
+
+I_
+_ScanLink_S_N(STG_NO_ARGS) {
+    I_ count = GEN_HS - 1;
+                   /* Offset of first ptr word, less 1 */
+    I_ ptrs  = count + GEN_CLOSURE_NoPTRS(Scan);
+                   /* Offset of last ptr word */
+    I_ size  = GEN_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_LINK("GEN ", size, ptrs);
+    while (++count <= ptrs) {
+	LINK_LOCATION(count);
+    }
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_S(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = GEN_CLOSURE_SIZE(New);
+
+    DEBUG_SCAN_MOVE("GEN ", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+    return(FIXED_HS + size);
+}
+
+\end{code}
+
+The linking code for revertible black holes with underlying @GEN@ closures.
+
+\begin{code}
+#ifdef PAR
+
+I_ 
+_ScanLink_RBH_N(STG_NO_ARGS)
+{
+    I_ count = GEN_RBH_HS - 1;	/* Offset of first ptr word, less 1 */
+    I_ ptrs  = GEN_RBH_CLOSURE_NoPTRS(Scan);
+    I_ size  = GEN_RBH_CLOSURE_SIZE(Scan);
+
+    /* 
+     * Get pointer count from original closure and adjust for one pointer 
+     * in the first two words of the RBH.
+     */
+    if (ptrs < 2)
+	ptrs = 1;
+    else
+	ptrs--;
+
+    ptrs += count;	    /* Offset of last ptr word */
+
+    DEBUG_SCAN_LINK("GRBH", size, ptrs);
+    while (++count <= ptrs) {
+	LINK_LOCATION(count);
+    }
+    return(FIXED_HS + size);
+}
+
+#ifdef GC_MUT_REQUIRED
+
+I_
+_ScanMove_RBH_S(STG_NO_ARGS) {
+    I_ count = GEN_RBH_HS - 1;
+    I_ size  = GEN_RBH_CLOSURE_SIZE(New);
+
+    DEBUG_SCAN_MOVE("GRBH", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + size);
+}
+
+#endif
+
+#endif
+
+\end{code}
+
+\begin{code}
+I_
+_ScanLink_Dyn(STG_NO_ARGS) {
+    I_ count = DYN_HS - 1;
+                   /* Offset of first ptr word, less 1 */
+    I_ ptrs = count + DYN_CLOSURE_NoPTRS(Scan);
+                   /* Offset of last ptr word */
+    I_ size = DYN_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_LINK("DYN ", size, ptrs-count);
+
+    while (++count <= ptrs) {
+	LINK_LOCATION(count);
+    }
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_Dyn(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = DYN_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_MOVE("DYN ", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanLink_Tuple(STG_NO_ARGS) {
+    I_ count = TUPLE_HS - 1;
+                   /* Offset of first ptr word, less 1 */
+    I_ ptrs = count + TUPLE_CLOSURE_NoPTRS(Scan);
+                   /* Offset of last ptr word */
+    I_ size = TUPLE_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_LINK("TUPL", size, ptrs-count);
+
+    while (++count <= ptrs) {
+	LINK_LOCATION(count);
+    }
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_Tuple(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = TUPLE_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_MOVE("TUPL", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+    return(FIXED_HS + size);
+}
+
+/*** MUTUPLE CLOSURE -- NO PTRS STORED IN CLOSURE -- NO DATA ***/
+/*             Only if special GC treatment required           */
+
+#ifdef GC_MUT_REQUIRED
+I_
+_ScanLink_MuTuple(STG_NO_ARGS) {
+    I_ count = MUTUPLE_HS - 1;
+                   /* Offset of first ptr word, less 1 */
+    I_ ptrs = count + MUTUPLE_CLOSURE_NoPTRS(Scan);
+                   /* Offset of last ptr word */
+    I_ size = MUTUPLE_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_LINK("MUT ", size, ptrs-count);
+
+    while (++count <= ptrs) {
+	LINK_LOCATION(count);
+    }
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_MuTuple(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = MUTUPLE_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_MOVE("MUT ", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_ImmuTuple(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = MUTUPLE_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_MOVE("IMUT", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+
+    /* Dont add to OldMutables list */
+
+    return(FIXED_HS + size);
+}
+#endif /* GCap || GCgn */
+
+
+I_
+_ScanLink_Data(STG_NO_ARGS) {
+    I_ size  = DATA_CLOSURE_SIZE(Scan);
+    DEBUG_SCAN_LINK("DATA", size, 0);
+    return(FIXED_HS + size);
+}
+
+I_
+_ScanMove_Data(STG_NO_ARGS) {
+    I_ count = FIXED_HS - 1;
+    I_ size  = DATA_CLOSURE_SIZE(Scan);
+
+    DEBUG_SCAN_MOVE("DATA", size);
+
+    SLIDE_FIXED_HDR;
+    while (++count <= size + (FIXED_HS - 1)) {
+	SLIDE_WORD(count);
+    }
+    return(FIXED_HS + size);
+}
+
+
+I_
+_ScanLink_BH_U(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("BH  ", MIN_UPD_SIZE, 0);
+    return(FIXED_HS + BH_U_SIZE); /* size includes _VHS */
+    /* NB: pretty intimate knowledge about BH closure layout */
+}
+
+I_
+_ScanMove_BH_U(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("BH  ", MIN_UPD_SIZE);
+    SLIDE_FIXED_HDR;
+    return(FIXED_HS  + BH_U_SIZE);
+    /* ditto */
+}
+
+I_
+_ScanLink_BH_N(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("BH N", MIN_NONUPD_SIZE, 0);
+    return(FIXED_HS + BH_N_SIZE); /* size includes _VHS */
+    /* NB: pretty intimate knowledge about BH closure layout */
+}
+
+I_
+_ScanMove_BH_N(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("BH N",MIN_NONUPD_SIZE);
+    SLIDE_FIXED_HDR;
+    return(FIXED_HS + BH_N_SIZE);
+    /* ditto */
+}
+
+#ifdef USE_COST_CENTRES
+I_
+_ScanLink_PI(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("PI  ", IND_CLOSURE_SIZE(dummy), 1);
+    LINK_LOCATION(IND_HS);
+    return(FIXED_HS + IND_CLOSURE_SIZE(dummy) /*MIN_UPD_SIZE*/);
+}
+
+I_
+_ScanMove_PI(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("PI  ", IND_CLOSURE_SIZE(dummy));
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(IND_HS);
+    return(FIXED_HS + IND_CLOSURE_SIZE(dummy) /*MIN_UPD_SIZE*/);
+}
+#endif
+
+\end{code}
+
+Linking and Marking Routines for FetchMes and stack objects.
+
+\begin{code}
+
+#if defined(CONCURRENT)
+
+#if defined(PAR)
+
+I_
+_ScanLink_FetchMe(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("FME ", MIN_UPD_SIZE, 0);
+    return(FIXED_HS + FETCHME_CLOSURE_SIZE(dummy) /*MIN_UPD_SIZE*/);
+}
+
+I_
+_ScanMove_FetchMe(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("FME ",MIN_UPD_SIZE);
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(FETCHME_GA_LOCN);
+    ASSERT(GALAlookup(FETCHME_GA(New)) != NULL);
+
+#ifdef GC_MUT_REQUIRED
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+#endif
+
+    return(FIXED_HS + FETCHME_CLOSURE_SIZE(dummy) /*MIN_UPD_SIZE*/);
+}
+
+I_
+_ScanLink_BF(STG_NO_ARGS) 
+{
+    DEBUG_SCAN_LINK("BF", BF_HS, 2 /*possibly wrong (WDP 95/07)*/);
+
+    LINK_LOCATION(BF_LINK_LOCN);
+    LINK_LOCATION(BF_NODE_LOCN);
+    return(FIXED_HS + BF_CLOSURE_SIZE(dummy));
+}
+
+I_
+_ScanMove_BF(STG_NO_ARGS) 
+{
+    I_ count;
+
+    SLIDE_FIXED_HDR;
+    for (count = FIXED_HS; count < FIXED_HS + BF_VHS; count++) {
+    	SLIDE_WORD(count);
+    }
+    SLIDE_WORD(BF_LINK_LOCN);
+    SLIDE_WORD(BF_NODE_LOCN);
+    SLIDE_WORD(BF_GTID_LOCN);
+    SLIDE_WORD(BF_SLOT_LOCN);
+    SLIDE_WORD(BF_WEIGHT_LOCN);
+
+#ifdef GC_MUT_REQUIRED
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+#endif
+
+    return(FIXED_HS + BF_CLOSURE_SIZE(dummy));
+}
+
+#endif	/* PAR */
+
+I_
+_ScanLink_BQ(STG_NO_ARGS) {
+    DEBUG_SCAN_LINK("BQ  ", BQ_CLOSURE_SIZE(dummy), BQ_CLOSURE_NoPTRS(Scan));
+    LINK_LOCATION(BQ_HS);
+    return(FIXED_HS + BQ_CLOSURE_SIZE(dummy));
+}
+
+I_
+_ScanMove_BQ(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("BQ  ", BQ_CLOSURE_SIZE(dummy));
+
+    SLIDE_FIXED_HDR;
+    SLIDE_WORD(BQ_HS);
+
+#ifdef GC_MUT_REQUIRED
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+#endif
+
+    return(FIXED_HS + BQ_CLOSURE_SIZE(dummy));
+}
+
+I_
+_ScanLink_TSO(STG_NO_ARGS) 
+{
+    STGRegisterTable *r = TSO_INTERNAL_PTR(Scan);
+    W_ liveness = r->rLiveness;
+    I_ i;
+
+    DEBUG_SCAN_LINK("TSO", TSO_HS + TSO_CTS_SIZE, 0/*wrong*/);
+
+    LINK_LOCATION(TSO_LINK_LOCN);
+    LINK_LOCATION(((P_) &r->rStkO) - Scan);
+    for(i = 0; liveness != 0; liveness >>= 1, i++) {
+    	if (liveness & 1) {
+    	    LINK_LOCATION(((P_) &r->rR[i].p) - Scan)
+    	}
+    }
+    return(TSO_HS + TSO_CTS_SIZE);
+}
+
+I_
+_ScanMove_TSO(STG_NO_ARGS) 
+{
+    I_ count;
+
+    SLIDE_FIXED_HDR;
+    for (count = FIXED_HS; count < FIXED_HS + TSO_VHS; count++) {
+    	SLIDE_WORD(count);
+    }
+
+    for(count = 0; count < BYTES_TO_STGWORDS(sizeof(STGRegisterTable)); count++)
+    	/* Do it this way in case there's a shift of just one word */
+        ((P_) TSO_INTERNAL_PTR(New))[count] = ((P_) TSO_INTERNAL_PTR(Scan))[count];
+
+#ifdef GC_MUT_REQUIRED
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+#endif
+
+    return(TSO_HS + TSO_CTS_SIZE);
+}
+
+I_
+_ScanLink_StkO(STG_NO_ARGS) {
+    I_ count;
+    I_ size = STKO_CLOSURE_SIZE(Scan);
+    I_ cts_size = STKO_CLOSURE_CTS_SIZE(Scan);
+    I_ sub = STKO_SuB_OFFSET(Scan);	/* Offset of first update frame in B stack */
+
+    /* Link the link */
+    LINK_LOCATION(STKO_LINK_LOCN);
+
+    /* Link the locations in the A stack */
+    DEBUG_SCAN_LINK("STKO", size, cts_size - STKO_SpA_OFFSET(SCAN) + 1);
+    for (count = STKO_SpA_OFFSET(Scan); count <= cts_size; count++) {
+	STKO_LINK_LOCATION(count);
+    }
+
+    /* Now link the updatees in the update stack */
+    while(sub > 0) {
+    	P_ subptr;
+
+    	STKO_LINK_LOCATION(sub + BREL(UF_UPDATEE));
+    	subptr = GRAB_SuB(STKO_CLOSURE_ADDR(Scan,sub));
+	sub = STKO_CLOSURE_OFFSET(Scan, subptr);
+    }
+
+    /*
+       I assume what's wanted is the size of the object 
+       rather the number of pointers in the object. KH 
+    */
+    return(FIXED_HS + size);
+}
+
+/* We move first and then repair, so that we can handle an overlapping source 
+   and destination.
+ */
+
+I_
+_ScanMove_StkO(STG_NO_ARGS) {
+    I_ count;
+    I_ size  = STKO_CLOSURE_SIZE(Scan);
+    I_ cts_size   = STKO_CLOSURE_CTS_SIZE(Scan);
+    I_ spa_offset = STKO_SpA_OFFSET(Scan);
+    I_ spb_offset = STKO_SpB_OFFSET(Scan);
+    I_ sub_offset = STKO_SuB_OFFSET(Scan);
+    I_ offset;
+    
+    DEBUG_SCAN_MOVE("STKO", size);
+
+    SLIDE_FIXED_HDR;
+#ifdef DO_REDN_COUNTING
+    SLIDE_WORD(STKO_ADEP_LOCN);
+    SLIDE_WORD(STKO_BDEP_LOCN);
+#endif
+    SLIDE_WORD(STKO_SIZE_LOCN);
+    SLIDE_WORD(STKO_RETURN_LOCN);
+    SLIDE_WORD(STKO_LINK_LOCN);
+
+    /* Adjust the four stack pointers...*IN ORDER* */
+    offset = New - Scan;
+    STKO_SuB(New) = STKO_SuB(Scan) + offset;
+    STKO_SpB(New) = STKO_SpB(Scan) + offset;
+    STKO_SpA(New) = STKO_SpA(Scan) + offset;
+    STKO_SuA(New) = STKO_SuA(Scan) + offset;
+
+    /* Slide the B stack */
+    for (count = 1; count <= spb_offset; count++) {
+	SLIDE_WORD((STKO_HS-1) + count);
+    }
+
+    /* Slide the A stack */
+    for (count = spa_offset; count <= cts_size; count++) {
+	SLIDE_WORD((STKO_HS-1) + count);
+    }
+
+    /* Repair internal pointers */
+    while (sub_offset > 0) {
+    	    P_ subptr;
+	    ADJUST_WORD((STKO_HS-1) + sub_offset + BREL(UF_SUA),offset);
+	    ADJUST_WORD((STKO_HS-1) + sub_offset + BREL(UF_SUB),offset);
+    	    subptr = GRAB_SuB(STKO_CLOSURE_ADDR(New,sub_offset));
+    	    sub_offset = STKO_CLOSURE_OFFSET(New, subptr);
+    }
+
+#ifdef GC_MUT_REQUIRED
+    /* Build new OldMutables list */
+    MUT_LINK(New) = (W_) StorageMgrInfo.OldMutables;
+    StorageMgrInfo.OldMutables = (P_) New;
+#endif
+
+    return(FIXED_HS + size);
+}
+
+#endif /* CONCURRENT */
+
+\end{code}
+
+\begin{code}
+#if defined(GCgn)
+I_
+_ScanMove_OldRoot(STG_NO_ARGS) {
+    DEBUG_SCAN_MOVE("OLDR", 2);
+    SLIDE_FIXED_HDR;
+    IND_CLOSURE_PTR(New) = IND_CLOSURE_PTR(Scan);
+    IND_CLOSURE_LINK(New) = (W_) genInfo.OldInNew;
+    genInfo.OldInNew = New;
+    genInfo.OldInNewno++;
+    return(IND_HS + MIN_UPD_SIZE); /* this looks wrong (WDP 95/07) */
+}
+#endif /* GCgn */
+
+/*** Dummy Entries -- Should not be entered ***/
+
+/* Should not be in a .lc file either...  --JSM */
+
+STGFUN(_Dummy_Static_entry) {
+    fprintf(stderr,"Called _Dummy_Static_entry\nShould never occur!\n");
+    abort();
+}
+
+STGFUN(_Dummy_Ind_entry) {
+    fprintf(stderr,"Called _Dummy_Ind_entry\nShould never occur!\n");
+    abort();
+}
+
+STGFUN(_Dummy_Caf_entry) {
+    fprintf(stderr,"Called _Dummy_Caf_Ind_entry\nShould never occur!\n");
+    abort();
+}
+
+STGFUN(_Dummy_Const_entry) {
+    fprintf(stderr,"Called _Dummy_Const_entry\nShould never occur!\n");
+    abort();
+}
+
+STGFUN(_Dummy_CharLike_entry) {
+    fprintf(stderr,"Called _Dummy_CharLike_entry\nShould never occur!\n");
+    abort();
+}
+
+#endif /* _INFO_COMPACTING */
+
+\end{code}

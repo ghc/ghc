@@ -1,0 +1,29 @@
+Typechecked:
+AbsBinds [tt8, tt4] [] [(mp.t1, ShouldSucceed.mp)]
+    {- rec -}
+    mp.t1 :: (tt8 -> tt4) -> [tt8] -> [tt4]
+    mp.t1
+	f.r61 [] = [] (tt4)
+    mp.t1
+	f.r62 (x.r63 : xs.r64)
+		= ((:) tt4) (f.r62 x.r63) (mp.t1 f.r62 xs.r64)
+AbsBinds [tt17, tt18] [] [(sd.t14, ShouldSucceed.sd)]
+    {- nonrec -}
+    sd.t14 :: (tt17, tt18) -> tt18
+    sd.t14
+	(f.r65, s.r66)
+		= s.r66
+AbsBinds [ot21, tt29, tt30] [] [(f.t20, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t20 :: ot21 -> [(tt29, tt30)] -> [tt30]
+    f.t20
+	x.r58 = ranOAL.r59 [tt29, tt30]
+	      where
+		  AbsBinds [tt27, tt28] [] [(ranOAL.t23, ranOAL.r59)]
+		      {- nonrec -}
+		      ranOAL.t23 :: [(tt27, tt28)] -> [tt28]
+		      ranOAL.t23
+			  xs.r60 = (ShouldSucceed.mp [(tt27, tt28), tt28])
+				       (ShouldSucceed.sd [tt27, tt28]) xs.r60
+		  {- nonrec -}
+

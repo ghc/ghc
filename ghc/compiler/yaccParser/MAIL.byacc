@@ -1,0 +1,146 @@
+Return-Path: mattson@dcs.gla.ac.uk
+Return-Path: <mattson@dcs.gla.ac.uk>
+Received: from starbuck.dcs.gla.ac.uk by goggins.dcs.gla.ac.uk 
+          with LOCAL SMTP (PP) id <02535-0@goggins.dcs.gla.ac.uk>;
+          Thu, 18 Nov 1993 09:59:57 +0000
+To: Robert.Corbett@Eng.Sun.COM
+cc: partain@dcs.gla.ac.uk
+Subject: Re: [Robert.Corbett@Eng.Sun.COM: Re: possible bug, byacc 1.9]
+In-reply-to: Your message from 9:46 AM GMT
+Date: Thu, 18 Nov 93 09:59:53 +0000
+From: Jim Mattson <mattson@dcs.gla.ac.uk>
+
+It's clear that this feature improves error detection, but it's not
+clear to me how it improves the scope of possible error recoveries.
+
+If I understand your explanation, it sounds like the only alternative 
+(short of changing the byacc source) is to add tens or hundreds of
+error productions sprinkled throughout the code anywhere that an
+unexpected symbol may appear, since no intervening reductions are
+allowed.  
+
+Although the addition of all of these error productions increases the
+scope of possible error recoveries, the same functionality (with, in fact,
+the same approach) is provided by other versions of yacc.  The apparent
+advantage of other versions of yacc is that they provide a facility by
+which a single _default_ error production can handle a number of
+possibilities (after some possibly illegal reductions have been performed).
+
+Am I missing something?
+
+--jim
+--------
+In reply to the following message:
+--------
+
+------- Forwarded Message
+
+Date: Wed, 17 Nov 93 22:33:44 PST
+From: Robert.Corbett@Eng.Sun.COM (Robert Corbett)
+Message-Id: <9311180633.AA07545@lupa.Eng.Sun.COM>
+To: partain@dcs.gla.ac.uk
+Subject: Re: possible bug, byacc 1.9
+
+It is a feature.  One difference between Berkeley Yacc and its
+predecessors is that the parsers Berkeley Yacc produces detect
+errors as soon as possible.  That will lead to different behavior.
+
+In this particular case, the token "IN" is not a permitted
+lookahead symbol in state 390.  AT&T Yacc parsers will not detect
+the error until after doing more reductions than Berkeley Yacc
+parsers.  Doing reductions in illegal contexts limits the scope of
+recoveries that are possible (unless backtracking is possible).
+
+I am sorry that my attempt to provide better error detection is
+causing you trouble.  You can get the AT&T Yacc behavior by
+replacing the routine sole_reduction in mkpar.c with a routine
+that returns the most frequently occurring reduction.
+
+					Yours truly,
+					Bob Corbett
+
+- ----- Begin Included Message -----
+
+>From partain@dcs.gla.ac.uk Wed Nov 17 05:03:44 1993
+To: robert.corbett@Eng
+Subject: possible bug, byacc 1.9
+Date: Wed, 17 Nov 93 12:33:42 +0000
+From: Will Partain <partain@dcs.gla.ac.uk>
+
+Sadly, it's in a *HUGE* grammar, which I will send you if you have the
+stomach for it.
+
+The problem occurs where {Sun's /usr/lang/yacc, bison} say:
+
+    state 390
+
+	aexp  ->  var .   (rule 356)
+	aexp  ->  var . AT aexp   (rule 366)
+
+	AT  	shift, and go to state 508
+	$default	reduce using rule 356 (aexp)
+
+but byacc says
+
+    state 396
+	aexp : var .  (356)
+	aexp : var . AT aexp  (366)
+
+	AT  shift 511
+	error  reduce 356
+	VARID  reduce 356
+	CONID  reduce 356
+	VARSYM  reduce 356
+	CONSYM  reduce 356
+	MINUS  reduce 356
+	INTEGER  reduce 356
+	FLOAT  reduce 356
+	CHAR  reduce 356
+	STRING  reduce 356
+	CHARPRIM  reduce 356
+	INTPRIM  reduce 356
+	FLOATPRIM  reduce 356
+	DOUBLEPRIM  reduce 356
+	CLITLIT  reduce 356
+	VOIDPRIM  reduce 356
+	CCURLY  reduce 356
+	VCCURLY  reduce 356
+	SEMI  reduce 356
+	OBRACK  reduce 356
+	CBRACK  reduce 356
+	OPAREN  reduce 356
+	CPAREN  reduce 356
+	COMMA  reduce 356
+	BQUOTE  reduce 356
+	RARROW  reduce 356
+	VBAR  reduce 356
+	EQUAL  reduce 356
+	DOTDOT  reduce 356
+	DCOLON  reduce 356
+	LARROW  reduce 356
+	WILDCARD  reduce 356
+	LAZY  reduce 356
+	WHERE  reduce 356
+	OF  reduce 356
+	THEN  reduce 356
+	ELSE  reduce 356
+	PLUS  reduce 356
+
+The token that comes in is "IN"; bison/sun-yacc-generated parser
+tickles the default, reduces to "aexp", but byacc-generated tickles
+"error" and the rest is history.
+
+Maybe this is enough for you to exclaim, "Oh yes, that's a feature."
+
+As I say, more info if you want it.
+
+Will Partain
+
+
+- ----- End Included Message -----
+
+
+
+------- End of Forwarded Message
+
+--------

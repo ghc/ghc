@@ -1,0 +1,9 @@
+runtests::
+	@echo '###############################################################'
+	@echo '# Tests of printing facilities in the compiler.               #'
+	@echo '###############################################################'
+
+RunStdTest(print001,$(GHC), -noC -hi Print001.hs -o2 Print001.stderr)
+RunStdTest(print002,$(GHC), -noC -fno-implicit-prelude -dppr-user -ddump-rif2hs -ddump-tc -hi Print002.hs -o2 Print002.stderr)
+RunStdTest(print003,$(GHC), -noC -hi Print003.hs -o2 Print003.stderr)
+RunStdTest(print004,$(GHC), -noC -hi Print004.hs -o2 Print004.stderr)

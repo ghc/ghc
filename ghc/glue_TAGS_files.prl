@@ -1,0 +1,28 @@
+#! /usr/local/bin/perl
+#
+# glue all the (e)TAGS files named on the command line
+# into one big TAGS file here; main task: unrelativize the
+# file names.
+#
+open (TAGS, "> TAGS") || die "can't open TAGS file for writing\n";
+
+foreach $f (@ARGV) {
+    open(INF, "< $f") || die "can't open $f for reading\n";
+    $f =~ s/\/?TAGS$//;
+
+    while (<INF>) {
+	print TAGS $_;
+	next if ! /^\f$/;
+
+	# otherwise, next line is filename; de-relativise it
+	$_ = <INF>;
+	die "unexpected file line:$_" if /^\f/ || /\x7f/; # sanity check
+	if (/^\//) { # absolute already; do nothing...
+	    print TAGS $_;
+	} else {
+	    print TAGS "$f/$_";
+	}
+    }
+    close(INF);
+}
+close(TAGS);

@@ -1,0 +1,106 @@
+Release~0.16 was the second public release of this compilation system.
+It was primarily a bug-fixing and ``solidifying'' release.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-0.16}
+in the top-level directory.
+
+%************************************************************************
+%*									*
+\subsection[0-16-new-docs]{New documentation}
+%*									*
+%************************************************************************
+
+We're providing a few more papers, in \tr{ghc/docs/papers}.  See
+\tr{ghc/docs/README} for a full list of documentation.
+
+%************************************************************************
+%*									*
+\subsection[0-16-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+New strictness analyser and update analyser; their use will be
+reflected in the pragmas in your interface files.  The format of these
+interface pragmas {\em will probably change}.
+
+Errors related to misuse of Prelude identifiers are more likely to be
+caught.
+
+For some unknown reason, our ``wired-in'' default declaration in 0.10 was
+\tr{default (Integer,Double)}.  We changed it to
+\tr{default (Int,Double)}, as the Report suggests (which is less safe).
+
+We've switched from basing our derived instances on a non-standard
+@cmp3@ method (class @Ord@), to basing them on another non-standard
+method @tagCmp@.  The relevant types and things are...
+\begin{verbatim}
+cmp3 :: b -> b -> b -> a -> a -> b
+
+tagCmp :: a -> a -> CMP_TAG
+data CMP_TAG = LT_TAG | EQ_TAG | GT_TAG
+\end{verbatim}
+If you peer into the \tr{ghc/lib/prelude/*.hs} code, it will be
+obvious what's going on here.  We hope to make further improvements
+on comparison code in the foreseeable future.
+
+%************************************************************************
+%*									*
+\subsection[0-16-new-in-libraries]{In the prelude and runtime support}
+%*									*
+%************************************************************************
+
+The libraries underpinning Glasgow monadic I/O, sequencing, primitive
+arrays, and variables have been reworked, with some consequent
+changes.  If you encounter difficulties, you should consult the
+@PreludeGlaIO.hi@ and @PreludeGlaArray.hi@ interfaces in your
+\tr{imports} directory.
+
+Andy Gill's proposal for access to standard Haskell I/O functions from
+the monadic I/O world has been implemented.  So you have functions
+such as @getArgsIO@, @appendChanIO@, etc., etc.
+
+The stuff you used to get from @Stdio.hi@ now comes directly from
+@PreludeGlaIO.hi@.
+
+The @packString#@ function has been moved into a module of its own,
+@PackedString@, and {\em its type has changed}.  The functions now in
+that module are (to be elaborated...):
+\begin{verbatim}
+packString  :: String -> PackedString
+packString# :: String -> Arr# Char#
+\end{verbatim}
+The latter is very useful to preparing @String@ arguments to pass to C.
+
+The HBC library modules that compile readily with GHC are available,
+you'll need to give a \tr{-lHShbc} option to the driver.  These
+modules are:
+\begin{verbatim}
+Either, Hash, ListUtil, Maybe, Miranda, Number, Parse, Pretty, QSort,
+Random, Time, Word
+\end{verbatim}
+
+The GNU multi-precision (GMP) package which underpins our @Integer@
+support has been upgraded to version 1.3.2.
+
+%************************************************************************
+%*									*
+\subsection[0-16-new-elsewhere]{New elsewhere}
+%*									*
+%************************************************************************
+
+0.16 has a new and much uglier ``assembler mangler''
+(\tr{ghc/driver/ghc-asm-*.lprl}), which is what converts GCC-produced
+assembly-language output into the stuff you actually run.  Besides
+throwing away function prologues/epilogues, it parks ``info tables''
+next to entry code, and fast-entry code right next to slow-entry code.
+
+The net effect of this assembler-mangler is that there is {\em very
+little runtime penalty} for compiling via GCC.
+
+The way we go about mapping ``STG registers'' to real machine
+registers (\tr{ghc/imports/StgRegs.lh}) is different.  It should be
+particularly better for machines with few registers (though we still
+don't have a good solution for x86 machines).
+
+We can now ``steal'' caller-save registers; in the past, we could only
+steal callee-save registers.

@@ -1,0 +1,15 @@
+interface Oberon_Id where
+from_string :: [Char] -> Oberon_Id
+	{-# ARITY from_string = 1 #-}
+to_string :: Oberon_Id -> [Char]
+	{-# ARITY to_string = 1 #-}
+data Oberon_Id 
+instance Eq Oberon_Id
+	{-# ARITY (==) = 2 #-}
+	{-# ARITY (/=) = 0 #-}
+instance Text Oberon_Id
+	{-# ARITY readsPrec = 0 #-}
+	{-# ARITY showsPrec = 2 #-}
+	{-# ARITY readList = 0 #-}
+	{-# ARITY showList = 0 #-}
+

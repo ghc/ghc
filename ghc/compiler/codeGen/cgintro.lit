@@ -1,0 +1,783 @@
+\section[codegen-intro]{Intro/background info for the code generator}
+
+\tr{NOTES.codeGen} LIVES!!!
+
+\begin{verbatim}
+=======================
+NEW!  10 Nov 93			Semi-tagging
+
+Rough idea
+
+	case x of		-- NB just a variable scrutinised
+	  []     -> ...
+	  (p:ps) -> ...p...	-- eg.  ps not used
+
+generates
+
+	Node = a ptr to x
+	while TRUE do { switch TAG(Node) {
+
+	  INDIRECTION_TAG : Node = Node[1]; break;	-- Dereference indirection
+
+	  OTHER_TAG : adjust stack; push return address; ENTER(Node)
+
+	  0 : 	adjust stack; 
+		JUMP( Nil_case )
+
+	  1 :   adjust stack;
+		R2 := Node[2]	-- Get ps
+		JUMP( Cons_case )
+	}
+
+* The "return address" is a vector table, which contains pointers to
+  Nil_case and Cons_case.
+
+* The "adjust stack" in the case of OTHER_TAG is one word different to
+  that in the case of a constructor tag (0,1,...), because it needs to
+  take account of the return address.  That's why the stack adjust
+  shows up in the branches, rather than before the switch.
+
+* In the case of *unvectored* returns, the "return address" will be
+  some code which switches on TagReg.  Currently, the branches of the
+  case at the return address have the code for the alternatives
+  actually there:
+
+	switch TagReg {
+	  0 : code for nil case
+	  1 : code for cons case
+	}
+	
+But with semi-tagging, we'll have to label each branch:
+
+	switch TagReg {
+	  0 : JUMP( Nil_case )
+	  1 : JUMP( Cons_case )
+	}
+
+So there's an extra jump.  Boring.  Boring.  (But things are usually
+eval'd...in which case we save a jump.)
+
+* TAG is a macro which gets a "tag" from the info table. The tag
+  encodes whether the thing is (a) an indirection, (b) evaluated
+  constructor with tag N, or (c) something else. The "something else"
+  usually indicates something unevaluated, but it might also include
+  FETCH_MEs etc.  Anything which must be entered.
+
+* Maybe we should get the info ptr out of Node, into a temporary
+  InfoPtrReg, so that TAG and ENTER share the info-ptr fetch.
+
+* We only load registers which are live in the alternatives.  So at
+  the start of an alternative, either the unused fields *will* be in
+  regs (if we came via enter/return) or they *won't* (if we came via
+  the semi-tagging switch).  If they aren't, GC had better not follow
+  them. So we can't arrange that all live ptrs are neatly lined up in
+  the first N regs any more.  So GC has to take a liveness
+  bit-pattern, not just a "number of live regs" number.
+
+* We need to know which of the constructors fields are live in the
+  alternatives.  Hence STG code has to be elaborated to keep live vars
+  for each alternative, or to tag each bound-var in the alternatives
+  with whether or not it is used.
+
+* The code generator needs to be able to construct unique labels for
+  the case alternatives.  (Previously this was done by the AbsC
+  flattening pass.) Reason: we now have an explicit join point at the
+  start of each alternative.
+
+* There's some question about how tags are mapped.  Is 0 the first
+  tag?  (Good when switching on TagReg when there are only two
+  constructors.)  What is OTHER_TAG and INDIRECTION_TAG?
+
+* This whole deal can be freely mixed with un-semi-tagged code.
+  There should be a compiler flag to control it.
+
+=======================
+Many of the details herein are moldy and dubious, but the general
+principles are still mostly sound.
+\end{verbatim}
+
+%************************************************************************
+%*									*
+\subsection{LIST OF OPTIMISATIONS TO DO}
+%*									*
+%************************************************************************
+
+\begin{itemize}
+\item
+Register return conventions.
+
+\item
+Optimisations for Enter when 
+	\begin{itemize}
+	\item
+	know code ptr, so don't indirect via Node
+	\item
+	know how many args
+	\item
+	top level closures don't load Node
+	\end{itemize}
+\item
+Strings.
+
+\item
+Case of unboxed op with more than one alternative, should generate
+a switch or an if statement.
+\end{itemize}
+
+{\em Medium}
+
+\begin{itemize}
+\item
+Don't allocate constructors with no args.  
+Instead have a single global one.
+
+\item
+Have global closures for all characters, and all small numbers.
+\end{itemize}
+
+
+{\em Small}
+
+\begin{itemize}
+\item
+When a closure is one of its own free variables, don't waste a field
+on it.  Instead just use Node.
+\end{itemize}
+
+
+%************************************************************************
+%*									*
+\subsection{ENTERING THE GARBAGE COLLECTOR}
+%*									*
+%************************************************************************
+
+[WDP: OLD]
+
+There are the following ways to get into the garbage collector:
+
+\begin{verbatim}
+_HEAP_OVERFLOW_ReturnViaNode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Used for the GC trap at closure entry.
+
+	- Node is only live ptr
+	- After GC, enter Node
+
+_HEAP_OVERFLOW_ReturnDirect0, _HEAP_OVERFLOW_ReturnDirect1, ... 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Used:	for fast entry of functions, and
+	case alternative where values are returned in regs
+
+	- PtrReg1..n are live ptrs
+	- ReturnReg points to start of code (before hp oflo check)
+	- After GC, jump to ReturnReg
+	- TagReg is preserved, in case this is an unvectored return
+
+
+_HEAP_OVERFLOW_CaseReturnViaNode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	*** GRIP ONLY ***
+
+Used for case alternatives which return node in heap
+
+	- Node is only live ptr
+	- RetVecReg points to return vector
+	- After GC, push RetVecReg and enter Node
+\end{verbatim}
+
+Exactly equivalent to @GC_ReturnViaNode@, preceded by pushing @ReturnVectorReg@.
+
+The only reason we re-enter Node is so that in a GRIP-ish world, the
+closure pointed to be Node is re-loaded into local store if necessary.
+
+%************************************************************************
+%*									*
+\subsection{UPDATES}
+%*									*
+%************************************************************************
+
+[New stuff 27 Nov 91]
+
+\subsubsection{Return conventions}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When executing the update continuation code for a constructor, 
+@RetVecReg@ points to the {\em beginning of} the return vector.  This is to
+enable the update code to find the normal continuation code.
+(@RetVecReg@ is set up by the code which jumps to the update continuation
+code.)
+
+\subsubsection{Stack arrangement}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each stack has a ``stack update ptr'', SuA and SuB, which point to the
+topmost word of the stack just after an update frame has been pushed.
+
+A standard update frame (on the B stack) looks like this 
+(stack grows downward in this picture):
+
+\begin{verbatim}
+	|					|
+	|---------------------------------------|
+	| Saved SuA				|
+	|---------------------------------------|
+	| Saved SuB				|
+	|---------------------------------------|
+	| Pointer to closure to be updated	|
+	|---------------------------------------|
+	| Pointer to Update return vector	|
+	|---------------------------------------|
+\end{verbatim}
+
+The SuB therefore points to the Update return vector component of the
+topmost update frame.
+
+A {\em constructor} update frame, which is pushed only by closures
+which know they will evaluate to a data object, looks just the 
+same, but without the saved SuA pointer.
+
+\subsubsection{Pushing update frames}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An update is pushed right at the start of the code for an updatable
+closure.  But {\em after} the stack overflow check.  (The B-stack oflo
+check should thereby include allowance for the update frame itself.)
+
+\subsubsection{Return vectors}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every ``return address'' pushed on the stack by a boxed \tr{case} is a
+pointer to a vector of one or more pairs of code pointers:
+
+\begin{verbatim}
+	------> -----------------
+		| Cont1 	|
+		|---------------|
+		| Update1	|
+		-----------------
+		| Cont2 	|
+		|---------------|
+		| Update2	|
+		-----------------
+		...etc...
+\end{verbatim}
+
+Each pair consists of a {\em continuation} code pointer and an
+{\em update} code pointer.
+
+For data types with only one constructor, or too many constructors for
+vectoring, the return vector consists of a single pair.
+
+When the \tr{data} decl for each data type is compiled, as well as
+making info tables for each constructor, an update code sequence for
+each constructor (or a single one, if unvectored) is also created.
+	
+ToDo: ** record naming convention for these code sequences somewhere **
+
+When the update code is entered, it uses the value stored in the
+return registers used by that constructor to update the thing pointed
+to by the update frame (all of which except for the return address is
+still on the B stack).  If it can do an update in place (ie
+constructor takes 3 words or fewer) it does so.
+
+In the unvectored case, this code first has to do a switch on the tag,
+UNLESS the return is in the heap, in which case simply overwrite with
+an indirection to the thing Node points to.
+
+Tricky point: if the update code can't update in place it has to
+allocate a new object, by performing a heap-oflo check and jumping to
+the appropriate heap-overflow entry point depending on which RetPtr
+registers are live (just as when compiling a case alternative).
+
+When the update code is entered, a register @ReturnReg@ is assumed to
+contain the ``return address'' popped from the B stack. This is so
+that the update code can enter the normal continuation code when it is
+done.
+
+For standard update frames, the A and B stack update ptrs are restored
+from the saved versions before returning, too.
+
+\subsubsection{Update return vector}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Both standard and constructor update frames have as their topmost word
+a pointer to a static, fixed, update return vector.
+
+The ``continuation'' entry of each pair in this vector sets UpdReg to
+point to the thing to be updated (gotten from the update frame), pops
+the update frame, and returns to the ``update'' entry of the
+corresponding pair in the next return vector (now exposed on top of B
+stk).
+
+The ``update'' entry of each pair in this vector overwrites the thing
+to be updated with an indirection to the thing UpdReg points to, and
+then returns in the same was as the "continuation" entry above.
+
+There need to be enough pairs in the update return vector to cater for
+any constructor at all.
+
+
+*************************
+
+Things which need to be altered if you change the number of constructors
+which switches off vectored returns:
+\begin{verbatim}
+	Extra cases in update return vector (file xxx)
+	The value xxxx in yyyy.lhs
+	others?
+\end{verbatim}
+**************************
+
+%************************************************************************
+%*									*
+\subsection{HEAP OBJECTS}
+%*									*
+%************************************************************************
+
+The heap consists of {\em closures}.
+A closure can be either:
+\begin{itemize}
+\item
+a {\em suspension}, which is an unevaluated thunk.
+\item
+a {\em constructed object} (or just constructor); created by let(recs) and
+by updating.
+\item
+a {\em partial application} (only updating creates these).
+\end{itemize}
+
+Closures are laid out with the {\em info pointer} at the lowest
+address (but see notes on the Global Address field for parallel
+system).  [We don't try to localise knowledge of this!  It is a royal
+pain having to cope with closures laid out backwards.]
+
+Ptr fields occur first (before non-ptr ones).
+
+Non-normal-form closures are always at least 3 words in size (excl
+global address), so they can be updated with a list cell (should they
+evaluate to that).
+
+Normal form (constructor) closures are always at least 2 words in size
+(excl global address), so they have room enough for forwarding ptrs
+during GC, and FETCHME boxes after flushing.
+
+1-word closures for normal-form closures in static space.  Explain
+more.
+
+Ideally, the info pointer of a closure would point to...
+\begin{verbatim}
+	      |-------------|
+	      | info table  |
+	      |-------------|
+info ptr ---> code
+\end{verbatim}
+
+But when C is the target code we can't guarantee the relative
+positions of code and data.  So the info ptr points to
+\begin{verbatim}
+	      |-------------|
+info ptr ---->|    ------------------------> code
+	      |-------------|
+	      | info table  |
+	      |-------------|
+\end{verbatim}
+
+That is, there's an extra indirection involved; and the info table
+occurs AFTER the info pointer rather than before. The info table
+entries are ``reversed'' too, so that bigger negative offsets in the
+``usual'' case turn into bigger positive offsets.
+	      
+SUSPENSIONS
+
+The simplest form of suspension is
+\begin{verbatim}
+	info-ptr, ptr free vars, non-ptr free vars
+\end{verbatim}
+
+where the info table for info-ptr gives 
+\begin{itemize}
+\item
+the total number of words of free vars
+\item
+the number of words of ptr free vars (== number of ptr free vars)
+in its extra-info part.
+\end{itemize}
+
+Optimised versions omit the size info from the info table, and instead
+use specialised GC routines.
+
+
+%************************************************************************
+%*									*
+\subsection{NAMING CONVENTIONS for compiled code}
+%*									*
+%************************************************************************
+
+
+Given a top-level closure called f defined in module M, 
+
+\begin{verbatim}
+	_M_f_closure		labels the closure itself
+				(only for top-level (ie static) closures)
+
+	_M_f_entry		labels the slow entry point of the code
+	_M_f_fast		labels the fast entry point of the code
+
+	_M_f_info		labels the info pointer for the closure for f
+				(NB the info ptr of a closure isn't public 
+				in the sense that these labels
+				are.  It is private to a module, and 
+				its name can be a secret.)
+\end{verbatim}
+
+These names are the REAL names that the linker sees. The initial underscores
+are attached by the C compiler.
+
+A non-top-level closure has the same names, but as well as the \tr{f}
+the labels have the unique number, so that different local closures
+which share a name don't get confused.  The reason we need a naming
+convention at all is that with a little optimisation a tail call may
+jump direct to the fast entry of a locally-defined closure.
+
+\tr{f} may be a constructor, in the case of closures which are the curried
+versions of the constructor.
+
+For constructor closures, we have the following naming conventions, where
+the constructor is C defined in module M:
+
+\begin{verbatim}
+	_M_C_con_info		is the info ptr for the constructor
+	_M_C_con_entry		is the corresponding code entry point
+\end{verbatim}
+
+%************************************************************************
+%*									*
+\subsection{ENTRY CONVENTIONS}
+%*									*
+%************************************************************************
+
+\begin{description}
+\item[Constructor objects:]
+	On entry to the code for a constructor (\tr{_M_C_con_entry}), Node
+	points to the constructor object.  [Even if the constructor has arity
+	zero...]
+
+\item[Non-top-level suspensions (both fast and slow entries):]
+	Node points to the closure.
+
+\item[Top-level suspensions, slow entry:]
+	ReturnReg points to the slow entry point itself
+
+\item[..ditto, fast entry:]
+	No entry convention
+\end{description}
+
+
+%************************************************************************
+%*									*
+\subsection{CONSTRUCTOR RETURN CONVENTIONS}
+%*									*
+%************************************************************************
+
+There is lots of excitement concerning the way in which constructors
+are returned to case expressions.
+
+{\em Simplest version}
+%=====================
+
+The return address on the stack points directly to some code.  It
+expects:
+
+\begin{verbatim}
+Boxed objects:
+	PtrReg1 points to the constructed value (in the heap) (unless arity=0)
+	Tag	contains its tag (unless # of constructors = 1)
+
+Unboxed Ints:	IntReg		contains the int
+	Float:	FloatReg	contains the returned value
+\end{verbatim}
+
+{\em Small improvement: vectoring}
+%=================================
+
+If there are fewer than (say) 8 constructors in the type, the return
+address points to a vector of return addresses.  The constructor does
+a vectored return.  No CSwitch.
+
+Complication: updates.  Update frames are built before the type of the
+thing which will be returned is known.  Hence their return address
+UPDATE has to be able to handle anything (vectored and nonvectored).
+
+Hence the vector table goes BACKWARD from ONE WORD BEFORE the word
+pointed to by the return address.
+
+{\em Big improvement: contents in registers}
+%===========================================
+
+Constructor with few enough components (eg 8ish) return their
+arguments in registers.  [If there is only one constructor in the
+type, the tag register can be pressed into service for this purpose.]
+
+Complication: updates.  Update frames are built before the type of the
+thing which will be returned is known.  Hence their return address
+UPDATE has to be able to handle anything.
+
+So, a return address is a pointer to a PAIR of return addresses (or
+maybe a pointer to some code immediately preceded by a pointer to some
+code).
+
+The ``main'' return address is just as before.
+
+The ``update'' return address expects just the same regs to be in use
+as the ``main'' address, BUT AS WELL the magic loc UpdPtr points to a
+closure to be updated.  It carries out the update, and contines with
+the main return address.
+
+The ``main'' code for UPDATE just loads UpdPtr the thing to be
+updated, and returns to the "update" entry of the next thing on the
+stack.
+
+The ``update'' entry for UPDATE just overwrites the thing to be
+updated with an indirection to UpdPtr.
+
+These two improvements can be combined orthogonally.
+
+
+%************************************************************************
+%*									*
+\subsection{REGISTERS}
+%*									*
+%************************************************************************
+
+Separate registers for
+\begin{verbatim}
+	C stack (incl interrupt handling, if this is not done on
+		another stk) (if interrupts don't mangle the C stack,
+		we could save it for most of the time and reuse the
+		register)
+
+	Arg stack
+	Basic value and control stack
+		These two grow towards each other, so they are each
+		other's limits!
+
+	Heap pointer
+\end{verbatim}
+
+And probably also
+\begin{verbatim}
+	Heap limit
+\end{verbatim}
+
+
+%************************************************************************
+%*									*
+\subsection{THE OFFSET SWAMP}
+%*									*
+%************************************************************************
+
+There are THREE kinds of offset:
+\begin{description}
+\item[virtual offsets:]
+
+    start at 1 at base of frame, and increase towards top of stack.
+
+    don't change when you adjust sp/hp.
+
+    independent of stack direction.
+
+    only exist inside the code generator, pre Abstract C
+
+    for multi-word objects, the offset identifies the word of the
+    object with smallest offset
+
+\item[reg-relative offsets:]
+
+    start at 0 for elt to which sp points, and increase ``into the
+    interesting stuff.''
+
+    Specifically, towards 
+    \begin{itemize}
+    \item
+    bottom of stack (for SpA, SpB)
+    \item
+    beginning of heap (for Hp)
+    \item
+    end of closure (for Node)
+    \end{itemize}
+
+    offset for a particular item changes when you adjust sp.
+
+    independent of stack direction.
+
+    exist in abstract C CVal and CAddr addressing modes
+
+    for multi-word objects, the offset identifies the word of the
+    object with smallest offset
+
+\item[real offsets:]
+
+    either the negation or identity of sp-relative offset.
+
+    start at 0 for elt to which sp points, and either increase or
+    decrease towards bottom of stk, depending on stk direction
+
+    exist in real C, usually as a macro call passing an sp-rel offset
+
+    for multi-word objects, the offset identifies the word of the
+    object with lowest address
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection{STACKS}
+%*									*
+%************************************************************************
+
+There are two stacks, as in the STG paper.
+\begin{description}
+\item[A stack:]
+contains only closure pointers.  Its stack ptr is SpA.
+
+\item[B stack:]
+contains basic values, return addresses, update frames.
+Its stack ptr is SpB.
+\end{description}
+
+SpA and SpB point to the topmost allocated word of stack (though they
+may not be up to date in the middle of a basic block).
+		
+\subsubsection{STACK ALLOCATION}
+
+A stack and B stack grow towards each other, so they overflow when
+they collide.
+
+The A stack grows downward; the B stack grows upward.  [We'll try to
+localise stuff which uses this info.]
+
+We can check for stack {\em overflow} not just at the start of a basic
+block, but at the start of an entire expression evaluation.  The
+high-water marks of case-expression alternatives can be max'd.
+
+Within the code for a closure, the ``stack frame'' is deemed to start
+with the last argument taken by the closure (ie the one deepest in the
+stack).  Stack slots are can then be identified by ``virtual offsets''
+from the base of the frame; the bottom-most word of the frame has
+offset 1.
+
+For multi-word slots (B stack only) the offset identifies the word
+with the smallest virtual offset. [If B grows upward, this is the word
+with the lowest physical address too.]
+
+Since there are two stacks, a ``stack frame'' really consists of two
+stack frames, one on each stack.
+
+For each stack, we keep track of the following:
+	
+\begin{verbatim}
+* virtSp	virtual stack ptr	offset of topmost occupied stack slot
+					(initialised to 0 if no args)
+
+* realSp	real stack ptr		offset of real stack ptr reg	
+					(initialised to 0 if no args)
+
+* tailSp	tail-call ptr		offset of topmost slot to be retained
+					at next tail call, excluding the 
+					argument to the tail call itself
+
+* hwSp		high-water mark		largest value taken by virtSp
+					in this closure body
+\end{verbatim}
+
+The real stack pointer is (for now) only adjusted at the tail call itself,
+at which point it is made to point to the topmost occupied word of the stack.
+
+We can't always adjust it at the beginning, because we don't
+necessarily know which tail call will be made (a conditional might
+intervene).  So stuff is actually put on the stack ``above'' the stack
+pointer.  This is ok because interrupts are serviced on a different
+stack.
+
+The code generator works entirely in terms of stack {\em virtual
+offsets}.  The conversion to real addressing modes is done solely when
+we look up a binding.  When we move a stack pointer, the offsets of
+variables currently bound to stack offsets in the environment will
+change.  We provide operations in the @cgBindings@ type to perform
+this offset-change (to wit, @shiftStkOffsets@), leaving open whether
+it is done pronto, or kept separate and applied to lookups.
+
+Stack overflow checking takes place at the start of a closure body, using
+the high-water mark information gotten from the closure body.
+
+
+%************************************************************************
+%*									*
+\subsection{HEAP ALLOCATION}
+%*									*
+%************************************************************************
+
+Heap ptr reg (Hp) points to the last word of allocated space (and not
+to the first word of free space).
+
+The heap limit register (HpLim) points to the last word of available
+space.
+
+A basic block allocates a chunk of heap called a ``heap frame''.
+The word of the frame nearest to the previously-allocated stuff
+has virtual offset 1, and offsets increase from 1 to the size of the 
+frame in words.  
+
+Closures are allocated with their code pointers having the lowest virtual
+offset.  
+
+NOTE: this means that closures are only laid out with code ptr at
+lowest PHYSICAL address if the heap grows upwards.
+
+Heap ptr reg is moved at the beginning of a basic block to account for
+the allocation of the whole frame.  At this time a heap exhaustion
+check is made (has the heap ptr gone past the heap limit?).  In the
+basic block, indexed accesses off the heap ptr fill in this newly
+allocated block.  [Bias to RISC here: no cheap auto-inc mode, and free
+indexing.]
+
+We maintain the following information during code generation:
+
+\begin{verbatim}
+* virtHp	virtual heap ptr	offset of last word
+					of the frame allocated so far
+					Starts at 0 and increases.
+* realHp	virtual offset of
+		the real Hp register
+\end{verbatim}
+
+Since virtHp only ever increases, it doubles as the heap high water mark.
+
+\subsubsection{BINDINGS}
+
+The code generator maintains info for each name about where it is.
+Each variable maps to:
+
+\begin{verbatim}
+	- its kind
+
+	- its volatile location:- a temporary variable
+				- a virtual heap offset n, meaning the 
+					ADDRESS OF a word in the current
+					heap frame
+				- absent
+
+	- its stable location: 	- a virtual stack offset n, meaning the
+					CONTENTS OF an object in the
+					current stack frame
+				- absent
+\end{verbatim}
+
+\subsubsection{ENTERING AN OBJECT}
+
+When a closure is entered at the normal entry point, the magic locs
+\begin{verbatim}
+	Node		points to the closure (unless it is a top-level closure)
+	ReturnReg	points to the code being jumped to
+\end{verbatim}
+At the fast entry point, Node is still set up, but ReturnReg may not be.
+[Not sure about this.]

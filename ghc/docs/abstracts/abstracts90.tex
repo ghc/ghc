@@ -1,0 +1,153 @@
+\documentstyle[11pt,slpj,abstracts]{article}
+
+\begin{document}
+
+\title{Abstracts of GRIP/GRASP-related papers and reports, 1990
+}
+
+\author{The GRASP team \\ Department of Computing Science \\
+University of Glasgow G12 8QQ
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP 
+and GRASP projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by FTP.  Connect to {\tt ftp.dcs.glasgow.ac.uk},
+and look in {\tt pub/glasgow-fp/papers}, {\tt pub/glasgow-fp/drafts}, {\tt pub/glasgow-fp/tech\_reports},
+or {\tt pub/glasgow-fp/grasp-and-aqua-docs}.
+
+They can also be obtained by writing to 
+Alexa Stewart, Department of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+alexa@dcs.glasgow.ac.uk.
+\end{abstract}
+
+\section{Published papers}
+
+\reference
+{Philip Wadler}
+{Comprehending monads}
+{{\em ACM Conference on Lisp and Functional Programming},
+Nice, France, pp.\ 61--78, June 1990.}
+{
+Category theorists invented {\em monads\/} in the 1960's
+to concisely express certain aspects of universal algebra.
+Functional programmers invented {\em list comprehensions\/}
+in the 1970's to concisely express certain programs involving lists.
+This paper shows how list comprehensions may be generalised
+to an arbitrary monad, and how the resulting programming feature
+can concisely express in a pure functional language some
+programs that manipulate state,
+handle exceptions, parse text, or invoke continuations.
+A new solution to the old problem
+of destructive array update is also presented.
+No knowledge of category theory is assumed.
+}
+
+\reference
+{Philip Wadler}
+{Linear types can change the world!}
+{{\em IFIP TC 2 Working Conference on Programming
+Concepts and Methods}, Sea of Galilee, Israel, April 1990.}
+{
+The linear logic of J.-Y.~Girard suggests a new type
+system for functional languages, one which supports operations
+that ``change the world''.
+Values belonging to a linear type must be used exactly once:
+like the world, they cannot be duplicated or destroyed.
+Such values require no reference counting or garbage collection,
+and safely admit destructive array update.
+Linear types extend Schmidt's notion of single threading;
+provide an alternative to Hudak and Bloss' update analysis;
+and offer a practical complement to Lafont and Holmstr\"om's elegant
+linear languages.
+}
+
+\reference{K Hammond and SL Peyton Jones}
+{Some early experiments on the GRIP parallel reducer}
+{Proc Nijmegen Workshop on Parallel Implementations of Functional Languages, TR 90-16, Dept
+of Informatics, University of Nijmegen, ed Plasmeijer, 1990, pp51-72}
+{
+GRIP is a multiprocessor designed to execute functional programs in 
+parallel using graph reduction.  We have implemented a compiler for
+GRIP, based on the Spineless Tagless G-machine
+and can now run parallel functional programs with substantial absolute
+speedup over the same program running on a uniprocessor Sun.
+
+Parallel functional programming shifts some of the burden of resource
+allocation from the programmer to the system.  Examples of such
+decisions include: when to create a new concurrent activity (or {\em
+thread}), when to execute such threads, where to execute them, and so
+on.
+
+It is clearly desirable that the system should take such decisions,
+{\em provided it does
+a good enough job}.  For example, a paged virtual memory system
+almost always does an adequate job, and a programmer very seldom
+has to intefere with it.
+The big question for parallel functional programming is whether good
+resource-allocation strategies exist, and how well they perform under a 
+variety of conditions.
+
+Now that we have an operational system, we are starting to carry out
+experiments to develop resource-allocation strategies, and measure
+their effectiveness.  This paper reports on some very preliminary
+results.  They mainly concern the question of when, or even whether,
+to create a new thread.  This is an aspect which has so far received
+little attention --- existing work has focused mainly
+on load sharing rather than on thread creation.  
+}
+
+
+\section{Technical reports}
+
+\reference
+{Simon L Peyton Jones and Philip Wadler}
+{A static semantics for \Haskell{}}
+{Dept of Computing Science, University of Glasgow}
+{
+This paper gives a static semantics for a large subset of \Haskell{}, including
+giving a translation into a language without overloading.
+It is our intention to cover the complete language in due course.
+
+One innovative aspect is the use of ideas from the second-order lambda
+calculus to record type information in the program.
+
+The paper is long (40 pages) and is more of a reference document than
+a narrative one.
+}
+
+\reference
+{Philip Wadler}
+{A simple type inference algorithm}
+{Dept of Computing Science, University of Glasgow}
+{
+This program is intended as a showcase for Haskell's
+literate programming facility and for the monadic style
+of programming.  It implements Hindley-Milner type inference.
+Monads are used for parsing and to simplify ``plumbing'' in the type
+checker. The monads for parsing, exceptions, and state as well
+as the routines for unparsing are designed to be of general utility.
+}
+ 
+\reference{The Grasp team}
+{The Glasgow Haskell I/O system}
+{Dept of Computing Science, University of Glasgow, Nov 1991}
+{
+Most input/output systems for non-strict functional languages
+feature a rather large ``operating system
+The Glasgow Haskell system implements input and output
+very largely within Haskell itself, without the conventional
+enclosing ``printing mechanism''.  This paper explains how the 
+IO system works in some detail.
+}
+
+\end{document}
+
+

@@ -1,0 +1,53 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide]{article}
+\begin{document}
+\title{Desugaring \Haskell{}}
+\author{The AQUA team}
+\date{February 1994}
+\maketitle
+\tableofcontents
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[De_sugar_er]{Desugaring}
+\downsection
+\end{onlypartofdoc}
+
+\input{intro.lit}
+
+\input{Desugar.lhs}
+
+\section[Desugar_match]{@match@: compiling out pattern-matching}
+\downsection
+\input{Match.lhs}
+\input{MatchCon.lhs}
+\input{MatchLit.lhs}
+\input{MatchProc.lhs}
+\upsection
+
+\section[Desugar_absSyntax]{Mangling the abstract syntax}
+
+Roughly speaking, a function with a name of the form
+\tr{ds<Something>} is the de-sugar-er for the nonterminal
+\pl{<Something>} in module @AbsSyntaxTypes@.
+\downsection
+\input{DsBinds.lhs}
+\input{DsExpr.lhs}
+\input{DsGRHSs.lhs}
+\input{DsListComp.lhs}
+\input{DsParZF.lhs}
+\upsection
+
+\section[Desugar_utilities]{Utilities and constants for desugaring}
+\downsection
+\input{DsMonad.lhs}
+\input{DsUtils.lhs}
+\upsection
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

@@ -1,0 +1,8 @@
+ 
+"tcfail032.hs", line 14: Type signature is too polymorphic:
+    Signature: a -> Int
+    Monomorphic type variables: a
+    In an expression with a type signature: x:: a -> Int
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

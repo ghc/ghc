@@ -1,0 +1,51 @@
+This is a short note describing how I (ADR <areid@dcs.glasgow.ac.uk>)
+added a new primitive operation (makeStablePtr#) to the compiler. It
+serves as documentation of what I did and as a guide to anyone else
+wanting to try it.
+
+1) Change compiler/prelude/PrimOps.lhs:
+
+   - add @MakeStablePtrOp@ to the datatype @PrimitiveOp@.
+
+   - add the following case to @primOpInfo@
+
+	primOpInfo MakeStablePtrOp
+	  = AlgResult "makeStablePtr#" []
+	[(ioWorldTy `UniFun` intPrimAndIoWorldTy), ioWorldTy]
+	intPrimAndIoWorldTyCon  []
+    -- makeStablePtr# :: IO_Int# -> IO_Int#
+    -- == makeStablePtr# :: (IoWorld -> (Int#, IoWorld)) -> (IoWorld -> (Int#, IoWorld))
+
+2) Change compiler/prelude/AbsPrel.lhs:
+
+   - add @MakeStablePtrOp@ to an appropriate place in @list_of_val_assoc_lists@
+
+     (This makes the operation visible to the programmer).
+
+     Since this is a glasgow extension, I added it to one of
+     @extra_known_vals_2@, @unboxed_ops@, @boxed_ops@. @unboxed_ops@
+     is made up of several lists of operators including
+     @prim_ops_used_unboxed_only@. By inspection I decided that this
+     (@prim_ops_used_unboxed_only@) was the one to go for.
+
+At this point I started recompiling the compiler - this took a long
+time since the change to @PrimitiveOp@ changed the @.hi@ file
+resulting in a complete (or near as makes no odds) recmpilation of the
+compiler. (Is there a way of using fastmake that avoids this?
+
+3) Change imports/StgMacros.lh to generate code for @MakeStablePtr#@
+
+   - this is just adding a macro that calls the appropriate operation.
+
+   (I suspect I could omit this step if I wanted since all this does
+   (ahem, will do) is call a function in the runtime system.)
+
+4) Change runtime/storage/SMap.lc to implement the new operation.
+
+   I won't bother describing this just now.
+
+
+This is a little untidy. I should perhaps add a new flag to the system
+which turns my extension off and checks that it is only used in
+conjunction with the Appel generational collector. But we're going to
+do the same to every collector eventually aren't we?

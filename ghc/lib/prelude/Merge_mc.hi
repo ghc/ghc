@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Merge where
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+mergeIO :: [a] -> [a] -> _State _RealWorld -> (Either IOError13 [a], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+nmergeIO :: [[a]] -> _State _RealWorld -> (Either IOError13 [a], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

@@ -1,0 +1,80 @@
+% =====================================================================
+% A4 layout file for documents with big left margins - for folders.
+% =====================================================================
+
+\typeout{A4 with big left margin document layout}
+
+% ---------------------------------------------------------------------
+% make "@" a letter
+% ---------------------------------------------------------------------
+\makeatletter
+
+% ---------------------------------------------------------------------
+% PAPER SIZE 
+%
+% TeX expects 1 inch margins all around (1 inch = 25.4 mm). 
+% a4 is exactly 297mm high by 208mm wide.
+% ---------------------------------------------------------------------
+
+\hsize=157.2truemm
+\vsize=246.2truemm
+
+% ---------------------------------------------------------------------
+% PAGE LAYOUT
+%
+% text size = 144.5mm wide by 231.1mm high
+%
+% Top Margin: 1in
+% Left margin: 1.5in
+% Right Margin: 1in
+% ---------------------------------------------------------------------
+
+\textwidth 144.5truemm
+\textheight 231.1truemm
+
+\oddsidemargin=12.7truemm
+\evensidemargin=0truemm
+\topmargin=0truemm
+
+% ---------------------------------------------------------------------
+% RUNNING HEAD: none
+% ---------------------------------------------------------------------
+\headheight 0mm
+\headsep 0mm
+
+% ---------------------------------------------------------------------
+% FOOT: page number and other information.
+% ---------------------------------------------------------------------
+\footheight 12pt
+\footskip 18truemm 
+\addtolength{\footskip}{\footheight}
+
+% ---------------------------------------------------------------------
+% INDENTATION
+%
+% 5mm indentation
+% --------------------------------------------------------------------- 
+\parindent 5truemm
+
+% ---------------------------------------------------------------------
+% math indentation.
+% ---------------------------------------------------------------------
+\mathindent 10.0truemm
+
+% ---------------------------------------------------------------------
+% FOOTNOTES
+%
+% Footnotes are in 10 point font.
+%
+% put 12+1-1 points between text and rule
+% put 10pt between at start of footnote
+% foot note rule 40mm long
+% ---------------------------------------------------------------------
+\skip\footins 12pt plus 2pt minus 2pt
+\footnotesep 10pt
+\def\footnoterule{\kern-3\p@ \hrule width 40mm \kern 2.6\p@}
+
+% ---------------------------------------------------------------------
+% make "@" an other
+% ---------------------------------------------------------------------
+\makeatother

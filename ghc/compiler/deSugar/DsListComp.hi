@@ -1,0 +1,16 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface DsListComp where
+import Bag(Bag)
+import CmdLineOpts(GlobalSwitch, SwitchResult)
+import CoreSyn(CoreExpr)
+import DsMonad(DsMatchContext)
+import HsExpr(Qual)
+import HsPat(TypecheckedPat)
+import Id(Id)
+import PreludePS(_PackedString)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import UniqFM(UniqFM)
+dsListComp :: CoreExpr Id Id -> [Qual Id TypecheckedPat] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22222222 _N_ _N_ _N_ _N_ #-}
+

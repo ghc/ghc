@@ -1,0 +1,77 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\subsection[getClockTime.lc]{getClockTime Runtime Support}
+
+\begin{code}
+#define NON_POSIX_SOURCE    /* gettimeofday */
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_GETCLOCK
+
+# ifdef HAVE_SYS_TIMERS_H
+#  define POSIX_4D9 1
+#  include <sys/timers.h>
+# endif
+
+#else
+# ifdef HAVE_GETTIMEOFDAY
+
+#  ifdef HAVE_SYS_TIME_H
+#   include <sys/time.h>
+#  endif
+
+# else
+
+#  ifdef HAVE_TIME_H
+#   include <time.h>
+#  endif
+
+# endif
+#endif
+
+StgInt
+getClockTime(sec, nsec)
+StgByteArray sec;
+StgByteArray nsec;
+{
+#ifdef HAVE_GETCLOCK
+    struct timespec tp;
+
+    if (getclock(TIMEOFDAY, &tp) != 0) {
+	cvtErrno();
+	stdErrno();
+	return -1;
+    }
+    ((unsigned long int *)sec)[0] = tp.tv_sec;
+    ((unsigned long int *)nsec)[0] = tp.tv_nsec;
+    return 0;
+#else
+#ifdef HAVE_GETTIMEOFDAY
+    struct timeval tp;
+ 
+    if (gettimeofday(&tp, NULL) != 0) {
+	cvtErrno();
+	stdErrno();
+	return -1;
+    }
+    ((unsigned long int *)sec)[0] = tp.tv_sec;
+    ((unsigned long int *)nsec)[0] = tp.tv_usec * 1000;
+    return 0;
+#else
+    time_t t;
+    if ((t = time(NULL)) == (time_t) -1) {
+	cvtErrno();
+	stdErrno();
+	return -1;
+    }
+    ((unsigned long int *)sec)[0] = t;
+    ((unsigned long int *)nsec)[0] = 0;
+    return 0;
+#endif
+#endif
+}
+
+\end{code}

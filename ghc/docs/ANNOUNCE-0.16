@@ -1,0 +1,146 @@
+	     The Glasgow Haskell Compiler -- version 0.16
+	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The second public release of the Glasgow Haskell Compiler is now
+available (GHC, version 0.16). Binaries (recommended) and source are
+freely available by FTP; details appear below.
+
+GHC 0.16 is still alpha-quality software.  This release in an interim
+measure, not as solid as I would prefer.  However, a lot has gone in
+since December.  The profiling system is Way Cool.  The compiler now
+has a strictness analyser and an update analyser.  Compiled programs
+tend to run faster.  Compilation speed is worse.  Bugs remain, but
+they tend to be work-around-able.
+
+To run this release, you need a Sun4 or Sun3, probably with 16+MB
+memory, and GNU C (gcc), version 2.1 or greater, and "perl".
+
+This system can be built from source using: itself (most likely to
+succeed), the previous GHC release (0.10) [least likely], or the
+Chalmers HBC compiler [in-between].  Please see the appropriate
+documentation for details.
+
+Please report bugs to glasgow-haskell-bugs@dcs.glasgow.ac.uk and
+direct general queries to glasgow-haskell-request@<same>.
+
+Will Partain
+(typist for the AQUA [formerly GRASP] project)
+
+....................................................................
+
+Why a Haskell programmer might want to use GHC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* GHC provides an extensible I/O system, based on a "monad" [1]. (The
+  standard Haskell I/O system is built on this foundation.)
+
+* A number of significant language extensions are implemented:
+	- Fully fledged unboxed data types [2].
+	- Ability to write arbitrary in-line C-language code, using
+	  the I/O monad to retain referential transparency.
+	- Incrementally-updatable arrays, also embedded in a monad.
+	- Mutable reference types.
+
+* A new profiling system is supplied, which enables you to find out
+  which bits of your program are eating both *time* and the *space* [3].
+
+* By default, the system uses a generational garbage collector which
+  lets you run programs whose live data is significantly larger than
+  the physical memory size before thrashing occurs.  (Conventional
+  2-space GC starts thrashing when the live data gets to about half
+  the physical memory size.)
+
+* Good error messages.  Well, fairly good error messages.  Line
+  numbers are pretty accurate, and during type checking you get
+  several (accurate) error reports rather than just one.
+
+* Performance: programs compiled with GHC "often" beat
+  Chalmers-HBC-compiled ones.  If you find programs where HBC wins,
+  please report it to us, as a bug :-).
+
+Why a functional-language implementor might want to use GHC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* We have tried very hard to write the compiler in a modular and
+  well-documented way, so that other researchers can modify and extend
+  it.  One of our goals is specifically to provide a framework to
+  support others' work.  Several people are already using it in this
+  way.
+
+* Highly configurable runtime system.  Heavy use of C macros means
+  that you can modify much of the storage representation without
+  telling the compiler.  For example, the system comes with 4
+  different garbage collectors! (all working)
+
+* Internals: extensive use of the second-order lambda calculus as an
+  intermediate code; the Spineless Tagless G-machine as evaluation
+  model [4].
+
+* Various performance-measurement hooks.
+
+Main shortcomings
+~~~~~~~~~~~~~~~~~
+* No interactive system.  This is a batch compiler only.  (Any
+  volunteers?)
+
+* Compiler is greedy on resources.  Going via C doesn't help here.
+
+* This system should run on any Unix box.  We haven't had time to do
+  any non-Sun ports.  Help or prodding welcome.
+
+References
+~~~~~~~~~~
+All these papers come with the distribution [in ghc/docs/papers].
+
+[1] "Imperative functional programming", Peyton Jones & Wadler, POPL '93
+
+[2] "Unboxed data types as first-class citizens", Peyton Jones &
+    Launchbury, FPCA '91
+
+[3] "Profiling lazy functional languages", Sansom & Peyton Jones,
+    Glasgow workshop '92
+
+[4] "Implementing lazy functional languages on stock hardware", Peyton
+    Jones, Journal of Functional Programming, Apr 1992
+
+How to get it
+~~~~~~~~~~~~~
+This release is available, in whole or in part, from the usual Haskell
+anonymous FTP sites, in the directory pub/haskell/glasgow:
+
+	ftp.dcs.glasgow.ac.uk  (130.209.240.50)
+	ftp.cs.chalmers.se     (129.16.225.66)          
+	nebula.cs.yale.edu     (128.36.13.1)
+
+We are mirrored by src.doc.ic.ac.uk, in
+computing/programming/languages/haskell/glasgow, and you can get files
+from there by every means known to humanity.
+
+These are the available files (.Z for compressed, .gz for gzipped) --
+some are `on demand', ask if you don't see them:
+
+ghc-0.16-bin-sun4.tar.{Z,gz} A binary distribution -- avoid compiling
+			altogether!  For SunOS 4.1.x; assumes you have
+			GNU C (gcc) version 2.x around...
+
+ghc-0.16-src.tar.gz	The basic source distribution; about 3MB.
+
+ghc-0.16-hi-files-{hbc,ghc-0.10}.tar.gz
+			Interface files for the compiler proper
+			(ghc/compiler/*/*.hi), to be used if booting
+			with either HBC or GHC version 0.10.  (The
+			distributed .hi files assume GHC version
+			0.16.)
+			
+ghc-0.16-hc-files.tar.gz The intermediate C files for the compiler
+			 proper, the prelude, and `Hello, world'.
+			 Used when porting.
+
+ghc-0.16-patch-*	Patches to the original distribution.  There
+			are none to start with, of course, but there
+			might be by the time you grab the files.
+			Please check for them.
+
+There are no diffs from version 0.10, as they would be laughably huge.
+
+Once you have the distribution, please follow the pointers in the
+ghc/README file to find all of the documentation in and about this
+release.

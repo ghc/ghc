@@ -1,0 +1,66 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq2.doubleeq =
+    /\ a.t25 -> \{-classdict-} [] [doubleeq.t26] -> doubleeq.t26
+{- nonrec -}
+defm.ShouldSucceed.Eq2.doubleeq =
+    /\ a.t27 ->
+	\{-dict-} d.ShouldSucceed.Eq2.t28 ->
+	    (error (a.t27 -> a.t27 -> Bool))
+		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.doubleeq\"\n"
+{- nonrec -}
+ShouldSucceed.Ord2.lt =
+    /\ a.t29 -> \{-classdict-} [d.ShouldSucceed.Eq2.t31] [lt.t30] -> lt.t30
+sdsel.ShouldSucceed.Ord2.ShouldSucceed.Eq2 =
+    /\ a.t29 ->
+	\{-classdict-} [d.ShouldSucceed.Eq2.t31] [lt.t30] ->
+	    d.ShouldSucceed.Eq2.t31
+{- nonrec -}
+defm.ShouldSucceed.Ord2.lt =
+    /\ a.t32 ->
+	\{-dict-} d.ShouldSucceed.Ord2.t33 ->
+	    (error (a.t32 -> a.t32 -> Bool))
+		"No default method for \"ShouldSucceed.Ord2.defm.ShouldSucceed.Ord2.lt\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq2.Int =
+    ({-dict-} [] [const.ShouldSucceed.Eq2.Int.doubleeq])
+const.ShouldSucceed.Eq2.Int.doubleeq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq2.Int.doubleeq
+    x.r31 y.r32
+	    = True
+AbsBinds
+[a.t15]
+[d.ShouldSucceed.Eq2.t16, d.ShouldSucceed.Ord2.t17]
+[(d.ShouldSucceed.Eq2.t18, dfun.ShouldSucceed.Eq2.List)]
+    {- rec -}
+    d.ShouldSucceed.Eq2.t18 = ({-dict-} [] [doubleeq.t19])
+    doubleeq.t19 :: [a.t15] -> [a.t15] -> Bool
+    doubleeq.t19
+	xs.r34 ys.r35
+		= True
+{- rec -}
+dfun.ShouldSucceed.Ord2.Int =
+    ({-dict-} [d.ShouldSucceed.Eq2.t22] [const.ShouldSucceed.Ord2.Int.lt])
+const.ShouldSucceed.Ord2.Int.lt :: Int -> Int -> Bool
+const.ShouldSucceed.Ord2.Int.lt
+    x.r54 y.r55
+	    = True
+d.ShouldSucceed.Eq2.t22 = dfun.ShouldSucceed.Eq2.Int
+AbsBinds
+[tt6, ot3]
+[d.Num.t9, d.ShouldSucceed.Ord2.t12]
+[(f.t1, ShouldSucceed.f)]
+    (d.ShouldSucceed.Eq2.t11,
+	sdsel.ShouldSucceed.Ord2.ShouldSucceed.Eq2 tt6 d.ShouldSucceed.Ord2.t12)
+    (fromInt.t8, fromInt tt6 d.Num.t9)
+    (lit.t7, fromInt.t8 (MkInt 1#))
+    (d.ShouldSucceed.Eq2.t10,
+	dfun.ShouldSucceed.Eq2.List tt6
+	    [d.ShouldSucceed.Eq2.t11, d.ShouldSucceed.Ord2.t12])
+    (ShouldSucceed.Eq2.doubleeq.t5,
+	ShouldSucceed.Eq2.doubleeq [tt6] d.ShouldSucceed.Eq2.t10)
+    {- nonrec -}
+    f.t1 :: [tt6] -> ot3 -> Bool
+    f.t1 x.r65 y.r66
+		 = ShouldSucceed.Eq2.doubleeq.t5 x.r65 ([lit.t7] (tt6))
+

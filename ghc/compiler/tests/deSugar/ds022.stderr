@@ -1,0 +1,368 @@
+Desugared:
+Tests.f :: for all d, e, f. <Fractional e> -> <Num d> -> d -> e -> [f]
+Tests.f =
+    /\ t101 t104 t107 -> \ dict.105 dict.102 ->
+	let dict.98 = dict.105 in
+	let dict.91 = dict.98 in
+	let dict.84 = dict.91 in
+	let
+	  dict.106 = (sdsel.Num.Eq t104) ((sdsel.Fractional.Num t104) dict.84) in
+	let dict.99 = dict.106 in
+	let dict.92 = dict.99 in
+	let dict.85 = dict.92 in
+	let dict.95 = dict.102 in
+	let dict.88 = dict.95 in
+	let dict.81 = dict.88 in
+	let dict.103 = (sdsel.Num.Eq t101) dict.81 in
+	let dict.96 = dict.103 in
+	let dict.89 = dict.96 in
+	let dict.82 = dict.89 in
+	let
+	  f.79 =
+	      \ ds.179 ds.180 ->
+		  let
+		    fail.181 =
+			(error [t107])
+			    "\"ds022.hs\", line 10: pattern-matching failure [function binding]\n"S
+		  in 
+		    case
+			((== t101)
+			     dict.82
+			     ((fromInteger t101) dict.81 (MkInteger! 1##))
+			     ds.179)
+		    of {
+		      True ->
+			  case
+			      ((== t104)
+				   dict.85
+				   ((fromRational t104)
+					dict.84 (MkDouble! 1.1000000000000001##))
+				   ds.180)
+			  of {
+			    True -> Nil! t107
+			    False -> fail.181
+			  }
+		      False ->
+			  case
+			      ((== t101)
+				   dict.89
+				   ((fromInteger t101) dict.88 (MkInteger! 2##))
+				   ds.179)
+			  of {
+			    True ->
+				case
+				    ((== t104)
+					 dict.92
+					 ((fromRational t104)
+					      dict.91
+					      (MkDouble! 2.2000000000000002##))
+					 ds.180)
+				of {
+				  True -> Nil! t107
+				  False -> fail.181
+				}
+			    False ->
+				case
+				    ((== t101)
+					 dict.96
+					 ((fromInteger t101)
+					      dict.95 (MkInteger! 3##))
+					 ds.179)
+				of {
+				  True ->
+				      case
+					  ((== t104)
+					       dict.99
+					       ((fromRational t104)
+						    dict.98
+						    (MkDouble!
+							 3.2999999999999998##))
+					       ds.180)
+				      of {
+					True -> Nil! t107
+					False -> fail.181
+				      }
+				  False ->
+				      case
+					  ((== t101)
+					       dict.103
+					       ((fromInteger t101)
+						    dict.102 (MkInteger! 4##))
+					       ds.179)
+				      of {
+					True ->
+					    case
+						((== t104)
+						     dict.106
+						     ((fromRational t104)
+							  dict.105
+							  (MkDouble!
+							       4.4000000000000004##))
+						     ds.180)
+					    of {
+					      True -> Nil! t107
+					      False -> fail.181
+					    }
+					False -> fail.181
+				      }
+				}
+			  }
+		    }
+	in  f.79
+Tests.g :: for all d, e, f. <Fractional e> -> <Num d> -> d -> e -> [f]
+Tests.g =
+    /\ t131 t134 t137 -> \ dict.135 dict.132 ->
+	let dict.128 = dict.135 in
+	let dict.121 = dict.128 in
+	let dict.114 = dict.121 in
+	let
+	  dict.136 = (sdsel.Num.Eq t134) ((sdsel.Fractional.Num t134) dict.114) in
+	let dict.129 = dict.136 in
+	let dict.122 = dict.129 in
+	let dict.115 = dict.122 in
+	let dict.125 = dict.132 in
+	let dict.118 = dict.125 in
+	let dict.111 = dict.118 in
+	let dict.133 = (sdsel.Num.Eq t131) dict.111 in
+	let dict.126 = dict.133 in
+	let dict.119 = dict.126 in
+	let dict.112 = dict.119 in
+	let
+	  g.109 =
+	      \ ds.183 ds.184 ->
+		  let
+		    fail.185 =
+			(error [t137])
+			    "\"ds022.hs\", line 15: pattern-matching failure [function binding]\n"S
+		  in 
+		    case
+			((== t131)
+			     dict.112
+			     ((fromInteger t131)
+				  dict.111
+				  (MkInteger! 11111111111111111111111##))
+			     ds.183)
+		    of {
+		      True ->
+			  case
+			      ((== t134)
+				   dict.115
+				   ((fromRational t134)
+					dict.114
+					(MkDouble! 1.1111111111111112##))
+				   ds.184)
+			  of {
+			    True -> Nil! t137
+			    False -> fail.185
+			  }
+		      False ->
+			  case
+			      ((== t131)
+				   dict.119
+				   ((fromInteger t131)
+					dict.118
+					(MkInteger! 22222222222222222222222##))
+				   ds.183)
+			  of {
+			    True ->
+				case
+				    ((== t134)
+					 dict.122
+					 ((fromRational t134)
+					      dict.121
+					      (MkDouble! 2.2222222222222223##))
+					 ds.184)
+				of {
+				  True -> Nil! t137
+				  False -> fail.185
+				}
+			    False ->
+				case
+				    ((== t131)
+					 dict.126
+					 ((fromInteger t131)
+					      dict.125
+					      (MkInteger!
+						   33333333333333333333333##))
+					 ds.183)
+				of {
+				  True ->
+				      case
+					  ((== t134)
+					       dict.129
+					       ((fromRational t134)
+						    dict.128
+						    (MkDouble!
+							 3.3333333333333335##))
+					       ds.184)
+				      of {
+					True -> Nil! t137
+					False -> fail.185
+				      }
+				  False ->
+				      case
+					  ((== t131)
+					       dict.133
+					       ((fromInteger t131)
+						    dict.132
+						    (MkInteger!
+							 44444444444444444444444##))
+					       ds.183)
+				      of {
+					True ->
+					    case
+						((== t134)
+						     dict.136
+						     ((fromRational t134)
+							  dict.135
+							  (MkDouble!
+							       4.4444444444444446##))
+						     ds.184)
+					    of {
+					      True -> Nil! t137
+					      False -> fail.185
+					    }
+					False -> fail.185
+				      }
+				}
+			  }
+		    }
+	in  g.109
+Tests.h :: for all d. Char -> [Char] -> [d]
+Tests.h =
+    /\ t148 -> \ ds.200 ds.201 ->
+	let
+	  fail.202 =
+	      (error [t148])
+		  "\"ds022.hs\", line 20: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.200 of {
+	    MkChar ds.203 ->
+		case ds.203 of {
+		  'a'# ->
+		      case (eqString (Nil! Char) ds.201) of {
+			True -> Nil! t148
+			False -> fail.202
+		      }
+		  '\''# ->
+		      case (eqString "foo"S ds.201) of {
+			True -> Nil! t148
+			False -> fail.202
+		      }
+		  '"'# ->
+		      case ds.201 of {
+			(:) ds.204 ds.205 ->
+			    case ds.204 of {
+			      MkChar ds.206 ->
+				  case ds.206 of {
+				    'b'# ->
+					case ds.205 of {
+					  (:) ds.207 ds.208 ->
+					      case ds.207 of {
+						MkChar ds.209 ->
+						    case ds.209 of {
+						      'a'# ->
+							  case ds.208 of {
+							    (:) ds.210 ds.211 ->
+								case ds.210 of {
+								  MkChar ds.212 ->
+								      case
+									  ds.212
+								      of {
+									'r'# ->
+									    case
+										ds.211
+									    of {
+									      Nil ->
+										  Nil! t148
+									      _ -> 
+										  fail.202
+									    }
+									_ -> 
+									    fail.202
+								      }
+								}
+							    _ ->  fail.202
+							  }
+						      _ ->  fail.202
+						    }
+					      }
+					  _ ->  fail.202
+					}
+				    _ ->  fail.202
+				  }
+			    }
+			_ ->  fail.202
+		      }
+		  '¨'# -> let blob.213 = ds.201 in  Nil! t148
+		  _ ->  fail.202
+		}
+	  }
+Tests.i :: for all d, e, f. <Fractional e> -> <Num d> -> d -> e -> [f]
+Tests.i =
+    /\ t172 t175 t178 -> \ dict.176 dict.173 ->
+	let dict.169 = dict.176 in
+	let dict.162 = dict.169 in
+	let dict.155 = dict.162 in
+	let
+	  dict.177 = (sdsel.Num.Eq t175) ((sdsel.Fractional.Num t175) dict.155) in
+	let dict.170 = dict.177 in
+	let dict.163 = dict.170 in
+	let dict.156 = dict.163 in
+	let dict.166 = dict.173 in
+	let dict.159 = dict.166 in
+	let dict.152 = dict.159 in
+	let dict.174 = (sdsel.Num.Eq t172) dict.152 in
+	let dict.167 = dict.174 in
+	let dict.160 = dict.167 in
+	let dict.153 = dict.160 in
+	let
+	  i.150 =
+	      \ ds.214 ds.215 ->
+		  let
+		    fail.216 =
+			(error [t178])
+			    "\"ds022.hs\", line 25: pattern-matching failure [function binding]\n"S
+		  in 
+		    case
+			((== t172)
+			     dict.153
+			     ((fromInteger t172) dict.152 (MkInteger! 1##))
+			     ds.214)
+		    of {
+		      True ->
+			  case
+			      ((== t175)
+				   dict.156
+				   ((fromRational t175)
+					dict.155
+					(MkDouble! 1.1000000000000001##))
+				   ds.215)
+			  of {
+			    True -> Nil! t178
+			    False -> fail.216
+			  }
+		      False ->
+			  case
+			      ((== t172)
+				   dict.160
+				   ((fromInteger t172) dict.159 (MkInteger! 2##))
+				   ds.214)
+			  of {
+			    True ->
+				case
+				    ((== t175)
+					 dict.163
+					 ((fromRational t175)
+					      dict.162
+					      (MkDouble! 2.2000000000000002##))
+					 ds.215)
+				of {
+				  True -> Nil! t178
+				  False -> fail.216
+				}
+			    False -> fail.216
+			  }
+		    }
+	in  i.150
+

@@ -1,0 +1,15 @@
+.TH MKDIRHIER 1 "Release 4" "X Version 11"
+.SH NAME
+mkdirhier \- makes a directory hierarchy
+.SH SYNOPSIS
+.B mkdirhier
+directory ...
+.SH DESCRIPTION
+The
+.I mkdirhier
+command creates the specified directories. Unlike
+.I mkdir
+if any of the parent directories of the specified directory
+do not exist, it creates them as well.
+.SH "SEE ALSO"
+mkdir(1)

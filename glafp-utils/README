@@ -1,0 +1,44 @@
+This directory tree's worth of stuff are utility bits that are used in
+more than one of the Glasgow functional-programming tools.  (For the
+project-specific bits, try <project>/utils/<blah>.)
+
+etags/		A variant of the common Emacs tags-generating program.
+
+msub/		a utility from Paul DuBois, that lets you substitute
+		for make variables (e.g., $(CC) ) in any old document.
+		Given that, with the "make world" configuration
+		system, Makefiles have loads of useful config info in
+		them, this is the program used to sneak that info into
+		other files.
+
+verbatim/	A LaTeX pre-processor that some people like, namely
+		Simon PJ.  Provides shorthand for common LaTeX
+		constructs that he uses.
+
+scripts/	little utility scripts
+
+ fastmake	a "make" wrapper for compiling Haskell programs;
+		essentially, strips out the "make depend"ed
+		dependencies to avoid so much re-checking.
+
+ lndir		from X imake stuff (via DuBois); make a shadow tree
+		of symbolic links
+
+ ltx		a "latex" wrapper.  Re-runs latex/bibtex/makeindex
+		enough times to "do the right thing."
+
+ mkdependC	script version of C makedepend (from X11R4 via DuBois)
+
+ mkdirhier	"mkdir a/b/c/d" will do "mkdir a; mkdir a/b; ..."
+		(assuming none of those dirs exist)
+
+ perltags	"etags" for Perl.
+
+ runstdtest	runs a pgm with some flags & some stdin; checks for an
+		expected exit code, expected stdout, and expected
+		stderr.  (Expect this to change :-)
+
+ zap-if-same	Zap files in this directory (and subdirectories) if
+		they are identical to files in the given directory
+		(and its subdirectories).  With -s, it replaces the
+		files here with symlinks to the files there.

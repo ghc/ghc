@@ -1,0 +1,888 @@
+***************************************************************************
+
+                      APPEL'S GARBAGE COLLECTION
+
+Global heap requirements as for 1s and 2s collectors.
+    ++ All closures in the old generation that are updated must be
+       updated with indirections and placed on the linked list of
+       updated old generation closures.
+
+***************************************************************************
+
+\begin{code}
+#if defined(GCap)
+
+#define  SCAV_REG_MAP
+#include "SMinternal.h"
+#include "SMcopying.h"
+#include "SMcompacting.h"
+#include "SMextn.h"
+
+REGDUMP(ScavRegDump);
+
+appelData appelInfo = {0, 0, 0, 0, 0,
+		       0, 0, 0, 0, 0, 0, 0, 0, 0,
+		       0, {{0, 0}, {0, 0}}
+		      };
+
+P_ heap_space = 0;		/* Address of first word of slab 
+				   of memory allocated for heap */
+
+P_ hp_start;	        /* Value of Hp when reduction was resumed */
+
+#if defined(PROMOTION_DATA)     /* For dead promote & premature promote data */
+P_ thisbase;                /* Start of old gen before this minor collection */
+P_ prevbase;                /* Start of old gen before previous minor collection */
+I_ prev_prom = 0;              /* Promoted previous minor collection */
+I_ dead_prev_prom = 0;         /* Dead words promoted previous minor */
+#endif /* PROMOTION_DATA */
+
+#if defined(_GC_DEBUG)
+void
+debug_look_for (start, stop, villain)
+  P_ start, stop, villain;
+{
+    P_ i;
+    for (i = start; i <= stop; i++) {
+	if ( (P_) *i == villain ) {
+	    fprintf(stderr, "* %x : %x\n", i, villain);
+	}
+    }
+}
+#endif
+
+I_
+initHeap( sm )
+    smInfo *sm;    
+{
+    if (heap_space == 0) { /* allocates if it doesn't already exist */
+
+	/* Allocate the roots space */
+	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+
+	/* Allocate the heap */
+	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+
+	/* ToDo (ADR): trash entire heap contents */
+
+	if (SM_force_gc == USE_2s) {
+	    stat_init("TWOSPACE(APPEL)",
+		      " No of Roots  Caf   Caf    Astk   Bstk",
+		      "Astk Bstk Reg  No  bytes  bytes  bytes");
+	} else {
+	    stat_init("APPEL",
+		      " No of Roots  Caf  Mut-  Old  Collec  Resid",
+		      "Astk Bstk Reg  No  able  Gen   tion   %heap");
+	}
+    }
+    sm->hardHpOverflowSize = 0;
+
+    if (SM_force_gc == USE_2s) {
+	I_ semi_space_words = SM_word_heap_size / 2;
+	appelInfo.space[0].base = HEAP_FRAME_BASE(heap_space, semi_space_words);
+	appelInfo.space[1].base = HEAP_FRAME_BASE(heap_space + semi_space_words, semi_space_words);
+	appelInfo.space[0].lim = HEAP_FRAME_LIMIT(heap_space, semi_space_words);
+	appelInfo.space[1].lim = HEAP_FRAME_LIMIT(heap_space + semi_space_words, semi_space_words);
+	appelInfo.semi_space = 0;
+	appelInfo.oldlim = heap_space - 1;  /* Never in old generation */
+
+	sm->hp = hp_start = appelInfo.space[appelInfo.semi_space].base - 1;
+
+	if (SM_alloc_size) {
+	    sm->hplim = sm->hp + SM_alloc_size;
+	    SM_alloc_min = 0; /* No min; alloc size specified */
+
+	    if (sm->hplim > appelInfo.space[appelInfo.semi_space].lim) {
+		fprintf(stderr, "Not enough heap for requested alloc size\n");
+		return -1;
+	    }
+	} else {
+	    sm->hplim = appelInfo.space[appelInfo.semi_space].lim;
+	}
+
+#if defined(FORCE_GC)
+        if (force_GC) {
+	   if (sm->hplim > sm->hp + GCInterval) {
+              sm->hplim = sm->hp + GCInterval;
+           }
+           else {
+              /* no point in forcing GC, 
+                 as the semi-space is smaller than GCInterval */
+              force_GC = 0; 
+           }
+        }
+#endif /* FORCE_GC */
+
+#if defined(LIFE_PROFILE)
+        sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2); /* space for HpLim incr */
+        if (do_life_prof) {
+	    sm->hplim = sm->hp + LifeInterval;
+        }
+#endif /* LIFE_PROFILE */
+
+	sm->OldLim = appelInfo.oldlim;
+	sm->CAFlist = NULL;
+
+#ifndef PAR
+	initExtensions( sm );
+#endif
+
+	if (SM_trace) {
+	    fprintf(stderr, "APPEL(2s) Heap: 0x%lx .. 0x%lx\n",
+		    (W_) heap_space, (W_) (heap_space - 1 + SM_word_heap_size));
+	    fprintf(stderr, "Initial: space %ld, base 0x%lx, lim 0x%lx\n         hp 0x%lx, hplim 0x%lx, free %lu\n",
+		    appelInfo.semi_space,
+		    (W_) appelInfo.space[appelInfo.semi_space].base,
+		    (W_) appelInfo.space[appelInfo.semi_space].lim,
+		    (W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
+	}
+	return 0;
+    }
+
+
+/* So not forced 2s */
+
+    appelInfo.newlim  = heap_space + SM_word_heap_size - 1;
+    if (SM_alloc_size) {
+	appelInfo.newfixed = SM_alloc_size;
+	appelInfo.newmin   = SM_alloc_size;
+        appelInfo.newbase  = heap_space + SM_word_heap_size - appelInfo.newfixed;
+    } else {
+	appelInfo.newfixed = 0;
+	appelInfo.newmin   = SM_alloc_min;
+	appelInfo.newbase  = heap_space + (SM_word_heap_size / 2);
+    }
+
+    appelInfo.oldbase = heap_space;
+    appelInfo.oldlim  = heap_space - 1;
+    appelInfo.oldlast = heap_space - 1;
+    appelInfo.oldmax  = heap_space - 1 + SM_word_heap_size - 2*appelInfo.newmin;
+
+    if (appelInfo.oldbase > appelInfo.oldmax) {
+	fprintf(stderr, "Not enough heap for requested/minimum allocation area\n");
+	return -1;
+    }
+
+    appelInfo.bit_words = (SM_word_heap_size + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
+    appelInfo.bits      = (BitWord *)(appelInfo.newlim) - appelInfo.bit_words;
+    if (appelInfo.bit_words > appelInfo.newmin)
+        appelInfo.oldmax = heap_space - 1 + SM_word_heap_size - appelInfo.bit_words - appelInfo.newmin;
+
+    if (SM_major_gen_size) {
+	appelInfo.oldthresh = heap_space -1 + SM_major_gen_size;
+	if (appelInfo.oldthresh > appelInfo.oldmax) {
+	    fprintf(stderr, "Not enough heap for requested major resid size\n");
+	    return -1;
+	}
+    } else {
+	appelInfo.oldthresh = heap_space + SM_word_heap_size * 2 / 3; /* Initial threshold -- 2/3rds */
+	if (appelInfo.oldthresh > appelInfo.oldmax)
+	    appelInfo.oldthresh = appelInfo.oldmax;
+    }
+
+    sm->hp = hp_start = appelInfo.newbase - 1;
+    sm->hplim = appelInfo.newlim;
+
+#if defined(FORCE_GC)
+        if (force_GC && (sm->hplim > sm->hp + GCInterval)) {
+              sm->hplim = sm->hp + GCInterval;
+           }
+#endif /* FORCE_GC */
+
+    sm->OldLim = appelInfo.oldlim;
+
+    sm->CAFlist = NULL;
+    appelInfo.OldCAFlist = NULL;
+    appelInfo.OldCAFno = 0;
+
+#ifndef PAR
+    initExtensions( sm );
+#endif
+
+    appelInfo.PromMutables = 0;
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+    prevbase = appelInfo.oldlim + 1;
+    thisbase = appelInfo.oldlim + 1;
+#endif /* PROMOTION_DATA */
+
+    if (SM_trace) {
+	fprintf(stderr, "APPEL Heap: 0x%lx .. 0x%lx\n",
+		(W_) heap_space, (W_) (heap_space - 1 + SM_word_heap_size));
+	fprintf(stderr, "Initial: newbase 0x%lx newlim 0x%lx; base 0x%lx lim 0x%lx thresh 0x%lx max 0x%lx\n         hp 0x%lx, hplim 0x%lx\n",
+		(W_) appelInfo.newbase, (W_) appelInfo.newlim,
+		(W_) appelInfo.oldbase, (W_) appelInfo.oldlim,
+		(W_) appelInfo.oldthresh, (W_) appelInfo.oldmax,
+		(W_) sm->hp, (W_) sm->hplim);
+    }
+
+    return 0;
+}
+
+static I_
+collect2s(reqsize, sm)
+    W_ reqsize;
+    smInfo *sm;
+{
+#if defined(LIFE_PROFILE)
+    I_ next_interval;  /* if doing profile */
+#endif
+    I_ free_space,	/* No of words of free space following GC */
+        alloc, 		/* Number of words allocated since last GC */
+	resident,	/* Number of words remaining after GC */
+        extra_caf_words,/* Extra words referenced from CAFs */
+        caf_roots,      /* Number of CAFs */
+        bstk_roots;     /* Number of update frames in B stack */
+
+    SAVE_REGS(&ScavRegDump);        /* Save registers */
+
+#if defined(LIFE_PROFILE)
+    if (do_life_prof) {	life_profile_setup(); }
+#endif /* LIFE_PROFILE */
+
+#if defined(USE_COST_CENTRES)
+    if (interval_expired) { heap_profile_setup(); }
+#endif  /* USE_COST_CENTRES */
+  
+    if (SM_trace)
+	fprintf(stderr, "Start: space %ld, base 0x%lx, lim 0x%lx\n       hp 0x%lx, hplim 0x%lx, req %lu\n",
+		appelInfo.semi_space,
+		(W_) appelInfo.space[appelInfo.semi_space].base,
+		(W_) appelInfo.space[appelInfo.semi_space].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (reqsize * sizeof(W_)));
+
+    alloc = sm->hp - hp_start;
+    stat_startGC(alloc);
+
+    appelInfo.semi_space = NEXT_SEMI_SPACE(appelInfo.semi_space);
+    ToHp = appelInfo.space[appelInfo.semi_space].base - 1;
+    Scav = appelInfo.space[appelInfo.semi_space].base;
+    OldGen = sm->OldLim; /* always evac ! */
+    
+    SetCAFInfoTables( sm->CAFlist );
+#ifdef PAR
+    EvacuateLocalGAs(rtsTrue);
+#else
+    evacSPTable( sm );
+#endif /* PAR */
+    EvacuateRoots( sm->roots, sm->rootno );
+#ifdef CONCURRENT
+    EvacuateSparks();
+#endif
+#ifndef PAR
+    EvacuateAStack( MAIN_SpA, stackInfo.botA );
+    EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
+#endif /* !PAR */
+
+    Scavenge();
+
+    EvacAndScavengeCAFs( sm->CAFlist, &extra_caf_words, &caf_roots );
+
+#ifdef PAR
+    RebuildGAtables(rtsTrue);
+#else
+    reportDeadMallocPtrs( sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+#endif /* PAR */
+
+    /* TIDY UP AND RETURN */
+
+    sm->hp = hp_start = ToHp;  /* Last allocated word */
+ 
+    resident = sm->hp - (appelInfo.space[appelInfo.semi_space].base - 1);
+    DO_MAX_RESIDENCY(resident); /* stats only */
+
+    if (SM_alloc_size) {
+	sm->hplim = sm->hp + SM_alloc_size;
+	if (sm->hplim > appelInfo.space[appelInfo.semi_space].lim) {
+	    free_space = 0;
+	} else {
+	    free_space = SM_alloc_size;
+	}
+    } else {
+	sm->hplim = appelInfo.space[appelInfo.semi_space].lim;
+	free_space = sm->hplim - sm->hp;
+    }
+
+#if defined(FORCE_GC)
+    if (force_GC && (sm->hplim > sm->hp + GCInterval)) {
+              sm->hplim = sm->hp + GCInterval;
+           }
+#endif /* FORCE_GC */
+
+    if (SM_stats_verbose) {
+	char comment_str[BIG_STRING_LEN];
+#ifndef PAR
+	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu  2s",
+		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
+		bstk_roots, sm->rootno,
+		caf_roots, extra_caf_words*sizeof(W_),
+		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1)*sizeof(W_),
+		(SUBTRACT_B_STK(MAIN_SpB, stackInfo.botB) + 1)*sizeof(W_));
+#else
+	/* ToDo: come up with some interesting statistics for the parallel world */
+	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu  2s",
+		0, 0L, sm->rootno, caf_roots, extra_caf_words*sizeof(W_), 0L, 0L);
+
+#endif
+
+#if defined(LIFE_PROFILE)
+	if (do_life_prof) {
+	    strcat(comment_str, " life");
+	}
+#endif
+#if defined(USE_COST_CENTRES)
+	if (interval_expired) {
+	    strcat(comment_str, " prof");
+	}
+#endif
+
+	stat_endGC(alloc, SM_word_heap_size, resident, comment_str);
+    } else {
+	stat_endGC(alloc, SM_word_heap_size, resident, "");
+    }
+
+#if defined(LIFE_PROFILE)
+      free_space = free_space / 2; /* space for HpLim incr */
+      if (do_life_prof) {
+	  next_interval = life_profile_done(alloc, reqsize);
+	  free_space -= next_interval;  /* ensure interval available */
+      }
+#endif /* LIFE_PROFILE */
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+      if (interval_expired) {
+# if defined(USE_COST_CENTRES)
+	  heap_profile_done();
+# endif
+	  report_cc_profiling(0 /*partial*/);
+      }
+#endif /* USE_COST_CENTRES */
+
+    if (SM_trace)
+	fprintf(stderr, "Done:  space %ld, base 0x%lx, lim 0x%lx\n       hp 0x%lx, hplim 0x%lx, free %lu\n",
+		appelInfo.semi_space,
+		(W_) appelInfo.space[appelInfo.semi_space].base,
+		(W_) appelInfo.space[appelInfo.semi_space].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (free_space * sizeof(W_)));
+
+#ifdef DEBUG
+	/* To help flush out bugs, we trash the part of the heap from
+	   which we're about to start allocating, and all of the space
+           we just came from. */
+    {
+      I_ old_space = NEXT_SEMI_SPACE(appelInfo.semi_space);
+      TrashMem(appelInfo.space[old_space].base, appelInfo.space[old_space].lim);
+      TrashMem(sm->hp+1, sm->hplim);
+    }
+#endif /* DEBUG */
+
+    RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
+
+    if ( (SM_alloc_min > free_space) || (reqsize > free_space) ) {
+      return( GC_HARD_LIMIT_EXCEEDED );	/* Heap absolutely exhausted */
+    } else {
+
+#if defined(LIFE_PROFILE)
+	/* ToDo: this may not be right now (WDP 94/11) */
+
+	/* space for HpLim incr */
+	sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2);
+	if (do_life_prof) {
+	    /* set hplim for next life profile */
+	    sm->hplim = sm->hp + next_interval;
+	}
+#endif /* LIFE_PROFILE */
+
+	if (reqsize + sm->hardHpOverflowSize > free_space) {
+	  return( GC_SOFT_LIMIT_EXCEEDED );	/* Heap nearly exhausted */
+	} else {
+	  return( GC_SUCCESS );          /* Heap OK */
+	}
+    }
+}
+
+
+I_
+collectHeap(reqsize, sm, do_full_collection)
+    W_ reqsize;
+    smInfo *sm;
+    rtsBool do_full_collection; /* do a major collection regardless? */
+{
+    I_ bstk_roots, caf_roots, mutable, old_words;
+    P_ oldptr, old_start, mutptr, prevmut;
+    P_ CAFptr, prevCAF;
+    P_ next;
+
+    I_ alloc, 		/* Number of words allocated since last GC */
+	resident;	/* Number of words remaining after GC */
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+    I_ promote,        /* Promoted this minor collection */
+        dead_prom,      /* Dead words promoted this minor */
+        dead_prev;      /* Promoted words that died since previos minor collection */
+    I_  root;
+    P_ base[2];
+#endif /* PROMOTION_DATA */
+
+    fflush(stdout);     /* Flush stdout at start of GC */
+
+    if (SM_force_gc == USE_2s) {
+	return collect2s(reqsize, sm);
+    }
+
+    SAVE_REGS(&ScavRegDump); /* Save registers */
+
+    if (SM_trace)
+	fprintf(stderr, "Start: newbase 0x%lx, newlim 0x%lx\n        hp 0x%lx, hplim 0x%lx, req %lu\n",
+		(W_) appelInfo.newbase, (W_) appelInfo.newlim, (W_) sm->hp, (W_) sm->hplim, reqsize * sizeof(W_));
+
+    alloc = sm->hp - hp_start;
+    stat_startGC(alloc);
+
+#ifdef FORCE_GC
+    alloc_since_last_major_GC += sm->hplim - hp_start;
+    /* this is indeed supposed to be less precise than alloc above */
+#endif /* FORCE_GC */
+
+    /* COPYING COLLECTION */
+
+    /* Set ToHp to end of old gen */
+    ToHp = appelInfo.oldlim;
+
+    /* Set OldGen register so we only evacuate new gen closures */
+    OldGen = appelInfo.oldlim;
+
+    /* FIRST: Evacuate and Scavenge CAFs and roots in the old generation */
+    old_start = ToHp;
+
+    SetCAFInfoTables( sm->CAFlist );
+
+    DEBUG_STRING("Evacuate CAFs:");
+    caf_roots = 0;
+    CAFptr = sm->CAFlist;
+    prevCAF = ((P_)(&sm->CAFlist)) - FIXED_HS; /* see IND_CLOSURE_LINK */
+    while (CAFptr) {
+      EVACUATE_CLOSURE(CAFptr); /* evac & upd OR return */
+      caf_roots++;
+      prevCAF = CAFptr;
+      CAFptr = (P_) IND_CLOSURE_LINK(CAFptr);
+    }
+    IND_CLOSURE_LINK(prevCAF) = (W_) appelInfo.OldCAFlist;
+    appelInfo.OldCAFlist = sm->CAFlist;
+    appelInfo.OldCAFno += caf_roots;
+    sm->CAFlist = NULL;
+
+    DEBUG_STRING("Evacuate Mutable Roots:");
+    mutable = 0;
+    mutptr = sm->OldMutables;
+    /* Clever, but completely illegal: */
+    prevmut = ((P_)&sm->OldMutables) - FIXED_HS;
+				/* See MUT_LINK */
+    while ( mutptr ) {
+
+	/* Scavenge the OldMutable */
+	P_ info = (P_) INFO_PTR(mutptr);
+	StgScavPtr scav_code = SCAV_CODE(info);
+	Scav = mutptr;
+	(scav_code)();
+
+	/* Remove from OldMutables if no longer mutable */
+	if (!IS_MUTABLE(info)) {
+    	    P_ tmp = mutptr;
+	    MUT_LINK(prevmut) = MUT_LINK(mutptr);
+	    mutptr = (P_) MUT_LINK(mutptr);
+	    MUT_LINK(tmp) = MUT_NOT_LINKED;
+	} else {
+	    prevmut = mutptr;
+	    mutptr = (P_) MUT_LINK(mutptr);
+	}
+	mutable++;
+    }
+
+#ifdef PAR
+    EvacuateLocalGAs(rtsFalse);
+#else
+    evacSPTable( sm );
+#endif /* PAR */
+
+    DEBUG_STRING("Scavenge evacuated old generation roots:");
+
+    Scav = appelInfo.oldlim + 1; /* Point to (info field of) first closure */
+
+    Scavenge();
+
+    old_words = ToHp - old_start;
+
+    /* PROMOTE closures rooted in the old generation and reset list of old gen roots */
+
+    appelInfo.oldlim = ToHp;
+
+    /* SECOND: Evacuate and scavenge remaining roots
+               These may already have been evacuated -- just get new address
+    */
+
+    EvacuateRoots( sm->roots, sm->rootno );
+
+#ifdef CONCURRENT
+    EvacuateSparks();
+#endif
+#ifndef PAR
+    EvacuateAStack( MAIN_SpA, stackInfo.botA );
+    EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
+    /* ToDo: Optimisation which squeezes out garbage update frames */
+#endif	/* PAR */
+
+    Scav = appelInfo.oldlim + 1; /* Point to (info field of) first closure */
+
+    Scavenge();
+
+    appelInfo.oldlim = ToHp;
+
+    /* record newly promoted mutuple roots */
+    MUT_LINK(prevmut) = (W_) appelInfo.PromMutables;
+    appelInfo.PromMutables = 0;
+
+    /* set new generation base, if not fixed */
+    if (! appelInfo.newfixed) {
+	appelInfo.newbase = appelInfo.oldlim + 1 + (((appelInfo.newlim - appelInfo.oldlim) + 1) / 2);
+    }
+
+#ifdef PAR
+    RebuildGAtables(rtsFalse);
+#else
+    reportDeadMallocPtrs(sm->MallocPtrList, 
+			 sm->OldMallocPtrList, 
+			 &(sm->OldMallocPtrList));
+    sm->MallocPtrList = NULL;   /* all (new) MallocPtrs have been promoted */
+#endif /* PAR */
+
+    resident = appelInfo.oldlim - sm->OldLim;
+    /* DONT_DO_MAX_RESIDENCY -- it is just a minor collection */
+
+    if (SM_stats_verbose) {
+	char minor_str[BIG_STRING_LEN];
+#ifndef PAR
+	sprintf(minor_str, "%4u %4ld %3ld %3ld  %4ld        Minor",
+	      (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
+	      bstk_roots, sm->rootno, caf_roots, mutable); /* oldnew_roots, old_words */
+#else
+	/* ToDo: come up with some interesting statistics for the parallel world */
+	sprintf(minor_str, "%4u %4ld %3ld %3ld  %4ld        Minor",
+		0, 0L, sm->rootno, caf_roots, mutable);
+#endif
+	stat_endGC(alloc, alloc, resident, minor_str);
+    } else {
+	stat_endGC(alloc, alloc, resident, "");
+    }
+
+    /* Note: if do_full_collection we want to force a full collection. [ADR] */
+
+#ifdef FORCE_GC
+    if (force_GC && (alloc_since_last_major_GC >= GCInterval)) { 
+       do_full_collection = 1; 
+    }
+#endif /* FORCE_GC */
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data major required */
+
+    if (! SM_stats_verbose &&
+	(appelInfo.oldlim < appelInfo.oldthresh) &&
+	(reqsize + sm->hardHpOverflowSize <= appelInfo.newlim - appelInfo.newbase) &&
+	(! do_full_collection) ) {
+
+#else  /* ! PROMOTION_DATA */
+
+    if ((appelInfo.oldlim < appelInfo.oldthresh) &&
+	(reqsize + sm->hardHpOverflowSize <= appelInfo.newlim - appelInfo.newbase) &&
+	(! do_full_collection) ) {
+
+#endif /* ! PROMOTION_DATA */
+
+	sm->hp = hp_start = appelInfo.newbase - 1;
+	sm->hplim = appelInfo.newlim;
+
+#if defined(FORCE_GC)
+        if (force_GC && 
+            (alloc_since_last_major_GC + (sm->hplim - hp_start) > GCInterval))
+        {
+              sm->hplim = sm->hp + (GCInterval - alloc_since_last_major_GC);
+        }
+#endif /* FORCE_GC */
+
+	sm->OldLim = appelInfo.oldlim;
+
+	if (SM_trace) {
+	    fprintf(stderr, "Minor: newbase 0x%lx newlim 0x%lx; base 0x%lx lim 0x%lx thresh 0x%lx max 0x%lx\n        hp 0x%lx, hplim 0x%lx, free %lu\n",
+		    (W_) appelInfo.newbase,   (W_) appelInfo.newlim,
+		    (W_) appelInfo.oldbase,   (W_) appelInfo.oldlim,
+		    (W_) appelInfo.oldthresh, (W_) appelInfo.oldmax,
+		    (W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
+	}
+
+#ifdef DEBUG
+	/* To help flush out bugs, we trash the part of the heap from
+	   which we're about to start allocating. */
+	TrashMem(sm->hp+1, sm->hplim);
+#endif /* DEBUG */
+
+        RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
+
+	return GC_SUCCESS;           /* Heap OK -- Enough space to continue */
+    }
+
+    DEBUG_STRING("Major Collection Required");
+
+#ifdef FORCE_GC
+    alloc_since_last_major_GC = 0;
+#endif /* FORCE_GC */
+
+    stat_startGC(0);
+
+    alloc = (appelInfo.oldlim - appelInfo.oldbase) + 1;
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+    if (SM_stats_verbose) {
+	promote = appelInfo.oldlim - thisbase + 1;
+    }
+#endif /* PROMOTION_DATA */
+
+    appelInfo.bit_words = (alloc + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
+    appelInfo.bits      = (BitWord *)(appelInfo.newlim) - appelInfo.bit_words;
+			  /* For some reason, this doesn't seem to use the last
+			     allocatable word at appelInfo.newlim */
+
+    if (appelInfo.bits <= appelInfo.oldlim) {
+	fprintf(stderr, "APPEL Major: Not enough space for bit vector\n");
+	return GC_HARD_LIMIT_EXCEEDED;
+    }
+
+    /* Zero bit vector for marking phase of major collection */
+    { BitWord *ptr = appelInfo.bits,
+	      *end = appelInfo.bits + appelInfo.bit_words;
+      while (ptr < end) { *(ptr++) = 0; };
+    }
+    
+#ifdef HAVE_VADVISE
+    vadvise(VA_ANOM);
+#endif
+
+    /* bracket use of MARK_REG_MAP with RESTORE/SAVE of SCAV_REG_MAP */
+    RESTORE_REGS(&ScavRegDump);
+
+    markHeapRoots(sm, 
+		  appelInfo.OldCAFlist,
+		  NULL,
+		  appelInfo.oldbase,
+		  appelInfo.oldlim,
+		  appelInfo.bits);
+
+    SAVE_REGS(&ScavRegDump);
+    /* end of bracket */
+
+#ifndef PAR
+    sweepUpDeadMallocPtrs(sm->OldMallocPtrList, 
+			  appelInfo.oldbase, 
+			  appelInfo.bits 
+			  );
+#endif /* !PAR */
+
+    /* Reset OldMutables -- this will be reconstructed during scan */
+    sm->OldMutables = 0;
+
+    LinkCAFs(appelInfo.OldCAFlist);
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+    /* What does this have to do with CAFs? -- JSM */
+    if (SM_stats_verbose) {
+	base[0] = thisbase;
+	base[1] = prevbase;
+
+	if (SM_trace) {
+	    fprintf(stderr, "Promote Bases: lim 0x%lx this 0x%lx prev 0x%lx Actual: ",
+		    appelInfo.oldlim + 1, thisbase, prevbase);
+	}
+	
+	/* search for first live closure for thisbase & prevbase */
+	for (root = 0; root < 2; root++) {
+	    P_ baseptr, search, scan_w_start;
+	    I_ prev_words, bit_words, bit_rem;
+	    BitWord *bit_array_ptr, *bit_array_end;
+	    
+	    baseptr = base[root];
+	    prev_words = (baseptr - appelInfo.oldbase);
+	    bit_words  = prev_words / BITS_IN(BitWord);
+	    bit_rem    = prev_words & (BITS_IN(BitWord) - 1);
+	    
+	    bit_array_ptr = appelInfo.bits + bit_words;
+	    bit_array_end = appelInfo.bits + appelInfo.bit_words;
+	    scan_w_start  = baseptr - bit_rem;
+	    
+	    baseptr = 0;
+	    while (bit_array_ptr < bit_array_end && !baseptr) {
+		BitWord w = *(bit_array_ptr++);
+		search = scan_w_start;
+		if (bit_rem) {
+		    search += bit_rem;
+		    w >>= bit_rem;
+		    bit_rem = 0;		
+		}
+		while (w && !baseptr) {
+		    if (w & 0x1) {     /* bit set -- found first closure */
+			baseptr = search;
+		    } else {
+			search++;      /* look at next bit */
+			w >>= 1;
+		    }
+		}
+		scan_w_start += BITS_IN(BitWord);
+	    }
+	    if (SM_trace) {
+		fprintf(stderr, "0x%lx%s", baseptr, root == 2 ? "\n" : " ");
+	    }
+	    
+	    base[root] = baseptr;
+	    if (baseptr) {
+		LINK_LOCATION_TO_CLOSURE(base + root);
+	    }
+	}
+    }
+#endif /* PROMOTION_DATA */
+
+    LinkRoots( sm->roots, sm->rootno );
+#ifdef CONCURRENT
+    LinkSparks();
+#endif
+#ifdef PAR
+    LinkLiveGAs(appelInfo.oldbase, appelInfo.bits);
+#else
+    DEBUG_STRING("Linking Stable Pointer Table:");
+    LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
+    LinkAStack( MAIN_SpA, stackInfo.botA );
+    LinkBStack( MAIN_SuB, stackInfo.botB );
+#endif
+
+    /* Do Inplace Compaction */
+    /* Returns start of next closure, -1 gives last allocated word */
+
+    appelInfo.oldlim = Inplace_Compaction(appelInfo.oldbase,
+					  appelInfo.oldlim,
+					  0, 0,
+					  appelInfo.bits,
+					  appelInfo.bit_words
+#ifndef PAR
+					  ,&(sm->OldMallocPtrList)
+#endif
+					  ) - 1;
+
+    appelInfo.oldlast = appelInfo.oldlim; 
+    resident = (appelInfo.oldlim - appelInfo.oldbase) + 1;
+    DO_MAX_RESIDENCY(resident); /* stats only */
+
+    /* set new generation base, if not fixed */
+    if (! appelInfo.newfixed) {
+	appelInfo.newbase = appelInfo.oldlim + 1 + (((appelInfo.newlim - appelInfo.oldlim) + 1) / 2);
+    }
+
+    /* set major threshold, if not fixed */
+    /* next major collection when old gen occupies 2/3rds of the free space or exceeds oldmax */
+    if (! SM_major_gen_size) {
+	appelInfo.oldthresh = appelInfo.oldlim + (appelInfo.newlim - appelInfo.oldlim) * 2 / 3;
+	if (appelInfo.oldthresh > appelInfo.oldmax)
+	    appelInfo.oldthresh = appelInfo.oldmax;
+    }
+
+    sm->hp = hp_start = appelInfo.newbase - 1;
+    sm->hplim = appelInfo.newlim;
+    
+#if defined(FORCE_GC)
+        if (force_GC && (sm->hplim > sm->hp + GCInterval)) {
+              sm->hplim = sm->hp + GCInterval;
+        }
+#endif /* FORCE_GC */
+
+    sm->OldLim = appelInfo.oldlim;
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+    if (SM_stats_verbose) {
+	/* restore moved thisbase & prevbase */
+	thisbase = base[0] ? base[0] : appelInfo.oldlim + 1;
+	prevbase = base[1] ? base[1] : appelInfo.oldlim + 1;
+
+	/* here are the numbers we want */
+	dead_prom = promote - (appelInfo.oldlim + 1 - thisbase);
+	dead_prev = prev_prom - (thisbase - prevbase) - dead_prev_prom;
+
+	if (SM_trace) {
+	    fprintf(stderr, "Collect Bases: lim 0x%lx this 0x%lx prev 0x%lx\n",
+		    appelInfo.oldlim + 1, thisbase, prevbase);
+	    fprintf(stderr, "Promoted: %ld Dead: this %ld prev %ld + %ld\n",
+		    promote, dead_prom, dead_prev_prom, dead_prev);
+	}
+
+	/* save values for next collection */
+	prev_prom = promote;
+	dead_prev_prom = dead_prom;
+	prevbase = thisbase;
+	thisbase = appelInfo.oldlim + 1;
+    }
+#endif /* PROMOTION_DATA */
+
+#ifdef HAVE_VADVISE
+    vadvise(VA_NORM);
+#endif
+
+    if (SM_stats_verbose) {
+	char major_str[BIG_STRING_LEN];
+#ifndef PAR
+	sprintf(major_str, "%4u %4ld %3ld %3ld  %4d %4d  *Major* %4.1f%%",
+		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
+		bstk_roots, sm->rootno, appelInfo.OldCAFno,
+		0, 0, resident / (StgFloat) SM_word_heap_size * 100);
+#else
+	/* ToDo: come up with some interesting statistics for the parallel world */
+	sprintf(major_str, "%4u %4ld %3ld %3ld  %4d %4d  *Major* %4.1f%%",
+		0, 0L, sm->rootno, appelInfo.OldCAFno, 0, 0,
+		resident / (StgFloat) SM_word_heap_size * 100);
+#endif
+
+#if defined(PROMOTION_DATA)   /* For dead promote & premature promote data */
+	{ char *promote_str[BIG_STRING_LEN];
+          sprintf(promote_str, " %6ld %6ld", dead_prom*sizeof(W_), dead_prev*sizeof(W_));
+	  strcat(major_str, promote_str);
+        }
+#endif /* PROMOTION_DATA */
+
+	stat_endGC(0, alloc, resident, major_str);
+    } else { 
+	stat_endGC(0, alloc, resident, "");
+    }
+
+    if (SM_trace) {
+	fprintf(stderr, "Major: newbase 0x%lx newlim 0x%lx; base 0x%lx lim 0x%lx thresh 0x%lx max 0x%lx\n        hp 0x%lx, hplim 0x%lx, free %lu\n",
+		(W_) appelInfo.newbase,   (W_) appelInfo.newlim,
+		(W_) appelInfo.oldbase,   (W_) appelInfo.oldlim,
+		(W_) appelInfo.oldthresh, (W_) appelInfo.oldmax,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
+    }
+
+#ifdef DEBUG
+    /* To help flush out bugs, we trash the part of the heap from
+       which we're about to start allocating. */
+    TrashMem(sm->hp+1, sm->hplim);
+#endif /* DEBUG */
+
+    RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
+
+    if ((appelInfo.oldlim > appelInfo.oldmax)
+	|| (reqsize > sm->hplim - sm->hp) ) {
+      return( GC_HARD_LIMIT_EXCEEDED );	/* Heap absolutely exhausted */
+    } else if (reqsize + sm->hardHpOverflowSize > sm->hplim - sm->hp) {
+      return( GC_SOFT_LIMIT_EXCEEDED );	/* Heap nearly exhausted */
+    } else {
+      return( GC_SUCCESS );          /* Heap OK */
+    }
+}
+
+#endif /* GCap */
+
+\end{code}

@@ -1,0 +1,10 @@
+Desugared:
+Tests.f :: for all d, e, f. f -> ((d, d) -> e) -> d -> (e, [f])
+Tests.f =
+    /\ o86 o96 t94 -> \ x.104 y.105 z.106 ->
+	let a.107 = (: t94) x.104 (Nil! t94) in
+	let b.108 = (: t94) x.104 a.107 in
+	let
+	  c.110 = y.105 (let d.109 = MkTuple2! o86 o86 z.106 z.106 in  d.109) in
+	let result.111 = MkTuple2! o96 [t94] c.110 b.108 in  result.111
+

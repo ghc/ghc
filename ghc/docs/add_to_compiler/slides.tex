@@ -1,0 +1,86 @@
+%01 title
+\begin{slide}{}
+\begin{center}
+{\Large
+How To Add\\
+An Optimisation Pass To\\
+The Glasgow Haskell Compiler\\[40pt]
+}
+{\large
+Will Partain\\
+(GRASP Project scribe)
+}
+\end{center}
+\end{slide}
+
+%02 hello, world
+\begin{slide}{}
+{\Large The state of play}
+
+\begin{verbatim}
+sun3% time gcc -c hello.c
+0.240u 0.520s 0:01.00 76.0% 0+51k 0+9io 0pf+0w
+
+sun3% time nlmlc -c hello.m
+3.320u 1.740s 0:05.65 89.5% 0+240k 1+21io 1pf+0w
+
+sun3% time nhc -c hello.hs
+26.680u 2.860s 0:32.00 92.3% 0+950k 2+31io 18pf+0w
+
+sun3% time do100x     # C
+6.980u  7.880s 0:14.93 99.5% 0+50k 0+0io 0pf+0w
+
+sun3% time do100x     # LML
+7.880u 10.500s 0:18.50 99.3% 0+57k 1+0io 1pf+0w
+
+sun3% time do100x     # haskell
+7.760u 10.440s 0:18.48 98.4% 0+56k 1+0io 1pf+0w
+\end{verbatim}
+\end{slide}
+%% % time hello100 > /dev/null
+%% 0.060u 0.100s 0:00.16 100.0% 0+51k 0+0io 0pf+0w
+
+%03 analyses
+\begin{slide}{}
+{\Large Analyses (FPCA~'89, PLDI~'91)}
+
+binding-time analysis\\
+closure analysis\\
+complexity analysis\\
+demand analysis\\
+facet analysis\\
+interference analysis\\
+lifetime analysis\\
+liveness analysis\\
+path analysis\\
+polymorphic-instance analysis\\
+stacklessness anaysis\\
+strictness analysis\\
+time analysis\\
+update analysis
+\end{slide}
+
+\begin{note}
+Contrast with conventional-compiler concerns:
+
+use of runtime feedback\\
+matching w/ low-level hardware concerns\\
+work very hard for their extra information
+\end{note}
+
+\begin{slide}{}
+{\Large Optimisations in use: LML}
+
+\begin{itemize}
+\item
+constant folding, arithmetic simplification
+\item
+many local transformations (case of case...)
+\item
+inlining, $\beta$-reduction
+\item
+strictness analysis
+\item
+G-code and m-code optimisation
+\end{itemize}
+\end{slide}

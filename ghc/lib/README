@@ -1,0 +1,22 @@
+Library code for Glorious Glasgow Haskell
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+"Library code" is written in (possibly Glasgow-extended) Haskell.  If
+it has to be written in C, it's in ../runtime.
+
+"tests" is supposed to be, well, tests.
+
+"prelude" and "glaExts" hold the standard and not-so-standard Prelude
+code; you get this stuff, like it or not.
+
+"std", "hbc" and "ghc" (and eventually "yale", etc., etc?) are
+libraries of useful modules.  The idea is: once all implementers agree
+on a module, it goes in "std"; otherwise, it lives in an
+implementation-specific library.
+
+Still in development.
+
+Will Partain
+93/07/09
+
+[Still still in development -- WDP 94/12]

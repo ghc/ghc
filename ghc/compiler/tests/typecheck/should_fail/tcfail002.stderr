@@ -1,0 +1,9 @@
+ 
+"tcfail002.hs", line 3:
+    Type variable "tt4" occurs within the type "[tt4]".
+    Inside two equations or case alternatives:
+	... (x : y) -> x
+	... z -> z
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

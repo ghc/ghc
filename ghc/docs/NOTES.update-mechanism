@@ -1,0 +1,195 @@
+	The Glorious New Update Mechanism
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	Simon & Jim Dec 93
+
+Return convention
+~~~~~~~~~~~~~~~~~
+When a constructor returns it makes sure that
+
+	R2 contains the info pointer for the constructor
+	R1,R3.. contain the components (if return in regs)
+	R1 points to the constructor object itself (if return in heap)
+
+The info table for a constructor contains a pointer to the
+constructor's update code.  If a constructor returns to an
+update frame, the update frame's code just jumps direct to the
+constructor's update code, via the info pointer in R2.
+
+This penalises slightly the return of a new constructor,
+because we have to load R2 with the info ptr.  [Fact: in runs
+of the compiler, 20-30% of all returns are of a new constructor;
+70-80% are existing constructors.]
+
+Info tables
+~~~~~~~~~~~
+Each dynamic-heap-allocated constructor has *two* info tables:
+
+* the "NewCon" info table is put into R2 when returning a new
+  constructor, which does not yet exist in the heap; R1 is dead!
+  The "NewCon" info table has no GC entries, because it's only ever used 
+  when returning in regs, never installed in a real constructor.
+
+  The NewCon table also needs a valid tag field (see taggery below)
+
+* the "ExistingCon" info table is used for all constructors allocated
+  in the heap.  
+
+The update code for a constructor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The update code for a constructor actually performs the update
+right away.  [At present, the update is deferred until we get
+back to the case expression.]  It knows how to do the update
+because the update code is constructor-specific.
+
+Once it's done the update, it makes R1 point to the constructor object
+in the heap (which'll either be freshly-allocated, if big, or the
+updated thing itself), and (for non-niladic constructors) makes R2 point 
+to the "ExistingCon" info table for the constructor.  (Of course the new 
+constructor will also have an ExistingCon info ptr.)  For niladic 
+constructors, we do *not* use the "ExistingCon" info table.  We continue
+to overwrite updatees in-place, because this saves us an indirection
+prior to garbage collection (and the extra niladic constructors disappear
+during the next garbage collection anyway).
+
+The update code in the ExistingCon info table simply updates with an
+indirection, using R1.  I *think* this can be one standard piece of
+code.  The only doubt here concerns GC; if updating with an
+indirection can cause GC (possible on GRIP?  or generational GC?),
+then we need to know which regs are live.  We can solve this by
+putting a liveness mask in the info table too.  [Arguably we want
+that anyway; consider returning to the bottom of a stack object.]
+So a liveness mask in the info table is probably a good idea.
+
+Constructors which return in heap return with an ExistingCon info 
+ptr.  They don't need a NewCon info table at all.
+
+Notice that this means that when we return an *existing* constructor,
+to an update frame, the update is done with an indirection, rather
+than [as now] copying the constructor afresh.  This solves the space duplication
+problem which shows up in "clausify".
+
+GC: R1 might be dead; R2 is a non-ptr.  So this return convention
+relies on using liveness masks for GC reg-liveness info, not the
+old no-of-live-ptrs info.
+
+Taggery 
+~~~~~~~ 
+
+  [Current: For unvectored returns with more than one constructor, we
+  currently load TagReg, and scrutinise it in the case expression.
+  Worse, we also have to scrutinise TagReg in the update entry of the
+  return vector.]
+
+In the new world, updates are handled without any nonsense.  No need
+to look at any register, becase we just jump to the constructor
+specific update code.
+
+Since we have an info ptr in R2, we can get the tag out of the info
+table, thus getting rid of TagReg altogether.  (This could conceivably
+be a *lose* on a machine with lots of regs, because it replaces a
+immediate small-const load by a memory fetch of the tag from the info
+table.  
+
+Not clear whether this is worth trying to improve.  Could 
+
+	a) #define TagReg to be a register or an offset from R2
+	b) issue a SET_TAG macro in the entry code for a constructor,
+	   which usually expands to nothing
+
+[NB 75-95% of all returns are vectored in runs of the compiler itself.]
+
+The entry code for a constructor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The real reason the registers are assigned as above is to make the
+entry code for a constructor simple.  When the entry code is executed,
+we have a new entry convention:
+
+	R1 points to the object
+	R2 is its info pointer
+
+(Why? because we usually enter it by indirecting through its info
+table, so it seems a shame to load the info ptr from memory twice.)
+
+So all the entry code has to do is to return (perhaps vectored-ly).
+(Maybe load TagReg, usually not --- see above.)
+
+NB this entry convention applies, of course, to all thunks as
+well as constructors -- whenever we enter an unknown object via R1 (Node).
+
+Case expressions
+~~~~~~~~~~~~~~~~
+Return vectors no longer need update code.
+
+Unvectored returns can therefore be *direct* to the code,
+rather than *indirect* via a 2-entry vector.
+
+Penalty for this improvement: "polymorphic" return vectors,
+notably that in an update frame, needs to accomodate either 
+a direct or a vectored return.  So it has to look like:
+
+	UpdVec:	jmp UnvectoredUpd
+		.word UpdVec0
+		.word UpdVec1
+		...
+
+that is, the return vector is offset by some fixed amount
+from the pointer put on the stack.  Or, it could be done
+backwards:
+
+		...
+		.word UpdVec1
+		.word UpdVec0
+	UpdVec:	...code for UnvectoredUpd...
+
+and then vectored returns would use negative offsets.
+
+This grunge is necessary *only* for a fixed set of polymorphic return
+vectors, part of the runtime system:
+
+	- update frames
+	- restore cost centres
+	- seq, par
+	- thread base
+	- stack object base
+
+Case expressions generate either a direct return, or a vector,
+but never a combination.
+
+Update Frames
+~~~~~~~~~~~~~
+
+Standard update frames are still required if we don't know the type of
+the constructor being returned.  However, we often do know the type.  In
+this case, we can generate a type-specific updating return-vector to place 
+in the update frame rather than the StdUpdRetVector.  This saves us one
+level of indirection.
+
+Partial applications
+~~~~~~~~~~~~~~~~~~~~
+PAPs are basically handled just the same way as at present.
+
+Changes from now
+~~~~~~~~~~~~~~~~
+* UpdReg dies.
+* TagReg dies.
+* RetVecReg dies.  (Previously needed to do return after update.)
+* Return vectors have half the number of entries.
+* Unvectored returns go direct.
+* Polymorphic seq/par and friends.
+* No space duplication problem (cf clausify)
+
+
+Glosses
+~~~~~~~
+Tag and update code are needed only for constructor info tables.
+It seems a shame to take up space in other info tables (ie 99% of them).
+
+Possibilities:
+
+- use an indirection to GC code, so the vari-sized gc stuff becomes
+  fixed
+- put the tag/upd code ptrs before the start of the info table.  (or
+  between the info table and code when reversing info tables...)
+ 
+
+Looks tricky to me.

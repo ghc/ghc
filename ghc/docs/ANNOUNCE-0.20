@@ -1,0 +1,55 @@
+This is version 0.20 of the Glorious Glasgow Haskell compilation
+system (GHC).
+
+Version 0.20 is an "internal" release, intended *ONLY* for the most
+fanatical GHC hackers.
+
+* Many things about it may be broken, though it
+does compile and run most programs.
+
+* I/O and ccall scheme re-done; any such low-level code probably needs
+  fixing; I/O attempts to follow 1.3 I/O proposal.  All ccall
+  arguments and results are automagically "boxed".
+
+* PrimOps fiddled; any code that uses them directly will probably need
+  attention.
+
+* We've renamed some things, so as to move to a we-don't-steal-user-
+  name-space policy.  Thus "tagCmp" has become "_tagCmp".  Names starting
+  with underscores are now cool if -fglasgow-exts.
+
+  You might want to see our "state-interface" document if you mess
+  with all this low-level/non-standard stuff; I'll try to remember to
+  put a copy up for FTP.
+
+* No promises about profiling.
+
+* Documentation is untouched since 0.19.
+
+Version 0.19 was the last public release.  It has held up pretty well
+and should be available wherever you got 0.20 from.  I commend 0.19 to
+all sane people.
+
+Configuring 0.20 is a little different than 0.19:
+
+    % cd <very-top>
+    % ./configure --with-boot=c
+    % ./STARTUP-ghc std
+    % cd ghc; make
+
+Things to note:
+
+* It's wrong for jmake to tell you "0: unknown flag -traditional"; but
+  it is harmless.
+
+* The 0.20 compiler seems more likely to run out of stack; use
+  -Rmax-stksize2m (or something) to increase; within the distribution,
+  probably something like...
+
+    % make EXTRA_HC_OPTS="-H20m -Rmax-stksize4m"
+
+See the "configure" script if you want to know what other options are
+-- there is no other documentation at this time!
+
+Will Partain, AQUA project typist
+partain@dcs.glasgow.ac.uk

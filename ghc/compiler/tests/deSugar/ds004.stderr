@@ -1,0 +1,31 @@
+Desugared:
+{- plain CoRec -}
+Test.nodups :: for all d. <Eq d> -> [d] -> [d]
+Test.nodups =
+    /\ t95 -> \ dict.90 ds.103 ->
+	let
+	  fail.104 =
+	      (error [t95])
+		  "\"ds004.hs\", line 9: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.103 of {
+	    Nil -> Nil! t95
+	    (:) x.105 ds.106 ->
+		case ds.106 of {
+		  Nil -> :! t95 x.105 (Nil! t95)
+		  (:) x.107 xs.108 ->
+		      let y.109 = x.105
+		      in 
+			case ((== t95) dict.90 y.109 x.107) of {
+			  True ->
+			      (Test.nodups t95) dict.90 ((: t95) x.107 xs.108)
+			  False ->
+			      (: t95)
+				  y.109
+				  ((Test.nodups t95)
+				       dict.90 ((: t95) x.107 xs.108))
+			}
+		}
+	  }
+{- end plain CoRec -}
+

@@ -1,0 +1,57 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Eq'.doubleeq =
+    /\ a.t22 -> \{-classdict-} [] [doubleeq.t23] -> doubleeq.t23
+{- nonrec -}
+defm.ShouldSucceed.Eq'.doubleeq =
+    /\ a.t24 ->
+	\{-dict-} d.ShouldSucceed.Eq'.t25 ->
+	    (error (a.t24 -> a.t24 -> Bool))
+		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.doubleeq\"\n"
+{- nonrec -}
+ShouldSucceed.Ord'.lt =
+    /\ a.t26 -> \{-classdict-} [d.ShouldSucceed.Eq'.t28] [lt.t27] -> lt.t27
+sdsel.ShouldSucceed.Ord'.ShouldSucceed.Eq' =
+    /\ a.t26 ->
+	\{-classdict-} [d.ShouldSucceed.Eq'.t28] [lt.t27] ->
+	    d.ShouldSucceed.Eq'.t28
+{- nonrec -}
+defm.ShouldSucceed.Ord'.lt =
+    /\ a.t29 ->
+	\{-dict-} d.ShouldSucceed.Ord'.t30 ->
+	    (error (a.t29 -> a.t29 -> Bool))
+		"No default method for \"ShouldSucceed.Ord'.defm.ShouldSucceed.Ord'.lt\"\n"
+{- rec -}
+dfun.ShouldSucceed.Eq'.Int =
+    ({-dict-} [] [const.ShouldSucceed.Eq'.Int.doubleeq])
+const.ShouldSucceed.Eq'.Int.doubleeq :: Int -> Int -> Bool
+const.ShouldSucceed.Eq'.Int.doubleeq
+    x.r31 y.r32
+	    = True
+AbsBinds
+[a.t15]
+[d.ShouldSucceed.Eq'.t16, d.ShouldSucceed.Eq'.t17]
+[(d.ShouldSucceed.Eq'.t18, dfun.ShouldSucceed.Eq'.List)]
+    {- rec -}
+    d.ShouldSucceed.Eq'.t18 = ({-dict-} [] [doubleeq.t19])
+    doubleeq.t19 :: [a.t15] -> [a.t15] -> Bool
+    doubleeq.t19
+	x.r34 y.r35
+		= True
+AbsBinds
+[tt6, ot3]
+[d.Num.t9, d.ShouldSucceed.Eq'.t11]
+[(f.t1, ShouldSucceed.f)]
+    (fromInt.t8, fromInt tt6 d.Num.t9)
+    (lit.t7, fromInt.t8 (MkInt 1#))
+    (d.ShouldSucceed.Eq'.t12, d.ShouldSucceed.Eq'.t11)
+    (d.ShouldSucceed.Eq'.t10,
+	dfun.ShouldSucceed.Eq'.List tt6
+	    [d.ShouldSucceed.Eq'.t11, d.ShouldSucceed.Eq'.t12])
+    (ShouldSucceed.Eq'.doubleeq.t5,
+	ShouldSucceed.Eq'.doubleeq [tt6] d.ShouldSucceed.Eq'.t10)
+    {- nonrec -}
+    f.t1 :: [tt6] -> ot3 -> Bool
+    f.t1 x.r63 y.r64
+		 = ShouldSucceed.Eq'.doubleeq.t5 x.r63 ([lit.t7] (tt6))
+

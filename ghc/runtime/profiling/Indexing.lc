@@ -1,0 +1,301 @@
+Only have cost centres etc if @USE_COST_CENTRES@ defined
+
+\begin{code}
+#define NULL_REG_MAP	/* Not threaded */
+#include "../storage/SMinternal.h"  /* for xmalloc */
+#if defined (USE_COST_CENTRES)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[indexing]{Indexing Cost Centres and Closure Categories}
+%*									*
+%************************************************************************
+
+See \tr{CostCentre.lh} for an overview.
+
+\begin{code}
+
+CostCentre *index_cc_table = 0;
+hash_t max_cc_no = DEFAULT_MAX_CC;
+
+static hash_t index_cc_no = 0;
+static hash_t mask_cc;
+
+hash_t
+init_index_cc()
+{
+    hash_t max2 = 1, count;
+
+    if (index_cc_table) {
+	if (max_cc_no != mask_cc + 1) {
+	    fprintf(stderr, "init_index_cc: twice %ld %ld\n", max_cc_no, mask_cc + 1);
+	    abort();
+	}
+	return mask_cc + 1;
+    }
+
+    while (max2 < max_cc_no) max2 <<= 1;
+
+    max_cc_no = max2;
+    mask_cc = max2 - 1;
+
+    index_cc_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
+    for (count = 0; count < max2; count++) index_cc_table[count] = 0;
+
+    return max2;
+}
+
+hash_t index_cc(cc)
+    CostCentre cc;
+{
+    if (cc->index_val == UNHASHED) {
+
+	hash_t h = hash_fixed((char *)&cc, sizeof(CostCentre)) & mask_cc;
+	while (index_cc_table[h])
+	    h = (h + 1) & mask_cc;
+
+        cc->index_val = h;
+	index_cc_table[h] = cc; 
+
+	if (++index_cc_no > mask_cc - (mask_cc >> 6)) {
+	    fprintf(stderr, "Cost Centre hash table full: %ld entries (in %ld table)\n",
+		    index_cc_no, mask_cc+1);
+	    fprintf(stderr, "   +RTS -z%c<size> option will increase the hash table size\n", CCchar);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    return cc->index_val;
+}
+\end{code}
+
+\begin{code}
+
+CostCentre *index_mod_table = 0;
+hash_t max_mod_no = DEFAULT_MAX_MOD;
+
+static hash_t index_mod_no = 0;
+static hash_t mask_mod;
+
+hash_t
+init_index_mod()
+{
+    hash_t max2 = 1, count;
+
+    if (index_mod_table) {
+	if (max_mod_no != mask_mod + 1) {
+	    fprintf(stderr, "init_index_mod: twice %ld %ld\n", max_mod_no, mask_mod + 1);
+	    abort();
+	}
+	return mask_mod + 1;
+    }
+
+    while (max2 < max_mod_no) max2 <<= 1;
+
+    max_mod_no = max2;
+    mask_mod = max2 - 1;
+
+    index_mod_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
+    for (count = 0; count < max2; count++) index_mod_table[count] = 0;
+
+    return max2;
+}
+
+hash_t index_mod(cc)
+    CostCentre cc;
+{
+    if (cc->index_val == UNHASHED) {
+
+	hash_t h = hash_str(cc->module) & mask_mod;
+
+	while (index_mod_table[h] && (strcmp(index_mod_table[h]->module, cc->module) != 0))
+	    h = (h + 1) & mask_mod;
+
+        cc->index_val = h;
+	index_mod_table[h] = cc;  /* may replace existing cc at h index */
+
+	if (++index_mod_no > mask_mod - (mask_mod >> 6)) {
+	    fprintf(stderr, "Module hash table full: %ld entries (in %ld table)\n",
+		    index_mod_no, mask_mod+1);
+	    fprintf(stderr, "   +RTS -z%c<size> option will increase the hash table size\n", MODchar);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    return cc->index_val;
+}
+\end{code}
+
+
+\begin{code}
+
+CostCentre *index_grp_table = 0;
+hash_t max_grp_no = DEFAULT_MAX_GRP;
+
+static hash_t index_grp_no = 0;
+static hash_t mask_grp;
+
+hash_t
+init_index_grp()
+{
+    hash_t max2 = 1, count;
+
+    if (index_grp_table) {
+	if (max_grp_no != mask_grp + 1) {
+	    fprintf(stderr, "init_index_grp: twice %ld %ld\n", max_grp_no, mask_grp + 1);
+	    abort();
+	}
+	return mask_grp + 1;
+    }
+
+    while (max2 < max_grp_no) max2 <<= 1;
+
+    max_grp_no = max2;
+    mask_grp = max2 - 1;
+
+    index_grp_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
+    for (count = 0; count < max2; count++) index_grp_table[count] = 0;
+
+    return max2;
+}
+
+hash_t index_grp(cc)
+    CostCentre cc;
+{
+    if (cc->index_val == UNHASHED) {
+
+	hash_t h = hash_str(cc->group) & mask_grp;
+
+	while (index_grp_table[h] && (strcmp(index_grp_table[h]->group, cc->group) != 0))
+	    h = (h + 1) & mask_grp;
+
+        cc->index_val = h;
+	index_grp_table[h] = cc;  /* may replace existing cc at h index */
+
+	if (++index_grp_no > mask_grp - (mask_grp >> 6)) {
+	    fprintf(stderr, "Group hash table full: %ld entries (in %ld table)\n",
+		    index_grp_no, mask_grp+1);
+	    fprintf(stderr, "   +RTS -z%c<size> option will increase the hash table size\n", GRPchar);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    return cc->index_val;
+}
+\end{code}
+
+
+\begin{code}
+
+ClCategory *index_descr_table = 0;
+hash_t max_descr_no = DEFAULT_MAX_DESCR;
+
+static hash_t index_descr_no = 0;
+static hash_t mask_descr;
+
+hash_t
+init_index_descr()
+{
+    hash_t max2 = 1, count;
+
+    if (index_descr_table) {
+	if (max_descr_no != mask_descr + 1) {
+	    fprintf(stderr, "init_index_descr: twice %ld %ld\n", max_descr_no, mask_descr + 1);
+	    abort();
+	}
+	return mask_descr + 1;
+    }
+
+    while (max2 < max_descr_no) max2 <<= 1;
+	   
+    max_descr_no = max2;
+    mask_descr = max2 - 1;
+
+    index_descr_table = (ClCategory *) xmalloc(max2 * sizeof(ClCategory));
+    for (count = 0; count < max2; count++) index_descr_table[count] = 0;
+
+    return max2;
+}
+
+hash_t index_descr(clcat)
+    ClCategory clcat;
+{
+    if (clcat->index_val == UNHASHED) {
+
+	hash_t h = hash_str(clcat->descr) & mask_descr;
+
+	while (index_descr_table[h] && (strcmp(index_descr_table[h]->descr, clcat->descr) != 0))
+	    h = (h + 1) & mask_descr;
+
+        clcat->index_val = h;
+	index_descr_table[h] = clcat;  /* may replace existing clcat at h index */
+
+	if (++index_descr_no > mask_descr - (mask_descr >> 6)) {
+	    fprintf(stderr, "Closure Description hash table full: %ld entries (in %ld table)\n",
+		    index_descr_no, mask_descr+1);
+	    fprintf(stderr, "   +RTS -z%c<size> option will increase the hash table size\n", DESCRchar);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    return clcat->index_val;
+}
+\end{code}
+
+
+\begin{code}
+
+ClCategory *index_type_table = 0;
+hash_t max_type_no = DEFAULT_MAX_TYPE;
+
+static hash_t index_type_no = 0;
+static hash_t mask_type;
+
+hash_t
+init_index_type()
+{
+    hash_t max2 = 1, count;
+
+    if (index_type_table) {
+	if (max_type_no != mask_type + 1) {
+	    fprintf(stderr, "init_index_type: twice %ld %ld\n", max_type_no, mask_type + 1);
+	    abort();
+	}
+	return mask_type + 1;
+    }
+
+    while (max2 < max_type_no) max2 <<= 1;
+	   
+    max_type_no = max2;
+    mask_type = max2 - 1;
+
+    index_type_table = (ClCategory *) xmalloc(max2 * sizeof(ClCategory));
+    for (count = 0; count < max2; count++) index_type_table[count] = 0;
+
+    return max2;
+}
+
+hash_t index_type(clcat)
+    ClCategory clcat;
+{
+    if (clcat->index_val == UNHASHED) {
+
+	hash_t h = hash_str(clcat->type) & mask_type;
+
+	while (index_type_table[h] && (strcmp(index_type_table[h]->type, clcat->type) != 0))
+	    h = (h + 1) & mask_type;
+
+        clcat->index_val = h;
+	index_type_table[h] = clcat;  /* may replace existing clcat at h index */
+
+	if (++index_type_no > mask_type - (mask_type >> 6)) {
+	    fprintf(stderr, "Type Description hash table full: %ld entries (in %ld table)\n",
+		    index_type_no, mask_type+1);
+	    fprintf(stderr, "   +RTS -z%c<size> option will increase the hash table size\n", TYPEchar);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    return clcat->index_val;
+}
+\end{code}
+
+\begin{code}
+#endif /* USE_COST_CENTRES */
+\end{code}

@@ -1,0 +1,15 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface DefSyn where
+import CoreSyn(CoreArg, CoreAtom, CoreBinding, CoreCaseAlternatives, CoreCaseDefault, CoreExpr)
+import Id(Id)
+type DefAtom = CoreAtom DefBindee
+data DefBindee   = DefArgExpr (CoreExpr Id DefBindee) | DefArgVar Id | Label (CoreExpr Id DefBindee) (CoreExpr Id DefBindee)
+type DefBinding = CoreBinding Id DefBindee
+type DefCaseAlternatives = CoreCaseAlternatives Id DefBindee
+type DefCaseDefault = CoreCaseDefault Id DefBindee
+type DefCoreArg = CoreArg DefBindee
+type DefExpr = CoreExpr Id DefBindee
+type DefProgram = [CoreBinding Id DefBindee]
+mkLabel :: CoreExpr Id DefBindee -> CoreExpr Id DefBindee -> CoreExpr Id DefBindee
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+

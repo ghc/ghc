@@ -1,0 +1,10 @@
+#define IHaveSubdirs
+
+SUBDIRS = hp2ps \
+	  hscpp \
+	  unlit \
+	  hstags \
+	  mkdependHS \
+	  parallel \
+	  ugen \
+	  stat2resid

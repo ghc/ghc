@@ -1,0 +1,37 @@
+PROGRAMS = grs2gr \
+	   gr2ps \
+	   gr2qp \
+	   qp2ps \
+	   ghc-fool-sort ghc-unfool-sort
+
+all:: $(PROGRAMS)
+/* stuff to have before we get going */
+MsubNeededHere($(PROGRAMS))
+
+/* === BUILD STUFF (installation, etc., below) ========== */
+
+MsubProgramScriptTarget(PerlCmd,grs2gr,grs2gr.pl,,)
+MsubProgramScriptTarget(/usr/local/bin/bash,gr2ps,gr2ps.bash,,)
+MsubProgramScriptTarget(PerlCmd,gr2qp,gr2qp.pl,,)
+MsubProgramScriptTarget(PerlCmd,qp2ps,qp2ps.pl,,)
+MsubProgramScriptTarget(PerlCmd,ghc-fool-sort,ghc-fool-sort.pl,,)
+MsubProgramScriptTarget(PerlCmd,ghc-unfool-sort,ghc-unfool-sort.pl,,)
+
+/* === INSTALLATION ======== */
+
+/* the rest of these vary from std/useful to hackish dans le extreme */
+
+MakeDirectories(install,    $(INSTSCRIPTDIR))
+InstallScriptTarget(grs2gr, $(INSTSCRIPTDIR))
+InstallScriptTarget(gr2ps,  $(INSTSCRIPTDIR))
+InstallScriptTarget(gr2qp,  $(INSTSCRIPTDIR))
+InstallScriptTarget(qp2ps,  $(INSTSCRIPTDIR))
+InstallScriptTarget(ghc-fool-sort,  $(INSTSCRIPTDIR))
+InstallScriptTarget(ghc-unfool-sort,$(INSTSCRIPTDIR))
+
+/* === OTHER STUFF ========= */
+
+ExtraStuffToClean($(PROGRAMS))
+
+ClearTagsFile()
+PerlTagsTarget( *.pl )

@@ -1,0 +1,11 @@
+/* this is a standalone Jmakefile; NOT part of ghc "make world" */
+
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+HaskellSuffixRules()
+
+/* LIT2LATEX_OPTS=-tbird */
+
+LIT2LATEX_OPTS=-ttgrind
+
+LitDocRootTargetWithNamedOutput(root,lit,root-standalone)

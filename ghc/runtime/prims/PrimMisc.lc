@@ -1,0 +1,97 @@
+%---------------------------------------------------------------*
+%
+\section{Executable code for random primitives}
+%
+%---------------------------------------------------------------*
+
+\begin{code}
+#include "rtsdefs.h"
+
+I_ __GenSymCounter = 0;
+I_ __SeqWorldCounter = 0;
+
+I_
+genSymZh(STG_NO_ARGS)
+{
+    return(__GenSymCounter++);
+}
+I_
+resetGenSymZh(STG_NO_ARGS) /* it's your funeral */
+{
+    __GenSymCounter=0;
+    return(__GenSymCounter);
+}
+
+I_
+byteArrayHasNUL__ (ba, len)
+  const char *ba;
+  I_ len;
+{
+    I_ i;
+
+    for (i = 0; i < len; i++) {
+	if (*(ba + i) == '\0') {
+	    return(1); /* true */
+	}
+    }
+
+    return(0); /* false */
+}
+
+I_
+stg_exit (n) /* can't call regular "exit" from Haskell
+		because it has no return value */
+  I_ n;
+{
+    EXIT(n);
+    return(0); /* GCC warning food */
+}
+\end{code}
+
+This may not be the right place for this: (ToDo?)
+\begin{code}
+#ifdef DEBUG
+void
+_stgAssert (filename, linenum)
+  char		*filename;
+  unsigned int  linenum;
+{
+    fflush(stdout);
+    fprintf(stderr, "ASSERTION FAILED: file %s, line %u\n", filename, linenum);
+    abort();
+}
+#endif /* DEBUG */
+\end{code}
+
+A little helper for the native code generator (it can't stomach
+loops):
+\begin{code}
+void
+newArrZh_init(result, n, init)
+P_ result;
+I_ n;
+P_ init;
+{
+  P_ p;
+
+  SET_MUTUPLE_HDR(result,ArrayOfPtrs_info,CCC,MUTUPLE_VHS+n,0)
+  for (p = result+MUTUPLE_HS; p < (result+MUTUPLE_HS+n); p++) {
+	*p = (W_) (init);
+  }
+}
+
+\end{code}
+
+Phantom info table vectors for multiple constructor primitive types that
+might have to perform a DynamicReturn (just Bool at the moment).
+
+\begin{code}
+
+ED_RO_(False_inregs_info);
+ED_RO_(True_inregs_info);
+const W_ Bool_itblvtbl[] = {
+    (W_) False_inregs_info,
+    (W_) True_inregs_info
+};
+
+\end{code}

@@ -1,0 +1,19 @@
+Typechecked:
+AbsBinds [tt12] [d.Num.t16] [(a.t1, ShouldSucceed.a)]
+    (fromInt.t15, fromInt tt12 d.Num.t16)
+    (lit.t8, fromInt.t15 (MkInt 3#))
+    (d.Num.t17, d.Num.t16)
+    (+.t6, (+) tt12 d.Num.t17)
+    (fromInt.t18, fromInt.t15)
+    (lit.t13, fromInt.t18 (MkInt 2#))
+    (+.t11, (+.t6))
+    {- nonrec -}
+    a.t1 :: tt12 -> tt12
+    a.t1 x.r54 = y.r55 +.t11 lit.t13
+	       where
+		   AbsBinds [] [] [(y.t4, y.r55)]
+		       {- nonrec -}
+		       y.t4 :: tt12
+		       y.t4 = x.r54 +.t6 lit.t8
+		   {- nonrec -}
+

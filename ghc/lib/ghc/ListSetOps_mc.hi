@@ -1,0 +1,13 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface ListSetOps where
+disjointLists :: Eq a => [a] -> [a] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
+intersectLists :: Eq a => [a] -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
+intersectingLists :: Eq a => [a] -> [a] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
+minusList :: Eq a => [a] -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "LSL" _N_ _N_ #-}
+unionLists :: Eq a => [a] -> [a] -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
+

@@ -1,0 +1,322 @@
+%****************************************************************************
+% 
+\section[SMmarkDefs.lh]{Definitions used by Pointer-Reversing Mark code}
+% 
+% (c) P. Sansom, K. Hammond, Glasgow University, January 26th 1993.  
+%
+%****************************************************************************
+
+Describe how to set the mark bit for a closure.
+
+\begin{code}
+#if defined(GCgn)
+
+#define SET_MARK_BIT(closure) 					\
+    do {							\
+      if (closure <= HeapLim) /* tested heap range for GCgn */	\
+	{							\
+	  long _hp_word = ((P_)closure) - HeapBase; 	    	\
+	  ASSERT(!IS_STATIC(INFO_PTR(closure)));		\
+	  DEBUG_SET_MARK(closure, _hp_word); 			\
+	  BitArray[_hp_word / BITS_IN(BitWord)] |= 	    	\
+    	    	1L << (_hp_word & (BITS_IN(BitWord) - 1));    	\
+        }							\
+    } while(0)
+
+#define CLEAR_MARK_BIT(closure)					\
+    do {							\
+	long _hp_word = ((P_)closure) - HeapBase; 		\
+	ASSERT(!IS_STATIC(INFO_PTR(closure)));			\
+	BitArray[_hp_word / BITS_IN(BitWord)] &= 	    	\
+    	    	~(1L << (_hp_word & (BITS_IN(BitWord) - 1)));  	\
+    } while (0)
+
+#else
+
+#define SET_MARK_BIT(closure) 					\
+    do {							\
+	long _hp_word = ((P_)closure) - HeapBase; 		\
+	ASSERT(!IS_STATIC(INFO_PTR(closure)));			\
+	DEBUG_SET_MARK(closure, _hp_word); 			\
+	BitArray[_hp_word / BITS_IN(BitWord)] |= 	    	\
+    	    	1L << (_hp_word & (BITS_IN(BitWord) - 1));    	\
+    } while (0)
+
+#define CLEAR_MARK_BIT(closure)					\
+    do {							\
+	long _hp_word = ((P_)closure) - HeapBase; 		\
+	ASSERT(!IS_STATIC(INFO_PTR(closure)));			\
+	BitArray[_hp_word / BITS_IN(BitWord)] &= 	    	\
+    	    	~(1L << (_hp_word & (BITS_IN(BitWord) - 1)));  	\
+    } while (0)
+
+\end{code}
+
+Macros from hell for frobbing bits in the bit array while marking.  We
+maintain a counter after the mark bit that tells us which pointers
+we've visited in a closure.  The bits in this counter may span word
+boundaries, and require some considerable ickiness to get munged into
+one word so Mr C Programmer can use them.
+
+Three variants follow.  The first is for closures which contain fewer
+pointers than there are bits in a word.
+
+\begin{code}
+
+#define GM_MASK(x) ((1L << (x)) - 1)
+
+#define GET_MARKED_PTRS(dest,closure,ptrs)			\
+    do {							\
+	long hw = ((P_)(closure)) - HeapBase + 1;		\
+	BitWord *bw = BitArray + (hw / BITS_IN(BitWord));	\
+	int offset = hw & (BITS_IN(BitWord) - 1);	    	\
+	int bat = BITS_IN(BitWord) - offset;			\
+								\
+	ASSERT(!IS_STATIC(INFO_PTR(closure)));			\
+								\
+	(dest) = (ptrs) <= bat ?				\
+	    bw[0] >> offset & GM_MASK(ptrs) :		    	\
+	    bw[0] >> offset | 	    	    	    	    	\
+                (bw[1] & GM_MASK((ptrs) - bat)) << bat;	    	\
+    } while (0)
+
+/* hw is the offset in words of closure from HeapBase + 1.
+
+   bw points to the BitArray word containing the bit corresponding
+	to the *second* word of the closure [hence +1 above]
+	(the bit corresp first word is the mark bit)
+
+   offset is the offset (in bits, from LS end, zero indexed) within *bw
+	of the first bit of value in *bw, 
+
+   bat is offset from the other end of the word; that's the same
+	as the number of bits available to store value in *bw.
+
+
+NOTA BENE: this code is awfully conservative.  In order to store a
+value which ranges 0--ptrs we use a field of ptrs bits wide.  We
+only need a field of log(ptrs) wide!
+
+*/
+
+/* "ptrs" is actually used as the width of the bit-field
+   in which we store "val". */
+
+#define SET_MARKED_PTRS(closure,ptrs,val)		    	\
+    do {						    	\
+	long hw = ((P_)(closure)) - HeapBase + 1;	    	\
+	BitWord *bw = BitArray + (hw / BITS_IN(BitWord));	\
+	int offset = hw & (BITS_IN(BitWord) - 1);    	    	\
+	int bat = BITS_IN(BitWord) - offset;		    	\
+    	BitWord bits;					    	\
+    	    	    	    	    	    	    	    	\
+	ASSERT( (ptrs) < BITS_IN(BitWord) );			\
+	ASSERT(!IS_STATIC(INFO_PTR(closure)));			\
+							    	\
+        bits = bw[0] & ~(GM_MASK(ptrs) << offset); 	    	\
+        bw[0] = bits | (val) << offset;    	    	    	\
+	if ((ptrs) > bat) {				    	\
+    	    bits = bw[1] & ~GM_MASK((ptrs) - bat);	    	\
+	    bw[1] = bits | ((val) >> bat);  		    	\
+	}						    	\
+    } while (0)
+/* NB Since ptrs < BITS_IN(BitWord)
+   we can be sure that the conditional will only happen if bat is strictly
+   *smaller* than BITS_IN(BitWord), and hence the right shift in the
+   last line is ok */
+
+/* 
+ * These are for the GEN family, which may blow up the GM_MASK macro.
+ */
+
+	/* If there are more ptrs than bits in a word, we still
+	   use just one word to store the value; value is bound to
+	   be < 2**(bits-in-word - 1) */
+
+#define __MIN__(a,b) (((a) < (b)) ? (a) : (b))
+
+#define GET_GEN_MARKED_PTRS(dest,closure,ptrs)			\
+	GET_MARKED_PTRS(dest,closure,__MIN__(ptrs,BITS_IN(BitWord)-1))
+
+#define SET_GEN_MARKED_PTRS(closure,ptrs,val)		    	\
+	SET_MARKED_PTRS(closure,__MIN__(ptrs,BITS_IN(BitWord)-1),val)
+
+/* Be very careful to use the following macro only for dynamic closures! */
+
+#define IS_MARK_BIT_SET(closure)				  		\
+	((BitArray[(((P_)closure) - HeapBase) / BITS_IN(BitWord)] >>		\
+	 ((((P_)closure) - HeapBase) & (BITS_IN(BitWord) - 1))) & 0x1)
+
+#endif
+\end{code}
+
+Don't set the mark bit when changing to marking in the next pointer.
+
+\begin{code}
+#define	INIT_MARK_NODE(dbg,ptrs)		\
+        do {					\
+	  DEBUG_PRSTART(dbg, ptrs);		\
+          LINK_GLOBALADDRESS(Mark);    	    	\
+	  SET_MARK_BIT(Mark);			\
+        } while (0)
+
+#define	CONTINUE_MARKING_NODE(dbg,pos)				\
+        do {							\
+	  DEBUG_PRIN(dbg, pos);			\
+        } while (0)
+\end{code}
+
+@JUMP_MARK@ and @JUMP_MARK_RETURN@ define how to jump to the marking
+entry code for a child closure (\tr{Mark}), or to the return code for
+its parent (\tr{MStack}), when marking's been completed.
+
+\begin{code}
+#define	JUMP_MARK						\
+	JMP_(PRMARK_CODE(INFO_PTR(Mark)))
+
+#define	JUMP_MARK_RETURN					\
+	JMP_(PRRETURN_CODE(INFO_PTR(MStack)))
+\end{code}
+
+Initialise the marking stack to mark from the first pointer in the
+closure (as specified by \tr{first_ptr}).  The type of the closure is
+given by \tr{closure_ptr}.
+
+\begin{code}
+#define	INIT_MSTACK_FROM(closure_ptr,first_ptr)			\
+    do { 							\
+	P_ temp = (P_) closure_ptr(Mark, first_ptr);	    	\
+    	closure_ptr(Mark, first_ptr) = (W_) MStack;   	    	\
+/*fprintf(stderr,"first_ptr=%d;temp=%lx;Mark=%lx;MStack=%lx\n",first_ptr,temp,Mark,MStack);*/ \
+    	MStack = Mark;                                  	\
+    	Mark = temp;                                  		\
+        JUMP_MARK;						\
+    } while (0)
+\end{code}
+
+Initialise the marking stack to mark from the first pointer in
+the closure.  The type of the closure is given by \tr{closure_ptr}.
+
+\begin{code}
+#define	INIT_MSTACK(closure_ptr)				\
+    INIT_MSTACK_FROM(closure_ptr,1)
+\end{code}
+
+Move to the next pointer after \tr{pos} in the closure whose
+type is given by \tr{closure_ptr}.
+
+\begin{code}
+#define	MOVE_TO_NEXT_PTR(closure_ptr,pos)			\
+    do {							\
+	P_ temp = (P_) closure_ptr(MStack, pos+1); 	    	\
+	closure_ptr(MStack, pos+1) = closure_ptr(MStack, pos); 	\
+	closure_ptr(MStack, pos) = (W_) Mark;   		\
+	Mark = temp;						\
+        JUMP_MARK;						\
+    } while(0)
+\end{code}
+
+Pop the mark stack at \tr{pos}, having flushed all pointers in
+a closure.
+
+\begin{code}
+#define	POP_MSTACK(dbg,closure_ptr,pos)				\
+    do {							\
+	RESTORE_MSTACK(dbg,closure_ptr,pos);			\
+        JUMP_MARK_RETURN;					\
+    } while (0)
+
+#define	RESTORE_MSTACK(dbg,closure_ptr,pos)			\
+    do {							\
+	P_ temp = Mark;                                  	\
+        DEBUG_PRLAST(dbg, pos);	                   		\
+	Mark = MStack;                                     	\
+	MStack = (P_) closure_ptr(Mark, pos);		    	\
+    	closure_ptr(Mark, pos) = (W_) temp;	  	    	\
+    } while (0)
+\end{code}
+
+Define some debugging macros.
+
+\begin{code}
+#if defined(_GC_DEBUG)
+
+#define DEBUG_PRSTART(type, ptrsvar) \
+    if (SM_trace & 8)                         \
+        fprintf(stderr, "PRMark Start (%s): 0x%lx, info 0x%lx ptrs %ld\n", \
+                type, Mark, INFO_PTR(Mark), ptrsvar)
+
+#define DEBUG_PRIN(type, posvar) \
+    if (SM_trace & 8)                     \
+        fprintf(stderr, "PRRet  In    (%s): 0x%lx, info 0x%lx pos %ld\n", \
+                type, MStack, INFO_PTR(MStack), posvar)
+
+#define DEBUG_PRLAST(type, ptrvar) \
+    if (SM_trace & 8)                       \
+        fprintf(stderr, "PRRet  Last  (%s): 0x%lx, info 0x%lx ptrs %ld\n", \
+                type, MStack, INFO_PTR(MStack), ptrvar)
+
+#define DEBUG_PR_MARKED \
+    if (SM_trace & 8)   \
+        fprintf(stderr, "PRMark Marked      : 0x%lx, info 0x%lx\n", \
+		Mark, INFO_PTR(Mark))
+
+#define DEBUG_PR_STAT \
+    if (SM_trace & 8) \
+        fprintf(stderr, "PRMark Static      : 0x%lx, info 0x%lx\n", \
+		Mark, INFO_PTR(Mark))
+
+#define DEBUG_PR_IND  \
+    if (SM_trace & 8) \
+        fprintf(stderr, "PRMark Ind : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
+		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
+
+#define DEBUG_PR_CAF  \
+    if (SM_trace & 8) \
+        fprintf(stderr, "PRMark Caf : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
+		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
+
+#define DEBUG_PR_CONST \
+    if (SM_trace & 8)  \
+        fprintf(stderr, "PRMark Const : 0x%lx -> 0x%lx, info 0x%lx\n", \
+		Mark, CONST_STATIC_CLOSURE(INFO_PTR(Mark)), INFO_PTR(Mark))
+
+#define DEBUG_PR_CHARLIKE \
+    if (SM_trace & 8)  \
+        fprintf(stderr, "PRMark CharLike (%lx) : 0x%lx -> 0x%lx, info 0x%lx\n", \
+		CHARLIKE_VALUE(Mark), Mark, CHARLIKE_CLOSURE(CHARLIKE_VALUE(Mark)), INFO_PTR(Mark))
+
+#define	DEBUG_PR_INTLIKE_TO_STATIC \
+    if (SM_trace & 8)  \
+        fprintf(stderr, "PRMark IntLike to Static (%ld) : 0x%lx -> 0x%lx, info 0x%lx\n", \
+		INTLIKE_VALUE(Mark), Mark, INTLIKE_CLOSURE(INTLIKE_VALUE(Mark)), INFO_PTR(Mark))
+
+#define	DEBUG_PR_INTLIKE_IN_HEAP \
+    if (SM_trace & 8)  \
+        fprintf(stderr, "PRMark IntLike in Heap   (%ld) : 0x%lx, info 0x%lx\n", \
+		INTLIKE_VALUE(Mark), Mark, INFO_PTR(Mark))
+
+#define DEBUG_PR_OLDIND \
+    if (SM_trace & 8) \
+        fprintf(stderr, "PRMark OldRoot Ind : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
+		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
+
+#else
+
+#define DEBUG_PRSTART(type, ptrvar)
+#define DEBUG_PRIN(type, posvar)
+#define DEBUG_PRLAST(type, ptrvar)
+#define DEBUG_PR_MARKED
+#define DEBUG_PR_STAT
+#define DEBUG_PR_IND
+#define DEBUG_PR_CAF
+#define DEBUG_PR_CONST
+#define DEBUG_PR_CHARLIKE
+#define	DEBUG_PR_INTLIKE_TO_STATIC
+#define	DEBUG_PR_INTLIKE_IN_HEAP
+#define DEBUG_PR_OLDIND
+
+#endif
+
+\end{code}
+

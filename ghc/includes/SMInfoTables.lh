@@ -1,0 +1,1763 @@
+%
+% (c) The OBFUSCATION-THROUGH-GRATUITOUS-PREPROCESSOR-ABUSE Project,
+%     Glasgow University, 1990-1994
+%
+%************************************************************************
+%*									*
+\section[info-table-macros]{Info-table macros}
+%*									*
+%************************************************************************
+
+We define {\em info tables} here.  First, all the different pieces of
+an info table (entry code, evac code, etc.); then all the different
+kinds of info tables (SPEC, DYN, etc).  NB: some of the parallel-only
+kinds are defined in \tr{Parallel.lh}, not here.
+
+An info-table contains several fields. The first field is
+the label of the closure's {\em standard-entry code}. This is used by
+the reducer to ``evaluate'' the closure. The remaining fields are used
+by the garbage collector and other parts of the runtime
+system. Info-tables are declared using the C macros defined below.
+The details of the contents are determined by the storage manager and
+are not of interest outside it.
+
+Info tables may either be {\em reversed} or not.  Reversed is normal
+and preferred, but it requires ``assembler mangling'' of the C
+compiler output.  (The native-code generator does reversed info-tables
+automagically.) With reversed info tables, (a)~the words are reversed
+[obviously], (b)~the info-table's C label addresses the word {\em just
+after} the info table (where its associated entry code ``happens to be''),
+and (c)~the entry-code word in the info table is omitted (it's
+vestigial).
+
+Info-table reversal is hidden behind the @IREL@ macro.
+
+The following fields are used when defining particular info-tables.
+Some sorts of info-table (e.g. @FETCHME_ITBL@) don't need all these
+fields to be specified.
+
+\begin{description}
+\item[@infolbl@]
+The name used to create labels for the info-table, profiling
+information, etc.
+
+\item[\tr{entry_code}:]
+The function which is called when entering the closure.
+
+\item[\tr{update_code}:]
+The function which is called when updating the closure (constructors only).
+
+\item[\tr{tag}:]
+(So much for the Spineless {\em Tagless} G-Machine...)  Used for
+semi-tagging checks.
+
+\item[\tr{type}:]
+Similar-but-different info to the \tr{tag} stuff; the
+parallel world needs more elaborate info.
+
+\item[\tr{size}:]
+The size of the closure (see \tr{SMClosures.lh} for a precise
+definition of ``size'').  Used by the garbage-collector, not the
+Haskell reducer.
+
+\item[\tr{ptrs}:]
+The number of pointers in the closure.  Used by the garbage-collector,
+not the Haskell reducer.
+
+\item[@localness@]
+Whether the info-table is local to this module or not.
+The field is set to @static@ if the info-table is
+local, and is empty otherwise.
+
+\item[@entry_localness@]
+Whether the @entry_code@ routine is local to this module or not.
+This field can have the following values:
+  \begin{description}
+  \item [@EXTFUN@]
+  The entry code is global.
+  \item [@INTFUN@]
+  The entry code is local.
+  \end{description}
+
+\item[@kind@]
+This identifies the general sort of the closure for profiling purposes.
+It can have the following values (defined in CostCentre.lh):
+
+  \begin{description}
+  \item[@CON_K@]
+  A constructor.
+  \item[@FN_K@]
+  A literal function.
+  \item[@PAP_K@]
+  A partial application.
+  \item[@THK_K@]
+  A thunk, or suspension.
+  \item[@BH_K@]
+  A black hole.
+  \item[@ARR_K@]
+  An array.
+  \item[@MP_K@]
+  A Malloc Pointer.
+  \item[@SPT_K@]
+  The Stable Pointer table.  (There should only be one of these but it
+  represents a form of weak space leak since it can't shrink to meet
+  non-demand so it may be worth watching separately? ADR)
+  \item[@INTERNAL_KIND@]
+  Something internal to the runtime system.
+  \end{description}
+
+\item[@descr@]
+This is a string used to identify the closure for profiling purposes.
+\end{description}
+
+So, for example:
+\begin{pseudocode}
+SPEC_N_ITBL(RBH_Save_0_info,RBH_Save_0_entry,UpdErr,0,INFO_OTHER_TAG,2,0,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_0");
+\end{pseudocode}
+
+%************************************************************************
+%*									*
+\subsection[info-table-common-up]{The commoned-up info-table world}
+%*									*
+%************************************************************************
+
+Since lots of info-tables share the same information (which doesn't
+change at run time) needlessly, we gather this common information
+together into a rep-table.
+
+Conditionally present data (concerning the parallel world, and also
+information for the collectors) are gathered into unique rep-tables,
+which are pointed to from info-tables.  This saves several words for
+each closure we build, at the cost of making garbage collection and
+fetching of data from info-tables a little more hairy.
+
+Size and pointers fields go away altogether, save for @GEN@ closures
+where they are tacked on to the end of info-tables.
+
+%************************************************************************
+%*									*
+\subsection[info-table-common]{Bits common to all info-tables}
+%*									*
+%************************************************************************
+
+The entry code for a closure, its type, its ``size'', and the number
+of pointer-words it contains are the same in every info table.  For
+the parallel system, two flush code-entries are also standard.
+
+Multi-slurp protection:
+\begin{code}
+#ifndef SMInfoTables_H
+#define SMInfoTables_H
+\end{code}
+
+\begin{code}
+#ifdef __STG_REV_TBLS__
+
+# define IREL(offset)	(-(offset))
+
+/* NB: the ENT_ macro (StgMacros.lh) must also be changed */
+
+# define ENTRY_CODE(infoptr)     ((F_)(infoptr))
+
+#else /* boring non-reversed info tables */
+
+# define IREL(offset)	(offset)
+
+# define ENTRY_CODE(infoptr)     (((FP_)(infoptr))[IREL(0)])
+
+#endif /* non-fixed size info tables */
+\end{code}
+
+\begin{code}
+#define INFO_TAG(infoptr)	((I_) ((P_)(infoptr))[IREL(1)])
+#define EVAL_TAG(infoptr)	(INFO_TAG(infoptr) >= 0)
+\end{code}
+
+\begin{code}
+
+#define INFO_INTERNAL		(~0L)	/* Should never see this */
+
+#define INFO_UNUSED		(~0L)
+/* We'd like to see this go away in code pointer fields, with specialized code
+   to print out an appropriate error message instead.
+   WDP 94/11: At least make it an Obviously Weird Value?
+ */
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[info-table-rtbl]{Rep tables in an info table}
+%*									*
+%************************************************************************
+
+Common information is pointed to by the rep table pointer.  We want to
+use extern declarations almost everywhere except for the single module
+(\tr{Rep.lc}) in which the rep tables are declared locally.
+
+\begin{code}
+#if defined(COMPILING_REP_LC) || defined(COMPILING_GHC)
+# define MAYBE_DECLARE_RTBL(l,s,p)
+#else
+# define MAYBE_DECLARE_RTBL(l,s,p)	EXTDATA_RO(MK_REP_REF(l,s,p));
+#endif
+
+#define INFO_RTBL(infoptr)	(((PP_)(infoptr))[IREL(2)])
+\end{code}
+  
+%************************************************************************
+%*									*
+\subsection{Maybe-there-maybe-not fields in an info table}
+%*									*
+%************************************************************************
+
+That's about it for the fixed stuff...entry code, a tag and an RTBL pointer.
+
+\begin{code}
+#define FIXED_INFO_WORDS		3
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Profiling-only fields in an info table}
+%*									*
+%************************************************************************
+
+These macros result in the profiling kind and description string being
+included only if required.
+\begin{code}
+#define PROFILING_INFO_OFFSET  (FIXED_INFO_WORDS)
+
+#if !defined(USE_COST_CENTRES)
+# define PROFILING_INFO_WORDS	0
+# define INCLUDE_PROFILING_INFO(base_name)
+# define INREGS_PROFILING_INFO    
+
+#else
+# define PROFILING_INFO_WORDS 	1
+
+# define INCLUDE_PROFILING_INFO(base_name) , (W_)REF_CAT_IDENT(base_name)
+# define INREGS_PROFILING_INFO	,INFO_UNUSED
+
+# define INFO_CAT(infoptr)  (((ClCategory *)(infoptr))[IREL(PROFILING_INFO_OFFSET)])
+
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Non-standard fields in an info table: where they'll be}
+%*									*
+%************************************************************************
+
+The @UPDATE_CODE@ field is a pointer to the update code for a constructor.
+I believe that constructors are always of the following types:
+
+\begin{itemize}
+\item @CHARLIKE@
+\item @CONST@
+\item @GEN_N@
+\item @INTLIKE@
+\item @SPEC_N@
+\item @STATIC@
+\end{itemize}
+
+Info tables for these types have non-standard update code fields.  In addition,
+because @GEN@ closures have further non-standard fields (size, ptrs), the
+info tables for @GEN_U@ closures also have a non-standard update code field 
+(which is filled in with @StdErrorCode@).
+
+When we're in the parallel world, we also have to know which registers are
+live when we're returning a constructor in registers, so we have a second 
+word for that as well.
+
+\begin{code}
+
+#define UPDATE_INFO_OFFSET  (PROFILING_INFO_OFFSET+PROFILING_INFO_WORDS)
+
+#ifndef PAR
+# define UPDATE_INFO_WORDS    1
+# define INCLUDE_UPDATE_INFO(upd,live)	,(W_)upd
+#else
+# define UPDATE_INFO_WORDS    2
+# define INCLUDE_UPDATE_INFO(upd,live)	,(W_)upd,(W_)live
+#endif
+
+#define UPDATE_CODE(infoptr)	(((FP_)(infoptr))[IREL(UPDATE_INFO_OFFSET)])
+#define INFO_LIVENESS(infoptr)	(((P_)(infoptr))[IREL(UPDATE_INFO_OFFSET+1)])
+\end{code}
+
+@GEN@ closures have the size and number of pointers in the info table
+rather than the rep table.  These non-standard fields follow the update
+code field (which is only required for @GEN_N@ closures, but which we
+include in @GEN_U@ closures just to keep this other stuff at a consistent
+offset).
+
+\begin{code}
+#define GEN_INFO_OFFSET	    (UPDATE_INFO_OFFSET+UPDATE_INFO_WORDS)
+#define GEN_INFO_WORDS    2
+#define INCLUDE_GEN_INFO(size,ptrs)	,(W_)size,(W_)ptrs
+
+#define GEN_INFO_SIZE(infoptr)	 ((I_)((P_)(infoptr))[IREL(GEN_INFO_OFFSET)])
+#define GEN_INFO_NoPTRS(infoptr) ((I_)((P_)(infoptr))[IREL(GEN_INFO_OFFSET+1)])
+\end{code}
+
+@CONST@ closures have a pointer to a static version of the closure in their
+info tables.  This non-standard field follows their update code field.
+
+\begin{code}
+#define CONST_INFO_OFFSET	    (UPDATE_INFO_OFFSET+UPDATE_INFO_WORDS)
+#define CONST_INFO_WORDS    1
+#define INCLUDE_CONST_INFO(closure)	,(W_)closure
+
+#define CONST_STATIC_CLOSURE(infoptr)	(((PP_)(infoptr))[IREL(CONST_INFO_OFFSET)])
+\end{code}
+
+@STATIC@ closures are like @GEN@ closures in that they also have the
+size and number of pointers in the info table rather than the rep
+table.  Again, these non-standard fields follow the update code field
+(which I believe is not actually needed for STATIC closures).
+
+\begin{code}
+#define STATIC_INFO_OFFSET	    (UPDATE_INFO_OFFSET+UPDATE_INFO_WORDS)
+#define STATIC_INFO_WORDS    2
+#define INCLUDE_STATIC_INFO(size,ptrs)	,(W_)size,(W_)ptrs
+
+#define STATIC_INFO_SIZE(infoptr)   ((I_)((P_)(infoptr))[IREL(STATIC_INFO_OFFSET)])
+#define STATIC_INFO_NoPTRS(infoptr) ((I_)((P_)(infoptr))[IREL(STATIC_INFO_OFFSET+1)])
+\end{code}
+
+In the parallel system, all updatable closures have corresponding
+revertible black holes.  When we are assembly-mangling, we guarantee that
+the revertible black hole code precedes the normal entry code, so that
+the RBH info table resides at a fixed offset from the normal info table.
+Otherwise, we add the RBH info table pointer to the end of the normal
+info table and vice versa.
+
+\begin{code}
+#ifdef PAR
+# define RBH_INFO_OFFSET	    (GEN_INFO_OFFSET+GEN_INFO_WORDS)
+
+# define INCLUDE_SPEC_PADDING				\
+	INCLUDE_UPDATE_INFO(INFO_UNUSED,INFO_UNUSED)	\
+	INCLUDE_GEN_INFO(INFO_UNUSED,INFO_UNUSED)
+
+# ifdef RBH_MAGIC_OFFSET
+
+#  define RBH_INFO_WORDS    0
+#  define INCLUDE_RBH_INFO(infoptr)
+
+#  define RBH_INFOPTR(infoptr)	    (((P_)infoptr) - RBH_MAGIC_OFFSET)
+#  define REVERT_INFOPTR(infoptr)   (((P_)infoptr) + RBH_MAGIC_OFFSET)
+
+# else
+
+#  define RBH_INFO_WORDS    1
+#  define INCLUDE_RBH_INFO(infoptr) ,(W_)infoptr
+
+#  define RBH_INFOPTR(infoptr)	    (((PP_)(infoptr))[IREL(RBH_INFO_OFFSET)])
+#  define REVERT_INFOPTR(infoptr)   (((PP_)(infoptr))[IREL(RBH_INFO_OFFSET)])
+
+# endif
+
+EXTFUN(RBH_entry);
+P_ convertToRBH PROTO((P_ closure));
+void convertToFetchMe PROTO((P_ closure, globalAddr *ga));
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Maybe-there-maybe-not fields in a rep table}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsubsection{Type field in a rep table}
+%*									*
+%************************************************************************
+
+The @INFO_TYPE@ field in the rep table tells what sort of animal
+the closure is.  
+
+\begin{code}
+#define TYPE_INFO_OFFSET  0
+#define TYPE_INFO_WORDS    1
+#define INCLUDE_TYPE_INFO(kind) (W_)CAT3(INFO_,kind,_TYPE)
+
+#define INFO_TYPE(infoptr)	(((P_)(INFO_RTBL(infoptr)))[TYPE_INFO_OFFSET])
+\end{code}
+
+The least significant 9 bits of the info-type are used as follows:
+
+\begin{tabular}{||l|l||}						   \hline
+Bit & Interpretation							\\ \hline
+0   & 1 $\Rightarrow$ Head normal form					\\
+1   & 1 $\Rightarrow$ Don't spark me  (Any HNF will have this set to 1)	\\
+2   & 1 $\Rightarrow$ This is a static closure				\\
+3   & 1 $\Rightarrow$ Has mutable pointer fields \\ 
+4   & 1 $\Rightarrow$ May be updated (inconsistent with being a HNF) \\ 
+5   & 1 $\Rightarrow$ Is a "primitive" array (a BIG structure) \\
+6   & 1 $\Rightarrow$ Is a black hole					\\
+7   & 1 $\Rightarrow$ Is an indirection					\\
+8   & 1 $\Rightarrow$ Is a thunk					\\
+\hline
+\end{tabular}
+
+Updatable structures (@_UP@) are thunks that may be shared.  Primitive
+arrays (@_BM@ -- Big Mothers) are structures that are always held
+in-memory (basically extensions of a closure).  Because there may be
+offsets into these arrays, a primitive array cannot be handled as a
+FetchMe in the parallel system, but must be shipped in its entirety if
+its parent closure is shipped.
+
+\begin{code}
+#define	IP_TAG_BITS		9
+
+#define _NF			0x0001  /* Normal form  */
+#define _NS			0x0002	/* Don't spark  */
+#define _ST			0x0004	/* Is static    */
+#define _MU 	    	    	0x0008  /* Is mutable   */
+#define _UP			0x0010	/* Is updatable (but not mutable) */
+#define _BM			0x0020	/* Is a "primitive" array */
+#define _BH			0x0040	/* Is a black hole */
+#define _IN			0x0080	/* Is an indirection */
+#define _TH			0x0100	/* Is a thunk */
+
+#define	IS_NF(infoptr)		((INFO_TYPE(infoptr)&_NF) != 0)
+#define	IS_MUTABLE(infoptr)	((INFO_TYPE(infoptr)&_MU) != 0)
+#define	IS_STATIC(infoptr)	((INFO_TYPE(infoptr)&_ST) != 0)
+#define	IS_UPDATABLE(infoptr)	((INFO_TYPE(infoptr)&_UP) != 0)
+#define	IS_BIG_MOTHER(infoptr)	((INFO_TYPE(infoptr)&_BM) != 0)
+#define IS_BLACK_HOLE(infoptr)	((INFO_TYPE(infoptr)&_BH) != 0)
+#define IS_INDIRECTION(infoptr)	((INFO_TYPE(infoptr)&_IN) != 0)
+#define IS_THUNK(infoptr)	((INFO_TYPE(infoptr)&_TH) != 0)
+
+#define	SHOULD_SPARK(closure)	((INFO_TYPE(INFO_PTR(closure))&_NS) == 0)
+\end{code}
+
+The other bits in the info-type field simply give a unique bit-pattern
+to identify the closure type.
+
+\begin{code}
+#define	IP_TAG_BIT_MASK		((1L<<IP_TAG_BITS)-1)
+
+#define BASE_INFO_TYPE(infoptr)	(INFO_TYPE(infoptr) & (~IP_TAG_BIT_MASK)) /* Strips out the tag bits */
+
+#define MAKE_BASE_INFO_TYPE(x)	((x) << IP_TAG_BITS)
+
+#define INFO_SPEC_TYPE		(MAKE_BASE_INFO_TYPE(1L))
+#define INFO_GEN_TYPE		(MAKE_BASE_INFO_TYPE(2L))
+#define INFO_DYN_TYPE		(MAKE_BASE_INFO_TYPE(3L) | _NF | _NS)
+#define INFO_TUPLE_TYPE		(MAKE_BASE_INFO_TYPE(4L) | _NF | _NS | _BM)
+#define INFO_DATA_TYPE		(MAKE_BASE_INFO_TYPE(5L) | _NF | _NS | _BM)
+#define INFO_MUTUPLE_TYPE	(MAKE_BASE_INFO_TYPE(6L) | _NF | _NS | _MU | _BM)
+#define INFO_IMMUTUPLE_TYPE	(MAKE_BASE_INFO_TYPE(7L) | _NF | _NS | _BM)
+#define INFO_STATIC_TYPE	(MAKE_BASE_INFO_TYPE(8L) | _NS | _ST)
+#define INFO_CONST_TYPE		(MAKE_BASE_INFO_TYPE(9L) | _NF | _NS)
+#define INFO_CHARLIKE_TYPE	(MAKE_BASE_INFO_TYPE(10L) | _NF | _NS)
+#define INFO_INTLIKE_TYPE	(MAKE_BASE_INFO_TYPE(11L) | _NF | _NS)
+#define INFO_BH_TYPE		(MAKE_BASE_INFO_TYPE(12L) | _NS | _BH)
+#define INFO_BQ_TYPE		(MAKE_BASE_INFO_TYPE(13L) | _NS | _MU | _BH)
+#define INFO_IND_TYPE		(MAKE_BASE_INFO_TYPE(14L) | _NS | _IN)
+#define INFO_CAF_TYPE		(MAKE_BASE_INFO_TYPE(15L) | _NF | _NS | _ST | _IN)
+#define INFO_FM_TYPE		(MAKE_BASE_INFO_TYPE(16L))
+#define INFO_TSO_TYPE		(MAKE_BASE_INFO_TYPE(17L) | _MU)
+#define INFO_STKO_TYPE		(MAKE_BASE_INFO_TYPE(18L))
+#define INFO_SPEC_RBH_TYPE	(MAKE_BASE_INFO_TYPE(19L) | _NS | _MU | _BH)
+#define INFO_GEN_RBH_TYPE	(MAKE_BASE_INFO_TYPE(20L) | _NS | _MU | _BH)
+#define INFO_BF_TYPE		(MAKE_BASE_INFO_TYPE(21L) | _NS | _MU | _BH)
+#define INFO_INTERNAL_TYPE	(MAKE_BASE_INFO_TYPE(22L))
+
+#define INFO_SPEC_N_TYPE	(INFO_SPEC_TYPE | _NF | _NS)
+#define INFO_SPEC_S_TYPE	(INFO_SPEC_TYPE | _TH)
+#define INFO_SPEC_U_TYPE	(INFO_SPEC_TYPE | _UP | _TH)
+
+#define INFO_GEN_N_TYPE		(INFO_GEN_TYPE | _NF | _NS)
+#define INFO_GEN_S_TYPE		(INFO_GEN_TYPE | _TH)
+#define INFO_GEN_U_TYPE		(INFO_GEN_TYPE | _UP | _TH)
+
+#define INFO_BH_N_TYPE		(INFO_BH_TYPE)
+#define INFO_BH_U_TYPE		(INFO_BH_TYPE | _UP)
+
+#define INFO_STKO_DYNAMIC_TYPE	(INFO_STKO_TYPE | _MU)
+#define INFO_STKO_STATIC_TYPE	(INFO_STKO_TYPE | _ST)
+
+#define INFO_FETCHME_TYPE	(INFO_FM_TYPE | _MU)
+#define INFO_FMBQ_TYPE		(INFO_FM_TYPE | _MU | _BH)
+
+#define MIN_INFO_TYPE		0
+#define MAX_INFO_TYPE		INFO_INTERNAL_TYPE
+
+\end{code}
+
+Notes:
+
+An indirection either points to HNF (post update); or is result of
+overwriting a FetchMe, in which case the thing fetched is either
+under evaluation (BH), or by now an HNF.  Thus, indirections get @_NS@.
+
+%************************************************************************
+%*									*
+\subsubsection{Size/no-of-pointers fields in a rep table}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define SIZE_INFO_OFFSET  (TYPE_INFO_OFFSET+TYPE_INFO_WORDS)
+#define SIZE_INFO_WORDS	  2
+#define INCLUDE_SIZE_INFO(size,ptrs) ,(W_)size, (W_)ptrs
+
+#define INFO_SIZE(infoptr)   ((I_)((FP_)(INFO_RTBL(infoptr)))[SIZE_INFO_OFFSET])
+#define INFO_NoPTRS(infoptr) ((I_)((FP_)(INFO_RTBL(infoptr)))[SIZE_INFO_OFFSET+1])
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Parallel-only fields in a rep table}
+%*									*
+%************************************************************************
+
+There is now nothing that is specific to the parallel world (GUM), but
+this could change so don't go deleting this little lot!  KH
+
+\begin{code}
+# define PAR_INFO_OFFSET		(SIZE_INFO_OFFSET+SIZE_INFO_WORDS)
+
+/* now the bits that are either on or off: */
+
+# define PAR_INFO_WORDS		0
+# define INCLUDE_PAR_INFO
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Copying-only fields in a rep table}
+%*									*
+%************************************************************************
+
+These macros result in the copying garbage collection code being
+included only if required.
+\begin{code}
+#if defined(_INFO_COPYING)
+# include "SMcopying.h" /* Copying Code Labels */
+# define COPY_INFO_OFFSET  (PAR_INFO_OFFSET+PAR_INFO_WORDS)
+# define COPY_INFO_WORDS 2
+# define INCLUDE_COPYING_INFO(evac, scav) ,(W_)evac,(W_)scav
+
+/* 
+ * use these if you have an unquenchable urge to dig around in
+ *  info tables (e.g., runtime/.../StgDebug.lc)
+ */
+
+# define INFO_EVAC_2S(infoptr)  (((FP_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET])
+# define INFO_SCAV_2S(infoptr)  (((FP_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET + 1])
+
+# if defined(UPDATES_ENTERED_COUNT)
+
+/* Don't commmon up CONST CHARLIKE and INTLIKE treat as SPEC 1_0 closure */
+/* This broke it -- turning it off. Use LARGE heap so no GC needed */
+#  if 0
+#   define INCLUDE_COPYING_INFO_CONST(evac, scav) \
+	INCLUDE_COPYING_INFO(_Evacuate_1,_Scavenge_1_0)
+#  endif /* 0 */
+
+#  define INCLUDE_COPYING_INFO_CONST(evac, scav) \
+	INCLUDE_COPYING_INFO(evac, scav)
+# else
+#  define INCLUDE_COPYING_INFO_CONST(evac, scav) \
+	INCLUDE_COPYING_INFO(evac, scav)
+# endif
+
+#else  /* ! _INFO_COPYING */
+
+# define COPY_INFO_WORDS 0
+# define INCLUDE_COPYING_INFO(evac, scav)
+# define INCLUDE_COPYING_INFO_CONST(evac, scav)
+
+#endif /* ! _INFO_COPYING */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Compacting-only fields in a rep table}
+%*									*
+%************************************************************************
+
+These macros result in the compacting garbage collection code being
+included only if required. This includes the variable length
+specialised marking code.
+
+\begin{code}
+#if !defined(_INFO_COMPACTING)
+
+# define INCLUDE_COMPACTING_INFO(scanlink,prmark,scanmove,marking)
+# define SPEC_COMPACTING_INFO(scanlink,prmark,scanmove,marking)
+
+#else /* defined(_INFO_COMPACTING) */
+
+# include "SMcompact.h" 	/* Single Space Compacting Code */
+# include "SMmark.h"    	/* Pointer Reversal Marking Code Labels */
+
+/* For SPEC closures compacting info is variable length -> must come last */
+
+# define COMPACTING_INFO_OFFSET  (COPY_INFO_OFFSET+COPY_INFO_WORDS)
+
+# define INCLUDE_COMPACTING_INFO(scanlink,prmark,scanmove,marking) \
+	,(W_)scanlink,(W_)prmark \
+	,(W_)scanmove,(W_)marking
+
+# define SPEC_COMPACTING_INFO(scanlink,prmark,scanmove,prreturn) \
+	,(W_)scanlink,(W_)prmark \
+	,(W_)scanmove, \
+	 (W_)prreturn
+
+
+# define INFO_SCAN_LINK_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET])
+# define INFO_MARK_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+1])
+# define INFO_SCAN_MOVE_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+2])
+# define INFO_MARKED_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+3])
+# define INFO_MARKING_1S(infoptr)  	(((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+4])
+
+#ifndef COMPILING_GHC
+extern F_ _Dummy_Static_entry(STG_NO_ARGS);
+extern F_ _Dummy_Ind_entry(STG_NO_ARGS);
+extern F_ _Dummy_Caf_entry(STG_NO_ARGS);
+extern F_ _Dummy_Const_entry(STG_NO_ARGS);
+extern F_ _Dummy_CharLike_entry(STG_NO_ARGS);
+#endif
+
+#endif /* _INFO_COMPACTING */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[SPEC_ITBL]{@SPEC_x_ITBL@: @SPEC@ info-tables}
+%*									*
+%************************************************************************
+
+Normal-form and updatable (non-normal-form) variants.
+
+\begin{code}
+
+#define SPEC_N_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag			        \
+	,(W_) MK_REP_REF(Spec_N,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	}
+
+MAYBE_DECLARE_RTBL(Spec_N,1,0)
+MAYBE_DECLARE_RTBL(Spec_N,1,1)
+MAYBE_DECLARE_RTBL(Spec_N,2,0)
+MAYBE_DECLARE_RTBL(Spec_N,2,1)
+MAYBE_DECLARE_RTBL(Spec_N,2,2)
+MAYBE_DECLARE_RTBL(Spec_N,3,0)
+MAYBE_DECLARE_RTBL(Spec_N,3,1)
+MAYBE_DECLARE_RTBL(Spec_N,3,2)
+MAYBE_DECLARE_RTBL(Spec_N,3,3)
+MAYBE_DECLARE_RTBL(Spec_N,4,0)
+MAYBE_DECLARE_RTBL(Spec_N,4,4)
+MAYBE_DECLARE_RTBL(Spec_N,5,0)
+MAYBE_DECLARE_RTBL(Spec_N,5,5)
+MAYBE_DECLARE_RTBL(Spec_N,6,6)
+MAYBE_DECLARE_RTBL(Spec_N,7,7)
+MAYBE_DECLARE_RTBL(Spec_N,8,8)
+MAYBE_DECLARE_RTBL(Spec_N,9,9)
+MAYBE_DECLARE_RTBL(Spec_N,10,10)
+MAYBE_DECLARE_RTBL(Spec_N,11,11)
+MAYBE_DECLARE_RTBL(Spec_N,12,12)
+
+#define SPEC_N_RTBL(size,ptrs) 							\
+    const W_ MK_REP_LBL(Spec_N,size,ptrs)[] = {					\
+	INCLUDE_TYPE_INFO(SPEC_N)						\
+	INCLUDE_SIZE_INFO(size,ptrs)						\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_Evacuate_,size),CAT4(_Scavenge_,size,_,ptrs)) \
+	SPEC_COMPACTING_INFO(CAT4(_ScanLink_,size,_,ptrs),			\
+			     CAT2(_PRStart_,ptrs),				\
+			     CAT2(_ScanMove_,size),CAT2(_PRIn_,ptrs))		\
+	}
+
+#define SPEC_S_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag			        \
+	,(W_) MK_REP_REF(Spec_S,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	}
+
+MAYBE_DECLARE_RTBL(Spec_S,1,0)
+MAYBE_DECLARE_RTBL(Spec_S,1,1)
+MAYBE_DECLARE_RTBL(Spec_S,2,0)
+MAYBE_DECLARE_RTBL(Spec_S,2,1)
+MAYBE_DECLARE_RTBL(Spec_S,2,2)
+MAYBE_DECLARE_RTBL(Spec_S,3,0)
+MAYBE_DECLARE_RTBL(Spec_S,3,1)
+MAYBE_DECLARE_RTBL(Spec_S,3,2)
+MAYBE_DECLARE_RTBL(Spec_S,3,3)
+MAYBE_DECLARE_RTBL(Spec_S,4,0)
+MAYBE_DECLARE_RTBL(Spec_S,4,4)
+MAYBE_DECLARE_RTBL(Spec_S,5,0)
+MAYBE_DECLARE_RTBL(Spec_S,5,5)
+MAYBE_DECLARE_RTBL(Spec_S,6,6)
+MAYBE_DECLARE_RTBL(Spec_S,7,7)
+MAYBE_DECLARE_RTBL(Spec_S,8,8)
+MAYBE_DECLARE_RTBL(Spec_S,9,9)
+MAYBE_DECLARE_RTBL(Spec_S,10,10)
+MAYBE_DECLARE_RTBL(Spec_S,11,11)
+MAYBE_DECLARE_RTBL(Spec_S,12,12)
+
+#define SPEC_S_RTBL(size,ptrs) 							\
+    const W_ MK_REP_LBL(Spec_S,size,ptrs)[] = {					\
+	INCLUDE_TYPE_INFO(SPEC_S)						\
+	INCLUDE_SIZE_INFO(size,ptrs)						\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_Evacuate_,size),CAT4(_Scavenge_,size,_,ptrs)) \
+	SPEC_COMPACTING_INFO(CAT4(_ScanLink_,size,_,ptrs),			\
+			     CAT2(_PRStart_,ptrs),				\
+			     CAT2(_ScanMove_,size),CAT2(_PRIn_,ptrs))		\
+	}
+
+#ifdef PAR
+# define SPEC_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    entry_localness(CAT2(RBH_,entry_code));    	\
+    localness W_ infolbl[];			\
+     localness W_ CAT2(RBH_,infolbl)[] = {	\
+        (W_) CAT2(RBH_,entry_code)		\
+	,(W_) INFO_OTHER_TAG			\
+	,(W_) MK_REP_REF(Spec_RBH,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(RBH)		\
+	INCLUDE_SPEC_PADDING			\
+	INCLUDE_RBH_INFO(infolbl)		\
+	};					\
+    STGFUN(CAT2(RBH_,entry_code)) { JMP_(RBH_entry); }\
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Spec_U,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_SPEC_PADDING			\
+	INCLUDE_RBH_INFO(CAT2(RBH_,infolbl))	\
+	}
+
+MAYBE_DECLARE_RTBL(Spec_RBH,1,0)
+MAYBE_DECLARE_RTBL(Spec_RBH,1,1)
+MAYBE_DECLARE_RTBL(Spec_RBH,2,0)
+MAYBE_DECLARE_RTBL(Spec_RBH,2,1)
+MAYBE_DECLARE_RTBL(Spec_RBH,2,2)
+MAYBE_DECLARE_RTBL(Spec_RBH,3,0)
+MAYBE_DECLARE_RTBL(Spec_RBH,3,1)
+MAYBE_DECLARE_RTBL(Spec_RBH,3,2)
+MAYBE_DECLARE_RTBL(Spec_RBH,3,3)
+MAYBE_DECLARE_RTBL(Spec_RBH,4,0)
+MAYBE_DECLARE_RTBL(Spec_RBH,4,4)
+MAYBE_DECLARE_RTBL(Spec_RBH,5,0)
+MAYBE_DECLARE_RTBL(Spec_RBH,5,5)
+MAYBE_DECLARE_RTBL(Spec_RBH,6,6)
+MAYBE_DECLARE_RTBL(Spec_RBH,7,7)
+MAYBE_DECLARE_RTBL(Spec_RBH,8,8)
+MAYBE_DECLARE_RTBL(Spec_RBH,9,9)
+MAYBE_DECLARE_RTBL(Spec_RBH,10,10)
+MAYBE_DECLARE_RTBL(Spec_RBH,11,11)
+MAYBE_DECLARE_RTBL(Spec_RBH,12,12)
+
+#define SPEC_RBH_RTBL(size,ptrs)						\
+    const W_ MK_REP_LBL(Spec_RBH,size,ptrs)[] = {				\
+	INCLUDE_TYPE_INFO(SPEC_RBH)			    			\
+	INCLUDE_SIZE_INFO(size,ptrs)						\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_Evacuate_RBH_,size),CAT4(_Scavenge_RBH_,size,_,ptrs)) \
+	SPEC_COMPACTING_INFO(CAT4(_ScanLink_RBH_,size,_,ptrs),			\
+			     CAT2(_PRStart_RBH_,ptrs),				\
+			     CAT2(_ScanMove_RBH_,size),CAT2(_PRIn_RBH_,ptrs))	\
+	}
+
+#define _Scavenge_RBH_2_0   _Scavenge_RBH_2_1
+#define _Scavenge_RBH_2_2   _Scavenge_RBH_2_1
+
+#define _Scavenge_RBH_3_0   _Scavenge_RBH_3_1
+#define _Scavenge_RBH_3_2   _Scavenge_RBH_3_1
+
+#define _Scavenge_RBH_4_0   _Scavenge_RBH_4_1
+#define _Scavenge_RBH_5_0   _Scavenge_RBH_5_1
+#define _Scavenge_RBH_6_0   _Scavenge_RBH_6_1
+#define _Scavenge_RBH_7_0   _Scavenge_RBH_7_1
+#define _Scavenge_RBH_8_0   _Scavenge_RBH_8_1
+#define _Scavenge_RBH_9_0   _Scavenge_RBH_9_1
+#define _Scavenge_RBH_10_0   _Scavenge_RBH_10_1
+#define _Scavenge_RBH_11_0   _Scavenge_RBH_11_1
+#define _Scavenge_RBH_12_0   _Scavenge_RBH_12_1
+
+#define _ScanLink_RBH_2_0   _ScanLink_RBH_2_1
+#define _ScanLink_RBH_2_2   _ScanLink_RBH_2_1
+
+#define _ScanLink_RBH_3_0   _ScanLink_RBH_3_1
+#define _ScanLink_RBH_3_2   _ScanLink_RBH_3_1
+
+#define _ScanLink_RBH_4_0   _ScanLink_RBH_4_1
+#define _ScanLink_RBH_5_0   _ScanLink_RBH_5_1
+#define _ScanLink_RBH_6_0   _ScanLink_RBH_6_1
+#define _ScanLink_RBH_7_0   _ScanLink_RBH_7_1
+#define _ScanLink_RBH_8_0   _ScanLink_RBH_8_1
+#define _ScanLink_RBH_9_0   _ScanLink_RBH_9_1
+#define _ScanLink_RBH_10_0   _ScanLink_RBH_10_1
+#define _ScanLink_RBH_11_0   _ScanLink_RBH_11_1
+#define _ScanLink_RBH_12_0   _ScanLink_RBH_12_1
+
+#define _PRStart_RBH_0	_PRStart_RBH_2
+#define _PRStart_RBH_1	_PRStart_RBH_2
+
+#define _PRIn_RBH_0	_PRIn_RBH_2
+#define _PRIn_RBH_1	_PRIn_RBH_2
+
+#else
+
+# define SPEC_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Spec_U,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+#endif
+
+MAYBE_DECLARE_RTBL(Spec_U,1,0)
+MAYBE_DECLARE_RTBL(Spec_U,1,1)
+MAYBE_DECLARE_RTBL(Spec_U,2,0)
+MAYBE_DECLARE_RTBL(Spec_U,2,1)
+MAYBE_DECLARE_RTBL(Spec_U,2,2)
+MAYBE_DECLARE_RTBL(Spec_U,3,0)
+MAYBE_DECLARE_RTBL(Spec_U,3,1)
+MAYBE_DECLARE_RTBL(Spec_U,3,2)
+MAYBE_DECLARE_RTBL(Spec_U,3,3)
+MAYBE_DECLARE_RTBL(Spec_U,4,0)
+MAYBE_DECLARE_RTBL(Spec_U,4,4)
+MAYBE_DECLARE_RTBL(Spec_U,5,0)
+MAYBE_DECLARE_RTBL(Spec_U,5,5)
+MAYBE_DECLARE_RTBL(Spec_U,6,6)
+MAYBE_DECLARE_RTBL(Spec_U,7,7)
+MAYBE_DECLARE_RTBL(Spec_U,8,8)
+MAYBE_DECLARE_RTBL(Spec_U,9,9)
+MAYBE_DECLARE_RTBL(Spec_U,10,10)
+MAYBE_DECLARE_RTBL(Spec_U,11,11)
+MAYBE_DECLARE_RTBL(Spec_U,12,12)
+
+#define SPEC_U_RTBL(size,ptrs)							\
+    const W_ MK_REP_LBL(Spec_U,size,ptrs)[] = {					\
+	INCLUDE_TYPE_INFO(SPEC_U)			    			\
+	INCLUDE_SIZE_INFO(size,ptrs)						\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_Evacuate_,size),CAT4(_Scavenge_,size,_,ptrs)) \
+	SPEC_COMPACTING_INFO(CAT4(_ScanLink_,size,_,ptrs),			\
+			     CAT2(_PRStart_,ptrs),				\
+			     CAT2(_ScanMove_,size),CAT2(_PRIn_,ptrs))		\
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[SELECT_ITBL]{@SELECT_ITBL@: Special @SPEC_U@ info-table for selectors}
+%*									*
+%************************************************************************
+
+These are different only in having slightly-magic GC code.  The idea
+is: it is a @MIN_UPD_SIZE@ (==2) thunk with one pointer, which, when
+entered, will select word $i$ from its pointee.
+
+When garbage-collecting such a closure, we ``peek'' at the pointee's
+tag (in its info table).  If it is evaluated, then we go ahead and do
+the selection---which is {\em just like an indirection}.  If it is not
+evaluated, we carry on {\em exactly as if it is a size-2/1-ptr thunk}.
+
+Copying: only the evacuate routine needs to be special.
+
+Compacting: only the PRStart (marking) routine needs to be special.
+
+\begin{code}
+
+#ifdef PAR
+# define SELECT_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,select_word_i,kind,descr,type) \
+    entry_localness(CAT2(RBH_,entry_code));    	\
+    localness W_ infolbl[];			\
+    localness W_ CAT2(RBH_,infolbl)[] = {	\
+        (W_) CAT2(RBH_,entry_code)		\
+	,(W_) INFO_OTHER_TAG			\
+	,(W_) MK_REP_REF(Spec_RBH,size,ptrs)	\
+	INCLUDE_PROFILING_INFO(RBH)		\
+	INCLUDE_SPEC_PADDING			\
+	INCLUDE_RBH_INFO(infolbl)		\
+	};					\
+    STGFUN(CAT2(RBH_,entry_code)) { JMP_(RBH_entry); }\
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Select,,select_word_i) \
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_SPEC_PADDING			\
+	INCLUDE_RBH_INFO(CAT2(RBH_,infolbl))	\
+	}					\
+
+#else
+
+# define SELECT_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,select_word_i,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Select,,select_word_i) \
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+#endif
+
+MAYBE_DECLARE_RTBL(Select,,0)
+MAYBE_DECLARE_RTBL(Select,,1)
+MAYBE_DECLARE_RTBL(Select,,2)
+MAYBE_DECLARE_RTBL(Select,,3)
+MAYBE_DECLARE_RTBL(Select,,4)
+MAYBE_DECLARE_RTBL(Select,,5)
+MAYBE_DECLARE_RTBL(Select,,6)
+MAYBE_DECLARE_RTBL(Select,,7)
+MAYBE_DECLARE_RTBL(Select,,8)
+MAYBE_DECLARE_RTBL(Select,,9)
+MAYBE_DECLARE_RTBL(Select,,10)
+MAYBE_DECLARE_RTBL(Select,,11)
+MAYBE_DECLARE_RTBL(Select,,12)
+
+#define SELECT_RTBL(size,ptrs,select_word_i)					\
+    const W_ MK_REP_LBL(Select,,select_word_i)[] = {				\
+	INCLUDE_TYPE_INFO(SPEC_U)						\
+	INCLUDE_SIZE_INFO(size,ptrs)						\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_EvacuateSelector_,select_word_i),		\
+			     CAT4(_Scavenge_,size,_,ptrs)) 			\
+	SPEC_COMPACTING_INFO(CAT4(_ScanLink_,size,_,ptrs),			\
+			     CAT2(_PRStartSelector_,select_word_i),		\
+                             CAT2(_ScanMove_,size),				\
+			     CAT2(_PRIn_,ptrs))					\
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[GEN_ITBL]{@GEN_x_ITBL@: Generic/general? info-tables}
+%*									*
+%************************************************************************
+
+@GEN@ info-table for non-updatable nodes (normal and non-normal forms).
+
+Size/no-of-ptrs are known at compile time, but we don't have GC
+routines wired in for those specific sizes.  Hence the size/no-of-ptrs
+is stored in the info-table.
+
+\begin{code}
+
+#define GEN_N_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Gen_N,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	INCLUDE_GEN_INFO(size,ptrs)		\
+	}
+
+MAYBE_DECLARE_RTBL(Gen_N,,)
+
+#define GEN_N_RTBL()								\
+    const W_ MK_REP_LBL(Gen_N,,)[] = {						\
+	INCLUDE_TYPE_INFO(GEN_N)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in info table */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_S,_Scavenge_S_N)				\
+	INCLUDE_COMPACTING_INFO(_ScanLink_S_N,_PRStart_N,_ScanMove_S,_PRIn_I)	\
+	}
+
+#define GEN_S_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Gen_S,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	INCLUDE_GEN_INFO(size,ptrs)		\
+	}
+
+MAYBE_DECLARE_RTBL(Gen_S,,)
+
+#define GEN_S_RTBL()								\
+    const W_ MK_REP_LBL(Gen_S,,)[] = {						\
+	INCLUDE_TYPE_INFO(GEN_S)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in info table */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_S,_Scavenge_S_N)				\
+	INCLUDE_COMPACTING_INFO(_ScanLink_S_N,_PRStart_N,_ScanMove_S,_PRIn_I)	\
+	}
+
+#ifdef PAR
+# define GEN_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    entry_localness(CAT2(RBH_,entry_code));    	\
+    localness W_ infolbl[];			\
+    localness W_ CAT2(RBH_,infolbl)[] = {	\
+        (W_) CAT2(RBH_,entry_code)		\
+	,(W_) INFO_OTHER_TAG			\
+	,(W_) MK_REP_REF(Gen_RBH,,)	    	\
+	INCLUDE_PROFILING_INFO(RBH)		\
+	INCLUDE_UPDATE_INFO(INFO_UNUSED,INFO_UNUSED)	\
+	INCLUDE_GEN_INFO(size,ptrs)		\
+	INCLUDE_RBH_INFO(infolbl)		\
+	};					\
+    STGFUN(CAT2(RBH_,entry_code)) { JMP_(RBH_entry); }\
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Gen_U,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(INFO_UNUSED,INFO_UNUSED)	\
+	INCLUDE_GEN_INFO(size,ptrs)		\
+	INCLUDE_RBH_INFO(CAT2(RBH_,infolbl))	\
+	}
+
+MAYBE_DECLARE_RTBL(Gen_RBH,,)
+
+# define GEN_RBH_RTBL()								\
+    const W_ MK_REP_LBL(Gen_RBH,,)[] = {					\
+	INCLUDE_TYPE_INFO(GEN_RBH)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: no size/no-ptrs! */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_RBH_S,_Scavenge_RBH_N)			\
+	INCLUDE_COMPACTING_INFO(_ScanLink_RBH_N,_PRStart_RBH_N,_ScanMove_RBH_S,_PRIn_RBH_I)	\
+	}
+
+#else
+
+# define GEN_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Gen_U,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(INFO_UNUSED,INFO_UNUSED)	\
+	INCLUDE_GEN_INFO(size,ptrs)		\
+	}
+#endif
+
+MAYBE_DECLARE_RTBL(Gen_U,,)
+
+#define GEN_U_RTBL()								\
+    const W_ MK_REP_LBL(Gen_U,,)[] = {						\
+	INCLUDE_TYPE_INFO(GEN_U)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: no size/no-ptrs! */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_S,_Scavenge_S_N)				\
+	INCLUDE_COMPACTING_INFO(_ScanLink_S_N,_PRStart_N,_ScanMove_S,_PRIn_I)	\
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[DYN_ITBL]{Dynamic-object info tables}
+%*									*
+%************************************************************************
+
+For these, the size/no-of-pointers is not known until runtime.  E.g.,
+arrays.  Those fields are, therefore, in the closure itself, and not
+in the info table.
+
+All @DYN@ closures are @PAP@s, so they are not updatable.
+
+\begin{code}
+
+#define DYN_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_LBL(Dyn,,)			\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(Dyn,,)
+
+#define DYN_RTBL()							\
+    const W_ MK_REP_LBL(Dyn,,)[] = {					\
+	INCLUDE_TYPE_INFO(DYN)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* in closure! */	\
+	INCLUDE_PAR_INFO						\
+	INCLUDE_COPYING_INFO(_Evacuate_Dyn,_Scavenge_Dyn)		\
+	INCLUDE_COMPACTING_INFO(_ScanLink_Dyn,_PRStart_Dyn,_ScanMove_Dyn,_PRIn_I_Dyn) \
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TUPLE_ITBL]{``Tuple'' and ``Data'' info-tables}
+%*									*
+%************************************************************************
+
+``Tuples'' are essentially DYNs with all pointers (no non-pointers).
+``Data things'' are DYNs with all non-pointers.
+
+\begin{code}
+
+#define TUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Tuple,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(Tuple,,)
+
+#define TUPLE_RTBL() \
+    const W_ MK_REP_LBL(Tuple,,)[] = { \
+	INCLUDE_TYPE_INFO(TUPLE)					\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in closure */	\
+	INCLUDE_PAR_INFO						\
+	INCLUDE_COPYING_INFO(_Evacuate_Tuple,_Scavenge_Tuple) \
+	INCLUDE_COMPACTING_INFO(_ScanLink_Tuple,_PRStart_Tuple,_ScanMove_Tuple,_PRIn_I_Tuple) \
+	}
+
+#define DATA_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Data,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(Data,,)
+
+#define DATA_RTBL() 			\
+    const W_ MK_REP_LBL(Data,,)[] = {	\
+	INCLUDE_TYPE_INFO(DATA)		\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in closure */ \
+	INCLUDE_PAR_INFO		 \
+	INCLUDE_COPYING_INFO(_Evacuate_Data,_Scavenge_Data) \
+	INCLUDE_COMPACTING_INFO(_ScanLink_Data,_PRStart_Data,_ScanMove_Data,_PRIn_Error) \
+    }
+
+/* Here is the decl for the only DATA info table used! */
+#ifndef COMPILING_GHC
+EXTDATA_RO(ArrayOfData_info);
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[MUTUPLE_ITBL]{Info-table for (im)mutable [array-ish] objects}
+%*									*
+%************************************************************************
+
+ToDo: Integrate with PAR stuff (Kevin) !!
+If someone bothers to document this I'll see what I can do! KH
+
+\begin{code}
+
+#if defined(GC_MUT_REQUIRED)
+
+# define MUTUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(MuTuple,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(MuTuple,,)
+
+# define MUTUPLE_RTBL()				\
+    const W_ MK_REP_LBL(MuTuple,,)[] = {	\
+	INCLUDE_TYPE_INFO(MUTUPLE)		\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in closure! */ \
+	INCLUDE_PAR_INFO			 \
+	INCLUDE_COPYING_INFO(_Evacuate_MuTuple,_Scavenge_MuTuple) \
+	INCLUDE_COMPACTING_INFO(_ScanLink_MuTuple,_PRStart_MuTuple,_ScanMove_MuTuple,_PRIn_I_MuTuple) \
+	}
+
+# define IMMUTUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(ImmuTuple,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(ImmuTuple,,)
+
+# define IMMUTUPLE_RTBL() \
+    const W_ MK_REP_LBL(ImmuTuple,,)[] = {  \
+	INCLUDE_TYPE_INFO(IMMUTUPLE)	    \
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in closure! */ \
+	INCLUDE_PAR_INFO			 \
+	INCLUDE_COPYING_INFO(_Evacuate_MuTuple,_Scavenge_MuTuple) \
+	INCLUDE_COMPACTING_INFO(_ScanLink_MuTuple,_PRStart_MuTuple,_ScanMove_ImmuTuple,_PRIn_I_MuTuple) \
+    }
+  
+#else   /* ! GC_MUT_REQUIRED --- define as TUPLE closure */
+
+# define MUTUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+	TUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type)
+# define IMMUTUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+	TUPLE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type)
+
+# define MUTUPLE_RTBL()
+# define IMMUTUPLE_RTBL()
+#endif
+
+/* Here are the decls for the only MUTUPLE info tables used. */
+#ifndef COMPILING_GHC
+EXTDATA_RO(ArrayOfPtrs_info);
+EXTDATA_RO(ImMutArrayOfPtrs_info);
+EXTDATA_RO(EmptySVar_info);
+EXTDATA_RO(FullSVar_info);
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[STATIC_ITBL]{Info tables for static objects (outside the heap)}
+%*									*
+%************************************************************************
+
+Size and ptrs fields are used by interpretive code, such as @ghci@,
+the parallel Pack code (@Pack.lc@) and possibly to-be-written debug
+code.
+
+\begin{code}
+
+#define STATIC_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Static,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	INCLUDE_STATIC_INFO(size,ptrs)		\
+	}
+
+MAYBE_DECLARE_RTBL(Static,,)
+
+#define STATIC_RTBL() \
+    const W_ MK_REP_LBL(Static,,)[] = { \
+	INCLUDE_TYPE_INFO(STATIC)	\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in info table! */ \
+	INCLUDE_PAR_INFO		 \
+	INCLUDE_COPYING_INFO(_Evacuate_Static,_Scavenge_Static) \
+	INCLUDE_COMPACTING_INFO(_Dummy_Static_entry,_PRStart_Static, \
+				_Dummy_Static_entry,_Dummy_Static_entry) \
+	}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[MallocPtr_ITBL]{@MallocPtr_TBL@: @MallocPtr@ info-table}
+%*									*
+%************************************************************************
+
+The following table is a bit like that for @SPEC@ with 0 pointers and
+a small number of non-ptrs.  However, the garbage collection routines
+are a bit special.
+
+I'm assuming @SPEC_N@, so that we don't need to pad out the info table. (JSM)
+
+\begin{code}
+#if !defined(PAR)
+
+# define MallocPtr_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type)	\
+    entry_localness(entry_code);		\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(MallocPtr,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+    }
+
+MAYBE_DECLARE_RTBL(MallocPtr,,)
+
+# define MallocPtr_RTBL() \
+    const W_ MK_REP_LBL(MallocPtr,,)[] = { \
+	INCLUDE_TYPE_INFO(INTERNAL)				\
+	INCLUDE_SIZE_INFO(MallocPtr_SIZE, 0L)   		\
+	INCLUDE_PAR_INFO					\
+	INCLUDE_COPYING_INFO(_Evacuate_MallocPtr,_Scavenge_MallocPtr) 	\
+	SPEC_COMPACTING_INFO(_ScanLink_MallocPtr,_PRStart_MallocPtr,_ScanMove_MallocPtr,_PRIn_0) \
+	}
+
+#endif /* !PAR */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[BH_ITBL]{Info tables for ``black holes''}
+%*									*
+%************************************************************************
+
+Special info-table for black holes. It is possible to describe these
+using @SPEC@ closures but this requires explicit use of the value of
+@MIN_UPD_SIZE@. For now we have a special macro and code.
+
+\begin{code}
+
+#define BH_ITBL(infolbl,bh_code,kind,localness,entry_localness) \
+    entry_localness(bh_code);			\
+    localness W_ infolbl[] = {			\
+        (W_) bh_code				\
+	,(W_) INFO_OTHER_TAG			\
+	,(W_) MK_REP_REF(BH,kind,)		\
+	INCLUDE_PROFILING_INFO(BH)		\
+    }
+
+MAYBE_DECLARE_RTBL(BH,U,)
+MAYBE_DECLARE_RTBL(BH,N,)
+
+#define BH_U_SIZE   MIN_UPD_SIZE
+#define BH_N_SIZE   MIN_NONUPD_SIZE
+#define BH_RTBL(kind)								\
+    const W_ MK_REP_LBL(BH,kind,)[] = {						\
+	INCLUDE_TYPE_INFO(BH)							\
+	INCLUDE_SIZE_INFO(CAT3(BH_,kind,_SIZE),0L)				\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(CAT2(_Evacuate_BH_,kind),CAT2(_Scavenge_BH_,kind))	\
+	INCLUDE_COMPACTING_INFO(CAT2(_ScanLink_BH_,kind),_PRStart_BH,		\
+				CAT2(_ScanMove_BH_,kind),_PRIn_Error)		\
+    }
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[IND_ITBL]{Info table for indirections}
+%*									*
+%************************************************************************
+
+An indirection simply extracts the pointer from the
+@IND_CLOSURE_PTR(closure)@ field. The garbage collection routines will
+short out the indirection.
+\begin{code}
+
+#define IND_ITBL(infolbl,ind_code,localness,entry_localness) \
+    CAT_DECLARE(infolbl,INTERNAL_KIND,"IND","IND")	\
+    entry_localness(ind_code);		    	    	\
+    localness W_ infolbl[] = {				\
+        (W_) ind_code					\
+	,(W_) INFO_IND_TAG				\
+	,(W_) MK_REP_REF(Ind,,)				\
+	INCLUDE_PROFILING_INFO(infolbl)			\
+	}
+
+MAYBE_DECLARE_RTBL(Ind,,)
+
+#define IND_RTBL()								\
+    const W_ MK_REP_LBL(Ind,,)[] = {						\
+	INCLUDE_TYPE_INFO(IND)							\
+	INCLUDE_SIZE_INFO(MIN_UPD_SIZE,INFO_UNUSED) /* #ptrs not here! */	\
+	INCLUDE_PAR_INFO			 				\
+	INCLUDE_COPYING_INFO(_Evacuate_Ind,_Scavenge_Ind) 			\
+	INCLUDE_COMPACTING_INFO(_Dummy_Ind_entry,_PRStart_Ind, 			\
+				_Dummy_Ind_entry,_Dummy_Ind_entry) 		\
+    }
+
+\end{code}
+
+Lexical-scoped profiling (now more-or-less the default... 94/06)
+requires a special permanent indirection for PAP closures.  These 
+look exactly like regular indirections, but they are not short-circuited
+on garbage collection.
+
+\begin{code}
+#if defined(USE_COST_CENTRES)
+
+# define PERM_IND_ITBL(infolbl,ind_code,localness,entry_localness) \
+    entry_localness(ind_code);		    	    	\
+    CAT_DECLARE(infolbl,INTERNAL_KIND,"IND","IND") 	\
+    localness W_ infolbl[] = {				\
+        (W_) ind_code					\
+	,(W_) INFO_IND_TAG				\
+	,(W_) MK_REP_REF(Perm_Ind,,)			\
+	INCLUDE_PROFILING_INFO(infolbl)			\
+    }
+
+MAYBE_DECLARE_RTBL(Perm_Ind,,)
+
+# define PERM_IND_RTBL()							\
+    const W_ MK_REP_LBL(Perm_Ind,,)[] = {					\
+	INCLUDE_TYPE_INFO(IND)							\
+	INCLUDE_SIZE_INFO(MIN_UPD_SIZE,INFO_UNUSED) /* #ptrs not here! */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_PI,_Scavenge_PI)				\
+	SPEC_COMPACTING_INFO(_ScanLink_PI,_PRStart_PI,				\
+			     _ScanMove_PI,_PRIn_PI)				\
+	}
+
+#else
+# define PERM_IND_RTBL()
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[CAF_ITBL]{Info table for updated @CAF@s}
+%*									*
+%************************************************************************
+
+Garbage collection of @CAF@s is tricky.  We have to cope with explicit
+collection from the @CAFlist@ as well as potential references from the
+stack and heap which will cause the @CAF@ evacuation code to be
+called.  They are treated like indirections which are shorted out.
+However they must also be updated to point to the new location of the
+new closure as the @CAF@ may still be used by references which
+reside in the code.
+
+\subsubsection{Copying Collection}
+
+A first scheme might use evacuation code which evacuates the reference
+and updates the indirection. This is no good as subsequent evacuations
+will result in an already evacuated closure being evacuated. This will
+leave a forward reference in to-space!
+
+An alternative scheme evacuates the @CAFlist@ first. The closures
+referenced are evacuated and the @CAF@ indirection updated to point to
+the evacuated closure. The @CAF@ evacuation code simply returns the
+updated indirection pointer --- the pointer to the evacuated closure.
+Unfortunately the closure the @CAF@ references may be a static
+closure, in fact, it may be another @CAF@. This will cause the second
+@CAF@'s evacuation code to be called before the @CAF@ has been
+evacuated, returning an unevacuated pointer.
+
+Another scheme leaves updating the @CAF@ indirections to the end
+of the garbage collection.
+All the references are evacuated and scavenged as usual (including the
+@CAFlist@). Once collection is complete the @CAFlist@ is traversed
+updating the @CAF@ references with the result of evacuating the
+referenced closure again. This will immediately return as it must be a
+forward reference, a static closure, or a @CAF@ which will indirect by
+evacuating its reference.
+
+The crux of the problem is that the @CAF@ evacuation code needs to
+know if its reference has already been evacuated and updated. If not, then
+the reference can be evacuated, updated and returned safely (possibly
+evacuating another @CAF@). If it has, then the updated reference can be
+returned. This can be done using two @CAF@ info-tables. At the start
+of a collection the @CAFlist@ is traversed and set to an internal {\em
+evacuate and update} info-table. During collection, evacution of such a
+@CAF@ also results in the info-table being reset back to the standard
+@CAF@ {\em return reference} info-table. Thus subsequent evacuations
+will simply return the updated reference. On completion of the
+collection all @CAF@s will have {\em return reference} info-tables
+again.
+
+This is the scheme we adopt. A @CAF@ indirection has evacuation code
+which returns the evacuated and updated reference. During garbage
+collection all the @CAF@s are overwritten with an internal @CAF@ info
+table which has evacuation code which performs this evacuate and
+update and restores the original @CAF@ code. At some point during the
+collection we must ensure that all the @CAF@s are indeed
+evacuated.
+
+The only potential problem with this scheme is a cyclic list of @CAF@s
+all directly referencing (possibly via indirections) another @CAF@!
+Evacuation of the first @CAF@ will fail in an infinite loop of @CAF@
+evacuations. This is solved by ensuring that the @CAF@ info-table is
+updated to a {\em return reference} info-table before performing the
+evacuate and update. If this {\em return reference} evacuation code is
+called before the actual evacuation is complete it must be because
+such a cycle of references exists. Returning the still unevacuated
+reference is OK --- all the @CAF@s will now reference the same
+@CAF@ which will reference itself! Construction of such a structure
+indicates the program must be in an infinite loop.
+
+
+\subsubsection{Compacting Collector}
+
+When shorting out a @CAF@, its reference must be marked. A first attempt
+might explicitly mark the @CAF@s, updating the reference with the
+marked reference (possibly short circuting indirections). The actual
+@CAF@ marking code can indicate that they have already been marked
+(though this might not have actually been done yet) and return the
+indirection pointer so it is shorted out. Unfortunately the @CAF@
+reference might point to an indirection which will be subsequently
+shorted out. Rather than returning the @CAF@ reference we treat the
+@CAF@ as an indirection, calling the mark code of the reference, which
+will return the appropriately shorted reference.
+
+Problem: Cyclic list of @CAF@s all directly referencing (possibly via
+indirections) another @CAF@!
+
+Before compacting, the locations of the @CAF@ references are
+explicitly linked to the closures they reference (if they reference
+heap allocated closures) so that the compacting process will update
+them to the closure's new location. Unfortunately these locations'
+@CAF@ indirections are static.  This causes premature termination
+since the test to find the info pointer at the end of the location
+list will match more than one value.  This can be solved by using an
+auxiliary dynamic array (on the top of the A stack).  One location for
+each @CAF@ indirection is linked to the closure that the @CAF@
+references. Once collection is complete this array is traversed and
+the corresponding @CAF@ is then updated with the updated pointer from
+the auxiliary array.
+
+\begin{code}
+
+#define CAF_ITBL(infolbl,ind_code,localness,entry_localness) \
+    CAT_DECLARE(infolbl,INTERNAL_KIND,"CAF","CAF")	\
+    entry_localness(ind_code);				\
+    localness W_ infolbl[] = {				\
+        (W_) ind_code					\
+	,(W_) INFO_IND_TAG				\
+	,(W_) MK_REP_REF(Caf,,)				\
+	INCLUDE_PROFILING_INFO(infolbl)			\
+    }
+
+MAYBE_DECLARE_RTBL(Caf,,)
+
+#define CAF_RTBL()								\
+    const W_ MK_REP_LBL(Caf,,)[] = {						\
+	INCLUDE_TYPE_INFO(CAF)							\
+	INCLUDE_SIZE_INFO(MIN_UPD_SIZE,INFO_UNUSED) /* #ptrs not here! */	\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO(_Evacuate_Caf,_Scavenge_Caf)			\
+	INCLUDE_COMPACTING_INFO(_Dummy_Caf_entry,_PRStart_Caf,			\
+				_Dummy_Caf_entry,_Dummy_Caf_entry)		\
+	}
+\end{code}
+
+
+It is possible to use an alternative marking scheme, using a similar
+idea to the copying solution. This scheme avoids the need to update
+the @CAF@ references explicitly. We introduce an auxillary {\em mark
+and update} @CAF@ info-table which is used to update all @CAF@s at the
+start of a collection. The new code marks the @CAF@ reference,
+updating it with the returned reference.  The returned reference is
+itself returned so the @CAF@ is shorted out.  The code also modifies the
+@CAF@ info-table to be a {\em return reference}.  Subsequent attempts to
+mark the @CAF@ simply return the updated reference.
+
+A cyclic @CAF@ reference will result in an attempt to mark the @CAF@
+before the marking has been completed and the reference updated. We
+cannot start marking the @CAF@ as it is already being marked. Nor can
+we return the reference as it has not yet been updated. Neither can we
+treat the CAF as an indirection since the @CAF@ reference has been
+obscured by the pointer reversal stack. All we can do is return the
+@CAF@ itself. This will result in some @CAF@ references not being
+shorted out.
+
+This scheme has not been adopted but has been implemented. The code is
+commented out with @#if 0@.
+
+%************************************************************************
+%*									*
+\subsection[CONST_ITBL]{@CONST_ITBL@}
+%*									*
+%************************************************************************
+
+This declares an info table for @CONST@ closures (size 0). 
+It is the info table for a dynamicaly-allocated closure which
+will redirect references to the corresponding
+static closure @<infolbl>_closure@ during garbage collection. 
+A pointer to the static closure is kept in the info table.  (It is
+assumed that this closure is declared elsewhere.)
+
+Why do such @CONST@ objects ever exist?  Why don't we just use the static
+object in the first place?  @CONST@ objects are used only for updating
+existing objects.  We could use an indirection, but that risks costing
+extra run-time indirections until the next gc shorts it out.  So
+we update with a @CONST@, and the next gc gets rid of it.
+
+\begin{code}
+
+#define CONST_ITBL(infolbl,closurelbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type)	\
+    entry_localness(entry_code);	    	\
+    EXTDATA(closurelbl);			\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) tag				\
+	,(W_) MK_REP_REF(Const,,)		\
+	INCLUDE_PROFILING_INFO(infolbl) 	\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	INCLUDE_CONST_INFO(closurelbl)		\
+	}
+
+MAYBE_DECLARE_RTBL(Const,,)
+
+#define CONST_RTBL()							\
+    const W_ MK_REP_LBL(Const,,)[] = {					\
+	INCLUDE_TYPE_INFO(CONST)					\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)			\
+	INCLUDE_PAR_INFO						\
+	INCLUDE_COPYING_INFO_CONST(_Evacuate_Const,_Scavenge_Const)	\
+	INCLUDE_COMPACTING_INFO(_Dummy_Const_entry,_PRStart_Const,	\
+				_Dummy_Const_entry,_Dummy_Const_entry)	\
+    }
+
+\end{code}
+
+This builds an info-table which will have pointers to the closure
+replaced with @closure_lbl@ during garbage collection. @closure_lbl@
+must be the label of a static closure, whose entry code has identical
+behaviour to that in the corresponding @CONST_ITBL@.  Usually
+the info pointer of this closure will be the very one defined by this
+macro!
+
+These closures always consist only of an info pointer; that is, its
+size is zero.
+
+A copying collection implements this with evacuation code which
+returns @closure_lbl@, without actually evacuating the object at all.
+A compacting collector uses marking code which returns
+@closure_lbl@, without marking the closure.
+
+%************************************************************************
+%*									*
+\subsection[FOOLIKE_ITBL]{``Char-like'' and ``Int-like'' info-tables}
+%*									*
+%************************************************************************
+
+Char-like: This builds an info-table which, when GC happens, will have
+pointers to the closure replaced with the appropriate element of the
+@CHARLIKE_closures@ array.
+
+\begin{code}
+
+#define CHARLIKE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*tag,size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);	    	\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) INFO_FIRST_TAG			\
+	,(W_) MK_REP_REF(CharLike,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+	}
+
+MAYBE_DECLARE_RTBL(CharLike,,)
+
+#define CHARLIKE_RTBL()								\
+    const W_ MK_REP_LBL(CharLike,,)[] = {					\
+	INCLUDE_TYPE_INFO(CHARLIKE)						\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)				\
+	INCLUDE_PAR_INFO							\
+	INCLUDE_COPYING_INFO_CONST(_Evacuate_CharLike,_Scavenge_CharLike)	\
+	INCLUDE_COMPACTING_INFO(_Dummy_CharLike_entry,_PRStart_CharLike,	\
+				_Dummy_CharLike_entry,_Dummy_CharLike_entry)	\
+	}
+
+\end{code}
+
+
+Int-like: this builds the info-table required for intlike closures.
+The normal heap-allocated info-table for fixed-size integers (size
+@1@); it is used for updates too. 
+At GC, this is redirected to a static intlike closure if one is
+available.
+
+Note again the sneaky hiding of a reference to the real info-table in
+the part of the info-table that normally holds the size of the
+closure.
+THIS CHANGES IN THE COMMONED INFO-TABLE WORLD.
+
+\begin{code}
+
+#define INTLIKE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*tag,size,ptrs unused*/ \
+    CAT_DECLARE(infolbl,kind,descr,type) 	\
+    entry_localness(entry_code);		\
+    localness W_ infolbl[] = {			\
+        (W_) entry_code				\
+	,(W_) INFO_FIRST_TAG			\
+	,(W_) MK_REP_REF(IntLike,,)		\
+	INCLUDE_PROFILING_INFO(infolbl)		\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+    }
+
+MAYBE_DECLARE_RTBL(IntLike,,)
+
+#define INTLIKE_RTBL()							\
+    const W_ MK_REP_LBL(IntLike,,)[] = {				\
+	INCLUDE_TYPE_INFO(INTLIKE)					\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)			\
+	INCLUDE_PAR_INFO				  		\
+	INCLUDE_COPYING_INFO_CONST(_Evacuate_IntLike,_Scavenge_1_0) 	\
+	INCLUDE_COMPACTING_INFO(_ScanLink_1_0,_PRStart_IntLike,		\
+				_ScanMove_1,_PRIn_Error) 		\
+    }
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[INREGS_ITBL]{@INREGS_ITBL@s}
+%*									*
+%************************************************************************
+
+The emaciated info table for a phantom closure that lives only in regs.
+We don't need any GC information, because these closures never make it into
+the heap (not with this info table, anyway).  Similarly, we don't need an
+entry address, because these closures are never entered...they only exist
+during a return.
+
+\begin{code}
+
+#define INREGS_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*mostly unused*/ \
+    localness W_ infolbl[] = {			\
+        (W_) INFO_UNUSED			\
+	,(W_) tag				\
+	,(W_) INFO_UNUSED			\
+	INREGS_PROFILING_INFO			\
+	INCLUDE_UPDATE_INFO(upd_code,liveness)	\
+    }
+
+/* Declare the phantom info table vectors (just Bool at the moment) */
+#ifndef COMPILING_GHC
+EXTDATA_RO(Bool_itblvtbl);
+#endif
+
+\end{code}
+
+End multi-slurp protection:
+\begin{code}
+#endif /* SMInfoTables_H */
+\end{code}

@@ -1,0 +1,50 @@
+#ifndef PLATFORM_H
+#define PLATFORM_H
+
+#define alpha_dec_osf1		 1
+#define hppa1_1_hp_hpux		 2
+#define i386_next_nextstep3	 3
+#define i386_unknown_freebsd	 4
+#define i386_unknown_linux	 5
+#define i386_unknown_netbsd	 6
+#define i386_unknown_solaris2	 7
+#define m68k_apple_macos7	 8
+#define m68k_next_nextstep	 9
+#define m68k_simonpj_grip	10
+#define m68k_sun_sunos4		11
+#define mips_dec_ultrix		12
+#define mips_sgi_irix		13
+#define rs6000_ibm_aix		14
+#define sparc_sun_solaris2	15
+#define sparc_sun_sunos4	16
+#define i386_unknown_linuxaout	17
+
+#define HostPlatform_TYPE   @HostPlatform_CPP@
+#define TargetPlatform_TYPE @HostPlatform_CPP@
+#define BuildPlatform_TYPE  @HostPlatform_CPP@
+
+#define @HostPlatform_CPP@_HOST		1
+#define @HostPlatform_CPP@_TARGET	1
+#define @HostPlatform_CPP@_BUILD  	1
+
+#define @HostArch_CPP@_HOST_ARCH	1
+#define @HostArch_CPP@_TARGET_ARCH	1
+#define @HostArch_CPP@_BUILD_ARCH  	1
+
+#define @HostOS_CPP@_HOST_OS		1
+#define @HostOS_CPP@_TARGET_OS	1
+#define @HostOS_CPP@_BUILD_OS 		1
+
+#define @HostVendor_CPP@_HOST_VENDOR	1
+#define @HostVendor_CPP@_TARGET_VENDOR 1
+#define @HostVendor_CPP@_BUILD_VENDOR 	1
+
+#define HC_UNSPECIFIED	1
+#define HC_GLASGOW_GHC	2
+#define HC_USE_HC_FILES 3
+#define HC_CHALMERS_HBC	4
+#define HC_ROJEMO_NHC	5
+#define HC_YALE_YHC	6
+#define HC_HUGS		7
+
+#endif

@@ -1,0 +1,116 @@
+#! /bin/sh
+#
+# die quickly if anything goes astray...
+set -e
+
+# figure out the absolute pathname of the "top" directory
+# (the one which has "mkworld", "nofib", "glafp-utils", etc., as subdirs)
+hardtop=`pwd`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/export/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+echo ''
+echo "*** The top of your build tree is: $hardtop"
+
+case "$hardtop" in
+  # NeXTStep brain damage
+  /private/tmp_mnt/auto* )
+    echo '***'
+    echo '*** AAARRRGGGHHHH!!!'
+    echo '***'
+    echo '*** Stupid automounter (and pwd) will not tell me'
+    echo '*** the absolute pathname for the current directory.'
+    echo '*** Be sure to set TopDirPwd in mkworld/site-DEF.jm.'
+    echo '*** (Then it does not matter what this script decides.)'
+    echo '***'
+    ;;
+esac
+
+# make "mkworld", "literate", and "glafp-utils" (no special configuration)
+
+#	make all the Makefiles first
+
+for i in @DoingMkWorld@ @DoingGlaFpUtils@ @DoingLiterate@ ; do
+  if [ -d $i ] ; then
+    ( set -e;									\
+      cd $i ;									\
+      echo '' ;									\
+      echo "*** configuring $i ..." ;						\
+      make -f Makefile.BOOT BOOT_DEFINES="-P none -S std -DTopDirPwd=$hardtop";	\
+      echo '' ;									\
+      echo "*** making Makefiles in $i ..." ;					\
+      make Makefile ; 								\
+      make Makefiles 								\
+    )
+  else
+    echo warning: $i is not a directory -- doing nothing for it
+  fi
+done
+
+#	now make the dependencies and Real Stuff
+
+for i in @DoingMkWorld@ @DoingGlaFpUtils@ @DoingLiterate@ ; do
+  if [ -d $i ] ; then
+    ( set -e;									\
+      cd $i ;									\
+      echo '' ;									\
+      echo "*** making dependencies in $i ..." ;				\
+      make depend ;								\
+      echo '' ;									\
+      echo "*** making all in $i ..." ;						\
+      make all									\
+    )
+  else
+    echo warning: $i is not a directory -- doing nothing for it
+  fi
+done
+
+# OK, now make the \`real' Makefiles
+
+for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ ; do
+  if [ -d $i ] ; then
+    ( set -e;									\
+      cd $i ;									\
+      echo '' ;									\
+      echo "*** configuring $i ..." ;						\
+      make -f Makefile.BOOT BOOT_DEFINES="-P $i -S @MkWorldSetup@ -C mkworld -DTopDirPwd=$hardtop";	\
+      echo '' ;									\
+      echo "*** making Makefiles in $i ..." ;					\
+      make Makefile ; 								\
+      make Makefiles 								\
+    )
+  else
+    echo warning: $i is not a directory -- doing nothing for it
+  fi
+done
+
+# Finally, the dependencies
+
+for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ ; do
+  if [ -d $i ] ; then
+    ( set -e;									\
+      cd $i ;									\
+      echo '' ;									\
+      echo "*** making dependencies in $i ..." ;				\
+      make depend 								\
+    )
+  else
+    echo warning: $i is not a directory -- doing nothing for it
+  fi
+done
+
+echo ''
+echo '*******************************************************************'
+echo "* Looking good! All you should need to do now is...               *"
+echo '*                                                                 *'
+for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ ; do
+    echo "        cd $i"
+    if [ $i = nofib ] ; then
+	echo '        make all        # or...'
+	echo '        make runtests'
+    else
+	echo '        make all'
+	echo '        make install   # if you are so inclined...'
+    fi
+done
+echo '*                                                                 *'
+echo '*******************************************************************'
+exit 0

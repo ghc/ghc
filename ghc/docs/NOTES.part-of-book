@@ -1,0 +1,73 @@
+E.g., for the typechecker sources of the compiler.
+
+% cd compiler/typechecker/
+
+* make a Jmakefile that is NOT plugged into the overall make-world
+  system; it will probably look like this:
+
+------------------------------
+/* this is a standalone Jmakefile; NOT part of ghc "make world" */
+
+LitDocRootTargetWithNamedOutput(root,lit,root-standalone)
+------------------------------
+
+* make a "root file", root.lit, to glue the modules together.
+
+  At the beginning you'll have something like:
+
+    \begin{onlystandalone}
+    \documentstyle[11pt,literate,a4wide]{article}
+    \begin{document}
+    \title{The Glasgow \Haskell{} typechecker}
+    \author{The GRASP team}
+    \date{October 1991}
+    \maketitle
+    \tableofcontents
+    \end{onlystandalone}
+
+    \begin{onlypartofdoc}
+    \section[Typechecker]{The typechecker}
+    \downsection
+    \end{onlypartofdoc}
+
+  At the end of the file, you'll need something like:
+
+    \begin{onlypartofdoc}
+    \upsection
+    \end{onlypartofdoc}
+
+    \begin{onlystandalone}
+    \printindex
+    \end{document}
+    \end{onlystandalone}
+
+  In between, simply \input all the modules, possibly adding some
+  sectioning hierarchy:
+
+    \section[Typechecker-core]{Typechecking the abstract syntax}
+    \downsection
+    \input{XXXXXXX.lhs}
+    \input{YYYYYYY.lhs}
+    \upsection
+
+    \section[Typechecker-support]{Typechecker: supporting modules}
+    \downsection
+    \input{AAAAAAAAAAA.lhs}
+    \input{BBBBBBBBBBB.lhs}
+    \upsection
+
+* To make your Makefile, do:
+
+    % jmkmf -P ghc
+
+  (because of a bug, you may have to do it twice :-)
+
+* Then do "make depend".
+
+* Now you are ready for business:
+
+    % make root.info
+    
+    or
+    
+    % make root.dvi

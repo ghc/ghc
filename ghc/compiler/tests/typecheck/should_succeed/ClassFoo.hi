@@ -1,0 +1,4 @@
+interface ClassFoo where
+class Foo a where
+    op1 :: a -> Int
+    op2 :: a -> a -> Int {-# ARITY op2 = 3 #-}{-# UPDATE op2 = 000 #-} {-# ARITY op1 = 1 #-}{-# UPDATE op1 = 0 #-}

@@ -1,0 +1,16 @@
+interface Lexer_Token where
+import Lexeme(Lexeme)
+import Source_Position(Source_Position)
+kind :: Token -> Lexeme
+	{-# ARITY kind = 1 #-}
+make :: Source_Position -> Lexeme -> Token
+	{-# ARITY make = 2 #-}
+position :: Token -> Source_Position
+	{-# ARITY position = 1 #-}
+data Token = Token Lexeme Source_Position
+instance Text Token
+	{-# ARITY readsPrec = 0 #-}
+	{-# ARITY showsPrec = 2 #-}
+	{-# ARITY readList = 0 #-}
+	{-# ARITY showList = 0 #-}
+

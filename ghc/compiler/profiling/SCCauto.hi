@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SCCauto where
+import CmdLineOpts(GlobalSwitch, SwitchResult)
+import CoreSyn(CoreBinding)
+import Id(Id)
+import PreludePS(_PackedString)
+addAutoCostCentres :: (GlobalSwitch -> SwitchResult) -> _PackedString -> [CoreBinding Id Id] -> [CoreBinding Id Id]
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLS" _N_ _N_ #-}
+

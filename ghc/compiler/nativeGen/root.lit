@@ -1,0 +1,60 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide]{article}
+\begin{document}
+\title{Native Code Generation}
+\author{The AQUA team}
+\date{February 1994}
+\maketitle
+\tableofcontents
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[Native_Code_Gen]{Native Code Generation}
+\downsection
+\end{onlypartofdoc}
+
+The following sections appear in fairly random order.
+
+\section{Asm}
+\downsection
+\input{AsmCodeGen.lhs}
+\input{AsmCodeClass.lhs}
+\input{AsmMatch.lhs}
+\input{AsmMonad.lhs}
+\input{AsmRegAlloc.lhs}
+\input{AsmUtils.lhs}
+\upsection
+
+\section{AbsC}
+\downsection
+\input{AbsCStixGen.lhs}
+\input{AbsCInline.lhs}
+\upsection
+
+\section{Stix}
+\downsection
+\input{Stix.lhs}
+\input{StixInfo.lhs}
+\input{StixMacro.lhs}
+\input{StixMisc.lhs}
+\input{StixPrim.lhs}
+\upsection
+
+\section{Sparc}
+\downsection
+\input{SparcGen.lhs}
+\input{SparcCode.lhs}
+\upsection
+
+\section{Misc}
+\downsection
+\input{MachDesc.lhs}
+\upsection
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

@@ -1,0 +1,120 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_coresyn where
+import UgenUtil
+import Util
+
+import U_list
+import U_literal
+import U_ttype
+%}}
+type coresyn;
+	/* binders: simple Id, plus a type */
+	cobinder : < gcobinder_v  : unkId;
+		     gcobinder_ty : ttype; >;
+
+	/* atoms */
+	colit	: < gcolit  	 : literal; >;
+	colocal : < gcolocal_v	 : coresyn; >;
+
+	cononrec : <gcononrec_b   : coresyn;
+		    gcononrec_rhs : coresyn; >;
+	corec :	   <gcorec  	  : list; >;
+	corec_pair: <gcorec_b 	: coresyn;
+		    gcorec_rhs 	: coresyn; >;
+
+	covar	: < gcovar	: coresyn; >;
+	coliteral :< gcoliteral : literal; >;
+	cocon	: < gcocon_con  : coresyn;
+		    gcocon_tys	: list;
+		    gcocon_args	: list; >;
+	coprim	: < gcoprim_op	: coresyn; /* primop or something */
+		    gcoprim_tys	: list;
+		    gcoprim_args: list; >;
+	colam	: < gcolam_vars	: list;
+		    gcolam_body	: coresyn; >;
+	cotylam	: < gcotylam_tvs: list;
+		    gcotylam_body : coresyn; >;
+	coapp	: < gcoapp_fun  : coresyn;
+		    gcoapp_args : list; >;
+	cotyapp	: < gcotyapp_e : coresyn;
+		    gcotyapp_t : ttype; >;
+	cocase	: < gcocase_s  : coresyn;
+		    gcocase_alts : coresyn; >;
+	colet	: < gcolet_bind	: coresyn;
+		    gcolet_body : coresyn; >;
+	coscc	: < gcoscc_scc  : coresyn;
+		    gcoscc_body : coresyn; >;
+
+	coalg_alts : <	gcoalg_alts : list;
+			gcoalg_deflt : coresyn; >;
+	coalg_alt  : <	gcoalg_con : coresyn;
+			gcoalg_bs  : list;
+			gcoalg_rhs : coresyn; >;
+
+	coprim_alts : < gcoprim_alts : list;
+		       gcoprim_deflt : coresyn; >;
+	coprim_alt  : <	gcoprim_lit  : literal;
+			gcoprim_rhs  : coresyn; >;
+
+	conodeflt : < >;
+	cobinddeflt : < gcobinddeflt_v : coresyn;
+			gcobinddeflt_rhs : coresyn; >;
+
+	co_primop :    < gco_primop : stringId;>;
+	co_ccall  :    < gco_ccall	    : stringId;
+			 gco_ccall_may_gc   : long;
+			 gco_ccall_arg_tys  : list;
+			 gco_ccall_res_ty   : ttype; >;
+    	co_casm   :    < gco_casm   	    : literal; 
+			 gco_casm_may_gc    : long;
+			 gco_casm_arg_tys   : list;
+			 gco_casm_res_ty    : ttype; >;
+
+	/* various flavours of cost-centres */
+	co_preludedictscc : < gco_preludedictscc_dupd : coresyn; >;
+	co_alldictscc	: < gco_alldictscc_m : hstring;
+			    gco_alldictscc_g : hstring;
+			    gco_alldictscc_dupd : coresyn; >;
+	co_usercc	: < gco_usercc_n    : hstring;
+			    gco_usercc_m    : hstring;
+			    gco_usercc_g    : hstring;
+			    gco_usercc_dupd : coresyn;
+			    gco_usercc_cafd : coresyn; >;
+	co_autocc	: < gco_autocc_i    : coresyn;
+			    gco_autocc_m    : hstring;
+			    gco_autocc_g    : hstring;
+			    gco_autocc_dupd : coresyn;
+			    gco_autocc_cafd : coresyn; >;
+	co_dictcc	: < gco_dictcc_i    : coresyn;
+			    gco_dictcc_m    : hstring;
+			    gco_dictcc_g    : hstring;
+			    gco_dictcc_dupd : coresyn;
+			    gco_dictcc_cafd : coresyn; >;
+	
+	co_scc_noncaf	: < >;
+	co_scc_caf	: < >;
+	co_scc_nondupd	: < >;
+	co_scc_dupd	: < >;
+
+	/* various flavours of Ids */
+	co_id		: < gco_id	    : stringId; >;
+	co_orig_id	: < gco_orig_id_m   : stringId;
+ 			    gco_orig_id_n   : stringId; >;
+	co_sdselid	: < gco_sdselid_c   : unkId;
+			    gco_sdselid_sc  : unkId; >;
+	co_classopid	: < gco_classopid_c : unkId;
+			    gco_classopid_o : unkId; >;
+	co_defmid	: < gco_defmid_c    : unkId;
+			    gco_defmid_op   : unkId; >;
+    	co_dfunid	: < gco_dfunid_c    : unkId;
+			    gco_dfunid_ty   : ttype; >;
+    	co_constmid	: < gco_constmid_c  : unkId;
+			    gco_constmid_op : unkId;
+			    gco_constmid_ty : ttype; >;
+	co_specid	: < gco_specid_un   : coresyn;
+			    gco_specid_tys  : list; >;
+	co_wrkrid   	: < gco_wrkrid_un   : coresyn; >;
+end;

@@ -1,0 +1,26 @@
+Typechecked:
+d.Num.t24 = dfun.Num.Integer
+d.Num.t26 = dfun.Num.Integer
+fromInt.t23 = fromInt tt2 d.Num.t24
+lit.t3 = fromInt.t23 (MkInt 2#)
+fromInt.t25 = fromInt tt15 d.Num.t26
+lit.t10 = fromInt.t25 (MkInt 1#)
+fromInt.t27 = fromInt.t25
+lit.t16 = fromInt.t27 (MkInt 0#)
+d.Num.t28 = d.Num.t24
+(+.t21) = (+) tt2 d.Num.t28
+AbsBinds [] [] [(j.t1, ShouldSucceed.j)]
+    {- nonrec -}
+    j.t1 :: tt2
+    j.t1 = lit.t3
+AbsBinds [] [] [(k.t6, ShouldSucceed.k), (l.t7, ShouldSucceed.l)]
+    {- rec -}
+    k.t6 :: [tt15]
+    k.t6 = ((:) tt15) lit.t10 (((:) tt15) ShouldSucceed.j l.t7)
+    l.t7 :: [tt15]
+    l.t7 = ((:) tt15) lit.t16 k.t6
+AbsBinds [] [] [(m.t19, ShouldSucceed.m)]
+    {- nonrec -}
+    m.t19 :: tt2
+    m.t19 = ShouldSucceed.j +.t21 ShouldSucceed.j
+

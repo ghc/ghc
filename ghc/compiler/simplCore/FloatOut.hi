@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface FloatOut where
+import CmdLineOpts(GlobalSwitch)
+import CoreSyn(CoreBinding)
+import Id(Id)
+import SplitUniq(SplitUniqSupply)
+floatOutwards :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding Id Id] -> [CoreBinding Id Id]
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "SLS" _N_ _N_ #-}
+

@@ -1,0 +1,10 @@
+Typechecked:
+AbsBinds [] [] [(x.t1, ShouldSucceed.x)]
+    {- nonrec -}
+    x.t1 :: [[Bool]]
+    x.t1 = [[True] (Bool)] ([Bool])
+AbsBinds [] [] [(xs.t3, ShouldSucceed.xs)]
+    {- nonrec -}
+    xs.t3 :: [Bool]
+    xs.t3 = [ x.r56 | x.r55 <- ShouldSucceed.x, x.r56 <- x.r55 ]
+

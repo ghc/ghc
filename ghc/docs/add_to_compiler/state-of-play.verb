@@ -1,0 +1,14 @@
+%************************************************************************
+%*									*
+\section{The state of play}
+%*									*
+%************************************************************************
+
+\ToDo{This section will describe the state of play: where
+functional-language compilers are; compared to their imperative
+cousins.}
+
+%The burden of proof remains with us functional programmers.  We
+%encourage you to help solve this problem by contributing compiler
+%passes that optimise real programs written in a standard non-toy
+%language effectively.

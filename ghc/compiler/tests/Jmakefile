@@ -1,0 +1,11 @@
+#define IHaveSubdirs
+
+SUBDIRS = reader \
+	  rename \
+	  simplCore \
+	  typecheck \
+	  deSugar \
+	  printing \
+	  ccall \
+	  deriving \
+	  bugs

@@ -1,0 +1,27 @@
+Desugared:
+{- plain CoRec -}
+defm.Test.Foo.op1 :: for all a. <Test.Foo a> -> a -> a
+defm.Test.Foo.op1 = /\ a -> (error (a -> a)) "No default method for \"op1\"\n"S
+defm.Test.Foo.op2 :: for all a. <Test.Foo a> -> a -> a
+defm.Test.Foo.op2 = /\ a -> (error (a -> a)) "No default method for \"op2\"\n"S
+Test.Foo.op1 :: for all a. <Test.Foo a> -> a -> a
+Test.Foo.op1 =
+    /\ a -> \ ds.95 ->
+	case ds.95 of {
+	  MkTuple2 op1.77 op2.78 -> op1.77
+	}
+Test.Foo.op2 :: for all a. <Test.Foo a> -> a -> a
+Test.Foo.op2 =
+    /\ a -> \ ds.96 ->
+	case ds.96 of {
+	  MkTuple2 op1.80 op2.81 -> op2.81
+	}
+dfun.Test.Foo.Int :: <Test.Foo Int>
+dfun.Test.Foo.Int =
+    let dict.89 = dfun.Test.Foo.Int in
+    let op1.85 = \ x.97 -> (Test.Foo.op2 Int) dict.89 x.97 in
+    let dict.93 = dfun.Test.Foo.Int in
+    let op2.86 = \ y.98 -> (Test.Foo.op1 Int) dict.93 y.98
+    in  MkTuple2! (Int -> Int) (Int -> Int) op1.85 op2.86
+{- end plain CoRec -}
+

@@ -1,0 +1,9 @@
+% From cvh/Public/GBC/Source/Gm7.hs
+\begin{verbatim}
+eval :: GmState -> [GmState]
+eval state = state: restStates
+             where
+             restStates | gmFinal state = []
+                        | otherwise = eval nextState
+             nextState  = doAdmin (step state)
+\end{verbatim}

@@ -1,0 +1,9 @@
+ 
+"tcfail013.hs", line 3:
+    Couldn't match type "[tt2]" against "Bool".
+    Inside two equations or case alternatives:
+	... [] -> 1
+	... True -> 2
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

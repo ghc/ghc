@@ -1,0 +1,10 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeArray where
+import PreludeBuiltin(Tuple2)
+import PreludeCore(_CCallable(..))
+data Array a b   = _Array (a, a) (Array# b)
+data Assoc a b   = (:=) a b
+data _ByteArray a   = _ByteArray (a, a) ByteArray#
+instance _CCallable (_ByteArray a)
+	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _TUP_0 [] [] _N_ #-}
+

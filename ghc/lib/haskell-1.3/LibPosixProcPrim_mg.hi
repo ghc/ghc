@@ -1,0 +1,193 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface LibPosixProcPrim where
+import LibSystem(ExitCode)
+import PreludeArray(_ByteArray)
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+import PreludeStdIO(Maybe)
+data ExitCode 	{-# GHC_PRAGMA ExitSuccess | ExitFailure Int #-}
+data Handler   = Default | Ignore | Catch (_State _RealWorld -> (Either IOError13 (), _State _RealWorld))
+data ProcessStatus   = Exited ExitCode | Terminated Int | Stopped Int
+type Signal = Int
+type SignalSet = _ByteArray ()
+addSignal :: Int -> _ByteArray () -> _ByteArray ()
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(AP)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+awaitSignal :: Maybe (_ByteArray ()) -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+backgroundRead :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+backgroundWrite :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+blockSignals :: _ByteArray () -> _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ #-}
+continueProcess :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+deleteSignal :: Int -> _ByteArray () -> _ByteArray ()
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(AP)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+emptySignalSet :: _ByteArray ()
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+executeFile :: [Char] -> Bool -> [[Char]] -> Maybe [([Char], [Char])] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 5 _U_ 21212 _N_ _S_ "SELSL" _N_ _N_ #-}
+exitImmediately :: ExitCode -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+floatingPointException :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+forkProcess :: _State _RealWorld -> (Either IOError13 (Maybe Int), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+fullSignalSet :: _ByteArray ()
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+getAnyProcessStatus :: Bool -> Bool -> _State _RealWorld -> (Either IOError13 (Maybe (Int, ProcessStatus)), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "EEL" _N_ _N_ #-}
+getEnvVar :: [Char] -> _State _RealWorld -> (Either IOError13 [Char], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+getEnvironment :: _State _RealWorld -> (Either IOError13 [([Char], [Char])], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getGroupProcessStatus :: Bool -> Bool -> Int -> _State _RealWorld -> (Either IOError13 (Maybe (Int, ProcessStatus)), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1111 _N_ _S_ "EEU(P)U(P)" {_A_ 4 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getPendingSignals :: _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getProcessStatus :: Bool -> Bool -> Int -> _State _RealWorld -> (Either IOError13 (Maybe ProcessStatus), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1111 _N_ _S_ "EEU(P)U(P)" {_A_ 4 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getSignalMask :: _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+illegalInstruction :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+inSignalSet :: Int -> _ByteArray () -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(AP)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+installHandler :: Int -> Handler -> Maybe (_ByteArray ()) -> _State _RealWorld -> (Either IOError13 Handler, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1111 _N_ _S_ "U(P)SSU(P)" {_A_ 4 _U_ 2112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+internalAbort :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+keyboardSignal :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+keyboardStop :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+keyboardTermination :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+killProcess :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+lostConnection :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+nullSignal :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
+openEndedPipe :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+processStatusChanged :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+queryStoppedChildFlag :: _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+raiseSignal :: Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+realTimeAlarm :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+removeEnvVar :: [Char] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+scheduleAlarm :: Int -> _State _RealWorld -> (Either IOError13 Int, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+segmentationViolation :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+setEnvVar :: [Char] -> [Char] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ #-}
+setEnvironment :: [([Char], [Char])] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+setSignalMask :: _ByteArray () -> _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ #-}
+setStoppedChildFlag :: Bool -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "EU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sigABRT :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigALRM :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigCHLD :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigCONT :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigFPE :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigHUP :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigILL :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigINT :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigKILL :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigPIPE :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigProcMask :: [Char] -> Int -> _ByteArray () -> _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _S_ "LU(P)U(AP)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+sigQUIT :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigSEGV :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigSTOP :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigSetSize :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigTERM :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigTSTP :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigTTIN :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigTTOU :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigUSR1 :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sigUSR2 :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+signalProcess :: Int -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(P)U(P)U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+signalProcessGroup :: Int -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(P)U(P)U(P)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int#) (u1 :: Int#) (u2 :: State# _RealWorld) -> case _#_ negateInt# [] [u1] of { _PRIM_ (u3 :: Int#) -> _APP_  _WRKR_ _ORIG_ LibPosixProcPrim signalProcess [ u0, u3, u2 ] } _N_} _F_ _ALWAYS_ \ (u0 :: Int) (u1 :: Int) (u2 :: _State _RealWorld) -> case u0 of { _ALG_ I# (u3 :: Int#) -> case u1 of { _ALG_ I# (u4 :: Int#) -> case u2 of { _ALG_ S# (u5 :: State# _RealWorld) -> case _#_ negateInt# [] [u4] of { _PRIM_ (u6 :: Int#) -> _APP_  _WRKR_ _ORIG_ LibPosixProcPrim signalProcess [ u3, u6, u5 ] }; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+sleep :: Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+softwareStop :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+softwareTermination :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+unBlockSignals :: _ByteArray () -> _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ #-}
+userDefinedSignal1 :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+userDefinedSignal2 :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Eq ProcessStatus
+	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool)] [_CONSTM_ Eq (==) (ProcessStatus), _CONSTM_ Eq (/=) (ProcessStatus)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq ExitCode
+	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool)] [_CONSTM_ Eq (==) (ExitCode), _CONSTM_ Eq (/=) (ExitCode)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord ProcessStatus
+	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq ProcessStatus}}, (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> ProcessStatus), (ProcessStatus -> ProcessStatus -> ProcessStatus), (ProcessStatus -> ProcessStatus -> _CMP_TAG)] [_DFUN_ Eq (ProcessStatus), _CONSTM_ Ord (<) (ProcessStatus), _CONSTM_ Ord (<=) (ProcessStatus), _CONSTM_ Ord (>=) (ProcessStatus), _CONSTM_ Ord (>) (ProcessStatus), _CONSTM_ Ord max (ProcessStatus), _CONSTM_ Ord min (ProcessStatus), _CONSTM_ Ord _tagCmp (ProcessStatus)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord ExitCode
+	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq ExitCode}}, (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> ExitCode), (ExitCode -> ExitCode -> ExitCode), (ExitCode -> ExitCode -> _CMP_TAG)] [_DFUN_ Eq (ExitCode), _CONSTM_ Ord (<) (ExitCode), _CONSTM_ Ord (<=) (ExitCode), _CONSTM_ Ord (>=) (ExitCode), _CONSTM_ Ord (>) (ExitCode), _CONSTM_ Ord max (ExitCode), _CONSTM_ Ord min (ExitCode), _CONSTM_ Ord _tagCmp (ExitCode)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Text ProcessStatus
+	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(ProcessStatus, [Char])]), (Int -> ProcessStatus -> [Char] -> [Char]), ([Char] -> [([ProcessStatus], [Char])]), ([ProcessStatus] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (ProcessStatus), _CONSTM_ Text showsPrec (ProcessStatus), _CONSTM_ Text readList (ProcessStatus), _CONSTM_ Text showList (ProcessStatus)] _N_
+	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Text ExitCode
+	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(ExitCode, [Char])]), (Int -> ExitCode -> [Char] -> [Char]), ([Char] -> [([ExitCode], [Char])]), ([ExitCode] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (ExitCode), _CONSTM_ Text showsPrec (ExitCode), _CONSTM_ Text readList (ExitCode), _CONSTM_ Text showList (ExitCode)] _N_
+	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

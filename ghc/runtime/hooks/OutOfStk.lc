@@ -1,0 +1,10 @@
+\begin{code}
+#include "rtsdefs.h"
+
+void
+StackOverflowHook (stack_size)
+  I_ stack_size;    /* in bytes */
+{
+    fprintf(stderr, "Stack space overflow: current size %ld bytes.\nUse `+RTS -Ksize' to increase it.\n", stack_size);
+}
+\end{code}

@@ -1,0 +1,162 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*									*
+\section{How data is handled within the RTS}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifndef RTSTYPES_H
+#define RTSTYPES_H
+\end{code}
+
+For all of you boolean crazies out there...
+
+\begin{code}
+
+typedef enum { 
+    rtsFalse = 0, 
+    rtsTrue 
+} rtsBool;
+
+\end{code}
+
+Hash tables for GUM are ADTs.  Peek inside, and I'll have to kill you.
+The same goes for hash list cells.
+
+\begin{code}
+#ifdef GUM
+typedef struct hashtable HashTable;
+typedef struct hashlist HashList;
+
+typedef double REAL_TIME;
+typedef int GLOBAL_TASK_ID;
+typedef int PACKET;
+typedef int OPCODE;
+
+/* Global addresses, in all their glory */
+
+typedef struct {
+    union {
+	P_ plc;
+	struct {
+	    GLOBAL_TASK_ID gtid;
+	    int slot;
+	} gc;
+    } loc;
+    unsigned weight;
+} globalAddr;
+
+/* (GA, LA) pairs */
+typedef struct gala {
+    globalAddr ga;
+    P_ la;
+    struct gala *next;
+    rtsBool preferred;
+} GALA;
+
+#endif
+
+#if defined(GRAN)
+typedef unsigned long TIME;
+typedef unsigned char PROC;
+typedef unsigned char EVTTYPE;
+#endif
+
+#if defined(PAR)
+typedef W_ TIME;
+typedef GLOBAL_TASK_ID PROC;
+#endif
+
+#if defined(GRAN) || defined(PAR)
+/* Granularity event types for output */
+enum gran_event_types {
+    GR_START = 0, GR_STARTQ, 
+    GR_STEALING, GR_STOLEN, GR_STOLENQ, 
+    GR_FETCH, GR_REPLY, GR_BLOCK, GR_RESUME, GR_RESUMEQ,
+    GR_SCHEDULE, GR_DESCHEDULE,
+    GR_END,
+    SP_SPARK, SP_SPARKAT, SP_USED, SP_PRUNED, SP_EXPORTED, SP_ACQUIRED,
+    GR_TERMINATE,
+    GR_EVENT_MAX
+};
+
+#endif
+
+#ifdef GRAN
+
+typedef struct spark
+{
+  struct spark *prev, *next;
+  P_ node;
+  I_ name, global;
+} *sparkq;
+
+typedef struct event {
+  PROC proc;            /* Processor id */
+  PROC creator;         /* Processor id of PE that created the event */
+  EVTTYPE evttype;      /* Event type */
+  TIME time;            /* Time at which event happened */
+  P_ tso;               /* Associated TSO, if relevant, Nil_closure otherwise*/
+  P_ node;              /* Associated node, if relevant, Nil_closure otherwise*/
+  sparkq spark;         /* Associated SPARK, if relevant, NULL otherwise */
+  struct event *next;
+  } *eventq;
+
+#endif
+
+\end{code}
+
+A cost centre is represented by a pointer to a static structure
+containing the @label@, @module@, @group@, and the statistical meters
+we are collecting.
+
+\begin{code}
+#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+
+typedef struct cc {
+    struct cc *registered;	/* list of registered cost centres 	*/
+    hash_t index_val;		/* hashed index -- initially UNHASHED   */
+	
+    char *label;            	/* cost centre label 			*/
+    char *module;           	/* name of module in which _scc_ occurs */
+    char *group;           	/* name of group  in which _scc_ occurs */
+
+    char is_subsumed;		/* '\0' => *not* a CAF or dict cc	*/
+				/* 'C'  => *is* a CAF cc		*/
+				/* 'D'  => *is* a dictionary cc		*/
+
+    /* Statistics Gathered */
+
+    W_ scc_count;          	/* no of scc expression instantiations	*/
+    W_ sub_scc_count;      	/* no of scc's set inside this cc	*/
+    W_ cafcc_count;        	/* no of scc expression instantiations	*/
+    W_ sub_cafcc_count;    	/* no of scc's set inside this cc	*/
+
+    W_ thunk_count;		/* no of {thunk,function,PAP} enters 	*/
+    W_ function_count;		/*    in this cost centre		*/
+    W_ pap_count;
+
+    W_ time_ticks;         	/* no of timer interrupts -- current interval */
+    W_ prev_ticks;         	/* no of timer interrupts -- previous intervals */
+    W_ mem_allocs;		/* no of allocations 			*/
+    W_ mem_alloc;		/* no of words allocated (excl CC_HDR)	*/
+
+    /* Heap Profiling by Cost Centre */
+
+    W_ selected;		/* is this cost centre selected */
+
+} *CostCentre;
+
+#endif /* defined(USE_COST_CENTRES) || defined(CONCURRENT) */
+\end{code}
+
+This structure will need to be expanded change as the statistics we
+gather improve.
+
+\begin{code}
+#endif /* ! RTSTYPES_H */
+\end{code}
+

@@ -1,0 +1,6 @@
+Typechecked:
+AbsBinds [ot2] [] [(f.t1, P.f)]
+    {- nonrec -}
+    f.t1 :: ot2 -> ()
+    f.t1 _ | otherwise = ()
+

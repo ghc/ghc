@@ -1,0 +1,12 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeBuiltin where
+import PreludeCore(Eq(..), Ix(..), Ord(..), Text(..))
+instance (Eq a, Eq b, Eq c, Eq d, Eq e) => Eq (a, b, c, d, e)
+	{-# GHC_PRAGMA _M_ PreludeBuiltin {-dfun-} _A_ 5 _U_ 11111 _N_ _N_ _N_ _N_ #-}
+instance (Ix a, Ix b, Ix c, Ix d, Ix e) => Ix (a, b, c, d, e)
+	{-# GHC_PRAGMA _M_ PreludeBuiltin {-dfun-} _A_ 6 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+instance (Ord a, Ord b, Ord c, Ord d, Ord e) => Ord (a, b, c, d, e)
+	{-# GHC_PRAGMA _M_ PreludeBuiltin {-dfun-} _A_ 6 _U_ 111112 _N_ _N_ _N_ _N_ #-}
+instance (Text a, Text b, Text c, Text d, Text e) => Text (a, b, c, d, e)
+	{-# GHC_PRAGMA _M_ PreludeBuiltin {-dfun-} _A_ 5 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+

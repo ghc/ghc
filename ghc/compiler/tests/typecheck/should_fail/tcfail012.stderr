@@ -1,0 +1,8 @@
+ 
+"tcfail012.hs", line 3:
+    Couldn't match type "Bool" against "[tt0]".
+    In a pattern binding:
+	True = []
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

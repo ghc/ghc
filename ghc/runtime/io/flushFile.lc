@@ -1,0 +1,30 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[flushFile.lc]{hFlush Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+flushFile(fp)
+StgAddr fp;
+{
+    int rc;
+
+    while ((rc = fflush((FILE *) fp)) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return rc;
+	}
+    }
+    return 0;
+}
+
+\end{code}
+
+
+

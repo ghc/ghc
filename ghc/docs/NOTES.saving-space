@@ -1,0 +1,250 @@
+Ways to save code space
+~~~~~~~~~~~~~~~~~~~~~~~
+SLPJ/BOS 16 Sept 94
+
+
+
+
+
+Heap entry points
+~~~~~~~~~~~~~~~~~
+We have lots of thunks of the form
+
+	let
+	   x = f p q r
+	in ...
+
+where f is know function of arity 3 (ie saturated).
+At the moment we generate special code for this one closure,
+which:
+	pushes an update frame
+	loads p,q,r into registers from the closure (or using
+		immediate loads if they are literals), 
+	jumps to f_fast.
+
+Since there are quite a lot of thunks of this form, the idea is to
+generate some code (and its info table) just once, *with the
+definition of f*, which does exactly as described above.  We can then
+use this code for every thunk of (exactly) this form.  Call this
+the "heap entry" for f:
+
+	slow entry:	args on stack
+	fast entry:	args in regs
+	heap entry:	args in closure pointed to by Node
+
+So the thunk for x would look like this:
+
+	-----------------
+  x =	| * | p | q | r |
+	--|--------------
+          |
+	  |	  common heap entry code for f
+	  ------> push update frame
+		  R2 := R1[2]	-- Second arg
+		  R3 := R1[3]	-- Third arg
+		  R1 := R1[1]	-- First arg
+		  goto f_fast
+
+The jump to f_fast can be implemented as a fall-through.  (The
+slow entry point can take a jump instead!)
+
+Of course there are also lots of thunks which *aren't* of the heap-entry
+form:
+	x = case y of ...
+	x = let v = ... in ...
+	etc
+
+Things to watch out for:
+
+* Literal args.  Consider
+
+	x = f 2 p 4
+
+We don't *have* to use the heap entry for f (we could generate special
+code+info table as we do now), but we *can* use it provided we
+generate a thunk with 2 and 4 stored in it as well as p:
+
+	-----------------
+	| * | 2 | p | 4 |
+	--|--------------
+          |
+	  |	  common heap entry code for f
+	  ------> push update frame
+		  R2 := R1[2]	-- Second arg
+		  R3 := R1[3]	-- Third arg
+		  R1 := R1[1]	-- First arg
+		  goto f_fast
+
+(If we have special code the thunk needs only p stored in it, because
+the special code can use immediate constants for 2 and 4:
+
+	---------
+	| * | p |
+	--|------
+          |
+	  |	special code for x
+	  ----> push update frame
+		R2 := R1[1]	-- Second arg
+		R3 := 4		-- Third  arg
+		R1 := 2		-- First arg
+		goto f_fast
+
+
+* Single-entry thunks.  If x is a single-entry thunk, there's no need to
+push an update frame. That suggests:
+
+	---------------
+    x = | * | 2 | p 4 |
+	--|------------
+          |
+	  |	  heap entry code for f
+	  ---->   -- NO!  NO!  push update frame
+		  R2 := R1[2]	-- Second arg
+		  R3 := R1[3]	-- Third arg
+		  R1 := R1[1]	-- First arg
+		  goto f_fast
+
+Let's call the two variants the
+	standard heap entry
+and	no-update heap entry
+	
+We can't fall through from the standard heap-entry code (which pushes
+an update frame) to the arg-loading code, because both need an info table.
+We have to take a jump.  
+
+For non-exported functions we may be able to see that only one of the
+two heap entries is required.
+
+* Local functions.  When f is a *local* (ie not top-level) function, its
+fast-entry convention is that
+	 R1   = the function closure
+	 R2.. = the args
+
+For example:
+
+	top p q = let
+			f = \r -> ..r..p...q... 
+		  in
+		  let
+			x = f q
+		  in 
+		  ...
+
+
+The shape of the heap-entry closure for f must be	 
+
+	       -------------
+	x  =   | * | f | q |
+	       --|----------
+		 |
+		 -------> heap entry code
+			  must load *f* into R1 as well as q and
+			  the other args
+
+
+
+
+
+Avoiding generating entries and info tables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At present, for every function we generate all of the following,
+just in case.  But they aren't always all needed, as noted below:
+
+[NB: all of this applies only to *functions*.  Thunks always
+have closure, info table, and entry code.]
+
+
+* Fast-entry code  ALWAYS NEEDED
+
+* Slow-entry code
+	Needed iff (a) we have any un-saturated calls to the function
+	OR	   (b) the function is passed as an arg
+
+* The function closure
+	Needed iff (a) we have any un-saturated calls to the function
+	OR	   (b) the function is passed as an arg
+	OR	   (c) if the function has free vars (ie top level)
+
+  Why case (a) here?  Because if the arg-satis check fails, 
+  UpdatePAP stuffs a pointer to the function closure in the PAP.
+  [Could be changed; UpdatePAP could stuff in a code ptr instead,
+   but doesn't seem worth it.]
+
+  [NB: these conditions imply that we might need the closure 
+  without the slow-entry code.  Here's how.
+
+	f x y = let g w = ...x..y..w...
+		in
+		...(g t)...
+
+  Here we need a closure for g which contains x and y,
+  but since the calls are all saturated we just jump to the
+  fast entry point for g, with R1 pointing to the closure for g.]
+
+
+* Slow-entry info table
+	Needed iff (a) we have any un-saturated calls to the function
+	OR	   (b) the function is passed as an arg
+	OR 	   (c) the function has free vars (ie top level)
+ 
+	NB.  (c) is only required so that the function closure has
+	an info table to point to, to keep the storage manager happy.
+	If (c) alone is true we could fake up an info table by choosing
+	one of a standard family of info tables, whose entry code just
+	bombs out.
+
+	If (c) is retained, then we'll sometimes generate an info table
+	(for storage mgr purposes) without slow-entry code.  Then we need
+	to use an error label in the info table to substitute for the absent
+	slow entry code.
+
+* Standard heap-entry code
+  Standard heap-entry info table
+	Needed iff we have any updatable thunks of the standard heap-entry shape.
+
+* Single-update heap-entry code
+  Single-update heap-entry info table
+	Needed iff we have any non-updatable thunks of the 
+	standard heap-entry shape.
+	
+
+All are needed if the function is exported, just to play safe.
+
+Idea: generate just the stuff we need!
+
+
+
+\begin{code}
+staticClosureRequired 		-- Assumption: it's a top-level, no-free-var binding
+	:: StgBinderInfo 
+	-> [Id]			-- Args
+	-> Bool
+staticClosureRequired (StgBinderInfo arg_occ unsat_occ _ _) args
+  = arg_occ || 		-- There's an argument occurrence
+    unsat_occ || 	-- There's an unsaturated call
+    null args		-- It's a thunk
+
+staticClosureRequired NoStgBinderInfo args = True
+
+
+
+slowFunEntryCodeRequired	-- Assumption: it's a function, not a thunk.
+	:: StgBinderInfo
+	-> Bool
+slowFunEntryCodeRequired (StgBinderInfo arg_occ unsat_occ _ _)
+  = arg_occ || 		-- There's an argument occurrence
+    unsat_occ 		-- There's an unsaturated call
+slowFunEntryCodeRequired NoStgBinderInfo = True
+
+
+funInfoTableRequired		-- Assumption: it's a function, not a thunk.
+	:: Bool			-- Top level?
+	-> StgBinderInfo
+	-> Bool
+funInfoTableRequired top_level (StgBinderInfo arg_occ unsat_occ _ _)
+  = not top_level ||
+    arg_occ || 		-- There's an argument occurrence
+    unsat_occ 		-- There's an unsaturated call
+
+funInfoTableRequired top_level NoStgBinderInfo = True
+\end{code}

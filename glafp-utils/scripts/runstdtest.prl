@@ -1,0 +1,409 @@
+#! /usr/local/bin/perl
+#
+# Given:
+#	* a program to run (1st arg)
+# 	* some "command-line opts" ( -O<opt1> -O<opt2> ... )
+#	    [default: anything on the cmd line this script doesn't recognise ]
+#	  the first opt not starting w/ "-" is taken to be an input
+#	  file and (if it exists) is grepped for "what's going on here"
+#	  comments (^--!!!).
+#	* a file to feed to stdin ( -i<file> ) [default: /dev/null ]
+#	* a "time" command to use (-t <cmd>).
+#
+#	* alternatively, a "-script <script>" argument says: run the
+#   	  named Bourne-shell script to do the test.  It's passed the
+#	  pgm-to-run as the one-and-only arg.
+#
+# Run the program with those options and that input, and check:
+# if we get...
+# 
+# 	* an expected exit status ( -x <val> ) [ default 0 ]
+# 	* expected output on stdout ( -o1 <file> ) [ default /dev/null ]
+#		( we'll accept one of several...)
+# 	* expected output on stderr ( -o2 <file> ) [ default /dev/null ]
+#		( we'll accept one of several...)
+#
+#	(if the expected-output files' names end in .Z, then
+#	 they are uncompressed before doing the comparison)
+# 
+# (This is supposed to be a "prettier" replacement for runstdtest.)
+#
+($Pgm = $0) =~ s|.*/||;
+$Verbose = 0;
+$Status = 0;
+@PgmArgs = ();
+$PgmExitStatus = 0;
+$PgmStdinFile  = '/dev/null';
+$TmpPrefix = '$(TMPDIR)';
+$ScriptFile = "$TmpPrefix/run_me$$";
+$DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alphas)
+$DefaultStderrFile = "$TmpPrefix/no_stderr$$";
+@PgmStdoutFile = ();
+@PgmStderrFile = ();
+$AltScript = '';
+$TimeCmd = '';
+$StatsFile = "$TmpPrefix/stats$$";
+$SysSpecificTiming = '';
+$SpixTiming = 'no';
+
+die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
+$ToRun = $ARGV[0]; shift(@ARGV);
+# avoid picking up same-named thing from somewhere else on $PATH...
+$ToRun = "./$ToRun" if $ToRun !~ /^\//;
+
+arg: while ($_ = $ARGV[0]) {
+    shift(@ARGV);
+    
+    /^-v$/	&& do { $Verbose = 1; next arg; };
+    /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
+    /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
+			$Status++,
+			print STDERR "$Pgm: bogus -i input file: $PgmStdinFile\n"
+			    if ! -f $PgmStdinFile;
+			next arg; };
+    /^-x(.*)/	&& do { $PgmExitStatus = &grab_arg_arg('-x',$1);
+			$Status++ ,
+			print STDERR "$Pgm: bogus -x expected exit status: $PgmExitStatus\n"
+			    if $PgmExitStatus !~ /^\d+$/;
+			next arg; };
+    /^-o1(.*)/	&& do { $out_file = &grab_arg_arg('-o1',$1);
+			push(@PgmStdoutFile, $out_file);
+			next arg; };
+    /^-o2(.*)/	&& do { $out_file = &grab_arg_arg('-o2',$1);
+			push(@PgmStderrFile, $out_file);
+			next arg; };
+    /^-script(.*)/ && do { $AltScript = &grab_arg_arg('-script',$1);
+			   @PgmStdoutFile = (); # re-init
+			   @PgmStderrFile = (); # ditto
+			   next arg; };
+    /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
+				  next arg; };
+    /^-spix-timing$/ && do { $SysSpecificTiming = 'ghcspix';
+			     $SpixTiming = 'yes';
+			     next arg; };
+    /^-t(.*)/	&& do { $TimeCmd = &grab_arg_arg('-t', $1); next arg; };
+
+    # anything else is taken to be a pgm arg
+    push(@PgmArgs, $_);
+}
+
+foreach $out_file ( @PgmStdoutFile ) {
+    $Status++ ,
+    print STDERR "$Pgm: bogus -o1 expected-output file: $out_file\n"
+	if ! -f $out_file;
+}
+
+foreach $out_file ( @PgmStderrFile ) {
+    $Status++,
+    print STDERR "$Pgm: bogus -o2 expected-stderr file: $out_file\n"
+	if ! -f $out_file;
+}
+
+exit 1 if $Status;
+
+# add on defaults if none specified
+@PgmStdoutFile = ( $DefaultStdoutFile ) if $#PgmStdoutFile < 0;
+@PgmStderrFile = ( $DefaultStderrFile ) if $#PgmStderrFile < 0;
+
+# tidy up the pgm args:
+# (1) look for the "first input file"
+#     and grep it for "interesting" comments (--!!! )
+# (2) quote any args w/ whitespace in them.
+$grep_done = 0;
+foreach $a ( @PgmArgs ) {
+    if (! $grep_done && $a !~ /^-/ && -f $a) {
+	print `egrep "^--!!!" $a`;
+	$grep_done = 1;
+    }
+    if ($a =~ /\s/ || $a =~ /'/) {
+	$a =~ s/'/\\'/g;    # backslash the quotes;
+	$a = "\"$a\"";	    # quote the arg
+    }
+}
+
+# deal with system-specific timing options
+$TimingMagic = '';
+if ( $SysSpecificTiming =~ /^ghc/ ) {
+    $TimingMagic = "+RTS -s$StatsFile -RTS"
+} elsif ( $SysSpecificTiming eq 'hbc' ) {
+    $TimingMagic = "-S$StatsFile";
+}
+
+if ($AltScript ne '') {
+    local($to_do);
+    $to_do = `cat $AltScript`;
+    # glue in pgm to run...
+    $* = 1;
+    $to_do =~ s/^\$1 /$ToRun /;
+    &run_something($to_do);
+    exit 0;
+#    exec "$AltScript $ToRun";
+#    print STDERR "Failed to exec!!! $AltScript $ToRun\n";
+#    exit 1;
+}
+
+$ToRunOrig = $ToRun;
+if ( $SpixTiming eq 'yes' ) {
+    $ToRun .= '.spix';
+
+    # gotta find first/last addresses in the mutator code
+    $FirstSpix = '_callWrapper';
+    $LastSpix  = '???'; # usually _mpz_get_si, but can't be sure
+
+    open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
+    spix: while (<SPIXNM>) {
+	if ( / T (_FreeMallocPtr|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
+	    $LastSpix = $1;
+	    last spix;
+	}
+    }
+    close(SPIXNM); # || die "nm -n $ToRunOrig close failed!\n";
+
+    $SpixifyLine = "spix -o $ToRun -t$FirstSpix,$LastSpix $ToRunOrig";
+    $SpixstatsLine = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats";
+} else {
+    $SpixifyLine = '';
+    $SpixstatsLine = '';
+}
+
+# OK, so we're gonna do the normal thing...
+
+$Script = <<EOSCRIPT;
+#! /bin/sh
+myexit=0
+diffsShown=0
+rm -f $DefaultStdoutFile $DefaultStderrFile
+cat /dev/null > $DefaultStdoutFile
+cat /dev/null > $DefaultStderrFile
+$SpixifyLine
+$TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+progexit=\$?
+if [ \$progexit -ne $PgmExitStatus ]; then
+    echo $ToRun @PgmArgs \\< $PgmStdinFile
+    echo expected exit status $PgmExitStatus not seen \\; got \$progexit
+    myexit=1
+else
+    hit='NO'
+    for out_file in @PgmStdoutFile ; do
+	if cmp -s \$out_file $TmpPrefix/runtest$$.1 ; then
+	    hit='YES'
+	fi
+    done
+    if [ \$hit = 'NO' ] ; then
+	echo $ToRun @PgmArgs \\< $PgmStdinFile
+	echo expected stdout not matched by reality
+	$(CONTEXT_DIFF) $PgmStdoutFile[0] $TmpPrefix/runtest$$.1
+	myexit=1
+	diffsShown=1
+    fi
+fi
+egrep -v '^ld\.so:.*has older revision than expected' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
+mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
+
+hit='NO'
+for out_file in @PgmStderrFile ; do
+    if cmp -s \$out_file $TmpPrefix/runtest$$.2 ; then
+	hit='YES'
+    fi
+done
+if [ \$hit = 'NO' ] ; then
+    echo $ToRun @PgmArgs \\< $PgmStdinFile
+    echo expected stderr not matched by reality
+    $(CONTEXT_DIFF) $PgmStderrFile[0] $TmpPrefix/runtest$$.2
+    myexit=1
+    diffsShown=1
+fi
+$SpixstatsLine
+$(RM) core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
+exit \$myexit
+EOSCRIPT
+
+# bung script into a file
+open(SCR, "> $ScriptFile") || die "Failed opening script file $ScriptFile!\n";
+print SCR $Script;
+close(SCR) || die "Failed closing script file!\n";
+chmod 0755, $ScriptFile;
+
+print STDERR $Script if $Verbose;
+
+&run_something($ScriptFile);
+
+if ( $SysSpecificTiming eq '' ) {
+    unlink $StatsFile;
+    unlink $ScriptFile;
+    exit 0;
+}
+
+&process_stats_file();
+&process_spixstats_file() if $SpixTiming eq 'yes';
+
+# print out what we found
+if ( $SpixTiming ne 'yes' ) {
+    print STDERR "<<$SysSpecificTiming: ",
+	"$BytesAlloc bytes, $GCs GCs, $MaxResidency bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	" :$SysSpecificTiming>>\n";
+} else {
+    print STDERR "<<$SysSpecificTiming: ",
+	"$BytesAlloc bytes, $GCs GCs, $MaxResidency bytes residency ($ResidencySamples samples), $TotalInsns instructions, $LoadInsns loads, $StoreInsns stores, $BranchInsns branches, $OtherInsns others",
+	" :$SysSpecificTiming>>\n";
+}
+
+# OK, party over
+unlink $StatsFile;
+unlink $ScriptFile;
+exit 0;
+
+sub grab_arg_arg {
+    local($option, $rest_of_arg) = @_;
+    
+    if ($rest_of_arg) {
+	return($rest_of_arg);
+    } elsif ($#ARGV >= 0) {
+	local($temp) = $ARGV[0]; shift(@ARGV); 
+	return($temp);
+    } else {
+	print STDERR "$Pgm: no argument following $option option\n";
+	$Status++;
+    }
+}
+
+sub run_something {
+    local($str_to_do) = @_;
+
+#   print STDERR "$str_to_do\n" if $Verbose;
+
+    local($return_val) = 0;
+    system($str_to_do);
+    $return_val = $?;
+
+    if ($return_val != 0) {
+#ToDo: this return-value mangling is wrong
+#	local($die_msg) = "$Pgm: execution of the $tidy_name had trouble";
+#	$die_msg .= " (program not found)" if $return_val == 255;
+#	$die_msg .= " ($!)" if $Verbose && $! != 0;
+#	$die_msg .= "\n";
+	unlink $ScriptFile;
+	unlink $StatsFile;
+
+	exit (($return_val == 0) ? 0 : 1);
+    }
+}
+
+sub process_stats_file {
+
+    # OK, process system-specific stats file
+    if ( $SysSpecificTiming =~ /^ghc/ ) {
+
+	#NB: nearly the same as in GHC driver's -ghc-timing stuff
+
+	open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
+	while (<STATS>) {
+	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
+
+	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
+		$MaxResidency = $1; $ResidencySamples = $2;
+	    }
+
+	    $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
+
+	    if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+		$InitTime = $1; $InitElapsed = $2;
+	    } elsif ( /^\s*MUT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+		$MutTime = $1; $MutElapsed = $2;
+	    } elsif ( /^\s*GC\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+		$GcTime = $1; $GcElapsed = $2;
+	    }
+	}
+	close(STATS) || die "Failed when closing $StatsFile\n";
+
+    } elsif ( $SysSpecificTiming eq 'hbc' ) {
+
+	open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
+	while (<STATS>) {
+	    $BytesAlloc = $1 if /^\s*([0-9]+) bytes allocated from the heap/;
+
+	    $GCs = $1 if /^\s*([0-9]+) GCs?,$/;
+
+	    if ( /^\s*(\d+\.\d\d) \((\d+\.\d)\) seconds total time,$/ ) {
+		$MutTime = $1; $MutElapsed = $2; # will fix up later
+
+		$InitTime = 0; $InitElapsed = 0; # hbc doesn't report these
+
+	    } elsif ( /^\s*(\d+\.\d\d) \((\d+\.\d)\) seconds GC time/ ) {
+		$GcTime = $1; $GcElapsed = $2;
+
+		# fix up mutator time now
+		$MutTime    = sprintf("%.2f", ($MutTime    - $GcTime));
+		$MutElapsed = sprintf("%.1f", ($MutElapsed - $GcElapsed));
+	    }
+	}
+	close(STATS) || die "Failed when closing $StatsFile\n";
+    }
+
+    # warn about what we didn't find
+    print STDERR "Warning: BytesAlloc not found in stats file\n" unless defined($BytesAlloc);
+    print STDERR "Warning: GCs not found in stats file\n" unless defined($GCs);
+    print STDERR "Warning: InitTime not found in stats file\n" unless defined($InitTime);
+    print STDERR "Warning: InitElapsed not found in stats file\n" unless defined($InitElapsed);
+    print STDERR "Warning: MutTime not found in stats file\n" unless defined($MutTime);
+    print STDERR "Warning: MutElapsed not found in stats file\n" unless defined($MutElapsed);
+    print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
+    print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
+
+    # things we didn't necessarily expect to find
+    $MaxResidency     = 0 unless defined($MaxResidency);
+    $ResidencySamples = 0 unless defined($ResidencySamples);
+
+    # a bit of tidying
+    $BytesAlloc =~ s/,//g;
+    $MaxResidency =~ s/,//g;
+    $GCs =~ s/,//g;
+    $InitTime =~ s/,//g;
+    $InitElapsed =~ s/,//g;
+    $MutTime =~ s/,//g;
+    $MutElapsed =~ s/,//g;
+    $GcTime =~ s/,//g;
+    $GcElapsed =~ s/,//g;
+}
+
+sub process_spixstats_file {
+
+    $TotalInsns = 0;
+    $LoadInsns  = 0;
+    $StoreInsns = 0;
+    $BranchInsns= 0;
+    $OtherInsns = 0;
+
+    open(STATS, "< $ToRunOrig.spixstats") || die "Failed when opening $ToRunOrig.spixstats\n";
+    while (<STATS>) {
+	last if /^OPCODES \(STATIC\):/; # party over
+
+	next if /^OPCODES \(DYNAMIC\):/;
+	next if /^$/;
+	next if /^opcode\s+#executed/;
+	next if /^SUBTOTAL/;
+
+	if ( /^ld\S*\s+(\d+)/ ) {
+	    $LoadInsns += $1;
+
+	} elsif ( /^st\S*\s+(\d+)/ ) {
+	    $StoreInsns += $1;
+
+	} elsif ( /^(jmpl|call|b\S*)\s+(\d+)/ ) {
+	    $BranchInsns += $2;
+
+	} elsif ( /^TOTAL\s+(\d+)/ ) {
+	    $TotalInsns = $1;
+	    print STDERR "TotalInsns doesn't match categories total!\n"
+		if $TotalInsns !=
+		   ($LoadInsns + $StoreInsns + $BranchInsns + $OtherInsns);
+
+	} elsif ( /^\S+\s+(\d+)/ ) {
+	    $OtherInsns += $1;
+
+	} else {
+	    die "Funny line?? $_";
+	}
+    }
+    close(STATS) || die "Failed when closing $ToRunOrig.spixstats\n";
+}

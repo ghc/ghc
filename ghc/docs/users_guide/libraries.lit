@@ -1,0 +1,1047 @@
+%************************************************************************
+%*                                                                      *
+\section[syslibs]{System libraries}
+\index{system libraries}
+\index{libraries, system}
+%*                                                                      *
+%************************************************************************
+
+We intend to provide more and more ready-to-use Haskell code, so that
+every program doesn't have to invent everything from scratch.
+
+At the moment, we supply a part of the HBC library, as well as the
+beginnings of one of our own (``GHC library'').
+
+If you provide a \tr{-syslib <name>}\index{-syslib <name> option} option,
+then the interfaces for that library will come into scope (and may be
+\tr{import}ed), and the code will be added in at link time.
+
+%************************************************************************
+%*                                                                      *
+\subsection[GHC-library]{The GHC system library}
+\index{library, GHC}
+\index{GHC library}
+%*                                                                      *
+%************************************************************************
+
+We have started to put together a ``GHC system library.''
+
+At the moment, the library is made of generally-useful bits of the
+compiler itself.
+
+To use this library, just give a \tr{-syslib ghc}\index{-syslib ghc option}
+option to GHC, both for compiling and linking.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Bag]{The @Bag@ type}
+\index{Bag module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+A {\em bag} is an unordered collection of elements which may contain
+duplicates.  To use, \tr{import Bag}.
+
+\begin{verbatim}
+emptyBag        :: Bag elt
+unitBag         :: elt -> Bag elt
+
+unionBags       :: Bag elt   -> Bag elt -> Bag elt
+unionManyBags   :: [Bag elt] -> Bag elt
+snocBag         :: Bag elt   -> elt     -> Bag elt
+
+elemBag         :: Eq elt => elt -> Bag elt -> Bool
+isEmptyBag      ::                  Bag elt -> Bool
+filterBag       :: (elt -> Bool) -> Bag elt -> Bag elt
+partitionBag    :: (elt -> Bool) -> Bag elt-> (Bag elt, Bag elt)
+        -- returns the elements that do/don't satisfy the predicate
+
+listToBag       :: [elt] -> Bag elt
+bagToList       :: Bag elt -> [elt]
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[BitSet]{The @BitSet@ type}
+\index{BitSet module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+Bit sets are a fast implementation of sets of integers ranging from 0
+to one less than the number of bits in a machine word (typically 31).
+If any element exceeds the maximum value for a particular machine
+architecture, the results of these operations are undefined.  You have
+been warned.  [``If you put any safety checks in this code, I will have
+to kill you.'' --JSM]
+
+\begin{verbatim}
+mkBS        :: [Int]  -> BitSet
+listBS      :: BitSet -> [Int]
+emptyBS     :: BitSet 
+singletonBS :: Int    -> BitSet
+
+unionBS     :: BitSet -> BitSet -> BitSet
+minusBS     :: BitSet -> BitSet -> BitSet
+elementBS   :: Int    -> BitSet -> Bool
+intersectBS :: BitSet -> BitSet -> BitSet
+
+isEmptyBS   :: BitSet -> Bool
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[FiniteMap]{The @FiniteMap@ type}
+\index{FiniteMap module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+What functional programmers call a {\em finite map}, everyone else
+calls a {\em lookup table}.
+
+Out code is derived from that in this paper:
+\begin{display}
+S Adams
+"Efficient sets: a balancing act"
+Journal of functional programming 3(4) Oct 1993, pages 553-562
+\end{display}
+Guess what?  The implementation uses balanced trees.
+
+\begin{verbatim}
+--      BUILDING
+emptyFM         :: FiniteMap key elt
+singletonFM     :: key -> elt -> FiniteMap key elt
+listToFM        :: Ord key => [(key,elt)] -> FiniteMap key elt
+                        -- In the case of duplicates, the last is taken
+
+--      ADDING AND DELETING
+                   -- Throws away any previous binding
+                   -- In the list case, the items are added starting with the
+                   -- first one in the list
+addToFM         :: Ord key => FiniteMap key elt -> key -> elt  -> FiniteMap key elt
+addListToFM     :: Ord key => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
+
+                   -- Combines with previous binding
+addToFM_C       :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> key -> elt  
+                           -> FiniteMap key elt
+addListToFM_C   :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> [(key,elt)] 
+                           -> FiniteMap key elt
+
+                   -- Deletion doesn't complain if you try to delete something
+                   -- which isn't there
+delFromFM       :: Ord key => FiniteMap key elt -> key   -> FiniteMap key elt
+delListFromFM   :: Ord key => FiniteMap key elt -> [key] -> FiniteMap key elt
+
+--      COMBINING
+                   -- Bindings in right argument shadow those in the left
+plusFM          :: Ord key => FiniteMap key elt -> FiniteMap key elt
+                           -> FiniteMap key elt
+
+                   -- Combines bindings for the same thing with the given function
+plusFM_C        :: Ord key => (elt -> elt -> elt) 
+                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+
+minusFM         :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+                   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
+
+intersectFM     :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+intersectFM_C   :: Ord key => (elt -> elt -> elt)
+                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+
+--      MAPPING, FOLDING, FILTERING
+foldFM          :: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a
+mapFM           :: (key -> elt1 -> elt2) -> FiniteMap key elt1 -> FiniteMap key elt2
+filterFM        :: Ord key => (key -> elt -> Bool) 
+                           -> FiniteMap key elt -> FiniteMap key elt
+
+--      INTERROGATING
+sizeFM          :: FiniteMap key elt -> Int
+isEmptyFM	:: FiniteMap key elt -> Bool
+
+elemFM		:: Ord key => key -> FiniteMap key elt -> Bool
+lookupFM        :: Ord key => FiniteMap key elt -> key -> Maybe elt
+lookupWithDefaultFM
+                :: Ord key => FiniteMap key elt -> elt -> key -> elt
+                -- lookupWithDefaultFM supplies a "default" elt
+                -- to return for an unmapped key
+
+--      LISTIFYING
+fmToList        :: FiniteMap key elt -> [(key,elt)]
+keysFM          :: FiniteMap key elt -> [key]
+eltsFM          :: FiniteMap key elt -> [elt]
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[ListSetOps]{The @ListSetOps@ type}
+\index{ListSetOps module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+Just a few set-sounding operations on lists.  If you want sets, use
+the \tr{Set} module.
+
+\begin{verbatim}
+unionLists          :: Eq a => [a] -> [a] -> [a]
+intersectLists      :: Eq a => [a] -> [a] -> [a]
+minusList           :: Eq a => [a] -> [a] -> [a]
+disjointLists       :: Eq a => [a] -> [a] -> Bool
+intersectingLists   :: Eq a => [a] -> [a] -> Bool
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Maybes]{The @Maybes@ type}
+\index{Maybes module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+Note: a \tr{Maybe} type is nearly inevitable in Haskell~1.3.
+You should use this module with \tr{-fhaskell-1.3}.
+
+Two non-abstract types:
+\begin{verbatim}
+data Maybe    a       = Nothing       | Just a -- Prelude; re-exported
+data MaybeErr val err = Succeeded val | Failed err
+\end{verbatim}
+
+Some operations to do with \tr{Maybe} (some commentary follows):
+\begin{verbatim}
+maybeToBool :: Maybe a -> Bool      -- Nothing => False; Just => True
+catMaybes   :: [Maybe a] -> [a]
+allMaybes   :: [Maybe a] -> Maybe [a]
+firstJust   :: [Maybe a] -> Maybe a
+findJust    :: (a -> Maybe b) -> [a] -> Maybe b
+
+assocMaybe  :: Eq a => [(a,b)] -> a -> Maybe b
+mkLookupFun :: (key -> key -> Bool) -- Equality predicate
+            -> [(key,val)]          -- The assoc list
+            -> (key -> Maybe val)   -- A lookup fun to use
+
+    -- a monad thing
+thenMaybe   :: Maybe a -> (a -> Maybe b) -> Maybe b
+returnMaybe :: a -> Maybe a
+failMaybe   :: Maybe a
+mapMaybe    :: (a -> Maybe b) -> [a] -> Maybe [b]
+\end{verbatim}
+
+@catMaybes@ takes a list of @Maybe@s and returns a list of the
+contents of all the @Just@s in it.
+
+@allMaybes@ collects a list of @Justs@ into a single @Just@, returning
+@Nothing@ if there are any @Nothings@.
+
+@firstJust@ takes a list of @Maybes@ and returns the
+first @Just@ if there is one, or @Nothing@ otherwise.
+
+@assocMaybe@ looks up in an association list, returning
+@Nothing@ if it fails.
+
+Now, some operations to do with \tr{MaybeErr} (comments follow):
+\begin{verbatim}
+    -- a monad thing (surprise, surprise)
+thenMaB   :: MaybeErr a err -> (a -> MaybeErr b err) -> MaybeErr b err
+returnMaB :: val -> MaybeErr val err
+failMaB   :: err -> MaybeErr val err
+
+listMaybeErrs :: [MaybeErr val err] -> MaybeErr [val] [err]
+foldlMaybeErrs :: (acc -> input -> MaybeErr acc err)
+               -> acc
+               -> [input]
+               -> MaybeErr acc [err]
+\end{verbatim}
+
+@listMaybeErrs@ takes a list of @MaybeErrs@ and, if they all succeed,
+returns a @Succeeded@ of a list of their values.  If any fail, it
+returns a @Failed@ of the list of all the errors in the list.
+
+@foldlMaybeErrs@ works along a list, carrying an accumulator; it
+applies the given function to the accumulator and the next list item,
+accumulating any errors that occur.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[PackedString]{The @_PackedString@ type}
+\index{PackedString module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+The type \tr{_PackedString} is built-in, i.e., no
+special action (other than a \tr{-fglasgow-exts} flag) is required to
+use it.
+
+The documentation here describes the {\em built-in} functions.
+
+You may also access this code as a system library and {\em not} use
+the \tr{-fglasgow-exts} flag.  Just do \tr{import PackedString},
+heave in your \tr{-syslib ghc}, and drop off the leading underscores
+which you see here.
+
+We still may change this interface (again).
+
+The basic type and functions which are available are:
+\begin{verbatim}
+data _PackedString
+
+_packString      :: [Char] -> _PackedString
+_packStringST    :: [Char] -> _ST s _PackedString
+_packCString     :: _Addr  -> _PackedString
+_packCBytes      :: Int -> _Addr -> _PackedString
+_packCBytesST    :: Int -> _Addr -> _ST s _PackedString
+_packBytesForC   :: [Char] -> _ByteArray Int
+_packBytesForCST :: [Char] -> _ST s (_ByteArray Int)
+_byteArrayToPS   :: _ByteArray Int -> _PackedString
+_psToByteArray   :: _PackedString -> _ByteArray Int
+
+_unpackPS        :: _PackedString -> [Char]
+\end{verbatim}
+
+We also provide a wad of list-manipulation-like functions:
+\begin{verbatim}
+_nilPS      :: _PackedString
+_consPS     :: Char -> _PackedString -> _PackedString
+
+_headPS     :: _PackedString -> Char
+_tailPS     :: _PackedString -> _PackedString
+_nullPS     :: _PackedString -> Bool
+_appendPS   :: _PackedString -> _PackedString -> _PackedString
+_lengthPS   :: _PackedString -> Int
+_indexPS    :: _PackedString -> Int -> Char
+            -- 0-origin indexing into the string
+_mapPS      :: (Char -> Char) -> _PackedString -> _PackedString {-or String?-}
+_filterPS   :: (Char -> Bool) -> _PackedString -> _PackedString {-or String?-}
+_foldlPS    :: (a -> Char -> a) -> a -> _PackedString -> a
+_foldrPS    :: (Char -> a -> a) -> a -> _PackedString -> a
+_takePS     :: Int -> _PackedString -> _PackedString
+_dropPS     :: Int -> _PackedString -> _PackedString
+_splitAtPS  :: Int -> _PackedString -> (_PackedString, _PackedString)
+_takeWhilePS:: (Char -> Bool) -> _PackedString -> _PackedString
+_dropWhilePS:: (Char -> Bool) -> _PackedString -> _PackedString
+_spanPS     :: (Char -> Bool) -> _PackedString -> (_PackedString, _PackedString)
+_breakPS    :: (Char -> Bool) -> _PackedString -> (_PackedString, _PackedString)
+_linesPS    :: _PackedString -> [_PackedString]
+_wordsPS    :: _PackedString -> [_PackedString]
+_reversePS  :: _PackedString -> _PackedString
+_concatPS   :: [_PackedString] -> _PackedString
+
+_substrPS   :: _PackedString -> Int -> Int -> _PackedString
+            -- pluck out a piece of a _PS
+            -- start and end chars you want; both 0-origin-specified
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Pretty]{The @Pretty@ type}
+\index{Pretty module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+This is the pretty-printer that we use in GHC.
+
+\begin{verbatim}
+type Pretty
+
+ppShow          :: Int{-width-} -> Pretty -> [Char]
+
+pp'SP           :: Pretty -- "comma space"
+ppComma         :: Pretty -- ,
+ppEquals        :: Pretty -- =
+ppLbrack        :: Pretty -- [
+ppLparen        :: Pretty -- (
+ppNil           :: Pretty -- nothing
+ppRparen        :: Pretty -- )
+ppRbrack        :: Pretty -- ]
+ppSP            :: Pretty -- space
+ppSemi          :: Pretty -- ;
+
+ppChar          :: Char -> Pretty
+ppDouble        :: Double -> Pretty
+ppFloat         :: Float -> Pretty
+ppInt           :: Int -> Pretty
+ppInteger       :: Integer -> Pretty
+ppRational      :: Rational -> Pretty
+ppStr           :: [Char] -> Pretty
+
+ppAbove         :: Pretty -> Pretty -> Pretty
+ppAboves        :: [Pretty] -> Pretty
+ppBeside        :: Pretty -> Pretty -> Pretty
+ppBesides       :: [Pretty] -> Pretty
+ppCat           :: [Pretty] -> Pretty
+ppHang          :: Pretty -> Int -> Pretty -> Pretty
+ppInterleave    :: Pretty -> [Pretty] -> Pretty -- spacing between
+ppIntersperse   :: Pretty -> [Pretty] -> Pretty -- no spacing between
+ppNest          :: Int -> Pretty -> Pretty
+ppSep           :: [Pretty] -> Pretty
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Set]{The @Set@ type}
+\index{Set module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+Our implementation of {\em sets} (key property: no duplicates) is just
+a variant of the \tr{FiniteMap} module.
+
+\begin{verbatim}
+mkSet           :: Ord a => [a]  -> Set a
+setToList       :: Set a -> [a]
+emptySet        :: Set a
+singletonSet    :: a -> Set a
+
+union           :: Ord a => Set a -> Set a -> Set a
+unionManySets   :: Ord a => [Set a] -> Set a
+intersect       :: Ord a => Set a -> Set a -> Set a
+minusSet        :: Ord a => Set a -> Set a -> Set a
+mapSet          :: Ord a => (b -> a) -> Set b -> Set a
+
+elementOf       :: Ord a => a -> Set a -> Bool
+isEmptySet      :: Set a -> Bool
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Util]{The @Util@ type}
+\index{Util module (GHC syslib)}
+%*                                                                      *
+%************************************************************************
+
+Stuff that has been useful to use in writing the compiler.  Don't be
+too surprised if this stuff moves/gets-renamed/etc.
+
+\begin{verbatim}
+-- general list processing
+forall          :: (a -> Bool) -> [a] -> Bool
+exists          :: (a -> Bool) -> [a] -> Bool
+zipEqual        :: [a] -> [b] -> [(a,b)]
+nOfThem         :: Int -> a -> [a]
+lengthExceeds   :: [a] -> Int -> Bool
+isSingleton     :: [a] -> Bool
+
+-- association lists
+assoc       :: Eq a => String -> [(a, b)] -> a -> b
+
+-- duplicate handling
+hasNoDups    :: Eq a => [a] -> Bool
+equivClasses :: (a -> a -> _CMP_TAG) -> [a] -> [[a]]
+runs         :: (a -> a -> Bool)     -> [a] -> [[a]]
+removeDups   :: (a -> a -> _CMP_TAG) -> [a] -> ([a], [[a]])
+
+-- sorting (don't complain of no choice...)
+quicksort          :: (a -> a -> Bool)     -> [a] -> [a]
+sortLt             :: (a -> a -> Bool)     -> [a] -> [a]
+stableSortLt       :: (a -> a -> Bool)     -> [a] -> [a]
+mergesort          :: (a -> a -> _CMP_TAG) -> [a] -> [a]
+mergeSort          :: Ord a => [a] -> [a]
+naturalMergeSort   :: Ord a => [a] -> [a]
+mergeSortLe        :: Ord a => [a] -> [a]
+naturalMergeSortLe :: Ord a => [a] -> [a]
+
+-- transitive closures
+transitiveClosure :: (a -> [a])         -- Successor function
+                  -> (a -> a -> Bool)   -- Equality predicate
+                  -> [a] 
+                  -> [a]                -- The transitive closure
+
+-- accumulating (Left, Right, Bi-directional)
+mapAccumL :: (acc -> x -> (acc, y))
+                        -- Function of elt of input list and
+                        -- accumulator, returning new accumulator and
+                        -- elt of result list
+          -> acc        -- Initial accumulator
+          -> [x]        -- Input list
+          -> (acc, [y]) -- Final accumulator and result list
+
+mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
+
+mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
+          -> accl -> accr -> [x]
+          -> (accl, accr, [y])
+
+-- comparisons
+cmpString :: String -> String -> _CMP_TAG
+
+-- this type is built-in
+data _CMP_TAG = _LT | _EQ | _GT
+
+-- pairs
+applyToPair :: ((a -> c), (b -> d)) -> (a, b) -> (c, d)
+applyToFst  :: (a -> c) -> (a, b) -> (c, b)
+applyToSnd  :: (b -> d) -> (a, b) -> (a, d)
+foldPair    :: (a->a->a, b->b->b) -> (a, b) -> [(a, b)] -> (a, b)
+unzipWith   :: (a -> b -> c) -> [(a, b)] -> [c]
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsection[C-interfaces]{Interfaces to C libraries}
+\index{C library interfaces}
+\index{interfaces, C library}
+%*                                                                      *
+%************************************************************************
+
+The GHC system library (\tr{-syslib ghc}) also provides interfaces to
+several useful C libraries, mostly from the GNU project.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Readline]{The @Readline@ interface}
+\index{Readline library (GHC syslib)}
+\index{command-line editing library}
+%*                                                                      *
+%************************************************************************
+
+(Darren Moffat supplied the \tr{Readline} interface.)
+
+The \tr{Readline} module is a straightforward interface to the GNU
+Readline library.  As such, you will need to look at the GNU
+documentation (and have a \tr{libreadline.a} file around somewhere...)
+
+You'll need to link any Readlining program with \tr{-lreadline -ltermcap},
+besides the usual \tr{-syslib ghc} (and \tr{-fhaskell-1.3}).
+
+The main function you'll use is:
+\begin{verbatim}
+readline :: String{-the prompt-} -> IO String
+\end{verbatim}
+
+If you want to mess around with Full Readline G(l)ory, we also
+provide:
+\begin{verbatim}
+rlInitialize, addHistory,
+
+rlBindKey, rlAddDefun, RlCallbackFunction(..),
+
+rlGetLineBuffer, rlSetLineBuffer, rlGetPoint, rlSetPoint, rlGetEnd,
+rlSetEnd, rlGetMark, rlSetMark, rlSetDone, rlPendingInput,
+
+rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
+\end{verbatim}
+(All those names are just Haskellised versions of what you
+will see in the GNU readline documentation.)
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Regexp]{The @Regexp@ and @MatchPS@ interfaces}
+\index{Regex library (GHC syslib)}
+\index{MatchPS library (GHC syslib)}
+\index{regular-expressions library}
+%*                                                                      *
+%************************************************************************
+
+(Sigbjorn Finne supplied the regular-expressions interface.)
+
+The \tr{Regex} library provides quite direct interface to the GNU
+regular-expression library, for doing manipulation on
+\tr{_PackedString}s.  You probably need to see the GNU documentation
+if you are operating at this level.
+
+The datatypes and functions that \tr{Regex} provides are:
+\begin{verbatim}
+data PatBuffer	# just a bunch of bytes (mutable)
+
+data REmatch
+ = REmatch (Array Int GroupBounds)  -- for $1, ... $n
+	   GroupBounds		    -- for $` (everything before match)
+	   GroupBounds		    -- for $& (entire matched string)
+	   GroupBounds		    -- for $' (everything after)
+	   GroupBounds		    -- for $+ (matched by last bracket)
+
+-- GroupBounds hold the interval where a group
+-- matched inside a string, e.g.
+--
+-- matching "reg(exp)" "a regexp" returns the pair (5,7) for the
+-- (exp) group. (_PackedString indices start from 0)
+
+type GroupBounds = (Int, Int)
+
+re_compile_pattern
+	:: _PackedString	-- pattern to compile
+	-> Bool			-- True <=> assume single-line mode
+	-> Bool			-- True <=> case-insensitive
+	-> PrimIO PatBuffer
+
+re_match :: PatBuffer		-- compiled regexp
+	 -> _PackedString	-- string to match
+	 -> Int			-- start position
+	 -> Bool		-- True <=> record results in registers
+	 -> PrimIO (Maybe REmatch)
+
+-- Matching on 2 strings is useful when you're dealing with multiple
+-- buffers, which is something that could prove useful for
+-- PackedStrings, as we don't want to stuff the contents of a file
+-- into one massive heap chunk, but load (smaller chunks) on demand.
+
+re_match2 :: PatBuffer		-- 2-string version
+	  -> _PackedString
+	  -> _PackedString
+	  -> Int
+	  -> Int
+	  -> Bool
+	  -> PrimIO (Maybe REmatch)
+
+re_search :: PatBuffer		-- compiled regexp
+	  -> _PackedString	-- string to search
+	  -> Int		-- start index
+	  -> Int		-- stop index
+	  -> Bool		-- True <=> record results in registers
+	  -> PrimIO (Maybe REmatch)
+
+re_search2 :: PatBuffer		-- Double buffer search
+	   -> _PackedString
+	   -> _PackedString
+	   -> Int		-- start index
+	   -> Int		-- range (?)
+	   -> Int		-- stop index
+	   -> Bool		-- True <=> results in registers
+	   -> PrimIO (Maybe REmatch)
+\end{verbatim}
+
+The \tr{MatchPS} module provides Perl-like ``higher-level'' facilities
+to operate on \tr{_PackedStrings}.  The regular expressions in
+question are in Perl syntax.  The ``flags'' on various functions can
+include: \tr{i} for case-insensitive, \tr{s} for single-line mode, and
+\tr{g} for global.  (It's probably worth your time to peruse the
+source code...)
+
+\begin{verbatim}
+matchPS :: _PackedString    -- regexp
+	-> _PackedString    -- string to match
+	-> [Char]	    -- flags
+	-> Maybe REmatch    -- info about what matched and where
+
+searchPS :: _PackedString   -- regexp
+	 -> _PackedString   -- string to match
+	 -> [Char]	    -- flags
+	 -> Maybe REmatch
+
+-- Perl-like match-and-substitute:
+substPS :: _PackedString    -- regexp
+	-> _PackedString    -- replacement
+	-> [Char]	    -- flags
+	-> _PackedString    -- string
+	-> _PackedString
+
+-- same as substPS, but no prefix and suffix:
+replacePS :: _PackedString  -- regexp
+	  -> _PackedString  -- replacement
+	  -> [Char]	    -- flags
+	  -> _PackedString  -- string
+	  -> _PackedString
+
+match2PS :: _PackedString   -- regexp
+	 -> _PackedString   -- string1 to match
+	 -> _PackedString   -- string2 to match
+	 -> [Char]	    -- flags
+	 -> Maybe REmatch
+
+search2PS :: _PackedString  -- regexp
+	  -> _PackedString  -- string to match
+	  -> _PackedString  -- string to match
+	  -> [Char]	    -- flags
+	  -> Maybe REmatch
+
+-- functions to pull the matched pieces out of an REmatch:
+
+getMatchesNo    :: REmatch -> Int
+getMatchedGroup :: REmatch -> Int -> _PackedString -> _PackedString
+getWholeMatch   :: REmatch -> _PackedString -> _PackedString
+getLastMatch    :: REmatch -> _PackedString -> _PackedString
+getAfterMatch   :: REmatch -> _PackedString -> _PackedString
+
+-- (reverse) brute-force string matching;
+-- Perl equivalent is index/rindex:
+findPS, rfindPS :: _PackedString -> _PackedString -> Maybe Int
+
+-- Equivalent to Perl "chop" (off the last character, if any):
+chopPS :: _PackedString -> _PackedString
+
+-- matchPrefixPS: tries to match as much as possible of strA starting
+-- from the beginning of strB (handy when matching fancy literals in
+-- parsers):
+matchPrefixPS :: _PackedString -> _PackedString -> Int
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection[Socket]{Network-interface toolkit---@Socket@ and @SocketPrim@}
+\index{SocketPrim interface (GHC syslib)}
+\index{Socket interface (GHC syslib)}
+\index{network-interface library}
+\index{sockets library}
+\index{BSD sockets library}
+%*                                                                      *
+%************************************************************************
+
+(Darren Moffat supplied the network-interface toolkit.)
+
+Your best bet for documentation is to look at the code---really!--- 
+normally in \tr{ghc/lib/ghc/{BSD,Socket,SocketPrim}.lhs}.
+
+The \tr{BSD} module provides functions to get at system-database info;
+pretty straightforward if you're into this sort of thing:
+\begin{verbatim}
+getHostName	    :: IO String
+
+getServiceByName    :: ServiceName -> IO ServiceEntry
+getServicePortNumber:: ServiceName -> IO PortNumber
+getServiceEntry	    :: IO ServiceEntry
+setServiceEntry	    :: Bool -> IO ()
+endServiceEntry	    :: IO ()
+
+getProtocolByName   :: ProtocolName -> IO ProtocolEntry
+getProtocolByNumber :: ProtocolNumber -> IO ProtcolEntry
+getProtocolNumber   :: ProtocolName -> ProtocolNumber
+getProtocolEntry    :: IO ProtocolEntry
+setProtocolEntry    :: Bool -> IO ()
+endProtocolEntry    :: IO ()
+
+getHostByName	    :: HostName -> IO HostEntry
+getHostByAddr	    :: Family -> HostAddress -> IO HostEntry
+getHostEntry	    :: IO HostEntry
+setHostEntry	    :: Bool -> IO ()
+endHostEntry	    :: IO ()
+\end{verbatim}
+
+The \tr{SocketPrim} interface provides quite direct access to the
+socket facilities in a BSD Unix system, including all the
+complications.  We hope you don't need to use it!  See the source if
+needed...
+
+The \tr{Socket} interface is a ``higher-level'' interface to sockets,
+and it is what we recommend.  Please tell us if the facilities it
+offers are inadequate to your task!
+
+The interface is relatively modest:
+\begin{verbatim}
+connectTo	:: Hostname -> PortID -> IO Handle
+listenOn	:: PortID -> IO Socket
+
+accept		:: Socket -> IO (Handle, HostName)
+sendTo		:: Hostname -> PortID -> String -> IO ()
+
+recvFrom	:: Hostname -> PortID -> IO String
+socketPort	:: Socket -> IO PortID
+
+data PortID	-- PortID is a non-abstract type
+  = Service String	-- Service Name eg "ftp"
+  | PortNumber Int	-- User defined Port Number
+  | UnixSocket String	-- Unix family socket in file system
+
+type Hostname = String
+\end{verbatim}
+
+Various examples of networking Haskell code are provided in
+\tr{ghc/misc/examples/}, notably the \tr{net???/Main.hs} programs.
+
+%************************************************************************
+%*                                                                      *
+\subsection[HBC-library]{The HBC system library}
+\index{HBC system library}
+\index{system library, HBC}
+%*                                                                      *
+%************************************************************************
+
+This documentation is stolen directly from the HBC distribution.  The
+modules that GHC does not support (because they require HBC-specific
+extensions) are omitted.
+
+\begin{description}
+\item[\tr{Either}:]
+\index{Either module (HBC library)}%
+A binary sum data type:
+\begin{verbatim}
+data Either a b = Left a | Right b
+\end{verbatim}
+The constructor \tr{Left} is typically used for errors; it can be
+renamed to \tr{Wrong} on import.
+
+\item[\tr{Maybe}:]
+\index{Maybe module (HBC library)}%
+A type for failure or success:
+\begin{verbatim}
+data Maybe a = Nothing | Just a
+thenM :: Maybe a -> (a -> Maybe b) -> Maybe b
+    -- apply a function that may fail
+\end{verbatim}
+
+\item[\tr{Option}:]
+\index{Option module (HBC library)}%
+An alias for \tr{Maybe}:
+\begin{verbatim}
+data Option a = None | Some a
+thenO :: Option a -> (a -> Option b) -> Option b
+\end{verbatim}
+
+\item[\tr{ListUtil}:]
+\index{ListUtil module (HBC library)}%
+Various useful functions involving lists that are missing from the
+\tr{Prelude}:
+\begin{verbatim}
+assoc :: (Eq c) => (a -> b) -> b -> [(c, a)] -> c -> b
+        -- assoc f d l k looks for k in the association list l, if it
+        -- is found f is applied to the value, otherwise d is returned.
+concatMap :: (a -> [b]) -> [a] -> [b]
+        -- flattening map (LML's concmap)
+unfoldr :: (a -> (b, a)) -> (a -> Bool) -> a -> [b]
+        -- unfoldr f p x repeatedly applies f to x until (p x) holds.
+        -- (f x) should give a list element and a new x.
+mapAccuml :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+        -- mapAccuml f s l maps f over l, but also threads the state s
+        -- through (LML's mapstate).
+union :: (Eq a) => [a] -> [a] -> [a]
+        -- union of two lists
+intersection :: (Eq a) => [a] -> [a] -> [a]
+        -- intersection of two lists
+chopList :: ([a] -> (b, [a])) -> [a] -> [b]
+        -- LMLs choplist
+assocDef :: (Eq a) => [(a, b)] -> b -> a -> b
+        -- LMLs assocdef
+lookup :: (Eq a) => [(a, b)] -> a -> Option b
+        -- lookup l k looks for the key k in the association list l
+        -- and returns an optional value
+tails :: [a] -> [[a]]
+        -- return all the tails of a list
+rept :: (Integral a) => a -> b -> [b]
+        -- repeat a value a number of times
+groupEq :: (a->a->Bool) -> [a] -> [[a]]
+        -- group list elements according to an equality predicate
+group :: (Eq a) => [a] -> [[a]]
+        -- group according to} ==
+readListLazily :: (Text a) => String -> [a]
+        -- read a list in a lazy fashion
+\end{verbatim}
+
+\item[\tr{Pretty}:]
+\index{Pretty module (HBC library)}%
+John Hughes's pretty printing library.  
+\begin{verbatim}
+type Context = (Bool, Int, Int, Int)
+type IText = Context -> [String]
+text :: String -> IText                 -- just text
+(~.) :: IText -> IText -> IText         -- horizontal composition
+(^.) :: IText -> IText -> IText         -- vertical composition
+separate :: [IText] -> IText            -- separate by spaces
+nest :: Int -> IText -> IText           -- indent
+pretty :: Int -> Int -> IText -> String -- format it
+\end{verbatim}
+
+\item[\tr{QSort}:]
+\index{QSort module (HBC library)}%
+A sort function using quicksort.
+\begin{verbatim}
+sortLe :: (a -> a -> Bool) -> [a] -> [a]
+        -- sort le l  sorts l with le as less than predicate
+sort :: (Ord a) => [a] -> [a]
+        -- sort l  sorts l using the Ord class
+\end{verbatim}
+
+\item[\tr{Random}:]
+\index{Random module (HBC library)}%
+Random numbers.
+\begin{verbatim}
+randomInts :: Int -> Int -> [Int]
+        -- given two seeds gives a list of random Int
+randomDoubles :: Int -> Int -> [Double]
+        -- random Double with uniform distribution in (0,1)
+normalRandomDoubles :: Int -> Int -> [Double]
+        -- random Double with normal distribution, mean 0, variance 1
+\end{verbatim}
+
+\item[\tr{Trace}:]
+Simple tracing.  (Note: This comes with GHC anyway.)
+\begin{verbatim}
+trace :: String -> a -> a       -- trace x y  prints x and returns y
+\end{verbatim}
+
+\item[\tr{Miranda}:]
+\index{Miranda module (HBC library)}%
+Functions found in the Miranda library.
+(Note: Miranda is a registered trade mark of Research Software Ltd.)
+
+\item[\tr{Word}:]
+\index{Word module (HBC library)}
+Bit manipulation.  (GHC doesn't implement absolutely all of this.
+And don't count on @Word@ being 32 bits on a Alpha...)
+\begin{verbatim}
+class Bits a where
+    bitAnd :: a -> a -> a       -- bitwise and
+    bitOr :: a -> a -> a        -- bitwise or
+    bitXor :: a -> a -> a       -- bitwise xor
+    bitCompl :: a -> a          -- bitwise negation
+    bitRsh :: a -> Int -> a     -- bitwise right shift
+    bitLsh :: a -> Int -> a     -- bitwise left shift
+    bitSwap :: a -> a           -- swap word halves
+    bit0 :: a                   -- word with least significant bit set
+    bitSize :: a -> Int         -- number of bits in a word
+
+data Byte                       -- 8  bit quantity
+data Short                      -- 16 bit quantity
+data Word                       -- 32 bit quantity
+
+instance Bits Byte, Bits Short, Bits Word
+instance Eq Byte, Eq Short, Eq Word
+instance Ord Byte, Ord Short, Ord Word
+instance Text Byte, Text Short, Text Word
+instance Num Byte, Num Short, Num Word
+wordToShorts :: Word -> [Short]   -- convert a Word to two Short
+wordToBytes :: Word -> [Byte]     -- convert a Word to four Byte
+bytesToString :: [Byte] -> String -- convert a list of Byte to a String (bit by bit)
+wordToInt :: Word -> Int          -- convert a Word to Int
+shortToInt :: Short -> Int        -- convert a Short to Int
+byteToInt :: Byte -> Int          -- convert a Byte to Int
+\end{verbatim}
+
+\item[\tr{Time}:]
+\index{Time module (HBC library)}%
+Manipulate time values (a Double with seconds since 1970).
+\begin{verbatim}
+--               year mon  day  hour min  sec  dec-sec  weekday
+data Time = Time Int  Int  Int  Int  Int  Int  Double  Int
+dblToTime :: Double -> Time     -- convert a Double to a Time
+timeToDbl :: Time -> Double     -- convert a Time to a Double
+timeToString :: Time -> String  -- convert a Time to a readable String
+\end{verbatim}
+
+\item[\tr{Hash}:]
+\index{Hash module (HBC library)}%
+Hashing functions.
+\begin{verbatim}
+class Hashable a where
+    hash :: a -> Int                            -- hash a value, return an Int
+-- instances for all Prelude types
+hashToMax :: (Hashable a) => Int -> a -> Int    -- hash into interval [0..x-1]
+\end{verbatim}
+
+\item[\tr{NameSupply}:]
+\index{NameSupply module (HBC library)}%
+Functions to generate unique names (Int).
+\begin{verbatim}
+type Name = Int
+initialNameSupply :: NameSupply
+        -- The initial name supply (may be different every
+        -- time the program is run.
+splitNameSupply :: NameSupply -> (NameSupply,NameSupply)
+        -- split the namesupply into two
+getName :: NameSupply -> Name
+        -- get the name associated with a name supply
+\end{verbatim}
+
+\item[\tr{Parse}:]
+\index{Parse module (HBC library)}%
+Higher order functions to build parsers.  With a little care these
+combinators can be used to build efficient parsers with good error
+messages.
+\begin{verbatim}
+infixr 8 +.+ , ..+ , +.. 
+infix  6 `act` , >>> , `into` , .> 
+infixr 4 ||| , ||! , |!! 
+data ParseResult a b 
+type Parser a b = a -> Int -> ParseResult a b 
+(|||) :: Parser a b -> Parser a b -> Parser a b
+        -- Alternative
+(||!) :: Parser a b -> Parser a b -> Parser a b
+        -- Alternative, but with committed choice
+(|!!) :: Parser a b -> Parser a b -> Parser a b
+        -- Alternative, but with committed choice
+(+.+) :: Parser a b -> Parser a c -> Parser a (b,c)
+        -- Sequence
+(..+) :: Parser a b -> Parser a c -> Parser a c
+        -- Sequence, throw away first part
+(+..) :: Parser a b -> Parser a c -> Parser a b
+        -- Sequence, throw away second part
+act   :: Parser a b -> (b->c) -> Parser a c
+        -- Action
+(>>>) :: Parser a (b,c) -> (b->c->d) -> Parser a d
+        -- Action on two items
+(.>) :: Parser a b -> c -> Parse a c
+        -- Action ignoring value
+into :: Parser a b -> (b -> Parser a c) -> Parser a c
+        -- Use a produced value in a parser.
+succeed b :: Parser a b
+        -- Always succeeds without consuming a token
+failP :: Parser a b
+        -- Always fails.
+many :: Parser a b -> Parser a [b]
+        -- Kleene star
+many1 :: Parser a b -> Parser a [b]
+        -- Kleene plus
+count :: Parser a b -> Int -> Parser a [b]
+        -- Parse an exact number of items
+sepBy1 :: Parser a b -> Parser a c -> Parser a [b]
+        -- Non-empty sequence of items separated by something
+sepBy :: Parser a b -> Parser a c -> Parser a [b]
+        -- Sequence of items separated by something
+lit :: (Eq a, Text a) => a -> Parser [a] a
+        -- Recognise a literal token from a list of tokens
+litp :: String -> (a->Bool) -> Parser [a] a
+        -- Recognise a token with a predicate.
+        -- The string is a description for error messages.
+testp :: String -> (a -> Bool) -> (Parser b a) -> Parser b a
+        -- Test a semantic value. 
+token :: (a -> Either String (b, a)) -> Parser a b
+        -- General token recogniser.
+parse :: Parser a b -> a -> Either ([String], a) [(b, a)]
+        -- Do a parse.  Return either error (possible tokens and rest
+        -- of tokens) or all possible parses.
+sParse :: (Text a) => (Parser [a] b) -> [a] -> Either String b
+        -- Simple parse.  Return error message or result.
+\end{verbatim}
+
+%%%simpleLex :: String -> [String]              -- A simple (but useful) lexical analyzer
+
+\item[\tr{Native}:]
+\index{Native module (HBC library)}%
+Functions to convert the primitive types \tr{Int}, \tr{Float}, and \tr{Double} to
+their native representation as a list of bytes (\tr{Char}).  If such a list
+is read/written to a file it will have the same format as when, e.g.,
+C read/writes the same kind of data.
+\begin{verbatim}
+type Bytes = [Char] -- A byte stream is just a list of characters
+
+class Native a where 
+    showBytes     :: a -> Bytes -> Bytes
+        -- prepend the representation of an item the a byte stream
+    listShowBytes :: [a] -> Bytes -> Bytes
+        -- prepend the representation of a list of items to a stream
+        -- (may be more efficient than repeating showBytes).
+    readBytes     :: Bytes -> Maybe (a, Bytes)
+        -- get an item from the stream and return the rest,
+        -- or fail if the stream is to short.
+    listReadBytes :: Int -> Bytes -> Maybe ([a], Bytes)
+        -- read n items from a stream.
+
+instance Native Int 
+instance Native Float 
+instance Native Double 
+instance (Native a, Native b) => Native (a,b)
+        -- juxtaposition of the two items
+instance (Native a, Native b, Native c) => Native (a, b, c)
+        -- juxtaposition of the three items
+instance (Native a) => Native [a]
+        -- an item count in an Int followed by the items
+
+shortIntToBytes :: Int -> Bytes -> Bytes
+        -- Convert an Int to what corresponds to a short in C.
+bytesToShortInt :: Bytes -> Maybe (Int, Bytes)
+        -- Get a short from a byte stream and convert to an Int.
+
+showB :: (Native a) => a -> Bytes       -- Simple interface to showBytes.
+readB :: (Native a) => Bytes -> a       -- Simple interface to readBytes.
+\end{verbatim}
+
+\item[\tr{Number}:]
+\index{Number module (HBC library)}%
+Simple numbers that belong to all numeric classes and behave like
+a naive user would expect (except that printing is still ugly).
+(NB: GHC does not provide a magic way to use \tr{Numbers} everywhere,
+but you should be able to do it with normal \tr{import}ing and
+\tr{default}ing.)
+\begin{verbatim}
+data Number                     -- The type itself.
+instance ...                    -- All reasonable instances.
+isInteger :: Number -> Bool     -- Test if a Number is an integer.
+\end{verbatim}
+\end{description}

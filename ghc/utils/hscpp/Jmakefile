@@ -1,0 +1,30 @@
+PROGRAMS = hscpp
+
+all:: $(PROGRAMS)
+/* stuff to have before we get going */
+MsubNeededHere($(PROGRAMS))
+
+/* === BUILD STUFF (installation, etc., below) ========== */
+
+Makefile ::
+	$(RM) hscpp
+
+/* do *not* want #! script stuck on the front */
+MsubTarget(hscpp,hscpp.prl,/*no flags*/,/*Makefile*/)
+
+hscpp ::
+	@chmod a+x $@
+
+/* === INSTALLATION ======== */
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC))
+InstallScriptTarget(hscpp, $(INSTLIBDIR_GHC))
+#endif /* DoInstall... */
+
+/* === OTHER STUFF ========= */
+
+ExtraStuffToClean($(PROGRAMS))
+
+ClearTagsFile()
+PerlTagsTarget( *.prl ) /* nothing for the Bourne shell scripts */

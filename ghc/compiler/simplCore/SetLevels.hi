@@ -1,0 +1,24 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SetLevels where
+import CmdLineOpts(GlobalSwitch)
+import CoreSyn(CoreBinding)
+import Id(Id)
+import Outputable(Outputable)
+import SplitUniq(SplitUniqSupply)
+data Level   = Level Int Int | Top
+incMinorLvl :: Level -> Level
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isTopLvl :: Level -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Level) -> case u0 of { _ALG_ _ORIG_ SetLevels Level (u1 :: Int) (u2 :: Int) -> _!_ False [] []; _ORIG_ SetLevels Top  -> _!_ True [] []; _NO_DEFLT_ } _N_ #-}
+ltLvl :: Level -> Level -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
+ltMajLvl :: Level -> Level -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
+setLevels :: [CoreBinding Id Id] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding (Id, Level) Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "S" _N_ _N_ #-}
+tOP_LEVEL :: Level
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ SetLevels Top [] [] _N_ #-}
+instance Outputable Level
+	{-# GHC_PRAGMA _M_ SetLevels {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Level) _N_
+	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

@@ -1,0 +1,54 @@
+
+What gets done when printing an interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Basically, we do three things:
+
+A) Create the import decls. For classes and values, this is easy. We
+   filter the CE and GVE for all exported objects that were not declared 
+   in the module. For types, this is a pain because we may have something
+   which is exported and which refers to a type that isn't. For example,
+   the interface
+   interface C where
+   ...
+   f :: A -> B
+   may export B, but A may be expected to come from somewhere else when
+   C is imported. So, we have to go through all envs which have ranges that
+   may refer to a type. This means the TCE, CE (the class op types), 
+   GIE_inst (instance types) and GVE (types in the sigs). AND we have to
+   filter out prelude defined types from the resulting list.
+
+   Finally, we print the import decls, using the conventions that the renamer
+   expects (no explicit constructors/ class ops, etc.)
+
+B) Print the fixity decls for whatever constructors/ functions are exported
+
+C) Print the rest of the decls needed. 
+	1) Type decls - contents of TCE with export flags
+	2) Class decls - contents of CE with export flags
+	3) Instance decls - contents of GIE_inst that refer to either
+                            an exported type or an exported class
+                            (filter then print)
+	4) Value decls - contents of GVE which are not constructors and
+                         which have an export flag
+
+Issues
+~~~~~~
+
+Type synonyms - to expand or not? Let's not, and complain if a type sig. is
+	        used but not defined
+
+Canonical form for interfaces - to get rid of perl post-processing!
+
+Deriving for an abstract data type - shall we worry about this now or later?
+
+Printing issues
+~~~~~~~~~~~~~~~
+
+It's convenient to make all ranges of environments know how to print themselves
+(they do now) and decide whether to do so by looking at the export flag
+in their Name fields. Presumably the constructors of a data type that is
+exported abstractly will decide not to print themselves, so no special code
+is needed.
+
+

@@ -1,0 +1,32 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[closeFile.lc]{hClose Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+closeFile(fp)
+StgAddr fp;
+{
+    int rc;
+
+    unlockFile(fileno((FILE *) fp));
+
+    while ((rc = fclose((FILE *) fp)) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return rc;
+	}
+    }
+    return 0;
+}
+
+\end{code}
+
+
+

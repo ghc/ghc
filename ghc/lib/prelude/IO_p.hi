@@ -1,0 +1,71 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeIO where
+import PreludeBuiltin(Bin, Char(..), Int(..), List(..))
+import PreludeCore(Bool(..), Text(..))
+abort :: IOError -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 2 _U_ 00 _N_ _S_ "A" {_A_ 1 _U_ 0 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: [Response]) -> _!_ _NIL_ [Request] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: IOError) -> _ORIG_ PreludeIO done _N_ #-}
+appendBinChan :: [Char] -> Bin -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+appendBinFile :: [Char] -> Bin -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+appendChan :: [Char] -> [Char] -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+appendFile :: [Char] -> [Char] -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+binDispatch :: (IOError -> [Response] -> a) -> (Bin -> [Response] -> a) -> [Response] -> a
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LLS" _N_ _N_ #-}
+deleteFile :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+done :: [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _NIL_ [Request] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: [Response]) -> _!_ _NIL_ [Request] [] _N_ #-}
+echo :: Bool -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+exit :: IOError -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 1 _U_ 11 _N_ _N_ _N_ _N_ #-}
+getArgs :: (IOError -> [Response] -> [Request]) -> ([[Char]] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _N_ _N_ _N_ #-}
+getEnv :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+getProgName :: (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _N_ _N_ _N_ #-}
+interact :: ([Char] -> [Char]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 1 _U_ 11 _N_ _N_ _N_ _N_ #-}
+print :: Text a => a -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 1 _U_ 121 _N_ _N_ _N_ _N_ #-}
+prints :: Text a => a -> [Char] -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1221 _N_ _N_ _N_ _N_ #-}
+readBinChan :: [Char] -> (IOError -> [Response] -> [Request]) -> (Bin -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+readBinFile :: [Char] -> (IOError -> [Response] -> [Request]) -> (Bin -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+readChan :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+readFile :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+setEnv :: [Char] -> [Char] -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+sigAction :: Int -> SigAct -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+statusChan :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+statusFile :: [Char] -> (IOError -> [Response] -> [Request]) -> ([Char] -> [Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2111 _N_ _N_ _N_ _N_ #-}
+stdecho :: [Char]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stderr :: [Char]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stdin :: [Char]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stdout :: [Char]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+strDispatch :: (IOError -> [Response] -> a) -> ([Char] -> [Response] -> a) -> [Response] -> a
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LLS" _N_ _N_ #-}
+strListDispatch :: (IOError -> [Response] -> a) -> ([[Char]] -> [Response] -> a) -> [Response] -> a
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LLS" _N_ _N_ #-}
+succDispatch :: (IOError -> [Response] -> a) -> ([Response] -> a) -> [Response] -> a
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LLS" _N_ _N_ #-}
+writeBinFile :: [Char] -> Bin -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+writeFile :: [Char] -> [Char] -> (IOError -> [Response] -> [Request]) -> ([Response] -> [Request]) -> [Response] -> [Request]
+	{-# GHC_PRAGMA _A_ 5 _U_ 22111 _N_ _N_ _N_ _N_ #-}
+

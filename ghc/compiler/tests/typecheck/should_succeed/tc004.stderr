@@ -1,0 +1,8 @@
+Typechecked:
+AbsBinds [] [] [(f.t1, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t1 :: Bool -> Bool
+    f.t1 x.r54 = case x.r54 of
+		   True -> True
+		   False -> x.r54
+

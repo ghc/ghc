@@ -1,0 +1,6 @@
+ 
+"tcfail031.hs", line 2:
+    Couldn't match type "Char" against "Bool". In a predicate expression: 'a'
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

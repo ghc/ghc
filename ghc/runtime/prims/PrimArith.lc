@@ -1,0 +1,461 @@
+%---------------------------------------------------------------*
+%
+\section{Executable code for arithmetic primitives}
+%
+%---------------------------------------------------------------*
+
+\begin{code}
+/* basic definitions, just as if this were a module */
+
+#include "rtsdefs.h"
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[rts-prims-int]{Things for Int}
+%*									*
+%************************************************************************
+
+Well, really just one little devil:
+
+\begin{code}
+I_
+stg_div(a, b)
+  I_ a, b;
+{
+    if (b >= 0) {
+    	if (a >= 0) { return( a / b ); }
+	else	    { return( ((a+1) / b) - 1 ); }
+    } else {
+	if (a > 0)  { return( ((a-1) / b) - 1 ); }
+	else	    { return( a / b ); }
+	/* ToDo: something for division by zero? */
+    }
+}
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[rts-prims-float]{Things for floating-point}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsubsection[rts-mving-float]{Moving floatish things around}
+%*									*
+%************************************************************************
+
+See \tr{imports/StgMacros.h} for more about these things.
+\begin{code}
+#if defined(FLOAT_ALIGNMENT_TROUBLES) && ! defined(__STG_GCC_REGS__)
+/* Not all machines suffer from these (e.g., m68k). */
+/* If we are registerizing, we must *not* have this code! */
+
+STG_INLINE
+void
+#ifdef __STDC__
+ASSIGN_DBL(W_ p_dest[], StgDouble src)
+#else
+ASSIGN_DBL(p_dest, src)
+  W_ p_dest[]; StgDouble src;
+#endif
+{
+    double_thing y;
+    y.d = src;
+    p_dest[0] = y.du.dhi;
+    p_dest[1] = y.du.dlo;
+}
+
+STG_INLINE
+StgDouble
+#ifdef __STDC__
+PK_DBL(W_ p_src[])
+#else
+PK_DBL(p_src)
+  W_ p_src[];
+#endif
+{
+    double_thing y;
+    y.du.dhi = p_src[0];
+    y.du.dlo = p_src[1];
+    return(y.d);
+}
+
+STG_INLINE
+void
+#ifdef __STDC__
+ASSIGN_FLT(W_ p_dest[], StgFloat src)
+#else
+ASSIGN_FLT(p_dest, src)
+  W_ p_dest[]; StgFloat src;
+#endif
+{ 
+    float_thing y;
+    y.f = src;
+    *p_dest = y.fu;
+}
+
+STG_INLINE
+StgFloat
+#ifdef __STDC__
+PK_FLT(W_ p_src[])
+#else
+PK_FLT(p_src)
+  W_ p_src[];
+#endif
+{
+    float_thing y;
+    y.fu = *p_src;
+    return(y.f);
+}
+
+#endif /* FLOAT_ALIGNMENT_TROUBLES and not registerizing */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[rts-coding-floats]{Encoding/decoding float-ish things}
+%*									*
+%************************************************************************
+
+Encoding and decoding Doubles.  Code based on the HBC code
+(lib/fltcode.c).
+
+\begin{code}
+#define GMP_BASE 4294967296.0
+#if alpha_TARGET_ARCH
+#define DNBIGIT 1   /* mantissa of a double will fit in one long */
+#else
+#define DNBIGIT	 2  /* mantissa of a double will fit in two longs */
+#endif
+#define FNBIGIT	 1  /* for float, one long */
+
+#if IEEE_FLOATING_POINT
+#define MY_DMINEXP  ((DBL_MIN_EXP) - (DBL_MANT_DIG) - 1)
+/* DMINEXP is defined in values.h on Linux (for example) */
+#define DHIGHBIT 0x00100000
+#define DMSBIT   0x80000000
+
+#define MY_FMINEXP  ((FLT_MIN_EXP) - (FLT_MANT_DIG) - 1)
+#define FHIGHBIT 0x00800000
+#define FMSBIT   0x80000000
+#endif
+
+#ifdef BIGENDIAN
+#define L 1
+#define H 0
+#else
+#define L 0
+#define H 1
+#endif
+\end{code}
+
+\begin{code}
+StgDouble
+#if __STDC__
+__encodeDouble (MP_INT *s, I_ e) /* result = s * 2^e */
+#else
+__encodeDouble (s, e)
+  MP_INT *s; I_ e;
+#endif /* ! __STDC__ */
+{
+    StgDouble r;
+    I_ i;
+/*  char *temp; */
+
+    /* Convert MP_INT to a double; knows a lot about internal rep! */
+    i = __abs(s->size)-1;
+    if (i < 0) {
+	r = 0.0;
+    } else {
+	for(r = s->d[i], i--; i >= 0; i--)
+	    r = r * GMP_BASE + s->d[i];
+    }
+
+    /* Now raise to the exponent */
+    if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+	r = ldexp(r, e);
+
+    /* sign is encoded in the size */
+    if (s->size < 0)
+	r = -r;
+
+/*
+    temp = xmalloc(mpz_sizeinbase(s,10)+2);
+    fprintf(stderr, "__encodeDouble(%s, %ld) => %g\n", mpz_get_str(temp,10,s), e, r);
+*/
+
+    return r;
+}
+
+#if ! alpha_TARGET_ARCH
+    /* On the alpha, Stg{Floats,Doubles} are the same */
+StgFloat
+#if __STDC__
+__encodeFloat (MP_INT *s, I_ e) /* result = s * 2^e */
+#else
+__encodeFloat (s, e)
+  MP_INT *s; I_ e;
+#endif /* ! __STDC__ */
+{
+    StgFloat r;
+    I_ i;
+
+    /* Convert MP_INT to a float; knows a lot about internal rep! */
+    for(r = 0.0, i = __abs(s->size)-1; i >= 0; i--)
+	r = (r * GMP_BASE) + s->d[i];
+
+    /* Now raise to the exponent */
+    if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+	r = ldexp(r, e);
+
+    /* sign is encoded in the size */
+    if (s->size < 0)
+	r = -r;
+
+    return r;
+}
+#endif	/* alpha */
+
+void
+#if __STDC__
+__decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
+#else
+__decodeDouble (man, exp, dbl)
+  MP_INT    *man;
+  I_        *exp;
+  StgDouble dbl;
+#endif /* ! __STDC__ */
+{
+#if ! IEEE_FLOATING_POINT
+    fprintf(stderr, "__decodeDouble: non-IEEE not yet supported\n");
+    abort();
+
+#else /* IEEE fl-pt */
+    /* Do some bit fiddling on IEEE */
+    unsigned int low, high; 	     	/* assuming 32 bit ints */
+    int sign, iexp;
+    union { double d; int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+/*  char *temp; */
+
+    u.d = dbl;	    /* grab chunks of the double */
+    low = u.i[L];
+    high = u.i[H];
+
+    /* we know the MP_INT* passed in has size zero, so we realloc
+    	no matter what.
+    */
+    man->alloc = DNBIGIT;
+
+    if (low == 0 && (high & ~DMSBIT) == 0) {
+	man->size = 0;
+	*exp = 0L;
+    } else {
+	man->size = DNBIGIT;
+	iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
+	sign = high;
+    	/* fprintf(stderr, "decode %g %08x %08x %d\n", u.d, high, low, iexp); */
+
+	high &= DHIGHBIT-1;
+	if (iexp != MY_DMINEXP)	/* don't add hidden bit to denorms */
+	    high |= DHIGHBIT;
+	else {
+	    iexp++;
+	    /* A denorm, normalize the mantissa */
+	    while (! (high & DHIGHBIT)) {
+		high <<= 1;
+		if (low & DMSBIT)
+		    high++;
+		low <<= 1;
+		iexp--;
+	    }
+	}
+        *exp = (I_) iexp;
+#if DNBIGIT == 2
+	man->d[0] = low;
+	man->d[1] = high;
+#else
+#if DNBIGIT == 1
+	man->d[0] = ((unsigned long)high) << 32 | (unsigned long)low;
+#else
+    	error : error : error : Cannae cope with DNBIGIT
+#endif
+#endif
+	if (sign < 0)
+	    man->size = -man->size;
+    }
+
+/*
+    temp = xmalloc(mpz_sizeinbase(man,10)+2);
+    fprintf(stderr, "__decodeDouble(%g) => %s, %ld\n", dbl, mpz_get_str(temp,10,man), *exp);
+*/
+
+#endif /* IEEE fl-pt */
+}
+
+#if ! alpha_TARGET_ARCH
+    /* Again, on the alpha we do not have separate "StgFloat" routines */
+void
+#if __STDC__
+__decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
+#else
+__decodeFloat (man, exp, flt)
+  MP_INT    *man;
+  I_    *exp;
+  StgFloat flt;
+#endif /* ! __STDC__ */
+{
+#if ! IEEE_FLOATING_POINT
+    fprintf(stderr, "__decodeFloat: non-IEEE not yet supported\n");
+    abort();
+
+#else /* IEEE fl-pt */
+    /* Do some bit fiddling on IEEE */
+    int high, sign; 	    	    /* assuming 32 bit ints */
+    union { float f; int i; } u;    /* assuming 32 bit float and int */
+
+    u.f = flt;	    /* grab the float */
+    high = u.i;
+
+    /* we know the MP_INT* passed in has size zero, so we realloc
+    	no matter what.
+    */
+    man->alloc = FNBIGIT;
+
+    if ((high & ~FMSBIT) == 0) {
+	man->size = 0;
+	*exp = 0;
+    } else {
+	man->size = FNBIGIT;
+	*exp = ((high >> 23) & 0xff) + MY_FMINEXP;
+	sign = high;
+
+	high &= FHIGHBIT-1;
+	if (*exp != MY_FMINEXP)	/* don't add hidden bit to denorms */
+	    high |= FHIGHBIT;
+	else {
+	    (*exp)++;
+	    /* A denorm, normalize the mantissa */
+	    while (! (high & FHIGHBIT)) {
+		high <<= 1;
+		(*exp)--;
+	    }
+	}
+#if FNBIGIT == 1
+	man->d[0] = high;
+#else
+    	error : error : error : Cannae cope with FNBIGIT
+#endif
+	if (sign < 0)
+	    man->size = -man->size;
+    }
+
+#endif /* IEEE fl-pt */
+}
+#endif	/* alpha */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[rts-prims-integer]{Things for Integers (using GNU MP pkg)}
+%*									*
+%************************************************************************
+
+See ghc/compiler/prelude/TyInteger.lhs for the comment on this stuff.
+
+%************************************************************************
+%*									*
+\subsubsection[rts-gmp-alloc]{Our custom memory allocation routines}
+%*									*
+%************************************************************************
+
+The GMP documentation says what these must do.
+
+\begin{code}
+#ifdef ALLOC_DEBUG
+StgInt DEBUG_GMPAllocBudget = 0;
+	/* # of _words_ known to be available for stgAllocForGMP */
+#endif
+
+void *
+stgAllocForGMP (size_in_bytes)
+  size_t size_in_bytes;
+{
+    void   *stuff_ptr;
+    I_	data_size_in_words, total_size_in_words;
+
+    /*	the new object will be "DATA_HS + BYTES_TO_STGWORDS(size_in_bytes)" words
+    */
+    data_size_in_words  = BYTES_TO_STGWORDS(size_in_bytes);
+    total_size_in_words = DATA_HS + data_size_in_words;
+
+#ifdef ALLOC_DEBUG
+	/* Check that we are within the current budget */
+    if (DEBUG_GMPAllocBudget < total_size_in_words) {
+	fprintf(stderr, "stgAllocForGMP: budget error: %ld %ld\n",
+			DEBUG_GMPAllocBudget, total_size_in_words);
+	abort();
+    }
+    else
+	DEBUG_GMPAllocBudget -= total_size_in_words;
+#endif
+
+    /*	if it's a DATA thingy, we'd better fill it in.
+    */
+    SET_DATA_HDR(SAVE_Hp+1,ArrayOfData_info,CCC,DATA_VHS+data_size_in_words,0);
+
+    /*	we're gonna return a pointer to the non-hdr part of the beast
+    */
+    stuff_ptr = (void *) (SAVE_Hp + 1 + DATA_HS);
+
+    /*	move the heap pointer right along...
+	(tell [ticky-ticky and regular] profiling about it, too)
+    */
+    SAVE_Hp += total_size_in_words;
+
+#if ! defined(DO_SPAT_PROFILING)
+    /* Note: ActivityReg is not defined in this .lc file */
+
+    ALLOC_HEAP(total_size_in_words); /* ticky-ticky profiling */
+/*  ALLOC_CON(DATA_HS,data_size_in_words,0); */
+    ALLOC_PRIM(DATA_HS,data_size_in_words,0,total_size_in_words);
+#endif /* ! DO_SPAT_PROFILING */
+    CC_ALLOC(CCC,total_size_in_words,CON_K); /* cc profiling */
+    /* NB: HACK WARNING: The above line will do The WRONG THING 
+	if the CurrCostCentre reg is ever put in a Real Machine Register (TM).
+    */
+
+#if defined(LIFE_PROFILE)  /* HACK warning -- Bump HpLim (see also StgMacros.lh)*/
+    SAVE_HpLim += 1;	   /* SET_DATA_HDR attempted HpLim++ in wrong window	*/
+#endif
+
+    /* and return what we said we would */
+    return(stuff_ptr);
+}
+
+void *
+stgReallocForGMP (ptr, old_size, new_size)
+  void *ptr;
+  size_t   old_size, new_size;
+{
+    void *new_stuff_ptr = stgAllocForGMP(new_size);
+    I_ i = 0;
+    char *p = (char *) ptr;
+    char *q = (char *) new_stuff_ptr;
+
+    for (; i < old_size; i++, p++, q++) {
+	*q = *p;
+    }
+
+    return(new_stuff_ptr);
+}
+
+void
+stgDeallocForGMP (ptr, size)
+  void *ptr;
+  size_t   size;
+{
+    /* easy for us: the garbage collector does the dealloc'n */
+}
+\end{code}

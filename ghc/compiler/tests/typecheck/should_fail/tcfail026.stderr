@@ -1,0 +1,6 @@
+ 
+"tcfail026.hs", line 9: multiple declarations of class:
+    A ( "tcfail026.hs", line 9,  "tcfail026.hs", line 3)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

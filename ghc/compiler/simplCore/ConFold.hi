@@ -1,0 +1,12 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface ConFold where
+import CoreSyn(CoreAtom, CoreExpr)
+import Id(Id)
+import PrimOps(PrimOp)
+import SimplEnv(SimplEnv)
+import SimplMonad(SimplCount)
+import SplitUniq(SplitUniqSupply)
+import UniType(UniType)
+completePrim :: SimplEnv -> PrimOp -> [UniType] -> [CoreAtom Id] -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 122222 _N_ _S_ "LSLS" _N_ _N_ #-}
+

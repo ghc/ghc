@@ -1,0 +1,69 @@
+Renamed-pass4:
+module Main where
+infixl 9 PreludeArray.!
+infixl 9 PreludeList.!!
+infixl 7 PreludeRatio.%
+infixl 7 (*)
+infixl 6 (+)
+infixl 6 (-)
+infixl 7 (/)
+infixl 9 PreludeArray.//
+infixl 7 `div`
+infixl 7 `mod`
+infixl 7 `quot`
+infixl 7 `rem`
+infixr 0 $
+infixr 3 &&
+infixr 8 (**)
+infixr 9 .
+infixr 8 Prelude.^
+infixr 8 Prelude.^^
+infixr 2 ||
+infix  4 (/=)
+infix  6 :+
+infix  1 :=
+infix  4 (<)
+infix  4 (<=)
+infix  4 (==)
+infix  4 (>)
+infix  4 (>=)
+infix  5 PreludeList.\\
+instance (Eq a, Eq b) => Eq (a, b)
+instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
+instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
+instance (Ord a, Ord b) => Ord (a, b)
+instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
+instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
+instance (Ix a, Ix b) => Ix (a, b)
+instance (Ix a, Ix b, Ix c) => Ix (a, b, c)
+instance (Ix a, Ix b, Ix c, Ix d) => Ix (a, b, c, d)
+instance (Text a, Text b) => Text (a, b)
+instance (Text a, Text b, Text c) => Text (a, b, c)
+instance (Text a, Text b, Text c, Text d) => Text (a, b, c, d)
+instance (Binary a, Binary b) => Binary (a, b)
+instance (Binary a, Binary b, Binary c) => Binary (a, b, c)
+instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d)
+{- nonrec -}
+Main.f
+    [] = []
+{- nonrec -}
+Main.g
+    x = x
+{- nonrec -}
+Main.f
+    (x : xs) = []
+PreludeArray.! :: Ix a => Array a b -> a -> b
+PreludeList.!! :: Integral a => [b] -> a -> b
+PreludeRatio.% :: Integral a => a -> a -> Ratio a
+PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
+PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
+Prelude.^ :: (Num b, Integral a) => b -> a -> b
+Prelude.^^ :: (Fractional b, Integral a) => b -> a -> b
+PreludeList.or :: [Bool] -> Bool
+
+ 
+"rn002.hs", line 2: multiple declarations of variable:
+    f ( "rn002.hs", line 2,  "rn002.hs", line 4)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

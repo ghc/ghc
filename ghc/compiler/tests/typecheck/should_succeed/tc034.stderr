@@ -1,0 +1,16 @@
+Typechecked:
+AbsBinds [tt12] [d.Num.t15] [(g.t1, ShouldSucceed.g)]
+    (fromInt.t14, fromInt tt12 d.Num.t15)
+    (lit.t4, fromInt.t14 (MkInt 2#))
+    (fromInt.t16, fromInt.t14)
+    (lit.t13, fromInt.t16 (MkInt 4#))
+    (fromInt.t17, fromInt.t16)
+    (lit.t11, fromInt.t17 (MkInt 3#))
+    {- nonrec -}
+    g.t1 :: ShouldSucceed.AList Bool -> tt12
+    g.t1 ShouldSucceed.ANull
+		 = lit.t4
+    g.t1 (ShouldSucceed.ANode b.r59 (ShouldSucceed.ANode c.r60 d.r61))
+		 | b.r59 = lit.t11
+		 | True = lit.t13
+

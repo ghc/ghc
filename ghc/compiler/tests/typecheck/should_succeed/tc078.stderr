@@ -1,0 +1,27 @@
+Typechecked:
+AbsBinds [a.t0] [d.Eq.t1] [(d.Eq.t2, dfun.Eq.M.Bar)]
+    {- rec -}
+    d.Eq.t2 = ({-dict-} [] [==.t3, /=.t4])
+    (==.t3) = defm.== (M.Bar a.t0) d.Eq.t2
+    (/=.t4) = defm./= (M.Bar a.t0) d.Eq.t2
+AbsBinds [a.t5] [d.Ord.t7, d.Eq.t6] [(d.Ord.t8, dfun.Ord.M.Bar)]
+    {- rec -}
+    d.Ord.t8 =
+	({-dict-}
+	[d.Eq.t6]
+	[<.t9, <=.t10, >=.t11, >.t12, max.t13, min.t14, cmp3.t15])
+    (<.t9) = defm.< (M.Bar a.t5) d.Ord.t8
+    (<=.t10) = defm.<= (M.Bar a.t5) d.Ord.t8
+    (>=.t11) = defm.>= (M.Bar a.t5) d.Ord.t8
+    (>.t12) = defm.> (M.Bar a.t5) d.Ord.t8
+    max.t13 = defm.max (M.Bar a.t5) d.Ord.t8
+    min.t14 = defm.min (M.Bar a.t5) d.Ord.t8
+    cmp3.t15 = /\ tt16 -> defm.cmp3 [M.Bar a.t5, tt16] d.Ord.t8
+
+=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= M
+interface M where
+data Bar a = MkBar Int a
+instance Eq a => Eq (Bar a)
+instance Ord a => Ord (Bar a)
+=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
+

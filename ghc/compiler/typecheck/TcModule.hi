@@ -1,0 +1,68 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcModule where
+import AbsSyn(Module)
+import Bag(Bag)
+import CE(CE(..))
+import CharSeq(CSeq)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import ErrUtils(Error(..))
+import FiniteMap(FiniteMap)
+import HsBinds(Bind, Binds, MonoBinds, Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, FixityDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsExpr(ArithSeqInfo, Expr, Qual)
+import HsImpExp(IE, ImportedInterface)
+import HsLit(Literal)
+import HsMatches(Match)
+import HsPat(InPat, RenamedPat(..), TypecheckedPat)
+import HsTypes(PolyType)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludeGlaST(_MutableArray)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import ProtoName(ProtoName)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TCE(TCE(..))
+import TcInstDcls(InstInfo)
+import TcMonad(TcResult)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data Module a b 	{-# GHC_PRAGMA Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+type CE = UniqFM Class
+data E 	{-# GHC_PRAGMA MkE (UniqFM TyCon) (UniqFM Id) (UniqFM Id) (UniqFM Class) #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
+data FixityDecl a 	{-# GHC_PRAGMA InfixL a Int | InfixR a Int | InfixN a Int #-}
+data Expr a b 	{-# GHC_PRAGMA Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id #-}
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+type RenamedPat = InPat Name
+data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+type TCE = UniqFM TyCon
+data InstInfo 	{-# GHC_PRAGMA InstInfo Class [TyVarTemplate] UniType [(Class, UniType)] [(Class, UniType)] Id [Id] (MonoBinds Name (InPat Name)) Bool _PackedString SrcLoc [Sig Name] #-}
+data TcResult a 	{-# GHC_PRAGMA TcSucceeded a Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) | TcFailed Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+tcModule :: E -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Module Name (InPat Name) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ((Binds Id TypecheckedPat, Binds Id TypecheckedPat, Binds Id TypecheckedPat, [(Inst, Expr Id TypecheckedPat)]), ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo), FiniteMap TyCon [[Labda UniType]], E, PprStyle -> Int -> Bool -> PrettyRep)
+	{-# GHC_PRAGMA _A_ 9 _U_ 221222120 _N_ _S_ "LLU(LAALSLLLLLLLL)LLLU(ALL)LA" {_A_ 8 _U_ 22122212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

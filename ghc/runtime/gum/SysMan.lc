@@ -1,0 +1,252 @@
+%****************************************************************************
+%
+\section[Sysman.lc]{GUM Sysman Program}
+%
+%  (c) The Parade/AQUA Projects, Glasgow University, 1994-1995.
+%      P. Trinder, November 30th. 1994.
+%
+%****************************************************************************
+
+The Sysman task controls initiation, termination, global GC
+synchronisation and statistics gathering. Based on K. Hammond's SysMan.lc
+in Graph for PVM.
+
+\begin{code}
+#define NON_POSIX_SOURCE /* so says Solaris */
+
+#include "rtsdefs.h"
+#include "LLC.h"
+\end{code}
+
+\begin{code}
+static GLOBAL_TASK_ID gtids[MAX_PES], IOTask =  0, StatsTask = 0;
+static long PEbuffer[MAX_PES];
+static int nPEs = 0;
+\end{code}
+
+\begin{code}
+static GLOBAL_TASK_ID sysman_id, sender_id;
+
+GLOBAL_TASK_ID mytid;
+
+static unsigned PEsTerminated = 0;
+
+static rtsBool Finishing = rtsFalse;
+\end{code}
+
+\begin{code}
+#define checkerr(c)	do {if((c)<0) { pvm_perror("Sysman"); EXIT(EXIT_FAILURE); }} while(0)
+\end{code}
+
+This Function not yet implemented for GUM 
+
+\begin{code}
+static void
+DoGlobalGC(STG_NO_ARGS)
+{}
+/*
+static void
+HandleException(STG_NO_ARGS)
+{}
+*/
+\end{code}
+
+\begin{code}
+main(argc, argv)
+int argc;
+char **argv;
+{
+    int rbufid;
+    int opcode, nbytes;
+    char **pargv;
+    int i;
+#if 0
+    int status;
+#endif
+    int spawn_flag = PvmTaskDefault;
+
+    char *petask;
+
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
+
+    if (argc > 1) {
+	if (*argv[1] == '-') {
+	    spawn_flag = PvmTaskDebug;
+	    argv[1] = argv[0];
+	    argv++; argc--;
+	}
+	sysman_id = pvm_mytid();/* This must be the first PVM call */
+	checkerr(sysman_id);
+
+	nPEs = atoi(argv[1]);
+
+	if ((petask = getenv(PETASK)) == NULL)
+	    petask = PETASK;
+
+#if 1
+	fprintf(stderr, "nPEs (%s) = %d\n", petask, nPEs);
+#endif
+
+	/* Check that we can create the number of PE and IMU tasks requested */
+	if (nPEs > MAX_PES) {
+	    fprintf(stderr, "No more than %d PEs allowed (%d requested)\n", MAX_PES, nPEs);
+	    EXIT(EXIT_FAILURE);
+	}
+	/* Create the PE Tasks */
+	if (nPEs > 0) {
+	    /* Initialise the PE task arguments from Sysman's arguments */
+	    pargv = argv + 1;
+#if 0
+	    fprintf(stderr, "Spawning %d PEs(%s) ...\n", nPEs, petask);
+	    fprintf(stderr, "  args: ");
+	    for (i = 0; pargv[i]; ++i)
+		fprintf(stderr, "%s, ", pargv[i]);
+	    fprintf(stderr, "\n");
+#endif
+
+	    checkerr(pvm_spawn(petask, pargv, spawn_flag, "", nPEs, gtids));
+	    for (i = 0; i < nPEs; i++)
+		PEbuffer[i] = (long) gtids[i];
+#if 0
+	    fprintf(stderr, "Spawned /* PWT */\n");
+#endif
+
+	}
+	/* Join the PE  sysman groups in order to allow barrier synchronisation */
+	checkerr(pvm_joingroup(PECTLGROUP));
+#if 0
+	fprintf(stderr, "Joined PECTLGROUP /* PWT */\n");
+#endif
+
+	/* Wait for all the PEs and IMUs to arrive */
+	checkerr(pvm_barrier(PECTLGROUP, nPEs + 1));
+
+#if 0
+	fprintf(stderr, "PECTLGROUP  barrier passed /* HWL */\n");
+#endif
+
+	/* Broadcast Global Task Ids of all PEs */
+
+	pvm_initsend(PvmDataDefault);
+	PutArgs(PEbuffer, nPEs);
+	pvm_bcast(PEGROUP, PP_PETIDS);
+
+#if 0
+	/* Find an IO task */
+	for (i = 0; IOTask <= 0 || status != PvmOk; ++i) {
+	    IOTask = pvm_gettid(PEGROUP, i);
+	    status = pvm_pstat(IOTask);
+	    fprintf(stderr, "Task %x, Status %x\n", IOTask, status);
+	}
+#endif
+
+	IOTask = gtids[0];
+#if 0
+	fprintf(stderr, "IO Task is [t%x]\n", IOTask);
+#endif
+
+	pvm_initsend(PvmDataDefault);
+	pvm_send(IOTask, PP_IO_INIT);
+
+	pvm_initsend(PvmDataDefault);
+	pvm_bcast(PEGROUP, PP_INIT);
+#if 0
+	fprintf(stderr, "Broadcast PP_INIT to all PEs\n");
+#endif
+
+	/* HWL-DEBUG */
+#if 0
+	fprintf(stderr, "Sysman successfully initialized!\n");
+#endif
+
+	/* Process incoming messages */
+	while (1) {
+	    if ((rbufid = pvm_recv(ANY_TASK, ANY_OPCODE)) < 0)
+		pvm_perror("Sysman: Receiving Message");
+
+	    else {
+		pvm_bufinfo(rbufid, &nbytes, &opcode, &sender_id);
+
+#if 0
+		fprintf(stderr, "HWL-DBG(SysMan; main loop): rbufid=%x, nbytes = %d, opcode = %x, sender_id = %x\n",
+		  rbufid, nbytes, opcode, sender_id);
+#endif
+
+		switch (opcode) {
+		case PP_GC_INIT:
+		    /* This Function not yet implemented for GUM */
+		    fprintf(stderr, "Global GC from %x Not yet implemented for GUM!\n", sender_id);
+		    sync(PECTLGROUP, PP_FULL_SYSTEM);
+		    broadcast(PEGROUP, PP_GC_INIT);
+		    DoGlobalGC();
+		    broadcast(PEGROUP, PP_INIT);
+		    break;
+
+		case PP_STATS_ON:
+		case PP_STATS_OFF:
+		    /* This Function not yet implemented for GUM */
+		    break;
+
+		case PP_FINISH:
+		    fprintf(stderr, "Finish from %x\n", sender_id);
+		    if (!Finishing) {
+			long buf = (long) StatsTask;
+			Finishing = rtsTrue;
+			pvm_initsend(PvmDataDefault);
+			pvm_pklong(&buf, 1, 1);
+			pvm_bcast(PEGROUP, PP_FINISH);
+		    } else {
+			++PEsTerminated;
+		    }
+
+		    if (PEsTerminated >= nPEs) {
+			broadcast(PEGROUP, PP_FINISH);
+			broadcast(MGRGROUP, PP_FINISH);
+			pvm_lvgroup(PEGROUP);
+			pvm_lvgroup(PECTLGROUP);
+			pvm_lvgroup(MGRGROUP);
+			pvm_exit();
+			EXIT(EXIT_SUCCESS);
+		    }
+		    break;
+
+		case PP_FAIL:
+		    fprintf(stderr, "Fail from %x\n", sender_id);
+		    if (!Finishing) {
+			Finishing = rtsTrue;
+			broadcast(PEGROUP, PP_FAIL);
+		    }
+		    break;
+
+		default:
+		    {
+/*		      char *opname = GetOpName(opcode);
+		      fprintf(stderr,"Sysman: Unrecognised opcode %s (%x)\n",
+                                     opname,opcode);	*/
+			fprintf(stderr, "Sysman: Unrecognised opcode (%x)\n",
+			  opcode);
+		    }
+		    break;
+		}
+	    }
+	}
+    }
+}
+\end{code}
+
+@myexit@ for the system manager.
+
+\begin{code}
+
+void
+myexit(n)
+I_ n;
+{
+#ifdef exit
+#undef exit
+#endif
+    exit(n);
+}
+
+\end{code}

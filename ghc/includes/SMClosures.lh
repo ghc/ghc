@@ -1,0 +1,1110 @@
+%************************************************************************
+%*									*
+\section[closure-layout]{Closure Layout}
+%*									*
+%************************************************************************
+
+We first describes the data structures that are shared by
+both the reducer and storage manager and then go on to describe
+the interface and its implementation.
+
+The heap consists of a contiguous sequence of closures. Each standard
+closure occupies a contiguous sequence of machine words, which is laid
+out as follows:
+
+\begin{rawlatex}
+\begin{center}
+\mbox{\epsffile{closure.ps}}
+\end{center}
+\end{rawlatex}
+
+\begin{onlyinfo}
+\begin{verbatim}
+< fixed-hdr-size> < var-hdr-size  >
+-----------------+-----------------+---------+-------------+
+|info|     |     |     |     |     | ptrs... | nonptrs ... |
+-----------------+-----------------+---------+-------------+
+<------------- header ------------>
+\end{verbatim}
+\end{onlyinfo}
+
+The closure starts with a header. Typically, the first word in the
+header is the {\em info pointer}, and points to its {\em info-table}.
+The rest of the header is used for bookkeeping and depends on the
+compiler options used. The fixed header is the same for all closures
+while the variable header may depend on the closure type.
+
+Following the header is a block of words each of which contains a
+pointer to another closure, followed by a block of words containing
+non-pointers. The non-pointers may include an unused portion of
+``slop'' needed to pad the closure.  This is to satisfy any minimum
+closure size requirements, primarily for updates in place.  The
+distinction between the pointers and non-pointers is that the garbage
+collector must follow the former but not the latter.  The pointers are
+placed first to mimimize the number of distinct closure shapes that
+have to be managed by the garbage collector.
+
+There are a few non-standard closures which do not follow the convention
+of placing all pointers first, but they are all administrative closures
+which require their own unique garbage collection code anyway (such as
+@TSO@'s and @STKO@'s in the threaded world).
+
+The heap grows upwards (towards higher addresses), and closures are
+laid out with the info pointer at the lowest address.
+
+During reduction, the heap pointer (@Hp@) points to the last word of
+allocated space (and not to the first word of free space) and the heap
+limit (@HpLim@) points to the last word of available space.
+
+%************************************************************************
+%*									*
+\subsection[closure-size]{The ``Size'' of Closures}
+%*									*
+%************************************************************************
+
+When we speak of the ``size'' of a closure, we mean {\em the number of
+words in the closure, excluding the fixed header, but including the
+variable header, the pointers, non-pointers and slop, if any}.
+
+All closures which may be updated must have a size of at least
+@MIN_UPD_SIZE@---currently, this is two, so that they may be directly
+overwritten with a small constructor closure, such as a @(:)@ cell or
+an indirection on the ``mutables'' list.
+
+%************************************************************************
+%*									*
+\subsection[closure-kinds]{Types of Closure}
+%*									*
+%************************************************************************
+
+{\em This section is now hopelessly out-of-date}.  This stuff is {\em
+important} if you want newcomers to understand GHC.  Am I the only
+person who bothers with documentation?! KH
+
+Yes, Kevin, you are.  I've taken a stab at this section.  I think {\em
+hopelessly out-of-date} is a bit overboard, especially compared to
+some of the other documentation in this system.  If you still don't
+like it, you're welcome to update it.
+
+(Umm... Before we update it, would anyone like to go for a pizza?
+[WDP 95/03])
+
+We identify several kinds of heap closures. Each type of closure
+is treated differently by the storage manager. Different
+info-table macros are used to declare the appropriate info-tables used
+by the storage manager (see section \ref{info-table-macros}).
+
+Note: it is vitally important that every closure has an appropriate
+info-table attached---otherwise chaos results!
+
+\begin{description}
+
+\item[@SPEC@ closures:] These are standard closures which contain
+specialized garbage collection code that ``knows'' the @size@/@ptrs@
+of the closure. It is only possible to use a specialized info-table if
+appropriately specialized garbage collection code is present in the
+runtime system. This implies that the compiler needs to know which
+@size@/@ptr@ combinations have specialized info-tables. A link-time
+error results if the compiler attempts to build a @SPEC@ closure for
+an inappropriate @size@/@ptr@ combination.
+
+\item[@GEN@ closures:] These are normal closures which use generic
+code for garbage collection. This interprets the @size@/@ptrs@
+information stored in the info table. @GEN@ closures can be built for
+any @size@/@ptrs@ combination.
+
+\item[@DYN@ closures:] Dynamic closures have the layout information
+(@size@/@ptrs@) stored within the variable header of the closure
+itself. They are currently only used for partial applications (@PAP@s)
+and the ``stable pointer table.''
+%partain:\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Size} & {\em No of ptrs} & {\em Pointers\ldots} & {\em Non-pointers\ldots}	\\ \hline
+\end{tabular}
+%partain:\end{center}
+
+\item[@TUPLE@ closure:] These are similar to @DYN@ closures but for
+closures which contain only pointers.  They are currently used for
+primitive arrays of pointers when mutuples and immutuples do not have
+to be distinguished during garbage collection.
+%partain:\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Size (= No of ptrs + TUPLE\_VHS)} & {\em Pointers\ldots} \\ \hline
+\end{tabular}
+%partain:\end{center}
+
+\item[@DATA@ closures:] These are also similar to @DYN@ closures but
+for closures containing only non-pointers. They are currently used for
+primitive arrays of bytes (arbitrary precision integers and arrays of
+unboxed values, for example).
+%partain:\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Size (= No of non-ptr words + DATA\_VHS)} & {\em Non-pointers\ldots} \\ \hline
+\end{tabular}
+%partain:\end{center}
+
+\item[@MUTUPLE@ closures:] These are a variant of the @TUPLE@
+closure. They are used when the garbage collection strategy requires a
+distinction between mutable and immutable tuples (i.e. when there is a
+``mutables'' list.)  Such an array may be frozen, becoming an @IMMUTUPLE@,
+with a different info-table.
+%partain:\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Size (= No of ptrs + MUTUPLE\_VHS)} & {\em Pointers\ldots} \\ \hline
+\end{tabular}
+%partain:\end{center}
+
+\item[@IMMUTUPLE@ closures:] These are frozen @MUTUPLE@ closures.
+%mattson:\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+{\em Fixed Hdr} & {\em Size (= No of ptrs + MUTUPLE\_VHS)} & {\em Pointers\ldots} \\ \hline
+\end{tabular}
+%mattson:\end{center}
+
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[special-closure-types]{Special types}
+%*									*
+%************************************************************************
+
+Special kinds of closures are required for static closures, ``black
+holes'', indirections, and in-place updates.
+
+When a ``black hole'' is updated it must be updated with a closure of
+size @MIN_UPD_SIZE@ or less.  Updates to some specific closure types
+are handled specially, as follows:
+
+\begin{itemize}
+\item
+if the new closure is of zero arity, then the black hole is replaced by
+the corresponding static closure (@CONST@);
+\item
+if the data type of the new closure is isomorphic to Char (one
+constructor, with argument type @Char#@), then the black hole is
+replaced by the corresponding member of the static character table
+(@CHARLIKE@);
+\item
+if the data type of the new closure is isomorphic to Int (one
+constructor, with argument type @Int#@), and the argument is in the
+range of the static small-int table then the black hole is replaced by
+the corresponding member of the integer table (@INTLIKE@).
+\end{itemize}	
+
+The special kinds of closure are:
+
+\begin{description}
+
+\item[@STATIC@ closures:] These are closures which are declared
+statically and hence do not reside in the heap. Such closures must not
+contain any heap pointers and must not be updated.  @CAF@ closures are
+an exception; see below.
+
+\item[@CONST@ closures:] There need be only one (static) closure for a
+nullary constructor. These are declared static at compile time and all
+references use the static closure (avoiding heap allocation). However,
+dynamic heap-allocated ones will nevertheless arise through updates.
+
+\item[@CHARLIKE@ and @INTLIKE@ closures] There is a similar story for
+constructors which have a single primitive data field such as @Int#@
+or @Char#@. During garbage collection, pointers to these closures can
+be replaced with a known @STATIC@ closure if an appropriate one exists.
+
+\item[@BH@ closures:] Black hole closures are used to overwrite
+closures currently being evaluated. They inform the garbage collector
+that there are no live roots in the closure, thus removing a potential
+space leak.  They also become synchronization points in the threaded
+world.
+
+\item[@BQ@ closures:] Blocking queue closures are black holes with a
+list of blocked threads to be awakened when the black hole is updated.
+
+\item[@IND@ closures:] Indirection closures just point to other
+closures. They are introduced when a closure is updated with a closure
+that has to be allocated in the heap. The closure to be updated is
+{\em indirected} to the new closure.  Indirections are normally
+removed during garbage collection.  However, when profiling, it may be
+necessary to maintain cost center information in an indirection, so
+there are also ``permanent indirections'' which are retained forever.
+
+\item[@CAF@ indirections:] These are statically defined closures which have
+been updated with a heap-allocated result.
+Initially these are exactly the same as a @STATIC@ closure but with
+special entry code. On entering the closure the entry code must:
+\begin{itemize}
+\item Allocate a black hole in the heap which will be updated with
+      the result.
+\item Overwrite the static closure with a special @CAF@ indirection.
+
+\item Link the static indirection onto the list of updated @CAF@s.
+\end{itemize}
+The indirection and the link field require the initial @STATIC@
+closure to be of at least size @MIN_UPD_SIZE@ (excluding the fixed
+header).
+
+@CAF@s are treated as special garbage collection roots.  These roots
+are explicitly collected by the garbage collector, since they may
+appear in code even if they are not linked with the main heap.  They
+consequently represent potentially enormous space-leaks.  A @CAF@
+closure retains a fixed location in statically allocated data space.
+When updated, the contents of the @CAF@ indirection are changed to
+reflect the new closure. @CAF@ indirections require special garbage
+collection code.
+
+\item[@FETCHME@ closures:] These are simply references to remote
+objects in the parallel system.
+
+\item[@TSO@ closures:] These are ``thread state objects,'' which are
+used in the threaded world to maintain the context (STG registers,
+PC location when asleep, etc.) for individual threads of computation.
+
+\item[@STKO@ closures:] These are ``stack objects,'' which are
+used in the threaded world as the stack for each thread is allocated
+from the heap in smallish chunks.  (The stack in the sequential world
+is allocated outside of the heap.)
+
+\item[@SPEC_RBH@ and @GEN_RBH@ closures:] These are ``revertible black
+holes'' for updatable @SPEC@ (respectively @GEN@) closures.  They are
+currently used in the parallel system, but they could also be used for
+speculation.  They act like a black hole for thread synchronization,
+but they can also be reverted back to the original @SPEC@
+(respectively @GEN@) form (so they do introduce a space leak).
+
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[closure-layout-macros]{Closure layout macros}
+%*									*
+%************************************************************************
+
+\begin{description}
+\item[@FIXED_HS@:]
+This is the number of fixed-header words present in every closures.
+This includes the info pointer---always the first word---and any
+other fixed info.  Because this name occurs so often, @_FHS@ is used as
+a shorthand form.
+
+\item[@SET_FIXED_HDR(closure, infolbl, costcentre)@:] Initialize the
+fixed-header part of @closure@, putting @infolbl@ into the first word
+(where the info-table pointer normally lives). Note that @infolbl@
+should be the name of the appropriate info-table. If we are profiling
+on a sequential machine, then the cost centre will be placed in the
+second word of the fixed header.
+
+\item[@<closure-kind>_VHS@:]
+This is the number of words in the variable part of the header.  This
+includes the @size@ and/or @ptr@ fields if required for this closure
+type, and any words which are reserved for garbage collection.
+
+@SPEC@, @CONST@, @CHARLIKE@, @INTLIKE@, @BH@ and @IND@ do
+not have variable header parts, hence no @<closure-kind>_VHS@ macro is
+defined for any of these closure types.
+
+\item[@SET_<closure-kind>_HDR(closure,infolbl,costcentre,size,no-of-ptrs)@:]
+This is used to initialize the header of a \tr{<closure-kind>} closure.
+The fixed header is set by using @SET_FIXED_HDR(closure,infolbl,costcentre)@
+macro.
+
+The variable part of the header, if present, uses the
+@size@/@ptrs@ fields.  The @size@ should {\em include} any slop
+words in the closure.  Any field that is not used may be junk.
+
+The fields actually used depend on the type of the closure (other
+fields are ignored):
+
+%partain:\begin{center}
+\begin{tabular}{|l|l|} \hline
+Closure     & Fields Used		               \\ \hline
+            &                                          \\
+\tr{SPEC}   & size/nonptrs fields ignored              \\
+\tr{GEN}    & both fields also ignored                 \\
+\tr{DYN}    & both fields used                         \\
+\tr{TUPLE}  & size used (ptrs = size - \tr{TUPLE_VHS}) \\
+\tr{DATA}   & size used (ptrs = 0)			\\\hline
+\end{tabular}
+%partain:\end{center}
+
+\item[@<closure-kind>_HS@:]
+Total number of words in the header:
+
+\pl{TOT_HDR = FIXED_HDR + VAR_HDR}.
+
+\item[@<closure-kind>_CLOSURE_SIZE(closure)@:]
+Returns the size of a closure of this kind.  This includes any @VAR_HDR@
+words and slop---but excludes the @FIXED_HDR@ words.
+
+\item[@<closure-kind>_CLOSURE_NoPTRS(closure)@:]
+Returns the number of closure pointer words in a closure of this kind.
+
+\item[@<closure-kind>_CLOSURE_NoNONPTRS(closure)@:]
+Returns the number of useful non-pointer words (including slop) in a
+closure of this kind.  These follow the pointer words in the closure;
+\pl{NoNONPTRS = SIZE - NoPTRS - VAR_HDR}.
+
+\item[@<closure-kind>_CLOSURE_PTR(closure,nth)@:]
+Returns the $n$th closure pointer in the closure (starting at 1).
+
+If a loop needs to process all the pointers and non-pointers in a closure then
+this macro should be avoided. Instead, have a pointer run over the closure;
+for example (from @StgUpdate.lhc@):
+\begin{pseudocode}
+{ P_ p = PapClosure + FIXED_HS + DYN_VHS;
+  I_ NPtrWords = DYN_CLOSURE_NoPTRS(Node);
+  I_ NNonPtrWords = DYN_CLOSURE_NoNONPTRS(Node);
+  for (i=0; i<NPtrWords;    i++) SpA[AREL(i)] = *(p++);
+  for (i=0; i<NNonPtrWords; i++) SpB[BREL(i)] = *(p++);
+}
+\end{pseudocode}
+
+\end{description}
+
+
+%************************************************************************
+%*									*
+\subsection[SMinterface.h-implementation]{Interface implementation}
+%*									*
+%************************************************************************
+
+This section details the implementation of the storage manager
+interface.
+
+NB: Heap objects specific to parallel implementations are not defined
+here, but in \tr{Parallel.lh} instead.
+
+%************************************************************************
+%*									*
+\subsubsection[common-to-all-closures]{Bits common to all closures (esp. @FIXED_HS@)}
+%*									*
+%************************************************************************
+
+The maximum number of pointers in a generic closure (@GEN@, @DYN@,
+@TUPLE@, @DATA@) is defined here.
+
+Multi-slurp protection:
+\begin{code}
+#ifndef SMClosures_H
+#define SMClosures_H
+\end{code}
+
+Macros to make rep-table names:
+If you change either of these, change .../nativeGen/StixInfo.lhs
+too---or else!
+\begin{code}
+
+#define MK_REP_LBL(n,s,p)	CAT6(n,_,s,_,p,_rtbl)
+#define MK_REP_REF(n,s,p)  	CAT6(n,_,s,_,p,_rtbl)
+
+\end{code}
+
+At the start of a closure is a fixed header. The info-pointer is
+normally the first word of a closure, in the fixed header.  Following
+this we may have any of (but occuring in this order): parallel words
+(currently a global address); profiling words (currently a cost
+centre).  It is possible to change the ordering of fixed header
+components by changing the @_HDR_POSN@ macros in the appropriate
+files, and the @SET_FIXED_HDR@/@SET_STATIC_FIXED_HDR@ macros below.
+
+The @FIXED_HS@, @SET_FIXED_HDR@ macros and the components
+which are used to define them must all be defined consistently.
+
+\begin{code}
+
+#define FIXED_HS 		(INFO_FIXED_HDR + PAR_FIXED_HDR + PROF_FIXED_HDR + AGE_FIXED_HDR)
+
+/* NB: this *defines* the intended order for the pieces of 
+   the fixed header.  Care should be taken to ensure that this
+   is followed below and in the component headers.
+*/
+
+#define _FHS 			FIXED_HS /* shorthand */
+
+#define SET_FIXED_HDR(closure,infolbl,costcentre) 	\
+    	SET_INFO_PTR(closure,infolbl);			\
+        SET_GRAN_HDR(closure,ThisPE);			\
+	SET_PAR_HDR(closure,LOCAL_GA); 			\
+	SET_PROF_HDR(closure,costcentre);		\
+	SET_AGE_HDR(closure)
+
+#define UPD_FIXED_HDR(closure,infolbl,costcentre)	\
+	SET_INFO_PTR(closure,infolbl);			\
+	SET_PROF_HDR(closure,costcentre)
+	/* fiddling SET_PAR_HDR would be a bug (says Patrick) */
+	/* no SET_AGE_HDR for inplace updates */
+
+/* These items are comma-separated */
+
+#define SET_STATIC_FIXED_HDR(closure,infolbl,cc_ident)	\
+	SET_STATIC_INFO_PTR(infolbl)			\
+        SET_STATIC_PROCS(closure)			\
+	SET_STATIC_PAR_HDR(closure) 			\
+	SET_STATIC_PROF_HDR(cc_ident)			\
+	SET_STATIC_AGE_HDR()
+
+\end{code}
+
+We define @MIN_UPD_SIZE@ to be the minimum size for updatable
+closures. This must be at least 2, to allow for @(:)@ cells and
+indirections on the ``mutables'' list. This is defined in
+\tr{GhcConstants.lh}.
+
+All updates are performed on closures of this size so @BH@ and @IND@
+closures all have this size.
+
+Finally we define the number of words that the storage-manager needs
+to reserve in the variable header for mutable closures:
+
+\begin{code}
+#if defined(GCap) || defined(GCgn)
+# define GC_MUT_REQUIRED
+# define GC_MUT_RESERVED_WORDS 		1
+# define MUT_NOT_LINKED			1 /* Assuming 1 is not a valid pointer */
+# define MUT_LINK(closure) 		(((P_)(closure))[FIXED_HS])
+# define SET_MUT_RESERVED_WORDS(closure) MUT_LINK(closure) = MUT_NOT_LINKED
+# define SET_STATIC_MUT_RESERVED_WORDS	, (W_) MUT_NOT_LINKED
+#else
+# define GC_MUT_RESERVED_WORDS 		0
+# define SET_STATIC_MUT_RESERVED_WORDS
+#endif
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[SPEC-closures]{@SPEC@ (specialized) closure macros}
+%*									*
+%************************************************************************
+
+@SPEC@ closures have no variable header size---it is always 0.
+@SPEC_VHS@ is left undefined, so that if anyone tries to use it,
+they will hear about it soon enough (WDP 95/05).
+
+\begin{code}
+#define SPEC_HS				(FIXED_HS)
+
+#define SPEC_CLOSURE_PTR(closure, no)	(((P_)(closure))[SPEC_HS + (no) - 1])
+#define SPEC_CLOSURE_SIZE(closure)	((W_)INFO_SIZE(INFO_PTR(closure)))
+#define SPEC_CLOSURE_NoPTRS(closure)	((W_)INFO_NoPTRS(INFO_PTR(closure)))
+#define SPEC_CLOSURE_NoNONPTRS(closure)	(SPEC_CLOSURE_SIZE(closure)-SPEC_CLOSURE_NoPTRS(closure)/*-SPEC_VHS*/)
+
+#define SET_SPEC_HDR(closure,infolbl,cc,size,ptrs) \
+					SET_FIXED_HDR(closure,infolbl,cc)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[MallocPtr-closures]{@MallocPtr@ closure macros}
+%*									*
+%************************************************************************
+
+Here's what a MallocPtr looks like:
+
+\begin{verbatim}
+            <Var  Hdr> 
++----------+----------+------+------+
+| Info Ptr | Forward  | Data | List |
++----------+----------+------+------+
+\end{verbatim}
+
+The list is a pointer to the next MallocPtr in the list of all
+MallocPtrs.  Note that it is essential that the garbage collector {\em
+not\/} follow this link but that the link must get updated with the
+new address.
+
+The optional @Forward@ field is used by copying collectors to insert
+the forwarding pointer into.  (If we overwrite the @Data@ part, we
+don't know which MallocPtr has just died; if we overwrite the @List@ part,
+we can't traverse the list of all MallocPtrs.)
+
+\begin{code}
+#if !defined(PAR)
+
+# if defined(_INFO_COPYING)
+#  define MallocPtr_VHS				1
+# else
+#  define MallocPtr_VHS				0
+# endif
+
+# define MallocPtr_HS			(FIXED_HS + MallocPtr_VHS)
+# define MallocPtr_SIZE			(MallocPtr_VHS + 2)
+
+# define MallocPtr_CLOSURE_NoPTRS(closure)  0
+# define MallocPtr_CLOSURE_DATA(closure)    (((StgMallocPtr *)(closure))[MallocPtr_HS + 0])
+# define MallocPtr_CLOSURE_LINK(closure)    (((StgPtrPtr) (closure))[MallocPtr_HS + 1])
+
+# define SET_MallocPtr_HDR(closure,infolbl,cc,size,ptrs) \
+					SET_FIXED_HDR(closure,infolbl,cc)
+\end{code}
+
+And to check that a Malloc ptr closure is valid
+
+\begin{code}
+EXTDATA_RO(MallocPtr_info);
+
+# if defined(DEBUG)
+
+#  define CHECK_MallocPtr_CLOSURE( closure ) \
+do {                                       \
+  CHECK_MallocPtr_InfoTable( closure );    \
+} while (0)
+
+#  define CHECK_MallocPtr_InfoTable( closure ) \
+  ASSERT( (*((PP_)(closure))) == MallocPtr_info )
+
+extern void Validate_MallocPtrList( P_ MPlist );
+#  define VALIDATE_MallocPtrList( mplist ) Validate_MallocPtrList( mplist )
+
+# else /* !DEBUG */
+
+#  define CHECK_MallocPtr_CLOSURE( closure ) /* nothing */
+#  define VALIDATE_MallocPtrList( mplist ) /* nothing */
+
+# endif /* !DEBUG */
+#endif /* !PAR */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[SP-table-closures]{@SPTable@ Stable Pointer Table closure macros}
+%*									*
+%************************************************************************
+
+
+A stable pointer is a name for a Haskell object which can be passed to
+the external world.  It is ``stable'' in the sense that the name does
+not change when the Haskell garbage collector runs---in contrast to
+the address of the object which may well change.
+
+The stable pointer type is parameterized by the type of the thing
+which is named.
+
+\begin{verbatim}
+type StablePtr# a
+\end{verbatim}
+
+A stable pointer is represented by an index into the (unique,
+heap-allocated) @StablePointerTable@.  The Haskell garbage collector
+treats the @StablePointerTable@ as a source of roots for GC.
+
+In order to provide efficient access to stable pointers and to be able
+to cope with any number of stable pointers ($0 \ldots 100000$), the
+table of stable pointers is an array stored on the heap and can grow
+when it overflows.  (Since we cannot compact the table by moving
+stable pointers about, it seems unlikely that a half-empty table can
+be reduced in size---this could be fixed if neccessary by using a
+hash table of some sort.)
+
+In general a stable pointer table closure looks like this:
+
+\begin{verbatim}
+<------------header--------------->
++------+------------+------+-------+---+---+---+-----+-----+--+--+--+----+
+| Info | GCReserved | Size | NPtrs |SP0|SP1|...|SPn-1| Top |s0|s1|..|sn-1|
++------+------------+------+-------+---+---+---+-----+-----+--+--+--+----+
+\end{verbatim}
+
+The fields are:
+\begin{description}
+
+\item[@Size@:] number of words excluding fixed header ($= @DYN_VHS@ + @NPtrs@ + 1 + @NPtrs@$)
+
+\item[@NPtrs@:] number of (stable) pointers.
+
+\item[@SPi@:] ``unstable'' pointer to a closure.  This is the pointer
+that gets updated when the garbage collector moves an object we have a
+stable pointer to.  If the pointer is not in use, it points to a
+static closure.
+
+\item[@si@:] entry in a stack of unused pointers.  Entries in
+use will contain a number in the range $0\ldots n-1$.
+
+\item[@Top@] is the index of the first element above the top of the stack.
+
+\end{description}
+
+For example, with $n = 4$ and pointers @0@ and @3@ in use (pointing to
+@p1@ and @p2@ respectively), the table might look like this:
+
+\begin{verbatim}
++------+----+---+----+---+---+----+---+---+---+---+---+
+| Info | 11 | 4 | p1 | x | x | p2 | 2 | 2 | 1 | ? | ? |
++------+----+---+----+---+---+----+---+---+---+---+---+
+                                   +-----------^
+\end{verbatim}
+
+From the above description, it should be clear that this is just a
+special case of a @DYN@ closure.  However, a few macros to access the
+various fields would be jolly useful.
+
+Nota Bene: one might think that since the table is mutable, we'd need
+to treat it a bit more like a @MUTUPLE@.  This isn't necessary because
+we treat the stable pointer table as a root.
+
+\begin{code}
+#if !defined(PAR)
+\end{code}
+
+\begin{code}
+# define SPT_SIZE(closure)         DYN_CLOSURE_SIZE(closure)
+# define SPT_NoPTRS(closure)       DYN_CLOSURE_NoPTRS(closure)
+# define SPT_TOP(closure)          (((I_ *) closure)[DYN_HS + SPT_NoPTRS(closure)])
+# define SPT_SPTR(closure,index)   (((PP_) closure)[DYN_HS + index])
+# define SPT_FREE(closure,index)   (((I_ *) closure)[DYN_HS + SPT_NoPTRS(closure) + 1 + index])
+\end{code}
+
+And to implement the stack:
+
+\begin{code}
+# define SPT_FULL(closure)         (SPT_TOP(closure) == SPT_NoPTRS(closure))
+# define SPT_EMPTY(closure)        (SPT_TOP(closure) == 0)
+
+# define SPT_PUSH(closure,free)    SPT_FREE(closure,SPT_TOP(closure)++) = free
+# define SPT_POP(closure)          SPT_FREE(closure,--SPT_TOP(closure))
+\end{code}
+
+And to check that an SPT_Closure is what it's supposed to be, we check
+that the size and number of pointers match up and we check that the
+free list and sptr areas are consistent.  
+
+Note that we cannot always check the info table since we might be
+halfway through garbage collection when we call these (eg in
+@freeStablePointer@.
+
+\begin{code}
+# if defined(DEBUG)
+
+#  define CHECK_SPT_CLOSURE( closure ) \
+do {                                 \
+  CHECK_SPT_InfoTable( closure );    \
+  CHECK_SPT_Size( closure );         \
+  CHECK_SPT_Contents( closure );     \
+} while (0)
+
+EXTDATA_RO(StablePointerTable_info);
+EXTDATA_RO(EmptyStablePointerTable_static_info);
+EXTDATA(EmptySPTable_closure);
+extern int ValidateSPTable PROTO(( P_ SPTable ));
+
+#  define CHECK_SPT_InfoTable( closure ) \
+  ASSERT( (*((PP_) (closure)) == EmptyStablePointerTable_static_info && (closure == EmptySPTable_closure) ) || \
+	  (*((PP_) (closure)) == StablePointerTable_info) )
+
+#  define CHECK_SPT_Size( closure ) \
+  ASSERT( SPT_SIZE( closure ) == DYN_VHS + 2 * SPT_NoPTRS( closure ) + 1 )
+
+#  define CHECK_SPT_Contents( closure ) \
+  ASSERT( ValidateSPTable( closure ) == 0 )
+
+# else
+
+#  define CHECK_SPT_InfoTable( closure ) /* nothing */
+#  define CHECK_SPT_Contents( closure ) /* nothing */
+#  define CHECK_SPT_Size( closure ) /* nothing */
+#  define CHECK_SPT_CLOSURE( closure ) /* nothing */
+
+# endif	/* DEBUG */
+#endif	/* !PAR */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[GEN-closures]{@GEN@ (generic) closure macros}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define GEN_VHS		0
+#define GEN_HS		(FIXED_HS + GEN_VHS)
+
+#define GEN_N_VHS	GEN_VHS
+#define GEN_N_HS	GEN_HS
+
+#define GEN_S_VHS	GEN_VHS
+#define GEN_S_HS	GEN_HS
+
+#define GEN_U_VHS	GEN_VHS
+#define GEN_U_HS	GEN_HS
+
+#define GEN_CLOSURE_SIZE(closure)	GEN_INFO_SIZE(INFO_PTR(closure))
+#define GEN_CLOSURE_NoPTRS(closure)	GEN_INFO_NoPTRS(INFO_PTR(closure))
+
+#define GEN_CLOSURE_NoNONPTRS(closure)	(GEN_CLOSURE_SIZE(closure) - GEN_CLOSURE_NoPTRS(closure) - GEN_VHS) 
+#define GEN_CLOSURE_PTR(closure, no)	(((P_)(closure))[GEN_HS + (no) - 1])
+
+#define SET_GEN_HDR(closure,infolbl,cc,size,ptrs) SET_FIXED_HDR(closure,infolbl,cc)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[DYN-closures]{@DYN@ (dynamic) closure macros}
+%*									*
+%************************************************************************
+
+For dynamic closures (with both pointers and data stored within the closure).
+
+\begin{code}
+#define DYN_VHS 		2
+#define DYN_HS			(FIXED_HS + DYN_VHS)
+
+#define DYN_CLOSURE_SIZE(closure)	(((P_)(closure))[FIXED_HS])
+#define DYN_CLOSURE_NoPTRS(closure)	(((P_)(closure))[FIXED_HS + 1])
+
+#define DYN_CLOSURE_NoNONPTRS(closure)	(DYN_CLOSURE_SIZE(closure) - DYN_CLOSURE_NoPTRS(closure) - DYN_VHS)
+#define DYN_CLOSURE_PTR(closure, no)	(((P_)(closure))[DYN_HS + (no) - 1])
+
+#define SET_DYN_HDR(closure,infolbl,cc,size,ptrs) \
+	{ SET_FIXED_HDR(closure,infolbl,cc);	\
+	  DYN_CLOSURE_NoPTRS(closure) = (W_)(ptrs); \
+	  DYN_CLOSURE_SIZE(closure) = (W_)(size); }
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[TUPLE-closures]{@TUPLE@ (big purely-pointer) closure macros}
+%*									*
+%************************************************************************
+
+For tuple closures (which contain only pointers after the variable header).
+
+\begin{code}
+#define TUPLE_VHS		1
+#define TUPLE_HS		(FIXED_HS + TUPLE_VHS)
+
+#define TUPLE_CLOSURE_SIZE(closure)	(((P_)(closure))[FIXED_HS])
+
+#define TUPLE_CLOSURE_NoPTRS(closure)	(TUPLE_CLOSURE_SIZE(closure) - TUPLE_VHS)
+#define TUPLE_CLOSURE_NoNONPTRS(closure) 0L
+#define TUPLE_CLOSURE_PTR(closure, no)	(((P_)(closure))[TUPLE_HS + (no) - 1])
+
+#define SET_TUPLE_HDR(closure,infolbl,cc,size,ptrs) \
+	{ SET_FIXED_HDR(closure,infolbl,cc);	\
+	  TUPLE_CLOSURE_SIZE(closure) = (W_)(size); }
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[DATA-closures]{@DATA@ (big purely non-pointer) closure macros}
+%*									*
+%************************************************************************
+
+For data closures (which contain only raw data (no pointers) after the
+variable header):
+
+\begin{code}
+#define DATA_VHS 	1
+#define DATA_HS		(FIXED_HS + DATA_VHS)
+
+#define DATA_CLOSURE_SIZE(closure)   	(((P_)(closure))[FIXED_HS])
+
+#define DATA_CLOSURE_NoPTRS(closure)    ((I_)0)
+#define DATA_CLOSURE_NoNONPTRS(closure) (DATA_CLOSURE_SIZE(closure) - DATA_VHS)
+
+#define SET_DATA_HDR(closure,infolbl,cc,size,ptrs/*==0*/) 	\
+	{ SET_FIXED_HDR(closure,infolbl,cc);			\
+	  DATA_CLOSURE_SIZE(closure) = (W_)(size); }
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[MUTUPLE-closures]{@MUTUPLE@ (mutable pointer) closure macros}
+%*									*
+%************************************************************************
+
+Mutable closures of pointers have to be treated specially for the
+benefit of generational garbage collection schemes. If the garbage
+collection scheme does not need to treat them specially
+@GC_MUT_REQUIRED@ is undefined and the closures are defined
+identical to @TUPLE@ closures.
+
+\begin{code}
+
+#if defined(GC_MUT_REQUIRED)
+
+# define MUTUPLE_VHS		(1 + GC_MUT_RESERVED_WORDS)
+# define MUTUPLE_HS		(FIXED_HS + MUTUPLE_VHS)
+
+# define MUTUPLE_CLOSURE_SIZE(closure)    (((P_)(closure))[FIXED_HS + GC_MUT_RESERVED_WORDS])
+
+# define MUTUPLE_CLOSURE_NoPTRS(closure)    (MUTUPLE_CLOSURE_SIZE(closure) - MUTUPLE_VHS)
+# define MUTUPLE_CLOSURE_NoNONPTRS(closure) 0L
+# define MUTUPLE_CLOSURE_PTR(closure, no)   (((P_)(closure))[MUTUPLE_HS + (no) - 1])
+
+# define SET_MUTUPLE_HDR(closure,infolbl,cc,size,ptrs) \
+	{ SET_FIXED_HDR(closure,infolbl,cc);	\
+	  SET_MUT_RESERVED_WORDS(closure); 	\
+	  MUTUPLE_CLOSURE_SIZE(closure) = (W_)(size); }
+
+#else   /* ! GC_MUT_REQUIRED---define as TUPLE closure */
+
+# define MUTUPLE_VHS TUPLE_VHS
+# define MUTUPLE_HS  TUPLE_HS	
+# define MUTUPLE_CLOSURE_SIZE(closure)      TUPLE_CLOSURE_SIZE(closure)
+# define MUTUPLE_CLOSURE_NoPTRS(closure)    TUPLE_CLOSURE_NoPTRS(closure)
+# define MUTUPLE_CLOSURE_NoNONPTRS(closure) TUPLE_CLOSURE_NoNONPTRS(closure)
+# define MUTUPLE_CLOSURE_PTR(closure, no)   TUPLE_CLOSURE_PTR(closure, no)
+# define SET_MUTUPLE_HDR(closure,infolbl,cc,size,ptrs) \
+	 SET_TUPLE_HDR(closure,infolbl,cc,size,ptrs)
+#endif
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[STATIC-closures]{@STATIC@ closure macros}
+%*									*
+%************************************************************************
+
+Static closures are those that are allocated in text/data space at
+compile time (i.e., not in dynamic heap).  The odd-looking macro
+@SET_STATIC_HDR@ depends on the compiler to cooperate---it must drop
+in the closure free-variable words and the concluding @};@!  Also note
+that the info-table label is a ``base'' label.
+
+@SET_STATIC_HDR@ is for SPEC-layout closures.
+
+\begin{code}
+#define STATIC_VHS		0
+#define STATIC_HS		(FIXED_HS)
+
+#define STATIC_CLOSURE_SIZE(closure)		(STATIC_INFO_SIZE(INFO_PTR(closure)))
+#define STATIC_CLOSURE_NoPTRS(closure)		(STATIC_INFO_NoPTRS(INFO_PTR(closure)))
+#define STATIC_CLOSURE_NoNONPTRS(closure)	(STATIC_CLOSURE_SIZE(closure)-STATIC_CLOSURE_NoPTRS(closure)-STATIC_VHS)
+
+#define SET_STATIC_HDR(closure,infolbl,cc,closure_localness,info_localness_macro) \
+	info_localness_macro(infolbl); \
+	closure_localness \
+	W_ closure[] = {SET_STATIC_FIXED_HDR(&closure[0],infolbl,cc)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[IND-closures]{@IND@ (indirection) closure macros}
+%*									*
+%************************************************************************
+
+Indirections are introduced when closures are updated. They are only
+built by the update macros and the special @CAF@ entry macro in
+@SMupdate.lh@.
+
+Indirections also have a fixed size of @IND_CLOSURE_SIZE(closure)@.
+
+Both for @CAF@s and for normal nodes in Appel's collector we have to
+be able to identify and link together lists of indirections which are
+treated specially by the garbage collector. For this purpose we use
+the @MUT_LINK@ field.
+
+@CAF@s (which look like indirections) need to be linked regardless of
+whether or not we're doing generational collection, so we don't rely
+on @MUT_LINK@ being defined.
+
+\begin{code}
+#define IND_VHS			(1)
+#define IND_HS			(FIXED_HS + IND_VHS)
+
+#define IND_CLOSURE_SIZE(closure) (MIN_UPD_SIZE)
+#define IND_CLOSURE_NoPTRS(closure) 1
+#define IND_CLOSURE_NoNONPTRS(closure)	(IND_CLOSURE_SIZE(closure)-IND_CLOSURE_NoPTRS(closure)-IND_VHS)
+\end{code}
+
+Indirections must store a pointer to the closure which is the target
+of the indirection:
+\begin{code}
+#define IND_CLOSURE_PTR(closure)    	(((P_)(closure))[IND_HS])
+\end{code}
+
+\begin{code}
+#define IND_CLOSURE_LINK(closure)	(((P_)(closure))[FIXED_HS])
+\end{code}
+
+When we are profiling, we occasionally use ``permanent indirections'' to
+store cost centres associated in some way with PAPs.  Don't ask me why.
+For now, a permanent indirection must have the same shape as a regular
+indirection.  The only difference is that it is, well, permanent.  That is
+to say, it is never short-circuited.  (What is the point, anyway?)
+
+Presumably, such objects could shrink as they moved into the old generation,
+but then their header size would change as well (the word that they get to
+lose is the VHS word of a standard indirection), and I just don't feel up
+to it today.  --JSM.
+
+\begin{code}
+#ifdef USE_COST_CENTRES
+
+#define	PERM_IND_CLOSURE_PTR(closure,dummy)	IND_CLOSURE_PTR(closure)
+
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[BH-closures]{@BH@ (black hole) closure macros}
+%*									*
+%************************************************************************
+
+There are two flavours of black holes; one for updatable closures
+(size @MIN_UPD_SIZE@) and one for single entry closures (size
+@MIN_NONUPD_SIZE@).  Note that single-entry black holes can never
+become blocking queues, because that would imply multiple entries
+to the closure.
+
+Black holes are introduced either on entering a closure or when
+performing garbage collection (see section
+\ref{black-hole-overwrite}). They indicate that the pointers within
+the closure are no longer needed.
+
+The compiler will also allocate an updatable black hole on entering a
+@CAF@.
+
+\begin{code}
+#define BH_HS			(FIXED_HS)
+#define BH_VHS			0L
+
+#define BH_CLOSURE_SIZE(closure)	((W_)INFO_SIZE(INFO_PTR(closure)))
+#define BH_CLOSURE_NoPTRS(closure)	0L
+#define BH_CLOSURE_NoNONPTRS(closure)	(BH_CLOSURE_SIZE(closure)-BH_CLOSURE_NoPTRS(closure)-BH_VHS)
+
+#define SET_BH_HDR(closure,infolbl,cc,size,ptrs) \
+	SET_FIXED_HDR(closure,infolbl,cc)
+        /* most args aren't used, but are required for SET_*_HDR uniformity */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[RBH-closures]{@RBH@ (revertable black hole) closure macros}
+%*									*
+%************************************************************************
+
+There are two kinds of revertable black holes, produced from GEN or
+SPEC closures, respectively.  There's no @SET_RBH_HDR@ macro -- use
+@TurnIntoRBH@ instead!!
+
+Note that the NoPTRS and NoNONPTRS macros refer to the *original* closure.
+
+\begin{code}
+#define SPEC_RBH_VHS				(1L)
+#define SPEC_RBH_HS				(FIXED_HS + SPEC_RBH_VHS)
+
+#define SPEC_RBH_CLOSURE_PTR(closure, no)	(((P_)(closure))[SPEC_RBH_HS + (no) - 1])
+#define SPEC_RBH_CLOSURE_SIZE(closure)		((W_)INFO_SIZE(REVERT_INFOPTR(INFO_PTR(closure))))
+#define SPEC_RBH_CLOSURE_NoPTRS(closure)	((W_)INFO_NoPTRS(REVERT_INFOPTR(INFO_PTR(closure))))
+#define SPEC_RBH_CLOSURE_NoNONPTRS(closure)	(SPEC_RBH_CLOSURE_SIZE(closure)-SPEC_RBH_CLOSURE_NoPTRS(closure)/*-SPEC_VHS*/)
+
+#define SPEC_RBH_BQ_LOCN			(SPEC_RBH_HS)
+#define SPEC_RBH_BQ(closure)			(((P_)(closure))[SPEC_RBH_BQ_LOCN])
+
+#define GEN_RBH_VHS				(1L)
+#define GEN_RBH_HS				(FIXED_HS + GEN_RBH_VHS)
+
+#define GEN_RBH_CLOSURE_PTR(closure, no)	(((P_)(closure))[GEN_RBH_HS + (no) - 1])
+#define GEN_RBH_CLOSURE_SIZE(closure)		(GEN_INFO_SIZE(REVERT_INFOPTR(INFO_PTR(closure))))
+#define GEN_RBH_CLOSURE_NoPTRS(closure)		(GEN_INFO_NoPTRS(REVERT_INFOPTR(INFO_PTR(closure))))
+#define GEN_RBH_CLOSURE_NoNONPTRS(closure)	(GEN_RBH_CLOSURE_SIZE(closure)-GEN_RBH_CLOSURE_NoPTRS(closure)-GEN_VHS)
+
+#define GEN_RBH_BQ_LOCN				(GEN_RBH_HS)
+#define GEN_RBH_BQ(closure)			(((P_)(closure))[GEN_RBH_BQ_LOCN])
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[CONST-closures]{@CONST@ (nullary data-constructor) closure macros}
+%*									*
+%************************************************************************
+
+These are never allocated normally---static closures are used
+instead.  They arise only as a result of in-place updates which use
+@INPLACE_UPD_HDR@.
+
+\begin{code}
+#define CONST_HS				(FIXED_HS)
+#define CONST_VHS				(0L)
+
+#define CONST_CLOSURE_SIZE(closure)		(0L)
+#define CONST_CLOSURE_NoPTRS(closure)		(0L)
+#define CONST_CLOSURE_NoNONPTRS(closure)	(0L)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[CHARLIKE-closures]{@CHARLIKE@ closure macros}
+%*									*
+%************************************************************************
+
+These are never allocated normally.  They are a static array of
+closures indexed by literal characters.  As with @CONST@ closures,
+@CHARLIKE@ closures only arise from in-place updates using
+@INPLACE_UPD_HDR@.
+\begin{code}
+#define CHARLIKE_HS		(FIXED_HS)
+#define CHARLIKE_VHS				(0L)
+
+#define CHARLIKE_CLOSURE_SIZE(closure)		(1L)
+#define CHARLIKE_CLOSURE_NoPTRS(closure)	(0L)
+#define CHARLIKE_CLOSURE_NoNONPTRS(closure)	(1L)
+
+/* Array of static charlike closures */
+extern const W_ CHARLIKE_closures[];
+
+/* Macro to retrieve static charlike closure */
+#define CHARLIKE_CLOSURE(the_char) \
+	(& CHARLIKE_closures[(CHARLIKE_HS+1) * ((W_)(the_char))])
+
+#define CHARLIKE_VALUE(closure) \
+	(((P_)(closure))[CHARLIKE_HS])
+
+/* INPLACE_UPD_HDR used for inplace updates */
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[INTLIKE-closures]{@INTLIKE@ closure macros}
+%*									*
+%************************************************************************
+
+These may be allocated normally (@SET_INTLIKE_HDR@) or result from
+inplace updates (@INPLACE_UPD_HDR@). They may be converted to a static
+closure during garbage collection.
+
+Note: the garbage collector (@EVAC_FN(IntLike)@) assumes that this has
+the same structure as a @SPEC_1_0@ closure.
+
+\begin{code}
+#define INTLIKE_HS		(FIXED_HS)
+#define INTLIKE_VHS				(0L)
+
+#define INTLIKE_CLOSURE_SIZE(closure)		(1L)
+#define INTLIKE_CLOSURE_NoPTRS(closure)		(0L)
+#define INTLIKE_CLOSURE_NoNONPTRS(closure)	(1L)
+
+/* Array of static intlike closures */
+extern P_ INTLIKE_closures;
+
+/* Range of static intlike closures MAX_INTLIKE, MIN_INTLIKE is in GhcConstants.lh */
+
+/* Macro to retrieve static intlike closure */
+#define INTLIKE_CLOSURE(the_int) \
+	(INTLIKE_closures + ((INTLIKE_HS+1) * ((I_)(the_int))))
+
+#define INTLIKE_VALUE(closure) \
+	((I_) ((P_)(closure))[INTLIKE_HS])
+
+#define SET_INTLIKE_HDR(closure,infolbl,cc,size,ptrs) \
+	SET_FIXED_HDR(closure,infolbl,cc)
+
+/* INPLACE_UPD_HDR used for inplace updates */
+\end{code}
+
+
+End multi-slurp protection:
+\begin{code}
+#endif /* SMClosures_H */
+\end{code}

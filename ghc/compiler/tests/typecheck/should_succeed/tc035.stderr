@@ -1,0 +1,9 @@
+Typechecked:
+AbsBinds [a.t10] [] [(g.t1, ShouldSucceed.g)]
+    {- rec -}
+    g.t1 :: ShouldSucceed.AnnExpr a.t10 -> [[Char]]
+    g.t1 (a.r60, (ShouldSucceed.Var name.r61))
+		 = [name.r61] ([Char])
+    g.t1 (a.r62, (ShouldSucceed.App e1.r63 e2.r64))
+		 = ((++) [Char]) (g.t1 e1.r63) (g.t1 e2.r64)
+

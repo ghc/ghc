@@ -1,0 +1,71 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide]{article}
+\begin{document}
+\title{The Glasgow \Haskell{} typechecker}
+\author{The AQUA team}
+\date{February 1994}
+\maketitle
+\tableofcontents
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[Typechecker]{The typechecker}
+\downsection
+\end{onlypartofdoc}
+
+\input{Typecheck.lhs}
+
+\section[Typechecker-monadery]{Typechecker: monad stuff (Saps)}
+\downsection
+\input{TcMonad.lhs}
+\input{TcMonadFns.lhs}
+\upsection
+
+\section{Typechecker: misc}
+\downsection
+\input{BackSubst.lhs}
+\input{Disambig.lhs}
+\input{Spec.lhs}
+\input{Subst.lhs}
+\input{Unify.lhs}
+\upsection
+
+\section[Typechecker-toplevel]{Typechecker: top-level modules}
+\downsection
+\input{TcModule.lhs}
+\upsection
+
+\section[Typechecker-core]{Typechecking the abstract syntax}
+\downsection
+\input{TcBinds.lhs}
+\input{TcClassDcl.lhs}
+\input{TcClassSig.lhs}
+\input{TcConDecls.lhs}
+\input{TcContext.lhs}
+\input{TcExpr.lhs}
+\input{TcGRHSs.lhs}
+\input{TcIfaceSig.lhs}
+\input{TcInstDcls.lhs}
+\input{TcMatches.lhs}
+\input{TcMonoBnds.lhs}
+\input{TcMonoType.lhs}
+\input{TcPat.lhs}
+\input{TcPolyType.lhs}
+\input{TcPragmas.lhs}
+\input{TcQuals.lhs}
+\input{TcTyDecls.lhs}
+\upsection
+
+\section[Typechecker-support]{Typechecker: supporting modules}
+\downsection
+\input{GenSpecEtc.lhs}
+\input{TcSimplify.lhs}
+\upsection
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

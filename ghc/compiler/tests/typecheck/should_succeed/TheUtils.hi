@@ -1,0 +1,33 @@
+interface TheUtils where
+import Maybes(Labda)
+import Pretty(PrettyRep)
+let_1_0 :: a -> (a -> b) -> b   {-# ARITY let_1_0 = 2 #-}{-# STRICTNESS let_1_0 = "T,F" ST #-}
+assoc :: (Eq a) => a -> [(a, b)] -> String -> b   {-# ARITY assoc = 4 #-}{-# STRICTNESS assoc = "2,F" ST #-}
+assocWithDefault :: (Eq a) => [(a, b)] -> b -> a -> (b, Bool)   {-# ARITY assocWithDefault = 4 #-}{-# STRICTNESS assocWithDefault = "1,F" ST #-}
+cfst :: a -> b -> a   {-# ARITY cfst = 2 #-}{-# STRICTNESS cfst = "0,0" ST #-}
+hasNoDups :: (Eq a) => [a] -> Bool   {-# ARITY hasNoDups = 2 #-}{-# STRICTNESS hasNoDups = "1,F" ST #-}
+mapAccumL :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])   {-# ARITY mapAccumL = 3 #-}{-# STRICTNESS mapAccumL = "2,F" ST #-}
+mapAccumR :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])   {-# ARITY mapAccumR = 3 #-}{-# STRICTNESS mapAccumR = "2,F" ST #-}
+map2 :: (a -> b -> c) -> [a] -> [b] -> [c]   {-# ARITY map2 = 3 #-}{-# STRICTNESS map2 = "1,F" ST #-}
+map3 :: (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]   {-# ARITY map3 = 4 #-}{-# STRICTNESS map3 = "1,F" ST #-}
+applyToPair :: (a -> b, c -> d) -> (a, c) -> (b, d)   {-# ARITY applyToPair = 2 #-}{-# STRICTNESS applyToPair = "0&1,F" ST #-}
+applyToFst :: (a -> b) -> (a, c) -> (b, c)   {-# ARITY applyToFst = 2 #-}{-# STRICTNESS applyToFst = "1,F" ST #-}
+applyToSnd :: (a -> b) -> (c, a) -> (c, b)   {-# ARITY applyToSnd = 2 #-}{-# STRICTNESS applyToSnd = "1,F" ST #-}
+foldPair :: (a -> a -> a, b -> b -> b) -> (a, b) -> [(a, b)] -> (a, b)   {-# ARITY foldPair = 3 #-}{-# STRICTNESS foldPair = "(0|1)&2,F" ST #-}
+clookup :: (Eq a) => [a] -> [b] -> a -> b   {-# ARITY clookup = 1 #-}{-# STRICTNESS clookup = "T,F" ST #-}
+clookupElse :: (Eq b) => a -> [b] -> [a] -> b -> a   {-# ARITY clookupElse = 5 #-}{-# STRICTNESS clookupElse = "2,F" ST #-}
+clookrepl :: (Eq a) => [a] -> [b] -> a -> (b -> b) -> [b]   {-# ARITY clookrepl = 5 #-}{-# STRICTNESS clookrepl = "1,F" ST #-}
+forall :: (a -> Bool) -> [a] -> Bool   {-# ARITY forall = 2 #-}{-# STRICTNESS forall = "1,F" ST #-}
+exists :: (a -> Bool) -> [a] -> Bool   {-# ARITY exists = 2 #-}{-# STRICTNESS exists = "1,F" ST #-}
+elemIndex :: (Eq a) => [a] -> a -> Int   {-# ARITY elemIndex = 3 #-}{-# STRICTNESS elemIndex = "1,F" ST #-}
+(\\\) :: (Eq a) => [a] -> [a] -> [a]   {-# ARITY (\\\) = 1 #-}{-# STRICTNESS (\\\) = "T,F" ST #-}
+nOfThem :: Int -> a -> [a]   {-# ARITY nOfThem = 2 #-}{-# STRICTNESS nOfThem = "T,F" ST #-}
+panic :: [Char] -> a   {-# ARITY panic = 1 #-}{-# STRICTNESS panic = "T,F" ST #-}
+pprPanic :: (Int -> Bool -> PrettyRep) -> a   {-# ARITY pprPanic = 1 #-}{-# STRICTNESS pprPanic = "T,F" ST #-}
+quicksort :: (a -> a -> Bool) -> [a] -> [a]   {-# ARITY quicksort = 2 #-}{-# STRICTNESS quicksort = "1,F" ST #-}
+runs :: (a -> a -> Bool) -> [a] -> [[a]]   {-# ARITY runs = 2 #-}{-# STRICTNESS runs = "1,F" ST #-}
+intLength :: [a] -> Int   {-# ARITY intLength = 1 #-}{-# STRICTNESS intLength = "0,F" ST #-}
+lengthExceeds :: [a] -> Int -> Bool   {-# ARITY lengthExceeds = 2 #-}{-# STRICTNESS lengthExceeds = "0&1,F" ST #-}
+
+data Labda a
+data PrettyRep

@@ -1,0 +1,72 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeStdIO where
+import PreludeBuiltin(Char(..), Int(..), Integer(..), List(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
+import PreludeCore(Bool(..), Eq(..), Ord(..), Text(..))
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+import PreludePrimIO(_MVar)
+data BufferMode   = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
+type FilePath = [Char]
+type Handle = _MVar _Handle
+type HandlePosn = (_MVar _Handle, Int)
+data IOMode   = ReadMode | WriteMode | AppendMode | ReadWriteMode
+data Maybe a   = Nothing | Just a
+data SeekMode   = AbsoluteSeek | RelativeSeek | SeekFromEnd
+data _Handle   = _ErrorHandle IOError13 | _ClosedHandle | _SemiClosedHandle _Addr (_Addr, Int) | _ReadHandle _Addr (Maybe BufferMode) Bool | _WriteHandle _Addr (Maybe BufferMode) Bool | _AppendHandle _Addr (Maybe BufferMode) Bool | _ReadWriteHandle _Addr (Maybe BufferMode) Bool | _SocketHandle _Addr Bool
+_bufferMode :: _Handle -> Maybe BufferMode
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+_filePtr :: _Handle -> _Addr
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+_getBufferMode :: _Handle -> _State _RealWorld -> (_Handle, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+_markHandle :: _Handle -> _Handle
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+hClose :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hFileSize :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Integer, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hFlush :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hGetPosn :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 (_MVar _Handle, Int), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsBlockBuffered :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 (Bool, Maybe Int), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsClosed :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsEOF :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsLineBuffered :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsNotBuffered :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsOpen :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsReadable :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsSeekable :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hIsWritable :: _MVar _Handle -> _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hSeek :: _MVar _Handle -> SeekMode -> Integer -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1111 _N_ _S_ "U(P)LU(PPP)U(P)" {_A_ 4 _U_ 2112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hSetBuffering :: _MVar _Handle -> BufferMode -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "LSU(P)" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+hSetPosn :: (_MVar _Handle, Int) -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P)L)U(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+isEOF :: _State _RealWorld -> (Either IOError13 Bool, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 4 \ (u0 :: State# _RealWorld) -> case _ORIG_ PreludeStdIO stdin13 of { _ALG_ _MVar (u1 :: SynchVar# _RealWorld _Handle) -> _APP_  _WRKR_ _ORIG_ PreludeStdIO hIsEOF [ u1, u0 ]; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: _State _RealWorld) -> _APP_  _ORIG_ PreludeStdIO hIsEOF [ _ORIG_ PreludeStdIO stdin13, u0 ] _N_ #-}
+openFile :: [Char] -> IOMode -> _State _RealWorld -> (Either IOError13 (_MVar _Handle), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+stderr13 :: _MVar _Handle
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stdin13 :: _MVar _Handle
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+stdout13 :: _MVar _Handle
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Eq a => Eq (Maybe a)
+	{-# GHC_PRAGMA _M_ PreludeStdIO {-dfun-} _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
+instance Ord a => Ord (Maybe a)
+	{-# GHC_PRAGMA _M_ PreludeStdIO {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Text a => Text (Maybe a)
+	{-# GHC_PRAGMA _M_ PreludeStdIO {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+

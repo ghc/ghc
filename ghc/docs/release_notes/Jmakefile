@@ -1,0 +1,13 @@
+/* there are rules to make this piece of "the book"
+ * as a standalone document,
+ * but nothing to "install" it
+ */
+
+LitStuffNeededHere(docs depend)
+InfoStuffNeededHere(docs)
+
+LiterateSuffixRules()
+DocProcessingSuffixRules()
+
+/* no space between the two args! */
+LitDocRootTarget(release,lit)

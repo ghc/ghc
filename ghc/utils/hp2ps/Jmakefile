@@ -1,0 +1,50 @@
+SRCS_C =	 	\
+	AuxFile.c	\
+	Axes.c		\
+	AreaBelow.c	\
+	Curves.c 	\
+	Deviation.c	\
+	Dimensions.c	\
+	Error.c 	\
+	HpFile.c	\
+	Key.c		\
+	Main.c 		\
+	Marks.c		\
+	TopTwenty.c	\
+	TraceElement.c	\
+	PsFile.c 	\
+	Reorder.c	\
+	Scale.c		\
+	Shade.c 	\
+	Utilities.c
+
+OBJS_C =	 	\
+	AuxFile.o	\
+	Axes.o		\
+	AreaBelow.o	\
+	Curves.o 	\
+	Deviation.o	\
+	Dimensions.o	\
+	Error.o 	\
+	HpFile.o	\
+	Key.o		\
+	Main.o 		\
+	Marks.o		\
+	TopTwenty.o	\
+	TraceElement.o	\
+	PsFile.o 	\
+	Reorder.o	\
+	Scale.o		\
+	Shade.o 	\
+	Utilities.o
+
+SuffixRule_c_o()
+
+BuildPgmFromCFiles(hp2ps,$(OBJS_C),-lm,)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTBINDIR_GHC))
+InstallBinaryTarget(hp2ps,$(INSTBINDIR_GHC))
+#endif /* DoInstall... */
+
+CDependTarget( $(SRCS_C) )

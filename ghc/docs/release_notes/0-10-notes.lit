@@ -1,0 +1,72 @@
+Release~0.10 was the first major, public release of this compilation
+system.
+
+The announcement (now distributed in \tr{ghc/docs/ANNOUNCE-0.10})
+describes the most notable features of this release.  These notes,
+therefore, just cover some of the fine points...
+
+%************************************************************************
+%*									*
+\subsection[0-10-new-docs]{New documentation}
+%*									*
+%************************************************************************
+
+We're providing a few more papers, in \tr{ghc/docs/papers}.  See
+\tr{ghc/docs/README} for a full list of documentation.
+
+%************************************************************************
+%*									*
+\subsection[0-10-new-in-usage]{User-visible changes}
+%*									*
+%************************************************************************
+
+An ``Appel-style'' generational garbage collector is now the default.
+(It used to be a two-space copying collector.)
+
+The flag to use the unboxery and other Glasgow extensions was
+\tr{-funboxed}.  We've changed it to \tr{-fglasgow-exts}.  We may
+elaborate this further, eventually...
+
+(If 0.06 is the last version you looked at, flags/options have changed
+a fair bit since then.)
+
+%************************************************************************
+%*									*
+\subsection[0-10-new-in-compiler]{New in the compiler proper}
+%*									*
+%************************************************************************
+
+Derived instances are in, well partly.  We'll put in the rest when
+there's a demand (or we have nothing better to do).
+
+@Integers@ (arbitrary-precision integers) are now in properly.
+Just as HBC does, we use the GNU multi-precision arithmetic package.
+Source is in \tr{ghc/runtime/gmp}.
+
+We did a bunch of stuff in the typechecker region to support
+overloading better; we called it ``dictionary stomping.''  One
+side-effect of this work is that error messages related to overloading
+have a slight chance of being sensible (which they weren't before).
+
+``Primitive arrays,'' on top of which efficient, regular Haskell
+arrays can be (are) built, went in.  There's a {\em little} about
+using them, in the ``Glasgow extensions'' section of the User's Guide.
+
+Similarly, the mechanisms for calling C directly (@ccall@ and @casm@)
+are more likely to be useful.  Again, a little documentation in the
+same place...
+
+%************************************************************************
+%*									*
+\subsection[0-10-new-in-libraries]{In the prelude and runtime support}
+%*									*
+%************************************************************************
+
+Our standard prelude conforms to the Haskell~1.2 report.
+
+We support a non-standard @fromInt@ method for the @Num@ class, just as
+HBC does.
+
+We support a non-standard @cmp3@ method for the @Ord@ class.  Snoop
+around in the \tr{ghc/lib/prelude/*.hs} code, if you care.  (We use it
+in code generated for derived instances.)

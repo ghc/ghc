@@ -1,0 +1,143 @@
+%************************************************************************
+%*                                                                      *
+\section[utils]{Other Haskell utility programs}
+\index{utilities, Haskell}
+%*                                                                      *
+%************************************************************************
+
+This section describes other program(s) which we distribute, that help
+with the Great Haskell Programming Task.
+
+%************************************************************************
+%*                                                                      *
+\subsection[mkdependHS]{Makefile dependencies in Haskell: using \tr{mkdependHS}}
+\index{mkdependHS}
+\index{Makefile dependencies}
+\index{dependencies in Makefiles}
+%*                                                                      *
+%************************************************************************
+
+It is reasonably straightforward to set up a \tr{Makefile} to use with
+GHC, assuming you name your source files the same as your modules.
+Thus:
+\begin{verbatim}
+HC      = ghc
+HCFLAGS = -fhaskell-1.3 -cpp -hi-diffs $(EXTRA_HC_OPTS)
+
+SRCS = Main.lhs Foo.lhs Bar.lhs
+OBJS = Main.o   Foo.o   Bar.o
+
+.SUFFIXES : .o .lhs
+.lhs.o:
+        $(RM) $@
+        $(HC) -c $< $(HCFLAGS)
+
+cool_pgm : $(OBJS)
+        $(RM) $@
+        $(HC) -o $@ $(HCFLAGS) $(OBJS)
+\end{verbatim}
+
+The only thing lacking in the above \tr{Makefile} is interface-file
+dependencies.  If \tr{Foo.lhs} imports module \tr{Bar} and the
+\tr{Bar} interface changes, then \tr{Foo.lhs} needs to be recompiled.
+
+Putting dependencies of the form \tr{Foo.o : Bar.hi} into your
+\tr{Makefile} by hand is rather error-prone.  Don't worry---never
+fear, \tr{mkdependHS} is here! (and is distributed as part of GHC)
+Add the following to your \tr{Makefile}:
+\begin{verbatim}
+depend :
+        mkdependHS -- $(HCFLAGS) -- $(SRCS)
+\end{verbatim}
+
+Now, before you start compiling, and any time you change the
+\tr{imports} in your program, do \tr{make depend} before you do
+\tr{make cool_pgm}.  \tr{mkdependHS} will append the needed
+dependencies to your \tr{Makefile}.
+
+A few caveats about this simple scheme: (a)~You may need to compile
+some modules explicitly to create their interfaces in the first place
+(e.g., \tr{make Bar.o} to create \tr{Bar.hi}).  (b)~You may have to
+type \tr{make} more than once for the dependencies to have full
+effect.  However, a \tr{make} run that does nothing {\em does} mean
+``everything's up-to-date.''  (c) This scheme will work with
+mutually-recursive modules but, again, it may take multiple
+iterations to ``settle.''
+
+%************************************************************************
+%*                                                                      *
+\subsection[hstags]{Emacs `TAGS' for Haskell: \tr{hstags}}
+\index{hstags}
+\index{TAGS for Haskell}
+%*                                                                      *
+%************************************************************************
+
+`Tags' is a facility for indexing the definitions of
+programming-language things in a multi-file program, and then using
+that index to jump around among these definitions.
+
+Rather than scratch your head, saying ``Now where did we define
+`foo'?'', you just do (in Emacs) \tr{M-. foo RET}, and You're There!
+Some people go wild over this stuff...
+
+GHC comes with a program \tr{hstags}, which build Emacs-able TAGS
+files.  The invocation syntax is:
+\begin{verbatim}
+hstags [GHC-options] file [files...]
+\end{verbatim}
+
+The best thing is just to feed it your GHC command-line flags.
+A good Makefile entry might be:
+\begin{verbatim}
+tags:
+        $(RM) TAGS
+        hstags $(GHC_FLAGS) *.lhs
+\end{verbatim}
+
+The only flags of its own are: \tr{-v} to be verbose; \tr{-a} to
+**APPEND** to the TAGS file, rather than write to it.
+
+Shortcomings: (1)~Instance declarations don't get into the TAGS file
+(but the definitions inside them do); as instances aren't named, this
+is probably just as well.  (2)~Data-constructor definitions don't get
+in.  Go for the corresponding type constructor instead.
+
+(Actually, GHC also comes with \tr{etags} [for C], and \tr{perltags}
+[for You Know What].  And---I cannot tell a lie---there is Denis
+Howe's \tr{fptags} [for Haskell, etc.] in the \tr{ghc/CONTRIB}
+section...)
+
+%************************************************************************
+%*                                                                      *
+\subsection[happy]{``Yacc for Haskell'': \tr{happy}}
+\index{happy}
+\index{Yacc for Haskell}
+\index{parser generator for Haskell}
+%*                                                                      *
+%************************************************************************
+
+Andy Gill and Simon Marlow have written a parser-generator for
+Haskell, called \tr{happy}.\index{happy parser generator} \tr{Happy}
+is to Haskell what \tr{Yacc} is to C.
+
+You can get \tr{happy} by FTP from \tr{ftp.dcs.glasgow.ac.uk} in
+\tr{pub/haskell/happy}, the file \tr{happy-0.8.tar.gz}.
+
+\tr{Happy} is at its shining best when compiled by GHC.
+
+%************************************************************************
+%*                                                                      *
+\subsection[pphs]{Pretty-printing Haskell: \tr{pphs}}
+\index{pphs}
+\index{pretty-printing Haskell code}
+%*                                                                      *
+%************************************************************************
+
+Andrew Preece has written
+\tr{pphs},\index{pphs}\index{pretty-printing Haskell}
+a utility to pretty-print Haskell code in LaTeX documents.
+Keywords in bolds, variables in italics---that sort of thing.  It is
+good at lining up program clauses and equals signs, things that are
+very tiresome to do by hand.
+
+The code is distributed with GHC in \tr{ghc/CONTRIB/pphs}.

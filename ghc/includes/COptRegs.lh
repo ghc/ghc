@@ -1,0 +1,1261 @@
+%
+% (c) The GRASP Project, Glasgow University, 1993
+%
+\section[StgRegs-decls]{STG-machine register mappings}
+
+\begin{code}
+#ifndef COPTREGS_H
+#define COPTREGS_H
+
+#include "StgMachDeps.h"
+#include "StgTypes.h"
+#include "MachRegs.h"
+
+#define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
+
+\end{code}
+
+Various parts of the GHC system use various sets of ``registers,'' by
+which we mean (frequently-used) words of globally-visible information.
+For example, the everyday ``Haskell threaded world,'' uses the
+``registers'' @Hp@, @R4@, etc., etc.
+
+We would really like to ``steal'' machine registers from the C
+execution model (via GCC's global-variable-in-register extension) and
+map some/all of our ``STG registers'' onto real machine registers.
+This has a profound benefit in terms of execution speed.
+
+This file/document/section sets out the various (machine-dependent)
+mappings that we use.
+
+Note: for one machine, there are {\em several} possible register
+mappings, {\em one} of which is in force at any time.  Obviously, the
+``main'' mapping (used in the Haskell threaded world) dominates, but
+when garbage-collecting (for example), we'd rather not tie up all
+those registers in that way (i.e., for global-variables that aren't
+used in the GC). Instead, we'd rather bring in {\em another} register
+mapping, tuned to the needs of a particular (isolated) bit of C code.
+As there are several garbage collectors there are quite a few possible
+mappings.
+
+%************************************************************************
+%*									*
+\subsection[saved-STG-regs]{Saved STG registers}
+%*									*
+%************************************************************************
+
+The following stuff is available regardless of register map.  It allows
+us access to the saved STG registers from other parts of the RTS (notably
+from the storage manager).
+
+\begin{code}
+
+typedef struct rt {
+    StgDouble rDbl[2];	/* Put a double first to ensure expected alignment */
+    StgFloat rFlt[4];
+    StgUnion rR[8];
+    PP_ rSpA;
+    PP_ rSuA;
+    P_ rSpB;
+    P_ rSuB;
+    P_ rHp;
+    P_ rHpLim;
+    I_ rTag;
+    StgRetAddr rRet;
+    I_ rActivity;
+    P_ rCstkptr;	/* used for iX86 registerizing only! offset=100 */
+    P_ rWrapReturn;	/* ditto; offset=104 */
+    P_ rSaveECX;	/* ditto; offset=108 */
+#if defined(CONCURRENT)
+    P_ rStkO;
+    I_ rLiveness;
+#endif
+} STGRegisterTable;
+
+\end{code}
+
+There are several confusing macro sets for accessing STG registers at various
+stages in their lives.  
+
+
+The MAIN_* macros refer to the save locations for the main thread.
+These are generally useful when the main thread is suspended.  Note
+that the save locations for S[up][AB] are actually in the pseudo stack
+object, MainStkO, when running threads.
+
+The SAVE_* macros refer to the save locations for the current thread,
+without using BaseReg.  These are used when we cannot be sure that any
+STG registers are actually loaded in machine registers.
+
+The RTBL_* macros refer to the register table locations for the current
+thread, indexed from BaseReg.  If BaseReg is in a machine register, that
+register {\em must} be loaded with the address of the register table.
+
+OK, now... In the sequential world at least, each of those
+``register'' declarations also set up a ``backup'' location; for
+register @r@, the backup location (a global variable) is @r_SAVE@.
+
+We need @SAVE_STG_REGS@ and @RESTORE_STG_REGS@ macros, which copy back
+and forth between the ``registers'' and their \tr{*_SAVE} backup
+locations.
+
+In the parallel world, we have the closely-related business of
+saving/restoring ``thread state''.  We do it in two stages:
+save/restore to/from \tr{*_SAVE} locations, then fill in the
+``thread-state object'' (TSO) from the \tr{*_SAVE} locations.  (This
+means the thread-state saving can more easily be written in C, rather
+than assembler.)
+
+Why no space to save BaseReg?  Because either (1) if in a caller-save
+register, the caller will have saved it; or (2) if in a callee-save
+register, the miniInterpret machinery will have saved it.  This works
+because we entered ``threaded Haskell land'' in a v disciplined
+way---i.e., via miniInterpret.
+
+However, the bits of code that use the various GC register maps (SCAV,
+MARK, SCAN) are called in less-disciplined ways, so their base-regs
+need saving/restoring.  (WDP 95/02)
+
+\begin{code}
+
+#ifndef PAR
+extern STGRegisterTable MainRegTable;
+#endif	/* PAR */
+
+/* these are for the main register table */
+#define MAIN_R1     	    (MainRegTable.rR[0])
+#define MAIN_R2     	    (MainRegTable.rR[1])
+#define MAIN_R3     	    (MainRegTable.rR[2])
+#define MAIN_R4     	    (MainRegTable.rR[3])
+#define MAIN_R5     	    (MainRegTable.rR[4])
+#define MAIN_R6     	    (MainRegTable.rR[5])
+#define MAIN_R7     	    (MainRegTable.rR[6])
+#define MAIN_R8     	    (MainRegTable.rR[7])
+#define MAIN_Flt1   	    (MainRegTable.rFlt[0])
+#define MAIN_Flt2   	    (MainRegTable.rFlt[1])
+#define MAIN_Flt3   	    (MainRegTable.rFlt[2])
+#define MAIN_Flt4   	    (MainRegTable.rFlt[3])
+#define MAIN_Dbl1   	    (MainRegTable.rDbl[0])
+#define MAIN_Dbl2   	    (MainRegTable.rDbl[1])
+
+#define MAIN_Tag    	    (MainRegTable.rTag)
+#define MAIN_Ret    	    (MainRegTable.rRet)
+#define MAIN_Activity 	    (MainRegTable.rActivity)
+
+#define MAIN_StkO   	    (MainStkO)
+#define MAIN_Liveness 	    (MainRegTable.rLiveness)
+
+#ifndef CONCURRENT
+
+#define MAIN_SpA    	    (MainRegTable.rSpA)
+#define MAIN_SuA    	    (MainRegTable.rSuA)
+#define MAIN_SpB    	    (MainRegTable.rSpB)
+#define MAIN_SuB    	    (MainRegTable.rSuB)
+
+/* these are really for *SAVE*ing */
+#define SAVE_R1     	    MAIN_R1
+#define SAVE_R2     	    MAIN_R2
+#define SAVE_R3     	    MAIN_R3
+#define SAVE_R4     	    MAIN_R4
+#define SAVE_R5     	    MAIN_R5
+#define SAVE_R6     	    MAIN_R6
+#define SAVE_R7     	    MAIN_R7
+#define SAVE_R8     	    MAIN_R8
+#define SAVE_Flt1   	    MAIN_Flt1
+#define SAVE_Flt2   	    MAIN_Flt2
+#define SAVE_Flt3   	    MAIN_Flt3
+#define SAVE_Flt4   	    MAIN_Flt4
+#define SAVE_Dbl1   	    MAIN_Dbl1
+#define SAVE_Dbl2   	    MAIN_Dbl2
+			    
+#define SAVE_SpA    	    MAIN_SpA
+#define SAVE_SuA    	    MAIN_SuA
+#define SAVE_SpB    	    MAIN_SpB
+#define SAVE_SuB    	    MAIN_SuB
+			    
+#define SAVE_Tag    	    MAIN_Tag
+#define SAVE_Ret    	    MAIN_Ret
+#define SAVE_Activity 	    MAIN_Activity
+
+#else
+
+extern P_ MainStkO;
+
+#define MAIN_SpA    	    (STKO_SpA(MainStkO))
+#define MAIN_SuA    	    (STKO_SuA(MainStkO))
+#define MAIN_SpB    	    (STKO_SpB(MainStkO))
+#define MAIN_SuB    	    (STKO_SuB(MainStkO))
+
+extern STGRegisterTable *CurrentRegTable;
+
+/* these are really for *SAVE*ing */
+#define SAVE_R1     	    (CurrentRegTable->rR[0])
+#define SAVE_R2     	    (CurrentRegTable->rR[1])
+#define SAVE_R3     	    (CurrentRegTable->rR[2])
+#define SAVE_R4     	    (CurrentRegTable->rR[3])
+#define SAVE_R5     	    (CurrentRegTable->rR[4])
+#define SAVE_R6     	    (CurrentRegTable->rR[5])
+#define SAVE_R7     	    (CurrentRegTable->rR[6])
+#define SAVE_R8     	    (CurrentRegTable->rR[7])
+#define SAVE_Flt1   	    (CurrentRegTable->rFlt[0])
+#define SAVE_Flt2   	    (CurrentRegTable->rFlt[1])
+#define SAVE_Flt3   	    (CurrentRegTable->rFlt[2])
+#define SAVE_Flt4   	    (CurrentRegTable->rFlt[3])
+#define SAVE_Dbl1   	    (CurrentRegTable->rDbl[0])
+#define SAVE_Dbl2   	    (CurrentRegTable->rDbl[1])
+
+/* These are only valid when StkOReg is loaded! */
+
+#define SAVE_SpA    	    (STKO_SpA(StkOReg))
+#define SAVE_SuA    	    (STKO_SuA(StkOReg))
+#define SAVE_SpB    	    (STKO_SpB(StkOReg))
+#define SAVE_SuB    	    (STKO_SuB(StkOReg))
+
+#define SAVE_Tag    	    (CurrentRegTable->rTag)
+#define SAVE_Ret    	    (CurrentRegTable->rRet)
+#define SAVE_Activity 	    (CurrentRegTable->rActivity)
+
+#define SAVE_StkO   	    (CurrentRegTable->rStkO)
+#define SAVE_Liveness 	    (CurrentRegTable->rLiveness)
+
+#endif	/* CONCURRENT */
+
+/* Note that the SAVE_ locations for the Hp registers are in the smInfo structure */
+
+#define SAVE_Hp	    	    (StorageMgrInfo.hp)
+#define SAVE_HpLim	    (StorageMgrInfo.hplim)
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[null-mapping-StgRegs]{The empty register mapping}
+%*									*
+%************************************************************************
+
+This mapping leaves all machine registers free for normal C allocation.
+In the RTS, this is the preferred mapping, because it allows gcc to use
+all available registers, with the normal callee-saves conventions.
+\begin{code}
+#if defined(NULL_REG_MAP)
+#else
+\end{code}
+
+This is a HACK here; see comment in COptJumps.lh.
+\begin{code}
+#if alpha_dec_osf1_TARGET && defined(__STG_TAILJUMPS__) && defined(__GNUC__)
+register void *_procedure __asm__("$27");
+#endif
+#if (mipsel_TARGET_ARCH || mipseb_TARGET_ARCH) && defined(__STG_TAILJUMPS__) && defined(__GNUC__)
+register void *_procedure __asm__("$25");
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[mark-mapping-StgRegs]{The ``mark'' register mapping}
+%*									*
+%************************************************************************
+
+The mark mapping is used for pointer-reversal marking during GC.  It
+is used by most of the current garbage collectors.
+
+\begin{code}
+#if defined(MARK_REG_MAP)
+\end{code}
+
+Mark (GC) register mapping:
+
+\begin{verbatim}
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
+        	-----  ----  -----  ------  ----  ----  ------
+MarkBase					  ebx
+		
+Mark	    	i0     a2    $9	    $16	    r4	  ebp
+MStack	    	i1     a3    $10    $17	    r5    esi
+MRoot  		i2     a4    $11    $18	    r6	  edi
+BitArray    	i3     a5    $12    $19	    r7
+HeapBase    	i4     d3    $13    $20	    r8
+HeapLim	    	i5     d4    $14    $21	    r9
+
+\end{verbatim}
+
+\begin{code}
+
+typedef struct {
+    P_ rMark;
+    P_ rMStack;
+    P_ rMRoot;
+    BitWord *rBitArray;
+    P_ rHeapBase;
+    P_ rHeapLim;
+    P_ rMarkBase;
+} RegisterTable;
+
+#define REGDUMP(dump)	static RegisterTable dump
+
+#define SAVE_Mark   	(MarkRegTable.rMark)
+#define SAVE_MStack    	(MarkRegTable.rMStack)
+#define SAVE_MRoot  	(MarkRegTable.rMRoot)
+#define SAVE_BitArray	(MarkRegTable.rBitArray)
+#define SAVE_HeapBase	(MarkRegTable.rHeapBase)
+#define SAVE_HeapLim	(MarkRegTable.rHeapLim)
+
+extern RegisterTable MarkRegTable;
+
+#ifdef REG_MarkBase
+GLOBAL_REG_DECL(RegisterTable *,MarkBaseReg,REG_MarkBase)
+#else
+#define MarkBaseReg (&MarkRegTable)
+#endif
+
+#ifdef REG_Mark
+GLOBAL_REG_DECL(P_,Mark,REG_Mark)
+#else
+#define Mark SAVE_Mark
+#endif
+
+#ifdef REG_MStack
+GLOBAL_REG_DECL(P_,MStack,REG_MStack)
+#else
+#define MStack SAVE_MStack
+#endif
+
+#ifdef REG_MRoot
+GLOBAL_REG_DECL(P_,MRoot,REG_MRoot)
+#else
+#define MRoot SAVE_MRoot
+#endif
+
+#ifdef REG_BitArray
+GLOBAL_REG_DECL(P_,BitArray,REG_BitArray)
+#else
+#define BitArray SAVE_BitArray
+#endif
+
+#ifdef REG_HeapBase
+GLOBAL_REG_DECL(P_,HeapBase,REG_HeapBase)
+#else
+#define HeapBase SAVE_HeapBase
+#endif
+
+#ifdef REG_HeapLim
+GLOBAL_REG_DECL(P_,HeapLim,REG_HeapLim)
+#else
+#define HeapLim SAVE_HeapLim
+#endif
+
+#if defined(__STG_GCC_REGS__)
+/* Keep -Wmissing-prototypes from complaining */
+void SAVE_REGS PROTO((RegisterTable *dump));
+void RESTORE_REGS PROTO((RegisterTable *dump));
+
+extern STG_INLINE 
+void SAVE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_MarkBase
+    dump->rMarkBase = (P_) MarkBaseReg; /* save whatever is in it */
+    MarkBaseReg = dump; /* set it correctly */
+#endif
+#ifdef REG_Mark    
+    dump->rMark = Mark;
+#endif
+#ifdef REG_MStack
+    dump->rMStack = MStack;
+#endif
+#ifdef REG_MRoot
+    dump->rMRoot = MRoot;
+#endif
+#ifdef REG_BitArray
+    dump->rBitArray = BitArray;
+#endif
+#ifdef REG_HeapBase
+    dump->rHeapBase = HeapBase;
+#endif
+#ifdef REG_HeapLim
+    dump->rHeapLim = HeapLim;
+#endif
+}
+
+extern STG_INLINE 
+void RESTORE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_Mark    
+    Mark = dump->rMark;
+#endif
+#ifdef REG_MStack
+    MStack = dump->rMStack;
+#endif
+#ifdef REG_MRoot
+    MRoot = dump->rMRoot;
+#endif
+#ifdef REG_BitArray
+    BitArray = dump->rBitArray;
+#endif
+#ifdef REG_HeapBase
+    HeapBase = dump->rHeapBase;
+#endif
+#ifdef REG_HeapLim
+    HeapLim = dump->rHeapLim;
+#endif
+#ifdef REG_MarkBase
+    MarkBaseReg = (RegisterTable *) dump->rMarkBase; /* restore to whatever it was */
+#endif
+}
+#else
+#define SAVE_REGS(dump)
+#define RESTORE_REGS(dump)
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[scan-mapping-StgRegs]{The ``scan'' register mapping}
+%*									*
+%************************************************************************
+
+The scan mapping is used for all of the in-place garbage collectors.
+On architectures with register windows, like the SPARC, these must
+reside in global registers, because the scan code is not threaded.
+
+\begin{code}
+#else
+#if defined(SCAN_REG_MAP)
+\end{code}
+
+Scan (GC) register mapping:
+
+\begin{verbatim}
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
+        	-----  ----  -----  ------  ----  ----  ------
+ScanBase   	g4
+		
+Scan	    	       a2    $9	    $16	    r4    ebx
+New	    	       a3    $10    $17	    r5	  ebp
+LinkLim		       a4    $11    $18	    r6	  esi
+
+\end{verbatim}
+
+\begin{code}
+
+typedef struct {
+    P_ rScan;
+    P_ rNew;
+    P_ rLinkLim;
+    P_ rScanBase;
+} RegisterTable;
+    
+#define REGDUMP(dump)	static RegisterTable dump
+
+#define SAVE_Scan   	(ScanRegTable.rScan)
+#define SAVE_New    	(ScanRegTable.rNew)
+#define SAVE_LinkLim  	(ScanRegTable.rLinkLim)
+
+extern RegisterTable ScanRegTable;
+
+#ifdef REG_ScanBase
+GLOBAL_REG_DECL(RegisterTable *,ScanBaseReg,REG_ScanBase)
+#else
+#define ScanBaseReg (&ScanRegTable)
+#endif
+
+#ifdef REG_Scan
+GLOBAL_REG_DECL(P_,Scan,REG_Scan)
+#else
+# ifdef REG_ScanBase
+#  define Scan (ScanBaseReg->rScan)
+# else
+#  define Scan SAVE_Scan
+# endif
+#endif
+
+#ifdef REG_New
+GLOBAL_REG_DECL(P_,New,REG_New)
+#else
+# ifdef REG_ScanBase
+#  define New (ScanBaseReg->rNew)
+# else
+#  define New SAVE_New
+# endif
+#endif
+
+#ifdef REG_LinkLim
+GLOBAL_REG_DECL(P_,LinkLim,REG_LinkLim)
+#else
+# ifdef REG_ScanBase
+#  define LinkLim (ScanBaseReg->rLinkLim)
+# else
+#  define LinkLim SAVE_LinkLim
+# endif
+#endif
+
+#if defined(__STG_GCC_REGS__)
+/* Keep -Wmissing-prototypes from complaining */
+void SAVE_REGS PROTO((RegisterTable *dump));
+void RESTORE_REGS PROTO((RegisterTable *dump));
+
+extern STG_INLINE 
+void SAVE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_ScanBase
+    dump->rScanBase = (P_) ScanBaseReg; /* save whatever is in it */
+    ScanBaseReg = dump; /* set it correctly */
+#endif
+#ifdef REG_Scan    
+    dump->rScan = Scan;
+#endif
+#ifdef REG_New
+    dump->rNew = New;
+#endif
+#ifdef REG_LinkLim
+    dump->rLinkLim = LinkLim;
+#endif
+}
+
+extern STG_INLINE 
+void RESTORE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_Scan    
+    Scan = dump->rScan;
+#endif
+#ifdef REG_New
+    New = dump->rNew;
+#endif
+#ifdef REG_LinkLim
+    LinkLim = dump->rLinkLim;
+#endif
+#ifdef REG_ScanBase
+    ScanBaseReg = (RegisterTable *) dump->rScanBase; /* restore to whatever it was */
+#endif
+}
+#else
+#define SAVE_REGS(dump)
+#define RESTORE_REGS(dump)
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[scav-mapping-StgRegs]{The ``scavenge'' register mapping}
+%*									*
+%************************************************************************
+
+The scan mapping is used for all of the in-place garbage collectors.
+(I believe that it must use a subset of the registers that are used
+in the mark mapping, but I could be wrong. --JSM)
+
+Note: registers must not be mangled by sliding register windows,
+etc. or there'll be trouble. ADR
+
+\begin{code}
+#else
+#if defined(SCAV_REG_MAP)
+\end{code}
+
+Scavenge (GC) register mapping:
+
+\begin{verbatim}
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
+        	-----  ----  -----  ------  ----  ----  ------
+ScavBase   	g4
+		
+Scav	    	       a2    $9	    $16	    r4    ebx
+ToHp	    	       a3    $10    $17	    r5	  ebp
+OldGen (gn/ap)	       a4    $11    $18	    r6	  esi
+AllocGen (gn)  	       a5
+OldHp	 (gn)  	       d3
+
+\end{verbatim}
+
+(Calling this struct @ScavRegisterTable@ would make it possible for
+@gdb@ to display it properly. At the moment, @gdb@ confuses it with
+the scan register table etc. ADR )
+
+\begin{code}
+
+typedef struct {
+    P_ rScav;
+    P_ rToHp;
+    P_ rOldGen;
+#ifdef GCgn
+    P_ rAllocGen;
+    P_ rOldHp;
+#endif
+    P_ rScavBase;
+} RegisterTable;
+
+#define REGDUMP(dump)	static RegisterTable dump
+
+#define SAVE_Scav   	(ScavRegTable.rScav)
+#define SAVE_ToHp    	(ScavRegTable.rToHp)
+#define SAVE_OldGen  	(ScavRegTable.rOldGen)
+#define SAVE_AllocGen  	(ScavRegTable.rAllocGen)
+#define SAVE_OldHp  	(ScavRegTable.rOldHp)
+
+extern RegisterTable ScavRegTable;
+
+#ifdef REG_ScavBase
+GLOBAL_REG_DECL(RegisterTable *,ScavBaseReg,REG_ScavBase)
+#else
+#define ScavBaseReg (&ScavRegTable)
+#endif
+
+#ifdef REG_Scav
+GLOBAL_REG_DECL(P_,Scav,REG_Scav)
+#else
+# ifdef REG_ScavBase
+#  define Scav (ScavBaseReg->rScav)
+# else
+#  define Scav SAVE_Scav
+# endif
+#endif
+
+#ifdef REG_ToHp
+GLOBAL_REG_DECL(P_,ToHp,REG_ToHp)
+#else
+# ifdef REG_ScavBase
+#  define ToHp (ScavBaseReg->rToHp)
+# else
+#  define ToHp SAVE_ToHp
+# endif
+#endif
+
+#ifdef REG_OldGen
+GLOBAL_REG_DECL(P_,OldGen,REG_OldGen)
+#else
+# ifdef REG_ScavBase
+#  define OldGen (ScavBaseReg->rOldGen)
+# else
+#  define OldGen SAVE_OldGen
+# endif
+#endif
+
+#ifdef REG_AllocGen
+GLOBAL_REG_DECL(P_,AllocGen,REG_AllocGen)
+#else
+# ifdef REG_ScavBase
+#  define AllocGen (ScavBaseReg->rAllocGen)
+# else
+#  define AllocGen SAVE_AllocGen
+# endif
+#endif
+
+#ifdef REG_OldHp
+GLOBAL_REG_DECL(P_,OldHp,REG_OldHp)
+#else
+# ifdef REG_ScavBase
+#  define OldHp (ScavBaseReg->rOldHp)
+# else
+#  define OldHp SAVE_OldHp
+# endif
+#endif
+
+#if defined(__STG_GCC_REGS__)
+/* Keep -Wmissing-prototypes from complaining */
+void SAVE_REGS PROTO((RegisterTable *dump));
+void RESTORE_REGS PROTO((RegisterTable *dump));
+
+extern STG_INLINE 
+void SAVE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_ScavBase
+    dump->rScavBase = (P_) ScavBaseReg; /* save whatever is in it */
+    ScavBaseReg = dump; /* set it correctly */
+#endif
+#ifdef REG_Scav    
+    dump->rScav = Scav;
+#endif
+#ifdef REG_ToHp
+    dump->rToHp = ToHp;
+#endif
+#ifdef REG_OldGen
+    dump->rOldGen = OldGen;
+#endif
+#ifdef REG_AllocGen
+    dump->rAllocGen = AllocGen;
+#endif
+#ifdef REG_OldHp
+    dump->rOldHp = OldHp;
+#endif
+}
+
+extern STG_INLINE 
+void RESTORE_REGS(dump)
+RegisterTable *dump;
+{
+#ifdef REG_Scav    
+    Scav = dump->rScav;
+#endif
+#ifdef REG_ToHp
+    ToHp = dump->rToHp;
+#endif
+#ifdef REG_OldGen
+    OldGen = dump->rOldGen;
+#endif
+#ifdef REG_AllocGen
+    AllocGen = dump->rAllocGen;
+#endif
+#ifdef REG_OldHp
+    OldHp = dump->rOldHp;
+#endif
+#ifdef REG_ScavBase
+    ScavBaseReg = (RegisterTable *) dump->rScavBase; /* restore to whatever it was */
+#endif
+}
+#else
+#define SAVE_REGS(dump)
+#define RESTORE_REGS(dump)
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[main-mapping-StgRegs]{The main register mapping (Haskell threaded world)}
+%*									*
+%************************************************************************
+
+\begin{code}
+#else	/* For simplicity, the default is MAIN_REG_MAP (this one) */
+\end{code}
+
+Main register-mapping summary: (1)~Specific architecture's details are
+given later.  (2)~Entries marked \tr{!} are caller-saves registers
+that {\em must be saved} across ccalls; those marked \tr{@} are
+caller-saves registers that need {\em not} be saved; those marked
+\tr{#} are caller-saves registers that need to be restored, but don't
+need to be saved; the rest are callee-save registers (the best kind).
+
+IF YOU CHANGE THIS TABLE, YOU MAY NEED TO CHANGE CallWrapper.s
+(or equiv) and [who knows?] maybe something else.  Check the
+documentation in the porter's part of the installation guide.
+
+\begin{verbatim}
+                sparc  m68k  alpha  mipseX  hppa   iX86  rs6000
+                -----  ----  -----  ------  ----   ----  ------
+BaseReg#               a5                          ebx
+
+StkOReg								(CONCURRENT)       
+		      
+R1/Node         l1     d7    $1!    $9!     %r11
+R2              l2     d6    $2!    $10!    %r12
+R3              l3     d5    $3!    $11!    %r13
+R4              l4           $4!    $12!    %r14
+R5              l5           $5!    $13!    %r15
+R6              l6	     $6!    $14!    %r16
+R7              l7           $7!    $15!    %r17
+R8                  	     $8!    $24!    %r18
+
+TagReg@
+
+FltReg1         f2!    fp2   $f1    $f20    %fr12
+FltReg2         f3!    fp3   $f2    $f22    %fr12R
+FltReg3         f4!    fp4   $f3    $f24    %fr13
+FltReg4         f5!    fp5   $f4    $f26    %fr13R
+		      
+DblReg1         f6!    fp6   $f5    $f28    %fr20		* SEE NOTES!
+DblReg2         f8!    fp7   $f6    $f30    %fr20		* SEE NOTES!
+		      
+SpA             i0     a3    $9     $16     %r4
+SuA             i1     d3    $10    $17     %r5
+SpB             i2     a4    $11    $18     %r6
+SuB             i3     d4    $12    $19     %r7
+
+Hp              i4     a2    $13    $20     %r8
+HpLim           i5           $14    $21     %r9
+
+RetReg	    	l0           $15    $22	    %r10
+
+Liveness							(CONCURRENT)  
+
+Activity        g5						(DO_SPAT_PROFILING)
+
+StdUpdRetVec#
+StkStub#        i7                  $23
+\end{verbatim}
+
+Notes:
+\begin{enumerate}
+\item
+Registers not mentioned in the summary table end up in the default
+(a memory location in @MainRegTable@).
+
+\item
+@BaseReg@ is in a machine register if anything is (well, unless everything is!)
+It points to a block of memory in which the things which don't end up in machine
+registers live.
+
+\item
+Exceptions to previous point:
+If the following labels are in machine registers, then the
+corresponding register name refers to what's in its register; otherwise,
+it refers to the label:
+\begin{verbatim}
+StdUpdRetVecReg	vtbl_StdUpdFrame
+StkStubReg	STK_STUB_closure
+\end{verbatim}
+Also, if TagReg is not in a machine register, its name refers to
+@INFO_TAG(InfoPtr)@, the tag field from the info table pointed to by
+register R2 (InfoPtr).
+
+\end{enumerate}
+
+Next, we have the code to declare the various global registers.  Those
+STG registers which don't actually live in machine registers are
+defined as macros which refer to the registers as fixed offsets into
+the register table.  Note that the register table will contain blank
+spots for the STG registers that reside in machine registers.  Not to
+worry; these blank spots will be filled in whenever the register
+context is saved, so the space does not go to waste.
+
+\begin{code}
+
+#define Node	(R1.p)
+#define InfoPtr (R2.d)
+
+/* these are if we get stuck using the reg-tbl "register" (no machine reg avail) */
+#define RTBL_Dbl1   	    (BaseReg->rDbl[0])
+#define RTBL_Dbl2   	    (BaseReg->rDbl[1])
+#define RTBL_Flt1   	    (BaseReg->rFlt[0])
+#define RTBL_Flt2   	    (BaseReg->rFlt[1])
+#define RTBL_Flt3   	    (BaseReg->rFlt[2])
+#define RTBL_Flt4   	    (BaseReg->rFlt[3])
+#define RTBL_R1     	    (BaseReg->rR[0])
+#define RTBL_R2     	    (BaseReg->rR[1])
+#define RTBL_R3     	    (BaseReg->rR[2])
+#define RTBL_R4     	    (BaseReg->rR[3])
+#define RTBL_R5     	    (BaseReg->rR[4])
+#define RTBL_R6     	    (BaseReg->rR[5])
+#define RTBL_R7     	    (BaseReg->rR[6])
+#define RTBL_R8     	    (BaseReg->rR[7])
+#define RTBL_SpA    	    (BaseReg->rSpA)
+#define RTBL_SuA    	    (BaseReg->rSuA)
+#define RTBL_SpB    	    (BaseReg->rSpB)
+#define RTBL_SuB    	    (BaseReg->rSuB)
+#define RTBL_Hp     	    (BaseReg->rHp)
+#define RTBL_HpLim  	    (BaseReg->rHpLim)
+#define RTBL_Tag    	    (BaseReg->rTag)
+#define RTBL_Ret    	    (BaseReg->rRet)
+#define RTBL_Activity  	    (BaseReg->rActivity)
+#define RTBL_StkO   	    (BaseReg->rStkO)
+#define RTBL_Liveness 	    (BaseReg->rLiveness)
+
+#ifdef REG_Base
+GLOBAL_REG_DECL(STGRegisterTable *,BaseReg,REG_Base)
+#else
+#ifdef CONCURRENT
+#define BaseReg CurrentRegTable
+#else
+#define BaseReg (&MainRegTable)
+#endif	/* CONCURRENT */
+#endif /* REG_Base */
+
+#ifdef REG_StkO
+GLOBAL_REG_DECL(P_,StkOReg,REG_StkO)
+#else
+#define StkOReg RTBL_StkO
+#endif
+
+/* R1 is used for Node */
+#ifdef REG_R1
+GLOBAL_REG_DECL(StgUnion,R1,REG_R1)
+#else
+#define R1 RTBL_R1
+#endif
+
+/* R2 is used for InfoPtr */
+#ifdef REG_R2
+GLOBAL_REG_DECL(StgUnion,R2,REG_R2)
+#else
+#define R2 RTBL_R2
+#endif
+
+#ifdef REG_R3
+GLOBAL_REG_DECL(StgUnion,R3,REG_R3)
+#else
+#define R3 RTBL_R3
+#endif
+
+#ifdef REG_R4
+GLOBAL_REG_DECL(StgUnion,R4,REG_R4)
+#else
+#define R4 RTBL_R4
+#endif
+
+#ifdef REG_R5
+GLOBAL_REG_DECL(StgUnion,R5,REG_R5)
+#else
+#define R5 RTBL_R5
+#endif
+
+#ifdef REG_R6
+GLOBAL_REG_DECL(StgUnion,R6,REG_R6)
+#else
+#define R6 RTBL_R6
+#endif
+
+#ifdef REG_R7
+GLOBAL_REG_DECL(StgUnion,R7,REG_R7)
+#else
+#define R7 RTBL_R7
+#endif
+
+#ifdef REG_R8
+GLOBAL_REG_DECL(StgUnion,R8,REG_R8)
+#else
+#define R8 RTBL_R8
+#endif
+
+#ifdef REG_Flt1
+GLOBAL_REG_DECL(StgFloat,FltReg1,REG_Flt1)
+#else
+#define FltReg1 RTBL_Flt1
+#endif
+
+#ifdef REG_Flt2
+GLOBAL_REG_DECL(StgFloat,FltReg2,REG_Flt2)
+#else
+#define FltReg2 RTBL_Flt2
+#endif
+
+#ifdef REG_Flt3
+GLOBAL_REG_DECL(StgFloat,FltReg3,REG_Flt3)
+#else
+#define FltReg3 RTBL_Flt3
+#endif
+
+#ifdef REG_Flt4
+GLOBAL_REG_DECL(StgFloat,FltReg4,REG_Flt4)
+#else
+#define FltReg4 RTBL_Flt4
+#endif
+
+#ifdef REG_Dbl1
+GLOBAL_REG_DECL(StgDouble,DblReg1,REG_Dbl1)
+#else
+#define DblReg1 RTBL_Dbl1
+#endif
+
+#ifdef REG_Dbl2
+GLOBAL_REG_DECL(StgDouble,DblReg2,REG_Dbl2)
+#else
+#define DblReg2 RTBL_Dbl2
+#endif
+
+#ifdef REG_Tag
+GLOBAL_REG_DECL(I_,TagReg,REG_Tag)
+
+#define SET_TAG(tag)	TagReg = tag
+#else
+#define TagReg INFO_TAG(InfoPtr)
+#define SET_TAG(tag)	/* nothing */
+#endif
+
+#ifdef REG_Ret
+GLOBAL_REG_DECL(StgRetAddr,RetReg,REG_Ret)
+#else
+#define RetReg RTBL_Ret
+#endif
+
+#ifdef REG_SpA
+GLOBAL_REG_DECL(PP_,SpA,REG_SpA)
+#else
+#define SpA RTBL_SpA
+#endif
+
+#ifdef REG_SuA
+GLOBAL_REG_DECL(PP_,SuA,REG_SuA)
+#else
+#define SuA RTBL_SuA
+#endif
+
+#ifdef REG_SpB
+GLOBAL_REG_DECL(P_,SpB,REG_SpB)
+#else
+#define SpB RTBL_SpB
+#endif
+
+#ifdef REG_SuB
+GLOBAL_REG_DECL(P_,SuB,REG_SuB)
+#else
+#define SuB RTBL_SuB
+#endif
+
+#ifdef REG_Hp
+GLOBAL_REG_DECL(P_,Hp,REG_Hp)
+#else
+#define Hp RTBL_Hp
+#endif
+
+#ifdef REG_HpLim
+GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
+#else
+#define HpLim RTBL_HpLim
+#endif
+
+#ifdef REG_Liveness
+GLOBAL_REG_DECL(I_,LivenessReg,REG_Liveness)
+#else
+#define LivenessReg RTBL_Liveness
+#endif
+
+#ifdef REG_Activity
+GLOBAL_REG_DECL(I_,ActivityReg,REG_Activity)
+#else
+#define ActivityReg RTBL_Activity
+#endif
+
+#ifdef REG_StdUpdRetVec
+GLOBAL_REG_DECL(D_,StdUpdRetVecReg,REG_StdUpdRetVec)
+#else
+#define StdUpdRetVecReg vtbl_StdUpdFrame
+#endif
+
+#ifdef REG_StkStub
+GLOBAL_REG_DECL(P_,StkStubReg,REG_StkStub)
+#else
+#define StkStubReg STK_STUB_closure
+#endif
+
+#ifdef CALLER_SAVES_StkO
+#define CALLER_SAVE_StkO    	SAVE_StkO = StkOReg;
+#define CALLER_RESTORE_StkO 	StkOReg = SAVE_StkO;
+#else
+#define CALLER_SAVE_StkO    	/* nothing */
+#define CALLER_RESTORE_StkO    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R1
+#define CALLER_SAVE_R1    	SAVE_R1 = R1;
+#define CALLER_RESTORE_R1 	R1 = SAVE_R1;
+#else
+#define CALLER_SAVE_R1      	/* nothing */
+#define CALLER_RESTORE_R1    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R2
+#define CALLER_SAVE_R2    	SAVE_R2 = R2;
+#define CALLER_RESTORE_R2 	R2 = SAVE_R2;
+#else
+#define CALLER_SAVE_R2      	/* nothing */
+#define CALLER_RESTORE_R2    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R3
+#define CALLER_SAVE_R3    	SAVE_R3 = R3;
+#define CALLER_RESTORE_R3 	R3 = SAVE_R3;
+#else
+#define CALLER_SAVE_R3      	/* nothing */
+#define CALLER_RESTORE_R3    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R4
+#define CALLER_SAVE_R4    	SAVE_R4 = R4;
+#define CALLER_RESTORE_R4 	R4 = SAVE_R4;
+#else
+#define CALLER_SAVE_R4      	/* nothing */
+#define CALLER_RESTORE_R4    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R5
+#define CALLER_SAVE_R5    	SAVE_R5 = R5;
+#define CALLER_RESTORE_R5 	R5 = SAVE_R5;
+#else
+#define CALLER_SAVE_R5      	/* nothing */
+#define CALLER_RESTORE_R5    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R6
+#define CALLER_SAVE_R6    	SAVE_R6 = R6;
+#define CALLER_RESTORE_R6 	R6 = SAVE_R6;
+#else
+#define CALLER_SAVE_R6      	/* nothing */
+#define CALLER_RESTORE_R6    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R7
+#define CALLER_SAVE_R7    	SAVE_R7 = R7;
+#define CALLER_RESTORE_R7 	R7 = SAVE_R7;
+#else
+#define CALLER_SAVE_R7      	/* nothing */
+#define CALLER_RESTORE_R7    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_R8
+#define CALLER_SAVE_R8    	SAVE_R8 = R8;
+#define CALLER_RESTORE_R8 	R8 = SAVE_R8;
+#else
+#define CALLER_SAVE_R8      	/* nothing */
+#define CALLER_RESTORE_R8    	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_FltReg1
+#define CALLER_SAVE_FltReg1    	SAVE_Flt1 = FltReg1;
+#define CALLER_RESTORE_FltReg1 	FltReg1 = SAVE_Flt1;
+#else
+#define CALLER_SAVE_FltReg1    	/* nothing */
+#define CALLER_RESTORE_FltReg1 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_FltReg2
+#define CALLER_SAVE_FltReg2    	SAVE_Flt2 = FltReg2;
+#define CALLER_RESTORE_FltReg2 	FltReg2 = SAVE_Flt2;
+#else
+#define CALLER_SAVE_FltReg2    	/* nothing */
+#define CALLER_RESTORE_FltReg2 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_FltReg3
+#define CALLER_SAVE_FltReg3    	SAVE_Flt3 = FltReg3;
+#define CALLER_RESTORE_FltReg3 	FltReg3 = SAVE_Flt3;
+#else
+#define CALLER_SAVE_FltReg3    	/* nothing */
+#define CALLER_RESTORE_FltReg3 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_FltReg4
+#define CALLER_SAVE_FltReg4    	SAVE_Flt4 = FltReg4;
+#define CALLER_RESTORE_FltReg4 	FltReg4 = SAVE_Flt4;
+#else
+#define CALLER_SAVE_FltReg4    	/* nothing */
+#define CALLER_RESTORE_FltReg4 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_DblReg1
+#define CALLER_SAVE_DblReg1    	SAVE_Dbl1 = DblReg1;
+#define CALLER_RESTORE_DblReg1 	DblReg1 = SAVE_Dbl1;
+#else
+#define CALLER_SAVE_DblReg1    	/* nothing */
+#define CALLER_RESTORE_DblReg1 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_DblReg2
+#define CALLER_SAVE_DblReg2    	SAVE_Dbl2 = DblReg2;
+#define CALLER_RESTORE_DblReg2 	DblReg2 = SAVE_Dbl2;
+#else
+#define CALLER_SAVE_DblReg2    	/* nothing */
+#define CALLER_RESTORE_DblReg2 	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Tag
+#define CALLER_SAVE_Tag	    	SAVE_Tag = TagReg;
+#define CALLER_RESTORE_Tag  	TagReg = SAVE_Tag;
+#else
+#define CALLER_SAVE_Tag	    	/* nothing */
+#define CALLER_RESTORE_Tag	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Ret
+#define CALLER_SAVE_Ret	    	SAVE_Ret = RetReg;
+#define CALLER_RESTORE_Ret  	RetReg = SAVE_Ret;
+#else
+#define CALLER_SAVE_Ret	    	/* nothing */
+#define CALLER_RESTORE_Ret	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SpA
+#define CALLER_SAVE_SpA	    	SAVE_SpA = SpA;
+#define CALLER_RESTORE_SpA  	SpA = SAVE_SpA;
+#else
+#define CALLER_SAVE_SpA	    	/* nothing */
+#define CALLER_RESTORE_SpA	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SuA
+#define CALLER_SAVE_SuA	    	SAVE_SuA = SuA;
+#define CALLER_RESTORE_SuA  	SuA = SAVE_SuA;
+#else
+#define CALLER_SAVE_SuA	    	/* nothing */
+#define CALLER_RESTORE_SuA	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SpB
+#define CALLER_SAVE_SpB	    	SAVE_SpB = SpB;
+#define CALLER_RESTORE_SpB  	SpB = SAVE_SpB;
+#else
+#define CALLER_SAVE_SpB	    	/* nothing */
+#define CALLER_RESTORE_SpB	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SuB
+#define CALLER_SAVE_SuB	    	SAVE_SuB = SuB;
+#define CALLER_RESTORE_SuB  	SuB = SAVE_SuB;
+#else
+#define CALLER_SAVE_SuB	    	/* nothing */
+#define CALLER_RESTORE_SuB	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Hp
+#define CALLER_SAVE_Hp	    	SAVE_Hp = Hp;
+#define CALLER_RESTORE_Hp   	Hp = SAVE_Hp;
+#else
+#define CALLER_SAVE_Hp	    	/* nothing */
+#define CALLER_RESTORE_Hp	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_HpLim
+#define CALLER_SAVE_HpLim   	SAVE_HpLim = HpLim;
+#define CALLER_RESTORE_HpLim	HpLim = SAVE_HpLim;
+#else
+#define CALLER_SAVE_HpLim   	/* nothing */
+#define CALLER_RESTORE_HpLim   	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Liveness
+#define CALLER_SAVE_Liveness	SAVE_Liveness = LivenessReg;
+#define CALLER_RESTORE_Liveness	LivenessReg = SAVE_Liveness;
+#else
+#define CALLER_SAVE_Liveness	/* nothing */
+#define CALLER_RESTORE_Liveness	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Activity
+#define CALLER_SAVE_Activity	SAVE_Activity = ActivityReg;
+#define CALLER_RESTORE_Activity	ActivityReg = SAVE_Activity;
+#else
+#define CALLER_SAVE_Activity	/* nothing */
+#define CALLER_RESTORE_Activity	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_Base
+#ifndef CONCURRENT
+#define CALLER_SAVE_Base	/* nothing, ever (it holds a fixed value) */
+#define CALLER_RESTORE_Base	BaseReg = MainRegTable;
+#else
+#define CALLER_SAVE_Base	/* nothing */
+#define CALLER_RESTORE_Base	BaseReg = CurrentRegTable;
+#endif
+#else
+#define CALLER_SAVE_Base	/* nothing */
+#define CALLER_RESTORE_Base	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_StdUpdRetVec
+#define CALLER_RESTORE_StdUpdRetVec	StdUpdRetVecReg = vtbl_StdUpdFrame;
+#else
+#define CALLER_RESTORE_StdUpdRetVec	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_StkStub
+#define CALLER_RESTORE_StkStub		StdUpdRetVecReg = STK_STUB_closure;
+#else
+#define CALLER_RESTORE_StkStub		/* nothing */
+#endif
+
+\end{code}
+
+Concluding \tr{#endifs} and multi-slurp protection:
+
+\begin{code}
+
+#endif	/* SCAV_REG_MAP */
+#endif	/* SCAN_REG_MAP */
+#endif	/* MARK_REG_MAP */
+#endif	/* NULL_REG_MAP */
+
+#endif	/* STGREGS_H */
+\end{code}

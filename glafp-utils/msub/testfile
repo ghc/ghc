@@ -1,0 +1,13 @@
+foo = ${foo}
+bar = ${bar}
+ugh = ${ugh}
+${space}y
+${a}
+
+The stuff in parens should be "abc": (${xyz})
+
+This should be a single dollar-sign: ${dollar}
+This should be a double dollar-sign: ${dollar}${dollar}
+So should this: ${doubledollar}
+
+This should say "y1": ${Y2}

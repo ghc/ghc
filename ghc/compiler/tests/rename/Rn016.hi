@@ -1,0 +1,11 @@
+interface Rn016 where
+import X(K)
+
+class K a where
+	op1 :: a -> a -> a
+	op2 :: Int -> a
+
+instance K Int
+instance K Bool
+instance K [a]
+	

@@ -1,0 +1,112 @@
+#if IncludeTestDirsInBuild == YES
+#define IHaveSubdirs
+#define __ghc_parser_tests_dir tests
+#else
+#define __ghc_parser_tests_dir /* nothing */
+#endif
+
+SUBDIRS = __ghc_parser_tests_dir
+
+/* only subdir is the test suite */
+#define NoAllTargetForSubdirs
+#define NoDocsTargetForSubdirs
+#define NoInstallTargetForSubdirs
+#define NoInstallDocsTargetForSubdirs
+#define NoDependTargetForSubdirs
+#define NoTagTargetForSubdirs
+
+YACC_OPTS = -d
+/* add to this on the command line with, e.g., EXTRA_YACC_OPTS=-v */
+
+#if BuildDataParallelHaskell == YES
+D_DPH = -DDPH
+#endif
+
+XCOMM D_DEBUG = -DDEBUG
+
+CPP_DEFINES = $(D_DEBUG) $(D_DPH)
+
+HSP_SRCS_C = /*main.c*/ hsparser.tab.c hslexer.c id.c atype.c ttype.c \
+	 tree.c literal.c coresyn.c list.c binding.c pbinding.c hpragma.c impidt.c \
+	 finfot.c util.c entidt.c syntax.c type2context.c import_dirlist.c infix.c printtree.c
+
+HSP_OBJS_O = /*main.o*/ hsparser.tab.o hslexer.o id.o atype.o ttype.o \
+	 tree.o literal.o coresyn.o list.o binding.o pbinding.o hpragma.o impidt.o \
+	 finfot.o util.o entidt.o syntax.o type2context.o import_dirlist.o infix.o printtree.o
+
+/* DPH uses some tweaked files; here are the lists again... */
+
+#if BuildDataParallelHaskell == YES
+DPH_HSP_SRCS_C = main.c hsparser-DPH.tab.c hslexer-DPH.c id.c atype.c ttype-DPH.c \
+	 tree-DPH.c literal.c coresyn.c list.c binding.c pbinding.c hpragma.c impidt.c \
+	 finfot.c util.c entidt.c syntax.c type2context.c import_dirlist.c infix.c printtree.c
+
+DPH_HSP_OBJS_O = main.o hsparser-DPH.tab.o hslexer-DPH.o id.o atype.o ttype-DPH.o \
+	 tree-DPH.o literal.o coresyn.o list.o binding.o pbinding.o hpragma.o impidt.o \
+	 finfot.o util.o entidt.o syntax.o type2context.o import_dirlist.o infix.o printtree.o
+#endif
+
+/* this is for etags */
+REAL_HSP_SRCS_C = main.c id.c \
+	 util.c syntax.c type2context.c import_dirlist.c infix.c printtree.c
+
+UgenNeededHere(all depend)
+
+BuildPgmFromCFiles(hsp,main.o,$(FLEX_LIB),libhsp.a)
+#if BuildDataParallelHaskell == YES
+BuildPgmFromCFiles(dphsp,$(DPH_HSP_OBJS_O),$(LEX_LIB),)
+#endif
+
+/* Most hsp files are in libhsp.a, so we can either make
+   a standalone parser, or incorporate the files into
+   the hsc compiler directly (WDP 94/10)
+*/
+NormalLibraryTarget(hsp,$(HSP_OBJS_O))
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC))
+InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
+#if BuildDataParallelHaskell == YES
+InstallBinaryTarget(dphsp,$(INSTLIBDIR_GHC))
+#endif
+#endif /* DoInstall... */
+
+YaccRunWithExpectMsg(hsparser,13,2)
+
+UgenTarget(atype)
+UgenTarget(binding)
+UgenTarget(coresyn)
+UgenTarget(entidt)
+UgenTarget(finfot)
+UgenTarget(impidt)
+UgenTarget(literal)
+UgenTarget(list)
+UgenTarget(pbinding)
+UgenTarget(hpragma)
+UgenTarget(tree)
+UgenTarget(ttype)
+
+#if BuildDataParallelHaskell == YES
+YaccRunWithExpectMsg(hsparser-DPH,12,4)
+UgenTarget(tree-DPH)
+UgenTarget(ttype-DPH)
+#endif
+
+CDependTarget( $(HSP_SRCS_C) )
+
+ExtraStuffToClean( y.output )
+ExtraStuffToBeVeryClean( $(STD_VERY_CLEAN) hsparser.tab.* hsparser-DPH.tab.* hslexer.c hslexer-DPH.c )
+
+EtagsNeededHere(tags) /* need this to do "make tags" */
+ClearTagsFile()
+CTagsTarget( *.y *.lex *.ugn $(REAL_HSP_SRCS_C) )
+
+
+
+
+
+
+
+
+
+

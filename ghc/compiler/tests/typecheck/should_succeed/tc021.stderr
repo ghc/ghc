@@ -1,0 +1,14 @@
+Typechecked:
+AbsBinds [tt0] [] [(x.t1, ShouldSucceed.x)]
+    {- rec -}
+    x.t1 :: tt0
+    x.t1 = x.t1
+AbsBinds [tt4, tt5] [] [(a.t3, ShouldSucceed.a)]
+    {- nonrec -}
+    a.t3 :: (tt4, tt5)
+    a.t3 = (ShouldSucceed.x tt4, ShouldSucceed.x tt5)
+AbsBinds [ot8, tt9, tt10] [] [(f.t7, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t7 :: ot8 -> (tt9, tt10)
+    f.t7 x.r56 = ShouldSucceed.a [tt9, tt10]
+

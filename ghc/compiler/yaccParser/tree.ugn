@@ -1,0 +1,80 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_tree where
+import UgenUtil
+import Util
+
+import U_binding
+import U_coresyn	( U_coresyn )	-- interface only
+import U_hpragma	( U_hpragma )	-- interface only
+import U_list
+import U_literal
+import U_ttype
+
+type U_infixTree = (ProtoName, U_tree, U_tree)
+
+rdU_infixTree :: _Addr -> UgnM U_infixTree
+rdU_infixTree pt
+  = ioToUgnM (_casm_ ``%r = gident(*Rginfun_hs((struct Sap *)%0));'' pt) `thenUgn` \ op_t ->
+    ioToUgnM (_casm_ ``%r = (*Rginarg1_hs((struct Sap *)%0));'' pt) `thenUgn` \ arg1_t ->
+    ioToUgnM (_casm_ ``%r = (*Rginarg2_hs((struct Sap *)%0));'' pt) `thenUgn` \ arg2_t ->
+
+    rdU_unkId op_t		`thenUgn` \ op	 ->
+    rdU_tree  arg1_t		`thenUgn` \ arg1 ->
+    rdU_tree  arg2_t		`thenUgn` \ arg2 ->
+    returnUgn (op, arg1, arg2)
+%}}
+type tree;
+	hmodule : < ghname	: stringId;
+		    ghimplist	: list;
+		    ghexplist	: list;
+		    ghmodlist	: binding;
+		    ghmodline	: long; >;
+	ident	: < gident 	: unkId; >;
+	lit 	: < glit	: literal; >;
+	tuple	: < gtuplelist	: list; >;
+	ap	: < gfun	: tree;
+		    garg	: tree; >;
+	lambda	: < glampats	: list;
+		    glamexpr	: tree;
+		    glamline	: long; >;
+	let	: < gletvdeflist : binding;
+		    gletvexpr	: tree; >;
+	casee	: < gcaseexpr	: tree;
+		    gcasebody	: list; >;
+	ife	: < gifpred	: tree;
+		    gifthen	: tree;
+		    gifelse	: tree; >;
+	par	: < gpare	: tree; >;
+	as	: < gasid	: unkId;
+		    gase	: tree; >;
+	lazyp	: < glazyp	: tree; >;
+	plusp	: < gplusp	: tree; 
+		    gplusi	: literal; >;
+	wildp	: < >;
+	restr	: < grestre	: tree;
+		    grestrt	: ttype; >;
+	comprh	: < gcexp	: tree;
+		    gcquals	: list; >;
+	qual	: < gqpat	: tree;
+		    gqexp	: tree;	>;
+	guard	: < ggexp	: tree; >;
+	def	: < ggdef	: tree; >;
+	tinfixop: < gdummy	: infixTree; >;
+	lsection: < glsexp	: tree; 
+		    glsop	: unkId; >;
+	rsection: < grsop	: unkId;
+		    grsexp	: tree; >;
+	eenum	: < gefrom	: tree;
+		    gestep	: list;
+		    geto	: list;	>;
+	llist	: < gllist	: list; >;
+	ccall	: < gccid	: stringId;
+		    gccinfo	: stringId;
+		    gccargs	: list; >;
+	scc	: < gsccid	: hstring;
+		    gsccexp	: tree; >;
+	negate	: < gnexp	: tree; >;
+end;

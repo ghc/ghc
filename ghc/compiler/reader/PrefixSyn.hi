@@ -1,0 +1,23 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PrefixSyn where
+import HsBinds(Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsExpr(Expr)
+import HsImpExp(IfaceImportDecl)
+import HsPat(InPat)
+import HsPragmas(ClassOpPragmas, GenPragmas)
+import HsTypes(PolyType)
+import PreludePS(_PackedString)
+import ProtoName(ProtoName)
+import SrcLoc(SrcLoc)
+data RdrBinding   = RdrNullBind | RdrAndBindings RdrBinding RdrBinding | RdrTyData (TyDecl ProtoName) | RdrTySynonym (TyDecl ProtoName) | RdrFunctionBinding Int [RdrMatch] | RdrPatternBinding Int [RdrMatch] | RdrClassDecl (ClassDecl ProtoName (InPat ProtoName)) | RdrInstDecl (_PackedString -> _PackedString -> Bool -> InstDecl ProtoName (InPat ProtoName)) | RdrDefaultDecl (DefaultDecl ProtoName) | RdrIfaceImportDecl IfaceImportDecl | RdrTySig [ProtoName] (PolyType ProtoName) RdrTySigPragmas SrcLoc | RdrSpecValSig [Sig ProtoName] | RdrInlineValSig (Sig ProtoName) | RdrDeforestSig (Sig ProtoName) | RdrMagicUnfoldingSig (Sig ProtoName) | RdrSpecInstSig (SpecialisedInstanceSig ProtoName) | RdrAbstractTypeSig (DataTypeSig ProtoName) | RdrSpecDataSig (DataTypeSig ProtoName)
+type RdrId = ProtoName
+data RdrMatch   = RdrMatch Int _PackedString (InPat ProtoName) [(Expr ProtoName (InPat ProtoName), Expr ProtoName (InPat ProtoName))] RdrBinding
+data RdrTySigPragmas   = RdrNoPragma | RdrGenPragmas (GenPragmas ProtoName) | RdrClassOpPragmas (ClassOpPragmas ProtoName)
+type SigConverter = RdrBinding -> [Sig ProtoName]
+type SrcFile = _PackedString
+type SrcFun = _PackedString
+type SrcLine = Int
+readInteger :: [Char] -> Integer
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+

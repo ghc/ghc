@@ -1,0 +1,277 @@
+%************************************************************************
+%*									*
+\section[GhcConstants]{Constants known by C code {\em and} by the compiler (hsc)}
+%*									*
+%************************************************************************
+
+Multi-slurp protection (start):
+\begin{code}
+#ifndef GHCCONSTANTS_H
+#define GHCCONSTANTS_H
+
+#ifndef PLATFORM_H
+#include "platform.h"
+#endif
+\end{code}
+
+% BECAUSE THIS FILE IS INCLUDED INTO HASKELL FILES, THERE MUST BE NO C
+% COMMENTS IN THE ``CODE'' BITS.
+
+This file defines constants that are common to diverse parts of the
+Glasgow Haskell compilation system.  For example, both the compiler
+proper and some magic runtime-system bits need to know the minimum
+size of an updatable closure.
+
+%************************************************************************
+%*									*
+\subsection[updatable-closure-size]{Size of Updatable Closures}
+%*									*
+%************************************************************************
+
+We define the minimum size for updatable closures. This must be at
+least 2, to allow for cons cells and linked indirections. All updates
+will be performed on closures of this size. For non-updatable closures
+the minimum size is 1 to allow for a forwarding pointer.
+
+\begin{code}
+#define MIN_UPD_SIZE	2
+#define MIN_NONUPD_SIZE 1
+\end{code}
+
+ToDo: @MIN_STATIC_NONUPD_SIZE@ ???
+
+%************************************************************************
+%*									*
+\subsection[double-etc-size]{Sizes of various types}
+%*									*
+%************************************************************************
+
+The size of an StgDouble, in StgWords.
+
+\begin{code}
+#if alpha_TARGET_ARCH
+#define DOUBLE_SIZE 	1
+#else
+#define DOUBLE_SIZE 	2
+#endif
+\end{code}
+
+Sizes of gmp objects, in StgWords
+
+\begin{code}
+#define MP_STRUCT_SIZE	3
+#define MIN_MP_INT_SIZE	16
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[spec-closure-constraints]{What can be declared as a @SPEC@ closure}
+%*									*
+%************************************************************************
+
+The following define what closure layouts can be declared as @SPEC@
+closures.
+
+\begin{code}
+#define MAX_SPEC_ALL_PTRS 12
+#define MAX_SPEC_ALL_NONPTRS 5
+#define MAX_SPEC_OTHER_SIZE 3
+\end{code}
+
+The highest-numbered selectee field that we can do magic on (i.e.,
+do the selection at GC time):
+\begin{code}
+#define MAX_SPEC_SELECTEE_SIZE 12
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[stg-reg-counts]{How many STG registers are there}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define MAX_VANILLA_REG 8
+#define MAX_FLOAT_REG 4
+#define MAX_DOUBLE_REG 2
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[vectored-return]{What number of data type cases can use vectored returns}
+%*									*
+%************************************************************************
+
+@MAX_VECTORED_RTN@ defines the largest number of constructors that a
+data type can have and still use a vectored return.
+\begin{code}
+#define MAX_VECTORED_RTN 8
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[intlike-range]{Range of int-like closures}
+%*									*
+%************************************************************************
+
+Range of built-in table of static small int-like closures.
+
+\begin{code}
+#define MAX_INTLIKE 		(16)
+#define MIN_INTLIKE 		(-16)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[string-size]{Maximum size of cost centre and description strings}
+%*									*
+%************************************************************************
+
+This is the maximum identifier length that can be used for a cost
+centre or description string. It includes the terminating null
+character.
+
+WDP 95/07: I think this STRING_SIZE thing is completely redundant.
+
+The printf formats are here, so we are less likely to make overly-long
+filenames (with disastrous results).  No more than 128 chars, please!
+
+\begin{code}
+#define STRING_SIZE 128
+
+#define STATS_FILENAME_MAXLEN	128
+
+#define TICKY_FILENAME_FMT	"%0.121s.ticky"
+#define STAT_FILENAME_FMT	"%0.122s.stat"
+#define PROF_FILENAME_FMT	"%0.122s.prof"
+#define PROF_FILENAME_FMT_GUM	"%0.118s.%03d.prof"
+#define TIME_FILENAME_FMT	"%0.122s.time"
+#define TIME_FILENAME_FMT_GUM	"%0.118s.%03d.time"
+#define HP_FILENAME_FMT		"%0.124s.hp"
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[update-frame-size]{Update frame size}
+%*									*
+%************************************************************************
+
+The update frames are described in \tr{SMupdate.lh}. All the compiler
+needs to ``know'' is the size of the different frames.
+
+First we define update frame sizes for the compiler. These may vary at
+runtime depending what type of code is being generated so we also
+define the parts which can be put together.
+
+****************************************************************
+*** NB: These update-frame sizes INCLUDE the return address. ***
+****************************************************************
+
+
+The update frame sizes when cost centres are not being used are:
+\begin{code}
+#define NOSCC_STD_UF_SIZE 	4
+#define NOSCC_CON_UF_SIZE 	2
+\end{code}
+
+If cost-centres are being used we have to add to the above sizes:
+\begin{code}
+#define SCC_STD_UF_SIZE		5
+#define SCC_CON_UF_SIZE		3
+\end{code}
+
+If we are compiling C code the use of cost centres is determined at
+compile time so we use conditional macro definitions.
+\begin{code}
+#if defined(USE_COST_CENTRES)
+#define STD_UF_SIZE	SCC_STD_UF_SIZE
+#define CON_UF_SIZE	SCC_CON_UF_SIZE
+#else
+#define STD_UF_SIZE 	NOSCC_STD_UF_SIZE
+#define CON_UF_SIZE	NOSCC_CON_UF_SIZE
+#endif
+\end{code}
+
+Sorry. but we can't comment these if's and else's !
+
+Offsets relative to a pointer to the top word (return address) of frame...
+
+Notes: (1)~GC looks at the @UF_RET@ word to determine frame type.  (2)
+GC requires that @UF_SUB@ be the same offset in all frames, no matter
+what.
+
+\begin{code}
+#define UF_RET		0
+#define UF_SUB		1
+#define UF_SUA		2
+#define UF_UPDATEE	3
+#define UF_COST_CENTRE	4
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[semi-tagging-constants]{Constants for semi-tagging}
+%*									*
+%************************************************************************
+
+Tags for indirection nodes and ``other'' (probably unevaluated) nodes;
+normal-form values of algebraic data types will have tags 0, 1, ...
+
+\begin{code}
+#define INFO_OTHER_TAG		(-1)
+#define INFO_IND_TAG		(-1)
+#define INFO_FIRST_TAG		0
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[liveness-masks]{Liveness masks for calling GC}
+%*									*
+%************************************************************************
+
+We often have to tell the RTS (usually: garbage-collector) what STG
+registers have ``followable'' pointers in them.  We used to just say
+{\em how many} there were; but this doesn't work in a semi-tagged
+world---part of the point of semi-tagging is to avoid loading up
+registers needlessly; but if you don't load a register and then you
+tell the GC that it has followable contents....
+
+So we use a {\em liveness mask} (one word) instead.  This is probably
+neater anyway.  The layout is:
+\begin{verbatim}
+--------------------------
+... | Rn | ... | R2 | R1 |
+--------------------------
+\end{verbatim}
+
+The \tr{LIVENESS_<reg>} macros are used both in Haskell and C.  The
+\tr{IS_LIVE_<reg>} macros (``is this register live according to this
+mask?'') are used only in C [obviously].
+\begin{code}
+#define NO_LIVENESS		0
+#define LIVENESS_R1		1
+#define LIVENESS_R2		2
+#define LIVENESS_R3		4
+#define LIVENESS_R4		8
+#define LIVENESS_R5		16
+#define LIVENESS_R6		32
+#define LIVENESS_R7		64
+#define LIVENESS_R8		128
+
+#define IS_LIVE_R1(mask)	(((mask) & LIVENESS_R1) != 0)
+#define IS_LIVE_R2(mask)	(((mask) & LIVENESS_R2) != 0)
+#define IS_LIVE_R3(mask)	(((mask) & LIVENESS_R3) != 0)
+#define IS_LIVE_R4(mask)	(((mask) & LIVENESS_R4) != 0)
+#define IS_LIVE_R5(mask)	(((mask) & LIVENESS_R5) != 0)
+#define IS_LIVE_R6(mask)	(((mask) & LIVENESS_R6) != 0)
+#define IS_LIVE_R7(mask)	(((mask) & LIVENESS_R7) != 0)
+#define IS_LIVE_R8(mask)	(((mask) & LIVENESS_R8) != 0)
+\end{code}
+
+Some extra stuff will probably be needed for ``shift bits off the end
+and stop when zero,'' which would be quicker.  Later.
+
+Multi-slurp protection (end-of-file):
+\begin{code}
+#endif
+\end{code}

@@ -1,0 +1,12 @@
+Typechecked:
+AbsBinds [tt5] [] [(f.t1, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t1 :: tt5 -> [tt5]
+    f.t1 x.r54 = a.r55
+	       where
+		   AbsBinds [] [] [(a.t4, a.r55)]
+		       {- rec -}
+		       a.t4 :: [tt5]
+		       a.t4 = ((:) tt5) x.r54 a.t4
+		   {- nonrec -}
+

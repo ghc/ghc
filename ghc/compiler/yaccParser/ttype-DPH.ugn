@@ -1,0 +1,23 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_ttype where
+import UgenUtil
+import Util
+%}}
+type ttype;
+	tname	: < gtypeid	: id;
+		    gtypel	: list; >;
+	namedtvar : < gnamedtvar	: id; >;
+	tllist	: < gtlist	: ttype; >;
+	ttuple	: < gttuple	: list; >;
+	tfun	: < gtfun	: ttype;
+		    gtarg	: ttype; >;
+	context	: < gtcontextl	: list;
+		    gtcontextt	: ttype; >;
+	tproc   : < gtpid	: list;
+		    gtdata	: ttype; >;
+	tpod	: < gtpod 	: ttype; >;			
+end;
+

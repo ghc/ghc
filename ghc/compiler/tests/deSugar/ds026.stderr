@@ -1,0 +1,49 @@
+Desugared:
+defm.Main.Boo.op1 :: for all a. <Main.Boo a> -> a -> a
+defm.Main.Boo.op1 = /\ a -> (error (a -> a)) "No default method for \"op1\"\n"S
+Main.Boo.op1 :: for all a. <Main.Boo a> -> a -> a
+Main.Boo.op1 =
+    /\ a -> \ ds.113 ->
+	case ds.113 of {
+	  MkTuple2 dict.84 op1.83 -> op1.83
+	}
+sdsel.Main.Boo.Main.Foo :: for all a. <Main.Boo a> -> <Main.Foo a>
+sdsel.Main.Boo.Main.Foo =
+    /\ a -> \ ds.114 ->
+	case ds.114 of {
+	  MkTuple2 dict.87 op1.86 -> dict.87
+	}
+defm.Main.Foo.op :: for all a. <Main.Foo a> -> a -> a
+defm.Main.Foo.op = /\ a -> (error (a -> a)) "No default method for \"op\"\n"S
+Main.Foo.op :: for all a. <Main.Foo a> -> a -> a
+Main.Foo.op = /\ a -> \ op.90 -> op.90
+defm.Main.Noo.op2 :: for all a, b. <Main.Noo a> -> <Eq b> -> a -> b -> a
+defm.Main.Noo.op2 =
+    /\ a b -> \ dict.102 ->
+	(error (a -> b -> a)) "No default method for \"op2\"\n"S
+Main.Noo.op2 :: for all a, b. <Main.Noo a> -> <Eq b> -> a -> b -> a
+Main.Noo.op2 =
+    /\ a b -> \ ds.115 ->
+	case ds.115 of {
+	  MkTuple2 dict.94 op2.93 -> op2.93 b
+	}
+sdsel.Main.Noo.Main.Boo :: for all a. <Main.Noo a> -> <Main.Boo a>
+sdsel.Main.Noo.Main.Boo =
+    /\ a -> \ ds.116 ->
+	case ds.116 of {
+	  MkTuple2 dict.98 op2.97 -> dict.98
+	}
+Main.f :: for all b, a. <Eq b> -> <Main.Noo a> -> a -> b -> a
+Main.f =
+    /\ b a -> \ dict.112 dict.111 ->
+	let
+	  dict.108 =
+	      (sdsel.Main.Boo.Main.Foo a) ((sdsel.Main.Noo.Main.Boo a) dict.111) in
+	let
+	  f.104 =
+	      \ x.68 y.69 ->
+		  (Main.Foo.op a)
+		      dict.108
+		      (((Main.Noo.op2 a) b) dict.111 dict.112 x.68 y.69)
+	in  f.104
+

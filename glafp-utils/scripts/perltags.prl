@@ -1,0 +1,69 @@
+# perl tags, in perl.
+# @(#)ptags 1.2 4/11/91, no copyright.  Bugfixes to lm@eng.sun.com.
+
+#In the hack-of-the-hour catagory, a tags file generator for perl.  Differences
+#from ctags:
+#
+#	1) Puts a tag in for the filename
+#	2) Puts in multiple tags for the same symbol (I have a hacked version
+#	   of vi that groks this).
+
+# tag	file	<vi expresion to find it>
+# catch	/u/lm/tmp/eintr.c	/^catch() {}$/
+
+if ($#ARGV == -1) {
+	unshift(@ARGV, "-");
+}
+open(STDOUT, ">> TAGS") || die "can't create TAGS";	# partain: NB: APPEND
+while ($_ = shift) {
+	next unless -f $_;
+	print STDERR "$_\n" if $v;
+	do file($_);
+}
+exit;
+
+sub file
+{
+	local($name) = $_[0];
+
+	open(F, $name) || return;
+	$entries = '';
+	$lcnt = 1;
+	$ccnt = 0;
+
+	while (<F>) {
+		# skip the word sub in comments
+		next unless /^[^#]*\bsub\b/;
+		# skip the word sub in a string (one line only, I'm lazy)
+		next if /"[^"]*sub/;
+#		print "$name: $. $_" if $d;
+		# demand that "sub" is first on the line (partain)
+		# (the initial > is for some literate perl scripts...)
+		next if ! /^>?\s*sub\s+/;
+		chop;
+		# rm comments
+		s/#.*$//;
+		# and here's the entry...
+		$entries .= "$_\x7f$lcnt,$ccnt\n";
+		$lcnt++;
+		$ccnt += length($_);
+	}
+	# print tag for filename
+	print "\f\n$name,",length($entries),"\n";
+	print $entries;
+}
+
+###I've always used this.  Don't recall whom I got it from...
+##
+##--tom
+##
+###!/usr/local/bin/perl
+#open(OUTPUT, "| sort >> TAGS");
+#while (<>) {
+#    if (/\bsub\s+(\w+')?(\S+)/) {
+#	$func = $2;
+#	chop;
+#	s,[\\\[\]/.*],\\$&,g;
+#	print OUTPUT "$func\t", $ARGV, "\t/^$_\$/\n";
+#    }
+#}

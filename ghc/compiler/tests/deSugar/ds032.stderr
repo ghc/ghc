@@ -1,0 +1,64 @@
+Desugared:
+dict.93 :: <Fractional Float>
+dict.93 = dfun.Fractional.Float
+dict.94 :: <Eq Float>
+dict.94 = dfun.Eq.Float
+dict.101 :: <Fractional Float>
+dict.101 = dfun.Fractional.Float
+dict.102 :: <Eq Float>
+dict.102 = dfun.Eq.Float
+dict.107 :: <Fractional Float>
+dict.107 = dfun.Fractional.Float
+dict.111 :: <Fractional Float>
+dict.111 = dfun.Fractional.Float
+{- plain CoRec -}
+Main.flatten :: Int -> Bool -> Float -> [(Int, Float)] -> [Char]
+Main.flatten =
+    \ n.130 nlp.131 ds.132 seqs.133 ->
+	let
+	  fail.134 =
+	      (error [Char])
+		  "\"ds032.hs\", line 10: pattern-matching failure [function binding]\n"S
+	in 
+	  case (eqFloat (MkFloat! 0.0000000000000000#) ds.132) of {
+	    True -> Main.flattenS nlp.131 seqs.133
+	    False ->
+		case (eqFloat (MkFloat! 1.0000000000000000#) ds.132) of {
+		  True ->
+		      let seqs.135 = seqs.133 in
+		      let nlp.136 = nlp.131 in
+		      let n.137 = n.130
+		      in 
+			Main.flatten
+			    n.137
+			    nlp.136
+			    (MkFloat! 1.1000000000000001#)
+			    ((: (Int, Float))
+				 (MkTuple2!
+				      Int
+				      Float
+				      n.137
+				      (MkFloat! 1.2000000000000000#))
+				 seqs.135)
+		  False -> fail.134
+		}
+	  }
+Main.flattenS :: Bool -> [(Int, Float)] -> [Char]
+Main.flattenS =
+    \ nlp.138 ds.139 ->
+	let
+	  fail.140 =
+	      (error [Char])
+		  "\"ds032.hs\", line 14: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.139 of {
+	    Nil -> Nil! Char
+	    (:) ds.141 seqs.142 ->
+		case ds.141 of {
+		  MkTuple2 col.143 seq.144 ->
+		      let nlp.145 = nlp.138
+		      in  Main.flatten col.143 nlp.145 seq.144 seqs.142
+		}
+	  }
+{- end plain CoRec -}
+

@@ -1,0 +1,17 @@
+This directory contains contributed software/bits related to the
+Glasgow Haskell compiler.
+
+fptags		Denis Howe <dbh@doc.ic.ac.uk>
+		Bourne-shell script.
+		Create an emacs tags file for one or more functional programs.
+
+haskell.el	A Haskell mode from Simon Marlow <simonm@dcs.glasgow.ac.uk>.
+
+haskel.gif	Provided by Lennart Augustsson <augustss@cs.chalmers.se>
+
+mira2hs		Denis Howe <dbh@doc.ic.ac.uk>
+		Bourne-shell script.
+		Convert Miranda code to Haskell, more-or-less.
+
+pphs		Pretty-print Haskell code in LaTeX documents.  Written by
+		Andrew Preece while a student at Glasgow.

@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface U_atype where
+import PreludePS(_PackedString)
+import ProtoName(ProtoName)
+import U_list(U_list)
+data U_atype   = U_atc ProtoName U_list Int
+rdU_atype :: _Addr -> _PackedString -> _State _RealWorld -> (U_atype, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

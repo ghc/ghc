@@ -1,0 +1,8 @@
+ 
+"Digraph.hs", line 19: Type signature is too polymorphic:
+    Signature: [Edge v]
+    Monomorphic type variables: v
+    In a type signature: [Edge v]
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

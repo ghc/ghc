@@ -1,0 +1,20 @@
+Typechecked:
+d.Num.t9 = dfun.Num.Integer
+fromInt.t8 = fromInt tt4 d.Num.t9
+lit.t5 = fromInt.t8 (MkInt 2#)
+AbsBinds [] [] [(w.t1, ShouldSucceed.w)]
+    {- nonrec -}
+    w.t1 :: tt4
+    w.t1 = a.r54
+     where
+	AbsBinds [] [] [(y.t3, y.r55)]
+	    {- nonrec -}
+	    y.t3 :: tt4
+	    y.t3 = lit.t5
+	{- nonrec -}
+	AbsBinds [] [] [(a.t7, a.r54)]
+	    {- nonrec -}
+	    a.t7 :: tt4
+	    a.t7 = y.r55
+	{- nonrec -}
+

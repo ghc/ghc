@@ -1,0 +1,95 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SimplMonad where
+import BasicLit(BasicLit)
+import BinderInfo(BinderInfo, DuplicationDanger, FunOrArg, InsideSCC)
+import Class(Class)
+import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import NameTypes(ShortName)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SimplEnv(SimplEnv)
+import SplitUniq(SplitUniqSupply, splitUniqSupply)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import Unique(Unique)
+infixr 9 `thenSmpl`
+infixr 9 `thenSmpl_`
+data BinderInfo 	{-# GHC_PRAGMA DeadCode | ManyOcc Int | OneOcc FunOrArg DuplicationDanger InsideSCC Int Int #-}
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data PrimOp
+	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
+data SimplCount 	{-# GHC_PRAGMA SimplCount Int# [(TickType, Int)] #-}
+type SmplM a = SplitUniqSupply -> SimplCount -> (a, SimplCount)
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data TickType   = UnfoldingDone | FoldrBuild | MagicUnfold | ConReused | CaseFloatFromLet | CaseOfCase | LetFloatFromLet | LetFloatFromCase | KnownBranch | Let2Case | CaseMerge | CaseElim | CaseIdentity | AtomicRhs | EtaExpansion | CaseOfError | FoldrConsNil | Foldr_Nil | FoldrFoldr | Foldr_List | FoldrCons | FoldrInline | TyBetaReduction | BetaReduction
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+cloneId :: SimplEnv -> (Id, BinderInfo) -> SplitUniqSupply -> SimplCount -> (Id, SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "LU(LA)LL" {_A_ 4 _U_ 1112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+cloneIds :: SimplEnv -> [(Id, BinderInfo)] -> SplitUniqSupply -> SimplCount -> ([Id], SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+cloneTyVarSmpl :: TyVar -> SplitUniqSupply -> SimplCount -> (TyVar, SimplCount)
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _N_ _N_ _N_ #-}
+combineSimplCounts :: SimplCount -> SimplCount -> SimplCount
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(PL)U(PA)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 0 3 XXX 4 \ (u0 :: Int#) (u1 :: [(TickType, Int)]) (u2 :: Int#) -> case _#_ plusInt# [] [u0, u2] of { _PRIM_ (u3 :: Int#) -> _!_ _ORIG_ SimplMonad SimplCount [] [u3, u1] } _N_} _F_ _IF_ARGS_ 0 2 CC 6 \ (u0 :: SimplCount) (u1 :: SimplCount) -> case u0 of { _ALG_ _ORIG_ SimplMonad SimplCount (u2 :: Int#) (u3 :: [(TickType, Int)]) -> case u1 of { _ALG_ _ORIG_ SimplMonad SimplCount (u4 :: Int#) (u5 :: [(TickType, Int)]) -> case _#_ plusInt# [] [u2, u4] of { _PRIM_ (u6 :: Int#) -> _!_ _ORIG_ SimplMonad SimplCount [] [u6, u3] }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+detailedSimplCount :: SplitUniqSupply -> SimplCount -> (SimplCount, SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: SimplCount) -> _!_ _TUP_2 [SimplCount, SimplCount] [u0, u0] _N_} _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: SplitUniqSupply) (u1 :: SimplCount) -> _!_ _TUP_2 [SimplCount, SimplCount] [u1, u1] _N_ #-}
+initSmpl :: SplitUniqSupply -> (SplitUniqSupply -> SimplCount -> (a, SimplCount)) -> (a, SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: SplitUniqSupply) (u2 :: SplitUniqSupply -> SimplCount -> (u0, SimplCount)) -> _APP_  u2 [ u1, _ORIG_ SimplMonad zeroSimplCount ] _N_ #-}
+mapAndUnzipSmpl :: (a -> SplitUniqSupply -> SimplCount -> ((b, c), SimplCount)) -> [a] -> SplitUniqSupply -> SimplCount -> (([b], [c]), SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+mapSmpl :: (a -> SplitUniqSupply -> SimplCount -> (b, SimplCount)) -> [a] -> SplitUniqSupply -> SimplCount -> ([b], SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+newId :: UniType -> SplitUniqSupply -> SimplCount -> (Id, SimplCount)
+	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _N_ _N_ _N_ #-}
+newIds :: [UniType] -> SplitUniqSupply -> SimplCount -> ([Id], SimplCount)
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+returnSmpl :: a -> SplitUniqSupply -> SimplCount -> (a, SimplCount)
+	{-# GHC_PRAGMA _A_ 3 _U_ 202 _N_ _N_ _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: u0) (u2 :: SplitUniqSupply) (u3 :: SimplCount) -> _!_ _TUP_2 [u0, SimplCount] [u1, u3] _N_ #-}
+showSimplCount :: SimplCount -> [Char]
+	{-# GHC_PRAGMA _A_ 0 _U_ 1 _N_ _N_ _N_ _N_ #-}
+simplCount :: SplitUniqSupply -> SimplCount -> (Int, SimplCount)
+	{-# GHC_PRAGMA _A_ 2 _U_ 01 _N_ _S_ "AU(PL)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+splitUniqSupply :: SplitUniqSupply -> (SplitUniqSupply, SplitUniqSupply)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _ALWAYS_ \ (u0 :: SplitUniqSupply) -> case u0 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u1 :: Int) (u2 :: SplitUniqSupply) (u3 :: SplitUniqSupply) -> _!_ _TUP_2 [SplitUniqSupply, SplitUniqSupply] [u2, u3]; _NO_DEFLT_ } _N_ #-}
+thenSmpl :: (SplitUniqSupply -> SimplCount -> (a, SimplCount)) -> (a -> SplitUniqSupply -> SimplCount -> (b, SimplCount)) -> SplitUniqSupply -> SimplCount -> (b, SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "SSSL" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: SplitUniqSupply -> SimplCount -> (u0, SimplCount)) (u3 :: u0 -> SplitUniqSupply -> SimplCount -> (u1, SimplCount)) (u4 :: SplitUniqSupply) (u5 :: SimplCount) -> case u4 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u6 :: Int) (u7 :: SplitUniqSupply) (u8 :: SplitUniqSupply) -> case _APP_  u2 [ u7, u5 ] of { _ALG_ _TUP_2 (u9 :: u0) (ua :: SimplCount) -> _APP_  u3 [ u9, u8, ua ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+thenSmpl_ :: (SplitUniqSupply -> SimplCount -> (a, SimplCount)) -> (SplitUniqSupply -> SimplCount -> (b, SimplCount)) -> SplitUniqSupply -> SimplCount -> (b, SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "SSSL" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: SplitUniqSupply -> SimplCount -> (u0, SimplCount)) (u3 :: SplitUniqSupply -> SimplCount -> (u1, SimplCount)) (u4 :: SplitUniqSupply) (u5 :: SimplCount) -> case u4 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u6 :: Int) (u7 :: SplitUniqSupply) (u8 :: SplitUniqSupply) -> case _APP_  u2 [ u7, u5 ] of { _ALG_ _TUP_2 (u9 :: u0) (ua :: SimplCount) -> _APP_  u3 [ u8, ua ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+tick :: TickType -> SplitUniqSupply -> SimplCount -> ((), SimplCount)
+	{-# GHC_PRAGMA _A_ 3 _U_ 001 _N_ _S_ "AAU(PL)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+tickN :: TickType -> Int -> SplitUniqSupply -> SimplCount -> ((), SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 0101 _N_ _S_ "AU(P)AU(PL)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+zeroSimplCount :: SimplCount
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Eq TickType
+	{-# GHC_PRAGMA _M_ SimplMonad {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TickType -> TickType -> Bool), (TickType -> TickType -> Bool)] [_CONSTM_ Eq (==) (TickType), _CONSTM_ Eq (/=) (TickType)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Ix TickType
+	{-# GHC_PRAGMA _M_ SimplMonad {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord TickType}}, ((TickType, TickType) -> [TickType]), ((TickType, TickType) -> TickType -> Int), ((TickType, TickType) -> TickType -> Bool)] [_DFUN_ Ord (TickType), _CONSTM_ Ix range (TickType), _CONSTM_ Ix index (TickType), _CONSTM_ Ix inRange (TickType)] _N_
+	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
+	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord TickType
+	{-# GHC_PRAGMA _M_ SimplMonad {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TickType}}, (TickType -> TickType -> Bool), (TickType -> TickType -> Bool), (TickType -> TickType -> Bool), (TickType -> TickType -> Bool), (TickType -> TickType -> TickType), (TickType -> TickType -> TickType), (TickType -> TickType -> _CMP_TAG)] [_DFUN_ Eq (TickType), _CONSTM_ Ord (<) (TickType), _CONSTM_ Ord (<=) (TickType), _CONSTM_ Ord (>=) (TickType), _CONSTM_ Ord (>) (TickType), _CONSTM_ Ord max (TickType), _CONSTM_ Ord min (TickType), _CONSTM_ Ord _tagCmp (TickType)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Text TickType
+	{-# GHC_PRAGMA _M_ SimplMonad {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(TickType, [Char])]), (Int -> TickType -> [Char] -> [Char]), ([Char] -> [([TickType], [Char])]), ([TickType] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (TickType), _CONSTM_ Text showsPrec (TickType), _CONSTM_ Text readList (TickType), _CONSTM_ Text showList (TickType)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(TickType, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

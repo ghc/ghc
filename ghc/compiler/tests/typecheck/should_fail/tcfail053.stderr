@@ -1,0 +1,5 @@
+ 
+"tcfail053.hs", line 2: undefined type constructor: A
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

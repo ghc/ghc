@@ -1,0 +1,284 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface IdInfo where
+import Bag(Bag)
+import BasicLit(BasicLit)
+import BinderInfo(BinderInfo, DuplicationDanger, FunOrArg, InsideSCC)
+import CharSeq(CSeq)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import CoreSyn(CoreArg, CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import Id(Id, IdDetails)
+import IdEnv(IdEnv(..))
+import InstEnv(InstTemplate, InstTy)
+import MagicUFs(MagicUnfoldingFun)
+import Maybes(Labda)
+import Outputable(Outputable)
+import PlainCore(PlainCoreAtom(..), PlainCoreExpr(..))
+import PreludeGlaST(_MutableArray)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SimplEnv(FormSummary, IdVal, InExpr(..), OutAtom(..), OutExpr(..), OutId(..), SimplEnv, UnfoldingDetails(..), UnfoldingGuidance(..))
+import SimplMonad(SimplCount)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc, mkUnknownSrcLoc)
+import Subst(Subst)
+import TaggedCore(SimplifiableBinder(..), SimplifiableCoreExpr(..))
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(UniqSM(..), Unique, UniqueSupply)
+class OptIdInfo a where
+	noInfo :: a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 1 _N_ _S_ "U(SAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) -> _APP_  _TYAPP_  patError# { u0 } [ _NOREP_S_ "%DIdInfo.OptIdInfo.noInfo\"" ] _N_ #-}
+	getInfo :: IdInfo -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(ASAA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: IdInfo -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: IdInfo) -> _APP_  _TYAPP_  patError# { (IdInfo -> u0) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.getInfo\"", u2 ] _N_ #-}
+	addInfo :: IdInfo -> a -> IdInfo
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AASA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: IdInfo -> u0 -> IdInfo) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: IdInfo) (u3 :: u0) -> _APP_  _TYAPP_  patError# { (IdInfo -> u0 -> IdInfo) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.addInfo\"", u2, u3 ] _N_ #-}
+	ppInfo :: PprStyle -> (Id -> Id) -> a -> Int -> Bool -> PrettyRep
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122222 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 122222 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0, IdInfo -> u0, IdInfo -> u0 -> IdInfo, PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep)) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0) (u3 :: IdInfo -> u0) (u4 :: IdInfo -> u0 -> IdInfo) (u5 :: PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 6 _U_ 022222 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 6 XXXXXX 7 _/\_ u0 -> \ (u1 :: {{OptIdInfo u0}}) (u2 :: PprStyle) (u3 :: Id -> Id) (u4 :: u0) (u5 :: Int) (u6 :: Bool) -> _APP_  _TYAPP_  patError# { (PprStyle -> (Id -> Id) -> u0 -> Int -> Bool -> PrettyRep) } [ _NOREP_S_ "%DIdInfo.OptIdInfo.ppInfo\"", u2, u3, u4, u5, u6 ] _N_ #-}
+data ArgUsage   = ArgUsage Int | UnknownArgUsage
+data ArgUsageInfo 	{-# GHC_PRAGMA NoArgUsageInfo | SomeArgUsageInfo [ArgUsage] #-}
+type ArgUsageType = [ArgUsage]
+data ArityInfo 	{-# GHC_PRAGMA UnknownArity | ArityExactly Int #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
+data BinderInfo 	{-# GHC_PRAGMA DeadCode | ManyOcc Int | OneOcc FunOrArg DuplicationDanger InsideSCC Int Int #-}
+data CoreAtom a 	{-# GHC_PRAGMA CoVarAtom a | CoLitAtom BasicLit #-}
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data DeforestInfo   = Don'tDeforest | DoDeforest
+data Demand   = WwLazy Bool | WwStrict | WwUnpack [Demand] | WwPrim | WwEnum
+data DemandInfo 	{-# GHC_PRAGMA UnknownDemand | DemandedAsPer Demand #-}
+data FBConsum   = FBGoodConsum | FBBadConsum
+data FBProd   = FBGoodProd | FBBadProd
+data FBType   = FBType [FBConsum] FBProd
+data FBTypeInfo 	{-# GHC_PRAGMA NoFBTypeInfo | SomeFBTypeInfo FBType #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type IdEnv a = UniqFM a
+data IdInfo 	{-# GHC_PRAGMA IdInfo ArityInfo DemandInfo SpecEnv StrictnessInfo UnfoldingDetails UpdateInfo DeforestInfo ArgUsageInfo FBTypeInfo SrcLoc #-}
+data InstTemplate 	{-# GHC_PRAGMA MkInstTemplate Id [UniType] [InstTy] #-}
+data MagicUnfoldingFun 	{-# GHC_PRAGMA MUF (SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)) #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+type PlainCoreAtom = CoreAtom Id
+type PlainCoreExpr = CoreExpr Id Id
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data FormSummary 	{-# GHC_PRAGMA WhnfForm | BottomForm | OtherForm #-}
+data IdVal 	{-# GHC_PRAGMA InlineIt (UniqFM IdVal) (UniqFM UniType) (CoreExpr (Id, BinderInfo) Id) | ItsAnAtom (CoreAtom Id) #-}
+type InExpr = CoreExpr (Id, BinderInfo) Id
+type OutAtom = CoreAtom Id
+type OutExpr = CoreExpr Id Id
+type OutId = Id
+data UnfoldingDetails   = NoUnfoldingDetails | LiteralForm BasicLit | OtherLiteralForm [BasicLit] | ConstructorForm Id [UniType] [CoreAtom Id] | OtherConstructorForm [Id] | GeneralForm Bool FormSummary (CoreExpr (Id, BinderInfo) Id) UnfoldingGuidance | MagicForm _PackedString MagicUnfoldingFun | IWantToBeINLINEd UnfoldingGuidance
+data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+type SimplifiableBinder = (Id, BinderInfo)
+type SimplifiableCoreExpr = CoreExpr (Id, BinderInfo) Id
+data SpecEnv 	{-# GHC_PRAGMA SpecEnv [SpecInfo] #-}
+data SpecInfo   = SpecInfo [Labda UniType] Int Id
+data StrictnessInfo   = NoStrictnessInfo | BottomGuaranteed | StrictnessInfo [Demand] (Labda Id)
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+type UniqSM a = UniqueSupply -> (UniqueSupply, a)
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data UniqueSupply 	{-# GHC_PRAGMA MkUniqueSupply Int# | MkNewSupply SplitUniqSupply #-}
+data UpdateInfo 	{-# GHC_PRAGMA NoUpdateInfo | SomeUpdateInfo [Int] #-}
+type UpdateSpec = [Int]
+addInfo_UF :: IdInfo -> UnfoldingDetails -> IdInfo
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_ #-}
+addOneToSpecEnv :: SpecEnv -> SpecInfo -> SpecEnv
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(L)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+applySubstToIdInfo :: Subst -> IdInfo -> (Subst, IdInfo)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(LLU(S)LLLLLLL)" _N_ _N_ #-}
+apply_to_IdInfo :: (UniType -> UniType) -> IdInfo -> IdInfo
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(LLLLLLLLLL)" _N_ _N_ #-}
+arityMaybe :: ArityInfo -> Labda Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: ArityInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo UnknownArity  -> _!_ _ORIG_ Maybes Hamna [Int] []; _ORIG_ IdInfo ArityExactly (u1 :: Int) -> _!_ _ORIG_ Maybes Ni [Int] [u1]; _NO_DEFLT_ } _N_ #-}
+boringIdInfo :: IdInfo -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(SLALLLLAAA)" _N_ _N_ #-}
+bottomIsGuaranteed :: StrictnessInfo -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: StrictnessInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo BottomGuaranteed  -> _!_ True [] []; (u1 :: StrictnessInfo) -> _!_ False [] [] } _N_ #-}
+getArgUsage :: ArgUsageInfo -> [ArgUsage]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: ArgUsageInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo NoArgUsageInfo  -> _!_ _NIL_ [ArgUsage] []; _ORIG_ IdInfo SomeArgUsageInfo (u1 :: [ArgUsage]) -> u1; _NO_DEFLT_ } _N_ #-}
+getFBType :: FBTypeInfo -> Labda FBType
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: FBTypeInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo NoFBTypeInfo  -> _!_ _ORIG_ Maybes Hamna [FBType] []; _ORIG_ IdInfo SomeFBTypeInfo (u1 :: FBType) -> _!_ _ORIG_ Maybes Ni [FBType] [u1]; _NO_DEFLT_ } _N_ #-}
+getInfo_UF :: IdInfo -> UnfoldingDetails
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAASAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UnfoldingDetails) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u5; _NO_DEFLT_ } _N_ #-}
+getSrcLocIdInfo :: IdInfo -> SrcLoc
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAAAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> ua; _NO_DEFLT_ } _N_ #-}
+getWorkerId :: StrictnessInfo -> Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+getWrapperArgTypeCategories :: UniType -> StrictnessInfo -> Labda [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+iWantToBeINLINEd :: UnfoldingGuidance -> UnfoldingDetails
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: UnfoldingGuidance) -> _!_ _ORIG_ SimplEnv IWantToBeINLINEd [] [u0] _N_ #-}
+indicatesWorker :: [Demand] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+lookupConstMethodId :: SpecEnv -> UniType -> Labda Id
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(S)L" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+lookupSpecEnv :: SpecEnv -> [UniType] -> Labda (Id, [UniType], Int)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(S)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+lookupSpecId :: Id -> [Labda UniType] -> Id
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LLU(LLU(S)LLLLLLL)L)L" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+mkArgUsageInfo :: [ArgUsage] -> ArgUsageInfo
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [ArgUsage]) -> _!_ _ORIG_ IdInfo SomeArgUsageInfo [] [u0] _N_ #-}
+mkArityInfo :: Int -> ArityInfo
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int) -> _!_ _ORIG_ IdInfo ArityExactly [] [u0] _N_ #-}
+mkBottomStrictnessInfo :: StrictnessInfo
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo BottomGuaranteed [] [] _N_ #-}
+mkDemandInfo :: Demand -> DemandInfo
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Demand) -> _!_ _ORIG_ IdInfo DemandedAsPer [] [u0] _N_ #-}
+mkFBTypeInfo :: FBType -> FBTypeInfo
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: FBType) -> _!_ _ORIG_ IdInfo SomeFBTypeInfo [] [u0] _N_ #-}
+mkMagicUnfolding :: _PackedString -> UnfoldingDetails
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+mkSpecEnv :: [SpecInfo] -> SpecEnv
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [SpecInfo]) -> _!_ _ORIG_ IdInfo SpecEnv [] [u0] _N_ #-}
+mkStrictnessInfo :: [Demand] -> Labda Id -> StrictnessInfo
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 6 \ (u0 :: [Demand]) (u1 :: Labda Id) -> case u0 of { _ALG_ (:) (u2 :: Demand) (u3 :: [Demand]) -> _!_ _ORIG_ IdInfo StrictnessInfo [] [u0, u1]; _NIL_  -> _!_ _ORIG_ IdInfo NoStrictnessInfo [] []; _NO_DEFLT_ } _N_ #-}
+mkUnfolding :: UnfoldingGuidance -> CoreExpr Id Id -> UnfoldingDetails
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+mkUnknownSrcLoc :: SrcLoc
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+mkUpdateInfo :: [Int] -> UpdateInfo
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [Int]) -> _!_ _ORIG_ IdInfo SomeUpdateInfo [] [u0] _N_ #-}
+noIdInfo :: IdInfo
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _ORIG_ IdInfo IdInfo [] [_CONSTM_ OptIdInfo noInfo (ArityInfo), _CONSTM_ OptIdInfo noInfo (DemandInfo), _ORIG_ IdInfo nullSpecEnv, _CONSTM_ OptIdInfo noInfo (StrictnessInfo), _ORIG_ IdInfo noInfo_UF, _CONSTM_ OptIdInfo noInfo (UpdateInfo), _CONSTM_ OptIdInfo noInfo (DeforestInfo), _CONSTM_ OptIdInfo noInfo (ArgUsageInfo), _CONSTM_ OptIdInfo noInfo (FBTypeInfo), _ORIG_ SrcLoc mkUnknownSrcLoc] _N_ #-}
+noInfo_UF :: UnfoldingDetails
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ SimplEnv NoUnfoldingDetails [] [] _N_ #-}
+nonAbsentArgs :: [Demand] -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+nullSpecEnv :: SpecEnv
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+ppIdInfo :: PprStyle -> Id -> Bool -> (Id -> Id) -> UniqFM UnfoldingDetails -> IdInfo -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 6 _U_ 22122222 _N_ _S_ "LLLLLU(SLLLLLLALA)" _N_ _N_ #-}
+unknownArity :: ArityInfo
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo UnknownArity [] [] _N_ #-}
+updateInfoMaybe :: UpdateInfo -> Labda [Int]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+willBeDemanded :: DemandInfo -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+workerExists :: StrictnessInfo -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+wwEnum :: Demand
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo WwEnum [] [] _N_ #-}
+wwLazy :: Demand
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+wwPrim :: Demand
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo WwPrim [] [] _N_ #-}
+wwStrict :: Demand
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo WwStrict [] [] _N_ #-}
+wwUnpack :: [Demand] -> Demand
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [Demand]) -> _!_ _ORIG_ IdInfo WwUnpack [] [u0] _N_ #-}
+instance Eq Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Demand -> Demand -> Bool), (Demand -> Demand -> Bool)] [_CONSTM_ Eq (==) (Demand), _CONSTM_ Eq (/=) (Demand)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Eq FBConsum
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBConsum -> FBConsum -> Bool), (FBConsum -> FBConsum -> Bool)] [_CONSTM_ Eq (==) (FBConsum), _CONSTM_ Eq (/=) (FBConsum)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq FBProd
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBProd -> FBProd -> Bool), (FBProd -> FBProd -> Bool)] [_CONSTM_ Eq (==) (FBProd), _CONSTM_ Eq (/=) (FBProd)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Eq FBType
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(FBType -> FBType -> Bool), (FBType -> FBType -> Bool)] [_CONSTM_ Eq (==) (FBType), _CONSTM_ Eq (/=) (FBType)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(LL)U(LL)" {_A_ 4 _U_ 2121 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(LL)U(LL)" {_A_ 4 _U_ 2121 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Eq UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool)] [_CONSTM_ Eq (==) (UpdateInfo), _CONSTM_ Eq (/=) (UpdateInfo)] _N_
+	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance OptIdInfo ArgUsageInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [ArgUsageInfo, (IdInfo -> ArgUsageInfo), (IdInfo -> ArgUsageInfo -> IdInfo), (PprStyle -> (Id -> Id) -> ArgUsageInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (ArgUsageInfo), _CONSTM_ OptIdInfo getInfo (ArgUsageInfo), _CONSTM_ OptIdInfo addInfo (ArgUsageInfo), _CONSTM_ OptIdInfo ppInfo (ArgUsageInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoArgUsageInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAASAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ArgUsageInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u8; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo ArityInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [ArityInfo, (IdInfo -> ArityInfo), (IdInfo -> ArityInfo -> IdInfo), (PprStyle -> (Id -> Id) -> ArityInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (ArityInfo), _CONSTM_ OptIdInfo getInfo (ArityInfo), _CONSTM_ OptIdInfo addInfo (ArityInfo), _CONSTM_ OptIdInfo ppInfo (ArityInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo UnknownArity [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(SAAAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ArityInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u1; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo DeforestInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [DeforestInfo, (IdInfo -> DeforestInfo), (IdInfo -> DeforestInfo -> IdInfo), (PprStyle -> (Id -> Id) -> DeforestInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (DeforestInfo), _CONSTM_ OptIdInfo getInfo (DeforestInfo), _CONSTM_ OptIdInfo addInfo (DeforestInfo), _CONSTM_ OptIdInfo ppInfo (DeforestInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo Don'tDeforest [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAEAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: DeforestInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u7; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)E" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAE" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo DemandInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [DemandInfo, (IdInfo -> DemandInfo), (IdInfo -> DemandInfo -> IdInfo), (PprStyle -> (Id -> Id) -> DemandInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (DemandInfo), _CONSTM_ OptIdInfo getInfo (DemandInfo), _CONSTM_ OptIdInfo addInfo (DemandInfo), _CONSTM_ OptIdInfo ppInfo (DemandInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo UnknownDemand [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(ASAAAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: DemandInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u2; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LALLLLLLLL)L" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 10122 _N_ _S_ "SAL" {_A_ 2 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo FBTypeInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [FBTypeInfo, (IdInfo -> FBTypeInfo), (IdInfo -> FBTypeInfo -> IdInfo), (PprStyle -> (Id -> Id) -> FBTypeInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (FBTypeInfo), _CONSTM_ OptIdInfo getInfo (FBTypeInfo), _CONSTM_ OptIdInfo addInfo (FBTypeInfo), _CONSTM_ OptIdInfo ppInfo (FBTypeInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoFBTypeInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: FBTypeInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u9; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20222 _N_ _S_ "SAS" {_A_ 2 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo SpecEnv
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [SpecEnv, (IdInfo -> SpecEnv), (IdInfo -> SpecEnv -> IdInfo), (PprStyle -> (Id -> Id) -> SpecEnv -> Int -> Bool -> PrettyRep)] [_ORIG_ IdInfo nullSpecEnv, _CONSTM_ OptIdInfo getInfo (SpecEnv), _CONSTM_ OptIdInfo addInfo (SpecEnv), _CONSTM_ OptIdInfo ppInfo (SpecEnv)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ IdInfo nullSpecEnv _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAU(L)AAAAAAA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [SpecInfo]) -> _!_ _ORIG_ IdInfo SpecEnv [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u3; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 11 _N_ _S_ "U(LLU(L)LLLLLLL)U(L)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 22122 _N_ _S_ "LLU(S)" {_A_ 3 _U_ 22122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance OptIdInfo StrictnessInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [StrictnessInfo, (IdInfo -> StrictnessInfo), (IdInfo -> StrictnessInfo -> IdInfo), (PprStyle -> (Id -> Id) -> StrictnessInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (StrictnessInfo), _CONSTM_ OptIdInfo getInfo (StrictnessInfo), _CONSTM_ OptIdInfo addInfo (StrictnessInfo), _CONSTM_ OptIdInfo ppInfo (StrictnessInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoStrictnessInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAASAAAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: StrictnessInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u4; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 22122 _N_ _S_ "LLS" _N_ _N_ #-}
+instance OptIdInfo UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [UpdateInfo, (IdInfo -> UpdateInfo), (IdInfo -> UpdateInfo -> IdInfo), (PprStyle -> (Id -> Id) -> UpdateInfo -> Int -> Bool -> PrettyRep)] [_CONSTM_ OptIdInfo noInfo (UpdateInfo), _CONSTM_ OptIdInfo getInfo (UpdateInfo), _CONSTM_ OptIdInfo addInfo (UpdateInfo), _CONSTM_ OptIdInfo ppInfo (UpdateInfo)] _N_
+	 noInfo = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ IdInfo NoUpdateInfo [] [] _N_,
+	 getInfo = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAASAAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UpdateInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: IdInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo IdInfo (u1 :: ArityInfo) (u2 :: DemandInfo) (u3 :: SpecEnv) (u4 :: StrictnessInfo) (u5 :: UnfoldingDetails) (u6 :: UpdateInfo) (u7 :: DeforestInfo) (u8 :: ArgUsageInfo) (u9 :: FBTypeInfo) (ua :: SrcLoc) -> u6; _NO_DEFLT_ } _N_,
+	 addInfo = _A_ 2 _U_ 12 _N_ _S_ "U(LLLLLLLLLL)S" _N_ _N_,
+	 ppInfo = _A_ 3 _U_ 20122 _N_ _S_ "LAS" {_A_ 2 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Demand}}, (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Bool), (Demand -> Demand -> Demand), (Demand -> Demand -> Demand), (Demand -> Demand -> _CMP_TAG)] [_DFUN_ Eq (Demand), _CONSTM_ Ord (<) (Demand), _CONSTM_ Ord (<=) (Demand), _CONSTM_ Ord (>=) (Demand), _CONSTM_ Ord (>) (Demand), _CONSTM_ Ord max (Demand), _CONSTM_ Ord min (Demand), _CONSTM_ Ord _tagCmp (Demand)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Ord UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq UpdateInfo}}, (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> Bool), (UpdateInfo -> UpdateInfo -> UpdateInfo), (UpdateInfo -> UpdateInfo -> UpdateInfo), (UpdateInfo -> UpdateInfo -> _CMP_TAG)] [_DFUN_ Eq (UpdateInfo), _CONSTM_ Ord (<) (UpdateInfo), _CONSTM_ Ord (<=) (UpdateInfo), _CONSTM_ Ord (>=) (UpdateInfo), _CONSTM_ Ord (>) (UpdateInfo), _CONSTM_ Ord max (UpdateInfo), _CONSTM_ Ord min (UpdateInfo), _CONSTM_ Ord _tagCmp (UpdateInfo)] _N_
+	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+instance Outputable Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Demand) _N_
+	 ppr = _A_ 2 _U_ 0220 _N_ _S_ "AL" {_A_ 1 _U_ 220 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Text Demand
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Demand, [Char])]), (Int -> Demand -> [Char] -> [Char]), ([Char] -> [([Demand], [Char])]), ([Demand] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Demand), _CONSTM_ Text showsPrec (Demand), _CONSTM_ Text readList (Demand), _CONSTM_ Text showList (Demand)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(Demand, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 3 _U_ 222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: Demand) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> Demand -> [Char] -> [Char]) } [ _NOREP_S_ "%DPreludeCore.Text.showsPrec\"", u0, u1, u2 ] _N_,
+	 readList = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
+	 showList = _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+instance Text UpdateInfo
+	{-# GHC_PRAGMA _M_ IdInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(UpdateInfo, [Char])]), (Int -> UpdateInfo -> [Char] -> [Char]), ([Char] -> [([UpdateInfo], [Char])]), ([UpdateInfo] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (UpdateInfo), _CONSTM_ Text showsPrec (UpdateInfo), _CONSTM_ Text readList (UpdateInfo), _CONSTM_ Text showList (UpdateInfo)] _N_
+	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AS" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 3 _U_ 222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: UpdateInfo) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> UpdateInfo -> [Char] -> [Char]) } [ _NOREP_S_ "%DPreludeCore.Text.showsPrec\"", u0, u1, u2 ] _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

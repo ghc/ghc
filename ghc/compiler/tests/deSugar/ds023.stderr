@@ -1,0 +1,12 @@
+Desugared:
+{- plain CoRec -}
+Tests.f :: for all d, e. <Num e> -> <Eq d> -> d -> e
+Tests.f =
+    /\ t83 t90 -> \ dict.91 dict.84 x.93 ->
+	((Tests.g t83) t90) dict.91 dict.84 ((== t83) dict.84 x.93 x.93) x.93
+Tests.g :: for all d, e. <Num e> -> <Eq d> -> Bool -> d -> e
+Tests.g =
+    /\ t83 t90 -> \ dict.91 dict.84 b.94 x.95 ->
+	(abs t90) dict.91 (((Tests.f t83) t90) dict.91 dict.84 x.95)
+{- end plain CoRec -}
+

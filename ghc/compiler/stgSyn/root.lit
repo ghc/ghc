@@ -1,0 +1,9 @@
+\documentstyle[11pt,literate,a4wide]{article}
+
+\begin{document}
+\author{Simon and friends}
+\title{STG Syntax}
+\maketitle
+
+\input{StgSyn.lhs}
+\end{document}

@@ -1,0 +1,95 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcMonadFns where
+import Bag(Bag)
+import CharSeq(CSeq)
+import Class(Class, ClassOp)
+import CmdLineOpts(GlobalSwitch)
+import ErrUtils(Error(..))
+import ErrsTc(UnifyErrContext)
+import HsBinds(Bind, Binds, MonoBinds, Sig)
+import HsExpr(ArithSeqInfo, Expr)
+import HsLit(Literal)
+import HsMatches(GRHS, GRHSsAndBinds, Match)
+import HsPat(InPat, TypecheckedPat)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo, SpecEnv, SpecInfo)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import InstEnv(InstTemplate)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludeGlaST(_MutableArray)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TcMonad(TcResult)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import Unique(Unique, UniqueSupply)
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data UnifyErrContext
+	{-# GHC_PRAGMA PredCtxt (Expr Name (InPat Name)) | AppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | TooManyArgsCtxt (Expr Name (InPat Name)) | FunAppCtxt (Expr Name (InPat Name)) (Labda Id) (Expr Name (InPat Name)) UniType UniType Int | OpAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) (Expr Name (InPat Name)) | SectionLAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | SectionRAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | CaseCtxt (Expr Name (InPat Name)) [Match Name (InPat Name)] | BranchCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | ListCtxt [Expr Name (InPat Name)] | PatCtxt (InPat Name) | CaseBranchesCtxt [Match Name (InPat Name)] | FilterCtxt (Expr Name (InPat Name)) | GeneratorCtxt (InPat Name) (Expr Name (InPat Name)) | GRHSsBranchCtxt [GRHS Name (InPat Name)] | GRHSsGuardCtxt (Expr Name (InPat Name)) | PatMonoBindsCtxt (InPat Name) (GRHSsAndBinds Name (InPat Name)) | FunMonoBindsCtxt Name [Match Name (InPat Name)] | MatchCtxt UniType UniType | ArithSeqCtxt (Expr Name (InPat Name)) | CCallCtxt [Char] [Expr Name (InPat Name)] | AmbigDictCtxt [Inst] | SigCtxt Id UniType | MethodSigCtxt Name UniType | ExprSigCtxt (Expr Name (InPat Name)) UniType | ValSpecSigCtxt Name UniType SrcLoc | ValSpecSpecIdCtxt Name UniType Name SrcLoc | BindSigCtxt [Id] | SuperClassSigCtxt | CaseBranchCtxt (Match Name (InPat Name)) | Rank2ArgCtxt (Expr Id TypecheckedPat) UniType #-}
+data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
+data MonoBinds a b 	{-# GHC_PRAGMA EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc #-}
+data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data SpecInfo 	{-# GHC_PRAGMA SpecInfo [Labda UniType] Int Id #-}
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data InstOrigin 	{-# GHC_PRAGMA OccurrenceOf Id SrcLoc | InstanceDeclOrigin SrcLoc | LiteralOrigin Literal SrcLoc | ArithSeqOrigin (ArithSeqInfo Name (InPat Name)) SrcLoc | SignatureOrigin | ClassDeclOrigin SrcLoc | DerivingOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class Bool TyCon SrcLoc | InstanceSpecOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class UniType SrcLoc | DefaultDeclOrigin SrcLoc | ValSpecOrigin Name SrcLoc | CCallOrigin SrcLoc [Char] (Labda (Expr Name (InPat Name))) | LitLitOrigin SrcLoc [Char] | UnknownOrigin #-}
+data OverloadedLit 	{-# GHC_PRAGMA OverloadedIntegral Integer Id Id | OverloadedFractional (Ratio Integer) Id #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+data TcResult a 	{-# GHC_PRAGMA TcSucceeded a Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) | TcFailed Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) #-}
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data UniqueSupply 	{-# GHC_PRAGMA MkUniqueSupply Int# | MkNewSupply SplitUniqSupply #-}
+applyTcSubstAndCollectTyVars :: [TyVar] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([TyVar], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222122 _N_ _S_ "S" _N_ _N_ #-}
+applyTcSubstAndExpectTyVars :: [TyVar] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([TyVar], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222122 _N_ _S_ "S" _N_ _N_ #-}
+copyTyVars :: [TyVarTemplate] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (([(TyVarTemplate, UniType)], [TyVar], [UniType]), Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2002120 _N_ _N_ _N_ _N_ #-}
+mkIdsWithGivenTys :: [Name] -> [UniType] -> [IdInfo] -> [(Name, Id)]
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "SSL" _N_ _N_ #-}
+mkIdsWithOpenTyVarTys :: [Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([(Name, Id)], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2002120 _N_ _N_ _N_ _N_ #-}
+mkIdsWithPolyTyVarTys :: [Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([(Name, Id)], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2002120 _N_ _N_ _N_ _N_ #-}
+newClassOpLocals :: [(TyVarTemplate, UniType)] -> [ClassOp] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([Id], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 8 _U_ 22002122 _N_ _S_ "LLAALU(AAS)LL" {_A_ 6 _U_ 222122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newDict :: InstOrigin -> Class -> UniType -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Inst, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 9 _U_ 222002120 _N_ _S_ "LLLAALU(ALA)LA" {_A_ 6 _U_ 222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newDicts :: InstOrigin -> [(Class, UniType)] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([Inst], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 8 _U_ 22002120 _N_ _S_ "LLAALU(ALA)LA" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newLocalWithGivenTy :: Name -> UniType -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Id, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 8 _U_ 22002120 _N_ _S_ "LLAALU(ALA)LA" {_A_ 5 _U_ 22212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newLocalsWithOpenTyVarTys :: [Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([Id], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2002120 _N_ _N_ _N_ _N_ #-}
+newLocalsWithPolyTyVarTys :: [Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([Id], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2002120 _N_ _N_ _N_ _N_ #-}
+newMethod :: InstOrigin -> Id -> [UniType] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Inst, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 9 _U_ 222002120 _N_ _S_ "LLLAALU(ALA)LA" {_A_ 6 _U_ 222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newOpenTyVarTy :: (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (UniType, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 6 _U_ 002120 _N_ _S_ "AALU(AAA)LA" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newOverloadedLit :: InstOrigin -> OverloadedLit -> UniType -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Inst, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 9 _U_ 222002120 _N_ _S_ "LLLAALU(ALA)LA" {_A_ 6 _U_ 222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newPolyTyVarTy :: (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (UniType, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 6 _U_ 002120 _N_ _S_ "AALU(AAA)LA" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newPolyTyVarTys :: Int -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ([UniType], Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 7 _U_ 2002120 _N_ _S_ "LAALU(AAA)LA" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newSpecId :: Id -> [Labda UniType] -> UniType -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Id, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 9 _U_ 222002120 _N_ _S_ "LLLAALU(ALA)LA" {_A_ 6 _U_ 222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newSpecPragmaId :: Name -> UniType -> Labda SpecInfo -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Id, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 9 _U_ 222002120 _N_ _S_ "LLLAALU(ALA)LA" {_A_ 6 _U_ 222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

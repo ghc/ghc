@@ -1,0 +1,19 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcQuals where
+import Bag(Bag)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import HsExpr(Qual)
+import HsPat(InPat, TypecheckedPat)
+import Id(Id)
+import LIE(LIE)
+import Name(Name)
+import Pretty(PprStyle, PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TcMonad(TcResult)
+import UniType(UniType)
+tcQuals :: E -> [Qual Name (InPat Name)] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ([Qual Id TypecheckedPat], LIE)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21222222 _N_ _S_ "LS" _N_ _N_ #-}
+

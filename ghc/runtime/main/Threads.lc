@@ -1,0 +1,3749 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+%
+%************************************************************************
+%*                                                                      *
+\section[Threads.lc]{Thread Control Routines}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%
+\subsection[thread-overview]{Overview of the Thread Management System}
+%
+%************************************************************************
+
+%************************************************************************
+%
+\subsection[thread-decls]{Thread Declarations}
+%
+%************************************************************************
+
+% I haven't checked if GRAN can work with QP profiling. But as we use our
+% own profiling (GR profiling) that should be irrelevant. -- HWL
+
+\begin{code}
+
+#if defined(CONCURRENT)
+
+# define NON_POSIX_SOURCE /* so says Solaris */
+
+# include "rtsdefs.h"
+# include <setjmp.h>
+
+#include "LLC.h"
+#include "HLC.h"
+
+static void init_qp_profiling(STG_NO_ARGS); /* forward decl */
+\end{code}
+
+@AvailableStack@ is used to determine whether an existing stack can be
+reused without new allocation, so reducing garbage collection, and
+stack setup time.  At present, it is only used for the first stack
+chunk of a thread, the one that's got @StkOChunkSize@ words.
+
+\begin{code}
+P_ AvailableStack = Nil_closure;
+P_ AvailableTSO = Nil_closure;
+\end{code}
+
+Macros for dealing with the new and improved GA field for simulating
+parallel execution. Based on @CONCURRENT@ package. The GA field now
+contains a mask, where the n-th bit stands for the n-th processor,
+where this data can be found. In case of multiple copies, several bits
+are set.  The total number of processors is bounded by @MAX_PROC@,
+which should be <= the length of a word in bits.  -- HWL
+
+\begin{code}
+/* mattson thinks this is obsolete */
+
+# if 0 && defined(GRAN)
+extern FILE *main_statsfile;         /* Might be of general interest  HWL */
+
+typedef unsigned long TIME;
+typedef unsigned char PROC;
+typedef unsigned char EVTTYPE;
+
+
+#  undef max
+#  define max(a,b) (a>b?a:b)
+
+static PROC
+ga_to_proc(W_ ga)
+{ PROC i;
+                                
+  for (i=0; i<MAX_PROC && !IS_LOCAL_TO(ga,i); i++) ; 
+
+  return (i);
+}
+
+/* NB: This takes a *node* rather than just a ga as input */
+static PROC
+where_is(P_ node)
+{ return (ga_to_proc(PROCS(node))); }   /* Access the GA field of the node */
+
+static PROC
+no_of_copies(P_ node)       /* DaH lo'lu'Qo'; currently unused */
+{ PROC i, n;
+                                
+  for (i=0, n=0; i<MAX_PROC; i++) 
+    if (IS_LOCAL_TO(PROCS(node),i))
+      n++;; 
+
+  return (n);
+}
+
+# endif /* GRAN ; HWL */ 
+\end{code}
+
+%****************************************************************
+%*								*
+\subsection[thread-getthread]{The Thread Scheduler}
+%*								*
+%****************************************************************
+
+This is the heart of the thread scheduling code.
+
+\begin{code}
+# if defined(GRAN_CHECK) && defined(GRAN)
+W_ debug = 0;
+# endif       
+
+W_ event_trace = 0;
+W_ event_trace_all = 0;
+
+STGRegisterTable *CurrentRegTable = NULL;
+P_ CurrentTSO = NULL;
+
+# if defined(GRAN)                                                  /* HWL */
+
+unsigned CurrentProc = 0;
+W_ IdleProcs = ~0L, Idlers = MAX_PROC; 
+
+# if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+# define FETCH_MASK_TSO  0x08000000  /* only bits 0, 1, 2 should be used */
+                                     /* normally */
+# endif
+
+I_ DoFairSchedule = 0;
+I_ DoReScheduleOnFetch = 0;
+I_ DoStealThreadsFirst = 0;
+I_ SimplifiedFetch = 0;
+I_ DoAlwaysCreateThreads = 0;
+I_ DoGUMMFetching = 0;
+I_ DoThreadMigration = 0;
+I_ FetchStrategy = 4;
+I_ PreferSparksOfLocalNodes = 0;
+
+# if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+I_ NoForward = 0;
+I_ PrintFetchMisses = 0, fetch_misses = 0;
+# endif
+
+# if defined(COUNT)
+I_ nUPDs = 0, nUPDs_old = 0, nUPDs_new = 0, nUPDs_BQ = 0, nPAPs = 0,
+   BQ_lens = 0;
+# endif
+
+I_ do_gr_binary = 0;
+I_ do_gr_profile = 0;        /* Full .gr profile or only END events? */
+I_ no_gr_profile = 0;        /* Don't create any .gr file at all? */
+I_ do_sp_profile = 0;
+I_ do_gr_migration = 0;
+
+P_ RunnableThreadsHd[MAX_PROC];
+P_ RunnableThreadsTl[MAX_PROC];
+
+P_ WaitThreadsHd[MAX_PROC];
+P_ WaitThreadsTl[MAX_PROC];
+
+sparkq PendingSparksHd[MAX_PROC][SPARK_POOLS];
+sparkq PendingSparksTl[MAX_PROC][SPARK_POOLS];
+
+W_ CurrentTime[MAX_PROC];       /* Per PE clock */
+
+# if defined(GRAN_CHECK) && defined(GRAN)
+P_ BlockedOnFetch[MAX_PROC];    /* HWL-CHECK */
+# endif
+
+I_ OutstandingFetches[MAX_PROC];
+
+W_ SparksAvail = 0;     /* How many sparks are available */
+W_ SurplusThreads = 0;  /* How many excess threads are there */
+
+StgBool NeedToReSchedule = StgFalse; /* Do we need to reschedule following a fetch? */
+
+/* Communication Cost Variables -- set in main program */
+
+W_ gran_latency =      LATENCY,          gran_additional_latency = ADDITIONAL_LATENCY, 
+   gran_fetchtime =    FETCHTIME, 
+   gran_lunblocktime = LOCALUNBLOCKTIME, gran_gunblocktime =       GLOBALUNBLOCKTIME,
+   gran_mpacktime =    MSGPACKTIME,      gran_munpacktime =        MSGUNPACKTIME,
+   gran_mtidytime =    0;
+
+W_ gran_threadcreatetime =         THREADCREATETIME,
+   gran_threadqueuetime =          THREADQUEUETIME,
+   gran_threaddescheduletime =     THREADDESCHEDULETIME,
+   gran_threadscheduletime =       THREADSCHEDULETIME,
+   gran_threadcontextswitchtime =  THREADCONTEXTSWITCHTIME;
+
+/* Instruction Cost Variables -- set in main program */
+
+W_ gran_arith_cost =   ARITH_COST,       gran_branch_cost =        BRANCH_COST, 
+   gran_load_cost =    LOAD_COST,        gran_store_cost =         STORE_COST, 
+   gran_float_cost =   FLOAT_COST,       gran_heapalloc_cost =     0;
+
+W_ max_proc = MAX_PROC;
+
+/* Granularity event types' names for output */
+
+char *event_names[] =
+    { "STARTTHREAD", "CONTINUETHREAD", "RESUMETHREAD", 
+      "MOVESPARK", "MOVETHREAD", "FINDWORK",
+      "FETCHNODE", "FETCHREPLY"
+    };
+
+# if defined(GRAN)
+/* Prototypes of GrAnSim debugging functions */
+void DEBUG_PRINT_NODE	PROTO((P_));
+void DEBUG_TREE		PROTO((P_));
+void DEBUG_INFO_TABLE	PROTO((P_));
+void DEBUG_CURR_THREADQ	PROTO((I_));
+void DEBUG_THREADQ	PROTO((P_, I_));
+void DEBUG_TSO		PROTO((P_, I_));
+void DEBUG_EVENT	PROTO((eventq, I_));
+void DEBUG_SPARK	PROTO((sparkq, I_));
+void DEBUG_SPARKQ	PROTO((sparkq, I_));
+void DEBUG_CURR_SPARKQ	PROTO((I_));
+void DEBUG_PROC		PROTO((I_, I_));
+void DCT(STG_NO_ARGS);
+void DCP(STG_NO_ARGS);
+void DEQ(STG_NO_ARGS);
+void DSQ(STG_NO_ARGS);
+
+void HandleFetchRequest PROTO((P_, PROC, P_));
+# endif /* GRAN ; HWL */ 
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+static eventq DelayedEventHd = NULL, DelayedEventTl = NULL;
+
+static I_ noOfEvents = 0;
+static I_ event_counts[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
+
+TIME SparkStealTime();
+
+/* Fcts for manipulating event queues have been deleted  -- HWL */
+/* ---------------------------------- */
+
+static void
+print_spark(spark)
+  sparkq spark;
+{
+
+  if (spark==NULL)
+    fprintf(stderr,"Spark: NIL\n");
+  else
+    fprintf(stderr,"Spark: Node 0x%lx, Name 0x%lx, Exported %s, Prev 0x%x, Next 0x%x\n",
+	    (W_) SPARK_NODE(spark), SPARK_NAME(spark), 
+            ((SPARK_EXPORTED(spark))?"True":"False"), 
+            SPARK_PREV(spark), SPARK_NEXT(spark) );
+}
+
+static print_sparkq(hd)
+sparkq hd;
+{
+  sparkq x;
+
+  fprintf(stderr,"Spark Queue with root at %x:\n",hd);
+  for (x=hd; x!=NULL; x=SPARK_NEXT(x)) {
+    print_spark(x);
+  }
+}
+
+static print_event(event)
+eventq event;
+{
+
+  if (event==NULL)
+    fprintf(stderr,"Evt: NIL\n");
+  else
+    fprintf(stderr,"Evt: %s (%u), PE %u [%u], Time %lu, TSO 0x%lx, node 0x%lx\n",
+              event_names[EVENT_TYPE(event)],EVENT_TYPE(event),
+              EVENT_PROC(event), EVENT_CREATOR(event), 
+              EVENT_TIME(event), EVENT_TSO(event), EVENT_NODE(event) /*,
+              EVENT_SPARK(event), EVENT_NEXT(event)*/ );
+
+}
+
+static print_eventq(hd)
+eventq hd;
+{
+  eventq x;
+
+  fprintf(stderr,"Event Queue with root at %x:\n",hd);
+  for (x=hd; x!=NULL; x=EVENT_NEXT(x)) {
+    print_event(x);
+  }
+}
+
+/* ---------------------------------- */
+
+#if 0 /* moved */
+static eventq getnextevent()
+{
+  static eventq entry = NULL;
+
+  if(EventHd == NULL)
+    {
+      fprintf(stderr,"No next event\n");
+      exit(EXIT_FAILURE); /* ToDo: abort()? EXIT??? */
+    }
+
+  if(entry != NULL)
+    free((char *)entry);
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if (debug & 0x20) {     /* count events */
+    noOfEvents++;
+    event_counts[EVENT_TYPE(EventHd)]++;
+  }
+#endif       
+
+  entry = EventHd;
+  EventHd = EVENT_NEXT(EventHd);
+  return(entry);
+}
+
+/* ToDo: replace malloc/free with a free list */
+
+static insert_event(newentry)
+eventq newentry;
+{
+  EVTTYPE evttype = EVENT_TYPE(newentry);
+  eventq event, *prev;
+
+  /* Search the queue and insert at the right point:
+     FINDWORK before everything, CONTINUETHREAD after everything.
+
+     This ensures that we find any available work after all threads have
+     executed the current cycle.  This level of detail would normally be
+     irrelevant, but matters for ridiculously low latencies...
+  */
+
+  if(EventHd == NULL)
+    EventHd = newentry;
+  else 
+    {
+      for (event = EventHd, prev=&EventHd; event != NULL; 
+           prev = &(EVENT_NEXT(event)), event = EVENT_NEXT(event))
+        {
+          if(evttype == FINDWORK ?       (EVENT_TIME(event) >=  EVENT_TIME(newentry)) :
+             evttype == CONTINUETHREAD ? (EVENT_TIME(event) > EVENT_TIME(newentry)) : 
+                                         (EVENT_TIME(event) >  EVENT_TIME(newentry) ||
+                                         (EVENT_TIME(event) == EVENT_TIME(newentry) &&
+                                          EVENT_TYPE(event) != FINDWORK )))
+            {
+              *prev = newentry;
+              EVENT_NEXT(newentry) = event;
+              break;
+            }
+        }
+      if (event == NULL)
+        *prev = newentry;
+    }
+}
+
+static newevent(proc,creator,time,evttype,tso,node,spark)
+PROC proc, creator;
+TIME time;
+EVTTYPE evttype;
+P_ tso, node;
+sparkq spark;
+{
+  extern P_ xmalloc();
+  eventq newentry = (eventq) xmalloc(sizeof(struct event));
+
+  EVENT_PROC(newentry) = proc;
+  EVENT_CREATOR(newentry) = creator;
+  EVENT_TIME(newentry) = time;
+  EVENT_TYPE(newentry) = evttype;
+  EVENT_TSO(newentry) =  tso;
+  EVENT_NODE(newentry) =  node;
+  EVENT_SPARK(newentry) =  spark;
+  EVENT_NEXT(newentry) = NULL;
+
+  insert_event(newentry);
+}
+#endif /* 0 moved */
+
+# else                                                            /* !GRAN */
+
+P_ RunnableThreadsHd = Nil_closure;
+P_ RunnableThreadsTl = Nil_closure;
+
+P_ WaitingThreadsHd = Nil_closure;
+P_ WaitingThreadsTl = Nil_closure;
+
+PP_ PendingSparksBase[SPARK_POOLS];
+PP_ PendingSparksLim[SPARK_POOLS];
+
+PP_ PendingSparksHd[SPARK_POOLS];
+PP_ PendingSparksTl[SPARK_POOLS];
+
+# endif                                                      /* GRAN ; HWL */
+
+static jmp_buf scheduler_loop;
+
+I_ MaxThreads = DEFAULT_MAX_THREADS;
+I_ required_thread_count = 0;
+I_ advisory_thread_count = 0;
+
+EXTFUN(resumeThread);
+
+P_ NewThread PROTO((P_, W_));
+
+I_ context_switch = 0;
+
+I_ contextSwitchTime = CS_MIN_MILLISECS;  /* In milliseconds */
+
+#if !defined(GRAN)
+
+I_ threadId = 0;
+
+I_ MaxLocalSparks = DEFAULT_MAX_LOCAL_SPARKS;
+I_ SparkLimit[SPARK_POOLS];
+
+extern I_ doSanityChks;
+extern void checkAStack(STG_NO_ARGS);
+
+rtsBool
+initThreadPools(size)
+I_ size;
+{
+    SparkLimit[ADVISORY_POOL] = SparkLimit[REQUIRED_POOL] = size;
+    if ((PendingSparksBase[ADVISORY_POOL] = (PP_) malloc(size * sizeof(P_))) == NULL)
+	return rtsFalse;
+    if ((PendingSparksBase[REQUIRED_POOL] = (PP_) malloc(size * sizeof(P_))) == NULL)
+	return rtsFalse;
+    PendingSparksLim[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL] + size;
+    PendingSparksLim[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL] + size;
+    return rtsTrue;
+}
+#endif
+
+#ifdef PAR
+rtsBool sameThread;
+#endif
+
+void
+ScheduleThreads(topClosure)
+P_ topClosure;
+{
+    I_ i;
+    P_ tso;
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+    if (time_profiling || contextSwitchTime > 0) {
+        if (initialize_virtual_timer(tick_millisecs)) {
+#else
+    if (contextSwitchTime > 0) {
+        if (initialize_virtual_timer(contextSwitchTime)) {
+#endif
+            fflush(stdout);
+            fprintf(stderr, "Can't initialize virtual timer.\n");
+            EXIT(EXIT_FAILURE);
+        }
+    } else
+        context_switch = 0 /* 1 HWL */;
+
+#if defined(GRAN_CHECK) && defined(GRAN)                                           /* HWL */
+    if ( debug & 0x40 ) {
+      fprintf(stderr,"D> Doing init in ScheduleThreads now ...\n");
+    }
+#endif
+
+#if defined(GRAN)                                                  /* KH */
+    for (i=0; i<max_proc; i++) 
+      {
+        RunnableThreadsHd[i] = RunnableThreadsTl[i] = Nil_closure;
+	WaitThreadsHd[i] = WaitThreadsTl[i] = Nil_closure;
+        PendingSparksHd[i][REQUIRED_POOL] = PendingSparksHd[i][ADVISORY_POOL] = 
+        PendingSparksTl[i][REQUIRED_POOL] = PendingSparksTl[i][ADVISORY_POOL] = 
+            NULL; 
+
+# if defined(GRAN_CHECK)
+        if (debug & 0x04) 
+          BlockedOnFetch[i] = 0; /*- StgFalse; -*/              /* HWL-CHECK */
+# endif
+        OutstandingFetches[i] = 0;
+      }
+
+    CurrentProc = MainProc;
+#endif /* GRAN */
+
+    if (DO_QP_PROF)
+        init_qp_profiling();
+
+    /*
+     * We perform GC so that a signal handler can install a new TopClosure and start
+     * a new main thread.
+     */
+#ifdef PAR
+    if (IAmMainThread) {
+#endif
+    if ((tso = NewThread(topClosure, T_MAIN)) == NULL) {
+        /* kludge to save the top closure as a root */
+        CurrentTSO = topClosure;
+    	ReallyPerformThreadGC(0, rtsTrue);
+        topClosure = CurrentTSO;
+        if ((tso = NewThread(topClosure, T_MAIN)) == NULL) {
+            fflush(stdout);
+            fprintf(stderr, "Not enough heap for main thread\n");
+            EXIT(EXIT_FAILURE);             
+        }
+    }           
+#ifndef GRAN
+    RunnableThreadsHd = RunnableThreadsTl = tso;
+#else
+    /* NB: CurrentProc must have been set to MainProc before that! -- HWL */
+    ThreadQueueHd = ThreadQueueTl = tso;
+
+# if defined(GRAN_CHECK)
+    if ( debug & 0x40 ) {
+      fprintf(stderr,"D> MainTSO has been initialized (0x%x)\n", tso);
+    }
+# endif      
+#endif
+
+#ifdef PAR
+    if (do_gr_profile) {
+	DumpGranEvent(GR_START, tso);
+	sameThread = rtsTrue;
+    }
+#endif
+
+#if defined(GRAN)
+    MAKE_BUSY(MainProc);  /* Everything except the main PE is idle */
+#endif      
+
+    required_thread_count = 1;
+    advisory_thread_count = 0;
+#ifdef PAR
+    }   /*if IAmMainThread ...*/
+#endif
+
+    /* ----------------------------------------------------------------- */
+    /* This part is the MAIN SCHEDULER LOOP; jumped at from ReSchedule   */
+    /* ----------------------------------------------------------------- */
+
+    if(setjmp(scheduler_loop) < 0)
+        return;
+
+#if defined(GRAN) && defined(GRAN_CHECK)
+    if ( debug & 0x80 ) {
+      fprintf(stderr,"D> MAIN Schedule Loop; ThreadQueueHd is ");
+      DEBUG_TSO(ThreadQueueHd,1);
+      /* if (ThreadQueueHd == MainTSO) {
+        fprintf(stderr,"D> Event Queue is now:\n");
+        DEQ();
+      } */
+    }
+#endif
+
+#ifdef PAR
+    if (PendingFetches != Nil_closure) {
+        processFetches();
+    }
+
+#elif defined(GRAN)
+    if (ThreadQueueHd == Nil_closure) {
+        fprintf(stderr, "No runnable threads!\n");
+        EXIT(EXIT_FAILURE);
+    }
+    if (DO_QP_PROF > 1 && CurrentTSO != ThreadQueueHd) {
+        QP_Event1("AG", ThreadQueueHd);
+    }
+#endif
+
+#ifndef PAR
+    while (RunnableThreadsHd == Nil_closure) {
+	/* If we've no work */
+	if (WaitingThreadsHd == Nil_closure) {
+	    fflush(stdout);
+	    fprintf(stderr, "No runnable threads!\n");
+	    EXIT(EXIT_FAILURE);
+	}
+	AwaitEvent(0);
+    }
+#else
+    if (RunnableThreadsHd == Nil_closure) {
+	if (advisory_thread_count < MaxThreads &&
+          (PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
+	  PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL])) {
+	    /* 
+             * If we're here (no runnable threads) and we have pending sparks,
+	     * we must have a space problem.  Get enough space to turn one of
+             * those pending sparks into a thread...ReallyPerformGC doesn't 
+             * return until the space is available, so it may force global GC.
+             * ToDo: Is this unnecessary here?  Duplicated in ReSchedule()? --JSM
+             */
+	    ReallyPerformThreadGC(THREAD_SPACE_REQUIRED, rtsTrue);
+	    SAVE_Hp -= THREAD_SPACE_REQUIRED;
+	} else {
+	    /*
+             * We really have absolutely no work.  Send out a fish (there may be
+             * some out there already), and wait for something to arrive.  We 
+             * clearly can't run any threads until a SCHEDULE or RESUME arrives, 
+             * and so that's what we're hoping to see.  (Of course, we still have 
+             * to respond to other types of messages.)
+             */
+	    if (!fishing)
+	        sendFish(choosePE(), mytid, NEW_FISH_AGE, NEW_FISH_HISTORY, 
+                  NEW_FISH_HUNGER);
+	    processMessages();
+	}
+	ReSchedule(0);
+    } else if (PacketsWaiting()) {  /* Look for incoming messages */
+	processMessages();
+    }
+#endif /* PAR */
+
+    if (DO_QP_PROF > 1 && CurrentTSO != RunnableThreadsHd) {
+        QP_Event1("AG", RunnableThreadsHd);
+    }
+
+#ifdef PAR
+    if (do_gr_profile && !sameThread)
+        DumpGranEvent(GR_SCHEDULE, RunnableThreadsHd);
+#endif
+
+#if !GRAN /* ROUND_ROBIN */
+    CurrentTSO = RunnableThreadsHd;
+    RunnableThreadsHd = TSO_LINK(RunnableThreadsHd);
+    TSO_LINK(CurrentTSO) = Nil_closure;
+    
+    if (RunnableThreadsHd == Nil_closure)
+        RunnableThreadsTl = Nil_closure;
+
+#else /* GRAN */
+    /* This used to be Round Robin. KH.  
+       I think we can ignore that, and move it down to ReSchedule instead.
+    */
+    CurrentTSO = ThreadQueueHd;
+    /* TSO_LINK(CurrentTSO) = Nil_closure;  humbug */
+#endif
+
+    /* If we're not running a timer, just leave the flag on */
+    if (contextSwitchTime > 0)
+        context_switch = 0;
+
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+    if (CurrentTSO == Nil_closure) {
+        fprintf(stderr,"Error: Trying to execute Nil_closure on proc %d (@ %d)\n",
+                CurrentProc,CurrentTime[CurrentProc]);
+        exit(99);
+      }
+
+    if (debug & 0x04) {
+      if (BlockedOnFetch[CurrentProc]) {
+        fprintf(stderr,"Error: Trying to execute TSO 0x%x on proc %d (@ %d) which is blocked-on-fetch by TSO 0x%x\n",
+              CurrentTSO,CurrentProc,CurrentTime[CurrentProc],BlockedOnFetch[CurrentProc]);
+        exit(99);
+      }
+    }
+
+    if ( (debug & 0x10) &&
+         (TSO_TYPE(CurrentTSO) & FETCH_MASK_TSO) ) {
+      fprintf(stderr,"Error: Trying to execute TSO 0x%x on proc %d (@ %d) which should be asleep!\n",
+              CurrentTSO,CurrentProc,CurrentTime[CurrentProc]);
+        exit(99);
+    }
+#endif
+
+# if defined(__STG_TAILJUMPS__)
+    miniInterpret((StgFunPtr)resumeThread);
+# else
+    if (doSanityChks)
+        miniInterpret_debug((StgFunPtr)resumeThread, checkAStack);
+    else
+        miniInterpret((StgFunPtr)resumeThread);
+# endif /* __STG_TAILJUMPS__ */
+}
+\end{code}
+
+% Some remarks on GrAnSim -- HWL
+
+The ReSchedule fct is the heart  of GrAnSim.  Based  on its par it issues a
+CONTINUETRHEAD to carry on executing the current thread in due course or it
+watches out for new work (e.g. called from EndThread).
+
+Then it picks the next   event (getnextevent) and handles it  appropriately
+(see switch construct). Note that a continue  in the switch causes the next
+event to be handled  and a break  causes a jmp  to the scheduler_loop where
+the TSO at the head of the current processor's runnable queue is executed.
+
+ReSchedule is mostly  entered from HpOverflow.lc:PerformReSchedule which is
+itself called via the GRAN_RESCHEDULE macro in the compiler generated code.
+
+\begin{code}
+#if defined(GRAN)
+
+void
+ReSchedule(what_next)
+int what_next;           /* Run the current thread again? */
+{
+  sparkq spark, nextspark;
+  P_ tso;
+  P_ node;
+  eventq event;
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if ( debug & 0x80 ) {
+    fprintf(stderr,"D> Entering ReSchedule with mode %u; tso is\n",what_next);
+    DEBUG_TSO(ThreadQueueHd,1);
+  }
+#endif
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if ( (debug & 0x80) || (debug & 0x40 ) )
+      if (what_next<FIND_THREAD || what_next>CHANGE_THREAD)
+	fprintf(stderr,"ReSchedule: illegal parameter %u for what_next\n",
+		what_next);
+#endif
+    
+  /* Run the current thread again (if there is one) */
+  if(what_next==SAME_THREAD && ThreadQueueHd != Nil_closure)
+    {
+      /* A bit of a hassle if the event queue is empty, but ... */
+      CurrentTSO = ThreadQueueHd;
+
+      newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+               CONTINUETHREAD,CurrentTSO,Nil_closure,NULL);
+
+      /* This code does round-Robin, if preferred. */
+      if(DoFairSchedule && TSO_LINK(CurrentTSO) != Nil_closure)
+        {
+          if(do_gr_profile)
+            DumpGranEvent(GR_DESCHEDULE,ThreadQueueHd);
+          ThreadQueueHd =           TSO_LINK(CurrentTSO);
+          TSO_LINK(ThreadQueueTl) = CurrentTSO;
+          ThreadQueueTl =           CurrentTSO;
+          TSO_LINK(CurrentTSO) =    Nil_closure;
+          if (do_gr_profile)
+            DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
+          CurrentTime[CurrentProc] += gran_threadcontextswitchtime;
+        }
+    }
+  /* Schedule `next thread' which is at ThreadQueueHd now i.e. thread queue */
+  /* has been updated before that already. */ 
+  else if(what_next==NEW_THREAD && ThreadQueueHd != Nil_closure)
+    {
+#if defined(GRAN_CHECK) && defined(GRAN)
+      if(DoReScheduleOnFetch)
+        {
+          fprintf(stderr,"ReSchedule(NEW_THREAD) shouldn't be used!!\n");
+          exit(99);
+        }
+#endif
+
+      if(do_gr_profile)
+        DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
+
+      CurrentTSO = ThreadQueueHd;
+      newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+               CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
+      
+      CurrentTime[CurrentProc] += gran_threadcontextswitchtime;
+    }
+
+  /* We go in here if the current thread is blocked on fetch => don'd CONT */
+  else if(what_next==CHANGE_THREAD)
+    {
+      /* just fall into event handling loop for next event */
+    }
+
+  /* We go in here if we have no runnable threads or what_next==0 */
+  else
+    {
+      newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+               FINDWORK,Nil_closure,Nil_closure,NULL);
+      CurrentTSO = Nil_closure;
+    }
+
+  /* ----------------------------------------------------------------- */
+  /* This part is the EVENT HANDLING LOOP                              */
+  /* ----------------------------------------------------------------- */
+
+  do {
+    /* Choose the processor with the next event */
+    event = getnextevent();
+    CurrentProc = EVENT_PROC(event);
+    if(EVENT_TIME(event) > CurrentTime[CurrentProc])
+      CurrentTime[CurrentProc] = EVENT_TIME(event);
+
+    MAKE_BUSY(CurrentProc);
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+    if (debug & 0x80)
+      fprintf(stderr,"D> After getnextevent, before HandleIdlePEs\n");
+#endif
+
+    /* Deal with the idlers */
+    HandleIdlePEs();
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+    if (event_trace && 
+        (event_trace_all || EVENT_TYPE(event) != CONTINUETHREAD ||
+         (debug & 0x80) ))
+      print_event(event);
+#endif
+
+    switch (EVENT_TYPE(event))
+      {
+        /* Should just be continuing execution */
+        case CONTINUETHREAD:
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+              if ( (debug & 0x04) && BlockedOnFetch[CurrentProc]) {
+                fprintf(stderr,"Warning: Discarding CONTINUETHREAD on blocked proc %u  @ %u\n",
+                        CurrentProc,CurrentTime[CurrentProc]);
+                print_event(event);
+                continue;
+              }
+#endif
+          if(ThreadQueueHd==Nil_closure) 
+            {
+              newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+                       FINDWORK,Nil_closure,Nil_closure,NULL);
+              continue; /* Catches superfluous CONTINUEs -- should be unnecessary */
+            }
+          else 
+            break;   /* fall into scheduler loop */
+
+        case FETCHNODE:
+#if defined(GRAN_CHECK) && defined(GRAN)
+          if (SimplifiedFetch) {
+            fprintf(stderr,"Error: FETCHNODE events not valid with simplified fetch\n");
+            exit (99);
+          }
+#endif       
+
+          CurrentTime[CurrentProc] += gran_munpacktime;
+          HandleFetchRequest(EVENT_NODE(event),
+                             EVENT_CREATOR(event),
+                             EVENT_TSO(event));
+          continue;
+
+        case FETCHREPLY:
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+          if (SimplifiedFetch) {
+            fprintf(stderr,"Error: FETCHREPLY events not valid with simplified fetch\n");
+            exit (99);
+          }
+
+          if (debug & 0x10) {
+            if (TSO_TYPE(EVENT_TSO(event)) & FETCH_MASK_TSO) {
+              TSO_TYPE(EVENT_TSO(event)) &= ~FETCH_MASK_TSO;
+            } else {
+              fprintf(stderr,"Error: FETCHREPLY: TSO 0x%x has fetch mask not set @ %d\n",
+                      CurrentTSO,CurrentTime[CurrentProc]);
+              exit(99);
+            }
+          }
+
+          if (debug & 0x04) {
+            if (BlockedOnFetch[CurrentProc]!=ThreadQueueHd) {
+              fprintf(stderr,"Error: FETCHREPLY: Proc %d (with TSO 0x%x) not blocked-on-fetch by TSO 0x%x\n",
+                      CurrentProc,CurrentTSO,BlockedOnFetch[CurrentProc]);
+              exit(99);
+            } else {
+              BlockedOnFetch[CurrentProc] = 0; /*- StgFalse; -*/
+            }
+          }
+#endif
+
+          /* Copy or  move node to CurrentProc */
+          if (FetchNode(EVENT_NODE(event),
+                        EVENT_CREATOR(event),
+                        EVENT_PROC(event)) ) {
+            /* Fetch has failed i.e. node has been grabbed by another PE */
+            P_ node = EVENT_NODE(event), tso = EVENT_TSO(event);
+            PROC p = where_is(node);
+            TIME fetchtime;
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+            if (PrintFetchMisses) {
+              fprintf(stderr,"Fetch miss @ %lu: node 0x%x is at proc %u (rather than proc %u)\n",
+                      CurrentTime[CurrentProc],node,p,EVENT_CREATOR(event));
+              fetch_misses++;
+            }
+#endif  /* GRAN_CHECK */
+
+            CurrentTime[CurrentProc] += gran_mpacktime;
+
+            /* Count fetch again !? */
+            ++TSO_FETCHCOUNT(tso);
+            TSO_FETCHTIME(tso) += gran_fetchtime;
+              
+            fetchtime = max(CurrentTime[CurrentProc],CurrentTime[p]) +
+                        gran_latency;
+
+            /* Chase the grabbed node */
+            newevent(p,CurrentProc,fetchtime,FETCHNODE,tso,node,NULL);
+
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+              if (debug & 0x04)
+                BlockedOnFetch[CurrentProc] = tso; /*-StgTrue;-*/
+
+              if (debug & 0x10) 
+                TSO_TYPE(tso) |= FETCH_MASK_TSO;
+#endif
+
+            CurrentTime[CurrentProc] += gran_mtidytime;
+
+            continue; /* NB: no REPLy has been processed; tso still sleeping */
+          }
+          
+          /* -- Qapla'! Fetch has been successful; node is here, now  */
+          ++TSO_FETCHCOUNT(EVENT_TSO(event));
+          TSO_FETCHTIME(EVENT_TSO(event)) += gran_fetchtime;
+              
+          if (do_gr_profile)
+            DumpGranEventAndNode(GR_REPLY,EVENT_TSO(event),
+                                 EVENT_NODE(event),EVENT_CREATOR(event));
+
+          --OutstandingFetches[CurrentProc];
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+          if (OutstandingFetches[CurrentProc] < 0) {
+            fprintf(stderr,"OutstandingFetches of proc %u has become negative\n",CurrentProc);
+            exit (99);
+          }
+#endif
+
+          if (!DoReScheduleOnFetch) {
+            CurrentTSO = EVENT_TSO(event);          /* awaken blocked thread */
+            newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+                     CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
+            TSO_BLOCKTIME(EVENT_TSO(event)) += CurrentTime[CurrentProc] - 
+                                               TSO_BLOCKEDAT(EVENT_TSO(event));
+            if(do_gr_profile)
+              DumpGranEvent(GR_RESUME,EVENT_TSO(event));
+            continue;
+          } else {
+            /* fall through to RESUMETHREAD */
+          }
+
+        case RESUMETHREAD:  /* Move from the blocked queue to the tail of */
+                            /* the runnable queue ( i.e. Qu' SImqa'lu') */ 
+          TSO_BLOCKTIME(EVENT_TSO(event)) += CurrentTime[CurrentProc] - 
+                                             TSO_BLOCKEDAT(EVENT_TSO(event));
+          StartThread(event,GR_RESUME);
+          continue;
+
+        case STARTTHREAD:
+          StartThread(event,GR_START);
+          continue;
+
+        case MOVETHREAD:
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+          if (!DoThreadMigration) {
+            fprintf(stderr,"MOVETHREAD events should never occur without -bM\n");
+            exit (99);
+          }
+#endif
+          CurrentTime[CurrentProc] += gran_munpacktime;
+          StartThread(event,GR_STOLEN);
+          continue; /* to the next event */
+
+        case MOVESPARK:
+          CurrentTime[CurrentProc] += gran_munpacktime;
+          spark = EVENT_SPARK(event);
+
+          ADD_TO_SPARK_QUEUE(spark); /* NB: this macro side-effects its arg.
+                                        so the assignment above is needed.  */
+
+          if(do_sp_profile)
+            DumpSparkGranEvent(SP_ACQUIRED,spark);
+
+          ++SparksAvail;                  /* Probably Temporarily */
+          /* Drop into FINDWORK */
+
+          if (!DoReScheduleOnFetch &&
+               (ThreadQueueHd != Nil_closure) ) { /* If we block on fetch then go */
+                continue;                      /* to next event (i.e. leave */
+          }                                    /* spark in sparkq for now) */
+
+        case FINDWORK:
+          if((ThreadQueueHd == Nil_closure || DoAlwaysCreateThreads)
+             && (FetchStrategy >= 2 || OutstandingFetches[CurrentProc] == 0))
+            {
+              W_ found = 0;
+              sparkq spark_of_non_local_node = NULL;
+
+              /* Choose a spark from the local spark queue */
+              spark = SparkQueueHd;
+
+              while (spark != NULL && !found)
+                {
+                  node = SPARK_NODE(spark);
+                  if (!SHOULD_SPARK(node)) 
+                    {
+                      if(do_sp_profile)
+                        DumpSparkGranEvent(SP_PRUNED,spark);
+
+                      assert(spark != NULL);
+
+                      SparkQueueHd = SPARK_NEXT(spark);
+                      if(SparkQueueHd == NULL)
+                        SparkQueueTl = NULL;
+
+                      DisposeSpark(spark);
+                  
+                      spark = SparkQueueHd;
+                    }
+                  /* -- node should eventually be sparked */
+                  else if (PreferSparksOfLocalNodes && 
+                          !IS_LOCAL_TO(PROCS(node),CurrentProc)) 
+                    {
+                      /* We have seen this spark before => no local sparks */
+                      if (spark==spark_of_non_local_node) {
+                        found = 1;
+                        break;
+                      }
+
+                      /* Remember first non-local node */
+                      if (spark_of_non_local_node==NULL)
+                        spark_of_non_local_node = spark;
+
+                      /* Special case: 1 elem sparkq with non-local spark */
+                      if (spark==SparkQueueTl) {
+                        found = 1;
+                        break;
+                      }                 
+
+                      /* Put spark (non-local!) at the end of the sparkq */
+                      SPARK_NEXT(SparkQueueTl) = spark;
+                      SparkQueueHd = SPARK_NEXT(spark);
+                      SPARK_NEXT(spark) = NULL;
+                      SparkQueueTl = spark;
+ 
+                      spark = SparkQueueHd;
+                    }
+                  else
+                    {
+                      found = 1;
+                    }
+                }
+
+              /* We've found a node; now, create thread (DaH Qu' yIchen) */
+              if (found) 
+                {
+                  CurrentTime[CurrentProc] += gran_threadcreatetime;
+
+                  node = SPARK_NODE(spark);
+                  if((tso = NewThread(node, T_REQUIRED))==NULL)
+                    {
+                      /* Some kind of backoff needed here in case there's too little heap */
+                      newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc]+1,
+                               FINDWORK,Nil_closure,Nil_closure,NULL);
+                      ReallyPerformThreadGC(TSO_HS+TSO_CTS_SIZE,StgTrue);
+                      spark = NULL;
+                      continue; /* to the next event, eventually */
+                    }
+                      
+                  TSO_EXPORTED(tso) =  SPARK_EXPORTED(spark);
+                  TSO_LOCKED(tso) =    !SPARK_GLOBAL(spark);
+                  TSO_SPARKNAME(tso) = SPARK_NAME(spark);
+
+                  newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+                           STARTTHREAD,tso,Nil_closure,NULL);
+
+                  assert(spark != NULL);
+
+                  SparkQueueHd = SPARK_NEXT(spark);
+                  if(SparkQueueHd == NULL)
+                    SparkQueueTl = NULL;
+                  
+                  DisposeSpark(spark);
+                }
+              else
+              /* Make the PE idle if nothing sparked and we have no threads. */
+                {
+                  if(ThreadQueueHd == Nil_closure)
+#if defined(GRAN_CHECK) && defined(GRAN)
+		    {
+                    MAKE_IDLE(CurrentProc);
+		    if ( (debug & 0x40) || (debug & 0x80) ) {
+			fprintf(stderr,"Warning in FINDWORK handling: No work found for PROC %u\n",CurrentProc);
+		      }
+		  }
+#else 
+                    MAKE_IDLE(CurrentProc);
+#endif  /* GRAN_CHECK */
+                  else
+                    newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+                             CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
+                }
+
+              continue; /* to the next event */
+            }
+          else
+            {
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+              if ( (debug & 0x04) &&
+                   (!DoReScheduleOnFetch &&  ThreadQueueHd != Nil_closure)
+                  ) {
+                fprintf(stderr,"Waning in FINDWORK handling:\n");
+                fprintf(stderr,"ThreadQueueHd!=Nil_closure should never happen with !DoReScheduleOnFetch");
+              }
+#endif
+              if (FetchStrategy < 2 && OutstandingFetches[CurrentProc] != 0)
+                continue;  /* to next event */
+              else
+                break;     /* run ThreadQueueHd */
+            }
+            /* never reached */
+
+        default:
+          fprintf(stderr,"Illegal event type %u\n",EVENT_TYPE(event));
+          continue;
+        }
+    _longjmp(scheduler_loop, 1);
+  } while(1);
+  }
+\end{code}
+
+Here follows the non-GRAN @ReSchedule@.
+\begin{code}
+#else      /* !GRAN */
+
+void
+ReSchedule(again)
+int again;  	    	    	    	/* Run the current thread again? */
+{
+    P_ spark;
+    PP_ sparkp;
+    P_ tso;
+
+#ifdef PAR
+    /* 
+     * In the parallel world, we do unfair scheduling for the moment.
+     * Ultimately, this should all be merged with the more sophicticated
+     * GrAnSim scheduling options.  (Of course, some provision should be
+     * made for *required* threads to make sure that they don't starve,
+     * but for now we assume that no one is running concurrent Haskell on
+     * a multi-processor platform.)
+     */
+
+    sameThread = again;
+
+    if (again) {
+	if (RunnableThreadsHd == Nil_closure)
+	    RunnableThreadsTl = CurrentTSO;
+	TSO_LINK(CurrentTSO) = RunnableThreadsHd;
+	RunnableThreadsHd = CurrentTSO;
+    }
+
+#else
+
+    /* 
+     * In the sequential world, we assume that the whole point of running
+     * the threaded build is for concurrent Haskell, so we provide round-robin
+     * scheduling.
+     */
+    
+    if (again) {
+    	if(RunnableThreadsHd == Nil_closure) {
+            RunnableThreadsHd = CurrentTSO;
+        } else {
+    	    TSO_LINK(RunnableThreadsTl) = CurrentTSO;
+            if (DO_QP_PROF > 1) {
+                QP_Event1("GA", CurrentTSO);
+            }
+        }
+        RunnableThreadsTl = CurrentTSO;
+    }
+#endif
+
+#if 1
+    /* 
+     * Debugging code, which is useful enough (and cheap enough) to compile
+     * in all the time.  This makes sure that we don't access saved registers,
+     * etc. in threads which are supposed to be sleeping.
+     */
+    CurrentTSO = Nil_closure;
+    CurrentRegTable = NULL;
+#endif
+
+    /* First the required sparks */
+
+    for (sparkp = PendingSparksHd[REQUIRED_POOL]; 
+      sparkp < PendingSparksTl[REQUIRED_POOL]; sparkp++) {
+	spark = *sparkp;
+    	if (SHOULD_SPARK(spark)) {    	
+	    if ((tso = NewThread(spark, T_REQUIRED)) == NULL)
+	    	break;
+            if (RunnableThreadsHd == Nil_closure) {
+        	RunnableThreadsHd = tso;
+#ifdef PAR
+		if (do_gr_profile) {
+		    DumpGranEvent(GR_START, tso);
+		    sameThread = rtsTrue;
+		}
+#endif
+	    } else {
+        	TSO_LINK(RunnableThreadsTl) = tso;
+#ifdef PAR
+		if (do_gr_profile)
+		    DumpGranEvent(GR_STARTQ, tso);
+#endif
+	    }
+            RunnableThreadsTl = tso;
+        } else {
+	    if (DO_QP_PROF)
+		QP_Event0(threadId++, spark);
+#ifdef PAR
+            if(do_sp_profile)
+                DumpSparkGranEvent(SP_PRUNED, threadId++);
+#endif
+	}
+    }
+    PendingSparksHd[REQUIRED_POOL] = sparkp;
+
+    /* Now, almost the same thing for advisory sparks */
+
+    for (sparkp = PendingSparksHd[ADVISORY_POOL]; 
+      sparkp < PendingSparksTl[ADVISORY_POOL]; sparkp++) {
+	spark = *sparkp;
+    	if (SHOULD_SPARK(spark)) {    	
+	    if (
+#ifdef PAR
+    /* In the parallel world, don't create advisory threads if we are 
+     * about to rerun the same thread, or already have runnable threads,
+     *  or the main thread has terminated */
+	      (RunnableThreadsHd != Nil_closure ||
+	       (required_thread_count == 0 && IAmMainThread)) || 
+#endif
+   	      advisory_thread_count == MaxThreads ||
+	      (tso = NewThread(spark, T_ADVISORY)) == NULL)
+	    	break;
+    	    advisory_thread_count++;
+            if (RunnableThreadsHd == Nil_closure) {
+        	RunnableThreadsHd = tso;
+#ifdef PAR
+		if (do_gr_profile) {
+		    DumpGranEvent(GR_START, tso);
+		    sameThread = rtsTrue;
+		}
+#endif
+            } else {
+        	TSO_LINK(RunnableThreadsTl) = tso;
+#ifdef PAR
+		if (do_gr_profile)
+		    DumpGranEvent(GR_STARTQ, tso);
+#endif
+	    }
+            RunnableThreadsTl = tso;
+        } else {
+	    if (DO_QP_PROF)
+		QP_Event0(threadId++, spark);
+#ifdef PAR
+            if(do_sp_profile)
+                DumpSparkGranEvent(SP_PRUNED, threadId++);
+#endif
+	}
+    }
+    PendingSparksHd[ADVISORY_POOL] = sparkp;
+
+#ifndef PAR
+    longjmp(scheduler_loop, required_thread_count == 0 ? -1 : 1);
+#else
+    longjmp(scheduler_loop, required_thread_count == 0 && IAmMainThread ? -1 : 1);
+#endif
+}
+
+#endif  /* !GRAN */
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[thread-gransim-execution]{Starting, Idling and Migrating
+                                        Threads (GrAnSim only)}
+%
+%****************************************************************************
+
+Thread start, idle and migration code for GrAnSim (i.e. simulating multiple
+processors). 
+
+\begin{code}
+#if defined(GRAN)
+
+StartThread(event,event_type)
+eventq event;
+enum gran_event_types event_type;
+{
+  if(ThreadQueueHd==Nil_closure)
+    {
+      CurrentTSO = ThreadQueueHd = ThreadQueueTl = EVENT_TSO(event);
+      newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc]+gran_threadqueuetime,
+               CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
+      if(do_gr_profile)
+        DumpGranEvent(event_type,EVENT_TSO(event));
+    }
+  else
+    {
+      TSO_LINK(ThreadQueueTl) = EVENT_TSO(event);
+      ThreadQueueTl = EVENT_TSO(event);
+
+      if(DoThreadMigration)
+        ++SurplusThreads;
+
+      if(do_gr_profile)
+        DumpGranEvent(event_type+1,EVENT_TSO(event));
+
+    }
+  CurrentTime[CurrentProc] += gran_threadqueuetime;
+}
+\end{code}
+
+Export work to idle PEs.
+
+\begin{code}
+HandleIdlePEs()
+{
+  PROC proc;
+
+  if(ANY_IDLE && (SparksAvail > 0l || SurplusThreads > 0l))
+    for(proc = 0; proc < max_proc; proc++)
+      if(IS_IDLE(proc))
+        {
+          if(DoStealThreadsFirst && 
+             (FetchStrategy >= 4 || OutstandingFetches[proc] == 0))
+            {
+              if (SurplusThreads > 0l)                    /* Steal a thread */
+                StealThread(proc);
+          
+              if(!IS_IDLE(proc))
+                break;
+            }
+
+          if(SparksAvail > 0l && 
+             (FetchStrategy >= 3 || OutstandingFetches[proc] == 0)) /* Steal a spark */
+            StealSpark(proc);
+
+          if (IS_IDLE(proc) && SurplusThreads > 0l && 
+              (FetchStrategy >= 4 || OutstandingFetches[proc] == 0)) /* Steal a thread */
+            StealThread(proc);
+        }
+}
+\end{code}
+
+Steal a spark and schedule  moving it to  proc. We want  to look at PEs  in
+clock order -- most retarded first.  Currently  sparks are only stolen from
+the @ADVISORY_POOL@ never from the @REQUIRED_POOL@. Eventually, this should
+be changed to first steal from the former then from the latter.
+
+\begin{code}
+StealSpark(proc)
+PROC proc;
+{
+  PROC p;
+  sparkq spark, prev, next;
+  int stolen = 0;
+  TIME times[MAX_PROC], stealtime;
+  unsigned ntimes=0, i, j;
+
+  /* times shall contain processors from which we may steal sparks */ 
+  for(p=0; p < max_proc; ++p)
+    if(proc != p && 
+       PendingSparksHd[p][ADVISORY_POOL] != NULL && 
+       CurrentTime[p] <= CurrentTime[CurrentProc])
+      times[ntimes++] = p;
+
+  /* sort times */
+  for(i=0; i < ntimes; ++i)
+    for(j=i+1; j < ntimes; ++j)
+      if(CurrentTime[times[i]] > CurrentTime[times[j]])
+        {
+          unsigned temp = times[i];
+          times[i] = times[j];
+          times[j] = temp;
+        }
+
+  for(i=0; i < ntimes && !stolen; ++i) 
+    {
+      p = times[i];
+      
+      for(prev=NULL, spark = PendingSparksHd[p][ADVISORY_POOL]; 
+          spark != NULL && !stolen; 
+          spark=next)
+        {
+          next = SPARK_NEXT(spark);
+          
+          if(SHOULD_SPARK(SPARK_NODE(spark)))
+            {
+              /* Don't Steal local sparks */
+              if(!SPARK_GLOBAL(spark))
+                {
+                  prev=spark;
+                  continue;
+                }
+              
+              SPARK_NEXT(spark) = NULL;
+              CurrentTime[p] += gran_mpacktime;
+
+              stealtime = (CurrentTime[p] > CurrentTime[proc]? CurrentTime[p]: CurrentTime[proc])
+                + SparkStealTime();
+              
+              newevent(proc,p /* CurrentProc */,stealtime,
+                       MOVESPARK,Nil_closure,Nil_closure,spark);
+
+              MAKE_BUSY(proc);
+              stolen = 1;
+              ++SPARK_GLOBAL(spark);
+
+              if(do_sp_profile)
+                DumpSparkGranEvent(SP_EXPORTED,spark);
+
+              CurrentTime[p] += gran_mtidytime;
+
+              --SparksAvail;
+            }
+          else
+            {
+              if(do_sp_profile)
+                DumpSparkGranEvent(SP_PRUNED,spark);
+              DisposeSpark(spark);
+            }
+          
+          if(spark == PendingSparksHd[p][ADVISORY_POOL])
+            PendingSparksHd[p][ADVISORY_POOL] = next;
+          
+          if(prev!=NULL)
+            SPARK_NEXT(prev) = next;
+        }
+                      
+      if(PendingSparksHd[p][ADVISORY_POOL] == NULL)
+        PendingSparksTl[p][ADVISORY_POOL] = NULL;
+    }
+}
+\end{code}
+
+Steal a spark and schedule moving it to proc.
+
+\begin{code}
+StealThread(proc)
+PROC proc;
+{
+  PROC p;
+  P_ thread, prev;
+  TIME times[MAX_PROC], stealtime;
+  unsigned ntimes=0, i, j;
+
+  /* Hunt for a thread */
+
+  /* times shall contain processors from which we may steal threads */ 
+  for(p=0; p < max_proc; ++p)
+    if(proc != p && RunnableThreadsHd[p] != Nil_closure && 
+       CurrentTime[p] <= CurrentTime[CurrentProc])
+      times[ntimes++] = p;
+
+  /* sort times */
+  for(i=0; i < ntimes; ++i)
+    for(j=i+1; j < ntimes; ++j)
+      if(CurrentTime[times[i]] > CurrentTime[times[j]])
+        {
+          unsigned temp = times[i];
+          times[i] = times[j];
+          times[j] = temp;
+        }
+
+  for(i=0; i < ntimes; ++i) 
+    {
+      p = times[i];
+      
+      /* Steal the first exportable thread in the runnable queue after the */
+      /* first one */ 
+      
+      if(RunnableThreadsHd[p] != Nil_closure)
+        {
+          for(prev = RunnableThreadsHd[p], thread = TSO_LINK(RunnableThreadsHd[p]); 
+              thread != Nil_closure && TSO_LOCKED(thread); 
+              prev = thread, thread = TSO_LINK(thread))
+            /* SKIP */;
+
+          if(thread != Nil_closure)   /* Take thread out of runnable queue */
+            {
+              TSO_LINK(prev) = TSO_LINK(thread);
+
+              TSO_LINK(thread) = Nil_closure;
+
+              if(RunnableThreadsTl[p] == thread)
+                RunnableThreadsTl[p] = prev;
+
+              /* Turn magic constants into params !? -- HWL */
+
+              CurrentTime[p] += 5l * gran_mpacktime;
+
+              stealtime = (CurrentTime[p] > CurrentTime[proc]? CurrentTime[p]: CurrentTime[proc])
+                           + SparkStealTime() + 4l * gran_additional_latency
+                             + 5l * gran_munpacktime;
+
+              /* Move the thread */
+              SET_PROCS(thread,PE_NUMBER(proc)); 
+
+              /* Move from one queue to another */
+              newevent(proc,p,stealtime,MOVETHREAD,thread,Nil_closure,NULL);
+              MAKE_BUSY(proc);
+              --SurplusThreads;
+
+              if(do_gr_profile)
+                DumpRawGranEvent(p,GR_STEALING,TSO_ID(thread));
+          
+              CurrentTime[p] += 5l * gran_mtidytime;
+
+              /* Found one */
+              break;
+            }
+        }
+    }
+}
+
+TIME SparkStealTime()
+{
+  double fishdelay, sparkdelay, latencydelay;
+  fishdelay =  (double)max_proc/2;
+  sparkdelay = fishdelay - ((fishdelay-1)/(double)(max_proc-1))*(double)Idlers;
+  latencydelay = sparkdelay*((double)gran_latency);
+
+/*
+  fprintf(stderr,"fish delay = %g, spark delay = %g, latency delay = %g, Idlers = %u\n",
+          fishdelay,sparkdelay,latencydelay,Idlers);
+*/
+  return((TIME)latencydelay);
+}
+#endif                                                       /* GRAN ; HWL */
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[thread-execution]{Executing Threads}
+%
+%****************************************************************************
+
+\begin{code}
+EXTDATA_RO(StkO_info);
+EXTDATA_RO(TSO_info);
+EXTDATA_RO(WorldStateToken_closure);
+
+EXTFUN(EnterNodeCode);
+UNVEC(EXTFUN(stopThreadDirectReturn);,EXTDATA(vtbl_stopStgWorld);)
+
+#if defined(GRAN)
+
+/* Slow but relatively reliable method uses xmalloc */
+/* Eventually change that to heap allocated sparks. */
+
+sparkq 
+NewSpark(node,name,local)
+P_ node;
+I_ name, local;
+{
+  extern P_ xmalloc();
+  sparkq newspark = (sparkq) xmalloc(sizeof(struct spark));
+  SPARK_PREV(newspark) = SPARK_NEXT(newspark) = NULL;
+  SPARK_NODE(newspark) = node;
+  SPARK_NAME(newspark) = name;
+  SPARK_GLOBAL(newspark) = !local;
+  return(newspark);
+}
+
+void
+DisposeSpark(spark)
+sparkq spark;
+{
+  if(spark!=NULL)
+    free(spark);
+
+  --SparksAvail;
+
+/* Heap-allocated disposal.
+
+  FREEZE_MUT_HDR(spark, ImMutArrayOfPtrs);
+  SPARK_PREV(spark) = SPARK_NEXT(spark) = SPARK_NODE(spark) = Nil_closure;
+*/
+}
+
+DisposeSparkQ(spark)
+sparkq spark;
+{
+  if (spark==NULL) 
+    return;
+
+  DisposeSparkQ(SPARK_NEXT(spark));
+
+#ifdef GRAN_CHECK
+  if (SparksAvail < 0)
+    fprintf(stderr,"DisposeSparkQ: SparksAvail<0 after disposing sparkq @ 0x%lx\n", spark);
+#endif
+
+  free(spark);
+}
+
+#endif
+
+I_ StkOChunkSize = DEFAULT_STKO_CHUNK_SIZE;
+
+/* Create a new TSO, with the specified closure to enter and thread type */
+
+P_
+NewThread(topClosure, type)
+P_ topClosure;
+W_ type;
+{
+    P_ stko, tso;
+
+    if (AvailableTSO != Nil_closure) {
+        tso = AvailableTSO;
+#if defined(GRAN)
+        SET_PROCS(tso,ThisPE);  /* Allocate it locally! */
+#endif
+        AvailableTSO = TSO_LINK(tso);
+    } else if (SAVE_Hp + TSO_HS + TSO_CTS_SIZE > SAVE_HpLim) {
+        return(NULL);
+    } else {
+        ALLOC_TSO(TSO_HS,BYTES_TO_STGWORDS(sizeof(STGRegisterTable)),
+                  BYTES_TO_STGWORDS(sizeof(StgDouble)));
+        tso = SAVE_Hp + 1;
+        SAVE_Hp += TSO_HS + TSO_CTS_SIZE;
+        SET_TSO_HDR(tso, TSO_info, CCC);
+    }
+
+    TSO_LINK(tso) = Nil_closure;
+    TSO_CCC(tso) = (CostCentre)STATIC_CC_REF(CC_MAIN);
+    TSO_NAME(tso) = (P_) INFO_PTR(topClosure);  /* A string would be nicer -- JSM */
+    TSO_ID(tso) = threadId++;
+    TSO_TYPE(tso) = type;
+    TSO_PC1(tso) = TSO_PC2(tso) = EnterNodeCode;
+    TSO_ARG1(tso) = TSO_EVENT(tso) = 0;
+    TSO_SWITCH(tso) = NULL;
+
+#ifdef DO_REDN_COUNTING
+    TSO_AHWM(tso) = 0;
+    TSO_BHWM(tso) = 0;
+#endif
+
+#if defined(GRAN) || defined(PAR)
+    TSO_SPARKNAME(tso)    = 0;
+#if defined(GRAN)
+    TSO_STARTEDAT(tso)    = CurrentTime[CurrentProc];
+#else
+    TSO_STARTEDAT(tso)    = CURRENT_TIME;
+#endif
+    TSO_EXPORTED(tso)     = 0;
+    TSO_BASICBLOCKS(tso)  = 0;
+    TSO_ALLOCS(tso)       = 0;
+    TSO_EXECTIME(tso)     = 0;
+    TSO_FETCHTIME(tso)    = 0;
+    TSO_FETCHCOUNT(tso)   = 0;
+    TSO_BLOCKTIME(tso)    = 0;
+    TSO_BLOCKCOUNT(tso)   = 0;
+    TSO_BLOCKEDAT(tso)    = 0;
+    TSO_GLOBALSPARKS(tso) = 0;
+    TSO_LOCALSPARKS(tso)  = 0;
+#endif    
+    /*
+     * set pc, Node (R1), liveness
+     */
+    CurrentRegTable = TSO_INTERNAL_PTR(tso);
+    SAVE_Liveness = LIVENESS_R1;
+    SAVE_R1.p = topClosure;
+
+# ifndef PAR
+    if (type == T_MAIN) {
+        stko = MainStkO;
+    } else {
+# endif
+        if (AvailableStack != Nil_closure) {
+            stko = AvailableStack;
+#if defined(GRAN)
+            SET_PROCS(stko,ThisPE);
+#endif
+	    AvailableStack = STKO_LINK(AvailableStack);
+        } else if (SAVE_Hp + STKO_HS + StkOChunkSize > SAVE_HpLim) {
+            return(NULL);
+        } else {
+            ALLOC_STK(STKO_HS,StkOChunkSize,0);
+            stko = SAVE_Hp + 1;
+    	    SAVE_Hp += STKO_HS + StkOChunkSize;
+            SET_STKO_HDR(stko, StkO_info, CCC);
+        }
+        STKO_SIZE(stko) = StkOChunkSize + STKO_VHS;
+        STKO_SpB(stko) = STKO_SuB(stko) = STKO_BSTK_BOT(stko) + BREL(1);
+        STKO_SpA(stko) = STKO_SuA(stko) = STKO_ASTK_BOT(stko) + AREL(1);
+        STKO_LINK(stko) = Nil_closure;
+        STKO_RETURN(stko) = NULL;
+# ifndef PAR
+    }
+# endif
+    
+#ifdef DO_REDN_COUNTING
+    STKO_ADEP(stko) = STKO_BDEP(stko) = 0;
+#endif
+
+    if (type == T_MAIN) {
+        STKO_SpA(stko) -= AREL(1);
+        *STKO_SpA(stko) = (P_) WorldStateToken_closure;
+    }
+
+    SAVE_Ret = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld);
+    SAVE_StkO = stko;
+
+    if (DO_QP_PROF) {
+        QP_Event1(do_qp_prof > 1 ? "*A" : "*G", tso);
+    }
+    return tso;
+}
+\end{code}
+
+\begin{code}
+
+void
+EndThread(STG_NO_ARGS)
+{
+#ifdef PAR
+    TIME now = CURRENT_TIME;
+#endif
+#ifdef DO_REDN_COUNTING
+    extern FILE *tickyfile;
+
+    if (tickyfile != NULL) {
+	fprintf(tickyfile, "Thread %d (%lx)\n\tA stack max. depth: %ld words\n",
+	  TSO_ID(CurrentTSO), TSO_NAME(CurrentTSO), TSO_AHWM(CurrentTSO));
+	fprintf(tickyfile, "\tB stack max. depth: %ld words\n",
+	  TSO_BHWM(CurrentTSO));
+    }
+#endif
+
+    if (DO_QP_PROF) {
+        QP_Event1("G*", CurrentTSO);
+    }
+
+#if defined(GRAN)
+    assert(CurrentTSO == ThreadQueueHd);
+    ThreadQueueHd = TSO_LINK(CurrentTSO);
+
+    if(ThreadQueueHd == Nil_closure)
+      ThreadQueueTl = Nil_closure;
+
+    else if (DoThreadMigration)
+      --SurplusThreads;
+
+    if (do_gr_sim)
+      {
+        if(TSO_TYPE(CurrentTSO)==T_MAIN)
+          {
+            int i;
+            for(i=0; i < max_proc; ++i) {
+              StgBool is_first = StgTrue;
+              while(RunnableThreadsHd[i] != Nil_closure)
+                {
+                  /* We schedule runnable threads before killing them to */
+                  /* make the job of bookkeeping the running, runnable, */
+                  /* blocked threads easier for scripts like gr2ps  -- HWL */ 
+
+                  if (do_gr_profile && !is_first)
+                    DumpRawGranEvent(i,GR_SCHEDULE,
+                                     TSO_ID(RunnableThreadsHd[i]));
+		  if (!no_gr_profile)
+		    DumpGranInfo(i,RunnableThreadsHd[i],StgTrue);
+                  RunnableThreadsHd[i] = TSO_LINK(RunnableThreadsHd[i]);
+                  is_first = StgFalse;
+                }
+            }
+
+            ThreadQueueHd = Nil_closure;
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+            /* Print event stats */
+            if (debug & 0x20) {
+              int i;
+
+              fprintf(stderr,"Statistics of events (total=%d):\n",
+                      noOfEvents);
+              for (i=0; i<=7; i++) {
+                fprintf(stderr,"> %s (%d): \t%ld \t%f%%\n",
+                        event_names[i],i,event_counts[i],
+                        (float)(100*event_counts[i])/(float)(noOfEvents) );
+              }
+            }
+#endif       
+
+          }
+
+	if (!no_gr_profile)
+	  DumpGranInfo(CurrentProc,CurrentTSO,
+		       TSO_TYPE(CurrentTSO) != T_ADVISORY);
+
+        /* Note ThreadQueueHd is Nil when the main thread terminates */
+        if(ThreadQueueHd != Nil_closure)
+          {
+            if (do_gr_profile && !no_gr_profile)
+              DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
+            CurrentTime[CurrentProc] += gran_threadscheduletime;
+          }
+
+        else if (do_gr_binary && TSO_TYPE(CurrentTSO)==T_MAIN &&
+		 !no_gr_profile)
+          grterminate(CurrentTime[CurrentProc]);
+      }
+#endif  /* GRAN */
+
+#ifdef PAR
+    if (do_gr_profile) {
+        TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
+	DumpGranInfo(thisPE, CurrentTSO, TSO_TYPE(CurrentTSO) != T_ADVISORY);
+    }
+#endif
+
+    switch (TSO_TYPE(CurrentTSO)) {
+    case T_MAIN:
+        required_thread_count--;
+#ifdef PAR
+        if (do_gr_binary)
+            grterminate(now);
+#endif
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+	if ( (debug & 0x80) || (debug & 0x40) )
+	  fprintf(stderr,"\nGRAN: I hereby terminate the main thread!\n");
+
+	/* I've stolen that from the end of ReSchedule (!GRAN).  HWL */
+	longjmp(scheduler_loop, required_thread_count > 0 ? 1 : -1);
+#else
+        ReSchedule(0);
+#endif  /* GRAN */
+
+    case T_REQUIRED:
+        required_thread_count--;
+        break;
+
+    case T_ADVISORY:
+        advisory_thread_count--;
+        break;
+
+    case T_FAIL:
+        EXIT(EXIT_FAILURE);
+
+    default:
+        fflush(stdout);
+        fprintf(stderr, "EndThread: %lx unknown\n", (W_) TSO_TYPE(CurrentTSO));
+        EXIT(EXIT_FAILURE);
+    }
+
+    /* Reuse stack object space */
+    ASSERT(STKO_LINK(SAVE_StkO) == Nil_closure);
+    STKO_LINK(SAVE_StkO) = AvailableStack;
+    AvailableStack = SAVE_StkO;
+    /* Reuse TSO */
+    TSO_LINK(CurrentTSO) = AvailableTSO;
+    AvailableTSO = CurrentTSO;
+    CurrentTSO = Nil_closure;
+    CurrentRegTable = NULL;
+
+#if defined(GRAN)
+        /* NB: Now ThreadQueueHd is either the next runnable thread on this */
+        /* proc or it's Nil_closure. In the latter case, a FINDWORK will be */
+        /* issued by ReSchedule. */
+        ReSchedule(SAME_THREAD);                /* back for more! */
+#else
+        ReSchedule(0);                          /* back for more! */
+#endif
+}
+\end{code}
+
+%****************************************************************************
+%
+\subsection[thread-blocking]{Local Blocking}
+%
+%****************************************************************************
+
+\begin{code}
+
+#if defined(COUNT)
+void CountnUPDs() { ++nUPDs; }
+void CountnUPDs_old() { ++nUPDs_old; }
+void CountnUPDs_new() { ++nUPDs_new; }
+
+void CountnPAPs() { ++nPAPs; }
+#endif
+
+EXTDATA_RO(BQ_info);
+
+#ifndef GRAN
+/* NB: non-GRAN version ToDo
+ *
+ * AwakenBlockingQueue awakens a list of TSOs and FBQs.
+ */
+
+P_ PendingFetches = Nil_closure;
+
+void
+AwakenBlockingQueue(bqe)
+  P_ bqe;
+{
+    P_ last_tso = NULL;
+
+# ifdef PAR
+    P_ next;
+    TIME now = CURRENT_TIME;
+
+# endif
+
+# ifndef PAR
+    while (bqe != Nil_closure) {
+# else
+    while (IS_MUTABLE(INFO_PTR(bqe))) {
+	switch (INFO_TYPE(INFO_PTR(bqe))) {
+	case INFO_TSO_TYPE:
+# endif
+	    if (DO_QP_PROF) {
+		QP_Event2(do_qp_prof > 1 ? "RA" : "RG", bqe, CurrentTSO);
+	    }
+# ifdef PAR
+	    if (do_gr_profile) {
+		DumpGranEvent(GR_RESUMEQ, bqe);
+		switch (TSO_QUEUE(bqe)) {
+		case Q_BLOCKED:
+		    TSO_BLOCKTIME(bqe) += now - TSO_BLOCKEDAT(bqe);
+		    break;
+		case Q_FETCHING:
+		    TSO_FETCHTIME(bqe) += now - TSO_BLOCKEDAT(bqe);
+		    break;
+		default:
+		    fflush(stdout);
+		    fprintf(stderr, "ABQ: TSO_QUEUE invalid.\n");
+		    EXIT(EXIT_FAILURE);
+		}
+	    }
+# endif
+	    if (last_tso == NULL) {
+		if (RunnableThreadsHd == Nil_closure) {
+		    RunnableThreadsHd = bqe;
+		} else {
+		    TSO_LINK(RunnableThreadsTl) = bqe;
+		}
+	    }
+	    last_tso = bqe;
+	    bqe = TSO_LINK(bqe);
+# ifdef PAR
+	    break;
+	case INFO_BF_TYPE:
+	    next = BF_LINK(bqe);
+	    BF_LINK(bqe) = PendingFetches;
+	    PendingFetches = bqe;
+	    bqe = next;
+	    if (last_tso != NULL)
+		TSO_LINK(last_tso) = next;
+	    break;
+	default:
+	    fprintf(stderr, "Unexpected IP (%#lx) in blocking queue at %#lx\n",
+	      INFO_PTR(bqe), (W_) bqe);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+#else
+    }
+# endif
+    if (last_tso != NULL) {
+	RunnableThreadsTl = last_tso;
+# ifdef PAR
+	TSO_LINK(last_tso) = Nil_closure;
+# endif
+    }
+}
+#endif /* !GRAN */
+
+#ifdef GRAN
+
+/* NB: GRAN version only ToDo
+ *
+ * AwakenBlockingQueue returns True if we are on the oldmutables list,
+ * so that the update code knows what to do next.
+ */
+
+I_
+AwakenBlockingQueue(node)
+  P_ node;
+{
+    P_ tso = (P_) BQ_ENTRIES(node);
+    P_ prev;
+
+    if(do_gr_sim)
+      {
+        W_ notifytime;
+
+# if defined(COUNT)
+        ++nUPDs;
+        if (tso != Nil_closure) 
+          ++nUPDs_BQ;
+# endif
+
+        while(tso != Nil_closure) {
+          W_ proc;
+          assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+
+# if defined(COUNT)
+          ++BQ_lens;
+# endif
+
+          /* Find where the tso lives */
+          proc = where_is(tso);
+ 
+          if(proc == CurrentProc)
+            notifytime = CurrentTime[CurrentProc] + gran_lunblocktime;
+          else
+            {
+              CurrentTime[CurrentProc] += gran_mpacktime;
+              notifytime = CurrentTime[CurrentProc] + gran_gunblocktime;
+              CurrentTime[CurrentProc] += gran_mtidytime;
+            }
+
+          /* and create a resume message */
+          newevent(proc, CurrentProc, notifytime, 
+                   RESUMETHREAD,tso,Nil_closure,NULL);
+
+          prev = tso;
+          tso = TSO_LINK(tso);
+          TSO_LINK(prev) = Nil_closure;
+        }
+      }
+    else
+      {
+	if (ThreadQueueHd == Nil_closure)
+	  ThreadQueueHd = tso;
+	else
+	  TSO_LINK(ThreadQueueTl) = tso;
+
+        while(TSO_LINK(tso) != Nil_closure) {
+          assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+          if (DO_QP_PROF) {
+            QP_Event2(do_qp_prof > 1 ? "RA" : "RG", tso, CurrentTSO);
+          }
+          tso = TSO_LINK(tso);
+        }
+        
+        assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+        if (DO_QP_PROF) {
+          QP_Event2(do_qp_prof > 1 ? "RA" : "RG", tso, CurrentTSO);
+        }
+        
+	ThreadQueueTl = tso;
+      }
+
+    return MUT_LINK(node) != MUT_NOT_LINKED;
+}
+
+#endif /* GRAN only */
+
+EXTFUN(Continue);
+
+void
+Yield(args)
+W_ args;
+{
+    SAVE_Liveness = args >> 1;
+    TSO_PC1(CurrentTSO) = Continue;
+    if (DO_QP_PROF) {
+	QP_Event1("GR", CurrentTSO);
+    }
+#ifdef PAR
+    if (do_gr_profile) {
+        /* Note that CURRENT_TIME may perform an unsafe call */
+	TSO_EXECTIME(CurrentTSO) += CURRENT_TIME - TSO_BLOCKEDAT(CurrentTSO);
+    }
+#endif
+    ReSchedule(args & 1);
+}
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[gr-fetch]{Fetching Nodes (GrAnSim only)}
+%
+%****************************************************************************
+
+The following GrAnSim routines simulate the fetching of nodes from a remote
+processor. We use a 1 word bitmask to indicate on which processor a node is
+lying. Thus,  moving or copying a  node from one  processor to another just
+requires  an     appropriate  change in this     bitmask  (using @SET_GA@).
+Additionally, the clocks have to be updated.
+
+A special case arises when the node that is  needed by processor A has been
+moved from a  processor B to a processor   C between sending  out a @FETCH@
+(from A) and its arrival at B. In that case the @FETCH@ has to be forwarded
+to C.
+ 
+Currently, we  only support GRIP-like  single closure fetching.  We plan to
+incorporate GUM-like packet fetching in the near future.
+ 
+\begin{code}
+#if defined(GRAN)
+
+/* Fetch node "node" to processor "p" */
+
+int
+FetchNode(node,from,to)
+P_ node;
+PROC from, to;
+{
+  assert(to==CurrentProc);
+  if (!IS_LOCAL_TO(PROCS(node),from) &&
+      !IS_LOCAL_TO(PROCS(node),to) ) 
+    return 1;
+
+  if(IS_NF(INFO_PTR(node)))                 /* Old: || IS_BQ(node) */
+    PROCS(node) |= PE_NUMBER(to);           /* Copy node */
+  else
+    PROCS(node) = PE_NUMBER(to);            /* Move node */
+
+  /* Now fetch the children */
+  if(DoGUMMFetching)
+    {
+      fprintf(stderr,"Sorry, GUMM fetching not yet implemented.\n");
+    }
+
+  return 0;
+}
+
+/* --------------------------------------------------
+   Cost of sending a packet of size n = C + P*n
+   where C = packet construction constant, 
+         P = cost of packing one word into a packet
+   [Should also account for multiple packets].
+   -------------------------------------------------- */
+
+void 
+HandleFetchRequest(node,p,tso)
+P_ node, tso;
+PROC p;
+{
+  if (IS_LOCAL_TO(PROCS(node),p) )  /* Somebody else moved node already => */
+    {                               /* start tso                           */ 
+      newevent(p,CurrentProc,
+               CurrentTime[CurrentProc] /* +gran_latency */,
+               FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+      CurrentTime[CurrentProc] += gran_mtidytime;
+    }
+  else if (IS_LOCAL_TO(PROCS(node),CurrentProc) )   /* Is node still here? */
+    {
+      /* Actual moving/copying of node is done on arrival; see FETCHREPLY */
+      /* Send a reply to the originator */
+      CurrentTime[CurrentProc] += gran_mpacktime;
+
+      newevent(p,CurrentProc,
+               CurrentTime[CurrentProc]+gran_latency,
+               FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+      
+      CurrentTime[CurrentProc] += gran_mtidytime;
+    }
+  else
+    {    /* Qu'vatlh! node has been grabbed by another proc => forward */
+      PROC p_new = where_is(node);
+      TIME fetchtime;
+
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+      if (NoForward) {
+        newevent(p,p_new,
+                 max(CurrentTime[p_new],CurrentTime[CurrentProc])+gran_latency,
+                 FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+        CurrentTime[CurrentProc] += gran_mtidytime;
+        return;
+      }
+#endif
+
+#if defined(GRAN_CHECK) && defined(GRAN)         /* Just for testing */
+      if (debug & 0x2)    /* 0x2 should be somehting like DBG_PRINT_FWD */
+        fprintf(stderr,"Qu'vatlh! node 0x%x has been grabbed by %d (current=%d; demander=%d) @ %d\n",
+                node,p_new,CurrentProc,p,CurrentTime[CurrentProc]);
+#endif
+      /* Prepare FORWARD message to proc p_new */
+      CurrentTime[CurrentProc] += gran_mpacktime;
+      
+      fetchtime = max(CurrentTime[CurrentProc],CurrentTime[p_new]) +
+                      gran_latency;
+          
+      newevent(p_new,p,fetchtime,FETCHNODE,tso,node,NULL);
+
+      CurrentTime[CurrentProc] += gran_mtidytime;
+    }
+}
+#endif
+\end{code}
+
+%****************************************************************************
+%
+\subsection[gr-simulation]{Granularity Simulation}
+%
+%****************************************************************************
+
+\begin{code}
+#if 0 /* moved to GranSim.lc */
+#if defined(GRAN)
+I_ do_gr_sim = 0;
+FILE *gr_file = NULL;
+char gr_filename[32];
+
+init_gr_simulation(rts_argc,rts_argv,prog_argc,prog_argv)
+char *prog_argv[], *rts_argv[];
+int prog_argc, rts_argc;
+{
+    I_ i;
+
+    if(do_gr_sim)
+      { 
+        char *extension = do_gr_binary? "gb": "gr";
+        sprintf(gr_filename, "%0.28s.%0.2s", prog_argv[0],extension);
+
+        if ((gr_file = fopen(gr_filename,"w")) == NULL ) 
+          {
+            fprintf(stderr, "Can't open granularity simulation report file %s\n", gr_filename);
+            exit(EXIT_FAILURE);             
+          }
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+        if(DoReScheduleOnFetch)
+          setbuf(gr_file,NULL);
+#endif
+
+        fputs("Granularity Simulation for ",gr_file);
+        for(i=0; i < prog_argc; ++i)
+          {
+            fputs(prog_argv[i],gr_file);
+            fputc(' ',gr_file);
+          }
+
+        if(rts_argc > 0)
+          {
+            fputs("+RTS ",gr_file);
+
+            for(i=0; i < rts_argc; ++i)
+              {
+                fputs(rts_argv[i],gr_file);
+                fputc(' ',gr_file);
+              }
+          }
+
+        fputs("\n\n--------------------\n\n",gr_file);
+
+        fputs("General Parameters:\n\n",gr_file);
+
+        fprintf(gr_file, "PEs %u, %s Scheduler, %sMigrate Threads%s\n",
+                max_proc,DoFairSchedule?"Fair":"Unfair",
+                DoThreadMigration?"":"Don't ",
+                DoThreadMigration && DoStealThreadsFirst?" Before Sparks":"",
+                DoReScheduleOnFetch?"":"Don't ");
+
+        fprintf(gr_file, "%s, Fetch %s in Each Packet\n",
+                SimplifiedFetch?"Simplified Fetch":(DoReScheduleOnFetch?"Reschedule on Fetch":"Block on Fetch"),
+                DoGUMMFetching?"Many Closures":"Exactly One Closure");
+        fprintf(gr_file, "Fetch Strategy(%u): If outstanding fetches %s\n",
+                FetchStrategy,
+                FetchStrategy==1?"only run runnable threads (don't create new ones":
+                FetchStrategy==2?"create threads only from local sparks":
+                FetchStrategy==3?"create threads from local or global sparks":
+                FetchStrategy==4?"create sparks and steal threads if necessary":
+                                 "unknown");
+
+        fprintf(gr_file, "Thread Creation Time %lu, Thread Queue Time %lu\n",
+                gran_threadcreatetime,gran_threadqueuetime);
+        fprintf(gr_file, "Thread DeSchedule Time %lu, Thread Schedule Time %lu\n",
+                gran_threaddescheduletime,gran_threadscheduletime);
+        fprintf(gr_file, "Thread Context-Switch Time %lu\n",
+                gran_threadcontextswitchtime);
+        fputs("\n\n--------------------\n\n",gr_file);
+
+        fputs("Communication Metrics:\n\n",gr_file);
+        fprintf(gr_file,
+                "Latency %lu (1st) %lu (rest), Fetch %lu, Notify %lu (Global) %lu (Local)\n",
+                gran_latency, gran_additional_latency, gran_fetchtime,
+                gran_gunblocktime, gran_lunblocktime);
+        fprintf(gr_file,
+                "Message Creation %lu (+ %lu after send), Message Read %lu\n",
+                gran_mpacktime, gran_mtidytime, gran_munpacktime);
+        fputs("\n\n--------------------\n\n",gr_file);
+
+        fputs("Instruction Metrics:\n\n",gr_file);
+        fprintf(gr_file,"Arith %lu, Branch %lu, Load %lu, Store %lu, Float %lu, Alloc %lu\n",
+                gran_arith_cost, gran_branch_cost, 
+                gran_load_cost, gran_store_cost,gran_float_cost,gran_heapalloc_cost);
+        fputs("\n\n++++++++++++++++++++\n\n",gr_file);
+      }
+
+    if(do_gr_binary)
+      grputw(sizeof(TIME));
+
+    Idlers = max_proc;
+    return(0);
+}
+
+void end_gr_simulation() {
+  if(do_gr_sim)
+    {
+      fprintf(stderr,"The simulation is finished. Look at %s for details.\n",
+              gr_filename);
+      fclose(gr_file);
+    }
+}
+#endif /*0*/
+\end{code}
+
+%****************************************************************************
+%
+\subsection[qp-profile]{Quasi-Parallel Profiling}
+%
+%****************************************************************************
+
+\begin{code}
+#ifndef PAR
+
+I_ do_qp_prof;
+FILE *qp_file;
+
+/* *Virtual* Time in milliseconds */
+long 
+qp_elapsed_time(STG_NO_ARGS)
+{
+    extern StgDouble usertime();
+
+    return ((long) (usertime() * 1e3));
+}
+
+static void 
+init_qp_profiling(STG_NO_ARGS)
+{
+    I_ i;
+    char qp_filename[32];
+
+    sprintf(qp_filename, "%0.24s.qp", prog_argv[0]);
+    if ((qp_file = fopen(qp_filename,"w")) == NULL ) {
+        fprintf(stderr, "Can't open quasi-parallel profile report file %s\n", 
+            qp_filename);
+        do_qp_prof = 0;
+    } else {
+        fputs(prog_argv[0], qp_file);
+        for(i = 1; prog_argv[i]; i++) {
+            fputc(' ', qp_file);
+            fputs(prog_argv[i], qp_file);
+        }
+        fprintf(qp_file, " +RTS -C%d -t%d\n", contextSwitchTime, MaxThreads);
+        fputs(time_str(), qp_file);
+        fputc('\n', qp_file);
+    }
+}
+
+void
+QP_Event0(tid, node)
+I_ tid;
+P_ node;
+{
+    fprintf(qp_file, "%lu ** %lu 0x%lx\n", qp_elapsed_time(), tid, INFO_PTR(node));
+}
+
+void
+QP_Event1(event, tso)
+char *event;
+P_ tso;
+{
+    fprintf(qp_file, "%lu %s %lu 0x%lx\n", qp_elapsed_time(), event,
+            TSO_ID(tso), TSO_NAME(tso));
+}
+
+void
+QP_Event2(event, tso1, tso2)
+char *event;
+P_ tso1, tso2;
+{
+    fprintf(qp_file, "%lu %s %lu 0x%lx %lu 0x%lx\n", qp_elapsed_time(), event,
+            TSO_ID(tso1), TSO_NAME(tso1), TSO_ID(tso2), TSO_NAME(tso2));
+}
+
+#endif /* !PAR */
+\end{code}
+
+%****************************************************************************
+%
+\subsection[entry-points]{Routines directly called from Haskell world}
+%
+%****************************************************************************
+
+The @GranSim...@ rotuines in here are directly called via macros from the
+threaded world. 
+
+First some auxiliary routines.
+
+\begin{code}
+#ifdef GRAN
+/* Take the current thread off the thread queue and thereby activate the */
+/* next thread. It's assumed that the next ReSchedule after this uses */
+/* NEW_THREAD as param. */
+/* This fct is called from GranSimBlock and GranSimFetch */
+
+void 
+ActivateNextThread ()
+{
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if(ThreadQueueHd != CurrentTSO) {
+    fprintf(stderr,"Error: ThreadQueueHd != CurrentTSO in ActivateNextThread\n");
+    exit(99);
+  }
+#endif
+ 
+  ThreadQueueHd = TSO_LINK(ThreadQueueHd);
+  if(ThreadQueueHd==Nil_closure) {
+    MAKE_IDLE(CurrentProc);
+    ThreadQueueTl = Nil_closure;
+  } else if (do_gr_profile) {
+    CurrentTime[CurrentProc] += gran_threadcontextswitchtime;
+    DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
+  }
+}
+\end{code}
+
+Now the main stg-called routines:
+
+\begin{code}
+/* ------------------------------------------------------------------------ */
+/* The following GranSim... fcts are stg-called from the threaded world.    */
+/* ------------------------------------------------------------------------ */
+
+/* Called from HEAP_CHK  -- NB: node and liveness are junk here now. 
+   They are left temporarily to avoid complete recompilation.
+   KH 
+*/
+void 
+GranSimAllocate(n,node,liveness)
+I_ n;
+P_ node;
+W_ liveness;
+{
+  TSO_ALLOCS(CurrentTSO) += n;
+  ++TSO_BASICBLOCKS(CurrentTSO);
+  
+  TSO_EXECTIME(CurrentTSO) += gran_heapalloc_cost;
+  CurrentTime[CurrentProc] += gran_heapalloc_cost;
+}
+
+/*
+  Subtract the values added above, if a heap check fails and
+  so has to be redone.
+*/
+void 
+GranSimUnallocate(n,node,liveness)
+W_ n;
+P_ node;
+W_ liveness;
+{
+  TSO_ALLOCS(CurrentTSO) -= n;
+  --TSO_BASICBLOCKS(CurrentTSO);
+  
+  TSO_EXECTIME(CurrentTSO) -= gran_heapalloc_cost;
+  CurrentTime[CurrentProc] -= gran_heapalloc_cost;
+}
+
+void 
+GranSimExec(ariths,branches,loads,stores,floats)
+W_ ariths,branches,loads,stores,floats;
+{
+  W_ cost = gran_arith_cost*ariths + gran_branch_cost*branches + gran_load_cost * loads +
+            gran_store_cost*stores + gran_float_cost*floats;
+
+  TSO_EXECTIME(CurrentTSO) += cost;
+  CurrentTime[CurrentProc] += cost;
+}
+
+
+/* 
+   Fetch the node if it isn't local
+   -- result indicates whether fetch has been done.
+
+   This is GRIP-style single item fetching.
+*/
+
+I_ 
+GranSimFetch(node /* , liveness_mask */ )
+P_ node;
+/* I_ liveness_mask; */
+{
+  /* Note: once a node has been fetched, this test will be passed */
+  if(!IS_LOCAL_TO(PROCS(node),CurrentProc) )
+    {
+      /* I suppose we shouldn't do this for CAFs? -- KH */
+      /* Should reschedule if the latency is high */
+      /* We should add mpacktime to the remote PE for the reply,
+         but we don't know who owns the node
+      */
+      /* if(DYNAMIC_POINTER(node)) */        /* For 0.22; gone in 0.23 !!! */
+        {
+          PROC p = where_is(node);
+          TIME fetchtime;
+
+#ifdef GRAN_CHECK
+	  if ( ( debug & 0x40 ) &&
+	       p == CurrentProc )
+	    fprintf(stderr,"GranSimFetch: Trying to fetch from own processor%u\n", p);
+#endif  /* GRAN_CHECK */
+
+          CurrentTime[CurrentProc] += gran_mpacktime;
+
+          ++TSO_FETCHCOUNT(CurrentTSO);
+          TSO_FETCHTIME(CurrentTSO) += gran_fetchtime;
+              
+          if (SimplifiedFetch)
+            {
+              FetchNode(node,CurrentProc);
+              CurrentTime[CurrentProc] += gran_mtidytime+gran_fetchtime+
+                                          gran_munpacktime;
+              return(1);
+            }
+
+          fetchtime = max(CurrentTime[CurrentProc],CurrentTime[p]) +
+                      gran_latency;
+
+          newevent(p,CurrentProc,fetchtime,FETCHNODE,CurrentTSO,node,NULL);
+          ++OutstandingFetches[CurrentProc];
+
+          /* About to block */
+          TSO_BLOCKEDAT(CurrentTSO) = CurrentTime[p];
+
+          if (DoReScheduleOnFetch) 
+            {
+
+              /* Remove CurrentTSO from the queue 
+                 -- assumes head of queue == CurrentTSO */
+              if(!DoFairSchedule)
+                {
+                  if(do_gr_profile)
+                    DumpGranEventAndNode(GR_FETCH,CurrentTSO,node,p);
+
+                  ActivateNextThread();
+              
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+                  if (debug & 0x10) {
+                    if (TSO_TYPE(CurrentTSO) & FETCH_MASK_TSO) {
+                      fprintf(stderr,"FETCHNODE: TSO 0x%x has fetch-mask set @ %d\n",
+                              CurrentTSO,CurrentTime[CurrentProc]);
+                      exit (99);
+                    } else {
+                      TSO_TYPE(CurrentTSO) |= FETCH_MASK_TSO;
+                    }
+
+                  }
+#endif
+
+                  TSO_LINK(CurrentTSO) = Nil_closure;
+                  /* CurrentTSO = Nil_closure; */
+
+                  /* ThreadQueueHd is now the next TSO to schedule or NULL */
+                  /* CurrentTSO is pointed to by the FETCHNODE event */
+                }
+              else                            /* DoFairSchedule */
+                {
+                  /* Remove from the tail of the thread queue */
+                  fprintf(stderr,"Reschedule-on-fetch is not yet compatible with fair scheduling\n");
+                  exit(99);
+                }
+            }
+          else                                /* !DoReScheduleOnFetch */
+            {
+              /* Note: CurrentProc is still busy as it's blocked on fetch */
+              if(do_gr_profile)
+                DumpGranEventAndNode(GR_FETCH,CurrentTSO,node,p);
+
+#if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+              if (debug & 0x04)
+                  BlockedOnFetch[CurrentProc] = CurrentTSO; /*- StgTrue; -*/
+
+              if (debug & 0x10) {
+                if (TSO_TYPE(CurrentTSO) & FETCH_MASK_TSO) {
+                  fprintf(stderr,"FETCHNODE: TSO 0x%x has fetch-mask set @ %d\n",
+                          CurrentTSO,CurrentTime[CurrentProc]);
+                  exit (99);
+                } else {
+                  TSO_TYPE(CurrentTSO) |= FETCH_MASK_TSO;
+                }
+
+                CurrentTSO = Nil_closure;
+              }
+#endif
+            }
+
+          CurrentTime[CurrentProc] += gran_mtidytime;
+
+          /* Rescheduling is necessary */
+          NeedToReSchedule = StgTrue;
+
+          return(1); 
+        }
+    }
+  return(0);
+}
+
+void 
+GranSimSpark(local,node)
+W_ local;
+P_ node;
+{
+  ++SparksAvail;
+  if(do_sp_profile)
+    DumpSparkGranEvent(SP_SPARK,node);
+
+  /* Force the PE to take notice of the spark */
+  if(DoAlwaysCreateThreads)
+    newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
+             FINDWORK,Nil_closure,Nil_closure,NULL);
+
+  if(local)
+    ++TSO_LOCALSPARKS(CurrentTSO);
+  else
+    ++TSO_GLOBALSPARKS(CurrentTSO);
+}
+
+void 
+GranSimSparkAt(spark,where,identifier)
+sparkq spark;
+P_  where;        /* This should be a node; alternatively could be a GA */
+I_ identifier;
+{
+  PROC p = where_is(where);
+  TIME exporttime;
+
+  if(do_sp_profile)
+    DumpSparkGranEvent(SP_SPARKAT,SPARK_NODE(spark));
+
+  CurrentTime[CurrentProc] += gran_mpacktime;
+
+  exporttime = (CurrentTime[p] > CurrentTime[CurrentProc]? 
+                CurrentTime[p]: CurrentTime[CurrentProc])
+               + gran_latency;
+  
+  newevent(p,CurrentProc,exporttime,MOVESPARK,Nil_closure,Nil_closure,spark);
+
+  CurrentTime[CurrentProc] += gran_mtidytime;
+
+  ++TSO_GLOBALSPARKS(CurrentTSO);
+}
+
+void 
+GranSimBlock()
+{
+  if(do_gr_profile)
+    DumpGranEvent(GR_BLOCK,CurrentTSO);
+
+  ++TSO_BLOCKCOUNT(CurrentTSO);
+  TSO_BLOCKEDAT(CurrentTSO) = CurrentTime[CurrentProc];
+  ActivateNextThread();
+}
+
+#endif  /* GRAN */
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[gc-GrAnSim]{Garbage collection routines for GrAnSim objects}
+%
+%****************************************************************************
+
+Garbage collection code for the event queue.  We walk the event queue
+so that if the only reference to a TSO is in some event (e.g. RESUME),
+the TSO is still preserved.
+
+\begin{code}
+#ifdef GRAN
+
+extern smInfo StorageMgrInfo;
+
+I_
+SaveEventRoots(num_ptr_roots)
+I_ num_ptr_roots;
+{
+  eventq event = EventHd;
+  while(event != NULL)
+    {
+      if(EVENT_TYPE(event) == RESUMETHREAD || 
+         EVENT_TYPE(event) == MOVETHREAD || 
+         EVENT_TYPE(event) == STARTTHREAD )
+        StorageMgrInfo.roots[num_ptr_roots++] = EVENT_TSO(event);
+
+      else if(EVENT_TYPE(event) == MOVESPARK)
+        StorageMgrInfo.roots[num_ptr_roots++] = SPARK_NODE(EVENT_SPARK(event));
+
+      else if (EVENT_TYPE(event) == FETCHNODE ||
+               EVENT_TYPE(event) == FETCHREPLY )
+        {
+          StorageMgrInfo.roots[num_ptr_roots++] = EVENT_TSO(event);
+          StorageMgrInfo.roots[num_ptr_roots++] = EVENT_NODE(event);
+        }
+
+      event = EVENT_NEXT(event);
+    }
+  return(num_ptr_roots);
+}
+
+I_
+SaveSparkRoots(num_ptr_roots)
+I_ num_ptr_roots;
+{
+  sparkq spark, /* prev, */ disposeQ=NULL;
+  PROC proc;
+  I_ i, sparkroots=0, prunedSparks=0;
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if ( debug & 0x40 ) 
+    fprintf(stderr,"D> Saving spark roots for GC ...\n");
+#endif       
+
+  for(proc = 0; proc < max_proc; ++proc) {
+    for(i = 0; i < SPARK_POOLS; ++i) {
+      for(/* prev = &PendingSparksHd[proc][i],*/ spark = PendingSparksHd[proc][i]; 
+	  spark != NULL; 
+	  /* prev = &SPARK_NEXT(spark), */ spark = SPARK_NEXT(spark))
+        {
+          if(++sparkroots <= MAX_SPARKS)
+            {
+#if defined(GRAN_CHECK) && defined(GRAN)
+	      if ( debug & 0x40 ) 
+		fprintf(main_statsfile,"Saving Spark Root %d(proc: %d; pool: %d) -- 0x%lx\n",
+			num_ptr_roots,proc,i,SPARK_NODE(spark));
+#endif       
+              StorageMgrInfo.roots[num_ptr_roots++] = SPARK_NODE(spark);
+            }
+          else
+            {
+              SPARK_NODE(spark) = Nil_closure;
+              if (prunedSparks==0) {
+                disposeQ = spark;
+		/*
+		   *prev = NULL;
+		*/
+	      }
+              prunedSparks++;
+            }
+        }  /* forall spark ... */
+        if (prunedSparks>0) {
+          fprintf(main_statsfile,"Pruning and disposing %lu excess sparks (> %lu) on proc %d for GC purposes\n",
+                  prunedSparks,MAX_SPARKS,proc);
+	  if (disposeQ == PendingSparksHd[proc][i])
+	    PendingSparksHd[proc][i] = NULL;
+	  else
+	    SPARK_NEXT(SPARK_PREV(disposeQ)) = NULL;
+          DisposeSparkQ(disposeQ);
+          prunedSparks = 0;
+          disposeQ = NULL;
+        }  
+        }  /* forall i ... */
+    }      /*forall proc .. */
+
+  return(num_ptr_roots);
+}
+
+/*
+   GC roots must be restored in *reverse order*.
+   The recursion is a little ugly, but is better than
+   in-place pointer reversal.
+*/
+
+static I_
+RestoreEvtRoots(event,num_ptr_roots)
+eventq event;
+I_ num_ptr_roots;
+{
+  if(event != NULL)
+    {
+      num_ptr_roots = RestoreEvtRoots(EVENT_NEXT(event),num_ptr_roots);
+
+      if(EVENT_TYPE(event) == RESUMETHREAD || 
+         EVENT_TYPE(event) == MOVETHREAD || 
+         EVENT_TYPE(event) == STARTTHREAD )
+        EVENT_TSO(event) = StorageMgrInfo.roots[--num_ptr_roots];
+
+      else if(EVENT_TYPE(event) == MOVESPARK )
+        SPARK_NODE(EVENT_SPARK(event)) = StorageMgrInfo.roots[--num_ptr_roots];
+
+      else if (EVENT_TYPE(event) == FETCHNODE ||
+               EVENT_TYPE(event) == FETCHREPLY )
+        {
+          EVENT_NODE(event) = StorageMgrInfo.roots[--num_ptr_roots];
+          EVENT_TSO(event) =  StorageMgrInfo.roots[--num_ptr_roots];
+        }
+    }
+
+  return(num_ptr_roots);
+}
+
+I_ 
+RestoreEventRoots(num_ptr_roots)
+I_ num_ptr_roots;
+{
+  return(RestoreEvtRoots(EventHd,num_ptr_roots));
+}
+
+static I_
+RestoreSpkRoots(spark,num_ptr_roots,sparkroots)
+sparkq spark;
+I_ num_ptr_roots, sparkroots;
+{
+  if(spark != NULL)
+    {
+      num_ptr_roots = RestoreSpkRoots(SPARK_NEXT(spark),num_ptr_roots,++sparkroots);
+      if(sparkroots <= MAX_SPARKS)
+        {
+          P_ n = SPARK_NODE(spark);
+          SPARK_NODE(spark) = StorageMgrInfo.roots[--num_ptr_roots];
+#if defined(GRAN_CHECK) && defined(GRAN)
+	  if ( debug & 0x40 ) 
+	    fprintf(main_statsfile,"Restoring Spark Root %d -- new: 0x%lx \n",
+		    num_ptr_roots,SPARK_NODE(spark));
+#endif
+        }
+      else
+#if defined(GRAN_CHECK) && defined(GRAN)
+	  if ( debug & 0x40 ) 
+	    fprintf(main_statsfile,"Error in RestoreSpkRoots (%d; @ spark 0x%x): More than MAX_SPARKS (%d) sparks\n",
+		    num_ptr_roots,SPARK_NODE(spark),MAX_SPARKS);
+#endif
+
+    }
+
+  return(num_ptr_roots);
+}
+
+I_ 
+RestoreSparkRoots(num_ptr_roots)
+I_ num_ptr_roots;
+{
+  PROC proc;
+  I_   i;
+
+  /* NB: PROC is currently an unsigned datatype i.e. proc>=0 is always */
+  /* true ((PROC)-1 == (PROC)255). So we need a second clause in the head */
+  /* of the for loop. For i that is currently not necessary. C is really */
+  /* impressive in datatype abstraction!   -- HWL */
+
+  for(proc = max_proc - 1; (proc >= 0) && (proc < max_proc); --proc) {
+    for(i = SPARK_POOLS - 1; (i >= 0) && (i < SPARK_POOLS) ; --i) {
+      num_ptr_roots = RestoreSpkRoots(PendingSparksHd[proc][i],num_ptr_roots,0);
+    }
+  }
+  return(num_ptr_roots);
+}
+
+#endif  /* GRAN */
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[GrAnSim-profile]{Writing profiling info for GrAnSim}
+%
+%****************************************************************************
+
+Event dumping routines.
+
+\begin{code}
+#ifdef GRAN 
+
+DumpGranEvent(name,tso)
+enum gran_event_types name;
+P_ tso;
+{
+  DumpRawGranEvent(CurrentProc,name,TSO_ID(tso));
+}
+
+DumpSparkGranEvent(name,id)
+enum gran_event_types name;
+W_ id;
+{
+  DumpRawGranEvent(CurrentProc,name,id);
+}
+
+DumpGranEventAndNode(name,tso,node,proc)
+enum gran_event_types name;
+P_ tso, node;
+PROC proc;
+{
+  PROC pe = CurrentProc;
+  W_ id = TSO_ID(tso);
+
+  if(name > GR_EVENT_MAX)
+    name = GR_EVENT_MAX;
+
+  if(do_gr_binary)
+    {
+      grputw(name);
+      grputw(pe);
+      grputw(CurrentTime[CurrentProc]);
+      grputw(id);
+    }
+  else
+    fprintf(gr_file,"PE %2u [%lu]: %s %lx \t0x%lx\t(from %2u)\n",
+            pe,CurrentTime[CurrentProc],gran_event_names[name],id,node,proc);
+}
+
+DumpRawGranEvent(pe,name,id)
+PROC pe;
+enum gran_event_types name;
+W_ id;
+{
+  if(name > GR_EVENT_MAX)
+    name = GR_EVENT_MAX;
+
+  if(do_gr_binary)
+    {
+      grputw(name);
+      grputw(pe);
+      grputw(CurrentTime[CurrentProc]);
+      grputw(id);
+    }
+  else
+    fprintf(gr_file,"PE %2u [%lu]: %s %lx\n",
+            pe,CurrentTime[CurrentProc],gran_event_names[name],id);
+}
+
+DumpGranInfo(pe,tso,mandatory_thread)
+PROC pe;
+P_ tso;
+I_ mandatory_thread;
+{
+  if(do_gr_binary)
+    {
+      grputw(GR_END);
+      grputw(pe);
+      grputw(CurrentTime[CurrentProc]);
+      grputw(TSO_ID(tso));
+      grputw(TSO_SPARKNAME(tso));
+      grputw(TSO_STARTEDAT(tso));
+      grputw(TSO_EXPORTED(tso));
+      grputw(TSO_BASICBLOCKS(tso));
+      grputw(TSO_ALLOCS(tso));
+      grputw(TSO_EXECTIME(tso));
+      grputw(TSO_BLOCKTIME(tso));
+      grputw(TSO_BLOCKCOUNT(tso));
+      grputw(TSO_FETCHTIME(tso));
+      grputw(TSO_FETCHCOUNT(tso));
+      grputw(TSO_LOCALSPARKS(tso));
+      grputw(TSO_GLOBALSPARKS(tso));
+      grputw(mandatory_thread);
+    }
+  else
+    {
+      /* NB: DumpGranEvent cannot be used because PE may be wrong (as well as the extra info) */
+      fprintf(gr_file,"PE %2u [%lu]: END %lx, SN %lu, ST %lu, EXP %c, BB %lu, HA %lu, RT %lu, BT %lu (%lu), FT %lu (%lu), LS %lu, GS %lu, MY %c\n"
+              ,pe
+              ,CurrentTime[CurrentProc]
+              ,TSO_ID(tso)
+              ,TSO_SPARKNAME(tso)
+              ,TSO_STARTEDAT(tso)
+              ,TSO_EXPORTED(tso)?'T':'F'
+              ,TSO_BASICBLOCKS(tso)
+              ,TSO_ALLOCS(tso)
+              ,TSO_EXECTIME(tso)
+              ,TSO_BLOCKTIME(tso)
+              ,TSO_BLOCKCOUNT(tso)
+              ,TSO_FETCHTIME(tso)
+              ,TSO_FETCHCOUNT(tso)
+              ,TSO_LOCALSPARKS(tso)
+              ,TSO_GLOBALSPARKS(tso)
+              ,mandatory_thread?'T':'F'
+              );
+    }
+}
+
+DumpTSO(tso)
+P_ tso;
+{
+  fprintf(stderr,"TSO 0x%lx, NAME 0x%lx, ID %lu, LINK 0x%lx, TYPE %s\n"
+          ,tso
+          ,TSO_NAME(tso)
+          ,TSO_ID(tso)
+          ,TSO_LINK(tso)
+          ,TSO_TYPE(tso)==T_MAIN?"MAIN":
+           TSO_TYPE(tso)==T_FAIL?"FAIL":
+           TSO_TYPE(tso)==T_REQUIRED?"REQUIRED":
+           TSO_TYPE(tso)==T_ADVISORY?"ADVISORY":
+           "???"
+          );
+          
+  fprintf(stderr,"PC (0x%lx,0x%lx), ARG (0x%lx,0x%lx), SWITCH %lx0x\n"
+          ,TSO_PC1(tso)
+          ,TSO_PC2(tso)
+          ,TSO_ARG1(tso)
+          ,TSO_ARG2(tso)
+          ,TSO_SWITCH(tso)
+          );
+
+  fprintf(gr_file,"SN %lu, ST %lu, GBL %c, BB %lu, HA %lu, RT %lu, BT %lu (%lu), FT %lu (%lu) LS %lu, GS %lu\n"
+          ,TSO_SPARKNAME(tso)
+          ,TSO_STARTEDAT(tso)
+          ,TSO_EXPORTED(tso)?'T':'F'
+          ,TSO_BASICBLOCKS(tso)
+          ,TSO_ALLOCS(tso)
+          ,TSO_EXECTIME(tso)
+          ,TSO_BLOCKTIME(tso)
+          ,TSO_BLOCKCOUNT(tso)
+          ,TSO_FETCHTIME(tso)
+          ,TSO_FETCHCOUNT(tso)
+          ,TSO_LOCALSPARKS(tso)
+          ,TSO_GLOBALSPARKS(tso)
+          );
+}
+
+/*
+   Output a terminate event and an 8-byte time.
+*/
+
+grterminate(v)
+TIME v;
+{
+  DumpGranEvent(GR_TERMINATE,0);
+
+  if(sizeof(TIME)==4)
+    {
+      putc('\0',gr_file);
+      putc('\0',gr_file);
+      putc('\0',gr_file);
+      putc('\0',gr_file);
+    }
+  else
+    {
+      putc(v >> 56l,gr_file);
+      putc((v >> 48l)&0xffl,gr_file);
+      putc((v >> 40l)&0xffl,gr_file);
+      putc((v >> 32l)&0xffl,gr_file);
+    }
+  putc((v >> 24l)&0xffl,gr_file);
+  putc((v >> 16l)&0xffl,gr_file);
+  putc((v >> 8l)&0xffl,gr_file);
+  putc(v&0xffl,gr_file);
+}
+
+/*
+   Length-coded output: first 3 bits contain length coding
+
+     00x        1 byte
+     01x        2 bytes
+     10x        4 bytes
+     110        8 bytes
+     111        5 or 9 bytes
+*/
+
+grputw(v)
+TIME v;
+{
+  if(v <= 0x3fl)
+    {
+      fputc(v & 0x3f,gr_file);
+    }
+
+  else if (v <= 0x3fffl)
+    {
+      fputc((v >> 8l)|0x40l,gr_file);
+      fputc(v&0xffl,gr_file);
+    }
+  
+  else if (v <= 0x3fffffffl)
+    {
+      fputc((v >> 24l)|0x80l,gr_file);
+      fputc((v >> 16l)&0xffl,gr_file);
+      fputc((v >> 8l)&0xffl,gr_file);
+      fputc(v&0xffl,gr_file);
+    }
+
+  else if (sizeof(TIME) == 4)
+    {
+      fputc(0x70,gr_file);
+      fputc((v >> 24l)&0xffl,gr_file);
+      fputc((v >> 16l)&0xffl,gr_file);
+      fputc((v >> 8l)&0xffl,gr_file);
+      fputc(v&0xffl,gr_file);
+    }
+
+  else 
+    {
+      if (v <= 0x3fffffffffffffl)
+        putc((v >> 56l)|0x60l,gr_file);
+      else
+        {
+          putc(0x70,gr_file);
+          putc((v >> 56l)&0xffl,gr_file);
+        }
+
+      putc((v >> 48l)&0xffl,gr_file);
+      putc((v >> 40l)&0xffl,gr_file);
+      putc((v >> 32l)&0xffl,gr_file);
+      putc((v >> 24l)&0xffl,gr_file);
+      putc((v >> 16l)&0xffl,gr_file);
+      putc((v >> 8l)&0xffl,gr_file);
+      putc(v&0xffl,gr_file);
+    }
+}
+#endif  /* GRAN */
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[GrAnSim-debug]{Debugging routines  for GrAnSim}
+%
+%****************************************************************************
+
+Debugging routines, mainly for GrAnSim. They should really be in a separate file.
+
+The    first couple  of routines     are   general ones   (look also   into
+c-as-asm/StgDebug.lc).
+
+\begin{code}
+
+#define NULL_REG_MAP        /* Not threaded */
+#include "stgdefs.h"
+
+char *
+info_hdr_type(info_ptr)
+W_ info_ptr;
+{
+#if ! defined(PAR) && !defined(GRAN)
+  switch (INFO_TAG(info_ptr))
+    {
+      case INFO_OTHER_TAG:
+        return("OTHER_TAG");
+/*    case INFO_IND_TAG:
+        return("IND_TAG");
+*/    default:
+        return("TAG<n>");
+    }
+#else /* PAR */
+  switch(INFO_TYPE(info_ptr))
+    {
+      case INFO_SPEC_U_TYPE:
+        return("SPECU");
+
+      case INFO_SPEC_N_TYPE:
+        return("SPECN");
+
+      case INFO_GEN_U_TYPE:
+        return("GENU");
+
+      case INFO_GEN_N_TYPE:
+        return("GENN");
+
+      case INFO_DYN_TYPE:
+        return("DYN");
+
+      /* 
+      case INFO_DYN_TYPE_N:
+        return("DYNN");
+
+      case INFO_DYN_TYPE_U:
+        return("DYNU");
+      */
+
+      case INFO_TUPLE_TYPE:
+        return("TUPLE");
+
+      case INFO_DATA_TYPE:
+        return("DATA");
+
+      case INFO_MUTUPLE_TYPE:
+        return("MUTUPLE");
+
+      case INFO_IMMUTUPLE_TYPE:
+        return("IMMUTUPLE");
+
+      case INFO_STATIC_TYPE:
+        return("STATIC");
+
+      case INFO_CONST_TYPE:
+        return("CONST");
+
+      case INFO_CHARLIKE_TYPE:
+        return("CHAR");
+
+      case INFO_INTLIKE_TYPE:
+        return("INT");
+
+      case INFO_BH_TYPE:
+        return("BHOLE");
+
+      case INFO_IND_TYPE:
+        return("IND");
+
+      case INFO_CAF_TYPE:
+        return("CAF");
+
+      case INFO_FETCHME_TYPE:
+        return("FETCHME");
+
+      case INFO_BQ_TYPE:
+        return("BQ");
+
+      /*
+      case INFO_BQENT_TYPE:
+        return("BQENT");
+      */
+
+      case INFO_TSO_TYPE:
+        return("TSO");
+
+      case INFO_STKO_TYPE:
+        return("STKO");
+
+      default:
+        fprintf(stderr,"Unknown header type %lu\n",INFO_TYPE(info_ptr));
+        return("??");
+      }
+#endif /* PAR */
+}
+        
+/*
+@var_hdr_size@ computes the size of the variable header for a closure.
+*/
+
+I_
+var_hdr_size(node)
+P_ node;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:    return(0);      /* by decree */
+      case INFO_SPEC_N_TYPE:    return(0);
+      case INFO_GEN_U_TYPE:     return(GEN_VHS);
+      case INFO_GEN_N_TYPE:     return(GEN_VHS);
+      case INFO_DYN_TYPE:       return(DYN_VHS);
+      /*
+      case INFO_DYN_TYPE_N:     return(DYN_VHS);
+      case INFO_DYN_TYPE_U:     return(DYN_VHS);
+      */
+      case INFO_TUPLE_TYPE:     return(TUPLE_VHS);
+      case INFO_DATA_TYPE:      return(DATA_VHS);
+      case INFO_MUTUPLE_TYPE:   return(MUTUPLE_VHS);
+      case INFO_IMMUTUPLE_TYPE: return(MUTUPLE_VHS); /* same layout */
+      case INFO_STATIC_TYPE:    return(STATIC_VHS);
+      case INFO_CONST_TYPE:     return(0);
+      case INFO_CHARLIKE_TYPE:  return(0);
+      case INFO_INTLIKE_TYPE:   return(0);
+      case INFO_BH_TYPE:        return(0);
+      case INFO_IND_TYPE:       return(0);
+      case INFO_CAF_TYPE:       return(0);
+      case INFO_FETCHME_TYPE:   return(0);
+      case INFO_BQ_TYPE:        return(0);
+      /*
+      case INFO_BQENT_TYPE:     return(0);
+      */
+      case INFO_TSO_TYPE:       return(TSO_VHS);
+      case INFO_STKO_TYPE:      return(STKO_VHS);
+      default:
+        fprintf(stderr,"Unknown info type 0x%lx (%lu)\n", INFO_PTR(node),
+          INFO_TYPE(INFO_PTR(node)));
+        return(0);
+    }
+}
+
+
+/* Determine the size and number of pointers for this kind of closure */
+void
+size_and_ptrs(node,size,ptrs)
+P_ node;
+W_ *size, *ptrs;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:
+      case INFO_SPEC_N_TYPE:
+        *size = INFO_SIZE(INFO_PTR(node));          /* New for 0.24; check */
+        *ptrs = INFO_NoPTRS(INFO_PTR(node));        /* that! -- HWL */
+        /* 
+        *size = SPEC_CLOSURE_SIZE(node);
+        *ptrs = SPEC_CLOSURE_NoPTRS(node);
+	*/
+        break;
+
+      case INFO_GEN_U_TYPE:
+      case INFO_GEN_N_TYPE:
+        *size = GEN_CLOSURE_SIZE(node);
+        *ptrs = GEN_CLOSURE_NoPTRS(node);
+        break;
+
+      /* 
+      case INFO_DYN_TYPE_U:
+      case INFO_DYN_TYPE_N:
+      */
+      case INFO_DYN_TYPE:
+        *size = DYN_CLOSURE_SIZE(node);
+        *ptrs = DYN_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_TUPLE_TYPE:
+        *size = TUPLE_CLOSURE_SIZE(node);
+        *ptrs = TUPLE_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_DATA_TYPE:
+        *size = DATA_CLOSURE_SIZE(node);
+        *ptrs = DATA_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_IND_TYPE:
+        *size = IND_CLOSURE_SIZE(node);
+        *ptrs = IND_CLOSURE_NoPTRS(node);
+        break;
+
+/* ToDo: more (WDP) */
+
+      /* Don't know about the others */
+      default:
+        *size = *ptrs = 0;
+        break;
+    }
+}
+
+void
+DEBUG_PRINT_NODE(node)
+P_ node;
+{
+   W_ info_ptr = INFO_PTR(node);
+   I_ size = 0, ptrs = 0, i, vhs = 0;
+   char *info_type = info_hdr_type(info_ptr);
+
+   size_and_ptrs(node,&size,&ptrs);
+   vhs = var_hdr_size(node);
+
+   fprintf(stderr,"Node: 0x%lx", (W_) node);
+
+#if defined(PAR)
+   fprintf(stderr," [GA: 0x%lx]",GA(node));
+#endif
+
+#if defined(USE_COST_CENTRES)
+   fprintf(stderr," [CC: 0x%lx]",CC_HDR(node));
+#endif
+
+#if defined(GRAN)
+   fprintf(stderr," [Bitmask: 0%lo]",PROCS(node));
+#endif
+
+   fprintf(stderr," IP: 0x%lx (%s), size %ld, %ld ptrs\n",
+                  info_ptr,info_type,size,ptrs);
+
+   /* For now, we ignore the variable header */
+
+   for(i=0; i < size; ++i)
+     {
+       if(i == 0)
+         fprintf(stderr,"Data: ");
+
+       else if(i % 6 == 0)
+         fprintf(stderr,"\n      ");
+
+       if(i < ptrs)
+         fprintf(stderr," 0x%lx[P]",*(node+_FHS+vhs+i));
+       else
+         fprintf(stderr," %lu[D]",*(node+_FHS+vhs+i));
+     }
+   fprintf(stderr, "\n");
+}
+
+
+#define INFO_MASK       0x80000000
+
+void
+DEBUG_TREE(node)
+P_ node;
+{
+  W_ size = 0, ptrs = 0, i, vhs = 0;
+
+  /* Don't print cycles */
+  if((INFO_PTR(node) & INFO_MASK) != 0)
+    return;
+
+  size_and_ptrs(node,&size,&ptrs);
+  vhs = var_hdr_size(node);
+
+  DEBUG_PRINT_NODE(node);
+  fprintf(stderr, "\n");
+
+  /* Mark the node -- may be dangerous */
+  INFO_PTR(node) |= INFO_MASK;
+
+  for(i = 0; i < ptrs; ++i)
+    DEBUG_TREE((P_)node[i+vhs+_FHS]);
+
+  /* Unmark the node */
+  INFO_PTR(node) &= ~INFO_MASK;
+}
+
+
+void
+DEBUG_INFO_TABLE(node)
+P_ node;
+{
+  W_ info_ptr = INFO_PTR(node);
+  char *ip_type = info_hdr_type(info_ptr);
+
+  fprintf(stderr,"%s Info Ptr @0x%lx; Entry: 0x%lx; Size: %lu; Ptrs: %lu\n\n",
+                 ip_type,info_ptr,(W_) ENTRY_CODE(info_ptr),INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
+#if defined(PAR)
+  fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
+#endif
+
+#if defined(USE_COST_CENTRES)
+  fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
+#endif
+
+#if defined(_INFO_COPYING)
+  fprintf(stderr,"Evacuate Entry:    0x%lx;\tScavenge Entry: 0x%lx\n",
+          INFO_EVAC_2S(info_ptr),INFO_SCAV_2S(info_ptr));
+#endif
+
+#if defined(_INFO_COMPACTING)
+  fprintf(stderr,"Scan Link:         0x%lx;\tScan Move:      0x%lx\n",
+          (W_) INFO_SCAN_LINK_1S(info_ptr), (W_) INFO_SCAN_MOVE_1S(info_ptr));
+  fprintf(stderr,"Mark:              0x%lx;\tMarked:         0x%lx;\t",
+          (W_) INFO_MARK_1S(info_ptr), (W_) INFO_MARKED_1S(info_ptr));
+#if 0 /* avoid INFO_TYPE */
+  if(BASE_INFO_TYPE(info_ptr)==INFO_SPEC_TYPE)
+    fprintf(stderr,"plus specialised code\n");
+  else
+    fprintf(stderr,"Marking:           0x%lx\n",(W_) INFO_MARKING_1S(info_ptr));
+#endif /* 0 */
+#endif
+}
+#endif /* GRAN */
+
+\end{code}
+
+The remaining debugging routines are more or less specific for GrAnSim.
+
+\begin{code}
+#if defined(GRAN) && defined(GRAN_CHECK)
+void
+DEBUG_CURR_THREADQ(verbose) 
+I_ verbose;
+{ 
+  fprintf(stderr,"Thread Queue on proc %d: ", CurrentProc);
+  DEBUG_THREADQ(ThreadQueueHd, verbose);
+}
+
+void 
+DEBUG_THREADQ(closure, verbose) 
+P_ closure;
+I_ verbose;
+{
+ P_ x;
+
+ fprintf(stderr,"Thread Queue: ");
+ for (x=closure; x!=Nil_closure; x=TSO_LINK(x))
+   if (verbose) 
+     DEBUG_TSO(x,0);
+   else
+     fprintf(stderr," 0x%x",x);
+
+ if (closure==Nil_closure)
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+/* Check with Threads.lh */
+static char *type_name[] = { "T_MAIN", "T_REQUIRED", "T_ADVISORY", "T_FAIL"};
+
+void 
+DEBUG_TSO(closure,verbose) 
+P_ closure;
+I_ verbose;
+{
+ 
+ if (closure==Nil_closure) {
+   fprintf(stderr,"TSO at 0x%x is Nil_closure!\n");
+   return;
+ }
+
+ fprintf(stderr,"TSO at 0x%x has the following contents:\n",closure);
+
+ fprintf(stderr,"> Name: 0x%x",TSO_NAME(closure));
+ fprintf(stderr,"\tLink: 0x%x\n",TSO_LINK(closure));
+ fprintf(stderr,"> Id: 0x%x",TSO_ID(closure));
+#if defined(GRAN_CHECK) && defined(GRAN)
+ if (debug & 0x10)
+   fprintf(stderr,"\tType: %s  %s\n",
+           type_name[TSO_TYPE(closure) & ~FETCH_MASK_TSO],
+           (TSO_TYPE(closure) & FETCH_MASK_TSO) ? "SLEEPING" : "");
+ else
+   fprintf(stderr,"\tType: %s\n",type_name[TSO_TYPE(closure)]);
+#else
+ fprintf(stderr,"\tType: %s\n",type_name[TSO_TYPE(closure)]);
+#endif
+ fprintf(stderr,"> PC1:  0x%x",TSO_PC1(closure));
+ fprintf(stderr,"\tPC2:  0x%x\n",TSO_PC2(closure));
+ fprintf(stderr,"> ARG1: 0x%x",TSO_ARG1(closure));
+ fprintf(stderr,"\tARG2: 0x%x\n",TSO_ARG2(closure));
+ fprintf(stderr,"> SWITCH: 0x%x\n", TSO_SWITCH(closure));
+
+ if (verbose) {
+   fprintf(stderr,"} LOCKED: 0x%x",TSO_LOCKED(closure));
+   fprintf(stderr,"\tSPARKNAME: 0x%x\n", TSO_SPARKNAME(closure));
+   fprintf(stderr,"} STARTEDAT: 0x%x", TSO_STARTEDAT(closure));
+   fprintf(stderr,"\tEXPORTED: 0x%x\n", TSO_EXPORTED(closure));
+   fprintf(stderr,"} BASICBLOCKS: 0x%x", TSO_BASICBLOCKS(closure));
+   fprintf(stderr,"\tALLOCS: 0x%x\n", TSO_ALLOCS(closure));
+   fprintf(stderr,"} EXECTIME: 0x%x", TSO_EXECTIME(closure));
+   fprintf(stderr,"\tFETCHTIME: 0x%x\n", TSO_FETCHTIME(closure));
+   fprintf(stderr,"} FETCHCOUNT: 0x%x", TSO_FETCHCOUNT(closure));
+   fprintf(stderr,"\tBLOCKTIME: 0x%x\n", TSO_BLOCKTIME(closure));
+   fprintf(stderr,"} BLOCKCOUNT: 0x%x", TSO_BLOCKCOUNT(closure));
+   fprintf(stderr,"\tBLOCKEDAT: 0x%x\n", TSO_BLOCKEDAT(closure));
+   fprintf(stderr,"} GLOBALSPARKS: 0x%x", TSO_GLOBALSPARKS(closure));
+   fprintf(stderr,"\tLOCALSPARKS: 0x%x\n", TSO_LOCALSPARKS(closure));
+ }
+}
+
+void 
+DEBUG_EVENT(event, verbose) 
+eventq event;
+I_ verbose;
+{
+  if (verbose) {
+    print_event(event);
+  }else{
+    fprintf(stderr," 0x%x",event);
+  }
+}
+
+void
+DEBUG_EVENTQ(verbose)
+I_ verbose;
+{
+ eventq x;
+
+ fprintf(stderr,"Eventq (hd @0x%x):\n",EventHd);
+ for (x=EventHd; x!=NULL; x=EVENT_NEXT(x)) {
+   DEBUG_EVENT(x,verbose);
+ }
+ if (EventHd==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+DEBUG_SPARK(spark, verbose) 
+sparkq spark;
+I_ verbose;
+{
+  if (verbose)
+    print_spark(spark);
+  else
+    fprintf(stderr," 0x%x",spark);
+}
+
+void 
+DEBUG_SPARKQ(spark,verbose) 
+sparkq spark;
+I_ verbose;
+{
+ sparkq x;
+
+ fprintf(stderr,"Sparkq (hd @0x%x):\n",spark);
+ for (x=spark; x!=NULL; x=SPARK_NEXT(x)) {
+   DEBUG_SPARK(x,verbose);
+ }
+ if (spark==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+DEBUG_CURR_SPARKQ(verbose) 
+I_ verbose;
+{
+  DEBUG_SPARKQ(SparkQueueHd,verbose);
+}
+
+void 
+DEBUG_PROC(proc,verbose)
+I_ proc;
+I_ verbose;
+{
+  fprintf(stderr,"Status of proc %d at time %d (0x%x): %s\n",
+          proc,CurrentTime[proc],CurrentTime[proc],
+          (CurrentProc==proc)?"ACTIVE":"INACTIVE");
+  DEBUG_THREADQ(RunnableThreadsHd[proc],verbose & 0x2);
+  if ( (CurrentProc==proc) )
+    DEBUG_TSO(CurrentTSO,1);
+
+  if (EventHd!=NULL)
+    fprintf(stderr,"Next event (%s) is on proc %d\n",
+            event_names[EVENT_TYPE(EventHd)],EVENT_PROC(EventHd));
+
+  if (verbose & 0x1) {
+    fprintf(stderr,"\nREQUIRED sparks: ");
+    DEBUG_SPARKQ(PendingSparksHd[proc][REQUIRED_POOL],1);
+    fprintf(stderr,"\nADVISORY_sparks: ");
+    DEBUG_SPARKQ(PendingSparksHd[proc][ADVISORY_POOL],1);
+  }
+}
+
+/* Debug CurrentTSO */
+void
+DCT(){ 
+  fprintf(stderr,"Current Proc: %d\n",CurrentProc);
+  DEBUG_TSO(CurrentTSO,1);
+}
+
+/* Debug Current Processor */
+void
+DCP(){ DEBUG_PROC(CurrentProc,2); }
+
+/* Shorthand for debugging event queue */
+void
+DEQ() { DEBUG_EVENTQ(1); }
+
+/* Shorthand for debugging spark queue */
+void
+DSQ() { DEBUG_CURR_SPARKQ(1); }
+
+/* Shorthand for printing a node */
+void
+DN(P_ node) { DEBUG_PRINT_NODE(node); }
+
+#endif /* GRAN */
+\end{code}
+
+
+%****************************************************************************
+%
+\subsection[qp-profile]{Quasi-Parallel Profiling}
+%
+%****************************************************************************
+
+\begin{code}
+#ifndef GRAN
+I_ do_qp_prof;
+FILE *qp_file;
+
+/* *Virtual* Time in milliseconds */
+long 
+qp_elapsed_time()
+{
+    return ((long) (usertime() * 1e3));
+}
+
+static void
+init_qp_profiling(STG_NO_ARGS)
+{
+    I_ i;
+    char qp_filename[32];
+
+    sprintf(qp_filename, "%0.24s.qp", prog_argv[0]);
+    if ((qp_file = fopen(qp_filename,"w")) == NULL ) {
+	fprintf(stderr, "Can't open quasi-parallel profile report file %s\n", 
+    	    qp_filename);
+    	do_qp_prof = 0;
+    } else {
+	fputs(prog_argv[0], qp_file);
+	for(i = 1; prog_argv[i]; i++) {
+    	    fputc(' ', qp_file);
+	    fputs(prog_argv[i], qp_file);
+    	}
+    	fprintf(qp_file, "+RTS -C%ld -t%ld\n", contextSwitchTime, MaxThreads);
+    	fputs(time_str(), qp_file);
+    	fputc('\n', qp_file);
+    }
+}
+
+void 
+QP_Event0(tid, node)
+I_ tid;
+P_ node;
+{
+    fprintf(qp_file, "%lu ** %lu 0x%lx\n", qp_elapsed_time(), tid, INFO_PTR(node));
+}
+
+void 
+QP_Event1(event, tso)
+char *event;
+P_ tso;
+{
+    fprintf(qp_file, "%lu %s %lu 0x%lx\n", qp_elapsed_time(), event,
+            TSO_ID(tso), (W_) TSO_NAME(tso));
+}
+
+void 
+QP_Event2(event, tso1, tso2)
+char *event;
+P_ tso1, tso2;
+{
+    fprintf(qp_file, "%lu %s %lu 0x%lx %lu 0x%lx\n", qp_elapsed_time(), event,
+            TSO_ID(tso1), (W_) TSO_NAME(tso1), TSO_ID(tso2), (W_) TSO_NAME(tso2));
+}
+#endif /* 0 */
+#endif /* GRAN */
+
+#if defined(CONCURRENT) && !defined(GRAN)
+/* romoluSnganpu' SamuS! */ 
+
+unsigned CurrentProc = 0;
+W_ IdleProcs = ~0l, Idlers = 32; 
+
+void 
+GranSimAllocate(n,node,liveness)
+I_ n;
+P_ node;
+W_ liveness;
+{ }
+
+void 
+GranSimUnallocate(n,node,liveness)
+W_ n;
+P_ node;
+W_ liveness;
+{ }
+
+
+void 
+GranSimExec(ariths,branches,loads,stores,floats)
+W_ ariths,branches,loads,stores,floats;
+{ }
+
+I_ 
+GranSimFetch(node /* , liveness_mask */ )
+P_ node;
+/* I_ liveness_mask; */
+{ }
+
+void 
+GranSimSpark(local,node)
+W_ local;
+P_ node;
+{ }
+
+#if 0
+void 
+GranSimSparkAt(spark,where,identifier)
+sparkq spark;
+P_  where;        /* This should be a node; alternatively could be a GA */
+I_ identifier;
+{ }
+#endif
+
+void 
+GranSimBlock()
+{ }
+#endif 
+
+\end{code}
+

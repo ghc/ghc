@@ -1,0 +1,5 @@
+ 
+"tcfail011.hs", line 3: undefined value: y
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

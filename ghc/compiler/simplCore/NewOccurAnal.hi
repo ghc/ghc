@@ -1,0 +1,31 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface NewOccurAnal where
+import BasicLit(BasicLit)
+import BinderInfo(BinderInfo, DuplicationDanger, FunOrArg, InsideSCC)
+import CmdLineOpts(GlobalSwitch, SimplifierSwitch)
+import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import PlainCore(PlainCoreExpr(..), PlainCoreProgram(..))
+import PrimOps(PrimOp)
+import TaggedCore(SimplifiableCoreBinding(..), SimplifiableCoreExpr(..))
+import TyVar(TyVar)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data BinderInfo 	{-# GHC_PRAGMA DeadCode | ManyOcc Int | OneOcc FunOrArg DuplicationDanger InsideSCC Int Int #-}
+data GlobalSwitch
+	{-# GHC_PRAGMA ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats #-}
+data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type PlainCoreExpr = CoreExpr Id Id
+type PlainCoreProgram = [CoreBinding Id Id]
+type SimplifiableCoreBinding = CoreBinding (Id, BinderInfo) Id
+type SimplifiableCoreExpr = CoreExpr (Id, BinderInfo) Id
+newOccurAnalyseBinds :: [CoreBinding Id Id] -> (GlobalSwitch -> Bool) -> (SimplifierSwitch -> Bool) -> [CoreBinding (Id, BinderInfo) Id]
+	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "LSL" _N_ _N_ #-}
+newOccurAnalyseExpr :: UniqFM Id -> CoreExpr Id Id -> (UniqFM BinderInfo, CoreExpr (Id, BinderInfo) Id)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+

@@ -1,0 +1,144 @@
+%************************************************************************
+%*									*
+\section[mkworld-utils-ghc]{``Utilities'' stuff for @ghc@ project}
+%*									*
+%************************************************************************
+
+It's become sorta traditional to change the project-wide
+Haskell-compiler options with @SetupHcOpts@ (rather than
+@ProjectHcOpts@).
+\begin{code}
+#if GhcWithHscOptimised == YES
+#define __hsc_opt -O
+#else
+#define __hsc_opt /**/
+#endif
+
+#ifndef SetupHcOpts
+#if HaskellCompilerType == HC_CHALMERS_HBC
+#define SetupHcOpts __hsc_opt -fpbu
+#else
+#if HaskellCompilerType == HC_GLASGOW_GHC
+#define SetupHcOpts __hsc_opt -hi-diffs -link-chk
+#else
+#if HaskellCompilerType == HC_ROJEMO_NHC
+#define SetupHcOpts /*nothing*/
+#else
+#define SetupHcOpts /*nothing*/
+#endif
+#endif
+#endif
+#endif /* SetupHcOpts */
+
+#ifndef ProjectCcOpts
+#if HaveGcc == YES && UseGcc == YES
+/* can cope w/ "-g -O" ...; but leave out -g to avoid bloated libs */
+#define ProjectCcOpts -O /*-g*/
+#else
+#define ProjectCcOpts /*-g*/
+#endif /* Gcc whatnot */
+#endif /* ProjectCcOpts */
+
+#ifndef ProjectJmakeDefines
+#define ProjectJmakeDefines /*none*/
+#endif
+\end{code}
+
+\begin{code}
+#ifndef MkDependHSSrc
+#define MkDependHSSrc $(GHC_UTILSRC)/mkdependHS
+#endif
+
+#ifndef MkDependHSCmd
+#if     defined(UseInstalledUtils)
+#define MkDependHSCmd mkdependHS
+#else
+#define MkDependHSCmd $(MKDEPENDHSSRC)/mkdependHS
+#endif
+#endif /* ! MkDependHSCmd */
+
+#ifndef MkDependHSNeededHere
+#if defined(UseInstalledUtils)
+#define MkDependHSNeededHere(target) /**/
+#else
+#define MkDependHSNeededHere(target) \
+__SomeUtilNeededHere(target,$(MKDEPENDHS),$(MKDEPENDHSSRC),mkdependHS)
+#endif /* UseInstalledUtils */
+#endif /* MkDependHSNeededHere */
+
+#ifndef UseInstalledUtils
+MKDEPENDHSSRC = MkDependHSSrc
+#endif
+
+#ifndef UnlitCmd
+#define UnlitCmd $(GHC_UNLITSRC)/unlit
+#endif
+
+#ifndef UnlitNeededHere
+#define UnlitNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC_UNLIT),$(GHC_UNLITSRC),unlit)
+#endif /* UnlitNeededHere */
+
+GHC_UNLIT    = UnlitCmd
+GHC_UNLITSRC = $(GHC_UTILSRC)/unlit
+\end{code}
+
+\begin{code}
+#ifndef HsTagsSrc
+#define HsTagsSrc $(GHC_UTILSRC)/hstags
+#endif
+#if     defined(UseInstalledUtils)
+#define HsTagsCmd hstags
+#else
+#define HsTagsCmd $(HSTAGSSRC)/hstags
+#endif
+
+#ifndef HsTagsNeededHere
+#if defined(UseInstalledUtils)
+#define HsTagsNeededHere(target) /**/
+#else
+#define HsTagsNeededHere(target) \
+__SomeUtilNeededHere(target,$(HSTAGS),$(HSTAGSSRC),hstags)
+#endif /* UseInstalledUtils */
+#endif /* HsTagsNeededHere */
+HSTAGS = HsTagsCmd
+#ifndef UseInstalledUtils
+HSTAGSSRC = HsTagsSrc
+#endif
+
+#ifndef AllProjectsHsTagsOpts
+#define AllProjectsHsTagsOpts /*none*/
+#endif
+#ifndef PlatformHsTagsOpts
+#define PlatformHsTagsOpts /*none*/
+#endif
+#ifndef ProjectHsTagsOpts
+#define ProjectHsTagsOpts /*none*/
+#endif
+#ifndef SetupHsTagsOpts
+#define SetupHsTagsOpts /*none*/
+#endif
+GenerateOptionsMakeVars(HSTAGS,OPTS,AllProjectsHsTagsOpts,PlatformHsTagsOpts,ProjectHsTagsOpts,SetupHsTagsOpts)
+HSTAGSFLAGS        = $(GLUED_HSTAGS_OPTS)
+
+/* ugen: allegedly generally-useful util from LML distribution */
+#ifndef UgenCmd
+#if     defined(UseInstalledUtils)
+#define UgenCmd ugen
+#else
+#define UgenCmd $(UGENSRC)/ugen
+#endif
+#endif
+#ifndef UgenNeededHere
+#if defined(UseInstalledUtils)
+#define UgenNeededHere(target) /**/
+#else
+#define UgenNeededHere(target) \
+__SomeUtilNeededHere(target,$(UGEN),$(UGENSRC),ugen)
+#endif /* ! UseInstalledUtils */
+#endif /* UgenNeededHere */
+UGEN = UgenCmd
+#ifndef UseInstalledUtils
+UGENSRC = $(GHC_UTILSRC)/ugen
+#endif
+\end{code}

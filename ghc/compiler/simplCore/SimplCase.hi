@@ -1,0 +1,14 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SimplCase where
+import BinderInfo(BinderInfo)
+import CoreSyn(CoreBinding, CoreCaseAlternatives, CoreExpr)
+import Id(Id)
+import SimplEnv(SimplEnv)
+import SimplMonad(SimplCount)
+import SplitUniq(SplitUniqSupply)
+import UniType(UniType)
+bindLargeRhs :: SimplEnv -> [(Id, BinderInfo)] -> UniType -> (SimplEnv -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)) -> SplitUniqSupply -> SimplCount -> ((CoreBinding Id Id, CoreExpr (Id, BinderInfo) Id), SimplCount)
+	{-# GHC_PRAGMA _A_ 4 _U_ 212222 _N_ _S_ "LSLS" _N_ _N_ #-}
+simplCase :: SimplEnv -> CoreExpr (Id, BinderInfo) Id -> CoreCaseAlternatives (Id, BinderInfo) Id -> (SimplEnv -> CoreExpr (Id, BinderInfo) Id -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)) -> UniType -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)
+	{-# GHC_PRAGMA _A_ 5 _U_ 2222222 _N_ _S_ "LSLLL" _N_ _N_ #-}
+

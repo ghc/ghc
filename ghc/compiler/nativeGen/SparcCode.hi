@@ -1,0 +1,85 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SparcCode where
+import AbsCSyn(MagicId)
+import AsmRegAlloc(MachineCode, MachineRegisters, Reg)
+import BitSet(BitSet)
+import CLabelInfo(CLabel)
+import CharSeq(CSeq)
+import FiniteMap(FiniteMap)
+import Maybes(Labda)
+import OrdList(OrdList)
+import PreludePS(_PackedString)
+import Pretty(PprStyle)
+import PrimKind(PrimKind)
+import Stix(CodeSegment)
+import UniqFM(UniqFM)
+import UniqSet(UniqSet(..))
+import Unique(Unique)
+data Addr   = AddrRegReg Reg Reg | AddrRegImm Reg Imm
+data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
+data Reg 	{-# GHC_PRAGMA FixedReg Int# | MappedReg Int# | MemoryReg Int PrimKind | UnmappedReg Unique PrimKind #-}
+data BitSet 	{-# GHC_PRAGMA MkBS Word# #-}
+data CLabel 
+data CSeq 	{-# GHC_PRAGMA CNil | CAppend CSeq CSeq | CIndent Int CSeq | CNewline | CStr [Char] | CCh Char | CInt Int | CPStr _PackedString #-}
+data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}
+data OrdList a 	{-# GHC_PRAGMA SeqList (OrdList a) (OrdList a) | ParList (OrdList a) (OrdList a) | OrdObj a | NoObj #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data CodeSegment 	{-# GHC_PRAGMA DataSegment | TextSegment #-}
+data Cond   = ALWAYS | NEVER | GEU | LU | EQ | GT | GE | GU | LT | LE | LEU | NE | NEG | POS | VC | VS
+data Imm   = ImmInt Int | ImmInteger Integer | ImmCLbl CLabel | ImmLab CSeq | ImmLit CSeq | LO Imm | HI Imm
+data RI   = RIReg Reg | RIImm Imm
+data Size   = SB | HW | UB | UHW | W | D | F | DF
+type SparcCode = OrdList SparcInstr
+data SparcInstr   = LD Size Addr Reg | ST Size Reg Addr | ADD Bool Bool Reg RI Reg | SUB Bool Bool Reg RI Reg | AND Bool Reg RI Reg | ANDN Bool Reg RI Reg | OR Bool Reg RI Reg | ORN Bool Reg RI Reg | XOR Bool Reg RI Reg | XNOR Bool Reg RI Reg | SLL Reg RI Reg | SRL Reg RI Reg | SRA Reg RI Reg | SETHI Imm Reg | NOP | FABS Size Reg Reg | FADD Size Reg Reg Reg | FCMP Bool Size Reg Reg | FDIV Size Reg Reg Reg | FMOV Size Reg Reg | FMUL Size Reg Reg Reg | FNEG Size Reg Reg | FSQRT Size Reg Reg | FSUB Size Reg Reg Reg | FxTOy Size Size Reg Reg | BI Cond Bool Imm | BF Cond Bool Imm | JMP Addr | CALL Imm Int Bool | LABEL CLabel | COMMENT _PackedString | SEGMENT CodeSegment | ASCII Bool [Char] | DATA Size [Imm]
+data SparcRegs 	{-# GHC_PRAGMA SRegs BitSet BitSet BitSet #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+type UniqSet a = UniqFM a
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+argRegs :: [Reg]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+baseRegOffset :: MagicId -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+callerSaves :: MagicId -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+f0 :: Reg
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+fp :: Reg
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ AsmRegAlloc FixedReg [] [30#] _N_ #-}
+freeRegs :: [Reg]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+g0 :: Reg
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ AsmRegAlloc FixedReg [] [0#] _N_ #-}
+is13Bits :: Integral a => a -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _S_ "U(LU(U(ALASAAAA)AAA)AAAAAAAAAA)" {_A_ 3 _U_ 1112 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Int ] 1 { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ }, [ Integer ] 1 { _A_ 1 _U_ 1 _N_ _S_ "U(PPP)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+kindToSize :: PrimKind -> Size
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "E" _N_ _N_ #-}
+o0 :: Reg
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+offset :: Addr -> Int -> Labda Addr
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+printLabeledCodes :: PprStyle -> [SparcInstr] -> CSeq
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+reservedRegs :: [Int]
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+sp :: Reg
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ AsmRegAlloc FixedReg [] [14#] _N_ #-}
+stgRegMap :: MagicId -> Labda Reg
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+strImmLit :: [Char] -> Imm
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance MachineCode SparcInstr
+	{-# GHC_PRAGMA _M_ SparcCode {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 6 _!_ _TUP_5 [(SparcInstr -> RegUsage), (SparcInstr -> RegLiveness -> RegLiveness), (SparcInstr -> (Reg -> Reg) -> SparcInstr), (Reg -> Reg -> OrdList SparcInstr), (Reg -> Reg -> OrdList SparcInstr)] [_CONSTM_ MachineCode regUsage (SparcInstr), _CONSTM_ MachineCode regLiveness (SparcInstr), _CONSTM_ MachineCode patchRegs (SparcInstr), _CONSTM_ MachineCode spillReg (SparcInstr), _CONSTM_ MachineCode loadReg (SparcInstr)] _N_
+	 regUsage = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
+	 regLiveness = _A_ 2 _U_ 11 _N_ _S_ "SU(LU(LL))" {_A_ 4 _U_ 1222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 patchRegs = _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_,
+	 spillReg = _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_,
+	 loadReg = _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
+instance MachineRegisters SparcRegs
+	{-# GHC_PRAGMA _M_ SparcCode {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 7 _!_ _TUP_6 [([Int] -> SparcRegs), (PrimKind -> SparcRegs -> [Int]), (SparcRegs -> Int# -> SparcRegs), (SparcRegs -> [Int] -> SparcRegs), (SparcRegs -> Int# -> SparcRegs), (SparcRegs -> [Int] -> SparcRegs)] [_CONSTM_ MachineRegisters mkMRegs (SparcRegs), _CONSTM_ MachineRegisters possibleMRegs (SparcRegs), _CONSTM_ MachineRegisters useMReg (SparcRegs), _CONSTM_ MachineRegisters useMRegs (SparcRegs), _CONSTM_ MachineRegisters freeMReg (SparcRegs), _CONSTM_ MachineRegisters freeMRegs (SparcRegs)] _N_
+	 mkMRegs = _A_ 1 _U_ 1 _N_ _N_ _N_ _N_,
+	 possibleMRegs = _A_ 2 _U_ 11 _N_ _S_ "EU(LLL)" {_A_ 4 _U_ 1111 _N_ _N_ _N_ _N_} _N_ _N_,
+	 useMReg = _A_ 2 _U_ 12 _N_ _S_ "U(LLL)P" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 useMRegs = _A_ 2 _U_ 11 _N_ _S_ "U(LLL)L" {_A_ 4 _U_ 1111 _N_ _N_ _N_ _N_} _N_ _N_,
+	 freeMReg = _A_ 2 _U_ 12 _N_ _S_ "U(LLL)P" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 freeMRegs = _A_ 2 _U_ 11 _N_ _S_ "U(LLL)L" {_A_ 4 _U_ 1111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

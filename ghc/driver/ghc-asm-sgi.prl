@@ -1,0 +1,69 @@
+# line 10 "ghc-asm-sgi.lprl"
+sub mangle_asm {
+
+    local($in_asmf, $out_asmf) = @_;
+    local($fun_code);
+
+    # multi-line regexp matching:
+    local($*) = 1;
+    local($i, $c);
+    &init_FUNNY_THINGS();
+
+    open(INASM, "< $in_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$in_asmf' (to read)\n");
+    open(OUTASM,"> $out_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$out_asmf' (to write)\n");
+
+    # just copy through now...
+    while (<INASM>) {
+	print OUTASM $_;
+    }
+
+    close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
+    close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+# line 36 "ghc-asm-sgi.lprl"
+sub init_FUNNY_THINGS {
+    print STDERR "SGI: init_FUNNY_THINGS\n";
+}
+# line 48 "ghc-asm-sgi.lprl"
+sub rev_tbl {
+    local($symb, $tbl, $discard1) = @_;
+
+    local($before) = '';
+    local($label) = '';
+    local(@words) = ();
+    local($after) = '';
+    local(@lines) = split(/\n/, $tbl);
+    local($i);
+
+    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t\.word\s+/; $i++) {
+	$label .= $lines[$i] . "\n",
+	    next if $lines[$i] =~ /^[A-Za-z0-9_]+:$/
+		 || $lines[$i] =~ /^\t\.global/;
+
+	$before .= $lines[$i] . "\n"; # otherwise...
+    }
+
+    for ( ; $i <= $#lines && $lines[$i] =~ /^\t\.word\s+/; $i++) {
+	push(@words, $lines[$i]);
+    }
+    # now throw away the first word (entry code):
+    shift(@words) if $discard1;
+
+    for (; $i <= $#lines; $i++) {
+	$after .= $lines[$i] . "\n";
+    }
+
+    $tbl = $before . join("\n", (reverse @words)) . "\n" . $label . $after;
+
+#    print STDERR "before=$before\n";
+#    print STDERR "label=$label\n";
+#    print STDERR "words=",(reverse @words),"\n";
+#    print STDERR "after=$after\n";
+
+    $tbl;
+}
+# line 88 "ghc-asm-sgi.lprl"
+# make "require"r happy...
+1;

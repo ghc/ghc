@@ -1,0 +1,367 @@
+\section[SM-extensions]{Storage Manager Extensions}
+
+ToDo ADR: Maybe this should be split between SMcopying.lc and
+SMcompacting.lc?
+
+
+This is a collection of C functions use in implementing the stable
+pointer and malloc pointer extensions. 
+
+The motivation for making this a separate file/section is twofold:
+
+1) It let's us focus on one thing.
+
+2) If we don't do this, there will be a huge amount of repetition
+   between the various GC schemes --- a maintenance nightmare.
+
+The second is the major motivation.  
+
+There are three main parts to this file:
+
+1) Code which is common to all GC schemes.
+
+2) Code for use in a compacting collector used in the 1-space, dual
+   mode and for collecting old generations in generational collectors.
+
+3) Code for use in a copying collector used in the 2-space, dual mode
+   and for collecting young generations in generational collectors.
+
+When debugging, it is incredibly helpful to trash part of the heap
+(say) once you're done with it.
+
+Remembering that @sm->hp@ points to the next word to be allocated, a
+typical use is
+
+\begin{pseudocode}
+#ifdef DEBUG
+  TrashMem(sm->hp+1, sm->hplim);
+#endif
+\end{pseudocode}
+
+\begin{code} 
+
+#if defined(GC1s)
+
+#define  SCAN_REG_DUMP
+#include "SMinternal.h"
+REGDUMP(ScanRegDump);
+
+#else /* GC2s, GCdu, GCap, GCgn */
+
+#define SCAV_REG_MAP
+#include "SMinternal.h"
+REGDUMP(ScavRegDump);
+
+#endif
+#include "SMextn.h"
+
+#ifdef DEBUG
+
+void
+TrashMem(from, to)
+  P_ from, to;
+{
+/* assertion overly strong - if free_mem == 0, sm->hp == sm->hplim */
+/*  ASSERT( from <= to ); */
+    if (SM_trace)
+	printf("Trashing from 0x%lx to 0x%lx inclusive\n", (W_) from, (W_) to);
+    while (from <= to) {
+	*from++ = DEALLOCATED_TRASH;
+    }
+}
+
+#endif /* DEBUG */
+\end{code}
+
+\begin{code}
+
+#ifndef PAR  	/* To end of the file */
+
+\end{code}
+
+\downsection
+\section[SM-extensions-common-code]{Code common to all GC schemes}
+
+\begin{code}
+EXTDATA(EmptySPTable_closure);
+
+void initExtensions( sm )
+  smInfo *sm;
+{
+  sm->MallocPtrList = NULL;
+#if defined(GCap) || defined(GCgn)
+  sm->OldMallocPtrList = NULL;
+#endif
+
+  sm->StablePointerTable = (P_) EmptySPTable_closure;
+}
+
+extern void FreeMallocPtr PROTO(( StgMallocPtr mp ));
+\end{code}
+
+\begin{code}
+#if defined(DEBUG)
+\end{code}
+
+When a Malloc Pointer is released, there should be absolutely no
+references to it.  To encourage and dangling references to show
+themselves, we'll trash its contents when we're done with it.
+
+\begin{code}
+#define TRASH_MallocPtr_CLOSURE( mptr ) Trash_MallocPtr_Closure(mptr)
+
+void
+Trash_MallocPtr_Closure(mptr)
+  P_ mptr;
+{ int i;
+  for( i = 0; i != MallocPtr_SIZE + _FHS; i++ ) {
+    mptr[ i ] = DEALLOCATED_TRASH;
+  }
+}
+\end{code}
+
+Also, every time we fiddle with the MallocPtr list, we should check it
+still makes sense.  This function returns @0@ if the list is sensible.
+
+(Would maintaining a separate Malloc Ptr count allow better testing?)
+
+\begin{code}
+void
+Validate_MallocPtrList( MallocPtrList )
+  P_ MallocPtrList;
+{
+  P_ MPptr;
+
+  for(MPptr = MallocPtrList; 
+      MPptr != NULL;
+      MPptr = MallocPtr_CLOSURE_LINK(MPptr) ) {
+    CHECK_MallocPtr_CLOSURE(MPptr);
+  }
+}
+\end{code}
+
+\begin{code}
+#else /* !DEBUG */
+
+#define TRASH_MallocPtr_CLOSURE( mp ) /* nothing */
+
+#endif /* !DEBUG */  
+\end{code}
+
+\begin{code}
+#ifdef DEBUG
+
+#define TRACE_MallocPtr(MPptr) Trace_MallocPtr( MPptr )
+#define TRACE_MPdies(MPptr) Trace_MPdies()
+#define TRACE_MPlives(MPptr) Trace_MPlives()
+#define TRACE_MPforwarded(MPptr, newAddress) Trace_MPforwarded( MPptr, newAddress )
+
+void
+Trace_MallocPtr( MPptr )
+  P_ MPptr;
+{
+  if (SM_trace & 16) {
+    printf("DEBUG: MallocPtr(%lx)=<%lx,_,%lx,%lx,%lx>\n", (W_) MPptr, (W_) MPptr[0], (W_) MPptr[1], (W_) MPptr[2], (W_) MPptr[3]);
+    printf(" Data = %lx, Next = %lx\n", 
+	(W_) MallocPtr_CLOSURE_DATA(MPptr), (W_) MallocPtr_CLOSURE_LINK(MPptr) );
+  }
+}
+
+void
+Trace_MPdies()
+{
+  if (SM_trace & 16) {
+    printf(" dying\n");
+  }
+}
+
+void
+Trace_MPlives()
+{
+  if (SM_trace & 16) { 
+    printf(" lived to tell the tale \n"); 
+  }
+}
+
+void
+Trace_MPforwarded( MPPtr, newAddress )
+  P_ MPPtr, newAddress;
+{
+  if (SM_trace & 16) {
+    printf(" forwarded to %lx\n", (W_) newAddress);
+  }
+}
+
+#else
+
+#define TRACE_MallocPtr(MPptr) /* nothing */
+#define TRACE_MPdies(MPptr) /* nothing */
+#define TRACE_MPlives(MPptr) /* nothing */
+#define TRACE_MPforwarded(MPptr, newAddress) /* nothing */
+
+#endif /* DEBUG */
+\end{code}
+
+
+\section[SM-extensions-compacting-code]{Compacting Collector Code}
+
+
+\begin{code}
+#if defined(_INFO_COMPACTING)
+
+/* Sweep up the dead MallocPtrs */
+
+/* Note that this has to happen before the linking phase trashes
+   the stable pointer table so that the FreeMallocPtr function can
+   safely call freeStablePointer. 
+*/
+
+void
+sweepUpDeadMallocPtrs( MallocPtrList, base, bits )
+  P_ MallocPtrList;
+  P_ base;
+  BitWord *bits;
+{
+    P_ MPptr, temp;
+    I_ MallocPtr_deaths = 0;
+    long _hp_word, bit_index, bit;
+
+    /* At this point, the MallocPtrList is in an invalid state (since
+       some info ptrs will have been mangled) so we can't validate
+       it. ADR */
+
+    DEBUG_STRING("Reporting Dead Malloc Ptrs:");
+    MPptr = MallocPtrList;
+    while ( MPptr != NULL ) {
+
+      TRACE_MallocPtr(MPptr);
+
+      _hp_word = MPptr - base;
+      bit_index = _hp_word / BITS_IN(BitWord);
+      bit = 1L << (_hp_word & (BITS_IN(BitWord) - 1));
+      if ( !( bits[bit_index] & bit ) ) { /* dead */
+
+	TRACE_MPdies( MPptr );
+	FreeMallocPtr( MallocPtr_CLOSURE_DATA(MPptr) );
+	MallocPtr_deaths++;
+
+	temp = MPptr;
+	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+	/* Now trash the closure to encourage bugs to show themselves */
+	TRASH_MallocPtr_CLOSURE( temp );
+
+      } else { 
+
+	TRACE_MPlives(MPptr);
+	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+      }
+    }
+}
+
+#endif /* _INFO_COMPACTING */
+\end{code}
+
+\section[SM-extensions-copying-code]{Copying Collector Code}
+
+\begin{code}
+#if defined(_INFO_COPYING)
+
+/* ToDo: a possible optimisation would be to maintain a flag that
+   told us whether the SPTable had been updated (with new
+   pointers) and so needs to be GC'd.  A simple way of doing this
+   might be to generalise the MUTUPLE closures to MUGEN closures.
+*/
+void evacSPTable( sm )
+smInfo *sm;
+{
+  DEBUG_STRING("Evacuate Stable Pointer Table:");
+  {
+    P_ evac = sm->StablePointerTable;
+    sm->StablePointerTable = EVACUATE_CLOSURE(evac);
+  }
+}
+
+
+
+/* First attempt at Malloc Ptr hackery... Later versions might 
+   do something useful with the two counters. [ADR]      */
+
+#if defined(DEBUG)
+#if defined(GCgn)
+
+EXTDATA_RO(Forward_Ref_New_info);
+EXTDATA_RO(Forward_Ref_Old_info);
+EXTDATA_RO(OldRoot_Forward_Ref_info);
+
+#else
+
+EXTDATA_RO(Forward_Ref_info);
+
+#endif
+#endif
+
+/* 
+  Call FreeMallocPtr on any dead MPs in oldMPList, add the remainder
+  to new sticking the result into newMPList.
+*/
+void
+reportDeadMallocPtrs(oldMPList, new, newMPList)
+  P_ oldMPList;
+  P_ new;
+  P_ *newMPList;
+{
+    P_ MPptr, temp;
+    I_ MP_no = 0, MP_deaths = 0;
+
+    /* At this point, the MallocPtrList is in an invalid state (since
+       some info ptrs will have been mangled) so we can't validate
+       it. ADR */
+
+    DEBUG_STRING("Updating MallocPtr List and reporting casualties:");
+    MPptr = oldMPList;
+    while ( MPptr != NULL ) {
+      TRACE_MallocPtr(MPptr);
+
+      if ((P_) INFO_PTR(MPptr) == MallocPtr_info ) {
+	/* can't have been forwarded - must be dead */
+
+	TRACE_MPdies(MPptr);
+	FreeMallocPtr( MallocPtr_CLOSURE_DATA(MPptr) );
+	MP_deaths++;
+
+	temp = MPptr;
+	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+
+	/* Now trash the closure to encourage bugs to show themselves */
+	TRASH_MallocPtr_CLOSURE( temp );
+      } else { /* Must have been forwarded - so it must be live */
+
+	P_ newAddress = (P_) FORWARD_ADDRESS(MPptr);
+
+#if defined(GCgn)
+	ASSERT( ( (P_) INFO_PTR(MPptr) == Forward_Ref_New_info ) ||
+		( (P_) INFO_PTR(MPptr) == Forward_Ref_Old_info ) ||
+		( (P_) INFO_PTR(MPptr) == OldRoot_Forward_Ref_info ) );
+#else
+	ASSERT( (P_) INFO_PTR(MPptr) == Forward_Ref_info );
+#endif
+
+	TRACE_MPforwarded( MPptr, newAddress );
+	MallocPtr_CLOSURE_LINK(newAddress) = new;
+	new = newAddress;
+	MP_no++;
+	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+      }
+    }
+
+    VALIDATE_MallocPtrList( new );
+    *newMPList = new;
+}
+#endif /* _INFO_COPYING */
+\end{code}
+
+\upsection
+
+\begin{code}
+#endif /* !PAR */
+\end{code}

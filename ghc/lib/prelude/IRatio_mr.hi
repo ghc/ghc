@@ -1,0 +1,83 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeRatio where
+import PreludeBuiltin(Int(..), Integer(..))
+import PreludeCore(Enum(..), Eq(..), Fractional(..), Integral(..), Num(..), Ord(..), Real(..), RealFrac(..), Text(..))
+(%) :: Integral a => a -> a -> Ratio a
+	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(U(U(U(SA)AAALALLAL)AA)ALLAAAAAAAA)" {_A_ 3 _U_ 12222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Integer ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LU(PPP)" {_A_ 4 _U_ 1222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+approxRational :: RealFrac a => a -> a -> Ratio Integer
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(U(LU(U(ASAALAAA)AAAA)L)AAAAAA)LL" {_A_ 5 _U_ 21222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+denominator :: Ratio a -> a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: Ratio u0) -> case u1 of { _ALG_ (:%) (u2 :: u0) (u3 :: u0) -> u3; _NO_DEFLT_ } _N_ #-}
+numerator :: Ratio a -> a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: Ratio u0) -> case u1 of { _ALG_ (:%) (u2 :: u0) (u3 :: u0) -> u2; _NO_DEFLT_ } _N_ #-}
+prec :: Int
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [7#] _N_ #-}
+reduce :: Integral a => a -> a -> Ratio a
+	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(U(U(U(SA)AAAAALAAL)AA)ALLAAAAAAAA)" {_A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Integer ] 1 { _A_ 2 _U_ 21 _N_ _S_ "LU(PPP)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+instance Integral a => Enum (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Enum (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 6 _!_ _TUP_5 [{{Ord (Ratio Integer)}}, (Ratio Integer -> [Ratio Integer]), (Ratio Integer -> Ratio Integer -> [Ratio Integer]), (Ratio Integer -> Ratio Integer -> [Ratio Integer]), (Ratio Integer -> Ratio Integer -> Ratio Integer -> [Ratio Integer])] [_DFUN_ Ord (Ratio Integer), _CONSTM_ Enum enumFrom (Ratio Integer), _CONSTM_ Enum enumFromThen (Ratio Integer), _CONSTM_ Enum enumFromTo (Ratio Integer), _CONSTM_ Enum enumFromThenTo (Ratio Integer)] _N_
+	 enumFrom = _A_ 1 _U_ 2 _N_ _N_ _N_ _N_,
+	 enumFromThen = _A_ 2 _U_ 21 _N_ _N_ _N_ _N_,
+	 enumFromTo = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 enumFromThenTo = _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance Integral a => Eq (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
+instance Eq (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Ratio Integer -> Ratio Integer -> Bool), (Ratio Integer -> Ratio Integer -> Bool)] [_CONSTM_ Eq (==) (Ratio Integer), _CONSTM_ Eq (/=) (Ratio Integer)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)L)U(U(PPP)L)" {_A_ 5 _U_ 22211 _N_ _N_ _F_ _IF_ARGS_ 0 5 XXXCC 9 \ (u0 :: Int#) (u1 :: Int#) (u2 :: ByteArray#) (u3 :: Integer) (u4 :: Ratio Integer) -> case u4 of { _ALG_ (:%) (u5 :: Integer) (u6 :: Integer) -> case u5 of { _ALG_ J# (u7 :: Int#) (u8 :: Int#) (u9 :: ByteArray#) -> case _#_ cmpInteger# [] [u0, u1, u2, u7, u8, u9] of { _PRIM_ 0# -> case u3 of { _ALG_ J# (ua :: Int#) (ub :: Int#) (uc :: ByteArray#) -> case u6 of { _ALG_ J# (ud :: Int#) (ue :: Int#) (uf :: ByteArray#) -> case _#_ cmpInteger# [] [ua, ub, uc, ud, ue, uf] of { _PRIM_ 0# -> _!_ True [] []; (ug :: Int#) -> _!_ False [] [] }; _NO_DEFLT_ }; _NO_DEFLT_ }; (uh :: Int#) -> _!_ False [] [] }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_} _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)L)U(U(PPP)L)" {_A_ 5 _U_ 22211 _N_ _N_ _F_ _IF_ARGS_ 0 5 XXXCC 9 \ (u0 :: Int#) (u1 :: Int#) (u2 :: ByteArray#) (u3 :: Integer) (u4 :: Ratio Integer) -> case u4 of { _ALG_ (:%) (u5 :: Integer) (u6 :: Integer) -> case u5 of { _ALG_ J# (u7 :: Int#) (u8 :: Int#) (u9 :: ByteArray#) -> case _#_ cmpInteger# [] [u0, u1, u2, u7, u8, u9] of { _PRIM_ 0# -> case u3 of { _ALG_ J# (ua :: Int#) (ub :: Int#) (uc :: ByteArray#) -> case u6 of { _ALG_ J# (ud :: Int#) (ue :: Int#) (uf :: ByteArray#) -> case _#_ cmpInteger# [] [ua, ub, uc, ud, ue, uf] of { _PRIM_ 0# -> _!_ False [] []; (ug :: Int#) -> _!_ True [] [] }; _NO_DEFLT_ }; _NO_DEFLT_ }; (uh :: Int#) -> _!_ True [] [] }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_} _N_ _N_ #-}
+instance Integral a => Fractional (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Fractional (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Num (Ratio Integer)}}, (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer)] [_DFUN_ Num (Ratio Integer), _CONSTM_ Fractional (/) (Ratio Integer), _CONSTM_ Fractional recip (Ratio Integer), _CONSTM_ Fractional fromRational (Ratio Integer)] _N_
+	 (/) = _A_ 2 _U_ 11 _N_ _S_ "U(LU(PPP))U(U(PPP)L)" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 recip = _A_ 1 _U_ 1 _N_ _S_ "U(U(PPP)L)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 fromRational = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Integer) (u1 :: Integer) -> _!_ (:%) [Integer] [u0, u1] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Ratio Integer) -> u0 _N_ #-}
+instance Integral a => Num (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance Num (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [{{Eq (Ratio Integer)}}, {{Text (Ratio Integer)}}, (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer), (Integer -> Ratio Integer), (Int -> Ratio Integer)] [_DFUN_ Eq (Ratio Integer), _DFUN_ Text (Ratio Integer), _CONSTM_ Num (+) (Ratio Integer), _CONSTM_ Num (-) (Ratio Integer), _CONSTM_ Num (*) (Ratio Integer), _CONSTM_ Num negate (Ratio Integer), _CONSTM_ Num abs (Ratio Integer), _CONSTM_ Num signum (Ratio Integer), _CONSTM_ Num fromInteger (Ratio Integer), _CONSTM_ Num fromInt (Ratio Integer)] _N_
+	 (+) = _A_ 2 _U_ 11 _N_ _S_ "U(LU(PPP))U(LU(PPP))" {_A_ 5 _U_ 12221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (-) = _A_ 2 _U_ 11 _N_ _S_ "U(LU(PPP))U(LU(PPP))" {_A_ 5 _U_ 12221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (*) = _A_ 2 _U_ 11 _N_ _S_ "U(LU(PPP))U(LU(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 negate = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 abs = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
+	 signum = _A_ 1 _U_ 1 _N_ _S_ "U(LA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 fromInteger = _A_ 1 _U_ 2 _N_ _N_ _N_ _N_,
+	 fromInt = _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
+instance Integral a => Ord (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Ord (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq (Ratio Integer)}}, (Ratio Integer -> Ratio Integer -> Bool), (Ratio Integer -> Ratio Integer -> Bool), (Ratio Integer -> Ratio Integer -> Bool), (Ratio Integer -> Ratio Integer -> Bool), (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer -> Ratio Integer), (Ratio Integer -> Ratio Integer -> _CMP_TAG)] [_DFUN_ Eq (Ratio Integer), _CONSTM_ Ord (<) (Ratio Integer), _CONSTM_ Ord (<=) (Ratio Integer), _CONSTM_ Ord (>=) (Ratio Integer), _CONSTM_ Ord (>) (Ratio Integer), _CONSTM_ Ord max (Ratio Integer), _CONSTM_ Ord min (Ratio Integer), _CONSTM_ Ord _tagCmp (Ratio Integer)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_,
+	 max = _A_ 2 _U_ 12 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 min = _A_ 2 _U_ 12 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(PPP)U(PPP))U(U(PPP)U(PPP))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Integral a => Real (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 3 _U_ 122 _N_ _N_ _N_ _N_ #-}
+instance Real (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Num (Ratio Integer)}}, {{Enum (Ratio Integer)}}, (Ratio Integer -> Ratio Integer)] [_DFUN_ Num (Ratio Integer), _DFUN_ Enum (Ratio Integer), _CONSTM_ Real toRational (Ratio Integer)] _N_
+	 toRational = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Integer) (u1 :: Integer) -> _!_ (:%) [Integer] [u0, u1] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Ratio Integer) -> u0 _N_ #-}
+instance Integral a => RealFrac (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance RealFrac (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 8 _!_ _TUP_7 [{{Real (Ratio Integer)}}, {{Fractional (Ratio Integer)}}, _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> (a$z1, Ratio Integer)), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1)] [_DFUN_ Real (Ratio Integer), _DFUN_ Fractional (Ratio Integer), _CONSTM_ RealFrac properFraction (Ratio Integer), _CONSTM_ RealFrac truncate (Ratio Integer), _CONSTM_ RealFrac round (Ratio Integer), _CONSTM_ RealFrac ceiling (Ratio Integer), _CONSTM_ RealFrac floor (Ratio Integer)] _N_
+	 properFraction = _A_ 2 _U_ 11 _N_ _S_ "LU(LL)" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_,
+	 truncate = _A_ 1 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 3 _/\_ u0 -> \ (u1 :: {{Integral u0}}) -> _APP_  _TYAPP_  _TYAPP_  _WRKR_ _ORIG_ PreludeCore _truncate { (Ratio Integer) } { u0 } [ _CONSTM_ RealFrac properFraction (Ratio Integer), u1 ] _N_,
+	 round = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_,
+	 ceiling = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_,
+	 floor = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance Integral a => Text (Ratio a)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Text (Ratio Integer)
+	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Ratio Integer, [Char])]), (Int -> Ratio Integer -> [Char] -> [Char]), ([Char] -> [([Ratio Integer], [Char])]), ([Ratio Integer] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Ratio Integer), _CONSTM_ Text showsPrec (Ratio Integer), _CONSTM_ Text readList (Ratio Integer), _CONSTM_ Text showList (Ratio Integer)] _N_
+	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LU(LL)" {_A_ 3 _U_ 1222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

@@ -1,0 +1,5 @@
+ 
+"tcfail056.hs", line 9: "<=" is not an operation of class "Eq".
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

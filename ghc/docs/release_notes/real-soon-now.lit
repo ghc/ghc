@@ -1,0 +1,49 @@
+%************************************************************************
+%*									*
+%*  Stuff for : Real Soon Now						*
+%*									*
+%************************************************************************
+
+Below is a short list of things we hope to tackle soon.  We welcome
+prodding, cajoling, large sums of money, offers of holidays in warm
+climates...  Umm, excuse me, I got carried away....
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[Compilation speed:]
+This is still our \#1 priority.  (Actually, we {\em have} saved a lot
+on compilation time since~0.16; however, we've spent a goodly chunk of
+our winnings.)
+
+%-------------------------------------------------------------------
+\item[Revised I/O scheme:] We've {\em finally} figured out the right
+way to do this ``state'' stuff; see the Launchbury/Peyton Jones ``Lazy
+Functional State Threads'' paper (draft; check
+\tr{ghc/docs/abstracts/abstracts93.tex}).
+
+Simultaneously, the Haskell~1.3 I/O proposal is coming along.  We hope
+to use the former to do the latter, if you know what I mean.
+
+%-------------------------------------------------------------------
+\item[More with unfoldings:]
+And our new simplifier.  Both of these new pieces of machinery are
+still a bit ``raw.''  (The reason we don't quote performance numbers
+is because we haven't collected any yet.)
+
+%-------------------------------------------------------------------
+\item[Specialised instances:]  Tedious and boring.
+
+%-------------------------------------------------------------------
+\item[More with ``semi-tagging'':]
+(which we haven't done much with yet...) and other code-generator-ish
+hacks.  [It depends how close we let Simon get to the code.]
+
+%-------------------------------------------------------------------
+\item[More tuning:]
+We're {\em generally} happy with the time/space behaviour of Haskell
+programs compiled with this system.  But there's always work to do.
+
+We still welcome a copy of any Haskell program for which a competing
+compiler generates better code.  We want to stamp out these
+unfortunate anomalies!
+\end{description}

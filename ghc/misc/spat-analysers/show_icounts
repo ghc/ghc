@@ -1,0 +1,354 @@
+#! /usr/local/bin/perl
+#
+%Datum = ();
+
+&init();
+
+$BigTotal = 0;
+
+while (<>) {
+    chop;
+    next if ! /^\s*(\d+): (.*)/;
+    $op_code = $1;
+    @num = split(/\s+/, $2);
+
+    $op_category = $Opcode2Cat{$op_code};
+
+    die "num = $#num\n" if $#num != 21;
+
+    for($i = 0; $i <= $#num; $i++) {
+	next if $num[$i] == 0;
+
+	$act = $ActivityName[$i];
+
+	$Datum{"$act/$op_category"} += $num[$i];
+	$TotPerCat{$op_category}    += $num[$i];
+	$BigTotal		    += $num[$i];
+    }
+}
+
+#print a header
+printf STDOUT "%12s", "";
+foreach $opcat (@ListOfCats) { printf STDOUT " %11s", $opcat; }
+printf STDOUT " %11s %s\n", 'TOTAL', " \%age";
+
+# print the collected goods
+%tot_for_opcat = ();
+foreach $act ( @ListOfActivities ) {
+    printf STDOUT "%-12s", $act;
+    $tot_for_act = 0;
+
+    foreach $opcat (@ListOfCats) {
+	$datum = $Datum{"$act/$opcat"};
+	printf STDOUT " %11s", &commas($datum);
+	$tot_for_act           += $datum;
+	$tot_for_opcat{$opcat} += $datum;
+    }
+    printf STDOUT "%12s %5.1f%%\n", &commas($tot_for_act), (($tot_for_act / $BigTotal) * 100.0);
+}
+
+foreach $k ( keys %TotPerCat ) {
+    die "category ($k) totals don't match: $TotPerCat{$k} != $tot_for_opcat{$k}\n"
+	if $TotPerCat{$k} != $tot_for_opcat{$k};
+}
+foreach $k ( keys %tot_for_opcat ) {
+    die "category ($k) totals don't match: $TotPerCat{$k} != $tot_for_opcat{$k}\n"
+	if $TotPerCat{$k} != $tot_for_opcat{$k};
+}
+
+#print totals by category and percentages
+printf STDOUT "\n%-12s", '*Totals*';
+$tot_to_chk = 0;
+foreach $opcat (@ListOfCats) {
+    printf STDOUT " %11s", &commas($TotPerCat{$opcat});
+    $tot_to_chk += $TotPerCat{$opcat};
+}
+
+printf STDOUT "%12s\n%-12s", &commas($BigTotal), '';
+
+die "Totals don't match: $tot_to_chk != $BigTotal\n" if $tot_to_chk != $BigTotal;
+
+foreach $opcat (@ListOfCats) {
+    printf STDOUT " %10.1f%%", (($TotPerCat{$opcat} / $BigTotal) * 100.0);
+}
+printf STDOUT "\n";
+
+# utils:
+
+sub commas {	# put commas into long integer numbers
+    local($_) = @_;
+
+    s/^\+//;
+
+    s/(\d)(\d\d\d)$/$1,$2/;
+    while ( /\d\d\d\d,/ ) {
+	s/(\d)(\d\d\d)\,/$1,$2,/;
+    }
+    $_;
+}
+
+sub init {
+    # order is important!
+    @ActivityName = ( 'UNKNOWN', 'GC', 'OTHER_REDN', 'ASTK_STUB',
+	    'FILL_IN_HEAP', 'HEAP_CHK', 'RETURN',
+	    'UPDATE', 'PUSH_UPDF', 'ARGS_CHK', 'UPDATE_PAP',
+	    'INDIRECT', 'XXX_12', 'XXX_13', 'OVERHEAD', 'TAILCALL',
+	    'CALL', 'STKADJ', 'ASTK', 'BSTK', 'RETREG', 'ARGREGS' );
+
+    @ListOfActivities = ( # print order
+	    'ASTK_STUB', 'FILL_IN_HEAP', 'HEAP_CHK',
+	    'RETURN', 'TAILCALL', 'UPDATE', 'PUSH_UPDF', 'UPDATE_PAP',
+	    'INDIRECT', 'ARGS_CHK',
+	    'CALL', 'STKADJ', 'ASTK', 'BSTK', 'RETREG', 'ARGREGS',
+	    'OTHER_REDN', 'GC', 'UNKNOWN', 'OVERHEAD' );
+
+    @ListOfCats = ('LD', 'ST', 'ARITH', 'BR', 'SETHI', 'NOP', 'OTHER'); # 'FL-PT', 
+    %Opcode2Cat = ();
+
+    $Opcode2Cat{'0'} =	'ARITH';    # IH_ADD
+    $Opcode2Cat{'1'} =	'ARITH';    # IH_ADDCC
+    $Opcode2Cat{'2'} =	'ARITH';    # IH_ADDX
+    $Opcode2Cat{'3'} =	'ARITH';    # IH_ADDXCC
+    $Opcode2Cat{'4'} =	'ARITH';    # IH_AND
+    $Opcode2Cat{'5'} =	'ARITH';    # IH_ANDCC
+    $Opcode2Cat{'6'} =	'ARITH';    # IH_ANDN
+    $Opcode2Cat{'7'} =	'ARITH';    # IH_ANDNCC
+    $Opcode2Cat{'8'} =	'BR';	    # IH_BA
+    $Opcode2Cat{'9'} =	'BR';	    # IH_BAA
+    $Opcode2Cat{'10'} =	'BR';	    # IH_BCC
+    $Opcode2Cat{'11'} =	'BR';	    # IH_BCCA
+    $Opcode2Cat{'12'} =	'BR';	    # IH_BCS
+    $Opcode2Cat{'13'} =	'BR';	    # IH_BCSA
+    $Opcode2Cat{'14'} =	'BR';	    # IH_BE
+    $Opcode2Cat{'15'} =	'BR';	    # IH_BEA
+    $Opcode2Cat{'16'} =	'BR';	    # IH_BG
+    $Opcode2Cat{'17'} =	'BR';	    # IH_BGA
+    $Opcode2Cat{'18'} =	'BR';	    # IH_BGE
+    $Opcode2Cat{'19'} =	'BR';	    # IH_BGEA
+    $Opcode2Cat{'20'} =	'BR';	    # IH_BGU
+    $Opcode2Cat{'21'} =	'BR';	    # IH_BGUA
+    $Opcode2Cat{'22'} =	'BR';	    # IH_BL
+    $Opcode2Cat{'23'} =	'BR';	    # IH_BLA
+    $Opcode2Cat{'24'} =	'BR';	    # IH_BLE
+    $Opcode2Cat{'25'} =	'BR';	    # IH_BLEA
+    $Opcode2Cat{'26'} =	'BR';	    # IH_BLEU
+    $Opcode2Cat{'27'} =	'BR';	    # IH_BLEUA
+    $Opcode2Cat{'28'} =	'BR';	    # IH_BN
+    $Opcode2Cat{'29'} =	'BR';	    # IH_BNA
+    $Opcode2Cat{'30'} =	'BR';	    # IH_BNE
+    $Opcode2Cat{'31'} =	'BR';	    # IH_BNEA
+    $Opcode2Cat{'32'} =	'BR';	    # IH_BNEG
+    $Opcode2Cat{'33'} =	'BR';	    # IH_BNEGA
+    $Opcode2Cat{'34'} =	'BR';	    # IH_BPOS
+    $Opcode2Cat{'35'} =	'BR';	    # IH_BPOSA
+    $Opcode2Cat{'36'} =	'BR';	    # IH_BVC
+    $Opcode2Cat{'37'} =	'BR';	    # IH_BVCA
+    $Opcode2Cat{'38'} =	'BR';	    # IH_BVS
+    $Opcode2Cat{'39'} =	'BR';	    # IH_BVSA
+    $Opcode2Cat{'40'} =	'BR';	    # IH_CALL
+    $Opcode2Cat{'41'} =	'OTHER';    # IH_CB0
+    $Opcode2Cat{'42'} =	'OTHER';    # IH_CB0A
+    $Opcode2Cat{'43'} =	'OTHER';    # IH_CB01
+    $Opcode2Cat{'44'} =	'OTHER';    # IH_CB01A
+    $Opcode2Cat{'45'} =	'OTHER';    # IH_CB012
+    $Opcode2Cat{'46'} =	'OTHER';    # IH_CB012A
+    $Opcode2Cat{'47'} =	'OTHER';    # IH_CB013
+    $Opcode2Cat{'48'} =	'OTHER';    # IH_CB013A
+    $Opcode2Cat{'49'} =	'OTHER';    # IH_CB02
+    $Opcode2Cat{'50'} =	'OTHER';    # IH_CB02A
+    $Opcode2Cat{'51'} =	'OTHER';    # IH_CB023
+    $Opcode2Cat{'52'} =	'OTHER';    # IH_CB023A
+    $Opcode2Cat{'53'} =	'OTHER';    # IH_CB03
+    $Opcode2Cat{'54'} =	'OTHER';    # IH_CB03A
+    $Opcode2Cat{'55'} =	'OTHER';    # IH_CB1
+    $Opcode2Cat{'56'} =	'OTHER';    # IH_CB1A
+    $Opcode2Cat{'57'} =	'OTHER';    # IH_CB12
+    $Opcode2Cat{'58'} =	'OTHER';    # IH_CB12A
+    $Opcode2Cat{'59'} =	'OTHER';    # IH_CB123
+    $Opcode2Cat{'60'} =	'OTHER';    # IH_CB123A
+    $Opcode2Cat{'61'} =	'OTHER';    # IH_CB13
+    $Opcode2Cat{'62'} =	'OTHER';    # IH_CB13A
+    $Opcode2Cat{'63'} =	'OTHER';    # IH_CB2
+    $Opcode2Cat{'64'} =	'OTHER';    # IH_CB2A
+    $Opcode2Cat{'65'} =	'OTHER';    # IH_CB23
+    $Opcode2Cat{'66'} =	'OTHER';    # IH_CB23A
+    $Opcode2Cat{'67'} =	'OTHER';    # IH_CB3
+    $Opcode2Cat{'68'} =	'OTHER';    # IH_CB3A
+    $Opcode2Cat{'69'} =	'OTHER';    # IH_CBA
+    $Opcode2Cat{'70'} =	'OTHER';    # IH_CBAA
+    $Opcode2Cat{'71'} =	'OTHER';    # IH_CBN
+    $Opcode2Cat{'72'} =	'OTHER';    # IH_CBNA
+    $Opcode2Cat{'73'} =	'OTHER';    # IH_CPOP1
+    $Opcode2Cat{'74'} =	'OTHER';    # IH_CPOP2
+    $Opcode2Cat{'75'} =	'OTHER'; # 'FL-PT';    # IH_FABSS
+    $Opcode2Cat{'76'} =	'OTHER'; # 'FL-PT';    # IH_FADDD
+    $Opcode2Cat{'77'} =	'OTHER'; # 'FL-PT';    # IH_FADDQ
+    $Opcode2Cat{'78'} =	'OTHER'; # 'FL-PT';    # IH_FADDS
+    $Opcode2Cat{'79'} =	'OTHER'; # 'FL-PT';    # IH_FBA
+    $Opcode2Cat{'80'} =	'OTHER'; # 'FL-PT';    # IH_FBAA
+    $Opcode2Cat{'81'} =	'OTHER'; # 'FL-PT';    # IH_FBE
+    $Opcode2Cat{'82'} =	'OTHER'; # 'FL-PT';    # IH_FBEA
+    $Opcode2Cat{'83'} =	'OTHER'; # 'FL-PT';    # IH_FBG
+    $Opcode2Cat{'84'} =	'OTHER'; # 'FL-PT';    # IH_FBGA
+    $Opcode2Cat{'85'} =	'OTHER'; # 'FL-PT';    # IH_FBGE
+    $Opcode2Cat{'86'} =	'OTHER'; # 'FL-PT';    # IH_FBGEA
+    $Opcode2Cat{'87'} =	'OTHER'; # 'FL-PT';    # IH_FBL
+    $Opcode2Cat{'88'} =	'OTHER'; # 'FL-PT';    # IH_FBLA
+    $Opcode2Cat{'89'} =	'OTHER'; # 'FL-PT';    # IH_FBLE
+    $Opcode2Cat{'90'} =	'OTHER'; # 'FL-PT';    # IH_FBLEA
+    $Opcode2Cat{'91'} =	'OTHER'; # 'FL-PT';    # IH_FBLG
+    $Opcode2Cat{'92'} =	'OTHER'; # 'FL-PT';    # IH_FBLGA
+    $Opcode2Cat{'93'} =	'OTHER'; # 'FL-PT';    # IH_FBN
+    $Opcode2Cat{'94'} =	'OTHER'; # 'FL-PT';    # IH_FBNA
+    $Opcode2Cat{'95'} =	'OTHER'; # 'FL-PT';    # IH_FBNE
+    $Opcode2Cat{'96'} =	'OTHER'; # 'FL-PT';    # IH_FBNEA
+    $Opcode2Cat{'97'} =	'OTHER'; # 'FL-PT';    # IH_FBO
+    $Opcode2Cat{'98'} =	'OTHER'; # 'FL-PT';    # IH_FBOA
+    $Opcode2Cat{'99'} =	'OTHER'; # 'FL-PT';    # IH_FBU
+    $Opcode2Cat{'100'} =    'OTHER'; # 'FL-PT';	# IH_FBUA
+    $Opcode2Cat{'101'} =    'OTHER'; # 'FL-PT';	# IH_FBUE
+    $Opcode2Cat{'102'} =    'OTHER'; # 'FL-PT';	# IH_FBUEA
+    $Opcode2Cat{'103'} =    'OTHER'; # 'FL-PT';	# IH_FBUG
+    $Opcode2Cat{'104'} =    'OTHER'; # 'FL-PT';	# IH_FBUGA
+    $Opcode2Cat{'105'} =    'OTHER'; # 'FL-PT';	# IH_FBUGE
+    $Opcode2Cat{'106'} =    'OTHER'; # 'FL-PT';	# IH_FBUGEA
+    $Opcode2Cat{'107'} =    'OTHER'; # 'FL-PT';	# IH_FBUL
+    $Opcode2Cat{'108'} =    'OTHER'; # 'FL-PT';	# IH_FBULA
+    $Opcode2Cat{'109'} =    'OTHER'; # 'FL-PT';	# IH_FBULE
+    $Opcode2Cat{'110'} =    'OTHER'; # 'FL-PT';	# IH_FBULEA
+    $Opcode2Cat{'111'} =    'OTHER'; # 'FL-PT';	# IH_FCMPD
+    $Opcode2Cat{'112'} =    'OTHER'; # 'FL-PT';	# IH_FCMPED
+    $Opcode2Cat{'113'} =    'OTHER'; # 'FL-PT';	# IH_FCMPEQ
+    $Opcode2Cat{'114'} =    'OTHER'; # 'FL-PT';	# IH_FCMPES
+    $Opcode2Cat{'115'} =    'OTHER'; # 'FL-PT';	# IH_FCMPQ
+    $Opcode2Cat{'116'} =    'OTHER'; # 'FL-PT';	# IH_FCMPS
+    $Opcode2Cat{'117'} =    'OTHER'; # 'FL-PT';	# IH_FDIVD
+    $Opcode2Cat{'118'} =    'OTHER'; # 'FL-PT';	# IH_FDIVQ
+    $Opcode2Cat{'119'} =    'OTHER'; # 'FL-PT';	# IH_FDIVS
+    $Opcode2Cat{'120'} =    'OTHER'; # 'FL-PT';	# IH_FDMULQ
+    $Opcode2Cat{'121'} =    'OTHER'; # 'FL-PT';	# IH_FDTOI
+    $Opcode2Cat{'122'} =    'OTHER'; # 'FL-PT';	# IH_FDTOQ
+    $Opcode2Cat{'123'} =    'OTHER'; # 'FL-PT';	# IH_FDTOS
+    $Opcode2Cat{'124'} =    'OTHER'; # 'FL-PT';	# IH_FITOD
+    $Opcode2Cat{'125'} =    'OTHER'; # 'FL-PT';	# IH_FITOQ
+    $Opcode2Cat{'126'} =    'OTHER'; # 'FL-PT';	# IH_FITOS
+    $Opcode2Cat{'127'} =    'OTHER';	# IH_FLUSH
+    $Opcode2Cat{'128'} =    'OTHER'; # 'FL-PT';	# IH_FMOVS
+    $Opcode2Cat{'129'} =    'OTHER'; # 'FL-PT';	# IH_FMULD
+    $Opcode2Cat{'130'} =    'OTHER'; # 'FL-PT';	# IH_FMULQ
+    $Opcode2Cat{'131'} =    'OTHER'; # 'FL-PT';	# IH_FMULS
+    $Opcode2Cat{'132'} =    'OTHER'; # 'FL-PT';	# IH_FNEGS
+    $Opcode2Cat{'133'} =    'OTHER'; # 'FL-PT';	# IH_FQTOD
+    $Opcode2Cat{'134'} =    'OTHER'; # 'FL-PT';	# IH_FQTOI
+    $Opcode2Cat{'135'} =    'OTHER'; # 'FL-PT';	# IH_FQTOS
+    $Opcode2Cat{'136'} =    'OTHER'; # 'FL-PT';	# IH_FSMULD
+    $Opcode2Cat{'137'} =    'OTHER'; # 'FL-PT';	# IH_FSQRTD
+    $Opcode2Cat{'138'} =    'OTHER'; # 'FL-PT';	# IH_FSQRTQ
+    $Opcode2Cat{'139'} =    'OTHER'; # 'FL-PT';	# IH_FSQRTS
+    $Opcode2Cat{'140'} =    'OTHER'; # 'FL-PT';	# IH_FSTOD
+    $Opcode2Cat{'141'} =    'OTHER'; # 'FL-PT';	# IH_FSTOI
+    $Opcode2Cat{'142'} =    'OTHER'; # 'FL-PT';	# IH_FSTOQ
+    $Opcode2Cat{'143'} =    'OTHER'; # 'FL-PT';	# IH_FSUBD
+    $Opcode2Cat{'144'} =    'OTHER'; # 'FL-PT';	# IH_FSUBQ
+    $Opcode2Cat{'145'} =    'OTHER'; # 'FL-PT';	# IH_FSUBS
+    $Opcode2Cat{'146'} =    'BR';	# IH_JMPL
+    $Opcode2Cat{'147'} =    'LD';   # IH_LD
+    $Opcode2Cat{'148'} =    'LD';   # IH_LDA
+    $Opcode2Cat{'149'} =    'LD';   # IH_LDC
+    $Opcode2Cat{'150'} =    'LD';   # IH_LDCSR
+    $Opcode2Cat{'151'} =    'LD';   # IH_LDD
+    $Opcode2Cat{'152'} =    'LD';   # IH_LDDA
+    $Opcode2Cat{'153'} =    'LD';   # IH_LDDC
+    $Opcode2Cat{'154'} =    'LD';   # IH_LDDF
+    $Opcode2Cat{'155'} =    'LD';   # IH_LDF
+    $Opcode2Cat{'156'} =    'LD';   # IH_LDFSR
+    $Opcode2Cat{'157'} =    'LD';   # IH_LDSB
+    $Opcode2Cat{'158'} =    'LD';   # IH_LDSBA
+    $Opcode2Cat{'159'} =    'LD';   # IH_LDSH
+    $Opcode2Cat{'160'} =    'LD';   # IH_LDSHA
+    $Opcode2Cat{'161'} =    'LD';   # IH_LDSTUB
+    $Opcode2Cat{'162'} =    'LD';   # IH_LDSTUBA
+    $Opcode2Cat{'163'} =    'LD';   # IH_LDUB
+    $Opcode2Cat{'164'} =    'LD';   # IH_LDUBA
+    $Opcode2Cat{'165'} =    'LD';   # IH_LDUH
+    $Opcode2Cat{'166'} =    'LD';   # IH_LDUHA
+    $Opcode2Cat{'167'} =    'ARITH';   # IH_MULSCC
+    $Opcode2Cat{'168'} =    'NOP';   # IH_NOP
+    $Opcode2Cat{'169'} =    'ARITH';	# IH_OR
+    $Opcode2Cat{'170'} =    'ARITH';	# IH_ORCC
+    $Opcode2Cat{'171'} =    'ARITH';	# IH_ORN
+    $Opcode2Cat{'172'} =    'ARITH';	# IH_ORNCC
+    $Opcode2Cat{'173'} =    'OTHER';	# IH_RDASR
+    $Opcode2Cat{'174'} =    'OTHER';	# IH_RDPSR
+    $Opcode2Cat{'175'} =    'OTHER';	# IH_RDTBR
+    $Opcode2Cat{'176'} =    'OTHER';	# IH_RDWIM
+    $Opcode2Cat{'177'} =    'OTHER';	# IH_RDY
+    $Opcode2Cat{'178'} =    'OTHER';	# IH_RESTORE
+    $Opcode2Cat{'179'} =    'OTHER';	# IH_RETT
+    $Opcode2Cat{'180'} =    'OTHER';	# IH_SAVE
+    $Opcode2Cat{'181'} =    'ARITH';	# IH_SDIV
+    $Opcode2Cat{'182'} =    'ARITH';	# IH_SDIVCC
+    $Opcode2Cat{'183'} =    'SETHI';	# IH_SETHI
+    $Opcode2Cat{'184'} =    'ARITH';	# IH_SLL
+    $Opcode2Cat{'185'} =    'ARITH';	# IH_SMUL
+    $Opcode2Cat{'186'} =    'ARITH';	# IH_SMULCC
+    $Opcode2Cat{'187'} =    'ARITH';	# IH_SRA
+    $Opcode2Cat{'188'} =    'ARITH';	# IH_SRL
+    $Opcode2Cat{'189'} =    'ST';   # IH_ST
+    $Opcode2Cat{'190'} =    'ST';   # IH_STA
+    $Opcode2Cat{'191'} =    'ST';   # IH_STB
+    $Opcode2Cat{'192'} =    'ST';   # IH_STBA
+    $Opcode2Cat{'193'} =    'ST';   # IH_STBAR
+    $Opcode2Cat{'194'} =    'ST';   # IH_STC
+    $Opcode2Cat{'195'} =    'ST';   # IH_STCSR
+    $Opcode2Cat{'196'} =    'ST';   # IH_STD
+    $Opcode2Cat{'197'} =    'ST';   # IH_STDA
+    $Opcode2Cat{'198'} =    'ST';   # IH_STDC
+    $Opcode2Cat{'199'} =    'ST';   # IH_STDCQ
+    $Opcode2Cat{'200'} =    'ST';   # IH_STDF
+    $Opcode2Cat{'201'} =    'ST';   # IH_STDFQ
+    $Opcode2Cat{'202'} =    'ST';   # IH_STF
+    $Opcode2Cat{'203'} =    'ST';   # IH_STFSR
+    $Opcode2Cat{'204'} =    'ST';   # IH_STH
+    $Opcode2Cat{'205'} =    'ST';   # IH_STHA
+    $Opcode2Cat{'206'} =    'ARITH';	# IH_SUB
+    $Opcode2Cat{'207'} =    'ARITH';	# IH_SUBCC
+    $Opcode2Cat{'208'} =    'ARITH';	# IH_SUBX
+    $Opcode2Cat{'209'} =    'ARITH';	# IH_SUBXCC
+    $Opcode2Cat{'210'} =    'OTHER';	# IH_SWAP
+    $Opcode2Cat{'211'} =    'OTHER';	# IH_SWAPA
+    $Opcode2Cat{'212'} =    'OTHER';	# IH_TA
+    $Opcode2Cat{'213'} =    'OTHER';	# IH_TADDCC
+    $Opcode2Cat{'214'} =    'OTHER';	# IH_TADDCCTV
+    $Opcode2Cat{'215'} =    'OTHER';	# IH_TCC
+    $Opcode2Cat{'216'} =    'OTHER';	# IH_TCS
+    $Opcode2Cat{'217'} =    'OTHER';	# IH_TE
+    $Opcode2Cat{'218'} =    'OTHER';	# IH_TG
+    $Opcode2Cat{'219'} =    'OTHER';	# IH_TGE
+    $Opcode2Cat{'220'} =    'OTHER';	# IH_TGU
+    $Opcode2Cat{'221'} =    'OTHER';	# IH_TL
+    $Opcode2Cat{'222'} =    'OTHER';	# IH_TLE
+    $Opcode2Cat{'223'} =    'OTHER';	# IH_TLEU
+    $Opcode2Cat{'224'} =    'OTHER';	# IH_TN
+    $Opcode2Cat{'225'} =    'OTHER';	# IH_TNE
+    $Opcode2Cat{'226'} =    'OTHER';	# IH_TNEG
+    $Opcode2Cat{'227'} =    'OTHER';	# IH_TPOS
+    $Opcode2Cat{'228'} =    'OTHER';	# IH_TSUBCC
+    $Opcode2Cat{'229'} =    'OTHER';	# IH_TSUBCCTV
+    $Opcode2Cat{'230'} =    'OTHER';	# IH_TVC
+    $Opcode2Cat{'231'} =    'OTHER';	# IH_TVS
+    $Opcode2Cat{'232'} =    'ARITH';	# IH_UDIV
+    $Opcode2Cat{'233'} =    'ARITH';	# IH_UDIVCC
+    $Opcode2Cat{'234'} =    'ARITH';	# IH_UMUL
+    $Opcode2Cat{'235'} =    'ARITH';	# IH_UMULCC
+    $Opcode2Cat{'236'} =    'OTHER';	# IH_UNIMP
+    $Opcode2Cat{'237'} =    'OTHER';	# IH_WRASR
+    $Opcode2Cat{'238'} =    'OTHER';	# IH_WRPSR
+    $Opcode2Cat{'239'} =    'OTHER';	# IH_WRTBR
+    $Opcode2Cat{'240'} =    'OTHER';	# IH_WRWIM
+    $Opcode2Cat{'241'} =    'OTHER';	# IH_WRY
+    $Opcode2Cat{'242'} =    'ARITH';	# IH_XNOR
+    $Opcode2Cat{'243'} =    'ARITH';	# IH_XNORCC
+    $Opcode2Cat{'244'} =    'ARITH';	# IH_XOR
+    $Opcode2Cat{'245'} =    'ARITH';	# IH_XORCC
+}

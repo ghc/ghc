@@ -1,0 +1,911 @@
+Desugared:
+Tests.f :: for all d. d -> d -> d -> [d]
+Tests.f =
+    /\ o175 -> \ x.282 y.283 z.284 ->
+	:! o175
+	   x.282
+	   (:! o175
+	       y.283
+	       (:! o175
+		   z.284
+		   (:! o175 x.282 (:! o175 y.283 (:! o175 z.284 (Nil! o175))))))
+Tests.f2 :: for all d, e, f. d -> e -> [f]
+Tests.f2 = /\ o178 o179 t180 -> \ x.285 y.286 -> Nil! t180
+Tests.g1 :: for all d, e. d -> e -> ()
+Tests.g1 = /\ o183 o184 -> \ x.287 y.288 -> MkTuple0
+Tests.g ::
+    for all d, e, f.
+	d
+	-> e
+	   -> f
+	      -> (d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f,
+		  d,
+		  e,
+		  f)
+Tests.g =
+    /\ o187 o188 o189 -> \ x.289 y.290 z.291 ->
+	MkTuple150!
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    o187
+	    o188
+	    o189
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+	    x.289
+	    y.290
+	    z.291
+Tests.fa :: for all d. [d] -> d
+Tests.fa =
+    /\ t218 -> \ ds.320 ->
+	let
+	  fail.321 =
+	      (error t218)
+		  "\"ds018.hs\", line 39: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.320 of {
+	    (:) a.322 ds.323 ->
+		case ds.323 of {
+		  (:) b.324 ds.325 ->
+		      case ds.325 of {
+			(:) c.326 ds.327 ->
+			    case ds.327 of {
+			      (:) d.328 ds.329 ->
+				  case ds.329 of {
+				    (:) e.330 ds.331 ->
+					case ds.331 of {
+					  (:) f.332 ds.333 ->
+					      case ds.333 of {
+						(:) g.334 ds.335 ->
+						    case ds.335 of {
+						      (:) h.336 ds.337 ->
+							  case ds.337 of {
+							    (:) i.338 ds.339 ->
+								case ds.339 of {
+								  (:) j.340
+								      ds.341 ->
+								      case
+									  ds.341
+								      of {
+									(:) k.342
+									    ds.343 ->
+									    case
+										ds.343
+									    of {
+									      (:) l.344
+										  ds.345 ->
+										  case
+										      ds.345
+										  of {
+										    (:) m.346
+											ds.347 ->
+											case
+											    ds.347
+											of {
+											  (:) n.348
+											      ds.349 ->
+											      case
+												  ds.349
+											      of {
+												(:) o.350
+												    ds.351 ->
+												    case
+													ds.351
+												    of {
+												      (:) p.352
+													  ds.353 ->
+													  case
+													      ds.353
+													  of {
+													    (:) q.354
+														ds.355 ->
+														case
+														    ds.355
+														of {
+														  (:) r.356
+														      ds.357 ->
+														      case
+															  ds.357
+														      of {
+															(:) s.358
+															    ds.359 ->
+															    case
+																ds.359
+															    of {
+															      (:) t.360
+																  ds.361 ->
+																  case
+																      ds.361
+																  of {
+																    (:) u.362
+																	ds.363 ->
+																	case
+																	    ds.363
+																	of {
+																	  (:) v.364
+																	      ds.365 ->
+																	      case
+																		  ds.365
+																	      of {
+																		(:) w.366
+																		    ds.367 ->
+																		    case
+																			ds.367
+																		    of {
+																		      (:) x.368
+																			  ds.369 ->
+																			  case
+																			      ds.369
+																			  of {
+																			    (:) y.370
+																				ds.371 ->
+																				case
+																				    ds.371
+																				of {
+																				  (:) z.372
+																				      ds.373 ->
+																				      case
+																					  ds.373
+																				      of {
+																					Nil ->
+																					    x.368
+																					_ -> 
+																					    fail.321
+																				      }
+																				  _ -> 
+																				      fail.321
+																				}
+																			    _ -> 
+																				fail.321
+																			  }
+																		      _ -> 
+																			  fail.321
+																		    }
+																		_ -> 
+																		    fail.321
+																	      }
+																	  _ -> 
+																	      fail.321
+																	}
+																    _ -> 
+																	fail.321
+																  }
+															      _ -> 
+																  fail.321
+															    }
+															_ -> 
+															    fail.321
+														      }
+														  _ -> 
+														      fail.321
+														}
+													    _ -> 
+														fail.321
+													  }
+												      _ -> 
+													  fail.321
+												    }
+												_ -> 
+												    fail.321
+											      }
+											  _ -> 
+											      fail.321
+											}
+										    _ -> 
+											fail.321
+										  }
+									      _ -> 
+										  fail.321
+									    }
+									_ -> 
+									    fail.321
+								      }
+								  _ ->  fail.321
+								}
+							    _ ->  fail.321
+							  }
+						      _ ->  fail.321
+						    }
+						_ ->  fail.321
+					      }
+					  _ ->  fail.321
+					}
+				    _ ->  fail.321
+				  }
+			      _ ->  fail.321
+			    }
+			_ ->  fail.321
+		      }
+		  _ ->  fail.321
+		}
+	    _ ->  fail.321
+	  }
+Tests.fb :: for all d, e. [d] -> [e]
+Tests.fb =
+    /\ t221 t222 -> \ ds.376 ->
+	let
+	  fail.377 =
+	      (error [t222])
+		  "\"ds018.hs\", line 41: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.376 of {
+	    Nil -> Nil! t222
+	    _ ->  fail.377
+	  }
+Tests.ga ::
+    for all d,
+	    e,
+	    f,
+	    g,
+	    h,
+	    i,
+	    j,
+	    k,
+	    l,
+	    m,
+	    n,
+	    o,
+	    p,
+	    q,
+	    r,
+	    s,
+	    t,
+	    u,
+	    v,
+	    w,
+	    x,
+	    y,
+	    z0,
+	    z1,
+	    z2,
+	    z3,
+	    z4,
+	    z5,
+	    z6,
+	    z7,
+	    z8,
+	    z9,
+	    z10,
+	    z11,
+	    z12,
+	    z13,
+	    z14,
+	    z15,
+	    z16,
+	    z17,
+	    z18,
+	    z19,
+	    z20,
+	    z21,
+	    z22,
+	    z23,
+	    z24,
+	    z25,
+	    z26,
+	    z27,
+	    z28,
+	    z29.
+	(d,
+	 e,
+	 f,
+	 g,
+	 h,
+	 i,
+	 j,
+	 k,
+	 l,
+	 m,
+	 n,
+	 o,
+	 p,
+	 q,
+	 r,
+	 s,
+	 t,
+	 u,
+	 v,
+	 w,
+	 x,
+	 y,
+	 z0,
+	 z29,
+	 z1,
+	 z2,
+	 z3,
+	 z4,
+	 z5,
+	 z6,
+	 z7,
+	 z8,
+	 z9,
+	 z10,
+	 z11,
+	 z12,
+	 z13,
+	 z14,
+	 z15,
+	 z16,
+	 z17,
+	 z18,
+	 z19,
+	 z20,
+	 z21,
+	 z22,
+	 z23,
+	 z24,
+	 z25,
+	 z26,
+	 z27,
+	 z28)
+	-> z29
+Tests.ga =
+    /\ o225
+       o226
+       o227
+       o228
+       o229
+       o230
+       o231
+       o232
+       o233
+       o234
+       o235
+       o236
+       o237
+       o238
+       o239
+       o240
+       o241
+       o242
+       o243
+       o244
+       o245
+       o246
+       o247
+       o249
+       o250
+       o251
+       o252
+       o253
+       o254
+       o255
+       o256
+       o257
+       o258
+       o259
+       o260
+       o261
+       o262
+       o263
+       o264
+       o265
+       o266
+       o267
+       o268
+       o269
+       o270
+       o271
+       o272
+       o273
+       o274
+       o275
+       o276
+       o248 -> \ ds.380 ->
+	let
+	  fail.381 =
+	      (error o248)
+		  "\"ds018.hs\", line 45: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.380 of {
+	    MkTuple52 a.382
+		      b.383
+		      c.384
+		      d.385
+		      e.386
+		      f.387
+		      g.388
+		      h.389
+		      i.390
+		      j.391
+		      k.392
+		      l.393
+		      m.394
+		      n.395
+		      o.396
+		      p.397
+		      q.398
+		      r.399
+		      s.400
+		      t.401
+		      u.402
+		      v.403
+		      w.404
+		      x.405
+		      y.406
+		      z.407
+		      aa.408
+		      ab.409
+		      ac.410
+		      ad.411
+		      ae.412
+		      af.413
+		      ag.414
+		      ah.415
+		      ai.416
+		      aj.417
+		      ak.418
+		      al.419
+		      am.420
+		      an.421
+		      ao.422
+		      ap.423
+		      aq.424
+		      ar.425
+		      as.426
+		      at.427
+		      au.428
+		      av.429
+		      aw.430
+		      ax.431
+		      ay.432
+		      az.433 -> x.405
+	  }
+Tests.gb :: for all d. () -> d -> d
+Tests.gb =
+    /\ o279 -> \ ds.436 x.437 ->
+	let
+	  fail.438 =
+	      (error o279)
+		  "\"ds018.hs\", line 47: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.436 of {
+	    MkTuple0 -> x.437
+	  }
+Tests.gb2 :: () -> ()
+Tests.gb2 =
+    \ ds.441 ->
+	let
+	  fail.442 =
+	      (error ())
+		  "\"ds018.hs\", line 48: pattern-matching failure [function binding]\n"S
+	in 
+	  case ds.441 of {
+	    MkTuple0 -> MkTuple0
+	  }
+

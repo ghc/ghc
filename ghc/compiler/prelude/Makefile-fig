@@ -1,0 +1,18 @@
+#
+# TransFig makefile
+#
+
+all: prelude-structure.tex 
+
+# translation into ps
+
+prelude-structure.tex: prelude-structure.ps Makefile-fig
+	fig2ps2tex prelude-structure.ps >prelude-structure.tex
+clean::
+	rm -f prelude-structure.tex
+
+prelude-structure.ps: prelude-structure.fig Makefile-fig
+	fig2dev -L ps prelude-structure.fig > prelude-structure.ps
+clean::
+	rm -f prelude-structure.ps
+

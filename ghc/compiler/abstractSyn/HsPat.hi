@@ -1,0 +1,58 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface HsPat where
+import HsExpr(Expr)
+import HsLit(Literal)
+import Id(Id)
+import Name(Name)
+import Outputable(NamedThing, Outputable)
+import Pretty(PprStyle, PrettyRep)
+import ProtoName(ProtoName)
+import UniType(UniType)
+data InPat a   = WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal
+type ProtoNamePat = InPat ProtoName
+type RenamedPat = InPat Name
+data TypecheckedPat   = WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat)
+irrefutablePat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isConPat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isLitPat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+only_con :: Id -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+patsAreAllCons :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+patsAreAllLits :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+pprConPatTy :: PprStyle -> UniType -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+pprInPat :: Outputable a => PprStyle -> InPat a -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 22122 _N_ _N_ _N_ _N_ #-}
+pprTypecheckedPat :: PprStyle -> TypecheckedPat -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+typeOfPat :: TypecheckedPat -> UniType
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+unfailablePat :: TypecheckedPat -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+unfailablePats :: [TypecheckedPat] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+instance NamedThing a => NamedThing (InPat a)
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 1 _U_ 0 _N_ _N_ _N_ _N_ #-}
+instance NamedThing TypecheckedPat
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TypecheckedPat -> ExportFlag), (TypecheckedPat -> Bool), (TypecheckedPat -> (_PackedString, _PackedString)), (TypecheckedPat -> _PackedString), (TypecheckedPat -> [_PackedString]), (TypecheckedPat -> SrcLoc), (TypecheckedPat -> Unique), (TypecheckedPat -> Bool), (TypecheckedPat -> UniType), (TypecheckedPat -> Bool)] [_CONSTM_ NamedThing getExportFlag (TypecheckedPat), _CONSTM_ NamedThing isLocallyDefined (TypecheckedPat), _CONSTM_ NamedThing getOrigName (TypecheckedPat), _CONSTM_ NamedThing getOccurrenceName (TypecheckedPat), _CONSTM_ NamedThing getInformingModules (TypecheckedPat), _CONSTM_ NamedThing getSrcLoc (TypecheckedPat), _CONSTM_ NamedThing getTheUnique (TypecheckedPat), _CONSTM_ NamedThing hasType (TypecheckedPat), _ORIG_ HsPat typeOfPat, _CONSTM_ NamedThing fromPreludeCore (TypecheckedPat)] _N_
+	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> ExportFlag) } [ _NOREP_S_ "%DOutputable.NamedThing.getExportFlag\"", u0 ] _N_,
+	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.isLocallyDefined\"", u0 ] _N_,
+	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> (_PackedString, _PackedString)) } [ _NOREP_S_ "%DOutputable.NamedThing.getOrigName\"", u0 ] _N_,
+	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> _PackedString) } [ _NOREP_S_ "%DOutputable.NamedThing.getOccurrenceName\"", u0 ] _N_,
+	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
+	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> SrcLoc) } [ _NOREP_S_ "%DOutputable.NamedThing.getSrcLoc\"", u0 ] _N_,
+	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
+	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TypecheckedPat) -> _!_ True [] [] _N_,
+	 getType = _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ HsPat typeOfPat _N_,
+	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TypecheckedPat) -> _APP_  _TYAPP_  patError# { (TypecheckedPat -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.fromPreludeCore\"", u0 ] _N_ #-}
+instance Outputable a => Outputable (InPat a)
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Outputable TypecheckedPat
+	{-# GHC_PRAGMA _M_ HsPat {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
+	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+

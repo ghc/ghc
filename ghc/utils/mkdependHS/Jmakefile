@@ -1,0 +1,16 @@
+PROGRAMS = mkdependHS
+
+all:: $(PROGRAMS)
+MsubNeededHere($(PROGRAMS))
+UnlitNeededHere($(PROGRAMS))
+
+MsubMakefileDependentProgramScriptTarget(PerlCmd,mkdependHS,mkdependHS.prl,/*no flags*/,/*Makefile*/)
+
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTBINDIR_GHC))
+InstallMsubbedScriptTarget(PerlCmd,mkdependHS,mkdependHS.prl,$(INSTBINDIR_GHC))
+#endif /* DoInstall... */
+
+ExtraStuffToClean($(PROGRAMS))
+ClearTagsFile()
+PerlTagsTarget( mkdependHS.prl )

@@ -1,0 +1,17 @@
+Typechecked:
+AbsBinds [a.t2] [d.Eq.t3] [(f.t1, ShouldSucceed.f)]
+    (d.Eq.t12, d.Eq.t3)
+    (==.t9, (==) a.t2 d.Eq.t12)
+    {- nonrec -}
+    f.t1 :: a.t2 -> [a.t2]
+    f.t1 x.r55 = g.r56 x.r55
+	       where
+		   AbsBinds [] [] [(g.t6, g.r56)]
+		       {- nonrec -}
+		       g.t6 :: a.t2 -> [a.t2]
+		       g.t6 y.r57 = if y.r57 ==.t9 x.r55 then
+					[] (a.t2)
+				    else
+					[y.r57] (a.t2)
+		   {- nonrec -}
+

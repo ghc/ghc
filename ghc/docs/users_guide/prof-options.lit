@@ -1,0 +1,30 @@
+%************************************************************************
+%*									*
+\subsection[prof-compiler-options]{Compiling programs for profiling}
+\index{profiling options}
+\index{options, for profiling}
+%*									*
+%************************************************************************
+
+\input{prof-compiler-options.lit}
+
+%************************************************************************
+%*									*
+\subsection[prof-rts-options]{Controlling the profiler at runtime}
+\index{profiling RTS options}
+\index{RTS options, for profiling}
+%*									*
+%************************************************************************
+
+\input{prof-rts-options.lit}
+
+%************************************************************************
+%*									*
+\subsection[prof-graphs]{Producing graphical heap profiles}
+\index{heap profiles, producing}
+%*									*
+%************************************************************************
+
+\input{prof-post-processors.lit}
+
+

@@ -1,0 +1,11 @@
+Typechecked:
+AbsBinds [tt11, tt12] [d.Num.t15] [(g.t1, ShouldSucceed.g)]
+    (fromInt.t14, fromInt tt12 d.Num.t15)
+    (lit.t13, fromInt.t14 (MkInt 2#))
+    {- nonrec -}
+    g.t1 :: ([tt12], tt11) -> tt12
+    g.t1 ((x.r54 : z.r56), y.r55)
+		 = x.r54
+    g.t1 (x.r57, y.r58)
+		 = lit.t13
+

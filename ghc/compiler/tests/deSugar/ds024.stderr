@@ -1,0 +1,10 @@
+Desugared:
+Main.f :: for all d, e. d -> [[e]]
+Main.f =
+    /\ o79 t81 -> \ x.88 ->
+	:! [t81] (Nil! t81) (:! [t81] (Nil! t81) (Nil! [t81]))
+Main.g :: for all d, e, f, g. d -> ([e], [f], [g])
+Main.g =
+    /\ o84 t85 t86 t87 -> \ x.89 ->
+	MkTuple3! [t85] [t86] [t87] (Nil! t85) (Nil! t86) (Nil! t87)
+

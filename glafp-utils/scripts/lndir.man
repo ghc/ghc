@@ -1,0 +1,61 @@
+.TH LNDIR 1 "Release 5" "X Version 11"
+.SH NAME
+lndir \- create a shadow directory of symbolic links to another directory tree
+.SH SYNOPSIS
+.B lndir
+fromdir [todir]
+.SH DESCRIPTION
+.I Lndir
+makes a shadow copy 
+.I todir 
+of a directory tree
+.I fromdir, 
+except that the shadow is not
+populated with real files but instead with symbolic links pointing at
+the real files in the 
+.I fromdir
+directory tree.  This is usually useful for maintaining source code for
+different machine architectures.  You create a shadow directory
+containing links to the real source which you will have usually NFS
+mounted from a machine of a different architecture, and then recompile
+it.  The object files will be in the shadow directory, while the
+source files in the shadow directory are just symlinks to the real
+files.
+.PP
+This has the advantage that if you update the source, you need not 
+propagate the change to the other architectures by hand, since all
+source in shadow directories are symlinks to the real thing: just cd
+to the shadow directory and recompile away.
+.PP
+The
+.I todir
+argument is optional and defaults to the current directory.  The
+.I fromdir
+argument may be relative (e.g., ../src) and is relative to
+.I todir
+(not the current directory).
+.PP 
+.ft B
+Note that RCS and SCCS directories are not shadowed.
+.ft
+.PP
+Note that if you add files, you must run
+.I lndir
+again.  Deleting files is a more painful problem; the symlinks will
+just point into never never land.
+.SH BUGS
+.I Patch
+gets upset if it cannot change the files.  You should never run
+.I patch
+from a shadow directory anyway.
+.PP
+You need to use something like
+.nf
+	find todir -type l -print | xargs rm
+.fi
+to clear out all files before you can relink (if fromdir moved, for instance).
+Something like
+.nf
+	 find . \\! -type d -print
+.fi
+will find all files that are not directories.

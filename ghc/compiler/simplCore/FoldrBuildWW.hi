@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface FoldrBuildWW where
+import CmdLineOpts(GlobalSwitch)
+import CoreSyn(CoreBinding)
+import Id(Id)
+import SplitUniq(SplitUniqSupply)
+mkFoldrBuildWW :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding Id Id] -> [CoreBinding Id Id]
+	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "LU(ALA)S" {_A_ 3 _U_ 221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

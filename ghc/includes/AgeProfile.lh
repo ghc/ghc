@@ -1,0 +1,151 @@
+%************************************************************************
+%*									*
+\subsection[AgeProfile.lh]{Age Profiling Definitions for Heap and Lifetime Profiling}
+%*									*
+%************************************************************************
+
+Multi-slurp protection:
+\begin{code}
+#ifndef LifeProfile_H
+#define LifeProfile_H
+\end{code}
+
+Definitions relating to the life field in fixed header:
+
+\begin{code}
+#define AGE_FIXED_HDR			(AGE_HDR_SIZE)
+#define AGE_HDR_POSN			AFTER_PROF_HDR
+#define AFTER_AGE_HDR			(AGE_FIXED_HDR+AGE_HDR_POSN)
+\end{code}
+
+We have age header in closure if @LIFE_PROFILE@ or
+@HEAP_PROF_WITH_AGE@ defined.
+
+\begin{code}
+
+#if defined(HEAP_PROF_WITH_AGE) || defined(LIFE_PROFILE) || defined(UPDATES_ENTERED_COUNT)
+
+#define AGE_HDR_SIZE 		1
+#define AGE_HDR(closure) 	(((P_)(closure))[AGE_HDR_POSN])
+#define	SET_STATIC_AGE_HDR()	,0
+
+#if defined (HEAP_PROF_WITH_AGE) || defined(UPDATES_ENTERED_COUNT)
+#define SET_AGE_HDR(closure) 	AGE_HDR(closure) = 0
+#endif
+
+/* SET_AGE_HDR(closure) defined below if LIFE_PROFILE required */
+
+
+#else  /* ! LIFE_PROFILE && ! HEAP_PROF_WITH_AGE && ! UPDATES_ENTERED */
+
+#define AGE_HDR_SIZE 		0
+#define SET_AGE_HDR(closure)
+#define	SET_STATIC_AGE_HDR()
+
+#endif /* ! LIFE_PROFILE && ! HEAP_PROF_WITH_AGE */
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[lifetime-profiling]{Declarations For Lifetime Profiling}
+%*									*
+%************************************************************************
+
+The SM is responsible for:
+\begin{itemize}
+\item
+Ensuring that the \tr{HpLim} increment will be ok by ALWAYS setting \tr{HpLim}
+lower than the end of the heap (halving the free space suffices).
+\item
+If the user has requested a lifetime profile the storage manager must
+arrange for a garbage collection to occur after \tr{LifeInterval}
+words allocated (excluding age words which will be fudged with the
+\tr{HpLim} increment). Additional collections are possible with
+\tr{part_interval} being returned to indicate what is left.
+\item
+Calling \tr{life_profile_setup} and \tr{life_profile_done} during each
+garbage collection. These can be avoided if the user has not requested
+a lifetime profile.
+\item
+Calling \tr{life_profile_closure} for every closure collected during a
+garbage collection.
+\end{itemize}
+
+The RTS is responsible for:
+\begin{itemize}
+\item
+Allocating extra age word in closures.
+\item
+Initialising closure age to \tr{CurrentTime} using
+\tr{SET_AGE_HDR(closure)}. This increments the heap limit pointer to
+avoid collecting too soon as a result of distortion from the extra
+word in closures.
+\item
+Calling \tr{life_profile_init} and \tr{life_profile_finish} routines.
+\item
+Calling \tr{update_profile_closure} for every closure updated.
+\end{itemize}
+
+
+\begin{code}
+#if defined(LIFE_PROFILE)
+
+extern W_ closures_alloced;
+#define SET_AGE_HDR(closure)	do { AGE_HDR(closure) = (W_)CurrentTime; \
+				closures_alloced++; HpLim++; } while(0)
+
+/* When we allocate a closure we increment HpLim so that age word will
+   not be included in the allocation before the next profiling interupt.
+*/
+
+
+/* start of execution -- looks for -l flag */
+extern I_ life_profile_init PROTO((StgChar *rts_argv[], StgChar *prog_argv[]));
+
+/* end of execution -- produce report if -l flag */
+extern void life_profile_finish PROTO((I_ alloc, StgChar *prog_argv[]));
+
+extern I_  do_life_prof;	/* Are we liftime profiling ? */
+extern I_  CurrentTime;   	/* Current time (LifeIntervals) */
+extern I_  LifeInterval;  	/* Lifetime resolution  (in words allocated) */
+
+#define DEFAULT_LIFE_INTERVAL  250     /* 1k -- report 10k */
+#define INTERVALS 	       100000  /* Intervals recoded */
+#define GROUPED 	       10      /* No of intervals grouped oin results */
+
+/* START of gc profile */
+extern void life_profile_setup(STG_NO_ARGS);
+
+/* END of gc profile -- returns next alloc interval */
+/* passed alloc since last (inc age words) and req size */
+
+extern I_ life_profile_done  PROTO((I_ alloc, I_ reqsize));
+
+/* LIFE PROFILE function called for every closure collected */
+/* records info if part_interval == 0, indicating a profile reqd */
+
+extern void life_profile_closure   PROTO((P_ closure, I_ size));
+
+/* UPDATE PROFILE function called for every closure updated */
+/* records info if the user requested a lifetime profiling */
+
+extern void update_profile_closure PROTO((P_ closure));
+
+#define LIFE_PROFILE_CLOSURE(closure,size) \
+	STGCALL2(void,(void *, P_, I_),life_profile_closure,closure,size)
+#define UPDATE_PROFILE_CLOSURE(closure) \
+	STGCALL1(void,(void *, P_),update_profile_closure,closure)	
+
+#else /* ! LIFE_PROFILE */
+
+#define LIFE_PROFILE_CLOSURE(closure,size)
+#define UPDATE_PROFILE_CLOSURE(closure)
+
+#endif /* ! LIFE_PROFILE */
+\end{code}
+
+End multi-slurp protection:
+\begin{code}
+#endif /* LifeProfile_H */
+\end{code}

@@ -1,0 +1,64 @@
+%************************************************************************
+%*									*
+\section[Driver-consistency-chk]{@chk_consistency_info@: Check an executable for consistency}
+%*									*
+%************************************************************************
+
+\begin{code}
+sub chk_consistency_info {
+    local($executable) = @_;
+
+    local($major_version, $minor_version);
+    local($phase, $infile, $opts);
+
+    print STDERR "Checking consistency of: $executable\n" if $Verbose;
+
+    &tidy_up_and_die(1, "Panic: no such executable: $executable\n")
+	if ! -x $executable;
+
+    # by this point, consistency strings (with commas) have become
+    # local symbols (with .'s)
+    $HsC_consist_options =~ s/,/./g;
+    $Cc_consist_options  =~ s/,/./g;
+
+    # now run `nm' and check all the version info
+    open(CONSIST, "$Nm -p $executable |") || &tidy_up_and_die(1,"$Pgm: can't run: $Nm\n");
+    while (<CONSIST>) {
+	chop;
+	next if ! /^[\da-fA-F]+\s+[tn]\s+(hsc|cc)\./;
+
+	if (/^[\da-fA-F]+\s+[tn]\s+(hsc|cc)\.(\S+)\.(\d+)\.(\d+)\.(.*)/) {
+	    $phase = $1; $infile = $2;
+	    $major_version = $3; $minor_version = $4;
+	    $opts = $5;
+	    if ($phase eq 'hsc') {
+		$Status++,
+		print STDERR "$Pgm: consistency error: major version not $HsC_major_version:\n$_\n"
+		    if $major_version != $HsC_major_version;
+		print STDERR "$Pgm: consistency warning: minor version not $HsC_minor_version:\n$_\n"
+		    if $minor_version != $HsC_minor_version;
+		$Status++,
+		print STDERR "$Pgm: consistency error: not options $HsC_consist_options:\n$_\n"
+		    if $opts ne $HsC_consist_options;
+
+	    } else { # phase is cc ...
+		$Status++,
+		print STDERR "$Pgm: consistency error: major version not $Cc_major_version:\n$_\n"
+		    if $major_version != $Cc_major_version;
+		print STDERR "$Pgm: consistency warning: minor version not $Cc_minor_version:\n$_\n"
+		    if $minor_version != $Cc_minor_version;
+
+		$Status++,
+		print STDERR "$Pgm: consistency error: not options $Cc_consist_options:\n$_\n"
+		    if $opts ne $Cc_consist_options;
+	    }
+	} else {
+	    print STDERR "$Pgm: consistency-checking: unrecognised `what' line:\n$_\n";
+	}
+    }
+    close(CONSIST) || &tidy_up_and_die(1,"Failed in running $Nm (consistency checking)\n");
+}
+
+# make "require"r happy...
+1;
+\end{code}

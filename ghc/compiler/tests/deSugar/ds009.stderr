@@ -1,0 +1,150 @@
+Desugared:
+SimpleListComp.f :: for all d. [d] -> [d]
+SimpleListComp.f =
+    /\ t104 -> \ xs.145 ->
+	let
+	  {- CoRec -}
+	  ds.146 =
+	      \ ds.147 ->
+		  case ds.147 of {
+		    Nil -> Nil t104
+		    (:) ds.148 ds.149 ->
+			let x.150 = ds.148 in  (: t104) x.150 (ds.146 ds.149)
+		  }
+	  {- end CoRec -}
+	in  ds.146 xs.145
+SimpleListComp.g :: for all d, e, f. [d] -> [e] -> [f] -> [(d, e, f)]
+SimpleListComp.g =
+    /\ t110 t111 t112 -> \ xs.163 ys.164 zs.165 ->
+	let
+	  {- CoRec -}
+	  ds.166 =
+	      \ ds.167 ->
+		  case ds.167 of {
+		    Nil -> Nil (t110, t111, t112)
+		    (:) ds.168 ds.169 ->
+			let x.170 = ds.168
+			in 
+			  let
+			    {- CoRec -}
+			    ds.171 =
+				\ ds.172 ->
+				    case ds.172 of {
+				      Nil -> ds.166 ds.169
+				      (:) ds.173 ds.174 ->
+					  let y.175 = ds.173
+					  in 
+					    let
+					      {- CoRec -}
+					      ds.176 =
+						  \ ds.177 ->
+						      case ds.177 of {
+							Nil -> ds.171 ds.174
+							(:) ds.178 ds.179 ->
+							    let z.180 = ds.178
+							    in 
+							      (: (t110,
+								  t111,
+								  t112))
+								  (MkTuple3!
+								       t110
+								       t111
+								       t112
+								       x.170
+								       y.175
+								       z.180)
+								  (ds.176 ds.179)
+						      }
+					      {- end CoRec -}
+					    in  ds.176 zs.165
+				    }
+			    {- end CoRec -}
+			  in  ds.171 ys.164
+		  }
+	  {- end CoRec -}
+	in  ds.166 xs.163
+SimpleListComp.h :: for all d. [d] -> [d] -> [[d]]
+SimpleListComp.h =
+    /\ t118 -> \ xs.189 ys.190 ->
+	let
+	  {- CoRec -}
+	  ds.191 =
+	      \ ds.192 ->
+		  case ds.192 of {
+		    Nil -> Nil [t118]
+		    (:) ds.193 ds.194 ->
+			let x.195 = ds.193
+			in 
+			  let
+			    {- CoRec -}
+			    ds.196 =
+				\ ds.197 ->
+				    case ds.197 of {
+				      Nil -> ds.191 ds.194
+				      (:) ds.198 ds.199 ->
+					  let y.200 = ds.198 in  ds.196 ds.199
+				    }
+			    {- end CoRec -}
+			  in  ds.196 ys.190
+		  }
+	  {- end CoRec -}
+	in  ds.191 xs.189
+SimpleListComp.i :: for all d, e. <Eq d> -> <Eq e> -> [([e], [d])] -> [[e]]
+SimpleListComp.i =
+    /\ t128 t127 -> \ dict.133 dict.132 ->
+	let dict.130 = (dfun.Eq.List t127) dict.132 in
+	let dict.131 = (dfun.Eq.List t128) dict.133 in
+	let dict.126 = ((dfun.Eq.Tuple2 [t127]) [t128]) dict.130 dict.131 in
+	let
+	  i.120 =
+	      \ xs.78 ->
+		  let
+		    {- CoRec -}
+		    ds.201 =
+			\ ds.202 ->
+			    case ds.202 of {
+			      Nil -> Nil [t127]
+			      (:) ds.203 ds.204 ->
+				  case ds.203 of {
+				    MkTuple2 x.80 y.81 ->
+					let all.79 = ds.203
+					in 
+					  case
+					      ((== ([t127], [t128]))
+						   dict.126
+						   all.79
+						   (MkTuple2!
+							[t127]
+							[t128]
+							(Nil! t127)
+							(Nil! t128)))
+					  of {
+					    True ->
+						(: [t127]) x.80 (ds.201 ds.204)
+					    False -> ds.201 ds.204
+					  }
+				  }
+			    }
+		    {- end CoRec -}
+		  in  ds.201 xs.78
+	in  i.120
+SimpleListComp.j :: for all d, e, f, g. [(f, g, d, e)] -> [(f, g)]
+SimpleListComp.j =
+    /\ t139 t140 t137 t138 -> \ xs.210 ->
+	let
+	  {- CoRec -}
+	  ds.211 =
+	      \ ds.212 ->
+		  case ds.212 of {
+		    Nil -> Nil (t137, t138)
+		    (:) ds.213 ds.214 ->
+			case ds.213 of {
+			  MkTuple4 a.215 b.216 c.217 d.218 ->
+			      (: (t137, t138))
+				  (MkTuple2! t137 t138 a.215 b.216)
+				  (ds.211 ds.214)
+			}
+		  }
+	  {- end CoRec -}
+	in  ds.211 xs.210
+

@@ -1,0 +1,5 @@
+/* this is a standalone Jmakefile; NOT part of ghc "make world" */
+
+/*LIT2LATEX_OPTS=-ttgrind*/
+
+LitDocRootTarget(root,lit)

@@ -1,0 +1,45 @@
+\begin{figure} \fbox{
+$\begin{array}{lrcll}
+%\\
+%\mbox{Program} & program & \rightarrow & binds & \\
+%\\
+\mbox{Bindings} & binds & \rightarrow & bind_1@;@ \ldots @;@~bind_n & n \geq 1 \\
+	& bind & \rightarrow & @nonrec@~ var ~@=@~ expr	\\
+	       && | & @rec@~ var_1 ~@=@~ expr_1 @;@ \ldots @;@~ var_n ~@=@~ expr_n & n \geq 1 \\
+\\
+\mbox{Expression} & expr 
+	& \rightarrow 	& expr_1 ~ expr_2	& \mbox{Application} \\
+	&& | & expr ~ type			& \mbox{Type application} \\
+	&& | & @\@~ var~ @->@ ~ expr		& \mbox{Lambda abstraction} \\
+	&& | & @/\@~ tyvar~ @->@ ~ expr		& \mbox{Type abstraction} \\
+	&& | & @case@ ~expr~ @of@ ~ alts	& \mbox{Case expression} \\
+	&& | & @let@~ bind ~@in@~ expr		& \mbox{Local definition(s)} \\
+	&& | & con~expr_1 \ldots expr_n		& \mbox{Saturated constructor}	\\
+	&& | & prim~expr_1 \ldots expr_n	& \mbox{Saturated primitive}	\\
+	&& | & var 				& \mbox{Variable}	\\
+	&& | & literal				& \\
+\\
+\mbox{Alternatives} & alts & \rightarrow 
+	& calt_1@;@ \ldots @;@~calt_n@; default ->@~ expr 
+		& n \geq 0~\mbox{(Boxed)}	\\
+	&& | & lalt_1@;@ \ldots @;@~lalt_n@;@~var ~@->@~ expr 
+		& n \geq 0~\mbox{(Unboxed)}	\\
+\\
+\mbox{Constructor alt}	
+	& calt & \rightarrow & con~var_1 \ldots var_n~@->@~expr & n \geq 0 \\
+\mbox{Literal alt}	
+	& lalt & \rightarrow & literal~@->@~expr &  \\
+\\
+\mbox{Literals} & literal 
+	& \rightarrow & integer			& \mbox{machine-level numbers} \\
+	&& | & \ldots & \\
+\\
+\mbox{Primitives} & prim
+	& \rightarrow & @+@ ~|~ @-@ ~|~ @*@ ~|~ @/@  	& \mbox{machine-level ops} \\
+	&& | & \ldots & \\
+\\
+\end{array}$
+}
+\caption{Abstract syntax of the Core language}
+\label{fig:core-syntax}
+\end{figure}

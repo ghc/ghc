@@ -1,0 +1,47 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface RenameExpr4 where
+import Bag(Bag)
+import CharSeq(CSeq)
+import CmdLineOpts(GlobalSwitch)
+import FiniteMap(FiniteMap)
+import HsBinds(Binds)
+import HsLit(Literal)
+import HsMatches(GRHS, GRHSsAndBinds, Match)
+import HsPat(InPat)
+import Id(Id)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import ProtoName(ProtoName)
+import RenameAuxFuns(GlobalNameFun(..))
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import TyCon(TyCon)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import UniqSet(UniqSet(..))
+import Unique(Unique)
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data GRHSsAndBinds a b 	{-# GHC_PRAGMA GRHSsAndBindsIn [GRHS a b] (Binds a b) | GRHSsAndBindsOut [GRHS a b] (Binds a b) UniType #-}
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+type GlobalNameFun = ProtoName -> Labda Name
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+type UniqSet a = UniqFM a
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+rnGRHSsAndBinds4 :: GRHSsAndBinds ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> ((GRHSsAndBinds Name (InPat Name), UniqFM Name), Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
+rnMatch4 :: Match ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> ((Match Name (InPat Name), UniqFM Name), Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222222 _N_ _S_ "S" _N_ _N_ #-}
+rnPat4 :: InPat ProtoName -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (InPat Name, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
+

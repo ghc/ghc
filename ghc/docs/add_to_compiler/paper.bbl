@@ -1,0 +1,72 @@
+\begin{thebibliography}{10}
+
+\bibitem{hudak91a}
+Report on the programming language {Haskell}, a non-strict purely functional
+  language ({Version} 1.1), August, 1991.
+\newblock Computing Science Department, Glasgow University, forthcoming.
+
+\bibitem{hammond89a}
+Kevin Hammond.
+\newblock Implementing type classes for {Haskell}.
+\newblock In {\em Proceedings of the Glasgow Workshop on Functional
+  Programming}, page ????, Fraserburgh, Scotland, August, 1989.
+
+\bibitem{partain92a}
+Will Partain.
+\newblock The {\tt nofib} benchmark suite of {Haskell} programs, 1992.
+
+\bibitem{peyton-jones87b}
+Simon~L. {Peyton Jones}.
+\newblock {\em The Implementation of Functional Programming Languages}.
+\newblock Prentice-Hall, 1987.
+
+\bibitem{peyton-jones92a}
+Simon~L. {Peyton Jones}.
+\newblock Implementing lazy functional languages on stock hardware: the
+  {Spineless Tagless G-machine}.
+\newblock {\em Journal of Functional Programming}, 1992.
+\newblock To appear.
+
+\bibitem{peyton-jones91b}
+Simon~L. {Peyton Jones} and John Launchbury.
+\newblock Unboxed values as first class citizens in a non-strict functional
+  language.
+\newblock In John Hughes, editor, {\em Functional Programming Languages and
+  Computer Architecture (FPCA)}, volume 523 of {\em Lecture Notes in Computer
+  Science}, pages 636--666, Cambridge, MA, August 26--30, 1991.
+  Springer-Verlag.
+
+\bibitem{peyton-jones90a}
+Simon~L. {Peyton Jones} and Philip Wadler.
+\newblock A static semantics for {Haskell}, 1990.
+\newblock Dept.~of Computing Science, University of Glasgow.
+
+\bibitem{peyton-jones92b}
+Simon~L. {Peyton Jones} and Philip Wadler.
+\newblock Imperative functional programming (extended abstract), 1992.
+\newblock To be in POPL~'93.
+
+\bibitem{wadler90a}
+Philip Wadler.
+\newblock Comprehending monads.
+\newblock In {\em Proceedings of the 1990 ACM Conference on {LISP} and
+  Functional Programming}, pages 61--78, Nice, France, June 27--29, 1990.
+
+\bibitem{wadler90b}
+Philip Wadler.
+\newblock A simple type inference algorithm, 1990.
+\newblock Dept.~of Computing Science, University of Glasgow.
+
+\bibitem{wadler92a}
+Philip Wadler.
+\newblock The essence of functional programming.
+\newblock In {\em 19th ACM Symposium on Principles of Programming Languages
+  (POPL)}, page ?????, Santa Fe, NM, January ????, 1992.
+
+\bibitem{wadler89a}
+Philip~L. Wadler and Stephen Blott.
+\newblock How to make {\em ad-hoc\/} polymorphism less {\em ad hoc\/}.
+\newblock In {\em 16th ACM Symposium on Principles of Programming Languages
+  (POPL)}, pages 60--76, Austin, TX, January 11--13, 1989.
+
+\end{thebibliography}

@@ -1,0 +1,13 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_list where
+import UgenUtil
+import Util
+%}}
+type list;
+	lcons	: < lhd	: VOID_STAR;
+		    ltl : list; >;
+	lnil	: <>;
+end;

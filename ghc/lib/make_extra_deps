@@ -1,0 +1,31 @@
+#! /usr/local/bin/perl
+# see comments in ghc/lib/Jmakefile
+
+open(MKF, "< Makefile") || die "Can't open Makefile\n";
+
+# read down to start of dependencies
+while (<MKF>) {
+    last if /# DO NOT DELETE: Beginning of Haskell dependencies/;
+}
+
+# slurp through dependencies, duplicating them
+while (<MKF>) {
+    last if /# DO NOT DELETE: End of Haskell dependencies/;
+    chop;
+
+    foreach $k ( '_p', '_t',
+		 '_mc', '_mr', '_mt', '_mp', '_mg',
+		 '_2s', '_1s', '_du',
+		 '_a', '_b', '_c', '_d', '_e', '_f', '_g', '_h',
+		 '_i', '_j', '_k', '_o', '_m', '_n', '_o' ) {
+	$copy = $_;
+
+	# change all .hc and .hi
+	$copy =~ s/\.hc\b/$k.hc/;
+	$copy =~ s/\.hi\b/$k.hi/;
+
+	print STDOUT "IfGhcBuild$k(", $copy, ")\n";
+    }
+}
+
+close(MKF) || die "Failed in closing Makefile\n";

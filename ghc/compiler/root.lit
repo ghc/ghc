@@ -1,0 +1,115 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{Glasgow Haskell Compiler Sources}
+
+\author{The GRASP Team}
+}
+\date{February 1991}
+\maketitle
+\tableofcontents
+\end{onlystandalone}
+
+#\input{main/Main.lhs}
+
+#\section[prefix_form_reader]{Reader}
+#\downsection
+#\input{reader/ReaderIntermForm.lhs}
+#\input{reader/ReaderIntermSyntax.lhs}
+#\input{reader/RIFToHaskell.lhs}
+#\upsection
+#
+#\section[Names]{Things to do with names}
+#\downsection
+#\input{names/Names.lhs}
+#\input{names/NameSupply.lhs}
+#\input{names/UniqInts.lhs}
+#\input{names/NameSupplyMonad.lhs}
+#\input{names/SpecialStrings.lhs}
+#\upsection
+#
+#\section[AbsSyntax_stuff]{Abstract syntax stuff}
+#\downsection
+#\input{absSyntax/AbsSyntax.lhs}
+#\input{absSyntax/PrintAbsSyntax.lhs}
+#\input{absSyntax/PrettyAbsSyntax.lhs}
+#\input{absSyntax/UniType.lhs}
+#\input{absSyntax/PrintUniType.lhs}
+#\input{absSyntax/PrettyUniType.lhs}
+#\input{absSyntax/TypeFuns.lhs}
+#\input{absSyntax/AbsSyntaxRepFuns.lhs}
+#\upsection
+#
+#\section[Error_reporting]{Error reporting things}
+#\downsection
+#\input{errors/Error.lhs}
+#\upsection
+#
+#\section[Dependency_analysis]{Dependency analysis}
+#\downsection
+#\input{depanal/Depend.lhs}
+#\input{depanal/StronglyConnComp.lhs}
+#\upsection
+#
+#\input{typecheck/root.lit}
+#
+#\section[SyntaxPrimitives_stuff]{Basic syntax stuff}
+#\downsection
+#\input{syntaxPrims/SyntaxPrimitives.lhs}
+#\input{syntaxPrims/PrintSyntaxPrims.lhs}
+#\input{syntaxPrims/SyntaxConstants.lhs}
+#\input{syntaxPrims/SyntaxConstants.lh}
+#\upsection
+#
+#\section[CoreSyntax_stuff]{CoreSyntax syntax stuff}
+#\downsection
+#\input{coreSyntax/CoreSyntax.lhs}
+#\input{coreSyntax/PrintCoreSyntax.lhs}
+#\input{coreSyntax/AnnCoreSyntax.lhs}
+#\upsection
+#
+#\input{deSugar/root.lit}
+#
+#\section[Simplify_stuff]{Simplifying core expressions}
+#\downsection
+#\input{simplify/Simplify.lhs}
+#\upsection
+#
+#\section[Lambda_lifting]{A simple lambda-lifter}
+#\downsection
+#\input{llift/LambdaLift.lhs}
+#\upsection
+#
+#\section[core-to-stg-conversion]{Converting core syntax to STG syntax}
+#\downsection
+#\input{core2stg/CoreToStg.lhs}
+#\upsection
+
+\section[stg-syntax]{The STG syntax}
+\downsection
+\input{stgSyntax/StgSyntax.lhs}
+\input{stgSyntax/PrintStgSyntax.lhs}
+\upsection
+
+\input{codeGen/root.lit}
+
+#\section[abstract-C-syntax]{Abstract C syntax}
+#\downsection
+#\input{absCSyntax/AbstractC.lhs}
+#\input{absCSyntax/FlattenAbsC.lhs}
+#\input{absCSyntax/PrintAbstractC.lhs}
+#\input{absCSyntax/AbsToRealC.lhs}
+#\upsection
+
+#\section[Utility_functions]{Utility functions}
+#\downsection
+#\input{utils/Util.lhs}
+#\input{utils/Util2.lhs}
+#\input{utils/Pretty.lhs}
+#\input{utils/Set.lhs}
+#\upsection
+
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

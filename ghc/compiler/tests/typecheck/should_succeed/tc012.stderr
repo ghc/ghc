@@ -1,0 +1,6 @@
+Typechecked:
+AbsBinds [ot2] [] [(q.t1, ShouldSucceed.q)]
+    {- nonrec -}
+    q.t1 :: ot2 -> ot2
+    q.t1 = \ y.r54 -> y.r54
+

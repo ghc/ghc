@@ -1,0 +1,294 @@
+			Haskell Prefix Form
+			===================
+
+This defines the interface between the Haskell lexer/parser "hsp"
+(written in lex/yacc/C) and the Haskell compiler proper, "hsc"
+(written in Haskell).
+
+White space in the form of spaces, tabs and newlines may occur between
+prefix items (I wouldn't recommend it [WDP]).  A literal tab
+terminates a string constant (and by extension also an integer
+constant, character constant, identifier or infix operator).
+
+There is a general list form, where L indicates a Cons node and N
+indicates Nil.  Elements in a list may be of arbitrary type.
+
+KH, 22/08/91:	Changed for Haskell 1.1+ -- this is where Haskell and LML
+		finally part company...
+
+JH, 09/07/92:	{0,5,6,I,O,u,v,w} Used in Data Parallel Haskell variant 
+		(Jonathan Hill, QMW)
+
+WDP, 02/04/93:	Added full-blown pragmas.
+WDP, 15/08/93:	Added even more full-blown pragmas.
+
+`Tag' namespace already used:
+
+#$%()+,-.012356789:=>@ABCDEGILMNOPQRSTUWXZ_abcdefghijklmnopstuvwxyz~
+
+			Meta-Syntactic Items
+			--------------------
+
+Lists (l)
+---------
+
+L  el  l		List constructor		el : l
+N			Null List			[]
+
+
+Strings (s)
+-----------
+
+#chars<TAB>		String of characters before <TAB>
+
+
+
+
+			Syntactic Items
+			---------------
+
+Expressions or Patterns (e or p)
+--------------------------------
+
+M  L s s b [op] [ix] [ei]
+			Haskell module:
+			(name, file, binding, fixities, imports, exports)
+
+4 s			Integer Constant		0, 1, ...
+H s			Unboxed Integer constant	0#, 1#, ... /* WDP */
+F s			Floating Point Constant		0.1, 0.2e-3, ...
+J s  			Unboxed Double Constant		0.1##, 0.2e-3##, ... /* WDP */
+K s  			Unboxed Float Constant		0.1#, 0.2e-3#, ... /* WDP */
+C s			Character Constant		'...'
+P s			Unboxed character constant	???????? /* WDP */
+S s			String Constant			"..."
+V s			String# Constant		"..."# /* WDP */
+Y s			"Literal C" Constant		``printf'' /* WDP */
+I s			"no rep" Integer (unfoldings)
+R s s			"no rep" Rational (numerator, denominator)
+s s			"no rep" String constant (unfoldings)
+
+i  id			Identifiers
+C  literal		Literal constant
+
+a  e1  e2		Function application		(e1 e2)
+@  e1  id  e2		Infix Application		e1 `op` e2
+(  e   id		Left section			(e op)
+)  id  e		Right Section			(op e)
+
+l  L   [p]   e		Lambda Expressions		\ p1 ... pn -> e
+c  e   [pb]		Case Expression			case e of pb1 ... pbn
+b  e1 e2 e3		If expression			if e1 then e2 else e3
+E  b   e		Let Expression			let b in e
+
+:  [e]			Explicit List			[ e1, ..., en ]
+Z  e   [q]		List Comprehension		[ e | q ]
+.  e1  [e2]  [e3]	Enumeration (e2/e3 may be [])	[e1,e2..e3]
+
+,  [e]			Explicit Tuple			( e1, ..., en )
+
+R  e   t		Type Constraint			e :: t
+
+-  e			Negation			- e
+
+j  id s [e]		C Call/Asm			(ccall/asm id/str e1 ... en)
+			s == "n" --> ccall, non-ptrs only
+			s == "p" --> ccall, ptrs allowed
+			s == "N" --> casm, non-ptrs only
+			s == "P" --> casm, ptrs allowed
+k  s  e			Set Cost Centre			(scc s e)
+
+s  id  p		As Pattern			id @ p
+~  p			Irrefutable Pattern		~ p
++  p   e		Plus Pattern			n + k
+			/*WDP: why a "p" on the plus pat? (KH: historical reasons) */
+_			Wildcard Pattern		_
+
+
+
+Qualifiers (q)
+--------------
+
+G  p  e			Generator			p <- e
+g  e			Guard				e
+
+Bindings (b)
+------------
+
+t  L C  [id] t [d] iprag DataType Binding		data C => t = d1 | ... | dn 
+								deriving (id1, ..., idm)
+n  L t1 t2 iprag	Type Synonym			type t1 = t2
+p  L [pb]		Pattern Binding			pb1 ; ... ; pbn
+f  L [pb]		Function Binding		pb1 ; ... ; pbn
+A  b1   b2		Multiple Definitions		b1 ; b2
+$  L C t  b iprag	Class				class C => t [where b]
+%  L C id t b iprag	Instance			instance C => id t [where b]
+D  L [ty]		Default				default (ty1, ..., tyn)
+
+St L [id] t iprag	Type Signature			id1, ...., idn :: t
+Ss L id [t]		Pragma: value specialis'ns	{-# SPECIALISE id :: t1, ... tn #-}
+SS L id t		Pragma: instance specialis'n	{-# SPECIALISE instance id t #-}
+Si L id [id]		Pragma: inline -- id [howto]	{-# INLINE id [id]{0,1} #-}
+Su L id			Pragma: magic unfolding		{-# MAGIC_UNFOLDING id #-}
+Sa L id			Pragma: abstract synonym	{-# ABSTRACT id #-}
+
+7  L id   [ei] [rn]	Import module (Interface only)	import id (eis) renaming rn
+B			null binding
+
+
+Fixity declarations (op)
+--------------
+/* WDP: most suspicious how these don't appear in interfaces */
+/* WDP: need line numbers? */
+
+   s1   s2   s3		s1 is the operator name
+			s2 is either "infix", "infixl" or "infixr"
+			s3 is the precedence
+
+Types (t)
+---------
+
+T  id   [t]		Type Constructor		id t1 ... tn
+:  t			Explicit List Type		[t]
+,  [t]			Explicit Tuple Type		(t1, ..., tn)
+>  t1   t2		Explicit Function Type		t1 -> t2
+y  id			Type Variable			id
+3  C    t		Type Context			C => t
+
+2A id t			"UniDict": class, type	(core unfoldings only)
+2B id	    	    	"UniTyVarTemplate"
+2C [id] t		"UniForall" tv1 ... tvN => type
+
+2D			Nothing (Maybe UniType)
+2E t			Just t  (ditto)
+
+Contexts (C)
+------------
+
+   [t]			Haskell context: t1, ..., tn
+
+
+Data Types (d)
+--------------
+
+1  L id [t]		Data constructor		id st1 ... stn
+
+
+Pattern Bindings (pb)
+---------------------
+
+W  L id p  [ge] b	Single grhs			p | g1 = e1 ... where b
+			(L,id) = (Line,Function)
+
+
+Guarded Expressions (ge)
+------------------------
+
+   g  e		g | e	(unguarded comes in with an
+			unsavoury (Var "_otherwise") `guard')
+
+
+Identifiers (id)
+----------------
+
+   s			An identifier is just a string
+
+
+Import declarations (ix)
+------------------------
+
+e  L s id [ei] [rn] b	Line, File Name, Module name, imported entities,
+			renamings, interface body
+h  L s id [ei] [rn] b	Hiding clause, as above...
+
+
+Renamings (rn)
+--------------
+
+   id id		From name, to name
+
+
+Exported/Imported Identifers (ei)
+---------------------------------
+
+x  id			ExImport Variable
+X  id			ExImport Constructor/Type/Class
+z  id			ExImport Class/Type plus all ops/cons
+8  id [id]		ExImport Type(C1,..Cn)
+9  id [id]		ExImport Class(o1,..on)
+m  id			Export Module
+
+
+Interface pragmas (iprag)
+-------------------------
+
+	User pragmas come in as "signatures"; see Bindings.
+
+PN			Null/empty pragma
+
+Pd  [d]			Data pragma: otherwise-hidden data constructors
+Pt			Type pragma: synonym is *abstract*
+Pc  [gprag] 		Class pragma: one gprag per superclass
+Po  gprag gprag		Class op pragma: gprags for dsel & defm
+  OUT: Pv  gprag [2prag]	Value pragma: gprag + specialisations
+Pis id gprag		Instance pragma (simple): id is module name, gprag for dfun
+Pic id gprag [1prag]	Ditto (constant methods): also gprags for classops
+PiS id gprag [3prag]  	Ditto (specialised): also (type, instance-prag) pairs
+
+Pg  Aprag uprag Sprag Uprag
+			General ("gprag"): arity, update, strictness, unfolding
+
+PA  id			Arity ("Aprag"): arity
+Pu  id	    	    	Update ("uprag"): update spec
+PS  id gprag		Strictness ("Sprag"): strictness spec, gprag for worker
+PM  id id		Magic unfolding ("Uprag"): var, magic-name string
+PU  id core		Unfolding ("Uprag"): "guidance", corexpr-unfolding
+
+Px			Unfold always (these are "guidance" ones...)
+Py  id id		Unfold if applied to "m" ty args, "n" val args
+Pz  id id		Unfold if applied to "m" ty args, & cons in marked val positions
+			(e.g., "CXXCXX" ==> in 1st & 4th arg positions)
+
+P1  id gprag		("1prag"): (name, gen-pragma) pair
+P2  t  gprag	    	("2prag"): (type, gen-pragma) pair
+P3  t  gprag [iprag]	("3prag"): (type, [(gen-pragma, instance-pragma)]) pair
+
+
+Core syntax [in iprags] (core)
+------------------------------
+
+Fa
+Fb
+<etc -- lots of this stuff>
+
+Used in Data Parallel Haskell variant (Jonathan Hill, QMW)
+----------------------------------------------------------
+
+    ** Expressions **
+
+5  e   [parqual]	Parallel ZF expression  << e | [parquals] >>
+6  [e]			Pod Literal		<< e1,...,ek>>
+O  [e] e		Processor (|e1,...,ek;e|)
+
+    ** Types **
+
+u  [t] t		Explicit Processor Type		(|t1,..tn;t|)
+v  [t]			Explicit Pod Type		<<t>>
+
+    ** Parallel Qualifiers **
+
+0 e e			Drawn From Generator 	exp <<- exp
+w e e			Indexed From Generator 	exp <<= exp
+I e 			Guard
+
+
+			     Other Items
+			     -----------
+
+Line Numbers (L)
+----------------
+
+   s			Haskell line number
+
+
+Kevin Hammond @ 22nd. August 1991

@@ -1,0 +1,517 @@
+%************************************************************************
+%*									*
+\section[Driver-asm-fiddling]{Fiddling with assembler files (SGI MIPS box)}
+%*									*
+%************************************************************************
+
+\begin{code}
+sub mangle_asm {
+    local($in_asmf, $out_asmf) = @_;
+
+    # multi-line regexp matching:
+    local($*) = 1;
+    local($i, $c);
+    &init_FUNNY_THINGS();
+
+    open(INASM, "< $in_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$in_asmf' (to read)\n");
+    open(OUTASM,"> $out_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$out_asmf' (to write)\n");
+
+    # read whole file, divide into "chunks":
+    #	record some info about what we've found...
+
+    @chk = ();		# contents of the chunk
+    $numchks = 0;	# number of them
+    @chkcat = ();	# what category of thing in each chunk
+    @chksymb = ();	# what symbol(base) is defined in this chunk
+    %slowchk = ();	# ditto, its regular "slow" entry code
+    %fastchk = ();	# ditto, fast entry code
+    %closurechk = ();	# ditto, the (static) closure
+    %infochk = (); 	# given a symbol base, say what chunk its info tbl is in
+    %vectorchk = ();    # ditto, return vector table
+    %directchk = ();    # ditto, direct return code
+    $EXTERN_DECLS = '';	# .globl <foo> .text
+
+    $i = 0;
+    $chkcat[0] = 'misc';
+
+    while (<INASM>) {
+
+	next if /^$/; # blank line
+	next if /^\s*#(NO_)?APP/;
+	next if /^\t\.file\t/;
+	next if /^ # /;
+
+	if ( /^\t\.(globl \S+ \.text|comm\t)/ ) {
+	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
+
+	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
+	    # duplicated from the bottom
+	    $chk[$i] .= $_;
+
+	# NB: all the rest start with a non-space
+
+	} elsif ( /^\d+:/ ) { # a funny-looking very-local label
+	    $chk[$i] .= $_;
+
+	} elsif ( /^(ret_|djn_)/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
+
+	} elsif ( /^vtbl_([A-Za-z0-9_]+):$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'vector';
+	    $chksymb[$i] = $1;
+
+	    $vectorchk{$1} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)DirectReturn:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'direct';
+	    $chksymb[$i] = $1;
+
+	    $directchk{$1} = $i;
+
+	} elsif ( /^[A-Za-z0-9_]+_upd:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
+
+	} elsif ( /^\$LC(\d+):$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'string';
+	    $chksymb[$i] = $1;
+
+	} elsif ( /^__stg_split_marker(\d+):$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'splitmarker';
+	    $chksymb[$i] = $1;
+
+	} elsif ( /^([A-Za-z0-9_]+)_info:$/ ) {
+	    $symb = $1;
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'infotbl';
+	    $chksymb[$i] = $symb;
+
+	    $infochk{$symb} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)_entry:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'slow';
+	    $chksymb[$i] = $1;
+
+	    $slowchk{$1} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)_fast\d+:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'fast';
+	    $chksymb[$i] = $1;
+
+	    $fastchk{$1} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)_closure:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'closure';
+	    $chksymb[$i] = $1;
+
+	    $closurechk{$1} = $i;
+
+	} elsif ( /^ghc.*c_ID:/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'consist';
+
+	} elsif ( /^(__gnu_compiled_c|gcc2_compiled\.):/ ) {
+	    ; # toss it
+
+	} elsif ( /^ErrorIO_call_count:/	 # HACK!!!!
+	       || /^[A-Za-z0-9_]+\.\d+:$/
+	       || /^.*_CAT:/	 		# PROF: _entryname_CAT
+	       || /^CC_.*_struct:/	  	# PROF: _CC_ccident_struct
+	       || /^.*_done:/			# PROF: _module_done
+	       || /^_module_registered:/	# PROF: _module_registered
+	       ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'data';
+  	    $chksymb[$i] = '';
+
+	} elsif ( /^[A-Za-z0-9_]/ ) {
+	    local($thing);
+	    chop($thing = $_);
+	    print STDERR "Funny global thing? ($.): $_"
+		unless $KNOWN_FUNNY_THING{$thing}
+		    || /^_(PRIn|PRStart).*:/	# pointer reversal GC routines
+		    || /^CC_.*:/		# PROF: _CC_ccident
+		    || /^_reg.*:/; 		# PROF: _reg<module>
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
+
+	} else { # simple line (duplicated at the top)
+	    $chk[$i] .= $_;
+	}
+    }
+    $numchks = $#chk + 1;
+
+#    print STDERR "\nCLOSURES:\n";
+#    foreach $s (sort (keys %closurechk)) {
+#	print STDERR "$s:\t\t",$closurechk{$s},"\n";
+#    }
+#    print STDERR "\nINFOS:\n";
+#    foreach $s (sort (keys %infochk)) {
+#	print STDERR "$s:\t\t",$infochk{$s},"\n";
+#    }
+#    print STDERR "SLOWS:\n";
+#    foreach $s (sort (keys %slowchk)) {
+#	print STDERR "$s:\t\t",$slowchk{$s},"\n";
+#    }
+#    print STDERR "\nFASTS:\n";
+#    foreach $s (sort (keys %fastchk)) {
+#	print STDERR "$s:\t\t",$fastchk{$s},"\n";
+#    }
+
+    # the division into chunks is imperfect;
+    # we throw some things over the fence into the next
+    # chunk.
+    #
+    # also, there are things we would like to know
+    # about the whole module before we start spitting
+    # output.
+
+    # NB: we start meddling at chunk 1, not chunk 0
+
+    for ($i = 1; $i < $numchks; $i++) {
+	$c = $chk[$i]; # convenience copy
+
+#	print STDERR "\nCHK $i (BEFORE):\n", $c;
+
+	# pin a funny end-thing on (for easier matching):
+	$c .= 'FUNNY#END#THING';
+
+	# pick some end-things and move them to the next chunk
+
+	while ( $c =~ /^(\s*\.align\s+\d+\n)FUNNY#END#THING/
+	     || $c =~ /^(\s*\.(globl|ent)\s+\S+\n)FUNNY#END#THING/
+	     || $c =~ /^(\s*\.text\n|\s*\.r?data\n)FUNNY#END#THING/ ) {
+	    $to_move = $1;
+
+	    if ( $to_move =~ /\.(globl|ent)/ && $i < ($numchks - 1) ) {
+		$chk[$i + 1] = $to_move . $chk[$i + 1];
+		# otherwise they're tossed
+	    }
+
+	    $c =~ s/^.*\nFUNNY#END#THING/FUNNY#END#THING/;
+	}
+
+	# toss all prologue stuff;
+	# be slightly paranoid to make sure there's
+	# nothing surprising in there
+	if ( $c =~ /--- BEGIN ---/ ) {
+	    if (($p, $r) = split(/--- BEGIN ---/, $c)) {
+		# the .frame/.mask/.fmask that we use is the same
+		# as that produced by GCC for miniInterpret; this
+		# gives GDB some chance of figuring out what happened
+		$FRAME = "\t.frame\t\$sp,2168,\$31\n\t.mask\t0x90000000,-4\n\t.fmask\t0x00000000,0\n";
+		$p =~ s/^\t\.(frame).*\n/__FRAME__/g;
+		$p =~ s/^\t\.(mask|fmask).*\n//g;
+		$p =~ s/^\t\.cprestore.*\n/\t\.cprestore 416\n/; # 16 + 100 4-byte args
+		$p =~ s/^\tsubu\t\$sp,\$sp,\d+\n//;
+		$p =~ s/^\tsw\t\$31,\d+\(\$sp\)\n//;
+		$p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//;
+		$p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
+		$p =~ s/__FRAME__/$FRAME/;
+		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+
+		# glue together what's left
+		$c = $p . $r;
+		$c =~ s/\n\t\n/\n/; # junk blank line
+	    }
+	}
+
+	# toss all epilogue stuff; again, paranoidly;
+	# first, this basic sequence may occur "--- END ---" or not
+	$c =~ s/^\tlw\t\$31,\d+\(\$sp\)\n\taddu\t\$sp,\$sp,\d+\n\tj\t\$31\n\t\.end/\t\.end/;
+
+	if ( $c =~ /--- END ---/ ) {
+	    if (($r, $e) = split(/--- END ---/, $c)) {
+		$e =~ s/^\tlw\t\$31,\d+\(\$sp\)\n//;
+		$e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//;
+		$e =~ s/^\taddu\t\$sp,\$sp,\d+\n//;
+		$e =~ s/^\tj\t\$31\n//;
+		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/;
+
+		# glue together what's left
+		$c = $r . $e;
+		$c =~ s/\n\t\n/\n/; # junk blank line
+	    }
+	}
+
+    	# toss all calls to __DISCARD__
+	$c =~ s/^\tjal\t__DISCARD__\n//g;
+	# that may leave some gratuitous asm macros around
+	# (no harm done; but we get rid of them to be tidier)
+	$c =~ s/^\t\.set\tnoreorder\n\t\.set\tnomacro\n\taddu\t(\S+)\n\t\.set\tmacro\n\t\.set\treorder\n/\taddu\t$1\n/;
+
+	$c =~ s/FUNNY#END#THING//;
+	$chk[$i] = $c; # update w/ convenience copy
+
+	print STDERR "NB: Contains magic stuff!\n$c\n" if $c =~ /^\t[^\.].*(\$28)\b/;
+
+#	print STDERR "\nCHK $i (AFTER):\n", $c;
+
+    }
+
+    # print out the header stuff first
+    $chk[0] = "\t\.file\t1 \"$ifile_root.hc\"\n" . $chk[0];
+
+    # get rid of horrible "$Revision: 1.1 $" strings
+    local(@lines0) = split(/\n/, $chk[0]);
+    local($z) = 0;
+    while ( $z <= $#lines0 ) {
+	if ( $lines0[$z] =~ /^\t\.byte\t0x24,0x52,0x65,0x76,0x69,0x73,0x69,0x6f$/ ) {
+	    undef($lines0[$z]);
+	    $z++;
+	    while ( $z <= $#lines0 ) {
+		undef($lines0[$z]);
+		last if $lines0[$z] =~ /[,\t]0x0$/;
+		$z++;
+	    }
+	}
+	$z++;
+    }
+    $chk[0] = join("\n", @lines0);
+    $chk[0] =~ s/\n\n+/\n/;
+    print OUTASM $chk[0];
+
+    # print out all the literal strings second
+    for ($i = 1; $i < $numchks; $i++) {
+	if ( $chkcat[$i] eq 'string' ) {
+	    print OUTASM "\t\.rdata\n\t\.align 2\n";
+	    print OUTASM $chk[$i];
+	    
+	    $chkcat[$i] = 'DONE ALREADY';
+	}
+    }
+
+    for ($i = 1; $i < $numchks; $i++) {
+#	print STDERR "$i: cat $chkcat[$i], symb $chksymb[$i]\n";
+
+	next if $chkcat[$i] eq 'DONE ALREADY';
+
+	if ( $chkcat[$i] eq 'misc' ) {
+	    print OUTASM "\t\.text\n\t\.align 2\n";
+	    print OUTASM $chk[$i];
+
+	} elsif ( $chkcat[$i] eq 'data' ) {
+	    print OUTASM "\t\.data\n\t\.align 2\n";
+	    print OUTASM $chk[$i];
+
+	} elsif ( $chkcat[$i] eq 'consist' ) {
+#? consistency string is just a v
+#? horrible bunch of .bytes,
+#? which I am too lazy to sort out (WDP 95/05)
+#?	    if ( $chk[$i] =~ /\.ascii.*\)(hsc|cc) (.*)\\11"\n\t\.ascii\s+"(.*)\\0"/ ) {
+#?		local($consist) = "$1.$2.$3";
+#?		$consist =~ s/,/./g;
+#?		$consist =~ s/\//./g;
+#?		$consist =~ s/-/_/g;
+#?		$consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
+#?		print OUTASM "\t\.text\n$consist:\n";
+#?	    } else {
+#?		print STDERR "Couldn't grok consistency: ", $chk[$i];
+#?	    }
+
+	} elsif ( $chkcat[$i] eq 'splitmarker' ) {
+	    # we can just re-constitute this one...
+    	    # ignore the final split marker, to save an empty object module
+    	    # Use _three_ underscores so that ghc-split doesn't get overly complicated
+	    print OUTASM "___stg_split_marker",$chksymb[$i],":\n";
+
+	} elsif ( $chkcat[$i] eq 'closure'
+	       || $chkcat[$i] eq 'infotbl'
+	       || $chkcat[$i] eq 'slow'
+	       || $chkcat[$i] eq 'fast' ) { # do them in that order
+	    $symb = $chksymb[$i];
+
+	    # CLOSURE
+	    if ( defined($closurechk{$symb}) ) {
+		print OUTASM "\t\.data\n\t\.align 2\n";
+		print OUTASM $chk[$closurechk{$symb}];
+		$chkcat[$closurechk{$symb}] = 'DONE ALREADY';
+	    }
+
+	    # INFO TABLE
+	    if ( defined($infochk{$symb}) ) {
+
+		print OUTASM "\t\.text\n\t\.align 2\n";
+		print OUTASM &rev_tbl($symb, $chk[$infochk{$symb}], 1);
+		# entry code will be put here!
+
+		$chkcat[$infochk{$symb}] = 'DONE ALREADY';
+	    }
+
+	    # STD ENTRY POINT
+	    if ( defined($slowchk{$symb}) ) {
+
+    		# teach it to drop through to the fast entry point:
+		$c = $chk[$slowchk{$symb}];
+    	    	if ( defined($fastchk{$symb}) ) {
+    		    $c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
+    	    	}
+
+		print OUTASM "\t\.text\n\t\.align 2\n";
+		print OUTASM $c;
+		$chkcat[$slowchk{$symb}] = 'DONE ALREADY';
+	    }
+	    
+	    # FAST ENTRY POINT
+	    if ( defined($fastchk{$symb}) ) {
+    	    	$c = $chk[$fastchk{$symb}];
+    	    	if ( ! defined($slowchk{$symb}) ) {
+		    print OUTASM "\t\.text\n\t\.align 2\n";
+    	    	}
+		print OUTASM $c;
+		$chkcat[$fastchk{$symb}] = 'DONE ALREADY';
+	    }
+
+	} elsif ( $chkcat[$i] eq 'vector'
+	       || $chkcat[$i] eq 'direct' ) { # do them in that order
+	    $symb = $chksymb[$i];
+
+	    # VECTOR TABLE
+	    if ( defined($vectorchk{$symb}) ) {
+		print OUTASM "\t\.text\n\t\.align 2\n";
+		print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
+		# direct return code will be put here!
+		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';
+	    }
+
+	    # DIRECT RETURN
+	    if ( defined($directchk{$symb}) ) {
+		print OUTASM "\t\.text\n\t\.align 2\n";
+		print OUTASM $chk[$directchk{$symb}];
+		$chkcat[$directchk{$symb}] = 'DONE ALREADY';
+	    } else {
+                # The commented nop is for the splitter, to ensure
+                # that no module ends with a label as the very last
+                # thing.  (The linker will adjust the label to point
+                # to the first code word of the next module linked in,
+                # even if alignment constraints cause the label to move!)
+
+		print OUTASM "\t# nop\n";
+	    }
+	} else {
+	    &tidy_up_and_die(1,"$Pgm: unknown chkcat (ghc-asm alpha)\n$chkcat[$i]\n$chk[$i]\n");
+	}
+    }
+
+    print OUTASM $EXTERN_DECLS;
+
+    # finished:
+    close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
+    close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+\end{code}
+
+\begin{code}
+sub init_FUNNY_THINGS {
+    %KNOWN_FUNNY_THING = (
+	'CheckHeapCode:', 1,
+	'CommonUnderflow:', 1,
+	'Continue:', 1,
+	'EnterNodeCode:', 1,
+	'ErrorIO_call_count:', 1,
+	'ErrorIO_innards:', 1,
+	'IndUpdRetDir:', 1,
+	'IndUpdRetV0:', 1,
+	'IndUpdRetV1:', 1,
+	'IndUpdRetV2:', 1,
+	'IndUpdRetV3:', 1,
+	'IndUpdRetV4:', 1,
+	'IndUpdRetV5:', 1,
+	'IndUpdRetV6:', 1,
+	'IndUpdRetV7:', 1,
+	'PrimUnderflow:', 1,
+	'StackUnderflowEnterNode:', 1,
+	'StdErrorCode:', 1,
+	'UnderflowVect0:', 1,
+	'UnderflowVect1:', 1,
+	'UnderflowVect2:', 1,
+	'UnderflowVect3:', 1,
+	'UnderflowVect4:', 1,
+	'UnderflowVect5:', 1,
+	'UnderflowVect6:', 1,
+	'UnderflowVect7:', 1,
+	'UpdErr:', 1,
+	'UpdatePAP:', 1,
+	'WorldStateToken:', 1,
+	'_Enter_Internal:', 1,
+	'_PRMarking_MarkNextAStack:', 1,
+	'_PRMarking_MarkNextBStack:', 1,
+	'_PRMarking_MarkNextCAF:', 1,
+	'_PRMarking_MarkNextGA:', 1,
+	'_PRMarking_MarkNextRoot:', 1,
+	'_PRMarking_MarkNextSpark:', 1,
+	'_Scavenge_Forward_Ref:', 1,
+	'__std_entry_error__:', 1,
+	'_startMarkWorld:', 1,
+	'resumeThread:', 1,
+	'startCcRegisteringWorld:', 1,
+	'startEnterFloat:', 1,
+	'startEnterInt:', 1,
+	'startPerformIO:', 1,
+	'startStgWorld:', 1,
+	'stopPerformIO:', 1
+  );
+}
+\end{code}
+
+The following table reversal is used for both info tables and return
+vectors.  In both cases, we remove the first entry from the table,
+reverse the table, put the label at the end, and paste some code
+(that which is normally referred to by the first entry in the table)
+right after the table itself.  (The code pasting is done elsewhere.)
+
+\begin{code}
+sub rev_tbl {
+    local($symb, $tbl, $discard1) = @_;
+
+    local($before) = '';
+    local($label) = '';
+    local(@words) = ();
+    local($after) = '';
+    local(@lines) = split(/\n/, $tbl);
+    local($i);
+
+    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t\.word\s+/; $i++) {
+	$label .= $lines[$i] . "\n",
+	    next if $lines[$i] =~ /^[A-Za-z0-9_]+:$/
+		 || $lines[$i] =~ /^\t\.globl/;
+
+	$before .= $lines[$i] . "\n"; # otherwise...
+    }
+
+    for ( ; $i <= $#lines && $lines[$i] =~ /^\t\.word\s+/; $i++) {
+	push(@words, $lines[$i]);
+    }
+    # now throw away the first word (entry code):
+    shift(@words) if $discard1;
+
+    for (; $i <= $#lines; $i++) {
+	$after .= $lines[$i] . "\n";
+    }
+
+    $tbl = $before . join("\n", (reverse @words)) . "\n" . $label . $after;
+
+#    print STDERR "before=$before\n";
+#    print STDERR "label=$label\n";
+#    print STDERR "words=",(reverse @words),"\n";
+#    print STDERR "after=$after\n";
+
+    $tbl;
+}
+
+# make "require"r happy...
+1;
+\end{code}

@@ -1,0 +1,87 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[inputReady.lc]{hReady Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
+StgInt
+inputReady(fp)
+StgAddr fp;
+{
+    int flags;
+    int c;
+
+    if (feof((FILE *) fp))
+	return 0;
+
+    /* Get the original file status flags */
+    while ((flags = fcntl(fileno((FILE *) fp), F_GETFL)) < 0) {
+	/* highly unlikely */
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+
+    /* If it's not already non-blocking, make it so */
+    if (!(flags & O_NONBLOCK)) {
+	while (fcntl(fileno((FILE *) fp), F_SETFL, flags | O_NONBLOCK) < 0) {
+	    /* still highly unlikely */
+	    if (errno != EINTR) {
+		cvtErrno();
+		stdErrno();
+		return -1;
+	    }
+	}
+    }
+    /* Now try to get a character */
+    while ((c = getc((FILE *) fp)) == EOF && errno == EINTR)
+	clearerr((FILE *) fp);
+
+    /* If we made it non-blocking for this, switch it back */
+    if (!(flags & O_NONBLOCK)) {
+	while (fcntl(fileno((FILE *) fp), F_SETFL, flags) < 0) {
+	    /* still highly unlikely */
+	    if (errno != EINTR) {
+		cvtErrno();
+		stdErrno();
+		return -1;
+	    }
+	}
+    }
+
+    if (c == EOF) {
+	if (errno == EAGAIN || feof((FILE *) fp)) {
+	    clearerr((FILE *) fp);
+	    return 0;
+	} else {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    } else if (ungetc(c, (FILE *) fp) == EOF) {
+	cvtErrno();
+	stdErrno();
+	return -1;
+    } else
+	return 1;
+}
+
+\end{code}

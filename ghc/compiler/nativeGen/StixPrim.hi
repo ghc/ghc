@@ -1,0 +1,33 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface StixPrim where
+import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelative)
+import BasicLit(BasicLit)
+import CLabelInfo(CLabel)
+import CharSeq(CSeq)
+import CmdLineOpts(GlobalSwitch, SwitchResult)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import MachDesc(RegLoc, Target)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import Pretty(PprStyle)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SMRep(SMRep)
+import SplitUniq(SplitUniqSupply)
+import Stix(CodeSegment, StixReg, StixTree)
+import UniType(UniType)
+import Unique(Unique)
+data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
+data Target 	{-# GHC_PRAGMA Target (GlobalSwitch -> SwitchResult) Int (SMRep -> Int) (MagicId -> RegLoc) (StixTree -> StixTree) (PrimKind -> Int) ([MagicId] -> [StixTree]) ([MagicId] -> [StixTree]) (HeapOffset -> Int) (CAddrMode -> StixTree) (CAddrMode -> StixTree) Int Int StixTree StixTree ([CAddrMode] -> PrimOp -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (CStmtMacro -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (StixTree -> StixTree -> StixTree -> SplitUniqSupply -> [StixTree] -> [StixTree]) (PprStyle -> [[StixTree]] -> SplitUniqSupply -> CSeq) Bool ([Char] -> [Char]) #-}
+data PrimOp
+	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data StixTree 	{-# GHC_PRAGMA StSegment CodeSegment | StInt Integer | StDouble (Ratio Integer) | StString _PackedString | StLitLbl CSeq | StLitLit _PackedString | StCLbl CLabel | StReg StixReg | StIndex PrimKind StixTree StixTree | StInd PrimKind StixTree | StAssign PrimKind StixTree StixTree | StLabel CLabel | StFunBegin CLabel | StFunEnd CLabel | StJump StixTree | StFallThrough CLabel | StCondJump CLabel StixTree | StData PrimKind [StixTree] | StPrim PrimOp [StixTree] | StCall _PackedString PrimKind [StixTree] | StComment _PackedString #-}
+amodeCode :: Target -> CAddrMode -> StixTree
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+amodeCode' :: Target -> CAddrMode -> StixTree
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+genPrimCode :: Target -> [CAddrMode] -> PrimOp -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LSSL" _N_ _N_ #-}
+

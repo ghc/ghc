@@ -1,0 +1,5 @@
+ 
+"tcfail049.hs", line 2: undefined value: g
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

@@ -1,0 +1,22 @@
+Desugared:
+Test.g1 :: for all d. d -> d
+Test.g1 = /\ o91 -> \ y.119 -> y.119
+Test.f1 :: for all d. d -> d
+Test.f1 = /\ t95 -> \ x.120 -> (Test.g1 t95) x.120
+Test.g2 :: for all d. d -> d
+Test.g2 = /\ o98 -> \ y.121 -> y.121
+Test.f2 :: for all d. d -> d
+Test.f2 = /\ t102 -> \ x.122 -> (Test.g2 t102) x.122
+{- plain CoRec -}
+Test.f3 :: for all d, e. d -> e
+Test.f3 = /\ o109 o110 -> \ x.123 -> ((Test.g3 o109) o110) x.123
+Test.g3 :: for all d, e. d -> e
+Test.g3 = /\ o109 o110 -> \ y.124 -> ((Test.f3 o109) o110) y.124
+{- end plain CoRec -}
+{- plain CoRec -}
+Test.g4 :: for all d, e. d -> e
+Test.g4 = /\ o117 o118 -> \ y.125 -> ((Test.f4 o117) o118) y.125
+Test.f4 :: for all d, e. d -> e
+Test.f4 = /\ o117 o118 -> \ x.126 -> ((Test.g4 o117) o118) x.126
+{- end plain CoRec -}
+

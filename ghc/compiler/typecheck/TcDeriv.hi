@@ -1,0 +1,33 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcDeriv where
+import Bag(Bag)
+import Class(Class)
+import CmdLineOpts(GlobalSwitch)
+import HsBinds(Binds)
+import HsDecls(FixityDecl)
+import HsPat(InPat)
+import Maybes(Labda)
+import Name(Name)
+import PreludePS(_PackedString)
+import Pretty(PprStyle, PrettyRep)
+import ProtoName(ProtoName)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TcInstDcls(InstInfo)
+import TcMonad(TcResult)
+import TyCon(TyCon)
+import TyVar(TyVar)
+import UniType(UniType)
+import UniqFM(UniqFM)
+type DerivEqn = (Class, TyCon, [TyVar], [(Class, UniType)])
+data TagThingWanted   = GenCon2Tag | GenTag2Con | GenMaxTag
+con2tag_PN :: TyCon -> ProtoName
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+maxtag_PN :: TyCon -> ProtoName
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+tag2con_PN :: TyCon -> ProtoName
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+tcDeriving :: _PackedString -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Bag InstInfo -> UniqFM TyCon -> [FixityDecl Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Bag InstInfo, Binds Name (InPat Name), PprStyle -> Int -> Bool -> PrettyRep)
+	{-# GHC_PRAGMA _A_ 5 _U_ 22220222222 _N_ _S_ "LLLSA" {_A_ 4 _U_ 2222222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

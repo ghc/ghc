@@ -1,0 +1,41 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface AbsCFuns where
+import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelative, ReturnInfo)
+import BasicLit(BasicLit)
+import CLabelInfo(CLabel)
+import ClosureInfo(ClosureInfo)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import Maybes(Labda)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SplitUniq(SplitUniqSupply)
+import Unique(Unique)
+data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
+data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
+data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+amodeCanSurviveGC :: CAddrMode -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+flattenAbsC :: SplitUniqSupply -> AbstractC -> AbstractC
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+getAmodeKind :: CAddrMode -> PrimKind
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+kindFromMagicId :: MagicId -> PrimKind
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mixedPtrLocn :: CAddrMode -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mixedTypeLocn :: CAddrMode -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mkAbsCStmtList :: AbstractC -> [AbstractC]
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+mkAbsCStmts :: AbstractC -> AbstractC -> AbstractC
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: AbstractC) (u1 :: AbstractC) -> _!_ _ORIG_ AbsCSyn AbsCStmts [] [u0, u1] _N_ #-}
+mkAbstractCs :: [AbstractC] -> AbstractC
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: [AbstractC]) -> case u0 of { _ALG_ (:) (u1 :: AbstractC) (u2 :: [AbstractC]) -> _APP_  _TYAPP_  _ORIG_ PreludeList foldr1 { AbstractC } [ _ORIG_ AbsCFuns mkAbsCStmts, u0 ]; _NIL_  -> _!_ _ORIG_ AbsCSyn AbsCNop [] []; _NO_DEFLT_ } _N_ #-}
+mkAlgAltsCSwitch :: CAddrMode -> [(Int, AbstractC)] -> AbstractC -> AbstractC
+	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _N_ _N_ _N_ #-}
+nonemptyAbsC :: AbstractC -> Labda AbstractC
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+

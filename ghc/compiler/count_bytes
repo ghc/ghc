@@ -1,0 +1,43 @@
+#! /usr/local/bin/perl
+#
+%DirCount = ();
+%ModCount = ();
+
+foreach $f ( @ARGV ) {
+    die "Not an .lhs file: $f\n" if $f !~ /\.lhs$/;
+    $f =~ s/\.lhs$/.o/;
+
+    $f_size = `size $f`;
+    die "Size failed?\n" if $? != 0;
+
+    if ( $f_size =~ /(\S+)\s*(\S+)\s*(\S+)\s*(\d+)\s*(\S+)/ ) {
+	$totsz = $4;
+
+	if ( $f =~ /(.*)\/(.*)/ ) {
+	    local($dir) = $1;
+	    local($mod) = $2;
+	    $DirCount{$dir} += $totsz;
+	    $ModCount{$mod} += $totsz;
+	} else {
+	    print STDERR "not counted in a directory: $f\n";
+	    $ModCount{$f} += $totsz;
+	}
+    } else {
+	die "Can't figure out size: $f_size\n";
+    }
+}
+
+# print the info
+$tot = 0;
+foreach $d (sort (keys %DirCount)) {
+    printf "%-20s %6d\n", $d, $DirCount{$d};
+    $tot += $DirCount{$d};
+}
+printf "\n%-20s %6d\n\n\n", 'TOTAL:', $tot;
+
+$tot = 0;
+foreach $m (sort (keys %ModCount)) {
+    printf "%-20s %6d\n", $m, $ModCount{$m};
+    $tot += $ModCount{$m};
+}
+printf "\n%-20s %6d\n", 'TOTAL:', $tot;

@@ -1,0 +1,8 @@
+ 
+"tcfail001.hs", line 8:
+    Couldn't match type "[tt5] -> [tt6]" against "[a]".
+    Inside a function binding:
+	op ... [] = []
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

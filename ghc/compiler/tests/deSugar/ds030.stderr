@@ -1,0 +1,31 @@
+Desugared:
+Test.f :: for all d. [d] -> Int {- 0 MkInt deriving ( )-} =
+    /\ t78 -> \ x.88 :: [t78] ->
+	let ds.89 :: [t78] = x.88 :: [t78] in
+	let
+	  fail.90 :: Int {- 0 MkInt deriving ( )-} =
+	      ({-CoTyApp-} error :: for all a.
+					[Char {- 0 MkChar deriving ( )-}] -> a
+		   Int {- 0 MkInt deriving ( )-})
+		  "\"ds030.hs\", line 5: pattern-matching failed in case\n"S in
+	let
+	  fail.92 :: Int {- 0 MkInt deriving ( )-} =
+	      let
+		dict.91 :: <Num {- Num -} <Num {- Num -} Int {- 0 MkInt deriving ( )-}>> =
+		    dfun.Num.Int :: <Num {- Num -} Int {- 0 MkInt deriving ( )-}>
+	      in 
+		MkInt :: IntPrim{- StgInt -} -> Int {- 0 MkInt deriving ( )-}!
+		    4#
+	in 
+	  case ds.89 :: [t78] of {
+	    [a] {- 1 a Nil, : deriving ( )-}
+	    Nil :: for all a. [a] ->
+		let
+		  dict.93 :: <Num {- Num -} <Num {- Num -} Int {- 0 MkInt deriving ( )-}>> =
+		      dfun.Num.Int :: <Num {- Num -} Int {- 0 MkInt deriving ( )-}>
+		in 
+		  MkInt :: IntPrim{- StgInt -} -> Int {- 0 MkInt deriving ( )-}!
+		      3#
+	    _ ->  fail.92 :: Int {- 0 MkInt deriving ( )-}
+	  }
+

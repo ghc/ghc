@@ -1,0 +1,36 @@
+\chapter{Error messages given}
+
+The {\tt pphs} program generates error messages to {\tt stderr},
+with error codes.  Normal operation of the program will be
+indicated by error code {\tt 0}.
+
+\section{\tt Call with one file name}
+
+Error code {\tt 1} is produced when {\tt pphs} is not called with
+exactly one filename.  Either no filename was given, or too many
+filenames were given.  Call {\tt pphs} again with one filename.
+
+\section{\tt File could not be opened}
+
+Error code {\tt 2} is produced when the filename given when {\tt pphs}
+was called could not be opened.  This could be because it did not exist,
+or was read-protected.  Call {\tt pphs} again with a filename that exists
+and is readable.
+
+\section{\tt Stack is too big}
+
+Error code {\tt 3} is produced when the program has used up too much of
+the computer's memory.  It is not possible to run {\tt pphs} on this file
+without getting more memory for the computer to use.
+
+\section{\tt Queue is too big}
+
+Error code {\tt 4} is produced when the program has used up too much of
+the computer's memory.  It is not possible to run {\tt pphs} on this file
+without getting more memory for the computer to use.
+
+\section{\tt Stack underflow}
+
+Error code {\tt 5} is produced when the program attempts to remove an item
+from a stack in memory that doesn't exist.  This should not happen in the
+{\tt pphs} program.

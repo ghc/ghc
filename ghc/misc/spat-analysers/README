@@ -1,0 +1,22 @@
+This directory (ghc/misc/spat-analysers) includes the source for
+"analysers" to use with the SPAT (SPARC Performance Analysis Tools?)
+system, which includes "shade", "shadow", and "spixtools".
+
+The analysers here are no actual use to you unless you have the SPAT
+system from Sun.  Bob Cmelik was the ringleader at Sun for quite
+some time.  The current person to contact about it is:
+	
+	John Rodriguez
+	Sun Microsystems Laboratories, Inc.
+	2550 Garcia Avenue, MS 29-225
+	Mountain View, CA 94043
+	(415) 336-1709
+        john.rodriguez@sun.com
+
+We are supplying these analysers so you can see the Cool Things you
+can do with them, in the hope that you will be motivated to build upon
+our work.
+
+Will Partain
+AQUA Project
+95/07/18

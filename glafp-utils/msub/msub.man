@@ -1,0 +1,274 @@
+.TH MSUB 1
+.SH NAME
+msub \- substitute \fImake\fR variables into template to produce script
+.SH SYNOPSIS
+.B msub
+[
+.B \-e
+] [
+.B \-f
+.I file
+] [
+.BI \+R str
+] [
+.BI \-R str
+] [
+.IB variable = value
+] [
+.I file
+\&...
+]
+.SH DESCRIPTION
+Makefiles often contain project configuration information specified as
+.I make
+variables, and it is often desirable to make use of that information in other
+files.
+.I msub
+allows targets to be produced easily
+from templates that contain references to those variables.
+.I msub
+is particularly useful in software projects that use
+.IR imake
+because virtually all configuration parameters are written into Makefiles
+and are thus available for propagation into other files.
+.PP
+First
+.I msub
+reads the
+.I Makefile
+and finds all variable definition lines
+of the form ``\fIvar\fR = \fIvalue\fR''.
+Then
+.I msub
+reads any files named on the command line (or the standard input
+if none), looks for references to those variables, and replaces the
+references with the corresponding variable values.
+References to undefined variables are replaced by the empty string.
+The result is written to the standard output.
+.PP
+.I msub
+takes the following options:
+.TP
+.B \-e
+Environment variable values override assignments within Makefiles.
+Normally assignments within Makefiles override environment variables.
+.TP
+.BI \-f \ file
+By default, variable values are extracted from
+.I Makefile
+(or
+.I makefile
+if
+.I Makefile
+is missing) in the current directory.
+If the
+.B \-f
+.I file
+option is given, variable values are extracted from
+.I file
+instead.
+Multiple
+.B \-f
+options may be specified.
+(Note:
+.I make
+recognizes
+.B \-f\ \-
+to mean the
+.I Makefile
+should be read from
+.IR stdin .
+.I msub
+doesn't, because template input may come from
+.IR stdin .)
+.TP
+.BI +R str
+.TP
+.BI \-R str
+The default variable reference indicators within templates
+are the same as in Makefiles, i.e.,
+``$('' and ``)'', and ``${'' and ``}''.
+These can be changed with the
+.B +R
+and
+.B \-R
+options, which must be specified in pairs.
+.B +R
+specifies the string that initiates a variable reference and
+.B \-R
+specifies the string that terminates it.
+Multiple pairs of reference indicators may be given.
+.TP
+.IB variable = value
+Variable definition.
+This definition overrides any regular definition for the specified
+variable within the makefile itself or in the environment.
+.SH EXAMPLES
+Suppose you want to produce for a program a help file that indicates the local
+e-mail address to which questions may be directed.
+If this address is specified as the variable EMAILHELPADDR in the
+.IR Makefile ,
+you can write a template
+.I helpfile.msub
+like this:
+.in +.5i
+.nf
+.sp .5v
+\&.\|.\|.\|\fIstuff\fP\|.\|.\|.
+Please direct questions to ${EMAILHELPADDR}.
+\&.\|.\|.\|\fImore stuff\fP\|.\|.\|.
+.sp .5v
+.fi
+.in
+Process the template to produce the help file like this:
+.in +.5i
+.nf
+.sp .5v
+msub helpfile.msub > helpfile
+.sp .5v
+.fi
+.in
+If the
+.I Makefile
+contains the following lines:
+.in +.5i
+.nf
+.sp .5v
+EMAILHELPADDR = postmaster@$(DOMAIN)
+DOMAIN = primate.wisc.edu
+.sp .5v
+.fi
+.in
+then
+.I helpfile
+will look like this:
+.in +.5i
+.nf
+.sp .5v
+\&.\|.\|.\|\fIstuff\fP\|.\|.\|.
+Please direct questions to postmaster@primate.wisc.edu.
+\&.\|.\|.\|\fImore stuff\fP\|.\|.\|.
+.sp .5v
+.fi
+.in
+.I msub
+can produce executable scripts, too.
+If the processor for which you're producing
+the script allows variable references, make sure you refer to
+.I make
+variables in the template in a different way than the processor refers to
+variables.
+For instance, ``${\fIvar\fP}'' is ambiguous in a shell script template \- is
+it a reference to a shell variable that you want
+.I msub
+to leave alone, or to a
+.I make
+variable for which you want
+.I msub
+to substitute the variable's value?
+To resolve the ambiguity, you can refer to shell variables as ``$\fIvar\fP''
+(which the shell recognizes, but
+.I msub
+doesn't), or you can use different indicators than the defaults to refer to
+.I make
+variables in the template.
+For example, you could use ``@<'' and ``>@'' and refer to variables as
+``@<\fIvar\fP>@''.
+Suppose you have a simple shell script to print your home directory pathname.
+You might write it like this:
+.in +.5i
+.nf
+.sp .5v
+#!@<SHELL>@
+echo ${HOME}
+.sp .5v
+.fi
+.in
+Then you can process the template like this (note that you must quote the
+arguments because ``<'' and ``>'' are special to the shell):
+.in +.5i
+.nf
+.sp .5v
+msub +R"@<" \-R">@" template > script
+.sp .5v
+.fi
+.in
+The
+.B +R/\-R
+arguments cause
+.I msub
+to recognize ``@<SHELL>@'' but not ``${HOME}''.
+The result looks like this:
+.in +.5i
+.nf
+.sp .5v
+#!/bin/sh
+echo ${HOME}
+.sp .5v
+.fi
+.in
+.SH "WHO-TO-BLAME"
+Paul DuBois, dubois@primate.wisc.edu
+.SH "BUGS AND RESTRICTIONS"
+CC, YACC, etc., have implicit values in
+.I make
+even if they're not defined in the
+.IR Makefile ,
+which isn't true for
+.IR msub .
+However, when
+.I msub
+is used with
+.IR imake ,
+this isn't normally a problem since
+.IR imake -generated
+Makefiles tend to contain explicit definitions for every parameter in the
+known universe.
+.PP
+.I msub
+is more restrictive in the variable names it recognizes and
+performs substitutions on than
+.IR make .
+.I make
+allows single character names to be referenced as ``$\fIc\fP'', where
+.I c
+is a letter;
+.I msub
+doesn't.
+.I msub
+also ignores
+.I make
+variables like
+``$*'' and ``$@''.
+.PP
+Recursive references in
+.I Makefile
+variables aren't expanded.
+If a
+.I Makefile
+contains the definition ``X = ${X}'', X won't be expanded.
+Indirectly recursive references aren't expanded, either.
+If a
+.I Makefile
+contains the definitions ``X = ${Y}'' and ``Y = ${X}'',
+neither X nor Y will be expanded.
+(These actually aren't bugs in
+.IR msub ,
+they're problems in the
+.IR Makefile .)
+.PP
+A comment at the end of a variable assignment line become part of the
+variable's value.
+If
+.I Makefile
+contains the following line:
+.in +.5i
+.nf
+.sp .5v
+SHELL = /bin/shell # default shell
+.sp .5v
+.fi
+.in
+then
+.I msub
+takes the value of SHELL to be ``/bin/shell # default shell''.

@@ -1,0 +1,48 @@
+Include order:
+
+# platform info
+#   discrim on "trigger" symbols in plat-TRIGGER.jm
+#   then slurp in plat-<platform>.jm
+#   *-GEN has defaults [if any]
+
+plat-TRIGGER.jm
+plat-<platform>.jm
+plat-GEN.jm
+
+# site overrides
+
+site-<project>-<setup>.jm
+site-<project>.jm
+site-GEN.jm
+
+# <thing>s just for a <project> and its various <setup>s
+
+<thing>-<project>-<setup>.jm
+<thing>-<project>.jm
+
+# things that many projects are likely to use
+
+<thing>-GEN.jm
+
+# finally, the directory-specific stuff
+
+Jmakefile
+
+-------------------------------------------------------------------
+must specify platform explicitly
+setup "std", project "none": nothing included
+
+-------------------------------------------------------------------
+<Things> that we have files for:
+
+rules:		macros related to the main "make" targets
+		excpt suffix, everything to make "make" do something is here
+		org by principal make target (all, install, etc.)
+
+suffix:		things to do w/ make suffix rules (i.e., implicit rules)
+
+utils:		utilities that are used in the build process
+		(where they are & default options for them)
+		(proj file must say which sysutils it wants)
+		(the proj files say whether src with or not ==> INeedXXX)
+install:	where things are installed, flags for installing

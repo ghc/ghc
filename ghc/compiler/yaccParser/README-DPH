@@ -1,0 +1,241 @@
+The *-DPH.* files are for parsing Jon Hill's "Data Parallel Haskell"
+variant.  These notes indicate the differences from the regular
+parser.  If they are much changed from what's below, someone probably
+needs to do some work.
+
+Note: you should also "grep" for "#ifdef DPH" in the C source files...
+
+Will Partain
+
+foreach i ( ttype.ugn tree.ugn hslexer.lex hsparser.y )
+    set base=$i:r
+    set suff=$i:e
+    diff -c2 $i $base-DPH.$suff
+end
+
+*** ttype.ugn	Thu Nov 21 18:54:47 1991
+--- ttype-DPH.ugn	Thu Jul  9 10:38:59 1992
+***************
+*** 12,15 ****
+--- 12,18 ----
+  	context	: < gtcontextl	: list;
+  		    gtcontextt	: ttype; >;
++ 	tproc   : < gtpid	: list;
++ 		    gtdata	: ttype; >;
++ 	tpod	: < gtpod 	: ttype; >;			
+  end;
+  
+*** tree.ugn	Thu May 14 17:13:43 1992
+--- tree-DPH.ugn	Thu Jul  9 10:39:04 1992
+***************
+*** 62,64 ****
+--- 62,75 ----
+  		    gsccexp	: tree; >;
+  	negate	: < gnexp	: tree; >;
++ 	parzf   : < gpzfexp	: tree;
++ 		    gpzfqual    : list; >;
++ 	pardgen : < gdproc	: tree;
++ 		    gdexp	: tree; >;
++ 	parigen : < giproc	: tree;
++ 		    giexp	: tree; >;
++ 	parfilt : < gpfilt	: tree; >;
++ 	pod	: < gpod	: list; >;
++ 	proc   	: < gpid	: list;
++ 		    gpdata      : tree; >;
++ 
+  end;
+*** hslexer.lex	Wed Jun  3 20:56:01 1992
+--- hslexer-DPH.lex	Thu Jul  9 10:45:03 1992
+***************
+*** 17,20 ****
+--- 17,21 ----
+  *       04/12/91 kh             Added Int#.                           *
+  *       31/01/92 kh             Haskell 1.2 version.                  *
++ *	19/03/92 Jon Hill	Added Data Parallel Notation	      *
+  *       24/04/92 ps             Added 'scc'.                          *
+  *       03/06/92 kh             Changed Infix/Prelude Handling.       *
+***************
+*** 560,563 ****
+--- 561,570 ----
+  "_"			{ RETURN(WILDCARD); }
+  "`"			{ RETURN(BQUOTE); }
++ "<<"			{ RETURN(OPOD); }
++ ">>"			{ RETURN(CPOD); }
++ "(|"			{ RETURN(OPROC); }
++ "|)"			{ RETURN(CPROC); }
++ "<<-"			{ RETURN(DRAWNFROM); }
++ "<<="			{ RETURN(INDEXFROM); }
+  
+  <PRIM>("-")?{N}"#"	{
+*** hsparser.y	Thu Jul  9 10:58:27 1992
+--- hsparser-DPH.y	Thu Jul  9 10:49:12 1992
+***************
+*** 5,9 ****
+  *                       Modified by:            Kevin Hammond             *
+  *                       Last date revised:      December 13 1991. KH.     *
+! *                       Modification:           Haskell 1.1 Syntax.       *
+  *                                                                         *
+  *                                                                         *
+--- 5,10 ----
+  *                       Modified by:            Kevin Hammond             *
+  *                       Last date revised:      December 13 1991. KH.     *
+! *                       Modification:           o Haskell 1.1 Syntax.     *
+! *						o Data Parallel Syntax.   *
+  *                                                                         *
+  *                                                                         *
+***************
+*** 15,19 ****
+  *                                                                         *
+  *                                                                         *
+! *                 LALR(1) Syntax for Haskell 1.2                          *
+  *                                                                         *
+  **************************************************************************/
+--- 16,20 ----
+  *                                                                         *
+  *                                                                         *
+! *                 LALR(1) Syntax for Haskell 1.2 + Data Parallelism       *
+  *                                                                         *
+  **************************************************************************/
+***************
+*** 146,149 ****
+--- 147,151 ----
+  %token	OBRACK		CBRACK		OPAREN		CPAREN
+  %token	COMMA		BQUOTE
++ %token  OPOD		CPOD 		OPROC 		CPROC
+  
+  
+***************
+*** 160,163 ****
+--- 162,166 ----
+  %token	DCOLON		LARROW
+  %token	WILDCARD	AT		LAZY		LAMBDA
++ %token 	DRAWNFROM	INDEXFROM
+  
+  
+***************
+*** 210,213 ****
+--- 213,218 ----
+  %left	OCURLY		OBRACK		OPAREN
+  
++ %left	OPOD		OPROC
++ 
+  %left 	EQUAL
+  
+***************
+*** 238,241 ****
+--- 243,248 ----
+    		upto
+  		cexp
++ 		tyvar_pids
++ 		parquals
+  
+  
+***************
+*** 246,249 ****
+--- 253,257 ----
+   		dpatk fpatk opatk aapatk
+    		texps
++  		processor parqual
+  
+  %type <uid>	MINUS VARID CONID VARSYM CONSYM
+***************
+*** 605,610 ****
+--- 613,629 ----
+  	|  OBRACK tyvar CBRACK			{ $$ = mktllist($2); }
+  	|  OPAREN tyvar RARROW tyvar CPAREN	{ $$ = mktfun($2,$4); }
++ 	|  OPOD tyvar CPOD			{ $$ = mktpod($2); }
++ 	|  OPROC tyvar_pids SEMI tyvar CPROC	{ $$ = mktproc($2,$4); }
++ 	|  OPOD tyvar_pids SEMI tyvar CPOD	{ $$ = mktpod(mktproc($2,$4));}
++ 	|  OPOD OPROC tyvar_pids SEMI tyvar CPROC CPOD	
++ 			{ $$ = mktpod(mktproc($3,$5)); }
+  	;
+  
++ /* Note (hilly) : Similar to tyvar_list except k>=1 not k>=2 */
++ 
++ tyvar_pids 	: tyvar COMMA tyvar_pids	{ $$ = mklcons($1,$3); }
++ 		|  tyvar 			{ $$ = lsing($1); }
++ 		;
++ 
+  defaultd:  defaultkey dtypes
+  	 	{ 
+***************
+*** 740,743 ****
+--- 759,765 ----
+  	|  OPAREN type CPAREN			{ $$ = $2; }
+  	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
++ 	|  OPOD type CPOD			{ $$ = mktpod($2); }
++ 	|  OPROC types SEMI type CPROC		{ $$ = mktproc($2,$4); }
++ 	|  OPOD types SEMI type CPOD		{ $$ = mktpod(mktproc($2,$4));}
+  	;
+  	
+***************
+*** 1027,1030 ****
+--- 1049,1055 ----
+  	|  sequence				{ $$ = mkpar($1); }
+  	|  comprehension			{ $$ = mkpar($1); }
++ 	|  OPOD exp VBAR parquals CPOD		{ $$ = mkparzf($2,$4); }
++ 	|  OPOD exps CPOD			{ $$ = mkpod($2); }
++ 	|  processor				{ $$ = mkpar($1); }
+  
+  	/* These only occur in patterns */
+***************
+*** 1035,1038 ****
+--- 1060,1076 ----
+  
+  
++ processor :  OPROC exps SEMI exp CPROC		{ $$ = mkproc($2,$4); }
++ 	  ;
++ 
++ parquals  :  parquals COMMA parqual		{ $$ = lapp($1,$3); }
++ 	  |  parqual				{ $$ = lsing($1); }
++ 	  ;
++ 
++ parqual  : exp					{ $$ = mkparfilt($1); }
++ 	  | processor DRAWNFROM exp		{ $$ = mkpardgen($1,$3); }
++ 	  | processor INDEXFROM exp		{ $$ = mkparigen($1,$3); }
++ 	  ;
++ 
++ 
+  /*
+  	LHS patterns are parsed in a similar way to
+***************
+*** 1131,1134 ****
+--- 1169,1173 ----
+  	|  OBRACK CBRACK				{ $$ = mkllist(Lnil); }
+  	|  LAZY apat					{ $$ = mklazyp($2); }
++         |  OPROC pats SEMI apat CPROC			{ $$ = mkproc($2,$4); }
+  	;
+  
+***************
+*** 1146,1149 ****
+--- 1185,1189 ----
+  	|  obrackkey CBRACK				{ $$ = mkllist(Lnil); }
+  	|  lazykey apat					{ $$ = mklazyp($2); }
++         |  oprockey pats SEMI opat CPROC		{ $$ = mkproc($2,$4); }
+  	;
+  
+***************
+*** 1283,1286 ****
+--- 1323,1327 ----
+  	|  OBRACK CBRACK			{ $$ = mkllist(Lnil); }
+  	|  LAZY apat				{ $$ = mklazyp($2); }
++         |  OPROC pats SEMI apat CPROC		{ $$ = mkproc($2,$4); }
+  	;
+  
+***************
+*** 1312,1315 ****
+--- 1353,1357 ----
+  	|  obrackkey CBRACK			{ $$ = mkllist(Lnil); }
+  	|  lazykey apat				{ $$ = mklazyp($2); }
++         |  oprockey pats SEMI opat CPROC		{ $$ = mkproc($2,$4); }
+  	;
+  */
+***************
+*** 1372,1375 ****
+--- 1414,1419 ----
+  	;
+  
++ oprockey:   OPROC	{ setstartlineno(); }
++ 	;
+  
+  

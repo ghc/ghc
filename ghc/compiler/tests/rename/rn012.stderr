@@ -1,0 +1,94 @@
+Renamed-pass4:
+module Imp500 where
+infixl 9 PreludeArray.!
+infixl 9 PreludeList.!!
+infixl 7 PreludeRatio.%
+infixl 7 (*)
+infixl 6 (+)
+infixl 6 (-)
+infixl 7 (/)
+infixl 9 PreludeArray.//
+infixl 7 `div`
+infixl 7 `mod`
+infixl 7 `quot`
+infixl 7 `rem`
+infixr 0 $
+infixr 3 &&
+infixr 8 (**)
+infixr 9 .
+infixr 8 Prelude.^
+infixr 8 Prelude.^^
+infixr 2 ||
+infix  4 (/=)
+infix  6 :+
+infix  1 :=
+infix  4 (<)
+infix  4 (<=)
+infix  4 (==)
+infix  4 (>)
+infix  4 (>=)
+infix  5 PreludeList.\\
+data Int10.T1 a
+    = Int10.C1 a
+data Int10.T10 a b c d e
+    = Int10.T10C1 a
+    | Int10.T10C2 b
+    | Int10.T10C3 c
+    | Int10.T10C4 d
+    | Int10.T10C5 e
+data Int10.T2 a b
+    = Int10.T2C1 a
+    | Int10.T2C2 b
+data Int10.T3 a b c
+    = Int10.T3C1 a
+    | Int10.T3C2 b
+    | Int10.T3C3 c
+data Int10.T4 a b c d
+    = Int10.T4C1 a
+    | Int10.T4C2 b
+    | Int10.T4C3 c
+    | Int10.T4C4 d
+data Int10.T5 a b c d e
+    = Int10.T5C1 a
+    | Int10.T5C2 b
+    | Int10.T5C3 c
+    | Int10.T5C4 d
+    | Int10.T5C5 e
+data Int10.T6 a
+    = Int10.T6C6 a
+data Int10.T7 a b
+    = Int10.T7C6 a
+    | Int10.T7C7 b
+data Int10.T8 a b c
+    = Int10.T8C1 a
+    | Int10.T8C2 b
+    | Int10.T8C3 c
+data Int10.T9 a b c d
+    = Int10.T9C1 a
+    | Int10.T9C2 b
+    | Int10.T9C3 c
+    | Int10.T9C4 d
+instance (Eq a, Eq b) => Eq (a, b)
+instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
+instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
+instance (Ord a, Ord b) => Ord (a, b)
+instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
+instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
+instance (Ix a, Ix b) => Ix (a, b)
+instance (Ix a, Ix b, Ix c) => Ix (a, b, c)
+instance (Ix a, Ix b, Ix c, Ix d) => Ix (a, b, c, d)
+instance (Text a, Text b) => Text (a, b)
+instance (Text a, Text b, Text c) => Text (a, b, c)
+instance (Text a, Text b, Text c, Text d) => Text (a, b, c, d)
+instance (Binary a, Binary b) => Binary (a, b)
+instance (Binary a, Binary b, Binary c) => Binary (a, b, c)
+instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d)
+PreludeArray.! :: Ix a => Array a b -> a -> b
+PreludeList.!! :: Integral a => [b] -> a -> b
+PreludeRatio.% :: Integral a => a -> a -> Ratio a
+PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
+PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
+Prelude.^ :: (Num b, Integral a) => b -> a -> b
+Prelude.^^ :: (Fractional b, Integral a) => b -> a -> b
+PreludeList.or :: [Bool] -> Bool
+

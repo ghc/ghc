@@ -1,0 +1,20 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Semaphore where
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+import PreludePrimIO(_MVar)
+data QSem 	{-# GHC_PRAGMA QSem (_MVar (Int, [_MVar ()])) #-}
+data QSemN 	{-# GHC_PRAGMA QSemN (_MVar (Int, [(Int, _MVar ())])) #-}
+newQSem :: Int -> _State _RealWorld -> (Either IOError13 QSem, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+newQSemN :: Int -> _State _RealWorld -> (Either IOError13 QSemN, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+signalQSem :: QSem -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P))U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+signalQSemN :: QSemN -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(U(P))LU(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+waitQSem :: QSem -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(U(P))U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+waitQSemN :: QSemN -> Int -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(U(P))LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

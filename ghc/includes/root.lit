@@ -1,0 +1,89 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{Imported Files}
+\author{The GRASP Team (editor: Kevin Hammond), \\
+Department of Computing Science, \\
+University of Glasgow, \\
+Glasgow, G12 8QQ, UK. \\
+\\
+Email: glasgow-haskell-\{request,bugs\}\@dcs.glasgow.ac.uk}
+\date{November 1992}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\clearpage
+\end{rawlatex}
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[imported-files]{Imported files}
+\downsection
+\end{onlypartofdoc}
+
+%---------------------------------------------------------------
+
+%************************************************************************
+%*									*
+\section[Definitions]{Standard Definitions}
+%*									*
+%************************************************************************
+
+\downsection
+\input{StgTypes.lh}
+\input{GhcConstants.lh}
+\input{StgRegs.lh}
+\upsection
+
+%************************************************************************
+%*									*
+\section[COpt-defns]{Definitions for Optimised C}
+%*									*
+%************************************************************************
+
+\downsection
+\input{COptJumps.lh}
+\input{COptWraps.lh}
+\upsection
+
+%************************************************************************
+%*									*
+%%%%%\section[SMinterface.lh]{Storage Manager Interface}
+%*									*
+%************************************************************************
+
+\input{SMinterface.lh}
+
+%************************************************************************
+%*									*
+\section[SM-defns]{Storage Manager Definitions}
+%*									*
+%************************************************************************
+
+\downsection
+\input{SMcompact.lh}
+\input{SMcopying.lh}
+\input{SMmark.lh}
+\input{SMupdate.lh}
+\upsection
+
+%************************************************************************
+%*									*
+%\section[Reduction-counts]{Definitions for reduction counting}
+%*									*
+%************************************************************************
+
+\downsection
+\input{RednCounts.lh}
+\upsection
+
+%------------------------------------------------------------------------
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+
+\begin{onlystandalone}
+%\printindex
+\end{document}
+\end{onlystandalone}

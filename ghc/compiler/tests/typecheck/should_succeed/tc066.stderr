@@ -1,0 +1,6 @@
+Typechecked:
+AbsBinds [a.t5, b.t6] [] [(f.t1, ShouldSucceed.f)]
+    {- nonrec -}
+    f.t1 :: [ShouldSucceed.Pair a.t5 b.t6] -> [b.t6]
+    f.t1 x.r58 = [ a.r59 | (ShouldSucceed.MkPair c.r60 a.r59) <- x.r58 ]
+

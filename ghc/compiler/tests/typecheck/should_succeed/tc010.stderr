@@ -1,0 +1,14 @@
+Typechecked:
+d.Num.t13 = dfun.Num.Integer
+fromInt.t12 = fromInt tt9 d.Num.t13
+lit.t10 = fromInt.t12 (MkInt 2#)
+d.Num.t14 = d.Num.t13
+(+.t8) = (+) tt9 d.Num.t14
+lit.t6 = lit.t10
+fromInt.t15 = fromInt.t12
+lit.t4 = fromInt.t15 (MkInt 1#)
+AbsBinds [] [] [(p.t1, ShouldSucceed.p)]
+    {- nonrec -}
+    p.t1 :: [(tt9, Bool)]
+    p.t1 = [ (y.r54 +.t8 lit.t10, True) | y.r54 <- [lit.t4, lit.t6] (tt9) ]
+

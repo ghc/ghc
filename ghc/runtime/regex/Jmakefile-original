@@ -1,0 +1,30 @@
+all:: /* so it comes first */
+
+/* the standard "whoami" target will give the basic info. */
+/* this target adds to it. */
+whoami::
+	@echo building Haskell regexp bindings
+
+#include "common.jm"
+
+REG_SRC = Regex.lhs	\
+	  LibMatchPS.lhs
+
+REG_OBJ = Regex.o	\
+	  LibMatchPS.o	\
+	  regex.o	
+
+REG_HI  = $(REG_SRC:.lhs=.hi)
+
+HaskellCode(Regex, '-#include "regex.h"')
+HaskellCode(LibMatchPS,)
+
+HaskellLib(libReg,${REG_OBJ} ${REG_HI},)
+
+all::	$(REG_OBJ)
+
+HaskellDependTarget( $(REG_SRC) )
+
+
+
+

@@ -1,0 +1,71 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Native where
+import PreludeArray(Array)
+import PreludeStdIO(Maybe)
+class Native a where
+	showBytes :: a -> [Char] -> [Char]
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(SAAA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> [Char] -> [Char]) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> [Char] -> [Char], [Char] -> Maybe (u0, [Char]), [u0] -> [Char] -> [Char], Int -> [Char] -> Maybe ([u0], [Char]))) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0 -> [Char] -> [Char]) (u3 :: [Char] -> Maybe (u0, [Char])) (u4 :: [u0] -> [Char] -> [Char]) (u5 :: Int -> [Char] -> Maybe ([u0], [Char])) -> u2; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{Native u0}}) (u2 :: u0) (u3 :: [Char]) -> _APP_  _TYAPP_  patError# { (u0 -> [Char] -> [Char]) } [ _NOREP_S_ "%DNative.Native.showBytes\"", u2, u3 ] _N_ #-}
+	readBytes :: [Char] -> Maybe (a, [Char])
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(ASAA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: [Char] -> Maybe (u0, [Char])) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> [Char] -> [Char], [Char] -> Maybe (u0, [Char]), [u0] -> [Char] -> [Char], Int -> [Char] -> Maybe ([u0], [Char]))) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0 -> [Char] -> [Char]) (u3 :: [Char] -> Maybe (u0, [Char])) (u4 :: [u0] -> [Char] -> [Char]) (u5 :: Int -> [Char] -> Maybe ([u0], [Char])) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{Native u0}}) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { ([Char] -> Maybe (u0, [Char])) } [ _NOREP_S_ "%DNative.Native.readBytes\"", u2 ] _N_ #-}
+	listShowBytes :: [a] -> [Char] -> [Char]
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AASA)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: [u0] -> [Char] -> [Char]) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> [Char] -> [Char], [Char] -> Maybe (u0, [Char]), [u0] -> [Char] -> [Char], Int -> [Char] -> Maybe ([u0], [Char]))) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0 -> [Char] -> [Char]) (u3 :: [Char] -> Maybe (u0, [Char])) (u4 :: [u0] -> [Char] -> [Char]) (u5 :: Int -> [Char] -> Maybe ([u0], [Char])) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 112 _N_ _S_ "LSL" _N_ _N_ #-}
+	listReadBytes :: Int -> [Char] -> Maybe ([a], [Char])
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: Int -> [Char] -> Maybe ([u0], [Char])) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: (u0 -> [Char] -> [Char], [Char] -> Maybe (u0, [Char]), [u0] -> [Char] -> [Char], Int -> [Char] -> Maybe ([u0], [Char]))) -> case u1 of { _ALG_ _TUP_4 (u2 :: u0 -> [Char] -> [Char]) (u3 :: [Char] -> Maybe (u0, [Char])) (u4 :: [u0] -> [Char] -> [Char]) (u5 :: Int -> [Char] -> Maybe ([u0], [Char])) -> u5; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 112 _N_ _S_ "LU(P)L" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+type Bytes = [Char]
+bytesToLongInt :: [Char] -> Maybe (Int, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+bytesToShortInt :: [Char] -> Maybe (Int, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+longIntToBytes :: Int -> [Char] -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+readB :: Native a => [Char] -> a
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(ASAA)L" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+shortIntToBytes :: Int -> [Char] -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+showB :: Native a => a -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(SAAA)L" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 1 2 CX 6 _/\_ u0 -> \ (u1 :: {{Native u0}}) (u2 :: u0) -> let {(u3 :: [Char]) = _!_ _NIL_ [Char] []} in case u1 of { _ALG_ _TUP_4 (u4 :: u0 -> [Char] -> [Char]) (u5 :: [Char] -> Maybe (u0, [Char])) (u6 :: [u0] -> [Char] -> [Char]) (u7 :: Int -> [Char] -> Maybe ([u0], [Char])) -> _APP_  u4 [ u2, u3 ]; _NO_DEFLT_ } _N_ #-}
+instance (Native a, Native b) => Native (a, b)
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance (Native a, Native b, Native c) => Native (a, b, c)
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance (Native a, Ix a, Native b) => Native (Array a b)
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance Native Bool
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Bool -> [Char] -> [Char]), ([Char] -> Maybe (Bool, [Char])), ([Bool] -> [Char] -> [Char]), (Int -> [Char] -> Maybe ([Bool], [Char]))] [_CONSTM_ Native showBytes (Bool), _CONSTM_ Native readBytes (Bool), _CONSTM_ Native listShowBytes (Bool), _CONSTM_ Native listReadBytes (Bool)] _N_
+	 showBytes = _A_ 2 _U_ 12 _N_ _S_ "EL" _N_ _N_,
+	 readBytes = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
+	 listShowBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
+	 listReadBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Native Char
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Char -> [Char] -> [Char]), ([Char] -> Maybe (Char, [Char])), ([Char] -> [Char] -> [Char]), (Int -> [Char] -> Maybe ([Char], [Char]))] [_CONSTM_ Native showBytes (Char), _CONSTM_ Native readBytes (Char), _CONSTM_ Native listShowBytes (Char), _CONSTM_ Native listReadBytes (Char)] _N_
+	 showBytes = _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Char) (u1 :: [Char]) -> _!_ (:) [Char] [u0, u1] _N_,
+	 readBytes = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
+	 listShowBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
+	 listReadBytes = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Native Double
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Double -> [Char] -> [Char]), ([Char] -> Maybe (Double, [Char])), ([Double] -> [Char] -> [Char]), (Int -> [Char] -> Maybe ([Double], [Char]))] [_CONSTM_ Native showBytes (Double), _CONSTM_ Native readBytes (Double), _CONSTM_ Native listShowBytes (Double), _CONSTM_ Native listReadBytes (Double)] _N_
+	 showBytes = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readBytes = _A_ 1 _U_ 2 _N_ _N_ _N_ _N_,
+	 listShowBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
+	 listReadBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Native Float
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Float -> [Char] -> [Char]), ([Char] -> Maybe (Float, [Char])), ([Float] -> [Char] -> [Char]), (Int -> [Char] -> Maybe ([Float], [Char]))] [_CONSTM_ Native showBytes (Float), _CONSTM_ Native readBytes (Float), _CONSTM_ Native listShowBytes (Float), _CONSTM_ Native listReadBytes (Float)] _N_
+	 showBytes = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readBytes = _A_ 1 _U_ 2 _N_ _N_ _N_ _N_,
+	 listShowBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
+	 listReadBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Native Int
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [Char]), ([Char] -> Maybe (Int, [Char])), ([Int] -> [Char] -> [Char]), (Int -> [Char] -> Maybe ([Int], [Char]))] [_CONSTM_ Native showBytes (Int), _CONSTM_ Native readBytes (Int), _CONSTM_ Native listShowBytes (Int), _CONSTM_ Native listReadBytes (Int)] _N_
+	 showBytes = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readBytes = _A_ 1 _U_ 2 _N_ _N_ _N_ _N_,
+	 listShowBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
+	 listReadBytes = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ #-}
+instance Native a => Native (Maybe a)
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+instance Native a => Native [a]
+	{-# GHC_PRAGMA _M_ Native {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+

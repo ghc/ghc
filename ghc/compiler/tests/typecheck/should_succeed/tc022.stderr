@@ -1,0 +1,11 @@
+Typechecked:
+AbsBinds [ot2] [] [(id.t1, ShouldSucceed.id)]
+    {- nonrec -}
+    id.t1 :: ot2 -> ot2
+    id.t1
+	x.r55 = x.r55
+AbsBinds [tt6] [] [(main.t4, ShouldSucceed.main)]
+    {- nonrec -}
+    main.t4 :: tt6 -> tt6
+    main.t4 = (ShouldSucceed.id (tt6 -> tt6)) (ShouldSucceed.id tt6)
+

@@ -1,0 +1,9 @@
+TEST_FLAGS=-noC -ddump-tc -dcore-lint -hi
+
+RunStdTest(drv001,$(GHC),$(TEST_FLAGS) drv001.hs -o2 drv001.stderr)
+RunStdTest(drv002,$(GHC),$(TEST_FLAGS) drv002.hs -o2 drv002.stderr)
+RunStdTest(drv003,$(GHC),$(TEST_FLAGS) drv003.hs -o2 drv003.stderr)
+RunStdTest(drv004,$(GHC),$(TEST_FLAGS) drv004.hs -o2 drv004.stderr)
+RunStdTest(drv005,$(GHC),$(TEST_FLAGS) drv005.hs -o2 drv005.stderr)
+RunStdTest(drv006,$(GHC),$(TEST_FLAGS) drv006.hs -o2 drv006.stderr)
+RunStdTest(drv007,$(GHC),$(TEST_FLAGS) drv007.hs -o2 drv007.stderr)

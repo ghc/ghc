@@ -1,0 +1,32 @@
+\section{Statement of requirements}
+
+There are various things that are required of the solution to the
+problem described previously.
+\begin{itemize}
+\item The program must take a file with a Haskell program in it and produce
+\LaTeX\ code to stdout.  This code must produce that Haskell program in
+typeset style when run through
+the \LaTeX\ program.  The result as typeset must be recognisable as having the same
+layout as the input file's Haskell program had.
+
+\item The input file will contain only Haskell code.  Any documentation in the file
+will be in the form of comments.
+
+\item The input file will not have any embedded typesetting characters in it so
+the program must analyse the input and decide for itself what needs to be 
+done to produce the correct \LaTeX\ code.
+
+\item The \LaTeX\ code produced must be easy to incorporate into a \LaTeX\
+document such as a paper or book.  Thus the produced code must be able 
+to be incorporated into documents of different page and font size.
+
+\item Keywords and identifiers must be highlightable so as to distinguish
+them from the rest of the Haskell program.
+The user should be allowed some choice in the typeface used for
+highlighting.
+
+\item Generality of use must be retained so as to allow the program to be used in conjunction
+with a file of any name and thus not use an inflexible built-in filename.
+
+\item The program must be in keeping with conventional UNIX style.
+\end{itemize}

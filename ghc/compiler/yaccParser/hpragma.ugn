@@ -1,0 +1,73 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_hpragma where
+import UgenUtil
+import Util
+
+import U_coresyn
+import U_list
+import U_literal	( U_literal )	-- ditto
+import U_ttype		( U_ttype )	-- interface only
+%}}
+type hpragma;
+	no_pragma:	    < > ;
+
+	idata_pragma:	    < gprag_data_constrs : list;  /*of con decls*/
+			      gprag_data_specs   : list;  /*specialisations*/ >;
+
+	itype_pragma:	    < >;
+	
+	iclas_pragma:	    < gprag_clas : list;    /*of gen pragmas*/ >;
+
+	iclasop_pragma:	    < gprag_dsel : hpragma; /* gen pragma: dict selector */
+			      gprag_defm : hpragma; /* gen pragma: default method */ >;
+
+	iinst_simpl_pragma: < gprag_imod_simpl : stringId;
+			      gprag_dfun_simpl : hpragma; /* gen pragma: of dfun */ >;
+
+	iinst_const_pragma: < gprag_imod_const : stringId;
+			      gprag_dfun_const : hpragma; /* gen pragma: of dfun */
+			      gprag_constms    : list; /* (name, gen pragma) pairs */ >;
+
+	iinst_spec_pragma:  < gprag_imod_spec  : stringId;
+			      gprag_dfun_spec  : hpragma; /* gen pragma: of dfun */
+			      gprag_inst_specs : list; /* (type, inst_pragma) pairs */ >;
+
+	igen_pragma:	    < gprag_arity      : hpragma; /* arity */
+			      gprag_update     : hpragma; /* update info */
+			      gprag_deforest   : hpragma; /* deforest info */
+			      gprag_strictness : hpragma; /* strictness info */
+		    	      gprag_unfolding  : hpragma; /* unfolding */
+			      gprag_specs      : list; /* (type, gen pragma) pairs */ >;
+
+	iarity_pragma:	    < gprag_arity_val  : numId; >;
+	iupdate_pragma:	    < gprag_update_val : stringId; >;
+	ideforest_pragma:   < >;
+	istrictness_pragma: < gprag_strict_spec : hstring;
+			      gprag_strict_wrkr : hpragma; /*about worker*/ >;
+	imagic_unfolding_pragma:  < gprag_magic_str : stringId; >;
+			
+	iunfolding_pragma:  < gprag_unfold_guide : hpragma; /* guidance */
+			      gprag_unfold_core : coresyn; >;
+
+	iunfold_always:	    < >;
+	iunfold_if_args:    < gprag_unfold_if_t_args : numId;
+			      gprag_unfold_if_v_args : numId;
+			      gprag_unfold_if_con_args : stringId;
+			      gprag_unfold_if_size : numId; >;
+
+	iname_pragma_pr:    < gprag_name_pr1	: unkId;
+			      gprag_name_pr2	: hpragma; >;
+	itype_pragma_pr:    < gprag_type_pr1	: list;   /* of maybe types */
+			      gprag_type_pr2	: numId; /* # dicts to ignore */
+			      gprag_type_pr3	: hpragma; >;
+	iinst_pragma_3s:    < gprag_inst_pt1	: list; /* of maybe types */
+			      gprag_inst_pt2	: numId;
+			      gprag_inst_pt3	: hpragma;
+			      gprag_inst_pt4	: list; >;
+	
+	idata_pragma_4s:    < gprag_data_spec	: list; /* of maybe types */ >;
+
+end;

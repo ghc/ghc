@@ -1,0 +1,17 @@
+Typechecked:
+d.Num.t19 = dfun.Num.Integer
+d.Num.t22 = dfun.Num.Integer
+fromInt.t18 = fromInt tt4 d.Num.t19
+lit.t16 = fromInt.t18 (MkInt 1#)
+d.Num.t20 = d.Num.t19
+(+.t14) = (+) tt4 d.Num.t20
+fromInt.t21 = fromInt tt6 d.Num.t22
+lit.t12 = fromInt.t21 (MkInt 2#)
+lit.t10 = lit.t16
+AbsBinds [] [] [(al.t2, ShouldSucceed.al), (am.t3, ShouldSucceed.am)]
+    {- nonrec -}
+    (al.t2 : am.t3) :: [tt4]
+    (al.t2 : am.t3)
+	= [ y.r55 +.t14 lit.t16 |
+	      (y.r55, z.r56) <- [(lit.t10, lit.t12)] ((tt4, tt6)) ]
+

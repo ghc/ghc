@@ -1,0 +1,6 @@
+ 
+"tcfail022.hs", line 2: multiple declarations of variable:
+    f ( "tcfail022.hs", line 2,  "tcfail022.hs", line 6)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

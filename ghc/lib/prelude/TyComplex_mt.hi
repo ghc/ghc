@@ -1,0 +1,4 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeComplex where
+data Complex a   = (:+) a a
+

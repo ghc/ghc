@@ -1,0 +1,27 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface StixInteger where
+import AbsCSyn(CAddrMode)
+import MachDesc(Target)
+import PreludePS(_PackedString)
+import PrimKind(PrimKind)
+import SplitUniq(SplitUniqSupply)
+import Stix(StixTree)
+decodeFloatingKind :: PrimKind -> Target -> [CAddrMode] -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 121102 _N_ _N_ _N_ _N_ #-}
+encodeFloatingKind :: PrimKind -> Target -> [CAddrMode] -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 121122 _N_ _S_ "LLSL" _N_ _N_ #-}
+gmpCompare :: Target -> CAddrMode -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 3 _U_ 22102 _N_ _N_ _N_ _N_ #-}
+gmpInt2Integer :: Target -> [CAddrMode] -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 3 _U_ 21122 _N_ _S_ "LLS" _N_ _N_ #-}
+gmpInteger2Int :: Target -> CAddrMode -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 3 _U_ 22102 _N_ _N_ _N_ _N_ #-}
+gmpString2Integer :: Target -> [CAddrMode] -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 3 _U_ 21122 _N_ _S_ "U(ALLLAAAAALAAAALASAAAA)LS" _N_ _N_ #-}
+gmpTake1Return1 :: Target -> [CAddrMode] -> _PackedString -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 212122 _N_ _S_ "U(AAALAAAAALAAAALAASAAA)LLL" _N_ _N_ #-}
+gmpTake2Return1 :: Target -> [CAddrMode] -> _PackedString -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 212122 _N_ _S_ "U(AAALAAAAALAAAALAASAAA)LLL" _N_ _N_ #-}
+gmpTake2Return2 :: Target -> [CAddrMode] -> _PackedString -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 4 _U_ 212122 _N_ _S_ "U(AAALAAAAALAAAALAASAAA)LLL" _N_ _N_ #-}
+

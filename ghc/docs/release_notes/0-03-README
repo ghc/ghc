@@ -1,0 +1,47 @@
+Version 0.03 of the new Glasgow Haskell compiler was an unannounced
+(exceedingly unpolished) release for our friends at York.
+
+-------------------------------------
+
+A quick list of things to note:
+
+* Significantly different parser (parsers/hsp/) and reader
+  (compiler/reader/), to do Haskell 1.1 syntax.  The abstract syntax
+  (compiler/abstractSyn/) now covers the entire Haskell language.
+
+* Compiler files have been majorly shuffled, renamed, in part to
+  ensure filenames are <= 14 chars.  Another such catastrophic
+  re-shuffle is unlikely for the foreseeable future.
+
+  The file docs/FILE-RENAMING is a fairly complete list of
+  what-changed-to-what.
+
+* Pretty-printing machinery (compiler/utils/{Pretty,Outputable}.lhs)
+  is completely changed.
+
+* Identifiers are now "Ids" (compiler/basicTypes/Id.lhs), not "Locals"
+  or "Globals".
+
+* What-the-compiler-must-know-about-the-prelude (compiler/prelude) is
+  believed to be complete; this includes Chars, Ints, Floats, and
+  Doubles as primitives.
+  
+  (Stuff for Integers and Rationals is NOT all there.)
+
+  All other prelude stuff should be specifiable w/ an ordinary
+  interface file (notably lib/prelude/MiniPrel.hi).
+
+* The compiler does full-blown overloading of expressions and
+  patterns.  Yell if this really won't do -- perhaps a build-time
+  option to override?
+
+* All flavours of patterns and expressions (e.g., n+k patterns,
+  arithmetic sequences) are in; testing in some cases near zero.
+
+* BUGS INEVITABLE, MAJOR BUGS ENTIRELY POSSIBLE, PATCHES WILL PROBABLY
+  BE REQUIRED.  Don't panic, report promptly!
+
+* "main"'s (main/Main.lhs) handling of command-line options [and the
+  feeding of same by the driver, driver/ghc.lprl] has been revised.
+
+* Documentation has _not_ been updated.

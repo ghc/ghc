@@ -1,0 +1,86 @@
+\begin{description}
+%-------------------------------------------------------------------
+\item[1.1 syntax:]
+Does \Haskell{} version~1.1 syntax.  The code for the parser
+(\tr{parsers/hsp/}) has been tidied up quite a bit [nice job, Kevin].
+
+%-------------------------------------------------------------------
+\item[Expressions and patterns:]
+All forms of expressions and patterns work, including overloaded
+patterns and @n+k@ patterns.
+
+%-------------------------------------------------------------------
+\item[A big part of the standard prelude is operational:]
+These parts (in \tr{lib/prelude}) have been compiled with the new
+compiler, and programs compiled with the new compiler can be linked to
+it.
+
+With the exceptions of (a)~hooking in the standard Haskell I/O system
+(see next item) and (b)~special pleading for constant-time-access
+arrays (or other magical features), all Prelude stuff is either done
+or easily do-able.
+
+%-------------------------------------------------------------------
+\item[Simple resolution of ambiguous overloading of numeric types:]
+(As per Haskell report, section~4.3.4).  @default@ declarations do
+{\em NOT} work; however, the ``default default''
+(@default (Int, Double)@) is wired in.  This should clear up nearly
+all annoying ``ambiguous dictionary'' errors.
+
+%-------------------------------------------------------------------
+\item[Better non-standard I/O:]
+We have implemented the bare bones of the I/O described in
+\tr{docs/io-design/}.  It's not standard \Haskell{} I/O
+(we haven't yet implemented the impedance-matcher discussed in the
+doc), and it's not the same as what was there in 0.02.  However, you
+can now write a simple reads-stdin/writes-stdout program:
+
+\begin{verbatim}
+#include "GhcPrelude.h"
+
+main = readString `thenIO` ( \ s ->
+       writeString (my_String_to_String_manglification s) )
+\end{verbatim}
+
+The implementation of @error@ (via @sysError@) is also as described in
+the I/O document.
+
+%-------------------------------------------------------------------
+\item[Faster compiler:]
+The compiler is faster than version~0.02---we promise---but the
+significant tuning work is not yet done.  We will do it after The
+Mangler (renamer) is in.
+
+%-------------------------------------------------------------------
+\item[Run compiled code on a Sun4:]
+If you compile your program to C (\tr{.hc} files), with, e.g.:
+
+\begin{verbatim}
+% glhc -C Foo.hs
+\end{verbatim}
+
+then you compile the output on a Sun4 with:
+
+\begin{verbatim}
+% glhc -c Foo.hc
+\end{verbatim}
+
+and, if you have the right things to link to, you can link with:
+
+\begin{verbatim}
+% glhc -o foo Foo.o
+\end{verbatim}
+
+The ``right things to link to'' include: the runtime system (
+\tr{cd runtimes/standard; make} on a sun4), and the standard libraries
+(\tr{cd lib; make all} on a sun4).
+
+We have not yet tried to make this work for Every Known Unix Box In
+The Universe.  (But we plan to, with your help :-)
+
+%-------------------------------------------------------------------
+\item[Upheaval during FPCA:]
+As advertised with 0.02: Files moved around, modules and data types
+were renamed, and a generally Much Cleaner World now exists.  We have
+no plans to do more of the same (at least for the compiler proper).
+\end{description}

@@ -1,0 +1,116 @@
+		  The Glasgow Haskell Compiler
+		  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+		Version 0.06 --- Hackers' release
+
+As many of you know, we have been working hard at Glasgow on a modular
+Haskell compiler.  We are proud to announce its first public release.
+
+We are calling it a "Hackers' release" because it is not yet suitable
+for Haskell *programmers*.  It is intended for *implementors* who are
+interested in using our compiler as a substrate for their own work.
+(A later version will indeed be a "Programmers' release".)  We also
+hope that some *porters*, people who would like to see Haskell running
+on their system, will help us debug any Sun dependencies in our
+generated C files.  Finally, the *curious* may simply want to see the
+World's Largest Haskell Program (40,000 lines?)!
+
+The compiler has the following characteristics:
+
+    * It is written in Haskell.
+
+    * It generates C as its target code.
+
+    * It is specifically designed to be modular, so that others can
+    use it as a "motherboard" into which they can "plug in" their
+    latest whizzy strictness analyser, profiler, or whatever.
+
+    * Internally, it uses the polymorphic second-order lambda calculus
+    as a way to preserve correct type information in the face of
+    substantial program transformations.
+
+    * It implements unboxed values as described in [1].  In
+    particular, the implementation of arithmetic and the exploitation
+    of strictness analysis is handled just as described there.
+
+    * Its back end is based on the Spineless Tagless G-machine, an
+    abstract machine for non-strict functional languages.  There is a
+    detailed paper describing this work [2].
+
+    * It plants code to gather quite a lot of simple profiling
+    information.
+
+    * Its runtime system is heavily configurable.  For example, it
+    comes complete with three different garbage collectors: two-space,
+    one-space compacting, and Appel-style generational.  Adding extra
+    fields to heap objects (for debugging or profiling for example) is
+    just a question of altering C macros; the Haskell source doesn't
+    need to be recompiled.  (Caveat: you have to alter them *right*!)
+
+The compiler also suffers its fair share of deficiencies:
+
+    * The compiler itself is large and slow.
+
+    * The code it generates is very, very unoptimised.  Any
+    comparisons you make of runtime speed with good existing compilers
+    will be deeply unflattering.  (Our next priority is optimisation.)
+
+    * Several language features aren't dealt with.  This has not
+    prevented us from compiling and running several quite large
+    Haskell programs.
+
+Please follow the pointers in the top-level README file to find all of
+the documentation in and about this release. Distribution info
+follows below.
+
+We hope you enjoy this system, and we look forward to hearing about
+your successes with it!  Please report bugs to
+glasgow-haskell-bugs@dcs.glasgow.ac.uk and direct general queries to
+glasgow-haskell-request@<same>.
+
+Simon Peyton Jones
+(and his GRASPing colleagues)
+......................................................................
+
+References
+~~~~~~~~~~
+[1] Simon L Peyton Jones and John Launchbury, "Unboxed values as first
+class citizens", Functional Programming Languages and Computer
+Architecture, Boston, ed Hughes, LNCS 523, Springer Verlag, Sept 1991.
+
+[2] Simon L Peyton Jones, "Implementing lazy functional languages on
+stock hardware: the Spineless Tagless G-machine", Journal of
+Functional Programming (to appear).  Also obtainable by anonymous FTP
+from ftp.dcs.glasgow.ac.uk:pub/glasgow-fp/stg.dvi.
+
+Distribution 
+~~~~~~~~~~~~
+This release is available, in whole or in part, from the usual Haskell
+anonymous FTP sites, in the directory pub/haskell/glasgow:
+
+	nebula.cs.yale.edu     (128.36.13.1)
+	ftp.dcs.glasgow.ac.uk  (130.209.240.50)
+	animal.cs.chalmers.se  (129.16.225.66)          
+
+(Beleaguered NIFTP users within the UK can get the same files by using
+a <FP>/haskell/glasgow prefix, instead of pub/haskell/glasgow.)
+
+These are the available files (for the ON DEMAND ones, please ask):
+
+ghc-0.06-src.tar.Z	the basic source distribution; assumes you
+			will compile it with Chalmers HBC, version
+			0.997.3 or later.
+
+ghc-0.06-proto-hi-files.tar.Z
+			An "overlay" of .hi interface files, to be
+			used when compiling with the *prototype*
+			Glasgow Haskell compiler (version 0.411 or
+			later).
+
+ghc-0.06-hc-files.tar.Z An "overlay" of .hc generated-C files; used
+			either to save you the trouble of compiling
+			the prelude, or because your only interest is
+			porting the C to
+
+ghc-0.06-tests.tar.Z	Some of our test files we have used in getting
+			this beast going.  We hope to grow them into a
+			semi-respectable benchmark suite.

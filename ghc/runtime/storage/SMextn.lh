@@ -1,0 +1,40 @@
+\section[SMextensions-header]{Header file for SMextensions}
+
+\begin{code}
+#ifndef PAR
+
+extern void initExtensions PROTO((smInfo *sm));
+
+#if defined(_INFO_COPYING)
+
+extern void evacSPTable PROTO((smInfo *sm));
+extern void reportDeadMallocPtrs PROTO((StgPtr oldMPList, StgPtr new, StgPtr *newMPLust));
+
+#endif /* _INFO_COPYING */
+
+#if defined(_INFO_COMPACTING)
+
+extern void sweepUpDeadMallocPtrs PROTO((
+					 P_ MallocPtrList,
+					 P_ base,
+					 BitWord *bits
+					 ));
+
+#endif /* _INFO_COMPACTING */
+
+extern void TrashMem PROTO(( P_ from, P_ to ));
+
+#if defined(DEBUG)
+
+extern void Trash_MallocPtr_Closure PROTO((P_ mptr));
+extern void Validate_MallocPtrList PROTO(( P_ MallocPtrList ));
+
+extern void Trace_MPdies  PROTO((void));
+extern void Trace_MPlives PROTO((void));
+extern void Trace_MPforwarded PROTO(( P_ MPPtr, P_ newAddress ));
+
+
+#endif /* DEBUG */
+
+#endif /* !PAR */
+\end{code}

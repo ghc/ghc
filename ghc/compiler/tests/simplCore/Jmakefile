@@ -1,0 +1,10 @@
+runtests::
+	@echo '###############################################################'
+	@echo '# Validation tests for the simplifier.                         #'
+	@echo '###############################################################'
+
+FLAGS=-noC -O -ddump-simpl -dcore-lint
+
+/* 001 is really a desugarer test, but it is only tickled by the simplifier */
+RunStdTest(simpl001,$(GHC), $(FLAGS) simpl001.hs -o2 simpl001.stderr)
+RunStdTest(simpl002,$(GHC), $(FLAGS) simpl002.hs -o2 simpl002.stderr)

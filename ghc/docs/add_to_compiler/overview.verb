@@ -1,0 +1,70 @@
+%************************************************************************
+%*									*
+\section{Overview of the Glasgow Haskell compiler}
+%*									*
+%************************************************************************
+
+Figure~\ref{fig:overview} shows a schematic overview of the Glasgow
+Haskell compiler (GHC), including all the major datatypes and most
+existing passes.
+\begin{figure}
+\centering
+\input{overview-fig}
+%\psfig{figure=closure.ps}
+\caption{Compiler overview}
+\label{fig:overview}
+\end{figure}
+The compiler is itself written in Haskell.  As of now, the compiler is
+made up of about 200?~modules, with roughly 40,000?~lines of
+Haskell code, excluding comments and blank lines.
+
+The compiler divides unsurprisingly into a {\em front end} and a {\em
+back end}, corresponding to the left and right columns of
+Figure~\ref{fig:overview}, respectively.
+
+The front end, discussed further in Section~\ref{sec:front-end}, is
+the part that may report errors back to the user.  The two main pieces
+are a {\em renamer},\srcloc{renamer/} which handles naming issues,
+including support of the Haskell module system, and the {\em
+typechecker}.\srcloc{typecheck/}
+
+The front end operates on a collection of data types that we call
+``abstract syntax.''\srcloc{abstractSyn/}  These types
+match the Haskell language, construct for construct.  For example,
+if you write @... [ x | x <- [1..n] ] ...@, the typechecker
+will actually see something like:
+\begin{verbatim}
+ListComp
+  (Var x)
+  (GeneratorQual (VarPatIn x)
+		 (ArithSeq (FromTo (Lit (IntLit 1)) (Var n))))
+\end{verbatim}
+So, the renamer and typechecker work on unrestructured Haskell source
+rather than its desugared equivalent.  The compiler should be {\em
+quicker} to find errors (because the source is much smaller and time
+hasn't been taken desugaring), and it should report errors more
+lucidly, in terms of the original program text.
+
+A conventional desugaring pass\srcloc{deSugar/} (basically Wadler's
+Chapter~5 of Peyton Jones's 1987 implementation book
+\cite{peyton-jones87b}) converts the typechecker's abstract-syntax output
+(with types attached) into the ``CoreSyntax''\srcloc{coreSyn/} data
+type.  This data type is little more than the second-order polymorphic
+lambda calculus and is intended to be the {\em lingua franca} of the
+compiler's back end, including almost all of the optimisation passes.
+Core syntax is explained at length in Section~\ref{sec:core-syntax}.
+
+The back end of the compiler, discussed further in
+Section~\ref{sec:back-end}, takes a successfully-typechecked module
+and produces executable code for it.  The back end consists of zero or
+more Core-to-Core transformation passes, followed by conversion to STG
+syntax\srcloc{stgSyn/} (a very low-level functional language, named
+after the intended Spineless Tagless G-machine\footnote{Oops!  Make
+that ``shared term graph'' language!  (Who's fooling who here,
+Simon?)} target architecture), then some STG-to-STG transformations,
+and finally out of the functional world\srcloc{codeGen/} into
+``Abstract~C,''\srcloc{absCSyn/} a datatype intended as an adequate
+launching pad into both portable C and into get-your-hands-{\em
+really}-dirty native-code generation for a particular instruction-set
+architecture.  We can generate C, or native-code for SPARCs and DEC
+Alphas.

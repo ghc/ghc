@@ -1,0 +1,25 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CgCase where
+import AbsCSyn(AbstractC)
+import BasicLit(BasicLit)
+import CgBindery(CgIdInfo)
+import CgMonad(CgInfoDownwards, CgState, EndOfBlockInfo, StubFlag)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda)
+import PrimOps(PrimOp)
+import StgSyn(StgAtom, StgBinding, StgCaseAlternatives, StgCaseDefault, StgExpr)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data StgCaseAlternatives a b 	{-# GHC_PRAGMA StgAlgAlts UniType [(Id, [a], [Bool], StgExpr a b)] (StgCaseDefault a b) | StgPrimAlts UniType [(BasicLit, StgExpr a b)] (StgCaseDefault a b) #-}
+data StgExpr a b 	{-# GHC_PRAGMA StgApp (StgAtom b) [StgAtom b] (UniqFM b) | StgConApp Id [StgAtom b] (UniqFM b) | StgPrimApp PrimOp [StgAtom b] (UniqFM b) | StgCase (StgExpr a b) (UniqFM b) (UniqFM b) Unique (StgCaseAlternatives a b) | StgLet (StgBinding a b) (StgExpr a b) | StgLetNoEscape (UniqFM b) (UniqFM b) (StgBinding a b) (StgExpr a b) | StgSCC UniType CostCentre (StgExpr a b) #-}
+cgCase :: StgExpr Id Id -> UniqFM Id -> UniqFM Id -> Unique -> StgCaseAlternatives Id Id -> CgInfoDownwards -> CgState -> CgState
+	{-# GHC_PRAGMA _A_ 5 _U_ 2222222 _N_ _S_ "SLLLL" _N_ _N_ #-}
+saveVolatileVarsAndRegs :: UniqFM Id -> CgInfoDownwards -> CgState -> ((AbstractC, EndOfBlockInfo, Labda Int), CgState)
+	{-# GHC_PRAGMA _A_ 1 _U_ 222 _N_ _N_ _N_ _N_ #-}
+

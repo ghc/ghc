@@ -1,0 +1,31 @@
+%************************************************************************
+%*									*
+\section[mkworld-macros-ghc]{CPP macros for @ghc@ project}
+%*									*
+%************************************************************************
+
+Rule to run the LML-ish \tr{ugen} utility.
+\begin{code}
+/* ToDo: cmp -> $(CMP) */
+
+#ifndef UgenTarget
+#define UgenTarget(fileroot)						@@\
+ExtraStuffToBeVeryClean(fileroot.c fileroot.h fileroot.hs)		@@\
+fileroot.c : fileroot.ugn						@@\
+	d=`dirname fileroot.ugn` ; f=`basename fileroot.ugn .ugn` ; \	@@\
+	$(RM) fileroot.c fileroot.hs "$$d/U_$$f.hs" fileroot.h-SAVE 	@@\
+	if [ -f fileroot.h ] ; then $(MV) -f fileroot.h fileroot.h-SAVE ; else exit 0 ; fi @@\
+	$(UGEN) fileroot.ugn || ( $(RM) fileroot.h fileroot.c fileroot.hs; $(MV) -f fileroot.h-SAVE fileroot.h )						@@\
+	if cmp -s fileroot.h-SAVE fileroot.h ; then \			@@\
+	    $(MV) -f fileroot.h-SAVE fileroot.h ; \			@@\
+	else \								@@\
+	    chmod 444 fileroot.h fileroot.c fileroot.hs ; \		@@\
+	fi								@@\
+	@$(RM) fileroot.h-SAVE						@@\
+	@d=`dirname fileroot.ugn` ; f=`basename fileroot.ugn .ugn` ; \	@@\
+	$(MV) -f fileroot.hs "$$d/U_$$f.hs"				@@\
+									@@\
+fileroot.h : fileroot.c							@@\
+	@: /* no-op */
+#endif /* UgenTarget */
+\end{code}

@@ -1,0 +1,7 @@
+ 
+"tcfail051.hs", line 3: undefined class: B
+ 
+"tcfail051.hs", line 3: "op1" is not an operation of class "*UNBOUND*B".
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

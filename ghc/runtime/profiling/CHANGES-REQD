@@ -1,0 +1,201 @@
+
+Adding @scc@ to the Haskell compiler -- A note of changes required
+
+
+Haskell Compiler:
+----------------
+
+SCC FRONT END SYNTAX:	scc "label" expr
+
+    	hslexer.lex    	scc recognised as SCC	    	
+    	hsparser.y    	scc expression parsed    	
+    	tree.ugn    	new tree construct  	    	
+    	printtree.c 	print scc (k bytecode)	    	
+	main.c		-S flag for scc (else warning)	
+
+SCC THROUGH COMPILER:
+	reader		PrefixSyn	new construct (SCC')
+    		    	ReadPrefix	read k bytecode	    		
+			PrefixToHs	-> AbsSyn			
+
+	abstractSyn	HsExpr 		new construct (SCC)		
+			BackSubst					
+	rename		RenameExpr4	rename body			
+	typecheck	TcExpr		no unify, use type of body		
+	deSugar		DsExpr		-> CoreSyn			
+
+    Core Syntax & Transformations:
+	coreSyn		CoreSyn 	new construct (CoSCC) not primop
+			AnnCoreSyn	new construct			
+			FreeVars					
+			CoreFuns					
+
+	simplCore0	SubstAnal0					
+			SimplCore0					
+			RmTrivLets0					
+			
+	simplCore				default: not used	n
+	stranal-sem				default: not used	n
+	interpreter				york:	 ???		n
+
+    Stg Syntax & Transformations:
+	stgSyn		CoreToStg	-> StgSyn		
+			StgSyn		new construct (StgSCC)
+
+			StgInfo (new)	pass gathering CC codegen info
+
+			LetFloat		default: not used	n
+			StgToStg		default: not used	n
+			FreeVariables		default: not used	n
+
+    Abstract C & Code Generation:
+	main		Main		-scc flag for update flavour	y
+	codeGen		CgMonad		-scc new Cg info		y
+	absCSyn		AbsCSyn		new construct (CCostCentre)	y
+
+	codeGen		CodeGen		declaring cost centers		y
+	codeGen		ClosureInfo	closure kind			y
+						type			y
+	codeGen		CgClosure	closure description		y
+
+	abstractC	PprAbsC		info table kind			y
+						   description		y
+						   type			y
+	
+     Real Code Generation Changes
+	Scc Expression:
+		+RCC update frame -- stack space required
+		+set new cost centre
+
+	Closure Entry:
+		!different sizes for STD and CON update frames
+		+single entry now requires RCC update frame
+		+resume the CC in closure entered
+
+	Return in Registers:	
+		+register return set RetCC (form closure or CCC)
+		+register update reset closures CC to RetCC
+		+attribute register update allocation to RetCC
+
+	CC_ALLOC calls with heap allocation
+
+     Optimisations:
+	update closure entry with scc -- no RCC frame			ToDo
+
+
+RTS stuff:
+---------
+
+Time		interupt				y
+
+Cost centre declaration macros				y
+
+Info table macros with "description" etc?		y
+
+Modify update frames to include cost centres		y
+Dummy update frame return vector			y
+Recognition of dummy ret vect UpdatePAP			y
+
+Heap profiling (2s)
+	Cost Centre					y
+	Description					y
+
+Profile info reported					y
+
+Conditionalise need for timer interupt			todo
+
+
+
+ADDING GRP_NAME to CC and TYPE to CAT:
+-------------------------------------
+
+driver		--  -Ggroup flag			y
+main/Main.lhs	--  -Ggroup flag			y
+		--  pass to codegen			y
+codeGen		--  grp_name passed into CCostCentre	y
+absCSyn		--  add group to CCostCentre		y
+		--  print group with CC decl		y
+		--  print type with INFO_TABLE decl	y
+uniType		--  getUniTyDescription			y
+
+runtime 	-- Add group to CostCentre		y
+		-- Add group to CC_DECALRE		y
+ 		-- Add type to ClCategory		y
+		-- Add type to CAT_DECLARE		y
+		-- Add type to INFO_TABLEs		y
+
+		-- Report group in profiling report	y
+
+		-- Heap profiling with group/module/type
+	   	-- selection by mod,grp,typ		y
+	        -- profiling by cc,mod,grp,descr,type	y
+		    -- always hash on feature		y
+		-- report by cc,mod,grp,descr,type	y
+
+	   	This is different to York as we can have unprofiled
+	   	costs/heap inherited from other modules/groups.
+
+		TESTING TESTING TESTING TESTING		ToDo
+
+	
+AUTO SCCS ...
+-------------
+
+driver			--  -prof-auto			y
+main/Main.lhs		--  -scc-auto			y
+			--  doSCCauto pass (desugared)	Improve?
+profiling/SCCauto.lhs	--  sccAutoTop			Improve?
+
+	Need to compare to all explicitly annotated.	ToDo
+
+	I think this needs to be incorperated into	ToDo
+	the desugarer/typechecker? as the dict stuff
+	currently distorts this.
+	OK if we are using lexical scoping !!!
+	eg: See tautclause in clausify1.hs  (cl.*)
+
+
+
+
+EXTENDING SCC ANNOTATIONS ...				ToDo
+-----------------------------
+
+Front End: 	let   scc "label"
+		where scc "label"
+		decl  scc "label"
+
+    	hsparser.y    	extended scc expressions parsed    	
+    	tree.ugn    	new scc language constructs  	    	
+    	printtree.c 	print new scc bytecode forms
+
+Compiler:
+	reader		PrefixSyn	new constructs
+    		    	ReadPrefix	read bytecodes	    		
+			PrefixToHs	-> AbsSyn			
+
+	abstractSyn	HsExpr 		new constructs
+			BackSubst					
+	rename		RenameExpr4	rename body
+	typecheck	TcExpr		no unify, use type of body
+	deSugar				desugar new scc constructs -> SCC
+
+
+LEXICAL/EVALUATION SCOPING ...
+
+driver		--  -prof-eval -prof-lex (def)		y
+main/Main.lhs	--  -scc-eval -scc-lex			y
+		--  doSCClex pass (stg_binds')		ToDo
+???		--  lexical scoping transform pass	ToDo
+
+
+
+OTHER POSSIBLE STUFF:
+ 
+codegen/CodeGen.lhs	-- code to declare mod and group strings
+			-- use references in CCostCentre
+
+profiling cost report	-- Reporting group / module costs
+				with / without components
+		   	   Eg sort on group time
+				with module time sub-sort
+				  with label time sub-sort

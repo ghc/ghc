@@ -1,0 +1,24 @@
+\section[Desugar_intro]{Introduction}
+
+This pass of the \Haskell{} compiler converts a typechecked program in
+@AbsSyntax@ form into a list of @CoreBinding@s, a much simpler form
+more suitable for subsequent passes.  The basic tasks in this
+``desugaring'' are:
+\begin{enumerate}
+\item
+Compile pattern-matching into equivalent code, mainly case-expressions.
+
+\item
+Convert list comprehensions into equivalent code.
+
+\item
+Make explicit all of the implicit activity due to overloading,
+dictionaries, etc., etc.
+\end{enumerate}
+
+For the basic desugaring process, we assume familiarity with Phil
+Wadler's chapter~5 in SLPJ.  The code here will be recognizable by the
+avid reader of that chapter.  The main difference you will see is that
+this code uses a simple monad to pass around the name supply; if
+you've read much of this compiler's code, the idioms used will be
+grievously familiar.

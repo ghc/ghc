@@ -1,0 +1,33 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PrefixToHs where
+import HsBinds(Binds, MonoBinds, Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsImpExp(IfaceImportDecl)
+import HsMatches(Match)
+import HsPat(InPat)
+import PrefixSyn(RdrBinding, RdrMatch)
+import PreludePS(_PackedString)
+import ProtoName(ProtoName)
+cvBinds :: _PackedString -> (RdrBinding -> [Sig ProtoName]) -> RdrBinding -> Binds ProtoName (InPat ProtoName)
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LLS" _N_ _N_ #-}
+cvClassOpSig :: RdrBinding -> [Sig ProtoName]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+cvInstDeclSig :: RdrBinding -> [Sig ProtoName]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+cvInstDecls :: Bool -> _PackedString -> _PackedString -> [_PackedString -> _PackedString -> Bool -> InstDecl ProtoName (InPat ProtoName)] -> [InstDecl ProtoName (InPat ProtoName)]
+	{-# GHC_PRAGMA _A_ 4 _U_ 2221 _N_ _S_ "LLLS" _N_ _N_ #-}
+cvMatches :: _PackedString -> Bool -> [RdrMatch] -> [Match ProtoName (InPat ProtoName)]
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
+cvMonoBinds :: _PackedString -> [RdrBinding] -> MonoBinds ProtoName (InPat ProtoName)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+cvSepdBinds :: _PackedString -> (RdrBinding -> [Sig ProtoName]) -> [RdrBinding] -> Binds ProtoName (InPat ProtoName)
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LLS" _N_ _N_ #-}
+cvValSig :: RdrBinding -> [Sig ProtoName]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+sepDeclsForInterface :: RdrBinding -> ([TyDecl ProtoName], [ClassDecl ProtoName (InPat ProtoName)], [_PackedString -> _PackedString -> Bool -> InstDecl ProtoName (InPat ProtoName)], [RdrBinding], [IfaceImportDecl])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+sepDeclsForTopBinds :: RdrBinding -> ([TyDecl ProtoName], [DataTypeSig ProtoName], [ClassDecl ProtoName (InPat ProtoName)], [_PackedString -> _PackedString -> Bool -> InstDecl ProtoName (InPat ProtoName)], [SpecialisedInstanceSig ProtoName], [DefaultDecl ProtoName], [RdrBinding])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+sepDeclsIntoSigsAndBinds :: RdrBinding -> ([RdrBinding], [RdrBinding])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+

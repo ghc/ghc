@@ -1,0 +1,7 @@
+ 
+The following classes form a cycle:
+    "tcfail027.hs", line 4:  A
+    "tcfail027.hs", line 7:  B
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

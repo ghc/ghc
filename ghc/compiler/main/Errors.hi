@@ -1,0 +1,173 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Errors where
+import Bag(Bag)
+import CharSeq(CSeq)
+import Class(Class, ClassOp)
+import CmdLineOpts(GlobalSwitch)
+import ErrUtils(Error(..), pprBagOfErrors)
+import ErrsRn(badClassOpErr, badExportNameErr, badImportNameErr, derivingInIfaceErr, derivingNonStdClassErr, dupNamesErr, dupPreludeNameErr, dupSigDeclErr, duplicateImportsInInterfaceErr, inlineInRecursiveBindsErr, methodBindErr, missingSigErr, shadowedNameErr, unknownNameErr, unknownSigDeclErr, weirdImportExportConstraintErr)
+import ErrsTc(UnifyErrContext(..), UnifyErrInfo(..), ambigErr, badMatchErr, badSpecialisationErr, classCycleErr, confusedNameErr, dataConArityErr, defaultErr, derivingEnumErr, derivingIxErr, derivingWhenInstanceExistsErr, dupInstErr, genCantGenErr, instTypeErr, methodTypeLacksTyVarErr, naughtyCCallContextErr, noInstanceErr, nonBoxedPrimCCallErr, notAsPolyAsSigErr, preludeInstanceErr, reduceErr, sigContextsErr, specCtxtGroundnessErr, specDataNoSpecErr, specDataUnboxedErr, specGroundnessErr, specInstUnspecInstNotFoundErr, topLevelUnboxedDeclErr, tyConArityErr, typeCycleErr, unifyErr, varyingArgsErr)
+import GenSpecEtc(SignatureInfo)
+import HsBinds(Binds, MonoBinds, ProtoNameMonoBinds(..), RenamedSig(..), Sig)
+import HsExpr(ArithSeqInfo, Expr, Qual, RenamedExpr(..), TypecheckedExpr(..))
+import HsImpExp(IE)
+import HsLit(Literal)
+import HsMatches(GRHS, GRHSsAndBinds, Match, RenamedGRHS(..), RenamedGRHSsAndBinds(..), RenamedMatch(..))
+import HsPat(InPat, ProtoNamePat(..), RenamedPat(..), TypecheckedPat)
+import HsPragmas(ClassOpPragmas, GenPragmas, ImpStrictness, ImpUnfolding)
+import HsTypes(MonoType, PolyType)
+import Id(Id, IdDetails)
+import IdInfo(DeforestInfo, IdInfo, UpdateInfo)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import InstEnv(InstTemplate)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import PrimKind(PrimKind)
+import ProtoName(ProtoName)
+import SimplEnv(UnfoldingGuidance)
+import SrcLoc(SrcLoc)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(TauType(..), UniType)
+import Unique(Unique)
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+data ClassOp 	{-# GHC_PRAGMA MkClassOp _PackedString Int UniType #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data UnifyErrContext
+  = PredCtxt (Expr Name (InPat Name)) | AppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | TooManyArgsCtxt (Expr Name (InPat Name)) | FunAppCtxt (Expr Name (InPat Name)) (Labda Id) (Expr Name (InPat Name)) UniType UniType Int | OpAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) (Expr Name (InPat Name)) | SectionLAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | SectionRAppCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | CaseCtxt (Expr Name (InPat Name)) [Match Name (InPat Name)] | BranchCtxt (Expr Name (InPat Name)) (Expr Name (InPat Name)) | ListCtxt [Expr Name (InPat Name)] | PatCtxt (InPat Name) | CaseBranchesCtxt [Match Name (InPat Name)] | FilterCtxt (Expr Name (InPat Name)) | GeneratorCtxt (InPat Name) (Expr Name (InPat Name)) | GRHSsBranchCtxt [GRHS Name (InPat Name)] | GRHSsGuardCtxt (Expr Name (InPat Name)) | PatMonoBindsCtxt (InPat Name) (GRHSsAndBinds Name (InPat Name)) | FunMonoBindsCtxt Name [Match Name (InPat Name)] | MatchCtxt UniType UniType | ArithSeqCtxt (Expr Name (InPat Name)) | CCallCtxt [Char] [Expr Name (InPat Name)] | AmbigDictCtxt [Inst] | SigCtxt Id UniType | MethodSigCtxt Name UniType | ExprSigCtxt (Expr Name (InPat Name)) UniType | ValSpecSigCtxt Name UniType SrcLoc | ValSpecSpecIdCtxt Name UniType Name SrcLoc | BindSigCtxt [Id] | SuperClassSigCtxt | CaseBranchCtxt (Match Name (InPat Name)) | Rank2ArgCtxt (Expr Id TypecheckedPat) UniType
+data UnifyErrInfo   = UnifyMisMatch UniType UniType | TypeRec TyVar UniType | UnifyListMisMatch [UniType] [UniType]
+data SignatureInfo 	{-# GHC_PRAGMA TySigInfo Id [TyVar] [Inst] UniType SrcLoc | ValSpecInfo Name UniType (Labda Name) SrcLoc | ValInlineInfo Name UnfoldingGuidance SrcLoc | ValDeforestInfo Name SrcLoc | ValMagicUnfoldingInfo Name _PackedString SrcLoc #-}
+data MonoBinds a b 	{-# GHC_PRAGMA EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc #-}
+type ProtoNameMonoBinds = MonoBinds ProtoName (InPat ProtoName)
+type RenamedSig = Sig Name
+data Sig a 	{-# GHC_PRAGMA Sig a (PolyType a) (GenPragmas a) SrcLoc | ClassOpSig a (PolyType a) (ClassOpPragmas a) SrcLoc | SpecSig a (PolyType a) (Labda a) SrcLoc | InlineSig a UnfoldingGuidance SrcLoc | DeforestSig a SrcLoc | MagicUnfoldingSig a _PackedString SrcLoc #-}
+data Expr a b 	{-# GHC_PRAGMA Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id #-}
+type RenamedExpr = Expr Name (InPat Name)
+type TypecheckedExpr = Expr Id TypecheckedPat
+data IE 	{-# GHC_PRAGMA IEVar _PackedString | IEThingAbs _PackedString | IEThingAll _PackedString | IEConWithCons _PackedString [_PackedString] | IEClsWithOps _PackedString [_PackedString] | IEModuleContents _PackedString #-}
+data GRHS a b 	{-# GHC_PRAGMA GRHS (Expr a b) (Expr a b) SrcLoc | OtherwiseGRHS (Expr a b) SrcLoc #-}
+data GRHSsAndBinds a b 	{-# GHC_PRAGMA GRHSsAndBindsIn [GRHS a b] (Binds a b) | GRHSsAndBindsOut [GRHS a b] (Binds a b) UniType #-}
+data Match a b 	{-# GHC_PRAGMA PatMatch b (Match a b) | GRHSMatch (GRHSsAndBinds a b) #-}
+type RenamedGRHS = GRHS Name (InPat Name)
+type RenamedGRHSsAndBinds = GRHSsAndBinds Name (InPat Name)
+type RenamedMatch = Match Name (InPat Name)
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+type ProtoNamePat = InPat ProtoName
+type RenamedPat = InPat Name
+data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
+data GenPragmas a 	{-# GHC_PRAGMA NoGenPragmas | GenPragmas (Labda Int) (Labda UpdateInfo) DeforestInfo (ImpStrictness a) (ImpUnfolding a) [([Labda (MonoType a)], Int, GenPragmas a)] #-}
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data TyVarTemplate 	{-# GHC_PRAGMA SysTyVarTemplate Unique _PackedString | UserTyVarTemplate Unique ShortName #-}
+type TauType = UniType
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+pprBagOfErrors :: PprStyle -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+badClassOpErr :: Name -> ProtoName -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+badExportNameErr :: [Char] -> [Char] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+badImportNameErr :: [Char] -> [Char] -> [Char] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 1222222 _N_ _N_ _N_ _N_ #-}
+derivingInIfaceErr :: ProtoName -> [ProtoName] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+derivingNonStdClassErr :: Name -> ProtoName -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+dupNamesErr :: [Char] -> [(ProtoName, SrcLoc)] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 21222 _N_ _S_ "LSL" _N_ _N_ #-}
+dupPreludeNameErr :: [Char] -> (ProtoName, SrcLoc) -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 21222 _N_ _S_ "LU(LS)L" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+dupSigDeclErr :: [Sig Name] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+duplicateImportsInInterfaceErr :: [Char] -> [ProtoName] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 5 _U_ 00222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 5 XXXXX 5 \ (u0 :: [Char]) (u1 :: [ProtoName]) (u2 :: PprStyle) (u3 :: Int) (u4 :: Bool) -> _APP_  _TYAPP_  _ORIG_ Util panic { (PprStyle -> Int -> Bool -> PrettyRep) } [ _NOREP_S_ "duplicateImportsInInterfaceErr: NOT DONE YET?", u2, u3, u4 ] _N_ #-}
+inlineInRecursiveBindsErr :: [(Name, SrcLoc)] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222 _N_ _S_ "S" _N_ _N_ #-}
+methodBindErr :: MonoBinds ProtoName (InPat ProtoName) -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+missingSigErr :: SrcLoc -> ProtoName -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "SLL" _N_ _N_ #-}
+shadowedNameErr :: Name -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "LSL" _N_ _N_ #-}
+unknownNameErr :: [Char] -> ProtoName -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+unknownSigDeclErr :: [Char] -> ProtoName -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+weirdImportExportConstraintErr :: ProtoName -> IE -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+ambigErr :: [Inst] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222 _N_ _S_ "S" _N_ _N_ #-}
+badMatchErr :: UniType -> UniType -> UnifyErrContext -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_ #-}
+badSpecialisationErr :: [Char] -> [Char] -> Int -> [Labda UniType] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 5 _U_ 12002222 _N_ _S_ "LLAAL" {_A_ 3 _U_ 122222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+classCycleErr :: [[(Int -> Bool -> PrettyRep, SrcLoc)]] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 1022 _N_ _N_ _N_ _N_ #-}
+confusedNameErr :: [Char] -> Name -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+dataConArityErr :: Id -> Int -> Int -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 2222222 _N_ _N_ _N_ _N_ #-}
+defaultErr :: [Inst] -> [UniType] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 12222 _N_ _N_ _N_ _N_ #-}
+derivingEnumErr :: TyCon -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+derivingIxErr :: TyCon -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+derivingWhenInstanceExistsErr :: Class -> TyCon -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+dupInstErr :: (Class, (UniType, SrcLoc), (UniType, SrcLoc)) -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 1222 _N_ _S_ "U(LU(LL)U(AL))L" {_A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+genCantGenErr :: [Inst] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222 _N_ _S_ "S" _N_ _N_ #-}
+instTypeErr :: UniType -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "LSL" _N_ _N_ #-}
+methodTypeLacksTyVarErr :: TyVarTemplate -> [Char] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+naughtyCCallContextErr :: Name -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+noInstanceErr :: Inst -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 1 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+nonBoxedPrimCCallErr :: Class -> UniType -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+notAsPolyAsSigErr :: UniType -> [TyVar] -> UnifyErrContext -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 5 _U_ 0222222 _N_ _S_ "ALLLL" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+preludeInstanceErr :: Class -> UniType -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+reduceErr :: [Inst] -> UnifyErrContext -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _N_ _N_ _N_ #-}
+sigContextsErr :: [SignatureInfo] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 2222 _N_ _N_ _N_ _N_ #-}
+specCtxtGroundnessErr :: UnifyErrContext -> [Inst] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 11222 _N_ _S_ "SLL" _N_ _N_ #-}
+specDataNoSpecErr :: Name -> [UniType] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+specDataUnboxedErr :: Name -> [UniType] -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+specGroundnessErr :: UnifyErrContext -> [UniType] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 12222 _N_ _S_ "SLL" _N_ _N_ #-}
+specInstUnspecInstNotFoundErr :: Class -> UniType -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _N_ _N_ _N_ #-}
+topLevelUnboxedDeclErr :: Id -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "LSL" _N_ _N_ #-}
+tyConArityErr :: Name -> Int -> Int -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 2222222 _N_ _N_ _N_ _N_ #-}
+typeCycleErr :: [[(Int -> Bool -> PrettyRep, SrcLoc)]] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 2 _U_ 1022 _N_ _N_ _N_ _N_ #-}
+unifyErr :: UnifyErrInfo -> UnifyErrContext -> SrcLoc -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+varyingArgsErr :: Name -> [Match Name (InPat Name)] -> PprStyle -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 3 _U_ 20222 _N_ _S_ "LAL" {_A_ 2 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

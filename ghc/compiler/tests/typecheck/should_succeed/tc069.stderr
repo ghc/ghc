@@ -1,0 +1,16 @@
+Typechecked:
+AbsBinds [] [] [(x.t1, Main.x)]
+    {- nonrec -}
+    x.t1 :: Char
+    x.t1 = 'a'
+AbsBinds [] [] [(y.t4, Main.y), (ys.t5, Main.ys)]
+    {- nonrec -}
+    (y.t4 : ys.t5) :: [Char]
+    (y.t4 : ys.t5) = ['a', 'b', 'c'] (Char)
+     where
+	AbsBinds [] [] [(p.t8, p.r56)]
+	    {- nonrec -}
+	    p.t8 :: Char
+	    p.t8 = Main.x
+	{- nonrec -}
+

@@ -1,0 +1,1677 @@
+\section[StgDebug]{Useful debugging routines for the STG machine}
+
+Call these functions directly from a debugger to print Nodes,
+registers, stacks, etc.
+
+(An invocation such as 
+
+  make EXTRA_HC_OPTS='-optl-u -optl_DEBUG_LoadSymbols' ghci
+
+ is usually required to get this code included in the object code.)
+
+Nota Bene: in a registerised build, you have to save all the registers
+in their appropriate SAVE locations before calling any code that needs
+register contents.  (This has to be repeated every time you emerge
+from the STG world.)
+
+On a sparc, this can be done by the following gdb script
+
+define saveRegs
+
+  set *(&MainRegTable+8) = $l1
+  set *(&MainRegTable+9) = $l2
+  set *(&MainRegTable+10) = $l3
+  set *(&MainRegTable+11) = $l4
+  set *(&MainRegTable+12) = $l5
+  set *(&MainRegTable+13) = $l6
+  set *(&MainRegTable+14) = $l7
+  set *(&MainRegTable+4) = $f2
+  set *(&MainRegTable+5) = $f3
+  set *(&MainRegTable+6) = $f4
+  set *(&MainRegTable+7) = $f5
+
+  set *((double *) &MainRegTable+0) = (double) $f6
+  set *((double *) &MainRegTable+2) = (double) $f8
+  set *(&MainRegTable+23) = $l0
+  set *(&MainRegTable+16) = $i0
+  set *(&MainRegTable+17) = $i1
+  set *(&MainRegTable+18) = $i2
+  set *(&MainRegTable+19) = $i3
+  set *(&StorageMgrInfo+0) = $i4
+  set *(&StorageMgrInfo+1) = $i5
+
+end
+
+
+New code (attempts to interpret heap/stack contents)
+  DEBUG_LoadSymbols( filename ) Load symbol table from object file
+                                (not essential but useful initialisation)
+  DEBUG_PrintA( depth, size )   Print "depth" entries from A stack
+  DEBUG_PrintB( depth, size )   ditto
+  DEBUG_Where( depth, size )    Ambitious attempt to print stacks
+                                symbolically.  Result is a little inaccurate
+                                but often good enough to do the job.
+  DEBUG_NODE( closure, size )   Print a closure on the heap
+  DEBUG_INFO_TABLE(closure)     Print info-table of a closure
+  DEBUG_SPT( size )             Print the Stable Pointer Table
+
+(Use variable DEBUG_details to set level of detail shown.)
+
+Older code (less fancy ==> more reliable)
+  DEBUG_ASTACK(lines)		Print "lines" lines of the A Stack
+  DEBUG_BSTACK(lines)		Print "lines" lines of the B Stack
+  DEBUG_UPDATES(frames)		Print "frames" update frames
+  DEBUG_REGS()			Print register values
+  DEBUG_MP()                    Print the MallocPtr Lists
+
+\begin{code}
+#if defined(RUNTIME_DEBUGGING)
+
+#include "rtsdefs.h"
+\end{code}
+
+\subsection[StgDebug_Symbol_Tables]{Loading Symbol Tables}
+
+NB: this assumes a.out files - won't work on Alphas.
+ToDo: At least add some #ifdefs
+
+\begin{code}
+#include <a.out.h>
+#include <stab.h>
+/* #include <nlist.h> */
+
+#include <stdio.h>
+
+#define FROM_START 0  /* for fseek */
+
+/* Simple lookup table */
+
+/* Current implementation is pretty dumb! */
+
+struct entry {
+  unsigned value;
+  int index;
+  char *name;
+};
+
+static int table_uninitialised = 1;
+static int max_table_size;
+static int table_size;
+static struct entry* table;
+
+static
+void reset_table( int size )
+{
+  max_table_size = size;
+  table_size = 0;
+  table = (struct entry *) malloc( size * sizeof( struct entry ) );
+}
+
+static
+void prepare_table()
+{
+  /* Could sort it... */
+}
+
+static
+void insert( unsigned value, int index, char *name )
+{
+  if ( table_size >= max_table_size ) {
+    fprintf( stderr, "Symbol table overflow\n" );
+    exit( 1 );
+  }
+  table[table_size].value = value;
+  table[table_size].index = index;
+  table[table_size].name = name;
+  table_size = table_size + 1;
+}
+
+static
+int lookup( unsigned value, int *result )
+{
+  int i;
+  for( i = 0; i < table_size && table[i].value != value; ++i ) {
+  }
+  if (i < table_size) {
+    *result = table[i].index;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+static int lookup_name( char *name, unsigned *result )
+{
+  int i;
+  for( i = 0; i < table_size && strcmp(name,table[i].name) != 0; ++i ) {
+  }
+  if (i < table_size) {
+    *result = table[i].value;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+\end{code}
+
+* Z-escapes:
+    "std"++xs -> "Zstd"++xs
+    char_to_c 'Z'  = "ZZ"
+    char_to_c '&'  = "Za"
+    char_to_c '|'  = "Zb"
+    char_to_c ':'  = "Zc"
+    char_to_c '/'  = "Zd"
+    char_to_c '='  = "Ze"
+    char_to_c '>'  = "Zg"
+    char_to_c '#'  = "Zh"
+    char_to_c '<'  = "Zl"
+    char_to_c '-'  = "Zm"
+    char_to_c '!'  = "Zn"
+    char_to_c '.'  = "Zo"
+    char_to_c '+'  = "Zp"
+    char_to_c '\'' = "Zq"
+    char_to_c '*'  = "Zt"
+    char_to_c '_'  = "Zu"
+    char_to_c c    = "Z" ++ show (ord c)
+
+\begin{code}
+static char unZcode( char ch )
+{
+  switch (ch) {
+  case 'Z' :
+  case '\0' : 
+    return ('Z');
+  case 'a' :
+    return ('&');
+  case 'b' :
+    return ('|');
+  case 'c' :
+    return (':');
+  case 'd' :
+    return ('/');
+  case 'e' :
+    return ('=');
+  case 'g' :
+    return ('>');
+  case 'h' :
+    return ('#');
+  case 'l' :
+    return ('<');
+  case 'm' :
+    return ('-');
+  case 'n' :
+    return ('!');
+  case 'o' :
+    return ('.');
+  case 'p' :
+    return ('+');
+  case 'q' :
+    return ('\'');
+  case 't' :
+    return ('*');
+  case 'u' :
+    return ('_');
+  default : 
+    return (ch);
+  }
+}
+
+/* Precondition: out big enough to handle output (about twice length of in) */
+static void enZcode( char *in, char *out )
+{
+  int i, j;
+
+  j = 0;
+  out[ j++ ] = '_';
+  for( i = 0; in[i] != '\0'; ++i ) {
+    switch (in[i]) {
+    case 'Z'  : 
+      out[j++] = 'Z';
+      out[j++] = 'Z';
+      break;
+    case '&'  : 
+      out[j++] = 'Z';
+      out[j++] = 'a';
+      break;
+    case '|'  : 
+      out[j++] = 'Z';
+      out[j++] = 'b';
+      break;
+    case ':'  : 
+      out[j++] = 'Z';
+      out[j++] = 'c';
+      break;
+    case '/'  : 
+      out[j++] = 'Z';
+      out[j++] = 'd';
+      break;
+    case '='  : 
+      out[j++] = 'Z';
+      out[j++] = 'e';
+      break;
+    case '>'  : 
+      out[j++] = 'Z';
+      out[j++] = 'g';
+      break;
+    case '#'  : 
+      out[j++] = 'Z';
+      out[j++] = 'h';
+      break;
+    case '<'  : 
+      out[j++] = 'Z';
+      out[j++] = 'l';
+      break;
+    case '-'  : 
+      out[j++] = 'Z';
+      out[j++] = 'm';
+      break;
+    case '!'  : 
+      out[j++] = 'Z';
+      out[j++] = 'n';
+      break;
+    case '.'  : 
+      out[j++] = 'Z';
+      out[j++] = 'o';
+      break;
+    case '+'  : 
+      out[j++] = 'Z';
+      out[j++] = 'p';
+      break;
+    case '\'' : 
+      out[j++] = 'Z';
+      out[j++] = 'q';
+      break;
+    case '*'  : 
+      out[j++] = 'Z';
+      out[j++] = 't';
+      break;
+    case '_'  : 
+      out[j++] = 'Z';
+      out[j++] = 'u';
+      break;
+    default :
+      out[j++] = in[i];
+      break;
+    }
+  }
+  out[j] = '\0';
+}
+\end{code}
+
+\begin{code}
+static int lookupForName( P_ addr, char **result )
+{
+  int i;
+  for( i = 0; i < table_size && table[i].value != (unsigned) addr; ++i ) {
+  }
+  if (i < table_size) {
+    *result = table[i].name;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+static void printZcoded( char *raw )
+{
+  int j;
+  
+  /* start at 1 to skip the leading "_" */
+  for( j = 1; raw[j] != '\0'; /* explicit */) {
+    if (raw[j] == 'Z') {
+      putchar(unZcode(raw[j+1]));
+      j = j + 2;
+    } else {
+      putchar(raw[j]);
+      j = j + 1;
+    }
+  }
+}
+
+static void printName( P_ addr )
+{
+  char *raw;
+
+  if (lookupForName( addr, &raw )) {
+    printZcoded(raw);
+  } else {
+    printf("0x%x", addr);
+  }
+}
+  
+/* Fairly ad-hoc piece of code that seems to filter out a lot of
+   rubbish like the obj-splitting symbols */
+
+static
+int isReal( unsigned char type, char *name )
+{
+  int external = type & N_EXT;
+  int tp = type & N_TYPE;
+
+  if (tp == N_TEXT || tp == N_DATA) {
+    return( name[0] == '_' && name[1] != '_' );
+  } else {
+    return( 0 );
+  }
+}
+
+void DEBUG_LoadSymbols( char *name )
+{
+  FILE *binary;
+
+  struct exec header;
+
+  long sym_offset;
+  long sym_size;
+  long num_syms;
+  long num_real_syms;
+  struct nlist *symbol_table;
+
+  long str_offset;
+  long str_size; /* assumed 4 bytes.... */
+  char *string_table;
+
+  long i;
+  
+  binary = fopen( name, "r" );
+  if (binary == NULL) {
+    fprintf( stderr, "Can't open symbol table file \"%s\".\n", name );
+  }
+
+
+  if (fread( &header,  sizeof( struct exec ), 1, binary ) != 1) { 
+    fprintf( stderr, "Can't read symbol table header.\n" );
+    exit( 1 );
+  }
+  if ( N_BADMAG( header ) ) {
+    fprintf( stderr, "Bad magic number in symbol table header.\n" );
+    exit( 1 );
+  }
+
+
+
+  sym_offset = N_SYMOFF( header );
+  sym_size = header.a_syms;
+  num_syms = sym_size / sizeof( struct nlist );
+  fseek( binary, sym_offset, FROM_START );
+
+  symbol_table = (struct nlist *) malloc( sym_size );
+  if (symbol_table == NULL) {
+    fprintf( stderr, "Can't allocate symbol table of size %d\n", sym_size );
+    exit( 1 );
+  }
+
+  printf("Reading %d symbols\n", num_syms);
+
+  if (fread( symbol_table, sym_size, 1, binary ) != 1) {
+    fprintf( stderr, "Can't read symbol table\n");
+    exit( 1 );
+  }
+
+
+
+  str_offset = N_STROFF( header );
+  fseek( binary, str_offset, FROM_START );
+
+  if (fread( &str_size, 4, 1, binary ) != 1) {
+    fprintf( stderr, "Can't read string table size\n");
+    exit( 1 );
+  }
+
+  /* apparently the size of the string table includes the 4 bytes that
+   * store the size...
+   */
+  string_table = (char *) malloc( str_size );
+  if (string_table == NULL) {
+    fprintf( stderr, "Can't allocate string table of size %d\n", str_size );
+    exit( 1 );
+  }
+
+  if (fread( string_table+4, str_size-4, 1, binary ) != 1) {
+    fprintf( stderr, "Can't read string table\n");
+    exit( 1 );
+  }
+
+  num_real_syms = 0;
+  for( i = 0; i != num_syms; ++i ) {
+    unsigned char type = symbol_table[i].n_type;
+    unsigned value = symbol_table[i].n_value;
+    char *str = &string_table[symbol_table[i].n_un.n_strx];
+
+    if ( isReal( type, str ) ) {
+      num_real_syms = num_real_syms + 1;
+    }
+  }
+
+  printf("Of which %d are real symbols\n", num_real_syms);
+
+/*
+  for( i = 0; i != num_syms; ++i ) {
+    unsigned char type = symbol_table[i].n_type;
+    unsigned value = symbol_table[i].n_value;
+    char *str = &string_table[symbol_table[i].n_un.n_strx];
+
+    if ( isReal(type, str) ) {
+      printf("Symbol %d. Extern? %c. Type: %c. Value: 0x%x. Name: %s\n",
+	     i,
+	     (external ? 'y' : 'n'),
+	     type,
+	     value,
+	     str
+	     );
+    }
+  }
+*/
+
+  reset_table( num_real_syms );
+
+  for( i = 0; i != num_syms; ++i ) {
+    unsigned char type = symbol_table[i].n_type;
+    unsigned value = symbol_table[i].n_value;
+    char *str = &string_table[symbol_table[i].n_un.n_strx];
+
+    if ( isReal( type, str ) ) {
+      insert( value, i, str );
+    }
+
+  }
+
+  prepare_table();
+}
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+\subsection[StgDebug_PrettyPrinting]{Pretty printing internal structures}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{code}
+#include "../storage/SMinternal.h"
+
+#ifdef GCap
+#define HP_BOT appelInfo.oldbase
+#elif GCdu
+#define HP_BOT dualmodeInfo.modeinfo[dualmodeInfo.mode].base
+#elif GC2s
+#define HP_BOT semispaceInfo[semispace].base
+#elif GC1s
+#define HP_BOT compactingInfo.base
+#else
+  unknown garbage collector - help, help!
+#endif
+\end{code}
+
+\begin{code}
+/* range: 0..NUM_LEVELS_OF_DETAIL-1.  Level of machine-related detail shown */
+#define NUM_LEVELS_OF_DETAIL 3
+static int DEBUG_details = 2; 
+\end{code}
+
+\begin{code}
+/* Determine the size and number of pointers for this kind of closure */
+static
+void 
+getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
+{
+  /* The result is used for printing out closure contents.  If the
+     info-table is mince, we'd better conservatively guess there's
+     nothing in the closure to avoid chasing non-ptrs. */
+  *vhs = 0;
+  *size = 0;
+  *ptrs = 0;
+  *type = "*unknown info type*";
+
+    /* ToDo: if in garbage collector, consider subtracting some weird offset which some GCs add to infoptr */
+
+  /* The order here precisely reflects that in SMInfoTables.lh to make
+     it easier to check that this list is complete. */
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:
+        *vhs = 0; /* by decree */
+        *size = SPEC_CLOSURE_SIZE(node);
+	*ptrs = SPEC_CLOSURE_NoPTRS(node);
+        *type = "SPECU";
+	break;
+      case INFO_SPEC_N_TYPE:
+        *vhs = 0; /* by decree */
+        *size = SPEC_CLOSURE_SIZE(node);
+	*ptrs = SPEC_CLOSURE_NoPTRS(node);
+        *type = "SPECN";
+	break;
+
+      case INFO_GEN_U_TYPE:
+	*vhs = GEN_VHS;
+        *size = GEN_CLOSURE_SIZE(node);
+	*ptrs = GEN_CLOSURE_NoPTRS(node);
+        *type = "GENU";
+	break;
+      case INFO_GEN_N_TYPE:
+	*vhs = GEN_VHS;
+        *size = GEN_CLOSURE_SIZE(node);
+	*ptrs = GEN_CLOSURE_NoPTRS(node);
+        *type = "GENN";
+	break;
+
+      case INFO_DYN_TYPE:
+	*vhs = DYN_VHS;
+        *size = DYN_CLOSURE_SIZE(node);
+	*ptrs = DYN_CLOSURE_NoPTRS(node);
+	*type = "DYN";
+	break;
+
+      case INFO_TUPLE_TYPE:
+	*vhs = TUPLE_VHS;
+        *size = TUPLE_CLOSURE_SIZE(node);
+	*ptrs = TUPLE_CLOSURE_NoPTRS(node);
+	*type = "TUPLE";
+	break;
+
+      case INFO_DATA_TYPE:
+	*vhs = DATA_VHS;
+        *size = DATA_CLOSURE_SIZE(node);
+	*ptrs = DATA_CLOSURE_NoPTRS(node);
+	*type = "DATA";
+	break;
+
+      case INFO_MUTUPLE_TYPE:
+	*vhs = MUTUPLE_VHS;
+        *size = MUTUPLE_CLOSURE_SIZE(node);
+	*ptrs = MUTUPLE_CLOSURE_NoPTRS(node);
+	*type = "MUTUPLE";
+	break;
+
+      case INFO_IMMUTUPLE_TYPE:
+	*vhs = MUTUPLE_VHS;
+        *size = MUTUPLE_CLOSURE_SIZE(node);
+	*ptrs = MUTUPLE_CLOSURE_NoPTRS(node);
+	*type = "IMMUTUPLE";
+	break;
+
+      case INFO_STATIC_TYPE:
+	*vhs = STATIC_VHS;
+        *size = INFO_SIZE(INFO_PTR(node));
+	*ptrs = INFO_NoPTRS(INFO_PTR(node));
+	*type = "STATIC";
+	break;
+
+      case INFO_CONST_TYPE:
+	*vhs = 0;
+        *size = 0;
+	*ptrs = 0;
+	*type = "CONST";
+	break;
+
+      case INFO_CHARLIKE_TYPE:
+	*vhs = 0;
+        *size = 1;
+	*ptrs = 0;
+	*type = "CHAR";
+	break;
+
+      case INFO_INTLIKE_TYPE:
+	*vhs = 0;
+        *size = 1;
+	*ptrs = 0;
+	*type = "INT";
+	break;
+
+      case INFO_BH_TYPE:
+	*vhs = 0;
+        *size = INFO_SIZE(INFO_PTR(node));
+	*ptrs = 0;
+	*type = "BHOLE";
+	break;
+
+/* most of the following are plausible guesses (particularily VHSs) ADR */
+      case INFO_BQ_TYPE:
+#ifdef CONCURRENT
+	*vhs = 0;
+        *size = BQ_CLOSURE_SIZE(node);
+	*ptrs = BQ_CLOSURE_NoPTRS(node);
+	*type = "BQ";
+#else
+	printf("Panic: found BQ Infotable in non-threaded system.\n");
+#endif
+	break;
+
+      case INFO_IND_TYPE:
+	*vhs = 0;
+        *size = IND_CLOSURE_SIZE(node);
+	*ptrs = IND_CLOSURE_NoPTRS(node);
+	*type = "IND";
+	break;
+
+      case INFO_CAF_TYPE:
+	*vhs = 0; /* ?? ADR */
+        *size = INFO_SIZE(INFO_PTR(node));
+	*ptrs = 0;
+	*type = "CAF";
+	break;
+
+      case INFO_FETCHME_TYPE:
+#ifdef PAR
+	*vhs = FETCHME_VHS;
+	*size = FETCHME_CLOSURE_SIZE(node);
+	*ptrs = FETCHME_CLOSURE_PTRS(node);
+	*type = "FETCHME";
+#else
+	printf("Panic: found FETCHME Infotable in sequential system.\n");
+#endif
+	break;
+
+      case INFO_FMBQ_TYPE:
+#ifdef PAR
+	*vhs = FMBQ_VHS;
+	*size = FMBQ_CLOSURE_SIZE(node);
+	*ptrs = FMBQ_CLOSURE_PTRS(node);
+	*type = "FMBQ";
+#else
+	printf("Panic: found FMBQ Infotable in sequential system.\n");
+#endif
+	break;
+
+      case INFO_BF_TYPE:
+#ifdef PAR
+	*vhs = 0;
+        *size = 0;
+	*ptrs = 0;
+	*type = "BlockedFetch";
+#else
+	printf("Panic: found BlockedFetch Infotable in sequential system.\n");
+#endif
+	break;
+
+      case INFO_TSO_TYPE:
+	/* Conservative underestimate: this will contain a regtable
+           which comes nowhere near fitting the standard "p ptrs; s-p
+           non-ptrs" format. ADR */
+#ifdef CONCURRENT
+	*vhs = TSO_VHS;
+        *size = 0;
+	*ptrs = 0;
+	*type = "TSO";
+#else
+	printf("Panic: found TSO Infotable in non-threaded system.\n");
+#endif
+	break;
+
+      case INFO_STKO_TYPE:
+	/* Conservative underestimate: this will contain stuff
+           which comes nowhere near fitting the standard "p ptrs; s-p
+           non-ptrs" format. JSM */
+#ifdef CONCURRENT
+	*vhs = STKO_VHS;
+        *size = 0;
+	*ptrs = 0;
+	*type = "STKO";
+#else
+	printf("Panic: found STKO Infotable in non-threaded system.\n");
+#endif
+	break;
+
+      /* There are no others in SMInfoTables.lh 11/5/94 ADR*/
+      default:
+	printf("Invalid/unknown info type %d\n", INFO_TYPE(INFO_PTR(node)));
+	break;
+    }
+}  
+
+static
+void 
+printWord( W_ word )
+{
+  printf("0x%08lx", word);
+}
+
+static
+void
+printAddress( P_ address )
+{
+#ifdef PAR
+  PP_ SpA  = STKO_SpA(SAVE_StkO);
+  PP_ SuA  = STKO_SuA(SAVE_StkO);
+  P_  SpB  = STKO_SpB(SAVE_StkO);
+  P_  SuB  = STKO_SuB(SAVE_StkO);
+#else
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+#endif
+  P_  Hp   = SAVE_Hp;
+
+  PP_ botA = stackInfo.botA;
+  P_ botB  = stackInfo.botB;
+  P_ HpBot = HP_BOT;
+
+  char *name;
+
+  /* ToDo: check if it's in text or data segment. */
+
+  /* The @-1@s in stack comparisions are because we sometimes use the
+     address of just below the stack... */
+
+  if (lookupForName( address, &name )) {
+    printZcoded( name );
+  } else {
+    if (DEBUG_details > 1) {
+      printWord( (W_) address );
+      printf(" : ");
+    }
+    if (HpBot <= address && address < Hp) {
+      printf("Hp[%d]", address - HpBot);
+    } else if (SUBTRACT_A_STK((PP_)address, botA) >= -1 && SUBTRACT_A_STK(SpA, (PP_)address) >= 0) {
+      printf("SpA[%d]", SUBTRACT_A_STK((PP_)address, botA));
+    } else if (SUBTRACT_B_STK(address, botB) >= -1 && SUBTRACT_B_STK(SpB, address) >= 0) {
+      /* ToDo: check if it's an update frame */
+      printf("SpB[%d]", SUBTRACT_B_STK(address, botB));
+    } else {
+      printWord( (W_) address );
+    }
+  }
+}
+
+static
+void
+printIndentation( int indentation )
+{
+  int i;
+  for (i = 0; i < indentation; ++i) { printf("  "); }
+}
+
+/* The weight parameter is used to (eventually) break cycles */
+static 
+void 
+printStandardShapeClosure( 
+      int indentation, 
+      int weight, 
+      P_ closure, int vhs, int size, int noPtrs
+)
+{
+#ifdef PAR
+  PP_ SpA  = STKO_SpA(SAVE_StkO);
+  PP_ SuA  = STKO_SuA(SAVE_StkO);
+  P_  SpB  = STKO_SpB(SAVE_StkO);
+  P_  SuB  = STKO_SuB(SAVE_StkO);
+#else
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+#endif
+  P_ Hp    = SAVE_Hp;
+
+  extern void printClosure PROTO( (P_, int, int) );
+  int numValues = size - vhs;
+  P_ HpBot = HP_BOT;
+
+  if (DEBUG_details > 1) {
+    printAddress( closure );
+    printf(": ");
+  }
+  printName((P_)INFO_PTR(closure));
+
+  if ( numValues > 0 ) {
+    int newWeight = weight-1 ;
+        /* I've tried dividing the weight by size to share it out amongst
+           sub-closures - but that didn't work too well. */
+
+    if (newWeight > 0) {
+      int i=0;
+      printf("(\n");
+      while (i < numValues) {
+	P_ data = (P_) closure[_FHS + vhs + i];
+
+	printIndentation(indentation+1);
+	if (i < noPtrs) {
+	  printClosure( data, indentation+1, newWeight);
+	} else {
+	  printAddress( data );
+	}
+	i = i + 1;
+	if (i < numValues) printf(",\n");
+      }
+      printf(")");
+    } else {
+      int i;
+      printf("(_");
+      for( i = 1; i < size; ++i ) {
+	printf(",_");
+      }
+      printf(")");
+    }
+  }
+}
+
+/* Should be static but has to be extern to allow mutual recursion */
+void 
+printClosure( P_ closure, int indentation, int weight )
+{
+  int vhs, size, ptrs;
+  char *type;
+
+  /* I'd love to put a test here that this actually _is_ a closure -
+     but testing that it is in the heap is overly strong. */
+
+  getClosureShape(closure, &vhs, &size, &ptrs, &type);
+
+  /* The order here precisely reflects that in SMInfoTables.lh to make
+     it easier to check that this list is complete. */
+  switch(INFO_TYPE(INFO_PTR(closure))) {
+  case INFO_SPEC_U_TYPE:
+  case INFO_SPEC_N_TYPE:
+  case INFO_GEN_U_TYPE:
+  case INFO_GEN_N_TYPE:
+  case INFO_DYN_TYPE:
+  case INFO_TUPLE_TYPE:
+  case INFO_DATA_TYPE:
+  case INFO_MUTUPLE_TYPE:
+  case INFO_IMMUTUPLE_TYPE:
+    printStandardShapeClosure(indentation, weight, closure, 
+			      vhs, size, ptrs);
+    break;
+
+  case INFO_STATIC_TYPE:
+    /* If the STATIC contains Floats or Doubles, we can't print it. */
+    /* And we can't always rely on the size/ptrs info either */
+    printAddress( closure );
+    printf(" STATIC");
+    break;
+
+  case INFO_CONST_TYPE:
+    if (DEBUG_details > 1) {
+      printAddress( closure );
+      printf(": ");
+    }
+    printName((P_)INFO_PTR(closure));
+    break;
+
+  case INFO_CHARLIKE_TYPE:
+    /* ToDo: check for non-printable characters */
+    if (DEBUG_details > 1) printf("CHARLIKE ");
+    printf("\'%c\'", (unsigned char) CHARLIKE_VALUE(closure));
+    break;
+
+  case INFO_INTLIKE_TYPE:
+    if (DEBUG_details > 1) printf("INTLIKE ");
+    printf("%d",INTLIKE_VALUE(closure));
+    break;
+
+  case INFO_BH_TYPE:
+    /* Is there anything to say here> */
+    if (DEBUG_details > 1) {
+      printAddress( closure );
+      printf(": ");
+    }
+    printName((P_)INFO_PTR(closure));
+    break;
+
+/* most of the following are just plausible guesses (particularily VHSs) ADR */
+
+  case INFO_BQ_TYPE:
+#ifdef CONCURRENT
+    printStandardShapeClosure(indentation, weight, closure, 
+			      vhs, size, ptrs);
+#else
+    printf("Panic: found BQ Infotable in non-threaded system.\n");
+#endif
+    break;
+
+  case INFO_IND_TYPE:
+    if (DEBUG_details > 0) {
+      printAddress( closure );
+      printf(" IND: ");
+    }
+    printClosure( (P_) IND_CLOSURE_PTR(closure), indentation, weight );
+    break;
+
+  case INFO_CAF_TYPE:
+    if (DEBUG_details > 0) {
+      printAddress( closure );
+      printf(" CAF: ");
+    }
+    printClosure( (P_) IND_CLOSURE_PTR(closure), indentation, weight );
+    break;
+
+  case INFO_FETCHME_TYPE:
+#ifdef PAR
+    printStandardShapeClosure(indentation, weight, closure, 
+			      vhs, size, ptrs);
+#else
+    printf("Panic: found FETCHME Infotable in sequential system.\n");
+#endif
+    break;
+
+  case INFO_FMBQ_TYPE:
+#ifdef PAR
+    printStandardShapeClosure(indentation, weight, closure, 
+			      vhs, size, ptrs);
+#else
+    printf("Panic: found FMBQ Infotable in sequential system.\n");
+#endif
+    break;
+
+  case INFO_BF_TYPE:
+#ifdef PAR
+    printStandardShapeClosure(indentation, weight, closure, 
+			      vhs, size, ptrs);
+#else
+    printf("Panic: found BlockedFetch Infotable in sequential system.\n");
+#endif
+    break;
+
+  case INFO_TSO_TYPE:
+#ifdef CONCURRENT
+    /* A TSO contains a regtable... */
+    printAddress( closure );
+    printf(" TSO: ...");
+#else
+    printf("Panic: found TSO Infotable in non-threaded system.\n");
+#endif
+    break;
+
+    case INFO_STKO_TYPE:
+#ifdef CONCURRENT
+    /* A STKO contains parts of the A and B stacks... */
+    printAddress( closure );
+    printf(" STKO: ...");
+#else
+    printf("Panic: found STKO Infotable in non-threaded system.\n");
+#endif
+    break;
+
+  /* There are no others in SMInfoTables.lh 11/5/94 ADR*/
+  default:
+    printf("Invalid/unknown info type %d\n", INFO_TYPE(INFO_PTR(closure)));
+    break;
+  }
+}    
+
+void
+DEBUG_NODE( P_ closure, int size )
+{
+  printClosure( closure, 0, size );
+  printf("\n");
+}
+\end{code}
+
+Now some stuff for printing stacks - almost certainly doesn't work
+under threads which keep the stack on the heap.
+
+\begin{code}
+#ifndef CONCURRENT
+
+static int
+minimum(int a, int b)
+{
+  if (a < b) {
+    return a;
+  } else {
+    return b;
+  }
+}
+
+void DEBUG_PrintA( int depth, int weight )
+{
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+  P_ Hp    = SAVE_Hp;
+
+  int i;
+  I_ size = minimum(depth, SUBTRACT_A_STK(SpA, stackInfo.botA)+1);
+     
+  printf("Dump of the Address Stack (SpA = 0x%x, SuA = 0x%x)\n", SpA, SuA);
+
+  for( i = 0; i < size; ++i ) {
+    printIndentation(1);
+    printf("SpA[%ld] (0x%08lx):", i, SpA + AREL(i));
+    printClosure((P_)*(SpA + AREL(i)), 2, weight);
+    printf("\n");
+  }
+}
+
+void DEBUG_PrintB( int depth, int weight )
+{
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+  P_ Hp    = SAVE_Hp;
+  
+  I_ i;
+  I_ size = minimum(depth, SUBTRACT_B_STK(SpB, stackInfo.botB)+1);
+
+  P_ updateFramePtr;
+  I_ update_count;
+     
+  printf("Dump of the Value Stack (SpB = 0x%x, SuB = 0x%x)\n", SpB, SuB);
+  
+  updateFramePtr = SuB;
+  update_count = 0;
+  i = 0;
+  while (i < size) {
+    if (updateFramePtr == SpB + BREL(i)) {
+      
+      printIndentation(1);
+      printf("SpB[%ld] (0x%08lx): UpdateFrame[%d](", 
+	     i, 
+	     updateFramePtr, 
+	     update_count 
+	     );
+      printName( (P_) *(SpB + BREL(i)) );
+      printf(", UF[%d] (= SpB[%ld]), SpA[%ld], ",
+	     update_count+1, 
+	     SUBTRACT_B_STK(SpB, GRAB_SuB(updateFramePtr)),
+	     SUBTRACT_A_STK(SpA, GRAB_SuA(updateFramePtr))
+	     );
+      printAddress( GRAB_UPDATEE(updateFramePtr) );
+      printf(")\n");
+
+      printIndentation(2);
+      printClosure( GRAB_UPDATEE(updateFramePtr), 3, weight );
+      printf("\n");
+
+      updateFramePtr = GRAB_SuB(updateFramePtr);
+      update_count = update_count + 1;
+
+      /* ToDo: GhcConstants.lh reveals that there are two other sizes possible */
+      i = i + STD_UF_SIZE;
+    } else {
+      printIndentation(1);
+      printf("SpB[%ld] (0x%08lx): ", i, SpB + BREL(i) );
+      printName((P_) *(SpB + BREL(i)) );
+      printf("\n");
+      i = i + 1;
+    }
+  }
+}
+#endif /* not CONCURRENT */
+\end{code}
+
+ToDo: 
+
+   All the following code incorrectly assumes that the only return
+   addresses are those associated with update frames.
+   
+   To do a proper job of printing the environment we need to:
+
+   1) Recognise vectored and non-vectored returns on the B stack.
+
+   2) Know where the local variables are in the A and B stacks for
+      each return situation.
+
+   Until then, we'll just need to look suspiciously at the
+   "environment" being printed out.
+
+   ADR 
+
+\begin{code}
+/* How many real stacks are there on SpA and SpB? */
+static
+int numStacks( )
+{
+#ifdef PAR
+  PP_ SpA  = STKO_SpA(SAVE_StkO);
+  PP_ SuA  = STKO_SuA(SAVE_StkO);
+  P_  SpB  = STKO_SpB(SAVE_StkO);
+  P_  SuB  = STKO_SuB(SAVE_StkO);
+#else
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+#endif
+  P_  Hp   = SAVE_Hp;
+  
+  int depth = 1; /* There's always at least one stack */
+
+  while (SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
+    SuB = GRAB_SuB( SuB );
+    depth = depth + 1;
+  }
+  return depth;
+}
+
+static
+void printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size )
+{
+  int i;
+
+  ASSERT( size >= 0 );
+
+  for( i = size-1; i >= 0; --i ) {
+    printIndentation( indentation );
+    printf("A[%ld][%ld]", depth, i);
+    if (DEBUG_details > 1) printf(" (0x%08lx) ", SpA + AREL(i) );
+    printf("=");
+    printClosure( *(SpA + AREL(i)), indentation+2, weight );
+    printf("\n");
+  }
+}
+
+static
+void printLocalBStack( int depth, int indentation, int weight, P_ SpB, int size )
+{
+  int i;
+
+  ASSERT( size >= 0 );
+
+  for( i = size-1; i >= 0; --i) {
+    printIndentation( indentation );
+    printf("B[%ld][%ld]", depth, i);
+    if (DEBUG_details > 1) printf(" (0x%08lx) ", SpB + BREL(i) );
+    printf("=");
+    printAddress( (P_) *(SpB + BREL(i)) );
+    printf("\n");
+  }
+}
+
+static
+void printEnvironment( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+{
+  int sizeA = SUBTRACT_A_STK(SpA, SuA);
+  int sizeB = SUBTRACT_B_STK(SpB, SuB);
+
+  if (sizeA + sizeB > 0) {
+    printIndentation( indentation );
+    printf("let\n");
+
+    printLocalAStack( depth, indentation+1, weight, SpA, sizeA );
+    printLocalBStack( depth, indentation+1, weight, SpB, sizeB );
+
+    printIndentation( indentation );
+    printf("in\n");
+  }
+}
+\end{code}
+
+Printing the current context is a little tricky.
+
+Ideally, we would work from the bottom of the stack up to the top
+recursively printing the stuff nearer the top.
+
+In practice, we have to work from the top down because the top
+contains info about how much data is below the current return address.
+
+The result is that we have two recursive passes over the stacks: the
+first one prints the "cases" and the second one prints the
+continuations (vector tables, etc.)
+
+Note that because we compress chains of update frames, the depth and
+indentation do not always change in step.
+
+ToDo: 
+
+* detecting non-updating cases too
+* printing continuations (from vector tables) properly
+* printing sensible names in environment.
+* fix bogus nature of lets
+
+
+\begin{code}
+static int maxDepth = 5;
+
+static
+int printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+{
+  int indentation;
+
+  if (depth < maxDepth && SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
+    PP_ nextSpA, nextSuA;
+    P_  nextSpB, nextSuB;
+
+    /* ToDo: GhcConstants.lh reveals that there are two other sizes of
+       update frame possible */
+    /* ToDo: botB is probably wrong in THREAD system */
+
+    nextSpB = SuB + BREL(STD_UF_SIZE);
+    nextSuB = GRAB_SuB( SuB );
+    nextSpA = SuA;
+    nextSuA = GRAB_SuA( nextSuB );
+
+    indentation = printCases( depth+1, weight, nextSpA, nextSuA, nextSpB, nextSuB );
+
+    if (DEBUG_details > 1 || nextSpB != nextSuB) { /* show frame (even if adjacent to another) */
+      printIndentation( indentation );
+      printf("case\n");
+      indentation = indentation + 1;
+    }
+    if (SpB != SuB) { 
+      /* next thing on stack is a return vector - no need to show it here. */
+      SpB = SpB + BREL(1);
+    }
+    printEnvironment( depth, indentation, weight, SpA, SuA, SpB, SuB );
+  } else {
+    printf("...\n");
+    indentation = 1;
+  }
+  
+  return indentation;
+}
+
+/* ToDo: pay more attention to format of vector tables in SMupdate.lh */
+
+static
+int isVTBLEntry( P_ entry )
+{
+  char *raw;
+
+  if (lookupForName( entry, &raw )) {
+    if ( strncmp( "_ret", raw, 4 ) == 0 ) {
+      return 1;
+    } else if ( strncmp( "_djn", raw, 4 ) == 0) {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+static
+void printVectorTable( int indentation, PP_ vtbl )
+{
+  if (isVTBLEntry( (P_) vtbl )) { /* Direct return */
+    printName( (P_) vtbl );
+  } else {
+    int i = 0;
+    while( isVTBLEntry( vtbl[RVREL(i)] )) {
+      printIndentation( indentation );
+      printf( "%d -> ", i );
+      printName( vtbl[RVREL(i)] );
+      printf( "\n" );
+      i = i + 1;
+    }
+  }
+}
+
+static
+void printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+{
+  if (depth < maxDepth && SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
+    PP_ nextSpA, nextSuA;
+    P_  nextSpB, nextSuB;
+    int nextIndent = indentation; /* Indentation to print next frame at */
+
+    /* ToDo: GhcConstants.lh reveals that there are two other sizes of
+       update frame possible */
+    /* ToDo: botB is probably wrong in THREAD system */
+
+    /* ToDo: ASSERT that SuA == nextSuA */
+
+    nextSpB = SuB + BREL(STD_UF_SIZE);
+    nextSuB = GRAB_SuB( SuB );
+    nextSpA = SuA;
+    nextSuA = GRAB_SuA( nextSuB );
+
+    if (DEBUG_details > 0) { /* print update information */
+
+      if (SpB != SuB) { /* start of chain of update frames */
+	printIndentation( indentation );
+	printf("of updatePtr ->\n");
+	printIndentation( indentation+1 );
+	printf("update\n");
+      }
+      printIndentation( indentation+2 );
+      printClosure( (P_)*(SuB + BREL(UF_UPDATEE)), indentation+2, weight );
+      printf(" := ");
+      printName( (P_) *(SuB + BREL(UF_RET)) );
+      printf("(updatePtr)\n");
+
+      if (nextSpB != nextSuB) { /* end of chain of update frames */
+	nextIndent = nextIndent-1;
+	printVectorTable( indentation+1, (PP_) *(nextSpB) );
+      }
+    } else {
+      if (nextSpB != nextSuB) { /* end of chain of update frames */
+	nextIndent = nextIndent-1;
+	printVectorTable( indentation, (PP_) *(nextSpB) );
+      }
+    }
+    printContinuations( depth+1, nextIndent, weight, nextSpA, nextSuA, nextSpB, nextSuB );
+
+  } else {
+    printf("...\n");
+  }
+}
+
+
+void DEBUG_Where( int depth, int weight )
+{
+#ifdef PAR
+  PP_ SpA  = STKO_SpA(SAVE_StkO);
+  PP_ SuA  = STKO_SuA(SAVE_StkO);
+  P_  SpB  = STKO_SpB(SAVE_StkO);
+  P_  SuB  = STKO_SuB(SAVE_StkO);
+#else
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+#endif
+  P_ Hp    = SAVE_Hp;
+  StgRetAddr RetReg = SAVE_Ret;
+  P_ Node  = SAVE_R1.p;
+
+  int indentation;
+
+  maxDepth = depth;
+
+  printf("WARNING: Non-updating cases may be incorrectly displayed\n");
+
+  indentation = printCases( 1, weight, SpA, SuA, SpB, SuB );
+
+  printIndentation( indentation );
+  printf("CASE\n");
+
+  printIndentation( indentation+1 );
+  printName( Node );
+  printf("\n");
+  printVectorTable( indentation+1, (PP_) RetReg );
+
+  printContinuations( depth, indentation, weight, SpA, SuA, SpB, SuB );
+}  
+\end{code}
+
+
+\begin{code}
+#if defined(RUNTIME_DEBUGGING)
+
+void
+DEBUG_INFO_TABLE(node)
+P_ node;
+{
+  int vhs, size, ptrs; /* not used */
+  char *ip_type;
+  StgPtr info_ptr = (StgPtr) INFO_PTR(node);
+
+  getClosureShape(node, &vhs, &size, &ptrs, &ip_type);
+
+  fprintf(stderr,
+	  "%s Info Ptr 0x%lx; Entry: 0x%lx; Update: 0x%lx\n",
+	  ip_type, info_ptr,
+	  (W_) ENTRY_CODE(info_ptr), (W_) UPDATE_CODE(info_ptr));
+  fprintf(stderr,
+	  "Tag: %d; Type: %d; Size: %lu; Ptrs: %lu\n\n",
+	  INFO_TAG(info_ptr), INFO_TYPE(info_ptr),
+	  INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
+#if defined(PAR)
+  fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
+#endif /* PAR */
+
+#if defined(USE_COST_CENTRES)
+  fprintf(stderr,"Cost Centre:       0x%lx\n",INFO_CAT(info_ptr));
+#endif /* USE_COST_CENTRES */
+
+#if defined(_INFO_COPYING)
+  fprintf(stderr,"Evacuate Entry:    0x%lx;\tScavenge Entry: 0x%lx\n",
+	  INFO_EVAC_2S(info_ptr),INFO_SCAV_2S(info_ptr));
+#endif /* INFO_COPYING */
+
+#if defined(_INFO_COMPACTING)
+  fprintf(stderr,"Scan Link:         0x%lx;\tScan Move:      0x%lx\n",
+	  (W_) INFO_SCAN_LINK_1S(info_ptr), (W_) INFO_SCAN_MOVE_1S(info_ptr));
+  fprintf(stderr,"Mark:              0x%lx;\tMarked:         0x%lx;\n",
+	  (W_) INFO_MARK_1S(info_ptr), (W_) INFO_MARKED_1S(info_ptr));
+  if(BASE_INFO_TYPE(info_ptr)==INFO_SPEC_TYPE)
+    fprintf(stderr,"plus specialised code\n");
+  else
+    fprintf(stderr,"Marking:           0x%lx\n",(W_) INFO_MARKING_1S(info_ptr));
+#endif /* INFO_COMPACTING */
+}
+
+void
+DEBUG_REGS()
+{
+#ifdef PAR
+  PP_ SpA  = STKO_SpA(SAVE_StkO);
+  PP_ SuA  = STKO_SuA(SAVE_StkO);
+  P_  SpB  = STKO_SpB(SAVE_StkO);
+  P_  SuB  = STKO_SuB(SAVE_StkO);
+#else
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+#endif
+  P_  Hp   = SAVE_Hp;
+  P_  HpLim= SAVE_HpLim;
+  I_  TagReg= SAVE_Tag;
+  StgRetAddr RetReg = SAVE_Ret;
+  P_  Node = SAVE_R1.p;
+  StgUnion  R1   = SAVE_R1;
+  StgUnion  R2   = SAVE_R2;
+  StgUnion  R3   = SAVE_R3;
+  StgUnion  R4   = SAVE_R4;
+  StgUnion  R5   = SAVE_R5;
+  StgUnion  R6   = SAVE_R6;
+  StgUnion  R7   = SAVE_R7;
+  StgUnion  R8   = SAVE_R8;
+  StgFloat FltReg1 = SAVE_Flt1;
+  StgFloat FltReg2 = SAVE_Flt2;
+  StgFloat FltReg3 = SAVE_Flt3;
+  StgFloat FltReg4 = SAVE_Flt4;
+  StgDouble DblReg1 = SAVE_Dbl1;
+  StgDouble DblReg2 = SAVE_Dbl2;
+
+  fprintf(stderr,"STG-Machine Register Values:\n\n");
+  fprintf(stderr,"Node:  %08lx;  Hp:    %08lx;  HpLim: %08lx;  Tag:   %8lu\n",Node,(W_)Hp,(W_)HpLim,TagReg);
+  fprintf(stderr,"SpA:   %08lx;  SpB:   %08lx;  SuA:   %08lx;  SuB:   %08lx\n",(W_)SpA,(W_)SpB,(W_)SuA,(W_)SuB);
+  fprintf(stderr,"RetReg: %08lx\n",RetReg);
+
+#if 0
+/* These bits need to have the FLUSH_REG_MAP, whereas the surrounding bits
+   use the MAIN_REG_MAP */
+
+  fprintf(stderr, "\n");
+  fprintf(stderr,"LiveR: %08lx\n", LivenessReg);
+  fprintf(stderr,"Flush: %08lx;  FStk:  %08lx;  FStkB: %08lx;  FTmp:  %08lx\n",(W_)FlushP,(W_)FStack,(W_)FStackBase,(W_)Temp);
+#endif /* 0 */
+
+  fprintf(stderr, "\n");
+
+  fprintf(stderr,"Gen:   %8lu, %8lu, %8lu, %8lu\n",R1.i,R2.i,R3.i,R4.i);
+  fprintf(stderr,"       %8lu, %8lu, %8lu, %8lu\n",R5.i,R6.i,R7.i,R8.i);
+  fprintf(stderr,"Float: %8g, %8g, %8g, %8g\n",FltReg1,FltReg2,FltReg3,FltReg4);
+  fprintf(stderr,"Dble:  %8g, %8g\n",DblReg1,DblReg2);
+}
+
+void
+DEBUG_MP()
+{
+  StgPtr mp;
+  StgInt i;
+
+  fprintf(stderr,"MallocPtrList\n\n");
+
+  for(mp = StorageMgrInfo.MallocPtrList; 
+      mp != NULL; 
+      mp = MallocPtr_CLOSURE_LINK(mp)) {
+
+    fprintf(stderr, "MallocPtr(0x%lx) = 0x%lx\n", mp, MallocPtr_CLOSURE_DATA(mp));
+
+/*
+    DEBUG_PRINT_NODE(mp);
+*/
+  }
+
+#if defined(GCap) || defined(GCgn)
+  fprintf(stderr,"\nOldMallocPtr List\n\n");
+
+  for(mp = StorageMgrInfo.OldMallocPtrList; 
+      mp != NULL; 
+      mp = MallocPtr_CLOSURE_LINK(mp)) {
+
+    fprintf(stderr, "  MallocPtr(0x%lx) = 0x%lx\n", mp, MallocPtr_CLOSURE_DATA(mp));
+/*  
+   DEBUG_PRINT_NODE(mp);
+*/
+  }
+#endif /* GCap || GCgn */
+
+  fprintf(stderr, "\n");
+}
+
+#ifndef PAR
+void
+DEBUG_SPT(int weight)
+{ 
+  StgPtr SPTable = StorageMgrInfo.StablePointerTable;
+  StgInt size = SPT_SIZE(SPTable);
+  StgInt ptrs = SPT_NoPTRS(SPTable);
+  StgInt top = SPT_TOP(SPTable);
+
+  StgInt i;
+
+/*
+  DEBUG_PRINT_NODE(SPTable);
+*/
+
+  fprintf(stderr,"SPTable@0x%lx:\n", SPTable);
+  fprintf(stderr,"  InfoPtr = 0x%lx\n", INFO_PTR(SPTable));
+  fprintf(stderr,"  size = %d, ptrs = %d, top = %d\n",
+	            size,      ptrs,      top
+	 );
+  for( i=0; i < ptrs; i++ ) {
+    if (i % 10 == 0) {
+      fprintf(stderr,"\n  ");
+    }
+    printClosure(SPT_SPTR(SPTable, i),1,weight);
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "\n");
+  for( i=0; i < top; i++) {
+    if (i % 10 == 0) {
+      fprintf(stderr,"\n  ");
+    }
+    fprintf(stderr, " %3d", SPT_FREE(SPTable, i));
+  }
+  
+  fprintf(stderr, "\n\n");
+
+}
+#endif /* !PAR */       
+
+
+/*
+  These routines crawl over the A and B stacks, printing
+  a maximum "lines" lines at the top of the stack.
+*/
+
+
+#define	STACK_VALUES_PER_LINE	5
+
+#if !defined(PAR)
+/* (stack stuff is really different on parallel machines) */
+
+void
+DEBUG_ASTACK(lines)
+I_ lines;
+{
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+
+  PP_	stackptr;
+  I_ count = 0;
+
+  fprintf(stderr,"Dump of the Address Stack, SpA: 0x%08lx, BOS: 0x%08lx\n",
+		    (W_) SpA, (W_) stackInfo.botA);
+  
+  for (stackptr = SpA;
+       SUBTRACT_A_STK(stackptr, stackInfo.botA) >= 0;
+       stackptr = stackptr + AREL(1)) 
+    {
+      if( count++ % STACK_VALUES_PER_LINE == 0)
+	{
+	  if(count >= lines * STACK_VALUES_PER_LINE)
+	    break;
+	  fprintf(stderr,"\nSpA[%ld] (0x%08lx): ",count-1,stackptr);
+	}
+      fprintf(stderr,"0x%08lx ",(W_) *stackptr);
+    }
+  fprintf(stderr, "\n");
+}
+
+
+void
+DEBUG_BSTACK(lines)
+I_ lines;
+{
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+
+  P_	stackptr;
+  I_ count = 0;
+
+  fprintf(stderr,"Dump of the Value Stack, SpB: 0x%08lx, BOS: 0x%08lx\n",
+		(W_) SpB, (W_) stackInfo.botB);
+  
+  for (stackptr = SpB;
+	 SUBTRACT_B_STK(stackptr, stackInfo.botB) > 0;
+	 stackptr = stackptr + BREL(1)) 
+      {
+	if( count++ % STACK_VALUES_PER_LINE == 0)
+	  {
+	    if(count >= lines * STACK_VALUES_PER_LINE)
+	      break;
+	    fprintf(stderr,"\nSpB[%ld] (0x%08lx): ",count-1,stackptr);
+	  }
+	fprintf(stderr,"0x%08lx ",(W_) *stackptr);
+      }
+  fprintf(stderr, "\n");
+}
+#endif /* not parallel */
+
+/*
+  This should disentangle update frames from both stacks.
+*/
+
+#if ! defined(PAR)
+void
+DEBUG_UPDATES(limit)
+I_ limit;
+{
+  PP_ SpA  = SAVE_SpA;
+  PP_ SuA  = SAVE_SuA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+
+  P_ updatee, retreg;
+  PP_ sua;
+  P_ sub;
+  PP_ spa = SuA;
+  P_ spb = SuB;
+  I_ count = 0;
+
+  fprintf(stderr,"Update Frame Stack Dump:\n\n");
+  
+  for(spb = SuB;
+      SUBTRACT_B_STK(spb, stackInfo.botB) > 0 && count++ < limit;
+      /* re-init given explicitly */)
+    {
+      updatee = GRAB_UPDATEE(spb); 	   /* Thing to be updated  */
+      retreg  = (P_) GRAB_RET(spb); 	   /* Return vector below */
+
+      fprintf(stderr,"SuA: 0x%08lx, SuB: 0x%08lx, Updatee 0x%08lx, RetReg 0x%x\n",
+	             (W_) spa, (W_) spb,
+		     (W_) updatee, (W_) retreg);
+
+      spa = GRAB_SuA(spb);                 /* Next SuA, SuB */
+      spb = GRAB_SuB(spb);
+    }
+}
+#endif /* not parallel */
+
+#endif /* RUNTIME_DEBUGGING */
+
+#endif /* PAR || RUNTIME_DEBUGGING */
+\end{code}

@@ -1,0 +1,13 @@
+\begin{tabbing}
+\begin{tabular}{@{}l@{\xspa1}c@{}l}
+{\keyword instance\/}\xspa{2}$(${\iden RealFloat\/}\xspa{1}{\iden a\/}$)$\xspa{1} & $\Rightarrow$ & \xspa{1}{\iden Num\/}\xspa{1}$(${\iden Complex\/}\xspa{1}{\iden a\/}$)$\xspa{2}{\keyword where\/}\\
+\skipover{{\keyword inst\/}}$(${\iden x\/}{:}{+}{\iden y\/}$)$\xspa{1}$+$\xspa{1}$(${\iden x\/}$'${:}{+}{\iden y\/}$')$\xspa{3} & $=$ & \xspa{2}$(${\iden x\/}$+${\iden x\/}$')$\xspa{1}{:}{+}\xspa{1}$(${\iden y\/}$+${\iden y\/}$')$\\
+\skipover{{\keyword inst\/}}$(${\iden x\/}{:}{+}{\iden y\/}$)$\xspa{1}$-$\xspa{1}$(${\iden x\/}$'${:}{+}{\iden y\/}$')$\xspa{3} & $=$ & \xspa{2}$(${\iden x\/}$-${\iden x\/}$')$\xspa{1}{:}{+}\xspa{1}$(${\iden y\/}$-${\iden y\/}$')$\\
+\skipover{{\keyword inst\/}}$(${\iden x\/}{:}{+}{\iden y\/}$)$\xspa{1}$\times $\xspa{1}$(${\iden x\/}$'${:}{+}{\iden y\/}$')$\xspa{3} & $=$ & \xspa{2}$(${\iden x\/}$\times ${\iden x\/}$'-${\iden y\/}$\times ${\iden y\/}$')$\xspa{1}{:}{+}\xspa{1}$(${\iden x\/}$\times ${\iden y\/}$'+${\iden y\/}$\times ${\iden x\/}$')$\\
+\skipover{{\keyword inst\/}}{\iden negate\/}\xspa{1}$(${\iden x\/}{:}{+}{\iden y\/}$)$\xspa{7} & $=$ & \xspa{2}{\iden negate\/}\xspa{1}{\iden x\/}\xspa{1}{:}{+}\xspa{1}{\iden negate\/}\xspa{1}{\iden y\/}\\
+\skipover{{\keyword inst\/}}{\iden abs\/}\xspa{1}{\iden z\/}\xspa{15} & $=$ & \xspa{2}{\iden magnitude\/}\xspa{1}{\iden z\/}\xspa{1}{:}{+}\xspa{1}{\numb 0\/}\\
+\skipover{{\keyword inst\/}}{\iden signum\/}\xspa{1}{\numb 0\/}\xspa{12} & $=$ & \xspa{2}{\numb 0\/}\\
+\skipover{{\keyword inst\/}}{\iden signum\/}\xspa{1}{\iden z@\/}$(${\iden x\/}{:}{+}{\iden y\/}$)$\xspa{5} & $=$ & \xspa{2}{\iden x\/}$/${\iden r\/}\xspa{1}{:}{+}\xspa{1}{\iden y\/}$/${\iden r\/}\xspa{2}{\keyword where\/}\xspa{1}{\iden r\/}\xspa{1}$=$\xspa{1}{\iden magnitude\/}\xspa{1}{\iden z\/}\\
+\skipover{{\keyword inst\/}}{\iden fromInteger\/}\xspa{1}{\iden n\/}\xspa{7} & $=$ & \xspa{2}{\iden fromInteger\/}\xspa{1}{\iden n\/}\xspa{1}{:}{+}\xspa{1}{\numb 0\/}
+\end{tabular}
+\end{tabbing}

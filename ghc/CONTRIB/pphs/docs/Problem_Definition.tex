@@ -1,0 +1,37 @@
+\section{Problem definition}
+
+The problem is that a system is needed to typeset Haskell programs
+to be inserted into documents.  This would be useful in, for
+instance, preparing papers for publication that are to include
+Haskell programs. 
+
+Haskell is a fairly new functional programming language and does not
+as yet have a full range of tools available to use with the language.
+
+Many people use the \LaTeX\ system for typesetting.  This uses
+embedded typesetting commands in the input to arrange the typesetting.
+The result as typeset has variable-width characters with a choice of
+font styles and sizes available.  The page-size, margins and layout
+are also controllable by the user.
+
+Haskell programs are generally written on editors that produce ASCII
+text.  This has fixed-width characters and one plain font.
+
+In Haskell, the language avoids using
+line terminators by having indentation to indicate the contextual meaning of
+each line. It is thus crucial that this indentation is retained
+when the text is put into \LaTeX.  However as the \LaTeX\ system uses
+variable width characters, the indentation
+level is dependent on the characters under which the text is aligned.
+The tabs and spaces that went to make
+up the indentation in the original file have to be replaced with a 
+suitable amount of space to make the text line up with the position with which it
+is aligned in the original file. 
+
+It is also desirable to have
+formatting improvements such as highlighting keywords and identifiers as well as
+inserting proper mathematical characters in place of the Haskell-ASCII simulations.
+
+Currently the only way of doing this is by labouriously inserting formatting
+commands into the text by hand.  The alternative is to print out the programs
+verbatim with plain ASCII-style fixed-width font.

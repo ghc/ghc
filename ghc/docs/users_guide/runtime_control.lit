@@ -1,0 +1,332 @@
+%************************************************************************
+%*                                                                      *
+\section[runtime-control]{Controlling the run-time behaviour of your programs}
+\index{runtime control of Haskell programs}
+\index{RTS options}
+%*                                                                      *
+%************************************************************************
+
+To make an executable program, the GHC system compiles your code and
+then links it with a non-trivial runtime system (RTS), which handles
+storage management, profiling, etc.
+
+You have some control over the behaviour of the RTS, by giving special
+command-line arguments to your program.
+
+%You have some control over the behavior of the runtime system, either
+%by giving special command-line arguments to your program (the usual) or by
+%building in your own defaults at compile time (the exotic).
+
+When your Haskell program starts up, its RTS extracts
+command-line arguments bracketed between \tr{+RTS}\index{+RTS option}
+and \tr{-RTS}\index{-RTS option} as its own.  For example:
+\begin{verbatim}
+% ./a.out -f +RTS -p -S -RTS -h foo bar
+\end{verbatim}
+The RTS will snaffle \tr{-p -S} for itself,
+and the remaining arguments \tr{-f -h foo bar} will be handed
+to your program when it does a @GetArgs@ I/O request.
+
+No \tr{-RTS} option is required if the runtime-system options extend
+to the end of the command line, as in this example:
+\begin{verbatim}
+% hls -ltr /usr/etc +RTS -H5m
+\end{verbatim}
+If you absolutely positively want all the rest of the options in a
+command line to go to the program (and not the RTS), use a
+\tr{--RTS}\index{--RTS option}.
+
+As always, for RTS options that take \tr{<size>}s: If the last
+character of \tr{size} is a K or k, multiply by 1000; if an M or m, by
+1,000,000; if a G or G, by 1,000,000,000.  (And any wraparound in the
+counters is {\em your} fault!)
+
+Giving a \tr{+RTS -f}\index{-f RTS option} option will print out the
+RTS options actually available in your program (which vary, depending
+on how you compiled).
+
+%************************************************************************
+%*                                                                      *
+\subsection{Generally-available RTS options}
+\index{RTS options, general}
+%*                                                                      *
+%************************************************************************
+
+The most important RTS options are:
+\begin{description}
+\item[\tr{-H<size>}:]
+\index{-H<size> RTS option}
+Set the heap size to \pl{<size>} bytes
+[default: 4M].
+
+\item[\tr{-K<size>}:]
+\index{-K<size> RTS option}
+Set the stack size to \pl{<size>} bytes [default: 64K].
+For concurrent/parallel programs, it is the stack size of the main
+thread; generally speaking, c/p stacks are in heap.
+
+Note: if your program seems to be consuming infinite stack space, it
+is probably in a loop :-) Of course, if stacks are in the heap, make
+that infinite {\em heap} space...
+
+\item[\tr{-s<file>} or \tr{-S<file>}:]
+\index{-S<file> RTS option}
+\index{-s<file> RTS option}
+Write modest (\tr{-s}) or verbose (\tr{-S}) garbage-collector
+statistics into file \pl{<file>}. The default \pl{<file>} is
+\pl{<program>}\tr{.stat}. The \pl{<file>} \tr{stderr} is treated
+specially, with the output really being sent to \tr{stderr}.
+
+%Note that \tr{stdout} is flushed before each garbage collection so the
+%interleaving of \tr{stdout} and the garbage collection statistics will
+%be accurate.
+
+%Note that the same program will typically allocate more space with a
+%generational collector than with a non-generational collector.
+The amount of heap allocation will typically increase as the total heap
+size is reduced.  The reason for this odd behaviour is that updates of
+promoted-to-old-generation objects may require the extra allocation of a new-generation
+object to ensure that there are never any pointers from the old
+generation to the new generation.
+
+For some garbage collectors (not including the default one, sadly),
+you can convert the \tr{-S} output into a residency graph (in
+PostScript), using the \tr{stat2resid}\index{stat2resid} utility in
+the GHC distribution (\tr{ghc/utils/stat2resid}).
+
+\item[\tr{-N}:]
+\index{-N RTS option}
+Normally, the garbage collector black-holes closures which are being
+evaluated, as a space-saving measure.  That's exactly what you want
+for ordinary Haskell programs.
+
+When signal handlers are present, however, a computation may be
+abandoned prematurely, leaving black holes behind.  If the signal
+handler shares one of these black-holed closures, disaster can result.
+Use the \tr{-N} option to prevent black-holing by the garbage
+collector if you suspect that your signal handlers may share {\em any}
+subexpressions with the top-level computation.  Expect your heap usage
+to increase, since the lifetimes of some closures may be extended.
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection{RTS options to control the garbage-collector}
+\index{RTS options, garbage-collection}
+%*                                                                      *
+%************************************************************************
+
+Besides the \tr{-H} (set heap size) and \tr{-S}/\tr{-s} (GC stats) RTS
+options, there are several options to give you precise control over
+garbage collection.
+
+\begin{description}
+\item[\tr{-M<n>}:]
+\index{-M<n> RTS option}
+Minimum \% \pl{<n>} of heap which must be available for allocation.
+The default is 3\%.
+
+\item[\tr{-A<size>}:]
+\index{-A<size> RTS option}
+Sets a limit on the size of the allocation area for generational
+garbage collection to \pl{<size>} bytes (\tr{-A} gives default of 64k). If
+a negative size is given the size of the allocation is fixed to
+-\pl{<size>}. For non-generational collectors, it fixes the minimum
+heap which must be available after a collection, overriding the
+\tr{-M<n>} RTS option.
+
+\item[\tr{-G<size>}:]
+\index{-G<size> RTS option}
+Sets the percentage of free space to be promoted before a major
+collection is invoked to \pl{<size>}\%. The default is 66\%. If a
+negative size is given it fixes the size of major generation threshold
+to -\pl{<size>} bytes.
+
+\item[\tr{-F2s}:]
+\index{-F2s RTS option}
+Forces a program compiled for generational GC to use two-space copying
+collection. The two-space collector may outperform the generational
+collector for programs which have a very low heap residency. It can
+also be used to generate a statistics file from which a basic heap
+residency profile can be produced (see Section \ref{stat2resid}).
+
+There will still be a small execution overhead imposed by the
+generational compilation as the test for old generation updates will
+still be executed (of course none will actually happen).  This
+overhead is typically less than 1\%.
+
+\item[\tr{-j<size>}:]
+\index{-j<size> RTS option}
+Force a major garbage collection every \pl{<size>} bytes.  (Normally
+used because you're keen on getting major-GC stats, notably heap residency
+info.)
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection{RTS options for profiling and Concurrent/Parallel Haskell}
+%*                                                                      *
+%************************************************************************
+
+The RTS options related to profiling are described in
+\Sectionref{prof-rts-options};
+and those for concurrent/parallel stuff, in \Sectionref{parallel-rts-opts}.
+
+%************************************************************************
+%*                                                                      *
+\subsection{RTS options for hackers, debuggers, and over-interested souls}
+\index{RTS options, hacking/debugging}
+%*                                                                      *
+%************************************************************************
+
+These RTS options might be used (a)~to avoid a GHC bug, (b)~to see
+``what's really happening'', or (c)~because you feel like it.  Not
+recommended for everyday use!
+
+\begin{description}
+\item[\tr{-B}:]
+\index{-B RTS option}
+Sound the bell at the start of each (major) garbage collection.
+[Why anyone would do this, I cannot imagine.]
+
+\item[\tr{-I}:]
+Use the ``debugging mini-interpreter'' with sanity-checking; you have
+to have an appropriately-compiled version of the prelude, etc.
+Goes together nicely with GDB (GNU debugger)...
+(OLD, REALLY)
+
+\item[\tr{-r<file>}:]
+\index{-r <file> RTS option}
+Produce ``ticky-ticky'' statistics at the end of the program run.
+The \tr{<file>} business works just like on the \tr{-S} RTS option (above).
+
+``Ticky-ticky'' statistics are counts of various program actions
+(updates, enters, etc.)
+The program must have been compiled using
+\tr{-fstg-reduction-counts}\index{-fstg-reduction-counts option}
+(a.k.a. ``ticky-ticky profiling''), and, for it to be really useful,
+linked with suitable system libraries.  Not a trivial undertaking:
+consult the installation guide on how to set things up for
+easy ``ticky-ticky'' profiling.
+
+\item[\tr{-T<num>}:]
+\index{-T RTS option}
+An RTS debugging flag; varying quantities of output depending on which bits
+are set in \pl{<num>}.
+
+\item[\tr{-Z}:]
+\index{-Z RTS option}
+Turn {\em off} ``update-frame squeezing'' at garbage-collection time.
+(There's no particularly good reason to turn it off.)
+\end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[rts-hooks]{``Hooks'' to change RTS failure messages}
+\index{hooks, RTS}
+\index{RTS hooks}
+%*                                                                      *
+%************************************************************************
+
+GHC lets you exercise rudimentary control over the messages printed
+when the runtime system ``blows up,'' e.g., on stack overflow.
+
+Simply write some of the following procedures in C and then make sure
+they get linked in, in preference to those in the RTS library:
+\begin{description}
+\item[\tr{void ErrorHdrHook (FILE *)}:]
+\index{ErrorHdrHook}
+What's printed out before the message from \tr{error}.
+
+\item[\tr{void OutOfHeapHook (unsigned long, unsigned long)}:]
+\index{OutOfHeapHook}
+The heap-overflow message.
+
+\item[\tr{void StackOverflowHook (long int)}:]
+\index{StackOverflowHook}
+The stack-overflow message.
+
+\item[\tr{void MallocFailHook (long int)}:]
+\index{MallocFailHook}
+The message printed if \tr{malloc} fails.
+
+\item[\tr{void PatErrorHdrHook (FILE *)}:]
+\index{PatErrorHdrHook}
+The message printed if a pattern-match fails (the failures
+that were not handled by the Haskell programmer).
+
+\item[\tr{void PreTraceHook (FILE *)}:]
+\index{PreTraceHook}
+What's printed out before a \tr{trace} message.
+
+\item[\tr{void PostTraceHook (FILE *)}:]
+\index{PostTraceHook}
+What's printed out after a \tr{trace} message.
+\end{description}
+
+For example, here is the ``hooks'' code used by GHC itself:
+\begin{verbatim}
+#include <stdio.h>
+#define W_ unsigned long int
+#define I_ long int
+
+void
+ErrorHdrHook (where)
+  FILE *where;
+{
+    fprintf(where, "\n"); /* no "Fail: " */
+}
+
+void
+OutOfHeapHook (request_size, heap_size)
+  W_ request_size; /* in bytes */
+  W_ heap_size;    /* in bytes */
+{
+    fprintf(stderr, "GHC's heap exhausted;\nwhile trying to 
+	allocate %lu bytes in a %lu-byte heap;\nuse the `-H<size>'
+	option to increase the total heap size.\n",
+	request_size,
+	heap_size);
+}
+
+void
+StackOverflowHook (stack_size)
+  I_ stack_size;    /* in bytes */
+{
+    fprintf(stderr, "GHC stack-space overflow: current size
+	%ld bytes.\nUse the `-K<size>' option to increase it.\n",
+	stack_size);
+}
+
+void
+PatErrorHdrHook (where)
+  FILE *where;
+{
+    fprintf(where, "\n*** Pattern-matching error within GHC!\n\n
+	This is a compiler bug; please report it to
+	glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\nFail: ");
+}
+
+void
+PreTraceHook (where)
+  FILE *where;
+{
+    fprintf(where, "\n"); /* not "Trace On" */
+}
+
+void
+PostTraceHook (where)
+  FILE *where;
+{
+    fprintf(where, "\n"); /* not "Trace Off" */
+}
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+%\subsection[rts-control-shell-scripts]{Hiding the runtime-control mess with a shell script}
+%*                                                                      *
+%************************************************************************
+
+%NOT DONE YET.
+

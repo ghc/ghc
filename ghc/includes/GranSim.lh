@@ -1,0 +1,71 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*									*
+\section{Macros and global declarations for GranSim}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GRAN
+
+#  define IS_IDLE(proc)	((IdleProcs & PE_NUMBER((long)proc)) != 0l)
+#  define ANY_IDLE	(Idlers > 0)
+#  define MAKE_IDLE(proc) do { if(!IS_IDLE(proc)) { ++Idlers; IdleProcs |= PE_NUMBER(proc);  } } while(0)
+#  define MAKE_BUSY(proc) do { if(IS_IDLE(proc))  { --Idlers; IdleProcs &= ~PE_NUMBER(proc); } } while(0)
+
+/* Event Types */
+#  define STARTTHREAD     0	/* Start a newly created thread */
+#  define CONTINUETHREAD  1     /* Continue running the first thread in the queue */
+#  define RESUMETHREAD    2     /* Resume a previously running thread */
+#  define MOVESPARK       3     /* Move a spark from one PE to another */
+#  define MOVETHREAD      4     /* Move a thread from one PE to another */
+#  define FINDWORK        5     /* Search for work */
+#  define FETCHNODE       6     /* Fetch a node */
+#  define FETCHREPLY      7     /* Receive a node */
+
+#  define EVENT_PROC(evt)	(evt->proc)
+#  define EVENT_CREATOR(evt)	(evt->creator)
+#  define EVENT_TIME(evt)	(evt->time)
+#  define EVENT_TYPE(evt)	(evt->evttype)
+#  define EVENT_TSO(evt)	(evt->tso)
+#  define EVENT_NODE(evt)	(evt->node)
+#  define EVENT_SPARK(evt)	(evt->spark)
+#  define EVENT_NEXT(evt)	(eventq)(evt->next)
+
+#endif /* GRAN */
+
+#if defined(GRAN) || defined(PAR)
+void DumpGranEvent PROTO((enum gran_event_types name, P_ tso));
+void DumpSparkGranEvent PROTO((enum gran_event_types name, W_ id));
+void DumpGranEventAndNode PROTO((enum gran_event_types name, P_ tso, P_ node, PROC proc));
+void DumpRawGranEvent PROTO((PROC pe, enum gran_event_types name, W_ id));
+void DumpGranInfo PROTO((PROC pe, P_ tso, rtsBool mandatory_thread));
+void grterminate PROTO((TIME v));
+
+# ifdef GRAN
+I_ SaveSparkRoots PROTO((I_));
+I_ SaveEventRoots PROTO((I_));
+
+I_ RestoreSparkRoots PROTO((I_));
+I_ RestoreEventRoots PROTO((I_));
+
+IF_RTS(int init_gr_simulation PROTO((int, char **, int, char **));)
+IF_RTS(void end_gr_simulation(STG_NO_ARGS);)
+# endif
+
+# ifdef PAR
+ullong msTime(STG_NO_ARGS);
+#  define CURRENT_TIME msTime()
+
+#  define CURRENT_PROC thisPE
+
+# else	/* GRAN */
+
+#  define CURRENT_TIME CurrentTime[CurrentProc]
+#  define CURRENT_PROC CurrentProc
+# endif
+
+#endif
+\end{code}

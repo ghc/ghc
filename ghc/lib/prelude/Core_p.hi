@@ -1,0 +1,45 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeCore where
+import PreludeBuiltin(Char(..), Int(..), Integer(..), List(..), Tuple2)
+import PreludeRatio(Ratio(..))
+_ceiling :: (RealFrac a, Integral b) => a -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 122 _N_ _S_ "U(U(AU(U(AAAASAAA)AAAA)A)LSAAAA)L" {_A_ 4 _U_ 11122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double, Int ] 2 { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
+_floor :: (RealFrac a, Integral b) => a -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 122 _N_ _S_ "U(U(AU(U(ASAAAAAA)AAAA)A)LSAAAA)L" {_A_ 4 _U_ 11122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double, Int ] 2 { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
+_integer_0 :: Integer
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [0#] _N_ #-}
+_integer_1 :: Integer
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [1#] _N_ #-}
+_integer_m1 :: Integer
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+_properFraction :: (RealFloat b, Integral a) => b -> (a, b)
+	{-# GHC_PRAGMA _A_ 2 _U_ 112 _N_ _S_ "U(ALLAASLAAA)L" {_A_ 5 _U_ 111112 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Int, Double ] 2 { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+_readList :: Text a => [Char] -> [([a], [Char])]
+	{-# GHC_PRAGMA _A_ 1 _U_ 22 _N_ _N_ _N_ _N_ #-}
+_round :: (RealFrac a, Integral b) => a -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 122 _N_ _S_ "U(U(AU(U(ALAAAAAS)AAAA)A)LSAAAA)L" {_A_ 5 _U_ 112122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double, Int ] 2 { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ }, [ (Ratio Integer), Integer ] 2 { _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+_showList :: Text a => [a] -> [Char] -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 212 _N_ _N_ _N_ _N_ #-}
+_showRational :: Int -> Ratio Integer -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(U(PPP)L)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+_truncate :: (RealFrac a, Integral b) => a -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 122 _N_ _S_ "U(AASAAAA)L" {_A_ 2 _U_ 122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double, Int ] 2 { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
+fromRationalX :: RealFloat a => Ratio Integer -> a
+	{-# GHC_PRAGMA _A_ 0 _U_ 22 _N_ _N_ _N_ _N_ #-}
+i0__ :: Num a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: {{Num u0}}) -> let {(u2 :: Integer) = _#_ int2Integer# [] [0#]} in case u1 of { _ALG_ _TUP_10 (u3 :: {{Eq u0}}) (u4 :: {{Text u0}}) (u5 :: u0 -> u0 -> u0) (u6 :: u0 -> u0 -> u0) (u7 :: u0 -> u0 -> u0) (u8 :: u0 -> u0) (u9 :: u0 -> u0) (ua :: u0 -> u0) (ub :: Integer -> u0) (uc :: Int -> u0) -> _APP_  ub [ u2 ]; _NO_DEFLT_ } _SPECIALISE_ [ Int ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ }, [ Integer ] 1 { _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [0#] _N_ } #-}
+i1__ :: Num a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: {{Num u0}}) -> let {(u2 :: Integer) = _#_ int2Integer# [] [1#]} in case u1 of { _ALG_ _TUP_10 (u3 :: {{Eq u0}}) (u4 :: {{Text u0}}) (u5 :: u0 -> u0 -> u0) (u6 :: u0 -> u0 -> u0) (u7 :: u0 -> u0 -> u0) (u8 :: u0 -> u0) (u9 :: u0 -> u0) (ua :: u0 -> u0) (ub :: Integer -> u0) (uc :: Int -> u0) -> _APP_  ub [ u2 ]; _NO_DEFLT_ } _SPECIALISE_ [ Int ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ }, [ Integer ] 1 { _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [1#] _N_ } #-}
+i2__ :: Num a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: {{Num u0}}) -> let {(u2 :: Integer) = _#_ int2Integer# [] [2#]} in case u1 of { _ALG_ _TUP_10 (u3 :: {{Eq u0}}) (u4 :: {{Text u0}}) (u5 :: u0 -> u0 -> u0) (u6 :: u0 -> u0 -> u0) (u7 :: u0 -> u0 -> u0) (u8 :: u0 -> u0) (u9 :: u0 -> u0) (ua :: u0 -> u0) (ub :: Integer -> u0) (uc :: Int -> u0) -> _APP_  ub [ u2 ]; _NO_DEFLT_ } _N_ #-}
+iminus1__ :: Num a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAAAASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+int2Integer :: Int -> Integer
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int#) -> _#_ int2Integer# [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Int) -> case u0 of { _ALG_ I# (u1 :: Int#) -> _#_ int2Integer# [] [u1]; _NO_DEFLT_ } _N_ #-}
+r0__ :: Fractional a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ }, [ (Ratio Integer) ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ } #-}
+r1__ :: Fractional a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+rhalf__ :: Fractional a => a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Double ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ }, [ (Ratio Integer) ] 1 { _A_ 0 _N_ _N_ _N_ _N_ _N_ } #-}
+

@@ -1,0 +1,46 @@
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
+interface ReadPragmas where
+import BasicLit(BasicLit)
+import HsCore(UfId, UnfoldingCoreAtom, UnfoldingCoreExpr)
+import HsPragmas(ClassPragmas, DataPragmas, GenPragmas, InstancePragmas, TypePragmas)
+import HsTypes(MonoType, PolyType)
+import LiftMonad(LiftM)
+import Maybes(Labda)
+import PrefixSyn(RdrTySigPragmas)
+import ProtoName(ProtoName)
+import SimplEnv(UnfoldingGuidance)
+cvt_IdString :: [Char] -> ProtoName
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _S_ "S" _N_ _N_ #-}
+rdBasicLit :: [Char] -> LiftM (BasicLit, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdClassPragma :: [Char] -> LiftM (ClassPragmas ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdCoreAtom :: [Char] -> LiftM (UnfoldingCoreAtom ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdCoreBinder :: [Char] -> LiftM ((ProtoName, PolyType ProtoName), [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdCoreExpr :: [Char] -> LiftM (UnfoldingCoreExpr ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdCoreId :: [Char] -> LiftM (UfId ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdCoreType :: [Char] -> LiftM (PolyType ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _S_ "S" _N_ _N_ #-}
+rdCoreTypeMaybe :: [Char] -> LiftM (Labda (PolyType ProtoName), [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdDataPragma :: [Char] -> LiftM (DataPragmas ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdGenPragma :: [Char] -> LiftM (GenPragmas ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdGuidance :: [Char] -> LiftM (UnfoldingGuidance, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdInstPragma :: [Char] -> LiftM (Labda [Char], InstancePragmas ProtoName, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdMonoTypeMaybe :: [Char] -> LiftM (Labda (MonoType ProtoName), [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rdTySigPragmas :: [Char] -> LiftM (RdrTySigPragmas, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _S_ "S" _N_ _N_ #-}
+rdTypePragma :: [Char] -> LiftM (TypePragmas, [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+rd_constm :: [Char] -> LiftM ((ProtoName, GenPragmas ProtoName), [Char])
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _S_ "S" _N_ _N_ #-}
+

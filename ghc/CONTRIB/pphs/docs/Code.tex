@@ -1,0 +1,53 @@
+\chapter{Project code}
+
+\section{The program code - {\tt pphs.c}} \label{prog-code}
+
+\newpage		    % 8 pages of code a2ps (21.4.94)
+\setcounter{page}{50}
+
+\section{The style file - {\tt pphs.sty}} \label{style-code}
+
+\begin{verbatim}
+% =========================================
+% Definitions for use with the pphs program
+% =========================================
+
+\typeout{For use with the pphs program}
+
+% Definitions of commands used by pphs
+
+\newbox\foo
+\def\skipover#1{\setbox\foo\hbox{#1}\hskip\wd\foo}
+\def\plusplus{\hbox{$+\mkern-7.5mu+$}}
+\def\xspa#1{\hskip#1ex}
+\def\bareq{\setbox\foo\hbox{$=$}\makebox[\wd\foo]{$|$}}
+
+% User-redefinable commands - typefaces
+
+\def\keyword{\bf}
+\def\iden{\it}
+\def\stri{\rm}
+\def\com{\rm}
+\def\numb{\rm}
+
+% User-redefinable commands - quote marks
+
+\def\forquo{\hbox{\rm '}}
+\def\escquo{\hbox{\rm '}}
+\end{verbatim}
+
+\section{The make file - {\tt Makefile}} \label{make-code}
+
+\begin{verbatim}
+# Makefile for A Preece's program... etc.
+
+default:
+        @echo "Type make pphs to create the program."
+
+pphs: pphs.c
+        cc -o pphs pphs.c
+
+test: pphs
+        pphs test
+        latex test.tex
+\end{verbatim}

@@ -1,0 +1,36 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Subst where
+import Bag(Bag)
+import Class(Class)
+import Maybes(Labda)
+import NameTypes(ShortName)
+import PreludeGlaST(_MutableArray)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import Unique(Unique)
+data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+data SubstResult   = SubstOK | OccursCheck TyVar UniType | AlreadyBound UniType
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+applySubstToThetaTy :: Subst -> [(Class, UniType)] -> (Subst, [(Class, UniType)])
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+applySubstToTy :: Subst -> UniType -> (Subst, UniType)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+applySubstToTyVar :: Subst -> TyVar -> (Subst, UniType)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+combineSubstUndos :: Subst -> Subst
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSLL)" {_A_ 4 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+extendSubst :: TyVar -> UniType -> Subst -> (Subst, SubstResult)
+	{-# GHC_PRAGMA _A_ 2 _U_ 221 _N_ _N_ _N_ _N_ #-}
+getSubstTyVarUnique :: Subst -> (Subst, Unique)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(U(LU(P))P)LLU(P))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+getSubstTyVarUniques :: Int -> Subst -> (Subst, [Unique])
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(U(U(LU(P))P)LLU(P))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+mkEmptySubst :: Int -> Subst
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
+pushSubstUndos :: Subst -> Subst
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LLLL)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+undoSubstUndos :: Subst -> Subst
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSLL)" {_A_ 4 _U_ 2112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

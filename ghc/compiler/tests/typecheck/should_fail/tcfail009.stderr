@@ -1,0 +1,7 @@
+ 
+"tcfail009.hs", line 3:
+    Couldn't match type "Integer" against "Int".
+    In an arithmetic sequence: [ (1 :: Int) .. (2 :: Integer) ]
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

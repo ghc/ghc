@@ -1,0 +1,130 @@
+%
+% Included by  prof-options.lit
+%
+
+Utility programs which produce graphical profiles.
+
+\subsubsection[hp2ps]{\tr{hp2ps}--heap profile to PostScript}
+\index{hp2ps (utility)}
+\index{heap profiles}
+\index{PostScript, from heap profiles}
+
+%\vspace{2ex}
+%\begin{quote}
+USAGE: \tr{hp2ps} [flags] [\pl{<file>}[\tr{.stat}]]
+%\end{quote}
+
+The program \tr{hp2ps}\index{hp2ps} converts a heap profile as
+produced by the \tr{-h<break-down>}\index{-h<break-down> RTS option}
+runtime option into a PostScript graph of the heap profile. By
+convention, the file to be processed by \tr{hp2ps} has a \tr{.hp}
+extension. The PostScript output is written to \pl{<file>}\tr{.ps}. If
+\pl{<file>} is omitted entirely, then the program behaves as a filter.
+
+\tr{hp2ps} is distributed in \tr{ghc/utils/hp2ps}. It was originally
+developed by Dave Wakeling as part of the HBC/LML heap
+profiler.
+
+
+The flags are:
+\begin{description}
+\item[\tr{-d}]
+In order to make graphs more readable, \tr{hp2ps} sorts the shaded
+bands for each identifier. The default sort ordering is for the bands
+with the largest area to be stacked on top of the smaller ones.  The
+\tr{-d} option causes rougher bands (those representing series of
+values with the largest standard deviations) to be stacked on top of
+smoother ones.
+
+\item[\tr{-b}] 
+Normally, \tr{hp2ps} puts the title of the graph in a small box at the
+top of the page. However, if the JOB string is too long to fit in a
+small box (more than 35 characters), then
+\tr{hp2ps} will choose to use a big box instead.  The \tr{-b}
+option forces \tr{hp2ps} to use a big box.
+
+\item[\tr{-e<float>[in|mm|pt]}]
+Generate encapsulated PostScript suitable for inclusion in LaTeX
+documents.  Usually, the PostScript graph is drawn in landscape mode
+in an area 9 inches wide by 6 inches high, and \tr{hp2ps} arranges
+for this area to be approximately centred on a sheet of a4 paper.
+This format is convenient of studying the graph in detail, but it is
+unsuitable for inclusion in LaTeX documents.  The \tr{-e} option
+causes the graph to be drawn in portrait mode, with float specifying
+the width in inches, millimetres or points (the default).  The
+resulting PostScript file conforms to the Encapsulated PostScript
+(EPS) convention, and it can be included in a LaTeX document using
+Rokicki's dvi-to-PostScript converter \tr{dvips}.
+
+\item[\tr{-g}]
+Create output suitable for the \tr{gs} PostScript previewer (or
+similar). In this case the graph is printed in portrait mode without
+scaling. The output is unsuitable for a laser printer.
+
+\item[\tr{-l}]
+Normally a profile is limited to 20 bands with additional identifiers
+being grouped into an \tr{OTHER} band. The \tr{-l} flag removes this
+20 band and limit, producing as many bands as necessary. No key is
+produced as it won't fit!. It is useful for creation time profiles
+with many bands.
+
+\item[\tr{-m<int>}]
+Normally a profile is limited to 20 bands with additional identifiers
+being grouped into an \tr{OTHER} band. The \tr{-m} flag specifies an
+alternative band limit (the maximum is 20).
+
+\tr{-m0} requests the band limit to be removed. As many bands as
+necessary are produced. However no key is produced as it won't fit! It
+is useful for displaying creation time profiles with many bands.
+
+\item[\tr{-p}]
+Use previous parameters. By default, the PostScript graph is
+automatically scaled both horizontally and vertically so that it fills
+the page.  However, when preparing a series of graphs for use in a
+presentation, it is often useful to draw a new graph using the same
+scale, shading and ordering as a previous one. The \tr{-p} flag causes
+the graph to be drawn using the parameters determined by a previous
+run of \tr{hp2ps} on \pl{file}. These are extracted from
+\pl{file}\tr{.aux}.
+
+\item[\tr{-s}] Use a small box for the title.
+
+\item[\tr{-t<float>}]
+Normally trace elements which sum to a total of less than 1\% of the
+profile are removed from the profile. The \tr{-t} option allows this
+percentage to be modified (maximum 5\%). 
+
+\tr{-t0} requests no trace elements to be removed from the profile,
+ensuring that all the data will be displayed. 
+
+\item[\tr{-?}] Print out usage information.
+\end{description}
+
+\subsubsection[stat2resid]{\tr{stat2resid}---residency info from GC stats}
+\index{stat2resid (utility)}
+\index{GC stats---residency info}
+\index{residency, from GC stats}
+
+%\vspace{2ex}
+%\begin{quote}
+USAGE: \tr{stat2resid} [\pl{<file>}[\tr{.stat}] [\pl{<outfile>}]]
+%\end{quote}
+
+The program \tr{stat2resid}\index{stat2resid} converts a detailed
+garbage collection statistics file produced by the 
+\tr{-S}\index{-S RTS option} runtime option into a PostScript heap
+residency graph. The garbage collection statistics file can be
+produced without compiling your program for profiling.
+
+By convention, the file to be processed by \tr{stat2resid} has a
+\tr{.stat} extension. If the \pl{<outfile>} is not specified the
+PostScript will be written to \pl{<file>}\tr{.resid.ps}. If
+\pl{<file>} is omitted entirely, then the program behaves as a filter. 
+
+The plot can not be produced from the statistics file for a
+generational collector, though a suitable stats file can be produced
+using the \tr{-F2s}\index{-F2s RTS option} runtime option when the
+program has been compiled for generational garbage collection (the
+default).
+
+\tr{stat2resid} is distributed in \tr{ghc/utils/stat2resid}.

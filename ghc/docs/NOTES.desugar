@@ -1,0 +1,323 @@
+(91/08/08: OLD!)
+
+These are notes about a _simple_ but complete pattern-matching
+compiler for Haskell.  I presume familiarity with Phil's
+pattern-matching stuff in Simon's book and use roughly the same notation.
+
+Abbreviations: "p" for pattern, "e" (or "E") for expression, "g" for
+guard, "v" for variable, "u" for new variable I made up. "[]" for
+FATBAR.
+
+Subscripts: "p11" is really short for "p_{1,1}".  Sometimes I'll use
+a "?", as in "pm1 ... pm?", to mean the second subscript goes up to
+something I'm really not worried about.
+
+NB: LETRECS NOT DEALT WITH YET.
+
+---------------------------------------------------------------------
+We need a slightly souped-up "match" for Haskell (vs the Phil-chapter
+one).  Simon suggested a re-arrangement of things, which I have then
+further re-arranged...
+
+Proposal (Simon)
+~~~~~~~~
+
+Eliminate default arg of match (3rd arg in Phil-chapter match) in
+favour of returning the variable (not special value) fail.  Thus a
+possible translation for
+
+	f [] [] = e1
+	f x  y  = e2
+
+would be
+
+	f p q = case p of 
+		[] -> case q of
+			[] -> e1
+			_  -> fail
+		_ -> fail
+		where
+		fail = e2
+
+Now the issue of whether to duplicate code or share it becomes whether
+to substitute copies of e2 or not.  This is a decision we need to take
+anyway for all other let-bound things, so why not for fail too?  If
+fail is used only once, we will certainly substitute for it.
+
+We could even detect that fail is used only in a head position, so it
+can be implemented as a stack-adjust then a jump.  This might well
+apply to other let-bound things too.
+
+Now here's a proposal for the "match" function.  The main difference is
+    1) no default argument
+    2) [contra simon's suggestion]  Patterns are still per-row as in
+       Phil's chapter.
+    3) [partain] even the input exprs are CoreExprs
+
+OK, for a "match" for m equations each with n patterns:
+
+match :: [Name]
+		-- n (variable) names, one per pattern column, bound
+		-- to the n expressions we are matching against the
+		-- patterns
+
+      -> [([Pat], CoreExpr)]
+		-- one pair for each of the m equations: the n
+		-- patterns in that equation, then the CoreExpr that
+		-- is evaluated if we get a match.  The CoreExpr may
+		-- contain free "fail"s; some hackery required to
+		-- ensure that is OK; see below
+
+      -> CoreExpr
+		-- the resulting code to do the matching
+
+In words,
+  takes
+    (1) a list of n (match-expression, pattern-column) pairs
+    (2) a list of m post-match expressions, expr i to be inserted
+	immediately after equation i's lhs matches
+  returns
+    (1) a desugared expr equivalent of the whole "match"
+
+Meaning
+~~~~~~~
+    match [u1, ..., un]
+	  [([p11, ..., p1n], e1), ..., ([pm1, ..., pmn], em)]
+
+    match [ (e1, [p11, ...,pm1]), ..., (en, [p1n, ...,pmn])]
+	  [ E1, ... Em ]
+
+    ********* MEANS *********
+
+    case (u1, ..., un) of
+	 (p11, ..., p1n) -> e1
+	 _		 -> fail
+    where
+    fail = case (u1, ..., un) of
+	        (p21, ..., p2n) -> e2
+	        _		-> fail
+    ... and so on ...
+
+Alternatively, this specification could be given in terms of
+pattern-matching lambdas, as in Phil's chapter.
+
+NOT CHANGED BEYOND HERE
+
+-------------------------------------------------------------------
+Cranking through a good old function definition with the above:
+
+    f p11 p12 ... p1n | g11 = e11
+		      | g12 = e12
+		      ...
+		      | g1? = e1?
+    ...
+    f pm1 pm2 ... pmn | gm1 = em1
+		      ...
+		      | gm? = em?
+
+The "match" equivalent is:
+
+f = \u1.\u2...\un ->
+	match [ (u1, [p11, ...,pm1]), ..., (un, [p1n, ...,pmn])]
+	      [ E1, ..., Em ]
+	where fail = error "pattern-match for f failed\n"
+	      E1   = if g11 then e11 else if g12 then ... else fail
+	      ...
+	      Em   = if gm1 then em1 else if gm2 then ... else fail
+
+Boring, huh?
+
+-------------------------------------------------------------------
+It is helpful to me to think about the simple/base cases for this
+complicated "match".
+
+ALL LISTS EMPTY
+
+    match [] []
+
+  corresponds to the syntactically bogus (zero equations!?)
+
+    case () of
+      () -> {- nothing!! -}
+      _  -> fail
+
+
+EMPTY RULE -- no more patterns
+
+    match [] [ ([], E1), ..., ([], Em) ]
+
+  [where, incidentally, each Ei will be of the form
+   (not that it has to be...)
+
+    Ei = let x1 = e1 in
+         let x2 = e2 in
+	 ...
+	 let x? = e? in
+	 if g1 then e'1
+	 else if g2 then 
+	 ...
+	 else if g? then e'?
+	 else fail
+  ]
+
+  becomes ("E1 [] E2 [] ... [] Em" in Phil's chapter...)
+
+    E1
+    where
+       fail = E2
+       where
+       ...
+         fail = Em-1
+	 where fail = Em
+
+  with any "fail" in Em being bound from an outer scope; perhaps it's
+  easier to see written as:
+
+    let fail = Em
+     in let fail = Em-1
+        in ...
+    	    let fail = E2 in E1
+-------------------------------------------------------------------
+HANDLING LAZY ("TWIDDLE") PATTERNS
+
+For Haskell, the "mixture rule" (p.~88) looks at a pattern-column and
+splits the equations into groups, depending on whether it sees
+
+    * all constructors, or
+    * all variables _OR LAZY PATTERNS_
+
+The following example shows what "match" does when confronted by one
+of these variables/lazy-patterns combinations.  Note the use of the
+binding lists.
+
+    f  v | g11 = e11
+    	 ...
+    	 | g1? = e1?
+    f ~p | g21 = e21
+    	 ...
+    	 | g2? = e2?
+
+is
+
+    f = \ u1 ->
+	match [(u1, [ v, ~p ])]
+	      [ if g11 then e11 else if ... else fail, -- E1
+		if g21 then e21 else if ... else fail  -- E2
+	      ]
+    where fail = error "no match in f\n"
+
+which transmogrifies into
+
+    f = \ u1 ->
+    	let u2 = u1 in
+    	match []
+	      [ -- E1 --
+	        let v = u2 
+	        in
+		if g11 then e11 else if ... else fail
+
+	       ,-- E2 --
+		let free_var1_of_p = match [(u2, [ p ])] [ free_var1_of_p ]
+		    ...
+		    free_var?_of_p = match [(u2, [ p ])] [ free_var?_of_p ]
+		in
+		if g21 then e21 else if ... else fail  -- E2
+
+	      ]
+    where fail = error "no match in f\n"
+
+For more specific match-failure error messages, one could insert
+"let fail = ..."'s in strategic places.
+
+-------------------------------------------------------------------
+"match" EQUIVALENTS FOR VARIOUS HASKELL CONSTRUCTS
+
+* function definition -- shown above
+
+* pattern-matching lambda (souped up version in static semantics)
+
+    \ p1 p2 ... pn | g1 -> e1
+		   | g2 -> e2
+		   ...
+		   | gm -> em
+
+  is the same as
+
+    \ u1.\u2 ... \un ->
+	match [ (u1, [p1]), ..., (un, [pn])]
+	      [ if g1 then e1 else if ... then em else fail
+	      ]
+    	where fail = error "no match in pattern-matching lambda at line 293\n"
+
+* pattern-matching (simple, non-recursive) "let"
+
+    let p = e
+    in E
+
+  corresponds to
+
+    case e of
+      ~p -> E
+
+  which has a "match" equivalent of
+
+    match [(e, [~p])] [ E ]
+
+  The full-blown Haskell "let" is more horrible:
+
+    let p | g1 = e1
+    	  ...
+    	  | gn = en
+    in E
+
+  corresponds to
+
+    case ( if g1 then e1 else... else if gn then en else error "?" ) of
+      ~p -> E
+
+  thinking about which I am not able to sleep well at night.
+  (Won't those g's have things bound from inside p ?)
+
+* pattern-matching (not-quite-so simple, non-recursive) "let"
+
+<mumble>
+
+* pattern binding
+
+    p | g1 = e1
+      | g2 = e2
+      ...
+      | gm = em
+
+  That's the same as
+
+    p = if g1 then e1 else if ... else if gm then em else fail
+    where fail = "...some appropriate thing..."
+
+  which corresponds to
+
+    match [ (if g1 ... then em else fail, [ ~p ]) ]
+    	  [ {-nothing-} ]
+    where fail = "...some appropriate thing..."
+
+* "case" expressions (souped up version in static semantics)
+
+    case e0 of
+      p1 | g11 -> e11
+    	 ...
+    	 | g1? -> e1?
+      ...
+      pm | gm1 -> em1
+    	 ...
+    	 | gm? -> em?
+
+  is the same as
+
+    match [ (e0, [p1, ..., pm]) ]
+    	  [ if g11 then e11 else if ... else fail -- E1
+    	    , ... ,
+	    if gm1 then em1 else if ... else fail
+    	  ]
+    where fail = error "pattern-matching case at line xxx failed\n"
+
+* list comprehensions

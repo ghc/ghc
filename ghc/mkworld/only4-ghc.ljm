@@ -1,0 +1,367 @@
+%************************************************************************
+%*									*
+\section[mkworld-only4-ghc]{Extra things ``only for'' for the @ghc@ project}
+%*									*
+%************************************************************************
+
+\begin{code}
+/* Project identification - name and version */
+
+#ifndef ProjectName
+#define ProjectName     The Glorious Glasgow Haskell Compilation System
+#endif
+/* ProjectVersion is something printable */
+#ifndef ProjectVersion
+#define ProjectVersion  0.26
+#endif
+/* A patchlevel change is something *very minor* */
+#ifndef ProjectPatchLevel
+#define ProjectPatchLevel patchlevel 0
+#endif
+/* GhcBuildeeVersion is something CPP-testable (ProjectVersion * 100) */
+#ifndef GhcBuildeeVersion
+#define GhcBuildeeVersion  26
+#endif
+\end{code}
+
+Make variables that say where the source to main pieces of the system live:
+\begin{code}
+/* state of the source world */
+GHC_DRIVERSRC    = $(TOP)/ghc/driver
+GHC_COMPILERSRC  = $(TOP)/ghc/compiler
+GHC_RUNTIMESRC   = $(TOP)/ghc/runtime
+GHC_LIBSRC	 = $(TOP)/ghc/lib
+GHC_INCLUDESRC   = $(TOP)/ghc/includes
+GHC_UTILSRC	 = $(TOP)/ghc/utils
+GHC_BOOKSRC	 = $(TOP)/ghc/book
+\end{code}
+
+Include definitions (usually to go with generated C):
+\begin{code}
+#ifndef GhcIncludesDir
+#define GhcIncludesDir $(GHC_INCLUDESRC)
+#endif
+GHC_INCLUDES = GhcIncludesDir
+\end{code}
+
+A make variable that's occasionally very important: we use \tr{GHC_*}
+when we really mean GHC, rather than \tr{HC*}, which just means ``the
+standard Haskell compiler'' (whatever that is).
+\begin{code}
+#ifndef AllProjectsGhcOpts
+#define AllProjectsGhcOpts /*none*/
+#endif
+
+#ifndef PlatformGhcOpts
+#define PlatformGhcOpts /*none*/
+#endif
+
+#if HaskellCompilerType == HC_CHALMERS_HBC
+GHC_RTS_STYLE = 'hbc'
+#else
+# if HaskellCompilerType == HC_ROJEMO_NHC
+GHC_RTS_STYLE = 'ghc' /* wrong, but more likely to trigger something */
+# else
+GHC_RTS_STYLE = 'ghc'
+# endif
+#endif
+
+#ifndef ProjectGhcOpts
+#define ProjectGhcOpts -hi-diffs -dcore-lint -link-chk
+#endif /* ! ProjectGhcOpts */
+
+#ifndef SetupGhcOpts
+#define SetupGhcOpts /*none*/
+#endif
+
+GenerateOptionsMakeVars(GHC,OPTS,AllProjectsGhcOpts,PlatformGhcOpts,ProjectGhcOpts,SetupGhcOpts)
+
+GHCFLAGS=$(GLUED_CPP_DEFINES) $(GLUED_GHC_OPTS)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{What to build}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsubsection{Include or leave out these individual ``features''}
+%*									*
+%************************************************************************
+
+\begin{code}
+/* build York interpreter as well as Glasgow compiler
+*/
+#ifndef BuildYorkInterpreter
+#define BuildYorkInterpreter NO
+#endif
+
+/* incorporate Semantique strictness analyser into the compiler;
+   it analyses, but the info generated is *UNUSED* :-(
+ */
+#ifndef UseSemantiqueStrictnessAnalyser
+#define UseSemantiqueStrictnessAnalyser NO
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Installation: whether to, where to, what to}
+%*									*
+%************************************************************************
+
+\begin{code}
+/* defaults for which pieces should be installed */
+/* ToDo: possibly obsolete */
+#ifndef DoInstallGHCSystem
+#define DoInstallGHCSystem	YES
+#endif /* DoInstallGHCSystem */
+\end{code}
+
+\begin{code}
+/* ------------------------------------------------------------------ */
+/* compiler-proper subsystem:
+    the lib/data bits are installed w/ a version number as well
+*/
+
+#ifndef InstBinDir_GHC
+# if AT_GLASGOW
+#  define InstBinDir_GHC $(exec_prefix_GHC)/bin/`/usr/local/gnu/bin/hw_os`
+# else
+#  define InstBinDir_GHC $(exec_prefix_GHC)/bin
+# endif
+#endif
+
+/* scripts are platform-independent */
+#ifndef InstScriptDir_GHC
+#define InstScriptDir_GHC $(exec_prefix_GHC)/bin
+#endif
+
+/* main "internally-used-by-GHC" stuff */
+#ifndef InstLibDir_GHC
+#define InstLibDir_GHC $(prefix_GHC)/lib/ghc/$(PROJECTVERSION)/$(HOSTPLATFORM)
+#endif
+
+/* "data" is defined (by WDP) to be platform-independent library stuff */
+#ifndef InstDataDir_GHC
+#define InstDataDir_GHC $(prefix_GHC)/lib/ghc/$(PROJECTVERSION)
+#endif
+
+prefix_GHC	  = InstRootDir_GHC	/* set by configure */
+exec_prefix_GHC   = InstBinRootDir_GHC  /* ditto */
+INSTBINDIR_GHC    = InstBinDir_GHC
+INSTSCRIPTDIR_GHC = InstScriptDir_GHC
+INSTLIBDIR_GHC    = InstLibDir_GHC
+INSTDATADIR_GHC   = InstDataDir_GHC
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Configuring the driver}
+%*									*
+%************************************************************************
+
+The driver script is the thing that glues the compilation system
+together.  It needs to know what is/isn't included in the system,
+e.g., what garbage-collectors are catered for.
+
+Mkworld records the needed information in make variables (e.g.,
+\tr{$(GHC_HSCPP)}), and we then `msub' that into the driver (perl)
+script.  Note: ALL configuration info should be HERE (not hacked into
+the script)!
+
+The first chunk of stuff here is mkworld boilerplate and probably
+doesn't need fiddling.  Once we get into what C compiler(s) to use for
+compiling .hc files, what libraries are available, etc., there may be
+something to tweak (but not here -- in a `setup' file, please!)  There
+are further comments where the tweakables begin...
+
+First, the driver can be installed under any old name; here's the default:
+\begin{code}
+#ifndef GhcDriverInstallName
+#define GhcDriverInstallName ghc
+#endif /* ! GhcDriverInstallName */
+GHC_DRIVER_INST_NAME = GhcDriverInstallName
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Where to find the programs for the various phases}
+%*									*
+%************************************************************************
+
+First, the driver itself:
+\begin{code}
+/* ghc: std driver for compilation system */
+#ifndef GhcDriverCmd
+#define GhcDriverCmd $(GHC_DRIVERSRC)/ghc
+#endif
+
+/* macro to make sure it has been built */
+#ifndef GhcDriverNeededHere
+#define GhcDriverNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC),$(GHC_DRIVERSRC),all)
+#endif
+
+/* could be GHC_DRIVER, but GHC is its common name */
+GHC = GhcDriverCmd
+\end{code}
+
+\tr{unlit}, to de-literatise a source file, is from the HBC
+distribution.  See utils-ghc.
+
+\tr{hscpp}: runs C pre-processor but converts \tr{#line}s to Haskell pragmas;
+is platform-independent.
+\begin{code}
+#ifndef HsCppCmd
+#define HsCppCmd $(GHC_HSCPPSRC)/hscpp
+#endif
+
+#ifndef HsCppNeededHere
+#define HsCppNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC_HSCPP),$(GHC_HSCPPSRC),hscpp)
+#endif
+
+GHC_HSCPP    = HsCppCmd $(ALLPROJ_CPP_DEFINES)
+GHC_HSCPPSRC = $(GHC_UTILSRC)/hscpp
+\end{code}
+
+\tr{hsp}: std Haskell parser.
+\begin{code}
+#ifndef HsParserCmd
+#define HsParserCmd $(GHC_HSPSRC)/hsp
+#endif
+
+#ifndef HsParserNeededHere
+#define HsParserNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC_HSP),$(GHC_HSPSRC),hsp)
+#endif /* HsParserNeededHere */
+
+GHC_HSP    = HsParserCmd
+GHC_HSPSRC = $(GHC_HSCSRC)
+\end{code}
+
+\tr{hsc}: std Haskell compiler.
+\begin{code}
+#ifndef HsCompilerCmd
+#define HsCompilerCmd $(GHC_HSCSRC)/hsc
+#endif
+
+#ifndef HsCompilerNeededHere
+#define HsCompilerNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC_HSC),$(GHC_HSCSRC),hsc)
+#endif /* HsCompilerNeededHere */
+
+GHC_HSC    = HsCompilerCmd
+GHC_HSCSRC = $(GHC_COMPILERSRC)
+\end{code}
+
+\tr{SysMan}: PVM-controlling program for parallel Haskell.
+\begin{code}
+#ifndef SysManCmd
+#define SysManCmd $(GHC_RUNTIMESRC)/gum/SysMan
+#endif
+
+#ifndef SysManNeededHere
+#define SysManNeededHere(target) \
+__SomeUtilNeededHere(target,$(GHC_SYSMAN),$(GHC_SYSMANSRC),gum/SysMan)
+#endif /* SysManNeededHere */
+
+GHC_SYSMAN    = SysManCmd
+GHC_SYSMANSRC = $(GHC_RUNTIMESRC)
+\end{code}
+
+For an ``assembler'' and a ``linker,'' the driver uses the same
+program as it used for C compilation; this means libraries and things
+are likely to be picked up correctly.
+
+%************************************************************************
+%*									*
+\subsubsection{Stuff for the C-compiling phase in particular...}
+%*									*
+%************************************************************************
+
+{\em High-level assembler}: C compiler with which to compile \tr{.hc} files.
+
+There are {\em three} things to set:
+\begin{enumerate}
+\item
+C compilers to use:
+\begin{itemize}
+\item
+compiler to use for ``debugging'' compilation (@GHC_DEBUG_HILEV_ASM@)
+\item
+compiler to use for ``optimising'' compiling (w/ regs magic, etc)
+(@GHC_OPT_HILEV_ASM@)
+This must be GCC; otherwise opt compiling must be turned off.
+\end{itemize}
+
+\item
+Whether or not you can do the ``optimising''-style compilation (set
+@GHC_GCC_IS_AVAILABLE@).
+\end{enumerate}
+
+For options that should always be applied {\em for this project},
+set the @ProjectGhcOpts@ variable...
+      
+Similarly, for a particular {\em setup}, use @SetupGhcOpts@...
+
+%************************************************************************
+%*									*
+\subsubsubsection{Which C compiler to use (GCC is best)}
+%*									*
+%************************************************************************
+
+\begin{code}
+/*  NON-OPTIMISING C COMPILATION: ==================================
+
+    We can use GCC 2.n for the non-optimising (normal) .hc C
+    compilation [use it if we have it]
+*/
+#ifndef GhcUseGccForDebuggingAsm
+#if HaveGcc == YES
+#define GhcUseGccForDebuggingAsm YES
+#else
+#define GhcUseGccForDebuggingAsm NO
+#endif
+#endif
+
+#ifndef GhcDebuggingHighLevelAsmCmd
+#if GhcUseGccForDebuggingAsm == YES
+#define GhcDebuggingHighLevelAsmCmd WhatGccIsCalled
+#else
+#define GhcDebuggingHighLevelAsmCmd $(CC)
+#endif /* ! gcc */
+#endif /* GhcDebuggingHighLevelAsmCmd */
+GHC_DEBUG_HILEV_ASM = GhcDebuggingHighLevelAsmCmd
+\end{code}
+
+\begin{code}
+/*  OPTIMISING C COMPILATION (regs, etc): ==========================
+
+    Must use GCC 2.n for this
+    compilation [OFF by default]
+*/
+/* We have GCC, which is necessary for optimising the Haskell
+    compiler's C output.
+*/
+#ifndef GhcUseGccForOptAsm
+#if HaveGcc == YES
+#define GhcUseGccForOptAsm YES
+#else
+#define GhcUseGccForOptAsm NO
+#endif
+#endif
+
+#ifndef GhcOptHighLevelAsmCmd
+#if GhcUseGccForOptAsm == YES
+#define GhcOptHighLevelAsmCmd WhatGccIsCalled
+GHC_GCC_IS_AVAILABLE = 1
+#else
+GHC_GCC_IS_AVAILABLE = 0
+#endif /* ! gcc */
+#endif /* GhcOptHighLevelAsmCmd */
+GHC_OPT_HILEV_ASM = GhcOptHighLevelAsmCmd
+\end{code}

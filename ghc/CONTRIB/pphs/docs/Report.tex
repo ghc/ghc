@@ -1,0 +1,49 @@
+\documentstyle[12pt,fleqn,rep,pphs]{report}
+\renewcommand{August 1994}
+\begin{document}
+
+\def\sect{\section}
+\def\subsect{\subsection}
+
+% Title page
+\title{Literate Haskell}
+\author{A. Preece \\\\ University of Glasgow}
+\maketitle
+
+\setcounter{page}{2}
+\tableofcontents
+
+\input{Introduction}
+\input{What}
+\input{How}
+\input{Uses}
+\input{Error_Messages}
+\input{Faults}
+\input{Future_Work}
+
+\appendix
+
+\input{Project_Documents}
+\input{User_Documents}
+\input{Code}
+
+\begin{thebibliography}{9}
+\addcontentsline{toc}{chapter}{Bibliography}
+
+\bibitem{Haskell-report}
+Hudak, P., Peyton Jones, S., Wadler, P., et al.,  {\em Haskell, Report on the Programming Language\/}
+(1992)
+
+\bibitem{LaTeX-book}
+Lamport, L.,  {\em \LaTeX : A Document Preparation System\/}
+(Addison-Wesley, 1986)
+
+\end{thebibliography}
+
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+
+I am very grateful for the help and advise of Project Supervisor Tom Melham,
+and also for the suggestions of Phil Wadler, Richard McPhee, and Mark Pollock.
+
+\end{document}

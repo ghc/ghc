@@ -1,0 +1,80 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_tree where
+import UgenUtil
+import Util
+%}}
+type tree;
+	hmodule : < ghname	: id;
+		    ghimplist	: list;
+		    ghexplist	: list;
+		    ghmodlist	: binding;
+		    ghmodline	: unsigned; >;
+	ident	: < gident 	: id;	>;
+	integer : < ginteger	: id;	>;
+	intprim : < gintprim	: id;	>;
+	floatr	: < gfloatr	: id;	>;
+	doubleprim : < gdoubleprim : id;	>;
+	floatprim : < gfloatprim : id;	>;
+	charr	: < gchar	: id;   >;
+	charprim : < gcharprim : id;	>;
+	clitlit : < gclitlit : id;	>;
+	voidprim : < >;
+	string	: < gstring	: id;	>;
+	tuple	: < gtuplelist	: list; >;
+	ap	: < gfun	: tree;
+		    garg	: tree; >;
+	lambda	: < glampats	: list;
+		    glamexpr	: tree;
+		    glamline	: unsigned; >;
+	let	: < gletvdeflist	: binding;
+		    gletvexpr	: tree; >;
+	casee	: < gcaseexpr	: tree;
+		    gcasebody	: list; >;
+	ife	: < gifpred	: tree;
+		    gifthen	: tree;
+		    gifelse	: tree; >;
+	par	: < gpare	: tree; >;
+	as	: < gasid	: id;
+		    gase	: tree; >;
+	lazyp	: < glazyp	: tree; >;
+	plusp	: < gplusp	: tree; 
+		    gplusi	: tree; >;
+	wildp	: < >;
+	restr	: < grestre	: tree;
+		    grestrt	: ttype; >;
+	comprh	: < gcexp	: tree;
+		    gcquals	: list; >;
+	qual	: < gqpat	: tree;
+		    gqexp	: tree;	>;
+	guard	: < ggexp	: tree; >;
+	def	: < ggdef	: binding; >;
+	tinfixop: < gdummy	: tree; >;
+	lsection: < glsexp	: tree; 
+		    glsop	: id;	>;
+	rsection: < grsop	: id;
+		    grsexp	: tree; >;
+	eenum	: < gefrom	: tree;
+		    gestep	: list;
+		    geto	: list;	>;
+	llist	: < gllist	: list; >;
+	ccall	: < gccid	: id;
+		    gccinfo	: id;
+		    gccargs	: list; >;
+	scc	: < gsccid	: id;
+		    gsccexp	: tree; >;
+	negate	: < gnexp	: tree; >;
+	parzf   : < gpzfexp	: tree;
+		    gpzfqual    : list; >;
+	pardgen : < gdproc	: tree;
+		    gdexp	: tree; >;
+	parigen : < giproc	: tree;
+		    giexp	: tree; >;
+	parfilt : < gpfilt	: tree; >;
+	pod	: < gpod	: list; >;
+	proc   	: < gprocid	: list;
+		    gprocdata   : tree; >;
+
+end;

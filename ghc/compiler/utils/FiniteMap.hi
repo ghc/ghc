@@ -1,0 +1,58 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface FiniteMap where
+import Maybes(Labda)
+import Outputable(Outputable)
+data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}
+type FiniteSet a = FiniteMap a ()
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+addListToFM :: Ord a => FiniteMap a b -> [(a, b)] -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 211 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ }, [ (_PackedString, _PackedString), _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ } #-}
+addListToFM_C :: Ord a => (b -> b -> b) -> FiniteMap a b -> [(a, b)] -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 4 _U_ 2211 _N_ _S_ "LLLS" _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 3 _U_ 211 _N_ _S_ "LLS" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 3 _U_ 211 _N_ _S_ "LLS" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 3 _U_ 211 _N_ _S_ "LLS" _N_ _N_ }, [ TyCon, _N_ ] 1 { _A_ 3 _U_ 211 _N_ _S_ "LLS" _N_ _N_ }, [ (_PackedString, _PackedString), _N_ ] 1 { _A_ 3 _U_ 211 _N_ _S_ "LLS" _N_ _N_ } #-}
+addToFM :: Ord a => FiniteMap a b -> a -> b -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 1122 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ }, [ TyCon, _N_ ] 1 { _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ } #-}
+delListFromFM :: Ord a => FiniteMap a b -> [a] -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ } #-}
+elemFM :: Ord a => a -> FiniteMap a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 121 _N_ _N_ _N_ _SPECIALISE_ [ _PackedString, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ } #-}
+elementOf :: Ord a => a -> FiniteMap a () -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 121 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ FiniteMap elemFM { u0 } { () } _N_ #-}
+eltsFM :: FiniteMap a b -> [b]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+emptyFM :: FiniteMap a b
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 2 0 X 1 _/\_ u0 u1 -> _!_ _ORIG_ FiniteMap EmptyFM [u0, u1] [] _N_ #-}
+emptySet :: FiniteMap a ()
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ FiniteMap EmptyFM [u0, ()] [] _N_ #-}
+fmToList :: FiniteMap a b -> [(a, b)]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isEmptyFM :: FiniteMap a b -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+isEmptySet :: FiniteMap a () -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ FiniteMap isEmptyFM { u0 } { () } _N_ #-}
+keysFM :: FiniteMap b a -> [b]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+listToFM :: Ord a => [(a, b)] -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 21 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ (_PackedString, _PackedString), _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
+lookupFM :: Ord a => FiniteMap a b -> a -> Labda b
+	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ (_PackedString, _PackedString), _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ } #-}
+lookupWithDefaultFM :: Ord a => FiniteMap a b -> b -> a -> b
+	{-# GHC_PRAGMA _A_ 1 _U_ 1112 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 3 _U_ 112 _N_ _S_ "SLL" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 3 _U_ 112 _N_ _S_ "SLL" _N_ _N_ } #-}
+minusFM :: Ord a => FiniteMap a b -> FiniteMap a b -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 221 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ }, [ _PackedString, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ }, [ TyCon, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ } #-}
+minusSet :: Ord a => FiniteMap a () -> FiniteMap a () -> FiniteMap a ()
+	{-# GHC_PRAGMA _A_ 1 _U_ 221 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ FiniteMap minusFM { u0 } { () } _N_ #-}
+mkSet :: Ord a => [a] -> FiniteMap a ()
+	{-# GHC_PRAGMA _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ #-}
+plusFM :: Ord a => FiniteMap a b -> FiniteMap a b -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 221 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SS" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SS" _N_ _N_ }, [ TyCon, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SS" _N_ _N_ } #-}
+plusFM_C :: Ord a => (b -> b -> b) -> FiniteMap a b -> FiniteMap a b -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 1 _U_ 2221 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 3 _U_ 221 _N_ _S_ "LSS" _N_ _N_ }, [ CLabel, _N_ ] 1 { _A_ 3 _U_ 221 _N_ _S_ "LSS" _N_ _N_ } #-}
+setToList :: FiniteMap a () -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ FiniteMap keysFM { () } { u0 } _N_ #-}
+singletonFM :: a -> b -> FiniteMap a b
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+union :: Ord a => FiniteMap a () -> FiniteMap a () -> FiniteMap a ()
+	{-# GHC_PRAGMA _A_ 1 _U_ 221 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ FiniteMap plusFM { u0 } { () } _N_ #-}
+instance Outputable a => Outputable (FiniteMap a b)
+	{-# GHC_PRAGMA _M_ FiniteMap {-dfun-} _A_ 3 _U_ 2 _N_ _S_ "LLS" _N_ _N_ #-}
+

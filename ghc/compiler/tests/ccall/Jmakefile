@@ -1,0 +1,21 @@
+runtests::
+	@echo '###############################################################'
+	@echo '# Validation tests for the ccall desugaring, etc.             #'
+	@echo '###############################################################'
+
+/* NB These tests are still in a state of flux... don't believe errors
+      they report. In fact, these aren't really very good tests at
+      all... */
+
+/* Flags used when testing typechecker and desugaring */
+DS_FLAGS= -fglasgow-exts -noC -dcore-lint -ddump-tc -ddump-ds 
+
+RunStdTest(cc001,$(GHC), $(DS_FLAGS) cc001.hs -o2 cc001.stderr)
+RunStdTest(cc002,$(GHC), $(DS_FLAGS) cc002.hs -o2 cc002.stderr)
+RunStdTest(cc003,$(GHC), $(DS_FLAGS) cc003.hs -x1 -o2 cc003.stderr)
+RunStdTest(cc004,$(GHC), $(DS_FLAGS) cc004.hs -o2 cc004.stderr)
+
+/* Flags used when testing code generation */
+CG_FLAGS= -fglasgow-exts -via-C -dcore-lint -ddump-stg -ddump-flatC
+
+

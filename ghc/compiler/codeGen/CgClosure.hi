@@ -1,0 +1,32 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CgClosure where
+import AbsCSyn(AbstractC)
+import CgBindery(CgIdInfo, StableLoc, VolatileLoc)
+import CgMonad(CgInfoDownwards, CgState, CompilationInfo, EndOfBlockInfo, StubFlag)
+import ClosureInfo(LambdaFormInfo)
+import CmdLineOpts(GlobalSwitch)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda)
+import PreludePS(_PackedString)
+import PrimOps(PrimOp)
+import StgSyn(StgAtom, StgBinderInfo, StgBinding, StgCaseAlternatives, StgExpr, UpdateFlag)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import Unique(Unique)
+data CgIdInfo 	{-# GHC_PRAGMA MkCgIdInfo Id VolatileLoc StableLoc LambdaFormInfo #-}
+data CgInfoDownwards 	{-# GHC_PRAGMA MkCgInfoDown CompilationInfo (UniqFM CgIdInfo) EndOfBlockInfo #-}
+data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
+data CompilationInfo 	{-# GHC_PRAGMA MkCompInfo (GlobalSwitch -> Bool) _PackedString #-}
+data HeapOffset 
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data StgExpr a b 	{-# GHC_PRAGMA StgApp (StgAtom b) [StgAtom b] (UniqFM b) | StgConApp Id [StgAtom b] (UniqFM b) | StgPrimApp PrimOp [StgAtom b] (UniqFM b) | StgCase (StgExpr a b) (UniqFM b) (UniqFM b) Unique (StgCaseAlternatives a b) | StgLet (StgBinding a b) (StgExpr a b) | StgLetNoEscape (UniqFM b) (UniqFM b) (StgBinding a b) (StgExpr a b) | StgSCC UniType CostCentre (StgExpr a b) #-}
+data UpdateFlag 	{-# GHC_PRAGMA ReEntrant | Updatable | SingleEntry #-}
+cgRhsClosure :: Id -> CostCentre -> StgBinderInfo -> [Id] -> [Id] -> StgExpr Id Id -> LambdaFormInfo -> CgInfoDownwards -> CgState -> ((Id, CgIdInfo), CgState)
+	{-# GHC_PRAGMA _A_ 7 _U_ 222222222 _N_ _S_ "LLLLLLS" _N_ _N_ #-}
+cgTopRhsClosure :: Id -> CostCentre -> StgBinderInfo -> [Id] -> StgExpr Id Id -> LambdaFormInfo -> CgInfoDownwards -> CgState -> ((Id, CgIdInfo), CgState)
+	{-# GHC_PRAGMA _A_ 6 _U_ 22222222 _N_ _N_ _N_ _N_ #-}
+

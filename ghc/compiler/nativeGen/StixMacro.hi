@@ -1,0 +1,32 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface StixMacro where
+import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelative)
+import BasicLit(BasicLit)
+import CLabelInfo(CLabel)
+import CharSeq(CSeq)
+import CmdLineOpts(GlobalSwitch, SwitchResult)
+import CostCentre(CostCentre)
+import HeapOffs(HeapOffset)
+import MachDesc(RegLoc, Target)
+import PreludePS(_PackedString)
+import PreludeRatio(Ratio(..))
+import Pretty(PprStyle)
+import PrimKind(PrimKind)
+import PrimOps(PrimOp)
+import SMRep(SMRep)
+import SplitUniq(SplitUniqSupply)
+import Stix(CodeSegment, StixReg, StixTree)
+import Unique(Unique)
+data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
+data CExprMacro 	{-# GHC_PRAGMA INFO_PTR | ENTRY_CODE | INFO_TAG | EVAL_TAG #-}
+data CStmtMacro 	{-# GHC_PRAGMA ARGS_CHK_A_LOAD_NODE | ARGS_CHK_A | ARGS_CHK_B_LOAD_NODE | ARGS_CHK_B | HEAP_CHK | STK_CHK | UPD_CAF | UPD_IND | UPD_INPLACE_NOPTRS | UPD_INPLACE_PTRS | UPD_BH_UPDATABLE | UPD_BH_SINGLE_ENTRY | PUSH_STD_UPD_FRAME | POP_STD_UPD_FRAME | SET_ARITY | CHK_ARITY | SET_TAG #-}
+data Target 	{-# GHC_PRAGMA Target (GlobalSwitch -> SwitchResult) Int (SMRep -> Int) (MagicId -> RegLoc) (StixTree -> StixTree) (PrimKind -> Int) ([MagicId] -> [StixTree]) ([MagicId] -> [StixTree]) (HeapOffset -> Int) (CAddrMode -> StixTree) (CAddrMode -> StixTree) Int Int StixTree StixTree ([CAddrMode] -> PrimOp -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (CStmtMacro -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (StixTree -> StixTree -> StixTree -> SplitUniqSupply -> [StixTree] -> [StixTree]) (PprStyle -> [[StixTree]] -> SplitUniqSupply -> CSeq) Bool ([Char] -> [Char]) #-}
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data StixTree 	{-# GHC_PRAGMA StSegment CodeSegment | StInt Integer | StDouble (Ratio Integer) | StString _PackedString | StLitLbl CSeq | StLitLit _PackedString | StCLbl CLabel | StReg StixReg | StIndex PrimKind StixTree StixTree | StInd PrimKind StixTree | StAssign PrimKind StixTree StixTree | StLabel CLabel | StFunBegin CLabel | StFunEnd CLabel | StJump StixTree | StFallThrough CLabel | StCondJump CLabel StixTree | StData PrimKind [StixTree] | StPrim PrimOp [StixTree] | StCall _PackedString PrimKind [StixTree] | StComment _PackedString #-}
+doHeapCheck :: Target -> StixTree -> StixTree -> StixTree -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 5 _U_ 022012 _N_ _S_ "ALLAU(ALA)" {_A_ 3 _U_ 2212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+genMacroCode :: Target -> CStmtMacro -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]
+	{-# GHC_PRAGMA _A_ 3 _U_ 21122 _N_ _S_ "LEL" _N_ _N_ #-}
+smStablePtrTable :: StixTree
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+

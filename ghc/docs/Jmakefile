@@ -1,0 +1,19 @@
+#define IHaveSubdirs
+
+/* just documents here */
+#define NoAllTargetForSubdirs
+#define NoRunTestsTargetForSubdirs
+#define NoInstallTargetForSubdirs
+#define NoTagTargetForSubdirs
+
+SUBDIRS = add_to_compiler \
+	  users_guide \
+	  install_guide \
+	  release_notes
+
+XCOMM 	  developers_guide ?
+XCOMM 	  interfaces ?
+XCOMM 	  pragmas ?
+
+XCOMM grasp_overview ?
+XCOMM style_guide ?

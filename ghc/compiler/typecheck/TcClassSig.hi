@@ -1,0 +1,20 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcClassSig where
+import Bag(Bag)
+import Class(Class, ClassOp)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import HsBinds(Sig)
+import Id(Id)
+import IdInfo(SpecEnv)
+import Name(Name)
+import Pretty(PprStyle, PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import TcMonad(Baby_TcResult)
+import TyVar(TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+tcClassSigs :: E -> UniqFM UniType -> Class -> (ClassOp -> SpecEnv) -> TyVarTemplate -> [Sig Name] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult ([ClassOp], [(Name, Id)], [Id], [Id])
+	{-# GHC_PRAGMA _A_ 6 _U_ 2222212122 _N_ _S_ "LLLLLS" _N_ _N_ #-}
+

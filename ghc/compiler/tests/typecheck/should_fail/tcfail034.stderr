@@ -1,0 +1,7 @@
+ 
+These overloadings don't match type signature:
+    "tcfail034.hs", line 15; class "Integral", type "a"
+    (at a use of an overloaded identifier: mod)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

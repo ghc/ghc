@@ -1,0 +1,19 @@
+/* based on the Makefile that comes with "gmp" */
+
+REGEX_OBJS = regex.o
+
+REGEX_SRCS = regex.c
+
+CC_OPTS = -I../../includes
+
+SuffixRule_c_o()
+
+NormalLibraryTarget(regex,$(REGEX_OBJS))
+
+#if DoInstallGHCSystem == YES
+InstallLibraryTarget(regex,$(INSTLIBDIR_GHC))
+#endif /* DoInstallGHCSystem */
+
+/* ToDo: something to make the doc */
+
+CDependTarget( $(REGEX_SRCS) )

@@ -1,0 +1,588 @@
+%
+% (c) The AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*                                                                      *
+\section[Signals.lc]{Signal Handlers}
+%*									*
+%************************************************************************
+
+There are two particular signals that we find interesting in the RTS:
+segmentation faults (for cheap stack overflow checks) and virtual
+timer alarms (for profiling and thread context switching).  POSIX
+compliance is supposed to make this kind of thing easy, but it
+doesn't.  Expect every new target platform to require gory hacks to
+get this stuff to work.
+
+Then, there are the user-specified signal handlers to cope with.
+Since they're pretty rudimentary, they shouldn't actually cause as
+much pain.
+
+\begin{code}
+
+#include "platform.h"
+
+#if defined(sunos4_TARGET_OS)
+    /* The sigaction in SunOS 4.1.X does not grok SA_SIGINFO */
+# define NON_POSIX_SOURCE
+#endif
+
+#if defined(osf1_TARGET_OS)
+    /* The include files for OSF1 do not normally define SA_SIGINFO */
+# define _OSF_SOURCE 1
+#endif
+
+#if defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
+    /* I have no idea why this works (WDP 95/03) */
+# define _BSD_SOURCE 1
+#endif
+
+#include "rtsdefs.h"
+
+#if defined(HAVE_SYS_TYPES_H)
+# include <sys/types.h>
+#endif
+
+#if defined(HAVE_SIGNAL_H)
+# include <signal.h>
+#endif
+#if irix_TARGET_OS
+/* SIGVTALRM not avail w/ POSIX_SOURCE, but worse things happen without */
+/* SIGH: triple SIGH (WDP 95/07) */
+# define SIGVTALRM 28
+#endif
+
+#if defined(HAVE_SIGINFO_H)
+    /* DEC OSF1 seems to need this explicitly.  Maybe others do as well? */
+# include <siginfo.h>
+#endif
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Stack-check by protected-memory-faulting}
+%*									*
+%************************************************************************
+
+If we are checking stack overflow by page faulting, then we need to be
+able to install a @SIGSEGV@ handler, preferably one which can
+determine where the fault occurred, so that we can satisfy ourselves
+that it really was a stack overflow and not some random segmentation
+fault.
+
+\begin{code}
+
+#if STACK_CHECK_BY_PAGE_FAULT
+
+extern P_ stks_space;	    /* Where the stacks live, from SMstacks.lc */
+extern I_ SM_word_stk_size; /* How big they are (ditto) */
+
+\end{code}
+
+SunOS 4.x is too old to have @SA_SIGINFO@ as a flag to @sigaction@, so
+we use the older @signal@ call instead.  This means that we also have
+to set up the handler to expect a different collection of arguments.
+Fun, eh?
+
+\begin{code}
+
+# if defined(sunos4_TARGET_OS) || defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
+
+static void
+segv_handler(sig, code, scp, addr)
+  int sig;
+  int code;
+  struct sigcontext *scp;
+  caddr_t addr;
+{
+    extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
+
+    if (addr >= (caddr_t) stks_space
+      && addr < (caddr_t) (stks_space + SM_word_stk_size))
+	StackOverflow();
+
+    fflush(stdout);
+    fprintf(stderr, "Segmentation fault caught, address = %lx\n", (W_) addr);
+    abort();
+}
+
+int
+install_segv_handler()
+{
+    return (int) signal(SIGSEGV, segv_handler) == -1;
+}
+
+# else	/* Not SunOS 4 */
+
+#  if defined(irix_TARGET_OS)
+     /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
+#   define si_addr _data._fault._addr
+#  endif
+
+static void
+segv_handler(sig, sip)
+  int sig;
+  siginfo_t *sip;
+{
+    fflush(stdout);
+    if (sip == NULL) {
+	fprintf(stderr, "Segmentation fault caught, address unknown\n");
+    } else {
+	if (sip->si_addr >= (caddr_t) stks_space
+	  && sip->si_addr < (caddr_t) (stks_space + SM_word_stk_size))
+	    StackOverflow();
+
+	fprintf(stderr, "Segmentation fault caught, address = %08lx\n", (W_) sip->si_addr);
+    }
+    abort();
+}
+
+int
+install_segv_handler()
+{
+    struct sigaction action;
+
+    action.sa_handler = segv_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_SIGINFO;
+    return sigaction(SIGSEGV, &action, NULL);
+}
+
+# endif    /* not SunOS 4 */
+
+#endif	/* STACK_CHECK_BY_PAGE_FAULT */
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Virtual-timer alarm (for profiling, etc.)}
+%*									*
+%************************************************************************
+
+The timer interrupt is somewhat simpler, and we could probably use
+sigaction across the board, but since we have committed ourselves to
+the non-POSIX signal under SunOS 4.1.X, we adopt the same approach
+here.
+
+\begin{code}
+#if (defined(USE_COST_CENTRES) || defined(CONCURRENT)) && !defined(GRAN)
+
+# if defined(USE_COST_CENTRES)
+extern I_ heap_profiling_req;
+# endif
+
+# ifdef CONCURRENT
+
+#  if defined(USE_COST_CENTRES) || defined(GUM)
+I_ contextSwitchTicks;
+I_ profilerTicks;
+#  endif
+  
+#  ifdef PAR
+extern P_ CurrentTSO;
+#  endif
+extern I_ contextSwitchTime;
+
+static void
+vtalrm_handler(sig)
+  int sig;
+{
+/*
+   For the parallel world, currentTSO is set if there is any work
+   on the current PE.  In this case we DO want to context switch,
+   in case other PEs have sent us messages which must be processed.
+*/
+
+#  if defined(USE_COST_CENTRES) || defined(GUM)
+    static I_ csTicks = 0, pTicks = 0;
+
+    if (time_profiling) {
+	if (++pTicks % profilerTicks == 0) {
+#   if ! defined(USE_COST_CENTRES)
+	    handle_tick_serial();
+#   else
+	    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+		handle_tick_serial();
+	    else
+		handle_tick_noserial();
+#   endif
+	}
+	if (++csTicks % contextSwitchTicks != 0)
+	    return;
+    }
+#  endif
+
+    if (WaitingThreadsHd != Nil_closure)
+	AwaitEvent(contextSwitchTime);
+
+#  ifdef PAR
+    if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL] ||
+      PendingSparksTl[ADVISORY_POOL] == PendingSparksLim[ADVISORY_POOL]) {
+	PruneSparks();
+	if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL])
+	    PendingSparksTl[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL] +
+	      SparkLimit[REQUIRED_POOL] / 2;
+	if (PendingSparksTl[ADVISORY_POOL] == PendingSparksLim[ADVISORY_POOL])
+	    PendingSparksTl[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL] +
+	      SparkLimit[ADVISORY_POOL] / 2;
+    }
+
+    if (CurrentTSO != NULL ||
+#  else
+    if (RunnableThreadsHd != Nil_closure ||
+#  endif
+      PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
+      PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL]) {
+	/* ToDo: anything else for GRAN? WDP */
+	context_switch = 1;
+    }
+}
+
+# endif
+
+# if defined(sunos4_TARGET_OS) || defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
+
+int
+install_vtalrm_handler()
+{
+    void (*old)();
+
+#  ifdef CONCURRENT
+    old = signal(SIGVTALRM, vtalrm_handler);
+#  else
+    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+        old = signal(SIGVTALRM, handle_tick_serial);
+    else
+        old = signal(SIGVTALRM, handle_tick_noserial);
+#  endif
+    return (int) old == -1;
+}
+
+static int vtalrm_mask;
+
+void
+blockVtAlrmSignal(STG_NO_ARGS)
+{
+    vtalrm_mask = sigblock(sigmask(SIGVTALRM));
+}
+
+void
+unblockVtAlrmSignal(STG_NO_ARGS)
+{
+    (void) sigsetmask(vtalrm_mask);
+}
+
+# else	/* Not SunOS 4 */
+
+int
+install_vtalrm_handler(STG_NO_ARGS)
+{
+    struct sigaction action;
+
+#  ifdef CONCURRENT
+    action.sa_handler = vtalrm_handler;
+#  else
+    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+	action.sa_handler = handle_tick_serial;
+    else
+	action.sa_handler = handle_tick_noserial;
+#  endif
+
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+
+    return sigaction(SIGVTALRM, &action, NULL);
+}
+
+void
+blockVtAlrmSignal(STG_NO_ARGS)
+{
+    sigset_t signals;
+    
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGVTALRM);
+
+    (void) sigprocmask(SIG_BLOCK, &signals, NULL);
+}
+
+void
+unblockVtAlrmSignal(STG_NO_ARGS)
+{
+    sigset_t signals;
+    
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGVTALRM);
+
+    (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
+}
+
+# endif /* SunOS 4 */
+
+#endif /* USE_COST_CENTRES || CONCURRENT (but not GRAN) */
+
+\end{code}
+
+Signal handling support for user-specified signal handlers.  Since we
+need stable pointers to do this properly, we just refuse to try in the
+parallel world.  Sorry.
+
+\begin{code}
+
+#ifdef PAR
+
+void
+blockUserSignals()
+{
+    return;
+}
+
+void
+unblockUserSignals()
+{
+    return;
+}
+
+I_ 
+# ifdef _POSIX_SOURCE
+sig_install(sig, spi, mask)
+  sigset_t *mask;
+# else
+  sig_install(sig, spi)
+# endif
+  I_ sig;
+  I_ spi;
+{
+    fflush(stdout);
+    fprintf(stderr,"No signal handling support in a parallel implementation.\n");
+    EXIT(EXIT_FAILURE);
+}
+
+#else	/* !PAR */
+
+# include <setjmp.h>
+
+extern StgPtr deRefStablePointer PROTO((StgStablePtr));
+extern void freeStablePointer PROTO((I_));
+extern jmp_buf restart_main;
+
+static I_ *handlers = NULL; /* Dynamically grown array of signal handlers */
+static I_ nHandlers = 0;    /* Size of handlers array */
+
+static void
+more_handlers(sig)
+  I_ sig;
+{
+    I_ i;
+
+    if (sig < nHandlers)
+	return;
+
+    if (handlers == NULL)
+	handlers = (I_ *) malloc((sig + 1) * sizeof(I_));
+    else
+	handlers = (I_ *) realloc(handlers, (sig + 1) * sizeof(I_));
+
+    if (handlers == NULL) {
+	fflush(stdout);
+	fprintf(stderr, "VM exhausted\n");
+	EXIT(EXIT_FAILURE);
+    }
+    for(i = nHandlers; i <= sig; i++)
+	/* Fill in the new slots with default actions */
+	handlers[i] = STG_SIG_DFL;
+
+    nHandlers = sig + 1;
+}
+
+# ifdef _POSIX_SOURCE
+
+static void
+generic_handler(sig)
+{
+    sigset_t signals;
+
+    SAVE_Hp = SAVE_HpLim;	/* Just to be safe */
+    if (initStacks(&StorageMgrInfo) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "initStacks failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+    TopClosure = deRefStablePointer(handlers[sig]);
+    sigemptyset(&signals);
+    sigaddset(&signals, sig);
+    sigprocmask(SIG_UNBLOCK, &signals, NULL);
+    longjmp(restart_main, sig);
+}
+
+static sigset_t userSignals;
+static sigset_t savedSignals;
+
+void
+initUserSignals()
+{
+    sigemptyset(&userSignals);
+}
+
+void
+blockUserSignals()
+{
+    sigprocmask(SIG_SETMASK, &userSignals, &savedSignals);
+}
+
+void
+unblockUserSignals()
+{
+    sigprocmask(SIG_SETMASK, &savedSignals, NULL);
+}
+
+
+I_ nocldstop = 0;
+
+I_ 
+sig_install(sig, spi, mask)
+  I_ sig;
+  I_ spi;
+  sigset_t *mask;
+{
+    sigset_t signals;
+    struct sigaction action;
+    I_ previous_spi;
+
+    /* Block the signal until we figure out what to do */
+    /* Count on this to fail if the signal number is invalid */
+    if(sig < 0 || sigemptyset(&signals) || sigaddset(&signals, sig) ||
+       sigprocmask(SIG_BLOCK, &signals, NULL))
+    	return STG_SIG_ERR;
+
+    more_handlers(sig);
+
+    previous_spi = handlers[sig];
+
+    switch(spi) {
+    case STG_SIG_IGN:
+    	handlers[sig] = STG_SIG_IGN;
+	sigdelset(&userSignals, sig);
+        action.sa_handler = SIG_IGN;
+    	break;
+    	
+    case STG_SIG_DFL:
+    	handlers[sig] = STG_SIG_DFL;
+	sigdelset(&userSignals, sig);
+        action.sa_handler = SIG_DFL;
+    	break;
+    default:
+    	handlers[sig] = spi;
+	sigaddset(&userSignals, sig);
+    	action.sa_handler = generic_handler;
+    	break;
+    }
+
+    if (mask != NULL)
+        action.sa_mask = *mask;
+    else
+	sigemptyset(&action.sa_mask);
+
+    action.sa_flags = sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
+    if (sigaction(sig, &action, NULL) || sigprocmask(SIG_UNBLOCK, &signals, NULL)) {
+	if (previous_spi)
+	  freeStablePointer(handlers[sig]);
+    	return STG_SIG_ERR;
+    }
+
+    return previous_spi;
+}
+
+# else	/* !POSIX */
+
+static void
+generic_handler(sig)
+{
+    SAVE_Hp = SAVE_HpLim;	/* Just to be safe */
+    if (initStacks(&StorageMgrInfo) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "initStacks failed!\n");
+	EXIT(EXIT_FAILURE);
+    }
+    TopClosure = deRefStablePointer(handlers[sig]);
+    sigsetmask(0);
+    longjmp(restart_main, sig);
+}
+
+static int userSignals;
+static int savedSignals;
+
+void
+initUserSignals()
+{
+    userSignals = 0;
+}
+
+void
+blockUserSignals()
+{
+    savedSignals = sigsetmask(userSignals);
+}
+
+void
+unblockUserSignals()
+{
+    sigsetmask(savedSignals);
+}
+
+I_ 
+sig_install(sig, spi)
+  I_ sig;
+  I_ spi;
+{
+    I_ previous_spi;
+    int mask;
+    void (*handler)();
+
+    /* Block the signal until we figure out what to do */
+    /* Count on this to fail if the signal number is invalid */
+    if(sig < 0 || (mask = sigmask(sig)) == 0)
+    	return STG_SIG_ERR;
+
+    mask = sigblock(mask);
+
+    more_handlers(sig);
+
+    previous_spi = handlers[sig];
+
+    switch(spi) {
+    case STG_SIG_IGN:
+    	handlers[sig] = STG_SIG_IGN;
+	userSignals &= ~sigmask(sig);
+        handler = SIG_IGN;
+    	break;
+    	
+    case STG_SIG_DFL:
+    	handlers[sig] = STG_SIG_DFL;
+	userSignals &= ~sigmask(sig);
+        handler = SIG_DFL;
+    	break;
+    default:
+    	handlers[sig] = spi;
+	userSignals |= sigmask(sig);
+    	handler = generic_handler;
+    	break;
+    }
+
+    if (signal(sig, handler) < 0) {
+	if (previous_spi)
+	  freeStablePointer(handlers[sig]);
+        sigsetmask(mask);
+    	return STG_SIG_ERR;
+    }
+
+    sigsetmask(mask);
+    return previous_spi;
+}
+
+# endif    /* POSIX */
+
+#endif	/* PAR */
+
+\end{code}

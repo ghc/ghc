@@ -1,0 +1,5 @@
+ 
+"ds035.hs", line 4: undefined value: minusIntPrim
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

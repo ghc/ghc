@@ -1,0 +1,10 @@
+\begin{code}
+#include "rtsdefs.h"
+
+void
+ErrorHdrHook (where)
+  FILE *where;
+{
+    fprintf(where, "\nFail: ");
+}
+\end{code}

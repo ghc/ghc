@@ -1,0 +1,23 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Def2Core where
+import CoreSyn(CoreBinding, CoreExpr)
+import DefSyn(DefBindee, DefBinding(..))
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import PlainCore(PlainCoreProgram(..))
+import SplitUniq(SUniqSM(..), SplitUniqSupply)
+import UniType(UniType)
+import Unique(Unique)
+data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
+data DefBindee 	{-# GHC_PRAGMA DefArgExpr (CoreExpr Id DefBindee) | DefArgVar Id | Label (CoreExpr Id DefBindee) (CoreExpr Id DefBindee) #-}
+type DefBinding = CoreBinding Id DefBindee
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type PlainCoreProgram = [CoreBinding Id Id]
+type SUniqSM a = SplitUniqSupply -> a
+d2c :: CoreExpr Id DefBindee -> SplitUniqSupply -> CoreExpr Id Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _S_ "S" _N_ _N_ #-}
+def2core :: [CoreBinding Id DefBindee] -> SplitUniqSupply -> [CoreBinding Id Id]
+	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _S_ "S" _N_ _N_ #-}
+defPanic :: [Char] -> [Char] -> CoreExpr Id DefBindee -> SplitUniqSupply -> a
+	{-# GHC_PRAGMA _A_ 3 _U_ 1111 _N_ _S_ _!_ _N_ _N_ #-}
+

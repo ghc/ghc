@@ -1,0 +1,35 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Reps.f = /\ r.t13 -> \{-classdict-} [] [f.t14] -> f.t14
+{- nonrec -}
+defm.ShouldSucceed.Reps.f =
+    /\ r.t15 ->
+	\{-dict-} d.ShouldSucceed.Reps.t16 ->
+	    (error (r.t15 -> r.t15 -> r.t15))
+		"No default method for \"ShouldSucceed.Reps.defm.ShouldSucceed.Reps.f\"\n"
+{- rec -}
+dfun.ShouldSucceed.Reps.Bool = ({-dict-} [] [const.ShouldSucceed.Reps.Bool.f])
+const.ShouldSucceed.Reps.Bool.f :: Bool -> Bool -> Bool
+const.ShouldSucceed.Reps.Bool.f
+    True True
+	    = True
+const.ShouldSucceed.Reps.Bool.f
+    x.r50 y.r51
+	    = False
+AbsBinds
+[q.t8]
+[]
+[(d.ShouldSucceed.Reps.t9, dfun.ShouldSucceed.Reps.ShouldSucceed.X)]
+    {- rec -}
+    d.ShouldSucceed.Reps.t9 = ({-dict-} [] [f.t10])
+    f.t10 ::
+	ShouldSucceed.X q.t8 -> ShouldSucceed.X q.t8 -> ShouldSucceed.X q.t8
+    f.t10
+	x.r53 y.r54
+		= y.r54
+AbsBinds [r.t3] [d.ShouldSucceed.Reps.t5] [(g.t1, ShouldSucceed.g)]
+    (ShouldSucceed.Reps.f.t4, ShouldSucceed.Reps.f r.t3 d.ShouldSucceed.Reps.t5)
+    {- nonrec -}
+    g.t1 :: r.t3 -> r.t3
+    g.t1 x.r64 = ShouldSucceed.Reps.f.t4 x.r64 x.r64
+

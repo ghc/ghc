@@ -1,0 +1,55 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Rename4 where
+import AbsSyn(Module)
+import Bag(Bag)
+import CharSeq(CSeq)
+import CmdLineOpts(GlobalSwitch)
+import ErrUtils(Error(..))
+import FiniteMap(FiniteMap)
+import HsBinds(Binds, Sig)
+import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, FixityDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
+import HsImpExp(IE, ImportedInterface)
+import HsLit(Literal)
+import HsPat(InPat, ProtoNamePat(..), RenamedPat(..))
+import HsPragmas(GenPragmas)
+import HsTypes(MonoType, PolyType)
+import Id(Id)
+import Maybes(Labda)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import PreludePS(_PackedString)
+import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import ProtoName(ProtoName)
+import RenameAuxFuns(GlobalNameFun(..))
+import RenameMonad4(Rn4M(..), TyVarNamesEnv(..), initRn4)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import TyCon(TyCon)
+import Unique(Unique)
+data Module a b 	{-# GHC_PRAGMA Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc #-}
+data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+type Error = PprStyle -> Int -> Bool -> PrettyRep
+data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+type ProtoNamePat = InPat ProtoName
+type RenamedPat = InPat Name
+data PolyType a 	{-# GHC_PRAGMA UnoverloadedTy (MonoType a) | OverloadedTy [(a, a)] (MonoType a) | ForAllTy [a] (MonoType a) #-}
+data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+type Pretty = Int -> Bool -> PrettyRep
+data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+type GlobalNameFun = ProtoName -> Labda Name
+type Rn4M a = (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (a, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+type TyVarNamesEnv = [(ProtoName, Name)]
+data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+initRn4 :: (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> ((GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (a, Bag (PprStyle -> Int -> Bool -> PrettyRep))) -> SplitUniqSupply -> (a, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 4 _U_ 2212 _N_ _S_ "LLSL" _N_ _N_ #-}
+rnGenPragmas4 :: GenPragmas ProtoName -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (GenPragmas Name, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
+rnModule4 :: Module ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (Module Name (InPat Name), Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 7 _U_ 1222210 _N_ _S_ "U(LLASSSSSSSSSL)LLLLU(ALS)A" {_A_ 6 _U_ 122221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+rnPolyType4 :: Bool -> Bool -> [(ProtoName, Name)] -> PolyType ProtoName -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (PolyType Name, Bag (PprStyle -> Int -> Bool -> PrettyRep))
+	{-# GHC_PRAGMA _A_ 4 _U_ 2221222222 _N_ _S_ "LLLS" _N_ _N_ #-}
+

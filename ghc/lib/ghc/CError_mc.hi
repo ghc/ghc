@@ -1,0 +1,35 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface CError where
+data CErrorCode
+  = NOERROR | EPERM | ENOENT | ESRCH | EINTR | EIO | ENXIO | E2BIG | ENOEXEC | EBADF | ECHILD | EAGAIN | ENOMEM | EACCES | EFAULT | ENOTBLK | EBUSY | EEXIST | EXDEV | ENODEV | ENOTDIR | EISDIR | EINVAL | ENFILE | EMFILE | ENOTTY | ETXTBSY | EFBIG | ENOSPC | ESPIPE | EROFS | EMLINK | EPIPE | EDOM | ERANGE | EWOULDBLOCK | EINPROGRESS | EALREADY | ENOTSOCK | EDESTADDRREQ | EMSGSIZE | EPROTOTYPE | ENOPROTOOPT | EPROTONOSUPPOR | ESOCKTNOSUPPORT | EOPNOTSUPP | EPFNOSUPPORT | EAFNOSUPPORT | EADDRINUSE | EADDRNOTAVAIL | ENETDOWN | ENETUNREACH | ENETRESET | ECONNABORTED | ECONNRESET | ENOBUFS | EISCONN | ENOTCONN | ESHUTDOWN | ETOOMANYREFS | ETIMEDOUT | ECONNREFUSED | ELOOP | ENAMETOOLONG | EHOSTDOWN | EHOSTUNREACH | ENOTEMPTY | EPROCLIM | EUSERS | EDQUOT | ESTALE | EREMOTE | ENOSTR | ETIME | ENOSR | ENOMSG | EBADMSG | EIDRM | EDEADLK | ENOLCK | ENONET | ERREMOTE | ENOLINK | EADV | ESRMNT | ECOMM | EPROTO | EMULTIHOP | EDOTDOT | EREMCHG | ENOSYS
+errorCodeToStr :: CErrorCode -> [Char]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "E" _N_ _N_ #-}
+getCErrorCode :: _State _RealWorld -> (CErrorCode, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+setCErrorCode :: CErrorCode -> _State _RealWorld -> ((), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "EU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Eq CErrorCode
+	{-# GHC_PRAGMA _M_ CError {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(CErrorCode -> CErrorCode -> Bool), (CErrorCode -> CErrorCode -> Bool)] [_CONSTM_ Eq (==) (CErrorCode), _CONSTM_ Eq (/=) (CErrorCode)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Ix CErrorCode
+	{-# GHC_PRAGMA _M_ CError {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord CErrorCode}}, ((CErrorCode, CErrorCode) -> [CErrorCode]), ((CErrorCode, CErrorCode) -> CErrorCode -> Int), ((CErrorCode, CErrorCode) -> CErrorCode -> Bool)] [_DFUN_ Ord (CErrorCode), _CONSTM_ Ix range (CErrorCode), _CONSTM_ Ix index (CErrorCode), _CONSTM_ Ix inRange (CErrorCode)] _N_
+	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
+	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
+	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord CErrorCode
+	{-# GHC_PRAGMA _M_ CError {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq CErrorCode}}, (CErrorCode -> CErrorCode -> Bool), (CErrorCode -> CErrorCode -> Bool), (CErrorCode -> CErrorCode -> Bool), (CErrorCode -> CErrorCode -> Bool), (CErrorCode -> CErrorCode -> CErrorCode), (CErrorCode -> CErrorCode -> CErrorCode), (CErrorCode -> CErrorCode -> _CMP_TAG)] [_DFUN_ Eq (CErrorCode), _CONSTM_ Ord (<) (CErrorCode), _CONSTM_ Ord (<=) (CErrorCode), _CONSTM_ Ord (>=) (CErrorCode), _CONSTM_ Ord (>) (CErrorCode), _CONSTM_ Ord max (CErrorCode), _CONSTM_ Ord min (CErrorCode), _CONSTM_ Ord _tagCmp (CErrorCode)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
+	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+instance Text CErrorCode
+	{-# GHC_PRAGMA _M_ CError {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(CErrorCode, [Char])]), (Int -> CErrorCode -> [Char] -> [Char]), ([Char] -> [([CErrorCode], [Char])]), ([CErrorCode] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (CErrorCode), _CONSTM_ Text showsPrec (CErrorCode), _CONSTM_ Text readList (CErrorCode), _CONSTM_ Text showList (CErrorCode)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(CErrorCode, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LE" _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

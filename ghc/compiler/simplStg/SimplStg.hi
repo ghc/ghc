@@ -1,0 +1,12 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SimplStg where
+import CmdLineOpts(GlobalSwitch, StgToDo, SwitchResult)
+import CostCentre(CostCentre)
+import Id(Id)
+import PreludePS(_PackedString)
+import Pretty(PprStyle)
+import SplitUniq(SplitUniqSupply)
+import StgSyn(StgBinding)
+stg2stg :: [StgToDo] -> (GlobalSwitch -> SwitchResult) -> _PackedString -> PprStyle -> SplitUniqSupply -> [StgBinding Id Id] -> _State _RealWorld -> (([StgBinding Id Id], ([CostCentre], [CostCentre])), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 7 _U_ 1222122 _N_ _S_ "SSLLU(ALL)LL" _N_ _N_ #-}
+

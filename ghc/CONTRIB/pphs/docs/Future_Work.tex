@@ -1,0 +1,30 @@
+\chapter{Things remaining to be implemented}
+
+Due to pressure of time, not everything that was planned to be included in
+{\tt pphs} was implemented.  This chapter details these things.
+
+\section{Faults}
+
+The faults detailed in Chapter~\ref{faults} remain to be rectified.  The fault
+regarding multiple columns of internal alignment would, it seems, require a
+major rethink on the way internal alignment is handled by {\tt pphs}, perhaps
+using the {\tt tabbing} environment with tabs and tabstops, rather than the
+{\tt tabular} environment as at present.  This could also
+be extended to left indentation to solve the problem with indentation under
+internal alignment section.  Elimination of the {\tt tabular} sections would solve
+the problem of pagebreaks during internal alignment sections.
+
+\section{Parsing}
+
+Currently, {\tt pphs} only does limited parsing.  This could be altered to
+give a full parse by restructuring into Lex.  This would be better because
+it would allow sections of code to be classified more easily once they were
+broken down.
+
+\section{Literate Haskell}
+
+It has been suggested that {\tt pphs} be extended to accept Literate Haskell
+files as input.  This is where the program code lines all start with {\tt >}
+and plain text is written between sections of code to document the file.
+This would be called by an additional option, say {\tt -l}, and would typeset
+the sections of Haskell code, whilst leaving the text sections alone.

@@ -1,0 +1,171 @@
+%****************************************************************************
+%
+\section[ParInit.lc]{Initialising the parallel RTS}
+%
+% (c) The Parade/AQUA Projects, Glasgow University, 1995.
+%     P. Trinder, January 17th 1995.
+% An extension based on Kevin Hammond's GRAPH for PVM version
+%
+%****************************************************************************
+
+\begin{code}
+#ifdef PAR /* whole file */
+
+#define NON_POSIX_SOURCE /* so says Solaris */
+
+#include "rtsdefs.h"
+#include <setjmp.h>
+#include "LLC.h"
+#include "HLC.h"
+\end{code}
+
+Global conditions defined here.
+
+\begin{code}
+rtsBool
+	OkToGC =		rtsFalse,	/* Set after initialisation	*/
+	IAmMainThread = 	rtsFalse,	/* Set for the main thread	*/
+	GlobalStopPending =   	rtsFalse,	/*  Terminate			*/
+	GlobalGCPending =     	rtsFalse;	/*  Start Global GC		*/
+\end{code}
+
+Task identifiers for various interesting global tasks.
+
+\begin{code}
+GLOBAL_TASK_ID IOTask = 0, 		/* The IO Task Id		*/
+	       SysManTask = 0, 		/* The System Manager Task Id	*/
+               GCManTask = 0, 		/* The GC Manager Task Id	*/
+               StatsManTask = 0,	/* The Statistics Manager Task Id*/
+	       mytid = 0;		/* This PE's Task Id		*/
+\end{code}
+
+\begin{code}
+REAL_TIME 	main_start_time;	/* When the program started	*/
+REAL_TIME   	main_stop_time;	    	/* When the program finished    */
+jmp_buf		exit_parallel_system;	/* How to abort from the RTS	*/
+\end{code}
+
+Flag handling.
+
+\begin{code}
+rtsBool TraceSparks =    rtsFalse;		/* Enable the spark trace mode 			*/
+rtsBool OutputDisabled = rtsFalse;		/* Disable output for performance purposes 	*/
+rtsBool SparkLocally =   rtsFalse;		/* Use local threads if possible 		*/
+rtsBool DelaySparks =    rtsFalse;		/* Use delayed sparking 			*/
+rtsBool LocalSparkStrategy =   rtsFalse;	/* Either delayed threads or local threads	*/
+rtsBool GlobalSparkStrategy =   rtsFalse;	/* Export all threads	    	    	    	*/
+
+rtsBool ParallelStats =	 rtsFalse;		/* Gather parallel statistics			*/
+rtsBool DeferGlobalUpdates =	 rtsFalse;	/* Defer updating of global nodes		*/
+rtsBool fishing = rtsFalse;                     /* We have no fish out in the stream            */
+\end{code}
+
+\begin{code}
+void
+RunParallelSystem(program_closure)
+StgPtr program_closure;
+{
+
+    /* Return here when exiting the program. */
+    if (setjmp(exit_parallel_system) != 0)
+	return;
+
+    /* Show that we've started */
+    if (IAmMainThread && !OutputDisabled)
+	fprintf(stderr, "Starting main program...\n");
+
+
+    /* Record the start time for statistics purposes. */
+    main_start_time = usertime();
+    /* fprintf(stderr, "Start time is %u\n", main_start_time); */
+
+    /*
+     * Start the main scheduler which will fish for threads on all but the PE with
+     * the main thread
+     */
+
+    ScheduleThreads(program_closure);
+    myexit(1);
+}
+\end{code}
+
+@myexit@ defines how to terminate the program.  If the exit code is
+non-zero (i.e. an error has occurred), the PE should not halt until
+outstanding error messages have been processed.  Otherwise, messages
+might be sent to non-existent Task Ids.  The infinite loop will actually
+terminate, since @STG_Exception@ will call @myexit@\tr{(0)} when
+it received a @PP_FINISH@ from the system manager task.
+
+\begin{code}
+void
+myexit(n)			/* NB: "EXIT" is set to "myexit" for parallel world */
+I_ n;
+{
+    GlobalStopPending = rtsTrue;
+    SendOp(PP_FINISH, SysManTask);
+    if (n != 0) 
+      WaitForTermination();
+    else
+      WaitForPEOp(PP_FINISH, SysManTask);
+    PEShutDown();
+    fprintf(stderr,"Processor %lx shutting down, %ld Threads run\n", mytid, threadId);
+
+    /* And actually terminate -- always with code 0 */
+    longjmp(exit_parallel_system, 1);
+}
+\end{code}
+
+\begin{code}
+void srand48 PROTO((long));
+time_t time PROTO((time_t *));
+
+void
+initParallelSystem(STG_NO_ARGS)
+{
+
+  /* Don't buffer standard channels... */
+  setbuf(stdout,NULL);
+  setbuf(stderr,NULL);
+
+  srand48(time(NULL) * getpid());	/*Initialise Random-number generator seed*/
+
+  OkToGC = rtsFalse;		/* Must not GC till we have set up the environment */
+			        /* because C is hanging onto heap pointers */
+			        /* maybe bogus for the new RTS? -- KH */
+				/* And for the GUM system? PWT */
+}
+\end{code}
+
+@SynchroniseSystem@ synchronises the reduction task with the system manager,
+and gathers information about which PEs are actually in use.
+
+\begin{code}
+GLOBAL_TASK_ID *PEs;
+
+void
+SynchroniseSystem(STG_NO_ARGS)
+{
+    PACKET addr;
+    int i;
+
+    _SetMyExceptionHandler(STG_Exception);
+
+    PEs = PEStartUp(nPEs);
+
+    /* Initialize global address tables */
+    initGAtables();
+
+    /* Record the shortened the PE identifiers for LAGA etc. tables */
+    for (i = 0; i < nPEs; ++i)
+	registerTask(PEs[i]);
+
+    addr = WaitForPEOp(PP_INIT, ANY_GLOBAL_TASK);
+    SysManTask = Sender_Task(addr);
+
+/*  pvm_notify( PvmTaskExit, PP_FAIL, 1, &SysManTask);  /* Setup an error handler */
+
+    /* Initialise the PE task array? */
+}
+
+#endif /* PAR -- whole file */
+\end{code}

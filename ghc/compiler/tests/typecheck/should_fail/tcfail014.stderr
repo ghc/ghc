@@ -1,0 +1,10 @@
+ 
+"tcfail014.hs", line 5:
+    Type variable "ot8" occurs within the type "ot8 -> ot9".
+    Too many arguments in application of function "z"
+ 
+"tcfail014.hs", line 6: No such instance:
+    class "Num", type "tt19 -> tt20" (at an overloaded literal: 1)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

@@ -1,0 +1,66 @@
+\chapter{Things that don't work} \label{faults}
+
+The {\tt pphs} program has some deficiencies that cause it to not always produce the
+correct code.  These are detailed in this chapter.
+
+\section{Internal alignment}
+
+The program can deal only with simple internal alignment.  It cannot deal with a
+situation where there is more than one column where internal alignment is occurring
+on the same line.  This can occur when two sections of internal
+alignment overlap by having lines in common or where one section is wholly within another.
+When this happens, {\tt pphs} will only
+line up one occurrence of internal alignment on each line.
+
+Related is left alignment under a section of internal alignment.  Take this earlier example.
+\begin{quote}
+\input{Haskell_leftindent1}
+\end{quote}
+This is how this code is typeset by {\tt pphs}:
+\begin{quote}
+\input{LaTeX_leftindent1}
+\end{quote}
+Notice how the {\bf where} on the third line doesn't line up under the {\it gcd\/}$'$ on
+the second.  The reason for this
+is the \LaTeX\ {\tt tabular} section does not respect any spaces that occur at the end
+of the right hand edge of the left hand column such as those after
+{\tt gcd x y} and instead moves the central column left
+so it is only one space away from the longest piece of text in the left hand column,
+in this case {\iden gcd\/}\xspa1 {\iden x\/}\xspa1 {\iden y\/}.
+The left indentation of the lines under the internal alignment section does not take this
+movement into account and so if a line is indented beyond the end of the text in the first
+column of the last line of the internal alignment section then it may be incorrectly
+positioned and therefore will not align with what it was aligned with in the original
+program.  Should a piece of text in the left hand column be longer once typeset than what was
+previously the longest, due to the variable-width characters used by \LaTeX ,
+then the second and third columns will get moved to the right, and so, similarly,
+any code indented under the other columns will be wrongly positioned.
+
+Where a section of internal alignment coincides with the bottom of the user's page,
+it can run off the bottom of the page.  This is because the {\tt tabular} environment
+used for internal alignment sections does not allow pagebreaks.  Therefore the pagebreak
+will come after the section has been completed.
+
+\section{Mathematical symbols}
+
+Mathematical symbols are always written in math font.  This means that where, say,
+comments are re-defined to be in typewriter font, as in the following
+example, any mathematical symbols in the comments
+will appear in math font, rather than typewriter font.
+\begin{quote}
+\def\com{\tt}
+\input{LaTeX_comment}
+\end{quote}
+
+\section{Left indentation}
+
+Where a line is indented beyond the end of its predecessor and aligns under another
+line, but when typeset, the predecessor becomes longer than the indentation level
+due to the variable-width characters,  the line's indentation will appear to be under the
+predecessor line.
+
+\section{Floating point numbers}
+
+Currently {\tt pphs} will recognise strings such as {\tt 3.} or {\tt 5.6e} as
+valid floating point numbers.  This needs rectifying so only valid floating
+point numbers are recognised.

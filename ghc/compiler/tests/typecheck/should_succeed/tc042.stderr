@@ -1,0 +1,125 @@
+Typechecked:
+AbsBinds [] [] [(idb.t1, ShouldSucceed.idb)]
+    {- nonrec -}
+    idb.t1 :: ShouldSucceed.Boolean -> ShouldSucceed.Boolean
+    idb.t1
+	x.r91 = x.r91
+AbsBinds [a.t12, b.t13] [] [(swap.t4, ShouldSucceed.swap)]
+    {- nonrec -}
+    swap.t4 :: ShouldSucceed.Pair b.t13 a.t12 -> ShouldSucceed.Pair a.t12 b.t13
+    swap.t4
+	t.r92 = case t.r92 of
+		  (ShouldSucceed.Mkpair x.r93 y.r94)
+			  -> (ShouldSucceed.Mkpair [a.t12, b.t13]) y.r94 x.r93
+AbsBinds [] [] [(neg.t16, ShouldSucceed.neg)]
+    {- nonrec -}
+    neg.t16 :: ShouldSucceed.Boolean -> ShouldSucceed.Boolean
+    neg.t16
+	b.r95 = case b.r95 of
+		  ShouldSucceed.FF
+			  -> ShouldSucceed.TT
+		  ShouldSucceed.TT
+			  -> ShouldSucceed.FF
+AbsBinds [alpha.t26] [] [(null.t20, ShouldSucceed.null)]
+    {- nonrec -}
+    null.t20 :: ShouldSucceed.List alpha.t26 -> ShouldSucceed.Boolean
+    null.t20
+	l.r96 = case l.r96 of
+		  ShouldSucceed.Nil
+			  -> ShouldSucceed.TT
+		  (ShouldSucceed.Cons y.r97 ys.r98)
+			  -> ShouldSucceed.FF
+AbsBinds [a.t30] [] [(idl.t29, ShouldSucceed.idl)]
+    {- rec -}
+    idl.t29 :: ShouldSucceed.List a.t30 -> ShouldSucceed.List a.t30
+    idl.t29
+	xs.r99 = case xs.r99 of
+		   ShouldSucceed.Nil
+			   -> ShouldSucceed.Nil a.t30
+		   (ShouldSucceed.Cons y.r100 ys.r101)
+			   -> (ShouldSucceed.Cons a.t30)
+				  y.r100 (idl.t29 ys.r101)
+AbsBinds [] [] [(add.t41, ShouldSucceed.add)]
+    {- rec -}
+    add.t41 :: ShouldSucceed.Nat -> ShouldSucceed.Nat -> ShouldSucceed.Nat
+    add.t41
+	a.r102 b.r103
+		= case a.r102 of
+		    ShouldSucceed.Zero
+			    -> b.r103
+		    (ShouldSucceed.Succ c.r104)
+			    -> ShouldSucceed.Succ (add.t41 c.r104 b.r103)
+AbsBinds [alpha.t49] [] [(app.t48, ShouldSucceed.app)]
+    {- rec -}
+    app.t48 ::
+	ShouldSucceed.List alpha.t49
+	-> ShouldSucceed.List alpha.t49 -> ShouldSucceed.List alpha.t49
+    app.t48
+	xs.r105 zs.r106
+		= case xs.r105 of
+		    ShouldSucceed.Nil
+			    -> zs.r106
+		    (ShouldSucceed.Cons y.r107 ys.r108)
+			    -> (ShouldSucceed.Cons alpha.t49)
+				   y.r107 (app.t48 ys.r108 zs.r106)
+AbsBinds [a.t61] [] [(length.t60, ShouldSucceed.length)]
+    {- rec -}
+    length.t60 :: ShouldSucceed.List a.t61 -> ShouldSucceed.Nat
+    length.t60
+	xs.r109 = case xs.r109 of
+		    ShouldSucceed.Nil
+			    -> ShouldSucceed.Zero
+		    (ShouldSucceed.Cons y.r110 ys.r111)
+			    -> ShouldSucceed.Succ (length.t60 ys.r111)
+AbsBinds [] [] [(before.t70, ShouldSucceed.before)]
+    {- rec -}
+    before.t70 ::
+	ShouldSucceed.List ShouldSucceed.Nat
+	-> ShouldSucceed.List ShouldSucceed.Nat
+    before.t70
+	xs.r112 = case xs.r112 of
+		    ShouldSucceed.Nil
+			    -> ShouldSucceed.Nil ShouldSucceed.Nat
+		    (ShouldSucceed.Cons y.r113 ys.r114)
+			    -> case y.r113 of
+				 ShouldSucceed.Zero
+					 -> ShouldSucceed.Nil ShouldSucceed.Nat
+				 (ShouldSucceed.Succ n.r115)
+					 -> (ShouldSucceed.Cons
+						 ShouldSucceed.Nat)
+						y.r113 (before.t70 ys.r114)
+AbsBinds [alpha.t95] [] [(reverse.t84, ShouldSucceed.reverse)]
+    {- rec -}
+    reverse.t84 :: ShouldSucceed.List alpha.t95 -> ShouldSucceed.List alpha.t95
+    reverse.t84
+	rs.r116 = case rs.r116 of
+		    ShouldSucceed.Nil
+			    -> ShouldSucceed.Nil alpha.t95
+		    (ShouldSucceed.Cons y.r117 ys.r118)
+			    -> (ShouldSucceed.app alpha.t95)
+				   (reverse.t84 ys.r118)
+				   ((ShouldSucceed.Cons alpha.t95)
+					y.r117 (ShouldSucceed.Nil alpha.t95))
+AbsBinds [alpha.t108] [] [(flatten.t98, ShouldSucceed.flatten)]
+    {- rec -}
+    flatten.t98 ::
+	ShouldSucceed.Tree alpha.t108 -> ShouldSucceed.List alpha.t108
+    flatten.t98
+	t.r119 = case t.r119 of
+		   (ShouldSucceed.Leaf x.r120)
+			   -> (ShouldSucceed.Cons alpha.t108)
+				  x.r120 (ShouldSucceed.Nil alpha.t108)
+		   (ShouldSucceed.Node l.r121 r.r122)
+			   -> (ShouldSucceed.app alpha.t108)
+				  (flatten.t98 l.r121) (flatten.t98 r.r122)
+AbsBinds [] [] [(sum.t113, ShouldSucceed.sum)]
+    {- rec -}
+    sum.t113 :: ShouldSucceed.Tree ShouldSucceed.Nat -> ShouldSucceed.Nat
+    sum.t113
+	t.r123 = case t.r123 of
+		   (ShouldSucceed.Leaf t.r124)
+			   -> t.r124
+		   (ShouldSucceed.Node l.r125 r.r126)
+			   -> ShouldSucceed.add
+				  (sum.t113 l.r125) (sum.t113 r.r126)
+

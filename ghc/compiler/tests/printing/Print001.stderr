@@ -1,0 +1,10 @@
+=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= Print001
+interface Print001 where
+f :: Eq a => (a -> b -> c) -> a -> b -> c {-# ARITY _ = 2 #-}
+f2 :: (Eq a, Ord a, Ix c) => (a -> b -> c) -> a -> b -> c {-# ARITY _ = 4 #-}
+g :: Foo Int (b -> a) (b -> [(b, Double, Int)]) -> Float {-# ARITY _ = 1 #-}
+mkFoo :: [((a -> Int) -> a) -> b] -> (a -> b, b -> b) -> () -> Foo a b c {-# ARITY _ = 3 #-}
+data Bar a = BarNil | BarCon (Foo a a a) (Bar a)
+data Foo a b c = MkFoo [((a -> Int) -> a) -> b] (a -> b, b -> b) ()
+=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
+

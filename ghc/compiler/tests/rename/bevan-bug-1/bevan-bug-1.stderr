@@ -1,0 +1,147 @@
+Typechecked:
+AbsBinds [] [] [(t_source_pos.t2, Lexer_Ops.t_source_pos)]
+    {- nonrec -}
+    t_source_pos.t2 ::
+	(Source_Position.Source_Position -> Source_Position.Source_Position)
+	-> Lexer_State.Lexer_State -> ((), Lexer_State.Lexer_State)
+    t_source_pos.t2
+	transformer.r49
+		= (Lexer_Combinators.and_with
+		       [Source_Position.Source_Position, ()])
+		      Lexer_State.p_source_pos
+		      (\ pos.r50 -> Lexer_State.i_source_pos
+					(transformer.r49 pos.r50))
+AbsBinds [] [] [(t_buffer.t11, Lexer_Ops.t_buffer)]
+    {- nonrec -}
+    t_buffer.t11 ::
+	(Lexer_Buffer.Lexer_Buffer -> Lexer_Buffer.Lexer_Buffer)
+	-> Lexer_State.Lexer_State -> ((), Lexer_State.Lexer_State)
+    t_buffer.t11
+	transformer.r51
+		= (Lexer_Combinators.and_with [Lexer_Buffer.Lexer_Buffer, ()])
+		      Lexer_State.p_buffer
+		      (\ buff.r52 -> Lexer_State.i_buffer
+					 (transformer.r51 buff.r52))
+AbsBinds [] [] [(buffer_len.t20, Lexer_Ops.buffer_len)]
+    {- nonrec -}
+    buffer_len.t20 :: Lexer_State.Lexer_State -> (Int, Lexer_State.Lexer_State)
+    buffer_len.t20
+	= (Lexer_Combinators.and_with [Lexer_Buffer.Lexer_Buffer, Int])
+	      Lexer_State.p_buffer
+	      (\ buff.r53 -> (Lexer_Combinators.return Int)
+				 (Lexer_Buffer.len buff.r53))
+AbsBinds [] [] [(decimal_to_int.t28, Lexer_Ops.decimal_to_int)]
+    {- nonrec -}
+    decimal_to_int.t28 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_Integer.Oberon_Integer, Lexer_State.Lexer_State)
+    decimal_to_int.t28
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_Integer.Oberon_Integer])
+	      Lexer_State.p_buffer
+	      (\ buff.r54 -> (Lexer_Combinators.return
+				  Oberon_Integer.Oberon_Integer)
+				 (Oberon_Integer.from_decimal_string
+				      (Lexer_Buffer.to_string buff.r54)))
+AbsBinds [] [] [(flush_buffer.t36, Lexer_Ops.flush_buffer)]
+    {- nonrec -}
+    flush_buffer.t36 :: Lexer_State.Lexer_State -> ((), Lexer_State.Lexer_State)
+    flush_buffer.t36 = Lexer_Ops.t_buffer Lexer_Buffer.flush
+AbsBinds [] [] [(hex_to_int.t39, Lexer_Ops.hex_to_int)]
+    {- nonrec -}
+    hex_to_int.t39 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_Integer.Oberon_Integer, Lexer_State.Lexer_State)
+    hex_to_int.t39
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_Integer.Oberon_Integer])
+	      Lexer_State.p_buffer
+	      (\ buff.r55 -> (Lexer_Combinators.return
+				  Oberon_Integer.Oberon_Integer)
+				 (Oberon_Integer.from_hex_string
+				      (Lexer_Buffer.to_string buff.r55)))
+AbsBinds [] [] [(move_input_column.t47, Lexer_Ops.move_input_column)]
+    {- nonrec -}
+    move_input_column.t47 :: Int -> Lexer_State.Lexer_Action ()
+    move_input_column.t47
+	dist.r56 = Lexer_Ops.t_source_pos
+		       ((flip [Source_Position.Source_Position,
+			       Int,
+			       Source_Position.Source_Position])
+			    Source_Position.shift_column dist.r56)
+AbsBinds [] [] [(next_input_line.t54, Lexer_Ops.next_input_line)]
+    {- nonrec -}
+    next_input_line.t54 ::
+	Lexer_State.Lexer_State -> ((), Lexer_State.Lexer_State)
+    next_input_line.t54 = Lexer_Ops.t_source_pos Source_Position.next_line
+AbsBinds [] [] [(store_char.t57, Lexer_Ops.store_char)]
+    {- nonrec -}
+    store_char.t57 :: Char -> Lexer_State.Lexer_Action ()
+    store_char.t57
+	c.r57 = Lexer_Ops.t_buffer (Lexer_Buffer.add c.r57)
+AbsBinds [] [] [(to_char.t61, Lexer_Ops.to_char)]
+    (toInteger.t79, int2Integer)
+    {- nonrec -}
+    to_char.t61 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_Integer.Oberon_Integer, Lexer_State.Lexer_State)
+    to_char.t61
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_Integer.Oberon_Integer])
+	      Lexer_State.p_buffer
+	      (\ buff.r58 -> (Lexer_Combinators.return
+				  Oberon_Integer.Oberon_Integer)
+				 ((((.) [Lexer_Buffer.Lexer_Buffer,
+					 [Char],
+					 Oberon_Integer.Oberon_Integer])
+				       (((.) [[Char],
+					      Char,
+					      Oberon_Integer.Oberon_Integer])
+					    (((.) [Char,
+						   Int,
+						   Oberon_Integer.Oberon_Integer])
+						 (((.) [Int,
+							Integer,
+							Oberon_Integer.Oberon_Integer])
+						      Oberon_Integer.from_int
+						      toInteger.t79)
+						 ord)
+					    (head Char))
+				       Lexer_Buffer.to_string) buff.r58))
+AbsBinds [] [] [(to_id.t88, Lexer_Ops.to_id)]
+    {- nonrec -}
+    to_id.t88 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_Id.Oberon_Id, Lexer_State.Lexer_State)
+    to_id.t88
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_Id.Oberon_Id])
+	      Lexer_State.p_buffer
+	      (\ buff.r59 -> (Lexer_Combinators.return Oberon_Id.Oberon_Id)
+				 (Oberon_Id.from_string
+				      (Lexer_Buffer.to_string buff.r59)))
+AbsBinds [] [] [(to_real.t96, Lexer_Ops.to_real)]
+    {- nonrec -}
+    to_real.t96 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_Real.Oberon_Real, Lexer_State.Lexer_State)
+    to_real.t96
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_Real.Oberon_Real])
+	      Lexer_State.p_buffer
+	      (\ buff.r60 -> (Lexer_Combinators.return Oberon_Real.Oberon_Real)
+				 (Oberon_Real.from_string
+				      (Lexer_Buffer.to_string buff.r60)))
+AbsBinds [] [] [(to_string.t104, Lexer_Ops.to_string)]
+    {- nonrec -}
+    to_string.t104 ::
+	Lexer_State.Lexer_State
+	-> (Oberon_String.Oberon_String, Lexer_State.Lexer_State)
+    to_string.t104
+	= (Lexer_Combinators.and_with
+	       [Lexer_Buffer.Lexer_Buffer, Oberon_String.Oberon_String])
+	      Lexer_State.p_buffer
+	      (\ buff.r61 -> (Lexer_Combinators.return
+				  Oberon_String.Oberon_String)
+				 (Oberon_String.from_string
+				      (Lexer_Buffer.to_string buff.r61)))

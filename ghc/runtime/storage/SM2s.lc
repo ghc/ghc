@@ -1,0 +1,291 @@
+***************************************************************************
+
+                           TWO SPACE COLLECTION
+
+***************************************************************************
+
+\begin{code}
+#if defined(GC2s)
+
+#define SCAV_REG_MAP
+#include "SMinternal.h"
+#include "SMcopying.h"
+#include "SMextn.h"
+
+REGDUMP(ScavRegDump);
+
+I_ semispace = 0;              /* 0 or 1 */
+semispaceData semispaceInfo[2]
+    = {{0,0}, {0,0}};
+
+P_ heap_space = 0;		/* Address of first word of slab 
+				   of memory allocated for heap */
+
+P_ hp_start;	        /* Value of Hp when reduction was resumed */
+
+
+I_ initHeap( sm )
+    smInfo *sm;    
+{
+    if (heap_space == 0) { /* allocates if it doesn't already exist */
+
+	I_ semispaceSize = SM_word_heap_size / 2;
+
+	/* Allocate the roots space */
+	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+
+	/* Allocate the heap */
+	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+    
+	/* Define the semi-spaces */
+	semispaceInfo[0].base = HEAP_FRAME_BASE(heap_space, semispaceSize);
+	semispaceInfo[1].base = HEAP_FRAME_BASE(heap_space + semispaceSize, semispaceSize);
+	semispaceInfo[0].lim = HEAP_FRAME_LIMIT(heap_space, semispaceSize);
+	semispaceInfo[1].lim = HEAP_FRAME_LIMIT(heap_space + semispaceSize, semispaceSize);
+
+	stat_init("TWOSPACE",
+		  " No of Roots  Caf   Caf    Astk   Bstk",
+		  "Astk Bstk Reg  No  bytes  bytes  bytes");
+    }
+
+    /* Initialise heap pointer and limit */
+    sm->hp = hp_start = semispaceInfo[semispace].base - 1;
+    sm->hardHpOverflowSize = 0;
+
+    if (SM_alloc_size) {
+	sm->hplim = sm->hp + SM_alloc_size;
+	SM_alloc_min = 0; /* No min; alloc size specified */
+
+	if (sm->hplim > semispaceInfo[semispace].lim) {
+	    fprintf(stderr, "Not enough heap for requested alloc size\n");
+	    return -1;
+	}
+    } else {
+	sm->hplim = semispaceInfo[semispace].lim;
+    }
+
+#if defined(FORCE_GC)
+    if (force_GC) {
+       if (sm->hplim > sm->hp + GCInterval) {
+          sm->hplim = sm->hp + GCInterval; 
+       }
+       else {
+          force_GC = 0; /* forcing GC has no effect, as semi-space is smaller than GCInterval */ 
+       }
+    }
+#endif /* FORCE_GC */
+
+#if defined(LIFE_PROFILE)
+    sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2); /* space for HpLim incr */
+    if (do_life_prof) {
+	sm->hplim = sm->hp + LifeInterval;
+    }
+#endif /* LIFE_PROFILE */
+
+    sm->CAFlist = NULL;
+
+#ifndef PAR
+    initExtensions( sm );
+#endif /* !PAR */
+
+    if (SM_trace) {
+	fprintf(stderr, "TWO SPACE Heap: 0base, 0lim, 1base, 1lim\n                0x%lx, 0x%lx, 0x%lx, 0x%lx\n",
+		(W_) semispaceInfo[0].base, (W_) semispaceInfo[0].lim,
+		(W_) semispaceInfo[1].base, (W_) semispaceInfo[1].lim);
+	fprintf(stderr, "TWO SPACE Initial: space %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
+		semispace,
+		(W_) semispaceInfo[semispace].base,
+		(W_) semispaceInfo[semispace].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
+    }
+
+    return 0;
+}
+
+I_
+collectHeap(reqsize, sm, do_full_collection)
+    W_ reqsize;
+    smInfo *sm;
+    rtsBool do_full_collection; /* ignored */
+{
+#if defined(LIFE_PROFILE)
+    I_ next_interval;  /* if doing profile */
+#endif
+
+    I_ free_space,	/* No of words of free space following GC */
+        alloc, 		/* Number of words allocated since last GC */
+	resident,	/* Number of words remaining after GC */
+        extra_caf_words,/* Extra words referenced from CAFs */
+        caf_roots,      /* Number of CAFs */
+        bstk_roots;     /* Number of update frames on B stack */
+
+    fflush(stdout);     /* Flush stdout at start of GC */
+    SAVE_REGS(&ScavRegDump); /* Save registers */
+
+#if defined(LIFE_PROFILE)
+    if (do_life_prof) {	life_profile_setup(); }
+#endif /* LIFE_PROFILE */
+
+#if defined(USE_COST_CENTRES)
+    if (interval_expired) { heap_profile_setup(); }
+#endif  /* USE_COST_CENTRES */
+  
+    if (SM_trace)
+	fprintf(stderr, "TWO SPACE Start: space %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, req %lu\n",
+		semispace, (W_) semispaceInfo[semispace].base,
+		(W_) semispaceInfo[semispace].lim,
+		(W_) sm->hp, (W_) sm->hplim, reqsize * sizeof(W_));
+
+    alloc = sm->hp - hp_start;
+    stat_startGC(alloc);
+
+    /* Set Up For Collecting:
+         - Flip Spaces
+	 - Set ToHp to point one below bottom of to-space (last allocated)
+	 - Set CAFs to Evac & Upd
+     */
+
+    semispace = NEXT_SEMI_SPACE(semispace);
+    ToHp = semispaceInfo[semispace].base - 1;
+    Scav = semispaceInfo[semispace].base;
+    
+    SetCAFInfoTables( sm->CAFlist );
+#ifdef PAR
+    EvacuateLocalGAs(rtsTrue);
+#else
+    evacSPTable( sm );
+#endif /* PAR */
+    EvacuateRoots( sm->roots, sm->rootno );
+#ifdef CONCURRENT
+    EvacuateSparks();
+#endif
+#ifndef PAR
+    EvacuateAStack( MAIN_SpA, stackInfo.botA );
+    EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
+#endif /* !PAR */
+
+    Scavenge();
+
+    EvacAndScavengeCAFs( sm->CAFlist, &extra_caf_words, &caf_roots );
+
+#ifdef PAR
+    RebuildGAtables(rtsTrue);
+#else
+    reportDeadMallocPtrs(sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+#endif /* PAR */
+
+    /* TIDY UP AND RETURN */
+
+    sm->hp = hp_start = ToHp;  /* Last allocated word */
+
+    resident = sm->hp - (semispaceInfo[semispace].base - 1);
+    DO_MAX_RESIDENCY(resident); /* stats only */
+
+    if (SM_alloc_size) {
+	sm->hplim = sm->hp + SM_alloc_size;
+	if (sm->hplim > semispaceInfo[semispace].lim) {
+	    free_space = 0;
+	} else {
+	    free_space = SM_alloc_size;
+	}
+    } else {
+	sm->hplim = semispaceInfo[semispace].lim;
+	free_space = sm->hplim - sm->hp;
+    }
+
+    if (SM_stats_verbose) {
+	char comment_str[BIG_STRING_LEN];
+#ifndef PAR
+	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu",
+		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
+		bstk_roots, sm->rootno,
+		caf_roots, extra_caf_words*sizeof(W_),
+		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1)*sizeof(W_),
+		(SUBTRACT_B_STK(MAIN_SpB, stackInfo.botB) + 1)*sizeof(W_));
+#else
+	/* ToDo: come up with some interesting statistics for the parallel world */
+	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu",
+		0, 0, sm->rootno, caf_roots, extra_caf_words*sizeof(W_), 0, 0);
+#endif
+
+#if defined(LIFE_PROFILE)
+	if (do_life_prof) {
+	    strcat(comment_str, " life");
+	}
+#endif
+#if defined(USE_COST_CENTRES)
+	if (interval_expired) {
+	    strcat(comment_str, " prof");
+	}
+#endif
+
+	stat_endGC(alloc, SM_word_heap_size, resident, comment_str);
+    } else {
+	stat_endGC(alloc, SM_word_heap_size, resident, "");
+    }
+
+#if defined(LIFE_PROFILE)
+      free_space = free_space / 2; /* space for HpLim incr */
+      if (do_life_prof) {
+	  next_interval = life_profile_done(alloc, reqsize);
+	  free_space -= next_interval;  /* ensure interval available */
+      }
+#endif /* LIFE_PROFILE */
+
+#if defined(USE_COST_CENTRES) || defined(GUM)
+      if (interval_expired) {
+#if defined(USE_COST_CENTRES)
+	  heap_profile_done();
+#endif
+	  report_cc_profiling(0 /*partial*/);
+      }
+#endif /* USE_COST_CENTRES */
+
+    if (SM_trace)
+	fprintf(stderr, "TWO SPACE Done: space %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
+		semispace, (W_) semispaceInfo[semispace].base,
+		(W_) semispaceInfo[semispace].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (free_space * sizeof(W_)));
+
+#ifdef DEBUG
+    /* To help flush out bugs, we trash the part of the heap from
+       which we're about to start allocating and all of the other semispace. */
+    TrashMem(sm->hp+1, sm->hplim);
+    TrashMem(semispaceInfo[NEXT_SEMI_SPACE(semispace)].base, 
+	     semispaceInfo[NEXT_SEMI_SPACE(semispace)].lim);
+#endif /* DEBUG */
+
+    RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
+
+    if ( (SM_alloc_min > free_space) || (reqsize > free_space) ) {
+      return( GC_HARD_LIMIT_EXCEEDED );	/* Heap absolutely exhausted */
+    } else {
+
+#if defined(FORCE_GC)
+    if (force_GC) {
+       if (sm->hplim > sm->hp + GCInterval) {
+	  sm->hplim = sm->hp + GCInterval;
+       }
+    }
+#endif /* FORCE_GC */
++ 	  
+#if defined(LIFE_PROFILE)
+      /* space for HpLim incr */
+      sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2);
+      if (do_life_prof) {
+	  /* set hplim for next life profile */
+	  sm->hplim = sm->hp + next_interval;
+      }
+#endif /* LIFE_PROFILE */
+	  
+      if (reqsize + sm->hardHpOverflowSize > free_space) {
+	return( GC_SOFT_LIMIT_EXCEEDED );   /* Heap nearly exhausted */
+      } else {
+	return( GC_SUCCESS );		    /* Heap OK */
+      }
+    }
+}
+
+#endif /* GC2s */
+
+\end{code}

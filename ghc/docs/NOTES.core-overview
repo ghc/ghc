@@ -1,0 +1,94 @@
+\documentstyle[11pt,a4wide]{article}
+\begin{document}
+
+%****************************************
+%*					*
+%*		The Core language			*
+%*					*
+%****************************************
+
+
+\title{The Core language}
+\author{Simon L Peyton Jones \and 
+Will Partain \and
+Patrick Sansom}
+
+\maketitle
+
+\section{Introduction}
+
+This document describes the Glasgow Haskell Core-language data type 
+in sufficient detail for an implementor to be able to use it.
+
+\section{Overview}
+
+The Core language is, roughly speaking, the second-order polymorphic
+lambda calculus, augmented with @let@, @letrec@ and @case@.
+It is a Haskell data type (defined shortly), but for convenience in this
+document we give it the concrete syntax given in Figure~\ref{fig:core-syntax}.
+
+Here are some of its important characteristics:
+\begin{description}
+\item[The Core language includes the second-order lambda calculus.]
+That is, type abstraction and type application are provided.
+\item[Constructors and primitive operators are always saturated.]
+This is easily done by adding extra lambdas and performing $\eta$-expansion.
+\item[All pattern-matching is done by simple @case@ expressions.]
+The @case@ expressions are simple in the sense that their patterns
+have only one level.
+\item[Every identifier includes its type.]
+This is not immediately obvious from the syntax, but will be fleshed out
+later.  The point is that it is easy to tell the type of any identifier or,
+in general, any Core expression.
+\item[There is no shadowing.]  
+Identifiers may not be globally unique,
+but there are no ``holes in the scope'' of any identifier.
+\end{description}
+All these properties should be maintained by programs which manipulate Core-langauge
+programs.
+
+\section{Identifiers: the type @Id@}
+
+Identifiers have the (abstract) type @Id@. 
+\begin{description}
+\item[Equality.]
+Identifiers have a unique number inside them,
+so they can be compared efficiently for equality.
+They are an instance of the class @Eq@.
+\item[Type.]
+The function 
+\begin{verbatim}
+	getIdUniType :: Id -> UniType
+\end{verbatim}
+ gets the type of an identifer.
+ \end{description}
+ 
+ \section{Types: the type @UniType@}
+ 
+ \subsection{@TyCon@}
+ 
+ The type @TyCon@ ranges over {\em data} type constructors,
+ not over the function type constructor.
+ 
+ A @TyCon@ can be one of:
+ \begin{itemize}
+ \item A primitive type.
+ \item A tuple type.
+ \item An algebraic data type (other than tuples).
+ \end{itemize}
+ 
+ \section{The Core language data type}
+ 
+ \subsection{@coreExpr@}
+
+Tycon in @case@.
+
+\subsection{@coreBinding@}
+
+\subsection{@coreProgram@}
+
+\subsection{@plainCore@ things}
+
+
+
+\end{document}

@@ -1,0 +1,45 @@
+This directory contains the source for Glorious Glasgow Haskell
+compiler proper, normally a binary called "hsc".  The source is
+organized into _one_ level of directories, and the literate Haskell
+source files sit in those directories (i.e., */*.lhs).
+
+The only "real" subdirectory is the tests/ directory [NB: not
+distributed normally, but available to gluttons for punishment], which
+includes some tests that we use to make sure we're not going
+backwards.  The subdirs of the test directory "match" the subdirs of
+the main source directory; e.g., the desugarer is in subdir deSugar/,
+and the tests for the desugarer are in tests/deSugar/.
+
+The main information about how the compiler goes together is in
+./Jmakefile.  The list of modules under "FRONTSRCS_LHS =", 
+"TCSRCS_LHS =", etc., should show the basic organization of the (many)
+modules.
+
+TO ADD A MODULE TO THE COMPILER:
+
+0. Be familiar with "How to add an optimisation pass..." (in
+   ghc/docs/add_to_compiler).
+
+1. Create an appropriately-named module in an appropriate subdirectory.
+
+2. Edit the Jmakefile:
+
+   * If you created a new subdirectory for the module, add that
+     directory to the SUBDIR_LIST and DASH_I_SUBDIR_LIST lists.
+
+   * Add your module to one of the lists of modules in the compiler;
+     e.g., TCSRCS_LHS.
+
+3. Re-make the Makefile: "make Makefile"
+
+4. Re-make the automatically-generated dependencies: "make depend".
+
+Your new module is now "wired in" and you may proceed normally...
+
+    % make
+
+(see also: day-to-day make-worlding section of developer's guide, near
+the end)
+
+5.  If you want to set up automagically (re-)runnable tests, follow
+    the suggests in the file tests/README.

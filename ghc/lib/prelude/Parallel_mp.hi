@@ -1,0 +1,9 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Parallel where
+infixr 0 `par`
+infixr 1 `seq`
+par :: a -> b -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _N_ _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: u0) (u3 :: u1) -> case _#_ par# [u0] [u2] of { _PRIM_ 0# -> _TYAPP_  parError# { u1 }; (u4 :: Int#) -> u3 } _N_ #-}
+seq :: a -> b -> b
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SL" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: u0) (u3 :: u1) -> case _#_ seq# [u0] [u2] of { _PRIM_ 0# -> _TYAPP_  parError# { u1 }; (u4 :: Int#) -> u3 } _N_ #-}
+

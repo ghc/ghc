@@ -1,0 +1,15 @@
+Typechecked:
+fromInt.t16 = int2Integer
+lit.t10 = fromInt.t16 (MkInt 2#)
+AbsBinds [tt12] [d.Num.t14] [(f.t1, ShouldSucceed.f)]
+    (d.Eq.t15, sdsel.Num.Eq tt12 d.Num.t14)
+    (fromInteger.t8, fromInteger tt12 d.Num.t14)
+    (==.t6, (==) tt12 d.Eq.t15)
+    {- nonrec -}
+    f.t1 :: [tt12] -> [tt12]
+    f.t1 (x.r54 : xs.r55)
+		 = if x.r54 ==.t6 (fromInteger.t8 lit.t10) then
+		       xs.r55
+		   else
+		       [] (tt12)
+

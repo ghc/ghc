@@ -1,0 +1,70 @@
+\documentstyle[literate]{article}
+\title{Lazy Imperative Programming}
+\begin{document}
+By John Launchbury, though he may not know it.
+
+This code describes {\em sequences}, which are independent state-based
+computations, typically involving (primitive) arrays.
+
+It also includes the basic code for Glasgow I/O, which is similar.
+
+The ``layers'' here are:
+\begin{description}
+\item[Bottom:]
+``World'' types; basic state-transformer monad.
+
+\item[Seq/IO PrimOps:]
+The true-blue primitives wired into the compiler.
+
+\item[Seq (incl arrays...) and IO monads:]
+Built on the above.
+
+\item[Variables:]
+Built on Seq.
+
+\item[PackedStrings:]
+Built on Seq.
+
+\item[DialogueIO:]
+Built on IO.
+
+\item[MainIO:]
+Built on DialogueIO.
+\end{description}
+
+%-----------------------------------------------------
+% "World" types and odd types for returning
+% several primitive things
+\input{PreludeWorld.lhs}
+\input{SemiPrelude.lhs}
+
+%-----------------------------------------------------
+% State transformer monad
+\input{PreludeST.lhs}
+
+%-----------------------------------------------------
+% basic Glasgow IO
+\input{PreludeGlaInOut.lhs}
+\input{PreludeGlaIO.lhs}
+
+%-----------------------------------------------------
+% Seq/array stuff
+\input{PreludeGlaArr.lhs}
+\input{PreludeGlaArray.lhs}
+
+%-----------------------------------------------------
+% Variables
+\input{PreludeVars.lhs}
+
+%-----------------------------------------------------
+% PackedString
+\input{PackedString.lhs}
+
+%-----------------------------------------------------
+% DialogueIO
+\input{PreludeDialogueIO.lhs}
+
+%-----------------------------------------------------
+% MainIO
+\input{MainIO.lhs}
+\end{document}

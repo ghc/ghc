@@ -1,0 +1,50 @@
+#   "zap" files in a directory tree if they're the same as somewhere else
+#
+#   zap normally means "rm", but "-s" means to put a symlink in place instead.
+#
+#   usage:
+#	# delete all files in this dir that are same as in master copy...
+#	% zap-if-same /src/ghc-master-copy
+#	# use lndir to put in mere links...
+#	% lndir /src/ghc-master-copy
+#
+#   a similar effect can be had with just...
+#	% zap-if-same -s /src/ghc-master-copy
+
+$Usage = "usage: zap-if-same [-s] master-dir\n";
+
+$Action = 'rm';
+
+if ($#ARGV >= 0 && $ARGV[0] eq '-s') {
+    $Action = 'link';
+    shift;
+}
+
+if ($#ARGV != 0) {
+    die $Usage;
+} else {
+    $Master_dir = $ARGV[0];
+    die "no such dir: $Master_dir\n$Usage" if ! -d $Master_dir;
+}
+
+open(F,"find . -type f -print |") || die "Cannot open find ($!)";
+while (<F>) {
+    chop;
+
+    if ( -f "$Master_dir/$_" && &same_contents($_) ) { # ToDo: & not same file?
+	print STDERR "$_ ...\n";
+	unlink $_;
+	if ($Action eq 'link') {
+	    symlink("$Master_dir/$_", $_);
+	}
+    }
+}
+close(F);
+
+sub same_contents {
+    local($f) = @_;
+
+    local($return_val) = 0;
+    $return_val = system("cmp -s $Master_dir/$f $f") >> 8;
+    ($return_val == 0) ? 1 : 0;
+}

@@ -1,0 +1,73 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface IdEnv where
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Maybes(Labda(..))
+import Outputable(NamedThing)
+import UniType(UniType)
+import UniqFM(UniqFM, addToUFM, delFromUFM, delListFromUFM, eltsUFM, emptyUFM, filterUFM, listToUFM, lookupUFM, mapUFM, minusUFM, plusUFM, plusUFM_C, singletonUFM)
+import Unique(Unique, u2i)
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type IdEnv a = UniqFM a
+data Labda a   = Hamna | Ni a
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+addOneToIdEnv :: UniqFM a -> Id -> a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _S_ "SU(U(P)AAA)L" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+addToUFM :: NamedThing a => UniqFM b -> a -> b -> UniqFM b
+	{-# GHC_PRAGMA _A_ 4 _U_ 1222 _N_ _S_ "U(AAAAAASAAA)SLL" {_A_ 4 _U_ 1222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 3 _U_ 222 _N_ _S_ "SSL" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 3 _U_ 222 _N_ _S_ "SSL" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 3 _U_ 212 _N_ _S_ "SU(U(P)AAA)L" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+combineIdEnvs :: (a -> a -> a) -> UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM plusUFM_C _N_ #-}
+delFromUFM :: NamedThing a => UniqFM b -> a -> UniqFM b
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)SL" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+delListFromUFM :: NamedThing a => UniqFM b -> [a] -> UniqFM b
+	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _N_ _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ } #-}
+delManyFromIdEnv :: UniqFM a -> [Id] -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _SPEC_ _ORIG_ UniqFM delListFromUFM [ (Id), _N_ ] _N_ #-}
+delOneFromIdEnv :: UniqFM a -> Id -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+eltsUFM :: UniqFM a -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+emptyUFM :: UniqFM a
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
+filterUFM :: (a -> Bool) -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+growIdEnv :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM plusUFM _N_ #-}
+growIdEnvList :: UniqFM a -> [(Id, a)] -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+isNullIdEnv :: UniqFM a -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+listToUFM :: NamedThing a => [(a, b)] -> UniqFM b
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
+lookupIdEnv :: UniqFM a -> Id -> Labda a
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+lookupNoFailIdEnv :: UniqFM a -> Id -> a
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+lookupUFM :: NamedThing a => UniqFM b -> a -> Labda b
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)SL" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+mapIdEnv :: (a -> b) -> UniqFM a -> UniqFM b
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM mapUFM _N_ #-}
+mapUFM :: (a -> b) -> UniqFM a -> UniqFM b
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+minusUFM :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+mkIdEnv :: [(Id, a)] -> UniqFM a
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _SPEC_ _ORIG_ UniqFM listToUFM [ (Id), _N_ ] _N_ #-}
+modifyIdEnv :: UniqFM a -> (a -> a) -> Id -> UniqFM a
+	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "SLU(U(P)AAA)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+nullIdEnv :: UniqFM a
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
+plusUFM :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+plusUFM_C :: (a -> a -> a) -> UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
+rngIdEnv :: UniqFM a -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM eltsUFM _N_ #-}
+singletonUFM :: NamedThing a => a -> b -> UniqFM b
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)LL" {_A_ 3 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 2 3 XXX 6 _/\_ u0 u1 -> \ (u2 :: u0 -> Unique) (u3 :: u0) (u4 :: u1) -> case _APP_  u2 [ u3 ] of { _ALG_ _ORIG_ Unique MkUnique (u5 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u1] [u5, u4]; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 2 3 CXX 7 _/\_ u0 u1 -> \ (u2 :: {{NamedThing u0}}) (u3 :: u0) (u4 :: u1) -> case case u2 of { _ALG_ _TUP_10 (u5 :: u0 -> ExportFlag) (u6 :: u0 -> Bool) (u7 :: u0 -> (_PackedString, _PackedString)) (u8 :: u0 -> _PackedString) (u9 :: u0 -> [_PackedString]) (ua :: u0 -> SrcLoc) (ub :: u0 -> Unique) (uc :: u0 -> Bool) (ud :: u0 -> UniType) (ue :: u0 -> Bool) -> _APP_  ub [ u3 ]; _NO_DEFLT_ } of { _ALG_ _ORIG_ Unique MkUnique (uf :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u1] [uf, u4]; _NO_DEFLT_ } _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "U(U(P)AAA)L" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: Int#) (u2 :: u0) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 2 CX 5 _/\_ u0 -> \ (u1 :: Id) (u2 :: u0) -> case u1 of { _ALG_ _ORIG_ Id Id (u3 :: Unique) (u4 :: UniType) (u5 :: IdInfo) (u6 :: IdDetails) -> case u3 of { _ALG_ _ORIG_ Unique MkUnique (u7 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u7, u2]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ } #-}
+u2i :: Unique -> Int#
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int#) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u1 :: Int#) -> u1; _NO_DEFLT_ } _N_ #-}
+unitIdEnv :: Id -> a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(U(P)AAA)L" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: Int#) (u2 :: u0) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 2 CX 5 _/\_ u0 -> \ (u1 :: Id) (u2 :: u0) -> case u1 of { _ALG_ _ORIG_ Id Id (u3 :: Unique) (u4 :: UniType) (u5 :: IdInfo) (u6 :: IdDetails) -> case u3 of { _ALG_ _ORIG_ Unique MkUnique (u7 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u7, u2]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+

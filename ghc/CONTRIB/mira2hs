@@ -1,0 +1,364 @@
+#!/bin/sh
+
+# mira2hs - Convert Miranda to Haskell (or Gofer)
+
+# usage:	mira2hs [infile [outfile]]
+#
+# Input defaults to stdin, output defaults to <infile>.hs or stdout if
+# input is stdin
+
+# Copyright Denis Howe 1992
+#
+# Permission is granted to make and distribute verbatim or modified
+# copies of this program, provided that every such copy or derived
+# work carries the above copyright notice and is distributed under
+# terms identical to these.
+#
+# Miranda is a trademark of Research Software Limited.
+# (E-mail: mira-request@ukc.ac.uk).
+#
+# Denis Howe <dbh@doc.ic.ac.uk>
+
+# NOTE: This program needs a sed which understands \<word\> regular
+# expressions, eg. Sun or GNU sed (gsed).
+
+# partain: got it from wombat.doc.ic.ac.uk:pub
+
+# 1.05 18 Sep 1992 zip -> zipPair
+# 1.04 29 Jul 1992 Improve handling of ==, -- and whitespace round guards
+# 		  $infix -> `infix`
+# 1.03 24 Apr 1992 Incorporate Lennart's miranda.hs functions
+# 		  Replace most Miranda fns & operators
+# 		  Use \<word\> patterns, ';' -> ',' in list comprehension
+# 		  Provide example main functions
+# 1.02 30 Mar 1992 Mods to header, fix handling of type,type
+# 		  Comment out String definition, Bool ops
+# 		  num -> Int, = -> == in guards
+# 1.01 10 Dec 1991 Convert type names to initial capital
+# 1.00 27 Sep 1991 Initial version advertised to net
+
+# Does NOT handle:
+#	continued inequalities (a < x < b)
+#	boolean '=' operator -> '==' (except in guards)
+#	main function
+#	multi-line type definitions
+#	guards on different line from body
+#	diagonalised list comprehensions (//)
+#	repeated variables in patterns (eg. LHS of function)
+#	filemode -> statusFile, getenv -> getEnv, read -> readFile, system
+#	include directives
+#	conflicts with prelude identifiers
+
+# Miranda's num type (Integral+Floating) is changed to Int so won't
+# work for non-intger nums.  Miranda has irrefutable ("lazy") tuple
+# patterns so you may need to add a ~, like ~(x,y) in Haskell.
+# Haskell functions "length" and "not" may need parentheses round
+# their arguments.
+
+# mira2hs copes equally well with literate and illiterate scripts.  It
+# doesn't care what characters lines begins with - it assumes
+# everything is code.  It will convert code even inside comments.
+# 
+# For literate programs you will have to turn the standard header into
+# literate form and rename the output .lhs.  You might want to do this
+# to (a copy of) mira2hs itself if you have lots of literate progs.
+
+# ToDo: = inside brackets -> ==
+
+if [ -n "$1" ]
+then	in=$1
+	out=`basename $in .m`.hs
+else	in="Standard input"
+fi
+[ -n "$2" ] && out=$2
+tmp=/tmp/m2h$$
+script=${tmp}s
+
+# Prepend a standard header and some function definitions.
+echo -- $in converted to Haskell by $USER on `date` > $tmp
+cat << "++++" >> $tmp
+module Main (main) where
+
+-------------------- mira2hs functions --------------------
+
+cjustify :: Int -> String -> String
+cjustify n s = spaces l ++ s ++ spaces r
+               where
+               m = n - length s
+               l = div m 2
+               r = m - l
+
+e :: (Floating a) => a
+e = exp 1
+
+hugenum :: (RealFloat a) => a
+hugenum = encodeFloat (r^d-1) (n-d)
+	  where r = floatRadix hugenum
+		d = floatDigits hugenum
+		(_,n) = floatRange hugenum
+
+subscripts :: [a] -> [Int]	-- Miranda index
+subscripts xs = f xs 0
+		where f []     n = []
+		      f (_:xs) n = n : f xs (n+1)
+
+integer :: (RealFrac a) => a -> Bool
+integer x = x == fromIntegral (truncate x)
+
+lay :: [String] -> String
+lay = concat . map (++"\n")
+
+layn :: [String] -> String
+layn =  concat . zipWith f [1..]
+           where
+	   f :: Int -> String -> String
+           f n x = rjustify 4 (show n) ++ ") " ++ x ++ "\n"
+
+limit :: (Eq a) => [a] -> a
+limit (x:y:ys) | x == y    = x
+               | otherwise = limit (y:ys)
+limit _                    = error "limit: bad use"
+
+ljustify :: Int -> String -> String
+ljustify n s = s ++ spaces (n - length s)
+
+member :: (Eq a) => [a] -> a -> Bool
+member xs x = elem x xs
+
+merge :: (Ord a) => [a] -> [a] -> [a]
+merge []         ys                     = ys
+merge xs         []                     = xs
+merge xxs@(x:xs) yys@(y:ys) | x <= y    = x : merge xs  yys
+		            | otherwise = y : merge xxs ys
+
+numval :: (Num a) => String -> a
+numval cs = read cs
+
+postfix :: [a] -> a -> [a]
+postfix xs x = xs ++ [x]
+
+rep :: Int -> b -> [b]
+rep n x = take n (repeat x)
+
+rjustify :: Int -> String -> String
+rjustify n s = spaces (n - length s) ++ s
+
+seq :: (Eq a) => a -> b -> b
+seq x y = if x == x then y else y
+
+shownum :: (Num a) => a -> String
+shownum x = show x
+
+sort :: (Ord a) => [a] -> [a]
+sort x	| n <= 1	= x
+	| otherwise	= merge (sort (take n2 x)) (sort (drop n2 x))
+			  where n = length x
+				n2 = div n 2
+spaces :: Int -> String
+spaces 0 = ""
+spaces n = ' ' : spaces (n-1)
+
+tinynum :: (RealFloat a) => a
+tinynum = encodeFloat 1 (n-d)
+	  where r = floatRadix tinynum
+		d = floatDigits tinynum
+		(n,_) = floatRange tinynum
+
+undef :: a
+undef = error "undefined"
+
+zipPair (x,y) = zip x y
+
+-- Following is UNTESTED
+data Sys_message =
+	Stdout String | Stderr String | Tofile String String | 
+	Closefile String | Appendfile String |
+--	System String |
+	Exit Int
+
+doSysMessages :: [Sys_message] -> Dialogue
+doSysMessages requests responses = doMsgs requests []
+
+doMsgs []			afs	= []
+doMsgs ((Appendfile f):rs)	afs	= doMsgs rs (f:afs)
+doMsgs ((Exit n)      :rs)	afs	= []
+doMsgs (r	      :rs)	afs
+ = doMsg r : doMsgs rs afs
+  where	doMsg (Stdout s)	= AppendChan stdout s
+	doMsg (Stderr s)	= AppendChan stderr s
+	doMsg (Tofile f s)	| elem f afs = AppendFile f s
+				| otherwise  = WriteFile  f s
+	doMsg (Closefile f)
+	 = error "doSysMessages{mira2hs}: Closefile sys_message not supported"
+--	doMsg (Closefile f)	= CloseFile f	-- optional
+--	doMsg (System cmd)
+--	 = error "doSysMessages{mira2hs}: System sys_message not supported"
+
+-- Pick a main.  (If I was clever main would be an overloaded fn :-).
+main :: Dialogue
+-- main = printString s		-- s :: String
+-- main = interact f		-- f :: String -> String
+-- main = doSysMessages l	-- l :: [Sys_message]
+-- main = print x		-- x :: (Text a) => a
+
+printString :: String -> Dialogue
+printString s = appendChan stdout s abort done
+
+-------------------- mira2hs functions end --------------------
+
+++++
+# It's amazing what sed can do.
+sed '
+# Type synonyms and constructed types: insert "type" or "data".  Add a
+# dummy :: to flag this line to the type name munging below.  Beware
+# ====== in comments.
+/[^=]==[^=]/s/\(.*=\)=/::type \1/g
+/::=/s/\(.*\)::=/::data \1=/g
+# Change type variable *s to "a"s
+/::/s/\*/a/g
+# List length & various other renamed functions (# reused below).
+s/ *# */ length /g
+s/\<arctan\>/atan/g
+s/\<code\>/ord/g
+s/\<converse\>/flip/g
+s/\<decode\>/chr/g
+s/\<dropwhile\>/dropWhile/g
+s/\<digit\>/isDigit/g
+s/\<entier\>/floor/g
+s/\<hd\>/head/g
+s/\<index\>/subscripts/g
+s/\<letter\>/isAlpha/g
+s/\<map2\>/zipWith/g
+s/\<max\>/maximum/g
+s/\<max2\>/max/g
+s/\<min\>/minimum/g
+s/\<min2\>/min/g
+s/\<mkset\>/nub/g
+s/\<neg\>/negate/g
+s/\<scan\>/scanl/g
+s/\<tl\>/tail/g
+# Miranda uncurried zip -> zipPair (above).  Do before zip2->zip.
+s/\<zip\>/zipPair/g
+# Miranda curried zip2 -> zip
+s/\<zip2\>/zip/g
+# Haskel div and mod are functions, not operators
+s/\<div\>/\`div\`/g
+s/\<mod\>/\`mod\`/g
+# Locate commas introducing guards by temporarily changing others.
+# Replace comma with #  when after || or unmatched ( or [ or before
+# unmatched ) or ] or in string or char constants.  Replace
+# matched () not containing commas with _<_ _>_ and matched []
+# with _{_ _}_ and repeat until no substitutions.
+: comma
+s/\(||.*\),/\1#/g
+s/\([[(][^])]*\),/\1#/g
+s/,\([^[(]*[])]\)/#\1/g
+s/(\([^),]*\))/_<_\1_>_/g
+s/\[\([^],]*\)\]/_{_\1_}_/g
+s/"\(.*\),\(.*\)"/"\1#\2"/g
+'"#change quotes
+s/','/'#'/g
+"'#change quotes
+t comma
+# Restore () and []
+s/_<_/(/g
+s/_>_/)/g
+s/_{_/[/g
+s/_}_/]/g
+# The only commas left now introduce guards, remove optional "if"
+s/,[ 	]*if/,/g
+s/[ 	]*,[ 	]*/,/g
+# Temporarily change ~=, <=, >=.
+s%~=%/_eq_%g
+s/<=/<_eq_/g
+s/>=/>_eq_/g
+# Replace every = in guard with == (do after type synonyms)
+: neq
+s/\(,.*[^=]\)=\([^=]\)/\1==\2/
+t neq
+# Fix other equals
+s/_eq_/=/g
+# Replace <pattern> = <rhs> , <guard> with <pattern> | (<guard>) = <rhs>
+s/=\(..*\),\(..*\)/| (\2) =\1/g
+s/(otherwise)/otherwise/g
+# Restore other commas
+s/#/,/g
+# List difference.  Beware ------ in comments.
+s/\([^-]\)--\([^-]\)/\1\\\\\2/g
+# Comments (do after list diff)
+s/||/--/g
+s/--|/---/g
+# Boolean not, or, and (do after comments)
+s/ *~ */ not /g
+s% *\\/ *% || %g
+s/&/&&/g
+# list indexing
+s/!/!!/g
+# Locate semicolon in list comprehensions by temporarily replacing ones
+# in string or char constants with #.  Replace matched [] not
+# containing semicolon with _{_ _}_ and repeat until no substitutions.
+: semico
+s/\[\([^];]*\)\]/_{_\1_}_/g
+s/"\([^;"]*\);\([^;"]*\)"/"\1#\2"/g
+'"#change quotes
+s/';'/'#'/g
+"'# change quotes
+t semico
+# Remaining [ ] must contain semicolons which we change to comas.
+: lcomp
+s/\(\[[^;]*\);/\1,/g
+s/;\([^;]*\]\)/,\1/g
+t lcomp
+# Restore [] and other semicolons
+s/_{_/[/g
+s/_}_/]/g
+s/#/;/g
+# Miranda dollar turns a function into an infix operator
+s/\$\([_A-Za-z0-9'\'']\{1,\}\)/`\1`/g
+' $1 >> $tmp
+
+# Create a sed script to change the first letter of each type name to
+# upper case.
+# Dummy definitions for predefined types (num is special).
+(
+	echo ::type char =
+	echo ::type bool =
+	echo ::type sys_message =
+	cat $tmp
+) | \
+# Find type definitions & extract type names
+sed -n '/::data[ 	].*=/{
+h;s/::data[	 ]*\([^	 =]\).*/\1/p
+y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/;p
+g;s/::data[	 ]*[^ 	=]\([^ 	=]*\).*=.*/\1/p
+}
+/::type[ 	].*=/{
+h;s/::type[	 ]*\([^	 =]\).*/\1/p
+y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/;p
+g;s/::type[	 ]*[^ 	=]\([^ 	=]*\).*=.*/\1/p
+}' | \
+# Read lower case initial, upper case inital and rest of type name.
+# Type is always after "::".
+(
+echo ": loop"
+while read h; read H; read t
+do echo "/::/s/\<$h$t\>/$H$t/g"
+done
+cat << "++++"
+# num -> Int
+/::/s/\<num\>/Int/g
+# Loop round to catch type,type,..
+t loop
+# Remove the dummy :: flags from type definitions.
+s/::type/type/
+s/::data/data/
+# Comment out string type if defined.
+s/\(type[ 	]*String[ 	]*=\)/-- \1/
+++++
+) > $script
+
+if [ "$out" ]
+then	exec > $out
+fi
+sed -f $script $tmp
+rm -f ${tmp}*

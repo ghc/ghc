@@ -1,0 +1,144 @@
+\section[stable-ptr-ops]{Stable Pointer Operations}
+
+The code that implements @performIO@ is mostly in
+@ghc/runtime/c-as-asm/PerformIO.lhc@.  However, this code can be
+called from the C world so it goes in a @.lc@ file.
+
+This code is based heavily on the code in @ghc/runtime/main/main.lc@.
+
+It is used to call a (stable pointer to a) function of type
+@IoWorld -> PrimIntAndIoWorld@ (ie @PrimIO_Int#@).
+
+(I doubt very much that this works at the moment - and we're going to
+change it to take/return a byte array anyway.  Code in PerformIO.lhc
+is even more dated.)
+
+\begin{code}
+#ifndef PAR
+
+#include "rtsdefs.h"
+
+extern StgPtr unstable_Closure;
+
+#ifndef __STG_TAILJUMPS__
+extern int doSanityChks;
+extern void checkAStack(STG_NO_ARGS);
+#endif
+
+void
+enterStablePtr(stableIndex, startCode)
+  StgStablePtr stableIndex;
+  StgFunPtr startCode;
+{
+  unstable_Closure = _deRefStablePointer(stableIndex, StorageMgrInfo.StablePointerTable);
+
+/* ToDo: Set arity to right value - if necessary */
+
+#if defined(__STG_TAILJUMPS__)
+  miniInterpret(startCode);
+#else
+  if (doSanityChks)
+    miniInterpret_debug(startCode, checkAStack);
+  else
+    miniInterpret(startCode);
+#endif /* not tail-jumping */
+
+}
+\end{code}
+
+\begin{code}
+EXTFUN(startPerformIO);
+
+extern void checkInCCallGC(STG_NO_ARGS);
+
+void
+performIO(stableIndex)
+  StgStablePtr stableIndex;
+{
+  checkInCCallGC();
+  enterStablePtr( stableIndex, (StgFunPtr) startPerformIO );
+}
+
+extern StgInt enterInt_Result;
+EXTFUN(startEnterInt);
+
+StgInt
+enterInt(stableIndex)
+  StgStablePtr stableIndex;
+{
+  checkInCCallGC();
+  enterStablePtr( stableIndex, (StgFunPtr) startEnterInt );
+  return enterInt_Result;
+}
+
+extern StgFloat enterFloat_Result;
+EXTFUN(startEnterFloat);
+
+StgInt
+enterFloat(stableIndex)
+  StgStablePtr stableIndex;
+{
+  checkInCCallGC();
+  enterStablePtr( stableIndex, (StgFunPtr) startEnterFloat );
+  return enterFloat_Result;
+}
+\end{code}
+
+\begin{code}
+StgPtr
+deRefStablePointer(stableIndex)
+  StgStablePtr stableIndex;
+{
+  return _deRefStablePointer(stableIndex, StorageMgrInfo.StablePointerTable);
+}
+\end{code}
+
+Despite the file name, we have two small malloc ptr operation - not
+worth putting in a file by itself.
+
+\begin{code}
+StgInt 
+eqMallocPtr(p1, p2)
+  StgMallocPtr p1;
+  StgMallocPtr p2;
+{
+  return (p1 == p2);
+}
+\end{code}
+
+And some code that HAS NO RIGHT being here.
+
+\begin{code}
+StgStablePtr softHeapOverflowHandler = -1;
+
+StgInt
+catchSoftHeapOverflow( newHandler, deltaLimit )
+  StgStablePtr newHandler;
+  StgInt deltaLimit;
+{
+  StgStablePtr oldHandler = softHeapOverflowHandler;
+
+  /* If we're in a _ccall_GC_ then HpLim will be stored in SAVE_HpLim
+     which provides an easy way of changing it. */
+  checkInCCallGC();
+
+  StorageMgrInfo.hardHpOverflowSize += deltaLimit;
+  SAVE_HpLim -= deltaLimit;
+
+  if (StorageMgrInfo.hardHpOverflowSize < 0) {
+    fprintf(stderr, "Error: Setting Hard Heap Overflow Size to negative value!\n");
+    EXIT(EXIT_FAILURE);
+  }
+
+  softHeapOverflowHandler = newHandler;
+  return oldHandler;
+}
+
+StgInt
+getSoftHeapOverflowHandler(STG_NO_ARGS)
+{
+  return (StgInt) softHeapOverflowHandler;
+}
+
+#endif /* !PAR */
+\end{code}

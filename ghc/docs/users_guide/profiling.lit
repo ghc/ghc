@@ -1,0 +1,239 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{The Glorious Haskell Compilation System\\ Profiling Guide}
+\author{The AQUA Team (Patrick M. Sansom)\\
+Department of Computing Science\\
+University of Glasgow\\
+Glasgow, Scotland\\
+G12 8QQ\\
+\\
+Email: glasgow-haskell-\{bugs,request\}\@dcs.glasgow.ac.uk}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\end{rawlatex}
+\end{onlystandalone}
+
+\section[profiling]{Profiling Haskell programs}
+\index{profiling, with cost-centres}
+\index{cost-centre profiling}
+
+Glasgow Haskell comes with a time and space profiling system. Its
+purpose is to help you improve your understanding of your program's
+execution behaviour, so you can improve it.
+
+%This profiling system is still under development.
+%Please e-mail reports of any bugs you discover to
+%\tr{glasgow-haskell-bugs@dcs.glasgow.ac.uk}.
+
+Any comments, suggestions and/or improvements you have to are welcome.
+Recommended ``profiling tricks'' would be especially cool!
+
+\subsection[profiling-intro]{How to profile a Haskell program}
+
+The GHC approach to profiling is very simple: annotate the expressions
+you consider ``interesting'' with {\em cost centre} labels (strings);
+so, for example, you might have:
+
+\begin{verbatim}
+f x y
+  = let
+	output1 = _scc_ "Pass1" ( pass1 x )
+	output2 = _scc_ "Pass2" ( pass2 output1 y )
+	output3 = _scc_ "Pass3" ( pass3 (output2 `zip` [1 .. ]) )
+    in concat output3
+\end{verbatim}
+
+The costs of the evaluating the expressions bound to \tr{output1},
+\tr{output2} and \tr{output3} will be attributed to the ``cost
+centres'' \tr{Pass1}, \tr{Pass2} and \tr{Pass3}, respectively.
+
+The costs of evaluating other expressions, e.g., \tr{concat output4},
+will be inherited by the scope which referenced the function \tr{f}.
+
+You can put in cost-centres via \tr{_scc_} constructs by hand, as in
+the example above.  Perfectly cool.  That's probably what you {\em
+would} do if your program divided into obvious ``passes'' or
+``phases'', or whatever.
+
+If your program is large or you have no clue what might be gobbling
+all the time, you can get GHC to mark all functions with \tr{_scc_}
+constructs, automagically.  Add an \tr{-auto} compilation flag to the
+usual \tr{-prof} option.
+
+Once you start homing in on the Guilty Suspects, you may well switch
+from automagically-inserted cost-centres to a few well-chosen ones of
+your own.
+
+To use profiling, you must {\em compile} and {\em run} with special
+options.  (We usually forget the ``run'' magic!---Do as we say, not as
+we do...) Details follow.
+
+If you're serious about this profiling game, you should probably read
+one or more of the Sansom/Peyton Jones papers about the GHC profiling
+system.  Just visit the Glasgow FP Web page...
+
+%************************************************************************
+%*									*
+\subsection[prof-compiler-options]{Compiling programs for profiling}
+\index{profiling options}
+\index{options, for profiling}
+%*									*
+%************************************************************************
+
+\input{prof-compiler-options.lit}
+
+%************************************************************************
+%*									*
+\subsection[prof-rts-options]{How to control your profiled program at runtime}
+\index{profiling RTS options}
+\index{RTS options, for profiling}
+%*									*
+%************************************************************************
+
+\input{prof-rts-options.lit}
+
+%************************************************************************
+%*									*
+\subsection[prof-graphs]{Producing graphical heap profiles}
+\index{heap profiles, producing}
+%*									*
+%************************************************************************
+
+\input{prof-post-processors.lit}
+
+% \subsection[cost-centres]{Profiling by Cost Centres}
+% 
+% Problems with lazy evaluation
+% 
+% The central idea is to identify particular source code expressions of
+% interest. These expressions are annotated with a {\em cost
+% centre}\index{cost centre} label. Execution and allocation costs are
+% attributed to the cost centre label which encloses the expression
+% incurring the costs.
+% 
+% Simple example
+% 
+% (Note: the paper in \tr{ghc/docs/papers/profiling.ps} may have some
+% decent examples...)
+% 
+% Costs are attribution to one cost centre.
+% Inheritance of un-profiled costs.
+% 
+% Degree of evaluation
+% Unevaluated arguments
+% Optimisation and transformation
+% Evaluation of instances
+%   escaping functions: evaluation vs lexical
+% 
+% \subsection[prof-annotations]{Annotating your Haskell source}
+% 
+%   Explicit annotations
+%   Automatic annotation
+% 
+% \subsection[prof-information]{Profiling information}
+% 
+%   Cost Centre Label,Module,Group
+%   Example time/alloc profile
+% 
+%   Description of heap profile
+%   Closure Description, Type and Kind
+% \subsection[limitations]{Limitations of the current profiling system}
+% 
+% There are a number of limitations and shortcomings of the current
+% profiling system. Any comments on the impact of these and any
+% suggested improvements would be greatly appreciated.
+% 
+% \begin{onlylatex}
+% \subsubsection*{Explicit \tr{_scc_} annotations}
+% \end{onlylatex}
+% \begin{onlyinfo}
+% Explicit \tr{_scc_} annotations:
+% \end{onlyinfo}
+% 
+% The explicit \tr{_scc_} source annotations cannot annotate entire
+% function declarations as the clauses, pattern matching are not part of
+% the expression syntax --- they are syntactic sugar. It is possible to
+% remove the syntactic sugar by hand, translating to a simple
+% declaration with case expressions on the rhs, but this is very
+% tiresome.
+% 
+% We propose to introduce an additional annotation to enable a \tr{_scc_}
+% annotation to be placed around an entire declaration.
+% 
+% To further ease the explicit annotation process we also propose to
+% provide annotations which instruct the compiler to annotate all the
+% declarations in a particular \tr{let} or \tr{where} clause with the
+% name of the declaration.
+% 
+% Other annotation schemes are feasible. Any suggestions / requests?
+% 
+% 
+% \begin{onlylatex}
+% \subsubsection*{Closure descriptions}
+% \end{onlylatex}
+% \begin{onlyinfo}
+% Closure descriptions:
+% \end{onlyinfo}
+% 
+% The closure descriptions are by no means perfect ...
+% 
+% The descriptions for expressions are somewhat tedious as they reflect
+% some of the structure of the transformed STG code. This is largely to
+% provide additional information so use of the STG code can be made if
+% required (use the compiler option \tr{-ddump-stg}). This may be
+% removed if the name of the \pl{corner} is considered sufficient.
+% 
+% Local bindings introduced by the compiler have a name \tr{?<tag>}.
+% Most of these are not related to the source in any meaningful way. For
+% example, the \tr{?stg} names are introduced during the CoreToStg pass.
+% Some other arbitrary compiler introduced names are: \tr{?ds},
+% \tr{?tpl}, \tr{?si}, \tr{?cs}, \tr{?ll}, and \tr{?sat}. Please let us
+% know if any of these turn out to be a problem. We could introduce a
+% more meaningful naming scheme into the compiler which assigns names
+% that reflect the nearest enclosing source binding. Another possibility
+% is to add the unique identifier so they aren't all clumped together as
+% one indistinguishable description.
+% 
+% There is only one closure description and type for all black holes,
+% ``BH''. It might be useful to record the closure that is currently
+% being evaluated as part of the black hole description.
+% 
+% Similarly there is only one partial application description, ``PAP''.
+% It might be useful to record the function being applied in the partial
+% application as part of the partial application description.
+% 
+% 
+% \begin{onlylatex}
+% \subsubsection*{Garbage collection and paging}
+% \end{onlylatex}
+% \begin{onlyinfo}
+% Garbage collection and paging:
+% \end{onlyinfo}
+% 
+% Currently the profiling implementation requires the two-space
+% (\tr{-gc-2s}) garbage collector to be used. When using the \tr{-prof}
+% options a particular garbage collector should not be specified. This
+% imposes particular paging characteristics which may be different from
+% the garbage collector your program normally uses. These paging
+% characteristics may distort the user time profiling results, though we
+% do not believe this is a significant problem.
+% 
+% 
+% \subsection[references]{Papers describing this work}
+% 
+% A discussion of our initial ideas are described in the paper
+% ``Profiling Lazy Functional Languages'' by Patrick Sansom and Simon
+% Peyton Jones.
+% 
+% It is in the GHC distribution in \tr{ghc/docs/papers/profiling.ps},
+% or it can be retrieved using ftp from
+% \tr{ftp.dcs.glasgow.ac.uk} (\tr{[130.209.240.50]})
+% in the file
+% \tr{pub/glasgow-fp/papers/lazy-profiling.ps}.
+
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

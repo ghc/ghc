@@ -1,0 +1,5 @@
+interface PreludeMain13_help where
+import PreludeIOError(IOError13)
+import PreludeMonadicIO(Either)
+import Main(main)
+main :: _State _RealWorld -> (Either IOError13 (), _State _RealWorld)

@@ -1,0 +1,10 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TreelessForm where
+import CmdLineOpts(SwitchResult)
+import CoreSyn(CoreExpr)
+import DefSyn(DefBindee)
+import Id(Id)
+import SplitUniq(SplitUniqSupply)
+convertToTreelessForm :: (a -> SwitchResult) -> CoreExpr Id DefBindee -> SplitUniqSupply -> CoreExpr Id DefBindee
+	{-# GHC_PRAGMA _A_ 2 _U_ 012 _N_ _S_ "AS" {_A_ 1 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+

@@ -1,0 +1,41 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface FreeVars where
+import AnnCoreSyn(AnnCoreBinding, AnnCoreCaseAlternatives, AnnCoreCaseDefault, AnnCoreExpr', AnnCoreExpr(..))
+import BasicLit(BasicLit)
+import Class(Class)
+import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
+import CostCentre(CostCentre)
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import PrimOps(PrimOp)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+import UniqFM(UniqFM)
+import UniqSet(IdSet(..), TyVarSet(..), UniqSet(..))
+import Unique(Unique)
+data AnnCoreBinding a b c 	{-# GHC_PRAGMA AnnCoNonRec a (c, AnnCoreExpr' a b c) | AnnCoRec [(a, (c, AnnCoreExpr' a b c))] #-}
+data AnnCoreCaseAlternatives a b c 	{-# GHC_PRAGMA AnnCoAlgAlts [(Id, [a], (c, AnnCoreExpr' a b c))] (AnnCoreCaseDefault a b c) | AnnCoPrimAlts [(BasicLit, (c, AnnCoreExpr' a b c))] (AnnCoreCaseDefault a b c) #-}
+data AnnCoreCaseDefault a b c 	{-# GHC_PRAGMA AnnCoNoDefault | AnnCoBindDefault a (c, AnnCoreExpr' a b c) #-}
+type AnnCoreExpr a b c = (c, AnnCoreExpr' a b c)
+data AnnCoreExpr' a b c 	{-# GHC_PRAGMA AnnCoVar b | AnnCoLit BasicLit | AnnCoCon Id [UniType] [CoreAtom b] | AnnCoPrim PrimOp [UniType] [CoreAtom b] | AnnCoLam [a] (c, AnnCoreExpr' a b c) | AnnCoTyLam TyVar (c, AnnCoreExpr' a b c) | AnnCoApp (c, AnnCoreExpr' a b c) (CoreAtom b) | AnnCoTyApp (c, AnnCoreExpr' a b c) UniType | AnnCoCase (c, AnnCoreExpr' a b c) (AnnCoreCaseAlternatives a b c) | AnnCoLet (AnnCoreBinding a b c) (c, AnnCoreExpr' a b c) | AnnCoSCC CostCentre (c, AnnCoreExpr' a b c) #-}
+data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+type CoreExprWithFVs = (FVInfo, AnnCoreExpr' Id Id FVInfo)
+type FVCoreBinding = CoreBinding (Id, UniqFM Id) Id
+type FVCoreExpr = CoreExpr (Id, UniqFM Id) Id
+data FVInfo   = FVInfo (UniqFM Id) (UniqFM TyVar) LeakInfo
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+type IdSet = UniqFM Id
+data LeakInfo   = MightLeak | LeakFree Int
+type TyVarSet = UniqFM TyVar
+type UniqSet a = UniqFM a
+addTopBindsFVs :: (UniqFM Id -> Id -> Bool) -> [CoreBinding Id Id] -> ([CoreBinding (Id, UniqFM Id) Id], UniqFM Id)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
+freeTyVarsOf :: (FVInfo, AnnCoreExpr' Id Id FVInfo) -> UniqFM TyVar
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(ASA)A)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UniqFM TyVar) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: (FVInfo, AnnCoreExpr' Id Id FVInfo)) -> case u0 of { _ALG_ _TUP_2 (u1 :: FVInfo) (u2 :: AnnCoreExpr' Id Id FVInfo) -> case u1 of { _ALG_ _ORIG_ FreeVars FVInfo (u3 :: UniqFM Id) (u4 :: UniqFM TyVar) (u5 :: LeakInfo) -> u4; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+freeVars :: CoreExpr Id Id -> (FVInfo, AnnCoreExpr' Id Id FVInfo)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+freeVarsOf :: (FVInfo, AnnCoreExpr' Id Id FVInfo) -> UniqFM Id
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(SAA)A)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UniqFM Id) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: (FVInfo, AnnCoreExpr' Id Id FVInfo)) -> case u0 of { _ALG_ _TUP_2 (u1 :: FVInfo) (u2 :: AnnCoreExpr' Id Id FVInfo) -> case u1 of { _ALG_ _ORIG_ FreeVars FVInfo (u3 :: UniqFM Id) (u4 :: UniqFM TyVar) (u5 :: LeakInfo) -> u3; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+

@@ -1,0 +1,450 @@
+\section[stk-overflow]{Stack overflow routine}
+
+%************************************************************************
+%*									*
+\subsection[arity-error]{Arity error has nothing to do with stack overflow}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#include "rtsdefs.h"
+
+extern void PrintRednCountInfo(STG_NO_ARGS);
+extern I_   showRednCountStats;
+
+#ifdef __DO_ARITY_CHKS__
+I_ ExpectedArity;
+
+void
+ArityError(n)
+  I_ n;
+{
+    fflush(stdout);
+    fprintf(stderr, "Arity error: called with %ld args, should have been %ld\n",
+		ExpectedArity, n);
+
+#if defined(DO_REDN_COUNTING)
+    if (showRednCountStats) {
+	PrintRednCountInfo();
+    }
+#endif
+
+    EXIT(EXIT_FAILURE);
+}
+
+#endif	/* __DO_ARITY_CHECKS__ */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[stk-oflow-seq]{Boring sequential stack overflow}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifndef CONCURRENT
+
+void
+StackOverflow(STG_NO_ARGS)
+{
+    fflush(stdout);
+    StackOverflowHook(SM_word_stk_size * sizeof(W_)); /*msg*/
+
+#if defined(DO_REDN_COUNTING)
+    if (showRednCountStats) {
+	PrintRednCountInfo();
+    }
+#endif
+
+    EXIT(EXIT_FAILURE);
+}
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[stk-squeeze]{Code for squeezing out update frames}
+%*									*
+%************************************************************************
+
+Code for squeezing out vacuous update frames.  Updatees of squeezed frames
+are turned into indirections to the common black hole (or blocking queue).
+
+\begin{code}
+
+I_ squeeze_upd_frames = 1; /* now ON by default */
+
+I_
+SqueezeUpdateFrames(bottom, top, frame)
+P_ bottom;
+P_ top;
+P_ frame;
+{
+    I_ displacement = 0;
+    P_ next_frame = NULL;	/* Temporally next */
+    P_ prev_frame;		/* Temporally previous */
+
+    /*
+     * If we have no update frames, there is nothing to do.
+     */
+
+    if (frame <= bottom)
+	return 0;
+
+    if ((prev_frame = GRAB_SuB(frame)) <= bottom) {
+#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+        if (!noBlackHoles)
+	    UPD_BH(GRAB_UPDATEE(frame), BH_UPD_info);
+#endif
+	return 0;
+    }
+
+    /*
+     * Walk down the stack, reversing the SuB pointers so that we can walk back up
+     * as we squeeze from the bottom.  Note that next_frame and prev_frame refer to
+     * next and previous as they were added to the stack, rather than the way we see
+     * them in this walk. (It makes the next loop less confusing.)
+     */
+
+    while (prev_frame > bottom) {
+	PUSH_SuB(frame, next_frame);
+	next_frame = frame;
+	frame = prev_frame;
+	prev_frame = GRAB_SuB(frame);
+    }
+
+    /*
+     * Now, we're at the bottom.  Frame points to the lowest update frame on the
+     * stack, and its saved SuB actually points to the frame above. We have to walk
+     * back up the stack, squeezing out empty update frames and turning the pointers
+     * back around on the way back up.
+     */
+
+    /*
+     * The bottom-most frame has not been altered, and we never want to eliminate it
+     * anyway.  Just black hole the updatee and walk one step up
+     * before starting to squeeze. When you get to the topmost frame,
+     * remember that there are still some words above it that might
+     * have to be moved.
+     */
+
+#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+    if (!noBlackHoles)
+	UPD_BH(GRAB_UPDATEE(frame), BH_UPD_info);
+#endif
+    prev_frame = frame;
+    frame = next_frame;
+
+    /* 
+     * Loop through all of the middle frames (everything except the very 
+     * bottom and the very top).
+     */
+    while ((next_frame = GRAB_SuB(frame)) != NULL) {
+	P_ sp;
+	P_ frame_bottom = frame + BREL(STD_UF_SIZE);
+
+	/* Check to see if the current frame is empty (both A and B) */
+	if (prev_frame == frame_bottom + BREL(displacement) &&
+	  GRAB_SuA(next_frame) == GRAB_SuA(frame)) {
+
+	    /* Now squeeze out the current frame */
+	    P_ updatee_keep = GRAB_UPDATEE(prev_frame);
+	    P_ updatee_bypass = GRAB_UPDATEE(frame);
+
+	    /*
+	      fprintf(stderr, "squeezing frame at %lx, ret %lx\n", frame,
+	      GRAB_RET(frame));
+	     */
+
+#ifdef CONCURRENT
+	    /* Check for a blocking queue on the node that's going away */
+	    if (INFO_PTR(updatee_bypass) == (W_) BQ_info) {
+		/* Sigh.  It has one.  Don't lose those threads! */
+		if (INFO_PTR(updatee_keep) == (W_) BQ_info) {
+		    /* Urgh.  Two queues.  Merge them. */
+		    P_ tso = (P_) BQ_ENTRIES(updatee_keep);
+
+		    while (TSO_LINK(tso) != Nil_closure)
+			tso = TSO_LINK(tso);
+
+		    TSO_LINK(tso) = (P_) BQ_ENTRIES(updatee_bypass);
+		} else {
+		    /* For simplicity, just swap the BQ for the BH */
+		    P_ temp = updatee_keep;
+
+		    updatee_keep = updatee_bypass;
+		    updatee_bypass = temp;
+
+		    /* Record the swap in the kept frame (below) */
+		    PUSH_UPDATEE(prev_frame, updatee_keep);
+		}
+	    }
+#endif
+
+	    UPD_EXISTING();	/* ticky stuff (NB: nothing for spat-profiling) */
+	    UPD_IND(updatee_bypass, updatee_keep);
+
+	    sp = frame - BREL(1);	/* Toss the current frame */
+	    displacement += STD_UF_SIZE;
+
+	} else {
+#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+	    if (!noBlackHoles)
+		UPD_BH(GRAB_UPDATEE(frame), BH_UPD_info);
+#endif
+
+	    /* No squeeze for this frame */
+	    sp = frame_bottom - BREL(1);	/* Keep the current frame */
+
+	    /* Fix the SuB in the current frame (should point to the frame below) */
+	    PUSH_SuB(frame, prev_frame);
+	}
+
+	/* Now slide all words from sp up to the next frame */
+
+	if (displacement > 0) {
+	    P_ next_frame_bottom = next_frame + BREL(STD_UF_SIZE);
+
+	    /*	    
+	     fprintf(stderr, "sliding [%lx, %lx] by %d\n", sp, next_frame_bottom,
+	     displacement);
+	    */
+
+	    while (sp <= next_frame_bottom) {
+		sp[BREL(displacement)] = *sp;
+		sp -= BREL(1);
+	    }
+	}
+	prev_frame = frame + BREL(displacement);
+	frame = next_frame;
+    }
+
+    /* 
+     * Now handle the topmost frame.  Patch SuB, black hole the updatee,
+     * and slide down.
+     */
+
+    PUSH_SuB(frame, prev_frame);
+
+#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+    if (!noBlackHoles)
+	UPD_BH(GRAB_UPDATEE(frame), BH_UPD_info);
+#endif
+
+    if (displacement > 0) {
+	P_ sp = frame + BREL(STD_UF_SIZE) - BREL(1);
+	
+	/*
+	 fprintf(stderr, "sliding [%lx, %lx] by %d\n", sp, top, displacement);
+	*/
+
+	while (sp <= top) {
+	    sp[BREL(displacement)] = *sp;
+	    sp -= BREL(1);
+	}
+    }
+    return displacement;
+}
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[stk-ouflow-par]{Rather exciting parallel stack overflow and underflow}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef CONCURRENT
+\end{code}
+
+StackOverflow: called inside a nice ``callwrapper'' when stack
+overflow occurs.  The state is already saved in the TSO, and the stack
+is in a tidy saved state.
+
+\begin{code}
+EXTDATA_RO(StkO_info);		/* boring extern decl */
+EXTFUN(EnterNodeCode);		/* For reentering node after potential GC */
+
+#ifdef PAR
+EXTDATA_RO(FetchMe_info);
+#endif
+
+I_
+StackOverflow(args1, args2)
+W_ args1;
+W_ args2;
+{
+    I_ i;
+    P_ old_stko, new_stko;
+    W_ headroom = STACK_OVERFLOW_HEADROOM(args1, args2);
+    I_ cts_size;
+
+#ifdef PAR
+    W_ is_prim_return = STACK_OVERFLOW_PRIM_RETURN(args1, args2);
+#endif
+    W_ reenter = STACK_OVERFLOW_REENTER(args1, args2);
+    W_ words_of_a = STACK_OVERFLOW_AWORDS(args1, args2);
+    W_ words_of_b = STACK_OVERFLOW_BWORDS(args1, args2);
+    W_ liveness = STACK_OVERFLOW_LIVENESS(args1, args2);
+    I_ really_reenter_node = 0;
+
+    SET_TASK_ACTIVITY(ST_OVERHEAD);
+
+
+    /*
+     * fprintf(stderr,"StackOverflow:liveness=%lx,a=%lx,b=%lx\n",
+     * liveness,words_of_a,words_of_b);
+     */
+
+    old_stko = SAVE_StkO;
+
+    /*
+     * fprintf(stderr, "SpA %lx SuA %lx SpB %lx SuB %lx\n", STKO_SpA(old_stko),
+     * STKO_SuA(old_stko), STKO_SpB(old_stko), STKO_SuB(old_stko));
+     */
+
+    if (squeeze_upd_frames) {
+	i = SqueezeUpdateFrames(STKO_BSTK_BOT(old_stko), STKO_SpB(old_stko),
+	  STKO_SuB(old_stko));
+	STKO_SuB(old_stko) += BREL(i);
+	STKO_SpB(old_stko) += BREL(i);
+	if ((P_) STKO_SpA(old_stko) - AREL(headroom) > STKO_SpB(old_stko)) {
+
+	    /*
+	     * fprintf(stderr, "SpA %lx SpB %lx headroom %d\n", STKO_SpA(old_stko),
+	     * STKO_SpB(old_stko), headroom);
+	     */
+
+	    /* We saved enough space to continue on the old StkO */
+	    return 0;
+	}
+    }
+    SAVE_Liveness = liveness;
+
+    /* Double the stack chunk size each time we grow the stack */
+    cts_size = STKO_CLOSURE_CTS_SIZE(old_stko) * 2;
+
+    if (SAVE_Hp + STKO_HS + cts_size > SAVE_HpLim) {
+	if (reenter) {
+	    /*
+	     * Even in the uniprocessor world, we may have to reenter node in case
+	     * node is a selector shorted out by GC.
+	     */
+	    assert(liveness & LIVENESS_R1);
+	    TSO_PC2(CurrentTSO) = EnterNodeCode;
+	    really_reenter_node = 1;
+	}
+	ReallyPerformThreadGC(STKO_HS + cts_size, rtsFalse);
+	old_stko = SAVE_StkO;
+    }
+    ALLOC_STK(STKO_HS, cts_size, 0);
+    new_stko = SAVE_Hp + 1;
+    SAVE_Hp += STKO_HS + cts_size;
+    SET_STKO_HDR(new_stko, StkO_info, CCC);
+
+    /* Initialize the StkO, as in NewThread */
+    STKO_SIZE(new_stko) = cts_size + STKO_VHS;
+    STKO_SpB(new_stko) = STKO_SuB(new_stko) = STKO_BSTK_BOT(new_stko) + BREL(1);
+    STKO_SpA(new_stko) = STKO_SuA(new_stko) = STKO_ASTK_BOT(new_stko) + AREL(1);
+    STKO_LINK(new_stko) = old_stko;
+
+    STKO_RETURN(new_stko) = SAVE_Ret;
+
+#ifdef PAR
+
+    /*
+     * When we fall off of the top stack segment, we will either be
+     * returning an algebraic data type, in which case R2 holds a
+     * valid info ptr, or we will be returning a primitive
+     * (e.g. int#), in which case R2 is garbage. If we need to perform
+     * GC to pull in the lower stack segment (this should only happen
+     * because of task migration), then we need to know the register
+     * liveness for the algebraic returns.  We get the liveness out of
+     * the info table.  Now, we could set up the primitive returns
+     * with a bogus infoptr, which has a NO_LIVENESS field in the info
+     * table, but that would involve a lot more overhead than the
+     * current approach. At present, we set up RetReg to point to
+     * *either* a polymorphic algebraic return point, or a primitive
+     * return point.
+     */
+
+    SAVE_Ret = is_prim_return ? (P_) PrimUnderflow : (P_) vtbl_Underflow;
+#else
+    SAVE_Ret = (P_) vtbl_Underflow;
+#endif
+
+    STKO_SpA(old_stko) += AREL(words_of_a);
+    STKO_SpB(old_stko) += BREL(words_of_b);
+
+#ifdef DO_REDN_COUNTING
+    /* Record the stack depths in chunks below the new stack object */
+
+    STKO_ADEP(new_stko) = STKO_ADEP(old_stko) +
+      AREL((I_) STKO_ASTK_BOT(old_stko) - (I_) STKO_SpA(old_stko));
+    STKO_BDEP(new_stko) = STKO_BDEP(old_stko) +
+      BREL((I_) STKO_BSTK_BOT(old_stko) - (I_) STKO_SpB(old_stko));
+#endif
+
+    if (STKO_SpB(old_stko) < STKO_BSTK_BOT(old_stko)) {
+
+	/*
+	 * This _should_ only happen if PAP_entry fails a stack check and there is
+	 * no update frame on the current stack.  We can deal with this by storing a
+	 * function's argument requirements in its info table, peering into the PAP
+	 * (it had better be in R1) for the function pointer and taking only the
+	 * necessary number of arguments, but this would be hard, so we haven't done
+	 * it.
+	 */
+	fflush(stdout);
+	fprintf(stderr, "StackOverflow too deep.  Probably a PAP with no update frame.\n");
+	abort(); /* an 'abort' may be overkill WDP 95/04 */
+    }
+    /* Move A stack words from old StkO to new StkO */
+    for (i = 1; i <= words_of_a; i++) {
+	STKO_SpA(new_stko)[-AREL(i)] = STKO_SpA(old_stko)[-AREL(i)];
+    }
+    STKO_SpA(new_stko) -= AREL(words_of_a);
+
+    /* Move B stack words from old StkO to new StkO */
+    for (i = 1; i <= words_of_b; i++) {
+	STKO_SpB(new_stko)[-BREL(i)] = STKO_SpB(old_stko)[-BREL(i)];
+    }
+    STKO_SpB(new_stko) -= BREL(words_of_b);
+
+    /* Now, handle movement of a single update frame */
+    /* ToDo: Make this more efficient.  (JSM) */
+    if (STKO_SpB(old_stko) < STKO_SuB(old_stko)) {
+	/* Yikes!  PAP_entry stole an update frame.  Fix the world! */
+	P_ frame = STKO_SuB(new_stko) - BREL(STD_UF_SIZE);
+
+	/*
+	 * fprintf(stderr, "Stolen update frame: (old %lx, new %lx) SuA %lx, SuB
+	 * %lx, return %lx\n", old_stko, new_stko, GRAB_SuA(frame), GRAB_SuB(frame),
+	 * GRAB_RET(frame));
+	 */
+
+	STKO_SuA(old_stko) = GRAB_SuA(frame);
+	STKO_SuB(old_stko) = GRAB_SuB(frame);
+
+	SAVE_Ret = STKO_RETURN(new_stko);
+	STKO_RETURN(new_stko) = GRAB_RET(frame);
+
+	PUSH_SuA(frame, STKO_SuA(new_stko));
+	PUSH_SuB(frame, STKO_SuB(new_stko));
+	PUSH_RET(frame, vtbl_Underflow);
+
+	STKO_SuB(new_stko) = frame;
+    }
+    SAVE_StkO = new_stko;
+    return really_reenter_node;
+}
+\end{code}
+
+Underflow things are all done in the threaded world.  The code is in
+main/StgThreads.lhc.
+
+\begin{code}
+#endif /* parallel */
+\end{code}

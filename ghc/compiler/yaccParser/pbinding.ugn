@@ -1,0 +1,23 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_pbinding where
+import UgenUtil
+import Util
+
+import U_binding
+import U_coresyn	( U_coresyn )	-- interface only
+import U_hpragma	( U_hpragma )	-- interface only
+import U_list
+import U_literal	( U_literal )	-- ditto
+import U_treeHACK
+import U_ttype		( U_ttype )	-- ditto
+%}}
+type pbinding;
+	pgrhs	: < ggpat	: tree;
+		    ggdexprs	: list;
+		    ggbind	: binding;
+	 	    ggfuncname	: stringId;
+		    ggline	: long; >;
+end;

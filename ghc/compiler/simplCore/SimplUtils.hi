@@ -1,0 +1,25 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SimplUtils where
+import BinderInfo(BinderInfo)
+import CoreSyn(CoreCaseAlternatives, CoreExpr)
+import Id(Id)
+import SimplEnv(SimplEnv)
+import SimplMonad(SimplCount)
+import SplitUniq(SplitUniqSupply)
+import TyVar(TyVar)
+import UniType(UniType)
+etaExpandCount :: CoreExpr a Id -> Int
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+floatExposesHNF :: Bool -> Bool -> Bool -> CoreExpr a Id -> Bool
+	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _S_ "LLLS" _N_ _N_ #-}
+mkCoLamTryingEta :: [Id] -> CoreExpr Id Id -> CoreExpr Id Id
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+mkCoTyLamTryingEta :: [TyVar] -> CoreExpr Id Id -> CoreExpr Id Id
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+mkIdentityAlts :: UniType -> SplitUniqSupply -> SimplCount -> (CoreCaseAlternatives (Id, BinderInfo) Id, SimplCount)
+	{-# GHC_PRAGMA _A_ 1 _U_ 222 _N_ _S_ "S" _N_ _N_ #-}
+simplIdWantsToBeINLINEd :: Id -> SimplEnv -> Bool
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LU(SAAAA)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+type_ok_for_let_to_case :: UniType -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+

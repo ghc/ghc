@@ -1,0 +1,44 @@
+Desugared:
+{- plain CoRec -}
+dfun.Eq.Test.Foo :: <Eq Test.Foo>
+dfun.Eq.Test.Foo =
+    let
+      ==.76 =
+	  \ ds.83 ds.84 ->
+	      let
+		fail.85 =
+		    (error Bool)
+			"\"ds027.hs\", line 8: pattern-matching failure [function binding]\n"S
+	      in 
+		case ds.83 of {
+		  Test.Bar ->
+		      case ds.84 of {
+			Test.Baz -> True
+			_ ->  fail.85
+		      }
+		  _ ->  fail.85
+		} in
+    let
+      /=.77 =
+	  \ ds.89 ds.90 ->
+	      let
+		fail.91 =
+		    (error Bool)
+			"\"ds027.hs\", line 9: pattern-matching failure [function binding]\n"S
+	      in 
+		case ds.89 of {
+		  Test.Bar ->
+		      case ds.90 of {
+			Test.Baz -> False
+			_ ->  fail.91
+		      }
+		  _ ->  fail.91
+		}
+    in 
+      MkTuple2!
+	  (Test.Foo -> Test.Foo -> Bool)
+	  (Test.Foo -> Test.Foo -> Bool)
+	  ==.76
+	  /=.77
+{- end plain CoRec -}
+

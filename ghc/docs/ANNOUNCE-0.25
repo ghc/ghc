@@ -1,0 +1,54 @@
+A binary-only from-working-sources no-guarantees snapshot of the
+Glasgow Haskell compiler (GHC) for Linux x86 machines is now available
+by FTP from ftp.dcs.glasgow.ac.uk, in
+pub/haskell/glasgow/ghc-0.25-linux.tar.gz.
+
+This release is the first, long-awaited "registerized" GHC for Linux,
+which produces code of reasonable size and speed.  We use our normal
+technique of "stealing registers" with GCC's
+global-variables-in-registers facility.  We "steal" six of the x86's
+eight general-purpose registers, including the C stack-pointer (%esp),
+which we use for the heap pointer (Hp).
+
+To use this GHC, you need a special version of GCC, which is also
+provided in the distribution (under "gcc-linux-to-linux").  Whatever
+you do, please do *not* report any "bugs" in this GCC to bug-gcc --
+report them to *me* instead.
+
+One special thing you must watch out for: If GCC "crashes" with a
+message about spilling registers, it is *not* a GCC problem.  It means
+you must get GHC to "back off" in its register "stealing".  First try
+a -monly-4-regs flag, then -monly-3-regs, and as a last resort,
+-monly-2-regs.  As far as we know, all Haskell code goes through GHC
+with a -monly-2-regs flag (but it produces substantially worse code
+with that flag).
+
+Profiling is not provided in this release.
+
+Please report any bugs to glasgow-haskell-bugs@dcs.glasgow.ac.uk.
+
+Will Partain
+AQUA project (slave)
+
+Dated: 95/04/01
+
+=== INSTALLATION NOTES ==============================================
+
+Unpack the distribution.
+
+Move "gcc-linux-to-linux" and "ghc-0.25-linux" wherever you like.
+
+Alter the "gcc" script to point to wherever you've put
+"gcc-linux-to-linux", and put the "gcc" script wherever you wish in
+your PATH.
+
+Make a link to ghc-0.25-linux/ghc/driver/ghc, so that "ghc" will be in
+your PATH.
+
+Change *all* hardwired paths in ghc/driver/ghc and in
+ghc/utils/hscpp/hscpp to point to where things are on your system.
+Notably: where "perl" is (first line of each script), where $TopPwd is
+(ghc script), where your gcc cpp is (hscpp script).
+
+GHC should then work.  Try "ghc -v" on something simple, to make sure
+it compiles and links a program correctly.

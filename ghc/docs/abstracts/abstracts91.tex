@@ -1,0 +1,232 @@
+\documentstyle[11pt,slpj,abstracts]{article}
+
+\begin{document}
+
+\title{Abstracts of GRIP/GRASP-related papers and reports, 1991
+}
+
+\author{The GRASP team \\ Department of Computing Science \\
+University of Glasgow G12 8QQ
+}
+
+\maketitle
+
+\begin{abstract}
+We present a list of papers and reports related to the GRIP 
+and GRASP projects,
+covering {\em the design, compilation technology,
+and parallel implementations of functional programming languages, especially
+\Haskell{}}.
+
+Most of them can be obtained by FTP.  Connect to {\tt ftp.dcs.glasgow.ac.uk},
+and look in {\tt pub/glasgow-fp/papers}, {\tt pub/glasgow-fp/drafts}, {\tt pub/glasgow-fp/tech\_reports},
+or {\tt pub/glasgow-fp/grasp-and-aqua-docs}.
+
+They can also be obtained by writing to 
+Alexa Stewart, Department of Computing Science,
+University of Glasgow G12 8QQ, UK.   Her electronic mail address is
+alexa@dcs.glasgow.ac.uk.
+\end{abstract}
+
+\section{Published papers}
+
+\reference
+{Simon L Peyton Jones and David Lester}
+{A modular fully-lazy lambda lifter in \Haskell{}}
+{{\em Software Practice and Experience}, 21(5) (May 1991)}
+{An important step in many compilers for functional languages is
+{\em lambda lifting}.  In his thesis, Hughes showed that by doing lambda
+lifting in a particular way, a useful property called {\em full laziness}
+can be preserved;
+full laziness has been seen as intertwined with
+lambda lifting ever since.  
+
+We show that, on the contrary, full laziness can be regarded as a completely
+separate process to lambda lifting, thus making it easy to use different
+lambda lifters following a full-laziness transformation, or to use
+the full-laziness transformation in compilers which do not require lambda
+lifting.
+
+On the way, we present the complete code for our modular fully-lazy
+lambda lifter, written in the \Haskell{} functional programming language.
+}
+
+\reference{Simon L Peyton Jones and Mark Hardie}
+{A Futurebus interface from off-the-shelf parts}
+{IEEE Micro, Feb 1991}
+{
+As part of the GRIP project we have designed a Futurebus interface using
+off-the-shelf parts.
+We describe our implementation, which is unusual in its use of fully
+asynchronous finite-state machines.
+Based on this experience we draw some lessons for future designs.
+}
+
+\reference{Simon L Peyton Jones and John Launchbury}
+{Unboxed values as first class citizens}
+{Functional Programming Languages and Computer Architecture (FPCA), Boston,
+ed Hughes, Springer LNCS 523, Sept 1991, pp636--666}
+{The code compiled from a non-strict functional program usually
+manipulates heap-allocated {\em boxed} numbers.
+Compilers for such languages often go to considerable trouble to
+optimise operations on boxed numbers into simpler operations
+on their unboxed forms.  These optimisations are usually handled
+in an {\em ad hoc} manner in 
+the code generator, because earlier phases of the compiler have
+no way to talk about unboxed values.
+
+We present a new approach, which makes unboxed values into (nearly) first-class
+citizens.  The language, including its type system, is extended to 
+handle unboxed values.  The optimisation of boxing and unboxing operations
+can now be reinterpreted as a set of correctness-preserving program
+transformations.  Indeed the particular transformations 
+required are ones which a compiler would want to implement anyway.
+The compiler becomes both simpler and more modular.
+
+Two other benefits accrue.  
+Firstly, the results of strictness analysis can be exploited within
+the same uniform transformational framework.
+Secondly, new algebraic data types with
+unboxed components can be declared.  Values of these types can be 
+manipulated much more efficiently than the corresponding boxed versions.
+
+Both a static and a dynamic semantics are given for the augmented language.
+The denotational dynamic semantics is notable for its use of
+{\em unpointed domains}.
+}
+
+\reference{Philip Wadler}
+{Is there a use for linear logic?}
+{ACM/IFIP Symposium on Partial Evaluation
+and Semantics Based Program Manipulation (PEPM), Yale
+University, June 1991}
+{
+Past attempts to apply Girard's linear logic have either had a clear
+relation to the theory (Lafont, Holmstr\"om, Abramsky) or a clear
+practical value (Guzm\'an and Hudak, Wadler), but not both.  This paper
+defines a sequence of languages based on linear logic that span the gap
+between theory and practice.  Type reconstruction in a linear type
+system can derive information about sharing.  An approach to linear type
+reconstruction based on {\em use types\/} is presented.  Applications
+to the {\em array update\/} problem are considered.
+}
+
+\reference{Simon L Peyton Jones}
+{The Spineless Tagless G-machine: a second attempt}
+{Proc Workshop on Parallel Implementations of Functional Languages,
+University of Southampton, ed Glaser \& Hartel, June 1991}
+{The Spineless Tagless G-machine is an abstract machine designed
+to support functional languages.  This presentation of the machine
+falls into two parts.  Firstly, we present the {\em STG language},
+an austere but recognisably-functional language, which as well as
+a {\em denotational} meaning has a well-defined {\em operational} semantics.
+The STG language is the ``abstract machine code'' for the Spineless
+Tagless G-machine, but it is sufficiently abstract that it can readily be
+compiled into G-machine Gcode or TIM code instead.
+
+Secondly, we discuss the mapping of the STG language onto stock hardware.
+The success of an abstract machine model depends largely on how efficient
+this mapping can be made, though this topic is often relegated to a short
+section.  Instead, we give a detailed discussion of the design issues and
+the choices we have made.  Our principal target is the C language, treating
+the C compiler as a portable assembler.
+
+A revised version is in preparation for the Journal of Functional Programming.
+}
+
+\reference{Gert Akerholt, Kevin Hammond, Simon Peyton Jones and Phil Trinder}
+{A parallel functional database on GRIP}
+{\GlasgowNinetyOne{}, pp1-24}
+{
+GRIP is a shared-memory multiprocessor designed for efficient parallel
+evaluation of functional languages, using compiled graph reduction.
+In this paper, we consider the feasibility of implementing a database
+manager on GRIP, and present results obtained from a pilot
+implementation.  A database implemented in a pure functional language
+must be modified {\em non-destructively}, i.e.\ the original database
+must be preserved and a new copy constructed.  The naive
+implementation provides evidence for the feasibility of a pure
+functional database in the form of modest real-time speed-ups, and
+acceptable real-time performance.  This performance can be tentatively
+compared with results for existing machines running a more
+sophisticated database benchmark.
+The functional database is also used to investigate the GRIP
+architecture, compared with an idealised machine.  The particular
+features investigated are the thread-creation costs and caching of
+GRIP's distributed memory.
+}
+
+\reference{PM Sansom}
+{Combining single-space and two-space compacting garbage collectors}
+{\GlasgowNinetyOne{}, pp312-324}
+{The garbage collector presented in this paper makes use of
+two well known compaction garbage collection algorithms with very
+different performance characteristics: Cheney's two-space copying
+collector and Jon\-ker's single-space sliding compaction collector. We
+propose a scheme which allows either collector to be used. The
+run-time memory requirements of the program being executed are used to
+determine the most appropriate collector. This enables us to achieve a
+fast collector for heap requirements less than half of the heap memory
+but allows the heap utilization to increase beyond this threshold.
+Using these ideas we develop a particularly attractive extension to
+Appel's generational collector.
+}
+
+\reference{PM Sansom}
+{Dual-mode garbage collection}
+{Proc Workshop on the Parallel Implementation of Functional Languages, Southampton, 
+ed Glaser \& Hartel, pp283-310}
+{
+The garbage collector presented in this paper makes use of two well
+known compaction garbage collection algorithms with very different
+performance characteristics: Cheney's two-space copying collector and
+Jonker's sliding compaction collector. We propose a scheme which
+allows either collector to be used. The run-time memory requirements
+of the program being executed are used to determine the most
+appropriate collector. This enables us to achieve a fast collector for
+heap requirements less than half of the heap memory but allows the
+heap utilization to increase beyond this threshold. Using these ideas
+we develop a particularly attractive extension to Appel's generational
+collector. 
+
+We also describe a particularly fast implementation of the garbage
+collector which avoids interpreting the structure and current state of
+closures by attaching specific code to heap objects. This code {\em
+knows} the structure and current state of the object and performs the
+appropriate actions without having to test any flag or arity fields.
+The result is an implementation of these collection schemes which does
+not require any additional storage to be associated with the heap
+objects.
+
+This paper is an earlier, and fuller, version of ``Combining
+single-space and two-space compacting garbage collectors'' above.
+}
+
+\reference{K Hammond}
+{Efficient type inference using monads}
+{\GlasgowNinetyOne{}, pp146-157}
+{{\em Efficient} type inference algorithms are based on
+graph-rewriting techniques.  Consequently, at first sight they seem
+unsuitable for functional language implementation.  In fact, most
+compilers written in functional languages use substitution-based
+algorithms, at a considerable cost in performance.  In this paper, we
+show how monads may be used to transform a substutition-based inference
+algorithm into one using a graph representation.  The resulting
+algorithm is faster than the corresponding substitution-based one.}
+
+
+\section{Technical reports}
+
+\reference{The Grasp team}
+{The Glasgow Haskell I/O system}
+{Dept of Computing Science, University of Glasgow, Nov 1991}
+{
+Most input/output systems for non-strict functional languages
+feature a rather large ``operating system
+The Glasgow Haskell system implements input and output
+very largely within Haskell itself, without the conventional
+enclosing ``printing mechanism''.  This paper explains how the 
+IO system works in some detail.
+}
+
+\end{document}

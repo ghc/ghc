@@ -1,0 +1,17 @@
+\begin{code}
+#include "rtsdefs.h"
+
+void
+PreTraceHook (where)
+  FILE *where;
+{
+    fprintf(where, "Trace On:\n");
+}
+
+void
+PostTraceHook (where)
+  FILE *where;
+{
+    fprintf(where, "\nTrace Off.\n");
+}
+\end{code}

@@ -1,0 +1,11 @@
+foo = Huh?
+bar = Huh?
+ugh = Huh?
+xy
+${wildcard x}
+
+This (abc) should be abc.
+
+This should be a single dollar: $
+This should be a double dollar: $$
+So should this: $$

@@ -1,0 +1,291 @@
+***************************************************************************
+
+                      COMPACTING GARBAGE COLLECTION
+
+Global heap requirements as for 1s and 2s collectors.
+
+***************************************************************************
+
+ToDo: soft heap limits.
+
+\begin{code}
+
+#if defined(GCdu)
+
+#define SCAV_REG_MAP
+#include "SMinternal.h"
+#include "SMcopying.h"
+#include "SMcompacting.h"
+#include "SMextn.h"
+
+REGDUMP(ScavRegDump);
+
+dualmodeData dualmodeInfo = {TWO_SPACE_BOT,
+			     DEFAULT_RESID_TO_COMPACT,
+			     DEFAULT_RESID_FROM_COMPACT,
+			     {{0,0,0,"low->high"},
+			      {0,0,0,"high->low"},
+			      {0,0,0,"compacting"}},
+			     0, 0
+			    };
+
+P_ heap_space = 0;		/* Address of first word of slab 
+				   of memory allocated for heap */
+
+P_ hp_start;	        /* Value of Hp when reduction was resumed */
+
+I_
+initHeap( sm )
+    smInfo *sm;    
+{
+    if (heap_space == 0) { /* allocates if it doesn't already exist */
+
+	I_ semispaceSize = SM_word_heap_size / 2;
+
+	/* Allocate the roots space */
+	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+
+	/* Allocate the heap */
+	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+    
+	dualmodeInfo.modeinfo[TWO_SPACE_BOT].heap_words =
+	    dualmodeInfo.modeinfo[TWO_SPACE_TOP].heap_words = SM_word_heap_size;
+
+	dualmodeInfo.modeinfo[TWO_SPACE_BOT].base =
+	    HEAP_FRAME_BASE(heap_space, semispaceSize);
+	dualmodeInfo.modeinfo[TWO_SPACE_BOT].lim =
+	    HEAP_FRAME_LIMIT(heap_space, semispaceSize);
+	dualmodeInfo.modeinfo[TWO_SPACE_TOP].base =
+	    HEAP_FRAME_BASE(heap_space + semispaceSize, semispaceSize);
+	dualmodeInfo.modeinfo[TWO_SPACE_TOP].lim =
+	    HEAP_FRAME_LIMIT(heap_space + semispaceSize, semispaceSize);
+
+	dualmodeInfo.bit_words = (SM_word_heap_size + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
+	dualmodeInfo.bits      = (BitWord *)(heap_space + SM_word_heap_size) - dualmodeInfo.bit_words;
+
+	dualmodeInfo.modeinfo[COMPACTING].heap_words =
+	    SM_word_heap_size - dualmodeInfo.bit_words;
+	dualmodeInfo.modeinfo[COMPACTING].base =
+	    HEAP_FRAME_BASE(heap_space, SM_word_heap_size - dualmodeInfo.bit_words);
+	dualmodeInfo.modeinfo[COMPACTING].lim =
+	    HEAP_FRAME_LIMIT(heap_space, SM_word_heap_size - dualmodeInfo.bit_words);
+
+	stat_init("DUALMODE", "Collection", "  Mode  ");
+    }
+
+    sm->hp = hp_start = dualmodeInfo.modeinfo[dualmodeInfo.mode].base - 1;
+
+    if (SM_alloc_size) {
+	sm->hplim = sm->hp + SM_alloc_size;
+	SM_alloc_min = 0; /* No min; alloc size specified */
+
+	if (sm->hplim > dualmodeInfo.modeinfo[dualmodeInfo.mode].lim) {
+	    fprintf(stderr, "Not enough heap for requested alloc size\n");
+	    return -1;
+	}
+    } else {
+	sm->hplim = dualmodeInfo.modeinfo[dualmodeInfo.mode].lim;
+    }
+
+    sm->CAFlist = NULL;
+
+#ifndef PAR
+    initExtensions( sm );
+#endif /* !PAR */
+
+    if (SM_trace) {
+	fprintf(stderr, "DUALMODE Heap: TS base, TS lim, TS base, TS lim, CM base, CM lim, CM bits, bit words\n                0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx\n",
+		(W_) dualmodeInfo.modeinfo[TWO_SPACE_BOT].base,
+		(W_) dualmodeInfo.modeinfo[TWO_SPACE_BOT].lim,
+		(W_) dualmodeInfo.modeinfo[TWO_SPACE_TOP].base,
+		(W_) dualmodeInfo.modeinfo[TWO_SPACE_TOP].lim,
+		(W_) dualmodeInfo.modeinfo[COMPACTING].base,
+		(W_) dualmodeInfo.modeinfo[COMPACTING].lim,
+		(W_) dualmodeInfo.bits, dualmodeInfo.bit_words);
+	fprintf(stderr, "DUALMODE Initial: mode %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
+		(W_) dualmodeInfo.mode,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].base,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
+    }
+
+    return 0;
+}
+
+I_
+collectHeap(reqsize, sm, do_full_collection)
+    W_ reqsize;
+    smInfo *sm;
+    rtsBool do_full_collection;
+{
+    I_  start_mode;
+
+    I_ free_space,	/* No of words of free space following GC */
+	alloc, 		/* Number of words allocated since last GC */
+	resident,	/* Number of words remaining after GC */
+	bstk_roots;	/* Number of update frames on B stack */
+    StgFloat residency;    /* % Words remaining after GC */
+
+    fflush(stdout);     /* Flush stdout at start of GC */
+    SAVE_REGS(&ScavRegDump); /* Save registers */
+
+    if (SM_trace)
+	fprintf(stderr, "DUALMODE Start: mode %ld, base 0x%lx, lim 0x%lx\n                      hp 0x%lx, hplim 0x%lx, req %lu\n",
+		dualmodeInfo.mode,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].base,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) (reqsize * sizeof(W_)));
+
+    alloc = sm->hp - hp_start;
+    stat_startGC(alloc);
+
+    start_mode = dualmodeInfo.mode;
+    if (start_mode == COMPACTING) { 
+
+	/* PERFORM COMPACTING COLLECTION */
+
+	/* bracket use of MARK_REG_MAP with RESTORE/SAVE of SCAV_REG_MAP */
+	RESTORE_REGS(&ScavRegDump);
+
+	markHeapRoots(sm, sm->CAFlist, 0,
+		      dualmodeInfo.modeinfo[COMPACTING].base,
+		      dualmodeInfo.modeinfo[COMPACTING].lim,
+		      dualmodeInfo.bits);
+
+	SAVE_REGS(&ScavRegDump);
+	/* end of bracket */
+
+#ifndef PAR
+	sweepUpDeadMallocPtrs(sm->MallocPtrList, 
+			      dualmodeInfo.modeinfo[COMPACTING].base,
+			      dualmodeInfo.bits);
+#endif
+	LinkCAFs(sm->CAFlist);
+
+	LinkRoots( sm->roots, sm->rootno );
+#ifdef CONCURRENT
+	LinkSparks();
+#endif
+#ifdef PAR
+	LinkLiveGAs(dualmodeInfo.modeinfo[COMPACTING].base, dualmodeInfo.bits);
+#else
+        DEBUG_STRING("Linking Stable Pointer Table:");
+        LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
+	LinkAStack( MAIN_SpA, stackInfo.botA );
+	LinkBStack( MAIN_SuB, stackInfo.botB );
+#endif
+
+	/* Do Inplace Compaction */
+	/* Returns start of next closure, -1 gives last allocated word */
+	
+	sm->hp = Inplace_Compaction(dualmodeInfo.modeinfo[COMPACTING].base,
+				    dualmodeInfo.modeinfo[COMPACTING].lim,
+				    0, 0,
+				    dualmodeInfo.bits,
+				    dualmodeInfo.bit_words
+#ifndef PAR
+				    ,&(sm->MallocPtrList)
+#endif
+				    ) - 1;
+
+    } else {
+
+	/* COPYING COLLECTION */
+
+	dualmodeInfo.mode = NEXT_SEMI_SPACE(start_mode);
+	ToHp = dualmodeInfo.modeinfo[dualmodeInfo.mode].base - 1;
+	Scav = dualmodeInfo.modeinfo[dualmodeInfo.mode].base;
+	       /* Point to (info field of) first closure */
+    
+	SetCAFInfoTables( sm->CAFlist );
+	EvacuateCAFs( sm->CAFlist );
+#ifdef PAR
+	EvacuateLocalGAs(rtsTrue);
+#else
+	evacSPTable( sm );
+#endif /* PAR */
+	EvacuateRoots( sm->roots, sm->rootno );
+#ifdef CONCURRENT
+	EvacuateSparks();
+#endif
+#ifndef PAR
+	EvacuateAStack( MAIN_SpA, stackInfo.botA );
+	EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
+#endif /* !PAR */
+
+	Scavenge();
+
+#ifdef PAR
+        RebuildGAtables(rtsTrue);
+#else
+	reportDeadMallocPtrs(sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+#endif /* PAR */
+
+	sm->hp = hp_start = ToHp;  /* Last allocated word */
+    }
+
+    /* Use residency to determine if a change in mode is required */
+
+    resident = sm->hp - (dualmodeInfo.modeinfo[dualmodeInfo.mode].base - 1);
+    residency = resident / (StgFloat) SM_word_heap_size;
+    DO_MAX_RESIDENCY(resident); /* stats only */
+
+    if ((start_mode == TWO_SPACE_TOP) &&
+	(residency > dualmodeInfo.resid_to_compact)) {
+	DEBUG_STRING("Changed Mode: Two Space => Compacting");
+	dualmodeInfo.mode = COMPACTING;
+
+	/* Zero bit vector for marking phase at next collection */
+	{ BitWord *ptr = dualmodeInfo.bits,
+	          *end = dualmodeInfo.bits + dualmodeInfo.bit_words;
+	  while (ptr < end) { *(ptr++) = 0; };
+    }
+
+    } else if ((start_mode == COMPACTING) &&
+	(residency < dualmodeInfo.resid_from_compact)) {
+	DEBUG_STRING("Changed Mode: Compacting => Two Space");
+	dualmodeInfo.mode = TWO_SPACE_BOT;
+    }
+
+    if (SM_alloc_size) {
+	sm->hplim = sm->hp + SM_alloc_size;
+	if (sm->hplim > dualmodeInfo.modeinfo[dualmodeInfo.mode].lim) {
+	    free_space = 0;
+	} else {
+	    free_space = SM_alloc_size;
+	}
+    } else {
+	sm->hplim = dualmodeInfo.modeinfo[dualmodeInfo.mode].lim;
+	free_space = sm->hplim - sm->hp;
+    }
+
+    hp_start = sm->hp;
+
+    stat_endGC(alloc, dualmodeInfo.modeinfo[start_mode].heap_words,
+	       resident, dualmodeInfo.modeinfo[start_mode].name);
+
+    if (SM_trace)
+	fprintf(stderr, "DUALMODE Done: mode %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
+		dualmodeInfo.mode,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].base,
+		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].lim,
+		(W_) sm->hp, (W_) sm->hplim, (W_) ((sm->hplim - sm->hp) * sizeof(W_)));
+
+#ifdef DEBUG
+    /* To help flush out bugs, we trash the part of the heap from
+       which we're about to start allocating. */
+    TrashMem(sm->hp+1, sm->hplim);
+#endif /* DEBUG */
+
+    RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
+
+    if ((SM_alloc_min > free_space) || (reqsize > free_space))
+	return GC_HARD_LIMIT_EXCEEDED;	/* Heap exhausted */
+    else 
+	return GC_SUCCESS;		/* Heap OK */
+}
+
+#endif /* GCdu */
+
+\end{code}
+

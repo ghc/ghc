@@ -1,0 +1,21 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface TcBinds where
+import Bag(Bag)
+import CmdLineOpts(GlobalSwitch)
+import E(E)
+import HsBinds(Binds)
+import HsPat(InPat, TypecheckedPat)
+import Id(Id)
+import LIE(LIE)
+import Name(Name)
+import Pretty(PprStyle, PrettyRep)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import Subst(Subst)
+import TcMonad(TcResult)
+import UniType(UniType)
+tcLocalBindsAndThen :: E -> (Binds Id TypecheckedPat -> a -> a) -> Binds Name (InPat Name) -> (E -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (a, LIE, b)) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (a, LIE, b)
+	{-# GHC_PRAGMA _A_ 4 _U_ 2212222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+tcTopBindsAndThen :: E -> (Binds Id TypecheckedPat -> a -> a) -> Binds Name (InPat Name) -> (E -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (a, LIE, b)) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (a, LIE, b)
+	{-# GHC_PRAGMA _A_ 4 _U_ 2212222222 _N_ _S_ "LLSL" _N_ _N_ #-}
+

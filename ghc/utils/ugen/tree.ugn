@@ -1,0 +1,27 @@
+%{
+#include "id.h"
+%}
+type tree;
+
+	typdef : <	
+		gtid		: id;
+		gtdeflist	: tree;
+	>;
+	deflist : <
+		gdeflist	: tree;
+		gdef		: tree;
+	>;
+	def : <
+		gdid		: id;
+		gditemlist	: tree;
+	>;
+	itemlist : <
+		gitemlist	: tree;
+		gitem		: tree;	
+	>;
+	emitemlist: < >;
+	item : <
+		gitemfunid	: id;
+		gitemtypid	: id;
+	>;
+end;

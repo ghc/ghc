@@ -1,0 +1,13 @@
+Typechecked:
+AbsBinds [tt10] [d.Num.t14] [(o.t1, ShouldSucceed.o)]
+    (fromInt.t13, fromInt tt10 d.Num.t14)
+    (lit.t11, fromInt.t13 (MkInt 1#))
+    (d.Num.t15, d.Num.t14)
+    (+.t9, (+) tt10 d.Num.t15)
+    {- nonrec -}
+    o.t1 :: (Bool, tt10) -> tt10
+    o.t1 (True, x.r54)
+		 = x.r54
+    o.t1 (False, y.r55)
+		 = y.r55 +.t9 lit.t11
+

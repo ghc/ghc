@@ -1,0 +1,465 @@
+\chapter{How it does it}
+
+This chapter explains in detail how the program {\tt pphs} was implemented
+from a programmer's viewpoint.  It was implemented in the C programming
+language, as this is a commonly used language often used for writing UNIX tools.
+The program code is shown in Appendix~\ref{prog-code} and the makefile in
+Appendix~\ref{make-code}.
+
+\section{General sequence of events}
+
+When the {\tt pphs} program is run, the program first finds out what, if any,
+options it has been called with.  If any have been specified, the appropriate
+variables are set.  The program then checks it has been called with exactly one
+further argument.  If not, the program terminates with an
+explanatory error message.  If called correctly, the program then checks that the
+supplied argument is the name of a file that exists and is readable.
+The program is normally used
+on files ending with a {\tt .hs} extension.  When called with a filename
+with no extension and that file is not found, then it appends the extension and searches
+for that file.  If no file with that name is found or the file is unreadable, an
+error message is produced and the program terminates.  If the file is found, the
+program starts the typesetting process by writing out the opening
+\LaTeX\ command to {\tt stdout}.
+This defines the \LaTeX\ environment which the program exploits to do the typesetting.
+It then initialises the variables used in the program.
+
+This done, the first character is read.  The program enters a loop and keeps
+reading characters until the end of the file is reached.  As each character is read
+in, its typeface is established and it is stored with its typeface in something
+called the {\em line store\/}.  If any left indentation is
+encountered, the correct characters to be skipped are identified from the {\em left
+indentation stack} and copied into the line store.  Internal alignment is checked
+for and if any is found, appropriate variables are set accordingly.  Each stored line is
+added to both the left indentation stack and the {\em writing queue}.  When the value of the
+internal alignment changes, or it has been established that the first line in the writing
+queue is not part of any internal alignment section, the lines in the queue are written out.
+
+Once all the lines are written out, {\tt pphs} then writes the closing \LaTeX\ command
+and terminates.
+
+\section{Basic storage unit for a line of code} \label{line-store}
+
+The basic storage unit used in {\tt pphs} is the line store unit.
+This stores the details of one line of Haskell code.  These are
+the characters on the line, the typeface associated with each
+character, the length of the line, the indentation level and the position of
+any internal alignment in the line.
+
+In the C program, {\tt ElementType} is the structure used for this type.  This has
+five parts:
+\begin{itemize}
+\item {\tt chars} which stores the characters used on the line of Haskell
+code
+
+\item {\tt typeface} which stores the typeface values associated with the
+characters on that line
+
+\item {\tt indentation} which stores the level of the line's indentation
+
+\item {\tt length} which stores the length of the line
+
+\item {\tt col} which stores the column where any internal alignment occurs or
+is set to {\tt 0} if there is none
+\end{itemize}
+The variable {\tt store} in the main program is of type {\tt ElementType} and
+is used as the basic storage unit for the current line.  Its C declaration is
+\begin{quote}
+\begin{verbatim}
+typedef struct ElementType_Tag {
+  char chars[MAXLINELENGTH];
+  enum face typeface[MAXLINELENGTH];
+  int indentation, length, col;
+} ElementType;
+\end{verbatim}
+\end{quote}
+
+\section{Stack of lines for left indentation}
+
+Due to \LaTeX 's variable width characters, {\tt pphs} cannot simply uses spaces
+for the left indentation as in the input Haskell file.  It has to work out how far
+each line is indented by finding out what it is indented under.  As each line is
+completed, it is added to a stack of lines, each line being stored in a basic
+storage unit.  If the line at the top of the stack is of a greater or equal
+indentation level and of a lesser or equal length, then it is no
+longer required for calculating typeset indentation
+and can be disposed of.  Once all lines of greater indentation level have been removed
+from the top of the stack, the current line can then be added.
+
+When a line's indentation level, in terms of the number of spaces used in the
+input, has been determined, {\tt pphs} has to find
+out the characters that determine the actual typeset length of the indentation.  To get this,
+{\tt pphs} looks down the stack until it comes to a line whose indentation is less than
+that of the current line and whose length is greater than the indentation level of the
+current line.  Once a suitable line is found, its characters and typefaces are copied
+into the line store of the current line; then the rest of the current line is read in,
+overwriting the characters beyond the indentation level.  If there is no line preceding
+the current one that is as long as the indentation level of the current line, spaces
+are placed in the line store instead.
+
+A special case has been made for left indentation.  Most of the time, the left-hand edge
+of the characters will be aligned, but where a {\tt |} is aligned under an {\tt =} sign, it is
+centered under the sign.  This will be the case for any further {\tt |} symbols aligned
+under this {\tt =} sign.
+
+The type {\tt StackType} is used in the program for the stack.  This makes a stack of
+the basic line storage units of {\tt ElementType}, together with a set of functions available
+for use with stacks.  These are {\tt CreateStack}, which returns an empty stack;
+{\tt IsEmptyStack}, which returns {\tt 1} if the stack which it is called with is empty,
+{\tt 0} otherwise; {\tt Push}, which takes a stack and an element and returns the stack
+with the element pushed onto the top; {\tt Top}, which takes a stack and returns the top
+element of the stack; {\tt Pop}, which takes a stack and returns it with the top element
+removed; and {\tt PopSym}, which is the same as {\tt Pop} except that it does not free the
+memory used by the top element - this function was found necessary to fix a fault caused by
+returning to a stack's previous state, having popped off elements in the interim period.
+
+\section{Internal alignment identification}
+
+Internal alignment is deemed to have occurred when a character matches the one
+immediately above it, the preceding characters in both lines are spaces, and there is
+more than one space preceding the character on at least one of the lines.
+
+To check for this in {\tt pphs}, the current position on the line, indicated by
+the linecounter, must be greater than one because either the current line or
+the previous line will be required to have two spaces before the current position.  The current
+line will be located in the line store and the previous line will be at the rear of the queue
+of lines waiting to be written out.
+
+One special case has been implemented for internal alignment.  This is to allow Haskell
+type declarations, such as in the example below, to align with their corresponding function
+definitions.
+\begin{quote}
+\input{Haskell_internalalign2}
+\end{quote}
+The {\tt =} sign can be under either the first or second {\tt :} symbol for the
+internal alignment to be recognised.
+
+\section{Typefaces and mathematical characters}
+
+Each character has a typeface value associated with it.  Normally, this will
+indicate the type of token the character is part of, either keyword, identifier,
+string, comment, number or maths symbol, but where Haskell uses an ASCII character
+simulation of a mathematical character or some other special symbol, the typeface
+value will indicate this as well.
+
+In the program, the typeface values are of the
+enumerated type called {\tt face}, which has the values shown in Table~\ref{tf-val}.
+They are used in the basic storage unit {\tt ElementType} in the {\tt typeface} part.
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|l|} \hline
+{\em value\/} & {\em indicates\/} \\ \hline
+{\tt KW} & keyword \\
+{\tt ID} & identifier \\
+{\tt IE} & exponent identifier \\
+{\tt ST} & string \\
+{\tt SE} & exponent string \\
+{\tt CO} & comment \\
+{\tt CE} & exponent comment \\
+{\tt NU} & number \\
+{\tt NE} & exponent number \\
+{\tt MA} & maths \\
+{\tt SP} & space \\
+{\tt LC} & line comment \\
+{\tt RC} & regional comment begin \\
+{\tt CR} & regional comment end \\
+{\tt BF} & backwards/forwards quote \\
+{\tt FQ} & forwards quote \\
+{\tt EQ} & escape quote \\
+{\tt DQ} & double quote begin \\
+{\tt QD} & double quote end \\
+{\tt EE} & escape double quote \\
+{\tt DC} & second part of double character \\
+{\tt DP} & double plus \\
+{\tt CP} & colon plus \\
+{\tt LE} & less than or equal to \\
+{\tt GE} & greater than or equal to \\
+{\tt LA} & left arrow \\
+{\tt RA} & right arrow \\
+{\tt RR} & double right arrow \\
+{\tt TI} & times \\
+{\tt EX} & double exponent character \\
+{\tt XP} & exponent \\
+{\tt BE} & bar aligned under equals \\ \hline
+\end{tabular}
+\end{center}
+\caption{Typeface values} \label{tf-val}
+\end{table}
+
+\subsection{Current character and retrospective update}
+
+The {\tt pphs} program has to determine the typeface of a character without knowledge of the
+characters to follow.  Therefore it allocates the value depending on the status
+of various boolean variables.  This may subsequently be found to be wrong once the remaining
+characters of that token have been read.
+
+In the case of keywords and double characters, these are only identifiable
+as such once all the characters of the token have been read in.  Having established
+the existence of a keyword or double character, {\tt pphs} then goes back and changes
+the typeface values for the appropriate characters.
+
+The functions {\tt CheckForDoubleChar} and {\tt CheckForKeyword} perform this in the
+program.
+
+\section{Writing lines out}
+
+Lines are written to {\tt stdout}, but not immediately on being read in.  Instead they
+are held back while it is established whether or not they form part of a section of
+internal alignment.
+
+Before any typeset Haskell code is written, {\tt pphs} writes an opening \LaTeX\ command
+{\tt \char'134 begin\char'173 tabbing\char'175 } to {\tt stdout}.  This defines the
+\LaTeX\ environment that the typeset code will be written in.  At the end,
+{\tt \char'134 end\char'173 tabbing\char'175 } is written to terminate this
+environment.
+
+\subsection{The line queue}
+
+Lines are stored in a queue while they are waiting to be written out.  
+The elements of the queue are the basic line storage units described in
+Section~\ref{line-store}.
+
+In the program, the queue is of type {\tt QueueType}
+and a set of functions related to queues is available.  This set consists of
+{\tt CreateQueue}, which returns an empty queue; {\tt IsEmptyQueue}, which takes
+a queue and returns {\tt 1} if the queue is empty, {\tt 0} otherwise; {\tt LengthOfQueue},
+which takes a queue and returns its length; {\tt FrontOfQueue}, which takes a queue and
+returns a pointer to its front element; {\tt RearOfQueue}, which takes a queue and returns
+a pointer to its rear element; {\tt AddToQueue}, which takes a queue and an element and
+returns the queue with the element added to the rear; {\tt TakeFromQueue}, which takes
+a queue and returns the queue with the front element removed.
+
+The last line in the queue is inspected to search
+for internal alignment; if any is found, the internal alignment variable of that
+line is altered accordingly.
+
+\subsection{When lines are written}
+
+The queue is written out by the function {\tt WriteQueue} when a section of internal
+alignment is commenced or terminated
+or when it has been established that there is no internal alignment involving the first line
+in the queue.  If the section being written out has been found to have
+no internal alignment, then the last line is retained
+in the queue because it may form part of the next section of internal alignment.
+
+At the end of the input, {\tt WriteRestOfQueue} writes all the lines remaining in the queue.
+This is because the last line of Haskell code will not form part of any further section of
+internal alignment and can therefore be written out.  Facilities
+are provided in the function {\tt WriteLine} to avoid writing the last newline
+character at the end of the Haskell
+file, as this would create an unwanted blank line in the final document.
+
+\subsection{Writing a line}
+
+The function {\tt WriteLine} is used in {\tt pphs} to write out one line.  This is
+called from either {\tt WriteQueue} or {\tt WriteRestOfQueue} and is supplied with
+a basic line storage unit containing the line needing to be written out together with a
+flag stating whether or not a \LaTeX\ newline character is required.
+
+If a line has any left indentation, this is written out first by calling the function
+{\tt WriteSkipover}.  The rest of the line is then written out by {\tt WriteWords}
+followed if necessary by the newline character.  Both these functions are given
+the current line in the line store.
+
+\subsection{Writing left indentation}
+
+As \LaTeX\ uses variable width characters, fixed width spaces cannot be used for the
+left indentation.  Instead, the width of the characters above the current line needs
+to be skipped.  The {\tt \char'134 skipover} command, defined in the {\tt pphs.sty}
+style file (see Section~\ref{style-file}), is used by the function {\tt WriteSkipover}
+to get \LaTeX\ to do this.  The command is supplied with the typefaces and characters
+in the lines above, and, with this, \LaTeX\ creates the correct amount of
+indentation in the typeset result.  The typefaces and characters are written in
+braces as the argument to {\tt \char'134 skipover} by calling {\tt WriteStartFace},
+{\tt WriteChar}, {\tt WriteSpaces} and {\tt WriteFinishFace}.  The typeface functions
+are called with the typeface value whereas the other two are given the line store,
+current position and where the end of the skipover section is.
+
+Using this specially defined {\tt \char'134 skipover} command avoids having to get
+information back from \LaTeX , therefore keeping the information flow unidirectional.
+
+\subsection{Writing the rest of a line}
+
+The function {\tt WriteWords} writes out the indented line once any left indentation
+has been dealt with.  Starting at the indentation level of the line, it uses the functions
+{\tt WriteStartFace}, {\tt WriteChar}, {\tt WriteSpaces} and {\tt WriteFinishFace} to
+write out each character and its typeface.  The typeface functions are called with
+the typeface value whereas the other two are given the line store, current position
+and where the end of the line is.
+
+\subsection{Writing \LaTeX\ typeface commands}
+
+Every character has a typeface associated with it, so at the start and finish of every
+line and every time the current typeface changes, typeface commands have to be written
+out.  This is done by the functions {\tt WriteStartFace} and {\tt WriteFinishFace}.
+They write the appropriate \LaTeX\ typeface commands according to the typeface values
+given as shown in Table~\ref{tf-comms}.  To avoid complications, double characters have
+their typefaces written out as part of the character command, therefore they need no
+further typeface commands.  Similarly, the user-redefinable quote mark characters
+have their typeface defined in their definitions, so do not need any more typeface
+commands.
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|l|l|} \hline	% ``commands'' to be over two columns
+{\em value\/} & \multicolumn{2}{c|}{\em commands\/} \\ \cline{2-3}
+              & {\em begin\/} & {\em end\/} \\ \hline
+{\tt KW} & {\tt \char'173 \char'134 keyword} & {\tt \char'134 /\char'175 }\\
+{\tt ID} & {\tt \char'173 \char'134 iden} & {\tt \char'134 /\char'175 }\\
+{\tt IE} & {\tt \char'173 \char'134 iden} & {\tt \char'134 /\char'175 \$ }\\
+{\tt ST} & {\tt \char'173 \char'134 stri} & {\tt \char'134 /\char'175 }\\
+{\tt SE} & {\tt \char'173 \char'134 stri} & {\tt \char'134 /\char'175 \$ }\\
+{\tt CO} & {\tt \char'173 \char'134 com} & {\tt \char'134 /\char'175 }\\
+{\tt CE} & {\tt \char'173 \char'134 com} & {\tt \char'134 /\char'175 \$ }\\
+{\tt NU} & {\tt \char'173 \char'134 numb} & {\tt \char'134 /\char'175 }\\
+{\tt NE} & {\tt \char'173 \char'134 numb} & {\tt \char'134 /\char'175 \$ }\\
+{\tt MA} & {\tt \$ } & {\tt \$ }\\
+{\tt SP} & & \\
+{\tt LC} & & \\
+{\tt RC} & & \\
+{\tt CR} & & \\
+{\tt BF} & &  \\
+{\tt FQ} & &  \\ \hline
+\end{tabular} \hskip3mm \begin{tabular}{|c|l|l|} \hline
+{\em value\/} & \multicolumn{2}{c|}{\em commands\/} \\ \cline{2-3}
+              & {\em begin\/} & {\em end\/} \\ \hline
+{\tt EQ} & & \\
+{\tt DQ} & & \\
+{\tt QD} & & \\
+{\tt EE} & & \\
+{\tt DC} & & \\
+{\tt DP} & & \\
+{\tt CP} & & \\
+{\tt LE} & & \\
+{\tt GE} & & \\
+{\tt LA} & & \\
+{\tt RA} & & \\
+{\tt RR} & & \\
+{\tt TI} & {\tt \$ } & {\tt \$ } \\
+{\tt EX} & {\tt \$ } & \\
+{\tt XP} & {\tt \$ } & \\
+{\tt BE} & & \\ \hline
+\end{tabular}
+\end{center}
+\caption{Typeface values and related \LaTeX\ commands} \label{tf-comms}
+\end{table}
+
+\subsection{Writing characters}
+
+{\tt WriteChar} is the function which handles writing characters.  It takes the line store,
+the current position on the line and the end of the current section - either the skipover
+section or the writing section - and returns the current position on the line which will
+have been incremented if a double character has been written.  If the first character of
+a double character is the last character of a skipover section, it will not be written
+so the indentation for that line will fall instead, below the start of the double
+character in a line above.  Most characters are written out as they were inputted,
+but many require special \LaTeX\ code.
+
+As \LaTeX\ uses embedded typesetting commands, some characters are reserved for this
+purpose.  Should any of these characters appear in the input Haskell code, {\tt pphs}
+has to produce the appropriate \LaTeX\ code to avoid these characters upsetting the typesetting
+process.  The characters and the replacement \LaTeX\ code are shown in Table~\ref{rep-chars}.
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|l|} \hline
+{\em input\/} & {\em \LaTeX\ code output } \\ \hline
+{\tt \#} & {\tt \char'134 \#} \\
+{\tt \$} & {\tt \char'134 \$} \\
+{\tt \%} & {\tt \char'134 \%} \\
+{\tt \&} & {\tt \char'134 \&} \\
+{\tt \char'176 } & {\tt \char'134 char'176 } \\
+{\tt \_} & {\tt \char'134 \_} \\
+{\tt \char'134} & {\tt \char'134 hbox\char'173 \$setminus\$\char'175 } \\
+{\tt \char'173} & {\tt \char'134 hbox\char'173 \$\char'134 cal \char'134 char'146 \$\char'175 } \\
+{\tt \char'175} & {\tt \char'134 hbox\char'173 \$\char'134 cal \char'134 char'147 \$\char'175 } \\
+{\tt *} & {\tt \char'134 times}\\ \hline
+\end{tabular} \hskip3mm \begin{tabular}{|c|l|} \hline
+{\em input\/} & {\em \LaTeX\ code output } \\ \hline
+{\tt ++} & {\tt \char'134 plusplus}\\
+{\tt :+} & {\tt \char'173 :\char'175 \char'173 +\char'175}\\
+{\tt <=} & {\tt \$\char'134 leq\$}\\
+{\tt >=} & {\tt \$\char'134 geq\$}\\
+{\tt <-} & {\tt \$\char'134 leftarrow\$}\\
+{\tt ->} & {\tt \$\char'134 rightarrow\$}\\
+{\tt =>} & {\tt \$\char'134 Rightarrow\$}\\
+{\tt \char'173 -} & {\tt \char'173 \char'134 com \char'134 \char'173 -\char'134 /\char'175 }\\
+{\tt -\char'175 } & {\tt \char'173 \char'134 com -\char'134 \char'175 \char'134 /\char'175 }\\
+{\tt --} & {\tt \char'173 \char'134 rm -\char'175 \char'173 \char'134 rm -\char'175 }\\ \hline
+\end{tabular}
+\end{center}
+\caption{Haskell input and replacement \LaTeX\ code} \label{rep-chars}
+\end{table}
+
+When a mathematical character needs written, {\tt WriteChar} outputs the \LaTeX\ code for
+the character rather than the Haskell ASCII character simulation.  Some of these
+simulations use more than one character, so this could cause problems if some left
+indentation is aligned under the second character of such a simulation.  It has been
+decided that in this case, the output from {\tt pphs} will cause the indented line
+to align under the start of the double character rather than the centre or end of it.
+The Haskell ASCII simulations and the \LaTeX\ codes that replaces them are shown in
+Table~\ref{rep-chars}.  The non-standard command {\tt \char'134 plusplus} is defined
+in the {\tt pphs.sty} style file (see Section~\ref{style-file}).
+
+When a {\tt |} symbol is aligned under an {\tt =} sign at the left indentation,
+{\tt \char'134 bareq} is output.  This command is defined in the {\tt pphs.sty}
+style file explained in Section~\ref{style-file} and causes \LaTeX\ to write the bar symbol
+centrally in the space it would have taken to write an equals sign, thereby causing
+the bar to be positioned centrally under the equals sign it is aligned under and the text
+following the bar to align with that after the equals sign.
+
+For writing spaces, {\tt WriteSpaces}, called with the line store, current position and the
+position of the end of the current section, first counts the number of consecutive spaces
+to be written before writing out a {\tt \char'134 xspa} command with an argument of
+the number of spaces needed.  This makes the output code easier to read.  The
+{\tt \char'134 xspa} command is defined in the {\tt pphs.sty} style file explained
+in Section~\ref{style-file}.  Any tab characters are treated as spaces by {\tt pphs}
+with the number of spaces they represent being calculated from the current position
+on the line and the {\tt tablength} variable, which may have been changed from its
+default of 8 by the {\tt -t} option at the program call.
+
+Numbers are written by {\tt WriteChar}, including floating point numbers.
+
+As \LaTeX\ provides several different quote marks, it was decided that the user
+should be able to choose a preferred symbol.  An input quote mark {\tt '} can
+either be a prime or a quote mark in the output.  This requires the program to
+determine which it is.  In program code this is fine, but in comments or strings
+the marks won't necessarily be used in a manner from which it can easily be
+determined which symbol is required.  In program code, an input {\tt '} is deemed
+to be a quote mark if either it is preceded by punctuation or a quote has
+already been opened; otherwise it is a prime.  Of the quote marks, these can
+either be for actual quotes or an escape quote where a quote mark is being quoted.
+Special cases has been implemented when the input file contains a quote within a comment
+started with a backquote and ended with a forwards quote, and for \LaTeX\ style
+quotes in comments started with two backquotes and ended with two forwards quote
+marks.  All input {\tt '} in strings, other than escape quotes, are treated
+as primes.  In strings, an input {\tt '} may be an apostrophe, however, there is
+little way of telling this.\label{string-apostrophe}  One of five different pieces
+of \LaTeX\ code can be produced having received {\tt '} as input.
+\begin{itemize}
+\item {\tt \char'134 forquo} for a forwards quote mark
+\item {\tt \char'134 escquo} for an escape (quoted) quote mark
+\item {\tt \char'173 \char'134 com '\char'134 /\char'175 } for a forward quote ending a quote
+in a comment opened by a backquote
+\item {\tt \char'173 \char'134 com ''\char'134 /\char'175 } for two forward quotes ending a quote
+in a comment opened by two backquotes
+\item {\tt '} for a prime which will be in the math font
+\end{itemize}
+The first two are commands defined in the {\tt pphs.sty} style file and are
+thus user-redefinable as described in Section~\ref{user-adj}.  Backquotes, input
+as {\tt `}, are either in the comment typeface for backquotes in comments or in
+math font elsewhere.
+
+\subsection{Writing internal alignment}
+
+To commence a section of internal alignment, either of the functions {\tt WriteQueue}
+or {\tt WriteRestOfQueue} write out
+{\tt \char'134 begin\char'173 tabular\char'175 \char'173 @\char'173 \char'175 l@\char'173 \char'134 xspa1\char'175 c@\char'173 \char'175 l\char'175 }
+before writing the first line of the section.  This provides an environment
+with three columns.  The first column accommodates the Haskell code to the left of the
+internal alignment, the second has the symbols that line up vertically, while the third
+has the Haskell code to the right.  The Haskell code is written complete with its \LaTeX\
+typesetting commands with the addition of {\tt \&} symbols denoting the breaks between
+columns.  Once the internal alignment section has been completed, the
+{\tt \char'134 end\char'173 tabular\char'175 } command is written to terminate the
+environment.

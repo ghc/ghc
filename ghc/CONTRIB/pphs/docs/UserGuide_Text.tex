@@ -1,0 +1,231 @@
+\sect{User guide to {\tt pphs}}
+
+The program {\tt pphs} typesets programs in the Haskell programming
+language for use with the \LaTeX\ intensional text formatting
+and typesetting system.  It takes
+as input a file containing a Haskell program and produces \LaTeX\
+code to {\tt stdout}.  There are various different features of this
+process.
+
+\subsect{Left indentation}
+
+It is in the nature of Haskell programs that indentation is heavily used.  As the
+indentation is vital to the parsing of the program, any attempt at typesetting
+Haskell code must replicate this indentation.  Take, for example, the following piece of code.
+\begin{quote}
+\input{Haskell_leftindent2}
+\end{quote}
+Note how the third, fifth and sixth lines start at different levels of indentation.
+The {\tt pphs} program produces the correct \LaTeX\ code to align these under the
+correct position in the preceding lines once typeset.  It also selects the correct
+line to line up under.  Note how the sixth line does not line up
+under its predecessor, but under the fourth line.
+The code necessary to typeset this is produced, preserving the parsing
+order.  Once typeset, it will look like this:
+\begin{quote}
+\input{LaTeX_leftindent2}
+\end{quote}
+Note that this
+example of possible input had no `extra' typesetting commands.
+
+A line of Haskell code may be indented beyond the end of its predecessor.
+Here, {\tt pphs} aligns it with whichever line it is lined up underneath in the
+original file, or, if longer than any preceding line, inserts space to correspond
+to that in the input file.
+
+\subsect{Internal alignment}
+
+Another form of alignment used in Haskell is {\em internal alignment}.  This is where
+there is vertical alignment of columns other than at the left-hand edge of the
+Haskell code.  This is typically characterised with a column of the same character
+appearing in the program code, and it is this case, along with a
+special case, that {\tt pphs} recognises for internal alignment having occurred.
+\begin{quote}
+\input{Haskell_internalalign1}
+\end{quote}
+In this example, see how the {\tt =} signs line up, one below the other.  This makes
+the program more readable, although it does not affect the parsing of the program.
+As the purpose of {\tt pphs} is to make Haskell programs even more readable, it
+retains this alignment.  This example would be typeset to produce the following:
+\begin{quote}
+\input{LaTeX_internalalign1}
+\end{quote}
+The special case for internal alignment is a $=$ aligned under a $::$.
+This will cause the same effect as would have happened if they were the same
+character.
+
+\subsect{Token highlighting}
+
+To increase the readability of Haskell programs, {\tt pphs} allows various tokens
+to be highlighted.  By using different typefaces for some pieces of code, this
+distinguishes them from the rest.  The user can specify the details of
+the highlighting, but the default settings are {\bf bold} for
+keywords, {\it italics} for identifiers and {\rm roman} for everything else.
+Strings, comments and numbers are also highlightable.
+
+Note that in the previous example, the keywords {\bf instance} and {\bf where}
+are highlighted in bold, whereas the various identifiers are in italics.
+
+\subsect{Mathematical symbols}
+
+Rather than simply replicate the ASCII approximations of mathematical symbols
+used in Haskell, {\tt pphs}
+substitutes the proper symbols in the output.  These are shown below.
+\begin{center}
+\begin{tabular}[t]{|c|c|} \hline
+{\em Haskell\/} & {\em Math\/} \\ \hline
+{\tt *} & $\times$ \\
+{\tt ++} & {\hbox{$+\mkern-7.5mu+$}} \\
+{\tt :+} & {:}{+} \\
+{\tt <=} & $\leq$ \\ \hline
+\end{tabular} \hskip3mm \begin{tabular}[t]{|c|c|} \hline
+{\em Haskell\/} & {\em Math\/} \\ \hline
+{\tt >=} & $\geq$ \\
+{\tt <-} & $\leftarrow$ \\
+{\tt ->} & $\rightarrow$ \\
+{\tt =>} & $\Rightarrow$ \\ \hline
+\end{tabular}
+\end{center}
+
+\subsect{\LaTeX\ typesetting characters}
+
+\LaTeX\ uses embedded typesetting commands, so {\tt pphs} has to ensure that if
+any of the characters used by \LaTeX\ appear in the input Haskell code, the correct
+\LaTeX\ code is outputted to typeset them, rather than have the characters interfere
+with the typesetting process.  The characters used by \LaTeX\ for typesetting are:
+\begin{quote}
+\(\#\ \$\ \%\ \&\ \char'176\ \_\ \char'136\ \hbox{$\setminus$}\ \hbox{$\cal \char'146\ \char'147$}\)
+\end{quote}
+The user of {\tt pphs} need not worry about using any of these characters in Haskell
+programs, as this will be dealt with by {\tt pphs} before \LaTeX\ gets to see the code.
+
+\subsect{How to call it}
+
+The program is called by typing {\tt pphs} followed by the name of
+the file containing the Haskell program to be typeset.  If the
+filename ends with a {\tt .hs} extension, this may be omitted,
+unless another file exists with the same name but no extension.
+When no extension is specified, the program will look for a
+filename with no extension before looking for a file with the
+{\tt .hs} extension.
+
+For example, if the Haskell program was in a file called {\tt Haskell.hs},
+the program would be called by
+\begin{quote}
+\tt pphs Haskell.hs
+\end{quote}
+As the filename ends with a {\tt .hs} extension, the extension may be omitted, provided
+there is no file already existing called {\tt Haskell}.  If there is no such file
+\begin{quote}
+\tt pphs Haskell
+\end{quote}
+would produce the same effect as the original call.
+
+As the program outputs to {\tt stdout}, the code produced may be
+directed to a file by using a {\tt >} symbol after the call, followed by
+the name of the file to contain the \LaTeX\ code produced by the
+program.  Continuing the above example, if the output code is to be in
+a file called {\tt Haskell.tex}, the call would now be
+\begin{quote}
+\tt pphs Haskell.hs > Haskell.tex
+\end{quote}
+It must be noted that if the file {\tt Haskell.tex} already exists, it must be
+renamed or removed before making this call.
+
+There are three options that can be specified in the program call.
+If it is desired that double colon symbols should look like $:\,:$ rather than $::$,
+use {\tt -w} in the call.  The length of the tab characters in the input file can
+be specified with {\tt -t} followed by the length.  The default tablength is 8.
+If identifiers with subscripts are wanted, eg {\iden ident$_1$\/}, then use {\tt -s}.
+These are written in the Haskell file as {\tt ident\_1}.
+
+If the length of the tabs are 4 and
+the wide double colons are required, the example call above would become as follows.
+\begin{quote}
+\tt pphs -t4w Haskell.hs > Haskell.tex
+\end{quote}
+
+\subsect{What to do with the produced code}
+
+Before including the \LaTeX\ code in the document, it is necessary
+to include definitions of the \LaTeX\ commands used by {\tt pphs}.
+This can be done simply by including the style file {\tt pphs.sty}
+by adding {\tt pphs} to the option list of the documentstyle
+command like thus:
+\begin{quote}
+\begin{verbatim}
+\documentstyle[12pt,a4,pphs]{article}
+\end{verbatim}
+\end{quote}
+
+Once this has been done, the file containing the \LaTeX\ code
+of the Haskell program code can be included.  This is done
+using the {\tt \char'134 input} command.  If the \LaTeX\
+code is located in a file called {\tt Haskell.tex} then the
+command is:
+\begin{quote}
+\begin{verbatim}
+\input{Haskell}
+\end{verbatim}
+\end{quote}
+This can be used in various \LaTeX\ environments such as {\tt quote},
+{\tt figure} or {\tt table} to produce different effects. An example
+of possible code is:
+\begin{quote}
+\begin{verbatim}
+\begin{quote}
+\input{Haskell}
+\end{quote}
+\end{verbatim}
+\end{quote}
+See Lamport, L.,  {\em \LaTeX : A Document Preparation System\/}
+(Addison-Wesley, 1986) for more details.
+
+\subsect{How to make adjustments to the output}
+
+The {\tt pphs} program is flexible in that it allows user choice on some aspects
+of the appearance of the final result.  User choice is allowed in two areas, typefaces
+and qoute marks.
+
+The default settings for typefaces are bold for keywords, italics for identifiers and
+roman for everything else that is not in the math typeface.  However, keywords, identifiers,
+strings, comments and numbers may be in whatever typeface the user chooses.
+This is done using the {\tt \char'134 def} command to redefine the typeface commands
+used by {\tt pphs}.  These are {\tt \char'134 keyword}, {\tt \char'134 iden},
+{\tt \char'134 stri}, {\tt \char'134 com} and {\tt \char'134 numb} respectively.
+
+For example, to put all comments into typewriter font, use
+{\tt \char'134 def\char'134 com\char'173 \char'134 tt\char'175} in
+the document.  The scope of the declaration will be from the point of introduction to
+the end of the document.  To cancel a redefinition, use {\tt \char'134 def} to
+redefine it back to what it was originally.  The different typefaces available in \LaTeX\ are
+\begin{center}
+\begin{tabular}{|c|l|} \hline
+{\em code\/} & {\em meaning\/} \\ \hline
+{\tt \char'134 bf} & {\bf Boldface} \\
+{\tt \char'134 em} & {\em Emphatic\/} \\
+{\tt \char'134 it} & {\it Italics\/} \\
+{\tt \char'134 rm} & {\rm Roman} \\ \hline
+\end{tabular} \hskip3mm \begin{tabular}{|c|l|} \hline
+{\em code\/} & {\em meaning\/} \\ \hline
+{\tt \char'134 sc} & {\sc Small Caps} \\
+{\tt \char'134 sf} & {\sf Sans Serif} \\
+{\tt \char'134 sl} & {\sl Slanted\/} \\
+{\tt \char'134 tt} & {\tt Typewriter} \\ \hline
+\end{tabular}
+\end{center}
+It should be noted that the emphatic typeface is just the same as italics, although
+nesting emphatic sections will alternate between italics and roman.
+
+Two types of quote mark are redefinable, forwards quotes and escape quotes.
+The default for both of them is ' but if it is wished to redefine one or
+both of them, use the {\tt \char'134 def} with either {\tt \char'134 forquo}
+or {\tt \char'134 escquo}.  For example, to make escape quotes be
+printed as {\sf '} use {\tt \char'134 def\char'134 escquo\char'173 \char'134 hbox\char'173 \char'134 sf '\char'175 \char'175} in the document.
+
+\subsect{Altering the output}
+
+As {\tt pphs} produces code which is subsequently run through \LaTeX , it is possible
+to alter the code before it is run through \LaTeX .  This is useful for correcting
+mistakes made by {\tt pphs}.  However, it is recommended that only those experienced
+in \LaTeX\ try this.

@@ -1,0 +1,20 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface LIE where
+import Class(Class)
+import Id(Id)
+import Inst(Inst, InstOrigin, OverloadedLit)
+import UniType(UniType)
+import Unique(Unique)
+data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
+data LIE 	{-# GHC_PRAGMA MkLIE [Inst] #-}
+mkLIE :: [Inst] -> LIE
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: [Inst]) -> _!_ _ORIG_ LIE MkLIE [] [u0] _N_ #-}
+nullLIE :: LIE
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+plusLIE :: LIE -> LIE -> LIE
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(L)U(L)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+unMkLIE :: LIE -> [Inst]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(S)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: [Inst]) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: LIE) -> case u0 of { _ALG_ _ORIG_ LIE MkLIE (u1 :: [Inst]) -> u1; _NO_DEFLT_ } _N_ #-}
+unitLIE :: Inst -> LIE
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
+

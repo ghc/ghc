@@ -1,0 +1,11 @@
+ 
+"tcfail023.hs", line 8: Duplicate/overlapping instances:
+    class "A", type "B"; at "tcfail023.hs", line 8 and "tcfail023.hs", line 11
+ 
+"tcfail023.hs", line 11:
+    Couldn't match type "Bool" against "B".
+    Inside a function binding:
+	op ... C = True
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

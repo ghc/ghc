@@ -1,0 +1,21 @@
+Desugared:
+Test.f :: for all d, e. d -> [e]
+Test.f = /\ o81 t82 -> \ x.102 -> Nil! t82
+Test.g :: for all d, e, f, g, h. d -> ([e], [f], [g], [h])
+Test.g =
+    /\ o85 t87 t89 t90 t91 -> \ x.103 ->
+	MkTuple4!
+	    [t87]
+	    [t89]
+	    [t90]
+	    [t91]
+	    (((Test.f [t88]) t87) (Nil! t88))
+	    (Nil! t89)
+	    (Nil! t90)
+	    (Nil! t91)
+Test.h :: for all d, e, f, g, h. d -> ([e], [f], [g], [h])
+Test.h =
+    /\ o94 t96 t97 t98 t99 -> \ x.104 ->
+	(((((Test.g Int) t96) t97) t98) t99)
+	    (let dict.105 = dfun.Num.Int in  MkInt! 1#)
+

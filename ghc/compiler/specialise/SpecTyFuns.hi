@@ -1,0 +1,29 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface SpecTyFuns where
+import Bag(Bag)
+import Class(Class)
+import Id(Id)
+import Maybes(Labda(..))
+import Pretty(PprStyle, Pretty(..), PrettyRep)
+import TyCon(TyCon)
+import TyVar(TyVar, TyVarTemplate)
+import UniType(UniType)
+type ConstraintVector = [Bool]
+data Labda a   = Hamna | Ni a
+type Pretty = Int -> Bool -> PrettyRep
+data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+argTysMatchSpecTys_error :: [Labda UniType] -> [UniType] -> Labda (Int -> Bool -> PrettyRep)
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+isUnboxedSpecialisation :: [Labda UniType] -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+mkConstraintVector :: [TyVarTemplate] -> [(Class, TyVarTemplate)] -> [Bool]
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
+mkSpecialisedCon :: Id -> [UniType] -> Id
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LLLL)S" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+pprSpecErrs :: PprStyle -> Bag (Id, [Labda UniType]) -> Bag (Id, [Labda UniType]) -> Bag (TyCon, [Labda UniType]) -> Int -> Bool -> PrettyRep
+	{-# GHC_PRAGMA _A_ 4 _U_ 222222 _N_ _S_ "LSLL" _N_ _N_ #-}
+specialiseCallTys :: Bool -> Bool -> Bool -> [Bool] -> [UniType] -> [Labda UniType]
+	{-# GHC_PRAGMA _A_ 5 _U_ 12211 _N_ _S_ "ELLLL" _N_ _N_ #-}
+specialiseConstrTys :: [UniType] -> [Labda UniType]
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+

@@ -1,0 +1,6 @@
+Typechecked:
+AbsBinds [tt0] [] [(x.t1, ShouldSucceed.x)]
+    {- rec -}
+    (x.t1@_) :: tt0
+    (x.t1@_) = x.t1
+

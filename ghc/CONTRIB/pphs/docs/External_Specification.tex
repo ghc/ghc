@@ -1,0 +1,117 @@
+\section{External specification}
+
+The program is to be run in UNIX by typing {\tt pphs} followed by the
+filename containing the Haskell code requiring to be typeset.  This will
+produce the \LaTeX\ code to stdout.  If there is some error,
+a suitable error message is to be printed to stderr.  The user may, if
+desired, direct the output to another file by typing {\tt pphs infilename > outfilename}.
+In this case, any error messages must still go to the screen and not the file.
+
+The input filename may be given in its entirety or the {\tt .hs} extension may be omitted.
+In the case where there are two files with the same name, except that one has the
+{\tt .hs} extension, to run the program on the file with the extension to its name
+the complete filename will be typed.
+
+The output will consist of the \LaTeX\ code to produce the typeset Haskell
+code.  As this is to be made easily insertable into another \LaTeX\ document, the output
+will not contain any header information such as declarations or definitions.  These,
+however, can
+be contained in a style file which the user will include in their main document.
+
+Keywords and identifiers are to be distinguished in the result as typeset.
+The default for keywords is to be boldface and for identifiers italics.
+Numbers not forming part of an identifier are to be in roman by default
+while math is to be used where appropriate.
+
+Haskell uses ASCII characters and combinations of ASCII characters 
+to substitute for mathematical characters not present on the
+keyboard.  Where this happens, the program is to replace the ASCII character(s)
+with the corresponding mathematical character using the special \LaTeX\ commands
+to generate them.  The single characters are:
+\begin{quote}
+\begin{tabular}[t]{@{}cc@{}}
+Haskell & Math\\
+{\tt *} & $\times$
+\end{tabular}
+\end{quote}
+The double characters are:
+\begin{quote}
+\begin{tabular}[t]{@{}cc@{}}
+Haskell & Math\\
+{\tt ++} & {\hbox{$+\mkern-7.5mu+$}}\\
+{\tt :+} & {:}{+}\\
+{\tt <=} & $\leq$\\
+{\tt >=} & $\geq$\\
+{\tt <-} & $\leftarrow$\\
+{\tt ->} & $\rightarrow$\\
+{\tt =>} & $\Rightarrow$
+\end{tabular}
+\end{quote}
+
+The \LaTeX\ system uses special characters to aid with the typesetting.  
+They are:
+\begin{quote}
+\(\#\ \$\ \%\ \&\ \char'176\ \_\ \char'136\ \hbox{$\setminus$}\ \hbox{$\cal \char'146\ \char'147$}\)
+\end{quote}
+These characters may
+appear in the input, so the program must generate the correct \LaTeX\ code to
+print them and
+avoid having them mess up the typesetting process.
+
+As the output when typeset must have the same layout as the input, the program
+must get the linebreaks and indentation right.  As \LaTeX\ is primarily designed for normal
+text, it would ignore the linebreaks and indentation in the Haskell file.  Therefore 
+the program must insert them using the correct typesetting commands.  In the case of
+linebreaks it must recognise where these occur, but for indentation it must also work out
+how much space needs to be inserted.
+
+There are two types of indentation in Haskell programs: left-hand and internal.
+For the former, the program must work out what the start of the line is aligned
+under in the input file.  It then has to calculate how much space is required
+to get the line of text to line up with this in the output once typeset.  
+Take, for instance, the following Haskell example input:
+\begin{quote}
+\begin{verbatim}
+foobar a b = c
+           where
+               c = (a, b)
+\end{verbatim}
+\end{quote}
+Notice that the {\tt w} of {\tt where} on the second line lines up
+under the {\tt =} on
+the first line.  Similarly, the {\tt c} on the third line is aligned under the
+final letter of {\tt where} on the second line.  The result as typeset must
+get the indentation correct like this:
+\begin{quote}
+\begin{tabbing}
+foobar a b = c\\
+\newbox\foo
+{\setbox\foo\hbox{foobar a b }\hskip\wd\foo}where\\
+{\setbox\foo\hbox{foobar a b wher}\hskip\wd\foo}c = (a, b)
+\end{tabbing}
+\end{quote}
+
+For internal indentation, the program must first recognise where it has 
+occurred.  It must then insert the correct amount of space to get alignment
+in the output.  As \LaTeX\ uses variable-width characters, extra space
+may be needed in lines preceding a line within an internal alignment section.  
+This is necessary if a lower line which 
+aligns in the input file is longer up to the alignment point,
+due to the variable-width characters, than its predecessors 
+once it has been properly typeset.  For example:
+\begin{quote}
+\begin{verbatim}
+lilli  :: a
+wmwm   :: b
+\end{verbatim}
+\end{quote}
+becomes
+\begin{quote}
+\begin{tabular}[t]{@{}l@{\ }c@{\ }l}
+lilli & :: & a\\
+wmwm  & :: & b\\
+\end{tabular}
+\end{quote}
+Notice how {\tt lilli} is longer than {\tt wmwm} in the input file style
+using fixed-width font but shorter when using the variable-width font
+of the typeset output.

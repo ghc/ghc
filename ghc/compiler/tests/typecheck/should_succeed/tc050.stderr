@@ -1,0 +1,60 @@
+Typechecked:
+{- nonrec -}
+ShouldSucceed.Foo.o_and = /\ a.t39 -> \{-classdict-} [] [o_and.t40] -> o_and.t40
+{- nonrec -}
+defm.ShouldSucceed.Foo.o_and =
+    /\ a.t41 ->
+	\{-dict-} d.ShouldSucceed.Foo.t42 ->
+	    (error (a.t41 -> a.t41 -> a.t41))
+		"No default method for \"ShouldSucceed.Foo.defm.ShouldSucceed.Foo.o_and\"\n"
+{- rec -}
+dfun.ShouldSucceed.Foo.Bool = ({-dict-} [] [const.ShouldSucceed.Foo.Bool.o_and])
+const.ShouldSucceed.Foo.Bool.o_and :: Bool -> Bool -> Bool
+const.ShouldSucceed.Foo.Bool.o_and
+    False x.r30
+	    = False
+const.ShouldSucceed.Foo.Bool.o_and
+    x.r31 False
+	    = False
+const.ShouldSucceed.Foo.Bool.o_and
+    True True
+	    = True
+{- rec -}
+dfun.ShouldSucceed.Foo.Int = ({-dict-} [] [const.ShouldSucceed.Foo.Int.o_and])
+const.ShouldSucceed.Foo.Int.o_and :: Int -> Int -> Int
+const.ShouldSucceed.Foo.Int.o_and
+    x.r32 0 = lit.t24
+const.ShouldSucceed.Foo.Int.o_and
+    0 x.r33 = lit.t30
+const.ShouldSucceed.Foo.Int.o_and
+    1 1 = lit.t38
+lit.t21 = MkInt 0#
+(==.t22) = eqInt
+lit.t24 = lit.t21
+lit.t26 = lit.t21
+(==.t27) = (==.t22)
+lit.t30 = lit.t21
+lit.t32 = MkInt 1#
+(==.t33) = (==.t22)
+lit.t35 = lit.t32
+(==.t36) = (==.t22)
+lit.t38 = lit.t32
+AbsBinds [ot3] [] [(f.t1, ShouldSucceed.f)]
+    (ShouldSucceed.Foo.o_and.t5, const.ShouldSucceed.Foo.Bool.o_and)
+    {- nonrec -}
+    f.t1 :: Bool -> ot3 -> Bool
+    f.t1 x.r61 y.r62
+		 = ShouldSucceed.Foo.o_and.t5 x.r61 False
+AbsBinds
+[ot9, a.t10]
+[d.Num.t15, d.ShouldSucceed.Foo.t16]
+[(g.t7, ShouldSucceed.g)]
+    (fromInt.t14, fromInt a.t10 d.Num.t15)
+    (lit.t13, fromInt.t14 (MkInt 1#))
+    (ShouldSucceed.Foo.o_and.t11,
+	ShouldSucceed.Foo.o_and a.t10 d.ShouldSucceed.Foo.t16)
+    {- nonrec -}
+    g.t7 :: a.t10 -> ot9 -> a.t10
+    g.t7 x.r63 y.r64
+		 = ShouldSucceed.Foo.o_and.t11 x.r63 lit.t13
+

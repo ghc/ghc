@@ -1,0 +1,6 @@
+ 
+"tcfail029.hs", line 5: No such instance:
+    class "Ord", type "Foo" (at a use of an overloaded identifier: >)
+Fail: Compilation errors found
+
+ghc: execution of the Haskell compiler had trouble

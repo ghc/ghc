@@ -1,0 +1,130 @@
+	     The Glasgow Haskell Compiler -- version 0.19
+	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			"What a great system!"
+
+The third public release of the Glasgow Haskell Compiler is now
+available (GHC, version 0.19). Binaries and sources are freely
+available by FTP; details below.
+
+Highlights of what's new in 0.19 since 0.16 (July 1993):
+  * Somewhat faster compilation times.
+  * Still better error messages.
+  * Better Haskell 1.2 compliance, including more derived instances,
+    `default' declarations, renaming, etc.
+  * Native-code generator for SPARC.
+  * Unfoldings across module boundaries.
+  * Automatic specialisation of overloaded functions.
+  * Better strictness analysis, including "looking inside tuples" and
+    "absence analysis" (arguments that aren't used).
+  * New "simplifier" (program-transformation engine).
+
+Please see the release notes for a more complete list (including
+Backward Incompatibilities to watch out for).
+
+To run this release, you need a machine with 16+MB memory, GNU C
+(`gcc') [version 2.1 or greater], and `perl'.  We have seen GHC work
+in *some* form or fashion on: Sun4s, Sun3s, DECstations, DEC Alphas,
+HP-PA boxes.  Sun4s, our development platform, are by far the best
+supported.  We will distribute binaries as we build them.
+
+Once you have the distribution, please follow the pointers in
+ghc/README to find all of the documentation in and about this release.
+
+Please report bugs to glasgow-haskell-bugs@dcs.glasgow.ac.uk and
+direct general queries to glasgow-haskell-request@<same>.
+
+We are very grateful to everyone who has sent a bug report, sent a
+"look at this weird result" report, lent us a machine on which to try
+a port, or (best of all) contributed code.  Keep up the good work.
+
+Simon Peyton Jones
+
+Dated: 93/12/16
+....................................................................
+
+"Should I start using GHC 0.19?"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* If you're using a previous release of GHC: YES.  (Recompile everything.)
+
+* If you want to hack on a Haskell compiler: YES.
+
+* If you're new to Haskell: Try Gofer (an interpreter for a
+  Haskell-like language) first; then come back and say YES.
+
+* If you want time profiling as well as space profiling: YES.
+
+* If you need the Glasgow Haskell extensions, i.e., calling C, unboxed
+  datatypes, monadic I/O etc.: YES.  (ghc/README says a little more
+  about these features.)
+
+* If you're using HBC at the moment: not a clear YES or NO.  *We*
+  really like having both compilers to play against each other.  For
+  example, HBC has better compilation times, but you'll like GHC's
+  error messages.  And you can try them both before submitting a bug
+  report for either one.
+
+* If you want simulated parallel execution on a uniprocessor: NO.
+  (Use the "hbcpp" variant of HBC from York.)
+
+....................................................................
+
+How to make sure every release of GHC will run your program (well)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*Please* send us a copy!  Part of our work is to collect and study
+large and *realistic* Haskell programs.  Only you can provide them.
+They need not be final, polished versions -- they just have to run.
+
+Among other things, we run every release against our entire
+collection, so if your program's in there...
+
+....................................................................
+
+How to get it
+~~~~~~~~~~~~~
+This release is available, in whole or in part, from the usual Haskell
+anonymous FTP sites, in the directory pub/haskell/glasgow:
+
+	ftp.dcs.glasgow.ac.uk  (130.209.240.50)
+	ftp.cs.chalmers.se     (129.16.225.66)          
+	nebula.cs.yale.edu     (128.36.13.1)
+
+We are mirrored by src.doc.ic.ac.uk, in
+computing/programming/languages/haskell/glasgow, and you can get files
+from there by every means known to humanity.
+
+These are the available files (.Z for compressed, .gz for gzipped) --
+some are `on demand', ask if you don't see them:
+
+ghc-0.19-bin-sun4.tar.{Z,gz} A binary distribution -- unpack & run!
+			For SunOS 4.1.x; assumes you have GNU C (gcc)
+			version 2.x around...
+
+ghc-0.19-bin-<other>.tar.gz Other binary distributions -- we will
+			make them available as we go along; they
+			will be announced on the Haskell mailing list
+			(not elsewhere).
+
+ghc-0.19-src.tar.gz	The basic source distribution; about 3MB.
+
+ghc-0.19-hc-files.tar.gz The intermediate C (.hc) files for the
+			 compiler proper, the prelude, and `Hello,
+			 world'.
+
+ghc-0.19.ANNOUNCE	This file
+
+ghc-0.19.{README,RELEASE-NOTES} From the distribution; for those who
+			want to peek before FTPing...
+
+ghc-0.19-ps-docs.tar.gz	Main GHC documents in PostScript format; in
+			case your TeX setup doesn't agree with our
+			DVI files...
+
+ghc-0.19-hi-files-hbc.tar.gz
+			Interface files for the compiler proper
+			(ghc/compiler/*/*.hi), to be used if booting
+			with either HBC.  (The distributed .hi files
+			assume GHC version 0.19.)
+			
+There are no diffs from version 0.16, as they would be laughably huge.

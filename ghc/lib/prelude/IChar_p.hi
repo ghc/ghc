@@ -1,0 +1,38 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface PreludeCore where
+import PreludeBuiltin(Char(..))
+instance Enum Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 6 _!_ _TUP_5 [{{Ord Char}}, (Char -> [Char]), (Char -> Char -> [Char]), (Char -> Char -> [Char]), (Char -> Char -> Char -> [Char])] [_DFUN_ Ord (Char), _CONSTM_ Enum enumFrom (Char), _CONSTM_ Enum enumFromThen (Char), _CONSTM_ Enum enumFromTo (Char), _CONSTM_ Enum enumFromThenTo (Char)] _N_
+	 enumFrom = _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 enumFromThen = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 enumFromTo = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
+	 enumFromThenTo = _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance Eq Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Char -> Char -> Bool), (Char -> Char -> Bool)] [_CONSTM_ Eq (==) (Char), _CONSTM_ Eq (/=) (Char)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ eqChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ eqChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ neChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ neChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Ix Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord Char}}, ((Char, Char) -> [Char]), ((Char, Char) -> Char -> Int), ((Char, Char) -> Char -> Bool)] [_DFUN_ Ord (Char), _CONSTM_ Ix range (Char), _CONSTM_ Ix index (Char), _CONSTM_ Ix inRange (Char)] _N_
+	 range = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Enum enumFromTo (Char) _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: (Char, Char)) -> case u0 of { _ALG_ _TUP_2 (u1 :: Char) (u2 :: Char) -> _APP_  _CONSTM_ Enum enumFromTo (Char) [ u1, u2 ]; _NO_DEFLT_ } _N_,
+	 index = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)L)U(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
+	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)L)U(P)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Char}}, (Char -> Char -> Bool), (Char -> Char -> Bool), (Char -> Char -> Bool), (Char -> Char -> Bool), (Char -> Char -> Char), (Char -> Char -> Char), (Char -> Char -> _CMP_TAG)] [_DFUN_ Eq (Char), _CONSTM_ Ord (<) (Char), _CONSTM_ Ord (<=) (Char), _CONSTM_ Ord (>=) (Char), _CONSTM_ Ord (>) (Char), _CONSTM_ Ord max (Char), _CONSTM_ Ord min (Char), _CONSTM_ Ord _tagCmp (Char)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ ltChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ ltChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ leChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ leChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ geChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ geChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Char#) (u1 :: Char#) -> _#_ gtChar# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: Char) (u1 :: Char) -> case u0 of { _ALG_ C# (u2 :: Char#) -> case u1 of { _ALG_ C# (u3 :: Char#) -> _#_ gtChar# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
+	 max = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 min = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Text Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Char, [Char])]), (Int -> Char -> [Char] -> [Char]), ([Char] -> [([Char], [Char])]), ([Char] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Char), _CONSTM_ Text showsPrec (Char), _CONSTM_ Text readList (Char), _CONSTM_ Text showList (Char)] _N_
+	 readsPrec = _A_ 1 _U_ 02 _N_ _S_ "A" {_A_ 0 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
+	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "AU(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance _CCallable Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _TUP_0 [] [] _N_ #-}
+instance _CReturnable Char
+	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _TUP_0 [] [] _N_ #-}
+

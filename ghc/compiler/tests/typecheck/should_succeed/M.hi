@@ -1,0 +1,4 @@
+interface M where
+class (ORD a, Text a) => EQ a where (===) :: a -> a -> Bool
+class (Num a) => ORD a
+data NUM = ONE | TWO

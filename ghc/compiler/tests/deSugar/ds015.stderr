@@ -1,0 +1,21 @@
+Desugared:
+Tests.f :: for all d. d -> d
+Tests.f = /\ o89 -> \ x.106 -> (\ x.107 -> x.107) x.106
+Tests.g :: for all d, e, f. ((d -> d) -> f) -> e -> f
+Tests.g =
+    /\ o98 o94 o97 -> \ x.108 y.109 ->
+	(\ x.110 y.111 -> y.111 x.110) (\ x.112 -> x.112) x.108
+Tests.h :: for all d, e. [e] -> d -> e
+Tests.h =
+    /\ o102 t105 -> \ x.115 y.116 ->
+	(\ ds.117 ->
+	     let
+	       fail.118 =
+		   (error t105)
+		       "\"ds015.hs\", line 9: pattern-matching failed in lambda\n"S
+	     in 
+	       case ds.117 of {
+		 (:) x.119 xs.120 -> x.119
+		 _ ->  fail.118
+	       }) x.115
+

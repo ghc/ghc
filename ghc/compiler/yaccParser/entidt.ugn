@@ -1,0 +1,20 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_entidt where
+import UgenUtil
+import Util
+
+import U_list
+%}}
+type entidt;
+	entid	    : < gentid	    : stringId;	>;
+	enttype	    : < gitentid    : stringId;	>;
+	enttypeall  : < gatentid    : stringId;	>;
+	enttypecons : < gctentid    : stringId;
+			gctentcons  : list;	>;
+	entclass    : < gcentid	    : stringId;
+			gcentops    : list;	>;
+	entmod	    : < gmentid	    : stringId;	>;
+end;

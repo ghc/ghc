@@ -1,0 +1,185 @@
+\section[storage-manager-init]{Initialising the storage manager}
+
+To initialise the storage manager, we pass it:
+\begin{itemize}
+\item
+An @argc@/@argv@ combo, which are the command-line arguments that have
+been deemed to belong to the runtime system.  The initialisation
+routine can slurp around in there for information of interest to
+it.
+
+\item
+A filehandle to which any storage-manager statistics should be written.
+\end{itemize}
+
+\begin{code}
+#define NULL_REG_MAP
+#include "SMinternal.h"
+
+/* global vars to hold some storage-mgr details; */
+/* decls for these are in SMinternal.h           */
+I_   SM_force_gc       = 0;
+I_   SM_word_heap_size = DEFAULT_HEAP_SIZE;
+I_   SM_alloc_min      = 0;
+StgFloat SM_pc_free_heap   = DEFAULT_PC_FREE;
+I_   SM_alloc_size     = 0;
+I_   SM_major_gen_size = 0;
+I_   SM_word_stk_size  = DEFAULT_STACKS_SIZE;
+FILE *SM_statsfile = NULL;
+I_   SM_trace = 0;
+I_   SM_stats_summary = 0;
+I_   SM_stats_verbose = 0;
+I_   SM_ring_bell = 0;
+
+I_ MaxResidency = 0;     /* in words; for stats only */
+I_ ResidencySamples = 0; /* for stats only */
+
+#ifndef atof
+extern double atof();
+/* no proto because some machines use const and some do not */
+#endif
+
+I_
+decode(s)
+  char *s;
+{
+    I_ c;
+    StgDouble m;
+    if (!*s)
+	return 0;
+    m = atof(s);
+    c = s[strlen(s)-1];
+    if (c == 'g' || c == 'G')
+	m *= 1000*1000*1000;	/* UNchecked! */
+    else if (c == 'm' || c == 'M')
+	m *= 1000*1000;			/* We do not use powers of 2 (1024) */
+    else if (c == 'k' || c == 'K')	/* to avoid possible bad effects on */
+	m *= 1000;			/* a direct-mapped cache.   	    */ 
+    else if (c == 'w' || c == 'W')
+	m *= sizeof(W_);
+    return (I_)m;
+}
+
+static void
+badoption(s)
+  char *s;
+{
+  fflush(stdout);
+  fprintf(stderr, "initSM: Bad RTS option: %s\n", s);
+  EXIT(EXIT_FAILURE);
+}		
+
+extern long strtol  PROTO((const char *, char **, int)); /* ToDo: properly? */
+
+I_
+initSM(rts_argc, rts_argv, statsfile)
+    I_     rts_argc;
+    char **rts_argv;
+    FILE  *statsfile;
+{
+    I_ arg;
+
+    /* save statsfile info */
+    SM_statsfile = statsfile;
+    
+    /* slurp through RTS args */
+
+    for (arg = 0; arg < rts_argc; arg++) {
+	if (rts_argv[arg][0] == '-') {
+	    switch(rts_argv[arg][1]) {
+	      case 'H':
+		SM_word_heap_size = decode(rts_argv[arg]+2) / sizeof(W_);
+
+		if (SM_word_heap_size <= 0) badoption( rts_argv[arg] );
+		break;
+
+	      case 'M':
+		SM_pc_free_heap = atof(rts_argv[arg]+2);
+
+		if ((SM_pc_free_heap < 0) || (SM_pc_free_heap > 100))
+		    badoption( rts_argv[arg] );
+		break;
+
+	      case 'A':
+		SM_alloc_size = decode(rts_argv[arg]+2) / sizeof(W_);
+
+		if (SM_alloc_size == 0) SM_alloc_size = DEFAULT_ALLOC_SIZE;
+		break;
+
+	      case 'G':
+		SM_major_gen_size = decode(rts_argv[arg]+2) / sizeof(W_);
+		break;
+
+	      case 'F':
+		if (strcmp(rts_argv[arg]+2, "2s") == 0) {
+		    SM_force_gc = USE_2s;
+		} else if (strcmp(rts_argv[arg]+2, "1s") == 0) {
+		    badoption( rts_argv[arg] ); /* ToDo ! */
+		} else {
+		    badoption( rts_argv[arg] );
+		}
+		break;
+
+	      case 'K':
+		SM_word_stk_size = decode(rts_argv[arg]+2) / sizeof(W_);
+
+		if (SM_word_stk_size == 0) badoption( rts_argv[arg] );
+		break;
+
+	      case 'S':
+		SM_stats_verbose++;
+		/* statsfile has already been determined */
+		break;
+	      case 's':
+		SM_stats_summary++;
+		/* statsfile has already been determined */
+		break;
+	      case 'B':
+		SM_ring_bell++;
+		break;
+
+	      case 'T':
+		if (rts_argv[arg][2] != '\0')
+		    SM_trace = (I_) strtol(rts_argv[arg]+2, (char **)NULL, 0);
+		else
+		    SM_trace = 1;
+		break;
+
+#ifdef GCdu
+	      case 'u':
+		dualmodeInfo.resid_to_compact = atof(rts_argv[arg]+2);
+		dualmodeInfo.resid_from_compact = dualmodeInfo.resid_from_compact + 0.05;
+		if (dualmodeInfo.resid_from_compact < 0.0 ||
+		    dualmodeInfo.resid_to_compact > 1.0) {
+		  badoption( rts_argv[arg] );
+		}
+#endif
+
+	      default:
+		/* otherwise none of my business */
+		break;
+	    }
+	}
+	/* else none of my business */
+    }
+
+    SM_alloc_min = (I_) (SM_word_heap_size * SM_pc_free_heap / 100);
+
+    return(0); /* all's well */
+}
+\end{code}
+
+
+\section[storage-manager-exit]{Winding up the storage manager}
+
+\begin{code}
+
+I_
+exitSM (sm_info)
+    smInfo *sm_info;
+{
+    stat_exit(sm_info->hp - hp_start);
+
+    return(0); /* I'm happy */
+}
+\end{code}

@@ -1,0 +1,30 @@
+\newcounter{refnumber}[section]
+
+\renewcommand{\therefnumber}{\arabic{refnumber}}
+
+\newcommand{\reference}[4]{	% authors, title, details, abstract
+\refstepcounter{refnumber} 
+\large
+{\bf \therefnumber.}  #1, {\em #2}, #3.
+\normalsize
+\begin{quote}
+#4
+\end{quote}
+\vspace{0.2in}
+}
+
+\newcommand{\shortreference}[3]{	% authors, title, details
+\large
+$\bullet$ #1, {\em #2}, #3.
+}
+
+
+\newcommand{\GlasgowNinetyTwo}[1]
+	{Functional Programming, Glasgow 1992, Springer Verlag Workshops in Computing}
+\newcommand{\GlasgowNinetyThree}[1]
+	{Glasgow Functional Programming Group Workshop, Ayr, July 1993}
+\newcommand{\GlasgowNinetyOne}
+	{Functional Programming, Glasgow 1991, Springer Verlag Workshops in Computing}
+
+% \newcommand{\Haskell}[1]{{\sc Haskell}}
+

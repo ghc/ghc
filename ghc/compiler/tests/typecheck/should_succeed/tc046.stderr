@@ -1,0 +1,19 @@
+Typechecked:
+{- nonrec -}
+H.B.op2 = /\ a.t0 -> \{-classdict-} [d.H.C.t2] [op2.t1] -> op2.t1
+sdsel.H.B.H.C = /\ a.t0 -> \{-classdict-} [d.H.C.t2] [op2.t1] -> d.H.C.t2
+{- nonrec -}
+defm.H.B.op2 =
+    /\ a.t3 ->
+	\{-dict-} d.H.B.t4 ->
+	    (error (a.t3 -> a.t3 -> a.t3))
+		"No default method for \"H.B.defm.H.B.op2\"\n"
+{- nonrec -}
+H.C.op1 = /\ a.t5 -> \{-classdict-} [] [op1.t6] -> op1.t6
+{- nonrec -}
+defm.H.C.op1 =
+    /\ a.t7 ->
+	\{-dict-} d.H.C.t8 ->
+	    (error (a.t7 -> a.t7))
+		"No default method for \"H.C.defm.H.C.op1\"\n"
+

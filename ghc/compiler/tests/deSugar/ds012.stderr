@@ -1,0 +1,58 @@
+Desugared:
+Tests.f :: for all d, e. <Num e> -> d -> e
+Tests.f =
+    /\ o81 t82 -> \ dict.101 ->
+	let dict.99 = dict.101 in
+	let dict.97 = dict.99 in
+	let dict.94 = dict.97 in
+	let dict.91 = dict.94 in
+	let dict.89 = dict.91 in
+	let dict.87 = dict.89 in
+	let dict.85 = dict.87 in
+	let dict.83 = dict.85 in
+	let
+	  f.80 =
+	      \ x.63 ->
+		  (+ t82)
+		      dict.83
+		      ((- t82)
+			   dict.85
+			   ((+ t82)
+				dict.87
+				((fromInteger t82) dict.89 (MkInteger! 1##))
+				((fromInteger t82) dict.91 (MkInteger! 2##)))
+			   ((fromInteger t82) dict.94 (MkInteger! 3##)))
+		      ((* t82)
+			   dict.97
+			   ((fromInteger t82) dict.99 (MkInteger! 4##))
+			   ((fromInteger t82) dict.101 (MkInteger! 5##)))
+	in  f.80
+Tests.g :: for all d. <Num d> -> d -> d
+Tests.g =
+    /\ t110 -> \ dict.111 ->
+	let dict.108 = dict.111 in
+	let
+	  g.105 =
+	      \ x.64 ->
+		  (+ t110) dict.108 x.64 (((Tests.f t110) t110) dict.111 x.64)
+	in  g.105
+Tests.h :: for all d, e. <Num e> -> d -> e
+Tests.h =
+    /\ o115 t120 -> \ dict.121 ->
+	let dict.119 = dict.121 in
+	let dict.117 = dict.119 in
+	let
+	  h.114 =
+	      \ x.65 ->
+		  (+ t120)
+		      dict.117
+		      ((fromInteger t120)
+			   dict.119
+			   (MkInteger!
+				111111111111111111111111111111111111111111111111111111111111##))
+		      ((fromInteger t120)
+			   dict.121
+			   (MkInteger!
+				222222222222222222222222222222222222222222222222222222222222##))
+	in  h.114
+

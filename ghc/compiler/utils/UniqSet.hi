@@ -1,0 +1,61 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface UniqSet where
+import Id(Id, IdDetails)
+import IdInfo(IdInfo)
+import Name(Name)
+import NameTypes(FullName, ShortName)
+import Outputable(NamedThing)
+import PreludePS(_PackedString)
+import TyCon(TyCon)
+import TyVar(TyVar)
+import UniType(UniType)
+import UniqFM(UniqFM, eltsUFM, emptyUFM, intersectUFM, isNullUFM, minusUFM, plusUFM, singletonUFM)
+import Unique(Unique, u2i)
+data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+type IdSet = UniqFM Id
+data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+type NameSet = UniqFM Name
+data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+type TyVarSet = UniqFM TyVar
+data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+type UniqSet a = UniqFM a
+data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+elementOfUniqSet :: NamedThing a => a -> UniqFM a -> Bool
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)LS" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ TyVar ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ Id ] 1 { _A_ 2 _U_ 12 _N_ _S_ "U(U(P)AAA)S" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ }, [ Name ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
+eltsUFM :: UniqFM a -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
+emptyUFM :: UniqFM a
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
+emptyUniqSet :: UniqFM a
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
+intersectUFM :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+intersectUniqSets :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM intersectUFM _N_ #-}
+isEmptyUniqSet :: UniqFM a -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM isNullUFM _N_ #-}
+isNullUFM :: UniqFM a -> Bool
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 5 _/\_ u0 -> \ (u1 :: UniqFM u0) -> case u1 of { _ALG_ _ORIG_ UniqFM EmptyUFM  -> _!_ True [] []; (u2 :: UniqFM u0) -> _!_ False [] [] } _N_ #-}
+mapUniqSet :: NamedThing b => (a -> b) -> UniqFM a -> UniqFM b
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "LLS" _N_ _SPECIALISE_ [ _N_, TyVar ] 1 { _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ }, [ _N_, Id ] 1 { _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ }, [ _N_, Name ] 1 { _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ } #-}
+minusUFM :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
+minusUniqSet :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM minusUFM _N_ #-}
+mkUniqSet :: NamedThing a => [a] -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _SPECIALISE_ [ TyVar ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ Id ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ }, [ Name ] 1 { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
+plusUFM :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+singletonUFM :: NamedThing a => a -> b -> UniqFM b
+	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)LL" {_A_ 3 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 2 3 XXX 6 _/\_ u0 u1 -> \ (u2 :: u0 -> Unique) (u3 :: u0) (u4 :: u1) -> case _APP_  u2 [ u3 ] of { _ALG_ _ORIG_ Unique MkUnique (u5 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u1] [u5, u4]; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 2 3 CXX 7 _/\_ u0 u1 -> \ (u2 :: {{NamedThing u0}}) (u3 :: u0) (u4 :: u1) -> case case u2 of { _ALG_ _TUP_10 (u5 :: u0 -> ExportFlag) (u6 :: u0 -> Bool) (u7 :: u0 -> (_PackedString, _PackedString)) (u8 :: u0 -> _PackedString) (u9 :: u0 -> [_PackedString]) (ua :: u0 -> SrcLoc) (ub :: u0 -> Unique) (uc :: u0 -> Bool) (ud :: u0 -> UniType) (ue :: u0 -> Bool) -> _APP_  ub [ u3 ]; _NO_DEFLT_ } of { _ALG_ _ORIG_ Unique MkUnique (uf :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u1] [uf, u4]; _NO_DEFLT_ } _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "U(U(P)AAA)L" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: Int#) (u2 :: u0) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 2 CX 5 _/\_ u0 -> \ (u1 :: Id) (u2 :: u0) -> case u1 of { _ALG_ _ORIG_ Id Id (u3 :: Unique) (u4 :: UniType) (u5 :: IdInfo) (u6 :: IdDetails) -> case u3 of { _ALG_ _ORIG_ Unique MkUnique (u7 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u7, u2]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ } #-}
+singletonUniqSet :: NamedThing a => a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAAASAAA)L" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 1 2 XX 4 _/\_ u0 -> \ (u1 :: {{NamedThing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  _TYAPP_  _ORIG_ UniqFM singletonUFM { u0 } { u0 } [ u1, u2, u2 ] _SPECIALISE_ [ TyVar ] 1 { _A_ 1 _U_ 2 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyVar) -> _APP_  _TYAPP_  _SPEC_ _ORIG_ UniqFM singletonUFM [ (TyVar), _N_ ] { TyVar } [ u0, u0 ] _N_ }, [ Id ] 1 { _A_ 1 _U_ 1 _N_ _S_ "U(U(P)LLL)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Id) -> case u0 of { _ALG_ _ORIG_ Id Id (u1 :: Unique) (u2 :: UniType) (u3 :: IdInfo) (u4 :: IdDetails) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u5 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [Id] [u5, u0]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ }, [ Name ] 1 { _A_ 1 _U_ 2 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Name) -> _APP_  _TYAPP_  _SPEC_ _ORIG_ UniqFM singletonUFM [ (Name), _N_ ] { Name } [ u0, u0 ] _N_ } #-}
+u2i :: Unique -> Int#
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int#) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u1 :: Int#) -> u1; _NO_DEFLT_ } _N_ #-}
+unionManyUniqSets :: [UniqFM a] -> UniqFM a
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+unionUniqSets :: UniqFM a -> UniqFM a -> UniqFM a
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM plusUFM _N_ #-}
+uniqSetToList :: UniqFM a -> [a]
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniqFM eltsUFM _N_ #-}
+

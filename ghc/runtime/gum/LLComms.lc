@@ -1,0 +1,438 @@
+%****************************************************************************
+%
+\section[LLComms.lc]{GUM Low-Level Inter-Task Communication}
+%
+% This module defines PVM Routines for PE-PE  communication.
+%
+% (c) The Parade/AQUA Projects, Glasgow University, 1994-1995
+%     P. Trinder, December 5th. 1994.
+%
+%****************************************************************************
+
+
+\begin{code}
+#ifdef PAR /* whole file */
+\end{code}
+
+This module defines the routines which communicate between PEs.  The
+code is based on Kevin Hammond's GRIP RTS. (@Opcodes.h@ defines
+@PEOp1@ etc. in terms of @SendOp1@ etc.).  
+
+\begin{onlylatex}
+\begin{center}
+\end{onlylatex}
+\begin{tabular}{|l|l|} \hline
+Routine		&	Arguments \\ \hline
+		&		\\
+@SendOp@	&	0			\\
+@SendOp1@	&	1			\\
+@SendOp2@	&	2			\\
+@SendOpN@	&	vector			\\
+@SendOpV@	&	variable		\\
+@SendOpNV@	&	variable+ vector	\\
+\end{tabular}
+\begin{onlylatex}
+\end{center}
+\end{onlylatex}
+
+First the standard include files.
+
+\begin{code}
+#define NON_POSIX_SOURCE /* so says Solaris */
+
+#include "rtsdefs.h"
+
+#include "LLC.h"
+#ifdef __STDC__
+#include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
+\end{code}
+
+Then some miscellaneous functions. 
+@GetOpName@ returns the character-string name of any opcode.
+
+\begin{code}
+char *UserPEOpNames[] = { PEOP_NAMES };
+
+char *
+GetOpName(op)
+unsigned op;
+{
+    if (op >= MIN_PEOPS && op <= MAX_PEOPS)
+	return (UserPEOpNames[op - MIN_PEOPS]);
+
+    else
+	return ("Unknown PE Opcode");
+}
+
+void NullException(STG_NO_ARGS)
+{
+  fprintf(stderr,"Null_Exception: called");
+}
+void (*ExceptionHandler)() = NullException;
+
+
+\end{code}
+
+@trace_SendOp@ handles the tracing of messages at the OS level.  If
+tracing is on (as specified by @PETrace@, @SystemTrace@ and
+@ReplyTrace@), then a message is printed.  The opcode and address word
+of the previous PE opcode is recorded in the variables @lastSendOp@ and
+@lastPEaddress@. @PElastop@ is a Boolean which records whether the
+last message sent was for a PE or an IMU.
+
+\begin{code}
+rtsBool PETrace = rtsFalse, IMUTrace = rtsFalse, SystemTrace = rtsFalse, ReplyTrace = rtsFalse;
+
+static void
+trace_SendOp(op, dest, data1, data2)
+OPCODE op;
+GLOBAL_TASK_ID dest;
+unsigned data1, data2;
+{
+    char *OpName;
+
+    if (!ReplyTrace && op == REPLY_OK)
+	return;
+
+    OpName = GetOpName(op);
+/*    fprintf(stderr, " %s [%x,%x] sent from %x to %x\n", OpName, data1, data2, mytid, dest);*/
+}
+
+\end{code}
+
+@SendOp@ sends a 0-argument message with opcode {\em op} to
+the global task {\em task}.
+
+\begin{code}
+void
+SendOp(op, task)
+OPCODE op;
+GLOBAL_TASK_ID task;
+{
+    trace_SendOp(op, task,0,0);
+
+    pvm_initsend(PvmDataRaw);
+    pvm_send( task, op );
+}
+\end{code}
+
+@SendOp1@ sends a 1-argument message with opcode {\em op}
+to the global task {\em task}.
+
+\begin{code}
+void
+SendOp1(op, task, arg1)
+OPCODE op;
+GLOBAL_TASK_ID task;
+StgWord arg1;
+{
+    trace_SendOp(op, task, arg1,0);
+
+    pvm_initsend(PvmDataRaw);
+    PutArg1(arg1);
+    pvm_send( task, op );
+}
+
+\end{code}
+
+@SendOp2@ is used by the FP code only. 
+
+\begin{code}
+void
+SendOp2(op, task, arg1, arg2)
+OPCODE op;
+GLOBAL_TASK_ID task;
+StgWord arg1;
+StgWord arg2;
+{
+    trace_SendOp(op, task, arg1, arg2);
+
+    pvm_initsend(PvmDataRaw);
+    PutArg1(arg1);
+    PutArg2(arg2);
+    pvm_send( task, op );
+}
+\end{code}
+
+@SendOpV@ takes a variable number of arguments, as specified by {\em n}.  
+For example,
+\begin{verbatim}
+    SendOpV( PP_STATS, StatsTask, 3, start_time, stop_time, sparkcount);
+\end{verbatim}
+
+\begin{code}
+
+#ifdef __STDC__
+void
+SendOpV(OPCODE op, GLOBAL_TASK_ID task, int n, ...)
+#else
+void
+SendOpV(op, task, n, va_alist)
+OPCODE op;
+GLOBAL_TASK_ID task;
+int n;
+va_dcl
+#endif
+{
+    va_list ap;
+    int i;
+    StgWord arg;
+
+#ifdef __STDC__
+    va_start(ap, n);
+#else
+    va_start(ap);
+#endif
+
+    trace_SendOp(op, task, 0, 0);
+
+    pvm_initsend(PvmDataRaw);
+
+    for (i = 0; i < n; ++i) {
+	arg = va_arg(ap, StgWord);
+	PutArgN(i, arg);
+    }
+    va_end(ap);
+
+    pvm_send(task, op);
+}
+\end{code}    
+
+@SendOpNV@ takes a variable-size datablock, as specified by {\em
+nelem} and a variable number of arguments, as specified by {\em
+narg}. N.B. The datablock and the additional arguments are contiguous
+and are copied over together.  For example,
+
+\begin{verbatim}
+        SendOpNV(PP_RESUME, tsoga.pe, 6, nelem, data,
+	    (W_) ga.weight, (W_) ga.loc.gc.gtid, (W_) ga.loc.gc.slot, 
+	    (W_) tsoga.weight, (W_) tsoga.loc.gc.gtid, (W_) tsoga.loc.gc.slot);
+\end{verbatim}
+
+Important: The variable arguments must all be StgWords.
+
+\begin{code}
+
+#ifdef __STDC__
+void
+SendOpNV(OPCODE op, GLOBAL_TASK_ID task, int nelem, StgWord *datablock, int narg, ...)
+#else
+void
+SendOpNV(op, task, nelem, datablock, narg, va_alist)
+OPCODE op;
+GLOBAL_TASK_ID task;
+int nelem;
+StgWord *datablock;
+int narg;
+va_dcl
+#endif
+{
+    va_list ap;
+    int i;
+    StgWord arg;
+
+#ifdef __STDC__
+    va_start(ap, narg);
+#else
+    va_start(ap);
+#endif
+
+    trace_SendOp(op, task, 0, 0);
+/*  fprintf(stderr,"SendOpNV: op = %x, task = %x, narg = %d, nelem = %d\n",op,task,narg,nelem); */
+
+    pvm_initsend(PvmDataRaw);
+
+    for (i = 0; i < narg; ++i) {
+	arg = va_arg(ap, StgWord);
+/*      fprintf(stderr,"SendOpNV: arg = %d\n",arg); */
+	PutArgN(i, arg);
+    }
+    arg = (StgWord) nelem;
+    PutArgN(narg, arg);
+
+/*  for (i=0; i < nelem; ++i) fprintf(stderr, "%d ",datablock[i]); */
+/*  fprintf(stderr," in SendOpNV\n");*/
+
+    PutArgs(datablock, nelem);
+    va_end(ap);
+
+    pvm_send(task, op);
+}
+\end{code}    
+
+
+@SendOpN@ take a variable size array argument, whose size is given by
+{\em n}.  For example,
+
+\begin{verbatim}
+    SendOpN( PP_STATS, StatsTask, 3, stats_array);
+\end{verbatim}
+
+\begin{code}
+
+void
+SendOpN(op, task, n, args)
+OPCODE op;
+GLOBAL_TASK_ID task;
+int n;
+StgWord *args;
+
+{
+    long arg;
+
+    trace_SendOp(op, task, 0, 0);
+
+    pvm_initsend(PvmDataRaw);
+    arg = (long) n;
+    PutArgN(0, arg);
+    PutArgs(args, n);
+    pvm_send(task, op);
+}
+\end{code}
+
+@WaitForPEOp@ waits for a packet from global task {\em who} with the
+opcode {\em op}.  Other opcodes are handled by the standard exception handler.
+
+\begin{code}
+PACKET WaitForPEOp(op, who)
+OPCODE op;
+GLOBAL_TASK_ID who;
+{
+  PACKET p;
+  int nbytes;
+  OPCODE opcode;
+  GLOBAL_TASK_ID sender_id;
+  rtsBool match;
+
+  do {
+/*    fprintf(stderr,"WaitForPEOp: op = %x, who = %x\n",op,who); */
+    while((p = pvm_recv(ANY_TASK,ANY_OPCODE)) < 0)
+      pvm_perror("WaitForPEOp: Waiting for PEOp");
+      
+    pvm_bufinfo( p, &nbytes, &opcode, &sender_id );
+
+    match = (op == ANY_OPCODE || op == opcode) && (who == ANY_TASK || who == sender_id);
+
+    if(match)
+      return(p);
+
+    /* Handle the unexpected opcodes */
+    HandleException(p);
+
+  } while(rtsTrue);
+}
+\end{code}
+
+\begin{code}
+
+OPCODE 
+Opcode(p)
+PACKET p;
+{
+  int nbytes;
+  OPCODE opcode;
+  GLOBAL_TASK_ID sender_id;
+  pvm_bufinfo( p, &nbytes, &opcode, &sender_id );
+  return(opcode);
+}
+
+GLOBAL_TASK_ID
+Sender_Task(p)
+PACKET p;
+{
+  int nbytes;
+  OPCODE opcode;
+  GLOBAL_TASK_ID sender_id;
+  pvm_bufinfo( p, &nbytes, &opcode, &sender_id );
+  return(sender_id);
+}
+
+void
+get_opcode_and_sender(p,popcode,psender_id)
+PACKET p;
+OPCODE *popcode;
+GLOBAL_TASK_ID *psender_id;
+{
+  int nbytes;
+  pvm_bufinfo( p, &nbytes, popcode, psender_id );
+}
+
+\end{code}
+
+@PEStartUp@ does the low-level comms specific startup stuff for a
+PE. It initialises the comms system, joins the appropriate groups,
+synchronises with the other PEs. Finally it receives from Control the
+array of Global Task Ids.
+
+\begin{code}
+
+static char *
+xmalloc(n)
+unsigned n;
+{
+    char *p = malloc(n);
+
+    if (p == NULL) {
+	fprintf(stderr, "Memory allocation of %u bytes failed\n", n);
+	EXIT(EXIT_FAILURE);
+    }
+    return p;
+}
+
+GLOBAL_TASK_ID *
+PEStartUp(nPEs)
+unsigned nPEs;
+{
+    int i;
+    PACKET addr;
+    long *buffer = (long *) xmalloc(sizeof(long) * nPEs);
+    GLOBAL_TASK_ID *PEs = (GLOBAL_TASK_ID *) xmalloc(sizeof(GLOBAL_TASK_ID) * nPEs);
+
+    mytid = _my_gtid;		/* Initialise PVM and get task id into global
+				 * variable */
+
+/*    fprintf(stderr,"PEStartup, No. PEs = %d \n", nPEs); */
+    checkComms(pvm_joingroup(PEGROUP), "PEStartup");
+/*    fprintf(stderr,"PEStartup, Joined PEGROUP\n"); */
+    checkComms(pvm_joingroup(PECTLGROUP), "PEStartup");
+/*    fprintf(stderr,"PEStartup, Joined PECTLGROUP\n"); */
+    checkComms(pvm_barrier(PECTLGROUP, nPEs + 1), "PEStartup");
+/*    fprintf(stderr,"PEStartup, Passed PECTLGROUP barrier\n"); */
+
+    addr = WaitForPEOp(PP_PETIDS, ANY_GLOBAL_TASK);
+    GetArgs(buffer, nPEs);
+    for (i = 0; i < nPEs; ++i) {
+	PEs[i] = (GLOBAL_TASK_ID) buffer[i];
+	/* fprintf(stderr,"PEs[%d] = %x \n", i, PEs[i]);  */
+    }
+    free(buffer);
+    return PEs;
+}
+\end{code}
+
+@PEShutdown@ does the low-level comms-specific shutdown stuff for a
+single PE. It leaves the groups and then exits from pvm.
+
+\begin{code}
+void
+PEShutDown(STG_NO_ARGS)
+{    
+     checkComms(pvm_lvgroup(PEGROUP),"PEShutDown");
+     checkComms(pvm_lvgroup(PECTLGROUP),"PEShutDown");
+     checkComms(pvm_exit(),"PEShutDown");
+}
+\end{code}
+
+@heapChkCounter@ tracks the number of heap checks since the last probe.
+Not currently used! We check for messages when a thread is resheduled.
+
+\begin{code}
+int heapChkCounter = 0;
+\end{code}
+
+\begin{code}
+#endif /* PAR -- whole file */
+\end{code}

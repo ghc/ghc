@@ -1,0 +1,45 @@
+Typechecked:
+AbsBinds [b.t0] [d.Eq.t1] [(d.Eq.t2, dfun.Eq.ShouldSucc.B)]
+    (d.Eq.t21, d.Eq.t1)
+    (==.t12, (==) b.t0 d.Eq.t21)
+    (d.Eq.t22, d.Eq.t2)
+    (==.t19, (==) (ShouldSucc.B b.t0) d.Eq.t22)
+    {- rec -}
+    d.Eq.t2 = ({-dict-} [] [==.t3, /=.t4])
+    (==.t3) :: ShouldSucc.B b.t0 -> ShouldSucc.B b.t0 -> Bool
+    (==.t3)
+	ShouldSucc.X ShouldSucc.X
+		= True
+    (==.t3)
+	(ShouldSucc.Y a.r17) (ShouldSucc.Y b.r18)
+		= a.r17 ==.t12 b.r18
+    (==.t3)
+	a.r19 b.r20
+		= False
+    (/=.t4) :: ShouldSucc.B b.t0 -> ShouldSucc.B b.t0 -> Bool
+    (/=.t4)
+	a.r21 b.r22
+		= not (a.r21 ==.t19 b.r22)
+AbsBinds [a.t23] [d.Eq.t24] [(d.Eq.t25, dfun.Eq.ShouldSucc.T)]
+    (d.Eq.t45, d.Eq.t24)
+    (d.Eq.t44, dfun.Eq.ShouldSucc.B a.t23 d.Eq.t45)
+    (==.t33, (==) (ShouldSucc.B a.t23) d.Eq.t44)
+    (d.Eq.t46, d.Eq.t25)
+    (==.t42, (==) (ShouldSucc.T a.t23) d.Eq.t46)
+    {- rec -}
+    d.Eq.t25 = ({-dict-} [] [==.t26, /=.t27])
+    (==.t26) :: ShouldSucc.T a.t23 -> ShouldSucc.T a.t23 -> Bool
+    (==.t26)
+	(ShouldSucc.D x.r24) (ShouldSucc.D y.r25)
+		= x.r24 ==.t33 y.r25
+    (==.t26)
+	ShouldSucc.C ShouldSucc.C
+		= True
+    (==.t26)
+	a.r26 b.r27
+		= False
+    (/=.t27) :: ShouldSucc.T a.t23 -> ShouldSucc.T a.t23 -> Bool
+    (/=.t27)
+	a.r28 b.r29
+		= not (a.r28 ==.t42 b.r29)
+

@@ -1,0 +1,568 @@
+From jbw@bigbird.bu.edu Tue Aug 18 08:07:53 1992
+From: jbw@bigbird.bu.edu (Joe Wells)
+Newsgroups: comp.emacs
+Subject: Re: How do I include symbols defined with #define in TAGS ?
+Date: 16 Aug 92 23:27:25 GMT
+Distribution: comp.emacs
+Organization: Boston University Computer Science Department
+In-reply-to: podi@ESD.3Com.COM's message of 14 Aug 92 17:53:29 GMT
+
+In article <podi.713814809@chamundi.NSD.3Com.COM> podi@ESD.3Com.COM (Podibanda Kuruppu) writes:
+
+   Keywords: Symbols defined by #defines in TAGS
+
+   I would greatly appreciate it if someone could tell me if I could
+   include symbols ( defined in .h files with #defines ) in a TAG file.
+
+Enclosed below is an earlier article with my solution to this.
+
+-- 
+Enjoy,
+
+Joe Wells <jbw@cs.bu.edu>
+Member of the League for Programming Freedom --- send e-mail for details
+
+----------------------------------------------------------------------
+Date: Sat, 4 Apr 92 00:46:52 -0500
+From: jbw@bigbird.bu.edu (Joe Wells)
+Message-Id: <9204040546.AA15208@bigbird.bu.edu>
+To: bug-gnu-emacs@prep.ai.mit.edu
+Subject: numerous bug fixes for etags
+
+Enclosed is a patch with numerous changes for etags.  The following are
+the changes and bugs fixed:
+
+1. Improvement: don't waste time calling strncmp (with "struct", "union",
+   "enum", "typedef") if the lengths are different.
+
+2. Bug: pfnote placed a NUL in the line buffer after the tag token which caused
+   things like `{' or `/*' to be ignored, thus severely screwing up the
+   parser.  Or it did something horrible, I don't remember for sure.
+
+3. Improvement: record defining occurrences of struct/union/enum tags.
+   This works even if combined with a typedef definition, for example:
+
+     typedef struct XXX {
+       .....
+     } YYY;
+
+4. Bug: when a tag token was the last item on the line before the newline
+   character, garbage would be seen as the token.  This is because when a
+   NUL was seen in the buffer the buffer was replaced with the next line.
+
+5. Bug: tag tokens immediately followed by a `{' with no intervening space
+   were not recorded.  This was only a problem because of improvement 3
+   above.
+
+6. Bug: a newline in the middle of a comment zeroed the `number' variable.
+   (Just for good measure I made it not zero `number' in strings even when
+   the newline is not preceded by `\', in case someone wants to run etags
+   on illegal code :-)  (`number' is used only on lines that begin with
+   `#'.)
+
+7. Bug: handling of #define lines was severely broken.  I don't actually
+   remember what etags did with them, but it was really bad.  It now
+   records macro definitions.
+
+8. Bug: when a tag token was the last item on the line except for
+   whitespace, etags would replace the contents of the line buffer and
+   then later do various string comparisons and inspections against
+   garbage values instead of against the token.  Fixing this required
+   copying the token into a buffer.  (This is roughly the same as bug 4
+   above, but in a different function.)
+
+9. Bug: when a tag token was the last item on the line before the newline
+   (and under various other circumstances), etags would skip over the NUL
+   in the buffer and skip to the first non-whitespace character in the
+   buffer.
+
+10. Improvement (possibly bug fix): parse typedefs even when we aren't
+    going to print them out.  I seem to remember that this fixed some bug,
+    but I don't remember the specific case that would trigger the bug.
+
+11. An unfinished attempt to detect and record global variable
+    definitions.
+
+The changes are to the 18.57 version of etags, but the only change in
+18.58 to the C code handling is to initialize some variables when starting
+on a new file, so these changes are orthogonal.
+
+-- 
+Enjoy,
+
+Joe Wells <jbw@cs.bu.edu>
+
+Member of the League for Programming Freedom --- send e-mail for details
+
+----------------------------------------------------------------------
+--- etags.c-dist	Tue Jan  8 14:08:38 1991
++++ etags.c	Sat Apr  4 00:41:22 1992
+@@ -62,7 +62,10 @@
+ 
+ /* cause token checking for typedef, struct, union, enum to distinguish
+    keywords from identifier-prefixes (e.g. struct vs struct_tag).  */
+-#define istoken(s, tok, len) (!strncmp(s,tok,len) && endtoken(*((s)+(len))))
++#define istoken(s, t, len) \
++  (((len) == (sizeof (t) -1)) && \
++   ((strncmp(s, t, len)) == 0) && \
++   (endtoken(*((s)+(len)))))
+ 
+ struct	nd_st {			/* sorting structure			*/
+ 	char	*name;			/* function or type name	*/
+@@ -505,6 +508,7 @@
+ {
+   register char *fp;
+   register NODE *np;
++  char save;
+   char *altname;
+   char tem[51];
+ 
+@@ -538,6 +542,7 @@
+   np->left = np->right = 0;
+   if (eflag)
+     {
++      save = linestart[linelen];
+       linestart[linelen] = 0;
+     }
+   else if (xflag == 0)
+@@ -546,6 +551,7 @@
+       linestart = tem;
+     }
+   np->pat = savestr (linestart);
++  linestart[linelen] = save;
+   if (head == NULL)
+     head = np;
+   else
+@@ -725,6 +731,17 @@
+   number = 0; \
+ }
+ 
++/* These two are part of a never-finished attempt to record global */
++/* variable definitions.  This is nearly impossible in C without the full */
++/* power of a C compiler due to C's stupid grammar. */
++logical infunc;
++int idents_in_decl;
++
++/* indicates whether the next token (if any) is the tag corresponding to */
++/* `struct', `union', or `enum' */
++logical next_token_is_tag;
++
++
+ C_entries ()
+ {
+   register int c;
+@@ -731,6 +748,15 @@
+   register char *token, *tp, *lp;
+   logical incomm, inquote, inchar, midtoken;
+   int level;
++
++  /* there are certain things that must be done when the end of line is */
++  /* encountered, but they must be delayed until after other things are */
++  /* done. */
++  logical new_line_flag;
++
++  /* same as new_line_flag for left braces. */
++  logical left_brace_flag;
++
+   char tok[BUFSIZ];
+ 
+   lineno = 0;
+@@ -739,17 +765,22 @@
+   *lp = 0;
+ 
+   number = 0;
+-  gotone = midtoken = inquote = inchar = incomm = FALSE;
++  gotone = midtoken = inquote = inchar = incomm = infunc = FALSE;
++  new_line_flag = FALSE;
++  left_brace_flag = FALSE;
+   level = 0;
++  idents_in_decl = 0;
++  next_token_is_tag = FALSE;
+ 
+   while (!feof (inf))
+     {
+       c = *lp++;
+       if (c == 0)
+-	{
+-	  CNL;
+-	  gotone = FALSE;
+-	}
++	new_line_flag = TRUE;
++#ifdef DEBUG
++      if (next_token_is_tag)
++	fprintf (stderr, "E: c: [%c], lp[-2]: [%c]\n", c, lp[-2]);
++#endif /* DEBUG */
+       if (c == '\\')
+ 	{
+ 	  c = *lp++;
+@@ -756,15 +787,18 @@
+ 	  if (c == 0)
+ 	    CNL_SAVE_NUMBER;
+ 	  c = ' ';
++	  /* is this correct?  I thought escaped newlines disappeared even */
++	  /* before the token breaker got to see things. */ 
+ 	} 
+       else if (incomm)
+ 	{
++	  new_line_flag = FALSE;
+ 	  if (c == '*')
+ 	    {
+ 	      while ((c = *lp++) == '*')
+ 		continue;
+ 	      if (c == 0)
+-		CNL;
++		CNL_SAVE_NUMBER;
+ 	      if (c == '/')
+ 		incomm = FALSE;
+ 	    }
+@@ -771,6 +805,7 @@
+ 	}
+       else if (inquote)
+ 	{
++	  new_line_flag = FALSE;
+ 	  /*
+ 	  * Too dumb to know about \" not being magic, but
+ 	  * they usually occur in pairs anyway.
+@@ -781,6 +816,7 @@
+ 	}
+       else if (inchar)
+ 	{
++	  new_line_flag = FALSE;
+ 	  if (c == '\'')
+ 	    inchar = FALSE;
+ 	  continue;
+@@ -809,8 +845,8 @@
+ 	    {
+ 	      tydef=middle;
+ 	    }
+-	  level++;
+-	  continue;
++	  left_brace_flag = TRUE;
++	  break;
+ 	case '}':
+ 	  if (lp == lb.buffer + 1)
+ 	    level = 0;	/* reset */
+@@ -820,8 +856,17 @@
+ 	    {
+ 	      tydef=end;
+ 	    }
++	  if (level == 0 && infunc)
++	    {
++	      idents_in_decl = 0;
++	      infunc = FALSE;
++	    }
+ 	  continue;
+ 	}
++#ifdef DEBUG
++      if (next_token_is_tag)
++	fprintf (stderr, "D: c: [%c], lp[-2]: [%c]\n", c, lp[-2]);
++#endif /* DEBUG */
+       if (!level && !inquote && !incomm && gotone == FALSE)
+ 	{
+ 	  if (midtoken)
+@@ -852,6 +897,11 @@
+ 				   tp-token+1);
+ 			  tok[tp-token+1] = 0;
+ 			  pfnote(tok, f, lb1.buffer, endpos, line, linestart);
++#ifdef DEBUG
++			  fprintf (stderr,
++				 "f: %d, infunc %d, tok: %s\nlb1.buffer: %s\n",
++				   f, infunc, tok, lb1.buffer);
++#endif /* DEBUG */
+ 			}
+ 		      else
+ 			{
+@@ -858,8 +908,15 @@
+ 			  strncpy (tok, token, tp-token+1);
+ 			  tok[tp-token+1] = 0;
+ 			  pfnote(tok, f, lb.buffer, endpos, line, linestart);
++#ifdef DEBUG
++			  fprintf (stderr,
++			         "f: %d, infunc %d, tok: %s\nlb.buffer:  %s\n",
++				   f, infunc, tok, lb.buffer);
++#endif /* DEBUG */
+ 			}
+ 		      gotone = f;	/* function */
++		      if (f)
++			infunc = TRUE;
+ 		    }
+ 		  midtoken = FALSE;
+ 		  token = lp - 1;
+@@ -873,8 +930,32 @@
+ 	      midtoken = TRUE;
+ 	    }
+ 	}
++#ifdef DEBUG
++      if (next_token_is_tag)
++	fprintf (stderr, "F: c: [%c], lp[-2]: [%c]\n", c, lp[-2]);
++#endif /* DEBUG */
++      if (left_brace_flag)
++	{
++	  left_brace_flag = FALSE;
++	  next_token_is_tag = FALSE;
++	  level++;
++	}
++      if (new_line_flag)
++	{
++	  new_line_flag = FALSE;
++	  number = 0;
++	  gotone = FALSE;
++	}
++      if (lp > lb.buffer && lp[-1] == 0)
++	CNL_SAVE_NUMBER;
+       if (c == ';'  &&  tydef==end)	/* clean with typedefs */
+ 	tydef=none;
++      if (c == ';' && level == 0 && !infunc)
++	idents_in_decl = 0;
++#ifdef DEBUG
++      if (next_token_is_tag)
++	fprintf (stderr, "G: c: [%c], lp[-2]: [%c]\n", c, lp[-2]);
++#endif /* DEBUG */
+     }
+ }
+ 
+@@ -891,70 +972,176 @@
+   reg char *lp = *lpp;
+   reg char c;
+   static logical next_token_is_func;
++
++  /* indicates that the next token will be a macro defined with #define */
++  static logical next_token_is_macro;
++
+   logical firsttok;	/* T if have seen first token in ()'s */
+-  int bad, win;
++  int bad = FALSE, win = FALSE;
++  int length = (lp - 1) - token;
++  
++  /* used to keep a copy of the token when we have to fill the line buffer */
++  /* with the contents of the next line */
++  static char *tok_buffer = NULL;
++  static long tok_buffer_size = 0;
+ 
+   *f = 1;			/* a function */
+   c = lp[-1];
+-  bad = FALSE;
+   if (!number)
+     {		/* space is not allowed in macro defs	*/
+-      while (iswhite(c))
++      while ((c == 0) || iswhite(c))
+ 	{
+-	  c = *lp++;
+-	  if (c == 0)
++#ifdef DEBUG
++	  if (next_token_is_tag)
++	    fprintf (stderr, "C: token: %s, c: [%c], lp - token: %d\n",
++		     token, c, lp - token);
++#endif /* DEBUG */
++	  while (c == 0)
+ 	    {
+ 	      if (feof (inf))
+-		break;
++		goto break_while_1;
++	      if (token != tok_buffer)
++		{
++		  if (length + 1 > tok_buffer_size)
++		    if (tok_buffer_size == 0)
++		      {
++			tok_buffer_size = length + 1;
++			tok_buffer = (char *) xmalloc (tok_buffer_size);
++		      }
++		    else
++		      {
++			tok_buffer_size = length + 1;
++			tok_buffer =
++			  (char *) xrealloc (tok_buffer, tok_buffer_size);
++		      }
++		  strncpy (tok_buffer, token, length);
++		  tok_buffer[length] = '\0';
++		  token = tok_buffer;
++		}
+ 	      CNL;
++	      c = *lp++;
+ 	    }
++	  while ((c != 0) && iswhite(c))
++	    c = *lp++;
+ 	}
+-      /* the following tries to make it so that a #define a b(c)	*/
+-      /* doesn't count as a define of b.				*/
++    break_while_1:
++      ;
+     }
+   else
+     {
++      /* the following tries to make it so that a #define a b(c)	*/
++      /* doesn't count as a define of b.				*/
+       number++;
+-      if (number >= 4  || (number==2 && strncmp (token, "define", 6)))
+-	{
+-	  gotone = TRUE;
+-	badone:
++#ifdef DEBUG
++      fprintf (stderr, "number: %d, n_t_i_m: %d, token: %s\n",
++	       number, next_token_is_macro, token);
++#endif /* DEBUG */
++      if (number == 2 && strncmp (token, "define", 6) == 0)
++	next_token_is_macro = TRUE;
++      else if (number == 3 && next_token_is_macro)
++	{
++	  next_token_is_macro = FALSE;
++	  while ((c != 0) && iswhite(c))
++	    {
++#ifdef DEBUG
++	      fprintf (stderr, "c: %c, %d\n", c, c);
++#endif /* DEBUG */
++	      c = *lp++;
++	    }
++#ifdef DEBUG
++	  fprintf (stderr, "c: %c, %d\n", c, c);
++#endif /* DEBUG */
++	  if (c == 0)		/* ignore plain "#define FLAG" */
+ 	  bad = TRUE;
++	  else
++	    win = TRUE;
++	  /* speed up skipping the rest of this line */
++	  gotone = TRUE;
++	  /* never treat a macro as a function, because it doesn't have a */
++	  /* function body, which is what "f" really stands for (now). */
++	  *f = FALSE;
+ 	  goto ret;
+ 	}
++      else
++	/* speed up skipping the rest of this line */
++	gotone = TRUE;
++      goto badone;
+     }
++  idents_in_decl ++;
++#ifdef DEBUG
++  fprintf (stderr,
++	   "A: iid: %d, tydef: %d, ntit: %d, ntif: %d, c: %c, token: %.*s\n",
++	   idents_in_decl, tydef, next_token_is_tag, next_token_is_func, c,
++	   length + 5, token);
++#endif /* DEBUG */
+   /* check for the typedef cases		*/
+-  if (tflag && istoken(token, "typedef", 7))
++  if (istoken (token, "typedef", length))
+     {
+       tydef=begin;
+       goto badone;
+     }
+-  if (tydef==begin && (istoken(token, "struct", 6) ||
+-		       istoken(token, "union", 5) || istoken(token, "enum", 4)))
+-  {
++#ifdef DEBUG
++  fprintf (stderr, "D\n");
++#endif /* DEBUG */
++  if (istoken (token, "struct", length) ||
++      istoken (token, "union", length) ||
++      istoken (token, "enum", length))
++    {
++      next_token_is_tag = 1;
++#ifdef DEBUG
++      fprintf (stderr, "A: token: %s\n", token);
++#endif /* DEBUG */
++      if (tydef == begin)
+     tydef=tag_ok;      
+     goto badone;
+   }
+-  if (tydef==tag_ok)
++  else if (next_token_is_tag)
+     {
++#ifdef DEBUG
++      fprintf (stderr, "B: token: %s, c: [%c]\n", token, c);
++#endif /* DEBUG */
++      if (tydef==tag_ok)
+       tydef=middle;
+-      goto badone;
++      next_token_is_tag = 0;
++      *f = 0;
++      /* only notice when a tag is being defined, not when it is merely */
++      /* being used. */
++      if (c == '{')
++	win = TRUE;
++      else
++	bad = TRUE;
++      goto ret;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "E\n");
++#endif /* DEBUG */
+   if (tydef==begin)		/* e.g. typedef ->int<- */
+     {
+       tydef=end;
+       goto badone;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "F\n");
++#endif /* DEBUG */
+   if (tydef==middle && level == 0) /* e.g. typedef struct tag ->struct_t<- */
+     {
+       tydef=end;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "G\n");
++#endif /* DEBUG */
+   if (tydef==end)
+     {
+       *f = 0;
+-      win = 1;
++#ifdef DEBUG
++      fprintf (stderr, "C token: %s\n", token);
++#endif /* DEBUG */
++      win = tflag;
+       goto ret;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "H\n");
++#endif /* DEBUG */
+   /* Detect GNUmacs's function-defining macros. */
+   if (!number && !strncmp (token, "DEF", 3))
+ 	 
+@@ -962,6 +1149,9 @@
+       next_token_is_func = 1;
+       goto badone;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "I\n");
++#endif /* DEBUG */
+   if (next_token_is_func)
+     {
+       next_token_is_func = 0;
+@@ -968,9 +1158,15 @@
+       win = 1;
+       goto ret;
+     }
++#ifdef DEBUG
++  fprintf (stderr, "J\n");
++#endif /* DEBUG */
+   if (c != '(')
+     goto badone;
+   firsttok = FALSE;
++#ifdef DEBUG
++  fprintf (stderr, "K\n");
++#endif /* DEBUG */
+   while ((c = *lp++) != ')')
+     {
+       if (c == 0)
+@@ -999,9 +1195,20 @@
+ 	}
+     }
+   win = isgood (c);
++  
+ ret:
++#ifdef DEBUG
++  fprintf (stderr,
++	   "B: iid: %d, tydef: %d, ntit: %d, ntif: %d, c: %c, token: %.*s\n",
++	   idents_in_decl, tydef, next_token_is_tag, next_token_is_func, c,
++	   length + 5, token);
++#endif /* DEBUG */
+   *lpp = lp - 1;
+   return !bad && win;
++
++ badone:
++  bad = TRUE;
++  goto ret;
+ }
+ 
+ getline (atchar)
+----------------------------------------------------------------------
+

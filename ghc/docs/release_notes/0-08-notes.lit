@@ -1,0 +1,149 @@
+0.08 was not an announced release, so these notes are of historical
+interest, at best.
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-docs]{New documentation, especially for hackers!}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-in-usage]{Main user-visible changes}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[@ghc@ driver flag fiddling:]
+These things change... A good thing to try is \tr{ghc -help}, unless
+of course you think the documentation might be right (in which case
+look there :-).
+
+%-------------------------------------------------------------------
+\item[@ghc@ driver more ``policy-free'':]
+
+The driver no longer has great wads of built-in options for its
+constituent phases (parser, Haskell compiler, C compiler, etc.).  It
+is much easier to configure these (if required) at build time.  A
+better idea, which we use, is to wired in very few options, but to use
+the ``make world'' machinery to ensure that the desired (wads of
+options) are always passed explicitly.
+
+%-------------------------------------------------------------------
+\item[-OC:] We got rid of the \tr{-OC} flag.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-in-compiler]{To do with the compiler proper}
+%*									*
+%************************************************************************
+
+\begin{description}
+%-------------------------------------------------------------------
+\item[``Renamer'' is in:]
+Essentially, this implements module-system stuff.  Checks for
+naming/scoping errors have been moved out of the typechecker into the
+renamer, which should be faster.
+
+%-------------------------------------------------------------------
+\item[Interface-file (\tr{.hi} file) generation:]
+It works.
+
+%-------------------------------------------------------------------
+\item[Ambiguous-type resolution:]
+It's basically right now, except that we still don't grok @default@
+declarations (which we have yet to see in a real Haskell program :-).
+
+%-------------------------------------------------------------------
+\item[Smaller C output:]
+
+%-------------------------------------------------------------------
+\item[Code generator:]
+Improvements related to the information carried around about closures
+(@ClosureInfo@ and @LambdaFormInfo@ types); matches the STG-machine paper.
+
+CAFs fully supported (notably updatable ones).
+
+Black-holing (at garbage-collection time) fully supported.
+
+%-------------------------------------------------------------------
+\item[Simplifiers:]
+Further work on the @Core@-to-@Core@ local-transformation passes (in
+\tr{compiler/simplCore/}).  Also, we have added
+some @STG@-to-@STG@ transformations; for example, floating @lets@
+outward is most conveniently done at the STG level...
+
+%-------------------------------------------------------------------
+\item[Cost-centre-style profiling:]
+
+%-------------------------------------------------------------------
+\item[Improvements to basic datatypes:]
+Notably to @Ids@ (\tr{basicTypes/Id.lhs}) and names
+(\tr{basicTypes/NameTypes.lhs}).  There is a new compiler-wide class,
+@NamedThing@ (\tr{utils/Outputable.lhs}).  Essentially it is easier to
+ask of an entity: where did you come from? (e.g., PreludeCore?,
+imported?) what are you? (a data-constructor? a dictionary selector?)
+what is your original name? where are you going? (exported or not...)
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-in-compiler-contrib]{In contributed bits of the compiler}
+%*									*
+%************************************************************************
+
+\begin{description}
+\item[Evaluation-transformer bits:]
+Denis Howe has sent us an initial version (\tr{compiler/evalTran}).
+It isn't used by default, but is presumably play-withable...
+
+This @Core@-to-@Core@ transformation makes all lets of the form
+\begin{verbatim}
+let VAR = eval EXPR in ...
+\end{verbatim}
+strict.  @eval@ is a dummy name which is thrown away (i.e., @eval x = x@).
+\end{description}
+
+Please send us {\em your} bits for next time!
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-in-libraries]{In @Prelude@ and runtime support}
+%*									*
+%************************************************************************
+
+Prelude is 1.2.
+
+The compiler has basically all of @PreludeCore@ wired into it (see
+\tr{compiler/prelude/}); the rest is brought in with a straightforward
+\tr{import Prelude} (which brings in \tr{imports/Prelude.hi}).  [The
+old \tr{MiniPrel*} files are dead and unmissed.]
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-in-mkworld]{In distribution/build/installation machinery}
+%*									*
+%************************************************************************
+
+The ``make world'' machinery has many small improvements.
+
+It works notably better in a shared-symlink-tree world (which we use
+at Glasgow).
+
+We have abandoned efforts to use one build tree for making object
+files for multiple platforms.  We can make simpler Makefiles as a
+result.
+
+There's a new standard setup, called \tr{fast}.  The name is
+inappropriate at present, but it is intended to be for people who
+value compiled-code-speed above all else (within reason, of course).
+
+%************************************************************************
+%*									*
+\subsection[0-08-new-misc]{Miscellaneous new things}
+%*									*
+%************************************************************************
+
+New version of Denis Howe's \tr{mira2hs} script.

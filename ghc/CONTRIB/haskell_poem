@@ -1,0 +1,58 @@
+From: dsmith@lucy.cs.waikato.ac.nz
+Subject: A Haskell Lover's Plea
+Date: Thu, 16 Mar 1995 21:06:35 -0500
+To: haskell-dist@dcs.gla.ac.uk
+
+
+          A Haskell Lover's Plea 
+
+Why should I renounce for you, dear Haskell,
+My much yearned for side-effects?
+Why should I face the software dragons 
+Without my weapon, my manly spear of destruction?
+They call you non-strict, oh so elegant and pure Ariel.
+Yet side-effect celibacy is surely severe.
+
+   Your flesh is too weak, you brutish beast.
+   The tarpit demons of software hell await you!
+   This sinful habit in which you indulge
+   Does more harm than good. 
+   Restrain yourself! And you too will see
+   The wondrous and refined joys of referential transparency!
+
+Alas, I can do without goto, without call/cc.
+But sans side-effects, I am lost and forlorn, can't you see?
+Oh, lady fairer yet than admirable Miranda (tm),
+Scheme's prolix, parenthetical tedium
+Is no match for your elegant syntax. What's more,
+Your list comprehensions outshine even Prolog for sure...
+
+    Ah, flatter me not, you low-spirited Caliban!
+    Do you not know what advantages await
+    Those who renounce destructive update?
+    Start with an immaculate high-level specification,
+    Throw in some algebraic code transformation.
+    Soon you will have a provably correct and maintainable implementation.
+
+Show mercy on mere mortals like me!
+How I dream still of the efficient pleasures of pointer manipulation!
+How I too wish to mutate memory with thoughts born of von Neumann earthiness!
+Relent! Relent! Let me have my assignment, my printf, my gensym.
+Let me fulfill my destructive impulses.
+Let me set bang. Let me update. Let me assign. Let me mutate.
+
+    Fear not, lowly beast, I have heard your pleas.
+    To satisfy your low-level desire
+    I'll give you monads, linear types, MADTs,
+    Even single-threaded polymorphic lambda calculi.
+    My beauty may suffer, still I will aspire
+    To let you do (within typeful limits) what you please.
+
+Rejoice!  Rejoice!  I'm free! I'm free!
+The best of both worlds is mine at last.
+Oh, infinite progeny of Church, Hope, and ML,
+I curry favor not when I say:
+Scan me right, fold me left, 
+Lazy lady of many shapes, you've got class.
+
+      Don Smith (dsmith@cs.waikato.ac.nz)

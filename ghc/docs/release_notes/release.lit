@@ -1,0 +1,93 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{Release notes for Glasgow Haskell}
+\author{Will Partain (for the AQUA Team)\\
+Department of Computing Science\\
+University of Glasgow\\
+Glasgow, Scotland\\
+G12 8QQ\\
+\\
+Email: glasgow-haskell-\{bugs,request\}\@dcs.glasgow.ac.uk}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\end{rawlatex}
+\clearpage
+\end{onlystandalone}
+
+% NOTE TO MAINTAINERS: the way these notes are organized:
+%   (1) What's new in the current release
+%   (2) What's next ("real soon now")
+%   (3) What was new in previous releases (reverse chronological order)
+%   (4) anything else
+%
+% Remember: this isn't the compiler documentation! -- it's just
+% pointers to it.  Mentioning something in the release notes is not
+% the same as documenting it.
+
+\section[release-0-26]{Release notes for version~0.26---7/95}
+\input{0-26-notes.lit}
+
+%\section[release-RSN]{What we hope to do Real Soon Now}
+%\downsection
+%\input{real-soon-now.lit}
+%\upsection
+
+\section{Non-release notes for versions~0.24 and 0.25}
+Version~0.24 (March 1995) was a tidy-up release; it mostly
+fixed some ``threads'' problems (now ``Concurrent Haskell''),
+some I/O problems, and some porting problems.
+
+Version~0.25 was a binary-only dump of a \tr{i386-*-linuxaout}
+build, just so people could try it.
+
+\section[release-0-23]{Release notes for version~0.23---12/94}
+\input{0-23-notes.lit}
+
+\section[release-0-22]{Release notes for version~0.22---7/94}
+\input{0-22-notes.lit}
+
+\section[release-0-19]{Release notes for version~0.19---12/93}
+\input{0-19-notes.lit}
+
+\section[release-0-16]{Release notes for version~0.16---07/93}
+\input{0-16-notes.lit}
+
+\section[release-0-10]{Release notes for version~0.10---12/92}
+\input{0-10-notes.lit}
+
+\section[release-0-09]{Release~0.09---9/92}
+
+This was an unannounced pseudo-release to a few people.
+
+\section[release-0-08]{Release notes for version~0.08---7/92}
+\input{0-08-notes.lit}
+
+\section[release-0-07]{Release~0.07}
+
+This was an unannounced pseudo-release to a few people.
+
+\section[release-0-06]{Release notes for version~0.06---3/92}
+\input{0-06-notes.lit}
+
+\section[release-0-05]{Release notes for version~0.05---12/91}
+\input{0-05-notes.lit}
+
+\section[releases-0-03-04]{Releases between 0.02 and 0.05}
+
+There were a couple of private releases to highly zealous people,
+mainly our friends at York.  There are README files in the
+\tr{release_notes/} dir about those, if you are really interested.
+
+\section[release-0-02]{Release notes for version~0.02---8/91}
+\downsection
+Nothing about version 0.02, our very first release, is still
+interesting :-)
+%\input{0-02-notes.lit}
+\upsection
+
+\begin{onlystandalone}
+% \printindex
+\end{document}
+\end{onlystandalone}

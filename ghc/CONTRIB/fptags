@@ -1,0 +1,53 @@
+#!/bin/sh
+
+#fptags - Create an emacs tags file for functional programs
+
+#Please send me a copy of any modifications you make.
+#Denis Howe <dbh@doc.ic.ac.uk>
+#0.00 20-Sep-1991 created
+#0.01 09-Apr-1992 don't count ==, <=, >= as definition
+#0.02 09-Feb-1994 fix bug in fix 0.01.  Add /=.
+
+# partain: got it from wombat.doc.ic.ac.uk:pub
+
+#The algorithm for spotting identifiers is crude to the point of
+#vulgarity.  Any line containing an = is assumed to define an
+#identifier.  If there are no non-white characters before the = then
+#the definition is assumed to start on the previous line.  White
+#characters are space, tab and > (for literate programs).  The =s in
+#the relations ==, <=, >= and /= are temporarily transformed while
+#searching for =s.
+
+#The tags file is not in the format produced by ctags but rather,
+#that produced by etags and used by GNU-Emacs's find-tag command.
+
+#Does not tag constructors in sum data types.
+
+#The tags file, TAGS, is created in the current directory.  It
+#contains an entry for each argument file.  The entry begins with a
+#line containing just ^L.  The next line contains the filename, a
+#comma and the number of following bytes before the next ^L or EOF.
+#Subsequent lines should give the location within the argument file of
+#identifier definitions.  Each line contains a prefix of a line from
+#the argument file, a ^?, the line number within the argument file, a
+#comma and the position of the start of that line in the argument file
+#(first character = 1).
+
+[ -z "$1" ] && echo usage: $0 files && exit 1
+exec > TAGS
+tf=/tmp/fp$$
+for f
+do	echo ""
+	sed 's/==//g
+	s/>=/>/g
+	s/<=/</g
+	s|/=|/|g' $f | awk '
+	/^[> 	]*=/{ print prevline "" NR-1 "," prevpos; }
+	/[^> 	].*=/{ print $0 "" NR "," pos; }
+	{ prevline = $0; prevpos = pos; pos += length($0)+1; }
+	' pos=1 | sed 's/[	 )]*=.*//
+	s//=/g' > $tf
+	echo -n $f,; echo `wc -c < $tf`	#lose spaces
+	cat $tf
+done
+rm -f $tf

@@ -1,0 +1,15 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface DsCCall where
+import Bag(Bag)
+import CmdLineOpts(GlobalSwitch, SwitchResult)
+import CoreSyn(CoreExpr)
+import DsMonad(DsMatchContext)
+import Id(Id)
+import PreludePS(_PackedString)
+import SplitUniq(SplitUniqSupply)
+import SrcLoc(SrcLoc)
+import UniType(UniType)
+import UniqFM(UniqFM)
+dsCCall :: _PackedString -> [CoreExpr Id Id] -> Bool -> Bool -> UniType -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
+	{-# GHC_PRAGMA _A_ 11 _U_ 22222122222 _N_ _S_ "LLLLSU(ALS)LLLLL" _N_ _N_ #-}
+

@@ -1,0 +1,162 @@
+{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+interface Algebra where
+import PreludeRatio(Ratio(..))
+infixl 7 *.
+infixl 6 +.
+infixl 6 -.
+infixl 7 /.
+class (Group a) => AbelianGroup a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(LLL)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{Monoid u0}}) (u2 :: u0 -> u0) (u3 :: u0 -> u0 -> u0) -> _!_ _TUP_3 [{{Monoid u0}}, (u0 -> u0), (u0 -> u0 -> u0)] [u1, u2, u3] _N_} _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{Group u0}}) -> u1 _N_ #-}
+class (Ring a) => CommutativeRing a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{AbelianGroup u0}}) (u2 :: u0 -> u0 -> u0) -> _!_ _TUP_2 [{{AbelianGroup u0}}, (u0 -> u0 -> u0)] [u1, u2] _N_} _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{Ring u0}}) -> u1 _N_ #-}
+class (UnityRing a) => DivisionRing a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(U(LL)AA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{Ring u0}}) (u2 :: u0) -> _!_ _TUP_2 [{{Ring u0}}, u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{UnityRing u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{UnityRing u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u2; _NO_DEFLT_ } _N_ #-} where
+	inv :: a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{UnityRing u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{UnityRing u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{DivisionRing u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> u0) } [ _NOREP_S_ "%DAlgebra.DivisionRing.inv\"", u2 ] _N_ #-}
+	(/.) :: a -> a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0 -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{UnityRing u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{UnityRing u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 122 _N_ _S_ "U(U(SA)LA)LL" {_A_ 4 _U_ 1122 _N_ _N_ _F_ _IF_ARGS_ 1 4 CXXX 7 _/\_ u0 -> \ (u1 :: {{Ring u0}}) (u2 :: u0 -> u0) (u3 :: u0) (u4 :: u0) -> case u1 of { _ALG_ _TUP_2 (u5 :: {{AbelianGroup u0}}) (u6 :: u0 -> u0 -> u0) -> let {(u7 :: u0) = _APP_  u2 [ u4 ]} in _APP_  u6 [ u3, u7 ]; _NO_DEFLT_ } _N_} _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: {{DivisionRing u0}}) (u2 :: u0) (u3 :: u0) -> case u1 of { _ALG_ _TUP_3 (u4 :: {{UnityRing u0}}) (u5 :: u0 -> u0) (u6 :: u0 -> u0 -> u0) -> case u4 of { _ALG_ _TUP_2 (u7 :: {{Ring u0}}) (u8 :: u0) -> case u7 of { _ALG_ _TUP_2 (u9 :: {{AbelianGroup u0}}) (ua :: u0 -> u0 -> u0) -> let {(ub :: u0) = _APP_  u5 [ u3 ]} in _APP_  ua [ u2, ub ]; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+class (DivisionRing a, CommutativeRing a) => Field a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(U(LLL)A)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{UnityRing u0}}) (u2 :: u0 -> u0) (u3 :: u0 -> u0 -> u0) -> _!_ _TUP_3 [{{UnityRing u0}}, (u0 -> u0), (u0 -> u0 -> u0)] [u1, u2, u3] _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{DivisionRing u0}}, {{CommutativeRing u0}})) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{DivisionRing u0}}) (u3 :: {{CommutativeRing u0}}) -> u2; _NO_DEFLT_ } _N_, _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{CommutativeRing u0}}) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{DivisionRing u0}}, {{CommutativeRing u0}})) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{DivisionRing u0}}) (u3 :: {{CommutativeRing u0}}) -> u3; _NO_DEFLT_ } _N_ #-}
+class (Monoid a) => Group a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(U(LL)AA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{SemiGroup u0}}) (u2 :: u0) -> _!_ _TUP_2 [{{SemiGroup u0}}, u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{Monoid u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{Monoid u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u2; _NO_DEFLT_ } _N_ #-} where
+	neg :: a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{Monoid u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{Monoid u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{Group u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> u0) } [ _NOREP_S_ "%DAlgebra.Group.neg\"", u2 ] _N_ #-}
+	(-.) :: a -> a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0 -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{Monoid u0}}, u0 -> u0, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_3 (u2 :: {{Monoid u0}}) (u3 :: u0 -> u0) (u4 :: u0 -> u0 -> u0) -> u4; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 122 _N_ _S_ "U(U(SA)LA)LL" {_A_ 4 _U_ 1122 _N_ _N_ _F_ _IF_ARGS_ 1 4 XXXX 6 _/\_ u0 -> \ (u1 :: {{SemiGroup u0}}) (u2 :: u0 -> u0) (u3 :: u0) (u4 :: u0) -> let {(u5 :: u0) = _APP_  u2 [ u4 ]} in _APP_  u1 [ u3, u5 ] _N_} _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: {{Group u0}}) (u2 :: u0) (u3 :: u0) -> case u1 of { _ALG_ _TUP_3 (u4 :: {{Monoid u0}}) (u5 :: u0 -> u0) (u6 :: u0 -> u0 -> u0) -> case u4 of { _ALG_ _TUP_2 (u7 :: {{SemiGroup u0}}) (u8 :: u0) -> let {(u9 :: u0) = _APP_  u5 [ u3 ]} in _APP_  u7 [ u2, u9 ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+class (CommutativeRing a, UnityRing a) => IntegralDomain a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{CommutativeRing u0}}) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{CommutativeRing u0}}, {{UnityRing u0}})) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{CommutativeRing u0}}) (u3 :: {{UnityRing u0}}) -> u2; _NO_DEFLT_ } _N_, _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{UnityRing u0}}) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{CommutativeRing u0}}, {{UnityRing u0}})) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{CommutativeRing u0}}) (u3 :: {{UnityRing u0}}) -> u3; _NO_DEFLT_ } _N_ #-}
+class (SemiGroup a) => Monoid a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{SemiGroup u0}}) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{SemiGroup u0}}, u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{SemiGroup u0}}) (u3 :: u0) -> u2; _NO_DEFLT_ } _N_ #-} where
+	zero :: a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{SemiGroup u0}}, u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{SemiGroup u0}}) (u3 :: u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: {{Monoid u0}}) -> _APP_  _TYAPP_  patError# { u0 } [ _NOREP_S_ "%DAlgebra.Monoid.zero\"" ] _N_ #-}
+class (IntegralDomain a) => PID a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{CommutativeRing u0}}) (u2 :: {{UnityRing u0}}) -> _!_ _TUP_2 [{{CommutativeRing u0}}, {{UnityRing u0}}] [u1, u2] _N_} _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{IntegralDomain u0}}) -> u1 _N_ #-}
+class (AbelianGroup a) => Ring a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(U(LLL)A)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{Monoid u0}}) (u2 :: u0 -> u0) (u3 :: u0 -> u0 -> u0) -> _!_ _TUP_3 [{{Monoid u0}}, (u0 -> u0), (u0 -> u0 -> u0)] [u1, u2, u3] _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{AbelianGroup u0}}, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{AbelianGroup u0}}) (u3 :: u0 -> u0 -> u0) -> u2; _NO_DEFLT_ } _N_ #-} where
+	(*.) :: a -> a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "U(AS)" {_A_ 1 _U_ 122 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0 -> u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{AbelianGroup u0}}, u0 -> u0 -> u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{AbelianGroup u0}}) (u3 :: u0 -> u0 -> u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{Ring u0}}) (u2 :: u0) (u3 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> u0 -> u0) } [ _NOREP_S_ "%DAlgebra.Ring.(*.)\"", u2, u3 ] _N_ #-}
+class SemiGroup a where
+	(+.) :: a -> a -> a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 122 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> u0 -> u0) -> u1 _N_
+		{-defm-} _A_ 3 _U_ 022 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 3 XXX 4 _/\_ u0 -> \ (u1 :: {{SemiGroup u0}}) (u2 :: u0) (u3 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> u0 -> u0) } [ _NOREP_S_ "%DAlgebra.SemiGroup.(+.)\"", u2, u3 ] _N_ #-}
+class (IntegralDomain a) => UFD a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{CommutativeRing u0}}) (u2 :: {{UnityRing u0}}) -> _!_ _TUP_2 [{{CommutativeRing u0}}, {{UnityRing u0}}] [u1, u2] _N_} _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{IntegralDomain u0}}) -> u1 _N_ #-}
+class (Ring a) => UnityRing a {-# GHC_PRAGMA {-superdicts-} _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: {{Ring u0}}) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{Ring u0}}, u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{Ring u0}}) (u3 :: u0) -> u2; _NO_DEFLT_ } _N_ #-} where
+	one :: a
+	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0) -> u1 _N_} _F_ _IF_ARGS_ 1 1 C 2 _/\_ u0 -> \ (u1 :: ({{Ring u0}}, u0)) -> case u1 of { _ALG_ _TUP_2 (u2 :: {{Ring u0}}) (u3 :: u0) -> u3; _NO_DEFLT_ } _N_
+		{-defm-} _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: {{UnityRing u0}}) -> _APP_  _TYAPP_  patError# { u0 } [ _NOREP_S_ "%DAlgebra.UnityRing.one\"" ] _N_ #-}
+data Q   = Q (Ratio Integer)
+instance AbelianGroup Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Q}}, (Q -> Q), (Q -> Q -> Q)] [_DFUN_ Monoid (Q), _CONSTM_ Group neg (Q), _CONSTM_ Group (-.) (Q)] _N_ #-}
+instance AbelianGroup Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Bool}}, (Bool -> Bool), (Bool -> Bool -> Bool)] [_DFUN_ Monoid (Bool), _ORIG_ Prelude not, _CONSTM_ Group (-.) (Bool)] _N_ #-}
+instance AbelianGroup Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Int}}, (Int -> Int), (Int -> Int -> Int)] [_DFUN_ Monoid (Int), _CONSTM_ Num negate (Int), _CONSTM_ Group (-.) (Int)] _N_ #-}
+instance AbelianGroup Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Integer}}, (Integer -> Integer), (Integer -> Integer -> Integer)] [_DFUN_ Monoid (Integer), _CONSTM_ Num negate (Integer), _CONSTM_ Group (-.) (Integer)] _N_ #-}
+instance CommutativeRing Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Q}}, (Q -> Q -> Q)] [_DFUN_ AbelianGroup (Q), _CONSTM_ Ring (*.) (Q)] _N_ #-}
+instance CommutativeRing Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Bool}}, (Bool -> Bool -> Bool)] [_DFUN_ AbelianGroup (Bool), _ORIG_ Prelude (&&)] _N_ #-}
+instance CommutativeRing Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Int}}, (Int -> Int -> Int)] [_DFUN_ AbelianGroup (Int), _CONSTM_ Num (*) (Int)] _N_ #-}
+instance CommutativeRing Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Integer}}, (Integer -> Integer -> Integer)] [_DFUN_ AbelianGroup (Integer), _CONSTM_ Num (*) (Integer)] _N_ #-}
+instance DivisionRing Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{UnityRing Q}}, (Q -> Q), (Q -> Q -> Q)] [_DFUN_ UnityRing (Q), _CONSTM_ DivisionRing inv (Q), _CONSTM_ DivisionRing (/.) (Q)] _N_
+	 inv = _A_ 1 _U_ 1 _N_ _S_ "U(L)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (/.) = _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ #-}
+instance DivisionRing Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{UnityRing Bool}}, (Bool -> Bool), (Bool -> Bool -> Bool)] [_DFUN_ UnityRing (Bool), _CONSTM_ DivisionRing inv (Bool), _CONSTM_ DivisionRing (/.) (Bool)] _N_
+	 inv = _A_ 1 _U_ 1 _N_ _S_ "E" _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Bool) -> u0 _N_,
+	 (/.) = _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: Bool) (u1 :: Bool) -> case u0 of { _ALG_ True  -> u1; False  -> _!_ False [] []; _NO_DEFLT_ } _N_ #-}
+instance Field Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{DivisionRing Q}}, {{CommutativeRing Q}}] [_DFUN_ DivisionRing (Q), _DFUN_ CommutativeRing (Q)] _N_ #-}
+instance Group Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Q}}, (Q -> Q), (Q -> Q -> Q)] [_DFUN_ Monoid (Q), _CONSTM_ Group neg (Q), _CONSTM_ Group (-.) (Q)] _N_
+	 neg = _A_ 1 _U_ 1 _N_ _S_ "U(L)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (-.) = _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ #-}
+instance Group Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Bool}}, (Bool -> Bool), (Bool -> Bool -> Bool)] [_DFUN_ Monoid (Bool), _ORIG_ Prelude not, _CONSTM_ Group (-.) (Bool)] _N_
+	 neg = _A_ 1 _U_ 1 _N_ _S_ "E" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Bool) -> case u0 of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_,
+	 (-.) = _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: Bool) (u1 :: Bool) -> case u0 of { _ALG_ True  -> _!_ True [] []; False  -> case u1 of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Group Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Int}}, (Int -> Int), (Int -> Int -> Int)] [_DFUN_ Monoid (Int), _CONSTM_ Num negate (Int), _CONSTM_ Group (-.) (Int)] _N_
+	 neg = _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num negate (Int) _N_,
+	 (-.) = _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 2 CC 6 \ (u0 :: Int) (u1 :: Int) -> case u0 of { _ALG_ I# (u2 :: Int#) -> case u1 of { _ALG_ I# (u3 :: Int#) -> case _#_ negateInt# [] [u3] of { _PRIM_ (u4 :: Int#) -> case _#_ plusInt# [] [u2, u4] of { _PRIM_ (u5 :: Int#) -> _!_ I# [] [u5] } }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+instance Group Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Monoid Integer}}, (Integer -> Integer), (Integer -> Integer -> Integer)] [_DFUN_ Monoid (Integer), _CONSTM_ Num negate (Integer), _CONSTM_ Group (-.) (Integer)] _N_
+	 neg = _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num negate (Integer) _N_,
+	 (-.) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+instance IntegralDomain Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{CommutativeRing Q}}, {{UnityRing Q}}] [_DFUN_ CommutativeRing (Q), _DFUN_ UnityRing (Q)] _N_ #-}
+instance IntegralDomain Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{CommutativeRing Integer}}, {{UnityRing Integer}}] [_DFUN_ CommutativeRing (Integer), _DFUN_ UnityRing (Integer)] _N_ #-}
+instance Monoid Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{SemiGroup Q}}, Q] [_CONSTM_ SemiGroup (+.) (Q), _CONSTM_ Monoid zero (Q)] _N_
+	 zero = _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Monoid Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{SemiGroup Bool}}, Bool] [_ORIG_ Prelude (||), _CONSTM_ Monoid zero (Bool)] _N_
+	 zero = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_ #-}
+instance Monoid Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{SemiGroup Int}}, Int] [_CONSTM_ Num (+) (Int), _CONSTM_ Monoid zero (Int)] _N_
+	 zero = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
+instance Monoid Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{SemiGroup Integer}}, Integer] [_CONSTM_ Num (+) (Integer), _CONSTM_ Monoid zero (Integer)] _N_
+	 zero = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [0#] _N_ #-}
+instance Monoid [a]
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance Ring Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Q}}, (Q -> Q -> Q)] [_DFUN_ AbelianGroup (Q), _CONSTM_ Ring (*.) (Q)] _N_
+	 (*.) = _A_ 2 _U_ 11 _N_ _S_ "U(L)U(L)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ring Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Bool}}, (Bool -> Bool -> Bool)] [_DFUN_ AbelianGroup (Bool), _ORIG_ Prelude (&&)] _N_
+	 (*.) = _A_ 2 _U_ 11 _N_ _S_ "EL" _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: Bool) (u1 :: Bool) -> case u0 of { _ALG_ True  -> u1; False  -> _!_ False [] []; _NO_DEFLT_ } _N_ #-}
+instance Ring Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Int}}, (Int -> Int -> Int)] [_DFUN_ AbelianGroup (Int), _CONSTM_ Num (*) (Int)] _N_
+	 (*.) = _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (*) (Int) _N_ #-}
+instance Ring Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{AbelianGroup Integer}}, (Integer -> Integer -> Integer)] [_DFUN_ AbelianGroup (Integer), _CONSTM_ Num (*) (Integer)] _N_
+	 (*.) = _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (*) (Integer) _N_ #-}
+instance SemiGroup Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ SemiGroup (+.) (Q) _N_
+	 (+.) = _A_ 2 _U_ 11 _N_ _S_ "U(L)U(L)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance SemiGroup Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 2 _N_ _N_ _S_ "EL" _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: Bool) (u1 :: Bool) -> case u0 of { _ALG_ True  -> _!_ True [] []; False  -> u1; _NO_DEFLT_ } _N_
+	 (+.) = _A_ 2 _U_ 11 _N_ _S_ "EL" _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: Bool) (u1 :: Bool) -> case u0 of { _ALG_ True  -> _!_ True [] []; False  -> u1; _NO_DEFLT_ } _N_ #-}
+instance SemiGroup Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (+) (Int) _N_
+	 (+.) = _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (+) (Int) _N_ #-}
+instance SemiGroup Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (+) (Integer) _N_
+	 (+.) = _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Num (+) (Integer) _N_ #-}
+instance SemiGroup [a]
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeList (++) _N_ #-}
+instance UnityRing Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{Ring Q}}, Q] [_DFUN_ Ring (Q), _CONSTM_ UnityRing one (Q)] _N_
+	 one = _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+instance UnityRing Bool
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{Ring Bool}}, Bool] [_DFUN_ Ring (Bool), _CONSTM_ UnityRing one (Bool)] _N_
+	 one = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_ #-}
+instance UnityRing Int
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{Ring Int}}, Int] [_DFUN_ Ring (Int), _CONSTM_ UnityRing one (Int)] _N_
+	 one = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
+instance UnityRing Integer
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [{{Ring Integer}}, Integer] [_DFUN_ Ring (Integer), _CONSTM_ UnityRing one (Integer)] _N_
+	 one = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [1#] _N_ #-}
+instance Eq Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Q -> Q -> Bool), (Q -> Q -> Bool)] [_CONSTM_ Eq (==) (Q), _CONSTM_ Eq (/=) (Q)] _N_
+	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)L))U(U(U(PPP)L))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)L))U(U(U(PPP)L))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Ord Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Q}}, (Q -> Q -> Bool), (Q -> Q -> Bool), (Q -> Q -> Bool), (Q -> Q -> Bool), (Q -> Q -> Q), (Q -> Q -> Q), (Q -> Q -> _CMP_TAG)] [_DFUN_ Eq (Q), _CONSTM_ Ord (<) (Q), _CONSTM_ Ord (<=) (Q), _CONSTM_ Ord (>=) (Q), _CONSTM_ Ord (>) (Q), _CONSTM_ Ord max (Q), _CONSTM_ Ord min (Q), _CONSTM_ Ord _tagCmp (Q)] _N_
+	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 max = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 min = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(PPP)U(PPP)))U(U(U(PPP)U(PPP)))" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+instance Text Q
+	{-# GHC_PRAGMA _M_ Algebra {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Q, [Char])]), (Int -> Q -> [Char] -> [Char]), ([Char] -> [([Q], [Char])]), ([Q] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Q), _CONSTM_ Text showsPrec (Q), _CONSTM_ Text readList (Q), _CONSTM_ Text showList (Q)] _N_
+	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(Q, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
+	 showsPrec = _A_ 2 _U_ 212 _N_ _S_ "LU(U(LL))" {_A_ 3 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
+	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+

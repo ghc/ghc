@@ -1,0 +1,228 @@
+Desugared:
+Test.z :: [(Char, Char, Char, Char, Char, Char, Char, Char, Char, Char)]
+Test.z =
+    let
+      {- CoRec -}
+      ds.136 =
+	  \ ds.137 ->
+	      case ds.137 of {
+		Nil ->
+		    Nil (Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char,
+			 Char)
+		(:) ds.138 ds.139 ->
+		    let a.140 = ds.138
+		    in 
+		      let
+			{- CoRec -}
+			ds.141 =
+			    \ ds.142 ->
+				case ds.142 of {
+				  Nil -> ds.136 ds.139
+				  (:) ds.143 ds.144 ->
+				      let b.145 = ds.143
+				      in 
+					let
+					  {- CoRec -}
+					  ds.146 =
+					      \ ds.147 ->
+						  case ds.147 of {
+						    Nil -> ds.141 ds.144
+						    (:) ds.148 ds.149 ->
+							let c.150 = ds.148
+							in 
+							  let
+							    {- CoRec -}
+							    ds.151 =
+								\ ds.152 ->
+								    case
+									ds.152
+								    of {
+								      Nil ->
+									  ds.146
+									      ds.149
+								      (:) ds.153
+									  ds.154 ->
+									  let
+									    d.155 =
+										ds.153
+									  in 
+									    let
+									      {- CoRec -}
+									      ds.156 =
+										  \ ds.157 ->
+										      case
+											  ds.157
+										      of {
+											Nil ->
+											    ds.151
+												ds.154
+											(:) ds.158
+											    ds.159 ->
+											    let
+											      e.160 =
+												  ds.158
+											    in 
+											      let
+												{- CoRec -}
+												ds.161 =
+												    \ ds.162 ->
+													case
+													    ds.162
+													of {
+													  Nil ->
+													      ds.156
+														  ds.159
+													  (:) ds.163
+													      ds.164 ->
+													      let
+														f.165 =
+														    ds.163
+													      in 
+														let
+														  {- CoRec -}
+														  ds.166 =
+														      \ ds.167 ->
+															  case
+															      ds.167
+															  of {
+															    Nil ->
+																ds.161
+																    ds.164
+															    (:) ds.168
+																ds.169 ->
+																let
+																  g.170 =
+																      ds.168
+																in 
+																  let
+																    {- CoRec -}
+																    ds.171 =
+																	\ ds.172 ->
+																	    case
+																		ds.172
+																	    of {
+																	      Nil ->
+																		  ds.166
+																		      ds.169
+																	      (:) ds.173
+																		  ds.174 ->
+																		  let
+																		    h.175 =
+																			ds.173
+																		  in 
+																		    let
+																		      {- CoRec -}
+																		      ds.176 =
+																			  \ ds.177 ->
+																			      case
+																				  ds.177
+																			      of {
+																				Nil ->
+																				    ds.171
+																					ds.174
+																				(:) ds.178
+																				    ds.179 ->
+																				    let
+																				      i.180 =
+																					  ds.178
+																				    in 
+																				      let
+																					{- CoRec -}
+																					ds.181 =
+																					    \ ds.182 ->
+																						case
+																						    ds.182
+																						of {
+																						  Nil ->
+																						      ds.176
+																							  ds.179
+																						  (:) ds.183
+																						      ds.184 ->
+																						      let
+																							j.185 =
+																							    ds.183
+																						      in 
+																							(: (Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char,
+																							    Char))
+																							    (MkTuple10!
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 Char
+																								 a.140
+																								 b.145
+																								 c.150
+																								 d.155
+																								 e.160
+																								 f.165
+																								 g.170
+																								 h.175
+																								 i.180
+																								 j.185)
+																							    (ds.181
+																								 ds.184)
+																						}
+																					{- end CoRec -}
+																				      in 
+																					ds.181
+																					    "12"S
+																			      }
+																		      {- end CoRec -}
+																		    in 
+																		      ds.176
+																			  "12"S
+																	    }
+																    {- end CoRec -}
+																  in 
+																    ds.171
+																	"12"S
+															  }
+														  {- end CoRec -}
+														in 
+														  ds.166
+														      "12"S
+													}
+												{- end CoRec -}
+											      in 
+												ds.161
+												    "12"S
+										      }
+									      {- end CoRec -}
+									    in 
+									      ds.156
+										  "12"S
+								    }
+							    {- end CoRec -}
+							  in  ds.151 "12"S
+						  }
+					  {- end CoRec -}
+					in  ds.146 "12"S
+				}
+			{- end CoRec -}
+		      in  ds.141 "12"S
+	      }
+      {- end CoRec -}
+    in  ds.136 "12"S
+

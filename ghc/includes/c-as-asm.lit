@@ -1,0 +1,509 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide]{article}
+\begin{document}
+\title{C as the assembly language for the Glasgow Haskell compiler}
+\author{Patrick Sansom, with help from his enemies}
+\date{June 1992}
+\maketitle
+\begin{rawlatex}
+\tableofcontents
+\end{rawlatex}
+\end{onlystandalone}
+
+\begin{onlypartofdoc}
+\section[C-as-assembler]{Using C for our assembler}
+\downsection
+\end{onlypartofdoc}
+
+% this file describes the issues;
+% it then \inputs all the actual source bits that do the job
+
+
+%************************************************************************
+%*									*
+\section[C-as-asm-intro-portable]{C as assembler: introduction to ``portable C''}
+%*									*
+%************************************************************************
+
+The Glasgow Haskell compiler expresses its output in C for the usual
+reasons: (1)~We hope it will be more readily portable to new machines;
+(2)~We'd rather not waste our time writing a register-allocator,
+instruction-selection mumbo-jumbo, etc.---in short, the dreary,
+tedious bits of a code-generator.
+
+The execution model that underlies Glasgow Haskell is the
+Spineless-Tagless G-machine (STG-machine).  The constituent pieces of
+the STG-machine model that must be fashioned out of good old-fashioned
+C code are, roughly:
+\begin{description}
+\item[Dynamic heap:] The usual.
+
+\item[Stack space:] With two stacks (A and B) growing from each end of a space,
+towards each other.  To pass (some) arguments, return addresses, ``update
+frames'', ...
+
+\item[Various ``STG registers'':] Stack pointers, heap pointers,
+return registers---all abstract machine-model entities...
+
+\item[Tables of static read-only info:] Mostly so-called ``info
+tables''...
+
+\item[Code:] Lots of code fragments that do nothing but tail-call each
+other.
+\end{description}
+
+OK, as mentioned, goal Numero Uno in using C as the compiler's target
+is to produce code that's relatively easy to port.  To this end, we
+need very-plain-vanilla bits of C to do all of the above things.
+Roughly speaking, here's what comes out:
+
+\begin{description}
+\item[Dynamic heap:] @malloc(3)@ a chunk of memory and use that.
+
+\item[Stack space:] Ditto.
+
+\item[Various ``STG registers'':] These are just global variables (or
+words in a ``global register table''), each just a 32|64-bit word (i.e.,
+not a funny structure, no funny tag bits, etc.---just very ordinary
+global variables).
+
+\item[Tables of static read-only info:] Initialised arrays of 32|64-bit
+words; they tend to come out looking something like (behind a wall of
+CPP macros) [very straightforward]:
+\begin{verbatim}
+const StgWord foo_info[] = { (StgWord) foo_entry, 0, 0 }
+\end{verbatim}
+
+\item[Code:] This is the tricky part: it's hard to convince any C compiler to do
+tail-calls, and certainly not all C compilers all of the time.
+
+Fortunately, {\em all} code fragments in the STG world can be coerced
+into C ``functions'' of the form:
+\begin{itemize}
+\item
+{\em No} arguments (all the STG-world function arguments, etc., go via
+the STG-world stacks and registers, not the C-world stacks/registers);
+\item
+They {\em always} know the next C fragment to be called (it's all
+tail-recursive, after all).
+\end{itemize}
+
+So: we dictate that every one of these code fragments is an
+argument-less C function of its own, which {\em returns} the address
+of the next code fragment to be executed (i.e., its continuation).  Here
+is an example of one such fragment (simplified from actual code):
+
+\begin{verbatim}
+stg_1848_entry (/* no args */) {
+    STK_CHK(0,-5);
+    PUSH_STD_UPD_FRAME(Node,StdUpdRetVecReg,0,0);
+    *(SpB+5)=(StgWord)(vtbl_1930);
+    Node=(StgPtr)(*(Node+SPEC_HS));
+    SpB=SpB+5;
+    return(*Node); /* *Node points at next code to enter */
+}
+\end{verbatim}
+
+Now all we need is a so-called {\em mini-interpreter} to dispatch
+these returned continuations; this is the basic idea:
+
+\begin{verbatim}
+StgFunPtr continuation = (StgFunPtr) start_cont;
+
+while ( 1 ) { continuation = (StgFunPtr) (continuation)(); }
+\end{verbatim}
+\end{description}
+
+If you are utterly baffled at this point, you probably need to read
+the STG-machine paper.
+
+All of the above is dead simple, if not particularly whizzy; in the
+rest of this document, when we talk about ``portable~C'' (or, ``the
+portable version''),
+\index{portable C output}
+we mean this stuff.
+
+%************************************************************************
+%*									*
+\section[C-as-asm-intro-fast]{C as assembler: going faster, introduction to ``optimised C''}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-portably-slow]{Why ``portable C'' is slow}
+%*									*
+%************************************************************************
+
+Compiling Haskell programs via simple, utterly portable C, as outlined
+above, comes at a significant cost in code size and speed.
+
+\begin{description}
+\item[Dynamic heap:] No problems associated with this.
+
+\item[Stack space:] Or this.
+
+[Well, not quite.  The C compiler won't take advantage of the {\em
+fact} (which it doesn't know) that the heap and stacks {\em cannot
+possibly overlap}.  In a perfect world, it could use this information
+to select better instruction sequences.)
+
+\item[Various ``STG registers'':] These are all in global C variables,
+about which C compilers are notoriously pessimistic.
+
+A load or store to one of these ``registers'' is almost certainly two
+or more instructions---not to mention stalls for going to memory.  And
+their global-you-don't-know-anything-about-me nature (in the C
+compiler's view) is very optimisation-unfriendly.
+
+And, because they're the ``registers'' of the STG execution model,
+they are {\em FREQUENTLY} used!  You {\em really pay} for their
+global-variableness... (estimates: 2--4x of code speed, 2x of code
+size)
+
+\item[Tables of static read-only info:] There aren't any big costs
+associated with these, except that you can't micro-manage their
+placement in memory, esp.~w.r.t.~entry-code fragments.
+(See \sectionref{C-as-asm-native}.)
+
+
+\item[Code:] Rather than really tail-jumping, we make many, many trips
+through the ``mini-interpreter.''  Besides all those instructions,
+there is probably plenty of pushing/popping of frames on/off the C
+stack, because each dispatch by the mini-interpreter is a C function
+call...
+
+Also, we don't ``fall through'' from argument-satisfaction-checking
+code into the real code for a function: we make an extra, fairly
+gratuitous trip through the mini-interpreter...
+
+We {\em estimate} that real tail-jumping should make programs go
+\pl{~25%} faster.
+\end{description}
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-fast]{Solution: ``Optimising C,'' with our friend, Richard Stallman}
+%*									*
+%************************************************************************
+
+The freely-available GNU~C compiler, GCC, (version 2.x), written under the
+lead of Richard Stallman at the Free Software Foundation, is a good
+C~compiler that has some non-standard extensions and machine-code
+hooks that make it possible to win back practically all the slow-nesses
+listed above for ``portable C''.
+
+First, there is a non-standard extension to C that makes it possible
+to put a ``global variable'' in a machine register.  For example,
+something like
+
+\begin{verbatim}
+register StgPtr SpB __asm__("%i4");
+\end{verbatim}
+
+says ``global variable'' \tr{SpB} should live in machine-register \tr{%i4}.
+
+Second, GCC offers an ``extended \tr{__asm__}'' directive, which lets
+you inject raw assembly-language stuff into the C-compiler output.
+Inserting \tr{jmps} in this way is is one component of the
+do-real-tailjumps machinery...
+
+The other main component of doing-real-tailjumps is shutting down the
+C world's function-calling machinery, i.e., pushing/popping of stack
+frames (and/or register windows, in the SPARC case).  This involves
+``sedding'' the C-compiler's assembly-language output, stripping off
+function prologues and epilogues, and other such really horrible
+stuff...
+
+{\em Caveat~1:} The above is machine- and compiler-specific.  {\em
+Response:} We don't care.  GCC is freely and widely available and has
+been ported to bazillions of machines.
+
+{\em Caveat~2:} The above constitutes {\em serious} mangling of what
+ends up in a \tr{.o} object file.  Mixing such \tr{.o} files with
+others that were incompatibly compiled (e.g., w/ different
+magical-global-register declarations) is {\em guaranteed} to result in
+gruesome program death.
+
+{\em Response:} We treat optimised-C \tr{.o} files quite separately.
+First, this document carefully records how C files from different
+``worlds'' must be compiled (next section); also, our
+compilation-system driver checks that executables it links are built
+from compatible \tr{.o} files (see \sectionref{driver-consistency-chking}).
+
+The User's Guide describes how the beleaguered Haskell programmer
+interacts with all this C optimisation stuff... (executive summary:
+it's invisible.)
+
+[For a discussion of how well you can do on compiling via straight
+ANSI-standard C, see the paper from CMU about compiling ML...]
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-worlds]{``Worlds'' that must interoperate in optimised~C}
+%*									*
+%************************************************************************
+
+A Glasgow-Haskell-compiled executable is made of bits that come from
+various places, or ``worlds.''  These are:
+\begin{itemize}
+\item
+The major ``world'' is the {\em Haskell Threaded World} of
+direct-jumping, machine-register-using compiled-to-optimised-C Haskell
+code.
+
+\item
+The Haskell Threaded World may call into the {\em Arbitrary~C
+World}; for example, to do I/O.  This is C code that is written by
+someone else, compiled by someone else, over which the Glasgow Haskell
+system has no control whatsoever.  However, a most pleasant property
+of the Arbitrary~C World is that it doesn't care about any of the
+internals of the Haskell threaded world.  In particular, it does
+not know about the heap, stack etc, and hence does not modify
+the magic ``registers'' @Hp@, @SpA@, etc.
+
+\item
+There may also be calls out to an {\em STG~C World}, of which the
+storage manager is the major example.  (The use of the GNU
+multi-precision arithmetic package to do ``Integers'' is nearly
+another; except we do all the STG magic in-line, then do ``ordinary''
+C calls to the library after we know it's safe to do so.) An STG~C
+World is a blob of C that needs to inspect/save/restore some part of
+the Haskell-Threaded-World state, notably some of its registers.  For
+example, the storage manager {\em really} needs to know where the heap
+pointer \tr{Hp}---in a machine register---is pointing to, before
+embarking on a garbage collection... :-)
+
+These STG~C Worlds are the tricky devils...
+
+{\em NB:} The storage manager is a direct-jumping threaded world of
+its own, with its own mapping-to-machine-registers, etc.
+
+\item
+The {\em C~Startup World}: The C runtime-system gets things going by
+invoking a user-supplied function, \tr{main} (or \tr{mainIO}, if
+Glasgow I/O is in force).  We must have such a function (it is
+provided by the GHC RTS), and it must get us from there into the
+Haskell Threaded World.
+
+Similarly, when we finally emerge from the Haskell Threaded World, we
+must exit as a well-behave C program would, i.e., set the exit status,
+etc., etc.
+
+The C~Startup World is not a big problem.
+\end{itemize}
+
+%************************************************************************
+%*									*
+\section[C-as-asm-issues]{Things to be {\em very careful} about with ``optimised C''}
+%*									*
+%************************************************************************
+
+(Most of) These issues can be organised according to the affected
+World-to-World transition...
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-starting-stopping]{Starting and stopping a Haskell Threaded World}
+%*									*
+%************************************************************************
+
+\begin{itemize}
+\item
+As part of real-tailjumping support, we completely shut down the
+pushing/popping of C stack frames (by sedding off
+prologues/epilogues).  This is fine---except the C compiler doesn't
+know we do this and may use the stack anyway (for temporaries,
+automatic variables, ...)!  The initialisation of the Haskell Threaded
+World must therefore ensure that there is some/enough C-stack space
+sitting around for this purpose...
+
+\item
+The ``mini-interpreter'' must be re-entrant!  The code for
+@error@---and bits of the RTS---actually exploit this.
+
+\item
+(C Startup to Haskell) Beginning of mini-interpreter: The STG
+registers (in real registers) must be initialised from the @smInfo@
+structure.  Ending: @smInfo@ updated from the STG registers.
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-haskell-to-arbitrary-C]{Haskell Threaded to/from Arbitrary~C}
+%*									*
+%************************************************************************
+
+Remember, ``Arbitrary C'' cannot modify any of the STG registers, so
+all that is required is to keep them safe across the call.
+
+Hence we can just call the arbitrary~C routine.  But, {\em don't} map
+any STG registers onto any call-clobbered registers; the arbitrary~C
+may stomp on them.  (Just use callee-save registers.) In the SPARC
+case, this means all \tr{%o} and several \tr{%g} registers are
+unavailable.  GCC~2.x warns if you try to snaffle call-clobbered
+registers.
+
+%************************************************************************
+%*									*
+\subsection[C-as-asm-haskell-to-STG-C]{Haskell Threaded to/from special ``STG~C''}
+%*									*
+%************************************************************************
+
+This is the tricky business.
+
+[ToDo: re-make this section in its particulars (it is out-of-date);
+principles still valid.]
+
+\begin{itemize}
+\item
+The compiler ``knows'' about things to which it makes ``STG calls''...
+
+It emits macro calls of the form \tr{STGCALLn(f, arg1, arg2..., arg_n)};
+calls to C-function @f@, with @n@ arguments, returning (at most) one
+32|64-bit value.  A use of this might look like...
+
+\begin{verbatim}
+x = STGCALL2( arby_prec_add, y, z );
+\end{verbatim}
+
+\item
+In portable~C, the above would just become an ordinary C
+function-call:
+
+\begin{verbatim}
+x = arby_prec_add(y,z);
+\end{verbatim}
+
+Also, in portable~C, the @xxx_SAVE@ backup global (see below) is
+\tr{#defined} to be the same as \tr{xxx}!
+
+\item
+In optimised~C, the @STGCALLn@ macros turn into (highly-machine
+dependent) uses of the ultra-magic @callWrapper@ function.
+
+At least in the SPARC case, using @STGCALL1@ as an example:
+
+\begin{verbatim}
+STGCALL1( f, x ) ---> %o5 := f; callWrapper(x)
+\end{verbatim}
+
+The @callWrapper@ function is very special indeed.  It must preserve
+all the callee-saves registers (SPARC e.g.: all \tr{%i} and \tr{%l}
+registers).  It is {\em NOT} tail-jumped to like the
+Haskell-Threaded-World routines.  So all it does is:
+
+\begin{enumerate}
+\item
+Save the return address (SPARC: \tr{[%o7]+8}) into @continuation_SAVE@.
+
+\item
+Save all relevant STG register in their corresponding @_SAVE@ backup globals.
+(We might have @callWrapper@ variants to save different sets.)
+
+\item
+Call the function (SPARC: \tr{call %o5}); note that the function
+arguments are all in the right place already.  (NOTE: It would be hard
+to think of something more machine- and compiler-assumptive!  But,
+remember, we are calling code with which we are on friendly terms...)
+
+\item
+Restore the @_SAVE@ backup globals into the registers; the restore
+mustn't affect the single returned 32|64-bit value (SPARC case: in \tr{%o0}).
+
+\item
+@STGJUMP@ (tail-jump) to @continuation_SAVE@.
+\end{enumerate}
+
+N.B.: @callWrapper@ only works up to a limited number of arguments
+(SPARC: 5 words, \tr{%o0-%o4}), because we are using \tr{%o5} (SPARC)
+for the function to call.  If we run into this limit, we should pass
+the function in a global instead of \tr{%o5} (or whatever).
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsubsection[C-as-asm-haskell-to-GC]{...To the Storage Manager in particular...}
+%*									*
+%************************************************************************
+
+The interface to the GC uses the same regime; having to save and restore
+all STG and ptr regs is no big deal, because it only happens once per GC.
+Other routines should only use SpA/B, Hp, HeapLimit, SuA/B (for GC).
+
+%************************************************************************
+%*									*
+\section[C-as-asm-native]{Things that could be better with a native-code generator}
+%*									*
+%************************************************************************
+
+Even with all the fancy GNU~C tricks and whatnot, the resulting code
+speed and size isn't as good as you could do if you wrote a full-blown
+native-code generator.  We have no interest in doing this---the payoff
+isn't big enough---but here we list, for the record, Things That Could
+Be Better:
+
+\begin{enumerate}
+\item
+We could park info-tables and entry code in judicious proximity to
+each other, so @ENTER_CLOSURE@ would be a
+single-indirection-with-offset, rather than a double-indirection.
+\end{enumerate}
+
+%************************************************************************
+%*									*
+\section[C-as-asm-registers]{IMPLEMENTATION: Mapping STG registers onto machine registers}
+%*									*
+%************************************************************************
+
+We have several mappings from STG~registers onto real machine registers,
+for different segments of the runtime system.  Each mapping is
+dependent on the target architecture as well.
+
+\downsection
+\input{StgRegs.lh}			% decls of STG registers
+\upsection
+
+%************************************************************************
+%*									*
+\section[C-as-asm-tailjumps]{IMPLEMENTATION: tail-jumping}
+%*									*
+%************************************************************************
+
+\downsection
+\input{COptJumps.lh}			% per-platform tailjumps (optimised C)
+
+\subsection[driver-sedding]{ToDo: driver sedding}
+
+THIS SHOULD BE THE SOURCE FOR THE PART OF THE DRIVER THAT MANGLES
+OPTIMISED C ASSEMBLER FILES.
+
+\input{../runtime/c-as-asm/StgMiniInt.lc}
+\upsection
+
+%************************************************************************
+%*									*
+\section[C-as-asm-wrappers]{IMPLEMENTATION: ``wrappers'' to call out from the threaded world}
+%*									*
+%************************************************************************
+
+\downsection
+\input{COptWraps.lh}
+
+\input{../runtime/c-as-asm/HpOverflow.lc}
+\upsection
+
+%************************************************************************
+%*									*
+\section[driver-consistency-chking]{ToDo: driver consistency checking}
+%*									*
+%************************************************************************
+
+THIS SHOULD BE THE SOURCE FOR THE PART OF THE DRIVER THAT CHECKS
+CONSISTENCY OF EXECUTABLES.
+
+
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}

@@ -1,0 +1,73 @@
+analyses:
+    strictness & binding-time analysis  (\cite{launchbury91a})
+    polymorphic-instance analysis (pldi 91; referred \cite{launchbury91a}, p 86 top left)
+    facet analysis (part of [higher-order offline] parameterized partial evaluation)
+	(pldi 91: \cite{consel91a})
+    binding-time analysis (fpca89; \cite{mogensen91})
+    strictness analysis (\cite{wadler87a})
+    update analysis (fpca; \cite{bloss89b})
+    path analysis (fpca; \cite{bloss89b})
+    interference, closure, and lifetime analysis (fpca; \cite{sestoft89a})
+    stacklessness anaysis (fpca; \cite{lester89b})
+    liveness analysis (AHU, reffed by lester89b)
+    complexity analysis (fpca, \cite{rosendahl89a})
+    demand analysis
+    time analysis
+
+type systems:
+    refinement types (pldi 91; \cite{freeman91a})
+    soft typing (pldi 91; \cite{cartwright91a})
+
+other:
+
+done in LML compiler:
+    llift	lambda lifter
+    	/Bconv
+    simpl
+	/asimpl	arithmetic simplifications
+	/casetr	case of case ... (& a couple of others ?)
+	/mlet	mlet (inlining) ?
+	/simpl	constant folding, casefold, Esimpl, simpl,
+		force arity, movelam
+    strict	very simple strictness analysis
+    transform
+	/case	caseelim
+    	/casep	condjoin
+	/constr constrtr
+	/lettrans let transformations
+    unrec
+    Gopt	G-code optimiser
+    mopt	m-code optimiser
+
+done in yale compiler:
+    (in flic)
+    optimization : \beta-redn (constant propagation & inlining)
+		   constant folding
+		   dead code elim
+    strictness analysis
+
+the competition:
+
+    (mips compiler)
+	compiles to "ucode" (symbolic assembler)
+	optimisations on both ucode and binary assembler
+	-O2		global ucode optimizer
+	-O3		global register alloc
+	-feedback file
+	-cord		procedure re-arranger ; reduce cache conflicts
+	pixie		adds things to binary for profiling
+	pixstats	generate exec stats from a pixified pgm
+	prof		analyse profile data (pc-sampling, basic-blk counting)
+
+    data dependence analysis (pldi 91; \cite{maydan91a})
+    (nice table of stats-- pldi 91; \cite{goff91a}, p 25)
+
+    tiling for better cache hits (pldi 91: \cite{wolf91a})
+
+    using real or estimated runtime profiles (pldi 91: \cite{wall91a})
+
+    procedure merging w/ instruction caches (pldi 91: \cite{mcfarling91a})
+
+    fortran @ 10 Gflops (pldi 91: \cite{bromley91a})
+
+    global instr scheduling for superscalar machines (pldi 91: \cite{bernstein91a})

@@ -1,0 +1,19 @@
+Typechecked:
+AbsBinds [ot6, ot4, ot5] [] [(s.t1, ShouldSucceed.s)]
+    {- nonrec -}
+    s.t1 :: (ot4 -> ot6 -> ot5) -> (ot4 -> ot6) -> ot4 -> ot5
+    s.t1 f.r56 g.r57 x.r58
+		 = f.r56 x.r58 (g.r57 x.r58)
+AbsBinds [ot10, ot9] [] [(k.t8, ShouldSucceed.k)]
+    {- nonrec -}
+    k.t8 :: ot9 -> ot10 -> ot9
+    k.t8 x.r59 y.r60
+		 = x.r59
+AbsBinds [tt19] [] [(main.t12, ShouldSucceed.main)]
+    {- nonrec -}
+    main.t12 :: tt19 -> tt19
+    main.t12
+	= (ShouldSucceed.s [tt18 -> tt19, tt19, tt19])
+	      (ShouldSucceed.k [tt18 -> tt19, tt19])
+	      (ShouldSucceed.k [tt18, tt19])
+

@@ -1,0 +1,595 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+%************************************************************************
+%*                                                                      *
+\section[GranSim.lc]{Granularity Simulator Routines}
+%*									*
+%************************************************************************
+
+Macros for dealing with the new and improved GA field for simulating
+parallel execution. Based on @CONCURRENT@ package. The GA field now
+contains a mask, where the n-th bit stands for the n-th processor,
+where this data can be found. In case of multiple copies, several bits
+are set. The total number of processors is bounded by @MAX_PROC@,
+which should be <= the length of a word in bits.  -- HWL
+
+\begin{code}
+#if defined(GRAN) || defined(PAR)
+
+#define NON_POSIX_SOURCE    /* gettimeofday */
+
+#include "rtsdefs.h"
+
+
+#ifdef HAVE_GETCLOCK
+
+#ifdef HAVE_SYS_TIMERS_H
+#define POSIX_4D9 1
+#include <sys/timers.h>
+#endif
+
+#else
+#ifdef HAVE_GETTIMEOFDAY
+
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+
+#else
+
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+
+#endif
+#endif
+
+void grputw PROTO((TIME v));
+
+#if defined(GRAN)
+/* Pointer to the event queue; events are currently malloc'ed */
+static eventq EventHd = NULL;
+
+PROC
+ga_to_proc(W_ ga)
+{
+    PROC i;
+
+    for (i = 0; i < MAX_PROC && !IS_LOCAL_TO(ga, i); i++);
+
+    return (i);
+}
+
+/* NB: This takes a *node* rather than just a ga as input */
+PROC
+where_is(P_ node)
+{ return (ga_to_proc(PROCS(node))); }   /* Access the GA field of the node */
+
+#if 0
+PROC
+no_of_copies(W_ ga)	/* DaH lo'lu'Qo'; currently unused */
+{
+    PROC i, n;
+
+    for (i = 0, n = 0; i < MAX_PROC; i++)
+	if (IS_LOCAL_TO(ga, i))
+	    n++;;
+
+    return (n);
+}
+#endif
+
+eventq 
+getnextevent()
+{
+  static eventq entry = NULL;
+
+  if(EventHd == NULL)
+    {
+      fprintf(stderr,"No next event\n");
+      exit(EXIT_FAILURE); /* why not EXIT??? WDP 95/07 */
+    }
+
+  if(entry != NULL)
+    free((char *)entry);
+
+#if defined(GRAN_CHECK) && defined(GRAN)
+  if (debug & 0x20) {     /* count events */
+    noOfEvents++;
+    event_counts[(EVENT_TYPE(EventHd)>=CONTINUETHREAD1) ? 
+		   CONTINUETHREAD :
+		   EVENT_TYPE(EventHd)]++;
+  }
+#endif       
+
+  entry = EventHd;
+  EventHd = EVENT_NEXT(EventHd);
+  return(entry);
+}
+
+/* ToDo: replace malloc/free with a free list */
+
+/* NB: newevent unused (WDP 95/07) */
+
+static 
+newevent(proc,creator,time,evttype,tso,node,spark)
+  PROC proc, creator;
+  TIME time;
+  EVTTYPE evttype;
+  P_ tso, node;
+  sparkq spark;
+{
+  eventq newentry = (eventq) xmalloc(sizeof(struct event));
+
+  EVENT_PROC(newentry) = proc;
+  EVENT_CREATOR(newentry) = creator;
+  EVENT_TIME(newentry) = time;
+  EVENT_TYPE(newentry) = evttype;
+  EVENT_TSO(newentry) =  tso;
+  EVENT_NODE(newentry) =  node;
+  EVENT_SPARK(newentry) =  spark;
+  EVENT_NEXT(newentry) = NULL;
+
+  insert_event(newentry);
+}
+
+#endif /* GRAN ; HWL */ 
+\end{code}
+
+%****************************************************************************
+%
+\subsection[GrAnSim-profile]{Writing profiling info for GrAnSim}
+%
+%****************************************************************************
+
+Event dumping routines.
+
+\begin{code}
+
+FILE *gr_file = NULL;
+
+char *gran_event_names[] = {
+    "START", "START(Q)",
+    "STEALING", "STOLEN", "STOLEN(Q)",
+    "FETCH", "REPLY", "BLOCK", "RESUME", "RESUME(Q)",
+    "SCHEDULE", "DESCHEDULE",
+    "END",
+    "SPARK", "SPARKAT", "USED", "PRUNED", "EXPORTED", "ACQUIRED",
+    "TERMINATE",
+    "??"
+};
+
+/* 
+ * If you're not using GNUC and you're on a 32-bit machine, you're 
+ * probably out of luck here.  However, since CONCURRENT currently
+ * requires GNUC, I'm not too worried about it.  --JSM
+ */
+
+#if !defined(GRAN)
+
+static ullong startTime = 0;
+
+ullong
+msTime(STG_NO_ARGS)
+{
+# ifdef HAVE_GETCLOCK
+    struct timespec tv;
+
+    if (getclock(TIMEOFDAY, &tv) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	EXIT(EXIT_FAILURE);
+    }
+    return tv.tv_sec * LL(1000) + tv.tv_nsec / LL(1000000) - startTime;
+# else
+# ifdef HAVE_GETTIMEOFDAY
+    struct timeval tv;
+ 
+    if (gettimeofday(&tv, NULL) != 0) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	EXIT(EXIT_FAILURE);
+    }
+    return tv.tv_sec * LL(1000) + tv.tv_usec / LL(1000) - startTime;
+# else
+    time_t t;
+    if ((t = time(NULL)) == (time_t) -1) {
+	fflush(stdout);
+	fprintf(stderr, "Clock failed\n");
+	EXIT(EXIT_FAILURE);
+    }
+    return t * LL(1000);
+# endif
+# endif
+}
+
+#endif /* !GRAN */
+
+
+void
+DumpGranEvent(name, tso)
+enum gran_event_types name;
+P_ tso;
+{
+    DumpRawGranEvent(CURRENT_PROC, name, TSO_ID(tso));
+}
+
+void
+DumpSparkGranEvent(name, id)
+enum gran_event_types name;
+W_ id;
+{
+    DumpRawGranEvent(CURRENT_PROC, name, id);
+}
+
+void
+DumpGranEventAndNode(name, tso, node, proc)
+enum gran_event_types name;
+P_ tso, node;
+PROC proc;
+{
+    PROC pe = CURRENT_PROC;
+    W_ id;
+
+    char time_string[500]; /*ToDo: kill magic constant */
+    ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
+
+#ifdef PAR
+    id = tso == NULL ? -1 : TSO_ID(tso);
+#else
+    id = TSO_ID(tso);
+#endif
+    if (name > GR_EVENT_MAX)
+	name = GR_EVENT_MAX;
+
+    if (do_gr_binary) {
+	grputw(name);
+	grputw(pe);
+ 	abort(); /* die please: a single word doesn't represent long long times */
+	grputw(CURRENT_TIME); /* this line is bound to do the wrong thing */
+	grputw(id);
+    } else
+	fprintf(gr_file, "PE %2u [%s]: %s %lx \t0x%lx\t(from %2u)\n",
+	  pe, time_string, gran_event_names[name], id, (W_) node, proc);
+}
+
+void
+DumpRawGranEvent(pe, name, id)
+PROC pe;
+enum gran_event_types name;
+W_ id;
+{
+    char time_string[500]; /* ToDo: kill magic constant */
+
+    if (name > GR_EVENT_MAX)
+	name = GR_EVENT_MAX;
+
+    ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
+
+    if (do_gr_binary) {
+	grputw(name);
+	grputw(pe);
+	abort(); /* die please: a single word doesn't represent long long times */
+	grputw(CURRENT_TIME); /* this line is bound to fail */
+	grputw(id);
+    } else
+	fprintf(gr_file, "PE %2u [%s]: %s %lx\n",
+	  pe, time_string, gran_event_names[name], id);
+}
+
+void
+DumpGranInfo(pe, tso, mandatory_thread)
+PROC pe;
+P_ tso;
+rtsBool mandatory_thread;
+{
+    char time_string[500]; /* ToDo: kill magic constant */
+    ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
+
+    if (do_gr_binary) {
+	grputw(GR_END);
+	grputw(pe);
+	abort(); /* die please: a single word doesn't represent long long times */
+	grputw(CURRENT_TIME); /* this line is bound to fail */
+	grputw(TSO_ID(tso));
+#ifdef PAR
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+	grputw(0);
+#else
+	grputw(TSO_SPARKNAME(tso));
+	grputw(TSO_STARTEDAT(tso));
+	grputw(TSO_EXPORTED(tso));
+	grputw(TSO_BASICBLOCKS(tso));
+	grputw(TSO_ALLOCS(tso));
+	grputw(TSO_EXECTIME(tso));
+	grputw(TSO_BLOCKTIME(tso));
+	grputw(TSO_BLOCKCOUNT(tso));
+	grputw(TSO_FETCHTIME(tso));
+	grputw(TSO_FETCHCOUNT(tso));
+	grputw(TSO_LOCALSPARKS(tso));
+	grputw(TSO_GLOBALSPARKS(tso));
+#endif
+	grputw(mandatory_thread);
+    } else {
+
+	/*
+	 * NB: DumpGranEvent cannot be used because PE may be wrong (as well as the
+	 * extra info)
+	 */
+	fprintf(gr_file, "PE %2u [%s]: END %lx, SN %lu, ST %lu, EXP %c, BB %lu, HA %lu, RT %lu, BT %lu (%lu), FT %lu (%lu), LS %lu, GS %lu, MY %c\n"
+	  ,pe
+	  ,time_string
+	  ,TSO_ID(tso)
+	  ,TSO_SPARKNAME(tso)
+	  ,TSO_STARTEDAT(tso)
+	  ,TSO_EXPORTED(tso) ? 'T' : 'F'
+	  ,TSO_BASICBLOCKS(tso)
+	  ,TSO_ALLOCS(tso)
+	  ,TSO_EXECTIME(tso)
+	  ,TSO_BLOCKTIME(tso)
+	  ,TSO_BLOCKCOUNT(tso)
+	  ,TSO_FETCHTIME(tso)
+	  ,TSO_FETCHCOUNT(tso)
+	  ,TSO_LOCALSPARKS(tso)
+	  ,TSO_GLOBALSPARKS(tso)
+	  ,mandatory_thread ? 'T' : 'F'
+	  );
+    }
+}
+
+/*
+   Output a terminate event and an 8-byte time.
+*/
+
+void
+grterminate(v)
+TIME v;
+{
+    DumpGranEvent(GR_TERMINATE, 0);
+
+    if (sizeof(TIME) == 4) {
+	putc('\0', gr_file);
+	putc('\0', gr_file);
+	putc('\0', gr_file);
+	putc('\0', gr_file);
+    } else {
+	putc(v >> 56l, gr_file);
+	putc((v >> 48l) & 0xffl, gr_file);
+	putc((v >> 40l) & 0xffl, gr_file);
+	putc((v >> 32l) & 0xffl, gr_file);
+    }
+    putc((v >> 24l) & 0xffl, gr_file);
+    putc((v >> 16l) & 0xffl, gr_file);
+    putc((v >> 8l) & 0xffl, gr_file);
+    putc(v & 0xffl, gr_file);
+}
+
+/*
+   Length-coded output: first 3 bits contain length coding
+
+     00x        1 byte
+     01x        2 bytes
+     10x        4 bytes
+     110        8 bytes
+     111        5 or 9 bytes
+*/
+
+void
+grputw(v)
+TIME v;
+{
+    if (v <= 0x3fl) {
+	fputc(v & 0x3f, gr_file);
+    } else if (v <= 0x3fffl) {
+	fputc((v >> 8l) | 0x40l, gr_file);
+	fputc(v & 0xffl, gr_file);
+    } else if (v <= 0x3fffffffl) {
+	fputc((v >> 24l) | 0x80l, gr_file);
+	fputc((v >> 16l) & 0xffl, gr_file);
+	fputc((v >> 8l) & 0xffl, gr_file);
+	fputc(v & 0xffl, gr_file);
+    } else if (sizeof(TIME) == 4) {
+	fputc(0x70, gr_file);
+	fputc((v >> 24l) & 0xffl, gr_file);
+	fputc((v >> 16l) & 0xffl, gr_file);
+	fputc((v >> 8l) & 0xffl, gr_file);
+	fputc(v & 0xffl, gr_file);
+    } else {
+	if (v <= 0x3fffffffffffffl)
+	    putc((v >> 56l) | 0x60l, gr_file);
+	else {
+	    putc(0x70, gr_file);
+	    putc((v >> 56l) & 0xffl, gr_file);
+	}
+
+	putc((v >> 48l) & 0xffl, gr_file);
+	putc((v >> 40l) & 0xffl, gr_file);
+	putc((v >> 32l) & 0xffl, gr_file);
+	putc((v >> 24l) & 0xffl, gr_file);
+	putc((v >> 16l) & 0xffl, gr_file);
+	putc((v >> 8l) & 0xffl, gr_file);
+	putc(v & 0xffl, gr_file);
+    }
+}
+
+\end{code}
+
+%****************************************************************************
+%
+\subsection[gr-simulation]{Granularity Simulation}
+%
+%****************************************************************************
+
+\begin{code}
+#ifdef GRAN
+char gr_filename[32]; /*ToDo: magic short filename constant????? WDP 95/07 */
+I_ do_gr_sim = 0;
+
+int
+init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv)
+char *prog_argv[], *rts_argv[];
+int prog_argc, rts_argc;
+{
+    I_ i;
+
+    if (do_gr_sim) {
+	char *extension = do_gr_binary ? "gb" : "gr";
+
+	sprintf(gr_filename, "%0.28s.%0.2s", prog_argv[0], extension);
+
+	if ((gr_file = fopen(gr_filename, "w")) == NULL) {
+	    fprintf(stderr, "Can't open granularity simulation report file %s\n", gr_filename);
+	    exit(EXIT_FAILURE); /* why not EXIT??? WDP 95/07 */
+	}
+#if defined(GRAN_CHECK) && defined(GRAN)
+	if (DoReScheduleOnFetch)
+	    setbuf(gr_file, NULL);
+#endif
+
+	fputs("Granularity Simulation for ", gr_file);
+	for (i = 0; i < prog_argc; ++i) {
+	    fputs(prog_argv[i], gr_file);
+	    fputc(' ', gr_file);
+	}
+
+	if (rts_argc > 0) {
+	    fputs("+RTS ", gr_file);
+
+	    for (i = 0; i < rts_argc; ++i) {
+		fputs(rts_argv[i], gr_file);
+		fputc(' ', gr_file);
+	    }
+	}
+	fputs("\n\n--------------------\n\n", gr_file);
+
+	fputs("General Parameters:\n\n", gr_file);
+
+	fprintf(gr_file, "PEs %u, %s Scheduler, %sMigrate Threads%s ????? %s\n",
+	  max_proc, DoFairSchedule ? "Fair" : "Unfair",
+	  DoThreadMigration ? "" : "Don't ",
+	  DoThreadMigration && DoStealThreadsFirst ? " Before Sparks" : "",
+	  DoReScheduleOnFetch ? "" : "Don't ");
+
+	fprintf(gr_file, "%s, Fetch %s in Each Packet\n",
+	  SimplifiedFetch ? "Simplified Fetch" : (DoReScheduleOnFetch ? "Reschedule on Fetch" : "Block on Fetch"),
+	  DoGUMMFetching ? "Many Closures" : "Exactly One Closure");
+	fprintf(gr_file, "Fetch Strategy(%lu): If outstanding fetches %s\n",
+	  FetchStrategy,
+	  FetchStrategy == 1 ? "only run runnable threads (don't create new ones" :
+	  FetchStrategy == 2 ? "create threads only from local sparks" :
+	  FetchStrategy == 3 ? "create threads from local or global sparks" :
+	  FetchStrategy == 4 ? "create sparks and steal threads if necessary" :
+	  "unknown");
+
+	fprintf(gr_file, "Thread Creation Time %lu, Thread Queue Time %lu\n",
+	  gran_threadcreatetime, gran_threadqueuetime);
+	fprintf(gr_file, "Thread DeSchedule Time %lu, Thread Schedule Time %lu\n",
+	  gran_threaddescheduletime, gran_threadscheduletime);
+	fprintf(gr_file, "Thread Context-Switch Time %lu\n",
+	  gran_threadcontextswitchtime);
+	fputs("\n\n--------------------\n\n", gr_file);
+
+	fputs("Communication Metrics:\n\n", gr_file);
+	fprintf(gr_file,
+	  "Latency %lu (1st) %lu (rest), Fetch %lu, Notify %lu (Global) %lu (Local)\n",
+	  gran_latency, gran_additional_latency, gran_fetchtime,
+	  gran_gunblocktime, gran_lunblocktime);
+	fprintf(gr_file,
+	  "Message Creation %lu (+ %lu after send), Message Read %lu\n",
+	  gran_mpacktime, gran_mtidytime, gran_munpacktime);
+	fputs("\n\n--------------------\n\n", gr_file);
+
+	fputs("Instruction Metrics:\n\n", gr_file);
+	fprintf(gr_file, "Arith %lu, Branch %lu, Load %lu, Store %lu, Float %lu, Alloc %lu\n",
+	  gran_arith_cost, gran_branch_cost,
+	  gran_load_cost, gran_store_cost, gran_float_cost, gran_heapalloc_cost);
+	fputs("\n\n++++++++++++++++++++\n\n", gr_file);
+    }
+    if (do_gr_binary)
+	grputw(sizeof(TIME));
+
+    Idlers = max_proc;
+    return (0);
+}
+
+void
+end_gr_simulation(STG_NO_ARGS)
+{
+    if (do_gr_sim) {
+	fprintf(stderr, "The simulation is finished. Look at %s for details.\n",
+	  gr_filename);
+	fclose(gr_file);
+    }
+}
+
+#endif /* GRAN */
+
+#ifdef PAR
+char gr_filename[50]; /*ToDo: (small) magic constant alert!!!! WDP 95/07 */
+
+I_ do_gr_profile = 0;
+I_ do_sp_profile = 0;
+I_ do_gr_binary = 0;
+
+void
+init_gr_profiling(rts_argc, rts_argv, prog_argc, prog_argv)
+char *prog_argv[], *rts_argv[];
+int prog_argc, rts_argc;
+{
+    int i;
+
+    char *extension = do_gr_binary ? "gb" : "gr";
+
+    sprintf(gr_filename, "%0.28s.%03d.%0.2s", prog_argv[0], thisPE, extension);
+
+    if ((gr_file = fopen(gr_filename, "w")) == NULL) {
+	fprintf(stderr, "Can't open activity report file %s\n", gr_filename);
+	EXIT(EXIT_FAILURE);
+    }
+
+    for (i = 0; i < prog_argc; ++i) {
+	fputs(prog_argv[i], gr_file);
+	fputc(' ', gr_file);
+    }
+
+    if (rts_argc > 0) {
+	fputs("+RTS ", gr_file);
+
+	for (i = 0; i < rts_argc; ++i) {
+	    fputs(rts_argv[i], gr_file);
+	    fputc(' ', gr_file);
+	}
+    }
+    fputc('\n', gr_file);
+
+    startTime = CURRENT_TIME;
+
+    if (startTime > LL(1000000000)) {
+	/* This shouldn't overflow twice */
+        fprintf(gr_file, "PE %2u [%lu%lu]: TIME\n", thisPE, 
+	    (TIME) (startTime / LL(1000000000)),
+	    (TIME) (startTime % LL(1000000000)));
+    } else {
+	fprintf(gr_file, "PE %2u [%lu]: TIME\n", thisPE, (TIME) startTime);
+    }
+
+    if (do_gr_binary)
+        grputw(sizeof(TIME));
+}
+#endif /* PAR */
+
+#endif /* GRAN || PAR */
+\end{code}
+
+

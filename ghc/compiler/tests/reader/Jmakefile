@@ -1,0 +1,9 @@
+runtests::
+	@echo '###############################################################'
+	@echo '# Validation tests for the reader in the compiler.            #'
+	@echo '###############################################################'
+
+RunStdTest(read001,$(GHC), -noC -ddump-rif2hs read001.hs -o2 read001.stderr)
+RunStdTest(read002,$(GHC), -noC -ddump-rif2hs read002.hs -o2 read002.stderr)
+/* gap 003 */
+RunStdTest(read004,$(GHC), -noC -fno-implicit-prelude -ddump-rif2hs read004.hs -o2 read004.stderr)

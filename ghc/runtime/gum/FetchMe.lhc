@@ -1,0 +1,144 @@
+%
+% (c) Parade/AQUA Projects, Glasgow University, 1995 
+%     Kevin Hammond, February 15th. 1995
+%
+%     This is for GUM only.
+%
+%************************************************************************
+%*                                                                      *
+\section[FetchMe.lhc]{Reading Closures}
+%*									*
+%************************************************************************
+
+This module defines routines for handling remote pointers (@FetchMe@s)
+in GUM.  It is threaded (@.lhc@) because @FetchMe_entry@ will be
+called during evaluation.
+
+\begin{code}
+#ifdef PAR /* whole file */
+
+#define MAIN_REG_MAP	    /* STG world */
+#include "rtsdefs.h"
+\end{code}
+
+\begin{code}
+
+EXTDATA_RO(BH_UPD_info);
+EXTDATA_RO(FetchMe_info);
+
+EXTFUN(EnterNodeCode);
+
+STGFUN(FetchMe_entry)
+{
+    globalAddr *rGA;
+    globalAddr *lGA;
+    globalAddr fmbqGA;
+
+# if defined(GRAN)
+    STGCALL0(void,(),GranSimBlock);	/* Do this before losing its TSO_LINK */
+# endif
+
+    rGA = FETCHME_GA(Node);
+    ASSERT(rGA->loc.gc.gtid != mytid);
+
+    TSO_LINK(CurrentTSO) = Nil_closure;
+    SET_INFO_PTR(Node, FMBQ_info);
+    FMBQ_ENTRIES(Node) = (W_) CurrentTSO;
+
+    LivenessReg = LIVENESS_R1;
+    SaveAllStgRegs();
+    TSO_PC1(CurrentTSO) = EnterNodeCode;
+
+    /* Calls out are now safe */
+
+    if (DO_QP_PROF) {
+    	QP_Event1("GR", CurrentTSO);
+    }
+
+    if(do_gr_profile) {
+        /* Note that CURRENT_TIME may perform an unsafe call */
+	TIME now = CURRENT_TIME;
+        TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
+        TSO_FETCHCOUNT(CurrentTSO)++;
+	TSO_QUEUE(CurrentTSO) = Q_FETCHING;
+        TSO_BLOCKEDAT(CurrentTSO) = now;
+        DumpGranEventAndNode(GR_FETCH, CurrentTSO, (SAVE_R1).p, 
+          taskIDtoPE(rGA->loc.gc.gtid));
+    }
+
+    /* Assign a brand-new global address to the newly created FMBQ */
+    lGA = MakeGlobal((SAVE_R1).p, rtsFalse);
+    splitWeight(&fmbqGA, lGA);
+    ASSERT(fmbqGA.weight == 1L << (BITS_IN(unsigned) - 1));
+
+    sendFetch(rGA, &fmbqGA, 0/*load*/);
+
+    ReSchedule(0);
+    FE_
+}
+
+FETCHME_ITBL(FetchMe_info,FetchMe_entry);
+
+\end{code}
+
+And for migrated FetchMes that are now blocked on remote blocking queues...
+
+\begin{code}
+
+STGFUN(BF_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fprintf(stderr, "Panic: Entered a BlockedFetch\n");
+    EXIT(EXIT_FAILURE);
+    FE_
+}
+
+BF_ITBL();
+
+\end{code}
+
+@FMBQ@ nodes are @FetchMe@s with blocking queues attached.  The fetch has
+been sent, but no reply has been received yet.
+
+\begin{code}
+
+EXTFUN(EnterNodeCode);
+
+STGFUN(FMBQ_entry)
+{   
+    FB_
+
+#if defined(GRAN)
+    STGCALL0(void,(),GranSimBlock);	/* Before overwriting TSO_LINK */
+#endif
+
+    TSO_LINK(CurrentTSO) = (P_) FMBQ_ENTRIES(Node);
+    FMBQ_ENTRIES(Node) = (W_) CurrentTSO;
+
+    LivenessReg = LIVENESS_R1;
+    SaveAllStgRegs();
+    TSO_PC1(CurrentTSO) = EnterNodeCode;
+
+    if (DO_QP_PROF) {
+    	QP_Event1("GR", CurrentTSO);
+    }
+
+    if(do_gr_profile) {
+        /* Note that CURRENT_TIME may perform an unsafe call */
+	TIME now = CURRENT_TIME;
+        TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
+        TSO_FETCHCOUNT(CurrentTSO)++;
+	TSO_QUEUE(CurrentTSO) = Q_FETCHING;
+        TSO_BLOCKEDAT(CurrentTSO) = now;
+        DumpGranEvent(GR_FETCH, CurrentTSO);
+    }
+
+    ReSchedule(0);
+    FE_
+}
+
+FMBQ_ITBL();
+
+#endif /* PAR -- whole file */
+\end{code}
