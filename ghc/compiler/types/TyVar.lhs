@@ -21,7 +21,7 @@ module TyVar (
 	emptyTyVarSet, unitTyVarSet, unionTyVarSets, addOneToTyVarSet,
 	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
 	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
-	isEmptyTyVarSet
+	isEmptyTyVarSet, delOneFromTyVarSet
   ) where
 
 #include "HsVersions.h"
@@ -31,7 +31,7 @@ import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 
 -- others
 import UniqSet		-- nearly all of it
-import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
+import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM, delFromUFM,
 			  plusUFM, sizeUFM, delFromUFM, isNullUFM, UniqFM
 			)
 import BasicTypes	( Unused, unused )
@@ -149,10 +149,12 @@ minusTyVarSet	  :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 isEmptyTyVarSet   :: GenTyVarSet flexi -> Bool
 mkTyVarSet	  :: [GenTyVar flexi] -> GenTyVarSet flexi
 addOneToTyVarSet  :: GenTyVarSet flexi -> GenTyVar flexi -> GenTyVarSet flexi
+delOneFromTyVarSet :: GenTyVarSet flexi -> GenTyVar flexi -> GenTyVarSet flexi
 
 emptyTyVarSet  	  = emptyUniqSet
 unitTyVarSet      = unitUniqSet
 addOneToTyVarSet  = addOneToUniqSet
+delOneFromTyVarSet = delOneFromUniqSet
 intersectTyVarSets= intersectUniqSets
 unionTyVarSets 	  = unionUniqSets
 unionManyTyVarSets= unionManyUniqSets

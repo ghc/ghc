@@ -201,9 +201,13 @@ simplBinder env (id, occ_info)
            | otherwise               = setIdSpecialisation id spec_env'
     in
     if not_in_scope then
-	-- No need to clone
+	-- No need to clone, but we *must* zap any current substitution
+	-- for the variable.  For example:
+	--	(\x.e) with id_subst = [x |-> e']
+	-- Here we must simply zap the substitution for x
 	let
-	    env' = setIdEnv env (new_in_scope_ids id2, id_subst)
+	    env' = setIdEnv env (new_in_scope_ids id2, 
+				 delOneFromIdEnv id_subst id)
 	in
 	returnSmpl (env', id2)
     else
@@ -237,9 +241,12 @@ simplBinders env binders = mapAccumLSmpl simplBinder env binders
 \begin{code}	
 simplTyBinder :: SimplEnv -> TyVar -> SmplM (SimplEnv, TyVar)
 simplTyBinder env tyvar
-  | not (tyvar `elementOfTyVarSet` tyvars)	-- No need to clone
-  = let
-	env' = setTyEnv env (tyvars `addOneToTyVarSet` tyvar, ty_subst)
+  | not (tyvar `elementOfTyVarSet` tyvars)
+  = 	-- No need to clone; but must zap any binding for tyvar
+	-- see comments with simplBinder above
+    let
+	env' = setTyEnv env (tyvars `addOneToTyVarSet` tyvar, 
+			     delFromTyVarEnv ty_subst tyvar)
     in
     returnSmpl (env', tyvar)
 
