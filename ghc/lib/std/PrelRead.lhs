@@ -235,15 +235,17 @@ lexLitChar ('\\':s)     =  do
 	    (esc,t) <- lexEsc s
 	    return ('\\':esc, t)
        where
-        lexEsc (c:s)       | c `elem` "abfnrtv\\\"'" = return ([c],s)
-        lexEsc s@(d:_)     | isDigit d               = lexDecDigits s
-        lexEsc ('o':d:s) | isDigit d                 = lexOctDigits (d:s)
-        lexEsc ('O':d:s) | isDigit d                 = lexOctDigits (d:s)
-        lexEsc ('x':d:s) | isDigit d                 = lexHexDigits (d:s)
-        lexEsc ('X':d:s) | isDigit d                 = lexHexDigits (d:s)
-	lexEsc ('^':c:s) | '@' <= c && c <= '_'    = [(['^',c],s)] -- cf. cntrl in 2.6 of H. report.
-	lexEsc s@(c:_)   | isUpper c		   = fromAsciiLab s
-        lexEsc _                                   = mzero
+        lexEsc (c:s)     | c `elem` escChars = return ([c],s)
+        lexEsc s@(d:_)   | isDigit d         = checkSize 10 lexDecDigits s
+        lexEsc ('o':d:s) | isOctDigit d      = checkSize  8 lexOctDigits (d:s)
+        lexEsc ('O':d:s) | isOctDigit d      = checkSize  8 lexOctDigits (d:s)
+        lexEsc ('x':d:s) | isHexDigit d      = checkSize 16 lexHexDigits (d:s)
+        lexEsc ('X':d:s) | isHexDigit d      = checkSize 16 lexHexDigits (d:s)
+	lexEsc ('^':c:s) | c >= '@' && c <= '_' = [(['^',c],s)] -- cf. cntrl in 2.6 of H. report.
+	lexEsc s@(c:_)   | isUpper c		= fromAsciiLab s
+        lexEsc _                                = mzero
+
+	escChars = "abfnrtv\\\"'"
 
         fromAsciiLab (x:y:z:ls) | isUpper y && (isUpper z || isDigit z) &&
 				   [x,y,z] `elem` asciiEscTab = return ([x,y,z], ls)
@@ -253,9 +255,36 @@ lexLitChar ('\\':s)     =  do
 				   
         asciiEscTab = "DEL" : asciiTab
 
+	 {-
+	   Check that the numerically escaped char literals are
+	   within accepted boundaries.
+	   
+	   Note: this allows char lits with leading zeros, i.e.,
+	         \0000000000000000000000000000001. 
+	 -}
+        checkSize base f str = do
+	   (num, res) <- f str
+	      -- Note: this is assumes that a Char is 8 bits long.
+	   if (toAnInt base num) > 255 then 
+	      mzero
+	    else
+	      case base of
+	         8  -> return ('o':num', res)
+	         16 -> return ('x':num', res)
+		 _  -> return (num, res)
+
+	toAnInt base xs = foldl (\ acc n -> acc*base + n) 0 (map digitToInt xs)
+
 
 lexLitChar (c:s)        =  return ([c],s)
 lexLitChar ""           =  mzero
+
+digitToInt :: Char -> Int
+digitToInt c
+ | isDigit c		=  fromEnum c - fromEnum '0'
+ | c >= 'a' && c <= 'f' =  fromEnum c - fromEnum 'a' + 10
+ | c >= 'A' && c <= 'F' =  fromEnum c - fromEnum 'A' + 10
+ | otherwise	        =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
 \end{code}
 
 %*********************************************************

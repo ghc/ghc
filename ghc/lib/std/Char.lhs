@@ -33,20 +33,7 @@ module Char
     ) where
 
 import PrelBase
-import PrelRead (readLitChar, lexLitChar)
+import PrelRead (readLitChar, lexLitChar, digitToInt)
 import {-# SOURCE #-} PrelErr   ( error )
-
-\end{code}
-
-\begin{code}
--- Digit conversion operations
-
-digitToInt :: Char -> Int
-digitToInt c
- | isDigit c		=  fromEnum c - fromEnum '0'
- | c >= 'a' && c <= 'f' =  fromEnum c - fromEnum 'a' + 10
- | c >= 'A' && c <= 'F' =  fromEnum c - fromEnum 'A' + 10
- | otherwise	        =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
-
 
 \end{code}
