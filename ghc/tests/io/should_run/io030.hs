@@ -2,7 +2,7 @@
 module Main(main) where
 
 import IO
-import Monad ( accumulate )
+import Monad ( sequence )
 
 testPosns :: Handle -> BufferMode -> IO ()
 testPosns hdl bmo = do
@@ -27,19 +27,19 @@ testPositioning hdl = do
   putStrLn ls
     -- go to the end
   hSeek hdl SeekFromEnd 0  
-  ls   <- accumulate (map (\ p -> hSetPosn p >> hGetChar hdl) ps)
+  ls   <- sequence (map (\ p -> hSetPosn p >> hGetChar hdl) ps)
   putStr "First ten chars: "
   putStrLn ls
 
     -- position ourselves in the middle.
   sz <- hFileSize hdl
   hSeek hdl AbsoluteSeek (sz `div` 2)
-  ls   <- accumulate (map (\ p -> hSetPosn p >> hGetChar hdl) ps)
+  ls   <- sequence (map (\ p -> hSetPosn p >> hGetChar hdl) ps)
   putStr "First ten chars: "
   putStrLn ls
 
 hGetChars :: Int -> Handle -> IO String
-hGetChars n h = accumulate (replicate n (hGetChar h))
+hGetChars n h = sequence (replicate n (hGetChar h))
 
 getFilePosns :: Int -> Handle -> IO [HandlePosn]
 getFilePosns 0 h = return []
