@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.80 2001/06/15 15:15:33 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.81 2001/06/25 01:35:07 sof Exp $
 --
 -- GHC Driver
 --
@@ -799,7 +799,7 @@ doLink o_files = do
 	 	      ++ pkg_lib_opts
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
-	              ++ if static then
+	              ++ if static && not no_hs_main then
 #ifdef LEADING_UNDERSCORE
 			    [ "-u _PrelMain_mainIO_closure" ,
 			      "-u ___init_PrelMain"] 
