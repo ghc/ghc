@@ -38,7 +38,7 @@ BOOT_SRCS += PrelPrimopWrappers.hs
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -cpp -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
+SRC_HC_OPTS += -cpp -fglasgow-exts $(GhcLibHcOpts)
 ifneq "$(ILXized)" "YES"
 SRC_HSC2HS_OPTS += -Icbits
 endif
