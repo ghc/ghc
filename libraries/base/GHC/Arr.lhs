@@ -87,7 +87,7 @@ class (Ord a) => Ix a where
 
     rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
 		       | otherwise   = 0
-    unsafeRangeSize b = rangeSize b
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 \end{code}
 
 Note that the following is NOT right
