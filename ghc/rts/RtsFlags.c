@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.47 2001/08/10 15:25:49 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.48 2001/08/13 12:34:37 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -384,7 +384,7 @@ usage_text[] = {
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -K4k   -K2m",
 "",
 "  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
-"  -M<size> Sets the maximum heap size (default 64M)  Egs: -M256k -M1G",
+"  -M<size> Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
 "  -m<n>    Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
@@ -535,8 +535,18 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
     //   argv[0] must be PGM argument -- leave in argv
 
-    for (mode = PGM; arg < total_arg && ! strequal("--RTS", argv[arg]); arg++) {
-	if (strequal("+RTS", argv[arg])) {
+    for (mode = PGM; arg < total_arg; arg++) {
+	// The '--RTS' argument disables all future +RTS ... -RTS processing.
+	if (strequal("--RTS", argv[arg])) {
+	    arg++;
+	    break;
+	}
+	// The '--' argument is passed through to the program, but
+	// disables all further +RTS ... -RTS processing.
+	else if (strequal("--", argv[arg])) {
+	    break;
+	}
+	else if (strequal("+RTS", argv[arg])) {
 	    mode = RTS;
 	}
 	else if (strequal("-RTS", argv[arg])) {
@@ -552,11 +562,9 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	  barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
 	}
     }
-    if (arg < total_arg) {
-	/* arg must be --RTS; process remaining program arguments */
-	while (++arg < total_arg) {
-	    argv[(*argc)++] = argv[arg];
-	}
+    // process remaining program arguments
+    for (; arg < total_arg; arg++) {
+	argv[(*argc)++] = argv[arg];
     }
     argv[*argc] = (char *) 0;
     rts_argv[*rts_argc] = (char *) 0;
