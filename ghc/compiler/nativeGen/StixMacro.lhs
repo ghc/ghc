@@ -72,13 +72,13 @@ adding an indirection.
 macroCode UPD_CAF args
   = let
 	[cafptr,bhptr] = map amodeToStix args
+	new_caf = StCall SLIT("newCAF") CCallConv VoidRep [cafptr]
     	w0 = StInd PtrRep cafptr
 	w1 = StInd PtrRep (StIndex PtrRep cafptr fixedHS)
-	a1 = StAssign PtrRep w0 ind_static_info
-	a2 = StAssign PtrRep w1 bhptr
-	a3 = StCall SLIT("newCAF") CCallConv VoidRep [cafptr]
+	a1 = StAssign PtrRep w1 bhptr
+	a2 = StAssign PtrRep w0 ind_static_info
     in
-    returnUs (\xs -> a1 : a2 : a3 : xs)
+    returnUs (\xs -> new_caf : a1 : a2 : xs)
 \end{code}
 
 -----------------------------------------------------------------------------
