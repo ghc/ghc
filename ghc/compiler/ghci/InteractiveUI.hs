@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.17 2000/11/27 12:10:01 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.18 2000/11/27 12:52:36 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -241,8 +241,16 @@ reloadModule "" = do
   case target state of
    Nothing -> io (putStr "no current target\n")
    Just path
-      -> do (new_cmstate, ok, mod) <- io (cmLoadModule (cmstate state) path)
-            setGHCiState state{cmstate=new_cmstate}  
+      -> do (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
+            setGHCiState 
+               state{cmstate=new_cmstate,
+                     modules = mods,
+                     current_module = case mods of 
+                                         [] -> defaultCurrentModule
+                                         xs -> head xs
+                    }
+
+
 reloadModule _ = noArgs ":reload"
 
 typeOfExpr :: String -> GHCi ()
