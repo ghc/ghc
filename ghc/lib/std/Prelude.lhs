@@ -9,6 +9,7 @@ module Prelude (
 
 	-- Everything from these modules
     module PrelList,
+
         -- Everything corresponding to the Report's PreludeText
     ReadS, ShowS,
     Read(readsPrec, readList),

@@ -155,9 +155,9 @@ noMethodBindingError     s = throw (NoMethodError (untangle s "No instance nor d
 irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
 nonExhaustiveGuardsError s = throw (NonExhaustiveGuards (untangle s "Non-exhaustive guards in"))
 patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
-recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection:"))
-recConError 		 s = throw (RecConError (untangle s "Missing field in record construction:"))
-recUpdError 		 s = throw (RecUpdError (untangle s "Record to doesn't contain field(s) to be updated"))
+recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection"))
+recConError 		 s = throw (RecConError (untangle s "Missing field in record construction"))
+recUpdError 		 s = throw (RecUpdError (untangle s "Record doesn't contain field(s) to be updated"))
 
 
 assertError :: String -> Bool -> a -> a
@@ -182,7 +182,7 @@ untangle coded message
   =  location
   ++ ": " 
   ++ message
-  ++ details
+  ++ "\'" ++ details ++ "\'"
   ++ "\n"
   where
     (location, details)

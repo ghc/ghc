@@ -34,7 +34,7 @@ module PrelConc (
 
 import PrelBase
 import PrelErr ( parError, seqError )
-import PrelST	  	( ST(..), STret(..), liftST )
+import PrelST	  	( liftST )
 import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
 import PrelBase		( Int(..) )
 

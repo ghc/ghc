@@ -53,7 +53,6 @@ import PrelForeign  ( makeForeignObj )
 #else
 #define FILE_OBJECT	    Addr
 #endif
-
 \end{code}
 
 %*********************************************************
@@ -104,7 +103,6 @@ withHandle (Handle h) act = do
 
 writeHandle (Handle h) hc = stToIO (writeVar h hc)
 #endif
-
 \end{code}
 
 nullFile__ is only used for closed handles, plugging it in as a null

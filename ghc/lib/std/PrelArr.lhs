@@ -640,5 +640,4 @@ thawArray (Array ixs arr#) = ST $ \ s# ->
 	      case writeArray# to#   cur# ele st# of { s1# ->
 	      copy (cur# +# 1#) end# from# to# s1#
 	      }}
-
 \end{code}
