@@ -28,6 +28,7 @@ import RdrHsSyn		( RdrNameStmt )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
+import Name		( Name )
 #endif
 
 import HsSyn
@@ -72,7 +73,7 @@ import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
 import FiniteMap	( emptyFM )
-import Name		( Name, nameModule, getName )
+import Name		( nameModule, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import NameSet		( emptyNameSet )
 import Module		( Module, ModLocation(..), showModMsg )
