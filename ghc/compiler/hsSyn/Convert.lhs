@@ -302,7 +302,7 @@ cvt_context tys = map cvt_pred tys
 cvt_pred :: Meta.Type -> HsPred RdrName
 cvt_pred ty = case split_ty_app ty of
 	   	(ConT tc, tys) -> HsClassP (tconName tc) (map cvtType tys)
-		other -> pprPanic "Malformed predicate" (ppr ty)
+		other -> pprPanic "Malformed predicate" (text (show (Meta.pprType ty)))
 
 cvtType :: Meta.Type -> HsType RdrName
 cvtType ty = trans (root ty [])
