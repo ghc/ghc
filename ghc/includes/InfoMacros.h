@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.17 2001/09/17 22:46:59 ken Exp $
+ * $Id: InfoMacros.h,v 1.18 2002/02/26 05:03:27 sof Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -35,8 +35,9 @@
 #define PROF_INFO(type_str, desc_str)
 #endif
 
+/* Why no empty array initializer in the 'else' branch? sof 2/02 */
 #ifdef USE_MINIINTERPRETER
-#define INIT_VECTOR {}
+#define INIT_VECTOR vector : {}
 #else
 #define INIT_VECTOR
 #endif
