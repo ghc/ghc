@@ -46,7 +46,9 @@ module SimplEnv (
 
 IMP_Ubiq(){-uitous-}
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
+#endif
 
 import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo,
 			  BinderInfo(..){-instances, too-}, FunOrArg, DuplicationDanger, InsideSCC
@@ -55,13 +57,13 @@ import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			  SimplifierSwitch(..), SwitchResult(..)
 			)
 import CoreSyn
-import CoreUnfold	( mkFormSummary, exprSmallEnoughToDup, 
+import CoreUnfold	( mkFormSummary, okToInline, couldBeSmallEnoughToInline,
 			  Unfolding(..), UfExpr, RdrName,
 			  SimpleUnfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance, UnfoldingGuidance(..)
 			)
 import CoreUtils	( coreExprCc, unTagBinders )
-import CostCentre	( CostCentre, noCostCentre, noCostCentreAttached )
+import CostCentre	( CostCentre, subsumedCosts, noCostCentreAttached )
 import FiniteMap	-- lots of things
 import Id		( idType, getIdUnfolding, getIdStrictness, idWantsToBeINLINEd,
 			  applyTypeEnvToId, getInlinePragma,
@@ -153,7 +155,7 @@ data SimplEnv
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr noCostCentre nullTyVarEnv nullIdEnv nullIdEnv nullConApps
+  = SimplEnv sw_chkr subsumedCosts nullTyVarEnv nullIdEnv nullIdEnv nullConApps
 
 combineSimplEnv :: SimplEnv -> SimplEnv -> SimplEnv
 combineSimplEnv env@(SimplEnv chkr _       _      _         out_id_env con_apps)
@@ -612,9 +614,12 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 	              occ_info out_id rhs
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env new_con_apps 
   where
-    new_out_id_env = case guidance of
-			UnfoldNever -> out_id_env		-- No new stuff to put in
-		        other	    -> out_id_env_with_unfolding
+    new_out_id_env | okToInline form occ_info (couldBeSmallEnoughToInline guidance) 
+		   = out_id_env_with_unfolding
+		   | otherwise
+		   = out_id_env
+	-- Don't bother to extend the OutIdEnv unless there is some possibility
+	-- that the thing might be inlined.  We check this by calling okToInline suitably.
 
     new_con_apps = _scc_ "eegnr.conapps" 
 		   extendConApps con_apps out_id rhs
@@ -658,127 +663,15 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 				other			      -> False
 
 	-- Compute unfolding details
-    rhs_info     = OutUnfolding unf_cc (SimpleUnfolding form_summary guidance template)
-    form_summary = _scc_ "eegnr.form_sum" 
-		   mkFormSummary rhs
-    guidance     = _scc_ "eegnr.guidance" 
-		   mkSimplUnfoldingGuidance chkr out_id rhs
+    rhs_info = OutUnfolding unf_cc (SimpleUnfolding form guidance template)
+    form     = _scc_ "eegnr.form_sum" 
+	       mkFormSummary rhs
+    guidance = _scc_ "eegnr.guidance" 
+	       mkSimplUnfoldingGuidance chkr out_id rhs
 
 	-- Compute cost centre for thing
     unf_cc  | noCostCentreAttached expr_cc = encl_cc
 	    | otherwise		           = expr_cc
 	    where
 	      expr_cc =  coreExprCc rhs
-\end{code}
-
-
-
-
-========================== OLD [removed SLPJ March 97] ====================
-
-I removed the attempt to inline recursive bindings when I discovered
-a program that made the simplifier loop  (nofib/spectral/hartel/typecheck/Main.hs)
-
-The nasty case is this:
-
-		letrec f = \x -> let z = f x' in ...
-
-		in
-		let n = f y
-		in
-		case n of { ... }
-
-If we bind n to its *simplified* RHS, we then *re-simplify* it when we
-inline n.  Then we may well inline f; and then the same thing happens
-with z!
-
-Recursive bindings
-~~~~~~~~~~~~~~~~~~
-We need to be pretty careful when extending 
-the environment with RHS info in recursive groups.
-
-Here's a nasty example:
-
-	letrec	r = f x
-		t = r
-		x = ...t...
-	in
-	...t...
-
-Here, r occurs exactly once, so we may reasonably inline r in t's RHS.
-But the pre-simplified t's rhs is an atom, r, so we may also decide to
-inline t everywhere.  But if we do *both* these reasonable things we get
-
-	letrec	r = f x
-		t = f x
-		x = ...r...
-	in
-	...t...
-
-Bad news!  (f x) is duplicated!  (The t in the body doesn't get
-inlined because by the time the recursive group is done we see that
-t's RHS isn't an atom.)
-
-Our solution is this: 
-	(a) we inline un-simplified RHSs, and then simplify
-	    them in a clone-only environment.  
-	(b) we inline only variables and values
-This means that
-
-
-	r = f x 	==>  r = f x
-	t = r		==>  t = r
-	x = ...t...	==>  x = ...r...
-     in			   in
-	t		     r
-
-Now t is dead, and we're home.
-
-Most silly x=y  bindings in recursive group will go away.  But not all:
-
-	let y = 1:x
-	    x = y
-
-Here, we can't inline x because it's in an argument position. so we'll just replace
-with a clone of y.  Instead we'll probably inline y (a small value) to give
-
-	let y = 1:x
-	    x = 1:y
-	
-which is OK if not clever.
-
-
-
-\begin{code}
-{-
-extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-		       (out_id, ((_,occ_info), old_rhs))
-  = case (form_summary, guidance) of
-     (_, UnfoldNever)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps -- No new stuff to put in
-     (ValueForm, _)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env_with_unfolding con_apps
-     (VarForm, _)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env_with_unfolding con_apps
-     other	    	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps	-- Not a value or variable
-     
--- SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
-  where
-{-
-    new_out_id_env = case (form_summary, guidance) of
-			(_, UnfoldNever)	-> out_id_env		-- No new stuff to put in
-			(ValueForm, _)		-> out_id_env_with_unfolding
-			(VarForm, _)		-> out_id_env_with_unfolding
-		        other	    		-> out_id_env		-- Not a value or variable
--}
-	-- If there is an unfolding, we add rhs-info for out_id,
-	-- No need to modify occ info because RHS is pre-simplification
-    out_id_env_with_unfolding =	addOneToIdEnv out_id_env out_id 
-			        (out_id, occ_info, rhs_info)
-
-	-- Compute unfolding details
-	-- Note that we use the "old" environment, that just has clones of the rec-bound vars,
-	-- in the InUnfolding.  So if we ever use the InUnfolding we'll just inline once.
-	-- Only if the thing is still small enough next time round will we inline again.
-    rhs_info     = InUnfolding env (SimpleUnfolding form_summary guidance old_rhs)
-    form_summary = mkFormSummary old_rhs
-    guidance     = mkSimplUnfoldingGuidance chkr out_id (unTagBinders old_rhs)
--}
 \end{code}
