@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.67 2000/10/11 10:21:10 rrt Exp $
+-- $Id: Main.hs,v 1.68 2000/10/11 16:06:38 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -866,16 +866,14 @@ way_details =
         [ ]),
 
     (WayPar, Way  "mp" "Parallel" 
-	[ "-fstack-check"
-	, "-fparallel"
+	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
 	, "-package concurrent"
 	, "-fvia-C" ]),
 
     (WayGran, Way  "mg" "Gransim" 
-	[ "-fstack-check"
-	, "-fgransim"
+	[ "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
 	, "-package concurrent"
@@ -1755,13 +1753,6 @@ run_phase Hsc	basename suff input_fn output_fn
 	
   -- build the hsc command line
 	hsc_opts <- build_hsc_opts
-	
-	doing_hi <- readIORef produceHi
-	tmp_hi_file <- if doing_hi 	
-			  then do fn <- newTempName "hi"
-				  add files_to_clean fn
-				  return fn
-			  else return ""
 	
   -- deal with -Rghc-timing
 	timing <- readIORef collect_ghc_timing
