@@ -12,7 +12,6 @@ import System
 import Parse
 import Eval
 
-main = do { [testdir] <- getArgs
-          ; str <- readFile (testdir ++ "/galois.gml")
+main = do { str <- readFile "galois.gml"
           ; mainEval (rayParse str)
           }
