@@ -835,7 +835,7 @@ work with symlinks.
 
 <Question>
 <Para>
-I'm getting &ldquote;permission denied&rdquote; messages from <Command>rm</Command> or
+I'm getting &ldquo;permission denied&rdquo; messages from <Command>rm</Command> or
 <Command>mv</Command>.
 </Para>
 </Question>
@@ -874,11 +874,11 @@ My programs compile fine but do nothing when run.
 </Para>
 </Question>
 
-<Answer>
-<Para>
-Very recent versions of the mingw package in Cygwin seem to cause this. mingwin version 20001111-1 works fine; you should be able to find it on a <ULink
-URL="http://sources.redhat.com/cygwin/mirrors.html">Cygwin mirror</ULink>. Download the archive <Filename>mingw-20001111-1.tar.gz</Filename>, place it in a directory called <Filename>mingw</Filename>, place that in a directory called <Filename>latest</Filename>, then run the Cygwin installer again, choose installation from local disk, and select the directory containing <Filename>latest</Filename> as the source directory for the installation packages. You should then be able to downgrade mingw to the required version by clicking on the line in the installation window until the required version appears.
-</Para>
+<Answer> <Para>Some recent versions of the mingw package in Cygwin seem to
+cause this. mingwin version 20001111-1 works fine; you should be able to
+select it by clicking on the version number of the mingw package in the list
+presented by the Cygwin setup program.</Para>
+</Answer>
 
 </QAndAEntry>
 
