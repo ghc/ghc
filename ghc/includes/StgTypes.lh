@@ -247,6 +247,14 @@ typedef union __dt
     unpacked_double du;
   } double_thing;
 
+typedef StgWord unpacked_float;
+
+typedef union __ft
+  { StgFloat f;
+    unpacked_float fu;
+  } float_thing;
+
+#if HAVE_LONG_LONG
 typedef union __it
   { StgInt64 i;
     unpacked_double iu;
@@ -256,13 +264,7 @@ typedef union __wt
   { StgWord64 w;
     unpacked_double wu;
   } word64_thing;
-
-typedef StgWord unpacked_float;
-
-typedef union __ft
-  { StgFloat f;
-    unpacked_float fu;
-  } float_thing;
+#endif
 
 \end{code}
 

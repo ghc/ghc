@@ -1221,6 +1221,7 @@ PK_FLT(W_ p_src[])
 
 #endif /* not __m68k__ */
 
+#if HAVE_LONG_LONG
 extern STG_INLINE
 void
 ASSIGN_Word64(W_ p_dest[], StgWord64 src)
@@ -1260,6 +1261,7 @@ PK_Int64(W_ p_src[])
     y.iu.dlo = p_src[1];
     return(y.i);
 }
+#endif
 
 \end{code}
 
