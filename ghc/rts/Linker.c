@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.119 2003/04/29 21:37:31 wolfgang Exp $
+ * $Id: Linker.c,v 1.120 2003/05/30 09:06:24 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -214,6 +214,15 @@ typedef struct _RtsSymbolVal {
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 #define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
+/* Extra syms gen'ed by mingw-2's gcc-3.2: */
+#if __GNUC__>=3
+#define RTS_MINGW_EXTRA_SYMS                    \
+      Sym(_imp____mb_cur_max)                   \
+      Sym(_imp___pctype)            
+#else
+#define RTS_MINGW_EXTRA_SYMS
+#endif
+
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
@@ -278,6 +287,7 @@ typedef struct _RtsSymbolVal {
       Sym(opendir)                              \
       Sym(readdir)                              \
       Sym(rewinddir)                            \
+      RTS_MINGW_EXTRA_SYMS                      \
       Sym(closedir)
 #endif
 
