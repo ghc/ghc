@@ -402,6 +402,7 @@ MKDIRHIER_PREFIX	= $(GLAFP_UTILS)/mkdirhier/
 LITERATE	    	= $(FPTOOLS_TOP)/literate
 
 LITERATE_PREFIX    	= $(FPTOOLS_TOP)/literate/
+INFO_PREFIX    	        = $(FPTOOLS_TOP)/literate/info-utils/
 TEXI2HTML_PREFIX        = $(LITERATE_PREFIX)texi2html/
 
 HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
