@@ -265,27 +265,31 @@
 	</varlistentry>
       </variablelist>
 
-      <para>A small word of warning: <option>-cpp</option> is not
-      friendly to &ldquo;string gaps&rdquo;.<indexterm><primary>-cpp
-      vs string gaps</primary></indexterm><indexterm><primary>string
-      gaps vs -cpp</primary></indexterm>.  In other words, strings
-      such as the following:</para>
+      <sect3 id="cpp-string-gaps">
+	<title>CPP and string gaps</title>
+
+	<para>A small word of warning: <option>-cpp</option> is not
+        friendly to &ldquo;string gaps&rdquo;.<indexterm><primary>-cpp
+        vs string gaps</primary></indexterm><indexterm><primary>string
+        gaps vs -cpp</primary></indexterm>.  In other words, strings
+        such as the following:</para>
 
 <ProgramListing>
 strmod = "\
 \ p \
 \ "
 </ProgramListing>
+	
+	<para>don't work with <option>-cpp</option>;
+        <filename>/usr/bin/cpp</filename> elides the backslash-newline
+        pairs.</para>
 
-      <para>don't work with <option>-cpp</option>;
-      <filename>/usr/bin/cpp</filename> elides the backslash-newline
-      pairs.</para>
-
-      <para>However, it appears that if you add a space at the end of
-      the line, then <command>cpp</command> (at least GNU
-      <command>cpp</command> and possibly other
-      <command>cpp</command>s) leaves the backslash-space pairs alone
-      and the string gap works as expected.</para>
+	<para>However, it appears that if you add a space at the end
+        of the line, then <command>cpp</command> (at least GNU
+        <command>cpp</command> and possibly other
+        <command>cpp</command>s) leaves the backslash-space pairs
+        alone and the string gap works as expected.</para>
+      </sect3>
     </sect2>
 
     <sect2 id="pre-processor">
