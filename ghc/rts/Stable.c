@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.7 1999/08/04 15:25:33 simonmar Exp $
+ * $Id: Stable.c,v 1.8 1999/09/15 13:50:14 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -273,9 +273,10 @@ markStablePtrTable(rtsBool full)
 
   end_stable_ptr_table = &stable_ptr_table[SPT_size];
 
-  /* Mark all the stable *pointers* (not stable names) 
+  /* Mark all the stable *pointers* (not stable names).
+   * _starting_ at index 1; index 0 is unused.
    */
-  for (p = stable_ptr_table; p < end_stable_ptr_table; p++) {
+  for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
     q = p->addr;
     /* internal pointers or NULL are free slots 
      */
@@ -330,7 +331,8 @@ gcStablePtrTable(rtsBool full)
 
   end_stable_ptr_table = &stable_ptr_table[SPT_size];
 
-  for (p = stable_ptr_table; p < end_stable_ptr_table; p++) {
+  /* NOTE: _starting_ at index 1; index 0 is unused. */
+  for (p = stable_ptr_table + 1; p < end_stable_ptr_table; p++) {
 
     /* Update the pointer to the StableName object, if there is one */
     if (p->sn_obj != NULL) {
