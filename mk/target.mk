@@ -288,11 +288,13 @@ endif
 # whether HS_SRCS is empty or not.
 #
 
+# can't split objs in way 'u', so we disable it here
+ifeq "$(way)" "u"
+SplitObjs = NO
+endif
+
 ifneq "$(HS_SRCS)" ""
 ifeq "$(SplitObjs)" "YES"
-
-# can't split objs in way 'u', so we disable it here
-ifneq "$(way)" "u"
 
 SRC_HC_OPTS += -split-objs
 
@@ -316,7 +318,6 @@ $(AR) $(AR_OPTS) $@ $(ArSupportsInput) $@.list
 $(RM) $@.list
 $(RANLIB) $@
 endef
-endif
 
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
