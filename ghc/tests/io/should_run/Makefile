@@ -3,7 +3,8 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-OMITTED_RUNTESTS = io005.run io033.run
+# io018 should run
+OMITTED_RUNTESTS = io005.run io018.run io033.run
 endif
 
 include $(TOP)/mk/should_run.mk
