@@ -3807,20 +3807,19 @@ GhcBootLibs = YES</programlisting>
 
 	    <listitem>
 	      <para>Copy
-	      <filename><replaceable>T</replaceable>/ghc/includes/ghcautoconf.h</filename>
+	      <filename><replaceable>T</replaceable>/ghc/includes/ghcautoconf.h</filename>, <filename><replaceable>T</replaceable>/ghc/includes/DerivedConstants.h</filename>, and <filename><replaceable>T</replaceable>/ghc/includes/GHCConstants.h</filename>
 	      to
 	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
 	      Note that we are building on the host machine, using the
-	      target machine's <literal>config.h</literal> file.  This
+	      target machine's configuration files.  This
 	      is so that the intermediate C files generated here will
 	      be suitable for compiling on the target system.</para>
-
 	    </listitem>
 
 	      <listitem>
-		<para>Touch <literal>ghcautoconf.h</literal>, just to make
-		sure it doesn't get replaced during the build:</para>
-<screen>$ touch <replaceable>H</replaceable>/ghc/includes/ghcautoconf.h</screen>
+		<para>Touch the generated configuration files, just to make
+		sure they don't get replaced during the build:</para>
+<screen>$ touch <replaceable>H</replaceable>/ghc/includes/{ghcautoconf.h,DerivedConstants.h,GHCConstants.h}</screen>
 	      </listitem>
 
 	    <listitem>
