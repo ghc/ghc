@@ -28,11 +28,6 @@ GhcHcOpts     = -Rghc-timing -DDEBUG
 GhcLibHcOpts  = -O -dcore-lint $(MyWarningOpts) -keep-hc-files 
 GhcLibWays    =
 
-# Debugging RTS
-GhcRtsHcOpts = -optc-DDEBUG
-GhcRtsCcOpts = -g
-SRC_HC_OPTS  += -lbfd -liberty
-
 # profiled RTS
 #GhcRtsCcOpts =  -pg -g
 
