@@ -39,9 +39,7 @@ BOOT_SRCS += PrelPrimopWrappers.hs
 # 	Setting the GHC compile options
 
 SRC_HC_OPTS += -cpp -fglasgow-exts $(GhcLibHcOpts)
-ifneq "$(ILXized)" "YES"
 SRC_HSC2HS_OPTS += -Icbits
-endif
 
 ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
@@ -102,6 +100,7 @@ CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 # The procedure differs from that in fptools/mk/target.mk in two ways:
 #  (a) we don't want PrelMain in the GHCi std library
 #  (b) on Win32 we must split it into two, because a single .o file can't
+#      have more than 65536 relocations in it.
 #      
 
 # we don't want PrelMain in the GHCi library.
