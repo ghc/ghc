@@ -20,6 +20,7 @@ module CmdLineOpts (
 
 	-- Manipulating DynFlags
 	defaultDynFlags,		-- DynFlags
+	defaultHscLang,			-- HscLang
 	dopt,				-- DynFlag -> DynFlags -> Bool
 	dopt_set, dopt_unset,		-- DynFlags -> DynFlag -> DynFlags
 	dopt_CoreToDo,			-- DynFlags -> [CoreToDo]
@@ -335,9 +336,15 @@ data HscLang
   | HscNothing
     deriving (Eq, Show)
 
+defaultHscLang
+  | cGhcWithNativeCodeGen == "YES" && 
+	(prefixMatch "i386" cTARGETPLATFORM ||
+	 prefixMatch "sparc" cTARGETPLATFORM)   =  HscAsm
+  | otherwise					=  HscC
+
 defaultDynFlags = DynFlags {
   coreToDo = [], stgToDo = [], 
-  hscLang = HscC, 
+  hscLang = defaultHscLang, 
   hscOutName = "", 
   hscStubHOutName = "", hscStubCOutName = "",
   extCoreName = "",

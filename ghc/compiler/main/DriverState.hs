@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.70 2002/02/16 18:15:14 sof Exp $
+-- $Id: DriverState.hs,v 1.71 2002/03/13 13:51:35 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -120,12 +120,6 @@ can_split =  prefixMatch "i386"    cTARGETPLATFORM
 
 -----------------------------------------------------------------------------
 -- Compiler output options
-
-defaultHscLang
-  | cGhcWithNativeCodeGen == "YES" && 
-	(prefixMatch "i386" cTARGETPLATFORM ||
-	 prefixMatch "sparc" cTARGETPLATFORM)   =  HscAsm
-  | otherwise					=  HscC
 
 GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
 GLOBAL_VAR(v_Output_file, Nothing, Maybe String)
