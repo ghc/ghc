@@ -8,7 +8,7 @@
 module OccName (
 	-- The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, tvName,
-	nameSpaceString, 
+	uvName, nameSpaceString, 
 
 	-- The OccName type
 	OccName, 	-- Abstract, instance of Outputable
@@ -19,7 +19,7 @@ module OccName (
 	mkDictOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	
-	isTvOcc, isDataOcc, isDataSymOcc, isSymOcc,
+	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -84,6 +84,7 @@ pprEncodedFS fs
 data NameSpace = VarName	-- Variables
 	       | DataName	-- Data constructors
 	       | TvName		-- Type variables
+	       | UvName		-- Usage variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
 				-- in the same name space for now.  
 	       deriving( Eq, Ord )
@@ -96,6 +97,7 @@ tcClsName = TcClsName		-- Not sure which!
 
 dataName = DataName
 tvName   = TvName
+uvName   = UvName
 varName  = VarName
 
 
@@ -103,6 +105,7 @@ nameSpaceString :: NameSpace -> String
 nameSpaceString DataName  = "Data constructor"
 nameSpaceString VarName   = "Variable"
 nameSpaceString TvName    = "Type variable"
+nameSpaceString UvName    = "Usage variable"
 nameSpaceString TcClsName = "Type constructor or class"
 \end{code}
 
@@ -211,10 +214,13 @@ occNameFlavour (OccName sp _) = nameSpaceString sp
 \end{code}
 
 \begin{code}
-isTvOcc, isDataSymOcc, isSymOcc :: OccName -> Bool
+isTvOcc, isDataSymOcc, isSymOcc, isUvOcc :: OccName -> Bool
 
 isTvOcc (OccName TvName _) = True
 isTvOcc other              = False
+
+isUvOcc (OccName UvName _) = True
+isUvOcc other              = False
 
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!

@@ -21,7 +21,7 @@ module Var (
         -- UVars
         UVar,
         isUVar,
-        mkUVar,
+        mkUVar, mkNamedUVar,
 
 	-- Ids
 	Id, DictId,
@@ -32,7 +32,7 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	Type( Type, Kind )
+import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	IdInfo( IdInfo, seqIdInfo )
 
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
@@ -232,6 +232,16 @@ mkUVar :: Unique -> UVar
 mkUVar unique = Var { varName    = mkSysLocalName unique SLIT("u"),
 		      realUnique = getKey unique,
 		      varDetails = UVar }
+
+mkNamedUVar :: Name -> UVar
+mkNamedUVar name = Var { varName    = name
+		       , realUnique = getKey (nameUnique name)
+		       , varDetails = UVar
+#ifdef DEBUG
+		       , varType = pprPanic "looking at Type of a uvar" (ppr name)
+		       , varInfo = pprPanic "looking at IdInfo of a uvar" (ppr name)
+#endif
+		       }
 \end{code}
 
 \begin{code}

@@ -39,7 +39,7 @@ import Id		( Id, mkId, mkVanillaId,
 			)
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
-import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp )
+import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, unUsgTy )
 import Var		( IdOrTyVar, mkTyVar, tyVarKind )
 import VarEnv
 import Name		( Name, NamedThing(..) )
@@ -213,7 +213,7 @@ tcCoreExpr (UfTuple name args)
     mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
 	-- Put the missing type arguments back in
-	con_args = map (Type . coreExprType) args' ++ args'
+	con_args = map (Type . unUsgTy . coreExprType) args' ++ args'
     in
     returnTc (Con con con_args)
 
@@ -255,7 +255,8 @@ tcCoreExpr (UfNote note expr)
   = tcCoreExpr expr		`thenTc` \ expr' ->
     case note of
 	UfCoerce to_ty -> tcHsType to_ty	`thenTc` \ to_ty' ->
-			  returnTc (Note (Coerce to_ty' (coreExprType expr')) expr')
+			  returnTc (Note (Coerce (unUsgTy to_ty')
+                                                 (unUsgTy (coreExprType expr'))) expr')
 	UfInlineCall   -> returnTc (Note InlineCall expr')
 	UfInlineMe     -> returnTc (Note InlineMe   expr')
 	UfSCC cc       -> returnTc (Note (SCC cc)   expr')

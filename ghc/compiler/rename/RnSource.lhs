@@ -22,7 +22,7 @@ import HsCore
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, unknownSigErr )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, 
 			  lookupImplicitOccRn, 
-			  bindLocalsRn, bindLocalRn, bindLocalsFVRn,
+			  bindLocalsRn, bindLocalRn, bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  bindCoreLocalFVRn, bindCoreLocalsFVRn,
 			  checkDupOrQualNames, checkDupNames,
@@ -630,9 +630,23 @@ rnHsType doc (MonoDictTy clas tys)
     rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->
     returnRn (MonoDictTy clas' tys', fvs `addOneFV` clas')
 
+rnHsType doc (MonoUsgForAllTy uv_rdr ty)
+  = bindUVarRn doc uv_rdr $ \ uv_name ->
+    rnHsType doc ty       `thenRn` \ (ty', fvs) ->
+    returnRn (MonoUsgForAllTy uv_name ty',
+              fvs )
+
 rnHsType doc (MonoUsgTy usg ty)
-  = rnHsType doc ty             `thenRn` \ (ty', fvs) ->
-    returnRn (MonoUsgTy usg ty', fvs)
+  = newUsg usg                          `thenRn` \ (usg', usg_fvs) ->
+    rnHsType doc ty                     `thenRn` \ (ty', ty_fvs) ->
+    returnRn (MonoUsgTy usg' ty',
+              usg_fvs `plusFV` ty_fvs)
+  where
+    newUsg usg = case usg of
+                   MonoUsOnce       -> returnRn (MonoUsOnce, emptyFVs)
+                   MonoUsMany       -> returnRn (MonoUsMany, emptyFVs)
+                   MonoUsVar uv_rdr -> lookupOccRn uv_rdr `thenRn` \ uv_name ->
+                                       returnRn (MonoUsVar uv_name, emptyFVs)
 
 rnHsTypes doc tys = mapFvRn (rnHsType doc) tys
 \end{code}

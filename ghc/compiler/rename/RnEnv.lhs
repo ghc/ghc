@@ -289,6 +289,10 @@ bindLocalsFVRn doc rdr_names enclosed_scope
     returnRn (thing, delListFromNameSet fvs names)
 
 -------------------------------------
+bindUVarRn :: SDoc -> RdrName -> (Name -> RnMS (a, FreeVars)) -> RnMS (a, FreeVars)
+bindUVarRn = bindLocalRn
+
+-------------------------------------
 extendTyVarEnvFVRn :: [HsTyVar Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
 	-- This tiresome function is used only in rnDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope

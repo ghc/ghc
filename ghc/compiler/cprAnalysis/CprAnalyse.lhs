@@ -15,7 +15,7 @@ import Var		( Var, Id, TyVar, idType, varName, varType )
 import Id               ( setIdCprInfo, getIdCprInfo, getIdUnfolding )
 import IdInfo           ( CprInfo(..) )
 import VarEnv
-import Type             ( Type(..), splitFunTys, splitForAllTys, splitNewType_maybe ) 
+import Type             ( Type, splitFunTys, splitForAllTys, splitNewType_maybe )
 import TyCon            ( isProductTyCon, isNewTyCon, isUnLiftedTyCon )
 import DataCon          ( dataConTyCon, splitProductType_maybe )
 import Const            ( Con(DataCon), isWHNFCon )
@@ -365,8 +365,9 @@ splitTypeToFunArgAndRes ty = (tyvars, argtys, resty)
           (argtys, resty) = splitFunTysIgnoringNewTypes funty
 --          (argtys, resty) = splitFunTys funty
 
--- Taken from splitFunTys in Type.lhs.  Modified to keep searching through newtypes
+-- splitFunTys, modified to keep searching through newtypes.
 -- Should move to Type.lhs if it is doing something sensible.
+
 splitFunTysIgnoringNewTypes :: Type -> ([Type], Type)
 splitFunTysIgnoringNewTypes ty = split ty
   where
@@ -377,6 +378,7 @@ splitFunTysIgnoringNewTypes ty = split ty
 				(args', res') = split rep_ty
 	     where
 		(args, res) = splitFunTys ty
+
 
 -- Is this the constructor for a product type (i.e. algebraic, single constructor) 
 -- NB: isProductTyCon replies 'False' for unboxed tuples

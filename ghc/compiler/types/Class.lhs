@@ -16,7 +16,7 @@ module Class (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon )
-import {-# SOURCE #-} Type	( Type )
+import {-# SOURCE #-} TypeRep	( Type )
 import {-# SOURCE #-} InstEnv	( InstEnv )
 
 import Var		( Id, TyVar )

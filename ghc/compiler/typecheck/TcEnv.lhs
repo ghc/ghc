@@ -7,6 +7,8 @@ module TcEnv(
 
 	initEnv, getEnvTyCons, getEnvClasses, getAllEnvTyCons,
 	
+        tcExtendUVarEnv, tcLookupUVar,
+
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
 
 	tcLookupTy,
@@ -33,7 +35,7 @@ import HsTypes	( HsTyVar, getTyVarName )
 import Id	( mkUserLocal, isDataConId_maybe )
 import MkId 	( mkSpecPragmaId )
 import Var	( TyVar, Id, setVarName,
-		  idType, lazySetIdInfo, idInfo, tyVarKind
+		  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
 		)
 import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 		  tcInstTyVars, zonkTcTyVars,
@@ -136,6 +138,7 @@ Data type declarations
 
 \begin{code}
 data TcEnv = TcEnv
+                  UsageEnv
 		  TypeEnv
 		  ValueEnv 
 		  (TcTyVarSet,		-- The in-scope TyVars
@@ -145,6 +148,7 @@ data TcEnv = TcEnv
 
 type NameEnv val = UniqFM val		-- Keyed by Names
 
+type UsageEnv   = NameEnv UVar
 type TypeEnv	= NameEnv (TcKind, Maybe Arity, TcTyThing)
 type ValueEnv	= NameEnv Id	
 
@@ -156,16 +160,40 @@ data TcTyThing = ATyVar TcTyVar		-- Mutable only so that the kind can be mutable
 
 
 initEnv :: TcRef TcTyVarSet -> TcEnv
-initEnv mut = TcEnv emptyUFM emptyUFM (emptyVarSet, mut)
+initEnv mut = TcEnv emptyUFM emptyUFM emptyUFM (emptyVarSet, mut)
 
-getEnvTyCons  (TcEnv te _ _) = [tc | (_, _, ATyCon tc) <- eltsUFM te]
-getEnvClasses (TcEnv te _ _) = [cl | (_, _, AClass cl) <- eltsUFM te]
-getAllEnvTyCons (TcEnv te _ _) = catMaybes (map gettc (eltsUFM te))
+getEnvTyCons  (TcEnv _ te _ _) = [tc | (_, _, ATyCon tc) <- eltsUFM te]
+getEnvClasses (TcEnv _ te _ _) = [cl | (_, _, AClass cl) <- eltsUFM te]
+getAllEnvTyCons (TcEnv _ te _ _) = catMaybes (map gettc (eltsUFM te))
     where                          
       gettc (_,_, ATyCon tc) = Just tc
       gettc (_,_, AClass cl) = Just (classTyCon cl)
       gettc _                = Nothing
 \end{code}
+
+The UsageEnv
+~~~~~~~~~~~~
+
+Extending the usage environment.
+
+\begin{code}
+tcExtendUVarEnv :: Name -> UVar -> TcM s r -> TcM s r
+tcExtendUVarEnv uv_name uv scope
+  = tcGetEnv                                                 `thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+    tcSetEnv (TcEnv (addToUFM ue uv_name uv) te ve gtvs) scope
+\end{code}
+
+Looking up in the environments.
+
+\begin{code}
+tcLookupUVar :: Name -> NF_TcM s UVar
+tcLookupUVar uv_name
+  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+    case lookupUFM ue uv_name of
+      Just uv -> returnNF_Tc uv
+      Nothing -> failWithTc (uvNameOutOfScope uv_name)
+\end{code}	
+
 
 The TypeEnv
 ~~~~~~~~~~~~
@@ -175,7 +203,7 @@ Extending the type environment.
 \begin{code}
 tcExtendTyVarEnv :: [TyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnv tyvars scope
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv te ve (in_scope_tvs, gtvs)) ->
+  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs, gtvs)) ->
     let
 	extend_list = [ (getName tv, (kindToTcKind (tyVarKind tv), Nothing, ATyVar tv))
 		      | tv <- tyvars
@@ -191,7 +219,7 @@ tcExtendTyVarEnv tyvars scope
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv te' ve (in_scope_tvs', gtvs')) scope
+    tcSetEnv (TcEnv ue te' ve (in_scope_tvs', gtvs')) scope
 
 -- This variant, tcExtendTyVarEnvForMeths, takes *two* bunches of tyvars:
 --	the signature tyvars contain the original names
@@ -201,20 +229,20 @@ tcExtendTyVarEnv tyvars scope
 
 tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     let
 	te' = addListToUFM te stuff
     in
-    tcSetEnv (TcEnv te' ve gtvs) thing_inside
+    tcSetEnv (TcEnv ue te' ve gtvs) thing_inside
   where
     stuff = [ (getName sig_tv, (kindToTcKind (tyVarKind inst_tv), Nothing, ATyVar inst_tv))
 	    | (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
 	    ]
 
 tcExtendGlobalTyVars extra_global_tvs scope
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv te ve (in_scope,gtvs)) ->
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve (in_scope,gtvs)) ->
     tc_extend_gtvs gtvs	extra_global_tvs	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv te ve (in_scope,gtvs')) scope
+    tcSetEnv (TcEnv ue te ve (in_scope,gtvs')) scope
 
 tc_extend_gtvs gtvs extra_global_tvs
   = tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
@@ -231,7 +259,7 @@ the environment.
 \begin{code}
 tcGetGlobalTyVars :: NF_TcM s TcTyVarSet
 tcGetGlobalTyVars
-  = tcGetEnv 						`thenNF_Tc` \ (TcEnv te ve (_,gtvs)) ->
+  = tcGetEnv 						`thenNF_Tc` \ (TcEnv ue te ve (_,gtvs)) ->
     tcReadMutVar gtvs					`thenNF_Tc` \ global_tvs ->
     zonkTcTyVars (varSetElems global_tvs)		`thenNF_Tc` \ global_tys' ->
     let
@@ -242,7 +270,7 @@ tcGetGlobalTyVars
 
 tcGetInScopeTyVars :: NF_TcM s [TcTyVar]
 tcGetInScopeTyVars
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te ve (in_scope_tvs, gtvs)) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs, gtvs)) ->
     returnNF_Tc (varSetElems in_scope_tvs)
 \end{code}
 
@@ -254,11 +282,11 @@ tcExtendTypeEnv :: [(Name, (TcKind, Maybe Arity, TcTyThing))] -> TcM s r -> TcM 
 tcExtendTypeEnv bindings scope
   = ASSERT( null [tv | (_, (_,_,ATyVar tv)) <- bindings] )
 	-- Not for tyvars; use tcExtendTyVarEnv
-    tcGetEnv					`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+    tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     let
 	te' = addListToUFM te bindings
     in
-    tcSetEnv (TcEnv te' ve gtvs) scope
+    tcSetEnv (TcEnv ue te' ve gtvs) scope
 \end{code}
 
 
@@ -267,7 +295,7 @@ Looking up in the environments.
 \begin{code}
 tcLookupTy :: Name ->  NF_TcM s (TcKind, Maybe Arity, TcTyThing)
 tcLookupTy name
-  = tcGetEnv	`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM te name of {
 	Just thing -> returnNF_Tc thing ;
  	Nothing    -> 
@@ -295,14 +323,14 @@ tcLookupTyCon name
 
 tcLookupClassByKey :: Unique -> NF_TcM s Class
 tcLookupClassByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM_Directly te key of
 	Just (_, _, AClass cl) -> returnNF_Tc cl
 	other		       -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
 
 tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
 tcLookupTyConByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     case lookupUFM_Directly te key of
 	Just (_, _, ATyCon tc) -> returnNF_Tc tc
 	other		       -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
@@ -320,22 +348,22 @@ tcLookupTyConByKey key
 \begin{code}
 tcExtendGlobalValEnv :: [Id] -> TcM s a -> TcM s a
 tcExtendGlobalValEnv ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     let
 	ve' = addListToUFM_Directly ve [(getUnique id, id) | id <- ids]
     in
-    tcSetEnv (TcEnv te ve' gtvs) scope
+    tcSetEnv (TcEnv ue te ve' gtvs) scope
 
 tcExtendLocalValEnv :: [(Name,TcId)] -> TcM s a -> TcM s a
 tcExtendLocalValEnv names_w_ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te ve (in_scope_tvs,gtvs)) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs,gtvs)) ->
     tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
     let
 	ve'		    = addListToUFM ve names_w_ids
 	extra_global_tyvars = tyVarsOfTypes (map (idType . snd) names_w_ids)
     in
     tc_extend_gtvs gtvs extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv te ve' (in_scope_tvs,gtvs')) scope
+    tcSetEnv (TcEnv ue te ve' (in_scope_tvs,gtvs')) scope
 \end{code}
 
 
@@ -344,7 +372,7 @@ tcLookupValue :: Name -> NF_TcM s Id	-- Panics if not found
 tcLookupValue name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc id
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
 		   returnNF_Tc (lookupWithDefaultUFM ve def name)
   where
     def = pprPanic "tcLookupValue:" (ppr name)
@@ -353,28 +381,28 @@ tcLookupValueMaybe :: Name -> NF_TcM s (Maybe Id)
 tcLookupValueMaybe name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc (Just id)
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
 		   returnNF_Tc (lookupUFM ve name)
 
 tcLookupValueByKey :: Unique -> NF_TcM s Id	-- Panics if not found
 tcLookupValueByKey key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     returnNF_Tc (explicitLookupValueByKey ve key)
 
 tcLookupValueByKeyMaybe :: Unique -> NF_TcM s (Maybe Id)
 tcLookupValueByKeyMaybe key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     returnNF_Tc (lookupUFM_Directly ve key)
 
 tcGetValueEnv :: NF_TcM s ValueEnv
 tcGetValueEnv
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
     returnNF_Tc ve
 
 tcSetValueEnv :: ValueEnv -> TcM s a -> TcM s a
 tcSetValueEnv ve scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv te _ gtvs) ->
-    tcSetEnv (TcEnv te ve gtvs) scope
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te _ gtvs) ->
+    tcSetEnv (TcEnv ue te ve gtvs) scope
 
 -- Non-monadic version, environment given explicitly
 explicitLookupValueByKey :: ValueEnv -> Unique -> Id
@@ -437,6 +465,9 @@ badCon con_id
   = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
 badPrimOp op
   = quotes (ppr op) <+> ptext SLIT("is not a primop")
+
+uvNameOutOfScope name
+  = ptext SLIT("UVar") <+> quotes (ppr name) <+> ptext SLIT("is not in scope")
 
 tyNameOutOfScope name
   = quotes (ppr name) <+> ptext SLIT("is not in scope")

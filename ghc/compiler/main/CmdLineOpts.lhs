@@ -295,8 +295,8 @@ src_filename = case argv of
 
 \begin{code}
 -- debugging opts
-opt_D_dump_all                  = lookUp  SLIT("-ddump-all")
-opt_D_dump_most                 = opt_D_dump_all  || lookUp  SLIT("-ddump-most")
+opt_D_dump_all   {- do not -}   = lookUp  SLIT("-ddump-all")
+opt_D_dump_most  {- export -}   = opt_D_dump_all  || lookUp  SLIT("-ddump-most")
 
 opt_D_dump_absC			= opt_D_dump_all  || lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= opt_D_dump_all  || lookUp  SLIT("-ddump-asm")
@@ -305,7 +305,7 @@ opt_D_dump_deriv		= opt_D_dump_most || lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= opt_D_dump_most || lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= opt_D_dump_all  || lookUp  SLIT("-ddump-flatC")
 opt_D_dump_foreign		= opt_D_dump_most || lookUp  SLIT("-ddump-foreign-stubs")
-opt_D_dump_inlinings		= opt_D_dump_most || lookUp  SLIT("-ddump-inlinings")
+opt_D_dump_inlinings		= opt_D_dump_all  || lookUp  SLIT("-ddump-inlinings")
 opt_D_dump_occur_anal		= opt_D_dump_most || lookUp  SLIT("-ddump-occur-anal")
 opt_D_dump_parsed		= opt_D_dump_most || lookUp  SLIT("-ddump-parsed")
 opt_D_dump_realC		= opt_D_dump_all  || lookUp  SLIT("-ddump-realC")

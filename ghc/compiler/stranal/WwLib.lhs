@@ -501,7 +501,7 @@ mk_cpr_case (ty, cpr_info@(CPRInfo ci_args))
       getUniqueUs                `thenUs`  \id_uniq   ->
       let id_id = mk_ww_local id_uniq ty 
           (args, tup, exp) = unzip3 sub_builds
-          con_app = mkConApp data_con (map Var args) 
+          -- not used: con_app = mkConApp data_con (map Var args) 
           new_tup = concat tup
           new_exp_case = \var -> Case (Var id_id) (mkWildId ty)
 				 [(DataCon data_con, args, 

@@ -41,7 +41,10 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type  ( Type, Kind, SuperKind )
+import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
+ -- Should just be Type(Type), but this fails due to bug present up to
+ -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
+
 import {-# SOURCE #-} DataCon ( DataCon )
 
 import Class 		( Class )

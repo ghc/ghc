@@ -62,10 +62,11 @@ coreExprType :: CoreExpr -> Type
 coreExprType (Var var)		    = idType var
 coreExprType (Let _ body)	    = coreExprType body
 coreExprType (Case _ _ alts)        = coreAltsType alts
-coreExprType (Note (Coerce ty _) e) = ty
+coreExprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
 coreExprType (Note (TermUsg u) e)   = mkUsgTy u (unUsgTy (coreExprType e))
 coreExprType (Note other_note e)    = coreExprType e
-coreExprType e@(Con con args)       = applyTypeToArgs e (conType con) args
+coreExprType e@(Con con args)       = ASSERT2( all (\ a -> case a of { Type ty -> isNotUsgTy ty; _ -> True }) args, ppr e)
+                                                                                                                                         applyTypeToArgs e (conType con) args
 
 coreExprType (Lam binder expr)
   | isId binder    = (case (lbvarInfo . idInfo) binder of
@@ -439,7 +440,7 @@ eqExpr e1 e2
 					 eq (extendVarEnvList env (vs1 `zip` vs2)) r1 r2
 
     eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
-    eq_note env (Coerce f1 t1) (Coerce f2 t2) = f1==f2 && t1==t2
+    eq_note env (Coerce t1 f1) (Coerce t2 f2) = t1==t2 && f1==f2
     eq_note env InlineCall     InlineCall     = True
     eq_note env other1	       other2	      = False
 \end{code}

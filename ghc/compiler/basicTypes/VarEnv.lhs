@@ -28,7 +28,7 @@ module VarEnv (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	CoreSyn( CoreExpr )
-import {-# SOURCE #-}	Type( Type )
+import {-# SOURCE #-}	TypeRep( Type )
 
 import OccName	( TidyOccEnv, emptyTidyOccEnv )
 import Var	( Var, Id, IdOrTyVar )

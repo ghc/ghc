@@ -36,7 +36,9 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
 			  emptyCoreRules, isEmptyCoreRules, seqRules
 			)
 import CoreFVs		( exprFreeVars )
-import Type		( Type(..), ThetaType, TyNote(..), 
+import TypeRep		( Type(..), TyNote(..), 
+			)  -- friend
+import Type		( ThetaType,
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy
 			)
 import VarSet
@@ -218,7 +220,8 @@ subst_ty subst ty
     go (NoteTy (SynNote ty1) ty2) = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)   = go ty2		-- Discard the free tyvar note
     go (FunTy arg res)   	  = (FunTy $! (go arg)) $! (go res)
-    go (NoteTy (UsgNote usg) ty2) = (NoteTy $! UsgNote usg) $! go ty2  	-- Keep usage annot
+    go (NoteTy (UsgNote usg)  ty2) = (NoteTy $! UsgNote usg) $! go ty2  	-- Keep usage annot
+    go (NoteTy (UsgForAll uv) ty2) = (NoteTy $! UsgForAll uv) $! go ty2  	-- Keep uvar bdr
     go (AppTy fun arg)   	  = mkAppTy (go fun) $! (go arg)
     go ty@(TyVarTy tv)   	  = case (lookupSubst subst tv) of
 	       				Nothing 	   -> ty

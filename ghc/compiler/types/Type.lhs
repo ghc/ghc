@@ -1,11 +1,12 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
-\section[Type]{Type}
+\section[Type]{Type - public interface}
 
 \begin{code}
 module Type (
-	Type(..), TyNote(..), UsageAnn(..),		-- Representation visible to friends
+        -- re-exports from TypeRep:
+	Type,
 	Kind, TyVarSubst,
 
 	superKind, superBoxity,				-- :: SuperKind
@@ -21,13 +22,15 @@ module Type (
 
 	funTyCon,
 
+        -- exports from this module:
+        hasMoreBoxityInfo,
+
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
 	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
 	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, splitFunTysN,
-	funResultTy, funArgTy,
-	zipFunTys,
+	funResultTy, funArgTy, zipFunTys,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
@@ -35,7 +38,8 @@ module Type (
 
 	mkSynTy, isSynTy, deNoteType, repType, splitNewType_maybe,
 
-        mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
+        UsageAnn(..), mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
+        mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	isForAllTy, applyTy, applyTys, mkPiType,
@@ -66,230 +70,52 @@ module Type (
 
 #include "HsVersions.h"
 
+-- We import the representation and primitive functions from TypeRep.
+-- Many things are reexported, but not the representation!
+
+import TypeRep
+
+-- Other imports:
+
 import {-# SOURCE #-}	DataCon( DataCon, dataConType )
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
-import Var	( Id, TyVar, IdOrTyVar, UVar,
-		  tyVarKind, tyVarName, isId, idType, setTyVarName, setVarOcc
+import Var	( TyVar, IdOrTyVar, UVar,
+		  tyVarKind, tyVarName, setTyVarName, isId, idType,
 		)
 import VarEnv
 import VarSet
 
-import Name	( NamedThing(..), Provenance(..), ExportFlag(..),
-		  mkWiredInTyConName, mkGlobalName, mkLocalName, mkKindOccFS, tcName,
-		  tidyOccName, TidyOccEnv
+import Name	( NamedThing(..), mkLocalName, tidyOccName,
 		)
 import NameSet
 import Class	( classTyCon, Class )
-import TyCon	( TyCon, KindCon, 
-		  mkFunTyCon, mkKindCon, mkSuperKindCon,
-		  matchesTyCon, isUnboxedTupleTyCon, isUnLiftedTyCon,
+import TyCon	( TyCon,
+		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon,
 		  isAlgTyCon, isSynTyCon, tyConArity,
-		  tyConKind, tyConDataCons, getSynTyConDefn, 
+	          tyConKind, tyConDataCons, getSynTyConDefn,
 		  tyConPrimRep, tyConClass_maybe
 		)
 
 -- others
-import BasicTypes 	( Unused )
-import SrcLoc		( mkBuiltinSrcLoc, noSrcLoc )
-import PrelMods		( pREL_GHC )
+import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Unique		-- quite a few *Keys
-import Util		( thenCmp, mapAccumL, seqList, ($!) )
+import Unique		( Uniquable(..) )
+import Util		( mapAccumL, seqList )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Type Classifications}
-%*									*
-%************************************************************************
-
-A type is
-
-	*unboxed*	iff its representation is other than a pointer
-			Unboxed types cannot instantiate a type variable.
-			Unboxed types are always unlifted.
-
-	*lifted*	A type is lifted iff it has bottom as an element.
-			Closures always have lifted types:  i.e. any
-			let-bound identifier in Core must have a lifted
-			type.  Operationally, a lifted object is one that
-			can be entered.
-			(NOTE: previously "pointed").			
-
-	*algebraic*	A type with one or more constructors, whether declared
-			with "data" or "newtype".   
-			An algebraic type is one that can be deconstructed
-			with a case expression.  
-			*NOT* the same as lifted types,  because we also 
-			include unboxed tuples in this classification.
-
-	*data*		A type declared with "data".  Also boxed tuples.
-
-	*primitive*	iff it is a built-in type that can't be expressed
-			in Haskell.
-
-Currently, all primitive types are unlifted, but that's not necessarily
-the case.  (E.g. Int could be primitive.)
-
-Some primitive types are unboxed, such as Int#, whereas some are boxed
-but unlifted (such as ByteArray#).  The only primitive types that we
-classify as algebraic are the unboxed tuples.
-
-examples of type classifications:
-
-Type		primitive	boxed		lifted		algebraic    
------------------------------------------------------------------------------
-Int#,		Yes		No		No		No
-ByteArray#	Yes		Yes		No		No
-(# a, b #)	Yes		No		No		Yes
-(  a, b  )	No		Yes		Yes		Yes
-[a]		No		Yes		Yes		Yes
 
 %************************************************************************
 %*									*
-\subsection{The data type}
+\subsection{Stuff to do with kinds.}
 %*									*
 %************************************************************************
-
-
-\begin{code}
-type SuperKind = Type
-type Kind      = Type
-
-type TyVarSubst = TyVarEnv Type
-
-data Type
-  = TyVarTy TyVar
-
-  | AppTy
-	Type		-- Function is *not* a TyConApp
-	Type
-
-  | TyConApp			-- Application of a TyCon
-	TyCon			-- *Invariant* saturated appliations of FunTyCon and
-				-- 	synonyms have their own constructors, below.
-	[Type]		-- Might not be saturated.
-
-  | FunTy			-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
-	Type
-	Type
-
-  | NoteTy 			-- Saturated application of a type synonym
-	TyNote
-	Type		-- The expanded version
-
-  | ForAllTy
-	TyVar
-	Type		-- TypeKind
-
-data TyNote
-  = SynNote Type	-- The unexpanded version of the type synonym; always a TyConApp
-  | FTVNote TyVarSet	-- The free type variables of the noted expression
-  | UsgNote UsageAnn    -- The usage annotation at this node
-
-data UsageAnn
-  = UsOnce		-- Used at most once
-  | UsMany		-- Used possibly many times (no info; this annotation can be omitted)
-  | UsVar UVar		-- Annotation is variable (should only happen inside analysis)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Kinds}
-%*									*
-%************************************************************************
-
-Kinds
-~~~~~
-k::K = Type bx
-     | k -> k
-     | kv
-
-kv :: KX is a kind variable
-
-Type :: BX -> KX
-
-bx::BX = Boxed 
-      |  Unboxed
-      |  AnyBox		-- Used *only* for special built-in things
-			-- like error :: forall (a::*?). String -> a
-			-- Here, the 'a' can be instantiated to a boxed or
-			-- unboxed type.
-      |  bv
-
-bxv :: BX is a boxity variable
-
-sk = KX		-- A kind
-   | BX		-- A boxity
-   | sk -> sk	-- In ptic (BX -> KX)
-
-\begin{code}
-mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str)
-				    (LocalDef mkBuiltinSrcLoc NotExported)
-	-- mk_kind_name is a bit of a hack
-	-- The LocalDef means that we print the name without
-	-- a qualifier, which is what we want for these kinds.
-	-- It's used for both Kinds and Boxities
-\end{code}
-
-Define KX, BX.
-
-\begin{code}
-superKind :: SuperKind 		-- KX, the type of all kinds
-superKindName = mk_kind_name kindConKey SLIT("KX")
-superKind = TyConApp (mkSuperKindCon superKindName) []
-
-superBoxity :: SuperKind		-- BX, the type of all boxities
-superBoxityName = mk_kind_name boxityConKey SLIT("BX")
-superBoxity = TyConApp (mkSuperKindCon superBoxityName) []
-\end{code}
-
-Define Boxed, Unboxed, AnyBox
-
-\begin{code}
-boxedKind, unboxedKind, anyBoxKind :: Kind	-- Of superkind superBoxity
-
-boxedConName = mk_kind_name boxedConKey SLIT("*")
-boxedKind    = TyConApp (mkKindCon boxedConName superBoxity) []
-
-unboxedConName = mk_kind_name unboxedConKey SLIT("#")
-unboxedKind    = TyConApp (mkKindCon unboxedConName superBoxity) []
-
-anyBoxConName = mk_kind_name anyBoxConKey SLIT("?")
-anyBoxCon     = mkKindCon anyBoxConName superBoxity	-- A kind of wild card
-anyBoxKind    = TyConApp anyBoxCon []
-\end{code}
-
-Define Type
-
-\begin{code}
-typeCon :: KindCon
-typeConName = mk_kind_name typeConKey SLIT("Type")
-typeCon     = mkKindCon typeConName (superBoxity `FunTy` superKind)
-\end{code}
-
-Define (Type Boxed), (Type Unboxed), (Type AnyBox)
-
-\begin{code}
-boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind
-boxedTypeKind   = TyConApp typeCon [boxedKind]
-unboxedTypeKind = TyConApp typeCon [unboxedKind]
-openTypeKind	= TyConApp typeCon [anyBoxKind]
-
-mkArrowKind :: Kind -> Kind -> Kind
-mkArrowKind k1 k2 = k1 `FunTy` k2
-
-mkArrowKinds :: [Kind] -> Kind -> Kind
-mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
-\end{code}
 
 \begin{code}
 hasMoreBoxityInfo :: Kind -> Kind -> Bool
@@ -302,21 +128,6 @@ hasMoreBoxityInfo k1 k2
 			Just (tc,[_]) -> tc == typeCon
 			Nothing	      -> False
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Wired-in type constructors
-%*									*
-%************************************************************************
-
-We define a few wired-in type constructors here to avoid module knots
-
-\begin{code}
-funTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("(->)") funTyCon
-funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
-\end{code}
-
 
 
 %************************************************************************
@@ -626,10 +437,11 @@ NB: Invariant: if present, usage note is at the very top of the type.
 This should be carefully preserved.
 
 In some parts of the compiler, comments use the _Once Upon a
-Polymorphic Type_ (POPL'99) usage of "sigma = usage-annotated type;
-tau = un-usage-annotated type"; unfortunately this conflicts with the
-rho/tau/theta/sigma usage in the rest of the compiler.
-(KSW 1999-04)
+Polymorphic Type_ (POPL'99) usage of "rho = generalised
+usage-annotated type; sigma = usage-annotated type; tau =
+usage-annotated type except on top"; unfortunately this conflicts with
+the rho/tau/theta/sigma usage in the rest of the compiler.  (KSW
+1999-07)
 
 \begin{code}
 mkUsgTy :: UsageAnn -> Type -> Type
@@ -646,16 +458,18 @@ isUsgTy :: Type -> Bool
 #ifndef USMANY
 isUsgTy _ = True
 #else
-isUsgTy (NoteTy (UsgNote _) _) = True
-isUsgTy other                  = False
+isUsgTy (NoteTy (UsgForAll _) ty) = isUsgTy ty
+isUsgTy (NoteTy (UsgNote   _) _ ) = True
+isUsgTy other                     = False
 #endif
 
 -- The isNotUsgTy function may return a false True if UsManys are omitted;
 -- in other words, A SSERT( isNotUsgTy ty ) may be useful but
 -- A SSERT( not (isNotUsg ty) ) is asking for trouble.  KSW 1999-04.
 isNotUsgTy :: Type -> Bool
-isNotUsgTy (NoteTy (UsgNote _) _) = False
-isNotUsgTy other                  = True
+isNotUsgTy (NoteTy (UsgForAll _) _) = False
+isNotUsgTy (NoteTy (UsgNote   _) _) = False
+isNotUsgTy other                    = True
 
 -- splitUsgTy_maybe is not exported, since it is meaningless if
 -- UsManys are omitted.  It is used in several places in this module,
@@ -663,7 +477,8 @@ isNotUsgTy other                  = True
 splitUsgTy_maybe :: Type -> Maybe (UsageAnn,Type)
 splitUsgTy_maybe (NoteTy (UsgNote usg) ty2) = ASSERT( isNotUsgTy ty2 )
                                               Just (usg,ty2)
-splitUsgTy_maybe ty                         = Nothing
+splitUsgTy_maybe ty@(NoteTy (UsgForAll _) _) = pprPanic "splitUsgTy_maybe:" $ pprType ty
+splitUsgTy_maybe ty                          = Nothing
 
 splitUsgTy :: Type -> (UsageAnn,Type)
 splitUsgTy ty = case splitUsgTy_maybe ty of
@@ -684,8 +499,38 @@ unUsgTy ty = case splitUsgTy_maybe ty of
                Just (_,ty1) -> ASSERT2( isNotUsgTy ty1, pprType ty )
                                ty1
                Nothing      -> ty
-\end{code}
 
+mkUsForAllTy :: UVar -> Type -> Type
+mkUsForAllTy uv ty = NoteTy (UsgForAll uv) ty
+
+mkUsForAllTys :: [UVar] -> Type -> Type
+mkUsForAllTys uvs ty = foldr (NoteTy . UsgForAll) ty uvs
+
+splitUsForAllTys :: Type -> ([UVar],Type)
+splitUsForAllTys ty = split ty []
+  where split (NoteTy (UsgForAll u) ty) uvs = split ty (u:uvs)
+        split other_ty                  uvs = (reverse uvs, other_ty)
+
+substUsTy :: VarEnv UsageAnn -> Type -> Type
+-- assumes range is fresh uvars, so no conflicts
+substUsTy ve    (NoteTy  note@(UsgNote (UsVar u))
+                                            ty ) = NoteTy (case lookupVarEnv ve u of
+                                                             Just ua -> UsgNote ua
+                                                             Nothing -> note)
+                                                          (substUsTy ve ty)
+substUsTy ve    (NoteTy  note@(UsgNote   _) ty ) = NoteTy note (substUsTy ve ty)
+substUsTy ve    (NoteTy  note@(UsgForAll _) ty ) = NoteTy note (substUsTy ve ty)
+substUsTy ve    (NoteTy  (SynNote ty1)      ty2) = NoteTy (SynNote (substUsTy ve ty1))
+                                                          (substUsTy ve ty2)
+substUsTy ve    (NoteTy  note@(FTVNote _)   ty ) = NoteTy note (substUsTy ve ty)
+substUsTy ve ty@(TyVarTy _                     ) = ty
+substUsTy ve    (AppTy   ty1                ty2) = AppTy (substUsTy ve ty1)
+                                                         (substUsTy ve ty2)
+substUsTy ve    (FunTy   ty1                ty2) = FunTy (substUsTy ve ty1)
+                                                         (substUsTy ve ty2)
+substUsTy ve    (TyConApp tyc               tys) = TyConApp tyc (map (substUsTy ve) tys)
+substUsTy ve    (ForAllTy yv                ty ) = ForAllTy yv (substUsTy ve ty)
+\end{code}
 
 
 ---------------------------------------------------------------------
@@ -747,11 +592,12 @@ Applying a for-all to its arguments
 
 \begin{code}
 applyTy :: Type -> Type -> Type
-applyTy (NoteTy note@(UsgNote _) fun) arg = NoteTy note (applyTy fun arg)
-applyTy (NoteTy _ fun)                arg = applyTy fun arg
-applyTy (ForAllTy tv ty)              arg = ASSERT( isNotUsgTy arg )
-                                            substTy (mkTyVarSubst [tv] [arg]) ty
-applyTy other		              arg = panic "applyTy"
+applyTy (NoteTy note@(UsgNote   _) fun) arg = NoteTy note (applyTy fun arg)
+applyTy (NoteTy note@(UsgForAll _) fun) arg = NoteTy note (applyTy fun arg)
+applyTy (NoteTy _ fun)                  arg = applyTy fun arg
+applyTy (ForAllTy tv ty)                arg = ASSERT( isNotUsgTy arg )
+                                              substTy (mkTyVarSubst [tv] [arg]) ty
+applyTy other		                arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 applyTys fun_ty arg_tys
@@ -760,29 +606,24 @@ applyTys fun_ty arg_tys
    (tvs, ty) = split fun_ty arg_tys
    
    split fun_ty               []         = ([], fun_ty)
+   split (NoteTy note@(UsgNote   _) fun_ty)
+                              args       = case split fun_ty args of
+                                             (tvs, ty) -> (tvs, NoteTy note ty)
+   split (NoteTy note@(UsgForAll _) fun_ty)
+                              args       = case split fun_ty args of
+                                             (tvs, ty) -> (tvs, NoteTy note ty)
    split (NoteTy _ fun_ty)    args       = split fun_ty args
    split (ForAllTy tv fun_ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat (map pprType arg_tys) $$
 								    text "in application of" <+> pprType fun_ty)
 					   case split fun_ty args of
 						  (tvs, ty) -> (tv:tvs, ty)
    split other_ty             args       = panic "applyTys"
-
-{- 		OLD version with bogus usage stuff
-
-	************* CHECK WITH KEITH **************
-
-   go env ty               []         = substTy (mkVarEnv env) ty
-   go env (NoteTy note@(UsgNote _) fun)
-                           args       = NoteTy note (go env fun args)
-   go env (NoteTy _ fun)   args       = go env fun args
-   go env (ForAllTy tv ty) (arg:args) = go ((tv,arg):env) ty args
-   go env other            args       = panic "applyTys"
--}
 \end{code}
 
 Note that we allow applications to be of usage-annotated- types, as an
 extension: we handle them by lifting the annotation outside.  The
 argument, however, must still be unannotated.
+
 
 %************************************************************************
 %*									*
@@ -873,6 +714,7 @@ tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
 tyVarsOfType (NoteTy (UsgNote _) ty)	= tyVarsOfType ty
+tyVarsOfType (NoteTy (UsgForAll _) ty)	= tyVarsOfType ty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
@@ -883,9 +725,10 @@ tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
 -- Add a Note with the free tyvars to the top of the type
 -- (but under a usage if there is one)
 addFreeTyVars :: Type -> Type
-addFreeTyVars (NoteTy note@(UsgNote _) ty) = NoteTy note (addFreeTyVars ty)
-addFreeTyVars ty@(NoteTy (FTVNote _) _)    = ty
-addFreeTyVars ty			   = NoteTy (FTVNote (tyVarsOfType ty)) ty
+addFreeTyVars (NoteTy note@(UsgNote   _) ty) = NoteTy note (addFreeTyVars ty)
+addFreeTyVars (NoteTy note@(UsgForAll _) ty) = NoteTy note (addFreeTyVars ty)
+addFreeTyVars ty@(NoteTy (FTVNote _) _)      = ty
+addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 
 -- Find the free names of a type, including the type constructors and classes it mentions
 namesOfType :: Type -> NameSet
@@ -956,6 +799,7 @@ tidyType env@(tidy_env, subst) ty
     go_note (SynNote ty)        = SynNote $! (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
     go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
+    go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
 
 tidyTypes  env tys    = map (tidyType env) tys
 \end{code}
@@ -1024,64 +868,6 @@ typePrimRep :: Type -> PrimRep
 typePrimRep ty = case splitTyConApp_maybe ty of
 		   Just (tc, ty_args) -> tyConPrimRep tc
 		   other	      -> PtrRep
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Equality on types}
-%*									*
-%************************************************************************
-
-For the moment at least, type comparisons don't work if 
-there are embedded for-alls.
-
-\begin{code}
-instance Eq Type where
-  ty1 == ty2 = case ty1 `cmpTy` ty2 of { EQ -> True; other -> False }
-
-instance Ord Type where
-  compare ty1 ty2 = cmpTy ty1 ty2
-
-cmpTy :: Type -> Type -> Ordering
-cmpTy ty1 ty2
-  = cmp emptyVarEnv ty1 ty2
-  where
-  -- The "env" maps type variables in ty1 to type variables in ty2
-  -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
-  -- we in effect substitute tv2 for tv1 in t1 before continuing
-    lookup env tv1 = case lookupVarEnv env tv1 of
-			  Just tv2 -> tv2
-			  Nothing  -> tv1
-
-    -- Get rid of NoteTy
-    cmp env (NoteTy _ ty1) ty2 = cmp env ty1 ty2
-    cmp env ty1 (NoteTy _ ty2) = cmp env ty1 ty2
-    
-    -- Deal with equal constructors
-    cmp env (TyVarTy tv1) (TyVarTy tv2) = lookup env tv1 `compare` tv2
-    cmp env (AppTy f1 a1) (AppTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
-    cmp env (FunTy f1 a1) (FunTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
-    cmp env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmps env tys1 tys2)
-    cmp env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmp (extendVarEnv env tv1 tv2) t1 t2
-    
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy
-    cmp env (AppTy _ _) (TyVarTy _) = GT
-    
-    cmp env (FunTy _ _) (TyVarTy _) = GT
-    cmp env (FunTy _ _) (AppTy _ _) = GT
-    
-    cmp env (TyConApp _ _) (TyVarTy _) = GT
-    cmp env (TyConApp _ _) (AppTy _ _) = GT
-    cmp env (TyConApp _ _) (FunTy _ _) = GT
-    
-    cmp env (ForAllTy _ _) other       = GT
-    
-    cmp env _ _		               = LT
-
-    cmps env []     [] = EQ
-    cmps env (t:ts) [] = GT
-    cmps env [] (t:ts) = LT
-    cmps env (t1:t1s) (t2:t2s) = cmp env t1 t2 `thenCmp` cmps env t1s t2s
 \end{code}
 
 

@@ -147,8 +147,8 @@ data Token
   | ITlit_lit
   | ITstring_lit
   | ITtypeapp
-  | ITonce
-  | ITmany
+  | ITusage
+  | ITfuall
   | ITarity 
   | ITspecialise
   | ITnocaf
@@ -182,6 +182,7 @@ data Token
   | ITdot
 
   | ITbiglam			-- GHC-extension symbols
+  | IThash
 
   | ITocurly  			-- special symbols
   | ITccurly
@@ -304,13 +305,13 @@ ghcExtensionKeywordsFM = listToUFM $
 	("__litlit",		ITlit_lit),
 	("__string",		ITstring_lit),
 	("__a",			ITtypeapp),
-	("__o",			ITonce),
-	("__m",			ITmany),
+	("__u",			ITusage),
+	("__fuall",		ITfuall),
 	("__A",			ITarity),
 	("__P",			ITspecialise),
 	("__C",			ITnocaf),
 	("__R",			ITrules),
-        ("__u",			ITunfold NoInlinePragInfo),
+        ("__U",			ITunfold NoInlinePragInfo),
 	
         ("__ccall",		ITccall (False, False, False)),
         ("__ccall_GC",		ITccall (False, False, True)),

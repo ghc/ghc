@@ -19,7 +19,8 @@ module UsageSPLint ( doLintUSPAnnotsBinds,
 
 import UsageSPUtils
 import CoreSyn
-import Type             ( Type(..), TyNote(..), UsageAnn(..), isUsgTy, tyUsg )
+import TypeRep          ( Type(..), TyNote(..) )  -- friend
+import Type             ( UsageAnn(..), isUsgTy, tyUsg )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import Var              ( IdOrTyVar, varType, idInfo )
 import IdInfo           ( LBVarInfo(..), lbvarInfo )

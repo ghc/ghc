@@ -11,8 +11,9 @@ module Unify ( unifyTysX, unifyTyListsX,
 	       match, matchTy, matchTys
   ) where 
 
-import Type	( Type(..), funTyCon, typeKind, tyVarsOfType,
-		  splitAppTy_maybe
+import TypeRep	( Type(..), funTyCon
+		)  -- friend
+import Type	( typeKind, tyVarsOfType, splitAppTy_maybe
 		)
 
 import Var	( TyVar, tyVarKind )

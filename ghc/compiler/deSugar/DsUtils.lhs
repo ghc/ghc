@@ -225,7 +225,7 @@ mkCoAlgCaseMatchResult var match_alts
     (con_id, arg_ids, match_result) = head match_alts
     arg_id 	   		    = head arg_ids
     coercion_bind		    = NonRec arg_id
-			(Note (Coerce (idType arg_id) scrut_ty) (Var var))
+			(Note (Coerce (unUsgTy (idType arg_id)) (unUsgTy scrut_ty)) (Var var))
     newtype_sanity		    = null (tail match_alts) && null (tail arg_ids)
 
 	-- Stuff for data types

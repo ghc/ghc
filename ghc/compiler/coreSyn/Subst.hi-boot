@@ -2,6 +2,6 @@ _interface_ Subst 1
 _exports_ Subst Subst mkTyVarSubst substTy ;
 _declarations_
 1 data Subst;
-1 mkTyVarSubst _:_ [Var.TyVar] -> [Type.Type] -> Subst ;;
-1 substTy _:_ Subst -> Type.Type -> Type.Type ;;
+1 mkTyVarSubst _:_ [Var.TyVar] -> [TypeRep.Type] -> Subst ;;
+1 substTy _:_ Subst -> TypeRep.Type -> TypeRep.Type ;;
 

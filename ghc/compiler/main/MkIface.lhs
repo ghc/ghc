@@ -337,7 +337,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 			IAmALoopBreaker	  -> True
 			other		  -> False
 
-    unfold_pretty | show_unfold = ptext SLIT("__u") <+> pprIfaceUnfolding rhs
+    unfold_pretty | show_unfold = ptext SLIT("__U") <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty
 
     show_unfold = not has_worker	 &&	-- Not unnecessary

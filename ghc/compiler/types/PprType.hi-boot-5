@@ -1,4 +1,4 @@
 __interface PprType 1 0 where
 __export PprType pprType ;
-1 pprType :: Type.Type -> Outputable.SDoc ;
+1 pprType :: TypeRep.Type -> Outputable.SDoc ;
 

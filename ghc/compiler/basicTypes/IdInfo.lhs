@@ -346,6 +346,7 @@ seqInlinePrag other
   = ()
 
 instance Outputable InlinePragInfo where
+  -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoInlinePragInfo  	= empty
   ppr IMustBeINLINEd    	= ptext SLIT("__UU")
   ppr IMustNotBeINLINEd 	= ptext SLIT("__Unot")
@@ -500,7 +501,8 @@ Text instance so that the update annotations can be read in.
 \begin{code}
 ppUpdateInfo NoUpdateInfo	   = empty
 ppUpdateInfo (SomeUpdateInfo [])   = empty
-ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("__U ")) (hcat (map int spec))
+ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("__UA ")) (hcat (map int spec))
+  -- was "__U "; changed to avoid conflict with unfoldings.  KSW 1999-07.
 \end{code}
 
 %************************************************************************

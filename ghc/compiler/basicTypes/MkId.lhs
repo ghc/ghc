@@ -353,7 +353,7 @@ mkNewTySelId field_label selector_ty = sel_id
 	
     [data_id] = mkTemplateLocals [data_ty]
     sel_rhs   = mkLams tyvars $ Lam data_id $
-		Note (Coerce rhs_ty data_ty) (Var data_id)
+		Note (Coerce (unUsgTy rhs_ty) (unUsgTy data_ty)) (Var data_id)
 \end{code}
 
 

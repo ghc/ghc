@@ -30,7 +30,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
 import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME, realWorldPrimId )
-import Type		( splitAlgTyConApp_maybe, 
+import Type		( splitAlgTyConApp_maybe,  unUsgTy,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkTyVarTy, mkFunTy, splitAppTy
@@ -423,7 +423,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      let ccall_io_adj = 
 	    mkLams [stbl_value]		     $
 	    bindNonRec x_ccall_adj ccall_adj $
-	    Note (Coerce (mkTyConApp ioTyCon [res_ty]) ccall_adj_ty)
+	    Note (Coerce (mkTyConApp ioTyCon [res_ty]) (unUsgTy ccall_adj_ty))
 		 (Var x_ccall_adj)
      in
      newSysLocalDs (coreExprType ccall_io_adj)	  `thenDs` \ x_ccall_io_adj ->

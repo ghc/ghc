@@ -3,4 +3,4 @@ _exports_
 DataCon DataCon dataConType ;
 _declarations_
 1 data DataCon ;
-1 dataConType _:_ DataCon -> Type.Type ;;
+1 dataConType _:_ DataCon -> TypeRep.Type ;;

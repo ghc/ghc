@@ -6,7 +6,7 @@
 This code is (based on) PhD work of Keith Wansbrough <kw217@cl.cam.ac.uk>,
 September 1998 .. May 1999.
 
-Keith Wansbrough 1998-09-04..1999-06-25
+Keith Wansbrough 1998-09-04..1999-07-07
 
 \begin{code}
 module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
@@ -14,7 +14,7 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
                       MungeFlags(isSigma,isLocal,isExp,hasUsg,mfLoc),
 
                       doAnnotBinds, doUnAnnotBinds,
-                      annotMany, annotManyN, unannotTy, freshannotTy,
+                      annotTy, annotTyN, annotMany, annotManyN, unannotTy, freshannotTy,
 
                       newVarUs, newVarUSMM,
                       UniqSMM, usToUniqSMM, uniqSMMToUs,
@@ -29,7 +29,8 @@ import Const            ( Con(..), Literal(..) )
 import Var              ( IdOrTyVar, varName, varType, setVarType, mkUVar )
 import Id               ( idMustBeINLINEd, isExportedId )
 import Name             ( isLocallyDefined )
-import Type             ( Type(..), TyNote(..), UsageAnn(..), isUsgTy, splitFunTys )
+import TypeRep          ( Type(..), TyNote(..) )  -- friend
+import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
 import Subst		( substTy, mkTyVarSubst )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv
@@ -326,11 +327,11 @@ genAnnotVar mungeType v | isTyVar v = return v
                         | otherwise = do { vty' <- mungeType (sigVarTyMF v) (varType v)
                                          ; return (setVarType v vty')
                                          }
-{- #ifdef DEBUG
+{- ifdef DEBUG
                                          ; return $
                                              pprTrace "genAnnotVar" (ppr (tyUsg vty') <+> ppr v) $
                                              (setVarType v vty')
-   #endif
+   endif
  -}
 \end{code}
 
@@ -459,6 +460,7 @@ unTermUsg _                    = panic "unTermUsg"
 
 unannotTy :: Type -> Type
 -- strip all annotations
+unannotTy    (NoteTy     (UsgForAll uv) ty) = unannotTy ty
 unannotTy    (NoteTy      (UsgNote _  ) ty) = unannotTy ty
 unannotTy    (NoteTy      (SynNote sty) ty) = NoteTy (SynNote (unannotTy sty)) (unannotTy ty)
 unannotTy    (NoteTy note@(FTVNote _  ) ty) = NoteTy note (unannotTy ty)
@@ -474,6 +476,7 @@ fixAnnotTy :: Type -> Type
 #ifndef USMANY
 fixAnnotTy = id
 #else
+fixAnnotTy     (NoteTy note@(UsgForAll uv) ty) = NoteTy note (fixAnnotTy  ty)
 fixAnnotTy      (NoteTy note@(UsgNote _  ) ty) = NoteTy note (fixAnnotTyN ty)
 fixAnnotTy  ty0                                = NoteTy (UsgNote UsMany) (fixAnnotTyN ty0)
 

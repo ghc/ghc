@@ -5,7 +5,7 @@ module ParseIface ( parseIface, IfaceStuff(..) ) where
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsTypes		( mkHsForAllTy )
+import HsTypes		( mkHsForAllTy, mkHsUsForAllTy )
 import HsCore
 import Const		( Literal(..), mkMachInt_safe )
 import BasicTypes	( Fixity(..), FixityDirection(..), 
@@ -25,7 +25,7 @@ import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
 import Name		( OccName, Provenance )
 import OccName          ( mkSysOccFS,
-			  tcName, varName, dataName, clsName, tvName,
+			  tcName, varName, dataName, clsName, tvName, uvName,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, mkSysModuleFS )			
@@ -100,8 +100,8 @@ import Ratio ( (%) )
  '__scc' 	{ ITscc }
  '__sccC'       { ITsccAllCafs }
 
- '__o'		{ ITonce }
- '__m'		{ ITmany }
+ '__u'		{ ITusage }
+ '__fuall'	{ ITfuall }
 
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
@@ -401,10 +401,14 @@ field		:  var_names1 '::' type		{ ($1, Unbanged $3) }
 --------------------------------------------------------------------------
 
 type		:: { RdrNameHsType }
-type		: '__forall' forall context '=>' type	
+type		: '__fuall'  fuall '=>' type    { mkHsUsForAllTy $2 $4 }
+                | '__forall' forall context '=>' type	
 						{ mkHsForAllTy $2 $3 $5 }
 		| btype '->' type		{ MonoFunTy $1 $3 }
 		| btype				{ $1 }
+
+fuall		:: { [RdrName] }
+fuall		: '[' uv_bndrs ']'		        { $2 }
 
 forall		:: { [HsTyVar RdrName] }
 forall		: '[' tv_bndrs ']'		        { $2 }
@@ -427,8 +431,12 @@ types2		:  type ',' type			{ [$1,$3] }
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
 		|  btype atype				{ MonoTyApp $1 $2 }
-                |  '__o' atype				{ MonoUsgTy UsOnce $2 }
-                |  '__m' atype				{ MonoUsgTy UsMany $2 }
+                |  '__u' usage atype			{ MonoUsgTy $2 $3 }
+
+usage		:: { MonoUsageAnn RdrName }
+usage		: '-' 					{ MonoUsOnce }
+		| '!' 					{ MonoUsMany }
+		| uv_name 				{ MonoUsVar $1 }
 
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ MonoTyVar $1 }
@@ -543,6 +551,17 @@ cls_name	:: { RdrName }
 qcls_name	:: { RdrName }
          	: cls_name		{ $1 }
 		| qdata_fs		{ mkSysQual clsName $1 }
+
+---------------------------------------------------
+uv_name		:: { RdrName }
+		:  VARID 		{ mkSysUnqual uvName $1 }
+
+uv_bndr		:: { RdrName }
+		:  uv_name		{ $1 }
+
+uv_bndrs	:: { [RdrName] }
+		:  			{ [] }
+		| uv_bndr uv_bndrs	{ $1 : $2 }
 
 ---------------------------------------------------
 tv_name		:: { RdrName }

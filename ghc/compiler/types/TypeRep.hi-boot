@@ -1,0 +1,7 @@
+_interface_ TypeRep 1
+_exports_ TypeRep Type Kind SuperKind ;
+_declarations_
+1 data Type ;
+1 type Kind = Type ;
+1 type SuperKind = Type ;;
+

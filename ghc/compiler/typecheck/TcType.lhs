@@ -52,11 +52,13 @@ module TcType (
 
 -- friends:
 import PprType		( pprType )
-import Type		( Type(..), Kind, ThetaType, TyNote(..), 
+import TypeRep		( Type(..), Kind, TyNote(..), 
+			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
+			)  -- friend
+import Type		( ThetaType,
 			  mkAppTy, mkTyConApp,
 			  splitDictTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
-			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( tyConKind, mkPrimTyCon )
@@ -435,6 +437,9 @@ zonkType unbound_var_fn ty
 
     go (NoteTy (UsgNote usg) ty2) = go ty2		`thenNF_Tc` \ ty2' ->
 				    returnNF_Tc (NoteTy (UsgNote usg) ty2')
+
+    go (NoteTy (UsgForAll uv) ty2)= go ty2		`thenNF_Tc` \ ty2' ->
+				    returnNF_Tc (NoteTy (UsgForAll uv) ty2')
 
     go (FunTy arg res)      	  = go arg		`thenNF_Tc` \ arg' ->
 				    go res		`thenNF_Tc` \ res' ->

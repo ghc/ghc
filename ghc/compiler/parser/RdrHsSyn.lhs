@@ -157,6 +157,7 @@ extract_ty (MonoTupleTy tys _)          acc = foldr extract_ty acc tys
 extract_ty (MonoFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (MonoDictTy cls tys)         acc = foldr extract_ty (cls : acc) tys
 extract_ty (MonoUsgTy usg ty)           acc = extract_ty ty acc
+extract_ty (MonoUsgForAllTy uv ty)      acc = extract_ty ty acc
 extract_ty (MonoTyVar tv)               acc = tv : acc
 extract_ty (HsForAllTy Nothing ctxt ty) acc = extract_ctxt ctxt (extract_ty ty acc)
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 

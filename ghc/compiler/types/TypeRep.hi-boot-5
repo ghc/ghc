@@ -1,0 +1,6 @@
+__interface TypeRep 1 0 where
+__export TypeRep Type Kind SuperKind ;
+1 data Type ;
+1 type Kind = Type ;
+1 type SuperKind = Type ;
+

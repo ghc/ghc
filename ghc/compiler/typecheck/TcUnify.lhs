@@ -16,10 +16,12 @@ module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 
 -- friends: 
 import TcMonad
-import Type	( Type(..), tyVarsOfType, funTyCon,
+import TypeRep	( Type(..), funTyCon,
+		  Kind, boxedTypeKind, typeCon, anyBoxCon, anyBoxKind,
+		)  -- friend
+import Type	( tyVarsOfType,
 		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
                   isNotUsgTy,
-		  Kind, boxedTypeKind, typeCon, anyBoxCon, anyBoxKind,
 		  splitAppTy_maybe,
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)

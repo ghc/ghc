@@ -18,11 +18,14 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import Type		( Type(..), TyNote(..), Kind, ThetaType, UsageAnn(..),
+import TypeRep		( Type(..), TyNote(..), Kind, UsageAnn(..),
+			  boxedTypeKind,
+			)  -- friend
+import Type		( ThetaType,
 			  splitDictTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
-			  boxedTypeKind
+                          splitUsForAllTys
 			)
 import Var		( TyVar, tyVarKind,
 			  tyVarName, setTyVarName
@@ -205,9 +208,18 @@ ppr_ty env ctxt_prec (NoteTy (SynNote ty) expansion)
 
 ppr_ty env ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty env ctxt_prec ty
 
+ppr_ty env ctxt_prec ty@(NoteTy (UsgForAll _) _)
+  = maybeParen ctxt_prec fUN_PREC $
+    sep [ ptext SLIT("__fuall") <+> brackets pp_uvars <+> ptext SLIT("=>"),
+          ppr_ty env tOP_PREC sigma
+        ]
+  where
+    (uvars,sigma) = splitUsForAllTys ty
+    pp_uvars      = hsep (map ppr uvars)
+
 ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
   = maybeParen ctxt_prec tYCON_PREC $
-    ppr u <+> ppr_ty env tYCON_PREC ty
+    ptext SLIT("__u") <+> ppr u <+> ppr_ty env tYCON_PREC ty
 
 ppr_theta env []    = empty
 ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_dict env tOP_PREC) theta)))
@@ -224,10 +236,11 @@ pprTyEnv = initPprEnv b b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
 
 \begin{code}
 instance Outputable UsageAnn where
-  ppr UsOnce     = ptext SLIT("__o")
-  ppr UsMany     = ptext SLIT("__m")
-  ppr (UsVar uv) = ptext SLIT("__uv") <> ppr uv
+  ppr UsOnce     = ptext SLIT("-")
+  ppr UsMany     = ptext SLIT("!")
+  ppr (UsVar uv) = ppr uv
 \end{code}
+
 
 %************************************************************************
 %*									*

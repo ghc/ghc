@@ -6,7 +6,7 @@
 This code is (based on) PhD work of Keith Wansbrough <kw217@cl.cam.ac.uk>,
 September 1998 .. May 1999.
 
-Keith Wansbrough 1998-09-04..1999-06-25
+Keith Wansbrough 1998-09-04..1999-07-06
 
 \begin{code}
 module UsageSPInf ( doUsageSPInf ) where
@@ -18,20 +18,27 @@ import UsageSPLint
 import UConSet
 
 import CoreSyn
-import Type             ( Type(..), TyNote(..), UsageAnn(..),
+import TypeRep          ( Type(..), TyNote(..) ) -- friend
+import Type             ( UsageAnn(..),
                           applyTy, applyTys,
                           splitFunTy_maybe, splitFunTys, splitTyConApp_maybe,
                           mkUsgTy, splitUsgTy, isUsgTy, isNotUsgTy, unUsgTy, tyUsg,
+                          splitUsForAllTys, substUsTy,
                           mkFunTy, mkForAllTy )
-import TyCon            ( tyConArgVrcs_maybe )
+import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import DataCon          ( dataConType )
 import Const            ( Con(..), Literal(..), literalType )
-import Var              ( IdOrTyVar, UVar, varType, mkUVar, modifyIdInfo )
+import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
+import Id               ( idMustBeINLINEd, isExportedId )
+import Name             ( isLocallyDefined )
 import VarEnv
+import VarSet
 import UniqSupply       ( UniqSupply, UniqSM,
                           initUs, splitUniqSupply )
 import Outputable
+import Maybes           ( expectJust )
+import List             ( unzip4 )
 import CmdLineOpts	( opt_D_dump_usagesp, opt_DoUSPLinting )
 import ErrUtils		( doIfSet, dumpIfSet )
 import PprCore          ( pprCoreBindings )
@@ -46,13 +53,17 @@ For full details, see _Once Upon a Polymorphic Type_, University of
 Glasgow Department of Computing Science Technical Report TR-1998-19,
 December 1998, or the summary in POPL'99.
 
+[** NEW VERSION NOW IMPLEMENTED; different from the papers
+    above. Hopefully to appear in PLDI'00, and Keith Wansbrough's
+    University of Cambridge PhD thesis, c. Sep 2000 **]
+
+
 Inference is performed as follows:
 
-  1.  Remove all manipulable[*] annotations and add fresh @UVar@
-      annotations.
+  1.  Remove all manipulable[*] annotations.
 
-  2.  Walk over the resulting term applying the type rules and
-      collecting the constraints.
+  2.  Walk over the resulting term adding fresh UVar annotations,
+      applying the type rules and collecting the constraints.
 
   3.  Find the solution to the constraints and apply the substitution
       to the annotations, leaving a @UVar@-free term.
@@ -64,8 +75,9 @@ not allowed to alter.
 As in the paper, a ``tau-type'' is a type that does *not* have an
 annotation on top (although it may have some inside), and a
 ``sigma-type'' is one that does (i.e., is a tau-type with an
-annotation added).  This conflicts with the totally unrelated usage of
-these terms in the remainder of GHC.  Caveat lector!  KSW 1999-04.
+annotation added).  Also, a ``rho-type'' is one that may have initial
+``\/u.''s.  This conflicts with the totally unrelated usage of these
+terms in the remainder of GHC.  Caveat lector!  KSW 1999-07.
 
 
 The inference is done over a set of @CoreBind@s, and inside the IO
@@ -79,21 +91,20 @@ doUsageSPInf :: UniqSupply
 doUsageSPInf us binds = do
                            let binds1      = doUnAnnotBinds binds
 
-                               (us1,us2)   = splitUniqSupply us
-                               (binds2,_)  = doAnnotBinds us1 binds1
+                           dumpIfSet opt_D_dump_usagesp "UsageSPInf unannot'd" $
+                             pprCoreBindings binds1
 
-                           dumpIfSet opt_D_dump_usagesp "UsageSPInf reannot'd" $
+                           let ((binds2,ucs,_),_)
+                                      = initUs us (uniqSMMToUs (usgInfBinds emptyVarEnv binds1))
+
+                           dumpIfSet opt_D_dump_usagesp "UsageSPInf annot'd" $
                              pprCoreBindings binds2
 
-                           doIfSet opt_DoUSPLinting $
-                              doLintUSPAnnotsBinds binds2       -- lint check 0
-
-                           let ((ucs,_),_) = initUs us2 (uniqSMMToUs (usgInfBinds binds2))
-                               ms          = solveUCS ucs
-                               s           = case ms of
-                                               Just s  -> s
-                                               Nothing -> panic "doUsageSPInf: insol. conset!"
-                               binds3      = appUSubstBinds s binds2
+                           let ms     = solveUCS ucs
+                               s      = case ms of
+                                          Just s  -> s
+                                          Nothing -> panic "doUsageSPInf: insol. conset!"
+                               binds3 = appUSubstBinds s binds2
 
                            doIfSet opt_DoUSPLinting $
                              do doLintUSPAnnotsBinds binds3     -- lint check 1
@@ -111,258 +122,351 @@ doUsageSPInf us binds = do
 Inferring an expression
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-When we infer types for an expression, we expect it to be already
-annotated - normally with usage variables everywhere (or possibly
-constants).  No context is required since variables already know their
-types.
+Inference takes an annotated (rho-typed) environment and an expression
+unannotated except for variables not appearing in the environment.  It
+returns an annotated expression, a type, a constraint set, and a
+multiset of free variables.  It is in the unique supply monad, which
+supplies fresh uvars for annotation.
+
+We conflate usage metavariables and usage variables; the latter are
+distinguished by falling within the scope of a usage binder.
 
 \begin{code}
-usgInfBinds :: [CoreBind]
-            -> UniqSMM (UConSet,
-                        VarMultiset)
+usgInfBinds :: VarEnv Var            -- incoming environment (usu. empty)
+            -> [CoreBind]            -- CoreBinds in dependency order
+            -> UniqSMM ([CoreBind],  -- annotated CoreBinds
+                        UConSet,     -- constraint set
+                        VarMultiset) -- usage of environment vars
 
-usgInfBinds [] = return (emptyUConSet,
-                         emptyMS)
+usgInfBinds ve []
+  = return ([],
+            emptyUConSet,
+            emptyMS)
 
-usgInfBinds (b:bs) = do { (ucs2,fv2) <- usgInfBinds bs    -- careful of scoping here
-                        ; (ucs1,fv1) <- usgInfBind b fv2
-                        ; return (ucs1 `unionUCS` ucs2,
-                                  fv1)
-                        }
+usgInfBinds ve (b0:b0s)
+-- (this clause is almost the same as the Let clause)
+  = do (v1s,ve1,b1,h1,fb1,fa1) <- usgInfBind  ve  b0
+       (b2s,h2,f2)             <- usgInfBinds ve1 b0s
+       let h3 = occChksUConSet v1s (fb1 `plusMS` f2)
+       return (b1:b2s,
+               unionUCSs [h1,h2,h3],
+               fa1 `plusMS` (f2 `delsFromMS` v1s))
 
-usgInfBind :: CoreBind                      -- CoreBind to infer for
-           -> VarMultiset                   -- fvs of `body' (later CoreBinds)
-           -> UniqSMM (UConSet,             -- constraints generated by this CoreBind
-                       VarMultiset)         -- fvs of this CoreBind and later ones
 
-usgInfBind (NonRec v1 e1) fv0 = do { (ty1u,ucs1,fv1) <- usgInfCE e1
-                                   ; let ty2u = varType v1
-                                         ucs2 = usgSubTy ty1u ty2u
-                                         ucs3 = occChkUConSet v1 fv0
-                                   ; return (unionUCSs [ucs1,ucs2,ucs3],
-                                             fv1 `plusMS` (fv0 `delFromMS` v1))
-                                   }
+usgInfBind :: VarEnv Var
+           -> CoreBind               -- CoreBind to infer for
+           -> UniqSMM ([Var],        -- variables bound
+                       VarEnv Var,   -- extended VarEnv
+                       CoreBind,     -- annotated CoreBind
+                       UConSet,      -- constraints generated by this CoreBind
+                       VarMultiset,  -- this bd's use of vars bound in this bd
+                                     --   (could be anything for other vars)
+                       VarMultiset)  -- this bd's use of other vars
 
-usgInfBind (Rec ves)      fv0 = do { tuf1s <- mapM (usgInfCE . snd) ves
-                                   ; let (ty1us,ucs1s,fv1s) = unzip3 tuf1s
-                                         vs    = map fst ves
-                                         ucs2s = zipWith usgSubTy ty1us (map varType vs)
-                                         fv3   = foldl plusMS fv0 fv1s
-                                         ucs3  = occChksUConSet vs fv3
-                                   ; return (unionUCSs (ucs1s ++ ucs2s ++ [ucs3]),
-                                             foldl delFromMS fv3 vs)
-                                   }
+usgInfBind ve (NonRec v1 e1) 
+  = do (v1',y1u) <- annotVar v1
+       (e2,y2u,h2,f2) <- usgInfCE (extendVarEnv ve v1 v1') e1
+       let h3        = usgSubTy y2u y1u
+           h4        = h2 `unionUCS` h3
+           (y4r,h4') = usgClos ve y2u h4
+           v1''      = setVarType v1 y4r
+           h5        = if isExportedId v1 then pessimise y4r else emptyUConSet
+       return ([v1''],
+               extendVarEnv ve v1 v1'',
+               NonRec v1'' e2,
+               h4' `unionUCS` h5,
+               emptyMS,
+               f2)
 
-usgInfCE :: CoreExpr
-         -> UniqSMM (Type,UConSet,VarMultiset)
-         -- ^- in the unique supply monad for new uvars
-         --          ^- type of the @CoreExpr@ (always a sigma type)
-         --               ^- set of constraints arising
-         --                       ^- variable appearances for occur()
+usgInfBind ve (Rec ves)
+  = do let (v1s,e1s) = unzip ves
+       vy1s' <- mapM annotVar v1s
+       let (v1s',y1us) = unzip vy1s'
+           ve'  = ve `plusVarEnv` (zipVarEnv v1s v1s')
+       eyhf2s <- mapM (usgInfCE ve') e1s
+       let (e2s,y2us,h2s,f2s) = unzip4 eyhf2s
+           h3s         = zipWith usgSubTy y2us y1us
+           h4s         = zipWith unionUCS h2s h3s
+           yh4s        = zipWith (usgClos ve) y2us h4s
+           (y4rs,h4s') = unzip yh4s
+           v1s''       = zipWith setVarType v1s y4rs
+           f5          = foldl plusMS emptyMS f2s
+           h6s         = zipWith (\ v y -> if isExportedId v then pessimise y else emptyUConSet)
+                                 v1s y4rs
+       return (v1s'',
+               ve `plusVarEnv` (zipVarEnv v1s v1s''),
+               Rec (zip v1s'' e2s),
+               unionUCSs (h4s' ++ h6s),
+               f5,
+               f5 `delsFromMS` v1s')  -- we take pains that v1'==v1'' etc
 
-usgInfCE e0@(Var v) | isTyVar v    = panic "usgInfCE: unexpected TyVar"
-                    | otherwise    = return (ASSERT( isUsgTy (varType v) )
-                                             varType v,
-                                             emptyUConSet,
-                                             unitMS v)
 
-usgInfCE e0@(Con (Literal lit) args) = ASSERT( null args )
-                                       do { u1 <- newVarUSMM (Left e0)
-                                          ; return (mkUsgTy u1 (literalType lit),
-                                                    emptyUConSet,
-                                                    emptyMS)
-                                          }
+usgInfCE :: VarEnv Var               -- unannotated -> annotated vars
+         -> CoreExpr                 -- expression to annotate / infer
+         -> UniqSMM (CoreExpr,       -- annotated expression        (e)
+                     Type,           -- (sigma) type of expression  (y)(u=sigma)(r=rho)
+                     UConSet,        -- set of constraints arising  (h)
+                     VarMultiset)    -- variable occurrences        (f)
 
-usgInfCE (Con DEFAULT _) = panic "usgInfCE: DEFAULT"
+usgInfCE ve e0@(Var v) | isTyVar v
+  = panic "usgInfCE: unexpected TyVar"
+                       | otherwise
+  = do v' <- instVar (lookupVar ve v)
+       ASSERT( isUsgTy (varType v' {-'cpp-}) )
+        return (Var v',
+                varType v',
+                emptyUConSet,
+                unitMS v')
 
-usgInfCE e0@(Con con args) = -- constant or primop.  guaranteed saturated.
-                          do { let (ety1s,e1s) = span isTypeArg args
-                                   ty1s = map (\ (Type ty) -> ty) ety1s  -- univ. + exist.
-                             ; (ty3us,ty3u) <- case con of
-                                                 DataCon c -> do { u4 <- newVarUSMM (Left e0)
-                                                                 ; return $ dataConTys c u4 ty1s
-                                                                     -- ty1s is exdicts + args
-                                                                 }
-                                                 PrimOp  p -> return $ primOpUsgTys p ty1s
-                                                 otherwise -> panic "usgInfCE: unrecognised Con"
-                             ; tuf4s <- mapM usgInfCE e1s
-                             ; let (ty4us,ucs4s,fv4s) = unzip3 tuf4s
-                                   ucs5s = zipWith usgSubTy
-                                                   ty4us ty3us
-                             ; return (ty3u,
-                                         -- note ty3 is T ty1s, so it already
-                                         -- has annotations inside where they
-                                         -- should be (for datacons); for
-                                         -- primops we assume types are
-                                         -- appropriately annotated already.
-                                       unionUCSs (ucs4s ++ ucs5s),
-                                       foldl plusMS emptyMS fv4s)
-                             }
-  where dataConTys c u tys = -- compute argtys of a datacon
-                             let rawCTy      = dataConType c
-                                 cTy         = ASSERT( isUnAnnotated rawCTy )
-                                             -- algebraic data types are defined entirely
-                                             -- unannotated; we place Many annotations inside
-                                             -- them to get the required tau-types (p20(fn) TR)
-                                               annotManyN rawCTy
-                                             -- we really don't want annots on top of the
-                                             -- funargs, but we can't easily avoid
-                                             -- this so we use unUsgTy later
-                                 (ty3us,ty3) = ASSERT( all isNotUsgTy tys )
-                                               splitFunTys (applyTys cTy tys)
-                                             -- safe 'cos a DataCon always returns a
-                                             -- value of type (TyCon tys), not an
-                                             -- arrow type
-                                 ty3u        = if null ty3us then mkUsgTy u ty3 else ty3
-                                             -- if no args, ty3 is tau; else already sigma
-                                 reUsg       = mkUsgTy u . unUsgTy
-                             in  (map reUsg ty3us,
-                                  reUsg ty3u)
+usgInfCE ve e0@(Con (Literal lit) args)
+  = ASSERT( null args )
+    do u1 <- newVarUSMM (Left e0)
+       return (e0,
+               mkUsgTy u1 (literalType lit),
+               emptyUConSet,
+               emptyMS)
 
-usgInfCE (App e1 (Type ty2)) = do { (ty1u,ucs,fv) <- usgInfCE e1
-                                  ; let (u,ty1) = splitUsgTy ty1u
-                                  ; ASSERT( isNotUsgTy ty2 )
-                                    return (mkUsgTy u (applyTy ty1 ty2),
-                                            ucs,
-                                            fv)
-                                  }
+usgInfCE ve (Con DEFAULT _)
+  = panic "usgInfCE: DEFAULT"
 
-usgInfCE (App e1 e2) = do { (ty1u,ucs1,fv1) <- usgInfCE e1
-                          ; (ty2u,ucs2,fv2) <- usgInfCE e2
-                          ; let (u1,ty1)    = splitUsgTy ty1u
-                                (ty3u,ty4u) = case splitFunTy_maybe ty1 of
-                                                Just tys -> tys
-                                                Nothing  -> panic "usgInfCE: app of non-funty"
-                                ucs5        = usgSubTy ty2u ty3u
-                          ; return (ASSERT( isUsgTy ty4u )
-                                    ty4u,
-                                    unionUCSs [ucs1,ucs2,ucs5],
-                                    fv1 `plusMS` fv2)
-                          }
+usgInfCE ve e0@(Con con args)
+  = -- constant or primop.  guaranteed saturated.
+    do let (ey1s,e1s) = span isTypeArg args
+       y1s <- mapM (\ (Type ty) -> annotTyN (Left e0) ty) ey1s  -- univ. + exist.
+       (y2us,y2u) <- case con of
+                         DataCon c -> do u2 <- newVarUSMM (Left e0)
+                                         return $ dataConTys c u2 y1s
+                                         -- y1s is exdicts + args
+                         PrimOp  p -> return $ primOpUsgTys p y1s
+                         otherwise -> panic "usgInfCE: unrecognised Con"
+       eyhf3s <- mapM (usgInfCE ve) e1s
+       let (e3s,y3us,h3s,f3s) = unzip4 eyhf3s
+           h4s = zipWith usgSubTy y3us y2us
+       ASSERT( isUsgTy y2u )
+        return (Con con (map Type y1s ++ e3s),
+                y2u,
+                unionUCSs (h3s ++ h4s),
+                foldl plusMS emptyMS f3s)
 
-usgInfCE (Lam v e) | isTyVar v = do { (ty1u,ucs,fv) <- usgInfCE e  -- safe to ignore free v here
-                                    ; let (u,ty1) = splitUsgTy ty1u
-                                    ; return (mkUsgTy u (mkForAllTy v ty1),
-                                              ucs,
-                                              fv)
-                                    }
-                   | otherwise = panic "usgInfCE: missing lambda usage annot"
+  where dataConTys c u y1s
+        -- compute argtys of a datacon
+          = let cTy        = annotMany (dataConType c)  -- extra (sigma) annots later replaced
+                (y2us,y2u) = splitFunTys (applyTys cTy y1s)
+                             -- safe 'cos a DataCon always returns a value of type (TyCon tys),
+                             -- not an arrow type.
+                reUsg      = mkUsgTy u . unUsgTy
+             in (map reUsg y2us, reUsg y2u)
+
+usgInfCE ve e0@(App ea (Type yb))
+  = do (ea1,ya1u,ha1,fa1) <- usgInfCE ve ea
+       let (u1,ya1) = splitUsgTy ya1u
+       yb1 <- annotTyN (Left e0) yb
+       return (App ea1 (Type yb1),
+               mkUsgTy u1 (applyTy ya1 yb1),
+               ha1,
+               fa1)
+
+usgInfCE ve (App ea eb)
+  = do (ea1,ya1u,ha1,fa1) <- usgInfCE ve ea
+       let ( u1,ya1) = splitUsgTy ya1u
+           (y2u,y3u) = expectJust "usgInfCE:App" $ splitFunTy_maybe ya1
+       (eb1,yb1u,hb1,fb1) <- usgInfCE ve eb
+       let h4 = usgSubTy yb1u y2u
+       ASSERT( isUsgTy y3u )
+        return (App ea1 eb1,
+                y3u,
+                unionUCSs [ha1,hb1,h4],
+                fa1 `plusMS` fb1)
+
+usgInfCE ve e0@(Lam v0 e) | isTyVar v0
+  = do (e1,y1u,h1,f1) <- usgInfCE ve e
+       let (u1,y1) = splitUsgTy y1u
+       return (Lam v0 e1,
+               mkUsgTy u1 (mkForAllTy v0 y1),
+               h1,
+               f1)
+
+                     -- [OLD COMMENT:]
                      -- if used for checking also, may need to extend this case to
                      -- look in lbvarInfo instead.
+                          | otherwise
+  = do u1  <- newVarUSMM (Left e0)
+       (v1,y1u) <- annotVar v0
+       (e2,y2u,h2,f2) <- usgInfCE (extendVarEnv ve v0 v1) e
+       let h3  = occChkUConSet v1 f2
+           f2' = f2 `delFromMS` v1
+           h4s = foldMS (\ v _ hs -> (leqUConSet u1 ((tyUsg . varType . lookupVar ve) v)
+                                      : hs))  -- in reverse order!
+                        []
+                        f2'
+       return (Note (TermUsg u1) (Lam v1 e2),  -- add annot for lbVarInfo computation
+               mkUsgTy u1 (mkFunTy y1u y2u),
+               unionUCSs (h2:h3:h4s),
+               f2')
 
-usgInfCE (Note (TermUsg u) (Lam v e))
-  = ASSERT( not (isTyVar v) )
-    do { (ty1u,ucs1,fv) <- usgInfCE e
-       ; let ty2u   = varType v
-             ucs2   = occChkUConSet v fv
-             fv'    = fv `delFromMS` v
-             ucs3s  = foldMS (\v _ ucss -> (leqUConSet u ((tyUsg . varType) v)
-                                            : ucss))  -- in reverse order!
-                             []
-                             fv'
-       ; return (mkUsgTy u (mkFunTy ty2u ty1u),
-                 unionUCSs ([ucs1,ucs2] ++ ucs3s),
-                 fv')
-       }
+usgInfCE ve (Let b0s e0)
+  = do (v1s,ve1,b1s,h1,fb1,fa1) <- usgInfBind ve b0s
+       (e2,y2u,h2,f2)           <- usgInfCE ve1 e0
+       let h3 = occChksUConSet v1s (fb1 `plusMS` f2)
+       ASSERT( isUsgTy y2u )
+        return (Let b1s e2,
+                y2u,
+                unionUCSs [h1,h2,h3],
+                fa1 `plusMS` (f2 `delsFromMS` v1s))
 
-usgInfCE (Let bind e0) = do { (ty0u,ucs0,fv0) <- usgInfCE e0
-                            ; (ucs1,fv1) <- usgInfBind bind fv0
-                            ; return (ASSERT( isUsgTy ty0u )
-                                      ty0u,
-                                      ucs0 `unionUCS` ucs1,
-                                      fv1)
-                            }
+usgInfCE ve (Case e0 v0 [(DEFAULT,[],e1)])
+-- pure strict let, no selection (could be at polymorphic or function type)
+  = do (v1,y1u) <- annotVar v0
+       (e2,y2u,h2,f2) <- usgInfCE ve e0
+       (e3,y3u,h3,f3) <- usgInfCE (extendVarEnv ve v0 v1) e1
+       let h4 = usgEqTy y2u y1u -- **! why not subty?
+           h5 = occChkUConSet v1 f3
+       ASSERT( isUsgTy y3u )
+        return (Case e2 v1 [(DEFAULT,[],e3)],
+                y3u,
+                unionUCSs [h2,h3,h4,h5],
+                f2 `plusMS` (f3 `delFromMS` v1))
+ 
+usgInfCE ve e0@(Case e1 v1 alts)
+-- general case (tycon of scrutinee must be known)
+-- (assumes well-typed already; so doesn't check constructor)
+  = do (v2,y1u) <- annotVar v1
+       (e2,y2u,h2,f2) <- usgInfCE ve e1
+       let h3       = usgEqTy y2u y1u -- **! why not subty?
+           (u2,y2)  = splitUsgTy y2u
+           (tc,y2s) = expectJust "usgInfCE:Case" $ splitTyConApp_maybe y2
+           (cs,v1ss,es) = unzip3 alts
+           v2ss     = map (map (\ v -> setVarType v (mkUsgTy u2 (annotManyN (varType v)))))
+                          v1ss
+           ve3      = extendVarEnv ve v1 v2
+       eyhf4s <- mapM (\ (v1s,v2s,e) -> usgInfCE (ve3 `plusVarEnv` (zipVarEnv v1s v2s)) e)
+                      (zip3 v1ss v2ss es)
+       let (e4s,y4us,h4s,f4s) = unzip4 eyhf4s
+       y5u <- annotTy (Left e0) (unannotTy (head y4us))
+       let h5s      = zipWith usgSubTy y4us (repeat y5u)
+           h6s      = zipWith occChksUConSet v2ss f4s
+           f4       = foldl1 maxMS (zipWith delsFromMS f4s v2ss)
+           h7       = occChkUConSet v2 (f4 `plusMS` (unitMS v2))
+       ASSERT( isUsgTy y5u )
+        return (Case e2 v2 (zip3 cs v2ss e4s),
+                y5u,
+                unionUCSs (h2:h3:h7:(h4s ++ h5s ++ h6s)),
+                f2 `plusMS` (f4 `delFromMS` v2))
 
-usgInfCE (Case e0 v0 [(DEFAULT,[],e1)])
-  = -- pure strict let, no selection (could be at polymorphic or function type)
-    do { (ty0u,ucs0,fv0) <- usgInfCE e0 
-       ; (ty1u,ucs1,fv1) <- usgInfCE e1
-       ; let (u0,ty0)   = splitUsgTy ty0u
-             ucs2       = usgEqTy ty0u (varType v0)  -- messy! but OK
-       ; ty4u <- freshannotTy ty1u
-       ; let ucs5 = usgSubTy ty1u ty4u
-             ucs7 = occChkUConSet v0 (fv1 `plusMS` (unitMS v0))
-       ; return (ASSERT( isUsgTy ty4u )
-                 ty4u,
-                 unionUCSs [ucs0,ucs1,ucs2,ucs5,ucs7],
-                 fv0 `plusMS` (fv1 `delFromMS` v0))
-       }
-
-usgInfCE expr@(Case e0 v0 alts)
-  = -- general case (tycon of scrutinee must be known)
-    do { let (cs,vss,es) = unzip3 alts
-       ; (ty0u,ucs0,fv0) <- usgInfCE e0 
-       ; tuf2s <- mapM usgInfCE es
-       ; let (u0,ty0)   = splitUsgTy ty0u
-             ucs1       = usgEqTy ty0u (varType v0)  -- messy! but OK
-             (tc,ty0ks) = case splitTyConApp_maybe ty0 of
-                            Just tcks -> tcks
-                            Nothing   -> pprPanic "usgInfCE: weird:" $
-                                           vcat [text "scrutinee:" <+> ppr e0,
-                                                 text "type:" <+> ppr ty0u]
-       ; let (ty2us,ucs2s,fv2s) = unzip3 tuf2s
-             ucs3ss = ASSERT2( all isNotUsgTy ty0ks, text "expression" <+> ppr e0 $$ text "has type" <+> ppr ty0u )
-                      zipWith (\ c vs -> zipWith (\ty v ->
-                                                   usgSubTy (mkUsgTy u0 ty)
-                                                            (varType v))
-                                                 (caseAltArgs ty0ks c)
-                                                 vs)
-                              cs
-                              vss
-       ; ty4u <- freshannotTy (head ty2us) -- assume at least one alt
-       ; let ucs5s = zipWith usgSubTy ty2us (repeat ty4u)
-             ucs6s = zipWith occChksUConSet vss fv2s
-             fv7   = ASSERT( not (null fv2s) && (length fv2s == length vss) )
-                     foldl1 maxMS (zipWith (foldl delFromMS) fv2s vss)
-             ucs7  = occChkUConSet v0 (fv7 `plusMS` (unitMS v0))
-       ; return (ASSERT( isUsgTy ty4u )
-                 ty4u,
-                 unionUCSs ([ucs0,ucs1] ++ ucs2s
-                            ++ (concat ucs3ss)
-                            ++ ucs5s
-                            ++ ucs6s
-                            ++ [ucs7]),
-                 fv0 `plusMS` (fv7 `delFromMS` v0))
-       }
-  where caseAltArgs                 :: [Type] -> Con -> [Type]
-        -- compute list of tau-types required by a case-alt
-        caseAltArgs tys (DataCon dc) = let rawCTy = dataConType dc
-                                           cTy    = ASSERT2( isUnAnnotated rawCTy, (text "caseAltArgs: rawCTy annotated!:" <+> ppr rawCTy <+> text "in" <+> ppr expr) )
-                                                    annotManyN rawCTy
-                                       in  ASSERT( all isNotUsgTy tys )
-                                           map unUsgTy (fst (splitFunTys (applyTys cTy tys)))
-        caseAltArgs tys (Literal _)  = []
-        caseAltArgs tys DEFAULT      = []
-        caseAltArgs tys (PrimOp _)   = panic "caseAltArgs: unexpected PrimOp"
-
-usgInfCE (Note (SCC _)          e) = usgInfCE e
-
-usgInfCE (Note (Coerce ty1 ty0) e)
-  = do { (ty2u,ucs2,fv2) <- usgInfCE e
-       ; let (u2,ty2) = splitUsgTy ty2u
-             ucs3     = usgEqTy ty0 ty2  -- messy but OK
-             ty0'     = (annotManyN . unannotTy) ty0  -- really nasty type
-             ucs4     = usgEqTy ty0 ty0'
-             ucs5     = emptyUConSet
+usgInfCE ve e0@(Note note ea)
+  = do (e1,y1u,h1,f1) <- usgInfCE ve ea
+       case note of
+         Coerce yb ya -> do let (u1,y1) = splitUsgTy y1u
+                                ya3 = annotManyN ya   -- really nasty type
+                                h3  = usgEqTy y1 ya3  -- messy but OK
+                            yb3 <- annotTyN (Left e0) yb
              -- What this says is that a Coerce does the most general possible
              -- annotation to what's inside it (nasty, nasty), because no information
              -- can pass through a Coerce.  It of course simply ignores the info
              -- that filters down through into ty1, because it can do nothing with it.
              -- It does still pass through the topmost usage annotation, though.
-       ; return (mkUsgTy u2 ty1,
-                 unionUCSs [ucs2,ucs3,ucs4,ucs5],
-                 fv2)
-       }
+                            return (Note (Coerce yb3 ya3) e1,
+                                    mkUsgTy u1 yb3,
+                                    unionUCSs [h1,h3],
+                                    f1)
 
-usgInfCE (Note InlineCall       e) = usgInfCE e
+         SCC _      -> return (Note note e1, y1u, h1, f1)
 
-usgInfCE (Note InlineMe         e) = usgInfCE e
+         InlineCall -> return (Note note e1, y1u, h1, f1)
 
-usgInfCE (Note (TermUsg u)      e) = pprTrace "usgInfCE: ignoring extra TermUsg:" (ppr u) $
-                                       usgInfCE e
+         InlineMe   -> return (Note note e1, y1u, h1, f1)
 
-usgInfCE (Type ty)                 = panic "usgInfCE: unexpected Type"
+         TermUsg _  -> pprPanic "usgInfCE:Note TermUsg" $ ppr e0
+
+usgInfCE ve e0@(Type _)
+  = pprPanic "usgInfCE:Type" $ ppr e0
 \end{code}
+
+
+\begin{code}
+lookupVar :: VarEnv Var -> Var -> Var
+-- if variable in VarEnv then return annotated version,
+-- otherwise it's imported and already annotated so leave alone.
+--lookupVar ve v = error "lookupVar unimplemented"
+lookupVar ve v = case lookupVarEnv ve v of
+                   Just v' -> v'
+                   Nothing -> ASSERT( not (isLocallyDefined v) || (idMustBeINLINEd v) )
+                              ASSERT( isUsgTy (varType v) )
+                              v
+
+instVar :: Var -> UniqSMM Var
+-- instantiate variable with rho-type, giving it a fresh sigma-type
+instVar v = do let (uvs,ty) = splitUsForAllTys (varType v)
+               case uvs of
+                 [] -> return v
+                 _  -> do uvs' <- mapM (\_ -> newVarUSMM (Left (Var v))) uvs
+                          let ty' = substUsTy (zipVarEnv uvs uvs') ty
+                          return (setVarType v ty')
+
+annotVar :: Var -> UniqSMM (Var,Type)
+-- freshly annotates a variable and returns it along with its new type
+annotVar v = do y1u <- annotTy (Left (Var v)) (varType v)
+                return (setVarType v y1u, y1u)
+\end{code}
+
+
+The closure operation, which does the generalisation at let bindings.
+
+\begin{code}
+usgClos :: VarEnv Var        -- environment to close with respect to
+        -> Type              -- type to close (sigma)
+        -> UConSet           -- constraint set to reduce
+        -> (Type,            -- closed type (rho)
+            UConSet)         -- residual constraint set
+
+usgClos _ve ty ucs = (ty,ucs)  -- dummy definition; no generalisation at all
+
+            -- hmm!  what if it sets some uvars to 1 or omega?
+            --  (should it do substitution here, or return a substitution,
+            --   or should it leave all that work to the end and just use
+            --   an "=" constraint here for now?)
+\end{code}
+
+The pessimise operation, which generates constraints to pessimise an
+id (applied to exported ids, to ensure that they have fully general
+types, since we don't know how they will be used in other modules).
+
+\begin{code}
+pessimise :: Type -> UConSet
+
+pessimise ty
+  = pess True emptyVarEnv ty
+
+  where
+    pess :: Bool -> UVarSet -> Type -> UConSet
+    pess co ve     (NoteTy (UsgForAll uv) ty)
+      = pess co (ve `extendVarSet` uv) ty
+    pess co ve ty0@(NoteTy (UsgNote u)    ty)
+      = pessN co ve ty `unionUCS`
+          (case (co,u) of
+             (False,_       ) -> emptyUConSet
+             (True ,UsMany  ) -> emptyUConSet
+             (True ,UsOnce  ) -> pprPanic "pessimise: can't force:" (ppr ty0)
+             (True ,UsVar uv) -> if uv `elemVarSet` ve
+                                 then emptyUConSet  -- if bound by \/u, no need to pessimise
+                                 else eqManyUConSet u)
+    pess _  _  ty0
+      = pprPanic "pessimise: missing annot:" (ppr ty0)
+
+    pessN :: Bool -> UVarSet -> Type -> UConSet
+    pessN co ve     (NoteTy (UsgForAll uv) ty) = pessN co (ve `extendVarSet` uv) ty
+    pessN co ve ty0@(NoteTy (UsgNote _)    _ ) = pprPanic "pessimise: unexpected annot:" (ppr ty0)
+    pessN co ve     (NoteTy (SynNote sty)  ty) = pessN co ve sty `unionUCS` pessN co ve ty
+    pessN co ve     (NoteTy (FTVNote _)    ty) = pessN co ve ty
+    pessN co ve     (TyVarTy _)                = emptyUConSet
+    pessN co ve     (AppTy _ _)                = emptyUConSet
+    pessN co ve     (TyConApp tc tys)          = ASSERT( not((isFunTyCon tc)&&(length tys > 1)) )
+                                                 emptyUConSet
+    pessN co ve     (FunTy ty1 ty2)            = pess (not co) ve ty1 `unionUCS` pess co ve ty2
+    pessN co ve     (ForAllTy _ ty)            = pessN co ve ty
+\end{code}
+
+
 
 ======================================================================
 
@@ -372,15 +476,16 @@ Helper functions
 If a variable appears more than once in an fv set, force its usage to be Many.
 
 \begin{code}
-occChkUConSet :: IdOrTyVar
+occChkUConSet :: Var
               -> VarMultiset
               -> UConSet
 
 occChkUConSet v fv = if occInMS v fv > 1
-                     then eqManyUConSet ((tyUsg . varType) v)
+                     then ASSERT2( isUsgTy (varType v), ppr v )
+                          eqManyUConSet ((tyUsg . varType) v)
                      else emptyUConSet
 
-occChksUConSet :: [IdOrTyVar]
+occChksUConSet :: [Var]
                -> VarMultiset
                -> UConSet
 
@@ -511,11 +616,12 @@ A @VarMultiset@ is what it says: a set of variables with counts
 attached to them.  We build one out of a @VarEnv@.
 
 \begin{code}
-type VarMultiset = VarEnv (IdOrTyVar,Int)  -- I guess 536 870 911 occurrences is enough
+type VarMultiset = VarEnv (Var,Int)  -- I guess 536 870 911 occurrences is enough
 
 emptyMS      =  emptyVarEnv
 unitMS v     =  unitVarEnv v (v,1)
 delFromMS    =  delVarEnv
+delsFromMS   =  delVarEnvList
 plusMS       :: VarMultiset -> VarMultiset -> VarMultiset
 plusMS       =  plusVarEnv_C (\ (v,n) (_,m) -> (v,n+m))
 maxMS        :: VarMultiset -> VarMultiset -> VarMultiset

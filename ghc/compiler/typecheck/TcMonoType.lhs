@@ -13,12 +13,14 @@ module TcMonoType ( tcHsType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsT
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), HsTyVar(..), Sig(..), pprClassAssertion, pprParendHsType )
+import HsSyn		( HsType(..), HsTyVar(..), MonoUsageAnn(..),
+                          Sig(..), pprClassAssertion, pprParendHsType )
 import RnHsSyn		( RenamedHsType, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
+                          tcExtendUVarEnv, tcLookupUVar,
 			  tcGetGlobalTyVars, TcTyThing(..)
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
@@ -28,8 +30,9 @@ import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
-import Type		( Type, ThetaType, 
-			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy, zipFunTys,
+import Type		( Type, ThetaType, UsageAnn(..),
+			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
+                          mkUsForAllTy, zipFunTys,
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
@@ -37,7 +40,7 @@ import Type		( Type, ThetaType,
 			)
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar )
+import Var		( TyVar, mkTyVar, mkNamedUVar )
 import VarEnv
 import VarSet
 import Bag		( bagToList )
@@ -161,8 +164,23 @@ tc_type_kind (MonoDictTy class_name tys)
     returnTc (boxedTypeKind, mkDictTy clas arg_tys)
 
 tc_type_kind (MonoUsgTy usg ty)
-  = tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
-    returnTc (kind, mkUsgTy usg tc_ty)
+  = newUsg usg                          `thenTc` \ usg' ->
+    tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
+    returnTc (kind, mkUsgTy usg' tc_ty)
+  where
+    newUsg usg = case usg of
+                   MonoUsOnce        -> returnTc UsOnce
+                   MonoUsMany        -> returnTc UsMany
+                   MonoUsVar uv_name -> tcLookupUVar uv_name `thenTc` \ uv ->
+                                        returnTc (UsVar uv)
+
+tc_type_kind (MonoUsgForAllTy uv_name ty)
+  = let
+        uv = mkNamedUVar uv_name
+    in
+    tcExtendUVarEnv uv_name uv $
+      tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
+      returnTc (kind, mkUsForAllTy uv tc_ty)
 
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ tyvars -> 

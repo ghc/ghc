@@ -3,16 +3,12 @@
 %
 \section[HsTypes]{Abstract syntax: user-defined types}
 
-If compiled without \tr{#define COMPILING_GHC}, you get
-(part of) a Haskell-abstract-syntax library.  With it,
-you get part of GHC.
-
 \begin{code}
 module HsTypes (
-	HsType(..), HsTyVar(..),
+	HsType(..), MonoUsageAnn(..), HsTyVar(..),
 	Context, ClassAssertion
 
-	, mkHsForAllTy
+	, mkHsForAllTy, mkHsUsForAllTy
 	, getTyVarName, replaceTyVarName
 	, pprParendHsType
 	, pprForAll, pprContext, pprClassAssertion
@@ -58,11 +54,23 @@ data HsType name
   | MonoDictTy		name	-- Class
 			[HsType name]
 
-  | MonoUsgTy           UsageAnn
+  | MonoUsgTy           (MonoUsageAnn name)
                         (HsType name)
+
+  | MonoUsgForAllTy     name
+                        (HsType name)
+
+data MonoUsageAnn name
+  = MonoUsOnce
+  | MonoUsMany
+  | MonoUsVar name
+  
 
 mkHsForAllTy []  []   ty = ty
 mkHsForAllTy tvs ctxt ty = HsForAllTy (Just tvs) ctxt ty
+
+mkHsUsForAllTy uvs ty = foldr (\ uv ty -> MonoUsgForAllTy uv ty)
+                              ty uvs
 
 data HsTyVar name
   = UserTyVar name
@@ -156,9 +164,26 @@ ppr_mono_ty ctxt_prec (MonoTyApp fun_ty arg_ty)
 ppr_mono_ty ctxt_prec (MonoDictTy clas tys)
   = ppr clas <+> hsep (map (ppr_mono_ty pREC_CON) tys)
 
+ppr_mono_ty ctxt_prec ty@(MonoUsgForAllTy _ _)
+  = maybeParen (ctxt_prec >= pREC_FUN) $
+    sep [ ptext SLIT("__fuall") <+> brackets pp_uvars <+> ptext SLIT("=>"),
+          ppr_mono_ty pREC_TOP sigma
+        ]
+  where
+    (uvars,sigma) = split [] ty
+    pp_uvars      = interppSP uvars
+
+    split uvs (MonoUsgForAllTy uv ty') = split (uv:uvs) ty'
+    split uvs ty'                      = (reverse uvs,ty')
+
 ppr_mono_ty ctxt_prec (MonoUsgTy u ty)
   = maybeParen (ctxt_prec >= pREC_CON) $
-    ppr u <+> ppr_mono_ty pREC_CON ty
+    ptext SLIT("__u") <+> pp_ua <+> ppr_mono_ty pREC_CON ty
+  where
+    pp_ua = case u of
+              MonoUsOnce   -> ptext SLIT("-")
+              MonoUsMany   -> ptext SLIT("!")
+              MonoUsVar uv -> ppr uv
 \end{code}
 
 
@@ -213,7 +238,7 @@ cmpHsType cmp (MonoDictTy c1 tys1)   (MonoDictTy c2 tys2)
   = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
 cmpHsType cmp (MonoUsgTy u1 ty1) (MonoUsgTy u2 ty2)
-  = cmpUsg u1 u2 `thenCmp` cmpHsType cmp ty1 ty2
+  = cmpUsg cmp u1 u2 `thenCmp` cmpHsType cmp ty1 ty2
 
 cmpHsType cmp ty1 ty2 -- tags must be different
   = let tag1 = tag ty1
@@ -226,9 +251,10 @@ cmpHsType cmp ty1 ty2 -- tags must be different
     tag (MonoListTy ty1)		= ILIT(3)
     tag (MonoTyApp tc1 tys1)		= ILIT(4)
     tag (MonoFunTy a1 b1)		= ILIT(5)
-    tag (MonoDictTy c1 tys1)		= ILIT(7)
-    tag (MonoUsgTy c1 tys1)		= ILIT(6)
-    tag (HsForAllTy _ _ _)		= ILIT(8)
+    tag (MonoDictTy c1 tys1)		= ILIT(6)
+    tag (MonoUsgTy c1 ty1)		= ILIT(7)
+    tag (MonoUsgForAllTy uv1 ty1)       = ILIT(8)
+    tag (HsForAllTy _ _ _)		= ILIT(9)
 
 -------------------
 cmpContext cmp a b
@@ -237,13 +263,19 @@ cmpContext cmp a b
     cmp_ctxt (c1, tys1) (c2, tys2)
       = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
--- Should be in Type, perhaps
-cmpUsg UsOnce UsOnce = EQ
-cmpUsg UsOnce UsMany = LT
-cmpUsg UsMany UsOnce = GT
-cmpUsg UsMany UsMany = EQ
-cmpUsg u1     u2     = pprPanic "cmpUsg:" $
-                         ppr u1 <+> ppr u2
+cmpUsg cmp  MonoUsOnce     MonoUsOnce    = EQ
+cmpUsg cmp  MonoUsMany     MonoUsMany    = EQ
+cmpUsg cmp (MonoUsVar u1) (MonoUsVar u2) = cmp u1 u2
+
+cmpUsg cmp ua1 ua2  -- tags must be different
+  = let tag1 = tag ua1
+        tag2 = tag ua2
+    in
+        if tag1 _LT_ tag2 then LT else GT
+  where
+    tag MonoUsOnce       = (ILIT(1) :: FAST_INT)
+    tag MonoUsMany       = ILIT(2)
+    tag (MonoUsVar    _) = ILIT(3)
 
 -- Should be in Maybes, I guess
 cmpMaybe cmp Nothing  Nothing  = EQ

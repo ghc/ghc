@@ -8,7 +8,7 @@ module FieldLabel where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	Type( Type )	-- FieldLabel is compiled very early
+import {-# SOURCE #-}	TypeRep( Type )	-- FieldLabel is compiled very early
 
 import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
 import Outputable

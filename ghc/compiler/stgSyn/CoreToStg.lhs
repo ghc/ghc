@@ -39,7 +39,7 @@ import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
 import Util		( lengthExceeds )
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
-import CmdLineOpts	( opt_D_verbose_stg2stg )
+import CmdLineOpts	( opt_D_verbose_stg2stg, opt_UsageSPOn )
 import UniqSet		( emptyUniqSet )
 import Maybes
 import Outputable
@@ -143,9 +143,15 @@ mkDemTy :: Demand -> Type -> RhsDemand
 mkDemTy strict ty = RhsDemand (isStrict strict) (isOnceTy ty)
 
 isOnceTy :: Type -> Bool
-isOnceTy ty = case tyUsg ty of
-	             UsOnce -> True
-        	     UsMany -> False
+isOnceTy ty
+  =
+#ifdef USMANY
+    opt_UsageSPOn &&  -- can't expect annotations if -fusagesp is off
+#endif
+    case tyUsg ty of
+      UsOnce   -> True
+      UsMany   -> False
+      UsVar uv -> pprPanic "CoreToStg: unexpected uvar annot:" (ppr uv)
 
 bdrDem :: Id -> RhsDemand
 bdrDem id = mkDem (getIdDemandInfo id) (isOnceTy (idType id))

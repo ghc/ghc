@@ -32,7 +32,7 @@ import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message,
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
 import Type		( Type, Kind, tyVarsOfType,
-			  splitFunTy_maybe, mkPiType, mkTyVarTy,
+			  splitFunTy_maybe, mkPiType, mkTyVarTy, unUsgTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
 			  splitAlgTyConApp_maybe,
@@ -238,7 +238,7 @@ lintCoreExpr (Note (Coerce to_ty from_ty) expr)
   = lintCoreExpr expr 	`thenL` \ expr_ty ->
     lintTy to_ty	`seqL`
     lintTy from_ty	`seqL`
-    checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)	`seqL`
+    checkTys from_ty (unUsgTy expr_ty) (mkCoerceErr from_ty expr_ty)	`seqL`
     returnL to_ty
 
 lintCoreExpr (Note other_note expr)
