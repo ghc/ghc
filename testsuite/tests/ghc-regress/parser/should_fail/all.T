@@ -20,10 +20,10 @@ test('read018', normal, compile_fail, [''])
 test('read019', normal, compile_fail, [''])
 test('read020', normal, compile_fail, [''])
 
-# empty file (length zero) is a legal Haskell module.  It fails to compile
+# empty file (length zero) is not a legal Haskell module.  It fails to compile
 # because it doesn't contain a definition of Main.main.  GHC 5.02 crashed
 # on this example.
-test('read021', normal, compile_fail, [''])
+test('read021', expect_fail_if_compiler_type('hugs'), compile_fail, [''])
 
 test('read022', normal, compile_fail, [''])
 test('read023', normal, compile_fail, [''])
