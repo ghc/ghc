@@ -24,10 +24,8 @@ import CoreSyn
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
 import MkId		( mkSysLocal )
 import Id		( idType, isBottomingId, getIdSpecialisation,
-			  mkIdWithNewUniq,
 			  dataConRepType,
-			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
-			  isNullIdEnv, IdEnv, Id
+			  Id
 			)
 import Literal		( literalType, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
@@ -35,26 +33,19 @@ import PprCore
 import PrimOp		( primOpType, PrimOp(..) )
 import SpecEnv	        ( specEnvValues )
 import SrcLoc		( noSrcLoc )
-import TyVar		( cloneTyVar,
-			  isEmptyTyVarEnv, addToTyVarEnv, TyVarEnv,
-			  TyVar, GenTyVar
-			)
 import Type		( mkFunTy, mkForAllTy, mkTyVarTy,
 			  splitFunTy_maybe, applyTys, isUnpointedType,
-			  splitSigmaTy, splitFunTys, instantiateTy,
+			  splitSigmaTy, splitFunTys,
 			  Type
 			)
 import TysWiredIn	( trueDataCon, falseDataCon )
-import Unique		( Unique )
 import BasicTypes	( Unused )
 import UniqSupply	( returnUs, thenUs,
-			  mapUs, mapAndUnzipUs, getUnique,
-			  UniqSM, UniqSupply
+			  mapAndUnzipUs, getUnique,
+			  UniqSM
 			)
-import Util		( zipEqual )
-import Outputable
+import Outputable	( assertPanic, pprPanic, ppr, vcat, panic )
 
-type TypeEnv = TyVarEnv Type
 \end{code}
 
 %************************************************************************

@@ -36,12 +36,17 @@ import PrimOp		( primOpType )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
-			  splitForAllTy_maybe,
+			  splitForAllTy_maybe, tyVarsOfType,
 			  isUnpointedType, typeKind, instantiateTy,
 			  splitAlgTyConApp_maybe, Type
 			)
 import TyCon		( TyCon, isPrimTyCon, isDataTyCon )
-import TyVar		( TyVar, tyVarKind, mkTyVarEnv )
+import TyVar		( TyVar, tyVarKind, mkTyVarEnv, 
+			  TyVarSet,
+			    emptyTyVarSet, mkTyVarSet, isEmptyTyVarSet, 
+			    minusTyVarSet, elementOfTyVarSet, tyVarSetToList,
+			    unionTyVarSets, intersectTyVarSets
+			)
 import ErrUtils		( ErrMsg )
 import Unique		( Unique )
 import Util		( zipEqual )
@@ -248,16 +253,17 @@ lintCoreExpr e@(App fun arg)
   = lintCoreExpr fun `thenMaybeL` \ty -> lintCoreArg {-True-} e ty arg
     -- Note: we do check for primitive types in this argument
 
-lintCoreExpr (Lam (ValBinder var) expr)
-  = addLoc (LambdaBodyOf var)
+lintCoreExpr (Lam vb@(ValBinder var) expr)
+  = addLoc (LambdaBodyOf vb)
       (addInScopeVars [var]
 	(lintCoreExpr expr `thenMaybeL` \ty ->
 	 returnL (Just (mkFunTy (idType var) ty))))
 
-lintCoreExpr (Lam (TyBinder tyvar) expr)
-  = lintCoreExpr expr `thenMaybeL` \ty ->
-    returnL (Just(mkForAllTy tyvar ty))
-    -- ToDo: Should add in-scope type variable at this point
+lintCoreExpr (Lam tb@(TyBinder tyvar) expr)
+  = addLoc (LambdaBodyOf tb)  $
+     addInScopeTyVars [tyvar] $
+       lintCoreExpr expr			   `thenMaybeL` \ ty ->
+       returnL (Just(mkForAllTy tyvar ty))
 
 lintCoreExpr e@(Case scrut alts)
  = lintCoreExpr scrut `thenMaybeL` \ty ->
@@ -310,8 +316,8 @@ lintCoreArg e ty (VarArg v)
     var_ty = idType v
 
 lintCoreArg e ty a@(TyArg arg_ty)
-  = lintTy arg_ty			`seqL`
-
+  = lintTy arg_ty			     `seqL`
+    checkTyVarsInScope (tyVarsOfType arg_ty) `seqL`
     case (splitForAllTy_maybe ty) of
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
@@ -441,23 +447,28 @@ lintTy ty = returnL ()
 type LintM a = Bool		-- True <=> specialisation has been done
 	    -> [LintLocInfo] 	-- Locations
 	    -> IdSet		-- Local vars in scope
+	    -> TyVarSet		-- Local tyvars in scope
 	    -> Bag ErrMsg	-- Error messages so far
 	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
 
 data LintLocInfo
-  = RhsOf Id		-- The variable bound
-  | LambdaBodyOf Id	-- The lambda-binder
-  | BodyOfLetRec [Id]	-- One of the binders
-  | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
+  = RhsOf Id			-- The variable bound
+  | LambdaBodyOf CoreBinder	-- The lambda-binder
+  | BodyOfLetRec [Id]		-- One of the binders
+  | ImportedUnfolding SrcLoc    -- Some imported unfolding (ToDo: say which)
 
 instance Outputable LintLocInfo where
     ppr (RhsOf v)
       = ppr (getSrcLoc v) <> colon <+> 
 	brackets (ptext SLIT("RHS of") <+> pp_binders [v])
 
-    ppr (LambdaBodyOf b)
+    ppr (LambdaBodyOf (ValBinder b))
       = ppr (getSrcLoc b) <> colon <+>
 	brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b)
+
+    ppr (LambdaBodyOf (TyBinder b))
+      = ppr (getSrcLoc b) <> colon <+>
+	brackets (ptext SLIT("in body of lambda with type binder") <+> ppr b)
 
     ppr (BodyOfLetRec bs)
       = ppr (getSrcLoc (head bs)) <> colon <+>
@@ -477,7 +488,7 @@ pp_binder b = hsep [ppr b, text "::", ppr (idType b)]
 \begin{code}
 initL :: LintM a -> Bool -> Maybe ErrMsg
 initL m spec_done
-  = case (m spec_done [] emptyIdSet emptyBag) of { (_, errs) ->
+  = case (m spec_done [] emptyIdSet emptyTyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
     else
@@ -485,23 +496,23 @@ initL m spec_done
     }
 
 returnL :: a -> LintM a
-returnL r spec loc scope errs = (r, errs)
+returnL r spec loc scope tyscope errs = (r, errs)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k spec loc scope errs
-  = case m spec loc scope errs of
-      (r, errs') -> k r spec loc scope errs'
+thenL m k spec loc scope tyscope errs
+  = case m spec loc scope tyscope errs of
+      (r, errs') -> k r spec loc scope tyscope errs'
 
 seqL :: LintM a -> LintM b -> LintM b
-seqL m k spec loc scope errs
-  = case m spec loc scope errs of
-      (_, errs') -> k spec loc scope errs'
+seqL m k spec loc scope tyscope errs
+  = case m spec loc scope tyscope errs of
+      (_, errs') -> k spec loc scope tyscope errs'
 
 thenMaybeL :: LintM (Maybe a) -> (a -> LintM (Maybe b)) -> LintM (Maybe b)
-thenMaybeL m k spec loc scope errs
-  = case m spec loc scope errs of
+thenMaybeL m k spec loc scope tyscope errs
+  = case m spec loc scope tyscope errs of
       (Nothing, errs2) -> (Nothing, errs2)
-      (Just r,  errs2) -> k r spec loc scope errs2
+      (Just r,  errs2) -> k r spec loc scope tyscope errs2
 
 mapL :: (a -> LintM b) -> [a] -> LintM [b]
 mapL f [] = returnL []
@@ -521,20 +532,20 @@ mapMaybeL f (x:xs)
 
 \begin{code}
 checkL :: Bool -> ErrMsg -> LintM ()
-checkL True  msg spec loc scope errs = ((), errs)
-checkL False msg spec loc scope errs = ((), addErr errs msg loc)
+checkL True  msg spec loc scope tyscope errs = ((), errs)
+checkL False msg spec loc scope tyscope errs = ((), addErr errs msg loc)
 
 checkIfSpecDoneL :: Bool -> ErrMsg -> LintM ()
-checkIfSpecDoneL True  msg spec  loc scope errs = ((), errs)
-checkIfSpecDoneL False msg True  loc scope errs = ((), addErr errs msg loc)
-checkIfSpecDoneL False msg False loc scope errs = ((), errs)
+checkIfSpecDoneL True  msg spec  loc scope tyscope errs = ((), errs)
+checkIfSpecDoneL False msg True  loc scope tyscope errs = ((), addErr errs msg loc)
+checkIfSpecDoneL False msg False loc scope tyscope errs = ((), errs)
 
 ifSpecDoneL :: LintM () -> LintM ()
-ifSpecDoneL m False loc scope errs = ((), errs)
-ifSpecDoneL m True  loc scope errs = m True loc scope errs
+ifSpecDoneL m False loc scope tyscope errs = ((), errs)
+ifSpecDoneL m True  loc scope tyscope errs = m True loc scope tyscope errs
 
 addErrL :: ErrMsg -> LintM ()
-addErrL msg spec loc scope errs = ((), addErr errs msg loc)
+addErrL msg spec loc scope tyscope errs = ((), addErr errs msg loc)
 
 addErr :: Bag ErrMsg -> ErrMsg -> [LintLocInfo] -> Bag ErrMsg
 
@@ -543,11 +554,11 @@ addErr errs_so_far msg locs
     errs_so_far `snocBag` (hang (ppr (head locs)) 4 msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m spec loc scope errs
-  = m spec (extra_loc:loc) scope errs
+addLoc extra_loc m spec loc scope tyscope errs
+  = m spec (extra_loc:loc) scope tyscope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m spec loc scope errs
+addInScopeVars ids m spec loc scope tyscope errs
   = -- We check if these "new" ids are already
     -- in scope, i.e., we have *shadowing* going on.
     -- For now, it's just a "trace"; we may make
@@ -562,8 +573,15 @@ addInScopeVars ids m spec loc scope errs
 --  (if isEmptyUniqSet shadowed
 --  then id
 --  else pprTrace "Shadowed vars:" (ppr (uniqSetToList shadowed))) (
-    m spec loc (scope `unionIdSets` new_set) errs
+    m spec loc (scope `unionIdSets` new_set) tyscope errs
 --  )
+
+addInScopeTyVars :: [TyVar] -> LintM a -> LintM a
+addInScopeTyVars tyvars m spec loc scope tyscope errs
+  = m spec loc scope (tyscope `unionTyVarSets` new_set) errs
+    where
+     new_set	= mkTyVarSet tyvars
+    
 \end{code}
 
 \begin{code}
@@ -579,7 +597,7 @@ checkSpecIdInScope binder id
 	   ppr binder
 
 checkInScope :: SDoc -> Id -> LintM ()
-checkInScope loc_msg id spec loc scope errs
+checkInScope loc_msg id spec loc scope tyscope errs
   = let
 	id_name = getName id
     in
@@ -588,8 +606,19 @@ checkInScope loc_msg id spec loc scope errs
     else
       ((),errs)
 
+checkTyVarsInScope :: TyVarSet -> LintM ()
+checkTyVarsInScope tyvars spec loc scope tyscope errs
+-- | not (isEmptyTyVarSet out_of_scope) = ((), errs')
+ | otherwise			= ((), errs)
+   where
+    out_of_scope = tyvars `minusTyVarSet` tyscope
+    errs'        = 
+       foldr (\ tv errs -> addErr errs (hsep [ppr tv, ptext SLIT("is out of scope")]) loc)
+	     errs
+	     (tyVarSetToList out_of_scope)
+
 checkTys :: Type -> Type -> ErrMsg -> LintM ()
-checkTys ty1 ty2 msg spec loc scope errs
+checkTys ty1 ty2 msg spec loc scope tyscope errs
   = if ty1 == ty2 then ((), errs) else ((), addErr errs msg loc)
 \end{code}
 

@@ -28,13 +28,14 @@ import Id		( idType, getIdArity, isBottomingId,
 			  IdSet, Id
 			)
 import IdInfo		( ArityInfo(..) )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(CCallOp) )
 import Type		( tyVarsOfType, Type )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  intersectTyVarSets, unionManyTyVarSets,
 			  TyVarSet, TyVar
 			)
 import BasicTypes	( Unused )
+
 import UniqSet		( unionUniqSets, addOneToUniqSet, delOneFromUniqSet )
 import Util		( panic, assertPanic )
 
@@ -169,8 +170,8 @@ fvExpr id_cands tyvar_cands (Prim op args)
     (args_fvs, tfvs) = freeArgs id_cands tyvar_cands args_to_use{-NB-}
     args_to_use
       = case op of
-	  CCallOp _ _ _ _ res_ty -> TyArg res_ty : args
-	  _			 -> args
+	  CCallOp _ _ _ _ _ res_ty -> TyArg res_ty : args
+	  _			   -> args
 
 -- this Lam stuff could probably be improved by rewriting (WDP 96/03)
 
@@ -339,8 +340,8 @@ freeArgs icands tcands (arg:args)
 	case (freeArgs icands tcands args) of { (irest, trest) ->
 	(arg_fvs `combine` irest, tfvs `combine` trest) }
   where
-    free_arg (LitArg   _) = noFreeAnything
-    free_arg (TyArg   ty) = (noFreeIds, freeTy tcands ty)
+    free_arg (LitArg   _)   = noFreeAnything
+    free_arg (TyArg   ty)   = (noFreeIds, freeTy tcands ty)
     free_arg (VarArg   v)
       | v `is_among` icands = (aFreeId v, noFreeTyVars)
       | otherwise	    = noFreeAnything

@@ -19,16 +19,13 @@ module PprCore (
 import CoreSyn
 import CostCentre	( showCostCentre )
 import Id		( idType, idInfo, isTupleCon,
-			  DataCon, GenId{-instances-}, Id
+			  GenId{-instances-}, Id
 			) 
-import IdInfo		( ppIdInfo, ppStrictnessInfo )
-import Literal		( Literal{-instances-} )
+import IdInfo		( ppIdInfo )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( pprParendType, pprTyVarBndr )
-import PrimOp		( PrimOp{-instances-} )
-import TyVar		( GenTyVar{-instances-} )
-import Unique		( Unique{-instances-} )
+
 \end{code}
 
 %************************************************************************
