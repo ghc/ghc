@@ -13,7 +13,7 @@ module CoreLint (
 
 IMP_Ubiq()
 
-import CmdLineOpts      ( opt_PprUserLength )
+import CmdLineOpts      ( opt_D_show_passes, opt_PprUserLength, opt_DoCoreLinting )
 import CoreSyn
 
 import Bag
@@ -30,7 +30,8 @@ import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 			  NamedThing(..) )
 import PprCore
-import Outputable	( PprStyle(..), Outputable(..) )
+import Outputable	( PprStyle(..), Outputable(..), pprErrorsStyle, printErrs )
+import ErrUtils		( doIfSet, ghcExit )
 import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
 import PrimOp		( primOpType, PrimOp(..) )
@@ -86,25 +87,33 @@ Outstanding issues:
     --
 
 \begin{code}
-lintCoreBindings
-	:: PprStyle -> String -> Bool -> [CoreBinding] -> [CoreBinding]
+lintCoreBindings :: String -> Bool -> [CoreBinding] -> IO ()
 
-lintCoreBindings sty whoDunnit spec_done binds
+lintCoreBindings whoDunnit spec_done binds
+  | not opt_DoCoreLinting
+  = return ()
+
+lintCoreBindings whoDunnit spec_done binds
   = case (initL (lint_binds binds) spec_done) of
-      Nothing  -> binds
-      Just msg ->
-	pprPanic "" (vcat [
-	  text ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
-	  msg sty,
-	  ptext SLIT("*** Offending Program ***"),
-	  vcat (map (pprCoreBinding sty) binds),
-	  ptext SLIT("*** End of Offense ***")
-	])
+      Nothing       -> doIfSet opt_D_show_passes
+			(hPutStr stderr ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
+
+      Just bad_news -> printErrs (display bad_news)	>>
+		       ghcExit 1
   where
     lint_binds [] = returnL ()
     lint_binds (bind:binds)
       = lintCoreBinding bind `thenL` \binders ->
 	addInScopeVars binders (lint_binds binds)
+
+    display bad_news
+      = vcat [
+		text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
+		bad_news pprErrorsStyle,
+		ptext SLIT("*** Offending Program ***"),
+		pprCoreBindings pprErrorsStyle binds,
+		ptext SLIT("*** End of Offense ***")
+	]
 \end{code}
 
 %************************************************************************
