@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.12 2000/03/21 11:22:35 simonmar Exp $
+ * $Id: readFile.c,v 1.13 2000/03/21 17:41:02 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -120,7 +120,7 @@ StgInt
 readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int count=0,rc=0, total_count;
+    int count, rc=0, total_count=0;
     int fd;
     char* p;
 
