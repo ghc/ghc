@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.27 2002/08/16 13:29:07 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.28 2002/10/05 22:31:04 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -300,21 +300,21 @@ char *
 ullong_format_string(ullong x, char *s, rtsBool with_commas)
 {
     if (x < (ullong)1000) 
-	sprintf(s, "%d", (nat)x);
+	sprintf(s, "%lu", (lnat)x);
     else if (x < (ullong)1000000)
-	sprintf(s, (with_commas) ? "%ld,%3.3ld" : "%ld%3.3ld",
-		(nat)((x)/(ullong)1000),
-		(nat)((x)%(ullong)1000));
+	sprintf(s, (with_commas) ? "%lu,%3.3lu" : "%lu%3.3lu",
+		(lnat)((x)/(ullong)1000),
+		(lnat)((x)%(ullong)1000));
     else if (x < (ullong)1000000000)
-	sprintf(s, (with_commas) ? "%ld,%3.3ld,%3.3ld" :  "%ld%3.3ld%3.3ld",
-		(nat)((x)/(ullong)1000000),
-		(nat)((x)/(ullong)1000%(ullong)1000),
-		(nat)((x)%(ullong)1000));
+	sprintf(s, (with_commas) ? "%lu,%3.3lu,%3.3lu" :  "%lu%3.3lu%3.3lu",
+		(lnat)((x)/(ullong)1000000),
+		(lnat)((x)/(ullong)1000%(ullong)1000),
+		(lnat)((x)%(ullong)1000));
     else
-	sprintf(s, (with_commas) ? "%ld,%3.3ld,%3.3ld,%3.3ld" : "%ld%3.3ld%3.3ld%3.3ld",
-		(nat)((x)/(ullong)1000000000),
-		(nat)((x)/(ullong)1000000%(ullong)1000),
-		(nat)((x)/(ullong)1000%(ullong)1000), 
-		(nat)((x)%(ullong)1000));
+	sprintf(s, (with_commas) ? "%lu,%3.3lu,%3.3lu,%3.3lu" : "%lu%3.3lu%3.3lu%3.3lu",
+		(lnat)((x)/(ullong)1000000000),
+		(lnat)((x)/(ullong)1000000%(ullong)1000),
+		(lnat)((x)/(ullong)1000%(ullong)1000), 
+		(lnat)((x)%(ullong)1000));
     return s;
 }
