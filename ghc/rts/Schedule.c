@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.188 2004/02/26 16:19:32 simonmar Exp $
+ * $Id: Schedule.c,v 1.189 2004/02/27 12:39:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -1952,21 +1952,12 @@ void
 scheduleThread_(StgTSO *tso)
 {
   // Precondition: sched_mutex must be held.
-
-  /* Put the new thread on the head of the runnable queue.  The caller
-   * better push an appropriate closure on this thread's stack
-   * beforehand.  In the SMP case, the thread may start running as
-   * soon as we release the scheduler lock below.
-   */
   PUSH_ON_RUN_QUEUE(tso);
   THREAD_RUNNABLE();
-
-#if 0
-  IF_DEBUG(scheduler,printTSO(tso));
-#endif
 }
 
-void scheduleThread(StgTSO* tso)
+void
+scheduleThread(StgTSO* tso)
 {
   ACQUIRE_LOCK(&sched_mutex);
   scheduleThread_(tso);
@@ -2014,7 +2005,10 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
     m->link = main_threads;
     main_threads = m;
     
-    scheduleThread_(tso);
+    PUSH_ON_RUN_QUEUE(tso);
+    // NB. Don't call THREAD_RUNNABLE() here, because the thread is
+    // bound and only runnable by *this* OS thread, so waking up other
+    // workers will just slow things down.
 
     return waitThread_(m, initialCapability);
 }
