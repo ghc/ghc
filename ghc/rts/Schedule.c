@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.189 2004/02/27 12:39:16 simonmar Exp $
+ * $Id: Schedule.c,v 1.190 2004/02/27 15:56:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -2062,9 +2062,7 @@ initScheduler(void)
   initMutex(&term_mutex);
 #endif
   
-#if defined(RTS_SUPPORTS_THREADS)
   ACQUIRE_LOCK(&sched_mutex);
-#endif
 
   /* A capability holds the state a native thread needs in
    * order to execute STG code. At least one capability is
