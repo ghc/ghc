@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.5 1998/05/05 12:53:29 sof Exp $
+# $Id: Makefile,v 1.6 1999/05/05 10:48:06 sof Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -43,6 +43,11 @@ Parallel_HC_OPTS  += -fglasgow-exts
 # 	Dependency generation
 
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
+
+DLL_NAME = HSconc.dll
+DLL_IMPLIB_NAME = libHSconcurrent_imp.a
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSconc.def
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

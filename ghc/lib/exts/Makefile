@@ -27,6 +27,10 @@ HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
 
 SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
 
+ifneq "$(way)" "dll"
+SRC_HC_OPTS += -static
+endif
+
 #
 # Profiling options
 WAY_p_HC_OPTS += -GPrelude
@@ -51,6 +55,14 @@ MAGIC_HSCPP_OPTS=-DBEGIN_FOR_GHC='-}' -DEND_FOR_GHC='{-' -DBEGIN_FOR_HUGS='{-' -
 # 	Dependency generation
 
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w $(MAGIC_HSCPP_OPTS)
+
+#-----------------------------------------------------------------------------
+# 	Win32 DLL setup
+
+DLL_NAME = HSexts.dll
+DLL_IMPLIB_NAME = libHSexts_imp.a
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSexts.def
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

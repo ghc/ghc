@@ -32,7 +32,10 @@ HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) PrelGHC.$(way_)hi
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts) -fcompiling-prelude
+ifneq "$(way)" "dll"
+SRC_HC_OPTS += -static
+endif
 
 #
 # Profiling options
@@ -79,6 +82,17 @@ PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 	cp $< $@
 
 boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+
+DLL_NAME = HSprel.dll
+DLL_IMPLIB_NAME = libHS_imp.a
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
+
+
+ifeq "$(way)" "dll"
+HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
+endif
+
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.12 1999/05/05 10:36:30 sof Exp $
+# $Id: Makefile,v 1.13 1999/05/05 10:48:06 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -33,7 +33,6 @@ LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
 SRC_MKDEPENDHS_OPTS += -optdep--include-prelude
 
-
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
@@ -50,6 +49,10 @@ WAY_mr_HC_OPTS += -GPrelude
 #
 ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
+endif
+
+ifneq "$(way)" "dll"
+SRC_HC_OPTS += -static
 endif
 
 #
