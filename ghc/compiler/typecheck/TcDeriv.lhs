@@ -43,7 +43,7 @@ import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
-			  isEnumerationTyCon, TyCon
+			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
@@ -426,6 +426,10 @@ makeDerivEqns tycl_decls
 	   && n_args_to_keep   >= 0		-- Well kinded: 
 						-- eg not: newtype T a = T Int deriving( Monad )
 	   && eta_ok				-- Eta reduction works
+	   && not (isRecursiveTyCon tycon)	-- Does not work for recursive tycons:
+						--	newtype A = MkA [A]
+						-- Don't want
+						--	instance Eq [A] => Eq A !!
 
 	-- Check that eta reduction is OK
 	-- 	(a) the dropped-off args are identical
