@@ -16,7 +16,7 @@ import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..), Stmt
 			  collectMonoBinders, andMonoBindList, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
-import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId )
+import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
 import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
@@ -27,7 +27,7 @@ import TcEnv		( tcExtendLocalValEnv,
 			  tcLookupTyCon, 
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
-import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
+import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
 import TcMonoType	( tcHsType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
@@ -837,6 +837,9 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
 	-- the spec-pragma-id at the same time
     tcExpr (HsVar name) sig_ty			`thenTc` \ (spec_expr, spec_lie) ->
 
+	-- Squeeze out any Methods (see comments with tcSimplifyToDicts)
+    tcSimplifyToDicts spec_lie			`thenTc` \ (spec_lie1, spec_binds) ->
+
     	-- Just specialise "f" by building a SpecPragmaId binding
 	-- It is the thing that makes sure we don't prematurely 
 	-- dead-code-eliminate the binding we are really interested in.
@@ -844,8 +847,8 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
 
 	-- Do the rest and combine
     tcSpecSigs sigs			`thenTc` \ (binds_rest, lie_rest) ->
-    returnTc (binds_rest `andMonoBinds` VarMonoBind spec_id spec_expr,
-	      lie_rest   `plusLIE`      spec_lie)
+    returnTc (binds_rest `andMonoBinds` VarMonoBind spec_id (mkHsLet spec_binds spec_expr),
+	      lie_rest   `plusLIE`      spec_lie1)
 
 tcSpecSigs (other_sig : sigs) = tcSpecSigs sigs
 tcSpecSigs []		      = returnTc (EmptyMonoBinds, emptyLIE)
