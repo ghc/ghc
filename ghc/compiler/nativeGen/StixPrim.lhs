@@ -8,7 +8,9 @@
 module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(NcgLoop)		-- paranoia checking only
+#endif
 
 import MachMisc
 #if __GLASGOW_HASKELL__ >= 202
@@ -607,4 +609,3 @@ flushStdout = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stdout")]
 flushStderr = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stderr")]
 errorIO = StJump (StInd PtrRep (sStLitLbl SLIT("ErrorIO_innards")))
 \end{code}
-

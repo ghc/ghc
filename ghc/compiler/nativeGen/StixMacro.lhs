@@ -8,9 +8,15 @@
 module StixMacro ( macroCode, heapCheck ) where
 
 IMP_Ubiq(){-uitious-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
+#else
+import {-# SOURCE #-} StixPrim ( amodeToStix )
+#endif
 
 import MachMisc
+
+-- In 2.0x we import Addr via GlaExts, so we better hide the other one here.
 #if __GLASGOW_HASKELL__ >= 202
 import MachRegs hiding (Addr)
 #else

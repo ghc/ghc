@@ -12,8 +12,11 @@ module StixInteger (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
-
+#else
+import {-# SOURCE #-} StixPrim ( amodeToStix )
+#endif
 import MachMisc
 #if __GLASGOW_HASKELL__ >= 202
 import MachRegs hiding (Addr)
