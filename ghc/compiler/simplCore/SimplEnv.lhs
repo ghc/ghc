@@ -21,7 +21,7 @@ module SimplEnv (
 	markDangerousOccs,
 	lookupRhsInfo, lookupOutIdEnv, isEvaluated,
 	extendEnvGivenBinding, extendEnvGivenNewRhs,
-	extendEnvGivenRhsInfo,
+	extendEnvGivenRhsInfo, extendEnvGivenInlining,
 
 	lookForConstructor,
 
@@ -84,7 +84,7 @@ import TyVar		( nullTyVarEnv, addOneToTyVarEnv, growTyVarEnvList,
 			  SYN_IE(TyVar)
 			)
 import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
-import UniqFM		( addToUFM_C, ufmToList	)
+import UniqFM		( addToUFM, addToUFM_C, ufmToList )
 import Usage		( SYN_IE(UVar), GenUsage{-instances-} )
 import Util		( SYN_IE(Eager), appEager, returnEager, runEager,
 			  zipEqual, thenCmp, cmpList, panic, panic#, assertPanic, Ord3(..) )
@@ -370,8 +370,11 @@ data RhsInfo = NoRhsInfo
 	     | OtherLit [Literal]		-- It ain't one of these
 	     | OtherCon [Id]			-- It ain't one of these
 
+		-- InUnfolding is used for let(rec) bindings that
+		-- are *definitely* going to be inlined.
+		-- We record the un-simplified RHS and drop the binding
 	     | InUnfolding SimplEnv		-- Un-simplified unfolding
-			   SimpleUnfolding	-- (need to snag envts therefore)
+			   SimplifiableCoreExpr	-- (need to snag envts therefore)
 
 	     | OutUnfolding CostCentre
 			    SimpleUnfolding	-- Already-simplified unfolding
@@ -401,7 +404,6 @@ modifyOutEnvItem (id, occ, info1) (_, _, info2)
 isEvaluated :: RhsInfo -> Bool
 isEvaluated (OtherLit _) = True
 isEvaluated (OtherCon _) = True
-isEvaluated (InUnfolding _  (SimpleUnfolding ValueForm _ expr)) = True
 isEvaluated (OutUnfolding _ (SimpleUnfolding ValueForm _ expr)) = True
 isEvaluated other = False
 \end{code}
@@ -436,6 +438,14 @@ markDangerousOccs (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) a
 \end{code}
 
 
+\begin{code}
+extendEnvGivenInlining :: SimplEnv -> Id -> BinderInfo -> InExpr -> SimplEnv
+extendEnvGivenInlining env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
+		       id occ_info rhs
+  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
+  where
+    new_out_id_env = addToUFM out_id_env id (id, occ_info, InUnfolding env rhs)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -540,27 +550,6 @@ cmp_app (UCA c1 as1) (UCA c2 as2)
 	tag (TyArg    _) = panic# "SimplEnv.cmp_app:TyArg"
 	tag (UsageArg _) = panic# "SimplEnv.cmp_app:UsageArg"
 \end{code}
-
-
-
-
-
-============================  OLD ================================
-	This version was used when we use the *simplified* RHS of a 
-	let as the thing's unfolding.  The has the nasty property described
-	in the following comments.  Much worse, it can fail to terminate
-	on recursive things.  Consider
-
-		letrec f = \x -> let z = f x' in ...
-
-		in
-		let n = f y
-		in
-		case n of { ... }
-
-	If we bind n to its *simplified* RHS, we then *re-simplify* it when
-	we inline n.  Then we may well inline f; and then the same thing
-	happens with z!
 
 
 @extendUnfoldEnvGivenRhs@ records in the UnfoldEnv info about the RHS
