@@ -192,6 +192,15 @@ mips-sgi-irix*)
         HostVendor_CPP='sgi'
         HostOS_CPP='irix'
         ;;
+rs6000-ibm-aix*)
+	HostPlatform=rs6000-ibm-aix
+	TargetPlatform=rs6000-ibm-aix #hack
+	BuildPlatform=rs6000-ibm-aix #hack
+        HostPlatform_CPP='rs6000_ibm_aix'
+        HostArch_CPP='rs6000'
+        HostVendor_CPP='ibm'
+        HostOS_CPP='aix'
+        ;;
 powerpc-ibm-aix*)
 	HostPlatform=powerpc-ibm-aix
 	TargetPlatform=powerpc-ibm-aix #hack
