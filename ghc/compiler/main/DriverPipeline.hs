@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.85 2001/06/29 12:58:20 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.86 2001/07/03 16:46:21 rrt Exp $
 --
 -- GHC Driver
 --
@@ -333,7 +333,7 @@ run_phase Cpp basename suff input_fn output_fn
 
 	-- ToDo: switch away from using 'echo' altogether (but need
 	-- a faster alternative than what's done below).
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+#if defined(mingw32_TARGET_OS)
 	  else do
 	    h <- openFile output_fn WriteMode
 	    hPutStrLn h ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}")

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.167 2001/06/28 14:41:19 simonmar Exp $
+# $Id: Makefile,v 1.168 2001/07/03 16:46:21 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -123,8 +123,7 @@ endif
 
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
-ifeq "$(MinimalUnixDeps)" "YES"
-SRC_HC_OPTS += -DMINIMAL_UNIX_DEPS
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -gt 5000); then echo YES; else echo NO; fi)
 
 ifneq "$(ghc_501_at_least)" "YES"
@@ -359,7 +358,7 @@ ghc-inplace : $(HS_PROG)
 	echo '#!/bin/sh' >>$@
 	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
-ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 	@$(RM) $@.bat
 	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %*" >$@.bat
 	chmod 755 $@.bat
