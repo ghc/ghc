@@ -38,8 +38,22 @@ typedef DWORD OSThreadId;
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
 
-#define ACQUIRE_LOCK(mutex)   WaitForSingleObject(mutex,INFINITE)
-#define RELEASE_LOCK(mutex)   ReleaseMutex(mutex)
+static inline void
+ACQUIRE_LOCK(Mutex *mutex)
+{
+    if (WaitForSingleObject(*mutex,INFINITE) == WAIT_FAILED) {
+	barf("WaitForSingleObject: %d", GetLastError());
+    }
+}
+
+static inline void
+RELEASE_LOCK(Mutex *mutex)
+{
+    if (ReleaseMutex(*mutex) == 0) {
+	barf("ReleaseMutex: %d", GetLastError());
+    }
+}
+
 # else
 #  error "Threads not supported"
 # endif
