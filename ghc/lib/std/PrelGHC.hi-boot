@@ -325,9 +325,35 @@ __export PrelGHC
   unsafeCoercezh
 ;
 
+instance {CCallable Charzh} = zdfCCallableCharzh;
+instance {CCallable Doublezh} = zdfCCallableDoublezh;
+instance {CCallable Floatzh} = zdfCCallableFloatzh;
+instance {CCallable Intzh} = zdfCCallableIntzh;
+instance {CCallable Addrzh} = zdfCCallableAddrzh;
+instance {CCallable Int64zh} = zdfCCallableInt64zh;
+instance {CCallable Word64zh} = zdfCCallableWord64zh;
+instance {CCallable Wordzh} = zdfCCallableWordzh;
+instance {CCallable ByteArrayzh} = zdfCCallableByteArrayzh;
+instance __forall [s] => {CCallable (MutableByteArrayzh s)} = zdfCCallableMutableByteArrayzh;
+instance {CCallable ForeignObjzh} = zdfCCallableForeignObjzh;
+
 -- CCallable and CReturnable have kind (Type AnyBox) so that
 -- things like Int# can be instances of CCallable. 
 1 class CCallable a :: ? ;
 1 class CReturnable a :: ? ;
 
 1 assert :: __forall [a] => PrelBase.Bool -> a -> a ;
+
+-- These guys don't really exist:
+--
+1 zdfCCallableCharzh :: {CCallable Charzh} ;
+1 zdfCCallableDoublezh :: {CCallable Doublezh} ;
+1 zdfCCallableFloatzh :: {CCallable Floatzh} ;
+1 zdfCCallableIntzh :: {CCallable Intzh} ;
+1 zdfCCallableAddrzh :: {CCallable Addrzh} ;
+1 zdfCCallableInt64zh :: {CCallable Int64zh} ;
+1 zdfCCallableWord64zh :: {CCallable Word64zh} ;
+1 zdfCCallableWordzh :: {CCallable Wordzh} ;
+1 zdfCCallableByteArrayzh :: {CCallable ByteArrayzh} ;
+1 zdfCCallableMutableByteArrayzh :: __forall [s] => {CCallable (MutableByteArrayzh s)} ;
+1 zdfCCallableForeignObjzh :: {CCallable ForeignObjzh} ;
