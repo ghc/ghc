@@ -10,8 +10,8 @@ import HsSyn
 %token	'/'	{ TokSpecial '/' }
 	'@'	{ TokSpecial '@' }
 	DQUO 	{ TokSpecial '\"' }
-	'#'	{ TokSpecial '#' }
 	URL	{ TokURL $$ }
+	ANAME	{ TokAName $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>..'	{ TokBirdTrack $$ }
@@ -65,11 +65,15 @@ seq1	:: { Doc }
 
 elem1	:: { Doc }
 	: STRING		{ DocString $1 }
-	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
-	| '#' STRING '#'	{ DocAName $2 }
+	| '/' strings '/'	{ DocEmphasis $2 }
 	| URL			{ DocURL $1 }
+	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }
 	| DQUO STRING DQUO	{ DocModule $2 }
+
+strings  :: { Doc }
+	: STRING		{ DocString $1 }
+	| STRING strings	{ docAppend (DocString $1) $2 }
 
 {
 happyError :: [Token] -> Either String a

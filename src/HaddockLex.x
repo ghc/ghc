@@ -19,7 +19,7 @@ import Debug.Trace
 
 $ws    = $white # \n
 $digit = [0-9]
-$special =  [\"\@\/\#]
+$special =  [\"\@\/]
 $alphanum = [A-Za-z0-9]
 $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 
@@ -47,10 +47,13 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 <string> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
   \<.*\>			{ strtoken $ \s -> TokURL (init (tail s)) }
+  \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
   [\'\`] $ident+ [\'\`]		{ ident }
   \\ .				{ strtoken (TokString . tail) }
-  [^ $special \< \n \'\` \\]* \n { strtoken TokString `andBegin` line }
-  [^ $special \< \n \'\` \\]+	 { strtoken TokString }
+  -- allow single-quotes to be literal if they don't surround identifiers
+  [\'\`]			{ strtoken TokString }
+  [^ $special \< \# \n \'\` \\]* \n { strtoken TokString `andBegin` line }
+  [^ $special \< \# \n \'\` \\]+    { strtoken TokString }
 }
 
 {
@@ -62,6 +65,7 @@ data Token
   | TokIdent [HsQName]
   | TokString String
   | TokURL String
+  | TokAName String
   | TokBirdTrack String
   deriving Show
 
@@ -79,7 +83,7 @@ alexGetChar (_, c:cs) = Just (c, (c,cs))
 alexInputPrevChar (c,_) = c
 
 tokenise :: String -> [Token]
-tokenise str = let toks = go ('\n',str) para in trace (show toks) toks
+tokenise str = let toks = go ('\n',str) para in {- trace (show toks) -} toks
   where go inp@(_,str) sc =
 	  case alexScan inp sc of
 		AlexEOF -> []
