@@ -106,14 +106,14 @@ dictionaries, which we resolve at the module level.
 
 \begin{code}
 tcBindsAndThen
-	:: (TcHsBinds s -> thing -> thing)		-- Combinator
+	:: (RecFlag -> TcMonoBinds s -> thing -> thing)		-- Combinator
 	-> RenamedHsBinds
 	-> TcM s (thing, LIE s)
 	-> TcM s (thing, LIE s)
 
 tcBindsAndThen combiner EmptyBinds do_next
   = do_next 	`thenTc` \ (thing, lie) ->
-    returnTc (combiner EmptyBinds thing, lie)
+    returnTc (combiner nonRecursive EmptyMonoBinds thing, lie)
 
 tcBindsAndThen combiner (ThenBinds binds1 binds2) do_next
   = tcBindsAndThen combiner binds1 (tcBindsAndThen combiner binds2 do_next)
@@ -146,17 +146,17 @@ tcBindsAndThen combiner (MonoBind bind sigs is_rec) do_next
 	-- All done
     let
  	final_lie   = lie2 `plusLIE` poly_lie
-	final_binds = MonoBind poly_binds  [] is_rec		`ThenBinds`
-		      MonoBind inst_mbinds [] nonRecursive	`ThenBinds`
-		      prag_binds
+	final_thing = combiner is_rec poly_binds $
+		      combiner nonRecursive inst_mbinds $
+		      combiner nonRecursive prag_binds 
+		      thing
     in
-    returnTc (prag_info_fn, (combiner final_binds thing, final_lie))
+    returnTc (prag_info_fn, (final_thing, final_lie))
     )					`thenTc` \ (_, result) ->
     returnTc result
   where
     binder_names = map fst (bagToList (collectMonoBinders bind))
     ty_sigs      = [sig  | sig@(Sig name _ _) <- sigs]
-
 \end{code}
 
 An aside.  The original version of @tcBindsAndThen@ which lacks a
@@ -494,10 +494,14 @@ been instantiated.
 
 \begin{code}
 data TcSigInfo s
-  = TySigInfo	    Name
-		    (TcIdBndr s)	-- *Polymorphic* binder for this value...
-		    [TcTyVar s] (TcThetaType s) (TcTauType s)
-		    SrcLoc
+  = TySigInfo	    
+	Name			-- N, the Name in corresponding binding
+	(TcIdBndr s)		-- *Polymorphic* binder for this value...
+				-- Usually has name = N, but doesn't have to.
+	[TcTyVar s]
+	(TcThetaType s)
+	(TcTauType s)
+	SrcLoc
 
 
 maybeSig :: [TcSigInfo s] -> Name -> Maybe (TcSigInfo s)
@@ -646,11 +650,11 @@ moving them into place as is done for type signatures.
 \begin{code}
 tcPragmaSigs :: [RenamedSig]			-- The pragma signatures
 	     -> TcM s (Name -> PragmaInfo,	-- Maps name to the appropriate PragmaInfo
-		       TcHsBinds s,
+		       TcMonoBinds s,
 		       LIE s)
 
 -- For now we just deal with INLINE pragmas
-tcPragmaSigs sigs = returnTc (prag_fn, EmptyBinds, emptyLIE )
+tcPragmaSigs sigs = returnTc (prag_fn, EmptyMonoBinds, emptyLIE )
   where
     prag_fn name | any has_inline sigs = IWantToBeINLINEd
 		 | otherwise	       = NoPragmaInfo

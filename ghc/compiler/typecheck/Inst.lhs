@@ -11,6 +11,7 @@ module Inst (
 
 	InstOrigin(..), OverloadedLit(..),
 	SYN_IE(LIE), emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE, plusLIEs,
+	pprLIE, pprLIEInFull,
 
         SYN_IE(InstanceMapper),
 
@@ -44,10 +45,10 @@ import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
 import TcType	( SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
 		  tcInstType, zonkTcType, tcSplitForAllTy, tcSplitRhoTy )
 
-import Bag	( emptyBag, unitBag, unionBags, unionManyBags, 
+import Bag	( emptyBag, unitBag, unionBags, unionManyBags, bagToList,
 		  listToBag, consBag, Bag )
 import Class	( classInstEnv,
-		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv), SYN_IE(ClassOp)
+		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv) 
 		)
 import ErrUtils ( addErrLoc, SYN_IE(Error) )
 import Id	( GenId, idType, mkInstId, SYN_IE(Id) )
@@ -68,7 +69,7 @@ import Type	( GenType, eqSimpleTy, instantiateTy,
 import TyVar	( unionTyVarSets, GenTyVar )
 import TysPrim	  ( intPrimTy )
 import TysWiredIn ( intDataCon, integerTy )
-import Unique	( showUnique, fromRationalClassOpKey, rationalTyConKey,
+import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
 import Util	( panic, zipEqual, zipWithEqual, assoc, assertPanic, pprTrace{-ToDo:rm-} )
@@ -94,6 +95,16 @@ plusLIEs lies	  = unionManyBags lies
 
 zonkLIE :: LIE s -> NF_TcM s (LIE s)
 zonkLIE lie = mapBagNF_Tc zonkInst lie
+
+pprLIE :: PprStyle -> LIE s -> Doc
+pprLIE sty lie = pprQuote sty $ \ sty ->
+		 braces (hsep (punctuate comma (map (pprInst sty) (bagToList lie))))
+
+
+pprLIEInFull sty insts
+  = vcat (map go (bagToList insts))
+  where
+    go inst = ppr sty inst <+> pprOrigin sty inst
 \end{code}
 
 %************************************************************************
@@ -365,29 +376,23 @@ relevant in error messages.
 
 \begin{code}
 instance Outputable (Inst s) where
-    ppr sty inst = pprQuote sty (\ sty -> ppr_inst sty (\ o l -> empty) inst)
+    ppr sty inst = pprQuote sty (\ sty -> pprInst sty inst)
 
-pprInst sty inst = ppr_inst sty (\ o l -> pprOrigin o l sty) inst
+pprInst sty (LitInst u lit ty orig loc)
+  = hsep [case lit of
+	      OverloadedIntegral   i -> integer i
+	      OverloadedFractional f -> rational f,
+	   ptext SLIT("at"),
+	   ppr sty ty,
+	   show_uniq sty u]
 
-ppr_inst sty ppr_orig (LitInst u lit ty orig loc)
-  = hang (ppr_orig orig loc)
-	 4 (hsep [case lit of
-		      OverloadedIntegral   i -> integer i
-		      OverloadedFractional f -> rational f,
-		   ptext SLIT("at"),
-		   ppr sty ty,
-		   show_uniq sty u])
+pprInst sty (Dict u clas ty orig loc)
+  = hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u]
 
-ppr_inst sty ppr_orig (Dict u clas ty orig loc)
-  = hang (ppr_orig orig loc)
-	 4 (pprQuote sty $ \ sty -> 
-	    hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
-
-ppr_inst sty ppr_orig (Method u id tys rho orig loc)
-  = hang (ppr_orig orig loc)
-	 4 (hsep [ppr sty id, ptext SLIT("at"), 
-		  pprQuote sty $ \ sty -> interppSP sty tys,
-		  show_uniq sty u])
+pprInst sty (Method u id tys rho orig loc)
+  = hsep [ppr sty id, ptext SLIT("at"), 
+	  interppSP sty tys,
+	  show_uniq sty u]
 
 show_uniq PprDebug u = ppr PprDebug u
 show_uniq sty	   u = empty
@@ -396,7 +401,7 @@ show_uniq sty	   u = empty
 Printing in error messages
 
 \begin{code}
-noInstanceErr inst sty = hang (ptext SLIT("No instance for:")) 4 (ppr sty inst)
+noInstanceErr inst sty = ptext SLIT("No instance for:") <+> ppr sty inst
 \end{code}
 
 %************************************************************************
@@ -406,7 +411,7 @@ noInstanceErr inst sty = hang (ptext SLIT("No instance for:")) 4 (ppr sty inst)
 %************************************************************************
 
 \begin{code}
-type InstanceMapper = Class -> (ClassInstEnv, ClassOp -> SpecEnv)
+type InstanceMapper = Class -> ClassInstEnv
 \end{code}
 
 A @ClassInstEnv@ lives inside a class, and identifies all the instances
@@ -434,7 +439,7 @@ lookupInst :: Inst s
 lookupInst dict@(Dict _ clas ty orig loc)
   = case lookupMEnv matchTy (get_inst_env clas orig) ty of
       Nothing	-> tcAddSrcLoc loc		 $
-		   tcAddErrCtxt (pprOrigin orig loc) $
+		   tcAddErrCtxt (\sty -> pprOrigin sty dict) $
 		   failTc (noInstanceErr dict)
 
       Just (dfun_id, tenv) 
@@ -511,8 +516,8 @@ lookupSimpleInst class_inst_env clas ty
 		          (_, theta, _) = splitSigmaTy (idType dfun)
 
 noSimpleInst clas ty sty
-  = sep [ptext SLIT("No instance for class"), ppr sty clas,
-	   ptext SLIT("at type"), ppr sty ty]
+  = ptext SLIT("No instance for") <+> 
+    (pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty)
 \end{code}
 
 
@@ -635,44 +640,46 @@ get_inst_env :: Class -> InstOrigin s -> ClassInstEnv
 -- get_inst_env clas (DerivingOrigin inst_mapper _ _)
 --  = fst (inst_mapper clas)
 get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
-  = fst (inst_mapper clas)
+  = inst_mapper clas
 get_inst_env clas other_orig = classInstEnv clas
 
 
-pprOrigin :: InstOrigin s -> SrcLoc -> Error
-
-pprOrigin orig locn sty
-  = hsep [text "arising from", pp_orig, text "at", ppr sty locn]
+pprOrigin :: PprStyle -> Inst s -> Doc
+pprOrigin sty inst
+  = hsep [text "arising from", pp_orig orig, text "at", ppr sty locn]
   where
-    pp_orig 
-      = case orig of
-      	  OccurrenceOf id ->
-      	    hsep [ptext SLIT("use of"), ppr sty id]
-      	  OccurrenceOfCon id ->
-      	    hsep [ptext SLIT("use of"), ppr sty id]
-      	  LiteralOrigin lit ->
-	    hsep [ptext SLIT("the literal"), ppr sty lit]
-      	  InstanceDeclOrigin ->
-	    ptext SLIT("an instance declaration")
-      	  ArithSeqOrigin seq ->
-	    hsep [ptext SLIT("the arithmetic sequence:"), ppr sty seq]
-      	  SignatureOrigin ->
-	    ptext SLIT("a type signature")
-      	  DoOrigin ->
-	    ptext SLIT("a do statement")
-      	  ClassDeclOrigin ->
-	    ptext SLIT("a class declaration")
-      	  InstanceSpecOrigin _ clas ty ->
-	    hsep [text "a SPECIALIZE instance pragma; class",
-		       ppr sty clas, text "type:", ppr sty ty]
-      	  ValSpecOrigin name ->
-	    hsep [ptext SLIT("a SPECIALIZE user-pragma for"), ppr sty name]
-      	  CCallOrigin clabel Nothing{-ccall result-} ->
-	    hsep [ptext SLIT("the result of the _ccall_ to"), text clabel]
-      	  CCallOrigin clabel (Just arg_expr) ->
-	    hsep [ptext SLIT("an argument in the _ccall_ to"), text clabel <> comma, text "namely", ppr sty arg_expr]
-      	  LitLitOrigin s ->
-	    hcat [ptext SLIT("the ``literal-literal''"), text s]
-      	  UnknownOrigin ->
-	    ptext SLIT("...oops -- I don't know where the overloading came from!")
+    (orig, locn) = case inst of
+			Dict _ _ _     orig loc -> (orig,loc)
+			Method _ _ _ _ orig loc -> (orig,loc)
+			LitInst _ _ _  orig loc -> (orig,loc)
+			
+    pp_orig (OccurrenceOf id)
+      	= hsep [ptext SLIT("use of"), ppr sty id]
+    pp_orig (OccurrenceOfCon id)
+	= hsep [ptext SLIT("use of"), ppr sty id]
+    pp_orig (LiteralOrigin lit)
+	= hsep [ptext SLIT("the literal"), ppr sty lit]
+    pp_orig (InstanceDeclOrigin)
+	=  ptext SLIT("an instance declaration")
+    pp_orig (ArithSeqOrigin seq)
+	= hsep [ptext SLIT("the arithmetic sequence:"), ppr sty seq]
+    pp_orig (SignatureOrigin)
+	=  ptext SLIT("a type signature")
+    pp_orig (DoOrigin)
+	=  ptext SLIT("a do statement")
+    pp_orig (ClassDeclOrigin)
+	=  ptext SLIT("a class declaration")
+    pp_orig (InstanceSpecOrigin _ clas ty)
+	= hsep [text "a SPECIALIZE instance pragma; class",
+	       ppr sty clas, text "type:", ppr sty ty]
+    pp_orig (ValSpecOrigin name)
+	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), ppr sty name]
+    pp_orig (CCallOrigin clabel Nothing{-ccall result-})
+	= hsep [ptext SLIT("the result of the _ccall_ to"), text clabel]
+    pp_orig (CCallOrigin clabel (Just arg_expr))
+	= hsep [ptext SLIT("an argument in the _ccall_ to"), text clabel <> comma, text "namely", ppr sty arg_expr]
+    pp_orig (LitLitOrigin s)
+	= hsep [ptext SLIT("the ``literal-literal''"), text s]
+    pp_orig (UnknownOrigin)
+	= ptext SLIT("...oops -- I don't know where the overloading came from!")
 \end{code}

@@ -244,11 +244,10 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	rn_one meth_binds = newDfunName Nothing mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
 			    rnMethodBinds meth_binds			`thenRn` \ rn_meth_binds ->
 			    returnRn (dfun_name, rn_meth_binds)
-    in
 
-    mapTc (gen_inst_info modname)
-	  (new_inst_infos `zip` dfun_names_w_method_binds)	`thenTc` \ really_new_inst_infos ->
-    let
+	really_new_inst_infos = map (gen_inst_info modname)
+			  	    (new_inst_infos `zip` dfun_names_w_method_binds)
+
 	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
     --pprTrace "derived:\n" (ddump_deriv PprDebug) $
@@ -441,7 +440,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	add_solns inst_decl_infos_in orig_eqns current_solns
 				`thenTc` \ (new_inst_infos, inst_mapper) ->
 	let
-	   class_to_inst_env cls = fst (inst_mapper cls)
+	   class_to_inst_env cls = inst_mapper cls
 	in
 	    -- Simplify each RHS
 
@@ -480,7 +479,9 @@ add_solns :: Bag InstInfo			-- The global, non-derived ones
     -- because we need the LHS info for addClassInstance.
 
 add_solns inst_infos_in eqns solns
-  = buildInstanceEnvs all_inst_infos `thenTc` \ inst_mapper ->
+  = discardErrsTc (buildInstanceEnvs all_inst_infos) `thenTc` \ inst_mapper ->
+	-- We do the discard-errs so that we don't get repeated error messages
+	-- about missing or duplicate instances.
     returnTc (new_inst_infos, inst_mapper)
   where
     new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
@@ -605,25 +606,24 @@ gen_bind (InstInfo clas _ ty _ _ _ _ _ _)
 
 gen_inst_info :: Module					-- Module name
 	      -> (InstInfo, (Name, RenamedMonoBinds))		-- the main stuff to work on
-	      -> TcM s InstInfo				-- the gen'd (filled-in) "instance decl"
+	      -> InstInfo				-- the gen'd (filled-in) "instance decl"
 
 gen_inst_info modname
     (InstInfo clas tyvars ty inst_decl_theta _ _ _ locn _, (dfun_name, meth_binds))
   =
 	-- Generate the various instance-related Ids
-    mkInstanceRelatedIds
-		dfun_name
-		clas tyvars ty
-		inst_decl_theta
-					`thenNF_Tc` \ (dfun_id, dfun_theta) ->
-
-    returnTc (InstInfo clas tyvars ty inst_decl_theta
-		       dfun_theta dfun_id
-		       meth_binds
-		       locn [])
+    InstInfo clas tyvars ty inst_decl_theta
+	       dfun_theta dfun_id
+	       meth_binds
+	       locn []
   where
-    from_here = isLocallyDefined tycon
-    (tycon,_,_) = getAppDataTyCon ty
+   (dfun_id, dfun_theta) = mkInstanceRelatedIds
+					dfun_name
+					clas tyvars ty
+					inst_decl_theta
+
+   from_here = isLocallyDefined tycon
+   (tycon,_,_) = getAppDataTyCon ty
 \end{code}
 
 

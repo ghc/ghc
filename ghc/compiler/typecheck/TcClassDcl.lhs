@@ -14,7 +14,7 @@ import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
 			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
 			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar,
-			  SYN_IE(RecFlag), nonRecursive, andMonoBinds,
+			  SYN_IE(RecFlag), nonRecursive, andMonoBinds, collectMonoBinders,
 			  Stmt, DoOrListComp, ArithSeqInfo, InPat, Fake )
 import HsTypes		( getTyVarName )
 import HsPragmas	( ClassPragmas(..) )
@@ -28,18 +28,19 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(Tc
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcAddImportedIdInfo,
 			  tcExtendGlobalTyVars )
-import TcInstDcls	( tcMethodBind )
+import TcBinds		( tcBindWithSigs, TcSigInfo(..) )
 import TcKind		( unifyKind, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, tcInstSigType )
+import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, 
+			  tcInstSigType, tcInstSigTcType )
 import PragmaInfo	( PragmaInfo(..) )
 
-import Bag		( foldBag, unionManyBags )
-import Class		( GenClass, GenClassOp, mkClass, mkClassOp, classBigSig, 
-			  classOps, classOpString, classOpLocalType, classDefaultMethodId,
-			  classOpTagByOccName, SYN_IE(ClassOp), SYN_IE(Class)
+import Bag		( bagToList )
+import Class		( GenClass, mkClass, classBigSig, 
+			  classDefaultMethodId,
+			  classOpTagByOccName, SYN_IE(Class)
 			)
 import CmdLineOpts      ( opt_PprUserLength )
 import Id		( GenId, mkSuperDictSelId, mkMethodSelId, 
@@ -48,15 +49,14 @@ import Id		( GenId, mkSuperDictSelId, mkMethodSelId,
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, moduleString, 
+import Name		( Name, isLocallyDefined, moduleString, getSrcLoc,
 			  nameString, NamedThing(..) )
 import Outputable
-import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import Pretty
-import PprType		( GenClass, GenType, GenTyVar, GenClassOp )
+import PprType		( GenClass, GenType, GenTyVar )
 import SpecEnv		( SpecEnv )
 import SrcLoc		( mkGeneratedSrcLoc )
-import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
+import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, splitRhoTy,
 			  mkForAllTy, mkSigmaTy, splitSigmaTy, SYN_IE(Type)
 			)
 import TysWiredIn	( stringTy )
@@ -107,7 +107,7 @@ Death to "ExpandingDicts".
 
 
 \begin{code}
-tcClassDecl1 rec_inst_mapper
+tcClassDecl1 rec_env rec_inst_mapper
       	     (ClassDecl context class_name
 			tyvar_name class_sigs def_methods pragmas src_loc)
   = tcAddSrcLoc src_loc	$
@@ -117,7 +117,7 @@ tcClassDecl1 rec_inst_mapper
     tcLookupClass class_name			`thenTc` \ (class_kind, rec_class) ->
     tcLookupTyVar (getTyVarName tyvar_name)	`thenNF_Tc` \ (tyvar_kind, rec_tyvar) ->
     let
-	(rec_class_inst_env, rec_class_op_inst_fn) = rec_inst_mapper rec_class
+	rec_class_inst_env = rec_inst_mapper rec_class
     in
 
 	-- FORCE THE CLASS AND ITS TYVAR TO HAVE SAME KIND
@@ -128,14 +128,14 @@ tcClassDecl1 rec_inst_mapper
 				`thenTc` \ (scs, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_class rec_tyvar rec_class_op_inst_fn) class_sigs
+    mapTc (tcClassSig rec_env rec_class rec_tyvar) class_sigs
 				`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS OBJECT ITSELF
     let
-	(ops, op_sel_ids, defm_ids) = unzip3 sig_stuff
+	(op_sel_ids, defm_ids) = unzip sig_stuff
 	clas = mkClass (uniqueOf class_name) (getName class_name) rec_tyvar
-		       scs sc_sel_ids ops op_sel_ids defm_ids
+		       scs sc_sel_ids op_sel_ids defm_ids
 		       rec_class_inst_env
     in
     returnTc clas
@@ -144,8 +144,7 @@ tcClassDecl1 rec_inst_mapper
 
     let
 	clas_ty = mkTyVarTy clas_tyvar
-	dict_component_tys = [mkDictTy sc clas_ty | sc <- scs] ++
-			     [classOpLocalType op | op <- ops])
+	dict_component_tys = classDictArgTys clas_ty
  	new_or_data = case dict_component_tys of
 			[_]   -> NewType
 			other -> DataType
@@ -203,20 +202,18 @@ tcClassContext rec_class rec_tyvar context pragmas
 	  returnTc (mkSuperDictSelId uniq rec_class super_class ty)
 
 
-tcClassSig :: Class	    		-- Knot tying only!
+tcClassSig :: TcEnv s			-- Knot tying only!
+	   -> Class	    		-- ...ditto...
 	   -> TyVar		 	-- The class type variable, used for error check only
-	   -> (ClassOp -> SpecEnv)	-- Ditto; the spec info for the class ops
 	   -> RenamedClassOpSig
-	   -> TcM s (ClassOp,		-- class op
-		     Id,		-- selector id
-		     Id)		-- default-method ids
+	   -> TcM s (Id,		-- selector id
+		     Maybe Id)		-- default-method ids
 
-tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
-	   (ClassOpSig op_name dm_name
+tcClassSig rec_env rec_clas rec_clas_tyvar
+	   (ClassOpSig op_name maybe_dm_name
 		       op_ty
 		       src_loc)
   = tcAddSrcLoc src_loc $
-    fixTc ( \ ~(_, rec_sel_id, rec_defm_id) ->	-- Knot for pragmas
 
 	-- Check the type signature.  NB that the envt *already has*
 	-- bindings for the type variables; see comments in TcTyAndClassDcls.
@@ -228,21 +225,19 @@ tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
 	global_ty   = mkSigmaTy [rec_clas_tyvar] 
 			        [(rec_clas, mkTyVarTy rec_clas_tyvar)]
 			        local_ty
-	class_op_nm = getOccName op_name
-	class_op    = mkClassOp class_op_nm
-				(classOpTagByOccName rec_clas{-yeeps!-} class_op_nm)
-				local_ty
     in
 
 	-- Build the selector id and default method id
     let
-	sel_id  = mkMethodSelId     op_name rec_clas class_op       global_ty
-	defm_id = mkDefaultMethodId dm_name rec_clas class_op False global_ty
-			-- ToDo: improve the "False"
+	sel_id      = mkMethodSelId op_name rec_clas global_ty
+	maybe_dm_id = case maybe_dm_name of
+			   Nothing      -> Nothing
+			   Just dm_name -> let 
+					     dm_id = mkDefaultMethodId dm_name rec_clas global_ty
+					   in
+					   Just (tcAddImportedIdInfo rec_env dm_id)
     in
-    tcAddImportedIdInfo defm_id			`thenNF_Tc` \ final_defm_id ->
-    returnTc (class_op, sel_id, final_defm_id)
-    )
+    returnTc (sel_id, maybe_dm_id)
 \end{code}
 
 
@@ -270,40 +265,39 @@ each local class decl.
 
 \begin{code}
 tcClassDecls2 :: [RenamedHsDecl]
-	      -> NF_TcM s (LIE s, TcHsBinds s)
+	      -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcClassDecls2 decls
   = foldr combine
-	  (returnNF_Tc (emptyLIE, EmptyBinds))
+	  (returnNF_Tc (emptyLIE, EmptyMonoBinds))
 	  [tcClassDecl2 cls_decl | ClD cls_decl <- decls]
   where
     combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1) ->
 		      tc2 `thenNF_Tc` \ (lie2, binds2) ->
 		      returnNF_Tc (lie1 `plusLIE` lie2,
-				   binds1 `ThenBinds` binds2)
+				   binds1 `AndMonoBinds` binds2)
 \end{code}
 
 @tcClassDecl2@ is the business end of things.
 
 \begin{code}
 tcClassDecl2 :: RenamedClassDecl	-- The class declaration
-	     -> NF_TcM s (LIE s, TcHsBinds s)
+	     -> NF_TcM s (LIE s, TcMonoBinds s)
 
 tcClassDecl2 (ClassDecl context class_name
 			tyvar_name class_sigs default_binds pragmas src_loc)
 
   | not (isLocallyDefined class_name)
-  = returnNF_Tc (emptyLIE, EmptyBinds)
+  = returnNF_Tc (emptyLIE, EmptyMonoBinds)
 
   | otherwise	-- It is locally defined
-  = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyBinds)) $
-    tcAddSrcLoc src_loc		     		      $
+  = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
+    tcAddSrcLoc src_loc		     		          $
 
 	-- Get the relevant class
     tcLookupClass class_name		`thenTc` \ (_, clas) ->
     let
-	(tyvar, scs, sc_sel_ids, ops, op_sel_ids, defm_ids)
-	  = classBigSig clas
+	(tyvar, scs, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
 	sel_binds = [ CoreMonoBind (RealId sel_id) (getUnfoldingTemplate (getIdUnfolding sel_id))
@@ -311,17 +305,13 @@ tcClassDecl2 (ClassDecl context class_name
 		      isLocallyDefined sel_id
 		    ]
 
-    	final_sel_binds = MonoBind (andMonoBinds sel_binds) [] nonRecursive 
+    	final_sel_binds = andMonoBinds sel_binds
     in
 	-- Generate bindings for the default methods
-    tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], _, _) ->
-    mapAndUnzipTc (buildDefaultMethodBind clas clas_tyvar default_binds) 
-		  (op_sel_ids `zip` [0..])
-					`thenTc` \ (const_insts_s, meth_binds) ->
+    buildDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
 
-    returnTc (unionManyBags const_insts_s, 
-	      final_sel_binds `ThenBinds`
-	      MonoBind (andMonoBinds meth_binds) [] nonRecursive)
+    returnTc (const_insts, 
+	      final_sel_binds `AndMonoBinds` meth_binds)
 \end{code}
 
 %************************************************************************
@@ -398,48 +388,62 @@ dfun.Foo.List
 \end{verbatim}
 
 \begin{code}
-buildDefaultMethodBind
+buildDefaultMethodBinds
 	:: Class
-	-> TcTyVar s
 	-> RenamedMonoBinds
-	-> (Id, Int)
 	-> TcM s (LIE s, TcMonoBinds s)
 
-buildDefaultMethodBind clas clas_tyvar default_binds (sel_id, idx)
-  = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+buildDefaultMethodBinds clas default_binds
+  = 	-- Construct suitable signatures
+    tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], [inst_ty], inst_env) ->
     let
-	avail_insts   = this_dict
-	defm_id       = classDefaultMethodId clas idx
-	no_prags name = NoPragmaInfo		-- No pragmas yet for default methods
+	mk_sig (bndr_name, locn)
+	  = let
+	        idx	   = classOpTagByOccName clas (getOccName bndr_name) - 1
+	        sel_id     = op_sel_ids !! idx
+	        Just dm_id = defm_ids !! idx
+	    in
+	    newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_dm_id) ->
+	    tcInstSigTcType (idType local_dm_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
+	    let
+		(theta', tau') = splitRhoTy rho_ty'
+		sig_info       = TySigInfo bndr_name local_dm_id tyvars' theta' tau' locn
+	    in
+	    returnNF_Tc (sig_info, ([clas_tyvar], RealId dm_id, TcId local_dm_id))
+    in
+    mapAndUnzipNF_Tc mk_sig bndrs	`thenNF_Tc` \ (sigs, abs_bind_stuff) ->
+
+	-- Typecheck the default bindings
+    let
+	clas_tyvar_set    = unitTyVarSet clas_tyvar
     in
     tcExtendGlobalTyVars clas_tyvar_set (
-	tcMethodBind noDefmExpr inst_ty no_prags default_binds (sel_id, idx)
-    )						`thenTc` \ (defm_bind, insts_needed, (_, local_defm_id)) ->
+	tcBindWithSigs (map fst bndrs) default_binds sigs nonRecursive (\_ -> NoPragmaInfo)
+    )						`thenTc` \ (defm_binds, insts_needed, _) ->
 
-	-- CHECK THE CONTEXT OF THE DEFAULT-METHOD BINDS
+	-- Check the context
+    newDicts origin [(clas,inst_ty)]		`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+    let
+	avail_insts   = this_dict
+    in
     tcSimplifyAndCheck
 	clas_tyvar_set
 	avail_insts
 	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
 
     let
-	defm_binds = AbsBinds
+	full_binds = AbsBinds
 		 	[clas_tyvar]
 			[this_dict_id]
-			[([clas_tyvar], RealId defm_id, local_defm_id)]
-			(dict_binds `AndMonoBinds` defm_bind)
+			abs_bind_stuff
+			(dict_binds `AndMonoBinds` defm_binds)
     in
-    returnTc (const_lie, defm_binds)
+    returnTc (const_lie, full_binds)
 
   where
-    clas_tyvar_set    = unitTyVarSet clas_tyvar
-    inst_ty           = mkTyVarTy clas_tyvar
-    origin            = ClassDeclOrigin
-    noDefmExpr _      = HsApp (HsVar (getName nO_DEFAULT_METHOD_ERROR_ID)) 
-			      (HsLit (HsString (_PK_ error_msg)))
-
-    error_msg = show (sep [text "Class",  ppr (PprForUser opt_PprUserLength) clas,
-				  text "Method", ppr (PprForUser opt_PprUserLength) sel_id])
+    (tyvar, scs, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
+    origin = ClassDeclOrigin
+    bndrs  = bagToList (collectMonoBinders default_binds)
 \end{code}
 
 
