@@ -55,6 +55,7 @@ import UniqFM
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
 			  panic, pprPanic, pprTrace
 			)
+import Maybes		( maybeToBool )
 import Outputable
 \end{code}
 
@@ -175,14 +176,17 @@ tcLookupTyConByKey uniq
 
 tcLookupClass name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
---  pprTrace "tcLookupClass:" (hsep [text "Uniq:", pprUnique10 (uniqueOf name), text "; avail:", hsep (map (pprUnique10 . fst) (ufmToList ce))]) $
---  pprTrace "tcLookupClass:" (hsep [text "Uniq:", pprUnique (uniqueOf name), text "; avail:", hsep (map (pprUnique . fst) (ufmToList ce))]) $
     case lookupUFM ce name of
-	Just stuff -> returnTc stuff
-	Nothing	   -> 	-- Could be that he's using a type constructor as a class
-			case lookupUFM tce name of
-			  Just _ ->  failTc (tyConAsClassErr name)
-			  Nothing -> pprPanic "tcLookupClass:" (ppr PprShowAll name)
+	Just stuff         -- Common case: it's ok
+	  -> returnTc stuff
+
+	Nothing		   -- Could be that he's using a type constructor as a class
+	  |  maybeToBool (maybeWiredInTyConName name)
+	  || maybeToBool (lookupUFM tce name)
+	  -> failTc (tyConAsClassErr name)
+
+	  | otherwise      -- Wierd!  Renamer shouldn't let this happen
+	  -> pprPanic "tcLookupClass:" (ppr PprShowAll name)
 
 tcLookupClassByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
