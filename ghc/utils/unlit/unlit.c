@@ -43,14 +43,14 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#define NULLSTR       ((char *)0)
-#define DEFNCHAR      '>'
-#define MISSINGBLANK  "unlit: Program line next to comment"
-#define EMPTYSCRIPT   "unlit: No definitions in file (perhaps you forgot the '>'s?)"
-#define USAGE         "usage: unlit [-q] [-n] [-c] file1 file2\n"
-#define CANNOTOPEN    "unlit: cannot open \"%s\"\n"
-#define DISTINCTNAMES "unlit: input and output filenames must differ\n"
-#define MISSINGCODE   "unlit: missing %s\n"
+#define NULLSTR        ((char *)0)
+#define DEFNCHAR       '>'
+#define MISSINGBLANK   "unlit: Program line next to comment"
+#define EMPTYSCRIPT    "unlit: No definitions in file (perhaps you forgot the '>'s?)"
+#define USAGE          "usage: unlit [-q] [-n] [-c] file1 file2\n"
+#define CANNOTOPEN     "unlit: cannot open \"%s\"\n"
+#define DISTINCTNAMES  "unlit: input and output filenames must differ\n"
+#define MISSINGENDCODE "unlit: missing \\end{code}\n"
 
 #define BEGINCODE "\\begin{code}"
 #define LENBEGINCODE 12
@@ -58,6 +58,7 @@
 #define LENENDCODE 10
 #ifdef PSEUDOCODE
 /* According to Will Partain, the inventor of pseudocode, this gone now. */
+#define MISSINGENDPSEUDOCODE "unlit: missing \\end{pseudocode}\n"
 #define BEGINPSEUDOCODE "\\begin{pseudocode}"
 #define LENBEGINPSEUDOCODE 18
 #define ENDPSEUDOCODE "\\end{pseudocode}"
@@ -228,7 +229,7 @@ FILE *ostream; {
 	    char lineb[1000];
 	    for(;;) {
 		if (fgets(lineb, sizeof lineb, istream) == NULL) {
-		    fprintf(stderr, MISSINGCODE, ENDCODE);
+		    complain(file, linesread, MISSINGENDCODE);
 		    exit(1);
 		}
 		linesread++;
@@ -245,7 +246,7 @@ FILE *ostream; {
 	    char lineb[1000];
 	    for(;;) {
 		if (fgets(lineb, sizeof lineb, istream) == NULL) {
-		    fprintf(stderr, MISSINGCODE, ENDPSEUDOCODE);
+		    complain(file, linesread, MISSINGENDPSEUDOCODE);
 		    exit(1);
 		}
 		linesread++;
