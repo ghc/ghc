@@ -18,12 +18,18 @@
 /* Define if using alloca.c.  */
 #undef C_ALLOCA
 
+/* Define if text section appear before data section in exec. */
+#undef CODE_BEFORE_DATA
+
 /* Define to empty if the keyword does not work.  */
 #undef const
 
 /* Define to one of _getb67, GETB67, getb67 for Cray-2 and Cray-YMP systems.
    This function is required for alloca.c support on those systems.  */
 #undef CRAY_STACKSEG_END
+
+/* Define to symbol that terminates data section. */
+#undef DATA_SECTION_END_MARKER
 
 /* Define if you have alloca, as a function or macro.  */
 #undef HAVE_ALLOCA
@@ -272,3 +278,6 @@
 
 /* Define if you have the iberty library (-liberty).  */
 #undef HAVE_LIBIBERTY
+
+/* Define to symbol that terminates text section. */
+#undef TEXT_SECTION_END_MARKER
