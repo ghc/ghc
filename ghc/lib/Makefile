@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.11 1997/06/03 23:42:21 sof Exp $
+# 	$Id: Makefile,v 1.12 1997/07/05 01:04:30 sof Exp $
 #
 #	
 #################################################################################
@@ -69,6 +69,12 @@ SRC_MKDEPENDHS_OPTS += -ighc:required:glaExts:concurrent -I$(GHC_INCLUDE_DIR)
 #-----------------------------------------------------------------------------
 # 	Rules
 
+## 6/97 - the manual copying of .hi-boot files to .hi is not used
+## anymore, renamer will look for a .hi-boot directly.
+## ToDo: remove old setup.
+
+ifeq "1" "0"
+
 # In preparation for building the various libHS* libraries,
 # we create the interface files needed to boot their build.
 #
@@ -108,6 +114,10 @@ hi-boot :
 		done; \
 	done
 	@touch ghc/IOBase.lhs
+else
+hi-boot :
+	@echo "Done."
+endif
 
 boot :: hi-boot
 
