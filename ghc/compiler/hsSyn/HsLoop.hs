@@ -1,9 +1,8 @@
 module HsLoop
-
        (
-        module HsExpr,
-	module HsBinds
+        module HsMatches,
+        module HsExpr
        ) where
 
+import HsMatches
 import HsExpr
-import HsBinds
