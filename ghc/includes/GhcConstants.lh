@@ -56,6 +56,18 @@ The size of an StgDouble, in StgWords.
 #endif
 \end{code}
 
+The size of an Stg{Int,Word}64, in StgWords.
+
+\begin{code}
+#if alpha_TARGET_ARCH
+#define WORD64_SIZE 	1
+#define INT64_SIZE 	1
+#else
+#define WORD64_SIZE 	2
+#define INT64_SIZE 	2
+#endif
+\end{code}
+
 Sizes of gmp objects, in StgWords
 
 \begin{code}
@@ -94,6 +106,7 @@ do the selection at GC time):
 #define MAX_VANILLA_REG 8
 #define MAX_FLOAT_REG 4
 #define MAX_DOUBLE_REG 2
+#define MAX_LONG_REG 2
 \end{code}
 
 %************************************************************************
