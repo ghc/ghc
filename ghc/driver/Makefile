@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.45 2000/11/07 10:42:56 simonmar Exp $
+# $Id: Makefile,v 1.46 2000/11/21 16:29:26 simonmar Exp $
 #
 
 TOP=..
@@ -63,6 +63,7 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cRM                   = \"$(RM)\"" >> Config.hs
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> Config.hs
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> Config.hs
+	@echo "cLibsReadline         = \"$(LibsReadline)\"" >> Config.hs
 	@echo "cGhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> Config.hs
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> Config.hs
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> Config.hs
