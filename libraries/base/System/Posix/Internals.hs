@@ -1,7 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -----------------------------------------------------------------------------
--- #hide
 -- |
 -- Module      :  System.Posix.Internals
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
@@ -19,6 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module System.Posix.Internals where
 
 #include "config.h"
