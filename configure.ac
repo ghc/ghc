@@ -1052,20 +1052,20 @@ AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 
-dnl ** (Mac OS X only: check for HaskellSupport.framework)
-HaveFrameworkHaskellSupport=NO
+dnl ** (Mac OS X only: check for GMP.framework)
+HaveFrameworkGMP=NO
 if test $HostPlatform = "powerpc-apple-darwin"; then
- AC_MSG_CHECKING([for HaskellSupport.framework])
+ AC_MSG_CHECKING([for GMP.framework])
  save_libs="$LIBS"
- LIBS="-framework HaskellSupport"
- AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkHaskellSupport=YES,)
- if test $HaveFrameworkHaskellSupport = YES; then
-  AC_DEFINE([HAVE_FRAMEWORK_HASKELLSUPPORT], [1], [Define to 1 if the HaskellSupport.framework is installed (Mac OS X only).])
+ LIBS="-framework GMP"
+ AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkGMP=YES,)
+ if test $HaveFrameworkGMP = YES; then
+  AC_DEFINE([HAVE_FRAMEWORK_GMP], [1], [Define to 1 if GMP.framework is installed (Mac OS X only).])
  fi;
  LIBS="$save_libs"
- AC_MSG_RESULT([$HaveFrameworkHaskellSupport])
+ AC_MSG_RESULT([$HaveFrameworkGMP])
 fi;
-AC_SUBST(HaveFrameworkHaskellSupport)
+AC_SUBST(HaveFrameworkGMP)
 
 dnl ** check for mingwex library
 AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
@@ -1133,103 +1133,84 @@ dnl ################################################################
 
 dnl ** check for libdl & RTLD_NEXT
 
-dnl (Mac OS X only) ... but don't check if we already have the
-dnl HaskellSupport.framework
+AC_CHECK_LIB(dl, dlopen, 
+    [HaveLibDL=YES
+     AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
+     LIBS="$LIBS -ldl"], 
+    [HaveLibDL=NO])
+AC_SUBST(HaveLibDL)
 
-if test $HaveFrameworkHaskellSupport = YES; then
-    HaveLibDL=NO
-    HaveRtldNext=NO
-    HaveRtldLocal=YES
-    AC_DEFINE([HAVE_RTLDLOCAL], [1], [Define to 1 if RTLD_LOCAL is available.])
-    HaveRtldGlobal=YES
-    AC_DEFINE([HAVE_RTLDGLOBAL], [1], [Define to 1 if RTLD_GLOBAL is available.])
-    HaveRtldNow=YES
-    AC_DEFINE([HAVE_RTLDNOW], [1], [Define to 1 if we can see RTLD_NOW in dlfcn.h.])
-    AC_SUBST(HaveLibDL)
-    AC_SUBST(HaveRtldNext)
-    AC_SUBST(HaveRtldLocal)
-    AC_SUBST(HaveRtldGlobal)
-    AC_SUBST(HaveRtldNow)
-else
-    AC_CHECK_LIB(dl, dlopen, 
-    	[HaveLibDL=YES
-    	 AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
-    	 LIBS="$LIBS -ldl"], 
-    	[HaveLibDL=NO])
-    AC_SUBST(HaveLibDL)
+dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
+AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_NEXT
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE([HAVE_RTLDNEXT], [1], [Define to 1 if we can see RTLD_NEXT in dlfcn.h.])
+  HaveRtldNext=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldNext=NO
+  ])    
+AC_SUBST(HaveRtldNext)
 
-    dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
-    AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
-    AC_EGREP_CPP(yes,
-    [
-     #include <dlfcn.h>
-     #ifdef RTLD_NEXT
-            yes
-     #endif
-    ], [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE([HAVE_RTLDNEXT], [1], [Define to 1 if we can see RTLD_NEXT in dlfcn.h.])
-      HaveRtldNext=YES
-    ], [
-      AC_MSG_RESULT(no)
-      HaveRtldNext=NO
-      ])    
-    AC_SUBST(HaveRtldNext)
+dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
+AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_LOCAL
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE([HAVE_RTLDLOCAL], [1], [Define to 1 if RTLD_LOCAL is available.])
+  HaveRtldLocal=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldLocal=NO
+  ])    
+AC_SUBST(HaveRtldLocal)
 
-    dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
-    AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
-    AC_EGREP_CPP(yes,
-    [
-     #include <dlfcn.h>
-     #ifdef RTLD_LOCAL
-            yes
-     #endif
-    ], [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_RTLDLOCAL)
-      HaveRtldLocal=YES
-    ], [
-      AC_MSG_RESULT(no)
-      HaveRtldLocal=NO
-      ])    
-    AC_SUBST(HaveRtldLocal)
+dnl ** RTLD_GLOBAL isn't available on openbsd
+AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_GLOBAL
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE([HAVE_RTLDGLOBAL], [1], [Define to 1 if RTLD_GLOBAL is available.])
+  HaveRtldGlobal=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldGlobal=NO
+  ])    
+AC_SUBST(HaveRtldGlobal)
 
-    dnl ** RTLD_GLOBAL isn't available on openbsd
-    AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
-    AC_EGREP_CPP(yes,
-    [
-     #include <dlfcn.h>
-     #ifdef RTLD_GLOBAL
-            yes
-     #endif
-    ], [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_RTLDGLOBAL)
-      HaveRtldGlobal=YES
-    ], [
-      AC_MSG_RESULT(no)
-      HaveRtldGlobal=NO
-      ])    
-    AC_SUBST(HaveRtldGlobal)
-
-    dnl ** RTLD_NOW isn't available on openbsd
-    AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
-    AC_EGREP_CPP(yes,
-    [
-     #include <dlfcn.h>
-     #ifdef RTLD_NOW
-            yes
-     #endif
-    ], [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_RTLDNOW)
-      HaveRtldNow=YES
-    ], [
-      AC_MSG_RESULT(no)
-      HaveRtldNow=NO
-      ])    
-    AC_SUBST(HaveRtldNow)
-fi
+dnl ** RTLD_NOW isn't available on openbsd
+AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_NOW
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE([HAVE_RTLDNOW], [1], [Define to 1 if we can see RTLD_NOW in dlfcn.h])
+  HaveRtldNow=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldNow=NO
+  ])    
+AC_SUBST(HaveRtldNow)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests

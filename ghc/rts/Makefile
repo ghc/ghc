@@ -233,7 +233,7 @@ endif
 # and not worth re-implementing in our Makefile framework.
 
 ifneq "$(HaveLibGmp)" "YES"
-ifneq "$(HaveFrameworkHaskellSupport)" "YES"
+ifneq "$(HaveFrameworkGMP)" "YES"
 boot ::
 	if [ -f gmp/config.status ]; then \
 	   cd gmp && CC=$(WhatGccIsCalled) ./config.status; \

@@ -759,14 +759,14 @@ HaveLibGmp	= @HaveLibGmp@
 LibGmp		= @LibGmp@
 
 #-----------------------------------------------------------------------------
+# GMP framework (Mac OS X)
+#
+HaveFrameworkGMP = @HaveFrameworkGMP@
+
+#-----------------------------------------------------------------------------
 # Mingwex Library
 #
 HaveLibMingwEx	= @HaveLibMingwEx@
-
-#-----------------------------------------------------------------------------
-# HaskellSupport framework (Mac OS X)
-#
-HaveFrameworkHaskellSupport = @HaveFrameworkHaskellSupport@
 
 #-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)

@@ -38,9 +38,7 @@
 #include <sys/stat.h>
 #endif
 
-#if defined(HAVE_FRAMEWORK_HASKELLSUPPORT)
-#include <HaskellSupport/dlfcn.h>
-#elif defined(HAVE_DLFCN_H)
+#if defined(HAVE_DLFCN_H)
 #include <dlfcn.h>
 #endif
 

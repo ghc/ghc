@@ -22,7 +22,7 @@ library-dirs:		LIB_DIR
 # endif
 #else /* !INSTALLING */
 library-dirs:		FPTOOLS_TOP_ABS"/ghc/rts"
-# ifndef HAVE_LIBGMP
+# if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
 			, FPTOOLS_TOP_ABS"/ghc/rts/gmp"
 # endif
 #endif
@@ -30,7 +30,7 @@ library-dirs:		FPTOOLS_TOP_ABS"/ghc/rts"
 hs-libraries:   "HSrts"
 
 extra-libraries:		"m"		/* for ldexp() */
-#ifndef HAVE_FRAMEWORK_HASKELLSUPPORT
+#ifndef HAVE_FRAMEWORK_GMP
 			      , "gmp"
 #ifdef HAVE_LIBDL
 			      , "dl"
@@ -138,8 +138,8 @@ ld-options:
 
 framework-dirs:
 
-#ifdef HAVE_FRAMEWORK_HASKELLSUPPORT
-frameworks:	"HaskellSupport"
+#ifdef HAVE_FRAMEWORK_GMP
+frameworks:	"GMP"
 #else
 frameworks:
 #endif
