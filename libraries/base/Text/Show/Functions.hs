@@ -19,5 +19,7 @@ module Text.Show.Functions () where
 
 import Prelude
 
+#ifndef __NHC__
 instance Show (a -> b) where
 	showsPrec _ _ = showString "<function>"
+#endif

@@ -3,7 +3,8 @@ SEARCH	= -I$(TOPDIR)/targets/$(MACHINE)
 
 DIRS	= Data Control Control/Monad Debug System System/IO System/Console \
 	  Foreign Foreign/C Foreign/Marshal Text Text/ParserCombinators \
-	  Text/ParserCombinators/Parsec Text/PrettyPrint Text/Html
+	  Text/ParserCombinators/Parsec Text/PrettyPrint Text/Html \
+	  Text/Show
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
@@ -16,7 +17,7 @@ SRCS	= \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs System/Locale.hs \
 	System/Directory.hs System/Mem.hs System/Cmd.hs System/Info.hs \
-	System/Console/GetOpt.hs \
+	System/Console/GetOpt.hs System/Random.hs \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
 	Foreign/ForeignPtr.hs Foreign/C/Types.hs Foreign/C/TypesISO.hs \
 	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
@@ -31,18 +32,19 @@ SRCS	= \
 	Text/ParserCombinators/Parsec/Prim.hs \
 	Text/ParserCombinators/Parsec.hs \
 	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
-	Text/Html/BlockTable.hs Text/Html.hs
+	Text/Html/BlockTable.hs Text/Html.hs \
+	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
 
-
-#	Data/Dynamic.hs Data/Generics.hs Data/STRef.hs Data/Unique.hs
+#	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
 #	Control/Monad/Identity.hs
 #	Debug/QuickCheck.hs
-#	System/CPUTime.hsc System/Random.hs System/Time.hsc
+#	System/CPUTime.hsc System/Time.hsc
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc
 #	Text/ParserCombinators/Parsec/Token.hs \
 #	Text/ParserCombinators/Parsec/Language.hs \
-#	Text/Read/* Text/Read.hs Text/Show/* Text/Show.hs
+#	Text/ParserCombinators/ReadP.hs Text/ParserCombinators/ReadPrec.hs
+#	Text/Read/Lex.hs
 #	Text/Regex/* Text/Regex.hs
 
 
