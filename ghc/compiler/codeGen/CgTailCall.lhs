@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.33 2002/04/29 14:03:42 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.34 2002/09/11 10:14:32 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -118,8 +118,7 @@ performPrimReturn :: SDoc	-- Just for debugging (sigh)
 performPrimReturn doc amode
   = let
 	kind = getAmodeRep amode
-	ret_reg = WARN( case kind of { PtrRep -> True; other -> False }, text "primRet" <+> doc <+> pprAmode amode )
-		  dataReturnConvPrim kind
+	ret_reg = dataReturnConvPrim kind
 
 	assign_possibly = case kind of
 	  VoidRep -> AbsCNop
