@@ -12,6 +12,7 @@ import HsDecls		( HsIdInfo(..) )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), Version(..) )
 import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas, noInstancePragmas )
 import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
 			  ArgUsageInfo, FBTypeInfo, ArityInfo, StrictnessInfo
@@ -92,7 +93,7 @@ parseIface ls = parseIToks (lexIface ls)
 	TYPE_PART       { ITtysig $$ }
 	ARITY_PART	{ ITarity }
 	STRICT_PART	{ ITstrict }
-	UNFOLD_PART	{ ITunfold }
+	UNFOLD_PART	{ ITunfold $$ }
 	DEMAND		{ ITdemand $$ }
 	BOTTOM		{ ITbottom }
 	LAM		{ ITlam }
