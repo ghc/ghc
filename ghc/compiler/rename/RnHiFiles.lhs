@@ -225,13 +225,14 @@ loadInterface doc_str mod_name from
 				vers_rules = rule_vers,
 				vers_decls = decls_vers }
 
-	-- For an explicit user import, add to mod_map info about
-	-- the things the imported module depends on, extracted
-	-- from its usage info; and delete the module itself, which is now in the PIT
+	-- Add to mod_map info about the things the imported module 
+	-- depends on, extracted from its usage info
+	-- No point for system imports, for reasons that escape me...
 	usages   = pi_usages iface
 	mod_map1 = case from of
-			ImportByUser _ -> addModDeps mod is_loaded usages mod_map
-			other          -> mod_map
+			ImportBySystem -> mod_map
+			other 	       -> addModDeps mod is_loaded usages mod_map
+	-- Delete the module itself, which is now in the PIT
 	mod_map2 = delFromFM mod_map1 mod_name
 
 	-- mod_deps is a pruned version of usages that records only what 
