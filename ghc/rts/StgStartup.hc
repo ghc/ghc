@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.12 2000/04/26 09:44:38 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.13 2000/04/26 13:50:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -76,9 +76,10 @@ STGFUN(stg_stop_thread_entry)
      * tidy up the registers and return to the scheduler.
     */
 
-    /* Move Su just off the end of the stack, we're about to spam the
-     * STOP_FRAME with the return value.
+    /* Move Sp to the last word on the stack, and Su to just past the end
+     * of the stack.  We then place the return value at the top of the stack.
      */
+    Sp += sizeofW(StgStopFrame) - 1;
     Su = (StgUpdateFrame *)(Sp+1);  
     Sp[0] = R1.w;
 
