@@ -407,9 +407,8 @@ isHiBootTyCon other			          = False
 
 isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
--- For the moment, they are primitive but lifted, but that may change
-isForeignTyCon (PrimTyCon {isUnLifted = is_unlifted}) = not is_unlifted
-isForeignTyCon other				      = False
+isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
+isForeignTyCon other				   = False
 \end{code}
 
 \begin{code}
