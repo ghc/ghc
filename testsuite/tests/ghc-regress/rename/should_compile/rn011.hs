@@ -1,5 +1,4 @@
 module Imp1000 where
-import Int10
 import {-# SOURCE #-} Int10
 import {-# SOURCE #-} Int10
 import {-# SOURCE #-} Int10
