@@ -443,7 +443,7 @@ getPackageFrameworkPath pkgs = do
 getPackageFrameworks  :: [PackageName] -> IO [String]
 getPackageFrameworks pkgs = do
   ps <- getExplicitPackagesAnd pkgs
-  return (concatMap extra_frameworks ps)
+  return (concatMap extraFrameworks ps)
 #endif
 
 -- -----------------------------------------------------------------------------
