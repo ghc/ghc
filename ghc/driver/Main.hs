@@ -1646,6 +1646,7 @@ opts =
 	------- Miscellaneous -----------------------------------------------
   ,  ( "cpp"		, NoArg (writeIORef cpp_flag True) )
   ,  ( "#include"	, SepArg (add cmdline_hc_includes) )
+  ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
 
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef output_dir  . Just) )
