@@ -237,8 +237,6 @@ stixStmt_ConFold stmt
                           (StAssignMem pk baseRegAddr src)
         StAssignMem pk addr src
            -> StAssignMem pk (stixExpr_ConFold addr) (stixExpr_ConFold src)
-        StAssignMachOp lhss mop args
-           -> StAssignMachOp lhss mop (map stixExpr_ConFold args)
         StVoidable expr
            -> StVoidable (stixExpr_ConFold expr)
         StJump dsts addr

@@ -95,7 +95,7 @@ __export PrelGHC
   uncheckedIShiftRLzh
   addIntCzh
   subIntCzh
-  mulIntCzh
+  mulIntMayOflozh
 
   Wordzh
   gtWordzh

@@ -493,6 +493,8 @@ but we don't care, since it doesn't get used much.  We hope.
 	      | SUB	      Size Operand Operand
 	      | IMUL	      Size Operand Operand	-- signed int mul
 	      | MUL	      Size Operand Operand	-- unsigned int mul
+              | IMUL64	      Reg Reg			-- 32 x 32 -> 64 signed mul
+		-- operand1:operand2 := (operand1[31:0] *signed operand2[31:0])
 
 -- Quotient and remainder.  SEE comment above -- these are not
 -- real x86 insns; instead they are expanded when printed

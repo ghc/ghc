@@ -46,7 +46,6 @@ import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
-import Maybes		( Maybe012(..), maybe012ToList )
 import Constants	( wORD_SIZE )
 import Outputable
 import FastTypes
@@ -72,10 +71,6 @@ data StixStmt
     -- Assign a value to memory.  First tree indicates the address to be
     -- assigned to, so there is an implicit dereference here.
   | StAssignMem PrimRep StixExpr StixExpr -- dst, src
-
-    -- Do a machine op which generates multiple values, and assign
-    -- the results to the lvalues stated here.
-  | StAssignMachOp (Maybe012 StixVReg) MachOp [StixExpr]
 
     -- A simple assembly label that we might jump to.
   | StLabel CLabel
@@ -171,8 +166,8 @@ repOfStixExpr (StInd rep _)   = rep
 repOfStixExpr (StCall target conv retrep args) = retrep
 repOfStixExpr (StMachOp mop args) 
    = case resultRepsOfMachOp mop of
-        Just1 rep -> rep
-        other     -> pprPanic "repOfStixExpr:StMachOp" (pprMachOp mop)
+        Just rep -> rep
+        Nothing  -> pprPanic "repOfStixExpr:StMachOp" (pprMachOp mop)
 
 
 -- used by insnFuture in RegAllocInfo.lhs
@@ -228,13 +223,6 @@ pprStixStmt t
                         -> ppr pr <> char '[' <> pprStixExpr addr <> char ']'
                                   <> text "  :=" <> ppr pr
                                   <> text "  " <> pprStixExpr rhs
-       StAssignMachOp lhss mop args
-                        -> parens (hcat (punctuate comma (
-                              map pprStixVReg (maybe012ToList lhss)
-                           )))
-                           <> text "  :=  "
-                           <> pprMachOp mop
-                           <> parens (hsep (punctuate comma (map pprStixExpr args)))
        StLabel ll       -> pprCLabel ll <+> char ':'
        StFunBegin ll    -> char ' ' $$ parens (text "FunBegin" <+> pprCLabel ll)
        StFunEnd ll      -> parens (text "FunEnd" <+> pprCLabel ll)
@@ -372,8 +360,6 @@ stixStmt_CountTempUses u t
         StJump     dsts t1      -> qe t1
         StCondJump lbl t1       -> qe t1
         StData     pk ts        -> sum (map qe ts)
-        StAssignMachOp lhss mop args
-           -> sum (map qv (maybe012ToList lhss)) + sum (map qe args)
         StVoidable expr  -> qe expr
         StSegment _      -> 0
         StFunBegin _     -> 0
@@ -430,21 +416,6 @@ stixStmt_MapUniques f t
          qs = stixStmt_MapUniques f
          qr = stixReg_MapUniques f
          qv = stixVReg_MapUniques f
-
-         doMopLhss Just0 = Just0
-         doMopLhss (Just1 r1)
-            = case qv r1 of
-                 Nothing -> Just1 r1
-                 other   -> doMopLhss_panic
-         doMopLhss (Just2 r1 r2)
-            = case (qv r1, qv r2) of
-                 (Nothing, Nothing) -> Just2 r1 r2
-                 other              -> doMopLhss_panic
-         -- Because the StixRegs processed by doMopLhss are lvalues, they
-         -- absolutely shouldn't be mapped to a StixExpr; 
-         -- hence we panic if they do.  Same deal for StAssignReg below.
-         doMopLhss_panic
-            = panic "stixStmt_MapUniques:doMopLhss"
      in
      case t of
         StAssignReg pk reg rhs
@@ -455,9 +426,7 @@ stixStmt_MapUniques f t
         StJump     dsts t1        -> StJump     dsts (qe t1)
         StCondJump lbl t1         -> StCondJump lbl (qe t1)
         StData     pk ts          -> StData     pk (map qe ts)
-        StVoidable expr           ->  StVoidable (qe expr)
-        StAssignMachOp lhss mop args
-           -> StAssignMachOp (doMopLhss lhss) mop (map qe args)
+        StVoidable expr           -> StVoidable (qe expr)
         StSegment _      -> t
         StLabel _        -> t
         StFunBegin _     -> t

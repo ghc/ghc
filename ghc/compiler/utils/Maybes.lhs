@@ -5,7 +5,6 @@
 
 \begin{code}
 module Maybes (
-	Maybe012(..), maybe012ToList,
 	MaybeErr(..),
 
 	orElse, 
@@ -28,22 +27,6 @@ import Maybe( catMaybes, mapMaybe )
 
 infixr 4 `orElse`
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Maybe012 type]{The @Maybe012@ type}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Maybe012 a = Just0 | Just1 a | Just2 a a deriving (Eq,Show)
-
-maybe012ToList Just0       = []
-maybe012ToList (Just1 x)   = [x]
-maybe012ToList (Just2 x y) = [x, y]
-\end{code}
-
 
 %************************************************************************
 %*									*

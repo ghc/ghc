@@ -989,6 +989,9 @@ pprInstr (IREM  sz src dst) = pprInstr_quotRem True False sz src dst
 pprInstr (QUOT sz src dst) = pprInstr_quotRem False True sz src dst
 pprInstr (REM  sz src dst) = pprInstr_quotRem False False sz src dst
 
+pprInstr (IMUL64 sd_hi sd_lo) = pprInstr_imul64 sd_hi sd_lo
+
+
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
 -- so as to preclude the possibility of a FP stack overflow exception.
@@ -1142,6 +1145,24 @@ pprInstr_quotRem signed isQuot sz src dst
                | not signed = if isQuot then "QUOT"  else "REM"
         fakeInsn = text opStr <+> pprOperand sz src 
                               <> char ',' <+> pprOperand sz dst
+
+-- Emit code to make hi_reg:lo_reg be the 64-bit product of hi_reg and lo_reg
+pprInstr_imul64 hi_reg lo_reg
+   = let fakeInsn = text "imul64" <+> pp_hi_reg <> comma <+> pp_lo_reg
+         pp_hi_reg = pprReg L hi_reg
+         pp_lo_reg = pprReg L lo_reg
+     in     
+         vcat [
+            text "\t# BEGIN " <> fakeInsn,
+            text "\tpushl" <+> pp_hi_reg <> text" ;  pushl" <+> pp_lo_reg,
+            text "\tpushl %eax ; pushl %edx",
+            text "\tmovl 12(%esp), %eax ; imull 8(%esp)",
+            text "\tmovl %edx, 12(%esp) ; movl %eax, 8(%esp)",
+            text "\tpopl %edx ; popl %eax",
+            text "\tpopl" <+> pp_lo_reg <> text " ;  popl" <+> pp_hi_reg,
+            text "\t# END   " <> fakeInsn
+         ]
+
 
 --------------------------
 

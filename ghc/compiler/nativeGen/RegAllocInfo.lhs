@@ -236,6 +236,7 @@ regUsage instr = case instr of
     ADD    sz src dst	-> usageRM src dst
     SUB    sz src dst	-> usageRM src dst
     IMUL   sz src dst	-> usageRM src dst
+    IMUL64    sd1 sd2   -> mkRU [sd1,sd2] [sd1,sd2]
     MUL    sz src dst	-> usageRM src dst
     IQUOT  sz src dst	-> usageRM src dst
     IREM   sz src dst	-> usageRM src dst
@@ -627,6 +628,7 @@ patchRegs instr env = case instr of
     ADD  sz src dst	-> patch2 (ADD  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst
     IMUL sz src dst 	-> patch2 (IMUL sz) src dst
+    IMUL64  sd1 sd2     -> IMUL64 (env sd1) (env sd2)
     MUL sz src dst 	-> patch2 (MUL sz) src dst
     IQUOT sz src dst 	-> patch2 (IQUOT sz) src dst
     IREM sz src dst 	-> patch2 (IREM sz) src dst

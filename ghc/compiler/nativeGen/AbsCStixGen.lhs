@@ -30,7 +30,7 @@ import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  staticClosureNeedsLink
 			)
 import Literal		( Literal(..), word2IntLit )
-import Maybes	    	( Maybe012(..), maybeToBool )
+import Maybes	    	( maybeToBool )
 import StgSyn		( StgOp(..) )
 import MachOp		( MachOp(..), resultRepsOfMachOp )
 import PrimRep	    	( isFloatingRep, is64BitRep, 
@@ -414,7 +414,7 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
  -- Translate out array indexing primops right here, so that
  -- individual targets don't have to deal with them
 
- gencode (CMachOpStmt (Just1 r1) (MO_ReadOSBI off_w rep) [base,index] vols) 
+ gencode (CMachOpStmt (Just r1) (MO_ReadOSBI off_w rep) [base,index] vols) 
   = returnUs (\xs ->
        mkStAssign 
           rep 
@@ -425,7 +425,8 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
        : xs
     )
 
- gencode (CMachOpStmt Just0 (MO_WriteOSBI off_w rep) [base,index,val] vols) 
+ -- Ordinary MachOps are passed through unchanged.
+ gencode (CMachOpStmt Nothing (MO_WriteOSBI off_w rep) [base,index,val] vols) 
   = returnUs (\xs ->
        StAssignMem 
           rep 
@@ -436,33 +437,14 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
        : xs
     )
 
- -- Gruesome cases for multiple-result primops
- gencode (CMachOpStmt (Just2 r1 r2) mop [arg1, arg2] vols)
-  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC]
-  = getUniqueUs `thenUs`		\ u1 ->
-    getUniqueUs `thenUs` 		\ u2 ->
-    let vr1 = StixVReg u1 IntRep
-        vr2 = StixVReg u2 IntRep
-        r1s = a2stix r1
-        r2s = a2stix r2
-    in
-    returnUs (\xs ->
-       StAssignMachOp (Just2 vr1 vr2) mop [a2stix arg1, a2stix arg2]
-       : mkStAssign IntRep r1s (StReg (StixTemp vr1))
-       : mkStAssign IntRep r2s (StReg (StixTemp vr2))
-       : xs
-    )
-
- -- Ordinary MachOps are passed through unchanged.
-
- gencode (CMachOpStmt (Just1 r1) mop args vols)
-  = let (Just1 rep) = resultRepsOfMachOp mop
-    in 
-    returnUs (\xs ->
-       mkStAssign rep (a2stix r1) 
-                  (StMachOp mop (map a2stix args))
-       : xs
-    )
+ gencode (CMachOpStmt (Just r1) mop args vols)
+  = case resultRepsOfMachOp mop of
+       Just rep 
+          -> returnUs (\xs ->
+                mkStAssign rep (a2stix r1) 
+                               (StMachOp mop (map a2stix args))
+                : xs
+             )
 \end{code}
 
 Now the dreaded conditional jump.

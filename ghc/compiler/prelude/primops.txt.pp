@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.13 2001/12/13 10:47:28 sewardj Exp $
+-- $Id: primops.txt.pp,v 1.14 2001/12/14 15:26:16 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -180,6 +180,30 @@ primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
 
 primop   IntMulOp    "*#" 
    Dyadic   Int# -> Int# -> Int#
+   {Low word of signed integer multiply.}
+   with commutable = True
+
+primop   IntMulMayOfloOp  "mulIntMayOflo#" 
+   GenPrimOp   Int# -> Int# -> Bool
+   {Return True if there is any possibility that the upper word of a
+    signed integer multiply might contain useful information.  Return
+    False only if you are completely sure that no overflow can occur.
+    On a 32-bit platform, the recommmended implementation is to do a 
+    32 x 32 -> 64 signed multiply, and compare result[63:32] with 
+    (result[31] >>signed 31).  If they are identical, meaning that the 
+    upper word is merely a sign extension of the lower one, return 0, else 1.
+
+    On a 64-bit platform it is not always possible to 
+    acquire the top 64 bits of the result.  Therefore, a recommended 
+    implementation is to take the absolute value of both operands, and 
+    return 0 iff bits[63:31] of them are zero, since that means that their 
+    magnitudes fit within 31 bits, so the magnitude of the product must fit 
+    into 62 bits.
+
+    If in doubt, return non-zero, but do make an effort to create the
+    correct answer for small args, since otherwise the performance of
+    (*) :: Integer -> Integer -> Integer will be poor.
+   }
    with commutable = True
 
 primop   IntQuotOp    "quotInt#"    Dyadic
@@ -197,11 +221,12 @@ primop   IntGcdOp    "gcdInt#"    Dyadic   Int# -> Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Add with carry.  First member of result is (wrapped) sum; second member is 0 iff no overflow occured.}
+	 {Add with carry.  First member of result is (wrapped) sum; 
+          second member is 0 iff no overflow occured.}
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Subtract with carry.  First member of result is (wrapped) difference; second member is 0 iff no overflow occured.}
-primop   IntMulCOp   "mulIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Multiply with carry.  First member of result is (wrapped) product; second member is 0 iff no overflow occured.}
+	 {Subtract with carry.  First member of result is (wrapped) difference; 
+          second member is 0 iff no overflow occured.}
+
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Bool
 primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Bool
 

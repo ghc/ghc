@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.88 2001/12/11 18:25:15 sof Exp $
+ * $Id: PrimOps.h,v 1.89 2001/12/14 15:26:16 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -28,38 +28,11 @@
  * Int operations with carry.
  * -------------------------------------------------------------------------- */
 
-/* With some bit-twiddling, we can define int{Add,Sub}Czh portably in
- * C, and without needing any comparisons.  This may not be the
- * fastest way to do it - if you have better code, please send it! --SDM
- *
- * Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
- *
- * We currently don't make use of the r value if c is != 0 (i.e. 
- * overflow), we just convert to big integers and try again.  This
- * could be improved by making r and c the correct values for
- * plugging into a new J#.  
- */
-#define addIntCzh(r,c,a,b)					\
-{ r = ((I_)(a)) + ((I_)(b));					\
-  c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
-    >> (BITS_IN (I_) - 1);					\
-}
-
-
-#define subIntCzh(r,c,a,b)					\
-{ r = ((I_)(a)) - ((I_)(b));					\
-  c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
-    >> (BITS_IN (I_) - 1);					\
-}
-
 /* Multiply with overflow checking.
  *
- * This is slightly more tricky - the usual sign rules for add/subtract
- * don't apply.  
+ * This is tricky - the usual sign rules for add/subtract don't apply.  
  *
- * On x86 hardware we use a hand-crafted assembly fragment to do the job.
- *
- * On other 32-bit machines we use gcc's 'long long' types, finding
+ * On 32-bit machines we use gcc's 'long long' types, finding
  * overflow with some careful bit-twiddling.
  *
  * On 64-bit machines where gcc's 'long long' type is also 64-bits,
@@ -68,19 +41,7 @@
  * multiplication.
  */
 
-#if i386_TARGET_ARCH
-
-#define mulIntCzh(r,c,a,b)				\
-{							\
-  __asm__("xorl %1,%1\n\t				\
-	   imull %2,%3\n\t				\
-	   jno 1f\n\t					\
-	   movl $1,%1\n\t				\
-	   1:" 						\
-	: "=r" (r), "=&r" (c) : "r" (a), "0" (b));	\
-}
-
-#elif SIZEOF_VOID_P == 4
+#if SIZEOF_VOID_P == 4
 
 #ifdef WORDS_BIGENDIAN
 #define C 0
@@ -95,8 +56,9 @@ typedef union {
     StgInt32 i[2];
 } long_long_u ;
 
-#define mulIntCzh(r,c,a,b)			\
-{						\
+#define mulIntMayOflo(a,b)			\
+({                                              \
+  StgInt32 r, c;				\
   long_long_u z;				\
   z.l = (StgInt64)a * (StgInt64)b;		\
   r = z.i[R];					\
@@ -105,7 +67,9 @@ typedef union {
     c = ((StgWord)((a^b) ^ r))			\
       >> (BITS_IN (I_) - 1);			\
   }						\
-}
+  c;                                            \
+})
+
 /* Careful: the carry calculation above is extremely delicate.  Make sure
  * you test it thoroughly after changing it.
  */
@@ -116,16 +80,17 @@ typedef union {
 
 #define stg_abs(a) (((I_)(a)) < 0 ? -((I_)(a)) : ((I_)(a)))
 
-#define mulIntCzh(r,c,a,b)			\
-{						\
+#define mulIntMayOflo(a,b)			\
+({                                              \
+  I_ c; 					\
   if (stg_abs(a) >= HALF_INT ||			\
       stg_abs(b) >= HALF_INT) {			\
     c = 1;					\
   } else {					\
-    r = ((I_)(a)) * ((I_)(b));			\
     c = 0;					\
   }						\
-}
+  c;                                            \
+})
 #endif
 
 

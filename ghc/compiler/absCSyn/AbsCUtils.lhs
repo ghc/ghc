@@ -34,7 +34,6 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety(..)
 			  isDynamicTarget, isCasmTarget, defaultCCallConv )
 import StgSyn		( StgOp(..) )
 import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
-import Maybes		( Maybe012(..) )
 import Outputable
 import Panic		( panic )
 import FastTypes
@@ -609,22 +608,22 @@ mkHalfWord_HIADDR res arg
      mkTemp WordRep			`thenFlt` \ t_hw_mask1 ->
      mkTemp WordRep			`thenFlt` \ t_hw_mask2 ->
      let a_hw_shift 
-            = CMachOpStmt (Just1 t_hw_shift) 
+            = CMachOpStmt (Just t_hw_shift) 
                           MO_Nat_Shl [CBytesPerWord, CLit (mkMachInt 2)] Nothing
          a_hw_mask1
-            = CMachOpStmt (Just1 t_hw_mask1)
+            = CMachOpStmt (Just t_hw_mask1)
                           MO_Nat_Shl [CLit (mkMachWord 1), t_hw_shift] Nothing
          a_hw_mask2
-            = CMachOpStmt (Just1 t_hw_mask2)
+            = CMachOpStmt (Just t_hw_mask2)
                           MO_Nat_Sub [t_hw_mask1, CLit (mkMachWord 1)] Nothing
          final
 #        if WORDS_BIGENDIAN
             = CSequential [ a_hw_shift, a_hw_mask1, a_hw_mask2,
-                 CMachOpStmt (Just1 res) MO_Nat_And [arg, t_hw_mask2] Nothing
+                 CMachOpStmt (Just res) MO_Nat_And [arg, t_hw_mask2] Nothing
               ]
 #        else
             = CSequential [ a_hw_shift,
-                 CMachOpStmt (Just1 res) MO_Nat_Shr [arg, t_hw_shift] Nothing
+                 CMachOpStmt (Just res) MO_Nat_Shr [arg, t_hw_shift] Nothing
               ]
 #        endif
      in
@@ -657,19 +656,19 @@ non_void_amode amode
         k       -> True
 
 doIndexOffForeignObjOp rep res addr idx
-   = Just (Just1 res, MO_ReadOSBI fixedHdrSize rep, [addr,idx])
+   = Just (Just res, MO_ReadOSBI fixedHdrSize rep, [addr,idx])
 
 doIndexOffAddrOp rep res addr idx
-   = Just (Just1 res, MO_ReadOSBI 0 rep, [addr,idx])
+   = Just (Just res, MO_ReadOSBI 0 rep, [addr,idx])
 
 doIndexByteArrayOp rep res addr idx
-   = Just (Just1 res, MO_ReadOSBI arrWordsHdrSize rep, [addr,idx])
+   = Just (Just res, MO_ReadOSBI arrWordsHdrSize rep, [addr,idx])
 
 doWriteOffAddrOp rep addr idx val
-   = Just (Just0, MO_WriteOSBI 0 rep, [addr,idx,val])
+   = Just (Nothing, MO_WriteOSBI 0 rep, [addr,idx,val])
 
 doWriteByteArrayOp rep addr idx val
-   = Just (Just0, MO_WriteOSBI arrWordsHdrSize rep, [addr,idx,val])
+   = Just (Nothing, MO_WriteOSBI arrWordsHdrSize rep, [addr,idx,val])
 
 -- Simple dyadic op but one for which we need to cast first arg to
 -- be sure of correctness
@@ -677,9 +676,22 @@ translateOp_dyadic_cast1 mop res cast_arg1_to arg1 arg2 vols
    = mkTemp cast_arg1_to		`thenFlt` \ arg1casted ->
      (returnFlt . CSequential) [
         CAssign arg1casted arg1,
-        CMachOpStmt (Just1 res) mop [arg1casted,arg2]
+        CMachOpStmt (Just res) mop [arg1casted,arg2]
            (if isDefinitelyInlineMachOp mop then Nothing else Just vols)
      ]
+
+getBitsPerWordMinus1 :: FlatM (AbstractC, CAddrMode)
+getBitsPerWordMinus1
+   = mkTemps [IntRep, IntRep]		`thenFlt` \ [t1,t2] ->
+     returnFlt (
+        CSequential [
+           CMachOpStmt (Just t1) MO_Nat_Shl 
+                       [CBytesPerWord, CLit (mkMachInt 3)] Nothing,
+           CMachOpStmt (Just t2) MO_Nat_Sub
+                       [t1, CLit (mkMachInt 1)] Nothing
+        ],
+        t2
+     )
 
 ------------------------------------------------------------------------------
 
@@ -689,6 +701,74 @@ dscCOpStmt :: [CAddrMode]	-- Results
            -> [MagicId]		-- Potentially volatile/live registers
                          	-- (to save/restore around the op)
            -> FlatM AbstractC
+
+
+dscCOpStmt [res_r,res_c] IntAddCOp [aa,bb] vols
+{- 
+   With some bit-twiddling, we can define int{Add,Sub}Czh portably in
+   C, and without needing any comparisons.  This may not be the
+   fastest way to do it - if you have better code, please send it! --SDM
+  
+   Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
+  
+   We currently don't make use of the r value if c is != 0 (i.e. 
+   overflow), we just convert to big integers and try again.  This
+   could be improved by making r and c the correct values for
+   plugging into a new J#.  
+   
+   { r = ((I_)(a)) + ((I_)(b));					\
+     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
+         >> (BITS_IN (I_) - 1);					\
+   } 
+   Wading through the mass of bracketry, it seems to reduce to:
+   c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
+
+   SSA-form:
+   t1 = a^b
+   t2 = ~t1
+   t3 = a^r
+   t4 = t2 & t3
+   c  = t4 >>unsigned BITS_IN(I_)-1
+-}
+   = mkTemps [IntRep,IntRep,IntRep,IntRep]	`thenFlt` \ [t1,t2,t3,t4] ->
+     getBitsPerWordMinus1			`thenFlt` \ (bpw1_code,bpw1_t) ->
+     (returnFlt . CSequential) [
+        CMachOpStmt (Just res_r) MO_Nat_Add [aa,bb] Nothing,
+        CMachOpStmt (Just t1) MO_Nat_Xor [aa,bb] Nothing,
+        CMachOpStmt (Just t2) MO_Nat_Not [t1] Nothing,
+        CMachOpStmt (Just t3) MO_Nat_Xor [aa,res_r] Nothing,
+        CMachOpStmt (Just t4) MO_Nat_And [t2,t3] Nothing,
+        bpw1_code,
+        CMachOpStmt (Just res_c) MO_Nat_Shr [t4, bpw1_t] Nothing
+     ]
+
+
+dscCOpStmt [res_r,res_c] IntSubCOp [aa,bb] vols
+{- Similarly:
+   #define subIntCzh(r,c,a,b)					\
+   { r = ((I_)(a)) - ((I_)(b));					\
+     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
+         >> (BITS_IN (I_) - 1);					\
+   }
+
+   c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
+
+   t1 = a^b
+   t2 = a^r
+   t3 = t1 & t2
+   c  = t3 >>unsigned BITS_IN(I_)-1
+-}
+   = mkTemps [IntRep,IntRep,IntRep]		`thenFlt` \ [t1,t2,t3] ->
+     getBitsPerWordMinus1			`thenFlt` \ (bpw1_code,bpw1_t) ->
+     (returnFlt . CSequential) [
+        CMachOpStmt (Just res_r) MO_Nat_Add [aa,bb] Nothing,
+        CMachOpStmt (Just t1) MO_Nat_Xor [aa,bb] Nothing,
+        CMachOpStmt (Just t2) MO_Nat_Xor [aa,res_r] Nothing,
+        CMachOpStmt (Just t3) MO_Nat_And [t2,t3] Nothing,
+        bpw1_code,
+        CMachOpStmt (Just res_c) MO_Nat_Shr [t3, bpw1_t] Nothing
+     ]
+
 
 -- #define parzh(r,node) r = 1
 dscCOpStmt [res] ParOp [arg] vols
@@ -725,7 +805,7 @@ dscCOpStmt [res] SizeofByteArrayOp [arg] vols
    = mkTemp WordRep 			`thenFlt` \ w ->
      (returnFlt . CSequential) [
         CAssign w (mkDerefOff WordRep arg fixedHdrSize),
-        CMachOpStmt (Just1 w) 
+        CMachOpStmt (Just w) 
            MO_NatU_Mul [w, CBytesPerWord] (Just vols),
         CAssign res w
      ]
@@ -744,7 +824,7 @@ dscCOpStmt [] TouchOp [arg] vols
 dscCOpStmt [res] ByteArrayContents_Char [arg] vols
    = mkTemp PtrRep			`thenFlt` \ ptr ->
      (returnFlt . CSequential) [
-         CMachOpStmt (Just1 ptr) MO_NatU_to_NatP [arg] Nothing,
+         CMachOpStmt (Just ptr) MO_NatU_to_NatP [arg] Nothing,
          CAssign ptr (mkNoDerefOff WordRep ptr arrWordsHdrSize),
          CAssign res ptr
      ]
@@ -761,7 +841,7 @@ dscCOpStmt [res] EqStableNameOp [arg1,arg2] vols
      (returnFlt . CSequential) [
         CAssign sn1 (mkDerefOff WordRep arg1 fixedHdrSize),
         CAssign sn2 (mkDerefOff WordRep arg2 fixedHdrSize),
-        CMachOpStmt (Just1 res) MO_Nat_Eq [sn1,sn2] Nothing
+        CMachOpStmt (Just res) MO_Nat_Eq [sn1,sn2] Nothing
      ]
 
 -- #define addrToHValuezh(r,a) r=(P_)a
@@ -806,8 +886,8 @@ dscCOpStmt [res] UnsafeFreezeByteArrayOp [arg] vols
 dscCOpStmt [r] AddrRemOp [a1,a2] vols 
    = mkTemp WordRep			`thenFlt` \ a1casted ->
      (returnFlt . CSequential) [
-        CMachOpStmt (Just1 a1casted) MO_NatP_to_NatU [a1] Nothing,
-        CMachOpStmt (Just1 r) MO_NatU_Rem [a1casted,a2] Nothing
+        CMachOpStmt (Just a1casted) MO_NatP_to_NatU [a1] Nothing,
+        CMachOpStmt (Just r) MO_NatU_Rem [a1casted,a2] Nothing
      ]
 
 -- not handled by translateOp because they need casts
@@ -838,11 +918,11 @@ dscCOpStmt ress op args vols
 
 
 translateOp [r] ReadArrayOp [obj,ix] 
-   = Just (Just1 r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
+   = Just (Just r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
 translateOp [r] IndexArrayOp [obj,ix] 
-   = Just (Just1 r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
+   = Just (Just r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
 translateOp [] WriteArrayOp [obj,ix,v] 
-   = Just (Just0, MO_WriteOSBI arrPtrsHdrSize PtrRep, [obj,ix,v])
+   = Just (Nothing, MO_WriteOSBI arrPtrsHdrSize PtrRep, [obj,ix,v])
 
 -- IndexXXXoffForeignObj
 
@@ -994,158 +1074,158 @@ translateOp [] WriteByteArrayOp_Word64 [a,i,x] = doWriteByteArrayOp Word64Rep  a
 
 -- Native word signless ops
 
-translateOp [r] IntAddOp       [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
-translateOp [r] IntSubOp       [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
-translateOp [r] WordAddOp      [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
-translateOp [r] WordSubOp      [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
-translateOp [r] AddrAddOp      [a1,a2] = Just (Just1 r, MO_Nat_Add,        [a1,a2])
-translateOp [r] AddrSubOp      [a1,a2] = Just (Just1 r, MO_Nat_Sub,        [a1,a2])
+translateOp [r] IntAddOp       [a1,a2] = Just (Just r, MO_Nat_Add,        [a1,a2])
+translateOp [r] IntSubOp       [a1,a2] = Just (Just r, MO_Nat_Sub,        [a1,a2])
+translateOp [r] WordAddOp      [a1,a2] = Just (Just r, MO_Nat_Add,        [a1,a2])
+translateOp [r] WordSubOp      [a1,a2] = Just (Just r, MO_Nat_Sub,        [a1,a2])
+translateOp [r] AddrAddOp      [a1,a2] = Just (Just r, MO_Nat_Add,        [a1,a2])
+translateOp [r] AddrSubOp      [a1,a2] = Just (Just r, MO_Nat_Sub,        [a1,a2])
 
-translateOp [r] IntEqOp        [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
-translateOp [r] IntNeOp        [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
-translateOp [r] WordEqOp       [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
-translateOp [r] WordNeOp       [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
-translateOp [r] AddrEqOp       [a1,a2] = Just (Just1 r, MO_Nat_Eq,         [a1,a2])
-translateOp [r] AddrNeOp       [a1,a2] = Just (Just1 r, MO_Nat_Ne,         [a1,a2])
+translateOp [r] IntEqOp        [a1,a2] = Just (Just r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] IntNeOp        [a1,a2] = Just (Just r, MO_Nat_Ne,         [a1,a2])
+translateOp [r] WordEqOp       [a1,a2] = Just (Just r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] WordNeOp       [a1,a2] = Just (Just r, MO_Nat_Ne,         [a1,a2])
+translateOp [r] AddrEqOp       [a1,a2] = Just (Just r, MO_Nat_Eq,         [a1,a2])
+translateOp [r] AddrNeOp       [a1,a2] = Just (Just r, MO_Nat_Ne,         [a1,a2])
 
-translateOp [r] AndOp          [a1,a2] = Just (Just1 r, MO_Nat_And,        [a1,a2])
-translateOp [r] OrOp           [a1,a2] = Just (Just1 r, MO_Nat_Or,         [a1,a2])
-translateOp [r] XorOp          [a1,a2] = Just (Just1 r, MO_Nat_Xor,        [a1,a2])
-translateOp [r] NotOp          [a1]    = Just (Just1 r, MO_Nat_Not,        [a1])
+translateOp [r] AndOp          [a1,a2] = Just (Just r, MO_Nat_And,        [a1,a2])
+translateOp [r] OrOp           [a1,a2] = Just (Just r, MO_Nat_Or,         [a1,a2])
+translateOp [r] XorOp          [a1,a2] = Just (Just r, MO_Nat_Xor,        [a1,a2])
+translateOp [r] NotOp          [a1]    = Just (Just r, MO_Nat_Not,        [a1])
 
 -- Native word signed ops
 
-translateOp [r] IntMulOp       [a1,a2] = Just (Just1 r, MO_NatS_Mul,       [a1,a2])
-translateOp [r] IntQuotOp      [a1,a2] = Just (Just1 r, MO_NatS_Quot,      [a1,a2])
-translateOp [r] IntRemOp       [a1,a2] = Just (Just1 r, MO_NatS_Rem,       [a1,a2])
-translateOp [r] IntNegOp       [a1]    = Just (Just1 r, MO_NatS_Neg,       [a1])
+translateOp [r] IntMulOp       [a1,a2] = Just (Just r, MO_NatS_Mul,       [a1,a2])
+translateOp [r] IntMulMayOfloOp [a1,a2] = Just (Just r, MO_NatS_MulMayOflo, [a1,a2])
+translateOp [r] IntQuotOp      [a1,a2] = Just (Just r, MO_NatS_Quot,      [a1,a2])
+translateOp [r] IntRemOp       [a1,a2] = Just (Just r, MO_NatS_Rem,       [a1,a2])
+translateOp [r] IntNegOp       [a1]    = Just (Just r, MO_NatS_Neg,       [a1])
 
-translateOp [r,c] IntAddCOp    [a1,a2] = Just (Just2 r c, MO_NatS_AddC,    [a1,a2])
-translateOp [r,c] IntSubCOp    [a1,a2] = Just (Just2 r c, MO_NatS_SubC,    [a1,a2])
-translateOp [r,c] IntMulCOp    [a1,a2] = Just (Just2 r c, MO_NatS_MulC,    [a1,a2])
+translateOp [r] IntGeOp        [a1,a2] = Just (Just r, MO_NatS_Ge,        [a1,a2])
+translateOp [r] IntLeOp        [a1,a2] = Just (Just r, MO_NatS_Le,        [a1,a2])
+translateOp [r] IntGtOp        [a1,a2] = Just (Just r, MO_NatS_Gt,        [a1,a2])
+translateOp [r] IntLtOp        [a1,a2] = Just (Just r, MO_NatS_Lt,        [a1,a2])
 
-translateOp [r] IntGeOp        [a1,a2] = Just (Just1 r, MO_NatS_Ge,        [a1,a2])
-translateOp [r] IntLeOp        [a1,a2] = Just (Just1 r, MO_NatS_Le,        [a1,a2])
-translateOp [r] IntGtOp        [a1,a2] = Just (Just1 r, MO_NatS_Gt,        [a1,a2])
-translateOp [r] IntLtOp        [a1,a2] = Just (Just1 r, MO_NatS_Lt,        [a1,a2])
 
 -- Native word unsigned ops
 
-translateOp [r] WordGeOp       [a1,a2] = Just (Just1 r, MO_NatU_Ge,        [a1,a2])
-translateOp [r] WordLeOp       [a1,a2] = Just (Just1 r, MO_NatU_Le,        [a1,a2])
-translateOp [r] WordGtOp       [a1,a2] = Just (Just1 r, MO_NatU_Gt,        [a1,a2])
-translateOp [r] WordLtOp       [a1,a2] = Just (Just1 r, MO_NatU_Lt,        [a1,a2])
+translateOp [r] WordGeOp       [a1,a2] = Just (Just r, MO_NatU_Ge,        [a1,a2])
+translateOp [r] WordLeOp       [a1,a2] = Just (Just r, MO_NatU_Le,        [a1,a2])
+translateOp [r] WordGtOp       [a1,a2] = Just (Just r, MO_NatU_Gt,        [a1,a2])
+translateOp [r] WordLtOp       [a1,a2] = Just (Just r, MO_NatU_Lt,        [a1,a2])
 
-translateOp [r] WordMulOp      [a1,a2] = Just (Just1 r, MO_NatU_Mul,       [a1,a2])
-translateOp [r] WordQuotOp     [a1,a2] = Just (Just1 r, MO_NatU_Quot,      [a1,a2])
-translateOp [r] WordRemOp      [a1,a2] = Just (Just1 r, MO_NatU_Rem,       [a1,a2])
+translateOp [r] WordMulOp      [a1,a2] = Just (Just r, MO_NatU_Mul,       [a1,a2])
+translateOp [r] WordQuotOp     [a1,a2] = Just (Just r, MO_NatU_Quot,      [a1,a2])
+translateOp [r] WordRemOp      [a1,a2] = Just (Just r, MO_NatU_Rem,       [a1,a2])
 
-translateOp [r] AddrGeOp       [a1,a2] = Just (Just1 r, MO_NatU_Ge,        [a1,a2])
-translateOp [r] AddrLeOp       [a1,a2] = Just (Just1 r, MO_NatU_Le,        [a1,a2])
-translateOp [r] AddrGtOp       [a1,a2] = Just (Just1 r, MO_NatU_Gt,        [a1,a2])
-translateOp [r] AddrLtOp       [a1,a2] = Just (Just1 r, MO_NatU_Lt,        [a1,a2])
+translateOp [r] AddrGeOp       [a1,a2] = Just (Just r, MO_NatU_Ge,        [a1,a2])
+translateOp [r] AddrLeOp       [a1,a2] = Just (Just r, MO_NatU_Le,        [a1,a2])
+translateOp [r] AddrGtOp       [a1,a2] = Just (Just r, MO_NatU_Gt,        [a1,a2])
+translateOp [r] AddrLtOp       [a1,a2] = Just (Just r, MO_NatU_Lt,        [a1,a2])
 
 -- 32-bit unsigned ops
 
-translateOp [r] CharEqOp       [a1,a2] = Just (Just1 r, MO_32U_Eq,        [a1,a2])
-translateOp [r] CharNeOp       [a1,a2] = Just (Just1 r, MO_32U_Ne,        [a1,a2])
-translateOp [r] CharGeOp       [a1,a2] = Just (Just1 r, MO_32U_Ge,        [a1,a2])
-translateOp [r] CharLeOp       [a1,a2] = Just (Just1 r, MO_32U_Le,        [a1,a2])
-translateOp [r] CharGtOp       [a1,a2] = Just (Just1 r, MO_32U_Gt,        [a1,a2])
-translateOp [r] CharLtOp       [a1,a2] = Just (Just1 r, MO_32U_Lt,        [a1,a2])
+translateOp [r] CharEqOp       [a1,a2] = Just (Just r, MO_32U_Eq,        [a1,a2])
+translateOp [r] CharNeOp       [a1,a2] = Just (Just r, MO_32U_Ne,        [a1,a2])
+translateOp [r] CharGeOp       [a1,a2] = Just (Just r, MO_32U_Ge,        [a1,a2])
+translateOp [r] CharLeOp       [a1,a2] = Just (Just r, MO_32U_Le,        [a1,a2])
+translateOp [r] CharGtOp       [a1,a2] = Just (Just r, MO_32U_Gt,        [a1,a2])
+translateOp [r] CharLtOp       [a1,a2] = Just (Just r, MO_32U_Lt,        [a1,a2])
 
 -- Double ops
 
-translateOp [r] DoubleEqOp     [a1,a2] = Just (Just1 r, MO_Dbl_Eq,      [a1,a2])
-translateOp [r] DoubleNeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Ne,      [a1,a2])
-translateOp [r] DoubleGeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Ge,      [a1,a2])
-translateOp [r] DoubleLeOp     [a1,a2] = Just (Just1 r, MO_Dbl_Le,      [a1,a2])
-translateOp [r] DoubleGtOp     [a1,a2] = Just (Just1 r, MO_Dbl_Gt,      [a1,a2])
-translateOp [r] DoubleLtOp     [a1,a2] = Just (Just1 r, MO_Dbl_Lt,      [a1,a2])
+translateOp [r] DoubleEqOp     [a1,a2] = Just (Just r, MO_Dbl_Eq,      [a1,a2])
+translateOp [r] DoubleNeOp     [a1,a2] = Just (Just r, MO_Dbl_Ne,      [a1,a2])
+translateOp [r] DoubleGeOp     [a1,a2] = Just (Just r, MO_Dbl_Ge,      [a1,a2])
+translateOp [r] DoubleLeOp     [a1,a2] = Just (Just r, MO_Dbl_Le,      [a1,a2])
+translateOp [r] DoubleGtOp     [a1,a2] = Just (Just r, MO_Dbl_Gt,      [a1,a2])
+translateOp [r] DoubleLtOp     [a1,a2] = Just (Just r, MO_Dbl_Lt,      [a1,a2])
 
-translateOp [r] DoubleAddOp    [a1,a2] = Just (Just1 r, MO_Dbl_Add,    [a1,a2])
-translateOp [r] DoubleSubOp    [a1,a2] = Just (Just1 r, MO_Dbl_Sub,    [a1,a2])
-translateOp [r] DoubleMulOp    [a1,a2] = Just (Just1 r, MO_Dbl_Mul,    [a1,a2])
-translateOp [r] DoubleDivOp    [a1,a2] = Just (Just1 r, MO_Dbl_Div,    [a1,a2])
-translateOp [r] DoublePowerOp  [a1,a2] = Just (Just1 r, MO_Dbl_Pwr,    [a1,a2])
+translateOp [r] DoubleAddOp    [a1,a2] = Just (Just r, MO_Dbl_Add,    [a1,a2])
+translateOp [r] DoubleSubOp    [a1,a2] = Just (Just r, MO_Dbl_Sub,    [a1,a2])
+translateOp [r] DoubleMulOp    [a1,a2] = Just (Just r, MO_Dbl_Mul,    [a1,a2])
+translateOp [r] DoubleDivOp    [a1,a2] = Just (Just r, MO_Dbl_Div,    [a1,a2])
+translateOp [r] DoublePowerOp  [a1,a2] = Just (Just r, MO_Dbl_Pwr,    [a1,a2])
 
-translateOp [r] DoubleSinOp    [a1]    = Just (Just1 r, MO_Dbl_Sin,    [a1])
-translateOp [r] DoubleCosOp    [a1]    = Just (Just1 r, MO_Dbl_Cos,    [a1])
-translateOp [r] DoubleTanOp    [a1]    = Just (Just1 r, MO_Dbl_Tan,    [a1])
-translateOp [r] DoubleSinhOp   [a1]    = Just (Just1 r, MO_Dbl_Sinh,   [a1])
-translateOp [r] DoubleCoshOp   [a1]    = Just (Just1 r, MO_Dbl_Cosh,   [a1])
-translateOp [r] DoubleTanhOp   [a1]    = Just (Just1 r, MO_Dbl_Tanh,   [a1])
-translateOp [r] DoubleAsinOp   [a1]    = Just (Just1 r, MO_Dbl_Asin,    [a1])
-translateOp [r] DoubleAcosOp   [a1]    = Just (Just1 r, MO_Dbl_Acos,    [a1])
-translateOp [r] DoubleAtanOp   [a1]    = Just (Just1 r, MO_Dbl_Atan,    [a1])
-translateOp [r] DoubleLogOp    [a1]    = Just (Just1 r, MO_Dbl_Log,    [a1])
-translateOp [r] DoubleExpOp    [a1]    = Just (Just1 r, MO_Dbl_Exp,    [a1])
-translateOp [r] DoubleSqrtOp   [a1]    = Just (Just1 r, MO_Dbl_Sqrt,    [a1])
-translateOp [r] DoubleNegOp    [a1]    = Just (Just1 r, MO_Dbl_Neg,    [a1])
+translateOp [r] DoubleSinOp    [a1]    = Just (Just r, MO_Dbl_Sin,    [a1])
+translateOp [r] DoubleCosOp    [a1]    = Just (Just r, MO_Dbl_Cos,    [a1])
+translateOp [r] DoubleTanOp    [a1]    = Just (Just r, MO_Dbl_Tan,    [a1])
+translateOp [r] DoubleSinhOp   [a1]    = Just (Just r, MO_Dbl_Sinh,   [a1])
+translateOp [r] DoubleCoshOp   [a1]    = Just (Just r, MO_Dbl_Cosh,   [a1])
+translateOp [r] DoubleTanhOp   [a1]    = Just (Just r, MO_Dbl_Tanh,   [a1])
+translateOp [r] DoubleAsinOp   [a1]    = Just (Just r, MO_Dbl_Asin,    [a1])
+translateOp [r] DoubleAcosOp   [a1]    = Just (Just r, MO_Dbl_Acos,    [a1])
+translateOp [r] DoubleAtanOp   [a1]    = Just (Just r, MO_Dbl_Atan,    [a1])
+translateOp [r] DoubleLogOp    [a1]    = Just (Just r, MO_Dbl_Log,    [a1])
+translateOp [r] DoubleExpOp    [a1]    = Just (Just r, MO_Dbl_Exp,    [a1])
+translateOp [r] DoubleSqrtOp   [a1]    = Just (Just r, MO_Dbl_Sqrt,    [a1])
+translateOp [r] DoubleNegOp    [a1]    = Just (Just r, MO_Dbl_Neg,    [a1])
 
 -- Float ops
 
-translateOp [r] FloatEqOp     [a1,a2] = Just (Just1 r, MO_Flt_Eq,      [a1,a2])
-translateOp [r] FloatNeOp     [a1,a2] = Just (Just1 r, MO_Flt_Ne,      [a1,a2])
-translateOp [r] FloatGeOp     [a1,a2] = Just (Just1 r, MO_Flt_Ge,      [a1,a2])
-translateOp [r] FloatLeOp     [a1,a2] = Just (Just1 r, MO_Flt_Le,      [a1,a2])
-translateOp [r] FloatGtOp     [a1,a2] = Just (Just1 r, MO_Flt_Gt,      [a1,a2])
-translateOp [r] FloatLtOp     [a1,a2] = Just (Just1 r, MO_Flt_Lt,      [a1,a2])
+translateOp [r] FloatEqOp     [a1,a2] = Just (Just r, MO_Flt_Eq,      [a1,a2])
+translateOp [r] FloatNeOp     [a1,a2] = Just (Just r, MO_Flt_Ne,      [a1,a2])
+translateOp [r] FloatGeOp     [a1,a2] = Just (Just r, MO_Flt_Ge,      [a1,a2])
+translateOp [r] FloatLeOp     [a1,a2] = Just (Just r, MO_Flt_Le,      [a1,a2])
+translateOp [r] FloatGtOp     [a1,a2] = Just (Just r, MO_Flt_Gt,      [a1,a2])
+translateOp [r] FloatLtOp     [a1,a2] = Just (Just r, MO_Flt_Lt,      [a1,a2])
 
-translateOp [r] FloatAddOp    [a1,a2] = Just (Just1 r, MO_Flt_Add,    [a1,a2])
-translateOp [r] FloatSubOp    [a1,a2] = Just (Just1 r, MO_Flt_Sub,    [a1,a2])
-translateOp [r] FloatMulOp    [a1,a2] = Just (Just1 r, MO_Flt_Mul,    [a1,a2])
-translateOp [r] FloatDivOp    [a1,a2] = Just (Just1 r, MO_Flt_Div,    [a1,a2])
-translateOp [r] FloatPowerOp  [a1,a2] = Just (Just1 r, MO_Flt_Pwr,    [a1,a2])
+translateOp [r] FloatAddOp    [a1,a2] = Just (Just r, MO_Flt_Add,    [a1,a2])
+translateOp [r] FloatSubOp    [a1,a2] = Just (Just r, MO_Flt_Sub,    [a1,a2])
+translateOp [r] FloatMulOp    [a1,a2] = Just (Just r, MO_Flt_Mul,    [a1,a2])
+translateOp [r] FloatDivOp    [a1,a2] = Just (Just r, MO_Flt_Div,    [a1,a2])
+translateOp [r] FloatPowerOp  [a1,a2] = Just (Just r, MO_Flt_Pwr,    [a1,a2])
 
-translateOp [r] FloatSinOp    [a1]    = Just (Just1 r, MO_Flt_Sin,    [a1])
-translateOp [r] FloatCosOp    [a1]    = Just (Just1 r, MO_Flt_Cos,    [a1])
-translateOp [r] FloatTanOp    [a1]    = Just (Just1 r, MO_Flt_Tan,    [a1])
-translateOp [r] FloatSinhOp   [a1]    = Just (Just1 r, MO_Flt_Sinh,   [a1])
-translateOp [r] FloatCoshOp   [a1]    = Just (Just1 r, MO_Flt_Cosh,   [a1])
-translateOp [r] FloatTanhOp   [a1]    = Just (Just1 r, MO_Flt_Tanh,   [a1])
-translateOp [r] FloatAsinOp   [a1]    = Just (Just1 r, MO_Flt_Asin,    [a1])
-translateOp [r] FloatAcosOp   [a1]    = Just (Just1 r, MO_Flt_Acos,    [a1])
-translateOp [r] FloatAtanOp   [a1]    = Just (Just1 r, MO_Flt_Atan,    [a1])
-translateOp [r] FloatLogOp    [a1]    = Just (Just1 r, MO_Flt_Log,    [a1])
-translateOp [r] FloatExpOp    [a1]    = Just (Just1 r, MO_Flt_Exp,    [a1])
-translateOp [r] FloatSqrtOp   [a1]    = Just (Just1 r, MO_Flt_Sqrt,    [a1])
-translateOp [r] FloatNegOp    [a1]    = Just (Just1 r, MO_Flt_Neg,    [a1])
+translateOp [r] FloatSinOp    [a1]    = Just (Just r, MO_Flt_Sin,    [a1])
+translateOp [r] FloatCosOp    [a1]    = Just (Just r, MO_Flt_Cos,    [a1])
+translateOp [r] FloatTanOp    [a1]    = Just (Just r, MO_Flt_Tan,    [a1])
+translateOp [r] FloatSinhOp   [a1]    = Just (Just r, MO_Flt_Sinh,   [a1])
+translateOp [r] FloatCoshOp   [a1]    = Just (Just r, MO_Flt_Cosh,   [a1])
+translateOp [r] FloatTanhOp   [a1]    = Just (Just r, MO_Flt_Tanh,   [a1])
+translateOp [r] FloatAsinOp   [a1]    = Just (Just r, MO_Flt_Asin,    [a1])
+translateOp [r] FloatAcosOp   [a1]    = Just (Just r, MO_Flt_Acos,    [a1])
+translateOp [r] FloatAtanOp   [a1]    = Just (Just r, MO_Flt_Atan,    [a1])
+translateOp [r] FloatLogOp    [a1]    = Just (Just r, MO_Flt_Log,    [a1])
+translateOp [r] FloatExpOp    [a1]    = Just (Just r, MO_Flt_Exp,    [a1])
+translateOp [r] FloatSqrtOp   [a1]    = Just (Just r, MO_Flt_Sqrt,    [a1])
+translateOp [r] FloatNegOp    [a1]    = Just (Just r, MO_Flt_Neg,    [a1])
 
 -- Conversions
 
-translateOp [r] Int2DoubleOp [a1]    = Just (Just1 r, MO_NatS_to_Dbl,    [a1])
-translateOp [r] Double2IntOp [a1]    = Just (Just1 r, MO_Dbl_to_NatS,    [a1])
+translateOp [r] Int2DoubleOp   [a1]   = Just (Just r, MO_NatS_to_Dbl,   [a1])
+translateOp [r] Double2IntOp   [a1]   = Just (Just r, MO_Dbl_to_NatS,   [a1])
 
-translateOp [r] Int2FloatOp  [a1]    = Just (Just1 r, MO_NatS_to_Flt,    [a1])
-translateOp [r] Float2IntOp  [a1]    = Just (Just1 r, MO_Flt_to_NatS,    [a1])
+translateOp [r] Int2FloatOp    [a1]   = Just (Just r, MO_NatS_to_Flt,   [a1])
+translateOp [r] Float2IntOp    [a1]   = Just (Just r, MO_Flt_to_NatS,   [a1])
 
-translateOp [r] Float2DoubleOp [a1]    = Just (Just1 r, MO_Flt_to_Dbl,    [a1])
-translateOp [r] Double2FloatOp [a1]    = Just (Just1 r, MO_Dbl_to_Flt,    [a1])
+translateOp [r] Float2DoubleOp [a1]   = Just (Just r, MO_Flt_to_Dbl,    [a1])
+translateOp [r] Double2FloatOp [a1]   = Just (Just r, MO_Dbl_to_Flt,    [a1])
 
-translateOp [r] Int2WordOp   [a1]    = Just (Just1 r, MO_NatS_to_NatU,   [a1])
-translateOp [r] Word2IntOp   [a1]    = Just (Just1 r, MO_NatU_to_NatS,   [a1])
+translateOp [r] Int2WordOp     [a1]   = Just (Just r, MO_NatS_to_NatU,  [a1])
+translateOp [r] Word2IntOp     [a1]   = Just (Just r, MO_NatU_to_NatS,  [a1])
 
-translateOp [r] Int2AddrOp   [a1]    = Just (Just1 r, MO_NatS_to_NatP,   [a1])
-translateOp [r] Addr2IntOp   [a1]    = Just (Just1 r, MO_NatP_to_NatS,   [a1])
+translateOp [r] Int2AddrOp     [a1]   = Just (Just r, MO_NatS_to_NatP,  [a1])
+translateOp [r] Addr2IntOp     [a1]   = Just (Just r, MO_NatP_to_NatS,  [a1])
 
-translateOp [r] OrdOp    [a1]    = Just (Just1 r, MO_32U_to_NatS,    [a1])
-translateOp [r] ChrOp    [a1]    = Just (Just1 r, MO_NatS_to_32U,    [a1])
+translateOp [r] OrdOp          [a1]   = Just (Just r, MO_32U_to_NatS,   [a1])
+translateOp [r] ChrOp          [a1]   = Just (Just r, MO_NatS_to_32U,   [a1])
 
-translateOp [r] Narrow8IntOp   [a1]    = Just (Just1 r, MO_8S_to_NatS,    [a1])
-translateOp [r] Narrow16IntOp  [a1]    = Just (Just1 r, MO_16S_to_NatS,    [a1])
-translateOp [r] Narrow32IntOp  [a1]    = Just (Just1 r, MO_32S_to_NatS,    [a1])
+translateOp [r] Narrow8IntOp   [a1]   = Just (Just r, MO_8S_to_NatS,    [a1])
+translateOp [r] Narrow16IntOp  [a1]   = Just (Just r, MO_16S_to_NatS,   [a1])
+translateOp [r] Narrow32IntOp  [a1]   = Just (Just r, MO_32S_to_NatS,   [a1])
 
-translateOp [r] Narrow8WordOp   [a1]    = Just (Just1 r, MO_8U_to_NatU,    [a1])
-translateOp [r] Narrow16WordOp  [a1]    = Just (Just1 r, MO_16U_to_NatU,    [a1])
-translateOp [r] Narrow32WordOp  [a1]    = Just (Just1 r, MO_32U_to_NatU,    [a1])
+translateOp [r] Narrow8WordOp   [a1]  = Just (Just r, MO_8U_to_NatU,    [a1])
+translateOp [r] Narrow16WordOp  [a1]  = Just (Just r, MO_16U_to_NatU,   [a1])
+translateOp [r] Narrow32WordOp  [a1]  = Just (Just r, MO_32U_to_NatU,   [a1])
 
-translateOp [r] SameMutVarOp   [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
-translateOp [r] SameMVarOp     [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
-translateOp [r] SameMutableArrayOp  [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
-translateOp [r] SameMutableByteArrayOp [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
-translateOp [r] EqForeignObj [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
-translateOp [r] EqStablePtrOp [a1,a2]  = Just (Just1 r, MO_Nat_Eq,    [a1,a2])
+-- Word comparisons masquerading as more exotic things.
+
+translateOp [r] SameMutVarOp   [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMVarOp     [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMutableArrayOp  [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] SameMutableByteArrayOp [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] EqForeignObj [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
+translateOp [r] EqStablePtrOp [a1,a2]  = Just (Just r, MO_Nat_Eq,    [a1,a2])
 
 translateOp _ _ _ = Nothing
 

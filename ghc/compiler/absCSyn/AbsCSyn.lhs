@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.42 2001/12/06 11:50:07 sewardj Exp $
+% $Id: AbsCSyn.lhs,v 1.43 2001/12/14 15:26:14 sewardj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -52,7 +52,6 @@ import Unique           ( Unique )
 import StgSyn		( StgOp )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
-import Maybes		( Maybe012(..) )
 import FastTypes
 
 import Outputable
@@ -123,7 +122,7 @@ stored in a mixed type location.)
   -- NEW CASES FOR EXPANDED PRIMOPS
 
   | CMachOpStmt			-- Machine-level operation
-	(Maybe012 CAddrMode)	-- 0, 1 or 2 results
+	(Maybe CAddrMode)	-- 0 or 1 results
 	MachOp
 	[CAddrMode]		-- Arguments
         (Maybe [MagicId])	-- list of regs which need to be preserved

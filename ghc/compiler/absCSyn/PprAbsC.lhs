@@ -45,7 +45,7 @@ import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
-import Maybes		( Maybe012(..), maybe012ToList, maybeToBool, catMaybes )
+import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper )
 import MachOp		( MachOp(..) )
 import ForeignCall	( ForeignCall(..) )
@@ -60,7 +60,7 @@ import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
 import Util		( nOfThem, lengthExceeds, listLengthCmp )
-import Maybe		( isNothing )
+import Maybe		( isNothing, maybeToList )
 
 import ST
 
@@ -255,7 +255,7 @@ pprAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs) _
 -- NEW CASES FOR EXPANDED PRIMOPS
 
 -- We have to deal with some of these specially
-pprAbsC (CMachOpStmt (Just1 res) (MO_ReadOSBI offw scaleRep)
+pprAbsC (CMachOpStmt (Just res) (MO_ReadOSBI offw scaleRep)
                      [baseAmode, indexAmode] maybe_vols) 
         _
   | isNothing maybe_vols
@@ -266,7 +266,7 @@ pprAbsC (CMachOpStmt (Just1 res) (MO_ReadOSBI offw scaleRep)
   | otherwise
   = panic "pprAbsC:MO_ReadOSBI -- out-of-line array indexing ?!?!"
 
-pprAbsC (CMachOpStmt Just0 (MO_WriteOSBI offw scaleRep)
+pprAbsC (CMachOpStmt Nothing (MO_WriteOSBI offw scaleRep)
                      [baseAmode, indexAmode, vAmode] maybe_vols)
         _
   | isNothing maybe_vols
@@ -277,18 +277,10 @@ pprAbsC (CMachOpStmt Just0 (MO_WriteOSBI offw scaleRep)
   | otherwise
   = panic "pprAbsC:MO_WriteOSBI -- out-of-line array indexing ?!?!"
 
-pprAbsC (CMachOpStmt (Just2 res carry) mop [arg1,arg2] maybe_vols) _
-  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC]
-  = hcat [ pprMachOp_for_C mop, 
-           lparen,
-           ppr_amode res, comma, ppr_amode carry, comma,
-           pprAmode arg1, comma, pprAmode arg2, 
-           rparen, semi ]
-
 -- The rest generically.
 
-pprAbsC stmt@(CMachOpStmt (Just1 res) mop [arg1,arg2] maybe_vols) _
-  = let prefix_fn = mop `elem` [MO_Dbl_Pwr, MO_Flt_Pwr]
+pprAbsC stmt@(CMachOpStmt (Just res) mop [arg1,arg2] maybe_vols) _
+  = let prefix_fn = mop `elem` [MO_Dbl_Pwr, MO_Flt_Pwr, MO_NatS_MulMayOflo]
     in
     case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
     saves $$
@@ -302,7 +294,7 @@ pprAbsC stmt@(CMachOpStmt (Just1 res) mop [arg1,arg2] maybe_vols) _
     $$ restores
     }
 
-pprAbsC stmt@(CMachOpStmt (Just1 res) mop [arg1] maybe_vols) _
+pprAbsC stmt@(CMachOpStmt (Just res) mop [arg1] maybe_vols) _
   = case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
     saves $$
     hcat [ppr_amode res, equals, 
@@ -664,6 +656,7 @@ pprMachOp_for_C MO_NatU_Gt       = text ">"
 pprMachOp_for_C MO_NatU_Lt       = text "<"
 
 pprMachOp_for_C MO_NatS_Mul      = char '*'
+pprMachOp_for_C MO_NatS_MulMayOflo = text "mulIntMayOflo"
 pprMachOp_for_C MO_NatS_Quot     = char '/'
 pprMachOp_for_C MO_NatS_Rem      = char '%'
 pprMachOp_for_C MO_NatS_Neg      = char '-'
@@ -671,10 +664,6 @@ pprMachOp_for_C MO_NatS_Neg      = char '-'
 pprMachOp_for_C MO_NatU_Mul      = char '*'
 pprMachOp_for_C MO_NatU_Quot     = char '/'
 pprMachOp_for_C MO_NatU_Rem      = char '%'
-
-pprMachOp_for_C MO_NatS_AddC	 = text "addIntCzh"
-pprMachOp_for_C MO_NatS_SubC	 = text "subIntCzh"
-pprMachOp_for_C MO_NatS_MulC	 = text "mulIntCzh"
 
 pprMachOp_for_C MO_Nat_And       = text "&"
 pprMachOp_for_C MO_Nat_Or        = text "|"
@@ -1718,7 +1707,7 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre _)
   where
     info_lbl = infoTableLabelFromCI cl_info
 
-ppr_decls_AbsC (CMachOpStmt res	_ args _) = ppr_decls_Amodes (maybe012ToList res ++ args)
+ppr_decls_AbsC (CMachOpStmt res	_ args _) = ppr_decls_Amodes (maybeToList res ++ args)
 ppr_decls_AbsC (COpStmt	results	_ args _) = ppr_decls_Amodes (results ++ args)
 
 ppr_decls_AbsC (CSimultaneous abc)  	  = ppr_decls_AbsC abc

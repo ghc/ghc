@@ -27,7 +27,7 @@ import CLabel		( CLabel, labelDynamic )
 #if sparc_TARGET_ARCH || alpha_TARGET_ARCH
 import CLabel 		( isAsmTemp )
 #endif
-import Maybes		( maybeToBool, Maybe012(..) )
+import Maybes		( maybeToBool )
 import PrimRep		( isFloatingRep, is64BitRep, PrimRep(..),
                           getPrimRepArrayElemSize )
 import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
@@ -103,8 +103,6 @@ stmtToInstrs stmt = case stmt of
       | ncg_target_is_32bit
         && is64BitRep pk -> assignReg_I64Code    reg (derefDLL src)
       | otherwise	 -> assignReg_IntCode pk reg (derefDLL src)
-    StAssignMachOp lhss mop rhss
-      -> assignMachOp lhss mop rhss
 
     StFallThrough lbl
 	-- When falling through on the Alpha, we still have to load pv
@@ -165,9 +163,6 @@ derefDLL tree
                 StReg    _             -> t
                 _                      -> pprPanic "derefDLL: unhandled case" 
                                                    (pprStixExpr t)
-
-assignMachOp :: Maybe012 StixVReg -> MachOp -> [StixExpr] 
-             -> NatM InstrBlock
 \end{code}
 
 %************************************************************************
@@ -968,6 +963,7 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
       MO_NatU_Rem  -> trivialCode (REM L) Nothing x y
       MO_NatS_Mul  -> let op = IMUL L in trivialCode op (Just op) x y
       MO_NatU_Mul  -> let op = MUL L in trivialCode op (Just op) x y
+      MO_NatS_MulMayOflo -> imulMayOflo x y
 
       MO_Flt_Add -> trivialFCode  FloatRep  GADD x y
       MO_Flt_Sub -> trivialFCode  FloatRep  GSUB x y
@@ -1001,6 +997,31 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
   where
     promote x = StMachOp MO_Flt_to_Dbl [x]
     demote x  = StMachOp MO_Dbl_to_Flt [x]
+
+    --------------------
+    imulMayOflo :: StixExpr -> StixExpr -> NatM Register
+    imulMayOflo a1 a2
+       = getNewRegNCG IntRep		`thenNat` \ t1 ->
+         getNewRegNCG IntRep		`thenNat` \ t2 ->
+         getNewRegNCG IntRep		`thenNat` \ res_lo ->
+         getNewRegNCG IntRep		`thenNat` \ res_hi ->
+         getRegister a1			`thenNat` \ reg1 ->
+         getRegister a2 		`thenNat` \ reg2 ->
+         let code1 = registerCode reg1 t1
+             code2 = registerCode reg2 t2
+             src1  = registerName reg1 t1
+             src2  = registerName reg2 t2
+             code dst = toOL [
+                           MOV L (OpReg src1) (OpReg res_hi),
+                           MOV L (OpReg src2) (OpReg res_lo),
+                           IMUL64 res_hi res_lo, 		-- result in res_hi:res_lo
+                           SAR L (ImmInt 31) (OpReg res_lo),	-- sign extend lower part
+                           SUB L (OpReg res_hi) (OpReg res_lo),	-- compare against upper
+                           MOV L (OpReg res_lo) (OpReg dst)
+                           -- dst==0 if high part == sign extended low part
+                        ]
+         in
+            returnNat (Any IntRep code)
 
     --------------------
     shift_code :: (Imm -> Operand -> Instr)
@@ -1172,41 +1193,6 @@ getRegister leaf
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
-
-
-
-assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
-  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC] 
-  = getRegister aa			`thenNat` \ registeraa ->
-    getRegister bb			`thenNat` \ registerbb ->
-    getNewRegNCG IntRep			`thenNat` \ tmp ->
-    getNewRegNCG IntRep			`thenNat` \ tmpaa ->
-    getNewRegNCG IntRep			`thenNat` \ tmpbb ->
-    let stixVReg_to_VReg (StixVReg u rep) = mkVReg u rep
-        rr = stixVReg_to_VReg sv_rr
-        cc = stixVReg_to_VReg sv_cc
-        codeaa = registerCode registeraa tmpaa
-        srcaa  = registerName registeraa tmpaa
-        codebb = registerCode registerbb tmpbb
-        srcbb  = registerName registerbb tmpbb
-
-        insn = case mop of MO_NatS_AddC -> ADD; MO_NatS_SubC -> SUB
-                           MO_NatS_MulC -> IMUL
-        cond = if mop == MO_NatS_MulC then OFLO else CARRY
-        str  = showSDoc (pprMachOp mop)
-
-        code = toOL [
-                 COMMENT (_PK_ ("begin " ++ str)),
-                 MOV L (OpReg srcbb) (OpReg tmp),
-                 insn L (OpReg srcaa) (OpReg tmp),
-                 MOV L (OpReg tmp) (OpReg rr),
-                 MOV L (OpImm (ImmInt 0)) (OpReg eax),
-                 SETCC cond (OpReg eax),
-                 MOV L (OpReg eax) (OpReg cc),
-                 COMMENT (_PK_ ("end " ++ str))
-               ]
-    in
-       returnNat (codeaa `appOL` codebb `appOL` code)
 
 #endif {- i386_TARGET_ARCH -}
 
@@ -1436,43 +1422,6 @@ getRegister leaf
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
-
-
-assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
-  = panic "assignMachOp(sparc)"
-{-
-  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC] 
-  = getRegister aa			`thenNat` \ registeraa ->
-    getRegister bb			`thenNat` \ registerbb ->
-    getNewRegNCG IntRep			`thenNat` \ tmp ->
-    getNewRegNCG IntRep			`thenNat` \ tmpaa ->
-    getNewRegNCG IntRep			`thenNat` \ tmpbb ->
-    let stixVReg_to_VReg (StixVReg u rep) = mkVReg u rep
-        rr = stixVReg_to_VReg sv_rr
-        cc = stixVReg_to_VReg sv_cc
-        codeaa = registerCode registeraa tmpaa
-        srcaa  = registerName registeraa tmpaa
-        codebb = registerCode registerbb tmpbb
-        srcbb  = registerName registerbb tmpbb
-
-        insn = case mop of MO_NatS_AddC -> ADD; MO_NatS_SubC -> SUB
-                           MO_NatS_MulC -> IMUL
-        cond = if mop == MO_NatS_MulC then OFLO else CARRY
-        str  = showSDoc (pprMachOp mop)
-
-        code = toOL [
-                 COMMENT (_PK_ ("begin " ++ str)),
-                 MOV L (OpReg srcbb) (OpReg tmp),
-                 insn L (OpReg srcaa) (OpReg tmp),
-                 MOV L (OpReg tmp) (OpReg rr),
-                 MOV L (OpImm (ImmInt 0)) (OpReg eax),
-                 SETCC cond (OpReg eax),
-                 MOV L (OpReg eax) (OpReg cc),
-                 COMMENT (_PK_ ("end " ++ str))
-               ]
-    in
-       returnNat (codeaa `appOL` codebb `appOL` code)
--}
 #endif {- sparc_TARGET_ARCH -}
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
