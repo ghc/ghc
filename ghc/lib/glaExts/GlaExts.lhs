@@ -3,6 +3,13 @@
 %
 \section[GlaExts]{The @GlaExts@ interface}
 
+Compatibility cruft: Deprecated! Don't use!  This rug will
+dissappear from underneath your feet very soon.
+
+This module will eventually be the interface to GHC-ONLY extensions:
+i.e. unboxery and primitive operations over unboxed values.
+
+OLD:
 The @GlaExts@ packages up various Glasgow extensions and
 exports them all through one interface. The Idea being that
 a Haskell program using a Glasgow extension doesn't have to
@@ -23,6 +30,12 @@ module GlaExts
         --
         stToIO,       -- :: ST RealWorld a -> IO a
 	ioToST,	      -- :: IO a -> ST RealWorld a
+
+	-- compatibility cruft
+	PrimIO,
+	ioToPrimIO,
+	primIOToIO,
+	unsafePerformPrimIO,
 
         -- Everything from module ByteArray:
 	module ByteArray,
@@ -51,5 +64,10 @@ import MutableArray
 import Monad
 import IOBase
 import Foreign
+
+type PrimIO a = IO a
+primIOToIO io = io
+ioToPrimIO io = io
+unsafePerformPrimIO = unsafePerformIO
 
 \end{code}
