@@ -1296,46 +1296,6 @@ $ cvs checkout nofib/spectral
       </variablelist>
     </sect2>
 
-    <sect2 id="pre-supposed-doc-tools">
-      <title>Tools for building the Documentation</title>
-
-      <para>The following additional tools are required if you want to
-      format the documentation that comes with the
-      <literal>fptools</literal> projects:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term>DocBook</term>
-	  <indexterm><primary>pre-supposed: DocBook</primary></indexterm>
-	  <indexterm><primary>DocBook, pre-supposed</primary></indexterm>
-	  <listitem>
-	    <para>All our documentation is written in SGML, using the
-            DocBook DTD.  Instructions on installing and configuring
-            the DocBook tools are in the installation guide (in the
-            GHC user guide).</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>TeX</term>
-	  <indexterm><primary>pre-supposed: TeX</primary></indexterm>
-	  <indexterm><primary>TeX, pre-supposed</primary></indexterm>
-	  <listitem>
-	    <para>A decent TeX distribution is required if you want to
-            produce printable documentation.  We recomment teTeX,
-            which includes just about everything you need.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para> In order to actually build any documentation, you need to
-      set <constant>SGMLDocWays</constant> in your
-      <filename>build.mk</filename>. Valid values to add to this list
-      are: <literal>dvi</literal>, <literal>ps</literal>,
-      <literal>pdf</literal>, <literal>html</literal>, and
-      <literal>rtf</literal>.</para>
-    </sect2>
-
     <sect2 id="pre-supposed-other-tools">
       <title>Other useful tools</title>
 
@@ -1353,6 +1313,10 @@ $ cvs checkout nofib/spectral
 	  </listitem>
 	</varlistentry>
       </variablelist>
+
+      <para>More tools are required if you want to format the documentation
+      that comes with GHC and other fptools projects.  See <xref
+      linkend="building-docs">.</para>
     </sect2>
   </sect1>
 
@@ -3201,6 +3165,266 @@ $ make way=p
       being included, and conflicting with yours.</para>
     </sect2>
   </sect1>
+
+  <sect1 id="building-docs">
+    <title>Building the documentation</title>
+
+    <sect2 id="pre-supposed-doc-tools">
+      <title>Tools for building the Documentation</title>
+
+      <para>The following additional tools are required if you want to
+      format the documentation that comes with the
+      <literal>fptools</literal> projects:</para>
+      
+      <variablelist>
+	<varlistentry>
+	  <term>DocBook</term>
+	  <indexterm><primary>pre-supposed: DocBook</primary></indexterm>
+	  <indexterm><primary>DocBook, pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>Much of our documentation is written in SGML, using
+            the DocBook DTD.  Instructions on installing and
+            configuring the DocBook tools are below.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>TeX</term>
+	  <indexterm><primary>pre-supposed: TeX</primary></indexterm>
+	  <indexterm><primary>TeX, pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>A decent TeX distribution is required if you want to
+            produce printable documentation.  We recomment teTeX,
+            which includes just about everything you need.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>Haddock</term>
+	  <indexterm><primary>Haddock</primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Haddock is a Haskell documentation tool that we use
+	    for automatically generating documentation from the
+	    library source code.  It is an <literal>fptools</literal>
+	    project in itself.  To build documentation for the
+	    libraries (<literal>fptools/libraries</literal>) you
+	    should check out and build Haddock in
+	    <literal>fptools/haddock</literal>.  Haddock requires GHC
+	    to build.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+
+    <sect2>
+      <title>Installing the DocBook tools</title>
+
+      <sect3>
+	<title>Installing the DocBook tools on Linux</title>
+
+	<para>If you're on a recent RedHat system (7.0+), you probably
+        have working DocBook tools already installed.  The configure
+        script should detect your setup and you're away.</para>
+
+	<para>If you don't have DocBook tools installed, and you are
+        using a system that can handle RedHat RPM packages, you can
+        probably use the <ULink
+        URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus
+        DocBook tools</ULink>, which is the most shrink-wrapped SGML
+        suite that we could find. You need all the RPMs except for
+        psgml (i.e.  <Filename>docbook</Filename>,
+        <Filename>jade</Filename>, <Filename>jadetex</Filename>,
+        <Filename>sgmlcommon</Filename> and
+        <Filename>stylesheets</Filename>). Note that most of these
+        RPMs are architecture neutral, so are likely to be found in a
+        <Filename>noarch</Filename> directory. The SuSE RPMs also
+        work; the RedHat ones <Emphasis>don't</Emphasis> in RedHat 6.2
+        (7.0 and later should be OK), but they are easy to fix: just
+        make a symlink from
+        <Filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</Filename>
+        to <Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </para>
+      </sect3>
+    
+      <sect3>
+	<title>Installing DocBook on FreeBSD</title>
+
+	<para>On FreeBSD systems, the easiest way to get DocBook up
+        and running is to install it from the ports tree or a
+        pre-compiled package (packages are available from your local
+        FreeBSD mirror site).</para>
+
+	<para>To use the ports tree, do this:
+<screen>
+      $ cd /usr/ports/textproc/docproj
+      $ make install
+</screen>
+        This installs the FreeBSD documentation project tools, which
+        includes everything needed to format the GHC
+        documentation.</para>
+      </sect3>
+
+      <sect3>
+	<title>Installing from binaries on Windows</title>
+	
+	<Para>It's a good idea to use Norman Walsh's <ULink
+        URL="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
+        notes</ULink> as a guide. You should get version 3.1 of
+        DocBook, and note that his file <Filename>test.sgm</Filename>
+        won't work, as it needs version 3.0. You should unpack Jade
+        into <Filename>\Jade</Filename>, along with the entities,
+        DocBook into <Filename>\docbook</Filename>, and the DocBook
+        stylesheets into <Filename>\docbook\stylesheets</Filename> (so
+        they actually end up in
+        <Filename>\docbook\stylesheets\docbook</Filename>).</para>
+      </Sect3>
+
+
+      <sect3>
+	<title>Installing the DocBook tools from source</title>
+
+	<sect4>
+	  <title>Jade</title>
+
+	  <para>Install <ULink
+          URL="http://openjade.sourceforge.net/">OpenJade</ULink>
+          (Windows binaries are available as well as sources). If you
+          want DVI, PS, or PDF then install JadeTeX from the
+          <Filename>dsssl</Filename> subdirectory. (If you get the
+          error:
+
+<screen>
+! LaTeX Error: Unknown option implicit=false' for package hyperref'.
+</screen>
+
+          your version of <Command>hyperref</Command> is out of date;
+          download it from CTAN
+          (<Filename>macros/latex/contrib/supported/hyperref</Filename>),
+          and make it, ensuring that you have first removed or renamed
+          your old copy. If you start getting file not found errors
+          when making the test for <Command>hyperref</Command>, you
+          can abort at that point and proceed straight to
+          <Command>make install</Command>, or enter them as
+          <Filename>../</Filename><Emphasis>filename</Emphasis>.)</para>
+
+	  <para>Make links from <Filename>virtex</Filename> to
+          <Filename>jadetex</Filename> and
+          <Filename>pdfvirtex</Filename> to
+          <Filename>pdfjadetex</Filename> (otherwise DVI, PostScript
+          and PDF output will not work). Copy
+          <Filename>dsssl/*.{dtd,dsl}</Filename> and
+          <Filename>catalog</Filename> to
+          <Filename>/usr/[local/]lib/sgml</Filename>.</para>
+	</sect4>
+
+	<sect4>
+	  <title>DocBook and the DocBook stylesheets</title>
+
+	  <para>Get a Zip of <ULink
+          URL="http://www.oasis-open.org/docbook/sgml/3.1/index.html">DocBook</ULink>
+          and install the contents in
+          <Filename>/usr/[local/]/lib/sgml</Filename>.</para>
+
+	  <para>Get the <ULink
+          URL="http://nwalsh.com/docbook/dsssl/">DocBook
+          stylesheets</ULink> and install in
+          <Filename>/usr/[local/]lib/sgml/stylesheets</Filename>
+          (thereby creating a subdirectory docbook). For indexing,
+          copy or link <Filename>collateindex.pl</Filename> from the
+          DocBook stylesheets archive in <Filename>bin</Filename> into
+          a directory on your <Constant>PATH</Constant>.</para>
+
+	  <para>Download the <ULink
+          URL="http://www.oasis-open.org/cover/ISOEnts.zip">ISO
+          entities</ULink> into
+          <Filename>/usr/[local/]lib/sgml</Filename>.</para>
+	</sect4>
+      </sect3>
+    </sect2>
+
+    <sect2>
+      <title>Configuring the DocBook tools</title>
+
+      <Para>Once the DocBook tools are installed, the configure script
+      will detect them and set up the build system accordingly. If you
+      have a system that isn't supported, let us know, and we'll try
+      to help.</para>
+    </sect2>
+
+    <sect2>
+      <title>Remaining problems</title>
+
+      <para>If you install from source, you'll get a pile of warnings
+      of the form
+
+<Screen>DTDDECL catalog entries are not supported</Screen>
+
+      every time you build anything. These can safely be ignored, but
+      if you find them tedious you can get rid of them by removing all
+      the <Constant>DTDDECL</Constant> entries from
+      <Filename>docbook.cat</Filename>.</para>
+    </sect2>
+
+    <sect2>
+      <title>Building the documentation</title>
+
+      <para>To build documentation in a certain format, you can
+      say, for example,</para>
+
+<screen>
+$ make html
+</screen>
+
+      <para>to build HTML documentation below the current directory.
+      The available formats are: <literal>dvi</literal>,
+      <literal>ps</literal>, <literal>pdf</literal>,
+      <literal>html</literal>, and <literal>rtf</literal>.  Note that
+      not all documentation can be built in all of these formats: HTML
+      documentation is generally supported everywhere, and DocBook
+      documentation might support the other formats (depending on what
+      other tools you have installed).</para>
+
+      <para>All of these targets are recursive; that is, saying
+      <literal>make html</literal> will make HTML docs for all the
+      documents recursively below the current directory.</para>
+
+      <para>Because there are many different formats that the DocBook
+      documentation can be generated in, you have to select which ones
+      you want by setting the <literal>SGMLDocWays</literal> variable
+      to a list of them.  For example, in
+      <filename>build.mk</filename> you might have a line:</para>
+
+<screen>
+SGMLDocWays = html ps
+</screen>
+
+      <para>This will cause the documentation to be built in the requested
+      formats as part of the main build (the default is not to build
+      any documentation at all).</para>
+    </sect2>
+
+    <sect2>
+      <title>Installing the documentation</title>
+
+      <para>To install the documentation, use:</para>
+
+<screen>
+$ make install-docs
+</screen>
+
+      <para>This will install the documentation into
+      <literal>$(datadir)</literal> (which defaults to
+      <literal>$(prefix)/share</literal>).  The exception is HTML
+      documentation, which goes into
+      <literal>$(datadir)/html</literal>, to keep things tidy.</para>
+
+      <para>Note that unless you set <literal>$(SGMLDocWays)</literal>
+      to a list of formats, the <literal>install-docs</literal> target
+      won't do anything for SGML documentation.</para>
+    </sect2>
+
+  </sect1>
+    
 
   <sect1 id="sec-porting-ghc">
     <title>Porting GHC</title>
