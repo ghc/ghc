@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: renameFile.c,v 1.4 1999/03/01 09:27:49 sof Exp $
+ * $Id: renameFile.c,v 1.5 1999/09/30 12:35:50 sof Exp $
  *
  * renameFile Runtime Support
  */
@@ -21,7 +21,7 @@
 #include <fcntl.h>
 #endif
 
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS) && !defined(O_NOCTTY)
 #define O_NOCTTY 0
 #endif
 
