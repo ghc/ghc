@@ -793,8 +793,8 @@ A @Word#@ is an unsigned @Int#@.
 \begin{code}
 primOpInfo AndOp    = Dyadic  SLIT("and#")	wordPrimTy
 primOpInfo OrOp	    = Dyadic  SLIT("or#")	wordPrimTy
+primOpInfo XorOp    = Dyadic  SLIT("xor#")	wordPrimTy
 primOpInfo NotOp    = Monadic SLIT("not#")	wordPrimTy
-primOpInfo XorOp    = Monadic SLIT("xor#")	wordPrimTy
 
 primOpInfo SllOp
   = PrimResult SLIT("shiftL#")  [] [wordPrimTy, intPrimTy] wordPrimTyCon WordRep []
