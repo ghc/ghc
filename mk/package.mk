@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.44 2005/01/20 14:22:31 simonmar Exp $
+# $Id: package.mk,v 1.45 2005/01/23 17:05:31 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -43,7 +43,7 @@ endif # Unix
 IMPORT_DIR_INSTALLED = $(PKG_LIBDIR)/imports
 IMPORT_DIR_INPLACE   = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)
 
-INCLODE_DIR_INSTALLED =
+INCLUDE_DIR_INSTALLED = $(PKG_LIBDIR)/include
 INCLUDE_DIR_INPLACE   = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)/include
 
 LIB_DIR_INSTALLED    = $(PKG_LIBDIR)
