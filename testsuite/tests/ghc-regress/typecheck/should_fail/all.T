@@ -101,3 +101,4 @@ test "tcfail100" { vtcf("") }
 test "tcfail101" { vtcf("") }
 test "tcfail102" { vtcf("") }
 test "tcfail103" { vtcf("") }
+test "tcfail104" { vtcf("") }
