@@ -14,7 +14,6 @@ module Class (
 	classSuperDictSelId, classDefaultMethodId,
 	classBigSig, classInstEnv,
 	isSuperClassOf,
-	classOpTagByOccName,
 
 	SYN_IE(ClassInstEnv)
     ) where
@@ -154,15 +153,6 @@ classDictArgTys (Class _ _ _ _ sc_sel_ids meth_sel_ids _ _ _) ty
     mk_arg_ty id = case splitRhoTy (applyTy (idType id) ty) of
 			(sel_theta, meth_ty) -> ASSERT( length sel_theta == 1 )
 		   				meth_ty
-
-classOpTagByOccName clas occ
-  = go (classSelIds clas) 1
-  where
-    go (sel_id : sel_ids) tag 
-	    | getOccName (idName sel_id) == occ = tag
-	    | otherwise		                = go sel_ids (tag+1)
-    go [] _ = pprPanic "classOpTagByOccName"
-		(hsep [ppr PprDebug (getName clas), ppr PprDebug occ])
 \end{code}
 
 @a `isSuperClassOf` b@ returns @Nothing@ if @a@ is not a superclass of

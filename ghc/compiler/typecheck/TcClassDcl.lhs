@@ -6,7 +6,9 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind ) where
+module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
+		    badMethodErr, tcMethodBind
+		  ) where
 
 IMP_Ubiq()
 
@@ -40,7 +42,7 @@ import PragmaInfo	( PragmaInfo(..) )
 import Bag		( bagToList, unionManyBags )
 import Class		( GenClass, mkClass, classBigSig, 
 			  classDefaultMethodId,
-			  classOpTagByOccName, SYN_IE(Class)
+			  SYN_IE(Class)
 			)
 import CmdLineOpts      ( opt_PprUserLength )
 import Id		( GenId, mkSuperDictSelId, mkMethodSelId, 
@@ -49,7 +51,8 @@ import Id		( GenId, mkSuperDictSelId, mkMethodSelId,
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, moduleString, getSrcLoc, nameOccName,
+import Name		( Name, isLocallyDefined, moduleString, getSrcLoc, 
+			  OccName, nameOccName,
 			  nameString, NamedThing(..) )
 import Outputable
 import Pretty
@@ -63,6 +66,7 @@ import TysWiredIn	( stringTy )
 import TyVar		( unitTyVarSet, GenTyVar, SYN_IE(TyVar) )
 import Unique		( Unique, Uniquable(..) )
 import Util
+import Maybes		( assocMaybe, maybeToBool )
 
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
@@ -402,18 +406,27 @@ tcDefaultMethodBinds clas default_binds
 	clas_tyvar_set = unitTyVarSet clas_tyvar
 
 	tc_dm meth_bind
-	  = let
-		bndr_name  = case meth_bind of
-				FunMonoBind name _ _ _		-> name
-				PatMonoBind (VarPatIn name) _ _ -> name
-				
-		idx    	   = classOpTagByOccName clas (nameOccName bndr_name) - 1
-		sel_id 	   = op_sel_ids !! idx
-		Just dm_id = defm_ids !! idx
-	    in
+	  | not (maybeToBool maybe_stuff)
+	  =	-- Binding for something that isn't in the class signature
+	    failTc (badMethodErr bndr_name clas)
+
+	  | otherwise
+	  =	-- Normal case
 	    tcMethodBind clas origin inst_ty sel_id meth_bind
 						`thenTc` \ (bind, insts, (_, local_dm_id)) ->
 	    returnTc (bind, insts, ([clas_tyvar], RealId dm_id, local_dm_id))
+	  where
+	    bndr_name  = case meth_bind of
+				FunMonoBind name _ _ _		-> name
+				PatMonoBind (VarPatIn name) _ _ -> name
+				
+	    maybe_stuff = assocMaybe assoc_list (nameOccName bndr_name)
+	    assoc_list  = [ (getOccName sel_id, pair) 
+			  | pair@(sel_id, dm_ie) <- op_sel_ids `zip` defm_ids
+			  ]
+	    Just (sel_id, Just dm_id) = maybe_stuff
+		 -- We're looking at a default-method binding, so the dm_id
+		 -- is sure to be there!  Hence the inner "Just".
     in	   
     tcExtendGlobalTyVars clas_tyvar_set (
 	mapAndUnzip3Tc tc_dm (flatten default_binds [])
@@ -479,9 +492,12 @@ tcMethodBind clas origin inst_ty sel_id meth_bind
 				PatMonoBind (VarPatIn name) _ loc -> (name, loc)
 \end{code}
 
-Contexts
-~~~~~~~~
+Contexts and errors
+~~~~~~~~~~~~~~~~~~~
 \begin{code}
+badMethodErr bndr clas sty
+  = hsep [ptext SLIT("Class"), ppr sty clas, ptext SLIT("does not have a method"), ppr sty bndr]
+
 classDeclCtxt class_name sty
   = hsep [ptext SLIT("In the class declaration for"), ppr sty class_name]
 \end{code}

@@ -34,7 +34,7 @@ import TcHsSyn		( SYN_IE(TcHsBinds),
 			  mkHsDictLam, mkHsDictApp )
 
 import TcBinds		( tcPragmaSigs )
-import TcClassDcl	( tcMethodBind )
+import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
@@ -381,23 +381,26 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	-- ...[NB May 97; all ignored except INLINE]
     tcPragmaSigs uprags		`thenTc` \ (prag_fn, spec_binds, spec_lie) ->
 
-	 -- Check the method bindings
+	 -- Check that all the method bindings come from this class
     let
 	inst_tyvars_set' = mkTyVarSet inst_tyvars'
 	check_from_this_class (bndr, loc)
 	  | nameOccName bndr `elem` sel_names = returnTc ()
 	  | otherwise			      = recoverTc (returnTc ()) $
 						tcAddSrcLoc loc $
-						failTc (instBndrErr bndr clas)
+						failTc (badMethodErr bndr clas)
 	sel_names = map getOccName op_sel_ids
     in
     mapTc check_from_this_class (bagToList (collectMonoBinders monobinds))	`thenTc_`
+
+	  -- Type check the method bindings themselves
     tcExtendGlobalTyVars inst_tyvars_set' (
         tcExtendGlobalValEnv (catMaybes defm_ids) $
 		-- Default-method Ids may be mentioned in synthesised RHSs 
+
 	mapAndUnzip3Tc (tcInstMethodBind clas inst_ty' monobinds) 
 		       (op_sel_ids `zip` defm_ids)
-    )				 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
+    )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
 	-- Check the overloading constraints of the methods and superclasses
     let
@@ -741,9 +744,6 @@ instTypeErr ty sty
       other	   -> sep [ptext SLIT("The type"), nest 4 (ppr sty ty), rest_of_msg]
   where
     rest_of_msg = ptext SLIT("cannot be used as an instance type")
-
-instBndrErr bndr clas sty
-  = hsep [ptext SLIT("Class"), ppr sty clas, ptext SLIT("does not have a method"), ppr sty bndr]
 
 derivingWhenInstanceExistsErr clas tycon sty
   = hang (hsep [ptext SLIT("Deriving class"), 
