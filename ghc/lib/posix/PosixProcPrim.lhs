@@ -14,7 +14,9 @@ module PosixProcPrim (
     ProcessStatus(..),
 
     addSignal,
+#ifndef cygwin32_TARGET_OS
     awaitSignal,
+#endif
     backgroundRead,
     backgroundWrite,
     blockSignals,
@@ -183,7 +185,13 @@ exitImmediately exitcode = do
 
 getEnvironment :: IO [(String, String)]
 getEnvironment = do
-    env <- unvectorize ``environ'' 0
+    --WAS: env  <- unvectorize ``environ'' 0
+    -- does not work too well, since the lit-lit
+    -- is turned into an Addr that is only evaluated
+    -- once (environ is changed to point the most
+    -- current env. block after the addition of new entries).
+    envp <- _casm_ `` %r=environ; ''
+    env  <- unvectorize (envp::Addr) 0
     return (map (split "") env)
   where
     split :: String -> String -> (String, String)
@@ -431,6 +439,7 @@ getPendingSignals = do
        then freeze bytes
        else syserr "getPendingSignals"
 
+#ifndef cygwin32_TARGET_OS
 awaitSignal :: Maybe SignalSet -> IO ()
 awaitSignal maybe_sigset = do
     pause maybe_sigset
@@ -438,13 +447,13 @@ awaitSignal maybe_sigset = do
     if err == interruptedOperation
        then return ()
        else syserr "awaitSignal"
---  where
 
 pause :: Maybe SignalSet -> IO ()
 pause maybe_sigset =
   case maybe_sigset of
    Nothing -> _casm_ ``(void) pause();''
    Just sigset -> _casm_ ``(void) sigsuspend((sigset_t *)%0);'' sigset
+#endif
 
 scheduleAlarm :: Int -> IO Int
 scheduleAlarm (I# secs#) =
