@@ -35,10 +35,9 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
-import Name		--( mkSysLocalName, changeUnique, Name )
+import Name		( mkSysLocalName, changeUnique, Name, NamedThing(..) )
 import Pretty		( Doc, (<>), ptext )
-import PprStyle		( PprStyle )
---import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( showUnique, mkAlphaTyVarUnique, Unique )
 import UniqFM           ( Uniquable(..) )
