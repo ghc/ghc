@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.11 1999/03/11 11:21:47 simonm Exp $
+ * $Id: MBlock.c,v 1.12 1999/09/16 08:37:08 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -178,7 +178,7 @@ getMBlocks(nat n)
          ret=(void*)-1;
     } else {
     /* The returned pointer is not aligned on a mega-block boundary. Make it. */
-       base_mblocks = (char*)((unsigned)base_non_committed & (unsigned)0xfff00000) + 0x100000;
+       base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)0xfff00000) + MBLOCK_SIZE;
 # if 0
        fprintf(stderr, "Dropping %d bytes off of 128M chunk\n", 
 	               (unsigned)base_mblocks - (unsigned)base_non_committed);
