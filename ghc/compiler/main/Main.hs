@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.147 2005/02/02 13:40:34 simonpj Exp $
+-- $Id: Main.hs,v 1.148 2005/02/10 15:26:23 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -15,10 +15,10 @@ module Main (main) where
 
 #ifdef GHCI
 import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
-import DriverState	( isInteractiveMode )
 #endif
 
 
+import DriverState	( isInteractiveMode )
 import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
@@ -169,6 +169,9 @@ main =
 	-- so there shouldn't be any difficulty if we receive further
 	-- signals.
 
+	-- Display banner
+   showBanner mode dflags2
+
 	-- Read the package config(s), and process the package-related
 	-- command-line flags
    dflags <- initPackages dflags2
@@ -205,8 +208,12 @@ main =
     --       the command-line.
    mapM_ (add v_Ld_inputs) (reverse objs)
 
-	---------------- Display banners and configuration -----------
-   showBanners mode dflags static_opts
+	---------------- Display configuration -----------
+   when (verbosity dflags >= 4) $
+	dumpPackages dflags
+
+   when (verbosity dflags >= 3) $
+	hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts)
 
 	---------------- Final sanity checking -----------
    checkOptions mode srcs objs
@@ -305,10 +312,9 @@ doMake dflags srcs  = do
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
-showBanners :: GhcMode -> DynFlags -> [String] -> IO ()
-showBanners mode dflags static_opts = do
+showBanner :: GhcMode -> DynFlags -> IO ()
+showBanner mode dflags = do
    let verb = verbosity dflags
-
 	-- Show the GHCi banner
 #  ifdef GHCI
    when (isInteractiveMode mode && verb >= 1) $
@@ -316,14 +322,8 @@ showBanners mode dflags static_opts = do
 #  endif
 
 	-- Display details of the configuration in verbose mode
-   when (verb >= 2) $
+   when (not (isInteractiveMode mode) && verb >= 2) $
 	do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	   hPutStr stderr cProjectVersion
 	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
 	   hPutStrLn stderr cBooterVersion
-
-   when (verb >= 4) $
-	dumpPackages dflags
-
-   when (verb >= 3) $
-	hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts)
