@@ -19,7 +19,6 @@
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
 #	dvi ps (no info) FPTOOLS adds: pdf rtf html
-#	dist binary-dist
 #	check
 #
 # 3. Some of the above targets have a version that
@@ -100,39 +99,7 @@ all docs runtests boot TAGS clean distclean mostlyclean maintainer-clean install
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 
-dist ::
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS) ; do \
-	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
-	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
-	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
-	done
 endif
-
-# The default dist rule:
-#
-# copy/link the contents of $(SRC_DIST_FILES) into the
-# shadow distribution tree. SRC_DIST_FILES contain the
-# build-generated files that you want to include in
-# a source distribution.
-#
-#
-ifneq "$(SRC_DIST_FILES)" ""
-dist::
-	@for i in $(SRC_DIST_FILES); do 		 \
-	  if ( echo "$$i" | grep "~" >/dev/null 2>&1 ); then	 \
-	    echo $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
-	    $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
-	  else \
-	    if (test -f "$$i"); then 			   \
-	      echo $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ; \
-	      $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ;	   \
-	     fi;					   \
-	  fi; \
-	done;
-endif
-
 
 #
 # Selectively building subdirectories.
@@ -269,25 +236,6 @@ boot :: depend
 #      supported everywhere, but the intention is to standardise on DocBook
 #      producing all formats.
 #
-# `dist' `binary-dist'
-#      Create a distribution tar file for this program. The tar file
-#      should be set up so that the file names in the tar file start with
-#      a subdirectory name which is the name of the package it is a
-#      distribution for. This name can include the version number.
-#
-#      For example, the distribution tar file of GCC version 1.40 unpacks
-#      into a subdirectory named `gcc-1.40'.
-# 
-#      The easiest way to do this is to create a subdirectory
-#      appropriately named, use ln or cp to install the proper files in
-#      it, and then tar that subdirectory.
-# 
-#      The dist target should explicitly depend on all non-source files
-#      that are in the distribution, to make sure they are up to date in
-#      the distribution. See Making Releases.
-#
-#	binary-dist is an FPtools addition for binary distributions
-# 
 # `check'
 #      Perform self-tests (if any). The user must build the program
 #      before running the tests, but need not install the program; you
@@ -824,85 +772,6 @@ install ::
 	 fi;
 
 endif
-
-###########################################
-#
-#	Targets: dist binary-dist
-#
-###########################################
-
-
-#
-# dist-pre is a canned rule the toplevel of your source tree
-# would use as follows, 
-#
-#  dist :: dist-pre
-#
-# it performs two tasks, first creating the distribution directory
-# tree and it then decorates the new tree with symbolic links pointing
-# to the symbolic links in the build tree.
-#
-# The dist-pre relies on (at least) the `find' in GNU findutils
-# (only tested with version 4.1). All non-GNU `find's I have
-# laid on my hands locally, has a restrictive treatment of {} in
-# -exec commands, i.e.,
-#
-#   find . -print echo a{} \;
-#   
-# does not expand the {}, it has to be a separate argument (i.e. `a {}').
-# GNU find is (IMHO) more sensible here, expanding any {} it comes across
-# inside an -exec, whether it is a separate arg or part of a word:
-#
-#  $ touch yes
-#  $ find --version
-#    GNU find version 4.1
-#  $ find yes -exec echo oh,{}! \;
-#    oh,yes!
-#
-# Of course, the above is not impossible to achieve with other finds,
-# just that GNU find does the Patently Right Thing here :)
-#
-# ====> if you're using these dist rules, get hold of GNU findutils.
-#
-#  --SOF 2/97
-#
-.PHONY: dist dist-pre dist-post
-
-#
-# The dist rules leaves out CVS, SRC (from mkshadowdir) and tests
-# directories when creating shadow source distrib tree
-#
-dist-pre::
-	-rm -rf $(SRC_DIST_DIR)
-	-rm -f $(SRC_DIST_NAME).tar.gz
-	(cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -exec $(MKDIRHIER) $(SRC_DIST_DIR)/{} \; \) ; )
-	(cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -type l -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
-
-#
-# After having created a shadow distribution tree and copied/linked
-# all the necessary files to it, `dist-post' makes sure the permissions
-# are set right and then package up the tree. Empty directories are also removed.
-#
-# For now, we make the packaging a separate rule, so as to allow
-# the inspection of the dist tree before eventually packaging it up.
-#
-dist-post::
-	@echo Deleting the following empty directories..
-	( cd $(SRC_DIST_DIR) ; cd .. ; $(FIND) $(SRC_DIST_NAME) -type d -exec sh -c 'test x`ls $$0 | wc -l | sed -e "s/ //g"` = x0' {} \; -print -exec rm -rf {} \; -prune )
-	( cd $(SRC_DIST_DIR) ; cd .. ; chmod -R a+rw $(SRC_DIST_NAME) ) 
-
-# Automatic generation of a MANIFEST file for a source distribution
-# tree that is ready to go.
-dist-manifest ::
-	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
-
-dist-package:: dist-package-tar-gz
-
-dist-package-tar-gz ::
-	cd $(SRC_DIST_DIR); cd ..; $(TAR) chzf $(SRC_DIST_NAME).tar.gz $(SRC_DIST_NAME)
-
-dist-package-zip ::
-	cd $(SRC_DIST_DIR); cd ..; $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME).zip $(SRC_DIST_NAME)
 
 ###########################################
 #

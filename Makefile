@@ -8,7 +8,6 @@
 
 TOP=.
 include $(TOP)/mk/boilerplate.mk
-SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 
 #
 # Totally evil hack to make the setting of SUBDIRS be dependent
@@ -21,11 +20,12 @@ ifneq "$(Project)" ""
    include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
 endif
 
-#
-# Files to include in fptools source distribution
-#
-SRC_DIST_DIRS += mk docs distrib $(ProjectsToBuild)
-SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 acconfig.h README INSTALL Makefile install-sh
+project-check :
+	@if [ "$(Project)" = "" ]; then \
+		echo "	You need to set \"Project\" in order to make $(CURRENT_TARGET)"; \
+		echo "	eg. make $(CURRENT_TARGET) Project=Ghc"; \
+		exit 1; \
+	fi
 
 # -----------------------------------------------------------------------------
 # Make sure configure is up-to-date
@@ -41,7 +41,29 @@ configure :: configure.in
 # Making a binary distribution
 #
 # To make a particular binary distribution: 
-# set $(Project) to the name of the project (currently Ghc or Happy).
+# set $(Project) to the name of the project, capitalised (eg. Ghc or Happy).
+
+# `dist' `binary-dist'
+#      Create a distribution tar file for this program. The tar file
+#      should be set up so that the file names in the tar file start with
+#      a subdirectory name which is the name of the package it is a
+#      distribution for. This name can include the version number.
+#
+#      For example, the distribution tar file of GCC version 1.40 unpacks
+#      into a subdirectory named `gcc-1.40'.
+# 
+#      The easiest way to do this is to create a subdirectory
+#      appropriately named, use ln or cp to install the proper files in
+#      it, and then tar that subdirectory.
+# 
+#      The dist target should explicitly depend on all non-source files
+#      that are in the distribution, to make sure they are up to date in
+#      the distribution. See Making Releases.
+#
+#	binary-dist is an FPtools addition for binary distributions
+# 
+
+binary-dist :: project-check
 
 BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
 BIN_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
@@ -201,8 +223,64 @@ binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
 
 # -----------------------------------------------------------------------------
+# Building source distributions
+#
+# Do it like this: 
+#
+#	$ make boot
+#	$ make dist Project=Ghc
 
-dist :: dist-pre
+.PHONY: dist
+
+#
+# Directory in which we're going to build the src dist
+#
+SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
+
+#
+# Files to include in source distributions
+#
+SRC_DIST_DIRS += docs distrib $(ProjectsToBuild)
+SRC_DIST_FILES += \
+	configure.in config.guess config.sub configure \
+	aclocal.m4 acconfig.h README Makefile install-sh \
+	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
+	mk/paths.mk mk/suffix.mk mk/target.mk
+
+dist dist-manifest dist-package :: project-check
+
+# clean the tree first, leaving certain extra files in place (eg. configure)
+dist :: distclean
+
+dist ::
+	-rm -rf $(SRC_DIST_DIR)
+	-rm -f $(SRC_DIST_NAME).tar.gz
+	mkdir $(SRC_DIST_DIR)
+	mkdir $(SRC_DIST_DIR)/mk
+	( cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -exec mkdir $(SRC_DIST_DIR)/{} \; \) ; )
+	( cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) $(SRC_DIST_FILES) -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -name "log" -prune -o -name "*-SAVE" -prune -o -name "*.orig" -prune -o -name "*.rej" -prune -o ! -type d -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
+
+# Automatic generation of a MANIFEST file for a source distribution
+# tree that is ready to go.
+dist-manifest ::
+	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
+
+dist-package :: dist-package-tar-gz
+
+SRC_DIST_PATHS = $(patsubst %, $(SRC_DIST_NAME)/%, $(SRC_DIST_FILES) $(SRC_DIST_DIRS))
+
+dist-package-tar-gz ::
+	$(TAR) chzf $(SRC_DIST_NAME)-src.tar.gz $(SRC_DIST_NAME)
+
+dist-package-zip ::
+	cd ..; $(LN_S) $(FPTOOLS_TOP_ABS) $(SRC_DIST_NAME) && \
+	       $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME)-src.zip $(SRC_DIST_PATHS)
+
+# -----------------------------------------------------------------------------
+
+DIST_CLEAN_FILES += config.cache config.status
+
+MAINTAINER_CLEAN_FILES += configure
+
 include $(TOP)/mk/target.mk
-dist :: dist-post
 
