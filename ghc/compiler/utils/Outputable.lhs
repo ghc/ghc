@@ -402,4 +402,12 @@ assertPprPanic file line msg
 		 	   text file, 
 			   text "line", int line], 
 		    msg]
+
+warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
+warnPprTrace False file line msg x = x
+warnPprTrace True  file line msg x
+  = trace (show (doc PprDebug)) x
+  where
+    doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
+	       msg]
 \end{code}
