@@ -19,7 +19,7 @@ import Inst		( InstOrigin(..),
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( tcLookupClass, tcLookupGlobalId, newLocalId, badCon )
+import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, newLocalId )
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
@@ -35,9 +35,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, intTy, integerTy )
-import PrelNames	( eqClassOpKey, geClassOpKey, 
-			  cCallableClassKey, eqStringIdKey,
-			)
+import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -272,7 +270,7 @@ tcPat tc_bndr (LitPatIn lit@(HsLitLit s _)) pat_ty
 
 tcPat tc_bndr pat@(LitPatIn lit@(HsString _)) pat_ty
   = unifyTauTy pat_ty stringTy			`thenTc_` 
-    tcLookupGlobalId eqStringIdName		`thenNF_Tc` \ eq_id ->
+    tcLookupGlobalId eqStringName		`thenNF_Tc` \ eq_id ->
     returnTc (NPat lit stringTy (HsVar eq_id `HsApp` HsLit lit), 
 	      emptyLIE, emptyBag, emptyBag, emptyLIE)
 
@@ -282,7 +280,7 @@ tcPat tc_bndr (LitPatIn simple_lit) pat_ty
 
 tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
   = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    tcLookupGlobalId eqClassOpName			`thenNF_Tc` \ eq_sel_id ->
+    tcLookupGlobalId eqName				`thenNF_Tc` \ eq_sel_id ->
     newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
 
     returnTc (NPat lit' pat_ty (HsApp (HsVar eq_id) over_lit_expr),
@@ -304,8 +302,8 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
 \begin{code}
 tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
   = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
-    tcLookupGlobalId minus				`thenNF_Tc` \ minus_sel_id ->
-    tcLookupGlobalId geClassOpName		`thenNF_Tc` \ ge_sel_id ->
+    tcLookupGlobalId minus			`thenNF_Tc` \ minus_sel_id ->
+    tcLookupGlobalId geName			`thenNF_Tc` \ ge_sel_id ->
     newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
     newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
     newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
@@ -366,7 +364,7 @@ simpleHsLitTy (HsString str)   = stringTy
 \begin{code}
 tcConstructor pat con_name pat_ty
   = 	-- Check that it's a constructor
-    tcLookupDataCon 		`thenNF_Tc` \ data_con ->
+    tcLookupDataCon con_name		`thenNF_Tc` \ data_con ->
 
 	-- Instantiate it
     let 
@@ -390,7 +388,6 @@ tcConstructor pat con_name pat_ty
     unifyTauTy pat_ty result_ty		`thenTc_`
 
     returnTc (data_con, ex_tvs', dicts, lie_avail, arg_tys')
-    }
 \end{code}	      
 
 ------------------------------------------------------
