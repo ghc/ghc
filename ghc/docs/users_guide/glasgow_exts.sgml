@@ -232,6 +232,68 @@ like expressions.  More specifically:
 </para>
 </sect2>
 
+<sect2 id="sec-kinding">
+<title>Explicitly-kinded quantification</title>
+
+<para>
+Haskell infers the kind of each type variable.  Sometimes it is nice to be able
+to give the kind explicitly as (machine-checked) documentation, 
+just as it is nice to give a type signature for a function.  On some occasions,
+it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
+John Hughes had to define the data type:
+<Screen>
+     data Set cxt a = Set [a]
+                    | Unused (cxt a -> ())
+</Screen>
+The only use for the <literal>Unused</literal> constructor was to force the correct
+kind for the type variable <literal>cxt</literal>.
+</para>
+<para>
+GHC now instead allows you to specify the kind of a type variable directly, wherever
+a type variable is explicitly bound.  Namely:
+<itemizedlist>
+<listitem><para><literal>data</literal> declarations:
+<Screen>
+  data Set (cxt :: * -> *) a = Set [a]
+</Screen></para></listitem>
+<listitem><para><literal>type</literal> declarations:
+<Screen>
+  type T (f :: * -> *) = f Int
+</Screen></para></listitem>
+<listitem><para><literal>class</literal> declarations:
+<Screen>
+  class (Eq a) => C (f :: * -> *) a where ...
+</Screen></para></listitem>
+<listitem><para><literal>forall</literal>'s in type signatures:
+<Screen>
+  f :: forall (cxt :: * -> *). Set cxt Int
+</Screen></para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+The parentheses are required.  Some of the spaces are required too, to
+separate the lexemes.  If you write <literal>(f::*->*)</literal> you
+will get a parse error, because "<literal>::*->*</literal>" is a
+single lexeme in Haskell.
+</para>
+
+<para>
+As part of the same extension, you can put kind annotations in types
+as well.  Thus:
+<Screen>
+   f :: (Int :: *) -> Int
+   g :: forall a. a -> (a :: *)
+</Screen>
+The syntax is
+<Screen>
+   atype ::= '(' ctype '::' kind ')
+</Screen>
+The parentheses are required.
+</para>
+</sect2>
+
+
 <sect2 id="class-method-types">
 <title>Class method types
 </title>
@@ -2219,66 +2281,6 @@ in <literal>f4</literal>'s scope.
 </sect3>
 </sect2>
 
-<sect2 id="sec-kinding">
-<title>Explicitly-kinded quantification</title>
-
-<para>
-Haskell infers the kind of each type variable.  Sometimes it is nice to be able
-to give the kind explicitly as (machine-checked) documentation, 
-just as it is nice to give a type signature for a function.  On some occasions,
-it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
-John Hughes had to define the data type:
-<Screen>
-     data Set cxt a = Set [a]
-                    | Unused (cxt a -> ())
-</Screen>
-The only use for the <literal>Unused</literal> constructor was to force the correct
-kind for the type variable <literal>cxt</literal>.
-</para>
-<para>
-GHC now instead allows you to specify the kind of a type variable directly, wherever
-a type variable is explicitly bound.  Namely:
-<itemizedlist>
-<listitem><para><literal>data</literal> declarations:
-<Screen>
-  data Set (cxt :: * -> *) a = Set [a]
-</Screen></para></listitem>
-<listitem><para><literal>type</literal> declarations:
-<Screen>
-  type T (f :: * -> *) = f Int
-</Screen></para></listitem>
-<listitem><para><literal>class</literal> declarations:
-<Screen>
-  class (Eq a) => C (f :: * -> *) a where ...
-</Screen></para></listitem>
-<listitem><para><literal>forall</literal>'s in type signatures:
-<Screen>
-  f :: forall (cxt :: * -> *). Set cxt Int
-</Screen></para></listitem>
-</itemizedlist>
-</para>
-
-<para>
-The parentheses are required.  Some of the spaces are required too, to
-separate the lexemes.  If you write <literal>(f::*->*)</literal> you
-will get a parse error, because "<literal>::*->*</literal>" is a
-single lexeme in Haskell.
-</para>
-
-<para>
-As part of the same extension, you can put kind annotations in types
-as well.  Thus:
-<Screen>
-   f :: (Int :: *) -> Int
-   g :: forall a. a -> (a :: *)
-</Screen>
-The syntax is
-<Screen>
-   atype ::= '(' ctype '::' kind ')
-</Screen>
-The parentheses are required.
-</para>
-</sect2>
 
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
