@@ -9,6 +9,7 @@
 module WorkWrap ( workersAndWrappers ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(nub))
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
@@ -212,12 +213,13 @@ tryWW fn_id rhs
 	work_info = noIdInfo `addStrictnessInfo` mkStrictnessInfo work_demands Nothing
 
 	wrap_rhs = wrap_fn work_id
+	ww_cons  = nub (get_ww_cons wrap_rhs)
 	wrap_id  = addInlinePragma (fn_id `addIdStrictness`
-				    mkStrictnessInfo revised_wrap_args_info (Just work_id))
+				    mkStrictnessInfo revised_wrap_args_info (Just (work_id, ww_cons)))
 		-- Add info to the wrapper:
 		--	(a) we want to inline it everywhere
 		-- 	(b) we want to pin on its revised stricteness info
-		--	(c) we pin on its worker id
+		--	(c) we pin on its worker id and the list of constructors mentioned in the wrapper
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
@@ -230,4 +232,12 @@ tryWW fn_id rhs
     wrap_args_info = case strictness_info of
 			StrictnessInfo args_info _ -> args_info
     revised_wrap_args_info = setUnpackStrategy wrap_args_info
+
+-- This rather crude function snaffles out the constructors needed to 
+-- make the wrapper, so that we can stick them in the strictness info.
+-- They're only needed if this thing gets exported.
+get_ww_cons (Lam _ body)		       = get_ww_cons body
+get_ww_cons (App fn _)  		       = get_ww_cons fn
+get_ww_cons (Case _ (AlgAlts [(con,_,rhs)] _)) = con : get_ww_cons rhs
+get_ww_cons other			       = []
 \end{code}
