@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.44 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.45 2003/01/07 09:29:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -14,6 +14,7 @@
 
 /* Various entry points */
 STGFUN(stg_PAP_entry);
+STGFUN(stg_BCO_entry);
 
 /* Entry code for constructors created by the bytecode interpreter */
 STGFUN(stg_interp_constr_entry);
