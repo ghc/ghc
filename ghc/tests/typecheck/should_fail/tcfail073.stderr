@@ -8,9 +8,9 @@ tcfail073.hs:3: Duplicate or overlapping instance declarations
 tcfail073.hs:3: Duplicate or overlapping instance declarations
     for `Eq (a, b)' at tcfail073.hs:8 and <NoSrcLoc>
  
-tcfail073.hs:8: Context `{Eq taTH}'
+tcfail073.hs:8: Context `{Eq taT4}'
 		    required by inferred type, but missing on a type signature
-		    `Eq taTH' arising from use of `==' at tcfail073.hs:8
+		    `Eq taT4' arising from use of `==' at tcfail073.hs:8
     When checking methods of an instance declaration
 
 Compilation had errors

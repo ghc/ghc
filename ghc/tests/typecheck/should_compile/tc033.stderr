@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d38 1 $d40 1 $d42 1 $d47 1 Eval 1;
+PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
 _exports_
 ShouldSucceed F Twine(Twine2) Twist(Twist2);
 _instances_

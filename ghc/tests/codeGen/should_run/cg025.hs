@@ -11,7 +11,7 @@ main = do
     args <- getArgs
     hPutStr stderr (shows args "\n")
     path <- getEnv "PATH"
-    hPutStr stderr (shows path "\n")
+    hPutStr stderr ("GOT PATH\n")
     stdin_txt <- getContents
     putStr stdin_txt
     file_cts <- readFile (head args)

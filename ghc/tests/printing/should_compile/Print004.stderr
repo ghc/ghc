@@ -2,57 +2,57 @@
 Print004.hs:18: Warning: no explicit method nor default method for `showsPrec'
 		in an instance declaration for `Show'
 ==================== Typechecked ====================
-Con{-r6u,l-}{i} =
-    _/\_ a_tr6C -> \ tpl_B1 -> Con{-r6u,l-}{i} {_@_ a_tr6C tpl_B1}
+Con{-r6v,l-}{i} =
+    _/\_ a_tr6C -> \ tpl_B1 -> Con{-r6v,l-}{i} {_@_ a_tr6C tpl_B1}
 Junk11{-r4,l-}{i} = _/\_ a_tr6A -> Junk11{-r4,l-}{i} {_@_ a_tr6A}
 Junk2{-r3,l-}{i} = _/\_ a_tr6A -> Junk2{-r3,l-}{i} {_@_ a_tr6A}
-AbsBinds [taIv] [] [([taIv], $d2{-rIx,x-}, d.Eval_aHe)]
-    d.Eval_aHe = ({-dict-} [] [])
-AbsBinds [taIw] [] [([taIw], $d3{-rIy,x-}, d.Eval_aHk)]
-    d.Eval_aHk = ({-dict-} [] [])
-AbsBinds [taHz] [d.Ord_aHT] [([taHz], $d4{-rIz,x-}, d.Show_aHq)]
-    d.Ord_aI1 = d.Ord_aHT
-    d.Show_aHZ = $d1{-rIA,x-} taHz d.Ord_aI1
-    showsPrec_aID =
-	PrelBase.showsPrec{-r2c,p-} (FunnyInternalType{-r6v,l-} taHz)
-	    d.Show_aHZ
-    showsPrec_aIE = showsPrec_aIF
-    AbsBinds [] [] [([], showsPrec_aIF, showsPrec_aIH)]
-	showsPrec_aIH a_rGx (Con{-r6u,l-}{i} b1_rGy)
-		      = PrelBase.showParen{-r16,p-} a_rGx >=_aIB lit_aIC
-						    PrelBase..{-rI,p-}
-							[PrelBase.String{-r2i,p-}, PrelBase.String{-r2i,p-}, PrelBase.String{-r2i,p-}] PrelBase.showString{-r18,p-} "Con "
-																       showsPrec_aID PrelBase.I#{-5b,w-}{i} 10#
-																		     b1_rGy
-    AbsBinds [] [] [([], showList_aIG, showList_aII)]
-	showList_aII = PrelBase.showList__{-r6F,p-}
-			   (OpaqueType{-r6,x-} taHz) showsPrec_aIE PrelBase.I#{-5b,w-}{i} 0#
-    d.Show_aHq = ({-dict-} [] [showsPrec_aIF, showList_aIG])
-AbsBinds [taIf] [d.Ord_aIn] [([taIf], $d1{-rIA,x-}, d.Show_aI8)]
-    d.Show_aIr = d.Show_aI8
-    $mshowList_aIJ =
-	PrelBase.$mshowList{-rii,p-} (FunnyInternalType{-r6v,l-} taIf)
-	    d.Show_aIr
-    AbsBinds [] [] [([], showsPrec_aIK, showsPrec_aIM)]
-	showsPrec_aIM
+AbsBinds [taI0] [] [([taI0], $d2{-rI2,x-}, d.Eval_aGJ)]
+    d.Eval_aGJ = ({-dict-} [] [])
+AbsBinds [taI1] [] [([taI1], $d3{-rI7,x-}, d.Eval_aGP)]
+    d.Eval_aGP = ({-dict-} [] [])
+AbsBinds [taH4] [d.Ord_aHo] [([taH4], $d4{-rI6,x-}, d.Show_aGV)]
+    d.Ord_aHw = d.Ord_aHo
+    d.Show_aHu = $d1{-rI5,x-} taH4 d.Ord_aHw
+    showsPrec_aIb =
+	PrelBase.showsPrec{-r5B,p-} (FunnyInternalType{-r6u,l-} taH4)
+	    d.Show_aHu
+    showsPrec_aIa = showsPrec_aI9
+    AbsBinds [] [] [([], showsPrec_aI9, showsPrec_aIc)]
+	showsPrec_aIc a_rG2 (Con{-r6v,l-}{i} b1_rG3)
+		      = PrelBase.showParen{-r63,p-} a_rG2 >=_aI4 lit_aI3
+						    PrelBase..{-r6d,p-}
+							[PrelBase.String{-r5y,p-}, PrelBase.String{-r5y,p-}, PrelBase.String{-r5y,p-}] PrelBase.showString{-r62,p-} "Con "
+																       showsPrec_aIb PrelBase.I#{-5b,w-}{i} 10#
+																		     b1_rG3
+    AbsBinds [] [] [([], showList_aI8, showList_aId)]
+	showList_aId = PrelBase.showList__{-r6F,p-}
+			   (OpaqueType{-r6,x-} taH4) showsPrec_aIa PrelBase.I#{-5b,w-}{i} 0#
+    d.Show_aGV = ({-dict-} [] [showsPrec_aI9, showList_aI8])
+AbsBinds [taHK] [d.Ord_aHS] [([taHK], $d1{-rI5,x-}, d.Show_aHD)]
+    d.Show_aHW = d.Show_aHD
+    $mshowList_aIg =
+	PrelBase.$mshowList{-rh6,p-} (FunnyInternalType{-r6u,l-} taHK)
+	    d.Show_aHW
+    AbsBinds [] [] [([], showsPrec_aIf, showsPrec_aIh)]
+	showsPrec_aIh
 	    = GHCerr.noDefaultMethodError{-8k,w-}
 		  (PrelBase.Int{-3f,W-}
-		   -> FunnyInternalType{-r6v,l-} taIf
-		   -> PrelBase.String{-r2i,p-}
-		   -> PrelBase.String{-r2i,p-}) "<NoSrcLoc>|showsPrec"
-    AbsBinds [] [] [([], showList_aIL, showList_aIN)]
-	showList_aIN = $mshowList_aIJ
-    d.Show_aI8 = ({-dict-} [] [showsPrec_aIK, showList_aIL])
-d.Ord_aIu = PrelBase.$d7{-re0,p-}
->=_aIB = PrelBase.>={-810,p-} PrelBase.Int{-3f,W-} d.Ord_aIu
-lit_aIC = PrelBase.I#{-5b,w-}{i} 10#
+		   -> FunnyInternalType{-r6u,l-} taHK
+		   -> PrelBase.String{-r5y,p-}
+		   -> PrelBase.String{-r5y,p-}) "<NoSrcLoc>|showsPrec"
+    AbsBinds [] [] [([], showList_aIe, showList_aIi)]
+	showList_aIi = $mshowList_aIg
+    d.Show_aHD = ({-dict-} [] [showsPrec_aIf, showList_aIe])
+d.Ord_aHZ = PrelBase.$d6{-rcZ,p-}
+>=_aI4 = PrelBase.>={-810,p-} PrelBase.Int{-3f,W-} d.Ord_aHZ
+lit_aI3 = PrelBase.I#{-5b,w-}{i} 10#
 
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ExportOpaque 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _usages_
-PrelBase 1 :: $d1 1 $d12 1 $d15 1 $d16 1 $d2 1 $d22 1 $d27 1 $d28 1 $d3 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelBase 1 :: $d1 1 $d10 1 $d12 1 $d13 1 $d15 1 $d2 1 $d20 1 $d21 1 $d26 1 $d27 1 $d28 1 $d29 1 $d3 1 $d30 1 $d31 1 $d33 1 $d34 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d6 1 $d7 1 $d8 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
 PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d29 1 $d33 1 $d34 1 $d35 1;
 _exports_
 ExportOpaque OpaqueType;

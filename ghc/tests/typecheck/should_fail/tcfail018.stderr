@@ -1,8 +1,8 @@
  
-tcfail018.hs:5: No instance for: `Num [taEA]'
+tcfail018.hs:5: No instance for: `Num [taDX]'
     arising from the literal 1 at tcfail018.hs:5
  
-tcfail018.hs:5: No instance for: `Num [taEA]'
+tcfail018.hs:5: No instance for: `Num [taDX]'
     arising from the literal 1 at tcfail018.hs:5
 
 Compilation had errors

@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _exports_
 ShouldSucceed x y ys;
 _declarations_

@@ -1,6 +1,6 @@
  
-tcfail012.hs:3: Couldn't match the type `[talB]' against `Bool'
-    Expected: `[talB]'
+tcfail012.hs:3: Couldn't match the type `[tala]' against `Bool'
+    Expected: `[tala]'
     Inferred: `Bool'
     In a pattern binding: `True = []'
 

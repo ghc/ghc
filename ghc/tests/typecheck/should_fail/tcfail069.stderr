@@ -1,6 +1,6 @@
  
-tcfail069.hs:21: Couldn't match the type `(,) taAJ' against `[]'
-    Expected: `[taAN]'
+tcfail069.hs:21: Couldn't match the type `(,) taAi' against `[]'
+    Expected: `[taAm]'
     Inferred: `([Int], [Int])'
     In a "case" branch: `[]' -> `error "foo"'
     In the case expression `case (list1, (list2)) of [] -> error "foo"'

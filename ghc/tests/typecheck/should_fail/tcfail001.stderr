@@ -2,9 +2,9 @@
 tcfail001.hs:9:warning:
     Duplicated class assertion `A a' in context: `(A a, A a)'
  
-tcfail001.hs:9: Couldn't match the type `-> oamd' against `[]'
-    Expected: `oamd -> oame'
-    Inferred: `[tamb]'
+tcfail001.hs:9: Couldn't match the type `-> oalM' against `[]'
+    Expected: `oalM -> oalN'
+    Inferred: `[talK]'
     In an equation for function `op': `op [] = []'
 
 Compilation had errors

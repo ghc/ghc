@@ -1,8 +1,8 @@
  
-tcfail010.hs:3: No instance for: `Num [taEH]'
+tcfail010.hs:3: No instance for: `Num [taE4]'
     arising from use of `+' at tcfail010.hs:3
  
-tcfail010.hs:3: No instance for: `Num [taEH]'
+tcfail010.hs:3: No instance for: `Num [taE4]'
     arising from use of `+' at tcfail010.hs:3
 
 Compilation had errors

@@ -1,7 +1,7 @@
  
-tcfail004.hs:3: Couldn't match the type `(,,) taUT' against `(,)'
-    Expected: `(taUT, taUV, taUX)'
-    Inferred: `(taUN, taUQ)'
+tcfail004.hs:3: Couldn't match the type `(,,) taUg' against `(,)'
+    Expected: `(taUg, taUi, taUk)'
+    Inferred: `(taUa, taUd)'
     In a pattern binding: `(f, g) = (1, 2, 3)'
 
 Compilation had errors

@@ -1,7 +1,7 @@
  
 tcfail076.hs:20: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `taEJ'
-		     in the inferred type `(taEz -> aaEy taEJ) -> aaEy taEJ'
+		     Can't for-all the type variable(s) `taE6'
+		     in the inferred type `(taDW -> aaDV taE6) -> aaDV taE6'
     In a polymorphic function argument `(\ cont' -> cont a)'
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In the first argument of `f', namely

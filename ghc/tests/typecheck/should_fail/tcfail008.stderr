@@ -1,8 +1,8 @@
  
-tcfail008.hs:3: No instance for: `Num [taEy]'
+tcfail008.hs:3: No instance for: `Num [taDV]'
     arising from the literal 2 at tcfail008.hs:3
  
-tcfail008.hs:3: No instance for: `Num [taEy]'
+tcfail008.hs:3: No instance for: `Num [taDV]'
     arising from the literal 2 at tcfail008.hs:3
  
 tcfail008.hs:3: No instance for: `Num [Int]'

@@ -12,7 +12,6 @@ cc002_HC_OPTS = -noC
 cc003_HC_OPTS = -noC
 cc004_HC_OPTS = -noC
 cc005_HC_OPTS = -fvia-C
-cc006_HC_OPTS = -fvia-C
-cc007_HC_OPTS = -fvia-C
+cc006_HC_OPTS = -fvia-C -fno-prune-tydecls
 
 include $(TOP)/mk/target.mk

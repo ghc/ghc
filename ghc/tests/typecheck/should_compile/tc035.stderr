@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _usages_
-PrelBase 1 :: $d2 1 $d23 1 $d24 1 $d25 1 $d38 1 $d39 1 $d40 1 $d42 1 $d45 1 $d47 1 $m>> 1 Eval 1 Monad 1 MonadPlus 1 MonadZero 1;
+PrelBase 1 :: $d16 1 $d17 1 $d18 1 $d2 1 $d29 1 $d30 1 $d31 1 $d33 1 $d36 1 $d38 1 $m>> 1 Eval 1 Monad 1 MonadPlus 1 MonadZero 1;
 PrelTup 1 :: $d13 1;
 _exports_
 ShouldSucceed g AnnExpr Expr(Var App);

@@ -3,47 +3,47 @@ BarNil{-r8,x-}{i} = _/\_ a_tr4J -> BarNil{-r8,x-}{i} {_@_ a_tr4J}
 BarCon{-r7,x-}{i} =
     _/\_ a_tr4J -> \ tpl_B1 tpl_B2 ->
 	BarCon{-r7,x-}{i} {_@_ a_tr4J tpl_B1 tpl_B2}
-MkFoo{-r4Q,x-}{i} =
+MkFoo{-r4P,x-}{i} =
     _/\_ d_tr4L e_tr4M f_tr4N -> \ tpl_B1 tpl_B2 tpl_B3 ->
-	MkFoo{-r4Q,x-}{i}
+	MkFoo{-r4P,x-}{i}
 	    {_@_ d_tr4L _@_ e_tr4M _@_ f_tr4N tpl_B1 tpl_B2 tpl_B3}
-AbsBinds [ta118, ta119] [] [([ta119, ta118], g{-r4A,x-}, g_a12b)]
-    g_a12b x_r4H = lit_a12j
+AbsBinds [ta10v, ta10w] [] [([ta10w, ta10v], g{-r4A,x-}, g_a11y)]
+    g_a11y x_r4H = lit_a11z
 AbsBinds
-[ta11m, ta11n, ta11o]
-[d.Eq_a11q, d.Ord_a11r, d.Ix_a11s]
-[([ta11m, ta11n, ta11o], f2{-r4z,x-}, f2_a12k)]
-    f2_a12k x_r4F = x_r4F
+[ta10J, ta10K, ta10L]
+[d.Eq_a10N, d.Ord_a10O, d.Ix_a10P]
+[([ta10J, ta10K, ta10L], f2{-r4z,x-}, f2_a11H)]
+    f2_a11H x_r4F = x_r4F
 AbsBinds
-[ta11C, ta11D, ta11E]
-[d.Eq_a11G]
-[([ta11C, ta11D, ta11E], f{-r4y,x-}, f_a12l)]
-    f_a12l x_r4D = x_r4D
+[ta10Z, ta110, ta111]
+[d.Eq_a113]
+[([ta10Z, ta110, ta111], f{-r4y,x-}, f_a11I)]
+    f_a11I x_r4D = x_r4D
 AbsBinds
-[ta11L, ta11N, ta11P]
+[ta118, ta11a, ta11c]
 []
-[([ta11L, ta11N, ta11P], mkFoo{-r4B,x-}, mkFoo_a12m)]
-    mkFoo_a12m = MkFoo{-r4Q,x-}{i} [ta11L, ta11N, ta11P]
-AbsBinds [ta127] [] [([ta127], $d1{-r12f,x-}, d.Eval_a11V)]
-    d.Eval_a11V = ({-dict-} [] [])
+[([ta118, ta11a, ta11c], mkFoo{-r4B,x-}, mkFoo_a11J)]
+    mkFoo_a11J = MkFoo{-r4P,x-}{i} [ta118, ta11a, ta11c]
+AbsBinds [ta11u] [] [([ta11u], $d1{-r11G,x-}, d.Eval_a11i)]
+    d.Eval_a11i = ({-dict-} [] [])
 AbsBinds
-[ta128, ta129, ta12a]
+[ta11v, ta11x, ta11w]
 []
-[([ta128, ta129, ta12a], $d2{-r12h,x-}, d.Eval_a123)]
-    d.Eval_a123 = ({-dict-} [] [])
-d.Fractional_a126 = PrelNum.$d23{-rFn,p-}
-fromRational_a12i =
+[([ta11v, ta11x, ta11w], $d2{-r11F,x-}, d.Eval_a11q)]
+    d.Eval_a11q = ({-dict-} [] [])
+d.Fractional_a11t = PrelNum.$d23{-rE3,p-}
+fromRational_a11A =
     PrelNum.fromRational{-8U,p-} PrelBase.Float{-3c,W-}
-	d.Fractional_a126
-lit_a12j = fromRational_a12i 2.0000000000000000
+	d.Fractional_a11t
+lit_a11z = fromRational_a11A 2.0
 
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ Print001 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _usages_
 Ix 1 :: $d3 1 $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 Ix 1;
-PrelBase 1 :: $d1 1 $d11 1 $d12 1 $d14 1 $d15 1 $d16 1 $d2 1 $d22 1 $d27 1 $d28 1 $d3 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
+PrelBase 1 :: $d1 1 $d10 1 $d11 1 $d12 1 $d13 1 $d15 1 $d2 1 $d20 1 $d21 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d29 1 $d3 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
 PrelNum 1 :: $d1 1 $d10 1 $d14 1 $d15 1 $d16 1 $d17 1 $d18 1 $d19 1 $d2 1 $d23 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d29 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
 PrelTup 1 :: $d10 1 $d13 1 $d14 1 $d3 1 $d4 1 $d49 1 $d50 1 $d9 1;
 _exports_

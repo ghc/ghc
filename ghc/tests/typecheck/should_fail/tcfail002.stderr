@@ -1,8 +1,8 @@
  
 tcfail002.hs:4: Cannot construct the infinite type (occur check)
-		    `talR' = `[talR]'
-    Expected: `[talR]'
-    Inferred: `talR'
+		    `talq' = `[talq]'
+    Expected: `[talq]'
+    Inferred: `talq'
     In an equation for function `c': `c z = z'
 
 Compilation had errors

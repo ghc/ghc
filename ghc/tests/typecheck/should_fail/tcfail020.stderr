@@ -1,5 +1,5 @@
  
-tcfail020.hs:11: No instance for: `A [taEp]'
+tcfail020.hs:11: No instance for: `A [taDM]'
     arising from an instance declaration at tcfail020.hs:11
     When checking superclass constraints of an instance declaration
 

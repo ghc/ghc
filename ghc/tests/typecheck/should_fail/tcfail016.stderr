@@ -1,7 +1,7 @@
  
-tcfail016.hs:9: Couldn't match the type `Expr' against `(,) taUk'
-    Expected: `AnnExpr taUk'
-    Inferred: `Expr taUk'
+tcfail016.hs:9: Couldn't match the type `Expr' against `(,) taTH'
+    Expected: `AnnExpr taTH'
+    Inferred: `Expr taTH'
     In the first argument of `g', namely `e1'
     In the first argument of `++', namely `(g e1)'
     In an equation for function `g': `g (App e1 e2) = (g e1) ++ (g e2)'

@@ -1,8 +1,8 @@
  
 tcfail071.hs:10: Couldn't match the signature/existential type variable
-		     `taEm' with the type `taEz -> taEw -> taEw'
-    Expected: `taEm'
-    Inferred: `taEz -> taEw -> taEw'
+		     `taDJ' with the type `taDW -> taDT -> taDT'
+    Expected: `taDJ'
+    Inferred: `taDW -> taDT -> taDT'
     In the first argument of `f', namely `c'
     In the first argument of `foldr', namely `(f c)'
     In a pattern binding: `p = foldr (f c) [] []'

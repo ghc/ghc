@@ -1,6 +1,6 @@
-module GHCmain(mainPrimIO) where
+module GHCmain(mainIO) where
 
 import ST
 import STBase
 
-mainPrimIO = _ccall_ puts "123\n" >> return ()
+mainIO = _ccall_ puts "123\n" >> return ()

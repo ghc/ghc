@@ -1,7 +1,7 @@
  
 tcfail032.hs:14: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `taDB'
-		     in the inferred type `taDB -> Int'
+		     Can't for-all the type variable(s) `taCY'
+		     in the inferred type `taCY -> Int'
     In an expression with a type signature:
 	`x :: _forall_ [a] (Eq a) => a -> Int'
 

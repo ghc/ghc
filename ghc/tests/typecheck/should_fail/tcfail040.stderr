@@ -1,5 +1,5 @@
  
-tcfail040.hs:3: Ambiguous context `{ORD taEt}'
-		    `ORD taEt' arising from use of `<<' at tcfail040.hs:19
+tcfail040.hs:3: Ambiguous context `{ORD taDQ}'
+		    `ORD taDQ' arising from use of `<<' at tcfail040.hs:19
 
 Compilation had errors

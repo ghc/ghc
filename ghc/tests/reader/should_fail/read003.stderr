@@ -11,9 +11,9 @@ module Read003 where
 
  
 read003.hs:8: Cannot construct the infinite type (occur check)
-		  `taIl' = `(taIl, taIo, taIr)'
-    Expected: `taIl'
-    Inferred: `(taIl, [taIz], taIr)'
+		  `taHn' = `(taHn, taHq, taHt)'
+    Expected: `taHn'
+    Inferred: `(taHn, [taHB], taHt)'
     In a pattern binding:
 	`~(a, b, c)
 	     | nullity b = a

@@ -1,8 +1,8 @@
  
 tcfail014.hs:5: Cannot construct the infinite type (occur check)
-		    `oaF6' = `oaF6 -> oaF8'
-    Expected: `oaF6 -> oaF8'
-    Inferred: `oaF6'
+		    `oaEt' = `oaEt -> oaEv'
+    Expected: `oaEt -> oaEv'
+    Inferred: `oaEt'
     In the first argument of `z', namely `z'
     In an equation for function `h': `h z = z z'
     In an equation for function `g':
@@ -11,7 +11,7 @@ tcfail014.hs:5: Cannot construct the infinite type (occur check)
 	   where
 	       h z = z z'
  
-tcfail014.hs:5: No instance for: `Num (taFs -> taFu)'
+tcfail014.hs:5: No instance for: `Num (taEP -> taER)'
     arising from use of `+' at tcfail014.hs:5
 
 Compilation had errors

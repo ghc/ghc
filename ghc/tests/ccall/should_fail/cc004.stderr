@@ -1,8 +1,8 @@
  
 cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
-		`CReturnable taLM'
+		`CReturnable taL8'
  
 cc004.hs:2: Cannot generalise these overloadings (in a _ccall_):
-		`CReturnable taMJ'
+		`CReturnable taM5'
 
 Compilation had errors

@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
-Addr ArrBase Foreign IO PrelNum
+Addr ArrBase Foreign IO PrelBounded PrelNum
 _usages_
-PrelBase 1 :: $d1 1 $d12 1 $d15 1 $d16 1 $d2 1 $d22 1 $d25 1 $d27 1 $d28 1 $d3 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 && 1 . 1 not 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Monad 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelBase 1 :: $d1 1 $d10 1 $d12 1 $d13 1 $d15 1 $d18 1 $d2 1 $d20 1 $d21 1 $d26 1 $d27 1 $d28 1 $d29 1 $d3 1 $d30 1 $d31 1 $d33 1 $d34 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d6 1 $d7 1 $d8 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $m>> 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 && 1 . 1 not 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Monad 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
 PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d29 1 $d33 1 $d34 1 $d35 1;
 PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
 _exports_

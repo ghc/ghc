@@ -1,7 +1,7 @@
  
-tcfail034.hs:13: Context `{Integral taWK}'
+tcfail034.hs:13: Context `{Integral taW7}'
 		     required by inferred type, but missing on a type signature
-		     `Integral taWK' arising from use of `mod' at tcfail034.hs:17
+		     `Integral taW7' arising from use of `mod' at tcfail034.hs:17
     When checking signature(s) for: `test'
 
 Compilation had errors

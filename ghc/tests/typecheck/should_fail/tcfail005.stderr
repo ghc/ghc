@@ -1,7 +1,7 @@
  
-tcfail005.hs:3: Couldn't match the type `(,) taU7' against `[]'
-    Expected: `(taU7, taU9)'
-    Inferred: `[taU3]'
+tcfail005.hs:3: Couldn't match the type `(,) taTu' against `[]'
+    Expected: `(taTu, taTw)'
+    Inferred: `[taTq]'
     In a pattern binding: `(h : i) = (1, ('a'))'
 
 Compilation had errors

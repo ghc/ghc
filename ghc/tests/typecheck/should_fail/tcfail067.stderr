@@ -5,14 +5,14 @@ tcfail067.hs:65: Warning: no explicit method nor default method for `abs'
 tcfail067.hs:65: Warning: no explicit method nor default method for `signum'
 		 in an instance declaration for `Num'
  
-tcfail067.hs:1: Context `{Ord ta19s}'
+tcfail067.hs:1: Context `{Ord ta18P}'
 		    required by inferred type, but missing on a type signature
-		    `Ord ta19s' arising from use of `SubRange' at tcfail067.hs:76
+		    `Ord ta18P' arising from use of `SubRange' at tcfail067.hs:76
     When checking signature(s) for: `numSubRangeBinOp'
  
-tcfail067.hs:65: Context `{Ord ta1aY}'
+tcfail067.hs:65: Context `{Ord ta1al}'
 		     required by inferred type, but missing on a type signature
-		     `Ord ta1aY' arising from use of `numSubRangeNegate' at tcfail067.hs:61
+		     `Ord ta1al' arising from use of `numSubRangeNegate' at tcfail067.hs:61
     When checking methods of an instance declaration
 
 Compilation had errors

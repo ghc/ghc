@@ -1,17 +1,17 @@
  
-tcfail019.hs:19: No instance for: `B [tamO]'
+tcfail019.hs:19: No instance for: `B [tamn]'
     arising from an instance declaration at tcfail019.hs:19
     When checking methods of an instance declaration
  
-tcfail019.hs:19: No instance for: `C [tamO]'
+tcfail019.hs:19: No instance for: `C [tamn]'
     arising from an instance declaration at tcfail019.hs:19
     When checking methods of an instance declaration
  
-tcfail019.hs:19: No instance for: `B [tamO]'
+tcfail019.hs:19: No instance for: `B [tamn]'
     arising from an instance declaration at tcfail019.hs:19
     When checking superclass constraints of an instance declaration
  
-tcfail019.hs:19: No instance for: `C [tamO]'
+tcfail019.hs:19: No instance for: `C [tamn]'
     arising from an instance declaration at tcfail019.hs:19
     When checking superclass constraints of an instance declaration
 
