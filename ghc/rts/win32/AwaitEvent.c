@@ -23,13 +23,18 @@
 void
 awaitEvent(rtsBool wait)
 {
-  RELEASE_LOCK(&sched_mutex);
+  int ret;
+
   do {
-    /* Try to de-queue completed IO requests */
-    if (!awaitRequests(wait)) {
-      return;
-    }
+    /* Try to de-queue completed IO requests
+     */
+    RELEASE_LOCK(&sched_mutex);
+    ret = awaitRequests(wait);
     ACQUIRE_LOCK(&sched_mutex);
+    if (!ret) { 
+      return; /* still hold the lock */
+    }
+
     /* we were interrupted, return to the scheduler immediately.
      */
     if (interrupted) {
@@ -51,7 +56,6 @@ awaitEvent(rtsBool wait)
       return; /* still hold the lock */
     }
 #endif
-    RELEASE_LOCK(&sched_mutex);
   } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
 }
 
