@@ -147,7 +147,10 @@ instance Ord Literal where
 mkMachInt, mkMachWord, mkMachInt64, mkMachWord64 :: Integer -> Literal
 
 mkMachInt  x   = -- ASSERT2( inIntRange x,  integer x ) 
-	 	 -- not true: you can write out of range Int# literals
+	 	 -- Not true: you can write out of range Int# literals
+		 -- For example, one can write (intToWord# 0xffff0000) to
+		 -- get a particular Word bit-pattern, and there's no other
+		 -- convenient way to write such literals, which is why we allow it.
 		 MachInt x
 mkMachWord x   = -- ASSERT2( inWordRange x, integer x ) 
 		 MachWord x
