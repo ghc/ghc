@@ -52,10 +52,14 @@ import Outputable
 \begin{code}
 data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
-		n_occ  :: OccName,	-- Its occurrence name
+		n_occ  :: !OccName,	-- Its occurrence name
 		n_uniq :: Unique,
-		n_loc  :: SrcLoc	-- Definition site
+		n_loc  :: !SrcLoc	-- Definition site
 	    }
+
+-- NOTE: we make the n_loc field strict to eliminate some potential
+-- (and real!) space leaks, due to the fact that we don't look at
+-- the SrcLoc in a Name all that often.
 
 data NameSort
   = Global Module	-- (a) TyCon, Class, their derived Ids, dfun Id
