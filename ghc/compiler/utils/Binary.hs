@@ -53,6 +53,7 @@ module Binary
 import {-# SOURCE #-} Module
 import FastString
 import Unique
+import Panic
 import UniqFM
 
 #if __GLASGOW_HASKELL__ < 503
@@ -620,6 +621,10 @@ undef = error "Binary.BinHandleState"
 getBinFileWithDict :: Binary a => FilePath -> IO a
 getBinFileWithDict file_path = do
   bh <- Binary.readBinMem file_path
+  magic <- get bh
+  when (magic /= binaryInterfaceMagic) $
+	throwDyn (ProgramError (
+	   "magic number mismatch: old/corrupt interface file?"))
   dict_p <- Binary.get bh		-- get the dictionary ptr
   data_p <- tellBin bh
   seekBin bh dict_p
@@ -630,9 +635,12 @@ getBinFileWithDict file_path = do
 
 initBinMemSize = (1024*1024) :: Int
 
+binaryInterfaceMagic = 0x1face :: Word32
+
 putBinFileWithDict :: Binary a => FilePath -> Module -> a -> IO ()
 putBinFileWithDict file_path mod a = do
   bh <- openBinMem initBinMemSize mod
+  put_ bh binaryInterfaceMagic
   p <- tellBin bh
   put_ bh p		-- placeholder for ptr to dictionary
   put_ bh a
