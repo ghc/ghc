@@ -240,7 +240,7 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 	-- Check the fields
     tc_fields field_tys rpats		`thenTc` \ (rpats', lie_req3, tvs, ids, lie_avail2) ->
 
-    returnTc (RecPat data_con con_res_ty ex_tvs ex_dicts rpats',
+    returnTc (co_fn <$> RecPat data_con con_res_ty ex_tvs ex_dicts rpats',
 	      lie_req1 `plusLIE` lie_req2 `plusLIE` lie_req3,
 	      listToBag ex_tvs `unionBags` tvs,
 	      ids,
