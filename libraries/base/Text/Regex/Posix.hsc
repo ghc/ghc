@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.5 2002/02/14 14:08:50 simonmar Exp $
+-- $Id: Posix.hsc,v 1.6 2002/02/16 18:04:28 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
 -- ToDo: should have an interface using PackedStrings.
@@ -32,6 +32,7 @@ module Text.Regex.Posix (
 	regNewline	-- (flag to regcomp) '.' doesn't match newline
   ) where
 
+#include <sys/types.h>
 #include "regex.h"
 
 import Prelude
