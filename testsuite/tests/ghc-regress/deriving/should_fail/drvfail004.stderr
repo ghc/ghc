@@ -2,7 +2,7 @@
 drvfail004.hs:5:
     Could not deduce (Eq (Foo a b)) from the context (Ord a, Ord b)
     Probable fix:
-	Add (Eq (Foo a b)) to the instance declaration context
+	Add (Eq (Foo a b)) to the instance declaration superclass context
 	Or add an instance declaration for (Eq (Foo a b))
     arising from the instance declaration at drvfail004.hs:5
     In the instance declaration for `Ord (Foo a b)'
