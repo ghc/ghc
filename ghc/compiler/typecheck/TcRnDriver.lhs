@@ -746,6 +746,7 @@ tc_src_decls
 		   hs_ruleds = rule_decls,
 		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
+		-- The latter come in via tycl_decls
         traceTc (text "Tc2") ;
 	tcg_env <- tcTyClDecls tycl_decls ;
 	setGblEnv tcg_env	$ do {
@@ -930,8 +931,8 @@ typecheckIfaceDecls :: HsGroup Name -> TcM TcGblEnv
   -- That is why the tcExtendX functions need to do partitioning.
   --
   -- If all the decls are from other modules, the returned TcGblEnv
-  -- will have an empty tc_genv, but its tc_inst_env and tc_ist 
-  -- caches may have been augmented.
+  -- will have an empty tc_genv, but its tc_inst_env
+  -- cache may have been augmented.
 typecheckIfaceDecls (HsGroup { hs_tyclds = tycl_decls,
 			       hs_instds = inst_decls,
 			       hs_ruleds = rule_decls })

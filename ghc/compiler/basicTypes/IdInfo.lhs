@@ -38,7 +38,7 @@ module IdInfo (
         workerInfo, setWorkerInfo, ppWorkerInfo,
 
 	-- Unfolding
-	unfoldingInfo, setUnfoldingInfo, 
+	unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
 
 #ifdef OLD_STRICTNESS
 	-- Old DemandInfo and StrictnessInfo
@@ -347,7 +347,11 @@ setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 #endif
 	-- Try to avoid spack leaks by seq'ing
 
-setUnfoldingInfo  info uf 
+setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
+  =				-- unfolding of an imported Id unless necessary
+    info { unfoldingInfo = uf }	-- (In this case the demand-zapping is redundant.)
+
+setUnfoldingInfo info uf 
   | isEvaldUnfolding uf
 	-- If the unfolding is a value, the demand info may
 	-- go pear-shaped, so we nuke it.  Example:

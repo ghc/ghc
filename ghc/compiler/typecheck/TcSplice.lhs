@@ -155,6 +155,8 @@ tcTopSplice expr res_ty
 
 
 tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr
+-- Type check an expression that is the body of a top-level splice
+--   (the caller will compile and run it)
 tcTopSpliceExpr expr meta_ty
   = checkNoErrs $	-- checkNoErrs: must not try to run the thing
 			--	        if the type checker fails!

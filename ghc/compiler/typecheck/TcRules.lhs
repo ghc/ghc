@@ -16,10 +16,10 @@ import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
-import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
+import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( tcExtendLocalValEnv )
+import TcEnv		( tcExtendLocalValEnv, tcLookupGlobalId )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
 import Outputable
@@ -33,14 +33,14 @@ tcRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
 tcRule (IfaceRule name act vars fun args rhs src_loc)
   = addSrcLoc src_loc 		$
     addErrCtxt (ruleCtxt name)	$
-    tcVar fun				`thenM` \ fun' ->
+    tcLookupGlobalId fun		`thenM` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mappM tcCoreExpr args		`thenM` \ args' ->
     tcCoreExpr rhs			`thenM` \ rhs' ->
     returnM (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
 
 tcRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
-  = tcVar fun				`thenM` \ fun' ->
+  = tcLookupGlobalId fun		`thenM` \ fun' ->
     returnM (IfaceRuleOut fun' rule)   
 
 tcRule (HsRule name act vars lhs rhs src_loc)

@@ -235,6 +235,7 @@ data TopEnv	-- Built once at top level then does not change
 		-- PIT, ImportedModuleInfo
 		-- DeclsMap, IfaceRules, IfaceInsts, InstGates
 		-- TypeEnv, InstEnv, RuleBase
+		-- Mutable, because we demand-load declarations that extend the state
 
 	top_hpt	 :: HomePackageTable,
 		-- The home package table that we've accumulated while 
@@ -273,15 +274,15 @@ data TcGblEnv
 		-- (Ids defined in this module start in the local envt, 
 		--  though they move to the global envt during zonking)
 	
-		-- Cached things
-	tcg_ist :: Name -> Maybe TyThing,	-- Imported symbol table
-		-- Global type env: a combination of tcg_eps, tcg_hpt
-		--	(but *not* tcg_type_env; no deep reason)
-		-- When the PCS changes this must be refreshed, 
-		-- notably after running some compile-time code
-	
-	tcg_inst_env :: InstEnv,	-- Global instance env: a combination of 
+	tcg_inst_env :: TcRef InstEnv,	-- Global instance env: a combination of 
 					--	tc_pcs, tc_hpt, *and* tc_insts
+		-- This field is mutable so that it can be updated inside a
+		-- Template Haskell splice, which might suck in some new
+		-- instance declarations.  This is a slightly differen strategy
+		-- than for the type envt, where we look up first in tcg_type_env
+		-- and then in the mutable EPS, because the InstEnv for this module
+		-- is constructed (in principle at least) only from the modules
+		-- 'below' this one, so it's this-module-specific
 
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
@@ -667,12 +668,18 @@ data Inst
 	TcThetaType	-- The (types of the) dictionaries to which the function
 			-- must be applied to get the method
 
-	TcTauType	-- The type of the method
+	TcTauType	-- The tau-type of the method
 
 	InstLoc
 
-	-- INVARIANT: in (Method u f tys theta tau loc)
+	-- INVARIANT 1: in (Method u f tys theta tau loc)
 	--	type of (f tys dicts(from theta)) = tau
+
+	-- INVARIANT 2: tau must not be of form (Pred -> Tau)
+	--   Reason: two methods are considerd equal if the 
+	--   	     base Id matches, and the instantiating types
+	--	     match.  The TcThetaType should then match too.
+	--   This only bites in the call to tcInstClassOp in TcClassDcl.mkMethodBind
 
   | LitInst
 	Id

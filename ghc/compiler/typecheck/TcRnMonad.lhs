@@ -116,7 +116,8 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
 	usg_var  <- newIORef emptyUsages ;
 	nc_var   <- newIORef (pcs_nc pcs) ;
 	eps_var  <- newIORef eps ;
-   
+	ie_var   <- newIORef (mkImpInstEnv dflags eps hpt) ;
+
       	let {
 	     env = Env { env_top = top_env,
 			 env_gbl = gbl_env,
@@ -139,8 +140,7 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
 		tcg_fix_env  = emptyFixityEnv,
 		tcg_default  = defaultDefaultTys,
 		tcg_type_env = emptyNameEnv,
-		tcg_ist      = mkImpTypeEnv eps hpt,
-		tcg_inst_env = mkImpInstEnv dflags eps hpt,
+		tcg_inst_env = ie_var,
 		tcg_exports  = [],
 		tcg_imports  = init_imports,
 		tcg_binds    = EmptyMonoBinds,
@@ -476,6 +476,7 @@ forkM :: SDoc -> TcM a -> TcM (Maybe a)
 -- Run thing_inside in an interleaved thread.  It gets a separate
 -- 	* errs_var, and
 --	* unique supply, 
+--	* LIE var is set to bottom (should never be used)
 -- but everything else is shared, so this is DANGEROUS.  
 --
 -- It returns Nothing if the computation fails
@@ -487,7 +488,8 @@ forkM doc thing_inside
  = do {	us <- newUniqueSupply ;
 	unsafeInterleaveM $
 	do { us_var <- newMutVar us ;
-	     (msgs, mb_res) <- tryTcLIE (setUsVar us_var thing_inside) ;
+	     (msgs, mb_res) <- tryTc (setLIEVar (panic "forkM: LIE used") $
+				      setUsVar us_var thing_inside) ;
 	     case mb_res of
 		Just r  -> return (Just r) 
 		Nothing -> do {

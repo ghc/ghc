@@ -5,7 +5,6 @@
 
 \begin{code}
 module TcIfaceSig ( tcInterfaceSigs,
-		    tcVar,
 		    tcCoreExpr,
 		    tcCoreLamBndrs,
 		    tcCoreBinds ) where
@@ -17,10 +16,7 @@ import TcHsSyn		( TypecheckedCoreBind )
 import TcRnTypes
 import TcRnMonad
 import TcMonoType	( tcIfaceType, kcHsSigType )
-import TcEnv		( RecTcGblEnv, tcExtendTyVarEnv, 
-			  tcExtendGlobalValEnv, 
-			  tcLookupGlobal_maybe, tcLookupRecId_maybe
-			)
+import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcLookupGlobalId )
 
 import RnHsSyn		( RenamedCoreDecl, RenamedTyClDecl )
 import HsCore
@@ -65,6 +61,14 @@ tcInterfaceSigs decls = fixM (tc_interface_sigs decls)
 	--   any type errors are found (ie there's an inconsistency)
 	--   we silently discard the pragma
 	--
+	-- NOTE ALSO: the knot is in two parts:
+	--	* Ids defined in this module are added to the typechecker envt
+	--	  which is knot-tied by the fixM.
+	--	* Imported Ids are side-effected into the PCS by the 
+	--	  tcExtendGlobalValueEnv, so they will be seen there provided
+	--	  we don't look them up too early. 
+	--	In both cases, we must defer lookups until after the knot is tied
+	--
 	-- We used to have a much bigger loop (in TcRnDriver), so that the 
 	-- interface pragmas could mention variables bound in this module 
 	-- (by mutual recn), but
@@ -104,69 +108,69 @@ tc_interface_sigs decls unf_env
 
 \begin{code}
 tcIdInfo unf_env in_scope_vars name ty info_ins
-  = foldlM tcPrag init_info info_ins 
+  = setGblEnv unf_env $
+	-- Use the knot-tied environment for the IdInfo
+	-- In particular: typechecking unfoldings and worker names
+    foldlM tcPrag init_info info_ins 
   where
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
     init_info = hasCafIdInfo
 
-    tcPrag info (HsNoCafRefs)   = returnM (info `setCafInfo`	 NoCafRefs)
-
-    tcPrag info (HsArity arity) = 
-	returnM (info `setArityInfo` arity)
+    tcPrag info HsNoCafRefs         = returnM (info `setCafInfo`   NoCafRefs)
+    tcPrag info (HsArity arity)     = returnM (info `setArityInfo` arity)
+    tcPrag info (HsStrictness str)  = returnM (info `setAllStrictnessInfo` Just str)
+    tcPrag info (HsWorker nm arity) = tcWorkerInfo ty info nm arity
 
     tcPrag info (HsUnfold inline_prag expr)
-	= tcPragExpr unf_env name in_scope_vars expr 	`thenM` \ maybe_expr' ->
+	= tcPragExpr name in_scope_vars expr 	`thenM` \ maybe_expr' ->
 	  let
-		-- maybe_expr doesn't get looked at if the unfolding
+		-- maybe_expr' doesn't get looked at if the unfolding
 		-- is never inspected; so the typecheck doesn't even happen
 		unfold_info = case maybe_expr' of
 				Nothing    -> noUnfolding
 				Just expr' -> mkTopUnfolding expr' 
-		info1 = info `setUnfoldingInfo` unfold_info
-		info2 = info1 `setInlinePragInfo` inline_prag
 	  in
-	  returnM info2
-
-    tcPrag info (HsStrictness strict_info)
-	= returnM (info `setAllStrictnessInfo` Just strict_info)
-
-    tcPrag info (HsWorker nm arity)
-	= tcWorkerInfo unf_env ty info nm arity
+ 	  returnM (info `setUnfoldingInfoLazily` unfold_info
+			`setInlinePragInfo`      inline_prag)
 \end{code}
 
 \begin{code}
-tcWorkerInfo unf_env ty info worker_name arity
-  = newUniqueSupply			`thenM` \ us ->
-    let
-	wrap_fn = initUs_ us (mkWrapper ty strict_sig)
-
+tcWorkerInfo ty info wkr_name arity
+  = forkM doc (tcVar wkr_name)	`thenM` \ maybe_wkr_id ->
 	-- Watch out! We can't pull on unf_env too eagerly!
-	info' = case tcLookupRecId_maybe unf_env worker_name of
-		  Just worker_id -> 
-		    info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
-		         `setWorkerInfo`     HasWorker worker_id arity
+	-- Hence the forkM
 
-    		  Nothing -> pprTrace "tcWorkerInfo failed:" 
-				      (ppr worker_name) info
-    in
-    returnM info'
+	-- We return without testing maybe_wkr_id, but as soon as info is
+	-- looked at we will test it.  That's ok, because its outside the
+	-- knot; and there seems no big reason to further defer the
+	-- tcVar lookup.  (Contrast with tcPragExpr, where postponing walking
+	-- over the unfolding until it's actually used does seem worth while.)
+    newUniqueSupply		`thenM` \ us ->
+    returnM (case maybe_wkr_id of
+	Nothing     -> info
+	Just wkr_id -> info `setUnfoldingInfoLazily`  mk_unfolding us wkr_id
+			    `setWorkerInfo`           HasWorker wkr_id arity)
+
   where
+    doc = text "worker for" <+> ppr wkr_name
+
+    mk_unfolding us wkr_id = mkTopUnfolding (initUs_ us (mkWrapper ty strict_sig) wkr_id)
+
     	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....
-      strict_sig = case newStrictnessInfo info of
-		 	Just sig -> sig
-			Nothing  -> pprPanic "Worker info but no strictness for" (ppr worker_name)
+    strict_sig = case newStrictnessInfo info of
+		   Just sig -> sig
+		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr_name)
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 
 \begin{code}
-tcPragExpr unf_env name in_scope_vars expr
+tcPragExpr :: Name -> [Id] -> UfExpr Name -> TcM (Maybe CoreExpr)
+tcPragExpr name in_scope_vars expr
   = forkM doc $
-    setGblEnv unf_env $
-
     tcCoreExpr expr		`thenM` \ core_expr' ->
 
 		-- Check for type consistency in the unfolding
@@ -185,19 +189,12 @@ tcPragExpr unf_env name in_scope_vars expr
 
 Variables in unfoldings
 ~~~~~~~~~~~~~~~~~~~~~~~
-****** Inside here we use only the Global environment, even for locally bound variables.
-****** Why? Because we know all the types and want to bind them to real Ids.
 
 \begin{code}
 tcVar :: Name -> TcM Id
-tcVar name
-  = tcLookupGlobal_maybe name	`thenM` \ maybe_id ->
-    case maybe_id of {
-	Just (AnId id)	-> returnM id ;
-	Nothing		-> failWithTc (noDecl name)
-    }
-
-noDecl name = hsep [ptext SLIT("Warning: no binding for"), ppr name]
+  -- Inside here we use only the Global environment, even for locally bound variables.
+  -- Why? Because we know all the types and want to bind them to real Ids.
+tcVar name = tcLookupGlobalId name
 \end{code}
 
 UfCore expressions.

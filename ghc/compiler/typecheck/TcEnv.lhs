@@ -33,9 +33,6 @@ module TcEnv(
 	-- Global type variables
 	tcGetGlobalTyVars,
 
-	-- Random useful things
-	RecTcGblEnv, tcLookupRecId_maybe, 
-
 	-- Template Haskell stuff
 	checkWellStaged, spliceOK, bracketOK, tcMetaTy, metaLevel, 
 	topIdLvl, 
@@ -73,7 +70,7 @@ import Name		( Name, NamedThing(..),
 			)
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( DFunId, TypeEnv, extendTypeEnvList, 
+import HscTypes		( DFunId, TypeEnv, extendTypeEnvList, lookupType,
 			  TyThing(..), ExternalPackageState(..) )
 import Rules		( RuleBase )
 import BasicTypes	( EP )
@@ -182,24 +179,6 @@ data TyThingDetails = SynTyDetails  Type
 
 %************************************************************************
 %*									*
-\subsection{Basic lookups}
-%*									*
-%************************************************************************
-
-\begin{code}
-type RecTcGblEnv = TcGblEnv
--- This environment is used for getting the 'right' IdInfo 
--- on imported things and for looking up Ids in unfoldings
--- The environment doesn't have any local Ids in it
-
-tcLookupRecId_maybe :: RecTcGblEnv -> Name -> Maybe Id
-tcLookupRecId_maybe env name = case lookup_global env name of
-				   Just (AnId id) -> Just id
-				   other	  -> Nothing
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Making new Ids}
 %*									*
 %************************************************************************
@@ -255,9 +234,8 @@ tcExtendGlobalEnv things thing_inside
 	      (lcl_things, pkg_things) = partition (isLocalThing mod) things
 	      ge'  = extendTypeEnvList (tcg_type_env env) lcl_things
 	      eps' = eps { eps_PTE = extendTypeEnvList (eps_PTE eps) pkg_things }
-	      ist' = mkImpTypeEnv eps' hpt
 	; setEps eps'
-	; setGblEnv (env {tcg_type_env = ge', tcg_ist = ist'}) thing_inside }
+	; setGblEnv (env {tcg_type_env = ge'}) thing_inside }
 
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
   -- Same deal as tcExtendGlobalEnv, but for Ids
@@ -275,17 +253,22 @@ tcExtendGlobalTypeEnv extra_env thing_inside
 
 
 \begin{code}
-lookup_global :: TcGblEnv -> Name -> Maybe TyThing
-	-- Try the global envt and then the global symbol table
-lookup_global env name 
-  = lookupNameEnv (tcg_type_env env) name 
-    	`seqMaybe`
-    tcg_ist env name
-
 tcLookupGlobal_maybe :: Name -> TcRn m (Maybe TyThing)
+-- This is a rather heavily-used function, so I've inlined a few things	(e.g. getEps)
+-- Notice that for imported things we read the current version from the EPS
+-- mutable variable.  This is important in situations like
+--	...$(e1)...$(e2)...
+-- where the code that e1 expands to might import some defns that 
+-- also turn out to be needed by the code that e2 expands to.
 tcLookupGlobal_maybe name
-  = getGblEnv		`thenM` \ env ->
-    returnM (lookup_global env name)
+  = do { env <- getGblEnv
+       ; if nameIsLocalOrFrom (tcg_mod env) name then
+		-- Defined in this module
+	      return (lookupNameEnv (tcg_type_env env) name)
+	 else 
+	 do { env <- getTopEnv
+	    ; eps <- readMutVar (top_eps env)
+	    ; return (lookupType (top_hpt env) (eps_PTE eps) name) }}
 \end{code}
 
 A variety of global lookups, when we know what we are looking for.
@@ -328,8 +311,15 @@ tcLookupTyCon name
 
 
 getInGlobalScope :: TcRn m (Name -> Bool)
-getInGlobalScope = do { gbl_env <- getGblEnv ;
-		        return (\n -> isJust (lookup_global gbl_env n)) }
+-- Get all things in the global environment; used for deciding what 
+-- rules to suck in.  Anything defined in this module (nameIsLocalOrFrom)
+-- is certainly in the envt, so we don't bother to look.
+getInGlobalScope 
+  = do { mod <- getModule
+       ; eps <- getEps
+       ; hpt <- getHpt
+       ; return (\n -> nameIsLocalOrFrom mod n || 
+		       isJust (lookupType hpt (eps_PTE eps) n)) }
 \end{code}
 
 
@@ -551,15 +541,31 @@ tcGetGlobalTyVars
 %*									*
 %************************************************************************
 
+The TcGblEnv holds a mutable variable containing the current full, instance environment.
+The ExtendInstEnv functions extend this environment by side effect, in case we are
+sucking in new instance declarations deep in the body of a TH splice, which are needed
+in another TH splice.  The tcg_insts field of the TcGblEnv contains just the dfuns
+from this module
+
 \begin{code}
 tcGetInstEnv :: TcM InstEnv
 tcGetInstEnv = getGblEnv 	`thenM` \ env -> 
-	       returnM (tcg_inst_env env)
+	       readMutVar (tcg_inst_env env)
 
 tcSetInstEnv :: InstEnv -> TcM a -> TcM a
+-- Horribly imperative; 
+-- but used only when temporarily enhancing the instance
+-- envt during 'deriving' context inference
 tcSetInstEnv ie thing_inside
   = getGblEnv 	`thenM` \ env ->
-    setGblEnv (env {tcg_inst_env = ie}) thing_inside
+    let 
+	ie_var = tcg_inst_env env
+    in
+    readMutVar  ie_var		`thenM` \ old_ie ->
+    writeMutVar ie_var ie	`thenM_`
+    thing_inside		`thenM` \ result ->
+    writeMutVar ie_var old_ie	`thenM_`    
+    returnM result
 
 tcExtendInstEnv :: [DFunId] -> TcM a -> TcM a
 	-- Add instances from local or imported
@@ -568,9 +574,11 @@ tcExtendInstEnv dfuns thing_inside
  = do { dflags <- getDOpts
       ; eps <- getEps
       ; env <- getGblEnv
+      ; let ie_var = tcg_inst_env env
+      ; inst_env <- readMutVar ie_var
       ; let
 	  -- Extend the total inst-env with the new dfuns
-	  (inst_env', errs) = extendInstEnv dflags (tcg_inst_env env) dfuns
+	  (inst_env', errs) = extendInstEnv dflags inst_env dfuns
   
 	  -- Sort the ones from this module from the others
 	  (lcl_dfuns, pkg_dfuns) = partition (isLocalThing mod) dfuns
@@ -580,11 +588,11 @@ tcExtendInstEnv dfuns thing_inside
        	  (eps_inst_env', _) = extendInstEnv dflags (eps_inst_env eps) pkg_dfuns
 	  eps'		     = eps { eps_inst_env = eps_inst_env' }
   
-	  env'	= env { tcg_inst_env = inst_env', 
-			tcg_insts = lcl_dfuns ++ tcg_insts env }
+	  env'	= env { tcg_insts = lcl_dfuns ++ tcg_insts env }
 
       ; traceDFuns dfuns
       ; addErrs errs
+      ; writeMutVar ie_var inst_env'
       ; setEps eps'
       ; setGblEnv env' thing_inside }
 
@@ -593,13 +601,15 @@ tcExtendLocalInstEnv :: [InstInfo] -> TcM a -> TcM a
 tcExtendLocalInstEnv infos thing_inside
  = do { dflags <- getDOpts
       ; env <- getGblEnv
+      ; let ie_var = tcg_inst_env env
+      ; inst_env <- readMutVar ie_var
       ; let
 	  dfuns 	    = map iDFunId infos
-	  (inst_env', errs) = extendInstEnv dflags (tcg_inst_env env) dfuns
-	  env'		    = env { tcg_inst_env = inst_env', 
-			            tcg_insts = dfuns ++ tcg_insts env }
+	  (inst_env', errs) = extendInstEnv dflags inst_env dfuns
+	  env'		    = env { tcg_insts = dfuns ++ tcg_insts env }
       ; traceDFuns dfuns
       ; addErrs errs
+      ; writeMutVar ie_var inst_env'
       ; setGblEnv env' thing_inside }
 
 traceDFuns dfuns
