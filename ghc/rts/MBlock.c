@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.6 1999/01/18 10:54:15 simonm Exp $
+ * $Id: MBlock.c,v 1.7 1999/01/25 11:55:06 sof Exp $
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned
@@ -49,6 +49,10 @@
 #define ASK_FOR_MEM_AT 0x50000000
 
 #elif solaris2_TARGET_OS
+/* guess */
+#define ASK_FOR_MEM_AT 0x50000000
+
+#elif osf3_TARGET_OS
 /* guess */
 #define ASK_FOR_MEM_AT 0x50000000
 
