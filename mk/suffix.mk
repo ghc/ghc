@@ -51,6 +51,10 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
 			 
+%.$(way_)hc : %.hs	 
+	$(RM) $@
+	$(HC) $(HC_OPTS) -C $< -o $@
+			 
 %.$(way_)o : %.$(way_)hc 
 	$(HASKELL_PRE_COMPILE)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
