@@ -28,7 +28,7 @@ module TcGenDeriv (
 
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
-			  HsBinds(..), StmtCtxt(..),
+			  HsBinds(..), StmtCtxt(..), HsType(..),
 			  unguardedRHS, mkSimpleMatch
 			)
 import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
@@ -1083,7 +1083,9 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
-	([([VarPatIn a_RDR], HsApp tagToEnum_Expr a_Expr)])
+	[([ConPatIn mkInt_RDR [VarPatIn a_RDR]], 
+	   ExprWithTySig (HsApp tagToEnum_Expr a_Expr) 
+			 (MonoTyVar (qual_orig_name tycon)))]
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
   = mk_easy_FunMonoBind (getSrcLoc tycon) 
