@@ -31,6 +31,7 @@ import RnMonad
 
 import FiniteMap
 import PrelMods
+import PrelInfo ( main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Maybes	( maybeToBool )
@@ -523,8 +524,13 @@ exportsFromAvail :: Module
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 exportsFromAvail this_mod Nothing export_avails global_name_env
-  = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) 
-		     export_avails global_name_env
+  = exportsFromAvail this_mod true_exports export_avails global_name_env
+  where
+    true_exports = Just $ if this_mod == mAIN
+                          then [IEVar main_RDR]
+                               -- export Main.main *only* unless otherwise specified,
+                          else [IEModuleContents this_mod]
+                               -- but for all other modules export everything.
 
 exportsFromAvail this_mod (Just export_items) 
 		 (mod_avail_env, entity_avail_env)
