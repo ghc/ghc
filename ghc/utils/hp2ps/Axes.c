@@ -1,6 +1,6 @@
+#include "Main.h"
 #include <stdio.h>
 #include <string.h>
-#include "Main.h"
 #include "Curves.h"
 #include "Defines.h"
 #include "Dimensions.h"

@@ -1,7 +1,7 @@
+#include "Main.h"
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
-#include "Main.h"
 #include "Defines.h"
 #include "HpFile.h"
 #include "Scale.h"

@@ -1,7 +1,7 @@
+#include "Main.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-#include "Main.h"
 #include "Defines.h"
 #include "Shade.h"
 #include "Error.h"

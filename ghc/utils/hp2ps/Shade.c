@@ -1,7 +1,7 @@
+#include "Main.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "Main.h"
 #include "Defines.h"
 #include "Error.h"
 #include "Utilities.h"

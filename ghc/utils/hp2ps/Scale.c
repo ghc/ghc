@@ -1,6 +1,6 @@
+#include "Main.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "Main.h"
 #include "Defines.h"
 #include "Dimensions.h"
 #include "Error.h"

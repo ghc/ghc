@@ -1,7 +1,7 @@
+#include "Main.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Main.h"
 #include "Defines.h"
 #include "AuxFile.h"
 #include "AreaBelow.h"

@@ -2,6 +2,7 @@
 #define MAIN_H
 
 #include "../includes/ghcconfig.h"
+#include <stdio.h>
 
 #ifdef __STDC__
 #define PROTO(x)	x

@@ -1,7 +1,7 @@
+#include "Main.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "Main.h"
 #include "Defines.h"
 
 /* own stuff */
