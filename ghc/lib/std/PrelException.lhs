@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.11 2000/01/30 10:25:28 simonmar Exp $
+% $Id: PrelException.lhs,v 1.12 2000/03/13 10:54:49 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -38,6 +38,7 @@ data Exception
   | AssertionFailed	String		-- Assertions
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
+  | PutFullMVar				-- Put on a full MVar
   | NonTermination
 
 data ArithException
@@ -83,6 +84,7 @@ instance Show Exception where
   showsPrec _ (AssertionFailed err)      = showString err
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
 
 -- Primitives:
