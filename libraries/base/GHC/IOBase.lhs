@@ -1,14 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.8 2002/04/11 12:03:44 simonpj Exp $
-% 
-% (c) The University of Glasgow, 1994-2001
-%
-
-% Definitions for the @IO@ monad and its friends.  Everything is exported
-% concretely; the @IO@ module itself exports abstractly.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.IOBase
+-- Copyright   :  (c) The University of Glasgow 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Definitions for the 'IO' monad and its friends.
+--
+-----------------------------------------------------------------------------
 
 module GHC.IOBase where
 

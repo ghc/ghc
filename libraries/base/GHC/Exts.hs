@@ -1,14 +1,12 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Exts
--- Copyright   :  (c) The University of Glasgow 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- Copyright   :  (c) The University of Glasgow 2002
+-- License     :  see libraries/base/LICENSE
 -- 
--- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
--- Portability :  non-portable
---
--- $Id: Exts.hs,v 1.5 2002/04/24 16:31:45 simonmar Exp $
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
 --
 -- GHC Extensions: this is the Approved Way to get at GHC-specific stuff.
 --

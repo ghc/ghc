@@ -1,10 +1,17 @@
-%
-% (c) The University of Glasgow, 1997-2001
-%
-\section[GHC.Int]{Module @GHC.Int@}
-
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Int
+-- Copyright   :  (c) The University of Glasgow 1997-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The sized integral datatypes, 'Int8', 'Int16', 'Int32', and 'Int64'.
+--
+-----------------------------------------------------------------------------
 
 #include "MachDeps.h"
 
@@ -780,4 +787,3 @@ instance Ix Int64 where
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
     unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-\end{code}

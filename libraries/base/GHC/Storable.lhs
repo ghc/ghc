@@ -1,13 +1,18 @@
-% -----------------------------------------------------------------------------
-% $Id: Storable.lhs,v 1.4 2002/02/05 17:32:27 simonmar Exp $
-%
-% (c) The FFI task force, 2000
-%
-
-A class for primitive marshaling
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -monly-3-regs #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Storable
+-- Copyright   :  (c) The FFI task force, 2000-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  ffi@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'Storable' class.
+--
+-----------------------------------------------------------------------------
 
 #include "MachDeps.h"
 

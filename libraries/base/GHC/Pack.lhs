@@ -1,20 +1,23 @@
-% ------------------------------------------------------------------------------
-% $Id: Pack.lhs,v 1.2 2001/09/14 11:25:24 simonmar Exp $
-%
-% (c) The University of Glasgow, 1997-2000
-%
-
-\section[GHC.Pack]{Packing/unpacking bytes}
-
-This module provides a small set of low-level functions for packing
-and unpacking a chunk of bytes. Used by code emitted by the compiler
-plus the prelude libraries.
-
-The programmer level view of packed strings is provided by a GHC
-system library PackedString.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Pack
+-- Copyright   :  (c) The University of Glasgow 1997-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- This module provides a small set of low-level functions for packing
+-- and unpacking a chunk of bytes. Used by code emitted by the compiler
+-- plus the prelude libraries.
+-- 
+-- The programmer level view of packed strings is provided by a GHC
+-- system library PackedString.
+--
+-----------------------------------------------------------------------------
 
 module GHC.Pack
        (

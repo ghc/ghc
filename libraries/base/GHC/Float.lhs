@@ -1,23 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Float.lhs,v 1.5 2002/02/27 14:33:09 simonmar Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Num]{Module @GHC.Num@}
-
-The types
-
-	Float
-	Double
-
-and the classes
-
-	Floating
-	RealFloat
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Float
+-- Copyright   :  (c) The University of Glasgow 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The types 'Float' and 'Double', and the classes 'Floating' and 'RealFloat'.
+--
+-----------------------------------------------------------------------------
 
 #include "ieee-flpt.h"
 

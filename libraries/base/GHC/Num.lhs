@@ -1,22 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Num.lhs,v 1.4 2002/02/05 17:32:26 simonmar Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Num]{Module @GHC.Num@}
-
-The class
-
-	Num
-
-and the type
-
-	Integer
-
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Num
+-- Copyright   :  (c) The University of Glasgow 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'Num' class and the 'Integer' type.
+--
+-----------------------------------------------------------------------------
 
 #include "MachDeps.h"
 #if SIZEOF_HSWORD == 4

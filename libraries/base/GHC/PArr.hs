@@ -1,12 +1,16 @@
 {-# OPTIONS -fparr #-}
 
---  $Id: PArr.hs,v 1.2 2002/02/12 10:50:37 simonmar Exp $
---
---  Copyright (c) [2001..2002] Manuel M T Chakravarty & Gabriele Keller
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.PArr
+-- Copyright   :  (c) 2001-2002 Manuel M T Chakravarty & Gabriele Keller
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  Manuel M. T. Chakravarty <chak@cse.unsw.edu.au>
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
 --
 --  Basic implementation of Parallel Arrays.
---
---- DESCRIPTION ---------------------------------------------------------------
 --
 --  This module has two functions: (1) It defines the interface to the
 --  parallel array extension of the Prelude and (2) it provides a vanilla

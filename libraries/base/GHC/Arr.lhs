@@ -1,18 +1,18 @@
-% -----------------------------------------------------------------------------
-% $Id: Arr.lhs,v 1.3 2002/04/01 09:19:18 simonpj Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Arr]{Module @GHC.Arr@}
-
-Array implementation, @GHC.Arr@ exports the basic array
-types and operations.
-
-For byte-arrays see @GHC.ByteArr@.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Arr
+-- Copyright   :  (c) The University of Glasgow, 1994-2000
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- GHC's array implementation.
+-- 
+-----------------------------------------------------------------------------
 
 module GHC.Arr where
 

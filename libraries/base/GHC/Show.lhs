@@ -1,14 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Show.lhs,v 1.5 2002/04/11 12:03:44 simonpj Exp $
-%
-% (c) The University of Glasgow, 1992-2000
-%
-
-\section{Module @GHC.Show@}
-
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Show
+-- Copyright   :  (c) The University of Glasgow, 1992-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'Show' class, and related operations.
+--
+-----------------------------------------------------------------------------
 
 module GHC.Show
 	(

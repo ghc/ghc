@@ -2,11 +2,19 @@
 
 #undef DEBUG_DUMP
 
--- -----------------------------------------------------------------------------
--- $Id: IO.hs,v 1.6 2002/03/18 14:03:20 simonmar Exp $
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.IO
+-- Copyright   :  (c) The University of Glasgow, 1992-2001
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
 --
--- (c) The University of Glasgow, 1992-2001
+-- String I\/O functions
 --
+-----------------------------------------------------------------------------
 
 module GHC.IO ( 
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,

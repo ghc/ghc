@@ -1,10 +1,4 @@
-% -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.8 2002/04/24 16:10:21 simonmar Exp $
-%
-% (c) The University of Glasgow, 1992-2002
-%
 \section[GHC.Base]{Module @GHC.Base@}
-
 
 The overall structure of the GHC Prelude is a bit tricky.
 
@@ -71,9 +65,21 @@ GHC.ByteArr	Types: ByteArray, MutableByteArray
 
 Other Prelude modules are much easier with fewer complex dependencies.
 
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Base
+-- Copyright   :  (c) The University of Glasgow, 1992-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- Basic data types and classes.
+-- 
+-----------------------------------------------------------------------------
 
 #include "MachDeps.h"
 

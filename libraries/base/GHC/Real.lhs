@@ -1,25 +1,19 @@
-% ------------------------------------------------------------------------------
-% $Id: Real.lhs,v 1.3 2002/02/12 15:51:26 simonmar Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Real]{Module @GHC.Real@}
-
-The types
-
-	Ratio, Rational
-
-and the classes
-
-	Real
-	Integral
-	Fractional
-	RealFrac
-
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Real
+-- Copyright   :  (c) The FFI Task Force, 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The types 'Ratio' and 'Rational', and the classes 'Real', 'Fractional',
+-- 'Integral', and 'RealFrac'.
+--
+-----------------------------------------------------------------------------
 
 module GHC.Real where
 

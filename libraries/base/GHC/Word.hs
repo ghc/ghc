@@ -1,10 +1,18 @@
-%
-% (c) The University of Glasgow, 1997-2001
-%
-\section[GHC.Word]{Module @GHC.Word@}
-
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Word
+-- Copyright   :  (c) The University of Glasgow, 1997-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Sized unsigned integral types: 'Word', 'Word8', 'Word16', 'Word32', and
+-- 'Word64'.
+--
+-----------------------------------------------------------------------------
 
 #include "MachDeps.h"
 
@@ -880,4 +888,3 @@ instance Ix Word64 where
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
-\end{code}

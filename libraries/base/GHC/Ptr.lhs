@@ -1,12 +1,19 @@
------------------------------------------------------------------------------
--- $Id: Ptr.lhs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
--- 
--- (c) The FFI Task Force, 2000
--- |
--- Module GHC.Ptr
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Ptr
+-- Copyright   :  (c) The FFI Task Force, 2000-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  ffi@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'Ptr' and 'FunPtr' types and operations.
+--
+-----------------------------------------------------------------------------
+
 module GHC.Ptr where
 
 import GHC.Base

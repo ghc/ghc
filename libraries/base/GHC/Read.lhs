@@ -1,15 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Read.lhs,v 1.6 2002/04/13 14:59:06 panne Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Read]{Module @GHC.Read@}
-
-Instances of the Read class.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Read
+-- Copyright   :  (c) The FFI Task Force, 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'Read' class and instances for basic data types.
+--
+-----------------------------------------------------------------------------
 
 module GHC.Read 
   ( Read(..)   -- class

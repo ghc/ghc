@@ -1,13 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.3 2002/02/05 17:32:26 simonmar Exp $
-%
-% (c) The University of Glasgow, 1998-2000
-%
-
-Exceptions and exception-handling functions.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Exception
+-- Copyright   :  (c) The University of Glasgow, 1998-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- Exceptions and exception-handling functions.
+-- 
+-----------------------------------------------------------------------------
 
 #ifndef __HUGS__
 module GHC.Exception 

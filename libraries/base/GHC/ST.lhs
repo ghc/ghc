@@ -1,13 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: ST.lhs,v 1.2 2001/12/21 15:07:25 simonmar Exp $
-%
-% (c) The University of Glasgow, 1992-2000
-%
-
-\section[GHC.ST]{The @ST@ monad}
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.ST
+-- Copyright   :  (c) The University of Glasgow, 1992-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The 'ST' Monad.
+--
+-----------------------------------------------------------------------------
 
 module GHC.ST where
 

@@ -1,23 +1,20 @@
--- -----------------------------------------------------------------------------
--- $Id: TopHandler.lhs,v 1.6 2002/03/11 14:53:51 simonmar Exp $
---
--- (c) The University of Glasgow, 2001
---
--- GHC.TopHandler
---
--- 'Top-level' IO actions want to catch exceptions (e.g., forkIO and 
--- GHC.Main.mainIO) and report them - topHandler is the exception
--- handler they should use for this:
-
--- make sure we handle errors while reporting the error!
--- (e.g. evaluating the string passed to 'error' might generate
---  another error, etc.)
-
--- These functions can't go in GHC.Main, because GHC.Main isn't
--- included in HSstd.o (because GHC.Main depends on Main, which
--- doesn't exist yet...).
-
 \begin{code}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.TopHandler
+-- Copyright   :  (c) The University of Glasgow, 2001-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Top-level IO actions want to catch exceptions (e.g., 'forkIO' and 
+-- 'GHC.Main.mainIO') and report them - 'topHandler' is the exception
+-- handler they should use for this.
+--
+-----------------------------------------------------------------------------
+
 module GHC.TopHandler (
    runMain, reportStackOverflow, reportError 
   ) where
@@ -38,6 +35,10 @@ runMain main = catchException (main >> return ()) topHandler
 topHandler :: Exception -> IO ()
 topHandler err = catchException (real_handler err) topHandler
 
+-- Make sure we handle errors while reporting the error!
+-- (e.g. evaluating the string passed to 'error' might generate
+--  another error, etc.)
+--
 real_handler :: Exception -> IO ()
 real_handler ex =
   case ex of

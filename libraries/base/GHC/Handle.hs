@@ -3,12 +3,19 @@
 #undef DEBUG_DUMP
 #undef DEBUG
 
--- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.6 2002/03/26 17:06:32 simonmar Exp $
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Handle
+-- Copyright   :  (c) The University of Glasgow, 1994-2001
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
 --
--- (c) The University of Glasgow, 1994-2001
+-- This module defines the basic operations on I\/O \"handles\".
 --
--- This module defines the basic operations on I/O "handles".
+-----------------------------------------------------------------------------
 
 module GHC.Handle (
   withHandle, withHandle', withHandle_,

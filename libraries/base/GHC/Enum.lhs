@@ -1,21 +1,24 @@
-% -----------------------------------------------------------------------------
-% $Id: Enum.lhs,v 1.7 2002/02/05 17:32:26 simonmar Exp $
-%
-% (c) The University of Glasgow, 1992-2000
-%
-
-\section[GHC.Bounded]{Module @GHC.Bounded@}
-
-Instances of Bounded for various datatypes.
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Enum
+-- Copyright   :  (c) The University of Glasgow, 1992-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- The 'Enum' and 'Bounded' classes.
+-- 
+-----------------------------------------------------------------------------
 
 module GHC.Enum(
 	Bounded(..), Enum(..),
 	boundedEnumFrom, boundedEnumFromThen,
 
-	-- Instances for Bounded and Eum: (), Char, Int
+	-- Instances for Bounded and Enum: (), Char, Int
 
    ) where
 

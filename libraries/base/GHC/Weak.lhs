@@ -1,13 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: Weak.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
-%
-% (c) The University of Glasgow, 1998-2000
-%
-
-\section[GHC.Weak]{Module @GHC.Weak@}
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Weak
+-- Copyright   :  (c) The University of Glasgow, 1998-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Weak pointers.
+--
+-----------------------------------------------------------------------------
 
 module GHC.Weak where
 

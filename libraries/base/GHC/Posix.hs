@@ -1,12 +1,21 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
--- ---------------------------------------------------------------------------
--- $Id: Posix.hs,v 1.6 2002/03/26 10:53:03 simonmar Exp $
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Posix
+-- Copyright   :  (c) The University of Glasgow, 1992-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
 --
 -- POSIX support layer for the standard libraries
 --
 -- Non-posix compliant in order to support the following features:
 --	* S_ISSOCK (no sockets in POSIX)
+--
+-----------------------------------------------------------------------------
 
 module GHC.Posix where
 

@@ -1,15 +1,18 @@
-% ------------------------------------------------------------------------------
-% $Id: List.lhs,v 1.6 2002/02/05 17:32:26 simonmar Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.List]{Module @GHC.List@}
-
-The List data type and its operations
-
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.List
+-- Copyright   :  (c) The University of Glasgow 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- The List data type and its operations
+--
+-----------------------------------------------------------------------------
 
 module GHC.List (
    [] (..),

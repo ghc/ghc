@@ -1,15 +1,17 @@
-% -----------------------------------------------------------------------------
-% $Id: Conc.lhs,v 1.4 2002/04/10 11:43:49 stolz Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\section[GHC.Conc]{Module @GHC.Conc@}
-
-Basic concurrency stuff
-
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Conc
+-- Copyright   :  (c) The University of Glasgow, 1994-2002
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- Basic concurrency stuff.
+-- 
+-----------------------------------------------------------------------------
 
 module GHC.Conc
 	( ThreadId(..)
