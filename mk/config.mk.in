@@ -759,7 +759,6 @@ HavePosixRegex  = @HavePosixRegex@
 # GTK+
 
 GTK_CONFIG		= @GTK_CONFIG@
-GTK_VERSION		= @GTK_VERSION@
 
 #-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)
