@@ -46,6 +46,10 @@ import Util		( thenCmp )
 import Ratio 		( numerator, denominator )
 import FastString	( uniqueOfFS )
 import Char		( ord )
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 
