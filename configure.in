@@ -598,6 +598,9 @@ AC_C_PROTOTYPES
 
 dnl ** are we big endian?
 AC_C_BIGENDIAN
+# Allay users' general fear of warnings of any kind.
+errprint((fptools configure script wizard sez: "don't worry, the above warning is harmless (to us.)")
+)
 
 dnl ** determine the return type of signal()
 AC_TYPE_SIGNAL
