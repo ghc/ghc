@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/12/20 16:55:27 $
+ * $Revision: 1.19 $
+ * $Date: 2000/02/24 14:05:55 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -942,7 +942,7 @@ void gcCStack() {
 Void gcCStack() {                       /* Garbage collect elements off    */
     Cell stackTop = NIL;                /* C stack                         */
     Cell *ptr = &stackTop;
-#if SIZEOF_INTP == 2
+#if SIZEOF_VOID_P == 2
     if (((long)(ptr) - (long)(CStackBase))&1)
         fatal("gcCStack");
 #elif STACK_ALIGNMENT == 2 /* eg Macintosh 68000 */
@@ -972,7 +972,7 @@ Void gcCStack() {                       /* Garbage collect elements off    */
     GuessDirection;
 #endif
 
-#if SIZEOF_INTP==4 && STACK_ALIGNMENT == 2 /* eg Macintosh 68000 */
+#if SIZEOF_VOID_P==4 && STACK_ALIGNMENT == 2 /* eg Macintosh 68000 */
     ptr = (Cell *)((long)(&stackTop) + 2);
     StackGrowsDown;
 #endif

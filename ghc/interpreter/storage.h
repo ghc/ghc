@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.26 $
- * $Date: 2000/02/15 13:16:20 $
+ * $Revision: 1.27 $
+ * $Date: 2000/02/24 14:05:55 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -300,7 +300,8 @@ extern  Ptr             cptrOf          Args((Cell));
 #define DICTAP       80           /* DICTAP     snd :: (QClassId,[Type])   */
 #define UNBOXEDTUP   81           /* UNBOXEDTUP snd :: [Type]              */
 
-#if SIZEOF_INTP != SIZEOF_INT
+#if SIZEOF_VOID_P != SIZEOF_INT
+wuiwiuwuiwmn SIZEOF_INT cc
 #define PTRCELL      82           /* C Heap Pointer snd :: (Int,Int)       */
 #endif
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.11 2000/02/15 13:16:20 sewardj Exp $
+ * $Id: StgCRun.c,v 1.12 2000/02/24 14:05:55 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -38,7 +38,7 @@
 
 static jmp_buf jmp_environment;
 
-#if 0
+#if 1
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {

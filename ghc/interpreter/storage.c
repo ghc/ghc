@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.43 $
- * $Date: 2000/02/15 13:16:20 $
+ * $Revision: 1.44 $
+ * $Date: 2000/02/24 14:05:55 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2441,7 +2441,7 @@ Int n; {
            : pair(INTCELL,n);
 }
 
-#if SIZEOF_INTP == SIZEOF_INT
+#if SIZEOF_VOID_P == SIZEOF_INT
 typedef union {Int i; Ptr p;} IntOrPtr;
 Cell mkPtr(p)
 Ptr p;
@@ -2475,7 +2475,7 @@ Cell c;
     x.i = snd(c);
     return x.p;
 }
-#elif SIZEOF_INTP == 2*SIZEOF_INT
+#elif SIZEOF_VOID_P == 2*SIZEOF_INT
 typedef union {struct {Int i1; Int i2;} i; Ptr p;} IntOrPtr;
 Cell mkPtr(p)
 Ptr p;
