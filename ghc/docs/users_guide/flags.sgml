@@ -1536,7 +1536,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-fno-method-sharing</option></entry>
-	      <entry>???</entry>
+	      <entry>Don't share specialisations of overloaded functions</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
