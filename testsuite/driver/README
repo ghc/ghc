@@ -16,4 +16,15 @@ the variable values automatically available are
   $conffile     fancyconfig.T
   $testdir      path/to/testdir
   $testroot     script
+  $testfile     script.T
+
+However, if it was using default.T as the test file and xyz.hs
+as the source file, these would be:
+
+  $tool         compiler/to/test/ghc-inplace
+  $confdir      foo/bar
+  $conffile     fancyconfig.T
+  $testdir      path/to/testdir
+  $testroot     xyz
+  $testfile     default.T
 

@@ -60,7 +60,7 @@ def guess_compiler_flags()
 {
    if   $tool contains "ghc"
    then 
-        return "-no-recomp"
+        return "-no-recomp -dcore-lint"
    else 
    if   $tool contains "nhc"
    then 
@@ -101,7 +101,7 @@ def simple_build_Main ( $_extra_args )
 -- from /dev/null.  Route output to testname.run.stdout and 
 -- testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run_main()
+def simple_run_main( $_extra_args )
 {
    $devnull = "/dev/null"
    $spec_stdin = qualify("stdin")
@@ -113,6 +113,7 @@ def simple_run_main()
    rm_or_fail($run_stdout)
    rm_or_fail($run_stderr)
    $cmd = qualify("") 
+          ++ " " ++ $_extra_args
           ++ " < " ++ $use_stdin
           ++ " > " ++ $run_stdout
           ++ " 2> " ++ $run_stderr
@@ -145,7 +146,7 @@ def check_stdout_ok()
 
    -- check for minimal level of sanity
    if   not ( exists($s_stdout) && exists($r_stdout) )
-   then framefail "vanilla-test: can't see a spec'd or run stdout missing"
+   then framefail "vanilla-test: .stdout and/or .run.stdout are missing"
    fi
 
    return
@@ -187,9 +188,11 @@ def check_stderr_ok()
 def vanilla-test ()
 {
    pretest_cleanup()
-   simple_build_Main( $extra_args )
-   $res = simple_run_main()
-   if $res /= "0" then framefail "vanilla-test: non-zero exit code from testee" fi
+   simple_build_Main( $extra_compile_args )
+   $res = simple_run_main( $extra_run_args )
+   if   $res /= "0" && $res /= $allowable_nonzero_exit_code
+   then framefail "vanilla-test: unexpected exit code from testee" 
+   fi
    $test_passed = check_stdout_ok() && check_stderr_ok()
 }
 

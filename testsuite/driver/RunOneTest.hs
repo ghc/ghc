@@ -1,5 +1,5 @@
 
-module RunOneTest ( run_one_test, splitPathname )
+module RunOneTest ( OneTest(..), t_root_of, run_one_test, splitPathname )
 where
 
 import CmdSyntax
@@ -7,6 +7,30 @@ import CmdSemantics
 import Directory
 import Monad	( when )
 import System	( ExitCode(..) )
+
+data OneTest
+   -- Exactly using the specified .T file
+   = Precisely FilePath
+   -- Using the specified .T file, but the supplied testroot
+   | Defaulted FilePath String
+     deriving Eq
+
+instance Show OneTest where
+   show ot@(Precisely t_file) = t_file
+   show ot@(Defaulted t_file basename)
+      = t_file ++ "(" ++ t_root_of ot ++ ")"
+
+-- Get the name of the .T file to use
+t_file_of (Precisely t_file) = t_file
+t_file_of (Defaulted t_file basename) = t_file
+
+-- Get the name of the test root
+t_root_of (Precisely t_file) 
+   = case splitPathname3 t_file of (dir, root, ext) -> root
+t_root_of (Defaulted t_file basefile) 
+   = case splitPathname3 basefile of (dir, root, ext) -> root
+
+
 
 -- This function should always return, no matter how disastrously
 -- things go.  If things go badly wrong, ie the test dir does not
@@ -23,37 +47,35 @@ import System	( ExitCode(..) )
 --       which the testconfig.T file says should happen, the second
 --       is what actually happened.
 
-run_one_test :: FilePath	-- path to the .T file
+run_one_test :: OneTest
              -> [(Var, String)]	-- default var bindings
 		-- containing at least $tool, $confdir, $conffile
              -> IO (Maybe (Result, Result))
-run_one_test test_path p_default
+run_one_test test_descr p_default
    = do { putStr "\n"
-        ; officialMsg ("====== " ++ test_path ++ " ======")
-        ; t_exists <- doesFileExist test_path
+        ; officialMsg ("====== " ++ show test_descr ++ " ======")
+        ; let t_file_path = t_file_of test_descr
+        ; let t_root      = t_root_of test_descr
+        ; t_exists <- doesFileExist t_file_path
         ; if    not t_exists 
-           then do officialMsg ("test file `" ++ test_path ++ 
+           then do officialMsg ("test file `" ++ t_file_path ++ 
                                 "' doesn't exist.")
                    return Nothing
            else 
 
-     do { let (test_dir, test_file) = splitPathname test_path
-        ; let p_init = p_default ++ [("testdir",  test_dir),
-                                     ("testroot", rdrop2 test_file)]
+     do { let (t_file_dir, t_file_name) = splitPathname t_file_path
+        ; let p_init = p_default 
+                       ++ [("testdir",  t_file_dir),
+                           ("testroot", t_root),
+                           ("testfile", t_file_name)]
         ; let tds = [mkInclude (EVar "confdir") (EVar "conffile"),
-                     mkInclude (EVar "testdir") 
-                               (EOp OpAppend (EVar "testroot") (EString ".T"))]
+                     mkInclude (EVar "testdir") (EVar "testfile")]
         -- ; print (show tds, show p_init)
-        ; doEval test_dir p_init tds
+        ; doEval t_file_dir p_init tds
      }}
      where
         mkInclude dir file 
            = TInclude (EOp OpAppend dir (EOp OpAppend (EString "/") file))
-        rdrop2 t_file_name
-           | take 2 (reverse t_file_name) == "T."
-           = take (length t_file_name - 2) t_file_name
-           | otherwise
-           = panic "rdrop2"
 
 
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy.ext")
@@ -67,3 +89,13 @@ splitPathname full
      in  if null p_r then (".", reverse f_r)
                      else (reverse p_r, reverse f_r)
 
+
+-- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")
+splitPathname3 full
+   = let (dir, base_and_ext) = splitPathname full
+     in  if '.' `elem` base_and_ext
+         then let r_bande = reverse base_and_ext
+                  r_ext = takeWhile (/= '.') r_bande
+                  r_root = drop (1 + length r_ext) r_bande
+              in  (dir, reverse r_root, reverse r_ext)
+         else (dir, base_and_ext, "")

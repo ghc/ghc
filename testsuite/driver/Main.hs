@@ -1,14 +1,16 @@
 
 module Main where
 
-import RunOneTest 	( run_one_test, splitPathname )
+import RunOneTest 	( OneTest(..), t_root_of, run_one_test, splitPathname )
 import CmdSyntax	( Var, Result(..), Expr(..), officialMsg, panic )
 import Directory
 import System
 import List
 
+--import IOExts(trace)
+
 findTests :: FilePath        -- name of root dir of tests
-          -> IO [FilePath]   -- paths to all files matching "*.T"
+          -> IO [OneTest]    -- descriptions of all tests to run
 
 findTests root_in
    = snarf ((reverse . dropWhile (== '/') . reverse) root_in)
@@ -30,9 +32,13 @@ findTests root_in
                 tagged_contents <- mapM tag_subdir dir_contents
                 --print tagged_contents
                 let tests_in_this_dir
-                       = [ scrub (this_dir++"/"++f) 
-                         | (False, f) <- tagged_contents, 
-                           take 2 (reverse f) == "T." ]
+                       = mk_tests_in_this_dir
+                            this_dir
+                            [f | (False, f) <- tagged_contents,
+                                 f `hasSuffix` ".T"]
+                            [f | (False, f) <- tagged_contents,
+                                 any (f `hasSuffix`) [".hs"]]
+                --print tests_in_this_dir
                 let subdir_names
                        = [ f | (True, f) <- tagged_contents ]
                 subdir_testss
@@ -41,21 +47,59 @@ findTests root_in
                        = tests_in_this_dir ++ concat subdir_testss
                 return subdir_tests
 
-        -- (eg)   "tests/./test1/run.stderr"  -->  "tests/test1/run.stderr"
-        scrub :: String -> String
-        scrub []               = []
-        scrub ('/':'.':'/':cs) = '/':scrub cs
-        scrub (c:cs)           = c : scrub cs
+hasSuffix :: String -> String -> Bool
+hasSuffix str suff 
+   = let r_suff = reverse suff
+         r_str  = reverse str
+     in  r_suff == take (length r_suff) r_str
+    
 
+-- (eg)   "tests/./test1/run.stderr"  -->  "tests/test1/run.stderr"
+scrub :: String -> String
+scrub []               = []
+scrub ('/':'.':'/':cs) = scrub ('/':cs)
+scrub (c:cs)           = c : scrub cs
+
+
+mk_tests_in_this_dir :: FilePath -> [String] -> [String] -> [OneTest]
+mk_tests_in_this_dir this_dir tfiles srcs
+   | "default.T" `notElem` tfiles
+   = map (Precisely . mkFullPath) tfiles
+   | otherwise
+   = -- Precisely of all T files, except default.T
+     --    and Default for all sources which don't have a 
+     --    corresponding T file
+     let all_ts_except = filter (/= "default.T") tfiles
+         precisely = map (Precisely . mkFullPath) all_ts_except
+         all_ts_except_roots = map getRoot all_ts_except
+         unescorted_sources
+             = filter (\src -> getRoot src `notElem` all_ts_except_roots) srcs
+         defaulted = map (Defaulted (mkFullPath "default.T")) unescorted_sources
+     in
+         --trace ("srcs = " ++ show srcs ++ "\n"
+         --       ++ "ue srcs = " ++ show unescorted_sources ++ "\n"
+         --       ++ "a_t_exc = " ++ show all_ts_except_roots) 
+         (sortBy cmp_rootname (defaulted ++ precisely))
+     where
+        getRoot str 
+           | '.' `elem` str 
+           = (reverse . drop 1 . dropWhile (/= '.') . reverse) str
+           | otherwise
+           = panic "Main.mk_tests_in_this_dir.getRoot"
+
+        mkFullPath str
+           = scrub (this_dir ++ "/" ++ str)
+
+        cmp_rootname td1 td2 = compare (t_root_of td1) (t_root_of td2)
 
 run_multiple_tests :: [(Var,String)] 		-- default var binds
-                   -> [FilePath] 		-- paths to test dirs
-                   -> IO [(FilePath, 
+                   -> [OneTest] 		-- paths to test dirs
+                   -> IO [(OneTest, 
                            Maybe (Result, Result))]
-run_multiple_tests base_varenv dirs_containing_tests
-   = mapM f dirs_containing_tests
-     where f a_dir = do res <- run_one_test a_dir base_varenv
-                        return (a_dir, res)
+run_multiple_tests base_varenv tests_to_run
+   = mapM f tests_to_run
+     where f a_test = do res <- run_one_test a_test base_varenv
+                         return (a_test, res)
 
 
 usage
@@ -97,7 +141,8 @@ main_really arg_ws0
      do { all_tests <- findTests root_dir
         ; putStr "\n"
         ; officialMsg ("Found " ++ show (length all_tests) ++ " tests:")
-        ; putStrLn (unlines all_tests)
+        ; putStr "\n"
+        ; putStrLn (unlines (map show all_tests))
         ; all_results <- run_multiple_tests base_varenv all_tests
         ; putStr "\n"
         ; officialMsg ("All done.")
@@ -109,7 +154,7 @@ main_really arg_ws0
 
 
 -- Summarise overall outcome
-executive_summary :: [(FilePath, Maybe (Result, Result))] -> String
+executive_summary :: [(OneTest, Maybe (Result, Result))] -> String
 executive_summary outcomes
    = let n_cands    = length outcomes
          meta_fails = filter is_meta_fail outcomes
@@ -161,10 +206,11 @@ executive_summary outcomes
             = ""
             | otherwise
             = "\nThe following tests had framework failures:\n"
-              ++ unlines (map (("   "++).fst) meta_fails)
+              ++ unlines (map (("   "++).show.fst) meta_fails)
 
-         ppTest (dir, Just (exp,act))
-             = "   exp:" ++ show exp ++ ", act:" ++ show act ++ "    " ++ dir
+         ppTest (test, Just (exp,act))
+             = "   exp:" ++ show exp ++ ", act:" ++ show act 
+               ++ "    " ++ show test
 
          is_meta_fail (_, Nothing) = True
          is_meta_fail other        = False
