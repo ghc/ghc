@@ -187,7 +187,7 @@ new
 
 new cmp hash_fn = do
   -- make a new hash table with a single, empty, segment
-  dir     <- newIOArray (0,dIR_SIZE) undefined
+  dir     <- newIOArray (0,dIR_SIZE-1) undefined
   segment <- newIOArray (0,sEGMENT_SIZE-1) []
   myWriteArray dir 0 segment
 
@@ -271,9 +271,15 @@ expandHashTable
       newsegment = newbucket `shiftR` sEGMENT_SHIFT
       newindex   = newbucket .&. sEGMENT_MASK
   --
+  if newsegment >= dIR_SIZE	-- make sure we don't overflow the table.
+	then return table
+	else do
+  --
   when (newindex == 0) $
 	do segment <- newIOArray (0,sEGMENT_SIZE-1) []
-	   myWriteArray dir newsegment segment
+	   writeIOArray dir newsegment segment
+	   -- doesn't happen very often, so we might as well use a safe
+	   -- array index here.
   --
   let table' =
   	if (split+1) < max
