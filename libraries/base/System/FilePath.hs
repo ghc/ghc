@@ -26,6 +26,7 @@ module System.FilePath
          , changeFileExt
          , isRootedPath
          , isAbsolutePath
+         , dropAbsolutePrefix
 
          , pathParents
          , commonParent
@@ -227,6 +228,17 @@ isAbsolutePath (_:':':c:_) | isPathSeparator c = True
 isAbsolutePath (c:_)       | isPathSeparator c = True
 #endif
 isAbsolutePath _ = False
+
+-- | If the function is applied to an absolute path then it returns a local path droping
+-- the absolute prefix in the path. Under Windows the prefix is \"\\\", \"c:\" or \"c:\\\". Under
+-- Unix the prefix is always \"/\".
+dropAbsolutePrefix :: FilePath -> FilePath
+dropAbsolutePrefix (c:cs) | isPathSeparator c = cs
+#ifdef mingw32_TARGET_OS
+dropAbsolutePrefix (_:':':c:cs) | isPathSeparator c = cs  -- path with drive letter
+dropAbsolutePrefix (_:':':cs)                       = cs
+#endif
+dropAbsolutePrefix cs = cs
 
 -- | Gets this path and all its parents.
 -- The function is useful in case if you want to create 
