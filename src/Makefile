@@ -19,7 +19,7 @@ else
 SRC_HC_OPTS += -package data -package text -package util -package net
 endif
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(Windows)" "YES"
 HS_PROG_EXT = .exe
 else
 HS_PROG_EXT = .bin
@@ -84,7 +84,11 @@ INTERP=$(SHELL)
 
 SCRIPT_SUBST_VARS = HADDOCKLIB HADDOCKBIN
 
+# The script isn't installed on Windows; we run the binary directly
+ifeq "$(Windows)" "NO"
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
+endif
+
 INSTALL_LIBEXECS = $(HS_PROG)
 
 # don't recurse on 'make install'

@@ -161,10 +161,11 @@ run flags files = do
 			(t:_) -> Just t
 
   libdir <- case [str | Flag_Lib str <- flags] of
-		[] -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
+		[] -> do maybe_exec_dir <- getBaseDir
+				-- Get directory of executable
 			 case maybe_exec_dir of
                                        Nothing  -> return "."
-                                       Just dir -> return (dir ++ "\\imports")
+                                       Just dir -> return dir
 		fs -> return (last fs)
 
   let css_file = case [str | Flag_CSS str <- flags] of
