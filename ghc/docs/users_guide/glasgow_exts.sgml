@@ -2175,9 +2175,27 @@ and brings into scope the type variable <literal>b</literal>.
 
 <listitem>
 <para>
- The type variables thus brought into scope may be mentioned
-in ordinary type signatures or pattern type signatures anywhere within
-their scope.
+The type variable(s) bound by the pattern have the same scope
+as the term variable(s) bound by the pattern.  For example:
+<programlisting>
+  let
+    f (x::a) = <...rhs of f...>
+    (p::b, q::b) = (1,2)
+  in <...body of let...>
+</programlisting>
+Here, the type variable <literal>a</literal> scopes over the right hand side of <literal>f</literal>,
+just like <literal>x</literal> does; while the type variable <literal>b</literal> scopes over the
+body of the <literal>let</literal>, and all the other definitions in the <literal>let</literal>,
+just like <literal>p</literal> and <literal>q</literal> do.
+</para>
+</listitem>
+
+
+<listitem>
+<para>
+The type variables bound by the pattern may be 
+mentioned in ordinary type signatures or pattern 
+type signatures anywhere within their scope.
 
 </para>
 </listitem>
@@ -2210,11 +2228,26 @@ and that is an incorrect typing.
 
 <listitem>
 <para>
- There is no implicit universal quantification on pattern type
-signatures, nor may one write an explicit <literal>forall</literal> type in a pattern
-type signature.  The pattern type signature is a monotype.
-
+The pattern type signature is a monotype:
 </para>
+
+<itemizedlist>
+<listitem> <para> 
+A pattern type signature cannot contain any explicit <literal>forall</literal> quantification.
+</para> </listitem>
+
+<listitem>  <para> 
+The type variables bound by a pattern type signature can only be instantiated to monotypes,
+not to type schemes.
+</para> </listitem>
+
+<listitem>  <para> 
+There is no implicit universal quantification on pattern type signatures (in contrast to
+ordinary type signatures).
+</para> </listitem>
+
+</itemizedlist>
+
 </listitem>
 
 <listitem>
@@ -2292,8 +2325,7 @@ Result type signatures are not yet implemented in Hugs.
 <title>Where a pattern type signature can occur</title>
 
 <para>
-A pattern type signature can occur in any pattern, but there
-are restrictions on pattern bindings:
+A pattern type signature can occur in any pattern.  For example:
 <itemizedlist>
 
 <listitem>
@@ -2374,56 +2406,31 @@ For example:
 <listitem>
 
 <para>
-Pattern type signatures that bind new type variables
-may not be used in pattern bindings at all.
-So this is illegal:
-
+Pattern type signatures 
+can be used in pattern bindings:
 
 <programlisting>
   f x = let (y, z::a) = x in ...
+  f1 x                = let (y, z::Int) = x in ...
+  f2 (x::(Int,a))     = let (y, z::a)   = x in ...
+  f3 :: (b->b)        = \x -> x
 </programlisting>
 
-
-But these are OK, because they do not bind fresh type variables:
-
-
+In all such cases, the binding is not generalised over the pattern-bound
+type variables.  Thus <literal>f3</literal> is monomorphic; <literal>f3</literal>
+has type <literal>b -&gt; b</literal> for some type <literal>b</literal>, 
+and <emphasis>not</emphasis> <literal>forall b. b -&gt; b</literal>.
+In contrast, the binding
 <programlisting>
-  f1 x            = let (y, z::Int) = x in ...
-  f2 (x::(Int,a)) = let (y, z::a)   = x in ...
+  f4 :: b->b
+  f4 = \x -> x
 </programlisting>
-
-
-However a single variable is considered a degenerate function binding,
-rather than a degerate pattern binding, so this is permitted, even
-though it binds a type variable:
-
-
-<programlisting>
-  f :: (b->b) = \(x::b) -> x
-</programlisting>
-
+makes a polymorphic function, but <literal>b</literal> is not in scope anywhere
+in <literal>f4</literal>'s scope.
 
 </para>
 </listitem>
-
 </itemizedlist>
-
-Such degnerate function bindings do not fall under the monomorphism
-restriction.  Thus:
-</para>
-
-<para>
-
-<programlisting>
-  g :: a -> a -> Bool = \x y. x==y
-</programlisting>
-
-</para>
-
-<para>
-Here <function>g</function> has type <literal>forall a. Eq a =&gt; a -&gt; a -&gt; Bool</literal>, just as if
-<function>g</function> had a separate type signature.  Lacking a type signature, <function>g</function>
-would get a monomorphic type.
 </para>
 
 </sect2>
