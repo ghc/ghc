@@ -456,9 +456,12 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	    	    body 	      = mkVarApps (mkVarApps (Var the_arg_id) field_tyvars) field_dict_ids
 	    	    strict_marks      = dataConStrictMarks data_con
 	    	    (expr, real_args) = rebuildConArgs data_con arg_ids strict_marks body
-						       (length arg_ids + 1)
+						       unpack_base
 	where
             arg_ids = mkTemplateLocalsNum field_base (dataConInstOrigArgTys data_con tyvar_tys)
+
+	    unpack_base = field_base + length arg_ids
+
 				-- arity+1 avoids all shadowing
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
