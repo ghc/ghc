@@ -158,7 +158,7 @@ P_ frame;
 		    /* Urgh.  Two queues.  Merge them. */
 		    P_ tso = (P_) BQ_ENTRIES(updatee_keep);
 
-		    while (TSO_LINK(tso) != Prelude_Z91Z93_closure)
+		    while (TSO_LINK(tso) != PrelBase_Z91Z93_closure)
 			tso = TSO_LINK(tso);
 
 		    TSO_LINK(tso) = (P_) BQ_ENTRIES(updatee_bypass);
