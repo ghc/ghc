@@ -26,7 +26,7 @@ import Type		( Kind, openTypeKind, liftedTypeKind,
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), PackageInstEnv,
-			  TyThing(..), implicitTyThings, 
+			  TyThing(..), implicitTyThings, typeEnvIds,
 			  ModIface(..), ModDetails(..), InstPool, 
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
@@ -445,10 +445,6 @@ loadImportedInsts cls tys
 	; let { (inst_pool', iface_insts) 
 		    = selectInsts (eps_insts eps) cls_gate tc_gates }
 
-	; traceTc (text "loadImportedInsts" <+> vcat [ppr cls <+> ppr tys,
-			text "new pool" <+> ppr inst_pool',
-			text "new insts" <+> ppr iface_insts])
-
 	-- Empty => finish up rapidly, without writing to eps
 	; if null iface_insts then
 		return (eps_inst_env eps)
@@ -829,7 +825,8 @@ tcPragExpr name expr
 
 		-- Check for type consistency in the unfolding
     ifOptM Opt_DoCoreLinting (
-	case lintUnfolding noSrcLoc [{- in scope -}] core_expr' of
+	get_in_scope_ids			`thenM` \ in_scope -> 
+	case lintUnfolding noSrcLoc in_scope core_expr' of
 	  Nothing       -> returnM ()
 	  Just fail_msg -> pprPanic "Iface Lint failure" (doc <+> fail_msg)
     )				`thenM_`
@@ -837,6 +834,14 @@ tcPragExpr name expr
    returnM core_expr'	
   where
     doc = text "Unfolding of" <+> ppr name
+    get_in_scope_ids 	-- Urgh; but just for linting
+	= setLclEnv () $ 
+	  do	{ env <- getGblEnv 
+		; case if_rec_types env of {
+			  Nothing -> return [] ;
+			  Just (_, get_env) -> do
+		{ type_env <- get_env
+		; return (typeEnvIds type_env) }}}
 \end{code}
 
 

@@ -517,9 +517,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	-- Deal with the type declarations; first bring their stuff
 	-- into scope, then rname them, then type check them
-   (rdr_env, imports) <- importsFromLocalDecls $
-	HsGroup { hs_tyclds = decls, hs_valds = EmptyBinds, hs_fords = [] } ;
-		-- Rather clumsy; lots of unused fields
+   (rdr_env, imports) <- importsFromLocalDecls (mkFakeGroup decls) ;
 
    updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl,
 			    tcg_imports = imports `plusImportAvails` tcg_imports gbl }) 
@@ -570,6 +568,12 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    return mod_guts
    }}}}
+
+mkFakeGroup decls -- Rather clumsy; lots of unused fields
+  = HsGroup {	hs_tyclds = decls, 	-- This is the one we want
+		hs_valds = EmptyBinds, hs_fords = [],
+		hs_instds = [], hs_fixds = [], hs_depds = [],
+		hs_ruleds = [] }
 \end{code}
 
 

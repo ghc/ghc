@@ -279,7 +279,8 @@ tcIfaceGlobal name
 	    Just thing -> return thing ;
 	    Nothing    -> 
 
-	setLclEnv () $ do
+	setLclEnv () $ do	-- This gets us back to IfG, mainly to 
+				-- pacify get_type_env; rather untidy
 	{ env <- getGblEnv
 	; case if_rec_types env of
 	    Just (mod, get_type_env) 

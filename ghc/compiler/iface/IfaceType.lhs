@@ -342,7 +342,7 @@ toIfaceKind k
   | Just (arg,res) <- splitFunTy_maybe k 
   = IfaceFunKind (toIfaceKind arg) (toIfaceKind res)
 #ifdef DEBUG
-  | otherwise = pprPanic "toIfaceKind" (crudePprType k)
+  | otherwise = pprTrace "toIfaceKind" (crudePprType k) IfaceOpenTypeKind
 #endif
 
 ---------------------
