@@ -47,6 +47,8 @@ module IdInfo (
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( SimplifiableCoreExpr )
+-- for mkdependHS, CoreSyn.hi-boot refers to it:
+import BinderInfo ( BinderInfo )
 
 import SpecEnv	        ( SpecEnv, emptySpecEnv, isEmptySpecEnv )
 import BasicTypes	( NewOrData )
