@@ -4,7 +4,7 @@
 \section{Fast strings}
 
 Compact representations of character strings with
-unique identifiers.
+unique identifiers (hash-cons'ish).
 
 \begin{code}
 #include "HsVersions.h"
@@ -56,6 +56,9 @@ import STBase
 import {-# SOURCE #-} Unique  ( mkUniqueGrimily, Unique, Uniquable(..) )
 #if __GLASGOW_HASKELL__ == 202
 import PrelBase ( Char (..) )
+#endif
+#if __GLASGOW_HASKELL__ >= 206
+import PackBase
 #endif
 #endif
 
@@ -131,7 +134,11 @@ nullFastString (FastString _ l# _) = l# ==# 0#
 nullFastString (CharStr _ l#) = l# ==# 0#
 
 unpackFS :: FastString -> String
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
 unpackFS (FastString _ l# ba#) = byteArrayToString (_ByteArray (0,I# l#) ba#)
+#else
+unpackFS (FastString _ l# ba#) = unpackCStringBA# l# ba#
+#endif
 unpackFS (CharStr addr len#) =
  unpack 0#
  where
@@ -329,7 +336,11 @@ mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 
 mkFastString :: String -> FastString
 mkFastString str = 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 205
  case stringToByteArray str of
+#else
+ case packString str of
+#endif
   (_ByteArray (_,I# len#) frozen#) -> 
     mkFastSubStringBA# frozen# 0# len#
     {- 0-indexed array, len# == index to one beyond end of string,
@@ -354,58 +365,47 @@ hashStr a# len# =
    1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-{- Currently UNUSED:
-  if len# ==# 0# then
-     0#
-  else
-     ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#)
-	`remInt#` hASH_TBL_SIZE#
--}
   where
     c0 = indexCharOffAddr# a# 0#
-    c1 = indexCharOffAddr# a# 1# --(len# `quotInt#` 2# -# 1#)
-    c2 = indexCharOffAddr# a# 2# --(len# -# 1#)
+    c1 = indexCharOffAddr# a# (len# `quotInt#` 2# -# 1#)
+    c2 = indexCharOffAddr# a# (len# -# 1#)
+{-
+    c1 = indexCharOffAddr# a# 1#
+    c2 = indexCharOffAddr# a# 2#
+-}
 
 hashSubStrFO  :: ForeignObj# -> Int# -> Int# -> Int#
- -- use the Addr to produce a hash value between 0 & m (inclusive)
+ -- use the FO to produce a hash value between 0 & m (inclusive)
 hashSubStrFO fo# start# len# =
   case len# of
    0# -> 0#
    1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-{-
-  if len# ==# 0# then
-     0#
-  else
-     ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#)
-	`remInt#` hASH_TBL_SIZE#
--}
   where
     c0 = indexCharOffFO# fo# 0#
-    c1 = indexCharOffFO# fo# 1# --(len# `quotInt#` 2# -# 1#)
-    c2 = indexCharOffFO# fo# 2# --(len# -# 1#)
+    c1 = indexCharOffFO# fo# (len# `quotInt#` 2# -# 1#)
+    c2 = indexCharOffFO# fo# (len# -# 1#)
+
+--    c1 = indexCharOffFO# fo# 1#
+--    c2 = indexCharOffFO# fo# 2#
 
 
 hashSubStrBA  :: ByteArray# -> Int# -> Int# -> Int#
- -- use the Addr to produce a hash value between 0 & m (inclusive)
+ -- use the byte array to produce a hash value between 0 & m (inclusive)
 hashSubStrBA ba# start# len# =
   case len# of
    0# -> 0#
    1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-{-
-  if len# ==# 0# then
-     0#
-  else
-     ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#)
-	`remInt#` hASH_TBL_SIZE#
--}
   where
     c0 = indexCharArray# ba# 0#
-    c1 = indexCharArray# ba# 1# --(len# `quotInt#` 2# -# 1#)
-    c2 = indexCharArray# ba# 2# --(len# -# 1#)
+    c1 = indexCharArray# ba# (len# `quotInt#` 2# -# 1#)
+    c2 = indexCharArray# ba# (len# -# 1#)
+
+--    c1 = indexCharArray# ba# 1#
+--    c2 = indexCharArray# ba# 2#
 
 \end{code}
 
