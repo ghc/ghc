@@ -4,7 +4,7 @@
 \section{Code output phase}
 
 \begin{code}
-module CodeOutput( codeOutput ) where
+module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
 

@@ -1092,7 +1092,8 @@ mkUnpackCode vars d p
         code_np = do_nptrs vreps_env_uszw ptrs_szw (reverse (map snd vreps_np))
         do_nptrs off_h off_s [] = nilOL
         do_nptrs off_h off_s (npr:nprs)
-           | npr `elem` [IntRep, WordRep, FloatRep, DoubleRep, CharRep, AddrRep]
+           | npr `elem` [IntRep, WordRep, FloatRep, DoubleRep, 
+                         CharRep, AddrRep, StablePtrRep]
            = approved
            | otherwise
            = moan64 "ByteCodeGen.mkUnpackCode" (ppr npr)
@@ -1173,6 +1174,7 @@ pushAtom True d p (AnnLit lit)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
+        MachLabel fs -> code CodePtrRep
         MachWord w   -> code WordRep
         MachInt i    -> code IntRep
         MachFloat r  -> code FloatRep

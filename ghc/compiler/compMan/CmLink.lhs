@@ -262,7 +262,8 @@ link' Interactive dflags batch_attempt_linking linkables pls
 
 	    -- Always load objects first.  Objects aren't allowed to
 	    -- depend on BCOs.
-	    let (objs, bcos) = partition isObjectLinkable linkables
+	    let (objs, bcos) = partition isObjectLinkable 
+                                  (concatMap partitionLinkable linkables)
 
 	    objs_loaded  <- readIORef v_ObjectsLoaded
 	    objs_loaded' <- linkObjs objs objs_loaded

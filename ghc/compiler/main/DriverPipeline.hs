@@ -1115,7 +1115,6 @@ compile ghci_mode summary source_unchanged have_object
 
       HscRecomp pcs details iface
 	stub_h_exists stub_c_exists maybe_interpreted_code -> do
-	   
 	   let 
 	   maybe_stub_o <- compileStub dyn_flags' stub_c_exists
 	   let stub_unlinked = case maybe_stub_o of

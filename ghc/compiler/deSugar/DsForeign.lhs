@@ -470,15 +470,19 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 	      parens (hsep (punctuate comma (zipWith (<+>) cParamTypes proto_args)))
 
   c_bits =
-    externDecl $$
     fun_proto  $$
     vcat 
      [ lbrace
      ,   text "SchedulerStatus rc;"
      ,   declareResult
 	  -- create the application + perform it.
-     ,   text "rc=rts_evalIO" <> 
-                  parens (foldl appArg (text "(StgClosure*)&" <> h_nm) (zip args c_args) <> comma <> text "&ret") <> semi
+     ,   text "rc=rts_evalIO" 
+         <> parens (foldl appArg (text "(StgClosure*)deRefStablePtr(a0)") 
+                                 (tail (zip args c_args))
+                    <> comma 
+                    <> text "&ret"
+                   ) 
+         <> semi
      ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ptext c_nm)
 						<> comma <> text "rc") <> semi
      ,   text "return" <> return_what <> semi
@@ -500,8 +504,6 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 		StdCallConv -> text (ccallConvAttribute cc)
      
   declareResult  = text "HaskellObj ret;"
-
-  externDecl     = mkExtern (text "HaskellObj") h_nm
 
   mkExtern ty nm = text "extern" <+> ty <+> nm <> semi
 

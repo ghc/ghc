@@ -66,7 +66,7 @@ import StgSyn
 import CoreToStg	( coreToStg )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
-import CodeOutput	( codeOutput )
+import CodeOutput	( codeOutput, outputForeignStubs )
 
 import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
@@ -368,7 +368,12 @@ hscRecomp ghci_mode dflags have_object
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
 
-      		    return ( False, False, Just (bcos,itbl_env), final_iface )
+		    ------------------ Create f-x-dynamic C-side stuff ---
+                    (istub_h_exists, istub_c_exists) 
+                       <- outputForeignStubs dflags c_code h_code
+
+      		    return ( istub_h_exists, istub_c_exists, 
+                             Just (bcos,itbl_env), final_iface )
 #else
 		then error "GHC not compiled with interpreter"
 #endif

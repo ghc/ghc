@@ -122,7 +122,10 @@ linkSomeBCOs toplevs_only ie ce_in ul_bcos
 data UnlinkedBCO
    = UnlinkedBCO Name
                  (SizedSeq Word16)		 -- insns
-                 (SizedSeq Word)		 -- literals
+                 (SizedSeq (Either Word FAST_STRING))	 -- literals
+			-- Either literal words or a pointer to a asciiz
+			-- string, denoting a label whose *address* should
+			-- be determined at link time
                  (SizedSeq (Either Name PrimOp)) -- ptrs
                  (SizedSeq Name)		 -- itbl refs
 
@@ -191,7 +194,7 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
      in
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
-         lits  <- return emptySS :: IO (SizedSeq Word)
+         lits  <- return emptySS :: IO (SizedSeq (Either Word FAST_STRING))
          ptrs  <- return emptySS :: IO (SizedSeq (Either Name PrimOp))
          itbls <- return emptySS :: IO (SizedSeq Name)
          let init_asm_state = (insns,lits,ptrs,itbls)
@@ -211,8 +214,10 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
                            free ptr
 
 -- instrs nonptrs ptrs itbls
-type AsmState = (SizedSeq Word16, SizedSeq Word, 
-                 SizedSeq (Either Name PrimOp), SizedSeq Name)
+type AsmState = (SizedSeq Word16, 
+                 SizedSeq (Either Word FAST_STRING),
+                 SizedSeq (Either Name PrimOp), 
+                 SizedSeq Name)
 
 data SizedSeq a = SizedSeq !Int [a]
 emptySS = SizedSeq 0 []
@@ -311,27 +316,31 @@ mkBits findLabel st proto_insns
 
        float (st_i0,st_l0,st_p0,st_I0) f
           = do let ws = mkLitF f
-               st_l1 <- addListToSS st_l0 ws
+               st_l1 <- addListToSS st_l0 (map Left ws)
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        double (st_i0,st_l0,st_p0,st_I0) d
           = do let ws = mkLitD d
-               st_l1 <- addListToSS st_l0 ws
+               st_l1 <- addListToSS st_l0 (map Left ws)
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        int (st_i0,st_l0,st_p0,st_I0) i
           = do let ws = mkLitI i
-               st_l1 <- addListToSS st_l0 ws
+               st_l1 <- addListToSS st_l0 (map Left ws)
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        int64 (st_i0,st_l0,st_p0,st_I0) i
           = do let ws = mkLitI64 i
-               st_l1 <- addListToSS st_l0 ws
+               st_l1 <- addListToSS st_l0 (map Left ws)
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        addr (st_i0,st_l0,st_p0,st_I0) a
           = do let ws = mkLitPtr a
-               st_l1 <- addListToSS st_l0 ws
+               st_l1 <- addListToSS st_l0 (map Left ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+
+       litlabel (st_i0,st_l0,st_p0,st_I0) fs
+          = do st_l1 <- addListToSS st_l0 [Right fs]
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        ptr (st_i0,st_l0,st_p0,st_I0) p
@@ -342,6 +351,7 @@ mkBits findLabel st proto_insns
           = do st_I1 <- addToSS st_I0 (getName dcon)
                return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
 
+       literal st (MachLabel fs)  = litlabel st fs
        literal st (MachWord w)    = int st (fromIntegral w)
        literal st (MachInt j)     = int st (fromIntegral j)
        literal st (MachFloat r)   = float st (fromRational r)
@@ -431,7 +441,7 @@ instrSize16s instr
 mkLitI   :: Int    -> [Word]
 mkLitF   :: Float  -> [Word]
 mkLitD   :: Double -> [Word]
-mkLitPtr :: Ptr ()   -> [Word]
+mkLitPtr :: Ptr () -> [Word]
 mkLitI64 :: Int64  -> [Word]
 
 mkLitF f
@@ -521,8 +531,9 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
         ptrs     <- listFromSS ptrsSS
         itbls    <- listFromSS itblsSS
 
-        linked_ptrs  <- mapM (lookupCE ce) ptrs
-        linked_itbls <- mapM (lookupIE ie) itbls
+        linked_ptrs     <- mapM (lookupCE ce) ptrs
+        linked_itbls    <- mapM (lookupIE ie) itbls
+        linked_literals <- mapM lookupLiteral literals
 
         let n_insns    = sizeSS insnsSS
             n_literals = sizeSS literalsSS
@@ -545,7 +556,7 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
                         :: UArray Int Word16
             insns_barr = case insns_arr of UArray lo hi barr -> barr
 
-            literals_arr = array (0, n_literals-1) (indexify literals)
+            literals_arr = array (0, n_literals-1) (indexify linked_literals)
                            :: UArray Int Word
             literals_barr = case literals_arr of UArray lo hi barr -> barr
 
@@ -565,6 +576,20 @@ newBCO :: ByteArray# -> ByteArray# -> Array# a -> ByteArray# -> IO BCO
 newBCO a b c d
    = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
 
+
+lookupLiteral :: Either Word FAST_STRING -> IO Word
+lookupLiteral (Left w) = return w
+lookupLiteral (Right addr_of_label_string)
+   = do let label_to_find = _UNPK_ addr_of_label_string
+        m <- lookupSymbol label_to_find 
+        case m of
+           -- Can't be bothered to find the official way to convert Addr# to Word#;
+           -- the FFI/Foreign designers make it too damn difficult
+           -- Hence we apply the Blunt Instrument, which works correctly
+           -- on all reasonable architectures anyway
+           Just (Ptr addr) -> return (W# (unsafeCoerce# addr))
+           Nothing         -> linkFail "ByteCodeLink: can't find label" 
+                                       label_to_find
 
 lookupCE :: ClosureEnv -> Either Name PrimOp -> IO HValue
 lookupCE ce (Right primop)

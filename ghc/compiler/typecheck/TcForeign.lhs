@@ -108,7 +108,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ CWrapper)
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
-    checkCg checkCOrAsm		`thenNF_Tc_`
+    checkCg checkCOrAsmOrInterp		`thenNF_Tc_`
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`

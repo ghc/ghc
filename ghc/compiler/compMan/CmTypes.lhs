@@ -6,7 +6,7 @@
 \begin{code}
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
-   Linkable(..), isObjectLinkable, 
+   Linkable(..), isObjectLinkable, partitionLinkable,
    ModSummary(..), ms_allimps, pprSummaryTime, modSummaryName,
   ) where
 
@@ -40,8 +40,7 @@ nameOfObject (DotO fn)   = fn
 nameOfObject (DotA fn)   = fn
 nameOfObject (DotDLL fn) = fn
 
-isInterpretable (BCOs _ _) = True
-isInterpretable _          = False
+isInterpretable = not . isObject
 
 data Linkable = LM {
   linkableTime     :: ClockTime,
@@ -51,6 +50,19 @@ data Linkable = LM {
 
 isObjectLinkable :: Linkable -> Bool
 isObjectLinkable l = all isObject (linkableUnlinked l)
+
+-- HACK to support f-x-dynamic in the interpreter; no other purpose
+partitionLinkable :: Linkable -> [Linkable]
+partitionLinkable li
+   = let li_uls = linkableUnlinked li
+         li_uls_obj = filter isObject li_uls
+         li_uls_bco = filter isInterpretable li_uls
+     in 
+         case (li_uls_obj, li_uls_bco) of
+            (objs@(_:_), bcos@(_:_)) 
+               -> [li{linkableUnlinked=li_uls_obj}, li{linkableUnlinked=li_uls_bco}]
+            other
+               -> [li]
 
 instance Outputable Linkable where
    ppr (LM when_made mod unlinkeds)
