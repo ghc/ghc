@@ -4,7 +4,7 @@
 \section[Inst]{The @Inst@ type: dictionaries or method instances}
 
 \begin{code}
-module Inst (
+module Inst ( 
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE,
 	plusLIEs, mkLIE, isEmptyLIE,
 
