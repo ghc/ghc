@@ -390,6 +390,21 @@ details.</para>
 	as <literal>&lt;&lt;loop&gt;&gt;</literal>).</para>
       </listitem>
     </varlistentry>
+
+    
+    <varlistentry>
+      <term>Does GHC implement any kind of extensible records?</term>
+
+      <listitem>
+	<para>No, extensible records are not implemented in GHC.
+	<ulink url="http://www.haskell.org/hugs/">Hugs</ulink>
+	implements TRex, one extensible record variant.  The problem
+	is that the record design space is large, and seems to lack
+	local optima.  And all reasonable variants break backward
+	compatibility.  As a result, nothing much happens.</para>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
 </chapter>
 
