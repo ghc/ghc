@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.60 2001/03/23 12:11:26 simonmar Exp $
+-- $Id: Main.hs,v 1.61 2001/03/27 10:33:24 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -307,7 +307,7 @@ setTopDir :: [String] -> IO [String]
 setTopDir args = do
   let (minusbs, others) = partition (prefixMatch "-B") args
   (case minusbs of
-    []   -> writeIORef v_TopDir clibdir
+    []   -> throwDyn (OtherError ("missing -B<dir> option"))
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
