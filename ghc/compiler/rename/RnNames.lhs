@@ -324,7 +324,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
 						-- only export T abstractly.  The single [n]
 						-- in the AvailTC is the type or class itself
-					ifOptRn opt_WarnMisc (addWarnRn (dodgyImportWarn mod item))	`thenRn_`
+					ifOptRn Opt_WarnMisc (addWarnRn (dodgyImportWarn mod item))	`thenRn_`
 		     	 		returnRn [(avail, [availName avail])]
 	  Just avail 		     -> returnRn [(avail, [availName avail])]
 
