@@ -423,7 +423,7 @@ usgClos :: VarEnv Var        -- environment to close with respect to
         -> (Type,            -- closed type (rho)
             UConSet)         -- residual constraint set
 
-usgClos _ve ty ucs = (ty,ucs)  -- dummy definition; no generalisation at all
+usgClos zz_ve ty ucs = (ty,ucs)  -- dummy definition; no generalisation at all
 
             -- hmm!  what if it sets some uvars to 1 or omega?
             --  (should it do substitution here, or return a substitution,
