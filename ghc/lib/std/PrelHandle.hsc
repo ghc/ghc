@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.11 2001/06/29 12:45:39 simonmar Exp $
+-- $Id: PrelHandle.hsc,v 1.12 2001/06/29 13:41:43 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -626,6 +626,9 @@ openFile' filepath ex_mode =
 	    	  ReadWriteMode -> rw_flags    
 	    	  AppendMode    -> append_flags
 
+      truncate | WriteMode <- mode = True
+	       | otherwise	   = False
+
       binary_flags
 #ifdef HAVE_O_BINARY
 	  | binary    = o_BINARY
@@ -644,21 +647,24 @@ openFile' filepath ex_mode =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    openFd fd filepath mode binary
+    openFd fd filepath mode binary truncate
+	-- ASSERT: if we just created the file, then openFd won't fail
+	-- (so we don't need to worry about removing the newly created file
+	--  in the event of an error).
 
 
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY 
-write_flags  = output_flags .|. o_WRONLY .|. o_TRUNC
+write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
-append_flags = output_flags .|. o_WRONLY .|. o_APPEND
+append_flags = write_flags  .|. o_APPEND
 
 -- ---------------------------------------------------------------------------
 -- openFd
 
-openFd :: FD -> FilePath -> IOMode -> Bool -> IO Handle
-openFd fd filepath mode binary = do
+openFd :: FD -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
+openFd fd filepath mode binary truncate = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -687,6 +693,10 @@ openFd fd filepath mode binary = do
 	   when (r == -1)  $
 		ioException (IOError Nothing ResourceBusy "openFile"
 				   "file is locked" Nothing)
+
+	   -- truncate the file if necessary
+	   when truncate (fileTruncate filepath)
+
 	   mkFileHandle fd filepath ha_type binary
 
 
