@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.8 2001/01/16 11:53:32 simonmar Exp $
+ * $Id: MBlock.h,v 1.9 2001/06/29 16:58:06 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,7 +51,7 @@ extern void * getMBlocks(nat n);
 /* guess */
 #define HEAP_BASE 0x50000000
 
-#elif _WIN32
+#elif defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 /* doesn't matter, we use a reserve/commit algorithm */
 
 #else
