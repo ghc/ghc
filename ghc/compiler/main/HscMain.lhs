@@ -16,7 +16,7 @@ module HscMain ( HscResult(..), hscMain,
 #ifdef GHCI
 import Interpreter
 import ByteCodeGen	( byteCodeGen )
-import CoreTidy		( tidyCoreExpr )
+import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Rename		( renameStmt, renameRdrName, slurpIface )
 import RdrName          ( rdrNameOcc, setRdrNameOcc )
@@ -59,7 +59,7 @@ import Desugar
 import Flattening       ( flatten, flattenExpr )
 import SimplCore
 import CoreUtils	( coreBindsSize )
-import CoreTidy		( tidyCorePgm )
+import TidyPgm		( tidyCorePgm )
 import CorePrep		( corePrepPgm )
 import StgSyn
 import CoreToStg	( coreToStg )

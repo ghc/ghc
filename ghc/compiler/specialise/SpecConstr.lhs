@@ -14,11 +14,10 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, eqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
-import CoreTidy		( tidyIdRules )
+import CoreTidy		( pprTidyIdRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import PprCore		( pprIdRules )
 import Id		( Id, idName, idType, idSpecialisation,
 			  isDataConId_maybe, 
 			  mkUserLocal, mkSysLocal )
@@ -182,7 +181,7 @@ specConstrProgram dflags us binds
 	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (vcat (map dump_specs (concat (map bindersOf binds'))))
+		  (vcat (map pprTidyIdRules (concat (map bindersOf binds'))))
 
 	return binds'
   where
@@ -190,8 +189,6 @@ specConstrProgram dflags us binds
     go env (bind:binds) = scBind env bind 	`thenUs` \ (env', _, bind') ->
 			  go env' binds 	`thenUs` \ binds' ->
 			  returnUs (bind' : binds')
-
-    dump_specs var = pprIdRules (tidyIdRules var)
 \end{code}
 
 

@@ -47,16 +47,22 @@ then
 then	
 	CoreLint( CoreUtils )
 	OccurAnal (CoreUtils.exprIsTrivial)
+	CoreTidy (CoreUtils.exprArity )
 then
 	CoreUnfold (OccurAnal.occurAnalyseGlobalExpr)
 then
-	CoreTidy (CoreUnfold.noUnfolding)
-	Subst (Unfolding, CoreFVs)
-	Generics (mkTopUnfolding)
+	Subst (CoreUnfold.Unfolding, CoreFVs)
+	Generics (CoreUnfold.mkTopUnfolding)
 then
-	Rules (Unfolding, CoreTidy.tidyIdRules)
-	MkId (CoreUnfold.mkUnfolding, Subst, Rule.addRule)
+	Rules (CoreUnfold.Unfolding, PprCore.pprTidyIdRules)
+then
+	MkId (CoreUnfold.mkUnfolding, Subst, Rules.addRule)
 then
 	PrelInfo (MkId)
 	HscTypes( Rules.RuleBase )
+
+---------------- END OF INFRASTRUCTURE --------------------
+
+then
+	CoreTidy (HscTypes.PersistentCompilerState)
 

@@ -25,9 +25,8 @@ import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
-import CoreTidy		( tidyIdRules )
+import CoreTidy		( pprTidyIdRules )
 import CoreLint		( showPass, endPass )
-import PprCore		( pprIdRules )
 import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
@@ -587,12 +586,10 @@ specProgram dflags us binds
 	endPass dflags "Specialise" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (vcat (map dump_specs (concat (map bindersOf binds'))))
+		  (vcat (map pprTidyIdRules (concat (map bindersOf binds'))))
 
 	return binds'
   where
-    dump_specs var = pprIdRules (tidyIdRules var)
-
 	-- We need to start with a Subst that knows all the things
 	-- that are in scope, so that the substitution engine doesn't
 	-- accidentally re-use a unique that's already in use

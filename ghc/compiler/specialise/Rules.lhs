@@ -19,9 +19,8 @@ import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
 import CoreFVs		( exprFreeVars, ruleRhsFreeVars, ruleLhsFreeIds )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
-import CoreTidy		( tidyIdRules )
 import CoreUtils	( eqExpr )
-import PprCore		( pprIdRules )
+import CoreTidy		( pprTidyIdRules )
 import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
 			  substEnv, setSubstEnv, emptySubst, isInScope, emptyInScopeSet,
 			  bindSubstList, unBindSubstList, substInScope, uniqAway
@@ -630,6 +629,5 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
 	-- locally defined ones!!
 
 pprRuleBase :: RuleBase -> SDoc
-pprRuleBase (RuleBase rules _) = vcat [ pprIdRules (tidyIdRules id)
-				      | id <- varSetElems rules ]
+pprRuleBase (RuleBase rules _) = vcat [ pprTidyIdRules id | id <- varSetElems rules ]
 \end{code}
