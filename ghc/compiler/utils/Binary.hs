@@ -302,7 +302,7 @@ getWord8 (BinIO _ ix_r h) = do
     ix <- readFastMutInt ix_r
     c <- hGetChar h
     writeFastMutInt ix_r (ix+1)
-    return (fromIntegral (ord c))	-- XXX not really correct
+    return $! (fromIntegral (ord c))	-- XXX not really correct
 
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh w = put_ bh w
@@ -324,7 +324,7 @@ instance Binary Word16 where
   get h = do
     w1 <- getWord8 h
     w2 <- getWord8 h
-    return ((fromIntegral w1 `shiftL` 8) .|. fromIntegral w2)
+    return $! ((fromIntegral w1 `shiftL` 8) .|. fromIntegral w2)
 
 
 instance Binary Word32 where
@@ -338,10 +338,10 @@ instance Binary Word32 where
     w2 <- getWord8 h
     w3 <- getWord8 h
     w4 <- getWord8 h
-    return ((fromIntegral w1 `shiftL` 24) .|. 
-	    (fromIntegral w2 `shiftL` 16) .|. 
-	    (fromIntegral w3 `shiftL`  8) .|. 
-	    (fromIntegral w4))
+    return $! ((fromIntegral w1 `shiftL` 24) .|. 
+	       (fromIntegral w2 `shiftL` 16) .|. 
+	       (fromIntegral w3 `shiftL`  8) .|. 
+	       (fromIntegral w4))
 
 
 instance Binary Word64 where
@@ -363,33 +363,33 @@ instance Binary Word64 where
     w6 <- getWord8 h
     w7 <- getWord8 h
     w8 <- getWord8 h
-    return ((fromIntegral w1 `shiftL` 56) .|. 
-	    (fromIntegral w2 `shiftL` 48) .|. 
-	    (fromIntegral w3 `shiftL` 40) .|. 
-	    (fromIntegral w4 `shiftL` 32) .|. 
-	    (fromIntegral w5 `shiftL` 24) .|. 
-	    (fromIntegral w6 `shiftL` 16) .|. 
-	    (fromIntegral w7 `shiftL`  8) .|. 
-	    (fromIntegral w8))
+    return $! ((fromIntegral w1 `shiftL` 56) .|. 
+	       (fromIntegral w2 `shiftL` 48) .|. 
+	       (fromIntegral w3 `shiftL` 40) .|. 
+	       (fromIntegral w4 `shiftL` 32) .|. 
+	       (fromIntegral w5 `shiftL` 24) .|. 
+	       (fromIntegral w6 `shiftL` 16) .|. 
+	       (fromIntegral w7 `shiftL`  8) .|. 
+	       (fromIntegral w8))
 
 -- -----------------------------------------------------------------------------
 -- Primitve Int writes
 
 instance Binary Int8 where
   put_ h w = put_ h (fromIntegral w :: Word8)
-  get h    = do w <- get h; return (fromIntegral (w::Word8))
+  get h    = do w <- get h; return $! (fromIntegral (w::Word8))
 
 instance Binary Int16 where
   put_ h w = put_ h (fromIntegral w :: Word16)
-  get h    = do w <- get h; return (fromIntegral (w::Word16))
+  get h    = do w <- get h; return $! (fromIntegral (w::Word16))
 
 instance Binary Int32 where
   put_ h w = put_ h (fromIntegral w :: Word32)
-  get h    = do w <- get h; return (fromIntegral (w::Word32))
+  get h    = do w <- get h; return $! (fromIntegral (w::Word32))
 
 instance Binary Int64 where
   put_ h w = put_ h (fromIntegral w :: Word64)
-  get h    = do w <- get h; return (fromIntegral (w::Word64))
+  get h    = do w <- get h; return $! (fromIntegral (w::Word64))
 
 -- -----------------------------------------------------------------------------
 -- Instances for standard types
@@ -401,12 +401,12 @@ instance Binary () where
 
 instance Binary Bool where
     put_ bh b = putByte bh (fromIntegral (fromEnum b))
-    get  bh   = do x <- getWord8 bh; return (toEnum (fromIntegral x))
+    get  bh   = do x <- getWord8 bh; return $! (toEnum (fromIntegral x))
 --    getF bh p = case getBitsF bh 1 p of (x,b) -> (toEnum x,b)
 
 instance Binary Char where
     put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
-    get  bh   = do x <- get bh; return (chr (fromIntegral (x :: Word32)))
+    get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
 --    getF bh p = case getBitsF bh 8 p of (x,b) -> (toEnum x,b)
 
 instance Binary Int where
@@ -414,12 +414,12 @@ instance Binary Int where
     put_ bh i = put_ bh (fromIntegral i :: Int32)
     get  bh = do
 	x <- get bh
-	return (fromIntegral (x :: Int32))
+	return $! (fromIntegral (x :: Int32))
 #elif SIZEOF_HSINT == 8
     put_ bh i = put_ bh (fromIntegral i :: Int64)
     get  bh = do
 	x <- get bh
-	return (fromIntegral (x :: Int64))
+	return $! (fromIntegral (x :: Int64))
 #else
 #error "unsupported sizeof(HsInt)"
 #endif
@@ -678,11 +678,17 @@ putFS bh s = error ("Binary.put_(FastString): " ++ unpackFS s)
 	-- the size of the ByteArray: the latter is rounded up to a
 	-- multiple of the word size.
   
+{- -- possible faster version, not quite there yet:
+getFS bh@BinMem{} = do
+  (I# l) <- get bh
+  arr <- readIORef (arr_r bh)
+  off <- readFastMutInt (off_r bh)
+  return $! (mkFastSubStringBA# arr off l)
+-}
 getFS bh = do
   (I# l) <- get bh
   (BA ba) <- getByteArray bh (I# l)
-  return (mkFastSubStringBA# ba 0# l)
-	-- XXX ToDo: one too many copies here
+  return $! (mkFastSubStringBA# ba 0# l)
 
 instance Binary FastString where
   put_ bh f@(FastString id l ba) =
