@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 1999/06/29 14:15:32 simonmar Exp $
+# $Id: Makefile,v 1.12 1999/06/29 14:18:14 simonmar Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -57,7 +57,7 @@ SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCO
 SRC_CC_OPTS = $(GhcRtsCcOpts)
 
 ifneq "$(way)" "dll"
-# SRC_HC_OPTS += -static
+SRC_HC_OPTS += -static
 endif
 # SRC_HC_OPTS += -optc-fPIC
 
