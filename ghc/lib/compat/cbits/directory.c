@@ -24,9 +24,9 @@
  * (PATH_MAX is not defined on systems with unlimited path length,
  * e.g. the Hurd).
  */
-INLINE HsInt __hscore_long_path_size() { return PATH_MAX; }
+INLINE HsInt __compat_long_path_size() { return PATH_MAX; } 
 #else
-INLINE HsInt __hscore_long_path_size() { return 4096; }
+INLINE HsInt __compat_long_path_size() { return 4096; }
 #endif
 
 #if defined(mingw32_TARGET_OS)

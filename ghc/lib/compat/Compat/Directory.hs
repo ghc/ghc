@@ -57,7 +57,8 @@ foreign import stdcall unsafe "SHGetFolderPathA"
                               -> CString 
                               -> IO CInt
 
-foreign import ccall unsafe "__hscore_long_path_size"
+-- __compat_long_path_size defined in cbits/directory.c
+foreign import ccall unsafe "__compat_long_path_size"
   long_path_size :: Int
 
 foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
