@@ -78,7 +78,7 @@ data VarDetails
 
 The <code>TyVar</code> case is self-explanatory.  The
 <code>MutTyVar</code> case is used only during type checking.  Then a
-tupe variable can be unified, using an imperative update, with a type,
+type variable can be unified, using an imperative update, with a type,
 and that is what the <code>IORef</code> is for.  The <code>Bool</code>
 field records whether the type variable arose from a type signature,
 in which case it should not be unified with a type (only with another
