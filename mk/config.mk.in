@@ -56,6 +56,13 @@
 # will be built as HC files for the target system, and likely won't
 # build on this host platform.
 #
+# An important invariant is that for any piece of source code, the
+# platform on which the code is going to run is the HOST platform,
+# and the platform on which we are building is the BUILD platform.
+# Additionally for the compiler, the platform this compiler will
+# generate code for is the TARGET.  TARGET is not meaningful outside
+# the compiler sources.
+#
 # Guidelines for when to use HOST vs. TARGET:
 #
 #  - In the build system (Makefile, foo.mk), normally we should test
@@ -65,11 +72,10 @@
 #
 #  - In the compiler itself, we should test HOST or TARGET depending
 #    on whether the conditional relates to the code being generated, or
-#    the platform on which the compiler is running.  For stage 2,
-#    HOSTPLATFORM should be reset to be TARGETPLATFORM (we currently
-#    don't do this, but we should).
+#    the platform on which the compiler is running.  See the section
+#    on "Coding Style" in the commentary for more details.
 #
-#  - In the RTS and library code, we should be testing TARGET only.
+#  - In all other code, we should be testing HOST only.
 #
 # NOTE: cross-compiling is not well supported by the build system.
 # You have to do a lot of work by hand to cross compile: see the
