@@ -48,7 +48,7 @@ module UniqFM (
 
 import {-# SOURCE #-} Name	( Name )
 
-import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
+import Unique		( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import Panic
 import GlaExts		-- Lots of Int# operations
 import FastTypes
@@ -219,8 +219,8 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-unitUFM	     key elt = mkLeafUFM (u2i (getUnique key)) elt
-unitDirectlyUFM key elt = mkLeafUFM (u2i key) elt
+unitUFM	     key elt = mkLeafUFM (getKey (getUnique key)) elt
+unitDirectlyUFM key elt = mkLeafUFM (getKey key) elt
 
 listToUFM key_elt_pairs
   = addListToUFM_C use_snd EmptyUFM key_elt_pairs
@@ -239,20 +239,20 @@ could be optimised using it.
 \begin{code}
 addToUFM fm key elt = addToUFM_C use_snd fm key elt
 
-addToUFM_Directly fm u elt = insert_ele use_snd fm (u2i u) elt
+addToUFM_Directly fm u elt = insert_ele use_snd fm (getKey u) elt
 
 addToUFM_C combiner fm key elt
-  = insert_ele combiner fm (u2i (getUnique key)) elt
+  = insert_ele combiner fm (getKey (getUnique key)) elt
 
 addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
 addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
 
 addListToUFM_C combiner fm key_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i (getUnique k)) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey (getUnique k)) e)
 	 fm key_elt_pairs
 
 addListToUFM_directly_C combiner fm uniq_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i k) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey k) e)
 	 fm uniq_elt_pairs
 \end{code}
 
@@ -261,8 +261,8 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM          fm key = delete fm (u2i (getUnique key))
-delFromUFM_Directly fm u   = delete fm (u2i u)
+delFromUFM          fm key = delete fm (getKey (getUnique key))
+delFromUFM_Directly fm u   = delete fm (getKey u)
 
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
@@ -540,20 +540,20 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-elemUFM key fm = case lookUp fm (u2i (getUnique key)) of
+elemUFM key fm = case lookUp fm (getKey (getUnique key)) of
 			Nothing -> False
 			Just _  -> True
 
-lookupUFM	   fm key = lookUp fm (u2i (getUnique key))
-lookupUFM_Directly fm key = lookUp fm (u2i key)
+lookupUFM	   fm key = lookUp fm (getKey (getUnique key))
+lookupUFM_Directly fm key = lookUp fm (getKey key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookUp fm (u2i (getUnique key)) of
+  = case lookUp fm (getKey (getUnique key)) of
       Nothing  -> deflt
       Just elt -> elt
 
 lookupWithDefaultUFM_Directly fm deflt key
-  = case lookUp fm (u2i key) of
+  = case lookUp fm (getKey key) of
       Nothing  -> deflt
       Just elt -> elt
 

@@ -38,7 +38,7 @@ import Module		( Module, moduleName, mkVanillaModule, isHomeModule )
 import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
-import Unique		( Unique, Uniquable(..), u2i, pprUnique )
+import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import FastTypes
 import Binary
 import Outputable
@@ -222,7 +222,7 @@ setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc
 
 \begin{code}
 hashName :: Name -> Int
-hashName name = iBox (u2i (nameUnique name))
+hashName name = iBox (getKey (nameUnique name))
 
 
 nameRdrName :: Name -> RdrName
