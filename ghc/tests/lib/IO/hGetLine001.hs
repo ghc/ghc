@@ -1,6 +1,9 @@
 -- !!! testing hGetLine
 
 import IO
+#if defined(__MINGW32__)
+import PrelHandle(hSetBinaryMode)
+#endif
 
 -- one version of 'cat'
 main = do
@@ -10,7 +13,10 @@ main = do
   loop stdin 
 
   h <- openFile "hGetLine001.hs" ReadMode
+
+# if defined(__MINGW32__)
   hSetBinaryMode h True
+# endif
 
   hSetBuffering h NoBuffering
   loop h

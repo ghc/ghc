@@ -2,6 +2,9 @@
 import IO
 import Directory (removeFile, doesFileExist)
 import Monad
+#if defined(__MINGW32__)
+import PrelHandle(hSetBinaryMode)
+#endif
 
 -- This test is weird, full marks to whoever dreamt it up!
 
@@ -11,7 +14,9 @@ main = do
    f <- doesFileExist username
    when f (removeFile username)
    cd <- openFile username ReadWriteMode
+#  if defined(__MINGW32__)
    hSetBinaryMode cd True
+#  endif
    hSetBuffering stdin NoBuffering
    hSetBuffering stdout NoBuffering
    hSetBuffering cd NoBuffering

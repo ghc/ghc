@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2001/06/01 14:33:01 sewardj Exp $
+# $Id: Makefile,v 1.8 2001/06/07 10:45:30 sewardj Exp $
 
 TOP = ../..
 
@@ -7,7 +7,7 @@ include $(TOP)/mk/boilerplate.mk
 
 include $(TOP)/mk/should_run.mk
 
-SRC_HC_OPTS += -dcore-lint
+SRC_HC_OPTS += -dcore-lint -cpp
 
 hGetBuffering001_RUNTEST_OPTS += -i hGetBuffering001.hs
 hSetBuffering002_RUNTEST_OPTS += -i hSetBuffering002.hs
@@ -21,6 +21,8 @@ hGetLine001_RUNTEST_OPTS      += -i hGetLine001.hs -o1 hGetLine001.stdout-mingw
 hFileSize001_RUNTEST_OPTS     += -o1 hFileSize001.stdout-mingw
 hSeek004_RUNTEST_OPTS         += -o1 hSeek004.stdout-mingw
 hGetPosn001_RUNTEST_OPTS      += -o1 hGetPosn001.stdout-mingw
+openFile003_RUNTEST_OPTS      += -o1 openFile003.stdout-mingw
+openFile005_RUNTEST_OPTS      += -o1 openFile005.stdout-mingw
 
 .PRECIOUS: %.o %.bin
 

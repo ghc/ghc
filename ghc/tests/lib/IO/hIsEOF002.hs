@@ -1,10 +1,15 @@
 -- !!! test hIsEOF in various buffering situations
 
 import IO
+#if defined(__MINGW32__)
+import PrelHandle(hSetBinaryMode)
+#endif
 
 main = do
   h <- openFile "hIsEOF002.hs" ReadMode
+# if defined(__MINGW32__)
   hSetBinaryMode h True
+# endif
   hSetBuffering h NoBuffering
   hSeek h SeekFromEnd 0
   hIsEOF h >>= print
@@ -39,7 +44,9 @@ main = do
   hClose h
 
   h <- openFile "hIsEOF002.out" ReadWriteMode
+# if defined(__MINGW32__)
   hSetBinaryMode h True
+# endif
   hSetBuffering h NoBuffering
   hSeek h SeekFromEnd 0
   hIsEOF h >>= print

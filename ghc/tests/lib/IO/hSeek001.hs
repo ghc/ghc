@@ -1,10 +1,15 @@
 -- !!! Test seeking
 
 import IO
+#if defined(__MINGW32__)
+import PrelHandle(hSetBinaryMode)
+#endif
 
 main = do
     h  <- openFile "hSeek001.in" ReadMode
+#   if defined(__MINGW32__)
     hSetBinaryMode h True
+#   endif
     True <- hIsSeekable h
     hSeek h SeekFromEnd (-1)
     z <- hGetChar h

@@ -1,0 +1,12 @@
+two writes (should fail)
+Right {loc=openFile005.out1,type=writable,binary=False,buffering=block (512)}
+write and an append (should fail)
+Right {loc=openFile005.out1,type=writable (append),binary=False,buffering=block (512)}
+read/write and a write (should fail)
+Right {loc=openFile005.out1,type=writable,binary=False,buffering=block (512)}
+read and a read/write (should fail)
+Right {loc=openFile005.out1,type=read-writable,binary=False,buffering=block (512)}
+write and a read (should fail)
+Right {loc=openFile005.out1,type=readable,binary=False,buffering=block (512)}
+two writes, different files (silly, but should succeed)
+two reads, should succeed
