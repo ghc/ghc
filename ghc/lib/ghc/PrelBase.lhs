@@ -632,6 +632,8 @@ data Integer	= J# Int# Int# ByteArray#
 %*********************************************************
 
 \begin{code}
+instance Eval (a -> b) 
+
 instance  Show (a -> b)  where
     showsPrec p f  =  showString "<<function>>"
     showList ls	   = showList__ (showsPrec 0) ls
