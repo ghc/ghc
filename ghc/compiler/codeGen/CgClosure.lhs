@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.52 2001/11/06 11:02:05 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.53 2001/11/23 11:47:12 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -274,12 +274,16 @@ closureCodeBody binder_info closure_info cc [] body
     is_box  = case body of { StgApp fun [] -> True; _ -> False }
 
     body_code   = profCtrC SLIT("TICK_ENT_THK") []		`thenC`
+		  -- node always points when profiling, so this is ok:
+		  ldvEnter					`thenC`
 		  thunkWrapper closure_info body_label (
-			-- We only enter cc after setting up update so that cc
-			-- of enclosing scope will be recorded in update frame
-			-- CAF/DICT functions will be subsumed by this enclosing cc
+			-- We only enter cc after setting up update so
+			-- that cc of enclosing scope will be recorded
+			-- in update frame CAF/DICT functions will be
+			-- subsumed by this enclosing cc
 		    enterCostCentreCode closure_info cc IsThunk	is_box `thenC`
-		    cgExpr body)
+		    cgExpr body
+		  )
 \end{code}
 
 If there is {\em at least one argument}, then this closure is in
@@ -481,7 +485,7 @@ enterCostCentreCode closure_info ccs is_thunk is_box
 	    ASSERT(is_thunk == IsFunction)
 	    costCentresC SLIT("ENTER_CCS_FSUB") []
  
-	else if isCurrentCCS ccs then 
+	else if isDerivedFromCurrentCCS ccs then 
 	    if re_entrant && not is_box
 		then costCentresC SLIT("ENTER_CCS_FCL") [CReg node]
 		else costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
@@ -593,11 +597,14 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 	   -> Code
 funWrapper closure_info arg_regs stk_tags info_label fun_body
   = 	-- Stack overflow check
-    nodeMustPointToIt (closureLFInfo closure_info)  	`thenFC` \ node_points ->
-    -- HWL   chu' ngoq:
+    nodeMustPointToIt (closureLFInfo closure_info)  `thenFC` \ node_points ->
+
+    -- enter for Ldv profiling
+    (if node_points then ldvEnter else nopC)	    `thenC`
+
     (if opt_GranMacros
        then yield arg_regs node_points
-       else absC AbsCNop)                                 `thenC`
+       else absC AbsCNop)                           `thenC`
 
         -- heap and/or stack checks
     fastEntryChecks arg_regs stk_tags info_label node_points (
