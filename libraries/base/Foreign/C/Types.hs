@@ -58,7 +58,6 @@ import NHC.FFI
   )
 #else
 
-import Foreign.C.TypesISO
 import Foreign.Storable
 import Data.Bits	( Bits(..) )
 import Data.Int		( Int8,  Int16,  Int32,  Int64  )
@@ -127,5 +126,33 @@ FLOATING_TYPE(CFloat,tyConCFloat,"CFloat",HTYPE_FLOAT)
 FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
 -- HACK: Currently no long double in the FFI, so we simply re-use double
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
+
+INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
+INTEGRAL_TYPE(CSize,tyConCSize,"CSize",HTYPE_SIZE_T)
+INTEGRAL_TYPE(CWchar,tyConCWchar,"CWchar",HTYPE_WCHAR_T)
+INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
+
+{-# RULES
+"fromIntegral/a->CPtrdiff"   fromIntegral = \x -> CPtrdiff   (fromIntegral x)
+"fromIntegral/a->CSize"      fromIntegral = \x -> CSize      (fromIntegral x)
+"fromIntegral/a->CWchar"     fromIntegral = \x -> CWchar     (fromIntegral x)
+"fromIntegral/a->CSigAtomic" fromIntegral = \x -> CSigAtomic (fromIntegral x)
+
+"fromIntegral/CPtrdiff->a"   fromIntegral = \(CPtrdiff   x) -> fromIntegral x
+"fromIntegral/CSize->a"      fromIntegral = \(CSize      x) -> fromIntegral x
+"fromIntegral/CWchar->a"     fromIntegral = \(CWchar     x) -> fromIntegral x
+"fromIntegral/CSigAtomic->a" fromIntegral = \(CSigAtomic x) -> fromIntegral x
+ #-}
+
+INTEGRAL_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
+INTEGRAL_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
+
+-- FIXME: Implement and provide instances for Eq and Storable
+data CFile = CFile
+data CFpos = CFpos
+data CJmpBuf = CJmpBuf
+
+-- C99 types which are still missing include:
+-- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
 
 #endif

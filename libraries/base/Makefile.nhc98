@@ -18,7 +18,7 @@ SRCS	= \
 	System/Directory.hs System/Mem.hs System/Cmd.hs System/Info.hs \
 	System/Console/GetOpt.hs System/Random.hs \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
-	Foreign/ForeignPtr.hs Foreign/C/Types.hs Foreign/C/TypesISO.hs \
+	Foreign/ForeignPtr.hs Foreign/C/Types.hs \
 	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
 	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs \
 	Foreign/Marshal/Pool.hs Foreign/Marshal.hs \
