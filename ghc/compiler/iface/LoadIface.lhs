@@ -761,13 +761,13 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 
 noIfaceErr dflags mod_name (PackageHidden pkg)
   = ptext SLIT("Could not import") <+> quotes (ppr mod_name) <> colon
-    $$ ptext SLIT("it is a member of package") <+> quotes (ppr pkg) <> comma
+    $$ ptext SLIT("it is a member of package") <+> ppr pkg <> comma
 	 <+> ptext SLIT("which is hidden")
 
 noIfaceErr dflags mod_name (ModuleHidden pkg)
   = ptext SLIT("Could not import") <+> quotes (ppr mod_name) <> colon
     $$ ptext SLIT("it is hidden") 
-	<+> parens (ptext SLIT("in package") <+> quotes (ppr pkg))
+	<+> parens (ptext SLIT("in package") <+> ppr pkg)
 
 noIfaceErr dflags mod_name (NotFound files)
   = ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name)
