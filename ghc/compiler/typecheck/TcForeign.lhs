@@ -43,7 +43,7 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy, isFFILabelTy,
 			  isFFIExternalTy, isFFIDynArgumentTy,
-			  isFFIDynResultTy, isForeignPtrTy
+			  isFFIDynResultTy,
 			)
 import ForeignCall	( CExportSpec(..), CCallTarget(..), CCallConv(..),
 			  isDynamicTarget, isCasmTarget ) 
@@ -251,11 +251,7 @@ checkForeignArgs pred tys
   = mapNF_Tc go tys		`thenNF_Tc_` 
     returnNF_Tc ()
   where
-    go ty = check (pred ty) (illegalForeignTyErr argument ty)   `thenNF_Tc_`
-	    warnTc (isForeignPtrTy ty) foreignPtrWarn
-    --
-    foreignPtrWarn = 
-      text "`ForeignPtr' as argument type in a foreign import is deprecated"
+    go ty = check (pred ty) (illegalForeignTyErr argument ty)
 
 ------------ Checking result types for foreign calls ----------------------
 -- Check that the type has the form 
