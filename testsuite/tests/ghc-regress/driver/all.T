@@ -25,6 +25,17 @@ test('driver060', normal, run_command_ignore_output, ['$MAKE test060'])
 test('driver061', normal, run_command_ignore_output, ['$MAKE test061'])
 test('driver062', normal, run_command_ignore_output, ['$MAKE test062'])
 test('driver063', normal, run_command, ['$MAKE -s --no-print-directory test063'])
+test('driver064', normal, run_command_ignore_output, ['$MAKE test064'])
+test('driver065', normal, run_command_ignore_output, ['$MAKE test065'])
+test('driver066', normal, run_command_ignore_output, ['$MAKE test066'])
+test('driver067', normal, run_command_ignore_output, ['$MAKE test067'])
+test('driver068', normal, run_command_ignore_output, ['$MAKE test068'])
+test('driver069', normal, run_command_ignore_output, ['$MAKE test069'])
+test('driver070', normal, run_command_ignore_output, ['$MAKE test070'])
+test('driver071', normal, run_command_ignore_output, ['$MAKE test071'])
+
+test('driver080', normal, run_command_ignore_output, ['$MAKE test080'])
+
 clean(['B/C.hi', 'B/C.o', 'B/C.ooo', 'B/C.xhi',
        'd1/P/Q.o', 'd2/R/S.o', 'd1/P/Q.hi', 'd2/R/S.hi',
        'A.ooo', 'A.xhi', 'Hello.hi', 'Hello.o', 'hello'])

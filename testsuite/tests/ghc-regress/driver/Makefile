@@ -220,3 +220,61 @@ test062:
 test063:
 	@$(RM) A.hi A.o A.hc D.hi D.o D.hc
 	-@$(TEST_HC) --make -i -v0 D.hs
+
+# Test -E
+test064:
+	@$(RM) A.hi A.hspp
+	$(TEST_HC) -E A.hs
+	test -f A.hspp
+
+# Test -E/-cpp
+test065:
+	@$(RM) A.hi A.hspp
+	$(TEST_HC) -E -cpp A.hs
+	test -f A.hspp
+
+# Test -E/-o
+test066:
+	@$(RM) A.hi A.tmp
+	$(TEST_HC) -E A.hs -o A.tmp
+	test -f A.tmp
+
+# Test -E/-cpp/-o
+test067:
+	@$(RM) A.hi A.tmp
+	$(TEST_HC) -cpp -E A.hs -o A.tmp
+	test -f A.tmp
+
+# Test -C
+test068:
+	@$(RM) A.hi A.hc
+	$(TEST_HC) -C A.hs
+	test -f A.hc
+
+# Test -C/-o
+test069:
+	@$(RM) A.hi A.tmp
+	$(TEST_HC) -C A.hs -o A.tmp
+	test -f A.tmp
+
+# Test -S
+test070:
+	@$(RM) A.hi A.s
+	$(TEST_HC) -S A.hs
+	test -f A.s
+
+# Test -S/-o
+test071:
+	@$(RM) A.hi A.tmp
+	$(TEST_HC) -S A.hs -o A.tmp
+	test -f A.tmp
+
+# No recompilation required, but we requested a .hc file --> should recompile
+# Broken briefy in ghc-6.3.
+test080:
+	@$(RM) A.hi A.o A.hc
+	$(TEST_HC) -c A.hs
+	test -f A.o
+	$(TEST_HC) -C A.hs
+	test -f A.hc
+
