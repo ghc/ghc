@@ -2,7 +2,7 @@
 
 <book id="haddock">
   <bookinfo>
-    <date>2002-4-10</date>
+    <date>2004-08-02</date>
     <title>Haddock User Guide</title>
     <author>
       <firstname>Simon</firstname>
@@ -100,7 +100,7 @@
     <section id="obtaining">
       <title>Obtaining Haddock</title>
 
-      <para>Distributions (source & binary) of Haddock can be obtained
+      <para>Distributions (source &amp; binary) of Haddock can be obtained
       from its <ulink url="http://www.haskell.org/haddock/">web
       site</ulink>.</para>
 
@@ -202,13 +202,13 @@
 
     <cmdsynopsis>
       <command>haddock</command>
-      <arg rep=repeat><replaceable>option</replaceable></arg>
-      <arg rep=repeat choice=plain><replaceable>file</replaceable></arg>
+      <arg rep="repeat"><replaceable>option</replaceable></arg>
+      <arg rep="repeat" choice="plain"><replaceable>file</replaceable></arg>
     </cmdsynopsis>
 
     <para>Where each <replaceable>file</replaceable> is a filename
     containing a Haskell source module.  Only plain Haskell source
-    files are accepted (but see <xref linkend="cpp"> for instructions
+    files are accepted (but see <xref linkend="cpp"/> for instructions
     on how to pre-process source files for feeding to Haddock).</para>
 
     <para>All the modules specified on the command line will be
@@ -229,10 +229,14 @@
 
     <variablelist>
       <varlistentry>
-	<term><option>-o</option> <replaceable>dir</replaceable></term>
-	<term><option>--odir</option>=<replaceable>dir</replaceable></term>
-	<indexterm><primary><option>-o</option></primary></indexterm>
-	<indexterm><primary><option>--odir</option></primary></indexterm>
+	<term>
+          <indexterm><primary><option>-o</option></primary></indexterm>
+          <option>-o</option> <replaceable>dir</replaceable>
+        </term>
+	<term>
+          <indexterm><primary><option>--odir</option></primary></indexterm>
+          <option>--odir</option>=<replaceable>dir</replaceable>
+        </term>
 	<listitem>
 	  <para>Generate files into <replaceable>dir</replaceable>
 	  instead of the current directory.</para>
@@ -240,10 +244,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable></term>
-	<term><option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable></term>
-	<indexterm><primary><option>-i</option></primary></indexterm>
-	<indexterm><primary><option>--read-interface</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-i</option></primary></indexterm>
+          <option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--read-interface</option></primary></indexterm>
+          <option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable>
+        </term>
 	<listitem>
 	  <para>Read the interface file in
 	  <replaceable>file</replaceable>, which must have been
@@ -269,11 +277,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-D</option> <replaceable>file</replaceable></term>
-	<term><option>--dump-interface</option>=<replaceable>file</replaceable></term>
-	<indexterm><primary><option>-D</option></primary></indexterm>
-	<indexterm><primary><option>--dump-interface</option></primary>
-	</indexterm>
+	<term>
+  	  <indexterm><primary><option>-D</option></primary></indexterm>
+          <option>-D</option> <replaceable>file</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--dump-interface</option></primary></indexterm>
+          <option>--dump-interface</option>=<replaceable>file</replaceable>
+        </term>
 	<listitem>
 	  <para>Produce an <firstterm>interface
 	  file</firstterm><footnote><para>Haddock interface files are
@@ -289,21 +300,28 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-l</option> <replaceable>dir</replaceable></term>
-	<term><option>--lib</option>=<replaceable>dir</replaceable></term>
-	<indexterm><primary><option>-l</option></primary></indexterm>
-	<indexterm><primary><option>--lib</option></primary>
-	</indexterm>
+	<term>
+	  <indexterm><primary><option>-l</option></primary></indexterm>
+          <option>-l</option> <replaceable>dir</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--lib</option></primary></indexterm>
+          <option>--lib</option>=<replaceable>dir</replaceable>
+        </term>
 	<listitem>
 	  <para>Use auxiliary files in <replaceable>dir</replaceable>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-S</option></term>
-	<term><option>--docbook</option></term>
-	<indexterm><primary><option>-S</option></primary></indexterm>
-	<indexterm><primary><option>--docbook</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-S</option></primary></indexterm>
+          <option>-S</option>
+        </term>
+	<term>
+	  <indexterm><primary><option>--docbook</option></primary></indexterm>
+          <option>--docbook</option>
+        </term>
 	<listitem>
 	  <para>Reserved for future use (output documentation in SGML DocBook
 	  format).</para>
@@ -311,10 +329,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-h</option></term>
-	<term><option>--html</option></term>
-	<indexterm><primary><option>-h</option></primary></indexterm>
-	<indexterm><primary><option>--html</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-h</option></primary></indexterm>
+          <option>-h</option>
+        </term>
+	<term>
+	  <indexterm><primary><option>--html</option></primary></indexterm>
+          <option>--html</option>
+        </term>
 	<listitem>
 	  <para>Generate documentation in HTML format.  Several files
 	  will be generated into the current directory (or the
@@ -367,14 +389,18 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-m</option></term>
-	<term><option>--html-help</option></term>
-	<indexterm><primary><option>--html-help</option></primary>
-	</indexterm>
+	<term>
+          <indexterm><primary><option>-m</option></primary></indexterm>
+          <option>-m</option>
+        </term>
+	<term>
+          <indexterm><primary><option>--html-help</option></primary></indexterm>
+          <option>--html-help</option>
+        </term>
 	<listitem>
 	  <para>(In HTML mode only) Produce extra contents and index
 	  files for given HTML Help system. Currently supported Help
-	  systems are Microsoft HTML Help 1.3 and 2.0 and GNOME DevHelp.
+	  systems are Microsoft HTML Help 1.3 and 2.0 and GNOME DevHelp.</para>
 
 	  <para>Using the Microsoft HTML Help system provides two
 	  advantages over plain HTML: the help viewer gives you a nice
@@ -389,24 +415,24 @@
 	  <ulink url="http://www.microsoft.com/">http://www.microsoft.com/</ulink>
 	  (search for <quote>HTML Help compiler</quote>).</para>
 
-	  Viewers
+	  <para>Viewers</para>
 	  <variablelist>
-	  	 <varlistentry>
-	  	    <term>Microsoft HTML Help Viewer</term>
-	  	    <listitem>Distributed with Microsoft Windows</listitem>
-	  	 </varlistentry>
-	     <varlistentry>
-            <term><ulink url="http://xchm.sourceforge.net">xCHM</ulink></term>
-	  	    <listitem>a CHM viewer for UNIX (Linux, *BSD, Solaris), written by Razvan Cojocaru</listitem>
-	  	 </varlistentry>
-	     <varlistentry>
-            <term><ulink url="http://www.jouledata.com/MacProducts.html">JouleData Solutions' CHM Viewer</ulink></term>
-	  	    <listitem>a comercial 100% native Cocoa .chm file viewer for the Mac OS X platform</listitem>
-	  	 </varlistentry>
-	     <varlistentry>
-            <term><ulink url="http://gnochm.sourceforge.net">GnoCHM</ulink></term>
-	  	    <listitem>a CHM file viewer. It is designed to integrate nicely with Gnome.</listitem>
-	  	 </varlistentry>
+            <varlistentry>
+              <term>Microsoft HTML Help Viewer</term>
+              <listitem><para>Distributed with Microsoft Windows</para></listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><ulink url="http://xchm.sourceforge.net">xCHM</ulink></term>
+              <listitem><para>a CHM viewer for UNIX (Linux, *BSD, Solaris), written by Razvan Cojocaru</para></listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><ulink url="http://www.jouledata.com/MacProducts.html">JouleData Solutions' CHM Viewer</ulink></term>
+              <listitem><para>a comercial 100% native Cocoa .chm file viewer for the Mac OS X platform</para></listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><ulink url="http://gnochm.sourceforge.net">GnoCHM</ulink></term>
+              <listitem><para>a CHM file viewer. It is designed to integrate nicely with Gnome.</para></listitem>
+            </varlistentry>
 	  </variablelist>
 
 	  <para>The GNOME DevHelp also provides help viewer which looks like
@@ -422,10 +448,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-s</option> <replaceable>URL</replaceable></term>
-	<term><option>--source</option>=<replaceable>URL</replaceable></term>
-	<indexterm><primary><option>-s</option></primary></indexterm>
-	<indexterm><primary><option>--source</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-s</option></primary></indexterm>
+          <option>-s</option> <replaceable>URL</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--source</option></primary></indexterm>
+          <option>--source</option>=<replaceable>URL</replaceable>
+        </term>
 	<listitem>
 	  <para>Include links to the source files in the generated
 	  documentation, where <replaceable>URL</replaceable> is the
@@ -434,9 +464,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-c</option> <replaceable>file</replaceable></term>
-	<term><option>--css</option>=<replaceable>file</replaceable></term>
-	<indexterm><primary><option>--css</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-c</option></primary></indexterm>
+          <option>-c</option> <replaceable>file</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--css</option></primary></indexterm>
+          <option>--css</option>=<replaceable>file</replaceable>
+        </term>
 	<listitem>
 	  <para>Specify a stylesheet to use instead of the default one
 	  that comes with Haddock.  It should specify certain classes:
@@ -445,10 +480,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-p</option> <replaceable>file</replaceable></term>
-	<term><option>--prologue</option>=<replaceable>file</replaceable></term>
-	<indexterm><primary><option>-p</option></primary></indexterm>
-	<indexterm><primary><option>--prologue</option></primary></indexterm>
+	<term>
+	  <indexterm><primary><option>-p</option></primary></indexterm>
+          <option>-p</option> <replaceable>file</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--prologue</option></primary></indexterm>
+          <option>--prologue</option>=<replaceable>file</replaceable>
+        </term>
 	<listitem>
 	  <para>Specify a file containing documentation which is
 	  placed on the main contents page under the heading
@@ -459,10 +498,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-t</option> <replaceable>title</replaceable></term>
-	<term><option>--title</option>=<replaceable>title</replaceable></term>
-	<indexterm><primary><option>-t</option></primary></indexterm>
-	<indexterm><primary><option>--title</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-t</option></primary></indexterm>
+          <option>-t</option> <replaceable>title</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--title</option></primary></indexterm>
+          <option>--title</option>=<replaceable>title</replaceable>
+        </term>
 	<listitem>
 	  <para>Use <replaceable>title</replaceable> as the page
 	  heading for each page in the documentation.This will
@@ -474,11 +517,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-n</option></term>
-	<term><option>--no-implicit-prelude</option></term>
-	<indexterm><primary><option>-n</option></primary></indexterm>
-	<indexterm><primary><option>--no-implicit-prelude</option></primary>
-	</indexterm>
+        <term>
+          <indexterm><primary><option>-n</option></primary></indexterm>
+          <option>-n</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--no-implicit-prelude</option></primary></indexterm>
+          <option>--no-implicit-prelude</option>
+        </term>
 	<listitem>
 	  <para>Don't automatically import <literal>Prelude</literal>
 	  in every module.  Used when producing documentation for the
@@ -487,32 +533,42 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-d</option></term>
-	<term><option>--debug</option></term>
-	<indexterm><primary><option>-d</option></primary></indexterm>
-	<indexterm><primary><option>--debug</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-d</option></primary></indexterm>
+          <option>-d</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--debug</option></primary></indexterm>
+          <option>--debug</option>
+        </term>
 	<listitem>
 	  <para>Produce extra debugging output.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-?</option></term>
-	<term><option>--help</option></term>
-	<indexterm><primary><option>-?</option></primary></indexterm>
-	<indexterm><primary><option>--help</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-?</option></primary></indexterm>
+          <option>-?</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--help</option></primary></indexterm>
+          <option>--help</option>
+        </term>
 	<listitem>
 	  <para>Display help and exit.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-v</option></term>
-	<term><option>--verbose</option></term>
-	<indexterm><primary><option>-v</option></primary>
-	</indexterm>
-	<indexterm><primary><option>--verbose</option></primary>
-	</indexterm>
+        <term>
+          <indexterm><primary><option>-v</option></primary></indexterm>
+          <option>-v</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--verbose</option></primary></indexterm>
+          <option>--verbose</option>
+        </term>
 	<listitem>
 	  <para>Increase verbosity.  Currently this will cause Haddock
 	  to emit some extra warnings, in particular about modules
@@ -523,18 +579,24 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-V</option></term>
-	<term><option>--version</option></term>
-	<indexterm><primary><option>-V</option></primary></indexterm>
-	<indexterm><primary><option>--version</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-V</option></primary></indexterm>
+          <option>-V</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--version</option></primary></indexterm>
+          <option>--version</option>
+        </term>
 	<listitem>
 	  <para>Output version information and exit.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>--use-index=<replaceable>URL</replaceable></option></term>
-	<indexterm><primary><option>--use-index</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--use-index</option></primary></indexterm>
+          <option>--use-index=<replaceable>URL</replaceable></option>
+        </term>
 	<listitem>
 	  <para>When generating HTML, do not generate an index.
 	  Instead, redirect the Index link on each page to
@@ -546,8 +608,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>--gen-index</option></term>
-	<indexterm><primary><option>--gen-index</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--gen-index</option></primary></indexterm>
+          <option>--gen-index</option>
+        </term>
 	<listitem>
 	  <para>Generate an HTML index containing entries pulled from
 	  all the specified interfaces (interfaces are specified using
@@ -558,11 +622,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-k</option> <replaceable>P</replaceable></term>
-	<term><option>--package=</option><replaceable>P</replaceable></term>
-	<indexterm><primary><option>-k</option></primary>
-	</indexterm>
-	<indexterm><primary><option>--package</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-k</option></primary></indexterm>
+          <option>-k</option> <replaceable>P</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--package</option></primary></indexterm>
+          <option>--package=</option><replaceable>P</replaceable>
+        </term>
 	<listitem>
 	  <para>Set the package name for these modules to
 	  <replaceable>P</replaceable>.  In a combined index generated
@@ -919,7 +986,7 @@ import C (a, b)
 
 	<para>The exception to this rule is when the re-exported
 	module is declared with the <literal>hide</literal> attribute
-	(<xref linkend="module-attributes">), in which case the module
+	(<xref linkend="module-attributes"/>), in which case the module
 	is never cross-referenced; the contents are always expanded in
 	place in the re-exporting module.</para>
       </section>
@@ -1086,8 +1153,10 @@ module A where
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>hide</literal></term>
-	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+          <term>
+            <indexterm><primary><literal>hide</literal></primary></indexterm>
+            <literal>hide</literal>
+          </term>
 	  <listitem>
 	    <para>Omit this module from the generated documentation,
 	    but nevertheless propagate definitions and documentation
@@ -1097,8 +1166,10 @@ module A where
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>prune</literal></term>
-	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+          <term>
+            <indexterm><primary><literal>hide</literal></primary></indexterm>
+            <literal>prune</literal>
+          </term>
 	  <listitem>
 	    <para>Omit definitions that have no documentation
 	    annotations from the generated documentation.</para>
@@ -1106,8 +1177,10 @@ module A where
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>ignore-exports</literal></term>
-	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+          <term>
+            <indexterm><primary><literal>hide</literal></primary></indexterm>
+            <literal>ignore-exports</literal>
+          </term>
 	  <listitem>
 	    <para>Ignore the export list.  Generate documentation as
 	    if the module had no export list - i.e. all the top-level
