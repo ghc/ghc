@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.17 2000/03/31 03:09:35 hwloidl Exp $
+ * $Id: Closures.h,v 1.18 2000/08/15 11:48:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -150,7 +150,7 @@ typedef struct StgClosure_ {
 
 typedef struct StgMutClosure_ {
     StgHeader   header;
-    StgPtr     *padding;
+    StgWord     padding;
     struct StgMutClosure_ *mut_link;
     struct StgClosure_ *payload[0];
 } StgMutClosure;
@@ -164,23 +164,23 @@ typedef struct {
     StgHeader   header;
     StgWord     n_args;
     StgClosure *fun;
-    StgPtr      payload[0];
+    StgClosure *payload[0];
 } StgPAP;
 
 typedef struct {
     StgHeader   header;
     StgWord     n_args;
     StgClosure *fun;
-    StgPtr      payload[0];
+    StgClosure *payload[0];
 } StgAP_UPD;
 
 typedef struct {
-    StgHeader  header;
-    StgWord    n_ptrs;
-    StgWord    n_words;
-    StgWord    n_instrs;
-    StgWord    stgexpr;
-    StgPtr     payload[0];
+    StgHeader   header;
+    StgWord     n_ptrs;
+    StgWord     n_words;
+    StgWord     n_instrs;
+    StgWord     stgexpr;
+    StgClosure *payload[0];
 } StgBCO;
 
 typedef struct {
@@ -347,7 +347,7 @@ typedef struct StgBlockingQueue_ {
 /* this closure is hanging at the end of a blocking queue in (see RBH.c) */
 typedef struct StgRBHSave_ {
   StgHeader    header;
-  StgPtr       payload[0];     /* 2 words ripped out of the guts of the */
+  StgClosure  *payload[0];     /* 2 words ripped out of the guts of the */
 } StgRBHSave;                  /*  closure holding the blocking queue */
  
 typedef struct StgRBH_ {

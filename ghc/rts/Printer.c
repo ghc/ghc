@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.27 2000/06/15 13:23:52 daan Exp $
+ * $Id: Printer.c,v 1.28 2000/08/15 11:48:06 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -107,7 +107,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,"AP_UPD("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {
                 fprintf(stderr,", ");
-                printPtr(ap->payload[i]);
+                printPtr((P_)ap->payload[i]);
             }
             fprintf(stderr,")\n");
             break;
@@ -196,8 +196,7 @@ void printClosure( StgClosure *obj )
 
     case TSO:
       fprintf(stderr,"TSO("); 
-      fprintf(stderr,"%d (%x)", 
-              stgCast(StgTSO*,obj)->id, stgCast(StgTSO*,obj));
+      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
       fprintf(stderr,")\n"); 
       break;
 
@@ -937,6 +936,8 @@ extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 #endif /* HAVE_BFD_H */
 
 #include "StoragePriv.h"
+
+void findPtr(P_ p);		/* keep gcc -Wall happy */
 
 void
 findPtr(P_ p)

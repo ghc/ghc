@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.18 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: RtsAPI.c,v 1.19 2000/08/15 11:48:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -199,7 +199,7 @@ rts_apply (HaskellObj f, HaskellObj arg)
   SET_HDR(ap, &AP_UPD_info, CCS_SYSTEM);
   ap->n_args = 1;
   ap->fun    = f;
-  ap->payload[0] = (P_)arg;
+  ap->payload[0] = arg;
   return (StgClosure *)ap;
 }
 

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.74 2000/08/03 11:28:35 simonmar Exp $
+ * $Id: Schedule.c,v 1.75 2000/08/15 11:48:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2724,7 +2724,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	      
       ap->n_args = 2;
       ap->fun = cf->handler;	/* :: Exception -> IO a */
-      ap->payload[0] = (P_)exception;
+      ap->payload[0] = exception;
       ap->payload[1] = ARG_TAG(0); /* realworld token */
 
       /* throw away the stack from Sp up to and including the
@@ -2772,7 +2772,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
     ap->fun    = (StgClosure *)sp[0];
     sp++;
     for(i=0; i < (nat)words; ++i) {
-      ap->payload[i] = (P_)*sp++;
+      ap->payload[i] = (StgClosure *)*sp++;
     }
     
     switch (get_itbl(su)->type) {
