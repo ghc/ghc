@@ -16,6 +16,7 @@ import ForeignCall	( CCallConv(..) )
 -- there is ifdeffery below
 import DATA_BITS	( Bits(..), shiftR, shiftL )
 import Foreign		( newArray )
+import Data.List        ( mapAccumL )
 
 import DATA_WORD	( Word8, Word32 )
 import Foreign		( Ptr )
@@ -435,7 +436,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ [mkRET,
          mkRESTORE_TRIVIAL]  -- this is in the delay slot of the RET
      )
-#elif powerpc_TARGET_ARCH
+#elif powerpc_TARGET_ARCH && darwin_TARGET_OS
 
    = let
          bytes_per_word = 4
@@ -503,7 +504,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                -- stfs f1, result_off(r31)
             DoubleArg -> 
                [0xd83f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
-               -- stfs f1, result_off(r31)
+               -- stfd f1, result_off(r31)
             _ | cgRepSizeW r_rep == 2 ->
                [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF),
                 0x909f0000 .|. (fromIntegral (result_off+4) .&. 0xFFFF)]
@@ -532,9 +533,111 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             0x7c0803a6,         -- mtlr r0
             0x4e800020          -- blr
          ]
+
+#elif powerpc_TARGET_ARCH && linux_TARGET_OS
+
+   -- All offsets here are measured in Words (not bytes).  This includes
+   -- arguments to the load/store machine code generators, alignment numbers
+   -- and the final 'framesize' among others.
+
+   = concatMap w32_to_w8s_bigEndian $ [
+            0x7c0802a6,                         -- mflr r0
+            0x93e1fffc,                         -- stw r31,-4(r1)
+            0x90010008,                         -- stw r0,8(r1)
+            0x94210000 .|. offset (-framesize), -- stwu r1, -frameSize(r1)
+            0x7c7f1b78                          -- mr r31, r3
+            ] ++ pass_parameters ++             -- pass the parameters
+            loadWord 12 addr_offW ++ [          -- lwz r12, a_off(r31)
+            0x7d8903a6,                         -- mtctr r12
+            0x4e800421                          -- bctrl
+            ] ++ gather_result ++ [             -- save the return value
+            0x80210000,                         -- lwz r1, 0(r1)
+            0x83e1fffc,                         -- lwz r31, -4(r1)
+            0x80010008,                         -- lwz r0, 8(r1)
+            0x7c0803a6,                         -- mtlr r0
+            0x4e800020                          -- blr
+         ]
+
+   where
+     gather_result :: [Word32]
+     gather_result = case r_rep of
+       VoidArg   -> []
+       FloatArg  -> storeFloat  1 r_offW
+       DoubleArg -> storeDouble 1 r_offW
+       LongArg   -> storeLong   3 r_offW
+       _         -> storeWord   3 r_offW
+
+     pass_parameters :: [Word32]
+     pass_parameters = concat params
+
+     -- vector aligned (4 word = 16 bytes) with 8 extra words of buffer space
+     framesize = alignedTo 4 (argsize + 8)
+
+     ((_,_,argsize), params) = mapAccumL loadparam (3,1,2) arg_offs_n_reps
+
+     -- handle one argument, returning machine code and the updated state
+     loadparam :: (Int, Int, Int) -> (Int, CgRep) ->
+                  ((Int, Int, Int), [Word32])
+
+     loadparam (gpr, fpr, stack) (ofs, rep) = case rep of
+       FloatArg | fpr <= 8  -> ( (gpr, fpr + 1, stack),  loadFloat fpr ofs )
+       FloatArg             -> ( (gpr, fpr, stack + 1),  stackWord stack ofs )
+
+       DoubleArg | fpr <= 8 -> ( (gpr, fpr + 1, stack),  loadDouble fpr ofs )
+       DoubleArg            -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
+
+       LongArg | even gpr   -> loadparam (gpr + 1, fpr, stack) (ofs, rep)
+       LongArg | gpr <= 9   -> ( (gpr + 2, fpr, stack),  loadLong gpr ofs )
+       LongArg              -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
+
+       _ | gpr <= 10        -> ( (gpr + 1, fpr, stack),  loadWord gpr ofs )
+       _                    -> ( (gpr, fpr, stack + 1),  stackWord stack ofs )
+      where astack = alignedTo 2 stack
+
+     alignedTo :: Int -> Int -> Int
+     alignedTo alignment x = case x `mod` alignment of
+                               0 -> x
+                               y -> x - y + alignment
+
+     -- convenience macros to do multiple-instruction data moves
+     stackWord dst src = loadWord 0 src ++ storeWordC 0 dst
+     stackLong dst src = stackWord dst src ++ stackWord (dst + 1) (src + 1)
+     loadLong  dst src = loadWord dst src ++ loadWord (dst + 1) (src + 1)
+     storeLong dst src = storeWord dst src ++ storeWord (dst + 1) (src + 1)
+
+     -- load data from the Haskell stack (relative to r31)
+     loadFloat   = loadstoreInstr 0xc01f0000 -- lfs fpr, ofs(r31)
+     loadDouble  = loadstoreInstr 0xc81f0000 -- lfd fpr, ofs(r31)
+     loadWord    = loadstoreInstr 0x801f0000 -- lwz gpr, ofs(r31)
+
+     -- store data to the Haskell stack (relative to r31)
+     storeFloat  = loadstoreInstr 0xd01f0000 -- stfs fpr, ofs(r31)
+     storeDouble = loadstoreInstr 0xd81f0000 -- stfd fpr, ofs(r31)
+     storeWord   = loadstoreInstr 0x901f0000 -- stw gpr, ofs(r31)
+
+     -- store data to the C stack (relative to r1)
+     storeWordC  = loadstoreInstr 0x90010000 -- stw gpr, ofs(r1)
+
+     -- machine code building blocks
+     loadstoreInstr :: Word32 -> Int -> Int -> [Word32]
+     loadstoreInstr code reg ofs = [ code .|. register reg .|. offset ofs ]
+
+     register :: Int -> Word32
+     register reg = fromIntegral reg `shiftL` 21
+
+     offset :: Int -> Word32
+     offset ofs   = fromIntegral (ofs * 4) .&. 0xFFFF
+
+     -- speaks for itself
+     w32_to_w8s_bigEndian :: Word32 -> [Word8]
+     w32_to_w8s_bigEndian w =  [fromIntegral (0xFF .&. (w `shiftR` 24)),
+                                fromIntegral (0xFF .&. (w `shiftR` 16)),
+                                fromIntegral (0xFF .&. (w `shiftR` 8)),
+                                fromIntegral (0xFF .&. w)]
+
 #else 
 
-   = undefined
+   = error "mkMarshalCode not implemented for this platform."
 
 #endif
 
