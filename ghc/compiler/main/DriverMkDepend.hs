@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.13 2001/06/26 16:30:50 rrt Exp $
+-- $Id: DriverMkDepend.hs,v 1.14 2001/08/02 16:35:10 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -18,6 +18,9 @@ import SysTools		( newTempName )
 import qualified SysTools
 import Module
 import Config
+import Module		( isHomeModule )
+import Finder		( findModule )
+import HscTypes		( ModuleLocation(..) )
 import Util
 import Panic
 
@@ -35,7 +38,6 @@ import Maybe
 	-- flags
 GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
 GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
-GLOBAL_VAR(v_Dep_ignore_dirs,		[], [String]);
 GLOBAL_VAR(v_Dep_exclude_mods,          [], [String]);
 GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
 GLOBAL_VAR(v_Dep_warnings,		True, Bool);
@@ -55,12 +57,9 @@ dep_opts = [
    (  "s", 			SepArg (add v_Dep_suffixes) ),
    (  "f", 			SepArg (writeIORef v_Dep_makefile) ),
    (  "w", 			NoArg (writeIORef v_Dep_warnings False) ),
-   (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) ),
-   (  "X", 			Prefix (addToDirList v_Dep_ignore_dirs) ),
-   (  "-exclude-directory=",	Prefix (addToDirList v_Dep_ignore_dirs) )
+   (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
 --   (  "-exclude-module=",       Prefix (add v_Dep_exclude_mods) )
 --   (  "x",                      Prefix (add v_Dep_exclude_mods) )
-   
  ]
 
 beginMkDependHS :: IO ()
@@ -124,11 +123,6 @@ beginMkDependHS = do
 	(zip import_dirs import_dir_contents ++
   	 zip pkg_import_dirs pkg_import_dir_contents)
 
-	-- ignore packages unless --include-prelude is on
-  include_prelude <- readIORef v_Dep_include_prelude
-  when (not include_prelude) $
-    mapM_ (add v_Dep_ignore_dirs) pkg_import_dirs
-
   return ()
 
 
@@ -169,40 +163,18 @@ endMkDependHS = do
 
 findDependency :: Bool -> FilePath -> ModuleName -> IO (Maybe (String, Bool))
 findDependency is_source src imp = do
-   dir_contents <- readIORef v_Dep_dir_contents
-   ignore_dirs  <- readIORef v_Dep_ignore_dirs
-   excl_mods    <- readIORef v_Dep_exclude_mods
-   hisuf        <- readIORef v_Hi_suf
-
-   let
-     imp_mod      = moduleNameUserString imp
-     imp_hi       = imp_mod ++ '.':hisuf
-     imp_hiboot   = imp_mod ++ ".hi-boot"
-     imp_hiboot_v = imp_mod ++ ".hi-boot-" ++ cHscIfaceFileVersion
-     imp_hs       = imp_mod ++ ".hs"
-     imp_lhs      = imp_mod ++ ".lhs"
-
-     deps | is_source = [ imp_hiboot_v, imp_hiboot, imp_hs, imp_lhs ]
-     	  | otherwise = [ imp_hi, imp_hs, imp_lhs ]
-
-     search [] = throwDyn (ProgramError (src ++ ": " ++ "can't find one of the following: " ++
-				      unwords (map (\d -> '`': d ++ "'") deps)))
-     search ((dir, contents) : dirs)
-	   | null present = search dirs
-	   | otherwise = 
-		if dir `elem` ignore_dirs 
-			then return Nothing
-			else if is_source
-				then if dep /= imp_hiboot_v 
-					then return (Just (dir++'/':imp_hiboot, False))	
-					else return (Just (dir++'/':dep, False))	
-				else return (Just (dir++'/':imp_hi, not is_source))
-	   where
-		present = filter (`elem` contents) deps
-		dep     = head present
- 
-   -- in
-   if imp_mod `elem` excl_mods then
-      return Nothing
-    else
-      search dir_contents
+   excl_mods <- readIORef v_Dep_exclude_mods
+   include_prelude <- readIORef v_Dep_include_prelude
+   let imp_mod = moduleNameUserString imp
+   if imp_mod `elem` excl_mods 
+      then return Nothing
+      else do
+	r <- findModule imp
+	case r of 
+	   Just (mod,loc)
+		| isHomeModule mod || include_prelude
+		-> return (Just (ml_hi_file loc, not is_source))
+		| otherwise 
+		-> return Nothing
+	   Nothing -> throwDyn (ProgramError 
+		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'"))
