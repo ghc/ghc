@@ -1,5 +1,5 @@
 # Initialise and check sanity.
-AC_INIT([Glasgow Haskell Compiler], [6.3.20040927], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([Glasgow Haskell Compiler], [6.3], [glasgow-haskell-bugs@haskell.org], [ghc])
 AC_CONFIG_SRCDIR([ghc.spec.in])
 
 # Calculate project version as an integer, using 2 digits for minor version
