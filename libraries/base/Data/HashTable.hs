@@ -220,7 +220,7 @@ insert (HashTable ref) key val = do
 	   then expandHashTable table1
 	   else return table1
   writeIORef ref table2
-  (segment_index,segment_offset) <- tableLocation table key
+  (segment_index,segment_offset) <- tableLocation table2 key
   segment <- myReadArray dir segment_index
   bucket <- myReadArray segment segment_offset
   myWriteArray segment segment_offset ((key,val):bucket)
