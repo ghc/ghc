@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.30 2001/05/18 16:54:05 simonmar Exp $
+-- $Id: System.lhs,v 1.31 2001/05/22 15:06:47 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -24,36 +24,31 @@ import PrelCTypes
 import PrelMarshalArray
 import PrelPtr
 import PrelStorable
-import PrelIOBase	( IOException(..), ioException, IOErrorType(..))
+import PrelIOBase
+import PrelConc
 
--- -----------------------------------------------------------------------------
--- The ExitCode type
-
--- The `ExitCode' type defines the exit codes that a program
--- can return.  `ExitSuccess' indicates successful termination;
--- and `ExitFailure code' indicates program failure
--- with value `code'.  The exact interpretation of `code'
--- is operating-system dependent.  In particular, some values of 
--- `code' may be prohibited (e.g. 0 on a POSIX-compliant system).
-
-data ExitCode = ExitSuccess | ExitFailure Int 
-                deriving (Eq, Ord, Read, Show)
-
+-- ---------------------------------------------------------------------------
+-- getArgs, getProgName, getEnv
 
 -- Computation `getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
 
 getArgs :: IO [String]
-getArgs = unpackArgv primArgv primArgc
+getArgs = do
+  argv <- peek prog_argv_label
+  argc <- peek prog_argc_label
+  peekArray (fromIntegral argc - 1) (advancePtr argv 1) >>= mapM peekCString
 
-foreign import ccall "get_prog_argv" unsafe   primArgv :: Ptr (Ptr CChar)
-foreign import ccall "get_prog_argc" unsafe   primArgc :: Int
+foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
+foreign label "prog_argc" prog_argc_label :: Ptr CInt
 
 -- Computation `getProgName' returns the name of the program
 -- as it was invoked.
 
 getProgName :: IO String
-getProgName = unpackProgName primArgv
+getProgName = do
+  argv <- peek prog_argv_label
+  unpackProgName argv
 
 -- Computation `getEnv var' returns the value
 -- of the environment variable {\em var}.  
@@ -105,29 +100,16 @@ foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
 -- handles are first closed.
 
 exitWith :: ExitCode -> IO a
-exitWith ExitSuccess = do
-    primExit 0
-    ioException (IOError Nothing OtherError "exitWith" "exit should not return" Nothing)
-
-exitWith (ExitFailure n) 
+exitWith ExitSuccess = throw (ExitException ExitSuccess)
+exitWith code@(ExitFailure n) 
   | n == 0 = ioException (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
-  | otherwise = do
-    primExit n
-    ioException (IOError Nothing OtherError "exitWith" "exit should not return" Nothing)
-
--- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
--- re-enter Haskell land through finalizers.
-foreign import ccall "shutdownHaskellAndExit" primExit :: Int -> IO ()
+  | otherwise = throw (ExitException code)
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
 
 -- ---------------------------------------------------------------------------
 -- Local utilities
-
-unpackArgv :: Ptr (Ptr CChar) -> Int -> IO [String] -- argv[1 .. argc-1]
-unpackArgv argv argc
-  = peekArray (argc-1) (advancePtr argv 1) >>= mapM peekCString
 
 unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do 
@@ -139,5 +121,4 @@ unpackProgName argv = do
     de_slash  acc []	   = reverse acc
     de_slash _acc ('/':xs) = de_slash []      xs
     de_slash  acc (x:xs)   = de_slash (x:acc) xs
-
 \end{code}

@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: PrelTopHandler.lhs,v 1.1 2001/05/21 14:07:31 simonmar Exp $
+-- $Id: PrelTopHandler.lhs,v 1.2 2001/05/22 15:06:47 simonmar Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -36,8 +36,18 @@ real_handler :: Exception -> IO ()
 real_handler ex =
   case ex of
 	AsyncException StackOverflow -> reportStackOverflow True
+
+	-- only the main thread gets ExitException exceptions
+	ExitException ExitSuccess     -> shutdownHaskellAndExit 0
+	ExitException (ExitFailure n) -> shutdownHaskellAndExit n
+
 	ErrorCall s -> reportError True s
 	other       -> reportError True (showsPrec 0 other "\n")
+
+-- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
+-- re-enter Haskell land through finalizers.
+foreign import ccall "shutdownHaskellAndExit" 
+  shutdownHaskellAndExit :: Int -> IO ()
 
 reportStackOverflow :: Bool -> IO ()
 reportStackOverflow bombOut = do

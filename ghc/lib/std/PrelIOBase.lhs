@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.38 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.39 2001/05/22 15:06:47 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -14,6 +14,7 @@
 module PrelIOBase where
 
 import PrelST
+import PrelRead
 import PrelArr
 import PrelBase
 import PrelNum	-- To get fromInteger etc, needed because of -fno-implicit-prelude
@@ -217,7 +218,7 @@ bufferIsWritable Buffer{ bufState=WriteBuffer } = True
 bufferIsWritable _other = False
 
 bufferEmpty :: Buffer -> Bool
-bufferEmpty Buffer{ bufRPtr=r, bufWPtr=w } | r == w = True
+bufferEmpty Buffer{ bufRPtr=r, bufWPtr=w } = r == w
 bufferEmpty _other = False
 
 -- only makes sense for a write buffer
@@ -283,8 +284,7 @@ type FilePath = String
 
 data BufferMode  
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-   deriving (Eq, Ord, Show)
-   {- Read instance defined in IO. -}
+   deriving (Eq, Ord, Show, Read)
 
 -- ---------------------------------------------------------------------------
 -- IORefs
@@ -370,6 +370,7 @@ data Exception
   | ArithException  	ArithException	-- Arithmetic exceptions
   | ArrayException	ArrayException  -- Array-related exceptions
   | ErrorCall		String		-- Calls to 'error'
+  | ExitException	ExitCode	-- Call to System.exitWith
   | NoMethodError       String		-- A non-existent method was invoked
   | PatternMatchFail	String		-- A pattern match / guard failure
   | RecSelError		String		-- Selecting a non-existent field
@@ -432,6 +433,7 @@ instance Show Exception where
   showsPrec _ (ArithException err)       = shows err
   showsPrec _ (ArrayException err)       = shows err
   showsPrec _ (ErrorCall err)	         = showString err
+  showsPrec _ (ExitException err)        = showString "exit: " . shows err
   showsPrec _ (NoMethodError err)        = showString err
   showsPrec _ (PatternMatchFail err)     = showString err
   showsPrec _ (RecSelError err)	         = showString err
@@ -443,6 +445,22 @@ instance Show Exception where
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (UserError err)            = showString err
+
+-- -----------------------------------------------------------------------------
+-- The ExitCode type
+
+-- The `ExitCode' type defines the exit codes that a program
+-- can return.  `ExitSuccess' indicates successful termination;
+-- and `ExitFailure code' indicates program failure
+-- with value `code'.  The exact interpretation of `code'
+-- is operating-system dependent.  In particular, some values of 
+-- `code' may be prohibited (e.g. 0 on a POSIX-compliant system).
+
+-- We need it here because it is used in ExitException in the
+-- Exception datatype (above).
+
+data ExitCode = ExitSuccess | ExitFailure Int 
+                deriving (Eq, Ord, Read, Show)
 
 -- --------------------------------------------------------------------------
 -- Primitive throw

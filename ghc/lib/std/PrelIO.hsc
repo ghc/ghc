@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.2 2001/05/21 14:05:04 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.3 2001/05/22 15:06:47 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -36,7 +36,7 @@ import PrelHandle	-- much of the real stuff is in here
 import PrelMaybe
 import PrelReal
 import PrelNum
-import PrelRead         ( Read(..), readIO )
+import PrelRead
 import PrelShow
 import PrelMaybe	( Maybe(..) )
 import PrelPtr
@@ -92,6 +92,20 @@ readLn          :: Read a => IO a
 readLn          =  do l <- getLine
                       r <- readIO l
                       return r
+
+  -- raises an exception instead of an error
+readIO          :: Read a => String -> IO a
+readIO s        =  case (do { (x,t) <- reads s ;
+			      ("","") <- lex t ;
+                              return x }) of
+#ifndef NEW_READS_REP
+			[x]    -> return x
+			[]     -> ioError (userError "Prelude.readIO: no parse")
+			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
+#else
+                        Just x -> return x
+                        Nothing  -> ioError (userError "Prelude.readIO: no parse")
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Simple input operations
