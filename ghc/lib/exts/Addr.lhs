@@ -28,6 +28,7 @@ import PrelAddr
 import PrelForeign
 import PrelStable
 import PrelBase
+import NumExts
 import PrelIOBase ( IO(..) )
 import Word	( indexWord8OffAddr,  indexWord16OffAddr
 		, indexWord32OffAddr, indexWord64OffAddr
@@ -47,6 +48,17 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 #endif
 
 \end{code}
+
+\begin{code}
+instance Show Addr where
+   showsPrec p (A# a) = showHex int
+     where
+       int = 
+	case word2Integer# (int2Word# (addr2Int# a)) of
+	  (# s, d #) -> J# s d
+
+\end{code}
+
 
 Coercing between machine ints and words
 

@@ -22,16 +22,12 @@ module PrelAddr (
 
 import PrelGHC
 import PrelBase
-import PrelShow
 import PrelCCall
 \end{code}
 
 \begin{code}
 data Addr = A# Addr# 	deriving (Eq, Ord)
 data Word = W# Word# 	deriving (Eq, Ord)
-
-instance Show Addr where
-   showsPrec p (A# a) = showsPrec p (I# (addr2Int# a))
 
 nullAddr :: Addr
 nullAddr = A# (int2Addr# 0#)
