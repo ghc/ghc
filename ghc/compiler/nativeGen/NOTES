@@ -4,16 +4,10 @@ Known bugs in nativeGen, 000124 (JRS)
 
 All these bugs are for x86; I don't know about sparc/alpha.
 
--- argument marshalling for ccall is fundamentally flawed, since
-   it moves the C stack pointer %esp as it pushes each argument.
-   Alas, the register allocator spills relative to %esp and 
-   assumes that it doesn't move.  Result: if the marshalling code
-   for a ccall involves any spills, the resulting code will 
-   probably be wrong.
-
-   The Right Way to fix this is to copy stuff onto the stack
-   without moving %esp, then adjust it immediately prior to the
-   call insn and un-adjust it immediately following it.
+-- absC -> stix translation for GET_TAG and in fact anything
+   to do with the packed-halfword layout info itbl field is
+   pretty dubious.  I think I have it fixed for big and little
+   endian 32-bit, but it won't work at all on a 64 bit platform.
 
 -- nofib/spectral/cvh_unboxing exposes some kind of spilling bug
    (I think), since there are many references to registers %M229
