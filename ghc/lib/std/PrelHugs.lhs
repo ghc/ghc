@@ -32,7 +32,7 @@ import PrelNum
 import PrelReal(Integral)
 import Prelude(fromIntegral)
 import IO(putStr,hFlush,stdout,stderr)
-import PrelException(catch)
+import PrelException(catch,catchException)
 import PrelIOBase(IO,unsafePerformIO)
 import PrelShow(show,shows,showString,showChar,Show,ShowS)
 import PrelRead(Read,ReadS,lex,reads)
@@ -129,12 +129,11 @@ hugsprimRunIO_toplevel m
            = primCatch (protect (n-1) comp)
                        (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
 -}
+
 hugsprimRunIO_toplevel :: IO a -> ()
 hugsprimRunIO_toplevel m
-   = unsafePerformIO (
-        catch (m >> hFlush stderr >> hFlush stdout)
-              (\e -> putStr (show e ++ "\n"))
-     )
-
-
+    = unsafePerformIO (
+         catchException (m >> hFlush stderr >> hFlush stdout)
+                        (\e -> putStr ("error: " ++ show e ++ "\n"))
+      )
 \end{code}
