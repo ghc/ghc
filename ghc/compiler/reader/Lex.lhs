@@ -26,7 +26,8 @@ IMPORT_DELOOPER(IdLoop)    -- get the CostCentre type&constructors from here
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
---import FiniteMap	( FiniteMap, listToFM, lookupFM )
+import BasicTypes	( NewOrData(..) )
+
 #if __GLASGOW_HASKELL__ >= 202
 import Maybes		( MaybeErr(..) )
 #else
@@ -37,8 +38,7 @@ import Pretty
 
 
 import ErrUtils		( Error(..) )
-import Outputable	( Outputable(..) )
-import PprStyle		( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import Util		( nOfThem, panic )
 
 import FastString
@@ -207,7 +207,8 @@ data IfaceToken
   | ITtysig [IfaceToken]   -- lazily return the stream of tokens for
 		           -- the info attached to an id.
 	-- Stuff for reading unfoldings
-  | ITarity | ITstrict | ITunfold
+  | ITarity | ITstrict 
+  | ITunfold Bool		-- True <=> there's an INLINE pragma on this Id
   | ITdemand [Demand] | ITbottom
   | ITlam | ITbiglam | ITcase | ITprim_case | ITlet | ITletrec | ITin | ITof
   | ITcoerce_in | ITcoerce_out | ITatsign
@@ -343,13 +344,15 @@ lex_demand buf =
     'P'# -> read_em (WwPrim       : acc) (stepOn buf)
     'E'# -> read_em (WwEnum       : acc) (stepOn buf)
     ')'# -> (reverse acc, stepOn buf)
-    'U'# -> do_unpack True  acc (stepOnBy# buf 2#)
-    'u'# -> do_unpack False acc (stepOnBy# buf 2#)
+    'U'# -> do_unpack DataType True  acc (stepOnBy# buf 2#)
+    'u'# -> do_unpack DataType False acc (stepOnBy# buf 2#)
+    'N'# -> do_unpack NewType True  acc (stepOnBy# buf 2#)
+    'n'# -> do_unpack NewType False acc (stepOnBy# buf 2#)
     _    -> (reverse acc, buf)
 
-  do_unpack wrapper_unpacks acc buf
+  do_unpack new_or_data wrapper_unpacks acc buf
    = case read_em [] buf of
-      (stuff, rest) -> read_em (WwUnpack wrapper_unpacks stuff : acc) rest
+      (stuff, rest) -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
 
 ------------------
 lex_scc buf =
@@ -734,7 +737,8 @@ ifaceKeywordsFM = listToUFM $
        ,("declarations_",	ITdeclarations)
        ,("pragmas_",		ITpragmas)
        ,("forall_",		ITforall)
-       ,("U_",			ITunfold)
+       ,("U_",			ITunfold False)
+       ,("U!_",			ITunfold True)
        ,("A_",			ITarity)
        ,("coerce_in_",		ITcoerce_in)
        ,("coerce_out_",		ITcoerce_out)
