@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.144 2005/01/28 12:55:38 simonmar Exp $
+-- $Id: Main.hs,v 1.145 2005/02/01 08:36:07 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -29,13 +29,13 @@ import DriverState	( isLinkMode, isMakeMode, isInteractiveMode,
 			  buildStgToDo, findBuildTag, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
-			  v_Output_file, v_Output_hi, 
-			  verifyOutputFiles, v_NoLink
+			  v_Output_file, v_Output_hi, v_GhcLink,
+			  verifyOutputFiles, GhcLink(..)
 			)
 import DriverFlags
 
 import DriverMkDepend	( doMkDependHS )
-import DriverPhases	( isSourceFilename )
+import DriverPhases	( Phase, isStopLn, isSourceFilename )
 
 import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
 import CmdLineOpts	( DynFlags(..), HscTarget(..), v_Static_hsc_opts,
@@ -213,23 +213,11 @@ main =
 
 	---------------- Do the business -----------
 
-   -- Always link in the haskell98 package for static linking.  Other
-   -- packages have to be specified via the -package flag.
-   let link_pkgs
-	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
-	  | otherwise = []
-
    case mode of
 	DoMake 	       -> doMake dflags srcs
 	DoMkDependHS   -> doMkDependHS dflags srcs 
-	StopBefore p   -> do { compileFiles mode dflags srcs; return () }
-	DoMkDLL	       -> do { o_files <- compileFiles mode dflags srcs; 
-			       doMkDLL dflags o_files link_pkgs }
-	DoLink	       -> do { o_files <- compileFiles mode dflags srcs; 
-			       omit_linking <- readIORef v_NoLink;
-			       when (not omit_linking)
-				    (staticLink dflags o_files link_pkgs) }
-
+	StopBefore p   -> do { o_files <- compileFiles mode dflags srcs 
+			     ; doLink dflags p o_files }
 #ifndef GHCI
 	DoInteractive -> noInteractiveError
 	DoEval _      -> noInteractiveError
@@ -280,6 +268,26 @@ compileFiles :: GhcMode
 	     -> [String]	-- Source files
 	     -> IO [String]	-- Object files
 compileFiles mode dflags srcs = mapM (compileFile mode dflags) srcs
+
+
+doLink :: DynFlags -> Phase -> [FilePath] -> IO ()
+doLink dflags stop_phase o_files
+  | not (isStopLn stop_phase)
+  = return ()		-- We stopped before the linking phase
+
+  | otherwise
+  = do 	{ ghc_link <- readIORef v_GhcLink
+	; case ghc_link of
+	    NoLink     -> return ()
+	    StaticLink -> staticLink dflags o_files link_pkgs
+	    MkDLL      -> doMkDLL dflags o_files link_pkgs
+	}
+  where
+   -- Always link in the haskell98 package for static linking.  Other
+   -- packages have to be specified via the -package flag.
+    link_pkgs
+	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
+	  | otherwise = []
 
 
 -- ----------------------------------------------------------------------------

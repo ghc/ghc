@@ -71,7 +71,7 @@ import Maybe
 preprocess :: DynFlags -> FilePath -> IO (DynFlags, FilePath)
 preprocess dflags filename =
   ASSERT2(isHaskellSrcFilename filename, text filename) 
-  runPipeline (StopBefore anyHsc) ("preprocess")  dflags
+  runPipeline anyHsc "preprocess"  dflags
 	False{-temporary output file-}
 	Nothing{-no specific output file-}
 	filename
@@ -88,15 +88,23 @@ compileFile mode dflags src = do
    when (not exists) $ 
    	throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
    
-   o_file  <- readIORef v_Output_file
-   no_link <- readIORef v_NoLink	-- Set by -c or -no-link
+   split    <- readIORef v_Split_object_files
+   o_file   <- readIORef v_Output_file
+   ghc_link <- readIORef v_GhcLink	-- Set by -c or -no-link
 	-- When linking, the -o argument refers to the linker's output.	
 	-- otherwise, we use it as the name for the pipeline's output.
-   let maybe_o_file | isLinkMode mode && not no_link = Nothing
-		    | otherwise		   	     = o_file
+   let maybe_o_file | isLinkMode mode && not (isNoLink ghc_link) 
+		    = Nothing	-- -o foo applies to linker
+		    | otherwise
+	     	    = o_file	-- -o foo applies to the file we are compiling now
+
+       stop_phase = case mode of 
+			StopBefore As | split -> SplitAs
+			StopBefore phase      -> phase
+			other		      -> StopLn
 
    mode_flag_string <- readIORef v_GhcModeFlag
-   (_, out_file) <- runPipeline mode mode_flag_string dflags True maybe_o_file
+   (_, out_file) <- runPipeline stop_phase mode_flag_string dflags True maybe_o_file
 				src Nothing{-no ModLocation-}
    return out_file
 
@@ -236,7 +244,7 @@ compile hsc_env mod_summary
 		_other -> do
 		   let object_filename = ml_obj_file location
 
-		   runPipeline DoLink "" dyn_flags
+		   runPipeline StopLn "" dyn_flags
 			       True Nothing output_fn (Just location)
 			-- the object filename comes from the ModLocation
 
@@ -256,7 +264,7 @@ compileStub dflags stub_c_exists
   | stub_c_exists = do
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	(_, stub_o) <- runPipeline DoLink "stub-compile" dflags
+	(_, stub_o) <- runPipeline StopLn "stub-compile" dflags
 			    True{-persistent output-} 
 			    Nothing{-no specific output file-}
 			    stub_c
@@ -303,8 +311,8 @@ link Batch dflags batch_attempt_linking hpt
              hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
 
 	-- check for the -no-link flag
-	omit_linking <- readIORef v_NoLink
-	if omit_linking 
+	ghc_link <- readIORef v_GhcLink
+	if isNoLink ghc_link
 	  then do when (verb >= 3) $
 		    hPutStrLn stderr "link(batch): linking omitted (-c flag given)."
 	          return Succeeded
@@ -340,25 +348,20 @@ link Batch dflags batch_attempt_linking hpt
 -- pipeline, but we throw away the resulting DynFlags at the end.
 
 runPipeline
-  :: GhcMode		-- when to stop
-  -> String		-- "stop after" flag
-  -> DynFlags		-- dynamic flags
-  -> Bool		-- final output is persistent?
-  -> Maybe FilePath	-- where to put the output, optionally
-  -> FilePath 		-- input filename
-  -> Maybe ModLocation  -- a ModLocation for this module, if we have one
+  :: Phase		-- When to stop
+  -> String		-- "GhcMode" flag as a string
+  -> DynFlags		-- Dynamic flags
+  -> Bool		-- Final output is persistent?
+  -> Maybe FilePath	-- Where to put the output, optionally
+  -> FilePath 		-- Input filename
+  -> Maybe ModLocation  -- A ModLocation for this module, if we have one
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline todo mode_flag_string dflags keep_output 
+runPipeline stop_phase mode_flag_string dflags keep_output 
   maybe_output_filename input_fn maybe_loc
   = do
-  split <- readIORef v_Split_object_files
   let (basename, suffix) = splitFilename input_fn
       start_phase = startPhase suffix
-
-      todo' = case todo of
-		StopBefore As | split -> StopBefore SplitAs
-		other		      -> todo
 
   -- We want to catch cases of "you can't get there from here" before
   -- we start the pipeline, because otherwise it will just run off the
@@ -366,10 +369,6 @@ runPipeline todo mode_flag_string dflags keep_output
   --
   -- There is a partial ordering on phases, where A < B iff A occurs
   -- before B in a normal compilation pipeline.
-  --
-  let stop_phase = case todo' of 
-			StopBefore phase -> phase
-			other		 -> StopLn
 
   when (not (start_phase `happensBefore` stop_phase)) $
 	throwDyn (UsageError 
@@ -622,8 +621,9 @@ runPhase (Hsc src_flavour) stop dflags basename suff input_fn get_output_fn _may
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
 	expl_o_file <- readIORef v_Output_file
-	no_link     <- readIORef v_NoLink
-	let location4 | Just ofile <- expl_o_file, no_link 
+	ghc_link     <- readIORef v_GhcLink
+	let location4 | Just ofile <- expl_o_file
+		      , isNoLink ghc_link 
 		      = location3 { ml_obj_file = ofile }
 		      | otherwise = location3
 

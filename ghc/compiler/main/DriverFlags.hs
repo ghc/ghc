@@ -183,7 +183,7 @@ static_flags =
   ,  ( "S"		, PassFlag (setMode (StopBefore As)))
   ,  ( "-make"		, PassFlag (setMode DoMake))
   ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
-  ,  ( "-mk-dll"	, PassFlag (setMode DoMkDLL))
+  ,  ( "-mk-dll"	, NoArg (writeIORef v_GhcLink NoLink))
   ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
 
 	-- -fno-code says to stop after Hsc but don't generate any code.
@@ -293,8 +293,8 @@ static_flags =
   ,  ( "optdll"		, HasArg (add v_Opt_dll) )
 
 	----- Linker --------------------------------------------------------
-  ,  ( "c"		, NoArg (writeIORef v_NoLink True) )
-  ,  ( "no-link"	, NoArg (writeIORef v_NoLink True) )	-- Deprecated
+  ,  ( "c"		, NoArg (writeIORef v_GhcLink NoLink) )
+  ,  ( "no-link"	, NoArg (writeIORef v_GhcLink NoLink) )	-- Deprecated
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
   ,  ( "dynamic"        , NoArg (writeIORef v_Static False) )
   ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc

@@ -36,16 +36,23 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 
 data GhcMode
   = DoMkDependHS			-- ghc -M
-  | DoMkDLL				-- ghc --mk-dll
-  | StopBefore Phase			-- ghc -E | -C | -S | -c
+  | StopBefore Phase			-- ghc -E | -C | -S
+					-- StopBefore StopLn is the default
   | DoMake				-- ghc --make
   | DoInteractive			-- ghc --interactive
-  | DoLink				-- [ the default ]
   | DoEval String			-- ghc -e
   deriving (Show)
 
-GLOBAL_VAR(v_GhcMode,     DoLink, GhcMode)
-GLOBAL_VAR(v_GhcModeFlag, "",     String)
+data GhcLink	-- What to do in the link step 
+  =		-- Only relevant for modes
+		-- 	DoMake and StopBefore StopLn
+    NoLink		-- Don't link at all
+  | StaticLink		-- Ordinary linker [the default]
+  | MkDLL		-- Make a DLL
+
+GLOBAL_VAR(v_GhcMode,     StopBefore StopLn, 	GhcMode)
+GLOBAL_VAR(v_GhcModeFlag, "",     		String)
+GLOBAL_VAR(v_GhcLink, 	  StaticLink,		GhcLink)
 
 setMode :: GhcMode -> String -> IO ()
 setMode m flag = do
@@ -71,14 +78,18 @@ isInterpretiveMode _             = False
 isMakeMode DoMake = True
 isMakeMode _      = False
 
-isLinkMode DoLink  = True
-isLinkMode DoMkDLL = True
-isLinkMode _       = False
+isLinkMode (StopBefore p) = True
+isLinkMode DoMake	  = True
+isLinkMode _   		  = False
 
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
 isCompManagerMode _             = False
+
+isNoLink :: GhcLink -> Bool
+isNoLink NoLink = True
+isNoLink other  = False
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
@@ -106,7 +117,6 @@ GLOBAL_VAR(v_Keep_ilx_files,		False,		Bool)
 -- Misc
 GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
 GLOBAL_VAR(v_Static, 			True,		Bool)
-GLOBAL_VAR(v_NoLink, 			False,		Bool)
 GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
 GLOBAL_VAR(v_MainModIs,			Nothing,	Maybe String)
 GLOBAL_VAR(v_MainFunIs,			Nothing,	Maybe String)
