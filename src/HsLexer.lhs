@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.15 2004/04/14 10:03:25 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.16 2004/05/09 14:39:53 panne Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -220,7 +220,7 @@ lexer cont input (SrcLoc _ x0) y0 col =
 	-- single-line comments
         tab y x bol s@('-':'-':' ':c:_) | doc c = 
 	 	is_a_token bol s y x
-        tab y _ _ ('-':'-':s) | null s || not (isSymbol (head s)) =
+        tab y _ _ ('-':'-':s) | null s || not (isSymbol (head (dropWhile (== '-') s)))  =
         	newLine cont (drop 1 (dropWhile (/= '\n') s)) y
 
 	-- multi-line nested comments
