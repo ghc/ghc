@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exts.hs,v 1.1 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: Exts.hs,v 1.2 2002/01/02 15:01:27 simonmar Exp $
 --
 -- GHC Extensions: this is the Approved Way to get at GHC-specific stuff.
 --
@@ -29,6 +29,8 @@ module GHC.Exts
         module GHC.Prim
 
        ) where
+
+import Prelude
 
 import {-# SOURCE #-} GHC.Prim
 import GHC.Base
