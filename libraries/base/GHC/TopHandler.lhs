@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: TopHandler.lhs,v 1.4 2002/02/05 17:32:27 simonmar Exp $
+-- $Id: TopHandler.lhs,v 1.5 2002/02/11 12:28:57 simonmar Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -19,7 +19,7 @@
 
 \begin{code}
 module GHC.TopHandler (
-   topHandler, reportStackOverflow, reportError 
+   runMain, reportStackOverflow, reportError 
   ) where
 
 import Prelude
@@ -31,6 +31,10 @@ import Foreign.Ptr
 import GHC.IOBase
 import GHC.Exception
 
+-- runMain is applied to Main.main by TcModule
+runMain :: IO a -> IO ()
+runMain main = catchException (main >> return ()) topHandler
+  
 topHandler :: Exception -> IO ()
 topHandler err = catchException (real_handler err) topHandler
 
