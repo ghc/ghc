@@ -305,8 +305,11 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 		| otherwise      = ppr work_id <+> 
 				   braces (hsep (map ppr con_list))
 
-    (Just work_id) = work_info
-    wrapper_cons   = snd $ getWorkerIdAndCons id rhs
+--    (Just work_id) = work_info
+-- Temporary fix.  We can't use the worker id saved by the w/w
+-- pass because later optimisations may have changed it.  So try
+-- to snaffle from the wrapper code again ...
+    (work_id, wrapper_cons)   = getWorkerIdAndCons id rhs
     con_list       = uniqSetToList wrapper_cons
 
     ------------  Unfolding  --------------
