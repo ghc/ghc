@@ -39,7 +39,9 @@ module Data.Complex
 
 import Prelude
 
+#ifndef __NHC__
 import Data.Dynamic
+#endif
 
 infix  6  :+
 
@@ -88,8 +90,10 @@ phase (x:+y)	 = atan2 y x
 -- -----------------------------------------------------------------------------
 -- Instances of Complex
 
+#ifndef __NHC__
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(Complex,complexTc,"Complex")
+#endif
 
 instance  (RealFloat a) => Num (Complex a)  where
     {-# SPECIALISE instance Num (Complex Float) #-}

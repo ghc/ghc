@@ -15,6 +15,10 @@
 
 module Data.List
    ( 
+#ifdef __NHC__
+     [] (..)
+   ,
+#endif
      elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
    , elemIndices       -- :: (Eq a) => a -> [a] -> [Int]
 
@@ -132,6 +136,7 @@ module Data.List
 
    ) where
 
+import Prelude hiding (Maybe(..))
 import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__

@@ -41,7 +41,18 @@ import GHC.Weak
 #endif
 #endif /* __GLASGOW_HASKELL__ */
 
+#ifdef __NHC__
+import NHC.IOExtras
+    ( IORef
+    , newIORef
+    , readIORef
+    , writeIORef
+    )
+#endif
+
+#ifndef __NHC__
 import Data.Dynamic
+#endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef'
@@ -54,5 +65,7 @@ mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 
+#ifndef __NHC__
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
+#endif

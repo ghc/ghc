@@ -13,18 +13,60 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Tuple (
-	  fst		-- :: (a,b) -> a
-	, snd		-- :: (a,b) -> a
-	, curry		-- :: ((a, b) -> c) -> a -> b -> c
-	, uncurry	-- :: (a -> b -> c) -> ((a, b) -> c)
-  ) where
+module Data.Tuple
+  ( fst		-- :: (a,b) -> a
+  , snd		-- :: (a,b) -> a
+  , curry	-- :: ((a, b) -> c) -> a -> b -> c
+  , uncurry	-- :: (a -> b -> c) -> ((a, b) -> c)
+#ifdef __NHC__
+  , (,)(..)
+  , (,,)(..)
+  , (,,,)(..)
+  , (,,,,)(..)
+  , (,,,,,)(..)
+  , (,,,,,,)(..)
+  , (,,,,,,,)(..)
+  , (,,,,,,,,)(..)
+  , (,,,,,,,,,)(..)
+  , (,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,,,)(..)
+#endif
+  )
+    where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+#endif  /* __GLASGOW_HASKELL__ */
+
+#ifdef __NHC__
+import Prelude
+import Prelude
+  ( (,)(..)
+  , (,,)(..)
+  , (,,,)(..)
+  , (,,,,)(..)
+  , (,,,,,)(..)
+  , (,,,,,,)(..)
+  , (,,,,,,,)(..)
+  , (,,,,,,,,)(..)
+  , (,,,,,,,,,)(..)
+  , (,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,,)(..)
+  , (,,,,,,,,,,,,,,)(..)
+  -- nhc98's prelude only supplies tuple instances up to size 15
+  , fst, snd
+  , curry, uncurry
+  )
+#endif
 
 default ()		-- Double isn't available yet
 
+#if !defined(__HUGS__) && !defined(__NHC__)
 data (,) a b = (,) a b deriving (Eq, Ord)
 data (,,) a b c = (,,) a b c deriving (Eq, Ord)
 data (,,,) a b c d = (,,,) a b c d deriving (Eq, Ord)
@@ -210,12 +252,12 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_ l_ m_ n_ o_ p_ q_ r_ s_ t_ u_ v_ w_ x_ y_ z_ a__ b__ c__ d__ e__ f__ g__ h__ i__ j__ k__ l__ m__ n__ o__ p__ q__ r__ s__ t__ u__ v__ w__ x__ y__ z__ a___ b___ c___ d___ e___ f___ g___ h___ i___ j___ k___ l___ m___ n___ o___ p___ q___ r___ s___ t___  u___ v___
  = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_ l_ m_ n_ o_ p_ q_ r_ s_ t_ u_ v_ w_ x_ y_ z_ a__ b__ c__ d__ e__ f__ g__ h__ i__ j__ k__ l__ m__ n__ o__ p__ q__ r__ s__ t__ u__ v__ w__ x__ y__ z__ a___ b___ c___ d___ e___ f___ g___ h___ i___ j___ k___ l___ m___ n___ o___ p___ q___ r___ s___ t___ u___ v___
 -}
-#endif  /* __GLASGOW_HASKELL__ */
+#endif  /* neither __HUGS__  nor __NHC__ */
 
 -- ---------------------------------------------------------------------------
 -- Standard functions over tuples
 
-#ifndef __HUGS__
+#if !defined(__HUGS__) && !defined(__NHC__)
 fst			:: (a,b) -> a
 fst (x,_)		=  x
 
@@ -229,4 +271,4 @@ curry f x y             =  f (x, y)
 
 uncurry                 :: (a -> b -> c) -> ((a, b) -> c)
 uncurry f p             =  f (fst p) (snd p)
-#endif  /* __HUGS__ */
+#endif  /* neither __HUGS__ nor __NHC__ */

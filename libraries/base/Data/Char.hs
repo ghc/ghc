@@ -48,3 +48,8 @@ import GHC.Read (readLitChar, lexLitChar)
 import Hugs.Char
 #endif
 
+#ifdef __NHC__
+import Prelude
+import Prelude(Char,String)
+import Char
+#endif
