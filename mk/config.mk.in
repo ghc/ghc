@@ -355,10 +355,10 @@ NoFibSubDirs = imaginary spectral real
 # The different ways to build nofib. Default is just to mirror
 # what is done for the ghc prelude libraries.
 #
-NoFibWays=$(GhcLibWays)
+NoFibWays = $(GhcLibWays)
 
 # Haskell compiler options for nofib
-NoFibHcOpts=
+NoFibHcOpts = -O
 
 # ==============================================================================
 #
