@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.102 2001/10/23 11:28:51 simonmar Exp $
+ * $Id: Schedule.c,v 1.103 2001/10/27 22:05:48 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1396,6 +1396,16 @@ int cmp_thread(const StgTSO *tso1, const StgTSO *tso2)
   if (id1 < id2) return (-1);
   if (id1 > id2) return 1;
   return 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Fetching the ThreadID from an StgTSO.
+ *
+ * This is used in the implementation of Show for ThreadIds.
+ * ------------------------------------------------------------------------ */
+int rts_getThreadId(const StgTSO *tso) 
+{
+  return tso->id;
 }
 
 /* ---------------------------------------------------------------------------
