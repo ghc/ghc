@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getClockTime.c,v 1.5 1999/09/12 14:33:56 sof Exp $
+ * $Id: getClockTime.c,v 1.6 1999/09/30 12:38:44 sof Exp $
  *
  * getClockTime Runtime Support
  */
@@ -40,8 +40,8 @@ getClockTime(StgByteArray sec, StgByteArray nsec)
 {
 #if defined(_WIN32) && !defined(cygwin32_TARGET_OS)
   /*
-   * time() as is implemented by cygwin (in B20.1) is
-   * not right, so stay away (and use time()) instead.
+   * ftime() as implemented by cygwin (in B20.1) is
+   * not right, so stay away & use time() there instead.
    */
   struct timeb t;
 
@@ -81,55 +81,6 @@ getClockTime(StgByteArray sec, StgByteArray nsec)
     }
     ((unsigned long int *)sec)[0] = tp.tv_sec;
     ((unsigned long int *)nsec)[0] = tp.tv_usec * 1000;
-    return 0;
-#else
-#error "getClockTime: don't know how to get at the clock's time"
-#endif
-}
-
-StgInt
-prim_getClockTime(StgByteArray sec, StgByteArray nsec)
-{
-#if defined(_WIN32) && !defined(cygwin32_TARGET_OS)
-  /* see getClockTime() comment re: ftime() & cygwin */
-  struct timeb t;
-
-  _ftime(&t);
-
-  ((unsigned long int *)sec)[0] = t.time;
-  ((unsigned long int *)nsec)[0] = t.millitm * 1000;
-  return 0;
-#elif defined(HAVE_TIME_H)
-    time_t t;
-    if ((t = time(NULL)) == (time_t) -1) {
-	cvtErrno();
-	stdErrno();
-	return -1;
-    }
-    ((StgInt64*)sec)[0] = t;
-    ((StgInt64*)nsec)[0] = 0;
-    return 0;
-#elif defined(HAVE_GETCLOCK)
-    struct timespec tp;
-
-    if (getclock(TIMEOFDAY, &tp) != 0) {
-	cvtErrno();
-	stdErrno();
-	return -1;
-    }
-    ((StgInt64*)sec)[0] = tp.tv_sec;
-    ((StgInt64*)nsec)[0] = tp.tv_nsec;
-    return 0;
-#elif defined(HAVE_GETTIMEOFDAY)
-    struct timeval tp;
- 
-    if (gettimeofday(&tp, NULL) != 0) {
-	cvtErrno();
-	stdErrno();
-	return -1;
-    }
-    ((StgInt64*)sec)[0] = tp.tv_sec;
-    ((StgInt64*)nsec)[0] = tp.tv_usec * 1000;
     return 0;
 #else
 #error "getClockTime: don't know how to get at the clock's time"
