@@ -14,6 +14,8 @@ module CmdLineOpts (
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
 	DynFlags(..),
 
+	v_Static_hsc_opts,
+
 	intSwitchSet,
 	switchIsOn,
 	isStaticHscFlag,
@@ -97,6 +99,7 @@ module CmdLineOpts (
 
 import Array	( array, (//) )
 import GlaExts
+import IOExts	( IORef, readIORef )
 import Argv
 import Constants	-- Default values for some flags
 import Util
@@ -314,15 +317,22 @@ dopt_HscLang = hscLang
 %************************************************************************
 
 \begin{code}
+-- v_Statis_hsc_opts is here to avoid a circular dependency with
+-- main/DriverState.
+GLOBAL_VAR(v_Static_hsc_opts, [], [String])
+
 lookUp	       	 :: FAST_STRING -> Bool
 lookup_int     	 :: String -> Maybe Int
 lookup_def_int   :: String -> Int -> Int
 lookup_def_float :: String -> Float -> Float
 lookup_str       :: String -> Maybe String
 
-lookUp     sw = sw `elem` argv
+unpacked_static_opts = unsafePerformIO (readIORef v_Static_hsc_opts)
+packed_static_opts   = map _PK_ unpacked_static_opts
+
+lookUp     sw = sw `elem` packed_static_opts
 	
-lookup_str sw = firstJust (map (startsWith sw) unpacked_opts)
+lookup_str sw = firstJust (map (startsWith sw) unpacked_static_opts)
 
 lookup_int sw = case (lookup_str sw) of
 		  Nothing -> Nothing
@@ -340,7 +350,6 @@ lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
 
-unpacked_opts = map _UNPK_ argv
 
 {-
  Putting the compiler options into temporary at-files
@@ -352,7 +361,7 @@ unpacked_opts :: [String]
 unpacked_opts =
   concat $
   map (expandAts) $
-  map _UNPK_ argv
+  map _UNPK_ argv  -- NOT ARGV any more: v_Static_hsc_opts
   where
    expandAts ('@':fname) = words (unsafePerformIO (readFile fname))
    expandAts l = [l]

@@ -4,6 +4,13 @@
 \section[CompManager]{The Compilation Manager}
 
 \begin{code}
+#if 1
+module CompManager ( )
+where
+the_answer = "42"
+
+#else
+
 module CompManager ( cmInit, cmLoadModule, 
                      cmGetExpr, cmRunExpr,
                      CmState, emptyCmState  -- abstract
@@ -526,5 +533,5 @@ downsweep rootNm finder
                 if null newHomeSummaries
                  then return homeSummaries
                  else loop (newHomeSummaries ++ homeSummaries)
-                 
+#endif                 
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.7 2000/10/26 16:21:02 sewardj Exp $
+-- $Id: DriverState.hs,v 1.8 2000/10/26 16:51:44 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -92,8 +92,6 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
-
-GLOBAL_VAR(v_Static_hsc_opts, [], [String])
 
 -- location of compiler-related files
 GLOBAL_VAR(v_TopDir,  clibdir, String)

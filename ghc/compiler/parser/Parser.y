@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.44 2000/10/24 13:23:33 sewardj Exp $
+$Id: Parser.y,v 1.45 2000/10/26 16:51:44 sewardj Exp $
 
 Haskell grammar.
 
@@ -12,7 +12,6 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 module Parser ( parse ) where
 
 import HsSyn
-import HsPragmas
 import HsTypes		( mkHsTupCon )
 import HsPat            ( InPat(..) )
 
