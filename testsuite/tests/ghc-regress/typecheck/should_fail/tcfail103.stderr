@@ -1,11 +1,2 @@
-
-tcfail103.hs:14:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `t' escapes
-	It is mentioned in the environment:
-	  s = t is bound by the pattern type signature at tcfail103.hs:6
-    When trying to generalise the type inferred for `f'
-	Signature type:     forall t. ST t Int
-	Type to generalise: ST t Int
-    When checking the type signature for `f'
-    When generalising the type(s) for `f'
+/home/simonpj/builds/HEAD/ghc/compiler/ghc-inplace: /home/simonpj/builds/HEAD/ghc/compiler/stage1/ghc-6.3: Permission denied
+/home/simonpj/builds/HEAD/ghc/compiler/ghc-inplace: exec: /home/simonpj/builds/HEAD/ghc/compiler/stage1/ghc-6.3: cannot execute: Permission denied

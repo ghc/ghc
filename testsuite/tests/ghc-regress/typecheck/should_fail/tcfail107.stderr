@@ -1,5 +1,4 @@
 
 tcfail107.hs:13:
     Type synonym `Const' should have 2 arguments, but has been given 1
-    In the type: Thing (Const Int) -> Thing (Const Int)
-    While checking the type signature for `test'
+    In the type signature: test :: Thing (Const Int) -> Thing (Const Int)
