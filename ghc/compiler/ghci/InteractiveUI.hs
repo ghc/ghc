@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.127 2002/07/02 10:16:35 wolfgang Exp $
+-- $Id: InteractiveUI.hs,v 1.128 2002/07/02 16:27:38 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -877,6 +877,8 @@ newPackages new_pkgs = do
    
     new_pkg_info <- getPackageDetails new_pkgs
     mapM_ (linkPackage dflags) (reverse new_pkg_info)
+
+  setContextAfterLoad []
 
 -----------------------------------------------------------------------------
 -- code for `:show'
