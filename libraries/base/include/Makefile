@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2005/02/01 00:52:22 ross Exp $
+# $Id: Makefile,v 1.6 2005/03/02 16:39:57 ross Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -13,5 +13,7 @@ INSTALL_INCLUDES = $(H_FILES)
 ifneq "$(HavePosixRegex)" "YES"
 INSTALL_INCLUDES += ./regex/regex.h
 endif
+
+DIST_CLEAN_FILES += HsBaseConfig.h
 
 include $(TOP)/mk/target.mk
