@@ -29,10 +29,8 @@ import Control.Monad           ( when )
 import System.Environment (getEnv)
 import System.FilePath
 import System.IO
-#if defined(mingw32_TARGET_OS)
 import Foreign
 import Foreign.C
-#endif
 import System.Directory(doesFileExist, getPermissions, setPermissions)
 #if defined(__GLASGOW_HASKELL__)
 import GHC.IOBase ( IOException(..) )
