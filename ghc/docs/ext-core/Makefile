@@ -2,7 +2,6 @@
 
 dvi: core.dvi
 ps: core.ps
-html:
 
 core.dvi:	core.tex prims.tex
 		latex core.tex
@@ -31,8 +30,11 @@ distclean: clean
 
 maintainer-clean: distclean
 
+# dummy targets
 all:
-
 boot:
+install:
+install-docs:
+html:
 
 # End of file

@@ -2,7 +2,6 @@
 
 dvi: sm.dvi rp.dvi ldv.dvi
 ps: sm.ps rp.ps ldv.ps
-html:
 
 ######## General rules
 .SUFFIXES:
@@ -26,8 +25,11 @@ distclean: clean
 
 maintainer-clean: distclean
 
+# dummy targets
 all:
-
 boot:
+install:
+install-docs:
+html:
 
 # End of file
