@@ -1,0 +1,12 @@
+---------------------------------------------------------------------------
+--                              GHCerr.hi-boot
+-- 
+--      This hand-written interface file is the initial bootstrap version
+--	for GHCerr.hi.
+--	It doesn't need to give "error" a type signature, 
+--	because it's wired into the compiler
+---------------------------------------------------------------------------
+ 
+_interface_ GHerr 1
+_exports_
+GHCerr error;
