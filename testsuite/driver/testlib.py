@@ -917,7 +917,11 @@ def guess_compiler_flags():
 
 def runCmd( cmd ):
     if_verbose( 1, cmd )
-    if (config.timeout_prog == ''):
+    # On Windows, we need to run the command via the cygwin shell here,
+    # rather than CMD.EXE.  os.system() does the right thing (as long as
+    # Python is the cygwin Python), but our timeout program doesn't.  So
+    # We disable the use of the timeout program on Windows, for now.
+    if (config.timeout_prog == '' or config.platform == 'i386-unknown-mingw32'):
         return os.system( cmd )
     else:
         r = os.spawnv(os.P_WAIT, config.timeout_prog,
