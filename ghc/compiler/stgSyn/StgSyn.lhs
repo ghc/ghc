@@ -64,7 +64,6 @@ with respect to binder and occurrence information (just as in
 data GenStgBinding bndr occ
   = StgNonRec	bndr (GenStgRhs bndr occ)
   | StgRec	[(bndr, GenStgRhs bndr occ)]
-  | StgCoerceBinding bndr occ			-- UNUSED?
 \end{code}
 
 %************************************************************************
@@ -497,10 +496,6 @@ pprGenStgBinding :: (Outputable bndr, Outputable bdee, Ord bdee)
 pprGenStgBinding (StgNonRec bndr rhs)
   = hang (hsep [ppr bndr, equals])
     	 4 ((<>) (ppr rhs) semi)
-
-pprGenStgBinding (StgCoerceBinding bndr occ)
-  = hang (hsep [ppr bndr, equals, ptext SLIT("{-Coerce-}")])
-    	 4 ((<>) (ppr occ) semi)
 
 pprGenStgBinding (StgRec pairs)
   = vcat ((ifPprDebug (ptext SLIT("{- StgRec (begin) -}"))) :
