@@ -549,7 +549,7 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 tidyBndr :: TidyEnv -> Var -> UniqSM (TidyEnv, Var)
 tidyBndr env var
   | isTyVar var = returnUs (tidyTyVar env var)
-  | otherwise   = tidyId env var (vanillaIdInfo `setCafInfo` NoCafRefs)
+  | otherwise   = tidyId env var vanillaIdInfo
 
 tidyBndrs :: TidyEnv -> [Var] -> UniqSM (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumLUs tidyBndr env vars
@@ -560,7 +560,6 @@ tidyBndrWithRhs env (id,rhs)
    = tidyId env id idinfo
    where
 	idinfo = vanillaIdInfo `setArityInfo` ArityExactly (exprArity rhs)
-			       `setCafInfo` NoCafRefs
 			-- NB: This throws away the IdInfo of the Id, which we
 			-- no longer need.  That means we don't need to
 			-- run over it with env, nor renumber it.
@@ -610,6 +609,9 @@ hasCafRefs p expr = if isCAF expr || isFastTrue (cafRefs p expr)
 			then MayHaveCafRefs
 			else NoCafRefs
 
+	-- used for recursive groups.  The whole group is set to
+	-- "MayHaveCafRefs" if at least one of the group is a CAF or
+	-- refers to any CAFs.
 hasCafRefss p exprs = if any isCAF exprs || isFastTrue (cafRefss p exprs)
 			then MayHaveCafRefs
 			else NoCafRefs
@@ -636,13 +638,13 @@ cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
 -- Decide whether a closure looks like a CAF or not.  In an effort to
 -- keep the number of CAFs (and hence the size of the SRTs) down, we
 -- would also like to look at the expression and decide whether it
--- requires a small bounded amount of heap, so we can ignore it as a CAF.
--- In these cases, we need to use an additional CAF list to keep track of
--- non-collectable CAFs.
--- 
--- We mark real CAFs as `MayHaveCafRefs' because this information is used
--- to decide whether a particular closure needs to be referenced in an
--- SRT or not.
+-- requires a small bounded amount of heap, so we can ignore it as a
+-- CAF.  In these cases however, we would need to use an additional
+-- CAF list to keep track of non-collectable CAFs.  
+
+-- We mark real CAFs as `MayHaveCafRefs' because this information is
+-- used to decide whether a particular closure needs to be referenced
+-- in an SRT or not.
 
 isCAF :: CoreExpr -> Bool
    -- special case for expressions which are always bottom,
@@ -652,7 +654,7 @@ isCAF e
   | not_function && is_bottom = False
   | not_function && updatable = True
   | otherwise		      = False
-  where 
+  where
     not_function = exprArity e == 0
     is_bottom    = exprIsBottom e
     updatable    = True {- ToDo: check type for onceness? -}
