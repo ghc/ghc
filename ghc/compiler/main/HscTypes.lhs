@@ -139,26 +139,26 @@ linking; it is the "linked" form of the mi_decls field.
 \begin{code}
 data ModIface 
    = ModIface {
-        mi_module   :: Module,			-- Complete with package info
-        mi_version  :: VersionInfo,		-- Module version number
-        mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
-	mi_boot	    :: IsBootInterface,		-- Whether this interface was read from an hi-boot file
+        mi_module   :: !Module,		    -- Complete with package info
+        mi_version  :: !VersionInfo,	    -- Module version number
+        mi_orphan   :: WhetherHasOrphans,   -- Whether this module has orphans
+	mi_boot	    :: !IsBootInterface,    -- read from an hi-boot file?
 
-        mi_usages   :: [ImportVersion Name],	-- Usages; kept sorted so that it's easy
-						-- to decide whether to write a new iface file
-						-- (changing usages doesn't affect the version of
-						--  this module)
+        mi_usages   :: ![ImportVersion Name],	
+		-- Usages; kept sorted so that it's easy to decide
+		-- whether to write a new iface file (changing usages
+		-- doesn't affect the version of this module)
 
-        mi_exports  :: [(ModuleName,Avails)],	-- What it exports
-						-- Kept sorted by (mod,occ),
-						-- to make version comparisons easier
+        mi_exports  :: ![(ModuleName,Avails)],
+		-- What it exports Kept sorted by (mod,occ), to make
+		-- version comparisons easier
 
-        mi_globals  :: GlobalRdrEnv,		-- Its top level environment
+        mi_globals  :: !GlobalRdrEnv,	    -- Its top level environment
 
-        mi_fixities :: NameEnv Fixity,		-- Fixities
-	mi_deprecs  :: Deprecations,		-- Deprecations
+        mi_fixities :: !(NameEnv Fixity),   -- Fixities
+	mi_deprecs  :: !Deprecations,	    -- Deprecations
 
-	mi_decls    :: IfaceDecls		-- The RnDecls form of ModDetails
+	mi_decls    :: IfaceDecls	    -- The RnDecls form of ModDetails
      }
 
 data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
@@ -180,10 +180,10 @@ mkIfaceDecls tycls rules insts
 data ModDetails
    = ModDetails {
 	-- The next three fields are created by the typechecker
-        md_types    :: TypeEnv,
-        md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: [IdCoreRule],	-- Domain may include Ids from other modules
-	md_binds    :: [CoreBind]
+        md_types    :: !TypeEnv,
+        md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
+        md_rules    :: ![IdCoreRule],	-- Domain may include Ids from other modules
+	md_binds    :: ![CoreBind]
      }
 
 -- The ModDetails takes on several slightly different forms:
@@ -512,18 +512,18 @@ type IsExported = Name -> Bool		-- True for names that are exported from this mo
 \begin{code}
 data PersistentCompilerState 
    = PCS {
-        pcs_PIT :: PackageIfaceTable,	-- Domain = non-home-package modules
+        pcs_PIT :: !PackageIfaceTable,	-- Domain = non-home-package modules
 					--   the mi_decls component is empty
 
-        pcs_PTE :: PackageTypeEnv,	-- Domain = non-home-package modules
+        pcs_PTE :: !PackageTypeEnv,	-- Domain = non-home-package modules
 					--   except that the InstEnv components is empty
 
-	pcs_insts :: PackageInstEnv,	-- The total InstEnv accumulated from all
+	pcs_insts :: !PackageInstEnv,	-- The total InstEnv accumulated from all
 					--   the non-home-package modules
 
-	pcs_rules :: PackageRuleBase,	-- Ditto RuleEnv
+	pcs_rules :: !PackageRuleBase,	-- Ditto RuleEnv
 
-        pcs_PRS :: PersistentRenamerState
+        pcs_PRS :: !PersistentRenamerState
      }
 \end{code}
 
@@ -554,11 +554,11 @@ type PackageRuleBase = RuleBase
 type PackageInstEnv  = InstEnv
 
 data PersistentRenamerState
-  = PRS { prsOrig    :: NameSupply,
-	  prsImpMods :: ImportedModuleInfo,
-	  prsDecls   :: DeclsMap,
-	  prsInsts   :: IfaceInsts,
-	  prsRules   :: IfaceRules
+  = PRS { prsOrig    :: !NameSupply,
+	  prsImpMods :: !ImportedModuleInfo,
+	  prsDecls   :: !DeclsMap,
+	  prsInsts   :: !IfaceInsts,
+	  prsRules   :: !IfaceRules
     }
 \end{code}
 
