@@ -48,8 +48,8 @@
 -----------------------------------------------------------------------------
 -- features
 
-* Have a short description for a module, which is presented by the module
-  name in the contents? (idea from George Russell).
+* Parse and remember {-# SOURCE #-} imports, possibly do something sensible
+  with them?
 
 * In theory there's no reason why we have to only link to modules which
   are imported by the current module.  This is an artificial
