@@ -906,10 +906,3 @@ dnl ** code before data?
 FPTOOLS_CODE_BEFORE_DATA
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
-
-echo ''
-echo '************************************************'
-echo '*** NOW DO: gmake boot followed by gmake all'
-echo '***         (where gmake == GNU make)'
-echo '************************************************'
-exit 0
