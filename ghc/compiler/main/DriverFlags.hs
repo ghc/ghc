@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.54 2001/05/24 15:10:19 dsyme Exp $
+-- $Id: DriverFlags.hs,v 1.55 2001/05/28 03:31:19 sof Exp $
 --
 -- Driver flags
 --
@@ -585,7 +585,7 @@ machdepCCOpts
 	= do n_regs <- dynFlag stolen_x86_regs
 	     sta    <- readIORef v_Static
 	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "",
-                        if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin -mwin32" else "" ],
+                        if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.21 2001/05/08 10:58:48 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.22 2001/05/28 03:31:19 sof Exp $
 --
 -- Utils for the driver
 --
@@ -26,6 +26,10 @@ import System
 import List
 import Char
 import Monad
+
+#ifndef mingw32_TARGET_OS
+import Posix
+#endif
 
 -----------------------------------------------------------------------------
 -- Errors
@@ -175,3 +179,56 @@ newdir dir s = dir ++ '/':drop_longest_prefix s '/'
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
+
+ghcToolDir :: String
+prependToolDir :: String -> IO String
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+ghcToolDir = unsafePerformIO $ do
+		bs <- getEnv "GHC_TOOLDIR" `IO.catch` (\ _ -> return "")
+		case bs of
+		  "" -> return bs
+		  ls -> 
+		    let
+		     term = last ls
+		     bs' 
+		      | term `elem` ['/', '\\'] = bs
+		      | otherwise = bs ++ ['/']
+		    in
+		    return bs'
+
+prependToolDir x = return (dosifyPath (ghcToolDir ++ x))
+#else
+ghcToolDir = ""
+prependToolDir x = return x
+#endif
+
+appendInstallDir :: String -> IO String
+appendInstallDir cmd = 
+  case ghcToolDir of
+    "" -> return cmd
+    _  -> return (unwords [cmd, '-':'B':ghcToolDir])
+
+-- convert filepath into MSDOS form.
+dosifyPath :: String -> String
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+dosifyPath stuff = subst '/' '\\' real_stuff
+ where
+   -- fully convince myself that /cygdrive/ prefixes cannot
+   -- really appear here.
+  cygdrive_prefix = "/cygdrive/"
+
+  real_stuff
+    | "/cygdrive/" `isPrefixOf` stuff = drop (length cygdrive_prefix) stuff
+    | otherwise = stuff
+   
+  subst a b ls = map (\ x -> if x == a then b else x) ls
+#else
+dosifyPath x = x
+#endif
+
+#ifdef mingw32_TARGET_OS
+foreign import "_getpid" myGetProcessID :: IO Int 
+#else
+myGetProcessID :: IO Int
+myGetProcessID = Posix.getProcessID
+#endif

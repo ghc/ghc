@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.10 2001/04/26 14:33:44 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.11 2001/05/28 03:31:19 sof Exp $
 --
 -- GHC Driver
 --
@@ -35,6 +35,7 @@ import Maybe
 GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
 GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
 GLOBAL_VAR(v_Dep_ignore_dirs,		[], [String]);
+GLOBAL_VAR(v_Dep_exclude_mods,          [], [String]);
 GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
 GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
@@ -56,6 +57,9 @@ dep_opts = [
    (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) ),
    (  "X", 			Prefix (addToDirList v_Dep_ignore_dirs) ),
    (  "-exclude-directory=",	Prefix (addToDirList v_Dep_ignore_dirs) )
+--   (  "-exclude-module=",       Prefix (add v_Dep_exclude_mods) )
+--   (  "x",                      Prefix (add v_Dep_exclude_mods) )
+   
  ]
 
 beginMkDependHS :: IO ()
@@ -157,17 +161,18 @@ endMkDependHS = do
 	-- create a backup of the original makefile
   when (isJust makefile_hdl) $
      runSomething ("Backing up " ++ makefile)
-	(unwords [ "cp", makefile, makefile++".bak" ])
+	(unwords [ cCP, dosifyPath makefile, dosifyPath $ makefile++".bak" ])
 
   	-- copy the new makefile in place
   runSomething "Installing new makefile"
-	(unwords [ "cp", tmp_file, makefile ])
+	(unwords [ cCP, dosifyPath tmp_file, dosifyPath makefile ])
 
 
 findDependency :: Bool -> FilePath -> ModuleName -> IO (Maybe (String, Bool))
 findDependency is_source src imp = do
    dir_contents <- readIORef v_Dep_dir_contents
    ignore_dirs  <- readIORef v_Dep_ignore_dirs
+   excl_mods    <- readIORef v_Dep_exclude_mods
    hisuf <- readIORef v_Hi_suf
 
    let
@@ -198,4 +203,7 @@ findDependency is_source src imp = do
 		dep     = head present
  
    -- in
-   search dir_contents
+   if imp_mod `elem` excl_mods then
+      return Nothing
+    else
+      search dir_contents

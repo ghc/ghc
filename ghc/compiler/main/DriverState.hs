@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.39 2001/05/24 15:10:19 dsyme Exp $
+-- $Id: DriverState.hs,v 1.40 2001/05/28 03:31:19 sof Exp $
 --
 -- Settings for the driver
 --
@@ -9,6 +9,7 @@
 
 module DriverState where
 
+#include "../includes/config.h"
 #include "HsVersions.h"
 
 import CmStaticInfo
@@ -595,6 +596,10 @@ GLOBAL_VAR(v_Pgm_s,   error "pgm_s", String)
 GLOBAL_VAR(v_Pgm_a,   cGCC,          String)
 GLOBAL_VAR(v_Pgm_l,   cGCC,          String)
 GLOBAL_VAR(v_Pgm_dll, cMkDLL,        String)
+
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+GLOBAL_VAR(v_Pgm_T,   cTOUCH,        String)
+#endif
 
 GLOBAL_VAR(v_Opt_dep,    [], [String])
 GLOBAL_VAR(v_Anti_opt_C, [], [String])

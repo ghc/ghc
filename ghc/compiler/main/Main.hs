@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.65 2001/05/23 09:59:18 simonmar Exp $
+-- $Id: Main.hs,v 1.66 2001/05/28 03:31:19 sof Exp $
 --
 -- GHC Driver program
 --
@@ -87,13 +87,8 @@ import Maybe
 
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> 
-	  case exception of
-#if __GLASGOW_HASKELL__ >= 501
-	     ExitException _ -> throw exception
-#endif
-	     _other -> do hPutStr stderr (show (Panic (show exception)))
-			  exitWith (ExitFailure 1)
+  handle (\exception -> do hPutStr stderr (show (Panic (show exception)))
+			   exitWith (ExitFailure 1)
          ) $ do
 
   -- all error messages are propagated as exceptions
@@ -154,11 +149,17 @@ main =
 		writeIORef v_Pgm_L (installed "unlit")
 		writeIORef v_Pgm_m (installed "ghc-asm")
 		writeIORef v_Pgm_s (installed "ghc-split")
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+		writeIORef v_Pgm_T (installed cTOUCH)
+#endif
 
 	else do writeIORef v_Path_usage (inplace (cGHC_DRIVER_DIR ++ "/ghc-usage.txt"))
 		writeIORef v_Pgm_L (inplace cGHC_UNLIT)
 		writeIORef v_Pgm_m (inplace cGHC_MANGLER)
 		writeIORef v_Pgm_s (inplace cGHC_SPLIT)
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+		writeIORef v_Pgm_T (inplace cTOUCH)
+#endif
 
 	-- read the package configuration
    conf_file <- readIORef v_Path_package_config

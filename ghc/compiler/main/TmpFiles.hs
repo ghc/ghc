@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.18 2001/04/21 10:19:53 panne Exp $
+-- $Id: TmpFiles.hs,v 1.19 2001/05/28 03:31:19 sof Exp $
 --
 -- Temporary file management
 --
@@ -87,7 +87,11 @@ removeTmpFiles verb fs = do
       blowAway f =
 	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
 		if '*' `elem` f 
-		  then kludgedSystem ("rm -f " ++ f) "Cleaning temp files" >> return ()
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+		  then kludgedSystem (cRM ++ ' ':dosifyPath f) "Cleaning temp files" >> return ()
+#else
+		  then kludgedSystem (cRM ++ f) "Cleaning temp files" >> return ()
+#endif
 		  else removeFile f)
 	    `catchAllIO`
 	   (\_ -> when verbose (hPutStrLn stderr 
@@ -99,7 +103,10 @@ removeTmpFiles verb fs = do
 -- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
 kludgedSystem cmd phase_name
  = do
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) || defined(MINIMAL_UNIX_DEPS)
+    -- in the case where we do want to use an MSDOS command shell, we assume
+    -- that files and paths have been converted to a form that's
+    -- understandable to the command we're invoking.
    exit_code <- system cmd `catchAllIO` 
 		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 #else

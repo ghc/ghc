@@ -52,7 +52,6 @@ module Util (
 	unzipWith
 
 	, global
-	, myGetProcessID
 
 #if __GLASGOW_HASKELL__ <= 408
 	, catchJust
@@ -73,9 +72,7 @@ import FastTypes
 #if __GLASGOW_HASKELL__ <= 408
 import Exception	( catchIO, justIoErrors, raiseInThread )
 #endif
-#ifndef mingw32_TARGET_OS
-import Posix
-#endif
+
 infixr 9 `thenCmp`
 \end{code}
 
@@ -725,12 +722,5 @@ Compatibility stuff:
 catchJust = catchIO
 ioErrors  = justIoErrors
 throwTo   = raiseInThread
-#endif
-
-#ifdef mingw32_TARGET_OS
-foreign import "_getpid" myGetProcessID :: IO Int 
-#else
-myGetProcessID :: IO Int
-myGetProcessID = Posix.getProcessID
 #endif
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.70 2001/05/25 12:09:43 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.71 2001/05/28 03:31:19 sof Exp $
 --
 -- GHC Driver
 --
@@ -311,8 +311,10 @@ run_phase Unlit _basename _suff input_fn output_fn
   = do unlit <- readIORef v_Pgm_L
        unlit_flags <- getOpts opt_L
        runSomething "Literate pre-processor"
-	  ("echo '# 1 \"" ++input_fn++"\"' > "++output_fn++" && "
-	   ++ unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
+       	  (unlit ++ unwords unlit_flags ++ 
+	  	    " -h " ++ input_fn ++ 
+		    ' ':input_fn ++ 
+		    ' ':output_fn)
        return True
 
 -------------------------------------------------------------------------------
@@ -326,7 +328,7 @@ run_phase Cpp basename suff input_fn output_fn
        do_cpp <- dynFlag cppFlag
        if do_cpp
           then do
-       	    cpp <- readIORef v_Pgm_P
+       	    cpp <- readIORef v_Pgm_P >>= prependToolDir
 	    hscpp_opts <- getOpts opt_P
        	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
 
@@ -340,19 +342,31 @@ run_phase Cpp basename suff input_fn output_fn
 
 	    runSomething "C pre-processor" 
 		(unwords
-       	    	   (["echo '{-# LINE 1 \"" ++ input_fn ++ "\" #-}'", ">", output_fn, "&&",
-		     cpp, verb] 
+       	    	   ([cpp, verb] 
 		    ++ include_paths
 		    ++ hs_src_cpp_opts
 		    ++ hscpp_opts
 		    ++ md_c_flags
-		    ++ [ "-x", "c", input_fn, ">>", output_fn ]
+		    ++ [ "-x", "c", input_fn, "-o", output_fn ]
 		   ))
+	-- ToDo: switch away from using 'echo' alltogether (but need
+	-- a faster alternative than what's done below).
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+	  else (do
+	    h <- openFile output_fn WriteMode
+	    hPutStrLn h ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}")
+	    ls <- readFile input_fn -- inefficient, but it'll do for now.
+	    			    -- ToDo: speed up via slurping.
+	    hPutStrLn h ls
+	    hClose h) `catchAllIO`
+	    	        (\_ -> throwDyn (PhaseFailed "Ineffective C pre-processor" (ExitFailure 1)))
+#else
 	  else do
 	    runSomething "Ineffective C pre-processor"
 	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
 		    ++ " >> " ++ output_fn)
+#endif
        return True
 
 -----------------------------------------------------------------------------
@@ -508,7 +522,12 @@ run_phase Hsc basename suff input_fn output_fn
 
             HscNoRecomp pcs details iface -> 
 	        do {
-		  runSomething "Touching object file" ("touch " ++ o_file);
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+		  touch <- readIORef v_Pgm_T;
+		  runSomething "Touching object file" (unwords [dosifyPath touch, dosifyPath o_file]);
+#else
+		  runSomething "Touching object file" (cTOUCH ++ o_file);
+#endif
 		  return False;
 		};
 
@@ -532,7 +551,7 @@ run_phase Hsc basename suff input_fn output_fn
 
 run_phase cc_phase basename suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
-   = do	cc <- readIORef v_Pgm_c
+   = do	cc  <- readIORef v_Pgm_c >>= prependToolDir >>= appendInstallDir
        	cc_opts <- (getOpts opt_c)
        	cmdline_include_dirs <- readIORef v_Include_paths
 
@@ -561,7 +580,6 @@ run_phase cc_phase basename suff input_fn output_fn
 		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
-
 	runSomething "C Compiler"
 	 (unwords ([ cc, "-x", "c", input_fn, "-o", output_fn ]
 		   ++ md_c_flags
@@ -591,9 +609,14 @@ run_phase Mangle _basename _suff input_fn output_fn
 	    then do n_regs <- dynFlag stolen_x86_regs
 		    return [ show n_regs ]
 	    else return []
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+       perl_path <- prependToolDir ("perl")
+       let real_mangler = unwords [perl_path, mangler]
+#else
+       let real_mangler = mangler
+#endif
        runSomething "Assembly Mangler"
-	(unwords (mangler : 
-		     mangler_opts
+	(unwords (real_mangler : mangler_opts
 		  ++ [ input_fn, output_fn ]
 		  ++ machdep_opts
 		))
@@ -604,7 +627,6 @@ run_phase Mangle _basename _suff input_fn output_fn
 
 run_phase SplitMangle _basename _suff input_fn _output_fn
   = do  splitter <- readIORef v_Pgm_s
-
 	-- this is the prefix used for the split .s files
 	tmp_pfx <- readIORef v_TmpDir
 	x <- myGetProcessID
@@ -615,8 +637,14 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 	-- allocate a tmp file to put the no. of split .s files in (sigh)
 	n_files <- newTempName "n_files"
 
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+        perl_path <- prependToolDir ("perl")
+        let real_splitter = unwords [perl_path, splitter]
+#else
+        let real_splitter = splitter
+#endif
 	runSomething "Split Assembly File"
-	 (unwords [ splitter
+	 (unwords [ real_splitter
 		  , input_fn
 		  , split_s_prefix
 		  , n_files ]
@@ -632,7 +660,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 -- As phase
 
 run_phase As _basename _suff input_fn output_fn
-  = do	as <- readIORef v_Pgm_a
+  = do	as <- readIORef v_Pgm_a >>= prependToolDir >>= appendInstallDir
         as_opts <- getOpts opt_a
 
         cmdline_include_paths <- readIORef v_Include_paths
@@ -768,7 +796,7 @@ checkProcessArgsResult flags basename suff
 
 doLink :: [String] -> IO ()
 doLink o_files = do
-    ln <- readIORef v_Pgm_l
+    ln <- readIORef v_Pgm_l >>= prependToolDir >>= appendInstallDir
     verb <- getVerbFlag
     static <- readIORef v_Static
     let imp = if static then "" else "_imp"
@@ -843,7 +871,7 @@ doLink o_files = do
 -- in a vain attempt to aid future portability
 doMkDLL :: [String] -> IO ()
 doMkDLL o_files = do
-    ln <- readIORef v_Pgm_dll
+    ln <- readIORef v_Pgm_dll >>= prependToolDir >>= appendInstallDir
     verb <- getVerbFlag
     static <- readIORef v_Static
     let imp = if static then "" else "_imp"

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.154 2001/04/13 13:37:24 panne Exp $
+# $Id: Makefile,v 1.155 2001/05/28 03:31:19 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -57,14 +57,25 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
 	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
+ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
+	@echo "cCP                   = \"copy /y\"" >> $(CONFIG_HS)
+	@echo "cRM                   = \"del /F /Q\"" >> $(CONFIG_HS)
+	@echo "cTOUCH                = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
+else
 	@echo "cCP                   = \"$(CP)\"" >> $(CONFIG_HS)
 	@echo "cRM                   = \"$(RM)\"" >> $(CONFIG_HS)
+	@echo "cTOUCH                = \"touch\"" >> $(CONFIG_HS)
+endif
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $(CONFIG_HS)
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
+ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
+	@echo "cRAWCPP               = \"$(subst -mwin32,,$(RAWCPP))\"" >> $(CONFIG_HS)
+else
 	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> $(CONFIG_HS)
+endif
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)
@@ -105,6 +116,12 @@ ifeq "$(ghc_411_at_least)" "1"
 SRC_HC_OPTS += -DGHCI
 DIRS += ghci
 endif
+endif
+
+# Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
+# for explanatory comment as to what this does.
+ifeq "$(MinimalUnixDeps)" "YES"
+SRC_HC_OPTS += -DMINIMAL_UNIX_DEPS
 endif
 
 HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
@@ -312,6 +329,11 @@ ghc-inplace : $(HS_PROG)
 	echo '#!/bin/sh' >>$@
 	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
+ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
+	@$(RM) $@.bat
+	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %*" >$@.bat
+	chmod 755 $@.bat
+endif
 
 CLEAN_FILES += ghc-inplace
 
