@@ -572,9 +572,9 @@ con_or_primop   :: { UfCon RdrName }
 con_or_primop   : qdata_name                    { UfDataCon $1 }
                 | qvar_name			{ UfPrimOp $1 }
                 | '__ccall' ccall_string      { let
-						(is_casm, may_gc) = $1
+						(is_dyn, is_casm, may_gc) = $1
 					        in
-						UfCCallOp $2 is_casm may_gc
+						UfCCallOp $2 is_dyn is_casm may_gc
 						}
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }

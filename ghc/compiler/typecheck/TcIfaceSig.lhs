@@ -306,8 +306,12 @@ tcUfCon (UfPrimOp name)
 	Just op -> returnTc (PrimOp op)
 	Nothing -> failWithTc (badPrimOp name)
 
-tcUfCon (UfCCallOp str casm gc)
-  = returnTc (PrimOp (CCallOp (Left str) casm gc cCallConv))
+tcUfCon (UfCCallOp str is_dyn casm gc)
+  = case is_dyn of
+       True  -> 
+          tcGetUnique `thenNF_Tc` \ u ->
+	  returnTc (PrimOp (CCallOp (Right u) casm gc cCallConv))
+       False -> returnTc (PrimOp (CCallOp (Left str) casm gc cCallConv))
 
 tcUfDataCon name
   = tcVar name		`thenTc` \ con_id ->

@@ -58,6 +58,7 @@ data UfCon name = UfDefault
 		| UfLitLitCon FAST_STRING (HsType name)
 	        | UfPrimOp name
  	 	| UfCCallOp FAST_STRING	   -- callee
+			    Bool	   -- True => dynamic (first arg is fun. pointer)
 			    Bool	   -- True <=> casm, rather than ccall
 			    Bool	   -- True <=> might cause GC
 
@@ -115,10 +116,11 @@ instance Outputable name => Outputable (UfCon name) where
     ppr UfDefault	= text "DEFAULT"
     ppr (UfDataCon d)	= ppr d
     ppr (UfPrimOp p)	= ppr p
-    ppr (UfCCallOp str is_casm can_gc)
+    ppr (UfCCallOp str is_dyn is_casm can_gc)
       =	hcat [before, ptext str, after]
       where
-	    before = ptext (if is_casm then SLIT("_casm_ ``") else SLIT("_ccall_ "))
+	    before = (if is_dyn then ptext SLIT("_dyn_") else empty) <>
+		     ptext (if is_casm then SLIT("_casm_ ``") else SLIT("_ccall_ "))
 	    after  = if is_casm then text "'' " else space
 
 instance Outputable name => Outputable (UfBinder name) where

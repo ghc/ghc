@@ -127,7 +127,7 @@ data IfaceToken
   | ITletrec 
   | ITcoerce
   | ITinline
-  | ITccall (Bool,Bool)	-- (is_casm, may_gc)
+  | ITccall (Bool,Bool,Bool)	-- (is_dyn, is_casm, may_gc)
   | ITdefaultbranch
   | ITbottom
   | ITinteger_lit 
@@ -656,10 +656,13 @@ ifaceKeywordsFM = listToUFM $
         ("__Unot",		ITunfold IMustNotBeINLINEd),
         ("__Ux",		ITunfold IAmALoopBreaker),
 	
-        ("__ccall",		ITccall (False, False)),
-        ("__ccall_GC",		ITccall (False, True)),
-        ("__casm",		ITccall (True,  False)),
-        ("__casm_GC",		ITccall (True,  True)),
+        ("__ccall",		ITccall (False, False, False)),
+        ("__dyn_ccall",		ITccall (True,  False, False)),
+        ("__dyn_ccall_GC",	ITccall (True,  False, True)),
+        ("__casm",		ITccall (False, True,  False)),
+        ("__dyn_casm",		ITccall (True,  True,  False)),
+        ("__casm_GC",		ITccall (False, True,  True)),
+        ("__dyn_casm_GC",	ITccall (True,  True,  True)),
 
         ("/\\",			ITbiglam)
        ]

@@ -759,8 +759,8 @@ rnUfCon (UfPrimOp op)
   = lookupOccRn op		`thenRn` \ op' ->
     returnRn (UfPrimOp op')
 
-rnUfCon (UfCCallOp str casm gc)
-  = returnRn (UfCCallOp str casm gc)
+rnUfCon (UfCCallOp str is_dyn casm gc)
+  = returnRn (UfCCallOp str is_dyn casm gc)
 \end{code}
 
 %*********************************************************

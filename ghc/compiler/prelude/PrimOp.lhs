@@ -2025,22 +2025,28 @@ pprPrimOp (CCallOp fun is_casm may_gc cconv)
         callconv = text "{-" <> pprCallConv cconv <> text "-}"
 
 	before
-	  | is_casm && may_gc = "__casm_GC ``"
-	  | is_casm	      = "__casm ``"
-	  | may_gc	      = "__ccall_GC "
-	  | otherwise	      = "__ccall "
+	  | is_casm && may_gc = "casm_GC ``"
+	  | is_casm	      = "casm ``"
+	  | may_gc	      = "ccall_GC "
+	  | otherwise	      = "ccall "
 
 	after
 	  | is_casm   = text "''"
 	  | otherwise = empty
+	  
+	ppr_dyn =
+	  case fun of
+	    Right _ -> text "dyn_"
+	    _	    -> empty
 
 	ppr_fun =
 	 case fun of
-	   Right _ -> ptext SLIT("<dynamic>")
+	   Right _ -> text "\"\""
 	   Left fn -> ptext fn
 	 
     in
     hcat [ ifPprDebug callconv
+	 , text "__", ppr_dyn
          , text before , ppr_fun , after]
 
 pprPrimOp other_op
