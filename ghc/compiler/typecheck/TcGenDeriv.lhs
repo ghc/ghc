@@ -1062,10 +1062,11 @@ gen_Data_binds fix_env tycon
 		-- Auxiliary definitions: the data type and constructors
      datatype_bind `consBag` listToBag (map mk_con_bind data_cons))
   where
-    tycon_loc = getSrcSpan tycon
+    tycon_loc  = getSrcSpan tycon
     tycon_name = tyConName tycon
-    data_cons = tyConDataCons tycon
-    n_cons    = length data_cons
+    data_cons  = tyConDataCons tycon
+    n_cons     = length data_cons
+    one_constr = n_cons == 1
 
 	------------ gfoldl
     gfoldl_bind = mk_FunBind tycon_loc gfoldl_RDR (map gfoldl_eqn data_cons)
@@ -1080,17 +1081,20 @@ gen_Data_binds fix_env tycon
 	------------ gunfold
     gunfold_bind = mk_FunBind tycon_loc
                               gunfold_RDR
-                              [([k_Pat,z_Pat,c_Pat], gunfold_rhs)]
+                              [([k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat], 
+				gunfold_rhs)]
 
-    gunfold_rhs = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
-			   (map gunfold_alt data_cons)
+    gunfold_rhs 
+	| one_constr = mk_unfold_rhs (head data_cons)	-- No need for case
+	| otherwise  = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
+			        (map gunfold_alt data_cons)
 
-    gunfold_alt dc
-      = mkSimpleHsAlt (mk_tag_pat dc)
-	              (foldr nlHsApp
+    gunfold_alt dc = mkSimpleHsAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
+    mk_unfold_rhs dc = foldr nlHsApp
                            (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
-                           (replicate (dataConSourceArity dc) (nlHsVar k_RDR)))
-    mk_tag_pat dc	-- Last one is a wild-pat, to avoid 
+                           (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
+
+    mk_unfold_pat dc	-- Last one is a wild-pat, to avoid 
 			-- redundant test, and annoying warning
       | tag-fIRST_TAG == n_cons-1 = nlWildPat	-- Last constructor
       | otherwise = nlConPat intDataCon_RDR [nlLitPat (HsIntPrim (toInteger tag))]
