@@ -5,6 +5,8 @@
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package std ... linking ... done.
+Prelude> :unset +s
+Prelude> :unset +t
 Prelude> -- A small multi-module program, with 4 modules, Main, B, C, D.  B & C
 Prelude> -- depend on D, and A depends on B & C.
 Prelude> -- 
@@ -14,7 +16,6 @@ Prelude> -- sensibly.
 Prelude> 
 Prelude> -- clean up
 Prelude> :! rm *.o *.hi
-Prelude> :unset +s
 Prelude> :! cp D1.hs D.hs
 Prelude> 
 Prelude> :load A
@@ -81,13 +82,11 @@ Main> a 42
 28.0
 Main> 
 Main> -- D,C,A compiled  (better not use A.o)
+Main> :! rm B.o
 Main> :load A
 Ok, modules loaded: Main, B, C, D.
 Main> :type (Main.a,B.b,C.c,D.d)
-(PrelFloat.Float -> PrelFloat.Float,
- PrelFloat.Float -> PrelFloat.Float,
- PrelFloat.Float -> PrelFloat.Float,
- PrelFloat.Float -> PrelFloat.Float)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
 28.0
 Main> 
@@ -112,6 +111,8 @@ Main>
 Main> -- A,B,C compiled (better not use A.o, B.o, C.o)
 Main> :! $HC $HC_OPTS --make A
 Main> :! rm D.o
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42

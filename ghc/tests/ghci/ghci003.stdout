@@ -1,0 +1,20 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- check that 'it' works
+Prelude> 1
+1
+Prelude> it
+1
+Prelude> print it
+1
+Prelude> return 42
+Prelude> it
+42
+Prelude> print it
+42
+Prelude> Leaving GHCi.

@@ -1,0 +1,13 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- bug: shouldn't be defaulting these expressions
+Prelude> :type (+)
+forall a. (Num a) => a -> a -> a
+Prelude> :type enumFromTo
+forall a. (Enum a) => a -> a -> [a]
+Prelude> Leaving GHCi.

@@ -1,3 +1,5 @@
+:unset +s
+:unset +t
 -- A small multi-module program, with 4 modules, Main, B, C, D.  B & C
 -- depend on D, and A depends on B & C.
 -- 
@@ -7,7 +9,6 @@
 
 -- clean up
 :! rm *.o *.hi
-:unset +s
 :! cp D1.hs D.hs
 
 :load A
@@ -50,6 +51,7 @@ a 42
 a 42
 
 -- D,C,A compiled  (better not use A.o)
+:! rm B.o
 :load A
 :type (Main.a,B.b,C.c,D.d)
 a 42
@@ -69,5 +71,6 @@ a 42
 -- A,B,C compiled (better not use A.o, B.o, C.o)
 :! $HC $HC_OPTS --make A
 :! rm D.o
+:load A
 :type (Main.a,B.b,C.c,D.d)
 a 42

@@ -1,5 +1,5 @@
--- first, tidy up:
 :unset +s
+-- first, tidy up:
 :! rm -f *.hi *.o *~
 :! cp D1.hs D.hs
 

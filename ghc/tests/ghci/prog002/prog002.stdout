@@ -5,9 +5,10 @@
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package std ... linking ... done.
+Prelude> :unset +s
+Prelude> :unset +t
 Prelude> -- first, clean up:
 Prelude> :! rm -f *.hi *.o *~
-Prelude> :unset +s
 Prelude> :! cp A1.hs A.hs
 Prelude> 
 Prelude> :load D

@@ -1,0 +1,7 @@
+-- check that 'it' works
+1
+it
+print it
+return 42
+it
+print it

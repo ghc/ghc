@@ -1,6 +1,7 @@
+:unset +s
+:unset +t
 -- first, clean up:
 :! rm -f *.hi *.o *~
-:unset +s
 :! cp A1.hs A.hs
 
 :load D
