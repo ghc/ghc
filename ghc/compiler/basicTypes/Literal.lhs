@@ -285,7 +285,6 @@ pprLit lit
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
 
       MachLitLit s ty | code_style  -> ptext s
-		      | iface_style -> ptext SLIT("__litlit") <+> pprFSAsString s
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
 						     pprFSAsString s,
 						     pprParendType ty])
