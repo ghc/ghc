@@ -32,7 +32,8 @@ module Lex (
 
 #include "HsVersions.h"
 
-import Char 		( toUpper )
+import Char 		( toUpper, isDigit, chr, ord )
+import Ratio		( (%) )
 
 import PrelNames	( mkTupNameStr )
 import ForeignCall	( Safety(..) )
@@ -48,15 +49,8 @@ import FastString
 import StringBuffer
 import GlaExts
 import Ctype
-import Char		( chr, ord )
 
 import Bits		( Bits(..) )	   -- non-std
-
-#if __GLASGOW_HASKELL__ >= 503
-import GHC.Read 	( readRational__ ) -- Glasgow non-std
-#else
-import PrelRead 	( readRational__ ) -- Glasgow non-std
-#endif
 import Int		( Int32 )
 \end{code}
 
@@ -800,6 +794,51 @@ after_lexnum cont exts i buf
   = case currentChar# buf of
 	'#'# | glaExtsEnabled exts -> cont (ITprimint i) (incLexeme buf)
 	_                          -> cont (ITinteger i) buf
+
+readRational :: ReadS Rational -- NB: doesn't handle leading "-"
+readRational r = do 
+     (n,d,s) <- readFix r
+     (k,t)   <- readExp s
+     return ((n%1)*10^^(k-d), t)
+ where
+     readFix r = do
+	(ds,s)  <- lexDecDigits r
+	(ds',t) <- lexDotDigits s
+	return (read (ds++ds'), length ds', t)
+
+     readExp (e:s) | e `elem` "eE" = readExp' s
+     readExp s			   = return (0,s)
+
+     readExp' ('+':s) = readDec s
+     readExp' ('-':s) = do
+			(k,t) <- readDec s
+			return (-k,t)
+     readExp' s	      = readDec s
+
+     readDec s = do
+        (ds,r) <- nonnull isDigit s
+        return (foldl1 (\n d -> n * 10 + d) [ ord d - ord '0' | d <- ds ],
+                r)
+
+     lexDecDigits = nonnull isDigit
+
+     lexDotDigits ('.':s) = return (span isDigit s)
+     lexDotDigits s       = return ("",s)
+
+     nonnull p s = do (cs@(_:_),t) <- return (span p s)
+                      return (cs,t)
+
+readRational__ :: String -> Rational -- NB: *does* handle a leading "-"
+readRational__ top_s
+  = case top_s of
+      '-' : xs -> - (read_me xs)
+      xs       -> read_me xs
+  where
+    read_me s
+      = case (do { (x,"") <- readRational s ; return x }) of
+	  [x] -> x
+	  []  -> error ("readRational__: no parse:"        ++ top_s)
+	  _   -> error ("readRational__: ambiguous parse:" ++ top_s)
 
 -----------------------------------------------------------------------------
 -- C "literal literal"s  (i.e. things like ``NULL'', ``stdout'' etc.)
