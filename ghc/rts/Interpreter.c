@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.31 $
- * $Date: 2001/11/08 12:46:31 $
+ * $Revision: 1.32 $
+ * $Date: 2001/11/14 11:46:12 $
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -775,9 +775,9 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int o_itbl                = BCO_NEXT;
                  void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
                  SAVE_STACK_POINTERS;
-                 tok = suspendThread(cap);
+                 tok = suspendThread(&cap->r);
                  marshall_fn ( (void*)(& StackWord(0) ) );
-                 cap = resumeThread(tok);
+                 cap = (Capability *)((void *)resumeThread(tok) - sizeof(StgFunTable));
                  LOAD_STACK_POINTERS;
                  goto nextInsn;
               }
