@@ -20,6 +20,7 @@ import OrdList		( OrdList, consOL, snocOL, appOL, unitOL,
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM, elemFM,
 			  addToFM, lookupFM, fmToList )
+import CoreUtils	( exprType )
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
@@ -38,6 +39,10 @@ import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem,
 import DataCon		( dataConRepArity )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
+import TysPrim		( foreignObjPrimTyCon, 
+			  arrayPrimTyCon, mutableArrayPrimTyCon,
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
+			)
 import PrimRep		( isFollowableRep )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
@@ -779,14 +784,16 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 
          pargs d [] = returnBc []
          pargs d ((_,a):az) 
-            = let rep_arg = atomRep a
-              in case rep_arg of
+            = let arg_ty = repType (exprType (deAnnotate' a))
+
+              in case splitTyConApp_maybe arg_ty of
                     -- Don't push the FO; instead push the Addr# it
                     -- contains.
-                    ForeignObjRep
+		    Just (t, _)
+		     | t == foreignObjPrimTyCon
                        -> pushAtom False{-irrelevant-} d p a
 							`thenBc` \ (push_fo, _) ->
-                          let foro_szW = taggedSizeW ForeignObjRep
+                          let foro_szW = taggedSizeW PtrRep
                               d_now    = d + addr_tsizeW
                               code     = push_fo `appOL` toOL [
                                             UPK_TAG addr_usizeW 0 0,
@@ -795,13 +802,13 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                           in  pargs d_now az 		`thenBc` \ rest ->
                               returnBc ((code, AddrRep) : rest)
 
-                    ArrayRep
+		     | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
                        -> pargs (d + addr_tsizeW) az	`thenBc` \ rest ->
                           parg_ArrayishRep arrPtrsHdrSize d p a
 							`thenBc` \ code ->
                           returnBc ((code,AddrRep):rest)
 
-                    ByteArrayRep
+		     | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> pargs (d + addr_tsizeW) az	`thenBc` \ rest ->
                           parg_ArrayishRep arrWordsHdrSize d p a
 							`thenBc` \ code ->
@@ -811,7 +818,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                     other
                        -> pushAtom True d p a		`thenBc` \ (code_a, sz_a) ->
                           pargs (d+sz_a) az		`thenBc` \ rest ->
-                          returnBc ((code_a, rep_arg) : rest)
+                          returnBc ((code_a, atomRep a) : rest)
 
          -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
          -- the stack but then advance it over the headers, so as to
@@ -1015,7 +1022,6 @@ atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
 atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
-
 
 -- Compile code which expects an unboxed Int on the top of stack,
 -- (call it i), and pushes the i'th closure in the supplied list 
