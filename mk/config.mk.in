@@ -108,15 +108,14 @@ exeext=@exeext@
 # Generally: 	* glafp-utils should be first
 #		* literate next
 #		* happy next
-#		* ghc&hslibs next
+#		* ghc next
 #		then it's up to you
 
-ProjectsToBuild   = glafp-utils literate ghc hslibs
+ProjectsToBuild   = glafp-utils ghc
 #
-# Make a distinction between building and installing, ProjectsToInstall
-# does not include the literate bits..
+# Make a distinction between building and installing
 #
-ProjectsToInstall = glafp-utils ghc hslibs
+ProjectsToInstall = glafp-utils ghc
 
 #
 # Should the various project tests directories be built?
@@ -250,46 +249,27 @@ GhcLibHcOpts= -O -split-objs -odir $*
 endif
 endif
 
-# what to include in a binary distribution
-
-GhcMainDir = ghc
-GhcBinDistDirs = ghc hslibs
-GhcBinDistDocs = docs ghc/docs/users_guide ghc/docs/libraries
-GhcBinDistPrlScripts = ghc stat2resid hstags mkdependHS
-GhcBinDistLibPrlScripts = hscpp
-GhcBinDistBins = hp2ps
-
-#################################################################################
-#
-#		hslibs project
-#
-# 	Set of (configurable) options needed by the Haskell libraries (hslibs)
-# 	plus their default options (if any).
-#
-#################################################################################
-
 # Build the Haskell Readline bindings?
 #
-HsLibsWithReadline=NO
+GhcLibsWithReadline=NO
 #
 # Include path to readline.h
 # (no path == in standard include path)
 #
 ReadlineIncludePath=
 
-# Build the socket libraries?
+# Build the socket libraries?  (ToDo: is this used?)
 #
-HsLibsWithSockets=YES
+GhcLibsWithSockets=YES
 
-#
-# The different ways to build hslibs. Default is just to mirror
-# what is done for the ghc prelude libraries.
-#
-HsLibWays=$(GhcLibWays)
+# what to include in a binary distribution
 
-# Option flags for hslibs are by default the same as for the options
-# used for the prelude libs (see above).
-HsLibHcOpts=$(GhcLibHcOpts)
+GhcMainDir = ghc
+GhcBinDistDirs = ghc
+GhcBinDistDocs = docs ghc/docs/users_guide ghc/docs/libraries
+GhcBinDistPrlScripts = ghc-$(GhcProjectVersion) stat2resid hstags mkdependHS
+GhcBinDistLibPrlScripts = hscpp
+GhcBinDistBins = hp2ps
 
 #################################################################################
 #
@@ -691,7 +671,7 @@ HSTAGS			= $(HSTAGS_PREFIX)hstags
 # Options for the compiling different `ways'. Various projects within
 # the glorious fptools tree support building in various user-configured
 # ways. For instance, you could set up one `way' such that the prelude
-# libraries and hslibs all were built with the option -ffoldr-build-on.
+# libraries all were built with the option -ffoldr-build-on.
 # 
 # To configure up your own way, have a look at some of the standard ways
 # such as profiling, and create your own set of WAY_*_OPTS defs below.
