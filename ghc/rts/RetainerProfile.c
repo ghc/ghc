@@ -1375,8 +1375,8 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    p = (P_)&ret_fun->payload;
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
-		bitmap = BITMAP_BITS(fun_info->f.bitmap);
-		size = BITMAP_SIZE(fun_info->f.bitmap);
+		bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+		size = BITMAP_SIZE(fun_info->f.b.bitmap);
 		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 		break;
 	    case ARG_GEN_BIG:
@@ -1431,7 +1431,7 @@ retain_PAP (StgPAP *pap, retainer c_child_r)
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
 	p = retain_small_bitmap(p, pap->n_args, bitmap, 
 				(StgClosure *)pap, c_child_r);
 	break;

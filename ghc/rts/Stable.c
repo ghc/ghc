@@ -179,7 +179,7 @@ lookupStableName(StgPtr p)
   
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
-    IF_DEBUG(stable,debugBelch("cached stable name %d at %p\n",sn,p));
+    IF_DEBUG(stable,debugBelch("cached stable name %ld at %p\n",sn,p));
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
@@ -372,13 +372,13 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    IF_DEBUG(stable, debugBelch("GC'd Stable name %d\n", 
+		    IF_DEBUG(stable, debugBelch("GC'd Stable name %ld\n", 
 						p - stable_ptr_table));
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, debugBelch("Stable name %d still alive at %p, ref %d\n", p - stable_ptr_table, p->addr, p->ref));
+		    IF_DEBUG(stable, debugBelch("Stable name %ld still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }
 	}

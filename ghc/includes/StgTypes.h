@@ -83,11 +83,13 @@ typedef unsigned __int64       StgWord64;
 #if SIZEOF_VOID_P == 8
 typedef StgInt64           StgInt;
 typedef StgWord64          StgWord;
+typedef StgInt32           StgHalfInt;
 typedef StgWord32          StgHalfWord;
 #else
 #if SIZEOF_VOID_P == 4
 typedef StgInt32           StgInt; 
 typedef StgWord32          StgWord;
+typedef StgInt16           StgHalfInt;
 typedef StgWord16          StgHalfWord;
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8

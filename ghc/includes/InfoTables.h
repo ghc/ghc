@@ -210,6 +210,26 @@ typedef struct StgLargeSRT_ {
 } StgLargeSRT;
 
 /* ----------------------------------------------------------------------------
+   Relative pointers
+
+   Several pointer fields in info tables are expressed as offsets
+   relative to the info pointer, so that we can generate
+   position-independent code.
+
+   There is a complication on the x86_64 platform, where pointeres are
+   64 bits, but the tools don't support 64-bit relative relocations.
+   However, the default memory model (small) ensures that all symbols
+   have values in the lower 2Gb of the address space, so offsets all
+   fit in 32 bits.  Hence we can use 32-bit offset fields.
+   ------------------------------------------------------------------------- */
+
+#if x86_64_TARGET_ARCH
+#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n;
+#else   
+#define OFFSET_FIELD(n) StgInt n;
+#endif
+
+/* ----------------------------------------------------------------------------
    Info Tables
    ------------------------------------------------------------------------- */
 
@@ -230,7 +250,7 @@ typedef union {
 #ifndef TABLES_NEXT_TO_CODE
     StgLargeBitmap* large_bitmap; /* pointer to large bitmap structure */
 #else
-    StgWord large_bitmap_offset;  /* offset from info table to large bitmap structure */
+    OFFSET_FIELD( large_bitmap_offset );  /* offset from info table to large bitmap structure */
 #endif
     
     StgWord selector_offset;	  /* used in THUNK_SELECTORs */
@@ -287,9 +307,12 @@ typedef struct _StgInfoTable {
    -------------------------------------------------------------------------- */
 
 typedef struct _StgFunInfoExtraRev {
-    StgWord        slow_apply_offset; /* apply to args on the stack */
-    StgWord        bitmap;	/* arg ptr/nonptr bitmap */
-    StgWord        srt_offset;	/* pointer to the SRT table */
+    OFFSET_FIELD ( slow_apply_offset ); /* apply to args on the stack */
+    union { 
+	StgWord bitmap;
+	OFFSET_FIELD ( bitmap_offset );	/* arg ptr/nonptr bitmap */
+    } b;
+    OFFSET_FIELD ( srt_offset ); /* pointer to the SRT table */
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
 } StgFunInfoExtraRev;
@@ -323,7 +346,7 @@ typedef struct {
 
 typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
-    StgWord      srt_offset;	/* offset to the SRT table */
+    OFFSET_FIELD( srt_offset );	/* offset to the SRT table */
     StgInfoTable i;
 #else
     StgInfoTable i;
@@ -346,7 +369,7 @@ typedef struct _StgThunkInfoTable {
     StgInfoTable i;
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
-    StgWord        srt_offset;	/* offset to the SRT table */
+    OFFSET_FIELD( srt_offset );	/* offset to the SRT table */
 #else
     StgSRT         *srt;	/* pointer to the SRT table */
 #endif
@@ -389,9 +412,9 @@ typedef struct _StgThunkInfoTable {
 
 #ifdef TABLES_NEXT_TO_CODE
 #define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
-                                        + (info)->f.bitmap))
+                                        + (info)->f.b.bitmap_offset))
 #else
-#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.bitmap))
+#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.b.bitmap_offset))
 #endif
 
 

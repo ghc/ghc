@@ -434,7 +434,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  bitmap_size = stp->n_blocks * BLOCK_SIZE / (sizeof(W_)*BITS_PER_BYTE);
 
 	  if (bitmap_size > 0) {
-	      bitmap_bdescr = allocGroup((nat)BLOCK_ROUND_UP(bitmap_size) 
+	      bitmap_bdescr = allocGroup((lnat)BLOCK_ROUND_UP(bitmap_size) 
 					 / BLOCK_SIZE);
 	      stp->bitmap = bitmap_bdescr;
 	      bitmap = bitmap_bdescr->start;
@@ -2352,8 +2352,8 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     p = (StgPtr)args;
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.bitmap);
-	size = BITMAP_SIZE(fun_info->f.bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+	size = BITMAP_SIZE(fun_info->f.b.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
 	size = GET_FUN_LARGE_BITMAP(fun_info)->size;
@@ -2393,7 +2393,7 @@ scavenge_PAP (StgPAP *pap)
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
 	scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);

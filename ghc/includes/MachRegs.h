@@ -264,20 +264,41 @@
   		callee-saves
   %rax
   %rbx		YES
-  %rcx
-  %rdx		(seem to be used as arg regs on x86-64)
-  %rsi		(seem to be used as arg regs on x86-64)
-  %rdi		(seem to be used as arg regs on x86-64)
-  %rbp		YES
+  %rcx          arg reg, caller-saves
+  %rdx		arg reg, caller-saves
+  %rsi		arg reg, caller-saves
+  %rdi		arg reg, caller-saves
+  %rbp		YES (our *prime* register)
   %rsp		(unavailable - stack pointer)
-  %r8
-  %r9
-  %r10
-  %r11		
+  %r8           arg reg, caller-saves
+  %r9		arg reg, caller-saves
+  %r10          caller-saves
+  %r11		caller-saves
   %r12		YES
   %r13		YES
   %r14		YES
   %r15		YES
+
+  %xmm0-7       arg regs, caller-saves
+  %xmm8-15      caller-saves
+
+  A better reg mapping might be:
+
+      %rbp  Sp
+      %rbx  R1
+      %r8   R2
+      %r9   R3
+      %r10  R4
+      %r12  Hp
+      %r14  SpLim
+      %r15  HpLim
+      %xmm8-11   F1-F4
+      %xmm12-13  D1-D2
+
+  Use the caller-saves regs for Rn, because we don't always have to
+  save those (as opposed to Sp/Hp/SpLim etc. which always have to be
+  saved).
+
   --------------------------------------------------------------------------- */
 
 #if x86_64_REGS

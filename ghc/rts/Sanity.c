@@ -169,7 +169,7 @@ checkStackFrame( StgPtr c )
 	switch (fun_info->f.fun_type) {
 	case ARG_GEN:
 	    checkSmallBitmap((StgPtr)ret_fun->payload, 
-			     BITMAP_BITS(fun_info->f.bitmap), size);
+			     BITMAP_BITS(fun_info->f.b.bitmap), size);
 	    break;
 	case ARG_GEN_BIG:
 	    checkLargeBitmap((StgPtr)ret_fun->payload,
@@ -361,7 +361,7 @@ checkClosure( StgClosure* p )
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
 		checkSmallBitmap( (StgPtr)pap->payload, 
-				  BITMAP_BITS(fun_info->f.bitmap), pap->n_args );
+				  BITMAP_BITS(fun_info->f.b.bitmap), pap->n_args );
 		break;
 	    case ARG_GEN_BIG:
 		checkLargeBitmap( (StgPtr)pap->payload, 

@@ -223,8 +223,8 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     p = (StgPtr)args;
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.bitmap);
-	size = BITMAP_SIZE(fun_info->f.bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+	size = BITMAP_SIZE(fun_info->f.b.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
 	size = GET_FUN_LARGE_BITMAP(fun_info)->size;
@@ -379,7 +379,7 @@ thread_PAP (StgPAP *pap)
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
 	thread_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
