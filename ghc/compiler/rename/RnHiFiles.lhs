@@ -14,7 +14,7 @@ module RnHiFiles (
 #include "HsVersions.h"
 
 import DriverState	( v_GhcMode, isCompManagerMode )
-import DriverUtil	( splitFilename )
+import DriverUtil	( splitFilename, replaceFilenameSuffix )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
@@ -60,7 +60,8 @@ import Maybes		( maybeToBool )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
-import Finder		( findModule, findPackageModule )
+import Finder		( findModule, findPackageModule, 
+			  hiBootExt, hiBootVerExt )
 import Lex
 import FiniteMap
 import ListSetOps	( minusList )
@@ -673,9 +674,9 @@ findHiFile mod_name hi_boot_file
 
 	-- Return the path to M.hi, M.hi-boot, or M.hi-boot-n as appropriate
 	let { hi_path            = ml_hi_file loc ;
-	      (hi_base, _hi_suf) = splitFilename hi_path ;
-    	      hi_boot_path       = hi_base ++ ".hi-boot" ;
-    	      hi_boot_ver_path   = hi_base ++ ".hi-boot-" ++ cHscIfaceFileVersion } ;
+    	      hi_boot_path       = replaceFilenameSuffix hi_path hiBootExt ;
+    	      hi_boot_ver_path   = replaceFilenameSuffix hi_path hiBootVerExt 
+	    };
 
 	if not hi_boot_file then
 	   return (Just (mod, hi_path))

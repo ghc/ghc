@@ -461,9 +461,9 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 		     ++ filename ++ "'" ++ show pipeline ++ show stop_phase)))
    let
 	-- .o and .hc suffixes can be overriden by command-line options:
-      myPhaseInputExt Ln  | Just s <- osuf  = s
       myPhaseInputExt HCc | Just s <- hcsuf = s
-      myPhaseInputExt other                 = phaseInputExt other
+      myPhaseInputExt Ln    = osuf
+      myPhaseInputExt other = phaseInputExt other
 
       annotatePipeline
 	 :: [Phase]		-- raw pipeline
@@ -687,10 +687,7 @@ run_phase MkDependHS basename suff input_fn output_fn
       deps_normals <- mapM (findDependency False orig_fn) import_normals
       let deps = deps_sources ++ deps_normals
 
-      osuf_opt <- readIORef v_Object_suf
-      let osuf = case osuf_opt of
-		   Nothing -> phaseInputExt Ln
-		   Just s  -> s
+      osuf <- readIORef v_Object_suf
 
       extra_suffixes <- readIORef v_Dep_suffixes
       let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
@@ -749,7 +746,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the import path, since this is
   -- what gcc does, and it's probably what you want.
-	let current_dir = getdir basename
+	let current_dir = directoryOf basename
 	
 	paths <- readIORef v_Include_paths
 	writeIORef v_Include_paths (current_dir : paths)
@@ -779,8 +776,8 @@ run_phase Hsc basename suff input_fn output_fn
   	       getImportsFromFile input_fn
 
   -- build a ModLocation to pass to hscMain.
-	(mod, location')
-	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
+	let (path,file) = splitFilenameDir basename
+	(mod, location') <- mkHomeModLocation mod_name True path file suff
 
   -- take -ohi into account if present
 	ohi <- readIORef v_Output_hi
@@ -993,8 +990,9 @@ run_phase SplitAs basename _suff _input_fn output_fn
 
 	let assemble_file n
 	      = do  let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
-		    let output_o = newdir real_odir 
+		    let output_o = replaceFilenameDirectory
 					(basename ++ "__" ++ show n ++ ".o")
+					 real_odir
 		    real_o <- osuf_ify output_o
 		    SysTools.runAs (map SysTools.Option as_opts ++
 		    		    [ SysTools.Option "-c"

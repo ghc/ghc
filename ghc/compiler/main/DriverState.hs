@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.82 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: DriverState.hs,v 1.83 2002/10/17 14:26:18 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -161,7 +161,7 @@ verifyOutputFiles = do
                              show dir ++ " does not exist (used with " ++ 
 			     show flg ++ " option.)"))
 
-GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
+GLOBAL_VAR(v_Object_suf,  phaseInputExt Ln, String)
 GLOBAL_VAR(v_HC_suf,  	  Nothing, Maybe String)
 GLOBAL_VAR(v_Hi_dir,      Nothing, Maybe String)
 GLOBAL_VAR(v_Hi_suf,      "hi",	   String)
@@ -173,14 +173,12 @@ odir_ify f = do
   odir_opt <- readIORef v_Output_dir
   case odir_opt of
 	Nothing -> return f
-	Just d  -> return (newdir d f)
+	Just d  -> return (replaceFilenameDirectory f d)
 
 osuf_ify :: String -> IO String
 osuf_ify f = do
-  osuf_opt <- readIORef v_Object_suf
-  case osuf_opt of
-	Nothing -> return f
-	Just s  -> return (newsuf s f)
+  osuf <- readIORef v_Object_suf
+  return (replaceFilenameSuffix f osuf)
 
 -----------------------------------------------------------------------------
 -- Compiler optimisation options

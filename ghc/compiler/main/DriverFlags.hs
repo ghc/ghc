@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.104 2002/10/13 10:55:06 wolfgang Exp $
+-- $Id: DriverFlags.hs,v 1.105 2002/10/17 14:26:17 simonmar Exp $
 --
 -- Driver flags
 --
@@ -229,7 +229,7 @@ static_flags =
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
   ,  ( "o"		, SepArg (writeIORef v_Output_file . Just) )
-  ,  ( "osuf"		, HasArg (writeIORef v_Object_suf  . Just) )
+  ,  ( "osuf"		, HasArg (writeIORef v_Object_suf) )
   ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf      . Just) )
   ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
   ,  ( "hidir"		, HasArg (writeIORef v_Hi_dir . Just) )

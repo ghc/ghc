@@ -455,7 +455,7 @@ cmCompileExpr cmstate dflags expr
 cmUnload :: CmState -> DynFlags -> IO CmState
 cmUnload state@CmState{ gmode=mode, pcs=pcs } dflags
  = do -- Throw away the old home dir cache
-      emptyHomeDirCache
+      flushFinderCache
 
       -- Unload everything the linker knows about
       cm_unload mode dflags []
@@ -1224,12 +1224,12 @@ summariseFile file
    = do hspp_fn <- preprocess file
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
-        let (path, basename, _ext) = splitFilename3 file
+        let (path, basename, ext) = splitFilename3 file
 	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
             the_imps = filter (/= gHC_PRIM_Name) imps
 
-	(mod, location)
-	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
+	(mod, location) <- mkHomeModLocation mod_name True{-is a root-}
+				path basename ext
 
         src_timestamp
            <- case ml_hs_file location of 

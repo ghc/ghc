@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.24 2002/10/09 15:03:52 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.25 2002/10/17 14:26:18 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -12,13 +12,13 @@ module DriverMkDepend where
 #include "HsVersions.h"
 
 import DriverState      
-import DriverUtil       ( add, softGetDirectoryContents )
+import DriverUtil       ( add, softGetDirectoryContents, replaceFilenameSuffix )
 import DriverFlags
 import SysTools		( newTempName )
 import qualified SysTools
 import Module		( ModuleName, ModLocation(..),
 			  moduleNameUserString, isHomeModule )
-import Finder		( findModuleDep )
+import Finder		( findModule, hiBootExt, hiBootVerExt )
 import Util             ( global )
 import Panic
 
@@ -171,13 +171,33 @@ findDependency is_source src imp = do
    if imp_mod `elem` excl_mods 
       then return Nothing
       else do
-	r <- findModuleDep imp is_source
+	r <- findModule imp
 	case r of 
 	   Just (mod,loc)
-		| isHomeModule mod || include_prelude
-		-> return (Just (ml_hi_file loc, not is_source))
-		| otherwise
+		-- not in this package: we don't need a dependency
+		| not (isHomeModule mod) && not include_prelude
 		-> return Nothing
+
+		-- normal import: just depend on the .hi file
+		| not is_source
+		-> return (Just (ml_hi_file loc, not is_source))
+
+		-- if it's a source import, we want to generate a dependency
+		-- on the .hi-boot file, not the .hi file
+		| otherwise
+		-> let hi_file = ml_hi_file loc
+		       boot_hi_file = replaceFilenameSuffix hi_file hiBootExt 
+		       boot_ver_hi_file = replaceFilenameSuffix hi_file hiBootVerExt 
+		   in do
+		   b <- doesFileExist boot_hi_file
+		   if b 
+		     then return (Just (boot_hi_file, not is_source))
+		     else do
+		        b <- doesFileExist boot_ver_hi_file
+		   	if b 
+			   then return (Just (boot_ver_hi_file, not is_source))
+		   	   else return (Just (hi_file, not is_source))
+
 	   Nothing -> throwDyn (ProgramError 
 		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'" ++
 		 if is_source then " (SOURCE import)" else ""))

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.34 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: DriverUtil.hs,v 1.35 2002/10/17 14:26:18 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -50,7 +50,7 @@ getOptionsFromSource file
 		   | otherwise -> return []
 
 matchOptions s
-  | Just s1 <- my_prefix_match "{-#" s,
+  | Just s1 <- my_prefix_match "{-#" s, -- -}
     Just s2 <- my_prefix_match "OPTIONS" (remove_spaces s1),
     Just s3 <- my_prefix_match "}-#" (reverse s2)
   = Just (reverse s3)
@@ -72,8 +72,7 @@ softGetDirectoryContents d
 -- Verify that the 'dirname' portion of a FilePath exists.
 -- 
 doesDirNameExist :: FilePath -> IO Bool
-doesDirNameExist fpath = doesDirectoryExist (getdir fpath)
-
+doesDirNameExist fpath = doesDirectoryExist (directoryOf fpath)
 
 -----------------------------------------------------------------------------
 -- Prefixing underscore to linker-level names
@@ -148,6 +147,14 @@ splitFilename f = split_longest_prefix f (=='.')
 getFileSuffix :: String -> Suffix
 getFileSuffix f = drop_longest_prefix f (=='.')
 
+-- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy.ext")
+splitFilenameDir :: String -> (String,String)
+splitFilenameDir str
+  = let (dir, rest) = split_longest_prefix str isPathSeparator
+  	real_dir | null dir  = "."
+		 | otherwise = dir
+    in  (real_dir, rest)
+
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,Suffix)
 splitFilename3 str
@@ -187,16 +194,17 @@ split_longest_prefix s pred
 	(_:pre) -> (reverse pre, reverse suf)
   where (suf,pre) = break pred (reverse s)
 
-newsuf :: String -> Suffix -> String
-newsuf suf s = remove_suffix '.' s ++ suf
+replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
+replaceFilenameSuffix s suf = remove_suffix '.' s ++ suf
 
--- getdir strips the filename off the input string, returning the directory.
-getdir :: String -> String
-getdir s = if null dir then "." else init dir
-  where dir = take_longest_prefix s isPathSeparator
+-- directoryOf strips the filename off the input string, returning
+-- the directory.
+directoryOf :: FilePath -> String
+directoryOf = fst . splitFilenameDir
 
-newdir :: String -> String -> String
-newdir dir s = dir ++ '/':drop_longest_prefix s isPathSeparator
+replaceFilenameDirectory :: FilePath -> String -> FilePath
+replaceFilenameDirectory s dir
+ = dir ++ '/':drop_longest_prefix s isPathSeparator
 
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
