@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1999/03/01 17:41:50 simonm Exp $
+# $Id: Makefile,v 1.7 1999/03/03 19:26:31 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -53,8 +53,10 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wredundant-decls 
 #WARNING_OPTS += -optc-Wconversion
 
-SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts)
-SRC_CC_OPTS += $(GhcRtsCcOpts)
+SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
+SRC_CC_OPTS += $(GhcRtsCcOpts) -optc-DCOMPILING_RTS
+
+DLLWRAP = dllwrap
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
@@ -78,6 +80,16 @@ CC=$(HC) $(HC_OPTS) $($*_HC_OPTS)
 # prevent this value from leaking into the GMP makefile
 unexport CC
 
+# -----------------------------------------------------------------------------
+#
+#  Building DLLs is only supported on mingw32 at the moment.
+# 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+dll ::
+	$(CP) -f libHSrts.a libHSrts_dll.a
+	ar d libHSrts_dll.a Main.o
+	$(DLLWRAP) -mno-cygwin --target=i386-mingw32 --export-all --output-lib libHSrts_imp.a --def HSrts.def -o HSrts.dll libHSrts_dll.a -lwinmm -lHS -lgmp -L. -Lgmp
+endif
 # -----------------------------------------------------------------------------
 # Compile GMP only if we don't have it already
 #
