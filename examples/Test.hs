@@ -22,11 +22,11 @@ module Test (
 
 	-- Subsection headings are introduced with '-- **' and so on.
 	-- ** Data types
-	T(..), T2, T3(..), T4(..), T5(..),
+	T(..), T2, T3(..), T4(..), T5(..), T6(..),
 	N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
 
 	-- ** Records
-	R(..),
+	R(..), R1(..),
 
 	-- | test that we can export record selectors on their own:
 	p, q, u,
@@ -72,8 +72,15 @@ module Test (
 
 	-- * Type signatures with argument docs
 	k, l, m, n, o,
+
+	-- * A section
+	-- and without an intervening comma:
+	-- ** A subsection 
+
    ) where
 
+import Hidden
+import Visible
 
 -- | This comment applies to the /following/ declaration
 -- and it continues until the next non-comment line
@@ -95,6 +102,16 @@ data T4 a b = A2 a | B2 b
 data T5 a b
   = A3 a -- ^ documents 'A3'
   | B3 b -- ^ documents 'B3'
+
+-- | Testing alternative comment styles
+data T6
+  -- | This is the doc for 'A4'
+  = A4
+  | B4
+  | -- ^ This is the doc for 'B4'
+
+    -- | This is the doc for 'C4'
+    C4
 
 -- | A newtype
 newtype N1 a b = N1 (a b)
@@ -163,6 +180,18 @@ data R =
        u,v :: Int
      }
   -- ^ This is the 'C2' record constructor, also with some fields:
+
+-- | Testing different record commenting styles
+data R1 
+  -- | This is the 'C3' record constructor
+  = C3 { 
+	-- | The 's1' record selector
+	  s1 :: Int
+	-- | The 's2' record selector
+	, s2 :: Int
+	, s3 :: Int,
+	-- ^ The 's3' record selector
+     }
 
 -- These section headers are only used when there is no export list to
 -- give the structure of the documentation:
