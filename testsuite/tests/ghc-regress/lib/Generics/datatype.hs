@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances #-}
 
 {-
 
@@ -15,6 +15,7 @@ import Data.Generics
 data Data a =>
      MyDataType a = MyDataType a
                   deriving (Typeable, Data)
+
 
 -- Some terms and corresponding type representations
 myTerm     = undefined :: MyDataType Int

@@ -92,13 +92,11 @@ type TypeFun a r = TypeVal a -> r
 type GTypeFun r  = forall a. Data a => TypeFun a r
 
 
+
 -- | Extend a type function
-extType :: Data a => GTypeFun r -> TypeFun a r -> GTypeFun r
-extType def ext = unTF ((TF def) `ext0` (TF ext))
+extType :: (Data a, Typeable r) => GTypeFun r -> TypeFun a r -> GTypeFun r
+extType f = maybe f id . cast
 
-
--- A type-level lambda
-newtype TF r x = TF { unTF :: TypeFun x r }
 
 
 ------------------------------------------------------------------------------
@@ -375,9 +373,9 @@ tDept     = typeVal :: TypeVal Dept
 
 
 -- Test cases
-test0   = t1 `reachableType` t1
-test1   = t1 `reachableType` t2
-test2   = t2 `reachableType` t1
+test0   = t1 `reachableType` t1 -- True
+test1   = t1 `reachableType` t2 -- True
+test2   = t2 `reachableType` t1 -- False
 test3   = t1 `reachableType` t3
 test4   = tPerson `reachableType` tCompany
 test5   = gcountSubtermTypes tPerson
