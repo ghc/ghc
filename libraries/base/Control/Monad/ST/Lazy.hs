@@ -51,10 +51,16 @@ import Hugs.LazyST
 
 #ifdef __GLASGOW_HASKELL__
 -- | The lazy state-transformer monad.
--- The first parameter is used solely to keep the states of different
--- invocations of 'runST' separate from each other and from invocations
--- of 'Control.Monad.ST.stToIO'.  In the first case the type parameter
--- is not instantiated; in the second it is 'RealWorld'.
+-- A computation of type @'ST' s a@ transforms an internal state indexed
+-- by @s@, and returns a value of type @a@.
+-- The @s@ parameter is either
+--
+-- * an unstantiated type variable (inside invocations of 'runST'), or
+--
+-- * 'RealWorld' (inside invocations of 'stToIO').
+--
+-- It serves to keep the internal states of different invocations of
+-- 'runST' separate from each other and from invocations of 'stToIO'.
 newtype ST s a = ST (State s -> (a, State s))
 data State s = S# (State# s)
 
@@ -82,14 +88,14 @@ instance Monad (ST s) where
 
 {-# NOINLINE runST #-}
 -- | Return the value computed by a state transformer computation.
--- The @forall@ is a technical device to ensure that the state used
--- by the 'ST' computation is inaccessible to the rest of the program.
+-- The @forall@ ensures that the internal state used by the 'ST'
+-- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
 
 -- | Allow the result of a state transformer computation to be used (lazily)
 -- inside the computation.
--- Note that if @f@ is strict, @'fixST' f@ will diverge.
+-- Note that if @f@ is strict, @'fixST' f = _|_@.
 fixST :: (a -> ST s a) -> ST s a
 fixST m = ST (\ s -> 
 		let 
@@ -135,7 +141,8 @@ unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = strictToLazyST . ST.unsafeIOToST
 
 -- | A monad transformer embedding lazy state transformers in the 'IO'
--- monad.  The 'RealWorld' parameter is a technical device to keep the
--- state used by such computations separate from those inside 'runST'.
+-- monad.  The 'RealWorld' parameter indicates that the internal state
+-- used by the 'ST' computation is a special one supplied by the 'IO'
+-- monad, and thus distinct from those used by invocations of 'runST'.
 stToIO :: ST RealWorld a -> IO a
 stToIO = ST.stToIO . lazyToStrictST

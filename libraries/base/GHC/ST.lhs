@@ -34,10 +34,17 @@ too many people got bitten by space leaks when it was lazy.
 
 \begin{code}
 -- | The strict state-transformer monad.
--- The first parameter is used solely to keep the states of different
--- invocations of 'runST' separate from each other and from invocations
--- of 'Control.Monad.ST.stToIO'.  In the first case the type parameter
--- is not instantiated; in the second it is 'RealWorld'.
+-- A computation of type @'ST' s a@ transforms an internal state indexed
+-- by @s@, and returns a value of type @a@.
+-- The @s@ parameter is either
+--
+-- * an unstantiated type variable (inside invocations of 'runST'), or
+--
+-- * 'RealWorld' (inside invocations of 'Control.Monad.ST.stToIO').
+--
+-- It serves to keep the internal states of different invocations
+-- of 'runST' separate from each other and from invocations of
+-- 'Control.Monad.ST.stToIO'.
 newtype ST s a = ST (STRep s a)
 type STRep s a = State# s -> (# State# s, a #)
 
@@ -77,7 +84,7 @@ unsafeInterleaveST (ST m) = ST ( \ s ->
 
 -- | Allow the result of a state transformer computation to be used (lazily)
 -- inside the computation.
--- Note that if @f@ is strict, @'fixST' f@ will diverge.
+-- Note that if @f@ is strict, @'fixST' f = _|_@.
 fixST :: (a -> ST s a) -> ST s a
 fixST k = ST $ \ s ->
     let ans       = liftST (k r) s
@@ -129,8 +136,8 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 -- module.  Regrettably delicate.  runST is behaving like a wrapper.
 
 -- | Return the value computed by a state transformer computation.
--- The @forall@ is a technical device to ensure that the state used
--- by the 'ST' computation is inaccessible to the rest of the program.
+-- The @forall@ ensures that the internal state used by the 'ST'
+-- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST st = runSTRep (case st of { ST st_rep -> st_rep })
 
