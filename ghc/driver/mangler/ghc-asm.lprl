@@ -1084,7 +1084,7 @@ sub mangle_asm {
 		    # references to fast-entry point.
 		    # (questionable re hppa and mips...)
 		    print STDERR "still has jump to fast entry point:\n$c"
-			if $c =~ /${T_US}${symb}_fast/;
+			if $c =~ /\b${T_US}${symb}_fast/;
 		}
 
 		print OUTASM $T_HDR_entry;
