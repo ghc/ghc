@@ -31,9 +31,13 @@ main = do
 speakString = "Someone wants to speak with you\n"
 
 speak cd = do
-     ready <- hReady cd
-     if ready then hGetChar cd >>= putChar else return ()
-     ready <- hReady stdin
-     if ready then (do { ch <- getChar; hPutChar cd ch}) else return ()
+     (do
+        ready <- hReady cd
+        if ready then 
+	   hGetChar cd >>= putChar
+	 else
+	   return ()
+        ready <- hReady stdin
+        if ready then (do { ch <- getChar; hPutChar cd ch})
+         else return ())
      speak cd
-
