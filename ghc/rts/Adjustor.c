@@ -42,7 +42,7 @@ Haskell side.
 #include "RtsFlags.h"
 
 /* Heavily arch-specific, I'm afraid.. */
-#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(alpha_TARGET_ARCH)
+#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(alpha_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
 
 #if defined(i386_TARGET_ARCH)
 /* Now here's something obscure for you:
@@ -280,6 +280,57 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	/* Ensure that instruction cache is consistent with our new code */
 	__asm__ volatile("call_pal %0" : : "i" (PAL_imb));
     }
+#elif defined(powerpc_TARGET_ARCH)
+/*
+	For PowerPC, the following code is used:
+
+	mr r10,r8
+	mr r9,r7
+	mr r8,r6
+	mr r7,r5
+	mr r6,r4
+	mr r5,r3
+	lis r0,0xDEAD ;hi(wptr)
+	lis r3,0xDEAF ;hi(hptr)
+	ori r0,r0,0xBEEF ; lo(wptr)
+	ori r3,r3,0xFACE ; lo(hptr)
+	mtctr r0
+	bctr
+
+	The arguments (passed in registers r3 - r10) are shuffled along by two to
+	make room for hptr and a dummy argument. As r9 and r10 are overwritten by
+	this code, it only works for up to 6 arguments (when floating point arguments
+	are involved, this may be more or less, depending on the exact situation).
+*/
+	if ((adjustor = stgMallocBytes(4*13, "createAdjustor")) != NULL) {
+		unsigned long *const adj_code = (unsigned long *)adjustor;
+
+		// make room for extra arguments
+		adj_code[0] = 0x7d0a4378;	//mr r10,r8
+		adj_code[1] = 0x7ce93b78;	//mr r9,r7
+		adj_code[2] = 0x7cc83378;	//mr r8,r6
+		adj_code[3] = 0x7ca72b78;	//mr r7,r5
+		adj_code[4] = 0x7c862378;	//mr r6,r4
+		adj_code[5] = 0x7c651b78;	//mr r5,r3
+		
+		adj_code[6] = 0x3c000000;	//lis r0,hi(wptr)
+		adj_code[6] |= ((unsigned long)wptr) >> 16;
+		
+		adj_code[7] = 0x3c600000;	//lis r3,hi(hptr)
+		adj_code[6] |= ((unsigned long)hptr) >> 16;
+		
+		adj_code[8] = 0x60000000;	//ori r0,r0,lo(wptr)
+		adj_code[8] |= ((unsigned long)wptr) & 0xFFFF; 
+		
+		adj_code[9] = 0x60630000;	//ori r3,r3,lo(hptr)
+		adj_code[9] |= ((unsigned long)hptr) & 0xFFFF;
+		
+		adj_code[10] = 0x7c0903a6;	//mtctr r0
+		adj_code[11] = 0x4e800420;	//bctr
+		adj_code[12] = (unsigned long)hptr;
+		
+		//MakeDataExecutable(adjustor,4*13);	// don't know if it is _really_ necessary
+	}
 #else
 #error Adjustor creation is not supported on this platform.
 #endif
@@ -320,7 +371,7 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
-#elif defined(sparc_TARGET_ARCH)
+#elif defined(alpha_TARGET_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
@@ -328,6 +379,12 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
+#elif defined(powerpc_TARGET_ARCH)
+ if ( *(StgWord*)ptr != 0x7d0a4378 ) {
+   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+ freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 4*12)));
 #else
  ASSERT(0);
 #endif
