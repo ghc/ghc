@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.102 2002/09/05 08:58:56 simonmar Exp $
+ * $Id: Linker.c,v 1.103 2002/09/13 15:02:50 simonpj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -583,6 +583,10 @@ static void ghciInsertStrHashTable ( char* obj_name,
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */
+
+
+static int linker_init_done = 0 ;
+
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 static void *dl_prog_handle;
 #endif
@@ -591,6 +595,13 @@ void
 initLinker( void )
 {
     RtsSymbolVal *sym;
+
+    /* Make initLinker idempotent, so we can call it
+       before evey relevant operation; that means we
+       don't need to initialise the linker separately */
+    if (linker_init_done == 1) { return; } else {
+      linker_init_done = 1;
+    }
 
     symhash = allocStrHashTable();
 
@@ -605,6 +616,9 @@ initLinker( void )
 }
 
 /* -----------------------------------------------------------------------------
+ *                  Loading DLL or .so dynamic libraries
+ * -----------------------------------------------------------------------------
+ *
  * Add a DLL from which symbols may be found.  In the ELF case, just
  * do RTLD_GLOBAL-style add, so no further messing around needs to
  * happen in order that symbols in the loaded .so are findable --
@@ -613,7 +627,12 @@ initLinker( void )
  *
  * In the PEi386 case, open the DLLs and put handles to them in a
  * linked list.  When looking for a symbol, try all handles in the
- * list.
+ * list.  This means that we need to load even DLLs that are guaranteed
+ * to be in the ghc.exe image already, just so we can get a handle
+ * to give to loadSymbol, so that we can find the symbols.  For such
+ * libraries, the LoadLibrary call should be a no-op except for returning
+ * the handle.
+ * 
  */
 
 #if defined(OBJFORMAT_PEi386)
@@ -631,14 +650,15 @@ typedef
 static OpenedDLL* opened_dlls = NULL;
 #endif
 
-
-
 char *
 addDLL( char *dll_name )
 {
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+   /* ------------------- ELF DLL loader ------------------- */
    void *hdl;
    char *errmsg;
+
+   initLinker();
 
    hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);
    if (hdl == NULL) {
@@ -652,14 +672,15 @@ addDLL( char *dll_name )
    /*NOTREACHED*/
 
 #  elif defined(OBJFORMAT_PEi386)
+   /* ------------------- Win32 DLL loader ------------------- */
 
-   /* Add this DLL to the list of DLLs in which to search for symbols.
-      The path argument is ignored. */
    char*      buf;
    OpenedDLL* o_dll;
    HINSTANCE  instance;
 
-   /* fprintf(stderr, "\naddDLL; path=`%s', dll_name = `%s'\n", path, dll_name); */
+   initLinker();
+
+   /* fprintf(stderr, "\naddDLL; dll_name = `%s'\n", dll_name); */
 
    /* See if we've already got it, and ignore if so. */
    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
@@ -667,11 +688,21 @@ addDLL( char *dll_name )
          return NULL;
    }
 
+   /* The file name has no suffix (yet) so that we can try
+      both foo.dll and foo.drv
+
+      The documentation for LoadLibrary says:
+      	If no file name extension is specified in the lpFileName
+      	parameter, the default library extension .dll is
+      	appended. However, the file name string can include a trailing
+      	point character (.) to indicate that the module name has no
+      	extension. */
+
    buf = stgMallocBytes(strlen(dll_name) + 10, "addDLL");
    sprintf(buf, "%s.DLL", dll_name);
    instance = LoadLibrary(buf);
    if (instance == NULL) {
-	 sprintf(buf, "%s.DRV", dll_name);		// KAA: allow loading of drivers (like winspool.drv)
+	 sprintf(buf, "%s.DRV", dll_name);	// KAA: allow loading of drivers (like winspool.drv)
 	 instance = LoadLibrary(buf);
 	 if (instance == NULL) {
 		free(buf);
@@ -682,6 +713,7 @@ addDLL( char *dll_name )
    }
    free(buf);
 
+   /* Add this DLL to the list of DLLs in which to search for symbols. */
    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
    o_dll->name     = stgMallocBytes(1+strlen(dll_name), "addDLL");
    strcpy(o_dll->name, dll_name);
@@ -702,6 +734,7 @@ void *
 lookupSymbol( char *lbl )
 {
     void *val;
+    initLinker() ;
     ASSERT(symhash != NULL);
     val = lookupStrHashTable(symhash, lbl);
 
@@ -747,6 +780,7 @@ void *
 lookupLocalSymbol( ObjectCode* oc, char *lbl )
 {
     void *val;
+    initLinker() ;
     val = lookupStrHashTable(oc->lochash, lbl);
 
     if (val == NULL) {
@@ -771,6 +805,9 @@ void ghci_enquire ( char* addr )
    char* a;
    const int DELTA = 64;
    ObjectCode* oc;
+
+   initLinker();
+
    for (oc = objects; oc; oc = oc->next) {
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
@@ -813,6 +850,8 @@ loadObj( char *path )
 #else
    FILE *f;
 #endif
+
+   initLinker();
 
    /* fprintf(stderr, "loadObj %s\n", path ); */
 
@@ -954,6 +993,8 @@ resolveObjs( void )
     ObjectCode *oc;
     int r;
 
+    initLinker();
+
     for (oc = objects; oc; oc = oc->next) {
 	if (oc->status != OBJECT_RESOLVED) {
 #           if defined(OBJFORMAT_ELF)
@@ -982,6 +1023,8 @@ unloadObj( char *path )
 
     ASSERT(symhash != NULL);
     ASSERT(objects != NULL);
+
+    initLinker(); 
 
     prev = NULL;
     for (oc = objects; oc; prev = oc, oc = oc->next) {
@@ -1830,7 +1873,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
             if ((void*)S != NULL) goto foundit;
             (void*)S = lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
-            belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+	    /* Newline first because the interactive linker has printed "linking..." */
+            belch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
             return 0;
            foundit:
          }

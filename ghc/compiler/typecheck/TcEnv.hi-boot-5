@@ -1,3 +1,0 @@
-__interface TcEnv 1 0 where
-__export TcEnv TcEnv;
-1 data TcEnv ;

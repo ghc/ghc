@@ -1,6 +1,0 @@
-module RnBinds where
-
-rnBinds :: forall b . RdrHsSyn.RdrNameHsBinds
-	-> (RnHsSyn.RenamedHsBinds
- 	-> RnMonad.RnMS (b, NameSet.FreeVars))
-	-> RnMonad.RnMS (b, NameSet.FreeVars)

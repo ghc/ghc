@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.101 2002/08/29 15:44:15 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.102 2002/09/13 15:02:34 simonpj Exp $
 --
 -- Driver flags
 --
@@ -493,8 +493,13 @@ decodeSize str
 -----------------------------------------------------------------------------
 -- RTS Hooks
 
+#if __GLASGOW_HASKELL__ >= 504
+foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
+foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
+#else
 foreign import "setHeapSize"       unsafe setHeapSize       :: Int -> IO ()
 foreign import "enableTimingStats" unsafe enableTimingStats :: IO ()
+#endif
 
 -----------------------------------------------------------------------------
 -- Build the Hsc static command line opts

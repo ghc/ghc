@@ -6,8 +6,8 @@
 
 \begin{code}
 module MkIface ( 
-	showIface, mkFinalIface,
-	pprModDetails, pprIface, pprUsage, pprUsages, pprExports,
+	showIface, mkIface, mkUsageInfo,
+	pprIface, pprUsage, pprUsages, pprExports,
 	ifaceTyThing,
   ) where
 
@@ -17,54 +17,60 @@ import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import TysPrim		( alphaTyVars )
-import BasicTypes	( NewOrData(..), Activation(..),
+import BasicTypes	( NewOrData(..), Activation(..), FixitySig(..),
 			  Version, initialVersion, bumpVersion 
 			)
 import NewDemand	( isTopSig )
-import RnMonad
+import TcRnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
-import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
-			  ModuleLocation(..), GhciMode(..), 
+import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
+			  ModGuts(..), ModGuts, 
+			  GhciMode(..), HscEnv(..),
 			  FixityEnv, lookupFixity, collectFixities,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, TypeEnv,
-			  GenAvailInfo,
-			  WhatsImported(..), GenAvailInfo(..), 
-			  ImportVersion, Deprecations(..),
-			  lookupVersion, typeEnvIds
+			  TyThing(..), DFunId, 
+			  Avails, AvailInfo, GenAvailInfo(..), availName, 
+			  ExternalPackageState(..),
+			  WhatsImported(..), ParsedIface(..),
+			  ImportVersion, Deprecations(..), initialVersionInfo,
+			  lookupVersion
 			)
 
 import CmdLineOpts
-import Id		( idType, idInfo, isImplicitId, idCgInfo,
-			  isLocalId, idName,
-			)
+import Id		( idType, idInfo, isImplicitId, idCgInfo )
 import DataCon		( dataConWorkId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
-import Var              ( Var )
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
-import PprCore		( pprIdRules )
-import Name		( getName, toRdrName, isExternalName, 
+import Name		( getName, nameModule, nameModule_maybe, nameOccName,
 			  nameIsLocalOrFrom, Name, NamedThing(..) )
 import NameEnv
 import NameSet
-import OccName		( pprOccName )
-import TyCon
+import OccName		( OccName, pprOccName )
+import TyCon		( DataConDetails(..), tyConTyVars, tyConDataCons, tyConTheta,
+			  isFunTyCon, isPrimTyCon, isNewTyCon, isClassTyCon, 
+			  isSynTyCon, isAlgTyCon, isForeignTyCon,
+			  getSynTyConDefn, tyConGenInfo, tyConDataConDetails, tyConArity )
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
-import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
+import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, tyClsNamesOfDFunHead )
 import SrcLoc		( noSrcLoc )
+import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
+			  ModLocation(..), mkSysModuleNameFS,
+			  ModuleEnv, emptyModuleEnv, foldModuleEnv, lookupModuleEnv,
+			  extendModuleEnv_C, elemModuleSet, moduleEnvElts
+			)
 import Outputable
-import Module		( ModuleName )
-import Util		( sortLt, dropList )
+import Util		( sortLt, dropList, seqList )
 import Binary		( getBinFileWithDict )
 import BinIface		( writeBinIface )
 import ErrUtils		( dumpIfSet_dyn )
+import FiniteMap
 import FastString
 
 import Monad		( when )
-import Maybe		( catMaybes )
+import Maybe		( catMaybes, isJust )
 import IO		( putStrLn )
 \end{code}
 
@@ -101,7 +107,7 @@ showIface filename = do
 	-- ppr pi_deprecs
 	]))
    where
-    ppr_fix (n,f) = ppr f <+> ppr n
+    ppr_fix (FixitySig n f _) = ppr f <+> ppr n
     ppr_inst i  = ppr i <+> semi
     ppr_decl (v,d)  = int v <+> ppr d <> semi
 \end{code}
@@ -113,29 +119,39 @@ showIface filename = do
 %************************************************************************
 
 \begin{code}
-
-
-
-mkFinalIface :: GhciMode
-	     -> DynFlags
-	     -> ModuleLocation
-	     -> Maybe ModIface		-- The old interface, if we have it
-	     -> ModIface		-- The new one, minus the decls and versions
-	     -> ModDetails		-- The ModDetails for this module
-	     -> IO ModIface		-- The new one, complete with decls and versions
+mkIface :: HscEnv
+	-> ModLocation
+	-> Maybe ModIface	-- The old interface, if we have it
+	-> ModGuts		-- The compiled, tidied module
+	-> IO ModIface		-- The new one, complete with decls and versions
 -- mkFinalIface 
 --	a) completes the interface
 --	b) writes it out to a file if necessary
 
-mkFinalIface ghci_mode dflags location maybe_old_iface 
-	new_iface@ModIface{ mi_module=mod }
-	new_details@ModDetails{ md_insts=insts, 
-				md_rules=rules,
-				md_types=types }
-  = do	{ 
-		-- Add the new declarations, and the is-orphan flag
-	  let iface_w_decls = new_iface { mi_decls = new_decls,
-					  mi_orphan = orphan_mod }
+mkIface hsc_env location maybe_old_iface 
+	impl@ModGuts{ mg_module = this_mod,
+		      mg_usages = usages,
+		      mg_exports = exports,
+		      mg_rdr_env = rdr_env,
+		      mg_fix_env = fix_env,
+		      mg_deprecs = deprecs,
+		      mg_insts = insts, 
+		      mg_rules = rules,
+		      mg_types = types }
+  = do	{ 	-- Sort the exports to make them easier to compare for versions
+	  let { my_exports = groupAvails this_mod exports ;
+
+	        iface_w_decls = ModIface { mi_module   = this_mod,
+					   mi_package  = opt_InPackage,
+					   mi_version  = initialVersionInfo,
+					   mi_usages   = usages,
+					   mi_exports  = my_exports,
+					   mi_decls    = new_decls,
+					   mi_orphan   = orphan_mod,
+					   mi_boot     = False,
+					   mi_fixities = fix_env,
+					   mi_globals  = Just rdr_env,
+					   mi_deprecs  = deprecs } }
 
 		-- Add version information
 	; let (final_iface, maybe_diffs) = _scc_ "versioninfo" addVersionInfo maybe_old_iface iface_w_decls
@@ -152,6 +168,9 @@ mkFinalIface ghci_mode dflags location maybe_old_iface
 	  return final_iface }
 
   where
+     dflags    = hsc_dflags hsc_env
+     ghci_mode = hsc_mode hsc_env
+
      must_write_hi_file Nothing       = False
      must_write_hi_file (Just _diffs) = ghci_mode /= Interactive
 		-- We must write a new .hi file if there are some changes
@@ -165,7 +184,7 @@ mkFinalIface ghci_mode dflags location maybe_old_iface
      inst_dcls    = map ifaceInstance insts
      ty_cls_dcls  = foldNameEnv ifaceTyThing_acc [] types
      rule_dcls    = map ifaceRule rules
-     orphan_mod   = isOrphanModule mod new_details
+     orphan_mod   = isOrphanModule impl
 
 write_diffs :: DynFlags -> ModIface -> Maybe SDoc -> IO ()
 write_diffs dflags new_iface Nothing
@@ -178,12 +197,12 @@ write_diffs dflags new_iface (Just sdoc_diffs)
 \end{code}
 
 \begin{code}
-isOrphanModule :: Module -> ModDetails -> Bool
-isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
+isOrphanModule :: ModGuts -> Bool
+isOrphanModule (ModGuts {mg_module = this_mod, mg_insts = insts, mg_rules = rules})
   = any orphan_inst insts || any orphan_rule rules
   where
 	-- A rule is an orphan if the LHS mentions nothing defined locally
-    orphan_inst dfun_id = no_locals (namesOfDFunHead (idType dfun_id))
+    orphan_inst dfun_id = no_locals (tyClsNamesOfDFunHead (idType dfun_id))
 	-- A instance is an orphan if its head mentions nothing defined locally
     orphan_rule rule    = no_locals (ruleLhsFreeNames rule)
 
@@ -213,14 +232,11 @@ ifaceTyThing (AClass clas) = cls_decl
 			   tcdFDs 	= toHsFDs clas_fds,
 			   tcdSigs	= map toClassOpSig op_stuff,
 			   tcdMeths	= Nothing, 
-			   tcdSysNames  = sys_names,
 			   tcdLoc	= noSrcLoc }
 
     (clas_tyvars, clas_fds, sc_theta, sc_sels, op_stuff) = classExtraBigSig clas
     tycon     = classTyCon clas
     data_con  = head (tyConDataCons tycon)
-    sys_names = mkClassDeclSysNames (getName tycon, getName data_con, 
-				     getName (dataConWorkId data_con), map getName sc_sels)
 
     toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
@@ -241,14 +257,15 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 			  tcdLoc    = noSrcLoc }
 
 	    | isAlgTyCon tycon
-	    = TyData {	tcdND	  = new_or_data,
-			tcdCtxt   = toHsContext (tyConTheta tycon),
-			tcdName   = getName tycon,
-		 	tcdTyVars = toHsTyVars tyvars,
-			tcdCons   = ifaceConDecls (tyConDataConDetails tycon),
-			tcdDerivs = Nothing,
-		        tcdSysNames  = map getName (tyConGenIds tycon),
-			tcdLoc	     = noSrcLoc }
+	    = TyData {	tcdND	   = new_or_data,
+			tcdCtxt    = toHsContext (tyConTheta tycon),
+			tcdName    = getName tycon,
+		 	tcdTyVars  = toHsTyVars tyvars,
+			tcdCons    = ifaceConDecls (tyConDataConDetails tycon),
+			tcdDerivs  = Nothing,
+		        tcdGeneric = Just (isJust (tyConGenInfo tycon)),
+				-- Just True <=> has generic stuff
+			tcdLoc	   = noSrcLoc }
 
 	    | isForeignTyCon tycon
 	    = ForeignType { tcdName    = getName tycon,
@@ -264,7 +281,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 		 	tcdTyVars = toHsTyVars (take (tyConArity tycon) alphaTyVars),
 			tcdCons   = Unknown,
 			tcdDerivs = Nothing,
-		        tcdSysNames  = [],
+		        tcdGeneric  = Just False,
 			tcdLoc	     = noSrcLoc }
 
 	    | otherwise = pprPanic "ifaceTyThing" (ppr tycon)
@@ -279,7 +296,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
     ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 
     ifaceConDecl data_con 
-	= ConDecl (getName data_con) (getName (dataConWorkId data_con))
+	= ConDecl (getName data_con)
 		  (toHsTyVars ex_tyvars)
 		  (toHsContext ex_theta)
 		  details noSrcLoc
@@ -291,13 +308,13 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 				-- includes the existential dictionaries
 	  details | null field_labels
 	    	  = ASSERT( tycon == tycon1 && tyvars == tyvars1 )
-	    	    VanillaCon (zipWith BangType strict_marks (map toHsType arg_tys))
+	    	    PrefixCon (zipWith BangType strict_marks (map toHsType arg_tys))
 
     	    	  | otherwise
 	    	  = RecCon (zipWith mk_field strict_marks field_labels)
 
     mk_field strict_mark field_label
-	= ([getName field_label], BangType strict_mark (toHsType (fieldLabelType field_label)))
+	= (getName field_label, BangType strict_mark (toHsType (fieldLabelType field_label)))
 
 ifaceTyThing (AnId id) = iface_sig
   where
@@ -368,7 +385,7 @@ ifaceInstance dfun_id
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
 
-ifaceRule :: IdCoreRule -> RuleDecl Name pat
+ifaceRule :: IdCoreRule -> RuleDecl Name
 ifaceRule (id, BuiltinRule _ _)
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
@@ -376,11 +393,230 @@ ifaceRule (id, Rule name act bndrs args rhs)
   = IfaceRule name act (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
 
-bogusIfaceRule :: (NamedThing a) => a -> RuleDecl Name pat
+bogusIfaceRule :: (NamedThing a) => a -> RuleDecl Name
 bogusIfaceRule id
   = IfaceRule FSLIT("bogus") NeverActive [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Keeping track of what we've slurped, and version numbers}
+%*							*
+%*********************************************************
+
+mkUsageInfo figures out what the ``usage information'' for this
+moudule is; that is, what it must record in its interface file as the
+things it uses.  
+
+We produce a line for every module B below the module, A, currently being
+compiled:
+	import B <n> ;
+to record the fact that A does import B indirectly.  This is used to decide
+to look to look for B.hi rather than B.hi-boot when compiling a module that
+imports A.  This line says that A imports B, but uses nothing in it.
+So we'll get an early bale-out when compiling A if B's version changes.
+
+The usage information records:
+
+\begin{itemize}
+\item	(a) anything reachable from its body code
+\item	(b) any module exported with a @module Foo@
+\item   (c) anything reachable from an exported item
+\end{itemize}
+
+Why (b)?  Because if @Foo@ changes then this module's export list
+will change, so we must recompile this module at least as far as
+making a new interface file --- but in practice that means complete
+recompilation.
+
+Why (c)?  Consider this:
+\begin{verbatim}
+	module A( f, g ) where	|	module B( f ) where
+	  import B( f )		|	  f = h 3
+	  g = ...		|	  h = ...
+\end{verbatim}
+
+Here, @B.f@ isn't used in A.  Should we nevertheless record @B.f@ in
+@A@'s usages?  Our idea is that we aren't going to touch A.hi if it is
+*identical* to what it was before.  If anything about @B.f@ changes
+than anyone who imports @A@ should be recompiled in case they use
+@B.f@ (they'll get an early exit if they don't).  So, if anything
+about @B.f@ changes we'd better make sure that something in A.hi
+changes, and the convenient way to do that is to record the version
+number @B.f@ in A.hi in the usage list.  If B.f changes that'll force a
+complete recompiation of A, which is overkill but it's the only way to 
+write a new, slightly different, A.hi.
+
+But the example is tricker.  Even if @B.f@ doesn't change at all,
+@B.h@ may do so, and this change may not be reflected in @f@'s version
+number.  But with -O, a module that imports A must be recompiled if
+@B.h@ changes!  So A must record a dependency on @B.h@.  So we treat
+the occurrence of @B.f@ in the export list *just as if* it were in the
+code of A, and thereby haul in all the stuff reachable from it.
+
+	*** Conclusion: if A mentions B.f in its export list,
+	    behave just as if A mentioned B.f in its source code,
+	    and slurp in B.f and all its transitive closure ***
+
+[NB: If B was compiled with -O, but A isn't, we should really *still*
+haul in all the unfoldings for B, in case the module that imports A *is*
+compiled with -O.  I think this is the case.]
+
+\begin{code}
+mkUsageInfo :: HscEnv -> ExternalPackageState
+	    -> ImportAvails -> Usages 
+	    -> [ImportVersion Name]
+
+mkUsageInfo hsc_env eps
+	    (ImportAvails { imp_mods = dir_imp_mods })
+	    (Usages { usg_ext  = pkg_mods, 
+		      usg_home = home_names })
+  = let
+	hpt = hsc_HPT hsc_env
+	pit = eps_PIT eps
+
+	import_all_mods = [moduleName m | (m,True) <- moduleEnvElts dir_imp_mods]
+
+	-- mv_map groups together all the things imported and used
+	-- from a particular module in this package
+	-- We use a finite map because we want the domain
+	mv_map :: ModuleEnv [Name]
+	mv_map  = foldNameSet add_mv emptyModuleEnv home_names
+        add_mv name mv_map = extendModuleEnv_C add_item mv_map mod [name]
+			   where
+			     mod = nameModule name
+			     add_item names _ = name:names
+
+	-- In our usage list we record
+	--
+	--	a) Specifically: Detailed version info for imports
+	--         from modules in this package Gotten from iVSlurp plus
+	--         import_all_mods
+	--
+	--	b) Everything: Just the module version for imports
+	--         from modules in other packages Gotten from iVSlurp plus
+	--         import_all_mods
+	--
+	--	c) NothingAtAll: The name only of modules, Baz, in
+	--	   this package that are 'below' us, but which we didn't need
+	--	   at all (this is needed only to decide whether to open Baz.hi
+	--	   or Baz.hi-boot higher up the tree).  This happens when a
+	--	   module, Foo, that we explicitly imported has 'import Baz' in
+	--	   its interface file, recording that Baz is below Foo in the
+	--	   module dependency hierarchy.  We want to propagate this
+	--	   info.  These modules are in a combination of HIT/PIT and
+	--	   iImpModInfo
+	--
+	--	d) NothingAtAll: The name only of all orphan modules
+	--	   we know of (this is needed so that anyone who imports us can
+	--	   find the orphan modules) These modules are in a combination
+	--	   of HIT/PIT and iImpModInfo
+
+	import_info0 = foldModuleEnv mk_imp_info 	      []	   pit
+	import_info1 = foldModuleEnv (mk_imp_info . hm_iface) import_info0 hpt
+	import_info  = not_even_opened_imports ++ import_info1
+
+		-- Recall that iImpModInfo describes modules that have
+		-- been mentioned in the import lists of interfaces we
+		-- have seen mentioned, but which we have not even opened when
+		-- compiling this module
+	not_even_opened_imports =
+	  [ (mod_name, orphans, is_boot, NothingAtAll) 
+	  | (mod_name, (orphans, is_boot)) <- fmToList (eps_imp_mods eps)]
+
+	
+	mk_imp_info :: ModIface -> [ImportVersion Name] -> [ImportVersion Name]
+	mk_imp_info iface so_far
+
+	  | Just ns <- lookupModuleEnv mv_map mod 	-- Case (a)
+	  = go_for_it (Specifically mod_vers maybe_export_vers 
+				    (mk_import_items ns) rules_vers)
+
+	  | mod `elemModuleSet` pkg_mods		-- Case (b)
+	  = go_for_it (Everything mod_vers)
+
+	  | import_all_mod				-- Case (a) and (b); the import-all part
+	  = if is_home_pkg_mod then
+		go_for_it (Specifically mod_vers (Just export_vers) [] rules_vers)
+		-- Since the module isn't in the mv_map, presumably we
+		-- didn't actually import anything at all from it
+	    else
+		go_for_it (Everything mod_vers)
+		
+	  | is_home_pkg_mod || has_orphans		-- Case (c) or (d)
+	  = go_for_it NothingAtAll
+
+	  | otherwise = so_far
+	  where
+	    go_for_it exports = (mod_name, has_orphans, mi_boot iface, exports) : so_far
+
+	    mod		    = mi_module iface
+	    mod_name	    = moduleName mod
+	    is_home_pkg_mod = isHomeModule mod
+	    version_info    = mi_version iface
+	    version_env     = vers_decls   version_info
+	    mod_vers	    = vers_module  version_info
+	    rules_vers	    = vers_rules   version_info
+	    export_vers	    = vers_exports version_info
+	    import_all_mod  = mod_name `elem` import_all_mods
+	    has_orphans	    = mi_orphan iface
+	    
+		-- The sort is to put them into canonical order
+	    mk_import_items ns = [(n,v) | n <- sortLt lt_occ ns, 
+	    		                  let v = lookupVersion version_env n
+		                 ]
+			 where
+			   lt_occ n1 n2 = nameOccName n1 < nameOccName n2
+
+	    maybe_export_vers | import_all_mod = Just (vers_exports version_info)
+			      | otherwise      = Nothing
+    in
+
+    -- seq the list of ImportVersions returned: occasionally these
+    -- don't get evaluated for a while and we can end up hanging on to
+    -- the entire collection of Ifaces.
+    import_info `seqList` import_info
+\end{code}
+
+\begin{code}
+groupAvails :: Module -> Avails -> [(ModuleName, Avails)]
+  -- Group by module and sort by occurrence
+  -- This keeps the list in canonical order
+groupAvails this_mod avails 
+  = [ (mkSysModuleNameFS fs, sortLt lt avails)
+    | (fs,avails) <- fmToList groupFM
+    ]
+  where
+    groupFM :: FiniteMap FastString Avails
+	-- Deliberately use the FastString so we
+	-- get a canonical ordering
+    groupFM = foldl add emptyFM avails
+
+    add env avail = addToFM_C combine env mod_fs [avail']
+		  where
+		    mod_fs = moduleNameFS (moduleName avail_mod)
+		    avail_mod = case nameModule_maybe (availName avail) of
+					  Just m  -> m
+					  Nothing -> this_mod
+		    combine old _ = avail':old
+		    avail'	  = sortAvail avail
+
+    a1 `lt` a2 = occ1 < occ2
+	       where
+		 occ1  = nameOccName (availName a1)
+		 occ2  = nameOccName (availName a2)
+
+sortAvail :: AvailInfo -> AvailInfo
+-- Sort the sub-names into canonical order.
+-- The canonical order has the "main name" at the beginning 
+-- (if it's there at all)
+sortAvail (Avail n) = Avail n
+sortAvail (AvailTC n ns) | n `elem` ns = AvailTC n (n : sortLt lt (filter (/= n) ns))
+			 | otherwise   = AvailTC n (    sortLt lt ns)
+			 where
+			   n1 `lt` n2 = nameOccName n1 < nameOccName n2
+\end{code}
 
 %************************************************************************
 %*				 					*
@@ -493,59 +729,7 @@ diffDecls (VersionInfo { vers_module = old_mod_vers, vers_decls = old_decls_vers
 \end{code}
 
 
-
-%************************************************************************
-%*				 					*
-\subsection{Writing ModDetails}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-pprModDetails :: ModDetails -> SDoc
-pprModDetails (ModDetails { md_types = type_env, md_insts = dfun_ids, md_rules = rules })
-  = vcat [ dump_types dfun_ids type_env
-	 , dump_insts dfun_ids
-	 , dump_rules rules]
-	  
-dump_types :: [Var] -> TypeEnv -> SDoc
-dump_types dfun_ids type_env
-  = text "TYPE SIGNATURES" $$ nest 4 (dump_sigs ids)
-  where
-    ids = [id | id <- typeEnvIds type_env, want_sig id]
-    want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocalId id && 
-				       isExternalName (idName id) && 
-				       not (id `elem` dfun_ids)
-	-- isLocalId ignores data constructors, records selectors etc
-	-- The isExternalName ignores local dictionary and method bindings
-	-- that the type checker has invented.  User-defined things have
-	-- Global names.
-
-dump_insts :: [Var] -> SDoc
-dump_insts []       = empty
-dump_insts dfun_ids = text "INSTANCES" $$ nest 4 (dump_sigs dfun_ids)
-
-dump_sigs :: [Var] -> SDoc
-dump_sigs ids
-	-- Print type signatures
-   	-- Convert to HsType so that we get source-language style printing
-	-- And sort by RdrName
-  = vcat $ map ppr_sig $ sortLt lt_sig $
-    [ (toRdrName id, toHsType (idType id))
-    | id <- ids ]
-  where
-    lt_sig (n1,_) (n2,_) = n1 < n2
-    ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
-
-dump_rules :: [IdCoreRule] -> SDoc
-dump_rules [] = empty
-dump_rules rs = vcat [ptext SLIT("{-# RULES"),
-		      nest 4 (pprIdRules rs),
-		      ptext SLIT("#-}")]
-\end{code}
-
-
-%************************************************************************
+b%************************************************************************
 %*				 					*
 \subsection{Writing an interface file}
 %*				 					*
@@ -651,12 +835,12 @@ pprIfaceDecls version_map decls
 \end{code}
 
 \begin{code}
-pprFixities :: NameEnv Fixity
-	    -> [TyClDecl Name pat]
+pprFixities :: FixityEnv
+	    -> [TyClDecl Name]
 	    -> SDoc
 pprFixities fixity_map decls
   = hsep [ ppr fix <+> ppr n 
-	 | (n,fix) <- collectFixities fixity_map decls ] <> semi
+	 | FixitySig n fix _ <- collectFixities fixity_map decls ] <> semi
 
 -- Disgusting to print these two together, but that's 
 -- the way the interface parser currently expects them.

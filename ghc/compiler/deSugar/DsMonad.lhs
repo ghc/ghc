@@ -6,17 +6,19 @@
 \begin{code}
 module DsMonad (
 	DsM,
-	initDs, returnDs, thenDs, andDs, mapDs, listDs,
+	initDs, returnDs, thenDs, mapDs, listDs,
 	mapAndUnzipDs, zipWithDs, foldlDs,
 	uniqSMtoDsM,
 	newTyVarsDs, cloneTyVarsDs,
-	duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
+	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
 	newFailLocalDs,
 	getSrcLocDs, putSrcLocDs,
 	getModuleDs,
 	getUniqueDs, getUniquesDs,
 	getDOptsDs,
-	dsLookupGlobalValue,
+	dsLookupGlobalId, dsLookupTyCon,
+
+	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
 	dsWarn, 
 	DsWarnings,
@@ -25,8 +27,10 @@ module DsMonad (
 
 #include "HsVersions.h"
 
-import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext )
+import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext, TypecheckedHsExpr )
+import HscTypes		( TyThing(..) )
 import Bag		( emptyBag, snocBag, Bag )
+import TyCon		( TyCon )
 import ErrUtils 	( WarnMsg )
 import Id		( mkSysLocal, setIdUnique, Id )
 import Module		( Module )
@@ -34,10 +38,12 @@ import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Type             ( Type )
-import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
+import UniqSupply	( initUs_, getUniqueUs, getUniquesUs, thenUs, returnUs, 
 			  UniqSM, UniqSupply )
-import Unique		( Unique )
-import Name		( Name )
+import Unique		( Unique ) 
+import Name		( Name, nameOccName )
+import NameEnv
+import OccName          ( occNameFS )
 import CmdLineOpts	( DynFlags )
 
 infixr 9 `thenDs`
@@ -47,19 +53,39 @@ Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
 a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 \begin{code}
-type DsM result =
-	DynFlags
-	-> UniqSupply
-        -> (Name -> Id)		-- Lookup well-known Ids
-	-> SrcLoc		-- to put in pattern-matching error msgs
-	-> Module       	-- module: for SCC profiling
-	-> DsWarnings
-	-> (result, DsWarnings)
+newtype DsM result
+  = DsM (DsEnv -> DsWarnings -> UniqSM (result, DsWarnings))
 
-type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which are
+unDsM (DsM x) = x	
+
+data DsEnv = DsEnv {
+	ds_dflags :: DynFlags,
+	ds_globals :: Name -> TyThing,	-- Lookup well-known Ids
+	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
+	ds_loc	   :: SrcLoc,		-- to put in pattern-matching error msgs
+	ds_mod	   :: Module       	-- module: for SCC profiling
+     }
+
+-- Inside [| |] brackets, the desugarer looks 
+-- up variables in the DsMetaEnv
+type DsMetaEnv = NameEnv DsMetaVal
+
+data DsMetaVal
+   = Bound Id		-- Bound by a pattern inside the [| |]. 
+			-- Will be dynamically alpha renamed.
+			-- The Id has type String
+
+   | Splice TypecheckedHsExpr	-- These bindings are introduced by
+				-- the PendingSplices on a HsBracketOut
+
+instance Monad DsM where
+  return = returnDs
+  (>>=)  = thenDs
+
+type DsWarnings = Bag DsWarning         -- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
+type DsWarning = (Loc, SDoc)
 
-{-# INLINE andDs #-}
 {-# INLINE thenDs #-}
 {-# INLINE returnDs #-}
 
@@ -67,30 +93,26 @@ type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which a
 
 initDs  :: DynFlags
 	-> UniqSupply
-	-> (Name -> Id)
+	-> (Name -> TyThing)
 	-> Module   -- module name: for profiling
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs dflags init_us lookup mod action
-  = action dflags init_us lookup noSrcLoc mod emptyBag
+initDs dflags init_us lookup mod (DsM action)
+  = initUs_ init_us (action ds_env emptyBag)
+  where
+    ds_env = DsEnv { ds_dflags = dflags, ds_globals = lookup,
+		     ds_loc = noSrcLoc, ds_mod = mod,
+		     ds_meta = emptyNameEnv }
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
-andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a
 
-thenDs m1 m2 dflags us genv loc mod warns
-  = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 dflags s1 genv loc mod warns)  of { (result, warns1) ->
-    m2 result dflags s2 genv loc mod warns1}}
-
-andDs combiner m1 m2 dflags us genv loc mod warns
-  = case splitUniqSupply us		    of { (s1, s2) ->
-    case (m1 dflags s1 genv loc mod warns)  of { (result1, warns1) ->
-    case (m2 dflags s2 genv loc mod warns1) of { (result2, warns2) ->
-    (combiner result1 result2, warns2) }}}
+thenDs (DsM m1) m2 = DsM( \ env warns ->
+    m1 env warns	`thenUs` \ (result, warns1) ->
+    unDsM (m2 result) env warns1)
 
 returnDs :: a -> DsM a
-returnDs result dflags us genv loc mod warns = (result, warns)
+returnDs result = DsM (\ env warns -> returnUs (result, warns))
 
 listDs :: [DsM a] -> DsM [a]
 listDs []     = returnDs []
@@ -136,76 +158,102 @@ functions are defined with it.  The difference in name-strings makes
 it easier to read debugging output.
 
 \begin{code}
+uniqSMtoDsM :: UniqSM a -> DsM a
+uniqSMtoDsM u_action = DsM(\ env warns -> 
+	u_action	`thenUs` \ res ->
+	returnUs (res, warns))
+
+    
+getUniqueDs :: DsM Unique
+getUniqueDs = DsM (\ env warns -> 
+    getUniqueUs		`thenUs` \ uniq -> 
+    returnUs (uniq, warns))
+
+getUniquesDs :: DsM [Unique]
+getUniquesDs = DsM(\ env warns -> 
+    getUniquesUs		`thenUs` \ uniqs -> 
+    returnUs (uniqs, warns))
+
+-- Make a new Id with the same print name, but different type, and new unique
+newUniqueId :: Name -> Type -> DsM Id
+newUniqueId id ty
+  = getUniqueDs 	`thenDs` \ uniq ->
+    returnDs (mkSysLocal (occNameFS (nameOccName id)) uniq ty)
+
+duplicateLocalDs :: Id -> DsM Id
+duplicateLocalDs old_local 
+  = getUniqueDs 	`thenDs` \ uniq ->
+    returnDs (setIdUnique old_local uniq)
+
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
-newSysLocalDs ty dflags us genv loc mod warns
-  = case uniqFromSupply us of { assigned_uniq ->
-    (mkSysLocal FSLIT("ds") assigned_uniq ty, warns) }
+newSysLocalDs ty
+  = getUniqueDs 	`thenDs` \ uniq ->
+    returnDs (mkSysLocal FSLIT("ds") uniq ty)
 
 newSysLocalsDs tys = mapDs newSysLocalDs tys
 
-newFailLocalDs ty dflags us genv loc mod warns
-  = case uniqFromSupply us of { assigned_uniq ->
-    (mkSysLocal FSLIT("fail") assigned_uniq ty, warns) }
+newFailLocalDs ty 
+  = getUniqueDs 	`thenDs` \ uniq ->
+    returnDs (mkSysLocal FSLIT("fail") uniq ty)
 	-- The UserLocal bit just helps make the code a little clearer
-
-getUniqueDs :: DsM Unique
-getUniqueDs dflags us genv loc mod warns
-  = (uniqFromSupply us, warns)
-
-getUniquesDs :: DsM [Unique]
-getUniquesDs dflags us genv loc mod warns
-  = (uniqsFromSupply us, warns)
-
-getDOptsDs :: DsM DynFlags
-getDOptsDs dflags us genv loc mod warns
-  = (dflags, warns)
-
-duplicateLocalDs :: Id -> DsM Id
-duplicateLocalDs old_local dflags us genv loc mod warns
-  = case uniqFromSupply us of { assigned_uniq ->
-    (setIdUnique old_local assigned_uniq, warns) }
-
-cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
-cloneTyVarsDs tyvars dflags us genv loc mod warns
-  = (zipWith setTyVarUnique tyvars (uniqsFromSupply us), warns)
 \end{code}
 
 \begin{code}
+cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
+cloneTyVarsDs tyvars 
+  = getUniquesDs	`thenDs` \ uniqs ->
+    returnDs (zipWith setTyVarUnique tyvars uniqs)
+
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
-newTyVarsDs tyvar_tmpls dflags us genv loc mod warns
-  = (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply us), warns)
+newTyVarsDs tyvar_tmpls 
+  = getUniquesDs	`thenDs` \ uniqs ->
+    returnDs (zipWith setTyVarUnique tyvar_tmpls uniqs)
 \end{code}
 
 We can also reach out and either set/grab location information from
 the @SrcLoc@ being carried around.
-\begin{code}
-uniqSMtoDsM :: UniqSM a -> DsM a
 
-uniqSMtoDsM u_action dflags us genv loc mod warns
-  = (initUs_ us u_action, warns)
+\begin{code}
+getDOptsDs :: DsM DynFlags
+getDOptsDs = DsM(\ env warns -> returnUs (ds_dflags env, warns))
+
+getModuleDs :: DsM Module
+getModuleDs = DsM(\ env warns -> returnUs (ds_mod env, warns))
 
 getSrcLocDs :: DsM SrcLoc
-getSrcLocDs dflags us genv loc mod warns
-  = (loc, warns)
+getSrcLocDs = DsM(\ env warns -> returnUs (ds_loc env, warns))
 
 putSrcLocDs :: SrcLoc -> DsM a -> DsM a
-putSrcLocDs new_loc expr dflags us genv old_loc mod warns
-  = expr dflags us genv new_loc mod warns
+putSrcLocDs new_loc (DsM expr) = DsM(\ env warns ->
+    expr (env { ds_loc = new_loc }) warns)
 
-dsWarn :: WarnMsg -> DsM ()
-dsWarn warn dflags us genv loc mod warns = ((), warns `snocBag` warn)
-
+dsWarn :: DsWarning -> DsM ()
+dsWarn warn = DsM(\ env warns -> returnUs ((), warns `snocBag` warn))
 \end{code}
 
 \begin{code}
-getModuleDs :: DsM Module
-getModuleDs dflags us genv loc mod warns = (mod, warns)
+dsLookupGlobalId :: Name -> DsM Id
+dsLookupGlobalId name = DsM(\ env warns -> 
+	returnUs (get_id name (ds_globals env name), warns))
+
+dsLookupTyCon :: Name -> DsM TyCon
+dsLookupTyCon name = DsM(\ env warns -> 
+	returnUs (get_tycon name (ds_globals env name), warns))
+
+get_id name (AnId id) = id
+get_id name other     = pprPanic "dsLookupGlobalId" (ppr name)
+
+get_tycon name (ATyCon tc) = tc
+get_tycon name other       = pprPanic "dsLookupTyCon" (ppr name)
 \end{code}
 
 \begin{code}
-dsLookupGlobalValue :: Name -> DsM Id
-dsLookupGlobalValue name dflags us genv loc mod warns
-  = (genv name, warns)
+dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
+dsLookupMetaEnv name = DsM(\ env warns -> returnUs (lookupNameEnv (ds_meta env) name, warns))
+
+dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
+dsExtendMetaEnv menv (DsM m)
+  = DsM (\ env warns -> m (env { ds_meta = ds_meta env `plusNameEnv` menv }) warns)
 \end{code}
 
 

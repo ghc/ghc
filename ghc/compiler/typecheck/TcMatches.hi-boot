@@ -6,11 +6,11 @@ _declarations_
 	      HsExpr.HsMatchContext Name.Name
 	      -> RnHsSyn.RenamedGRHSs
 	      -> TcType.TcType
-	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, Inst.LIE) ;;
+	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, TcMonad.LIE) ;;
 3 tcMatchesFun _:_ _forall_ [s] => 
 		[(Name.Name,Var.Id)]
 	     ->	Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
-	     -> TcMonad.TcM s ([TcHsSyn.TcMatch], Inst.LIE) ;;
+	     -> TcMonad.TcM s ([TcHsSyn.TcMatch], TcMonad.LIE) ;;
 

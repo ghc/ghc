@@ -4,8 +4,8 @@
 \section[TcInstDecls]{Typechecking instance declarations}
 
 \begin{code}
-module TcInstDcls ( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, 
-		    tcInstDecls2, initInstEnv, tcAddDeclCtxt ) where
+module TcInstDcls ( tcInstDecls1, tcIfaceInstDecls, 
+		    tcInstDecls2, tcAddDeclCtxt ) where
 
 #include "HsVersions.h"
 
@@ -15,7 +15,7 @@ import CmdLineOpts	( DynFlag(..) )
 import HsSyn		( InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
 			  andMonoBindList, collectMonoBinders, 
-			  isClassDecl, toHsType
+			  isClassDecl, isSourceInstDecl, toHsType
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, 
 			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
@@ -24,39 +24,35 @@ import RnHsSyn		( RenamedHsBinds, RenamedInstDecl,
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr )
-import TcMonad       
+import TcRnMonad       
 import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr, 
-			  UserTypeCtxt(..), SourceTyCtxt(..) )
-import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys,
+			  checkAmbiguity, UserTypeCtxt(..), SourceTyCtxt(..) )
+import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe,
 			  TyVarDetails(..)
 			)
-import Inst		( InstOrigin(..), newDicts, instToId,
-			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
+import Inst		( InstOrigin(..), newDicts, instToId, showLIE )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendLocalValEnv2,
-			  tcLookupId, tcLookupClass, tcExtendTyVarEnv2,
+			  tcLookupClass, tcExtendTyVarEnv2,
+			  tcExtendInstEnv, tcExtendLocalInstEnv, tcLookupGlobalId,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
 			)
-import InstEnv		( InstEnv, extendInstEnv )
 import PprType		( pprClassPred )
 import TcMonoType	( tcSigPolyId, tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
-import HscTypes		( HomeSymbolTable, DFunId, FixityEnv,
-			  PersistentCompilerState(..), PersistentRenamerState,
-			  ModDetails(..)
-			)
+import HscTypes		( DFunId )
 import Subst		( mkTyVarSubst, substTheta )
 import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
+import NameSet		
 import Id		( setIdLocalExported )
 import MkId		( mkDictFunId, unsafeCoerceId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
-import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
 import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
 import TyCon		( TyCon )
@@ -71,6 +67,7 @@ import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc,
 			  assocElts, extendAssoc_C, equivClassesByUniq, minusList
 			)
 import Maybe		( catMaybes )
+import List		( partition )
 import Outputable
 import FastString
 \end{code}
@@ -158,95 +155,61 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1	-- Deal with source-code instance decls
-   :: PersistentRenamerState	
-   -> InstEnv 			-- Imported instance envt
-   -> FixityEnv			-- for deriving Show and Read
-   -> Module			-- Module for deriving
-   -> [RenamedTyClDecl]		-- For deriving stuff
+tcInstDecls1	-- Deal with both source-code and imported instance decls
+   :: [RenamedTyClDecl]		-- For deriving stuff
    -> [RenamedInstDecl]		-- Source code instance decls
-   -> TcM (InstEnv,		-- the full inst env
-	   [InstInfo],		-- instance decls to process; contains all dfuns
-				-- for this module
-	   RenamedHsBinds)	-- derived instances
+   -> TcM (TcGblEnv,		-- The full inst env
+	   [InstInfo],		-- Source-code instance decls to process; 
+				-- contains all dfuns for this module
+	   RenamedHsBinds,	-- Supporting bindings for derived instances
+	   FreeVars)		-- And the free vars of the derived code
 
-tcInstDecls1 prs inst_env get_fixity this_mod 
-	     tycl_decls inst_decls
--- The incoming inst_env includes all the imported instances already
-  = checkNoErrsTc $
+tcInstDecls1 tycl_decls inst_decls
+  = checkNoErrs $
 	-- Stop if addInstInfos etc discovers any errors
 	-- (they recover, so that we get more than one error each round)
+    let
+      (src_inst_decls, iface_inst_decls) = partition isSourceInstDecl inst_decls
+    in
+
+	-- (0) Deal with the imported instance decls
+    tcIfaceInstDecls iface_inst_decls	`thenM` \ imp_dfuns ->
+    tcExtendInstEnv imp_dfuns		$
+
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc tcLocalInstDecl1 inst_decls	`thenNF_Tc` \ local_inst_infos ->
+    mappM tcLocalInstDecl1 src_inst_decls    `thenM` \ local_inst_infos ->
 
     let
 	local_inst_info = catMaybes local_inst_infos
 	clas_decls	= filter isClassDecl tycl_decls
     in
 	-- (2) Instances from generic class declarations
-    getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
+    getGenericInstances clas_decls		`thenM` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
-	--      a) imported instance decls (from this module)	     inst_env1
-	--	b) local instance decls				     inst_env2
-	--	c) generic instances				     final_inst_env
-    addInstInfos inst_env local_inst_info	`thenNF_Tc` \ inst_env1 ->
-    addInstInfos inst_env1 generic_inst_info	`thenNF_Tc` \ inst_env2 ->
+	--      a) imported instance decls (from this module)
+	--	b) local instance decls
+	--	c) generic instances
+    tcExtendLocalInstEnv local_inst_info	$
+    tcExtendLocalInstEnv generic_inst_info	$
 
 	-- (3) Compute instances from "deriving" clauses; 
 	--     note that we only do derivings for things in this module; 
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving prs this_mod inst_env2 
-	       get_fixity tycl_decls		`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env2 deriv_inst_info	`thenNF_Tc` \ final_inst_env ->
+    tcDeriving tycl_decls			`thenM` \ (deriv_inst_info, deriv_binds, fvs) ->
+    tcExtendLocalInstEnv deriv_inst_info	$
 
-    returnTc (final_inst_env, 
-	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
-	      deriv_binds)
-
-initInstEnv :: PersistentCompilerState -> HomeSymbolTable -> NF_TcM InstEnv
--- Initialise the instance environment from the 
--- persistent compiler state and the home symbol table
-initInstEnv pcs hst
-  = let
-	pkg_inst_env = pcs_insts pcs
-	hst_dfuns    = foldModuleEnv ((++) . md_insts) [] hst
-    in
-    addInstDFuns pkg_inst_env hst_dfuns
-
-addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
-addInstInfos inst_env infos = addInstDFuns inst_env (map iDFunId infos)
-
-addInstDFuns :: InstEnv -> [DFunId] -> NF_TcM InstEnv
-addInstDFuns inst_env dfuns
-  = getDOptsTc				`thenNF_Tc` \ dflags ->
-    let
-	(inst_env', errs) = extendInstEnv dflags inst_env dfuns
-    in
-    addErrsTc errs			`thenNF_Tc_` 
-    traceTc (text "Adding instances:" <+> vcat (map pp dfuns))	`thenTc_`
-    returnTc inst_env'
-  where
-    pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
+    getGblEnv					`thenM` \ gbl_env ->
+    returnM (gbl_env, 
+	     generic_inst_info ++ deriv_inst_info ++ local_inst_info,
+	     deriv_binds, fvs)
 \end{code} 
 
 \begin{code}
-tcIfaceInstDecls1 :: [RenamedInstDecl] -> NF_TcM [DFunId]
-tcIfaceInstDecls1 decls = mapNF_Tc tcIfaceInstDecl1 decls
-
-tcIfaceInstDecl1 :: RenamedInstDecl -> NF_TcM DFunId
-	-- An interface-file instance declaration
-	-- Should be in scope by now, because we should
-	-- have sucked in its interface-file definition
-	-- So it will be replete with its unfolding etc
-tcIfaceInstDecl1 decl@(InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
-  = tcLookupId dfun_name
-
-
 tcLocalInstDecl1 :: RenamedInstDecl 
-		 -> NF_TcM (Maybe InstInfo)	-- Nothing if there was an error
+		 -> TcM (Maybe InstInfo)	-- Nothing if there was an error
 	-- A source-file instance declaration
 	-- Type-check all the stuff before the "where"
 	--
@@ -257,26 +220,43 @@ tcLocalInstDecl1 :: RenamedInstDecl
 	--	instance CCallable [Char] 
 tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags Nothing src_loc)
   =	-- Prime error recovery, set source location
-    recoverNF_Tc (returnNF_Tc Nothing)	$
-    tcAddSrcLoc src_loc			$
-    tcAddErrCtxt (instDeclCtxt poly_ty)	$
+    recoverM (returnM Nothing)		$
+    addSrcLoc src_loc			$
+    addErrCtxt (instDeclCtxt poly_ty)	$
 
 	-- Typecheck the instance type itself.  We can't use 
 	-- tcHsSigType, because it's not a valid user type.
-    kcHsSigType poly_ty			`thenTc_`
-    tcHsType poly_ty			`thenTc` \ poly_ty' ->
+    kcHsSigType poly_ty			`thenM_`
+    tcHsType poly_ty			`thenM` \ poly_ty' ->
     let
 	(tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
     in
-    checkValidTheta InstThetaCtxt theta		`thenTc_`
-    checkValidInstHead tau			`thenTc` \ (clas,inst_tys) ->
+    checkValidTheta InstThetaCtxt theta			`thenM_`
+    checkAmbiguity tyvars theta (tyVarsOfType tau)	`thenM_`
+    checkValidInstHead tau			`thenM` \ (clas,inst_tys) ->
     checkTc (checkInstFDs theta clas inst_tys)
-	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenTc_`
-    newDFunName clas inst_tys src_loc				`thenNF_Tc` \ dfun_name ->
-    returnTc (Just (InstInfo { iDFunId = mkDictFunId dfun_name clas tyvars inst_tys theta,
+	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
+    newDFunName clas inst_tys src_loc				`thenM` \ dfun_name ->
+    returnM (Just (InstInfo { iDFunId = mkDictFunId dfun_name clas tyvars inst_tys theta,
 			       iBinds = binds, iPrags = uprags }))
   where
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
+\end{code}
+
+Imported instance declarations
+
+\begin{code}
+tcIfaceInstDecls :: [RenamedInstDecl] -> TcM [DFunId]
+-- Deal with the instance decls, 
+tcIfaceInstDecls decls = mappM tcIfaceInstDecl decls
+
+tcIfaceInstDecl :: RenamedInstDecl -> TcM DFunId
+	-- An interface-file instance declaration
+	-- Should be in scope by now, because we should
+	-- have sucked in its interface-file definition
+	-- So it will be replete with its unfolding etc
+tcIfaceInstDecl decl@(InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
+  = tcLookupGlobalId dfun_name
 \end{code}
 
 
@@ -313,33 +293,33 @@ gives rise to the instance declarations
 \begin{code}
 getGenericInstances :: [RenamedTyClDecl] -> TcM [InstInfo] 
 getGenericInstances class_decls
-  = mapTc get_generics class_decls		`thenTc` \ gen_inst_infos ->
+  = mappM get_generics class_decls		`thenM` \ gen_inst_infos ->
     let
 	gen_inst_info = concat gen_inst_infos
     in
     if null gen_inst_info then
-	returnTc []
+	returnM []
     else
-    getDOptsTc						`thenNF_Tc`  \ dflags ->
-    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
-		      (vcat (map pprInstInfo gen_inst_info)))	
-							`thenNF_Tc_`
-    returnTc gen_inst_info
+    getDOpts						`thenM`  \ dflags ->
+    ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
+	 	    (vcat (map pprInstInfo gen_inst_info)))	
+							`thenM_`
+    returnM gen_inst_info
 
 get_generics decl@(ClassDecl {tcdMeths = Nothing})
-  = returnTc []	-- Imported class decls
+  = returnM []	-- Imported class decls
 
 get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods, tcdLoc = loc})
   | null groups		
-  = returnTc [] -- The comon case: no generic default methods
+  = returnM [] -- The comon case: no generic default methods
 
   | otherwise	-- A source class decl with generic default methods
-  = recoverNF_Tc (returnNF_Tc [])				$
-    tcAddDeclCtxt decl						$
-    tcLookupClass class_name					`thenTc` \ clas ->
+  = recoverM (returnM [])				$
+    tcAddDeclCtxt decl					$
+    tcLookupClass class_name				`thenM` \ clas ->
 
 	-- Make an InstInfo out of each group
-    mapTc (mkGenericInstance clas loc) groups		`thenTc` \ inst_infos ->
+    mappM (mkGenericInstance clas loc) groups		`thenM` \ inst_infos ->
 
 	-- Check that there is only one InstInfo for each type constructor
   	-- The main way this can fail is if you write
@@ -354,15 +334,15 @@ get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods,
 			      group `lengthExceeds` 1]
 	get_uniq (tc,_) = getUnique tc
     in
-    mapTc (addErrTc . dupGenericInsts) bad_groups	`thenTc_`
+    mappM (addErrTc . dupGenericInsts) bad_groups	`thenM_`
 
 	-- Check that there is an InstInfo for each generic type constructor
     let
 	missing = genericTyCons `minusList` [tc | (tc,_) <- tc_inst_infos]
     in
-    checkTc (null missing) (missingGenericInstances missing)	`thenTc_`
+    checkTc (null missing) (missingGenericInstances missing)	`thenM_`
 
-    returnTc inst_infos
+    returnM inst_infos
 
   where
 	-- Group the declarations by type pattern
@@ -406,18 +386,18 @@ mkGenericInstance clas loc (hs_ty, binds)
     tcHsTyVars sig_tvs (kcHsSigType hs_ty)	$ \ tyvars ->
 
 	-- Type-check the instance type, and check its form
-    tcHsSigType GenPatCtxt hs_ty		`thenTc` \ inst_ty ->
+    tcHsSigType GenPatCtxt hs_ty		`thenM` \ inst_ty ->
     checkTc (validGenericInstanceType inst_ty)
-	    (badGenericInstanceType binds)	`thenTc_`
+	    (badGenericInstanceType binds)	`thenM_`
 
 	-- Make the dictionary function.
-    newDFunName clas [inst_ty] loc		`thenNF_Tc` \ dfun_name ->
+    newDFunName clas [inst_ty] loc		`thenM` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
 	dfun_id    = mkDictFunId dfun_name clas tyvars [inst_ty] inst_theta
     in
 
-    returnTc (InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = [] })
+    returnM (InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = [] })
 \end{code}
 
 
@@ -428,18 +408,10 @@ mkGenericInstance clas loc (hs_ty, binds)
 %************************************************************************
 
 \begin{code}
-tcInstDecls2 :: [InstInfo]
-	     -> NF_TcM (LIE, TcMonoBinds)
-
+tcInstDecls2 :: [InstInfo] -> TcM TcMonoBinds
 tcInstDecls2 inst_decls
---  = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
-  = foldr combine (returnNF_Tc (emptyLIE, EmptyMonoBinds)) 
-          (map tcInstDecl2 inst_decls)
-  where
-    combine tc1 tc2 = tc1 	`thenNF_Tc` \ (lie1, binds1) ->
-		      tc2	`thenNF_Tc` \ (lie2, binds2) ->
-		      returnNF_Tc (lie1 `plusLIE` lie2,
-				   binds1 `AndMonoBinds` binds2)
+  = mappM tcInstDecl2 inst_decls	`thenM` \ binds_s ->
+    returnM (andMonoBindList binds_s)
 \end{code}
 
 ======= New documentation starts here (Sept 92)	 ==============
@@ -510,11 +482,11 @@ First comes the easy case of a non-local instance decl.
 
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> TcM (LIE, TcMonoBinds)
+tcInstDecl2 :: InstInfo -> TcM TcMonoBinds
 
 tcInstDecl2 (NewTypeDerived { iDFunId = dfun_id })
-  = tcInstType InstTv (idType dfun_id)		`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
-    newDicts InstanceDeclOrigin dfun_theta'	`thenNF_Tc` \ rep_dicts ->
+  = tcInstType InstTv (idType dfun_id)		`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
+    newDicts InstanceDeclOrigin dfun_theta'	`thenM` \ rep_dicts ->
     let
 	rep_dict_id = ASSERT( isSingleton rep_dicts )
 		      instToId (head rep_dicts)		-- Derived newtypes have just one dict arg
@@ -528,13 +500,13 @@ tcInstDecl2 (NewTypeDerived { iDFunId = dfun_id })
 	-- type equality mechanism isn't clever enough; see comments with Type.eqType.
 	-- So Lint complains if we don't have this. 
     in
-    returnTc (emptyLIE, VarMonoBind dfun_id body)
+    returnM (VarMonoBind dfun_id body)
 
 tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags })
   =	 -- Prime error recovery
-    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))	$
-    tcAddSrcLoc (getSrcLoc dfun_id)			   	$
-    tcAddErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
+    recoverM (returnM EmptyMonoBinds)	$
+    addSrcLoc (getSrcLoc dfun_id)			   	$
+    addErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
     let
 	inst_ty = idType dfun_id
 	(inst_tyvars, _) = tcSplitForAllTys inst_ty
@@ -544,7 +516,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
     in
 
 	-- Instantiate the instance decl with tc-style type variables
-    tcInstType InstTv inst_ty		`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
+    tcInstType InstTv inst_ty		`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
     let
 	Just pred         = tcSplitPredTy_maybe inst_head'
 	(clas, inst_tys') = getClassPredTys pred
@@ -555,14 +527,14 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	origin	  = InstanceDeclOrigin
     in
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts origin sc_theta'		`thenNF_Tc` \ sc_dicts ->
-    newDicts origin dfun_theta'		`thenNF_Tc` \ dfun_arg_dicts ->
-    newDicts origin [pred] 		`thenNF_Tc` \ [this_dict] ->
+    newDicts origin sc_theta'		`thenM` \ sc_dicts ->
+    newDicts origin dfun_theta'		`thenM` \ dfun_arg_dicts ->
+    newDicts origin [pred] 		`thenM` \ [this_dict] ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
 	 -- Check that all the method bindings come from this class
-    mkMethodBinds clas inst_tys' op_items monobinds `thenTc` \ (meth_insts, meth_infos) ->
+    mkMethodBinds clas inst_tys' op_items monobinds `thenM` \ (meth_insts, meth_infos) ->
 
     let		 -- These insts are in scope; quite a few, eh?
 	avail_insts = [this_dict] ++ dfun_arg_dicts ++
@@ -571,11 +543,11 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	xtve    = inst_tyvars `zip` inst_tyvars'
 	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts uprags
     in
-    mapAndUnzipTc tc_meth meth_infos 		`thenTc` \ (meth_binds_s, meth_lie_s) ->
+    mappM tc_meth meth_infos 		`thenM` \ meth_binds_s ->
 
 	-- Figure out bindings for the superclass context
     tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts	
-		`thenTc` \ (zonked_inst_tyvars, sc_binds_inner, sc_binds_outer) ->
+		`thenM` \ (zonked_inst_tyvars, sc_binds_inner, sc_binds_outer) ->
 
 	-- Deal with SPECIALISE instance pragmas by making them
 	-- look like SPECIALISE pragmas for the dfun
@@ -590,7 +562,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 			     | (sel_id, sig, _) <- meth_infos]	$
 		-- Map sel_id to the local method name we are using
 	tcSpecSigs spec_prags
-    )					`thenTc` \ (prag_binds, prag_lie) ->
+    )					`thenM` \ prag_binds ->
 
 	-- Create the result bindings
     let
@@ -644,8 +616,8 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		 	 [(inst_tyvars', local_dfun_id, this_dict_id)] 
 		 	 inlines all_binds
     in
-    returnTc (plusLIEs meth_lie_s `plusLIE` prag_lie,
-	      main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
+    showLIE "instance" 		`thenM_`
+    returnM (main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
 \end{code}
 
 Superclass loops
@@ -691,20 +663,20 @@ from this_dict!!
 
 \begin{code}
 tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
-  = tcAddErrCtxt superClassCtxt 	$
-    tcSimplifyCheck doc inst_tyvars'
-		    dfun_arg_dicts
-		    (mkLIE sc_dicts)	`thenTc` \ (sc_lie, sc_binds1) ->
+  = addErrCtxt superClassCtxt 	$
+    getLIE (tcSimplifyCheck doc inst_tyvars'
+			    dfun_arg_dicts
+			    sc_dicts)		`thenM` \ (sc_binds1, sc_lie) ->
 
 	-- It's possible that the superclass stuff might have done unification
-    checkSigTyVars inst_tyvars' 	`thenTc` \ zonked_inst_tyvars ->
+    checkSigTyVars inst_tyvars' 	`thenM` \ zonked_inst_tyvars ->
 
 	-- We must simplify this all the way down 
 	-- lest we build superclass loops
 	-- See notes about superclass loops above
-    tcSimplifyTop sc_lie		`thenTc` \ sc_binds2 ->
+    tcSimplifyTop sc_lie		`thenM` \ sc_binds2 ->
 
-    returnTc (zonked_inst_tyvars, sc_binds1, sc_binds2)
+    returnM (zonked_inst_tyvars, sc_binds1, sc_binds2)
 
   where
     doc = ptext SLIT("instance declaration superclass context")
@@ -713,10 +685,10 @@ tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
 \begin{code}
 mkMethodBinds clas inst_tys' op_items monobinds
   = 	 -- Check that all the method bindings come from this class
-    mapTc (addErrTc . badMethodErr clas) bad_bndrs	`thenNF_Tc_`
+    mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
 
 	-- Make the method bindings
-    mapAndUnzipTc mk_method_bind op_items
+    mapAndUnzipM mk_method_bind op_items
 
   where
     mk_method_bind op_item = mkMethodBind InstanceDeclOrigin clas 
@@ -827,8 +799,8 @@ simplified: only zeze2 is extracted and its body is simplified.
 
 \begin{code}
 tcAddDeclCtxt decl thing_inside
-  = tcAddSrcLoc (tcdLoc decl) 	$
-    tcAddErrCtxt ctxt 	$
+  = addSrcLoc (tcdLoc decl) 	$
+    addErrCtxt ctxt 	$
     thing_inside
   where
      thing = case decl of

@@ -11,17 +11,14 @@ module Check ( check , ExhaustivePat ) where
 
 
 import HsSyn		
-import TcHsSyn		( TypecheckedPat, outPatType )
-import TcType		( tcTyConAppTyCon, tcTyConAppArgs )
+import TcHsSyn		( TypecheckedPat, hsPatType )
+import TcType		( tcTyConAppTyCon )
 import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, 
 			  CanItFail(..),  tidyLitPat, tidyNPat, 
  			)
 import Id		( idType )
-import DataCon		( DataCon, dataConTyCon, dataConArgTys,
-			  dataConSourceArity, dataConFieldLabels )
+import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConFieldLabels )
 import Name             ( Name, mkInternalName, getOccName, isDataSymOcc, getName, mkVarOcc )
-import TcType		( mkTyVarTys )
-import TysPrim		( charPrimTy )
 import TysWiredIn
 import PrelNames	( unboundKey )
 import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
@@ -134,29 +131,27 @@ untidy_pars :: WarningPat -> WarningPat
 untidy_pars p = untidy True p
 
 untidy :: NeedPars -> WarningPat -> WarningPat
-untidy _ p@WildPatIn = p
-untidy _ p@(VarPatIn name) = p
-untidy _ (LitPatIn lit) = LitPatIn (untidy_lit lit)
-untidy _ p@(ConPatIn name []) = p
-untidy b (ConPatIn name pats)  = 
-       pars b (ConPatIn name (map untidy_pars pats)) 
-untidy b (ConOpPatIn pat1 name fixity pat2) = 
-       pars b (ConOpPatIn (untidy_pars pat1) name fixity (untidy_pars pat2)) 
-untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
-untidy _ (PArrPatIn pats)  = 
-       panic "Check.untidy: Shouldn't get a parallel array here!"
-untidy _ (TuplePatIn pats boxed) = TuplePatIn (map untidy_no_pars pats) boxed
+untidy _ p@(WildPat _)   = p
+untidy _ p@(VarPat name) = p
+untidy _ (LitPat lit)    = LitPat (untidy_lit lit)
+untidy _ p@(ConPatIn name (PrefixCon [])) = p
+untidy b (ConPatIn name ps)     = pars b (ConPatIn name (untidy_con ps))
+untidy _ (ListPat pats ty)   	= ListPat (map untidy_no_pars pats) ty
+untidy _ (TuplePat pats boxed)  = TuplePat (map untidy_no_pars pats) boxed
+untidy _ (PArrPat _ _)	 	= panic "Check.untidy: Shouldn't get a parallel array here!"
+untidy _ (SigPatIn _ _) 	= panic "Check.untidy: SigPat"
 
-untidy _ pat = pprPanic "Check.untidy: SigPatIn" (ppr pat)
+untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats) 
+untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)
+untidy_con (RecCon bs)      = RecCon    [(f,untidy_pars p) | (f,p) <- bs]
 
 pars :: NeedPars -> WarningPat -> WarningPat
-pars True p = ParPatIn p
+pars True p = ParPat p
 pars _    p = p
 
 untidy_lit :: HsLit -> HsLit
 untidy_lit (HsCharPrim c) = HsChar c
---untidy_lit (HsStringPrim s) = HsString s
-untidy_lit lit = lit
+untidy_lit lit 		  = lit
 \end{code}
 
 This equation is the same that check, the only difference is that the
@@ -205,13 +200,14 @@ check' qs@((EqnInfo n ctx ps result):_)
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
-   | otherwise    = panic "Check.check': Not implemented :-("
+   | otherwise    = pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
   where
      -- Note: RecPats will have been simplified to ConPats
      --       at this stage.
-    constructors = or (map is_con qs)
-    literals     = or (map is_lit qs)    
-    only_vars    = and (map is_var qs) 
+    first_pats   = ASSERT2( okGroup qs, pprGroup qs ) map firstPat qs
+    constructors = any is_con first_pats
+    literals     = any is_lit first_pats
+    only_vars    = all is_var first_pats
 --    npat         = or (map is_npat qs)
 --    nplusk       = or (map is_nplusk qs)
 \end{code}
@@ -252,7 +248,8 @@ process_literals used_lits qs
   | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = process_explicit_literals used_lits qs
-       default_eqns    = (map remove_var (filter is_var qs))
+       default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) 
+			 map remove_var (filter (is_var . firstPat) qs)
        (pats',indexs') = check' default_eqns 
        pats_default    = [(new_wild_pat:ps,constraints) | (ps,constraints) <- (pats')] ++ pats 
        indexs_default  = unionUniqSets indexs' indexs
@@ -267,13 +264,14 @@ construct_literal_matrix lit qs =
     (map (\ (xs,ys) -> (new_lit:xs,ys)) pats,indexs) 
   where
     (pats,indexs) = (check' (remove_first_column_lit lit qs)) 
-    new_lit = LitPatIn lit 
+    new_lit = LitPat lit 
 
 remove_first_column_lit :: HsLit
                         -> [EquationInfo] 
                         -> [EquationInfo]
-remove_first_column_lit lit qs = 
-    map shift_pat (filter (is_var_lit lit) qs)
+remove_first_column_lit lit qs
+  = ASSERT2( okGroup qs, pprGroup qs ) 
+    map shift_pat (filter (is_var_lit lit . firstPat) qs)
   where
      shift_pat (EqnInfo n ctx []     result) =  panic "Check.shift_var: no patterns"
      shift_pat (EqnInfo n ctx (_:ps) result) =  EqnInfo n ctx ps result
@@ -328,7 +326,7 @@ need_default_case used_cons unused_cons qs
   | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = no_need_default_case used_cons qs
-       default_eqns    = (map remove_var (filter is_var qs))
+       default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) map remove_var (filter (is_var . firstPat) qs)
        (pats',indexs') = check' default_eqns 
        pats_default    = [(make_whole_con c:ps,constraints) | 
                           c <- unused_cons, (ps,constraints) <- pats'] ++ pats
@@ -361,11 +359,12 @@ is transformed in:
 remove_first_column :: TypecheckedPat                -- Constructor 
                     -> [EquationInfo] 
                     -> [EquationInfo]
-remove_first_column (ConPat con _ _ _ con_pats) qs = 
-    map shift_var (filter (is_var_con con) qs)
+remove_first_column (ConPatOut con (PrefixCon con_pats) _ _ _) qs
+  = ASSERT2( okGroup qs, pprGroup qs ) 
+    map shift_var (filter (is_var_con con . firstPat) qs)
   where
-     new_wilds = [WildPat (outPatType arg_pat) | arg_pat <- con_pats]
-     shift_var (EqnInfo n ctx (ConPat _ _ _ _ ps':ps) result) = 
+     new_wilds = [WildPat (hsPatType arg_pat) | arg_pat <- con_pats]
+     shift_var (EqnInfo n ctx (ConPatOut _ (PrefixCon ps') _ _ _:ps) result) = 
                 EqnInfo n ctx (ps'++ps)               result 
      shift_var (EqnInfo n ctx (WildPat _     :ps)     result) = 
                 EqnInfo n ctx (new_wilds ++   ps)     result
@@ -373,7 +372,7 @@ remove_first_column (ConPat con _ _ _ con_pats) qs =
 
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
-   (VarPatIn new_var:takeList (tail pats) (repeat new_wild_pat),[(new_var,used_lits)])
+   (VarPat new_var:takeList (tail pats) (repeat new_wild_pat),[(new_var,used_lits)])
   where new_var = hash_x
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
@@ -384,7 +383,7 @@ make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
 make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = takeList (tail pats) (repeat new_wild_pat)
 
 compare_cons :: TypecheckedPat -> TypecheckedPat -> Bool
-compare_cons (ConPat id1 _ _ _ _) (ConPat id2 _ _ _ _) = id1 == id2  
+compare_cons (ConPatOut id1 _ _ _ _) (ConPatOut id2 _ _ _ _) = id1 == id2  
 
 remove_dups :: [TypecheckedPat] -> [TypecheckedPat]
 remove_dups []     = []
@@ -392,7 +391,7 @@ remove_dups (x:xs) | or (map (\y -> compare_cons x y) xs) = remove_dups  xs
                    | otherwise                            = x : remove_dups xs
 
 get_used_cons :: [EquationInfo] -> [TypecheckedPat]
-get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPat _ _ _ _ _):_) _) <- qs ]
+get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPatOut _ _ _ _ _):_) _) <- qs ]
 
 remove_dups' :: [HsLit] -> [HsLit] 
 remove_dups' []                   = []
@@ -407,9 +406,9 @@ get_used_lits qs = remove_dups' all_literals
 
 get_used_lits' :: [EquationInfo] -> [HsLit]
 get_used_lits' [] = []
-get_used_lits' ((EqnInfo _ _ ((LitPat lit _):_) _):qs) = 
+get_used_lits' ((EqnInfo _ _ ((LitPat lit):_) _):qs) = 
 	       lit : get_used_lits qs
-get_used_lits' ((EqnInfo _ _ ((NPat lit _ _):_) _):qs) = 
+get_used_lits' ((EqnInfo _ _ ((NPatOut lit _ _):_) _):qs) = 
 	       lit : get_used_lits qs
 get_used_lits' (q:qs)                                  =       
 	       get_used_lits qs
@@ -417,11 +416,11 @@ get_used_lits' (q:qs)                                  =
 get_unused_cons :: [TypecheckedPat] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
-       (ConPat _ ty _ _ _) = head used_cons
-       ty_con 		   = tcTyConAppTyCon ty		-- Newtype observable
-       all_cons        	   = tyConDataCons ty_con
-       used_cons_as_id 	   = map (\ (ConPat d _ _ _ _) -> d) used_cons
-       unused_cons     	   = uniqSetToList
+       (ConPatOut _ _ ty _ _) = head used_cons
+       ty_con 		      = tcTyConAppTyCon ty		-- Newtype observable
+       all_cons        	      = tyConDataCons ty_con
+       used_cons_as_id 	      = map (\ (ConPatOut d _ _ _ _) -> d) used_cons
+       unused_cons     	      = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
 all_vars :: [TypecheckedPat] -> Bool
@@ -434,37 +433,56 @@ remove_var (EqnInfo n ctx (WildPat _:ps) result) = EqnInfo n ctx ps result
 remove_var _                                     =
 	 panic "Check.remove_var: equation does not begin with a variable"
 
-is_con :: EquationInfo -> Bool
-is_con (EqnInfo _ _ ((ConPat _ _ _ _ _):_) _) = True
-is_con _                                      = False
+-----------------------
+eqnPats :: EquationInfo -> [TypecheckedPat]
+eqnPats (EqnInfo _ _ ps _) = ps
 
-is_lit :: EquationInfo -> Bool
-is_lit (EqnInfo _ _ ((LitPat _ _):_) _) = True
-is_lit (EqnInfo _ _ ((NPat _ _ _):_) _) = True
-is_lit _                                = False
+firstPat :: EquationInfo -> TypecheckedPat
+firstPat eqn_info = head (eqnPats eqn_info)
 
-is_npat :: EquationInfo -> Bool
-is_npat (EqnInfo _ _ ((NPat _ _ _):_) _) = True
-is_npat _                                 = False
+okGroup :: [EquationInfo] -> Bool
+-- True if all equations have at least one pattern, and
+-- all have the same number of patterns
+okGroup [] = True
+okGroup (e:es) = n_pats > 0 && and [length (eqnPats e) == n_pats | e <- es]
+	       where
+		 n_pats = length (eqnPats e)
 
-is_nplusk :: EquationInfo -> Bool
-is_nplusk (EqnInfo _ _ ((NPlusKPat _ _ _ _ _):_) _) = True
-is_nplusk _                                         = False
+-- Half-baked print
+pprGroup es = vcat (map pprEqnInfo es)
+pprEqnInfo e = ppr (eqnPats e)
 
-is_var :: EquationInfo -> Bool
-is_var (EqnInfo _ _ ((WildPat _):_) _)  = True
-is_var _                                = False
+is_con :: TypecheckedPat -> Bool
+is_con (ConPatOut _ _ _ _ _) = True
+is_con _                     = False
 
-is_var_con :: DataCon -> EquationInfo -> Bool
-is_var_con con (EqnInfo _ _ ((WildPat _):_)     _)                 = True
-is_var_con con (EqnInfo _ _ ((ConPat id _ _ _ _):_) _) | id == con = True
-is_var_con con _                                                   = False
+is_lit :: TypecheckedPat -> Bool
+is_lit (LitPat _)      = True
+is_lit (NPatOut _ _ _) = True
+is_lit _               = False
 
-is_var_lit :: HsLit -> EquationInfo -> Bool
-is_var_lit lit (EqnInfo _ _ ((WildPat _):_)     _)               = True
-is_var_lit lit (EqnInfo _ _ ((LitPat lit' _):_) _) | lit == lit' = True
-is_var_lit lit (EqnInfo _ _ ((NPat lit' _ _):_) _) | lit == lit' = True
-is_var_lit lit _                                                 = False
+is_npat :: TypecheckedPat -> Bool
+is_npat (NPatOut _ _ _) = True
+is_npat _               = False
+
+is_nplusk :: TypecheckedPat -> Bool
+is_nplusk (NPlusKPatOut _ _ _ _) = True
+is_nplusk _                      = False
+
+is_var :: TypecheckedPat -> Bool
+is_var (WildPat _) = True
+is_var _           = False
+
+is_var_con :: DataCon -> TypecheckedPat -> Bool
+is_var_con con (WildPat _)                        = True
+is_var_con con (ConPatOut id _ _ _ _) | id == con = True
+is_var_con con _                                  = False
+
+is_var_lit :: HsLit -> TypecheckedPat -> Bool
+is_var_lit lit (WildPat _)	                = True
+is_var_lit lit (LitPat lit')      | lit == lit' = True
+is_var_lit lit (NPatOut lit' _ _) | lit == lit' = True
+is_var_lit lit _                                = False
 \end{code}
 
 The difference beteewn @make_con@ and @make_whole_con@ is that
@@ -507,59 +525,47 @@ not the second. \fbox{\ ???\ }
 \begin{code}
 isInfixCon con = isDataSymOcc (getOccName con)
 
-is_nil (ConPatIn con []) = con == getName nilDataCon
-is_nil _                 = False
+is_nil (ConPatIn con (PrefixCon [])) = con == getName nilDataCon
+is_nil _               		     = False
 
-is_list (ListPatIn _) = True
+is_list (ListPat _ _) = True
 is_list _             = False
 
 return_list id q = id == consDataCon && (is_nil q || is_list q) 
 
-make_list p q | is_nil q   = ListPatIn [p]
-make_list p (ListPatIn ps) = ListPatIn (p:ps)  
-make_list _ _              = panic "Check.make_list: Invalid argument"
+make_list p q | is_nil q    = ListPat [p] placeHolderType
+make_list p (ListPat ps ty) = ListPat (p:ps) ty
+make_list _ _               = panic "Check.make_list: Invalid argument"
 
 make_con :: TypecheckedPat -> ExhaustivePat -> ExhaustivePat           
-make_con (ConPat id _ _ _ _) (p:q:ps, constraints) 
+make_con (ConPatOut id _ _ _ _) (p:q:ps, constraints) 
      | return_list id q = (make_list p q : ps, constraints)
-     | isInfixCon id = ((ConOpPatIn p name fixity q) : ps, constraints) 
-    where name   = getName id
-          fixity = panic "Check.make_con: Guessing fixity"
+     | isInfixCon id    = (ConPatIn (getName id) (InfixCon p q) : ps, constraints) 
 
-make_con (ConPat id _ _ _ pats) (ps, constraints) 
-      | isTupleTyCon tc = (TuplePatIn pats_con (tupleTyConBoxity tc) : rest_pats, constraints) 
-      | otherwise       = (ConPatIn name pats_con		     : rest_pats, constraints)
-    where name      = getName id
-	  (pats_con, rest_pats) = splitAtList pats ps
-	  tc	    = dataConTyCon id
+make_con (ConPatOut id (PrefixCon pats) _ _ _) (ps, constraints) 
+      | isTupleTyCon tc  = (TuplePat pats_con (tupleTyConBoxity tc) : rest_pats, constraints) 
+      | isPArrFakeCon id = (PArrPat pats_con placeHolderType        : rest_pats, constraints) 
+      | otherwise        = (ConPatIn name (PrefixCon pats_con)      : rest_pats, constraints)
+    where 
+	name     	      = getName id
+	(pats_con, rest_pats) = splitAtList pats ps
+	tc	    	      = dataConTyCon id
 
 -- reconstruct parallel array pattern
 --
 -- * don't check for the type only; we need to make sure that we are really
 --   dealing with one of the fake constructors and not with the real
 --   representation 
---
-make_con (ConPat id _ _ _ pats) (ps, constraints) 
-  | isPArrFakeCon id = (PArrPatIn patsCon     : restPats, constraints) 
-  | otherwise        = (ConPatIn name patsCon : restPats, constraints)
-  where 
-    name                = getName id
-    (patsCon, restPats) = splitAtList pats ps
-    tc	                = dataConTyCon id
-	  
 
 make_whole_con :: DataCon -> WarningPat
-make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wild_pat
-                   | otherwise      = ConPatIn name pats
+make_whole_con con | isInfixCon con = ConPatIn name (InfixCon new_wild_pat new_wild_pat)
+                   | otherwise      = ConPatIn name (PrefixCon pats)
                 where 
-                  fixity = panic "Check.make_whole_con: Guessing fixity"
                   name   = getName con
-                  arity  = dataConSourceArity con 
-                  pats   = replicate arity new_wild_pat
-
+                  pats   = [new_wild_pat | t <- dataConOrigArgTys con]
 
 new_wild_pat :: WarningPat
-new_wild_pat = WildPatIn
+new_wild_pat = WildPat placeHolderType
 \end{code}
 
 This equation makes the same thing as @tidy@ in @Match.lhs@, the
@@ -581,83 +587,78 @@ simplify_pat :: TypecheckedPat -> TypecheckedPat
 simplify_pat pat@(WildPat gt) = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
 
-simplify_pat (LazyPat p)      = simplify_pat p
-simplify_pat (AsPat id p)     = simplify_pat p
-simplify_pat (SigPat p ty fn) = simplify_pat p	-- I'm not sure this is right
+simplify_pat (ParPat p)      	 = simplify_pat p
+simplify_pat (LazyPat p)      	 = simplify_pat p
+simplify_pat (AsPat id p)     	 = simplify_pat p
+simplify_pat (SigPatOut p ty fn) = simplify_pat p	-- I'm not sure this is right
 
-simplify_pat (ConPat id ty tvs dicts ps) = ConPat id ty tvs dicts (map simplify_pat ps)
+simplify_pat (ConPatOut id ps ty tvs dicts) = ConPatOut id (simplify_con id ps) ty tvs dicts
 
-simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
-	                             (ConPat nilDataCon list_ty [] [] [])
+simplify_pat (ListPat ps ty) = foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
+	                             (mkNilPat list_ty)
 	                             (map simplify_pat ps)
                              where list_ty = mkListTy ty
 
 -- introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
 --
-simplify_pat (PArrPat ty ps)
-  = ConPat (parrFakeCon arity) (mkPArrTy ty) [] [] (map simplify_pat ps)
+simplify_pat (PArrPat ps ty)
+  = ConPatOut (parrFakeCon arity)
+	      (PrefixCon (map simplify_pat ps)) 
+	      (mkPArrTy ty) [] [] 
   where
     arity = length ps
 
 simplify_pat (TuplePat ps boxity)
-  = ConPat (tupleCon boxity arity)
-	   (mkTupleTy boxity arity (map outPatType ps)) [] []
-	   (map simplify_pat ps)
+  = ConPatOut (tupleCon boxity arity)
+	      (PrefixCon (map simplify_pat ps))
+	      (mkTupleTy boxity arity (map hsPatType ps)) [] []
   where
     arity = length ps
 
-simplify_pat (RecPat dc ty ex_tvs dicts [])   
-  = ConPat dc ty ex_tvs dicts all_wild_pats
-  where
-    all_wild_pats = map WildPat con_arg_tys
-
-      -- Identical to machinations in Match.tidy1:
-    inst_tys    = tcTyConAppArgs ty	-- Newtype is observable
-    con_arg_tys = dataConArgTys dc (inst_tys ++ mkTyVarTys ex_tvs)
-
-simplify_pat (RecPat dc ty ex_tvs dicts idps) 
-  = ConPat dc ty ex_tvs dicts pats
-  where
-    pats = map (simplify_pat.snd) all_pats
-
-     -- pad out all the missing fields with WildPats.
-    field_pats = map (\ f -> (getName f, WildPat (panic "simplify_pat(RecPat-2)")))
-		     (dataConFieldLabels dc)
-    all_pats = 
-      foldr
-       ( \ (id,p,_) acc -> insertNm (getName id) p acc)
-       field_pats
-       idps
-       
-    insertNm nm p [] = [(nm,p)]
-    insertNm nm p (x@(n,_):xs)
-      | nm == n    = (nm,p):xs
-      | otherwise  = x : insertNm nm p xs
-
-simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit pat
+simplify_pat pat@(LitPat lit) = tidyLitPat lit pat
 
 -- unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
-simplify_pat pat@(NPat (HsString s) _ _) = 
-   foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
-	(ConPat nilDataCon stringTy [] [] []) (unpackIntFS s)
+simplify_pat pat@(NPatOut (HsString s) _ _) = 
+   foldr (\c pat -> ConPatOut consDataCon (PrefixCon [mk_char_lit c,pat]) stringTy [] [])
+	 (ConPatOut nilDataCon (PrefixCon []) stringTy [] []) (unpackIntFS s)
   where
-    mk_char_lit c = ConPat charDataCon charTy [] [] 
-			[LitPat (HsCharPrim c) charPrimTy]
+    mk_char_lit c = ConPatOut charDataCon (PrefixCon [LitPat (HsCharPrim c)]) 
+			      charTy [] [] 
 
-simplify_pat pat@(NPat lit lit_ty hsexpr) = tidyNPat lit lit_ty pat
+simplify_pat pat@(NPatOut lit lit_ty hsexpr) = tidyNPat lit lit_ty pat
 
-simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = 
-     WildPat ty
-   where ty = panic "Check.simplify_pat: Gessing ty"
+simplify_pat (NPlusKPatOut id hslit hsexpr1 hsexpr2)
+   = WildPat (idType id)
 
-simplify_pat (DictPat dicts methods) = 
-    case num_of_d_and_ms of
+simplify_pat (DictPat dicts methods)
+  = case num_of_d_and_ms of
        0 -> simplify_pat (TuplePat [] Boxed) 
        1 -> simplify_pat (head dict_and_method_pats) 
        _ -> simplify_pat (TuplePat dict_and_method_pats Boxed)
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
+
+-----------------
+simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_pat ps)
+simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_pat p1, simplify_pat p2]
+simplify_con con (RecCon fs)      
+  | null fs   = PrefixCon [wild_pat | t <- dataConOrigArgTys con]
+		-- Special case for null patterns; maybe not a record at all
+  | otherwise = PrefixCon (map (simplify_pat.snd) all_pats)
+  where
+     -- pad out all the missing fields with WildPats.
+    field_pats = map (\ f -> (getName f, wild_pat))
+		     (dataConFieldLabels con)
+    all_pats = foldr (\ (id,p) acc -> insertNm (getName id) p acc)
+		     field_pats fs
+       
+    insertNm nm p [] = [(nm,p)]
+    insertNm nm p (x@(n,_):xs)
+      | nm == n    = (nm,p):xs
+      | otherwise  = x : insertNm nm p xs
+
+    wild_pat = WildPat (panic "Check.simplify_con")
 \end{code}

@@ -14,14 +14,19 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			)
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
-import HscTypes		( PersistentCompilerState(..),
-			  PackageRuleBase, HomeSymbolTable, IsExported, ModDetails(..)
+import HscTypes		( PersistentCompilerState(..), ExternalPackageState(..),
+			  HscEnv(..), GhciMode(..),
+			  ModGuts(..), ModGuts, Avails, availsToNameSet, 
+			  PackageRuleBase, HomePackageTable, ModDetails(..),
+			  HomeModInfo(..)
 			)
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
 			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase, 
 			  ruleCheckProgram )
 import Module		( moduleEnvElts )
+import Name		( Name, isExternalName )
+import NameSet		( elemNameSet )
 import PprCore		( pprCoreBindings, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
@@ -61,29 +66,32 @@ import List             ( partition )
 %************************************************************************
 
 \begin{code}
-core2core :: DynFlags		-- includes spec of what core-to-core passes to do
+core2core :: HscEnv
 	  -> PersistentCompilerState
-	  -> HomeSymbolTable
-	  -> IsExported
-	  -> ModDetails
-	  -> IO ModDetails
+	  -> ModGuts
+	  -> IO ModGuts
 
-core2core dflags pcs hst is_exported 
-	  mod_details@(ModDetails { md_binds = binds_in, md_rules = rules_in })
+core2core hsc_env pcs 
+	  mod_impl@(ModGuts { mg_exports = exports, 
+			      mg_binds = binds_in, 
+			      mg_rules = rules_in })
   = do
-        let core_todos    = dopt_CoreToDo dflags
-	let pkg_rule_base = pcs_rules pcs		-- Rule-base accumulated from imported packages
-	
+        let dflags 	  = hsc_dflags hsc_env
+	    hpt		  = hsc_HPT hsc_env
+	    ghci_mode	  = hsc_mode hsc_env
+	    core_todos    = dopt_CoreToDo dflags
+	    pkg_rule_base = eps_rule_base (pcs_EPS pcs)	-- Rule-base accumulated from imported packages
 
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
 	(rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
-		<- prepareRules dflags pkg_rule_base hst ru_us binds_in rules_in
+		<- prepareRules dflags pkg_rule_base hpt ru_us binds_in rules_in
 
 		-- PREPARE THE BINDINGS
-	let binds1 = updateBinders local_rule_ids rule_rhs_fvs is_exported binds_in
+	let binds1 = updateBinders ghci_mode local_rule_ids 
+				   rule_rhs_fvs exports binds_in
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
@@ -96,17 +104,15 @@ core2core dflags pcs hst is_exported
 	-- Return results
         -- We only return local orphan rules, i.e., local rules not attached to an Id
 	-- The bindings cotain more rules, embedded in the Ids
-	return (mod_details { md_binds = processed_binds, md_rules = orphan_rules})
+	return (mod_impl { mg_binds = processed_binds, mg_rules = orphan_rules})
 
 
 simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
-	     -> PersistentCompilerState
-	     -> HomeSymbolTable
 	     -> CoreExpr
 	     -> IO CoreExpr
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
-simplifyExpr dflags pcs hst expr
+simplifyExpr dflags expr
   = do	{
 	; showPass dflags "Simplify"
 
@@ -213,7 +219,7 @@ noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
 -- so that the opportunity to apply the rule isn't lost too soon
 
 \begin{code}
-prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
+prepareRules :: DynFlags -> PackageRuleBase -> HomePackageTable
 	     -> UniqSupply
 	     -> [CoreBind]
 	     -> [IdCoreRule]		-- Local rules
@@ -222,7 +228,7 @@ prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
 		    [IdCoreRule],	-- Orphan rules
 		    IdSet) 		-- RHS free vars of all rules
 
-prepareRules dflags pkg_rule_base hst us binds local_rules
+prepareRules dflags pkg_rule_base hpt us binds local_rules
   = do	{ let env	       = emptySimplEnv SimplGently [] local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
@@ -240,7 +246,7 @@ prepareRules dflags pkg_rule_base hst us binds local_rules
 	      rule_rhs_fvs		  = unionVarSets (map (ruleRhsFreeVars . snd) better_rules)
 	      local_rule_base		  = extendRuleBaseList emptyRuleBase local_rules
 	      local_rule_ids		  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
-	      imp_rule_base		  = foldl add_rules pkg_rule_base (moduleEnvElts hst)
+	      imp_rule_base		  = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
 	      rule_base			  = extendRuleBaseList imp_rule_base orphan_rules
 	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
 		-- The last step black-lists the free vars of local rules too
@@ -253,15 +259,16 @@ prepareRules dflags pkg_rule_base hst us binds local_rules
 	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
     }
   where
-    add_rules rule_base mds = extendRuleBaseList rule_base (md_rules mds)
+    add_rules rule_base mod_info = extendRuleBaseList rule_base (md_rules (hm_details mod_info))
 
 	-- Boringly, we need to gather the in-scope set.
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
-updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
+updateBinders :: GhciMode
+	      -> IdSet	 		-- Locally defined ids with their Rules attached
 	      -> IdSet			-- Ids free in the RHS of local rules
-	      -> IsExported
+	      -> Avails			-- What is exported
 	      -> [CoreBind] -> [CoreBind]
 	-- A horrible function
 
@@ -290,7 +297,7 @@ updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
 --     the rules (maybe we should?), so this substitution would make the rule
 --     bogus.
 
-updateBinders rule_ids rule_rhs_fvs is_exported binds
+updateBinders ghci_mode rule_ids rule_rhs_fvs exports binds
   = map update_bndrs binds
   where
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r
@@ -304,6 +311,19 @@ updateBinders rule_ids rule_rhs_fvs is_exported binds
 
     dont_discard bndr =  is_exported (idName bndr)
 		      || bndr `elemVarSet` rule_rhs_fvs 
+
+    	-- In interactive mode, we don't want to discard any top-level
+    	-- entities at all (eg. do not inline them away during
+    	-- simplification), and retain them all in the TypeEnv so they are
+    	-- available from the command line.
+	--
+	-- isExternalName separates the user-defined top-level names from those
+	-- introduced by the type checker.
+    is_exported :: Name -> Bool
+    is_exported | ghci_mode == Interactive = isExternalName
+		| otherwise 		   = (`elemNameSet` export_fvs)
+
+    export_fvs = availsToNameSet exports
 \end{code}
 
 

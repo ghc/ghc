@@ -1,0 +1,7 @@
+module TcSplice where
+
+tcSpliceExpr :: Name.Name
+	     -> RnHsSyn.RenamedHsExpr
+	     -> TcType.TcType
+	     -> TcRnTypes.TcM TcHsSyn.TcExpr
+

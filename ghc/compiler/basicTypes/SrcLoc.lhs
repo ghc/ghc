@@ -11,11 +11,11 @@
 module SrcLoc (
 	SrcLoc,			-- Abstract
 
-	mkSrcLoc, isGoodSrcLoc,	
+	mkSrcLoc, isGoodSrcLoc,	isWiredInLoc,
 	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
 
 	importedSrcLoc,		-- Unknown place in an interface
-	builtinSrcLoc,		-- Something wired into the compiler
+	wiredInSrcLoc,		-- Something wired into the compiler
 	generatedSrcLoc,	-- Code generated within the compiler
 
 	incSrcLine, replaceSrcLine,
@@ -45,12 +45,16 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
 data SrcLoc
-  = SrcLoc	FastString	-- A precise location (file name)
+  = WiredInLoc		-- Used exclusively for Ids and TyCons
+			-- that are totally wired in to the
+			-- compiler.  That supports the 
+			-- occasionally-useful predicate
+			-- isWiredInName
+
+  | SrcLoc	FastString	-- A precise location (file name)
 		FastInt
 
   | UnhelpfulSrcLoc FastString	-- Just a general indication
-
-  | NoSrcLoc
 \end{code}
 
 Note that an entity might be imported via more than one route, and
@@ -67,13 +71,16 @@ rare case.
 Things to make 'em:
 \begin{code}
 mkSrcLoc x y      = SrcLoc x (iUnbox y)
-noSrcLoc	  = NoSrcLoc
+wiredInSrcLoc	  = WiredInLoc
+noSrcLoc	  = UnhelpfulSrcLoc FSLIT("<No locn>")
 importedSrcLoc	  = UnhelpfulSrcLoc FSLIT("<imported>")
-builtinSrcLoc	  = UnhelpfulSrcLoc FSLIT("<built-into-the-compiler>")
 generatedSrcLoc   = UnhelpfulSrcLoc FSLIT("<compiler-generated-code>")
 
 isGoodSrcLoc (SrcLoc _ _) = True
 isGoodSrcLoc other        = False
+
+isWiredInLoc WiredInLoc = True
+isWiredInLoc other	= False
 
 srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _) = fname
@@ -105,13 +112,13 @@ instance Eq SrcLoc where
 instance Ord SrcLoc where
   compare = cmpSrcLoc
 
-cmpSrcLoc NoSrcLoc NoSrcLoc = EQ
-cmpSrcLoc NoSrcLoc other    = LT
+cmpSrcLoc WiredInLoc WiredInLoc = EQ
+cmpSrcLoc WiredInLoc other      = LT
 
 cmpSrcLoc (UnhelpfulSrcLoc s1) (UnhelpfulSrcLoc s2) = s1 `compare` s2
 cmpSrcLoc (UnhelpfulSrcLoc s1) other		    = GT
 
-cmpSrcLoc (SrcLoc s1 l1) NoSrcLoc	     = GT
+cmpSrcLoc (SrcLoc s1 l1) WiredInLoc	     = GT
 cmpSrcLoc (SrcLoc s1 l1) (UnhelpfulSrcLoc _) = LT
 cmpSrcLoc (SrcLoc s1 l1) (SrcLoc s2 l2)      = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2)
 					     where
@@ -132,5 +139,5 @@ instance Outputable SrcLoc where
 					-- so emacs can find the file
 
     ppr (UnhelpfulSrcLoc s) = ftext s
-    ppr NoSrcLoc	    = ptext SLIT("<No locn>")
+    ppr WiredInLoc	    = ptext SLIT("<Wired in>")
 \end{code}

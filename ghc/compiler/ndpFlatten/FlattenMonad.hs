@@ -72,13 +72,13 @@ import OccName	    (UserFS)
 import Var          (Var(..))
 import Id	    (Id, mkSysLocal)
 import Name	    (Name)
-import VarSet       (VarSet, emptyVarSet, unitVarSet, extendVarSet,
-		     varSetElems, unionVarSet)
-import VarEnv       (VarEnv, emptyVarEnv, unitVarEnv, zipVarEnv, plusVarEnv,
+import VarSet       (VarSet, emptyVarSet, extendVarSet, varSetElems )
+import VarEnv       (VarEnv, emptyVarEnv, zipVarEnv, plusVarEnv,
 		     elemVarEnv, lookupVarEnv, lookupVarEnv_NF, delVarEnvList)
 import TyCon        (tyConName)
 import Type	    (Type, tyConAppTyCon)
-import HscTypes	    (HomeSymbolTable, PersistentCompilerState(..),
+import HscTypes	    (HomePackageTable, PersistentCompilerState(pcs_EPS), 
+		     ExternalPackageState(eps_PTE), HscEnv(hsc_HPT),
 		     TyThing(..), lookupType)
 import PrelNames    (charPrimTyConName, intPrimTyConName, floatPrimTyConName,
 		     doublePrimTyConName, fstName, andName, orName,
@@ -87,8 +87,7 @@ import PrelNames    (charPrimTyConName, intPrimTyConName, floatPrimTyConName,
 import PrimOp	    (eqCharName, eqIntName, eqFloatName, eqDoubleName,
 		     neqIntName)
 		     -- neqCharName, neqFloatName,neqDoubleName,
-import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps,
-		     bindersOfBinds)
+import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps)
 import CoreUtils    (exprType)
 
 -- friends
@@ -133,10 +132,10 @@ data FlattenState = FlattenState {
 -- initial value of the flattening state
 --
 initialFlattenState :: PersistentCompilerState 
-		    -> HomeSymbolTable 
+		    -> HomePackageTable 
 		    -> UniqSupply 
 		    -> FlattenState
-initialFlattenState pcs hst us = 
+initialFlattenState pcs hpt us = 
   FlattenState {
     us	     = us,
     env      = lookup,
@@ -146,7 +145,7 @@ initialFlattenState pcs hst us =
   }
   where
     lookup n = 
-      case lookupType hst (pcs_PTE pcs) n of
+      case lookupType hpt (eps_PTE (pcs_EPS pcs)) n of
         Just (AnId v) -> v 
 	_             -> pprPanic "FlattenMonad: unknown name:" (ppr n)
 
@@ -165,12 +164,13 @@ instance Monad Flatten where
 
 -- execute the given flattening computation (EXPORTED)
 --
-runFlatten :: PersistentCompilerState 
-	   -> HomeSymbolTable 
+runFlatten :: HscEnv
+	   -> PersistentCompilerState 
 	   -> UniqSupply 
 	   -> Flatten a 
 	   -> a    
-runFlatten pcs hst us m = fst $ unFlatten m (initialFlattenState pcs hst us)
+runFlatten hsc_env pcs us m 
+  = fst $ unFlatten m (initialFlattenState pcs (hsc_HPT hsc_env) us)
 
 
 -- variable generation

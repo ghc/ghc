@@ -66,7 +66,8 @@ import FastString
 
 module	:: { RdrNameHsModule }
 	: '%module' modid tdefs vdefgs
-		{ HsModule $2 Nothing Nothing [] ($3 ++ concat $4) Nothing noSrcLoc}
+		{ HsModule (mkHomeModule $2) Nothing Nothing 
+		           [] ($3 ++ concat $4) Nothing noSrcLoc}
 
 tdefs	:: { [RdrNameHsDecl] }
 	: {- empty -}	{[]}
@@ -80,7 +81,7 @@ tdef	:: { RdrNameHsDecl }
 
 trep    :: { (RdrName -> [HsTyVarBndr RdrName] -> DataConDetails (ConDecl RdrName)) }
         : {- empty -}   { (\ x ts -> Unknown) }
-        | '=' ty        { (\ x ts -> DataCons [ConDecl x x ts [] (VanillaCon [unbangedType $2]) noSrcLoc]) }
+        | '=' ty        { (\ x ts -> DataCons [ConDecl x ts [] (PrefixCon [unbangedType $2]) noSrcLoc]) }
 
 tbind	:: { HsTyVarBndr RdrName }
 	:  name                    { IfaceTyVar $1 liftedTypeKind }
@@ -95,20 +96,20 @@ vdefgs	:: { [[RdrNameHsDecl]] }
 	| vdefg ';' vdefgs	{ ($1:$3) }
 
 vdefg	:: { [RdrNameHsDecl] }
-	: '%rec' '{' vdefs1 '}' { $3   }
-	|  vdef                 { [$1] }
+	: '%rec' '{' vdefs1 '}' { map CoreD $3   }
+	|  vdef                 { [CoreD $1] }
 
 let_bind :: { UfBinding RdrName }
 	: '%rec' '{' vdefs1 '}' { UfRec (map convBind $3)   }
 	|  vdef                 { let (b,r) = convBind $1
 				  in UfNonRec b r }
 
-vdefs1	:: { [RdrNameHsDecl] }
+vdefs1	:: { [RdrNameCoreDecl] }
 	: vdef		        { [$1] }
 	| vdef ';' vdefs1       { $1:$3 }
 
-vdef	:: { RdrNameHsDecl }
-	: qname '::' ty '=' exp { TyClD (CoreDecl  $1 $3 $5 noSrcLoc) }
+vdef	:: { RdrNameCoreDecl }
+	: qname '::' ty '=' exp { CoreDecl $1 $3 $5 noSrcLoc }
 
 
 vbind	:: { (RdrName, RdrNameHsType) }
@@ -146,7 +147,7 @@ cons1	:: { [ConDecl RdrName] }
 
 con	:: { ConDecl RdrName }
 	: q_d_name attbinds atys 
-		{ mkConDecl $1 $2 [] (VanillaCon (map unbangedType $3)) noSrcLoc}
+		{ ConDecl $1 $2 [] (PrefixCon (map unbangedType $3)) noSrcLoc}
 
 atys	:: { [ RdrNameHsType] }
 	: {- empty -}   { [] }
@@ -240,8 +241,8 @@ q_d_name	:: { RdrName }
 
 
 {
-convBind :: RdrNameHsDecl -> (UfBinder RdrName, UfExpr RdrName)
-convBind (TyClD (CoreDecl n ty rhs _)) = (UfValBinder n ty, rhs)
+convBind :: RdrNameCoreDecl -> (UfBinder RdrName, UfExpr RdrName)
+convBind (CoreDecl n ty rhs _) = (UfValBinder n ty, rhs)
 
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l

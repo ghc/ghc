@@ -9,12 +9,15 @@ Defines classes for pretty-printing and forcing, both forms of
 \begin{code}
 
 module Outputable (
-	Outputable(..),			-- Class
+	Outputable(..), OutputableBndr(..),	-- Class
+
+	BindingSite(..),
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
 	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper,
 	codeStyle, userStyle, debugStyle, asmStyle,
-	ifPprDebug, unqualStyle,
+	ifPprDebug, unqualStyle, 
+	mkErrStyle, defaultErrStyle,
 
 	SDoc, 		-- Abstract
 	docToSDoc,
@@ -102,6 +105,18 @@ neverQualify  n = True
 
 defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
 
+mkErrStyle :: PrintUnqualified -> PprStyle
+-- Style for printing error messages
+mkErrStyle print_unqual = mkUserStyle print_unqual (PartWay opt_PprUserLength)
+
+defaultErrStyle :: PprStyle
+-- Default style for error messages
+-- It's a bit of a hack because it doesn't take into account what's in scope
+-- Only used for desugarer warnings, and typechecker errors in interface sigs
+defaultErrStyle 
+  | opt_PprStyle_Debug = mkUserStyle alwaysQualify AllTheWay
+  | otherwise	       = mkUserStyle neverQualify  (PartWay opt_PprUserLength)
+
 mkUserStyle unqual depth |  opt_PprStyle_Debug = PprDebug
 	          	 |  otherwise          = PprUser unqual depth
 \end{code}
@@ -174,12 +189,9 @@ printSDoc d sty = do
 
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
-printErrs :: PrintUnqualified -> SDoc -> IO ()
-printErrs unqual doc = do
-   Pretty.printDoc PageMode stderr (doc style)
-   hFlush stderr
- where
-   style = mkUserStyle unqual (PartWay opt_PprUserLength)
+printErrs :: Doc -> IO ()
+printErrs doc = do Pretty.printDoc PageMode stderr doc
+		   hFlush stderr
 
 printDump :: SDoc -> IO ()
 printDump doc = do
@@ -348,7 +360,39 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
 instance Outputable FastString where
     ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
 					-- no double quotes or anything
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{The @OutputableBndr@ class}
+%*									*
+%************************************************************************
+
+When we print a binder, we often want to print its type too.
+The @OutputableBndr@ class encapsulates this idea.
+
+@BindingSite@ is used to tell the thing that prints binder what
+language construct is binding the identifier.  This can be used
+to decide how much info to print.
+
+\begin{code}
+data BindingSite = LambdaBind | CaseBind | LetBind
+
+class Outputable a => OutputableBndr a where
+   pprBndr :: BindingSite -> a -> SDoc
+   pprBndr b x = ppr x
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{Random printing helpers}
+%*									*
+%************************************************************************
+
+\begin{code}
 #if __GLASGOW_HASKELL__ < 410
 -- Assume we have only 8-bit Chars.
 

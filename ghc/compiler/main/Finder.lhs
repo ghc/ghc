@@ -6,23 +6,24 @@
 \begin{code}
 module Finder (
     initFinder, 	-- :: [PackageConfig] -> IO (), 
-    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-    findModuleDep,	-- :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
-    findPackageModule,	-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModLocation))
+    findModuleDep,	-- :: ModuleName -> Bool -> IO (Maybe (Module, ModLocation))
+    findPackageModule,	-- :: ModuleName -> IO (Maybe (Module, ModLocation))
     mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
-			--	-> IO ModuleLocation
+			--	-> IO ModLocation
     emptyHomeDirCache,	-- :: IO ()
     flushPackageCache   -- :: [PackageConfig] -> IO ()
   ) where
 
 #include "HsVersions.h"
 
-import HscTypes		( ModuleLocation(..) )
+import Module		( Module, ModLocation(..), ModuleName,
+			  moduleNameUserString, mkHomeModule, mkPackageModule
+			)
 import Packages		( PackageConfig(..) )
 import DriverPhases
 import DriverState
 import DriverUtil
-import Module
 import FastString
 import Config
 
@@ -54,10 +55,10 @@ flushPackageCache pkgs = return ()
 emptyHomeDirCache :: IO ()
 emptyHomeDirCache = return ()
 
-findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findModule :: ModuleName -> IO (Maybe (Module, ModLocation))
 findModule name = findModuleDep name False
 
-findModuleDep :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
+findModuleDep :: ModuleName -> Bool -> IO (Maybe (Module, ModLocation))
 findModuleDep name is_source
   = do	{ j <- maybeHomeModule name is_source
 	; case j of
@@ -65,7 +66,7 @@ findModuleDep name is_source
 	    Nothing	     -> findPackageMod name False is_source
 	}
 
-maybeHomeModule :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
+maybeHomeModule :: ModuleName -> Bool -> IO (Maybe (Module, ModLocation))
 maybeHomeModule mod_name is_source = do
    home_path <- readIORef v_Import_paths
    hisuf     <- readIORef v_Hi_suf
@@ -109,7 +110,7 @@ maybeHomeModule mod_name is_source = do
 mkHiOnlyModuleLocn mod_name hi_file =
  return
    ( mkHomeModule mod_name
-   , ModuleLocation{ ml_hspp_file = Nothing
+   , ModLocation{ ml_hspp_file = Nothing
     		   , ml_hs_file   = Nothing
 		   , ml_hi_file   = hi_file
 		   , ml_obj_file  = Nothing
@@ -141,7 +142,7 @@ mkHomeModuleLocn mod_name
    o_file <- odir_ify (basename ++ '.':phaseInputExt Ln) >>= osuf_ify
 
    return (mkHomeModule mod_name,
-           ModuleLocation{ ml_hspp_file = Nothing
+           ModLocation{ ml_hspp_file = Nothing
 	   		 , ml_hs_file   = Just source_fn
 			 , ml_hi_file   = hi
 			 , ml_obj_file  = Just o_file
@@ -150,7 +151,7 @@ mkHomeModuleLocn mod_name
 findPackageMod :: ModuleName
 	       -> Bool
 	       -> Bool
-	       -> IO (Maybe (Module, ModuleLocation))
+	       -> IO (Maybe (Module, ModLocation))
 findPackageMod mod_name hiOnly is_source = do
   pkgs <- getPackageInfo
 
@@ -166,7 +167,7 @@ findPackageMod mod_name hiOnly is_source = do
 
       retPackageModule mod_name mbFName path =
         return ( mkPackageModule mod_name
-               , ModuleLocation{ ml_hspp_file = Nothing
+               , ModLocation{ ml_hspp_file = Nothing
 		 	       , ml_hs_file   = mbFName
 			       , ml_hi_file   = path ++ '.':package_hisuf
 			       , ml_obj_file  = Nothing
@@ -190,13 +191,13 @@ findPackageMod mod_name hiOnly is_source = do
 	     ])))
  where
 
-findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findPackageModule :: ModuleName -> IO (Maybe (Module, ModLocation))
 findPackageModule mod_name = findPackageMod mod_name True False
 
 searchPathExts :: [FilePath]
 	       -> String
-	       -> [(String, FilePath -> String -> IO (Module, ModuleLocation))] 
-	       -> IO (Maybe (Module, ModuleLocation))
+	       -> [(String, FilePath -> String -> IO (Module, ModLocation))] 
+	       -> IO (Maybe (Module, ModLocation))
 searchPathExts path basename exts = search path
   where
     search [] = return Nothing

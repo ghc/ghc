@@ -4,49 +4,61 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, rnSourceDecls, 
-	) where
+module RnSource ( 
+	rnSrcDecls, rnExtCoreDecls, checkModDeprec,
+	rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, 
+	rnBinds, rnStats,
+    ) where
 
 #include "HsVersions.h"
 
 import RnExpr
 import HsSyn
-import HscTypes		( GlobalRdrEnv, AvailEnv )
 import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
-import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl,
+import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl, RdrNameHsDecl,
+			  RdrNameDeprecation, RdrNameFixitySig,
+			  RdrNameHsBinds,
 			  extractGenericPatTyVars
 			)
 import RnHsSyn
 import HsCore
 
+import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 
-import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
-import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupIfaceName,
-			  lookupSysBinder, newLocalsRn,
+import RnBinds		( rnTopMonoBinds, rnMonoBinds, rnMethodBinds, 
+			  renameSigs, renameSigsFVs )
+import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupSysBndr,
+			  newLocalsRn, lookupGlobalOccRn,
 			  bindLocalsFVRn, bindPatSigTyVars,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
-			  checkDupOrQualNames, checkDupNames, mapFvRn
+			  checkDupOrQualNames, checkDupNames, mapFvRn,
+			  lookupTopSrcBndr_maybe, lookupTopSrcBndr,
+			  dataTcOccs, unknownNameErr,
+			  plusGlobalRdrEnv
 			)
-import RnMonad
+import TcRnMonad
 
+import BasicTypes	( FixitySig(..) )
+import HscTypes		( ExternalPackageState(..), FixityEnv, 
+			  Deprecations(..), plusDeprecs )
+import Module		( moduleEnvElts )
 import Class		( FunDep, DefMeth (..) )
 import TyCon		( DataConDetails(..), visibleDataCons )
-import DataCon		( dataConWorkId )
-import Name		( Name, NamedThing(..) )
+import Name		( Name )
 import NameSet
-import PrelNames	( deRefStablePtrName, newStablePtrName,
-			  bindIOName, returnIOName
-			)
-import TysWiredIn	( tupleCon )
+import NameEnv
+import ErrUtils		( dumpIfSet )
+import PrelNames	( newStablePtrName, bindIOName, returnIOName )
 import List		( partition )
+import Bag		( bagToList )
 import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Maybes		( maybeToBool )
-import Maybe            ( maybe )
+import Maybe            ( maybe, catMaybes )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -65,6 +77,133 @@ Checks the @(..)@ etc constraints in the export list.
 \end{enumerate}
 
 
+\begin{code}
+rnSrcDecls :: [RdrNameHsDecl] -> RnM (TcGblEnv, [RenamedHsDecl], FreeVars)
+
+rnSrcDecls decls
+ = do {	(rdr_env, imports) <- importsFromLocalDecls decls ;
+	updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv`
+						  tcg_rdr_env gbl,
+				 tcg_imports = imports `plusImportAvails` 
+						  tcg_imports gbl }) 
+		     $ do {
+
+		-- Deal with deprecations (returns only the extra deprecations)
+	deprecs <- rnSrcDeprecDecls [d | DeprecD d <- decls] ;
+	updGblEnv (\gbl -> gbl { tcg_deprecs = tcg_deprecs gbl `plusDeprecs` deprecs })
+		  $ do {
+
+		-- Deal with top-level fixity decls 
+		-- (returns the total new fixity env)
+	fix_env <- rnSrcFixityDecls decls ;
+	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
+		  $ do {
+
+		-- Rename remaining declarations
+	(rn_src_decls, src_fvs) <- rn_src_decls decls ;
+
+	tcg_env <- getGblEnv ;
+	return (tcg_env, rn_src_decls, src_fvs)
+    }}}}
+
+rnExtCoreDecls :: [RdrNameHsDecl] -> RnM ([RenamedHsDecl], FreeVars)
+rnExtCoreDecls decls = rn_src_decls decls
+
+rn_src_decls decls	-- Declarartions get reversed, but no matter
+  = go emptyFVs [] decls
+  where
+	-- Fixity and deprecations have been dealt with already; ignore them
+    go fvs ds' []             = returnM (ds', fvs)
+    go fvs ds' (FixD _:ds)    = go fvs ds' ds
+    go fvs ds' (DeprecD _:ds) = go fvs ds' ds
+    go fvs ds' (d:ds)         = rnSrcDecl d	`thenM` \(d', fvs') ->
+			        go (fvs `plusFV` fvs') (d':ds') ds
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+	Source-code fixity declarations
+%*							 *
+%*********************************************************
+
+\begin{code}
+rnSrcFixityDecls :: [RdrNameHsDecl] -> TcRn m FixityEnv
+rnSrcFixityDecls decls
+  = getGblEnv					`thenM` \ gbl_env ->
+    foldlM rnFixityDecl (tcg_fix_env gbl_env) 
+	    fix_decls				`thenM` \ fix_env ->
+    traceRn (text "fixity env" <+> ppr fix_env)	`thenM_`
+    returnM fix_env
+  where
+    fix_decls = foldr get_fix_sigs [] decls
+
+	-- Get fixities from top level decls, and from class decl sigs too
+    get_fix_sigs (FixD fix) acc = fix:acc
+    get_fix_sigs (TyClD (ClassDecl { tcdSigs = sigs})) acc
+       = [sig | FixSig sig <- sigs] ++ acc
+    get_fix_sigs other_decl acc = acc
+
+rnFixityDecl :: FixityEnv -> RdrNameFixitySig -> TcRn m FixityEnv
+rnFixityDecl fix_env (FixitySig rdr_name fixity loc)
+  =	-- GHC extension: look up both the tycon and data con 
+	-- for con-like things
+	-- If neither are in scope, report an error; otherwise
+	-- add both to the fixity env
+     mappM lookupTopSrcBndr_maybe (dataTcOccs rdr_name)	`thenM` \ maybe_ns ->
+     case catMaybes maybe_ns of
+	  [] -> addSrcLoc loc 			$
+		addErr (unknownNameErr rdr_name)	`thenM_`
+	        returnM fix_env
+	  ns -> foldlM add fix_env ns
+  where
+    add fix_env name 
+      = case lookupNameEnv fix_env name of
+          Just (FixitySig _ _ loc') -> addErr (dupFixityDecl rdr_name loc loc')	`thenM_`
+    				       returnM fix_env
+    	  Nothing -> returnM (extendNameEnv fix_env name (FixitySig name fixity loc))
+
+dupFixityDecl rdr_name loc1 loc2
+  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
+	  ptext SLIT("at ") <+> ppr loc1,
+	  ptext SLIT("and") <+> ppr loc2]
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+	Source-code deprecations declarations
+%*							 *
+%*********************************************************
+
+For deprecations, all we do is check that the names are in scope.
+It's only imported deprecations, dealt with in RnIfaces, that we
+gather them together.
+
+\begin{code}
+rnSrcDeprecDecls :: [RdrNameDeprecation] -> TcRn m Deprecations
+rnSrcDeprecDecls [] 
+  = returnM NoDeprecs
+
+rnSrcDeprecDecls decls
+  = mappM rn_deprec decls	`thenM` \ pairs ->
+    returnM (DeprecSome (mkNameEnv (catMaybes pairs)))
+ where
+   rn_deprec (Deprecation rdr_name txt loc)
+     = addSrcLoc loc			$
+       lookupTopSrcBndr rdr_name	`thenM` \ name ->
+       returnM (Just (name, (name,txt)))
+
+checkModDeprec :: Maybe DeprecTxt -> Deprecations
+-- Check for a module deprecation; done once at top level
+checkModDeprec Nothing    = NoDeprecs
+checkModdeprec (Just txt) = DeprecAll txt
+
+badDeprec d
+  = sep [ptext SLIT("Illegal deprecation when whole module is deprecated"),
+	 nest 4 (ppr d)]
+\end{code}
+
 %*********************************************************
 %*							*
 \subsection{Source code declarations}
@@ -72,51 +211,70 @@ Checks the @(..)@ etc constraints in the export list.
 %*********************************************************
 
 \begin{code}
-rnSourceDecls :: GlobalRdrEnv -> AvailEnv -> LocalFixityEnv -> RnMode
-	      -> [RdrNameHsDecl] 
-	      -> RnMG ([RenamedHsDecl], FreeVars)
-	-- The decls get reversed, but that's ok
+rnSrcDecl :: RdrNameHsDecl -> RnM (RenamedHsDecl, FreeVars)
 
-rnSourceDecls gbl_env avails local_fixity_env mode decls
-  = initRnMS gbl_env avails emptyRdrEnv local_fixity_env mode (go emptyFVs [] decls)
-  where
-	-- Fixity and deprecations have been dealt with already; ignore them
-    go fvs ds' []             = returnRn (ds', fvs)
-    go fvs ds' (FixD _:ds)    = go fvs ds' ds
-    go fvs ds' (DeprecD _:ds) = go fvs ds' ds
-    go fvs ds' (d:ds)         = rnSourceDecl d	`thenRn` \(d', fvs') ->
-			        go (fvs `plusFV` fvs') (d':ds') ds
+rnSrcDecl (ValD binds) = rnTopBinds binds	`thenM` \ (new_binds, fvs) ->
+			 returnM (ValD new_binds, fvs)
 
+rnSrcDecl (TyClD tycl_decl)
+  = rnTyClDecl tycl_decl			`thenM` \ new_decl ->
+    finishSourceTyClDecl tycl_decl new_decl	`thenM` \ (new_decl', fvs) ->
+    returnM (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
-rnSourceDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
+rnSrcDecl (InstD inst)
+  = rnInstDecl inst			`thenM` \ new_inst ->
+    finishSourceInstDecl inst new_inst	`thenM` \ (new_inst', fvs) ->
+    returnM (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
 
-rnSourceDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
-			    returnRn (ValD new_binds, fvs)
+rnSrcDecl (RuleD rule)
+  = rnHsRuleDecl rule		`thenM` \ (new_rule, fvs) ->
+    returnM (RuleD new_rule, fvs)
 
-rnSourceDecl (TyClD tycl_decl)
-  = rnTyClDecl tycl_decl			`thenRn` \ new_decl ->
-    finishSourceTyClDecl tycl_decl new_decl	`thenRn` \ (new_decl', fvs) ->
-    returnRn (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
+rnSrcDecl (ForD ford)
+  = rnHsForeignDecl ford		`thenM` \ (new_ford, fvs) ->
+    returnM (ForD new_ford, fvs)
 
-rnSourceDecl (InstD inst)
-  = rnInstDecl inst			`thenRn` \ new_inst ->
-    finishSourceInstDecl inst new_inst	`thenRn` \ (new_inst', fvs) ->
-    returnRn (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
-
-rnSourceDecl (RuleD rule)
-  = rnHsRuleDecl rule		`thenRn` \ (new_rule, fvs) ->
-    returnRn (RuleD new_rule, fvs)
-
-rnSourceDecl (ForD ford)
-  = rnHsForeignDecl ford		`thenRn` \ (new_ford, fvs) ->
-    returnRn (ForD new_ford, fvs)
-
-rnSourceDecl (DefD (DefaultDecl tys src_loc))
-  = pushSrcLocRn src_loc $
-    mapFvRn (rnHsTypeFVs doc_str) tys		`thenRn` \ (tys', fvs) ->
-    returnRn (DefD (DefaultDecl tys' src_loc), fvs)
+rnSrcDecl (DefD (DefaultDecl tys src_loc))
+  = addSrcLoc src_loc $
+    mapFvRn (rnHsTypeFVs doc_str) tys		`thenM` \ (tys', fvs) ->
+    returnM (DefD (DefaultDecl tys' src_loc), fvs)
   where
     doc_str = text "In a `default' declaration"
+
+
+rnSrcDecl (CoreD (CoreDecl name ty rhs loc))
+  = addSrcLoc loc $
+    lookupTopBndrRn name		`thenM` \ name' ->
+    rnHsTypeFVs doc_str ty		`thenM` \ (ty', ty_fvs) ->
+    rnCoreExpr rhs                      `thenM` \ rhs' ->
+    returnM (CoreD (CoreDecl name' ty' rhs' loc), 
+	     ty_fvs `plusFV` ufExprFVs rhs')
+  where
+    doc_str = text "In the Core declaration for" <+> quotes (ppr name)
+\end{code}
+
+%*********************************************************
+%*							*
+		Bindings
+%*							*
+%*********************************************************
+
+These chaps are here, rather than in TcBinds, so that there
+is just one hi-boot file (for RnSource).  rnSrcDecls is part
+of the loop too, and it must be defined in this module.
+
+\begin{code}
+rnTopBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, FreeVars)
+rnTopBinds EmptyBinds		  = returnM (EmptyBinds, emptyFVs)
+rnTopBinds (MonoBind bind sigs _) = rnTopMonoBinds bind sigs
+  -- The parser doesn't produce other forms
+
+rnBinds	:: RdrNameHsBinds 
+	-> (RenamedHsBinds -> RnM (result, FreeVars))
+	-> RnM (result, FreeVars)
+rnBinds EmptyBinds	       thing_inside = thing_inside EmptyBinds
+rnBinds (MonoBind bind sigs _) thing_inside = rnMonoBinds bind sigs thing_inside
+  -- the parser doesn't produce other forms
 \end{code}
 
 
@@ -128,25 +286,24 @@ rnSourceDecl (DefD (DefaultDecl tys src_loc))
 
 \begin{code}
 rnHsForeignDecl (ForeignImport name ty spec isDeprec src_loc)
-  = pushSrcLocRn src_loc 		$
-    lookupTopBndrRn name	        `thenRn` \ name' ->
-    rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs) ->
-    returnRn (ForeignImport name' ty' spec isDeprec src_loc, 
+  = addSrcLoc src_loc 		$
+    lookupTopBndrRn name	        `thenM` \ name' ->
+    rnHsTypeFVs (fo_decl_msg name) ty	`thenM` \ (ty', fvs) ->
+    returnM (ForeignImport name' ty' spec isDeprec src_loc, 
 	      fvs `plusFV` extras spec)
   where
     extras (CImport _ _ _ _ CWrapper) = mkFVs [newStablePtrName,
-					       deRefStablePtrName,  
 					       bindIOName, returnIOName]
     extras _			      = emptyFVs
 
 rnHsForeignDecl (ForeignExport name ty spec isDeprec src_loc)
-  = pushSrcLocRn src_loc 			$
-    lookupOccRn name		        	`thenRn` \ name' ->
-    rnHsTypeFVs (fo_decl_msg name) ty  		`thenRn` \ (ty', fvs) ->
-    returnRn (ForeignExport name' ty' spec isDeprec src_loc, 
+  = addSrcLoc src_loc 			$
+    lookupOccRn name		        	`thenM` \ name' ->
+    rnHsTypeFVs (fo_decl_msg name) ty  		`thenM` \ (ty', fvs) ->
+    returnM (ForeignExport name' ty' spec isDeprec src_loc, 
 	      mkFVs [bindIOName, returnIOName] `plusFV` fvs)
 
-fo_decl_msg name = ptext SLIT("The foreign declaration for") <+> ppr name
+fo_decl_msg name = ptext SLIT("In the foreign declaration for") <+> ppr name
 \end{code}
 
 
@@ -159,17 +316,17 @@ fo_decl_msg name = ptext SLIT("The foreign declaration for") <+> ppr name
 \begin{code}
 rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
 	-- Used for both source and interface file decls
-  = pushSrcLocRn src_loc $
-    rnHsSigType (text "an instance decl") inst_ty	`thenRn` \ inst_ty' ->
+  = addSrcLoc src_loc $
+    rnHsSigType (text "an instance decl") inst_ty	`thenM` \ inst_ty' ->
 
     (case maybe_dfun_rdr_name of
-	Nothing		   -> returnRn Nothing
-	Just dfun_rdr_name -> lookupIfaceName dfun_rdr_name	`thenRn` \ dfun_name ->
-			      returnRn (Just dfun_name)
-    )							`thenRn` \ maybe_dfun_name ->
+	Nothing		   -> returnM Nothing
+	Just dfun_rdr_name -> lookupGlobalOccRn dfun_rdr_name	`thenM` \ dfun_name ->
+			      returnM (Just dfun_name)
+    )							`thenM` \ maybe_dfun_name ->
 
     -- The typechecker checks that all the bindings are for the right class.
-    returnRn (InstDecl inst_ty' EmptyMonoBinds [] maybe_dfun_name src_loc)
+    returnM (InstDecl inst_ty' EmptyMonoBinds [] maybe_dfun_name src_loc)
 
 -- Compare finishSourceTyClDecl
 finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
@@ -179,17 +336,17 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
     let
 	meth_doc    = text "In the bindings in an instance declaration"
 	meth_names  = collectLocatedMonoBinders mbinds
-	(inst_tyvars, (cls,_)) = getHsInstHead inst_ty
+	(inst_tyvars, _, cls,_) = splitHsInstDeclTy inst_ty
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
     in
 
 	-- Rename the bindings
 	-- NB meth_names can be qualified!
-    checkDupNames meth_doc meth_names 		`thenRn_`
+    checkDupNames meth_doc meth_names 		`thenM_`
     extendTyVarEnvForMethodBinds inst_tyvars (		
 	rnMethodBinds cls [] mbinds
-    )						`thenRn` \ (mbinds', meth_fvs) ->
+    )						`thenM` \ (mbinds', meth_fvs) ->
     let 
 	binders    = collectMonoBinders mbinds'
 	binder_set = mkNameSet binders
@@ -203,9 +360,9 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	-- But the (unqualified) method names are in scope
     bindLocalNames binders (
        renameSigsFVs (okInstDclSig binder_set) uprags
-    )							`thenRn` \ (uprags', prag_fvs) ->
+    )							`thenM` \ (uprags', prag_fvs) ->
 
-    returnRn (InstDecl inst_ty mbinds' uprags' maybe_dfun_name src_loc,
+    returnM (InstDecl inst_ty mbinds' uprags' maybe_dfun_name src_loc,
 	      meth_fvs `plusFV` prag_fvs)
 \end{code}
 
@@ -217,33 +374,33 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 
 \begin{code}
 rnIfaceRuleDecl (IfaceRule rule_name act vars fn args rhs src_loc)
-  = pushSrcLocRn src_loc	$
-    lookupOccRn fn		`thenRn` \ fn' ->
+  = addSrcLoc src_loc	$
+    lookupOccRn fn		`thenM` \ fn' ->
     rnCoreBndrs vars		$ \ vars' ->
-    mapRn rnCoreExpr args	`thenRn` \ args' ->
-    rnCoreExpr rhs		`thenRn` \ rhs' ->
-    returnRn (IfaceRule rule_name act vars' fn' args' rhs' src_loc)
+    mappM rnCoreExpr args	`thenM` \ args' ->
+    rnCoreExpr rhs		`thenM` \ rhs' ->
+    returnM (IfaceRule rule_name act vars' fn' args' rhs' src_loc)
 
 rnIfaceRuleDecl (IfaceRuleOut fn rule)		-- Builtin rules come this way
-  = lookupOccRn fn		`thenRn` \ fn' ->
-    returnRn (IfaceRuleOut fn' rule)
+  = lookupOccRn fn		`thenM` \ fn' ->
+    returnM (IfaceRuleOut fn' rule)
 
 rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
-  = pushSrcLocRn src_loc				$
+  = addSrcLoc src_loc				$
     bindPatSigTyVars (collectRuleBndrSigTys vars)	$
 
     bindLocalsFVRn doc (map get_var vars)	$ \ ids ->
-    mapFvRn rn_var (vars `zip` ids)		`thenRn` \ (vars', fv_vars) ->
+    mapFvRn rn_var (vars `zip` ids)		`thenM` \ (vars', fv_vars) ->
 
-    rnExpr lhs					`thenRn` \ (lhs', fv_lhs) ->
-    rnExpr rhs					`thenRn` \ (rhs', fv_rhs) ->
-    checkRn (validRuleLhs ids lhs')
-	    (badRuleLhsErr rule_name lhs')	`thenRn_`
+    rnExpr lhs					`thenM` \ (lhs', fv_lhs) ->
+    rnExpr rhs					`thenM` \ (rhs', fv_rhs) ->
+    checkErr (validRuleLhs ids lhs')
+	    (badRuleLhsErr rule_name lhs')	`thenM_`
     let
 	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
     in
-    mapRn (addErrRn . badRuleVar rule_name) bad_vars	`thenRn_`
-    returnRn (HsRule rule_name act vars' lhs' rhs' src_loc,
+    mappM (addErr . badRuleVar rule_name) bad_vars	`thenM_`
+    returnM (HsRule rule_name act vars' lhs' rhs' src_loc,
 	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
   where
     doc = text "In the transformation rule" <+> ftext rule_name
@@ -251,9 +408,23 @@ rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
     get_var (RuleBndr v)      = v
     get_var (RuleBndrSig v _) = v
 
-    rn_var (RuleBndr v, id)	 = returnRn (RuleBndr id, emptyFVs)
-    rn_var (RuleBndrSig v t, id) = rnHsTypeFVs doc t	`thenRn` \ (t', fvs) ->
-				   returnRn (RuleBndrSig id t', fvs)
+    rn_var (RuleBndr v, id)	 = returnM (RuleBndr id, emptyFVs)
+    rn_var (RuleBndrSig v t, id) = rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
+				   returnM (RuleBndrSig id t', fvs)
+\end{code}
+
+Check the shape of a transformation rule LHS.  Currently
+we only allow LHSs of the form @(f e1 .. en)@, where @f@ is
+not one of the @forall@'d variables.
+
+\begin{code}
+validRuleLhs foralls lhs
+  = check lhs
+  where
+    check (OpApp _ op _ _)		  = check op
+    check (HsApp e1 e2) 		  = check e1
+    check (HsVar v) | v `notElem` foralls = True
+    check other				  = False
 \end{code}
 
 
@@ -278,81 +449,65 @@ However, we can also do some scoping checks at the same time.
 
 \begin{code}
 rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc = loc})
-  = pushSrcLocRn loc $
-    lookupTopBndrRn name		`thenRn` \ name' ->
-    rnHsType doc_str ty			`thenRn` \ ty' ->
-    mapRn rnIdInfo id_infos		`thenRn` \ id_infos' -> 
-    returnRn (IfaceSig {tcdName = name', tcdType = ty', tcdIdInfo = id_infos', tcdLoc = loc})
+  = addSrcLoc loc $
+    lookupTopBndrRn name		`thenM` \ name' ->
+    rnHsType doc_str ty			`thenM` \ ty' ->
+    mappM rnIdInfo id_infos		`thenM` \ id_infos' -> 
+    returnM (IfaceSig {tcdName = name', tcdType = ty', tcdIdInfo = id_infos', tcdLoc = loc})
   where
     doc_str = text "In the interface signature for" <+> quotes (ppr name)
 
-rnTyClDecl (CoreDecl {tcdName = name, tcdType = ty, tcdRhs = rhs, tcdLoc = loc})
-  = pushSrcLocRn loc $
-    lookupTopBndrRn name		`thenRn` \ name' ->
-    rnHsType doc_str ty			`thenRn` \ ty' ->
-    rnCoreExpr rhs                      `thenRn` \ rhs' ->
-    returnRn (CoreDecl {tcdName = name', tcdType = ty', tcdRhs = rhs', tcdLoc = loc})
-  where
-    doc_str = text "In the Core declaration for" <+> quotes (ppr name)
-
 rnTyClDecl (ForeignType {tcdName = name, tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
-  = pushSrcLocRn loc 			$
-    lookupTopBndrRn name		`thenRn` \ name' ->
-    returnRn (ForeignType {tcdName = name', tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
+  = addSrcLoc loc 			$
+    lookupTopBndrRn name		`thenM` \ name' ->
+    returnM (ForeignType {tcdName = name', tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
-		    tcdTyVars = tyvars, tcdCons = condecls, 
-		    tcdDerivs = derivs, tcdLoc = src_loc, tcdSysNames = sys_names})
-  = pushSrcLocRn src_loc $
-    lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
+		    tcdTyVars = tyvars, tcdCons = condecls, tcdGeneric = want_generic,
+		    tcdDerivs = derivs, tcdLoc = src_loc})
+  = addSrcLoc src_loc $
+    lookupTopBndrRn tycon		    	`thenM` \ tycon' ->
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
-    rnContext data_doc context 			`thenRn` \ context' ->
-    rn_derivs derivs 				`thenRn` \ derivs' ->
-    checkDupOrQualNames data_doc con_names	`thenRn_`
+    rnContext data_doc context 			`thenM` \ context' ->
+    rn_derivs derivs 				`thenM` \ derivs' ->
+    checkDupOrQualNames data_doc con_names	`thenM_`
 
-    rnConDecls tycon' condecls			`thenRn` \ condecls' ->
-    mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
-    returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
-		      tcdTyVars = tyvars', tcdCons = condecls', 
-		      tcdDerivs = derivs', tcdLoc = src_loc, tcdSysNames = sys_names'})
+    rnConDecls tycon' condecls			`thenM` \ condecls' ->
+    returnM (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
+		     tcdTyVars = tyvars', tcdCons = condecls', tcdGeneric = want_generic,
+		     tcdDerivs = derivs', tcdLoc = src_loc})
   where
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName (visibleDataCons condecls)
 
-    rn_derivs Nothing   = returnRn Nothing
-    rn_derivs (Just ds) = rnContext data_doc ds	`thenRn` \ ds' -> returnRn (Just ds')
+    rn_derivs Nothing   = returnM Nothing
+    rn_derivs (Just ds) = rnContext data_doc ds	`thenM` \ ds' -> returnM (Just ds')
     
 rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLoc = src_loc})
-  = pushSrcLocRn src_loc $
-    lookupTopBndrRn name			`thenRn` \ name' ->
+  = addSrcLoc src_loc $
+    lookupTopBndrRn name			`thenM` \ name' ->
     bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType syn_doc ty				`thenRn` \ ty' ->
-    returnRn (TySynonym {tcdName = name', tcdTyVars = tyvars', tcdSynRhs = ty', tcdLoc = src_loc})
+    rnHsType syn_doc ty				`thenM` \ ty' ->
+    returnM (TySynonym {tcdName = name', tcdTyVars = tyvars', tcdSynRhs = ty', tcdLoc = src_loc})
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
-		       tcdSysNames = names, tcdLoc = src_loc})
+		       tcdLoc = src_loc})
 	-- Used for both source and interface file decls
-  = pushSrcLocRn src_loc $
+  = addSrcLoc src_loc $
 
-    lookupTopBndrRn cname			`thenRn` \ cname' ->
-
-	-- Deal with the implicit tycon and datacon name
-	-- They aren't in scope (because they aren't visible to the user)
-	-- and what we want to do is simply look them up in the cache;
-	-- we jolly well ought to get a 'hit' there!
-    mapRn lookupSysBinder names			`thenRn` \ names' ->
+    lookupTopBndrRn cname			`thenM` \ cname' ->
 
 	-- Tyvars scope over superclass context and method signatures
     bindTyVarsRn cls_doc tyvars			$ \ tyvars' ->
 
 	-- Check the superclasses
-    rnContext cls_doc context			`thenRn` \ context' ->
+    rnContext cls_doc context			`thenM` \ context' ->
 
 	-- Check the functional dependencies
-    rnFds cls_doc fds				`thenRn` \ fds' ->
+    rnFds cls_doc fds				`thenM` \ fds' ->
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
@@ -360,50 +515,49 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
 	(op_sigs, non_op_sigs) = partition isClassOpSig sigs
 	sig_rdr_names_w_locs   = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     in
-    checkDupOrQualNames sig_doc sig_rdr_names_w_locs	`thenRn_` 
-    mapRn (rnClassOp cname' fds') op_sigs		`thenRn` \ sigs' ->
+    checkDupOrQualNames sig_doc sig_rdr_names_w_locs	`thenM_` 
+    mappM (rnClassOp cname' fds') op_sigs		`thenM` \ sigs' ->
     let
 	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
-    renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ non_ops' ->
+    renameSigs (okClsDclSig binders) non_op_sigs	  `thenM` \ non_ops' ->
 
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
 	-- The renamer *could* check this for class decls, but can't
 	-- for instance decls.
 
-    returnRn (ClassDecl { tcdCtxt = context', tcdName = cname', tcdTyVars = tyvars',
-			  tcdFDs = fds', tcdSigs = non_ops' ++ sigs', tcdMeths = Nothing, 
-			  tcdSysNames = names', tcdLoc = src_loc})
+    returnM (ClassDecl { tcdCtxt = context', tcdName = cname', tcdTyVars = tyvars',
+			 tcdFDs = fds', tcdSigs = non_ops' ++ sigs', tcdMeths = Nothing, 
+			 tcdLoc = src_loc})
   where
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
 rnClassOp clas clas_fds sig@(ClassOpSig op dm_stuff ty locn)
-  = pushSrcLocRn locn $
-    lookupTopBndrRn op			`thenRn` \ op_name ->
+  = addSrcLoc locn $
+    lookupTopBndrRn op			`thenM` \ op_name ->
     
     	-- Check the signature
-    rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty ->
+    rnHsSigType (quotes (ppr op)) ty	`thenM` \ new_ty ->
     
     	-- Make the default-method name
     (case dm_stuff of 
         DefMeth dm_rdr_name
     	    -> 	-- Imported class that has a default method decl
-    		-- See comments with tname, snames, above
-    	    	lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
-		returnRn (DefMeth dm_name)
+    	    	lookupSysBndr dm_rdr_name 	`thenM` \ dm_name ->
+		returnM (DefMeth dm_name)
 	    		-- An imported class decl for a class decl that had an explicit default
 	    		-- method, mentions, rather than defines,
 	    		-- the default method, so we must arrange to pull it in
 
-        GenDefMeth -> returnRn GenDefMeth
-        NoDefMeth  -> returnRn NoDefMeth
-    )						`thenRn` \ dm_stuff' ->
+        GenDefMeth -> returnM GenDefMeth
+        NoDefMeth  -> returnM NoDefMeth
+    )						`thenM` \ dm_stuff' ->
     
-    returnRn (ClassOpSig op_name dm_stuff' new_ty locn)
+    returnM (ClassOpSig op_name dm_stuff' new_ty locn)
 
-finishSourceTyClDecl :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
+finishSourceTyClDecl :: RdrNameTyClDecl -> RenamedTyClDecl -> RnM (RenamedTyClDecl, FreeVars)
 	-- Used for source file decls only
 	-- Renames the default-bindings of a class decl
 finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- Get mbinds from here
@@ -419,18 +573,18 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
 	-- Hence the 
-    pushSrcLocRn src_loc				$
+    addSrcLoc src_loc				$
     extendTyVarEnvForMethodBinds tyvars			$
-    getLocalNameEnv					`thenRn` \ name_env ->
+    getLocalRdrEnv					`thenM` \ name_env ->
     let
 	meth_rdr_names_w_locs = collectLocatedMonoBinders mbinds
 	gen_rdr_tyvars_w_locs = [(tv,src_loc) | tv <- extractGenericPatTyVars mbinds,
 						not (tv `elemRdrEnv` name_env)]
     in
-    checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
-    newLocalsRn gen_rdr_tyvars_w_locs			`thenRn` \ gen_tyvars ->
-    rnMethodBinds cls gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
-    returnRn (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
+    checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenM_`
+    newLocalsRn gen_rdr_tyvars_w_locs			`thenM` \ gen_tyvars ->
+    rnMethodBinds cls gen_tyvars mbinds			`thenM` \ (mbinds', meth_fvs) ->
+    returnM (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
   where
     meth_doc = text "In the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
@@ -440,10 +594,10 @@ finishSourceTyClDecl _ tycl_decl@(TyData {tcdDerivs = derivings})
   -- FVs that are `needed' by the interface file declaration, and
   -- derivings do not appear in this.  It also means that the tcGroups
   -- are smaller, which turned out to be important for the usage inference. KSW 2002-02.
-  = returnRn (tycl_decl,
+  = returnM (tycl_decl,
               maybe emptyFVs extractHsCtxtTyNames derivings)
 
-finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
+finishSourceTyClDecl _ tycl_decl = returnM (tycl_decl, emptyFVs)
 	-- Not a class declaration
 \end{code}
 
@@ -452,7 +606,7 @@ type variable environment iff -fglasgow-exts
 
 \begin{code}
 extendTyVarEnvForMethodBinds tyvars thing_inside
-  = doptRn Opt_GlasgowExts			`thenRn` \ opt_GlasgowExts ->
+  = doptM Opt_GlasgowExts			`thenM` \ opt_GlasgowExts ->
     if opt_GlasgowExts then
 	extendTyVarEnvFVRn (map hsTyVarName tyvars) thing_inside
     else
@@ -468,65 +622,62 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 
 \begin{code}
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
-conDeclName (ConDecl n _ _ _ _ l) = (n,l)
+conDeclName (ConDecl n _ _ _ l) = (n,l)
 
-rnConDecls :: Name -> DataConDetails RdrNameConDecl -> RnMS (DataConDetails RenamedConDecl)
-rnConDecls tycon Unknown     = returnRn Unknown
-rnConDecls tycon (HasCons n) = returnRn (HasCons n)
+rnConDecls :: Name -> DataConDetails RdrNameConDecl -> RnM (DataConDetails RenamedConDecl)
+rnConDecls tycon Unknown     = returnM Unknown
+rnConDecls tycon (HasCons n) = returnM (HasCons n)
 rnConDecls tycon (DataCons condecls)
   = 	-- Check that there's at least one condecl,
 	-- or else we're reading an interface file, or -fglasgow-exts
     (if null condecls then
-	doptRn Opt_GlasgowExts	`thenRn` \ glaExts ->
-	getModeRn		`thenRn` \ mode ->
-	checkRn (glaExts || isInterfaceMode mode)
+	doptM Opt_GlasgowExts	`thenM` \ glaExts ->
+	getModeRn		`thenM` \ mode ->
+	checkErr (glaExts || isInterfaceMode mode)
 		(emptyConDeclsErr tycon)
-     else returnRn ()
-    )						`thenRn_` 
+     else returnM ()
+    )						`thenM_` 
 
-    mapRn rnConDecl condecls			`thenRn` \ condecls' ->
-    returnRn (DataCons condecls')
+    mappM rnConDecl condecls			`thenM` \ condecls' ->
+    returnM (DataCons condecls')
 
-rnConDecl :: RdrNameConDecl -> RnMS RenamedConDecl
-rnConDecl (ConDecl name wkr tvs cxt details locn)
-  = pushSrcLocRn locn $
-    checkConName name		`thenRn_` 
-    lookupTopBndrRn name	`thenRn` \ new_name ->
-
-    lookupSysBinder wkr		`thenRn` \ new_wkr ->
-	-- See comments with ClassDecl
+rnConDecl :: RdrNameConDecl -> RnM RenamedConDecl
+rnConDecl (ConDecl name tvs cxt details locn)
+  = addSrcLoc locn $
+    checkConName name		`thenM_` 
+    lookupTopBndrRn name	`thenM` \ new_name ->
 
     bindTyVarsRn doc tvs 		$ \ new_tyvars ->
-    rnContext doc cxt			`thenRn` \ new_context ->
-    rnConDetails doc locn details	`thenRn` \ new_details -> 
-    returnRn (ConDecl new_name new_wkr new_tyvars new_context new_details locn)
+    rnContext doc cxt			`thenM` \ new_context ->
+    rnConDetails doc locn details	`thenM` \ new_details -> 
+    returnM (ConDecl new_name new_tyvars new_context new_details locn)
   where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
 
-rnConDetails doc locn (VanillaCon tys)
-  = mapRn (rnBangTy doc) tys	`thenRn` \ new_tys  ->
-    returnRn (VanillaCon new_tys)
+rnConDetails doc locn (PrefixCon tys)
+  = mappM (rnBangTy doc) tys	`thenM` \ new_tys  ->
+    returnM (PrefixCon new_tys)
 
 rnConDetails doc locn (InfixCon ty1 ty2)
-  = rnBangTy doc ty1  		`thenRn` \ new_ty1 ->
-    rnBangTy doc ty2  		`thenRn` \ new_ty2 ->
-    returnRn (InfixCon new_ty1 new_ty2)
+  = rnBangTy doc ty1  		`thenM` \ new_ty1 ->
+    rnBangTy doc ty2  		`thenM` \ new_ty2 ->
+    returnM (InfixCon new_ty1 new_ty2)
 
 rnConDetails doc locn (RecCon fields)
-  = checkDupOrQualNames doc field_names	`thenRn_`
-    mapRn (rnField doc) fields		`thenRn` \ new_fields ->
-    returnRn (RecCon new_fields)
+  = checkDupOrQualNames doc field_names	`thenM_`
+    mappM (rnField doc) fields		`thenM` \ new_fields ->
+    returnM (RecCon new_fields)
   where
-    field_names = [(fld, locn) | (flds, _) <- fields, fld <- flds]
+    field_names = [(fld, locn) | (fld, _) <- fields]
 
-rnField doc (names, ty)
-  = mapRn lookupTopBndrRn names	`thenRn` \ new_names ->
-    rnBangTy doc ty		`thenRn` \ new_ty ->
-    returnRn (new_names, new_ty) 
+rnField doc (name, ty)
+  = lookupTopBndrRn name	`thenM` \ new_name ->
+    rnBangTy doc ty		`thenM` \ new_ty ->
+    returnM (new_name, new_ty) 
 
 rnBangTy doc (BangType s ty)
-  = rnHsType doc ty		`thenRn` \ new_ty ->
-    returnRn (BangType s new_ty)
+  = rnHsType doc ty		`thenM` \ new_ty ->
+    returnM (BangType s new_ty)
 
 -- This data decl will parse OK
 --	data T = a Int
@@ -539,8 +690,7 @@ rnBangTy doc (BangType s ty)
 -- from interface files, which always print in prefix form
 
 checkConName name
-  = checkRn (isRdrDataCon name)
-	    (badDataCon name)
+  = checkErr (isRdrDataCon name) (badDataCon name)
 \end{code}
 
 
@@ -551,17 +701,17 @@ checkConName name
 %*********************************************************
 
 \begin{code}
-rnFds :: SDoc -> [FunDep RdrName] -> RnMS [FunDep Name]
+rnFds :: SDoc -> [FunDep RdrName] -> RnM [FunDep Name]
 
 rnFds doc fds
-  = mapRn rn_fds fds
+  = mappM rn_fds fds
   where
     rn_fds (tys1, tys2)
-      =	rnHsTyVars doc tys1		`thenRn` \ tys1' ->
-	rnHsTyVars doc tys2		`thenRn` \ tys2' ->
-	returnRn (tys1', tys2')
+      =	rnHsTyVars doc tys1		`thenM` \ tys1' ->
+	rnHsTyVars doc tys2		`thenM` \ tys2' ->
+	returnM (tys1', tys2')
 
-rnHsTyVars doc tvs  = mapRn (rnHsTyvar doc) tvs
+rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
 rnHsTyvar doc tyvar = lookupOccRn tyvar
 \end{code}
 
@@ -573,84 +723,81 @@ rnHsTyvar doc tyvar = lookupOccRn tyvar
 
 \begin{code}
 rnIdInfo (HsWorker worker arity)
-  = lookupOccRn worker			`thenRn` \ worker' ->
-    returnRn (HsWorker worker' arity)
+  = lookupOccRn worker			`thenM` \ worker' ->
+    returnM (HsWorker worker' arity)
 
-rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ expr' ->
-				  returnRn (HsUnfold inline expr')
-rnIdInfo (HsStrictness str)     = returnRn (HsStrictness str)
-rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
-rnIdInfo HsNoCafRefs		= returnRn HsNoCafRefs
+rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenM` \ expr' ->
+				  returnM (HsUnfold inline expr')
+rnIdInfo (HsStrictness str)     = returnM (HsStrictness str)
+rnIdInfo (HsArity arity)	= returnM (HsArity arity)
+rnIdInfo HsNoCafRefs		= returnM HsNoCafRefs
 \end{code}
 
 @UfCore@ expressions.
 
 \begin{code}
 rnCoreExpr (UfType ty)
-  = rnHsType (text "unfolding type") ty	`thenRn` \ ty' ->
-    returnRn (UfType ty')
+  = rnHsType (text "unfolding type") ty	`thenM` \ ty' ->
+    returnM (UfType ty')
 
 rnCoreExpr (UfVar v)
-  = lookupOccRn v 	`thenRn` \ v' ->
-    returnRn (UfVar v')
+  = lookupOccRn v 	`thenM` \ v' ->
+    returnM (UfVar v')
 
 rnCoreExpr (UfLit l)
-  = returnRn (UfLit l)
+  = returnM (UfLit l)
 
 rnCoreExpr (UfLitLit l ty)
-  = rnHsType (text "litlit") ty	`thenRn` \ ty' ->
-    returnRn (UfLitLit l ty')
+  = rnHsType (text "litlit") ty	`thenM` \ ty' ->
+    returnM (UfLitLit l ty')
 
 rnCoreExpr (UfFCall cc ty)
-  = rnHsType (text "ccall") ty	`thenRn` \ ty' ->
-    returnRn (UfFCall cc ty')
+  = rnHsType (text "ccall") ty	`thenM` \ ty' ->
+    returnM (UfFCall cc ty')
 
-rnCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
-  = mapRn rnCoreExpr args		`thenRn` \ args' ->
-    returnRn (UfTuple (HsTupCon tup_name boxity arity) args')
-  where
-    tup_name = getName (dataConWorkId (tupleCon boxity arity))
-	-- Get the *worker* name and use that
+rnCoreExpr (UfTuple (HsTupCon boxity arity) args) 
+  = mappM rnCoreExpr args		`thenM` \ args' ->
+    returnM (UfTuple (HsTupCon boxity arity) args')
 
 rnCoreExpr (UfApp fun arg)
-  = rnCoreExpr fun		`thenRn` \ fun' ->
-    rnCoreExpr arg		`thenRn` \ arg' ->
-    returnRn (UfApp fun' arg')
+  = rnCoreExpr fun		`thenM` \ fun' ->
+    rnCoreExpr arg		`thenM` \ arg' ->
+    returnM (UfApp fun' arg')
 
 rnCoreExpr (UfCase scrut bndr alts)
-  = rnCoreExpr scrut			`thenRn` \ scrut' ->
+  = rnCoreExpr scrut			`thenM` \ scrut' ->
     bindCoreLocalRn bndr		$ \ bndr' ->
-    mapRn rnCoreAlt alts		`thenRn` \ alts' ->
-    returnRn (UfCase scrut' bndr' alts')
+    mappM rnCoreAlt alts		`thenM` \ alts' ->
+    returnM (UfCase scrut' bndr' alts')
 
 rnCoreExpr (UfNote note expr) 
-  = rnNote note			`thenRn` \ note' ->
-    rnCoreExpr expr		`thenRn` \ expr' ->
-    returnRn  (UfNote note' expr')
+  = rnNote note			`thenM` \ note' ->
+    rnCoreExpr expr		`thenM` \ expr' ->
+    returnM  (UfNote note' expr')
 
 rnCoreExpr (UfLam bndr body)
   = rnCoreBndr bndr 		$ \ bndr' ->
-    rnCoreExpr body		`thenRn` \ body' ->
-    returnRn (UfLam bndr' body')
+    rnCoreExpr body		`thenM` \ body' ->
+    returnM (UfLam bndr' body')
 
 rnCoreExpr (UfLet (UfNonRec bndr rhs) body)
-  = rnCoreExpr rhs		`thenRn` \ rhs' ->
+  = rnCoreExpr rhs		`thenM` \ rhs' ->
     rnCoreBndr bndr 		$ \ bndr' ->
-    rnCoreExpr body		`thenRn` \ body' ->
-    returnRn (UfLet (UfNonRec bndr' rhs') body')
+    rnCoreExpr body		`thenM` \ body' ->
+    returnM (UfLet (UfNonRec bndr' rhs') body')
 
 rnCoreExpr (UfLet (UfRec pairs) body)
   = rnCoreBndrs bndrs		$ \ bndrs' ->
-    mapRn rnCoreExpr rhss	`thenRn` \ rhss' ->
-    rnCoreExpr body		`thenRn` \ body' ->
-    returnRn (UfLet (UfRec (bndrs' `zip` rhss')) body')
+    mappM rnCoreExpr rhss	`thenM` \ rhss' ->
+    rnCoreExpr body		`thenM` \ body' ->
+    returnM (UfLet (UfRec (bndrs' `zip` rhss')) body')
   where
     (bndrs, rhss) = unzip pairs
 \end{code}
 
 \begin{code}
 rnCoreBndr (UfValBinder name ty) thing_inside
-  = rnHsType doc ty		`thenRn` \ ty' ->
+  = rnHsType doc ty		`thenM` \ ty' ->
     bindCoreLocalRn name	$ \ name' ->
     thing_inside (UfValBinder name' ty')
   where
@@ -668,60 +815,90 @@ rnCoreBndrs (b:bs) thing_inside = rnCoreBndr b		$ \ name' ->
 
 \begin{code}
 rnCoreAlt (con, bndrs, rhs)
-  = rnUfCon con 			`thenRn` \ con' ->
+  = rnUfCon con 			`thenM` \ con' ->
     bindCoreLocalsRn bndrs		$ \ bndrs' ->
-    rnCoreExpr rhs			`thenRn` \ rhs' ->
-    returnRn (con', bndrs', rhs')
+    rnCoreExpr rhs			`thenM` \ rhs' ->
+    returnM (con', bndrs', rhs')
 
 rnNote (UfCoerce ty)
-  = rnHsType (text "unfolding coerce") ty	`thenRn` \ ty' ->
-    returnRn (UfCoerce ty')
+  = rnHsType (text "unfolding coerce") ty	`thenM` \ ty' ->
+    returnM (UfCoerce ty')
 
-rnNote (UfSCC cc)   = returnRn (UfSCC cc)
-rnNote UfInlineCall = returnRn UfInlineCall
-rnNote UfInlineMe   = returnRn UfInlineMe
+rnNote (UfSCC cc)   = returnM (UfSCC cc)
+rnNote UfInlineCall = returnM UfInlineCall
+rnNote UfInlineMe   = returnM UfInlineMe
 
 
 rnUfCon UfDefault
-  = returnRn UfDefault
+  = returnM UfDefault
 
-rnUfCon (UfTupleAlt (HsTupCon _ boxity arity))
-  = returnRn (UfTupleAlt (HsTupCon tup_name boxity arity))
-  where
-    tup_name = getName (tupleCon boxity arity)
+rnUfCon (UfTupleAlt tup_con)
+  = returnM (UfTupleAlt tup_con)
 
 rnUfCon (UfDataAlt con)
-  = lookupOccRn con		`thenRn` \ con' ->
-    returnRn (UfDataAlt con')
+  = lookupOccRn con		`thenM` \ con' ->
+    returnM (UfDataAlt con')
 
 rnUfCon (UfLitAlt lit)
-  = returnRn (UfLitAlt lit)
+  = returnM (UfLitAlt lit)
 
 rnUfCon (UfLitLitAlt lit ty)
-  = rnHsType (text "litlit") ty		`thenRn` \ ty' ->
-    returnRn (UfLitLitAlt lit ty')
+  = rnHsType (text "litlit") ty		`thenM` \ ty' ->
+    returnM (UfLitLitAlt lit ty')
 \end{code}
 
 %*********************************************************
-%*							 *
-\subsection{Rule shapes}
-%*							 *
+%*							*
+\subsection{Statistics}
+%*							*
 %*********************************************************
-
-Check the shape of a transformation rule LHS.  Currently
-we only allow LHSs of the form @(f e1 .. en)@, where @f@ is
-not one of the @forall@'d variables.
 
 \begin{code}
-validRuleLhs foralls lhs
-  = check lhs
-  where
-    check (OpApp _ op _ _)		  = check op
-    check (HsApp e1 e2) 		  = check e1
-    check (HsVar v) | v `notElem` foralls = True
-    check other				  = False
-\end{code}
+rnStats :: [RenamedHsDecl]	-- Imported decls
+	-> TcRn m ()
+rnStats imp_decls
+  = doptM Opt_D_dump_rn_trace 	`thenM` \ dump_rn_trace ->
+    doptM Opt_D_dump_rn_stats 	`thenM` \ dump_rn_stats ->
+    doptM Opt_D_dump_rn 	`thenM` \ dump_rn ->
+    getEps			`thenM` \ eps ->
 
+    ioToTcRn (dumpIfSet (dump_rn_trace || dump_rn_stats || dump_rn)
+		        "Renamer statistics"
+		        (getRnStats eps imp_decls))	`thenM_`
+    returnM ()
+
+getRnStats :: ExternalPackageState -> [RenamedHsDecl] -> SDoc
+getRnStats eps imported_decls
+  = hcat [text "Renamer stats: ", stats]
+  where
+    n_mods = length [() | _ <- moduleEnvElts (eps_PIT eps)]
+	-- This is really only right for a one-shot compile
+
+    (decls_map, n_decls_slurped) = eps_decls eps
+    
+    n_decls_left   = length [decl | (avail, True, (_,decl)) <- nameEnvElts decls_map
+    			-- Data, newtype, and class decls are in the decls_fm
+    			-- under multiple names; the tycon/class, and each
+    			-- constructor/class op too.
+    			-- The 'True' selects just the 'main' decl
+    		     ]
+    
+    (insts_left, n_insts_slurped) = eps_insts eps
+    n_insts_left  = length (bagToList insts_left)
+    
+    (rules_left, n_rules_slurped) = eps_rules eps
+    n_rules_left  = length (bagToList rules_left)
+    
+    stats = vcat 
+    	[int n_mods <+> text "interfaces read",
+    	 hsep [ int n_decls_slurped, text "type/class/variable imported, out of", 
+    	        int (n_decls_slurped + n_decls_left), text "read"],
+    	 hsep [ int n_insts_slurped, text "instance decls imported, out of",  
+    	        int (n_insts_slurped + n_insts_left), text "read"],
+    	 hsep [ int n_rules_slurped, text "rule decls imported, out of",  
+    	        int (n_rules_slurped + n_rules_left), text "read"]
+	]
+\end{code}    
 
 %*********************************************************
 %*							 *

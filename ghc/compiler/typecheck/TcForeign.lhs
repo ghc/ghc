@@ -25,16 +25,15 @@ import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
-import TcMonad
+import TcRnMonad
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
-import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignExportDecl )
+import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignDecl )
 import TcExpr		( tcExpr )			
-import Inst		( emptyLIE, LIE, plusLIE )
 
 import ErrUtils		( Message )
-import Id		( Id, mkLocalId, setIdLocalExported )
+import Id		( Id, mkLocalId, mkVanillaGlobal, setIdLocalExported )
+import IdInfo		( noCafIdInfo )
 import PrimRep		( getPrimRepSize, isFloatingRep )
-import Module		( Module )
 import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
 import Name		( NamedThing(..), mkExternalName )
@@ -75,25 +74,28 @@ isForeignExport _	  	          = False
 \begin{code}
 tcForeignImports :: [RenamedHsDecl] -> TcM ([Id], [TypecheckedForeignDecl])
 tcForeignImports decls = 
-  mapAndUnzipTc tcFImport 
+  mapAndUnzipM tcFImport 
     [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
 
 tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
- = tcAddSrcLoc src_loc			$
-   tcAddErrCtxt (foreignDeclCtxt fo)	$
-   tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc`	\ sig_ty ->
+ = addSrcLoc src_loc			$
+   addErrCtxt (foreignDeclCtxt fo)	$
+   tcHsSigType (ForSigCtxt nm) hs_ty	`thenM`	\ sig_ty ->
    let 
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
 	(_, t_ty)	  = tcSplitForAllTys sig_ty
 	(arg_tys, res_ty) = tcSplitFunTys t_ty
-	id		  = mkLocalId nm sig_ty
+	id		  = mkVanillaGlobal nm sig_ty noCafIdInfo
+		-- Foreign-imported things don't neeed zonking etc
+		-- They are rather like constructors; we make the final
+		-- Global Id right away.
    in
-   tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenNF_Tc_` 
+   tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM_` 
    -- can't use sig_ty here because it :: Type and we need HsType Id
    -- hence the undefined
-   returnTc (id, ForeignImport id undefined imp_decl isDeprec src_loc)
+   returnM (id, ForeignImport id undefined imp_decl isDeprec src_loc)
 \end{code}
 
 
@@ -103,7 +105,7 @@ tcCheckFIType _ _ _ (DNImport _)
   = checkCg checkDotNet
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ (CLabel _))
-  = checkCg checkCOrAsm		`thenNF_Tc_`
+  = checkCg checkCOrAsm		`thenM_`
     check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
@@ -114,16 +116,16 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
    	-- is DEPRECATED, though.
     checkCg (if cconv == StdCallConv
 		then checkC
-		else checkCOrAsmOrInterp)		`thenNF_Tc_`
+		else checkCOrAsmOrInterp)		`thenM_`
 	-- the native code gen can't handle foreign import stdcall "wrapper",
 	-- because it doesn't emit the '@n' suffix on the label of the
 	-- C stub function.  Infrastructure changes are required to make this
 	-- happen; MachLabel will need to carry around information about
 	-- the arity of the foreign call.
     case arg_tys of
-	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
-		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`
-		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty	`thenNF_Tc_`
+	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenM_`
+		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenM_`
+		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty	`thenM_`
 		     checkFEDArgs arg1_tys
 		  where
 		     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
@@ -131,27 +133,27 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport _ safety _ _ (CFunction target))
   | isDynamicTarget target	-- Foreign import dynamic
-  = checkCg checkCOrAsmOrInterp		`thenNF_Tc_`
+  = checkCg checkCOrAsmOrInterp		`thenM_`
     case arg_tys of		-- The first arg must be Ptr, FunPtr, or Addr
       []     		-> check False (illegalForeignTyErr empty sig_ty)
-      (arg1_ty:arg_tys) -> getDOptsTc							`thenNF_Tc` \ dflags ->
+      (arg1_ty:arg_tys) -> getDOpts							`thenM` \ dflags ->
 			   check (isFFIDynArgumentTy arg1_ty)
-				 (illegalForeignTyErr argument arg1_ty)			`thenNF_Tc_`
-			   checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenNF_Tc_`
+				 (illegalForeignTyErr argument arg1_ty)			`thenM_`
+			   checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
 			   checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
 
   | otherwise 		-- Normal foreign import
   = checkCg (if isCasmTarget target
-	     then checkC else checkCOrAsmOrDotNetOrInterp)	`thenNF_Tc_`
-    checkCTarget target						`thenNF_Tc_`
-    getDOptsTc							`thenNF_Tc` \ dflags ->
-    checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenNF_Tc_`
+	     then checkC else checkCOrAsmOrDotNetOrInterp)	`thenM_`
+    checkCTarget target						`thenM_`
+    getDOpts							`thenM` \ dflags ->
+    checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
     checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget (StaticTarget str) 
-  = checkCg checkCOrAsmOrDotNetOrInterp	 	`thenNF_Tc_`
+  = checkCg checkCOrAsmOrDotNetOrInterp	 	`thenM_`
     check (isCLabelString str) (badCName str)
 
 checkCTarget (CasmTarget _)
@@ -176,7 +178,7 @@ checkFEDArgs arg_tys
                          map typePrimRep arg_tys)
     err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
 #else
-checkFEDArgs arg_tys = returnNF_Tc ()
+checkFEDArgs arg_tys = returnM ()
 #endif
 \end{code}
 
@@ -188,46 +190,47 @@ checkFEDArgs arg_tys = returnNF_Tc ()
 %************************************************************************
 
 \begin{code}
-tcForeignExports :: Module -> [RenamedHsDecl] 
-    		 -> TcM (LIE, TcMonoBinds, [TcForeignExportDecl])
-tcForeignExports mod decls = 
-   foldlTc combine (emptyLIE, EmptyMonoBinds, [])
+tcForeignExports :: [RenamedHsDecl] 
+    		 -> TcM (TcMonoBinds, [TcForeignDecl])
+tcForeignExports decls = 
+   foldlM combine (EmptyMonoBinds, [])
      [foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
   where
-   combine (lie, binds, fs) fe = 
-       tcFExport mod fe `thenTc ` \ (a_lie, b, f) ->
-       returnTc (lie `plusLIE` a_lie, b `AndMonoBinds` binds, f:fs)
+   combine (binds, fs) fe = 
+       tcFExport fe	`thenM ` \ (b, f) ->
+       returnM (b `AndMonoBinds` binds, f:fs)
 
-tcFExport :: Module -> RenamedForeignDecl -> TcM (LIE, TcMonoBinds, TcForeignExportDecl)
-tcFExport mod fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
-   tcAddSrcLoc src_loc			$
-   tcAddErrCtxt (foreignDeclCtxt fo)	$
+tcFExport :: RenamedForeignDecl -> TcM (TcMonoBinds, TcForeignDecl)
+tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
+   addSrcLoc src_loc			$
+   addErrCtxt (foreignDeclCtxt fo)	$
 
-   tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc` \ sig_ty ->
-   tcExpr (HsVar nm) sig_ty		`thenTc` \ (rhs, lie) ->
+   tcHsSigType (ForSigCtxt nm) hs_ty	`thenM` \ sig_ty ->
+   tcExpr (HsVar nm) sig_ty		`thenM` \ rhs ->
 
-   tcCheckFEType sig_ty spec		`thenTc_`
+   tcCheckFEType sig_ty spec		`thenM_`
 
 	  -- we're exporting a function, but at a type possibly more
 	  -- constrained than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
 
-   tcGetUnique				`thenNF_Tc` \ uniq ->
+   newUnique			`thenM` \ uniq ->
+   getModule			`thenM` \ mod ->
    let
         gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) src_loc
 	id   = setIdLocalExported (mkLocalId gnm sig_ty)
 	bind = VarMonoBind id rhs
    in
-   returnTc (lie, bind, ForeignExport id undefined spec isDeprec src_loc)
+   returnM (bind, ForeignExport id undefined spec isDeprec src_loc)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------
 
 \begin{code}
 tcCheckFEType sig_ty (CExport (CExportStatic str _))
-  = check (isCLabelString str) (badCName str)		`thenNF_Tc_`
-    checkForeignArgs isFFIExternalTy arg_tys  	        `thenNF_Tc_`
+  = check (isCLabelString str) (badCName str)		`thenM_`
+    checkForeignArgs isFFIExternalTy arg_tys  	        `thenM_`
     checkForeignRes nonIOok isFFIExportResultTy res_ty
   where
       -- Drop the foralls before inspecting n
@@ -246,10 +249,10 @@ tcCheckFEType sig_ty (CExport (CExportStatic str _))
 
 \begin{code}
 ------------ Checking argument types for foreign import ----------------------
-checkForeignArgs :: (Type -> Bool) -> [Type] -> NF_TcM ()
+checkForeignArgs :: (Type -> Bool) -> [Type] -> TcM ()
 checkForeignArgs pred tys
-  = mapNF_Tc go tys		`thenNF_Tc_` 
-    returnNF_Tc ()
+  = mappM go tys		`thenM_` 
+    returnM ()
   where
     go ty = check (pred ty) (illegalForeignTyErr argument ty)
 
@@ -257,7 +260,7 @@ checkForeignArgs pred tys
 -- Check that the type has the form 
 --    (IO t) or (t) , and that t satisfies the given predicate.
 --
-checkForeignRes :: Bool -> (Type -> Bool) -> Type -> NF_TcM ()
+checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM ()
 
 nonIOok  = True
 mustBeIO = False
@@ -266,7 +269,7 @@ checkForeignRes non_io_result_ok pred_res_ty ty
  = case tcSplitTyConApp_maybe ty of
       Just (io, [res_ty]) 
         | io `hasKey` ioTyConKey && pred_res_ty res_ty 
-	-> returnNF_Tc ()
+	-> returnM ()
       _   
         -> check (non_io_result_ok && pred_res_ty ty) 
 		 (illegalForeignTyErr result ty)
@@ -304,21 +307,21 @@ checkCOrAsmOrDotNetOrInterp other
    = Just (text "requires interpreted, C, native or .NET ILX code generation")
 
 checkCg check
- = getDOptsTc		`thenNF_Tc` \ dflags ->
+ = getDOpts		`thenM` \ dflags ->
    let hscLang = dopt_HscLang dflags in
    case hscLang of
-     HscNothing -> returnNF_Tc ()
+     HscNothing -> returnM ()
      otherwise  ->
        case check hscLang of
-	 Nothing  -> returnNF_Tc ()
+	 Nothing  -> returnM ()
 	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 \end{code} 
 			   
 Warnings
 
 \begin{code}
-check :: Bool -> Message -> NF_TcM ()
-check True _	   = returnTc ()
+check :: Bool -> Message -> TcM ()
+check True _	   = returnM ()
 check _    the_err = addErrTc the_err
 
 illegalForeignTyErr arg_or_res ty

@@ -13,41 +13,35 @@ import {-# SOURCE #-} RnHiFiles( loadInterface )
 import FlattenInfo      ( namesNeededForFlattening )
 import HsSyn
 import RnHsSyn		( RenamedFixitySig )
-import RdrHsSyn		( RdrNameIE, RdrNameHsType, RdrNameFixitySig, extractHsTyRdrTyVars )
+import RdrHsSyn		( RdrNameHsType, extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrQual, setRdrNameOcc,
-			  lookupRdrEnv, foldRdrEnv, rdrEnvToList, elemRdrEnv,
-			  unqualifyRdrName
+			  mkRdrUnqual, mkRdrQual, setRdrNameSpace, rdrNameOcc,
+			  lookupRdrEnv, rdrEnvToList, elemRdrEnv, 
+			  extendRdrEnv, addListToRdrEnv, emptyRdrEnv,
+			  isExact_maybe, unqualifyRdrName
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
-			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), AvailEnv,
-			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..), 
-			  ModIface(..), GhciMode(..),
-			  Deprecations(..), lookupDeprec,
-			  extendLocalRdrEnv, lookupFixity
+			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), 
+			  GenAvailInfo(..), AvailInfo, Avails, 
+			  ModIface(..), NameCache(..),
+			  Deprecations(..), lookupDeprec, isLocalGRE,
+			  extendLocalRdrEnv, availName, availNames,
+			  lookupFixity
 			)
-import RnMonad
-import Name		( Name, 
-			  getSrcLoc, nameIsLocalOrFrom,
-			  mkInternalName, mkExternalName,
-			  mkIPName, nameOccName, nameModule_maybe,
-			  setNameModuleAndLoc, nameModule
-			)
-import NameEnv
+import TcRnMonad
+import Name		( Name, getName, getSrcLoc, nameIsLocalOrFrom, isWiredInName,
+			  mkInternalName, mkExternalName, mkIPName, 
+			  nameOccName, setNameModuleAndLoc, nameModule	)
 import NameSet
-import OccName		( OccName, occNameUserString, occNameFlavour, 
-			  isDataSymOcc, setOccNameSpace, tcName )
-import Module		( ModuleName, moduleName, mkVanillaModule, 
-			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
-import PrelNames	( mkUnboundName, 
-			  derivingOccurrences,
-			  mAIN_Name, main_RDR_Unqual,
-			  runIOName, intTyConName, 
+import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour )
+import Module		( Module, ModuleName, moduleName, mkVanillaModule )
+import PrelNames	( mkUnboundName, intTyConName, qTyConName,
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
-			  bindIOName, returnIOName, failIOName, thenIOName
+			  bindIOName, returnIOName, failIOName, thenIOName,
+			  templateHaskellNames
 			)
 import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
@@ -55,12 +49,8 @@ import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
-import Util		( sortLt )
-import BasicTypes	( mapIPName, defaultFixity )
+import BasicTypes	( mapIPName, FixitySig(..) )
 import List		( nub )
-import UniqFM		( lookupWithDefaultUFM )
-import Maybe		( mapMaybe )
-import Maybes		( orElse, catMaybes )
 import CmdLineOpts
 import FastString	( FastString )
 \end{code}
@@ -72,7 +62,7 @@ import FastString	( FastString )
 %*********************************************************
 
 \begin{code}
-newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
+newTopBinder :: Module -> RdrName -> SrcLoc -> TcRn m Name
 	-- newTopBinder puts into the cache the binder with the
 	-- module information set correctly.  When the decl is later renamed,
 	-- the binding site will thereby get the correct module.
@@ -81,17 +71,12 @@ newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
 	-- the occurrences, so that doesn't matter
 
 newTopBinder mod rdr_name loc
+  | Just name <- isExact_maybe rdr_name
+  = returnM name
+
+  | otherwise
   = 	-- First check the cache
-
-    	-- There should never be a qualified name in a binding position (except in instance decls)
-	-- The parser doesn't check this because the same parser parses instance decls
-    (if isQual rdr_name then
-	qualNameErr (text "In its declaration") (rdr_name,loc)
-     else
-	returnRn ()
-    )				`thenRn_`
-
-    getNameSupplyRn		`thenRn` \ name_supply -> 
+    getNameCache		`thenM` \ name_supply -> 
     let 
 	occ = rdrNameOcc rdr_name
 	key = (moduleName mod, occ)
@@ -106,30 +91,25 @@ newTopBinder mod rdr_name loc
 	--	b) its defining SrcLoc
 	-- So we update this info
 
-	Just name -> let 
-			new_name  = setNameModuleAndLoc name mod loc
-			new_cache = addToFM cache key new_name
-		     in
-		     setNameSupplyRn (name_supply {nsNames = new_cache})	`thenRn_`
---		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
-		     returnRn new_name
+	Just name 
+	  | isWiredInName name -> returnM name
+		-- Don't mess with wired-in names.  Apart from anything
+		-- else, their wired-in-ness is in the SrcLoca
+	  | otherwise 
+	  -> let 
+		new_name  = setNameModuleAndLoc name mod loc
+		new_cache = addToFM cache key new_name
+	     in
+	     setNameCache (name_supply {nsNames = new_cache})	`thenM_`
+	     returnM new_name
 		     
 	-- Miss in the cache!
 	-- Build a completely new Name, and put it in the cache
 	-- Even for locally-defined names we use implicitImportProvenance; 
 	-- updateProvenances will set it to rights
-	Nothing -> let
-			(us', us1) = splitUniqSupply (nsUniqs name_supply)
-			uniq   	   = uniqFromSupply us1
-			new_name   = mkExternalName uniq mod occ loc
-			new_cache  = addToFM cache key new_name
-		   in
-		   setNameSupplyRn (name_supply {nsUniqs = us', nsNames = new_cache})	`thenRn_`
---		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
-		   returnRn new_name
+	Nothing -> addNewName name_supply key mod occ loc
 
-
-newGlobalName :: ModuleName -> OccName -> RnM d Name
+newGlobalName :: ModuleName -> OccName -> TcRn m Name
   -- Used for *occurrences*.  We make a place-holder Name, really just
   -- to agree on its unique, which gets overwritten when we read in
   -- the binding occurence later (newTopBinder)
@@ -148,34 +128,46 @@ newGlobalName :: ModuleName -> OccName -> RnM d Name
   -- (but since it affects DLL-ery it does matter that we get it right
   --  in the end).
 newGlobalName mod_name occ
-  = getNameSupplyRn		`thenRn` \ name_supply ->
+  = getNameCache		`thenM` \ name_supply ->
     let
 	key = (mod_name, occ)
 	cache = nsNames name_supply
     in
     case lookupFM cache key of
-	Just name -> -- traceRn (text "newGlobalName: hit" <+> ppr name) `thenRn_`
-		     returnRn name
+	Just name -> -- traceRn (text "newGlobalName: hit" <+> ppr name) `thenM_`
+		     returnM name
 
-	Nothing   -> setNameSupplyRn (name_supply {nsUniqs = us', nsNames = new_cache})  `thenRn_`
-		     -- traceRn (text "newGlobalName: new" <+> ppr name)		  `thenRn_`
-		     returnRn name
-		  where
-		     (us', us1) = splitUniqSupply (nsUniqs name_supply)
-		     uniq   	= uniqFromSupply us1
-		     mod        = mkVanillaModule mod_name
-		     name       = mkExternalName uniq mod occ noSrcLoc
-		     new_cache  = addToFM cache key name
+	Nothing   -> -- traceRn (text "newGlobalName: new" <+> ppr name)  `thenM_`
+		     addNewName name_supply key (mkVanillaModule mod_name) occ noSrcLoc
+
+-- Look up a "system name" in the name cache.
+-- This is done by the type checker... 
+-- For *source* declarations, this will put the thing into the name cache
+-- For *interface* declarations, RnHiFiles.getSysBinders will already have
+-- put it into the cache.
+lookupSysName :: Name			-- Base name
+	      -> (OccName -> OccName) 	-- Occurrence name modifier
+	      -> TcRn m Name		-- System name
+lookupSysName base_name mk_sys_occ
+  = getNameCache		`thenM` \ name_supply ->
+    let
+	mod = nameModule base_name
+	occ = mk_sys_occ (nameOccName base_name)
+	key = (moduleName mod, occ)
+    in
+    case lookupFM (nsNames name_supply) key of
+	Just name -> returnM name
+	Nothing   -> addNewName name_supply key mod occ noSrcLoc
 
 newIPName rdr_name_ip
-  = getNameSupplyRn		`thenRn` \ name_supply ->
+  = getNameCache		`thenM` \ name_supply ->
     let
 	ipcache = nsIPs name_supply
     in
     case lookupFM ipcache key of
-	Just name_ip -> returnRn name_ip
-	Nothing      -> setNameSupplyRn new_ns 	`thenRn_`
-		        returnRn name_ip
+	Just name_ip -> returnM name_ip
+	Nothing      -> setNameCache new_ns 	`thenM_`
+		        returnM name_ip
 		  where
 		     (us', us1)  = splitUniqSupply (nsUniqs name_supply)
 		     uniq   	 = uniqFromSupply us1
@@ -185,6 +177,21 @@ newIPName rdr_name_ip
 		     new_ns	 = name_supply {nsUniqs = us', nsIPs = new_ipcache}
     where 
 	key = rdr_name_ip	-- Ensures that ?x and %x get distinct Names
+
+addNewName :: NameCache -> (ModuleName,OccName) 
+	   -> Module -> OccName -> SrcLoc -> TcRn m Name
+-- Internal function: extend the name cache, dump it back into
+-- 		      the monad, and return the new name
+-- (internal, hence the rather redundant interface)
+addNewName name_supply key mod occ loc
+  = setNameCache new_name_supply 	`thenM_`
+    returnM name
+  where
+     (us', us1) = splitUniqSupply (nsUniqs name_supply)
+     uniq   	= uniqFromSupply us1
+     name       = mkExternalName uniq mod occ loc
+     new_cache  = addToFM (nsNames name_supply) key name
+     new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
 \end{code}
 
 %*********************************************************
@@ -197,9 +204,9 @@ Looking up a name in the RnEnv.
 
 \begin{code}
 lookupBndrRn rdr_name
-  = getLocalNameEnv		`thenRn` \ local_env ->
+  = getLocalRdrEnv		`thenM` \ local_env ->
     case lookupRdrEnv local_env rdr_name of 
-	  Just name -> returnRn name
+	  Just name -> returnM name
 	  Nothing   -> lookupTopBndrRn rdr_name
 
 lookupTopBndrRn rdr_name
@@ -209,47 +216,66 @@ lookupTopBndrRn rdr_name
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
 
-  | isOrig rdr_name
+   	-- There should never be a qualified name in a binding position 
+	-- The parser could check this, but doesn't (yet)
+  | isQual rdr_name
+  = getSrcLocM							`thenM` \ loc ->
+    qualNameErr (text "In its declaration") (rdr_name,loc)	`thenM_`
+    returnM (mkUnboundName rdr_name)
+
+  | otherwise
+  = ASSERT( not (isOrig rdr_name) )
+	-- Original names are used only for occurrences, 
+	-- not binding sites
+
+    getModeRn			`thenM` \ mode ->
+    case mode of
+	InterfaceMode mod -> 
+	    getSrcLocM		`thenM` \ loc ->
+	    newTopBinder mod rdr_name loc
+
+	other -> lookupTopSrcBndr rdr_name
+
+lookupTopSrcBndr :: RdrName -> TcRn m Name
+lookupTopSrcBndr rdr_name
+  = lookupTopSrcBndr_maybe rdr_name	`thenM` \ maybe_name ->
+    case maybe_name of
+	Just name -> returnM name
+	Nothing	  -> unboundName rdr_name
+		  	        
+
+lookupTopSrcBndr_maybe :: RdrName -> TcRn m (Maybe Name)
+-- Look up a source-code binder 
+
+-- Ignores imported names; for example, this is OK:
+--	import Foo( f )
+--	infix 9 f	-- The 'f' here does not need to be qualified
+--	f x = x		-- Nor here, of course
+
+lookupTopSrcBndr_maybe rdr_name
+  | Just name <- isExact_maybe rdr_name
 	-- This is here just to catch the PrelBase defn of (say) [] and similar
-	-- The parser reads the special syntax and returns an Orig RdrName
+	-- The parser reads the special syntax and returns an Exact RdrName
 	-- But the global_env contains only Qual RdrNames, so we won't
 	-- find it there; instead just get the name via the Orig route
 	--
-  = 	-- This is a binding site for the name, so check first that it 
+  	-- We are at a binding site for the name, so check first that it 
 	-- the current module is the correct one; otherwise GHC can get
 	-- very confused indeed.  This test rejects code like
 	--	data T = (,) Int Int
 	-- unless we are in GHC.Tup
-    getModuleRn				`thenRn` \ mod -> 
-    checkRn (moduleName mod == rdrNameModule rdr_name)
-	    (badOrigBinding rdr_name)	`thenRn_`
-    lookupOrigName rdr_name
+  = getModule				`thenM` \ mod -> 
+    checkErr (moduleName mod == moduleName (nameModule name))
+	     (badOrigBinding rdr_name)	`thenM_`
+    returnM (Just name)
 
   | otherwise
-  = getModeRn	`thenRn` \ mode ->
-    if isInterfaceMode mode
-	then lookupSysBinder rdr_name	
-		-- lookupSysBinder uses the Module in the monad to set
-		-- the correct module for the binder.  This is important because
-		-- when GHCi is reading in an old interface, it just sucks it
-		-- in entire (Rename.loadHomeDecls) which uses lookupTopBndrRn
-		-- rather than via the iface file cache which uses newTopBndrRn
-		-- We must get the correct Module into the thing.
-
-    else 
-    getModuleRn		`thenRn` \ mod ->
-    getGlobalNameEnv	`thenRn` \ global_env ->
-    case lookup_local mod global_env rdr_name of
-	Just name -> returnRn name
-	Nothing	  -> failWithRn (mkUnboundName rdr_name)
-		  	        (unknownNameErr rdr_name)
-
-lookup_local mod global_env rdr_name
-  = case lookupRdrEnv global_env rdr_name of
-	  Nothing   -> Nothing
-	  Just gres -> case [n | GRE n _ _ <- gres, nameIsLocalOrFrom mod n] of
-			 []     -> Nothing
-			 (n:ns) -> Just n
+  = getGlobalRdrEnv			`thenM` \ global_env ->
+    case lookupRdrEnv global_env rdr_name of
+	  Nothing   -> returnM Nothing
+	  Just gres -> case [gre_name gre | gre <- gres, isLocalGRE gre] of
+			 []     -> returnM Nothing
+			 (n:ns) -> returnM (Just n)
 	      
 
 -- lookupSigOccRn is used for type signatures and pragmas
@@ -262,42 +288,73 @@ lookup_local mod global_env rdr_name
 -- The Haskell98 report does not stipulate this, but it will!
 -- So we must treat the 'f' in the signature in the same way
 -- as the binding occurrence of 'f', using lookupBndrRn
-lookupSigOccRn :: RdrName -> RnMS Name
+lookupSigOccRn :: RdrName -> RnM Name
 lookupSigOccRn = lookupBndrRn
 
 -- lookupInstDeclBndr is used for the binders in an 
 -- instance declaration.   Here we use the class name to
 -- disambiguate.  
 
-lookupInstDeclBndr :: Name -> RdrName -> RnMS Name
+lookupInstDeclBndr :: Name -> RdrName -> RnM Name
 	-- We use the selector name as the binder
 lookupInstDeclBndr cls_name rdr_name
-  | isOrig rdr_name	-- Occurs in derived instances, where we just
-			-- refer diectly to the right method
-  = lookupOrigName rdr_name
+  | isUnqual rdr_name
+  = 	-- Find all the things the class op name maps to
+	-- and pick the one with the right parent name
+    getGblEnv				`thenM` \ gbl_env ->
+    let
+	avail_env = imp_env (tcg_imports gbl_env)
+    in
+    case lookupAvailEnv avail_env cls_name of
+	Nothing -> 
+	    -- If the class itself isn't in scope, then cls_name will
+	    -- be unboundName, and there'll already be an error for
+	    -- that in the error list.  Example:
+	    -- e.g.   import Prelude hiding( Ord )
+	    --	    instance Ord T where ...
+	    -- The program is wrong, but that should not cause a crash.
+		returnM (mkUnboundName rdr_name)
 
-  | otherwise	
-  = getGlobalAvails	`thenRn` \ avail_env ->
-    case lookupNameEnv avail_env cls_name of
-	  -- The class itself isn't in scope, so cls_name is unboundName
-	  -- e.g.   import Prelude hiding( Ord )
-	  --	    instance Ord T where ...
-	  -- The program is wrong, but that should not cause a crash.
-	Nothing -> returnRn (mkUnboundName rdr_name)
 	Just (AvailTC _ ns) -> case [n | n <- ns, nameOccName n == occ] of
-				(n:ns)-> ASSERT( null ns ) returnRn n
-				[]    -> failWithRn (mkUnboundName rdr_name)
-						    (unknownNameErr rdr_name)
+				(n:ns)-> ASSERT( null ns ) returnM n
+				[]    -> unboundName rdr_name
+
 	other		    -> pprPanic "lookupInstDeclBndr" (ppr cls_name)
+
+  | isQual rdr_name	-- Should never have a qualified name in a binding position
+  = getSrcLocM							`thenM` \ loc ->
+    qualNameErr (text "In an instance method") (rdr_name,loc)	`thenM_`
+    returnM (mkUnboundName rdr_name)
+	
+  | otherwise	 	-- Occurs in derived instances, where we just
+			-- refer directly to the right method, and avail_env
+			-- isn't available
+  = ASSERT2( not (isQual rdr_name), ppr rdr_name )
+    lookupOrigName rdr_name
+
   where
     occ = rdrNameOcc rdr_name
 
+lookupSysBndr :: RdrName -> RnM Name
+-- Used for the 'system binders' in a data type or class declaration
+-- Do *not* look up in the RdrEnv; these system binders are never in scope
+-- Instead, get the module from the monad... but remember that
+-- where the module is depends on whether we are renaming source or 
+-- interface file stuff
+lookupSysBndr rdr_name
+  = getSrcLocM		`thenM` \ loc ->
+    getModeRn		`thenM` \ mode ->
+    case mode of
+	InterfaceMode mod -> newTopBinder mod rdr_name loc
+	other 		  -> getModule	`thenM` \ mod ->
+			     newTopBinder mod rdr_name loc
+
 -- lookupOccRn looks up an occurrence of a RdrName
-lookupOccRn :: RdrName -> RnMS Name
+lookupOccRn :: RdrName -> RnM Name
 lookupOccRn rdr_name
-  = getLocalNameEnv			`thenRn` \ local_env ->
+  = getLocalRdrEnv			`thenM` \ local_env ->
     case lookupRdrEnv local_env rdr_name of
-	  Just name -> returnRn name
+	  Just name -> returnM name
 	  Nothing   -> lookupGlobalOccRn rdr_name
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
@@ -306,18 +363,14 @@ lookupOccRn rdr_name
 --	class op names in class and instance decls
 
 lookupGlobalOccRn rdr_name
-  = getModeRn 		`thenRn` \ mode ->
-    if (isInterfaceMode mode)
-	then lookupIfaceName rdr_name
-	else 
+  = getModeRn 		`thenM` \ mode ->
+    case mode of
+	InterfaceMode mod -> lookupIfaceName mod rdr_name 
+	SourceMode 	  -> lookupSrcName       rdr_name 
 
-    getGlobalNameEnv	`thenRn` \ global_env ->
-    case mode of 
-	SourceMode -> lookupSrcName global_env rdr_name
-
-	CmdLineMode
+	CmdLineMode 
 	 | not (isQual rdr_name) -> 
-		lookupSrcName global_env rdr_name
+		lookupSrcName rdr_name
 
 		-- We allow qualified names on the command line to refer to 
 		-- *any* name exported by any module in scope, just as if 
@@ -328,105 +381,120 @@ lookupGlobalOccRn rdr_name
 		-- it isn't there, we manufacture a new occurrence of an
 		-- original name.
 	 | otherwise -> 
-		case lookupRdrEnv global_env rdr_name of
-		       Just _  -> lookupSrcName global_env rdr_name
-		       Nothing -> lookupQualifiedName rdr_name
+		lookupSrcName_maybe rdr_name	`thenM` \ mb_name ->
+		case mb_name of
+		  Just name -> returnM name
+		  Nothing   -> lookupQualifiedName rdr_name
 
--- a qualified name on the command line can refer to any module at all: we
+-- A qualified name on the command line can refer to any module at all: we
 -- try to load the interface if we don't already have it.
-lookupQualifiedName :: RdrName -> RnM d Name
+lookupQualifiedName :: RdrName -> TcRn m Name
 lookupQualifiedName rdr_name
  = let 
        mod = rdrNameModule rdr_name
        occ = rdrNameOcc rdr_name
    in
-   loadInterface (ppr rdr_name) mod ImportByUser `thenRn` \ iface ->
+   loadInterface (ppr rdr_name) mod (ImportByUser False) `thenM` \ iface ->
    case  [ name | (_,avails) <- mi_exports iface,
     	   avail	     <- avails,
     	   name 	     <- availNames avail,
     	   nameOccName name == occ ] of
-      (n:ns) -> ASSERT (null ns) returnRn n
-      _      -> failWithRn (mkUnboundName rdr_name) (unknownNameErr rdr_name)
+      (n:ns) -> ASSERT (null ns) returnM n
+      _      -> unboundName rdr_name
 
-lookupSrcName :: GlobalRdrEnv -> RdrName -> RnM d Name
--- NB: passed GlobalEnv explicitly, not necessarily in RnMS monad
-lookupSrcName global_env rdr_name
-  | isOrig rdr_name	-- Can occur in source code too
-  = lookupOrigName rdr_name
+lookupSrcName :: RdrName -> TcRn m Name
+lookupSrcName rdr_name
+  = lookupSrcName_maybe rdr_name	`thenM` \ mb_name ->
+    case mb_name of
+	Nothing   -> unboundName rdr_name
+	Just name -> returnM name
+			
+lookupSrcName_maybe :: RdrName -> TcRn m (Maybe Name)
+lookupSrcName_maybe rdr_name
+  | Just name <- isExact_maybe rdr_name	-- Can occur in source code too
+  = returnM (Just name)
+
+  | isOrig rdr_name			-- An original name
+  = newGlobalName (rdrNameModule rdr_name) 
+		  (rdrNameOcc rdr_name)	`thenM` \ name ->
+    returnM (Just name)
 
   | otherwise
-  = case lookupRdrEnv global_env rdr_name of
-	Just [GRE name _ Nothing]	-> returnRn name
-	Just [GRE name _ (Just deprec)] -> warnDeprec name deprec	`thenRn_`
-					   returnRn name
-	Just stuff@(GRE name _ _ : _)	-> addNameClashErrRn rdr_name stuff	`thenRn_`
-			       		   returnRn name
-	Nothing				-> failWithRn (mkUnboundName rdr_name)
-				   		      (unknownNameErr rdr_name)
+  = lookupGRE rdr_name 	`thenM` \ mb_gre ->
+    case mb_gre of
+	Nothing  -> returnM Nothing
+	Just gre -> returnM (Just (gre_name gre))
 
-lookupOrigName :: RdrName -> RnM d Name 
-lookupOrigName rdr_name
-  = -- NO: ASSERT( isOrig rdr_name )
-    -- Now that .hi-boot files are read by the main parser, they contain
-    -- ordinary qualified names (which we treat as Orig names here).
-    newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
-
-lookupIfaceUnqual :: RdrName -> RnM d Name
-lookupIfaceUnqual rdr_name
-  = ASSERT( isUnqual rdr_name )
+lookupGRE :: RdrName -> TcRn m (Maybe GlobalRdrElt)
+lookupGRE rdr_name
+  = getGlobalRdrEnv			`thenM` \ global_env ->
+    case lookupRdrEnv global_env rdr_name of
+	Just [gre] -> case gre_deprec gre of
+			Nothing -> returnM (Just gre)
+			Just _  -> warnDeprec gre	`thenM_`
+				   returnM (Just gre)
+	Just stuff@(gre : _) -> addNameClashErrRn rdr_name stuff	`thenM_`
+			        returnM (Just gre)
+	Nothing		     -> return Nothing
+			
+lookupIfaceName :: Module -> RdrName -> TcRn m Name
   	-- An Unqual is allowed; interface files contain 
 	-- unqualified names for locally-defined things, such as
 	-- constructors of a data type.
-    getModuleRn 			`thenRn ` \ mod ->
-    newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
-
-lookupIfaceName :: RdrName -> RnM d Name
-lookupIfaceName rdr_name
-  | isUnqual rdr_name = lookupIfaceUnqual rdr_name
+lookupIfaceName mod rdr_name
+  | isUnqual rdr_name = newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
   | otherwise	      = lookupOrigName rdr_name
+
+lookupOrigName :: RdrName -> TcRn m Name
+	-- Just for original or exact names
+lookupOrigName rdr_name
+  | Just n <- isExact_maybe rdr_name 
+	-- This happens in derived code, which we 
+	-- rename in InterfaceMode
+  = returnM n
+
+  | otherwise	-- Usually Orig, but can be a Qual when 
+		-- we are reading a .hi-boot file
+  = newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+
+
+dataTcOccs :: RdrName -> [RdrName]
+-- If the input is a data constructor, return both it and a type
+-- constructor.  This is useful when we aren't sure which we are
+-- looking at
+dataTcOccs rdr_name
+  | isDataOcc occ = [rdr_name, rdr_name_tc]
+  | otherwise 	  = [rdr_name]
+  where    
+    occ 	= rdrNameOcc rdr_name
+    rdr_name_tc = setRdrNameSpace rdr_name tcName
 \end{code}
-
-@lookupOrigName@ takes an RdrName representing an {\em original}
-name, and adds it to the occurrence pool so that it'll be loaded
-later.  This is used when language constructs (such as monad
-comprehensions, overloaded literals, or deriving clauses) require some
-stuff to be loaded that isn't explicitly mentioned in the code.
-
-This doesn't apply in interface mode, where everything is explicit,
-but we don't check for this case: it does no harm to record an
-``extra'' occurrence and @lookupOrigNames@ isn't used much in
-interface mode (it's only the @Nothing@ clause of @rnDerivs@ that
-calls it at all I think).
-
-  \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
 
 \begin{code}
-lookupOrigNames :: [RdrName] -> RnM d NameSet
-lookupOrigNames rdr_names
-  = mapRn lookupOrigName rdr_names	`thenRn` \ names ->
-    returnRn (mkNameSet names)
+unboundName rdr_name = addErr (unknownNameErr rdr_name)	`thenM_`
+		       returnM (mkUnboundName rdr_name)
 \end{code}
-
-lookupSysBinder is used for the "system binders" of a type, class, or
-instance decl.  It ensures that the module is set correctly in the
-name cache, and sets the provenance on the returned name too.  The
-returned name will end up actually in the type, class, or instance.
-
-\begin{code}
-lookupSysBinder rdr_name
-  = ASSERT( isUnqual rdr_name )
-    getModuleRn				`thenRn` \ mod ->
-    getSrcLocRn				`thenRn` \ loc ->
-    newTopBinder mod rdr_name loc
-\end{code}
-
 
 %*********************************************************
 %*							*
-\subsection{Looking up fixities}
+		Fixities
 %*							*
 %*********************************************************
 
+\begin{code}
+--------------------------------
+bindLocalFixities :: [RenamedFixitySig] -> RnM a -> RnM a
+-- Used for nested fixity decls
+-- No need to worry about type constructors here,
+-- Should check for duplicates but we don't
+bindLocalFixities fixes thing_inside
+  | null fixes = thing_inside
+  | otherwise  = extendFixityEnv new_bit thing_inside
+  where
+    new_bit = [(n,s) | s@(FixitySig n _ _) <- fixes]
+\end{code}
+
+--------------------------------
 lookupFixity is a bit strange.  
 
 * Nested local fixity decls are put in the local fixity env, which we
@@ -441,13 +509,13 @@ lookupFixity is a bit strange.
   We put them all in the local fixity environment
 
 \begin{code}
-lookupFixityRn :: Name -> RnMS Fixity
+lookupFixityRn :: Name -> RnM Fixity
 lookupFixityRn name
-  = getModuleRn				`thenRn` \ this_mod ->
+  = getModule				`thenM` \ this_mod ->
     if nameIsLocalOrFrom this_mod name
     then	-- It's defined in this module
-	getFixityEnv			`thenRn` \ local_fix_env ->
-	returnRn (lookupLocalFixity local_fix_env name)
+	getFixityEnv		`thenM` \ local_fix_env ->
+	returnM (lookupFixity local_fix_env name)
 
     else	-- It's imported
       -- For imported names, we have to get their fixities by doing a
@@ -463,59 +531,11 @@ lookupFixityRn name
       -- nothing from B will be used).  When we come across a use of
       -- 'f', we need to know its fixity, and it's then, and only
       -- then, that we load B.hi.  That is what's happening here.
-        loadInterface doc name_mod ImportBySystem	`thenRn` \ iface ->
-	returnRn (lookupFixity (mi_fixities iface) name)
+        loadInterface doc name_mod ImportBySystem	`thenM` \ iface ->
+	returnM (lookupFixity (mi_fixities iface) name)
   where
     doc      = ptext SLIT("Checking fixity for") <+> ppr name
     name_mod = moduleName (nameModule name)
-
---------------------------------
-lookupLocalFixity :: LocalFixityEnv -> Name -> Fixity
-lookupLocalFixity env name
-  = case lookupNameEnv env name of 
-	Just (FixitySig _ fix _) -> fix
-	Nothing		  	 -> defaultFixity
-
-extendNestedFixityEnv :: [(Name, RenamedFixitySig)] -> RnMS a -> RnMS a
--- Used for nested fixity decls
--- No need to worry about type constructors here,
--- Should check for duplicates but we don't
-extendNestedFixityEnv fixes enclosed_scope
-  = getFixityEnv 	`thenRn` \ fix_env ->
-    let
-	new_fix_env = extendNameEnvList fix_env fixes
-    in
-    setFixityEnv new_fix_env enclosed_scope
-
-mkTopFixityEnv :: GlobalRdrEnv -> [RdrNameFixitySig] -> RnMG LocalFixityEnv
-mkTopFixityEnv gbl_env fix_sigs 
-  = getModuleRn				`thenRn` \ mod -> 
-    let
-		-- GHC extension: look up both the tycon and data con 
-		-- for con-like things
-		-- If neither are in scope, report an error; otherwise
-		-- add both to the fixity env
-	go fix_env (FixitySig rdr_name fixity loc)
-	  = case catMaybes (map (lookup_local mod gbl_env) rdr_names) of
-		  [] -> pushSrcLocRn loc 			$
-			addErrRn (unknownNameErr rdr_name)	`thenRn_`
-	 	        returnRn fix_env
-		  ns -> foldlRn add fix_env ns
-
-	  where
-	    add fix_env name 
-	      = case lookupNameEnv fix_env name of
-	          Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')	`thenRn_`
-					       returnRn fix_env
-		  Nothing -> returnRn (extendNameEnv fix_env name (FixitySig name fixity loc))
-	    
-	    rdr_names | isDataSymOcc occ = [rdr_name, rdr_name_tc]
-		      | otherwise 	     = [rdr_name]
-
-	    occ 	= rdrNameOcc rdr_name
-	    rdr_name_tc = setRdrNameOcc rdr_name (setOccNameSpace occ tcName)
-    in
-    foldlRn go emptyLocalFixityEnv fix_sigs
 \end{code}
 
 
@@ -529,65 +549,42 @@ mkTopFixityEnv gbl_env fix_sigs
 mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
-getImplicitStmtFVs 	-- Compiling a statement
-  = returnRn (mkFVs [printName, bindIOName, thenIOName, 
-		     returnIOName, failIOName]
-	      `plusFV` ubiquitousNames)
+implicitStmtFVs source_fvs 	-- Compiling a statement
+  = stmt_fvs `plusFV` implicitModuleFVs source_fvs
+  where
+    stmt_fvs = mkFVs [printName, bindIOName, thenIOName, returnIOName, failIOName]
 		-- These are all needed implicitly when compiling a statement
 		-- See TcModule.tc_stmts
 
-getImplicitModuleFVs decls	-- Compiling a module
-  = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
-    returnRn (deriving_names `plusFV` ubiquitousNames)
-  where
-	-- deriv_classes is now a list of HsTypes, so a "normal" one
-	-- appears as a (HsClassP c []).  The non-normal ones for the new
-	-- newtype-deriving extension, and they don't require any
-	-- implicit names, so we can silently filter them out.
-	deriv_occs = [occ | TyClD (TyData {tcdDerivs = Just deriv_classes}) <- decls,
-		   	    HsClassP cls [] <- deriv_classes,
-			    occ <- lookupWithDefaultUFM derivingOccurrences [] cls ]
+implicitModuleFVs source_fvs
+  = mkTemplateHaskellFVs source_fvs 	`plusFV` 
+    namesNeededForFlattening		`plusFV`
+    ubiquitousNames
+
+	-- This is a bit of a hack.  When we see the Template-Haskell construct
+	--	[| expr |]
+	-- we are going to need lots of the ``smart constructors'' defined in
+	-- the main Template Haskell data type module.  Rather than treat them
+	-- all as free vars at every occurrence site, we just make the Q type
+	-- consructor a free var.... and then use that here to haul in the others
+mkTemplateHaskellFVs source_fvs
+#ifdef GHCI
+	-- Only if Template Haskell is enabled
+  | qTyConName `elemNameSet` source_fvs = templateHaskellNames
+#endif
+  | otherwise			        = emptyFVs
 
 -- ubiquitous_names are loaded regardless, because 
 -- they are needed in virtually every program
 ubiquitousNames 
   = mkFVs [unpackCStringName, unpackCStringFoldrName, 
 	   unpackCStringUtf8Name, eqStringName]
-	-- Virtually every program has error messages in it somewhere
-
-  `plusFV`
+		-- Virtually every program has error messages in it somewhere
+	  `plusFV`
     mkFVs [getName unitTyCon, funTyConName, boolTyConName, intTyConName]
-	-- Add occurrences for very frequently used types.
-	--  	 (e.g. we don't want to be bothered with making funTyCon a
-	--	  free var at every function application!)
-  `plusFV`
-    namesNeededForFlattening
-        -- this will be empty unless flattening is activated
-
-checkMain ghci_mode mod_name gbl_env
-	-- LOOKUP main IF WE'RE IN MODULE Main
-	-- The main point of this is to drag in the declaration for 'main',
-	-- its in another module, and for the Prelude function 'runIO',
-	-- so that the type checker will find them
-	--
-	-- We have to return the main_name separately, because it's a
-	-- bona fide 'use', and should be recorded as such, but the others
-	-- aren't 
-  | mod_name /= mAIN_Name
-  = returnRn (Nothing, emptyFVs, emptyFVs)
-
-  | not (main_RDR_Unqual `elemRdrEnv` gbl_env)
-  = complain_no_main		`thenRn_`
-    returnRn (Nothing, emptyFVs, emptyFVs)
-
-  | otherwise
-  = lookupSrcName gbl_env main_RDR_Unqual	`thenRn` \ main_name ->
-    returnRn (Just main_name, unitFV main_name, unitFV runIOName)
-
-  where
-    complain_no_main | ghci_mode == Interactive = addWarnRn noMainMsg
-		     | otherwise 		= addErrRn  noMainMsg
-		-- In interactive mode, only warn about the absence of main
+		-- Add occurrences for very frequently used types.
+		--  	 (e.g. we don't want to be bothered with making 
+		--	  funTyCon a free var at every function application!)
 \end{code}
 
 %************************************************************************
@@ -625,22 +622,23 @@ checks the type of the user thing against the type of the standard thing.
 
 \begin{code}
 lookupSyntaxName :: Name 			-- The standard name
-	         -> RnMS (Name, FreeVars)	-- Possibly a non-standard name
+	         -> RnM (Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = getModeRn				`thenRn` \ mode ->
-    case mode of {
-	InterfaceMode -> returnRn (std_name, unitFV std_name) ;
+  = getModeRn				`thenM` \ mode ->
+    if isInterfaceMode mode then
+	returnM (std_name, unitFV std_name)
 				-- Happens for 'derived' code
 				-- where we don't want to rebind
-   	other ->
+    else
 
-    doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
+    doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
     if not no_prelude then
-	returnRn (std_name, unitFV std_name)	-- Normal case
+	returnM (std_name, unitFV std_name)	-- Normal case
+
     else
 	-- Get the similarly named thing from the local environment
-    lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenRn` \ usr_name ->
-    returnRn (usr_name, mkFVs [usr_name, std_name]) }
+    lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
+    returnM (usr_name, mkFVs [usr_name, std_name])
 \end{code}
 
 
@@ -652,55 +650,53 @@ lookupSyntaxName std_name
 
 \begin{code}
 newLocalsRn :: [(RdrName,SrcLoc)]
-	    -> RnMS [Name]
+	    -> RnM [Name]
 newLocalsRn rdr_names_w_loc
- =  getNameSupplyRn		`thenRn` \ name_supply ->
+ =  newUniqueSupply 		`thenM` \ us ->
     let
-	(us', us1) = splitUniqSupply (nsUniqs name_supply)
-	uniqs	   = uniqsFromSupply us1
+	uniqs	   = uniqsFromSupply us
 	names	   = [ mkInternalName uniq (rdrNameOcc rdr_name) loc
 		     | ((rdr_name,loc), uniq) <- rdr_names_w_loc `zip` uniqs
 		     ]
     in
-    setNameSupplyRn (name_supply {nsUniqs = us'})	`thenRn_`
-    returnRn names
+    returnM names
 
 
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	   	    -> [(RdrName,SrcLoc)]
-	    	    -> ([Name] -> RnMS a)
-	    	    -> RnMS a
+	    	    -> ([Name] -> RnM a)
+	    	    -> RnM a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
-  = getModeRn 				`thenRn` \ mode ->
-    getLocalNameEnv			`thenRn` \ local_env ->
-    getGlobalNameEnv			`thenRn` \ global_env ->
+  = getModeRn 			`thenM` \ mode ->
+    getLocalRdrEnv		`thenM` \ local_env ->
+    getGlobalRdrEnv		`thenM` \ global_env ->
 
 	-- Check for duplicate names
-    checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
+    checkDupOrQualNames doc_str rdr_names_w_loc	`thenM_`
 
     	-- Warn about shadowing, but only in source modules
     let
       check_shadow (rdr_name,loc)
 	|  rdr_name `elemRdrEnv` local_env 
  	|| rdr_name `elemRdrEnv` global_env 
-	= pushSrcLocRn loc $ addWarnRn (shadowedNameWarn rdr_name)
+	= addSrcLoc loc $ addWarn (shadowedNameWarn rdr_name)
         | otherwise 
-	= returnRn ()
+	= returnM ()
     in
 
     (case mode of
-	SourceMode -> ifOptRn Opt_WarnNameShadowing	$
-		      mapRn_ check_shadow rdr_names_w_loc
-	other	   -> returnRn ()
-    )					`thenRn_`
+	SourceMode -> ifOptM Opt_WarnNameShadowing	$
+		      mappM_ check_shadow rdr_names_w_loc
+	other	   -> returnM ()
+    )					`thenM_`
 
-    newLocalsRn rdr_names_w_loc		`thenRn` \ names ->
+    newLocalsRn rdr_names_w_loc		`thenM` \ names ->
     let
 	new_local_env = addListToRdrEnv local_env (map fst rdr_names_w_loc `zip` names)
     in
-    setLocalNameEnv new_local_env (enclosed_scope names)
+    setLocalRdrEnv new_local_env (enclosed_scope names)
 
-bindCoreLocalRn :: RdrName -> (Name -> RnMS a) -> RnMS a
+bindCoreLocalRn :: RdrName -> (Name -> RnM a) -> RnM a
   -- A specialised variant when renaming stuff from interface
   -- files (of which there is a lot)
   --	* one at a time
@@ -708,19 +704,14 @@ bindCoreLocalRn :: RdrName -> (Name -> RnMS a) -> RnMS a
   -- 	* always imported
   -- 	* deal with free vars
 bindCoreLocalRn rdr_name enclosed_scope
-  = getSrcLocRn 		`thenRn` \ loc ->
-    getLocalNameEnv		`thenRn` \ name_env ->
-    getNameSupplyRn		`thenRn` \ name_supply ->
+  = getSrcLocM 		`thenM` \ loc ->
+    getLocalRdrEnv		`thenM` \ name_env ->
+    newUnique			`thenM` \ uniq ->
     let
-	(us', us1) = splitUniqSupply (nsUniqs name_supply)
-	uniq	   = uniqFromSupply us1
-	name	   = mkInternalName uniq (rdrNameOcc rdr_name) loc
-    in
-    setNameSupplyRn (name_supply {nsUniqs = us'})	`thenRn_`
-    let
+	name	     = mkInternalName uniq (rdrNameOcc rdr_name) loc
 	new_name_env = extendRdrEnv name_env rdr_name name
     in
-    setLocalNameEnv new_name_env (enclosed_scope name)
+    setLocalRdrEnv new_name_env (enclosed_scope name)
 
 bindCoreLocalsRn []     thing_inside = thing_inside []
 bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
@@ -728,25 +719,25 @@ bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
 				       thing_inside (name':names')
 
 bindLocalNames names enclosed_scope
-  = getLocalNameEnv 		`thenRn` \ name_env ->
-    setLocalNameEnv (extendLocalRdrEnv name_env names)
+  = getLocalRdrEnv 		`thenM` \ name_env ->
+    setLocalRdrEnv (extendLocalRdrEnv name_env names)
 		    enclosed_scope
 
 bindLocalNamesFV names enclosed_scope
   = bindLocalNames names $
-    enclosed_scope `thenRn` \ (thing, fvs) ->
-    returnRn (thing, delListFromNameSet fvs names)
+    enclosed_scope `thenM` \ (thing, fvs) ->
+    returnM (thing, delListFromNameSet fvs names)
 
 
 -------------------------------------
 bindLocalRn doc rdr_name enclosed_scope
-  = getSrcLocRn 				`thenRn` \ loc ->
+  = getSrcLocM 				`thenM` \ loc ->
     bindLocatedLocalsRn doc [(rdr_name,loc)]	$ \ (n:ns) ->
     ASSERT( null ns )
     enclosed_scope n
 
 bindLocalsRn doc rdr_names enclosed_scope
-  = getSrcLocRn		`thenRn` \ loc ->
+  = getSrcLocM		`thenM` \ loc ->
     bindLocatedLocalsRn doc
 			(rdr_names `zip` repeat loc)
 		 	enclosed_scope
@@ -755,21 +746,21 @@ bindLocalsRn doc rdr_names enclosed_scope
 	-- except that it deals with free vars
 bindLocalsFVRn doc rdr_names enclosed_scope
   = bindLocalsRn doc rdr_names		$ \ names ->
-    enclosed_scope names		`thenRn` \ (thing, fvs) ->
-    returnRn (thing, delListFromNameSet fvs names)
+    enclosed_scope names		`thenM` \ (thing, fvs) ->
+    returnM (thing, delListFromNameSet fvs names)
 
 -------------------------------------
-extendTyVarEnvFVRn :: [Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
+extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 	-- This tiresome function is used only in rnSourceDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope
-  = bindLocalNames tyvars enclosed_scope 	`thenRn` \ (thing, fvs) -> 
-    returnRn (thing, delListFromNameSet fvs tyvars)
+  = bindLocalNames tyvars enclosed_scope 	`thenM` \ (thing, fvs) -> 
+    returnM (thing, delListFromNameSet fvs tyvars)
 
 bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
-	      -> ([HsTyVarBndr Name] -> RnMS a)
-	      -> RnMS a
+	      -> ([HsTyVarBndr Name] -> RnM a)
+	      -> RnM a
 bindTyVarsRn doc_str tyvar_names enclosed_scope
-  = getSrcLocRn					`thenRn` \ loc ->
+  = getSrcLocM					`thenM` \ loc ->
     let
 	located_tyvars = [(hsTyVarName tv, loc) | tv <- tyvar_names] 
     in
@@ -777,14 +768,14 @@ bindTyVarsRn doc_str tyvar_names enclosed_scope
     enclosed_scope (zipWith replaceTyVarName tyvar_names names)
 
 bindPatSigTyVars :: [RdrNameHsType]
-		 -> RnMS (a, FreeVars)
-	  	 -> RnMS (a, FreeVars)
+		 -> RnM (a, FreeVars)
+	  	 -> RnM (a, FreeVars)
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
 
 bindPatSigTyVars tys enclosed_scope
-  = getLocalNameEnv			`thenRn` \ name_env ->
-    getSrcLocRn				`thenRn` \ loc ->
+  = getLocalRdrEnv		`thenM` \ name_env ->
+    getSrcLocM			`thenM` \ loc ->
     let
 	forall_tyvars  = nub [ tv | ty <- tys,
 				    tv <- extractHsTyRdrTyVars ty, 
@@ -798,26 +789,26 @@ bindPatSigTyVars tys enclosed_scope
 	doc_sig        = text "In a pattern type-signature"
     in
     bindLocatedLocalsRn doc_sig located_tyvars	$ \ names ->
-    enclosed_scope 				`thenRn` \ (thing, fvs) ->
-    returnRn (thing, delListFromNameSet fvs names)
+    enclosed_scope 				`thenM` \ (thing, fvs) ->
+    returnM (thing, delListFromNameSet fvs names)
 
 
 -------------------------------------
 checkDupOrQualNames, checkDupNames :: SDoc
 				   -> [(RdrName, SrcLoc)]
-				   -> RnM d ()
+				   -> TcRn m ()
 	-- Works in any variant of the renamer monad
 
 checkDupOrQualNames doc_str rdr_names_w_loc
   =	-- Check for use of qualified names
-    mapRn_ (qualNameErr doc_str) quals 	`thenRn_`
+    mappM_ (qualNameErr doc_str) quals 	`thenM_`
     checkDupNames doc_str rdr_names_w_loc
   where
     quals = filter (isQual . fst) rdr_names_w_loc
     
 checkDupNames doc_str rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group
-    mapRn_ (dupNamesErr doc_str) dups
+    mappM_ (dupNamesErr doc_str) dups
   where
     (_, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `compare` n2) rdr_names_w_loc
 \end{code}
@@ -864,13 +855,17 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails deprecs
 	-- duplicates.  So the simple thing is to do the fold.
 
     add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
-    add_avail env avail = foldl add_name env (availNames avail)
+    add_avail env avail = foldl (add_name (availName avail)) env (availNames avail)
 
-    add_name env name 	-- Add qualified name only
-	= addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) elt
+    add_name parent env name 	-- Add qualified name only
+	= addOneToGlobalRdrEnv env (mkRdrQual this_mod occ) elt
 	where
 	  occ  = nameOccName name
-	  elt  = GRE name (mk_provenance name) (lookupDeprec deprecs name)
+	  elt  = GRE {gre_name   = name,
+		      gre_parent = parent, 
+		      gre_prov   = mk_provenance name, 
+		      gre_deprec = lookupDeprec deprecs name}
+		      
 \end{code}
 
 \begin{code}
@@ -895,11 +890,12 @@ combine_globals ns_old ns_new	-- ns_new is often short
     choose n m | n `beats` m = n
 	       | otherwise   = m
 
-    (GRE n pn _) `beats` (GRE m pm _) = n==m && pn `hasBetterProv` pm
+    g1 `beats` g2 = gre_name g1 == gre_name g2 && 
+		    gre_prov g1 `hasBetterProv` gre_prov g2
 
     is_duplicate :: GlobalRdrElt -> GlobalRdrElt -> Bool
-    is_duplicate (GRE n1 LocalDef _) (GRE n2 LocalDef _) = False
-    is_duplicate (GRE n1 _        _) (GRE n2 _	      _) = n1 == n2
+    is_duplicate g1 g2 | isLocalGRE g1 && isLocalGRE g2 = False
+    is_duplicate g1 g2 = gre_name g1 == gre_name g2
 \end{code}
 
 We treat two bindings of a locally-defined name as a duplicate,
@@ -915,159 +911,6 @@ defn of the same name; in this case the names will compare as equal, but
 will still have different provenances.
 
 
-@unQualInScope@ returns a function that takes a @Name@ and tells whether
-its unqualified name is in scope.  This is put as a boolean flag in
-the @Name@'s provenance to guide whether or not to print the name qualified
-in error messages.
-
-\begin{code}
-unQualInScope :: GlobalRdrEnv -> Name -> Bool
--- True if 'f' is in scope, and has only one binding,
--- and the thing it is bound to is the name we are looking for
--- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
---
--- This fn is only efficient if the shared 
--- partial application is used a lot.
-unQualInScope env
-  = (`elemNameSet` unqual_names)
-  where
-    unqual_names :: NameSet
-    unqual_names = foldRdrEnv add emptyNameSet env
-    add rdr_name [GRE name _ _] unquals | isUnqual rdr_name = addOneToNameSet unquals name
-    add _        _              unquals		 	    = unquals
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Avails}
-%*									*
-%************************************************************************
-
-\begin{code}
-plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
-plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (nub (ns1 ++ ns2))
--- Added SOF 4/97
-#ifdef DEBUG
-plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
-#endif
-
-addAvail :: AvailEnv -> AvailInfo -> AvailEnv
-addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
-
-unitAvailEnv :: AvailInfo -> AvailEnv
-unitAvailEnv a = unitNameEnv (availName a) a
-
-plusAvailEnv :: AvailEnv -> AvailEnv -> AvailEnv
-plusAvailEnv = plusNameEnv_C plusAvail
-
-availEnvElts = nameEnvElts
-
-addAvailToNameSet :: NameSet -> AvailInfo -> NameSet
-addAvailToNameSet names avail = addListToNameSet names (availNames avail)
-
-availsToNameSet :: [AvailInfo] -> NameSet
-availsToNameSet avails = foldl addAvailToNameSet emptyNameSet avails
-
-availName :: GenAvailInfo name -> name
-availName (Avail n)     = n
-availName (AvailTC n _) = n
-
-availNames :: GenAvailInfo name -> [name]
-availNames (Avail n)      = [n]
-availNames (AvailTC n ns) = ns
-
--------------------------------------
-filterAvail :: RdrNameIE	-- Wanted
-	    -> AvailInfo	-- Available
-	    -> Maybe AvailInfo	-- Resulting available; 
-				-- Nothing if (any of the) wanted stuff isn't there
-
-filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
-  | sub_names_ok = Just (AvailTC n (filter is_wanted ns))
-  | otherwise    = Nothing
-  where
-    is_wanted name = nameOccName name `elem` wanted_occs
-    sub_names_ok   = all (`elem` avail_occs) wanted_occs
-    avail_occs	   = map nameOccName ns
-    wanted_occs    = map rdrNameOcc (want:wants)
-
-filterAvail (IEThingAbs _) (AvailTC n ns)       = ASSERT( n `elem` ns ) 
-						  Just (AvailTC n [n])
-
-filterAvail (IEThingAbs _) avail@(Avail n)      = Just avail		-- Type synonyms
-
-filterAvail (IEVar _)      avail@(Avail n)      = Just avail
-filterAvail (IEVar v)      avail@(AvailTC n ns) = Just (AvailTC n (filter wanted ns))
-						where
-						  wanted n = nameOccName n == occ
-						  occ      = rdrNameOcc v
-	-- The second equation happens if we import a class op, thus
-	-- 	import A( op ) 
-	-- where op is a class operation
-
-filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
-	-- We don't complain even if the IE says T(..), but
-	-- no constrs/class ops of T are available
-	-- Instead that's caught with a warning by the caller
-
-filterAvail ie avail = Nothing
-
--------------------------------------
-groupAvails :: Module -> Avails -> [(ModuleName, Avails)]
-  -- Group by module and sort by occurrence
-  -- This keeps the list in canonical order
-groupAvails this_mod avails 
-  = [ (mkSysModuleNameFS fs, sortLt lt avails)
-    | (fs,avails) <- fmToList groupFM
-    ]
-  where
-    groupFM :: FiniteMap FastString Avails
-	-- Deliberately use the FastString so we
-	-- get a canonical ordering
-    groupFM = foldl add emptyFM avails
-
-    add env avail = addToFM_C combine env mod_fs [avail']
-		  where
-		    mod_fs = moduleNameFS (moduleName avail_mod)
-		    avail_mod = case nameModule_maybe (availName avail) of
-					  Just m  -> m
-					  Nothing -> this_mod
-		    combine old _ = avail':old
-		    avail'	  = sortAvail avail
-
-    a1 `lt` a2 = occ1 < occ2
-	       where
-		 occ1  = nameOccName (availName a1)
-		 occ2  = nameOccName (availName a2)
-
-sortAvail :: AvailInfo -> AvailInfo
--- Sort the sub-names into canonical order.
--- The canonical order has the "main name" at the beginning 
--- (if it's there at all)
-sortAvail (Avail n) = Avail n
-sortAvail (AvailTC n ns) | n `elem` ns = AvailTC n (n : sortLt lt (filter (/= n) ns))
-			 | otherwise   = AvailTC n (    sortLt lt ns)
-			 where
-			   n1 `lt` n2 = nameOccName n1 < nameOccName n2
-\end{code}
-
-\begin{code}
-pruneAvails :: (Name -> Bool)	-- Keep if this is True
-	    -> [AvailInfo]
-	    -> [AvailInfo]
-pruneAvails keep avails
-  = mapMaybe del avails
-  where
-    del :: AvailInfo -> Maybe AvailInfo	-- Nothing => nothing left!
-    del (Avail n) | keep n    = Just (Avail n)
-    	          | otherwise = Nothing
-    del (AvailTC n ns) | null ns'  = Nothing
-		       | otherwise = Just (AvailTC n ns')
-		       where
-		         ns' = filter keep ns
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection{Free variable manipulation}
@@ -1076,11 +919,11 @@ pruneAvails keep avails
 
 \begin{code}
 -- A useful utility
-mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
+mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 	       let
 		  (ys, fvs_s) = unzip stuff
 	       in
-	       returnRn (ys, plusFVs fvs_s)
+	       returnM (ys, plusFVs fvs_s)
 \end{code}
 
 
@@ -1091,31 +934,31 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [ModuleName] -> RnM d ()
+warnUnusedModules :: [ModuleName] -> TcRn m ()
 warnUnusedModules mods
-  = ifOptRn Opt_WarnUnusedImports (mapRn_ (addWarnRn . unused_mod) mods)
+  = ifOptM Opt_WarnUnusedImports (mappM_ (addWarn . unused_mod) mods)
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
-			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
+			 parens (ptext SLIT("except perhaps instances visible in") <+>
 				   quotes (ppr m))]
 
-warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
-warnUnusedImports names
-  = ifOptRn Opt_WarnUnusedImports (warnUnusedBinds names)
+warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> TcRn m ()
+warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
+warnUnusedTopBinds gres = ifOptM Opt_WarnUnusedBinds   (warnUnusedGREs gres)
 
-warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
-warnUnusedLocalBinds names
-  = ifOptRn Opt_WarnUnusedBinds (warnUnusedBinds [(n,LocalDef) | n<-names])
-
-warnUnusedMatches names
-  = ifOptRn Opt_WarnUnusedMatches (warnUnusedGroup [(n,LocalDef) | n<-names])
+warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> TcRn m ()
+warnUnusedLocalBinds names = ifOptM Opt_WarnUnusedBinds   (warnUnusedLocals names)
+warnUnusedMatches    names = ifOptM Opt_WarnUnusedMatches (warnUnusedLocals names)
 
 -------------------------
+--	Helpers
+warnUnusedGREs   gres  = warnUnusedBinds [(n,p) | GRE {gre_name = n, gre_prov = p} <- gres]
+warnUnusedLocals names = warnUnusedBinds [(n,LocalDef) | n<-names]
 
-warnUnusedBinds :: [(Name,Provenance)] -> RnM d ()
+warnUnusedBinds :: [(Name,Provenance)] -> TcRn m ()
 warnUnusedBinds names
-  = mapRn_ warnUnusedGroup  groups
+  = mappM_ warnUnusedGroup  groups
   where
 	-- Group by provenance
    groups = equivClasses cmp names
@@ -1124,13 +967,13 @@ warnUnusedBinds names
 
 -------------------------
 
-warnUnusedGroup :: [(Name,Provenance)] -> RnM d ()
+warnUnusedGroup :: [(Name,Provenance)] -> TcRn m ()
 warnUnusedGroup names
-  | null filtered_names  = returnRn ()
-  | not is_local	 = returnRn ()
+  | null filtered_names  = returnM ()
+  | not is_local	 = returnM ()
   | otherwise
-  = pushSrcLocRn def_loc	$
-    addWarnRn			$
+  = addSrcLoc def_loc	$
+    addWarn			$
     sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) filtered_names)))]
   where
     filtered_names = filter reportable names
@@ -1151,19 +994,17 @@ warnUnusedGroup names
 
 \begin{code}
 addNameClashErrRn rdr_name (np1:nps)
-  = addErrRn (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
+  = addErr (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
 		    ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
   where
     msg1 = ptext  SLIT("either") <+> mk_ref np1
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
-    mk_ref (GRE name prov _) = quotes (ppr name) <> comma <+> pprNameProvenance name prov
+    mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
 shadowedNameWarn shadow
   = hsep [ptext SLIT("This binding for"), 
 	       quotes (ppr shadow),
 	       ptext SLIT("shadows an existing binding")]
-
-noMainMsg = ptext SLIT("No 'main' defined in module Main")
 
 unknownNameErr name
   = sep [text flavour, ptext SLIT("not in scope:"), quotes (ppr name)]
@@ -1175,26 +1016,21 @@ badOrigBinding name
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
 qualNameErr descriptor (name,loc)
-  = pushSrcLocRn loc $
-    addErrRn (vcat [ ptext SLIT("Invalid use of qualified name") <+> quotes (ppr name),
+  = addSrcLoc loc $
+    addErr (vcat [ ptext SLIT("Invalid use of qualified name") <+> quotes (ppr name),
 		     descriptor])
 
 dupNamesErr descriptor ((name,loc) : dup_things)
-  = pushSrcLocRn loc $
-    addErrRn ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
+  = addSrcLoc loc $
+    addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      descriptor)
 
-warnDeprec :: Name -> DeprecTxt -> RnM d ()
-warnDeprec name txt
-  = ifOptRn Opt_WarnDeprecations	$
-    addWarnRn (sep [ text (occNameFlavour (nameOccName name)) <+> 
+warnDeprec :: GlobalRdrElt -> TcRn m ()
+warnDeprec (GRE {gre_name = name, gre_deprec = Just txt})
+  = ifOptM Opt_WarnDeprecations	$
+    addWarn (sep [ text (occNameFlavour (nameOccName name)) <+> 
 		     quotes (ppr name) <+> text "is deprecated:", 
 		     nest 4 (ppr txt) ])
-
-dupFixityDecl rdr_name loc1 loc2
-  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-	  ptext SLIT("at ") <+> ppr loc1,
-	  ptext SLIT("and") <+> ppr loc2]
 \end{code}
 

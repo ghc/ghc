@@ -25,7 +25,7 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  isLocalId, hasNoBinding, idNewStrictness, 
 		  isDataConId_maybe, idUnfolding
 		)
-import HscTypes ( ModDetails(..), implicitTyThingIds, typeEnvElts )
+import HscTypes ( ModGuts(..), ModGuts, implicitTyThingIds, typeEnvElts )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -96,23 +96,23 @@ any trivial or useless bindings.
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-corePrepPgm :: DynFlags -> ModDetails -> IO ModDetails
-corePrepPgm dflags mod_details
+corePrepPgm :: DynFlags -> ModGuts -> IO ModGuts
+corePrepPgm dflags mod_impl
   = do	showPass dflags "CorePrep"
 	us <- mkSplitUniqSupply 's'
 
-	let implicit_binds = mkImplicitBinds (md_types mod_details)
+	let implicit_binds = mkImplicitBinds (mg_types mod_impl)
 		-- NB: we must feed mkImplicitBinds through corePrep too
 		-- so that they are suitably cloned and eta-expanded
 
 	    binds_out = initUs_ us (
-			  corePrepTopBinds (md_binds mod_details)	`thenUs` \ floats1 ->
-			  corePrepTopBinds implicit_binds		`thenUs` \ floats2 ->
+			  corePrepTopBinds (mg_binds mod_impl)	`thenUs` \ floats1 ->
+			  corePrepTopBinds implicit_binds	`thenUs` \ floats2 ->
 			  returnUs (deFloatTop (floats1 `appOL` floats2))
 			)
 	    
         endPass dflags "CorePrep" Opt_D_dump_prep binds_out
-	return (mod_details { md_binds = binds_out })
+	return (mod_impl { mg_binds = binds_out })
 
 corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags expr

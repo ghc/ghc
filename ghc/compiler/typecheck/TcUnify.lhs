@@ -29,7 +29,7 @@ import TcHsSyn		( TypecheckedHsExpr, TcPat, mkHsLet )
 import TypeRep		( Type(..), SourceType(..), TyNote(..),
 			  openKindCon, typeCon )
 
-import TcMonad          -- TcType, amongst others
+import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, TyVarDetails(SigTv),
 			  isTauTy, isSigmaTy, 
@@ -43,15 +43,13 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  hasMoreBoxityInfo, tyVarBindingInfo, allDistinctTyVars
 			)
 import qualified Type	( getTyVar_maybe )
-import Inst		( LIE, emptyLIE, plusLIE, 
-			  newDicts, instToId, tcInstCall
-			)
+import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult,
 			  newTyVarTy, newTyVarTys, newBoxityVar, newHoleTyVarTy,
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcTyVar )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
-import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, tcLEnvElts )
+import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, getLclEnvElts )
 import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
 import Id		( Id, mkSysLocal, idType )
@@ -94,9 +92,9 @@ expected_ty.
 type TcHoleType = TcSigmaType	-- Either a TcSigmaType, 
 				-- or else a hole
 
-tcSubExp :: TcHoleType  -> TcSigmaType -> TcM (ExprCoFn, LIE)
-tcSubOff :: TcSigmaType -> TcHoleType  -> TcM (ExprCoFn, LIE)
-tcSub    :: TcSigmaType -> TcSigmaType -> TcM (ExprCoFn, LIE)
+tcSubExp :: TcHoleType  -> TcSigmaType -> TcM ExprCoFn
+tcSubOff :: TcSigmaType -> TcHoleType  -> TcM ExprCoFn
+tcSub    :: TcSigmaType -> TcSigmaType -> TcM ExprCoFn
 \end{code}
 
 These two check for holes
@@ -116,11 +114,11 @@ tcSubOff expected_ty offered_ty
 
 checkHole (TyVarTy tv) other_ty thing_inside
   | isHoleTyVar tv
-  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> thing_inside ty other_ty
-	Nothing -> putTcTyVar tv other_ty	`thenNF_Tc_`
-		   returnTc (idCoercion, emptyLIE)
+	Nothing -> putTcTyVar tv other_ty	`thenM_`
+		   returnM idCoercion
 
 checkHole ty other_ty thing_inside 
   = thing_inside ty other_ty
@@ -130,8 +128,8 @@ No holes expected now.  Add some error-check context info.
 
 \begin{code}
 tcSub expected_ty actual_ty
-  = traceTc (text "tcSub" <+> details)		`thenNF_Tc_`
-    tcAddErrCtxtM (unifyCtxt "type" expected_ty actual_ty)
+  = traceTc (text "tcSub" <+> details)		`thenM_`
+    addErrCtxtM (unifyCtxt "type" expected_ty actual_ty)
 		  (tc_sub expected_ty expected_ty actual_ty actual_ty)
   where
     details = vcat [text "Expected:" <+> ppr expected_ty,
@@ -145,7 +143,7 @@ tc_sub :: TcSigmaType		-- expected_ty, before expanding synonyms
        -> TcSigmaType		-- 		..and after
        -> TcSigmaType		-- actual_ty, before
        -> TcSigmaType		-- 		..and after
-       -> TcM (ExprCoFn, LIE)
+       -> TcM ExprCoFn
 
 -----------------------------------
 -- Expand synonyms
@@ -169,8 +167,8 @@ tc_sub exp_sty expected_ty act_sty actual_ty
 	-- It's really important to check for escape wrt the free vars of
 	-- both expected_ty *and* actual_ty
 	\ body_exp_ty -> tc_sub body_exp_ty body_exp_ty act_sty actual_ty
-    )				`thenTc` \ (gen_fn, co_fn, lie) ->
-    returnTc (gen_fn <.> co_fn, lie)
+    )				`thenM` \ (gen_fn, co_fn) ->
+    returnM (gen_fn <.> co_fn)
 
 -----------------------------------
 -- Specialisation case:
@@ -180,9 +178,9 @@ tc_sub exp_sty expected_ty act_sty actual_ty
 
 tc_sub exp_sty expected_ty act_sty actual_ty
   | isSigmaTy actual_ty
-  = tcInstCall Rank2Origin actual_ty		`thenNF_Tc` \ (inst_fn, lie1, body_ty) ->
-    tc_sub exp_sty expected_ty body_ty body_ty	`thenTc` \ (co_fn, lie2) ->
-    returnTc (co_fn <.> mkCoercion inst_fn, lie1 `plusLIE` lie2)
+  = tcInstCall Rank2Origin actual_ty		`thenM` \ (inst_fn, body_ty) ->
+    tc_sub exp_sty expected_ty body_ty body_ty	`thenM` \ co_fn ->
+    returnM (co_fn <.> mkCoercion inst_fn)
 
 -----------------------------------
 -- Function case
@@ -206,26 +204,26 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 
 tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ (TyVarTy tv)
   = ASSERT( not (isHoleTyVar tv) )
-    getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+    getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub exp_sty exp_ty ty ty
-	Nothing -> imitateFun tv exp_sty	`thenNF_Tc` \ (act_arg, act_res) ->
+	Nothing -> imitateFun tv exp_sty	`thenM` \ (act_arg, act_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 tc_sub _ (TyVarTy tv) act_sty act_ty@(FunTy act_arg act_res)
   = ASSERT( not (isHoleTyVar tv) )
-    getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+    getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub ty ty act_sty act_ty
-	Nothing -> imitateFun tv act_sty	`thenNF_Tc` \ (exp_arg, exp_res) ->
+	Nothing -> imitateFun tv act_sty	`thenM` \ (exp_arg, exp_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 -----------------------------------
 -- Unification case
 -- If none of the above match, we revert to the plain unifier
 tc_sub exp_sty expected_ty act_sty actual_ty
-  = uTys exp_sty expected_ty act_sty actual_ty	`thenTc_`
-    returnTc (idCoercion, emptyLIE)
+  = uTys exp_sty expected_ty act_sty actual_ty	`thenM_`
+    returnM idCoercion
 \end{code}    
     
 %************************************************************************
@@ -236,9 +234,9 @@ tc_sub exp_sty expected_ty act_sty actual_ty
 
 \begin{code}
 tcSub_fun exp_arg exp_res act_arg act_res
-  = tc_sub act_arg act_arg exp_arg exp_arg	`thenTc` \ (co_fn_arg, lie1) ->
-    tc_sub exp_res exp_res act_res act_res	`thenTc` \ (co_fn_res, lie2) ->
-    tcGetUnique					`thenNF_Tc` \ uniq ->
+  = tc_sub act_arg act_arg exp_arg exp_arg	`thenM` \ co_fn_arg ->
+    tc_sub exp_res exp_res act_res act_res	`thenM` \ co_fn_res ->
+    newUnique					`thenM` \ uniq ->
     let
 	-- co_fn_arg :: HsExpr exp_arg -> HsExpr act_arg
 	-- co_fn_res :: HsExpr act_res -> HsExpr exp_res
@@ -256,9 +254,9 @@ tcSub_fun exp_arg exp_res act_arg act_res
 		--	HsApp e $it   :: HsExpr act_res
 		-- 	co_fn_res $it :: HsExpr exp_res
     in
-    returnTc (coercion, lie1 `plusLIE` lie2)
+    returnM coercion
 
-imitateFun :: TcTyVar -> TcType -> NF_TcM (TcType, TcType)
+imitateFun :: TcTyVar -> TcType -> TcM (TcType, TcType)
 imitateFun tv ty
   = ASSERT( not (isHoleTyVar tv) )
 	-- NB: tv is an *ordinary* tyvar and so are the new ones
@@ -266,13 +264,13 @@ imitateFun tv ty
    	-- Check that tv isn't a type-signature type variable
 	-- (This would be found later in checkSigTyVars, but
 	--  we get a better error message if we do it here.)
-    checkTcM (not (isSkolemTyVar tv))
-	     (failWithTcM (unifyWithSigErr tv ty))	`thenTc_`
+    checkM (not (isSkolemTyVar tv))
+	   (failWithTcM (unifyWithSigErr tv ty))	`thenM_`
 
-    newTyVarTy openTypeKind		`thenNF_Tc` \ arg ->
-    newTyVarTy openTypeKind		`thenNF_Tc` \ res ->
-    putTcTyVar tv (mkFunTy arg res)	`thenNF_Tc_`
-    returnNF_Tc (arg,res)
+    newTyVarTy openTypeKind		`thenM` \ arg ->
+    newTyVarTy openTypeKind		`thenM` \ res ->
+    putTcTyVar tv (mkFunTy arg res)	`thenM_`
+    returnM (arg,res)
 \end{code}
 
 
@@ -287,16 +285,16 @@ tcGen :: TcSigmaType				-- expected_ty
       -> TcTyVarSet				-- Extra tyvars that the universally
 						--	quantified tyvars of expected_ty
 						-- 	must not be unified
-      -> (TcRhoType -> TcM (result, LIE))	-- spec_ty
-      -> TcM (ExprCoFn, result, LIE)
+      -> (TcRhoType -> TcM result)		-- spec_ty
+      -> TcM (ExprCoFn, result)
 	-- The expression has type: spec_ty -> expected_ty
 
 tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall-type
 						-- If not, the call is a no-op
-  = tcInstType SigTv expected_ty 	`thenNF_Tc` \ (forall_tvs, theta, phi_ty) ->
+  = tcInstType SigTv expected_ty 	`thenM` \ (forall_tvs, theta, phi_ty) ->
 
 	-- Type-check the arg and unify with poly type
-    thing_inside phi_ty			`thenTc` \ (result, lie) ->
+    getLIE (thing_inside phi_ty)	`thenM` \ (result, lie) ->
 
 	-- Check that the "forall_tvs" havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -309,21 +307,21 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- Conclusion: include the free vars of the expected_ty in the
 	-- list of "free vars" for the signature check.
 
-    newDicts SignatureOrigin theta			`thenNF_Tc` \ dicts ->
-    tcSimplifyCheck sig_msg forall_tvs dicts lie	`thenTc` \ (free_lie, inst_binds) ->
+    newDicts SignatureOrigin theta			`thenM` \ dicts ->
+    tcSimplifyCheck sig_msg forall_tvs dicts lie	`thenM` \ inst_binds ->
 
 #ifdef DEBUG
-    zonkTcTyVars forall_tvs `thenNF_Tc` \ forall_tys ->
+    zonkTcTyVars forall_tvs `thenM` \ forall_tys ->
     traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
 				    text "expected_ty" <+> ppr expected_ty,
 				    text "inst ty" <+> ppr forall_tvs <+> ppr theta <+> ppr phi_ty,
 				    text "free_tvs" <+> ppr free_tvs,
-				    text "forall_tys" <+> ppr forall_tys])	`thenNF_Tc_`
+				    text "forall_tys" <+> ppr forall_tys])	`thenM_`
 #endif
 
-    checkSigTyVarsWrt free_tvs forall_tvs		`thenTc` \ zonked_tvs ->
+    checkSigTyVarsWrt free_tvs forall_tvs		`thenM` \ zonked_tvs ->
 
-    traceTc (text "tcGen:done") `thenNF_Tc_`
+    traceTc (text "tcGen:done") `thenM_`
 
     let
 	    -- This HsLet binds any Insts which came out of the simplification.
@@ -332,7 +330,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	dict_ids = map instToId dicts
 	co_fn e  = TyLam zonked_tvs (DictLam dict_ids (mkHsLet inst_binds e))
     in
-    returnTc (mkCoercion co_fn, result, free_lie)
+    returnM (mkCoercion co_fn, result)
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
     sig_msg  = ptext SLIT("type of an expression")
@@ -391,7 +389,7 @@ unifyTauTy ty1 ty2 	-- ty1 expected, ty2 inferred
 	-- (no quantification whatsoever)
     ASSERT2( isTauTy ty1, ppr ty1 )
     ASSERT2( isTauTy ty2, ppr ty2 )
-    tcAddErrCtxtM (unifyCtxt "type" ty1 ty2) $
+    addErrCtxtM (unifyCtxt "type" ty1 ty2) $
     uTys ty1 ty1 ty2 ty2
 \end{code}
 
@@ -402,8 +400,8 @@ complain if their lengths differ.
 
 \begin{code}
 unifyTauTyLists :: [TcTauType] -> [TcTauType] ->  TcM ()
-unifyTauTyLists [] 	     []	        = returnTc ()
-unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenTc_`
+unifyTauTyLists [] 	     []	        = returnM ()
+unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenM_`
 					unifyTauTyLists tys1 tys2
 unifyTauTyLists ty1s ty2s = panic "Unify.unifyTauTyLists: mismatched type lists!"
 \end{code}
@@ -414,9 +412,9 @@ lists, when all the elts should be of the same type.
 
 \begin{code}
 unifyTauTyList :: [TcTauType] -> TcM ()
-unifyTauTyList []		 = returnTc ()
-unifyTauTyList [ty]		 = returnTc ()
-unifyTauTyList (ty1:tys@(ty2:_)) = unifyTauTy ty1 ty2	`thenTc_`
+unifyTauTyList []		 = returnM ()
+unifyTauTyList [ty]		 = returnM ()
+unifyTauTyList (ty1:tys@(ty2:_)) = unifyTauTy ty1 ty2	`thenM_`
 				   unifyTauTyList tys
 \end{code}
 
@@ -462,7 +460,7 @@ uTys _ (SourceTy (NType tc1 tys1)) _ (SourceTy (NType tc2 tys2))
 
 	-- Functions; just check the two parts
 uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
-  = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
+  = uTys fun1 fun1 fun2 fun2	`thenM_`    uTys arg1 arg1 arg2 arg2
 
 	-- Type constructors must match
 uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
@@ -481,14 +479,14 @@ uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
 	-- so if one type is an App the other one jolly well better be too
 uTys ps_ty1 (AppTy s1 t1) ps_ty2 ty2
   = case tcSplitAppTy_maybe ty2 of
-	Just (s2,t2) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
+	Just (s2,t2) -> uTys s1 s1 s2 s2	`thenM_`    uTys t1 t1 t2 t2
 	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
 
 	-- Now the same, but the other way round
 	-- Don't swap the types, because the error messages get worse
 uTys ps_ty1 ty1 ps_ty2 (AppTy s2 t2)
   = case tcSplitAppTy_maybe ty1 of
-	Just (s1,t1) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
+	Just (s1,t1) -> uTys s1 s1 s2 s2	`thenM_`    uTys t1 t1 t2 t2
 	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
 
 	-- Not expecting for-alls in unification
@@ -571,8 +569,8 @@ uVar :: Bool		-- False => tyvar is the "expected"
      -> TcM ()
 
 uVar swapped tv1 ps_ty2 ty2
-  = traceTc (text "uVar" <+> ppr swapped <+> ppr tv1 <+> (ppr ps_ty2 $$ ppr ty2))	`thenNF_Tc_`
-    getTcTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
+  = traceTc (text "uVar" <+> ppr swapped <+> ppr tv1 <+> (ppr ps_ty2 $$ ppr ty2))	`thenM_`
+    getTcTyVar tv1	`thenM` \ maybe_ty1 ->
     case maybe_ty1 of
 	Just ty1 | swapped   -> uTys ps_ty2 ty2 ty1 ty1	-- Swap back
 		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
@@ -588,25 +586,25 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 
 	-- Same type variable => no-op
   | tv1 == tv2
-  = returnTc ()
+  = returnM ()
 
 	-- Distinct type variables
 	-- ASSERT maybe_ty1 /= Just
   | otherwise
-  = getTcTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+  = getTcTyVar tv2	`thenM` \ maybe_ty2 ->
     case maybe_ty2 of
 	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
 
 	Nothing | update_tv2
 
 		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
-		   putTcTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
-		   returnTc ()
+		   putTcTyVar tv2 (TyVarTy tv1)		`thenM_`
+		   returnM ()
 		|  otherwise
 
 		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
-                   putTcTyVar tv1 ps_ty2		`thenNF_Tc_`
-	  	   returnTc ()
+                   putTcTyVar tv1 ps_ty2		`thenM_`
+	  	   returnM ()
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
@@ -621,20 +619,20 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 	-- Second one isn't a type variable
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
   = 	-- Check that tv1 isn't a type-signature type variable
-    checkTcM (not (isSkolemTyVar tv1))
-	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
+    checkM (not (isSkolemTyVar tv1))
+	   (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenM_`
 
 	-- Do the occurs check, and check that we are not
 	-- unifying a type variable with a polytype
 	-- Returns a zonked type ready for the update
-    checkValue tv1 ps_ty2 non_var_ty2	`thenTc` \ ty2 ->
+    checkValue tv1 ps_ty2 non_var_ty2	`thenM` \ ty2 ->
 
    	-- Check that the kinds match
-    checkKinds swapped tv1 ty2		`thenTc_`
+    checkKinds swapped tv1 ty2		`thenM_`
 
 	-- Perform the update
-    putTcTyVar tv1 ty2			`thenNF_Tc_`
-    returnTc ()
+    putTcTyVar tv1 ty2			`thenM_`
+    returnM ()
 \end{code}
 
 \begin{code}
@@ -642,14 +640,14 @@ checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
 -- ty2 has been zonked at this stage, which ensures that
 -- its kind has as much boxity information visible as possible.
-  | tk2 `hasMoreBoxityInfo` tk1 = returnTc ()
+  | tk2 `hasMoreBoxityInfo` tk1 = returnM ()
 
   | otherwise
 	-- Either the kinds aren't compatible
 	--	(can happen if we unify (a b) with (c d))
 	-- or we are unifying a lifted type variable with an
 	-- 	unlifted type: e.g.  (id 3#) is illegal
-  = tcAddErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
+  = addErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
     unifyMisMatch k1 k2
 
   where
@@ -684,16 +682,16 @@ checkValue tv1 ps_ty2 non_var_ty2
 -- Rather, we should bind t to () (= non_var_ty2).
 -- 
 -- That's why we have this two-state occurs-check
-  = zonkTcType ps_ty2			`thenNF_Tc` \ ps_ty2' ->
+  = zonkTcType ps_ty2			`thenM` \ ps_ty2' ->
     case okToUnifyWith tv1 ps_ty2' of {
-	Nothing -> returnTc ps_ty2' ;	-- Success
+	Nothing -> returnM ps_ty2' ;	-- Success
 	other ->
 
-    zonkTcType non_var_ty2		`thenNF_Tc` \ non_var_ty2' ->
+    zonkTcType non_var_ty2		`thenM` \ non_var_ty2' ->
     case okToUnifyWith tv1 non_var_ty2' of
 	Nothing -> 	-- This branch rarely succeeds, except in strange cases
 			-- like that in the example above
-		    returnTc non_var_ty2'
+		    returnM non_var_ty2'
 
 	Just problem -> failWithTcM (unifyCheck problem tv1 ps_ty2')
     }
@@ -755,29 +753,29 @@ subFunTy :: TcHoleType	-- Fail if ty isn't a function type
 subFunTy ty@(TyVarTy tyvar) thing_inside
   | isHoleTyVar tyvar
   = 	-- This is the interesting case
-    getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of {
 	Just ty' -> subFunTy ty' thing_inside ;
 	Nothing  -> 
 
-    newHoleTyVarTy 		`thenNF_Tc` \ arg_ty ->
-    newHoleTyVarTy 		`thenNF_Tc` \ res_ty ->
+    newHoleTyVarTy 		`thenM` \ arg_ty ->
+    newHoleTyVarTy 		`thenM` \ res_ty ->
 
 	-- Do the business
-    thing_inside arg_ty res_ty	`thenTc` \ answer ->
+    thing_inside arg_ty res_ty	`thenM` \ answer ->
 
 	-- Extract the answers
-    readHoleResult arg_ty	`thenNF_Tc` \ arg_ty' ->
-    readHoleResult res_ty	`thenNF_Tc` \ res_ty' ->
+    readHoleResult arg_ty	`thenM` \ arg_ty' ->
+    readHoleResult res_ty	`thenM` \ res_ty' ->
 
 	-- Write the answer into the incoming hole
-    putTcTyVar tyvar (mkFunTy arg_ty' res_ty')	`thenNF_Tc_` 
+    putTcTyVar tyvar (mkFunTy arg_ty' res_ty')	`thenM_` 
 
 	-- And return the answer
-    returnTc answer }
+    returnM answer }
 
 subFunTy ty thing_inside
-  = unifyFunTy ty 	`thenTc` \ (arg,res) ->
+  = unifyFunTy ty 	`thenM` \ (arg,res) ->
     thing_inside arg res
 
 		 
@@ -786,21 +784,21 @@ unifyFunTy :: TcRhoType	 		-- Fail if ty isn't a function type
 
 unifyFunTy ty@(TyVarTy tyvar)
   = ASSERT( not (isHoleTyVar tyvar) )
-    getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyFunTy ty'
 	Nothing  -> unify_fun_ty_help ty
 
 unifyFunTy ty
   = case tcSplitFunTy_maybe ty of
-	Just arg_and_res -> returnTc arg_and_res
+	Just arg_and_res -> returnM arg_and_res
 	Nothing 	 -> unify_fun_ty_help ty
 
 unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
-  = newTyVarTy openTypeKind	`thenNF_Tc` \ arg ->
-    newTyVarTy openTypeKind	`thenNF_Tc` \ res ->
-    unifyTauTy ty (mkFunTy arg res)	`thenTc_`
-    returnTc (arg,res)
+  = newTyVarTy openTypeKind	`thenM` \ arg ->
+    newTyVarTy openTypeKind	`thenM` \ res ->
+    unifyTauTy ty (mkFunTy arg res)	`thenM_`
+    returnM (arg,res)
 \end{code}
 
 \begin{code}
@@ -808,20 +806,20 @@ unifyListTy :: TcType              -- expected list type
 	    -> TcM TcType      -- list element type
 
 unifyListTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyListTy ty'
 	other	 -> unify_list_ty_help ty
 
 unifyListTy ty
   = case tcSplitTyConApp_maybe ty of
-	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnTc arg_ty
+	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnM arg_ty
 	other					    -> unify_list_ty_help ty
 
 unify_list_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
-    unifyTauTy ty (mkListTy elt_ty)	`thenTc_`
-    returnTc elt_ty
+  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
+    unifyTauTy ty (mkListTy elt_ty)	`thenM_`
+    returnM elt_ty
 
 -- variant for parallel arrays
 --
@@ -829,25 +827,25 @@ unifyPArrTy :: TcType              -- expected list type
 	    -> TcM TcType	   -- list element type
 
 unifyPArrTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
       Just ty' -> unifyPArrTy ty'
       _        -> unify_parr_ty_help ty
 unifyPArrTy ty
   = case tcSplitTyConApp_maybe ty of
-      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnTc arg_ty
+      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnM arg_ty
       _  					  -> unify_parr_ty_help ty
 
 unify_parr_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
-    unifyTauTy ty (mkPArrTy elt_ty)	`thenTc_`
-    returnTc elt_ty
+  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
+    unifyTauTy ty (mkPArrTy elt_ty)	`thenM_`
+    returnM elt_ty
 \end{code}
 
 \begin{code}
 unifyTupleTy :: Boxity -> Arity -> TcType -> TcM [TcType]
 unifyTupleTy boxity arity ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyTupleTy boxity arity ty'
 	other	 -> unify_tuple_ty_help boxity arity ty
@@ -858,13 +856,13 @@ unifyTupleTy boxity arity ty
 		|  isTupleTyCon tycon 
 		&& tyConArity tycon == arity
 		&& tupleTyConBoxity tycon == boxity
-		-> returnTc arg_tys
+		-> returnM arg_tys
 	other -> unify_tuple_ty_help boxity arity ty
 
 unify_tuple_ty_help boxity arity ty
-  = newTyVarTys arity kind				`thenNF_Tc` \ arg_tys ->
-    unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenTc_`
-    returnTc arg_tys
+  = newTyVarTys arity kind				`thenM` \ arg_tys ->
+    unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenM_`
+    returnM arg_tys
   where
     kind | isBoxed boxity = liftedTypeKind
 	 | otherwise      = openTypeKind
@@ -882,12 +880,12 @@ unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
 	  -> TcM ()
 unifyKind k1 k2 
-  = tcAddErrCtxtM (unifyCtxt "kind" k1 k2) $
+  = addErrCtxtM (unifyCtxt "kind" k1 k2) $
     uTys k1 k1 k2 k2
 
 unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
-unifyKinds []       []       = returnTc ()
-unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenTc_`
+unifyKinds []       []       = returnM ()
+unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenM_`
 			       unifyKinds ks1 ks2
 unifyKinds _ _ = panic "unifyKinds: length mis-match"
 \end{code}
@@ -898,17 +896,17 @@ unifyOpenTypeKind :: TcKind -> TcM ()
 -- for some boxity bx
 
 unifyOpenTypeKind ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyOpenTypeKind ty'
 	other	 -> unify_open_kind_help ty
 
 unifyOpenTypeKind ty
-  | isTypeKind ty = returnTc ()
+  | isTypeKind ty = returnM ()
   | otherwise     = unify_open_kind_help ty
 
 unify_open_kind_help ty	-- Revert to ordinary unification
-  = newBoxityVar 	`thenNF_Tc` \ boxity ->
+  = newBoxityVar 	`thenM` \ boxity ->
     unifyKind ty (mkTyConApp typeCon [boxity])
 \end{code}
 
@@ -924,9 +922,9 @@ Errors
 
 \begin{code}
 unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
-  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
-    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (err ty1' ty2')
+  = zonkTcType ty1	`thenM` \ ty1' ->
+    zonkTcType ty2	`thenM` \ ty2' ->
+    returnM (err ty1' ty2')
   where
     err ty1 ty2 = (env1, 
 		   nest 4 
@@ -939,8 +937,8 @@ unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
 
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
 	-- tv1 is zonked already
-  = zonkTcType ty2	`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (err ty2')
+  = zonkTcType ty2	`thenM` \ ty2' ->
+    returnM (err ty2')
   where
     err ty2 = (env2, ptext SLIT("When matching types") <+> 
 		     sep [quotes pp_expected, ptext SLIT("and"), quotes pp_actual])
@@ -953,8 +951,8 @@ unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 infer
 	      pp2 = ppr ty2'
 
 unifyMisMatch ty1 ty2
-  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
-    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
+  = zonkTcType ty1	`thenM` \ ty1' ->
+    zonkTcType ty2	`thenM` \ ty2' ->
     let
     	(env, [tidy_ty1, tidy_ty2]) = tidyOpenTypes emptyTidyEnv [ty1',ty2']
 	msg = hang (ptext SLIT("Couldn't match"))
@@ -1053,7 +1051,7 @@ checkSigTyVars sig_tvs = check_sig_tyvars emptyVarSet sig_tvs
 
 checkSigTyVarsWrt :: TcTyVarSet -> [TcTyVar] -> TcM [TcTyVar]
 checkSigTyVarsWrt extra_tvs sig_tvs
-  = zonkTcTyVarsAndFV (varSetElems extra_tvs)	`thenNF_Tc` \ extra_tvs' ->
+  = zonkTcTyVarsAndFV (varSetElems extra_tvs)	`thenM` \ extra_tvs' ->
     check_sig_tyvars extra_tvs' sig_tvs
 
 check_sig_tyvars
@@ -1065,28 +1063,28 @@ check_sig_tyvars
 	-> TcM [TcTyVar]	-- Zonked signature type variables
 
 check_sig_tyvars extra_tvs []
-  = returnTc []
+  = returnM []
 check_sig_tyvars extra_tvs sig_tvs 
-  = zonkTcTyVars sig_tvs	`thenNF_Tc` \ sig_tys ->
-    tcGetGlobalTyVars		`thenNF_Tc` \ gbl_tvs ->
+  = zonkTcTyVars sig_tvs	`thenM` \ sig_tys ->
+    tcGetGlobalTyVars		`thenM` \ gbl_tvs ->
     let
 	env_tvs = gbl_tvs `unionVarSet` extra_tvs
     in
     traceTc (text "check_sig_tyvars" <+> (vcat [text "sig_tys" <+> ppr sig_tys,
 				      text "gbl_tvs" <+> ppr gbl_tvs,
-				      text "extra_tvs" <+> ppr extra_tvs]))	`thenNF_Tc_`
+				      text "extra_tvs" <+> ppr extra_tvs]))	`thenM_`
 
-    checkTcM (allDistinctTyVars sig_tys env_tvs)
-	     (complain sig_tys env_tvs)		`thenTc_`
+    checkM (allDistinctTyVars sig_tys env_tvs)
+	   (complain sig_tys env_tvs)		`thenM_`
 
-    returnTc (map (tcGetTyVar "checkSigTyVars") sig_tys)
+    returnM (map (tcGetTyVar "checkSigTyVars") sig_tys)
 
   where
     complain sig_tys globals
       = -- "check" checks each sig tyvar in turn
-        foldlNF_Tc check
-		   (env2, emptyVarEnv, [])
-		   (tidy_tvs `zip` tidy_tys)	`thenNF_Tc` \ (env3, _, msgs) ->
+        foldlM check
+	       (env2, emptyVarEnv, [])
+	       (tidy_tvs `zip` tidy_tys)	`thenM` \ (env3, _, msgs) ->
 
         failWithTcM (env3, main_msg $$ nest 4 (vcat msgs))
       where
@@ -1102,13 +1100,13 @@ check_sig_tyvars extra_tvs sig_tvs
 		-- acc maps a zonked type variable back to a signature type variable
 	  = case tcGetTyVar_maybe ty of {
 	      Nothing ->			-- Error (a)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (quotes (ppr ty)) : msgs) ;
+			returnM (tidy_env, acc, unify_msg sig_tyvar (quotes (ppr ty)) : msgs) ;
 
 	      Just tv ->
 
 	    case lookupVarEnv acc tv of {
 		Just sig_tyvar' -> 	-- Error (b)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar thing : msgs)
+			returnM (tidy_env, acc, unify_msg sig_tyvar thing : msgs)
 		    where
 			thing = ptext SLIT("another quantified type variable") <+> quotes (ppr sig_tyvar')
 
@@ -1119,12 +1117,12 @@ check_sig_tyvars extra_tvs sig_tvs
 			-- Game plan: 
 			--       get the local TcIds and TyVars from the environment,
 			-- 	 and pass them to find_globals (they might have tv free)
-	    then   tcGetEnv 					`thenNF_Tc` \ ve ->
-        	   find_globals tv tidy_env  (tcLEnvElts ve)	`thenNF_Tc` \ (tidy_env1, globs) ->
-		   returnNF_Tc (tidy_env1, acc, escape_msg sig_tyvar tv globs : msgs)
+	    then   getLclEnvElts			`thenM` \ ve ->
+        	   find_globals tv tidy_env ve		`thenM` \ (tidy_env1, globs) ->
+		   returnM (tidy_env1, acc, escape_msg sig_tyvar tv globs : msgs)
 
 	    else 	-- All OK
-	    returnNF_Tc (tidy_env, extendVarEnv acc tv sig_tyvar, msgs)
+	    returnM (tidy_env, extendVarEnv acc tv sig_tyvar, msgs)
 	    }}
 \end{code}
 
@@ -1139,14 +1137,14 @@ check_sig_tyvars extra_tvs sig_tvs
 find_globals :: Var 
              -> TidyEnv 
              -> [TcTyThing] 
-             -> NF_TcM (TidyEnv, [SDoc])
+             -> TcM (TidyEnv, [SDoc])
 
 find_globals tv tidy_env things
   = go tidy_env [] things
   where
-    go tidy_env acc [] = returnNF_Tc (tidy_env, acc)
+    go tidy_env acc [] = returnM (tidy_env, acc)
     go tidy_env acc (thing : things)
-      = find_thing ignore_it tidy_env thing 	`thenNF_Tc` \ (tidy_env1, maybe_doc) ->
+      = find_thing ignore_it tidy_env thing 	`thenM` \ (tidy_env1, maybe_doc) ->
 	case maybe_doc of
 	  Just d  -> go tidy_env1 (d:acc) things
 	  Nothing -> go tidy_env1 acc     things
@@ -1154,22 +1152,22 @@ find_globals tv tidy_env things
     ignore_it ty = not (tv `elemVarSet` tyVarsOfType ty)
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId id)
-  = zonkTcType  (idType id)	`thenNF_Tc` \ id_ty ->
+find_thing ignore_it tidy_env (ATcId id _)
+  = zonkTcType  (idType id)	`thenM` \ id_ty ->
     if ignore_it id_ty then
-	returnNF_Tc (tidy_env, Nothing)
+	returnM (tidy_env, Nothing)
     else let
 	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
 	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
 		   nest 2 (parens (ptext SLIT("bound at") <+>
 			 	   ppr (getSrcLoc id)))]
     in
-    returnNF_Tc (tidy_env', Just msg)
+    returnM (tidy_env', Just msg)
 
 find_thing ignore_it tidy_env (ATyVar tv)
-  = zonkTcTyVar tv		`thenNF_Tc` \ tv_ty ->
+  = zonkTcTyVar tv		`thenM` \ tv_ty ->
     if ignore_it tv_ty then
-	returnNF_Tc (tidy_env, Nothing)
+	returnM (tidy_env, Nothing)
     else let
 	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
 	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
@@ -1181,7 +1179,7 @@ find_thing ignore_it tidy_env (ATyVar tv)
 	
 	bound_at = tyVarBindingInfo tv
     in
-    returnNF_Tc (tidy_env2, Just msg)
+    returnM (tidy_env2, Just msg)
 
 -----------------------
 escape_msg sig_tv tv globs
@@ -1206,9 +1204,9 @@ These two context are used with checkSigTyVars
     
 \begin{code}
 sigCtxt :: Id -> [TcTyVar] -> TcThetaType -> TcTauType
-	-> TidyEnv -> NF_TcM (TidyEnv, Message)
+	-> TidyEnv -> TcM (TidyEnv, Message)
 sigCtxt id sig_tvs sig_theta sig_tau tidy_env
-  = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
+  = zonkTcType sig_tau		`thenM` \ actual_tau ->
     let
 	(env1, tidy_sig_tvs)    = tidyOpenTyVars tidy_env sig_tvs
 	(env2, tidy_sig_rho)	= tidyOpenType env1 (mkPhiTy sig_theta sig_tau)
@@ -1219,5 +1217,5 @@ sigCtxt id sig_tvs sig_theta sig_tau tidy_env
  	msg = vcat [ptext SLIT("When trying to generalise the type inferred for") <+> quotes (ppr id),
 		    nest 4 sub_msg]
     in
-    returnNF_Tc (env3, msg)
+    returnM (env3, msg)
 \end{code}

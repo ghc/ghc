@@ -34,7 +34,7 @@ import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
-import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
+import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, eqType )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,

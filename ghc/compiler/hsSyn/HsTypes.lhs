@@ -12,7 +12,7 @@ module HsTypes (
 
 	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
 	, hsTyVarName, hsTyVarNames, replaceTyVarName
-	, getHsInstHead
+	, splitHsInstDeclTy
 	
 	-- Type place holder
 	, PostTcType, placeHolderType,
@@ -46,10 +46,10 @@ import Var		( TyVar, tyVarKind )
 import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
-import PrelNames	( mkTupConRdrName, listTyConKey, parrTyConKey,
+import PrelNames	( listTyConKey, parrTyConKey,
 			  usOnceTyConKey, usManyTyConKey, hasKey, unboundKey,
 			  usOnceTyConName, usManyTyConName )
-import SrcLoc		( builtinSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Util		( eqListBy, lengthIs )
 import FiniteMap
 import Outputable
@@ -81,7 +81,7 @@ type SyntaxName = Name		-- These names are filled in by the renamer
 placeHolderName :: SyntaxName
 placeHolderName = mkInternalName unboundKey 
 			(mkVarOcc FSLIT("syntaxPlaceHolder")) 
-			builtinSrcLoc
+			noSrcLoc
 \end{code}
 
 
@@ -116,7 +116,7 @@ data HsType name
 
   | HsPArrTy		(HsType name)	-- Elem. type of parallel array: [:t:]
 
-  | HsTupleTy		(HsTupCon name)
+  | HsTupleTy		HsTupCon
 			[HsType name]	-- Element types (length gives arity)
 
   | HsOpTy		(HsType name) (HsTyOp name) (HsType name)
@@ -153,18 +153,16 @@ hsUsOnce_Name = HsTyVar usOnceTyConName
 hsUsMany_Name = HsTyVar usManyTyConName
 
 -----------------------
-data HsTupCon name = HsTupCon name Boxity Arity
+data HsTupCon = HsTupCon Boxity Arity
 
-instance Eq name => Eq (HsTupCon name) where
-  (HsTupCon _ b1 a1) == (HsTupCon _ b2 a2) = b1==b2 && a1==a2
+instance Eq HsTupCon where
+  (HsTupCon b1 a1) == (HsTupCon b2 a2) = b1==b2 && a1==a2
    
-mkHsTupCon :: NameSpace -> Boxity -> [a] -> HsTupCon RdrName
-mkHsTupCon space boxity args = HsTupCon (mkTupConRdrName space boxity arity) boxity arity
-			     where
-			       arity = length args
+mkHsTupCon :: NameSpace -> Boxity -> [a] -> HsTupCon
+mkHsTupCon space boxity args = HsTupCon boxity (length args)
 
-hsTupParens :: HsTupCon name -> SDoc -> SDoc
-hsTupParens (HsTupCon _ b _) p = tupleParens b p
+hsTupParens :: HsTupCon -> SDoc -> SDoc
+hsTupParens (HsTupCon b _) p = tupleParens b p
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -211,23 +209,41 @@ replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
 
 
 \begin{code}
-getHsInstHead :: HsType name -> ([HsTyVarBndr name], (name, [HsType name]))
-	-- Split up an instance decl type, returning the 'head' part
+splitHsInstDeclTy 
+    :: Outputable name
+    => HsType name 
+    -> ([HsTyVarBndr name], HsContext name, name, [HsType name])
+	-- Split up an instance decl type, returning the pieces
 
--- In interface fiels, the type of the decl is held like this:
---	forall a. Foo a -> Baz (T a)
--- so we have to strip off function argument types,
--- as well as the bit before the '=>' (which is always 
--- empty in interface files)
---
--- The parser ensures the type will have the right shape.
+-- In interface files, the instance declaration head is created
+-- by HsTypes.toHsType, which does not guarantee to produce a
+-- HsForAllTy.  For example, if we had the weird decl
+--	instance Foo T => Foo [T]
+-- then we'd get the instance type
+--	Foo T -> Foo [T]
+-- So when colleting the instance context, to be on the safe side
+-- we gather predicate arguments
+-- 
+-- For source code, the parser ensures the type will have the right shape.
 -- (e.g. see ParseUtil.checkInstType)
 
-getHsInstHead  (HsForAllTy (Just tvs) _ tau) = (tvs, get_head1 tau)
-getHsInstHead  tau			     = ([],  get_head1 tau)
+splitHsInstDeclTy inst_ty
+  = case inst_ty of
+	HsForAllTy (Just tvs) cxt1 tau 
+	      -> (tvs, cxt1++cxt2, cls, tys)
+	      where
+		 (cxt2, cls, tys) = split_tau tau
 
-get_head1 (HsFunTy _ ty)		= get_head1 ty
-get_head1 (HsPredTy (HsClassP cls tys)) = (cls,tys)
+	other -> ([],  cxt2,  cls, tys)
+	      where
+		 (cxt2, cls, tys) = split_tau inst_ty
+
+  where
+    split_tau (HsFunTy (HsPredTy p) ty)	= (p:ps, cls, tys)
+					where
+					  (ps, cls, tys) = split_tau ty
+    split_tau (HsPredTy (HsClassP cls tys)) = ([], cls,tys)
+    split_tau other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 \end{code}
 
 
@@ -409,7 +425,7 @@ toHsType (SourceTy pred)	   = HsPredTy (toHsPred pred)
 
 toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
   | not saturated	       = generic_case
-  | isTupleTyCon tc	       = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc) (tyConArity tc)) tys'
+  | isTupleTyCon tc	       = HsTupleTy (HsTupCon (tupleTyConBoxity tc) (tyConArity tc)) tys'
   | tc `hasKey` listTyConKey   = HsListTy (head tys')
   | tc `hasKey` parrTyConKey   = HsPArrTy (head tys')
   | tc `hasKey` usOnceTyConKey = hsUsOnce_Name		 -- must print !, . unqualified

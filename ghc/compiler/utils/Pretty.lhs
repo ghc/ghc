@@ -1017,7 +1017,8 @@ pprCols = (100 :: Int) -- could make configurable
 
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc mode hdl doc
-  = fullRender mode pprCols 1.5 put done doc
+  = do { fullRender mode pprCols 1.5 put done doc ;
+	 hFlush hdl }
   where
     put (Chr c)  next = hPutChar hdl c >> next 
     put (Str s)  next = hPutStr  hdl s >> next 

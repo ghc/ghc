@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.11 2000/12/19 12:36:12 sewardj Exp $
+-- $Id: Interpreter.hs,v 1.12 2002/09/13 15:02:35 simonpj Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -12,12 +12,7 @@ module Interpreter (
 	module ByteCodeGen,
 	module Linker
 #else
-    ClosureEnv, emptyClosureEnv, 
-    ItblEnv, emptyItblEnv,
-    byteCodeGen,
-    HValue,
-    UnlinkedBCO, UnlinkedBCOExpr,
-    loadObjs, resolveObjs,
+
 #endif
   ) where
 
@@ -38,8 +33,7 @@ import Outputable
 -- NO!  No interpreter; generate stubs for all the bits
 -- ------------------------------------------------------------
 
-type ClosureEnv = ()
-emptyClosureEnv = ()
+extendLinkEnv xs = return ()
 
 type ItblEnv = ()
 emptyItblEnv = ()

@@ -5,7 +5,7 @@
 -- 
 -- Binary interface file support.
 
-module BinIface ( writeBinIface ) where
+module BinIface ( writeBinIface, readBinIface ) where
 
 #include "HsVersions.h"
 
@@ -16,26 +16,62 @@ import HsTypes
 import HsCore
 import HsDecls
 import HsBinds
+import HsPat		( HsConDetails(..) )
 import TyCon
 import Class
 import VarEnv
 import CostCentre
-import Name		( Name, nameOccName )
+import RdrName		( mkRdrUnqual, mkRdrQual )
+import Name		( Name, nameOccName, nameModule_maybe )
 import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts )
+import Module		( moduleName )
 import OccName		( OccName )
-import RnMonad		( ParsedIface(..) )
 import RnHsSyn
 import DriverState	( v_Build_tag )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion )
-import StringBuffer	( hGetStringBuffer )
 import Panic
 import SrcLoc
 import Binary
 
 import DATA_IOREF	( readIORef )
 import EXCEPTION	( throwDyn )
-
 import Monad		( when )
+
+#include "HsVersions.h"
+
+-- ---------------------------------------------------------------------------
+-- We write out a ModIface, but read it in as a ParsedIface.
+-- There are some big differences, and some subtle ones.  We do most
+-- of the conversion on the way out, so there is minimal fuss when we
+-- read it back in again (see RnMonad.lhs)
+
+-- The main difference is that all Names in a ModIface are RdrNames in
+-- a ParsedIface, so when writing out a Name in binary we make sure it
+-- is binary-compatible with a RdrName.
+
+-- Other subtle differences: 
+--	- pi_mod is a ModuleName, but mi_mod is a Module.  Hence we put
+--	  Modules as ModuleNames.
+--	- pi_exports and pi_usages, Names have
+-- 	  to be converted to OccNames.
+--	- pi_fixity is a NameEnv in ModIface,
+-- 	  but a list of (Name,Fixity) pairs in ParsedIface.
+--	- versioning is totally different.
+--	- deprecations are different.
+
+writeBinIface :: FilePath -> ModIface -> IO ()
+writeBinIface hi_path mod_iface
+  = putBinFileWithDict hi_path (mi_module mod_iface) mod_iface
+
+readBinIface :: FilePath -> IO ParsedIface
+readBinIface hi_path = getBinFileWithDict hi_path
+
+
+-- %*********************************************************
+-- %*						 	    *
+-- 		All the Binary instances
+-- %*							    *
+-- %*********************************************************
 
 -- BasicTypes
 {-! for IPName derive: Binary !-}
@@ -45,6 +81,20 @@ import Monad		( when )
 {-! for Boxity derive: Binary !-}
 {-! for StrictnessMark derive: Binary !-}
 {-! for Activation derive: Binary !-}
+
+instance Binary Name where
+  -- we must print these as RdrNames, because that's how they will be read in
+  put_ bh name
+   = case nameModule_maybe name of
+       Just mod
+	  | this_mod == mod -> put_ bh (mkRdrUnqual occ)
+	  | otherwise       -> put_ bh (mkRdrQual (moduleName mod) occ)
+       _ 		    -> put_ bh (mkRdrUnqual occ)
+    where
+      occ 	       = nameOccName name
+      (this_mod,_,_,_) = getUserData bh
+
+  get bh = error "can't Binary.get a Name"    
 
 -- NewDemand
 {-! for Demand derive: Binary !-}
@@ -81,7 +131,7 @@ instance Binary DmdType where
 {-! for ConDetails derive: Binary !-}
 {-! for BangType derive: Binary !-}
 
-instance (Binary name) => Binary (TyClDecl name pat) where
+instance (Binary name) => Binary (TyClDecl name) where
     put_ bh (IfaceSig name ty idinfo _) = do
 	    putByte bh 0
 	    put_ bh name
@@ -89,7 +139,7 @@ instance (Binary name) => Binary (TyClDecl name pat) where
 	    lazyPut bh idinfo
     put_ bh (ForeignType ae af ag ah) = 
 	error "Binary.put_(TyClDecl): ForeignType"
-    put_ bh (TyData ai aj ak al am an ao _) = do
+    put_ bh (TyData ai aj ak al am _ (Just generics) _) = do
 	    putByte bh 2
 	    put_ bh ai
 	    put_ bh aj
@@ -97,13 +147,13 @@ instance (Binary name) => Binary (TyClDecl name pat) where
 	    put_ bh al
 	    put_ bh am
 	    -- ignore Derivs
-	    put_ bh ao -- store the SysNames for now (later: derive them)
+	    put_ bh generics -- Record whether generics needed or not
     put_ bh (TySynonym aq ar as _) = do
 	    putByte bh 3
 	    put_ bh aq
 	    put_ bh ar
 	    put_ bh as
-    put_ bh c@(ClassDecl ctxt nm tyvars fds sigs _ sysnames _) = do
+    put_ bh c@(ClassDecl ctxt nm tyvars fds sigs _ _) = do
 	    putByte bh 4
 	    put_ bh ctxt
 	    put_ bh nm
@@ -111,7 +161,6 @@ instance (Binary name) => Binary (TyClDecl name pat) where
 	    put_ bh fds
 	    put_ bh sigs
 		-- ignore methods (there should be none)
-	    put_ bh sysnames
 		-- ignore SrcLoc
     get bh = do
 	    h <- getByte bh
@@ -130,9 +179,9 @@ instance (Binary name) => Binary (TyClDecl name pat) where
 		    nm     <- get bh
 		    tyvars <- get bh
 		    cons   <- get bh
-		    sysnames <- get bh
+		    generics <- get bh
 		    return (TyData n_or_d ctx nm tyvars cons 
-				Nothing sysnames noSrcLoc)
+				Nothing (Just generics) noSrcLoc)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
@@ -144,27 +193,24 @@ instance (Binary name) => Binary (TyClDecl name pat) where
 		    tyvars <- get bh
 		    fds <- get bh
 		    sigs <- get bh
-		    sysnames <- get bh
 		    return (ClassDecl ctxt nm tyvars fds sigs 
-				Nothing sysnames noSrcLoc)
+				      Nothing noSrcLoc)
 
 instance (Binary name) => Binary (ConDecl name) where
-    put_ bh (ConDecl aa ab ac ad ae _) = do
+    put_ bh (ConDecl aa ac ad ae _) = do
 	    put_ bh aa
-	    put_ bh ab
 	    put_ bh ac
 	    put_ bh ad
 	    put_ bh ae
 		-- ignore SrcLoc
     get bh = do
 	  aa <- get bh
-	  ab <- get bh
 	  ac <- get bh
 	  ad <- get bh
 	  ae <- get bh
-	  return (ConDecl aa ab ac ad ae noSrcLoc)
+	  return (ConDecl aa ac ad ae noSrcLoc)
 
-instance (Binary name) => Binary (InstDecl name pat) where
+instance (Binary name) => Binary (InstDecl name) where
     put_ bh (InstDecl aa _ _ ad _) = do
 	    put_ bh aa
 		-- ignore MonoBinds
@@ -176,7 +222,7 @@ instance (Binary name) => Binary (InstDecl name pat) where
 	  ad <- get bh
 	  return (InstDecl aa EmptyMonoBinds [{-no sigs-}] ad noSrcLoc)
 
-instance (Binary name) => Binary (RuleDecl name pat) where
+instance (Binary name) => Binary (RuleDecl name) where
     put_ bh (IfaceRule ag ah ai aj ak al _) = do
 	    put_ bh ag
 	    put_ bh ah
@@ -217,27 +263,7 @@ instance Binary name => Binary (Sig name) where
 {-! for IsDupdCC derive: Binary !-}
 {-! for CostCentre derive: Binary !-}
 
--- ---------------------------------------------------------------------------
--- HscTypes
 
--- NB. we write out a ModIface, but read it in as a ParsedIface.
--- There are some big differences, and some subtle ones.  We do most
--- of the conversion on the way out, so there is minimal fuss when we
--- read it back in again (see RnMonad.lhs)
-
--- The main difference is that all Names in a ModIface are RdrNames in
--- a ParsedIface, so when writing out a Name in binary we make sure it
--- is binary-compatible with a RdrName.
-
--- Other subtle differences: 
---	- pi_mod is a ModuleName, but mi_mod is a Module.  Hence we put
---	  Modules as ModuleNames.
---	- pi_exports and pi_usages, Names have
--- 	  to be converted to OccNames.
---	- pi_fixity is a NameEnv in ModIface,
--- 	  but a list of (Name,Fixity) pairs in ParsedIface.
---	- versioning is totally different.
---	- deprecations are different.
 
 instance Binary ModIface where
   put_ bh iface =  do
@@ -363,13 +389,6 @@ instance Binary ParsedIface where
 		 pi_insts = reverse insts,
 		 pi_rules = rules,
 		 pi_deprecs = deprecs })
-
--- ----------------------------------------------------------------------------
--- Writing a binary interface
-
-writeBinIface :: FilePath -> ModIface -> IO ()
-writeBinIface hi_path mod_iface =
-  putBinFileWithDict hi_path (mi_module mod_iface) mod_iface
 
 -- ----------------------------------------------------------------------------
 {-* Generated by DrIFT-v1.0 : Look, but Don't Touch. *-}
@@ -500,6 +519,15 @@ instance Binary Fixity where
 	  ab <- get bh
 	  return (Fixity aa ab)
 
+instance (Binary name) => Binary (FixitySig name) where
+    put_ bh (FixitySig aa ab _) = do
+	    put_ bh aa
+	    put_ bh ab
+    get bh = do
+	  aa <- get bh
+	  ab <- get bh
+	  return (FixitySig aa ab noSrcLoc)
+
 instance (Binary name) => Binary (IPName name) where
     put_ bh (Dupable aa) = do
 	    putByte bh 0
@@ -604,16 +632,14 @@ instance (Binary name) => Binary (HsTyVarBndr name) where
 		      ac <- get bh
 		      return (IfaceTyVar ab ac)
 
-instance (Binary name) => Binary (HsTupCon name) where
-    put_ bh (HsTupCon aa ab ac) = do
-	    put_ bh aa
+instance Binary HsTupCon where
+    put_ bh (HsTupCon ab ac) = do
 	    put_ bh ab
 	    put_ bh ac
     get bh = do
-	  aa <- get bh
 	  ab <- get bh
 	  ac <- get bh
-	  return (HsTupCon aa ab ac)
+	  return (HsTupCon ab ac)
 
 instance (Binary name) => Binary (HsTyOp name) where
     put_ bh HsArrow    = putByte bh 0
@@ -927,8 +953,8 @@ instance (Binary name) => Binary (BangType name) where
 	  ab <- get bh
 	  return (BangType aa ab)
 
-instance (Binary name) => Binary (ConDetails name) where
-    put_ bh (VanillaCon aa) = do
+instance (Binary name, Binary arg) => Binary (HsConDetails name arg) where
+    put_ bh (PrefixCon aa) = do
 	    putByte bh 0
 	    put_ bh aa
     put_ bh (InfixCon ab ac) = do
@@ -942,7 +968,7 @@ instance (Binary name) => Binary (ConDetails name) where
 	    h <- getByte bh
 	    case h of
 	      0 -> do aa <- get bh
-		      return (VanillaCon aa)
+		      return (PrefixCon aa)
 	      1 -> do ab <- get bh
 		      ac <- get bh
 		      return (InfixCon ab ac)
@@ -1028,5 +1054,3 @@ instance Binary CostCentre where
 		      return (NormalCC aa ab ac ad)
 	      _ -> do ae <- get bh
 		      return (AllCafsCC ae)
-
-

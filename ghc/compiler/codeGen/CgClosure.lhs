@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.57 2002/04/29 14:03:41 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.58 2002/09/13 15:02:27 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 

@@ -25,7 +25,7 @@ module IdInfo (
 
 	-- New demand and strictness info
  	newStrictnessInfo, setNewStrictnessInfo, 
-  	newDemandInfo, setNewDemandInfo,
+  	newDemandInfo, setNewDemandInfo, pprNewStrictness,
 
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
@@ -94,12 +94,12 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
-import Type		( usOnce, usMany )
+import Type		( usOnce )
 import Demand		hiding( Demand, seqDemand )
 import qualified Demand
 import NewDemand
 import Outputable	
-import Util		( seqList, listLengthCmp )
+import Util		( listLengthCmp )
 import Maybe		( isJust )
 import List		( replicate )
 
@@ -152,6 +152,9 @@ setAllStrictnessInfo info (Just sig)
 
 seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
+
+pprNewStrictness Nothing = empty
+pprNewStrictness (Just sig) = ftext FSLIT("Str:") <+> ppr sig
 
 #ifdef OLD_STRICTNESS
 oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo

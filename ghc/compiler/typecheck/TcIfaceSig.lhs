@@ -5,7 +5,6 @@
 
 \begin{code}
 module TcIfaceSig ( tcInterfaceSigs,
-                    tcDelay,
 		    tcVar,
 		    tcCoreExpr,
 		    tcCoreLamBndrs,
@@ -13,16 +12,16 @@ module TcIfaceSig ( tcInterfaceSigs,
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..), HsTupCon(..) )
+import HsSyn		( CoreDecl(..), TyClDecl(..), HsTupCon(..) )
 import TcHsSyn		( TypecheckedCoreBind )
-import TcMonad
+import TcRnMonad
 import TcMonoType	( tcIfaceType )
-import TcEnv		( RecTcEnv, tcExtendTyVarEnv, 
-			  tcExtendGlobalValEnv, tcSetEnv, tcEnvIds,
+import TcEnv		( RecTcGblEnv, tcExtendTyVarEnv, 
+			  tcExtendGlobalValEnv, 
 			  tcLookupGlobal_maybe, tcLookupRecId_maybe
 			)
 
-import RnHsSyn		( RenamedTyClDecl )
+import RnHsSyn		( RenamedCoreDecl, RenamedTyClDecl )
 import HsCore
 import Literal		( Literal(..) )
 import CoreSyn
@@ -31,17 +30,16 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkVanillaGlobal, mkLocalId, idName, isDataConWrapId_maybe )
-import Module		( Module )
+import Id		( Id, mkVanillaGlobal, mkLocalId, isDataConWrapId_maybe )
 import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons, tyConTyVars )
 import DataCon		( DataCon, dataConWorkId, dataConExistentialTyVars, dataConArgTys )
-import Type		( Type, mkTyVarTys, splitTyConApp )
+import Type		( mkTyVarTys, splitTyConApp )
 import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
-import Name		( Name, nameIsLocalOrFrom )
-import ErrUtils		( pprBagOfErrors )
+import Name		( Name )
+import UniqSupply	( initUs_ )
 import Outputable	
 import Util		( zipWithEqual, dropList, equalLength )
 import HscTypes		( TyThing(..) )
@@ -55,17 +53,18 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: RecTcEnv		-- Envt to use when checking unfoldings
-		-> Module		-- This module
+tcInterfaceSigs :: RecTcGblEnv		-- Envt to use when checking unfoldings
 		-> [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM [Id]
 		
 
-tcInterfaceSigs unf_env mod decls
-  = listTc [ do_one name ty id_infos src_loc
-	   | IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
+tcInterfaceSigs unf_env decls
+  = sequenceM [ do_one name ty id_infos src_loc
+	      | IfaceSig {tcdName = name, tcdType = ty, 
+			  tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
   where
-    in_scope_vars = filter (nameIsLocalOrFrom mod . idName) (tcEnvIds unf_env)
+    in_scope_vars = []
+--    in_scope_vars = filter (nameIsLocalOrFrom mod . idName) (tcEnvIds unf_env)
 		-- Oops: using isLocalId instead can give a black hole
 		-- because it looks at the idinfo
 
@@ -75,29 +74,29 @@ tcInterfaceSigs unf_env mod decls
 	-- if -dcore-lint is on.
 
     do_one name ty id_infos src_loc
-      = tcAddSrcLoc src_loc 		 		$	
-	tcAddErrCtxt (ifaceSigCtxt name)		$
-	tcIfaceType ty					`thenTc` \ sigma_ty ->
+      = addSrcLoc src_loc 		 		$	
+	addErrCtxt (ifaceSigCtxt name)		$
+	tcIfaceType ty					`thenM` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
-		 sigma_ty id_infos			`thenTc` \ id_info ->
-	returnTc (mkVanillaGlobal name sigma_ty id_info)
+		 sigma_ty id_infos			`thenM` \ id_info ->
+	returnM (mkVanillaGlobal name sigma_ty id_info)
 \end{code}
 
 \begin{code}
 tcIdInfo unf_env in_scope_vars name ty info_ins
-  = foldlTc tcPrag init_info info_ins 
+  = foldlM tcPrag init_info info_ins 
   where
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
     init_info = hasCafIdInfo
 
-    tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
+    tcPrag info (HsNoCafRefs)   = returnM (info `setCafInfo`	 NoCafRefs)
 
     tcPrag info (HsArity arity) = 
-	returnTc (info `setArityInfo` arity)
+	returnM (info `setArityInfo` arity)
 
     tcPrag info (HsUnfold inline_prag expr)
-	= tcPragExpr unf_env name in_scope_vars expr 	`thenNF_Tc` \ maybe_expr' ->
+	= tcPragExpr unf_env name in_scope_vars expr 	`thenM` \ maybe_expr' ->
 	  let
 		-- maybe_expr doesn't get looked at if the unfolding
 		-- is never inspected; so the typecheck doesn't even happen
@@ -107,10 +106,10 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
 		info1 = info `setUnfoldingInfo` unfold_info
 		info2 = info1 `setInlinePragInfo` inline_prag
 	  in
-	  returnTc info2
+	  returnM info2
 
     tcPrag info (HsStrictness strict_info)
-	= returnTc (info `setAllStrictnessInfo` Just strict_info)
+	= returnM (info `setAllStrictnessInfo` Just strict_info)
 
     tcPrag info (HsWorker nm arity)
 	= tcWorkerInfo unf_env ty info nm arity
@@ -118,8 +117,10 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
 
 \begin{code}
 tcWorkerInfo unf_env ty info worker_name arity
-  = uniqSMToTcM (mkWrapper ty strict_sig) `thenNF_Tc` \ wrap_fn ->
+  = newUniqueSupply			`thenM` \ us ->
     let
+	wrap_fn = initUs_ us (mkWrapper ty strict_sig)
+
 	-- Watch out! We can't pull on unf_env too eagerly!
 	info' = case tcLookupRecId_maybe unf_env worker_name of
 		  Just worker_id -> 
@@ -127,9 +128,9 @@ tcWorkerInfo unf_env ty info worker_name arity
 		         `setWorkerInfo`     HasWorker worker_id arity
 
     		  Nothing -> pprTrace "tcWorkerInfo failed:" 
-				(ppr worker_name) info
+				      (ppr worker_name) info
     in
-    returnTc info'
+    returnM info'
   where
     	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....
@@ -143,31 +144,19 @@ an unfolding that isn't going to be looked at.
 
 \begin{code}
 tcPragExpr unf_env name in_scope_vars expr
-  = tcDelay unf_env doc Nothing $
-	tcCoreExpr expr		`thenTc` \ core_expr' ->
+  = forkM doc $
+    setGblEnv unf_env $
+
+    tcCoreExpr expr		`thenM` \ core_expr' ->
 
 		-- Check for type consistency in the unfolding
-	tcGetSrcLoc		`thenNF_Tc` \ src_loc -> 
-	getDOptsTc		`thenNF_Tc` \ dflags ->
-	case lintUnfolding dflags src_loc in_scope_vars core_expr' of
-	  (Nothing,_)       -> returnTc (Just core_expr')  -- ignore warnings
+    getSrcLocM		`thenM` \ src_loc -> 
+    getDOpts		`thenM` \ dflags ->
+    case lintUnfolding dflags src_loc in_scope_vars core_expr' of
+	  (Nothing,_)       -> returnM core_expr'  -- ignore warnings
 	  (Just fail_msg,_) -> failWithTc ((doc <+> text "failed Lint") $$ fail_msg)
   where
     doc = text "unfolding of" <+> ppr name
-
-tcDelay :: RecTcEnv -> SDoc -> a -> TcM a -> NF_TcM a
-tcDelay unf_env doc bad_ans thing_inside
-  = forkNF_Tc (
-	recoverNF_Tc bad_value (
-		tcSetEnv unf_env thing_inside
-    ))			
-  where
-	-- The trace tells what wasn't available, for the benefit of
-	-- compiler hackers who want to improve it!
-    bad_value = getErrsTc		`thenNF_Tc` \ (warns,errs) ->
-		returnNF_Tc (pprTrace "Failed:" 
-				   	 (hang doc 4 (pprBagOfErrors errs))
-					 bad_ans)
 \end{code}
 
 
@@ -179,9 +168,9 @@ Variables in unfoldings
 \begin{code}
 tcVar :: Name -> TcM Id
 tcVar name
-  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
+  = tcLookupGlobal_maybe name	`thenM` \ maybe_id ->
     case maybe_id of {
-	Just (AnId id)	-> returnTc id ;
+	Just (AnId id)	-> returnM id ;
 	Nothing		-> failWithTc (noDecl name)
     }
 
@@ -194,87 +183,87 @@ UfCore expressions.
 tcCoreExpr :: UfExpr Name -> TcM CoreExpr
 
 tcCoreExpr (UfType ty)
-  = tcIfaceType ty		`thenTc` \ ty' ->
+  = tcIfaceType ty		`thenM` \ ty' ->
 	-- It might not be of kind type
-    returnTc (Type ty')
+    returnM (Type ty')
 
 tcCoreExpr (UfVar name)
-  = tcVar name 	`thenTc` \ id ->
-    returnTc (Var id)
+  = tcVar name 	`thenM` \ id ->
+    returnM (Var id)
 
 tcCoreExpr (UfLit lit)
-  = returnTc (Lit lit)
+  = returnM (Lit lit)
 
 -- The dreaded lit-lits are also similar, except here the type
 -- is read in explicitly rather than being implicit
 tcCoreExpr (UfLitLit lit ty)
-  = tcIfaceType ty		`thenTc` \ ty' ->
-    returnTc (Lit (MachLitLit lit ty'))
+  = tcIfaceType ty		`thenM` \ ty' ->
+    returnM (Lit (MachLitLit lit ty'))
 
 tcCoreExpr (UfFCall cc ty)
-  = tcIfaceType ty 	`thenTc` \ ty' ->
-    tcGetUnique		`thenNF_Tc` \ u ->
-    returnTc (Var (mkFCallId u cc ty'))
+  = tcIfaceType ty 	`thenM` \ ty' ->
+    newUnique		`thenM` \ u ->
+    returnM (Var (mkFCallId u cc ty'))
 
-tcCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
-  = mapTc tcCoreExpr args	`thenTc` \ args' ->
+tcCoreExpr (UfTuple (HsTupCon boxity arity) args) 
+  = mappM tcCoreExpr args	`thenM` \ args' ->
     let
 	-- Put the missing type arguments back in
 	con_args = map (Type . exprType) args' ++ args'
     in
-    returnTc (mkApps (Var con_id) con_args)
+    returnM (mkApps (Var con_id) con_args)
   where
     con_id = dataConWorkId (tupleCon boxity arity)
     
 
 tcCoreExpr (UfLam bndr body)
   = tcCoreLamBndr bndr 		$ \ bndr' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Lam bndr' body')
+    tcCoreExpr body		`thenM` \ body' ->
+    returnM (Lam bndr' body')
 
 tcCoreExpr (UfApp fun arg)
-  = tcCoreExpr fun		`thenTc` \ fun' ->
-    tcCoreExpr arg		`thenTc` \ arg' ->
-    returnTc (App fun' arg')
+  = tcCoreExpr fun		`thenM` \ fun' ->
+    tcCoreExpr arg		`thenM` \ arg' ->
+    returnM (App fun' arg')
 
 tcCoreExpr (UfCase scrut case_bndr alts) 
-  = tcCoreExpr scrut					`thenTc` \ scrut' ->
+  = tcCoreExpr scrut					`thenM` \ scrut' ->
     let
 	scrut_ty = exprType scrut'
 	case_bndr' = mkLocalId case_bndr scrut_ty
     in
     tcExtendGlobalValEnv [case_bndr']	$
-    mapTc (tcCoreAlt scrut_ty) alts	`thenTc` \ alts' ->
-    returnTc (Case scrut' case_bndr' alts')
+    mappM (tcCoreAlt scrut_ty) alts	`thenM` \ alts' ->
+    returnM (Case scrut' case_bndr' alts')
 
 tcCoreExpr (UfLet (UfNonRec bndr rhs) body)
-  = tcCoreExpr rhs		`thenTc` \ rhs' ->
+  = tcCoreExpr rhs		`thenM` \ rhs' ->
     tcCoreValBndr bndr 		$ \ bndr' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Let (NonRec bndr' rhs') body')
+    tcCoreExpr body		`thenM` \ body' ->
+    returnM (Let (NonRec bndr' rhs') body')
 
 tcCoreExpr (UfLet (UfRec pairs) body)
   = tcCoreValBndrs bndrs	$ \ bndrs' ->
-    mapTc tcCoreExpr rhss	`thenTc` \ rhss' ->
-    tcCoreExpr body		`thenTc` \ body' ->
-    returnTc (Let (Rec (bndrs' `zip` rhss')) body')
+    mappM tcCoreExpr rhss	`thenM` \ rhss' ->
+    tcCoreExpr body		`thenM` \ body' ->
+    returnM (Let (Rec (bndrs' `zip` rhss')) body')
   where
     (bndrs, rhss) = unzip pairs
 
 tcCoreExpr (UfNote note expr) 
-  = tcCoreExpr expr		`thenTc` \ expr' ->
+  = tcCoreExpr expr		`thenM` \ expr' ->
     case note of
-	UfCoerce to_ty -> tcIfaceType to_ty	`thenTc` \ to_ty' ->
-			  returnTc (Note (Coerce to_ty'
+	UfCoerce to_ty -> tcIfaceType to_ty	`thenM` \ to_ty' ->
+			  returnM (Note (Coerce to_ty'
                                                  (exprType expr')) expr')
-	UfInlineCall   -> returnTc (Note InlineCall expr')
-	UfInlineMe     -> returnTc (Note InlineMe   expr')
-	UfSCC cc       -> returnTc (Note (SCC cc)   expr')
+	UfInlineCall   -> returnM (Note InlineCall expr')
+	UfInlineMe     -> returnM (Note InlineMe   expr')
+	UfSCC cc       -> returnM (Note (SCC cc)   expr')
 \end{code}
 
 \begin{code}
 tcCoreLamBndr (UfValBinder name ty) thing_inside
-  = tcIfaceType ty		`thenTc` \ ty' ->
+  = tcIfaceType ty		`thenM` \ ty' ->
     let
 	id = mkLocalId name ty'
     in
@@ -294,7 +283,7 @@ tcCoreLamBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 tcCoreValBndr (UfValBinder name ty) thing_inside
-  = tcIfaceType ty			`thenTc` \ ty' ->
+  = tcIfaceType ty			`thenM` \ ty' ->
     let
 	id = mkLocalId name ty'
     in
@@ -302,7 +291,7 @@ tcCoreValBndr (UfValBinder name ty) thing_inside
     thing_inside id
     
 tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
-  = mapTc tcIfaceType tys		`thenTc` \ tys' ->
+  = mappM tcIfaceType tys		`thenM` \ tys' ->
     let
 	ids = zipWithEqual "tcCoreValBndr" mkLocalId names tys'
     in
@@ -316,25 +305,25 @@ tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
 \begin{code}
 tcCoreAlt scrut_ty (UfDefault, names, rhs)
   = ASSERT( null names )
-    tcCoreExpr rhs		`thenTc` \ rhs' ->
-    returnTc (DEFAULT, [], rhs')
+    tcCoreExpr rhs		`thenM` \ rhs' ->
+    returnM (DEFAULT, [], rhs')
   
 tcCoreAlt scrut_ty (UfLitAlt lit, names, rhs)
   = ASSERT( null names )
-    tcCoreExpr rhs		`thenTc` \ rhs' ->
-    returnTc (LitAlt lit, [], rhs')
+    tcCoreExpr rhs		`thenM` \ rhs' ->
+    returnM (LitAlt lit, [], rhs')
 
 tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
   = ASSERT( null names )
-    tcCoreExpr rhs		`thenTc` \ rhs' ->
-    tcIfaceType ty		`thenTc` \ ty' ->
-    returnTc (LitAlt (MachLitLit str ty'), [], rhs')
+    tcCoreExpr rhs		`thenM` \ rhs' ->
+    tcIfaceType ty		`thenM` \ ty' ->
+    returnM (LitAlt (MachLitLit str ty'), [], rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
 tcCoreAlt scrut_ty alt@(con, names, rhs)
-  = tcConAlt con	`thenTc` \ con ->
+  = tcConAlt con	`thenM` \ con ->
     let
 	ex_tyvars  	  = dataConExistentialTyVars con
 	(tycon, inst_tys) = splitTyConApp scrut_ty	-- NB: not tcSplitTyConApp
@@ -357,17 +346,17 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
     ASSERT( con `elem` tyConDataCons tycon && equalLength inst_tys main_tyvars )
     tcExtendTyVarEnv ex_tyvars'			$
     tcExtendGlobalValEnv arg_ids		$
-    tcCoreExpr rhs					`thenTc` \ rhs' ->
-    returnTc (DataAlt con, ex_tyvars' ++ arg_ids, rhs')
+    tcCoreExpr rhs					`thenM` \ rhs' ->
+    returnM (DataAlt con, ex_tyvars' ++ arg_ids, rhs')
 
 
 tcConAlt :: UfConAlt Name -> TcM DataCon
-tcConAlt (UfTupleAlt (HsTupCon _ boxity arity))
-  = returnTc (tupleCon boxity arity)
+tcConAlt (UfTupleAlt (HsTupCon boxity arity))
+  = returnM (tupleCon boxity arity)
 
 tcConAlt (UfDataAlt con_name)
-  = tcVar con_name	`thenTc` \ con_id ->
-    returnTc (case isDataConWrapId_maybe con_id of
+  = tcVar con_name	`thenM` \ con_id ->
+    returnM (case isDataConWrapId_maybe con_id of
 		    Just con -> con
 		    Nothing  -> pprPanic "tcCoreAlt" (ppr con_id))
 \end{code}
@@ -380,21 +369,21 @@ tcConAlt (UfDataAlt con_name)
 
 
 \begin{code}
-tcCoreBinds :: [RenamedTyClDecl] -> TcM [TypecheckedCoreBind]
+tcCoreBinds :: [RenamedCoreDecl] -> TcM [TypecheckedCoreBind]
 -- We don't assume the bindings are in dependency order
 -- So first build the environment, then check the RHSs
-tcCoreBinds ls = mapTc tcCoreBinder ls		`thenTc` \ bndrs ->
+tcCoreBinds ls = mappM tcCoreBinder ls		`thenM` \ bndrs ->
 		 tcExtendGlobalValEnv bndrs	$
-		 mapTc tcCoreBind ls
+		 mappM tcCoreBind ls
 
-tcCoreBinder (CoreDecl { tcdName = nm, tcdType = ty })
- = tcIfaceType ty   `thenTc` \ ty' ->
-   returnTc (mkLocalId nm ty')
+tcCoreBinder (CoreDecl nm ty _ _)
+ = tcIfaceType ty   `thenM` \ ty' ->
+   returnM (mkLocalId nm ty')
 
-tcCoreBind (CoreDecl { tcdName = nm, tcdRhs = rhs })
- = tcVar nm		`thenTc` \ id ->
-   tcCoreExpr rhs	`thenTc` \ rhs' ->
-   returnTc (id, rhs')
+tcCoreBind (CoreDecl nm _ rhs _)
+ = tcVar nm		`thenM` \ id ->
+   tcCoreExpr rhs	`thenM` \ rhs' ->
+   returnM (id, rhs')
 \end{code}
 
 

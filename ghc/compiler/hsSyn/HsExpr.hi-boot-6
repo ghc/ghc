@@ -1,14 +1,14 @@
 module HsExpr where
 
-data HsExpr i p
-data Match a b
-data GRHSs a b
+data HsExpr i
+data Match a
+data GRHSs a
 
-pprExpr :: (Outputable.Outputable i, Outputable.Outputable p) => 
-	HsExpr.HsExpr i p -> Outputable.SDoc
+pprExpr :: (Outputable.OutputableBndr i) => 
+	HsExpr.HsExpr i -> Outputable.SDoc
 
-pprPatBind :: (Outputable.Outputable i, Outputable.Outputable p) => 
-	p -> HsExpr.GRHSs i p -> Outputable.SDoc
+pprPatBind :: (Outputable.OutputableBndr i) => 
+	HsPat.Pat i -> HsExpr.GRHSs i -> Outputable.SDoc
 
-pprFunBind :: (Outputable.Outputable i, Outputable.Outputable p) => 
-	i -> [HsExpr.Match i p] -> Outputable.SDoc
+pprFunBind :: (Outputable.OutputableBndr i) => 
+	i -> [HsExpr.Match i] -> Outputable.SDoc

@@ -13,7 +13,7 @@ module Panic
    ( 
      GhcException(..), ghcError, progName, 
      panic, panic#, assertPanic, trace,
-     showGhcException
+     showException, showGhcException, throwDyn
    ) where
 
 #include "HsVersions.h"
@@ -60,6 +60,12 @@ progName = unsafePerformIO (getProgName)
 
 short_usage = "Usage: For basic information, try the `--help' option."
    
+showException :: Exception -> String
+-- Show expected dynamic exceptions specially
+showException (DynException d) | Just e <- fromDynamic d 
+			       = show (e::GhcException)
+showException other_exn	       = show other_exn
+
 instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
   showsPrec _ e = showString progName . showString ": " . showGhcException e

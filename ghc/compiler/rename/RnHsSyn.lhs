@@ -11,39 +11,40 @@ module RnHsSyn where
 import HsSyn
 import HsCore
 import Class		( FunDep, DefMeth(..) )
-import TyCon		( visibleDataCons )
+import TyCon		( visibleDataCons, tyConName )
 import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
-import BasicTypes	( Boxity )
+import BasicTypes	( Boxity, FixitySig )
 import Outputable
 \end{code}
 
 
 \begin{code}
-type RenamedHsDecl		= HsDecl		Name RenamedPat
-type RenamedArithSeqInfo	= ArithSeqInfo		Name RenamedPat
+type RenamedHsDecl		= HsDecl		Name
+type RenamedArithSeqInfo	= ArithSeqInfo		Name
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
 type RenamedContext		= HsContext 		Name
-type RenamedRuleDecl		= RuleDecl		Name RenamedPat
-type RenamedTyClDecl		= TyClDecl		Name RenamedPat
+type RenamedRuleDecl		= RuleDecl		Name
+type RenamedTyClDecl		= TyClDecl		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
 type RenamedForeignDecl		= ForeignDecl		Name
-type RenamedGRHS		= GRHS			Name RenamedPat
-type RenamedGRHSs		= GRHSs			Name RenamedPat
-type RenamedHsBinds		= HsBinds		Name RenamedPat
-type RenamedHsExpr		= HsExpr		Name RenamedPat
-type RenamedInstDecl		= InstDecl		Name RenamedPat
+type RenamedCoreDecl		= CoreDecl		Name
+type RenamedGRHS		= GRHS			Name
+type RenamedGRHSs		= GRHSs			Name
+type RenamedHsBinds		= HsBinds		Name
+type RenamedHsExpr		= HsExpr		Name
+type RenamedInstDecl		= InstDecl		Name
 type RenamedMatchContext	= HsMatchContext	Name
-type RenamedMatch		= Match			Name RenamedPat
-type RenamedMonoBinds		= MonoBinds		Name RenamedPat
+type RenamedMatch		= Match			Name
+type RenamedMonoBinds		= MonoBinds		Name
 type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
 type RenamedHsPred		= HsPred		Name
-type RenamedRecordBinds		= HsRecordBinds		Name RenamedPat
+type RenamedRecordBinds		= HsRecordBinds		Name
 type RenamedSig			= Sig			Name
-type RenamedStmt		= Stmt			Name RenamedPat
+type RenamedStmt		= Stmt			Name
 type RenamedFixitySig		= FixitySig		Name
 type RenamedDeprecation		= DeprecDecl		Name
 \end{code}
@@ -125,6 +126,13 @@ In all cases this is set up for interface-file declarations:
 	*** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
+----------------
+impDeclFVs :: RenamedHsDecl -> NameSet
+	-- Just the ones that come from imports
+impDeclFVs (InstD d) = instDeclFVs d
+impDeclFVs (TyClD d) = tyClDeclFVs d
+
+----------------
 tyClDeclFVs :: RenamedTyClDecl -> NameSet
 tyClDeclFVs (ForeignType {})
   = emptyFVs
@@ -158,9 +166,6 @@ tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds,
 		Just _ -> emptyFVs	-- Source code, so the default methods
 					-- are *bound* not *free*
 
-tyClDeclFVs (CoreDecl {tcdType = ty, tcdRhs = rhs})
-  = extractHsTyNames ty `plusFV` ufExprFVs rhs
-
 ----------------
 hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
 
@@ -183,12 +188,12 @@ ruleDeclFVs (IfaceRule _ _ vars _ args rhs _)
     ufExprFVs rhs `plusFV` plusFVs (map ufExprFVs args)
 
 ----------------
-conDeclFVs (ConDecl _ _ tyvars context details _)
+conDeclFVs (ConDecl _ tyvars context details _)
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     conDetailsFVs details
 
-conDetailsFVs (VanillaCon btys)    = plusFVs (map bangTyFVs btys)
+conDetailsFVs (PrefixCon btys)    = plusFVs (map bangTyFVs btys)
 conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
 conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
 
@@ -228,8 +233,10 @@ ufConFVs other		    = emptyFVs
 ufNoteFVs (UfCoerce ty) = extractHsTyNames ty
 ufNoteFVs note		= emptyFVs
 
-hsTupConFVs (HsTupCon n _ _) = unitFV n
+hsTupConFVs (HsTupCon bx n) = unitFV (tyConName (tupleTyCon bx n))
+	-- Always return the TyCon; that'll suck in the data con
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -245,7 +252,7 @@ maybeGenericMatch :: RenamedMatch -> Maybe (RenamedHsType, RenamedMatch)
   -- Tells whether a Match is for a generic definition
   -- and extract the type from a generic match and put it at the front
 
-maybeGenericMatch (Match (TypePatIn ty : pats) sig_ty grhss)
+maybeGenericMatch (Match (TypePat ty : pats) sig_ty grhss)
   = Just (ty, Match pats sig_ty grhss)
 
 maybeGenericMatch other_match = Nothing

@@ -10,7 +10,7 @@ module StgLint ( lintStgBindings ) where
 
 import StgSyn
 
-import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
+import Bag		( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import Id		( Id, idType, isLocalId )
 import VarSet
 import DataCon		( DataCon, dataConArgTys, dataConRepType )
@@ -18,7 +18,7 @@ import PrimOp		( primOpType )
 import Literal		( literalType, Literal )
 import Maybes		( catMaybes )
 import Name		( getSrcLoc )
-import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
+import ErrUtils		( Message, addErrLocHdrLine )
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, dropForAlls, Type
 			)
@@ -299,8 +299,8 @@ lintDeflt deflt@(StgBindDefault rhs) scrut_ty = lintStgExpr rhs
 \begin{code}
 type LintM a = [LintLocInfo] 	-- Locations
 	    -> IdSet		-- Local vars in scope
-	    -> Bag ErrMsg	-- Error messages so far
-	    -> (a, Bag ErrMsg)	-- Result and error messages (if any)
+	    -> Bag Message	-- Error messages so far
+	    -> (a, Bag Message)	-- Result and error messages (if any)
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -331,7 +331,7 @@ initL m
     if isEmptyBag errs then
 	Nothing
     else
-	Just (pprBagOfErrors errs)
+	Just (vcat (punctuate (text "") (bagToList errs)))
     }
 
 returnL :: a -> LintM a
@@ -383,13 +383,14 @@ checkL False msg loc scope errs = ((), addErr errs msg loc)
 addErrL :: Message -> LintM ()
 addErrL msg loc scope errs = ((), addErr errs msg loc)
 
-addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
+addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
 
 addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
-    mk_msg (loc:_) = let (l,hdr) = dumpLoc loc in addErrLocHdrLine l hdr msg
-    mk_msg []      = dontAddErrLoc msg
+    mk_msg (loc:_) = let (l,hdr) = dumpLoc loc 
+		     in addErrLocHdrLine l hdr msg
+    mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs

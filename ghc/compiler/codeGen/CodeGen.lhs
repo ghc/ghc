@@ -31,7 +31,6 @@ import AbsCSyn
 import PrelNames	( gHC_PRIM )
 import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, 
 			  mkPlainModuleInitLabel, mkModuleInitLabel )
-
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, flattenAbsC )
 import CgBindery	( CgIdInfo, addBindC, addBindsC, getCAddrModeAndInfo )
@@ -41,14 +40,15 @@ import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
+import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..),
+			  typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
-import Module           ( Module )
 import PrimRep		( PrimRep(..) )
-import TyCon            ( TyCon, isDataTyCon )
-import BasicTypes	( TopLevelFlag(..), Version )
+import TyCon            ( isDataTyCon )
+import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
@@ -62,29 +62,27 @@ import DATA_IOREF	( readIORef )
 
 \begin{code}
 codeGen :: DynFlags
-	-> Module		-- Module name
-	-> [Module]		-- Import names
+	-> ModGuts
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
-	-> [Id]			-- foreign-exported binders
-	-> [TyCon] 		-- Local tycons, including ones from classes
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
-codeGen dflags mod_name imported_modules cost_centre_info fe_binders
-	tycons stg_binds
+codeGen dflags 
+	mod_impl@(ModGuts { mg_module = mod_name, mg_types = type_env })
+	cost_centre_info stg_binds
   = do	
 	showPass dflags "CodeGen"
 	fl_uniqs <- mkSplitUniqSupply 'f'
 	way <- readIORef v_Build_tag
 
 	let
+	    tycons	   = typeEnvTyCons type_env
 	    data_tycons    = filter isDataTyCon tycons
 	    cinfo          = MkCompInfo mod_name
 
 	    datatype_stuff = genStaticConBits cinfo data_tycons
 	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit fe_binders mod_name way
-				imported_modules cost_centre_info
+	    init_stuff     = mkModuleInit way cost_centre_info mod_impl
 
 	    abstractC = mkAbstractCs [ maybeSplitCode,
 				       init_stuff, 
@@ -108,13 +106,14 @@ codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 
 \begin{code}
 mkModuleInit 
-	:: [Id]			-- foreign exported functions
-	-> Module		-- module name
-	-> String		-- the "way"
-	-> [Module]		-- import names
+	:: String		-- the "way"
 	-> CollectedCCs         -- cost centre info
+	-> ModGuts
 	-> AbstractC
-mkModuleInit fe_binders mod way imps cost_centre_info
+mkModuleInit way cost_centre_info
+	     (ModGuts { mg_module  = mod,
+			mg_foreign = ForeignStubs _ _ _ fe_binders,
+			mg_dir_imps = imported_modules })
   = let
 	register_fes = 
 	   map (\f -> CMacroStmt REGISTER_FOREIGN_EXPORT [f]) fe_labels
@@ -125,13 +124,13 @@ mkModuleInit fe_binders mod way imps cost_centre_info
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
 	-- we don't want/need to init GHC.Prim, so filter it out
-	mk_import_register imp
-	    | imp == gHC_PRIM = AbsCNop
-	    | otherwise = CMacroStmt REGISTER_IMPORT [
-				CLbl (mkModuleInitLabel imp way) AddrRep
-	    		  ]
+	mk_import_register mod
+	    | mod == gHC_PRIM = AbsCNop
+	    | otherwise	      = CMacroStmt REGISTER_IMPORT [
+				   CLbl (mkModuleInitLabel mod way) AddrRep
+				]
 
-	register_imports = map mk_import_register imps
+	register_imports = map mk_import_register imported_modules
     in
     mkAbstractCs [
 	cc_decls,

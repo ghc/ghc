@@ -4,34 +4,39 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcExpr, tcMonoExpr, tcId ) where
+module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 
 #include "HsVersions.h"
 
+#ifdef GHCI 	/* Only if bootstrapped */
+import {-# SOURCE #-}	TcSplice( tcSpliceExpr )
+import TcEnv		( bracketOK, tcMetaTy )
+import TcSimplify	( tcSimplifyBracket )
+import PrelNames	( exprTyConName )
+import HsSyn		( HsBracket(..) )
+#endif
+
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsMatchContext(..), HsDoContext(..), MonoBinds(..),
-			  mkMonoBind, andMonoBindList
+			  mkMonoBind, recBindFields
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, TypecheckedMonoBinds,
-			  simpleHsLitTy, mkHsDictApp, mkHsTyApp, mkHsLet )
-
-import TcMonad
+import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet )
+import TcRnMonad
 import TcUnify		( tcSubExp, tcGen, (<$>),
 			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy,
 			  unifyTupleTy )
 import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
-			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethodFromName, newIPDict,
-			  newDicts, newMethodWithGivenTy, tcSyntaxName,
+			  newDicts, newMethodWithGivenTy, 
 			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId
+import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId,
+			  wellStaged, metaLevel
 			)
-import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
+import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplifyIPs )
@@ -39,29 +44,28 @@ import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
-			  isSigmaTy, mkFunTy, mkAppTy, mkFunTys,
+			  isSigmaTy, isTauTy, mkFunTy, mkFunTys,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
 			  tyVarsOfTypes, isLinearPred,
-			  liftedTypeKind, openTypeKind, mkArrowKind,
+			  liftedTypeKind, openTypeKind, 
 			  tcSplitSigmaTy, tcTyConAppTyCon,
 			  tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, 
-			  isDataConWrapId_maybe, mkSysLocal )
+import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
 import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks
 			)
-import Name		( Name )
+import Name		( Name, isExternalName )
 import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
-import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
+import TysWiredIn	( boolTy )
 import PrelNames	( cCallableClassName, cReturnableClassName, 
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
-			  ioTyConName, monadNames
+			  ioTyConName, liftName
 			)
 import ListSetOps	( minusList )
 import CmdLineOpts
@@ -81,10 +85,10 @@ import FastString
 \begin{code}
 tcExpr :: RenamedHsExpr		-- Expession to type check
 	-> TcSigmaType 		-- Expected type (could be a polytpye)
-	-> TcM (TcExpr, LIE)	-- Generalised expr with expected type, and LIE
+	-> TcM TcExpr		-- Generalised expr with expected type
 
 tcExpr expr expected_ty 
-  = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenNF_Tc_`
+  = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenM_`
     tc_expr' expr expected_ty
 
 tc_expr' expr expected_ty
@@ -94,8 +98,8 @@ tc_expr' expr expected_ty
   | otherwise
   = tcGen expected_ty emptyVarSet (
 	tcMonoExpr expr
-    )					`thenTc` \ (gen_fn, expr', lie) ->
-    returnTc (gen_fn <$> expr', lie)
+    )				`thenM` \ (gen_fn, expr') ->
+    returnM (gen_fn <$> expr')
 \end{code}
 
 
@@ -110,22 +114,23 @@ tcMonoExpr :: RenamedHsExpr		-- Expession to type check
 	   -> TcRhoType 		-- Expected type (could be a type variable)
 					-- Definitely no foralls at the top
 					-- Can be a 'hole'.
-	   -> TcM (TcExpr, LIE)
+	   -> TcM TcExpr
 
 tcMonoExpr (HsVar name) res_ty
-  = tcId name			`thenNF_Tc` \ (expr', lie1, id_ty) ->
-    tcSubExp res_ty id_ty 	`thenTc` \ (co_fn, lie2) ->
-    returnTc (co_fn <$> expr', lie1 `plusLIE` lie2)
+  = tcId name			`thenM` \ (expr', id_ty) ->
+    tcSubExp res_ty id_ty 	`thenM` \ co_fn ->
+    returnM (co_fn <$> expr')
 
 tcMonoExpr (HsIPVar ip) res_ty
   = 	-- Implicit parameters must have a *tau-type* not a 
 	-- type scheme.  We enforce this by creating a fresh
 	-- type variable as its type.  (Because res_ty may not
 	-- be a tau-type.)
-    newTyVarTy openTypeKind		`thenNF_Tc` \ ip_ty ->
-    newIPDict (IPOcc ip) ip ip_ty 	`thenNF_Tc` \ (ip', inst) ->
-    tcSubExp res_ty ip_ty		`thenTc` \ (co_fn, lie) ->
-    returnNF_Tc (co_fn <$> HsIPVar ip', lie `plusLIE` unitLIE inst)
+    newTyVarTy openTypeKind		`thenM` \ ip_ty ->
+    newIPDict (IPOcc ip) ip ip_ty 	`thenM` \ (ip', inst) ->
+    extendLIE inst			`thenM_`
+    tcSubExp res_ty ip_ty		`thenM` \ co_fn ->
+    returnM (co_fn <$> HsIPVar ip')
 \end{code}
 
 
@@ -137,17 +142,17 @@ tcMonoExpr (HsIPVar ip) res_ty
 
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = tcAddErrCtxt (exprSigCtxt in_expr)	$
-   tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
-   tcExpr expr sig_tc_ty		`thenTc` \ (expr', lie1) ->
+ = addErrCtxt (exprSigCtxt in_expr)	$
+   tcHsSigType ExprSigCtxt poly_ty	`thenM` \ sig_tc_ty ->
+   tcExpr expr sig_tc_ty		`thenM` \ expr' ->
 
 	-- Must instantiate the outer for-alls of sig_tc_ty
 	-- else we risk instantiating a ? res_ty to a forall-type
 	-- which breaks the invariant that tcMonoExpr only returns phi-types
-   tcInstCall SignatureOrigin sig_tc_ty	`thenNF_Tc` \ (inst_fn, lie2, inst_sig_ty) ->
-   tcSubExp res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
+   tcInstCall SignatureOrigin sig_tc_ty	`thenM` \ (inst_fn, inst_sig_ty) ->
+   tcSubExp res_ty inst_sig_ty		`thenM` \ co_fn ->
 
-   returnTc (co_fn <$> inst_fn expr', lie1 `plusLIE` lie2 `plusLIE` lie3)
+   returnM (co_fn <$> inst_fn expr')
 
 tcMonoExpr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -166,17 +171,21 @@ tcMonoExpr (HsType ty) res_ty
 %************************************************************************
 
 \begin{code}
-tcMonoExpr (HsLit lit)     res_ty = tcLit lit res_ty
-tcMonoExpr (HsOverLit lit) res_ty = newOverloadedLit (LiteralOrigin lit) lit res_ty
-tcMonoExpr (HsPar expr)    res_ty = tcMonoExpr expr res_ty
+tcMonoExpr (HsLit lit)     res_ty  = tcLit lit res_ty
+tcMonoExpr (HsOverLit lit) res_ty  = newOverloadedLit (LiteralOrigin lit) lit res_ty
+tcMonoExpr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
+				     returnM (HsPar expr')
+tcMonoExpr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
+				     returnM (HsSCC lbl expr')
+
 
 tcMonoExpr (NegApp expr neg_name) res_ty
   = tcMonoExpr (HsApp (HsVar neg_name) expr) res_ty
 	-- ToDo: use tcSyntaxName
 
 tcMonoExpr (HsLam match) res_ty
-  = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->
-    returnTc (HsLam match', lie)
+  = tcMatchLambda match res_ty 		`thenM` \ match' ->
+    returnM (HsLam match')
 
 tcMonoExpr (HsApp e1 e2) res_ty 
   = tcApp e1 [e2] res_ty
@@ -194,112 +203,48 @@ a type error will occur if they aren't.
 -- 	op e
 
 tcMonoExpr in_expr@(SectionL arg1 op) res_ty
-  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
-    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
-    tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2) ->
-    tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSubExp res_ty (mkFunTy arg2_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
-    returnTc (co_fn <$> SectionL arg1' op', lie1 `plusLIE` lie2 `plusLIE` lie3)
+  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
+    addErrCtxt (exprCtxt in_expr)		$
+    tcSubExp res_ty (mkFunTy arg2_ty op_res_ty)	`thenM` \ co_fn ->
+    returnM (co_fn <$> SectionL arg1' op')
 
 -- Right sections, equivalent to \ x -> x op expr, or
 --	\ x -> op x expr
 
 tcMonoExpr in_expr@(SectionR op arg2) res_ty
-  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
-    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
-    tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2) ->
-    tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSubExp res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
-    returnTc (co_fn <$> SectionR op' arg2', lie1 `plusLIE` lie2 `plusLIE` lie3)
+  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
+    addErrCtxt (exprCtxt in_expr)		$
+    tcSubExp res_ty (mkFunTy arg1_ty op_res_ty)	`thenM` \ co_fn ->
+    returnM (co_fn <$> SectionR op' arg2')
 
 -- equivalent to (op e1) e2:
 
 tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
-  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
-    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
-    tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2a) ->
-    tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2b) ->
-    tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSubExp res_ty op_res_ty			`thenTc` \ (co_fn, lie3) ->
-    returnTc (OpApp arg1' op' fix arg2', 
-	      lie1 `plusLIE` lie2a `plusLIE` lie2b `plusLIE` lie3)
-\end{code}
-
-The interesting thing about @ccall@ is that it is just a template
-which we instantiate by filling in details about the types of its
-argument and result (ie minimal typechecking is performed).  So, the
-basic story is that we allocate a load of type variables (to hold the
-arg/result types); unify them with the args/result; and store them for
-later use.
-
-\begin{code}
-tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
-
-  = getDOptsTc				`thenNF_Tc` \ dflags ->
-
-    checkTc (not (is_casm && dopt_HscLang dflags /= HscC)) 
-        (vcat [text "_casm_ is only supported when compiling via C (-fvia-C).",
-               text "Either compile with -fvia-C, or, better, rewrite your code",
-               text "to use the foreign function interface.  _casm_s are deprecated",
-               text "and support for them may one day disappear."])
-					`thenTc_`
-
-    -- Get the callable and returnable classes.
-    tcLookupClass cCallableClassName	`thenNF_Tc` \ cCallableClass ->
-    tcLookupClass cReturnableClassName	`thenNF_Tc` \ cReturnableClass ->
-    tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
-    let
-	new_arg_dict (arg, arg_ty)
-	  = newDicts (CCallOrigin (unpackFS lbl) (Just arg))
-		     [mkClassPred cCallableClass [arg_ty]]	`thenNF_Tc` \ arg_dicts ->
-	    returnNF_Tc arg_dicts	-- Actually a singleton bag
-
-	result_origin = CCallOrigin (unpackFS lbl) Nothing {- Not an arg -}
-    in
-
-	-- Arguments
-    let tv_idxs | null args  = []
-		| otherwise  = [1..length args]
-    in
-    newTyVarTys (length tv_idxs) openTypeKind		`thenNF_Tc` \ arg_tys ->
-    tcMonoExprs args arg_tys		   		`thenTc`    \ (args', args_lie) ->
-
-	-- The argument types can be unlifted or lifted; the result
-	-- type must, however, be lifted since it's an argument to the IO
-	-- type constructor.
-    newTyVarTy liftedTypeKind  		`thenNF_Tc` \ result_ty ->
-    let
-	io_result_ty = mkTyConApp ioTyCon [result_ty]
-    in
-    unifyTauTy res_ty io_result_ty		`thenTc_`
-
-	-- Construct the extra insts, which encode the
-	-- constraints on the argument and result types.
-    mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
-    newDicts result_origin [mkClassPred cReturnableClass [result_ty]]	`thenNF_Tc` \ ccres_dict ->
-    returnTc (HsCCall lbl args' may_gc is_casm io_result_ty,
-	      mkLIE (ccres_dict ++ concat ccarg_dicts_s) `plusLIE` args_lie)
+  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
+    tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
+    addErrCtxt (exprCtxt in_expr)		$
+    tcSubExp res_ty op_res_ty			`thenM` \ co_fn ->
+    returnM (OpApp arg1' op' fix arg2')
 \end{code}
 
 \begin{code}
-tcMonoExpr (HsSCC lbl expr) res_ty
-  = tcMonoExpr expr res_ty		`thenTc` \ (expr', lie) ->
-    returnTc (HsSCC lbl expr', lie)
-
 tcMonoExpr (HsLet binds expr) res_ty
   = tcBindsAndThen
 	combiner
 	binds 			-- Bindings to check
-	tc_expr		`thenTc` \ (expr', lie) ->
-    returnTc (expr', lie)
+	(tcMonoExpr expr res_ty)
   where
-    tc_expr = tcMonoExpr expr res_ty `thenTc` \ (expr', lie) ->
-	      returnTc (expr', lie)
     combiner is_rec bind expr = HsLet (mkMonoBind bind [] is_rec) expr
 
 tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
-  = tcAddSrcLoc src_loc			$
-    tcAddErrCtxt (caseCtxt in_expr)	$
+  = addSrcLoc src_loc			$
+    addErrCtxt (caseCtxt in_expr)	$
 
 	-- Typecheck the case alternatives first.
 	-- The case patterns tend to give good type info to use
@@ -316,94 +261,162 @@ tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
 	-- claimed by the pattern signatures.  But if we typechecked the
 	-- match with x in scope and x's type as the expected type, we'd be hosed.
 
-    tcMatchesCase matches res_ty	`thenTc`    \ (scrut_ty, matches', lie2) ->
+    tcMatchesCase matches res_ty	`thenM`    \ (scrut_ty, matches') ->
 
-    tcAddErrCtxt (caseScrutCtxt scrut)	(
+    addErrCtxt (caseScrutCtxt scrut)	(
       tcMonoExpr scrut scrut_ty
-    )					`thenTc`    \ (scrut',lie1) ->
+    )					`thenM`    \ scrut' ->
 
-    returnTc (HsCase scrut' matches' src_loc, plusLIE lie1 lie2)
+    returnM (HsCase scrut' matches' src_loc)
 
 tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
-  = tcAddSrcLoc src_loc	$
-    tcAddErrCtxt (predCtxt pred) (
-    tcMonoExpr pred boolTy	)	`thenTc`    \ (pred',lie1) ->
+  = addSrcLoc src_loc	$
+    addErrCtxt (predCtxt pred) (
+    tcMonoExpr pred boolTy	)	`thenM`    \ pred' ->
 
-    zapToType res_ty			`thenTc`    \ res_ty' ->
+    zapToType res_ty			`thenM`    \ res_ty' ->
 	-- C.f. the call to zapToType in TcMatches.tcMatches
 
-    tcMonoExpr b1 res_ty'		`thenTc`    \ (b1',lie2) ->
-    tcMonoExpr b2 res_ty'		`thenTc`    \ (b2',lie3) ->
-    returnTc (HsIf pred' b1' b2' src_loc, plusLIE lie1 (plusLIE lie2 lie3))
-\end{code}
+    tcMonoExpr b1 res_ty'		`thenM`    \ b1' ->
+    tcMonoExpr b2 res_ty'		`thenM`    \ b2' ->
+    returnM (HsIf pred' b1' b2' src_loc)
 
-\begin{code}
-tcMonoExpr expr@(HsDo do_or_lc stmts method_names _ src_loc) res_ty
-  = tcAddSrcLoc src_loc (tcDoStmts do_or_lc stmts method_names src_loc res_ty)
-\end{code}
+tcMonoExpr (HsDo do_or_lc stmts method_names _ src_loc) res_ty
+  = addSrcLoc src_loc		$
+    tcDoStmts do_or_lc stmts method_names res_ty	`thenM` \ (binds, stmts', methods') ->
+    returnM (mkHsLet binds (HsDo do_or_lc stmts' methods' res_ty src_loc))
 
-\begin{code}
 tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
-  = unifyListTy res_ty                        `thenTc` \ elt_ty ->  
-    mapAndUnzipTc (tc_elt elt_ty) exprs	      `thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitList elt_ty exprs', plusLIEs lies)
+  = unifyListTy res_ty                `thenM` \ elt_ty ->  
+    mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
+    returnM (ExplicitList elt_ty exprs')
   where
     tc_elt elt_ty expr
-      = tcAddErrCtxt (listCtxt expr) $
+      = addErrCtxt (listCtxt expr) $
 	tcMonoExpr expr elt_ty
 
 tcMonoExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
-  = unifyPArrTy res_ty                        `thenTc` \ elt_ty ->  
-    mapAndUnzipTc (tc_elt elt_ty) exprs	      `thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitPArr elt_ty exprs', plusLIEs lies)
+  = unifyPArrTy res_ty                `thenM` \ elt_ty ->  
+    mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
+    returnM (ExplicitPArr elt_ty exprs')
   where
     tc_elt elt_ty expr
-      = tcAddErrCtxt (parrCtxt expr) $
+      = addErrCtxt (parrCtxt expr) $
 	tcMonoExpr expr elt_ty
 
 tcMonoExpr (ExplicitTuple exprs boxity) res_ty
-  = unifyTupleTy boxity (length exprs) res_ty	`thenTc` \ arg_tys ->
-    mapAndUnzipTc (\ (expr, arg_ty) -> tcMonoExpr expr arg_ty)
-               (exprs `zip` arg_tys) -- we know they're of equal length.
-               					`thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitTuple exprs' boxity, plusLIEs lies)
+  = unifyTupleTy boxity (length exprs) res_ty	`thenM` \ arg_tys ->
+    tcMonoExprs exprs arg_tys 			`thenM` \ exprs' ->
+    returnM (ExplicitTuple exprs' boxity)
+\end{code}
 
+
+%************************************************************************
+%*									*
+		Foreign calls
+%*									*
+%************************************************************************
+
+The interesting thing about @ccall@ is that it is just a template
+which we instantiate by filling in details about the types of its
+argument and result (ie minimal typechecking is performed).  So, the
+basic story is that we allocate a load of type variables (to hold the
+arg/result types); unify them with the args/result; and store them for
+later use.
+
+\begin{code}
+tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
+
+  = getDOpts				`thenM` \ dflags ->
+
+    checkTc (not (is_casm && dopt_HscLang dflags /= HscC)) 
+        (vcat [text "_casm_ is only supported when compiling via C (-fvia-C).",
+               text "Either compile with -fvia-C, or, better, rewrite your code",
+               text "to use the foreign function interface.  _casm_s are deprecated",
+               text "and support for them may one day disappear."])
+					`thenM_`
+
+    -- Get the callable and returnable classes.
+    tcLookupClass cCallableClassName	`thenM` \ cCallableClass ->
+    tcLookupClass cReturnableClassName	`thenM` \ cReturnableClass ->
+    tcLookupTyCon ioTyConName		`thenM` \ ioTyCon ->
+    let
+	new_arg_dict (arg, arg_ty)
+	  = newDicts (CCallOrigin (unpackFS lbl) (Just arg))
+		     [mkClassPred cCallableClass [arg_ty]]	`thenM` \ arg_dicts ->
+	    returnM arg_dicts	-- Actually a singleton bag
+
+	result_origin = CCallOrigin (unpackFS lbl) Nothing {- Not an arg -}
+    in
+
+	-- Arguments
+    let tv_idxs | null args  = []
+		| otherwise  = [1..length args]
+    in
+    newTyVarTys (length tv_idxs) openTypeKind		`thenM` \ arg_tys ->
+    tcMonoExprs args arg_tys		   		`thenM` \ args' ->
+
+	-- The argument types can be unlifted or lifted; the result
+	-- type must, however, be lifted since it's an argument to the IO
+	-- type constructor.
+    newTyVarTy liftedTypeKind  		`thenM` \ result_ty ->
+    let
+	io_result_ty = mkTyConApp ioTyCon [result_ty]
+    in
+    unifyTauTy res_ty io_result_ty		`thenM_`
+
+	-- Construct the extra insts, which encode the
+	-- constraints on the argument and result types.
+    mappM new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenM` \ ccarg_dicts_s ->
+    newDicts result_origin [mkClassPred cReturnableClass [result_ty]]	`thenM` \ ccres_dict ->
+    extendLIEs (ccres_dict ++ concat ccarg_dicts_s)			`thenM_`
+    returnM (HsCCall lbl args' may_gc is_casm io_result_ty)
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Record construction and update
+%*									*
+%************************************************************************
+
+\begin{code}
 tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
-  = tcAddErrCtxt (recordConCtxt expr)		$
-    tcId con_name			`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
+  = addErrCtxt (recordConCtxt expr)		$
+    tcId con_name			`thenM` \ (con_expr, con_tau) ->
     let
 	(_, record_ty)   = tcSplitFunTys con_tau
 	(tycon, ty_args) = tcSplitTyConApp record_ty
     in
     ASSERT( isAlgTyCon tycon )
-    unifyTauTy res_ty record_ty          `thenTc_`
+    unifyTauTy res_ty record_ty          `thenM_`
 
 	-- Check that the record bindings match the constructor
 	-- con_name is syntactically constrained to be a data constructor
-    tcLookupDataCon con_name	`thenTc` \ data_con ->
+    tcLookupDataCon con_name	`thenM` \ data_con ->
     let
 	bad_fields = badFields rbinds data_con
     in
     if notNull bad_fields then
-	mapNF_Tc (addErrTc . badFieldCon con_name) bad_fields	`thenNF_Tc_`
-	failTc	-- Fail now, because tcRecordBinds will crash on a bad field
+	mappM (addErrTc . badFieldCon data_con) bad_fields	`thenM_`
+	failM	-- Fail now, because tcRecordBinds will crash on a bad field
     else
 
 	-- Typecheck the record bindings
-    tcRecordBinds tycon ty_args rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
+    tcRecordBinds tycon ty_args rbinds		`thenM` \ rbinds' ->
     
     let
       (missing_s_fields, missing_fields) = missingFields rbinds data_con
     in
-    checkTcM (null missing_s_fields)
-	(mapNF_Tc (addErrTc . missingStrictFieldCon con_name) missing_s_fields `thenNF_Tc_`
-	 returnNF_Tc ())  `thenNF_Tc_`
-    doptsTc Opt_WarnMissingFields `thenNF_Tc` \ warn ->
-    checkTcM (not (warn && notNull missing_fields))
-	(mapNF_Tc ((warnTc True) . missingFieldCon con_name) missing_fields `thenNF_Tc_`
-	 returnNF_Tc ())  `thenNF_Tc_`
+    checkM (null missing_s_fields)
+	(mappM_ (addErrTc . missingStrictFieldCon con_name) missing_s_fields)
+	 				`thenM_`
+    doptM Opt_WarnMissingFields		`thenM` \ warn ->
+    checkM (not (warn && notNull missing_fields))
+	(mappM_ ((warnTc True) . missingFieldCon con_name) missing_fields)
+	 				`thenM_`
 
-    returnTc (RecordConOut data_con con_expr rbinds', con_lie `plusLIE` rbinds_lie)
+    returnM (RecordConOut data_con con_expr rbinds')
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -432,15 +445,15 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 -- All this is done in STEP 4 below.
 
 tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
-  = tcAddErrCtxt (recordUpdCtxt	expr)		$
+  = addErrCtxt (recordUpdCtxt	expr)		$
 
 	-- STEP 0
 	-- Check that the field names are really field names
     ASSERT( notNull rbinds )
     let 
-	field_names = [field_name | (field_name, _, _) <- rbinds]
+	field_names = recBindFields rbinds
     in
-    mapNF_Tc tcLookupGlobal_maybe field_names		`thenNF_Tc` \ maybe_sel_ids ->
+    mappM tcLookupGlobal_maybe field_names		`thenM` \ maybe_sel_ids ->
     let
 	bad_guys = [ addErrTc (notSelector field_name) 
 		   | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
@@ -449,7 +462,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 			other		   -> True
 		   ]
     in
-    checkTcM (null bad_guys) (listNF_Tc bad_guys `thenNF_Tc_` failTc)	`thenTc_`
+    checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
     
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
@@ -464,13 +477,13 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	data_cons    = tyConDataCons tycon
 	tycon_tyvars = tyConTyVars tycon		-- The data cons use the same type vars
     in
-    tcInstTyVars VanillaTv tycon_tyvars		`thenNF_Tc` \ (_, result_inst_tys, inst_env) ->
+    tcInstTyVars VanillaTv tycon_tyvars		`thenM` \ (_, result_inst_tys, inst_env) ->
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (any (null . badFields rbinds) data_cons)
-	    (badFieldsUpd rbinds)		`thenTc_`
+	    (badFieldsUpd rbinds)		`thenM_`
 
 	-- STEP 3
 	-- Typecheck the update bindings.
@@ -479,8 +492,8 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	result_record_ty = mkTyConApp tycon result_inst_tys
     in
-    unifyTauTy res_ty result_record_ty          `thenTc_`
-    tcRecordBinds tycon result_inst_tys rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
+    unifyTauTy res_ty result_record_ty          `thenM_`
+    tcRecordBinds tycon result_inst_tys rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 4
 	-- Use the un-updated fields to find a vector of booleans saying
@@ -489,7 +502,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- WARNING: this code assumes that all data_cons in a common tycon
 	-- have FieldLabels abstracted over the same tyvars.
     let
-	upd_field_lbls      = [recordSelectorFieldLabel sel_id | (sel_id, _, _) <- rbinds']
+	upd_field_lbls      = map recordSelectorFieldLabel (recBindFields rbinds')
 	con_field_lbls_s    = map dataConFieldLabels data_cons
 
 		-- A constructor is only relevant to this process if
@@ -501,17 +514,17 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	common_tyvars       = tyVarsOfTypes (map fieldLabelType non_upd_field_lbls)
 
 	mk_inst_ty (tyvar, result_inst_ty) 
-	  | tyvar `elemVarSet` common_tyvars = returnNF_Tc result_inst_ty	-- Same as result type
+	  | tyvar `elemVarSet` common_tyvars = returnM result_inst_ty	-- Same as result type
 	  | otherwise			     = newTyVarTy liftedTypeKind	-- Fresh type
     in
-    mapNF_Tc mk_inst_ty (zip tycon_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
+    mappM mk_inst_ty (zip tycon_tyvars result_inst_tys)	`thenM` \ inst_tys ->
 
 	-- STEP 5
 	-- Typecheck the expression to be updated
     let
 	record_ty = mkTyConApp tycon inst_tys
     in
-    tcMonoExpr record_expr record_ty		`thenTc`    \ (record_expr', record_lie) ->
+    tcMonoExpr record_expr record_ty		`thenM` \ record_expr' ->
 
 	-- STEP 6
 	-- Figure out the LIE we need.  We have to generate some 
@@ -523,88 +536,130 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	theta' = substTheta inst_env (tyConTheta tycon)
     in
-    newDicts RecordUpdOrigin theta'	`thenNF_Tc` \ dicts ->
+    newDicts RecordUpdOrigin theta'	`thenM` \ dicts ->
+    extendLIEs dicts			`thenM_`
 
 	-- Phew!
-    returnTc (RecordUpdOut record_expr' record_ty result_record_ty rbinds', 
-	      mkLIE dicts `plusLIE` record_lie `plusLIE` rbinds_lie)
+    returnM (RecordUpdOut record_expr' record_ty result_record_ty rbinds') 
+\end{code}
 
+
+%************************************************************************
+%*									*
+	Arithmetic sequences			e.g. [a,b..]
+	and their parallel-array counterparts	e.g. [: a,b.. :]
+		
+%*									*
+%************************************************************************
+
+\begin{code}
 tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
-  = unifyListTy res_ty 				`thenTc` \ elt_ty ->  
-    tcMonoExpr expr elt_ty		 	`thenTc` \ (expr', lie1) ->
+  = unifyListTy res_ty 				`thenM` \ elt_ty ->  
+    tcMonoExpr expr elt_ty		 	`thenM` \ expr' ->
 
     newMethodFromName (ArithSeqOrigin seq) 
-		      elt_ty enumFromName	`thenNF_Tc` \ enum_from ->
+		      elt_ty enumFromName	`thenM` \ enum_from ->
 
-    returnTc (ArithSeqOut (HsVar (instToId enum_from)) (From expr'),
-	      lie1 `plusLIE` unitLIE enum_from)
+    returnM (ArithSeqOut (HsVar enum_from) (From expr'))
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
-  = tcAddErrCtxt (arithSeqCtxt in_expr) $ 
-    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+  = addErrCtxt (arithSeqCtxt in_expr) $ 
+    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
+    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (ArithSeqOrigin seq) 
-		      elt_ty enumFromThenName		`thenNF_Tc` \ enum_from_then ->
+		      elt_ty enumFromThenName		`thenM` \ enum_from_then ->
 
-    returnTc (ArithSeqOut (HsVar (instToId enum_from_then))
-			  (FromThen expr1' expr2'),
-	      lie1 `plusLIE` lie2 `plusLIE` unitLIE enum_from_then)
+    returnM (ArithSeqOut (HsVar enum_from_then) (FromThen expr1' expr2'))
+
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
-  = tcAddErrCtxt (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+  = addErrCtxt (arithSeqCtxt in_expr) $
+    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
+    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (ArithSeqOrigin seq) 
-	  	      elt_ty enumFromToName		`thenNF_Tc` \ enum_from_to ->
+	  	      elt_ty enumFromToName		`thenM` \ enum_from_to ->
 
-    returnTc (ArithSeqOut (HsVar (instToId enum_from_to))
-			  (FromTo expr1' expr2'),
-	      lie1 `plusLIE` lie2 `plusLIE` unitLIE enum_from_to)
+    returnM (ArithSeqOut (HsVar enum_from_to) (FromTo expr1' expr2'))
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = tcAddErrCtxt  (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
+  = addErrCtxt  (arithSeqCtxt in_expr) $
+    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
+    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
+    tcMonoExpr expr3 elt_ty				`thenM`    \ expr3' ->
     newMethodFromName (ArithSeqOrigin seq) 
-		      elt_ty enumFromThenToName		`thenNF_Tc` \ eft ->
+		      elt_ty enumFromThenToName		`thenM` \ eft ->
 
-    returnTc (ArithSeqOut (HsVar (instToId eft))
-			  (FromThenTo expr1' expr2' expr3'),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` unitLIE eft)
+    returnM (ArithSeqOut (HsVar eft) (FromThenTo expr1' expr2' expr3'))
 
 tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
-  = tcAddErrCtxt (parrSeqCtxt in_expr) $
-    unifyPArrTy  res_ty         			`thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+  = addErrCtxt (parrSeqCtxt in_expr) $
+    unifyPArrTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
+    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (PArrSeqOrigin seq) 
-		      elt_ty enumFromToPName 		`thenNF_Tc` \ enum_from_to ->
+		      elt_ty enumFromToPName 		`thenM` \ enum_from_to ->
 
-    returnTc (PArrSeqOut (HsVar (instToId enum_from_to))
-			 (FromTo expr1' expr2'),
-	      lie1 `plusLIE` lie2 `plusLIE` unitLIE enum_from_to)
+    returnM (PArrSeqOut (HsVar enum_from_to) (FromTo expr1' expr2'))
 
 tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = tcAddErrCtxt  (parrSeqCtxt in_expr) $
-    unifyPArrTy  res_ty         			`thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
+  = addErrCtxt  (parrSeqCtxt in_expr) $
+    unifyPArrTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
+    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
+    tcMonoExpr expr3 elt_ty				`thenM`    \ expr3' ->
     newMethodFromName (PArrSeqOrigin seq)
-		      elt_ty enumFromThenToPName	`thenNF_Tc` \ eft ->
+		      elt_ty enumFromThenToPName	`thenM` \ eft ->
 
-    returnTc (PArrSeqOut (HsVar (instToId eft))
-			 (FromThenTo expr1' expr2' expr3'),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` unitLIE eft)
+    returnM (PArrSeqOut (HsVar eft) (FromThenTo expr1' expr2' expr3'))
 
 tcMonoExpr (PArrSeqIn _) _ 
   = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer shouldn't have
     -- let it through
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Template Haskell
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GHCI	/* Only if bootstrapped */
+	-- Rename excludes these cases otherwise
+
+tcMonoExpr (HsSplice n expr) res_ty = tcSpliceExpr n expr res_ty
+  
+tcMonoExpr (HsBracket (ExpBr expr)) res_ty
+  = getStage 					`thenM` \ level ->
+    case bracketOK level of {
+	Nothing         -> failWithTc (illegalBracket level) ;
+	Just next_level ->
+
+   	-- Typecheck expr to make sure it is valid,
+	-- but throw away the results.  We'll type check
+	-- it again when we actually use it.
+    newMutVar []	 		`thenM` \ pending_splices ->
+    getLIEVar				`thenM` \ lie_var ->
+    newTyVarTy openTypeKind		`thenM` \ any_ty ->
+
+    setStage (Brack next_level pending_splices lie_var) (
+	getLIE (tcMonoExpr expr any_ty)
+    )						`thenM` \ (expr', lie) ->
+    tcSimplifyBracket lie 			`thenM_`  
+
+    tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
+    unifyTauTy res_ty meta_exp_ty		`thenM_`
+
+	-- Return the original expression, not the type-decorated one
+    readMutVar pending_splices		`thenM` \ pendings ->
+    returnM (HsBracketOut (ExpBr expr) pendings)
+    }
+#endif GHCI
 \end{code}
 
 %************************************************************************
@@ -615,24 +670,36 @@ tcMonoExpr (PArrSeqIn _) _
 
 \begin{code}
 tcMonoExpr (HsWith expr binds is_with) res_ty
-  = tcMonoExpr expr res_ty			`thenTc` \ (expr', expr_lie) ->
-    mapAndUnzip3Tc tcIPBind binds		`thenTc` \ (avail_ips, binds', bind_lies) ->
+  = getLIE (tcMonoExpr expr res_ty)	`thenM` \ (expr', expr_lie) ->
+    mapAndUnzipM tc_ip_bind binds	`thenM` \ (avail_ips, binds') ->
 
 	-- If the binding binds ?x = E, we  must now 
 	-- discharge any ?x constraints in expr_lie
-    tcSimplifyIPs avail_ips expr_lie		`thenTc` \ (expr_lie', dict_binds) ->
+    tcSimplifyIPs avail_ips expr_lie	`thenM` \ dict_binds ->
     let
 	expr'' = HsLet (mkMonoBind dict_binds [] Recursive) expr'
     in
-    returnTc (HsWith expr'' binds' is_with, expr_lie' `plusLIE` plusLIEs bind_lies)
-
-tcIPBind (ip, expr)
-  = newTyVarTy openTypeKind		`thenTc` \ ty ->
-    tcGetSrcLoc				`thenTc` \ loc ->
-    newIPDict (IPBind ip) ip ty		`thenNF_Tc` \ (ip', ip_inst) ->
-    tcMonoExpr expr ty			`thenTc` \ (expr', lie) ->
-    returnTc (ip_inst, (ip', expr'), lie)
+    returnM (HsWith expr'' binds' is_with)
+  where
+    tc_ip_bind (ip, expr)
+      = newTyVarTy openTypeKind		`thenM` \ ty ->
+  	getSrcLocM			`thenM` \ loc ->
+  	newIPDict (IPBind ip) ip ty	`thenM` \ (ip', ip_inst) ->
+  	tcMonoExpr expr ty		`thenM` \ expr' ->
+  	returnM (ip_inst, (ip', expr'))
 \end{code}
+
+
+%************************************************************************
+%*									*
+		Catch-all
+%*									*
+%************************************************************************
+
+\begin{code}
+tcMonoExpr other _ = pprPanic "tcMonoExpr" (ppr other)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -644,42 +711,41 @@ tcIPBind (ip, expr)
 
 tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
       -> TcType			    		-- Expected result type of application
-      -> TcM (TcExpr, LIE)		    	-- Translated fun and args
+      -> TcM TcExpr			    	-- Translated fun and args
 
 tcApp (HsApp e1 e2) args res_ty 
   = tcApp e1 (e2:args) res_ty		-- Accumulate the arguments
 
 tcApp fun args res_ty
   = 	-- First type-check the function
-    tcExpr_id fun  				`thenTc` \ (fun', lie_fun, fun_ty) ->
+    tcExpr_id fun  				`thenM` \ (fun', fun_ty) ->
 
-    tcAddErrCtxt (wrongArgsCtxt "too many" fun args) (
-	traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_ty)) 	`thenNF_Tc_`
+    addErrCtxt (wrongArgsCtxt "too many" fun args) (
+	traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_ty)) 	`thenM_`
 	split_fun_ty fun_ty (length args)
-    )						`thenTc` \ (expected_arg_tys, actual_result_ty) ->
+    )						`thenM` \ (expected_arg_tys, actual_result_ty) ->
 
 	-- Now typecheck the args
-    mapAndUnzipTc (tcArg fun)
-	  (zip3 args expected_arg_tys [1..])	`thenTc` \ (args', lie_args_s) ->
+    mappM (tcArg fun)
+	  (zip3 args expected_arg_tys [1..])	`thenM` \ args' ->
 
 	-- Unify with expected result after type-checking the args
 	-- so that the info from args percolates to actual_result_ty.
 	-- This is when we might detect a too-few args situation.
 	-- (One can think of cases when the opposite order would give
 	-- a better error message.)
-    tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
-		  (tcSubExp res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
+    addErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
+		  (tcSubExp res_ty actual_result_ty)	`thenM` \ co_fn ->
 
-    returnTc (co_fn <$> foldl HsApp fun' args', 
-	      lie_res `plusLIE` lie_fun `plusLIE` plusLIEs lie_args_s)
+    returnM (co_fn <$> foldl HsApp fun' args') 
 
 
 -- If an error happens we try to figure out whether the
 -- function has been given too many or too few arguments,
 -- and say so
 checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
-  = zonkTcType expected_res_ty	  `thenNF_Tc` \ exp_ty' ->
-    zonkTcType actual_res_ty	  `thenNF_Tc` \ act_ty' ->
+  = zonkTcType expected_res_ty	  `thenM` \ exp_ty' ->
+    zonkTcType actual_res_ty	  `thenM` \ act_ty' ->
     let
       (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
       (env2, act_ty'') = tidyOpenType env1     act_ty'
@@ -693,7 +759,7 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
               | len_exp_args > len_act_args = wrongArgsCtxt "too many" fun args
 	      | otherwise		    = appCtxt fun args
     in
-    returnNF_Tc (env2, message)
+    returnM (env2, message)
 
 
 split_fun_ty :: TcType		-- The type of the function
@@ -702,22 +768,22 @@ split_fun_ty :: TcType		-- The type of the function
 		     TcType)	-- Function result types
 
 split_fun_ty fun_ty 0 
-  = returnTc ([], fun_ty)
+  = returnM ([], fun_ty)
 
 split_fun_ty fun_ty n
   = 	-- Expect the function to have type A->B
-    unifyFunTy fun_ty		`thenTc` \ (arg_ty, res_ty) ->
-    split_fun_ty res_ty (n-1)	`thenTc` \ (arg_tys, final_res_ty) ->
-    returnTc (arg_ty:arg_tys, final_res_ty)
+    unifyFunTy fun_ty		`thenM` \ (arg_ty, res_ty) ->
+    split_fun_ty res_ty (n-1)	`thenM` \ (arg_tys, final_res_ty) ->
+    returnM (arg_ty:arg_tys, final_res_ty)
 \end{code}
 
 \begin{code}
 tcArg :: RenamedHsExpr				-- The function (for error messages)
       -> (RenamedHsExpr, TcSigmaType, Int)	-- Actual argument and expected arg type
-      -> TcM (TcExpr, LIE)			-- Resulting argument and LIE
+      -> TcM TcExpr				-- Resulting argument and LIE
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
-  = tcAddErrCtxt (funAppCtxt the_fun arg arg_no) $
+  = addErrCtxt (funAppCtxt the_fun arg arg_no) $
     tcExpr arg expected_arg_ty
 \end{code}
 
@@ -751,30 +817,71 @@ This gets a bit less sharing, but
 	b) perhaps fewer separated lambdas
 
 \begin{code}
-tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
+tcId :: Name -> TcM (TcExpr, TcType)
 tcId name	-- Look up the Id and instantiate its type
-  = tcLookupId name			`thenNF_Tc` \ id ->
-    case isDataConWrapId_maybe id of
-	Nothing       -> loop (HsVar id) emptyLIE (idType id)
-	Just data_con -> inst_data_con id data_con
+  = tcLookupIdLvl name			`thenM` \ (id, bind_lvl) ->
+
+	-- Check for cross-stage lifting
+    getStage				`thenM` \ use_stage -> 
+    case use_stage of
+      Brack use_lvl ps_var lie_var
+	| use_lvl > bind_lvl && not (isExternalName name)
+	-> 	-- E.g. \x -> [| h x |]
+			-- We must behave as if the reference to x was
+			--	h $(lift x)	
+			-- We use 'x' itself as the splice proxy, used by 
+			-- the desugarer to stitch it all back together
+			-- NB: isExernalName is true of top level things, 
+			-- and false of nested bindings
+	
+	let
+	    id_ty = idType id
+	in
+	checkTc (isTauTy id_ty)	(polySpliceErr id)	`thenM_` 
+		    -- If x is polymorphic, its occurrence sites might
+		    -- have different instantiations, so we can't use plain
+		    -- 'x' as the splice proxy name.  I don't know how to 
+		    -- solve this, and it's probably unimportant, so I'm
+		    -- just going to flag an error for now
+
+	setLIEVar lie_var	(
+	newMethodFromName orig id_ty liftName	`thenM` \ lift ->
+		-- Put the 'lift' constraint into the right LIE
+	
+	-- Update the pending splices
+        readMutVar ps_var			`thenM` \ ps ->
+        writeMutVar ps_var ((name, HsApp (HsVar lift) (HsVar id)) : ps)	`thenM_`
+
+	returnM (HsVar id, id_ty))
+
+      other -> 
+	let
+	   use_lvl = metaLevel use_stage
+	in
+	checkTc (wellStaged bind_lvl use_lvl)
+		(badStageErr id bind_lvl use_lvl)	`thenM_`
+
+	case isDataConWrapId_maybe id of
+		Nothing       -> loop (HsVar id) (idType id)
+		Just data_con -> inst_data_con id data_con
+
   where
     orig = OccurrenceOf name
 
-    loop (HsVar fun_id) lie fun_ty
+    loop (HsVar fun_id) fun_ty
 	| want_method_inst fun_ty
-	= tcInstType VanillaTv fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
+	= tcInstType VanillaTv fun_ty		`thenM` \ (tyvars, theta, tau) ->
 	  newMethodWithGivenTy orig fun_id 
-		(mkTyVarTys tyvars) theta tau	`thenNF_Tc` \ meth ->
-	  loop (HsVar (instToId meth)) 
-	       (unitLIE meth `plusLIE` lie) tau
+		(mkTyVarTys tyvars) theta tau	`thenM` \ meth ->
+	  loop (HsVar (instToId meth)) tau
 
-    loop fun lie fun_ty 
+    loop fun fun_ty 
 	| isSigmaTy fun_ty
-	= tcInstCall orig fun_ty	`thenNF_Tc` \ (inst_fn, inst_lie, tau) ->
-	  loop (inst_fn fun) (inst_lie `plusLIE` lie) tau
+	= tcInstCall orig fun_ty	`thenM` \ (inst_fn, tau) ->
+	  loop (inst_fn fun) tau
 
 	| otherwise
-	= returnNF_Tc (fun, lie, fun_ty)
+	= returnM (fun, fun_ty)
 
     want_method_inst fun_ty 
 	| opt_NoMethodSharing = False	
@@ -794,10 +901,10 @@ tcId name	-- Look up the Id and instantiate its type
 	-- constraints for their silly theta, which no longer appears in
 	-- the type of dataConWrapId.  It's dual to TcPat.tcConstructor
     inst_data_con id data_con
-      = tcInstDataCon orig data_con	`thenNF_Tc` \ (ty_args, ex_dicts, arg_tys, result_ty, stupid_lie, ex_lie, _) ->
-	returnNF_Tc (mkHsDictApp (mkHsTyApp (HsVar id) ty_args) ex_dicts, 
-		     stupid_lie `plusLIE` ex_lie, 
-		     mkFunTys arg_tys result_ty)
+      = tcInstDataCon orig data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
+	extendLIEs ex_dicts		`thenM_`
+	returnM (mkHsDictApp (mkHsTyApp (HsVar id) ty_args) (map instToId ex_dicts), 
+		 mkFunTys arg_tys result_ty)
 \end{code}
 
 Typecheck expression which in most cases will be an Id.
@@ -806,78 +913,14 @@ The expression can return a higher-ranked type, such as
 so we must create a HoleTyVarTy to pass in as the expected tyvar.
 
 \begin{code}
-tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, LIE, TcType)
+tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, TcType)
 tcExpr_id (HsVar name) = tcId name
-tcExpr_id expr         = newHoleTyVarTy			`thenNF_Tc` \ id_ty ->
-			 tcMonoExpr expr id_ty		`thenTc`    \ (expr', lie_id) ->
-			 readHoleResult id_ty		`thenTc`    \ id_ty' ->
-		         returnTc (expr', lie_id, id_ty') 
+tcExpr_id expr         = newHoleTyVarTy			`thenM` \ id_ty ->
+			 tcMonoExpr expr id_ty		`thenM` \ expr' ->
+			 readHoleResult id_ty		`thenM` \ id_ty' ->
+		         returnM (expr', id_ty') 
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{@tcDoStmts@ typechecks a {\em list} of do statements}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcDoStmts PArrComp stmts method_names src_loc res_ty
-  = unifyPArrTy res_ty			  `thenTc` \elt_ty              ->
-    tcStmts (DoCtxt PArrComp) 
-	    (mkPArrTy, elt_ty) stmts      `thenTc` \(stmts', stmts_lie) ->
-    returnTc (HsDo PArrComp stmts'
-		   []		 	-- Unused
-		   res_ty src_loc,
-	      stmts_lie)
-
-tcDoStmts ListComp stmts method_names src_loc res_ty
-  = unifyListTy res_ty			`thenTc` \ elt_ty ->
-    tcStmts (DoCtxt ListComp) 
-	    (mkListTy, elt_ty) stmts	`thenTc` \ (stmts', stmts_lie) ->
-    returnTc (HsDo ListComp stmts'
-		   []			-- Unused
-		   res_ty src_loc,
-	      stmts_lie)
-
-tcDoStmts DoExpr stmts method_names src_loc res_ty
-  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m_ty ->
-    newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
-    unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenTc_`
-
-    tcStmts (DoCtxt DoExpr) (mkAppTy m_ty, elt_ty) stmts	`thenTc`   \ (stmts', stmts_lie) ->
-
-	-- Build the then and zero methods in case we need them
-	-- It's important that "then" and "return" appear just once in the final LIE,
-	-- not only for typechecker efficiency, but also because otherwise during
-	-- simplification we end up with silly stuff like
-	--	then = case d of (t,r) -> t
-	--	then = then
-	-- where the second "then" sees that it already exists in the "available" stuff.
-	--
-    mapNF_Tc (tc_syn_name m_ty) 
-	     (zipEqual "tcDoStmts" monadNames method_names)	`thenNF_Tc` \ stuff ->
-    let
-	(binds, ids, lies) = unzip3 stuff
-    in	
-
-    returnTc (mkHsLet (andMonoBindList binds) $
-	      HsDo DoExpr stmts' ids
-		   res_ty src_loc,
-	      stmts_lie `plusLIE` plusLIEs lies)
-
-  where
-    tc_syn_name :: TcType -> (Name,Name) -> TcM (TypecheckedMonoBinds, Id, LIE)
-    tc_syn_name m_ty (std_nm, usr_nm)
-	= tcSyntaxName DoOrigin m_ty std_nm usr_nm 	`thenTc` \ (expr, lie, expr_ty) ->
-	  case expr of
-	    HsVar v -> returnTc (EmptyMonoBinds, v, lie)
-	    other   -> tcGetUnique		`thenTc` \ uniq ->
-		       let
-			  id = mkSysLocal FSLIT("syn") uniq expr_ty
-		       in
-		       returnTc (VarMonoBind id expr, id, lie)
-\end{code}
 
 %************************************************************************
 %*									*
@@ -907,16 +950,16 @@ tcRecordBinds
 	:: TyCon		-- Type constructor for the record
 	-> [TcType]		-- Args of this type constructor
 	-> RenamedRecordBinds
-	-> TcM (TcRecordBinds, LIE)
+	-> TcM TcRecordBinds
 
 tcRecordBinds tycon ty_args rbinds
-  = mapAndUnzipTc do_bind rbinds	`thenTc` \ (rbinds', lies) ->
-    returnTc (rbinds', plusLIEs lies)
+  = mappM do_bind rbinds
   where
     tenv = mkTopTyVarSubst (tyConTyVars tycon) ty_args
 
-    do_bind (field_lbl_name, rhs, pun_flag)
-      = tcLookupGlobalId field_lbl_name		`thenNF_Tc` \ sel_id ->
+    do_bind (field_lbl_name, rhs)
+      = addErrCtxt (fieldCtxt field_lbl_name)	$
+           tcLookupId field_lbl_name		`thenM` \ sel_id ->
 	let
 	    field_lbl = recordSelectorFieldLabel sel_id
 	    field_ty  = substTy tenv (fieldLabelType field_lbl)
@@ -929,14 +972,12 @@ tcRecordBinds tycon ty_args rbinds
 		-- The caller of tcRecordBinds has already checked
 		-- that all the fields come from the same type
 
-	tcExpr rhs field_ty 			`thenTc` \ (rhs', lie) ->
+	tcExpr rhs field_ty 			`thenM` \ rhs' ->
 
-	returnTc ((sel_id, rhs', pun_flag), lie)
+	returnM (sel_id, rhs')
 
 badFields rbinds data_con
-  = [field_name | (field_name, _, _) <- rbinds,
-		  not (field_name `elem` field_names)
-    ]
+  = filter (not . (`elem` field_names)) (recBindFields rbinds)
   where
     field_names = map fieldLabelName (dataConFieldLabels data_con)
 
@@ -957,7 +998,7 @@ missingFields rbinds data_con
 	  	 not (fieldLabelName fl `elem` field_names_used)
 	  ]
 
-    field_names_used = [ field_name | (field_name, _, _) <- rbinds ]
+    field_names_used = recBindFields rbinds
     field_labels     = dataConFieldLabels data_con
 
     field_info = zipEqual "missingFields"
@@ -975,13 +1016,13 @@ missingFields rbinds data_con
 %************************************************************************
 
 \begin{code}
-tcMonoExprs :: [RenamedHsExpr] -> [TcType] -> TcM ([TcExpr], LIE)
+tcMonoExprs :: [RenamedHsExpr] -> [TcType] -> TcM [TcExpr]
 
-tcMonoExprs [] [] = returnTc ([], emptyLIE)
+tcMonoExprs [] [] = returnM []
 tcMonoExprs (expr:exprs) (ty:tys)
- = tcMonoExpr  expr  ty		`thenTc` \ (expr',  lie1) ->
-   tcMonoExprs exprs tys		`thenTc` \ (exprs', lie2) ->
-   returnTc (expr':exprs', lie1 `plusLIE` lie2)
+ = tcMonoExpr  expr  ty		`thenM` \ expr' ->
+   tcMonoExprs exprs tys	`thenM` \ exprs' ->
+   returnM (expr':exprs')
 \end{code}
 
 
@@ -994,16 +1035,17 @@ tcMonoExprs (expr:exprs) (ty:tys)
 Overloaded literals.
 
 \begin{code}
-tcLit :: HsLit -> TcType -> TcM (TcExpr, LIE)
+tcLit :: HsLit -> TcType -> TcM TcExpr
 tcLit (HsLitLit s _) res_ty
-  = tcLookupClass cCallableClassName			`thenNF_Tc` \ cCallableClass ->
+  = tcLookupClass cCallableClassName			`thenM` \ cCallableClass ->
     newDicts (LitLitOrigin (unpackFS s))
-	     [mkClassPred cCallableClass [res_ty]]	`thenNF_Tc` \ dicts ->
-    returnTc (HsLit (HsLitLit s res_ty), mkLIE dicts)
+	     [mkClassPred cCallableClass [res_ty]]	`thenM` \ dicts ->
+    extendLIEs dicts					`thenM_`
+    returnM (HsLit (HsLitLit s res_ty))
 
 tcLit lit res_ty 
-  = unifyTauTy res_ty (simpleHsLitTy lit)		`thenTc_`
-    returnTc (HsLit lit, emptyLIE)
+  = unifyTauTy res_ty (hsLitType lit)		`thenM_`
+    returnM (HsLit lit)
 \end{code}
 
 
@@ -1013,12 +1055,16 @@ tcLit lit res_ty
 %*									*
 %************************************************************************
 
-Mini-utils:
-
 Boring and alphabetical:
 \begin{code}
 arithSeqCtxt expr
   = hang (ptext SLIT("In an arithmetic sequence:")) 4 (ppr expr)
+
+
+badStageErr id bind_lvl use_lvl
+  = ptext SLIT("Stage error:") <+> quotes (ppr id) <+> 
+	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
+		ptext SLIT("but used at stage") <+> ppr use_lvl]
 
 parrSeqCtxt expr
   = hang (ptext SLIT("In a parallel array sequence:")) 4 (ppr expr)
@@ -1036,6 +1082,9 @@ exprSigCtxt expr
 exprCtxt expr
   = hang (ptext SLIT("In the expression:")) 4 (ppr expr)
 
+fieldCtxt field_name
+  = ptext SLIT("In the") <+> quotes (ppr field_name) <+> ptext SLIT("field of a record")
+
 funAppCtxt fun arg arg_no
   = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
 		    quotes (ppr fun) <> text ", namely"])
@@ -1050,13 +1099,8 @@ parrCtxt expr
 predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
 
-wrongArgsCtxt too_many_or_few fun args
-  = hang (ptext SLIT("Probable cause:") <+> quotes (ppr fun)
-		    <+> ptext SLIT("is applied to") <+> text too_many_or_few 
-		    <+> ptext SLIT("arguments in the call"))
-	 4 (parens (ppr the_app))
-  where
-    the_app = foldl HsApp fun args	-- Used in error messages
+illegalBracket level
+  = ptext SLIT("Illegal bracket at level") <+> ppr level
 
 appCtxt fun args
   = ptext SLIT("In the application") <+> quotes (ppr the_app)
@@ -1070,9 +1114,7 @@ lurkingRank2Err fun fun_ty
 
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
-	 4 (pprQuotedList fields)
-  where
-    fields = [field | (field, _, _) <- rbinds]
+	 4 (pprQuotedList (recBindFields rbinds))
 
 recordUpdCtxt expr = ptext SLIT("In the record update:") <+> ppr expr
 recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
@@ -1089,4 +1131,16 @@ missingFieldCon :: Name -> FieldLabel -> SDoc
 missingFieldCon con field
   = hsep [ptext SLIT("Field") <+> quotes (ppr field),
 	  ptext SLIT("is not initialised")]
+
+polySpliceErr :: Id -> SDoc
+polySpliceErr id
+  = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
+
+wrongArgsCtxt too_many_or_few fun args
+  = hang (ptext SLIT("Probable cause:") <+> quotes (ppr fun)
+		    <+> ptext SLIT("is applied to") <+> text too_many_or_few 
+		    <+> ptext SLIT("arguments in the call"))
+	 4 (parens (ppr the_app))
+  where
+    the_app = foldl HsApp fun args	-- Used in error messages
 \end{code}

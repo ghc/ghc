@@ -21,7 +21,7 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..) )
-import Module		( Module, moduleString )
+import Module		( moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
 import Type		( repType, eqType )
@@ -30,6 +30,7 @@ import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
 			)
 
+import HscTypes		( ForeignStubs(..) )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
 			  CExportSpec(..),
@@ -41,7 +42,6 @@ import TysWiredIn	( unitTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
 import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName )
 import BasicTypes	( Activation( NeverActive ) )
-import ErrUtils         ( addShortWarnLocLine )
 import Outputable
 import Maybe 		( fromJust )
 import FastString
@@ -64,36 +64,28 @@ so we reuse the desugaring code in @DsCCall@ to deal with these.
 type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
 				-- the occurrence analyser will sort it all out
 
-dsForeigns :: Module
-           -> [TypecheckedForeignDecl] 
-	   -> DsM ( [Id]		-- Foreign-exported binders; 
-					-- we have to generate code to register these
-		  , [Binding]
-		  , SDoc	      -- Header file prototypes for
-                                      -- "foreign exported" functions.
-		  , SDoc 	      -- C stubs to use when calling
-                                      -- "foreign exported" functions.
-		  , [FastString]     -- headers that need to be included
-				      -- into C code generated for this module
-		  )
-dsForeigns mod_name fos
-  = foldlDs combine ([], [], empty, empty, []) fos
+dsForeigns :: [TypecheckedForeignDecl] 
+	   -> DsM (ForeignStubs, [Binding])
+dsForeigns fos
+  = foldlDs combine (ForeignStubs empty empty [] [], []) fos
  where
-  combine (acc_feb, acc_f, acc_h, acc_c, acc_header) 
+  combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (ForeignImport id _ spec depr loc)
-    = dsFImport mod_name id spec	           `thenDs` \(bs, h, c, hd) -> 
+    = dsFImport id spec	           `thenDs` \(bs, h, c, hd) -> 
       warnDepr depr loc				   `thenDs` \_              ->
-      returnDs (acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c, hd ++ acc_header)
+      returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) (hd ++ acc_hdrs) acc_feb, 
+		bs ++ acc_f)
 
-  combine (acc_feb, acc_f, acc_h, acc_c, acc_header) 
+  combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) depr loc)
-    = dsFExport mod_name id (idType id) 
+    = dsFExport id (idType id) 
 		ext_nm cconv False                 `thenDs` \(h, c) ->
       warnDepr depr loc				   `thenDs` \_              ->
-      returnDs (id:acc_feb, acc_f, h $$ acc_h, c $$ acc_c, acc_header)
+      returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
+		acc_f)
 
   warnDepr False _   = returnDs ()
-  warnDepr True  loc = dsWarn (addShortWarnLocLine loc msg)
+  warnDepr True  loc = dsWarn (loc, msg)
    where
     msg = ptext SLIT("foreign declaration uses deprecated non-standard syntax")
 \end{code}
@@ -124,36 +116,34 @@ inside returned tuples; but inlining this wrapper is a Really Good Idea
 because it exposes the boxing to the call site.
 
 \begin{code}
-dsFImport :: Module
-	  -> Id
+dsFImport :: Id
 	  -> ForeignImport
 	  -> DsM ([Binding], SDoc, SDoc, [FastString])
-dsFImport modName id (CImport cconv safety header lib spec)
-  = dsCImport modName id spec cconv safety	  `thenDs` \(ids, h, c) ->
+dsFImport id (CImport cconv safety header lib spec)
+  = dsCImport id spec cconv safety	  `thenDs` \(ids, h, c) ->
     returnDs (ids, h, c, if nullFastString header then [] else [header])
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
   --	    support such calls yet; if `nullFastString lib', the value was not given
-dsFImport modName id (DNImport spec)
-  = dsFCall modName id (DNCall spec)	          `thenDs` \(ids, h, c) ->
+dsFImport id (DNImport spec)
+  = dsFCall id (DNCall spec)	          `thenDs` \(ids, h, c) ->
     returnDs (ids, h, c, [])
 
-dsCImport :: Module
-	  -> Id
+dsCImport :: Id
 	  -> CImportSpec
 	  -> CCallConv
 	  -> Safety
 	  -> DsM ([Binding], SDoc, SDoc)
-dsCImport modName id (CLabel cid)       _     _
+dsCImport id (CLabel cid)       _     _
  = ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
    returnDs ([(id, rhs)], empty, empty)
  where
    (resTy, foRhs) = resultWrapper (idType id)
    rhs		  = foRhs (mkLit (MachLabel cid))
-dsCImport modName id (CFunction target) cconv safety
-  = dsFCall modName id (CCall (CCallSpec target cconv safety))
-dsCImport modName id CWrapper           cconv _
-  = dsFExportDynamic modName id cconv
+dsCImport id (CFunction target) cconv safety
+  = dsFCall id (CCall (CCallSpec target cconv safety))
+dsCImport id CWrapper           cconv _
+  = dsFExportDynamic id cconv
 \end{code}
 
 
@@ -164,7 +154,7 @@ dsCImport modName id CWrapper           cconv _
 %************************************************************************
 
 \begin{code}
-dsFCall mod_Name fn_id fcall
+dsFCall fn_id fcall
   = let
 	ty		     = idType fn_id
 	(tvs, fun_ty)        = tcSplitForAllTys ty
@@ -225,8 +215,7 @@ For each `@foreign export foo@' in a module M we generate:
 the user-written Haskell function `@M.foo@'.
 
 \begin{code}
-dsFExport :: Module
-	  -> Id			-- Either the exported Id, 
+dsFExport :: Id			-- Either the exported Id, 
 				-- or the foreign-export-dynamic constructor
 	  -> Type		-- The type of the thing callable from C
 	  -> CLabelString	-- The name to export to C land
@@ -238,7 +227,7 @@ dsFExport :: Module
 		 , SDoc		-- contents of Module_stub.c
 		 )
 
-dsFExport mod_name fn_id ty ext_name cconv isDyn
+dsFExport fn_id ty ext_name cconv isDyn
    = 
      let
         (tvs,sans_foralls)		= tcSplitForAllTys ty
@@ -265,8 +254,6 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
      )
 					`thenDs` \ (res_ty,		-- t
 						    is_IO_res_ty) ->	-- Bool
-     getModuleDs
-					`thenDs` \ mod -> 
      let
       	(h_stub, c_stub) 
            = mkFExportCBits ext_name 
@@ -299,23 +286,23 @@ foreign export "f_helper" f_helper :: StablePtr (Addr -> Int -> IO Int) -> Addr 
 \end{verbatim}
 
 \begin{code}
-dsFExportDynamic :: Module
-		 -> Id
+dsFExportDynamic :: Id
 		 -> CCallConv
 		 -> DsM ([Binding], SDoc, SDoc)
-dsFExportDynamic mod_name id cconv
-  =  newSysLocalDs ty					 `thenDs` \ fe_id ->
+dsFExportDynamic id cconv
+  =  newSysLocalDs ty				 `thenDs` \ fe_id ->
+     getModuleDs				`thenDs` \ mod_name -> 
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
        fe_nm	   = mkFastString (moduleString mod_name ++ "_" ++ toCName fe_id)
      in
-     dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
-     newSysLocalDs arg_ty				`thenDs` \ cback ->
-     dsLookupGlobalValue newStablePtrName		`thenDs` \ newStablePtrId ->
+     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
+     newSysLocalDs arg_ty			`thenDs` \ cback ->
+     dsLookupGlobalId newStablePtrName	`thenDs` \ newStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
      in
-     dsLookupGlobalValue bindIOName		        `thenDs` \ bindIOId ->
+     dsLookupGlobalId bindIOName		        `thenDs` \ bindIOId ->
      newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
      let
       stbl_app cont ret_ty 

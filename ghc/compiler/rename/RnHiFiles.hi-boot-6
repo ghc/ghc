@@ -3,5 +3,5 @@ module RnHiFiles where
 loadInterface
 	:: Outputable.SDoc
 	-> Module.ModuleName
-	-> Module.WhereFrom
-	-> RnMonad.RnM d HscTypes.ModIface
+	-> TcRnTypes.WhereFrom
+	-> TcRnTypes.TcRn m HscTypes.ModIface

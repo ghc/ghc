@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.21 2002/08/29 15:44:15 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.22 2002/09/13 15:02:34 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -16,9 +16,9 @@ import DriverUtil       ( add, softGetDirectoryContents )
 import DriverFlags
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( ModuleName, moduleNameUserString, isHomeModule )
+import Module		( ModuleName, ModLocation(..),
+			  moduleNameUserString, isHomeModule )
 import Finder		( findModuleDep )
-import HscTypes		( ModuleLocation(..) )
 import Util             ( global )
 import Panic
 

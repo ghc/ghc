@@ -50,15 +50,15 @@ module TcType (
 
   ---------------------------------
   -- Misc type manipulators
-  deNoteType, 
-  namesOfType, namesOfDFunHead,
+  deNoteType, classNamesOfTheta,
+  tyClsNamesOfType, tyClsNamesOfDFunHead, 
   getDFunTyKey,
 
   ---------------------------------
   -- Predicate types  
-  PredType, getClassPredTys_maybe, getClassPredTys, 
+  getClassPredTys_maybe, getClassPredTys, 
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
-  mkDictTy, tcSplitPredTy_maybe, predTyUnique,
+  mkDictTy, tcSplitPredTy_maybe, 
   isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
 
@@ -105,6 +105,7 @@ module TcType (
 
 
 import {-# SOURCE #-} PprType( pprType )
+-- PprType imports TcType so that it can print intelligently
 
 -- friends:
 import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
@@ -736,34 +737,38 @@ deNoteSourceType (IParam n ty)    = IParam n (deNoteType ty)
 deNoteSourceType (NType tc tys)   = NType tc (map deNoteType tys)
 \end{code}
 
-Find the free names of a type, including the type constructors and classes it mentions
-This is used in the front end of the compiler
+Find the free tycons and classes of a type.  This is used in the front
+end of the compiler.
 
 \begin{code}
-namesOfType :: Type -> NameSet
-namesOfType (TyVarTy tv)		= unitNameSet (getName tv)
-namesOfType (TyConApp tycon tys)	= unitNameSet (getName tycon) `unionNameSets` namesOfTypes tys
-namesOfType (NoteTy (SynNote ty1) ty2)	= namesOfType ty1
-namesOfType (NoteTy other_note    ty2)	= namesOfType ty2
-namesOfType (SourceTy (IParam n ty))	= namesOfType ty
-namesOfType (SourceTy (ClassP cl tys))	= unitNameSet (getName cl) `unionNameSets` namesOfTypes tys
-namesOfType (SourceTy (NType tc tys))	= unitNameSet (getName tc) `unionNameSets` namesOfTypes tys
-namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
-namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
-namesOfType (ForAllTy tyvar ty)		= namesOfType ty `delFromNameSet` getName tyvar
+tyClsNamesOfType :: Type -> NameSet
+tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
+tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (NoteTy (SynNote ty1) ty2) = tyClsNamesOfType ty1
+tyClsNamesOfType (NoteTy other_note    ty2) = tyClsNamesOfType ty2
+tyClsNamesOfType (SourceTy (IParam n ty))   = tyClsNamesOfType ty
+tyClsNamesOfType (SourceTy (ClassP cl tys)) = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (SourceTy (NType tc tys))  = unitNameSet (getName tc) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
+tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
+tyClsNamesOfType (ForAllTy tyvar ty)	    = tyClsNamesOfType ty
 
-namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
+tyClsNamesOfTypes tys = foldr (unionNameSets . tyClsNamesOfType) emptyNameSet tys
 
-namesOfDFunHead :: Type -> NameSet
+tyClsNamesOfDFunHead :: Type -> NameSet
 -- Find the free type constructors and classes 
 -- of the head of the dfun instance type
 -- The 'dfun_head_type' is because of
 --	instance Foo a => Baz T where ...
 -- The decl is an orphan if Baz and T are both not locally defined,
 --	even if Foo *is* locally defined
-namesOfDFunHead dfun_ty = case tcSplitSigmaTy dfun_ty of
-				(tvs,_,head_ty) -> delListFromNameSet (namesOfType head_ty)
-								      (map getName tvs)
+tyClsNamesOfDFunHead dfun_ty 
+  = case tcSplitSigmaTy dfun_ty of
+	(tvs,_,head_ty) -> tyClsNamesOfType head_ty
+
+classNamesOfTheta :: ThetaType -> [Name]
+-- Looks just for ClassP things; maybe it should check
+classNamesOfTheta preds = [ getName c | ClassP c _ <- preds ]
 \end{code}
 
 

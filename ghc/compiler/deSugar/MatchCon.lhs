@@ -10,7 +10,7 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( OutPat(..) )
+import HsSyn		( Pat(..), HsConDetails(..) )
 
 import DsMonad
 import DsUtils
@@ -83,7 +83,7 @@ matchConFamily (var:vars) eqns_info
 	-- Sort into equivalence classes by the unique on the constructor
 	-- All the EqnInfos should start with a ConPat
 	eqn_groups = equivClassesByUniq get_uniq eqns_info
-	get_uniq (EqnInfo _ _ (ConPat data_con _ _ _ _ : _) _) = getUnique data_con
+	get_uniq (EqnInfo _ _ (ConPatOut data_con _ _ _ _ : _) _) = getUnique data_con
     in
 	-- Now make a case alternative out of each group
     mapDs (match_con vars) eqn_groups	`thenDs` \ alts ->
@@ -96,7 +96,7 @@ more-or-less the @matchCon@/@matchClause@ functions on page~94 in
 Wadler's chapter in SLPJ.
 
 \begin{code}
-match_con vars (eqn1@(EqnInfo _ _ (ConPat data_con _ ex_tvs ex_dicts arg_pats : _) _)
+match_con vars (eqn1@(EqnInfo _ _ (ConPatOut data_con (PrefixCon arg_pats) _ ex_tvs ex_dicts : _) _)
 		: other_eqns)
   = -- Make new vars for the con arguments; avoid new locals where possible
     mapDs selectMatchVar arg_pats	`thenDs` \ arg_vars ->
@@ -117,14 +117,14 @@ match_con vars (eqn1@(EqnInfo _ _ (ConPat data_con _ ex_tvs ex_dicts arg_pats : 
     returnDs (data_con, ex_tvs ++ ex_dicts ++ arg_vars, match_result')
   where
     shift_con_pat :: EquationInfo -> EquationInfo
-    shift_con_pat (EqnInfo n ctx (ConPat _ _ _ _ arg_pats : pats) match_result)
+    shift_con_pat (EqnInfo n ctx (ConPatOut _ (PrefixCon arg_pats) _ _ _ : pats) match_result)
       = EqnInfo n ctx (arg_pats ++ pats) match_result
 
     other_pats = [p | EqnInfo _ _ (p:_) _ <- other_eqns]
 
     var_prs = concat [ (ex_tvs'   `zip` ex_tvs) ++ 
 		       (ex_dicts' `zip` ex_dicts) 
-		     | ConPat _ _ ex_tvs' ex_dicts' _ <- other_pats ]
+		     | ConPatOut _ _ _ ex_tvs' ex_dicts' <- other_pats ]
 
     do_subst e = substExpr subst e
 	       where

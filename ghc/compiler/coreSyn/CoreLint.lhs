@@ -27,8 +27,7 @@ import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( doIfSet, dumpIfSet_core, ghcExit, Message, showPass,
-			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
-                          WarnMsg, pprBagOfWarnings)
+			  addErrLocHdrLine )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Type		( Type, tyVarsOfType, eqType,
 			  splitFunTy_maybe, mkTyVarTy,
@@ -481,9 +480,9 @@ lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
 \begin{code}
 type LintM a = [LintLocInfo] 	-- Locations
 	    -> IdSet		-- Local vars in scope
-	    -> Bag ErrMsg	-- Error messages so far
-            -> Bag WarnMsg      -- Warning messages so far
-	    -> (Maybe a, Bag ErrMsg, Bag WarnMsg)  -- Result and error/warning messages (if any)
+	    -> Bag Message	-- Error messages so far
+            -> Bag Message      -- Warning messages so far
+	    -> (Maybe a, Bag Message, Bag Message)  -- Result and error/warning messages (if any)
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -498,11 +497,12 @@ data LintLocInfo
 initL :: LintM a -> (Maybe Message {- errors -}, Maybe Message {- warnings -})
 initL m
   = case m [] emptyVarSet emptyBag emptyBag of
-      (_, errs, warns) -> (ifNonEmptyBag errs  pprBagOfErrors,
-                           ifNonEmptyBag warns pprBagOfWarnings)
+      (_, errs, warns) -> (ifNonEmptyBag errs,
+                           ifNonEmptyBag warns)
   where
-    ifNonEmptyBag bag f | isEmptyBag bag = Nothing
-                        | otherwise      = Just (f bag)
+    ifNonEmptyBag bag 
+	| isEmptyBag bag = Nothing
+        | otherwise      = Just (vcat (punctuate (text "") (bagToList bag)))
 
 returnL :: a -> LintM a
 returnL r loc scope errs warns = (Just r, errs, warns)
@@ -537,7 +537,7 @@ checkL False msg = addErrL msg
 addErrL :: Message -> LintM a
 addErrL msg loc scope errs warns = (Nothing, addErr errs msg loc, warns)
 
-addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
+addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
 -- errors or warnings, actually... they're the same type.
 addErr errs_so_far msg locs
   = ASSERT( notNull locs )

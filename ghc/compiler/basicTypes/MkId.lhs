@@ -49,7 +49,6 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
 			)
-import Module		( Module )
 import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..), nullAddrLit )
@@ -58,8 +57,7 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
-import Name		( mkWiredInName, mkFCallName, Name )
-import OccName		( mkVarOcc )
+import Name		( mkFCallName, Name )
 import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, 
@@ -98,7 +96,6 @@ import FastString
 import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
 import List		( nubBy )
-import Char             ( ord )
 \end{code}		
 
 %************************************************************************
@@ -811,7 +808,7 @@ another gun with which to shoot yourself in the foot.
 \begin{code}
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
-  = pcMiscPrelId unsafeCoerceIdKey gHC_PRIM FSLIT("unsafeCoerce#") ty info
+  = pcMiscPrelId unsafeCoerceName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -826,13 +823,13 @@ unsafeCoerceId
 -- The reason is is here is because we don't provide 
 -- a way to write this literal in Haskell.
 nullAddrId 
-  = pcMiscPrelId nullAddrIdKey gHC_PRIM FSLIT("nullAddr#") addrPrimTy info
+  = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setUnfoldingInfo` 
 	   mkCompulsoryUnfolding (Lit nullAddrLit)
 
 seqId
-  = pcMiscPrelId seqIdKey gHC_PRIM FSLIT("seq") ty info
+  = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -849,7 +846,7 @@ seqId
 -- the info in PrelBase.hi.  This is important, because the strictness
 -- analyser will spot it as strict!
 lazyId
-  = pcMiscPrelId lazyIdKey pREL_BASE FSLIT("lazy") ty info
+  = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
@@ -865,7 +862,7 @@ evaluate its argument and call the dataToTag# primitive.
 
 \begin{code}
 getTagId
-  = pcMiscPrelId getTagIdKey gHC_PRIM FSLIT("getTag#") ty info
+  = pcMiscPrelId getTagName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
@@ -890,8 +887,7 @@ This comes up in strictness analysis
 
 \begin{code}
 realWorldPrimId	-- :: State# RealWorld
-  = pcMiscPrelId realWorldPrimIdKey gHC_PRIM FSLIT("realWorld#")
-		 realWorldStatePrimTy
+  = pcMiscPrelId realWorldName realWorldStatePrimTy
 		 (noCafIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated
 	-- which in turn makes Simplify.interestingArg return True,
@@ -937,22 +933,21 @@ mkRuntimeErrorApp err_id res_ty err_msg
   where
     err_string = Lit (MachStr (mkFastString (stringToUtf8 err_msg)))
 
-rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrIdKey 	    	 FSLIT("recSelError")
-rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorIdKey 	    	 FSLIT("runtimeError")
-
-iRREFUT_PAT_ERROR_ID		= mkRuntimeErrorId irrefutPatErrorIdKey	         FSLIT("irrefutPatError")
-rEC_CON_ERROR_ID		= mkRuntimeErrorId recConErrorIdKey    		 FSLIT("recConError")
-nON_EXHAUSTIVE_GUARDS_ERROR_ID	= mkRuntimeErrorId nonExhaustiveGuardsErrorIdKey FSLIT("nonExhaustiveGuardsError")
-pAT_ERROR_ID			= mkRuntimeErrorId patErrorIdKey		 FSLIT("patError")
-nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorIdKey	 FSLIT("noMethodBindingError")
+rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrorName
+rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorName
+iRREFUT_PAT_ERROR_ID		= mkRuntimeErrorId irrefutPatErrorName
+rEC_CON_ERROR_ID		= mkRuntimeErrorId recConErrorName
+nON_EXHAUSTIVE_GUARDS_ERROR_ID	= mkRuntimeErrorId nonExhaustiveGuardsErrorName
+pAT_ERROR_ID			= mkRuntimeErrorId patErrorName
+nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 
 -- The runtime error Ids take a UTF8-encoded string as argument
-mkRuntimeErrorId key name = pc_bottoming_Id key pREL_ERR name runtimeErrorTy
-runtimeErrorTy 		  = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
+mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
+runtimeErrorTy 	      = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
 \end{code}
 
 \begin{code}
-eRROR_ID = pc_bottoming_Id errorIdKey pREL_ERR FSLIT("error") errorTy
+eRROR_ID = pc_bottoming_Id errorName errorTy
 
 errorTy  :: Type
 errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
@@ -969,21 +964,17 @@ errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy
 %************************************************************************
 
 \begin{code}
-pcMiscPrelId :: Unique{-IdKey-} -> Module -> FastString -> Type -> IdInfo -> Id
-pcMiscPrelId key mod str ty info
-  = let
-	name = mkWiredInName mod (mkVarOcc str) key
-	imp  = mkVanillaGlobal name ty info -- the usual case...
-    in
-    imp
+pcMiscPrelId :: Name -> Type -> IdInfo -> Id
+pcMiscPrelId name ty info
+  = mkVanillaGlobal name ty info
     -- We lie and say the thing is imported; otherwise, we get into
     -- a mess with dependency analysis; e.g., core2stg may heave in
     -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
     -- being compiled, then it's just a matter of luck if the definition
     -- will be in "the right place" to be in scope.
 
-pc_bottoming_Id key mod name ty
- = pcMiscPrelId key mod name ty bottoming_info
+pc_bottoming_Id name ty
+ = pcMiscPrelId name ty bottoming_info
  where
     bottoming_info = hasCafIdInfo `setAllStrictnessInfo` Just strict_sig
 	-- Do *not* mark them as NoCafRefs, because they can indeed have

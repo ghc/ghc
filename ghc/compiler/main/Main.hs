@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.110 2002/09/06 14:35:44 simonmar Exp $
+-- $Id: Main.hs,v 1.111 2002/09/13 15:02:35 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -29,13 +29,13 @@ import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
 import Packages		( showPackages )
 
-import DriverPipeline	( doLink, doMkDLL, genPipeline, pipeLoop )
+import DriverPipeline	( staticLink, doMkDLL, genPipeline, pipeLoop )
 import DriverState	( buildCoreToDo, buildStgToDo,
-			  findBuildTag, getPackageInfo, unregFlags, 
+			  findBuildTag, getPackageInfo, getPackageConfigMap,
+			  getPackageExtraGhcOpts, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
-			  v_Cmdline_libraries, v_Keep_tmp_files, v_Ld_inputs,
+			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_OptLevel, v_Output_file, v_Output_hi, 
-			  v_Package_details, v_Ways, getPackageExtraGhcOpts,
 			  readPackageConf, verifyOutputFiles
 			)
 import DriverFlags	( buildStaticHscOpts,
@@ -52,6 +52,7 @@ import CmdLineOpts	( dynFlag, restoreDynFlags,
 			  DynFlags(..), HscLang(..), v_Static_hsc_opts,
 			  defaultHscLang
 			)
+import BasicTypes	( failed )
 import Outputable
 import Util
 import Panic		( GhcException(..), panic )
@@ -239,7 +240,7 @@ main =
    when (verb >= 2) 
 	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
-   pkg_details <- readIORef v_Package_details
+   pkg_details <- getPackageConfigMap
    showPackages pkg_details
 
    when (verb >= 3) 
@@ -304,7 +305,7 @@ main =
    o_files <- mapM compileFile srcs
 
    when (mode == DoMkDependHS) endMkDependHS
-   when (mode == DoLink) (doLink o_files)
+   when (mode == DoLink) (staticLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
 
 
@@ -319,8 +320,8 @@ beginMake fileish_args
 	 _     -> do dflags <- getDynFlags 
 		     state <- cmInit Batch
 		     graph <- cmDepAnal state dflags mods
-		     (_, ok, _) <- cmLoadModules state dflags graph
-		     when (not ok) (exitWith (ExitFailure 1))
+		     (_, ok_flag, _) <- cmLoadModules state dflags graph
+		     when (failed ok_flag) (exitWith (ExitFailure 1))
 		     return ()
 
 
@@ -329,13 +330,11 @@ beginInteractive :: [String] -> IO ()
 beginInteractive = throwDyn (CmdLineError "not built for interactive use")
 #else
 beginInteractive fileish_args
-  = do minus_ls <- readIORef v_Cmdline_libraries
+  = do state <- cmInit Interactive
 
        let (objs, mods) = partition objish_file fileish_args
-	   libs = map Object objs ++ map DLL minus_ls
 
-       state <- cmInit Interactive
-       interactiveUI state mods libs
+       interactiveUI state mods objs
 #endif
 
 checkOptions :: [String] -> IO ()

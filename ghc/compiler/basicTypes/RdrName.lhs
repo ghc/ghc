@@ -10,14 +10,16 @@ module RdrName (
 	RdrName,
 
 	-- Construction
-	mkRdrUnqual, mkRdrQual, mkRdrOrig, mkRdrUnqual,
-	mkUnqual, mkQual, mkIfaceOrig, mkOrig,
+	mkRdrUnqual, mkRdrQual, 
+	mkUnqual, mkQual, mkOrig, mkIfaceOrig, 
+	nameRdrName, getRdrName, 
 	qualifyRdrName, unqualifyRdrName, mkRdrNameWkr,
 	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
-	rdrNameModule, rdrNameOcc, setRdrNameOcc,
-	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isUnqual, isOrig,
+	rdrNameModule, rdrNameOcc, setRdrNameSpace,
+	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isUnqual, 
+	isOrig, isExact, isExact_maybe,
 
 	-- Environment
 	RdrNameEnv, 
@@ -32,13 +34,15 @@ module RdrName (
 
 import OccName	( NameSpace, tcName,
 		  OccName, UserFS, EncodedFS,
-		  mkSysOccFS,
-		  mkOccFS, mkVarOcc,
+		  mkSysOccFS, setOccNameSpace,
+		  mkOccFS, mkVarOcc, occNameFlavour,
 		  isDataOcc, isTvOcc, isTcOcc, mkWorkerOcc
 		)
 import Module   ( ModuleName,
 		  mkSysModuleNameFS, mkModuleNameFS
 		)
+import Name	( Name, NamedThing(getName), nameModule, nameOccName )
+import Module	( moduleName )
 import FiniteMap
 import Outputable
 import Binary
@@ -53,21 +57,27 @@ import Util	( thenCmp )
 %************************************************************************
 
 \begin{code}
-data RdrName = RdrName Qual OccName
-  {-! derive: Binary !-}
+data RdrName 
+  = Unqual OccName
+	-- Used for ordinary, unqualified occurrences 
 
-data Qual
-  = Unqual
+  | Qual ModuleName OccName
+	-- A qualified name written by the user in 
+	-- *source* code.  The module isn't necessarily 
+	-- the module where the thing is defined; 
+	-- just the one from which it is imported
 
-  | Qual ModuleName	-- A qualified name written by the user in source code
-			-- The module isn't necessarily the module where
-			-- the thing is defined; just the one from which it
-			-- is imported
-
-  | Orig ModuleName	-- This is an *original* name; the module is the place
-			-- where the thing was defined
-  {-! derive: Binary !-}
-
+  | Orig ModuleName OccName
+	-- An original name; the module is the *defining* module.
+	-- This is used when GHC generates code that will be fed
+	-- into the renamer (e.g. from deriving clauses), but where
+	-- we want to say "Use Prelude.map dammit".  
+ 
+  | Exact Name
+	-- We know exactly the Name. This is used 
+	--  (a) when the parser parses built-in syntax like "[]" 
+	--	and "(,)", but wants a RdrName from it
+	--  (b) possibly, by the meta-programming stuff
 \end{code}
 
 
@@ -79,52 +89,71 @@ data Qual
 
 \begin{code}
 rdrNameModule :: RdrName -> ModuleName
-rdrNameModule (RdrName (Qual m) _) = m
-rdrNameModule (RdrName (Orig m) _) = m
-rdrNameModule n			   = pprPanic "rdrNameModule" (ppr n)
+rdrNameModule (Qual m _) = m
+rdrNameModule (Orig m _) = m
+rdrNameModule (Exact n)  = moduleName (nameModule n)
+rdrNameModule (Unqual n) = pprPanic "rdrNameModule" (ppr n)
 
 rdrNameOcc :: RdrName -> OccName
-rdrNameOcc (RdrName _ occ) = occ
+rdrNameOcc (Qual _ occ) = occ
+rdrNameOcc (Unqual occ) = occ
+rdrNameOcc (Orig _ occ) = occ
+rdrNameOcc (Exact name) = nameOccName name
 
-setRdrNameOcc :: RdrName -> OccName -> RdrName
-setRdrNameOcc (RdrName q _) occ = RdrName q occ
+setRdrNameSpace :: RdrName -> NameSpace -> RdrName
+-- This rather gruesome function is used mainly by the parser
+-- When parsing		data T a = T | T1 Int
+-- we parse the data constructors as *types* because of parser ambiguities,
+-- so then we need to change the *type constr* to a *data constr*
+--
+-- The original-name case *can* occur when parsing
+-- 		data [] a = [] | a : [a]
+-- For the orig-name case we return an unqualified name.
+setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace occ ns)
+setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace occ ns)
+setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace occ ns)
+setRdrNameSpace (Exact n)    ns = Unqual (setOccNameSpace (nameOccName n) ns)
 \end{code}
 
 \begin{code}
 	-- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
-mkRdrUnqual occ = RdrName Unqual occ
+mkRdrUnqual occ = Unqual occ
 
 mkRdrQual :: ModuleName -> OccName -> RdrName
-mkRdrQual mod occ = RdrName (Qual mod) occ
+mkRdrQual mod occ = Qual mod occ
 
-mkRdrOrig :: ModuleName -> OccName -> RdrName
-mkRdrOrig mod occ = RdrName (Orig mod) occ
+mkOrig :: ModuleName -> OccName -> RdrName
+mkOrig mod occ = Orig mod occ
 
 mkIfaceOrig :: NameSpace -> (EncodedFS, EncodedFS) -> RdrName
-mkIfaceOrig ns (m,n) = RdrName (Orig (mkSysModuleNameFS m)) (mkSysOccFS ns n)
+mkIfaceOrig ns (m,n) = Qual (mkSysModuleNameFS m) (mkSysOccFS ns n)
 
 
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
 mkUnqual :: NameSpace -> UserFS -> RdrName
-mkUnqual sp n = RdrName Unqual (mkOccFS sp n)
+mkUnqual sp n = Unqual (mkOccFS sp n)
 
 mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
-mkQual sp (m, n) = RdrName (Qual (mkModuleNameFS m)) (mkOccFS sp n)
+mkQual sp (m, n) = Qual (mkModuleNameFS m) (mkOccFS sp n)
 
-mkOrig :: NameSpace -> ModuleName -> UserFS -> RdrName
-mkOrig sp mod n = RdrName (Orig mod) (mkOccFS sp n)
+getRdrName :: NamedThing thing => thing -> RdrName
+getRdrName name = Exact (getName name)
+
+nameRdrName :: Name -> RdrName
+nameRdrName name = Exact name
 
 qualifyRdrName :: ModuleName -> RdrName -> RdrName
 	-- Sets the module name of a RdrName, even if it has one already
-qualifyRdrName mod (RdrName _ occ) = RdrName (Qual mod) occ
+qualifyRdrName mod rn = Qual mod (rdrNameOcc rn)
 
 unqualifyRdrName :: RdrName -> RdrName
-unqualifyRdrName (RdrName _ occ) = RdrName Unqual occ
+unqualifyRdrName rdr_name = Unqual (rdrNameOcc rdr_name)
 
 mkRdrNameWkr :: RdrName -> RdrName 	-- Worker-ify it
-mkRdrNameWkr (RdrName qual occ) = RdrName qual (mkWorkerOcc occ)
+mkRdrNameWkr rdr_name = Qual (rdrNameModule rdr_name)
+		 	     (mkWorkerOcc (rdrNameOcc rdr_name))
 \end{code}
 
 \begin{code}
@@ -133,24 +162,30 @@ mkRdrNameWkr (RdrName qual occ) = RdrName qual (mkWorkerOcc occ)
 	-- the renamer.  We can't just put "error..." because
 	-- we sometimes want to print out stuff after reading but
 	-- before renaming
-dummyRdrVarName = RdrName Unqual (mkVarOcc FSLIT("V-DUMMY"))
-dummyRdrTcName  = RdrName Unqual (mkOccFS tcName FSLIT("TC-DUMMY"))
+dummyRdrVarName = Unqual (mkVarOcc FSLIT("V-DUMMY"))
+dummyRdrTcName  = Unqual (mkOccFS tcName FSLIT("TC-DUMMY"))
 \end{code}
 
 
 \begin{code}
-isRdrDataCon (RdrName _ occ) = isDataOcc occ
-isRdrTyVar   (RdrName _ occ) = isTvOcc occ
-isRdrTc      (RdrName _ occ) = isTcOcc occ
+isRdrDataCon rn = isDataOcc (rdrNameOcc rn)
+isRdrTyVar   rn = isTvOcc   (rdrNameOcc rn)
+isRdrTc      rn = isTcOcc   (rdrNameOcc rn)
 
-isUnqual (RdrName Unqual _) = True
-isUnqual other		    = False
+isUnqual (Unqual _) = True
+isUnqual other	    = False
 
-isQual (RdrName (Qual _) _) = True
-isQual _		    = False
+isQual (Qual _ _) = True
+isQual _	  = False
 
-isOrig (RdrName (Orig _)    _) = True
-isOrig other		       = False
+isOrig (Orig _ _) = True
+isOrig _	  = False
+
+isExact (Exact _) = True
+isExact other	= False
+
+isExact_maybe (Exact n) = Just n
+isExact_maybe other	  = Nothing
 \end{code}
 
 
@@ -162,13 +197,19 @@ isOrig other		       = False
 
 \begin{code}
 instance Outputable RdrName where
-    ppr (RdrName qual occ) = pp_qual qual <> ppr occ
-			   where
-			     pp_qual Unqual      = empty
-			     pp_qual (Qual mod)  = ppr mod <> dot
-			     pp_qual (Orig mod)  = ppr mod <> dot
+    ppr (Exact name)   = ppr name
+    ppr (Unqual occ)   = ppr occ <+> ppr_name_space occ
+    ppr (Qual mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
+    ppr (Orig mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
 
-pprUnqualRdrName (RdrName qual occ) = ppr occ
+ppr_name_space occ = ifPprDebug (parens (text (occNameFlavour occ)))
+
+instance OutputableBndr RdrName where
+    pprBndr _ n 
+	| isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
+	| otherwise		 = ppr n
+
+pprUnqualRdrName rdr_name = ppr (rdrNameOcc rdr_name)
 
 instance Eq RdrName where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
@@ -180,16 +221,20 @@ instance Ord RdrName where
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
 
-    compare (RdrName q1 o1) (RdrName q2 o2)
-	= (o1  `compare` o2) `thenCmp` 
-	  (q1  `cmpQual` q2) 
-
-cmpQual Unqual	    Unqual      = EQ
-cmpQual (Qual m1)   (Qual m2)   = m1 `compare` m2
-cmpQual (Orig m1)   (Orig m2)   = m1 `compare` m2
-cmpQual Unqual      _	        = LT
-cmpQual (Qual _)    (Orig _)    = LT
-cmpQual _	    _	        = GT
+	-- Unqual < Qual < Orig < Exact
+    compare (Qual m1 o1) (Qual m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2) 
+    compare (Orig m1 o1) (Orig m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2) 
+    compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
+    compare (Exact n1)    (Exact n2)  = n1 `compare` n2
+ 
+    compare (Unqual _)   _ 	      = LT
+  
+    compare (Qual _ _)   (Orig _ _)   = LT
+    compare (Qual _ _)   (Exact _)    = LT
+ 
+    compare (Orig _ _)   (Exact _)    = LT
+ 
+    compare _		 _	      = GT
 \end{code}
 
 
@@ -221,35 +266,34 @@ rdrEnvToList    = fmToList
 elemRdrEnv      = elemFM
 foldRdrEnv	= foldFM
 \end{code}
-\begin{code}
-{-* Generated by DrIFT-v1.0 : Look, but Don't Touch. *-}
-instance Binary RdrName where
-    put_ bh (RdrName aa ab) = do
-	    put_ bh aa
-	    put_ bh ab
-    get bh = do
-	  aa <- get bh
-	  ab <- get bh
-	  return (RdrName aa ab)
 
-instance Binary Qual where
-    put_ bh Unqual = do
+\begin{code}
+instance Binary RdrName where
+    put_ bh (Unqual aa) = do
 	    putByte bh 0
-    put_ bh (Qual aa) = do
+	    put_ bh aa
+
+    put_ bh (Qual aa ab) = do
 	    putByte bh 1
 	    put_ bh aa
-    put_ bh (Orig ab) = do
-	    putByte bh 2
 	    put_ bh ab
+
+    put_ bh (Orig aa ab) = do
+	    putByte bh 2
+	    put_ bh aa
+	    put_ bh ab
+
+    put_ bh (Exact n) = pprPanic "No Binary instance for RdrName.Exact" (ppr n)
+
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return Unqual
-	      1 -> do aa <- get bh
-		      return (Qual aa)
-	      _ -> do ab <- get bh
-		      return (Orig ab)
-
---  Imported from other files :-
-
+	  h <- getByte bh
+	  case h of
+	    0 -> do aa <- get bh
+		    return (Unqual aa)
+	    1 -> do aa <- get bh
+		    ab <- get bh
+		    return (Qual aa ab)
+	    _ -> do aa <- get bh
+		    ab <- get bh
+		    return (Orig aa ab)
 \end{code}

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.221 2002/09/06 14:35:43 simonmar Exp $
+# $Id: Makefile,v 1.222 2002/09/13 15:02:25 simonpj Exp $
 
 TOP = ..
 
@@ -101,10 +101,13 @@ CLEAN_FILES += $(CONFIG_HS)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis compMan ndpFlatten
+  profiling parser usageSP cprAnalysis compMan ndpFlatten 
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
+
+# HsGeneric.hs is not used just now
+EXCLUDED_SRCS += hsSyn/HsGeneric.hs
 
 ifeq ($(GhcWithNativeCodeGen),YES)
 ALL_DIRS += nativeGen
@@ -132,15 +135,17 @@ compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
-ifeq "$(GhcWithInterpreter)" "YES"
-ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -DGHCI -package readline
+ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
+# Yes, include the interepreter, readline, and Template Haskell extensions
+SRC_HC_OPTS += -DGHCI -package readline -package haskell-src
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS += -package unix
 endif
 ALL_DIRS += ghci
-endif
-endif
+else
+# No interpreter, so exclude Template Haskell modules
+EXCLUDED_SRCS += deSugar/DsMeta.hs typecheck/TcSplice.lhs hsSyn/Convert.lhs
+endif 
 
 # There are some C files to include in HS_PROG, so add these to HS_OBJS
 HS_OBJS	 += $(C_OBJS)

@@ -8,11 +8,11 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import Name 		( isLexSym )
-import Module		( ModuleName, WhereFrom )
+import Module		( ModuleName )
 import Outputable
 import FastString
 import SrcLoc		( SrcLoc )
+import Char		( isAlpha )
 \end{code}
 
 %************************************************************************
@@ -25,7 +25,7 @@ One per \tr{import} declaration in a module.
 \begin{code}
 data ImportDecl name
   = ImportDecl	  ModuleName			-- module name
-		  WhereFrom
+		  Bool				-- True <=> {-# SOURCE #-} import
 		  Bool				-- True => qualified
 		  (Maybe ModuleName)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
@@ -35,7 +35,7 @@ data ImportDecl name
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
     ppr (ImportDecl mod from qual as spec _)
-      = hang (hsep [ptext SLIT("import"), ppr from, 
+      = hang (hsep [ptext SLIT("import"), ppr_imp from, 
                     pp_qual qual, ppr mod, pp_as as])
 	     4 (pp_spec spec)
       where
@@ -44,6 +44,9 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 
 	pp_as Nothing   = empty
 	pp_as (Just a)  = ptext SLIT("as ") <+> ppr a
+
+	ppr_imp True  = ptext SLIT("{-# SOURCE #-}")
+	ppr_imp False = empty
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
@@ -86,23 +89,33 @@ ieNames (IEModuleContents _   ) = []
 
 \begin{code}
 instance (Outputable name) => Outputable (IE name) where
-    ppr (IEVar	        var)	= ppr_var var
+    ppr (IEVar	        var)	= pprHsVar var
     ppr (IEThingAbs	thing)	= ppr thing
     ppr (IEThingAll	thing)	= hcat [ppr thing, text "(..)"]
     ppr (IEThingWith thing withs)
-	= ppr thing <> parens (fsep (punctuate comma (map ppr_var withs)))
+	= ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
     ppr (IEModuleContents mod)
 	= ptext SLIT("module") <+> ppr mod
-
-ppr_var v | isOperator v = parens (ppr v)
-	  | otherwise	 = ppr v
 \end{code}
 
 \begin{code}
-isOperator :: Outputable a => a -> Bool
-isOperator v = isLexSym (mkFastString (showSDocUnqual (ppr v)))
-	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
-	-- that we don't need NamedThing in the context of all these functions.
-	-- Gruesome, but simple.
+pprHsVar :: Outputable name => name -> SDoc
+pprHsVar v | isOperator ppr_v = parens ppr_v
+	   | otherwise	      = ppr_v
+	   where
+	     ppr_v = ppr v
+
+isOperator :: SDoc -> Bool
+isOperator ppr_v 
+  = case showSDocUnqual ppr_v of
+	('(':s)   -> False		-- (), (,) etc
+	('[':s)   -> False		-- []
+	('$':c:s) -> not (isAlpha c)	-- Don't treat $d as an operator
+	(':':c:s) -> not (isAlpha c)	-- Don't treat :T as an operator
+	(c:s)     -> not (isAlpha c)	-- Starts with non-alpha
+	other     -> False
+    -- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
+    -- that we don't need NamedThing in the context of all these functions.
+    -- Gruesome, but simple.
 \end{code}
 

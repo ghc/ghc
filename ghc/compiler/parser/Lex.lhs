@@ -135,6 +135,7 @@ data Token
   | ITclose_prag
 
   | ITdotdot  			-- reserved symbols
+  | ITcolon
   | ITdcolon
   | ITequal
   | ITlam
@@ -194,6 +195,15 @@ data Token
   | ITprimfloat  Rational
   | ITprimdouble Rational
   | ITlitlit     FastString
+
+  -- MetaHaskell extension tokens
+  | ITopenExpQuote  		-- [| or [e|
+  | ITopenPatQuote		-- [p|
+  | ITopenDecQuote		-- [d|
+  | ITopenTypQuote		-- [t|         
+  | ITcloseQuote		-- |]
+  | ITidEscape   FastString	-- $x
+  | ITparenEscape		-- $( 
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
@@ -302,6 +312,8 @@ ghcExtensionKeywordsFM = listToUFM $
 haskellKeySymsFM = listToUFM $
 	map (\ (x,y) -> (mkFastString x,y))
       [ ("..",		ITdotdot)
+       ,(":",		ITcolon)	-- (:) is a reserved op, 
+					-- meaning only list cons
        ,("::",		ITdcolon)
        ,("=",		ITequal)
        ,("\\",		ITlam)
@@ -316,6 +328,7 @@ haskellKeySymsFM = listToUFM $
        ,("*",		ITstar)
        ,(".",		ITdot)		-- sadly, for 'forall a . t'
        ]
+
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -374,7 +387,7 @@ lexer cont buf s@(PState{
 		-- processing if necessary).
             '{'# | lookAhead# buf 1# `eqChar#` '-'# ->
 		if lookAhead# buf 2# `eqChar#` '#'# then
-		  case expandWhile# is_space (setCurrentPos# buf 3#) of { buf1->
+		  case expandWhile# is_space (addToCurrentPos buf 3#) of { buf1->
 		  case expandWhile# is_ident (stepOverLexeme buf1)   of { buf2->
 		  let lexeme = mkFastString -- ToDo: too slow
 			          (map toUpper (lexemeToString buf2)) in
@@ -514,57 +527,76 @@ lexToken cont exts buf =
 
     -- special symbols ----------------------------------------------------
     '('# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '#'# 
-		-> cont IToubxparen (setCurrentPos# buf 2#)
+		-> cont IToubxparen (addToCurrentPos buf 2#)
 	 | otherwise
-		-> cont IToparen (incLexeme buf)
+		-> cont IToparen (incCurrentPos buf)
 
-    ')'# -> cont ITcparen    (incLexeme buf)
+    ')'# -> cont ITcparen    (incCurrentPos buf)
     '['# | parrEnabled exts && lookAhead# buf 1# `eqChar#` ':'# ->
-	    cont ITopabrack  (setCurrentPos# buf 2#)
-	 | otherwise -> 
-	    cont ITobrack    (incLexeme buf)
-    ']'# -> cont ITcbrack    (incLexeme buf)
-    ','# -> cont ITcomma     (incLexeme buf)
-    ';'# -> cont ITsemi      (incLexeme buf)
+	    cont ITopabrack  (addToCurrentPos buf 2#)
+         ------- MetaHaskell Extensions, looking for [| [e|  [t|  [p| and [d|
+         | glaExtsEnabled exts && 
+           ((lookAhead# buf 1# ) `eqChar#` '|'# ) ->
+                cont ITopenExpQuote (addToCurrentPos buf 2# ) 
+         | glaExtsEnabled exts && 
+           (let c = (lookAhead# buf 1# ) 
+            in eqChar# c 'e'# || eqChar# c 't'# || eqChar# c 'd'#  || eqChar# c 'p'#) &&
+           ((lookAhead# buf 2#) `eqChar#` '|'#) ->
+                let quote 'e'# = ITopenExpQuote
+                    quote 'p'# = ITopenPatQuote
+                    quote 'd'# = ITopenDecQuote
+                    quote 't'# = ITopenTypQuote
+                in cont (quote (lookAhead# buf 1#)) (addToCurrentPos buf 3# )
+         | otherwise -> 
+	    cont ITobrack    (incCurrentPos buf)
+	    
+    ']'# -> cont ITcbrack    (incCurrentPos buf)
+    ','# -> cont ITcomma     (incCurrentPos buf)
+    ';'# -> cont ITsemi      (incCurrentPos buf)
     '}'# -> \ s@PState{context = ctx} ->
 	    case ctx of	
-		(_:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
+		(_:ctx') -> cont ITccurly (incCurrentPos buf) s{context=ctx'}
 		_  	 -> lexError "too many '}'s" buf s
     '|'# -> case lookAhead# buf 1# of
 	         '}'#  | glaExtsEnabled exts -> cont ITccurlybar 
-                                                     (setCurrentPos# buf 2#)
-                 _                           -> lex_sym cont (incLexeme buf)
+                                                     (addToCurrentPos buf 2#)
+                 -- MetaHaskell extension 
+                 ']'#  |  glaExtsEnabled exts -> cont ITcloseQuote (addToCurrentPos buf 2#)
+                 other -> lex_sym cont (incCurrentPos buf)
     ':'# -> case lookAhead# buf 1# of
 	         ']'#  | parrEnabled exts    -> cont ITcpabrack
-                                                     (setCurrentPos# buf 2#)
-                 _                           -> lex_sym cont (incLexeme buf)
+                                                     (addToCurrentPos buf 2#)
+                 _                           -> lex_sym cont (incCurrentPos buf)
 
                 
     '#'# -> case lookAhead# buf 1# of
 		')'#  | glaExtsEnabled exts 
-		     -> cont ITcubxparen (setCurrentPos# buf 2#)
+		     -> cont ITcubxparen (addToCurrentPos buf 2#)
 		'-'# -> case lookAhead# buf 2# of
-			   '}'# -> cont ITclose_prag (setCurrentPos# buf 3#)
-			   _    -> lex_sym cont (incLexeme buf)
-		_    -> lex_sym cont (incLexeme buf)
+			   '}'# -> cont ITclose_prag (addToCurrentPos buf 3#)
+			   _    -> lex_sym cont (incCurrentPos buf)
+		_    -> lex_sym cont (incCurrentPos buf)
 
     '`'# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '`'#
-		-> lex_cstring cont (setCurrentPos# buf 2#)
+		-> lex_cstring cont (addToCurrentPos buf 2#)
 	 | otherwise
-	   	-> cont ITbackquote (incLexeme buf)
+	   	-> cont ITbackquote (incCurrentPos buf)
 
     '{'# ->   -- for Emacs: -}
             case lookAhead# buf 1# of
            '|'# | glaExtsEnabled exts 
-                -> cont ITocurlybar (setCurrentPos# buf 2#)
+                -> cont ITocurlybar (addToCurrentPos buf 2#)
 	   '-'# -> case lookAhead# buf 2# of
-		    '#'# -> lex_prag cont (setCurrentPos# buf 3#)
-	   	    _    -> cont ITocurly (incLexeme buf) 
-	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf) 
+		    '#'# -> lex_prag cont (addToCurrentPos buf 3#)
+	   	    _    -> cont ITocurly (incCurrentPos buf) 
+	   _ -> (layoutOff `thenP_` cont ITocurly)  (incCurrentPos buf) 
+
+    
+              
 
     -- strings/characters -------------------------------------------------
-    '\"'#{-"-} -> lex_string cont exts [] (incLexeme buf)
-    '\''#      -> lex_char (char_end cont) exts (incLexeme buf)
+    '\"'#{-"-} -> lex_string cont exts [] (incCurrentPos buf)
+    '\''#      -> lex_char (char_end cont) exts (incCurrentPos buf)
 
 	-- Hexadecimal and octal constants
     '0'# | (ch `eqChar#` 'x'# || ch `eqChar#` 'X'#) && is_hexdigit ch2
@@ -573,7 +605,7 @@ lexToken cont exts buf =
 		-> readNum (after_lexnum cont exts) buf' is_octdigit  8 oct_or_dec
 	where ch   = lookAhead# buf 1#
 	      ch2  = lookAhead# buf 2#
-	      buf' = setCurrentPos# buf 2#
+	      buf' = addToCurrentPos buf 2#
 
     '\NUL'# ->
 	    if bufferExhausted (stepOn buf) then
@@ -582,14 +614,21 @@ lexToken cont exts buf =
 	       trace "lexIface: misplaced NUL?" $ 
 	       cont (ITunknown "\NUL") (stepOn buf)
 
-    '?'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->
-	    lex_ip ITdupipvarid cont (incLexeme buf)
+    '?'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->  -- ?x implicit parameter
+	    specialPrefixId ITdupipvarid cont exts (incCurrentPos buf)
     '%'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->
-	    lex_ip ITsplitipvarid cont (incLexeme buf)
+	    specialPrefixId ITsplitipvarid cont exts (incCurrentPos buf)
+	    
+    ---------------- MetaHaskell Extensions for quotation escape    
+    '$'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->  -- $x  variable escape 
+	    specialPrefixId ITidEscape cont exts (addToCurrentPos buf 1#) 
+    '$'# | glaExtsEnabled exts &&  -- $( f x )  expression escape 
+           ((lookAhead# buf 1#) `eqChar#` '('#) -> cont ITparenEscape (addToCurrentPos buf 2#)
+          
     c | is_digit  c -> lex_num cont exts 0 buf
       | is_symbol c -> lex_sym cont buf
       | is_upper  c -> lex_con cont exts buf
-      | is_ident  c -> lex_id  cont exts buf
+      | is_lower  c -> lex_id  cont exts buf
       | otherwise   -> lexError "illegal character" buf
 
 -- Int# is unlifted, and therefore faster than Bool for flags.
@@ -616,11 +655,11 @@ lex_prag cont buf
 lex_string cont exts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
-	   let buf' = incLexeme buf
+	   let buf' = incCurrentPos buf
                s' = mkFastString (map chr (reverse s)) 
            in case currentChar# buf' of
 		'#'# | glaExtsEnabled exts -> if all (<= 0xFF) s
-                    then cont (ITprimstring s') (incLexeme buf')
+                    then cont (ITprimstring s') (incCurrentPos buf')
                     else lexError "primitive string literal must contain only characters <= \'\\xFF\'" buf'
 		_                   -> cont (ITstring s') buf'
 
@@ -628,15 +667,15 @@ lex_string cont exts s buf
 	'\\'# | next_ch `eqChar#` '&'# 
 		-> lex_string cont exts s buf'
 	      | is_space next_ch
-		-> lex_stringgap cont exts s (incLexeme buf)
+		-> lex_stringgap cont exts s (incCurrentPos buf)
 
 	    where next_ch = lookAhead# buf 1#
-		  buf' = setCurrentPos# buf 2#
+		  buf' = addToCurrentPos buf 2#
 
 	_ -> lex_char (lex_next_string cont s) exts buf
 
 lex_stringgap cont exts s buf
-  = let buf' = incLexeme buf in
+  = let buf' = incCurrentPos buf in
     case currentChar# buf of
 	'\n'# -> \st@PState{loc = loc} -> lex_stringgap cont exts s buf' 
 		  st{loc = incSrcLine loc}
@@ -649,21 +688,21 @@ lex_next_string cont s exts c buf = lex_string cont exts (c:s) buf
 lex_char :: (Int# -> Int -> P a) -> Int# -> P a
 lex_char cont exts buf
   = case currentChar# buf of
-	'\\'# -> lex_escape (cont exts) (incLexeme buf)
-	c | is_any c -> cont exts (I# (ord# c)) (incLexeme buf)
+	'\\'# -> lex_escape (cont exts) (incCurrentPos buf)
+	c | is_any c -> cont exts (I# (ord# c)) (incCurrentPos buf)
 	other -> charError buf
 
 char_end cont exts c buf
   = case currentChar# buf of
-	'\''# -> let buf' = incLexeme buf in
+	'\''# -> let buf' = incCurrentPos buf in
 		 case currentChar# buf' of
 			'#'# | glaExtsEnabled exts 
-				-> cont (ITprimchar c) (incLexeme buf')
+				-> cont (ITprimchar c) (incCurrentPos buf')
 			_   	-> cont (ITchar c) buf'
 	_     -> charError buf
 
 lex_escape cont buf
-  = let buf' = incLexeme buf in
+  = let buf' = incCurrentPos buf in
     case currentChar# buf of
 	'a'#	   -> cont (ord '\a') buf'
 	'b'#	   -> cont (ord '\b') buf'
@@ -677,7 +716,7 @@ lex_escape cont buf
 	'\''#      -> cont (ord '\'') buf'
 	'^'#	   -> let c = currentChar# buf' in
 		      if c `geChar#` '@'# && c `leChar#` '_'#
-			then cont (I# (ord# c -# ord# '@'#)) (incLexeme buf')
+			then cont (I# (ord# c -# ord# '@'#)) (incCurrentPos buf')
 			else charError buf'
 
 	'x'#      -> readNum (after_charnum cont) buf' is_hexdigit 16 hex
@@ -699,7 +738,7 @@ readNum cont buf is_digit base conv = read buf 0
   where read buf i 
 	  = case currentChar# buf of { c ->
 	    if is_digit c
-		then read (incLexeme buf) (i*base + (toInteger (I# (conv c))))
+		then read (incCurrentPos buf) (i*base + (toInteger (I# (conv c))))
 		else cont i buf
 	    }
 
@@ -770,7 +809,7 @@ lex_num cont exts acc buf =
              -- this case is not optimised at all, as the
              -- presence of floating point numbers in interface
              -- files is not that common. (ToDo)
-	    case expandWhile# is_digit (incLexeme buf') of
+	    case expandWhile# is_digit (incCurrentPos buf') of
               buf2 -> -- points to first non digit char
 
 		let l = case currentChar# buf2 of
@@ -779,21 +818,21 @@ lex_num cont exts acc buf =
 		          _ -> buf2
 
 		    do_exponent 
-			= let buf3 = incLexeme buf2 in
+			= let buf3 = incCurrentPos buf2 in
 			  case currentChar# buf3 of
 				'-'# | is_digit (lookAhead# buf3 1#)
-				   -> expandWhile# is_digit (incLexeme buf3)
+				   -> expandWhile# is_digit (incCurrentPos buf3)
 				'+'# | is_digit (lookAhead# buf3 1#)
-				   -> expandWhile# is_digit (incLexeme buf3)
+				   -> expandWhile# is_digit (incCurrentPos buf3)
 				x | is_digit x -> expandWhile# is_digit buf3
 				_ -> buf2
 
 		    v = readRational__ (lexemeToString l)
 
 		in case currentChar# l of -- glasgow exts only
-		      '#'# | glaExtsEnabled exts -> let l' = incLexeme l in
+		      '#'# | glaExtsEnabled exts -> let l' = incCurrentPos l in
 			      case currentChar# l' of
-				'#'# -> cont (ITprimdouble v) (incLexeme l')
+				'#'# -> cont (ITprimdouble v) (incCurrentPos l')
 				_    -> cont (ITprimfloat  v) l'
 		      _ -> cont (ITrational v) l
 
@@ -801,7 +840,7 @@ lex_num cont exts acc buf =
 		
 after_lexnum cont exts i buf
   = case currentChar# buf of
-	'#'# | glaExtsEnabled exts -> cont (ITprimint i) (incLexeme buf)
+	'#'# | glaExtsEnabled exts -> cont (ITprimint i) (incCurrentPos buf)
 	_                          -> cont (ITinteger i) buf
 
 readRational :: ReadS Rational -- NB: doesn't handle leading "-"
@@ -858,17 +897,26 @@ readRational__ top_s
 lex_cstring cont buf =
  case expandUntilMatch (stepOverLexeme buf) "\'\'" of
    Just buf' -> cont (ITlitlit (lexemeToFastString 
-				(setCurrentPos# buf' (negateInt# 2#))))
+				(addToCurrentPos buf' (negateInt# 2#))))
            	   (mergeLexemes buf buf')
    Nothing   -> lexError "unterminated ``" buf
 
 -----------------------------------------------------------------------------
 -- identifiers, symbols etc.
 
-lex_ip ip_constr cont buf =
+-- used for identifiers with special prefixes like 
+-- ?x (implicit parameters), $x (MetaHaskell escapes) and #x
+-- we've already seen the prefix char, so look for an id, and wrap 
+-- the new "ip_constr" around the lexeme returned
+
+specialPrefixId ip_constr cont exts buf = lex_id newcont exts buf
+ where newcont (ITvarid lexeme) buf2 = cont (ip_constr (tailFS lexeme)) buf2
+       newcont token buf2 = cont token buf2
+{-  
  case expandWhile# is_ident buf of
    buf' -> cont (ip_constr (tailFS lexeme)) buf'
 	where lexeme = lexemeToFastString buf'
+-}
 
 lex_id cont exts buf =
  let buf1 = expandWhile# is_ident buf in
@@ -901,8 +949,8 @@ lex_sym cont buf =
    buf' -> case lookupUFM haskellKeySymsFM lexeme of {
 	 	Just kwd_token -> --trace ("keysym: "++unpackFS lexeme) $
 				  cont kwd_token buf' ;
-	 	Nothing        -> --trace ("sym: "++unpackFS lexeme) $
-				  cont (mk_var_token lexeme) buf'
+	 	Nothing        -> --trace ("sym: "++unpackFS lexeme) $ 
+			  cont (mk_var_token lexeme) buf'
            }
    	where lexeme = lexemeToFastString buf'
 
@@ -920,7 +968,7 @@ lex_con cont exts buf =
  let all_buf = mergeLexemes buf con_buf
      
      con_lexeme = lexemeToFastString con_buf
-     mod_lexeme = lexemeToFastString (decLexeme buf)
+     mod_lexeme = lexemeToFastString (decCurrentPos buf)
      all_lexeme = lexemeToFastString all_buf
 
      just_a_conid
@@ -930,7 +978,7 @@ lex_con cont exts buf =
 
  case currentChar# all_buf of
      '.'# -> maybe_qualified cont exts all_lexeme 
-		(incLexeme all_buf) just_a_conid
+		(incCurrentPos all_buf) just_a_conid
      _    -> just_a_conid
   }}
 
@@ -940,22 +988,22 @@ maybe_qualified cont exts mod buf just_a_conid =
  case currentChar# buf of
   '['# -> 	-- Special case for []
     case lookAhead# buf 1# of
-     ']'# -> cont (ITqconid  (mod,FSLIT("[]"))) (setCurrentPos# buf 2#)
+     ']'# -> cont (ITqconid  (mod,FSLIT("[]"))) (addToCurrentPos buf 2#)
      _    -> just_a_conid
 
   '('# ->  -- Special case for (,,,)
 	   -- This *is* necessary to deal with e.g. "instance C PrelBase.(,,)"
     case lookAhead# buf 1# of
      '#'# | glaExtsEnabled exts -> case lookAhead# buf 2# of
-		','# -> lex_ubx_tuple cont mod (setCurrentPos# buf 3#) 
+		','# -> lex_ubx_tuple cont mod (addToCurrentPos buf 3#) 
 				just_a_conid
 		_    -> just_a_conid
-     ')'# -> cont (ITqconid (mod,FSLIT("()"))) (setCurrentPos# buf 2#)
-     ','# -> lex_tuple cont mod (setCurrentPos# buf 2#) just_a_conid
+     ')'# -> cont (ITqconid (mod,FSLIT("()"))) (addToCurrentPos buf 2#)
+     ','# -> lex_tuple cont mod (addToCurrentPos buf 2#) just_a_conid
      _    -> just_a_conid
 
   '-'# -> case lookAhead# buf 1# of
-            '>'# -> cont (ITqconid (mod,FSLIT("(->)"))) (setCurrentPos# buf 2#)
+            '>'# -> cont (ITqconid (mod,FSLIT("(->)"))) (addToCurrentPos buf 2#)
             _    -> lex_id3 cont exts mod buf just_a_conid
 
   _    -> lex_id3 cont exts mod buf just_a_conid

@@ -643,8 +643,6 @@ addFreeTyVars ty@(NoteTy (FTVNote _) _)      = ty
 addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 \end{code}
 
-
-
 %************************************************************************
 %*									*
 \subsection{TidyType}

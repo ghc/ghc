@@ -123,8 +123,8 @@ oclose preds fixed_tvs
 \begin{code}
 grow :: [PredType] -> TyVarSet -> TyVarSet
 grow preds fixed_tvs 
-  | null pred_sets = fixed_tvs
-  | otherwise	   = loop fixed_tvs
+  | null preds = fixed_tvs
+  | otherwise  = loop fixed_tvs
   where
     loop fixed_tvs
 	| new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs

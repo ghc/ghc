@@ -19,26 +19,24 @@ import IlxGen		( ilxGen )
 
 #ifdef JAVA
 import JavaGen		( javaGen )
+import OccurAnal	( occurAnalyseBinds )
 import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
+import FastString	( unpackFS )
 import DriverState	( v_HCHeader )
-import TyCon		( TyCon )
 import Id		( Id )
-import CoreSyn		( CoreBind )
 import StgSyn		( StgBinding )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
-import Module		( Module )
+import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), typeEnvTyCons )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import Pretty		( Mode(..), printDoc )
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
-
-import DATA_IOREF	( readIORef )
-
+import DATA_IOREF	( readIORef, writeIORef )
 import Monad		( when )
 import IO
 \end{code}
@@ -52,17 +50,20 @@ import IO
 
 \begin{code}
 codeOutput :: DynFlags
-	   -> Module
-	   -> [TyCon]			-- Local tycons
-	   -> [CoreBind]		-- Core bindings
+	   -> ModGuts
 	   -> [(StgBinding,[Id])]	-- The STG program with SRTs
-	   -> SDoc 		-- C stubs for foreign exported functions
-	   -> SDoc		-- Header file prototype for foreign exported functions
-	   -> AbstractC		-- Compiled abstract C
+	   -> AbstractC			-- Compiled abstract C
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
-codeOutput dflags mod_name tycons core_binds stg_binds 
-	   c_code h_code flat_abstractC
-  = -- You can have C (c_output) or assembly-language (ncg_output),
+codeOutput dflags 
+	   (ModGuts {mg_module = mod_name,
+		     mg_types  = type_env,
+		     mg_foreign = foreign_stubs,
+		     mg_binds   = core_binds})
+	   stg_binds flat_abstractC
+  = let
+	tycons = typeEnvTyCons type_env
+    in
+    -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
 
@@ -70,7 +71,7 @@ codeOutput dflags mod_name tycons core_binds stg_binds
 
     do	{ showPass dflags "CodeOutput"
 	; let filenm = dopt_OutName dflags 
-	; stub_names <- outputForeignStubs dflags c_code h_code
+	; stub_names <- outputForeignStubs dflags foreign_stubs
 	; case dopt_HscLang dflags of
              HscInterpreted -> return stub_names
              HscAsm         -> outputAsm dflags filenm flat_abstractC
@@ -188,7 +189,20 @@ outputIlx dflags filename mod tycons stg_binds
 %************************************************************************
 
 \begin{code}
-outputForeignStubs dflags c_code h_code
+    -- Turn the list of headers requested in foreign import
+    -- declarations into a string suitable for emission into generated
+    -- C code...
+mkForeignHeaders headers
+  = unlines 
+  . map (\fname -> "#include \"" ++ unpackFS fname ++ "\"")
+  . reverse 
+  $ headers
+
+outputForeignStubs :: DynFlags -> ForeignStubs
+		   -> IO (Bool, 	-- Header file created
+			  Bool)		-- C file created
+outputForeignStubs dflags NoStubs = return (False, False)
+outputForeignStubs dflags (ForeignStubs h_code c_code hdrs _)
   = do
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
@@ -200,16 +214,19 @@ outputForeignStubs dflags c_code h_code
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
-        hc_header <- readIORef v_HCHeader
+	  -- Extend the list of foreign headers (used in outputC)
+        fhdrs <- readIORef v_HCHeader
+	let new_fhdrs = fhdrs ++ mkForeignHeaders hdrs
+        writeIORef v_HCHeader new_fhdrs
 
 	stub_c_file_exists
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
-		 hc_header ++
+		 new_fhdrs ++
 		 "#include \"RtsAPI.h\"\n" ++
 		 cplusplus_hdr)
 		 cplusplus_ftr
-	   -- we're adding the default hc_header to the stub file, but this
+	   -- We're adding the default hc_header to the stub file, but this
 	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
 	   -- avoid the register variables etc. being enabled.
 

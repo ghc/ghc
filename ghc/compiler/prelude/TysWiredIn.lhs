@@ -53,7 +53,7 @@ module TysWiredIn (
 	-- tuples
 	mkTupleTy,
 	tupleTyCon, tupleCon, 
-	unitTyCon, unitDataConId, pairTyCon, 
+	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
 
@@ -88,10 +88,9 @@ import TysPrim
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( mkPrelModule )
-import Name		( Name, nameRdrName, nameUnique, nameOccName, 
+import Name		( Name, nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
 import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
-import RdrName		( rdrNameOcc )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
@@ -121,6 +120,9 @@ alpha_beta_tyvars = [alphaTyVar, betaTyVar]
 %*									*
 %************************************************************************
 
+If you change which things are wired in, make sure you change their
+names in PrelNames, so they use wTcQual, wDataQual, etc
+
 \begin{code}
 wiredInTyCons :: [TyCon]
 wiredInTyCons = data_tycons ++ tuple_tycons ++ unboxed_tuple_tycons
@@ -142,7 +144,6 @@ data_tycons = genericTyCons ++
 
 genericTyCons :: [TyCon]
 genericTyCons = [ plusTyCon, crossTyCon, genUnitTyCon ]
-
 
 tuple_tycons = unitTyCon : [tupleTyCon Boxed   i | i <- [2..mAX_TUPLE_SIZE] ]
 unboxed_tuple_tycons     = [tupleTyCon Unboxed i | i <- [1..mAX_TUPLE_SIZE] ]
@@ -203,8 +204,7 @@ pcDataCon name tyvars context arg_tys tycon
                 [ {- no labelled fields -} ]
                 tyvars context [] [] arg_tys tycon work_id wrap_id
 
-    wrap_rdr  = nameRdrName name
-    wrap_occ  = rdrNameOcc wrap_rdr
+    wrap_occ  = nameOccName name
 
     mod       = nameModule name
     wrap_id   = mkDataConWrapId data_con
@@ -259,7 +259,8 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	gen_info  = mk_tc_gen_info mod tc_uniq tc_name tycon
 
 unitTyCon     = tupleTyCon Boxed 0
-unitDataConId = dataConWorkId (head (tyConDataCons unitTyCon))
+unitDataCon   = head (tyConDataCons unitTyCon)
+unitDataConId = dataConWorkId unitDataCon
 
 pairTyCon = tupleTyCon Boxed 2
 

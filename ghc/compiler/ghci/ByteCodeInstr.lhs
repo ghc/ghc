@@ -19,7 +19,7 @@ import PrimRep		( PrimRep )
 import DataCon		( DataCon )
 import VarSet		( VarSet )
 import PrimOp		( PrimOp )
-import Ptr
+import GHC.Ptr
 \end{code}
 
 %************************************************************************

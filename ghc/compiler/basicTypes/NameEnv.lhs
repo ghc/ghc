@@ -7,8 +7,9 @@
 module NameEnv (
 	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
-	extendNameEnv_C, extendNameEnv, foldNameEnv, filterNameEnv,
-	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
+	extendNameEnv_C, extendNameEnv, extendNameEnvList, 
+	foldNameEnv, filterNameEnv,
+	plusNameEnv, plusNameEnv_C, 
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
 	elemNameEnv
     ) where

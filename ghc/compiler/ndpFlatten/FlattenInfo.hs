@@ -37,7 +37,7 @@ import PrelNames   (fstName, andName, orName, lengthPName, replicatePName,
 namesNeededForFlattening :: FreeVars
 namesNeededForFlattening
   | not opt_Flatten = emptyFVs		-- none without -fflatten
-  | otherwise       = mkFVs
-    [fstName, andName, orName, lengthPName, replicatePName, mapPName,
-    bpermutePName, bpermuteDftPName, indexOfPName]
+  | otherwise
+  = mkFVs [fstName, andName, orName, lengthPName, replicatePName, mapPName,
+	   bpermutePName, bpermuteDftPName, indexOfPName]
     -- stuff from PrelGHC doesn't have to go here

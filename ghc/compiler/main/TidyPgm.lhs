@@ -33,11 +33,10 @@ import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
 import Module		( Module, moduleName )
-import HscTypes		( PersistentCompilerState( pcs_PRS ), 
-			  PersistentRenamerState( prsOrig ),
-			  NameSupply( nsNames, nsUniqs ),
+import HscTypes		( PersistentCompilerState( pcs_nc ), 
+			  NameCache( nsNames, nsUniqs ),
 			  TypeEnv, extendTypeEnvList, typeEnvIds,
-			  ModDetails(..), TyThing(..)
+			  ModGuts(..), ModGuts, TyThing(..)
 			)
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( orElse )
@@ -87,10 +86,10 @@ binder
     [Even non-exported things need system-wide Uniques because the
     byte-code generator builds a single Name->BCO symbol table.]
 
-    We use the NameSupply kept in the PersistentRenamerState as the
+    We use the NameCache kept in the PersistentCompilerState as the
     source of such system-wide uniques.
 
-    For external Ids, use the original-name cache in the NameSupply 
+    For external Ids, use the original-name cache in the NameCache
     to ensure that the unique assigned is the same as the Id had 
     in any previous compilation run.
   
@@ -119,16 +118,17 @@ throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 
 \begin{code}
-tidyCorePgm :: DynFlags -> Module
+tidyCorePgm :: DynFlags
 	    -> PersistentCompilerState
 	    -> CgInfoEnv		-- Information from the back end,
 					-- to be splatted into the IdInfo
-	    -> ModDetails
-	    -> IO (PersistentCompilerState, ModDetails)
+	    -> ModGuts
+	    -> IO (PersistentCompilerState, ModGuts)
 
-tidyCorePgm dflags mod pcs cg_info_env
-	    (ModDetails { md_types = env_tc, md_insts = insts_tc, 
-			  md_binds = binds_in, md_rules = orphans_in })
+tidyCorePgm dflags pcs cg_info_env
+	    mod_impl@(ModGuts { mg_module = mod, 
+				mg_types = env_tc, mg_insts = insts_tc, 
+				mg_binds = binds_in, mg_rules = orphans_in })
   = do	{ showPass dflags "Tidy Core"
 
 	; let ext_ids   = findExternalSet   binds_in orphans_in
@@ -147,9 +147,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 	-- The second exported decl must 'get' the name 'f', so we
 	-- have to put 'f' in the avoids list before we get to the first
 	-- decl.  tidyTopId then does a no-op on exported binders.
-	; let   prs	      = pcs_PRS pcs
-		orig_ns       = prsOrig prs
-
+	; let   orig_ns       = pcs_nc pcs
 		init_tidy_env = (orig_ns, initTidyOccEnv avoids, emptyVarEnv)
 		avoids	      = [getOccName name | bndr <- typeEnvIds env_tc,
 						   let name = idName bndr,
@@ -167,8 +165,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 
 	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
 
-	; let prs' = prs { prsOrig = orig_ns' }
-	      pcs' = pcs { pcs_PRS = prs' }
+	; let pcs' = pcs { pcs_nc = orig_ns' }
 
 	; let final_ids  = [ id 
 			   | bind <- tidy_binds
@@ -184,17 +181,17 @@ tidyCorePgm dflags mod pcs cg_info_env
 	; let tidy_type_env = mkFinalTypeEnv env_tc final_ids
 	      tidy_dfun_ids = map lookup_dfun_id insts_tc
 
-	; let tidy_details = ModDetails { md_types = tidy_type_env,
-					  md_rules = tidy_rules,
-					  md_insts = tidy_dfun_ids,
-					  md_binds = tidy_binds }
+	; let tidy_result = mod_impl { mg_types = tidy_type_env,
+				       mg_rules = tidy_rules,
+				       mg_insts = tidy_dfun_ids,
+				       mg_binds = tidy_binds }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
 		(pprIdRules tidy_rules)
 
-	; return (pcs', tidy_details)
+	; return (pcs', tidy_result)
 	}
 
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
@@ -369,10 +366,10 @@ addExternal (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (NameSupply, TidyOccEnv, VarEnv Var)
+type TopTidyEnv = (NameCache, TidyOccEnv, VarEnv Var)
 
 -- TopTidyEnv: when tidying we need to know
---   * ns: The NameSupply, containing a unique supply and any pre-ordained Names.  
+--   * ns: The NameCache, containing a unique supply and any pre-ordained Names.  
 --	  These may have arisen because the
 --	  renamer read in an interface file mentioning M.$wf, say,
 --	  and assigned it unique r77.  If, on this compilation, we've

@@ -31,28 +31,27 @@ import CmdLineOpts
 import IO
 import FastString
 
-emitExternalCore :: DynFlags -> ModIface -> ModDetails -> IO ()
-emitExternalCore dflags iface details 
+emitExternalCore :: DynFlags -> ModGuts -> IO ()
+emitExternalCore dflags mod_impl
  | opt_EmitExternalCore 
  = (do handle <- openFile corename WriteMode
-       hPutStr handle (show (mkExternalCore iface details))      
+       hPutStr handle (show (mkExternalCore mod_impl))      
        hClose handle)
    `catch` (\err -> pprPanic "Failed to open or write external core output file" 
 	                     (text corename))
    where corename = extCoreName dflags
-emitExternalCore _ _ _ 
+emitExternalCore _ _
  | otherwise
  = return ()
 
 
-mkExternalCore :: ModIface -> ModDetails -> C.Module
-mkExternalCore (ModIface {mi_module=mi_module,mi_exports=mi_exports}) 
-	       (ModDetails {md_types=md_types,md_binds=md_binds}) =
-    C.Module mname tdefs vdefs
+mkExternalCore :: ModGuts -> C.Module
+mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = binds})
+  = C.Module mname tdefs vdefs
   where
-    mname = make_mid mi_module
-    tdefs = foldr collect_tdefs [] (typeEnvTyCons md_types)
-    vdefs = map make_vdef md_binds
+    mname = make_mid this_mod
+    tdefs = foldr collect_tdefs [] (typeEnvTyCons type_env)
+    vdefs = map make_vdef binds
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 

@@ -973,8 +973,31 @@ example, we define the <literal>min</literal> function by binding
   min  = let ?cmp = (<=) in least
 </programlisting>
 <para>
-Note the following additional constraints:
+Note the following points:
 <itemizedlist>
+<listitem><para>
+You may not mix implicit-parameter bindings with ordinary bindings in a 
+single <literal>let</literal>
+expression; use two nested <literal>let</literal>s instead.
+</para></listitem>
+
+<listitem><para>
+You may put multiple implicit-parameter bindings in a
+single <literal>let</literal> expression; they are <emphasis>not</emphasis> treated
+as a mutually recursive group (as ordinary <literal>let</literal> bindings are).
+Instead they are treated as a non-recursive group, each scoping over the bindings that
+follow.  For example, consider:
+<programlisting>
+  f y = let { ?x = y; ?x = ?x+1 } in ?x
+</programlisting>
+This function adds one to its argument.
+</para></listitem>
+
+<listitem><para>
+You may not have an implicit-parameter binding in a <literal>where</literal> clause,
+only in a <literal>let</literal> binding.
+</para></listitem>
+
 <listitem>
 <para> You can't have an implicit parameter in the context of a class or instance
 declaration.  For example, both these declarations are illegal:

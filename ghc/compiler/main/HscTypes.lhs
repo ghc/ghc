@@ -5,23 +5,26 @@
 
 \begin{code}
 module HscTypes ( 
+	HscEnv(..), 
 	GhciMode(..),
 
-	ModuleLocation(..), showModMsg,
-
 	ModDetails(..),	ModIface(..), 
-	HomeSymbolTable, emptySymbolTable,
-	PackageTypeEnv,
-	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
+	ModGuts(..), ModImports(..), ForeignStubs(..),
+	ParsedIface(..), IfaceDeprecs,
+
+	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
+
+	ExternalPackageState(..), 
+	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
 	lookupIface, lookupIfaceByModName, moduleNameToModule,
 	emptyModIface,
 
-	InteractiveContext(..),
+	InteractiveContext(..), emptyInteractiveContext, icPrintUnqual,
 
 	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
 	VersionInfo(..), initialVersionInfo, lookupVersion,
-	FixityEnv, lookupFixity, collectFixities,
+	FixityEnv, lookupFixity, collectFixities, emptyFixityEnv,
 
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
@@ -30,22 +33,27 @@ module HscTypes (
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
-	PersistentRenamerState(..), IsBootInterface, DeclsMap,
-	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, IsExported,
-	NameSupply(..), OrigNameCache, OrigIParamCache,
-	Avails, AvailEnv, emptyAvailEnv,
+	IsBootInterface, DeclsMap,
+	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, 
+	NameCache(..), OrigNameCache, OrigIParamCache,
+	Avails, availsToNameSet, availName, availNames,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	ExportItem, RdrExportItem,
+
 	PersistentCompilerState(..),
 
-	Deprecations(..), lookupDeprec,
+	Deprecations(..), lookupDeprec, plusDeprecs,
 
 	InstEnv, ClsInstEnv, DFunId,
 	PackageInstEnv, PackageRuleBase,
 
-	GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
-	LocalRdrEnv, extendLocalRdrEnv,
+	GlobalRdrEnv, GlobalRdrElt(..), emptyGlobalRdrEnv, pprGlobalRdrEnv,
+	LocalRdrEnv, extendLocalRdrEnv, isLocalGRE, unQualInScope,
 	
+	-- Linker stuff
+	Linkable(..), isObjectLinkable,
+	Unlinked(..), CompiledByteCode,
+	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
 
 	-- Provenance
 	Provenance(..), ImportReason(..), 
@@ -55,10 +63,16 @@ module HscTypes (
 
 #include "HsVersions.h"
 
-import RdrName		( RdrName, RdrNameEnv, addListToRdrEnv, 
-			  mkRdrUnqual, rdrEnvToList )
+#ifdef GHCI
+import ByteCodeAsm	( CompiledByteCode )
+#endif
+
+import RdrName		( RdrName, mkRdrUnqual, 
+			  RdrNameEnv, addListToRdrEnv, foldRdrEnv, isUnqual,
+			  rdrEnvToList, emptyRdrEnv )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import NameEnv
+import NameSet	
 import OccName		( OccName )
 import Module
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
@@ -68,8 +82,11 @@ import Id		( Id )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
 import DataCon		( dataConWorkId, dataConWrapId )
+import Packages		( PackageName, preludePackage )
+import CmdLineOpts	( DynFlags )
 
-import BasicTypes	( Version, initialVersion, Fixity, defaultFixity, IPName )
+import BasicTypes	( Version, initialVersion, IPName,
+			  Fixity, FixitySig(..), defaultFixity )
 
 import HsSyn		( DeprecTxt, TyClDecl, tyClDeclName, ifaceRuleDeclName,
 			  tyClDeclNames )
@@ -77,68 +94,83 @@ import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
+import PrelNames	( isBuiltInSyntaxName )
 
 import FiniteMap
 import Bag		( Bag )
-import Maybes		( seqMaybe, orElse, expectJust )
+import Maybes		( orElse )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp, sortLt )
 import UniqSupply	( UniqSupply )
 import Maybe		( fromJust )
+import FastString	( FastString )
+
+import Time		( ClockTime )
 \end{code}
+
 
 %************************************************************************
 %*									*
-\subsection{Which mode we're in
+\subsection{Compilation environment}
 %*									*
 %************************************************************************
+
+The HscEnv gives the environment in which to compile a chunk of code.
+
+\begin{code}
+data HscEnv = HscEnv { hsc_mode   :: GhciMode,
+		       hsc_dflags :: DynFlags,
+		       hsc_HPT    :: HomePackageTable }
+\end{code}
+
+The GhciMode is self-explanatory:
 
 \begin{code}
 data GhciMode = Batch | Interactive | OneShot 
-     deriving Eq
+	      deriving Eq
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Module locations}
-%*									*
-%************************************************************************
 
 \begin{code}
-data ModuleLocation
-   = ModuleLocation {
-        ml_hs_file   :: Maybe FilePath,
-        ml_hspp_file :: Maybe FilePath,  -- path of preprocessed source
-        ml_hi_file   :: FilePath,
-        ml_obj_file  :: Maybe FilePath
-     }
-     deriving Show
+type HomePackageTable  = ModuleEnv HomeModInfo	-- Domain = modules in the home package
+type PackageIfaceTable = ModuleEnv ModIface	-- Domain = modules in the imported packages
 
-instance Outputable ModuleLocation where
-   ppr = text . show
+emptyHomePackageTable  = emptyModuleEnv
+emptyPackageIfaceTable = emptyModuleEnv
 
--- Probably doesn't really belong here, but used in HscMain and InteractiveUI.
-
-showModMsg :: Bool -> Module -> ModuleLocation -> String
-showModMsg use_object mod location =
-    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
-    ++" ( " ++ expectJust "showModMsg" (ml_hs_file location) ++ ", "
-    ++ (if use_object
-	  then expectJust "showModMsg" (ml_obj_file location)
-	  else "interpreted")
-    ++ " )"
- where mod_str = moduleUserString mod
+data HomeModInfo = HomeModInfo { hm_iface    :: ModIface,
+				 hm_details  :: ModDetails,
+				 hm_linkable :: Linkable }
 \end{code}
 
-For a module in another package, the hs_file and obj_file
-components of ModuleLocation are undefined.  
+Simple lookups in the symbol table.
 
-The locations specified by a ModuleLocation may or may not
-correspond to actual files yet: for example, even if the object
-file doesn't exist, the ModuleLocation still contains the path to
-where the object file will reside if/when it is created.
+\begin{code}
+lookupIface :: HomePackageTable -> PackageIfaceTable -> Name -> Maybe ModIface
+-- We often have two IfaceTables, and want to do a lookup
+lookupIface hpt pit name
+  = case lookupModuleEnv hpt mod of
+	Just mod_info -> Just (hm_iface mod_info)
+	Nothing       -> lookupModuleEnv pit mod
+  where
+    mod = nameModule name
+
+lookupIfaceByModName :: HomePackageTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
+-- We often have two IfaceTables, and want to do a lookup
+lookupIfaceByModName hpt pit mod
+  = case lookupModuleEnvByName hpt mod of
+	Just mod_info -> Just (hm_iface mod_info)
+	Nothing       -> lookupModuleEnvByName pit mod
+\end{code}
+
+\begin{code}
+-- Use instead of Finder.findModule if possible: this way doesn't
+-- require filesystem operations, and it is guaranteed not to fail
+-- when the IfaceTables are properly populated (i.e. after the renamer).
+moduleNameToModule :: HomePackageTable -> PackageIfaceTable -> ModuleName -> Module
+moduleNameToModule hpt pit mod 
+   = mi_module (fromJust (lookupIfaceByModName hpt pit mod))
+\end{code}
 
 
 %************************************************************************
@@ -162,17 +194,14 @@ data ModIface
         mi_module   :: !Module,
 	mi_package  :: !PackageName,	    -- Which package the module comes from
         mi_version  :: !VersionInfo,	    -- Module version number
+        mi_orphan   :: !WhetherHasOrphans,  -- Whether this module has orphans
+	mi_boot	    :: !IsBootInterface,    -- Read from an hi-boot file?
 
-        mi_orphan   :: WhetherHasOrphans,   -- Whether this module has orphans
-		-- NOT STRICT!  we fill this field with _|_ sometimes
-
-	mi_boot	    :: !IsBootInterface,    -- read from an hi-boot file?
-
-        mi_usages   :: [ImportVersion Name],	
+        mi_usages   :: [ImportVersion Name],
 		-- Usages; kept sorted so that it's easy to decide
 		-- whether to write a new iface file (changing usages
 		-- doesn't affect the version of this module)
-		-- NOT STRICT!  we read this field lazilly from the interface file
+		-- NOT STRICT!  we read this field lazily from the interface file
 
         mi_exports  :: ![ExportItem],
 		-- What it exports Kept sorted by (mod,occ), to make
@@ -180,7 +209,8 @@ data ModIface
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
 		-- Its top level environment or Nothing if we read this
-		-- interface from a file.
+		-- interface from an interface file.  (We need the source
+		-- file to figure out the top-level environment.)
 
         mi_fixities :: !FixityEnv,	    -- Fixities
 	mi_deprecs  :: Deprecations,	    -- Deprecations
@@ -189,6 +219,87 @@ data ModIface
 	mi_decls    :: IfaceDecls	    -- The RnDecls form of ModDetails
 		-- NOT STRICT!  we fill this field with _|_ sometimes
      }
+
+-- Should be able to construct ModDetails from mi_decls in ModIface
+data ModDetails
+   = ModDetails {
+	-- The next three fields are created by the typechecker
+        md_types    :: !TypeEnv,
+        md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
+        md_rules    :: ![IdCoreRule]	-- Domain may include Ids from other modules
+     }
+
+
+
+-- A ModGuts is carried through the compiler, accumulating stuff as it goes
+-- There is only one ModGuts at any time, the one for the module
+-- being compiled right now.  Once it is compiled, a ModIface and 
+-- ModDetails are extracted and the ModGuts is dicarded.
+
+data ModGuts
+  = ModGuts {
+        mg_module   :: !Module,
+	mg_exports  :: !Avails,			-- What it exports
+	mg_usages   :: ![ImportVersion Name],	-- What it imports, directly or otherwise
+						-- ...exactly as in ModIface
+	mg_dir_imps :: ![Module],		-- Directly imported modules
+
+        mg_rdr_env  :: !GlobalRdrEnv,	-- Top-level lexical environment
+	mg_fix_env  :: !FixityEnv,	-- Fixity env, for things declared in this module
+	mg_deprecs  :: !Deprecations,	-- Deprecations declared in the module
+
+	mg_types    :: !TypeEnv,
+	mg_insts    :: ![DFunId],	-- Instances 
+        mg_rules    :: ![IdCoreRule],	-- Rules from this module
+	mg_binds    :: ![CoreBind],	-- Bindings for this module
+	mg_foreign  :: !ForeignStubs
+    }
+
+-- The ModGuts takes on several slightly different forms:
+--
+-- After simplification, the following fields change slightly:
+--	mg_rules	Orphan rules only (local ones now attached to binds)
+--	mg_binds	With rules attached
+--
+-- After CoreTidy, the following fields change slightly:
+--	mg_types	Now contains Ids as well, replete with final IdInfo
+--			   The Ids are only the ones that are visible from
+--			   importing modules.  Without -O that means only
+--			   exported Ids, but with -O importing modules may
+--			   see ids mentioned in unfoldings of exported Ids
+--
+--	mg_insts	Same DFunIds as before, but with final IdInfo,
+--			   and the unique might have changed; remember that
+--			   CoreTidy links up the uniques of old and new versions
+--
+--	mg_rules	All rules for exported things, substituted with final Ids
+--
+--	mg_binds	Tidied
+
+
+
+data ModImports
+  = ModImports {
+	imp_direct     :: ![(Module,Bool)],	-- Explicitly-imported modules
+						-- Boolean is true if we imported the whole
+						--	module (apart, perhaps, from hiding some)
+	imp_pkg_mods   :: !ModuleSet,		-- Non-home-package modules on which we depend,
+						--	directly or indirectly
+	imp_home_names :: !NameSet		-- Home package things on which we depend,
+						--	directly or indirectly
+    }
+
+data ForeignStubs = NoStubs
+		  | ForeignStubs
+			SDoc 		-- Header file prototypes for
+                                      	-- 	"foreign exported" functions
+			SDoc 		-- C stubs to use when calling
+                                        -- 	"foreign exported" functions
+			[FastString] 	-- Headers that need to be included
+				        -- 	into C code generated for this module
+			[Id]		-- Foreign-exported binders
+					-- 	we have to generate code to register these
+
 
 data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
 			       dcl_rules :: [RenamedRuleDecl],	-- Sorted
@@ -202,51 +313,6 @@ mkIfaceDecls tycls rules insts
   where
     d1 `lt_tycl` d2 = tyClDeclName      d1 < tyClDeclName      d2
     r1 `lt_rule` r2 = ifaceRuleDeclName r1 < ifaceRuleDeclName r2
-
-
--- typechecker should only look at this, not ModIface
--- Should be able to construct ModDetails from mi_decls in ModIface
-data ModDetails
-   = ModDetails {
-	-- The next three fields are created by the typechecker
-        md_types    :: !TypeEnv,
-        md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: ![IdCoreRule],	-- Domain may include Ids from other modules
-	md_binds    :: ![CoreBind]
-     }
-
--- The ModDetails takes on several slightly different forms:
---
--- After typecheck + desugar
---	md_types	Contains TyCons, Classes, and implicit Ids
---	md_insts	All instances from this module (incl derived ones)
---	md_rules	All rules from this module
---	md_binds	Desugared bindings
---
--- After simplification
---	md_types	Same as after typecheck
---	md_insts	Ditto
---	md_rules	Orphan rules only (local ones now attached to binds)
---	md_binds	With rules attached
---
--- After CoreTidy
---	md_types	Now contains Ids as well, replete with final IdInfo
---			   The Ids are only the ones that are visible from
---			   importing modules.  Without -O that means only
---			   exported Ids, but with -O importing modules may
---			   see ids mentioned in unfoldings of exported Ids
---
---	md_insts	Same DFunIds as before, but with final IdInfo,
---			   and the unique might have changed; remember that
---			   CoreTidy links up the uniques of old and new versions
---
---	md_rules	All rules for exported things, substituted with final Ids
---
---	md_binds	Tidied
---
--- Passed back to compilation manager
---	Just as after CoreTidy, but with md_binds nuked
-
 \end{code}
 
 \begin{code}
@@ -266,46 +332,35 @@ emptyModIface mod
     }		
 \end{code}
 
-Symbol tables map modules to ModDetails:
+
+%************************************************************************
+%*									*
+		Parsed interface files
+%*									*
+%************************************************************************
+
+A ParsedIface is exactly as read from an interface file.
 
 \begin{code}
-type SymbolTable	= ModuleEnv ModDetails
-type IfaceTable		= ModuleEnv ModIface
+type IfaceDeprecs = Maybe (Either DeprecTxt [(RdrName,DeprecTxt)])
+	-- Nothing	  => NoDeprecs
+	-- Just (Left t)  => DeprecAll
+	-- Just (Right p) => DeprecSome
 
-type HomeIfaceTable     = IfaceTable
-type PackageIfaceTable  = IfaceTable
-
-type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
-
-emptySymbolTable :: SymbolTable
-emptySymbolTable = emptyModuleEnv
-
-emptyIfaceTable :: IfaceTable
-emptyIfaceTable = emptyModuleEnv
-\end{code}
-
-Simple lookups in the symbol table.
-
-\begin{code}
-lookupIface :: HomeIfaceTable -> PackageIfaceTable -> Name -> Maybe ModIface
--- We often have two IfaceTables, and want to do a lookup
-lookupIface hit pit name
-  = lookupModuleEnv hit mod `seqMaybe` lookupModuleEnv pit mod
-  where
-    mod = nameModule name
-
-lookupIfaceByModName :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
--- We often have two IfaceTables, and want to do a lookup
-lookupIfaceByModName hit pit mod
-  = lookupModuleEnvByName hit mod `seqMaybe` lookupModuleEnvByName pit mod
-
--- Use instead of Finder.findModule if possible: this way doesn't
--- require filesystem operations, and it is guaranteed not to fail
--- when the IfaceTables are properly populated (i.e. after the renamer).
-moduleNameToModule :: HomeIfaceTable -> PackageIfaceTable -> ModuleName
-   -> Module
-moduleNameToModule hit pit mod 
-   = mi_module (fromJust (lookupIfaceByModName hit pit mod))
+data ParsedIface
+  = ParsedIface {
+      pi_mod	   :: ModuleName,
+      pi_pkg       :: PackageName,
+      pi_vers	   :: Version,		 		-- Module version number
+      pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
+      pi_usages	   :: [ImportVersion OccName],		-- Usages
+      pi_exports   :: (Version, [RdrExportItem]),	-- Exports
+      pi_decls	   :: [(Version, RdrNameTyClDecl)],	-- Local definitions
+      pi_fixity	   :: [FixitySig RdrName],		-- Local fixity declarations,
+      pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
+      pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
+      pi_deprecs   :: IfaceDeprecs			-- Deprecations
+    }
 \end{code}
 
 
@@ -327,14 +382,21 @@ data InteractiveContext
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- The cached GlobalRdrEnv, built from
 					-- ic_toplev_scope and ic_exports
 
-	ic_print_unqual :: PrintUnqualified,
-					-- cached PrintUnqualified, as above
-
 	ic_rn_local_env :: LocalRdrEnv,	-- Lexical context for variables bound
 					-- during interaction
 
 	ic_type_env :: TypeEnv		-- Ditto for types
     }
+
+emptyInteractiveContext
+  = InteractiveContext { ic_toplev_scope = [],
+			 ic_exports = [],
+			 ic_rn_gbl_env = emptyRdrEnv,
+			 ic_rn_local_env = emptyRdrEnv,
+			 ic_type_env = emptyTypeEnv }
+
+icPrintUnqual :: InteractiveContext -> PrintUnqualified
+icPrintUnqual ictxt = unQualInScope (ic_rn_gbl_env ictxt)
 \end{code}
 
 
@@ -413,10 +475,10 @@ extendTypeEnvWithIds env ids
 \end{code}
 
 \begin{code}
-lookupType :: HomeSymbolTable -> PackageTypeEnv -> Name -> Maybe TyThing
-lookupType hst pte name
-  = case lookupModuleEnv hst (nameModule name) of
-	Just details -> lookupNameEnv (md_types details) name
+lookupType :: HomePackageTable -> PackageTypeEnv -> Name -> Maybe TyThing
+lookupType hpt pte name
+  = case lookupModuleEnv hpt (nameModule name) of
+	Just details -> lookupNameEnv (md_types (hm_details details)) name
 	Nothing	     -> lookupNameEnv pte name
 \end{code}
 
@@ -467,6 +529,13 @@ lookupDeprec (DeprecSome env) name = case lookupNameEnv env name of
 					    Just (_, txt) -> Just txt
 					    Nothing	  -> Nothing
 
+plusDeprecs :: Deprecations -> Deprecations -> Deprecations
+plusDeprecs d NoDeprecs = d
+plusDeprecs NoDeprecs d = d
+plusDeprecs d (DeprecAll t) = DeprecAll t
+plusDeprecs (DeprecAll t) d = DeprecAll t
+plusDeprecs (DeprecSome v1) (DeprecSome v2) = DeprecSome (v1 `plusNameEnv` v2)
+
 instance Eq Deprecations where
   -- Used when checking whether we need write a new interface
   NoDeprecs       == NoDeprecs	     = True
@@ -493,10 +562,18 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 type RdrExportItem = (ModuleName, [RdrAvailInfo])
 type ExportItem    = (ModuleName, [AvailInfo])
 
-type AvailEnv = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
+availsToNameSet :: [AvailInfo] -> NameSet
+availsToNameSet avails = foldl add emptyNameSet avails
+		       where
+			 add set avail = addListToNameSet set (availNames avail)
 
-emptyAvailEnv :: AvailEnv
-emptyAvailEnv = emptyNameEnv
+availName :: GenAvailInfo name -> name
+availName (Avail n)     = n
+availName (AvailTC n _) = n
+
+availNames :: GenAvailInfo name -> [name]
+availNames (Avail n)      = [n]
+availNames (AvailTC n ns) = ns
 
 instance Outputable n => Outputable (GenAvailInfo n) where
    ppr = pprAvail
@@ -510,14 +587,23 @@ pprAvail (Avail n) = ppr n
 \end{code}
 
 \begin{code}
-type FixityEnv = NameEnv Fixity
+type FixityEnv = NameEnv (FixitySig Name)
+	-- We keep the whole fixity sig so that we
+	-- can report line-number info when there is a duplicate
+	-- fixity declaration
+
+emptyFixityEnv :: FixityEnv
+emptyFixityEnv = emptyNameEnv
 
 lookupFixity :: FixityEnv -> Name -> Fixity
-lookupFixity env n = lookupNameEnv env n `orElse` defaultFixity
+lookupFixity env n = case lookupNameEnv env n of
+			Just (FixitySig _ fix _) -> fix
+			Nothing			 -> defaultFixity
 
-collectFixities :: FixityEnv -> [TyClDecl Name pat] -> [(Name,Fixity)]
+collectFixities :: FixityEnv -> [TyClDecl Name] -> [FixitySig Name]
+-- Collect fixities for the specified declarations
 collectFixities env decls
-  = [ (n, fix) 
+  = [ fix
     | d <- decls, (n,_) <- tyClDeclNames d,
       Just fix <- [lookupNameEnv env n]
     ]
@@ -542,8 +628,10 @@ type IsBootInterface     = Bool
 
 type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
 
-data WhatsImported name  = NothingAtAll				-- The module is below us in the
-								-- hierarchy, but we import nothing
+data WhatsImported name  = NothingAtAll			-- The module is below us in the
+							-- hierarchy, but we import nothing
+							-- Used for orphan modules, so they appear
+							-- in the usage list
 
 			 | Everything Version		-- Used for modules from other packages;
 							-- we record only the module's version number
@@ -565,8 +653,6 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 	--	we imported the module without saying exactly what we imported
 	-- We need to recompile if the module exports changes, because we might
 	-- now have a name clash in the importing module.
-
-type IsExported = Name -> Bool		-- True for names that are exported from this module
 \end{code}
 
 
@@ -579,66 +665,70 @@ type IsExported = Name -> Bool		-- True for names that are exported from this mo
 The @PersistentCompilerState@ persists across successive calls to the
 compiler.
 
-  * A ModIface for each non-home-package module
-
-  * An accumulated TypeEnv from all the modules in imported packages
-
-  * An accumulated InstEnv from all the modules in imported packages
-    The point is that we don't want to keep recreating it whenever
-    we compile a new module.  The InstEnv component of pcPST is empty.
-    (This means we might "see" instances that we shouldn't "really" see;
-    but the Haskell Report is vague on what is meant to be visible, 
-    so we just take the easy road here.)
-
-  * Ditto for rules
- 
-  * The persistent renamer state
-
 \begin{code}
 data PersistentCompilerState 
    = PCS {
-        pcs_PIT :: !PackageIfaceTable,	-- Domain = non-home-package modules
-					--   the mi_decls component is empty
-
-        pcs_PTE :: !PackageTypeEnv,	-- Domain = non-home-package modules
-					--   except that the InstEnv components is empty
-
-	pcs_insts :: !PackageInstEnv,	-- The total InstEnv accumulated from all
-					--   the non-home-package modules
-
-	pcs_rules :: !PackageRuleBase,	-- Ditto RuleEnv
-
-        pcs_PRS :: !PersistentRenamerState
+	pcs_nc  :: !NameCache,
+        pcs_EPS :: !ExternalPackageState
      }
 \end{code}
 
-
-The persistent renamer state contains:
-
-  * A name supply, which deals with allocating unique names to
-    (Module,OccName) original names, 
- 
-  * A "holding pen" for declarations that have been read out of
-    interface files but not yet sucked in, renamed, and typechecked
 
 \begin{code}
 type PackageTypeEnv  = TypeEnv
 type PackageRuleBase = RuleBase
 type PackageInstEnv  = InstEnv
 
-data PersistentRenamerState
-  = PRS { prsOrig    :: !NameSupply,
-	  prsImpMods :: !ImportedModuleInfo,
+data ExternalPackageState
+  = EPS {
+	eps_PIT :: !PackageIfaceTable,
+		-- The ModuleIFaces for modules in external packages
+		-- whose interfaces we have opened
+		-- The declarations in these interface files are held in
+		-- eps_decls, eps_insts, eps_rules (below), not in the 
+		-- mi_decls fields of the iPIT.  
+		-- What _is_ in the iPIT is:
+		--	* The Module 
+		--	* Version info
+		--	* Its exports
+		--	* Fixities
+		--	* Deprecations
 
-		-- Holding pens for stuff that has been read in
-		-- but not yet slurped into the renamer
-	  prsDecls   :: !DeclsMap,
-	  prsInsts   :: !IfaceInsts,
-	  prsRules   :: !IfaceRules
-    }
+	eps_imp_mods :: !ImportedModuleInfo,
+		-- Modules that we know something about, because they are mentioned
+		-- in interface files, BUT which we have not loaded yet.  
+		-- No module is both in here and in the PIT
+
+	eps_PTE :: !PackageTypeEnv,		-- Domain = external-package modules
+
+	eps_inst_env :: !PackageInstEnv,	-- The total InstEnv accumulated from
+						--   all the external-package modules
+	eps_rule_base :: !PackageRuleBase,	-- Ditto RuleEnv
+
+
+	-- Holding pens for stuff that has been read in from file,
+	-- but not yet slurped into the renamer
+	eps_decls      :: !DeclsMap,
+		-- A single, global map of Names to unslurped decls
+	eps_insts      :: !IfaceInsts,
+		-- The as-yet un-slurped instance decls; this bag is depleted when we
+		-- slurp an instance decl so that we don't slurp the same one twice.
+		-- Each is 'gated' by the names that must be available before
+		-- this instance decl is needed.
+	eps_rules      :: !IfaceRules,
+		-- Similar to instance decls, only for rules
+
+	eps_inst_gates :: !NameSet	-- Gates for instance decls
+		-- The instance gates must accumulate across
+		-- all invocations of the renamer; 
+		-- see "the gating story" in RnIfaces.lhs
+		-- These names should all be from other packages;
+		-- for the home package we have all the instance
+		-- declarations anyhow
+  }
 \end{code}
 
-The NameSupply makes sure that there is just one Unique assigned for
+The NameCache makes sure that there is just one Unique assigned for
 each original name; i.e. (module-name, occ-name) pair.  The Name is
 always stored as a Global, and has the SrcLoc of its binding location.
 Actually that's not quite right.  When we first encounter the original
@@ -651,8 +741,8 @@ encounter the occurrence, we may not know the details of the module, so
 we just store junk.  Then when we find the binding site, we fix it up.
 
 \begin{code}
-data NameSupply
- = NameSupply { nsUniqs :: UniqSupply,
+data NameCache
+ = NameCache {  nsUniqs :: UniqSupply,
 		-- Supply of uniques
 		nsNames :: OrigNameCache,
 		-- Ensures that one original name gets one unique
@@ -672,7 +762,8 @@ invocations of the renamer, at least from Rename.checkOldIface to Rename.renameS
 And there's no harm in it persisting across multiple compilations.
 
 \begin{code}
-type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
+type ImportedModuleInfo 
+    = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
 \end{code}
 
 A DeclsMap contains a binding for each Name in the declaration
@@ -699,11 +790,74 @@ type GateFn       = (Name -> Bool) -> Bool	-- Returns True <=> gate is open
 
 %************************************************************************
 %*									*
+\subsection{Linkable stuff}
+%*									*
+%************************************************************************
+
+This stuff is in here, rather than (say) in Linker.lhs, because the Linker.lhs
+stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
+
+\begin{code}
+data Linkable = LM {
+  linkableTime     :: ClockTime,	-- Time at which this linkable was built
+					-- (i.e. when the bytecodes were produced,
+					--	 or the mod date on the files)
+  linkableModName  :: ModuleName,	-- Should be Module, but see below
+  linkableUnlinked :: [Unlinked]
+ }
+
+isObjectLinkable :: Linkable -> Bool
+isObjectLinkable l = all isObject (linkableUnlinked l)
+
+instance Outputable Linkable where
+   ppr (LM when_made mod unlinkeds)
+      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
+        $$ nest 3 (ppr unlinkeds)
+
+-------------------------------------------
+data Unlinked
+   = DotO FilePath
+   | DotA FilePath
+   | DotDLL FilePath
+   | BCOs CompiledByteCode
+
+#ifndef GHCI
+data CompiledByteCode = NoByteCode
+#endif
+
+instance Outputable Unlinked where
+   ppr (DotO path)   = text "DotO" <+> text path
+   ppr (DotA path)   = text "DotA" <+> text path
+   ppr (DotDLL path) = text "DotDLL" <+> text path
+#ifdef GHCI
+   ppr (BCOs bcos)   = text "BCOs" <+> ppr bcos
+#else
+   ppr (BCOs bcos)   = text "No byte code"
+#endif
+
+isObject (DotO _)   = True
+isObject (DotA _)   = True
+isObject (DotDLL _) = True
+isObject _          = False
+
+isInterpretable = not . isObject
+
+nameOfObject (DotO fn)   = fn
+nameOfObject (DotA fn)   = fn
+nameOfObject (DotDLL fn) = fn
+
+byteCodeOfObject (BCOs bc) = bc
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Provenance and export info}
 %*									*
 %************************************************************************
 
 A LocalRdrEnv is used for local bindings (let, where, lambda, case)
+Also used in 
 
 \begin{code}
 type LocalRdrEnv = RdrNameEnv Name
@@ -721,14 +875,56 @@ type GlobalRdrEnv = RdrNameEnv [GlobalRdrElt]
 	-- The list is because there may be name clashes
 	-- These only get reported on lookup, not on construction
 
-data GlobalRdrElt = GRE Name Provenance (Maybe DeprecTxt)
-	-- The Maybe DeprecTxt tells whether this name is deprecated
+emptyGlobalRdrEnv = emptyRdrEnv
 
+data GlobalRdrElt 
+  = GRE { gre_name   :: Name,
+	  gre_parent :: Name,	-- Name of the "parent" structure
+				-- 	* the tycon of a data con
+				--	* the class of a class op
+				-- For others it's just the same as gre_name
+	  gre_prov   :: Provenance,		-- Why it's in scope
+	  gre_deprec :: Maybe DeprecTxt		-- Whether this name is deprecated
+    }
+
+instance Outputable GlobalRdrElt where
+  ppr gre = ppr (gre_name gre) <+> 
+	    parens (hsep [text "parent:" <+> ppr (gre_parent gre) <> comma,
+			  pprNameProvenance gre])
 pprGlobalRdrEnv env
   = vcat (map pp (rdrEnvToList env))
   where
-    pp (rn, nps) = ppr rn <> colon <+> 
-		   vcat [ppr n <+> pprNameProvenance n p | (GRE n p _) <- nps]
+    pp (rn, gres) = ppr rn <> colon <+> 
+		    vcat [ ppr (gre_name gre) <+> pprNameProvenance gre
+			 | gre <- gres]
+
+isLocalGRE :: GlobalRdrElt -> Bool
+isLocalGRE (GRE {gre_prov = LocalDef}) = True
+isLocalGRE other    		       = False
+\end{code}
+
+@unQualInScope@ returns a function that takes a @Name@ and tells whether
+its unqualified name is in scope.  This is put as a boolean flag in
+the @Name@'s provenance to guide whether or not to print the name qualified
+in error messages.
+
+\begin{code}
+unQualInScope :: GlobalRdrEnv -> Name -> Bool
+-- True if 'f' is in scope, and has only one binding,
+-- and the thing it is bound to is the name we are looking for
+-- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
+--
+-- Also checks for built-in syntax, which is always 'in scope'
+--
+-- This fn is only efficient if the shared 
+-- partial application is used a lot.
+unQualInScope env
+  = \n -> n `elemNameSet` unqual_names || isBuiltInSyntaxName n
+  where
+    unqual_names :: NameSet
+    unqual_names = foldRdrEnv add emptyNameSet env
+    add rdr_name [gre] unquals | isUnqual rdr_name = addOneToNameSet unquals (gre_name gre)
+    add _        _     unquals		 	   = unquals
 \end{code}
 
 The "provenance" of something says how it came to be in scope.
@@ -788,10 +984,12 @@ hasBetterProv LocalDef 				  _			       = True
 hasBetterProv (NonLocalDef (UserImport _ _ _   )) (NonLocalDef ImplicitImport) = True
 hasBetterProv _					  _			       = False
 
-pprNameProvenance :: Name -> Provenance -> SDoc
-pprNameProvenance name LocalDef   	 = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
-pprNameProvenance name (NonLocalDef why) = sep [ppr_reason why, 
-					        nest 2 (ppr_defn (nameSrcLoc name))]
+pprNameProvenance :: GlobalRdrElt -> SDoc
+pprNameProvenance (GRE {gre_name = name, gre_prov = prov})
+  = case prov of
+	LocalDef	-> ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+	NonLocalDef why ->  sep [ppr_reason why, 
+				 nest 2 (ppr_defn (nameSrcLoc name))]
 
 ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")
 ppr_reason (UserImport mod loc _) = ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc

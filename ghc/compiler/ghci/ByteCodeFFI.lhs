@@ -12,16 +12,16 @@ import Outputable
 import PrimRep		( PrimRep(..), getPrimRepSize, isFollowableRep )
 import ForeignCall	( CCallConv(..) )
 
--- DON'T remove apparently unused imports here .. there is ifdeffery
--- below
-import Bits		( Bits(..), shiftR, shiftL )
+-- DON'T remove apparently unused imports here .. 
+-- there is ifdeffery below
+import DATA_BITS	( Bits(..), shiftR, shiftL )
 import Foreign		( newArray )
 
-import Data.Word	( Word8, Word32 )
-import Foreign		( Ptr, mallocBytes )
-import Debug.Trace	( trace )
+import DATA_WORD	( Word8, Word32 )
+import Foreign		( Ptr )
 import System.IO.Unsafe ( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
+-- import Debug.Trace	( trace )
 \end{code}
 
 %************************************************************************

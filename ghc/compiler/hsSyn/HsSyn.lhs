@@ -23,10 +23,10 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	collectHsBinders, collectHsOutBinders, collectLocatedHsBinders, 
+	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
 	collectSigTysFromMonoBinds,
-	hsModuleName, hsModuleImports
+	hsModule, hsImports
      ) where
 
 #include "HsVersions.h"
@@ -45,14 +45,14 @@ import BasicTypes	( Fixity, Version, NewOrData )
 import Name		( NamedThing )
 import Outputable
 import SrcLoc		( SrcLoc )
-import Module		( ModuleName )
+import Module		( Module )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
-data HsModule name pat
+data HsModule name
   = HsModule
-	ModuleName		-- module name
+	Module
 	(Maybe Version)		-- source interface version number
 	(Maybe [IE name])	-- export list; Nothing => export everything
 				-- Just [] => export *nothing* (???)
@@ -61,14 +61,14 @@ data HsModule name pat
 				-- imported interfaces early on, adding that
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
-	[HsDecl name pat]	-- Type, class, value, and interface signature decls
+	[HsDecl name]	-- Type, class, value, and interface signature decls
 	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
 	SrcLoc
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat)
-	=> Outputable (HsModule name pat) where
+instance (NamedThing name, OutputableBndr name)
+	=> Outputable (HsModule name) where
 
     ppr (HsModule name iface_version exports imports
 		      decls deprec src_loc)
@@ -93,8 +93,8 @@ instance (NamedThing name, Outputable name, Outputable pat)
 	pp_nonnull [] = empty
 	pp_nonnull xs = vcat (map ppr xs)
 
-hsModuleName    (HsModule mod_name _ _ _ _ _ _) = mod_name
-hsModuleImports (HsModule mod_name vers exports imports decls deprec src_loc) = imports
+hsModule  (HsModule mod _ _ _ _ _ _) = mod
+hsImports (HsModule mod vers exports imports decls deprec src_loc) = imports
 \end{code}
 
 
@@ -118,30 +118,21 @@ where
 it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
-collectLocatedHsBinders :: HsBinds name (InPat name) -> [(name,SrcLoc)]
+collectLocatedHsBinders :: HsBinds name -> [(name,SrcLoc)]
 collectLocatedHsBinders EmptyBinds = []
 collectLocatedHsBinders (MonoBind b _ _) 
  = collectLocatedMonoBinders b
 collectLocatedHsBinders (ThenBinds b1 b2)
  = collectLocatedHsBinders b1 ++ collectLocatedHsBinders b2
 
-collectHsBinders :: HsBinds name (InPat name) -> [name]
+collectHsBinders :: HsBinds name -> [name]
 collectHsBinders EmptyBinds = []
 collectHsBinders (MonoBind b _ _) 
  = collectMonoBinders b
 collectHsBinders (ThenBinds b1 b2)
  = collectHsBinders b1 ++ collectHsBinders b2
 
--- corresponds to `collectHsBinders', but operates on renamed patterns
---
-collectHsOutBinders :: HsBinds name (OutPat name) -> [name]
-collectHsOutBinders EmptyBinds = []
-collectHsOutBinders (MonoBind b _ _) 
- = collectMonoOutBinders b
-collectHsOutBinders (ThenBinds b1 b2)
- = collectHsOutBinders b1 ++ collectHsOutBinders b2
-
-collectLocatedMonoBinders :: MonoBinds name (InPat name) -> [(name,SrcLoc)]
+collectLocatedMonoBinders :: MonoBinds name -> [(name,SrcLoc)]
 collectLocatedMonoBinders binds
   = go binds []
   where
@@ -150,23 +141,12 @@ collectLocatedMonoBinders binds
     go (FunMonoBind f _ _ loc) acc = (f,loc) : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 
-collectMonoBinders :: MonoBinds name (InPat name) -> [name]
+collectMonoBinders :: MonoBinds name -> [name]
 collectMonoBinders binds
   = go binds []
   where
     go EmptyMonoBinds	       acc = acc
     go (PatMonoBind pat _ loc) acc = collectPatBinders pat ++ acc
-    go (FunMonoBind f _ _ loc) acc = f : acc
-    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
-
--- corresponds to `collectMonoBinders', but operates on renamed patterns
---
-collectMonoOutBinders :: MonoBinds name (OutPat name) -> [name]
-collectMonoOutBinders binds
-  = go binds []
-  where
-    go EmptyMonoBinds	       acc = acc
-    go (PatMonoBind pat _ loc) acc = collectOutPatBinders pat ++ acc
     go (FunMonoBind f _ _ loc) acc = f : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}
@@ -180,7 +160,7 @@ collectMonoOutBinders binds
 Get all the pattern type signatures out of a bunch of bindings
 
 \begin{code}
-collectSigTysFromMonoBinds :: MonoBinds name (InPat name) -> [HsType name]
+collectSigTysFromMonoBinds :: MonoBinds name -> [HsType name]
 collectSigTysFromMonoBinds bind
   = go bind []
   where

@@ -1,0 +1,12 @@
+__interface RnSource 1 0 where
+__export RnSource rnBinds rnSrcDecls;
+
+1 rnBinds :: __forall [b] => RdrHsSyn.RdrNameHsBinds
+	-> (RnHsSyn.RenamedHsBinds
+ 	-> TcRnTypes.RnM (b, NameSet.FreeVars))
+	-> TcRnTypes.RnM (b, NameSet.FreeVars) ;
+
+1 rnSrcDecls :: [RdrHsSyn.RdrNameHsDecl]
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, [RnHsSyn.RenamedHsDecl], NameSet.FreeVars) ;
+
+

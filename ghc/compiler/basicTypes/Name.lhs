@@ -17,31 +17,28 @@ module Name (
 
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
-	setNameOcc, nameRdrName, setNameModuleAndLoc, 
-	toRdrName, hashName, 
-	externaliseName, localiseName,
+	setNameOcc, setNameModuleAndLoc, 
+	hashName, externaliseName, localiseName,
 
-	nameSrcLoc, 
+	nameSrcLoc, eqNameByOcc,
 
 	isSystemName, isInternalName, isExternalName,
-	isTyVarName, isDllName, 
+	isTyVarName, isDllName, isWiredInName,
 	nameIsLocalOrFrom, isHomePackageName,
 	
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, getOccString, toRdrName
+	getSrcLoc, getOccString
     ) where
 
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, moduleName, mkVanillaModule, isHomeModule )
-import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
+import Module		( Module, ModuleName, moduleName, mkVanillaModule, isHomeModule )
 import CmdLineOpts	( opt_Static )
-import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
+import SrcLoc		( noSrcLoc, isWiredInLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import FastTypes
-import Binary
 import Outputable
 \end{code}
 
@@ -108,12 +105,6 @@ nameSrcLoc		:: Name -> SrcLoc
 nameUnique  name = n_uniq name
 nameOccName name = n_occ  name
 nameSrcLoc  name = n_loc  name
-
-nameModule (Name { n_sort = External mod }) = mod
-nameModule name				  = pprPanic "nameModule" (ppr name)
-
-nameModule_maybe (Name { n_sort = External mod }) = Just mod
-nameModule_maybe name				= Nothing
 \end{code}
 
 \begin{code}
@@ -122,9 +113,18 @@ isInternalName	  :: Name -> Bool
 isExternalName	  :: Name -> Bool
 isSystemName	  :: Name -> Bool
 isHomePackageName :: Name -> Bool
+isWiredInName	  :: Name -> Bool
+
+isWiredInName name = isWiredInLoc (n_loc name)
 
 isExternalName (Name {n_sort = External _}) = True
-isExternalName other	                = False
+isExternalName other	                    = False
+
+nameModule (Name { n_sort = External mod }) = mod
+nameModule name				    = pprPanic "nameModule" (ppr name)
+
+nameModule_maybe (Name { n_sort = External mod }) = Just mod
+nameModule_maybe name				  = Nothing
 
 isInternalName name = not (isExternalName name)
 
@@ -142,6 +142,18 @@ isTyVarName name = isTvOcc (nameOccName name)
 
 isSystemName (Name {n_sort = System}) = True
 isSystemName other		      = False
+
+eqNameByOcc :: Name -> Name -> Bool
+-- Compare using the strings, not the unique
+-- See notes with HsCore.eq_ufVar
+eqNameByOcc (Name {n_sort = sort1, n_occ = occ1})
+	    (Name {n_sort = sort2, n_occ = occ2})
+  = sort1 `eq_sort` sort2 && occ1 == occ2
+  where
+    eq_sort (External m1) (External m2) = moduleName m1 == moduleName m2
+    eq_sort (External _)  _		= False
+    eq_sort _            (External _)   = False
+    eq_sort _		 _		= True
 \end{code}
 
 
@@ -167,14 +179,12 @@ mkExternalName :: Unique -> Module -> OccName -> SrcLoc -> Name
 mkExternalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = External mod,
 				       n_occ = occ, n_loc = loc }
 
-mkKnownKeyExternalName :: RdrName -> Unique -> Name
-mkKnownKeyExternalName rdr_name uniq
-  = mkExternalName uniq (mkVanillaModule (rdrNameModule rdr_name))
-		      (rdrNameOcc rdr_name)
-		      builtinSrcLoc
+mkKnownKeyExternalName :: ModuleName -> OccName -> Unique -> Name
+mkKnownKeyExternalName mod occ uniq
+  = mkExternalName uniq (mkVanillaModule mod) occ noSrcLoc
 
 mkWiredInName :: Module -> OccName -> Unique -> Name
-mkWiredInName mod occ uniq = mkExternalName uniq mod occ builtinSrcLoc
+mkWiredInName mod occ uniq = mkExternalName uniq mod occ wiredInSrcLoc
 
 mkSystemName :: Unique -> UserFS -> Name
 mkSystemName uniq fs = Name { n_uniq = uniq, n_sort = System, 
@@ -236,13 +246,6 @@ setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc
 \begin{code}
 hashName :: Name -> Int
 hashName name = iBox (getKey (nameUnique name))
-
-
-nameRdrName :: Name -> RdrName
--- Makes a qualified name for top-level (External) names, 
--- whether locally defined or not and an unqualified name just for Internals
-nameRdrName (Name { n_occ = occ, n_sort = External mod }) = mkRdrOrig (moduleName mod) occ
-nameRdrName (Name { n_occ = occ })			  = mkRdrUnqual occ
 \end{code}
 
 
@@ -275,26 +278,6 @@ instance NamedThing Name where
     getName n = n
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Binary output}
-%*									*
-%************************************************************************
-
-\begin{code}
-instance Binary Name where
-  -- we must print these as RdrNames, because that's how they will be read in
-  put_ bh Name {n_sort = sort, n_uniq = uniq, n_occ = occ} =
-   case sort of
-    External mod
-	| this_mod == mod -> put_ bh (mkRdrUnqual occ)
-	| otherwise       -> put_ bh (mkRdrOrig (moduleName mod) occ)
-        where (this_mod,_,_,_) = getUserData bh
-    _ -> do 
-	put_ bh (mkRdrUnqual occ)
-
-  get bh = error "can't Binary.get a Name"    
-\end{code}
 
 %************************************************************************
 %*									*
@@ -306,6 +289,9 @@ instance Binary Name where
 instance Outputable Name where
 	-- When printing interfaces, all Internals have been given nice print-names
     ppr name = pprName name
+
+instance OutputableBndr Name where
+    pprBndr _ name = pprName name
 
 pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
@@ -355,10 +341,8 @@ class NamedThing a where
 \begin{code}
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 getOccString	    :: NamedThing a => a -> String
-toRdrName	    :: NamedThing a => a -> RdrName
 
 getSrcLoc	    = nameSrcLoc	   . getName
 getOccString 	    = occNameString	   . getOccName
-toRdrName	    = nameRdrName	   . getName
 \end{code}
 

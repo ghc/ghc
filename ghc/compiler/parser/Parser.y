@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.101 2002/09/06 14:35:44 simonmar Exp $
+$Id: Parser.y,v 1.102 2002/09/13 15:02:37 simonpj Exp $
 
 Haskell grammar.
 
@@ -17,13 +17,13 @@ import HsSyn
 import HsTypes		( mkHsTupCon )
 
 import RdrHsSyn
-import RnMonad		( ParsedIface(..) )
+import HscTypes		( ParsedIface(..), IsBootInterface )
 import Lex
 import ParseUtil
 import RdrName
-import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, 
-			  listTyCon_RDR, parrTyCon_RDR, tupleTyCon_RDR, 
-			  unitCon_RDR, nilCon_RDR, tupleCon_RDR )
+import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
+			  parrTyConName, consDataConName, nilDataConName )
+import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon )
 import ForeignCall	( Safety(..), CExportSpec(..), 
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
 			)
@@ -34,7 +34,8 @@ import Module
 import CmdLineOpts	( opt_SccProfilingOn, opt_InPackage )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  NewOrData(..), StrictnessMark(..), Activation(..) )
+			  NewOrData(..), StrictnessMark(..), Activation(..),
+			  FixitySig(..) )
 import Panic
 
 import GLAEXTS
@@ -177,6 +178,7 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 -}
 
  '..'		{ ITdotdot }  			-- reserved symbols
+ ':'		{ ITcolon }
  '::'		{ ITdcolon }
  '='		{ ITequal }
  '\\'		{ ITlam }
@@ -231,6 +233,15 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
  PRIMFLOAT	{ ITprimfloat  $$ }
  PRIMDOUBLE	{ ITprimdouble $$ }
  CLITLIT	{ ITlitlit     $$ }
+ 
+-- Template Haskell
+'[|'            { ITopenExpQuote  }       
+'[p|'           { ITopenPatQuote  }      
+'[t|'           { ITopenTypQuote  }      
+'[d|'           { ITopenDecQuote  }      
+'|]'            { ITcloseQuote    }
+ID_SPLICE       { ITidEscape $$   }           -- $x
+'$('	        { ITparenEscape   }           -- $( exp )
 
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { ITeof }
@@ -253,9 +264,10 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 
 module 	:: { RdrNameHsModule }
  	: srcloc 'module' modid maybemoddeprec maybeexports 'where' body 
-		{ HsModule $3 Nothing $5 (fst $7) (snd $7) $4 $1 }
+		{ HsModule (mkHomeModule $3) Nothing $5 (fst $7) (snd $7) $4 $1 }
 	| srcloc body
-		{ HsModule mAIN_Name Nothing Nothing (fst $2) (snd $2) Nothing $1 }
+		{ HsModule (mkHomeModule mAIN_Name) Nothing Nothing 
+			   (fst $2) (snd $2) Nothing $1 }
 
 maybemoddeprec :: { Maybe DeprecTxt }
 	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }
@@ -336,20 +348,21 @@ exportlist :: { [RdrNameIE] }
  	|  export				{ [$1]  }
 	|  {- empty -}				{ [] }
 
-   -- GHC extension: we allow things like [] and (,,,) to be exported
+   -- No longer allow things like [] and (,,,) to be exported
+   -- They are built in syntax, always available
 export 	:: { RdrNameIE }
 	:  qvar					{ IEVar $1 }
-	|  gtycon				{ IEThingAbs $1 }
-	|  gtycon '(' '..' ')'			{ IEThingAll $1 }
-	|  gtycon '(' ')'		        { IEThingWith $1 [] }
-	|  gtycon '(' qcnames ')'		{ IEThingWith $1 (reverse $3) }
+	|  oqtycon				{ IEThingAbs $1 }
+	|  oqtycon '(' '..' ')'			{ IEThingAll $1 }
+	|  oqtycon '(' ')'		        { IEThingWith $1 [] }
+	|  oqtycon '(' qcnames ')'		{ IEThingWith $1 (reverse $3) }
 	|  'module' modid			{ IEModuleContents $2 }
 
 qcnames :: { [RdrName] }
 	:  qcnames ',' qcname			{ $3 : $1 }
 	|  qcname				{ [$1]  }
 
-qcname 	:: { RdrName }
+qcname 	:: { RdrName }	-- Variable or data constructor
 	:  qvar					{ $1 }
 	|  gcon					{ $1 }
 
@@ -369,9 +382,9 @@ importdecl :: { RdrNameImportDecl }
 	: 'import' srcloc maybe_src optqualified modid maybeas maybeimpspec 
 		{ ImportDecl $5 $3 $4 $6 $7 $2 }
 
-maybe_src :: { WhereFrom }
-	: '{-# SOURCE' '#-}'			{ ImportByUserSource }
-	| {- empty -}				{ ImportByUser }
+maybe_src :: { IsBootInterface }
+	: '{-# SOURCE' '#-}'			{ True }
+	| {- empty -}				{ False }
 
 optqualified :: { Bool }
       	: 'qualified'                           { True  }
@@ -449,6 +462,7 @@ topdecl :: { RdrBinding }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
+	| '$(' exp ')'					{ RdrHsDecl (SpliceD $2) }
       	| decl						{ $1 }
 
 syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an infix
@@ -795,6 +809,7 @@ type :: { RdrNameHsType }
 gentype :: { RdrNameHsType }
         : btype                         { $1 }
         | btype qtyconop gentype        { HsOpTy $1 (HsTyOp $2) $3 }
+        | btype  '`' tyvar '`' gentype  { HsOpTy $1 (HsTyOp $3) $5 }
 	| btype '->' gentype		{ HsOpTy $1 HsArrow $3 }
 
 btype :: { RdrNameHsType }
@@ -867,9 +882,9 @@ akind	:: { Kind }
 -- Datatype declarations
 
 newconstr :: { RdrNameConDecl }
-	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [unbangedType $3]) $1 }
+	: srcloc conid atype	{ ConDecl $2 [] [] (PrefixCon [unbangedType $3]) $1 }
 	| srcloc conid '{' var '::' ctype '}'
-				{ mkConDecl $2 [] [] (RecCon [([$4], unbangedType $6)]) $1 }
+				{ ConDecl $2 [] [] (RecCon [($4, unbangedType $6)]) $1 }
 
 constrs :: { [RdrNameConDecl] }
         : {- empty; a GHC extension -}  { [] }
@@ -881,19 +896,19 @@ constrs1 :: { [RdrNameConDecl] }
 
 constr :: { RdrNameConDecl }
 	: srcloc forall context '=>' constr_stuff
-		{ mkConDecl (fst $5) $2 $3 (snd $5) $1 }
+		{ ConDecl (fst $5) $2 $3 (snd $5) $1 }
 	| srcloc forall constr_stuff
-		{ mkConDecl (fst $3) $2 [] (snd $3) $1 }
+		{ ConDecl (fst $3) $2 [] (snd $3) $1 }
 
 forall :: { [RdrNameHsTyVar] }
 	: 'forall' tv_bndrs '.'		{ $2 }
 	| {- empty -}			{ [] }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
-	: btype				{% mkVanillaCon $1 []		    }
-	| btype '!' atype satypes	{% mkVanillaCon $1 (BangType MarkedUserStrict $3 : $4) }
-	| gtycon '{' '}' 		{% mkRecCon $1 [] }
-	| gtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
+	: btype				{% mkPrefixCon $1 [] }
+	| btype '!' atype satypes	{% mkPrefixCon $1 (BangType MarkedUserStrict $3 : $4) }
+	| conid '{' '}' 		{ ($1, RecCon []) }
+	| conid '{' fielddecls '}' 	{ ($1, mkRecCon $3) }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
 
 satypes	:: { [RdrNameBangType] }
@@ -951,7 +966,6 @@ valdef :: { RdrBinding }
 	| var ',' sig_vars srcloc '::' sigtype	{ foldr1 RdrAndBindings 
 							 [ RdrSig (Sig n $6 $4) | n <- $1:$3 ]
                                                 }
-
 
 rhs	:: { RdrNameGRHSs }
 	: '=' srcloc exp wherebinds	{ (GRHSs (unguardedRHS $3 $2) $4 placeHolderType)}
@@ -1026,19 +1040,17 @@ aexp	:: { RdrNameHsExpr }
 	| aexp1				{ $1 }
 
 aexp1	:: { RdrNameHsExpr }
-        : aexp1 '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
-							(reverse $3)) }
-  	| aexp2					{ $1 }
- 	| var_or_con '{|' gentype '|}'          { HsApp $1 (HsType $3) }
+        : aexp1 '{' fbinds '}' 		{% (mkRecConstrOrUpdate $1 (reverse $3)) }
+  	| aexp2				{ $1 }
 
-
-var_or_con :: { RdrNameHsExpr }
-        : qvar                          { HsVar $1 }
-        | gcon                          { HsVar $1 }
+-- Here was the syntax for type applications that I was planning
+-- but there are difficulties (e.g. what order for type args)
+-- so it's not enabled yet.
+ 	| qcname '{|' gentype '|}'          { (HsApp (HsVar $1) (HsType $3)) }
 
 aexp2	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
-	| var_or_con			{ $1 }
+	| qcname			{ HsVar $1 }
 	| literal			{ HsLit $1 }
 	| INTEGER			{ HsOverLit (mkHsIntegral   $1) }
 	| RATIONAL			{ HsOverLit (mkHsFractional $1) }
@@ -1050,6 +1062,16 @@ aexp2	:: { RdrNameHsExpr }
 	| '(' infixexp qop ')'		{ (SectionL $2 (HsVar $3))  }
 	| '(' qopm infixexp ')'		{ (SectionR $2 $3) }
 	| '_'				{ EWildPat }
+	
+	-- MetaHaskell Extension
+	| ID_SPLICE                     { mkHsSplice (HsVar (mkUnqual varName $1))}  -- $x
+	| '$(' exp ')'   	        { mkHsSplice $2 }                            -- $( exp )
+	| '[|' exp '|]'                 { HsBracket (ExpBr $2) }                       
+	| '[t|' ctype '|]'              { HsBracket (TypBr $2) }                       
+	| '[p|' srcloc infixexp '|]'    {% checkPattern $2 $3 `thenP` \p ->
+					   returnP (HsBracket (PatBr p)) }
+	| '[d|' cvtopdecls '|]'		{ HsBracket (DecBr $2) }
+
 
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
@@ -1197,8 +1219,8 @@ fbinds 	:: { RdrNameHsRecordBinds }
 	| fbind				{ [$1] }
 	| {- empty -}			{ [] }
 
-fbind	:: { (RdrName, RdrNameHsExpr, Bool) }
-	: qvar '=' exp			{ ($1,$3,False) }
+fbind	:: { (RdrName, RdrNameHsExpr) }
+	: qvar '=' exp			{ ($1,$3) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -1232,21 +1254,15 @@ deprec_var :: { RdrName }
 deprec_var : var			{ $1 }
 	   | tycon			{ $1 }
 
-gtycon 	:: { RdrName }
-	: qtycon			{ $1 }
- 	| '(' qtyconop ')'		{ $2 }
-	| '(' ')'			{ unitTyCon_RDR }
-	| '(' '->' ')'			{ funTyCon_RDR }
-	| '[' ']'			{ listTyCon_RDR }
-	| '[:' ':]'			{ parrTyCon_RDR }
-	| '(' commas ')'		{ tupleTyCon_RDR $2 }
-
 gcon 	:: { RdrName }	-- Data constructor namespace
-	: '(' ')'		{ unitCon_RDR }
-	| '[' ']'		{ nilCon_RDR }
-	| '(' commas ')'	{ tupleCon_RDR $2 }
+	: sysdcon		{ $1 }
  	| qcon			{ $1 }
 -- the case of '[:' ':]' is part of the production `parr'
+
+sysdcon	:: { RdrName }	-- Data constructor namespace
+	: '(' ')'		{ getRdrName unitDataCon }
+	| '(' commas ')'	{ getRdrName (tupleCon Boxed $2) }
+	| '[' ']'		{ nameRdrName nilDataConName }
 
 var 	:: { RdrName }
 	: varid			{ $1 }
@@ -1291,13 +1307,17 @@ qconop :: { RdrName }
 -----------------------------------------------------------------------------
 -- Type constructors
 
-tycon 	:: { RdrName }	-- Unqualified
-	: CONID			{ mkUnqual tcClsName $1 }
+gtycon 	:: { RdrName }	-- A "general" qualified tycon
+	: oqtycon			{ $1 }
+	| '(' ')'			{ getRdrName unitTyCon }
+	| '(' commas ')'		{ getRdrName (tupleTyCon Boxed $2) }
+	| '(' '->' ')'			{ nameRdrName funTyConName }
+	| '[' ']'			{ nameRdrName listTyConName }
+	| '[:' ':]'			{ nameRdrName parrTyConName }
 
-tyconop	:: { RdrName }	-- Unqualified
-	: CONSYM		{ mkUnqual tcClsName $1 }
-	| '`' tyvar '`'		{ $2 }
-	| '`' tycon '`'		{ $2 }
+oqtycon :: { RdrName }	-- An "ordinary" qualified tycon
+	: qtycon			{ $1 }
+ 	| '(' qtyconop ')'		{ $2 }
 
 qtycon :: { RdrName }	-- Qualified or unqualified
 	: QCONID		{ mkQual tcClsName $1 }
@@ -1307,6 +1327,14 @@ qtyconop :: { RdrName }	-- Qualified or unqualified
 	  : QCONSYM		{ mkQual tcClsName $1 }
 	  | '`' QCONID '`'	{ mkQual tcClsName $2 }
 	  | tyconop		{ $1 }
+
+tycon 	:: { RdrName }	-- Unqualified
+	: CONID			{ mkUnqual tcClsName $1 }
+
+tyconop	:: { RdrName }	-- Unqualified
+	: CONSYM		{ mkUnqual tcClsName $1 }
+	| '`' tycon '`'		{ $2 }
+
 
 -----------------------------------------------------------------------------
 -- Any operator
@@ -1407,6 +1435,8 @@ qconsym :: { RdrName }	-- Qualified or unqualified
 
 consym :: { RdrName }
 	: CONSYM		{ mkUnqual dataName $1 }
+	| ':'			{ nameRdrName consDataConName }
+	-- ':' means only list cons
 
 
 -----------------------------------------------------------------------------

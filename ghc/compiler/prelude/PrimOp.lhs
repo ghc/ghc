@@ -7,7 +7,7 @@
 module PrimOp (
 	PrimOp(..), allThePrimOps,
 	primOpType, primOpSig, primOpArity,
-	mkPrimOpIdName, primOpRdrName, primOpTag, primOpOcc,
+	mkPrimOpIdName, primOpTag, primOpOcc,
 
 	commutableOp,
 
@@ -17,7 +17,10 @@ module PrimOp (
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..),
 
-	eqCharName, eqIntName, eqFloatName, eqDoubleName, neqIntName,
+	eqCharName, eqIntName, neqIntName,
+	ltCharName, eqWordName, ltWordName, eqAddrName, ltAddrName,
+	eqFloatName, ltFloatName, eqDoubleName, ltDoubleName, 
+	ltIntName, geIntName, leIntName, minusIntName, tagToEnumName	
     ) where
 
 #include "HsVersions.h"
@@ -29,14 +32,13 @@ import TysWiredIn
 import NewDemand
 import Var		( TyVar )
 import Name		( Name, mkWiredInName )
-import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep, tyConAppTyCon )
 import PprType          () -- get at Outputable Type instance.
 import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
-import PrelNames	( gHC_PRIM, gHC_PRIM_Name )
+import PrelNames	( gHC_PRIM )
 import Outputable
 import FastTypes
 \end{code}
@@ -399,9 +401,6 @@ mkPrimOpIdName :: PrimOp -> Name
 mkPrimOpIdName op
   = mkWiredInName gHC_PRIM (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
 
-primOpRdrName :: PrimOp -> RdrName 
-primOpRdrName op = mkRdrOrig gHC_PRIM_Name (primOpOcc op)
-
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case (primOpInfo op) of
 			      Dyadic    occ _	  -> occ
@@ -472,12 +471,35 @@ pprPrimOp  :: PrimOp -> SDoc
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
 \end{code}
 
-Names for some primops (for ndpFlatten/FlattenMonad.lhs)
+
+%************************************************************************
+%*									*
+	Names for some primops (for ndpFlatten/FlattenMonad.lhs)
+%*									*
+%************************************************************************
 
 \begin{code}
-eqCharName	  = mkPrimOpIdName CharEqOp
-eqIntName	  = mkPrimOpIdName IntEqOp
-eqFloatName	  = mkPrimOpIdName FloatEqOp
-eqDoubleName	  = mkPrimOpIdName DoubleEqOp
-neqIntName	  = mkPrimOpIdName IntNeOp
+eqIntName	= mkPrimOpIdName IntEqOp
+ltIntName	= mkPrimOpIdName IntLtOp
+geIntName	= mkPrimOpIdName IntGeOp
+leIntName	= mkPrimOpIdName IntLeOp
+neqIntName	= mkPrimOpIdName IntNeOp
+minusIntName	= mkPrimOpIdName IntSubOp
+
+eqCharName	= mkPrimOpIdName CharEqOp
+ltCharName	= mkPrimOpIdName CharLtOp
+
+eqFloatName	= mkPrimOpIdName FloatEqOp
+ltFloatName	= mkPrimOpIdName FloatLtOp
+
+eqDoubleName	= mkPrimOpIdName DoubleEqOp
+ltDoubleName	= mkPrimOpIdName DoubleLtOp
+
+eqWordName	= mkPrimOpIdName WordEqOp
+ltWordName	= mkPrimOpIdName WordLtOp
+
+eqAddrName	= mkPrimOpIdName AddrEqOp
+ltAddrName	= mkPrimOpIdName AddrLtOp
+
+tagToEnumName	= mkPrimOpIdName TagToEnumOp
 \end{code}

@@ -77,6 +77,7 @@ import qualified EXCEPTION as Exception ( catch )
 import EXCEPTION        ( catchAllIO )
 #endif
 
+import CString		( CString, peekCString )
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import DATA_INT
     
@@ -102,9 +103,9 @@ import qualified Posix
 #else
 import List		( isPrefixOf )
 import Util		( dropList )
-import MarshalArray
+-- import Foreign.Marshal.Array
 import Foreign
-import CString
+-- import CString
 #endif
 
 #ifdef mingw32_HOST_OS

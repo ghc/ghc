@@ -1,32 +1,65 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[PrelNames]{Definitions of prelude modules}
+\section[PrelNames]{Definitions of prelude modules and names}
+
+
+-- MetaHaskell Extension
+to do -- three things
+1) Allocate a key
+2) Make a "Name"
+3) Add the name to knownKeyNames
+
 
 The strings identify built-in prelude modules.  They are
 defined here so as to avod 
 
-[oh dear, looks like the recursive module monster caught up with
- and gobbled whoever was writing the above :-) -- SOF ]
+* ModuleNames for prelude modules, 
+	e.g.	pREL_BASE_Name :: ModuleName
+
+* Modules for prelude modules
+	e.g.	pREL_Base :: Module
+
+* Uniques for Ids, DataCons, TyCons and Classes that the compiler 
+  "knows about" in some way
+	e.g.	intTyConKey :: Unique
+		minusClassOpKey :: Unique
+
+* Names for Ids, DataCons, TyCons and Classes that the compiler 
+  "knows about" in some way
+	e.g.	intTyConName :: Name
+		minusName    :: Name
+  One of these Names contains
+	(a) the module and occurrence name of the thing
+	(b) its Unique
+  The may way the compiler "knows about" one of these things is
+  where the type checker or desugarer needs to look it up. For
+  example, when desugaring list comprehensions the desugarer
+  needs to conjure up 'foldr'.  It does this by looking up
+  foldrName in the environment.
+
+* RdrNames for Ids, DataCons etc that the compiler may emit into
+  generated code (e.g. for deriving).  It's not necessary to know
+  the uniques for these guys, only their names
+
 
 \begin{code}
 module PrelNames (
 	Unique, Uniquable(..), hasKey, 	-- Re-exported for convenience
 
 	-----------------------------------------------------------
-	module PrelNames,	-- A huge bunch of (a) RdrNames, e.g. intTyCon_RDR
-				--		   (b) Uniques   e.g. intTyConKey
+	module PrelNames,	-- A huge bunch of (a) Names,  e.g. intTyConName
+				--		   (b) Uniques e.g. intTyConKey
 				-- So many that we export them all
 
 	-----------------------------------------------------------
-	knownKeyNames, 
-        mkTupNameStr, mkTupConRdrName,
+	knownKeyNames, templateHaskellNames,
+	mkTupNameStr, isBuiltInSyntaxName,
 
 	------------------------------------------------------------
 	-- Goups of classes and types
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, noDictClassKeys,
 	fractionalClassKeys, numericClassKeys, standardClassKeys,
-	derivingOccurrences, 	-- For a given class C, this tells what other 
 	derivableClassKeys,	-- things are needed as a result of a 
 				-- deriving(C) clause
 	numericTyKeys, cCallishTyKeys,
@@ -36,25 +69,33 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import Module	  ( ModuleName, mkPrelModule, mkHomeModule, mkModuleName )
-import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, 
+import Module	  ( ModuleName, mkPrelModule, mkHomeModule, mkModuleName,mkVanillaModule )
+import OccName	  ( UserFS, dataName, tcName, clsName, 
 		    mkKindOccFS, mkOccFS
 		  )
-import RdrName	  ( RdrName, mkOrig, mkUnqual )
-import UniqFM
+
+-- to avoid clashes with Meta.var we must make a local alias for OccName.varName
+-- we do this by removing varName from the import of OccName above, making
+-- a qualified instance of OccName and using OccNameAlias.varName where varName
+-- ws previously used in this file.
+import qualified OccName as OccNameAlias 
+
+		  
+import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 		    mkPreludeTyConUnique, mkPreludeClassUnique,
-		    mkTupleTyConUnique
+		    mkTupleTyConUnique, isTupleKey
 		  ) 
-import BasicTypes ( Boxity(..), Arity )
-import UniqFM	  ( UniqFM, listToUFM )
-import Name	  ( Name, mkInternalName, mkKnownKeyExternalName, nameRdrName )
-import RdrName    ( rdrNameOcc )
-import SrcLoc     ( builtinSrcLoc, noSrcLoc )
+import BasicTypes ( Boxity(..) )
+import Name	  ( Name, mkInternalName, mkKnownKeyExternalName, mkWiredInName, nameUnique )
+import NameSet	  ( NameSet, mkNameSet )
+import SrcLoc     ( noSrcLoc )
 import Util	  ( nOfThem )
 import Panic	  ( panic )
 import FastString
+
+
 \end{code}
 
 
@@ -67,19 +108,38 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkInternalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
+itName uniq = mkInternalName uniq (mkOccFS OccNameAlias.varName FSLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
+mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Built-in-syntax names
+%*									*
+%************************************************************************
+
+Built-in syntax names are parsed directly into Exact RdrNames.
+This predicate just identifies them. 
+
+\begin{code}
+isBuiltInSyntaxName :: Name -> Bool
+isBuiltInSyntaxName n
+  =  isTupleKey uniq
+  || uniq `elem` [listTyConKey, nilDataConKey, consDataConKey,
+		  funTyConKey, parrTyConKey]
+  where
+     uniq = nameUnique n
+\end{code}
 
 %************************************************************************
 %*									*
@@ -91,11 +151,13 @@ This section tells what the compiler knows about the assocation of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in TysWiredIn etc.
 
+
+MetaHaskell Extension
+It is here that the names defiend in module Meta must be added
 \begin{code}
 knownKeyNames :: [Name]
 knownKeyNames
- =  [
-	-- Type constructors (synonyms especially)
+ =  [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runIOName,
 	orderingTyConName,
@@ -118,101 +180,114 @@ knownKeyNames
 	enumClassName,			-- derivable
 	monadClassName,
     	functorClassName,
-	showClassName,			-- derivable
 	realClassName,			-- numeric
 	integralClassName,		-- numeric
 	fractionalClassName,		-- numeric
 	floatingClassName,		-- numeric
 	realFracClassName,		-- numeric
 	realFloatClassName,		-- numeric
-	readClassName,			-- derivable
-	ixClassName,			-- derivable (but it isn't Prelude.Ix; hmmm)
 	cCallableClassName,		-- mentioned, ccallish
 	cReturnableClassName,		-- mentioned, ccallish
 
-	-- ClassOps 
-	fromIntegerName,
-	negateName,
-	geName,
-	minusName,
-	enumFromName,
-	enumFromThenName,
-	enumFromToName,
-	enumFromThenToName,
-	fromEnumName,
-	toEnumName,
-	eqName,
-	thenMName,
-	bindMName,
-	returnMName,
-	failMName,
-	fromRationalName,
+	-- Numeric stuff
+	negateName, minusName, 
+	fromRationalName, fromIntegerName, 
+	geName, eqName, 
+	
+	-- Enum stuff
+	enumFromName, enumFromThenName,	
+	enumFromThenToName, enumFromToName,
+	enumFromToPName, enumFromThenToPName,
 
-        -- not class methods, but overloaded (for parallel arrays)
-	enumFromToPName,
-	enumFromThenToPName,
+	-- Monad stuff
+	thenMName, bindMName, returnMName, failMName,
+	thenIOName, bindIOName, returnIOName, failIOName,
 
-	deRefStablePtrName,
+	-- Ix stuff
+	ixClassName, 
+
+	-- Show stuff
+	showClassName, 
+
+	-- Read stuff
+	readClassName, 
+	
+	-- Stable pointers
 	newStablePtrName,
-	bindIOName,
-	thenIOName,
-	returnIOName,
-	failIOName,
 
 	-- Strings and lists
-	mapName,
-	appendName,
-	unpackCStringName,
-	unpackCStringAppendName,
-	unpackCStringFoldrName,
-	unpackCStringUtf8Name,
+	unpackCStringName, unpackCStringAppendName,
+	unpackCStringFoldrName, unpackCStringUtf8Name,
 
 	-- List operations
-	concatName,
-	filterName,
-	zipName,
-	foldrName,
-	buildName,
-	augmentName,
+	concatName, filterName,
+	zipName, foldrName, buildName, augmentName, appendName,
 
         -- Parallel array operations
-	nullPName,
-	lengthPName,
-	replicatePName,
-	mapPName,
-	filterPName,
-	zipPName,
-	crossPName,
-	indexPName,
-	toPName,
-	bpermutePName,
-	bpermuteDftPName,
-	indexOfPName,
+	nullPName, lengthPName, replicatePName,	mapPName,
+	filterPName, zipPName, crossPName, indexPName,
+	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
+        -- MetaHaskell Extension, "the smart constructors" 
+        -- text1 from Meta/work/gen.hs
+        intLName,
+        charLName,
+        plitName,
+        pvarName,
+        ptupName,
+        pconName,
+        ptildeName,
+        paspatName,
+        pwildName,
+        varName,
+        conName,
+        litName,
+        appName,
+        infixEName,        
+        lamName,
+        tupName,
+        doEName,
+        compName,
+        listExpName,
+        condName,
+        letEName,
+        caseEName,
+        infixAppName,
+        sectionLName,
+        sectionRName,        
+        guardedName,
+        normalName,
+        bindStName,
+        letStName,
+        noBindStName,
+        parStName,
+        fromName,
+        fromThenName,
+        fromToName,
+        fromThenToName,
+        liftName,
+        gensymName,
+        returnQName,
+        bindQName,   
+        funName,
+        valName,
+        protoName, matchName, clauseName,
+	exprTyConName, declTyConName, pattTyConName, mtchTyConName, clseTyConName,
+	qTyConName, expTyConName, matTyConName, clsTyConName,
+        
 	-- FFI primitive types that are not wired-in.
-	int8TyConName,
-	int16TyConName,
-	int32TyConName,
-	int64TyConName,
-	word8TyConName,
-	word16TyConName,
-	word32TyConName,
-	word64TyConName,
+	int8TyConName, int16TyConName, int32TyConName, int64TyConName,
+	word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
 	-- Others
-	unsafeCoerceName,
-	otherwiseIdName,
-	plusIntegerName,
-	timesIntegerName,
-	eqStringName,
-	assertName,
-	runSTRepName,
-	printName,
-	splitName, fstName, sndName,	-- Used by splittery
+	unsafeCoerceName, otherwiseIdName, 
+	plusIntegerName, timesIntegerName,
+	eqStringName, assertName, runSTRepName,
+	printName, splitName, fstName, sndName,
+	errorName,
 
-	-- Others (needed for flattening and not mentioned before)
-	andName,
-	orName
+	-- Booleans
+	andName, orName
     ]
 
 monadNames :: [Name]	-- The monad ops need by a HsDo
@@ -226,6 +301,8 @@ monadNames = [returnMName, failMName, bindMName, thenMName]
 %*									*
 %************************************************************************
 
+
+--MetaHaskell Extension Add a new module here
 \begin{code}
 pRELUDE_Name      = mkModuleName "Prelude"
 gHC_PRIM_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
@@ -277,6 +354,10 @@ pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
 pRELUDE		= mkPrelModule pRELUDE_Name
 
 iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
+
+-- MetaHaskell Extension  text2 from Meta/work/gen.hs
+mETA_META_Name   = mkModuleName "Language.Haskell.THSyntax"
+
 \end{code}
 
 %************************************************************************
@@ -301,37 +382,133 @@ mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, mkFastString "(#,#)")
 mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, mkFastString "(#,,#)")
 mkTupNameStr Unboxed 4 = (gHC_PRIM_Name, mkFastString "(#,,,#)")
 mkTupNameStr Unboxed n = (gHC_PRIM_Name, mkFastString ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
-
-mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
-mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
-					  (mod, occ) -> mkOrig space mod occ
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Unqualified RdrNames}
+			RdrNames
 %*									*
 %************************************************************************
 
 \begin{code}
-main_RDR_Unqual :: RdrName
-main_RDR_Unqual = mkUnqual varName FSLIT("main")
--- Don't get a RdrName from PrelNames.mainName, because nameRdrName
--- gets an Orig RdrName, and we want a Qual or Unqual one.  An Unqual
--- one will do fine.
+getTag_RDR		= nameRdrName getTagName
+
+eq_RDR 			= nameRdrName eqName
+ge_RDR 			= nameRdrName geName
+ne_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("/=")
+le_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("<=") 
+gt_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT(">")  
+compare_RDR		= varQual_RDR  pREL_BASE_Name FSLIT("compare") 
+ltTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("LT") 
+eqTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("EQ")
+gtTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("GT")
+
+eqClass_RDR		= nameRdrName eqClassName
+numClass_RDR 		= nameRdrName numClassName
+ordClass_RDR 		= nameRdrName ordClassName
+enumClass_RDR		= nameRdrName enumClassName
+monadClass_RDR		= nameRdrName monadClassName
+cCallableClass_RDR	= nameRdrName cCallableClassName
+cReturnableClass_RDR	= nameRdrName cReturnableClassName
+
+map_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("map")
+append_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("++")
+
+foldr_RDR 		= nameRdrName foldrName
+build_RDR 		= nameRdrName buildName
+returnM_RDR 		= nameRdrName returnMName
+bindM_RDR 		= nameRdrName bindMName
+failM_RDR 		= nameRdrName failMName
+
+false_RDR		= nameRdrName falseDataConName
+true_RDR		= nameRdrName trueDataConName
+and_RDR			= nameRdrName andName
+
+error_RDR		= nameRdrName errorName
+
+fromEnum_RDR		= varQual_RDR pREL_ENUM_Name FSLIT("fromEnum")
+toEnum_RDR		= varQual_RDR pREL_ENUM_Name FSLIT("toEnum")
+mkInt_RDR		= nameRdrName intDataConName
+
+enumFrom_RDR		= nameRdrName enumFromName
+enumFromTo_RDR 		= nameRdrName enumFromToName
+enumFromThen_RDR	= nameRdrName enumFromThenName
+enumFromThenTo_RDR	= nameRdrName enumFromThenToName
+
+ratioDataCon_RDR	= nameRdrName ratioDataConName
+plusInteger_RDR		= nameRdrName plusIntegerName
+timesInteger_RDR	= nameRdrName timesIntegerName
+
+ioDataCon_RDR		= nameRdrName ioDataConName
+
+eqString_RDR		= nameRdrName eqStringName
+unpackCString_RDR      	= nameRdrName unpackCStringName
+unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
+unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
+
+newStablePtr_RDR 	= nameRdrName newStablePtrName
+
+bindIO_RDR	  	= nameRdrName bindIOName
+returnIO_RDR	  	= nameRdrName returnIOName
+
+fromInteger_RDR		= nameRdrName fromIntegerName
+fromRational_RDR	= nameRdrName fromRationalName
+minus_RDR		= nameRdrName minusName
+times_RDR		= varQual_RDR  pREL_NUM_Name FSLIT("*")
+plus_RDR                = varQual_RDR pREL_NUM_Name FSLIT("+")
+
+compose_RDR		= varQual_RDR pREL_BASE_Name FSLIT(".")
+
+not_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("not")
+succ_RDR 		= varQual_RDR pREL_ENUM_Name FSLIT("succ")
+pred_RDR                = varQual_RDR pREL_ENUM_Name FSLIT("pred")
+minBound_RDR            = varQual_RDR pREL_ENUM_Name FSLIT("minBound")
+maxBound_RDR            = varQual_RDR pREL_ENUM_Name FSLIT("maxBound")
+range_RDR               = varQual_RDR pREL_ARR_Name FSLIT("range")
+inRange_RDR             = varQual_RDR pREL_ARR_Name FSLIT("inRange")
+index_RDR		= varQual_RDR pREL_ARR_Name FSLIT("index")
+
+readList_RDR            = varQual_RDR pREL_READ_Name FSLIT("readList")
+readListDefault_RDR     = varQual_RDR pREL_READ_Name FSLIT("readListDefault")
+readListPrec_RDR        = varQual_RDR pREL_READ_Name FSLIT("readListPrec")
+readListPrecDefault_RDR = varQual_RDR pREL_READ_Name FSLIT("readListPrecDefault")
+readPrec_RDR            = varQual_RDR pREL_READ_Name FSLIT("readPrec")
+parens_RDR              = varQual_RDR pREL_READ_Name FSLIT("parens")
+choose_RDR              = varQual_RDR pREL_READ_Name FSLIT("choose")
+lexP_RDR                = varQual_RDR pREL_READ_Name FSLIT("lexP")
+
+punc_RDR                = dataQual_RDR lEX_Name FSLIT("Punc")
+ident_RDR               = dataQual_RDR lEX_Name FSLIT("Ident")
+symbol_RDR              = dataQual_RDR lEX_Name FSLIT("Symbol")
+
+step_RDR                = varQual_RDR  rEAD_PREC_Name FSLIT("step")
+alt_RDR                 = varQual_RDR  rEAD_PREC_Name FSLIT("+++") 
+reset_RDR               = varQual_RDR  rEAD_PREC_Name FSLIT("reset")
+prec_RDR                = varQual_RDR  rEAD_PREC_Name FSLIT("prec")
+
+showList_RDR            = varQual_RDR pREL_SHOW_Name FSLIT("showList")
+showList___RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showList__")
+showsPrec_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showsPrec") 
+showString_RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showString")
+showSpace_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showSpace") 
+showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen") 
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Commonly-used RdrNames}
+\subsection{Known-key names}
 %*									*
 %************************************************************************
 
 Many of these Names are not really "built in", but some parts of the
 compiler (notably the deriving mechanism) need to mention their names,
 and it's convenient to write them all down in one place.
+
+--MetaHaskell Extension  add the constrs and the lower case case
+-- guys as well (perhaps) e.g. see  trueDataConName	below
+
 
 \begin{code}
 dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
@@ -376,56 +553,47 @@ threadIdPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("ThreadId#") threadI
 cCallableClassName   	      = clsQual gHC_PRIM_Name FSLIT("CCallable") cCallableClassKey
 cReturnableClassName 	      = clsQual gHC_PRIM_Name FSLIT("CReturnable") cReturnableClassKey
 
--- PrelBase data types and constructors
-charTyConName	  = tcQual   pREL_BASE_Name FSLIT("Char") charTyConKey
-charDataConName   = dataQual pREL_BASE_Name FSLIT("C#") charDataConKey
-intTyConName	  = tcQual   pREL_BASE_Name FSLIT("Int") intTyConKey
-intDataConName	  = dataQual pREL_BASE_Name FSLIT("I#") intDataConKey
-orderingTyConName = tcQual   pREL_BASE_Name FSLIT("Ordering") orderingTyConKey
-boolTyConName	  = tcQual   pREL_BASE_Name FSLIT("Bool") boolTyConKey
-falseDataConName  = dataQual pREL_BASE_Name FSLIT("False") falseDataConKey
-trueDataConName	  = dataQual pREL_BASE_Name FSLIT("True") trueDataConKey
-listTyConName	  = tcQual   pREL_BASE_Name FSLIT("[]") listTyConKey
-nilDataConName 	  = dataQual pREL_BASE_Name FSLIT("[]") nilDataConKey
-consDataConName	  = dataQual pREL_BASE_Name FSLIT(":") consDataConKey
+getTagName 	 = wVarQual gHC_PRIM_Name FSLIT("getTag#")	getTagIdKey
+unsafeCoerceName = wVarQual gHC_PRIM_Name FSLIT("unsafeCoerce#") unsafeCoerceIdKey 
+nullAddrName     = wVarQual gHC_PRIM_Name FSLIT("nullAddr#")	nullAddrIdKey
+seqName		 = wVarQual gHC_PRIM_Name FSLIT("seq")		seqIdKey
+realWorldName	 = wVarQual gHC_PRIM_Name FSLIT("realWorld#")	realWorldPrimIdKey
 
--- PrelTup
-fstName		  = varQual pREL_TUP_Name FSLIT("fst") fstIdKey
-sndName		  = varQual pREL_TUP_Name FSLIT("snd") sndIdKey
+-- PrelBase data types and constructors
+charTyConName	  = wTcQual   pREL_BASE_Name FSLIT("Char") charTyConKey
+charDataConName   = wDataQual pREL_BASE_Name FSLIT("C#") charDataConKey
+intTyConName	  = wTcQual   pREL_BASE_Name FSLIT("Int") intTyConKey
+intDataConName	  = wDataQual pREL_BASE_Name FSLIT("I#") intDataConKey
+orderingTyConName = tcQual   pREL_BASE_Name FSLIT("Ordering") orderingTyConKey
+boolTyConName	  = wTcQual   pREL_BASE_Name FSLIT("Bool") boolTyConKey
+falseDataConName  = wDataQual pREL_BASE_Name FSLIT("False") falseDataConKey
+trueDataConName	  = wDataQual pREL_BASE_Name FSLIT("True") trueDataConKey
+listTyConName	  = wTcQual   pREL_BASE_Name FSLIT("[]") listTyConKey
+nilDataConName 	  = wDataQual pREL_BASE_Name FSLIT("[]") nilDataConKey
+consDataConName	  = wDataQual pREL_BASE_Name FSLIT(":") consDataConKey
+eqName		  = varQual  pREL_BASE_Name FSLIT("==") eqClassOpKey
+geName		  = varQual  pREL_BASE_Name FSLIT(">=") geClassOpKey
 
 -- Generics
 crossTyConName     = tcQual   pREL_BASE_Name FSLIT(":*:") crossTyConKey
 crossDataConName   = dataQual pREL_BASE_Name FSLIT(":*:") crossDataConKey
-plusTyConName      = tcQual   pREL_BASE_Name FSLIT(":+:") plusTyConKey
-inlDataConName     = dataQual pREL_BASE_Name FSLIT("Inl") inlDataConKey
-inrDataConName     = dataQual pREL_BASE_Name FSLIT("Inr") inrDataConKey
-genUnitTyConName   = tcQual   pREL_BASE_Name FSLIT("Unit") genUnitTyConKey
-genUnitDataConName = dataQual pREL_BASE_Name FSLIT("Unit") genUnitDataConKey
+plusTyConName      = wTcQual   pREL_BASE_Name FSLIT(":+:") plusTyConKey
+inlDataConName     = wDataQual pREL_BASE_Name FSLIT("Inl") inlDataConKey
+inrDataConName     = wDataQual pREL_BASE_Name FSLIT("Inr") inrDataConKey
+genUnitTyConName   = wTcQual   pREL_BASE_Name FSLIT("Unit") genUnitTyConKey
+genUnitDataConName = wDataQual pREL_BASE_Name FSLIT("Unit") genUnitDataConKey
 
--- Random PrelBase functions
-unsafeCoerceName  = varQual pREL_BASE_Name FSLIT("unsafeCoerce") 
-							     unsafeCoerceIdKey
-otherwiseIdName   = varQual pREL_BASE_Name FSLIT("otherwise") otherwiseIdKey
-appendName	  = varQual pREL_BASE_Name FSLIT("++")	     appendIdKey
-foldrName	  = varQual pREL_BASE_Name FSLIT("foldr")     foldrIdKey
-mapName	   	  = varQual pREL_BASE_Name FSLIT("map")	     mapIdKey
-buildName	  = varQual pREL_BASE_Name FSLIT("build")     buildIdKey
-augmentName	  = varQual pREL_BASE_Name FSLIT("augment")   augmentIdKey
-eqStringName	  = varQual pREL_BASE_Name FSLIT("eqString")  eqStringIdKey
-andName		  = varQual pREL_BASE_Name FSLIT("&&")	     andIdKey
-orName		  = varQual pREL_BASE_Name FSLIT("||")	     orIdKey
-
--- Strings
+-- Base strings Strings
 unpackCStringName       = varQual pREL_BASE_Name FSLIT("unpackCString#") unpackCStringIdKey
 unpackCStringAppendName = varQual pREL_BASE_Name FSLIT("unpackAppendCString#") unpackCStringAppendIdKey
 unpackCStringFoldrName  = varQual pREL_BASE_Name FSLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual pREL_BASE_Name FSLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
+eqStringName	 	= varQual pREL_BASE_Name FSLIT("eqString")  eqStringIdKey
 
--- Classes Eq and Ord
+-- Base classes (Eq, Ord, Functor)
 eqClassName	  = clsQual pREL_BASE_Name FSLIT("Eq") eqClassKey
+functorClassName  = clsQual pREL_BASE_Name FSLIT("Functor") functorClassKey
 ordClassName	  = clsQual pREL_BASE_Name FSLIT("Ord") ordClassKey
-eqName		  = varQual  pREL_BASE_Name FSLIT("==") eqClassOpKey
-geName		  = varQual  pREL_BASE_Name FSLIT(">=") geClassOpKey
 
 -- Class Monad
 monadClassName	   = clsQual pREL_BASE_Name FSLIT("Monad") monadClassKey
@@ -434,14 +602,21 @@ bindMName	   = varQual pREL_BASE_Name FSLIT(">>=") bindMClassOpKey
 returnMName	   = varQual pREL_BASE_Name FSLIT("return") returnMClassOpKey
 failMName	   = varQual pREL_BASE_Name FSLIT("fail") failMClassOpKey
 
--- Class Functor
-functorClassName  = clsQual pREL_BASE_Name FSLIT("Functor") functorClassKey
 
--- Class Show
-showClassName	  = clsQual pREL_SHOW_Name FSLIT("Show") showClassKey
+-- Random PrelBase functions
+otherwiseIdName   = varQual pREL_BASE_Name FSLIT("otherwise") otherwiseIdKey
+foldrName	  = varQual pREL_BASE_Name FSLIT("foldr")     foldrIdKey
+buildName	  = varQual pREL_BASE_Name FSLIT("build")     buildIdKey
+augmentName	  = varQual pREL_BASE_Name FSLIT("augment")   augmentIdKey
+appendName	  = varQual pREL_BASE_Name FSLIT("++")        appendIdKey
+andName		  = varQual pREL_BASE_Name FSLIT("&&")	      andIdKey
+orName		  = varQual pREL_BASE_Name FSLIT("||")	      orIdKey
+assertName        = varQual pREL_BASE_Name FSLIT("assert")   assertIdKey
+lazyIdName	  = wVarQual pREL_BASE_Name FSLIT("lazy")     lazyIdKey
 
--- Class Read
-readClassName	  = clsQual pREL_READ_Name FSLIT("Read") readClassKey
+-- PrelTup
+fstName		  = varQual pREL_TUP_Name FSLIT("fst") fstIdKey
+sndName		  = varQual pREL_TUP_Name FSLIT("snd") sndIdKey
 
 -- Module PrelNum
 numClassName	  = clsQual pREL_NUM_Name FSLIT("Num") numClassKey
@@ -450,9 +625,9 @@ minusName	  = varQual pREL_NUM_Name FSLIT("-") minusClassOpKey
 negateName	  = varQual pREL_NUM_Name FSLIT("negate") negateClassOpKey
 plusIntegerName   = varQual pREL_NUM_Name FSLIT("plusInteger") plusIntegerIdKey
 timesIntegerName  = varQual pREL_NUM_Name FSLIT("timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual  pREL_NUM_Name FSLIT("Integer") integerTyConKey
-smallIntegerDataConName = dataQual pREL_NUM_Name FSLIT("S#") smallIntegerDataConKey
-largeIntegerDataConName = dataQual pREL_NUM_Name FSLIT("J#") largeIntegerDataConKey
+integerTyConName  = wTcQual  pREL_NUM_Name FSLIT("Integer") integerTyConKey
+smallIntegerDataConName = wDataQual pREL_NUM_Name FSLIT("S#") smallIntegerDataConKey
+largeIntegerDataConName = wDataQual pREL_NUM_Name FSLIT("J#") largeIntegerDataConKey
 
 -- PrelReal types and classes
 rationalTyConName   = tcQual   pREL_REAL_Name  FSLIT("Rational") rationalTyConKey
@@ -465,30 +640,22 @@ fractionalClassName = clsQual  pREL_REAL_Name  FSLIT("Fractional") fractionalCla
 fromRationalName    = varQual  pREL_REAL_Name  FSLIT("fromRational") fromRationalClassOpKey
 
 -- PrelFloat classes
-floatTyConName	   = tcQual   pREL_FLOAT_Name FSLIT("Float") floatTyConKey
-floatDataConName   = dataQual pREL_FLOAT_Name FSLIT("F#") floatDataConKey
-doubleTyConName    = tcQual   pREL_FLOAT_Name FSLIT("Double") doubleTyConKey
-doubleDataConName  = dataQual pREL_FLOAT_Name FSLIT("D#") doubleDataConKey
+floatTyConName	   = wTcQual   pREL_FLOAT_Name FSLIT("Float") floatTyConKey
+floatDataConName   = wDataQual pREL_FLOAT_Name FSLIT("F#") floatDataConKey
+doubleTyConName    = wTcQual   pREL_FLOAT_Name FSLIT("Double") doubleTyConKey
+doubleDataConName  = wDataQual pREL_FLOAT_Name FSLIT("D#") doubleDataConKey
 floatingClassName  = clsQual  pREL_FLOAT_Name FSLIT("Floating") floatingClassKey
 realFloatClassName = clsQual  pREL_FLOAT_Name FSLIT("RealFloat") realFloatClassKey
 
 -- Class Ix
 ixClassName	   = clsQual pREL_ARR_Name FSLIT("Ix") ixClassKey
 
--- Class Enum
+-- Enum module (Enum, Bounded)
 enumClassName 	   = clsQual pREL_ENUM_Name FSLIT("Enum") enumClassKey
-toEnumName	   = varQual pREL_ENUM_Name FSLIT("toEnum") toEnumClassOpKey
-fromEnumName	   = varQual pREL_ENUM_Name FSLIT("fromEnum") fromEnumClassOpKey
 enumFromName	   = varQual pREL_ENUM_Name FSLIT("enumFrom") enumFromClassOpKey
 enumFromToName	   = varQual pREL_ENUM_Name FSLIT("enumFromTo") enumFromToClassOpKey
 enumFromThenName   = varQual pREL_ENUM_Name FSLIT("enumFromThen") enumFromThenClassOpKey
 enumFromThenToName = varQual pREL_ENUM_Name FSLIT("enumFromThenTo") enumFromThenToClassOpKey
-
--- Overloaded via Class Enum
-enumFromToPName	   = varQual pREL_PARR_Name FSLIT("enumFromToP") enumFromToPIdKey
-enumFromThenToPName= varQual pREL_PARR_Name FSLIT("enumFromThenToP") enumFromThenToPIdKey
-
--- Class Bounded
 boundedClassName  = clsQual pREL_ENUM_Name FSLIT("Bounded") boundedClassKey
 
 -- List functions
@@ -496,22 +663,87 @@ concatName	  = varQual pREL_LIST_Name FSLIT("concat") concatIdKey
 filterName	  = varQual pREL_LIST_Name FSLIT("filter") filterIdKey
 zipName	   	  = varQual pREL_LIST_Name FSLIT("zip") zipIdKey
 
+-- MetaHaskell Extension, "the smart constructors"
+-- text3 from Meta/work/gen.hs
+intLName       = varQual mETA_META_Name FSLIT("intL")          intLIdKey
+charLName      = varQual mETA_META_Name FSLIT("charL")         charLIdKey
+plitName       = varQual mETA_META_Name FSLIT("plit")          plitIdKey
+pvarName       = varQual mETA_META_Name FSLIT("pvar")          pvarIdKey
+ptupName       = varQual mETA_META_Name FSLIT("ptup")          ptupIdKey
+pconName       = varQual mETA_META_Name FSLIT("pcon")          pconIdKey
+ptildeName     = varQual mETA_META_Name FSLIT("ptilde")        ptildeIdKey
+paspatName     = varQual mETA_META_Name FSLIT("paspat")        paspatIdKey
+pwildName      = varQual mETA_META_Name FSLIT("pwild")         pwildIdKey
+varName        = varQual mETA_META_Name FSLIT("var")           varIdKey
+conName        = varQual mETA_META_Name FSLIT("con")           conIdKey
+litName        = varQual mETA_META_Name FSLIT("lit")           litIdKey
+appName        = varQual mETA_META_Name FSLIT("app")           appIdKey
+infixEName     = varQual mETA_META_Name FSLIT("infixE")        infixEIdKey
+lamName        = varQual mETA_META_Name FSLIT("lam")           lamIdKey
+tupName        = varQual mETA_META_Name FSLIT("tup")           tupIdKey
+doEName        = varQual mETA_META_Name FSLIT("doE")           doEIdKey
+compName       = varQual mETA_META_Name FSLIT("comp")          compIdKey
+listExpName    = varQual mETA_META_Name FSLIT("listExp")       listExpIdKey
+condName       = varQual mETA_META_Name FSLIT("cond")          condIdKey
+letEName       = varQual mETA_META_Name FSLIT("letE")          letEIdKey
+caseEName      = varQual mETA_META_Name FSLIT("caseE")         caseEIdKey
+infixAppName   = varQual mETA_META_Name FSLIT("infixApp")      infixAppIdKey
+sectionLName   = varQual mETA_META_Name FSLIT("sectionL")      sectionLIdKey
+sectionRName   = varQual mETA_META_Name FSLIT("sectionR")      sectionRIdKey
+guardedName    = varQual mETA_META_Name FSLIT("guarded")       guardedIdKey
+normalName     = varQual mETA_META_Name FSLIT("normal")        normalIdKey
+bindStName     = varQual mETA_META_Name FSLIT("bindSt")        bindStIdKey
+letStName      = varQual mETA_META_Name FSLIT("letSt")         letStIdKey
+noBindStName   = varQual mETA_META_Name FSLIT("noBindSt")      noBindStIdKey
+parStName      = varQual mETA_META_Name FSLIT("parSt")         parStIdKey
+fromName       = varQual mETA_META_Name FSLIT("from")          fromIdKey
+fromThenName   = varQual mETA_META_Name FSLIT("fromThen")      fromThenIdKey
+fromToName     = varQual mETA_META_Name FSLIT("fromTo")        fromToIdKey
+fromThenToName = varQual mETA_META_Name FSLIT("fromThenTo")    fromThenToIdKey
+liftName       = varQual mETA_META_Name FSLIT("lift")          liftIdKey
+gensymName     = varQual mETA_META_Name FSLIT("gensym")        gensymIdKey
+returnQName    = varQual mETA_META_Name FSLIT("returnQ")       returnQIdKey
+bindQName      = varQual mETA_META_Name FSLIT("bindQ")         bindQIdKey
+funName        = varQual mETA_META_Name FSLIT("fun")           funIdKey
+valName        = varQual mETA_META_Name FSLIT("val")           valIdKey
+matchName      = varQual mETA_META_Name FSLIT("match")         matchIdKey
+clauseName     = varQual mETA_META_Name FSLIT("clause")        clauseIdKey
+protoName      = varQual mETA_META_Name FSLIT("proto")         protoIdKey
+exprTyConName  = tcQual  mETA_META_Name FSLIT("Expr")  	       exprTyConKey
+declTyConName  = tcQual  mETA_META_Name FSLIT("Decl")  	       declTyConKey
+pattTyConName  = tcQual  mETA_META_Name FSLIT("Patt")  	       pattTyConKey
+mtchTyConName  = tcQual  mETA_META_Name FSLIT("Mtch")  	       mtchTyConKey
+clseTyConName  = tcQual  mETA_META_Name FSLIT("Clse")  	       clseTyConKey
+stmtTyConName  = tcQual  mETA_META_Name FSLIT("Stmt") 	       stmtTyConKey
+
+qTyConName     = tcQual  mETA_META_Name FSLIT("Q")  	       qTyConKey
+expTyConName   = tcQual  mETA_META_Name FSLIT("Exp")  	       expTyConKey
+matTyConName   = tcQual  mETA_META_Name FSLIT("Mat")  	       matTyConKey
+clsTyConName   = tcQual  mETA_META_Name FSLIT("Cls")  	       clsTyConKey
+
+-- Class Show
+showClassName	  = clsQual pREL_SHOW_Name FSLIT("Show")       showClassKey
+
+-- Class Read
+readClassName	   = clsQual pREL_READ_Name FSLIT("Read") readClassKey
+
 -- parallel array types and functions
-parrTyConName	  = tcQual  pREL_PARR_Name FSLIT("[::]")       parrTyConKey
-parrDataConName   = dataQual pREL_PARR_Name FSLIT("PArr")      parrDataConKey
-nullPName	  = varQual pREL_PARR_Name FSLIT("nullP")      nullPIdKey
-lengthPName	  = varQual pREL_PARR_Name FSLIT("lengthP")    lengthPIdKey
-replicatePName	  = varQual pREL_PARR_Name FSLIT("replicateP") replicatePIdKey
-mapPName	  = varQual pREL_PARR_Name FSLIT("mapP")       mapPIdKey
-filterPName	  = varQual pREL_PARR_Name FSLIT("filterP")    filterPIdKey
-zipPName	  = varQual pREL_PARR_Name FSLIT("zipP")       zipPIdKey
-crossPName	  = varQual pREL_PARR_Name FSLIT("crossP")     crossPIdKey
-indexPName	  = varQual pREL_PARR_Name FSLIT("!:")	      indexPIdKey
-toPName	          = varQual pREL_PARR_Name FSLIT("toP")	      toPIdKey
-bpermutePName     = varQual pREL_PARR_Name FSLIT("bpermuteP")  bpermutePIdKey
-bpermuteDftPName  = varQual pREL_PARR_Name FSLIT("bpermuteDftP") 
-							      bpermuteDftPIdKey
-indexOfPName      = varQual pREL_PARR_Name FSLIT("indexOfP")   indexOfPIdKey
+enumFromToPName	   = varQual pREL_PARR_Name FSLIT("enumFromToP") enumFromToPIdKey
+enumFromThenToPName= varQual pREL_PARR_Name FSLIT("enumFromThenToP") enumFromThenToPIdKey
+parrTyConName	  = wTcQual  pREL_PARR_Name FSLIT("[::]")      	 parrTyConKey
+parrDataConName   = wDataQual pREL_PARR_Name FSLIT("PArr")     	 parrDataConKey
+nullPName	  = varQual pREL_PARR_Name FSLIT("nullP")      	 nullPIdKey
+lengthPName	  = varQual pREL_PARR_Name FSLIT("lengthP")    	 lengthPIdKey
+replicatePName	  = varQual pREL_PARR_Name FSLIT("replicateP") 	 replicatePIdKey
+mapPName	  = varQual pREL_PARR_Name FSLIT("mapP")       	 mapPIdKey
+filterPName	  = varQual pREL_PARR_Name FSLIT("filterP")    	 filterPIdKey
+zipPName	  = varQual pREL_PARR_Name FSLIT("zipP")       	 zipPIdKey
+crossPName	  = varQual pREL_PARR_Name FSLIT("crossP")     	 crossPIdKey
+indexPName	  = varQual pREL_PARR_Name FSLIT("!:")	       	 indexPIdKey
+toPName	          = varQual pREL_PARR_Name FSLIT("toP")	       	 toPIdKey
+bpermutePName     = varQual pREL_PARR_Name FSLIT("bpermuteP")    bpermutePIdKey
+bpermuteDftPName  = varQual pREL_PARR_Name FSLIT("bpermuteDftP") bpermuteDftPIdKey
+indexOfPName      = varQual pREL_PARR_Name FSLIT("indexOfP")     indexOfPIdKey
 
 -- IOBase things
 ioTyConName	  = tcQual   pREL_IO_BASE_Name FSLIT("IO") ioTyConKey
@@ -530,22 +762,23 @@ int16TyConName    = tcQual pREL_INT_Name  FSLIT("Int16") int16TyConKey
 int32TyConName    = tcQual pREL_INT_Name  FSLIT("Int32") int32TyConKey
 int64TyConName    = tcQual pREL_INT_Name  FSLIT("Int64") int64TyConKey
 
-word8TyConName    = tcQual pREL_WORD_Name FSLIT("Word8")  word8TyConKey
-word16TyConName   = tcQual pREL_WORD_Name FSLIT("Word16") word16TyConKey
-word32TyConName   = tcQual pREL_WORD_Name FSLIT("Word32") word32TyConKey
-word64TyConName   = tcQual pREL_WORD_Name FSLIT("Word64") word64TyConKey
+-- Word module
+word8TyConName    = tcQual   pREL_WORD_Name FSLIT("Word8")  word8TyConKey
+word16TyConName   = tcQual   pREL_WORD_Name FSLIT("Word16") word16TyConKey
+word32TyConName   = tcQual   pREL_WORD_Name FSLIT("Word32") word32TyConKey
+word64TyConName   = tcQual   pREL_WORD_Name FSLIT("Word64") word64TyConKey
+wordTyConName     = wTcQual   pREL_WORD_Name FSLIT("Word")   wordTyConKey
+wordDataConName   = wDataQual pREL_WORD_Name FSLIT("W#")     wordDataConKey
 
-wordTyConName     = tcQual   pREL_WORD_Name FSLIT("Word")   wordTyConKey
-wordDataConName   = dataQual pREL_WORD_Name FSLIT("W#")     wordDataConKey
+-- Addr module
+addrTyConName	  = wTcQual   aDDR_Name FSLIT("Addr") addrTyConKey
+addrDataConName   = wDataQual aDDR_Name FSLIT("A#") addrDataConKey
 
-addrTyConName	  = tcQual   aDDR_Name FSLIT("Addr") addrTyConKey
-addrDataConName   = dataQual aDDR_Name FSLIT("A#") addrDataConKey
-
-ptrTyConName	  = tcQual   pREL_PTR_Name FSLIT("Ptr") ptrTyConKey
-ptrDataConName    = dataQual pREL_PTR_Name FSLIT("Ptr") ptrDataConKey
-
-funPtrTyConName	  = tcQual   pREL_PTR_Name FSLIT("FunPtr") funPtrTyConKey
-funPtrDataConName = dataQual pREL_PTR_Name FSLIT("FunPtr") funPtrDataConKey
+-- PrelPtr module
+ptrTyConName	  = wTcQual   pREL_PTR_Name FSLIT("Ptr") ptrTyConKey
+ptrDataConName    = wDataQual pREL_PTR_Name FSLIT("Ptr") ptrDataConKey
+funPtrTyConName	  = wTcQual   pREL_PTR_Name FSLIT("FunPtr") funPtrTyConKey
+funPtrDataConName = wDataQual pREL_PTR_Name FSLIT("FunPtr") funPtrDataConKey
 
 -- Byte array types
 byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  FSLIT("ByteArray") byteArrayTyConKey
@@ -554,13 +787,20 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  FSLIT("MutableByteArray") 
 -- Foreign objects and weak pointers
 stablePtrTyConName    = tcQual   pREL_STABLE_Name FSLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name FSLIT("StablePtr") stablePtrDataConKey
-deRefStablePtrName    = varQual  pREL_STABLE_Name FSLIT("deRefStablePtr") deRefStablePtrIdKey
 newStablePtrName      = varQual  pREL_STABLE_Name FSLIT("newStablePtr") newStablePtrIdKey
 
-assertName         = varQual gHC_PRIM_Name FSLIT("assert") assertIdKey
-getTagName	   = varQual gHC_PRIM_Name FSLIT("getTag#") getTagIdKey
+-- Error module
+errorName		 = wVarQual pREL_ERR_Name FSLIT("error")	        errorIdKey
+recSelErrorName		 = wVarQual pREL_ERR_Name FSLIT("recSelError") 	        recSelErrorIdKey
+runtimeErrorName	 = wVarQual pREL_ERR_Name FSLIT("runtimeError")         runtimeErrorIdKey
+irrefutPatErrorName	 = wVarQual pREL_ERR_Name FSLIT("irrefutPatError")      irrefutPatErrorIdKey
+recConErrorName		 = wVarQual pREL_ERR_Name FSLIT("recConError")          recConErrorIdKey
+patErrorName 		 = wVarQual pREL_ERR_Name FSLIT("patError") 	        patErrorIdKey
+noMethodBindingErrorName = wVarQual pREL_ERR_Name FSLIT("noMethodBindingError") noMethodBindingErrorIdKey
+nonExhaustiveGuardsErrorName 
+  = wVarQual pREL_ERR_Name FSLIT("nonExhaustiveGuardsError") nonExhaustiveGuardsErrorIdKey
 
-errorName	   = varQual pREL_ERR_Name FSLIT("error") errorIdKey
+-- PrelST module
 runSTRepName	   = varQual pREL_ST_Name  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
@@ -569,136 +809,25 @@ splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
 
 %************************************************************************
 %*									*
-\subsection{Known names}
+\subsection{Standard groups of names}
 %*									*
 %************************************************************************
 
-The following names are known to the compiler, but they don't require
-pre-assigned keys.  Mostly these names are used in generating deriving
-code, which is passed through the renamer anyway.
-
-	THEY ARE ALL ORIGINAL NAMES, HOWEVER
-
 \begin{code}
--- Lists and tuples
-tupleCon_RDR, tupleTyCon_RDR		:: Int -> RdrName
-ubxTupleCon_RDR, ubxTupleTyCon_RDR 	:: Int -> RdrName
-
-tupleCon_RDR      = mkTupConRdrName dataName Boxed  
-tupleTyCon_RDR    = mkTupConRdrName tcName   Boxed  
-ubxTupleCon_RDR   = mkTupConRdrName dataName Unboxed
-ubxTupleTyCon_RDR = mkTupConRdrName tcName   Unboxed
-
-unitCon_RDR   	  = dataQual_RDR pREL_BASE_Name FSLIT("()")
-unitTyCon_RDR 	  = tcQual_RDR   pREL_BASE_Name FSLIT("()")
-
-and_RDR	   	   = varQual_RDR  pREL_BASE_Name FSLIT("&&")
-not_RDR	   	   = varQual_RDR  pREL_BASE_Name FSLIT("not")
-compose_RDR	   = varQual_RDR  pREL_BASE_Name FSLIT(".")
-ne_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("/=")
-le_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("<=")
-lt_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("<")
-gt_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT(">")
-ltTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("LT")
-eqTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("EQ")
-gtTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("GT")
-max_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("max")
-min_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("min")
-compare_RDR	   = varQual_RDR  pREL_BASE_Name FSLIT("compare")
-showList_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showList")
-showList___RDR     = varQual_RDR  pREL_SHOW_Name FSLIT("showList__")
-showsPrec_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showsPrec")
-showSpace_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showSpace")
-showString_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showString")
-showParen_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showParen")
-
-readsPrec_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readsPrec")
-readPrec_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readPrec")
-readListPrec_RDR   = varQual_RDR  pREL_READ_Name FSLIT("readListPrec")
-readList_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readList")
-
-readListDefault_RDR     = varQual_RDR  pREL_READ_Name FSLIT("readListDefault")
-readListPrecDefault_RDR = varQual_RDR  pREL_READ_Name FSLIT("readListPrecDefault")
-parens_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("parens")
-choose_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("choose")
-lexP_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("lexP")
-
--- Module ReadPrec
-step_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("step")
-reset_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("reset")
-alt_RDR		   = varQual_RDR  rEAD_PREC_Name FSLIT("+++")
-prec_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("prec")
-
--- Module Lex
-symbol_RDR	   = dataQual_RDR  lEX_Name FSLIT("Symbol")
-ident_RDR	   = dataQual_RDR  lEX_Name FSLIT("Ident")
-punc_RDR	   = dataQual_RDR  lEX_Name FSLIT("Punc")
-
-times_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("*")
-plus_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("+")
-negate_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("negate")
-range_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("range")
-index_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("index")
-inRange_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("inRange")
-succ_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("succ")
-pred_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("pred")
-minBound_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("minBound")
-maxBound_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("maxBound")
-assertErr_RDR      = varQual_RDR  pREL_ERR_Name FSLIT("assertError")
-\end{code}
-
-These RDR names also have known keys, so we need to get back the RDR names to
-populate the occurrence list above.
-
-\begin{code}
-funTyCon_RDR  		= nameRdrName funTyConName
-nilCon_RDR    		= nameRdrName nilDataConName
-listTyCon_RDR 		= nameRdrName listTyConName
-parrTyCon_RDR 		= nameRdrName parrTyConName
-ioTyCon_RDR		= nameRdrName ioTyConName
-intTyCon_RDR 		= nameRdrName intTyConName
-eq_RDR 			= nameRdrName eqName
-ge_RDR 			= nameRdrName geName
-numClass_RDR 		= nameRdrName numClassName
-ordClass_RDR 		= nameRdrName ordClassName
-map_RDR 		= nameRdrName mapName
-append_RDR 		= nameRdrName appendName
-foldr_RDR 		= nameRdrName foldrName
-build_RDR 		= nameRdrName buildName
-enumFromTo_RDR 		= nameRdrName enumFromToName
-returnM_RDR 		= nameRdrName returnMName
-bindM_RDR 		= nameRdrName bindMName
-failM_RDR 		= nameRdrName failMName
-false_RDR		= nameRdrName falseDataConName
-true_RDR		= nameRdrName trueDataConName
-error_RDR		= nameRdrName errorName
-getTag_RDR		= nameRdrName getTagName
-fromEnum_RDR		= nameRdrName fromEnumName
-toEnum_RDR		= nameRdrName toEnumName
-enumFrom_RDR		= nameRdrName enumFromName
-mkInt_RDR		= nameRdrName intDataConName
-enumFromThen_RDR	= nameRdrName enumFromThenName
-enumFromThenTo_RDR	= nameRdrName enumFromThenToName
-ratioDataCon_RDR	= nameRdrName ratioDataConName
-plusInteger_RDR		= nameRdrName plusIntegerName
-timesInteger_RDR	= nameRdrName timesIntegerName
-enumClass_RDR		= nameRdrName enumClassName
-monadClass_RDR		= nameRdrName monadClassName
-ioDataCon_RDR		= nameRdrName ioDataConName
-cCallableClass_RDR	= nameRdrName cCallableClassName
-cReturnableClass_RDR	= nameRdrName cReturnableClassName
-eqClass_RDR		= nameRdrName eqClassName
-eqString_RDR		= nameRdrName eqStringName
-unpackCString_RDR      	= nameRdrName unpackCStringName
-unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
-unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
-deRefStablePtr_RDR 	= nameRdrName deRefStablePtrName
-newStablePtr_RDR 	= nameRdrName newStablePtrName
-bindIO_RDR	  	= nameRdrName bindIOName
-returnIO_RDR	  	= nameRdrName returnIOName
-fromInteger_RDR		= nameRdrName fromIntegerName
-fromRational_RDR	= nameRdrName fromRationalName
-minus_RDR		= nameRdrName minusName
+templateHaskellNames :: NameSet
+-- The names that are implicitly mentioned by ``bracket''
+-- Should stay in sync with the import list of DsMeta
+templateHaskellNames
+  = mkNameSet [ intLName,charLName, plitName, pvarName, ptupName, 
+		pconName, ptildeName, paspatName, pwildName, 
+                varName, conName, litName, appName, lamName,
+                tupName, doEName, compName, 
+                listExpName, condName, letEName, caseEName,
+                infixAppName, guardedName, normalName,
+		bindStName, letStName, noBindStName, parStName,
+		fromName, fromThenName, fromToName, fromThenToName,
+		funName, valName, liftName,gensymName, bindQName, 
+		appendName, matchName, clauseName ]
 \end{code}
 
 %************************************************************************
@@ -710,20 +839,29 @@ minus_RDR		= nameRdrName minusName
 All these are original names; hence mkOrig
 
 \begin{code}
-varQual  mod str uq = mkKnownKeyExternalName (varQual_RDR  mod str) uq
-dataQual mod str uq = mkKnownKeyExternalName (dataQual_RDR mod str) uq
-tcQual   mod str uq = mkKnownKeyExternalName (tcQual_RDR   mod str) uq
-clsQual  mod str uq = mkKnownKeyExternalName (clsQual_RDR  mod str) uq
+varQual  = mk_known_key_name OccNameAlias.varName	-- Note use of local alias vName
+dataQual = mk_known_key_name dataName
+tcQual   = mk_known_key_name tcName
+clsQual  = mk_known_key_name clsName
 
-kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) builtinSrcLoc
+wVarQual  = mk_wired_in_name OccNameAlias.varName	-- The wired-in analogues
+wDataQual = mk_wired_in_name dataName		
+wTcQual   = mk_wired_in_name tcName
+
+varQual_RDR  mod str = mkOrig mod (mkOccFS OccNameAlias.varName str)   -- note use of local alias vName
+tcQual_RDR   mod str = mkOrig mod (mkOccFS tcName str)
+clsQual_RDR  mod str = mkOrig mod (mkOccFS clsName str)
+dataQual_RDR mod str = mkOrig mod (mkOccFS dataName str)
+
+mk_known_key_name space mod str uniq 
+  = mkKnownKeyExternalName mod (mkOccFS space str) uniq 
+mk_wired_in_name space mod str uniq 
+  = mkWiredInName (mkVanillaModule mod) (mkOccFS space str) uniq
+
+kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) noSrcLoc
 	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
 	-- And they don't come from any particular module; indeed we always
 	-- want to print them unqualified.  Hence the LocalName
-
-varQual_RDR  mod str = mkOrig varName  mod str
-tcQual_RDR   mod str = mkOrig tcName   mod str
-clsQual_RDR  mod str = mkOrig clsName  mod str
-dataQual_RDR mod str = mkOrig dataName mod str
 \end{code}
 
 %************************************************************************
@@ -731,6 +869,7 @@ dataQual_RDR mod str = mkOrig dataName mod str
 \subsubsection[Uniques-prelude-Classes]{@Uniques@ for wired-in @Classes@}
 %*									*
 %************************************************************************
+--MetaHaskell extension hand allocate keys here
 
 \begin{code}
 boundedClassKey		= mkPreludeClassUnique 1 
@@ -834,6 +973,18 @@ genUnitTyConKey				= mkPreludeTyConUnique 81
 -- Parallel array type constructor
 parrTyConKey				= mkPreludeTyConUnique 82
 
+-- Template Haskell
+qTyConKey    = mkPreludeTyConUnique 83
+exprTyConKey = mkPreludeTyConUnique 84
+declTyConKey = mkPreludeTyConUnique 85
+pattTyConKey = mkPreludeTyConUnique 86
+mtchTyConKey = mkPreludeTyConUnique 87
+clseTyConKey = mkPreludeTyConUnique 88
+stmtTyConKey = mkPreludeTyConUnique 89
+expTyConKey  = mkPreludeTyConUnique 90
+matTyConKey  = mkPreludeTyConUnique 91
+clsTyConKey  = mkPreludeTyConUnique 92
+
 unitTyConKey = mkTupleTyConUnique Boxed 0
 \end{code}
 
@@ -881,36 +1032,37 @@ parrDataConKey				= mkPreludeDataConUnique 24
 
 \begin{code}
 absentErrorIdKey	      = mkPreludeMiscIdUnique  1
-appendIdKey 		      = mkPreludeMiscIdUnique  2
+getTagIdKey		      = mkPreludeMiscIdUnique  2
 augmentIdKey		      = mkPreludeMiscIdUnique  3
-buildIdKey		      = mkPreludeMiscIdUnique  4
-errorIdKey		      = mkPreludeMiscIdUnique  5
-foldlIdKey		      = mkPreludeMiscIdUnique  6
-foldrIdKey		      = mkPreludeMiscIdUnique  7
-recSelErrIdKey		      = mkPreludeMiscIdUnique  8
-integerMinusOneIdKey	      = mkPreludeMiscIdUnique  9
-integerPlusOneIdKey	      = mkPreludeMiscIdUnique 10
-integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 11
-integerZeroIdKey	      = mkPreludeMiscIdUnique 12
-int2IntegerIdKey	      = mkPreludeMiscIdUnique 13
-seqIdKey		      = mkPreludeMiscIdUnique 14
-irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
-eqStringIdKey		      = mkPreludeMiscIdUnique 16
-noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
-nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
-runtimeErrorIdKey	      = mkPreludeMiscIdUnique 19 
-parErrorIdKey		      = mkPreludeMiscIdUnique 20
-parIdKey		      = mkPreludeMiscIdUnique 21
-patErrorIdKey		      = mkPreludeMiscIdUnique 22
-realWorldPrimIdKey	      = mkPreludeMiscIdUnique 23
-recConErrorIdKey	      = mkPreludeMiscIdUnique 24
-recUpdErrorIdKey	      = mkPreludeMiscIdUnique 25
-traceIdKey		      = mkPreludeMiscIdUnique 26
-unpackCStringUtf8IdKey	      = mkPreludeMiscIdUnique 27
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 28
-unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 29
-unpackCStringIdKey	      = mkPreludeMiscIdUnique 30
-ushowListIdKey		      = mkPreludeMiscIdUnique 31
+appendIdKey		      = mkPreludeMiscIdUnique  4
+buildIdKey		      = mkPreludeMiscIdUnique  5
+errorIdKey		      = mkPreludeMiscIdUnique  6
+foldlIdKey		      = mkPreludeMiscIdUnique  7
+foldrIdKey		      = mkPreludeMiscIdUnique  8
+recSelErrorIdKey	      = mkPreludeMiscIdUnique  9
+integerMinusOneIdKey	      = mkPreludeMiscIdUnique 10
+integerPlusOneIdKey	      = mkPreludeMiscIdUnique 11
+integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 12
+integerZeroIdKey	      = mkPreludeMiscIdUnique 13
+int2IntegerIdKey	      = mkPreludeMiscIdUnique 14
+seqIdKey		      = mkPreludeMiscIdUnique 15
+irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 16
+eqStringIdKey		      = mkPreludeMiscIdUnique 17
+noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 18
+nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 19
+runtimeErrorIdKey	      = mkPreludeMiscIdUnique 20 
+parErrorIdKey		      = mkPreludeMiscIdUnique 21
+parIdKey		      = mkPreludeMiscIdUnique 22
+patErrorIdKey		      = mkPreludeMiscIdUnique 23
+realWorldPrimIdKey	      = mkPreludeMiscIdUnique 24
+recConErrorIdKey	      = mkPreludeMiscIdUnique 25
+recUpdErrorIdKey	      = mkPreludeMiscIdUnique 26
+traceIdKey		      = mkPreludeMiscIdUnique 27
+unpackCStringUtf8IdKey	      = mkPreludeMiscIdUnique 28
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 29
+unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 30
+unpackCStringIdKey	      = mkPreludeMiscIdUnique 31
+
 unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 32
 concatIdKey		      = mkPreludeMiscIdUnique 33
 filterIdKey		      = mkPreludeMiscIdUnique 34
@@ -919,7 +1071,6 @@ bindIOIdKey		      = mkPreludeMiscIdUnique 36
 returnIOIdKey		      = mkPreludeMiscIdUnique 37
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
-getTagIdKey		      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 printIdKey		      = mkPreludeMiscIdUnique 43
@@ -930,7 +1081,6 @@ splitIdKey		      = mkPreludeMiscIdUnique 48
 fstIdKey		      = mkPreludeMiscIdUnique 49
 sndIdKey		      = mkPreludeMiscIdUnique 50
 otherwiseIdKey		      = mkPreludeMiscIdUnique 51
-mapIdKey		      = mkPreludeMiscIdUnique 52
 assertIdKey		      = mkPreludeMiscIdUnique 53
 runSTRepIdKey		      = mkPreludeMiscIdUnique 54
 
@@ -943,20 +1093,20 @@ thenIOIdKey		      = mkPreludeMiscIdUnique 59
 lazyIdKey		      = mkPreludeMiscIdUnique 60
 
 -- Parallel array functions
-nullPIdKey	              = mkPreludeMiscIdUnique 70
-lengthPIdKey		      = mkPreludeMiscIdUnique 71
-replicatePIdKey		      = mkPreludeMiscIdUnique 72
-mapPIdKey		      = mkPreludeMiscIdUnique 73
-filterPIdKey		      = mkPreludeMiscIdUnique 74
-zipPIdKey		      = mkPreludeMiscIdUnique 75
-crossPIdKey		      = mkPreludeMiscIdUnique 76
-indexPIdKey		      = mkPreludeMiscIdUnique 77
-toPIdKey		      = mkPreludeMiscIdUnique 78
-enumFromToPIdKey              = mkPreludeMiscIdUnique 79
-enumFromThenToPIdKey          = mkPreludeMiscIdUnique 80
-bpermutePIdKey		      = mkPreludeMiscIdUnique 81
-bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 82
-indexOfPIdKey		      = mkPreludeMiscIdUnique 83
+nullPIdKey	              = mkPreludeMiscIdUnique 80
+lengthPIdKey		      = mkPreludeMiscIdUnique 81
+replicatePIdKey		      = mkPreludeMiscIdUnique 82
+mapPIdKey		      = mkPreludeMiscIdUnique 83
+filterPIdKey		      = mkPreludeMiscIdUnique 84
+zipPIdKey		      = mkPreludeMiscIdUnique 85
+crossPIdKey		      = mkPreludeMiscIdUnique 86
+indexPIdKey		      = mkPreludeMiscIdUnique 87
+toPIdKey		      = mkPreludeMiscIdUnique 88
+enumFromToPIdKey              = mkPreludeMiscIdUnique 89
+enumFromThenToPIdKey          = mkPreludeMiscIdUnique 90
+bpermutePIdKey		      = mkPreludeMiscIdUnique 91
+bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 92
+indexOfPIdKey		      = mkPreludeMiscIdUnique 93
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
@@ -966,6 +1116,7 @@ during type checking.
 \begin{code}
 	-- Just a place holder for  unbound variables  produced by the renamer:
 unboundKey		      = mkPreludeMiscIdUnique 101 
+
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103
 fromRationalClassOpKey	      = mkPreludeMiscIdUnique 104
@@ -979,9 +1130,53 @@ negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
 bindMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
-fromEnumClassOpKey	      = mkPreludeMiscIdUnique 115
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
-toEnumClassOpKey	      = mkPreludeMiscIdUnique 119
+
+-- MetaHaskell Extension, (text4 118) from Meta/work/gen.hs
+intLIdKey       = mkPreludeMiscIdUnique 118
+charLIdKey      = mkPreludeMiscIdUnique 119
+plitIdKey       = mkPreludeMiscIdUnique 120
+pvarIdKey       = mkPreludeMiscIdUnique 121
+ptupIdKey       = mkPreludeMiscIdUnique 122
+pconIdKey       = mkPreludeMiscIdUnique 123
+ptildeIdKey     = mkPreludeMiscIdUnique 124
+paspatIdKey     = mkPreludeMiscIdUnique 125
+pwildIdKey      = mkPreludeMiscIdUnique 126
+varIdKey        = mkPreludeMiscIdUnique 127
+conIdKey        = mkPreludeMiscIdUnique 128
+litIdKey        = mkPreludeMiscIdUnique 129
+appIdKey        = mkPreludeMiscIdUnique 130
+infixEIdKey     = mkPreludeMiscIdUnique 131
+lamIdKey        = mkPreludeMiscIdUnique 132
+tupIdKey        = mkPreludeMiscIdUnique 133
+doEIdKey        = mkPreludeMiscIdUnique 134
+compIdKey       = mkPreludeMiscIdUnique 135
+listExpIdKey    = mkPreludeMiscIdUnique 137
+condIdKey       = mkPreludeMiscIdUnique 138
+letEIdKey       = mkPreludeMiscIdUnique 139
+caseEIdKey      = mkPreludeMiscIdUnique 140
+infixAppIdKey   = mkPreludeMiscIdUnique 141
+sectionLIdKey   = mkPreludeMiscIdUnique 142
+sectionRIdKey   = mkPreludeMiscIdUnique 143
+guardedIdKey    = mkPreludeMiscIdUnique 144
+normalIdKey     = mkPreludeMiscIdUnique 145
+bindStIdKey     = mkPreludeMiscIdUnique 146
+letStIdKey      = mkPreludeMiscIdUnique 147
+noBindStIdKey   = mkPreludeMiscIdUnique 148
+parStIdKey      = mkPreludeMiscIdUnique 149
+fromIdKey       = mkPreludeMiscIdUnique 150
+fromThenIdKey   = mkPreludeMiscIdUnique 151
+fromToIdKey     = mkPreludeMiscIdUnique 152
+fromThenToIdKey = mkPreludeMiscIdUnique 153
+liftIdKey       = mkPreludeMiscIdUnique 154
+gensymIdKey     = mkPreludeMiscIdUnique 155
+returnQIdKey    = mkPreludeMiscIdUnique 156
+bindQIdKey      = mkPreludeMiscIdUnique 157
+funIdKey        = mkPreludeMiscIdUnique 158
+valIdKey        = mkPreludeMiscIdUnique 159
+protoIdKey      = mkPreludeMiscIdUnique 160
+matchIdKey      = mkPreludeMiscIdUnique 161
+clauseIdKey     = mkPreludeMiscIdUnique 162
 \end{code}
 
 
@@ -1027,62 +1222,6 @@ cCallishTyKeys =
 %*									*
 %************************************************************************
 
-@derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@TcDeriv@).
-
-@derivingOccurrences@ maps a class name to a list of the (qualified)
-occurrences that will be mentioned by the derived code for the class
-when it is later generated.  We don't need to put in things that are
-WiredIn (because they are already mapped to their correct name by the
-@NameSupply@.  The class itself, and all its class ops, is already
-flagged as an occurrence so we don't need to mention that either.
-
-@derivingOccurrences@ has an item for every derivable class, even if
-that item is empty, because we treat lookup failure as indicating that
-the class is illegal in a deriving clause.
-
-\begin{code}
-derivingOccurrences :: UniqFM [RdrName]
-derivingOccurrences = listToUFM deriving_occ_info
-
-derivableClassKeys  = map fst deriving_occ_info
-
-deriving_occ_info
-  = [ (eqClassKey, 	[intTyCon_RDR, and_RDR, not_RDR])
-    , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR, error_RDR])
-				-- EQ (from Ordering) is needed to force in the constructors
-				-- as well as the type constructor.
-    , (enumClassKey, 	[intTyCon_RDR, eq_RDR, ge_RDR, and_RDR, map_RDR, plus_RDR, 
-			 error_RDR, showsPrec_RDR, append_RDR]) 
-				-- The last two Enum deps are only used to produce better
-				-- error msgs for derived toEnum methods.
-    , (boundedClassKey,	[intTyCon_RDR])
-    , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
-			 showParen_RDR, showSpace_RDR, showList___RDR])
-    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR,
-			 lexP_RDR, readPrec_RDR, 
-			 readListDefault_RDR, readListPrecDefault_RDR,
-			 step_RDR, parens_RDR, reset_RDR, prec_RDR, alt_RDR, choose_RDR,
-			 ident_RDR,	-- Pulls in the entire Lex.Lexeme data type
-			 bindM_RDR	-- Pulls in the entire Monad class decl
-			] )
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR, error_RDR,
-                         foldr_RDR, build_RDR, 
-                             -- foldr and build required for list comprehension used
-                             -- with single constructor types  -- KSW 2000-06
-			 returnM_RDR, failM_RDR])
-			     -- the last two are needed to force returnM, thenM and failM
-			     -- in before typechecking the list(monad) comprehension
-			     -- generated for derived Ix instances (range method)
-			     -- of single constructor types.  -- SOF 8/97
-    ]
-	-- intTyCon: Practically any deriving needs Int, either for index calculations, 
-	--		or for taggery.
-	-- ordClass: really it's the methods that are actually used.
-	-- numClass: for Int literals
-\end{code}
-
-
 NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
 even though every numeric class has these two as a superclass,
 because the list of ambiguous dictionaries hasn't been simplified.
@@ -1126,5 +1265,14 @@ standardClassKeys
 noDictClassKeys 	-- These classes are used only for type annotations;
 			-- they are not implemented by dictionaries, ever.
   = cCallishClassKeys
+\end{code}
+
+@derivableClassKeys@ is also used in checking \tr{deriving} constructs
+(@TcDeriv@).
+
+\begin{code}
+derivableClassKeys
+  = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
+      boundedClassKey, showClassKey, readClassKey ]
 \end{code}
 

@@ -12,11 +12,11 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
 import TyCon		( tyConName )
-import HsSyn		( OutPat(..), HsExpr(..), Stmt(..),
+import HsSyn		( Pat(..), HsExpr(..), Stmt(..),
 			  HsMatchContext(..), HsDoContext(..),
-			  collectHsOutBinders )
+			  collectHsBinders )
 import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr,
-			  outPatType )
+			  hsPatType )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -30,7 +30,7 @@ import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
 			  splitTyConApp_maybe )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, unitTy,
-			  mkListTy, mkTupleTy, intDataCon )
+			  mkListTy, mkTupleTy )
 import Match		( matchSimply )
 import PrelNames	( trueDataConName, falseDataConName, foldrName,
 			  buildName, replicatePName, mapPName, filterPName,
@@ -64,7 +64,7 @@ dsListComp quals elt_ty
     in
     newSysLocalsDs [c_ty,n_ty]		`thenDs` \ [c, n] ->
     dfListComp c n quals		`thenDs` \ result ->
-    dsLookupGlobalValue buildName	`thenDs` \ build_id ->
+    dsLookupGlobalId buildName	`thenDs` \ build_id ->
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
 
@@ -189,7 +189,7 @@ deBindComp pat core_list1 quals core_list2
 	u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
 	-- u1_ty is a [alpha] type, and u2_ty = alpha
-	u2_ty = outPatType pat
+	u2_ty = hsPatType pat
 
 	res_ty = exprType core_list2
 	h_ty   = u1_ty `mkFunTy` res_ty
@@ -304,7 +304,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
   = dsExpr list1				`thenDs` \ core_list1 ->
 
     -- find the required type
-    let x_ty   = outPatType pat
+    let x_ty   = hsPatType pat
 	b_ty   = idType n_id
     in
 
@@ -319,7 +319,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
 		pat core_rest (Var b)		`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
-    dsLookupGlobalValue foldrName		`thenDs` \ foldr_id ->
+    dsLookupGlobalId foldrName		`thenDs` \ foldr_id ->
     returnDs (
       Var foldr_id `App` Type x_ty 
 		   `App` Type b_ty
@@ -345,9 +345,9 @@ dsPArrComp      :: [TypecheckedStmt]
 	        -> Type		    -- Don't use; called with `undefined' below
 	        -> DsM CoreExpr
 dsPArrComp qs _  =
-  dsLookupGlobalValue replicatePName			  `thenDs` \repP ->
+  dsLookupGlobalId replicatePName			  `thenDs` \repP ->
   let unitArray = mkApps (Var repP) [Type unitTy, 
-				     mkConApp intDataCon [mkIntLit 1], 
+				     mkIntExpr 1, 
 				     mkTupleExpr []]
   in
   dePArrComp qs (TuplePat [] Boxed) unitArray
@@ -362,7 +362,7 @@ dePArrComp :: [TypecheckedStmt]
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
 dePArrComp [ResultStmt e' _] pa cea =
-  dsLookupGlobalValue mapPName				  `thenDs` \mapP    ->
+  dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
   let ty = parrElemType cea
   in
   deLambda ty pa e'					  `thenDs` \(clam, 
@@ -372,7 +372,7 @@ dePArrComp [ResultStmt e' _] pa cea =
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
 dePArrComp (ExprStmt b _ _ : qs) pa cea =
-  dsLookupGlobalValue filterPName			  `thenDs` \filterP  ->
+  dsLookupGlobalId filterPName			  `thenDs` \filterP  ->
   let ty = parrElemType cea
   in
   deLambda ty pa b					  `thenDs` \(clam,_) ->
@@ -384,10 +384,10 @@ dePArrComp (ExprStmt b _ _ : qs) pa cea =
 --    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
 --
 dePArrComp (BindStmt p e _ : qs) pa cea =
-  dsLookupGlobalValue falseDataConName			  `thenDs` \falseId ->
-  dsLookupGlobalValue trueDataConName			  `thenDs` \trueId ->
-  dsLookupGlobalValue filterPName			  `thenDs` \filterP ->
-  dsLookupGlobalValue crossPName			  `thenDs` \crossP  ->
+  dsLookupGlobalId falseDataConName			  `thenDs` \falseId ->
+  dsLookupGlobalId trueDataConName			  `thenDs` \trueId ->
+  dsLookupGlobalId filterPName			  `thenDs` \filterP ->
+  dsLookupGlobalId crossPName			  `thenDs` \crossP  ->
   dsExpr e						  `thenDs` \ce      ->
   let ty'cea = parrElemType cea
       ty'ce  = parrElemType ce
@@ -409,8 +409,8 @@ dePArrComp (BindStmt p e _ : qs) pa cea =
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
 dePArrComp (LetStmt ds : qs) pa cea =
-  dsLookupGlobalValue mapPName				  `thenDs` \mapP    ->
-  let xs     = collectHsOutBinders ds
+  dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
+  let xs     = collectHsBinders ds
       ty'cea = parrElemType cea
   in
   newSysLocalDs ty'cea					  `thenDs` \v       ->
@@ -435,7 +435,7 @@ dePArrComp (LetStmt ds : qs) pa cea =
 --
 dePArrComp (ParStmtOut []             : qss2) pa cea = dePArrComp qss2 pa cea
 dePArrComp (ParStmtOut ((xs, qs):qss) : qss2) pa cea =
-  dsLookupGlobalValue zipPName				  `thenDs` \zipP    ->
+  dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
   let pa'     = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
       ty'cea  = parrElemType cea
       resStmt = ResultStmt (ExplicitTuple (map HsVar xs) Boxed) noSrcLoc

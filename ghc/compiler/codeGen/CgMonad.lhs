@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.34 2002/04/29 14:03:42 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.35 2002/09/13 15:02:28 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 

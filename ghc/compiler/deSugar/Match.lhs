@@ -11,7 +11,7 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 import {-# SOURCE #-} DsExpr( dsExpr )
 import CmdLineOpts	( DynFlag(..), dopt )
 import HsSyn		
-import TcHsSyn		( TypecheckedPat, TypecheckedMatch, TypecheckedMatchContext, outPatType )
+import TcHsSyn		( TypecheckedPat, TypecheckedMatch, TypecheckedMatchContext, hsPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
 import CoreUtils	( bindNonRec )
@@ -24,11 +24,11 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
 import TcType		( mkTyVarTys, Type, tcTyConAppArgs, tcEqType )
-import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
+import TysWiredIn	( consDataCon, mkTupleTy, mkListTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
 import UniqSet
-import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
+import SrcLoc		( noSrcLoc )x
 import Util             ( lengthExceeds, isSingleton, notNull )
 import Outputable
 \end{code}
@@ -110,17 +110,16 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 	       | otherwise                           = empty
 
 pp_context NoMatchContext msg rest_of_msg_fun
-  = dontAddErrLoc (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
+  = (noSrcLoc, ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
 
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
-  = addWarnLocHdrLine loc 
-	(ptext SLIT("Pattern match(es)") <+> msg)
-	(sep [ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)])
+  = (loc, vcat [ptext SLIT("Pattern match(es)") <+> msg,
+	        sep [ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]])
   where
     (ppr_match, pref)
 	= case kind of
-	     FunRhs fun -> (pprMatchContext kind,		    \ pp -> ppr fun <+> pp)
-	     other	-> (pprMatchContext kind <+> ppr_pats pats, \ pp -> pp)
+	     FunRhs fun -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+	     other	-> (pprMatchContext kind, \ pp -> pp)
 
 ppr_pats pats = sep (map ppr pats)
 
@@ -320,7 +319,7 @@ The @VarPat@ information isn't needed any more after this.
 Float, 	Double, at least) are converted to unboxed form; e.g.,
 \tr{(NPat (HsInt i) _ _)} is converted to:
 \begin{verbatim}
-(ConPat I# _ _ [LitPat (HsIntPrim i) _])
+(ConPat I# _ _ [LitPat (HsIntPrim i)])
 \end{verbatim}
 \end{description}
 
@@ -343,6 +342,15 @@ tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
   = tidy1 v pat match_result	`thenDs` \ (pat', match_result') ->
     returnDs (EqnInfo n ctx (pat' : pats) match_result')
 
+
+tidy1 :: Id 			-- The Id being scrutinised
+      -> TypecheckedPat 	-- The pattern against which it is to be matched
+      -> MatchResult		-- Current thing do do after matching
+      -> DsM (TypecheckedPat, 	-- Equivalent pattern
+	      MatchResult)	-- Augmented thing to do afterwards
+				-- The augmentation usually takes the form
+				-- of new bindings to be added to the front
+
 -------------------------------------------------------
 --	(pat', mr') = tidy1 v pat mr
 -- tidies the *outer level only* of pat, giving pat'
@@ -355,14 +363,8 @@ tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
 --	NPlusKPat
 --
 
-
-tidy1 :: Id 			-- The Id being scrutinised
-      -> TypecheckedPat 	-- The pattern against which it is to be matched
-      -> MatchResult		-- Current thing do do after matching
-      -> DsM (TypecheckedPat, 	-- Equivalent pattern
-	      MatchResult)	-- Augmented thing to do afterwards
-				-- The augmentation usually takes the form
-				-- of new bindings to be added to the front
+tidy1 v (ParPat pat) match_result 
+  = tidy1 v pat match_result
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
@@ -401,58 +403,34 @@ tidy1 v (LazyPat pat) match_result
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (RecPat data_con pat_ty ex_tvs dicts rpats) match_result
-  | null rpats
-  =	-- Special case for C {}, which can be used for 
-	-- a constructor that isn't declared to have
-	-- fields at all
-    returnDs (ConPat data_con pat_ty ex_tvs dicts (map WildPat con_arg_tys'), match_result)
-
-  | otherwise
-  = returnDs (ConPat data_con pat_ty ex_tvs dicts pats, match_result)
+tidy1 v (ConPatOut con ps pat_ty ex_tvs dicts) match_result
+  = returnDs (ConPatOut con tidy_ps pat_ty ex_tvs dicts, match_result)
   where
-    pats 	     = map mk_pat tagged_arg_tys
+    tidy_ps = PrefixCon (tidy_con con pat_ty ex_tvs ps)
 
-	-- Boring stuff to find the arg-tys of the constructor
-    inst_tys         = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
-    con_arg_tys'     = dataConInstOrigArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
-    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
-
-	-- mk_pat picks a WildPat of the appropriate type for absent fields,
-	-- and the specified pattern for present fields
-    mk_pat (arg_ty, lbl) = case [pat | (sel_id,pat,_) <- rpats,
-					recordSelectorFieldLabel sel_id == lbl
-				] of
-				(pat:pats) -> ASSERT( null pats )
-					      pat
-				[]	   -> WildPat arg_ty
-
-tidy1 v (ListPat ty pats) match_result
+tidy1 v (ListPat pats ty) match_result
   = returnDs (list_ConPat, match_result)
   where
-    list_ty = mkListTy ty
-    list_ConPat
-      = foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
-	      (ConPat nilDataCon  list_ty [] [] [])
-	      pats
+    list_ty     = mkListTy ty
+    list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
+	      	  	(mkNilPat list_ty)
+	      	  	pats
 
 -- introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
 --
-tidy1 v (PArrPat ty pats) match_result
+tidy1 v (PArrPat pats ty) match_result
   = returnDs (parrConPat, match_result)
   where
     arity      = length pats
-    parrConPat = ConPat (parrFakeCon arity) (mkPArrTy ty) [] [] pats
+    parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
 tidy1 v (TuplePat pats boxity) match_result
   = returnDs (tuple_ConPat, match_result)
   where
     arity = length pats
-    tuple_ConPat
-      = ConPat (tupleCon boxity arity)
-	       (mkTupleTy boxity arity (map outPatType pats)) [] [] 
-	       pats
+    tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats
+				  (mkTupleTy boxity arity (map hsPatType pats))
 
 tidy1 v (DictPat dicts methods) match_result
   = case num_of_d_and_ms of
@@ -464,17 +442,44 @@ tidy1 v (DictPat dicts methods) match_result
     dict_and_method_pats = map VarPat (dicts ++ methods)
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(LitPat lit lit_ty) match_result
+tidy1 v pat@(LitPat lit) match_result
   = returnDs (tidyLitPat lit pat, match_result)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(NPat lit lit_ty _) match_result
+tidy1 v pat@(NPatOut lit lit_ty _) match_result
   = returnDs (tidyNPat lit lit_ty pat, match_result)
 
 -- and everything else goes through unchanged...
 
 tidy1 v non_interesting_pat match_result
   = returnDs (non_interesting_pat, match_result)
+
+
+tidy_con data_con pat_ty ex_tvs (PrefixCon ps)   = ps
+tidy_con data_con pat_ty ex_tvs (InfixCon p1 p2) = [p1,p2]
+tidy_con data_con pat_ty ex_tvs (RecCon rpats)
+  | null rpats
+  =	-- Special case for C {}, which can be used for 
+	-- a constructor that isn't declared to have
+	-- fields at all
+    map WildPat con_arg_tys'
+
+  | otherwise
+  = map mk_pat tagged_arg_tys
+  where
+	-- Boring stuff to find the arg-tys of the constructor
+    inst_tys         = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
+    con_arg_tys'     = dataConInstOrigArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
+    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
+
+	-- mk_pat picks a WildPat of the appropriate type for absent fields,
+	-- and the specified pattern for present fields
+    mk_pat (arg_ty, lbl) = case [pat | (sel_id,pat) <- rpats,
+					recordSelectorFieldLabel sel_id == lbl
+				] of
+				(pat:pats) -> ASSERT( null pats )
+					      pat
+				[]	   -> WildPat arg_ty
 \end{code}
 
 \noindent
@@ -620,7 +625,7 @@ Meanwhile, the strategy is:
 
 \begin{code}
 matchSigPat :: [Id] -> EquationInfo -> DsM MatchResult
-matchSigPat (var:vars) (EqnInfo n ctx (SigPat pat ty co_fn : pats) result)
+matchSigPat (var:vars) (EqnInfo n ctx (SigPatOut pat ty co_fn : pats) result)
   = selectMatchVar pat						`thenDs` \ new_var ->
     dsExpr (HsApp co_fn (HsVar var))				`thenDs` \ rhs ->
     match (new_var:vars) [EqnInfo n ctx (pat:pats) result]	`thenDs` \ result' ->

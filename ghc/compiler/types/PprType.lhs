@@ -85,6 +85,9 @@ instance Outputable SourceType where
 instance Outputable name => Outputable (IPName name) where
     ppr (Dupable n) = char '?' <> ppr n -- Ordinary implicit parameters
     ppr (Linear  n) = char '%' <> ppr n -- Splittable implicit parameters
+
+instance Outputable name => OutputableBndr (IPName name) where
+    pprBndr _ n = ppr n	-- Simple for now
 \end{code}
 
 

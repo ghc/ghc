@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.81 2002/08/29 15:44:15 simonmar Exp $
+-- $Id: DriverState.hs,v 1.82 2002/09/13 15:02:34 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -14,7 +14,11 @@ module DriverState where
 
 import SysTools		( getTopDir )
 import ParsePkgConf	( loadPackageConfig )
-import Packages		( PackageConfig(..), mungePackagePaths )
+import Packages		( PackageConfig(..), PackageConfigMap, 
+			  PackageName, mkPackageName, packageNameString,
+			  packageDependents,
+			  mungePackagePaths, emptyPkgMap, extendPkgMap, lookupPkg,
+			  preludePackage, rtsPackage, haskell98Package  )
 import CmdLineOpts
 import DriverPhases
 import DriverUtil
@@ -456,34 +460,61 @@ GLOBAL_VAR(v_HCHeader, "", String)
 -----------------------------------------------------------------------------
 -- Packages
 
--- package list is maintained in dependency order
-GLOBAL_VAR(v_Packages, ("haskell98":"base":"rts":[]), [String])
+------------------------
+-- The PackageConfigMap is read in from the configuration file
+-- It doesn't change during a run
+GLOBAL_VAR(v_Package_details, emptyPkgMap, PackageConfigMap)
 
 readPackageConf :: String -> IO ()
 readPackageConf conf_file = do
-  proto_pkg_details <- loadPackageConfig conf_file
-  top_dir <- getTopDir
-  let pkg_details    = mungePackagePaths top_dir proto_pkg_details
-  old_pkg_details <- readIORef v_Package_details
+  proto_pkg_configs <- loadPackageConfig conf_file
+  top_dir 	    <- getTopDir
+  old_pkg_map 	    <- readIORef v_Package_details
 
-  let -- new package override old ones
-      new_pkg_names = map name pkg_details
-      filtered_old_pkg_details = 
-	 filter (\p -> name p `notElem` new_pkg_names) old_pkg_details
+  let pkg_configs = mungePackagePaths top_dir proto_pkg_configs
+      new_pkg_map = extendPkgMap old_pkg_map pkg_configs
+   
+  writeIORef v_Package_details new_pkg_map
 
-  writeIORef v_Package_details (pkg_details ++ filtered_old_pkg_details)
+getPackageConfigMap :: IO PackageConfigMap
+getPackageConfigMap = readIORef v_Package_details
+
+
+------------------------
+-- The package list reflects what was given as command-line options,
+-- 	plus their dependent packages.
+-- It is maintained in dependency order;
+-- 	earlier ones depend on later ones, but not vice versa
+GLOBAL_VAR(v_Packages, initPackageList, [PackageName])
+
+getPackages :: IO [PackageName]
+getPackages = readIORef v_Packages
+
+initPackageList = [haskell98Package,
+		   preludePackage,
+		   rtsPackage]
 
 addPackage :: String -> IO ()
 addPackage package
-  = do pkg_details <- readIORef v_Package_details
-       case lookupPkg package pkg_details of
-	  Nothing -> throwDyn (CmdLineError ("unknown package name: " ++ package))
-	  Just details -> do
-	    ps <- readIORef v_Packages
-	    unless (package `elem` ps) $ do
-		mapM_ addPackage (package_deps details)
-		ps <- readIORef v_Packages
-		writeIORef v_Packages (package:ps)
+  = do	{ pkg_details <- getPackageConfigMap
+ 	; ps  <- readIORef v_Packages
+	; ps' <- add_package pkg_details ps (mkPackageName package)
+		-- Throws an exception if it fails
+	; writeIORef v_Packages ps' }
+
+add_package :: PackageConfigMap -> [PackageName]
+	    -> PackageName -> IO [PackageName]
+add_package pkg_details ps p	
+  | p `elem` ps	-- Check if we've already added this package
+  = return ps
+  | Just details <- lookupPkg pkg_details p
+  = do	{	-- Add the package's dependents first
+	  ps' <- foldM	(add_package pkg_details) ps 
+			(packageDependents details)
+	; return (p : ps') }
+
+  | otherwise
+  = throwDyn (CmdLineError ("unknown package name: " ++ packageNameString p))
 
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
@@ -573,22 +604,14 @@ getPackageFrameworks = do
 #endif
 
 getPackageInfo :: IO [PackageConfig]
-getPackageInfo = do
-  ps <- readIORef v_Packages
-  getPackageDetails ps
+getPackageInfo = do ps <- getPackages  
+		    getPackageDetails ps
 
-getPackageDetails :: [String] -> IO [PackageConfig]
+getPackageDetails :: [PackageName] -> IO [PackageConfig]
 getPackageDetails ps = do
-  pkg_details <- readIORef v_Package_details
-  return [ pkg | p <- ps, Just pkg <- [ lookupPkg p pkg_details ] ]
+  pkg_details <- getPackageConfigMap
+  return [ pkg | Just pkg <- map (lookupPkg pkg_details) ps ]
 
-GLOBAL_VAR(v_Package_details, [], [PackageConfig])
-
-lookupPkg :: String -> [PackageConfig] -> Maybe PackageConfig
-lookupPkg nm ps
-   = case [p | p <- ps, name p == nm] of
-        []    -> Nothing
-        (p:_) -> Just p
 
 -----------------------------------------------------------------------------
 -- Ways

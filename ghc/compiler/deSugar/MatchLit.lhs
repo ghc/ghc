@@ -4,26 +4,89 @@
 \section[MatchLit]{Pattern-matching literal patterns}
 
 \begin{code}
-module MatchLit ( matchLiterals ) where
+module MatchLit ( dsLit, matchLiterals ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
-import HsSyn		( HsLit(..), OutPat(..), HsExpr(..) )
-import TcHsSyn		( TypecheckedPat )
-import CoreSyn		( Expr(..), Bind(..) )
-import Id		( Id )
-
 import DsMonad
+import DsCCall		( resultWrapper )
 import DsUtils
 
+import HsSyn		( HsLit(..), Pat(..), HsExpr(..) )
+import TcHsSyn		( TypecheckedPat )
+import Id		( Id )
+import CoreSyn
+import TyCon		( tyConDataCons )
+import TcType		( tcSplitTyConApp, isIntegerTy  )
+
+import PrelNames	( ratioTyConKey )
+import Unique		( hasKey )
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
 import Type		( isUnLiftedType )
 import Panic		( panic, assertPanic )
+import Maybe		( isJust )
+import Ratio 		( numerator, denominator )
 \end{code}
+
+%************************************************************************
+%*									*
+		Desugaring literals
+	[used to be in DsExpr, but DsMeta needs it,
+	 and it's nice to avoid a loop]
+%*									*
+%************************************************************************
+
+We give int/float literals type @Integer@ and @Rational@, respectively.
+The typechecker will (presumably) have put \tr{from{Integer,Rational}s}
+around them.
+
+ToDo: put in range checks for when converting ``@i@''
+(or should that be in the typechecker?)
+
+For numeric literals, we try to detect there use at a standard type
+(@Int@, @Float@, etc.) are directly put in the right constructor.
+[NB: down with the @App@ conversion.]
+
+See also below where we look for @DictApps@ for \tr{plusInt}, etc.
+
+\begin{code}
+dsLit :: HsLit -> DsM CoreExpr
+dsLit (HsChar c)       = returnDs (mkCharExpr c)
+dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
+dsLit (HsString str)   = mkStringLitFS str
+dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
+dsLit (HsInteger i)    = mkIntegerExpr i
+dsLit (HsInt i)	       = returnDs (mkIntExpr i)
+dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
+dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
+dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
+dsLit (HsLitLit str ty)
+  = ASSERT( isJust maybe_ty )
+    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
+  where
+    (maybe_ty, wrap_fn) = resultWrapper ty
+    Just rep_ty 	= maybe_ty
+
+dsLit (HsRat r ty)
+  = mkIntegerExpr (numerator r)		`thenDs` \ num ->
+    mkIntegerExpr (denominator r)	`thenDs` \ denom ->
+    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
+  where
+    (ratio_data_con, integer_ty) 
+	= case tcSplitTyConApp ty of
+		(tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+				   (head (tyConDataCons tycon), i_ty)
+\end{code}
+
+%************************************************************************
+%*									*
+		Pattern matching on literals
+%*									*
+%************************************************************************
 
 \begin{code}
 matchLiterals :: [Id]
@@ -39,7 +102,7 @@ is much like @matchConFamily@, which uses @match_cons_used@ to create
 the alts---here we use @match_prims_used@.
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_ty : ps1) _ : eqns)
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal : ps1) _ : eqns)
   = -- GENERATE THE ALTS
     match_prims_used vars eqns_info `thenDs` \ prim_alts ->
 
@@ -48,7 +111,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
   where
     match_prims_used _ [{-no more eqns-}] = returnDs []
 
-    match_prims_used vars eqns_info@(EqnInfo n ctx (pat@(LitPat literal lit_ty):ps1) _ : eqns)
+    match_prims_used vars eqns_info@(EqnInfo n ctx (pat@(LitPat literal):ps1) _ : eqns)
       = let
 	    (shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	      = partitionEqnsByLit pat eqns_info
@@ -78,7 +141,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
 
 \begin{code}
 matchLiterals all_vars@(var:vars)
-  eqns_info@(EqnInfo n ctx (pat@(NPat literal lit_ty eq_chk):ps1) _ : eqns)
+  eqns_info@(EqnInfo n ctx (pat@(NPatOut literal lit_ty eq_chk):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit pat eqns_info
@@ -108,7 +171,7 @@ We generate:
 
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (pat@(NPlusKPat master_n k ty ge sub):ps1) _ : eqns)
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (pat@(NPlusKPatOut master_n k ge sub):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit pat eqns_info
@@ -151,16 +214,16 @@ partitionEqnsByLit master_pat eqns
   where
     partition_eqn :: TypecheckedPat -> EquationInfo -> (Maybe EquationInfo, Maybe EquationInfo)
 
-    partition_eqn (LitPat k1 _) (EqnInfo n ctx (LitPat k2 _ : remaining_pats) match_result)
+    partition_eqn (LitPat k1) (EqnInfo n ctx (LitPat k2 : remaining_pats) match_result)
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (NPat k1 _ _) (EqnInfo n ctx (NPat k2 _ _ : remaining_pats) match_result)
+    partition_eqn (NPatOut k1 _ _) (EqnInfo n ctx (NPatOut k2 _ _ : remaining_pats) match_result)
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (NPlusKPat master_n k1 _ _ _)
- 	          (EqnInfo n ctx (NPlusKPat n' k2 _ _ _ : remaining_pats) match_result)
+    partition_eqn (NPlusKPatOut master_n k1 _ _)
+ 	          (EqnInfo n ctx (NPlusKPatOut n' k2 _ _ : remaining_pats) match_result)
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
       where
@@ -176,3 +239,4 @@ partitionEqnsByLit master_pat eqns
 	-- Default case; not for this pattern
     partition_eqn master_pat eqn = (Nothing, Just eqn)
 \end{code}
+

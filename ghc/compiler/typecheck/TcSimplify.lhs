@@ -10,6 +10,7 @@ module TcSimplify (
 	tcSimplifyInfer, tcSimplifyInferCheck,
 	tcSimplifyCheck, tcSimplifyRestricted,
 	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop,
+	tcSimplifyBracket,
 
 	tcSimplifyDeriv, tcSimplifyDefault,
 	bindInstsOfLocalFuns
@@ -24,9 +25,9 @@ import TcHsSyn		( TcExpr, TcId,
 			  TcMonoBinds, TcDictBinds
 			)
 
-import TcMonad
+import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
-			  tyVarsOfInst, predsOfInsts, predsOfInst, newDicts,
+			  tyVarsOfInst, fdPredsOfInsts, fdPredsOfInst, newDicts,
 			  isDict, isClassDict, isLinearInst, linearInstType,
 			  isStdClassTyVarDict, isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
@@ -35,16 +36,16 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  newDictsFromOld, newMethodAtLoc,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
-			  Inst, LIE, pprInsts, pprInstsInFull,
-			  mkLIE, lieToList
+			  Inst, pprInsts, pprInstsInFull,
+			  isIPDict, isInheritableInst
 			)
-import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupGlobalId )
+import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupId )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, isIPPred, isInheritablePred, predHasFDs )
+			  tyVarsOfPred )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
@@ -533,31 +534,32 @@ again.
 tcSimplifyInfer
 	:: SDoc
 	-> TcTyVarSet		-- fv(T); type vars
-	-> LIE			-- Wanted
+	-> [Inst]		-- Wanted
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
-		LIE,		-- Free
 		TcDictBinds,	-- Bindings
 		[TcId])		-- Dict Ids that must be bound here (zonked)
+	-- Any free (escaping) Insts are tossed into the environment
 \end{code}
 
 
 \begin{code}
 tcSimplifyInfer doc tau_tvs wanted_lie
   = inferLoop doc (varSetElems tau_tvs)
-	      (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
+	      wanted_lie		`thenM` \ (qtvs, frees, binds, irreds) ->
 
 	-- Check for non-generalisable insts
-    mapTc_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenTc_`
+    mappM_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenM_`
 
-    returnTc (qtvs, mkLIE frees, binds, map instToId irreds)
+    extendLIEs frees							`thenM_`
+    returnM (qtvs, binds, map instToId irreds)
 
 inferLoop doc tau_tvs wanteds
   =   	-- Step 1
-    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
-    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
-    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
+    zonkTcTyVarsAndFV tau_tvs		`thenM` \ tau_tvs' ->
+    mappM zonkInst wanteds		`thenM` \ wanteds' ->
+    tcGetGlobalTyVars			`thenM` \ gbl_tvs ->
     let
- 	preds = predsOfInsts wanteds'
+ 	preds = fdPredsOfInsts wanteds'
 	qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
 
 	try_me inst
@@ -566,11 +568,11 @@ inferLoop doc tau_tvs wanteds
 	  | otherwise	    		  = ReduceMe 			-- Lits and Methods
     in
 		-- Step 2
-    reduceContext doc try_me [] wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+    reduceContext doc try_me [] wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
 
 		-- Step 3
     if no_improvement then
-	returnTc (varSetElems qtvs, frees, binds, irreds)
+	returnM (varSetElems qtvs, frees, binds, irreds)
     else
 	-- If improvement did some unification, we go round again.  There
 	-- are two subtleties:
@@ -587,8 +589,8 @@ inferLoop doc tau_tvs wanteds
 	-- However, NOTICE that when we are done, we might have some bindings, but
 	-- the final qtvs might be empty.  See [NO TYVARS] below.
 				
-	inferLoop doc tau_tvs (irreds ++ frees)	`thenTc` \ (qtvs1, frees1, binds1, irreds1) ->
-	returnTc (qtvs1, frees1, binds `AndMonoBinds` binds1, irreds1)
+	inferLoop doc tau_tvs (irreds ++ frees)	`thenM` \ (qtvs1, frees1, binds1, irreds1) ->
+	returnM (qtvs1, frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
 
 Example [LOOP]
@@ -634,9 +636,9 @@ The net effect of [NO TYVARS]
 \begin{code}
 isFreeWhenInferring :: TyVarSet -> Inst	-> Bool
 isFreeWhenInferring qtvs inst
-  =  isFreeWrtTyVars qtvs inst			-- Constrains no quantified vars
-  && all isInheritablePred (predsOfInst inst)	-- And no implicit parameter involved
-						-- (see "Notes on implicit parameters")
+  =  isFreeWrtTyVars qtvs inst		-- Constrains no quantified vars
+  && isInheritableInst inst		-- And no implicit parameter involved
+					-- (see "Notes on implicit parameters")
 
 isFreeWhenChecking :: TyVarSet	-- Quantified tyvars
 	 	   -> NameSet	-- Quantified implicit parameters
@@ -664,9 +666,8 @@ tcSimplifyCheck
 	 :: SDoc
 	 -> [TcTyVar]		-- Quantify over these
 	 -> [Inst]		-- Given
-	 -> LIE			-- Wanted
-	 -> TcM (LIE,		-- Free
-		 TcDictBinds)	-- Bindings
+	 -> [Inst]		-- Wanted
+	 -> TcM TcDictBinds	-- Bindings
 
 -- tcSimplifyCheck is used when checking expression type signatures,
 -- class decls, instance decls etc.
@@ -676,8 +677,8 @@ tcSimplifyCheck
 --	need to worry about setting them before calling tcSimplifyCheck
 tcSimplifyCheck doc qtvs givens wanted_lie
   = tcSimplCheck doc get_qtvs
-		 givens wanted_lie	`thenTc` \ (qtvs', frees, binds) ->
-    returnTc (frees, binds)
+		 givens wanted_lie	`thenM` \ (qtvs', binds) ->
+    returnM binds
   where
     get_qtvs = zonkTcTyVarsAndFV qtvs
 
@@ -689,9 +690,8 @@ tcSimplifyInferCheck
 	 :: SDoc
 	 -> TcTyVarSet		-- fv(T)
 	 -> [Inst]		-- Given
-	 -> LIE			-- Wanted
+	 -> [Inst]		-- Wanted
 	 -> TcM ([TcTyVar],	-- Variables over which to quantify
-		 LIE,		-- Free
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyInferCheck doc tau_tvs givens wanted_lie
@@ -708,37 +708,38 @@ tcSimplifyInferCheck doc tau_tvs givens wanted_lie
 	-- f isn't quantified over b.
     all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
 
-    get_qtvs = zonkTcTyVarsAndFV all_tvs	`thenNF_Tc` \ all_tvs' ->
-	       tcGetGlobalTyVars		`thenNF_Tc` \ gbl_tvs ->
+    get_qtvs = zonkTcTyVarsAndFV all_tvs	`thenM` \ all_tvs' ->
+	       tcGetGlobalTyVars		`thenM` \ gbl_tvs ->
 	       let
 	          qtvs = all_tvs' `minusVarSet` gbl_tvs
 			-- We could close gbl_tvs, but its not necessary for
 			-- soundness, and it'll only affect which tyvars, not which
 			-- dictionaries, we quantify over
 	       in
-	       returnNF_Tc qtvs
+	       returnM qtvs
 \end{code}
 
 Here is the workhorse function for all three wrappers.
 
 \begin{code}
 tcSimplCheck doc get_qtvs givens wanted_lie
-  = check_loop givens (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
+  = check_loop givens wanted_lie	`thenM` \ (qtvs, frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
-    complainCheck doc givens irreds		`thenNF_Tc_`
+    complainCheck doc givens irreds		`thenM_`
 
 	-- Done
-    returnTc (qtvs, mkLIE frees, binds)
+    extendLIEs frees				`thenM_`
+    returnM (qtvs, binds)
 
   where
     ip_set = mkNameSet (ipNamesOfInsts givens)
 
     check_loop givens wanteds
       =		-- Step 1
-    	mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens' ->
-    	mapNF_Tc zonkInst wanteds	`thenNF_Tc` \ wanteds' ->
-    	get_qtvs 			`thenNF_Tc` \ qtvs' ->
+    	mappM zonkInst givens	`thenM` \ givens' ->
+    	mappM zonkInst wanteds	`thenM` \ wanteds' ->
+    	get_qtvs 			`thenM` \ qtvs' ->
 
  		    -- Step 2
     	let
@@ -747,14 +748,14 @@ tcSimplCheck doc get_qtvs givens wanted_lie
  	    try_me inst | isFreeWhenChecking qtvs' ip_set inst = Free
  			| otherwise  			       = ReduceMe
     	in
-    	reduceContext doc try_me givens' wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+    	reduceContext doc try_me givens' wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
 
  		    -- Step 3
     	if no_improvement then
- 	    returnTc (varSetElems qtvs', frees, binds, irreds)
+ 	    returnM (varSetElems qtvs', frees, binds, irreds)
     	else
- 	    check_loop givens' (irreds ++ frees) 	`thenTc` \ (qtvs', frees1, binds1, irreds1) ->
- 	    returnTc (qtvs', frees1, binds `AndMonoBinds` binds1, irreds1)
+ 	    check_loop givens' (irreds ++ frees) 	`thenM` \ (qtvs', frees1, binds1, irreds1) ->
+ 	    returnM (qtvs', frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
 
 
@@ -769,12 +770,11 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 			-- i.e. ones subject to the monomorphism restriction
 	:: SDoc
 	-> TcTyVarSet		-- Free in the type of the RHSs
-	-> LIE			-- Free in the RHSs
+	-> [Inst]		-- Free in the RHSs
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
-		LIE,		-- Free
 		TcDictBinds)	-- Bindings
 
-tcSimplifyRestricted doc tau_tvs wanted_lie
+tcSimplifyRestricted doc tau_tvs wanteds
   = 	-- First squash out all methods, to find the constrained tyvars
    	-- We can't just take the free vars of wanted_lie because that'll
 	-- have methods that may incidentally mention entirely unconstrained variables
@@ -784,21 +784,20 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
 	-- We want to infer the polymorphic type
 	--	foo :: forall b. b -> b
     let
-	wanteds = lieToList wanted_lie
 	try_me inst = ReduceMe		-- Reduce as far as we can.  Don't stop at
 					-- dicts; the idea is to get rid of as many type
 					-- variables as possible, and we don't want to stop
 					-- at (say) Monad (ST s), because that reduces
 					-- immediately, with no constraint on s.
     in
-    simpleReduceLoop doc try_me wanteds		`thenTc` \ (_, _, constrained_dicts) ->
+    simpleReduceLoop doc try_me wanteds		`thenM` \ (_, _, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
-    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenNF_Tc` \ tau_tvs' ->
-    tcGetGlobalTyVars				`thenNF_Tc` \ gbl_tvs ->
+    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
+    tcGetGlobalTyVars				`thenM` \ gbl_tvs ->
     let
 	constrained_tvs = tyVarsOfInsts constrained_dicts
-	qtvs = (tau_tvs' `minusVarSet` oclose (predsOfInsts constrained_dicts) gbl_tvs)
+	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs)
 			 `minusVarSet` constrained_tvs
     in
 
@@ -815,18 +814,19 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
 	-- Remember that we may need to do *some* simplification, to
 	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
 	-- just to float all constraints
-    mapNF_Tc zonkInst (lieToList wanted_lie)	`thenNF_Tc` \ wanteds' ->
+    mappM zonkInst wanteds			`thenM` \ wanteds' ->
     let
         try_me inst | isFreeWrtTyVars qtvs inst = Free
 	            | otherwise                 = ReduceMe
     in
-    reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+    reduceContext doc try_me [] wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
     ASSERT( no_improvement )
     ASSERT( null irreds )
 	-- No need to loop because simpleReduceLoop will have
 	-- already done any improvement necessary
 
-    returnTc (varSetElems qtvs, mkLIE frees, binds)
+    extendLIEs frees				`thenM_`
+    returnM (varSetElems qtvs, binds)
 \end{code}
 
 
@@ -876,21 +876,41 @@ because the scsel will mess up matching.  Instead we want
 Hence "DontReduce NoSCs"
 
 \begin{code}
-tcSimplifyToDicts :: LIE -> TcM ([Inst], TcDictBinds)
-tcSimplifyToDicts wanted_lie
-  = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) ->
+tcSimplifyToDicts :: [Inst] -> TcM (TcDictBinds)
+tcSimplifyToDicts wanteds
+  = simpleReduceLoop doc try_me wanteds		`thenM` \ (frees, binds, irreds) ->
 	-- Since try_me doesn't look at types, we don't need to
 	-- do any zonking, so it's safe to call reduceContext directly
     ASSERT( null frees )
-    returnTc (irreds, binds)
+    extendLIEs irreds		`thenM_`
+    returnM binds
 
   where
     doc = text "tcSimplifyToDicts"
-    wanteds = lieToList wanted_lie
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
     try_me inst	| isDict inst = DontReduce NoSCs
 		| otherwise   = ReduceMe
+\end{code}
+
+
+
+tcSimplifyBracket is used when simplifying the constraints arising from
+a Template Haskell bracket [| ... |].  We want to check that there aren't
+any constraints that can't be satisfied (e.g. Show Foo, where Foo has no
+Show instance), but we aren't otherwise interested in the results.
+Nor do we care about ambiguous dictionaries etc.  We will type check
+this bracket again at its usage site.
+
+\begin{code}
+tcSimplifyBracket :: [Inst] -> TcM ()
+tcSimplifyBracket wanteds
+  = simpleReduceLoop doc try_me wanteds		`thenM_`
+    returnM ()
+
+  where
+    doc     = text "tcSimplifyBracket"
+    try_me inst	= ReduceMe
 \end{code}
 
 
@@ -916,14 +936,14 @@ force the binding for ?x to be of type Int.
 
 \begin{code}
 tcSimplifyIPs :: [Inst]		-- The implicit parameters bound here
-	      -> LIE
-	      -> TcM (LIE, TcDictBinds)
-tcSimplifyIPs given_ips wanted_lie
-  = simpl_loop given_ips wanteds	`thenTc` \ (frees, binds) ->
-    returnTc (mkLIE frees, binds)
+	      -> [Inst]		-- Wanted
+	      -> TcM TcDictBinds
+tcSimplifyIPs given_ips wanteds
+  = simpl_loop given_ips wanteds	`thenM` \ (frees, binds) ->
+    extendLIEs frees			`thenM_`
+    returnM binds
   where
     doc	     = text "tcSimplifyIPs" <+> ppr given_ips
-    wanteds  = lieToList wanted_lie
     ip_set   = mkNameSet (ipNamesOfInsts given_ips)
 
 	-- Simplify any methods that mention the implicit parameter
@@ -931,17 +951,17 @@ tcSimplifyIPs given_ips wanted_lie
 		| otherwise		   = ReduceMe
 
     simpl_loop givens wanteds
-      = mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
-        mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
+      = mappM zonkInst givens		`thenM` \ givens' ->
+        mappM zonkInst wanteds		`thenM` \ wanteds' ->
 
-        reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+        reduceContext doc try_me givens' wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
 
         if no_improvement then
 	    ASSERT( null irreds )
-	    returnTc (frees, binds)
+	    returnM (frees, binds)
 	else
-	    simpl_loop givens' (irreds ++ frees)	`thenTc` \ (frees1, binds1) ->
-	    returnTc (frees1, binds `AndMonoBinds` binds1)
+	    simpl_loop givens' (irreds ++ frees)	`thenM` \ (frees1, binds1) ->
+	    returnM (frees1, binds `AndMonoBinds` binds1)
 \end{code}
 
 
@@ -971,20 +991,21 @@ For each method @Inst@ in the @init_lie@ that mentions one of the
 @LIE@), as well as the @HsBinds@ generated.
 
 \begin{code}
-bindInstsOfLocalFuns ::	LIE -> [TcId] -> TcM (LIE, TcMonoBinds)
+bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM TcMonoBinds
 
-bindInstsOfLocalFuns init_lie local_ids
+bindInstsOfLocalFuns wanteds local_ids
   | null overloaded_ids
 	-- Common case
-  = returnTc (init_lie, EmptyMonoBinds)
+  = extendLIEs wanteds		`thenM_`
+    returnM EmptyMonoBinds
 
   | otherwise
-  = simpleReduceLoop doc try_me wanteds		`thenTc` \ (frees, binds, irreds) ->
+  = simpleReduceLoop doc try_me wanteds		`thenM` \ (frees, binds, irreds) ->
     ASSERT( null irreds )
-    returnTc (mkLIE frees, binds)
+    extendLIEs frees		`thenM_`
+    returnM binds
   where
     doc		     = text "bindInsts" <+> ppr local_ids
-    wanteds	     = lieToList init_lie
     overloaded_ids   = filter is_overloaded local_ids
     is_overloaded id = isOverloadedTy (idType id)
 
@@ -1085,7 +1106,7 @@ The loop startes
 \begin{code}
 extractResults :: Avails
 	       -> [Inst]		-- Wanted
-	       -> NF_TcM (TcDictBinds, 	-- Bindings
+	       -> TcM (TcDictBinds, 	-- Bindings
 			  [Inst],	-- Irreducible ones
 			  [Inst])	-- Free ones
 
@@ -1093,7 +1114,7 @@ extractResults avails wanteds
   = go avails EmptyMonoBinds [] [] wanteds
   where
     go avails binds irreds frees [] 
-      = returnNF_Tc (binds, irreds, frees)
+      = returnM (binds, irreds, frees)
 
     go avails binds irreds frees (w:ws)
       = case lookupFM avails w of
@@ -1116,8 +1137,8 @@ extractResults avails wanteds
 				new_binds = addBind binds w rhs
 
 	  Just (Linear n split_inst avail)	-- Transform Linear --> LinRhss
-	    -> get_root irreds frees avail w		`thenNF_Tc` \ (irreds', frees', root_id) ->
-	       split n (instToId split_inst) root_id w	`thenNF_Tc` \ (binds', rhss) ->
+	    -> get_root irreds frees avail w		`thenM` \ (irreds', frees', root_id) ->
+	       split n (instToId split_inst) root_id w	`thenM` \ (binds', rhss) ->
 	       go (addToFM avails w (LinRhss rhss))
 		  (binds `AndMonoBinds` binds')
 		  irreds' frees' (split_inst : w : ws)
@@ -1128,11 +1149,11 @@ extractResults avails wanteds
 		   new_binds  = addBind binds w rhs
 		   new_avails = addToFM avails w (LinRhss rhss)
 
-    get_root irreds frees (Given id _) w = returnNF_Tc (irreds, frees, id)
-    get_root irreds frees Irred	       w = cloneDict w	`thenNF_Tc` \ w' ->
-					   returnNF_Tc (w':irreds, frees, instToId w')
-    get_root irreds frees IsFree       w = cloneDict w	`thenNF_Tc` \ w' ->
-					   returnNF_Tc (irreds, w':frees, instToId w')
+    get_root irreds frees (Given id _) w = returnM (irreds, frees, id)
+    get_root irreds frees Irred	       w = cloneDict w	`thenM` \ w' ->
+					   returnM (w':irreds, frees, instToId w')
+    get_root irreds frees IsFree       w = cloneDict w	`thenM` \ w' ->
+					   returnM (irreds, w':frees, instToId w')
 
     add_given avails w 
 	| instBindingRequired w = addToFM avails w (Given (instToId w) True)
@@ -1161,7 +1182,7 @@ extractResults avails wanteds
 
 
 split :: Int -> TcId -> TcId -> Inst 
-      -> NF_TcM (TcDictBinds, [TcExpr])
+      -> TcM (TcDictBinds, [TcExpr])
 -- (split n split_id root_id wanted) returns
 --	* a list of 'n' expressions, all of which witness 'avail'
 --	* a bunch of auxiliary bindings to support these expressions
@@ -1179,11 +1200,11 @@ split n split_id root_id wanted
     occ     = getOccName id
     loc     = getSrcLoc id
 
-    go 1 = returnNF_Tc (EmptyMonoBinds, [HsVar root_id])
+    go 1 = returnM (EmptyMonoBinds, [HsVar root_id])
 
-    go n = go ((n+1) `div` 2)		`thenNF_Tc` \ (binds1, rhss) ->
-	   expand n rhss		`thenNF_Tc` \ (binds2, rhss') ->
-	   returnNF_Tc (binds1 `AndMonoBinds` binds2, rhss')
+    go n = go ((n+1) `div` 2)		`thenM` \ (binds1, rhss) ->
+	   expand n rhss		`thenM` \ (binds2, rhss') ->
+	   returnM (binds1 `AndMonoBinds` binds2, rhss')
 
 	-- (expand n rhss) 
 	-- Given ((n+1)/2) rhss, make n rhss, using auxiliary bindings
@@ -1192,19 +1213,19 @@ split n split_id root_id wanted
 	--	      [fst x, snd x, rhs2] )
     expand n rhss
 	| n `rem` 2 == 0 = go rhss 	-- n is even
-	| otherwise  	 = go (tail rhss)	`thenNF_Tc` \ (binds', rhss') ->
-			   returnNF_Tc (binds', head rhss : rhss')
+	| otherwise  	 = go (tail rhss)	`thenM` \ (binds', rhss') ->
+			   returnM (binds', head rhss : rhss')
 	where
-	  go rhss = mapAndUnzipNF_Tc do_one rhss	`thenNF_Tc` \ (binds', rhss') ->
-		    returnNF_Tc (andMonoBindList binds', concat rhss')
+	  go rhss = mapAndUnzipM do_one rhss	`thenM` \ (binds', rhss') ->
+		    returnM (andMonoBindList binds', concat rhss')
 
-	  do_one rhs = tcGetUnique 			`thenNF_Tc` \ uniq -> 
-		       tcLookupGlobalId fstName		`thenNF_Tc` \ fst_id ->
-		       tcLookupGlobalId sndName		`thenNF_Tc` \ snd_id ->
+	  do_one rhs = newUnique 			`thenM` \ uniq -> 
+		       tcLookupId fstName		`thenM` \ fst_id ->
+		       tcLookupId sndName		`thenM` \ snd_id ->
 		       let 
 			  x = mkUserLocal occ uniq pair_ty loc
 		       in
-		       returnNF_Tc (VarMonoBind x (mk_app split_id rhs),
+		       returnM (VarMonoBind x (mk_app split_id rhs),
 				    [mk_fs_app fst_id ty x, mk_fs_app snd_id ty x])
 
 mk_fs_app id ty var = HsVar id `TyApp` [ty,ty] `HsApp` HsVar var
@@ -1236,13 +1257,13 @@ simpleReduceLoop :: SDoc
 			 [Inst])		-- Irreducible
 
 simpleReduceLoop doc try_me wanteds
-  = mapNF_Tc zonkInst wanteds			`thenNF_Tc` \ wanteds' ->
-    reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
+    reduceContext doc try_me [] wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
     if no_improvement then
-	returnTc (frees, binds, irreds)
+	returnM (frees, binds, irreds)
     else
-	simpleReduceLoop doc try_me (irreds ++ frees)	`thenTc` \ (frees1, binds1, irreds1) ->
-	returnTc (frees1, binds `AndMonoBinds` binds1, irreds1)
+	simpleReduceLoop doc try_me (irreds ++ frees)	`thenM` \ (frees1, binds1, irreds1) ->
+	returnM (frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
 
 
@@ -1252,7 +1273,7 @@ reduceContext :: SDoc
 	      -> (Inst -> WhatToDo)
 	      -> [Inst]			-- Given
 	      -> [Inst]			-- Wanted
-	      -> NF_TcM (Bool, 		-- True <=> improve step did no unification
+	      -> TcM (Bool, 		-- True <=> improve step did no unification
 			 [Inst],	-- Free
 			 TcDictBinds,	-- Dictionary bindings
 			 [Inst])	-- Irreducible
@@ -1265,19 +1286,19 @@ reduceContext doc try_me givens wanteds
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds,
 	     text "----------------------"
-	     ]))					`thenNF_Tc_`
+	     ]))					`thenM_`
 
         -- Build the Avail mapping from "givens"
-    foldlNF_Tc addGiven emptyFM givens			`thenNF_Tc` \ init_state ->
+    foldlM addGiven emptyFM givens			`thenM` \ init_state ->
 
         -- Do the real work
-    reduceList (0,[]) try_me wanteds init_state		`thenNF_Tc` \ avails ->
+    reduceList (0,[]) try_me wanteds init_state		`thenM` \ avails ->
 
 	-- Do improvement, using everything in avails
 	-- In particular, avails includes all superclasses of everything
-    tcImprove avails					`thenTc` \ no_improvement ->
+    tcImprove avails					`thenM` \ no_improvement ->
 
-    extractResults avails wanteds			`thenNF_Tc` \ (binds, irreds, frees) ->
+    extractResults avails wanteds			`thenM` \ (binds, irreds, frees) ->
 
     traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1289,18 +1310,17 @@ reduceContext doc try_me givens wanteds
 	     text "frees" <+> ppr frees,
 	     text "no_improvement =" <+> ppr no_improvement,
 	     text "----------------------"
-	     ])) 					`thenNF_Tc_`
+	     ])) 					`thenM_`
 
-    returnTc (no_improvement, frees, binds, irreds)
+    returnM (no_improvement, frees, binds, irreds)
 
 tcImprove avails
- =  tcGetInstEnv 				`thenTc` \ inst_env ->
+ =  tcGetInstEnv 				`thenM` \ inst_env ->
     let
 	preds = [ (pred, pp_loc)
 		| inst <- keysFM avails,
 		  let pp_loc = pprInstLoc (instLoc inst),
-		  pred <- predsOfInst inst,
-		  predHasFDs pred
+		  pred <- fdPredsOfInst inst
 		]
 		-- Avails has all the superclasses etc (good)
 		-- It also has all the intermediates of the deduction (good)
@@ -1310,15 +1330,15 @@ tcImprove avails
 	eqns  = improve (classInstEnv inst_env) preds
      in
      if null eqns then
-	returnTc True
+	returnM True
      else
-	traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))	`thenNF_Tc_`
-        mapTc_ unify eqns	`thenTc_`
-	returnTc False
+	traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))	`thenM_`
+        mappM_ unify eqns	`thenM_`
+	returnM False
   where
     unify ((qtvs, t1, t2), doc)
-	 = tcAddErrCtxt doc				$
-	   tcInstTyVars VanillaTv (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
+	 = addErrCtxt doc				$
+	   tcInstTyVars VanillaTv (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
 	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
 \end{code}
 
@@ -1364,8 +1384,8 @@ reduceList (n,stack) try_me wanteds state
 #endif
     go wanteds state
   where
-    go []     state = returnTc state
-    go (w:ws) state = reduce (n+1, w:stack) try_me w state	`thenTc` \ state' ->
+    go []     state = returnM state
+    go (w:ws) state = reduce (n+1, w:stack) try_me w state	`thenM` \ state' ->
 		      go ws state'
 
     -- Base case: we're done!
@@ -1373,10 +1393,10 @@ reduce stack try_me wanted state
     -- It's the same as an existing inst, or a superclass thereof
   | Just avail <- isAvailable state wanted
   = if isLinearInst wanted then
-	addLinearAvailable state avail wanted	`thenNF_Tc` \ (state', wanteds') ->
+	addLinearAvailable state avail wanted	`thenM` \ (state', wanteds') ->
 	reduceList stack try_me wanteds' state'
     else
-	returnTc state		-- No op for non-linear things
+	returnM state		-- No op for non-linear things
 
   | otherwise
   = case try_me wanted of {
@@ -1392,9 +1412,9 @@ reduce stack try_me wanted state
 	try_simple addFree
 
     ; ReduceMe ->		-- It should be reduced
-	lookupInst wanted	      `thenNF_Tc` \ lookup_result ->
+	lookupInst wanted	      `thenM` \ lookup_result ->
 	case lookup_result of
-	    GenInst wanteds' rhs -> reduceList stack try_me wanteds' state	`thenTc` \ state' ->
+	    GenInst wanteds' rhs -> reduceList stack try_me wanteds' state	`thenM` \ state' ->
 				    addWanted state' wanted rhs wanteds'
 	    SimpleInst rhs       -> addWanted state wanted rhs []
 
@@ -1405,7 +1425,7 @@ reduce stack try_me wanted state
     }
   where
     try_simple do_this_otherwise
-      = lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
+      = lookupInst wanted	  `thenM` \ lookup_result ->
 	case lookup_result of
 	    SimpleInst rhs -> addWanted state wanted rhs []
 	    other	   -> do_this_otherwise state wanted
@@ -1420,19 +1440,19 @@ isAvailable avails wanted = lookupFM avails wanted
 	-- *not* by unique.  So
 	--	d1::C Int ==  d2::C Int
 
-addLinearAvailable :: Avails -> Avail -> Inst -> NF_TcM (Avails, [Inst])
+addLinearAvailable :: Avails -> Avail -> Inst -> TcM (Avails, [Inst])
 addLinearAvailable avails avail wanted
 	-- avails currently maps [wanted -> avail]
 	-- Extend avails to reflect a neeed for an extra copy of avail
 
   | Just avail' <- split_avail avail
-  = returnNF_Tc (addToFM avails wanted avail', [])
+  = returnM (addToFM avails wanted avail', [])
 
   | otherwise
-  = tcLookupGlobalId splitName			`thenNF_Tc` \ split_id ->
+  = tcLookupId splitName			`thenM` \ split_id ->
     newMethodAtLoc (instLoc wanted) split_id 
-		   [linearInstType wanted]	`thenNF_Tc` \ (split_inst,_) ->
-    returnNF_Tc (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
+		   [linearInstType wanted]	`thenM` \ split_inst ->
+    returnM (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
 
   where
     split_avail :: Avail -> Maybe Avail
@@ -1447,7 +1467,7 @@ addLinearAvailable avails avail wanted
     split_avail other = pprPanic "addLinearAvailable" (ppr avail $$ ppr wanted $$ ppr avails)
 		  
 -------------------------
-addFree :: Avails -> Inst -> NF_TcM Avails
+addFree :: Avails -> Inst -> TcM Avails
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
 	-- to avails, so that any other equal Insts will be commoned up right
 	-- here rather than also being tossed upstairs.  This is really just
@@ -1460,9 +1480,9 @@ addFree :: Avails -> Inst -> NF_TcM Avails
 	-- but a is not bound here, then we *don't* want to derive
 	-- dn from df here lest we lose sharing.
 	--
-addFree avails free = returnNF_Tc (addToFM avails free IsFree)
+addFree avails free = returnM (addToFM avails free IsFree)
 
-addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> NF_TcM Avails
+addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> TcM Avails
 addWanted avails wanted rhs_expr wanteds
   = ASSERT2( not (wanted `elemFM` avails), ppr wanted $$ ppr avails )
     addAvailAndSCs avails wanted avail
@@ -1470,20 +1490,20 @@ addWanted avails wanted rhs_expr wanteds
     avail | instBindingRequired wanted = Rhs rhs_expr wanteds
 	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
-addGiven :: Avails -> Inst -> NF_TcM Avails
+addGiven :: Avails -> Inst -> TcM Avails
 addGiven state given = addAvailAndSCs state given (Given (instToId given) False)
 	-- No ASSERT( not (given `elemFM` avails) ) because in an instance
 	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
 	-- so the assert isn't true
 
-addIrred :: WantSCs -> Avails -> Inst -> NF_TcM Avails
-addIrred NoSCs  avails irred = returnNF_Tc (addToFM avails irred Irred)
+addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
+addIrred NoSCs  avails irred = returnM (addToFM avails irred Irred)
 addIrred AddSCs avails irred = ASSERT2( not (irred `elemFM` avails), ppr irred $$ ppr avails )
     	      		       addAvailAndSCs avails irred Irred
 
-addAvailAndSCs :: Avails -> Inst -> Avail -> NF_TcM Avails
+addAvailAndSCs :: Avails -> Inst -> Avail -> TcM Avails
 addAvailAndSCs avails inst avail
-  | not (isClassDict inst) = returnNF_Tc avails1
+  | not (isClassDict inst) = returnM avails1
   | otherwise		   = addSCs is_loop avails1 inst 
   where
     avails1 = addToFM avails inst avail
@@ -1502,15 +1522,15 @@ find_all_deps_help avails inst
 	Just avail -> findAllDeps avails avail
 	Nothing    -> []
 
-addSCs :: (Inst -> Bool) -> Avails -> Inst -> NF_TcM Avails
+addSCs :: (Inst -> Bool) -> Avails -> Inst -> TcM Avails
 	-- Add all the superclasses of the Inst to Avails
 	-- The first param says "dont do this because the original thing
 	--	depends on this one, so you'd build a loop"
 	-- Invariant: the Inst is already in Avails.
 
 addSCs is_loop avails dict
-  = newDictsFromOld dict sc_theta'	`thenNF_Tc` \ sc_dicts ->
-    foldlNF_Tc add_sc avails (zipEqual "add_scs" sc_dicts sc_sels)
+  = newDictsFromOld dict sc_theta'	`thenM` \ sc_dicts ->
+    foldlM add_sc avails (zipEqual "add_scs" sc_dicts sc_sels)
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
@@ -1518,10 +1538,10 @@ addSCs is_loop avails dict
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       = case lookupFM avails sc_dict of
-	  Just (Given _ _) -> returnNF_Tc avails	-- Given is cheaper than
+	  Just (Given _ _) -> returnM avails	-- Given is cheaper than
 							--   a superclass selection
-	  Just other | is_loop sc_dict -> returnNF_Tc avails	-- See Note [SUPERCLASS-LOOP]
-		     | otherwise       -> returnNF_Tc avails'	-- SCs already added
+	  Just other | is_loop sc_dict -> returnM avails	-- See Note [SUPERCLASS-LOOP]
+		     | otherwise       -> returnM avails'	-- SCs already added
 
 	  Nothing -> addSCs is_loop avails' sc_dict
       where
@@ -1585,9 +1605,9 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 
 
 \begin{code}
-tcSimplifyTop :: LIE -> TcM TcDictBinds
-tcSimplifyTop wanted_lie
-  = simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenTc` \ (frees, binds, irreds) ->
+tcSimplifyTop :: [Inst] -> TcM TcDictBinds
+tcSimplifyTop wanteds
+  = simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
     ASSERT( null frees )
 
     let
@@ -1607,21 +1627,20 @@ tcSimplifyTop wanted_lie
 		-- Collect together all the bad guys
 	bad_guys 	       = non_stds ++ concat std_bads
     	(tidy_env, tidy_dicts) = tidyInsts bad_guys
-    	(bad_ips, non_ips)     = partition is_ip tidy_dicts
+    	(bad_ips, non_ips)     = partition isIPDict tidy_dicts
     	(no_insts, ambigs)     = partition no_inst non_ips
-    	is_ip d   = any isIPPred (predsOfInst d)
     	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
-    	fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
+    	fixed_tvs = oclose (fdPredsOfInsts tidy_dicts) emptyVarSet
     in
 
 	-- Report definite errors
-    mapNF_Tc (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenNF_Tc_`
-    mapNF_Tc (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenNF_Tc_`
+    mappM (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenM_`
+    mappM (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenM_`
 
 	-- Deal with ambiguity errors, but only if
 	-- if there has not been an error so far; errors often
 	-- give rise to spurious ambiguous Insts
-    ifErrsTc (returnTc []) (
+    ifErrsM (returnM []) (
 	
 	-- Complain about the ones that don't fall under
 	-- the Haskell rules for disambiguation
@@ -1629,15 +1648,13 @@ tcSimplifyTop wanted_lie
 	--	e.g. Num (IO a) and Eq (Int -> Int)
 	-- and ambiguous dictionaries
 	--	e.g. Num a
-	mapNF_Tc (addAmbigErr tidy_env)	ambigs	`thenNF_Tc_`
+	mappM (addAmbigErr tidy_env)	ambigs	`thenM_`
 
 	-- Disambiguate the ones that look feasible
-        mapTc disambigGroup std_oks
-    )					`thenTc` \ binds_ambig ->
+        mappM disambigGroup std_oks
+    )					`thenM` \ binds_ambig ->
 
-    returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
-  where
-    wanteds = lieToList wanted_lie
+    returnM (binds `andMonoBinds` andMonoBindList binds_ambig)
 
 ----------------------------------
 d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
@@ -1697,43 +1714,43 @@ disambigGroup dicts
 	-- default list which can satisfy all the ambiguous classes.
 	-- For example, if Real a is reqd, but the only type in the
 	-- default list is Int.
-    tcGetDefaultTys			`thenNF_Tc` \ default_tys ->
+    getDefaultTys			`thenM` \ default_tys ->
     let
       try_default [] 	-- No defaults work, so fail
-	= failTc
+	= failM
 
       try_default (default_ty : default_tys)
 	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
-	  tcSimplifyDefault theta		`thenTc` \ _ ->
-	  returnTc default_ty
+	  tcSimplifyDefault theta		`thenM` \ _ ->
+	  returnM default_ty
         where
 	  theta = [mkClassPred clas [default_ty] | clas <- classes]
     in
 	-- See if any default works, and if so bind the type variable to it
 	-- If not, add an AmbigErr
-    recoverTc (addAmbigErrs dicts			`thenNF_Tc_`
-	       returnTc EmptyMonoBinds)	$
+    recoverM (addAmbigErrs dicts	`thenM_`
+	      returnM EmptyMonoBinds)	$
 
-    try_default default_tys		 	`thenTc` \ chosen_default_ty ->
+    try_default default_tys		 	`thenM` \ chosen_default_ty ->
 
 	-- Bind the type variable and reduce the context, for real this time
-    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenTc_`
+    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenM_`
     simpleReduceLoop (text "disambig" <+> ppr dicts)
-		     reduceMe dicts			`thenTc` \ (frees, binds, ambigs) ->
+		     reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
     WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
-    warnDefault dicts chosen_default_ty			`thenTc_`
-    returnTc binds
+    warnDefault dicts chosen_default_ty			`thenM_`
+    returnM binds
 
   | all isCreturnableClass classes
   = 	-- Default CCall stuff to (); we don't even both to check that () is an
 	-- instance of CReturnable, because we know it is.
-    unifyTauTy (mkTyVarTy tyvar) unitTy    `thenTc_`
-    returnTc EmptyMonoBinds
+    unifyTauTy (mkTyVarTy tyvar) unitTy    `thenM_`
+    returnM EmptyMonoBinds
 
   | otherwise -- No defaults
-  = addAmbigErrs dicts	`thenNF_Tc_`
-    returnTc EmptyMonoBinds
+  = addAmbigErrs dicts	`thenM_`
+    returnM EmptyMonoBinds
 
   where
     tyvar       = get_tv (head dicts)		-- Should be non-empty
@@ -1795,15 +1812,15 @@ tcSimplifyDeriv :: [TyVar]
 	        -> TcM ThetaType	-- Needed
 
 tcSimplifyDeriv tyvars theta
-  = tcInstTyVars VanillaTv tyvars			`thenNF_Tc` \ (tvs, _, tenv) ->
+  = tcInstTyVars VanillaTv tyvars			`thenM` \ (tvs, _, tenv) ->
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDicts DataDeclOrigin (substTheta tenv theta)	`thenNF_Tc` \ wanteds ->
-    simpleReduceLoop doc reduceMe wanteds		`thenTc` \ (frees, _, irreds) ->
+    newDicts DataDeclOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
+    simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
-    doptsTc Opt_AllowUndecidableInstances		`thenNF_Tc` \ undecidable_ok ->
+    doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
     let
  	tv_set      = mkVarSet tvs
 	simpl_theta = map dictPred irreds	-- reduceMe squashes all non-dicts
@@ -1832,7 +1849,7 @@ tcSimplifyDeriv tyvars theta
 	  = addErrTc (badDerivedPred pred)
   
 	  | otherwise
-	  = returnNF_Tc ()
+	  = returnM ()
 	  where
 	    pred_tyvars = tyVarsOfPred pred
 
@@ -1841,9 +1858,9 @@ tcSimplifyDeriv tyvars theta
 		-- but the result should mention TyVars not TcTyVars
     in
    
-    mapNF_Tc check_pred simpl_theta		`thenNF_Tc_`
-    checkAmbiguity tvs simpl_theta tv_set	`thenTc_`
-    returnTc (substTheta rev_env simpl_theta)
+    mappM check_pred simpl_theta		`thenM_`
+    checkAmbiguity tvs simpl_theta tv_set	`thenM_`
+    returnM (substTheta rev_env simpl_theta)
   where
     doc    = ptext SLIT("deriving classes for a data type")
 \end{code}
@@ -1857,14 +1874,14 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 		  -> TcM ()
 
 tcSimplifyDefault theta
-  = newDicts DataDeclOrigin theta		`thenNF_Tc` \ wanteds ->
-    simpleReduceLoop doc reduceMe wanteds	`thenTc` \ (frees, _, irreds) ->
+  = newDicts DataDeclOrigin theta		`thenM` \ wanteds ->
+    simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )	-- try_me never returns Free
-    mapNF_Tc (addErrTc . noInstErr) irreds 	`thenNF_Tc_`
+    mappM (addErrTc . noInstErr) irreds 	`thenM_`
     if null irreds then
-	returnTc ()
+	returnM ()
     else
-	failTc
+	failM
   where
     doc = ptext SLIT("default declaration")
 \end{code}
@@ -1910,7 +1927,7 @@ addTopInstanceErrs tidy_env tidy_dicts
 	 	ptext SLIT("for") <+> pprInsts tidy_dicts)
 
 addAmbigErrs dicts
-  = mapNF_Tc (addAmbigErr tidy_env) tidy_dicts
+  = mappM (addAmbigErr tidy_env) tidy_dicts
   where
     (tidy_env, tidy_dicts) = tidyInsts dicts
 
@@ -1923,8 +1940,8 @@ addAmbigErr tidy_env tidy_dict
     ambig_tvs = varSetElems (tyVarsOfInst tidy_dict)
 
 warnDefault dicts default_ty
-  = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn_flag ->
-    tcAddSrcLoc (get_loc (head dicts)) (warnTc warn_flag warn_msg)
+  = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
+    addSrcLoc (get_loc (head dicts)) (warnTc warn_flag warn_msg)
   where
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts
@@ -1934,17 +1951,17 @@ warnDefault dicts default_ty
 		      pprInstsInFull tidy_dicts]
 
 complainCheck doc givens irreds
-  = mapNF_Tc zonkInst given_dicts_and_ips		 	  `thenNF_Tc` \ givens' ->
-    mapNF_Tc (addNoInstanceErrs doc givens') (groupInsts irreds)  `thenNF_Tc_`
-    returnNF_Tc ()
+  = mappM zonkInst given_dicts_and_ips		 	  `thenM` \ givens' ->
+    mappM (addNoInstanceErrs doc givens') (groupInsts irreds)  `thenM_`
+    returnM ()
   where
     given_dicts_and_ips = filter (not . isMethod) givens
 	-- Filter out methods, which are only added to
 	-- the given set as an optimisation
 
 addNoInstanceErrs what_doc givens dicts
-  = getDOptsTc		`thenNF_Tc` \ dflags ->
-    tcGetInstEnv	`thenNF_Tc` \ inst_env ->
+  = getDOpts		`thenM` \ dflags ->
+    tcGetInstEnv	`thenM` \ inst_env ->
     let
     	(tidy_env1, tidy_givens) = tidyInsts givens
 	(tidy_env2, tidy_dicts)  = tidyMoreInsts tidy_env1 dicts

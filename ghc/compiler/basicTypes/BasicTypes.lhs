@@ -20,7 +20,7 @@ module BasicTypes(
 
 	Unused, unused,
 
-	Fixity(..), FixityDirection(..),
+	FixitySig(..), Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, 
 	arrowFixity, negateFixity, negatePrecedence,
 	compareFixity,
@@ -46,12 +46,15 @@ module BasicTypes(
 	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict,
 
 	CompilerPhase, 
-	Activation(..), isActive, isNeverActive, isAlwaysActive
+	Activation(..), isActive, isNeverActive, isAlwaysActive,
+
+	SuccessFlag(..), succeeded, failed, successIf
    ) where
 
 #include "HsVersions.h"
 
 import Outputable
+import SrcLoc
 \end{code}
 
 %************************************************************************
@@ -137,21 +140,34 @@ mapIPName f (Linear  n) = Linear  (f n)
 %************************************************************************
 
 \begin{code}
+------------------------
+data FixitySig name = FixitySig name Fixity SrcLoc 
+
+instance Eq name => Eq (FixitySig name) where
+   (FixitySig n1 f1 _) == (FixitySig n2 f2 _) = n1==n2 && f1==f2
+
+instance Outputable name => Outputable (FixitySig name) where
+  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
+
+------------------------
 data Fixity = Fixity Int FixityDirection
-data FixityDirection = InfixL | InfixR | InfixN 
-		     deriving(Eq)
 
 instance Outputable Fixity where
     ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
+
+instance Eq Fixity where		-- Used to determine if two fixities conflict
+  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
+
+------------------------
+data FixityDirection = InfixL | InfixR | InfixN 
+		     deriving(Eq)
 
 instance Outputable FixityDirection where
     ppr InfixL = ptext SLIT("infixl")
     ppr InfixR = ptext SLIT("infixr")
     ppr InfixN = ptext SLIT("infix")
 
-instance Eq Fixity where		-- Used to determine if two fixities conflict
-  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
-
+------------------------
 maxPrecedence = (9::Int)
 defaultFixity = Fixity maxPrecedence InfixL
 
@@ -407,6 +423,28 @@ instance Outputable StrictnessMark where
 
 %************************************************************************
 %*									*
+\subsection{Success flag}
+%*									*
+%************************************************************************
+
+\begin{code}
+data SuccessFlag = Succeeded | Failed
+
+successIf :: Bool -> SuccessFlag
+successIf True  = Succeeded
+successIf False = Failed
+
+succeeded, failed :: SuccessFlag -> Bool
+succeeded Succeeded = True
+succeeded Failed    = False
+
+failed Succeeded = False
+failed Failed    = True
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Activation}
 %*									*
 %************************************************************************
@@ -443,3 +481,4 @@ isNeverActive act	  = False
 isAlwaysActive AlwaysActive = True
 isAlwaysActive other	    = False
 \end{code}
+

@@ -15,7 +15,8 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr,
 			       GRHSs,  pprPatBind )
 
 -- friends:
-import HsImpExp		( ppr_var )
+import HsImpExp		( pprHsVar )
+import HsPat		( Pat )
 import HsTypes		( HsType )
 import CoreSyn		( CoreExpr )
 import PprCore		( {- instance Outputable (Expr a) -} )
@@ -24,7 +25,7 @@ import PprCore		( {- instance Outputable (Expr a) -} )
 import Name		( Name )
 import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
-import BasicTypes	( RecFlag(..), Fixity, Activation(..) )
+import BasicTypes	( RecFlag(..), FixitySig(..), Activation(..) )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
@@ -46,32 +47,31 @@ grammar.
 Collections of bindings, created by dependency analysis and translation:
 
 \begin{code}
-data HsBinds id pat		-- binders and bindees
+data HsBinds id		-- binders and bindees
   = EmptyBinds
 
-  | ThenBinds	(HsBinds id pat)
-		(HsBinds id pat)
+  | ThenBinds	(HsBinds id)
+		(HsBinds id)
 
-  | MonoBind 	(MonoBinds id pat)
-		[Sig id]		-- Empty on typechecker output
+  | MonoBind 	(MonoBinds id)
+		[Sig id]		-- Empty on typechecker output, Type Signatures
 		RecFlag
 \end{code}
 
 \begin{code}
-nullBinds :: HsBinds id pat -> Bool
+nullBinds :: HsBinds id -> Bool
 
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
 nullBinds (MonoBind b _ _)	= nullMonoBinds b
 
-mkMonoBind :: MonoBinds id pat -> [Sig id] -> RecFlag -> HsBinds id pat
+mkMonoBind :: MonoBinds id -> [Sig id] -> RecFlag -> HsBinds id
 mkMonoBind EmptyMonoBinds _ _ = EmptyBinds
 mkMonoBind mbinds sigs is_rec = MonoBind mbinds sigs is_rec
 \end{code}
 
 \begin{code}
-instance (Outputable pat, Outputable id) =>
-		Outputable (HsBinds id pat) where
+instance (OutputableBndr id) => Outputable (HsBinds id) where
     ppr binds = ppr_binds binds
 
 ppr_binds EmptyBinds = empty
@@ -99,11 +99,11 @@ ppr_binds (MonoBind bind sigs is_rec)
 Global bindings (where clauses)
 
 \begin{code}
-data MonoBinds id pat
+data MonoBinds id
   = EmptyMonoBinds
 
-  | AndMonoBinds    (MonoBinds id pat)
-		    (MonoBinds id pat)
+  | AndMonoBinds    (MonoBinds id)
+		    (MonoBinds id)
 
   | FunMonoBind     id		-- Used for both functions 	f x = e
 				-- and variables		f = \x -> e
@@ -114,16 +114,16 @@ data MonoBinds id pat
 				-- FunMonoBinds, so if you change this, you'll need to
 				-- change e.g. rnMethodBinds
 		    Bool		-- True => infix declaration
-		    [Match id pat]
+		    [Match id]
 		    SrcLoc
 
-  | PatMonoBind     pat		-- The pattern is never a simple variable;
+  | PatMonoBind     (Pat id)	-- The pattern is never a simple variable;
 				-- That case is done by FunMonoBind
-		    (GRHSs id pat)
+		    (GRHSs id)
 		    SrcLoc
 
   | VarMonoBind	    id			-- TRANSLATION
-		    (HsExpr id pat)
+		    (HsExpr id)
 
   | CoreMonoBind    id			-- TRANSLATION
 		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
@@ -133,7 +133,7 @@ data MonoBinds id pat
 		[id]			-- Dicts
 		[([TyVar], id, id)]	-- (type variables, polymorphic, momonmorphic) triples
 		NameSet			-- Set of *polymorphic* variables that have an INLINE pragma
-		(MonoBinds id pat)      -- The "business end"
+		(MonoBinds id)      -- The "business end"
 
 	-- Creates bindings for *new* (polymorphic, overloaded) locals
 	-- in terms of *old* (monomorphic, non-overloaded) ones.
@@ -171,16 +171,16 @@ So the desugarer tries to do a better job:
 -- We keep the invariant that a MonoBinds is only empty 
 -- if it is exactly EmptyMonoBinds
 
-nullMonoBinds :: MonoBinds id pat -> Bool
+nullMonoBinds :: MonoBinds id -> Bool
 nullMonoBinds EmptyMonoBinds	     = True
 nullMonoBinds other_monobind	     = False
 
-andMonoBinds :: MonoBinds id pat -> MonoBinds id pat -> MonoBinds id pat
+andMonoBinds :: MonoBinds id -> MonoBinds id -> MonoBinds id
 andMonoBinds EmptyMonoBinds mb = mb
 andMonoBinds mb EmptyMonoBinds = mb
 andMonoBinds mb1 mb2 = AndMonoBinds mb1 mb2
 
-andMonoBindList :: [MonoBinds id pat] -> MonoBinds id pat
+andMonoBindList :: [MonoBinds id] -> MonoBinds id
 andMonoBindList binds
   = loop1 binds
   where
@@ -196,12 +196,11 @@ andMonoBindList binds
 
 
 \begin{code}
-instance (Outputable id, Outputable pat) =>
-		Outputable (MonoBinds id pat) where
+instance OutputableBndr id => Outputable (MonoBinds id) where
     ppr mbind = ppr_monobind mbind
 
 
-ppr_monobind :: (Outputable id, Outputable pat) => MonoBinds id pat -> SDoc
+ppr_monobind :: OutputableBndr id => MonoBinds id -> SDoc
 ppr_monobind EmptyMonoBinds = empty
 ppr_monobind (AndMonoBinds binds1 binds2)
       = ppr_monobind binds1 $$ ppr_monobind binds2
@@ -211,10 +210,10 @@ ppr_monobind (FunMonoBind fun inf matches locn) = pprFunBind fun matches
       -- ToDo: print infix if appropriate
 
 ppr_monobind (VarMonoBind name expr)
-      = sep [ppr name <+> equals, nest 4 (pprExpr expr)]
+      = sep [pprBndr LetBind name <+> equals, nest 4 (pprExpr expr)]
 
 ppr_monobind (CoreMonoBind name expr)
-      = sep [ppr name <+> equals, nest 4 (ppr expr)]
+      = sep [pprBndr LetBind name <+> equals, nest 4 (ppr expr)]
 
 ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
      = sep [ptext SLIT("AbsBinds"),
@@ -223,7 +222,10 @@ ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
 	    brackets (sep (punctuate comma (map ppr exports))),
 	    brackets (interpp'SP (nameSetToList inlines))]
        $$
-       nest 4 (ppr val_binds)
+       nest 4 ( vcat [pprBndr LetBind x | (_,x,_) <- exports]
+			-- Print type signatures
+		$$
+		ppr val_binds )
 \end{code}
 
 %************************************************************************
@@ -263,12 +265,6 @@ data Sig name
 		SrcLoc
 
   | FixSig	(FixitySig name)	-- Fixity declaration
-
-
-data FixitySig name = FixitySig name Fixity SrcLoc 
-
-instance Eq name => Eq (FixitySig name) where
-   (FixitySig n1 f1 _) == (FixitySig n2 f2 _) = n1==n2 && f1==f2
 \end{code}
 
 \begin{code}
@@ -335,7 +331,7 @@ ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (ClassOpSig var dm ty _)
-      = sep [ ppr_var var <+> dcolon, 
+      = sep [ pprHsVar var <+> dcolon, 
 	      nest 4 (ppr ty),
 	      nest 4 (pp_dm_comment) ]
       where
@@ -363,10 +359,6 @@ ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
-
-
-instance Outputable name => Outputable (FixitySig name) where
-  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
 \end{code}
 
 Checking for distinct signatures; oh, so boring

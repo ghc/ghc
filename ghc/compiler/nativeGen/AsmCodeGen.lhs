@@ -23,7 +23,7 @@ import Stix		( StixReg(..), StixStmt(..), StixExpr(..), StixVReg(..),
                           pprStixStmts, pprStixStmt, 
                           stixStmt_CountTempUses, stixStmt_Subst,
                           liftStrings,
-                          initNat, mapNat,
+                          initNat, 
                           mkNatM_State,
                           uniqOfNatM_State, deltaOfNatM_State )
 import UniqSupply	( returnUs, thenUs, initUs, 

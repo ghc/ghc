@@ -101,11 +101,11 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     count_binds (MonoBind b sigs _) = case (count_monobinds b, count_sigs sigs) of
 				        ((vs,fs),(ts,_,ss,is)) -> (vs,fs,ts,ss,is)
 
-    count_monobinds EmptyMonoBinds	  	   = (0,0)
-    count_monobinds (AndMonoBinds b1 b2)  	   = count_monobinds b1 `add2` count_monobinds b2
-    count_monobinds (PatMonoBind (VarPatIn n) r _) = (1,0)
-    count_monobinds (PatMonoBind p r _)            = (0,1)
-    count_monobinds (FunMonoBind f _ m _)          = (0,1)
+    count_monobinds EmptyMonoBinds	  	 = (0,0)
+    count_monobinds (AndMonoBinds b1 b2)  	 = count_monobinds b1 `add2` count_monobinds b2
+    count_monobinds (PatMonoBind (VarPat n) r _) = (1,0)
+    count_monobinds (PatMonoBind p r _)          = (0,1)
+    count_monobinds (FunMonoBind f _ m _)        = (0,1)
 
     count_mb_monobinds (Just mbs) = count_monobinds mbs
     count_mb_monobinds Nothing	  = (0,0)

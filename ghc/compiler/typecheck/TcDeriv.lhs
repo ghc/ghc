@@ -11,14 +11,14 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
-			  collectLocatedMonoBinders )
+			  collectMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..) )
 
-import TcMonad
-import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
-			  tcLookupTyCon, tcExtendTyVarEnv
+import TcRnMonad
+import TcEnv		( tcGetInstEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
+			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
@@ -26,19 +26,18 @@ import TcMonoType	( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( bindLocatedLocalsRn )
-import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
-import HscTypes		( DFunId, PersistentRenamerState, FixityEnv )
+import RnEnv		( bindLocalsFVRn )
+import TcRnMonad		( thenM, returnM, mapAndUnzipM )
+import HscTypes		( DFunId )
 
 import BasicTypes	( NewOrData(..) )
 import Class		( className, classKey, classTyVars, Class )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConRepArgTys, isNullaryDataCon, isExistentialDataCon )
-import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
-import Module		( Module )
 import Name		( Name, getSrcLoc, nameUnique )
+import NameSet
 import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
@@ -191,37 +190,34 @@ version.  So now all classes are "offending".
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: PersistentRenamerState
-	    -> Module			-- name of module under scrutiny
-	    -> InstEnv			-- What we already know about instances
-	    -> FixityEnv	-- used in deriving Show and Read
-	    -> [RenamedTyClDecl]	-- All type constructors
+tcDeriving  :: [RenamedTyClDecl]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
-		    RenamedHsBinds)	-- Extra generated bindings
+		    RenamedHsBinds,	-- Extra generated bindings
+		    FreeVars)		-- These are free in the generated bindings
 
-tcDeriving prs mod inst_env get_fixity tycl_decls
-  = recoverTc (returnTc ([], EmptyBinds)) $
-    getDOptsTc				  `thenNF_Tc` \ dflags ->
+tcDeriving tycl_decls
+  = recoverM (returnM ([], EmptyBinds, emptyFVs)) $
+    getDOpts			`thenM` \ dflags ->
+    tcGetInstEnv		`thenM` \ inst_env ->
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns tycl_decls		    		`thenTc` \ (ordinary_eqns, newtype_inst_info) ->
+    makeDerivEqns tycl_decls		    		`thenM` \ (ordinary_eqns, newtype_inst_info) ->
     let
 	-- Add the newtype-derived instances to the inst env
 	-- before tacking the "ordinary" ones
 	inst_env1 = extend_inst_env dflags inst_env 
 				    (map iDFunId newtype_inst_info)
     in    
-    deriveOrdinaryStuff mod prs inst_env1 get_fixity 
-			ordinary_eqns			`thenTc` \ (ordinary_inst_info, binds) ->
+    deriveOrdinaryStuff inst_env1 ordinary_eqns		`thenM` \ (ordinary_inst_info, binds, fvs) ->
     let
 	inst_info  = newtype_inst_info ++ ordinary_inst_info
     in
 
-    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
-	 	          (ddump_deriving inst_info binds))	`thenTc_`
+    ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
+	     (ddump_deriving inst_info binds))		`thenM_`
 
-    returnTc (inst_info, binds)
+    returnM (inst_info, binds, fvs)
 
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
@@ -229,47 +225,49 @@ tcDeriving prs mod inst_env get_fixity tycl_decls
       = vcat (map ppr_info inst_infos) $$ ppr extra_binds
 
     ppr_info inst_info = pprInstInfo inst_info $$ 
-			 nest 4 (ppr (iBinds inst_info))
+			 nest 4 (pprInstInfoDetails inst_info)
 	-- pprInstInfo doesn't print much: only the type
 
 -----------------------------------------
-deriveOrdinaryStuff mod prs inst_env_in get_fixity []	-- Short cut
-  = returnTc ([], EmptyBinds)
+deriveOrdinaryStuff inst_env_in []	-- Short cut
+  = returnM ([], EmptyBinds, emptyFVs)
 
-deriveOrdinaryStuff mod prs inst_env_in get_fixity eqns
+deriveOrdinaryStuff inst_env_in eqns
   =	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
-    solveDerivEqns inst_env_in eqns	    	`thenTc` \ new_dfuns ->
+    solveDerivEqns inst_env_in eqns	    	`thenM` \ new_dfuns ->
 
 	-- Now augment the InstInfos, adding in the rather boring
 	-- actual-code-to-do-the-methods binds.  We may also need to
 	-- generate extra not-one-inst-decl-specific binds, notably
 	-- "con2tag" and/or "tag2con" functions.  We do these
 	-- separately.
-    gen_taggery_Names new_dfuns			`thenTc` \ nm_alist_etc ->
+    gen_taggery_Names new_dfuns		`thenM` \ nm_alist_etc ->
 
-    tcGetEnv					`thenNF_Tc` \ env ->
-    getDOptsTc					`thenNF_Tc` \ dflags ->
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map (gen_bind get_fixity) new_dfuns
-	mbinders	 = collectLocatedMonoBinders extra_mbinds
+	mbinders	 = collectMonoBinders extra_mbinds
+    in
+    mappM gen_bind new_dfuns		`thenM` \ method_binds_s ->
 	
+    traceTc (text "tcDeriv" <+> ppr method_binds_s)	`thenM_`
+    getModule						`thenM` \ this_mod ->
+    initRn (InterfaceMode this_mod) (
 	-- Rename to get RenamedBinds.
-	-- The only tricky bit is that the extra_binds must scope over the
-	-- method bindings for the instances.
-	(rn_method_binds_s, rn_extra_binds)
-		= renameDerivedCode dflags mod prs (
-			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
-			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
-			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->
-			returnRn (rn_method_binds_s, rn_extra_binds)
-		  )
+	-- The only tricky bit is that the extra_binds must scope 
+	-- over the method bindings for the instances.
+	bindLocalsFVRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
+	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, fvs) ->
+	mapAndUnzipM rn_meths method_binds_s		`thenM` \ (rn_method_binds_s, fvs_s) ->
+	returnM ((rn_method_binds_s, rn_extra_binds), 
+		  fvs `plusFV` plusFVs fvs_s)
+    )				`thenM` \ ((rn_method_binds_s, rn_extra_binds), fvs) ->
+    let
 	new_inst_infos = zipWith gen_inst_info new_dfuns rn_method_binds_s
     in
-    returnTc (new_inst_infos, rn_extra_binds)
+    returnM (new_inst_infos, rn_extra_binds, fvs)
 
   where
 	-- Make a Real dfun instead of the dummy one we have so far
@@ -277,8 +275,7 @@ deriveOrdinaryStuff mod prs inst_env_in get_fixity eqns
     gen_inst_info dfun binds
       = InstInfo { iDFunId = dfun, iBinds = binds, iPrags = [] }
 
-    rn_meths (cls, meths) = rnMethodBinds cls [] meths `thenRn` \ (meths', _) -> 
-			    returnRn meths'	-- Ignore the free vars returned
+    rn_meths (cls, meths) = rnMethodBinds cls [] meths
 \end{code}
 
 
@@ -309,8 +306,8 @@ makeDerivEqns :: [RenamedTyClDecl]
 		      [InstInfo])	-- Special newtype derivings
 
 makeDerivEqns tycl_decls
-  = mapAndUnzipTc mk_eqn derive_these	 	`thenTc` \ (maybe_ordinaries, maybe_newtypes) ->
-    returnTc (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
+  = mapAndUnzipM mk_eqn derive_these	 	`thenM` \ (maybe_ordinaries, maybe_newtypes) ->
+    returnM (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
     ------------------------------------------------------------------
     derive_these :: [(NewOrData, Name, RenamedHsPred)]
@@ -321,17 +318,17 @@ makeDerivEqns tycl_decls
 		     pred <- preds ]
 
     ------------------------------------------------------------------
-    mk_eqn :: (NewOrData, Name, RenamedHsPred) -> NF_TcM (Maybe DerivEqn, Maybe InstInfo)
+    mk_eqn :: (NewOrData, Name, RenamedHsPred) -> TcM (Maybe DerivEqn, Maybe InstInfo)
 	-- We swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
     mk_eqn (new_or_data, tycon_name, pred)
-      = tcLookupTyCon tycon_name		`thenNF_Tc` \ tycon ->
-	tcAddSrcLoc (getSrcLoc tycon)		$
-        tcAddErrCtxt (derivCtxt Nothing tycon)	$
+      = tcLookupTyCon tycon_name		`thenM` \ tycon ->
+	addSrcLoc (getSrcLoc tycon)		$
+        addErrCtxt (derivCtxt Nothing tycon)	$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
-        tcHsPred pred				`thenTc` \ pred' ->
+        tcHsPred pred				`thenM` \ pred' ->
 	case getClassPredTys_maybe pred' of
 	   Nothing 	    -> bale_out (malformedPredErr tycon pred)
 	   Just (clas, tys) -> mk_eqn_help new_or_data tycon clas tys
@@ -341,8 +338,8 @@ makeDerivEqns tycl_decls
       | Just err <- chk_out clas tycon tys
       = bale_out (derivingThingErr clas tys tycon tyvars err)
       | otherwise 
-      = new_dfun_name clas tycon	 `thenNF_Tc` \ dfun_name ->
-	returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints), Nothing)
+      = new_dfun_name clas tycon	 `thenM` \ dfun_name ->
+	returnM (Just (dfun_name, clas, tycon, tyvars, constraints), Nothing)
       where
 	tyvars    = tyConTyVars tycon
 	data_cons = tyConDataCons tycon
@@ -361,15 +358,15 @@ makeDerivEqns tycl_decls
 
 	--    | offensive_class = tyConTheta tycon
 	--    | otherwise	    = []
-	-- offensive_class = classKey clas `elem` needsDataDeclCtxtClassKeys
+	-- offensive_class = classKey clas `elem` PrelInfo.needsDataDeclCtxtClassKeys
 
 
     mk_eqn_help NewType tycon clas tys
-      =	doptsTc Opt_GlasgowExts			`thenTc` \ gla_exts ->
+      =	doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
         if can_derive_via_isomorphism && (gla_exts || standard_instance) then
 		-- Go ahead and use the isomorphism
-       	   new_dfun_name clas tycon  		`thenNF_Tc` \ dfun_name ->
-	   returnTc (Nothing, Just (NewTypeDerived (mk_dfun dfun_name)))
+       	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
+	   returnM (Nothing, Just (NewTypeDerived (mk_dfun dfun_name)))
 	else
 	   if standard_instance then
 		mk_eqn_help DataType tycon clas []	-- Go via bale-out route
@@ -441,7 +438,7 @@ makeDerivEqns tycl_decls
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
 				(ptext SLIT("too hard for cunning newtype deriving"))
 
-    bale_out err = addErrTc err `thenNF_Tc_` returnNF_Tc (Nothing, Nothing) 
+    bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
 
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> [TcType] -> Maybe SDoc
@@ -520,29 +517,29 @@ solveDerivEqns inst_env_in orig_eqns
       = pprPanic "solveDerivEqns: probable loop" 
 		 (vcat (map pprDerivEqn orig_eqns) $$ ppr current_solns)
       | otherwise
-      =	getDOptsTc				`thenNF_Tc` \ dflags ->
+      =	getDOpts				`thenM` \ dflags ->
         let 
 	    dfuns    = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
 	    inst_env = extend_inst_env dflags inst_env_in dfuns
         in
-        checkNoErrsTc (
+        checkNoErrs (
 		  -- Extend the inst info from the explicit instance decls
 		  -- with the current set of solutions, and simplify each RHS
 	    tcSetInstEnv inst_env $
-	    mapTc gen_soln orig_eqns
-	)				`thenTc` \ new_solns ->
+	    mappM gen_soln orig_eqns
+	)				`thenM` \ new_solns ->
 	if (current_solns == new_solns) then
-	    returnTc dfuns
+	    returnM dfuns
 	else
 	    iterateDeriv (n+1) new_solns
 
     ------------------------------------------------------------------
 
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
-      = tcAddSrcLoc (getSrcLoc tc)		$
-	tcAddErrCtxt (derivCtxt (Just clas) tc)	$
-	tcSimplifyDeriv tyvars deriv_rhs	`thenTc` \ theta ->
-	returnTc (sortLt (<) theta)	-- Canonicalise before returning the soluction
+      = addSrcLoc (getSrcLoc tc)		$
+	addErrCtxt (derivCtxt (Just clas) tc)	$
+	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
+	returnM (sortLt (<) theta)	-- Canonicalise before returning the soluction
 \end{code}
 
 \begin{code}
@@ -626,23 +623,25 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when renaming
 --  the method binds)
-gen_bind :: FixityEnv -> DFunId -> (Name, RdrNameMonoBinds)
-gen_bind get_fixity dfun
-  = (cls_nm, binds)
+gen_bind :: DFunId -> TcM (Name, RdrNameMonoBinds)
+gen_bind dfun
+  = getFixityEnv		`thenM` \ fix_env -> 
+    returnM (cls_nm, gen_binds_fn fix_env cls_nm tycon)
   where
     cls_nm	  = className clas
     (clas, tycon) = simpleDFunClassTyCon dfun
 
-    binds = assoc "gen_bind:bad derived class" gen_list 
-		  (nameUnique cls_nm) tycon
-
+gen_binds_fn fix_env cls_nm
+  = assoc "gen_bind:bad derived class"
+	  gen_list (nameUnique cls_nm)
+  where
     gen_list = [(eqClassKey,      gen_Eq_binds)
 	       ,(ordClassKey,     gen_Ord_binds)
 	       ,(enumClassKey,    gen_Enum_binds)
 	       ,(boundedClassKey, gen_Bounded_binds)
 	       ,(ixClassKey,      gen_Ix_binds)
-	       ,(showClassKey,    gen_Show_binds get_fixity)
-	       ,(readClassKey,    gen_Read_binds get_fixity)
+	       ,(showClassKey,    gen_Show_binds fix_env)
+	       ,(readClassKey,    gen_Read_binds fix_env)
 	       ]
 \end{code}
 
@@ -686,8 +685,8 @@ gen_taggery_Names :: [DFunId]
 			   TagThingWanted)]
 
 gen_taggery_Names dfuns
-  = foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
-    foldlTc do_tag2con names_so_far tycons_of_interest
+  = foldlM do_con2tag []           tycons_of_interest `thenM` \ names_so_far ->
+    foldlM do_tag2con names_so_far tycons_of_interest
   where
     all_CTs = map simpleDFunClassTyCon dfuns
     all_tycons		    = map snd all_CTs
@@ -702,21 +701,21 @@ gen_taggery_Names dfuns
 	 || (we_are_deriving enumClassKey tycon)
 	 || (we_are_deriving ixClassKey   tycon))
 	
-      = returnTc ((con2tag_RDR tycon, tycon, GenCon2Tag)
+      = returnM ((con2tag_RDR tycon, tycon, GenCon2Tag)
 		   : acc_Names)
       | otherwise
-      = returnTc acc_Names
+      = returnM acc_Names
 
     do_tag2con acc_Names tycon
       | isDataTyCon tycon &&
          (we_are_deriving enumClassKey tycon ||
 	  we_are_deriving ixClassKey   tycon
 	  && isEnumerationTyCon tycon)
-      = returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
+      = returnM ( (tag2con_RDR tycon, tycon, GenTag2Con)
 		 : (maxtag_RDR  tycon, tycon, GenMaxTag)
 		 : acc_Names)
       | otherwise
-      = returnTc acc_Names
+      = returnM acc_Names
 
     we_are_deriving clas_key tycon
       = is_in_eqns clas_key tycon all_CTs

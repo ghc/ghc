@@ -48,6 +48,7 @@ module Binary
 
   ) where
 
+#include "HsVersions.h"
 #include "MachDeps.h"
 
 import {-# SOURCE #-} Module
@@ -58,10 +59,10 @@ import UniqFM
 import FastMutInt
 
 #if __GLASGOW_HASKELL__ < 503
-import IOExts
-import Bits
-import Int
-import Word
+import DATA_IOREF
+import DATA_BITS
+import DATA_INT
+import DATA_WORD
 import Char
 import Monad
 import Exception

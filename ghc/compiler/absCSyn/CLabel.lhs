@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.54 2002/07/18 09:16:12 simonmar Exp $
+% $Id: CLabel.lhs,v 1.55 2002/09/13 15:02:26 simonpj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -90,7 +90,6 @@ import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp )
 import CostCentre	( CostCentre, CostCentreStack )
-import BasicTypes	( Version )
 import Outputable
 import FastString
 \end{code}

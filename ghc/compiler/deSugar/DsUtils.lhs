@@ -20,10 +20,11 @@ module DsUtils (
 	mkCoLetsMatchResult, mkGuardedMatchResult, 
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 
-	mkErrorAppDs, mkNilExpr, mkConsExpr,
-	mkStringLit, mkStringLitFS, mkIntegerLit, 
+	mkErrorAppDs, mkNilExpr, mkConsExpr, mkListExpr,
+	mkIntExpr, mkCharExpr,
+	mkStringLit, mkStringLitFS, mkIntegerExpr, 
 
-	mkSelectorBinds, mkTupleExpr, mkTupleSelector,
+	mkSelectorBinds, mkTupleExpr, mkTupleSelector, mkCoreTup,
 
 	selectMatchVar
     ) where
@@ -33,7 +34,7 @@ module DsUtils (
 import {-# SOURCE #-} Match ( matchSimply )
 
 import HsSyn
-import TcHsSyn		( TypecheckedPat, outPatType, collectTypedPatBinders )
+import TcHsSyn		( TypecheckedPat, hsPatType )
 import CoreSyn
 
 import DsMonad
@@ -43,11 +44,11 @@ import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import MkId		( mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
-import TyCon		( isNewTyCon, tyConDataCons, isRecursiveTyCon )
+import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConSourceArity )
 import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp )
 import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
-import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
+import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
 			  unitDataConId, unitTy,
@@ -77,23 +78,22 @@ import FastString
 
 \begin{code}
 tidyLitPat :: HsLit -> TypecheckedPat -> TypecheckedPat
-tidyLitPat (HsChar c) pat = ConPat charDataCon   charTy [] [] [LitPat (HsCharPrim c)   charPrimTy]
+tidyLitPat (HsChar c) pat = mkCharLitPat c
 tidyLitPat lit        pat = pat
 
 tidyNPat :: HsLit -> Type -> TypecheckedPat -> TypecheckedPat
 tidyNPat (HsString s) _ pat
   | lengthFS s <= 1	-- Short string literals only
-  = foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
-	  (ConPat nilDataCon stringTy [] [] []) (unpackIntFS s)
+  = foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c,pat] stringTy)
+	  (mkNilPat stringTy) (unpackIntFS s)
 	-- The stringTy is the type of the whole pattern, not 
 	-- the type to instantiate (:) or [] with!
   where
-    mk_char_lit c = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
 
 tidyNPat lit lit_ty default_pat
-  | isIntTy lit_ty     	= ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
-  | isFloatTy lit_ty  	= ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
-  | isDoubleTy lit_ty 	= ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
+  | isIntTy lit_ty     	= mkPrefixConPat intDataCon    [LitPat (mk_int lit)]    lit_ty 
+  | isFloatTy lit_ty  	= mkPrefixConPat floatDataCon  [LitPat (mk_float lit)]  lit_ty 
+  | isDoubleTy lit_ty 	= mkPrefixConPat doubleDataCon [LitPat (mk_double lit)] lit_ty 
   | otherwise		= default_pat
 
   where
@@ -144,7 +144,7 @@ selectMatchVar :: TypecheckedPat -> DsM Id
 selectMatchVar (VarPat var)     = returnDs var
 selectMatchVar (AsPat var pat) 	= returnDs var
 selectMatchVar (LazyPat pat)   	= selectMatchVar pat
-selectMatchVar other_pat       	= newSysLocalDs (outPatType other_pat) -- OK, better make up one...
+selectMatchVar other_pat       	= newSysLocalDs (hsPatType other_pat) -- OK, better make up one...
 \end{code}
 
 
@@ -337,7 +337,7 @@ mkCoAlgCaseMatchResult var match_alts
 	  panic "DsUtils: You may not mix `[:...:]' with `PArr' patterns"
     --
     mk_parrCase fail = 		   
-      dsLookupGlobalValue lengthPName			`thenDs` \lengthP  ->
+      dsLookupGlobalId lengthPName			`thenDs` \lengthP  ->
       unboxAlt						`thenDs` \alt      ->
       returnDs (Case (len lengthP) (mkWildId intTy) [alt])
       where
@@ -349,7 +349,7 @@ mkCoAlgCaseMatchResult var match_alts
 	--
 	unboxAlt = 
 	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
-	  dsLookupGlobalValue indexPName		`thenDs` \indexP   ->
+	  dsLookupGlobalId indexPName		`thenDs` \indexP   ->
 	  mapDs (mkAlt indexP) match_alts               `thenDs` \alts     ->
 	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild (dft : alts)))
           where
@@ -369,8 +369,7 @@ mkCoAlgCaseMatchResult var match_alts
 	    lit   = MachInt $ toInteger (dataConSourceArity con)
 	    binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] args]
 	    --
-	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, toInt i]
-	    toInt     i = mkConApp intDataCon [Lit $ MachInt i]
+	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr i]
 \end{code}
 
 
@@ -403,8 +402,14 @@ mkErrorAppDs err_id ty msg
 %************************************************************************
 
 \begin{code}
-mkIntegerLit :: Integer -> DsM CoreExpr
-mkIntegerLit i
+mkCharExpr    :: Int	 -> CoreExpr	  -- Returns 	C# c :: Int
+mkIntExpr     :: Integer -> CoreExpr	  -- Returns 	I# i :: Int
+mkIntegerExpr :: Integer -> DsM CoreExpr  -- Result :: Integer
+
+mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
+mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
+
+mkIntegerExpr i
   | inIntRange i  	-- Small enough, so start from an Int
   = returnDs (mkSmallIntegerLit i)
 
@@ -413,8 +418,8 @@ mkIntegerLit i
 -- integral literals. This improves constant folding.
 
   | otherwise 		-- Big, so start from a string
-  = dsLookupGlobalValue plusIntegerName		`thenDs` \ plus_id ->
-    dsLookupGlobalValue timesIntegerName	`thenDs` \ times_id ->
+  = dsLookupGlobalId plusIntegerName		`thenDs` \ plus_id ->
+    dsLookupGlobalId timesIntegerName	`thenDs` \ times_id ->
     let 
         plus a b  = Var plus_id  `App` a `App` b
         times a b = Var times_id `App` a `App` b
@@ -444,16 +449,16 @@ mkStringLitFS str
 
   | lengthFS str == 1
   = let
-	the_char = mkConApp charDataCon [mkLit (MachChar (headIntFS str))]
+	the_char = mkCharExpr (headIntFS str)
     in
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
   | all safeChar int_chars
-  = dsLookupGlobalValue unpackCStringName	`thenDs` \ unpack_id ->
+  = dsLookupGlobalId unpackCStringName	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
-  = dsLookupGlobalValue unpackCStringUtf8Name	`thenDs` \ unpack_id ->
+  = dsLookupGlobalId unpackCStringUtf8Name	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr (mkFastString (intsToUtf8 int_chars)))))
 
   where
@@ -518,7 +523,7 @@ mkSelectorBinds pat val_expr
     in
     returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
-    binders	= collectTypedPatBinders pat
+    binders	= collectPatBinders pat
     local_tuple = mkTupleExpr binders
     tuple_ty    = exprType local_tuple
 
@@ -532,14 +537,15 @@ mkSelectorBinds pat val_expr
       where
         error_expr = mkCoerce (idType bndr_var) (Var err_var)
 
-    is_simple_pat (TuplePat ps Boxed)  = all is_triv_pat ps
-    is_simple_pat (ConPat _ _ _ _ ps)  = all is_triv_pat ps
-    is_simple_pat (VarPat _)	       = True
-    is_simple_pat (RecPat _ _ _ _ ps)  = and [is_triv_pat p | (_,p,_) <- ps]
-    is_simple_pat other		       = False
+    is_simple_pat (TuplePat ps Boxed)    = all is_triv_pat ps
+    is_simple_pat (ConPatOut _ ps _ _ _) = all is_triv_pat (hsConArgs ps)
+    is_simple_pat (VarPat _)	       	 = True
+    is_simple_pat (ParPat p)		 = is_simple_pat p
+    is_simple_pat other		       	 = False
 
     is_triv_pat (VarPat v)  = True
     is_triv_pat (WildPat _) = True
+    is_triv_pat (ParPat p)  = is_triv_pat p
     is_triv_pat other       = False
 \end{code}
 
@@ -550,10 +556,21 @@ has only one element, it is the identity function.
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
 
+{- This code has been replaced by mkCoreTup below
 mkTupleExpr []	 = Var unitDataConId
 mkTupleExpr [id] = Var id
 mkTupleExpr ids	 = mkConApp (tupleCon Boxed (length ids))
-			    (map (Type . idType) ids ++ [ Var i | i <- ids ])
+			    (map (Type . idType) ids ++ [ Var i | i <-ids])
+-}
+
+mkTupleExpr ids = mkCoreTup(map Var ids)			    
+			    
+mkCoreTup :: [CoreExpr] -> CoreExpr			    
+mkCoreTup []   = Var unitDataConId
+mkCoreTup [c]  = c
+mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
+			 (map (Type . exprType) cs ++ cs)
+			    
 \end{code}
 
 
@@ -598,6 +615,10 @@ mkNilExpr ty = mkConApp nilDataCon [Type ty]
 
 mkConsExpr :: Type -> CoreExpr -> CoreExpr -> CoreExpr
 mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
+
+mkListExpr :: Type -> [CoreExpr] -> CoreExpr
+mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
+
 \end{code}
 
 

@@ -12,7 +12,7 @@ module TcHsSyn (
 	TcExpr, TcGRHSs, TcGRHS, TcMatch,
 	TcStmt, TcArithSeqInfo, TcRecordBinds,
 	TcHsModule, TcDictBinds,
-	TcForeignExportDecl,
+	TcForeignDecl,
 	
 	TypecheckedHsBinds, TypecheckedRuleDecl,
 	TypecheckedMonoBinds, TypecheckedPat,
@@ -25,15 +25,13 @@ module TcHsSyn (
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
-	simpleHsLitTy,
+	hsLitType, hsPatType, 
 
-	collectTypedPatBinders, outPatType, 
+	-- re-exported from TcMonad
+	TcId, TcIdSet,
 
-	-- re-exported from TcEnv
-	TcId, 
-
-	zonkTopBinds, zonkId, zonkIdBndr, zonkIdOcc, zonkExpr,
-	zonkForeignExports, zonkRules
+	zonkTopBinds, zonkTopDecls, zonkTopExpr,
+	zonkId, zonkIdBndr
   ) where
 
 #include "HsVersions.h"
@@ -42,11 +40,10 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, setIdType, Id )
+import Id	( idType, setIdType, Id )
 import DataCon	( dataConWrapId )	
-import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
-import TcMonad
+import TcRnMonad
 import Type	  ( Type )
 import TcType	  ( TcType, tcGetTyVar )
 import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcTyVars )
@@ -55,12 +52,13 @@ import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		  )
 import TysWiredIn ( charTy, stringTy, intTy, integerTy,
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy )
-import CoreSyn    ( Expr(..), CoreExpr, CoreBind, Bind(..), CoreAlt, Note(..) )
-import Var	  ( isId )
-import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName )
+import CoreSyn    ( CoreExpr )
+import Var	  ( isId, isLocalVar )
+import VarEnv
+import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName, mapIPName )
+import Maybes	  ( orElse )
 import Bag
 import Outputable
-import HscTypes	( TyThing(..) )
 \end{code}
 
 
@@ -75,37 +73,36 @@ At the end of type checking we zonk everything to @Typechecked...@ datatypes,
 which have immutable type variables in them.
 
 \begin{code}
-type TcHsBinds     	= HsBinds TcId TcPat
-type TcMonoBinds	= MonoBinds TcId TcPat
-type TcDictBinds	= TcMonoBinds
-type TcPat	     	= OutPat TcId
-type TcExpr	     	= HsExpr TcId TcPat
-type TcGRHSs		= GRHSs TcId TcPat
-type TcGRHS		= GRHS TcId TcPat
-type TcMatch		= Match TcId TcPat
-type TcStmt		= Stmt TcId TcPat
-type TcArithSeqInfo	= ArithSeqInfo TcId TcPat
-type TcRecordBinds	= HsRecordBinds TcId TcPat
-type TcHsModule	= HsModule TcId TcPat
-
-type TcForeignExportDecl = ForeignDecl TcId
-type TcRuleDecl 	 = RuleDecl    TcId TcPat
+type TcHsBinds     	= HsBinds      	TcId
+type TcMonoBinds	= MonoBinds    	TcId 
+type TcDictBinds	= TcMonoBinds 
+type TcPat	     	= OutPat       	TcId
+type TcExpr	     	= HsExpr       	TcId 
+type TcGRHSs		= GRHSs        	TcId
+type TcGRHS		= GRHS         	TcId
+type TcMatch		= Match        	TcId
+type TcStmt		= Stmt         	TcId
+type TcArithSeqInfo	= ArithSeqInfo 	TcId
+type TcRecordBinds	= HsRecordBinds TcId
+type TcHsModule		= HsModule	TcId
+type TcForeignDecl      = ForeignDecl  TcId
+type TcRuleDecl 	= RuleDecl     TcId
 
 type TypecheckedPat		= OutPat	Id
-type TypecheckedMonoBinds 	= MonoBinds	Id TypecheckedPat
+type TypecheckedMonoBinds 	= MonoBinds	Id
 type TypecheckedDictBinds 	= TypecheckedMonoBinds
-type TypecheckedHsBinds		= HsBinds	Id TypecheckedPat
-type TypecheckedHsExpr		= HsExpr	Id TypecheckedPat
-type TypecheckedArithSeqInfo	= ArithSeqInfo	Id TypecheckedPat
-type TypecheckedStmt		= Stmt		Id TypecheckedPat
-type TypecheckedMatch		= Match		Id TypecheckedPat
+type TypecheckedHsBinds		= HsBinds	Id
+type TypecheckedHsExpr		= HsExpr	Id
+type TypecheckedArithSeqInfo	= ArithSeqInfo	Id
+type TypecheckedStmt		= Stmt		Id
+type TypecheckedMatch		= Match		Id
 type TypecheckedMatchContext	= HsMatchContext Id
-type TypecheckedGRHSs		= GRHSs		Id TypecheckedPat
-type TypecheckedGRHS		= GRHS		Id TypecheckedPat
-type TypecheckedRecordBinds	= HsRecordBinds Id TypecheckedPat
-type TypecheckedHsModule	= HsModule	Id TypecheckedPat
-type TypecheckedForeignDecl     = ForeignDecl Id
-type TypecheckedRuleDecl	= RuleDecl      Id TypecheckedPat
+type TypecheckedGRHSs		= GRHSs		Id
+type TypecheckedGRHS		= GRHS		Id
+type TypecheckedRecordBinds	= HsRecordBinds Id
+type TypecheckedHsModule	= HsModule	Id
+type TypecheckedForeignDecl     = ForeignDecl   Id
+type TypecheckedRuleDecl	= RuleDecl      Id
 type TypecheckedCoreBind        = (Id, CoreExpr)
 \end{code}
 
@@ -129,75 +126,56 @@ mkHsConApp data_con tys args = foldl HsApp (HsVar (dataConWrapId data_con) `mkHs
 \end{code}
 
 
-------------------------------------------------------
-\begin{code}
-simpleHsLitTy :: HsLit -> TcType
-simpleHsLitTy (HsCharPrim c)   = charPrimTy
-simpleHsLitTy (HsStringPrim s) = addrPrimTy
-simpleHsLitTy (HsInt i)	       = intTy
-simpleHsLitTy (HsInteger i)    = integerTy
-simpleHsLitTy (HsIntPrim i)    = intPrimTy
-simpleHsLitTy (HsFloatPrim f)  = floatPrimTy
-simpleHsLitTy (HsDoublePrim d) = doublePrimTy
-simpleHsLitTy (HsChar c)       = charTy
-simpleHsLitTy (HsString str)   = stringTy
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection[mkFailurePair]{Code for pattern-matching and other failures}
 %*									*
 %************************************************************************
 
-Note: If @outPatType@ doesn't bear a strong resemblance to @exprType@,
+Note: If @hsPatType@ doesn't bear a strong resemblance to @exprType@,
 then something is wrong.
 \begin{code}
-outPatType :: TypecheckedPat -> Type
+hsPatType :: TypecheckedPat -> Type
 
-outPatType (WildPat ty)		= ty
-outPatType (VarPat var)		= idType var
-outPatType (LazyPat pat)	= outPatType pat
-outPatType (AsPat var pat)	= idType var
-outPatType (ConPat _ ty _ _ _)	= ty
-outPatType (ListPat ty _)	= mkListTy ty
-outPatType (PArrPat ty _)	= mkPArrTy ty
-outPatType (TuplePat pats box)	= mkTupleTy box (length pats) (map outPatType pats)
-outPatType (RecPat _ ty _ _ _)  = ty
-outPatType (SigPat _ ty _)	= ty
-outPatType (LitPat lit ty)	= ty
-outPatType (NPat lit ty _)	= ty
-outPatType (NPlusKPat _ _ ty _ _) = ty
-outPatType (DictPat ds ms)      = case (length ds_ms) of
-				    0 -> unitTy
-				    1 -> idType (head ds_ms)
-				    n -> mkTupleTy Boxed n (map idType ds_ms)
-				   where
-				    ds_ms = ds ++ ms
+hsPatType (ParPat pat)		  = hsPatType pat
+hsPatType (WildPat ty)		  = ty
+hsPatType (VarPat var)		  = idType var
+hsPatType (LazyPat pat)		  = hsPatType pat
+hsPatType (LitPat lit)		  = hsLitType lit
+hsPatType (AsPat var pat)	  = idType var
+hsPatType (ListPat _ ty)	  = mkListTy ty
+hsPatType (PArrPat _ ty)	  = mkPArrTy ty
+hsPatType (TuplePat pats box)	  = mkTupleTy box (length pats) (map hsPatType pats)
+hsPatType (ConPatOut _ _ ty _ _)  = ty
+hsPatType (SigPatOut _ ty _)	  = ty
+hsPatType (NPatOut lit ty _)	  = ty
+hsPatType (NPlusKPatOut id _ _ _) = idType id
+hsPatType (DictPat ds ms)         = case (ds ++ ms) of
+				       []  -> unitTy
+				       [d] -> idType d
+				       ds  -> mkTupleTy Boxed (length ds) (map idType ds)
+
+
+hsLitType :: HsLit -> TcType
+hsLitType (HsChar c)       = charTy
+hsLitType (HsCharPrim c)   = charPrimTy
+hsLitType (HsString str)   = stringTy
+hsLitType (HsStringPrim s) = addrPrimTy
+hsLitType (HsInt i)	   = intTy
+hsLitType (HsIntPrim i)    = intPrimTy
+hsLitType (HsInteger i)    = integerTy
+hsLitType (HsRat _ ty)	   = ty
+hsLitType (HsFloatPrim f)  = floatPrimTy
+hsLitType (HsDoublePrim d) = doublePrimTy
+hsLitType (HsLitLit _ ty)  = ty
 \end{code}
 
-
-Nota bene: @DsBinds@ relies on the fact that at least for simple
-tuple patterns @collectTypedPatBinders@ returns the binders in
-the same order as they appear in the tuple.
-
-@collectTypedBinders@ and @collectedTypedPatBinders@ are the exportees.
-
 \begin{code}
-collectTypedPatBinders :: TypecheckedPat -> [Id]
-collectTypedPatBinders (VarPat var)	       = [var]
-collectTypedPatBinders (LazyPat pat)	       = collectTypedPatBinders pat
-collectTypedPatBinders (AsPat a pat)	       = a : collectTypedPatBinders pat
-collectTypedPatBinders (SigPat pat _ _)	       = collectTypedPatBinders pat
-collectTypedPatBinders (ConPat _ _ _ _ pats)   = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (ListPat t pats)        = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (PArrPat t pats)        = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (TuplePat pats _)       = concat (map collectTypedPatBinders pats)
-collectTypedPatBinders (RecPat _ _ _ _ fields) = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat)
-							  fields)
-collectTypedPatBinders (DictPat ds ms)	       = ds ++ ms
-collectTypedPatBinders (NPlusKPat var _ _ _ _) = [var]
-collectTypedPatBinders any_other_pat	       = [ {-no binders-} ]
+-- zonkId is used *during* typechecking just to zonk the Id's type
+zonkId :: TcId -> TcM TcId
+zonkId id
+  = zonkTcType (idType id) `thenM` \ ty' ->
+    returnM (setIdType id ty')
 \end{code}
 
 
@@ -224,143 +202,159 @@ It's all pretty boring stuff, because HsSyn is such a large type, and
 the environment manipulation is tiresome.
 
 \begin{code}
--- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> NF_TcM TcId
-zonkId id
-  = zonkTcType (idType id) `thenNF_Tc` \ ty' ->
-    returnNF_Tc (setIdType id ty')
+type ZonkEnv = IdEnv Id
+	-- Maps an Id to its zonked version; both have the same Name
+	-- Is only consulted lazily; hence knot-tying
+
+emptyZonkEnv = emptyVarEnv
+
+extendZonkEnv :: ZonkEnv -> [Id] -> ZonkEnv
+extendZonkEnv env ids = extendVarEnvList env [(id,id) | id <- ids]
+
+mkZonkEnv :: [Id] -> ZonkEnv
+mkZonkEnv ids = extendZonkEnv emptyZonkEnv ids
+
+zonkIdOcc :: ZonkEnv -> TcId -> Id
+-- Ids defined in this module should be in the envt; 
+-- ignore others.  (Actually, data constructors are also
+-- not LocalVars, even when locally defined, but that is fine.)
+--
+-- Actually, Template Haskell works in 'chunks' of declarations, and
+-- an earlier chunk won't be in the 'env' that the zonking phase 
+-- carries around.  Instead it'll be in the tcg_gbl_env, already fully
+-- zonked.  There's no point in looking it up there (except for error 
+-- checking), and it's not conveniently to hand; hence the simple
+-- 'orElse' case in the LocalVar branch.
+--
+-- Even without template splices, in module Main, the checking of
+-- 'main' is done as a separte chunk.
+zonkIdOcc env id 
+  | isLocalVar id = lookupVarEnv env id `orElse` id
+  | otherwise	  = id
+
+zonkIdOccs env ids = map (zonkIdOcc env) ids
 
 -- zonkIdBndr is used *after* typechecking to get the Id's type
 -- to its final form.  The TyVarEnv give 
-zonkIdBndr :: TcId -> NF_TcM Id
+zonkIdBndr :: TcId -> TcM Id
 zonkIdBndr id
-  = zonkTcTypeToType (idType id)	`thenNF_Tc` \ ty' ->
-    returnNF_Tc (setIdType id ty')
-
-zonkIdOcc :: TcId -> NF_TcM Id
-zonkIdOcc id 
-  = tcLookupGlobal_maybe (idName id)	`thenNF_Tc` \ maybe_id' ->
-	-- We're even look up up superclass selectors and constructors; 
-	-- even though zonking them is a no-op anyway, and the
-	-- superclass selectors aren't in the environment anyway.
-	-- But we don't want to call isLocalId to find out whether
-	-- it's a superclass selector (for example) because that looks
-	-- at the IdInfo field, which in turn be in a knot because of
-	-- the big knot in typecheckModule
-    let
-	new_id = case maybe_id' of
-		    Just (AnId id') -> id'
-		    other  	    -> id -- WARN( isLocalId id, ppr id ) id
-					-- Oops: the warning can give a black hole
-					-- because it looks at the idinfo
-    in
-    returnNF_Tc new_id
+  = zonkTcTypeToType (idType id)	`thenM` \ ty' ->
+    returnM (setIdType id ty')
 \end{code}
 
 
 \begin{code}
-zonkTopBinds :: TcMonoBinds -> NF_TcM (TypecheckedMonoBinds, TcEnv)
-zonkTopBinds binds	-- Top level is implicitly recursive
-  = fixNF_Tc (\ ~(_, new_ids) ->
-	tcExtendGlobalValEnv (bagToList new_ids)	$
-	zonkMonoBinds binds			`thenNF_Tc` \ (binds', new_ids) ->
-	tcGetEnv				`thenNF_Tc` \ env ->
-	returnNF_Tc ((binds', env), new_ids)
-    )					`thenNF_Tc` \ (stuff, _) ->
-    returnNF_Tc stuff
+zonkTopExpr :: TcExpr -> TcM TypecheckedHsExpr
+zonkTopExpr e = zonkExpr emptyZonkEnv e
 
-zonkBinds :: TcHsBinds -> NF_TcM (TypecheckedHsBinds, TcEnv)
+zonkTopDecls :: TcMonoBinds -> [TcRuleDecl] -> [TcForeignDecl]
+	     -> TcM ([Id], 
+			TypecheckedMonoBinds, 
+			[TypecheckedForeignDecl],
+			[TypecheckedRuleDecl])
+zonkTopDecls binds rules fords	-- Top level is implicitly recursive
+  = fixM (\ ~(new_ids, _, _, _) ->
+	let
+	   zonk_env = mkZonkEnv new_ids
+	in
+	zonkMonoBinds zonk_env binds		`thenM` \ (binds', new_ids) ->
+	zonkRules zonk_env rules		`thenM` \ rules' ->
+	zonkForeignExports zonk_env fords	`thenM` \ fords' ->
+	
+	returnM (bagToList new_ids, binds', fords', rules')
+    )
 
-zonkBinds binds 
-  = go binds (\ binds' -> tcGetEnv `thenNF_Tc` \ env -> 
-			  returnNF_Tc (binds', env))
-  where
-    -- go :: TcHsBinds
-    --    -> (TypecheckedHsBinds
-    --	      -> NF_TcM (TypecheckedHsBinds, TcEnv)
-    --       ) 
-    --	  -> NF_TcM (TypecheckedHsBinds, TcEnv)
+zonkTopBinds :: TcMonoBinds -> TcM ([Id], TypecheckedMonoBinds)
+zonkTopBinds binds
+  = fixM (\ ~(new_ids, _) ->
+	let
+	   zonk_env = mkZonkEnv new_ids
+	in
+	zonkMonoBinds zonk_env binds		`thenM` \ (binds', new_ids) ->
+	returnM (bagToList new_ids, binds')
+    )
 
-    go (ThenBinds b1 b2) thing_inside = go b1 	$ \ b1' -> 
-					go b2 	$ \ b2' ->
-					thing_inside (b1' `ThenBinds` b2')
+---------------------------------------------
+zonkBinds :: ZonkEnv -> TcHsBinds -> TcM (ZonkEnv, TypecheckedHsBinds)
+zonkBinds env EmptyBinds = returnM (env, EmptyBinds)
 
-    go EmptyBinds thing_inside = thing_inside EmptyBinds
+zonkBinds env (ThenBinds b1 b2)
+  = zonkBinds env b1 	`thenM` \ (env1, b1') -> 
+    zonkBinds env1 b2 	`thenM` \ (env2, b2') -> 
+    returnM (env2, b1' `ThenBinds` b2')
 
-    go (MonoBind bind sigs is_rec) thing_inside
-	  = ASSERT( null sigs )
-	    fixNF_Tc (\ ~(_, new_ids) ->
-		tcExtendGlobalValEnv (bagToList new_ids)	$
-		zonkMonoBinds bind				`thenNF_Tc` \ (new_bind, new_ids) ->
-		thing_inside (mkMonoBind new_bind [] is_rec)	`thenNF_Tc` \ stuff ->
-		returnNF_Tc (stuff, new_ids)
-	    )							`thenNF_Tc` \ (stuff, _) ->
-	   returnNF_Tc stuff
-\end{code}
+zonkBinds env (MonoBind bind sigs is_rec)
+  = ASSERT( null sigs )
+    fixM (\ ~(env1, _) ->
+	zonkMonoBinds env1 bind		`thenM` \ (new_bind, new_ids) ->
+	let 
+	   env2 = extendZonkEnv env (bagToList new_ids)
+	in
+	returnM (env2, mkMonoBind new_bind [] is_rec)
+    )
 
-\begin{code}
--------------------------------------------------------------------------
-zonkMonoBinds :: TcMonoBinds
-	      -> NF_TcM (TypecheckedMonoBinds, Bag Id)
+---------------------------------------------
+zonkMonoBinds :: ZonkEnv -> TcMonoBinds
+	      -> TcM (TypecheckedMonoBinds, Bag Id)
 
-zonkMonoBinds EmptyMonoBinds = returnNF_Tc (EmptyMonoBinds, emptyBag)
+zonkMonoBinds env EmptyMonoBinds = returnM (EmptyMonoBinds, emptyBag)
 
-zonkMonoBinds (AndMonoBinds mbinds1 mbinds2)
-  = zonkMonoBinds mbinds1		`thenNF_Tc` \ (b1', ids1) ->
-    zonkMonoBinds mbinds2		`thenNF_Tc` \ (b2', ids2) ->
-    returnNF_Tc (b1' `AndMonoBinds` b2', 
+zonkMonoBinds env (AndMonoBinds mbinds1 mbinds2)
+  = zonkMonoBinds env mbinds1		`thenM` \ (b1', ids1) ->
+    zonkMonoBinds env mbinds2		`thenM` \ (b2', ids2) ->
+    returnM (b1' `AndMonoBinds` b2', 
 		 ids1 `unionBags` ids2)
 
-zonkMonoBinds (PatMonoBind pat grhss locn)
-  = zonkPat pat		`thenNF_Tc` \ (new_pat, ids) ->
-    zonkGRHSs grhss	`thenNF_Tc` \ new_grhss ->
-    returnNF_Tc (PatMonoBind new_pat new_grhss locn, ids)
+zonkMonoBinds env (PatMonoBind pat grhss locn)
+  = zonkPat env pat	`thenM` \ (new_pat, ids) ->
+    zonkGRHSs env grhss	`thenM` \ new_grhss ->
+    returnM (PatMonoBind new_pat new_grhss locn, ids)
 
-zonkMonoBinds (VarMonoBind var expr)
-  = zonkIdBndr var    	`thenNF_Tc` \ new_var ->
-    zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (VarMonoBind new_var new_expr, unitBag new_var)
+zonkMonoBinds env (VarMonoBind var expr)
+  = zonkIdBndr var    	`thenM` \ new_var ->
+    zonkExpr env expr	`thenM` \ new_expr ->
+    returnM (VarMonoBind new_var new_expr, unitBag new_var)
 
-zonkMonoBinds (CoreMonoBind var core_expr)
-  = zonkIdBndr var    	`thenNF_Tc` \ new_var ->
-    returnNF_Tc (CoreMonoBind new_var core_expr, unitBag new_var)
+zonkMonoBinds env (CoreMonoBind var core_expr)
+  = zonkIdBndr var    	`thenM` \ new_var ->
+    returnM (CoreMonoBind new_var core_expr, unitBag new_var)
 
-zonkMonoBinds (FunMonoBind var inf ms locn)
-  = zonkIdBndr var			`thenNF_Tc` \ new_var ->
-    mapNF_Tc zonkMatch ms		`thenNF_Tc` \ new_ms ->
-    returnNF_Tc (FunMonoBind new_var inf new_ms locn, unitBag new_var)
+zonkMonoBinds env (FunMonoBind var inf ms locn)
+  = zonkIdBndr var			`thenM` \ new_var ->
+    mappM (zonkMatch env) ms		`thenM` \ new_ms ->
+    returnM (FunMonoBind new_var inf new_ms locn, unitBag new_var)
 
 
-zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
-  = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
+zonkMonoBinds env (AbsBinds tyvars dicts exports inlines val_bind)
+  = mappM zonkTcTyVarToTyVar tyvars	`thenM` \ new_tyvars ->
 	-- No need to extend tyvar env: the effects are
 	-- propagated through binding the tyvars themselves
 
-    mapNF_Tc zonkIdBndr  dicts		`thenNF_Tc` \ new_dicts ->
-    tcExtendGlobalValEnv new_dicts			$
-
-    fixNF_Tc (\ ~(_, _, val_bind_ids) ->
-	tcExtendGlobalValEnv (bagToList val_bind_ids)	$
-	zonkMonoBinds val_bind 				`thenNF_Tc` \ (new_val_bind, val_bind_ids) ->
-        mapNF_Tc zonkExport exports			`thenNF_Tc` \ new_exports ->
-	returnNF_Tc (new_val_bind, new_exports,  val_bind_ids)
-    )						`thenNF_Tc ` \ (new_val_bind, new_exports, _) ->
+    mappM zonkIdBndr  dicts		`thenM` \ new_dicts ->
+    fixM (\ ~(_, _, val_bind_ids) ->
+	let
+	  env1 = extendZonkEnv (extendZonkEnv env new_dicts)
+			       (bagToList val_bind_ids)
+	in
+	zonkMonoBinds env1 val_bind 		`thenM` \ (new_val_bind, val_bind_ids) ->
+        mappM (zonkExport env1) exports	`thenM` \ new_exports ->
+	returnM (new_val_bind, new_exports, val_bind_ids)
+    )						`thenM ` \ (new_val_bind, new_exports, _) ->
     let
-	    new_globals = listToBag [global | (_, global, local) <- new_exports]
+	new_globals = listToBag [global | (_, global, local) <- new_exports]
     in
-    returnNF_Tc (AbsBinds new_tyvars new_dicts new_exports inlines new_val_bind,
+    returnM (AbsBinds new_tyvars new_dicts new_exports inlines new_val_bind,
 		 new_globals)
   where
-    zonkExport (tyvars, global, local)
-	= zonkTcTyVars tyvars		`thenNF_Tc` \ tys ->
+    zonkExport env (tyvars, global, local)
+	= zonkTcTyVars tyvars		`thenM` \ tys ->
 	  let
 		new_tyvars = map (tcGetTyVar "zonkExport") tys
 		-- This isn't the binding occurrence of these tyvars
 		-- but they should *be* tyvars.  Hence tcGetTyVar.
 	  in
-	  zonkIdBndr global		`thenNF_Tc` \ new_global ->
-	  zonkIdOcc local		`thenNF_Tc` \ new_local -> 
-	  returnNF_Tc (new_tyvars, new_global, new_local)
+	  zonkIdBndr global		`thenM` \ new_global ->
+	  returnM (new_tyvars, new_global, zonkIdOcc env local)
 \end{code}
 
 %************************************************************************
@@ -370,29 +364,26 @@ zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
 %************************************************************************
 
 \begin{code}
-zonkMatch :: TcMatch -> NF_TcM TypecheckedMatch
+zonkMatch :: ZonkEnv -> TcMatch -> TcM TypecheckedMatch
 
-zonkMatch (Match pats _ grhss)
-  = zonkPats pats				`thenNF_Tc` \ (new_pats, new_ids) ->
-    tcExtendGlobalValEnv (bagToList new_ids)	$
-    zonkGRHSs grhss 				`thenNF_Tc` \ new_grhss ->
-    returnNF_Tc (Match new_pats Nothing new_grhss)
+zonkMatch env (Match pats _ grhss)
+  = zonkPats env pats						`thenM` \ (new_pats, new_ids) ->
+    zonkGRHSs (extendZonkEnv env (bagToList new_ids)) grhss 	`thenM` \ new_grhss ->
+    returnM (Match new_pats Nothing new_grhss)
 
 -------------------------------------------------------------------------
-zonkGRHSs :: TcGRHSs
-	  -> NF_TcM TypecheckedGRHSs
+zonkGRHSs :: ZonkEnv -> TcGRHSs -> TcM TypecheckedGRHSs
 
-zonkGRHSs (GRHSs grhss binds ty)
-  = zonkBinds binds   		`thenNF_Tc` \ (new_binds, new_env) ->
-    tcSetEnv new_env $
+zonkGRHSs env (GRHSs grhss binds ty)
+  = zonkBinds env binds   	`thenM` \ (new_env, new_binds) ->
     let
 	zonk_grhs (GRHS guarded locn)
-	  = zonkStmts guarded  `thenNF_Tc` \ new_guarded ->
-	    returnNF_Tc (GRHS new_guarded locn)
+	  = zonkStmts new_env guarded  `thenM` \ new_guarded ->
+	    returnM (GRHS new_guarded locn)
     in
-    mapNF_Tc zonk_grhs grhss 	`thenNF_Tc` \ new_grhss ->
-    zonkTcTypeToType ty 	`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (GRHSs new_grhss new_binds new_ty)
+    mappM zonk_grhs grhss 	`thenM` \ new_grhss ->
+    zonkTcTypeToType ty 	`thenM` \ new_ty ->
+    returnM (GRHSs new_grhss new_binds new_ty)
 \end{code}
 
 %************************************************************************
@@ -402,247 +393,262 @@ zonkGRHSs (GRHSs grhss binds ty)
 %************************************************************************
 
 \begin{code}
-zonkExpr :: TcExpr -> NF_TcM TypecheckedHsExpr
+zonkExpr :: ZonkEnv -> TcExpr -> TcM TypecheckedHsExpr
 
-zonkExpr (HsVar id)
-  = zonkIdOcc id	`thenNF_Tc` \ id' ->
-    returnNF_Tc (HsVar id')
+zonkExpr env (HsVar id)
+  = returnM (HsVar (zonkIdOcc env id))
 
-zonkExpr (HsIPVar id)
-  = mapIPNameTc zonkIdOcc id	`thenNF_Tc` \ id' ->
-    returnNF_Tc (HsIPVar id')
+zonkExpr env (HsIPVar id)
+  = returnM (HsIPVar (mapIPName (zonkIdOcc env) id))
 
-zonkExpr (HsLit (HsRat f ty))
-  = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
-    returnNF_Tc (HsLit (HsRat f new_ty))
+zonkExpr env (HsLit (HsRat f ty))
+  = zonkTcTypeToType ty	    `thenM` \ new_ty  ->
+    returnM (HsLit (HsRat f new_ty))
 
-zonkExpr (HsLit (HsLitLit lit ty))
-  = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
-    returnNF_Tc (HsLit (HsLitLit lit new_ty))
+zonkExpr env (HsLit (HsLitLit lit ty))
+  = zonkTcTypeToType ty	    `thenM` \ new_ty  ->
+    returnM (HsLit (HsLitLit lit new_ty))
 
-zonkExpr (HsLit lit)
-  = returnNF_Tc (HsLit lit)
+zonkExpr env (HsLit lit)
+  = returnM (HsLit lit)
 
 -- HsOverLit doesn't appear in typechecker output
 
-zonkExpr (HsLam match)
-  = zonkMatch match	`thenNF_Tc` \ new_match ->
-    returnNF_Tc (HsLam new_match)
+zonkExpr env (HsLam match)
+  = zonkMatch env match	`thenM` \ new_match ->
+    returnM (HsLam new_match)
 
-zonkExpr (HsApp e1 e2)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (HsApp new_e1 new_e2)
+zonkExpr env (HsApp e1 e2)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    returnM (HsApp new_e1 new_e2)
 
-zonkExpr (OpApp e1 op fixity e2)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr op	`thenNF_Tc` \ new_op ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (OpApp new_e1 new_op fixity new_e2)
+zonkExpr env (HsBracketOut body bs) 
+  = mappM zonk_b bs	`thenM` \ bs' ->
+    returnM (HsBracketOut body bs')
+  where
+    zonk_b (n,e) = zonkExpr env e	`thenM` \ e' ->
+		   returnM (n,e')
 
-zonkExpr (NegApp _ _) = panic "zonkExpr: NegApp"
-zonkExpr (HsPar _)    = panic "zonkExpr: HsPar"
+zonkExpr env (HsSplice n e) = WARN( True, ppr e )	-- Should not happen
+			      returnM (HsSplice n e)
 
-zonkExpr (SectionL expr op)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkExpr op		`thenNF_Tc` \ new_op ->
-    returnNF_Tc (SectionL new_expr new_op)
+zonkExpr env (OpApp e1 op fixity e2)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env op	`thenM` \ new_op ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    returnM (OpApp new_e1 new_op fixity new_e2)
 
-zonkExpr (SectionR op expr)
-  = zonkExpr op		`thenNF_Tc` \ new_op ->
-    zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (SectionR new_op new_expr)
+zonkExpr env (NegApp _ _) = panic "zonkExpr env: NegApp"
 
-zonkExpr (HsCase expr ms src_loc)
-  = zonkExpr expr    	    `thenNF_Tc` \ new_expr ->
-    mapNF_Tc zonkMatch ms   `thenNF_Tc` \ new_ms ->
-    returnNF_Tc (HsCase new_expr new_ms src_loc)
+zonkExpr env (HsPar e)    
+  = zonkExpr env e	`thenM` \new_e ->
+    returnM (HsPar new_e)
 
-zonkExpr (HsIf e1 e2 e3 src_loc)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    zonkExpr e3	`thenNF_Tc` \ new_e3 ->
-    returnNF_Tc (HsIf new_e1 new_e2 new_e3 src_loc)
+zonkExpr env (SectionL expr op)
+  = zonkExpr env expr	`thenM` \ new_expr ->
+    zonkExpr env op		`thenM` \ new_op ->
+    returnM (SectionL new_expr new_op)
 
-zonkExpr (HsLet binds expr)
-  = zonkBinds binds		`thenNF_Tc` \ (new_binds, new_env) ->
-    tcSetEnv new_env		$
-    zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsLet new_binds new_expr)
+zonkExpr env (SectionR op expr)
+  = zonkExpr env op		`thenM` \ new_op ->
+    zonkExpr env expr		`thenM` \ new_expr ->
+    returnM (SectionR new_op new_expr)
 
-zonkExpr (HsWith expr binds is_with)
-  = zonkIPBinds binds				`thenNF_Tc` \ new_binds ->
-    tcExtendGlobalValEnv (map (ipNameName . fst) new_binds)	$
-    zonkExpr expr				`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsWith new_expr new_binds is_with)
+zonkExpr env (HsCase expr ms src_loc)
+  = zonkExpr env expr    	`thenM` \ new_expr ->
+    mappM (zonkMatch env) ms	`thenM` \ new_ms ->
+    returnM (HsCase new_expr new_ms src_loc)
+
+zonkExpr env (HsIf e1 e2 e3 src_loc)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    zonkExpr env e3	`thenM` \ new_e3 ->
+    returnM (HsIf new_e1 new_e2 new_e3 src_loc)
+
+zonkExpr env (HsLet binds expr)
+  = zonkBinds env binds		`thenM` \ (new_env, new_binds) ->
+    zonkExpr new_env expr	`thenM` \ new_expr ->
+    returnM (HsLet new_binds new_expr)
+
+zonkExpr env (HsWith expr binds is_with)
+  = mappM zonk_ip_bind binds	`thenM` \ new_binds ->
+    let
+	env1 = extendZonkEnv env (map (ipNameName . fst) new_binds)
+    in
+    zonkExpr env1 expr		`thenM` \ new_expr ->
+    returnM (HsWith new_expr new_binds is_with)
     where
-	zonkIPBinds = mapNF_Tc zonkIPBind
-	zonkIPBind (n, e)
-	    = mapIPNameTc zonkIdBndr n	`thenNF_Tc` \ n' ->
-	      zonkExpr e		`thenNF_Tc` \ e' ->
-	      returnNF_Tc (n', e')
+	zonk_ip_bind (n, e)
+	    = mapIPNameTc zonkIdBndr n	`thenM` \ n' ->
+	      zonkExpr env e		`thenM` \ e' ->
+	      returnM (n', e')
 
-zonkExpr (HsDo do_or_lc stmts ids ty src_loc)
-  = zonkStmts stmts 		`thenNF_Tc` \ new_stmts ->
-    zonkTcTypeToType ty		`thenNF_Tc` \ new_ty   ->
-    mapNF_Tc zonkIdOcc ids	`thenNF_Tc` \ new_ids ->
-    returnNF_Tc (HsDo do_or_lc new_stmts new_ids new_ty src_loc)
+zonkExpr env (HsDo do_or_lc stmts ids ty src_loc)
+  = zonkStmts env stmts 	`thenM` \ new_stmts ->
+    zonkTcTypeToType ty		`thenM` \ new_ty   ->
+    returnM (HsDo do_or_lc new_stmts 
+		      (zonkIdOccs env ids) 
+		      new_ty src_loc)
 
-zonkExpr (ExplicitList ty exprs)
-  = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->
-    mapNF_Tc zonkExpr exprs	`thenNF_Tc` \ new_exprs ->
-    returnNF_Tc (ExplicitList new_ty new_exprs)
+zonkExpr env (ExplicitList ty exprs)
+  = zonkTcTypeToType ty			`thenM` \ new_ty ->
+    mappM (zonkExpr env) exprs	`thenM` \ new_exprs ->
+    returnM (ExplicitList new_ty new_exprs)
 
-zonkExpr (ExplicitPArr ty exprs)
-  = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->
-    mapNF_Tc zonkExpr exprs	`thenNF_Tc` \ new_exprs ->
-    returnNF_Tc (ExplicitPArr new_ty new_exprs)
+zonkExpr env (ExplicitPArr ty exprs)
+  = zonkTcTypeToType ty			`thenM` \ new_ty ->
+    mappM (zonkExpr env) exprs	`thenM` \ new_exprs ->
+    returnM (ExplicitPArr new_ty new_exprs)
 
-zonkExpr (ExplicitTuple exprs boxed)
-  = mapNF_Tc zonkExpr exprs  	`thenNF_Tc` \ new_exprs ->
-    returnNF_Tc (ExplicitTuple new_exprs boxed)
+zonkExpr env (ExplicitTuple exprs boxed)
+  = mappM (zonkExpr env) exprs  	`thenM` \ new_exprs ->
+    returnM (ExplicitTuple new_exprs boxed)
 
-zonkExpr (RecordConOut data_con con_expr rbinds)
-  = zonkExpr con_expr	`thenNF_Tc` \ new_con_expr ->
-    zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordConOut data_con new_con_expr new_rbinds)
+zonkExpr env (RecordConOut data_con con_expr rbinds)
+  = zonkExpr env con_expr	`thenM` \ new_con_expr ->
+    zonkRbinds env rbinds	`thenM` \ new_rbinds ->
+    returnM (RecordConOut data_con new_con_expr new_rbinds)
 
-zonkExpr (RecordUpd _ _) = panic "zonkExpr:RecordUpd"
+zonkExpr env (RecordUpd _ _) = panic "zonkExpr env:RecordUpd"
 
-zonkExpr (RecordUpdOut expr in_ty out_ty rbinds)
-  = zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    zonkTcTypeToType in_ty	`thenNF_Tc` \ new_in_ty ->
-    zonkTcTypeToType out_ty	`thenNF_Tc` \ new_out_ty ->
-    zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordUpdOut new_expr new_in_ty new_out_ty new_rbinds)
+zonkExpr env (RecordUpdOut expr in_ty out_ty rbinds)
+  = zonkExpr env expr		`thenM` \ new_expr ->
+    zonkTcTypeToType in_ty	`thenM` \ new_in_ty ->
+    zonkTcTypeToType out_ty	`thenM` \ new_out_ty ->
+    zonkRbinds env rbinds	`thenM` \ new_rbinds ->
+    returnM (RecordUpdOut new_expr new_in_ty new_out_ty new_rbinds)
 
-zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
-zonkExpr (ArithSeqIn _)      = panic "zonkExpr:ArithSeqIn"
-zonkExpr (PArrSeqIn _)       = panic "zonkExpr:PArrSeqIn"
+zonkExpr env (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
+zonkExpr env (ArithSeqIn _)      = panic "zonkExpr env:ArithSeqIn"
+zonkExpr env (PArrSeqIn _)       = panic "zonkExpr env:PArrSeqIn"
 
-zonkExpr (ArithSeqOut expr info)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkArithSeq info	`thenNF_Tc` \ new_info ->
-    returnNF_Tc (ArithSeqOut new_expr new_info)
+zonkExpr env (ArithSeqOut expr info)
+  = zonkExpr env expr		`thenM` \ new_expr ->
+    zonkArithSeq env info	`thenM` \ new_info ->
+    returnM (ArithSeqOut new_expr new_info)
 
-zonkExpr (PArrSeqOut expr info)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkArithSeq info	`thenNF_Tc` \ new_info ->
-    returnNF_Tc (PArrSeqOut new_expr new_info)
+zonkExpr env (PArrSeqOut expr info)
+  = zonkExpr env expr		`thenM` \ new_expr ->
+    zonkArithSeq env info	`thenM` \ new_info ->
+    returnM (PArrSeqOut new_expr new_info)
 
-zonkExpr (HsCCall fun args may_gc is_casm result_ty)
-  = mapNF_Tc zonkExpr args 	`thenNF_Tc` \ new_args ->
-    zonkTcTypeToType result_ty	`thenNF_Tc` \ new_result_ty ->
-    returnNF_Tc (HsCCall fun new_args may_gc is_casm new_result_ty)
+zonkExpr env (HsCCall fun args may_gc is_casm result_ty)
+  = mappM (zonkExpr env) args	`thenM` \ new_args ->
+    zonkTcTypeToType result_ty		`thenM` \ new_result_ty ->
+    returnM (HsCCall fun new_args may_gc is_casm new_result_ty)
 
-zonkExpr (HsSCC lbl expr)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsSCC lbl new_expr)
+zonkExpr env (HsSCC lbl expr)
+  = zonkExpr env expr	`thenM` \ new_expr ->
+    returnM (HsSCC lbl new_expr)
 
-zonkExpr (TyLam tyvars expr)
-  = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
+zonkExpr env (TyLam tyvars expr)
+  = mappM zonkTcTyVarToTyVar tyvars	`thenM` \ new_tyvars ->
 	-- No need to extend tyvar env; see AbsBinds
 
-    zonkExpr expr			`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (TyLam new_tyvars new_expr)
+    zonkExpr env expr			`thenM` \ new_expr ->
+    returnM (TyLam new_tyvars new_expr)
 
-zonkExpr (TyApp expr tys)
-  = zonkExpr expr    	    		`thenNF_Tc` \ new_expr ->
-    mapNF_Tc zonkTcTypeToType tys	`thenNF_Tc` \ new_tys ->
-    returnNF_Tc (TyApp new_expr new_tys)
+zonkExpr env (TyApp expr tys)
+  = zonkExpr env expr    	    		`thenM` \ new_expr ->
+    mappM zonkTcTypeToType tys	`thenM` \ new_tys ->
+    returnM (TyApp new_expr new_tys)
 
-zonkExpr (DictLam dicts expr)
-  = mapNF_Tc zonkIdBndr dicts		`thenNF_Tc` \ new_dicts ->
-    tcExtendGlobalValEnv new_dicts	$
-    zonkExpr expr    	    		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (DictLam new_dicts new_expr)
+zonkExpr env (DictLam dicts expr)
+  = mappM zonkIdBndr dicts		`thenM` \ new_dicts ->
+    let
+	env1 = extendZonkEnv env new_dicts
+    in
+    zonkExpr env1 expr    	    		`thenM` \ new_expr ->
+    returnM (DictLam new_dicts new_expr)
 
-zonkExpr (DictApp expr dicts)
-  = zonkExpr expr    	    	`thenNF_Tc` \ new_expr ->
-    mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
-    returnNF_Tc (DictApp new_expr new_dicts)
-
-
-
--------------------------------------------------------------------------
-zonkArithSeq :: TcArithSeqInfo -> NF_TcM TypecheckedArithSeqInfo
-
-zonkArithSeq (From e)
-  = zonkExpr e		`thenNF_Tc` \ new_e ->
-    returnNF_Tc (From new_e)
-
-zonkArithSeq (FromThen e1 e2)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (FromThen new_e1 new_e2)
-
-zonkArithSeq (FromTo e1 e2)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (FromTo new_e1 new_e2)
-
-zonkArithSeq (FromThenTo e1 e2 e3)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    zonkExpr e3	`thenNF_Tc` \ new_e3 ->
-    returnNF_Tc (FromThenTo new_e1 new_e2 new_e3)
-
--------------------------------------------------------------------------
-zonkStmts :: [TcStmt]
-	  -> NF_TcM [TypecheckedStmt]
-
-zonkStmts [] = returnNF_Tc []
-
-zonkStmts (ParStmtOut bndrstmtss : stmts)
-  = mapNF_Tc (mapNF_Tc zonkId) bndrss	`thenNF_Tc` \ new_bndrss ->
-    let new_binders = concat new_bndrss in
-    mapNF_Tc zonkStmts stmtss		`thenNF_Tc` \ new_stmtss ->
-    tcExtendGlobalValEnv new_binders	$ 
-    zonkStmts stmts			`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
-  where (bndrss, stmtss) = unzip bndrstmtss
-
-zonkStmts (ResultStmt expr locn : stmts)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ResultStmt new_expr locn : new_stmts)
-
-zonkStmts (ExprStmt expr ty locn : stmts)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
-    zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ExprStmt new_expr new_ty locn : new_stmts)
-
-zonkStmts (LetStmt binds : stmts)
-  = zonkBinds binds		`thenNF_Tc` \ (new_binds, new_env) ->
-    tcSetEnv new_env		$
-    zonkStmts stmts		`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (LetStmt new_binds : new_stmts)
-
-zonkStmts (BindStmt pat expr locn : stmts)
-  = zonkExpr expr				`thenNF_Tc` \ new_expr ->
-    zonkPat pat					`thenNF_Tc` \ (new_pat, new_ids) ->
-    tcExtendGlobalValEnv (bagToList new_ids)	$ 
-    zonkStmts stmts				`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (BindStmt new_pat new_expr locn : new_stmts)
+zonkExpr env (DictApp expr dicts)
+  = zonkExpr env expr    	    	`thenM` \ new_expr ->
+    returnM (DictApp new_expr (zonkIdOccs env dicts))
 
 
 
 -------------------------------------------------------------------------
-zonkRbinds :: TcRecordBinds -> NF_TcM TypecheckedRecordBinds
+zonkArithSeq :: ZonkEnv -> TcArithSeqInfo -> TcM TypecheckedArithSeqInfo
 
-zonkRbinds rbinds
-  = mapNF_Tc zonk_rbind rbinds
+zonkArithSeq env (From e)
+  = zonkExpr env e		`thenM` \ new_e ->
+    returnM (From new_e)
+
+zonkArithSeq env (FromThen e1 e2)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    returnM (FromThen new_e1 new_e2)
+
+zonkArithSeq env (FromTo e1 e2)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    returnM (FromTo new_e1 new_e2)
+
+zonkArithSeq env (FromThenTo e1 e2 e3)
+  = zonkExpr env e1	`thenM` \ new_e1 ->
+    zonkExpr env e2	`thenM` \ new_e2 ->
+    zonkExpr env e3	`thenM` \ new_e3 ->
+    returnM (FromThenTo new_e1 new_e2 new_e3)
+
+-------------------------------------------------------------------------
+zonkStmts :: ZonkEnv -> [TcStmt] -> TcM [TypecheckedStmt]
+
+zonkStmts env [] = returnM []
+
+zonkStmts env (ParStmtOut bndrstmtss : stmts)
+  = mappM (mappM zonkId) bndrss	`thenM` \ new_bndrss ->
+    mappM (zonkStmts env) stmtss	`thenM` \ new_stmtss ->
+    let 
+	new_binders = concat new_bndrss
+	env1 = extendZonkEnv env new_binders
+    in
+    zonkStmts env1 stmts		`thenM` \ new_stmts ->
+    returnM (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
   where
-    zonk_rbind (field, expr, pun)
-      = zonkExpr expr		`thenNF_Tc` \ new_expr ->
-	zonkIdOcc field		`thenNF_Tc` \ new_field ->
-	returnNF_Tc (new_field, new_expr, pun)
+    (bndrss, stmtss) = unzip bndrstmtss
+
+zonkStmts env (ResultStmt expr locn : stmts)
+  = zonkExpr env expr	`thenM` \ new_expr ->
+    zonkStmts env stmts	`thenM` \ new_stmts ->
+    returnM (ResultStmt new_expr locn : new_stmts)
+
+zonkStmts env (ExprStmt expr ty locn : stmts)
+  = zonkExpr env expr	`thenM` \ new_expr ->
+    zonkTcTypeToType ty	`thenM` \ new_ty ->
+    zonkStmts env stmts	`thenM` \ new_stmts ->
+    returnM (ExprStmt new_expr new_ty locn : new_stmts)
+
+zonkStmts env (LetStmt binds : stmts)
+  = zonkBinds env binds		`thenM` \ (new_env, new_binds) ->
+    zonkStmts new_env stmts	`thenM` \ new_stmts ->
+    returnM (LetStmt new_binds : new_stmts)
+
+zonkStmts env (BindStmt pat expr locn : stmts)
+  = zonkExpr env expr			`thenM` \ new_expr ->
+    zonkPat env pat			`thenM` \ (new_pat, new_ids) ->
+    let
+	env1 = extendZonkEnv env (bagToList new_ids)
+    in
+    zonkStmts env1 stmts		`thenM` \ new_stmts ->
+    returnM (BindStmt new_pat new_expr locn : new_stmts)
+
+
 
 -------------------------------------------------------------------------
-mapIPNameTc :: (a -> NF_TcM b) -> IPName a -> NF_TcM (IPName b)
-mapIPNameTc f (Dupable n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Dupable r)
-mapIPNameTc f (Linear  n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Linear r)
+zonkRbinds :: ZonkEnv -> TcRecordBinds -> TcM TypecheckedRecordBinds
+
+zonkRbinds env rbinds
+  = mappM zonk_rbind rbinds
+  where
+    zonk_rbind (field, expr)
+      = zonkExpr env expr	`thenM` \ new_expr ->
+	returnM (zonkIdOcc env field, new_expr)
+
+-------------------------------------------------------------------------
+mapIPNameTc :: (a -> TcM b) -> IPName a -> TcM (IPName b)
+mapIPNameTc f (Dupable n) = f n  `thenM` \ r -> returnM (Dupable r)
+mapIPNameTc f (Linear  n) = f n  `thenM` \ r -> returnM (Linear r)
 \end{code}
 
 
@@ -653,97 +659,105 @@ mapIPNameTc f (Linear  n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Linear r)
 %************************************************************************
 
 \begin{code}
-zonkPat :: TcPat -> NF_TcM (TypecheckedPat, Bag Id)
+zonkPat :: ZonkEnv -> TcPat -> TcM (TypecheckedPat, Bag Id)
 
-zonkPat (WildPat ty)
-  = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty ->
-    returnNF_Tc (WildPat new_ty, emptyBag)
+zonkPat env (ParPat p)
+  = zonkPat env p	`thenM` \ (new_p, ids) ->
+    returnM (ParPat new_p, ids)
 
-zonkPat (VarPat v)
-  = zonkIdBndr v	    `thenNF_Tc` \ new_v ->
-    returnNF_Tc (VarPat new_v, unitBag new_v)
+zonkPat env (WildPat ty)
+  = zonkTcTypeToType ty	    `thenM` \ new_ty ->
+    returnM (WildPat new_ty, emptyBag)
 
-zonkPat (LazyPat pat)
-  = zonkPat pat	    `thenNF_Tc` \ (new_pat, ids) ->
-    returnNF_Tc (LazyPat new_pat, ids)
+zonkPat env (VarPat v)
+  = zonkIdBndr v	    `thenM` \ new_v ->
+    returnM (VarPat new_v, unitBag new_v)
 
-zonkPat (AsPat n pat)
-  = zonkIdBndr n	    `thenNF_Tc` \ new_n ->
-    zonkPat pat	    `thenNF_Tc` \ (new_pat, ids) ->
-    returnNF_Tc (AsPat new_n new_pat, new_n `consBag` ids)
+zonkPat env (LazyPat pat)
+  = zonkPat env pat	    `thenM` \ (new_pat, ids) ->
+    returnM (LazyPat new_pat, ids)
 
-zonkPat (ListPat ty pats)
-  = zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
-    zonkPats pats		`thenNF_Tc` \ (new_pats, ids) ->
-    returnNF_Tc (ListPat new_ty new_pats, ids)
+zonkPat env (AsPat n pat)
+  = zonkIdBndr n	    `thenM` \ new_n ->
+    zonkPat env pat	    `thenM` \ (new_pat, ids) ->
+    returnM (AsPat new_n new_pat, new_n `consBag` ids)
 
-zonkPat (PArrPat ty pats)
-  = zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
-    zonkPats pats		`thenNF_Tc` \ (new_pats, ids) ->
-    returnNF_Tc (PArrPat new_ty new_pats, ids)
+zonkPat env (ListPat pats ty)
+  = zonkTcTypeToType ty	`thenM` \ new_ty ->
+    zonkPats env pats		`thenM` \ (new_pats, ids) ->
+    returnM (ListPat new_pats new_ty, ids)
 
-zonkPat (TuplePat pats boxed)
-  = zonkPats pats   		`thenNF_Tc` \ (new_pats, ids) ->
-    returnNF_Tc (TuplePat new_pats boxed, ids)
+zonkPat env (PArrPat pats ty)
+  = zonkTcTypeToType ty	`thenM` \ new_ty ->
+    zonkPats env pats		`thenM` \ (new_pats, ids) ->
+    returnM (PArrPat new_pats new_ty, ids)
 
-zonkPat (ConPat n ty tvs dicts pats)
-  = zonkTcTypeToType ty			`thenNF_Tc` \ new_ty ->
-    mapNF_Tc zonkTcTyVarToTyVar tvs	`thenNF_Tc` \ new_tvs ->
-    mapNF_Tc zonkIdBndr dicts		`thenNF_Tc` \ new_dicts ->
-    tcExtendGlobalValEnv new_dicts	$
-    zonkPats pats			`thenNF_Tc` \ (new_pats, ids) ->
-    returnNF_Tc (ConPat n new_ty new_tvs new_dicts new_pats, 
+zonkPat env (TuplePat pats boxed)
+  = zonkPats env pats   		`thenM` \ (new_pats, ids) ->
+    returnM (TuplePat new_pats boxed, ids)
+
+zonkPat env (ConPatOut n stuff ty tvs dicts)
+  = zonkTcTypeToType ty			`thenM` \ new_ty ->
+    mappM zonkTcTyVarToTyVar tvs	`thenM` \ new_tvs ->
+    mappM zonkIdBndr dicts		`thenM` \ new_dicts ->
+    let
+	env1 = extendZonkEnv env new_dicts
+    in
+    zonkConStuff env stuff		`thenM` \ (new_stuff, ids) ->
+    returnM (ConPatOut n new_stuff new_ty new_tvs new_dicts, 
 		 listToBag new_dicts `unionBags` ids)
 
-zonkPat (RecPat n ty tvs dicts rpats)
-  = zonkTcTypeToType ty			`thenNF_Tc` \ new_ty ->
-    mapNF_Tc zonkTcTyVarToTyVar tvs	`thenNF_Tc` \ new_tvs ->
-    mapNF_Tc zonkIdBndr dicts		`thenNF_Tc` \ new_dicts ->
-    tcExtendGlobalValEnv new_dicts	$
-    mapAndUnzipNF_Tc zonk_rpat rpats	`thenNF_Tc` \ (new_rpats, ids_s) ->
-    returnNF_Tc (RecPat n new_ty new_tvs new_dicts new_rpats, 
-		 listToBag new_dicts `unionBags` unionManyBags ids_s)
-  where
-    zonk_rpat (f, pat, pun)
-      = zonkPat pat		`thenNF_Tc` \ (new_pat, ids) ->
-	returnNF_Tc ((f, new_pat, pun), ids)
+zonkPat env (LitPat lit) = returnM (LitPat lit, emptyBag)
 
-zonkPat (LitPat lit ty)
-  = zonkTcTypeToType ty	        `thenNF_Tc` \ new_ty  ->
-    returnNF_Tc (LitPat lit new_ty, emptyBag)
+zonkPat env (SigPatOut pat ty expr)
+  = zonkPat env pat			`thenM` \ (new_pat, ids) ->
+    zonkTcTypeToType ty		`thenM` \ new_ty  ->
+    zonkExpr env expr		`thenM` \ new_expr ->
+    returnM (SigPatOut new_pat new_ty new_expr, ids)
 
-zonkPat (SigPat pat ty expr)
-  = zonkPat pat			`thenNF_Tc` \ (new_pat, ids) ->
-    zonkTcTypeToType ty		`thenNF_Tc` \ new_ty  ->
-    zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (SigPat new_pat new_ty new_expr, ids)
+zonkPat env (NPatOut lit ty expr)
+  = zonkTcTypeToType ty		`thenM` \ new_ty   ->
+    zonkExpr env expr		`thenM` \ new_expr ->
+    returnM (NPatOut lit new_ty new_expr, emptyBag)
 
-zonkPat (NPat lit ty expr)
-  = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty   ->
-    zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (NPat lit new_ty new_expr, emptyBag)
+zonkPat env (NPlusKPatOut n k e1 e2)
+  = zonkIdBndr n	        `thenM` \ new_n ->
+    zonkExpr env e1		        `thenM` \ new_e1 ->
+    zonkExpr env e2		        `thenM` \ new_e2 ->
+    returnM (NPlusKPatOut new_n k new_e1 new_e2, unitBag new_n)
 
-zonkPat (NPlusKPat n k ty e1 e2)
-  = zonkIdBndr n	        `thenNF_Tc` \ new_n ->
-    zonkTcTypeToType ty	        `thenNF_Tc` \ new_ty ->
-    zonkExpr e1		        `thenNF_Tc` \ new_e1 ->
-    zonkExpr e2		        `thenNF_Tc` \ new_e2 ->
-    returnNF_Tc (NPlusKPat new_n k new_ty new_e1 new_e2, unitBag new_n)
-
-zonkPat (DictPat ds ms)
-  = mapNF_Tc zonkIdBndr ds      `thenNF_Tc` \ new_ds ->
-    mapNF_Tc zonkIdBndr ms      `thenNF_Tc` \ new_ms ->
-    returnNF_Tc (DictPat new_ds new_ms,
+zonkPat env (DictPat ds ms)
+  = mappM zonkIdBndr ds      `thenM` \ new_ds ->
+    mappM zonkIdBndr ms      `thenM` \ new_ms ->
+    returnM (DictPat new_ds new_ms,
 		 listToBag new_ds `unionBags` listToBag new_ms)
 
+---------------------------
+zonkConStuff env (PrefixCon pats)
+  = zonkPats env pats		`thenM` \ (new_pats, ids) ->
+    returnM (PrefixCon new_pats, ids)
 
-zonkPats []
-  = returnNF_Tc ([], emptyBag)
+zonkConStuff env (InfixCon p1 p2)
+  = zonkPat env p1		`thenM` \ (new_p1, ids1) ->
+    zonkPat env p2		`thenM` \ (new_p2, ids2) ->
+    returnM (InfixCon new_p1 new_p2, ids1 `unionBags` ids2)
 
-zonkPats (pat:pats) 
-  = zonkPat pat		`thenNF_Tc` \ (pat',  ids1) ->
-    zonkPats pats	`thenNF_Tc` \ (pats', ids2) ->
-    returnNF_Tc (pat':pats', ids1 `unionBags` ids2)
+zonkConStuff env (RecCon rpats)
+  = mapAndUnzipM zonk_rpat rpats	`thenM` \ (new_rpats, ids_s) ->
+    returnM (RecCon new_rpats, unionManyBags ids_s)
+  where
+    zonk_rpat (f, pat)
+      = zonkPat env pat		`thenM` \ (new_pat, ids) ->
+	returnM ((f, new_pat), ids)
+
+---------------------------
+zonkPats env []
+  = returnM ([], emptyBag)
+
+zonkPats env (pat:pats) 
+  = zonkPat env pat	`thenM` \ (pat',  ids1) ->
+    zonkPats env pats	`thenM` \ (pats', ids2) ->
+    returnM (pat':pats', ids1 `unionBags` ids2)
 \end{code}
 
 %************************************************************************
@@ -754,35 +768,35 @@ zonkPats (pat:pats)
 
 
 \begin{code}
-zonkForeignExports :: [TcForeignExportDecl] -> NF_TcM [TypecheckedForeignDecl]
-zonkForeignExports ls = mapNF_Tc zonkForeignExport ls
+zonkForeignExports :: ZonkEnv -> [TcForeignDecl] -> TcM [TypecheckedForeignDecl]
+zonkForeignExports env ls = mappM (zonkForeignExport env) ls
 
-zonkForeignExport :: TcForeignExportDecl -> NF_TcM (TypecheckedForeignDecl)
-zonkForeignExport (ForeignExport i hs_ty spec isDeprec src_loc) =
-   zonkIdOcc i	`thenNF_Tc` \ i' ->
-   returnNF_Tc (ForeignExport i' undefined spec isDeprec src_loc)
+zonkForeignExport :: ZonkEnv -> TcForeignDecl -> TcM (TypecheckedForeignDecl)
+zonkForeignExport env (ForeignExport i hs_ty spec isDeprec src_loc) =
+   returnM (ForeignExport (zonkIdOcc env i) undefined spec isDeprec src_loc)
 \end{code}
 
 \begin{code}
-zonkRules :: [TcRuleDecl] -> NF_TcM [TypecheckedRuleDecl]
-zonkRules rs = mapNF_Tc zonkRule rs
+zonkRules :: ZonkEnv -> [TcRuleDecl] -> TcM [TypecheckedRuleDecl]
+zonkRules env rs = mappM (zonkRule env) rs
 
-zonkRule (HsRule name act vars lhs rhs loc)
-  = mapNF_Tc zonk_bndr vars				`thenNF_Tc` \ new_bndrs ->
-    tcExtendGlobalValEnv (filter isId new_bndrs)	$
+zonkRule env (HsRule name act vars lhs rhs loc)
+  = mappM zonk_bndr vars				`thenM` \ new_bndrs ->
+    let
+	env1 = extendZonkEnv env (filter isId new_bndrs)
 	-- Type variables don't need an envt
 	-- They are bound through the mutable mechanism
-    zonkExpr lhs					`thenNF_Tc` \ new_lhs ->
-    zonkExpr rhs					`thenNF_Tc` \ new_rhs ->
-    returnNF_Tc (HsRule name act (map RuleBndr new_bndrs) new_lhs new_rhs loc)
+    in
+    zonkExpr env1 lhs					`thenM` \ new_lhs ->
+    zonkExpr env1 rhs					`thenM` \ new_rhs ->
+    returnM (HsRule name act (map RuleBndr new_bndrs) new_lhs new_rhs loc)
 	-- I hate this map RuleBndr stuff
   where
    zonk_bndr (RuleBndr v) 
 	| isId v    = zonkIdBndr v
 	| otherwise = zonkTcTyVarToTyVar v
 
-zonkRule (IfaceRuleOut fun rule)
-  = zonkIdOcc fun	`thenNF_Tc` \ fun' ->
-    returnNF_Tc (IfaceRuleOut fun' rule)
+zonkRule env (IfaceRuleOut fun rule)
+  = returnM (IfaceRuleOut (zonkIdOcc env fun) rule)
 \end{code}
 

@@ -23,12 +23,12 @@ import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,
 			  isDataConId, isGlobalId, idArity,
 #ifdef OLD_STRICTNESS
-			  idDemandInfo,  idStrictness, idCprInfo,
+			  idDemandInfo,  idStrictness, idCprInfo, idName,
 #endif
 			  idNewStrictness, idNewStrictness_maybe,
 			  setIdNewStrictness, idNewDemandInfo,
 			  idNewDemandInfo_maybe,
-			  setIdNewDemandInfo, idName 
+			  setIdNewDemandInfo
 			)
 #ifdef OLD_STRICTNESS
 import IdInfo 		( newStrictnessFromOld, newDemand )
@@ -853,7 +853,7 @@ argDemand (Defer d) = lazyDmd
 argDemand (Eval ds) = Eval (mapDmds argDemand ds)
 argDemand (Box Bot) = evalDmd
 argDemand (Box d)   = box (argDemand d)
-argDemand Bot	    = Abs	-- Don't pass args that are consumed by bottom/err
+argDemand Bot	    = Abs	-- Don't pass args that are consumed (only) by bottom
 argDemand d	    = d
 \end{code}
 

@@ -4,7 +4,7 @@
 \section[TcRules]{Typechecking transformation rules}
 
 \begin{code}
-module TcRules ( tcIfaceRules, tcSourceRules ) where
+module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
@@ -12,69 +12,58 @@ import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
-import TcMonad
+import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( tcExtendLocalValEnv, tcLookupId )
-import Inst		( LIE, plusLIEs, emptyLIE, instToId )
+import TcEnv		( tcExtendLocalValEnv )
+import Inst		( instToId )
 import Id		( idType, mkLocalId )
 import Outputable
 \end{code}
 
 \begin{code}
-tcIfaceRules :: [RenamedRuleDecl] -> TcM [TypecheckedRuleDecl]
-tcIfaceRules decls = mapTc tcIfaceRule decls
+tcRules :: [RenamedRuleDecl] -> TcM [TypecheckedRuleDecl]
+tcRules decls = mappM tcRule decls
 
-tcIfaceRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
-  -- No zonking necessary!
-tcIfaceRule (IfaceRule name act vars fun args rhs src_loc)
-  = tcAddSrcLoc src_loc 		$
-    tcAddErrCtxt (ruleCtxt name)	$
-    tcVar fun				`thenTc` \ fun' ->
+tcRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
+tcRule (IfaceRule name act vars fun args rhs src_loc)
+  = addSrcLoc src_loc 		$
+    addErrCtxt (ruleCtxt name)	$
+    tcVar fun				`thenM` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
-    mapTc tcCoreExpr args		`thenTc` \ args' ->
-    tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
+    mappM tcCoreExpr args		`thenM` \ args' ->
+    tcCoreExpr rhs			`thenM` \ rhs' ->
+    returnM (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
 
-tcIfaceRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
-  = tcVar fun				`thenTc` \ fun' ->
-    returnTc (IfaceRuleOut fun' rule)   
+tcRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
+  = tcVar fun				`thenM` \ fun' ->
+    returnM (IfaceRuleOut fun' rule)   
 
-tcSourceRules :: [RenamedRuleDecl] -> TcM (LIE, [TypecheckedRuleDecl])
-tcSourceRules decls
-  = mapAndUnzipTc tcSourceRule decls	`thenTc` \ (lies, decls') ->
-    returnTc (plusLIEs lies, decls')
-
-tcSourceRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
-					-- if they are from the module being compiled
-  = tcLookupId fun			`thenTc` \ fun' ->
-    returnTc (emptyLIE, IfaceRuleOut fun' rule)   
-
-tcSourceRule (HsRule name act vars lhs rhs src_loc)
-  = tcAddSrcLoc src_loc 				$
-    tcAddErrCtxt (ruleCtxt name)			$
-    newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
+tcRule (HsRule name act vars lhs rhs src_loc)
+  = addSrcLoc src_loc 				$
+    addErrCtxt (ruleCtxt name)			$
+    newTyVarTy openTypeKind				`thenM` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
     tcAddScopedTyVars (collectRuleBndrSigTys vars) (
 
 		-- Ditto forall'd variables
-	mapNF_Tc new_id vars				`thenNF_Tc` \ ids ->
-	tcExtendLocalValEnv ids				$
+	mappM new_id vars			`thenM` \ ids ->
+	tcExtendLocalValEnv ids			$
 	
 		-- Now LHS and RHS
-	tcMonoExpr lhs rule_ty				`thenTc` \ (lhs', lhs_lie) ->
-	tcMonoExpr rhs rule_ty				`thenTc` \ (rhs', rhs_lie) ->
+	getLIE (tcMonoExpr lhs rule_ty)		`thenM` \ (lhs', lhs_lie) ->
+	getLIE (tcMonoExpr rhs rule_ty)		`thenM` \ (rhs', rhs_lie) ->
 	
-	returnTc (ids, lhs', rhs', lhs_lie, rhs_lie)
-    )						`thenTc` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
+	returnM (ids, lhs', rhs', lhs_lie, rhs_lie)
+    )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
 		-- Check that LHS has no overloading at all
-    tcSimplifyToDicts lhs_lie			`thenTc` \ (lhs_dicts, lhs_binds) ->
+    getLIE (tcSimplifyToDicts lhs_lie)	`thenM` \ (lhs_binds, lhs_dicts) ->
 
 	-- Gather the template variables and tyvars
     let
@@ -110,18 +99,18 @@ tcSourceRule (HsRule name act vars lhs rhs src_loc)
 	-- 
     tcSimplifyInferCheck (text "tcRule")
 			 forall_tvs
-			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs1, lie', rhs_binds) ->
+			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
 
-    returnTc (lie', HsRule	name act
-				(map RuleBndr (forall_tvs1 ++ tpl_ids))	-- yuk
-				(mkHsLet lhs_binds lhs')
-				(mkHsLet rhs_binds rhs')
-				src_loc)
+    returnM (HsRule name act
+		    (map RuleBndr (forall_tvs1 ++ tpl_ids))	-- yuk
+		    (mkHsLet lhs_binds lhs')
+		    (mkHsLet rhs_binds rhs')
+		    src_loc)
   where
-    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenNF_Tc` \ ty ->
-		          	     returnNF_Tc (mkLocalId var ty)
-    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenTc` \ ty ->
-				     returnNF_Tc (mkLocalId var ty)
+    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenM` \ ty ->
+		          	     returnM (mkLocalId var ty)
+    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenM` \ ty ->
+				     returnM (mkLocalId var ty)
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

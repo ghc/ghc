@@ -66,27 +66,29 @@ import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 import CmdLineOpts  (opt_Flatten)
 import Panic        (panic)
 import ErrUtils     (dumpIfSet_dyn)
-import UniqSupply   (UniqSupply, mkSplitUniqSupply)
-import CmdLineOpts  (DynFlag(..), DynFlags)
+import UniqSupply   (mkSplitUniqSupply)
+import CmdLineOpts  (DynFlag(..))
 import Literal      (Literal, literalType)
-import Var	    (Var(..),TyVar)
+import Var	    (Var(..))
 import DataCon	    (DataCon, dataConTag)
 import TypeRep      (Type(..))
 import Type         (isTypeKind)
-import HscTypes	    (HomeSymbolTable, PersistentCompilerState, ModDetails(..))
+import HscTypes	    (PersistentCompilerState, ModGuts(..), 
+		     ModGuts, HscEnv(..) )
 import CoreFVs	    (exprFreeVars)
 import CoreSyn	    (Expr(..), Bind(..), Alt(..), AltCon(..), Note(..),
-		     CoreBndr, CoreExpr, CoreBind, CoreAlt, mkLams, mkLets,
+		     CoreBndr, CoreExpr, CoreBind, mkLams, mkLets,
 		     mkApps, mkIntLitInt)  
 import PprCore      (pprCoreExpr)
 import CoreLint	    (showPass, endPass)
 
 import CoreUtils    (exprType, applyTypeToArg, mkPiType)
-import VarEnv       (IdEnv, mkVarEnv, zipVarEnv, extendVarEnv)
+import VarEnv       (zipVarEnv)
 import TysWiredIn   (mkTupleTy)
 import BasicTypes   (Boxity(..))
-import Outputable   (showSDoc, Outputable(..))
+import Outputable
 import FastString
+
 
 -- FIXME: fro debugging - remove this
 import TRACE    (trace)
@@ -100,15 +102,16 @@ import Monad        (liftM, foldM)
 -- entry point to the flattening transformation for the compiler driver when
 -- compiling a complete module (EXPORTED) 
 --
-flatten :: DynFlags 
+flatten :: HscEnv
 	-> PersistentCompilerState 
-	-> HomeSymbolTable
-	-> ModDetails			-- the module to be flattened
-	-> IO ModDetails
-flatten dflags pcs hst modDetails@(ModDetails {md_binds = binds}) 
-  | not opt_Flatten = return modDetails -- skip without -fflatten
+	-> ModGuts
+	-> IO ModGuts
+flatten hsc_env pcs mod_impl@(ModGuts {mg_binds = binds}) 
+  | not opt_Flatten = return mod_impl -- skip without -fflatten
   | otherwise       =
   do
+    let dflags = hsc_dflags hsc_env
+
     us <- mkSplitUniqSupply 'l'		-- 'l' as in fLattening
     --
     -- announce vectorisation
@@ -117,26 +120,27 @@ flatten dflags pcs hst modDetails@(ModDetails {md_binds = binds})
     --
     -- vectorise all toplevel bindings
     --
-    let binds' = runFlatten pcs hst us $ vectoriseTopLevelBinds binds
+    let binds' = runFlatten hsc_env pcs us $ vectoriseTopLevelBinds binds
     --
     -- and dump the result if requested
     --
     endPass dflags "Flattening [first phase: vectorisation]" 
 	    Opt_D_dump_vect binds'
-    return $ modDetails {md_binds = binds'}
+    return $ mod_impl {mg_binds = binds'}
 
 -- entry point to the flattening transformation for the compiler driver when
 -- compiling a single expression in interactive mode (EXPORTED) 
 --
-flattenExpr :: DynFlags 
+flattenExpr :: HscEnv
 	    -> PersistentCompilerState 
-	    -> HomeSymbolTable 
 	    -> CoreExpr			-- the expression to be flattened
 	    -> IO CoreExpr
-flattenExpr dflags pcs hst expr
+flattenExpr hsc_env pcs expr
   | not opt_Flatten = return expr       -- skip without -fflatten
   | otherwise       =
   do
+    let dflags = hsc_dflags hsc_env
+
     us <- mkSplitUniqSupply 'l'		-- 'l' as in fLattening
     --
     -- announce vectorisation
@@ -145,7 +149,7 @@ flattenExpr dflags pcs hst expr
     --
     -- vectorise the expression
     --
-    let expr' = fst . runFlatten pcs hst us $ vectorise expr
+    let expr' = fst . runFlatten hsc_env pcs us $ vectorise expr
     --
     -- and dump the result if requested
     --

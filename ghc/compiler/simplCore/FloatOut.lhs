@@ -18,7 +18,8 @@ import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
 import CoreLint		( showPass, endPass )
-import SetLevels	( setLevels, Level(..), ltMajLvl, ltLvl, isTopLvl )
+import SetLevels	( Level(..), LevelledExpr, LevelledBind,
+			  setLevels, ltMajLvl, ltLvl, isTopLvl )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
@@ -98,8 +99,6 @@ vwhich might usefully be separated to
 Well, maybe.  We don't do this at the moment.
 
 \begin{code}
-type LevelledExpr  = TaggedExpr Level
-type LevelledBind  = TaggedBind Level
 type FloatBind     = (Level, CoreBind)
 type FloatBinds    = [FloatBind]
 \end{code}
@@ -166,7 +165,7 @@ floatTopBind bind@(Rec _)
 floatBind :: LevelledBind
 	  -> (FloatStats, FloatBinds, CoreBind)
 
-floatBind (NonRec (name,level) rhs)
+floatBind (NonRec (TB name level) rhs)
   = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
     (fs, rhs_floats, NonRec name rhs') }
 
@@ -199,7 +198,7 @@ floatBind bind@(Rec pairs)
   where
     bind_level = getBindLevel bind
 
-    do_pair ((name, level), rhs)
+    do_pair (TB name level, rhs)
       = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
 	(fs, rhs_floats, (name, rhs'))
 	}
@@ -242,7 +241,8 @@ floatExpr lvl (App e a)
 floatExpr lvl lam@(Lam _ _)
   = let
 	(bndrs_w_lvls, body) = collectBinders lam
-	(bndrs, lvls)	     = unzip bndrs_w_lvls
+	bndrs		     = [b | TB b _ <- bndrs_w_lvls]
+	lvls		     = [l | TB b l <- bndrs_w_lvls]
 
 	-- For the all-tyvar case we are prepared to pull 
 	-- the lets out, to implement the float-out-of-big-lambda
@@ -309,7 +309,7 @@ floatExpr lvl (Let bind body)
   where
     bind_lvl = getBindLevel bind
 
-floatExpr lvl (Case scrut (case_bndr, case_lvl) alts)
+floatExpr lvl (Case scrut (TB case_bndr case_lvl) alts)
   = case floatExpr lvl scrut	of { (fse, fde, scrut') ->
     case floatList float_alt alts	of { (fsa, fda, alts')  ->
     (add_stats fse fsa, fda ++ fde, Case scrut' case_bndr alts')
@@ -319,7 +319,7 @@ floatExpr lvl (Case scrut (case_bndr, case_lvl) alts)
 	-- don't gratuitiously float bindings out of the RHSs
     float_alt (con, bs, rhs)
 	= case (floatRhs case_lvl rhs)	of { (fs, rhs_floats, rhs') ->
-	  (fs, rhs_floats, (con, map fst bs, rhs')) }
+	  (fs, rhs_floats, (con, [b | TB b _ <- bs], rhs')) }
 
 
 floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
@@ -369,8 +369,8 @@ add_to_stats (FlS a b c) floats
 %************************************************************************
 
 \begin{code}
-getBindLevel (NonRec (_, lvl) _)      = lvl
-getBindLevel (Rec (((_,lvl), _) : _)) = lvl
+getBindLevel (NonRec (TB _ lvl) _)      = lvl
+getBindLevel (Rec (((TB _ lvl), _) : _)) = lvl
 \end{code}
 
 \begin{code}

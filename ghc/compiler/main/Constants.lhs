@@ -89,7 +89,8 @@ module Constants (
 All pretty arbitrary:
 
 \begin{code}
-mAX_TUPLE_SIZE = (37 :: Int)
+mAX_TUPLE_SIZE = (62 :: Int)	-- Should really match the number
+				-- of decls in Data.Tuple
 mAX_CONTEXT_REDUCTION_DEPTH = (20 :: Int)
 \end{code}
 

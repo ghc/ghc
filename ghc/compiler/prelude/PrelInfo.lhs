@@ -13,12 +13,6 @@ module PrelInfo (
 	ghcPrimExports,
 	cCallableClassDecl, cReturnableClassDecl, assertDecl,
 	
-	-- Primop RdrNames
-	eqH_Char_RDR,   ltH_Char_RDR,   eqH_Word_RDR,  ltH_Word_RDR, 
-	eqH_Addr_RDR,   ltH_Addr_RDR,   eqH_Float_RDR, ltH_Float_RDR, 
-	eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR,   ltH_Int_RDR,
-	geH_RDR, leH_RDR, minusH_RDR, tagToEnumH_RDR, 
-
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
 
@@ -32,13 +26,13 @@ module PrelInfo (
 
 import PrelNames	-- Prelude module names
 
-import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName, primOpOcc )
+import PrimOp		( allThePrimOps, primOpOcc )
 import DataCon		( DataCon )
 import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
-import Name		( nameOccName, nameRdrName )
-import RdrName		( mkRdrUnqual )
+import Name		( nameOccName )
+import RdrName		( mkRdrUnqual, getRdrName )
 import HsSyn		( HsTyVarBndr(..), TyClDecl(..), HsType(..) )
 import OccName		( mkVarOcc )
 import TysPrim		( primTyCons )
@@ -100,7 +94,6 @@ wired-in Ids, and the CCallable & CReturnable classes.
 ghcPrimExports :: [RdrAvailInfo]
  = AvailTC cCallableOcc [ cCallableOcc ] :
    AvailTC cReturnableOcc [ cReturnableOcc ] :
-   Avail (nameOccName assertName) :	-- doesn't have an Id
    map (Avail . nameOccName . idName) ghcPrimIds ++
    map (Avail . primOpOcc) allThePrimOps ++
    [ AvailTC occ [occ] |
@@ -112,7 +105,7 @@ ghcPrimExports :: [RdrAvailInfo]
 
 assertDecl
   = IfaceSig { 
- 	tcdName = nameRdrName assertName,
+ 	tcdName = getRdrName assertName,
 	tcdType = HsForAllTy (Just [liftedAlpha]) [] (HsTyVar alpha),
 	tcdIdInfo = [],
 	tcdLoc = noSrcLoc
@@ -120,7 +113,7 @@ assertDecl
 
 cCallableClassDecl
   = mkClassDecl
-    ([], nameRdrName cCallableClassName, [openAlpha])
+    ([], getRdrName cCallableClassName, [openAlpha])
     [] -- no fds
     [] -- no sigs
     Nothing -- no mbinds
@@ -128,7 +121,7 @@ cCallableClassDecl
 
 cReturnableClassDecl
   = mkClassDecl
-    ([], nameRdrName cReturnableClassName, [openAlpha])
+    ([], getRdrName cReturnableClassName, [openAlpha])
     [] -- no fds
     [] -- no sigs
     Nothing -- no mbinds
@@ -137,35 +130,6 @@ cReturnableClassDecl
 alpha = mkRdrUnqual (mkVarOcc FSLIT("a"))
 openAlpha = IfaceTyVar alpha openTypeKind
 liftedAlpha = IfaceTyVar alpha liftedTypeKind
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{RdrNames for the primops}
-%*									*
-%************************************************************************
-
-These can't be in PrelNames, because we get the RdrName from the PrimOp,
-which is above PrelNames in the module hierarchy.
-
-\begin{code}
-eqH_Char_RDR	= primOpRdrName CharEqOp
-ltH_Char_RDR	= primOpRdrName CharLtOp
-eqH_Word_RDR	= primOpRdrName WordEqOp
-ltH_Word_RDR	= primOpRdrName WordLtOp
-eqH_Addr_RDR	= primOpRdrName AddrEqOp
-ltH_Addr_RDR	= primOpRdrName AddrLtOp
-eqH_Float_RDR	= primOpRdrName FloatEqOp
-ltH_Float_RDR	= primOpRdrName FloatLtOp
-eqH_Double_RDR	= primOpRdrName DoubleEqOp
-ltH_Double_RDR	= primOpRdrName DoubleLtOp
-eqH_Int_RDR	= primOpRdrName IntEqOp
-ltH_Int_RDR	= primOpRdrName IntLtOp
-geH_RDR		= primOpRdrName IntGeOp
-leH_RDR		= primOpRdrName IntLeOp
-minusH_RDR	= primOpRdrName IntSubOp
-
-tagToEnumH_RDR	= primOpRdrName TagToEnumOp
 \end{code}
 
 

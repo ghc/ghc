@@ -14,14 +14,14 @@ module DsBinds ( dsMonoBinds, AutoScc(..) ) where
 
 
 import {-# SOURCE #-}	DsExpr( dsExpr )
+import DsMonad
+import DsGRHSs		( dsGuarded )
+import DsUtils
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( exprType, mkInlineMe, mkSCC )
 import TcHsSyn		( TypecheckedMonoBinds )
-import DsMonad
-import DsGRHSs		( dsGuarded )
-import DsUtils
 import Match		( matchWrapper )
 
 import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )

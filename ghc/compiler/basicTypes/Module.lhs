@@ -41,8 +41,8 @@ module Module
     (
       Module, 		   	-- Abstract, instance of Eq, Ord, Outputable
 
-    , PackageName		-- = FastString; instance of Outputable, Uniquable
-    , preludePackage		-- :: PackageName
+    , ModLocation(..),
+    , showModMsg
 
     , ModuleName
     , pprModuleName		-- :: ModuleName -> SDoc
@@ -59,7 +59,6 @@ module Module
     , mkVanillaModule	        -- :: ModuleName -> Module
     , isVanillaModule		-- :: Module -> Bool
     , mkPrelModule		-- :: UserString -> Module
-    , mkModule			-- :: ModuleName -> PackageName -> Module
     , mkHomeModule		-- :: ModuleName -> Module
     , isHomeModule		-- :: Module -> Bool
     , mkPackageModule		-- :: ModuleName -> Module
@@ -70,15 +69,13 @@ module Module
 
     , pprModule,
  
-	-- Where to find a .hi file
-    , WhereFrom(..)
-
     , ModuleEnv,
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
     , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
     , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
     , moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
-    , lookupModuleEnvByName, extendModuleEnv_C
+    , extendModuleEnv_C
+    , lookupModuleEnvByName, extendModuleEnvByName, unitModuleEnvByName
 
     , ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
 
@@ -87,9 +84,11 @@ module Module
 #include "HsVersions.h"
 import OccName
 import Outputable
+import Packages		( PackageName, preludePackage )
 import CmdLineOpts	( opt_InPackage )
 import FastString	( FastString )
 import Unique		( Uniquable(..) )
+import Maybes		( expectJust )
 import UniqFM
 import UniqSet
 import Binary
@@ -134,11 +133,6 @@ data PackageInfo
 		-- Later on (in RnEnv.newTopBinder) we'll update the cache
 		-- to have the right PackageName
 
-type PackageName = FastString		-- No encoding at all
-
-preludePackage :: PackageName
-preludePackage = FSLIT("base")
-
 packageInfoPackage :: PackageInfo -> PackageName
 packageInfoPackage ThisPackage        = opt_InPackage
 packageInfoPackage DunnoYet	      = FSLIT("<?>")
@@ -152,27 +146,43 @@ instance Outputable PackageInfo where
 
 %************************************************************************
 %*									*
-\subsection{Where from}
+\subsection{Module locations}
 %*									*
 %************************************************************************
 
-The @WhereFrom@ type controls where the renamer looks for an interface file
-
 \begin{code}
-data WhereFrom = ImportByUser		-- Ordinary user import: look for M.hi
-	       | ImportByUserSource	-- User {- SOURCE -}: look for M.hi-boot
-	       | ImportBySystem		-- Non user import.  Look for M.hi if M is in
-					-- the module this module depends on, or is a system-ish module; 
-					-- M.hi-boot otherwise
-	       | ImportByCmdLine        -- The user typed a qualified name at
-					-- the GHCi prompt, try to demand-load
-					-- the interface.
+data ModLocation
+   = ModLocation {
+        ml_hs_file   :: Maybe FilePath,
+        ml_hspp_file :: Maybe FilePath,  -- path of preprocessed source
+        ml_hi_file   :: FilePath,
+        ml_obj_file  :: Maybe FilePath
+     }
+     deriving Show
 
-instance Outputable WhereFrom where
-  ppr ImportByUser       = empty
-  ppr ImportByUserSource = ptext SLIT("{- SOURCE -}")
-  ppr ImportBySystem     = ptext SLIT("{- SYSTEM IMPORT -}")
+instance Outputable ModLocation where
+   ppr = text . show
+
+-- Rather a gruesome function to have in Module
+
+showModMsg :: Bool -> Module -> ModLocation -> String
+showModMsg use_object mod location =
+    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
+    ++" ( " ++ expectJust "showModMsg" (ml_hs_file location) ++ ", "
+    ++ (if use_object
+	  then expectJust "showModMsg" (ml_obj_file location)
+	  else "interpreted")
+    ++ " )"
+ where mod_str = moduleUserString mod
 \end{code}
+
+For a module in another package, the hs_file and obj_file
+components of ModLocation are undefined.  
+
+The locations specified by a ModLocation may or may not
+correspond to actual files yet: for example, even if the object
+file doesn't exist, the ModLocation still contains the path to
+where the object file will reside if/when it is created.
 
 
 %************************************************************************
@@ -255,21 +265,22 @@ pprModule :: Module -> SDoc
 pprModule (Module mod p) = getPprStyle $ \ sty ->
 			   if debugStyle sty then
 				-- Print the package too
-				ppr p <> dot <> pprModuleName mod
+				-- Don't use '.' because it gets confused
+				-- 	with module names
+				brackets (ppr p) <> pprModuleName mod
 			   else
 				pprModuleName mod
 \end{code}
 
 
 \begin{code}
-mkModule :: ModuleName	-- Name of the module
-	 -> PackageName
-	 -> Module
-mkModule mod_nm pack_name
+mkPrelModule :: ModuleName -> Module
+mkPrelModule mod_nm
   = Module mod_nm pack_info
   where
-    pack_info | pack_name == opt_InPackage = ThisPackage
-	      | otherwise		   = AnotherPackage
+    pack_info
+      | opt_InPackage == preludePackage = ThisPackage
+      | otherwise			= AnotherPackage
 
 mkHomeModule :: ModuleName -> Module
 mkHomeModule mod_nm = Module mod_nm ThisPackage
@@ -290,9 +301,6 @@ mkVanillaModule name = Module name DunnoYet
 isVanillaModule :: Module -> Bool
 isVanillaModule (Module nm DunnoYet) = True
 isVanillaModule _                       = False
-
-mkPrelModule :: ModuleName -> Module
-mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = unpackFS fs
@@ -318,6 +326,9 @@ printModulePrefix _                       = True
 
 \begin{code}
 type ModuleEnv elt = UniqFM elt
+-- A ModuleName and Module have the same Unique,
+-- so both will work as keys.  
+-- The 'ByName' variants work on ModuleNames
 
 emptyModuleEnv       :: ModuleEnv a
 mkModuleEnv          :: [(Module, a)] -> ModuleEnv a
@@ -335,13 +346,18 @@ moduleEnvElts        :: ModuleEnv a -> [a]
                   
 isEmptyModuleEnv     :: ModuleEnv a -> Bool
 lookupModuleEnv      :: ModuleEnv a -> Module     -> Maybe a
-lookupModuleEnvByName:: ModuleEnv a -> ModuleName -> Maybe a
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
 elemModuleEnv        :: Module -> ModuleEnv a -> Bool
 foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
 
+-- The ByName variants
+lookupModuleEnvByName :: ModuleEnv a -> ModuleName -> Maybe a
+unitModuleEnvByName   :: ModuleName -> a -> ModuleEnv a
+extendModuleEnvByName :: ModuleEnv a -> ModuleName -> a -> ModuleEnv a
+
 elemModuleEnv       = elemUFM
 extendModuleEnv     = addToUFM
+extendModuleEnvByName = addToUFM
 extendModuleEnv_C   = addToUFM_C
 extendModuleEnvList = addListToUFM
 plusModuleEnv_C     = plusUFM_C
@@ -356,6 +372,7 @@ mkModuleEnv         = listToUFM
 emptyModuleEnv      = emptyUFM
 moduleEnvElts       = eltsUFM
 unitModuleEnv       = unitUFM
+unitModuleEnvByName = unitUFM
 isEmptyModuleEnv    = isNullUFM
 foldModuleEnv       = foldUFM
 \end{code}

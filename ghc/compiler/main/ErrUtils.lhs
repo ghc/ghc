@@ -5,7 +5,8 @@
 
 \begin{code}
 module ErrUtils (
-	ErrMsg, WarnMsg, Message, Messages, errorsFound, warningsFound,
+	ErrMsg, WarnMsg, Message, 
+	Messages, errorsFound, warningsFound, emptyMessages,
 
 	addShortErrLocLine, addShortWarnLocLine,
 	addErrLocHdrLine, addWarnLocHdrLine, dontAddErrLoc,
@@ -15,16 +16,17 @@ module ErrUtils (
 	printError,
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
-	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, 
+	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,
 	showPass
     ) where
 
 #include "HsVersions.h"
 
-import Bag		( Bag, bagToList, isEmptyBag )
+import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc, isGoodSrcLoc )
 import Util		( sortLt )
 import Outputable
+import qualified Pretty
 import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 
 import List             ( replicate )
@@ -33,42 +35,53 @@ import IO		( hPutStr, hPutStrLn, stderr, stdout )
 \end{code}
 
 \begin{code}
-type MsgWithLoc = (SrcLoc, SDoc)
+type MsgWithLoc = (SrcLoc, Pretty.Doc)
+	-- The SrcLoc is used for sorting errors into line-number order
+	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
+	-- whether to qualify an External Name) at the error occurrence
 
 type ErrMsg  = MsgWithLoc
 type WarnMsg = MsgWithLoc
 type Message = SDoc
 
-addShortErrLocLine  :: SrcLoc -> Message -> ErrMsg
-addErrLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
-addWarnLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
-addShortWarnLocLine :: SrcLoc -> Message -> WarnMsg
+addShortErrLocLine  :: SrcLoc -> PrintUnqualified -> Message -> ErrMsg
+addShortWarnLocLine :: SrcLoc -> PrintUnqualified -> Message -> WarnMsg
+	-- Used heavily by renamer/typechecker
+	-- Be refined about qualification, return an ErrMsg
 
-addShortErrLocLine locn rest_of_err_msg
-  | isGoodSrcLoc locn = (locn, hang (ppr locn <> colon) 4 
-				    rest_of_err_msg)
-  | otherwise	      = (locn, rest_of_err_msg)
+addErrLocHdrLine    :: SrcLoc -> Message -> Message -> Message
+addWarnLocHdrLine   :: SrcLoc -> Message -> Message -> Message
+	-- Used by Lint and other system stuff
+	-- Always print qualified, return a Message
 
-addErrLocHdrLine locn hdr rest_of_err_msg
-  = ( locn
-    , hang (ppr locn <> colon<+> hdr) 
-         4 rest_of_err_msg
-    )
+addShortErrLocLine locn print_unqual msg
+  = (locn, doc (mkErrStyle print_unqual))
+  where
+    doc = mkErrDoc locn msg
 
-addWarnLocHdrLine locn hdr rest_of_err_msg
-  = ( locn
-    , hang (ppr locn <> colon <+> ptext SLIT("Warning:") <+> hdr) 
-         4 (rest_of_err_msg)
-    )
+addShortWarnLocLine locn print_unqual msg
+  = (locn, doc (mkErrStyle print_unqual))
+  where
+    doc = mkWarnDoc locn msg
 
-addShortWarnLocLine locn rest_of_err_msg
-  | isGoodSrcLoc locn = (locn, hang (ppr locn <> colon) 4 
-				    (ptext SLIT("Warning:") <+> rest_of_err_msg))
-  | otherwise	      = (locn, rest_of_err_msg)
+addErrLocHdrLine locn hdr msg
+  = mkErrDoc locn (hdr $$ msg)
+
+addWarnLocHdrLine locn hdr msg
+  = mkWarnDoc locn (hdr $$ msg)
 
 dontAddErrLoc :: Message -> ErrMsg
-dontAddErrLoc msg = (noSrcLoc, msg)
+dontAddErrLoc msg = (noSrcLoc, msg defaultErrStyle)
 
+mkErrDoc locn msg
+  | isGoodSrcLoc locn = hang (ppr locn <> colon) 4 msg
+  | otherwise	      = msg
+	
+mkWarnDoc locn msg 
+  | isGoodSrcLoc locn = hang (ppr locn <> colon) 4 warn_msg
+  | otherwise	      = warn_msg
+  where
+    warn_msg = ptext SLIT("Warning:") <+> msg
 \end{code}
 
 \begin{code}
@@ -79,32 +92,35 @@ printError str = hPutStrLn stderr str
 \begin{code}
 type Messages = (Bag WarnMsg, Bag ErrMsg)
 
+emptyMessages :: Messages
+emptyMessages = (emptyBag, emptyBag)
+
 errorsFound :: Messages -> Bool
 errorsFound (warns, errs) = not (isEmptyBag errs)
 
 warningsFound :: Messages -> Bool
 warningsFound (warns, errs) = not (isEmptyBag warns)
 
-printErrorsAndWarnings :: PrintUnqualified -> Messages -> IO ()
+printErrorsAndWarnings :: Messages -> IO ()
 	-- Don't print any warnings if there are errors
-printErrorsAndWarnings unqual (warns, errs)
+printErrorsAndWarnings (warns, errs)
   | no_errs && no_warns  = return ()
-  | no_errs		 = printErrs unqual (pprBagOfWarnings warns)
-  | otherwise		 = printErrs unqual (pprBagOfErrors   errs)
+  | no_errs		 = printErrs (pprBagOfWarnings warns)
+  | otherwise		 = printErrs (pprBagOfErrors   errs)
   where
     no_warns = isEmptyBag warns
     no_errs  = isEmptyBag errs
 
-pprBagOfErrors :: Bag ErrMsg -> SDoc
+pprBagOfErrors :: Bag ErrMsg -> Pretty.Doc
 pprBagOfErrors bag_of_errors
-  = vcat [text "" $$ p | (_,p) <- sorted_errs ]
+  = Pretty.vcat [Pretty.text "" Pretty.$$ p | (_,p) <- sorted_errs ]
     where
       bag_ls	  = bagToList bag_of_errors
       sorted_errs = sortLt occ'ed_before bag_ls
 
       occ'ed_before (a,_) (b,_) = LT == compare a b
 
-pprBagOfWarnings :: Bag WarnMsg -> SDoc
+pprBagOfWarnings :: Bag WarnMsg -> Pretty.Doc
 pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
 \end{code}
 
@@ -135,21 +151,21 @@ showPass dflags what
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag   = return ()
-  | otherwise  = printDump (dump hdr doc)
+  | otherwise  = printDump (mkDumpDoc hdr doc)
 
 dumpIfSet_core :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_core dflags flag hdr doc
   | dopt flag dflags
 	|| verbosity dflags >= 4
-	|| dopt Opt_D_verbose_core2core dflags 	= printDump (dump hdr doc)
+	|| dopt Opt_D_verbose_core2core dflags 	= printDump (mkDumpDoc hdr doc)
   | otherwise                                   = return ()
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   | dopt flag dflags || verbosity dflags >= 4 
   = if   flag `elem` [Opt_D_dump_stix, Opt_D_dump_asm]
-    then printForC stdout (dump hdr doc)
-    else printDump (dump hdr doc)
+    then printForC stdout (mkDumpDoc hdr doc)
+    else printDump (mkDumpDoc hdr doc)
   | otherwise
   = return ()
 
@@ -157,10 +173,10 @@ dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
 dumpIfSet_dyn_or dflags flags hdr doc
   | or [dopt flag dflags | flag <- flags]
   || verbosity dflags >= 4 
-  = printDump (dump hdr doc)
+  = printDump (mkDumpDoc hdr doc)
   | otherwise = return ()
 
-dump hdr doc 
+mkDumpDoc hdr doc 
    = vcat [text "", 
 	   line <+> text hdr <+> line,
 	   doc,

@@ -7,7 +7,7 @@
 module CoreSyn (
 	Expr(..), Alt, Bind(..), AltCon(..), Arg, Note(..),
 	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
-	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
+	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..),
 
 	mkLets, mkLams, 
 	mkApps, mkTyApps, mkValApps, mkVarApps,
@@ -343,12 +343,18 @@ type CoreAlt  = Alt  CoreBndr
 Binders are ``tagged'' with a \tr{t}:
 
 \begin{code}
-type Tagged t = (CoreBndr, t)
+data TaggedBndr t = TB CoreBndr t	-- TB for "tagged binder"
 
-type TaggedBind t = Bind (Tagged t)
-type TaggedExpr t = Expr (Tagged t)
-type TaggedArg  t = Arg  (Tagged t)
-type TaggedAlt  t = Alt  (Tagged t)
+type TaggedBind t = Bind (TaggedBndr t)
+type TaggedExpr t = Expr (TaggedBndr t)
+type TaggedArg  t = Arg  (TaggedBndr t)
+type TaggedAlt  t = Alt  (TaggedBndr t)
+
+instance Outputable b => Outputable (TaggedBndr b) where
+  ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
+
+instance Outputable b => OutputableBndr (TaggedBndr b) where
+  pprBndr _ b = ppr b	-- Simple
 \end{code}
 
 

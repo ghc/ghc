@@ -27,7 +27,7 @@ import NameSet
 import VarSet
 import Var		( Var, isId, isLocalVar, varName )
 import Type		( tyVarsOfType )
-import TcType		( namesOfType )
+import TcType		( tyClsNamesOfType )
 import Util		( mapAndUnzip )
 import Outputable
 \end{code}
@@ -164,9 +164,9 @@ ruleLhsFreeNames (fn, Rule _ _ tpl_vars tpl_args rhs)
   = addOneToNameSet (exprsFreeNames tpl_args `del_binders` tpl_vars) (varName fn)
 
 exprFreeNames :: CoreExpr -> NameSet
-exprFreeNames (Var v) 	= unitNameSet (varName v)
-exprFreeNames (Lit _) 	= emptyNameSet
-exprFreeNames (Type ty) = namesOfType ty
+exprFreeNames (Var v) 	  = unitNameSet (varName v)
+exprFreeNames (Lit _) 	  = emptyNameSet
+exprFreeNames (Type ty)   = tyClsNamesOfType ty	-- Don't need free tyvars
 exprFreeNames (App e1 e2) = exprFreeNames e1 `unionNameSets` exprFreeNames e2
 exprFreeNames (Lam v e)   = exprFreeNames e `delFromNameSet` varName v
 exprFreeNames (Note n e)  = exprFreeNames e

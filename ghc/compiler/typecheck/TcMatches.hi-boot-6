@@ -3,12 +3,12 @@ module TcMatches where
 tcGRHSs ::  HsExpr.HsMatchContext Name.Name
 	      -> RnHsSyn.RenamedGRHSs
 	      -> TcType.TcType
-	      -> TcMonad.TcM (TcHsSyn.TcGRHSs, Inst.LIE)
+	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs
 
 tcMatchesFun :: 
 		[(Name.Name,Var.Id)]
 	     ->	Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
-	     -> TcMonad.TcM ([TcHsSyn.TcMatch], Inst.LIE)
+	     -> TcRnTypes.TcM [TcHsSyn.TcMatch]
 

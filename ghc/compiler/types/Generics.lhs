@@ -5,7 +5,7 @@ module Generics ( mkTyConGenInfo, mkGenericRhs,
 
 
 import RnHsSyn		( RenamedHsExpr )
-import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch, placeHolderType )
+import HsSyn		( HsExpr(..), Pat(..), mkSimpleMatch, placeHolderType )
 
 import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  mkTyVarTys, mkForAllTys, mkTyConApp, 
@@ -35,7 +35,7 @@ import IdInfo           ( noCafIdInfo, setUnfoldingInfo, setArityInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Maybe		( isNothing )
-import SrcLoc		( builtinSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Unique		( Unique, builtinUniques, mkBuiltinUnique )
 import Util             ( takeList, dropList )
 import Outputable 
@@ -541,8 +541,8 @@ bimapApp env (Just (tycon, ty_args))
 -------------------
 -- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
 bimapArrow [ep1, ep2]
-  = EP { fromEP = mk_hs_lam [VarPatIn g1, VarPatIn g2] from_body, 
-	 toEP   = mk_hs_lam [VarPatIn g1, VarPatIn g2] to_body }
+  = EP { fromEP = mk_hs_lam [VarPat g1, VarPat g2] from_body, 
+	 toEP   = mk_hs_lam [VarPat g1, VarPat g2] to_body }
   where
     from_body = fromEP ep2 `HsApp` (HsPar $ HsVar g1 `HsApp` (HsPar $ toEP   ep1 `HsApp` HsVar g2))
     to_body   = toEP   ep2 `HsApp` (HsPar $ HsVar g1 `HsApp` (HsPar $ fromEP ep1 `HsApp` HsVar g2))
@@ -553,7 +553,7 @@ bimapTuple eps
 	 toEP   = mk_hs_lam [tuple_pat] to_body }
   where
     names	= takeList eps genericNames
-    tuple_pat	= TuplePatIn (map VarPatIn names) Boxed
+    tuple_pat	= TuplePat (map VarPat names) Boxed
     eps_w_names = eps `zip` names
     to_body     = ExplicitTuple [toEP   ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
     from_body   = ExplicitTuple [fromEP ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
@@ -563,10 +563,10 @@ genericNames :: [Name]
 genericNames = [mkSystemName (mkBuiltinUnique i) (mkFastString ('g' : show i)) | i <- [1..]]
 (g1:g2:g3:_) = genericNames
 
-mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType builtinSrcLoc))
+mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType noSrcLoc))
 
 idEP :: EP RenamedHsExpr
 idEP = EP idexpr idexpr
      where
-       idexpr = mk_hs_lam [VarPatIn g3] (HsVar g3)
+       idexpr = mk_hs_lam [VarPat g3] (HsVar g3)
 \end{code}

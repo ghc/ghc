@@ -4,22 +4,28 @@
 \section[ByteCodeGen]{Generate bytecode from Core}
 
 \begin{code}
-module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
-		     filterNameMap,
-                     byteCodeGen, coreExprToBCOs
+module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, 
+		     byteCodeGen, coreExprToBCOs
 		   ) where
 
 #include "HsVersions.h"
 
+import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
+import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 )
+import ByteCodeAsm	( CompiledByteCode(..), UnlinkedBCO, UnlinkedBCOExpr, 
+			  assembleBCO, assembleBCOs, iNTERP_STACK_CHECK_THRESH )
+import ByteCodeLink	( lookupStaticPtr )
+
 import Outputable
-import Name		( Name, getName )
+import Name		( Name, getName, mkSystemName )
 import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe, isFCallId,
-			  idPrimRep, mkSysLocal, idName, isFCallId_maybe, isPrimOpId )
+			  idPrimRep, mkLocalId, isFCallId_maybe, isPrimOpId )
 import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM, elemFM,
 			  addToFM, lookupFM, fmToList )
+import HscTypes		( ModGuts(..), ModGuts, typeEnvTyCons, typeEnvClasses )
 import CoreUtils	( exprType )
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -30,7 +36,7 @@ import CoreFVs		( freeVars )
 import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe, isTyVarTy )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
-import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
+import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Type		( Type, repType, splitFunTys, dropForAlls )
@@ -52,17 +58,10 @@ import Panic		( GhcException(..) )
 import PprType		( pprType )
 import SMRep		( arrWordsHdrSize, arrPtrsHdrSize )
 import Constants	( wORD_SIZE )
-import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
-import ByteCodeItbls	( ItblEnv, mkITbls )
-import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-			  ClosureEnv, HValue, filterNameMap, linkFail,
-			  iNTERP_STACK_CHECK_THRESH )
-import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 )
-import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
-import CTypes		( CInt )
+import Foreign.C	( CInt )
 import Control.Exception	( throwDyn )
 
 import GHC.Exts		( Int(..), ByteArray# )
@@ -81,13 +80,13 @@ import Char		( ord )
 \begin{code}
 
 byteCodeGen :: DynFlags
-            -> [CoreBind] 
-            -> [TyCon] -> [Class]
-            -> IO ([UnlinkedBCO], ItblEnv)
-byteCodeGen dflags binds local_tycons local_classes
+            -> ModGuts
+            -> IO CompiledByteCode
+byteCodeGen dflags (ModGuts { mg_binds = binds, mg_types = type_env })
    = do showPass dflags "ByteCodeGen"
-        let tycs = local_tycons ++ map classTyCon local_classes
-        itblenv <- mkITbls tycs
+        let  local_tycons  = typeEnvTyCons  type_env
+	     local_classes = typeEnvClasses type_env
+	     tycs = local_tycons ++ map classTyCon local_classes
 
         let flatBinds = concatMap getBind binds
             getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
@@ -105,9 +104,7 @@ byteCodeGen dflags binds local_tycons local_classes
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-bcos" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        bcos <- mapM assembleBCO proto_bcos
-
-        return (bcos, itblenv)
+        assembleBCOs proto_bcos tycs
         
 
 -- Returns: (the root BCO for this expression, 
@@ -120,13 +117,10 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_id   = mkSysLocal FSLIT("ExprTopLevel") 
-				(mkPseudoUnique3 0) 
-				(panic "invented_id's type")
-      let invented_name = idName invented_id
-
-      	  annexpr = freeVars expr
-	  fvs = filter (not.isTyVar) (varSetElems (fst annexpr))
+      let invented_name = mkSystemName (mkPseudoUnique3 0) FSLIT("ExprTopLevel")
+          invented_id   = mkLocalId invented_name (panic "invented_id's type")
+      	  annexpr       = freeVars expr
+	  fvs 		= filter (not.isTyVar) (varSetElems (fst annexpr))
 
       (BcM_State all_proto_bcos final_ctr mallocd, ()) 
          <- runBc (BcM_State [] 0 []) 
@@ -897,12 +891,8 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                  DynamicTarget
                     -> returnBc (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> let sym_to_find = unpackFS target in
-                       ioToBc (lookupSymbol sym_to_find) `thenBc` \res ->
-                       case res of
-                           Just aa -> returnBc (True, aa)
-                           Nothing -> ioToBc (linkFail "ByteCodeGen.generateCCall" 
-                                                       sym_to_find)
+                    -> ioToBc (lookupStaticPtr target) `thenBc` \res ->
+                       returnBc (True, res)
                  CasmTarget _
                     -> pprPanic "ByteCodeGen.generateCCall: casm" (ppr ccall_spec)
      in

@@ -623,22 +623,22 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 -------------
 
 isLexConId cs				-- Prefix type or data constructors
-  | nullFastString cs	      = False		-- 	e.g. "Foo", "[]", "(,)" 
+  | nullFastString cs = False		-- 	e.g. "Foo", "[]", "(,)" 
   | cs == FSLIT("[]") = True
   | otherwise	      = startsConId (headFS cs)
 
 isLexVarId cs				-- Ordinary prefix identifiers
-  | nullFastString cs	 = False		-- 	e.g. "x", "_x"
-  | otherwise    = startsVarId (headFS cs)
+  | nullFastString cs = False		-- 	e.g. "x", "_x"
+  | otherwise         = startsVarId (headFS cs)
 
 isLexConSym cs				-- Infix type or data constructors
-  | nullFastString cs	= False			--	e.g. ":-:", ":", "->"
+  | nullFastString cs = False		--	e.g. ":-:", ":", "->"
   | cs == FSLIT("->") = True
-  | otherwise	= startsConSym (headFS cs)
+  | otherwise	      = startsConSym (headFS cs)
 
 isLexVarSym cs				-- Infix identifiers
-  | nullFastString cs = False			-- 	e.g. "+"
-  | otherwise = startsVarSym (headFS cs)
+  | nullFastString cs = False		-- 	e.g. "+"
+  | otherwise         = startsVarSym (headFS cs)
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool

@@ -21,7 +21,8 @@ import Var		( TyVar, Id )
 import VarSet
 import VarEnv
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
-import Name		( getSrcLoc )
+import Name		( getSrcLoc, nameModule )
+import SrcLoc		( isGoodSrcLoc )
 import TcType		( Type, tcTyConAppTyCon, mkTyVarTy,
 			  tcSplitDFunTy, tyVarsOfTypes,
 			  matchTys, unifyTyListsX, allDistinctTyVars
@@ -31,7 +32,7 @@ import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
 import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM, eltsUFM )
-import Id		( idType )
+import Id		( idType, idName )
 import ErrUtils		( Message )
 import CmdLineOpts
 import Util             ( notNull )
@@ -443,7 +444,14 @@ fundepErr  dfun1 dfun2 = addInstErr (ptext SLIT("Functional dependencies conflic
 addInstErr what dfun1 dfun2 
  = hang what 2 (ppr_dfun dfun1 $$ ppr_dfun dfun2)
   where
-    ppr_dfun dfun = ppr (getSrcLoc dfun) <> colon <+> pprClassPred clas tys
-		  where
-		    (_,_,clas,tys) = tcSplitDFunTy (idType dfun)
+    ppr_dfun dfun = pp_loc <> colon <+> pprClassPred clas tys
+      where
+	(_,_,clas,tys) = tcSplitDFunTy (idType dfun)
+	loc = getSrcLoc dfun
+	mod = nameModule (idName dfun)
+	
+	-- Worth trying to print a good location... imported dfuns
+	-- don't have a useful SrcLoc but we can say which module they come from
+	pp_loc | isGoodSrcLoc loc = ppr loc
+	       | otherwise	  = ptext SLIT("In module") <+> ppr mod
 \end{code}

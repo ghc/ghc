@@ -9,7 +9,7 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
-import Id		( Id, idName, idType, mkUserLocal, idSpecialisation, isDataConWrapId )
+import Id		( Id, idName, idType, mkUserLocal, isDataConWrapId )
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  mkForAllTys, tcCmpType

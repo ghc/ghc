@@ -42,8 +42,8 @@ import Util		( thenCmp )
 
 import Ratio 		( numerator )
 import FastString	( uniqueOfFS, lengthFS )
-import Int		( Int8,  Int16,  Int32 )
-import Word		( Word8, Word16, Word32 )
+import DATA_INT		( Int8,  Int16,  Int32 )
+import DATA_WORD	( Word8, Word16, Word32 )
 import Char		( ord, chr )
 \end{code}
 

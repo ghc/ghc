@@ -1,5 +1,0 @@
-_interface_ RnBinds 1
-_exports_
-RnBinds rnBinds;
-_declarations_
-1 rnBinds _:_ _forall_ [b] => RdrHsSyn.RdrNameHsBinds -> (RnHsSyn.RenamedHsBinds -> RnMonad.RnMS (b, NameSet.FreeVars)) -> RnMonad.RnMS (b, NameSet.FreeVars) ;;

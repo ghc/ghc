@@ -8,7 +8,7 @@ module TcTyDecls ( tcTyDecl, kcConDetails ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), 
+import HsSyn		( TyClDecl(..), ConDecl(..), HsConDetails(..), BangType,
 			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
@@ -17,23 +17,23 @@ import BasicTypes	( NewOrData(..) )
 import TcMonoType	( tcHsTyVars, tcHsTheta, tcHsType, 
 			  kcHsContext, kcHsSigType, kcHsLiftedSigType
 			)
-import TcEnv		( tcExtendTyVarEnv, 
-			  tcLookupTyCon, tcLookupRecId, 
-			  TyThingDetails(..), RecTcEnv
-			)
+import TcEnv		( tcExtendTyVarEnv, tcLookupTyCon, TyThingDetails(..) )
 import TcType		( tyVarsOfTypes, tyVarsOfPred, ThetaType )
-import TcMonad
+import RnEnv		( lookupSysName )
+import TcRnMonad
 
 import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
 import FieldLabel	( fieldLabelName, fieldLabelType, allFieldLabelTags, mkFieldLabel )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import Var		( TyVar )
-import Name		( Name, NamedThing(..) )
+import Name		( Name )
+import OccName		( mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import Outputable
 import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
-			  tyConTyVars )
+			  tyConTyVars, tyConName )
 import VarSet		( intersectVarSet, isEmptyVarSet )
-import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
+import Generics		( mkTyConGenInfo )
+import CmdLineOpts	( DynFlag(..) )
 import List		( nubBy )
 \end{code}
 
@@ -46,28 +46,44 @@ import List		( nubBy )
 \begin{code}
 tcTyDecl :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcTyDecl (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
-  = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
+  = tcLookupTyCon tycon_name			`thenM` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
-    tcHsType rhs				`thenTc` \ rhs_ty ->
-    returnTc (tycon_name, SynTyDetails rhs_ty)
+    tcHsType rhs				`thenM` \ rhs_ty ->
+    returnM (tycon_name, SynTyDetails rhs_ty)
 
 tcTyDecl (TyData {tcdND = new_or_data, tcdCtxt = context,
-			  tcdName = tycon_name, tcdCons = con_decls})
-  = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
+		  tcdName = tycon_name, tcdCons = con_decls,
+		  tcdGeneric = generic})
+  = tcLookupTyCon tycon_name			`thenM` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
     in
     tcExtendTyVarEnv tyvars				$
-    tcHsTheta context					`thenTc` \ ctxt ->
-    tcConDecls new_or_data tycon tyvars ctxt con_decls	`thenTc` \ data_cons ->
+    tcHsTheta context					`thenM` \ ctxt ->
+    tcConDecls new_or_data tycon tyvars ctxt con_decls	`thenM` \ data_cons ->
     let
 	sel_ids = mkRecordSelectors tycon data_cons
     in
-    returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
+    tcGenericInfo tycon generic				`thenM` \ gen_info ->
+    returnM (tycon_name, DataTyDetails ctxt data_cons sel_ids gen_info)
 
 tcTyDecl (ForeignType {tcdName = tycon_name})
-  = returnTc (tycon_name, ForeignTyDetails)
+  = returnM (tycon_name, ForeignTyDetails)
 
+
+tcGenericInfo tycon generics	-- Source code decl: consult the flag
+  = do_we_want	generics	`thenM` \ want_generics ->
+    if want_generics then
+	mapM (lookupSysName (tyConName tycon))
+	     [mkGenOcc1, mkGenOcc2]		`thenM` \ gen_sys_names ->
+	returnM (mkTyConGenInfo tycon gen_sys_names)
+    else
+	returnM Nothing
+  where
+    do_we_want (Just g) = returnM g		-- Interface file decl
+						-- so look at decl
+    do_we_want Nothing  = doptM Opt_Generics	-- Source code decl
+						-- so look at flag
 
 mkRecordSelectors tycon data_cons
   = 	-- We'll check later that fields with the same name 
@@ -88,10 +104,11 @@ mkRecordSelectors tycon data_cons
 %************************************************************************
 
 \begin{code}
-kcConDetails :: NewOrData -> RenamedContext -> ConDetails Name -> TcM ()
+kcConDetails :: NewOrData -> RenamedContext 
+	     -> HsConDetails Name (BangType Name) -> TcM ()
 kcConDetails new_or_data ex_ctxt details
-  = kcHsContext ex_ctxt		`thenTc_`
-    mapTc_ kc_sig_type (conDetailsTys details)
+  = kcHsContext ex_ctxt		`thenM_`
+    mappM_ kc_sig_type (conDetailsTys details)
   where
     kc_sig_type = case new_or_data of
 		    DataType -> kcHsSigType
@@ -105,44 +122,43 @@ tcConDecls :: NewOrData -> TyCon -> [TyVar] -> ThetaType
 
 tcConDecls new_or_data tycon tyvars ctxt con_decls
   = case con_decls of
-	Unknown     -> returnTc Unknown
-	HasCons n   -> returnTc (HasCons n)
-	DataCons cs -> mapTc tc_con_decl cs	`thenTc` \ data_cons ->
-		       returnTc (DataCons data_cons)
+	Unknown     -> returnM Unknown
+	HasCons n   -> returnM (HasCons n)
+	DataCons cs -> mappM tc_con_decl cs	`thenM` \ data_cons ->
+		       returnM (DataCons data_cons)
   where
-    tc_con_decl (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
-      = tcAddSrcLoc src_loc						$
+    tc_con_decl (ConDecl name ex_tvs ex_ctxt details src_loc)
+      = addSrcLoc src_loc						$
 	tcHsTyVars ex_tvs (kcConDetails new_or_data ex_ctxt details)	$ \ ex_tyvars ->
-	tcHsTheta ex_ctxt						`thenTc` \ ex_theta ->
+	tcHsTheta ex_ctxt						`thenM` \ ex_theta ->
 	case details of
-	    VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
+	    PrefixCon btys     -> tc_datacon ex_tyvars ex_theta btys
 	    InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
 	    RecCon fields      -> tc_rec_con ex_tyvars ex_theta fields
       where
 	
 	tc_datacon ex_tyvars ex_theta btys
-	  = mapTc tcHsType (map getBangType btys)	`thenTc` \ arg_tys ->
+	  = mappM tcHsType (map getBangType btys)	`thenM` \ arg_tys ->
 	    mk_data_con ex_tyvars ex_theta (map getBangStrictness btys) arg_tys []
     
 	tc_rec_con ex_tyvars ex_theta fields
-	  = checkTc (null ex_tyvars) (exRecConErr name)	`thenTc_`
-	    mapTc tc_field (fields `zip` allFieldLabelTags)	`thenTc` \ field_labels_s ->
+	  = checkTc (null ex_tyvars) (exRecConErr name)	`thenM_`
+	    mappM tc_field (fields `zip` allFieldLabelTags)	`thenM` \ field_labels ->
 	    let
-		field_labels = concat field_labels_s
-		arg_stricts = [str | (ns, bty) <- fields, 
-				     let str = getBangStrictness bty, 
-				     n <- ns	-- One for each.  E.g   x,y,z :: !Int
+		arg_stricts = [str | (n, bty) <- fields, 
+				     let str = getBangStrictness bty
 			      ]
 	    in
 	    mk_data_con ex_tyvars ex_theta arg_stricts 
 			(map fieldLabelType field_labels) field_labels
     
-	tc_field ((field_label_names, bty), tag)
-	  = tcHsType (getBangType bty)			`thenTc` \ field_ty ->
-	    returnTc [mkFieldLabel (getName name) tycon field_ty tag | name <- field_label_names]
+	tc_field ((field_label_name, bty), tag)
+	  = tcHsType (getBangType bty)		`thenM` \ field_ty ->
+	    returnM (mkFieldLabel field_label_name tycon field_ty tag)
     
 	mk_data_con ex_tyvars ex_theta arg_stricts arg_tys fields
-	  = let
+	  = lookupSysName name mkWorkerOcc	`thenM` \ wkr_name ->
+	    let
 	       data_con = mkDataCon name arg_stricts fields
 			       tyvars (thinContext arg_tys ctxt)
 			       ex_tyvars ex_theta
@@ -152,7 +168,7 @@ tcConDecls new_or_data tycon tyvars ctxt con_decls
 	       data_con_id      = mkDataConId wkr_name data_con
 	       data_con_wrap_id = mkDataConWrapId data_con
 	    in
-	    returnNF_Tc data_con
+	    returnM data_con
 
 -- The context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys

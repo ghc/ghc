@@ -6,7 +6,7 @@
 \begin{code}
 module ParseUtil (
 	  parseError	      -- String -> Pa
-	, mkVanillaCon, mkRecCon,
+	, mkPrefixCon, mkRecCon
 
 	, mkRecConstrOrUpdate -- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
@@ -44,14 +44,13 @@ import List		( isSuffixOf )
 import Lex
 import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
 import HsSyn		-- Lots of it
+import TysWiredIn	( unitTyCon )
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..))
 import SrcLoc
 import RdrHsSyn
 import RdrName
-import PrelNames	( unitTyCon_RDR )
-import OccName  	( dataName, varName, tcClsName, isDataOcc,
-			  occNameSpace, setOccNameSpace, occNameUserString )
+import OccName  	( dataName, varName, isDataOcc, isTcOcc, occNameUserString )
 import CStrings		( CLabelString )
 import FastString
 import Outputable
@@ -66,37 +65,33 @@ parseError s =
 
 
 -----------------------------------------------------------------------------
--- mkVanillaCon
+-- mkPrefixCon
 
 -- When parsing data declarations, we sometimes inadvertently parse
 -- a constructor application as a type (eg. in data T a b = C a b `D` E a b)
 -- This function splits up the type application, adds any pending
 -- arguments, and converts the type constructor back into a data constructor.
 
-mkVanillaCon :: RdrNameHsType -> [RdrNameBangType] -> P (RdrName, RdrNameConDetails)
+mkPrefixCon :: RdrNameHsType -> [RdrNameBangType] -> P (RdrName, RdrNameConDetails)
 
-mkVanillaCon ty tys
+mkPrefixCon ty tys
  = split ty tys
  where
    split (HsAppTy t u)  ts = split t (unbangedType u : ts)
    split (HsTyVar tc)   ts = tyConToDataCon tc	`thenP` \ data_con ->
-			     returnP (data_con, VanillaCon ts)
+			     returnP (data_con, PrefixCon ts)
    split _		 _ = parseError "Illegal data/newtype declaration"
 
-mkRecCon :: RdrName -> [([RdrName],RdrNameBangType)] -> P (RdrName, RdrNameConDetails)
-mkRecCon con fields
-  = tyConToDataCon con	`thenP` \ data_con ->
-    returnP (data_con, RecCon fields)
+mkRecCon :: [([RdrName],RdrNameBangType)] -> RdrNameConDetails
+mkRecCon fields
+  = RecCon [ (l,t) | (ls,t) <- fields, l <- ls ] 
 
 tyConToDataCon :: RdrName -> P RdrName
 tyConToDataCon tc
-  | occNameSpace tc_occ == tcClsName
-  = returnP (setRdrNameOcc tc (setOccNameSpace tc_occ dataName))
+  | isTcOcc (rdrNameOcc tc)
+  = returnP (setRdrNameSpace tc dataName)
   | otherwise
   = parseError (showSDoc (text "Not a constructor:" <+> quotes (ppr tc)))
-  where 
-    tc_occ   = rdrNameOcc tc
-
 
 ----------------------------------------------------------------------------
 -- Various Syntactic Checks
@@ -147,7 +142,7 @@ checkContext (HsParTy ty)	-- to be sure HsParTy doesn't get into the way
   = checkContext ty
 
 checkContext (HsTyVar t)	-- Empty context shows up as a unit type ()
-  | t == unitTyCon_RDR = returnP []
+  | t == getRdrName unitTyCon = returnP []
 
 checkContext t 
   = checkPred t `thenP` \p ->
@@ -201,17 +196,17 @@ checkPatterns :: SrcLoc -> [RdrNameHsExpr] -> P [RdrNamePat]
 checkPatterns loc es = mapP (checkPattern loc) es
 
 checkPat :: RdrNameHsExpr -> [RdrNamePat] -> P RdrNamePat
-checkPat (HsVar c) args | isRdrDataCon c = returnP (ConPatIn c args)
+checkPat (HsVar c) args | isRdrDataCon c = returnP (ConPatIn c (PrefixCon args))
 checkPat (HsApp f x) args = 
 	checkPat x [] `thenP` \x ->
 	checkPat f (x:args)
 checkPat e [] = case e of
-	EWildPat	   -> returnP WildPatIn
-	HsVar x		   -> returnP (VarPatIn x)
-	HsLit l 	   -> returnP (LitPatIn l)
+	EWildPat	   -> returnP (WildPat placeHolderType)
+	HsVar x		   -> returnP (VarPat x)
+	HsLit l 	   -> returnP (LitPat l)
 	HsOverLit l	   -> returnP (NPatIn l Nothing)
-	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPatIn)
-	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPatIn n)
+	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPat)
+	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPat n)
         ExprWithTySig e t  -> checkPat e [] `thenP` \e ->
 			      -- Pattern signatures are parsed as sigtypes,
 			      -- but they aren't explicit forall points.  Hence
@@ -239,31 +234,29 @@ checkPat e [] = case e of
 			      checkPat r [] `thenP` \r ->
 			      case op of
 			   	 HsVar c | isDataOcc (rdrNameOcc c)
-					-> returnP (ConOpPatIn l c fix r)
+					-> returnP (ConPatIn c (InfixCon l r))
 			   	 _ -> patFail
 
-	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
+	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPat)
 	ExplicitList _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (ListPatIn ps)
+			      returnP (ListPat ps placeHolderType)
 	ExplicitPArr _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (PArrPatIn ps)
+			      returnP (PArrPat ps placeHolderType)
 
 	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (TuplePatIn ps b)
+			      returnP (TuplePat ps b)
 
 	RecordCon c fs     -> mapP checkPatField fs `thenP` \fs ->
-			      returnP (RecPatIn c fs)
+			      returnP (ConPatIn c (RecCon fs))
 -- Generics 
-	HsType ty          -> returnP (TypePatIn ty) 
+	HsType ty          -> returnP (TypePat ty) 
 	_                  -> patFail
 
 checkPat _ _ = patFail
 
-checkPatField :: (RdrName, RdrNameHsExpr, Bool) 
-	-> P (RdrName, RdrNamePat, Bool)
-checkPatField (n,e,b) =
-	checkPat e [] `thenP` \p ->
-	returnP (n,p,b)
+checkPatField :: (RdrName, RdrNameHsExpr) -> P (RdrName, RdrNamePat)
+checkPatField (n,e) = checkPat e [] `thenP` \p ->
+		      returnP (n,p)
 
 patFail = parseError "Parse error in pattern"
 

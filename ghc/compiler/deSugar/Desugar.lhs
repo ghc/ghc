@@ -4,18 +4,19 @@
 \section[Desugar]{@deSugar@: the main function}
 
 \begin{code}
-module Desugar ( deSugar, deSugarExpr,
-                 deSugarCore ) where
+module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_SccProfilingOn )
-import HscTypes		( ModDetails(..), TypeEnv )
+import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
+import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..), 
+			  PersistentCompilerState(..), 
+	  		  lookupType )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
-import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr,
-                          TypecheckedCoreBind )
-import TcModule		( TcResults(..) )
+import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
+import TcRnTypes	( TcGblEnv(..), ImportAvails(imp_mods) )
+import MkIface		( mkUsageInfo )
 import Id		( Id )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
@@ -26,18 +27,18 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module )
+import Module		( Module, moduleEnvElts )
 import Id		( Id )
 import NameEnv		( lookupNameEnv )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )
 import CoreLint		( showPass, endPass )
-import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings )
+import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, addShortWarnLocLine )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
-import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), TyThing(..), lookupType,  )
 import FastString
+import DATA_IOREF	( readIORef )
 \end{code}
 
 %************************************************************************
@@ -46,70 +47,92 @@ import FastString
 %*									*
 %************************************************************************
 
-The only trick here is to get the @DsMonad@ stuff off to a good
-start.
-
 \begin{code}
-deSugar :: DynFlags
-	-> PersistentCompilerState -> HomeSymbolTable
-	-> Module -> PrintUnqualified
-        -> TcResults
-	-> IO (ModDetails, (SDoc, SDoc, [FastString], [CoreBndr]))
+deSugar :: HscEnv -> PersistentCompilerState
+        -> TcGblEnv -> IO ModGuts
 
-deSugar dflags pcs hst mod_name unqual
-        (TcResults {tc_env    = type_env,
-		    tc_binds  = all_binds,
-		    tc_insts  = insts,
-		    tc_rules  = rules,
-		    tc_fords  = fo_decls})
+deSugar hsc_env pcs
+        (TcGblEnv { tcg_mod      = mod,
+		    tcg_type_env = type_env,
+		    tcg_usages   = usage_var,
+		    tcg_imports  = imports,
+		    tcg_exports  = exports,
+		    tcg_rdr_env  = rdr_env,
+		    tcg_fix_env  = fix_env,
+	    	    tcg_deprecs  = deprecs,
+		    tcg_insts    = insts,
+		    tcg_binds	 = binds,
+		    tcg_fords    = fords,
+		    tcg_rules	 = rules })
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
+	; usages <- readIORef usage_var 
 
 	-- Do desugaring
-	; let (ds_result, ds_warns) = initDs dflags us lookup mod_name
-					     (dsProgram mod_name all_binds rules fo_decls)    
-
-	      (ds_binds, ds_rules, foreign_stuff) = ds_result
-	      
-	      mod_details = ModDetails { md_types = type_env,
-					 md_insts = insts,
-					 md_rules = ds_rules,
-					 md_binds = ds_binds }
+	; let ((ds_binds, ds_rules, ds_fords), ds_warns) 
+		= initDs dflags us lookup mod
+			 (dsProgram binds rules fords)
+	
+	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns))
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs unqual (pprBagOfWarnings ds_warns))
+		  (printErrs warn_doc)
 
 	-- Lint result if necessary
         ; endPass dflags "Desugar" Opt_D_dump_ds ds_binds
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
-		(printDump (ppr_ds_rules ds_rules))
+		  (printDump (ppr_ds_rules ds_rules))
 
-        ; return (mod_details, foreign_stuff)
+	; let 
+	     mod_guts = ModGuts {	
+		mg_module   = mod,
+		mg_exports  = exports,
+		mg_usages   = mkUsageInfo hsc_env eps imports usages,
+		mg_dir_imps = [m | (m,_) <- moduleEnvElts (imp_mods imports)],
+	        mg_rdr_env  = rdr_env,
+		mg_fix_env  = fix_env,
+		mg_deprecs  = deprecs,
+		mg_types    = type_env,
+		mg_insts    = insts,
+	        mg_rules    = ds_rules,
+		mg_binds    = ds_binds,
+		mg_foreign  = ds_fords }
+	
+        ; return mod_guts
 	}
 
   where
+    dflags       = hsc_dflags hsc_env
+    print_unqual = unQualInScope rdr_env
+
+	-- Desugarer warnings are SDocs; here we
+	-- add the info about whether or not to print unqualified
+    mk_warn (loc,sdoc) = (loc, addShortWarnLocLine loc print_unqual sdoc)
+
 	-- The lookup function passed to initDs is used for well-known Ids, 
 	-- such as fold, build, cons etc, so the chances are
 	-- it'll be found in the package symbol table.  That's
 	-- why we don't merge all these tables
-    pte      = pcs_PTE pcs
-    lookup n = case lookupType hst pte n of {
-		 Just (AnId v) -> v ;
+    eps	     = pcs_EPS pcs
+    pte      = eps_PTE eps
+    hpt      = hsc_HPT hsc_env
+    lookup n = case lookupType hpt pte n of {
+		 Just v -> v ;
 		 other -> 
 	       case lookupNameEnv type_env n of
-		 Just (AnId v) -> v ;
+		 Just v -> v ;
 		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
                }
 
-deSugarExpr :: DynFlags
-	    -> PersistentCompilerState -> HomeSymbolTable
+deSugarExpr :: HscEnv
+	    -> PersistentCompilerState
 	    -> Module -> PrintUnqualified
  	    -> TypecheckedHsExpr
 	    -> IO CoreExpr
-deSugarExpr dflags pcs hst mod_name unqual tc_expr
+deSugarExpr hsc_env pcs mod_name unqual tc_expr
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
@@ -118,7 +141,7 @@ deSugarExpr dflags pcs hst mod_name unqual tc_expr
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs unqual (pprBagOfWarnings ds_warns))
+		  (printErrs (pprBagOfWarnings ds_warns))
 
 	-- Dump output
 	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)
@@ -126,14 +149,16 @@ deSugarExpr dflags pcs hst mod_name unqual tc_expr
         ; return core_expr
 	}
   where
-    pte      = pcs_PTE pcs
-    lookup n = case lookupType hst pte n of
-		 Just (AnId v) -> v 
-		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
+    dflags   = hsc_dflags hsc_env
+    hpt      = hsc_HPT hsc_env
+    pte      = eps_PTE (pcs_EPS pcs)
+    lookup n = case lookupType hpt pte n of
+		 Just v -> v 
+		 other	-> pprPanic "Desugar: lookup:" (ppr n)
 
-dsProgram mod_name all_binds rules fo_decls
+dsProgram all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
-    dsForeigns mod_name fo_decls	`thenDs` \ (fe_binders, foreign_binds, h_code, c_code, headers) ->
+    dsForeigns fo_decls			`thenDs` \ (ds_fords, foreign_binds) ->
     let
 	ds_binds      = [Rec (foreign_binds ++ core_prs)]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -144,8 +169,8 @@ dsProgram mod_name all_binds rules fo_decls
 
 	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
-    mapDs (dsRule local_binders) rules	`thenDs` \ rules' ->
-    returnDs (ds_binds, rules', (h_code, c_code, headers, fe_binders))
+    mapDs (dsRule local_binders) rules	`thenDs` \ ds_rules ->
+    returnDs (ds_binds, ds_rules, ds_fords)
   where
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs
@@ -156,23 +181,6 @@ ppr_ds_rules rules
     pprIdRules rules
 \end{code}
 
-Simplest thing in the world, desugaring External Core:
-
-\begin{code}
-deSugarCore :: (TypeEnv, [TypecheckedCoreBind], [TypecheckedRuleDecl])
-	    -> IO (ModDetails, (SDoc, SDoc, [FastString], [CoreBndr]))
-deSugarCore (type_env, pairs, rules) 
-  = return (mod_details, no_foreign_stuff)
-  where
-    mod_details = ModDetails { md_types = type_env
-			     , md_insts = []
-			     , md_rules = ds_rules
-			     , md_binds = ds_binds }
-    ds_binds = [Rec pairs]
-    ds_rules = [(fun,rule) | IfaceRuleOut fun rule <- rules]
-
-    no_foreign_stuff = (empty,empty,[],[])
-\end{code}
 
 
 %************************************************************************

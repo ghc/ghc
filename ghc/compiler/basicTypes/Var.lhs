@@ -14,7 +14,7 @@ module Var (
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
 	mkTyVar, mkSysTyVar, 
-	newMutTyVar, readMutTyVar, writeMutTyVar, makeTyVarImmutable, 
+	mkMutTyVar, mutTyVarRef, makeTyVarImmutable, 
 
 	-- Ids
 	Id, DictId,
@@ -47,7 +47,7 @@ import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import FastTypes
 import Outputable
 
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import DATA_IOREF	( IORef )
 \end{code}
 
 
@@ -197,21 +197,17 @@ mkSysTyVar uniq kind = Var { varName    = name
 		     where
 		       name = mkSystemTvNameEncoded uniq FSLIT("t")
 
-newMutTyVar :: Name -> Kind -> TyVarDetails -> IO TyVar
-newMutTyVar name kind details 
-  = do loc <- newIORef Nothing
-       return (Var { varName    = name
-		   , realUnique = getKey (nameUnique name)
-		   , varType    = kind
-		   , varDetails = MutTyVar loc details
-		   , varInfo    = pprPanic "newMutTyVar" (ppr name)
-		   })
+mkMutTyVar :: Name -> Kind -> TyVarDetails -> IORef (Maybe Type) -> TyVar
+mkMutTyVar name kind details ref
+  = Var { varName    = name
+	, realUnique = getKey (nameUnique name)
+	, varType    = kind
+	, varDetails = MutTyVar ref details
+	, varInfo    = pprPanic "newMutTyVar" (ppr name)
+	}
 
-readMutTyVar :: TyVar -> IO (Maybe Type)
-readMutTyVar (Var {varDetails = MutTyVar loc _}) = readIORef loc
-
-writeMutTyVar :: TyVar -> Maybe Type -> IO ()
-writeMutTyVar (Var {varDetails = MutTyVar loc _}) val = writeIORef loc val
+mutTyVarRef :: TyVar -> IORef (Maybe Type)
+mutTyVarRef (Var {varDetails = MutTyVar loc _}) = loc
 
 makeTyVarImmutable :: TyVar -> TyVar
 makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}

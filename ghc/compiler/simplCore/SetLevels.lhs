@@ -46,6 +46,7 @@ module SetLevels (
 	setLevels, 
 
 	Level(..), tOP_LEVEL,
+	LevelledBind, LevelledExpr,
 
 	incMinorLvl, ltMajLvl, ltLvl, isTopLvl, isInlineCtxt
     ) where
@@ -319,7 +320,7 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
 	alts_env = extendCaseBndrLvlEnv env expr' case_bndr incd_lvl
     in
     mapLvl (lvl_alt alts_env) alts	`thenLvl` \ alts' ->
-    returnLvl (Case expr' (case_bndr, incd_lvl) alts')
+    returnLvl (Case expr' (TB case_bndr incd_lvl) alts')
   where
       incd_lvl  = incMinorLvl ctxt_lvl
 
@@ -327,7 +328,7 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
 	= lvlMFE True incd_lvl new_env rhs	`thenLvl` \ rhs' ->
 	  returnLvl (con, bs', rhs')
 	where
-	  bs'     = [ (b, incd_lvl) | b <- bs ]
+	  bs'     = [ TB b incd_lvl | b <- bs ]
 	  new_env = extendLvlEnv alts_env bs'
 \end{code}
 
@@ -355,7 +356,7 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   | otherwise	-- Float it out!
   = lvlFloatRhs abs_vars dest_lvl env ann_expr	`thenLvl` \ expr' ->
     newLvlVar "lvl" abs_vars ty			`thenLvl` \ var ->
-    returnLvl (Let (NonRec (var,dest_lvl) expr') 
+    returnLvl (Let (NonRec (TB var dest_lvl) expr') 
 		   (mkVarApps (Var var) abs_vars))
   where
     expr     = deAnnotate ann_expr
@@ -421,19 +422,19 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
   = lvlExpr ctxt_lvl env rhs			`thenLvl` \ rhs' ->
-    returnLvl (NonRec (bndr, ctxt_lvl) rhs', env)
+    returnLvl (NonRec (TB bndr ctxt_lvl) rhs', env)
 
   | null abs_vars
   =	-- No type abstraction; clone existing binder
     lvlExpr dest_lvl env rhs			`thenLvl` \ rhs' ->
     cloneVar top_lvl env bndr ctxt_lvl dest_lvl	`thenLvl` \ (env', bndr') ->
-    returnLvl (NonRec (bndr', dest_lvl) rhs', env') 
+    returnLvl (NonRec (TB bndr' dest_lvl) rhs', env') 
 
   | otherwise
   = -- Yes, type abstraction; create a new binder, extend substitution, etc
     lvlFloatRhs abs_vars dest_lvl env rhs	`thenLvl` \ rhs' ->
     newPolyBndrs dest_lvl env abs_vars [bndr]	`thenLvl` \ (env', [bndr']) ->
-    returnLvl (NonRec (bndr', dest_lvl) rhs', env')
+    returnLvl (NonRec (TB bndr' dest_lvl) rhs', env')
 
   where
     bind_fvs = rhs_fvs `unionVarSet` idFreeVars bndr
@@ -451,12 +452,12 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
 lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
   | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
   = mapLvl (lvlExpr ctxt_lvl env) rhss			`thenLvl` \ rhss' ->
-    returnLvl (Rec ((bndrs `zip` repeat ctxt_lvl) `zip` rhss'), env)
+    returnLvl (Rec ([TB b ctxt_lvl | b <- bndrs] `zip` rhss'), env)
 
   | null abs_vars
   = cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl	`thenLvl` \ (new_env, new_bndrs) ->
     mapLvl (lvlExpr ctxt_lvl new_env) rhss		`thenLvl` \ new_rhss ->
-    returnLvl (Rec ((new_bndrs `zip` repeat dest_lvl) `zip` new_rhss), new_env)
+    returnLvl (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
   | isSingleton pairs && count isId abs_vars > 1
   = 	-- Special case for self recursion where there are
@@ -482,16 +483,17 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
     in
     lvlExpr body_lvl body_env rhs_body		`thenLvl` \ new_rhs_body ->
     newPolyBndrs dest_lvl env abs_vars [bndr]	`thenLvl` \ (poly_env, [poly_bndr]) ->
-    returnLvl (Rec [((poly_bndr,dest_lvl), mkLams abs_vars_w_lvls $
-					   mkLams new_lam_bndrs $
-					   Let (Rec [((new_bndr,rhs_lvl), mkLams new_lam_bndrs new_rhs_body)]) 
-						(mkVarApps (Var new_bndr) lam_bndrs))],
+    returnLvl (Rec [(TB poly_bndr dest_lvl, 
+	       mkLams abs_vars_w_lvls $
+	       mkLams new_lam_bndrs $
+	       Let (Rec [(TB new_bndr rhs_lvl, mkLams new_lam_bndrs new_rhs_body)]) 
+		   (mkVarApps (Var new_bndr) lam_bndrs))],
 	       poly_env)
 
   | otherwise	-- Non-null abs_vars
   = newPolyBndrs dest_lvl env abs_vars bndrs		`thenLvl` \ (new_env, new_bndrs) ->
     mapLvl (lvlFloatRhs abs_vars dest_lvl new_env) rhss `thenLvl` \ new_rhss ->
-    returnLvl (Rec ((new_bndrs `zip` repeat dest_lvl) `zip` new_rhss), new_env)
+    returnLvl (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
   where
     (bndrs,rhss) = unzip pairs
@@ -524,7 +526,7 @@ lvlFloatRhs abs_vars dest_lvl env rhs
 %************************************************************************
 
 \begin{code}
-lvlLamBndrs :: Level -> [CoreBndr] -> (Level, [(CoreBndr, Level)])
+lvlLamBndrs :: Level -> [CoreBndr] -> (Level, [TaggedBndr Level])
 -- Compute the levels for the binders of a lambda group
 -- The binders returned are exactly the same as the ones passed,
 -- but they are now paired with a level
@@ -540,10 +542,10 @@ lvlLamBndrs lvl bndrs
 	| isId bndr && 			-- Go to the next major level if this is a value binder,
 	  not bumped_major && 		-- and we havn't already gone to the next level (one jump per group)
 	  not (isOneShotLambda bndr)	-- and it isn't a one-shot lambda
-	= go new_lvl True ((bndr,new_lvl) : rev_lvld_bndrs) bndrs
+	= go new_lvl True (TB bndr new_lvl : rev_lvld_bndrs) bndrs
 
 	| otherwise
-	= go old_lvl bumped_major ((bndr,old_lvl) : rev_lvld_bndrs) bndrs
+	= go old_lvl bumped_major (TB bndr old_lvl : rev_lvld_bndrs) bndrs
 
 	where
 	  new_lvl = incMajorLvl old_lvl
@@ -628,7 +630,7 @@ floatLams (FloatOutSw float_lams _, _, _, _) = float_lams
 floatConsts :: LevelEnv -> Bool
 floatConsts (FloatOutSw _ float_consts, _, _, _) = float_consts
 
-extendLvlEnv :: LevelEnv -> [(Var,Level)] -> LevelEnv
+extendLvlEnv :: LevelEnv -> [TaggedBndr Level] -> LevelEnv
 -- Used when *not* cloning
 extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
   = (float_lams,
@@ -636,9 +638,9 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
      foldl del_subst subst prs,
      foldl del_id id_env prs)
   where
-    add_lvl   env (v,l) = extendVarEnv env v l
-    del_subst env (v,_) = extendInScope env v
-    del_id    env (v,_) = delVarEnv env v
+    add_lvl   env (TB v l) = extendVarEnv env v l
+    del_subst env (TB v _) = extendInScope env v
+    del_id    env (TB v _) = delVarEnv env v
   -- We must remove any clone for this variable name in case of
   -- shadowing.  This bit me in the following case
   -- (in nofib/real/gg/Spark.hs):
@@ -662,7 +664,7 @@ extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_b
      extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
      
 extendCaseBndrLvlEnv env scrut case_bndr lvl
-  = extendLvlEnv          env [(case_bndr,lvl)]
+  = extendLvlEnv          env [TB case_bndr lvl]
 
 extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pairs
   = (float_lams,

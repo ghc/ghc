@@ -10,14 +10,14 @@
 
 module DriverPipeline (
 
-	-- interfaces for the batch-mode driver
-   genPipeline, runPipeline, pipeLoop,
+	-- Interfaces for the batch-mode driver
+   genPipeline, runPipeline, pipeLoop, staticLink,
 
-	-- interfaces for the compilation manager (interpreted/batch-mode)
-   preprocess, compile, CompResult(..),
+	-- Interfaces for the compilation manager (interpreted/batch-mode)
+   preprocess, 
+   compile, CompResult(..), 
+   link, 
 
-	-- batch-mode linking interface
-   doLink,
         -- DLL building
    doMkDLL
   ) where
@@ -25,7 +25,6 @@ module DriverPipeline (
 #include "HsVersions.h"
 
 import Packages
-import CmTypes
 import GetImports
 import DriverState
 import DriverUtil
@@ -44,6 +43,7 @@ import CmdLineOpts
 import Config
 import Panic
 import Util
+import BasicTypes	( SuccessFlag(..) )
 import Maybes		( expectJust )
 
 import ParserCoreUtils ( getCoreModuleName )
@@ -60,9 +60,271 @@ import IO
 import Monad
 import Maybe
 
+
 -----------------------------------------------------------------------------
--- genPipeline
+--			Pre process
+-----------------------------------------------------------------------------
+
+-- Just preprocess a file, put the result in a temp. file (used by the
+-- compilation manager during the summary phase).
+
+preprocess :: FilePath -> IO FilePath
+preprocess filename =
+  ASSERT(haskellish_src_file filename) 
+  do restoreDynFlags	-- Restore to state of last save
+     let fInfo = (filename, getFileSuffix filename)
+     pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
+			     defaultHscLang fInfo
+     (fn,_)   <- runPipeline pipeline fInfo
+     	                     False{-no linking-} False{-no -o flag-}
+     return fn
+
+-----------------------------------------------------------------------------
+--			Compile
+-----------------------------------------------------------------------------
+
+-- Compile a single module, under the control of the compilation manager.
 --
+-- This is the interface between the compilation manager and the
+-- compiler proper (hsc), where we deal with tedious details like
+-- reading the OPTIONS pragma from the source file, and passing the
+-- output of hsc through the C compiler.
+
+-- The driver sits between 'compile' and 'hscMain', translating calls
+-- to the former into calls to the latter, and results from the latter
+-- into results from the former.  It does things like preprocessing
+-- the .hs file if necessary, and compiling up the .stub_c files to
+-- generate Linkables.
+
+-- NB.  No old interface can also mean that the source has changed.
+
+compile :: GhciMode                -- distinguish batch from interactive
+	-> Module
+	-> ModLocation
+	-> Bool			   -- True <=> source unchanged
+	-> Bool			   -- True <=> have object
+        -> Maybe ModIface          -- old interface, if available
+        -> HomePackageTable        -- For home-module stuff
+        -> PersistentCompilerState -- persistent compiler state
+        -> IO CompResult
+
+data CompResult
+   = CompOK   PersistentCompilerState	-- Updated PCS
+              ModDetails 		-- New details
+              ModIface			-- New iface
+              (Maybe Linkable)	-- New code; Nothing => compilation was not reqd
+		                --			(old code is still valid)
+
+   | CompErrs PersistentCompilerState	-- Updated PCS
+
+
+compile ghci_mode this_mod location
+	source_unchanged have_object 
+	old_iface hpt pcs = do 
+
+   dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
+
+
+   showPass dyn_flags 
+	(showSDoc (text "Compiling" <+> ppr this_mod))
+
+   let verb	  = verbosity dyn_flags
+   let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
+   let input_fnpp = expectJust "compile:hspp" (ml_hspp_file location)
+   let mod_name   = moduleName this_mod
+
+   when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
+
+   opts <- getOptionsFromSource input_fnpp
+   processArgs dynamic_flags opts []
+   dyn_flags <- getDynFlags
+
+   let hsc_lang      = hscLang dyn_flags
+       (basename, _) = splitFilename input_fn
+       
+   keep_hc <- readIORef v_Keep_hc_files
+#ifdef ILX
+   keep_il <- readIORef v_Keep_il_files
+#endif
+   keep_s  <- readIORef v_Keep_s_files
+
+   output_fn <- 
+	case hsc_lang of
+	   HscAsm  | keep_s    -> return (basename ++ '.':phaseInputExt As)
+		   | otherwise -> newTempName (phaseInputExt As)
+	   HscC    | keep_hc   -> return (basename ++ '.':phaseInputExt HCc)
+		   | otherwise -> newTempName (phaseInputExt HCc)
+           HscJava             -> newTempName "java" -- ToDo
+#ifdef ILX
+	   HscILX  | keep_il   -> return (basename ++ '.':phaseInputExt Ilasm)
+                   | otherwise -> newTempName (phaseInputExt Ilx2Il) 	
+#endif
+	   HscInterpreted      -> return (error "no output file")
+           HscNothing	       -> return (error "no output file")
+
+   let dyn_flags' = dyn_flags { hscOutName = output_fn,
+				hscStubCOutName = basename ++ "_stub.c",
+				hscStubHOutName = basename ++ "_stub.h",
+				extCoreName = basename ++ ".hcr" }
+
+   -- figure out which header files to #include in a generated .hc file
+   c_includes <- getPackageCIncludes
+   cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
+
+   let cc_injects = unlines (map mk_include 
+                                 (c_includes ++ reverse cmdline_includes))
+       mk_include h_file = 
+	case h_file of 
+           '"':_{-"-} -> "#include "++h_file
+           '<':_      -> "#include "++h_file
+           _          -> "#include \""++h_file++"\""
+
+   writeIORef v_HCHeader cc_injects
+
+   -- -no-recomp should also work with --make
+   do_recomp <- readIORef v_Recomp
+   let source_unchanged' = source_unchanged && do_recomp
+       hsc_env = HscEnv { hsc_mode = ghci_mode,
+			  hsc_dflags = dyn_flags',
+			  hsc_HPT    = hpt }
+
+   -- run the compiler
+   hsc_result <- hscMain hsc_env pcs this_mod location
+			 source_unchanged' have_object old_iface
+
+   case hsc_result of
+      HscFail pcs -> return (CompErrs pcs)
+
+      HscNoRecomp pcs details iface -> return (CompOK pcs details iface Nothing)
+
+      HscRecomp pcs details iface
+	stub_h_exists stub_c_exists maybe_interpreted_code -> do
+	   let 
+	   maybe_stub_o <- compileStub dyn_flags' stub_c_exists
+	   let stub_unlinked = case maybe_stub_o of
+				  Nothing -> []
+				  Just stub_o -> [ DotO stub_o ]
+
+	   (hs_unlinked, unlinked_time) <-
+	     case hsc_lang of
+
+		-- in interpreted mode, just return the compiled code
+		-- as our "unlinked" object.
+		HscInterpreted -> 
+		    case maybe_interpreted_code of
+#ifdef GHCI
+		       Just comp_bc -> do tm <- getClockTime 
+                                          return ([BCOs comp_bc], tm)
+#endif
+		       Nothing -> panic "compile: no interpreted code"
+
+		-- we're in batch mode: finish the compilation pipeline.
+		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
+					hsc_lang (output_fn, getFileSuffix output_fn)
+                             -- runPipeline takes input_fn so it can split off 
+                             -- the base name and use it as the base of 
+                             -- the output object file.
+                             let (basename, suffix) = splitFilename input_fn
+			     (o_file,_) <- 
+			         pipeLoop pipe (output_fn, getFileSuffix output_fn)
+			     		       False False 
+                                               basename suffix
+                             o_time <- getModificationTime o_file
+			     return ([DotO o_file], o_time)
+
+	   let linkable = LM unlinked_time mod_name
+			     (hs_unlinked ++ stub_unlinked)
+
+	   return (CompOK pcs details iface (Just linkable))
+
+-----------------------------------------------------------------------------
+-- stub .h and .c files (for foreign export support)
+
+compileStub dflags stub_c_exists
+  | not stub_c_exists = return Nothing
+  | stub_c_exists = do
+	-- compile the _stub.c file w/ gcc
+	let stub_c = hscStubCOutName dflags
+	pipeline   <- genPipeline (StopBefore Ln) "" True defaultHscLang (stub_c,"c")
+	(stub_o,_) <- runPipeline pipeline (stub_c,"c") False{-no linking-} 
+			          False{-no -o option-}
+	return (Just stub_o)
+
+
+-----------------------------------------------------------------------------
+--			Link
+-----------------------------------------------------------------------------
+
+link :: GhciMode		-- interactive or batch
+     -> DynFlags		-- dynamic flags
+     -> Bool			-- attempt linking in batch mode?
+     -> [Linkable]
+     -> IO SuccessFlag
+
+-- For the moment, in the batch linker, we don't bother to tell doLink
+-- which packages to link -- it just tries all that are available.
+-- batch_attempt_linking should only be *looked at* in batch mode.  It
+-- should only be True if the upsweep was successful and someone
+-- exports main, i.e., we have good reason to believe that linking
+-- will succeed.
+
+-- There will be (ToDo: are) two lists passed to link.  These
+-- correspond to
+--
+--	1. The list of all linkables in the current home package.  This is
+--	   used by the batch linker to link the program, and by the interactive
+--	   linker to decide which modules from the previous link it can
+--	   throw away.
+--	2. The list of modules on which we just called "compile".  This list
+--	   is used by the interactive linker to decide which modules need
+--	   to be actually linked this time around (or unlinked and re-linked
+--	   if the module was recompiled).
+
+link mode dflags batch_attempt_linking linkables
+   = do let verb = verbosity dflags
+        when (verb >= 3) $ do
+	     hPutStrLn stderr "link: linkables are ..."
+             hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
+
+	res <- link' mode dflags batch_attempt_linking linkables
+
+        when (verb >= 3) (hPutStrLn stderr "link: done")
+
+	return res
+
+#ifdef GHCI
+link' Interactive dflags batch_attempt_linking linkables
+    = do showPass dflags "Not Linking...(demand linker will do the job)"
+	 -- linkModules dflags linkables
+	 return Succeeded
+#endif
+
+link' Batch dflags batch_attempt_linking linkables
+   | batch_attempt_linking
+   = do when (verb >= 1) $
+             hPutStrLn stderr "ghc: linking ..."
+
+	-- Don't showPass in Batch mode; doLink will do that for us.
+        staticLink (concatMap getOfiles linkables)
+
+	-- staticLink only returns if it succeeds
+        return Succeeded
+
+   | otherwise
+   = do when (verb >= 3) $ do
+	    hPutStrLn stderr "link(batch): upsweep (partially) failed OR"
+            hPutStrLn stderr "   Main.main not exported; not linking."
+        return Succeeded
+   where
+      verb = verbosity dflags
+      getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+
+
+
+-----------------------------------------------------------------------------
+--			genPipeline: Pipeline construction
+-----------------------------------------------------------------------------
+
 -- Herein is all the magic about which phases to run in which order, whether
 -- the intermediate files should be in TMPDIR or in the current directory,
 -- what the suffix of the intermediate files should be, etc.
@@ -516,7 +778,7 @@ run_phase Hsc basename suff input_fn output_fn
 	     else 
   	       getImportsFromFile input_fn
 
-  -- build a ModuleLocation to pass to hscMain.
+  -- build a ModLocation to pass to hscMain.
 	(mod, location')
 	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
 
@@ -563,18 +825,18 @@ run_phase Hsc basename suff input_fn output_fn
 		   		     hscStubCOutName = basename ++ "_stub.c",
 				     hscStubHOutName = basename ++ "_stub.h",
 				     extCoreName = basename ++ ".hcr" }
+	    hsc_env = HscEnv { hsc_mode = OneShot,
+			       hsc_dflags = dyn_flags',
+			       hsc_HPT    = emptyHomePackageTable }
+			
 
   -- run the compiler!
         pcs <- initPersistentCompilerState
-	result <- hscMain OneShot
-                          dyn_flags' mod
+	result <- hscMain hsc_env pcs mod
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
 			  False
 			  Nothing	 -- no iface
-			  emptyModuleEnv -- HomeSymbolTable
-			  emptyModuleEnv -- HomeIfaceTable
-			  pcs
 
 	case result of {
 
@@ -780,7 +1042,7 @@ run_phase Ilasm _basename _suff input_fn output_fn
 -- wrapper script calling the binary. Currently, we need this only in 
 -- a parallel way (i.e. in GUM), because PVM expects the binary in a
 -- central directory.
--- This is called from doLink below, after linking. I haven't made it
+-- This is called from staticLink below, after linking. I haven't made it
 -- a separate phase to minimise interfering with other modules, and
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
@@ -868,10 +1130,10 @@ checkProcessArgsResult flags basename suff
            ++ unwords flags)) (ExitFailure 1))
 
 -----------------------------------------------------------------------------
--- Linking
+-- Static linking, of .o files
 
-doLink :: [String] -> IO ()
-doLink o_files = do
+staticLink :: [String] -> IO ()
+staticLink o_files = do
     verb       <- getVerbFlag
     static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
@@ -916,12 +1178,12 @@ doLink o_files = do
 	-- opts from -optl-<blah>
     extra_ld_opts <- getStaticOpts v_Opt_l
 
-    rts_pkg <- getPackageDetails ["rts"]
-    std_pkg <- getPackageDetails ["std"]
+    [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, preludePackage]
+
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
-                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+                   else [ head (library_dirs rts_pkg) ++ "/Main.dll_o",
+                          head (library_dirs std_pkg) ++ "/PrelMain.dll_o" ]
 
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runLink ( [ SysTools.Option verb
@@ -992,13 +1254,12 @@ doMkDLL o_files = do
 	-- opts from -optdll-<blah>
     extra_ld_opts <- getStaticOpts v_Opt_dll
 
-    rts_pkg <- getPackageDetails ["rts"]
-    std_pkg <- getPackageDetails ["std"]
+    [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, stdPackage]
 
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
-                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+                   else [ head (library_dirs rts_pkg) ++ "/Main.dll_o",
+                          head (library_dirs std_pkg) ++ "/PrelMain.dll_o" ]
 
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runMkDLL
@@ -1022,184 +1283,3 @@ doMkDLL o_files = do
                else [ "--export-all" ])
 	 ++ extra_ld_opts
 	))
-
------------------------------------------------------------------------------
--- Just preprocess a file, put the result in a temp. file (used by the
--- compilation manager during the summary phase).
-
-preprocess :: FilePath -> IO FilePath
-preprocess filename =
-  ASSERT(haskellish_src_file filename) 
-  do restoreDynFlags	-- Restore to state of last save
-     let fInfo = (filename, getFileSuffix filename)
-     pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
-			     defaultHscLang fInfo
-     (fn,_)   <- runPipeline pipeline fInfo
-     	                     False{-no linking-} False{-no -o flag-}
-     return fn
-
------------------------------------------------------------------------------
--- Compile a single module, under the control of the compilation manager.
---
--- This is the interface between the compilation manager and the
--- compiler proper (hsc), where we deal with tedious details like
--- reading the OPTIONS pragma from the source file, and passing the
--- output of hsc through the C compiler.
-
--- The driver sits between 'compile' and 'hscMain', translating calls
--- to the former into calls to the latter, and results from the latter
--- into results from the former.  It does things like preprocessing
--- the .hs file if necessary, and compiling up the .stub_c files to
--- generate Linkables.
-
--- NB.  No old interface can also mean that the source has changed.
-
-compile :: GhciMode                -- distinguish batch from interactive
-        -> ModSummary              -- summary, including source
-	-> Bool			   -- True <=> source unchanged
-	-> Bool			   -- True <=> have object
-        -> Maybe ModIface          -- old interface, if available
-        -> HomeSymbolTable         -- for home module ModDetails
-	-> HomeIfaceTable	   -- for home module Ifaces
-        -> PersistentCompilerState -- persistent compiler state
-        -> IO CompResult
-
-data CompResult
-   = CompOK   PersistentCompilerState	-- updated PCS
-              ModDetails  -- new details (HST additions)
-              ModIface    -- new iface   (HIT additions)
-              (Maybe Linkable)
-                       -- new code; Nothing => compilation was not reqd
-                       -- (old code is still valid)
-
-   | CompErrs PersistentCompilerState	-- updated PCS
-
-
-compile ghci_mode summary source_unchanged have_object 
-	old_iface hst hit pcs = do 
-   dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
-
-
-   showPass dyn_flags 
-	(showSDoc (text "Compiling" <+> ppr (modSummaryName summary)))
-
-   let verb	  = verbosity dyn_flags
-   let location   = ms_location summary
-   let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
-   let input_fnpp = expectJust "compile:hspp" (ml_hspp_file location)
-
-   when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
-
-   opts <- getOptionsFromSource input_fnpp
-   processArgs dynamic_flags opts []
-   dyn_flags <- getDynFlags
-
-   let hsc_lang      = hscLang dyn_flags
-       (basename, _) = splitFilename input_fn
-       
-   keep_hc <- readIORef v_Keep_hc_files
-#ifdef ILX
-   keep_il <- readIORef v_Keep_il_files
-#endif
-   keep_s  <- readIORef v_Keep_s_files
-
-   output_fn <- 
-	case hsc_lang of
-	   HscAsm  | keep_s    -> return (basename ++ '.':phaseInputExt As)
-		   | otherwise -> newTempName (phaseInputExt As)
-	   HscC    | keep_hc   -> return (basename ++ '.':phaseInputExt HCc)
-		   | otherwise -> newTempName (phaseInputExt HCc)
-           HscJava             -> newTempName "java" -- ToDo
-#ifdef ILX
-	   HscILX  | keep_il   -> return (basename ++ '.':phaseInputExt Ilasm)
-                   | otherwise -> newTempName (phaseInputExt Ilx2Il) 	
-#endif
-	   HscInterpreted      -> return (error "no output file")
-           HscNothing	       -> return (error "no output file")
-
-   let dyn_flags' = dyn_flags { hscOutName = output_fn,
-				hscStubCOutName = basename ++ "_stub.c",
-				hscStubHOutName = basename ++ "_stub.h",
-				extCoreName = basename ++ ".hcr" }
-
-   -- figure out which header files to #include in a generated .hc file
-   c_includes <- getPackageCIncludes
-   cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
-
-   let cc_injects = unlines (map mk_include 
-                                 (c_includes ++ reverse cmdline_includes))
-       mk_include h_file = 
-	case h_file of 
-           '"':_{-"-} -> "#include "++h_file
-           '<':_      -> "#include "++h_file
-           _          -> "#include \""++h_file++"\""
-
-   writeIORef v_HCHeader cc_injects
-
-   -- -no-recomp should also work with --make
-   do_recomp <- readIORef v_Recomp
-   let source_unchanged' = source_unchanged && do_recomp
-
-   -- run the compiler
-   hsc_result <- hscMain ghci_mode dyn_flags'
-			 (ms_mod summary) location
-			 source_unchanged' have_object old_iface hst hit pcs
-
-   case hsc_result of
-      HscFail pcs -> return (CompErrs pcs)
-
-      HscNoRecomp pcs details iface -> return (CompOK pcs details iface Nothing)
-
-      HscRecomp pcs details iface
-	stub_h_exists stub_c_exists maybe_interpreted_code -> do
-	   let 
-	   maybe_stub_o <- compileStub dyn_flags' stub_c_exists
-	   let stub_unlinked = case maybe_stub_o of
-				  Nothing -> []
-				  Just stub_o -> [ DotO stub_o ]
-
-	   (hs_unlinked, unlinked_time) <-
-	     case hsc_lang of
-
-		-- in interpreted mode, just return the compiled code
-		-- as our "unlinked" object.
-		HscInterpreted -> 
-		    case maybe_interpreted_code of
-#ifdef GHCI
-		       Just (bcos,itbl_env) -> do tm <- getClockTime 
-                                                  return ([BCOs bcos itbl_env], tm)
-#endif
-		       Nothing -> panic "compile: no interpreted code"
-
-		-- we're in batch mode: finish the compilation pipeline.
-		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
-					hsc_lang (output_fn, getFileSuffix output_fn)
-                             -- runPipeline takes input_fn so it can split off 
-                             -- the base name and use it as the base of 
-                             -- the output object file.
-                             let (basename, suffix) = splitFilename input_fn
-			     (o_file,_) <- 
-			         pipeLoop pipe (output_fn, getFileSuffix output_fn)
-			     		       False False 
-                                               basename suffix
-                             o_time <- getModificationTime o_file
-			     return ([DotO o_file], o_time)
-
-	   let linkable = LM unlinked_time (modSummaryName summary)
-			     (hs_unlinked ++ stub_unlinked)
-
-	   return (CompOK pcs details iface (Just linkable))
-
-
------------------------------------------------------------------------------
--- stub .h and .c files (for foreign export support)
-
-compileStub dflags stub_c_exists
-  | not stub_c_exists = return Nothing
-  | stub_c_exists = do
-	-- compile the _stub.c file w/ gcc
-	let stub_c = hscStubCOutName dflags
-	pipeline   <- genPipeline (StopBefore Ln) "" True defaultHscLang (stub_c,"c")
-	(stub_o,_) <- runPipeline pipeline (stub_c,"c") False{-no linking-} 
-			          False{-no -o option-}
-	return (Just stub_o)

@@ -12,7 +12,7 @@ module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
 #include "HsVersions.h"
 
 import Name		( Name, getName )
-import FiniteMap	( FiniteMap, listToFM, emptyFM, plusFM )
+import NameEnv
 import Type		( typePrimRep )
 import DataCon		( DataCon, dataConRepArgTys )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
@@ -23,12 +23,14 @@ import Util             ( lengthIs, listLengthCmp )
 
 import Foreign		( Storable(..), Word8, Word16, Word32, Word64,
 			  malloc, castPtr, plusPtr )
-import Bits		( Bits(..), shiftR )
-
-import Monad		( liftM )
+import DATA_BITS	( Bits(..), shiftR )
 
 import GHC.Exts		( Int(I#), addr2Int# )
+#if __GLASGOW_HASKELL__ < 503
+import Ptr		( Ptr(..) )
+#else
 import GHC.Ptr		( Ptr(..) )
+#endif
 \end{code}
 
 %************************************************************************
@@ -38,22 +40,26 @@ import GHC.Ptr		( Ptr(..) )
 %************************************************************************
 
 \begin{code}
-
 type ItblPtr = Ptr StgInfoTable
-type ItblEnv = FiniteMap Name ItblPtr
+type ItblEnv = NameEnv (Name, ItblPtr)
+	-- We need the Name in the range so we know which
+	-- elements to filter out when unloading a module
+
+mkItblEnv :: [(Name,ItblPtr)] -> ItblEnv
+mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
 
 
 -- Make info tables for the data decls in this module
 mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return emptyFM
+mkITbls [] = return emptyNameEnv
 mkITbls (tc:tcs) = do itbls  <- mkITbl tc
                       itbls2 <- mkITbls tcs
-                      return (itbls `plusFM` itbls2)
+                      return (itbls `plusNameEnv` itbls2)
 
 mkITbl :: TyCon -> IO ItblEnv
 mkITbl tc
    | not (isDataTyCon tc) 
-   = return emptyFM
+   = return emptyNameEnv
    | dcs `lengthIs` n -- paranoia; this is an assertion.
    = make_constr_itbls dcs
      where
@@ -68,10 +74,10 @@ make_constr_itbls :: [DataCon] -> IO ItblEnv
 make_constr_itbls cons
    | listLengthCmp cons 8 /= GT -- <= 8 elements in the list
    = do is <- mapM mk_vecret_itbl (zip cons [0..])
-	return (listToFM is)
+	return (mkItblEnv is)
    | otherwise
    = do is <- mapM mk_dirret_itbl (zip cons [0..])
-	return (listToFM is)
+	return (mkItblEnv is)
      where
         mk_vecret_itbl (dcon, conNo)
            = mk_itbl dcon conNo (vecret_entry conNo)

@@ -4,18 +4,32 @@
 \section[DsExpr]{Matching expressions (Exprs)}
 
 \begin{code}
-module DsExpr ( dsExpr, dsLet ) where
+module DsExpr ( dsExpr, dsLet, dsLit ) where
 
 #include "HsVersions.h"
 
 
+import Match		( matchWrapper, matchSimply )
+import MatchLit		( dsLit )
+import DsBinds		( dsMonoBinds, AutoScc(..) )
+import DsGRHSs		( dsGuarded )
+import DsCCall		( dsCCall )
+import DsListComp	( dsListComp, dsPArrComp )
+import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr)
+import DsMonad
+
+#ifdef GHCI
+	-- Template Haskell stuff iff bootstrapped
+import DsMeta		( dsBracket )
+#endif
+
 import HsSyn		( failureFreePat,
-			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
+			  HsExpr(..), Pat(..), HsLit(..), ArithSeqInfo(..),
 			  Stmt(..), HsMatchContext(..), HsDoContext(..), 
-			  Match(..), HsBinds(..), MonoBinds(..), 
+			  Match(..), HsBinds(..), MonoBinds(..), HsConDetails(..),
 			  mkSimpleMatch 
 			)
-import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, outPatType )
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, hsPatType )
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -23,20 +37,10 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, outPat
 -- Sigh.  This is a pain.
 
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
-			  isIntegerTy, tcSplitTyConApp, isUnLiftedType, Type )
+			  tcSplitTyConApp, isUnLiftedType, Type )
 import Type		( splitFunTys )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
-
-import DsMonad
-import DsBinds		( dsMonoBinds, AutoScc(..) )
-import DsGRHSs		( dsGuarded )
-import DsCCall		( dsCCall, resultWrapper )
-import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringLit, mkStringLitFS, 
-			  mkConsExpr, mkNilExpr, mkIntegerLit
-			)
-import Match		( matchWrapper, matchSimply )
 
 import FieldLabel	( FieldLabel, fieldLabelTyCon )
 import CostCentre	( mkUserCC )
@@ -44,17 +48,13 @@ import Id		( Id, idType, recordSelectorFieldLabel )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isExistentialDataCon )
-import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
-import TysWiredIn	( tupleCon, charDataCon, intDataCon )
+import TysWiredIn	( tupleCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
-import Maybes		( maybeToBool )
-import PrelNames	( hasKey, ratioTyConKey, toPName )
+import PrelNames	( toPName )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 import FastString
-
-import Ratio 		( numerator, denominator )
 \end{code}
 
 
@@ -146,6 +146,7 @@ dsLet (MonoBind binds sigs is_rec) body
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
+dsExpr (HsPar x) = dsExpr x
 dsExpr (HsVar var)  = returnDs (Var var)
 dsExpr (HsIPVar ip) = returnDs (Var (ipNameName ip))
 dsExpr (HsLit lit)  = dsLit lit
@@ -330,7 +331,7 @@ dsExpr (ExplicitList ty xs)
 --   here at compile time
 --
 dsExpr (ExplicitPArr ty xs)
-  = dsLookupGlobalValue toPName				`thenDs` \toP      ->
+  = dsLookupGlobalId toPName				`thenDs` \toP      ->
     dsExpr (ExplicitList ty xs)				`thenDs` \coreList ->
     returnDs (mkApps (Var toP) [Type ty, coreList])
 
@@ -412,7 +413,7 @@ dsExpr (RecordConOut data_con con_expr rbinds)
 	-- hence TcType.tcSplitFunTys
 
 	mk_arg (arg_ty, lbl)
-	  = case [rhs | (sel_id,rhs,_) <- rbinds,
+	  = case [rhs | (sel_id,rhs) <- rbinds,
 			lbl == recordSelectorFieldLabel sel_id] of
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsExpr rhs
@@ -467,7 +468,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 	out_inst_tys = tcTyConAppArgs record_out_ty	-- Newtype opaque
 
 	mk_val_arg field old_arg_id 
-	  = case [rhs | (sel_id, rhs, _) <- rbinds, 
+	  = case [rhs | (sel_id, rhs) <- rbinds, 
 			field == recordSelectorFieldLabel sel_id] of
 	      (rhs:rest) -> ASSERT(null rest) rhs
 	      []	 -> HsVar old_arg_id
@@ -481,7 +482,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 		rhs = foldl HsApp (TyApp (HsVar (dataConWrapId con)) out_inst_tys)
 				  val_args
 	    in
-	    returnDs (mkSimpleMatch [ConPat con record_in_ty [] [] (map VarPat arg_ids)]
+	    returnDs (mkSimpleMatch [ConPatOut con (PrefixCon (map VarPat arg_ids)) record_in_ty [] []]
 				    rhs
 				    record_out_ty
 				    src_loc)
@@ -502,7 +503,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 
   where
     updated_fields :: [FieldLabel]
-    updated_fields = [recordSelectorFieldLabel sel_id | (sel_id,_,_) <- rbinds]
+    updated_fields = [recordSelectorFieldLabel sel_id | (sel_id,_) <- rbinds]
 
 	-- Get the type constructor from the first field label, 
 	-- so that we are sure it'll have all its DataCons
@@ -537,6 +538,19 @@ dsExpr (DictApp expr dicts)	-- becomes a curried application
   = dsExpr expr			`thenDs` \ core_expr ->
     returnDs (foldl (\f d -> f `App` (Var d)) core_expr dicts)
 \end{code}
+
+Here is where we desugar the Template Haskell brackets and escapes
+
+\begin{code}
+-- Template Haskell stuff
+
+#ifdef GHCI	/* Only if bootstrapping */
+dsExpr (HsBracketOut x ps) = dsBracket x ps
+dsExpr (HsSplice n e)      = pprPanic "dsExpr:splice" (ppr e)
+#endif
+
+\end{code}
+
 
 \begin{code}
 
@@ -601,7 +615,7 @@ dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
-		a_ty       = outPatType pat
+		a_ty       = hsPatType pat
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
                                    (HsLit (HsString (mkFastString msg)))
 	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
@@ -623,53 +637,4 @@ dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
 
   where
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[DsExpr-literals]{Literals}
-%*									*
-%************************************************************************
-
-We give int/float literals type @Integer@ and @Rational@, respectively.
-The typechecker will (presumably) have put \tr{from{Integer,Rational}s}
-around them.
-
-ToDo: put in range checks for when converting ``@i@''
-(or should that be in the typechecker?)
-
-For numeric literals, we try to detect there use at a standard type
-(@Int@, @Float@, etc.) are directly put in the right constructor.
-[NB: down with the @App@ conversion.]
-
-See also below where we look for @DictApps@ for \tr{plusInt}, etc.
-
-\begin{code}
-dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsChar c)       = returnDs (mkConApp charDataCon [mkLit (MachChar c)])
-dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
-dsLit (HsString str)   = mkStringLitFS str
-dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
-dsLit (HsInteger i)    = mkIntegerLit i
-dsLit (HsInt i)	       = returnDs (mkConApp intDataCon [mkIntLit i])
-dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
-dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
-dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
-dsLit (HsLitLit str ty)
-  = ASSERT( maybeToBool maybe_ty )
-    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
-  where
-    (maybe_ty, wrap_fn) = resultWrapper ty
-    Just rep_ty 	= maybe_ty
-
-dsLit (HsRat r ty)
-  = mkIntegerLit (numerator r)		`thenDs` \ num ->
-    mkIntegerLit (denominator r)	`thenDs` \ denom ->
-    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
-  where
-    (ratio_data_con, integer_ty) 
-	= case tcSplitTyConApp ty of
-		(tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-				   (head (tyConDataCons tycon), i_ty)
 \end{code}

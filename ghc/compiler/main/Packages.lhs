@@ -4,11 +4,18 @@
 \section{Package manipulation}
 
 \begin{code}
-module Packages ( PackageConfig(..), 
-		  defaultPackageConfig,
-		  mungePackagePaths,
-		  showPackages
-		)
+module Packages (
+	PackageConfig(..), 
+	defaultPackageConfig,
+	mungePackagePaths, packageDependents, 
+	showPackages,
+
+	PackageName,		-- Instance of Outputable
+	mkPackageName, packageNameString,
+	preludePackage, rtsPackage, stdPackage, haskell98Package,	-- :: PackageName
+
+	PackageConfigMap, emptyPkgMap, extendPkgMap, lookupPkg
+    )
 where
 
 #include "HsVersions.h"
@@ -19,7 +26,15 @@ import CmdLineOpts	( dynFlag, verbosity )
 import DriverUtil	( my_prefix_match )
 import ErrUtils		( dumpIfSet )
 import Outputable	( docToSDoc )
+import FastString
+import UniqFM
 \end{code}
+
+%*********************************************************
+%*						 	 *
+\subsection{Basic data types}
+%*							 *
+%*********************************************************
 
 \begin{code}
 #define WANT_PRETTY
@@ -29,7 +44,50 @@ import Outputable	( docToSDoc )
 
 -- There's a blob of code shared with ghc-pkg, 
 -- so we just include it from there 
+-- Primarily it defines
+--	PackageConfig (a record)
+--	PackageName   (FastString)
+
 #include "../utils/ghc-pkg/Package.hs"
+\end{code}
+
+\begin{code}
+type PackageName = FastString	-- No encoding at all
+
+mkPackageName :: String -> PackageName
+mkPackageName = mkFastString
+
+packageNameString :: PackageName -> String
+packageNameString = unpackFS
+
+stdPackage, rtsPackage, preludePackage, haskell98Package :: PackageName
+preludePackage   = FSLIT("base")
+stdPackage 	 = FSLIT("std")	-- Do we still have this?
+rtsPackage 	 = FSLIT("rts")
+haskell98Package = FSLIT("haskell98")
+
+packageDependents :: PackageConfig -> [PackageName]
+-- Impedence matcher, because PackageConfig has Strings 
+-- not PackageNames at the moment.  Sigh.
+packageDependents pkg = map mkPackageName (package_deps pkg)
+\end{code}
+
+A PackageConfigMap maps a PackageName to a PackageConfig
+
+\begin{code}
+type PackageConfigMap = UniqFM PackageConfig
+
+lookupPkg    :: PackageConfigMap -> PackageName -> Maybe PackageConfig
+emptyPkgMap  :: PackageConfigMap
+
+emptyPkgMap  = emptyUFM
+lookupPkg    = lookupUFM
+
+extendPkgMap :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
+extendPkgMap pkg_map new_pkgs 
+  = foldl add pkg_map new_pkgs
+  where
+    add pkg_map p = addToUFM pkg_map (mkFastString (name p)) p
 \end{code}
 
 %*********************************************************
@@ -64,11 +122,13 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 %*********************************************************
 
 \begin{code}
-showPackages :: [PackageConfig] -> IO ()
+showPackages :: PackageConfigMap -> IO ()
 -- Show package info on console, if verbosity is >= 3
-showPackages ps
+showPackages pkg_map
   = do  { verb <- dynFlag verbosity
 	; dumpIfSet (verb >= 3) "Packages"
 	  	    (docToSDoc (vcat (map dumpPkgGuts ps)))
 	}
+  where
+    ps = eltsUFM pkg_map
 \end{code}

@@ -16,6 +16,7 @@ module RdrHsSyn (
 	RdrNameContext,
 	RdrNameDefaultDecl,
 	RdrNameForeignDecl,
+	RdrNameCoreDecl,
 	RdrNameGRHS,
 	RdrNameGRHSs,
 	RdrNameHsBinds,
@@ -46,9 +47,9 @@ module RdrHsSyn (
 	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
-	mkHsOpApp, mkClassDecl, mkClassOpSigDM, mkConDecl,
+	mkHsOpApp, mkClassDecl, mkClassOpSigDM, 
 	mkHsNegApp, mkNPlusKPat, mkHsIntegral, mkHsFractional,
-	mkHsDo,
+	mkHsDo, mkHsSplice,
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -60,13 +61,10 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
-import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
-                          mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
-			  mkGenOcc2
-                      	)
+import OccName		( mkDefaultMethodOcc, mkVarOcc )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc, isRdrTyVar )
 import List		( nub )
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), FixitySig )
 import Class            ( DefMeth (..) )
 \end{code}
 
@@ -78,38 +76,39 @@ import Class            ( DefMeth (..) )
 %************************************************************************
 
 \begin{code}
-type RdrNameArithSeqInfo	= ArithSeqInfo		RdrName RdrNamePat
+type RdrNameArithSeqInfo	= ArithSeqInfo		RdrName
 type RdrNameBangType		= BangType		RdrName
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
-type RdrNameConDetails		= ConDetails		RdrName
+type RdrNameConDetails		= HsConDetails		RdrName RdrNameBangType
 type RdrNameContext		= HsContext 		RdrName
-type RdrNameHsDecl		= HsDecl		RdrName RdrNamePat
+type RdrNameHsDecl		= HsDecl		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
 type RdrNameForeignDecl		= ForeignDecl		RdrName
-type RdrNameGRHS		= GRHS			RdrName RdrNamePat
-type RdrNameGRHSs		= GRHSs			RdrName RdrNamePat
-type RdrNameHsBinds		= HsBinds		RdrName RdrNamePat
-type RdrNameHsExpr		= HsExpr		RdrName RdrNamePat
-type RdrNameHsModule		= HsModule		RdrName RdrNamePat
+type RdrNameCoreDecl		= CoreDecl		RdrName
+type RdrNameGRHS		= GRHS			RdrName
+type RdrNameGRHSs		= GRHSs			RdrName
+type RdrNameHsBinds		= HsBinds		RdrName
+type RdrNameHsExpr		= HsExpr		RdrName
+type RdrNameHsModule		= HsModule		RdrName
 type RdrNameIE			= IE			RdrName
 type RdrNameImportDecl 		= ImportDecl		RdrName
-type RdrNameInstDecl		= InstDecl		RdrName RdrNamePat
-type RdrNameMatch		= Match			RdrName RdrNamePat
-type RdrNameMonoBinds		= MonoBinds		RdrName RdrNamePat
+type RdrNameInstDecl		= InstDecl		RdrName
+type RdrNameMatch		= Match			RdrName
+type RdrNameMonoBinds		= MonoBinds		RdrName
 type RdrNamePat			= InPat			RdrName
 type RdrNameHsType		= HsType		RdrName
 type RdrNameHsTyVar		= HsTyVarBndr		RdrName
 type RdrNameSig			= Sig			RdrName
-type RdrNameStmt		= Stmt			RdrName RdrNamePat
-type RdrNameTyClDecl		= TyClDecl		RdrName RdrNamePat
+type RdrNameStmt		= Stmt			RdrName
+type RdrNameTyClDecl		= TyClDecl		RdrName
 
 type RdrNameRuleBndr            = RuleBndr              RdrName
-type RdrNameRuleDecl            = RuleDecl              RdrName RdrNamePat
+type RdrNameRuleDecl            = RuleDecl              RdrName
 type RdrNameDeprecation         = DeprecDecl            RdrName
 type RdrNameFixitySig		= FixitySig		RdrName
 
-type RdrNameHsRecordBinds	= HsRecordBinds		RdrName RdrNamePat
+type RdrNameHsRecordBinds	= HsRecordBinds		RdrName
 \end{code}
 
 
@@ -171,8 +170,8 @@ extractGenericPatTyVars binds
     get (FunMonoBind _ _ ms _) acc = foldr get_m acc ms
     get other		       acc = acc
 
-    get_m (Match (TypePatIn ty : _) _ _) acc = extract_ty ty acc
-    get_m other				 acc = acc
+    get_m (Match (TypePat ty : _) _ _) acc = extract_ty ty acc
+    get_m other			       acc = acc
 \end{code}
 
 
@@ -196,41 +195,17 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 mkClassDecl (cxt, cname, tyvars) fds sigs mbinds loc
   = ClassDecl { tcdCtxt = cxt, tcdName = cname, tcdTyVars = tyvars,
 		tcdFDs = fds,  tcdSigs = sigs,  tcdMeths = mbinds,
-		tcdSysNames = new_names, tcdLoc = loc }
-  where
-    cls_occ  = rdrNameOcc cname
-    data_occ = mkClassDataConOcc cls_occ
-    dname    = mkRdrUnqual data_occ
-    dwname   = mkRdrUnqual (mkWorkerOcc data_occ)
-    tname    = mkRdrUnqual (mkClassTyConOcc   cls_occ)
-    sc_sel_names = [ mkRdrUnqual (mkSuperDictSelOcc n cls_occ) 
-		   | n <- [1..length cxt]]
-      -- We number off the superclass selectors, 1, 2, 3 etc so that we 
-      -- can construct names for the selectors.  Thus
-      --      class (C a, C b) => D a b where ...
-      -- gives superclass selectors
-      --      D_sc1, D_sc2
-      -- (We used to call them D_C, but now we can have two different
-      --  superclasses both called C!)
-    new_names = mkClassDeclSysNames (tname, dname, dwname, sc_sel_names)
+		tcdLoc = loc }
 
 mkTyData new_or_data (context, tname, tyvars) data_cons maybe src
-  = let t_occ  = rdrNameOcc tname
-        name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
-	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
-    in TyData { tcdND = new_or_data, tcdCtxt = context, tcdName = tname,
-		tcdTyVars = tyvars, tcdCons = data_cons, 
-		tcdDerivs = maybe, tcdLoc = src, tcdSysNames = [name1, name2] }
+  = TyData { tcdND = new_or_data, tcdCtxt = context, tcdName = tname,
+	     tcdTyVars = tyvars,  tcdCons = data_cons, 
+	     tcdDerivs = maybe,   tcdLoc = src, tcdGeneric = Nothing }
 
 mkClassOpSigDM op ty loc
   = ClassOpSig op (DefMeth dm_rn) ty loc
   where
     dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
-
-mkConDecl cname ex_vars cxt details loc
-  = ConDecl cname wkr_name ex_vars cxt details loc
-  where
-    wkr_name = mkRdrUnqual (mkWorkerOcc (rdrNameOcc cname))
 \end{code}
 
 \begin{code}
@@ -262,6 +237,13 @@ mkNPlusKPat n k       = NPlusKPatIn n k placeHolderName
 mkHsDo ctxt stmts loc = HsDo ctxt stmts [] placeHolderType loc
 \end{code}
 
+\begin{code}
+mkHsSplice e = HsSplice unqualSplice e
+
+unqualSplice = mkRdrUnqual (mkVarOcc FSLIT("splice"))
+		-- A name (uniquified later) to
+		-- identify the splice
+\end{code}
 
 %************************************************************************
 %*									*

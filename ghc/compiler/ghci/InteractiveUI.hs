@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.133 2002/09/06 14:35:44 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.134 2002/09/13 15:02:32 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -9,26 +9,21 @@
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
 	interactiveUI,  -- :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
-	LibrarySpec(..),
 	ghciWelcomeMsg
    ) where
 
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import Packages
-
 import CompManager
-import CmTypes		( Linkable, isObjectLinkable, ModSummary(..) )
-import CmLink		( findModuleLinkable_maybe )
-
-import HscTypes		( TyThing(..), showModMsg, InteractiveContext(..) )
+import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
+			  isObjectLinkable )
 import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
 import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
-import DriverUtil	( handle, remove_spaces )
-import Linker
+import DriverUtil	( remove_spaces, handle )
+import Linker		( initLinker, showLinkerState, linkLibraries )
 import Finder		( flushPackageCache )
 import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
@@ -37,11 +32,11 @@ import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
-import Module		( moduleName )
+import Module		( showModMsg, lookupModuleEnv )
 import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )
 import OccName		( isSymOcc )
-import BasicTypes	( defaultFixity )
+import BasicTypes	( defaultFixity, SuccessFlag(..) )
 import Outputable
 import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 			  restoreDynFlags, dopt_unset )
@@ -53,6 +48,7 @@ import System.Posix
 #endif
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+import Control.Concurrent	( yield )	-- Used in readline loop
 import System.Console.Readline as Readline
 #endif
 
@@ -77,7 +73,6 @@ import GHC.Exts		( unsafeCoerce# )
 import Foreign		( nullPtr )
 import Foreign.C.String	( CString, peekCString, withCString )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
-
 
 -----------------------------------------------------------------------------
 
@@ -152,42 +147,26 @@ helpText = "\
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
-interactiveUI cmstate paths cmdline_libs = do
+interactiveUI :: CmState -> [FilePath] -> [FilePath] -> IO ()
+interactiveUI cmstate paths cmdline_objs = do
    hFlush stdout
    hSetBuffering stdout NoBuffering
 
    dflags <- getDynFlags
 
-   -- link in the available packages
-   pkgs <- getPackageInfo
+   -- Link in the available packages
    initLinker
-   linkPackages dflags cmdline_libs pkgs
+	--	Now that demand-loading works, we don't really need to pre-load the packages
+	--   pkgs <- getPackages
+	--   linkPackages dflags  pkgs
+   linkLibraries dflags cmdline_objs
 
-   (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
-   case maybe_hval of
-	Just hval -> do
-		let action = unsafeCoerce# hval :: IO ()
-		action -- do it now
-		writeIORef turn_off_buffering action -- and save it for later
-	_ -> panic "interactiveUI:buffering"
-
-   (cmstate, maybe_hval)
-	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stderr"
-   case maybe_hval of
-	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
-	_ -> panic "interactiveUI:stderr"
-
-   (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stdout"
-   case maybe_hval of
-	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
-	_ -> panic "interactiveUI:stdout"
+	-- Initialise buffering for the *interpreted* I/O system
+   cmstate <- initInterpBuffering cmstate dflags
 
 	-- We don't want the cmd line to buffer any input that might be
 	-- intended for the program, so unbuffer stdin.
-   hSetBuffering stdin  NoBuffering
+   hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
    cmstate <- cmSetContext cmstate dflags [] ["Prelude"]
@@ -208,7 +187,6 @@ interactiveUI cmstate paths cmdline_libs = do
 #endif
 
    return ()
-
 
 runGHCi :: [FilePath] -> DynFlags -> GHCi ()
 runGHCi paths dflags = do
@@ -358,7 +336,7 @@ readlineLoop = do
 runCommand :: String -> GHCi Bool
 runCommand c = 
   ghciHandle ( \exception -> do
-		flushEverything
+		flushInterpBuffers
 		showException exception
 		return False
 	     ) $
@@ -402,9 +380,9 @@ finishEvalExpr names
       cmstate <- getCmState
       when b (mapM_ (showTypeOfName cmstate) names)
 
+      flushInterpBuffers
       b <- isOptionSet RevertCAFs
       io (when b revertCAFs)
-      flushEverything
       return True
 
 showTypeOfName :: CmState -> Name -> GHCi ()
@@ -413,12 +391,6 @@ showTypeOfName cmstate n
 	case maybe_str of
 	  Nothing  -> return ()
 	  Just str -> io (putStrLn (showSDoc (ppr n) ++ " :: " ++ str))
-
-flushEverything :: GHCi ()
-flushEverything
-   = io $ do Monad.join (readIORef flush_stdout)
-     	     Monad.join (readIORef flush_stderr)
-             return ()
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -435,6 +407,46 @@ specialCommand str = do
 					 ++ ")") >> return False)
 
 noArgs c = throwDyn (CmdLineError ("command `" ++ c ++ "' takes no arguments"))
+
+
+-----------------------------------------------------------------------------
+-- To flush buffers for the *interpreted* computation we need
+-- to refer to *its* stdout/stderr handles
+
+GLOBAL_VAR(flush_interp,       error "no flush_interp", IO ())
+GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
+
+no_buf_cmd = "IO.hSetBuffering IO.stdout IO.NoBuffering" ++
+	     " Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
+flush_cmd  = "IO.hFlush IO.stdout Prelude.>> IO.hFlush IO.stderr"
+
+initInterpBuffering :: CmState -> DynFlags -> IO CmState
+initInterpBuffering cmstate dflags
+ = do (cmstate, maybe_hval) <- cmCompileExpr cmstate dflags no_buf_cmd
+	
+      case maybe_hval of
+	Just hval -> writeIORef turn_off_buffering (unsafeCoerce# hval :: IO ())
+	other	  -> panic "interactiveUI:setBuffering"
+	
+      (cmstate, maybe_hval) <- cmCompileExpr cmstate dflags flush_cmd
+      case maybe_hval of
+	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
+	_         -> panic "interactiveUI:flush"
+
+      turnOffBuffering	-- Turn it off right now
+
+      return cmstate
+
+
+flushInterpBuffers :: GHCi ()
+flushInterpBuffers
+ = io $ do Monad.join (readIORef flush_interp)
+           return ()
+
+turnOffBuffering :: IO ()
+turnOffBuffering
+ = do Monad.join (readIORef turn_off_buffering)
+      return ()
 
 -----------------------------------------------------------------------------
 -- Commands
@@ -623,9 +635,9 @@ modulesLoadedMsg ok mods dflags =
 	| otherwise = hsep (
 	    punctuate comma (map text mods)) <> text "."
    case ok of
-    False ->
+    Failed ->
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
-    True  ->
+    Succeeded  ->
        io (putStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas)))
 
 
@@ -701,7 +713,7 @@ browseModule m exports_only = do
 		rn_decl{ tcdCons = DataCons (filter conIsVisible cons) }
 	  other -> other
         where
-	  conIsVisible (ConDecl n _ _ _ _ _) = n `elem` thing_names
+	  conIsVisible (ConDecl n _ _ _ _) = n `elem` thing_names
 
   io (putStrLn (showSDocForUser unqual (
    	 vcat (map (ppr . thingDecl) things')))
@@ -877,18 +889,14 @@ optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
 
-newPackages new_pkgs = do
-  state <- getGHCiState
-  dflags <- io getDynFlags
+newPackages new_pkgs = do	-- The new packages are already in v_Packages
+  state    <- getGHCiState
+  dflags   <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, targets = [] }
 
-  io $ do
-    pkgs <- getPackageInfo
-    flushPackageCache pkgs
-   
-    new_pkg_info <- getPackageDetails new_pkgs
-    mapM_ (linkPackage dflags) (reverse new_pkg_info)
+  io $ do pkgs <- getPackageInfo
+	  flushPackageCache pkgs
 
   setContextAfterLoad []
 
@@ -899,21 +907,25 @@ showCmd str =
   case words str of
 	["modules" ] -> showModules
 	["bindings"] -> showBindings
+	["linker"]   -> io showLinkerState
 	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
 
 showModules = do
   cms <- getCmState
-  let mg = cmGetModuleGraph cms
-      ls = cmGetLinkables   cms
-      maybe_linkables = map (findModuleLinkable_maybe ls) 
-				(map (moduleName.ms_mod) mg)
-  zipWithM showModule mg maybe_linkables
-  return ()
+  let (mg, hpt) = cmGetModInfo cms
+  mapM_ (showModule hpt) mg
 
-showModule :: ModSummary -> Maybe Linkable -> GHCi ()
-showModule m (Just l) = do
-  io (putStrLn (showModMsg (isObjectLinkable l) (ms_mod m) (ms_location m)))
-showModule _ Nothing = panic "missing linkable"
+
+showModule :: HomePackageTable -> ModSummary -> GHCi ()
+showModule hpt mod_summary
+  = case lookupModuleEnv hpt mod of
+	Nothing	      -> panic "missing linkable"
+	Just mod_info -> io (putStrLn (showModMsg obj_linkable mod locn))
+		      where
+			 obj_linkable = isObjectLinkable (hm_linkable mod_info)
+  where
+    mod = ms_mod mod_summary
+    locn = ms_location mod_summary
 
 showBindings = do
   cms <- getCmState
@@ -923,6 +935,7 @@ showBindings = do
 
   io (mapM_ showBinding (cmGetBindings cms))
   return ()
+
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -941,10 +954,6 @@ data GHCiOption
 	| ShowType		-- show the type of expressions
 	| RevertCAFs		-- revert CAFs after every evaluation
 	deriving Eq
-
-GLOBAL_VAR(flush_stdout, error "no flush_stdout", IO ())
-GLOBAL_VAR(flush_stderr, error "no flush_stdout", IO ())
-GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }
 
@@ -1000,219 +1009,6 @@ ghciUnblock :: GHCi a -> GHCi a
 ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 
 -----------------------------------------------------------------------------
--- package loader
-
--- Left: full path name of a .o file, including trailing .o
--- Right: "unadorned" name of a .DLL/.so
---        e.g.    On unix     "qt"  denotes "libqt.so"
---                On WinDoze  "burble"  denotes "burble.DLL"
---        addDLL is platform-specific and adds the lib/.so/.DLL
---        suffixes platform-dependently; we don't do that here.
--- 
--- For dynamic objects only, try to find the object file in all the 
--- directories specified in v_Library_Paths before giving up.
-
-data LibrarySpec = Object FilePath | DLL String
-#ifdef darwin_TARGET_OS
-		    | Framework String
-#endif
-
--- Packages that don't need loading, because the compiler shares them with
--- the interpreted program.
-dont_load_these = [ "rts" ]
-
--- Packages that are already linked into GHCi.  For mingw32, we only
--- skip gmp and rts, since std and after need to load the msvcrt.dll
--- library which std depends on.
-loaded_in_ghci
-#          ifndef mingw32_TARGET_OS
-           = [ "std", "concurrent", "posix", "text", "util" ]
-#          else
-	   = [ ]
-#          endif
-
-showLS (Object nm)  = "(static) " ++ nm
-showLS (DLL nm) = "(dynamic) " ++ nm
-#ifdef darwin_TARGET_OS
-showLS (Framework nm) = "(framework) " ++ nm
-#endif
-
-linkPackages :: DynFlags -> [LibrarySpec] -> [PackageConfig] -> IO ()
-linkPackages dflags cmdline_lib_specs pkgs
-   = do mapM_ (linkPackage dflags) (reverse pkgs)
-        lib_paths <- readIORef v_Library_paths
-        mapM_ (preloadLib dflags lib_paths) cmdline_lib_specs
-	if (null cmdline_lib_specs)
-	   then return ()
-	   else do maybePutStr dflags "final link ... "
-
-		   ok <- resolveObjs
-		   if ok then maybePutStrLn dflags "done."
-	      		 else throwDyn (InstallationError 
-                                          "linking extra libraries/objects failed")
-     where
-        preloadLib :: DynFlags -> [String] -> LibrarySpec -> IO ()
-        preloadLib dflags lib_paths lib_spec
-           = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
-                case lib_spec of
-                   Object static_ish
-                      -> do b <- preload_static lib_paths static_ish
-                            maybePutStrLn dflags (if b  then "done." 
-							else "not found")
-                   DLL dll_unadorned
-                      -> -- We add "" to the set of paths to try, so that
-                         -- if none of the real paths match, we force addDLL
-                         -- to look in the default dynamic-link search paths.
-                         do maybe_errstr <- loadDynamic (lib_paths++[""]) 
-                                                            dll_unadorned
-                            case maybe_errstr of
-                               Nothing -> return ()
-                               Just mm -> preloadFailed mm lib_paths lib_spec
-                            maybePutStrLn dflags "done"
-
-        preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
-        preloadFailed sys_errmsg paths spec
-           = do maybePutStr dflags
-		       ("failed.\nDynamic linker error message was:\n   " 
-                        ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
-                        ++ showLS spec ++ "\nDirectories to search are:\n"
-                        ++ unlines (map ("   "++) paths) )
-                give_up
-
-        -- not interested in the paths in the static case.
-        preload_static paths name
-           = do b <- doesFileExist name
-                if not b then return False
-                         else loadObj name >> return True
-
-        give_up 
-           = (throwDyn . CmdLineError)
-                "user specified .o/.so/.DLL could not be loaded."
-
-linkPackage :: DynFlags -> PackageConfig -> IO ()
-linkPackage dflags pkg
-   | name pkg `elem` dont_load_these = return ()
-   | otherwise
-   = do 
-        let dirs      =  library_dirs pkg
-        let libs      =  hs_libraries pkg ++ extra_libraries pkg
-        classifieds   <- mapM (locateOneObj dirs) libs
-#ifdef darwin_TARGET_OS
-        let fwDirs    =  framework_dirs pkg
-        let frameworks=  extra_frameworks pkg
-#endif
-
-        -- Complication: all the .so's must be loaded before any of the .o's.  
-	let dlls = [ dll | DLL dll <- classifieds ]
-	    objs = [ obj | Object obj <- classifieds ]
-
-	maybePutStr dflags ("Loading package " ++ name pkg ++ " ... ")
-
-	-- If this package is already part of the GHCi binary, we'll already
-	-- have the right DLLs for this package loaded, so don't try to
-	-- load them again.
-	when (name pkg `notElem` loaded_in_ghci) $ do
-#ifdef darwin_TARGET_OS
-	    loadFrameworks fwDirs frameworks
-#endif
-	    loadDynamics dirs dlls
-	
-	-- After loading all the DLLs, we can load the static objects.
-	mapM_ loadObj objs
-
-        maybePutStr dflags "linking ... "
-        ok <- resolveObjs
-	if ok then maybePutStrLn dflags "done."
-	      else panic ("can't load package `" ++ name pkg ++ "'")
-
-loadDynamics dirs [] = return ()
-loadDynamics dirs (dll:dlls) = do
-  r <- loadDynamic dirs dll
-  case r of
-    Nothing  -> loadDynamics dirs dlls
-    Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
-                                       ++ dll ++ " (" ++ err ++ ")" ))
-#ifdef darwin_TARGET_OS
-loadFrameworks dirs [] = return ()
-loadFrameworks dirs (fw:fws) = do
-  r <- loadFramework dirs fw
-  case r of
-    Nothing  -> loadFrameworks dirs fws
-    Just err -> throwDyn (CmdLineError ("can't load framework: " 
-                                       ++ fw ++ " (" ++ err ++ ")" ))
-#endif
-
--- Try to find an object file for a given library in the given paths.
--- If it isn't present, we assume it's a dynamic library.
-locateOneObj :: [FilePath] -> String -> IO LibrarySpec
-locateOneObj [] lib
-   = return (DLL lib) -- we assume
-locateOneObj (d:ds) lib
-   = do let path = d ++ '/':lib ++ ".o"
-        b <- doesFileExist path
-        if b then return (Object path) else locateOneObj ds lib
-
--- ----------------------------------------------------------------------------
--- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
-
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
-loadDynamic paths rootname = addDLL rootname
-  -- ignore paths on windows (why? --SDM)
-
-#else
-
--- return Nothing == success, else Just error message from dlopen
-loadDynamic (path:paths) rootname = do
-  let dll = path ++ '/':mkSOName rootname
-  b <- doesFileExist dll
-  if not b
-     then loadDynamic paths rootname
-     else addDLL dll
-loadDynamic [] rootname = do
-	-- tried all our known library paths, let dlopen() search its
-	-- own builtin paths now.
-   addDLL (mkSOName rootname)
-
-#ifdef darwin_TARGET_OS
-mkSOName root = "lib" ++ root ++ ".dylib"
-#else
-mkSOName root = "lib" ++ root ++ ".so"
-#endif
-
-#endif
-
--- Darwin / MacOS X only: load a framework
--- a framework is a dynamic library packaged inside a directory of the same
--- name. They are searched for in different paths than normal libraries.
-#ifdef darwin_TARGET_OS
-loadFramework extraPaths rootname
-   = loadFramework' (extraPaths ++ defaultFrameworkPaths) where
-   defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
-
-   loadFramework' (path:paths) = do
-      let dll = path ++ '/' : rootname ++ ".framework/" ++ rootname
-      b <- doesFileExist dll
-      if not b
-         then loadFramework' paths
-         else addDLL dll
-   loadFramework' [] = do
-	-- tried all our known library paths, but dlopen()
-	-- has no built-in paths for frameworks: give up
-      return $ Just $ "not found"
-#endif
-
-addDLL :: String -> IO (Maybe String)
-addDLL str = do
-  maybe_errmsg <- withCString str $ \dll -> c_addDLL dll
-  if maybe_errmsg == nullPtr
-	then return Nothing
-	else do str <- peekCString maybe_errmsg
-		return (Just str)
-
-foreign import ccall "addDLL" unsafe  
-  c_addDLL :: CString -> IO CString
-
------------------------------------------------------------------------------
 -- timing & statistics
 
 timeIt :: GHCi a -> GHCi a
@@ -1228,7 +1024,7 @@ timeIt action
 		  io $ printTimes (allocs2 - allocs1) (time2 - time1)
 		  return a
 
-foreign import "getAllocations" getAllocations :: IO Int
+foreign import ccall "getAllocations" getAllocations :: IO Int
 
 printTimes :: Int -> Integer -> IO ()
 printTimes allocs psecs
@@ -1246,21 +1042,15 @@ looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
 
 isAlphaNumEx c = isAlphaNum c || c == '_' || c == '.'
 
-maybePutStr dflags s | verbosity dflags > 0 = putStr s
-		     | otherwise	    = return ()
-
-maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
-		       | otherwise	      = return ()
-
 -----------------------------------------------------------------------------
 -- reverting CAFs
 	
 revertCAFs :: IO ()
 revertCAFs = do
   rts_revertCAFs
-  Monad.join (readIORef turn_off_buffering)
-	-- have to do this again, because we just reverted
-	-- stdout, stderr & stdin to their defaults.
+  turnOffBuffering
+	-- Have to turn off buffering again, because we just 
+	-- reverted stdout, stderr & stdin to their defaults.
 
 foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()  
-	-- make it "safe", just in case
+	-- Make it "safe", just in case

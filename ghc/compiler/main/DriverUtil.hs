@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.33 2002/08/29 15:44:15 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.34 2002/09/13 15:02:34 simonpj Exp $
 --
 -- Utils for the driver
 --

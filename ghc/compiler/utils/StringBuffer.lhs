@@ -32,9 +32,9 @@ module StringBuffer
 	lexemeIndex,	  -- :: StringBuffer -> Int#
 
 	 -- moving the end point of the current lexeme.
-        setCurrentPos#,   -- :: StringBuffer -> Int# -> StringBuffer
-	incLexeme,	  -- :: StringBuffer -> StringBuffer
-	decLexeme,	  -- :: StringBuffer -> StringBuffer
+        addToCurrentPos,   -- :: StringBuffer -> Int# -> StringBuffer
+	incCurrentPos,	  -- :: StringBuffer -> StringBuffer
+	decCurrentPos,	  -- :: StringBuffer -> StringBuffer
 
          -- move the start and end lexeme pointer on by x units.        
         stepOn,           -- :: StringBuffer -> StringBuffer
@@ -91,7 +91,7 @@ import GLAEXTS
 import Foreign
 
 #if __GLASGOW_HASKELL__ >= 502
-import CForeign
+import CString ( newCString )
 #endif
 
 import IO		( openFile, isEOFError )
@@ -340,16 +340,16 @@ lexemeIndex (StringBuffer fo# _ c# _) = c#
 
 \begin{code}
  -- moving the end point of the current lexeme.
-setCurrentPos# :: StringBuffer -> Int# -> StringBuffer
-setCurrentPos# (StringBuffer fo l# s# c#) i# =
+addToCurrentPos :: StringBuffer -> Int# -> StringBuffer
+addToCurrentPos (StringBuffer fo l# s# c#) i# =
  StringBuffer fo l# s# (c# +# i#)
 
 -- augmenting the current lexeme by one.
-incLexeme :: StringBuffer -> StringBuffer
-incLexeme (StringBuffer fo l# s# c#) = StringBuffer fo l# s# (c# +# 1#)
+incCurrentPos :: StringBuffer -> StringBuffer
+incCurrentPos (StringBuffer fo l# s# c#) = StringBuffer fo l# s# (c# +# 1#)
 
-decLexeme :: StringBuffer -> StringBuffer
-decLexeme (StringBuffer fo l# s# c#) = StringBuffer fo l# s# (c# -# 1#)
+decCurrentPos :: StringBuffer -> StringBuffer
+decCurrentPos (StringBuffer fo l# s# c#) = StringBuffer fo l# s# (c# -# 1#)
 
 \end{code}
 

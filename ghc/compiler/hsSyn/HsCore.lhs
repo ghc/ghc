@@ -16,7 +16,7 @@ module HsCore (
 	UfBinding(..), UfConAlt(..),
 	HsIdInfo(..), pprHsIdInfo,
 	
-	eq_ufExpr, eq_ufBinders, pprUfExpr, pprHsIdInfo,
+	eq_ufExpr, eq_ufBinders, pprUfExpr, 
 
 	toUfExpr, toUfBndr, ufBinderName
     ) where
@@ -34,9 +34,8 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
 import IdInfo		( InlinePragInfo )
-import Name		( Name, NamedThing(..), toRdrName )
+import Name		( Name, NamedThing(..), eqNameByOcc )
 import RdrName		( RdrName, rdrNameOcc )
-import OccName		( isTvOcc )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import NewDemand	( StrictSig, pprIfaceStrictSig )
@@ -63,7 +62,7 @@ import FastString
 data UfExpr name
   = UfVar 	name
   | UfType      (HsType name)
-  | UfTuple 	(HsTupCon name) [UfExpr name]		-- Type arguments omitted
+  | UfTuple 	HsTupCon [UfExpr name]		-- Type arguments omitted
   | UfLam 	(UfBinder name)	(UfExpr name)
   | UfApp 	(UfExpr name)   (UfExpr name)
   | UfCase	(UfExpr name) name [UfAlt name]
@@ -82,7 +81,7 @@ type UfAlt name = (UfConAlt name, [name], UfExpr name)
 
 data UfConAlt name = UfDefault
  		   | UfDataAlt name
-		   | UfTupleAlt (HsTupCon name)
+		   | UfTupleAlt HsTupCon
 		   | UfLitAlt Literal
 		   | UfLitLitAlt FastString (HsType name)
 
@@ -145,7 +144,7 @@ toUfCon (LitAlt l)   = case maybeLitLit l of
 toUfCon DEFAULT	     = UfDefault
 
 ---------------------
-mk_hs_tup_con tc dc = HsTupCon (getName dc) (tupleTyConBoxity tc) (dataConSourceArity dc)
+mk_hs_tup_con tc dc = HsTupCon (tupleTyConBoxity tc) (dataConSourceArity dc)
 
 ---------------------
 toUfBndr x | isId x    = UfValBinder (getName x) (toHsType (varType x))
@@ -186,7 +185,7 @@ toUfVar v = case isFCallId_maybe v of
 %************************************************************************
 
 \begin{code}
-instance (NamedThing name, Outputable name) => Outputable (UfExpr name) where
+instance OutputableBndr name => Outputable (UfExpr name) where
     ppr e = pprUfExpr noParens e
 
 
@@ -200,7 +199,7 @@ instance NamedThing RdrName where
 noParens :: SDoc -> SDoc
 noParens pp = pp
 
-pprUfExpr :: (NamedThing name, Outputable name) => (SDoc -> SDoc) -> UfExpr name -> SDoc
+pprUfExpr :: OutputableBndr name => (SDoc -> SDoc) -> UfExpr name -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
@@ -210,7 +209,7 @@ pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprHs
 pprUfExpr add_par (UfFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
 
-pprUfExpr add_par e@(UfLam _ _)   = add_par (char '\\' <+> hsep (map ppr bndrs)
+pprUfExpr add_par e@(UfLam _ _)   = add_par (char '\\' <+> hsep (map (pprBndr LambdaBind) bndrs)
                                              <+> ptext SLIT("->") <+> pprUfExpr noParens body)
                                   where (bndrs,body) = collectUfBndrs e
 pprUfExpr add_par app@(UfApp _ _) = add_par (pprUfApp app)
@@ -221,17 +220,13 @@ pprUfExpr add_par (UfCase scrut bndr alts)
 		       braces (hsep (map pp_alt alts))])
       where
 	pp_alt (UfTupleAlt tup_con, bs, rhs) = hsTupParens tup_con (interpp'SP bs) <+> ppr_rhs rhs
-	pp_alt (c,		    bs, rhs) = ppr c <+> hsep (map pp_bndr bs) <+> ppr_rhs rhs
+	pp_alt (c,		    bs, rhs) = ppr c <+> hsep (map (pprBndr CaseBind) bs) <+> ppr_rhs rhs
 
         ppr_rhs rhs = ptext SLIT("->") <+> pprUfExpr noParens rhs <> semi
 
-	-- This use of getOccName is the sole reason for the NamedThing in pprUfExpr's type
-	pp_bndr v   | isTvOcc (getOccName v) = char '@' <+> ppr v
-		    | otherwise		     = ppr v
-
 pprUfExpr add_par (UfLet (UfNonRec b rhs) body)
       = add_par (hsep [ptext SLIT("let"), 
-		       braces (ppr b <+> equals <+> pprUfExpr noParens rhs), 
+		       braces (pprBndr LetBind b <+> equals <+> pprUfExpr noParens rhs), 
 		       ptext SLIT("in"), pprUfExpr noParens body])
 
 pprUfExpr add_par (UfLet (UfRec pairs) body)
@@ -267,6 +262,10 @@ instance Outputable name => Outputable (UfConAlt name) where
 instance Outputable name => Outputable (UfBinder name) where
     ppr (UfValBinder name ty)  = hsep [ppr name, dcolon, pprParendHsType ty]
     ppr (UfTyBinder name kind) = char '@' <+> pprHsTyVarBndr name kind
+
+instance OutputableBndr name => OutputableBndr (UfBinder name) where
+    pprBndr _ (UfValBinder name ty)  = hsep [ppr name, dcolon, pprParendHsType ty]
+    pprBndr _ (UfTyBinder name kind) = char '@' <+> pprHsTyVarBndr name kind
 \end{code}
 
 
@@ -315,9 +314,10 @@ eq_ufVar :: (NamedThing name, Ord name) => EqHsEnv name -> name -> name -> Bool
 -- Compare *Rdr* names.  A real hack to avoid gratuitous 
 -- differences when comparing interface files
 eq_ufVar env n1 n2 = case lookupFM env n1 of
-		       Just n1 -> toRdrName n1 == toRdrName n2
-		       Nothing -> toRdrName n1 == toRdrName n2
-
+		       Just n1 -> check n1
+		       Nothing -> check n2
+   where
+	check n1 = eqNameByOcc (getName n1) (getName n2)
 
 -----------------
 eq_ufExpr :: (NamedThing name, Ord name) => EqHsEnv name -> UfExpr name -> UfExpr name -> Bool
@@ -374,7 +374,7 @@ eq_ufConAlt env _ _ = False
 %************************************************************************
 
 \begin{code}
-pprHsIdInfo :: (NamedThing n, Outputable n) => [HsIdInfo n] -> SDoc
+pprHsIdInfo :: OutputableBndr n => [HsIdInfo n] -> SDoc
 pprHsIdInfo []   = empty
 pprHsIdInfo info = ptext SLIT("{-##") <+> hsep (map ppr_hs_info info) <+> ptext SLIT("##-}")
 

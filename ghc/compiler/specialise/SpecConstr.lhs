@@ -18,7 +18,7 @@ import CoreTidy		( pprTidyIdRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import Id		( Id, idName, idType, idSpecialisation,
+import Id		( Id, idName, idType, 
 			  isDataConId_maybe, 
 			  mkUserLocal, mkSysLocal )
 import Var		( Var )
