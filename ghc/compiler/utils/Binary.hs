@@ -55,6 +55,7 @@ import FastString
 import Unique
 import Panic
 import UniqFM
+import FastMutInt
 
 #if __GLASGOW_HASKELL__ < 503
 import IOExts
@@ -553,26 +554,6 @@ instance (Integral a, Binary a) => Binary (Ratio a) where
 instance Binary (Bin a) where
   put_ bh (BinPtr i) = put_ bh i
   get bh = do i <- get bh; return (BinPtr i)
-
--- -----------------------------------------------------------------------------
--- unboxed mutable Ints
-
-#ifdef __GLASGOW_HASKELL__
-data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
-
-newFastMutInt = IO $ \s ->
-  case newByteArray# size s of { (# s, arr #) ->
-  (# s, FastMutInt arr #) }
-  where I# size = SIZEOF_HSWORD
-
-readFastMutInt (FastMutInt arr) = IO $ \s ->
-  case readIntArray# arr 0# s of { (# s, i #) ->
-  (# s, I# i #) }
-
-writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
-  case writeIntArray# arr 0# i s of { s ->
-  (# s, () #) }
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing
