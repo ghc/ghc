@@ -687,9 +687,6 @@ sub mangle_asm {
 	# (see elsewhere)
 	$c = &hppa_mash_prologue($c) if $TargetPlatform =~ /^hppa-/;
 
-	# do some register renaming before dropping the prologue
-	$c = &ia64_rename_outputs($c) if $TargetPlatform =~ /^ia64-/;
-
 	# be slightly paranoid to make sure there's
 	# nothing surprising in there
 	if ( $c =~ /--- BEGIN ---/ ) {
@@ -717,7 +714,7 @@ sub mangle_asm {
 
 		} elsif ($TargetPlatform =~ /^ia64-/) {
 		    $p =~ s/^\t\.prologue .*\n//;
-		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, .*\n//;
+		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, 31, \d+, 0\n//;
 		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//;
 		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//;
 		    $p =~ s/^\t\.(mii|mmi)\n//;	# bundling is no longer sensible
@@ -1249,45 +1246,6 @@ sub hppa_mash_prologue { # OK, epilogue, too
     s/_info,DATA/_info,CODE/g;
 
     return($_);
-}
-\end{code}
-
-On IA64 we use a single register frame throughout STG execution, and delete
-the frame management instructions from the prologue and epilogue - similarly
-to the memory stack.  Unfortunately, gcc always uses absolute register names
-instead of logical names like out0.  This means that outputs (i.e. inputs to
-other functions) will end up in the wrong registers relative to our "frame".
-Hence this evil register renaming....
-
-\begin{code}
-sub ia64_rename_outputs {
-    local($_) = @_;
-
-    return ($_) if (!/^\talloc r\d+ = ar\.pfs, (\d+), (\d+), (\d+), (\d+)$/);
-
-    local($inputs,$locals,$outputs,$rotating) = ($1,$2,$3,$4);
-    local($oldbase,$newbase,$old,$new,$i);
-    local($LOCALS) = 24; # must correspond to value in StgCRun.c
-
-    # Check everything fits in our standard frame.  Only 8 outputs should
-    # ever go in registers.
-
-    die "No inputs allowed: $inputs"               if ($inputs > 0);
-    die "Too many locals: $locals"                 if ($locals > $LOCALS);
-    die "Too many outputs: $outputs"               if ($outputs > 8);
-    die "No rotating registers allowed: $rotating" if ($rotating > 0);
-
-    $outbase = 32 + $inputs + $locals;
-    $newbase = 32 + 0 + $LOCALS;
-
-    # Always do renaming from the top to avoid collisions
-    for ($i = $outputs-1; $i >= 0; $i--) {
-	$old = $outbase + $i;
-	$new = $newbase + $i;
-	s/\br$old\b/r$new/g;
-    }
-
-    return ($_);
 }
 \end{code}
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.34 2002/06/03 13:08:41 matthewc Exp $
+ * $Id: StgCRun.c,v 1.35 2002/06/07 09:40:10 matthewc Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -465,7 +465,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
-void StgRunIsImplementedInAssembler(void)
+static void StgRunIsImplementedInAssembler(void)
 {
 	__asm__ volatile (
 		"\n.globl _StgRun\n"
@@ -491,7 +491,13 @@ void StgRunIsImplementedInAssembler(void)
 /* -----------------------------------------------------------------------------
    IA64 architecture
 
-   Again, in assembler - so we can fiddle with the register stack.
+   Again, in assembler - so we can fiddle with the register stack, and because
+   gcc doesn't handle asm-clobbered callee-saves correctly.
+
+   loc0  - loc15: preserved locals
+   loc16 - loc28: STG registers
+           loc29: saved ar.pfs
+           loc30: saved b0
    -------------------------------------------------------------------------- */
 
 #ifdef ia64_TARGET_ARCH
@@ -500,26 +506,42 @@ void StgRunIsImplementedInAssembler(void)
 #undef RESERVED_C_STACK_BYTES
 #define RESERVED_C_STACK_BYTES 1024
 
-void StgRunIsImplementedInAssembler(void)
+static void StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile(
 		".global StgRun\n"
 		"StgRun:\n"
-		"\talloc r55 = ar.pfs, 0, 24, 8, 0\n"	/* setup register frame */
-		"\tmov r54 = b0\n"			/* save return address */
-		"\tadds sp = -%0, sp\n"			/* setup stack */
-		"\tld8 r16=[r32],8 ;;\n"	/* branch to f using descriptor */
-		"\tld8 r1=[r32]\n"
-		"\tmov b6=r16\n"
-		"\tbr.few b6 ;;\n"
+		"\talloc loc29 = ar.pfs, 0, 31, 8, 0\n"	/* setup register frame */
+		"\tld8 r18 = [r32],8\n"			/* get procedure address */
+		"\tadds sp = -%0, sp ;;\n"		/* setup stack */
+		"\tld8 gp = [r32]\n"			/* get procedure GP */
+		"\tadds r16 = %0-(6*16), sp\n"
+		"\tadds r17 = %0-(5*16), sp ;;\n"
+		"\tstf.spill [r16] = f16,32\n"		/* spill callee-saved fp regs */
+		"\tstf.spill [r17] = f17,32\n"
+		"\tmov b6 = r18 ;;\n"			/* set target address */
+		"\tstf.spill [r16] = f18,32\n"
+		"\tstf.spill [r17] = f19,32\n"
+		"\tmov loc30 = b0 ;;\n"			/* save return address */
+		"\tstf.spill [r16] = f20,32\n"
+		"\tstf.spill [r17] = f21,32\n"
+		"\tbr.few b6 ;;\n"			/* branch to function */
 		".global StgReturn\n"
 		"StgReturn:\n"
-		"\tmov r8 = 0\n"		/* return value in r8 */
-		"\tmov ar.pfs = r55\n"		/* restore register frame */
-		"\tmov b0 = r54\n"		/* restore return address */
+		"\tmov r8 = loc16\n"		/* return value in r8 */
+		"\tadds r16 = %0-(6*16), sp\n"
+	    	"\tadds r17 = %0-(5*16), sp ;;\n"
+		"\tldf.fill f16 = [r16],32\n"	/* start restoring fp regs */
+		"\tldf.fill f17 = [r17],32\n"
+		"\tmov ar.pfs = loc29 ;;\n"	/* restore register frame */
+		"\tldf.fill f18 = [r16],32\n"
+		"\tldf.fill f19 = [r17],32\n"
+		"\tmov b0 = loc30 ;;\n"		/* restore return address */
+		"\tldf.fill f20 = [r16],32\n"
+		"\tldf.fill f21 = [r17],32\n"
 		"\tadds sp = %0, sp\n"		/* restore stack */
 		"\tbr.ret.sptk.many b0 ;;\n"	/* return */
-	: : "i"(RESERVED_C_STACK_BYTES));
+	: : "i"(RESERVED_C_STACK_BYTES + 6*16));
 }
 
 #endif

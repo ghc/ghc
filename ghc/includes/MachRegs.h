@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.10 2001/01/18 11:28:50 sewardj Exp $
+ * $Id: MachRegs.h,v 1.11 2002/06/07 09:40:10 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -390,6 +390,48 @@
 #define REG_HpLim	r26
 
 #endif /* powerpc */
+
+/* -----------------------------------------------------------------------------
+   The IA64 register mapping
+
+   We place the general registers in the locals area of the register stack,
+   so that the call mechanism takes care of saving them for us.  We reserve
+   the first 16 for gcc's use - since gcc uses the highest used register to
+   determine the register stack frame size, this gives us a constant size
+   register stack frame.
+   
+   \tr{f16-f32} are the callee-saved floating point registers.
+   -------------------------------------------------------------------------- */
+
+#ifdef ia64_TARGET_ARCH
+
+#define REG(x) __asm__(#x)
+
+#define REG_R1		loc16
+#define REG_R2		loc17
+#define REG_R3		loc18
+#define REG_R4		loc19
+#define REG_R5		loc20
+#define REG_R6		loc21
+#define REG_R7		loc22
+#define REG_R8		loc23
+
+#define REG_F1		f16
+#define REG_F2		f17
+#define REG_F3		f18
+#define REG_F4		f19
+
+#define REG_D1		f20
+#define REG_D2		f21
+
+#define REG_Sp		loc24
+#define REG_Su		loc25
+#define REG_SpLim	loc26
+
+#define REG_Hp		loc27
+#define REG_HpLim	loc28
+
+#endif /* ia64 */
 
 /* -----------------------------------------------------------------------------
    The Sun SPARC register mapping
