@@ -232,7 +232,7 @@ data ModIface
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Deprecations
-	mi_deprecs  :: Deprecs [(OccName,DeprecTxt)],
+	mi_deprecs  :: IfaceDeprecs,
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Type, class and variable declarations
