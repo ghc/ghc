@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.2 2001/08/17 12:50:34 simonmar Exp $
+ * $Id: HsCore.h,v 1.3 2001/09/13 11:40:28 simonmar Exp $
  *
  * Definitions for package `core' which are visible in Haskell land.
  *
@@ -104,9 +104,5 @@ HsInt systemCmd(HsAddr cmd);
 
 /* in inputReady.c */
 int inputReady(int fd, int msecs);
-
-/* in progargs.c */
-HsAddr get_prog_argv(void);
-HsInt  get_prog_argc();
 
 #endif
