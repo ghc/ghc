@@ -1,6 +1,8 @@
 import IO
-import IOExts
+import System.IO
 import Foreign
 import CForeign
 
-main = withCStringLen "hello world\n" $ \(ptr,len) -> hPutBuf stdout ptr len
+main = do
+  hSetBinaryMode stdout True
+  withCStringLen "hello world\n" $ \(ptr,len) -> hPutBuf stdout ptr len

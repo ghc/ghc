@@ -1,5 +1,6 @@
 import IO
-import IOExts
+import System.IO
+import Debug.Trace
 
 main = do
    hPutStr stderr

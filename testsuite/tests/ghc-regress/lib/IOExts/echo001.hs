@@ -1,7 +1,7 @@
 module Main(main) where
 
 import IO
-import IOExts
+import System.IO
 import Char
 
 main = do

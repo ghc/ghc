@@ -1,5 +1,5 @@
--- !!! test IOExts.performGC
+-- !!! test System.Mem.performGC
 
-import IOExts
+import System.Mem
 
 main = performGC

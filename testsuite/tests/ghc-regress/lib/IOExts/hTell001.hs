@@ -2,7 +2,7 @@
 module Main(main) where
 
 import IO
-import IOExts
+import System.IO
 
 getPosnAndPrint h = do
   x <- hTell h
@@ -44,7 +44,7 @@ main = do
        putStrLn ""
   hClose h
   putStrLn ""
-  h  <- openFileEx file (BinaryMode ReadMode)
+  h  <- openBinaryFile file ReadMode
   recordDoAndRepos h $
    recordDoAndRepos h $
     recordDoAndRepos h $

@@ -1,10 +1,10 @@
 import IO
-import IOExts
+import System.IO
 import Foreign
 import CForeign
 
 main = do
-  h <- openFile "hGetBuf001.hs" ReadMode
+  h <- openBinaryFile "hGetBuf001.hs" ReadMode
 
   let sz = 42
       loop = do
