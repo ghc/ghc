@@ -993,4 +993,18 @@ ghc-4.05.
 
 </Sect1>
 
+
+<Sect1>
+<Title>Building the documentation</Title>
+
+<Para>
+This is a slightly sore point at the moment, because the GHC team has been unable to strike a good balance between having a documentation system that is easy to maintain and one that is widely available. We use the DocBook DTD, which is widely used; however, shrink-wrapped distributions of DocBook are few and far between, and getting it to work out of the box is a nightmare. We settled on the Cygnus DocBook tools; however, these are only available as Red Hat RPMs, and hence at the moment the documentation can only be built on systems which can use RPMs (i.e. most versions of Linux). Sorry about that. We will probably add pre-built documentation to future binary distributions until the situation is sorted out (either we bite the bullet and have our own version of the DocBook tools, or a more portable distribution is made available).
+</Para>
+
+<Para>
+See the Building Guide for details of what to install to get the DocBook tools and how to build the documentation (it's done by the build system, but just isn't part of a normal build).
+</Para>
+
+</Sect1>
+
 </Chapter>
