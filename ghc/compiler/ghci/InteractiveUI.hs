@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.102 2001/12/05 00:06:32 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.103 2001/12/05 19:24:53 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -35,7 +35,7 @@ import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity )
 import Outputable
 import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
-import Panic		( GhcException(..) )
+import Panic		( GhcException(..), showGhcException )
 import Config
 
 #ifndef mingw32_TARGET_OS
@@ -323,7 +323,7 @@ showException (DynException dyn) =
     Nothing               -> io (putStrLn ("*** Exception: (unknown)"))
     Just Interrupted      -> io (putStrLn "Interrupted.")
     Just (CmdLineError s) -> io (putStrLn s)	 -- omit the location for CmdLineError
-    Just ph@PhaseFailed{} -> io (putStrLn (showGhcException ph)) -- ditto
+    Just ph@PhaseFailed{} -> io (putStrLn (showGhcException ph "")) -- ditto
     Just other_ghc_ex     -> io (print other_ghc_ex)
 
 showException other_exception

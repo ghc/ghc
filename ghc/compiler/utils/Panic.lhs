@@ -12,7 +12,8 @@ some unnecessary loops in the module dependency graph.
 module Panic  
    ( 
      GhcException(..), ghcError, progName, 
-     panic, panic#, assertPanic, trace 
+     panic, panic#, assertPanic, trace,
+     showGhcException
    ) where
 
 import Config
