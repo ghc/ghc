@@ -1,4 +1,4 @@
-%
+s%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcModule]{Typechecking a whole module}
@@ -75,7 +75,7 @@ import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
 			  LStmt, LHsExpr, LHsType, mkMatchGroup,
-			  collectStmtsBinders, mkSimpleMatch, placeHolderType,
+			  collectStmtsBinders, mkSimpleMatch, 
 			  nlLetStmt, nlExprStmt, nlBindStmt, nlResultStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
@@ -103,7 +103,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  tyThingToIfaceDecl, dfunToIfaceInst )
 import IfaceEnv		( lookupOrig )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( Id, isImplicitId, globalIdDetails )
+import Id		( Id, isImplicitId, setIdType, globalIdDetails )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
@@ -116,9 +116,8 @@ import Name		( nameOccName, nameModule )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
 import Module		( Module, lookupModuleEnv )
-import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
-			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
-			  availNames, availName, icPrintUnqual, ModIface(..),
+import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
+			  availNames, availName, ModIface(..),
 			  ModDetails(..), Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
@@ -127,7 +126,6 @@ import Panic		( ghcError, GhcException(..) )
 import SrcLoc		( SrcLoc )
 #endif
 
-import FastString	( mkFastString )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag )
 
@@ -735,12 +733,16 @@ tcRnStmt hsc_env ictxt rdr_stmt
     (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
     
     traceTc (text "tcs 1") ;
-    let {	-- Make all the bound ids "global" ids, now that
-    		-- they're notionally top-level bindings.  This is
-	    	-- important: otherwise when we come to compile an expression
-	    	-- using these ids later, the byte code generator will consider
-	    	-- the occurrences to be free rather than global.
-	global_ids     = map (globaliseId VanillaGlobal) bound_ids ;
+    let {	-- (a) Make all the bound ids "global" ids, now that
+    		--     they're notionally top-level bindings.  This is
+	    	--     important: otherwise when we come to compile an expression
+	    	--     using these ids later, the byte code generator will consider
+	    	--     the occurrences to be free rather than global.
+		-- 
+		-- (b) Tidy their types; this is important, because :info may
+		--     ask to look at them, and :info expects the things it looks
+		--     up to have tidy types
+	global_ids = map globaliseAndTidy bound_ids ;
     
 		-- Update the interactive context
 	rn_env   = ic_rn_local_env ictxt ;
@@ -769,8 +771,14 @@ tcRnStmt hsc_env ictxt rdr_stmt
 
     returnM (new_ic, bound_names, tc_expr)
     }
-\end{code}
 
+globaliseAndTidy :: Id -> Id
+globaliseAndTidy id
+-- Give the Id a Global Name, and tidy its type
+  = setIdType (globaliseId VanillaGlobal id) tidy_type
+  where
+    tidy_type = tidyTopType (idType id)
+\end{code}
 
 Here is the grand plan, implemented in tcUserStmt
 
