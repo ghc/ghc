@@ -480,12 +480,12 @@ appKeys k ks = foldl appKey k ks
 
 
 -- | Variant for unary type constructors
-class Typeable (t ()) => Typeable1 t where
+class Typeable1 t where
   typeOf1 :: t a -> TyCon
 
 
 -- | Variant for binary type constructors
-class Typeable (t () ()) => Typeable2 t where
+class Typeable2 t where
   typeOf2 :: t a b -> TyCon
 
 
