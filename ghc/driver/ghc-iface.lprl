@@ -49,9 +49,21 @@ sub postprocessHiFile {
     }
 
     # if we produced an interface file "no matter what",
-    # print what we got on stderr (ToDo: honor -ohi flag)
+    # print what we got on stderr.
     if ( $HiOnStdout ) {
-	system("$Cat $new_hi 1>&2");
+        if ( $HiWith ne '' ) {
+	    # output some of the sections
+	    local($hi_after)  = "$Tmp_prefix.hi-now";
+
+	    foreach $hi ( split(' ',$HiWith) ) { 
+	    	$HiSection{$hi} = 1; 
+	    }
+	    &hiSectionsOnly($new_hi, $hi_after);
+
+	    system("$Cat $hi_after 1>&2 ; $Rm $hi_after; ");
+	} else {
+            system("$Cat $new_hi 1>&2");
+	}
     } else {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
@@ -69,6 +81,32 @@ sub deUsagifyHi {
     while ($_ ne '') {
 	print NEWHIF $_ unless /^(__interface|import)/;
 	$_ = <OLDHIF>;
+    }
+
+    close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");
+    close(NEWHIF) || &tidy_up_and_die(1,"Failed writing to $ofile\n");
+}
+\end{code}
+
+\begin{code}
+sub hiSectionsOnly {
+    local($ifile,$ofile) = @_;
+
+    open(OLDHIF, "< $ifile") || &tidy_up_and_die(1,"Can't open $ifile (read)\n");
+    open(NEWHIF, "> $ofile") || &tidy_up_and_die(1,"Can't open $ofile (write)\n");
+
+    # read up to _usages_ line
+    $_ = <OLDHIF>;
+    while ($_ ne '' ) {
+	if ( /^__export/ && $HiSection {'exports'} 	     ||
+	     /^import /  && $HiSection {'imports'} 	     ||
+	     /^\d+ ([^ ]+ :: |type |data |class |newtype )/  && $HiSection {'declarations'} ||
+	     /^instance / && $HiSection {'instances'} ) {
+       	     print NEWHIF $_;
+       	     $_ = <OLDHIF>;
+        } else {
+          $_ = <OLDHIF>;
+	}
     }
 
     close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");

@@ -2792,6 +2792,8 @@ arg: while($_ = $Args[0]) {
 
     /^-hi$/	         && do { $HiOnStdout = 1; $ProduceHi = '-hifile='; next arg; };
     # _do_ generate an interface; usually used as: -noC -hi
+    /^-hi-with-(.*)$/    && do { $HiOnStdout = 1; $HiWith .= " $1" ; $ProduceHi = '-hifile='; next arg; };
+    # limit ourselves to outputting a particular section.
 
     /^-nohi$/	    && do { $ProduceHi = '-nohifile='; next arg; };
     # don't generate an interface (even if generating C)
