@@ -5,9 +5,10 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-test "fed001"   { vtr("-fglasgow-exts -package lang", 
-                     "", "") }
-test "ffi001"   { vtr("-fglasgow-exts -package lang", 
-                     "", "") }
-test "ffi002"   { vtr("ffi002.c -fglasgow-exts -no-hs-main", 
-                     "", "") }
+test "fed001"   { vtr("-fglasgow-exts -package lang",        "", "") }
+test "ffi001"   { vtr("-fglasgow-exts -package lang",        "", "") }
+
+-- skip this test for now: we don't have the machinery to compile the .c file
+-- separately.
+test "ffi002"   { skip when True
+		  vtr("ffi002.c -fglasgow-exts -no-hs-main", "", "") }
