@@ -606,7 +606,7 @@ ppr_con_details con (VanillaCon tys)
   = ppr con <+> hsep (map (ppr_bang) tys)
 
 ppr_con_details con (RecCon fields)
-  = ppr con <+> braces (hsep (punctuate comma (map ppr_field fields)))
+  = ppr con <+> braces (sep (punctuate comma (map ppr_field fields)))
   where
     ppr_field (ns, ty) = hsep (map (ppr) ns) <+> 
 			 dcolon <+>
