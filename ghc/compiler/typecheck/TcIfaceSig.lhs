@@ -67,8 +67,9 @@ tcInterfaceSigs unf_env (SigD (IfaceSig name ty id_infos src_loc) : rest)
 	    sig_id | any inline_please id_infos = addInlinePragma imp_id
 	           | otherwise	 	        = imp_id
 
-	    inline_please (HsUnfold inline _) = inline
-	    inline_please other		  = False
+	    inline_please (HsUnfold inline _)			       = inline
+	    inline_please (HsStrictness (HsStrictnessInfo _ (Just _))) = True	-- Inline wrappers
+	    inline_please other				 	       = False
 	in
 	returnTc sig_id
     ))						`thenTc` \ sig_id ->

@@ -184,7 +184,7 @@ tryWW	:: Id				-- The fn binder
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW fn_id rhs
-  | (certainlySmallEnoughToInline $
+  | (certainlySmallEnoughToInline fn_id $
      calcUnfoldingGuidance (getInlinePragma fn_id) 
 			  opt_UnfoldingCreationThreshold
 			  rhs

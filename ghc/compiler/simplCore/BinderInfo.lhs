@@ -145,7 +145,7 @@ okToInline False small_enough (OneOcc _ NoDupDanger _ n_alts _)
 -- If the thing isn't a redex, there's no danger of duplicating work, 
 -- so we can inline if it occurs once, or is small
 okToInline True small_enough occ_info 
- = small_enough || one_occ
+ = one_occ || small_enough
  where
    one_occ = case occ_info of
 		OneOcc _ _ _ n_alts _ -> n_alts <= 1

@@ -30,6 +30,7 @@ import Id		( idType, getIdInfo, getIdUnfolding,
 			  elemIdEnv, isNullIdEnv, addOneToIdEnv
 			)
 import SpecEnv		( lookupSpecEnv, substSpecEnv, isEmptySpecEnv )
+import OccurAnal	( occurAnalyseGlobalExpr )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
 import SimplEnv
@@ -64,7 +65,7 @@ completeVar env var args result_ty
   | maybeToBool maybe_specialisation
   = tick SpecialisationDone	`thenSmpl_`
     simplExpr (bindTyVars env spec_bindings) 
-	      spec_template
+	      (occurAnalyseGlobalExpr spec_template)
 	      remaining_args
 	      result_ty
 
@@ -87,7 +88,7 @@ completeVar env var args result_ty
     && ok_to_inline
     && costCentreOk (getEnclosingCC env) (getEnclosingCC unf_env)
     )
-  = pprTrace "Unfolding" (ppr var) $
+  = -- pprTrace "Unfolding" (ppr var) $
     unfold var unf_env unf_template args result_ty
 
 
@@ -135,7 +136,7 @@ completeVar env var args result_ty
     essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
     is_case_scrutinee	      = switchIsOn sw_chkr SimplCaseScrutinee
     ok_to_inline	      = okToInline (whnfOrBottom form) small_enough occ_info 
-    small_enough	      = smallEnoughToInline arg_evals is_case_scrutinee guidance
+    small_enough	      = smallEnoughToInline var arg_evals is_case_scrutinee guidance
     arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
 
     is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)

@@ -24,7 +24,7 @@ import Id		( idType, idMustBeINLINEd, idWantsToBeINLINEd, idMustNotBeINLINEd,
 			  addIdArity, getIdArity,
 			  getIdDemandInfo, addIdDemandInfo
 			)
-import Name		( isExported )
+import Name		( isExported, isLocallyDefined )
 import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
 			  atLeastArity, unknownArity )
 import Literal		( isNoRepLit )
@@ -1021,47 +1021,53 @@ Because then we can't remove the x=y binding, in which case we
 have just made things worse, perhaps a lot worse.
 
 \begin{code}
-	-- Right hand sides that are constructors
-	--	let v = C args
-	--	in
-	--- ...(let w = C same-args in ...)...
-	-- Then use v instead of w.	 This may save
-	-- re-constructing an existing constructor.
 completeNonRec env binder new_id new_rhs
-  |  not (isExported new_id)		-- Don't bother for exported things
-					-- because we won't be able to drop
-					-- its binding.
-  && maybeToBool maybe_atomic_rhs
-  = tick tick_type	`thenSmpl_`
+  = returnSmpl (env', [NonRec b r | (b,r) <- binds])
+  where
+    (env', binds) = completeBind env binder new_id new_rhs
+
+
+completeBind :: SimplEnv 
+	     -> InBinder -> OutId -> OutExpr		-- Id and RHS
+	     -> (SimplEnv, [(OutId, OutExpr)])		-- Final envt and binding(s)
+
+completeBind env binder@(_,occ_info) new_id new_rhs
+  | idMustNotBeINLINEd new_id		-- Occurrence analyser says "don't inline"
+  = (env, new_binds)
+
+  |  atomic_rhs			-- If rhs (after eta reduction) is atomic
+  && not (isExported new_id)	-- and binder isn't exported
+  = 	-- Drop the binding completely
     let
-	env1 = notInScope env new_id
-	env2 = bindIdToAtom env1 binder rhs_arg
+        env1 = notInScope env new_id
+	env2 = bindIdToAtom env1 binder the_arg
     in
-    returnSmpl (env2, [])
+    (env2, [])
+
+  |  atomic_rhs 		-- Rhs is atomic, and new_id is exported
+  && case eta'd_rhs of { Var v -> isLocallyDefined v && not (isExported v); other -> False }
+  =	-- The local variable v will be eliminated next time round
+	-- in favour of new_id, so it's a waste to replace all new_id's with v's
+	-- this time round.
+	-- This case is an optional improvement; saves a simplifier iteration
+    (env, [(new_id, eta'd_rhs)])
+
+  | otherwise				-- Non-atomic
+  = let
+	env1 = extendEnvGivenBinding env occ_info new_id new_rhs
+    in 
+    (env1, new_binds)
+	     
   where
-    Just (rhs_arg, tick_type) = maybe_atomic_rhs
-    maybe_atomic_rhs 
-      = 		-- Try first for an existing constructor application
-	case maybe_con new_rhs of {
-	Just con -> Just (VarArg con, ConReused);
+    new_binds  = [(new_id, new_rhs)]
+    atomic_rhs = is_atomic eta'd_rhs
+    eta'd_rhs  = case lookForConstructor env new_rhs of 
+		   Just v -> Var v
+		   other  -> etaCoreExpr new_rhs
 
- 	Nothing  ->	-- No good; try eta-reduction
-	case etaCoreExpr new_rhs of {
-	Var v -> Just (VarArg v, AtomicRhs);
-	Lit l -> Just (LitArg l, AtomicRhs);
-
-	other -> Nothing -- Neither worked, so return Nothing
-	}}
-	
-
-    maybe_con (Con con con_args) | switchIsSet env SimplReuseCon
-				 = lookForConstructor env con con_args 
-    maybe_con other_rhs		 = Nothing
-
-completeNonRec env binder@(id,occ_info) new_id new_rhs
-  = returnSmpl (new_env , [NonRec new_id new_rhs])
-  where
-    new_env = extendEnvGivenBinding env occ_info new_id new_rhs
+    the_arg    = case eta'd_rhs of
+			  Var v -> VarArg v
+			  Lit l -> LitArg l
 \end{code}
 
 ----------------------------------------------------------------------------
@@ -1203,31 +1209,11 @@ simplRecursiveGroup env (new_id : new_ids) ((binder@(id, occ_info), rhs) : pairs
   | otherwise
   = simplRhsExpr env binder rhs new_id		`thenSmpl` \ (new_rhs, arity) ->
     let
-	new_id' = new_id `withArity` arity
-    
-	-- ToDo: this next bit could usefully share code with completeNonRec
-
-        new_env 
-	  | idMustNotBeINLINEd new_id		-- Occurrence analyser says "don't inline"
-	  = env
-
-	  | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
-	  = let
-	       env1 = notInScope env new_id
-	    in
-    	    bindIdToAtom env1 binder the_arg
-
-	  | otherwise				-- Non-atomic
-	  = extendEnvGivenBinding env occ_info new_id new_rhs
-						-- Don't eta if it doesn't eliminate the binding
-
-        eta'd_rhs = etaCoreExpr new_rhs
-        the_arg   = case eta'd_rhs of
-			  Var v -> VarArg v
-			  Lit l -> LitArg l
+	new_id'   = new_id `withArity` arity
+        (new_env, new_binds') = completeBind env binder new_id' new_rhs
     in
     simplRecursiveGroup new_env new_ids pairs	`thenSmpl` \ (new_pairs, final_env) ->
-    returnSmpl ((new_id', new_rhs) : new_pairs, final_env)   
+    returnSmpl (new_binds' ++ new_pairs, final_env)   
   where
     ok_to_dup = switchIsSet env SimplOkToDupCode
 \end{code}

@@ -472,7 +472,8 @@ extendConApps con_apps id other_rhs = con_apps
 \end{code}
 
 \begin{code}
-lookForConstructor (SimplEnv _ _ _ _ _ con_apps) con args
+lookForConstructor env@(SimplEnv _ _ _ _ _ con_apps) (Con con args)
+  | switchIsSet env SimplReuseCon
   = case lookupFM con_apps (UCA con val_args) of
 	Nothing     -> Nothing
 
@@ -485,6 +486,7 @@ lookForConstructor (SimplEnv _ _ _ _ _ con_apps) con args
     val_args = filter isValArg args		-- Literals and Ids
     ty_args  = [ty | TyArg ty <- args]		-- Just types
 
+lookForConstructor env other = Nothing
 \end{code}
 
 NB: In @lookForConstructor@ we used (before Apr 94) to have a special case
@@ -590,7 +592,7 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env new_con_apps 
   where
     new_out_id_env | okToInline (whnfOrBottom form) 
-				(couldBeSmallEnoughToInline guidance) 
+				(couldBeSmallEnoughToInline out_id guidance) 
 				occ_info 
 		   = out_id_env_with_unfolding
 		   | otherwise

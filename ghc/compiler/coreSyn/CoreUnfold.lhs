@@ -313,11 +313,15 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
       = nukeScrutDiscount (size_up rhs)
 		`addSize`
 	size_up body
+		`addSizeN`
+	1	-- For the allocation
 
     size_up (Let (Rec pairs) body)
       = nukeScrutDiscount (foldr addSize sizeZero [size_up rhs | (_,rhs) <- pairs])
 		`addSize`
 	size_up body
+		`addSizeN`
+	length pairs	-- For the allocation
 
     size_up (Case scrut alts)
       = nukeScrutDiscount (size_up scrut)
@@ -451,19 +455,21 @@ is more accurate (see @sizeExpr@ above for how this discount size
 is computed).
 
 \begin{code}
-smallEnoughToInline :: [Bool]			-- Evaluated-ness of value arguments
+smallEnoughToInline :: Id			-- The function (for trace msg only)
+		    -> [Bool]			-- Evaluated-ness of value arguments
 		    -> Bool			-- Result is scrutinised
 		    -> UnfoldingGuidance
 		    -> Bool			-- True => unfold it
 
-smallEnoughToInline _ _ UnfoldAlways = True
-smallEnoughToInline _ _ UnfoldNever  = False
-smallEnoughToInline arg_is_evald_s result_is_scruted
+smallEnoughToInline _ _ _ UnfoldAlways = True
+smallEnoughToInline _ _ _ UnfoldNever  = False
+smallEnoughToInline id arg_is_evald_s result_is_scruted
 	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
   = if enough_args n_vals_wanted arg_is_evald_s &&
        size - discount <= opt_UnfoldingUseThreshold
     then
-       pprTrace "small enough" (int size <+> int discount) True
+       -- pprTrace "small enough" (ppr id <+> int size <+> int discount) 
+       True
     else
        False
   where
@@ -486,8 +492,8 @@ smallEnoughToInline arg_is_evald_s result_is_scruted
 		    | otherwise		= 0
 
     arg_discount no_of_constrs is_evald
-      | is_evald  = 1 + no_of_constrs * opt_UnfoldingConDiscount
-      | otherwise = 1
+      | is_evald  = no_of_constrs * opt_UnfoldingConDiscount
+      | otherwise = 0
 \end{code}
 
 We use this one to avoid exporting inlinings that we ``couldn't possibly
@@ -495,12 +501,11 @@ use'' on the other side.  Can be overridden w/ flaggery.
 Just the same as smallEnoughToInline, except that it has no actual arguments.
 
 \begin{code}
---UNUSED?
-couldBeSmallEnoughToInline :: UnfoldingGuidance -> Bool
-couldBeSmallEnoughToInline guidance = smallEnoughToInline (repeat True) True guidance
+couldBeSmallEnoughToInline :: Id -> UnfoldingGuidance -> Bool
+couldBeSmallEnoughToInline id guidance = smallEnoughToInline id (repeat True) True guidance
 
-certainlySmallEnoughToInline :: UnfoldingGuidance -> Bool
-certainlySmallEnoughToInline guidance = smallEnoughToInline (repeat False) False guidance
+certainlySmallEnoughToInline :: Id -> UnfoldingGuidance -> Bool
+certainlySmallEnoughToInline id guidance = smallEnoughToInline id (repeat False) False guidance
 \end{code}
 
 Predicates

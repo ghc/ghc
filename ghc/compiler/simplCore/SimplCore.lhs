@@ -37,7 +37,7 @@ import Id		( mkSysLocal, mkUserId, setIdVisibility, replaceIdInfo,
                           replacePragmaInfo, getIdDemandInfo, idType,
 			  getIdInfo, getPragmaInfo, mkIdWithNewUniq,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
- 			  lookupIdEnv, IdEnv, omitIfaceSigForId,
+ 			  lookupIdEnv, IdEnv, 
 			  Id
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
@@ -236,11 +236,13 @@ foldl_mn f z (x:xs) = f z x	>>= \ zz ->
 
 Several tasks are done by @tidyCorePgm@
 
-1.  Eliminate indirections.  The point here is to transform
-	x_local = E
-	x_exported = x_local
-    ==>
-	x_exported = E
+----------------
+	[March 98] Indirections are now elimianted by the occurrence analyser
+	-- 1.  Eliminate indirections.  The point here is to transform
+	--	x_local = E
+	--	x_exported = x_local
+	--    ==>
+	--	x_exported = E
 
 2.  Make certain top-level bindings into Globals. The point is that 
     Global things get externally-visible labels at code generation
@@ -287,110 +289,15 @@ Several tasks are done by @tidyCorePgm@
 	generator makes global labels from the uniques for local thunks etc.]
 
 
-Eliminate indirections
-~~~~~~~~~~~~~~~~~~~~~~
-In @elimIndirections@, we look for things at the top-level of the form...
-\begin{verbatim}
-	x_local = ....
-	x_exported = x_local
-\end{verbatim}
-In cases we find like this, we go {\em backwards} and replace
-\tr{x_local} with \tr{x_exported}.  This save a gratuitous jump
-(from \tr{x_exported} to \tr{x_local}), and makes strictness
-information propagate better.
-
-We rely on prior eta reduction to simplify things like
-\begin{verbatim}
-	x_exported = /\ tyvars -> x_local tyvars
-==>
-	x_exported = x_local
-\end{verbatim}
-
-If more than one exported thing is equal to a local thing (i.e., the
-local thing really is shared), then we do one only:
-\begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local
-	x_exported2 = x_local
-==>
-	x_exported1 = ....
-
-	x_exported2 = x_exported1
-\end{verbatim}
-
-There's a possibility of leaving unchanged something like this:
-\begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local Int
-\end{verbatim}
-By the time we've thrown away the types in STG land this 
-could be eliminated.  But I don't think it's very common
-and it's dangerous to do this fiddling in STG land 
-because we might elminate a binding that's mentioned in the
-unfolding for something.
-
-General Strategy: first collect the info; then make a \tr{Id -> Id} mapping.
-Then blast the whole program (LHSs as well as RHSs) with it.
-
 
 
 \begin{code}
 tidyCorePgm :: Module -> [CoreBinding] -> [CoreBinding]
 
 tidyCorePgm mod binds_in
-  = initTM mod indirection_env $
-    tidyTopBindings (catMaybes reduced_binds)	`thenTM` \ binds ->
+  = initTM mod nullIdEnv $
+    tidyTopBindings binds_in	`thenTM` \ binds ->
     returnTM (bagToList binds)
-  where
-    (indirection_env, reduced_binds) = mapAccumL try_bind nullIdEnv binds_in
-
-    try_bind :: IdEnv CoreBinder -> CoreBinding -> (IdEnv CoreBinder, Maybe CoreBinding)
-    try_bind env_so_far (NonRec exported_binder rhs)
-	| isExported exported_binder &&		-- Only if this is exported
-	  maybeToBool maybe_rhs_id &&		-- 	and the RHS is a simple Id
-
-	  isLocallyDefined rhs_id &&		-- Only if this one is defined in this
-	  					-- 	module, so that we *can* change its
-					  	-- 	binding to be the exported thing!
-
-	  not (isExported rhs_id) &&		-- Only if this one is not itself exported,
-						--	since the transformation will nuke it
-
-	  not (omitIfaceSigForId rhs_id) &&	-- Don't do the transformation if rhs_id is
-						-- 	something like a constructor, whose 
-						--	definition is implicitly exported and 
-						-- 	which must not vanish.
-		-- To illustrate the preceding check consider
-		--	data T = MkT Int
-		--	mkT = MkT
-		--	f x = MkT (x+1)
-		-- Here, we'll make a local, non-exported, defn for MkT, and without the
-		-- above condition we'll transform it to:
-		--	mkT = \x. MkT [x]
-		--	f = \y. mkT (y+1)
-		-- This is bad because mkT will get the IdDetails of MkT, and won't
-		-- be exported.  Also the code generator won't make a definition for
-		-- the MkT constructor.
-		-- Slightly gruesome, this.
-
-	  not (maybeToBool (lookupIdEnv env_so_far rhs_id))
-						-- Only if not already substituted for
-
-	= (addOneToIdEnv env_so_far rhs_id (ValBinder new_rhs_id), Nothing)
-	where
-	   maybe_rhs_id = case etaCoreExpr rhs of
-				Var rhs_id -> Just rhs_id
-				other	   -> Nothing
-	   Just rhs_id  = maybe_rhs_id
-	   new_rhs_id   = exported_binder `replaceIdInfo`     getIdInfo rhs_id
-					  `replacePragmaInfo` getPragmaInfo rhs_id
-				-- NB: we keep the Pragmas and IdInfo for the old rhs_id!
-				-- This is important; it might be marked "no-inline" by
-				-- the occurrence analyser (because it's recursive), and
-				-- we must not lose that information.
-
-    try_bind env_so_far bind
-	= (env_so_far, Just bind)
 \end{code}
 
 Top level bindings

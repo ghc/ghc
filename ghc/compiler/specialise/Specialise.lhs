@@ -32,7 +32,7 @@ import TyVar		( TyVar,
 			  TyVarEnv, mkTyVarEnv, delFromTyVarEnv
 			)
 import CoreSyn
-import OccurAnal	( occurAnalyseGlobalExpr )
+import PprCore		()	-- Instances 
 import Name		( NamedThing(..), getSrcLoc )
 import SpecEnv		( addToSpecEnv, lookupSpecEnv, specEnvValues )
 
@@ -1191,7 +1191,7 @@ addIdSpecialisations id spec_stuff
     (new_spec_env, errs) = foldr add (getIdSpecialisation id, []) spec_stuff
 
     add (tyvars, tys, template) (spec_env, errs)
-	= case addToSpecEnv True spec_env tyvars tys (occurAnalyseGlobalExpr template) of
+	= case addToSpecEnv True spec_env tyvars tys template of
 		Succeeded spec_env' -> (spec_env', errs)
 		Failed err 	    -> (spec_env, err:errs)
 
@@ -1234,7 +1234,7 @@ substSpecEnvRhs te ve rhs
 				        where
 					  te' = delFromTyVarEnv te tyvar
 
-    go te ve (Lam b@(ValBinder (v,_)) e) = Lam b (go te ve' e)
+    go te ve (Lam b@(ValBinder v) e) = Lam b (go te ve' e)
 				     where
 				       ve' = delOneFromIdEnv ve v
 

@@ -45,7 +45,7 @@ module IdInfo (
 
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
-import {-# SOURCE #-} CoreSyn	 ( SimplifiableCoreExpr )
+import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
 
 -- for mkdependHS, CoreSyn.hi-boot refers to it:
 import BinderInfo ( BinderInfo )
@@ -198,7 +198,7 @@ ppDemandInfo (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""),
 A @IdSpecEnv@ holds details of an @Id@'s specialisations. 
 
 \begin{code}
-type IdSpecEnv = SpecEnv SimplifiableCoreExpr
+type IdSpecEnv = SpecEnv CoreExpr
 \end{code}
 
 For example, if \tr{f}'s @SpecEnv@ contains the mapping:

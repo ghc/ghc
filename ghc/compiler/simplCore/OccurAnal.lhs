@@ -22,13 +22,15 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
+			  omitIfaceSigForId,
 			  idType, idUnique, Id,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  elementOfIdSet,
 			  addOneToIdSet, IdSet,
-			  nullIdEnv, unitIdEnv, combineIdEnvs,
+
+			  IdEnv, nullIdEnv, unitIdEnv, combineIdEnvs,
 			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
-			  mapIdEnv, lookupIdEnv, IdEnv 
+			  mapIdEnv, lookupIdEnv, elemIdEnv, addOneToIdEnv
 			)
 import Specialise       ( idSpecVars )
 import Name		( isExported, isLocallyDefined )
@@ -39,116 +41,6 @@ import Unique		( u2i )
 import UniqFM		( keysUFM )  
 import Util		( zipWithEqual )
 import Outputable
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[OccurAnal-types]{Data types}
-%*									*
-%************************************************************************
-
-\begin{code}
-data OccEnv =
-  OccEnv
-    Bool	-- IgnoreINLINEPragma flag
-		-- False <=> OK to use INLINEPragma information
-		-- True  <=> ignore INLINEPragma information
-
-    (Id -> IdSet -> Bool)	-- Tells whether an Id occurrence is interesting,
-				-- given the set of in-scope variables
-
-    IdSet	-- In-scope Ids
-
-
-addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv ip ifun cands) ids
-  = OccEnv ip ifun (cands `unionIdSets` mkIdSet ids)
-
-addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv ip ifun cands) id
-  = OccEnv ip ifun (addOneToIdSet cands id)
-
-isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv _ ifun cands) id = ifun id cands
-
-inlineMe :: OccEnv -> Id -> Bool
-inlineMe env id
-  = {-	See comments with simplIdWantsToBeINLINEd in SimplUtils.lhs 
-	not ignore_inline_prag && 
-    -}
-    idWantsToBeINLINEd id
-
-
-type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
-
-combineUsageDetails, combineAltsUsageDetails
-	:: UsageDetails -> UsageDetails -> UsageDetails
-
-combineUsageDetails usage1 usage2
-  = combineIdEnvs addBinderInfo usage1 usage2
-
-combineAltsUsageDetails usage1 usage2
-  = combineIdEnvs orBinderInfo usage1 usage2
-
-addOneOcc :: UsageDetails -> Id -> BinderInfo -> UsageDetails
-addOneOcc usage id info
-  = combineIdEnvs addBinderInfo usage (unitIdEnv id info)
-	-- ToDo: make this more efficient
-
-emptyDetails = (nullIdEnv :: UsageDetails)
-
-unitDetails id info = (unitIdEnv id info :: UsageDetails)
-
-tagBinders :: UsageDetails	    -- Of scope
-	   -> [Id]		    -- Binders
-	   -> (UsageDetails, 	    -- Details with binders removed
-	      [(Id,BinderInfo)])    -- Tagged binders
-
-tagBinders usage binders =
- let
-  usage' = usage `delManyFromIdEnv` binders
-  uss    = [ (binder, usage_of usage binder) | binder <- binders ]
- in
- if isNullIdEnv usage' then
-    (usage', uss)
- else
-    (usage', uss)
-{-
-  = (usage `delManyFromIdEnv` binders,
-     [ (binder, usage_of usage binder) | binder <- binders ]
-    )
--}
-tagBinder :: UsageDetails	    -- Of scope
-	  -> Id			    -- Binders
-	  -> (UsageDetails, 	    -- Details with binders removed
-	      (Id,BinderInfo))	    -- Tagged binders
-
-tagBinder usage binder =
- let
-   usage'  = usage `delOneFromIdEnv` binder
-   us      = usage_of usage binder 
-   cont =
-    if isNullIdEnv usage' then  -- Bogus test to force evaluation.
-       (usage', (binder, us))
-    else
-       (usage', (binder, us))
- in
- if isDeadOcc us then		-- Ditto 
-	cont
- else 
-	cont
-
-
-usage_of usage binder
-  | isExported binder
-  = noBinderInfo	-- Visible-elsewhere things count as many
-  | otherwise
-  = case (lookupIdEnv usage binder) of
-      Nothing   -> deadOccurrence
-      Just info -> info
-
-isNeeded env usage binder = not (isDeadOcc (usage_of usage binder))
 \end{code}
 
 
@@ -168,37 +60,17 @@ occurAnalyseBinds
 
 occurAnalyseBinds binds simplifier_sw_chkr
   | opt_D_dump_occur_anal = pprTrace "OccurAnal:"
-				     (vcat (map ppr_bind binds'))
+				     (pprGenericBindings binds')
 				     binds'
   | otherwise		  = binds'
   where
-    (_, binds') = doo initial_env binds
+    (_, _, binds') = occAnalTop initial_env binds
 
     initial_env = OccEnv (simplifier_sw_chkr IgnoreINLINEPragma)
 			 (\id in_scope -> isLocallyDefined id)	-- Anything local is interesting
 			 emptyIdSet				-- Not actually used
-
-    doo env [] = (emptyDetails, [])
-    doo env (bind:binds)
-      = (final_usage, new_binds ++ the_rest)
-      where
-	new_env			 = env `addNewCands` (bindersOf bind)
-	(binds_usage, the_rest)  = doo new_env binds
-	(final_usage, new_binds) = occAnalBind env bind binds_usage
-
-	-- This really ought to be done properly by PprCore, but
-	-- it isn't.  pprCoreBinding only works on Id binders, and
-	-- the general case is complicated by the fact that it has to work
-	-- for interface files too.  Sigh
-
-ppr_bind bind@(NonRec binder expr)
-  = ppr bind
-
-ppr_bind bind@(Rec binds)
-  = vcat [ptext SLIT("Rec {"),
-	      nest 2 (ppr bind),
-	      ptext SLIT("end Rec }")]
 \end{code}
+
 
 \begin{code}
 occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
@@ -219,6 +91,134 @@ occurAnalyseGlobalExpr expr
 	-- discard occurence info returned
     snd (occurAnalyseExpr (\_ -> False) expr)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Top level stuff}
+%*									*
+%************************************************************************
+
+In @occAnalTop@ we do indirection-shorting.  That is, if we have this:
+
+	loc = <expression>
+	...
+	exp = loc
+
+where exp is exported, and loc is not, then we replace it with this:
+
+	loc = exp
+	exp = <expression>
+	...
+
+Without this we never get rid of the exp = loc thing.
+This save a gratuitous jump
+(from \tr{x_exported} to \tr{x_local}), and makes strictness
+information propagate better.
+This used to happen in the final phase, but its tidier to do it here.
+
+
+If more than one exported thing is equal to a local thing (i.e., the
+local thing really is shared), then we do one only:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local
+	x_exported2 = x_local
+==>
+	x_exported1 = ....
+
+	x_exported2 = x_exported1
+\end{verbatim}
+
+We rely on prior eta reduction to simplify things like
+\begin{verbatim}
+	x_exported = /\ tyvars -> x_local tyvars
+==>
+	x_exported = x_local
+\end{verbatim}
+Hence,there's a possibility of leaving unchanged something like this:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local Int
+\end{verbatim}
+By the time we've thrown away the types in STG land this 
+could be eliminated.  But I don't think it's very common
+and it's dangerous to do this fiddling in STG land 
+because we might elminate a binding that's mentioned in the
+unfolding for something.
+
+
+\begin{code}
+occAnalTop :: OccEnv 			-- What's in scope
+	   -> [CoreBinding]
+	   -> (IdEnv BinderInfo, 	-- Occurrence info
+	       IdEnv Id,		-- Indirection elimination info
+	       [SimplifiableCoreBinding]
+	      )
+
+occAnalTop env [] = (emptyDetails, nullIdEnv, [])
+
+-- Special case for eliminating indirections
+occAnalTop env (NonRec exported_id (Var local_id) : binds)
+  | isExported exported_id &&		-- Only if this is exported
+
+    isLocallyDefined local_id &&	-- Only if this one is defined in this
+					-- 	module, so that we *can* change its
+				  	-- 	binding to be the exported thing!
+
+    not (isExported local_id) &&	-- Only if this one is not itself exported,
+					--	since the transformation will nuke it
+
+    not (omitIfaceSigForId local_id) &&	-- Don't do the transformation if rhs_id is
+					-- 	something like a constructor, whose 
+					--	definition is implicitly exported and 
+					-- 	which must not vanish.
+		-- To illustrate the preceding check consider
+		--	data T = MkT Int
+		--	mkT = MkT
+		--	f x = MkT (x+1)
+		-- Here, we'll make a local, non-exported, defn for MkT, and without the
+		-- above condition we'll transform it to:
+		--	mkT = \x. MkT [x]
+		--	f = \y. mkT (y+1)
+		-- This is bad because mkT will get the IdDetails of MkT, and won't
+		-- be exported.  Also the code generator won't make a definition for
+		-- the MkT constructor.
+		-- Slightly gruesome, this.
+
+
+    not (maybeToBool (lookupIdEnv ind_env local_id))
+					-- Only if not already substituted for
+    
+  = 	-- Aha!  An indirection; let's eliminate it!
+    (scope_usage, ind_env', binds')
+  where
+    (scope_usage, ind_env, binds') = occAnalTop env binds
+    ind_env' = addOneToIdEnv ind_env local_id exported_id
+
+-- The normal case
+occAnalTop env (bind : binds)
+  = (final_usage, ind_env, new_binds ++ binds')
+  where
+    new_env			   = env `addNewCands` (bindersOf bind)
+    (scope_usage, ind_env, binds') = occAnalTop new_env binds
+    (final_usage, new_binds)       = occAnalBind env (zap_bind bind) scope_usage
+
+	-- Deal with any indirections
+    zap_bind (NonRec bndr rhs) 
+	| bndr `elemIdEnv` ind_env 			= Rec (zap (bndr,rhs))
+		-- The Rec isn't strictly necessary, but it's convenient
+    zap_bind (Rec pairs)
+	| or [id `elemIdEnv` ind_env | (id,_) <- pairs] = Rec (concat (map zap pairs))
+
+    zap_bind bind = bind
+
+    zap pair@(bndr,rhs) = case lookupIdEnv ind_env bndr of
+			    Nothing          -> [pair]
+			    Just exported_id -> [(bndr, Var exported_id),
+					         (exported_id, rhs)]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -514,7 +514,9 @@ occAnalRhs env id rhs
   where
     (rhs_usage, rhs') = occAnal env rhs
     total_usage = foldr add rhs_usage (idSpecVars id)
-    add v u     = addOneOcc u v (argOccurrence 0)
+    add v u     = addOneOcc u v noBinderInfo	-- Give a non-committal binder info
+						-- (i.e manyOcc) because many copies
+						-- of the specialised thing can appear
 \end{code}
 
 Expressions
@@ -686,3 +688,115 @@ occAnalArg env (VarArg v)
   | otherwise         = emptyDetails
 occAnalArg _   _      = emptyDetails
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[OccurAnal-types]{Data types}
+%*									*
+%************************************************************************
+
+\begin{code}
+data OccEnv =
+  OccEnv
+    Bool	-- IgnoreINLINEPragma flag
+		-- False <=> OK to use INLINEPragma information
+		-- True  <=> ignore INLINEPragma information
+
+    (Id -> IdSet -> Bool)	-- Tells whether an Id occurrence is interesting,
+				-- given the set of in-scope variables
+
+    IdSet	-- In-scope Ids
+
+
+addNewCands :: OccEnv -> [Id] -> OccEnv
+addNewCands (OccEnv ip ifun cands) ids
+  = OccEnv ip ifun (cands `unionIdSets` mkIdSet ids)
+
+addNewCand :: OccEnv -> Id -> OccEnv
+addNewCand (OccEnv ip ifun cands) id
+  = OccEnv ip ifun (addOneToIdSet cands id)
+
+isCandidate :: OccEnv -> Id -> Bool
+isCandidate (OccEnv _ ifun cands) id = ifun id cands
+
+inlineMe :: OccEnv -> Id -> Bool
+inlineMe env id
+  = {-	See comments with simplIdWantsToBeINLINEd in SimplUtils.lhs 
+	not ignore_inline_prag && 
+    -}
+    idWantsToBeINLINEd id
+
+
+type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
+
+combineUsageDetails, combineAltsUsageDetails
+	:: UsageDetails -> UsageDetails -> UsageDetails
+
+combineUsageDetails usage1 usage2
+  = combineIdEnvs addBinderInfo usage1 usage2
+
+combineAltsUsageDetails usage1 usage2
+  = combineIdEnvs orBinderInfo usage1 usage2
+
+addOneOcc :: UsageDetails -> Id -> BinderInfo -> UsageDetails
+addOneOcc usage id info
+  = combineIdEnvs addBinderInfo usage (unitIdEnv id info)
+	-- ToDo: make this more efficient
+
+emptyDetails = (nullIdEnv :: UsageDetails)
+
+unitDetails id info = (unitIdEnv id info :: UsageDetails)
+
+tagBinders :: UsageDetails	    -- Of scope
+	   -> [Id]		    -- Binders
+	   -> (UsageDetails, 	    -- Details with binders removed
+	      [(Id,BinderInfo)])    -- Tagged binders
+
+tagBinders usage binders =
+ let
+  usage' = usage `delManyFromIdEnv` binders
+  uss    = [ (binder, usage_of usage binder) | binder <- binders ]
+ in
+ if isNullIdEnv usage' then
+    (usage', uss)
+ else
+    (usage', uss)
+{-
+  = (usage `delManyFromIdEnv` binders,
+     [ (binder, usage_of usage binder) | binder <- binders ]
+    )
+-}
+tagBinder :: UsageDetails	    -- Of scope
+	  -> Id			    -- Binders
+	  -> (UsageDetails, 	    -- Details with binders removed
+	      (Id,BinderInfo))	    -- Tagged binders
+
+tagBinder usage binder =
+ let
+   usage'  = usage `delOneFromIdEnv` binder
+   us      = usage_of usage binder 
+   cont =
+    if isNullIdEnv usage' then  -- Bogus test to force evaluation.
+       (usage', (binder, us))
+    else
+       (usage', (binder, us))
+ in
+ if isDeadOcc us then		-- Ditto 
+	cont
+ else 
+	cont
+
+
+usage_of usage binder
+  | isExported binder
+  = noBinderInfo	-- Visible-elsewhere things count as many
+  | otherwise
+  = case (lookupIdEnv usage binder) of
+      Nothing   -> deadOccurrence
+      Just info -> info
+
+isNeeded env usage binder = not (isDeadOcc (usage_of usage binder))
+\end{code}
+
+

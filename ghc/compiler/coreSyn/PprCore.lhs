@@ -10,7 +10,8 @@
 \begin{code}
 module PprCore (
 	pprCoreExpr, pprIfaceUnfolding, 
-	pprCoreBinding, pprCoreBindings
+	pprCoreBinding, pprCoreBindings,
+	pprGenericBindings
     ) where
 
 #include "HsVersions.h"
@@ -50,14 +51,70 @@ print something.
 
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 
+Un-annotated core dumps
+~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-pprCoreBinding  :: CoreBinding   -> SDoc
 pprCoreBindings :: [CoreBinding] -> SDoc
+pprCoreBinding  :: CoreBinding   -> SDoc
+pprCoreExpr     :: CoreExpr	 -> SDoc
 
+pprCoreBindings = pprTopBinds pprCoreEnv
+pprCoreBinding  = pprTopBind pprCoreEnv
+pprCoreExpr     = ppr_expr pprCoreEnv
+
+pprCoreEnv = init_ppr_env ppr pprCoreBinder ppr
+\end{code}
+
+Printer for unfoldings in interfaces
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+pprIfaceUnfolding :: CoreExpr -> SDoc
+pprIfaceUnfolding = ppr_expr pprIfaceEnv
+
+pprIfaceEnv = init_ppr_env pprTyVarBndr pprIfaceBinder  ppr
+\end{code}
+
+Generic Core (possibly annotated binders etc)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+pprGenericBindings :: (Outputable bndr, Outputable occ) => [GenCoreBinding bndr occ flexi] -> SDoc
+pprGenericBindings = pprTopBinds pprGenericEnv
+
+pprGenericEnv :: (Outputable bndr, Outputable occ) => PprEnv flexi bndr occ
+pprGenericEnv = init_ppr_env ppr (\_ -> ppr) ppr
+
+pprGenericArgEnv :: (Outputable occ) => PprEnv flexi bndr occ
+pprGenericArgEnv = init_ppr_env ppr (error "ppr_bndr") ppr
+
+instance (Outputable bndr, Outputable occ) => Outputable (GenCoreBinding bndr occ flexi) where
+    ppr bind = ppr_bind pprGenericEnv bind
+
+instance (Outputable bndr, Outputable occ) => Outputable (GenCoreExpr bndr occ flexi) where
+    ppr expr = ppr_expr pprGenericEnv expr
+
+instance (Outputable occ) => Outputable (GenCoreArg occ flexi) where
+    ppr arg = ppr_arg pprGenericArgEnv arg
+
+instance (Outputable bndr, Outputable occ) => Outputable (GenCoreCaseAlts bndr occ flexi) where
+    ppr alts = ppr_alts pprGenericEnv alts
+
+instance (Outputable bndr, Outputable occ) => Outputable (GenCoreCaseDefault bndr occ flexi) where
+    ppr deflt  = ppr_default pprGenericEnv deflt
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Instance declarations for Core printing}
+%*									*
+%************************************************************************
+
+
+\begin{code}
 init_ppr_env tvbndr pbdr pocc
   = initPprEnv
 	(Just ppr) -- literals
-	(Just ppr_con)		-- data cons
+	(Just ppr)		-- data cons
 	(Just ppr_prim)		-- primops
 	(Just (\ cc -> text (showCostCentre True cc)))
 
@@ -68,20 +125,6 @@ init_ppr_env tvbndr pbdr pocc
 	(Just pbdr) (Just pocc) -- value vars
   where
 
-    ppr_con con = ppr con
-
-{-	[We now use Con {a,b,c} for Con expressions. SLPJ March 97.]
-	[We can't treat them as ordinary applications because the Con doesn't have
-	 dictionaries in it, whereas the constructor Id does.]
-
-	OLD VERSION: 
-	-- ppr_con is used when printing Con expressions; we add a "!" 
-	-- to distinguish them from ordinary applications.  But not when
-	-- printing for interfaces, where they are treated as ordinary applications
-    ppr_con con | ifaceStyle sty = ppr sty con
-	        | otherwise	 = ppr sty con <> char '!'
--}
-
 	-- We add a "!" to distinguish Primitive applications from ordinary applications.  
 	-- But not when printing for interfaces, where they are treated 
 	-- as ordinary applications
@@ -90,73 +133,26 @@ init_ppr_env tvbndr pbdr pocc
 					 else
 					    ppr prim <> char '!')
 
---------------
-pprCoreBindings binds = vcat (map pprCoreBinding binds)
+\end{code}
 
-pprCoreBinding (NonRec binder expr) = ppr_binding (binder, expr)
+%************************************************************************
+%*									*
+\subsection{The guts}
+%*									*
+%************************************************************************
 
-pprCoreBinding (Rec binds)
+\begin{code}
+pprTopBinds pe binds = vcat (map (pprTopBind pe) binds)
+
+pprTopBind pe (NonRec binder expr)
+ = sep [ppr_binding_pe pe (binder,expr)] $$ text ""
+
+pprTopBind pe (Rec binds)
   = vcat [ptext SLIT("Rec {"),
-	  vcat (map ppr_binding binds),
-	  ptext SLIT("end Rec }")]
-
-ppr_binding (binder, expr)
- = sep [pprCoreBinder LetBind binder, 
-        nest 2 (equals <+> pprCoreExpr expr)]
+	  vcat (map (ppr_binding_pe pe) binds),
+	  ptext SLIT("end Rec }"),
+	  text ""]
 \end{code}
-
-General expression printer
-
-\begin{code}
-pprCoreExpr :: CoreExpr	-> SDoc
-pprCoreExpr = ppr_expr pprCoreEnv
-
-pprCoreEnv = init_ppr_env ppr pprCoreBinder ppr
-\end{code}
-
-Printer for unfoldings in interfaces
-
-\begin{code}
-pprIfaceUnfolding :: CoreExpr -> SDoc
-pprIfaceUnfolding = ppr_expr pprIfaceEnv
-
-pprIfaceEnv = init_ppr_env pprTyVarBndr pprIfaceBinder  ppr
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Instance declarations for Core printing}
-%*									*
-%************************************************************************
-
-\begin{code}
-pprGenEnv :: (Outputable bndr, Outputable occ) => PprEnv flexi bndr occ
-pprGenEnv = init_ppr_env ppr (\_ -> ppr) ppr
-
-pprGenArgEnv :: (Outputable occ) => PprEnv flexi bndr occ
-pprGenArgEnv = init_ppr_env ppr (error "ppr_bndr") ppr
-
-instance (Outputable bndr, Outputable occ) => Outputable (GenCoreBinding bndr occ flexi) where
-    ppr bind = ppr_bind pprGenEnv bind
-
-instance (Outputable bndr, Outputable occ) => Outputable (GenCoreExpr bndr occ flexi) where
-    ppr expr = ppr_expr pprGenEnv expr
-
-instance (Outputable occ) => Outputable (GenCoreArg occ flexi) where
-    ppr arg = ppr_arg pprGenArgEnv arg
-
-instance (Outputable bndr, Outputable occ) => Outputable (GenCoreCaseAlts bndr occ flexi) where
-    ppr alts = ppr_alts pprGenEnv alts
-
-instance (Outputable bndr, Outputable occ) => Outputable (GenCoreCaseDefault bndr occ flexi) where
-    ppr deflt  = ppr_default pprGenEnv deflt
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Workhorse routines (...????...)}
-%*									*
-%************************************************************************
 
 \begin{code}
 ppr_bind pe (NonRec val_bdr expr) = ppr_binding_pe pe (val_bdr, expr)
