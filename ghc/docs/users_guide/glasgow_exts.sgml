@@ -142,6 +142,9 @@ Executive summary of our extensions:
     <varlistentry>
       <term>Generic classes:</term>
       <listitem>
+	<para>(Note: support for generic classes is currently broken
+        in GHC 5.02).</para>
+
 	<para>Generic class declarations allow you to define a class
         whose methods say how to work over an arbitrary data type.
         Then it's really easy to make any new type into an instance of
@@ -3259,6 +3262,9 @@ program even if fusion doesn't happen.  More rules in <filename>PrelList.lhs</fi
 
 <sect1 id="generic-classes">
 <title>Generic classes</title>
+
+    <para>(Note: support for generic classes is currently broken in
+    GHC 5.02).</para>
 
 <para>
 The ideas behind this extension are described in detail in "Derivable type classes",
