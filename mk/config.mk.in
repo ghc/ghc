@@ -272,7 +272,7 @@ StripLibraries=NO
 
 # For a debugging RTS:
 # GhcRtsHcOpts = -optc-DDEBUG
-# GhcRtsCcOpts = -optc-g
+# GhcRtsCcOpts = -g
 
 # For an optimised RTS:
 GhcRtsHcOpts=-O2
