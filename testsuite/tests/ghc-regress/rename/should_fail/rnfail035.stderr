@@ -1,2 +1,2 @@
 
-rnfail035.hs:2:20: Type constructor or class not in scope: `C'
+rnfail035.hs:2:20: Not in scope: type constructor or class `C'

@@ -1,2 +1,2 @@
 
-rnfail027.hs:5:9: Variable not in scope: `wibble'
+rnfail027.hs:5:9: Not in scope: `wibble'
