@@ -55,7 +55,6 @@ import Type		( Type, splitAlgTyConApp_maybe,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
 			  Type
 			)
-import Class		( Class, classSelIds )
 import TysWiredIn	( smallIntegerDataCon, isIntegerTy )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )

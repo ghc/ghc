@@ -18,7 +18,7 @@ import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsCheap, exprIsTrivial, cheapEqExpr, coreExprType,
+import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType,
 			  exprIsWHNF, FormSummary(..)
 			)
 import Subst		( substBndrs, substBndr, substIds )
@@ -293,35 +293,37 @@ to the result) deals OK with this).
 
 There is no point in looking for a combination of the two, 
 because that would leave use with some lets sandwiched between lambdas;
-but it's awkward to detect that case, so we don't bother.
+that's what the final test in the first equation is for.
 
 \begin{code}
 tryEtaExpansion :: InExpr -> SimplM InExpr
 tryEtaExpansion rhs
   |  not opt_SimplDoLambdaEtaExpansion
-  || exprIsTrivial rhs			-- Don't eta-expand a trival RHS
-  || null y_tys				-- No useful expansion
+  || exprIsTrivial rhs				-- Don't eta-expand a trival RHS
+  || null y_tys					-- No useful expansion
+  || not (null x_bndrs || and trivial_args)	-- Not (no x-binders or no z-binds)
   = returnSmpl rhs
 
   | otherwise	-- Consider eta expansion
-  = newIds y_tys			( \ y_bndrs ->
-    tick (EtaExpansion (head y_bndrs))	`thenSmpl_`
-    mapAndUnzipSmpl bind_z_arg args	`thenSmpl` (\ (z_binds, z_args) ->
-    returnSmpl (mkLams x_bndrs			$ 
-		mkLets (catMaybes z_binds)	$
- 		mkLams y_bndrs			$
+  = newIds y_tys						$ ( \ y_bndrs ->
+    tick (EtaExpansion (head y_bndrs))				`thenSmpl_`
+    mapAndUnzipSmpl bind_z_arg (args `zip` trivial_args)	`thenSmpl` (\ (maybe_z_binds, z_args) ->
+    returnSmpl (mkLams x_bndrs				$ 
+		mkLets (catMaybes maybe_z_binds)	$
+ 		mkLams y_bndrs				$
 		mkApps (mkApps fun z_args) (map Var y_bndrs))))
   where
     (x_bndrs, body) = collectValBinders rhs
     (fun, args)	    = collectArgs body
-    no_of_xs	    = length x_bndrs
+    trivial_args    = map exprIsTrivial args
     fun_arity	    = case fun of
 			Var v -> arityLowerBound (getIdArity v)
 			other -> 0
 
-    bind_z_arg arg | exprIsTrivial arg = returnSmpl (Nothing, arg)
-		   | otherwise	       = newId (coreExprType arg)	$ \ z ->
-					 returnSmpl (Just (NonRec z arg), Var z)
+    bind_z_arg (arg, trivial_arg) 
+	| trivial_arg = returnSmpl (Nothing, arg)
+        | otherwise   = newId (coreExprType arg)	$ \ z ->
+			returnSmpl (Just (NonRec z arg), Var z)
 
 	-- Note: I used to try to avoid the coreExprType call by using
 	-- the type of the binder.  But this type doesn't necessarily

@@ -222,6 +222,7 @@ match (App f1 a1) (App f2 a2) tpl_vars kont subst
 match (Lam x1 e1) (Lam x2 e2) tpl_vars kont subst
   = bind [x1] [x2] (match e1 e2) tpl_vars kont subst
 
+{-	THESE EQUATIONS ARE BOGUS.  SLPJ 19 May 99
 -- This rule does eta expansion
 --		(\x.M)  ~  N 	iff	M  ~  N x
 -- We must clone the binder in case it's already in scope in N
@@ -237,6 +238,7 @@ match (Lam x1 e1) e2 tpl_vars kont subst
 -- Remembering that by (A), y can't be free in M, we get this
 match e1 (Lam x2 e2) tpl_vars kont subst
   = match (App e1 (mkVarArg x2)) e2 tpl_vars kont subst
+-}
 
 match (Case e1 x1 alts1) (Case e2 x2 alts2) tpl_vars kont subst
   = match e1 e2 tpl_vars case_kont subst

@@ -148,6 +148,10 @@ lintStgExpr e@(StgCon con args _)
   where
     con_ty = conType con
 
+lintStgExpr (StgLam _ bndrs _)
+  = addErrL (ptext SLIT("Unexpected StgLam") <+> ppr bndrs)	`thenL_`
+    returnL Nothing
+
 lintStgExpr (StgLet binds body)
   = lintStgBinds binds		`thenL` \ binders ->
     addLoc (BodyOfLetRec binders) (

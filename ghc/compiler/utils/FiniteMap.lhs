@@ -131,8 +131,8 @@ minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -
 		   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
 
 intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
-intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt2)
-			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt2
+intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt1 -> elt2 -> elt3)
+			   -> FiniteMap key elt1 -> FiniteMap key elt2 -> FiniteMap key elt3
 
 --	MAPPING, FOLDING, FILTERING
 foldFM		:: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a

@@ -147,6 +147,23 @@ An example might be: @f x = x:[]@.
 
 %************************************************************************
 %*									*
+\subsubsection{@StgLam@}
+%*									*
+%************************************************************************
+
+StgLam is used *only* during CoreToStg's work.  Before CoreToStg has finished
+it encodes (\x -> e) as (let f = \x -> e in f)
+
+\begin{code}
+  | StgLam
+	Type		-- Type of whole lambda (useful when making a binder for it)
+	[Id]
+	StgExpr		-- Body of lambda
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsubsection{@GenStgExpr@: case-expressions}
 %*									*
 %************************************************************************
@@ -587,6 +604,10 @@ pprStgExpr (StgApp func args)
 \begin{code}
 pprStgExpr (StgCon con args _)
   = hsep [ ppr con, brackets (interppSP args)]
+
+pprStgExpr (StgLam _ bndrs body)
+  =sep [ char '\\' <+> ppr bndrs <+> ptext SLIT("->"),
+	 pprStgExpr body ]
 \end{code}
 
 \begin{code}

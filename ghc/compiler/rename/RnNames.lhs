@@ -37,11 +37,11 @@ import Bag	( bagToList )
 import Maybes	( maybeToBool )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
-import Name	( Name, ExportFlag(..), ImportReason(..), 
-		  isLocallyDefined, setNameImportReason,
+import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
+		  isLocallyDefined, setNameProvenance,
 		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance
 		)
-import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual )
+import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual, isQual )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
@@ -71,17 +71,17 @@ getGlobalNames :: RdrNameHsModule
 getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
-    fixRn (\ ~(rec_exported_avails, _) ->
+    fixRn (\ ~(rec_gbl_env, rec_exported_avails, _) ->
 
-      fixRn (\ ~(rec_rn_env, _) ->
+--       fixRn (\ ~(rec_rn_env, _) ->
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
-	   rec_unqual_fn = unQualInScope rec_rn_env
+	   rec_unqual_fn = unQualInScope rec_gbl_env
 
 	   rec_exp_fn :: Name -> ExportFlag
 	   rec_exp_fn = mk_export_fn (availsToNameSet rec_exported_avails)
 	in
-	setOmitQualFn rec_unqual_fn		$
+--	setOmitQualFn rec_unqual_fn		$
 	setModuleRn this_mod			$
 
 		-- PROCESS LOCAL DECLS
@@ -97,8 +97,8 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
 	  is_source_import other				     = False
 	in
-	mapAndUnzipRn importsFromImportDecl ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
-	mapAndUnzipRn importsFromImportDecl source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
+	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
+	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
 
 		-- COMBINE RESULTS
 		-- We put the local env second, so that a local provenance
@@ -111,8 +111,8 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	    all_avails :: ExportAvails
 	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
 	in
-	returnRn (gbl_env, all_avails)
-      )							`thenRn` \ (gbl_env, all_avails) ->
+--	returnRn (gbl_env, all_avails)
+--      )							`thenRn` \ (gbl_env, all_avails) ->
 
 	-- TRY FOR EARLY EXIT
 	-- We can't go for an early exit before this because we have to check
@@ -131,21 +131,30 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	-- why we wait till after the plusEnv stuff to do the early-exit.
       checkEarlyExit this_mod			`thenRn` \ up_to_date ->
       if up_to_date then
-	returnRn (junk_exp_fn, Nothing)
+	returnRn (gbl_env, junk_exp_fn, Nothing)
       else
  
+	-- RECORD BETTER PROVENANCES IN THE CACHE
+ 	-- The names in the envirnoment have better provenances (e.g. imported on line x)
+	-- than the names in the name cache.  We update the latter now, so that we
+	-- we start renaming declarations we'll get the good names
+	-- The isQual is because the qualified name is always in scope
+      updateProvenances (concat [names | (rdr_name, names) <- rdrEnvToList imp_gbl_env, 
+					  isQual rdr_name])	`thenRn_`
+
 	-- PROCESS EXPORT LISTS
       exportsFromAvail this_mod exports all_avails gbl_env 	`thenRn` \ exported_avails ->
 
 	-- DONE
-      returnRn (exported_avails, Just (all_avails, gbl_env))
-    )		`thenRn` \ (exported_avails, maybe_stuff) ->
+      returnRn (gbl_env, exported_avails, Just all_avails)
+    )		`thenRn` \ (gbl_env, exported_avails, maybe_stuff) ->
 
     case maybe_stuff of {
 	Nothing -> returnRn Nothing ;
-	Just (all_avails, gbl_env) ->
+	Just all_avails ->
 
-
+   traceRn (text "updateProv" <+> fsep (map ppr (rdrEnvElts gbl_env)))	`thenRn_`
+    
 	-- DEAL WITH FIXITIES
    fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
    let
@@ -215,11 +224,12 @@ checkEarlyExit mod
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: RdrNameImportDecl
+importsFromImportDecl :: (Name -> Bool)		-- OK to omit qualifier
+		      -> RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
+importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
     getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails) ->
 
@@ -237,7 +247,8 @@ importsFromImportDecl (ImportDecl imp_mod_name from qual_only as_mod import_spec
 	--	(b) the print-unqualified field
 	-- But don't fiddle with wired-in things or we get in a twist
     let
-	improve_prov name = setNameImportReason name (UserImport imp_mod iloc (is_explicit name))
+	improve_prov name = setNameProvenance name (NonLocalDef (UserImport imp_mod iloc (is_explicit name)) 
+							        (is_unqual name))
 	is_explicit name  = name `elemNameSet` explicits
     in
     qualifyImports imp_mod_name

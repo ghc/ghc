@@ -291,14 +291,24 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
 	--
 	-- Here the gates are Baz and T, but *not* Foo.
     let 
-	munged_inst_ty = case inst_ty of
-				HsForAllTy tvs cxt ty -> HsForAllTy tvs [] ty
-				other		      -> inst_ty
-	free_names = extractHsTyRdrNames munged_inst_ty
+	munged_inst_ty = removeContext inst_ty
+	free_names     = extractHsTyRdrNames munged_inst_ty
     in
     setModuleRn (moduleName mod) $
     mapRn mkImportedGlobalFromRdrName free_names	`thenRn` \ gate_names ->
     returnRn ((mkNameSet gate_names, (mod, InstD decl)) `consBag` insts)
+
+
+-- In interface files, the instance decls now look like
+--	forall a. Foo a -> Baz (T a)
+-- so we have to strip off function argument types as well
+-- as the bit before the '=>' (which is always empty in interface files)
+removeContext (HsForAllTy tvs cxt ty) = HsForAllTy tvs [] (removeFuns ty)
+removeContext ty		      = removeFuns ty
+
+removeFuns (MonoFunTy _ ty) = removeFuns ty
+removeFuns ty		    = ty
+
 
 loadRule :: Module -> Bag GatedDecl 
 	 -> RdrNameRuleDecl -> RnM d (Bag GatedDecl)

@@ -47,7 +47,7 @@ import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique, getUnique, unboundKey )
 import UniqFM		( UniqFM )
 import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM, 
-			  addListToFM_C, addToFM_C, eltsFM
+			  addListToFM_C, addToFM_C, eltsFM, fmToList
 			)
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import Maybes		( mapMaybe )
@@ -156,6 +156,7 @@ lookupRdrEnv = lookupFM
 addListToRdrEnv = addListToFM
 rdrEnvElts	= eltsFM
 extendRdrEnv    = addToFM
+rdrEnvToList    = fmToList
 
 --------------------------------
 type NameEnv a = UniqFM a	-- Domain is Name

@@ -22,7 +22,7 @@ import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName, isSystemName,
-			  nameOccName, setNameModule,
+			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
 			  setNameProvenance, getNameProvenance, pprNameProvenance
 			)
@@ -55,54 +55,7 @@ import Maybes		( mapMaybe )
 %*********************************************************
 
 \begin{code}
-newImportedBinder :: Module -> RdrName -> RnM d Name
--- Make a new imported binder.  It might be in the cache already,
--- but if so it will have a dopey provenance, so replace it.
-newImportedBinder mod rdr_name
-  = ASSERT2( isUnqual rdr_name, ppr rdr_name )
-
-	-- First check the cache
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
-    let 
- 	occ = rdrNameOcc rdr_name
-	key = (moduleName mod, occ)
-    in
-    case lookupFM cache key of
-	
-	-- A hit in the cache!
-	-- Overwrite the thing in the cache with a Name whose Module and Provenance
-	-- is correct.  It might be in the cache arising from an *occurrence*,
-	-- whereas we are now at the binding site.
-	-- Similarly for known-key things.  
-	-- 	For example, GHCmain.lhs imports as SOURCE
-	-- 	Main; but Main.main is a known-key thing.
-	Just name -> getOmitQualFn			`thenRn` \ omit_fn ->
-		     let
-			  new_name = setNameProvenance (setNameModule name mod)
-						       (NonLocalDef ImplicitImport (omit_fn name))
-			  new_cache = addToFM cache key new_name
-		     in
-		     setNameSupplyRn (us, inst_ns, new_cache)	`thenRn_`
-		     returnRn new_name
-
-	Nothing -> 	-- Miss in the cache!
-			-- Build a new original name, and put it in the cache
-		   getOmitQualFn			`thenRn` \ omit_fn ->
-		   let
-			(us', us1) = splitUniqSupply us
-			uniq   	   = uniqFromSupply us1
-			name       = mkGlobalName uniq mod occ (NonLocalDef ImplicitImport (omit_fn name))
-					-- For in-scope things we improve the provenance
-					-- in RnNames.importsFromImportDecl
-			new_cache  = addToFM cache key name
-		   in
-		   setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
-		   returnRn name
-
-
--- Make an imported global name, checking first to see if it's in the cache
-mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
-mkImportedGlobalName mod_name occ
+newImportedGlobalName mod_name occ mod
   = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
     let
 	key = (mod_name, occ)
@@ -114,9 +67,29 @@ mkImportedGlobalName mod_name occ
 		  where
 		     (us', us1) = splitUniqSupply us
 		     uniq   	= uniqFromSupply us1
-		     name       = mkGlobalName uniq (mkVanillaModule mod_name) occ 
-					       (NonLocalDef ImplicitImport False)
+		     name       = mkGlobalName uniq mod occ (NonLocalDef ImplicitImport False)
 		     new_cache  = addToFM cache key name
+
+updateProvenances :: [Name] -> RnM d ()
+updateProvenances names
+  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
+    setNameSupplyRn (us, inst_ns, update cache names)
+  where
+    update cache [] 	      = cache
+    update cache (name:names) = WARN( not (key `elemFM` cache), ppr name )
+				update (addToFM cache key name) names
+ 			      where
+				key = (moduleName (nameModule name), nameOccName name)
+
+newImportedBinder :: Module -> RdrName -> RnM d Name
+newImportedBinder mod rdr_name
+  = ASSERT2( isUnqual rdr_name, ppr rdr_name )
+    newImportedGlobalName (moduleName mod) (rdrNameOcc rdr_name) mod
+
+-- Make an imported global name, checking first to see if it's in the cache
+mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
+mkImportedGlobalName mod_name occ
+  = newImportedGlobalName mod_name occ (mkVanillaModule mod_name)
 	
 mkImportedGlobalFromRdrName rdr_name
   | isQual rdr_name

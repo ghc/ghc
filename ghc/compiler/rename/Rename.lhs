@@ -213,26 +213,59 @@ isOrphanDecl other = False
 -------------------------------------------------------
 slurpImpDecls source_fvs
   = traceRn (text "slurpImp" <+> fsep (map ppr (nameSetToList source_fvs))) `thenRn_`
-	-- The current slurped-set records all local things
-    getSlurped					`thenRn` \ local_binders ->
 
-    slurpSourceRefs source_fvs			`thenRn` \ (decls1, needed1, wired_in) ->
-    let
-	inst_gates1 = foldr (plusFV . getWiredInGates)     source_fvs  wired_in
-	inst_gates2 = foldr (plusFV . getGates source_fvs) inst_gates1 decls1
-    in
-	-- Do this first slurpDecls before the getImportedInstDecls,
-	-- so that the home modules of all the inst_gates will be sure to be loaded
-    slurpDecls decls1 needed1			`thenRn` \ (decls2, needed2) ->	
-    mapRn_ (load_home local_binders) wired_in	`thenRn_`
+	-- The current slurped-set records all local things
+    getSlurped					`thenRn` \ source_binders ->
+    slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls1, needed1, inst_gates) ->
 
 	-- Now we can get the instance decls
-    getImportedInstDecls inst_gates2		`thenRn` \ inst_decls ->
-    rnIfaceDecls decls2 needed2 inst_decls	`thenRn` \ (decls3, needed3) ->
-    closeDecls	 decls3 needed3
+    slurpInstDecls decls1 needed1 inst_gates	`thenRn` \ (decls2, needed2) ->
+
+	-- And finally get everything else
+    closeDecls	 decls2 needed2
   where
-    load_home local_binders name 
-	| name `elemNameSet` local_binders = returnRn ()
+
+-------------------------------------------------------
+slurpSourceRefs :: NameSet			-- Variables defined in source
+		-> FreeVars			-- Variables referenced in source
+		-> RnMG ([RenamedHsDecl],
+			 FreeVars,		-- Un-satisfied needs
+			 FreeVars)		-- "Gates"
+-- The declaration (and hence home module) of each gate has
+-- already been loaded
+
+slurpSourceRefs source_binders source_fvs
+  = go [] 				-- Accumulating decls
+       emptyFVs 			-- Unsatisfied needs
+       source_fvs			-- Accumulating gates
+       (nameSetToList source_fvs)	-- Gates whose defn hasn't been loaded yet
+  where
+    go decls fvs gates []
+	= returnRn (decls, fvs, gates)
+
+    go decls fvs gates (wanted_name:refs) 
+	| isWiredInName wanted_name
+ 	= load_home wanted_name		`thenRn_`
+	  go decls fvs (gates `plusFV` getWiredInGates wanted_name) refs
+
+	| otherwise
+	= importDecl wanted_name 		`thenRn` \ maybe_decl ->
+	  case maybe_decl of
+		-- No declaration... (already slurped, or local)
+	    Nothing   -> go decls fvs gates refs
+	    Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
+			 let
+			    new_gates = getGates source_fvs new_decl
+			 in
+			 go (new_decl : decls)
+			    (fvs1 `plusFV` fvs)
+			    (gates `plusFV` new_gates)
+			    (nameSetToList new_gates ++ refs)
+
+	-- When we find a wired-in name we must load its
+	-- home module so that we find any instance decls therein
+    load_home name 
+	| name `elemNameSet` source_binders = returnRn ()
 		-- When compiling the prelude, a wired-in thing may
 		-- be defined in this module, in which case we don't
 		-- want to load its home module!
@@ -246,42 +279,30 @@ slurpImpDecls source_fvs
 	  doc = ptext SLIT("need home module for wired in thing") <+> ppr name
 
 -------------------------------------------------------
-slurpSourceRefs :: FreeVars			-- Variables referenced in source
-		-> RnMG ([RenamedHsDecl],
-			 FreeVars,		-- Un-satisfied needs
-			 [Name])		-- Those variables referenced in the source
-						-- that turned out to be wired in things
+-- slurpInstDecls imports appropriate instance decls.
+-- It has to incorporate a loop, because consider
+--	instance Foo a => Baz (Maybe a) where ...
+-- It may be that Baz and Maybe are used in the source module,
+-- but not Foo; so we need to chase Foo too.
 
-slurpSourceRefs source_fvs
-  = go [] emptyFVs [] (nameSetToList source_fvs)
+slurpInstDecls decls needed gates
+  | isEmptyFVs gates
+  = returnRn (decls, needed)
+
+  | otherwise
+  = getImportedInstDecls gates				`thenRn` \ inst_decls ->
+    rnInstDecls decls needed emptyFVs inst_decls	`thenRn` \ (decls1, needed1, gates1) ->
+    slurpInstDecls decls1 needed1 gates1
   where
-    go decls fvs wired []
-	= returnRn (decls, fvs, wired)
-    go decls fvs wired (wanted_name:refs) 
-	| isWiredInName wanted_name
- 	= go decls fvs (wanted_name:wired) refs
-	| otherwise
-	= importDecl wanted_name 		`thenRn` \ maybe_decl ->
-	  case maybe_decl of
-		-- No declaration... (already slurped, or local)
-	    Nothing   -> go decls fvs wired refs
-	    Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 go (new_decl : decls) (fvs1 `plusFV` fvs) wired
-			    (extraGates new_decl ++ refs)
-
--- Hack alert.  If we suck in a class 
---	class Ord a => Baz a where ...
--- then Eq is also a 'gate'.  Why?  Because Eq is a superclass of Ord,
--- and hence may be needed during context reduction even though
--- Eq is never mentioned explicitly.  So we snaffle out the super-classes
--- right now, so that slurpSourceRefs will heave them in
---
--- Similarly the RHS of type synonyms
-extraGates (TyClD (ClassDecl ctxt _ tvs _ _ _ _ _ _ _))
-  = nameSetToList (delListFromNameSet (extractHsCtxtTyNames ctxt) (map getTyVarName tvs))
-extraGates (TyClD (TySynonym _ tvs ty _))
-  = nameSetToList (delListFromNameSet (extractHsTyNames ty) (map getTyVarName tvs))
-extraGates other = []
+    rnInstDecls decls fvs gates []
+	= returnRn (decls, fvs, gates)
+    rnInstDecls decls fvs gates (d:ds) 
+	= rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
+	  rnInstDecls (new_decl:decls) 
+		      (fvs1 `plusFV` fvs)
+		      (gates `plusFV` getInstDeclGates new_decl)
+		      ds
+    
 
 -------------------------------------------------------
 -- closeDecls keeps going until the free-var set is empty
@@ -366,7 +387,7 @@ getGates source_fvs (TyClD (ClassDecl ctxt cls tvs sigs _ _ _ _ _ _))
 getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
   = delListFromNameSet (extractHsTyNames ty)
 		       (map getTyVarName tvs)
-    `addOneToNameSet` tycon
+	-- A type synonym type constructor isn't a "gate" for instance decls
 
 getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _))
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
@@ -407,26 +428,25 @@ getWiredInGates is just like getGates, but it sees a wired-in Name
 rather than a declaration.
 
 \begin{code}
-getWiredInGates name | is_tycon  = get_wired_tycon the_tycon
-		     | otherwise = get_wired_id the_id
+getWiredInGates :: Name -> FreeVars
+getWiredInGates name 	-- No classes are wired in
+  | is_id	         = getWiredInGates_s (namesOfType (idType the_id))
+  | isSynTyCon the_tycon = getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
+  | otherwise 	         = unitFV name
   where
-    maybe_wired_in_tycon = maybeWiredInTyConName name
-    is_tycon		 = maybeToBool maybe_wired_in_tycon
     maybe_wired_in_id    = maybeWiredInIdName name
-    Just the_tycon	 = maybe_wired_in_tycon
+    is_id		 = maybeToBool maybe_wired_in_id
+    maybe_wired_in_tycon = maybeWiredInTyConName name
     Just the_id 	 = maybe_wired_in_id
+    Just the_tycon	 = maybe_wired_in_tycon
+    (tyvars,ty) 	 = getSynTyConDefn the_tycon
 
-get_wired_id id = namesOfType (idType id)
+getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToList names)
+\end{code}
 
-get_wired_tycon tycon 
-  | isSynTyCon tycon
-  = namesOfType ty `minusNameSet` mkNameSet (map getName tyvars)
-
-  | otherwise		-- data or newtype
-  = foldr (unionNameSets . namesOfType . dataConType) emptyNameSet data_cons
-  where
-    (tyvars,ty) = getSynTyConDefn tycon
-    data_cons   = tyConDataCons tycon
+\begin{code}
+getInstDeclGates (InstD (InstDecl inst_ty _ _ _ _)) = extractHsTyNames inst_ty
+getInstDeclGates other				    = emptyFVs
 \end{code}
 
 

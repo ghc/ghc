@@ -109,7 +109,11 @@ applyTypeToArgs e op_ty (other_arg : args)
 \begin{code}
 data FormSummary
   = VarForm		-- Expression is a variable (or scc var, etc)
+
   | ValueForm		-- Expression is a value: i.e. a value-lambda,constructor, or literal
+			-- 	May 1999: I'm experimenting with allowing "cheap" non-values
+			--	here.
+
   | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
 			-- ho about inlining such things, because it can't waste work
   | OtherForm		-- Anything else
@@ -137,10 +141,16 @@ mkFormSummary expr
 
     go n (Note _ e)         = go n e
 
-    go n (Let (NonRec b r) e) | exprIsTrivial r = go n e	-- let f = f' alpha in (f,g) 
-								-- should be treated as a value
+    go n (Let (NonRec b r) e) | exprIsCheap r = go n e	-- let f = f' alpha in (f,g) 
+							-- should be treated as a value
     go n (Let _ e)    = OtherForm
-    go n (Case _ _ _) = OtherForm
+
+	-- We want selectors to look like values
+	-- e.g.  case x of { (a,b) -> a }
+	-- should give a ValueForm, so that it will be inlined
+	-- vigorously
+    go n expr@(Case _ _ _) | exprIsCheap expr = ValueForm
+		  	   | otherwise	      = OtherForm
 
     go 0 (Lam x e) | isId x    = ValueForm	-- NB: \x.bottom /= bottom!
     		   | otherwise = go 0 e

@@ -45,9 +45,8 @@ import CoreFVs		( exprFreeVars )
 import CoreUnfold	( Unfolding(..), mkUnfolding, callSiteInline, 
 			  isEvaldUnfolding, blackListed )
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
-			  coreExprType, coreAltsType, exprIsCheap, exprArity,
-			  exprOkForSpeculation,
-			  FormSummary(..), mkFormSummary, whnfOrBottom
+			  coreExprType, coreAltsType, exprArity,
+			  exprOkForSpeculation
 			)
 import Rules		( lookupRule )
 import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
@@ -239,6 +238,7 @@ simplExprF (Let (Rec pairs) body) cont
     simplRecBind NotTopLevel pairs bndrs' (simplExprF body cont)
 
 simplExprF expr@(Lam _ _) cont = simplLam expr cont
+
 simplExprF (Type ty) cont
   = ASSERT( case cont of { Stop _ -> True; ArgOf _ _ _ -> True; other -> False } )
     simplType ty	`thenSmpl` \ ty' ->
@@ -1146,21 +1146,26 @@ rebuild_case scrut case_bndr alts se cont
 
 	-- Deal with the case binder, and prepare the continuation;
 	-- The new subst_env is in place
-    simplBinder case_bndr 			$ \ case_bndr' ->
     prepareCaseCont better_alts cont		$ \ cont' ->
 	
 
 	-- Deal with variable scrutinee
-    substForVarScrut scrut case_bndr'		$ \ zap_occ_info ->
-    let
-	case_bndr'' = zap_occ_info case_bndr'
-    in
+    (	simplBinder case_bndr 			$ \ case_bndr' ->
+	substForVarScrut scrut case_bndr'		$ \ zap_occ_info ->
+	let
+	   case_bndr'' = zap_occ_info case_bndr'
+	in
 
 	-- Deal with the case alternaatives
-    simplAlts zap_occ_info scrut_cons 
-	      case_bndr'' better_alts cont'	`thenSmpl` \ alts' ->
+	simplAlts zap_occ_info scrut_cons 
+	          case_bndr'' better_alts cont'	`thenSmpl` \ alts' ->
 
-    mkCase scrut case_bndr'' alts'		`thenSmpl` \ case_expr ->
+	mkCase scrut case_bndr'' alts'
+    )						`thenSmpl` \ case_expr ->
+
+	-- Notice that the simplBinder, prepareCaseCont, etc, do *not* scope
+	-- over the rebuild_done; rebuild_done returns the in-scope set, and
+	-- that should not include these chaps!
     rebuild_done case_expr	
   where
 	-- scrut_cons tells what constructors the scrutinee can't possibly match

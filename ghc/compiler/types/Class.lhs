@@ -88,7 +88,7 @@ The rest of these functions are just simple selectors.
 \begin{code}
 classKey	     (Class key _ _ _ _ _ _ _ _)  = key
 classSuperClassTheta (Class _ _ _ scs _ _ _ _ _)  = scs
-classSelIds  	     (Class _ _ _ _ _ sels _ _ _) = sels
+classSelIds  	     (Class _ _ _ _ sc_sels op_sels _ _ _) = sc_sels ++ op_sels
 classTyCon   	     (Class _ _ _ _ _ _ _ _ tc)   = tc
 classInstEnv 	     (Class _ _ _ _ _ _ _ env _)  = env
 

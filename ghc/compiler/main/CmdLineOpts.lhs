@@ -576,8 +576,10 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
 #if __GLASGOW_HASKELL__ < 400
 	  Lift v -> v
-#else
+#elif __GLASGOW_HASKELL__ < 403
 	  (# _, v #) -> v
+#else
+	  (# v #) -> v
 #endif
     }
   where

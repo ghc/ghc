@@ -27,7 +27,7 @@ module SimplMonad (
 	newId, newIds,
 
 	-- Counting
-	SimplCount, Tick(..), TickCounts,
+	SimplCount, Tick(..),
 	tick, freeTick,
 	getSimplCount, zeroSimplCount, pprSimplCount, 
 	plusSimplCount, isZeroSimplCount,
@@ -423,7 +423,6 @@ plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 ----------------------------------------------------------
 type SimplCount = Int
 
-zeroSimplCount :: SimplCount
 zeroSimplCount = 0
 
 isZeroSimplCount n = n==0

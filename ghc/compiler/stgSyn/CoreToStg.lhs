@@ -109,8 +109,20 @@ A binder to be floated out becomes an @StgFloatBind@.
 type StgEnv = IdEnv Id
 
 data StgFloatBind = NoBindF
-		  | NonRecF Id StgExpr RhsDemand
 		  | RecF [(Id, StgRhs)]
+		  | NonRecF 
+			Id
+			StgExpr		-- *Can* be a StgLam
+			RhsDemand
+			[StgFloatBind]
+
+-- The interesting one is the NonRecF
+-- 	NonRecF x rhs demand binds
+-- means
+--	x = let binds in rhs
+-- (or possibly case etc if x demand is strict)
+-- The binds are kept separate so they can be floated futher
+-- if appropriate
 \end{code}
 
 A @RhsDemand@ gives the demand on an RHS: strict (@isStrictDem@) and
@@ -167,16 +179,21 @@ topCoreBindsToStg us core_binds
     coreBindsToStg env (b:bs)
       = coreBindToStg  TopLevel env b	`thenUs` \ (bind_spec, new_env) ->
     	coreBindsToStg new_env bs 	`thenUs` \ new_bs ->
-	let
-	   res_bs = case bind_spec of
-			NonRecF bndr rhs dem -> ASSERT2( not (isStrictDem dem) && not (isUnLiftedType (idType bndr)),
-							 ppr b )
-								-- No top-level cases!
-						     StgNonRec bndr (exprToRhs dem rhs) : new_bs
-			RecF prs	     -> StgRec prs : new_bs
-			NoBindF		     -> pprTrace "topCoreBindsToStg" (ppr b) new_bs
-	in
-    	returnUs res_bs
+	case bind_spec of
+	  NonRecF bndr rhs dem floats 
+		-> ASSERT2( not (isStrictDem dem) && 
+			    not (isUnLiftedType (idType bndr)),
+			    ppr b )		-- No top-level cases!
+
+		   mkStgBinds floats rhs	`thenUs` \ new_rhs ->
+		   returnUs (StgNonRec bndr (exprToRhs dem new_rhs) : new_bs)
+					-- Keep all the floats inside...
+					-- Some might be cases etc
+					-- We might want to revisit this decision
+
+	  RecF prs -> returnUs (StgRec prs : new_bs)
+	  NoBindF  -> pprTrace "topCoreBindsToStg" (ppr b) $
+		      returnUs new_bs
 \end{code}
 
 
@@ -190,9 +207,9 @@ topCoreBindsToStg us core_binds
 coreBindToStg :: TopLevelFlag -> StgEnv -> CoreBind -> UniqSM (StgFloatBind, StgEnv)
 
 coreBindToStg top_lev env (NonRec binder rhs)
-  = coreExprToStg env rhs dem			`thenUs` \ stg_rhs ->
-    case stg_rhs of
-	StgApp var [] | not (isExportedId binder)
+  = coreExprToStgFloat env rhs dem			`thenUs` \ (floats, stg_rhs) ->
+    case (floats, stg_rhs) of
+	([], StgApp var []) | not (isExportedId binder)
 		     -> returnUs (NoBindF, extendVarEnv env binder var)
 		-- A trivial binding let x = y in ...
 		-- can arise if postSimplExpr floats a NoRep literal out
@@ -201,7 +218,7 @@ coreBindToStg top_lev env (NonRec binder rhs)
 		-- occur; e.g. an exported user binding f = g
 
 	other -> newLocalId top_lev env binder		`thenUs` \ (new_env, new_binder) ->
-		 returnUs (NonRecF new_binder stg_rhs dem, new_env)
+		 returnUs (NonRecF new_binder stg_rhs dem floats, new_env)
   where
     dem = bdrDem binder
 
@@ -211,7 +228,12 @@ coreBindToStg top_lev env (Rec pairs)
     returnUs (RecF (binders' `zip` stg_rhss), env')
   where
     binders = map fst pairs
-    do_rhs env (bndr,rhs) = coreRhsToStg env rhs (bdrDem bndr)
+    do_rhs env (bndr,rhs) = coreExprToStgFloat env rhs dem	`thenUs` \ (floats, stg_expr) ->
+			    mkStgBinds floats stg_expr		`thenUs` \ stg_expr' ->
+				-- NB: stg_expr' might still be a StgLam (and we want that)
+			    returnUs (exprToRhs dem stg_expr')
+			  where
+			    dem = bdrDem bndr
 \end{code}
 
 
@@ -222,19 +244,16 @@ coreBindToStg top_lev env (Rec pairs)
 %************************************************************************
 
 \begin{code}
-coreRhsToStg :: StgEnv -> CoreExpr -> RhsDemand -> UniqSM StgRhs
-coreRhsToStg env rhs dem
-  = coreExprToStg env rhs dem	`thenUs` \ stg_expr ->
-    returnUs (exprToRhs dem stg_expr)
-
 exprToRhs :: RhsDemand -> StgExpr -> StgRhs
-exprToRhs dem (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
-  | var1 == var2 
-  = rhs
-	-- This curious stuff is to unravel what a lambda turns into
-	-- We have to do it this way, rather than spot a lambda in the
-	-- incoming rhs.  Why?  Because trivial bindings might conceal
-	-- what the rhs is actually like.
+exprToRhs dem (StgLam _ bndrs body)
+  = ASSERT( not (null bndrs) )
+    StgRhsClosure noCCS
+		  stgArgOcc
+		  noSRT
+		  bOGUS_FVs
+	  	  ReEntrant 	-- binders is non-empty
+		  bndrs
+		  body
 
 {-
   We reject the following candidates for 'static constructor'dom:
@@ -329,25 +348,12 @@ coreArgToStg :: StgEnv -> (CoreArg,RhsDemand) -> UniqSM ([StgFloatBind], StgArg)
 -- This is where we arrange that a non-trivial argument is let-bound
 
 coreArgToStg env (arg,dem)
-  | isStrictDem dem || isUnLiftedType arg_ty
-	-- Strict, so float all the binds out
-  = coreExprToStgFloat env arg dem  `thenUs` \ (binds, arg') ->
+  = coreExprToStgFloat env arg dem		`thenUs` \ (floats, arg') ->
     case arg' of
-	    StgCon con [] _ | isWHNFCon con -> returnUs (binds, StgConArg con)
-	    StgApp v []			    -> returnUs (binds, StgVarArg v)
-	    other			    -> newStgVar arg_ty	`thenUs` \ v ->
-					       returnUs (binds ++ [NonRecF v arg' dem], StgVarArg v)
-  | otherwise
-	-- Lazy
-  = coreExprToStgFloat env arg dem  `thenUs` \ (binds, arg') ->
-    case (binds, arg') of
-	([], StgCon con [] _) | isWHNFCon con -> returnUs ([], StgConArg con)
-	([], StgApp v [])		      -> returnUs ([], StgVarArg v)
-
-	-- A non-trivial argument: we must let-bind it
-	-- We don't do the case part here... we leave that to mkStgLets
-	(_, other) ->	 newStgVar arg_ty	`thenUs` \ v ->
-			 returnUs ([NonRecF v (mkStgBinds binds arg') dem], StgVarArg v)
+	StgCon con [] _ -> returnUs (floats, StgConArg con)
+	StgApp v []	-> returnUs (floats, StgVarArg v)
+	other		-> newStgVar arg_ty	`thenUs` \ v ->
+			   returnUs ([NonRecF v arg' dem floats], StgVarArg v)
   where
     arg_ty = coreExprType arg
 \end{code}
@@ -362,8 +368,9 @@ coreArgToStg env (arg,dem)
 \begin{code}
 coreExprToStg :: StgEnv -> CoreExpr -> RhsDemand -> UniqSM StgExpr
 coreExprToStg env expr dem
-  = coreExprToStgFloat env expr dem  `thenUs` \ (binds,stg_expr) ->
-    returnUs (mkStgBinds binds stg_expr)
+  = coreExprToStgFloat env expr dem	`thenUs` \ (binds,stg_expr) ->
+    mkStgBinds binds stg_expr		`thenUs` \ stg_expr' ->
+    deStgLam stg_expr'
 \end{code}
 
 %************************************************************************
@@ -380,6 +387,8 @@ coreExprToStgFloat :: StgEnv -> CoreExpr
 -- given by RhsDemand, and is solely used ot figure out the usage
 -- of constructor args: if the constructor is used once, then so are
 -- its arguments.  The strictness info in RhsDemand isn't used.
+
+-- The StgExpr returned *can* be an StgLam
 \end{code}
 
 Simple cases first
@@ -420,50 +429,30 @@ coreExprToStgFloat env expr@(Type _) dem
 \begin{code}
 coreExprToStgFloat env expr@(Lam _ _) dem
   = let
+	expr_ty		= coreExprType expr
 	(binders, body) = collectBinders expr
 	id_binders      = filter isId binders
         body_dem        = trace "coreExprToStg: approximating body_dem in Lam"
                           safeDem
     in
-    newLocalIds NotTopLevel env id_binders	`thenUs` \ (env', binders') ->
-    coreExprToStg env' body body_dem		`thenUs` \ stg_body ->
-
     if null id_binders then	-- It was all type/usage binders; tossed
-	returnUs ([], stg_body)
+	coreExprToStgFloat env body dem
     else
-    case stg_body of
+	-- At least some value binders
+    newLocalIds NotTopLevel env id_binders	`thenUs` \ (env', binders') ->
+    coreExprToStgFloat env' body body_dem	`thenUs` \ (floats, stg_body) ->
+    mkStgBinds floats stg_body			`thenUs` \ stg_body' ->
 
-      -- if the body reduced to a lambda too...
-      (StgLet (StgNonRec var (StgRhsClosure cc bi srt fvs uf args body))
-	      (StgApp var' []))
-       | var == var' ->
- 	returnUs ([],
-				-- ToDo: make this a float, but we need
-				-- a lambda form for that!  Sigh
-		  StgLet (StgNonRec var (StgRhsClosure noCCS
-				  stgArgOcc
-				  noSRT
-				  bOGUS_FVs
-				  ReEntrant
-				  (binders' ++ args)
-				  body))
-		  (StgApp var []))
-				    
+    case stg_body' of
+      StgLam ty lam_bndrs lam_body ->
+		-- If the body reduced to a lambda too, join them up
+	  returnUs ([], StgLam expr_ty (binders' ++ lam_bndrs) lam_body)
+
       other ->
-
-	-- We must let-bind the lambda
-	newStgVar (coreExprType expr)	`thenUs` \ var ->
-	returnUs ([],
-			-- Ditto
-		  StgLet (StgNonRec var (StgRhsClosure noCCS
-				  stgArgOcc
-				  noSRT
-				  bOGUS_FVs
-				  ReEntrant 	-- binders is non-empty
-				  binders'
-				  stg_body))
-		  (StgApp var []))
+		-- Body didn't reduce to a lambda, so return one
+	  returnUs ([], StgLam expr_ty binders' stg_body')
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -477,23 +466,23 @@ coreExprToStgFloat env expr@(App _ _) dem
         (fun,rads,_,_) = collect_args expr
         ads            = reverse rads
     in
-    coreArgsToStg env ads		`thenUs` \ (binds, stg_args) ->
+    coreArgsToStg env ads		`thenUs` \ (arg_floats, stg_args) ->
 
 	-- Now deal with the function
     case (fun, stg_args) of
       (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
 				-- there are no arguments.
-			    returnUs (binds, 
+			    returnUs (arg_floats, 
 				      StgApp (stgLookup env fun_id) stg_args)
 
       (non_var_fun, []) -> 	-- No value args, so recurse into the function
-			    ASSERT( null binds )
+			    ASSERT( null arg_floats )
 			    coreExprToStgFloat env non_var_fun dem
 
       other ->	-- A non-variable applied to things; better let-bind it.
-		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
-                coreExprToStg env fun onceDem   `thenUs` \ stg_fun ->
-		returnUs (NonRecF fun_id stg_fun onceDem : binds,
+		newStgVar (coreExprType fun)		`thenUs` \ fun_id ->
+                coreExprToStgFloat env fun onceDem	`thenUs` \ (fun_floats, stg_fun) ->
+		returnUs (NonRecF fun_id stg_fun onceDem fun_floats : arg_floats,
 			  StgApp fun_id stg_args)
 
   where
@@ -574,7 +563,7 @@ coreExprToStgFloat env expr@(Con con args) dem
 	dems' = zipWith mkDem stricts onces
         args' = filter isValArg args
     in
-    coreArgsToStg env (zip args' dems')                  `thenUs` \ (binds, stg_atoms) ->
+    coreArgsToStg env (zip args' dems')                  `thenUs` \ (arg_floats, stg_atoms) ->
 
 	-- YUK YUK: must unique if present
     (case con of
@@ -583,7 +572,7 @@ coreExprToStgFloat env expr@(Con con args) dem
        _                                -> returnUs con
     )                                                     `thenUs` \ con' ->
 
-    returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
+    returnUs (arg_floats, StgCon con' stg_atoms (coreExprType expr))
 \end{code}
 
 
@@ -700,41 +689,101 @@ newLocalIds top_lev env (b:bs)
 
 
 \begin{code}
-mkStgBinds :: [StgFloatBind] -> StgExpr -> StgExpr
-mkStgBinds binds body = foldr mkStgBind body binds
+-- Stg doesn't have a lambda *expression*, 
+deStgLam (StgLam ty bndrs body) = mkStgLamExpr ty bndrs body
+deStgLam expr		        = returnUs expr
 
-mkStgBind NoBindF    body = body
-mkStgBind (RecF prs) body = StgLet (StgRec prs) body
+mkStgLamExpr ty bndrs body
+  = ASSERT( not (null bndrs) )
+    newStgVar ty		`thenUs` \ fn ->
+    returnUs (StgLet (StgNonRec fn lam_closure) (StgApp fn []))
+  where
+    lam_closure = StgRhsClosure noCCS
+				stgArgOcc
+				noSRT
+				bOGUS_FVs
+				ReEntrant 	-- binders is non-empty
+				bndrs
+				body
 
-mkStgBind (NonRecF bndr rhs dem) body
+mkStgBinds :: [StgFloatBind] 
+	   -> StgExpr		-- *Can* be a StgLam 
+	   -> UniqSM StgExpr	-- *Can* be a StgLam 
+
+mkStgBinds []     body = returnUs body
+mkStgBinds (b:bs) body 
+  = deStgLam body		`thenUs` \ body' ->
+    go (b:bs) body'
+  where
+    go []     body = returnUs body
+    go (b:bs) body = go bs body 	`thenUs` \ body' ->
+		     mkStgBind  b body'
+
+-- The 'body' arg of mkStgBind can't be a StgLam
+mkStgBind NoBindF    body = returnUs body
+mkStgBind (RecF prs) body = returnUs (StgLet (StgRec prs) body)
+
+mkStgBind (NonRecF bndr rhs dem floats) body
 #ifdef DEBUG
 	-- We shouldn't get let or case of the form v=w
   = case rhs of
 	StgApp v [] -> pprTrace "mkStgLet" (ppr bndr <+> ppr v)
-		       (mk_stg_let bndr rhs dem body)
-	other	    ->  mk_stg_let bndr rhs dem body
+		       (mk_stg_let bndr rhs dem floats body)
+	other	    ->  mk_stg_let bndr rhs dem floats body
 
-mk_stg_let bndr rhs dem body
+mk_stg_let bndr rhs dem floats body
 #endif
-  | isUnLiftedType bndr_ty				-- Use a case/PrimAlts
+  | isUnLiftedType bndr_ty			-- Use a case/PrimAlts
   = ASSERT( not (isUnboxedTupleType bndr_ty) )
+    mkStgBinds floats $
     mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
 
-  | isStrictDem dem && not_whnf				-- Use an case/AlgAlts
-  = mkStgCase rhs bndr (StgAlgAlts bndr_ty [] (StgBindDefault body))
+  | is_whnf
+  = if is_strict then
+	-- Strict let with WHNF rhs
+	mkStgBinds floats $
+	StgLet (StgNonRec bndr (exprToRhs dem rhs)) body
+    else
+	-- Lazy let with WHNF rhs; float until we find a strict binding
+	let
+	    (floats_out, floats_in) = splitFloats floats
+	in
+	mkStgBinds floats_in rhs	`thenUs` \ new_rhs ->
+	mkStgBinds floats_out $
+	StgLet (StgNonRec bndr (exprToRhs dem new_rhs)) body
 
-  | otherwise
-  = ASSERT( not (isUnLiftedType bndr_ty) )
-    StgLet (StgNonRec bndr expr_rhs) body
+  | otherwise 	-- Not WHNF
+  = if is_strict then
+	-- Strict let with non-WHNF rhs
+	mkStgBinds floats $
+	mkStgCase rhs bndr (StgAlgAlts bndr_ty [] (StgBindDefault body))
+    else
+	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
+	mkStgBinds floats rhs		`thenUs` \ new_rhs ->
+	returnUs (StgLet (StgNonRec bndr (exprToRhs dem new_rhs)) body)
+	
   where
-    bndr_ty = idType bndr
-    expr_rhs = exprToRhs dem rhs
-    not_whnf = case expr_rhs of
-		StgRhsClosure _ _ _ _ _ args _ -> null args
-		StgRhsCon _ _ _		       -> False
+    bndr_ty   = idType bndr
+    is_strict = isStrictDem dem
+    is_whnf   = case rhs of
+		  StgCon _ _ _ -> True
+		  StgLam _ _ _ -> True
+		  other	       -> False
 
-mkStgCase (StgLet bind expr) bndr alts
-  = StgLet bind (mkStgCase expr bndr alts)
+-- Split at the first strict binding
+splitFloats fs@(NonRecF _ _ dem _ : _) 
+  | isStrictDem dem = ([], fs)
+
+splitFloats (f : fs) = case splitFloats fs of
+		  	     (fs_out, fs_in) -> (f : fs_out, fs_in)
+
+splitFloats [] = ([], [])
+
+
 mkStgCase scrut bndr alts
-  = StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT alts
+  = ASSERT( case scrut of { StgLam _ _ _ -> False; other -> True } )
+	-- We should never find 
+	--	case (\x->e) of { ... }
+	-- The simplifier eliminates such things
+    StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT alts
 \end{code}

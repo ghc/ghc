@@ -259,7 +259,7 @@ ppr_expr pe (Note (Coerce to_ty from_ty) expr)
 	          ppr_parend_expr pe expr]
 #else
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
-  = sep [sep [ptext SLIT("__coerce"), nest 4 pTy pe to_ty],
+  = sep [sep [ptext SLIT("__coerce"), nest 4 (pTy pe to_ty)],
 	 ppr_parend_expr pe expr]
 #endif
 
