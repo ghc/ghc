@@ -738,23 +738,24 @@ Sadly, the @gr2ps@ script, used to convert ``parallelism profiles''
 to PostScript, is written in Bash (GNU's Bourne Again shell).
 This bug will be fixed (someday).
 
-<tag>Flex:</tag>
-<nidx>pre-supposed: flex</nidx>
+<tag>Flex:</tag> 
+<nidx>pre-supposed: flex</nidx> 
 <nidx>flex, pre-supposed</nidx>
-This is a quite-a-bit-better-than-Lex lexer.  Used in the
-literate-programming stuff.  You won't need it unless you're hacking
-on some of our more obscure stuff.  On our machines, the version in
-@/bin@ doesn't work; you need the GNU version.  Find out by saying
-@flex --version@ (our current version is 2.5.3, but maybe earlier ones
-will work).  If it doesn't know about the @--version@ flag, it ain't
-the right @flex@.
+
+This is a quite-a-bit-better-than-Lex lexer.  Used to build GHC's
+lexer, and a couple of utilities in @glafp-utils@.  On our machines,
+the version in @/bin@ doesn't work; you need the GNU version.  Find
+out by saying @flex --version@ (our current version is 2.5.3, but
+maybe earlier ones will work).  If it doesn't know about the
+@--version@ flag, it ain't the right @flex@.
 
 <tag>Yacc:</tag>
 <nidx>pre-supposed: non-worthless Yacc</nidx>
 <nidx>Yacc, pre-supposed</nidx>
+
 If you mess with the Haskell parser, you'll need a Yacc that can cope.
-The unbundled @/usr/lang/yacc@ is OK; the GNU @bison@ is OK;
-Berkeley yacc, @byacc@, is not OK.
+The unbundled @/usr/lang/yacc@ is OK; the GNU @bison@ is OK; Berkeley
+yacc, @byacc@, is not OK.
 
 <tag>@sed@</tag>
 <nidx>pre-supposed: sed</nidx>
@@ -846,9 +847,7 @@ All the other directories are individual <em/projects/ of the
 @fptools@ system --- for example, the Glasgow Haskell Compiler
 (@ghc@), the Happy parser generator (@happy@), the @nofib@ benchmark
 suite, and so on.  You can have zero or more of these.  Needless to
-say, some of them are needed to build others.  For example, you need
-@literate@ (or an installed copy of the tools) in order to format the
-GHC documentation.
+say, some of them are needed to build others.
 
 The important thing to remember is that even if you want only one
 project (@happy@, say), you must have a source tree whose root
@@ -1016,7 +1015,7 @@ change.  (The override occurs because the main boilerplate file,
 For example, @config.mk.in@ contains the definition:
 
 <tscreen><verb>
-  ProjectsToBuild = glafp-utils literate ghc hslibs
+  ProjectsToBuild = glafp-utils ghc
 </verb></tscreen>
 
 The accompanying comment explains that this is the list of enabled
@@ -1031,7 +1030,7 @@ add @green-card@, you can add this line to @build.mk@:
 or, if you prefer,
 
 <tscreen><verb>
-  ProjectsToBuild = glafp-utils literate ghc hslibs green-card
+  ProjectsToBuild = glafp-utils ghc green-card
 </verb></tscreen>
 
 (GNU @make@ allows existing definitions to have new text appended
@@ -1138,13 +1137,16 @@ extensively.
 
 In any directory you should be able to make the following:
 <descrip>
-<tag>@boot@:</tag> does the one-off preparation required to get ready
-for the real work.  Notably, it does @gmake depend@ in all directories
-that contain programs.  But @boot@ does more.  For example, you can't
-do @gmake depend@ in a directory of C program until you have converted
-the literate @.lh@ header files into standard @.h@ header files.
+
+<tag>@boot@:</tag> 
+
+does the one-off preparation required to get ready for the real work.
+Notably, it does @gmake depend@ in all directories that contain
+programs.  But @boot@ does more.  For example, you can't do @gmake
+depend@ in a directory of C program until you have converted the
+literate @.lh@ header files into standard @.h@ header files.
 Similarly, you can't convert a literate file to illiterate form until
-you have built the @literate@ tools.  @boot@ takes care of these
+you have built the @unlit@ tool.  @boot@ takes care of these
 inter-directory dependencies.
 
 You should say @gmake boot@ right after configuring your build tree,
