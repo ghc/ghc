@@ -46,6 +46,7 @@ import Prelude
 
 #ifdef __NHC__
 import CPUTime		( getCPUTime )
+import Foreign.Ptr      ( Ptr, nullPtr )
 #else
 import System.CPUTime	( getCPUTime )
 import System.Time	( getClockTime, ClockTime(..) )
@@ -64,9 +65,9 @@ import GHC.IOBase	( stToIO )
 -- replacement here.
 #ifdef __NHC__
 data ClockTime = TOD Integer ()
-foreign import ccall "time.h time" readtime :: Int -> IO Int
+foreign import ccall "time.h time" readtime :: Ptr () -> IO Int
 getClockTime :: IO ClockTime
-getClockTime = do t <- readtime 0;  return (TOD (toInteger t) ())
+getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
 #endif
 
 {- $intro
