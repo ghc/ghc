@@ -172,7 +172,7 @@ ilxcheck:
 
 ifeq "$(ILXized)" "YES"
 
-SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module
+SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module -DILX
 
 HS_ILX+=PrelGHC.$(way_)o
 PrelGHC.$(way_)o: PrelGHC.ilx.real
@@ -181,9 +181,6 @@ PrelGHC.$(way_)o: PrelGHC.ilx.real
 	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
 #	mv $@.tmp $@
 
-PrelGHC.$(way_)hi: PrelGHC.hi-boot
-	cp $< $@
-
 std.dll: $(HS_OBJS)
 	al -out:$@ $(HS_OBJS)
 
@@ -191,11 +188,7 @@ std.$(way_)mvl: $(HS_IL)
 	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb $(HS_IL)) 2>&1) | tee $@
 
 std.$(way_)vlb: std.dll
-#	echo "call devcorb2gen fastchecked" > tmp.bat
-	echo "copy c:\\devel\\fcom\\bin\\msilxlib.$(ILX_WAY).dll msilxlib.$(ILX_WAY).dll" > tmp.bat
-	echo "copy c:\\devel\\fcom\\bin\\mkvlb.exe ." >> tmp.bat
-	echo "copy c:\\devel\\fcom\\bin\\mkvlb.pdb ." >> tmp.bat
-	echo ".\\mkvlb.exe -V -o $@.tmp std" >> tmp.bat
+	mkvlb.exe -V -o $@.tmp std
 	cmd /c tmp.bat
 	mv $@.tmp $@
 
