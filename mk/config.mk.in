@@ -121,16 +121,6 @@ ProjectsToInstall = glafp-utils ghc
 #
 IncludeTestDirsInBuild=NO
 
-#
-# Name variables for the main project
-#
-Project		  = Ghc
-ProjectName       = $($(Project)ProjectName)
-ProjectNameShort  = $($(Project)ProjectNameShort)
-ProjectVersion    = $($(Project)ProjectVersion)
-ProjectVersionInt = $($(Project)ProjectVersionInt)
-ProjectPatchLevel = $($(Project)ProjectPatchLevel)
-
 #################################################################################
 #
 #		GHC project
@@ -140,21 +130,11 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 #
 #################################################################################
 
-#
-# Name variables for ghc:
-# 
-# *ProjectVersion    is treated as a *string*
-# *ProjectVersionInt is treated as an *integer* (for cpp defines)
-
-GhcProjectName         = The Glorious Glasgow Haskell Compilation System
-GhcProjectNameShort    = ghc
-GhcProjectVersion = proto-3.03-9-Aug
-GhcProjectVersionInt   = 303
-GhcProjectPatchLevel   = 0
-
 #---------------------------------------------------------------
 #
 # Variables that control how the compiler itself is built
+#
+#---------------------------------------------------------------
 
 # Specify the Haskell compiler to be used to compile the compiler itself
 #
@@ -263,14 +243,10 @@ GhcLibsWithSockets=YES
 #
 StripLibraries=NO
 
-# what to include in a binary distribution
-
-GhcMainDir = ghc
-GhcBinDistDirs = ghc
-GhcBinDistDocs = docs ghc/docs/users_guide ghc/docs/libraries
-GhcBinDistPrlScripts = ghc-$(GhcProjectVersion) stat2resid hstags mkdependHS
-GhcBinDistLibPrlScripts = hscpp
-GhcBinDistBins = hp2ps
+# Include compiler support for letting the compiler (optionally) report
+# your compilation to a central server for generation of fun stats.
+#
+GhcReportCompiles=YES
 
 #################################################################################
 #
@@ -280,15 +256,6 @@ GhcBinDistBins = hp2ps
 #
 #################################################################################
 
-#
-# Name variables for happy:
-#
-HappyProjectName       = Happy
-HappyProjectNameShort  = happy
-HappyProjectVersion    = 1.5
-HappyProjectVersionInt = 15
-HappyProjectPatchLevel = 0
-
 # The compiler you'd like to use to compile Happy
 WithHappyHc = $(WithGhcHc)
 
@@ -296,13 +263,6 @@ WithHappyHc = $(WithGhcHc)
 # 	      to compile the Happy sources with.
 #
 HappyHcOpts = 
-
-# what to include in a binary distribution
-
-HappyMainDir = happy
-HappyBinDistDirs = happy
-HappyBinDistDocs = happy/doc
-HappyBinDistShScripts = happy
 
 #################################################################################
 #
