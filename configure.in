@@ -675,6 +675,16 @@ if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
 fi;
 
+AC_ARG_ENABLE(src-tree-haddock,
+[  --enable-src-tree-haddock
+        Build and use source tree (fptools/haddock) version of haddock.
+],
+[UseSrcTreeHaddock=YES],
+[UseSrcTreeHaddock=NO]
+)
+dnl ** check for installed haddock
+FPTOOLS_HADDOCK
+
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
 dnl --------------------------------------------------
