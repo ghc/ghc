@@ -542,7 +542,8 @@ endif
 #
 #	SRC_HC_OPTS += -O
 
-SRC_HC_OPTS += -H16m -O
+SRC_HC_OPTS += @CPPFLAGS@ @CFLAGS@ -H16m -O
+EXTRA_LD_OPTS+=	@LDFLAGS@
 
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
