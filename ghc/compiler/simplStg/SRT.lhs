@@ -12,7 +12,7 @@ module SRT where
 #include "HsVersions.h"
 
 import Id        ( Id, idCafInfo )
-import IdInfo 	 ( CafInfo(..) )
+import IdInfo 	 ( mayHaveCafRefs )
 import StgSyn
 
 import UniqFM
@@ -97,7 +97,7 @@ srtTopBind (StgNonRec binder rhs) =
         extra_refs = filter (`notElem` srt) filtered_g
 	bind_srt   = reverse (extra_refs ++ srt)
    in
-   ASSERT2(null bind_srt || mayHaveCafRefs binder, ppr binder)
+   ASSERT2(null bind_srt || idMayHaveCafRefs binder, ppr binder)
 
    case rhs of
         StgRhsClosure _ _ _ _ _ _ _ ->
@@ -109,7 +109,7 @@ srtTopBind (StgNonRec binder rhs) =
 
 
 srtTopBind (StgRec bs) =
-    ASSERT(null bind_srt || all mayHaveCafRefs binders)
+    ASSERT(null bind_srt || all idMayHaveCafRefs binders)
     (attach_srt_bind (StgRec new_bs) 0 (length bind_srt), bind_srt)
   where
     (binders,rhss) = unzip bs
@@ -379,14 +379,11 @@ getGlobalRefs args = mkUniqSet (concat (map globalRefArg args))
 
 globalRefArg :: StgArg -> [Id]
 globalRefArg (StgVarArg id)
-  | mayHaveCafRefs id = [id]
-  | otherwise         = []
+  | idMayHaveCafRefs id = [id]
+  | otherwise           = []
 globalRefArg _ = []
 
-mayHaveCafRefs id
- = case idCafInfo id of
-	MayHaveCafRefs -> True
-	NoCafRefs      -> False
+idMayHaveCafRefs id = mayHaveCafRefs (idCafInfo id)
 \end{code}
 
 -----------------------------------------------------------------------------
