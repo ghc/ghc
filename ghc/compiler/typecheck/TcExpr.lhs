@@ -191,6 +191,9 @@ tc_expr (HsLit lit) res_ty  = tcLit lit res_ty
 
 tc_expr (HsOverLit lit) res_ty  
   = zapExpectedType res_ty liftedTypeKind		`thenM` \ res_ty' ->
+ 	-- Overloaded literals must have liftedTypeKind, because
+ 	-- we're instantiating an overloaded function here,
+ 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
     newOverloadedLit (LiteralOrigin lit) lit res_ty'	`thenM` \ lit_expr ->
     returnM (unLoc lit_expr) 	-- ToDo: nasty unLoc
 
