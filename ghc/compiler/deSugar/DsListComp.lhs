@@ -357,7 +357,7 @@ dsPArrComp qs _  =
 				     mkIntExpr 1, 
 				     mkCoreTup []]
   in
-  dePArrComp qs (noLoc (TuplePat [] Boxed)) unitArray
+  dePArrComp qs (mkTuplePat []) unitArray
 
 -- the work horse
 --
@@ -382,7 +382,7 @@ dePArrComp (ExprStmt b _ : qs) pa cea =
   dsLookupGlobalId filterPName			  `thenDs` \filterP  ->
   let ty = parrElemType cea
   in
-  deLambda ty pa b					  `thenDs` \(clam,_) ->
+  deLambda ty pa b				  `thenDs` \(clam,_) ->
   dePArrComp qs pa (mkApps (Var filterP) [Type ty, clam, cea])
 --
 --  <<[:e' | p <- e, qs:]>> pa ea = 
@@ -400,10 +400,10 @@ dePArrComp (BindStmt p e : qs) pa cea =
       true   = Var trueDataConId
   in
   newSysLocalDs ty'ce					  `thenDs` \v       ->
-  matchSimply (Var v) (StmtCtxt PArrComp) p true false      `thenDs` \pred    ->
+  matchSimply (Var v) (StmtCtxt PArrComp) p true false    `thenDs` \pred    ->
   let cef    = mkApps (Var filterP) [Type ty'ce, mkLams [v] pred, ce]
       ty'cef = ty'ce				-- filterP preserves the type
-      pa'    = noLoc (TuplePat [pa, p] Boxed)
+      pa'    = mkTuplePat [pa, p]
   in
   dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
 --
@@ -427,8 +427,8 @@ dePArrComp (LetStmt ds : qs) pa cea =
       errMsg   = "DsListComp.dePArrComp: internal error!"
   in
   mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
-  matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr  `thenDs` \ccase   ->
-  let pa'    = noLoc $ TuplePat [pa, noLoc (TuplePat (map nlVarPat xs) Boxed)] Boxed
+  matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr`thenDs` \ccase   ->
+  let pa'    = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
       proj   = mkLams [v] ccase
   in
   dePArrComp qs pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
@@ -439,18 +439,38 @@ dePArrComp (LetStmt ds : qs) pa cea =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrComp (ParStmt []             : qss2) pa cea = dePArrComp qss2 pa cea
-dePArrComp (ParStmt ((qs, xs):qss) : qss2) pa cea =
-  dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
-  let pa'     = noLoc $ TuplePat [pa, noLoc (TuplePat (map nlVarPat xs) Boxed)] Boxed
-      ty'cea  = parrElemType cea
-      resStmt = ResultStmt (noLoc $ ExplicitTuple (map nlHsVar xs) Boxed)
+dePArrComp (ParStmt qss            : qs) pa cea = 
+  dsLookupGlobalId crossPName				`thenDs` \crossP  ->
+  deParStmt qss						`thenDs` \(pQss, 
+								   ceQss) ->
+  let ty'cea   = parrElemType cea
+      ty'ceQss = parrElemType ceQss
+      pa'      = mkTuplePat [pa, pQss]
   in
-  dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
-  let ty'cqs = parrElemType cqs
-      cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
-  in
-  dePArrComp (ParStmt qss : qss2) pa' cea'
+  dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'ceQss, 
+					  cea, ceQss])
+  where
+    deParStmt []             =
+      -- empty parallel statement lists have not source representation
+      panic "DsListComp.dePArrComp: Empty parallel list comprehension"
+    deParStmt ((qs, xs):qss) =          -- first statement
+      let resStmt = ResultStmt $ mkExplicitTuple (map nlHsVar xs)
+      in
+      dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
+      parStmts qss (mkTuplePat (map nlVarPat xs)) cqs
+    ---
+    parStmts []             pa cea = return (pa, cea)
+    parStmts ((qs, xs):qss) pa cea =    -- subsequent statements (zip'ed)
+      dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
+      let pa'     = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
+	  ty'cea  = parrElemType cea
+	  resStmt = ResultStmt $ mkExplicitTuple (map nlHsVar xs)
+      in
+      dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
+      let ty'cqs = parrElemType cqs
+	  cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
+      in
+      parStmts qss pa' cea'
 
 -- generate Core corresponding to `\p -> e'
 --
@@ -477,4 +497,16 @@ parrElemType e  =
     Just (tycon, [ty]) | tycon == parrTyCon -> ty
     _							  -> panic
       "DsListComp.parrElemType: not a parallel array type"
+
+-- Smart constructor for source tuple patterns
+--
+mkTuplePat :: [LPat id] -> LPat id
+mkTuplePat [lpat] = lpat
+mkTuplePat lpats  = noLoc $ TuplePat lpats Boxed
+
+-- Smart constructor for source tuple expressions
+--
+mkExplicitTuple :: [LHsExpr id] -> LHsExpr id
+mkExplicitTuple [lexp] = lexp
+mkExplicitTuple lexps  = noLoc $ ExplicitTuple lexps Boxed
 \end{code}
