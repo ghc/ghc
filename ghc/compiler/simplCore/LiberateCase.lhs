@@ -16,7 +16,7 @@ import Util		( panic )
 liberateCase = panic "LiberateCase.liberateCase: ToDo"
 
 {- LATER: to end of file:
-import CoreUnfold	( UnfoldingGuidance(..) )
+import CoreUnfold	( UnfoldingGuidance(..), PragmaInfo(..) )
 import Id		( localiseId )
 import Maybes
 import Outputable
@@ -180,7 +180,7 @@ libCaseBind env (Rec pairs)
 	-- to think that something is top-level when it isn't.
 
     rhs_small_enough rhs
-      = case (calcUnfoldingGuidance True{-sccs OK-} lIBERATE_BOMB_SIZE rhs) of
+      = case (calcUnfoldingGuidance NoPragmaInfo lIBERATE_BOMB_SIZE rhs) of
 	  UnfoldNever -> False
 	  _ 	      -> True	-- we didn't BOMB, so it must be OK
 
