@@ -136,7 +136,10 @@ module Data.List
 
    ) where
 
+#ifdef __NHC__
 import Prelude hiding (Maybe(..))
+#endif
+
 import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
