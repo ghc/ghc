@@ -1,5 +1,5 @@
 
-include ($confdir ++ "/../std-macros.T")
+include ($confdir ++ "/../singlefile-macros.T")
 expect pass
 
 pretest_cleanup()
