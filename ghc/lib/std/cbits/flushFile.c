@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: flushFile.c,v 1.7 2000/04/12 17:33:16 simonmar Exp $
+ * $Id: flushFile.c,v 1.8 2000/09/25 10:51:04 simonmar Exp $
  *
  * hFlush Runtime Support
  */
@@ -15,8 +15,9 @@ flushFile(StgForeignPtr ptr)
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
 
-    if ( (fo->flags & FILEOBJ_WRITE) && FILEOBJ_NEEDS_FLUSHING(fo) ) {
-       rc = writeBuffer(ptr,fo->bufWPtr - fo->bufRPtr);
+    if ( FILEOBJ_WRITEABLE(fo) && FILEOBJ_JUST_WRITTEN(fo) &&
+	 FILEOBJ_NEEDS_FLUSHING(fo) ) {
+       rc = writeBuffer(ptr, fo->bufWPtr - fo->bufRPtr);
     }
 
     return rc;
@@ -28,14 +29,10 @@ flushBuffer(StgForeignPtr ptr)
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
 
-    /* If the file object is writeable, or if it's
-       RW *and* the last operation on it was a write,
-       flush it.
-    */
-    if ( (!FILEOBJ_READABLE(fo) && FILEOBJ_WRITEABLE(fo)) ||
-         (FILEOBJ_RW(fo) && FILEOBJ_JUST_WRITTEN(fo)) ) {
-       rc = flushFile(ptr);
-       if (rc<0) return rc;
+    if ( FILEOBJ_WRITEABLE(fo) && FILEOBJ_JUST_WRITTEN(fo) &&
+	 FILEOBJ_NEEDS_FLUSHING(fo) ) {
+	rc = writeBuffer(ptr, fo->bufWPtr - fo->bufRPtr);
+	if (rc<0) return rc;
     }
     
     /* TODO: shouldn't we do the lseek stuff from flushReadBuffer
