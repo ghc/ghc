@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.23 2001/01/12 11:04:45 simonmar Exp $
+-- $Id: DriverState.hs,v 1.24 2001/01/16 12:41:03 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -602,11 +602,7 @@ way_details =
 	, "-fvia-C" ]),
 
     (WayUnreg, Way  "u" "Unregisterised" 
-	[ "-optc-DNO_REGS"
-	, "-optc-DUSE_MINIINTERPRETER"
-	, "-fno-asm-mangling"
-	, "-funregisterised"
-	, "-fvia-C" ]),
+	unregFlags ),
 
     (WayPar, Way  "mp" "Parallel" 
 	[ "-fparallel"
@@ -647,6 +643,13 @@ way_details =
     (WayUser_A,  Way  "A"  "User way 'A'"  ["$WAY_A_REAL_OPTS"]),	
     (WayUser_B,  Way  "B"  "User way 'B'"  ["$WAY_B_REAL_OPTS"]) 
   ]
+
+unregFlags = 
+   [ "-optc-DNO_REGS"
+   , "-optc-DUSE_MINIINTERPRETER"
+   , "-fno-asm-mangling"
+   , "-funregisterised"
+   , "-fvia-C" ]
 
 -----------------------------------------------------------------------------
 -- Programs for particular phases

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.46 2001/01/12 11:04:45 simonmar Exp $
+-- $Id: Main.hs,v 1.47 2001/01/16 12:41:03 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -168,9 +168,13 @@ main =
 	-- process all the other arguments, and get the source files
    non_static <- processArgs static_flags flags2 []
 
-	-- find the build tag, and re-process the build-specific options
-   more_opts <- findBuildTag
-   way_non_static <- processArgs static_flags more_opts []
+	-- Find the build tag, and re-process the build-specific options.
+	-- Also add in flags for unregisterised compilation, if 
+	-- GhcUnregisterised=YES.
+   way_opts <- findBuildTag
+   let unreg_opts | cGhcUnregisterised == "YES" = unregFlags
+		  | otherwise = []
+   way_non_static <- processArgs static_flags (unreg_opts ++ way_opts) []
 
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
