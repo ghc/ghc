@@ -53,6 +53,7 @@ typedef struct _IOFileObject {
  * we need to use separate r/w calls.
  */ 
 #define FILEOBJ_WINSOCK  1024
+#define FILEOBJ_BINARY   2048
 
 #define FILEOBJ_IS_EOF(x)     ((x)->flags & FILEOBJ_EOF)
 #define FILEOBJ_SET_EOF(x)    ((x)->flags |= FILEOBJ_EOF)
