@@ -169,25 +169,17 @@ GhcWithHscBuiltViaC=@BootingFromHc@
 #
 # Target platforms supported:
 #   i386, alpha & sparc
-GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha sparc) = x); then echo NO; else echo YES; fi)
+ifneq "$(findstring $(HostArch_CPP), i386 alpha sparc)" ""
+GhcWithNativeCodeGen=YES
+else
+GhcWithNativeCodeGen=NO
+endif
 
 # Include GHCi in the compiler
-ifeq "$(linux_TARGET_OS)" "1"
+ifneq "$(findstring $(HostOS_CPP), linux solaris freebsd netbsd openbsd)" ""
 GhcWithInterpreter=YES
 else 
-ifeq "$(solaris_TARGET_OS)" "1"
-GhcWithInterpreter=YES
-else
-ifeq "$(freebsd_TARGET_OS)" "1"
-GhcWithInterpreter=YES
-else
-ifeq "$(netbsd_TARGET_OS)" "1"
-GhcWithInterpreter=YES
-else
 GhcWithInterpreter=NO
-endif
-endif
-endif
 endif
 
 #
