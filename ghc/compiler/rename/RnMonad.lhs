@@ -39,6 +39,7 @@ import IOBase
 
 import HsSyn		
 import RdrHsSyn
+import BasicTypes	( SYN_IE(Version), NewOrData )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, SYN_IE(Error), SYN_IE(Warning)
 			)
@@ -51,7 +52,7 @@ import PrelInfo		( builtinNames )
 import TyCon		( TyCon {- instance NamedThing -} )
 import TysWiredIn	( boolTyCon )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap, emptyFM, bagToFM )
@@ -119,7 +120,7 @@ data RnDown s = RnDown
 		  SrcLoc
 		  (MutableVar s RnNameSupply)
 		  (MutableVar s (Bag Warning, Bag Error))
-		  (MutableVar s [(Name,Necessity)])		-- Occurrences
+		  (MutableVar s ([Name],[Name]))	-- Occurrences: compulsory and optional resp
 
 data Necessity = Compulsory | Optional		-- We *must* find definitions for
 						-- compulsory occurrences; we *may* find them
@@ -139,8 +140,13 @@ data SDown s = SDown
 		  RnSMode
 
 
-data RnSMode	= SourceMode
-		| InterfaceMode
+data RnSMode	= SourceMode			-- Renaming source code
+		| InterfaceMode Necessity	-- Renaming interface declarations.  The "necessity"
+						-- flag says free variables *must* be found and slurped
+						-- or whether they need not be.  For value signatures of
+						-- things that are themselves compulsorily imported
+						-- we arrange that the type signature is read in compulsory mode,
+						-- but the pragmas in optional mode.
 
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
@@ -231,8 +237,10 @@ data Ifaces = Ifaces
 					-- This is used to generate the "usage" information for this module.
 					-- Subset of the previous field.
 
-		(Bag IfaceInst)		-- The as-yet un-slurped instance decls; this bag is depleted when we
-					-- slurp an instance decl so that we don't slurp the same one twice.
+		(Bag IfaceInst, NameSet) -- The as-yet un-slurped instance decls; this bag is depleted when we
+					 -- slurp an instance decl so that we don't slurp the same one twice.
+					 -- Together with them is the set of tycons/classes that may allow 
+					 -- the instance decls in.
 
 		(FiniteMap Name RdrNameTyDecl)
 					-- Deferred data type declarations; each has the following properties
@@ -291,14 +299,14 @@ initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
 
 
 emptyIfaces :: Module -> Ifaces
-emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] emptyBag emptyFM []
+emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] (emptyBag, emptyNameSet) emptyFM []
 
 builtins :: FiniteMap (Module,OccName) Name
 builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)
 
 	-- Initial value for the occurrence pool.
-initOccs :: [(Name,Necessity)]
-initOccs = [(getName boolTyCon, Compulsory)]
+initOccs :: ([Name],[Name])	-- Compulsory and optional respectively
+initOccs = ([getName boolTyCon], [])
 	-- Booleans occur implicitly a lot, so it's tiresome to keep recording the fact, and
 	-- rather implausible that not one will be used in the module.
 	-- We could add some other common types, notably lists, but the general idea is
@@ -330,10 +338,10 @@ renameSourceCode mod_name name_supply m
   = runSST (
 	newMutVarSST name_supply		`thenSST` \ names_var ->
 	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
-	newMutVarSST []				`thenSST` \ occs_var ->
+	newMutVarSST ([],[])			`thenSST` \ occs_var ->
     	let
 	    rn_down = RnDown mkGeneratedSrcLoc names_var errs_var occs_var
-	    s_down = SDown emptyRnEnv emptyNameEnv mod_name InterfaceMode
+	    s_down = SDown emptyRnEnv emptyNameEnv mod_name (InterfaceMode Compulsory)
 	in
 	m rn_down s_down			`thenSST` \ result ->
 	
@@ -482,35 +490,93 @@ newInstUniq (RnDown loc names_var errs_var occs_var) l_down
 
 ================  Occurrences =====================
 
+Every time we get an occurrence of a name we put it in one of two lists:
+	one for "compulsory" occurrences
+	one for "optional" occurrences
+
+The significance of "compulsory" is
+	(a) we *must* find the declaration
+	(b) in the case of type or class names, the name is part of the
+	    source level program, and we must slurp in any instance decls
+	    involving it.  
+
+We don't need instance decls "optional" names, because the type inference
+process will never come across them.  Optional names are buried inside
+type checked (but not renamed) cross-module unfoldings and such.
+
+The pair of lists is held in a mutable variable in RnDown.  
+
+The lists are kept separate so that we can process all the compulsory occurrences 
+before any of the optional ones.  Why?  Because suppose we processed an optional 
+"g", and slurped an interface decl of g::T->T.  Then we'd rename the type T->T in
+optional mode.  But if we later need g compulsorily we'll find that it's already
+been slurped and will do nothing.  We could, I suppose, rename it a second time,
+but it seems simpler just to do all the compulsory ones first.
+
 \begin{code}
-addOccurrenceName :: Necessity -> Name -> RnM s d Name	-- Same name returned as passed
-addOccurrenceName necessity name (RnDown loc names_var errs_var occs_var) l_down
+addOccurrenceName :: Name -> RnMS s Name	-- Same name returned as passed
+addOccurrenceName name (RnDown loc names_var errs_var occs_var)
+		       (SDown rn_env local_env mod_name mode)
   | isLocallyDefinedName name ||
     not_necessary necessity
   = returnSST name
 
   | otherwise
-  = readMutVarSST occs_var			`thenSST` \ occs ->
-    writeMutVarSST occs_var ((name,necessity) : occs)	`thenSST_`
+  = readMutVarSST occs_var			`thenSST` \ (comp_occs, opt_occs) ->
+    let
+	new_occ_pair = case necessity of
+			 Optional   -> (comp_occs, name:opt_occs)
+			 Compulsory -> (name:comp_occs, opt_occs)
+    in
+    writeMutVarSST occs_var new_occ_pair	`thenSST_`
     returnSST name
   where
-    not_necessary Compulsory = False
-    not_necessary Optional = opt_IgnoreIfacePragmas
-    		-- Never look for optional things if we're
-		-- ignoring optional input interface information
+    necessity = case mode of 
+		  SourceMode	          -> Compulsory
+		  InterfaceMode necessity -> necessity
 
-addOccurrenceNames :: Necessity -> [Name] -> RnM s d ()
-addOccurrenceNames necessity names (RnDown loc names_var errs_var occs_var) l_down
-  = readMutVarSST occs_var			`thenSST` \ occs ->
-    writeMutVarSST occs_var ([(name,necessity) | name <- names, not (isLocallyDefinedName name)] ++ occs)
 
-popOccurrenceName :: RnM s d (Maybe (Name,Necessity))
-popOccurrenceName (RnDown loc names_var errs_var occs_var) l_down
+addOccurrenceNames :: [Name] -> RnMS s ()
+addOccurrenceNames names (RnDown loc names_var errs_var occs_var)
+		         (SDown rn_env local_env mod_name mode)
+  | not_necessary necessity 
+  = returnSST ()
+
+  | otherwise
+  = readMutVarSST occs_var			`thenSST` \ (comp_occs, opt_occs) ->
+    let
+	new_occ_pair = case necessity of
+			 Optional   -> (comp_occs, non_local_names ++ opt_occs)
+			 Compulsory -> (non_local_names ++ comp_occs, opt_occs)
+    in
+    writeMutVarSST occs_var new_occ_pair
+  where
+    non_local_names = filter (not . isLocallyDefinedName) names
+    necessity = case mode of 
+		  SourceMode	          -> Compulsory
+		  InterfaceMode necessity -> necessity
+
+	-- Never look for optional things if we're
+	-- ignoring optional input interface information
+not_necessary Compulsory = False
+not_necessary Optional   = opt_IgnoreIfacePragmas
+
+popOccurrenceName :: Necessity -> RnM s d (Maybe Name)
+popOccurrenceName necessity (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST occs_var			`thenSST` \ occs ->
-    case occs of
-	[] 	   -> returnSST Nothing
-	(occ:occs) -> writeMutVarSST occs_var occs	`thenSST_`
-		      returnSST (Just occ)
+    case (necessity, occs) of
+		-- Find a compulsory occurrence
+	(Compulsory, (comp:comps, opts)) -> writeMutVarSST occs_var (comps, opts)	`thenSST_`
+					    returnSST (Just comp)
+
+		-- Find an optional occurrence
+		-- We shouldn't be looking unless we've done all the compulsories
+	(Optional, (comps, opt:opts)) -> ASSERT( null comps )
+					 writeMutVarSST occs_var (comps, opts)	`thenSST_`
+					 returnSST (Just opt)
+
+		-- No suitable occurrence
+	other -> returnSST Nothing
 
 -- findOccurrencesRn does the enclosed thing with a *fresh* occurrences
 -- variable, and returns the list of occurrences thus found.  It's useful
@@ -520,10 +586,10 @@ popOccurrenceName (RnDown loc names_var errs_var occs_var) l_down
 
 findOccurrencesRn :: RnM s d a -> RnM s d [Name]
 findOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
-  = newMutVarSST []							`thenSST` \ new_occs_var ->
+  = newMutVarSST ([],[])						`thenSST` \ new_occs_var ->
     enclosed_thing (RnDown loc names_var errs_var new_occs_var) l_down	`thenSST_`
-    readMutVarSST new_occs_var						`thenSST` \ occs ->
-    returnSST (map fst occs)
+    readMutVarSST new_occs_var						`thenSST` \ (occs,_) ->
+    returnSST occs
 \end{code}
 
 
@@ -565,6 +631,10 @@ getModuleRn rn_down (SDown rn_env local_env mod_name mode)
 getModeRn :: RnMS s RnSMode
 getModeRn rn_down (SDown rn_env local_env mod_name mode)
   = returnSST mode
+
+setModeRn :: RnSMode -> RnMS s a -> RnMS s a
+setModeRn new_mode thing_inside rn_down (SDown rn_env local_env mod_name mode)
+  = thing_inside rn_down (SDown rn_env local_env mod_name new_mode)
 \end{code}
 
 
