@@ -295,13 +295,25 @@ load_thread_state
 	               ]) 
         : StAssignReg PtrRep 
              stgHpLim
-	     (StMachOp MO_Nat_Add 
-                       [StInd PtrRep 
-                              (StMachOp MO_Nat_Add
-		                        [StReg stgCurrentNursery, 
-		                         StInt (toInteger (BDESCR_START * BYTES_PER_WORD))]),
-	                StInt (toInteger (bLOCK_SIZE - (1 * BYTES_PER_WORD)))
-	               ]) 
+             (StIndex Word8Rep 
+                (StInd PtrRep 
+                       (StIndex PtrRep (StReg stgCurrentNursery)
+                                       (StInt (toInteger BDESCR_START))
+                       )
+                )
+                (StMachOp MO_Nat_Sub
+                   [StMachOp MO_NatU_Mul
+                      [StInd WordRep 
+                             (StIndex PtrRep (StReg stgCurrentNursery)
+                                             (StInt (toInteger BDESCR_BLOCKS))),
+                       StInt (toInteger bLOCK_SIZE{-in bytes-})
+                      ],
+                      StInt (1 * BYTES_PER_WORD)
+                   ]
+                )
+
+             ) 
+
         : xs
      )
 \end{code}

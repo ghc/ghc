@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.7 2001/12/12 18:12:46 sewardj Exp $
+ * $Id: mkNativeHdr.c,v 1.8 2002/01/08 10:36:24 sewardj Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -52,6 +52,7 @@
 
 #define BDESCR_START OFFSET(bd, bd.start)
 #define BDESCR_FREE  OFFSET(bd, bd.free)
+#define BDESCR_BLOCKS OFFSET(bd, bd.blocks)
 
 StgRegTable RegTable;
 
@@ -116,6 +117,7 @@ main()
 
     printf("#define BDESCR_START %d\n", BDESCR_START);
     printf("#define BDESCR_FREE %d\n", BDESCR_FREE);
+    printf("#define BDESCR_BLOCKS %d\n", BDESCR_BLOCKS);
 
     printf("\n-- FILE size for the Native Code Generator\n");
 
