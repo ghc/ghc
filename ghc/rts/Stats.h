@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.h,v 1.14 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Stats.h,v 1.15 2002/01/24 07:50:02 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,3 +46,7 @@ extern double    mut_user_time_during_heap_census(void);
 
 extern void      statDescribeGens( void );
 extern HsInt     getAllocations( void );
+
+#ifdef SMP
+extern long int  stat_getElapsedTime ( void );
+#endif

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.112 2002/01/24 02:06:48 sof Exp $
+ * $Id: Schedule.c,v 1.113 2002/01/24 07:50:02 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1907,7 +1907,7 @@ initScheduler(void)
   initCapability(&MainCapability);
 #endif
 
-#if defined(SMP) || defined(PAR)
+#if /* defined(SMP) ||*/ defined(PAR)
   initSparkPools();
 #endif
 }
@@ -1935,7 +1935,7 @@ startTasks( void )
     task_ids[i].mut_etime = 0.0;
     task_ids[i].gc_time = 0.0;
     task_ids[i].gc_etime = 0.0;
-    task_ids[i].elapsedtimestart = elapsedtime();
+    task_ids[i].elapsedtimestart = stat_getElapsedTime();
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Started task: %ld\n",tid););
   }
 }

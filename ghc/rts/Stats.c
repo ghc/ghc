@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.41 2001/11/28 14:29:59 simonmar Exp $
+ * $Id: Stats.c,v 1.42 2002/01/24 07:50:01 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -586,16 +586,24 @@ stat_workerStop(void)
     nat i;
     pthread_t me = pthread_self();
 
+    getTimes();
+
     for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
 	if (task_ids[i].id == me) {
-	    task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
-	    task_ids[i].mut_etime = elapsedtime()
+	    task_ids[i].mut_time = CurrentUserTime - task_ids[i].gc_time;
+	    task_ids[i].mut_etime = CurrentElapsedTime
 		- GCe_tot_time
 		- task_ids[i].elapsedtimestart;
 	    if (task_ids[i].mut_time < 0.0)  { task_ids[i].mut_time = 0.0;  }
 	    if (task_ids[i].mut_etime < 0.0) { task_ids[i].mut_etime = 0.0; }
 	}
     }
+}
+
+long int stat_getElapsedTime ()
+{
+  getTimes();
+  return CurrentElapsedTime;
 }
 #endif
 
