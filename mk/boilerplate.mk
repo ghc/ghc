@@ -41,7 +41,7 @@ $(TOP)/config.status : $(TOP)/configure
 	echo "configure changed, reconfiguring with same settings..."; \
 	( cd $(FPTOOLS_TOP) && ./config.status --recheck ); \
 
-$(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/configure $(TOP)/config.status
+$(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/configure
 	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info...";
 	@( cd $(FPTOOLS_TOP) && ./config.status )
 
