@@ -586,9 +586,7 @@ addErr errs_so_far msg locs
    context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1
 	       | otherwise	    = cxt1
  
-   mk_msg msg
-     | isNoSrcLoc loc = (loc, hang context 4 msg)
-     | otherwise      = addErrLocHdrLine loc context msg
+   mk_msg msg = addErrLocHdrLine loc context msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs warns

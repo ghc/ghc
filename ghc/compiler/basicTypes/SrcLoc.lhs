@@ -11,15 +11,12 @@
 module SrcLoc (
 	SrcLoc,			-- Abstract
 
-	mkSrcLoc,
-	noSrcLoc, isNoSrcLoc,	-- "I'm sorry, I haven't a clue"
+	mkSrcLoc, isGoodSrcLoc,	
+	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
 
-	mkIfaceSrcLoc,		-- Unknown place in an interface
-				-- (this one can die eventually ToDo)
-
-	mkBuiltinSrcLoc,	-- Something wired into the compiler
-
-	mkGeneratedSrcLoc,	-- Code generated within the compiler
+	importedSrcLoc,		-- Unknown place in an interface
+	builtinSrcLoc,		-- Something wired into the compiler
+	generatedSrcLoc,	-- Code generated within the compiler
 
 	incSrcLine, replaceSrcLine,
 	
@@ -46,12 +43,12 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
 data SrcLoc
-  = NoSrcLoc
-
-  | SrcLoc	FAST_STRING	-- A precise location (file name)
+  = SrcLoc	FAST_STRING	-- A precise location (file name)
 		FastInt
 
   | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
+
+  | NoSrcLoc
 \end{code}
 
 Note that an entity might be imported via more than one route, and
@@ -67,15 +64,14 @@ rare case.
 
 Things to make 'em:
 \begin{code}
-noSrcLoc	    = NoSrcLoc
-mkSrcLoc x y        = SrcLoc x (iUnbox y)
+mkSrcLoc x y      = SrcLoc x (iUnbox y)
+noSrcLoc	  = NoSrcLoc
+importedSrcLoc	  = UnhelpfulSrcLoc SLIT("<imported>")
+builtinSrcLoc	  = UnhelpfulSrcLoc SLIT("<built-into-the-compiler>")
+generatedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
 
-mkIfaceSrcLoc	    = UnhelpfulSrcLoc SLIT("<an interface file>")
-mkBuiltinSrcLoc	    = UnhelpfulSrcLoc SLIT("<built-into-the-compiler>")
-mkGeneratedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
-
-isNoSrcLoc NoSrcLoc = True
-isNoSrcLoc other    = False
+isGoodSrcLoc (SrcLoc _ _) = True
+isGoodSrcLoc other        = False
 
 srcLocFile :: SrcLoc -> FAST_STRING
 srcLocFile (SrcLoc fname _) = fname
@@ -137,6 +133,4 @@ instance Outputable SrcLoc where
 					-- so emacs can find the file
 
     ppr (UnhelpfulSrcLoc s) = ptext s
-
-    ppr NoSrcLoc = text "<NoSrcLoc>"
 \end{code}

@@ -265,7 +265,7 @@ newDFunName mod clas (ty:_) loc
     tcGetUnique			`thenNF_Tc` \ uniq ->
     returnNF_Tc (mkGlobalName uniq mod
 			      (mkDFunOcc dfun_string inst_uniq) 
-			      (LocalDef loc Exported))
+			      loc)
   where
 	-- Any string that is somewhat unique will do
     dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
@@ -275,7 +275,7 @@ newDefaultMethodName op_name loc
   = tcGetUnique			`thenNF_Tc` \ uniq ->
     returnNF_Tc (mkGlobalName uniq (nameModule op_name)
 			      (mkDefaultMethodOcc (getOccName op_name))
-			      (LocalDef loc Exported))
+			      loc)
 \end{code}
 
 

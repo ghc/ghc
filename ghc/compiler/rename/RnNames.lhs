@@ -31,9 +31,7 @@ import Bag	( bagToList )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
 import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
-		  setNameProvenance,
-		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance,
-		  nameEnvElts
+		  setLocalNameSort, nameOccName,  nameEnvElts
 		)
 import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
 import OccName	( setOccNameSpace, dataName )
@@ -139,14 +137,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 		returnRn Nothing
 	else
 	
-		-- RECORD BETTER PROVENANCES IN THE CACHE
-		-- The names in the envirnoment have better provenances (e.g. imported on line x)
-		-- than the names in the name cache.  We update the latter now, so that we
-		-- we start renaming declarations we'll get the good names
-		-- The isQual is because the qualified name is always in scope
-	updateProvenances (concat [names | (rdr_name, names) <- rdrEnvToList gbl_env, 
-					   isQual rdr_name])	`thenRn_`
-	
 		-- PROCESS EXPORT LISTS
 	exportsFromAvail this_mod exports all_avails gbl_env	`thenRn` \ export_avails ->
 	
@@ -223,27 +213,16 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 
     filterImports imp_mod_name import_spec avails   `thenRn` \ (filtered_avails, hides, explicits) ->
 
+    let
+	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
+					 (is_unqual name))
+    in
+
     qualifyImports imp_mod_name
 		   (not qual_only)	-- Maybe want unqualified names
 		   as_mod hides
-		   (improveAvails imp_mod iloc explicits 
-				  is_unqual filtered_avails)
-
-
-improveAvails imp_mod iloc explicits is_unqual avails
-	-- We 'improve' the provenance by setting
-	--	(a) the import-reason field, so that the Name says how it came into scope
-	--		including whether it's explicitly imported
-	--	(b) the print-unqualified field
-  = map improve_avail avails
-  where
-    improve_avail (Avail n)      = Avail (improve n)
-    improve_avail (AvailTC n ns) = AvailTC (improve n) (map improve ns)
-
-    improve name = setNameProvenance name 
-			(NonLocalDef (UserImport imp_mod iloc (is_explicit name)) 
-				     (is_unqual name))
-    is_explicit name  = name `elemNameSet` explicits
+		   mk_provenance
+		   filtered_avails
 \end{code}
 
 
@@ -268,15 +247,16 @@ importsFromLocalDecls mod_name rec_exp_fn decls
 
 	-- Build the environment
     qualifyImports mod_name 
-		   True		-- Want unqualified names
-		   Nothing	-- no 'as M'
-		   []		-- Hide nothing
+		   True			-- Want unqualified names
+		   Nothing		-- no 'as M'
+		   []			-- Hide nothing
+		   (\n -> LocalDef)	-- Provenance is local
 		   avails
-
   where
     mod = mkThisModule mod_name
 
-getLocalDeclBinders :: Module -> (Name -> ExportFlag)
+getLocalDeclBinders :: Module 
+		    -> (Name -> Bool)	-- Is-exported predicate
 		    -> RdrNameHsDecl -> RnMG Avails
 getLocalDeclBinders mod rec_exp_fn (ValD binds)
   = mapRn do_one (bagToList (collectTopBinders binds))
@@ -291,9 +271,9 @@ getLocalDeclBinders mod rec_exp_fn decl
 	Just avail -> returnRn [avail]
 
 newLocalName mod rec_exp_fn rdr_name loc 
-  = check_unqual rdr_name loc 			`thenRn_`
-    newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
-    returnRn (setNameProvenance name (LocalDef loc (rec_exp_fn name)))
+  = check_unqual rdr_name loc		`thenRn_`
+    newTopBinder mod rdr_name loc 	`thenRn` \ name ->
+    returnRn (setLocalNameSort name (rec_exp_fn name))
   where
 	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
@@ -417,10 +397,11 @@ qualifyImports :: ModuleName		-- Imported module
 	       -> Bool			-- True <=> want unqualified import
 	       -> Maybe ModuleName	-- Optional "as M" part 
 	       -> [AvailInfo]		-- What's to be hidden
+	       -> (Name -> Provenance)
 	       -> Avails		-- Whats imported and how
 	       -> RnMG (GlobalRdrEnv, ExportAvails)
 
-qualifyImports this_mod unqual_imp as_mod hides avails
+qualifyImports this_mod unqual_imp as_mod hides mk_provenance avails
   = 
  	-- Make the name environment.  We're talking about a 
 	-- single module here, so there must be no name clashes.
@@ -450,9 +431,10 @@ qualifyImports this_mod unqual_imp as_mod hides avails
 	| unqual_imp = env2
 	| otherwise  = env1
 	where
-	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) name
-	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    name
+	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) (name,prov)
+	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
 	  occ  = nameOccName name
+	  prov = mk_provenance name
 
     del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
 			where
@@ -605,7 +587,7 @@ exportsFromAvail this_mod (Just export_items)
        where
 	  rdr_name	  = ieName ie
           maybe_in_scope  = lookupFM global_name_env rdr_name
-	  Just (name:dup_names) = maybe_in_scope
+	  Just ((name,_):dup_names) = maybe_in_scope
 	  maybe_avail        = lookupUFM entity_avail_env name
 	  Just avail         = maybe_avail
  	  maybe_export_avail = filterAvail ie avail
@@ -676,13 +658,10 @@ exportClashErr occ_name ie1 ie2
 
 dupDeclErr (n:ns)
   = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
-	  nest 4 (vcat (map pp sorted_ns))]
+	  nest 4 (vcat (map ppr sorted_locs))]
   where
-    sorted_ns = sortLt occ'ed_before (n:ns)
-
-    occ'ed_before a b = LT == compare (getSrcLoc a) (getSrcLoc b)
-
-    pp n      = pprProvenance (getNameProvenance n)
+    sorted_locs = sortLt occ'ed_before (map nameSrcLoc (n:ns))
+    occ'ed_before a b = LT == compare a b
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 

@@ -14,9 +14,9 @@ module Name (
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
-	nameUnique, setNameUnique, setNameProvenance, getNameProvenance, 
-	setNameImportReason, tidyTopName, 
-	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule, 
+	nameUnique, setNameUnique, setLocalNameSort,
+	tidyTopName, 
+	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModuleAndLoc, 
 	toRdrName, hashName,
 
 	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
@@ -33,11 +33,6 @@ module Name (
 	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, elemNameEnv, 
 
-
-	-- Provenance
-	Provenance(..), ImportReason(..), pprProvenance,
-	ExportFlag(..), PrintUnqualified,
-        pprNameProvenance, hasBetterProv,
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
@@ -71,25 +66,96 @@ import Outputable
 \begin{code}
 data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
-		n_uniq :: Unique,
 		n_occ  :: OccName,	-- Its occurrence name
-		n_prov :: Provenance	-- How it was made
+		n_uniq :: Unique,
+		n_loc  :: SrcLoc	-- Definition site
 	    }
 
 data NameSort
-  = Local
-  | Global Module
+  = Global Module	-- (a) TyCon, Class, their derived Ids, dfun Id
+			-- (b) imported Id
+
+  | Exported		-- An exported Ids defined in the module being compiled
+
+  | Local		-- A user-defined, but non-exported Id or TyVar,
+			-- defined in the module being compiled
+
+  | System		-- A system-defined Id or TyVar.  Typically the
+			-- OccName is very uninformative (like 's')
 \end{code}
 
-Things with a @Global@ name are given C static labels, so they finally
-appear in the .o file's symbol table.  They appear in the symbol table
-in the form M.n.  If originally-local things have this property they
-must be made @Global@ first.
+Notes about the NameSorts:
+
+1.  An Exported Id is changed to Global right at the
+    end in the tidyCore pass, so that an importer sees a Global
+    Similarly, Local Ids that are visible to an importer (e.g. when 
+    optimisation is on) are changed to Globals.
+
+2.  Things with a @Global@ name are given C static labels, so they finally
+    appear in the .o file's symbol table.  They appear in the symbol table
+    in the form M.n.  If originally-local things have this property they
+    must be made @Global@ first.
+
+3.  A System Name differs in the following ways:
+	a) has unique attached when printing dumps
+	b) unifier eliminates sys tyvars in favour of user provs where possible
+
+    Before anything gets printed in interface files or output code, it's
+    fed through a 'tidy' processor, which zaps the OccNames to have
+    unique names; and converts all sys-locals to user locals
+    If any desugarer sys-locals have survived that far, they get changed to
+    "ds1", "ds2", etc.
+
+\begin{code}
+nameUnique		:: Name -> Unique
+nameOccName		:: Name -> OccName 
+nameModule		:: Name -> Module
+nameSrcLoc		:: Name -> SrcLoc
+
+nameUnique  name = n_uniq name
+nameOccName name = n_occ  name
+nameSrcLoc  name = n_loc  name
+nameModule (Name { n_sort = Global mod }) = mod
+nameModule name				  = pprPanic "nameModule" (ppr name)
+\end{code}
+
+\begin{code}
+isLocallyDefinedName	:: Name -> Bool
+isUserExportedName	:: Name -> Bool
+isLocalName		:: Name -> Bool		-- Not globala
+isGlobalName		:: Name -> Bool
+isSystemName		:: Name -> Bool
+isExternallyVisibleName :: Name -> Bool
+
+isGlobalName (Name {n_sort = Global _}) = True
+isGlobalName other	                = False
+
+isLocalName name = not (isGlobalName name)
+
+isLocallyDefinedName name = isLocalName name
+
+-- Global names are by definition those that are visible
+-- outside the module, *as seen by the linker*.  Externally visible
+-- does not mean visible at the source level (that's isExported).
+isExternallyVisibleName name = isGlobalName name
+
+isUserExportedName (Name { n_sort = Exported }) = True
+isUserExportedName other		        = False
+
+isSystemName (Name {n_sort = System}) = True
+isSystemName other		      = False
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Making names}
+%*									*
+%************************************************************************
 
 \begin{code}
 mkLocalName :: Unique -> OccName -> SrcLoc -> Name
-mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, 
-				  n_prov = LocalDef loc NotExported }
+mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, n_loc = loc }
 	-- NB: You might worry that after lots of huffing and
 	-- puffing we might end up with two local names with distinct
 	-- uniques, but the same OccName.  Indeed we can, but that's ok
@@ -105,33 +171,35 @@ mkImportedLocalName :: Unique -> OccName -> SrcLoc -> Name
 	-- file. This is useful when trying to decide which of two type
 	-- variables should 'win' when unifying them.
 	-- NB: this is only for non-top-level names, so we use ImplicitImport
-mkImportedLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, 
-					  n_prov = NonLocalDef ImplicitImport True }
+	--
+	-- Oct 00: now that Names lack Provenances, mkImportedLocalName doesn't make
+	--	   sense any more, so it's just the same as mkLocalName
+mkImportedLocalName uniq occ loc = mkLocalName uniq occ loc
 
 
-mkGlobalName :: Unique -> Module -> OccName -> Provenance -> Name
+mkGlobalName :: Unique -> Module -> OccName -> SrcLoc -> Name
 mkGlobalName uniq mod occ prov = Name { n_uniq = uniq, n_sort = Global mod,
-					n_occ = occ, n_prov = prov }
+					n_occ = occ, n_loc = loc }
 				
 
 mkKnownKeyGlobal :: RdrName -> Unique -> Name
 mkKnownKeyGlobal rdr_name uniq
   = mkGlobalName uniq (mkVanillaModule (rdrNameModule rdr_name))
 		      (rdrNameOcc rdr_name)
-		      systemProvenance
+		      builtinSrcLoc
 
 mkWiredInName :: Module -> OccName -> Unique -> Name
-mkWiredInName mod occ uniq = mkGlobalName uniq mod occ systemProvenance
+mkWiredInName mod occ uniq = mkGlobalName uniq mod occ builtinSrcLoc
 
 mkSysLocalName :: Unique -> UserFS -> Name
-mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
-				n_occ = mkVarOcc fs, n_prov = systemProvenance }
+mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = System, 
+				n_occ = mkVarOcc fs, n_loc = noSrcLoc }
 
 mkCCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall
 mkCCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
 			       n_occ = mkCCallOcc str, 
-			       n_prov = NonLocalDef ImplicitImport True }
+			       n_prov = noSrcLoc }
 
 mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- Make a top-level name; make it Global if top-level
@@ -142,11 +210,12 @@ mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- We have to make sure that the name is globally unique
 	-- and we don't have tidyCore to help us. So we append
 	-- the unique.  Hack!  Hack!
+	-- (Used only by the STG lambda lifter.)
 mkTopName uniq mod fs
   = Name { n_uniq = uniq, 
 	   n_sort = mk_top_sort mod,
 	   n_occ  = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
-	   n_prov = LocalDef noSrcLoc NotExported }
+	   n_loc = noSrcLoc }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
@@ -177,25 +246,31 @@ setNameOcc :: Name -> OccName -> Name
 	-- This is used by the tidy-up pass
 setNameOcc name occ = name {n_occ = occ}
 
-setNameModule :: Name -> Module -> Name
-setNameModule name mod = name {n_sort = set (n_sort name)}
+setNameModuleAndLoc :: Name -> Module -> SrcLoc -> Name
+setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc}
 		       where
-			 set (Global _)             = Global mod
+			 set (Global _) = Global mod
+
+setLocalNameSort :: Name -> Bool -> Name
+  -- Set the name's sort to Local or Exported, depending on the boolean
+setLocalNameSort name is_exported = name { n_sort = if is_exported then Exported
+								   else Local }
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Setting provenance and visibility
+\subsection{Tidying a name}
 %*									*
 %************************************************************************
 
 tidyTopName is applied to top-level names in the final program
 
-For top-level things, it globalises Local names 
-				(if all top-level things should be visible)
-			 and localises non-exported Global names
-				 (if only exported things should be visible)
+For top-level things, 
+	it globalises Local names 
+		(if all top-level things should be visible)
+	and localises non-exported Global names
+		 (if only exported things should be visible)
 
 In all cases except an exported global, it gives it a new occurrence name.
 
@@ -231,7 +306,7 @@ tidyTopName mod env name
     (env', occ') = tidyOccName env (n_occ name)
 
     name'        = Name { n_uniq = n_uniq name, n_sort = mk_top_sort mod,
-			  n_occ = occ', n_prov = LocalDef noSrcLoc NotExported }
+			  n_occ = occ', n_loc = n_loc name }
 
 mk_top_sort mod | all_toplev_ids_visible = Global mod
 		| otherwise		 = Local
@@ -242,128 +317,6 @@ all_toplev_ids_visible =
 \end{code}
 
 
-\begin{code}
-setNameProvenance :: Name -> Provenance -> Name	
-	-- setNameProvenance used to only change the provenance of 
-	-- Implicit-provenance things, but that gives bad error messages 
-	-- for names defined twice in the same module, so I changed it to 
-	-- set the provenance of *any* global (SLPJ Jun 97)
-setNameProvenance name prov = name {n_prov = prov}
-
-getNameProvenance :: Name -> Provenance
-getNameProvenance name = n_prov name
-
-setNameImportReason :: Name -> ImportReason -> Name
-setNameImportReason name reason
-  = name { n_prov = new_prov }
-  where
-	-- It's important that we don't do the pattern matching
-	-- in the top-level clause, else we get a black hole in 
-	-- the renamer.  Rather a yukky constraint.  There's only
-	-- one call, in RnNames
-    old_prov = n_prov name
-    new_prov = case old_prov of
-		  NonLocalDef _ omit -> NonLocalDef reason omit
-		  other		     -> old_prov
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Provenance and export info}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Provenance
-  = LocalDef			-- Defined locally
-	SrcLoc 			-- Defn site
-	ExportFlag		-- Whether it's exported
-
-  | NonLocalDef  		-- Defined non-locally
-	ImportReason
-	PrintUnqualified
-
-  | SystemProv			-- Either (a) a system-generated local with 
-				--	      a v short name OccName
-				-- or     (b) a known-key global which should have a proper
-				--	      provenance attached by the renamer
-\end{code}
-
-Sys-provs are only used internally.  When the compiler generates (say)
-a fresh desguar variable it always calls it "ds", and of course it gets
-a fresh unique.  But when printing -ddump-xx dumps, we must print it with
-its unique, because there'll be a lot of "ds" variables.
-
-Names with SystemProv differ in the following ways:
-	a) locals have unique attached when printing dumps
-	b) unifier eliminates sys tyvars in favour of user provs where possible
-	c) renamer replaces SystemProv with a better one
-
-Before anything gets printed in interface files or output code, it's
-fed through a 'tidy' processor, which zaps the OccNames to have
-unique names; and converts all sys-locals to user locals
-If any desugarer sys-locals have survived that far, they get changed to
-"ds1", "ds2", etc.
-
-\begin{code}
-data ImportReason
-  = UserImport Module SrcLoc Bool	-- Imported from module M on line L
-					-- Note the M may well not be the defining module
-					-- for this thing!
-	-- The Bool is true iff the thing was named *explicitly* in the import spec,
-	-- rather than being imported as part of a group; e.g.
-	--	import B
-	--	import C( T(..) )
-	-- Here, everything imported by B, and the constructors of T
-	-- are not named explicitly; only T is named explicitly.
-	-- This info is used when warning of unused names.
-
-  | ImplicitImport			-- Imported implicitly for some other reason
-			
-
-type PrintUnqualified = Bool	-- True <=> the unqualified name of this thing is
-				-- in scope in this module, so print it 
-				-- unqualified in error messages
-
-data ExportFlag = Exported  | NotExported
-\end{code}
-
-Something is "Exported" if it may be mentioned by another module without
-warning.  The crucial thing about Exported things is that they must
-never be dropped as dead code, even if they aren't used in this module.
-Furthermore, being Exported means that we can't see all call sites of the thing.
-
-Exported things include:
-
-	- explicitly exported Ids, including data constructors, 
-	  class method selectors
-
-	- dfuns from instance decls
-
-Being Exported is *not* the same as finally appearing in the .o file's 
-symbol table.  For example, a local Id may be mentioned in an Exported
-Id's unfolding in the interface file, in which case the local Id goes
-out too.
-
-
-\begin{code}
-systemProvenance :: Provenance
-systemProvenance = SystemProv
-
--- pprNameProvenance is used in error messages to say where a name came from
-pprNameProvenance :: Name -> SDoc
-pprNameProvenance name = pprProvenance (getNameProvenance name)
-
-pprProvenance :: Provenance -> SDoc
-pprProvenance SystemProv	     = ptext SLIT("System")
-pprProvenance (LocalDef loc _)       = ptext SLIT("defined at")    <+> ppr loc
-pprProvenance (NonLocalDef ImplicitImport _)
-  = ptext SLIT("implicitly imported")
-pprProvenance (NonLocalDef (UserImport mod loc _) _) 
-  =  ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -372,36 +325,15 @@ pprProvenance (NonLocalDef (UserImport mod loc _) _)
 %************************************************************************
 
 \begin{code}
-nameUnique		:: Name -> Unique
-nameOccName		:: Name -> OccName 
-nameModule		:: Name -> Module
-nameSrcLoc		:: Name -> SrcLoc
-isLocallyDefinedName	:: Name -> Bool
-isUserExportedName	:: Name -> Bool
-isLocalName		:: Name -> Bool
-isGlobalName		:: Name -> Bool
-isExternallyVisibleName :: Name -> Bool
-
-
-
 hashName :: Name -> Int
 hashName name = iBox (u2i (nameUnique name))
 
-nameUnique name = n_uniq name
-nameOccName name = n_occ name
-
-nameModule name =
-  case n_sort name of
-    Local -> pprPanic "nameModule" (ppr name)
-    x     -> nameSortModule x
-
-nameSortModule (Global       mod)   = mod
 
 nameRdrName :: Name -> RdrName
 -- Makes a qualified name for top-level (Global) names, whether locally defined or not
 -- and an unqualified name just for Locals
-nameRdrName (Name { n_sort = Local, n_occ = occ }) = mkRdrUnqual occ
-nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (moduleName (nameSortModule sort)) occ
+nameRdrName (Name { n_occ = occ, n_sort = Global mod }) = mkRdrQual (moduleName mod) occ
+nameRdrName (Name { n_occ = occ })			= mkRdrUnqual occ
 
 ifaceNameRdrName :: Name -> RdrName
 -- Makes a qualified naem for imported things, 
@@ -409,63 +341,17 @@ ifaceNameRdrName :: Name -> RdrName
 ifaceNameRdrName n | isLocallyDefined n = mkRdrUnqual (nameOccName n)
 		   | otherwise		= mkRdrQual   (moduleName (nameModule n)) (nameOccName n) 
 
-isUserExportedName (Name { n_prov = LocalDef _ Exported }) = True
-isUserExportedName other			           = False
-
-isUserImportedExplicitlyName (Name { n_prov = NonLocalDef (UserImport _ _ explicit) _ }) = explicit
-isUserImportedExplicitlyName other			           			 = False
-
-isUserImportedName (Name { n_prov = NonLocalDef (UserImport _ _ _) _ }) = True
-isUserImportedName other			           		= False
-
-maybeUserImportedFrom (Name { n_prov = NonLocalDef (UserImport m _ _) _ }) = Just m
-maybeUserImportedFrom other			           		   = Nothing
-
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
-	       not (isLocallyDefinedName nm) && 
--- isLocallyDefinedName test is needed because nameModule won't work on local names
-	       not (isLocalModule (nameModule nm))
+	       not (isLocallyDefinedName nm) &&		-- isLocallyDefinedName test needed 'cos
+	       not (isLocalModule (nameModule nm))	-- nameModule won't work on local names
 
-nameSrcLoc name = provSrcLoc (n_prov name)
 
-provSrcLoc (LocalDef loc _)         	        = loc        
-provSrcLoc (NonLocalDef (UserImport _ loc _) _) = loc
-provSrcLoc other				= noSrcLoc   
-  
-isLocallyDefinedName (Name {n_sort = Local})        = True	-- Local (might have SystemProv)
-isLocallyDefinedName (Name {n_prov = LocalDef _ _}) = True	-- Global, but defined here
-isLocallyDefinedName other		            = False	-- Other
-
-isLocalName (Name {n_sort = Local}) = True
-isLocalName _ 		            = False
-
-isGlobalName (Name {n_sort = Local}) = False
-isGlobalName other	             = True
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
 
--- Global names are by definition those that are visible
--- outside the module, *as seen by the linker*.  Externally visible
--- does not mean visible at the source level (that's isExported).
-isExternallyVisibleName name = isGlobalName name
-
-hasBetterProv :: Name -> Name -> Bool
--- Choose 
---	a local thing		      over an	imported thing
---	a user-imported thing	      over a	non-user-imported thing
--- 	an explicitly-imported thing  over an	implicitly imported thing
-hasBetterProv n1 n2
-  = case (n_prov n1, n_prov n2) of
-	(LocalDef _ _,			      _				  ) -> True
-	(NonLocalDef (UserImport _ _ True) _, _				  ) -> True
-	(NonLocalDef (UserImport _ _ _   ) _, NonLocalDef ImplicitImport _) -> True
-	other								    -> False
-
-isSystemName (Name {n_prov = SystemProv}) = True
-isSystemName other			  = False
 \end{code}
 
 

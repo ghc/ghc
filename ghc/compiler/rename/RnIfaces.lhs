@@ -107,27 +107,25 @@ tryLoadInterface doc_str mod_name from
 	mod_map  = iImpModInfo ifaces
 	mod_info = lookupFM mod_map mod_name
 
-	hi_boot_file = case from of {
-		     	 ImportByUser       -> False ;		-- Not hi-boot
-		     	 ImportByUserSource -> True ;		-- hi-boot
-			 ImportBySystem     -> 
-		       case mod_info of
-			 Just (_, is_boot, _) -> is_boot
+	hi_boot_file 
+	  = case (from, mod_info) of
+		(ImportByUser,       _)    	       -> False 	-- Not hi-boot
+		(ImportByUserSource, _)		       -> True 		-- hi-boot
+		(ImportBySystem, Just (_, is_boot, _)) -> is_boot 	-- 
+		(ImportBySystem, Nothing)	       -> False
+			-- We're importing a module we know absolutely
+			-- nothing about, so we assume it's from
+			-- another package, where we aren't doing 
+			-- dependency tracking. So it won't be a hi-boot file.
 
-			 Nothing -> False
-				-- We're importing a module we know absolutely
-				-- nothing about, so we assume it's from
-				-- another package, where we aren't doing 
-				-- dependency tracking. So it won't be a hi-boot file.
-		       }
 	redundant_source_import 
 	  = case (from, mod_info) of 
 		(ImportByUserSource, Just (_,False,_)) -> True
-		other					 -> False
+		other				       -> False
    in
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case mod_info of {
-	Just (_, _, Just _)
+	Just (_, _, True)
 		-> 	-- We're read it already so don't re-read it
 		    returnRn (ifaces, Nothing) ;
 
@@ -140,20 +138,19 @@ tryLoadInterface doc_str mod_name from
 		(warnRedundantSourceImport mod_name)	`thenRn_`
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
+   findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_resultb ->
    case read_result of {
 	Left err -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 	   let
-		mod         = mkVanillaModule mod_name
-		new_mod_map = addToFM mod_map mod_name (False, False, Just (mod, 0, 0, 0, from, []))
+		new_mod_map = addToFM mod_map mod_name (False, False, True)
 		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
 	   returnRn (new_ifaces, Just err) ;
 
 	-- Found and parsed!
-	Right iface ->
+	Right (mod, iface) ->
 
 	-- LOAD IT INTO Ifaces
 
@@ -162,43 +159,45 @@ tryLoadInterface doc_str mod_name from
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
 
-    getModuleRn 		`thenRn` \ this_mod ->
-    let
-	mod = pi_mod iface
-    in
+
 	-- Sanity check.  If we're system-importing a module we know nothing at all
 	-- about, it should be from a different package to this one
     WARN( not (maybeToBool mod_info) && 
 	  case from of { ImportBySystem -> True; other -> False } &&
 	  isLocalModule mod,
 	  ppr mod )
-    foldlRn (loadDecl mod)	(iDecls ifaces)   (pi_decls iface)	`thenRn` \ new_decls ->
+
+    loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
+    loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ (rule_vers, new_rules) ->
+    loadFixDecls mod_name	 		  (pi_fixity iface)	`thenRn` \ (fix_vers, fix_env) ->
+    foldlRn (loadDeprec mod)	emptyDeprecEnv	  (pi_deprecs iface)	`thenRn` \ deprec_env ->
     foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
-    loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ new_rules ->
-    loadFixDecls mod_name	(iFixes ifaces)   (pi_fixity iface)	`thenRn` \ new_fixities ->
-    foldlRn (loadDeprec mod)	(iDeprecs ifaces) (pi_deprecs iface)	`thenRn` \ new_deprecs ->
-    mapRn (loadExport this_mod) (pi_exports iface)			`thenRn` \ avails_s ->
+    loadExports 			 	  (pi_exports iface)	`thenRn` \ avails ->
     let
+	version	= VersionInfo { modVers  = pi_vers iface, 
+				fixVers  = fix_vers,
+				ruleVers = rule_vers,
+				declVers = decl_vers }
+
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
 	-- from its usage info.
 	mod_map1 = case from of
 			ImportByUser -> addModDeps mod (pi_usages iface) mod_map
 			other        -> mod_map
+	mod_map2 = addToFM mod_map1 mod_name (pi_orphan iface, hi_boot_file, True)
 
-	-- Now add info about this module
-	mod_map2    = addToFM mod_map1 mod_name mod_details
-	cts	    = (pi_mod iface, pi_vers iface, 
-		       fst (pi_fixity iface), fst (pi_rules iface), 
-		       from, concat avails_s)
-	mod_details = (pi_orphan iface, hi_boot_file, Just cts)
+	-- Now add info about this module to the PST
+	new_pst     = extendModuleEnv pst mod mod_detils
+ 	mod_details = ModDetails { mdModule = mod, mvVersion = version,
+				   mdExports = avails,
+				   mdFixEnv = fix_env, mdDeprecEnv = deprec_env }
 
-	new_ifaces = ifaces { iImpModInfo = mod_map2,
+	new_ifaces = ifaces { iPST	  = new_pst,
 			      iDecls      = new_decls,
-			      iFixes      = new_fixities,
 			      iInsts      = new_insts,
 			      iRules	  = new_rules,
-			      iDeprecs	  = new_deprecs }
+			      iImpModInfo = mod_map2  }
     in
     setIfacesRn new_ifaces		`thenRn_`
     returnRn (new_ifaces, Nothing)
@@ -209,7 +208,7 @@ tryLoadInterface doc_str mod_name from
 --	import decls in the interface file
 -----------------------------------------------------
 
-addModDeps :: Module -> [ImportVersion a] 
+addModDeps :: Module -> PackageSymbolTable -> [ImportVersion a] 
 	   -> ImportedModuleInfo -> ImportedModuleInfo
 -- (addModDeps M ivs deps)
 -- We are importing module M, and M.hi contains 'import' decls given by ivs
@@ -219,25 +218,33 @@ addModDeps mod new_deps mod_deps
 	-- Don't record dependencies when importing a module from another package
 	-- Except for its descendents which contain orphans,
 	-- and in that case, forget about the boot indicator
+    filtered_new_deps :: (ModuleName, (WhetherHasOrphans, IsBootInterface))
     filtered_new_deps
-	| isLocalModule mod = [ (imp_mod, (has_orphans, is_boot, Nothing))
+	| isLocalModule mod = [ (imp_mod, (has_orphans, is_boot, False))
 			      | (imp_mod, has_orphans, is_boot, _) <- new_deps 
 			      ]			      
-	| otherwise	    = [ (imp_mod, (True, False, Nothing))
+	| otherwise	    = [ (imp_mod, (True, False, False))
 			      | (imp_mod, has_orphans, _, _) <- new_deps, 
 				has_orphans
 			      ]
     add (imp_mod, dep) deps = addToFM_C combine deps imp_mod dep
 
-    combine old@(_, old_is_boot, cts) new
-	| maybeToBool cts || not old_is_boot = old	-- Keep the old info if it's already loaded
+    combine old@(_, old_is_boot, old_is_loaded) new
+	| old_is_loaded || not old_is_boot = old	-- Keep the old info if it's already loaded
 							-- or if it's a non-boot pending load
-	| otherwise			     = new	-- Otherwise pick new info
+	| otherwise			    = new	-- Otherwise pick new info
 
 
 -----------------------------------------------------
 --	Loading the export list
 -----------------------------------------------------
+
+loadExports :: [ExportItem] -> RnM d Avails
+loadExports items
+  = getModuleRn 				`thenRn` \ this_mod ->
+    mapRn (loadExport this_mod) items		`thenRn` \ avails_s ->
+    returnRn (concat avails_s)
+
 
 loadExport :: Module -> ExportItem -> RnM d [AvailInfo]
 loadExport this_mod (mod, entities)
@@ -276,16 +283,22 @@ loadExport this_mod (mod, entities)
 --	Loading type/class/value decls
 -----------------------------------------------------
 
-loadDecl :: Module 
-	 -> DeclsMap
-	 -> (Version, RdrNameHsDecl)
-	 -> RnM d DeclsMap
+loadDecls :: Module 
+	  -> DeclsMap
+	  -> [(Version, RdrNameHsDecl)]
+	  -> RnM d (NameEnv Version, DeclsMap)
+loadDecls mod decls_map decls
+  = foldlRn (loadDecl mod) (emptyNameEnv, decls_map) decls
 
-loadDecl mod decls_map (version, decl)
+loadDecl :: Module 
+	 -> (NameEnv Version, DeclsMap)
+	 -> (Version, RdrNameHsDecl)
+	 -> RnM d (NameEnv Version, DeclsMap)
+loadDecl mod (version_map, decls_map) (version, decl)
   = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
     case maybe_avail of {
-	Nothing -> returnRn decls_map;	-- No bindings
-	Just avail ->
+	Nothing    -> returnRn (version_map, decls_map);	-- No bindings
+	Just avail -> 
 
     getDeclSysBinders new_name decl	`thenRn` \ sys_bndrs ->
     let
@@ -296,13 +309,15 @@ loadDecl mod decls_map (version, decl)
 
 	main_name     = availName avail
 	new_decls_map = foldl add_decl decls_map
-				       [ (name, (version, full_avail, name==main_name, (mod, decl'))) 
+				       [ (name, (full_avail, name==main_name, (mod, decl'))) 
 				       | name <- availNames full_avail]
 	add_decl decls_map (name, stuff)
 	  = WARN( name `elemNameEnv` decls_map, ppr name )
 	    extendNameEnv decls_map name stuff
+
+	new_version_map = extendNameEnv version_map main_name version
     in
-    returnRn new_decls_map
+    returnRn (new_version_map, new_decls_map)
     }
   where
 	-- newTopBinder puts into the cache the binder with the
@@ -311,7 +326,7 @@ loadDecl mod decls_map (version, decl)
 	-- There maybe occurrences that don't have the correct Module, but
 	-- by the typechecker will propagate the binding definition to all 
 	-- the occurrences, so that doesn't matter
-    new_name rdr_name loc = newTopBinder mod (rdrNameOcc rdr_name)
+    new_name rdr_name loc = newTopBinder mod rdr_name loc
 
     {-
       If a signature decl is being loaded, and optIgnoreIfacePragmas is on,
@@ -338,12 +353,12 @@ loadDecl mod decls_map (version, decl)
 --	Loading fixity decls
 -----------------------------------------------------
 
-loadFixDecls mod_name fixity_env (version, decls)
-  | null decls = returnRn fixity_env
+loadFixDecls mod_name (version, decls)
+  | null decls = returnRn (version, emptyNameEnv)
 
   | otherwise
   = mapRn (loadFixDecl mod_name) decls	`thenRn` \ to_add ->
-    returnRn (extendNameEnvList fixity_env to_add)
+    returnRn (version, mkNameEnv to_add)
 
 loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
   = newGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
@@ -395,14 +410,14 @@ removeFuns ty		    = ty
 
 loadRules :: Module -> IfaceRules 
 	  -> (Version, [RdrNameRuleDecl])
-	  -> RnM d IfaceRules
+	  -> RnM d (Version, IfaceRules)
 loadRules mod rule_bag (version, rules)
   | null rules || opt_IgnoreIfacePragmas 
-  = returnRn rule_bag
+  = returnRn (version, rule_bag)
   | otherwise
   = setModuleRn mod		 	$
     mapRn (loadRule mod) rules		`thenRn` \ new_rules ->
-    returnRn (rule_bag `unionBags` listToBag new_rules)
+    returnRn (version, rule_bag `unionBags` listToBag new_rules)
 
 loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
 -- "Gate" the rule simply by whether the rule variable is
@@ -561,9 +576,13 @@ data ImportDeclResult
   | HereItIs (Module, RdrNameHsDecl)
 
 importDecl name
-  = getSlurped 				`thenRn` \ already_slurped ->
-    if name `elemNameSet` already_slurped then
-	returnRn AlreadySlurped	-- Already dealt with
+  = getIfacesRn				`thenRn` \ ifaces ->
+    getHomeSymbolTableRn		`thenRn` \ hst ->
+    if name `elemNameSet` iSlurp ifaces
+    || inTypeEnv (iPST ifaces) name
+    || inTypeEnv hst	       name
+    then	-- Already dealt with
+	returnRn AlreadySlurped	
 
     else if isLocallyDefined name then	-- Don't bring in decls from
 					-- the renamed module's own interface file
@@ -579,21 +598,6 @@ importDecl name
     else getNonWiredInDecl name
   where
     doc = ptext SLIT("need home module for wired in thing") <+> ppr name
-
-
-{-	I don't think this is necessary any more; SLPJ May 00
-    load_home name 
-	| name `elemNameSet` source_binders = returnRn ()
-		-- When compiling the prelude, a wired-in thing may
-		-- be defined in this module, in which case we don't
-		-- want to load its home module!
-		-- Using 'isLocallyDefined' doesn't work because some of
-		-- the free variables returned are simply 'listTyCon_Name',
-		-- with a system provenance.  We could look them up every time
-		-- but that seems a waste.
-	| otherwise = loadHomeInterface doc name	`thenRn_`
-		      returnRn ()
--}
 
 getNonWiredInDecl :: Name -> RnMG ImportDeclResult
 getNonWiredInDecl needed_name 
@@ -778,7 +782,7 @@ lookupFixityRn :: Name -> RnMS Fixity
 lookupFixityRn name
   | isLocallyDefined name
   = getFixityEnv			`thenRn` \ local_fix_env ->
-    returnRn (lookupFixity local_fix_env name)
+    returnRn (lookupLocalFixity local_fix_env name)
 
   | otherwise	-- Imported
       -- For imported names, we have to get their fixities by doing a loadHomeInterface,
@@ -789,7 +793,10 @@ lookupFixityRn name
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
   = loadHomeInterface doc name		`thenRn` \ ifaces ->
-    returnRn (lookupFixity (iFixes ifaces) name)
+    getHomeSymbolTableRn 		`thenRn` \ hst ->
+    returnRn (lookupFixityEnv hst name		   `orElse`
+	      lookupFixityEnv (iPST ifaces) name)  `orElse`
+	      defaultFixity)
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
@@ -1110,7 +1117,7 @@ getDeclSysBinders new_name other_decl
 findAndReadIface :: SDoc -> ModuleName 
 		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
 					-- False <=> Look for .hi file
-		 -> RnM d (Either Message ParsedIface)
+		 -> RnM d (Either Message (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
@@ -1120,16 +1127,18 @@ findAndReadIface doc_str mod_name hi_boot_file
       -- one for 'normal' ones, the other for .hi-boot files,
       -- hence the need to signal which kind we're interested.
 
-    getFinderRn				`thenRn` \ finder ->
-    ioToRn (finder mod_name)		`thenRn` \ maybe_module ->
+    getFinderRn					`thenRn` \ finder ->
+    ioToRn (findModule finder mod_name)		`thenRn` \ maybe_module ->
+
     case maybe_module of
-	-- Found the file
-      Just fpath -> traceRn (ptext SLIT("...reading from") <+> text fpath)	`thenRn_`
-		    readIface mod_name fpath
+      Just mod | hi_boot_file, Just fpath <- moduleHiBootFile mod
+	      -> readIface mod fpath
+	       | not hi_boot_file, Just fpath <- moduleHiFile mod
+	      -> readIface mod fpath
 	
 	-- Can't find it
-      Nothing    -> traceRn (ptext SLIT("...not found"))	`thenRn_`
-		    returnRn (Left (noIfaceErr mod_name hi_boot_file search_path))
+      other   -> traceRn (ptext SLIT("...not found"))	`thenRn_`
+		 returnRn (Left (noIfaceErr finder mod_name hi_boot_file))
 
   where
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
@@ -1142,11 +1151,12 @@ findAndReadIface doc_str mod_name hi_boot_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: ModuleName -> String -> RnM d (Either Message ParsedIface)
+readIface :: Module -> String -> RnM d (Either Message (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface wanted_mod file_path
-  = ioToRnM (hGetStringBuffer False file_path)       `thenRn` \ read_result ->
+  = traceRn (ptext SLIT("...reading from") <+> text file_path)	`thenRn_`
+    ioToRnM (hGetStringBuffer False file_path)      		 `thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
              case parseIface contents
@@ -1155,9 +1165,9 @@ readIface wanted_mod file_path
 				glasgow_exts = 1#,
 				loc = mkSrcLoc (mkFastString file_path) 1 } of
 		  POk _  (PIface iface) ->
-		      warnCheckRn (read_mod == wanted_mod)
+		      warnCheckRn (moduleName wanted_mod == read_mod)
 		    		  (hiModuleNameMismatchWarn wanted_mod read_mod) `thenRn_`
-		      returnRn (Right iface)
+		      returnRn (Right (mod, iface))
 		    where
 		      read_mod = moduleName (pi_mod iface)
 
@@ -1213,10 +1223,10 @@ warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (pprModuleName mod_name)
 
-hiModuleNameMismatchWarn :: ModuleName -> ModuleName  -> Message
+hiModuleNameMismatchWarn :: Module -> ModuleName  -> Message
 hiModuleNameMismatchWarn requested_mod read_mod = 
     hsep [ ptext SLIT("Something is amiss; requested module name")
-	 , pprModuleName requested_mod
+	 , ppr requested_mod
 	 , ptext SLIT("differs from name found in the interface file")
    	 , pprModuleName read_mod
   	 ]

@@ -4,12 +4,22 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
-module HscTypes ( TyThing(..), GlobalSymbolTable, OrigNameEnv, AvailEnv,
-		  WhetherHasOrphans, ImportVersion, ExportItem,
-		  PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-		  IfaceInsts, IfaceRules, DeprecationEnv, ModDetails(..),
-		  InstEnv, lookupTypeEnv )
-where
+module HscTypes ( 
+	ModDetails(..),	GlobalSymbolTable, 
+
+	TyThing(..), lookupTypeEnv,
+
+	WhetherHasOrphans, ImportVersion, ExportItem,
+	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
+	IfaceInsts, IfaceRules, DeprecationEnv, OrigNameEnv, AvailEnv,
+
+	InstEnv, 
+
+		-- Provenance
+	Provenance(..), ImportReason(..), PrintUnqualified,
+        pprProvenance, hasBetterProv
+
+    ) where
 
 #include "HsVersions.h"
 
@@ -57,6 +67,7 @@ data ModDetails
    = ModDetails {
 	moduleId      :: Module,
         moduleExports :: Avails,		-- What it exports
+	mdVersion     :: VersionInfo,
         moduleEnv     :: GlobalRdrEnv,		-- Its top level environment
 
         fixityEnv     :: NameEnv Fixity,
@@ -92,14 +103,12 @@ type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupFixityEnv :: SymbolTable -> Name -> Fixity
+lookupFixityEnv :: SymbolTable -> Name -> Maybe Fixity
 	-- Returns defaultFixity if there isn't an explicit fixity
 lookupFixityEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
-	Nothing	     -> defaultFixity
-	Just details -> case lookupNameEnv (fixityEnv details) name of
-				Just fixity -> fixity
-				Nothing	    -> defaultFixity
+	Nothing	     -> Nothing
+	Just details -> lookupNameEnv (fixityEnv details) name
 \end{code}
 
 
@@ -170,11 +179,15 @@ These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
 
 \begin{code}
-type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
+data VersionInfo 
+  = VersionInfo {
+	modVers :: Version,
+	fixVers :: Version,
+	ruleVers :: Version,
+	declVers :: NameEnv Version
+    }
 
-type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
-					-- These only get reported on lookup,
-					-- not on construction
+type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
@@ -264,7 +277,6 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 	-- 'Everything' means there was a "module M" in 
 	-- this module's export list, so we just have to go by M's version,
 	-- not the list of (name,version) pairs
-
 \end{code}
 
 
@@ -313,16 +325,34 @@ data PersistentRenamerState
 	  prsInsts :: IfaceInsts,
 	  prsRules :: IfaceRules
     }
+\end{code}
 
+The OrigNameEnv makes sure that there is just one Unique assigned for
+each original name; i.e. (module-name, occ-name) pair.  The Name is
+always stored as a Global, and has the SrcLoc of its binding location.
+Actually that's not quite right.  When we first encounter the original
+name, we might not be at its binding site (e.g. we are reading an
+interface file); so we give it 'noSrcLoc' then.  Later, when we find
+its binding site, we fix it up.
+
+Exactly the same is true of the Module stored in the Name.  When we first
+encounter the occurrence, we may not know the details of the module, so
+we just store junk.  Then when we find the binding site, we fix it up.
+
+\begin{code}
 data OrigNameEnv
- = Orig { origNames  :: FiniteMap (Module,OccName) Name, -- Ensures that one original name gets one unique
-	  origIParam :: FiniteMap OccName Name		 -- Ensures that one implicit parameter name gets one unique
+ = Orig { origNames  :: FiniteMap (ModuleName,OccName) Name,	-- Ensures that one original name gets one unique
+	  origIParam :: FiniteMap OccName Name			-- Ensures that one implicit parameter name gets one unique
    }
+\end{code}
 
-type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
-		-- A DeclsMap contains a binding for each Name in the declaration
-		-- including the constructors of a type decl etc.
-		-- The Bool is True just for the 'main' Name.
+
+A DeclsMap contains a binding for each Name in the declaration
+including the constructors of a type decl etc.  The Bool is True just
+for the 'main' Name.
+
+\begin{code}
+type DeclsMap = NameEnv (AvailInfo, Bool, (Module, RdrNameHsDecl))
 
 type IfaceInsts = Bag GatedDecl
 type IfaceRules = Bag GatedDecl
@@ -379,3 +409,70 @@ type HomeInterfaceTable = ModuleEnv ModIFace
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{Provenance and export info}
+%*									*
+%************************************************************************
+
+The GlobalRdrEnv gives maps RdrNames to Names.  There is a separate
+one for each module, corresponding to that module's top-level scope.
+
+\begin{code}
+type GlobalRdrEnv = RdrNameEnv [(Name,Provenance)]	-- The list is because there may be name clashes
+							-- These only get reported on lookup,
+							-- not on construction
+\end{code}
+
+The "provenance" of something says how it came to be in scope.
+
+\begin{code}
+data Provenance
+  = LocalDef			-- Defined locally
+
+  | NonLocalDef  		-- Defined non-locally
+	ImportReason
+	PrintUnqualified
+
+data ImportReason
+  = UserImport Module SrcLoc Bool	-- Imported from module M on line L
+					-- Note the M may well not be the defining module
+					-- for this thing!
+	-- The Bool is true iff the thing was named *explicitly* in the import spec,
+	-- rather than being imported as part of a group; e.g.
+	--	import B
+	--	import C( T(..) )
+	-- Here, everything imported by B, and the constructors of T
+	-- are not named explicitly; only T is named explicitly.
+	-- This info is used when warning of unused names.
+
+  | ImplicitImport			-- Imported implicitly for some other reason
+			
+
+type PrintUnqualified = Bool	-- True <=> the unqualified name of this thing is
+				-- in scope in this module, so print it 
+				-- unqualified in error messages
+\end{code}
+
+\begin{code}
+hasBetterProv :: Provenance -> Provenance -> Bool
+-- Choose 
+--	a local thing		      over an	imported thing
+--	a user-imported thing	      over a	non-user-imported thing
+-- 	an explicitly-imported thing  over an	implicitly imported thing
+hasBetterProv LocalDef 				    _				   = True
+hasBetterProv (NonLocalDef (UserImport _ _ True) _) _				   = True
+hasBetterProv (NonLocalDef (UserImport _ _ _   ) _) (NonLocalDef ImplicitImport _) = True
+hasBetterProv _					    _				   = False
+
+pprNameProvenance :: Name -> Provenance -> SDoc
+pprProvenance name LocalDef   	       = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+pprProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
+					      nest 2 (parens (ppr_defn (nameSrcLoc name)))]
+
+ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")
+ppr_reason (UserImport mod loc _) = ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc
+
+ppr_defn loc | isGoodSrcLoc loc = ptext SLIT("at") <+> ppr loc
+	     | otherwise	= empty
+\end{code}

@@ -16,14 +16,13 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 			  mkRdrUnqual, qualifyRdrName
 			)
 import HsTypes		( hsTyVarName, hsTyVarNames, replaceTyVarName )
-
+import HscTypes		( pprNameProvenance )
 import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
 			  mkIPName, hasBetterProv, isLocallyDefined, 
 			  nameOccName, setNameModule, nameModule,
-			  setNameProvenance, getNameProvenance, pprNameProvenance,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
 			)
 import NameSet
@@ -50,38 +49,27 @@ import List		( nub )
 \begin{code}
 implicitImportProvenance = NonLocalDef ImplicitImport False
 
-newTopBinder :: Module -> OccName -> RnM d Name
-newTopBinder mod occ
+newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
+newTopBinder mod rdr_name loc
   = 	-- First check the cache
     traceRn (text "newTopBinder" <+> ppr mod <+> ppr occ) `thenRn_`
 
     getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let 
+	occ = rdrNameOcc rdr_name
 	key = (moduleName mod, occ)
     in
     case lookupFM cache key of
 
-	-- A hit in the cache!  We are at the binding site of the name, which is
-	-- the time we know all about the Name's host Module (in particular, which
-	-- package it comes from), so update the Module in the name.
-	-- But otherwise *leave the Provenance alone*:
-	--
-	--	* For imported names, the Provenance may already be correct.
-	--	  e.g. We imported Prelude.hi, and set the provenance of PrelShow.Show
-	--	       to 'UserImport from Prelude'.  Note that we havn't yet opened PrelShow.hi
-	--	       Later we find we really need PrelShow.Show, so we open PrelShow.hi, and
-	--	       that's when we find the binding occurrence of Show. 
-	--
-	--	* For locally defined names, we do a setProvenance on the Name
-	--	  right after newTopBinder, and then use updateProveances to finally
-	--	  set the provenances in the cache correctly.
-	--
-	-- NB: for wired-in names it's important not to
-	-- forget that they are wired in even when compiling that module
-	-- (else we spit out redundant defns into the interface file)
+	-- A hit in the cache!  We are at the binding site of the name, and
+	-- this is the moment when we know all about 
+	--	a) the Name's host Module (in particular, which
+	-- 	   package it comes from)
+	--	b) its defining SrcLoc
+	-- So we update this info
 
 	Just name -> let 
-			new_name  = setNameModule name mod
+			new_name  = setNameModuleAndLoc name mod loc
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, new_cache, ipcache)	`thenRn_`
@@ -95,7 +83,7 @@ newTopBinder mod occ
 	Nothing -> let
 			(us', us1) = splitUniqSupply us
 			uniq   	   = uniqFromSupply us1
-			new_name   = mkGlobalName uniq mod occ implicitImportProvenance
+			new_name   = mkGlobalName uniq mod occ loc
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (us', new_cache, ipcache)	`thenRn_`
@@ -106,8 +94,8 @@ newTopBinder mod occ
 newGlobalName :: ModuleName -> OccName -> RnM d Name
   -- Used for *occurrences*.  We make a place-holder Name, really just
   -- to agree on its unique, which gets overwritten when we read in
-  -- the binding occurence later (newImportedBinder)
-  -- The place-holder Name doesn't have the right Provenance, and its
+  -- the binding occurence later (newTopBinder)
+  -- The place-holder Name doesn't have the right SrcLoc, and its
   -- Module won't have the right Package either.
   --
   -- (We have to pass a ModuleName, not a Module, because we may be
@@ -137,9 +125,8 @@ newGlobalName mod_name occ
 		     (us', us1) = splitUniqSupply us
 		     uniq   	= uniqFromSupply us1
 		     mod        = mkVanillaModule mod_name
-		     name       = mkGlobalName uniq mod occ implicitImportProvenance
+		     name       = mkGlobalName uniq mod occ noSrcLoc
 		     new_cache  = addToFM cache key name
-
 
 newIPName rdr_name
   = getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
@@ -153,34 +140,6 @@ newIPName rdr_name
 		     name        = mkIPName uniq key
 		     new_ipcache = addToFM ipcache key name
     where key = (rdrNameOcc rdr_name)
-
-updateProvenances :: [Name] -> RnM d ()
--- Update the provenances of everything that is in scope.
--- We must be careful not to disturb the Module package info
--- already in the cache.  Why not?  Consider
---   module A		module M( f )
---	import M( f )	  import N( f)
---	import N
--- So f is defined in N, and M re-exports it.
--- When processing module A:
---	1. We read M.hi first, and make a vanilla name N.f 
---	   (without reading N.hi). The package info says <THIS> 
---	   for lack of anything better.  
---	2. Now we read N, which update the cache to record 
---	   the correct package for N.f.
---	3. Finally we update provenances (once we've read all imports).
--- Step 3 must not destroy package info recorded in Step 2.
-
-updateProvenances names
-  = getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
-    setNameSupplyRn (us, foldr update cache names, ipcache)
-  where
-    update name cache = addToFM_C update_prov cache key name
-		      where
-		   	key = (moduleName (nameModule name), nameOccName name)
-
-    update_prov name_in_cache name_with_prov
-	= setNameProvenance name_in_cache (getNameProvenance name_with_prov)
 \end{code}
 
 %*********************************************************
@@ -258,9 +217,9 @@ lookupGlobalOccRn rdr_name
 
     getGlobalNameEnv	`thenRn` \ global_env ->
     case lookupRdrEnv global_env rdr_name of
-	Just [name]	    -> returnRn name
-	Just stuff@(name:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-			       returnRn name
+	Just [(name,_)]	 -> returnRn name
+	Just stuff@(_:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
+			    returnRn name
 	Nothing -> 	-- Not found when processing source code; so fail
 			failWithRn (mkUnboundName rdr_name)
 				   (unknownNameErr rdr_name)
@@ -314,29 +273,11 @@ or instance.
 \begin{code}
 lookupSysBinder rdr_name
   = ASSERT( isUnqual rdr_name )
-    getModuleRn					`thenRn` \ mod ->
-    newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
-    getModeRn					`thenRn` \ mode ->
-    case mode of
-	SourceMode    -> getSrcLocRn		`thenRn` \ loc ->
-			 returnRn (setNameProvenance name (LocalDef loc Exported))
-	InterfaceMode -> returnRn name
+    getModuleRn				`thenRn` \ mod ->
+    getSrcLocRn				`thenRn` \ loc ->
+    newTopBinder mod rdr_name loc
 \end{code}
 
-@unQualInScope@ returns a function that takes a @Name@ and tells whether
-its unqualified name is in scope.  This is put as a boolean flag in
-the @Name@'s provenance to guide whether or not to print the name qualified
-in error messages.
-
-\begin{code}
-unQualInScope :: GlobalRdrEnv -> Name -> Bool
-unQualInScope env
-  = lookup
-  where
-    lookup name = case lookupRdrEnv env (mkRdrUnqual (nameOccName name)) of
-			   Just [name'] -> name == name'
-			   other        -> False
-\end{code}
 
 
 %*********************************************************
@@ -538,38 +479,37 @@ checkDupNames doc_str rdr_names_w_loc
 
 %************************************************************************
 %*									*
-\subsection{Envt utility functions}
+\subsection{GlobalRdrEnv}
 %*									*
 %************************************************************************
-
-\subsubsection{NameEnv}%  ================
 
 \begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusFM_C combine_globals env1 env2
 
-addOneToGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> Name -> GlobalRdrEnv
+addOneToGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> (Name,Provenance) -> GlobalRdrEnv
 addOneToGlobalRdrEnv env rdr_name name = addToFM_C combine_globals env rdr_name [name]
 
 delOneFromGlobalRdrEnv :: GlobalRdrEnv -> RdrName -> GlobalRdrEnv 
 delOneFromGlobalRdrEnv env rdr_name = delFromFM env rdr_name
 
-combine_globals :: [Name] 	-- Old
-		-> [Name]	-- New
-		-> [Name]
+combine_globals :: [(Name,Provenance)] 	-- Old
+		-> [(Name,Provenance)]	-- New
+		-> [(Name,Provenance)]
 combine_globals ns_old ns_new	-- ns_new is often short
   = foldr add ns_old ns_new
   where
-    add n ns | any (is_duplicate n) ns_old = map choose ns	-- Eliminate duplicates
+    add n ns | any (is_duplicate n) ns_old = map (choose n) ns	-- Eliminate duplicates
 	     | otherwise	           = n:ns
-	     where
-	       choose m | n==m && n `hasBetterProv` m = n
-			| otherwise		      = m
 
+    choose n m | n `beats` m = n
+	       | otherwise   = m
 
-is_duplicate :: Name -> Name -> Bool
-is_duplicate n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
-		   | otherwise 		                        = n1 == n2
+    (n,pn) `beats` (m,pm) = n==m && pn `hasBetterProv` pm
+
+    is_duplicate :: Provenance -> (Name,Provenance) -> Bool
+    is_duplicate (n1,LocalDef _) (n2,LocalDef _) = False
+    is_duplicate _		 _		 = n1 == n2
 \end{code}
 
 We treat two bindings of a locally-defined name as a duplicate,
@@ -577,7 +517,7 @@ because they might be two separate, local defns and we want to report
 and error for that, {\em not} eliminate a duplicate.
 
 On the other hand, if you import the same name from two different
-import statements, we {\em d}* want to eliminate the duplicate, not report
+import statements, we {\em do} want to eliminate the duplicate, not report
 an error.
 
 If a module imports itself then there might be a local defn and an imported
@@ -585,8 +525,27 @@ defn of the same name; in this case the names will compare as equal, but
 will still have different provenances.
 
 
+@unQualInScope@ returns a function that takes a @Name@ and tells whether
+its unqualified name is in scope.  This is put as a boolean flag in
+the @Name@'s provenance to guide whether or not to print the name qualified
+in error messages.
 
-\subsubsection{AvailInfo}%  ================
+\begin{code}
+unQualInScope :: GlobalRdrEnv -> Name -> Bool
+unQualInScope env
+  = lookup
+  where
+    lookup name = case lookupRdrEnv env (mkRdrUnqual (nameOccName name)) of
+			   Just [(name',_)] -> name == name'
+			   other            -> False
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Avails}
+%*									*
+%************************************************************************
 
 \begin{code}
 plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
@@ -676,8 +635,6 @@ pprAvail (Avail n) = ppr n
 \end{code}
 
 
-
-
 %************************************************************************
 %*									*
 \subsection{Free variable manipulation}
@@ -719,8 +676,6 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 %*									*
 %************************************************************************
 
-
-
 \begin{code}
 warnUnusedModules :: [Module] -> RnM d ()
 warnUnusedModules mods
@@ -732,30 +687,31 @@ warnUnusedModules mods
 			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
 				   quotes (pprModuleName m))]
 
-warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
+warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names
   | not opt_WarnUnusedImports
   = returnRn () 	-- Don't force names unless necessary
   | otherwise
-  = warnUnusedBinds (const True) names
+  = warnUnusedBinds names
 
+warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedLocalBinds ns
   | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedBinds (const True) ns
+  | otherwise		    = warnUnusedBinds [(n,LocalDef) | n<-ns]
 
 warnUnusedMatches names
-  | opt_WarnUnusedMatches = warnUnusedGroup (const True) names
+  | opt_WarnUnusedMatches = warnUnusedGroup [(n,LocalDef) | n<-ns]
   | otherwise 		  = returnRn ()
 
 -------------------------
 
-warnUnusedBinds :: (Bool -> Bool) -> [Name] -> RnM d ()
-warnUnusedBinds warn_when_local names
-  = mapRn_ (warnUnusedGroup warn_when_local) groups
+warnUnusedBinds :: [(Name,Provenance)] -> RnM d ()
+warnUnusedBinds names
+  = mapRn_ warnUnusedGroup  groups
   where
 	-- Group by provenance
    groups = equivClasses cmp names
-   name1 `cmp` name2 = getNameProvenance name1 `cmp_prov` getNameProvenance name2
+   (_,prov1) `cmp` (_,prov2) = prov1 `cmp_prov` prov2
  
    cmp_prov (LocalDef _ _) (NonLocalDef _ _)       = LT
    cmp_prov (LocalDef loc1 _) (LocalDef loc2 _)    = loc1 `compare` loc2
@@ -767,46 +723,39 @@ warnUnusedBinds warn_when_local names
 
 -------------------------
 
---	NOTE: the function passed to warnUnusedGroup is
---	now always (const True) so we should be able to
---	simplify the code slightly.  I'm leaving it there
---	for now just in case I havn't realised why it was there.
---	Looks highly bogus to me.  SLPJ Dec 99
-
-warnUnusedGroup :: (Bool -> Bool) -> [Name] -> RnM d ()
-warnUnusedGroup emit_warning names
-  | null filtered_names         = returnRn ()
-  | not (emit_warning is_local) = returnRn ()
+warnUnusedGroup :: [(Name,Provenance)] -> RnM d ()
+warnUnusedGroup names
+  | null filtered_names  = returnRn ()
+  | not is_local	 = returnRn ()
   | otherwise
   = pushSrcLocRn def_loc	$
     addWarnRn			$
     sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr filtered_names)))]
   where
     filtered_names = filter reportable names
-    name1 	   = head filtered_names
+    (name1, prov1) = head filtered_names
     (is_local, def_loc, msg)
-	= case getNameProvenance name1 of
-		LocalDef loc _ 			     -> (True, loc, text "Defined but not used")
-		NonLocalDef (UserImport mod loc _) _ ->
-		 (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
-			 			      text "but not used")
-		other -> (False, getSrcLoc name1, text "Strangely defined but not used")
+	= case prov1 of
+		LocalDef loc _  -> (True, loc, text "Defined but not used")
 
-    reportable name = case occNameUserString (nameOccName name) of
-			('_' : _) -> False
-			zz_other  -> True
+		NonLocalDef (UserImport mod loc _) _ 
+			-> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> text "but not used")
+
+    reportable (name,_) = case occNameUserString (nameOccName name) of
+				('_' : _) -> False
+				zz_other  -> True
 	-- Haskell 98 encourages compilers to suppress warnings about
 	-- unused names in a pattern if they start with "_".
 \end{code}
 
 \begin{code}
-addNameClashErrRn rdr_name (name1:names)
+addNameClashErrRn rdr_name (np1:nps)
   = addErrRn (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
 		    ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
   where
-    msg1 = ptext  SLIT("either") <+> mk_ref name1
-    msgs = [ptext SLIT("    or") <+> mk_ref name | name <- names]
-    mk_ref name = quotes (ppr name) <> comma <+> pprNameProvenance name
+    msg1 = ptext  SLIT("either") <+> mk_ref np1
+    msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
+    mk_ref (name,prov) = quotes (ppr name) <> comma <+> pprNameProvenance name prov
 
 fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
   = hang (hsep [ptext SLIT("Conflicting fixities for"), quotes (ppr rdr_name)])

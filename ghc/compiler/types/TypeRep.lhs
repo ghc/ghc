@@ -27,9 +27,7 @@ import Var	( TyVar, UVar )
 import VarEnv
 import VarSet
 
-import Name	( Name, Provenance(..), ExportFlag(..),
-		  mkGlobalName, mkKindOccFS, tcName,
-		)
+import Name	( Name, mkGlobalName, mkKindOccFS, tcName )
 import OccName	( mkOccFS, tcName )
 import TyCon	( TyCon, KindCon,
 		  mkFunTyCon, mkKindCon, mkSuperKindCon,
@@ -37,7 +35,7 @@ import TyCon	( TyCon, KindCon,
 import Class	( Class )
 
 -- others
-import SrcLoc		( mkBuiltinSrcLoc )
+import SrcLoc		( builtinSrcLoc )
 import PrelNames	( pREL_GHC, kindConKey, boxityConKey, boxedConKey, 
 			  unboxedConKey, typeConKey, anyBoxConKey, funTyConName
 			)
@@ -224,8 +222,7 @@ in two situations:
 
 
 \begin{code}
-mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str)
-				    (LocalDef mkBuiltinSrcLoc NotExported)
+mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str) builtinSrcLoc
 	-- mk_kind_name is a bit of a hack
 	-- The LocalDef means that we print the name without
 	-- a qualifier, which is what we want for these kinds.

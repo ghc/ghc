@@ -136,10 +136,10 @@ data SDown = SDown {
 			-- We still need the unsullied global name env so that
 			--   we can look up record field names
 
-		  rn_fixenv :: FixityEnv	-- Local fixities
+		  rn_fixenv :: LocalFixityEnv	-- Local fixities
 			-- The global fixities are held in the
 			-- rn_ifaces field.  Why?  See the comments
-			-- with RnIfaces.lookupFixity
+			-- with RnIfaces.lookupLocalFixity
 		}
 
 data RnMode	= SourceMode			-- Renaming source code
@@ -152,19 +152,14 @@ data RnMode	= SourceMode			-- Renaming source code
 
 \begin{code}
 --------------------------------
-type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
-					-- These only get reported on lookup,
-					-- not on construction
-type LocalRdrEnv  = RdrNameEnv Name
-
---------------------------------
-type FixityEnv = NameEnv RenamedFixitySig
+type LocalRdrEnv    = RdrNameEnv Name
+type LocalFixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
 	-- fixity declaration
 
-lookupFixity :: FixityEnv -> Name -> Fixity
-lookupFixity env name
+lookupLocalFixity :: FixityEnv -> Name -> Fixity
+lookupLocalFixity env name
   = case lookupNameEnv env name of 
 	Just (FixitySig _ fix _) -> fix
 	Nothing		  	 -> defaultFixity
@@ -255,27 +250,8 @@ data Ifaces = Ifaces {
 		-- Subset of the previous field.
     }
 
-type ImportedModuleInfo 
-     = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
-
-		-- Suppose the domain element is module 'A'
-		--
-		-- The first Bool is True if A contains 
-		-- 'orphan' rules or instance decls
-
-		-- The second Bool is true if the interface file actually
-		-- read was an .hi-boot file
-
-		-- Nothing => A's interface not yet read, but this module has
-		-- 	      imported a module, B, that itself depends on A
-		--
-		-- Just xx => A's interface has been read.  The Module in 
-		--		the Just has the correct Dll flag
-
-		-- This set is used to decide whether to look for
-		-- A.hi or A.hi-boot when importing A.f.
-		-- Basically, we look for A.hi if A is in the map, and A.hi-boot
-		-- otherwise
+type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface, IsLoaded)
+type IsLoaded = True
 \end{code}
 
 
@@ -290,32 +266,43 @@ initRn :: DynFlags -> Finder -> HomeSymbolTable
        -> PersistentCompilerState
        -> Module -> SrcLoc
        -> RnMG t
-       -> IO (t, (Bag WarnMsg, Bag ErrMsg))
+       -> IO (t, PersistentCompilerState, (Bag WarnMsg, Bag ErrMsg))
 
 initRn dflags finder hst pcs mod loc do_rn
-  = do uniqs     <- mkSplitUniqSupply 'r'
-       names_var <- newIORef (uniqs, prsOrig prs)
-       errs_var  <- newIORef (emptyBag,emptyBag)
-       iface_var <- newIORef (initIfaces pcs)
-       let rn_down = RnDown { rn_mod = mod,
-	   		      rn_loc = loc, 
-    
-		   	      rn_finder = finder,
-		   	      rn_dflags = dflags,
-		   	      rn_hst    = hst,
-			 	     
-		   	      rn_ns     = names_var, 
-		   	      rn_errs   = errs_var, 
-	  	   	      rn_ifaces = iface_var,
-	             }
+  = do 
+	let prs = pcsPRS pcs
+	uniqs     <- mkSplitUniqSupply 'r'
+	names_var <- newIORef (uniqs, prsOrig prs)
+	errs_var  <- newIORef (emptyBag,emptyBag)
+	iface_var <- newIORef (initIfaces pcs)
+	let rn_down = RnDown { rn_mod = mod,
+			       rn_loc = loc, 
+	
+			       rn_finder = finder,
+			       rn_dflags = dflags,
+			       rn_hst    = hst,
+					     
+			       rn_ns     = names_var, 
+			       rn_errs   = errs_var, 
+			       rn_ifaces = iface_var,
+			     }
+	
+	-- do the business
+	res <- do_rn rn_down ()
+	
+	-- Grab state and record it
+	(warns, errs) <- readIORef errs_var
+	new_ifaces    <- readIORef iface_var
+	(_, new_orig) <- readIORef names_var
 
-       -- do the business
-       res <- do_rn rn_down ()
-
-       -- grab errors and return
-       (warns, errs) <- readIORef errs_var
-
-       return (res, (warns, errs))
+	let new_prs = prs { prsOrig = new_orig, 
+			    prsDecls = iDecls new_ifaces,
+			    prsInsts = iInsts new_ifaces,
+			    prsRules = iRules new_ifaces }
+	let new_pcs = pcs { pcsPST = iPST new_ifaces, 
+			    pcsPRS = new_prs }
+	
+	return (res, new_pcs, (warns, errs))
 
 
 initIfaces :: PersistentCompilerState -> Ifaces
@@ -545,12 +532,15 @@ getSrcLocRn down l_down
 \end{code}
 
 %================
-\subsubsection{The finder}
+\subsubsection{The finder and home symbol table}
 %=====================
 
 \begin{code}
 getFinderRn :: RnM d Finder
 getFinderRn down l_down = return (rn_finder down)
+
+getHomeSymbolTableRn :: RnM d HomeSymbolTable
+getHomeSymbolTableRn down l_down = return (rn_hst down)
 \end{code}
 
 %================
@@ -602,10 +592,6 @@ setModuleRn new_mod enclosed_thing rn_down l_down
 %=====================
 
 \begin{code}
-getNameEnvs :: RnMS (GlobalRdrEnv, LocalRdrEnv)
-getNameEnvs rn_down (SDown {rn_genv = global_env, rn_lenv = local_env})
-  = return (global_env, local_env)
-
 getLocalNameEnv :: RnMS LocalRdrEnv
 getLocalNameEnv rn_down (SDown {rn_lenv = local_env})
   = return local_env
@@ -618,7 +604,7 @@ setLocalNameEnv :: LocalRdrEnv -> RnMS a -> RnMS a
 setLocalNameEnv local_env' m rn_down l_down
   = m rn_down (l_down {rn_lenv = local_env'})
 
-getFixityEnv :: RnMS FixityEnv
+getFixityEnv :: RnMS LocalFixityEnv
 getFixityEnv rn_down (SDown {rn_fixenv = fixity_env})
   = return fixity_env
 

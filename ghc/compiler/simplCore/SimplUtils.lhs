@@ -32,7 +32,7 @@ import Id		( Id, idType, isId, idName,
 			)
 import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
-import Name		( isLocalName, setNameUnique )
+import Name		( setNameUnique )
 import Demand		( Demand, isStrict, wwLazy, wwLazy )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,

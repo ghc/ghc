@@ -27,7 +27,7 @@ import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
 			  mkForeignExportOcc, isLocalName,
-			  NamedThing(..), Provenance(..), ExportFlag(..)
+			  NamedThing(..),
 			)
 import Type		( unUsgTy, repType,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
@@ -271,8 +271,7 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
 			 | otherwise        = nameModule name
 
 			occ	            = mkForeignExportOcc (nameOccName name)
-			prov	            = LocalDef src_loc Exported
-			helper_name         = mkGlobalName uniq mod occ prov
+			helper_name         = mkGlobalName uniq mod occ src_loc
 
       	the_app = getFun_wrapper (return_io_wrapper (mkVarApps (Var i) (tvs ++ fe_args)))
       	the_body = mkLams (tvs ++ wrapper_args) the_app

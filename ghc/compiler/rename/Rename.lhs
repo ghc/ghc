@@ -72,24 +72,20 @@ import IO		( openFile, IOMode(..) )
 
 
 \begin{code}
-type RenameResult = ( Module		-- This module
+type RenameResult = ( PersistentCompilerState,
+		    , Module		-- This module
 		    , RenamedHsModule	-- Renamed module
 		    , Maybe ParsedIface	-- The existing interface file, if any
 		    , ParsedIface	-- The new interface
-		    , RnNameSupply	-- Final env; for renaming derivings
-		    , FixityEnv		-- The fixity environment; for derivings
 		    , [Module])		-- Imported modules
 		   
-renameModule :: PersistentCompilerState -> GlobalSymbolTable
+renameModule :: PersistentCompilerState -> HomeSymbolTable
 	     -> RdrNameHsModule -> IO (Maybe RenameResult)
-renameModule pcs gst this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
+renameModule old_pcs hst this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     do {
-	((maybe_rn_stuff, dump_action), msgs) 
-	   <- initRn dflags finder gst prs
-		     (mkThisModule mod_name) 
-		     (mkSearchPath opt_HiMap) loc
-		     (rename this_mod) ;
+	((maybe_rn_stuff, dump_action), msgs, new_pcs) 
+	   <- initRn dflags finder old_pcs hst loc (rename this_mod) ;
 
 	-- Check for warnings
 	printErrorsAndWarnings msgs ;
@@ -99,9 +95,9 @@ renameModule pcs gst this_mod@(HsModule mod_name vers exports imports local_decl
 
 	-- Return results
 	if not (isEmptyBag rn_errs_bag) then
-	    do { ghcExit 1 ; return Nothing }
+	    return (old_pcs, Nothing)
         else
-	    return maybe_rn_stuff
+	    return (new_pcs, maybe_rn_stuff)
     }
 \end{code}
 
@@ -622,7 +618,7 @@ fixitiesFromLocalDecls gbl_env decls
 		       `thenRn_` returnRn acc 
 		    | otherwise -> returnRn acc ;
 	
-	    Just (name:_) ->
+	    Just ((name,_):_) ->
 
 		-- Check for duplicate fixity decl
 	  case lookupNameEnv acc name of {
@@ -712,14 +708,18 @@ reportUnusedNames mod_name direct_import_mods
 		    , case parent_avail of { AvailTC _ _ -> True; other -> False }
 		    ]
 
-	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))
-	defined_but_not_used =
-	   nameSetToList (defined_names `minusNameSet` really_used_names)
+	defined_names, defined_but_not_used :: [(Name,Provenance)]
+	defined_names	     = concat (rdrEnvElts gbl_env)
+	defined_but_not_used = filter not_used defined_names
+ 	not_used name	     = not (name `elemNameSet` really_used_names)
 
 	-- Filter out the ones only defined implicitly
-	bad_locals     = [n | n <- defined_but_not_used, isLocallyDefined	      n]
-	bad_imp_names  = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n,
-						         not (module_unused n)]
+	bad_locals :: [Name]
+	bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
+	
+	bad_imp_names :: [(Name,Provenance)]
+	bad_imp_names  = [(n,p) | (n,p@(UserImport mod _ True) <- defined_but_not_used,
+				  not (module_unused mod)]
 
 	deprec_used deprec_env = [ (n,txt)
                                  | n <- nameSetToList mentioned_names,
@@ -774,12 +774,9 @@ reportUnusedNames mod_name direct_import_mods
 			       not (maybeToBool (lookupFM minimal_imports m)),
 			       moduleName m /= pRELUDE_Name]
 
-	module_unused :: Name -> Bool
-	-- Name is imported from a module that's completely unused,
-	-- so don't report stuff about the name (the module covers it)
-	module_unused n = expectJust "module_unused" (maybeUserImportedFrom n)
-			  `elem` unused_imp_mods
-				-- module_unused is only called if it's user-imported
+	module_unused :: Module -> Bool
+	module_unused mod = mod `elem` unused_imp_mods
+
     in
     warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
