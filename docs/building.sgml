@@ -819,10 +819,11 @@ from the source is that the build tree can be placed in a
 non-backed-up partition, saving your systems support people from
 backing up untold megabytes of easily-regenerated, and
 rapidly-changing, gubbins.  The golden rule is that (with a single
-exception&mdash;<XRef LinkEnd="sec-build-config"> <Emphasis>absolutely everything in the build tree is either
-a symbolic link to the source tree, or else is mechanically
-generated</Emphasis>.  It should be perfectly OK for your build tree to vanish
-overnight; an hour or two compiling and you're on the road again.
+exception&mdash;<XRef LinkEnd="sec-build-config">)
+<Emphasis>absolutely everything in the build tree is either a symbolic
+link to the source tree, or else is mechanically generated</Emphasis>.
+It should be perfectly OK for your build tree to vanish overnight; an
+hour or two compiling and you're on the road again.
 </Para>
 
 <Para>
@@ -919,12 +920,13 @@ Runs the newly-created <Command>configure</Command> script, thus:
 ./configure
 </ProgramListing>
 
-<Command>configure</Command>'s mission is to scurry round your computer working out
-what architecture it has, what operating system, whether it has the
-<Function>vfork</Function> system call, where <Command>yacc</Command> is kept, whether <Command>gcc</Command> is available,
-where various obscure <Literal>&num;include</Literal> files are, whether it's a leap year,
-and what the systems manager had for lunch.  It communicates these
-snippets of information in two ways:
+<Command>configure</Command>'s mission is to scurry round your
+computer working out what architecture it has, what operating system,
+whether it has the <Function>vfork</Function> system call, where
+<Command>yacc</Command> is kept, whether <Command>gcc</Command> is
+available, where various obscure <Literal>&num;include</Literal> files
+are, whether it's a leap year, and what the systems manager had for
+lunch.  It communicates these snippets of information in two ways:
 </Para>
 
 <Para>
@@ -1250,8 +1252,12 @@ file.  Typing <Command>gmake</Command> alone is generally the same as typing <Co
 <ListItem>
 <Para>
 installs the things built by <Literal>all</Literal>.  Where does it
-install them?  That is specified by <Filename>mk/config.mk.in</Filename>; you can 
-override it in <Filename>mk/build.mk</Filename>.
+install them?  That is specified by
+<Filename>mk/config.mk.in</Filename>; you can override it in
+<Filename>mk/build.mk</Filename>, or by running
+<command>configure</command> with command-line arguments like
+<literal>--bindir=/home/simonpj/bin</literal>;  see <literal>./configure
+--help</literal> for the full details.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
@@ -2477,11 +2483,14 @@ vagaries of different systems, it seems.  The solution is simple:
 <ListItem>
 
 <Para>
- If you're compiling with GHC 4.00 or above, then the
-<Emphasis>maximum</Emphasis> heap size must have been reached.  This is somewhat
-unlikely, since the maximum is set to 64M by default.  Anyway, you can
-raise it with the <Option>-optCrts-M&lt;size&gt;</Option> flag (add this flag to
-<Constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</Constant> <Command>make</Command> variable in the appropriate <Filename>Makefile</Filename>).
+ If you're compiling with GHC 4.00 or later, then the
+<Emphasis>maximum</Emphasis> heap size must have been reached.  This
+is somewhat unlikely, since the maximum is set to 64M by default.
+Anyway, you can raise it with the
+<Option>-optCrts-M&lt;size&gt;</Option> flag (add this flag to
+<Constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</Constant>
+<Command>make</Command> variable in the appropriate
+<Filename>Makefile</Filename>).
 
 </Para>
 </ListItem>
