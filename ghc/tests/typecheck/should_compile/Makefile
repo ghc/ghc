@@ -8,4 +8,7 @@ tc019_HC_OPTS = -fglasgow-exts
 tc065_HC_OPTS = -syslib misc
 tc097_HC_OPTS = -fglasgow-exts
 
+# mkdependHS doesn't understand OPTIONS pragmas...
+SRC_MKDEPENDHS_OPTS += -fglasgow-exts -syslib misc
+
 include $(TOP)/mk/target.mk
