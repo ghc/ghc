@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.5 1999/01/14 18:36:18 sof Exp $
+ * $Id: PrimOps.h,v 1.6 1999/01/18 14:36:13 sof Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -643,6 +643,7 @@ extern StgPtr *stable_ptr_free;
 #define freeStablePointer(stable_ptr)			\
  {							\
   stable_ptr_table[stable_ptr] = (P_)stable_ptr_free;	\
+  IF_DEBUG(weak,fprintf(stderr, "Freed stable pointer %d\n", stable_ptr)); \
   stable_ptr_free = &stable_ptr_table[stable_ptr];	\
  }
 
