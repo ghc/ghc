@@ -62,14 +62,6 @@
 # Compiler produced files that are targets of the source's imports.
 MKDEPENDHS_OBJ_SUFFICES=o
 
-# HC_OPTS sometimes contains $*, which will expand to nothing in the depend
-# rule below.  So we replace $* with a dummy value for passing to mkdependHS
-# and hope it works.  
-#
-# This crops up with GhcLibHcOpts which ends in '-split_objs -odir $*'
-
-MKDEPENDHS_HC_OPTS = $(patsubst $*,dollar_star,$(HC_OPTS))
-
 depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
 	@$(RM) .depend
 	@touch .depend
@@ -80,8 +72,13 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(MKDEPENDHS_HC_OPTS) $(MKDEPENDHS_SRCS)
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(patsubst -odir,,$(HC_OPTS)) $(MKDEPENDHS_SRCS)
 endif
+
+# the above patsubst is a hack to remove the '-odir $*' from HC_OPTS
+# which is present when we're splitting objects.  The $* maps to
+# nothing, since this isn't a pattern rule, so we have to get rid of
+# the -odir too to avoid problems.
 
 ##################################################################
 # 			boot
