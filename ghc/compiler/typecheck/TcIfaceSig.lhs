@@ -55,8 +55,20 @@ signatures.
 tcInterfaceSigs :: [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM TcGblEnv
 		
+-- May 2003: 
+--	NOTE 1: careful about the side-effected EPS
+--		in the two tcExtendGlobalValueEnv calls
+--	NOTE 2: no point in tying the knot with fixM; all
+--		the important knot-tying comes via the PCS global variable
+
 tcInterfaceSigs decls = 
   zapEnv (fixM (tc_interface_sigs decls)) `thenM` \ (_,sig_ids) ->
+	-- The zapEnv dramatically trims the environment, solely
+	-- to plug the space leak that would otherwise be caused
+	-- by a rich environment bound into lots of lazy thunks
+	-- The thunks are the lazily-typechecked IdInfo of the 
+	-- imported things.
+
   tcExtendGlobalValEnv sig_ids getGblEnv  `thenM` \ gbl_env ->
   returnM gbl_env
 	-- We tie a knot so that the Ids read out of interfaces are in scope
