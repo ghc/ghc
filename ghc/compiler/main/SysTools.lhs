@@ -204,7 +204,7 @@ initSysTools minusB_args
 	; config_exists <- doesFileExist pkgconfig_path
 	; when (not config_exists) $
 	     throwDyn (InstallationError 
-		         ("Can't find package.conf in " ++ pkgconfig_path))
+		         ("Can't find package.conf as " ++ pkgconfig_path))
 
 #if defined(mingw32_TARGET_OS)
 	--		WINDOWS-SPECIFIC STUFF
@@ -407,7 +407,6 @@ touch purpose arg =  do p <- readIORef v_Pgm_T
 
 copy :: String -> String -> String -> IO ()
 copy purpose from to =
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
     (do
       h <- openFile to WriteMode
       ls <- readFile from -- inefficient, but it'll do for now.
@@ -415,15 +414,6 @@ copy purpose from to =
       hPutStrLn h ls
       hClose h) `catchAllIO`
 		 (\_ -> throwDyn (PhaseFailed purpose (ExitFailure 1)))
-#else
-    do
-    -- ToDo: switch away from using 'echo' altogether (but need
-    -- a faster alternative than what's done below).
-      SysTools.runSomething "Ineffective C pre-processor"
-		  ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
-		  ++ output_fn ++ " && cat " ++ input_fn
-		  ++ " >> " ++ output_fn) []
-#endif
 \end{code}
 
 \begin{code}
