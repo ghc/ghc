@@ -431,6 +431,7 @@ __export PrelGHC
 -- Export PrelErr.error, so that others do not have to import PrelErr
 __export PrelErr error ;
 
+infixr 0 seq ;
 
 --------------------------------------------------
 instance {CCallable Charzh} = zdfCCallableCharzh;
