@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArr.lhs,v 1.25 2000/08/31 19:57:42 simonpj Exp $
+% $Id: PrelArr.lhs,v 1.26 2001/03/25 09:57:24 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -389,16 +389,12 @@ old_array // ivs
 	-- copy the old array:
 	arr <- thawSTArray old_array
 	-- now write the new elements into the new array:
-	fill_it_in arr ivs
-	freezeSTArray arr
+	foldr (fill_one_in arr) (unsafeFreezeSTArray arr) ivs
     )
 
-fill_it_in :: Ix ix => STArray s ix elt -> [(ix, elt)] -> ST s ()
-{-# INLINE fill_it_in #-}
-fill_it_in arr lst = foldr (fill_one_in arr) (return ()) lst
-	 -- **** STRICT **** (but that's OK...)
-
-fill_one_in arr (i, v) rst = writeSTArray arr i v >> rst
+{-# INLINE fill_one_in #-}
+fill_one_in :: Ix ix => STArray s ix e -> (ix, e) -> ST s a -> ST s a
+fill_one_in arr (i, v) next = writeSTArray arr i v >> next
 
 zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> STArray s ix elt -> [(ix,elt2)] -> ST s ()
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value
@@ -420,7 +416,7 @@ accum f old_array ivs
 	arr <- thawSTArray old_array
 	-- now zap the elements in question with "f":
 	zap_with_f f arr ivs
-	freezeSTArray arr
+	unsafeFreezeSTArray arr
     )
 
 
@@ -430,7 +426,7 @@ accumArray f zero ixs ivs
   = runST (do
 	arr <- newSTArray ixs zero
 	zap_with_f f arr ivs
-	freezeSTArray arr
+	unsafeFreezeSTArray arr
     )
 \end{code}
 
@@ -458,7 +454,6 @@ instance  (Ix a, Show a, Show b) => Show (Array a b)  where
 		    showString "array " .
 		    shows (bounds a) . showChar ' ' .
 		    shows (assocs a)                  )
-    showList = showList__ (showsPrec 0)
 
 {-
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
@@ -466,7 +461,6 @@ instance  (Ix a, Read a, Read b) => Read (Array a b)  where
 	   (\r -> [(array b as, u) | ("array",s) <- lex r,
 				     (b,t)       <- reads s,
 				     (as,u)      <- reads t   ])
-    readList = readList__ (readsPrec 0)
 -}
 \end{code}
 
