@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.24 2000/02/25 14:55:42 panne Exp $
+$Id: Parser.y,v 1.25 2000/02/28 09:17:54 simonmar Exp $
 
 Haskell grammar.
 
@@ -515,11 +515,11 @@ ctype	:: { RdrNameHsType }
 
 type :: { RdrNameHsType }
 	: btype '->' type		{ MonoFunTy $1 $3 }
+	| IPVARID '::' type		{ MonoIParamTy (mkSrcUnqual ipName $1) $3 }
 	| btype				{ $1 }
 
 btype :: { RdrNameHsType }
 	: btype atype			{ MonoTyApp $1 $2 }
-	| IPVARID '::' type		{ MonoIParamTy (mkSrcUnqual ipName $1) $3 }
 	| atype				{ $1 }
 
 atype :: { RdrNameHsType }
