@@ -100,10 +100,10 @@ sub mangle_command_line_args {
 	if ( /^--$/ ) {
 	    $Dashdashes_seen++;
 
-	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
-	    push(@Defines, $_);
-	} elsif ( /^-I/ ) {
-	    $Include_dirs .= " $_";
+	} elsif ( /^(-optc)?(-D.*)/ ) { # recognized wherever they occur
+	    push(@Defines, $2);
+	} elsif ( /^(-optc)?(-I.*)/ ) {
+	    $Include_dirs .= " $2";
 
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
