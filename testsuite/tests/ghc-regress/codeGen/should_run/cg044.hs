@@ -1,9 +1,11 @@
+{-# OPTIONS -cpp #-}
 -- !!! Testing IEEE Float and Double extremity predicates.
 module Main(main) where
 
-import Char
-import ST
-import MutableArray
+import Data.Char
+import Control.Monad.ST
+import Data.Word
+import Data.Array.ST
 
 #include "config.h"
 
@@ -38,7 +40,7 @@ double_numbers :: [Double]
 double_numbers =
       [ 0
       , encodeFloat 0 0     -- 0 using encodeFloat method
-      , mkDouble (map chr (reverse_if_bigendian [0,0,0,0,0,0, 0xf0, 0x7f]))  -- +inf
+      , mkDouble (reverse_if_bigendian [0,0,0,0,0,0, 0xf0, 0x7f])  -- +inf
       , encodeFloat 1 2047  -- +Inf 
       , encodeFloat 1 2048
       , encodeFloat 1  2047		  -- signalling NaN
@@ -173,12 +175,13 @@ doubleOrFloat ls
 
 -- make a double from a list of 8 bytes
 -- (caller deals with byte ordering.)
-mkDouble :: [Char] -> Double
+mkDouble :: [Word8] -> Double
 mkDouble ls = 
  runST ( do
-   arr <- newCharArray (0,7)
-   sequence (zipWith (writeCharArray arr) [(0::Int)..] (take 8 ls))
-   readDoubleArray arr 0
+   arr <- newArray_ (0,7)
+   sequence (zipWith (writeArray arr) [(0::Int)..] (take 8 ls))
+   arr' <- castSTUArray arr
+   readArray arr' 0
  )
 
 showAndPerform :: (Show a, Show b)

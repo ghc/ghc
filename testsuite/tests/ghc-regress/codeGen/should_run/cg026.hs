@@ -1,18 +1,17 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -- !!! simple tests of primitive arrays
 --
 module Main ( main ) where
 
 import GHC.Exts
-import Char 	( chr )
+import Data.Char 	( chr )
 
-import Addr
-import ST
-import ST
-import MutableArray
-import ByteArray
+import Control.Monad.ST
+import Data.Array.ST
+import Data.Array.Unboxed
 	
-import Ratio
-import Array
+import Data.Ratio
 
 main = putStr
 	 (test_chars	++ "\n"  ++
@@ -32,33 +31,33 @@ test_chars
     in
 	shows (lookup_range arr# 42# 416#) "\n"
   where
-    f :: Int -> ByteArray Int
+    f :: Int -> UArray Int Char
 
     f size@(I# size#)
       = runST (
 	    -- allocate an array of the specified size
-	  newCharArray (0, (size-1))	>>= \ arr# ->
+	  newArray_ (0, (size-1))	>>= \ arr# ->
 
 	    -- fill in all elements; elem i has "i" put in it
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeByteArray arr#
+	  freeze arr#
 	)
 
-    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+    fill_in :: STUArray s Int Char -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeCharArray arr_in# (I# first#) ((chr (I# first#))) >>
+	else writeArray arr_in# (I# first#) ((chr (I# first#))) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
-    lookup_range :: ByteArray Int -> Int# -> Int# -> [Char]
+    lookup_range :: UArray Int Char -> Int# -> Int# -> [Char]
     lookup_range arr from# to#
       = if (from# ># to#)
 	then []
-	else (indexCharArray arr (I# from#))
+	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# Int# -------------------------------------------
@@ -69,33 +68,33 @@ test_ints
     in
 	shows (lookup_range arr# 42# 416#) "\n"
   where
-    f :: Int -> ByteArray Int
+    f :: Int -> UArray Int Int
 
     f size@(I# size#)
       = runST (
 	    -- allocate an array of the specified size
-	  newIntArray (0, (size-1))	>>= \ arr# ->
+	  newArray_ (0, (size-1))	>>= \ arr# ->
 
 	    -- fill in all elements; elem i has i^2 put in it
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeByteArray arr#
+	  freeze arr#
 	)
 
-    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+    fill_in :: STUArray s Int Int -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeIntArray arr_in# (I# first#) (I# (first# *# first#)) >>
+	else writeArray arr_in# (I# first#) (I# (first# *# first#)) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
-    lookup_range :: ByteArray Int -> Int# -> Int# -> [Int]
+    lookup_range :: UArray Int Int -> Int# -> Int# -> [Int]
     lookup_range arr from# to#
       = if (from# ># to#)
 	then []
-	else (indexIntArray arr (I# from#))
+	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# Addr# -------------------------------------------
@@ -106,37 +105,37 @@ test_addrs
     in
 	shows (lookup_range arr# 42# 416#) "\n"
   where
-    f :: Int -> ByteArray Int
+    f :: Int -> UArray Int (Ptr ())
 
     f size@(I# size#)
       = runST (
 	    -- allocate an array of the specified size
-	  newAddrArray (0, (size-1))	>>= \ arr# ->
+	  newArray_ (0, (size-1))	>>= \ arr# ->
 
 	    -- fill in all elements; elem i has i^2 put in it
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeByteArray arr#
+	  freeze arr#
 	)
 
-    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+    fill_in :: STUArray s Int (Ptr ()) -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeAddrArray arr_in# (I# first#)
-			    (A# (int2Addr# (first# *# first#))) >>
+	else writeArray arr_in# (I# first#)
+			    (Ptr (int2Addr# (first# *# first#))) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
-    lookup_range :: ByteArray Int -> Int# -> Int# -> [ Int ]
+    lookup_range :: UArray Int (Ptr ()) -> Int# -> Int# -> [ Int ]
     lookup_range arr from# to#
       = let
-	    a2i (A# a#) = I# (addr2Int# a#)
+	    a2i (Ptr a#) = I# (addr2Int# a#)
 	in
 	if (from# ># to#)
 	then []
-	else (a2i (indexAddrArray arr (I# from#)))
+	else (a2i (arr ! (I# from#)))
 	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# Float# -------------------------------------------
@@ -147,21 +146,21 @@ test_floats
     in
 	shows (lookup_range arr# 42# 416#) "\n"
   where
-    f :: Int -> ByteArray Int
+    f :: Int -> UArray Int Float
 
     f size@(I# size#)
       = runST (
 	    -- allocate an array of the specified size
-	  newFloatArray (0, (size-1))	>>= \ arr# ->
+	  newArray_ (0, (size-1))	>>= \ arr# ->
 
 	    -- fill in all elements; elem i has "i * pi" put in it
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeByteArray arr#
+	  freeze arr#
 	)
 
-    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+    fill_in :: STUArray s Int Float -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
@@ -170,14 +169,14 @@ test_floats
 	     in trace (show e) $ writeFloatArray arr_in# (I# first#) e >>
 	     fill_in arr_in# (first# +# 1#) last#
 -}
-	else writeFloatArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
+	else writeArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
-    lookup_range :: ByteArray Int -> Int# -> Int# -> [Float]
+    lookup_range :: UArray Int Float -> Int# -> Int# -> [Float]
     lookup_range arr from# to#
       = if (from# ># to#)
 	then []
-	else (indexFloatArray arr (I# from#))
+	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# Double# -------------------------------------------
@@ -188,33 +187,33 @@ test_doubles
     in
 	shows (lookup_range arr# 42# 416#) "\n"
   where
-    f :: Int -> ByteArray Int
+    f :: Int -> UArray Int Double
 
     f size@(I# size#)
       = runST (
 	    -- allocate an array of the specified size
-	  newDoubleArray (0, (size-1))	>>= \ arr# ->
+	  newArray_ (0, (size-1))	>>= \ arr# ->
 
 	    -- fill in all elements; elem i has "i * pi" put in it
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeByteArray arr#
+	  freeze arr#
 	)
 
-    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+    fill_in :: STUArray s Int Double -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeDoubleArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
+	else writeArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
-    lookup_range :: ByteArray Int -> Int# -> Int# -> [Double]
+    lookup_range :: UArray Int Double -> Int# -> Int# -> [Double]
     lookup_range arr from# to#
       = if (from# ># to#)
 	then []
-	else (indexDoubleArray arr (I# from#))
+	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# (Ratio Int) (ptrs) ---------------------------------
@@ -230,10 +229,10 @@ test_ptrs
 
     f size
       = runST (
-	  newSTArray (1, size) (3 % 5)	>>= \ arr# ->
+	  newArray (1, size) (3 % 5)	>>= \ arr# ->
 	  -- don't fill in the whole thing
 	  fill_in arr# 1 400		>>
-	  freezeSTArray arr#
+	  freeze arr#
 	)
 
     fill_in :: STArray s Int (Ratio Int) -> Int -> Int -> ST s ()
@@ -241,7 +240,7 @@ test_ptrs
     fill_in arr_in# first last
       = if (first > last)
 	then return ()
-	else writeSTArray arr_in# first (fromIntegral (first * first)) >>
+	else writeArray arr_in# first (fromIntegral (first * first)) >>
 	     fill_in  arr_in# (first + 1) last
 
     lookup_range :: Array Int (Ratio Int) -> Int -> Int -> [Ratio Int]

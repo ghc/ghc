@@ -1,6 +1,7 @@
+{-# OPTIONS -fglasgow-exts #-}
 module ShouldCompile where
 
-import GlaExts
+import GHC.Exts
 
 data CList = CNil | CCons Int# CList
 
