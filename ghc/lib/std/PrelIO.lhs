@@ -20,15 +20,15 @@ import PrelIOBase
 import PrelHandle	-- much of the real stuff is in here
 
 import PrelNum
-import PrelRead         ( readParen, Read(..), reads, lex,
-			  readIO 
-			)
+import PrelRead         ( readParen, Read(..), reads, lex, readIO )
 import PrelShow
 import PrelMaybe	( Either(..), Maybe(..) )
 import PrelAddr		( Addr(..), AddrOff(..), nullAddr, plusAddr )
+import PrelList		( concat, reverse, null )
 import PrelByteArr	( ByteArray )
-import PrelPack		( unpackNBytesAccST )
-import PrelException    ( ioError, catch, catchException, throw, blockAsyncExceptions )
+import PrelPack		( unpackNBytesST, unpackNBytesAccST )
+import PrelException    ( ioError, catch, catchException, throw, 
+			  blockAsyncExceptions )
 import PrelConc
 \end{code}
 
@@ -137,30 +137,33 @@ hGetChar handle = do
   EOF and return the partial line. Next attempt at calling
   hGetLine on the handle will yield an EOF IO exception though.
 -}
-hGetLine :: Handle -> IO String
-hGetLine h = do
-  c <- hGetChar h
-  if c == '\n' then
-     return ""
-   else do
-    l <- getRest
-    return (c:l)
- where
-  getRest = do
-    c <- 
-      catch 
-        (hGetChar h)
-        (\ err -> do
-          if isEOFError err then
-	     return '\n'
-	   else
-	     ioError err)
-    if c == '\n' then
-       return ""
-     else do
-       s <- getRest
-       return (c:s)
 
+hGetLine :: Handle -> IO String
+hGetLine h = hGetLineBuf' []
+  where hGetLineBuf' xss = do
+	   (eol, xss) <- catch 
+	    ( do
+	      mayBlockRead' "hGetLine" h 
+	        (\fo -> readLine fo)
+	        (\fo bytes -> do
+	    	  buf <- getBufStart fo bytes
+	    	  eol <- readCharOffAddr buf (bytes-1)
+		  xs <- if (eol == '\n') 
+			  then stToIO (unpackNBytesST buf (bytes-1))
+ 	        	  else stToIO (unpackNBytesST buf bytes)
+	          return (eol, xs:xss)
+	       )
+            )
+            (\e -> if isEOFError e && not (null xss)
+			then return ('\n', xss)
+			else ioError e)
+		
+	   if (eol == '\n')
+		then return (concat (reverse xss))
+        	else hGetLineBuf' xss
+
+readCharOffAddr (A# a) (I# i)
+  = IO $ \s -> case readCharOffAddr# a i s of { (# s,x #) -> (# s, C# x #) }
 \end{code}
 
 @hLookahead hdl@ returns the next character from handle @hdl@

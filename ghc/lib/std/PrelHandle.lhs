@@ -1108,10 +1108,10 @@ mayBlock fo act = do
      _ -> do
         return rc
 
-data MayBlock
+data MayBlock a
   = BlockRead Int
   | BlockWrite Int
-  | NoBlock Int
+  | NoBlock a
 
 mayBlockRead :: String -> Handle -> (FILE_OBJECT -> IO Int) -> IO Int
 mayBlockRead fname handle fn = do
@@ -1139,6 +1139,38 @@ mayBlockRead fname handle fn = do
 	BlockWrite fd -> do
 	   threadWaitWrite fd
 	   mayBlockRead fname handle fn
+	NoBlock c -> return c
+
+mayBlockRead' :: String -> Handle
+	-> (FILE_OBJECT -> IO Int)
+	-> (FILE_OBJECT -> Int -> IO a)
+	-> IO a
+mayBlockRead' fname handle fn io = do
+    r <- wantReadableHandle fname handle $ \ handle_ -> do
+	 let fo = haFO__ handle_
+         rc <- fn fo
+         case rc of
+           -5 -> do  -- (possibly blocking) read
+             fd <- getFileFd fo
+             return (BlockRead fd)
+  	   -6 -> do  -- (possibly blocking) write
+  	     fd <- getFileFd fo
+             return (BlockWrite fd)
+  	   -7 -> do  -- (possibly blocking) write on connected handle
+  	     fd <- getConnFileFd fo
+	     return (BlockWrite fd)
+           _ ->
+             if rc >= 0
+         	  then do a <- io fo rc 
+			  return (NoBlock a)
+         	  else constructErrorAndFail fname
+    case r of
+	BlockRead fd -> do
+	   threadWaitRead fd
+	   mayBlockRead' fname handle fn io
+	BlockWrite fd -> do
+	   threadWaitWrite fd
+	   mayBlockRead' fname handle fn io
 	NoBlock c -> return c
 
 mayBlockWrite :: String -> Handle -> (FILE_OBJECT -> IO Int) -> IO Int
