@@ -111,17 +111,26 @@ exeext=
 #		* ghc&hslibs next
 #		then it's up to you
 
-ProjectsToBuild   = glafp-utils literate happy ghc hslibs
+ProjectsToBuild   = glafp-utils literate ghc hslibs
 #
 # Make a distinction between building and installing, ProjectsToInstall
 # does not include the literate bits..
 #
-ProjectsToInstall = glafp-utils happy ghc hslibs
+ProjectsToInstall = glafp-utils ghc hslibs
 
 #
 # Should the various project tests directories be built?
 #
 IncludeTestDirsInBuild=NO
+
+#
+# Name variables for the main project
+#
+Project		  = Ghc
+ProjectName       = $($(Project)ProjectName)
+ProjectNameShort  = $($(Project)ProjectNameShort)
+ProjectVersion    = $($(Project)ProjectVersion)
+ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 
 #################################################################################
 #
@@ -139,24 +148,6 @@ GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
 GhcProjectVersion      = 2.09
 GhcProjectPatchLevel   = 0
-
-#
-# Name variables for happy:
-#
-HappyProjectName       = Happy
-HappyProjectNameShort  = happy
-HappyProjectVersion    = 1.5
-HappyProjectPatchLevel = 0
-
-#
-# Name variables for the fptools, for now equal to the above
-# ghc stuff
-#
-ProjectName       =$(GhcProjectName)
-ProjectNameShort  =$(GhcProjectNameShort)
-ProjectVersion    =$(GhcProjectVersion)
-ProjectPatchLevel =$(GhcProjectPatchLevel)
-
 
 #---------------------------------------------------------------
 #
@@ -260,6 +251,13 @@ else
 GhcLibHcOpts= -O
 endif
 
+# what to include in a binary distribution
+
+GhcMainDir = ghc
+GhcBinDistDirs = ghc hslibs
+GhcBinDistDocs = docs ghc/docs/users_guide
+GhcBinDistPrlScripts = ghc stat2resid hstags mkdependHS
+GhcBinDistLibPrlScripts = hscpp
 
 #################################################################################
 #
@@ -301,6 +299,14 @@ HsLibHcOpts=$(GhcLibHcOpts)
 #
 #################################################################################
 
+#
+# Name variables for happy:
+#
+HappyProjectName       = Happy
+HappyProjectNameShort  = happy
+HappyProjectVersion    = 1.5
+HappyProjectPatchLevel = 0
+
 # The compiler you'd like to use to compile Happy
 WithHappyHc = $(WithGhcHc)
 
@@ -309,6 +315,12 @@ WithHappyHc = $(WithGhcHc)
 #
 HappyHcOpts = 
 
+# what to include in a binary distribution
+
+HappyMainDir = happy
+HappyBinDistDirs = happy
+HappyBinDistDocs = happy/doc
+HappyBinDistShScripts = happy
 
 #################################################################################
 #
@@ -317,8 +329,6 @@ HappyHcOpts =
 # 	Haggis specific options
 #
 #################################################################################
-
-
 
 #################################################################################
 #
@@ -633,6 +643,12 @@ TROFF			= troff
 UNAME			= uname
 YACC			= @YaccCmd@
 
+#-----------------------------------------------------------------------------
+# SGML stuff (currently not configured - we assume you have it)
+
+SGML2LATEX		= sgml2latex
+SGML2HTML		= sgml2html
+SGML2TXT		= sgml2txt
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
