@@ -2263,7 +2263,9 @@ sub process_ghc_timings {
 
         $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
 
-	if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	# The presence of -? in the following pattern is only there to
+	# accommodate 0.29 && <= 2.05 RTS'
+	if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*-?(\d+\.\d\d)s elapsed\)/ ) {
 	    $InitTime = $1; $InitElapsed = $2;
 	} elsif ( /^\s*MUT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
 	    $MutTime = $1; $MutElapsed = $2;
@@ -2477,7 +2479,7 @@ arg: while($_ = $args[0]) {
        do { push(@Cmd_opts, $_); push(@Cmd_opts,$args[0]); shift(@args); next arg; };
     /^--?./  && do { push(@Cmd_opts, $_); next arg; };
 
-    if (/\.[oa]$/) {
+    if (/\.([^_]+_)?[oa]$/) {
 	push(@Link_file, $_);
     } else {
 	push(@Input_file, $_);
