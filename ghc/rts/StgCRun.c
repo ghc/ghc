@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.21 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: StgCRun.c,v 1.22 2000/11/13 14:53:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -314,6 +314,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
    does the last paragraph above mean when it says "the top of the
    stack is used for globals"?  What globals?  --SDM
 
+   Updated info (GHC 4.08.2): not saving %i7 any more (see below).
    -------------------------------------------------------------------------- */
 	
 #ifdef sparc_TARGET_ARCH
@@ -321,11 +322,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
-    unsigned char space[RESERVED_C_STACK_BYTES];
-#if 0
-    register void *i7 __asm__("%i7");
-    ((void **)(space))[100] = i7;
-#endif
+    StgChar space[RESERVED_C_STACK_BYTES];
     f();
     __asm__ volatile (
 	    ".align 4\n"		
@@ -343,6 +340,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
      * assembler.
      */
 #if 0
+    /* updated 4.08.2: we don't save %i7 in the middle of the reserved
+     * space any more, since gcc tries to save its address across the
+     * call to f(), this gets clobbered in STG land and we end up
+     * dereferencing a bogus pointer in StgReturn.
+     */
     __asm__ volatile ("ld %1,%0" 
 		      : "=r" (i7) : "m" (((void **)(space))[100]));
 #endif
