@@ -280,8 +280,8 @@ ppr_expr pe expr@(Lam _ _)
 	(uvars, tyvars, vars, body) = collectBinders expr
     in
     hang (hsep [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
-		   pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
-		   pp_vars SLIT("\\")   (pMajBndr pe) vars])
+		pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
+		pp_vars SLIT("\\")   (pMajBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = empty
@@ -424,8 +424,15 @@ pprBigCoreBinder sty binder
   = vcat [sig, pragmas, ppr sty binder]
   where
     sig = ifnotPprShowAll sty (
+	    hsep [ppr sty binder, ppDcolon, ppr sty (idType binder)])
+
+{- Having the type come on a separate line does not look "right" to me (doesn't
+   save too much space either), so I've replaced it with a one-line version. -- SOF
+
 	    hang (hsep [ppr sty binder, ppDcolon])
 		 4 (ppr sty (idType binder)))
+-}
+
     pragmas =
 	ifnotPprForUser sty
 	 (ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder))
