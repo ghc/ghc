@@ -974,9 +974,9 @@ newtype GHC.IOBase.IO a
 	  <para>Only <literal>data</literal>, <literal>type</literal>,
 	  <literal>newtype</literal>, <literal>class</literal>, and
 	  type signature declarations may be included. You cannot declare
-	  <literal>instances</literal> or derive them automatically.
-</para>
-	</listitem>
+	  <literal>instances</literal> or derive them automatically with 
+          a <literal>deriving</literal> clause.</para>
+</listitem>
 
 <listitem> <para>For <literal>data</literal> or <literal>newtype</literal> declaration, you may omit all
 the constructors, by omitting the '=' and everything that follows it:
@@ -1004,9 +1004,16 @@ module A where
 	    but you <emphasis>must</emphasis> do so in hi-boot files.)</para>
 	</listitem>
 
-<listitem> <para>For <literal>class</literal> declaration, you may not specify any class
-operations.  We could lift this restriction if it became tiresome.</para>
-</listitem>
+<listitem><para>
+	In a <literal>class</literal> declararation, you may not specify any class operations; that is, 
+	  there can be no <literal>where</literal> part.  If you want to use the class operations in a recursive
+	  way, declare them in the <literal>hi-boot</literal> file with separate, overloaded type signatures, thus:
+<programlisting>
+   class Num a
+   (+) :: Num a => a -> a -> a
+</programlisting>
+	  </para>
+	</listitem>
       </itemizedlist>
 
 <para>If <literal>M.hi-boot</literal> mentions an entity <literal>N.f</literal>, defined in some other
