@@ -28,7 +28,7 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 
-$tempfile = "$Tmp_prefix.i";
+$tempfile = '';
 
 sub quit_upon_signal { 
   if (-f $tempfile) {
@@ -152,6 +152,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
+    $tempfile = "$Tmp_prefix.i";
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     $result = system("${CPP} $Include_dirs @Defines -x c $fname -o $tempfile");

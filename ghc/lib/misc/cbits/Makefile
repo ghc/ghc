@@ -14,10 +14,7 @@ ifneq "$(HAVE_READLINE)" "YES"
   C_SRCS := $(filter-out ghcReadline.c,$(C_SRCS))
 endif
 
-# ToDo: properly
-# -D__GNUC__ : added to turn off noise from byteorder.h with 2.7.2 / Solaris-2.3
-#
-SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) -D__GNUC__
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 LIBRARY=libHSmisc_cbits.a
