@@ -117,7 +117,7 @@ HsInt
 __hscore_renameFile( HsAddr src,
 		     HsAddr dest)
 {
-#if (defined(_MSC_VER) || defined(_WIN32))
+#if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
     static int forNT = -1;
     
     /* ToDo: propagate error codes back */
