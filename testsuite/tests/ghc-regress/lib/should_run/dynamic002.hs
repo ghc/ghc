@@ -1,27 +1,25 @@
 -- !!! Testing Typeable instances
 module Main(main) where
 
-import Dynamic
-import Array
-import Complex
-import IO
-import Addr
-import ForeignObj
-import IOExts
-import Int
-import ST
-import StableName
-import StablePtr
-import Word
-import Exception
-import ByteArray
-import MutableArray
-import PackedString
-import Weak
-import MArray
-import IArray
-import CTypes
-import CTypesISO
+import Data.Dynamic
+import Data.Array
+import Data.Array.MArray
+import Data.Array.ST
+import Data.Array.IO
+import Data.Array.Unboxed
+import Data.Complex
+import Data.PackedString
+import Data.Int
+import Data.Word
+import Data.IORef
+import System.IO
+import Control.Monad.ST
+import System.Mem.StableName
+import System.Mem.Weak
+import Foreign.StablePtr
+import Control.Exception
+import Foreign.C.Types
+import Foreign.C.TypesISO
 
 main :: IO ()
 main = do
@@ -46,9 +44,7 @@ main = do
    print (typeOf (undefined :: (Maybe ())))
    print (typeOf (undefined :: Ordering))
 
-   print (typeOf (undefined :: Addr))
    print (typeOf (undefined :: Dynamic))
-   print (typeOf (undefined :: ForeignObj))
    print (typeOf (undefined :: (IORef ())))
    print (typeOf (undefined :: Int8))
    print (typeOf (undefined :: Int16))
@@ -66,11 +62,9 @@ main = do
 
    print (typeOf (undefined :: ArithException))
    print (typeOf (undefined :: AsyncException))
-   print (typeOf (undefined :: (ByteArray ())))
    print (typeOf (undefined :: Exception))
    print (typeOf (undefined :: (IOArray () ())))
    print (typeOf (undefined :: (IOUArray () ())))
-   print (typeOf (undefined :: (MutableByteArray () ())))
    print (typeOf (undefined :: PackedString))
    print (typeOf (undefined :: (STArray () () ())))
    print (typeOf (undefined :: (STUArray () () ())))

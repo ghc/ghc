@@ -18,9 +18,7 @@ Integer
 IO ()
 Maybe ()
 Ordering
-Addr
 Dynamic
-ForeignObj
 IORef ()
 Int8
 Int16
@@ -37,11 +35,9 @@ Word32
 Word64
 ArithException
 AsyncException
-ByteArray ()
 Exception
 IOArray () ()
 IOUArray () ()
-MutableByteArray () ()
 PackedString
 STArray () () ()
 STUArray () () ()
