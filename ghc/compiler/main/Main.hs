@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.45 2001/01/09 17:16:36 rrt Exp $
+-- $Id: Main.hs,v 1.46 2001/01/12 11:04:45 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -241,6 +241,9 @@ main =
 
    when (verb >= 2) 
 	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
+
+   when (verb >= 3) 
+	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
 
 	-- initialise the finder
    pkg_avails <- getPackageInfo

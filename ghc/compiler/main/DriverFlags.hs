@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.38 2001/01/08 12:31:34 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.39 2001/01/12 11:04:45 simonmar Exp $
 --
 -- Driver flags
 --
@@ -18,7 +18,6 @@ import DriverState
 import DriverUtil
 import TmpFiles 	( v_TmpDir )
 import CmdLineOpts
-import TmpFiles	 	( newTempName )
 import Config
 import Util
 import Panic
@@ -26,7 +25,6 @@ import Panic
 import Exception
 import IOExts
 
-import Directory 	( removeFile )
 import IO
 import Maybe
 import Monad
@@ -349,7 +347,7 @@ setVerbosityAtLeast n =
 			  then dfs{ verbosity = n }
 			  else dfs)
 
-setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 2 })
+setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
 setVerbosity n 
   | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
   | otherwise     = throwDyn (OtherError "can't parse verbosity flag (-v<n>)")
@@ -506,13 +504,10 @@ buildStaticHscOpts = do
 	    _ -> error "unknown opt level"
 	    -- ToDo: -Ofile
  
-  let stg_opts = [ "-flet-no-escape" ]
-	-- let-no-escape always on for now
-
 	-- take into account -fno-* flags by removing the equivalent -f*
 	-- flag from our list.
   anti_flags <- getStaticOpts v_Anti_opt_C
-  let basic_opts = opt_C_ ++ optimisation_opts ++ stg_opts
+  let basic_opts = opt_C_ ++ optimisation_opts
       filtered_opts = filter (`notElem` anti_flags) basic_opts
 
   static <- (do s <- readIORef v_Static; if s then return "-static" 
@@ -528,9 +523,9 @@ buildStaticHscOpts = do
 runSomething phase_name cmd
  = do
    verb <- dynFlag verbosity
-   when (verb >= 2) $ putStrLn ("*** " ++ phase_name)
-   when (verb >= 3) $ putStrLn cmd
-   hFlush stdout
+   when (verb >= 2) $ hPutStrLn stderr ("*** " ++ phase_name)
+   when (verb >= 3) $ hPutStrLn stderr cmd
+   hFlush stderr
 
    -- test for -n flag
    n <- readIORef v_Dry_run
@@ -541,5 +536,5 @@ runSomething phase_name cmd
 
    if exit_code /= ExitSuccess
 	then throwDyn (PhaseFailed phase_name exit_code)
-	else do when (verb >= 3) (putStr "\n")
+	else do when (verb >= 3) (hPutStr stderr "\n")
 	        return ()

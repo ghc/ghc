@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.22 2001/01/09 17:16:35 rrt Exp $
+-- $Id: DriverState.hs,v 1.23 2001/01/12 11:04:45 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -244,14 +244,15 @@ GLOBAL_VAR(v_Strictness,  		True,  Bool)
 GLOBAL_VAR(v_CPR,         		True,  Bool)
 GLOBAL_VAR(v_CSE,         		True,  Bool)
 
-hsc_minusO2_flags = hsc_minusO_flags	-- for now
-
+-- these are the static flags you get without -O.
 hsc_minusNoO_flags =
        [ 
  	"-fignore-interface-pragmas",
-	"-fomit-interface-pragmas"
+	"-fomit-interface-pragmas",
+	"-flet-no-escape"
 	]
 
+-- these are the static flags you get when -O is on.
 hsc_minusO_flags =
   [ 
 	"-ffoldr-build-on",
@@ -259,8 +260,11 @@ hsc_minusO_flags =
 	"-fdo-lambda-eta-expansion",
 	"-fcase-of-case",
  	"-fcase-merge",
-	"-flet-to-case"
+	"-flet-to-case",
+	"-flet-no-escape"
    ]
+
+hsc_minusO2_flags = hsc_minusO_flags	-- for now
 
 getStaticOptimisationFlags 0 = hsc_minusNoO_flags
 getStaticOptimisationFlags 1 = hsc_minusO_flags
