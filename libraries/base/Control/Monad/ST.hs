@@ -10,7 +10,7 @@
 --
 -- This library provides support for /strict/ state threads, as
 -- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
--- Jones /Lazy State Threads/.
+-- Jones /Lazy Functional State Threads/.
 --
 -----------------------------------------------------------------------------
 
