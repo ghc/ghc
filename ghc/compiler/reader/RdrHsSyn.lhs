@@ -63,6 +63,8 @@ import Util		( thenCmp )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
 import Outputable
+
+import Char		( isUpper )
 \end{code}
 
 \begin{code}

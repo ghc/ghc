@@ -266,12 +266,12 @@ rn_mono_binds top_lev binders mbinds sigs
     flattenMonoBinds siglist mbinds	`thenRn` \ mbinds_info ->
 
 	 -- Do the SCC analysis
-    let edges	    = mkEdges (mbinds_info `zip` [0..])
+    let edges	    = mkEdges (mbinds_info `zip` [(0::Int)..])
 	scc_result  = stronglyConnComp edges
 	final_binds = foldr1 ThenBinds (map reconstructCycle scc_result)
 
 	 -- Deal with bound and free-var calculation
-	rhs_fvs = unionManyNameSets [fvs | (_,_,fvs,_,_) <- mbinds_info]
+	rhs_fvs = unionManyNameSets [fvs | (_,fvs,_,_) <- mbinds_info]
     in
     returnRn (final_binds, rhs_fvs)
 \end{code}
@@ -282,7 +282,7 @@ unique ``vertex tags'' on its output; minor plumbing required.
 \begin{code}
 flattenMonoBinds :: [RenamedSig]		-- Signatures
 		 -> RdrNameMonoBinds
-		 -> RnMS s (Int, [FlatMonoBindsInfo])
+		 -> RnMS s [FlatMonoBindsInfo]
 
 flattenMonoBinds sigs EmptyMonoBinds = returnRn []
 
@@ -387,14 +387,14 @@ as the two cases are similar.
 reconstructCycle :: SCC FlatMonoBindsInfo
 		 -> RenamedHsBinds
 
-reconstructCycle (AcyclicSCC (_, _, _, binds, sigs))
+reconstructCycle (AcyclicSCC (_, _, binds, sigs))
   = MonoBind binds sigs NonRecursive
 
 reconstructCycle (CyclicSCC cycle)
   = MonoBind this_gp_binds this_gp_sigs Recursive
   where
-    this_gp_binds      = foldr1 AndMonoBinds [binds | (_, _, _, binds, _) <- cycle]
-    this_gp_sigs       = foldr1 (++)	     [sigs  | (_, _, _, _, sigs) <- cycle]
+    this_gp_binds      = foldr1 AndMonoBinds [binds | (_, _, binds, _) <- cycle]
+    this_gp_sigs       = foldr1 (++)	     [sigs  | (_, _, _, sigs) <- cycle]
 \end{code}
 
 %************************************************************************

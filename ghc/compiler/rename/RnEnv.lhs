@@ -473,7 +473,7 @@ addOneToGlobalNameEnv :: GlobalNameEnv -> RdrName -> (Name, HowInScope) -> RnM s
 addOneToGlobalNameEnv env rdr_name name
  = case lookupFM env rdr_name of
 	Just name2 | conflicting_name name name2
-		   -> addNameClashErrRn (rdr_name, (name, name2)))	`thenRn_`
+		   -> addNameClashErrRn (rdr_name, (name, name2)) `thenRn_`
 		      returnRn env
 
 	other      -> returnRn (addToFM env rdr_name name)
@@ -713,7 +713,7 @@ addNameClashErrRn (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
   | otherwise
   = addErrRn (hang (hsep [ptext SLIT("Conflicting definitions for"), quotes (ppr rdr_name)])
 	      4 (vcat [ppr how_in_scope1,
-		       ppr how_in_scope2])
+		       ppr how_in_scope2]))
 
 fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
   = hang (hsep [ptext SLIT("Conflicting fixities for"), quotes (ppr rdr_name)])
