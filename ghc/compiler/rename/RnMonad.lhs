@@ -494,6 +494,7 @@ andRn    :: (a -> a -> a) -> RnM d a -> RnM d a -> RnM d a
 mapRn    :: (a -> RnM d b) -> [a] -> RnM d [b]
 mapRn_   :: (a -> RnM d b) -> [a] -> RnM d ()
 mapMaybeRn :: (a -> RnM d (Maybe b)) -> [a] -> RnM d [b]
+flatMapRn  :: (a -> RnM d [b])       -> [a] -> RnM d [b]
 sequenceRn :: [RnM d a] -> RnM d [a]
 foldlRn :: (b  -> a -> RnM d b) -> b -> [a] -> RnM d b
 mapAndUnzipRn :: (a -> RnM d (b,c)) -> [a] -> RnM d ([b],[c])
@@ -546,6 +547,11 @@ mapMaybeRn f (x:xs) = f x		`thenRn` \ maybe_r ->
 		      case maybe_r of
 			Nothing -> returnRn rs
 			Just r  -> returnRn (r:rs)
+
+flatMapRn f []     = returnRn []
+flatMapRn f (x:xs) = f x 		`thenRn` \ r ->
+		     flatMapRn f xs	`thenRn` \ rs ->
+		     returnRn (r ++ rs)
 \end{code}
 
 

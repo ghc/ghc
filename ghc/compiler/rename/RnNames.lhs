@@ -34,14 +34,15 @@ import PrelMods
 import PrelInfo ( main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
-import Maybes	( maybeToBool )
+import Maybes	( maybeToBool, catMaybes )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
 import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
 		  isLocallyDefined, setNameProvenance,
 		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance
 		)
-import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual, isQual )
+import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual )
+import OccName	( setOccNameSpace, dataName )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
@@ -374,6 +375,9 @@ filterImports :: ModuleName			-- The module being imported
 	      -> RnMG ([AvailInfo],		-- What's actually imported
 		       [AvailInfo],		-- What's to be hidden
 						-- (the unqualified version, that is)
+			-- (We need to return both the above sets, because
+			--  the qualified version is never hidden; so we can't
+			--  implement hiding by reducing what's imported.)
 		       NameSet)			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
@@ -382,7 +386,7 @@ filterImports mod Nothing imports
   = returnRn (imports, [], emptyNameSet)
 
 filterImports mod (Just (want_hiding, import_items)) avails
-  = mapMaybeRn check_item import_items		`thenRn` \ avails_w_explicits ->
+  = flatMapRn get_item import_items		`thenRn` \ avails_w_explicits ->
     let
 	(item_avails, explicits_s) = unzip avails_w_explicits
 	explicits		   = foldl addListToNameSet emptyNameSet explicits_s
@@ -403,19 +407,46 @@ filterImports mod (Just (want_hiding, import_items)) avails
 	-- they won't make any difference because naked entities like T
 	-- in an import list map to TcOccs, not VarOccs.
 
-    check_item item@(IEModuleContents _)
-      = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn Nothing
+    bale_out item = addErrRn (badImportItemErr mod item)	`thenRn_`
+		    returnRn []
+
+    get_item item@(IEModuleContents _) = bale_out item
+
+    get_item item@(IEThingAll _)
+      = case check_item item of
+	  Nothing    		     -> bale_out item
+	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
+						-- only export T abstractly.  The single [n]
+						-- in the AvailTC is the type or class itself
+					addWarnRn (dodgyImportWarn mod item)	`thenRn_`
+		     	 		returnRn [(avail, [availName avail])]
+	  Just avail 		     -> returnRn [(avail, [availName avail])]
+
+    get_item item@(IEThingAbs n)
+      | want_hiding	-- hiding( C ) 
+			-- Here the 'C' can be a data constructor *or* a type/class
+      = case catMaybes [check_item item, check_item (IEThingAbs data_n)] of
+		[]     -> bale_out item
+		avails -> returnRn [(a, []) | a <- avails]
+				-- The 'explicits' list is irrelevant when hiding
+      where
+	data_n = setRdrNameOcc n (setOccNameSpace (rdrNameOcc n) dataName)
+
+    get_item item
+      = case check_item item of
+	  Nothing    -> bale_out item
+	  Just avail -> returnRn [(avail, availNames avail)]
+
+    ok_dotdot_item (AvailTC _ [n]) = False
+    ok_dotdot_item other = True
 
     check_item item
       | not (maybeToBool maybe_in_import_avails) ||
 	not (maybeToBool maybe_filtered_avail)
-      = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn Nothing
+      = Nothing
 
       | otherwise    
-      = warnCheckRn (okItem item avail) (dodgyImportWarn mod item)	`thenRn_`
-        returnRn (Just (filtered_avail, explicits))
+      = Just filtered_avail
 		
       where
  	wanted_occ	       = rdrNameOcc (ieName item)
@@ -424,19 +455,6 @@ filterImports mod (Just (want_hiding, import_items)) avails
 	Just avail	       = maybe_in_import_avails
 	maybe_filtered_avail   = filterAvail item avail
 	Just filtered_avail    = maybe_filtered_avail
-	explicits	       | dot_dot   = [availName filtered_avail]
-			       | otherwise = availNames filtered_avail
-
-	dot_dot = case item of 
-		    IEThingAll _    -> True
-		    other	    -> False
-
-
-okItem (IEThingAll _) (AvailTC _ [n]) = False
-		-- This occurs when you import T(..), but
-		-- only export T abstractly.  The single [n]
-		-- in the AvailTC is the type or class itself
-okItem _ _ = True
 \end{code}
 
 
@@ -608,7 +626,7 @@ exportsFromAvail this_mod (Just export_items)
 	| otherwise	-- Phew!  It's OK!  Now to check the occurrence stuff!
 
 
-	= warnCheckRn (okItem ie avail) (dodgyExportWarn ie)	`thenRn_`
+	= warnCheckRn (ok_item ie avail) (dodgyExportWarn ie)	`thenRn_`
           check_occs ie occs export_avail			`thenRn` \ occs' ->
 	  returnRn (mods, occs', add_avail avails export_avail)
 
@@ -621,6 +639,12 @@ exportsFromAvail this_mod (Just export_items)
  	  maybe_export_avail = filterAvail ie avail
 	  enough_avail	     = maybeToBool maybe_export_avail
 	  Just export_avail  = maybe_export_avail
+
+    ok_item (IEThingAll _) (AvailTC _ [n]) = False
+		-- This occurs when you import T(..), but
+		-- only export T abstractly.  The single [n]
+		-- in the AvailTC is the type or class itself
+    ok_item _ _ = True
 
 add_avail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
 
