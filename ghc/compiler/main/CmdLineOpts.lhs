@@ -93,7 +93,8 @@ module CmdLineOpts (
 	opt_OmitBlackHoling,
 	opt_Static,
 	opt_Unregisterised,
-	opt_EmitExternalCore
+	opt_EmitExternalCore,
+	opt_PIC
     ) where
 
 #include "HsVersions.h"
@@ -832,6 +833,8 @@ opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
 
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
+
+opt_PIC                         = lookUp FSLIT("-fPIC")
 \end{code}
 
 %************************************************************************
@@ -874,7 +877,8 @@ isStaticHscFlag f =
 	"frule-check",
 	"frules-off",
 	"fcpr-off",
-	"ferror-spans"
+	"ferror-spans",
+	"fPIC"
 	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",

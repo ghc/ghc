@@ -15,9 +15,6 @@
 module PprMach ( 
 	pprNatCmmTop, pprBasicBlock,
 	pprInstr, pprSize, pprUserReg,
-#if darwin_TARGET_OS
-	pprDyldSymbolStub,
-#endif
   ) where
 
 
@@ -36,6 +33,8 @@ import Unique		( pprUnique )
 import Pretty
 import FastString
 import qualified Outputable
+
+import CmdLineOpts      ( opt_PIC )
 
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
@@ -378,14 +377,16 @@ pprImm :: Imm -> Doc
 
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
-pprImm (ImmCLbl l)    = (if labelDynamic l then text "__imp_" else empty)
-                        <> pprCLabel_asm l
-pprImm (ImmIndex l i) = (if labelDynamic l then text "__imp_" else empty)
-                        <> pprCLabel_asm l <> char '+' <> int i
+pprImm (ImmCLbl l)    = pprCLabel_asm l
+pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
 pprImm (ImmFloat _) = panic "pprImm:ImmFloat"
 pprImm (ImmDouble _) = panic "pprImm:ImmDouble"
+
+pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
+pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
+                            <> lparen <> pprImm b <> rparen
 
 #if sparc_TARGET_ARCH
 pprImm (LO i)
@@ -415,9 +416,6 @@ pprImm (HA i)
   where
     pp_ha = text "ha16("
     
-pprImm (ImmDyldNonLazyPtr lbl)
-  = ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$non_lazy_ptr")
-  
 #else
 pprImm (LO i)
   = pprImm i <> text "@l"
@@ -643,7 +641,9 @@ pprInstr (COMMENT s)
    =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ftext s))
      ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ftext s))
      ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ftext s))
-     ,IF_ARCH_powerpc( ((<>) (ptext SLIT("; ")) (ftext s))
+     ,IF_ARCH_powerpc( IF_OS_linux(
+        ((<>) (ptext SLIT("# ")) (ftext s)),
+        ((<>) (ptext SLIT("; ")) (ftext s)))
      ,))))
 
 pprInstr (DELTA d)
@@ -1958,9 +1958,8 @@ pprInstr (BCTR _) = hcat [
 	ptext SLIT("bctr")
     ]
 pprInstr (BL lbl _) = hcat [
-	ptext SLIT("\tbl\tL"),
-        pprCLabel_asm lbl,
-	ptext SLIT("$stub")
+	ptext SLIT("\tbl\t"),
+        pprCLabel_asm lbl
     ]
 pprInstr (BCTRL _) = hcat [
 	char '\t',
@@ -2089,6 +2088,18 @@ pprInstr (MFCR reg) = hcat [
 	pprReg reg
     ]
 
+pprInstr (MFLR reg) = hcat [
+	char '\t',
+	ptext SLIT("mflr"),
+	char '\t',
+	pprReg reg
+    ]
+
+pprInstr (FETCHPC reg) = vcat [
+        ptext SLIT("\tbcl\t20,31,1f"),
+        hcat [ ptext SLIT("1:\tmflr\t"), pprReg reg ]
+    ]
+
 pprInstr _ = panic "pprInstr (ppc)"
 
 pprLogic op reg1 reg2 ri = hcat [
@@ -2138,43 +2149,6 @@ pprFSize F32 = char 's'
 limitShiftRI :: RI -> RI
 limitShiftRI (RIImm (ImmInt i)) | i > 32 || i < 0 = RIImm (ImmInt 32)
 limitShiftRI x = x
-
-{-
-  The Mach-O object file format used in Darwin/Mac OS X needs a so-called
-  "symbol stub" for every function that might be imported from a dynamic
-  library.
-  The stubs are always the same, and they are all output at the end of the
-  generated assembly (see AsmCodeGen.lhs), so we don't use the Instr datatype.
-  Instead, we just pretty-print it directly.
--}
-
-#if darwin_TARGET_OS
-pprDyldSymbolStub (True, lbl) =
-    vcat [
-	ptext SLIT(".symbol_stub"),
-	ptext SLIT("L") <> pprLbl <> ptext SLIT("$stub:"),
-	    ptext SLIT("\t.indirect_symbol") <+> pprLbl,
-	    ptext SLIT("\tlis r11,ha16(L") <> pprLbl <> ptext SLIT("$lazy_ptr)"),
-	    ptext SLIT("\tlwz r12,lo16(L") <> pprLbl <> ptext SLIT("$lazy_ptr)(r11)"),
-	    ptext SLIT("\tmtctr r12"),
-	    ptext SLIT("\taddi r11,r11,lo16(L") <> pprLbl <> ptext SLIT("$lazy_ptr)"),
-	    ptext SLIT("\tbctr"),
-	ptext SLIT(".lazy_symbol_pointer"),
-	ptext SLIT("L") <> pprLbl <> ptext SLIT("$lazy_ptr:"),
-	    ptext SLIT("\t.indirect_symbol") <+> pprLbl,
-	    ptext SLIT("\t.long dyld_stub_binding_helper")
-    ]
-    where pprLbl = pprCLabel_asm lbl
-    
-pprDyldSymbolStub (False, lbl) =
-    vcat [
-        ptext SLIT(".non_lazy_symbol_pointer"),
-        char 'L' <> pprLbl <> ptext SLIT("$non_lazy_ptr:"),
-	    ptext SLIT("\t.indirect_symbol") <+> pprLbl,
-            ptext SLIT("\t.long\t0")
-    ]
-    where pprLbl = pprCLabel_asm lbl
-#endif
 
 #endif /* powerpc_TARGET_ARCH */
 

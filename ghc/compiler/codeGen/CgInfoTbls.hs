@@ -15,13 +15,14 @@ module CgInfoTbls (
 	emitDirectReturnInstr, emitVectoredReturnInstr,
 	mkRetInfoTable,
 	mkStdInfoTable,
+	stdInfoTableSizeB,
 	mkFunGenInfoExtraBits,
 	entryCode, closureInfoPtr,
 	getConstrTag,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
 	funInfoTable,
-	vectorSlot,
+	retVec
   ) where
 
 
@@ -120,7 +121,7 @@ emitClosureCodeAndInfoTable cl_info args body
 			(mkIntCLit 0, fromIntegral (dataConTagZ con)) 
 
 	    Nothing  -> -- Not a constructor
-			srtLabelAndLength srt
+			srtLabelAndLength srt info_lbl
 
     ptrs       = closurePtrsSize cl_info
     nptrs      = size - ptrs
@@ -141,10 +142,13 @@ emitClosureCodeAndInfoTable cl_info args body
 	| ArgGen liveness <- arg_descr
 	= [ fun_amode,
 	    srt_label,
-	    mkLivenessCLit liveness, 
-	    CmmLabel (mkSlowEntryLabel (closureName cl_info)) ]
+	    makeRelativeRefTo info_lbl $ mkLivenessCLit liveness, 
+	    slow_entry ]
 	| needs_srt = [fun_amode, srt_label]
 	| otherwise = [fun_amode]
+
+    slow_entry = makeRelativeRefTo info_lbl (CmmLabel slow_entry_label)
+    slow_entry_label = mkSlowEntryLabel (closureName cl_info)
 
     fun_amode = packHalfWordsCLit fun_type arity
     fun_type  = argDescrType arg_descr
@@ -207,7 +211,15 @@ vectorSlot info_amode zero_indexed_tag
 		   zero_indexed_tag
 	-- The "2" is one for the entry-code slot and one for the SRT slot
 
-
+retVec :: CmmExpr -> CmmExpr -> CmmExpr
+-- Get a return vector from the info pointer
+retVec info_amode zero_indexed_tag
+  = let slot = vectorSlot info_amode zero_indexed_tag
+        tableEntry = CmmLoad slot wordRep
+    in if tablesNextToCode
+           then CmmMachOp (MO_Add wordRep) [tableEntry, info_amode]
+           else tableEntry
+           
 emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)
@@ -229,7 +241,7 @@ emitReturnTarget name stmts vector srt
 	 		 (False, False) -> rET_VEC_SMALL
  
 	      (std_info, extra_bits) = 
-		   mkRetInfoTable liveness srt_info cl_type vector
+		   mkRetInfoTable info_lbl liveness srt_info cl_type vector
 
 	; blks <- cgStmtsToBlocks stmts
 	; emitInfoTableAndCode info_lbl std_info extra_bits args blks
@@ -241,15 +253,16 @@ emitReturnTarget name stmts vector srt
 
 
 mkRetInfoTable
-  :: Liveness		-- liveness
+  :: CLabel             -- info label
+  -> Liveness		-- liveness
   -> C_SRT		-- SRT Info
   -> Int		-- type (eg. rET_SMALL)
   -> [CmmLit]		-- vector
   -> ([CmmLit],[CmmLit])
-mkRetInfoTable liveness srt_info cl_type vector
+mkRetInfoTable info_lbl liveness srt_info cl_type vector
   =  (std_info, extra_bits)
   where
-	(srt_label, srt_len) = srtLabelAndLength srt_info
+	(srt_label, srt_len) = srtLabelAndLength srt_info info_lbl
  
 	srt_slot | need_srt  = [srt_label]
 	         | otherwise = []
@@ -259,9 +272,9 @@ mkRetInfoTable liveness srt_info cl_type vector
 		-- an SRT slot, so that the vector table is at a 
 		-- known offset from the info pointer
  
-	liveness_lit = mkLivenessCLit liveness
+	liveness_lit = makeRelativeRefTo info_lbl $ mkLivenessCLit liveness
 	std_info = mkStdInfoTable zeroCLit zeroCLit cl_type srt_len liveness_lit
-        extra_bits = srt_slot ++ vector
+        extra_bits = srt_slot ++ map (makeRelativeRefTo info_lbl) vector
 
 
 emitDirectReturnTarget
@@ -292,11 +305,15 @@ emitAlgReturnTarget name branches mb_deflt srt ret_conv
 		-- global labels, so we can't use them at the 'call site'
 
       VectoredReturn fam_sz -> do
-	{ tagged_lbls <- mapFCs emit_alt branches
-	; deflt_lbl   <- emit_deflt mb_deflt
+	{ let tagged_lbls = zip (map fst branches) $
+	                    map (CmmLabel . mkAltLabel uniq . fst) branches
+	      deflt_lbl | isJust mb_deflt = CmmLabel $ mkDefaultLabel uniq
+	                | otherwise       = mkIntCLit 0
 	; let vector = [ assocDefault deflt_lbl tagged_lbls i 
 		       | i <- [0..fam_sz-1]]
 	; lbl <- emitReturnTarget name noCgStmts vector srt 
+	; mapFCs emit_alt branches
+	; emit_deflt mb_deflt
 	; return (lbl, Just (tagged_lbls, deflt_lbl)) }
   where
     uniq = getUnique name 
@@ -331,9 +348,8 @@ emitVectoredReturnInstr :: CmmExpr	-- *Zero-indexed* constructor tag
 			-> Code
 emitVectoredReturnInstr zero_indexed_tag
   = do	{ info_amode <- getSequelAmode
-	; let slot = vectorSlot info_amode zero_indexed_tag
-	; stmtC (CmmJump (CmmLoad slot wordRep) []) }
-
+	; let target = retVec info_amode zero_indexed_tag
+	; stmtC (CmmJump target []) }
 
 
 -------------------------------------------------------------------------
@@ -532,7 +548,31 @@ getSRTInfo id (SRT off len bmp)
 
 srt_escape = (-1) :: StgHalfWord
 
-srtLabelAndLength :: C_SRT -> (CmmLit, StgHalfWord)
-srtLabelAndLength NoC_SRT 		 = (zeroCLit,	 	 0)
-srtLabelAndLength (C_SRT lbl off bitmap) = (cmmLabelOffW lbl off, bitmap)
+srtLabelAndLength :: C_SRT -> CLabel -> (CmmLit, StgHalfWord)
+srtLabelAndLength NoC_SRT _		
+  = (zeroCLit, 0)
+srtLabelAndLength (C_SRT lbl off bitmap) info_lbl
+  = (makeRelativeRefTo info_lbl $ cmmLabelOffW lbl off, bitmap)
 
+-------------------------------------------------------------------------
+--
+--	Position independent code
+--
+-------------------------------------------------------------------------
+-- In order to support position independent code, we mustn't put absolute
+-- references into read-only space. Info tables in the tablesNextToCode
+-- case must be in .text, which is read-only, so we doctor the CmmLits
+-- to use relative offsets instead.
+
+-- Note that this is done even when the -fPIC flag is not specified,
+-- as we want to keep binary compatibility between PIC and non-PIC.
+
+makeRelativeRefTo :: CLabel -> CmmLit -> CmmLit
+        
+makeRelativeRefTo info_lbl (CmmLabel lbl)
+  | tablesNextToCode
+  = CmmLabelDiffOff lbl info_lbl 0
+makeRelativeRefTo info_lbl (CmmLabelOff lbl off)
+  | tablesNextToCode
+  = CmmLabelDiffOff lbl info_lbl off
+makeRelativeRefTo _ lit = lit

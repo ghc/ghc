@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.33 2004/08/13 13:09:17 simonmar Exp $
+ * $Id: InfoTables.h,v 1.34 2004/10/07 15:54:26 wolfgang Exp $
  * 
  * (c) The GHC Team, 1998-2002
  *
@@ -232,7 +232,11 @@ typedef union {
     StgWord bitmap;		  // word-sized bit pattern describing
 				  //  a stack frame: see below
 
+#ifndef TABLES_NEXT_TO_CODE
     StgLargeBitmap* large_bitmap; // pointer to large bitmap structure
+#else
+    StgWord large_bitmap_offset;  // offset from info table to large bitmap structure
+#endif
     
     StgWord selector_offset;	  // used in THUNK_SELECTORs
 
@@ -288,9 +292,9 @@ typedef struct _StgInfoTable {
    -------------------------------------------------------------------------- */
 
 typedef struct _StgFunInfoExtraRev {
-    StgFun         *slow_apply; // apply to args on the stack
+    StgWord        slow_apply_offset; // apply to args on the stack
     StgWord        bitmap;	// arg ptr/nonptr bitmap
-    StgSRT         *srt;	// pointer to the SRT table
+    StgWord        srt_offset;	// pointer to the SRT table
     StgHalfWord    fun_type;    // function type
     StgHalfWord    arity;       // function arity
 } StgFunInfoExtraRev;
@@ -322,7 +326,7 @@ typedef struct {
 
 typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
-    StgSRT      *srt;	// pointer to the SRT table
+    StgWord      srt_offset;	// offset to the SRT table
     StgInfoTable i;
 #else
     StgInfoTable i;
@@ -342,10 +346,50 @@ typedef struct _StgThunkInfoTable {
 #if !defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
+#if defined(TABLES_NEXT_TO_CODE)
+    StgWord        srt_offset;	// offset to the SRT table
+#else
     StgSRT         *srt;	// pointer to the SRT table
+#endif
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
 } StgThunkInfoTable;
+
+
+/* -----------------------------------------------------------------------------
+   Accessor macros for fields that might be offsets (C version)
+   -------------------------------------------------------------------------- */
+
+// GET_SRT(info)
+// info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->srt_offset))
+#else
+#define GET_SRT(info) ((info)->srt)
+#endif
+
+// GET_FUN_SRT(info)
+// info must be a StgFunInfoTable*
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_FUN_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->f.srt_offset))
+#else
+#define GET_FUN_SRT(info) ((info)->f.srt)
+#endif
+
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
+                                        + (info)->layout.large_bitmap_offset))
+#else
+#define GET_LARGE_BITMAP(info) ((info)->layout.large_bitmap)
+#endif
+
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
+                                        + (info)->f.bitmap))
+#else
+#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.bitmap))
+#endif
+
 
 #endif /* INFOTABLES_H */

@@ -594,7 +594,13 @@ __stg_gc_fun
 	size = BITMAP_SIZE(StgFunInfoExtra_bitmap(info));
     } else { 
 	if (type == ARG_GEN_BIG) {
+#ifdef TABLES_NEXT_TO_CODE
+            // bitmap field holds an offset
+            size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info)
+                                        + %GET_ENTRY(R1) /* ### */ );
+#else
 	    size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info) );
+#endif
 	} else {
 	    size = BITMAP_SIZE(W_[stg_arg_bitmaps + WDS(type)]);
 	}

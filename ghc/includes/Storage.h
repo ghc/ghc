@@ -333,7 +333,7 @@ INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
 
     case RET_BIG:
     case RET_VEC_BIG:
-	return 1 + info->i.layout.large_bitmap->size;
+	return 1 + GET_LARGE_BITMAP(&info->i)->size;
 
     case RET_BCO:
 	return 2 + BCO_BITMAP_SIZE((StgBCO *)((P_)frame)[1]);

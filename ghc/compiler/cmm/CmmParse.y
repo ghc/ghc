@@ -464,7 +464,7 @@ exprMacros = listToUFM [
   ( FSLIT("INFO_TYPE"),    \ [x] -> infoTableClosureType x ),
   ( FSLIT("INFO_PTRS"),    \ [x] -> infoTablePtrs x ),
   ( FSLIT("INFO_NPTRS"),   \ [x] -> infoTableNonPtrs x ),
-  ( FSLIT("RET_VEC"),      \ [info, conZ] -> CmmLoad (vectorSlot info conZ) wordRep )
+  ( FSLIT("RET_VEC"),      \ [info, conZ] -> retVec info conZ )
   ]
 
 -- we understand a subset of C-- primitives:
@@ -677,9 +677,10 @@ forkLabelledCodeEC ec = do
 
 retInfo name size live_bits cl_type vector = do
   let liveness = smallLiveness (fromIntegral size) (fromIntegral live_bits)
-      (info1,info2) = mkRetInfoTable liveness NoC_SRT 
+      info_lbl = mkRtsRetInfoLabelFS name
+      (info1,info2) = mkRetInfoTable info_lbl liveness NoC_SRT 
 				(fromIntegral cl_type) vector
-  return (mkRtsRetInfoLabelFS name, info1, info2)
+  return (info_lbl, info1, info2)
 
 stdInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str =
   basicInfo name (packHalfWordsCLit ptrs nptrs) 
@@ -854,7 +855,9 @@ doSwitch mb_range scrut arms deflt
 initEnv :: Env
 initEnv = listToUFM [
   ( FSLIT("SIZEOF_StgHeader"), 
-	CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) )
+	CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) ),
+  ( FSLIT("SIZEOF_StgInfoTable"),
+        CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) )
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Maybe Cmm)

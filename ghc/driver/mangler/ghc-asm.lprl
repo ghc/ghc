@@ -562,6 +562,11 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
+	} elsif ( /^${T_US}(stg_ap_stack_entries|stg_stack_save_entries|stg_arg_bitmaps)${T_POST_LBL}$/o ) {
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^(${T_US}__gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/o ) {
 	    ; # toss it
 
@@ -638,8 +643,10 @@ sub mangle_asm {
 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
 		   /^\.picsymbol_stub/
 		|| /^\.section __TEXT,__picsymbol_stub1,.*/
+		|| /^\.section __TEXT,__picsymbolstub1,.*/
 		|| /^\.symbol_stub/
 		|| /^\.section __TEXT,__symbol_stub1,.*/
+		|| /^\.section __TEXT,__symbolstub1,.*/
 		|| /^\.lazy_symbol_pointer/
 		|| /^\.non_lazy_symbol_pointer/ ))
 	{
@@ -651,6 +658,16 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
+	} elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ && /^\.LCTOC1 = /o ) {
+		# PowerPC Linux's large-model PIC (-fPIC) generates a gobal offset
+		# table "by hand". Be sure to copy it over.
+		# Note that this label and all entries in the table should actually
+		# go into the .got2 section, but it isn't easy to distinguish them
+		# from other constant literals (.LC\d+), so we just put everything
+		# in .rodata.
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'literal';
+	    $chksymb[$i] = 'LCTOC1';
 	} else { # simple line (duplicated at the top)
 
 	    $chk[$i] .= $_;
@@ -763,12 +780,12 @@ sub mangle_asm {
 		    $p =~ s/__FRAME__/$FRAME/;
 		} elsif ($TargetPlatform =~ /^powerpc-apple-.*/) {
 		    $pcrel_label = $p;
-		    $pcrel_label =~ s/(.|\n)*^(L\d+\$pb):\n(.|\n)*/$2/ or $pcrel_label = "";
+		    $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/ or $pcrel_label = "";
 
 		    $p =~ s/^\tmflr r0\n//;
  		    $p =~ s/^\tbl saveFP # f\d+\n//;
  		    $p =~ s/^\tbl saveFP ; save f\d+-f\d+\n//;
-		    $p =~ s/^L\d+\$pb:\n//;
+		    $p =~ s/^\"?L\d+\$pb\"?:\n//;
  		    $p =~ s/^\tstmw r\d+,-\d+\(r1\)\n//;
    		    $p =~ s/^\tstfd f\d+,-\d+\(r1\)\n//g;
  		    $p =~ s/^\tstw r0,\d+\(r1\)\n//g;
@@ -790,6 +807,16 @@ sub mangle_asm {
  		    $p =~ s/^\tstw r0,8\(1\)\n//;
   		    $p =~ s/^\tstwu 1,-\d+\(1\)\n//; 
   		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g; 
+                    
+                        # GCC's "large-model" PIC (-fPIC)
+		    $pcrel_label = $p;
+		    $pcrel_label =~ s/(.|\n)*^.LCF(\d+):\n(.|\n)*/$2/ or $pcrel_label = "";
+
+                    $p =~ s/^\tbcl 20,31,.LCF\d+\n//;
+                    $p =~ s/^.LCF\d+:\n//;
+                    $p =~ s/^\tmflr 30\n//;
+                    $p =~ s/^\tlwz 0,\.LCL\d+-\.LCF\d+\(30\)\n//;
+                    $p =~ s/^\tadd 30,0,30\n//;
 
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
 		    # under some circumstances, only when generating position dependent code.
@@ -804,13 +831,20 @@ sub mangle_asm {
 		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
 		die "Prologue junk?: $p\n" if $p =~ /^\s+[^\s\.]/;
 		
+                # For PIC, we want to keep part of the prologue
 		if ($TargetPlatform =~ /^powerpc-apple-.*/ && $pcrel_label ne "") {
-		    # on PowerPC, we have to keep a part of the prologue
-		    # (which loads the current instruction pointer into register r31)
+		    # Darwin: load the current instruction pointer into register r31
 		    $p .= "bcl 20,31,$pcrel_label\n";
 		    $p .= "$pcrel_label:\n";
 		    $p .= "\tmflr r31\n";
-		}
+		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/ && $pcrel_label ne "") {
+                    # Linux: load the GOT pointer into register 30
+                    $p .= "\tbcl 20,31,.LCF$pcrel_label\n";
+                    $p .= ".LCF$pcrel_label:\n";
+                    $p .= "\tmflr 30\n";
+                    $p .= "\tlwz 0,.LCL$pcrel_label-.LCF$pcrel_label(30)\n";
+                    $p .= "\tadd 30,0,30\n";
+                }
 		
 		# glue together what's left
 		$c = $p . $r;
@@ -886,7 +920,7 @@ sub mangle_asm {
 	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
 	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
 	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
-	$c =~ s/^\tbl\s+__DISCARD__\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
+	$c =~ s/^\tbl\s+__DISCARD__(\@plt)?\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
 
 	# IA64: mangle tailcalls into jumps here
 	if ($TargetPlatform =~ /^ia64-/) {
@@ -1362,13 +1396,30 @@ sub rev_tbl {
 	$before .= $lines[$i] . "\n"; # otherwise...
     }
 
+    $infoname = $label;
+    $infoname =~ s/(.|\n)*^([A-Za-z0-9_]+_info)${T_POST_LBL}$(.|\n)*/\2/;
+    
     # Grab the table data...
     if ( $TargetPlatform !~ /^hppa/ ) {
 	for ( ; $i <= $#lines && $lines[$i] =~ /^\t?${T_DOT_WORD}\s+/o; $i++) {
-	    push(@words, $lines[$i]);
+	    $line = $lines[$i];
+	    # Convert addresses of SRTs, slow entrypoints and large bitmaps
+	    # to offsets (relative to the info label),
+	    # in order to support position independent code.
+            $line =~ s/$infoname/0/
+            || $line =~ s/([A-Za-z0-9_]+_srtd)$/\1 - $infoname/
+            || $line =~ s/([A-Za-z0-9_]+_srt(\+\d+)?)$/\1 - $infoname/
+	    || $line =~ s/([A-Za-z0-9_]+_slow)$/\1 - $infoname/
+	    || $line =~ s/([A-Za-z0-9_]+_btm)$/\1 - $infoname/
+            || $line =~ s/([A-Za-z0-9_]+_alt)$/\1 - $infoname/
+            || $line =~ s/([A-Za-z0-9_]+_dflt)$/\1 - $infoname/
+            || $line =~ s/([A-Za-z0-9_]+_ret)$/\1 - $infoname/;
+	    push(@words, $line);
 	}
     } else { # hppa weirdness
 	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+(${T_DOT_WORD}|\.IMPORT)/; $i++) {
+            # FIXME: the RTS now expects offsets instead of addresses
+            # for all labels in info tables.
 	    if ($lines[$i] =~ /^\s+\.IMPORT/) {
 		push(@imports, $lines[$i]);
 	    } else {

@@ -19,11 +19,12 @@ import PprMach
 import RegisterAlloc
 import RegAllocInfo	( jumpDests )
 import NCGMonad
+import PositionIndependentCode
 
 import Cmm
 import PprCmm		( pprStmt, pprCmms )
 import MachOp
-import CLabel           ( CLabel, mkSplitMarkerLabel )
+import CLabel           ( CLabel, mkSplitMarkerLabel, mkAsmTempLabel )
 #if powerpc_TARGET_ARCH
 import CLabel           ( mkRtsCodeLabel )
 #endif
@@ -32,13 +33,13 @@ import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
 import FastTypes
-#if darwin_TARGET_OS
-import PprMach		( pprDyldSymbolStub )
-import List		( group, sort )
+#if darwin_TARGET_OS || (powerpc_TARGET_ARCH && linux_TARGET_OS)
+import List		( groupBy, sortBy )
+import CLabel           ( pprCLabel )
 #endif
 import ErrUtils		( dumpIfSet_dyn )
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_Static,
-			  opt_EnsureSplittableC )
+			  opt_EnsureSplittableC, opt_PIC )
 
 import Digraph
 import qualified Pretty
@@ -112,21 +113,10 @@ The machine-dependent bits break down as follows:
 
 nativeCodeGen :: DynFlags -> [Cmm] -> UniqSupply -> IO Pretty.Doc
 nativeCodeGen dflags cmms us
-  | not opt_Static
-  = panic "NCG does not handle dynamic libraries right now"
-  -- ToDo: MachCodeGen used to have derefDLL function which expanded
-  -- dynamic CLabels (labelDynamic lbl == True) into the appropriate
-  -- dereferences.  This should be done in the pre-NCG cmmToCmm pass instead.
-  -- It doesn't apply to static data, of course.  There are hacks so that
-  -- the RTS knows what to do for references to closures in a DLL in SRTs,
-  -- and we never generate a reference to a closure in another DLL in a
-  -- static constructor.
-
-  | otherwise
   = let ((ppr_cmms, insn_sdoc, imports), _) = initUs us $
 	   cgCmm (concat (map add_split cmms))
 
-	cgCmm :: [CmmTop] -> UniqSM (Cmm, Pretty.Doc, [(Bool, CLabel)])
+	cgCmm :: [CmmTop] -> UniqSM (Cmm, Pretty.Doc, [CLabel])
 	cgCmm tops = 
 	   lazyMapUs (cmmNativeGen dflags) tops  `thenUs` \ results -> 
 	   let (cmms,docs,imps) = unzip3 results in
@@ -143,11 +133,28 @@ nativeCodeGen dflags cmms us
 
     split_marker = CmmProc [] mkSplitMarkerLabel [] []
 
-#if darwin_TARGET_OS
+#if darwin_TARGET_OS || (powerpc_TARGET_ARCH && linux_TARGET_OS)
      	 -- Generate "symbol stubs" for all external symbols that might
 	 -- come from a dynamic library.
-    dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
-				    map head $ group $ sort imps
+{-    dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
+				    map head $ group $ sort imps-}
+				    
+	-- (Hack) sometimes two Labels pretty-print the same, but have
+	-- different uniques; so we compare their text versions...
+    dyld_stubs imps 
+        | needImportedSymbols
+          = Pretty.vcat $
+            (pprGotDeclaration :) $
+            map (pprImportedSymbol . fst . head) $
+            groupBy (\(_,a) (_,b) -> a == b) $
+            sortBy (\(_,a) (_,b) -> compare a b) $
+            map doPpr $
+            imps
+        | otherwise
+          = Pretty.empty
+        
+        where doPpr lbl = (lbl, Pretty.render $ pprCLabel lbl astyle)
+              astyle = mkCodeStyle AsmStyle
 #else
     dyld_stubs imps = Pretty.empty
 #endif
@@ -169,17 +176,17 @@ nativeCodeGen dflags cmms us
 -- Complete native code generation phase for a single top-level chunk
 -- of Cmm.
 
-cmmNativeGen :: DynFlags -> CmmTop -> UniqSM (CmmTop, Pretty.Doc, [(Bool,CLabel)])
+cmmNativeGen :: DynFlags -> CmmTop -> UniqSM (CmmTop, Pretty.Doc, [CLabel])
 cmmNativeGen dflags cmm
    = {-# SCC "fixAssigns"       #-} 
  	fixAssignsTop cmm	     `thenUs` \ fixed_cmm ->
      {-# SCC "genericOpt"       #-} 
-	cmmToCmm fixed_cmm           `bind`   \ cmm ->
+	cmmToCmm fixed_cmm           `bind`   \ (cmm, imports) ->
         (if dopt Opt_D_dump_opt_cmm dflags  -- space leak avoidance
 	   then cmm 
 	   else CmmData Text [])     `bind`   \ ppr_cmm ->
      {-# SCC "genMachCode"      #-}
-	genMachCode cmm              `thenUs` \ (pre_regalloc, imports) ->
+	genMachCode cmm              `thenUs` \ (pre_regalloc, lastMinuteImports) ->
      {-# SCC "regAlloc"         #-}
 	map regAlloc pre_regalloc    `bind`   \ with_regs ->
      {-# SCC "sequenceBlocks"   #-}
@@ -189,7 +196,7 @@ cmmNativeGen dflags cmm
      {-# SCC "vcat"             #-}
 	Pretty.vcat (map pprNatCmmTop final_mach_code)  `bind`   \ final_sdoc ->
 
-        returnUs (ppr_cmm, final_sdoc Pretty.$$ Pretty.text "", imports)
+        returnUs (ppr_cmm, final_sdoc Pretty.$$ Pretty.text "", lastMinuteImports ++ imports)
      where
         x86fp_kludge :: NatCmmTop -> NatCmmTop
         x86fp_kludge top@(CmmData _ _) = top
@@ -279,7 +286,7 @@ reorder id accum (b@(block,id',out) : rest)
 -- Switching between the two monads whilst carrying along the same
 -- Unique supply breaks abstraction.  Is that bad?
 
-genMachCode :: CmmTop -> UniqSM ([NatCmmTop], [(Bool,CLabel)])
+genMachCode :: CmmTop -> UniqSM ([NatCmmTop], [CLabel])
 
 genMachCode cmm_top initial_us
   = let initial_st             = mkNatM_State initial_us 0
@@ -323,7 +330,7 @@ fixAssign (CmmAssign (CmmGlobal BaseReg) src)
 
 fixAssign (CmmAssign (CmmGlobal reg) src)
   | Left  realreg <- reg_or_addr
-  = returnUs [CmmAssign (CmmGlobal reg) (cmmExprConFold src)]
+  = returnUs [CmmAssign (CmmGlobal reg) src]
   | Right baseRegAddr <- reg_or_addr
   = returnUs [CmmStore baseRegAddr src]
            -- Replace register leaves with appropriate StixTrees for
@@ -362,6 +369,10 @@ Here we do:
   (c) Replacement of references to GlobalRegs which do not have
       machine registers by the appropriate memory load (eg.
       Hp ==>  *(BaseReg + 34) ).
+  (d) Position independent code and dynamic linking
+        (i)  introduce the appropriate indirections
+             and position independent refs
+        (ii) compile a list of imported symbols
 
 Ideas for other things we could do (ToDo):
 
@@ -369,73 +380,114 @@ Ideas for other things we could do (ToDo):
   - eliminate dead code blocks
 -}
 
-cmmToCmm :: CmmTop -> CmmTop
-cmmToCmm top@(CmmData _ _) = top
-cmmToCmm (CmmProc info lbl params blocks) = 
-  CmmProc info lbl params (map cmmBlockConFold (cmmPeep blocks))
+cmmToCmm :: CmmTop -> (CmmTop, [CLabel])
+cmmToCmm top@(CmmData _ _) = (top, [])
+cmmToCmm (CmmProc info lbl params blocks) = runCmmOpt $ do
+  blocks' <- mapM cmmBlockConFold (cmmPeep blocks)
+  return $ CmmProc info lbl params blocks'
 
-cmmBlockConFold :: CmmBasicBlock -> CmmBasicBlock
-cmmBlockConFold (BasicBlock id stmts) = 
-  BasicBlock id (map cmmStmtConFold stmts)
+newtype CmmOptM a = CmmOptM ([CLabel] -> (# a, [CLabel] #))
+
+instance Monad CmmOptM where
+  return x = CmmOptM $ \imports -> (# x,imports #)
+  (CmmOptM f) >>= g =
+    CmmOptM $ \imports ->
+                case f imports of
+                  (# x, imports' #) ->
+                    case g x of
+                      CmmOptM g' -> g' imports'
+
+addImportCmmOpt :: CLabel -> CmmOptM ()
+addImportCmmOpt lbl = CmmOptM $ \imports -> (# (), lbl:imports #)
+
+runCmmOpt :: CmmOptM a -> (a, [CLabel])
+runCmmOpt (CmmOptM f) = case f [] of
+                        (# result, imports #) -> (result, imports)
+
+cmmBlockConFold :: CmmBasicBlock -> CmmOptM CmmBasicBlock
+cmmBlockConFold (BasicBlock id stmts) = do
+  stmts' <- mapM cmmStmtConFold stmts
+  return $ BasicBlock id stmts'
 
 cmmStmtConFold stmt
    = case stmt of
         CmmAssign reg src
-           -> case cmmExprConFold src of
-		 CmmReg reg' | reg == reg' -> CmmNop
-		 new_src -> CmmAssign reg new_src
+           -> do src' <- cmmExprConFold False src
+                 return $ case src' of
+		   CmmReg reg' | reg == reg' -> CmmNop
+		   new_src -> CmmAssign reg new_src
 
         CmmStore addr src
-           -> CmmStore (cmmExprConFold addr) (cmmExprConFold src)
+           -> do addr' <- cmmExprConFold False addr
+                 src'  <- cmmExprConFold False src
+                 return $ CmmStore addr' src'
 
         CmmJump addr regs
-           -> CmmJump (cmmExprConFold addr) regs
+           -> do addr' <- cmmExprConFold True addr
+                 return $ CmmJump addr' regs
 
 	CmmCall target regs args vols
-	   -> CmmCall (case target of 
-			 CmmForeignCall e conv -> 
-				CmmForeignCall (cmmExprConFold e) conv
-			 other -> other)
-		  regs
-		  [ (cmmExprConFold arg,hint) | (arg,hint) <- args ]
-		  vols
+	   -> do target' <- case target of
+			      CmmForeignCall e conv -> do
+			        e' <- cmmExprConFold True e
+			        return $ CmmForeignCall e' conv
+			      other -> return other
+                 args' <- mapM (\(arg, hint) -> do
+                                  arg' <- cmmExprConFold False arg
+                                  return (arg', hint)) args
+	         return $ CmmCall target' regs args' vols
 
         CmmCondBranch test dest
-           -> let test_opt = cmmExprConFold test
-              in 
-	      case test_opt of
-		CmmLit (CmmInt 0 _) -> 
-		    CmmComment (mkFastString ("deleted: " ++ 
+           -> do test' <- cmmExprConFold False test
+	         return $ case test' of
+		   CmmLit (CmmInt 0 _) -> 
+		     CmmComment (mkFastString ("deleted: " ++ 
 					showSDoc (pprStmt stmt)))
 
-		CmmLit (CmmInt n _) ->  CmmBranch dest
-		other ->  CmmCondBranch (cmmExprConFold test) dest
+		   CmmLit (CmmInt n _) -> CmmBranch dest
+		   other -> CmmCondBranch test' dest
 
 	CmmSwitch expr ids
-	   -> CmmSwitch (cmmExprConFold expr) ids
+	   -> do expr' <- cmmExprConFold False expr
+	         return $ CmmSwitch expr' ids
 
         other
-           -> other
+           -> return other
 
 
-cmmExprConFold expr
+cmmExprConFold isJumpTarget expr
    = case expr of
         CmmLoad addr rep
-           -> CmmLoad (cmmExprConFold addr) rep
+           -> do addr' <- cmmExprConFold False addr
+                 return $ CmmLoad addr' rep
 
         CmmMachOp mop args
            -- For MachOps, we first optimize the children, and then we try 
            -- our hand at some constant-folding.
-           -> cmmMachOpFold mop (map cmmExprConFold args)
+           -> do args' <- mapM (cmmExprConFold False) args
+                 return $ cmmMachOpFold mop args'
+
+        CmmLit (CmmLabel lbl)
+           -> cmmMakeDynamicReference addImportCmmOpt isJumpTarget lbl
+        CmmLit (CmmLabelOff lbl off)
+           -> do dynRef <- cmmMakeDynamicReference addImportCmmOpt isJumpTarget lbl
+                 return $ cmmMachOpFold (MO_Add wordRep) [
+                     dynRef,
+                     (CmmLit $ CmmInt (fromIntegral off) wordRep)
+                   ]
 
 #if powerpc_TARGET_ARCH
-           -- On powerpc, it's easier to jump directly to a label than
+           -- On powerpc (non-PIC), it's easier to jump directly to a label than
            -- to use the register table, so we replace these registers
            -- with the corresponding labels:
         CmmReg (CmmGlobal GCEnter1)
-          -> CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_enter_1"))) 
+          | not opt_PIC
+          -> cmmExprConFold isJumpTarget $
+             CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
-          -> CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_fun")))
+          | not opt_PIC
+          -> cmmExprConFold isJumpTarget $
+             CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_fun")))
 #endif
 
         CmmReg (CmmGlobal mid)
@@ -446,29 +498,29 @@ cmmExprConFold expr
            -- and for all others we generate an indirection to its
            -- location in the register table.
            -> case get_GlobalReg_reg_or_addr mid of
-                 Left  realreg -> expr
+                 Left  realreg -> return expr
                  Right baseRegAddr 
                     -> case mid of 
-                          BaseReg -> cmmExprConFold baseRegAddr
-                          other   -> cmmExprConFold (CmmLoad baseRegAddr 
+                          BaseReg -> cmmExprConFold False baseRegAddr
+                          other   -> cmmExprConFold False (CmmLoad baseRegAddr 
 							(globalRegRep mid))
 	   -- eliminate zero offsets
 	CmmRegOff reg 0
-	   -> cmmExprConFold (CmmReg reg)
+	   -> cmmExprConFold False (CmmReg reg)
 
         CmmRegOff (CmmGlobal mid) offset
            -- RegOf leaves are just a shorthand form. If the reg maps
            -- to a real reg, we keep the shorthand, otherwise, we just
            -- expand it and defer to the above code. 
            -> case get_GlobalReg_reg_or_addr mid of
-                Left  realreg -> expr
+                Left  realreg -> return expr
                 Right baseRegAddr
-                   -> cmmExprConFold (CmmMachOp (MO_Add wordRep) [
+                   -> cmmExprConFold False (CmmMachOp (MO_Add wordRep) [
                                         CmmReg (CmmGlobal mid),
                                         CmmLit (CmmInt (fromIntegral offset)
                                                        wordRep)])
         other
-           -> other
+           -> return other
 
 
 -- -----------------------------------------------------------------------------
@@ -655,7 +707,6 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
 -- Anything else is just too hard.
 
 cmmMachOpFold mop args = CmmMachOp mop args
-
 
 -- -----------------------------------------------------------------------------
 -- exactLog2

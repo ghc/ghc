@@ -369,6 +369,8 @@ pprLit lit = case lit of
     CmmFloat f rep     -> hsep [ rational f, dcolon, ppr rep ]
     CmmLabel clbl      -> pprCLabel clbl
     CmmLabelOff clbl i -> pprCLabel clbl <> ppr_offset i
+    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel clbl1 <> char '-'  
+                                  <> pprCLabel clbl2 <> ppr_offset i
 
 pprLit1 lit@(CmmLabelOff clbl i) = parens (pprLit lit)
 pprLit1 lit                      = pprLit lit

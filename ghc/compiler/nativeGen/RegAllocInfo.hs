@@ -344,6 +344,8 @@ regUsage instr = case instr of
     FCTIWZ r1 r2	-> usage ([r2], [r1])
     FRSP r1 r2		-> usage ([r2], [r1])
     MFCR reg            -> usage ([], [reg])
+    MFLR reg            -> usage ([], [reg])
+    FETCHPC reg         -> usage ([], [reg])
     _ 	    	    	-> noUsage
   where
     usage (src, dst) = RU (filter interesting src)
@@ -621,6 +623,8 @@ patchRegs instr env = case instr of
     FCTIWZ r1 r2	-> FCTIWZ (env r1) (env r2)
     FRSP r1 r2		-> FRSP (env r1) (env r2)
     MFCR reg            -> MFCR (env reg)
+    MFLR reg            -> MFLR (env reg)
+    FETCHPC reg         -> FETCHPC (env reg)
     _ -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)

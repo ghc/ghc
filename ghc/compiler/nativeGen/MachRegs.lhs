@@ -107,6 +107,8 @@ data Imm
   | ImmIndex    CLabel Int
   | ImmFloat	Rational
   | ImmDouble	Rational
+  | ImmConstantSum Imm Imm
+  | ImmConstantDiff Imm Imm
 #if sparc_TARGET_ARCH
   | LO Imm		    {- Possible restrictions... -}
   | HI Imm
@@ -115,10 +117,6 @@ data Imm
   | LO Imm
   | HI Imm
   | HA Imm	{- high halfword adjusted -}
-#if darwin_TARGET_OS
-        -- special dyld (dynamic linker) things
-  | ImmDyldNonLazyPtr CLabel  -- Llabel$non_lazy_ptr
-#endif
 #endif
 strImmLit s = ImmLit (text s)
 
@@ -128,6 +126,10 @@ litToImm (CmmFloat f F32)    = ImmFloat f
 litToImm (CmmFloat f F64)    = ImmDouble f
 litToImm (CmmLabel l)        = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
+litToImm (CmmLabelDiffOff l1 l2 off)
+                             = ImmConstantSum
+                               (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
+                               (ImmInt off)
 
 -- -----------------------------------------------------------------------------
 -- Addressing modes

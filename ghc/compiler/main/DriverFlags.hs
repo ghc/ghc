@@ -621,11 +621,20 @@ machdepCCOpts
       --     for "normal" programs, but it doesn't support register variable
       --     declarations.
       -- -mdynamic-no-pic:
-      --     As we don't support haskell code in shared libraries anyway,
-      --     we might as well turn of PIC code generation and save space and time.
-      --     This is completely optional.
-       = return ( ["-no-cpp-precomp","-mdynamic-no-pic"], [] )
+      --     Turn off PIC code generation to save space and time.
+      -- -fno-common:
+      --     Don't generate "common" symbols - these are unwanted
+      --     in dynamic libraries.
 
+        = if opt_PIC
+            then return ( ["-no-cpp-precomp", "-fno-common"],
+                          ["-fno-common"] )
+            else return ( ["-no-cpp-precomp", "-mdynamic-no-pic"],
+                          ["-mdynamic-no-pic"] )
+
+   | prefixMatch "powerpc" cTARGETPLATFORM && opt_PIC
+        = return ( ["-fPIC"], ["-fPIC"] )
+  
    | otherwise
 	= return ( [], [] )
 

@@ -2303,7 +2303,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     StgThunkInfoTable *thunk_info;
 
     thunk_info = itbl_to_thunk_itbl(info);
-    scavenge_srt((StgClosure **)thunk_info->srt, thunk_info->i.srt_bitmap);
+    scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
 }
 
 STATIC_INLINE void
@@ -2312,7 +2312,7 @@ scavenge_fun_srt(const StgInfoTable *info)
     StgFunInfoTable *fun_info;
 
     fun_info = itbl_to_fun_itbl(info);
-    scavenge_srt((StgClosure **)fun_info->f.srt, fun_info->i.srt_bitmap);
+    scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
 }
 
 STATIC_INLINE void
@@ -2321,7 +2321,7 @@ scavenge_ret_srt(const StgInfoTable *info)
     StgRetInfoTable *ret_info;
 
     ret_info = itbl_to_ret_itbl(info);
-    scavenge_srt((StgClosure **)ret_info->srt, ret_info->i.srt_bitmap);
+    scavenge_srt((StgClosure **)GET_SRT(ret_info), ret_info->i.srt_bitmap);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2371,8 +2371,8 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 	size = BITMAP_SIZE(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	size = ((StgLargeBitmap *)fun_info->f.bitmap)->size;
-	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
+	size = GET_FUN_LARGE_BITMAP(fun_info)->size;
+	scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
 	p += size;
 	break;
     default:
@@ -2411,7 +2411,7 @@ scavenge_PAP (StgPAP *pap)
 	bitmap = BITMAP_BITS(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
+	scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
 	p += size;
 	break;
     case ARG_BCO:
@@ -3772,7 +3772,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
-	scavenge_srt((StgClosure **)info->srt, info->i.srt_bitmap);
+	scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
 	continue;
 
     case RET_BCO: {
@@ -3795,9 +3795,9 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     {
 	nat size;
 
-	size = info->i.layout.large_bitmap->size;
+	size = GET_LARGE_BITMAP(&info->i)->size;
 	p++;
-	scavenge_large_bitmap(p, info->i.layout.large_bitmap, size);
+	scavenge_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
 	p += size;
 	// and don't forget to follow the SRT 
 	goto follow_srt;

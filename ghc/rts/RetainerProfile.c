@@ -329,11 +329,11 @@ init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
 {
     if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
 	info->type = posTypeLargeSRT;
-	info->next.large_srt.srt = (StgLargeSRT *)infoTable->f.srt;
+	info->next.large_srt.srt = (StgLargeSRT *)GET_FUN_SRT(infoTable);
 	info->next.large_srt.offset = 0;
     } else {
 	info->type = posTypeSRT;
-	info->next.srt.srt = (StgClosure **)(infoTable->f.srt);
+	info->next.srt.srt = (StgClosure **)GET_FUN_SRT(infoTable);
 	info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
     }
 }
@@ -343,11 +343,11 @@ init_srt_thunk( stackPos *info, StgThunkInfoTable *infoTable )
 {
     if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
 	info->type = posTypeLargeSRT;
-	info->next.large_srt.srt = (StgLargeSRT *)infoTable->srt;
+	info->next.large_srt.srt = (StgLargeSRT *)GET_SRT(infoTable);
 	info->next.large_srt.offset = 0;
     } else {
 	info->type = posTypeSRT;
-	info->next.srt.srt = (StgClosure **)(infoTable->srt);
+	info->next.srt.srt = (StgClosure **)GET_SRT(infoTable);
 	info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
     }
 }
@@ -1319,7 +1319,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 
 	follow_srt:
-	    retainSRT((StgClosure **)info->srt, info->i.srt_bitmap, c, c_child_r);
+	    retainSRT((StgClosure **)GET_SRT(info), info->i.srt_bitmap, c, c_child_r);
 	    continue;
 
 	case RET_BCO: {
@@ -1338,9 +1338,9 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
 	case RET_BIG:
 	case RET_VEC_BIG:
-	    size = info->i.layout.large_bitmap->size;
+	    size = GET_LARGE_BITMAP(&info->i)->size;
 	    p++;
-	    retain_large_bitmap(p, info->i.layout.large_bitmap,
+	    retain_large_bitmap(p, GET_LARGE_BITMAP(&info->i),
 				size, c, c_child_r);
 	    p += size;
 	    // and don't forget to follow the SRT 
@@ -1383,8 +1383,8 @@ retainStack( StgClosure *c, retainer c_child_r,
 		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 		break;
 	    case ARG_GEN_BIG:
-		size = ((StgLargeBitmap *)fun_info->f.bitmap)->size;
-		retain_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, 
+		size = GET_FUN_LARGE_BITMAP(fun_info)->size;
+		retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), 
 				    size, c, c_child_r);
 		p += size;
 		break;
@@ -1439,7 +1439,7 @@ retain_PAP (StgPAP *pap, retainer c_child_r)
 				(StgClosure *)pap, c_child_r);
 	break;
     case ARG_GEN_BIG:
-	retain_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap,
+	retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info),
 			    size, (StgClosure *)pap, c_child_r);
 	p += size;
 	break;

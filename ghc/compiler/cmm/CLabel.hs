@@ -74,9 +74,15 @@ module CLabel (
 
 	mkCCLabel, mkCCSLabel,
 
+        DynamicLinkerLabelInfo(..),
+        mkDynamicLinkerLabel,
+        dynamicLinkerLabelInfo,
+        
+        mkPicBaseLabel,
+
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, externallyVisibleCLabel,
-	CLabelType(..), labelType, labelDynamic, labelCouldBeDynamic,
+	CLabelType(..), labelType, labelDynamic,
 
 	pprCLabel
     ) where
@@ -96,7 +102,6 @@ import Config		( cLeadingUnderscore )
 import CostCentre	( CostCentre, CostCentreStack )
 import Outputable
 import FastString
-
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -163,8 +168,20 @@ data CLabel
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
 
-  deriving (Eq, Ord)
+      -- Dynamic Linking in the NCG:
+      -- generated and used inside the NCG only,
+      -- see module PositionIndependentCode for details.
+      
+  | DynamicLinkerLabel DynamicLinkerLabelInfo CLabel
+        -- special variants of a label used for dynamic linking
 
+  | PicBaseLabel                -- a label used as a base for PIC calculations
+                                -- on some platforms.
+                                -- It takes the form of a local numeric
+                                -- assembler label '1'; it is pretty-printed
+                                -- as 1b, referring to the previous definition
+                                -- of 1: in the assembler source file.
+  deriving (Eq, Ord)
 
 data IdLabelInfo
   = Closure		-- Label for closure
@@ -226,6 +243,14 @@ data RtsLabelInfo
 	-- NOTE: Eq on LitString compares the pointer only, so this isn't
 	-- a real equality.
 
+data DynamicLinkerLabelInfo
+  = CodeStub            -- MachO: Lfoo$stub, ELF: foo@plt
+  | SymbolPtr           -- MachO: Lfoo$non_lazy_ptr, Windows: __imp_foo
+  | GotSymbolPtr        -- ELF: foo@got
+  | GotSymbolOffset     -- ELF: foo@gotoff
+  
+  deriving (Eq, Ord)
+  
 -- -----------------------------------------------------------------------------
 -- Constructing CLabels
 
@@ -309,6 +334,20 @@ mkRtsDataLabelFS    str = RtsLabel (RtsDataFS    str)
 mkRtsSlowTickyCtrLabel :: String -> CLabel
 mkRtsSlowTickyCtrLabel pat = RtsLabel (RtsSlowTickyCtr pat)
 
+        -- Dynamic linking
+        
+mkDynamicLinkerLabel :: DynamicLinkerLabelInfo -> CLabel -> CLabel
+mkDynamicLinkerLabel = DynamicLinkerLabel
+
+dynamicLinkerLabelInfo :: CLabel -> Maybe (DynamicLinkerLabelInfo, CLabel)
+dynamicLinkerLabelInfo (DynamicLinkerLabel info lbl) = Just (info, lbl)
+dynamicLinkerLabelInfo _ = Nothing
+
+        -- Position independent code
+        
+mkPicBaseLabel :: CLabel
+mkPicBaseLabel = PicBaseLabel
+
 -- -----------------------------------------------------------------------------
 -- Converting info labels to entry labels.
 
@@ -345,8 +384,7 @@ needsCDecl (IdLabel _ SRT)		= False
 needsCDecl (IdLabel _ SRTDesc)		= False
 needsCDecl (IdLabel _ Bitmap)		= False
 needsCDecl (IdLabel _ _)		= True
-needsCDecl (CaseLabel _ CaseReturnPt)	= True
-needsCDecl (CaseLabel _ CaseReturnInfo)	= True
+needsCDecl (CaseLabel _ _)	        = True
 needsCDecl (ModuleInitLabel _ _)	= True
 needsCDecl (PlainModuleInitLabel _)	= True
 needsCDecl ModuleRegdLabel		= False
@@ -384,7 +422,7 @@ externallyVisibleCLabel (ForeignLabel _ _ _) = True
 externallyVisibleCLabel (IdLabel id _)     = isExternalName id
 externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
-
+externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel 
@@ -411,7 +449,7 @@ labelType (RtsLabel (RtsEntryFS _))           = CodeLabel
 labelType (RtsLabel (RtsRetInfoFS _))         = DataLabel
 labelType (RtsLabel (RtsRetFS _))             = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
-labelType (CaseLabel _ CaseReturnPt)	      = CodeLabel
+labelType (CaseLabel _ _)	              = CodeLabel
 labelType (ModuleInitLabel _ _)               = CodeLabel
 labelType (PlainModuleInitLabel _)            = CodeLabel
 
@@ -441,22 +479,18 @@ labelDynamic lbl =
   case lbl of
    RtsLabel _  	     -> not opt_Static  -- i.e., is the RTS in a DLL or not?
    IdLabel n k       -> isDllName n
+#if mingw32_TARGET_OS
    ForeignLabel _ _ d  -> d
+#else
+   -- On Mac OS X and on ELF platforms, false positives are OK,
+   -- so we claim that all foreign imports come from dynamic libraries
+   ForeignLabel _ _ _ -> True
+#endif
    ModuleInitLabel m _  -> (not opt_Static) && (not (isHomeModule m))
    PlainModuleInitLabel m -> (not opt_Static) && (not (isHomeModule m))
+   
+   -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _ 		     -> False
-
--- Basically the same as above, but this time for Darwin only.
--- The things that GHC does when labelDynamic returns true are not quite right
--- for Darwin. Also, every ForeignLabel might possibly be from a dynamic library,
--- and a 'false positive' doesn't really hurt on Darwin, so this just returns
--- True for every ForeignLabel.
---
--- ToDo: Clean up DLL-related code so we can do away with the distinction
---       between this and labelDynamic above.
-
-labelCouldBeDynamic (ForeignLabel _ _ _) = True
-labelCouldBeDynamic lbl = labelDynamic lbl
 
 {-
 OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the
@@ -514,6 +548,12 @@ pprCLabel (AsmTempLabel u)
 	ptext asmTempLabelPrefix <> pprUnique u
      else
 	char '_' <> pprUnique u
+
+pprCLabel (DynamicLinkerLabel info lbl)
+   = pprDynamicLinkerAsmLabel info lbl
+   
+pprCLabel PicBaseLabel
+   = ptext SLIT("1b")
 #endif
 
 pprCLabel lbl = 
@@ -668,3 +708,29 @@ asmTempLabelPrefix =
 #else
      SLIT(".L")
 #endif
+
+pprDynamicLinkerAsmLabel :: DynamicLinkerLabelInfo -> CLabel -> SDoc
+
+#if darwin_TARGET_OS
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = char 'L' <> pprCLabel lbl <> text "$non_lazy_ptr"
+pprDynamicLinkerAsmLabel CodeStub lbl
+  = char 'L' <> pprCLabel lbl <> text "$stub"
+#elif powerpc_TARGET_ARCH && linux_TARGET_OS
+pprDynamicLinkerAsmLabel CodeStub lbl
+  = pprCLabel lbl <> text "@plt"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = text ".LC_" <> pprCLabel lbl
+#elif linux_TARGET_OS
+pprDynamicLinkerAsmLabel CodeStub lbl
+  = pprCLabel lbl <> text "@plt"
+pprDynamicLinkerAsmLabel GotSymbolPtr lbl
+  = pprCLabel lbl <> text "@got"
+pprDynamicLinkerAsmLabel GotSymbolOffset lbl
+  = pprCLabel lbl <> text "@gotoff"
+#elif mingw32_TARGET_OS
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = text "__imp_" <> pprCLabel lbl
+#endif
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"

@@ -13,6 +13,7 @@ module NCGMonad (
 	initNat, addImportNat, getUniqueNat,
 	mapAccumLNat, setDeltaNat, getDeltaNat,
 	getBlockIdNat, getNewLabelNat, getNewRegNat, getNewRegPairNat,
+	getPicBaseMaybeNat, getPicBaseNat
  ) where
   
 #include "HsVersions.h"
@@ -28,7 +29,8 @@ import Unique		( Unique )
 data NatM_State = NatM_State {
 			natm_us      :: UniqSupply,
 			natm_delta   :: Int,
-			natm_imports :: [(Bool,CLabel)]
+			natm_imports :: [(CLabel)],
+			natm_pic     :: Maybe Reg
 		}
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
@@ -36,7 +38,7 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat (NatM a) = a
 
 mkNatM_State :: UniqSupply -> Int -> NatM_State
-mkNatM_State us delta = NatM_State us delta []
+mkNatM_State us delta = NatM_State us delta [] Nothing
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m = case unNat m init_st of { (r,st) -> (r,st) }
@@ -66,20 +68,20 @@ mapAccumLNat f b (x:xs)
        return (b__3, x__2:xs__2)
 
 getUniqueNat :: NatM Unique
-getUniqueNat = NatM $ \ (NatM_State us delta imports) ->
+getUniqueNat = NatM $ \ (NatM_State us delta imports pic) ->
     case splitUniqSupply us of
-         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports))
+         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports pic))
 
 getDeltaNat :: NatM Int
 getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
 setDeltaNat :: Int -> NatM ()
-setDeltaNat delta = NatM $ \ (NatM_State us _ imports) ->
-   ((), NatM_State us delta imports)
+setDeltaNat delta = NatM $ \ (NatM_State us _ imports pic) ->
+   ((), NatM_State us delta imports pic)
 
-addImportNat :: Bool -> CLabel -> NatM ()
-addImportNat is_code imp = NatM $ \ (NatM_State us delta imports) -> 
-   ((), NatM_State us delta ((is_code,imp):imports))
+addImportNat :: CLabel -> NatM ()
+addImportNat imp = NatM $ \ (NatM_State us delta imports pic) -> 
+   ((), NatM_State us delta (imp:imports) pic)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat = do u <- getUniqueNat; return (BlockId u)
@@ -96,3 +98,14 @@ getNewRegPairNat rep = do
   let lo = mkVReg u rep; hi = getHiVRegFromLo lo
   return (lo,hi)
 
+getPicBaseMaybeNat :: NatM (Maybe Reg)
+getPicBaseMaybeNat = NatM (\state -> (natm_pic state, state))
+
+getPicBaseNat :: MachRep -> NatM Reg
+getPicBaseNat rep = do
+  mbPicBase <- getPicBaseMaybeNat
+  case mbPicBase of
+        Just picBase -> return picBase
+        Nothing -> do
+            reg <- getNewRegNat rep
+            NatM (\state -> (reg, state { natm_pic = Just reg }))

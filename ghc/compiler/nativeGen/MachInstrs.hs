@@ -661,6 +661,10 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | CRNOR   Int Int Int    -- condition register nor
 	      | MFCR    Reg            -- move from condition register
 	      
+	      | MFLR    Reg            -- move from link register
+	      | FETCHPC Reg            -- pseudo-instruction:
+	                               -- bcl to next insn, mflr reg
+	      
 condUnsigned GU = True
 condUnsigned LU = True
 condUnsigned GEU = True

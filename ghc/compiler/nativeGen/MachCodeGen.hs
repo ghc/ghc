@@ -20,6 +20,7 @@ module MachCodeGen ( cmmTopCodeGen, InstrBlock ) where
 import MachInstrs
 import MachRegs
 import NCGMonad
+import PositionIndependentCode ( cmmMakeDynamicReference, initializePicBase )
 
 -- Our intermediate code:
 import PprCmm		( pprExpr )
@@ -28,7 +29,7 @@ import MachOp
 import CLabel
 
 -- The rest:
-import CmdLineOpts	( opt_Static )
+import CmdLineOpts	( opt_PIC )
 import ForeignCall	( CCallConv(..) )
 import OrdList
 import Pretty
@@ -60,7 +61,13 @@ type InstrBlock = OrdList Instr
 cmmTopCodeGen :: CmmTop -> NatM [NatCmmTop]
 cmmTopCodeGen (CmmProc info lab params blocks) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
-  return (CmmProc info lab params (concat nat_blocks) : concat statics)
+  picBaseMb <- getPicBaseMaybeNat
+  let proc = CmmProc info lab params (concat nat_blocks)
+      tops = proc : concat statics
+  case picBaseMb of
+      Just picBase -> initializePicBase picBase tops
+      Nothing -> return tops
+  
 cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
@@ -487,6 +494,11 @@ getRegister (CmmReg reg)
 
 getRegister tree@(CmmRegOff _ _) 
   = getRegister (mangleIndexTree tree)
+
+getRegister CmmPicBaseReg
+  = do
+      reg <- getPicBaseNat wordRep
+      return (Fixed wordRep reg nilOL)
 
 -- end of machine-"independent" bit; here we go on the rest...
 
@@ -1461,6 +1473,23 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Mul F64   -> trivialCodeNoImm F64 (FMUL F64) x y
       MO_S_Quot F64   -> trivialCodeNoImm F64 (FDIV F64) x y
 
+         -- optimize addition with 32-bit immediate
+         -- (needed for PIC)
+      MO_Add I32 ->
+        case y of
+          CmmLit (CmmInt imm immrep) | Just _ <- makeImmediate I32 True (-imm)
+            -> trivialCode I32 True ADD x (CmmLit $ CmmInt imm immrep)
+          CmmLit lit
+            -> do
+                (src, srcCode) <- getSomeReg x
+                let imm = litToImm lit
+                    code dst = srcCode `appOL` toOL [
+                                    ADDIS dst src (HA imm),
+                                    ADD dst dst (RIImm (LO imm))
+                                ]
+                return (Any I32 code)
+          _ -> trivialCode I32 True ADD x y
+
       MO_Add rep -> trivialCode rep True ADD x y
       MO_Sub rep ->
         case y of    -- subfi ('substract from' with immediate) doesn't exist
@@ -1496,53 +1525,25 @@ getRegister (CmmLit (CmmInt i rep))
     in
     	return (Any rep code)
 
-getRegister (CmmLit (CmmFloat f F32)) = do
+getRegister (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    tmp <- getNewRegNat I32
-    let code dst = toOL [
+    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    Amode addr addr_code <- getAmode dynRef
+    let code dst = 
 	    LDATA ReadOnlyData  [CmmDataLabel lbl,
-				 CmmStaticLit (CmmFloat f F32)],
-	    LIS tmp (HA (ImmCLbl lbl)),
-	    LD F32 dst (AddrRegImm tmp (LO (ImmCLbl lbl)))
-	    ]
-    -- in
-    return (Any F32 code)
-
-getRegister (CmmLit (CmmFloat d F64)) = do
-    lbl <- getNewLabelNat
-    tmp <- getNewRegNat I32
-    let code dst = toOL [
-	    LDATA ReadOnlyData  [CmmDataLabel lbl,
-				 CmmStaticLit (CmmFloat d F64)],
-	    LIS tmp (HA (ImmCLbl lbl)),
-	    LD F64 dst (AddrRegImm tmp (LO (ImmCLbl lbl)))
-	    ]
-    -- in
-    return (Any F32 code)
-
-#if darwin_TARGET_OS
-getRegister (CmmLit (CmmLabel lbl))
-    | labelCouldBeDynamic lbl
-    = do
-        addImportNat False lbl
-    	let imm = ImmDyldNonLazyPtr lbl
-    	    code dst = toOL [
-                    LIS dst (HA imm),
-                    LD  I32 dst (AddrRegImm dst (LO imm))
-                ]
-        return (Any I32 code)
-#endif
+				 CmmStaticLit (CmmFloat f frep)]
+            `consOL` (addr_code `snocOL` LD frep dst addr)
+    return (Any frep code)
 
 getRegister (CmmLit lit)
-  = let 
-	rep = cmmLitRep lit
-	imm = litToImm lit
-    	code dst = toOL [
-                LIS dst (HI imm),
-                OR dst dst (RIImm (LO imm))
-            ]
-    in
-    	return (Any rep code)
+  = let rep = cmmLitRep lit
+        imm = litToImm lit
+        code dst = toOL [
+              LIS dst (HI imm),
+              OR dst dst (RIImm (LO imm))
+          ]
+    in return (Any rep code)
+
 getRegister other = pprPanic "getRegister(ppc)" (pprExpr other)
     
     -- extend?Rep: wrap integer expression of type rep
@@ -1760,14 +1761,22 @@ getAmode (CmmMachOp (MO_Add I32) [x, CmmLit (CmmInt i _)])
         (reg, code) <- getSomeReg x
         return (Amode (AddrRegImm reg off) code)
 
+   -- optimize addition with 32-bit immediate
+   -- (needed for PIC)
+getAmode (CmmMachOp (MO_Add I32) [x, CmmLit lit])
+  = do
+        tmp <- getNewRegNat I32
+        (src, srcCode) <- getSomeReg x
+        let imm = litToImm lit
+            code = srcCode `snocOL` ADDIS tmp src (HA imm)
+        return (Amode (AddrRegImm tmp (LO imm)) code)
+
 getAmode (CmmLit lit)
   = do
         tmp <- getNewRegNat I32
-        let
+        let imm = litToImm lit
             code = unitOL (LIS tmp (HA imm))
         return (Amode (AddrRegImm tmp (LO imm)) code)
-    where
-        imm = litToImm lit
     
 getAmode (CmmMachOp (MO_Add I32) [x, y])
   = do
@@ -3142,12 +3151,16 @@ genCCall target dest_regs argsAndHints vols
                                                         initialStackOffset
                                                         (toOL []) []
                                                 
+        (labelOrExpr, reduceToF32) <- case target of
+            CmmForeignCall (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
+            CmmForeignCall expr conv -> return  (Right expr, False)
+            CmmPrim mop -> outOfLineFloatOp mop
+                                                        
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
-            codeAfter = move_sp_up finalStack `appOL` moveResult
+            codeAfter = move_sp_up finalStack `appOL` moveResult reduceToF32
 
         case labelOrExpr of
             Left lbl -> do
-		addImportNat True lbl
 		return (         codeBefore
                         `snocOL` BL lbl usedRegs
                         `appOL`	 codeAfter)
@@ -3270,7 +3283,7 @@ genCCall target dest_regs argsAndHints vols
                     F64 -> (0, 1, 8, fprs)
 #endif
         
-        moveResult =
+        moveResult reduceToF32 =
             case dest_regs of
                 [] -> nilOL
                 [(dest, _hint)]
@@ -3282,47 +3295,51 @@ genCCall target dest_regs argsAndHints vols
                     where rep = cmmRegRep dest
                           r_dest = getRegisterReg dest
                           
-        (labelOrExpr, reduceToF32) = case target of
-            CmmForeignCall (CmmLit (CmmLabel lbl)) conv -> (Left lbl, False)
-            CmmForeignCall expr conv -> (Right expr, False)
-            CmmPrim mop -> (Left $ mkForeignLabel label Nothing False, reduce)
-                where
-                    (label, reduce) = case mop of
-                        MO_F32_Exp   -> (FSLIT("exp"), True)
-                        MO_F32_Log   -> (FSLIT("log"), True)
-                        MO_F32_Sqrt  -> (FSLIT("sqrt"), True)
+        outOfLineFloatOp mop =
+            do
+                mopExpr <- cmmMakeDynamicReference addImportNat True $
+                              mkForeignLabel functionName Nothing True
+                let mopLabelOrExpr = case mopExpr of
+                        CmmLit (CmmLabel lbl) -> Left lbl
+                        _ -> Right mopExpr
+                return (mopLabelOrExpr, reduce)
+            where
+                (functionName, reduce) = case mop of
+                    MO_F32_Exp   -> (FSLIT("exp"), True)
+                    MO_F32_Log   -> (FSLIT("log"), True)
+                    MO_F32_Sqrt  -> (FSLIT("sqrt"), True)
                         
-                        MO_F32_Sin   -> (FSLIT("sin"), True)
-                        MO_F32_Cos   -> (FSLIT("cos"), True)
-                        MO_F32_Tan   -> (FSLIT("tan"), True)
+                    MO_F32_Sin   -> (FSLIT("sin"), True)
+                    MO_F32_Cos   -> (FSLIT("cos"), True)
+                    MO_F32_Tan   -> (FSLIT("tan"), True)
+                    
+                    MO_F32_Asin  -> (FSLIT("asin"), True)
+                    MO_F32_Acos  -> (FSLIT("acos"), True)
+                    MO_F32_Atan  -> (FSLIT("atan"), True)
+                    
+                    MO_F32_Sinh  -> (FSLIT("sinh"), True)
+                    MO_F32_Cosh  -> (FSLIT("cosh"), True)
+                    MO_F32_Tanh  -> (FSLIT("tanh"), True)
+                    MO_F32_Pwr   -> (FSLIT("pow"), True)
                         
-                        MO_F32_Asin  -> (FSLIT("asin"), True)
-                        MO_F32_Acos  -> (FSLIT("acos"), True)
-                        MO_F32_Atan  -> (FSLIT("atan"), True)
+                    MO_F64_Exp   -> (FSLIT("exp"), False)
+                    MO_F64_Log   -> (FSLIT("log"), False)
+                    MO_F64_Sqrt  -> (FSLIT("sqrt"), False)
                         
-                        MO_F32_Sinh  -> (FSLIT("sinh"), True)
-                        MO_F32_Cosh  -> (FSLIT("cosh"), True)
-                        MO_F32_Tanh  -> (FSLIT("tanh"), True)
-                        MO_F32_Pwr   -> (FSLIT("pow"), True)
-                        
-                        MO_F64_Exp   -> (FSLIT("exp"), False)
-                        MO_F64_Log   -> (FSLIT("log"), False)
-                        MO_F64_Sqrt  -> (FSLIT("sqrt"), False)
-                        
-                        MO_F64_Sin   -> (FSLIT("sin"), False)
-                        MO_F64_Cos   -> (FSLIT("cos"), False)
-                        MO_F64_Tan   -> (FSLIT("tan"), False)
-                        
-                        MO_F64_Asin  -> (FSLIT("asin"), False)
-                        MO_F64_Acos  -> (FSLIT("acos"), False)
-                        MO_F64_Atan  -> (FSLIT("atan"), False)
-                        
-                        MO_F64_Sinh  -> (FSLIT("sinh"), False)
-                        MO_F64_Cosh  -> (FSLIT("cosh"), False)
-                        MO_F64_Tanh  -> (FSLIT("tanh"), False)
-                        MO_F64_Pwr   -> (FSLIT("pow"), False)
-                        other -> pprPanic "genCCall(ppc): unknown callish op"
-                                        (pprCallishMachOp other)
+                    MO_F64_Sin   -> (FSLIT("sin"), False)
+                    MO_F64_Cos   -> (FSLIT("cos"), False)
+                    MO_F64_Tan   -> (FSLIT("tan"), False)
+                     
+                    MO_F64_Asin  -> (FSLIT("asin"), False)
+                    MO_F64_Acos  -> (FSLIT("acos"), False)
+                    MO_F64_Atan  -> (FSLIT("atan"), False)
+                    
+                    MO_F64_Sinh  -> (FSLIT("sinh"), False)
+                    MO_F64_Cosh  -> (FSLIT("cosh"), False)
+                    MO_F64_Tanh  -> (FSLIT("tanh"), False)
+                    MO_F64_Pwr   -> (FSLIT("pow"), False)
+                    other -> pprPanic "genCCall(ppc): unknown callish op"
+                                    (pprCallishMachOp other)
 
 #endif /* darwin_TARGET_OS || linux_TARGET_OS */
                 
@@ -3348,23 +3365,42 @@ genSwitch expr ids = do
   -- in
   return code
 #elif powerpc_TARGET_ARCH
-genSwitch expr ids = do
-  (reg,e_code) <- getSomeReg expr
-  tmp <- getNewRegNat I32
-  lbl <- getNewLabelNat
-  let
-	jumpTable = map jumpTableEntry ids
-
-        code = e_code `appOL` toOL [
-                        LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
-                        SLW tmp reg (RIImm (ImmInt 2)),
-                        ADDIS tmp tmp (HA (ImmCLbl lbl)),
-                        LD I32 tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
-                        MTCTR tmp,
-                        BCTR [ id | Just id <- ids ]
-                ]
-  -- in
-  return code
+genSwitch expr ids 
+  | opt_PIC
+  = do
+        (reg,e_code) <- getSomeReg expr
+        tmp <- getNewRegNat I32
+        lbl <- getNewLabelNat
+        dynRef <- cmmMakeDynamicReference addImportNat False lbl
+        (tableReg,t_code) <- getSomeReg $ dynRef
+        let
+            jumpTable = map jumpTableEntry ids
+        
+            code = e_code `appOL` t_code `appOL` toOL [
+                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+                            SLW tmp reg (RIImm (ImmInt 2)),
+                            LD I32 tmp (AddrRegReg tableReg tmp),
+                            MTCTR tmp,
+                            BCTR [ id | Just id <- ids ]
+                    ]
+        return code
+  | otherwise
+  = do
+        (reg,e_code) <- getSomeReg expr
+        tmp <- getNewRegNat I32
+        lbl <- getNewLabelNat
+        let
+            jumpTable = map jumpTableEntry ids
+        
+            code = e_code `appOL` toOL [
+                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+                            SLW tmp reg (RIImm (ImmInt 2)),
+                            ADDIS tmp tmp (HA (ImmCLbl lbl)),
+                            LD I32 tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
+                            MTCTR tmp,
+                            BCTR [ id | Just id <- ids ]
+                    ]
+        return code
 #else
 genSwitch expr ids = panic "ToDo: genSwitch"
 #endif
@@ -4147,6 +4183,8 @@ coerceInt2FP fromRep toRep x = do
     lbl <- getNewLabelNat
     itmp <- getNewRegNat I32
     ftmp <- getNewRegNat F64
+    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    Amode addr addr_code <- getAmode dynRef
     let
     	code' dst = code `appOL` maybe_exts `appOL` toOL [
 		LDATA ReadOnlyData
@@ -4157,9 +4195,9 @@ coerceInt2FP fromRep toRep x = do
 		ST I32 itmp (spRel 3),
 		LIS itmp (ImmInt 0x4330),
 		ST I32 itmp (spRel 2),
-		LD F64 ftmp (spRel 2),
-		LIS itmp (HA (ImmCLbl lbl)),
-		LD F64 dst (AddrRegImm itmp (LO (ImmCLbl lbl))),
+		LD F64 ftmp (spRel 2)
+            ] `appOL` addr_code `appOL` toOL [
+		LD F64 dst addr,
 		FSUB F64 dst ftmp dst
 	    ] `appOL` maybe_frsp dst
             
@@ -4201,3 +4239,4 @@ eXTRA_STK_ARGS_HERE :: Int
 eXTRA_STK_ARGS_HERE
   = IF_ARCH_alpha(0, IF_ARCH_sparc(23, ???))
 #endif
+

@@ -346,7 +346,7 @@ main(int argc, char *argv[])
     struct_field(StgFunInfoExtraFwd, bitmap);
 
     struct_size(StgFunInfoExtraRev);
-    struct_field(StgFunInfoExtraRev, slow_apply);
+    struct_field(StgFunInfoExtraRev, slow_apply_offset);
     struct_field(StgFunInfoExtraRev, fun_type);
     struct_field(StgFunInfoExtraRev, arity);
     struct_field(StgFunInfoExtraRev, bitmap);

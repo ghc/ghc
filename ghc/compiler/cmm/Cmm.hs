@@ -162,6 +162,7 @@ data CmmExpr
 	--        ** is shorthand only, meaning **
 	-- CmmMachOp (MO_S_Add rep (CmmReg reg) (CmmLit (CmmInt i rep)))
 	--	where rep = cmmRegRep reg
+  | CmmPicBaseReg               -- Base Register for PIC calculations
 
 cmmExprRep :: CmmExpr -> MachRep
 cmmExprRep (CmmLit lit)      = cmmLitRep lit
@@ -169,6 +170,7 @@ cmmExprRep (CmmLoad _ rep)   = rep
 cmmExprRep (CmmReg reg)      = cmmRegRep reg
 cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
 cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
+cmmExprRep CmmPicBaseReg     = wordRep
 
 data CmmReg 
   = CmmLocal  LocalReg
@@ -201,12 +203,22 @@ data CmmLit
   | CmmFloat  Rational MachRep
   | CmmLabel    CLabel			-- Address of label
   | CmmLabelOff CLabel Int		-- Address of label + byte offset
+  
+        -- Due to limitations in the C backend, the following
+        -- MUST ONLY be used inside the info table indicated by label2
+        -- (label2 must be the info label), and label1 must be an
+        -- SRT, a slow entrypoint or a large bitmap (see the Mangler)
+        -- Don't use it at all unless tablesNextToCode.
+        -- It is also used inside the NCG during when generating
+        -- position-independent code. 
+  | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
 
 cmmLitRep :: CmmLit -> MachRep
 cmmLitRep (CmmInt _ rep)    = rep
 cmmLitRep (CmmFloat _ rep)  = rep
 cmmLitRep (CmmLabel _)      = wordRep
 cmmLitRep (CmmLabelOff _ _) = wordRep
+cmmLitRep (CmmLabelDiffOff _ _ _) = wordRep
 
 -----------------------------------------------------------------------------
 -- A local label.

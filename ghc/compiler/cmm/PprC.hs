@@ -85,7 +85,8 @@ pprC (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 pprTop :: CmmTop -> SDoc
 pprTop (CmmProc info clbl _params blocks) =
     (if not (null info)
-        then pprWordArray (entryLblToInfoLbl clbl) info
+        then pprDataExterns info $$
+             pprWordArray (entryLblToInfoLbl clbl) info
         else empty) $$
     (case blocks of
         [] -> empty
@@ -367,9 +368,18 @@ pprLit lit = case lit of
     CmmFloat f rep     -> parens (machRepCType rep) <> (rational f)
     CmmLabel clbl      -> mkW_ <> pprCLabel clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabel clbl <> char '+' <> int i
+    CmmLabelDiffOff clbl1 clbl2 i
+        -- WARNING:
+        -- * the lit must occur in the info table clbl2
+        -- * clbl1 must be an SRT, a slow entry point or a large bitmap
+        -- The Mangler is expected to convert any reference to an SRT,
+        -- a slow entry point or a large bitmap
+        -- from an info table to an offset.
+        -> mkW_ <> pprCLabel clbl1 <> char '+' <> int i
 
 pprLit1 :: CmmLit -> SDoc
 pprLit1 lit@(CmmLabelOff _ _) = parens (pprLit lit)
+pprLit1 lit@(CmmLabelDiffOff _ _ _) = parens (pprLit lit)
 pprLit1 lit@(CmmFloat _ _)    = parens (pprLit lit)
 pprLit1 other = pprLit other
 
@@ -786,6 +796,8 @@ te_BB (BasicBlock _ ss)		= mapM_ te_Stmt ss
 
 te_Lit :: CmmLit -> TE ()
 te_Lit (CmmLabel l) = te_lbl l
+te_Lit (CmmLabelOff l _) = te_lbl l
+te_Lit (CmmLabelDiffOff l1 l2 _) = te_lbl l1
 te_Lit _ = return ()
 
 te_Stmt :: CmmStmt -> TE ()

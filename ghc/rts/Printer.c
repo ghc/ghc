@@ -622,8 +622,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 		break;
 	    case ARG_GEN_BIG:
 		printLargeBitmap(spBottom, sp+2,
-				 (StgLargeBitmap *)fun_info->f.bitmap,
-				 BITMAP_SIZE(fun_info->f.bitmap));
+				 GET_FUN_LARGE_BITMAP(fun_info),
+				 GET_FUN_LARGE_BITMAP(fun_info)->size);
 		break;
 	    default:
 		printSmallBitmap(spBottom, sp+1,

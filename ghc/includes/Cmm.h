@@ -346,7 +346,13 @@
 // macros which use the appropriate version here:
 //
 #ifdef TABLES_NEXT_TO_CODE
-#define StgFunInfoExtra_slow_apply(i) StgFunInfoExtraRev_slow_apply(i)
+        // when TABLES_NEXT_TO_CODE, slow_apply is stored as an offset
+        // instead of the normal pointer.
+        
+#define StgFunInfoExtra_slow_apply(fun_info)    \
+        (StgFunInfoExtraRev_slow_apply_offset(fun_info)    \
+        + (fun_info) + SIZEOF_StgFunInfoExtraRev + SIZEOF_StgInfoTable)
+
 #define StgFunInfoExtra_fun_type(i)   StgFunInfoExtraRev_fun_type(i)
 #define StgFunInfoExtra_arity(i)      StgFunInfoExtraRev_arity(i)
 #define StgFunInfoExtra_bitmap(i)     StgFunInfoExtraRev_bitmap(i)

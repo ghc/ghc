@@ -3814,14 +3814,24 @@ static int ocResolve_MachO(ObjectCode* oc)
 
 static void machoInitSymbolsWithoutUnderscore()
 {
-    void *p;
+    extern void* symbolsWithoutUnderscore[];
+    void **p = symbolsWithoutUnderscore;
+    __asm__ volatile(".data\n_symbolsWithoutUnderscore:");
 
 #undef Sym
-#define Sym(x)						\
-    __asm__ ("lis %0,hi16(" #x ")\n\tori %0,%0,lo16(" #x ")" : "=r" (p));	\
-    ghciInsertStrHashTable("(GHCi built-in symbols)", symhash, #x, p);
+#define Sym(x)  \
+    __asm__ volatile(".long " # x);
 
     RTS_MACHO_NOUNDERLINE_SYMBOLS
 
+    __asm__ volatile(".text");
+    
+#undef Sym
+#define Sym(x)  \
+    ghciInsertStrHashTable("(GHCi built-in symbols)", symhash, #x, *p++);
+    
+    RTS_MACHO_NOUNDERLINE_SYMBOLS
+    
+#undef Sym
 }
 #endif

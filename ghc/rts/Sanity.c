@@ -151,8 +151,8 @@ checkStackFrame( StgPtr c )
 
     case RET_BIG: // large bitmap (> 32 entries)
     case RET_VEC_BIG:
-	size = info->i.layout.large_bitmap->size;
-	checkLargeBitmap((StgPtr)c + 1, info->i.layout.large_bitmap, size);
+	size = GET_LARGE_BITMAP(&info->i)->size;
+	checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
 	return 1 + size;
 
     case RET_FUN:
@@ -170,7 +170,7 @@ checkStackFrame( StgPtr c )
 	    break;
 	case ARG_GEN_BIG:
 	    checkLargeBitmap((StgPtr)ret_fun->payload,
-			     (StgLargeBitmap *)fun_info->f.bitmap, size);
+			     GET_FUN_LARGE_BITMAP(fun_info), size);
 	    break;
 	default:
 	    checkSmallBitmap((StgPtr)ret_fun->payload,
@@ -360,7 +360,7 @@ checkClosure( StgClosure* p )
 		break;
 	    case ARG_GEN_BIG:
 		checkLargeBitmap( (StgPtr)pap->payload, 
-				  (StgLargeBitmap *)fun_info->f.bitmap, 
+				  GET_FUN_LARGE_BITMAP(fun_info), 
 				  pap->n_args );
 		break;
 	    case ARG_BCO:
