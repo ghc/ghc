@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.147 2004/05/15 15:35:47 dons Exp $
  *
- * (c) The GHC Team, 2000-2003
+ * (c) The GHC Team, 2000-2004
  *
  * RTS Object Linker
  *
@@ -364,6 +363,7 @@ typedef struct _RtsSymbolVal {
       SymX(__int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
       SymX(andIntegerzh_fast)			\
+      SymX(barf)				\
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(catchzh_fast)			\
       SymX(cmp_thread)				\
