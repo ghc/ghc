@@ -364,14 +364,6 @@ addMessages (m_warns, m_errs)
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `unionBags` m_warns,
 			       errs  `unionBags` m_errs) }
-
-checkGHCI :: Message -> TcRn m ()	-- Check that GHCI is on
-					-- otherwise add the error message
-#ifdef GHCI 
-checkGHCI m = returnM ()
-#else
-checkGHCI m = addErr m
-#endif
 \end{code}
 
 
