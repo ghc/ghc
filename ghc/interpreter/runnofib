@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TROOT=/home/v-julsew/Nov25
+TROOT=/home/v-julsew/Feb24
 
 STGHUGSFLAGS=-P$TROOT/fpt/ghc/interpreter/lib
 NROOT=$TROOT/fpt/nofib
