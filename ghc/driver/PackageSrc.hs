@@ -70,7 +70,11 @@ package_details installing
         extra_libraries   = [ "winmm", "wsock32" ], -- winmm for the threadDelay timer, wsock32 for the linker
 #endif
         include_dirs   = if installing
-                            then [ "$libdir/includes" ]
+                            then [ "$libdir/include"
+#ifdef mingw32_TARGET_OS
+				 , "$libdir/include/mingw"
+#endif
+				 ]
                             else [ ghc_src_dir cGHC_INCLUDE_DIR ],
         c_includes     = [ "Stg.h" ],           -- ha!
         package_deps   = [ "gmp" ],
