@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.21 2000/04/03 13:44:47 simonmar Exp $
+ * $Id: Main.c,v 1.22 2000/04/03 16:26:01 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 #  else /* !PAR && !GRAN */
 
     /* ToDo: want to start with a larger stack size */
-    status = rts_evalIO(mainIO_closure, NULL);
+    status = rts_evalIO((HaskellObj)mainIO_closure, NULL);
 
 #  endif /* !PAR && !GRAN */
 
