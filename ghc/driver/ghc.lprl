@@ -2444,7 +2444,7 @@ sub add_syslib {
 
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib eq 'contrib' || $syslib eq 'exts';
+          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eg 'conc';
 	  #HACK! they have no cbits
 }
 \end{code}
