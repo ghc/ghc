@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.193 2001/10/19 10:02:50 sewardj Exp $
+# $Id: Makefile,v 1.194 2001/10/23 16:33:27 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -14,7 +14,7 @@ WAYS=$(GhcCompilerWays)
 # Note: there have been reports of people running up against the ARG_MAX limit
 # when linking ghc with all its constituent object files. The likely source of 
 # the problem is that the environment is a bit too big, so a workaround could
-# be to do ` env PATH=$(PATH) make ghc 'to minimise the environment. (or the
+# be to do `env PATH=$(PATH) make ghc' to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
