@@ -597,16 +597,31 @@ $ ghci -lm
 
       <para>On systems with <literal>.so</literal>-style shared
       libraries, the actual library loaded will the
-      <filename>lib<replaceable>lib</replaceable>.so</filename>.  If
-      no such library exists on the standard library search path,
-      including paths given using
-      <literal>-L<replaceable>path</replaceable></literal>, then
-      <literal>ghci</literal> will signal an error.</para>
+      <filename>lib<replaceable>lib</replaceable>.so</filename>.  GHCi
+      searches the following places for libraries, in this order:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Paths specified using the
+          <literal>-L<replaceable>path</replaceable></literal>
+          command-line option,</para>
+	</listitem>
+	<listitem>
+	  <para>the standard library search path for your system,
+	  which on some systems may be overriden by setting the
+	  <literal>LD_LIBRARY_PATH</literal> environment variable.
+	</listitem>
+      </itemizedlist>
 
       <para>On systems with <literal>.dll</literal>-style shared
       libraries, the actual library loaded will be
       <filename><replaceable>lib</replaceable>.dll</filename>.  Again,
       GHCi will signal an error if it can't find the library.</para>
+
+      <para>GHCi can also load plain object files
+      (<literal>.o</literal> or <literal>.obj</literal> depending on
+      your platform) from the command-line.  Just add the name the
+      object file to the command line.</para>
     </sect2>
 
   </sect1>
