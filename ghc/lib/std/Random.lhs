@@ -164,7 +164,7 @@ mkStdRNG = do
 randomIvalInteger :: (RandomGen g, Num a) => (Integer, Integer) -> g -> (a, g)
 randomIvalInteger (l,h) rng
  | l > h     = randomIvalInteger (h,l) rng
- | otherwise = case (f n 1 rng) of (v, rng') -> (fromInteger (v `mod` (k+1)), rng')
+ | otherwise = case (f n 1 rng) of (v, rng') -> (fromInteger (l + v `mod` (k+1)), rng')
      where
        k = h - l + 1
        b = 2147483561
