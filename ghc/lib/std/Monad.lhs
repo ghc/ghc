@@ -58,14 +58,17 @@ guard p         =  if p then return () else zero
 
 -- This subsumes the list-based filter function.
 
+{-# SPECIALISE filter :: (a -> Bool) -> [a] -> [a] #-}
 filter          :: MonadZero m => (a -> Bool) -> m a -> m a
 filter p        =  applyM (\x -> if p x then return x else zero)
 
 -- This subsumes the list-based concat function.
 
+{-# SPECIALISE concat :: [[a]] -> [a] #-}
 concat          :: MonadPlus m => [m a] -> m a
 concat          =  foldr (++) zero
  
+{-# SPECIALISE applyM :: (a -> [b]) -> [a] -> [b] #-}
 applyM          :: Monad m => (a -> m b) -> m a -> m b
 applyM f x      =  x >>= f
 \end{code}
