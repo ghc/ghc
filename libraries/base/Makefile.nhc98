@@ -28,7 +28,6 @@ SRCS	= \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
 
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
-#	Debug/QuickCheck.hs
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc
 #	Text/ParserCombinators/ReadP.hs Text/ParserCombinators/ReadPrec.hs
@@ -95,5 +94,5 @@ Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
 Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
 Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
 	Foreign/Marshal/Array.$C
-Foreign/C.$C:      Foreign/C/Types.$C Foreign/C/Error.$C Foreign/C/String/$C
+Foreign/C.$C:      Foreign/C/Types.$C Foreign/C/Error.$C Foreign/C/String.$C
 
