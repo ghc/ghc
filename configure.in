@@ -565,10 +565,11 @@ AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
 dnl ** check for jade/openjade & determine a working catalog
 AC_PATH_PROGS(JadeCmd,openjade jade,jade)
 FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl, 
-                        /etc/sgml/catalog /etc/sgml.catalog /usr/share/sgml/CATALOG.docbkdsl $hardtop/glafp-utils/docbook/CATALOG*)
+                        /etc/sgml/catalog /etc/sgml.catalog /usr/share/sgml/CATALOG.docbkdsl glafp-utils/docbook/CATALOG*)
 if test -z "$Catalog"; then
   AC_MSG_RESULT([Warning: You will not be able to build the documentation.])
 fi
+Catalog=$hardtop/$Catalog
 AC_SUBST(Catalog)
 
 compress_nm=`basename $CompressCmd`
