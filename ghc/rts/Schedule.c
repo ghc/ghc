@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.16 1999/03/16 13:20:16 simonm Exp $
+ * $Id: Schedule.c,v 1.17 1999/03/17 09:50:08 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -557,9 +557,15 @@ threadStackOverflow(StgTSO *tso)
 
   /* Mark the old one as dead so we don't try to scavenge it during
    * garbage collection (the TSO will likely be on a mutables list in
-   * some generation, but it'll get collected soon enough).
+   * some generation, but it'll get collected soon enough).  It's
+   * important to set the sp and su values to just beyond the end of
+   * the stack, so we don't attempt to scavenge any part of the dead
+   * TSO's stack.
    */
   tso->whatNext = ThreadKilled;
+  tso->sp = (P_)&(tso->stack[tso->stack_size]);
+  tso->su = (StgUpdateFrame *)tso->sp;
+  tso->blocked_on = NULL;
   dest->mut_link = NULL;
 
   IF_DEBUG(sanity,checkTSO(tso));
