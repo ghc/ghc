@@ -123,7 +123,7 @@ Config.hs contains two sorts of things
 %*									*
 %************************************************************************
 
-All these pathnames are maintained in Unix format. 
+All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
 (See remarks under pathnames below)
 
 \begin{code}
@@ -168,10 +168,11 @@ initSysTools minusB_args
 		-- top_dir
 		-- 	for "installed" this is the root of GHC's support files
 		--	for "in-place" it is the root of the build tree
+		-- NB: top_dir is assumed to be in standard Unix format '/' separated
 
-	; let installed_bin pgm   =  top_dir `slash` "bin" `slash` pgm
-	      installed     file  =  top_dir `slash` file
-	      inplace dir   pgm   =  top_dir `slash` dir `slash` pgm
+	; let installed_bin pgm   =  pgmPath (top_dir `slash` "bin") pgm
+	      installed     file  =  pgmPath top_dir file
+	      inplace dir   pgm   =  pgmPath (top_dir `slash` dir) pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
@@ -317,7 +318,7 @@ setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
 
 getTopDir :: [String]
 	  -> IO (Bool, 		-- True <=> am installed, False <=> in-place
-	         String)	-- TopDir
+	         String)	-- TopDir (in Unix format '/' separated)
 
 getTopDir minusbs
   = do { top_dir1 <- get_proto
@@ -510,7 +511,7 @@ runSomething :: String		-- For -v message
 	     -> String		-- Command name (possibly a full path)
 				-- 	assumed already dos-ified
 	     -> [String]	-- Arguments
-				--	runSomthing will dos-ify them
+				--	runSomething will dos-ify them
 	     -> IO ()
 
 runSomething phase_name pgm args
@@ -521,7 +522,8 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
-    cmd_line = unwords (dosifyPaths (pgm : args))
+    cmd_line = unwords (pgm : dosifyPaths args)
+	-- The pgm is already in native format
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -573,12 +575,21 @@ dosifyPaths :: [String] -> [String]
 unDosifyPath :: String -> String
 -- Just change '\' to '/'
 
+pgmPath :: String		-- Directory string in Unix format
+	-> String		-- Program name with no directory separators
+				--	(e.g. copy /y)
+	-> String		-- Program invocation string in native format
+
+
+
 #if defined(mingw32_TARGET_OS)
 
 --------------------- Windows version ------------------
 unDosifyPath xs = xs
 
 dosifyPaths xs = map dosifyPath xs
+
+pgmPath dir pgm = dosifyPath dir ++ '\\' : pgm
 
 dosifyPath stuff
   = subst '/' '\\' real_stuff
@@ -596,6 +607,7 @@ dosifyPath stuff
 --------------------- Unix version ---------------------
 dosifyPaths  ps = ps
 unDosifyPath xs = subst '\\' '/' xs
+pgmPath dir pgm = dir ++ '/' : pgm
 --------------------------------------------------------
 #endif
 
