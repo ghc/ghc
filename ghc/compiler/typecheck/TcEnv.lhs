@@ -89,7 +89,7 @@ data TcEnv
 
 	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
 
-	tcGEnv	 :: NameEnv TyThing	-- The global type environment we've accumulated while
+	tcGEnv	 :: NameEnv TyThing,	-- The global type environment we've accumulated while
 					-- compiling this module:
 					--	types and classes (both imported and local)
 					-- 	imported Ids
@@ -172,15 +172,15 @@ data TyThingDetails = SynTyDetails Type
 lookup_global :: TcEnv -> Name -> Maybe TyThing
 	-- Try the global envt and then the global symbol table
 lookup_global env name 
-  = case lookupNameEnv (tcGEnv env) name of {
-	Just thing -> Just thing ;
+  = case lookupNameEnv (tcGEnv env) name of
+	Just thing -> Just thing
 	Nothing    -> lookupTypeEnv (tcGST env) name
 
 lookup_local :: TcEnv -> Name -> Maybe TcTyThing
 	-- Try the local envt and then try the global
 lookup_local env name
- = case lookupNameEnv (tcLEnv env) name of
-	Just thing -> Just thing ;
+  = case lookupNameEnv (tcLEnv env) name of
+	Just thing -> Just thing
 	Nothing    -> case lookup_global env name of
 			Just thing -> AGlobal thing
 			Nothing	   -> Nothing
@@ -323,9 +323,9 @@ tcLookupGlobalId name
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon con_name
   = tcLookupGlobalId con_name		`thenNF_Tc` \ con_id ->
-    case isDataConWrapId_maybe con_id of {
+    case isDataConWrapId_maybe con_id of
  	Just data_con -> returnTc data_con
-	Nothing	      -> failWithTc (badCon con_id);
+	Nothing	      -> failWithTc (badCon con_id)
 
 
 tcLookupClass :: Name -> NF_TcM Class
@@ -435,7 +435,7 @@ tcExtendLocalValEnv names_w_ids thing_inside
 tcExtendGlobalTyVars extra_global_tvs thing_inside
   = tcGetEnv						`thenNF_Tc` \ env ->
     tc_extend_gtvs (tcTyVars env) extra_global_tvs	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (env {tcTyVars = gtvs') thing_inside
+    tcSetEnv (env {tcTyVars = gtvs'}) thing_inside
 
 tc_extend_gtvs gtvs extra_global_tvs
   = tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
@@ -487,6 +487,6 @@ tcSetInstEnv ie thing_inside
 \begin{code}
 badCon con_id = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
 
-notFound where name = failWithTc (text where <> colon <+> quotes (ppr name) <+> 
+notFound wheRe name = failWithTc (text wheRe <> colon <+> quotes (ppr name) <+> 
 				  ptext SLIT("is not in scope"))
 \end{code}

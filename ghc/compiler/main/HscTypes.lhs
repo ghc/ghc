@@ -9,6 +9,29 @@ where
 
 #include "HsVersions.h"
 
+import Name		( Name, NameEnv )
+import Module		( Module, ModuleName )
+import Class		( Class )
+import OccName		( OccName )
+import RdrName		( RdrNameEnv )
+import Outputable	( SDoc )
+import UniqFM 		( UniqFM )
+import FiniteMap	( FiniteMap )
+import Bag		( Bag )
+import Id		( Id )
+import VarEnv		( IdEnv )
+import BasicTypes	( Version, Fixity )
+import TyCon		( TyCon )
+import ErrUtils		( ErrMsg, WarnMsg )
+import CmLink		( Linkable )
+import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameHsDecl,
+			  RdrNameDeprecation, RdrNameFixitySig )
+import UniqSupply	( UniqSupply )
+import HsDecls		( DeprecTxt )
+import CoreSyn		( CoreRule )
+import RnMonad		( ImportVersion, ExportItem, WhetherHasOrphans )
+import NameSet		( NameSet )
+
 \end{code}
 
 %************************************************************************
@@ -17,7 +40,7 @@ where
 %*									*
 %************************************************************************
 
-A @ModDetails@ summarises everything we know about a compiled module
+A @ModDetails@ summarises everything we know about a compiled module.
 
 \begin{code}
 data ModDetails
@@ -56,8 +79,7 @@ type PackageSymbolTable = SymbolTable	-- Domain = modules in the some other pack
 type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 \end{code}
 
-
-Simple lookups in the symbol table
+Simple lookups in the symbol table.
 
 \begin{code}
 lookupFixityEnv :: SymbolTable -> Name -> Fixity
@@ -235,12 +257,19 @@ data PersistentRenamerState
   = PRS { prsOrig  :: OrigNameEnv,
 	  prsDecls :: DeclsMap,
 	  prsInsts :: IfaceInsts,
-	  prsRules :: IfaceRules,
+	  prsRules :: IfaceRules
     }
 
+<<<<<<< HscTypes.lhs
+data NameSupply
+ = NS { nsUniqs  :: UniqSupply,
+	nsNames  :: FiniteMap (Module,OccName) Name,	-- Ensures that one original name gets one unique
+	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
+=======
 data OrigNameEnv
  = Orig { origNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
 	  origIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
+>>>>>>> 1.6
    }
 
 type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))

@@ -329,29 +329,29 @@ initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> Module -> SrcLoc
 
 initRn dflags finder gst prs mod loc do_rn
-  = do { uniqs     <- mkSplitUniqSupply 'r'
-	 names_var <- newIORef (uniqs, prsOrig pcs)
-	 errs_var  <- newIORef (emptyBag,emptyBag)
-	 iface_var <- newIORef (initIfaces prs)
-	 let rn_down = RnDown { rn_mod = mod,
-			   	rn_loc = loc, 
-     
-			   	rn_finder = finder,
-			   	rn_dflags = dflags,
-			   	rn_gst    = gst,
+  = do uniqs     <- mkSplitUniqSupply 'r'
+       names_var <- newIORef (uniqs, prsOrig pcs)
+       errs_var  <- newIORef (emptyBag,emptyBag)
+       iface_var <- newIORef (initIfaces prs)
+       let rn_down = RnDown { rn_mod = mod,
+	   		      rn_loc = loc, 
+    
+		   	      rn_finder = finder,
+		   	      rn_dflags = dflags,
+		   	      rn_gst    = gst,
 			 	     
-			   	rn_ns     = names_var, 
-			   	rn_errs   = errs_var, 
-		  	   	rn_ifaces = iface_var,
-		       }
+		   	      rn_ns     = names_var, 
+		   	      rn_errs   = errs_var, 
+	  	   	      rn_ifaces = iface_var,
+	             }
 
-	-- do the business
-  res <- do_rn rn_down ()
+       -- do the business
+       res <- do_rn rn_down ()
 
-	-- grab errors and return
-  (warns, errs) <- readIORef errs_var
+       -- grab errors and return
+       (warns, errs) <- readIORef errs_var
 
-  return (res, errs, warns)
+       return (res, errs, warns)
 
 
 initIfaces :: PersistentRenamerState -> Ifaces
