@@ -18,7 +18,7 @@ import MachMisc
 import MachRegs
 
 import AbsCSyn		-- bits and bobs...
-import CgCompInfo	( mIN_MP_INT_SIZE )
+import Constants	( mIN_MP_INT_SIZE )
 import Literal		( Literal(..) )
 import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )

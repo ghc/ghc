@@ -15,7 +15,7 @@ import MachRegs
 
 import AbsCSyn
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
-import CgCompInfo	( spARelToInt, spBRelToInt )
+import Constants	( spARelToInt, spBRelToInt )
 import CostCentre	( noCostCentreAttached )
 import HeapOffs		( hpRelToInt, subOff )
 import Literal		( Literal(..) )

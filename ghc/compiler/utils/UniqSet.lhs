@@ -14,18 +14,19 @@ module UniqSet (
 	SYN_IE(UniqSet),    -- abstract type: NOT
 
 	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
-	addOneToUniqSet,
+	addOneToUniqSet, addListToUniqSet,
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
 	elementOfUniqSet, mapUniqSet, intersectUniqSets,
-	isEmptyUniqSet
+	isEmptyUniqSet, filterUniqSet, sizeUniqSet
     ) where
 
-IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER( SpecLoop )
 
 import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique )
 import SrcLoc		( SrcLoc )
+import Outputable	( Outputable(..) )
 import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PprStyle		( PprStyle )
 import Util		( Ord3(..) )
@@ -65,7 +66,10 @@ mkUniqSet :: Uniquable a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
 
 addOneToUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
-addOneToUniqSet set x = set `unionUniqSets` unitUniqSet x
+addOneToUniqSet (MkUniqSet set) x = MkUniqSet (addToUFM set x x)
+
+addListToUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
+addListToUniqSet (MkUniqSet set) xs = MkUniqSet (addListToUFM set [(x,x) | x<-xs])
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (plusUFM set1 set2)
@@ -79,11 +83,17 @@ unionManyUniqSets (s:ss) = s `unionUniqSets` unionManyUniqSets ss
 minusUniqSet  :: UniqSet a -> UniqSet a -> UniqSet a
 minusUniqSet (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (minusUFM set1 set2)
 
+filterUniqSet :: (a -> Bool) -> UniqSet a -> UniqSet a
+filterUniqSet pred (MkUniqSet set) = MkUniqSet (filterUFM pred set)
+
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (intersectUFM set1 set2)
 
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet x (MkUniqSet set) = maybeToBool (lookupUFM set x)
+
+sizeUniqSet :: UniqSet a -> Int
+sizeUniqSet (MkUniqSet set) = sizeUFM set
 
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}
@@ -103,15 +113,15 @@ mapUniqSet f (MkUniqSet set)
     addOneToUniqSet :: UniqSet Unique -> Unique -> UniqSet Unique
     #-}
 {-# SPECIALIZE
-    elementOfUniqSet :: RnName -> UniqSet RnName -> Bool
+    elementOfUniqSet :: Name -> UniqSet Name -> Bool
 		      , Unique -> UniqSet Unique -> Bool
     #-}
 {-# SPECIALIZE
-    mkUniqSet :: [RnName] -> UniqSet RnName
+    mkUniqSet :: [Name] -> UniqSet Name
     #-}
 
 {-# SPECIALIZE
-    unitUniqSet :: RnName -> UniqSet RnName
+    unitUniqSet :: Name -> UniqSet Name
 		 , Unique -> UniqSet Unique
     #-}
 #endif

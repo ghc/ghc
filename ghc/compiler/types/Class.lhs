@@ -14,11 +14,7 @@ module Class (
 	classSuperDictSelId, classOpId, classDefaultMethodId,
 	classSig, classBigSig, classInstEnv,
 	isSuperClassOf,
-	classOpTagByString, classOpTagByString_maybe,
-
-	derivableClassKeys, needsDataDeclCtxtClassKeys,
-	cCallishClassKeys, isNoDictClass,
-	isNumericClass, isStandardClass, isCcallishClass,
+	classOpTagByOccName, classOpTagByOccName_maybe,
 
 	GenClassOp(..), SYN_IE(ClassOp),
 	mkClassOp,
@@ -38,10 +34,10 @@ import Usage		( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
 
 import MatchEnv		( MatchEnv )
 import Maybes		( assocMaybe )
-import Name		( changeUnique, Name )
+import Name		( changeUnique, Name, OccName, occNameString )
 import Unique		-- Keys for built-in classes
 import Pretty		( SYN_IE(Pretty), ppCat, ppPStr )
---import PprStyle		( PprStyle )
+import PprStyle		( PprStyle(..) )
 import SrcLoc		( SrcLoc )
 import Util
 \end{code}
@@ -59,7 +55,7 @@ get appropriately general instances of Ord3 for GenType.
 
 \begin{code}
 data GenClassOp ty
-  = ClassOp	FAST_STRING -- The operation name
+  = ClassOp	OccName	-- The operation name
 
 		Int	-- Unique within a class; starts at 1
 
@@ -175,77 +171,6 @@ clas `isSuperClassOf` (Class _ _ _ _ _ _ _ _ _ links) = assocMaybe links clas
 
 %************************************************************************
 %*									*
-\subsection[Class-std-groups]{Standard groups of Prelude classes}
-%*									*
-%************************************************************************
-
-@derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@TcDeriv@).
-
-NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
-even though every numeric class has these two as a superclass,
-because the list of ambiguous dictionaries hasn't been simplified.
-
-\begin{code}
-isNumericClass, isStandardClass :: Class -> Bool
-
-isNumericClass   (Class key _ _ _ _ _ _ _ _ _) = --pprTrace "isNum:" (ppCat (map pprUnique (key : numericClassKeys ))) $
-						 key `is_elem` numericClassKeys
-isStandardClass  (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` standardClassKeys
-isCcallishClass	 (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` cCallishClassKeys
-isNoDictClass    (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` noDictClassKeys
-is_elem = isIn "is_X_Class"
-
-numericClassKeys
-  = [ numClassKey
-    , realClassKey
-    , integralClassKey
-    , fractionalClassKey
-    , floatingClassKey
-    , realFracClassKey
-    , realFloatClassKey
-    ]
-
-derivableClassKeys
-  = [ eqClassKey
-    , ordClassKey
-    , enumClassKey
-    , evalClassKey
-    , boundedClassKey
-    , showClassKey
-    , readClassKey
-    , ixClassKey
-    ]
-
-needsDataDeclCtxtClassKeys -- see comments in TcDeriv
-  = [ readClassKey
-    ]
-
-cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
-
-standardClassKeys
-  = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
-    --
-    -- We have to have "CCallable" and "CReturnable" in the standard
-    -- classes, so that if you go...
-    --
-    --	    _ccall_ foo ... 93{-numeric literal-} ...
-    --
-    -- ... it can do The Right Thing on the 93.
-
-noDictClassKeys 	-- These classes are used only for type annotations;
-			-- they are not implemented by dictionaries, ever.
-  = cCallishClassKeys
-	-- I used to think that class Eval belonged in here, but
-	-- we really want functions with type (Eval a => ...) and that
-	-- means that we really want to pass a placeholder for an Eval
-	-- dictionary.  The unit tuple is what we'll get if we leave things
-	-- alone, and that'll do for now.  Could arrange to drop that parameter
-	-- in the end.
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection[Class-instances]{Instance declarations for @Class@}
 %*									*
 %************************************************************************
@@ -274,6 +199,9 @@ instance Uniquable (GenClass tyvar uvar) where
 
 instance NamedThing (GenClass tyvar uvar) where
     getName (Class _ n _ _ _ _ _ _ _ _) = n
+
+instance NamedThing (GenClassOp ty) where
+    getOccName (ClassOp occ _ _) = occ
 \end{code}
 
 
@@ -316,14 +244,14 @@ object).  Of course, the type of @op@ recorded in the GVE will be its
 ******************************************************************
 
 \begin{code}
-mkClassOp :: FAST_STRING -> Int -> ty -> GenClassOp ty
+mkClassOp :: OccName -> Int -> ty -> GenClassOp ty
 mkClassOp name tag ty = ClassOp name tag ty
 
 classOpTag :: GenClassOp ty -> Int
 classOpTag    (ClassOp _ tag _) = tag
 
 classOpString :: GenClassOp ty -> FAST_STRING
-classOpString (ClassOp str _ _) = str
+classOpString (ClassOp occ _ _) = occNameString occ
 
 classOpLocalType :: GenClassOp ty -> ty {-SigmaType-}
 classOpLocalType (ClassOp _ _ ty) = ty
@@ -331,23 +259,23 @@ classOpLocalType (ClassOp _ _ ty) = ty
 
 Rather unsavoury ways of getting ClassOp tags:
 \begin{code}
-classOpTagByString_maybe :: Class -> FAST_STRING -> Maybe Int
-classOpTagByString       :: Class -> FAST_STRING -> Int
+classOpTagByOccName_maybe :: Class -> OccName -> Maybe Int
+classOpTagByOccName       :: Class -> OccName -> Int
 
-classOpTagByString clas op
-  = case (classOpTagByString_maybe clas op) of
+classOpTagByOccName clas op
+  = case (classOpTagByOccName_maybe clas op) of
       Just tag -> tag
 #ifdef DEBUG
-      Nothing  -> pprPanic "classOpTagByString:" (ppCat (ppPStr op : map (ppPStr . classOpString) (classOps clas)))
+      Nothing  -> pprPanic "classOpTagByOccName:" (ppCat (ppr PprDebug op : map (ppPStr . classOpString) (classOps clas)))
 #endif
 
-classOpTagByString_maybe clas op
-  = go (map classOpString (classOps clas)) 1
+classOpTagByOccName_maybe clas op
+  = go (classOps clas) 1
   where
-    go []     _   = Nothing
-    go (n:ns) tag = if n == op
-		    then Just tag
-		    else go ns (tag+1)
+    go []     		      _   = Nothing
+    go (ClassOp occ _ _ : ns) tag = if occ == op
+				    then Just tag
+				    else go ns (tag+1)
 \end{code}
 
 %************************************************************************

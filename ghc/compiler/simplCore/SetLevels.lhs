@@ -29,14 +29,14 @@ import CoreSyn
 import CoreUtils	( coreExprType )
 import CoreUnfold	( whnfOrBottom )
 import FreeVars		-- all of it
-import Id		( idType, mkSysLocal, toplevelishId,
+import Id		( idType, mkSysLocal, 
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  unionManyIdSets, minusIdSet, mkIdSet,
 			  idSetToList,
 			  lookupIdEnv, SYN_IE(IdEnv)
 			)
 import Pretty		( ppStr, ppBesides, ppChar, ppInt )
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
@@ -269,19 +269,31 @@ lvlExpr ctxt_lvl envs (_, AnnCoerce c ty expr)
   = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
     returnLvl (Coerce c ty expr')
 
-lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnLam (ValBinder arg) rhs)
-  = lvlMFE incd_lvl (new_venv, tenv) rhs `thenLvl` \ rhs' ->
-    returnLvl (Lam (ValBinder (arg,incd_lvl)) rhs')
-  where
-    incd_lvl = incMajorLvl ctxt_lvl
-    new_venv = growIdEnvList venv [(arg,incd_lvl)]
+-- We don't split adjacent lambdas.  That is, given
+--	\x y -> (x+1,y)
+-- we don't float to give 
+--	\x -> let v = x+y in \y -> (v,y)
+-- Why not?  Because partial applications are fairly rare, and splitting
+-- lambdas makes them more expensive.
 
-lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (TyBinder tyvar) e)
-  = lvlExpr incd_lvl (venv, new_tenv) e	`thenLvl` \ e' ->
-    returnLvl (Lam (TyBinder tyvar) e')
+lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnLam (ValBinder arg) rhs)
+  = lvlMFE incd_lvl (new_venv, tenv) body `thenLvl` \ body' ->
+    returnLvl (foldr (Lam . ValBinder) body' lvld_args)
   where
-    incd_lvl   = incMinorLvl ctxt_lvl
-    new_tenv   = addOneToTyVarEnv tenv tyvar incd_lvl
+    incd_lvl     = incMajorLvl ctxt_lvl
+    (args, body) = annCollectValBinders rhs
+    lvld_args    = [(a,incd_lvl) | a <- (arg:args)]
+    new_venv     = growIdEnvList venv lvld_args
+
+-- We don't need to play such tricks for type lambdas, because
+-- they don't get annotated
+
+lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (TyBinder tyvar) body)
+  = lvlExpr incd_lvl (venv, new_tenv) body	`thenLvl` \ body' ->
+    returnLvl (Lam (TyBinder tyvar) body')
+  where
+    incd_lvl = incMinorLvl ctxt_lvl
+    new_tenv = addOneToTyVarEnv tenv tyvar incd_lvl
 
 lvlExpr ctxt_lvl (venv, tenv) (_, AnnLam (UsageBinder u) e)
   = panic "SetLevels.lvlExpr:AnnLam UsageBinder"
@@ -707,14 +719,23 @@ idLevel :: IdEnv Level -> Id -> Level
 idLevel venv v
   = case lookupIdEnv venv v of
       Just level -> level
-      Nothing    -> ASSERT(toplevelishId v)
-		    tOP_LEVEL
+      Nothing    -> tOP_LEVEL
 
 tyvarLevel :: TyVarEnv Level -> TyVar -> Level
 tyvarLevel tenv tyvar
   = case lookupTyVarEnv tenv tyvar of
       Just level -> level
       Nothing    -> tOP_LEVEL
+\end{code}
+
+\begin{code}
+annCollectValBinders (_, (AnnLam (ValBinder arg) rhs))
+  = (arg:args, body) 
+  where
+    (args, body) = annCollectValBinders rhs
+
+annCollectValBinders body
+  = ([], body)
 \end{code}
 
 %************************************************************************
@@ -740,5 +761,5 @@ applications, to give them a fighting chance of being floated.
 newLvlVar :: Type -> LvlM Id
 
 newLvlVar ty us
-  = mkSysLocal SLIT("lvl") (getUnique us) ty mkUnknownSrcLoc
+  = mkSysLocal SLIT("lvl") (getUnique us) ty noSrcLoc
 \end{code}

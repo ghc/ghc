@@ -2472,7 +2472,7 @@ cloneLetBinders top_lev is_rec old_ids tvenv idenv us
 
 	 -- Don't clone if it is a top-level thing. Why not?
 	 -- (a) we don't want to change the uniques
-	 --     on such things (see TopLevId in Id.lhs)
+	 --     on such things
 	 -- (b) we don't have to be paranoid about name capture
 	 -- (c) the thing is polymorphic so no need to subst
 

@@ -25,7 +25,8 @@ import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
 			)
-import IdInfo		( StrictnessInfo(..), Demand{-instance Outputable-} )
+import IdInfo		( StrictnessInfo(..) )
+import Demand		( Demand{-instance Outputable-} )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( ppStr, ppCat )
@@ -116,7 +117,7 @@ getStrAnalFlags (AbsValEnv flags _) = flags
 \end{code}
 
 \begin{code}
-absValFromStrictness :: AnalysisKind -> StrictnessInfo -> AbsVal
+absValFromStrictness :: AnalysisKind -> StrictnessInfo bdee -> AbsVal
 
 absValFromStrictness anal NoStrictnessInfo 	       = AbsTop
 

@@ -12,11 +12,14 @@ module TcDeriv ( tcDeriving ) where
 
 IMP_Ubiq()
 
-import HsSyn		( FixityDecl, Sig, HsBinds(..), Bind(..), MonoBinds(..),
+import HsSyn		( HsDecl, FixityDecl, Fixity, InstDecl, 
+			  Sig, HsBinds(..), Bind(..), MonoBinds(..),
 			  GRHSsAndBinds, Match, HsExpr, HsLit, InPat,
-			  ArithSeqInfo, Fake, MonoType )
+			  ArithSeqInfo, Fake, HsType
+			)
 import HsPragmas	( InstancePragmas(..) )
-import RnHsSyn		( mkRnName, RnName(..), SYN_IE(RenamedHsBinds), RenamedFixityDecl(..) )
+import RdrHsSyn		( RdrName, SYN_IE(RdrNameMonoBinds) )
+import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds), SYN_IE(RenamedFixityDecl) )
 import TcHsSyn		( TcIdOcc )
 
 import TcMonad
@@ -28,18 +31,19 @@ import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
-import RnMonad
-import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv )
-import RnBinds		( rnMethodBinds, rnTopBinds )
+import RnBinds		( rnMethodBinds, rnTopMonoBinds )
+import RnEnv		( newDfunName )
+import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..), 
+			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, isEmptyBag, unionBags, listToBag )
-import Class		( classKey, needsDataDeclCtxtClassKeys, GenClass )
+import Class		( classKey, GenClass )
 import ErrUtils		( pprBagOfErrors, addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
+import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
-import Name		( isLocallyDefined, getSrcLoc,
-			  mkTopLevName, origName, mkImplicitName, ExportFlag(..),
-			  RdrName(..), Name{--O only-}
+import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
+			  Name{--O only-}
 			)
 import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
@@ -194,24 +198,22 @@ context to the instance decl.  The "offending classes" are
 
 \begin{code}
 tcDeriving  :: Module			-- name of module under scrutiny
-	    -> RnEnv			-- for "renaming" bits of generated code
+	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
-	    -> [RenamedFixityDecl]	-- Fixity info; used by Read and Show
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds,	-- Extra generated bindings
 		      PprStyle -> Pretty)  -- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
 
-tcDeriving modname rn_env inst_decl_infos_in fixities
+tcDeriving modname rn_name_supply inst_decl_infos_in
   =	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns	    	`thenTc` \ eqns ->
+    makeDerivEqns			    	`thenTc` \ eqns ->
 
 	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
-    solveDerivEqns inst_decl_infos_in eqns
-			    	`thenTc` \ new_inst_infos ->
+    solveDerivEqns inst_decl_infos_in eqns    	`thenTc` \ new_inst_infos ->
 
 	-- Now augment the InstInfos, adding in the rather boring
 	-- actual-code-to-do-the-methods binds.  We may also need to
@@ -219,19 +221,37 @@ tcDeriving modname rn_env inst_decl_infos_in fixities
 	-- "con2tag" and/or "tag2con" functions.  We do these
 	-- separately.
 
-    gen_taggery_Names new_inst_infos	`thenTc` \ nm_alist_etc ->
-    gen_tag_n_con_binds rn_env nm_alist_etc
-				`thenTc` \ (extra_binds, deriver_rn_env) ->
+    gen_taggery_Names new_inst_infos		`thenTc` \ nm_alist_etc ->
 
-    mapTc (gen_inst_info modname fixities deriver_rn_env) new_inst_infos
-				`thenTc` \ really_new_inst_infos ->
+
     let
-	ddump_deriv = ddump_deriving really_new_inst_infos extra_binds
+	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
+	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
+	method_binds_s   = map gen_bind new_inst_infos
+	
+	-- Rename to get RenamedBinds.
+	-- The only tricky bit is that the extra_binds must scope over the
+	-- method bindings for the instances.
+	(dfun_names_w_method_binds, rn_extra_binds)
+		= renameSourceCode modname rn_name_supply (
+			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
+			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
+			returnRn (dfun_names_w_method_binds, rn_extra_binds)
+		  )
+	rn_one meth_binds = newDfunName mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
+			    rnMethodBinds meth_binds		`thenRn` \ rn_meth_binds ->
+			    returnRn (dfun_name, rn_meth_binds)
+    in
+
+    mapTc (gen_inst_info modname)
+	  (new_inst_infos `zip` dfun_names_w_method_binds)	`thenTc` \ really_new_inst_infos ->
+    let
+	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
     --pprTrace "derived:\n" (ddump_deriv PprDebug) $
 
     returnTc (listToBag really_new_inst_infos,
-	      extra_binds,
+	      rn_extra_binds,
 	      ddump_deriv)
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Pretty)
@@ -239,7 +259,7 @@ tcDeriving modname rn_env inst_decl_infos_in fixities
     ddump_deriving inst_infos extra_binds sty
       = ppAboves ((map pp_info inst_infos) ++ [ppr sty extra_binds])
       where
-	pp_info (InstInfo clas tvs ty inst_decl_theta _ _ _ mbinds _ _ _ _)
+	pp_info (InstInfo clas tvs ty inst_decl_theta _ _ mbinds _ _)
 	  = ppAbove (ppr sty (mkSigmaTy tvs inst_decl_theta (mkDictTy clas ty)))
 		    (ppr sty mbinds)
 \end{code}
@@ -271,17 +291,22 @@ makeDerivEqns :: TcM s [DerivEqn]
 
 makeDerivEqns
   = tcGetEnv			    `thenNF_Tc` \ env ->
+    let
+	local_data_tycons = filter (\tc -> isLocallyDefined tc && isDataTyCon tc)
+				   (getEnv_TyCons env)
+	-- ToDo: what about newtypes???
+    in
+    if null local_data_tycons then
+	-- Bale out now; evalClass may not be loaded if there aren't any
+	returnTc []
+    else
     tcLookupClassByKey evalClassKey `thenNF_Tc` \ eval_clas ->
     let
-	tycons = filter isDataTyCon (getEnv_TyCons env)
-	-- ToDo: what about newtypes???
-	think_about_deriving = need_deriving eval_clas tycons
+	think_about_deriving = need_deriving eval_clas local_data_tycons
+	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
+	eqns		     = map mk_eqn derive_these
     in
     mapTc chk_out think_about_deriving `thenTc_`
-    let
-	(derive_these, _) = removeDups cmp_deriv think_about_deriving
-	eqns = map mk_eqn derive_these
-    in
     returnTc eqns
   where
     ------------------------------------------------------------------
@@ -467,14 +492,11 @@ add_solns inst_infos_in eqns solns
 
 		 dummy_dfun_id
 
-		 (my_panic "const_meth_ids")
-		 (my_panic "binds")   (my_panic "from_here")
-		 (my_panic "modname") mkGeneratedSrcLoc
+		 (my_panic "binds") (getSrcLoc tycon)
 		 (my_panic "upragmas")
       where
 	dummy_dfun_id
-	  = mkDictFunId bottom bottom bottom dummy_dfun_ty
-			bottom bottom bottom bottom
+	  = mkDictFunId bottom dummy_dfun_ty bottom bottom
 	  where
 	    bottom = panic "dummy_dfun_id"
 
@@ -556,83 +578,59 @@ the renamer.  What a great hack!
 \end{itemize}
 
 \begin{code}
-gen_inst_info :: Module			-- Module name
-	      -> [RenamedFixityDecl]	-- all known fixities;
-					-- may be needed for Text
-	      -> RnEnv			-- lookup stuff for names we may use
-	      -> InstInfo		-- the main stuff to work on
-	      -> TcM s InstInfo		-- the gen'd (filled-in) "instance decl"
+-- Generate the method bindings for the required instance
+gen_bind :: InstInfo -> RdrNameMonoBinds
+gen_bind (InstInfo clas _ ty _ _ _ _ _ _)
+  | not from_here 
+  = EmptyMonoBinds
+  | otherwise
+  = assoc "gen_inst_info:bad derived class"
+	  [(eqClassKey,	     gen_Eq_binds)
+	  ,(ordClassKey,     gen_Ord_binds)
+	  ,(enumClassKey,    gen_Enum_binds)
+	  ,(evalClassKey,    gen_Eval_binds)
+	  ,(boundedClassKey, gen_Bounded_binds)
+	  ,(showClassKey,    gen_Show_binds)
+	  ,(readClassKey,    gen_Read_binds)
+	  ,(ixClassKey,	     gen_Ix_binds)
+	  ]
+	  (classKey clas) 
+	  tycon
+  where
+      from_here   = isLocallyDefined tycon
+      (tycon,_,_) = getAppDataTyCon ty	
+	    
 
-gen_inst_info modname fixities deriver_rn_env
-    (InstInfo clas tyvars ty inst_decl_theta _ _ _ _ _ _ locn _)
+gen_inst_info :: Module					-- Module name
+	      -> (InstInfo, (Name, RenamedMonoBinds))		-- the main stuff to work on
+	      -> TcM s InstInfo				-- the gen'd (filled-in) "instance decl"
+
+gen_inst_info modname
+    (InstInfo clas tyvars ty inst_decl_theta _ _ _ locn _, (dfun_name, meth_binds))
   =
 	-- Generate the various instance-related Ids
     mkInstanceRelatedIds
-		True {-from_here-} locn modname
-		NoInstancePragmas
+		dfun_name
 		clas tyvars ty
 		inst_decl_theta
-		[{-no user pragmas-}]
-			`thenTc` \ (dfun_id, dfun_theta, const_meth_ids) ->
+					`thenNF_Tc` \ (dfun_id, dfun_theta) ->
 
-	-- Generate the bindings for the new instance declaration,
-	-- rename it, and check for errors
-    let
-	(tycon,_,_)  = --pprTrace "gen_inst_info:ty" (ppCat[ppr PprDebug clas, ppr PprDebug ty]) $
-		       getAppDataTyCon ty
-
-	proto_mbinds
-	  = assoc "gen_inst_info:bad derived class"
-		[(eqClassKey,	   gen_Eq_binds)
-		,(ordClassKey,	   gen_Ord_binds)
-		,(enumClassKey,	   gen_Enum_binds)
-		,(evalClassKey,	   gen_Eval_binds)
-		,(boundedClassKey, gen_Bounded_binds)
-		,(showClassKey,	   gen_Show_binds fixities)
-		,(readClassKey,	   gen_Read_binds fixities)
-		,(ixClassKey,	   gen_Ix_binds)
-		]
-		clas_key $ tycon
-    in
-{-
-    let
-	((qual, unqual, tc_qual, tc_unqual), stack) = deriver_rn_env
-    in
-    pprTrace "gen_inst:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
-    pprTrace "gen_inst:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
-    pprTrace "gen_inst:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
-    pprTrace "gen_inst:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
--}
-    -- pprTrace "derived binds:" (ppr PprDebug proto_mbinds) $
-
-    rnMtoTcM deriver_rn_env (
-	setExtraRn emptyUFM{-no fixities-} $
-	rnMethodBinds clas_Name proto_mbinds
-    )			`thenNF_Tc` \ (mbinds, errs) ->
-
-    if not (isEmptyBag errs) then
-	panic "gen_inst_info:renamer errs!\n"
---	pprPanic "gen_inst_info:renamer errs!\n"
---		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug proto_mbinds))
-    else
-	-- All done
-    let
-	from_here = isLocallyDefined tycon	-- If so, then from here
-    in
     returnTc (InstInfo clas tyvars ty inst_decl_theta
-		       dfun_theta dfun_id const_meth_ids
-		       (if from_here then mbinds else EmptyMonoBinds)
-		       from_here modname locn [])
+		       dfun_theta dfun_id
+		       meth_binds
+		       locn [])
   where
-    clas_key  = classKey clas
-    clas_Name = RnImplicitClass (mkImplicitName clas_key (origName "gen_inst_info" clas))
+    from_here = isLocallyDefined tycon
+    (tycon,_,_) = getAppDataTyCon ty
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection[TcGenDeriv-con2tag-tag2con]{Generating extra binds (@con2tag@ and @tag2con@)}
+\subsection[TcDeriv-taggery-Names]{What con2tag/tag2con functions are available?}
 %*									*
 %************************************************************************
+
 
 data Foo ... = ...
 
@@ -640,60 +638,6 @@ con2tag_Foo :: Foo ... -> Int#
 tag2con_Foo :: Int -> Foo ...	-- easier if Int, not Int#
 maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
 
-\begin{code}
-gen_tag_n_con_binds :: RnEnv
-		    -> [(RdrName, TyCon, TagThingWanted)]
-		    -> TcM s (RenamedHsBinds,
-			      RnEnv) -- input one with any new names added
-
-gen_tag_n_con_binds rn_env nm_alist_etc
-  = 
-    let
-	-- We have the renamer's final "name funs" in our hands
-	-- (they were passed in).  So we can handle ProtoNames
-	-- that refer to anything "out there".  But our generated
-	-- code may also mention "con2tag" (etc.).  So we need
-	-- to augment to "name funs" to include those.
-
-	names_to_add = [ pn | (pn,_,_) <- nm_alist_etc ]
-    in
-    tcGetUniques (length names_to_add)	`thenNF_Tc` \ uniqs ->
-    let
-	pairs_to_add = [ case pn of { Qual pnm pnn ->
-			 (pn, mkRnName (mkTopLevName u (OrigName pnm pnn) mkGeneratedSrcLoc ExportAll [])) }
-		       | (pn,u) <- zipEqual "gen_tag..." names_to_add uniqs ]
-
-	deriver_rn_env
-	  = if null names_to_add
-	    then rn_env else added_rn_env
-
-	(added_rn_env, errs_bag)
-	  = extendGlobalRnEnv rn_env pairs_to_add [{-no tycons-}]
-
-	----------------
-	proto_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
-	proto_mbinds     = foldr AndMonoBinds EmptyMonoBinds proto_mbind_list
-    in
-    ASSERT(isEmptyBag errs_bag)
-
-    rnMtoTcM deriver_rn_env (
-	setExtraRn emptyUFM{-no fixities-} $
-	rnTopBinds (SingleBind (RecBind proto_mbinds))
-    )			`thenNF_Tc` \ (binds, errs) ->
-
-    if not (isEmptyBag errs) then
-	panic "gen_tag_n_con_binds:renamer errs!\n"
---	pprPanic "gen_tag_n_con_binds:renamer errs!\n"
---		 (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug binds))
-    else
-	returnTc (binds, deriver_rn_env)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[TcDeriv-taggery-Names]{What con2tag/tag2con functions are available?}
-%*									*
-%************************************************************************
 
 We have a @con2tag@ function for a tycon if:
 \begin{itemize}
@@ -724,7 +668,7 @@ gen_taggery_Names inst_infos
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = [ mk_CT c ty | (InstInfo c _ ty _ _ _ _ _ _ _ _ _) <- inst_infos ]
+    all_CTs = [ mk_CT c ty | (InstInfo c _ ty _ _ _ _ _ _) <- inst_infos ]
 		    
     mk_CT c ty = (c, fst (getAppTyCon ty))
 
@@ -739,7 +683,7 @@ gen_taggery_Names inst_infos
 	|| (we_are_deriving enumClassKey tycon)
 	|| (we_are_deriving ixClassKey   tycon)
 	then
-	  returnTc ((con2tag_PN tycon, tycon, GenCon2Tag)
+	  returnTc ((con2tag_RDR tycon, tycon, GenCon2Tag)
 		   : acc_Names)
 	else
 	  returnTc acc_Names
@@ -748,8 +692,8 @@ gen_taggery_Names inst_infos
       = if (we_are_deriving enumClassKey tycon)
 	|| (we_are_deriving ixClassKey   tycon)
 	then
-	  returnTc ( (tag2con_PN tycon, tycon, GenTag2Con)
-		   : (maxtag_PN  tycon, tycon, GenMaxTag)
+	  returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
+		   : (maxtag_RDR  tycon, tycon, GenMaxTag)
 		   : acc_Names)
 	else
 	  returnTc acc_Names

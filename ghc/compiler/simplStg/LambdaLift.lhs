@@ -13,12 +13,13 @@ IMP_Ubiq(){-uitous-}
 import StgSyn
 
 import Bag		( emptyBag, unionBags, unitBag, snocBag, bagToList )
-import Id		( idType, mkSysLocal, addIdArity,
+import Id		( idType, mkSysLocal, addIdArity, 
 			  mkIdSet, unitIdSet, minusIdSet,
 			  unionManyIdSets, idSetToList, SYN_IE(IdSet),
 			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv)
 			)
-import SrcLoc		( mkUnknownSrcLoc )
+import IdInfo		( ArityInfo, exactArity )
+import SrcLoc		( noSrcLoc )
 import Type		( splitForAllTy, mkForAllTys, mkFunTys )
 import UniqSupply	( getUnique, splitUniqSupply )
 import Util		( zipEqual, panic, assertPanic )
@@ -441,8 +442,8 @@ newSupercombinator :: Type
 		   -> LiftM Id
 
 newSupercombinator ty arity ci us idenv
-  = (mkSysLocal SLIT("sc") uniq ty mkUnknownSrcLoc)	-- ToDo: improve location
-    `addIdArity` arity
+  = (mkSysLocal SLIT("sc") uniq ty noSrcLoc)	-- ToDo: improve location
+    `addIdArity` exactArity arity
 	-- ToDo: rm the addIdArity?  Just let subsequent stg-saturation pass do it?
   where
     uniq = getUnique us

@@ -31,7 +31,7 @@ import CoreUnfold	( SimpleUnfolding, mkFormSummary, FormSummary(..) )
 import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
 			  getIdArity, GenId{-instance Eq-}
 			)
-import IdInfo		( arityMaybe )
+import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
@@ -218,12 +218,7 @@ eta_fun expr@(Var v)
   | isBottomingId v		-- Bottoming ids have "infinite arity"
   = 10000			-- Blargh.  Infinite enough!
 
-eta_fun expr@(Var v)
-  | maybeToBool arity_maybe	-- We know the arity
-  = arity
-  where
-    arity_maybe = arityMaybe (getIdArity v)
-    arity 	= case arity_maybe of { Just arity -> arity }
+eta_fun expr@(Var v) = idMinArity v
 
 eta_fun other = 0		-- Give up
 \end{code}
@@ -280,12 +275,11 @@ manifestlyCheap other_expr   -- look for manifest partial application
 	       num_val_args == 0 ||	-- Just a type application of
 					-- a variable (f t1 t2 t3)
 					-- counts as WHNF
-	       case (arityMaybe (getIdArity f)) of
-		 Nothing     -> False
-		 Just arity  -> num_val_args < arity
+	       num_val_args < idMinArity f
 
       _ -> False
     }
+
 \end{code}
 
 Eta reduction on type lambdas
@@ -406,6 +400,11 @@ simplIdWantsToBeINLINEd id env
   = if switchIsSet env IgnoreINLINEPragma
     then False
     else idWantsToBeINLINEd id
+
+idMinArity id = case getIdArity id of
+			UnknownArity   -> 0
+			ArityAtLeast n -> n
+			ArityExactly n -> n
 
 type_ok_for_let_to_case :: Type -> Bool
 

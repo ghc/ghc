@@ -25,7 +25,6 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnComp )
 import Id		( idWantsToBeINLINEd, isConstMethodId,
-			  externallyVisibleId,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  unitIdSet, elementOfIdSet,
 			  addOneToIdSet, SYN_IE(IdSet),
@@ -34,6 +33,7 @@ import Id		( idWantsToBeINLINEd, isConstMethodId,
 			  mapIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Eq-}
 			)
+import Name		( isExported )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
@@ -138,7 +138,7 @@ tagBinder usage binder
     )
 
 usage_of usage binder
-  | externallyVisibleId binder = ManyOcc 0 -- Visible-elsewhere things count as many
+  | isExported binder = ManyOcc 0 -- Visible-elsewhere things count as many
   | otherwise
   = case (lookupIdEnv usage binder) of
       Nothing   -> DeadCode

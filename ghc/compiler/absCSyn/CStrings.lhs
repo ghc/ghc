@@ -126,7 +126,7 @@ identToC ps
     char_to_c '<'  = ppPStr SLIT("Zl")
     char_to_c '-'  = ppPStr SLIT("Zm")
     char_to_c '!'  = ppPStr SLIT("Zn")
-    char_to_c '.'  = ppPStr SLIT("Zo")
+    char_to_c '.'  = ppPStr SLIT("_")
     char_to_c '+'  = ppPStr SLIT("Zp")
     char_to_c '\'' = ppPStr SLIT("Zq")
     char_to_c '*'  = ppPStr SLIT("Zt")

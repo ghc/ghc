@@ -7,14 +7,13 @@
 #include "HsVersions.h"
 
 module PprType(
-	GenTyVar, pprGenTyVar,
+	GenTyVar, pprGenTyVar, pprTyVarBndr,
 	TyCon, pprTyCon, showTyCon,
 	GenType,
 	pprGenType, pprParendGenType,
 	pprType, pprParendType,
 	pprMaybeTy,
 	getTypeString,
-	typeMaybeString,
 	specMaybeTysSuffix,
 	getTyDescription,
 	GenClass, 
@@ -37,15 +36,15 @@ import TyVar		( GenTyVar(..) )
 import TyCon		( TyCon(..), NewOrData )
 import Class		( SYN_IE(Class), GenClass(..),
 			  SYN_IE(ClassOp), GenClassOp(..) )
-import Kind		( Kind(..) )
+import Kind		( Kind(..), isBoxedTypeKind, pprParendKind )
 import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar) )
 
 -- others:
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
-import Name		( isLexVarSym, isLexSpecialSym, origName, moduleOf,
-			  getLocalName, Name{-instance Outputable-}
+import Name		(  nameString, Name{-instance Outputable-}, 
+			   OccName, pprOccName, getOccString, pprNonSymOcc
 			)
 import Outputable	( ifPprShowAll, interpp'SP )
 import PprEnv
@@ -97,11 +96,12 @@ works just by setting the initial context precedence very high.
 pprGenType, pprParendGenType :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
 		       => PprStyle -> GenType tyvar uvar -> Pretty
 
-pprGenType       sty ty = ppr_ty sty (init_ppr_env sty) tOP_PREC   ty
-pprParendGenType sty ty = ppr_ty sty (init_ppr_env sty) tYCON_PREC ty
+pprGenType       sty ty = ppr_ty (init_ppr_env sty) tOP_PREC   ty
+pprParendGenType sty ty = ppr_ty (init_ppr_env sty) tYCON_PREC ty
 
-pprType       	 sty ty = ppr_ty sty (init_ppr_env sty) tOP_PREC   (ty :: Type)
-pprParendType 	 sty ty = ppr_ty sty (init_ppr_env sty) tYCON_PREC (ty :: Type)
+pprType, pprParendType :: PprStyle -> Type -> Pretty
+pprType       	 sty ty = ppr_ty (init_ppr_env_type sty) tOP_PREC   ty
+pprParendType 	 sty ty = ppr_ty (init_ppr_env_type sty) tYCON_PREC ty
 
 pprMaybeTy :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
            => PprStyle -> Maybe (GenType tyvar uvar) -> Pretty
@@ -110,132 +110,132 @@ pprMaybeTy sty (Just ty) = pprParendGenType sty ty
 \end{code}
 
 \begin{code}
-ppr_ty :: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-       => PprStyle -> PprEnv tyvar uvar bndr occ -> Int
+ppr_ty :: PprEnv tyvar uvar bndr occ -> Int
        -> GenType tyvar uvar
        -> Pretty
 
-ppr_ty sty env ctxt_prec (TyVarTy tyvar)
-  = ppr_tyvar env tyvar
+ppr_ty env ctxt_prec (TyVarTy tyvar)
+  = pTyVarO env tyvar
 
-ppr_ty sty env ctxt_prec (TyConTy tycon usage)
-  = ppr sty tycon
+ppr_ty env ctxt_prec (TyConTy tycon usage)
+  = ppr_tycon env tycon
 
-ppr_ty sty env ctxt_prec ty@(ForAllTy _ _)
-  | showUserishTypes sty = ppr_ty sty env' ctxt_prec body_ty
-
-  | otherwise = ppSep [ ppPStr SLIT("_forall_"), 
-		        ppIntersperse pp'SP pp_tyvars,
-			ppPStr SLIT("=>"),
-			ppr_ty sty env' ctxt_prec body_ty
-		      ]
+ppr_ty env ctxt_prec ty@(ForAllTy _ _)
+  | show_forall = ppSep [ ppPStr SLIT("_forall_"), pp_tyvars, 
+			  pp_theta, ppPStr SLIT("=>"), pp_body
+		        ]
+  | null theta = pp_body
+  | otherwise  = ppSep [pp_theta, ppPStr SLIT("=>"), pp_body]
   where
-    (tyvars, body_ty) = splitForAllTy ty
-    env' 	      = foldl add_tyvar env tyvars
-    pp_tyvars	      = map (ppr_tyvar env') tyvars
+    (tyvars, rho_ty) = splitForAllTy ty
+    (theta, body_ty) | show_context = splitRhoTy rho_ty
+		     | otherwise    = ([], rho_ty)
 
-ppr_ty sty env ctxt_prec (ForAllUsageTy uv uvs ty)
+    pp_tyvars = ppBracket (ppIntersperse ppSP (map (pTyVarB env) tyvars))
+    pp_theta  | null theta = ppNil
+	      | otherwise  = ppCurlies (ppInterleave ppComma (map (ppr_dict env tOP_PREC) theta))
+    pp_body   = ppr_ty env ctxt_prec body_ty
+
+    sty = pStyle env
+    show_forall = case sty of
+			PprForUser -> False
+			other      -> True
+
+    show_context = case sty of
+			PprInterface -> True
+			PprForUser   -> True
+			other	     -> False
+
+ppr_ty env ctxt_prec (ForAllUsageTy uv uvs ty)
   = panic "ppr_ty:ForAllUsageTy"
 
-ppr_ty sty env ctxt_prec ty@(FunTy (DictTy _ _ _) _ _)
-  | showUserishTypes sty
-    -- Print a nice looking context  (Eq a, Text b) => ...
-  = ppSep [ppBeside (ppr_theta theta) (ppPStr SLIT(" =>")),
-	   ppr_ty sty env ctxt_prec body_ty
-    ]
-  where
-    (theta, body_ty) = splitRhoTy ty
-
-    ppr_theta = case sty of { PprInterface -> ppr_theta_2 ; _ -> ppr_theta_1 }
-
-    ppr_theta_1 [ct] = ppr_dict sty env tOP_PREC ct
-    ppr_theta_1 cts  = ppParens (ppInterleave ppComma (map (ppr_dict sty env tOP_PREC) cts))
-
-    ppr_theta_2 cts  = ppBesides [ppStr "{{", ppInterleave ppComma (map (ppr_dict sty env tOP_PREC) cts), ppStr "}}"]
-
-ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
+ppr_ty env ctxt_prec (FunTy ty1 ty2 usage)
     -- We fiddle the precedences passed to left/right branches,
     -- so that right associativity comes out nicely...
   = maybeParen ctxt_prec fUN_PREC
-	(ppCat [ppr_ty sty env fUN_PREC ty1,
+	(ppCat [ppr_ty env fUN_PREC ty1,
 		ppPStr SLIT("->"),
-		ppr_ty sty env tOP_PREC ty2])
+		ppr_ty env tOP_PREC ty2])
 
-ppr_ty sty env ctxt_prec ty@(AppTy _ _)
-  = ppr_corner sty env ctxt_prec fun_ty arg_tys
+ppr_ty env ctxt_prec ty@(AppTy _ _)
+  = ppr_corner env ctxt_prec fun_ty arg_tys
   where
     (fun_ty, arg_tys) = splitAppTy ty
 
-ppr_ty sty env ctxt_prec (SynTy tycon tys expansion)
-  | codeStyle sty
+ppr_ty env ctxt_prec (SynTy tycon tys expansion)
+  | codeStyle (pStyle env)
 	-- always expand types that squeak into C-variable names
-  = ppr_ty sty env ctxt_prec expansion
+  = ppr_ty env ctxt_prec expansion
 
   | otherwise
   = ppBeside
-     (ppr_app sty env ctxt_prec (ppr sty tycon) tys)
-     (ifPprShowAll sty (ppCat [ppStr " {- expansion:",
-			       ppr_ty sty env tOP_PREC expansion,
-			       ppStr "-}"]))
+     (ppr_app env ctxt_prec (ppr_tycon env tycon) tys)
+     (ifPprShowAll (pStyle env) (ppCat [ppStr " {- expansion:",
+			       		ppr_ty env tOP_PREC expansion,
+				        ppStr "-}"]))
 
-ppr_ty sty env ctxt_prec (DictTy clas ty usage)
-  = ppr_dict sty env ctxt_prec (clas, ty)
+ppr_ty env ctxt_prec (DictTy clas ty usage)
+  = ppCurlies (ppr_dict env tOP_PREC (clas, ty))
+	-- Curlies are temporary
+
 
 -- Some help functions
-ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
+ppr_corner env ctxt_prec (TyConTy FunTyCon usage) arg_tys
   | length arg_tys == 2
-  = ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
+  = ppr_ty env ctxt_prec (FunTy ty1 ty2 usage)
   where
     (ty1:ty2:_) = arg_tys
 
-ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
-  | not (codeStyle sty) -- no magic in that case
+ppr_corner env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
+  | not (codeStyle (pStyle env)) -- no magic in that case
   = --ASSERT(length arg_tys == a)
     --(if (length arg_tys /= a) then pprTrace "ppr_corner:" (ppCat [ppInt a, ppInterleave ppComma (map (pprGenType PprDebug) arg_tys)]) else id) $
     ppBesides [ppLparen, arg_tys_w_commas, ppRparen]
   where
-    arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty sty env tOP_PREC) arg_tys)
+    arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty env tOP_PREC) arg_tys)
 
-ppr_corner sty env ctxt_prec (TyConTy tycon usage) arg_tys
-  | not (codeStyle sty) && uniqueOf tycon == listTyConKey
+ppr_corner env ctxt_prec (TyConTy tycon usage) arg_tys
+  | not (codeStyle (pStyle env)) && uniqueOf tycon == listTyConKey
   = ASSERT(length arg_tys == 1)
-    ppBesides [ppLbrack, ppr_ty sty env tOP_PREC ty1, ppRbrack]		    
+    ppBesides [ppLbrack, ppr_ty env tOP_PREC ty1, ppRbrack]		    
   where
     (ty1:_) = arg_tys
 
-ppr_corner sty env ctxt_prec (TyConTy tycon usage) arg_tys
-  = ppr_app sty env ctxt_prec (ppr sty tycon) arg_tys
+ppr_corner env ctxt_prec (TyConTy tycon usage) arg_tys
+  = ppr_app env ctxt_prec (ppr_tycon env tycon) arg_tys
 		      
-ppr_corner sty env ctxt_prec (TyVarTy tyvar) arg_tys
-  = ppr_app sty env ctxt_prec (ppr_tyvar env tyvar) arg_tys
+ppr_corner env ctxt_prec (TyVarTy tyvar) arg_tys
+  = ppr_app env ctxt_prec (pTyVarO env tyvar) arg_tys
   
 
-ppr_app sty env ctxt_prec pp_fun []      
+ppr_app env ctxt_prec pp_fun []      
   = pp_fun
-ppr_app sty env ctxt_prec pp_fun arg_tys 
+ppr_app env ctxt_prec pp_fun arg_tys 
   = maybeParen ctxt_prec tYCON_PREC (ppCat [pp_fun, arg_tys_w_spaces])
   where
-    arg_tys_w_spaces = ppIntersperse ppSP (map (ppr_ty sty env tYCON_PREC) arg_tys)
+    arg_tys_w_spaces = ppIntersperse ppSP (map (ppr_ty env tYCON_PREC) arg_tys)
 
 
-ppr_dict sty env ctxt_prec (clas, ty)
+ppr_dict env ctxt_prec (clas, ty)
   = maybeParen ctxt_prec tYCON_PREC
-	(ppCat [ppr sty clas, ppr_ty sty env tYCON_PREC ty]) 
+	(ppCat [ppr_class env clas, ppr_ty env tYCON_PREC ty]) 
 \end{code}
 
-This stuff is effectively stubbed out for the time being
-(WDP 960425):
 \begin{code}
+	-- This one uses only "ppr"
 init_ppr_env sty
-  = initPprEnv sty b b b b b b b b b b b
+  = initPprEnv sty b b b b (Just (ppr sty)) (Just (ppr sty)) (Just (ppr sty)) b b b b b
   where
     b = panic "PprType:init_ppr_env"
 
-ppr_tyvar env tyvar = ppr (pStyle env) tyvar
-ppr_uvar  env uvar  = ppr (pStyle env) uvar
+	-- This one uses pprTyVarBndr, and thus is specific to GenTyVar's types
+init_ppr_env_type sty
+  = initPprEnv sty b b b b (Just (pprTyVarBndr sty)) (Just (ppr sty)) (Just (ppr sty)) b b b b b
+  where
+    b = panic "PprType:init_ppr_env"
 
-add_tyvar env tyvar = env
-add_uvar  env  uvar = env
+ppr_tycon  env tycon = ppr (pStyle env) tycon
+ppr_class  env clas  = ppr (pStyle env) clas
 \end{code}
 
 @ppr_ty@ takes an @Int@ that is the precedence of the context.
@@ -274,12 +274,22 @@ pprGenTyVar sty (TyVar uniq kind name usage)
   where
     pp_u    = pprUnique uniq
     pp_name = case name of
-		Just n  -> ppPStr (getLocalName n)
+		Just n  -> pprOccName sty (getOccName n)
 		Nothing -> case kind of
 				TypeKind        -> ppChar 'o'
 				BoxedTypeKind   -> ppChar 't'
 				UnboxedTypeKind -> ppChar 'u'
 				ArrowKind _ _   -> ppChar 'a'
+\end{code}
+
+We print type-variable binders with their kinds in interface files.
+
+\begin{code}
+pprTyVarBndr sty@PprInterface tyvar@(TyVar uniq kind name usage)
+  | not (isBoxedTypeKind kind)
+  = ppBesides [pprGenTyVar sty tyvar, ppStr "::", pprParendKind kind]
+
+pprTyVarBndr sty tyvar = pprGenTyVar sty tyvar
 \end{code}
 
 %************************************************************************
@@ -309,6 +319,14 @@ maybe_code sty x
     mangle '>' = ppPStr SLIT("Zg")
 
 pprTyCon :: PprStyle -> TyCon -> Pretty
+pprTyCon sty tycon = ppr sty (getName tycon)
+
+{-	This old code looks suspicious to me.  
+	Just printing the name should do the job; apart from the extra junk 
+	on SynTyCons etc. 
+
+	Let's try and live without all this...
+	Delete in due course.				SLPJ Nov 96
 
 pprTyCon sty (PrimTyCon _ name _ _) = ppr sty name
 
@@ -322,9 +340,6 @@ pprTyCon sty (TupleTyCon _ _ arity) = case arity of
 					n -> maybe_code sty ( "(" ++ nOfThem (n-1) ',' ++ ")" )
 
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
-  | uniq == listTyConKey
-  = maybe_code sty "[]"
-  | otherwise
   = ppr sty name
 
 pprTyCon sty (SpecTyCon tc ty_maybes)
@@ -341,6 +356,7 @@ pprTyCon sty (SynTyCon uniq name kind arity tyvars expansion)
 			 interpp'SP sty tyvars,
 			 pprParendGenType sty expansion,
 			 ppStr "-}"]))
+-}
 \end{code}
 
 
@@ -363,10 +379,8 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
       PprShowAll    -> pp_sigd
       _		    -> pp_user
   where
-    pp_C    = ppPStr op_name
-    pp_user = if isLexVarSym op_name && not (isLexSpecialSym op_name)
-	      then ppParens pp_C
-	      else pp_C
+    pp_C    = ppr sty op_name
+    pp_user = pprNonSymOcc sty op_name
     pp_sigd = ppCat [pp_user, ppPStr SLIT("::"), ppr sty ty]
 \end{code}
 
@@ -383,49 +397,27 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
     -- Produces things like what we have in mkCompoundName,
     -- which can be "dot"ted together...
 
-getTypeString :: Type -> [Either OrigName FAST_STRING]
+getTypeString :: Type -> FAST_STRING
 
 getTypeString ty
   = case (splitAppTy ty) of { (tc, args) ->
-    do_tc tc : map do_arg_ty args }
+    _CONCAT_ (do_tc tc : map do_arg_ty args) }
   where
-    do_tc (TyConTy tc _) = Left (origName "do_tc" tc)
+    do_tc (TyConTy tc _) = nameString (getName tc)
     do_tc (SynTy _ _ ty) = do_tc ty
     do_tc other = --pprTrace "getTypeString:do_tc:" (pprType PprDebug other) $
-		  Right (_PK_ (ppShow 1000 (pprType PprForC other)))
+		  (_PK_ (ppShow 1000 (pprType PprForC other)))
 
-    do_arg_ty (TyConTy tc _) = Left (origName "do_arg_ty" tc)
-    do_arg_ty (TyVarTy tv)   = Right (_PK_ (ppShow 80 (ppr PprForC tv)))
+    do_arg_ty (TyConTy tc _) = nameString (getName tc)
+    do_arg_ty (TyVarTy tv)   = _PK_ (ppShow 80 (ppr PprForC tv))
     do_arg_ty (SynTy _ _ ty) = do_arg_ty ty
     do_arg_ty other	     = --pprTrace "getTypeString:do_arg_ty:" (pprType PprDebug other) $
-			       Right (_PK_ (ppShow 1000 (pprType PprForC other)))
+			       _PK_ (ppShow 1000 (pprType PprForC other))
 
 	-- PprForC expands type synonyms as it goes;
 	-- it also forces consistent naming of tycons
 	-- (e.g., can't have both "(,) a b" and "(a,b)":
 	-- must be consistent!
-
-    --------------------------------------------------
-    -- tidy: very ad-hoc
-    tidy [] = [] -- done
-
-    tidy (' ' : more)
-      = case more of
-	  ' ' : _	 -> tidy more
-	  '-' : '>' : xs -> '-' : '>' : tidy (no_leading_sps xs)
-	  other	    	 -> ' ' : tidy more
-
-    tidy (',' : more) = ',' : tidy (no_leading_sps more)
-
-    tidy (x : xs) = x : tidy xs  -- catch all
-
-    no_leading_sps [] = []
-    no_leading_sps (' ':xs) = no_leading_sps xs
-    no_leading_sps other = other
-
-typeMaybeString :: Maybe Type -> [Either OrigName FAST_STRING]
-typeMaybeString Nothing  = [Right SLIT("!")]
-typeMaybeString (Just t) = getTypeString t
 
 specMaybeTysSuffix :: [Maybe Type] -> FAST_STRING
 specMaybeTysSuffix ty_maybes
@@ -450,8 +442,8 @@ getTyDescription ty
       TyVarTy _	      -> "*"
       AppTy fun _     -> getTyDescription fun
       FunTy _ res _   -> '-' : '>' : fun_result res
-      TyConTy tycon _ -> _UNPK_ (getLocalName tycon)
-      SynTy tycon _ _ -> _UNPK_ (getLocalName tycon)
+      TyConTy tycon _ -> getOccString tycon
+      SynTy tycon _ _ -> getOccString tycon
       DictTy _ _ _    -> "dict"
       ForAllTy _ ty   -> getTyDescription ty
       _		      -> pprPanic "getTyDescription: other" (pprType PprDebug tau_ty)

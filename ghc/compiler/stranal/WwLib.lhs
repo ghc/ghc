@@ -18,7 +18,7 @@ import CoreSyn
 import Id		( idType, mkSysLocal, dataConArgTys )
 import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID )
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
 			  maybeAppDataTyConExpandingDicts
 			)
@@ -193,7 +193,7 @@ mkWwBodies
 							--   hole for worker id
 		      CoreExpr -> CoreExpr,	-- Worker expr w/ hole
 	   						--   for original fn body
-		      StrictnessInfo,			-- Worker strictness info
+		      StrictnessInfo Id,		-- Worker strictness info
 		      Type -> Type)		-- Worker type w/ hole
 	   )						--   for type of original fn body
 
@@ -205,7 +205,9 @@ mkWwBodies body_ty tyvars args arg_infos
     then returnUs Nothing
 
     else -- the rest...
-    mk_ww_arg_processing args arg_infos (mAX_WORKER_ARGS - nonAbsentArgs arg_infos)
+    mk_ww_arg_processing args arg_infos 
+			 False 		-- Initialise the "useful-split" flag
+			 (mAX_WORKER_ARGS - nonAbsentArgs arg_infos)
 		`thenMaybeUs` \ (wrap_frag, work_args_info, work_frag) ->
     let
 	(work_args, wrkr_demands) = unzip work_args_info
@@ -261,11 +263,19 @@ mk_ww_arg_processing
 	-> [Demand]		-- Strictness info for those args
 				--   must be at least as long as args
 
+	-> Bool			-- False <=> we've done nothing useful in an enclosing call
+				-- If this is False when we hit the end of the arg list, we
+				-- don't want to do a w/w split... the wrapper would be the identity fn!
+				-- So we return Nothing
+
 	-> Int			-- Number of extra args we are prepared to add.
 				-- This prevents over-eager unpacking, leading
 				-- to huge-arity functions.
 
 	-> UniqSM (Maybe 	-- Nothing iff any unpack on abstract type
+				-- or if the wrapper would be the identity fn (can happen if we unpack
+				-- a huge structure, and decide not to do it)
+
 		     (CoreExpr -> CoreExpr,	-- Wrapper expr w/
 							--   hole for worker id
 							--   applied to types
@@ -274,17 +284,20 @@ mk_ww_arg_processing
 		      CoreExpr -> CoreExpr)	-- Worker body expr w/ hole
 	   )						--   for original fn body
 
-mk_ww_arg_processing [] _ _ = returnUs (Just (id, [], id))
+mk_ww_arg_processing [] _ useful_split _ = if useful_split then
+						returnUs (Just (id, [], id))
+					   else
+						returnUs Nothing
 
-mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
+mk_ww_arg_processing (arg : args) (WwLazy True : infos) useful_split max_extra_args
   =  	-- Absent argument
 	-- So, finish args to the right...
     --pprTrace "Absent; num_wrkr_args=" (ppInt num_wrkr_args) (
     let
 	arg_ty = idType arg
     in
-    mk_ww_arg_processing args infos max_extra_args
-				    -- we've already discounted for absent args,
+    mk_ww_arg_processing args infos True {- useful split -} max_extra_args
+				    -- We've already discounted for absent args,
 				    -- so we don't change max_extra_args
 		   `thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
@@ -306,7 +319,7 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
 	    panic "WwLib: haven't done mk_absent_let for primitives yet"
 
 
-mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
+mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) useful_split max_extra_args
   | new_max_extra_args > 0	-- Check that we are prepared to add arguments
   = 	-- this is the complicated one.
     --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) $
@@ -319,6 +332,7 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 	  Just (_, _, []) ->	   -- An abstract type
 				   -- We have to give up on the whole idea
 				   returnUs Nothing
+
 	  Just (_, _, (_:_:_)) ->  -- Two or more constructors; that's odd
 				   panic "mk_ww_arg_processing: multi-constr"
 
@@ -332,12 +346,12 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 
 	    let
 		unpk_args = zipWithEqual "mk_ww_arg_processing"
-			     (\ u t -> mkSysLocal SLIT("upk") u t mkUnknownSrcLoc)
+			     (\ u t -> mkSysLocal SLIT("upk") u t noSrcLoc)
 			     uniqs inst_con_arg_tys
 	    in
 		-- In processing the rest, push the sub-component args
 		-- and infos on the front of the current bunch
-	    mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) new_max_extra_args
+	    mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) True {- useful split -} new_max_extra_args
 			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
 	    returnUs (Just (
@@ -370,14 +384,14 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 			    (map TyArg con_tys ++ map VarArg unpk_args)))
 	      body
 
-mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
+mk_ww_arg_processing (arg : args) (arg_demand : infos) useful_split max_extra_args
   | otherwise
   = 	-- For all others at the moment, we just
 	-- pass them to the worker unchanged.
     --pprTrace "Other; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr ";arg=", ppr PprDebug arg, ppr PprDebug arg_demand]) (
 
 	-- Finish args to the right...
-    mk_ww_arg_processing args infos max_extra_args
+    mk_ww_arg_processing args infos useful_split max_extra_args
 			`thenMaybeUs` \ (wrap_rest, work_args_info, work_rest) ->
 
     returnUs (Just (
@@ -389,4 +403,7 @@ mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
 	      \ hole -> work_rest hole
     ))
     --)
+
+nonAbsentArgs :: [Demand] -> Int
+nonAbsentArgs cmpts = length [() | WwLazy True <- cmpts]
 \end{code}

@@ -16,17 +16,19 @@ import DsMonad
 import DsUtils
 
 import CoreUtils	( coreExprType )
-import Id		( dataConArgTys, mkTupleCon )
+import Id		( dataConArgTys )
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
 import Pretty
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, eqTy, maybeBoxedPrimType )
-import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, maybeAppTyCon,
+			  eqTy, maybeBoxedPrimType )
+import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( getStatePairingConInfo,
-			  realWorldStateTy, stateDataCon,
+			  realWorldStateTy, stateDataCon, pairDataCon, unitDataCon,
 			  stringTy
 			)
 import Util		( pprPanic, pprError, panic )
@@ -121,15 +123,13 @@ unboxArg arg
     -- oops: we can't see the data constructors!!!
   = can't_see_datacons_error "argument" arg_ty
 
-  -- Byte-arrays, both mutable and otherwise
-  -- (HACKy method -- but we really don't want the TyCons wired-in...) [WDP 94/10]
+  -- Byte-arrays, both mutable and otherwise; hack warning
   | is_data_type &&
     length data_con_arg_tys == 2 &&
-    not (isPrimType data_con_arg_ty1) &&
-    isPrimType data_con_arg_ty2
+    maybeToBool maybe_arg2_tycon &&
+    (arg2_tycon ==  byteArrayPrimTyCon ||
+     arg2_tycon ==  mutableByteArrayPrimTyCon)
     -- and, of course, it is an instance of CCallable
---  ( tycon == byteArrayTyCon ||
---    tycon == mutableByteArrayTyCon )
   = newSysLocalsDs data_con_arg_tys		`thenDs` \ vars@[ixs_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
 	      \ body -> Case arg (AlgAlts [(the_data_con,vars,body)]
@@ -160,6 +160,9 @@ unboxArg arg
     data_con_arg_tys = dataConArgTys the_data_con tycon_arg_tys
     (data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
 
+    maybe_arg2_tycon = maybeAppTyCon data_con_arg_ty2
+    Just (arg2_tycon,_) = maybe_arg2_tycon
+
 can't_see_datacons_error thing ty
   = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
 	     (ppBesides [ppStr thing, ppStr "; type: ", ppr PprForUser ty])
@@ -167,9 +170,6 @@ can't_see_datacons_error thing ty
 
 
 \begin{code}
-tuple_con_2 = mkTupleCon 2 -- out here to avoid CAF (sigh)
-covar_tuple_con_0 = Var (mkTupleCon 0) -- ditto
-
 boxResult :: Type				-- Type of desired result
 	  -> DsM (Type,			-- Type of the result of the ccall itself
 		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
@@ -191,7 +191,7 @@ boxResult result_ty
     mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]  `thenDs` \ new_state ->
     mkConDs the_data_con (map TyArg tycon_arg_tys ++ [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
 
-    mkConDs tuple_con_2
+    mkConDs pairDataCon
 	    [TyArg result_ty, TyArg realWorldStateTy, VarArg the_result, VarArg new_state]
 							`thenDs` \ the_pair ->
     let
@@ -210,8 +210,8 @@ boxResult result_ty
 
     mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]
 						`thenDs` \ new_state ->
-    mkConDs tuple_con_2
-	    [TyArg result_ty, TyArg realWorldStateTy, VarArg covar_tuple_con_0, VarArg new_state]
+    mkConDs pairDataCon
+	    [TyArg result_ty, TyArg realWorldStateTy, VarArg (Var unitDataCon), VarArg new_state]
 						`thenDs` \ the_pair ->
 
     let

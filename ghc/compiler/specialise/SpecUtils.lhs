@@ -24,7 +24,7 @@ module SpecUtils (
 IMP_Ubiq(){-uitous-}
 
 import Bag		( isEmptyBag, bagToList )
-import Class		( classOpString, GenClass{-instance NamedThing-} )
+import Class		( GenClass{-instance NamedThing-}, GenClassOp {- instance NamedThing -} )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
@@ -33,7 +33,7 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  GenId {-instance NamedThing -}
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Name		( origName, isLexVarSym, isLexSpecialSym, pprNonSym )
+import Name		( OccName, pprNonSym, pprOccName, modAndOcc )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
@@ -228,7 +228,10 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
       where
 	(mod_name, id_name) = get_id_name id
 
+
     get_id_name id
+
+{- Don't understand this -- and looks TURGID.  SLPJ 4 Nov 96 
       | maybeToBool (isDefaultMethodId_maybe id)
       = (this_mod, _NIL_)
 
@@ -238,12 +241,13 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	in (use_mod, _NIL_)
 
       | otherwise
-      = case (origName "get_id_name" id) of { OrigName m n -> (m, n) }
+-}
+      = modAndOcc id
 
     get_ty_data (ty, tys)
       = (mod_name, [(ty_name, ty, tys)])
       where
-	(OrigName mod_name ty_name) = origName "get_ty_data" ty
+	(mod_name, ty_name) = modAndOcc ty
 
     module_names    = concat [keysFM idspecs_fm, keysFM tyspecs_fm]
     mods            = map head (equivClasses _CMP_STRING_ module_names)
@@ -280,7 +284,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 pp_module mod
   = ppBesides [ppPStr mod, ppStr ":"]
 
-pp_tyspec :: PprStyle -> Pretty -> (FAST_STRING, TyCon, [Maybe Type]) -> Pretty
+pp_tyspec :: PprStyle -> Pretty -> (OccName, TyCon, [Maybe Type]) -> Pretty
 
 pp_tyspec sty pp_mod (_, tycon, tys)
   = ppCat [pp_mod,
@@ -296,7 +300,7 @@ pp_tyspec sty pp_mod (_, tycon, tys)
     choose_ty (tv, Nothing) = (mkTyVarTy tv, Just tv)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
-pp_idspec :: PprStyle -> Pretty -> (FAST_STRING, Id, [Maybe Type], Bool) -> Pretty
+pp_idspec :: PprStyle -> Pretty -> (OccName, Id, [Maybe Type], Bool) -> Pretty
 
 pp_idspec sty pp_mod (_, id, tys, is_err)
   | isDictFunId id
@@ -309,28 +313,24 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | is_const_method_id
   = let
 	Just (cls, clsty, clsop) = const_method_maybe
-    	(OrigName _ cls_str) = origName "pp_idspec" cls
-	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
-	   pp_clsop clsop_str, ppStr "::",
+	   pprNonSym sty clsop, ppStr "::",
 	   pprGenType sty spec_ty,
 	   ppStr "#-} {- IN instance",
-	   ppPStr cls_str, pprParendGenType sty clsty,
+	   pprOccName sty (getOccName cls), pprParendGenType sty clsty,
 	   ppStr "-}", pp_essential ]
 
   | is_default_method_id
   = let
 	Just (cls, clsop, _) = default_method_maybe
-    	(OrigName _ cls_str) = origName "pp_idspec2" cls
-	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,
 	   ppStr "{- instance",
-	   ppPStr cls_str,
+	   pprOccName sty (getOccName cls),
 	   ppStr "EXPLICIT METHOD REQUIRED",
-	   pp_clsop clsop_str, ppStr "::",
+	   pprNonSym sty clsop, ppStr "::",
 	   pprGenType sty spec_ty,
 	   ppStr "-}", pp_essential ]
 
@@ -349,10 +349,4 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
 
     default_method_maybe = isDefaultMethodId_maybe id
     is_default_method_id = maybeToBool default_method_maybe
-
-    pp_clsop str | isLexVarSym str && not (isLexSpecialSym str)
-    	         = ppParens (ppPStr str)
-    	         | otherwise
-		 = ppPStr str
-
 \end{code}

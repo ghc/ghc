@@ -29,7 +29,7 @@ import AbsCSyn
 import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
-import CgCompInfo	( spARelToInt, spBRelToInt, mIN_UPD_SIZE )
+import Constants	( spARelToInt, spBRelToInt, mIN_UPD_SIZE )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
 			  CLabel{-instance Ord-}

@@ -32,7 +32,7 @@ IMP_Ubiq(){-uitous-}
 
 import Id		( externallyVisibleId, GenId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
-import Name		( showRdr, getOccName, RdrName )
+import Name		( OccName, getOccString, moduleString )
 import Pretty		( ppShow, prettyToUn )
 import PprStyle		( PprStyle(..) )
 import UniqSet
@@ -393,7 +393,7 @@ uppCostCentre sty print_as_string cc
 	    basic_kind = do_caf is_caf ++ do_kind kind
 	in
 	if friendly_sty then
-	    do_dupd is_dupd (basic_kind ++ ('/': _UNPK_ mod_name) ++ ('/': _UNPK_ grp_name))
+	    do_dupd is_dupd (basic_kind ++ ('/': moduleString mod_name) ++ ('/': _UNPK_ grp_name))
 	else
 	    basic_kind
       where
@@ -407,8 +407,8 @@ uppCostCentre sty print_as_string cc
 	do_id :: Id -> String
 	do_id id
 	  = if print_as_string
-	    then showRdr sty (getOccName id)	-- use occ name
-	    else showId sty id	      		-- we really do
+	    then  getOccString id		-- use occ name
+	    else showId sty id	 		-- we really do
 
     ---------------
     do_dupd ADupdCC str = if friendly_sty then str ++ "/DUPD" else str

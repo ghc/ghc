@@ -11,7 +11,7 @@
 #include "HsVersions.h"
 
 module PprCore (
-	pprCoreExpr,
+	pprCoreExpr, pprIfaceUnfolding, 
 	pprCoreBinding,
 	pprBigCoreBinder,
 	pprTypedCoreBinder
@@ -32,10 +32,10 @@ import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )
-import Name		( isSymLexeme )
+import Name		( OccName, parenInCode )
 import Outputable	-- quite a few things
 import PprEnv
-import PprType		( pprParendGenType, GenType{-instances-}, GenTyVar{-instance-} )
+import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import PrimOp		( PrimOp{-instances-} )
@@ -68,7 +68,7 @@ print something.
 pprCoreBinding :: PprStyle -> CoreBinding -> Pretty
 
 pprGenCoreBinding
-	:: (Eq tyvar, Outputable tyvar,
+	:: (Eq tyvar,  Outputable tyvar,
 	    Eq uvar,  Outputable uvar,
 	    Outputable bndr,
 	    Outputable occ)
@@ -80,15 +80,16 @@ pprGenCoreBinding
 	-> Pretty
 
 pprGenCoreBinding sty pbdr1 pbdr2 pocc bind
-  = ppr_bind (init_ppr_env sty pbdr1 pbdr2 pocc) bind
+  = ppr_bind (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) bind
 
-init_ppr_env sty pbdr1 pbdr2 pocc
+init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
   = initPprEnv sty
 	(Just (ppr sty)) -- literals
 	(Just (ppr sty)) -- data cons
 	(Just (ppr sty)) -- primops
 	(Just (\ cc -> ppStr (showCostCentre sty True cc)))
-	(Just (ppr sty)) -- tyvars
+	(Just tvbndr)	 -- tyvar binders
+	(Just (ppr sty)) -- tyvar occs
 	(Just (ppr sty)) -- usage vars
 	(Just pbdr1) (Just pbdr2) (Just pocc) -- value vars
 	(Just (pprParendGenType sty)) -- types
@@ -120,7 +121,8 @@ pprCoreExpr
 pprCoreExpr = pprGenCoreExpr
 
 pprGenCoreExpr, pprParendCoreExpr
-	:: (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
+	:: (Eq tyvar, Outputable tyvar,
+	    Eq uvar, Outputable uvar,
 	    Outputable bndr,
 	    Outputable occ)
 	=> PprStyle
@@ -131,7 +133,7 @@ pprGenCoreExpr, pprParendCoreExpr
 	-> Pretty
 
 pprGenCoreExpr sty pbdr1 pbdr2 pocc expr
-  = ppr_expr (init_ppr_env sty pbdr1 pbdr2 pocc) expr
+  = ppr_expr (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) expr
 
 pprParendCoreExpr sty pbdr1 pbdr2 pocc expr
   = let
@@ -143,14 +145,23 @@ pprParendCoreExpr sty pbdr1 pbdr2 pocc expr
     in
     parenify (pprGenCoreExpr sty pbdr1 pbdr2 pocc expr)
 
+-- Printer for unfoldings in interfaces
+pprIfaceUnfolding :: CoreExpr -> Pretty
+pprIfaceUnfolding = ppr_expr env 
+  where
+    env = init_ppr_env PprInterface (pprTyVarBndr PprInterface)
+				    (pprTypedCoreBinder PprInterface)
+				    (pprTypedCoreBinder PprInterface)
+				    (ppr PprInterface)
+
 ppr_core_arg sty pocc arg
-  = ppr_arg (init_ppr_env sty pocc pocc pocc) arg
+  = ppr_arg (init_ppr_env sty (ppr sty) pocc pocc pocc) arg
 
 ppr_core_alts sty pbdr1 pbdr2 pocc alts
-  = ppr_alts (init_ppr_env sty pbdr1 pbdr2 pocc) alts
+  = ppr_alts (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) alts
 
 ppr_core_default sty pbdr1 pbdr2 pocc deflt
-  = ppr_default (init_ppr_env sty pbdr1 pbdr2 pocc) deflt
+  = ppr_default (init_ppr_env sty (ppr sty) pbdr1 pbdr2 pocc) deflt
 \end{code}
 
 %************************************************************************
@@ -207,13 +218,11 @@ ppr_bind pe (NonRec val_bdr expr)
 	 4 (ppr_expr pe expr)
 
 ppr_bind pe (Rec binds)
-  = ppAboves [ ppStr "{- Rec -}",
-	       ppAboves (map ppr_pair binds),
-	       ppStr "{- end Rec -}" ]
+  = ppAboves (map ppr_pair binds)
   where
     ppr_pair (val_bdr, expr)
       = ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
-	     4 (ppr_expr pe expr)
+	     4 (ppr_expr pe expr `ppBeside` ppSemi)
 \end{code}
 
 \begin{code}
@@ -245,9 +254,9 @@ ppr_expr pe expr@(Lam _ _)
   = let
 	(uvars, tyvars, vars, body) = collectBinders expr
     in
-    ppHang (ppCat [pp_vars SLIT("_/u\\_") (pUVar    pe) uvars,
-		   pp_vars SLIT("_/\\_")  (pTyVar   pe) tyvars,
-		   pp_vars SLIT("\\")     (pMinBndr pe) vars])
+    ppHang (ppCat [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
+		   pp_vars SLIT("/\\")  (pTyVarB  pe) tyvars,
+		   pp_vars SLIT("\\")   (pMinBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = ppNil
@@ -283,12 +292,12 @@ ppr_expr pe (Case expr alts)
 	ppr_rhs (PrimAlts ((_,expr):[]) NoDefault)  = ppr_expr pe expr
     in 
     ppSep
-    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_parend_expr pe expr), ppStr "of {", ppr_alt alts],
-	 ppBeside (ppr_rhs alts) (ppStr "}")]
+    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_expr pe expr), ppStr "of {", ppr_alt alts],
+	 ppBeside (ppr_rhs alts) (ppStr ";}")]
 
   | otherwise -- default "case" printing
   = ppSep
-    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_parend_expr pe expr), ppStr "of {"],
+    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_expr pe expr), ppStr "of {"],
      ppNest 2 (ppr_alts pe alts),
      ppStr "}"]
 
@@ -312,19 +321,22 @@ ppr_expr pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 
 -- general case (recursive case, too)
 ppr_expr pe (Let bind expr)
-  = ppSep [ppHang (ppStr "let {") 2 (ppr_bind pe bind),
+  = ppSep [ppHang (ppStr keyword) 2 (ppr_bind pe bind),
 	   ppHang (ppStr "} in ") 2 (ppr_expr pe expr)]
+  where
+    keyword = case bind of
+		Rec _      -> "letrec {"
+		NonRec _ _ -> "let {"
 
 ppr_expr pe (SCC cc expr)
   = ppSep [ppCat [ppPStr SLIT("_scc_"), pSCC pe cc],
 	   ppr_parend_expr pe expr ]
 
 ppr_expr pe (Coerce c ty expr)
-  = ppSep [ppCat [ppPStr SLIT("_coerce_"), pp_coerce c],
-	   pTy pe ty, ppr_parend_expr pe expr ]
+  = ppSep [pp_coerce c, pTy pe ty, ppr_parend_expr pe expr ]
   where
-    pp_coerce (CoerceIn  v) = ppBeside (ppStr "{-in-}")  (ppr (pStyle pe) v)
-    pp_coerce (CoerceOut v) = ppBeside (ppStr "{-out-}") (ppr (pStyle pe) v)
+    pp_coerce (CoerceIn  v) = ppBeside (ppStr "_coerce_in_")  (ppr (pStyle pe) v)
+    pp_coerce (CoerceOut v) = ppBeside (ppStr "_coerce_out_") (ppr (pStyle pe) v)
 
 only_one_alt (AlgAlts []     (BindDefault _ _)) = True
 only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
@@ -332,8 +344,7 @@ only_one_alt (PrimAlts []    (BindDefault _ _)) = True
 only_one_alt (PrimAlts (_:[]) NoDefault) 	= True
 only_one_alt _					= False 
 
-ppr_alt_con con pp_con
-  = if isSymLexeme con then ppParens pp_con else pp_con
+ppr_alt_con con pp_con = if parenInCode (getOccName con) then ppParens pp_con else pp_con
 \end{code}
 
 \begin{code}
@@ -349,14 +360,14 @@ ppr_alts pe (AlgAlts alts deflt)
 			   ppInterleave ppSP (map (pMinBndr pe) params),
 			   ppStr "->"]
 	       )
-	     4 (ppr_expr pe expr)
+	     4 (ppr_expr pe expr `ppBeside` ppSemi)
 
 ppr_alts pe (PrimAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (lit, expr)
       = ppHang (ppCat [pLit pe lit, ppStr "->"])
-	     4 (ppr_expr pe expr)
+	     4 (ppr_expr pe expr `ppBeside` ppSemi)
 \end{code}
 
 \begin{code}
@@ -364,7 +375,7 @@ ppr_default pe NoDefault = ppNil
 
 ppr_default pe (BindDefault val_bdr expr)
   = ppHang (ppCat [pMinBndr pe val_bdr, ppStr "->"])
-	 4 (ppr_expr pe expr)
+	 4 (ppr_expr pe expr `ppBeside` ppSemi)
 \end{code}
 
 \begin{code}
@@ -387,8 +398,7 @@ pprBigCoreBinder sty binder
 
     pragmas =
 	ifnotPprForUser sty
-	 (ppIdInfo sty binder False{-no specs, thanks-} id nullIdEnv
-	  (getIdInfo binder))
+	 (ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder))
 
 pprBabyCoreBinder sty binder
   = ppCat [ppr sty binder, pp_strictness]
@@ -402,7 +412,5 @@ pprBabyCoreBinder sty binder
 		-- ppStr ("{- " ++ (showList xx "") ++ " -}")
 
 pprTypedCoreBinder sty binder
-  = ppBesides [ppLparen, ppCat [ppr sty binder,
-	ppStr "::", ppr sty (idType binder)],
-	ppRparen]
+  = ppBesides [ppr sty binder, ppStr "::", pprParendGenType sty (idType binder)]
 \end{code}

@@ -20,7 +20,7 @@ IMP_Ubiq(){-uitous-}
 import Bag		( bagToList )
 import PprStyle		( PprStyle(..) )
 import Pretty
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc{-instance-} )
+import SrcLoc		( noSrcLoc, SrcLoc{-instance-} )
 \end{code}
 
 \begin{code}

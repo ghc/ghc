@@ -14,13 +14,13 @@ module TysPrim where
 IMP_Ubiq(){-uitous-}
 
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
-import Name		( mkPrimitiveName )
-import PrelMods		( gHC_BUILTINS )
+import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
 import Type		( applyTyCon, mkTyVarTys, mkTyConTy )
 import TyVar		( GenTyVar(..), alphaTyVars )
 import Usage		( usageOmega )
+import PrelMods		( gHC__ )
 import Unique
 \end{code}
 
@@ -40,10 +40,10 @@ alphaTys = mkTyVarTys alphaTyVars
 pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> PrimRep -> TyCon
 
 pcPrimTyCon key str arity primrep
-  = mkPrimTyCon name (mk_kind arity) primrep
+  = the_tycon
   where
-    name = mkPrimitiveName key (OrigName gHC_BUILTINS str)
-
+    name      = mkWiredInTyConName key gHC__ str the_tycon
+    the_tycon = mkPrimTyCon name (mk_kind arity) primrep
     mk_kind 0 = mkUnboxedTypeKind
     mk_kind n = mkTypeKind `mkArrowKind` mk_kind (n-1)
 
@@ -111,17 +111,8 @@ We never manipulate values of type RealWorld; it's only used in the type
 system, to parameterise State#.
 
 \begin{code}
-realWorldTy = applyTyCon realWorldTyCon []
-realWorldTyCon
-  = mkDataTyCon name mkBoxedTypeKind 
-	[{-no tyvars-}]
-	[{-no context-}]
-	[{-no data cons!-}] -- we tell you *nothing* about this guy
-	[{-no derivings-}]
-	DataType
-  where
-    name = mkPrimitiveName realWorldTyConKey (OrigName gHC_BUILTINS SLIT("RealWorld"))
-
+realWorldTy	     = applyTyCon realWorldTyCon []
+realWorldTyCon	     = mk_no_constr_tycon realWorldTyConKey SLIT("RealWorld") 
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}
 
@@ -137,17 +128,21 @@ defined in \tr{TysWiredIn.lhs}, not here.
 --
 -- ) It's boxed; there is only one value of this
 -- type, namely "void", whose semantics is just bottom.
-voidTy = mkTyConTy voidTyCon
+voidTy    = mkTyConTy voidTyCon
+voidTyCon = mk_no_constr_tycon voidTyConKey SLIT("Void")
+\end{code}
 
-voidTyCon
-  = mkDataTyCon name mkBoxedTypeKind 
-	[{-no tyvars-}]
-	[{-no context-}]
-	[{-no data cons!-}]
-	[{-no derivings-}]
-	DataType
+\begin{code}
+mk_no_constr_tycon key str
+  = the_tycon
   where
-    name = mkPrimitiveName voidTyConKey (OrigName gHC_BUILTINS SLIT("Void"))
+    name      = mkWiredInTyConName key gHC__ str the_tycon
+    the_tycon = mkDataTyCon name mkBoxedTypeKind 
+			[{-no tyvars-}]
+			[{-no context-}]
+			[{-no data cons!-}] -- we tell you *nothing* about this guy
+			[{-no derivings-}]
+			DataType
 \end{code}
 
 %************************************************************************

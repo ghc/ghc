@@ -10,60 +10,43 @@ Haskell. [WDP 94/11])
 #include "HsVersions.h"
 
 module IdInfo (
-	IdInfo,		-- abstract
+	IdInfo,		-- Abstract
+
 	noIdInfo,
-	boringIdInfo,
 	ppIdInfo,
 	applySubstToIdInfo, apply_to_IdInfo,    -- not for general use, please
 
-	OptIdInfo(..),	-- class; for convenience only
-			-- all the *Infos herein are instances of it
-
-	-- component "id infos"; also abstract:
-	SrcLoc,
-	getSrcLocIdInfo,
-
-	ArityInfo,
-	mkArityInfo, unknownArity, arityMaybe,
+	ArityInfo(..),
+	exactArity, atLeastArity, unknownArity,
+	arityInfo, addArityInfo, ppArityInfo,
 
 	DemandInfo,
-	mkDemandInfo,
-	willBeDemanded,
+	noDemandInfo, mkDemandInfo, demandInfo, ppDemandInfo, addDemandInfo, willBeDemanded,
 
-	StrictnessInfo(..), 	-- non-abstract
-	Demand(..),	    	-- non-abstract
-
+	StrictnessInfo(..),				-- Non-abstract
+	Demand(..),	    				-- Non-abstract
 	wwLazy, wwStrict, wwUnpack, wwPrim, wwEnum,
-	indicatesWorker, nonAbsentArgs,
-	mkStrictnessInfo, mkBottomStrictnessInfo,
-	getWrapperArgTypeCategories,
-	getWorkerId,
+
+	getWorkerId_maybe,
 	workerExists,
-	bottomIsGuaranteed,
+	mkStrictnessInfo, mkBottomStrictnessInfo, noStrictnessInfo, bottomIsGuaranteed,
+	strictnessInfo, ppStrictnessInfo, addStrictnessInfo, 
 
-	mkUnfolding,
-	noInfo_UF, getInfo_UF, addInfo_UF, -- to avoid instance virus
+	unfoldInfo, addUnfoldInfo, 
 
-	UpdateInfo,
-	mkUpdateInfo,
-	SYN_IE(UpdateSpec),
-	updateInfoMaybe,
+	specInfo, addSpecInfo,
+
+	UpdateInfo, SYN_IE(UpdateSpec),
+	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, addUpdateInfo,
 
 	DeforestInfo(..),
+	deforestInfo, ppDeforestInfo, addDeforestInfo,
 
-	ArgUsageInfo,
-	ArgUsage(..),
-	SYN_IE(ArgUsageType),
-	mkArgUsageInfo,
-	getArgUsage,
+	ArgUsageInfo, ArgUsage(..), SYN_IE(ArgUsageType),
+	mkArgUsageInfo, argUsageInfo, addArgUsageInfo, getArgUsage,
 
-	FBTypeInfo,
-	FBType(..),
-	FBConsum(..),
-	FBProd(..),
-	mkFBTypeInfo,
-	getFBType
-
+	FBTypeInfo, FBType(..), FBConsum(..), FBProd(..),
+	fbTypeInfo, ppFBTypeInfo, addFBTypeInfo, mkFBTypeInfo, getFBType
     ) where
 
 IMP_Ubiq()
@@ -74,13 +57,14 @@ IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 			-- *not* importing much of anything else,
 			-- except from the very general "utils".
 
+import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
+
+import Demand
 import Maybes		( firstJust )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
-import SrcLoc		( mkUnknownSrcLoc )
-import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import Unique		( pprUnique )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
@@ -90,9 +74,6 @@ ord = fromEnum :: Char -> Int
 
 applySubstToTy = panic "IdInfo.applySubstToTy"
 showTypeCategory = panic "IdInfo.showTypeCategory"
-mkFormSummary = panic "IdInfo.mkFormSummary"
-isWrapperFor = panic "IdInfo.isWrapperFor"
-pprCoreUnfolding = panic "IdInfo.pprCoreUnfolding"
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
@@ -115,12 +96,15 @@ data IdInfo
 	DemandInfo		-- Whether or not it is definitely
 				-- demanded
 
-	SpecEnv			-- Specialisations of this function which exist
+	SpecEnv
+				-- Specialisations of this function which exist
 
-	StrictnessInfo		-- Strictness properties, notably
+	(StrictnessInfo Id)
+				-- Strictness properties, notably
 				-- how to conjure up "worker" functions
 
-	Unfolding		-- Its unfolding; for locally-defined
+	Unfolding
+				-- Its unfolding; for locally-defined
 				-- things, this can *only* be NoUnfolding
 
 	UpdateInfo		-- Which args should be updated
@@ -131,47 +115,11 @@ data IdInfo
 	ArgUsageInfo		-- how this Id uses its arguments
 
 	FBTypeInfo		-- the Foldr/Build W/W property of this function.
-
-	SrcLoc			-- Source location of definition
-
-	-- ToDo: SrcLoc is in FullNames too (could rm?)  but it
-	-- is needed here too for things like ConstMethodIds and the
-	-- like, which don't have full-names of their own Mind you,
-	-- perhaps the Name for a constant method could give the
-	-- class/type involved?
 \end{code}
 
 \begin{code}
-noIdInfo = IdInfo noInfo noInfo noInfo noInfo noInfo_UF
-		  noInfo noInfo noInfo noInfo mkUnknownSrcLoc
-
--- "boring" means: nothing to put in interface
-boringIdInfo (IdInfo UnknownArity
-		     UnknownDemand
-		     specenv
-		     strictness
-		     unfolding
-		     NoUpdateInfo
-		     Don'tDeforest
-		     _ {- arg_usage: currently no interface effect -}
-		     _ {- no f/b w/w -}
-		     _ {- src_loc: no effect on interfaces-}
-	      )
-	      |  isNullSpecEnv specenv
-	      && boring_strictness strictness
-	      && boring_unfolding unfolding
-  = True
-  where
-    boring_strictness NoStrictnessInfo = True
-    boring_strictness BottomGuaranteed = False
-    boring_strictness (StrictnessInfo wrap_args _) = all_present_WwLazies wrap_args
-
-    boring_unfolding NoUnfolding = True
-    boring_unfolding _	    	 = False
-
-boringIdInfo _ = False
-
-pp_NONE = ppPStr SLIT("_N_")
+noIdInfo = IdInfo UnknownArity UnknownDemand nullSpecEnv NoStrictnessInfo noUnfolding
+		  NoUpdateInfo Don'tDeforest NoArgUsageInfo NoFBTypeInfo 
 \end{code}
 
 Simply turgid.  But BE CAREFUL: don't @apply_to_Id@ if that @Id@
@@ -179,7 +127,7 @@ will in turn @apply_to_IdInfo@ of the self-same @IdInfo@.  (A very
 nasty loop, friends...)
 \begin{code}
 apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
-			      update deforest arg_usage fb_ww srcloc)
+			      update deforest arg_usage fb_ww)
   | isNullSpecEnv spec
   = idinfo
   | otherwise
@@ -193,7 +141,7 @@ apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 	--   apply_wrap wrap 		`thenLft` \ new_wrap ->
     in
     IdInfo arity demand new_spec strictness unfold
-	   update deforest arg_usage fb_ww srcloc
+	   update deforest arg_usage fb_ww
   where
     apply_spec (SpecEnv is)
       = SpecEnv (map do_one is)
@@ -222,11 +170,11 @@ apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 Variant of the same thing for the typechecker.
 \begin{code}
 applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
-			      update deforest arg_usage fb_ww srcloc)
+			      update deforest arg_usage fb_ww)
   = panic "IdInfo:applySubstToIdInfo"
 {- LATER:
     case (apply_spec s0 spec) of { (s1, new_spec) ->
-    (s1, IdInfo arity demand new_spec strictness unfold update deforest arg_usage fb_ww srcloc) }
+    (s1, IdInfo arity demand new_spec strictness unfold update deforest arg_usage fb_ww) }
   where
     apply_spec s0 (SpecEnv is)
       = case (mapAccumL do_one s0 is) of { (s1, new_is) ->
@@ -245,77 +193,29 @@ applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
 
 \begin{code}
 ppIdInfo :: PprStyle
-	 -> Id		-- The Id for which we're printing this IdInfo
 	 -> Bool	-- True <=> print specialisations, please
-	 -> (Id -> Id)	-- to look up "better Ids" w/ better IdInfos;
-	 -> IdEnv Unfolding
-			-- inlining info for top-level fns in this module
-	 -> IdInfo	-- see MkIface notes
+	 -> IdInfo
 	 -> Pretty
 
-ppIdInfo sty for_this_id specs_please better_id_fn inline_env
-    i@(IdInfo arity demand specenv strictness unfold update deforest arg_usage fbtype srcloc)
-  | boringIdInfo i
-  = ppPStr SLIT("_NI_")
-
-  | otherwise
-  = let
-	stuff = ppCat [
+ppIdInfo sty specs_please
+    	 (IdInfo arity demand specenv strictness unfold update deforest arg_usage fbtype)
+  = ppCat [
 		    -- order is important!:
-		    ppInfo sty better_id_fn arity,
-		    ppInfo sty better_id_fn update,
-		    ppInfo sty better_id_fn deforest,
+		    ppArityInfo sty arity,
+		    ppUpdateInfo sty update,
+		    ppDeforestInfo sty deforest,
 
-		    pp_strictness sty (Just for_this_id)
-						  better_id_fn inline_env strictness,
-
-		    if bottomIsGuaranteed strictness
-		    then pp_NONE
-		    else pp_unfolding sty for_this_id inline_env unfold,
+		    ppStrictnessInfo sty strictness,
 
 		    if specs_please
-		    then pp_NONE -- ToDo -- sty (not (isDataCon for_this_id))
+		    then ppNil -- ToDo -- sty (not (isDataCon for_this_id))
 					 -- better_id_fn inline_env (mEnvToList specenv)
-		    else pp_NONE,
+		    else ppNil,
 
 		    -- DemandInfo needn't be printed since it has no effect on interfaces
-		    ppInfo sty better_id_fn demand,
-		    ppInfo sty better_id_fn fbtype
-		]
-    in
-    case sty of
-      PprInterface -> if opt_OmitInterfacePragmas
-		      then ppNil
-		      else stuff
-      _		   -> stuff
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[OptIdInfo-class]{The @OptIdInfo@ class (keeps things tidier)}
-%*									*
-%************************************************************************
-
-\begin{code}
-class OptIdInfo a where
-    noInfo	:: a
-    getInfo	:: IdInfo -> a
-    addInfo	:: IdInfo -> a -> IdInfo
-		-- By default, "addInfo" will not overwrite
-		-- "info" with "non-info"; look at any instance
-		-- to see an example.
-    ppInfo	:: PprStyle -> (Id -> Id) -> a -> Pretty
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[srcloc-IdInfo]{Source-location info in an @IdInfo@}
-%*									*
-%************************************************************************
-
-Not used much, but...
-\begin{code}
-getSrcLocIdInfo  (IdInfo _ _ _ _ _ _ _ _ _ src_loc) = src_loc
+		    ppDemandInfo sty demand,
+		    ppFBTypeInfo sty fbtype
+	]
 \end{code}
 
 %************************************************************************
@@ -326,31 +226,24 @@ getSrcLocIdInfo  (IdInfo _ _ _ _ _ _ _ _ _ src_loc) = src_loc
 
 \begin{code}
 data ArityInfo
-  = UnknownArity	-- no idea
-  | ArityExactly Int	-- arity is exactly this
+  = UnknownArity	-- No idea
+  | ArityExactly Int	-- Arity is exactly this
+  | ArityAtLeast Int	-- Arity is this or greater
 \end{code}
 
 \begin{code}
-mkArityInfo  = ArityExactly
+exactArity   = ArityExactly
+atLeastArity = ArityAtLeast
 unknownArity = UnknownArity
 
-arityMaybe :: ArityInfo -> Maybe Int
+arityInfo (IdInfo arity _ _ _ _ _ _ _ _) = arity
 
-arityMaybe UnknownArity	    = Nothing
-arityMaybe (ArityExactly i) = Just i
-\end{code}
+addArityInfo id_info			UnknownArity = id_info
+addArityInfo (IdInfo _ a c d e f g h i) arity	     = IdInfo arity a c d e f g h i
 
-\begin{code}
-instance OptIdInfo ArityInfo where
-    noInfo = UnknownArity
-
-    getInfo (IdInfo arity _ _ _ _ _ _ _ _ _) = arity
-
-    addInfo id_info UnknownArity = id_info
-    addInfo (IdInfo _ a c d e f g h i j) arity = IdInfo arity a c d e f g h i j
-
-    ppInfo sty _ UnknownArity	      = ifPprInterface sty pp_NONE
-    ppInfo sty _ (ArityExactly arity) = ppCat [ppPStr SLIT("_A_"), ppInt arity]
+ppArityInfo sty UnknownArity	     = ppNil
+ppArityInfo sty (ArityExactly arity) = ppCat [ppPStr SLIT("_A_"), ppInt arity]
+ppArityInfo sty (ArityAtLeast arity) = ppCat [ppPStr SLIT("_A>_"), ppInt arity]
 \end{code}
 
 %************************************************************************
@@ -373,6 +266,8 @@ data DemandInfo
 \end{code}
 
 \begin{code}
+noDemandInfo = UnknownDemand
+
 mkDemandInfo :: Demand -> DemandInfo
 mkDemandInfo demand = DemandedAsPer demand
 
@@ -382,22 +277,13 @@ willBeDemanded _		      = False
 \end{code}
 
 \begin{code}
-instance OptIdInfo DemandInfo where
-    noInfo = UnknownDemand
+demandInfo (IdInfo _ demand _ _ _ _ _ _ _) = demand
 
-    getInfo (IdInfo _ demand _ _ _ _ _ _ _ _) = demand
+addDemandInfo (IdInfo a _ c d e f g h i) demand = IdInfo a demand c d e f g h i
 
-{-	DELETED!  If this line is in, there is no way to
-	nuke a DemandInfo, and we have to be able to do that
-	when floating let-bindings around
-    addInfo id_info UnknownDemand = id_info
--}
-    addInfo (IdInfo a _ c d e f g h i j) demand = IdInfo a demand c d e f g h i j
-
-    ppInfo PprInterface _ _	      = ppNil
-    ppInfo sty _ UnknownDemand	      = ppStr "{-# L #-}"
-    ppInfo sty _ (DemandedAsPer info)
-      = ppCat [ppStr "{-#", ppStr (showList [info] ""), ppStr "#-}"]
+ppDemandInfo PprInterface _	      = ppNil
+ppDemandInfo sty UnknownDemand	      = ppStr "{-# L #-}"
+ppDemandInfo sty (DemandedAsPer info) = ppCat [ppStr "{-#", ppStr (showList [info] ""), ppStr "#-}"]
 \end{code}
 
 %************************************************************************
@@ -409,16 +295,10 @@ instance OptIdInfo DemandInfo where
 See SpecEnv.lhs
 
 \begin{code}
-instance OptIdInfo SpecEnv where
-    noInfo = nullSpecEnv
+specInfo (IdInfo _ _ spec _ _ _ _ _ _) = spec
 
-    getInfo (IdInfo _ _ spec _ _ _ _ _ _ _) = spec
-
-    addInfo id_info spec | isNullSpecEnv spec = id_info
-    addInfo (IdInfo a b _ d e f g h i j) spec = IdInfo a b spec d e f g h i j
-
-    ppInfo sty better_id_fn spec = panic "IdInfo:ppSpecs"
---      = ppSpecs sty True better_id_fn nullIdEnv (mEnvToList spec)
+addSpecInfo id_info spec | isNullSpecEnv spec = id_info
+addSpecInfo (IdInfo a b _ d e f g h i) spec   = IdInfo a b spec d e f g h i
 \end{code}
 
 %************************************************************************
@@ -438,7 +318,7 @@ version of the function; and (c)~the type signature of that worker (if
 it exists); i.e. its calling convention.
 
 \begin{code}
-data StrictnessInfo
+data StrictnessInfo bdee
   = NoStrictnessInfo
 
   | BottomGuaranteed	-- This Id guarantees never to return;
@@ -446,280 +326,55 @@ data StrictnessInfo
 			-- Useful for "error" and other disguised
 			-- variants thereof.
 
-  | StrictnessInfo	[Demand]	-- the main stuff; see below.
-			(Maybe Id)	-- worker's Id, if applicable.
-\end{code}
-
-This type is also actually used in the strictness analyser:
-\begin{code}
-data Demand
-  = WwLazy		-- Argument is lazy as far as we know
-	MaybeAbsent	-- (does not imply worker's existence [etc]).
-			-- If MaybeAbsent == True, then it is
-			-- *definitely* lazy.  (NB: Absence implies
-			-- a worker...)
-
-  | WwStrict		-- Argument is strict but that's all we know
-			-- (does not imply worker's existence or any
-			-- calling-convention magic)
-
-  | WwUnpack		-- Argument is strict & a single-constructor
-	[Demand]	-- type; its constituent parts (whose StrictInfos
-			-- are in the list) should be passed
-			-- as arguments to the worker.
-
-  | WwPrim		-- Argument is of primitive type, therefore
-			-- strict; doesn't imply existence of a worker;
-			-- argument should be passed as is to worker.
-
-  | WwEnum		-- Argument is strict & an enumeration type;
-			-- an Int# representing the tag (start counting
-			-- at zero) should be passed to the worker.
-  deriving (Eq, Ord)
-      -- we need Eq/Ord to cross-chk update infos in interfaces
-
-type MaybeAbsent = Bool -- True <=> not even used
-
--- versions that don't worry about Absence:
-wwLazy	    = WwLazy 	  False
-wwStrict    = WwStrict
-wwUnpack xs = WwUnpack xs
-wwPrim	    = WwPrim
-wwEnum	    = WwEnum
+  | StrictnessInfo	[Demand]	-- The main stuff; see below.
+			(Maybe bdee)	-- Worker's Id, if applicable.
+					-- (It may not be applicable because the strictness info
+					-- might say just "SSS" or something; so there's no w/w split.)
 \end{code}
 
 \begin{code}
-mkStrictnessInfo :: [Demand] -> Maybe Id -> StrictnessInfo
+mkStrictnessInfo :: [Demand] -> Maybe bdee -> StrictnessInfo bdee
 
-mkStrictnessInfo [] _    = NoStrictnessInfo
-mkStrictnessInfo xs wrkr = StrictnessInfo xs wrkr
+mkStrictnessInfo xs wrkr 
+  | all is_lazy xs	 = NoStrictnessInfo		-- Uninteresting
+  | otherwise		 = StrictnessInfo xs wrkr
+  where
+    is_lazy (WwLazy False) = True	-- NB "Absent" args do *not* count!
+    is_lazy _	           = False	-- (as they imply a worker)
 
+noStrictnessInfo       = NoStrictnessInfo
 mkBottomStrictnessInfo = BottomGuaranteed
 
 bottomIsGuaranteed BottomGuaranteed = True
 bottomIsGuaranteed other    	    = False
 
-getWrapperArgTypeCategories
-	:: Type		-- wrapper's type
-	-> StrictnessInfo	-- strictness info about its args
-	-> Maybe String
+strictnessInfo (IdInfo _ _ _ strict _ _ _ _ _) = strict
 
-getWrapperArgTypeCategories _ NoStrictnessInfo	    = Nothing
-getWrapperArgTypeCategories _ BottomGuaranteed
-  = trace "getWrapperArgTypeCategories:BottomGuaranteed!" Nothing  -- wrong
-getWrapperArgTypeCategories _ (StrictnessInfo [] _) = Nothing
+addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
+addStrictnessInfo (IdInfo a b d _ e f g h i) strict	      = IdInfo a b d strict e f g h i
 
-getWrapperArgTypeCategories ty (StrictnessInfo arg_info _)
-  = Just (mkWrapperArgTypeCategories ty arg_info)
+ppStrictnessInfo sty NoStrictnessInfo = ppNil
+ppStrictnessInfo sty BottomGuaranteed = ppPStr SLIT("_S_ _!_")
 
-workerExists :: StrictnessInfo -> Bool
+ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
+  = ppCat [ppPStr SLIT("_S_"), ppStr (showList wrapper_args ""), pp_wrkr]
+  where
+    pp_wrkr = case wrkr_maybe of
+		 Nothing   -> ppNil
+		 Just wrkr -> ppr sty wrkr
+\end{code}
+
+
+\begin{code}
+workerExists :: StrictnessInfo bdee -> Bool
 workerExists (StrictnessInfo _ (Just worker_id)) = True
 workerExists other				 = False
 
-getWorkerId :: StrictnessInfo -> Id
-
-getWorkerId (StrictnessInfo _ (Just worker_id)) = worker_id
-#ifdef DEBUG
-getWorkerId junk = pprPanic "getWorkerId: " (ppInfo PprDebug (\x->x) junk)
-#endif
+getWorkerId_maybe :: StrictnessInfo bdee -> Maybe bdee
+getWorkerId_maybe (StrictnessInfo _ maybe_worker_id) = maybe_worker_id
+getWorkerId_maybe other				     = Nothing
 \end{code}
 
-\begin{code}
-isStrict :: Demand -> Bool
-
-isStrict WwStrict	= True
-isStrict (WwUnpack _)	= True
-isStrict WwPrim		= True
-isStrict WwEnum		= True
-isStrict _		= False
-
-nonAbsentArgs :: [Demand] -> Int
-
-nonAbsentArgs cmpts
-  = foldr tick_non 0 cmpts
-  where
-    tick_non (WwLazy True) acc = acc
-    tick_non other	   acc = acc + 1
-
-all_present_WwLazies :: [Demand] -> Bool
-all_present_WwLazies infos
-  = and (map is_L infos)
-  where
-    is_L (WwLazy False) = True	-- False <=> "Absent" args do *not* count!
-    is_L _	        = False	-- (as they imply a worker)
-\end{code}
-
-WDP 95/04: It is no longer enough to look at a list of @Demands@ for
-an ``Unpack'' or an ``Absent'' and declare a worker.  We also have to
-check that @mAX_WORKER_ARGS@ hasn't been exceeded.  Therefore,
-@indicatesWorker@ mirrors the process used in @mk_ww_arg_processing@
-in \tr{WwLib.lhs}.  A worker is ``indicated'' when we hit an Unpack
-or an Absent {\em that we accept}.
-\begin{code}
-indicatesWorker :: [Demand] -> Bool
-
-indicatesWorker dems
-  = fake_mk_ww (mAX_WORKER_ARGS - nonAbsentArgs dems) dems
-  where
-    fake_mk_ww _ [] = False
-    fake_mk_ww _ (WwLazy True : _) = True -- we accepted an Absent
-    fake_mk_ww extra_args (WwUnpack cmpnts : dems)
-      | extra_args_now > 0 = True -- we accepted an Unpack
-      where
-	extra_args_now = extra_args + 1 - nonAbsentArgs cmpnts
-
-    fake_mk_ww extra_args (_ : dems)
-      = fake_mk_ww extra_args dems
-\end{code}
-
-\begin{code}
-mkWrapperArgTypeCategories
-	:: Type		-- wrapper's type
-	-> [Demand]	-- info about its arguments
-	-> String	-- a string saying lots about the args
-
-mkWrapperArgTypeCategories wrapper_ty wrap_info
-  = case (splitFunTyExpandingDicts wrapper_ty) of { (arg_tys,_) ->
-    map do_one (wrap_info `zip` (map showTypeCategory arg_tys)) }
-  where
-    -- ToDo: this needs FIXING UP (it was a hack anyway...)
-    do_one (WwPrim, _) = 'P'
-    do_one (WwEnum, _) = 'E'
-    do_one (WwStrict, arg_ty_char) = arg_ty_char
-    do_one (WwUnpack _, arg_ty_char)
-      = if arg_ty_char `elem` "CIJFDTS"
-	then toLower arg_ty_char
-	else if arg_ty_char == '+' then 't'
-	else trace ("mkWrapp..:funny char:"++[arg_ty_char]) '-'
-    do_one (other_wrap_info, _) = '-'
-\end{code}
-
-Whether a worker exists depends on whether the worker has an
-absent argument, a @WwUnpack@ argument, (or @WwEnum@ ToDo???) arguments.
-
-If a @WwUnpack@ argument is for an {\em abstract} type (or one that
-will be abstract outside this module), which might happen for an
-imported function, then we can't (or don't want to...) unpack the arg
-as the worker requires.  Hence we have to give up altogether, and call
-the wrapper only; so under these circumstances we return \tr{False}.
-
-\begin{code}
-#ifdef REALLY_HASKELL_1_3
-instance Read Demand where
-#else
-instance Text Demand where
-#endif
-    readList str = read_em [{-acc-}] str
-      where
-	read_em acc []		= [(reverse acc, "")]
-	-- lower case indicates absence...
-	read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
-	read_em acc ('A' : xs)	= read_em (WwLazy   True  : acc) xs
-	read_em acc ('S' : xs)	= read_em (WwStrict : acc) xs
-	read_em acc ('P' : xs)	= read_em (WwPrim : acc) xs
-	read_em acc ('E' : xs)	= read_em (WwEnum : acc) xs
-
-	read_em acc (')' : xs)	= [(reverse acc, xs)]
-	read_em acc ( 'U'  : '(' : xs)
-	  = case (read_em [] xs) of
-	      [(stuff, rest)] -> read_em (WwUnpack stuff : acc) rest
-	      _ -> panic ("Text.Demand:"++str++"::"++xs)
-
-	read_em acc other = panic ("IdInfo.readem:"++other)
-
-#ifdef REALLY_HASKELL_1_3
-instance Show Demand where
-#endif
-    showList wrap_args rest = (concat (map show1 wrap_args)) ++ rest
-      where
-	show1 (WwLazy False) = "L"
-	show1 (WwLazy True)  = "A"
-	show1 WwStrict	     = "S"
-	show1 WwPrim	     = "P"
-	show1 WwEnum	     = "E"
-	show1 (WwUnpack args)= "U(" ++ (concat (map show1 args)) ++ ")"
-
-instance Outputable Demand where
-    ppr sty si = ppStr (showList [si] "")
-
-instance OptIdInfo StrictnessInfo where
-    noInfo = NoStrictnessInfo
-
-    getInfo (IdInfo _ _ _ strict _ _ _ _ _ _) = strict
-
-    addInfo id_info NoStrictnessInfo = id_info
-    addInfo (IdInfo a b d _ e f g h i j) strict = IdInfo a b d strict e f g h i j
-
-    ppInfo sty better_id_fn strictness_info
-      = pp_strictness sty Nothing better_id_fn nullIdEnv strictness_info
-\end{code}
-
-We'll omit the worker info if the thing has an explicit unfolding
-already.
-\begin{code}
-pp_strictness sty _ _ _ NoStrictnessInfo = ifPprInterface sty pp_NONE
-
-pp_strictness sty _ _ _ BottomGuaranteed = ppPStr SLIT("_S_ _!_")
-
-pp_strictness sty for_this_id_maybe better_id_fn inline_env
-    info@(StrictnessInfo wrapper_args wrkr_maybe)
-  = let
-	(have_wrkr, wrkr_id) = case wrkr_maybe of
-				 Nothing -> (False, panic "ppInfo(Strictness)")
-				 Just xx -> (True,  xx)
-
-	wrkr_to_print   = better_id_fn wrkr_id
-	wrkr_info	= getIdInfo   wrkr_to_print
-
-	-- if we aren't going to be able to *read* the strictness info
-	-- in TcPragmas, we need not even print it.
-	wrapper_args_to_use
-	  = if not (indicatesWorker wrapper_args) then
-		wrapper_args -- no worker/wrappering in any case
-	    else
-		case for_this_id_maybe of
-		  Nothing -> wrapper_args
-		  Just id -> if externallyVisibleId id
-			     && (unfoldingUnfriendlyId id || not have_wrkr) then
-				-- pprTrace "IdInfo: unworker-ising:" (ppCat [ppr PprDebug have_wrkr, ppr PprDebug id]) $
-				map un_workerise wrapper_args
-			     else
-				wrapper_args
-
-	id_is_worker
-	  = case for_this_id_maybe of
-	      Nothing -> False
-	      Just id -> isWorkerId id
-
-	am_printing_iface = case sty of { PprInterface -> True ; _ -> False }
-
-	pp_basic_info
-	  = ppBesides [ppStr "_S_ \"",
-		ppStr (showList wrapper_args_to_use ""), ppStr "\""]
-
-	pp_with_worker
-	  = ppBesides [ ppSP, ppChar '{',
-			ppIdInfo sty wrkr_to_print True{-wrkr specs, yes!-} better_id_fn inline_env wrkr_info,
-			ppChar '}' ]
-    in
-    if all_present_WwLazies wrapper_args_to_use then -- too boring
-	ifPprInterface sty pp_NONE
-
-    else if id_is_worker && am_printing_iface then
-    	pp_NONE -- we don't put worker strictness in interfaces
-		-- (it can be deduced)
-
-    else if not (indicatesWorker wrapper_args_to_use)
-	 || not have_wrkr
-	 || boringIdInfo wrkr_info then
-	ppBeside pp_basic_info ppNil
-    else
-	ppBeside pp_basic_info pp_with_worker
-  where
-    un_workerise (WwLazy   _) = WwLazy False -- avoid absence
-    un_workerise (WwUnpack _) = WwStrict
-    un_workerise other	      = other
-\end{code}
 
 %************************************************************************
 %*									*
@@ -728,41 +383,9 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 %************************************************************************
 
 \begin{code}
-mkUnfolding guide expr
-  = CoreUnfolding (SimpleUnfolding (mkFormSummary expr)
-				   guide
-				   (occurAnalyseGlobalExpr expr))
-\end{code}
+unfoldInfo (IdInfo _ _ _ _ unfolding _ _ _ _) = unfolding
 
-\begin{code}
-noInfo_UF = NoUnfolding
-
-getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _) = unfolding
-
-addInfo_UF id_info@(IdInfo a b c d e f g h i j) NoUnfolding = id_info
-addInfo_UF (IdInfo a b d e _ f g h i j) uf = IdInfo a b d e uf f g h i j
-\end{code}
-
-\begin{code}
-pp_unfolding sty for_this_id inline_env uf_details
-  = case (lookupIdEnv inline_env for_this_id) of
-      Nothing -> pp uf_details
-      Just dt -> pp dt
-  where
-    pp NoUnfolding = pp_NONE
-
-    pp (MagicUnfolding tag _)
-      = ppCat [ppPStr SLIT("_MF_"), pprUnique tag]
-
-    pp (CoreUnfolding (SimpleUnfolding _ guide template))
-      = let
-	    untagged = unTagBinders template
-	in
-    	if untagged `isWrapperFor` for_this_id
-	then -- pprTrace "IdInfo:isWrapperFor:" (ppAbove (ppr PprDebug for_this_id) (ppr PprDebug untagged))
-	     pp_NONE
-	else ppCat [ppPStr SLIT("_F_"), ppr sty guide, pprCoreUnfolding untagged]
-
+addUnfoldInfo (IdInfo a b d e _ f g h i) uf = IdInfo a b d e uf f g h i
 \end{code}
 
 %************************************************************************
@@ -804,18 +427,14 @@ instance Text UpdateInfo where
 	ok_digit c | c >= '0' && c <= '2' = ord c - ord '0'
 		   | otherwise = panic "IdInfo: not a digit while reading update pragma"
 
-instance OptIdInfo UpdateInfo where
-    noInfo = NoUpdateInfo
+updateInfo (IdInfo _ _ _ _ _ update _ _ _) = update
 
-    getInfo (IdInfo _ _ _ _ _ update _ _ _ _) = update
+addUpdateInfo id_info			 NoUpdateInfo = id_info
+addUpdateInfo (IdInfo a b d e f _ g h i) upd_info     = IdInfo a b d e f upd_info g h i
 
-    addInfo id_info NoUpdateInfo = id_info
-    addInfo (IdInfo a b d e f _ g h i j) upd_info = IdInfo a b d e f upd_info g h i j
-
-    ppInfo sty better_id_fn NoUpdateInfo	= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeUpdateInfo [])	= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeUpdateInfo spec)
-      = ppBeside (ppPStr SLIT("_U_ ")) (ppBesides (map ppInt spec))
+ppUpdateInfo sty NoUpdateInfo	       = ppNil
+ppUpdateInfo sty (SomeUpdateInfo [])   = ppNil
+ppUpdateInfo sty (SomeUpdateInfo spec) = ppBeside (ppPStr SLIT("_U_ ")) (ppBesides (map ppInt spec))
 \end{code}
 
 %************************************************************************
@@ -836,19 +455,13 @@ data DeforestInfo
 \end{code}
 
 \begin{code}
-instance OptIdInfo DeforestInfo where
-    noInfo = Don'tDeforest
+deforestInfo (IdInfo _ _ _ _ _ _ deforest _ _) = deforest
 
-    getInfo (IdInfo _ _ _ _ _ _ deforest _ _ _) = deforest
+addDeforestInfo id_info 		   Don'tDeforest = id_info
+addDeforestInfo (IdInfo a b d e f g _ h i) deforest	 = IdInfo a b d e f g deforest h i
 
-    addInfo id_info Don'tDeforest = id_info
-    addInfo (IdInfo a b d e f g _ h i j) deforest =
-    	IdInfo a b d e f g deforest h i j
-
-    ppInfo sty better_id_fn Don'tDeforest
-      = ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn DoDeforest
-      = ppPStr SLIT("_DEFOREST_")
+ppDeforestInfo sty Don'tDeforest = ppNil
+ppDeforestInfo sty DoDeforest    = ppPStr SLIT("_DEFOREST_")
 \end{code}
 
 %************************************************************************
@@ -869,27 +482,22 @@ type ArgUsageType  = [ArgUsage]		-- c_1 -> ... -> BLOB
 \end{code}
 
 \begin{code}
-mkArgUsageInfo = SomeArgUsageInfo
+mkArgUsageInfo [] = NoArgUsageInfo
+mkArgUsageInfo au = SomeArgUsageInfo au
 
 getArgUsage :: ArgUsageInfo -> ArgUsageType
-getArgUsage NoArgUsageInfo	    = []
+getArgUsage NoArgUsageInfo	  = []
 getArgUsage (SomeArgUsageInfo u)  = u
 \end{code}
 
 \begin{code}
-instance OptIdInfo ArgUsageInfo where
-    noInfo = NoArgUsageInfo
+argUsageInfo (IdInfo _ _ _ _ _  _ _ au _) = au
 
-    getInfo (IdInfo _ _ _ _ _  _ _ au _ _) = au
+addArgUsageInfo id_info			   NoArgUsageInfo = id_info
+addArgUsageInfo (IdInfo a b d e f g h _ i) au_info	  = IdInfo a b d e f g h au_info i
 
-    addInfo id_info NoArgUsageInfo = id_info
-    addInfo (IdInfo a b d e f g h _ i j) au_info = IdInfo a b d e f g h au_info i j
-
-    ppInfo sty better_id_fn NoArgUsageInfo		= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeArgUsageInfo [])	= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeArgUsageInfo aut)
-      = ppBeside (ppPStr SLIT("_L_ ")) (ppArgUsageType aut)
-
+ppArgUsageInfo sty NoArgUsageInfo	  = ppNil
+ppArgUsageInfo sty (SomeArgUsageInfo aut) = ppBeside (ppPStr SLIT("_L_ ")) (ppArgUsageType aut)
 
 ppArgUsage (ArgUsage n)      = ppInt n
 ppArgUsage (UnknownArgUsage) = ppChar '-'
@@ -899,6 +507,7 @@ ppArgUsageType aut = ppBesides
 	  ppIntersperse ppComma (map ppArgUsage aut),
 	  ppChar '"' ]
 \end{code}
+
 %************************************************************************
 %*									*
 \subsection[FBType-IdInfo]{Type of an expression through Foldr/build's eyes}
@@ -909,7 +518,6 @@ ppArgUsageType aut = ppBesides
 data FBTypeInfo
   = NoFBTypeInfo
   | SomeFBTypeInfo FBType
-  -- ??? deriving (Eq, Ord)
 
 data FBType = FBType [FBConsum] FBProd deriving (Eq)
 
@@ -926,22 +534,14 @@ getFBType (SomeFBTypeInfo u)  = Just u
 \end{code}
 
 \begin{code}
-instance OptIdInfo FBTypeInfo where
-    noInfo = NoFBTypeInfo
+fbTypeInfo (IdInfo _ _ _ _ _ _ _ _ fb) = fb
 
-    getInfo (IdInfo _ _ _ _ _ _ _ _ fb _) = fb
+addFBTypeInfo id_info NoFBTypeInfo = id_info
+addFBTypeInfo (IdInfo a b d e f g h i _) fb_info = IdInfo a b d e f g h i fb_info
 
-    addInfo id_info NoFBTypeInfo = id_info
-    addInfo (IdInfo a b d e f g h i _ j) fb_info = IdInfo a b d e f g h i fb_info j
-
-    ppInfo PprInterface _ NoFBTypeInfo = ppNil
-    ppInfo sty 		_ NoFBTypeInfo = ifPprInterface sty pp_NONE
-    ppInfo sty 		_ (SomeFBTypeInfo (FBType cons prod))
+ppFBTypeInfo sty NoFBTypeInfo = ppNil
+ppFBTypeInfo sty (SomeFBTypeInfo (FBType cons prod))
       = ppBeside (ppPStr SLIT("_F_ ")) (ppFBType cons prod)
-
---ppFBType (FBType n)      = ppBesides [ppInt n]
---ppFBType (UnknownFBType) = ppBesides [ppStr "-"]
---
 
 ppFBType cons prod = ppBesides
 	([ ppChar '"' ] ++ map ppCons cons ++ [ ppChar '-', ppProd prod, ppChar '"' ])

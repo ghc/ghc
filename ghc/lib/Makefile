@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:47:41 simonm Exp $
+# $Id: Makefile,v 1.3 1996/12/19 09:13:55 simonpj Exp $
 
 TOP = ../..
 include $(TOP)/ghc/mk/ghc.mk
@@ -24,6 +24,10 @@ all ::
 		echo; \
 		$(MAKE) -f Makefile.libHS suffix=$$i; \
 	done
+
+# Shortcut for typical case when testing: just make the "normal" version
+libHS.a ::
+	$(MAKE)  -f Makefile.libHS suffix=norm
 
 install ::
 	@for i in $(WAY_SUFFIXES); do \

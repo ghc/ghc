@@ -52,7 +52,7 @@ import Class	( GenClass )
 import Id	( idType )
 import Kind	( Kind )
 import TcKind	( TcKind )
-import TcMonad	hiding ( rnMtoTcM )
+import TcMonad
 import Usage	( SYN_IE(Usage), GenUsage, SYN_IE(UVar), duffUsage )
 
 import TysPrim		( voidTy )

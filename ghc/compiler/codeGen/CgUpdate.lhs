@@ -13,7 +13,7 @@ IMP_Ubiq(){-uitous-}
 import CgMonad
 import AbsCSyn
 
-import CgCompInfo	( sTD_UF_SIZE, sCC_STD_UF_SIZE )
+import Constants	( sTD_UF_SIZE, sCC_STD_UF_SIZE )
 import CgStackery	( allocUpdateFrame )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Util		( assertPanic )

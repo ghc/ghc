@@ -44,7 +44,7 @@ import Id		( idPrimRep, toplevelishId, isDataCon,
 			  GenId{-instance NamedThing-}
 			)
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, oddlyImportedName, Name{-instance NamedThing-} )
+import Name		( isLocallyDefined, isWiredInName, Name{-instance NamedThing-} )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
@@ -195,8 +195,8 @@ I {\em think} all looking-up is done through @getCAddrMode(s)@.
 getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
-  | not (isLocallyDefined name) || oddlyImportedName name
-    {- Why the "oddlyImported"?
+  | not (isLocallyDefined name) || isWiredInName name
+    {- Why the "isWiredInName"?
 	Imagine you are compiling GHCbase.hs (a module that
 	supplies some of the wired-in values).  What can
 	happen is that the compiler will inject calls to

@@ -11,6 +11,7 @@ module SST(
 	thenSST, thenSST_, returnSST, fixSST,
 	thenFSST, thenFSST_, returnFSST, failFSST,
 	recoverFSST, recoverSST, fixFSST,
+	unsafeInterleaveSST, 
 
 	newMutVarSST, readMutVarSST, writeMutVarSST
 #if __GLASGOW_HASKELL__ >= 200
@@ -69,6 +70,11 @@ stToSST st s
 
 runSST :: SST REAL_WORLD r  -> r
 runSST m = case m realWorld# of SST_R r s -> r
+
+unsafeInterleaveSST :: SST s r -> SST s r
+unsafeInterleaveSST m s = SST_R r s		-- Duplicates the state!
+			where
+			  SST_R r _ = m s
 
 returnSST :: r -> SST s r
 thenSST   :: SST s r -> (r -> State# s -> b) -> State# s -> b

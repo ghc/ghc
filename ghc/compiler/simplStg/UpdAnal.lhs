@@ -27,7 +27,7 @@
 > --import Id
 > --import IdInfo
 > --import Pretty
-> --import SrcLoc 	( mkUnknownSrcLoc )
+> --import SrcLoc 	( noSrcLoc )
 > --import StgSyn
 > --import UniqSet
 > --import Unique 	( getBuiltinUniques )
@@ -479,7 +479,7 @@ Convert a Closure into a representation that can be placed in a .hi file.
 >	    where
 >		(c,b,_)     = foldl doApp f ids
 >	      	ids         = map mkid (getBuiltinUniques arity)
->	      	mkid u      = mkSysLocal SLIT("upd") u noType mkUnknownSrcLoc
+>	      	mkid u      = mkSysLocal SLIT("upd") u noType noSrcLoc
 >	      	countUses u = if u `elemRefs` b then 2 else min (lookupc c u) 2
 >	      	noType      = panic "UpdAnal: no type!"
 >

@@ -50,12 +50,13 @@ IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
 import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo,
 			  BinderInfo(..){-instances, too-}, FunOrArg, DuplicationDanger, InsideSCC
 			)
-import CgCompInfo	( uNFOLDING_CREATION_THRESHOLD )
-import CmdLineOpts	( switchIsOn, intSwitchSet, SimplifierSwitch(..), SwitchResult(..) )
+import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
+			  SimplifierSwitch(..), SwitchResult(..)
+			)
 import CoreSyn
 import CoreUnfold	( mkFormSummary, exprSmallEnoughToDup, 
-			  Unfolding(..), SimpleUnfolding(..), FormSummary(..),
-			  mkSimpleUnfolding,
+			  Unfolding(..), UfExpr, RdrName,
+			  SimpleUnfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance, UnfoldingGuidance(..)
 			)
 import CoreUtils	( coreExprCc, unTagBinders )
@@ -66,7 +67,6 @@ import Id		( idType, getIdUnfolding, getIdStrictness, idWantsToBeINLINEd,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
 			  addOneToIdEnv, modifyIdEnv, mkIdSet, modifyIdEnv_Directly,
 			  SYN_IE(IdEnv), SYN_IE(IdSet), GenId )
-import IdInfo		( bottomIsGuaranteed, StrictnessInfo )
 import Literal		( isNoRepLit, Literal{-instances-} )
 import Maybes		( maybeToBool, expectJust )
 import Name		( isLocallyDefined )
@@ -472,13 +472,37 @@ inline t everywhere.  But if we do *both* these reasonable things we get
 	in
 	...t...
 
-(The t in the body doesn't get inlined because by the time the recursive
-group is done we see that t's RHS isn't an atom.)
+Bad news!  (f x) is duplicated!  (The t in the body doesn't get
+inlined because by the time the recursive group is done we see that
+t's RHS isn't an atom.)
 
-Bad news!  (f x) is duplicated!  Our solution is to only be prepared to
-inline RHSs in their own RHSs if they are *values* (lambda or constructor).
+Our solution is this: 
+	(a) we inline un-simplified RHSs, and then simplify
+	    them in a clone-only environment.  
+	(b) we inline only variables and values
+This means taht
 
-This means that silly x=y  bindings in recursive group will never go away. Sigh.  ToDo!
+
+	r = f x 	==>  r = f x
+	t = r		==>  t = r
+	x = ...t...	==>  x = ...r...
+     in			   in
+	t		     r
+
+Now t is dead, and we're home.
+
+Most silly x=y  bindings in recursive group will go away.  But not all:
+
+	let y = 1:x
+	    x = y
+
+Here, we can't inline x because it's in an argument position. so we'll just replace
+with a clone of y.  Instead we'll probably inline y (a small value) to give
+
+	let y = 1:x
+	    x = 1:y
+	
+which is OK if not clever.
 -}
 
 extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
@@ -486,9 +510,10 @@ extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env co
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
   where
     new_out_id_env = case (form_summary, guidance) of
-			(ValueForm, UnfoldNever) -> out_id_env		-- No new stuff to put in
-			(ValueForm, _)		 -> out_id_env_with_unfolding
-		        other	    		 -> out_id_env		-- Not a value
+			(_, UnfoldNever)	-> out_id_env		-- No new stuff to put in
+			(ValueForm, _)		-> out_id_env_with_unfolding
+			(VarForm, _)		-> out_id_env_with_unfolding
+		        other	    		-> out_id_env		-- Not a value or variable
 
 	-- If there is an unfolding, we add rhs-info for out_id,
 	-- No need to modify occ info because RHS is pre-simplification
@@ -496,19 +521,18 @@ extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env co
 			        (out_id, occ_info, rhs_info)
 
 	-- Compute unfolding details
+	-- Note that we use the "old" environment, that just has clones of the rec-bound vars,
+	-- in the InUnfolding.  So if we ever use the InUnfolding we'll just inline once.
+	-- Only if the thing is still small enough next time round will we inline again.
     rhs_info     = InUnfolding env (SimpleUnfolding form_summary guidance old_rhs)
     form_summary = mkFormSummary old_rhs
     guidance     = mkSimplUnfoldingGuidance chkr out_id (unTagBinders old_rhs)
 
 
 mkSimplUnfoldingGuidance chkr out_id rhs
-  | not (switchIsOn chkr IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
-  = UnfoldAlways
-
-  | otherwise
-  = calcUnfoldingGuidance True{-sccs OK-} bOMB_OUT_SIZE rhs
+  = calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold rhs
   where
-    bOMB_OUT_SIZE = getSimplIntSwitch chkr SimplUnfoldingCreationThreshold
+    inline_prag = not (switchIsOn chkr IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
 
 extendEnvGivenRhsInfo :: SimplEnv -> OutId -> BinderInfo -> RhsInfo -> SimplEnv
 extendEnvGivenRhsInfo env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)

@@ -23,6 +23,7 @@ module RdrHsSyn (
 	SYN_IE(RdrNameGRHS),
 	SYN_IE(RdrNameGRHSsAndBinds),
 	SYN_IE(RdrNameHsBinds),
+	SYN_IE(RdrNameHsDecl),
 	SYN_IE(RdrNameHsExpr),
 	SYN_IE(RdrNameHsModule),
 	SYN_IE(RdrNameIE),
@@ -30,9 +31,8 @@ module RdrHsSyn (
 	SYN_IE(RdrNameInstDecl),
 	SYN_IE(RdrNameMatch),
 	SYN_IE(RdrNameMonoBinds),
-	SYN_IE(RdrNameMonoType),
 	SYN_IE(RdrNamePat),
-	SYN_IE(RdrNamePolyType),
+	SYN_IE(RdrNameHsType),
 	SYN_IE(RdrNameQual),
 	SYN_IE(RdrNameSig),
 	SYN_IE(RdrNameSpecInstSig),
@@ -45,15 +45,27 @@ module RdrHsSyn (
 	SYN_IE(RdrNameGenPragmas),
 	SYN_IE(RdrNameInstancePragmas),
 	SYN_IE(RdrNameCoreExpr),
+	extractHsTyVars,
 
-	getRawImportees,
-	getRawExportees
+	RdrName(..),
+	qual, varQual, tcQual, varUnqual,
+	dummyRdrVarName, dummyRdrTcName,
+	isUnqual, isQual,
+	showRdr, rdrNameOcc,
+	cmpRdr
+
     ) where
 
 IMP_Ubiq()
 
 import HsSyn
-import Name		( ExportFlag(..) )
+import Lex
+import PrelMods		( pRELUDE )
+import Name		( ExportFlag(..), Module(..), pprModule,
+			  OccName(..), pprOccName )
+import Pretty		
+import PprStyle		( PprStyle(..) )
+import Util		( cmpPString, panic, thenCmp )
 \end{code}
 
 \begin{code}
@@ -64,6 +76,7 @@ type RdrNameClassDecl		= ClassDecl		Fake Fake RdrName RdrNamePat
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
 type RdrNameContext		= Context 		RdrName
+type RdrNameHsDecl		= HsDecl		Fake Fake RdrName RdrNamePat
 type RdrNameSpecDataSig		= SpecDataSig		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
 type RdrNameFixityDecl		= FixityDecl		RdrName
@@ -77,9 +90,8 @@ type RdrNameImportDecl 		= ImportDecl		RdrName
 type RdrNameInstDecl		= InstDecl		Fake Fake RdrName RdrNamePat
 type RdrNameMatch		= Match			Fake Fake RdrName RdrNamePat
 type RdrNameMonoBinds		= MonoBinds		Fake Fake RdrName RdrNamePat
-type RdrNameMonoType		= MonoType		RdrName
 type RdrNamePat			= InPat			RdrName
-type RdrNamePolyType		= PolyType		RdrName
+type RdrNameHsType		= HsType		RdrName
 type RdrNameQual		= Qualifier		Fake Fake RdrName RdrNamePat
 type RdrNameSig			= Sig			RdrName
 type RdrNameSpecInstSig		= SpecInstSig 		RdrName
@@ -91,34 +103,101 @@ type RdrNameClassPragmas	= ClassPragmas		RdrName
 type RdrNameDataPragmas		= DataPragmas		RdrName
 type RdrNameGenPragmas		= GenPragmas		RdrName
 type RdrNameInstancePragmas	= InstancePragmas	RdrName
-type RdrNameCoreExpr		= UnfoldingCoreExpr	RdrName
+type RdrNameCoreExpr		= GenCoreExpr		RdrName RdrName RdrName RdrName 
 \end{code}
 
+@extractHsTyVars@ looks just for things that could be type variables.
+It's used when making the for-alls explicit.
+
+\begin{code}
+extractHsTyVars :: HsType RdrName -> [RdrName]
+extractHsTyVars ty
+  = get ty []
+  where
+    get (MonoTyApp con tys)	 acc = foldr get (insert con acc) tys
+    get (MonoListTy tc ty)	 acc = get ty acc
+    get (MonoTupleTy tc tys)	 acc = foldr get acc tys
+    get (MonoFunTy ty1 ty2)	 acc = get ty1 (get ty2 acc)
+    get (MonoDictTy cls ty)	 acc = get ty acc
+    get (MonoTyVar tv) 	         acc = insert tv acc
+    get (HsPreForAllTy ctxt ty)  acc = foldr (get . snd) (get ty acc) ctxt
+    get (HsForAllTy tvs ctxt ty) acc = filter (`notElem` locals) $
+				       foldr (get . snd) (get ty acc) ctxt
+				     where
+				       locals = map getTyVarName tvs
+
+    insert (Qual _ _)	      acc = acc
+    insert (Unqual (TCOcc _)) acc = acc
+    insert other 	      acc | other `elem` acc = acc
+				  | otherwise	     = other : acc
+\end{code}
+
+   
 %************************************************************************
 %*									*
-\subsection{Grabbing importees and exportees}
+\subsection[RdrName]{The @RdrName@ datatype; names read from files}
 %*									*
 %************************************************************************
 
 \begin{code}
-getRawImportees :: [RdrNameIE] ->  [RdrName]
-getRawExportees :: Maybe [RdrNameIE] -> ([(RdrName, ExportFlag)], [Module])
+data RdrName
+  = Unqual OccName
+  | Qual   Module OccName
 
-getRawImportees imps
-  = foldr do_imp [] imps
-  where
-    do_imp (IEVar n)	     acc = n:acc
-    do_imp (IEThingAbs  n)   acc = n:acc
-    do_imp (IEThingWith n _) acc = n:acc
-    do_imp (IEThingAll  n)   acc = n:acc
+qual     (m,n) = Qual m n
+tcQual   (m,n) = Qual m (TCOcc n)
+varQual  (m,n) = Qual m (VarOcc n)
 
-getRawExportees Nothing     = ([], [])
-getRawExportees (Just exps)
-  = foldr do_exp ([],[]) exps
-  where
-    do_exp (IEVar n)		(prs, mods) = ((n, ExportAll):prs, mods)
-    do_exp (IEThingAbs n)	(prs, mods) = ((n, ExportAbs):prs, mods)
-    do_exp (IEThingAll n)	(prs, mods) = ((n, ExportAll):prs, mods)
-    do_exp (IEThingWith n _)	(prs, mods) = ((n, ExportAll):prs, mods)
-    do_exp (IEModuleContents n) (prs, mods) = (prs, n : mods)
+	-- This guy is used by the reader when HsSyn has a slot for
+	-- an implicit name that's going to be filled in by
+	-- the renamer.  We can't just put "error..." because
+	-- we sometimes want to print out stuff after reading but
+	-- before renaming
+dummyRdrVarName = Unqual (VarOcc SLIT("V-DUMMY"))
+dummyRdrTcName = Unqual (VarOcc SLIT("TC-DUMMY"))
+
+varUnqual n = Unqual (VarOcc n)
+
+isUnqual (Unqual _) = True
+isUnqual (Qual _ _) = False
+
+isQual (Unqual _) = False
+isQual (Qual _ _) = True
+
+cmpRdr (Unqual  n1) (Unqual  n2) = n1 `cmp` n2
+cmpRdr (Unqual  n1) (Qual m2 n2) = LT_
+cmpRdr (Qual m1 n1) (Unqual  n2) = GT_
+cmpRdr (Qual m1 n1) (Qual m2 n2) = (n1 `cmp` n2) `thenCmp` (_CMP_STRING_ m1 m2)
+				   -- always compare module-names *second*
+
+rdrNameOcc :: RdrName -> OccName
+rdrNameOcc (Unqual occ) = occ
+rdrNameOcc (Qual _ occ) = occ
+
+instance Text RdrName where -- debugging
+    showsPrec _ rn = showString (ppShow 80 (ppr PprDebug rn))
+
+instance Eq RdrName where
+    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True }
+
+instance Ord RdrName where
+    a <= b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> True;  GT__ -> False }
+    a <	 b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+
+instance Ord3 RdrName where
+    cmp = cmpRdr
+
+instance Outputable RdrName where
+    ppr sty (Unqual n) = pprOccName sty n
+    ppr sty (Qual m n) = ppBesides [pprModule sty m, ppStr ".", pprOccName sty n]
+
+instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
+    getOccName = rdrNameOcc
+    getName = panic "no getName for RdrNames"
+
+showRdr sty rdr = ppShow 100 (ppr sty rdr)
 \end{code}
+

@@ -54,9 +54,9 @@ module FiniteMap (
 	minusFM,
 	foldFM,
 
-	IF_NOT_GHC(intersectFM COMMA)
-	IF_NOT_GHC(intersectFM_C COMMA)
-	IF_NOT_GHC(mapFM COMMA filterFM COMMA)
+	intersectFM,
+	intersectFM_C,
+	mapFM, filterFM,
 
 	sizeFM, isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
 
@@ -69,14 +69,17 @@ module FiniteMap (
 #endif
     ) where
 
+IMPORT_DELOOPER(SpecLoop)
 import Maybes
+import Bag	  ( Bag, foldBag )
+import Outputable ( Outputable(..) )
+
+# ifdef DEBUG
+import PprStyle	( PprStyle )
+import Pretty	( SYN_IE(Pretty), PrettyRep )
+# endif
 
 #ifdef COMPILING_GHC
-IMP_Ubiq(){-uitous-}
-# ifdef DEBUG
-import Pretty
-# endif
-import Bag	( foldBag )
 
 # if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a
@@ -144,8 +147,8 @@ minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -
 		   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
 
 intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
-intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
-			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt2)
+			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt2
 
 --	MAPPING, FOLDING, FILTERING
 foldFM		:: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a

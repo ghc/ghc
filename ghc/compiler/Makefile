@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1996/12/18 18:42:48 dnt Exp $
+# $Id: Makefile,v 1.5 1996/12/19 09:10:03 simonpj Exp $
 
 TOP = ../..
 FlexSuffixRules = YES
@@ -100,12 +100,26 @@ endif
 INCLUDEDIRS = $(foreach dir,$(DIRS),-i$(dir))
 SRCS = \
   $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs)) \
-  $(UGNHS) rename/ParseIface.hs
+  $(UGNHS) rename/ParseIface.hs \
+  main/LoopHack.hc
+
+# LoopHack.lhc is an SLPJ addition to fix a profiling problem.  See comments
+# inside it.
+
 LOOPS = $(patsubst %.lhi, %.hi, $(wildcard */*.lhi))
 HCS = $(patsubst %.hs, %.hc, $(patsubst %.lhs, %.hc, $(SRCS)))
 OBJS = \
   $(patsubst %.hc, %.o, $(HCS)) rename/ParseIface.o \
-  parser/hsclink.o parser/hschooks.o libhsp.a
+  parser/hsclink.o parser/hschooks.o libhsp.a \
+  main/LoopHack.o
+
+main/LoopHack.hc : main/LoopHack.lhc
+	$(RM) $@
+	$(GHC_UNLIT) $<  $@ || ( $(RM) $@ && exit 1 )
+	@chmod 444 $@
+
+main/LoopHack.o : main/LoopHack.hc
+	$(HC) -v -c $(HC_OPTS) $<  
 
 # -----------------------------------------------------------------------------
 # options for the Haskell compiler
@@ -141,7 +155,9 @@ endif
 all :: hsc libhsp.a
 
 hsc : $(OBJS)
-	$(HC) $(HC_OPTS) -o $@ $^
+#	$(HC) -no-link-chk "-pgml time /projects/pacsoft/ghc/src/pureatria/purelink-1.2.2-solaris2/purelink gcc" $(HC_OPTS) -o $@ $^
+	$(HC) -no-link-chk "-pgml time gcc -B/projects/unsupported/gnu/sparc-sunos5/bin/g" $(HC_OPTS) -o $@ $^
+#	$(HC) -no-link-chk "-pgml time gcc" $(HC_OPTS) -o $@ $^
 
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
@@ -149,7 +165,7 @@ parser/hschooks.o : parser/hschooks.c
 
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	happy -g rename/ParseIface.y
+	happy +RTS -K2m -RTS -g rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
 
 # ----------------------------------------------------------------------------

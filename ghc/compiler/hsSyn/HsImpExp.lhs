@@ -57,6 +57,7 @@ instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) wher
 \subsection{Imported and exported entities}
 %*									*
 %************************************************************************
+
 \begin{code}
 data IE name
   = IEVar		name
@@ -64,6 +65,14 @@ data IE name
   | IEThingAll          name		-- Class/Type plus all methods/constructors
   | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
   | IEModuleContents    Module		-- (Export Only)
+\end{code}
+
+\begin{code}
+ieName :: IE name -> name
+ieName (IEVar n) 	 = n
+ieName (IEThingAbs  n)   = n
+ieName (IEThingWith n _) = n
+ieName (IEThingAll  n)   = n
 \end{code}
 
 \begin{code}
@@ -78,3 +87,4 @@ instance (NamedThing name, Outputable name) => Outputable (IE name) where
     ppr sty (IEModuleContents mod)
 	= ppBeside (ppPStr SLIT("module ")) (ppPStr mod)
 \end{code}
+

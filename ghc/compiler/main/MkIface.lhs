@@ -8,59 +8,61 @@
 
 module MkIface (
 	startIface, endIface,
-	ifaceUsages,
-	ifaceVersions,
-	ifaceExportList,
-	ifaceFixities,
-	ifaceInstanceModules,
-	ifaceDecls,
-	ifaceInstances,
-	ifacePragmas
+	ifaceMain, ifaceInstances,
+	ifaceDecls
     ) where
 
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(IO(Handle,hPutStr,openFile,hClose,IOMode(..)))
 
-import Bag		( bagToList )
-import Class		( GenClass(..){-instance NamedThing-}, GenClassOp(..) )
-import CmdLineOpts	( opt_ProduceHi )
-import FieldLabel	( FieldLabel{-instance NamedThing-} )
-import FiniteMap	( emptyFM, addToFM, lookupFM, fmToList, eltsFM, FiniteMap )
 import HsSyn
+import RdrHsSyn		( RdrName(..) )
+import RnHsSyn		( SYN_IE(RenamedHsModule) )
+import RnMonad
+
+import TcInstUtil	( InstInfo(..) )
+
+import CmdLineOpts
 import Id		( idType, dataConRawArgTys, dataConFieldLabels, isDataCon,
-			  dataConStrictMarks, StrictnessMark(..),
+			  getIdInfo, idWantsToBeINLINEd, wantIdSigInIface,
+			  dataConStrictMarks, StrictnessMark(..), 
+			  SYN_IE(IdSet), idSetToList, unionIdSets, unitIdSet, minusIdSet, 
+			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
 			  GenId{-instance NamedThing/Outputable-}
 			)
-import Maybes		( maybeToBool )
-import Name		( origName, nameOf, moduleOf,
-			  exportFlagOn, nameExportFlag, ExportFlag(..),
-			  isLexSym, isLexCon, isLocallyDefined, isWiredInName,
-			  RdrName(..){-instance Outputable-},
-			  OrigName(..){-instance Ord-},
-			  Name{-instance NamedThing-}
+import IdInfo		( StrictnessInfo, ArityInfo, Unfolding,
+			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
+			  getWorkerId_maybe, bottomIsGuaranteed 
 			)
-import ParseUtils	( UsagesMap(..), VersionsMap(..) )
+import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr, GenCoreBinding(..) )
+import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..) )
+import FreeVars		( addExprFVs )
+import Name		( isLocallyDefined, isWiredInName, modAndOcc, getName, pprOccName,
+			  OccName, occNameString, nameOccName, nameString, isExported, pprNonSym,
+			  Name {-instance NamedThing-}, Provenance
+			)
+import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
+import Class		( GenClass(..){-instance NamedThing-}, GenClassOp, classOpLocalType )
+import FieldLabel	( FieldLabel{-instance NamedThing-} )
+import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
+import TyVar		( GenTyVar {- instance Eq -} )
+import Unique		( Unique {- instance Eq -} )
+
 import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
-import PprType		-- most of it (??)
---import PrelMods	( modulesWithBuiltins )
-import PrelInfo		( builtinValNamesMap, builtinTcNamesMap )
-import Pretty		( prettyToUn )
+import PprType
+import PprCore		( pprIfaceUnfolding )
+import Pretty
 import Unpretty		-- ditto
-import RnHsSyn		( isRnConstr, SYN_IE(RenamedHsModule), RnName(..) )
-import RnUtils		( SYN_IE(RnEnv) {-, pprRnEnv ToDo:rm-} )
-import TcModule		( SYN_IE(TcIfaceInfo) )
-import TcInstUtil	( InstInfo(..) )
-import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
-import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
-import Util		( sortLt, removeDups, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}{-, pprTrace ToDo:rm-} )
 
-uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
-ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
-ppr_tyvar tv = prettyToUn (ppr PprInterface tv)
-ppr_name   n
-  = case (origName "ppr_name" n) of { OrigName m s ->
-    uppBesides [uppPStr m, uppChar '.', uppPStr s] }
+
+import Bag		( bagToList )
+import Maybes		( catMaybes, maybeToBool )
+import FiniteMap	( emptyFM, addToFM, lookupFM, fmToList, eltsFM, FiniteMap )
+import UniqFM		( UniqFM, lookupUFM, listToUFM )
+import Util		( sortLt, zipWithEqual, zipWith3Equal, mapAccumL,
+			  assertPanic, panic{-ToDo:rm-}, pprTrace )
+
 \end{code}
 
 We have a function @startIface@ to open the output file and put
@@ -74,39 +76,20 @@ to the handle provided by @startIface@.
 \begin{code}
 startIface  :: Module
 	    -> IO (Maybe Handle) -- Nothing <=> don't do an interface
+
+ifaceMain   :: Maybe Handle
+	    -> InterfaceDetails
+	    -> IO ()
+
+ifaceInstances :: Maybe Handle -> Bag InstInfo -> IO ()
+
+ifaceDecls :: Maybe Handle
+	   -> RenamedHsModule
+	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
+	   -> [CoreBinding]	-- In dependency order, later depend on earlier
+	   -> IO ()
+
 endIface    :: Maybe Handle -> IO ()
-ifaceUsages
-	    :: Maybe Handle
-	    -> UsagesMap
-	    -> IO ()
-ifaceVersions
-	    :: Maybe Handle
-	    -> VersionsMap
-	    -> IO ()
-ifaceExportList
-	    :: Maybe Handle
-	    -> (Name -> ExportFlag, ([(Name,ExportFlag)], [(Name,ExportFlag)]))
-	    -> RnEnv
-	    -> IO ()
-ifaceFixities
-	    :: Maybe Handle
-	    -> RenamedHsModule
-	    -> IO ()
-ifaceInstanceModules
-	    :: Maybe Handle
-	    -> [Module]
-	    -> IO ()
-ifaceDecls  :: Maybe Handle
-	    -> TcIfaceInfo  -- info produced by typechecker, for interfaces
-	    -> IO ()
-ifaceInstances
-	    :: Maybe Handle
-	    -> TcIfaceInfo  -- as above
-	    -> IO ()
-ifacePragmas
-	    :: Maybe Handle
-	    -> IO ()
-ifacePragmas = panic "ifacePragmas" -- stub
 \end{code}
 
 \begin{code}
@@ -115,370 +98,341 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn ->
 	openFile fn WriteMode	>>= \ if_hdl ->
-	hPutStr if_hdl ("{-# GHC_PRAGMA INTERFACE VERSION 20 #-}\ninterface "++ _UNPK_ mod) >>
+	hPutStr if_hdl ("{-# GHC_PRAGMA INTERFACE VERSION 20 #-}\n_interface_ "++ _UNPK_ mod ++ "\n") >>
 	return (Just if_hdl)
 
 endIface Nothing	= return ()
 endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 \end{code}
 
-\begin{code}
-ifaceUsages Nothing{-no iface handle-} _ = return ()
-
-ifaceUsages (Just if_hdl) usages
-  | null usages_list
-  = return ()
-  | otherwise
-  = hPutStr if_hdl "\n__usages__\n"   >>
-    hPutStr if_hdl (uppShow 0 (uppAboves (map upp_uses usages_list)))
-  where
-    usages_list = fmToList usages -- NO: filter has_no_builtins (...)
-
---  has_no_builtins (m, _)
---    = m `notElem` modulesWithBuiltins
---    -- Don't *have* to do this; save gratuitous spillage in
---    -- every interface.  Could be flag-controlled...
-
-    upp_uses (m, (mv, versions))
-      = uppBesides [uppPStr m, uppSP, uppInt mv, uppPStr SLIT(" :: "),
-	       upp_versions (fmToList versions), uppSemi]
-
-    upp_versions nvs
-      = uppIntersperse uppSP [ uppCat [uppPStr n, uppInt v] | (n,v) <- nvs ]
-\end{code}
 
 \begin{code}
-ifaceVersions Nothing{-no iface handle-} _ = return ()
+ifaceMain Nothing iface_stuff = return ()
+ifaceMain (Just if_hdl)
+	  (import_usages, ExportEnv avails fixities, instance_modules)
+  =
+    ifaceInstanceModules	if_hdl instance_modules		>>
+    ifaceUsages			if_hdl import_usages		>>
+    ifaceExports		if_hdl avails			>>
+    ifaceFixities		if_hdl fixities			>>
+    return ()
 
-ifaceVersions (Just if_hdl) version_info
-  | null version_list
-  = return ()
-  | otherwise
-  = hPutStr if_hdl "\n__versions__\n"	>>
-    hPutStr if_hdl (uppShow 0 (upp_versions version_list))
-    -- NB: when compiling Prelude.hs, this will spew out
-    -- stuff for [], (), (,), etc. [i.e., builtins], which
-    -- we'd rather it didn't.  The version-mangling in
-    -- the driver will ignore them.
-  where
-    version_list = fmToList version_info
-
-    upp_versions nvs
-      = uppAboves [ uppPStr n | (n,v) <- nvs ]
-\end{code}
-
-\begin{code}
-ifaceInstanceModules Nothing{-no iface handle-} _ = return ()
-ifaceInstanceModules (Just _)		       [] = return ()
-
-ifaceInstanceModules (Just if_hdl) imods
-  = hPutStr if_hdl "\n__instance_modules__\n" >>
-    hPutStr if_hdl (uppShow 0 (uppCat (map uppPStr imods)))
-\end{code}
-
-Export list: grab the Names of things that are marked Exported, sort
-(so the interface file doesn't ``wobble'' from one compilation to the
-next...), and print.  We work from the renamer's final ``RnEnv'',
-which has all the names we might possibly be interested in.
-(Note that the ``module X'' export items can cause a lot of grief.)
-\begin{code}
-ifaceExportList Nothing{-no iface handle-} _ _ = return ()
-
-ifaceExportList (Just if_hdl)
-		(export_fn, (dotdot_vals, dotdot_tcs))
-		rn_env@((qual, unqual, tc_qual, tc_unqual), _)
-  = let
-	name_flag_pairs :: FiniteMap OrigName ExportFlag
-	name_flag_pairs
-	  = foldr (from_wired  True{-val-ish-})
-	   (foldr (from_wired  False{-tycon-ish-})
-	   (foldr (from_dotdot True{-val-ish-})
-	   (foldr (from_dotdot False{-tycon-ish-})
-	   (foldr from_val
-	   (foldr from_val
-	   (foldr from_tc
-	   (foldr from_tc emptyFM{-init accum-}
-		  (eltsFM tc_unqual))
-		  (eltsFM tc_qual))
-		  (eltsFM unqual))
-		  (eltsFM qual))
-		  dotdot_tcs)
-		  dotdot_vals)
-		  (eltsFM builtinTcNamesMap))
-		  (eltsFM builtinValNamesMap)
-
-	sorted_pairs = sortLt lexical_lt (fmToList name_flag_pairs)
-
-    in
-    --pprTrace "Exporting:" (pprRnEnv PprDebug rn_env) $
-    hPutStr if_hdl "\n__exports__\n" >>
-    hPutStr if_hdl (uppShow 0 (uppAboves (map upp_pair sorted_pairs)))
-  where
-    from_val rn acc
-      | fun_looking rn && exportFlagOn ef = addToFM acc on ef
-      | otherwise			  = acc
-      where
-	ef = export_fn n -- NB: using the export fn!
-	n  = getName rn
-	on = origName "from_val" n
-
-    -- fun_looking: must avoid class ops and data constructors
-    -- and record fieldnames
-    fun_looking (RnName    _) = True
-    fun_looking (WiredInId i) = not (isDataCon i)
-    fun_looking _		  = False
-
-    from_tc rn acc
-      | exportFlagOn ef = addToFM acc on ef
-      | otherwise	= acc
-      where
-	ef = export_fn n -- NB: using the export fn!
-	n  = getName rn
-	on = origName "from_tc" n
-
-    from_dotdot is_valish (n,ef) acc
-      | is_valish && isLexCon str = acc
-      | exportFlagOn ef		  = addToFM acc on ef
-      | otherwise		  = acc
-      where
-	on = origName "from_dotdot" n
-	(OrigName _ str) = on
-
-    from_wired is_val_ish rn acc
-      | is_val_ish && not (fun_looking rn)
-			= acc -- these things don't cause export-ery
-      | exportFlagOn ef = addToFM acc on ef
-      | otherwise       = acc
-      where
-	n  = getName rn
-	ef = export_fn n
-	on = origName "from_wired" n
-
-    --------------
-    lexical_lt (n1,_) (n2,_) = n1 < n2
-
-    --------------
-    upp_pair (OrigName m n, ef)
-      = uppBesides [uppPStr m, uppSP, uppPStr n, uppSP, upp_export ef]
-      where
-	upp_export ExportAll = uppPStr SLIT("(..)")
-	upp_export ExportAbs = uppNil
-\end{code}
-
-\begin{code}
-ifaceFixities Nothing{-no iface handle-} _ = return ()
-
-ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
-  = let
-	pp_fixities = foldr go [] fixities
-    in
-    if null pp_fixities then
-	return ()
-    else 
-	hPutStr if_hdl "\n__fixities__\n" >>
-	hPutStr if_hdl (uppShow 0 (uppAboves pp_fixities))
-  where
-    go (InfixL v i) acc = (if isLocallyDefined v then (:) (print_fix "l" i v) else id) acc
-    go (InfixR v i) acc = (if isLocallyDefined v then (:) (print_fix "r" i v) else id) acc
-    go (InfixN v i) acc = (if isLocallyDefined v then (:) (print_fix ""  i v) else id) acc
-
-    print_fix suff prec var
-      = uppBesides [uppPStr SLIT("infix"), uppStr suff, uppSP, uppInt prec, uppSP, ppr_name var, uppSemi]
-\end{code}
-
-\begin{code}
-non_wired x = not (isWiredInName (getName x)) --ToDo:move?
-
-ifaceDecls Nothing{-no iface handle-} _ = return ()
-
-ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
-  = ASSERT(all isLocallyDefined vals)
-    ASSERT(all isLocallyDefined tycons)
-    ASSERT(all isLocallyDefined classes)
-    let
-	nonwired_classes = filter non_wired classes
-	nonwired_tycons  = filter non_wired tycons
-	nonwired_vals    = filter non_wired vals
-
-	lt_lexical a b = origName "lt_lexical" a < origName "lt_lexical" b
-
-	sorted_classes = sortLt lt_lexical nonwired_classes
-	sorted_tycons  = sortLt lt_lexical nonwired_tycons
-	sorted_vals    = sortLt lt_lexical nonwired_vals
-    in
-    if (null sorted_classes && null sorted_tycons && null sorted_vals) then
+ifaceDecls Nothing rn_mod final_ids simplified = return ()
+ifaceDecls (Just hdl) 
+	   (HsModule _ _ _ _ _ decls _)
+	   final_ids binds
+  | null decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
-	return ()
-    else
-    hPutStr if_hdl "\n__declarations__\n" >>
-    hPutStr if_hdl (uppShow 0 (uppAboves [
-	uppAboves (map ppr_class sorted_classes),
-	uppAboves (map ppr_tycon sorted_tycons),
-	uppAboves [ppr_val v (idType v) | v <- sorted_vals]]))
+  | otherwise
+  = hPutStr hdl "_declarations_\n"	>>
+    ifaceTCDecls hdl decls		>>
+    ifaceBinds hdl final_ids binds	>>
+    return ()
 \end{code}
 
 \begin{code}
+ifaceUsages if_hdl import_usages
+  = hPutStr if_hdl "_usages_\n"   >>
+    hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
+  where
+    upp_uses (m, mv, versions)
+      = uppBesides [upp_module m, uppSP, uppInt mv, uppPStr SLIT(" :: "),
+		    upp_import_versions (sort_versions versions), uppSemi]
+
+	-- For imported versions we do print the version number
+    upp_import_versions nvs
+      = uppIntersperse uppSP [ uppCat [ppr_unqual_name n, uppInt v] | (n,v) <- nvs ]
+
+
+ifaceInstanceModules if_hdl [] = return ()
+ifaceInstanceModules if_hdl imods
+  = hPutStr if_hdl "_instance_modules_\n" >>
+    hPutStr if_hdl (uppShow 0 (uppCat (map uppPStr imods))) >>
+    hPutStr if_hdl "\n"
+
+ifaceExports if_hdl [] = return ()
+ifaceExports if_hdl avails
+  = hPutStr if_hdl "_exports_\n"			>>
+    hPutCol if_hdl upp_avail (sortLt lt_avail avails)
+
+ifaceFixities if_hdl [] = return ()
+ifaceFixities if_hdl fixities 
+  = hPutStr if_hdl "_fixities_\n"		>>
+    hPutCol if_hdl upp_fixity fixities
+
+ifaceTCDecls if_hdl decls
+  =  hPutCol if_hdl ppr_decl tc_decls_for_iface
+  where
+    tc_decls_for_iface = sortLt lt_decl (filter for_iface decls)
+    for_iface decl@(ClD _) = for_iface_name (hsDeclName decl)
+    for_iface decl@(TyD _) = for_iface_name (hsDeclName decl)
+    for_iface other_decl   = False
+
+    for_iface_name name = isLocallyDefined name && 
+			  not (isWiredInName name)
+
+    lt_decl d1 d2 = hsDeclName d1 < hsDeclName d2
+\end{code}			 
+
+%************************************************************************
+%*				 					*
+\subsection{Instance declarations}
+%*				 					*
+%************************************************************************
+
+
+\begin{code}			 
 ifaceInstances Nothing{-no iface handle-} _ = return ()
+				 
+ifaceInstances (Just if_hdl) inst_infos
+  | null togo_insts = return ()		 
+  | otherwise 	    = hPutStr if_hdl "_instances_\n" >>
+		      hPutCol if_hdl pp_inst (sortLt lt_inst togo_insts)
+  where				 
+    togo_insts	= filter is_togo_inst (bagToList inst_infos)
+    is_togo_inst (InstInfo _ _ _ _ _ dfun_id _ _ _) = isLocallyDefined dfun_id
+				 
+    -------			 
+    lt_inst (InstInfo _ _ _ _ _ dfun_id1 _ _ _)
+	    (InstInfo _ _ _ _ _ dfun_id2 _ _ _)
+      = getOccName dfun_id1 < getOccName dfun_id2
+	-- The dfuns are assigned names df1, df2, etc, in order of original textual
+	-- occurrence, and this makes as good a sort order as any
 
-ifaceInstances (Just if_hdl) (_, _, _, insts)
-  = let
-	togo_insts	= filter is_togo_inst (bagToList insts)
-
-	sorted_insts	= sortLt lt_inst togo_insts
-    in
-    if null togo_insts then
-	return ()
-    else
-	hPutStr if_hdl "\n__instances__\n" >>
-	hPutStr if_hdl (uppShow 0 (uppAboves (map pp_inst sorted_insts)))
-  where
-    is_togo_inst (InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
-      = from_here -- && ...
-
-    -------
-    lt_inst (InstInfo clas1 _ ty1 _ _ _ _ _ _ _ _ _)
-	    (InstInfo clas2 _ ty2 _ _ _ _ _ _ _ _ _)
-      = let
-	    tycon1 = fst (getAppTyCon ty1)
-	    tycon2 = fst (getAppTyCon ty2)
-	in
-	case (origName "lt_inst" clas1 `cmp` origName "lt_inst" clas2) of
-	  LT_ -> True
-	  GT_ -> False
-	  EQ_ -> origName "lt_inst2" tycon1 < origName "lt_inst2" tycon2
-
-    -------
-    pp_inst (InstInfo clas tvs ty theta _ _ _ _ _ _ _ _)
-      = let
+    -------			 
+    pp_inst (InstInfo clas tvs ty theta _ dfun_id _ _ _)
+      = let			 
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas ty)
-	    renumbered_ty = initNmbr (nmbrType forall_ty)
-	in
-	case (splitForAllTy renumbered_ty) of { (rtvs, rrho_ty) ->
-	uppBesides [uppPStr SLIT("instance "), ppr_forall rtvs, ppr_ty rrho_ty, uppSemi] }
+	    renumbered_ty = renumber_ty forall_ty
+	in			 
+	uppBesides [uppPStr SLIT("instance "), ppr_ty renumbered_ty, 
+		    uppPStr SLIT(" = "), ppr_unqual_name dfun_id, uppSemi]
 \end{code}
+
 
 %************************************************************************
-%*									*
-\subsection{Printing tycons, classes, ...}
-%*									*
+%*				 					*
+\subsection{Printing values}
+%*				 					*
 %************************************************************************
 
 \begin{code}
-ppr_class :: Class -> Unpretty
+ifaceId :: (Id -> IdInfo)		-- This function "knows" the extra info added
+					-- by the STG passes.  Sigh
 
-ppr_class c
-  = --pprTrace "ppr_class:" (ppr PprDebug c) $
-    case (initNmbr (nmbrClass c)) of { -- renumber it!
-      Class _ n tyvar super_classes sdsels ops sels defms insts links ->
+	    -> IdSet			-- Set of Ids that are needed by earlier interface
+					-- file emissions.  If the Id isn't in this set, and isn't
+					-- exported, there's no need to emit anything
+	    -> Id
+	    -> CoreExpr			-- The Id's right hand side
+	    -> Maybe (Pretty, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
 
-	uppCat [uppPStr SLIT("class"), ppr_context tyvar super_classes,
-		ppr_name n, ppr_tyvar tyvar,
-		if null ops
-		then uppSemi
-		else uppCat [uppStr "where {", uppCat (map ppr_op ops), uppStr "};"]]
-    }
+ifaceId get_idinfo needed_ids id rhs
+  | not (wantIdSigInIface (id `elementOfIdSet` needed_ids) 
+			  opt_OmitInterfacePragmas
+			  id)
+  = Nothing 		-- Well, that was easy!
+
+ifaceId get_idinfo needed_ids id rhs
+  = Just (ppCat [sig_pretty, prag_pretty, ppSemi], new_needed_ids)
   where
-    ppr_context :: TyVar -> [Class] -> Unpretty
+    idinfo     = get_idinfo id
+    ty_pretty  = pprType PprInterface (initNmbr (nmbrType (idType id)))
+    sig_pretty = ppBesides [ppr PprInterface (getOccName id), ppPStr SLIT(" :: "), ty_pretty]
 
-    ppr_context tv []   = uppNil
---  ppr_context tv [sc] = uppBeside (ppr_assert tv sc) (uppPStr SLIT(" =>"))
-    ppr_context tv super_classes
-      = uppBesides [uppStr "{{",
-		    uppIntersperse upp'SP{-'-} (map (ppr_assert tv) super_classes),
-		    uppStr "}} =>"]
+    prag_pretty | opt_OmitInterfacePragmas = ppNil
+		| otherwise		   = ppCat [arity_pretty, strict_pretty, unfold_pretty]
 
-    ppr_assert tv (Class _ n _ _ _ _ _ _ _ _) = uppCat [ppr_name n, ppr_tyvar tv]
+    ------------  Arity  --------------
+    arity_pretty  = ppArityInfo PprInterface (arityInfo idinfo)
 
-    clas_mod = moduleOf (origName "ppr_class" c)
+    ------------  Strictness  --------------
+    strict_info   = strictnessInfo idinfo
+    maybe_worker  = getWorkerId_maybe strict_info
+    strict_pretty = ppStrictnessInfo PprInterface strict_info
 
-    ppr_op (ClassOp o _ ty) = pp_sig (Qual clas_mod o) ty
+    ------------  Unfolding  --------------
+    unfold_pretty | show_unfold = ppCat [ppStr "_U_", pprIfaceUnfolding rhs]
+		  | otherwise   = ppNil
+
+    show_unfold = not (maybeToBool maybe_worker) &&		-- Unfolding is implicit
+		  not (bottomIsGuaranteed strict_info) &&	-- Ditto
+		  case guidance of 				-- Small enough to show
+			UnfoldNever -> False
+			other       -> True 
+
+    guidance    = calcUnfoldingGuidance (idWantsToBeINLINEd id) 
+					opt_InterfaceUnfoldThreshold
+					rhs
+
+    
+    ------------  Extra free Ids  --------------
+    new_needed_ids = (needed_ids `minusIdSet` unitIdSet id)	`unionIdSets` 
+		     extra_ids
+
+    extra_ids | opt_OmitInterfacePragmas = emptyIdSet
+	      | otherwise		 = worker_ids	`unionIdSets`
+					   unfold_ids
+
+    worker_ids = case maybe_worker of
+			Just wkr -> unitIdSet wkr
+			Nothing  -> emptyIdSet
+
+    unfold_ids | show_unfold = free_vars
+	       | otherwise   = emptyIdSet
+			     where
+			       (_,free_vars) = addExprFVs interesting emptyIdSet rhs
+			       interesting bound id = not (id `elementOfIdSet` bound) &&
+						      not (isDataCon id) &&
+						      not (isWiredInName (getName id)) &&
+						      isLocallyDefined id 
 \end{code}
 
 \begin{code}
-ppr_val v ty -- renumber the type first!
-  = --pprTrace "ppr_val:" (ppr PprDebug v) $
-    pp_sig v (initNmbr (nmbrType ty))
+ifaceBinds :: Handle
+	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
+	   -> [CoreBinding]	-- In dependency order, later depend on earlier
+	   -> IO ()
 
-pp_sig op ty
-  = case (splitForAllTy ty) of { (tvs, rho_ty) ->
-    uppBesides [ppr_name op, uppPStr SLIT(" :: "), ppr_forall tvs, ppr_ty rho_ty, uppSemi] }
+ifaceBinds hdl final_ids binds
+  = hPutStr hdl (uppShow 0 (prettyToUn (ppAboves pretties)))	>>
+    hPutStr hdl "\n"
+  where
+    final_id_map  = listToUFM [(id,id) | id <- final_ids]
+    get_idinfo id = case lookupUFM final_id_map id of
+			Just id' -> getIdInfo id'
+			Nothing  -> pprTrace "ifaceBinds not found:" (ppr PprDebug id) $
+				    getIdInfo id
 
-ppr_forall []  = uppNil
-ppr_forall tvs = uppBesides [ uppStr "__forall__ [", uppInterleave uppComma (map ppr_tyvar tvs), uppStr "] " ]
+    pretties = go emptyIdSet (reverse binds)	-- Reverse so that later things will 
+						-- provoke earlier ones to be emitted
+    go needed [] = if not (isEmptyIdSet needed) then
+			pprTrace "ifaceBinds: free vars:" 
+				  (ppSep (map (ppr PprDebug) (idSetToList needed))) $
+			[]
+		   else
+			[]
+
+    go needed (NonRec id rhs : binds)
+	= case ifaceId get_idinfo needed id rhs of
+		Nothing		       -> go needed binds
+		Just (pretty, needed') -> pretty : go needed' binds
+
+	-- Recursive groups are a bit more of a pain.  We may only need one to
+	-- start with, but it may call out the next one, and so on.  So we
+	-- have to look for a fixed point.
+    go needed (Rec pairs : binds)
+	= pretties ++ go needed'' binds
+	where
+	  (needed', pretties) = go_rec needed pairs
+	  needed'' = needed' `minusIdSet` mkIdSet (map fst pairs)
+		-- Later ones may spuriously cause earlier ones to be "needed" again
+
+    go_rec :: IdSet -> [(Id,CoreExpr)] -> (IdSet, [Pretty])
+    go_rec needed pairs
+	| null pretties = (needed, [])
+	| otherwise	= (final_needed, more_pretties ++ pretties)
+	where
+	  reduced_pairs		 	= [pair | (pair,Nothing) <- pairs `zip` maybes]
+	  pretties		 	= catMaybes maybes
+	  (needed', maybes)	 	= mapAccumL do_one needed pairs
+	  (final_needed, more_pretties) = go_rec needed' reduced_pairs
+
+	  do_one needed (id,rhs) = case ifaceId get_idinfo needed id rhs of
+					Nothing		       -> (needed,  Nothing)
+					Just (pretty, needed') -> (needed', Just pretty)
 \end{code}
 
+
+%************************************************************************
+%*				 					*
+\subsection{Random small things}
+%*				 					*
+%************************************************************************
+				 
 \begin{code}
-ppr_tycon tycon
-  = --pprTrace "ppr_tycon:" (ppr PprDebug tycon) $
-    ppr_tc (initNmbr (nmbrTyCon tycon))
+upp_avail NotAvailable    = uppNil
+upp_avail (Avail name ns) = uppBesides [upp_module mod, uppSP, 
+					upp_occname occ, uppSP, 
+					upp_export ns]
+			     where
+				(mod,occ) = modAndOcc name
 
-------------------------
-ppr_tc (PrimTyCon _ n _ _)
-  = uppCat [ uppStr "{- data", ppr_name n, uppStr " *built-in* -}" ]
+upp_export []    = uppNil
+upp_export names = uppBesides [uppStr "(", 
+			       uppIntersperse uppSP (map (upp_occname . getOccName) names), 
+			       uppStr ")"]
 
-ppr_tc FunTyCon
-  = uppCat [ uppStr "{- data", ppr_name FunTyCon, uppStr " *built-in* -}" ]
+upp_fixity (occ, Fixity prec dir, prov) = uppBesides [upp_dir dir, uppSP, 
+						      uppInt prec, uppSP, 
+					       	      upp_occname occ, uppSemi]
+upp_dir InfixR = uppStr "infixr"				 
+upp_dir InfixL = uppStr "infixl"				 
+upp_dir InfixN = uppStr "infix"				 
 
-ppr_tc (TupleTyCon _ n _)
-  = uppCat [ uppStr "{- ", ppr_name n, uppStr "-}" ]
+ppr_unqual_name :: NamedThing a => a -> Unpretty		-- Just its occurrence name
+ppr_unqual_name name = upp_occname (getOccName name)
 
-ppr_tc (SynTyCon _ n _ _ tvs expand)
-  = let
-	pp_tyvars   = map ppr_tyvar tvs
-    in
-    uppBesides [uppPStr SLIT("type "), ppr_name n, uppSP, uppIntersperse uppSP pp_tyvars,
-	   uppPStr SLIT(" = "), ppr_ty expand, uppSemi]
+ppr_name :: NamedThing a => a -> Unpretty		-- Its full name
+ppr_name   n = uppPStr (nameString (getName n))
 
-ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
-  = uppCat [pp_data_or_new,
-	   ppr_context ctxt,
-	   ppr_name n,
-	   uppIntersperse uppSP (map ppr_tyvar tvs),
-	   uppEquals, pp_condecls,
-	   uppSemi]
-	   -- NB: we do not print deriving info in interfaces
-  where
-    pp_data_or_new = case data_or_new of
-		      DataType -> uppPStr SLIT("data")
-		      NewType  -> uppPStr SLIT("newtype")
+upp_occname :: OccName -> Unpretty
+upp_occname occ = uppPStr (occNameString occ)
 
-    ppr_context []      = uppNil
---  ppr_context [(c,t)] = uppCat [ppr_name c, ppr_ty t, uppPStr SLIT("=>")]
-    ppr_context cs
-      = uppBesides[uppStr "{{",
-		   uppInterleave uppComma [uppCat [ppr_name c, ppr_ty t] | (c,t) <- cs],
-		   uppStr "}}", uppPStr SLIT(" =>")]
+upp_module :: Module -> Unpretty
+upp_module mod = uppPStr mod
 
-    pp_condecls
-      = let
-	    (c:cs) = cons
-	in
-	uppCat ((ppr_con c) : (map ppr_next_con cs))
+uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
 
-    ppr_next_con con = uppCat [uppChar '|', ppr_con con]
+ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
+ppr_tyvar tv = prettyToUn (ppr PprInterface tv)
+ppr_tyvar_bndr tv = prettyToUn (pprTyVarBndr PprInterface tv)
 
-    ppr_con con
-      = let
-	    con_arg_tys  = dataConRawArgTys   con
-	    labels       = dataConFieldLabels con -- none if not a record
-	    strict_marks = dataConStrictMarks con
-	in
-	uppCat [ppr_name con, ppr_fields labels strict_marks con_arg_tys]
+ppr_decl decl = prettyToUn (ppr PprInterface decl) `uppBeside` uppSemi
 
-    ppr_fields labels strict_marks con_arg_tys
-      = if null labels then -- not a record thingy
-	    uppIntersperse uppSP (zipWithEqual  "ppr_fields" ppr_bang_ty strict_marks con_arg_tys)
-	else
-	    uppCat [ uppChar '{',
-	    uppInterleave uppComma (zipWith3Equal "ppr_field" ppr_field labels strict_marks con_arg_tys),
-	    uppChar '}' ]
+renumber_ty ty = initNmbr (nmbrType ty)
+\end{code}
 
-    ppr_bang_ty b t
-      = uppBeside (case b of { MarkedStrict -> uppChar '!'; _ -> uppNil })
-		  (prettyToUn (pprParendType PprInterface t))
 
-    ppr_field l b t
-      = uppBesides [ppr_name l, uppPStr SLIT(" :: "),
-		   case b of { MarkedStrict -> uppChar '!'; _ -> uppNil },
-		   ppr_ty t]
+%************************************************************************
+%*				 					*
+\subsection{Comparisons
+%*				 					*
+%************************************************************************
+				 
+
+The various sorts above simply prevent unnecessary "wobbling" when
+things change that don't have to.  We therefore compare lexically, not
+by unique
+
+\begin{code}
+lt_avail :: AvailInfo -> AvailInfo -> Bool
+
+NotAvailable `lt_avail` (Avail _ _)  = True
+(Avail n1 _) `lt_avail` (Avail n2 _) = n1 `lt_name` n2
+any	     `lt_avail` NotAvailable = False
+
+lt_name :: Name -> Name -> Bool
+n1 `lt_name` n2 = modAndOcc n1 < modAndOcc n2
+
+lt_lexical :: NamedThing a => a -> a -> Bool
+lt_lexical a1 a2 = getName a1 `lt_name` getName a2
+
+lt_imp_vers :: ImportVersion a -> ImportVersion a -> Bool
+lt_imp_vers (m1,_,_) (m2,_,_) = m1 < m2
+
+sort_versions vs = sortLt lt_vers vs
+
+lt_vers :: LocalVersion Name -> LocalVersion Name -> Bool
+lt_vers (n1,v1) (n2,v2) = n1 `lt_name` n2
+\end{code}
+
+
+\begin{code}
+hPutCol :: Handle 
+	-> (a -> Unpretty)
+	-> [a]
+	-> IO ()
+hPutCol hdl fmt xs = hPutStr hdl (uppShow 0 (uppAboves (map fmt xs))) >>
+		     hPutStr hdl "\n"
 \end{code}

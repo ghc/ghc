@@ -14,245 +14,187 @@ IMP_Ubiq()
 IMPORT_1_3(List(partition))
 
 import HsSyn
-import RdrHsSyn		( SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
-import RnHsSyn		( RnName(..){-.. is for Ix hack only-}, SYN_IE(RenamedHsModule), isRnTyConOrClass, isRnWired )
+import RdrHsSyn		( RdrName, SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
+import RnHsSyn		( SYN_IE(RenamedHsModule), SYN_IE(RenamedHsDecl), extractHsTyNames )
 
---ToDo:rm: all for debugging only
---import Maybes
---import Name
---import Outputable
---import RnIfaces
---import PprStyle
---import Pretty
---import FiniteMap
---import Util (pprPanic, pprTrace)
-
-import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
-			  UsagesMap(..), VersionsMap(..)
-			)
+import CmdLineOpts	( opt_HiMap )
 import RnMonad
-import RnNames		( getGlobalNames, SYN_IE(GlobalNameInfo) )
-import RnSource		( rnSource )
-import RnIfaces		( rnIfaces, initIfaceCache, IfaceCache )
-import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv, emptyRnEnv )
-
-import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
-import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
+import RnNames		( getGlobalNames )
+import RnSource		( rnDecl )
+import RnIfaces		( getImportedInstDecls, getDecl, getImportVersions, getSpecialInstModules,
+			  mkSearchPath, getWiredInDecl
+			)
+import RnEnv		( availsToNameSet, addAvailToNameSet, addImplicitOccsRn )
+import Id		( GenId {- instance NamedThing -} )
+import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
+			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, nameSetToList,
+			  isWiredInName, modAndOcc
+			)
+import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
+import TyCon		( TyCon )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
-import Maybes		( catMaybes )
-import Name		( isLocallyDefined, mkWiredInName, getLocalName, isLocalName,
-			  origName,
-			  Name, RdrName(..), ExportFlag(..)
-			)
---import PprStyle		-- ToDo:rm
-import PrelInfo		( builtinNameMaps, builtinKeysMap, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import Pretty
-import Unique		( ixClassKey )
-import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
-import UniqSupply	( splitUniqSupply )
-import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
+import PprStyle		( PprStyle(..) )
+import Util		( panic, assertPanic, pprTrace )
 \end{code}
+
+
 
 \begin{code}
 renameModule :: UniqSupply
 	     -> RdrNameHsModule
-
-	     -> IO (RenamedHsModule, 	-- output, after renaming
-		    RnEnv,		-- final env (for renaming derivings)
-		    [Module],	   	-- imported modules; for profiling
-
-		    (Name -> ExportFlag,	-- export info
-		     ([(Name,ExportFlag)],
-		      [(Name,ExportFlag)])),
-
-		    (UsagesMap,
-	            VersionsMap,      	-- version info; for usage
-		    [Module]),	   	-- instance modules; for iface
-
-		    Bag Error,
-		    Bag Warning)
+	     -> IO (Maybe 			-- Nothing <=> everything up to date;
+						-- no ned to recompile any further
+			  (RenamedHsModule, 	-- Output, after renaming
+			   InterfaceDetails,	-- Interface; for interface file generatino
+			   RnNameSupply,	-- Final env; for renaming derivings
+			   [Module]),	   	-- Imported modules; for profiling
+		    Bag Error, 
+		    Bag Warning
+		   )
 \end{code} 
 
-ToDo: May want to arrange to return old interface for this module!
-ToDo: Deal with instances (instance version, this module on instance list ???)
 
 \begin{code}
-renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
+renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
+  = 	-- INITIALISE THE RENAMER MONAD
+    initRn mod_name us (mkSearchPath opt_HiMap) loc $
 
-  = {-
+ 	-- FIND THE GLOBAL NAME ENVIRONMENT
+    getGlobalNames this_mod			`thenRn` \ global_name_info ->
+
+    case global_name_info of {
+	Nothing -> 	-- Everything is up to date; no need to recompile further
+			returnRn Nothing ;
+
+			-- Otherwise, just carry on
+	Just (export_env, rn_env, local_avails) ->
+
+	-- RENAME THE SOURCE
+	-- We also add occurrences for Int, Double, and (), because they
+	-- are the types to which ambigious type variables may be defaulted by
+	-- the type checker; so they won't every appear explicitly.
+	-- [The () one is a GHC extension for defaulting CCall results.]
+    initRnMS rn_env mod_name SourceMode (mapRn rnDecl local_decls)	`thenRn` \ rn_local_decls ->
+    addImplicitOccsRn [getName intTyCon, 
+		       getName doubleTyCon, 
+		       getName unitTyCon]		`thenRn_` 
+
+	-- SLURP IN ALL THE NEEDED DECLARATIONS
+	-- Notice that the rnEnv starts empty
+    closeDecls rn_local_decls (availsToNameSet local_avails) []
+       						`thenRn` \ (rn_all_decls, imported_avails) ->
+
+	-- SLURP IN ALL NEEDED INSTANCE DECLARATIONS
+	-- We keep the ones that only mention things (type constructors, classes) that are
+	-- already imported.  Ones which don't can't possibly be useful to us.
+    getImportedInstDecls 				`thenRn` \ imported_insts ->
     let
-	pp_pair (n,m) = ppBesides [ppPStr m,ppChar '.',ppPStr n]
-    in
-    pprTrace "builtins:\n" (case builtinNameMaps of { (builtin_ids, builtin_tcs) ->
-    			    ppAboves [ ppCat (map pp_pair (keysFM builtin_ids))
-    				     , ppCat (map pp_pair (keysFM builtin_tcs))
-    				     , ppCat (map pp_pair (keysFM builtinKeysMap))
-    				     ]}) $
-    -}
-    -- _scc_ "rnGlobalNames"
-    makeHiMap opt_HiMap	    >>=	         \ hi_files ->
---  pprTrace "HiMap:\n" (ppAboves [ ppCat [ppPStr m, ppStr p] | (m,p) <- fmToList hi_files])
-    initIfaceCache modname hi_files  >>= \ iface_cache ->
+	all_big_names = mkNameSet [name | Avail name _ <- local_avails]    `unionNameSets` 
+			mkNameSet [name | Avail name _ <- imported_avails]
 
-    fixIO ( \ ~(_, _, _, _, rec_occ_fm, ~(rec_export_fn,_)) ->
+	rn_needed_insts = [ initRnMS emptyRnEnv mod_name InterfaceMode (rnDecl (InstD inst_decl))
+			  | (inst_names, mod_name, inst_decl) <- imported_insts,
+			    all (`elemNameSet` all_big_names) inst_names
+			  ]
+    in
+    sequenceRn rn_needed_insts				`thenRn` \ inst_decls ->
+	-- Maybe we need to do another close-decls?
+
+
+	-- GENERATE THE VERSION/USAGE INFO
+    getImportVersions imported_avails			`thenRn` \ import_versions ->
+    getNameSupplyRn					`thenRn` \ name_supply ->
+
+
+	-- GENERATE THE SPECIAL-INSTANCE MODULE LIST
+	-- The "special instance" modules are those modules that contain instance
+	-- declarations that contain no type constructor or class that was declared
+	-- in that module.
+    getSpecialInstModules				`thenRn` \ imported_special_inst_mods ->
     let
-	rec_occ_fn :: Name -> [RdrName]
-	rec_occ_fn n = case lookupUFM rec_occ_fm n of
-		         Nothing        -> []
-		         Just (rn,occs) -> occs
-
-	global_name_info = (builtinNameMaps, builtinKeysMap, rec_export_fn, rec_occ_fn)
+	special_inst_decls = [d | InstD d@(InstDecl inst_ty _ _ _ _) <- rn_local_decls,
+				  all (not.isLocallyDefined) (nameSetToList (extractHsTyNames inst_ty))
+			     ]
+	special_inst_mods | null special_inst_decls = imported_special_inst_mods
+			  | otherwise		    = mod_name : imported_special_inst_mods
     in
-    getGlobalNames iface_cache global_name_info us1 input >>=
-	\ (occ_env, imp_mods, unqual_imps, imp_fixes, top_errs, top_warns) ->
+		  
+    
 
-    if not (isEmptyBag top_errs) then
-	return (rn_panic, rn_panic, top_errs, top_warns, emptyUFM, rn_panic)
-    else
-
-    -- No top-level name errors so rename source ...
-    -- _scc_ "rnSource"
-    case initRn True modname occ_env us2
-		(rnSource imp_mods unqual_imps imp_fixes input) of {
-	((rn_module, export_fn, module_dotdots, src_occs), src_errs, src_warns) ->
-
-    --pprTrace "renameModule:" (ppCat (map (ppr PprDebug . fst) (bagToList src_occs))) $
+	-- RETURN THE RENAMED MODULE
     let
-	occ_fm :: UniqFM (RnName, [RdrName])
+	import_mods = [mod | ImportDecl mod _ _ _ _ <- imports]
 
-	occ_list = [ (rn,(rn,[occ])) | (rn,occ) <- bagToList src_occs]
-        occ_fm = addListToUFM_C insert_occ emptyUFM occ_list
-
-	insert_occ (rn,olds) (rn',[new]) = (rn, insert new olds)
-
-        insert new []         = [new]
-        insert new xxs@(x:xs) = case cmp new x of LT_  -> new : xxs
-			      			  EQ_  -> xxs
-			      			  GT__ -> x : insert new xs
-
-	occ_warns = map multipleOccWarn (filter multiple_occs (eltsUFM occ_fm))
-
-	multiple_occs (rn, (o1:o2:_)) = getLocalName o1 /= SLIT("negate")
-					-- the user is rarely responsible if
-					-- "negate" is mentioned in multiple ways
-	multiple_occs _               = False
+	renamed_module = HsModule mod_name vers 
+				  trashed_exports trashed_imports trashed_fixities
+				  (inst_decls ++ rn_all_decls)
+			          loc
     in
-    return (rn_module, imp_mods, 
-	    top_errs  `unionBags` src_errs,
-	    top_warns `unionBags` src_warns `unionBags` listToBag occ_warns,
-	    occ_fm, (export_fn, module_dotdots))
-
-    }) >>= \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, export_stuff) ->
-
-    if not (isEmptyBag errs_so_far) then
-	return (rn_panic, rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
-    else
-
-    -- No errors renaming source so rename the interfaces ...
-    -- _scc_ "preRnIfaces"
-    let
-	-- split up all names that occurred in the source; between
-	-- those that are defined therein and those merely mentioned.
-	-- We also divide by tycon/class and value names (as usual).
-
-	occ_rns = [ rn | (rn,_) <- eltsUFM occ_fm ]
-		-- all occurrence names, from this module and imported
-
-	(defined_here, defined_elsewhere)
-	  = partition isLocallyDefined occ_rns
-
-	(_, imports_used)
-          = partition isRnWired defined_elsewhere
-
-	(def_tcs, def_vals) = partition isRnTyConOrClass defined_here
-	(occ_tcs, occ_vals) = partition isRnTyConOrClass occ_rns
-		-- the occ stuff includes *all* occurrences,
-		-- including those for which we have definitions
-
-	(orig_def_env, orig_def_dups)
-	  = extendGlobalRnEnv emptyRnEnv (map pairify_rn def_vals)
-					 (map pairify_rn def_tcs)
-	(orig_occ_env, orig_occ_dups)
-	  = extendGlobalRnEnv emptyRnEnv (map pairify_rn occ_vals)
-					 (map pairify_rn occ_tcs)
-
-	-- This stuff is pretty dodgy right now: I think original
-	-- names and occurrence names may be getting entangled
-	-- when they shouldn't be... WDP 96/06
-
-        pairify_rn rn -- ToDo: move to Name?
-	  = let
-		name = getName rn
-	    in
-	    (if isLocalName name
-	     then Unqual (getLocalName name)
-	     else case (origName "pairify_rn" name) of { OrigName m n ->
-		  Qual m n }
-	     , rn)
-    in
---  ASSERT (isEmptyBag orig_occ_dups)
---    (if (isEmptyBag orig_occ_dups) then \x->x
---     else pprTrace "orig_occ_dups:" (ppAboves [ ppCat [ppr PprDebug m, ppr PprDebug n, ppr PprDebug o] | (m,n,o) <- bagToList orig_occ_dups])) $
-    ASSERT (isEmptyBag orig_def_dups)
-
-    -- _scc_ "rnIfaces"
-    rnIfaces iface_cache imp_mods us3 orig_def_env orig_occ_env
-	     rn_module (initMustHaves ++ imports_used) >>=
-	\ (rn_module_with_imports, final_env,
-	   (implicit_val_fm, implicit_tc_fm),
-	   usage_stuff,
-	   (iface_errs, iface_warns)) ->
-
-    return (rn_module_with_imports,
-	    final_env,
-	    imp_mods,
-	    export_stuff,
-	    usage_stuff,
-	    errs_so_far  `unionBags` iface_errs,
-	    warns_so_far `unionBags` iface_warns)
+    returnRn (Just (renamed_module, 
+		    (import_versions, export_env, special_inst_mods),
+		     name_supply,
+		     import_mods))
+    }
   where
-    rn_panic = panic "renameModule: aborted with errors"
-
-    (us1, us') = splitUniqSupply us
-    (us2, us3) = splitUniqSupply us'
-
-initMustHaves :: [RnName]
-    -- things we *must* find declarations for, because the
-    -- compiler may eventually make reference to them (e.g.,
-    -- class Eq)
-initMustHaves
-  | opt_NoImplicitPrelude
-  = [{-no Prelude.hi, no point looking-}]
-  | otherwise
-  = [ name_fn (mkWiredInName u orig ExportAll)
-    | (orig@(OrigName mod str), (u, name_fn)) <- fmToList builtinKeysMap ]
+    trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
+    trashed_imports  = {-trace "rnSource:trashed_imports"-} []
+    trashed_fixities = []
 \end{code}
 
 \begin{code}
-makeHiMap :: Maybe String -> IO (FiniteMap Module FilePath)
+closeDecls :: [RenamedHsDecl]			-- Declarations got so far
+	   -> NameSet				-- Names bound by those declarations
+	   -> [AvailInfo]			-- Available stuff generated by closeDecls so far
+	   -> RnMG ([RenamedHsDecl],		-- The closed set
+		    [AvailInfo])		-- Available stuff generated by closeDecls
+	-- The monad includes a list of possibly-unresolved Names
+	-- This list is empty when closeDecls returns
 
-makeHiMap Nothing = error "Rename.makeHiMap:no .hi map given by the GHC driver (?)"
-makeHiMap (Just f)
-  = readFile f	>>= \ cts ->
-    return (snag_mod emptyFM cts [])
-  where
-    -- we alternate between "snag"ging mod(ule names) and path(names),
-    -- accumulating names (reversed) and the final resulting map
-    -- as we move along.
+closeDecls decls decl_names import_avails
+  = popOccurrenceName		`thenRn` \ maybe_unresolved ->
 
-    snag_mod map  []       []   = map
-    snag_mod map  (' ':cs) rmod = snag_path map (_PK_ (reverse rmod)) cs []
-    snag_mod map  (c:cs)   rmod = snag_mod  map cs (c:rmod)
+    case maybe_unresolved of
 
-    snag_path map mod []        rpath = addToFM map mod (reverse rpath)
-    snag_path map mod ('\n':cs) rpath = snag_mod (addToFM map mod (reverse rpath)) cs []
-    snag_path map mod (c:cs)    rpath = snag_path map mod cs (c:rpath)
+	-- No more unresolved names; we're done
+	Nothing ->	returnRn (decls, import_avails)
+
+	-- An "unresolved" name that we've already dealt with
+	Just (name,_) | name `elemNameSet` decl_names 
+	  -> closeDecls decls decl_names import_avails
+	
+	-- An unresolved name that's wired in.  In this case there's no 
+	-- declaration to get, but we still want to record it as now available,
+	-- so that we remember to look for instance declarations involving it.
+	Just (name,_) | isWiredInName name
+	  -> getWiredInDecl name	`thenRn` \ decl_avail ->
+		     closeDecls decls 
+				(addAvailToNameSet decl_names decl_avail)
+				(decl_avail : import_avails)
+
+	-- Genuinely unresolved name
+	Just (name,necessity) | otherwise
+	  -> getDecl name		`thenRn` \ (decl_avail,new_decl) ->
+	     case decl_avail of
+
+		-- Can't find the declaration; check that it was optional
+		NotAvailable -> checkRn (case necessity of { Optional -> True; other -> False})
+					(getDeclErr name)	`thenRn_` 
+				closeDecls decls decl_names import_avails
+
+		-- Found it
+		other -> initRnMS emptyRnEnv mod_name InterfaceMode (
+				     rnDecl new_decl
+			 )				`thenRn` \ rn_decl ->
+			 closeDecls (rn_decl : decls)
+				    (addAvailToNameSet decl_names decl_avail)
+				    (decl_avail : import_avails)
+		     where
+		         (mod_name,_) = modAndOcc name
+
+getDeclErr name sty
+  = ppSep [ppStr "Failed to find interface decl for", ppr sty name]
 \end{code}
 
-Warning message used herein:
-\begin{code}
-multipleOccWarn (name, occs) sty
-  = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
-	       ppInterleave ppComma (map (ppr sty) occs)]
-\end{code}
+

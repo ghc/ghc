@@ -36,7 +36,7 @@ import TysPrim
 import TysWiredIn
 
 import CStrings		( identToC )
-import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
+import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
 import PprStyle		( codeStyle{-, PprStyle(..) ToDo:rm-} )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
@@ -702,12 +702,12 @@ primOpInfo CharNeOp   = Compare SLIT("neChar#")   charPrimTy
 primOpInfo CharLtOp   = Compare SLIT("ltChar#")   charPrimTy
 primOpInfo CharLeOp   = Compare SLIT("leChar#")   charPrimTy
 
-primOpInfo IntGtOp    = Compare SLIT("gtInt#")	   intPrimTy
-primOpInfo IntGeOp    = Compare SLIT("geInt#")	   intPrimTy
-primOpInfo IntEqOp    = Compare SLIT("eqInt#")	   intPrimTy
-primOpInfo IntNeOp    = Compare SLIT("neInt#")	   intPrimTy
-primOpInfo IntLtOp    = Compare SLIT("ltInt#")	   intPrimTy
-primOpInfo IntLeOp    = Compare SLIT("leInt#")	   intPrimTy
+primOpInfo IntGtOp    = Compare SLIT(">#")	   intPrimTy
+primOpInfo IntGeOp    = Compare SLIT(">=#")	   intPrimTy
+primOpInfo IntEqOp    = Compare SLIT("==#")	   intPrimTy
+primOpInfo IntNeOp    = Compare SLIT("/=#")	   intPrimTy
+primOpInfo IntLtOp    = Compare SLIT("<#")	   intPrimTy
+primOpInfo IntLeOp    = Compare SLIT("<=#")	   intPrimTy
 
 primOpInfo WordGtOp   = Compare SLIT("gtWord#")   wordPrimTy
 primOpInfo WordGeOp   = Compare SLIT("geWord#")   wordPrimTy
@@ -730,12 +730,12 @@ primOpInfo FloatNeOp  = Compare SLIT("neFloat#")  floatPrimTy
 primOpInfo FloatLtOp  = Compare SLIT("ltFloat#")  floatPrimTy
 primOpInfo FloatLeOp  = Compare SLIT("leFloat#")  floatPrimTy
 
-primOpInfo DoubleGtOp = Compare SLIT("gtDouble#") doublePrimTy
-primOpInfo DoubleGeOp = Compare SLIT("geDouble#") doublePrimTy
-primOpInfo DoubleEqOp = Compare SLIT("eqDouble#") doublePrimTy
-primOpInfo DoubleNeOp = Compare SLIT("neDouble#") doublePrimTy
-primOpInfo DoubleLtOp = Compare SLIT("ltDouble#") doublePrimTy
-primOpInfo DoubleLeOp = Compare SLIT("leDouble#") doublePrimTy
+primOpInfo DoubleGtOp = Compare SLIT(">##") doublePrimTy
+primOpInfo DoubleGeOp = Compare SLIT(">=##") doublePrimTy
+primOpInfo DoubleEqOp = Compare SLIT("==##") doublePrimTy
+primOpInfo DoubleNeOp = Compare SLIT("/=##") doublePrimTy
+primOpInfo DoubleLtOp = Compare SLIT("<##") doublePrimTy
+primOpInfo DoubleLeOp = Compare SLIT("<=##") doublePrimTy
 \end{code}
 
 %************************************************************************
@@ -756,9 +756,9 @@ primOpInfo ChrOp = Coercing SLIT("chr#") intPrimTy charPrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo IntAddOp  = Dyadic SLIT("plusInt#")	 intPrimTy
-primOpInfo IntSubOp  = Dyadic SLIT("minusInt#") intPrimTy
-primOpInfo IntMulOp  = Dyadic SLIT("timesInt#") intPrimTy
+primOpInfo IntAddOp  = Dyadic SLIT("+#")	 intPrimTy
+primOpInfo IntSubOp  = Dyadic SLIT("-#") intPrimTy
+primOpInfo IntMulOp  = Dyadic SLIT("*#") intPrimTy
 primOpInfo IntQuotOp = Dyadic SLIT("quotInt#")	 intPrimTy
 primOpInfo IntRemOp  = Dyadic SLIT("remInt#")	 intPrimTy
 
@@ -851,10 +851,10 @@ primOpInfo FloatPowerOp	= Dyadic    SLIT("powerFloat#")   floatPrimTy
 similar).
 
 \begin{code}
-primOpInfo DoubleAddOp	= Dyadic    SLIT("plusDouble#")   doublePrimTy
-primOpInfo DoubleSubOp	= Dyadic    SLIT("minusDouble#")  doublePrimTy
-primOpInfo DoubleMulOp	= Dyadic    SLIT("timesDouble#")  doublePrimTy
-primOpInfo DoubleDivOp	= Dyadic    SLIT("divideDouble#") doublePrimTy
+primOpInfo DoubleAddOp	= Dyadic    SLIT("+##")   doublePrimTy
+primOpInfo DoubleSubOp	= Dyadic    SLIT("-##")  doublePrimTy
+primOpInfo DoubleMulOp	= Dyadic    SLIT("*##")  doublePrimTy
+primOpInfo DoubleDivOp	= Dyadic    SLIT("/##") doublePrimTy
 primOpInfo DoubleNegOp	= Monadic   SLIT("negateDouble#") doublePrimTy
 
 primOpInfo Double2IntOp	    = Coercing SLIT("double2Int#")   doublePrimTy intPrimTy
@@ -875,7 +875,7 @@ primOpInfo DoubleAtanOp	= Monadic   SLIT("atanDouble#")   doublePrimTy
 primOpInfo DoubleSinhOp	= Monadic   SLIT("sinhDouble#")   doublePrimTy
 primOpInfo DoubleCoshOp	= Monadic   SLIT("coshDouble#")   doublePrimTy
 primOpInfo DoubleTanhOp	= Monadic   SLIT("tanhDouble#")   doublePrimTy
-primOpInfo DoublePowerOp= Dyadic    SLIT("powerDouble#")  doublePrimTy
+primOpInfo DoublePowerOp= Dyadic    SLIT("**##")  doublePrimTy
 \end{code}
 
 %************************************************************************

@@ -44,7 +44,7 @@ IMPORT_DELOOPER(TyLoop)	( SYN_IE(Type), GenType,
 			  SYN_IE(Class), GenClass,
 			  SYN_IE(Id), GenId,
 			  splitSigmaTy, splitFunTy,
-			  mkTupleCon, isNullaryDataCon, idType
+			  tupleCon, isNullaryDataCon, idType
 			  --LATER: specMaybeTysSuffix
 			)
 
@@ -53,12 +53,12 @@ import Usage		( GenUsage, SYN_IE(Usage) )
 import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 
 import Maybes
-import Name		( Name, RdrName(..), appendRdr, nameUnique,
-			  mkTupleTyConName, mkFunTyConName
-			)
-import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
+import Name		( Name, nameUnique, mkWiredInTyConName )
+import Unique		( Unique, funTyConKey )
 import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PrimRep		( PrimRep(..) )
+import PrelMods		( gHC__, pREL_TUP, pREL_BASE )
+import Lex		( mkTupNameStr )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic )
 --import {-hide me-}
@@ -124,14 +124,11 @@ data NewOrData
 \end{code}
 
 \begin{code}
-mkFunTyCon   = FunTyCon
-mkSpecTyCon  = SpecTyCon
+mkFunTyCon     = FunTyCon
+mkFunTyConName = mkWiredInTyConName funTyConKey gHC__ SLIT("->") FunTyCon
 
-mkTupleTyCon arity
-  = TupleTyCon u n arity 
-  where
-    n = mkTupleTyConName arity
-    u = uniqueOf n
+mkSpecTyCon  = SpecTyCon
+mkTupleTyCon = TupleTyCon
 
 mkDataTyCon name = DataTyCon (nameUnique name) name
 mkPrimTyCon name = PrimTyCon (nameUnique name) name
@@ -229,7 +226,7 @@ tyConDataCons :: TyCon -> [Id]
 tyConFamilySize  :: TyCon -> Int
 
 tyConDataCons (DataTyCon _ _ _ _ _ data_cons _ _) = data_cons
-tyConDataCons (TupleTyCon _ _ a)		  = [mkTupleCon a]
+tyConDataCons (TupleTyCon _ _ a)		  = [tupleCon a]
 tyConDataCons other				  = []
 	-- You may think this last equation should fail,
 	-- but it's quite convenient to return no constructors for
@@ -267,7 +264,7 @@ getSynTyConDefn (SynTyCon _ _ _ _ tyvars ty) = (tyvars,ty)
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe Id
 
-maybeTyConSingleCon (TupleTyCon _ _ arity)        = Just (mkTupleCon arity)
+maybeTyConSingleCon (TupleTyCon _ _ arity)        = Just (tupleCon arity)
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _) = Just c
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _) = Nothing
 maybeTyConSingleCon (PrimTyCon _ _ _ _)	          = Nothing
@@ -344,4 +341,5 @@ instance NamedThing TyCon where
     getName	other_tc           = moduleNamePair (expectJust "tycon1" (getName other_tc))
     getName other			     = Nothing
 -}
+
 \end{code}

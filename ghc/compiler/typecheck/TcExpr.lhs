@@ -13,18 +13,17 @@ IMP_Ubiq()
 import HsSyn		( HsExpr(..), Qualifier(..), Stmt(..),
 			  HsBinds(..), Bind(..), MonoBinds(..), 
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
-			  Match, Fake, InPat, OutPat, PolyType,
+			  Match, Fake, InPat, OutPat, HsType,
 			  failureFreePat, collectPatBinders )
 import RnHsSyn		( SYN_IE(RenamedHsExpr), SYN_IE(RenamedQual),
-			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds),
-			  RnName{-instance Outputable-}
+			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds)
 			)
 import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcQual), SYN_IE(TcStmt),
 			  TcIdOcc(..), SYN_IE(TcRecordBinds),
 			  mkHsTyApp
 			)
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  SYN_IE(LIE), emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
 			  newMethod, newMethodWithGivenTy, newDicts )
@@ -35,7 +34,7 @@ import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			)
 import SpecEnv		( SpecEnv )
 import TcMatches	( tcMatchesCase, tcMatch )
-import TcMonoType	( tcPolyType )
+import TcMonoType	( tcHsType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( SYN_IE(TcType), TcMaybe(..),
@@ -463,7 +462,7 @@ tcExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3))
 \begin{code}
 tcExpr in_expr@(ExprWithTySig expr poly_ty)
  = tcExpr expr			`thenTc` \ (texpr, lie, tau_ty) ->
-   tcPolyType  poly_ty		`thenTc` \ sigma_sig ->
+   tcHsType  poly_ty		`thenTc` \ sigma_sig ->
 
 	-- Check the tau-type part
    tcSetErrCtxt (exprSigCtxt in_expr)	$
@@ -627,7 +626,7 @@ tcArg expected_arg_ty arg
 %************************************************************************
 
 \begin{code}
-tcId :: RnName -> NF_TcM s (TcExpr s, LIE s, TcType s)
+tcId :: Name -> NF_TcM s (TcExpr s, LIE s, TcType s)
 
 tcId name
   = 	-- Look up the Id and instantiate its type

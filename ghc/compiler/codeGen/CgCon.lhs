@@ -29,7 +29,7 @@ import CgBindery	( getArgAmodes, bindNewToNode,
 			  heapIdInfo, CgIdInfo
 			)
 import CgClosure	( cgTopRhsClosure )
-import CgCompInfo	( mAX_INTLIKE, mIN_INTLIKE )
+import Constants	( mAX_INTLIKE, mIN_INTLIKE )
 import CgHeapery	( allocDynClosure )
 import CgRetConv	( dataReturnConvAlg, DataReturnConvention(..) )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
@@ -124,7 +124,7 @@ cgTopRhsCon name con args all_zero_size_args
   = cgTopRhsClosure name top_cc NoStgBinderInfo [] body lf_info
   where
     body = StgCon con args emptyIdSet{-emptyLiveVarSet-}
-    lf_info = mkClosureLFInfo True {- Top level -} [] ReEntrant [] body
+    lf_info = mkClosureLFInfo True {- Top level -} [] ReEntrant []
 \end{code}
 
 OK, so now we have the general case.

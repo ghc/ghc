@@ -15,17 +15,19 @@ IMPORT_1_3(GHCio(stThen))
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
+import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
 import RdrHsSyn
 import PrefixToHs
 
 import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
-import Name		( RdrName(..), isRdrLexConOrSpecial, preludeQual )
+import Name		( RdrName(..), OccName(..) )
+import Lex		( isLexConId )
 import PprStyle		( PprStyle(..) )
-import PrelMods		( pRELUDE )
+import PrelMods
 import Pretty
-import SrcLoc		( mkBuiltinSrcLoc, SrcLoc )
+import SrcLoc		( mkGeneratedSrcLoc, noSrcLoc, SrcLoc )
 import Util		( nOfThem, pprError, panic )
 \end{code}
 
@@ -56,16 +58,26 @@ wlkMaybe wlk_it (U_just x)
 \end{code}
 
 \begin{code}
-rdQid   :: ParseTree -> UgnM RdrName
-rdQid pt = rdU_qid pt `thenUgn` \ qid -> wlkQid qid
+wlkTvId   = wlkQid TvOcc
+wlkTCId   = wlkQid TCOcc
+wlkVarId  = wlkQid VarOcc
+wlkDataId = wlkQid VarOcc
+wlkEntId = wlkQid (\occ -> if isLexConId occ
+			   then TCOcc occ
+			   else VarOcc occ)
 
-wlkQid	:: U_qid -> UgnM RdrName
-wlkQid (U_noqual name)
-  = returnUgn (Unqual name)
-wlkQid (U_aqual  mod name)
-  = returnUgn (Qual mod name)
-wlkQid (U_gid n name)
-  = returnUgn (preludeQual name)
+wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
+wlkQid mk_occ_name (U_noqual name)
+  = returnUgn (Unqual (mk_occ_name name))
+wlkQid mk_occ_name (U_aqual  mod name)
+  = returnUgn (Qual mod (mk_occ_name name))
+
+	-- I don't understand this one!  It is what shows up when we meet (), [], or (,,,).
+wlkQid mk_occ_name (U_gid n name)
+  = returnUgn (Unqual (mk_occ_name name))
+
+rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId qid
+rdVarId pt = rdU_qid pt `thenUgn` \ qid -> wlkVarId qid
 
 cvFlag :: U_long -> Bool
 cvFlag 0 = False
@@ -108,36 +120,30 @@ rdModule
     wlkList  rdFixOp	hfixlist `thenUgn` \ fixities 	->
     wlkBinding		hmodlist `thenUgn` \ binding	->
 
-    case sepDeclsForTopBinds binding of
-    (tydecls, tysigs, classdecls, instdecls, instsigs, defaultdecls, binds) ->
-
-      returnUgn (modname,
-       		 HsModule modname
+    let
+	val_decl    = ValD (add_main_sig modname (cvBinds srcfile cvValSig binding))
+	other_decls = cvOtherDecls binding
+    in
+    returnUgn (modname,
+       	       HsModule modname
 	      		  (case srciface_version of { 0 -> Nothing; n -> Just n })
 	      		  exports
 	      		  imports
 	      		  fixities
-	      		  tydecls
-			  tysigs
-	      		  classdecls
-	      		  instdecls
-	      		  instsigs
-	      		  defaultdecls
-			  (add_main_sig modname (cvSepdBinds srcfile cvValSig binds))
-	      		  [{-no interface sigs yet-}]
+			  (val_decl: other_decls)
 	      		  src_loc
        		)
   where
     add_main_sig modname binds
-      = if modname == SLIT("Main") then
+      = if modname == mAIN then
 	    let
-	       s = Sig (Unqual SLIT("main")) (io_ty SLIT("IO")) noGenPragmas mkBuiltinSrcLoc
+	       s = Sig (varUnqual SLIT("main")) (io_ty SLIT("IO")) mkGeneratedSrcLoc
 	    in
 	    add_sig binds s
 
-	else if modname == SLIT("GHCmain") then
+	else if modname == gHC_MAIN then
 	    let
-	       s = Sig (Unqual SLIT("mainPrimIO")) (io_ty SLIT("PrimIO")) noGenPragmas mkBuiltinSrcLoc
+	       s = Sig (varUnqual SLIT("mainPrimIO")) (io_ty SLIT("PrimIO"))  mkGeneratedSrcLoc
 	    in
 	    add_sig binds s
 
@@ -148,7 +154,7 @@ rdModule
 	add_sig (BindWith b ss) s = BindWith b (s:ss)
 	add_sig _		_ = panic "rdModule:add_sig"
 
-	io_ty t = HsForAllTy [] [] (MonoTyApp (Unqual t) [MonoTupleTy []])
+	io_ty t = MonoTyApp (Unqual (TCOcc t)) [MonoTupleTy dummyRdrTcName []]
 \end{code}
 
 %************************************************************************
@@ -175,11 +181,11 @@ wlkExpr expr
 
       U_lsection lsexp lop -> -- left section
 	wlkExpr lsexp	`thenUgn` \ expr ->
-	wlkQid  lop	`thenUgn` \ op   ->
+	wlkVarId  lop	`thenUgn` \ op   ->
 	returnUgn (SectionL expr (HsVar op))
 
       U_rsection rop rsexp -> -- right section
-	wlkQid  rop	`thenUgn` \ op   ->
+	wlkVarId  rop	`thenUgn` \ op   ->
 	wlkExpr rsexp	`thenUgn` \ expr ->
 	returnUgn (SectionR (HsVar op) expr)
 
@@ -303,7 +309,7 @@ wlkExpr expr
 
       U_restr restre restrt -> 	-- expression with type signature
 	wlkExpr	    restre	`thenUgn` \ expr ->
-	wlkPolyType restrt	`thenUgn` \ ty	 ->
+	wlkHsType restrt	`thenUgn` \ ty	 ->
 	returnUgn (ExprWithTySig expr ty)
 
       --------------------------------------------------------------
@@ -317,7 +323,7 @@ wlkExpr expr
 	returnUgn (HsLit lit)
 
       U_ident n -> 			-- simple identifier
-	wlkQid n	`thenUgn` \ var ->
+	wlkVarId n	`thenUgn` \ var ->
 	returnUgn (HsVar var)
 
       U_ap fun arg -> 			-- application
@@ -326,18 +332,14 @@ wlkExpr expr
 	returnUgn (HsApp expr1 expr2)
 
       U_infixap fun arg1 arg2 ->	-- infix application
-	wlkQid  fun	`thenUgn` \ op    ->
+	wlkVarId  fun	`thenUgn` \ op    ->
 	wlkExpr arg1	`thenUgn` \ expr1 ->
 	wlkExpr arg2	`thenUgn` \ expr2 ->
 	returnUgn (OpApp expr1 (HsVar op) expr2)
 
       U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
-	-- this is a hack
-	let
-	    rdr = preludeQual SLIT("negate")
-	in
-	returnUgn (NegApp expr (HsVar rdr))
+	returnUgn (NegApp expr (HsVar dummyRdrVarName))
 
       U_llist llist -> -- explicit list
 	wlkList rdExpr llist `thenUgn` \ exprs ->
@@ -348,7 +350,7 @@ wlkExpr expr
 	returnUgn (ExplicitTuple exprs)
 
       U_record con rbinds -> -- record construction
-	wlkQid  con		`thenUgn` \ rcon     ->
+	wlkDataId  con		`thenUgn` \ rcon     ->
 	wlkList rdRbind rbinds	`thenUgn` \ recbinds ->
 	returnUgn (RecordCon (HsVar rcon) recbinds)
 
@@ -373,7 +375,7 @@ wlkExpr expr
 
 rdRbind pt
   = rdU_tree pt		`thenUgn` \ (U_rbind var exp) ->
-    wlkQid   var	`thenUgn` \ rvar ->
+    wlkVarId   var	`thenUgn` \ rvar ->
     wlkMaybe rdExpr exp	`thenUgn` \ expr_maybe ->
     returnUgn (
       case expr_maybe of
@@ -398,7 +400,7 @@ wlkPat pat
 	)
 
       U_as avar as_pat -> 		-- "as" pattern
-	wlkQid avar	`thenUgn` \ var ->
+	wlkVarId avar	`thenUgn` \ var ->
 	wlkPat as_pat	`thenUgn` \ pat ->
 	returnUgn (AsPatIn var pat)
 
@@ -413,11 +415,11 @@ wlkPat pat
 	returnUgn (LitPatIn lit)
 
       U_ident nn ->			-- simple identifier
-	wlkQid nn	`thenUgn` \ n ->
+	wlkVarId nn	`thenUgn` \ n ->
 	returnUgn (
-	  if isRdrLexConOrSpecial n
-	  then ConPatIn n []
-	  else VarPatIn n
+	  case rdrNameOcc n of
+		VarOcc occ | isLexConId occ -> ConPatIn n []
+		other     		    -> VarPatIn n
 	)
 
       U_ap l r ->	-- "application": there's a list of patterns lurking here!
@@ -455,7 +457,7 @@ wlkPat pat
 		  returnUgn (pat,acc)
 
       U_infixap fun arg1 arg2 ->	-- infix pattern
-	wlkQid fun	`thenUgn` \ op   ->
+	wlkVarId fun	`thenUgn` \ op   ->
 	wlkPat arg1	`thenUgn` \ pat1 ->
 	wlkPat arg2	`thenUgn` \ pat2 ->
 	returnUgn (ConOpPatIn pat1 op pat2)
@@ -473,13 +475,13 @@ wlkPat pat
 	returnUgn (TuplePatIn pats)
 
       U_record con rpats -> 		-- record destruction
-	wlkQid  con		`thenUgn` \ rcon     ->
+	wlkDataId  con		`thenUgn` \ rcon     ->
 	wlkList rdRpat rpats	`thenUgn` \ recpats ->
 	returnUgn (RecPatIn rcon recpats)
 	where
 	  rdRpat pt
 	    = rdU_tree pt	 `thenUgn` \ (U_rbind var pat) ->
-    	      wlkQid   var	 `thenUgn` \ rvar ->
+    	      wlkVarId   var	 `thenUgn` \ rvar ->
     	      wlkMaybe rdPat pat `thenUgn` \ pat_maybe ->
 	      returnUgn (
 		case pat_maybe of
@@ -551,7 +553,7 @@ wlkBinding binding
 	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   ntctxt   `thenUgn` \ ctxt	    ->
 	wlkTyConAndTyVars  nttype   `thenUgn` \ (tycon, tyvars) ->
-	wlkList rdConDecl  ntcon    `thenUgn` \ con	    ->
+	wlkList rdConDecl  ntcon    `thenUgn` \ [con]	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
 	returnUgn (RdrTyDecl (TyNew ctxt tycon tyvars con derivings noDataPragmas src_loc))
 
@@ -582,10 +584,7 @@ wlkBinding binding
 	wlkBinding	 cbindw	 `thenUgn` \ binding	  ->
 	getSrcFileUgn		 `thenUgn` \ sf		  ->
 	let
-	    (class_sigs, class_methods) = sepDeclsIntoSigsAndBinds binding
-
-	    final_sigs    = concat (map cvClassOpSig class_sigs)
-	    final_methods = cvMonoBinds sf class_methods
+	    (final_methods, final_sigs) = cvMonoBindsAndSigs sf cvClassOpSig binding
 	in
 	returnUgn (RdrClassDecl
 	  (ClassDecl ctxt clas tyvar final_sigs final_methods noClassPragmas src_loc))
@@ -594,19 +593,17 @@ wlkBinding binding
       U_ibind ibindc iclas ibindi ibindw srcline ->
 	mkSrcLocUgn	srcline		$ \ src_loc ->
 	wlkContext	ibindc	`thenUgn` \ ctxt    ->
-	wlkQid		iclas	`thenUgn` \ clas    ->
-	wlkMonoType	ibindi	`thenUgn` \ inst_ty ->
+	wlkTCId		iclas	`thenUgn` \ clas    ->
+	wlkMonoType	ibindi	`thenUgn` \ at_ty ->
 	wlkBinding	ibindw	`thenUgn` \ binding ->
 	getSrcModUgn		`thenUgn` \ modname ->
 	getSrcFileUgn		`thenUgn` \ sf	    ->
 	let
-	    (ss, bs)  = sepDeclsIntoSigsAndBinds binding
-	    binds     = cvMonoBinds sf bs
-	    uprags    = concat (map cvInstDeclSig ss)
-	    ctxt_inst_ty = HsPreForAllTy ctxt inst_ty
+	    (binds,uprags) = cvMonoBindsAndSigs sf cvInstDeclSig binding
+	    inst_ty = HsPreForAllTy ctxt (MonoDictTy clas at_ty)
 	in
 	returnUgn (RdrInstDecl
-          (InstDecl clas ctxt_inst_ty binds True{-from here-} modname uprags noInstancePragmas src_loc))
+          (InstDecl inst_ty binds uprags Nothing {- No dfun id -} src_loc))
 
 	-- "default" declaration
       U_dbind dbindts srcline ->
@@ -625,7 +622,7 @@ wlkDerivings :: U_maybe -> UgnM (Maybe [RdrName])
 wlkDerivings (U_nothing) = returnUgn Nothing
 wlkDerivings (U_just pt)
   = rdU_list pt		 `thenUgn` \ ds	    ->
-    wlkList rdQid ds	 `thenUgn` \ derivs ->
+    wlkList rdTCId ds	 `thenUgn` \ derivs ->
     returnUgn (Just derivs)
 \end{code}
 
@@ -633,55 +630,55 @@ wlkDerivings (U_just pt)
 	-- type signature
 wlk_sig_thing (U_sbind sbindids sbindid srcline)
   = mkSrcLocUgn		srcline  	$ \ src_loc ->
-    wlkList rdQid	sbindids `thenUgn` \ vars    ->
-    wlkPolyType		sbindid  `thenUgn` \ poly_ty ->
+    wlkList rdVarId	sbindids `thenUgn` \ vars    ->
+    wlkHsType		sbindid  `thenUgn` \ poly_ty ->
     returnUgn (RdrTySig vars poly_ty src_loc)
 
 	-- value specialisation user-pragma
 wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
   = mkSrcLocUgn	srcline		    	    $ \ src_loc ->
-    wlkQid  uvar		    `thenUgn` \ var ->
+    wlkVarId  uvar		    `thenUgn` \ var ->
     wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
     returnUgn (RdrSpecValSig [SpecSig var ty using_id src_loc
 			     | (ty, using_id) <- tys_and_ids ])
   where
-    rd_ty_and_id :: ParseTree -> UgnM (RdrNamePolyType, Maybe RdrName)
+    rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
     rd_ty_and_id pt
       = rdU_binding pt		`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
-	wlkPolyType vspec_ty	`thenUgn` \ ty	     ->
-	wlkMaybe rdQid vspec_id	`thenUgn` \ id_maybe ->
+	wlkHsType vspec_ty	`thenUgn` \ ty	     ->
+	wlkMaybe rdVarId vspec_id	`thenUgn` \ id_maybe ->
 	returnUgn(ty, id_maybe)
 
 	-- instance specialisation user-pragma
 wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkQid	iclas		`thenUgn` \ clas    ->
+    wlkTCId	iclas		`thenUgn` \ clas    ->
     wlkMonoType ispec_ty	`thenUgn` \ ty	    ->
     returnUgn (RdrSpecInstSig (SpecInstSig clas ty src_loc))
 
 	-- data specialisation user-pragma
 wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
   = mkSrcLocUgn srcline		 	 $ \ src_loc ->
-    wlkQid	itycon		 `thenUgn` \ tycon   ->
+    wlkTCId	itycon		 `thenUgn` \ tycon   ->
     wlkList rdMonoType dspec_tys `thenUgn` \ tys     ->
     returnUgn (RdrSpecDataSig (SpecDataSig tycon (MonoTyApp tycon tys) src_loc))
 
 	-- value inlining user-pragma
 wlk_sig_thing (U_inline_uprag ivar srcline)
   = mkSrcLocUgn	srcline      		$ \ src_loc ->
-    wlkQid	ivar		`thenUgn` \ var     ->
+    wlkVarId	ivar		`thenUgn` \ var     ->
     returnUgn (RdrInlineValSig (InlineSig var src_loc))
 
 	-- "deforest me" user-pragma
 wlk_sig_thing (U_deforest_uprag ivar srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkQid	ivar		`thenUgn` \ var     ->
+    wlkVarId	ivar		`thenUgn` \ var     ->
     returnUgn (RdrDeforestSig (DeforestSig var src_loc))
 
 	-- "magic" unfolding user-pragma
 wlk_sig_thing (U_magicuf_uprag ivar str srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkQid	ivar		`thenUgn` \ var     ->
+    wlkVarId	ivar		`thenUgn` \ var     ->
     returnUgn (RdrMagicUnfoldingSig (MagicUnfoldingSig var str src_loc))
 \end{code}
 
@@ -692,16 +689,16 @@ wlk_sig_thing (U_magicuf_uprag ivar str srcline)
 %************************************************************************
 
 \begin{code}
-rdPolyType :: ParseTree -> UgnM RdrNamePolyType
-rdMonoType :: ParseTree -> UgnM RdrNameMonoType
+rdHsType :: ParseTree -> UgnM RdrNameHsType
+rdMonoType :: ParseTree -> UgnM RdrNameHsType
 
-rdPolyType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkPolyType ttype
+rdHsType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
 rdMonoType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkMonoType ttype
 
-wlkPolyType :: U_ttype -> UgnM RdrNamePolyType
-wlkMonoType :: U_ttype -> UgnM RdrNameMonoType
+wlkHsType :: U_ttype -> UgnM RdrNameHsType
+wlkMonoType :: U_ttype -> UgnM RdrNameHsType
 
-wlkPolyType ttype
+wlkHsType ttype
   = case ttype of
       U_context tcontextl tcontextt -> -- context
 	wlkContext  tcontextl	`thenUgn` \ ctxt ->
@@ -715,11 +712,11 @@ wlkPolyType ttype
 wlkMonoType ttype
   = case ttype of
       U_namedtvar tv -> -- type variable
-	wlkQid tv	`thenUgn` \ tyvar ->
+	wlkTvId tv	`thenUgn` \ tyvar ->
 	returnUgn (MonoTyVar tyvar)
 
       U_tname tcon -> -- type constructor
-	wlkQid tcon	`thenUgn` \ tycon ->
+	wlkTCId tcon	`thenUgn` \ tycon ->
 	returnUgn (MonoTyApp tycon [])
 
       U_tapp t1 t2 ->
@@ -731,9 +728,9 @@ wlkMonoType ttype
 	  = case t of
 	      U_tapp t1 t2   -> wlkMonoType t2	`thenUgn` \ ty2 ->
 			        collect t1 (ty2:acc)
-	      U_tname tcon   -> wlkQid tcon	`thenUgn` \ tycon ->
+	      U_tname tcon   -> wlkTCId tcon	`thenUgn` \ tycon ->
 			        returnUgn (tycon, acc)
-	      U_namedtvar tv -> wlkQid tv	`thenUgn` \ tyvar ->
+	      U_namedtvar tv -> wlkTvId tv	`thenUgn` \ tyvar ->
 			        returnUgn (tyvar, acc)
 	      U_tllist _ -> panic "tlist"
 	      U_ttuple _ -> panic "ttuple"
@@ -744,11 +741,11 @@ wlkMonoType ttype
 	      
       U_tllist tlist -> -- list type
 	wlkMonoType tlist	`thenUgn` \ ty ->
-	returnUgn (MonoListTy ty)
+	returnUgn (MonoListTy dummyRdrTcName ty)
 
       U_ttuple ttuple ->
 	wlkList rdMonoType ttuple `thenUgn` \ tys ->
-	returnUgn (MonoTupleTy tys)
+	returnUgn (MonoTupleTy dummyRdrTcName tys)
 
       U_tfun tfun targ ->
 	wlkMonoType tfun	`thenUgn` \ ty1 ->
@@ -758,14 +755,14 @@ wlkMonoType ttype
 \end{code}
 
 \begin{code}
-wlkTyConAndTyVars :: U_ttype -> UgnM (RdrName, [RdrName])
+wlkTyConAndTyVars :: U_ttype -> UgnM (RdrName, [HsTyVar RdrName])
 wlkContext   	  :: U_list  -> UgnM RdrNameContext
-wlkClassAssertTy  :: U_ttype -> UgnM (RdrName, RdrName)
+wlkClassAssertTy  :: U_ttype -> UgnM (RdrName, HsTyVar RdrName)
 
 wlkTyConAndTyVars ttype
   = wlkMonoType ttype	`thenUgn` \ (MonoTyApp tycon ty_args) ->
     let
-	args = [ a | (MonoTyVar a) <- ty_args ]
+	args = [ UserTyVar a | (MonoTyVar a) <- ty_args ]
     in
     returnUgn (tycon, args)
 
@@ -775,11 +772,13 @@ wlkContext list
 
 wlkClassAssertTy xs
   = wlkMonoType xs   `thenUgn` \ mono_ty ->
-    returnUgn (mk_class_assertion mono_ty)
+    returnUgn (case mk_class_assertion mono_ty of
+		  (clas, MonoTyVar tyvar) -> (clas, UserTyVar tyvar)
+    )
 
-mk_class_assertion :: RdrNameMonoType -> (RdrName, RdrName)
+mk_class_assertion :: RdrNameHsType -> (RdrName, RdrNameHsType)
 
-mk_class_assertion (MonoTyApp name [(MonoTyVar tyname)]) = (name, tyname)
+mk_class_assertion (MonoTyApp name [ty@(MonoTyVar tyname)]) = (name, ty)
 mk_class_assertion other
   = pprError "ERROR: malformed type context: " (ppr PprForUser other)
     -- regrettably, the parser does let some junk past
@@ -796,33 +795,33 @@ wlkConDecl :: U_constr -> UgnM RdrNameConDecl
 
 wlkConDecl (U_constrpre ccon ctys srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkQid	ccon		`thenUgn` \ con	    ->
+    wlkDataId	ccon		`thenUgn` \ con	    ->
     wlkList     rdBangType ctys	`thenUgn` \ tys	    ->
     returnUgn (ConDecl con tys src_loc)
 
 wlkConDecl (U_constrinf cty1 cop cty2 srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkBangType cty1		`thenUgn` \ ty1	    ->
-    wlkQid	cop		`thenUgn` \ op	    ->
+    wlkDataId	cop		`thenUgn` \ op	    ->
     wlkBangType cty2		`thenUgn` \ ty2	    ->
     returnUgn (ConOpDecl ty1 op ty2 src_loc)
 
 wlkConDecl (U_constrnew ccon cty srcline)
   = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkQid	ccon		`thenUgn` \ con	    ->
+    wlkDataId	ccon		`thenUgn` \ con	    ->
     wlkMonoType cty		`thenUgn` \ ty	    ->
     returnUgn (NewConDecl con ty src_loc)
 
 wlkConDecl (U_constrrec ccon cfields srcline)
   = mkSrcLocUgn srcline			$ \ src_loc      ->
-    wlkQid	ccon		`thenUgn` \ con		 ->
+    wlkDataId	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
     returnUgn (RecConDecl con fields_lists src_loc)
   where
     rd_field :: ParseTree -> UgnM ([RdrName], BangType RdrName)
     rd_field pt
       = rdU_constr pt		`thenUgn` \ (U_field fvars fty) ->
-	wlkList rdQid	fvars	`thenUgn` \ vars ->
+	wlkList rdVarId	fvars	`thenUgn` \ vars ->
 	wlkBangType fty		`thenUgn` \ ty ->
 	returnUgn (vars, ty)
 
@@ -832,9 +831,9 @@ rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty
 wlkBangType :: U_ttype -> UgnM (BangType RdrName)
 
 wlkBangType (U_tbang bty) = wlkMonoType bty `thenUgn` \ ty ->
-			    returnUgn (Banged   (HsPreForAllTy [] ty))
+			    returnUgn (Banged   ty)
 wlkBangType uty		  = wlkMonoType uty `thenUgn` \ ty ->
-			    returnUgn (Unbanged (HsPreForAllTy [] ty))
+			    returnUgn (Unbanged ty)
 \end{code}
 
 %************************************************************************
@@ -851,7 +850,7 @@ rdMatch pt
     mkSrcLocUgn srcline			$ \ src_loc      ->
     wlkPat	gpat		`thenUgn` \ pat     ->
     wlkBinding	gbind		`thenUgn` \ binding ->
-    wlkQid	gsrcfun		`thenUgn` \ srcfun  ->
+    wlkVarId	gsrcfun		`thenUgn` \ srcfun  ->
     let
 	wlk_guards (U_pnoguards exp)
 	  = wlkExpr exp `thenUgn` \ expr ->
@@ -881,12 +880,14 @@ rdFixOp :: ParseTree -> UgnM RdrNameFixityDecl
 rdFixOp pt 
   = rdU_tree pt `thenUgn` \ fix ->
     case fix of
-      U_fixop op (-1) prec -> wlkQid op `thenUgn` \ op ->
-				       returnUgn (InfixL op prec)
-      U_fixop op   0  prec -> wlkQid op `thenUgn` \ op ->
-				       returnUgn (InfixN op prec)
-      U_fixop op   1  prec -> wlkQid op `thenUgn` \ op ->
-				       returnUgn (InfixR op prec)
+      U_fixop op dir_n prec -> wlkVarId op `thenUgn` \ op ->
+				       returnUgn (FixityDecl op (Fixity prec dir) noSrcLoc)
+						-- ToDo: add SrcLoc!
+			    where
+			      dir = case dir_n of
+					(-1) -> InfixL
+					0    -> InfixN
+					1    -> InfixR
       _ -> error "ReadPrefix:rdFixOp"
 \end{code}
 
@@ -926,21 +927,21 @@ rdEntity pt
   = rdU_entidt pt `thenUgn` \ entity ->
     case entity of
       U_entid evar -> 		-- just a value
-	wlkQid	evar		`thenUgn` \ var ->
+	wlkEntId	evar		`thenUgn` \ var ->
 	returnUgn (IEVar var)
 
       U_enttype x -> 		-- abstract type constructor/class
-	wlkQid	x		`thenUgn` \ thing ->
+	wlkTCId	x		`thenUgn` \ thing ->
 	returnUgn (IEThingAbs thing)
 
       U_enttypeall x -> 	-- non-abstract type constructor/class
-	wlkQid	x		`thenUgn` \ thing ->
+	wlkTCId	x		`thenUgn` \ thing ->
 	returnUgn (IEThingAll thing)
 
       U_enttypenamed x ns -> 	-- non-abstract type constructor/class
 				-- with specified constrs/methods
-	wlkQid	x		`thenUgn` \ thing ->
-	wlkList rdQid ns	`thenUgn` \ names -> 
+	wlkTCId	x		`thenUgn` \ thing ->
+	wlkList rdVarId ns	`thenUgn` \ names -> 
 	returnUgn (IEThingWith thing names)
 
       U_entmod mod -> 		-- everything provided unqualified by a module

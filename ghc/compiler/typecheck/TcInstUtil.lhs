@@ -20,7 +20,8 @@ import HsSyn		( MonoBinds, Fake, InPat, Sig )
 import RnHsSyn		( SYN_IE(RenamedMonoBinds), RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcEnv		( tcLookupGlobalValueMaybe )
+import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 
 import Bag		( bagToList )
@@ -29,7 +30,7 @@ import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
 			  SYN_IE(ClassOp)
 			)
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
-import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
+import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal, replaceIdInfo, getIdInfo )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
@@ -63,10 +64,7 @@ data InstInfo
 			--   element for each superclass; the "Mark
 			--   Jones optimisation"
       Id		-- The dfun id
-      [Id]		-- Constant methods (either all or none)
       RenamedMonoBinds	-- Bindings, b
-      Bool		-- True <=> local instance decl
-      Module		-- Name of module where this instance defined
       SrcLoc		-- Source location assoc'd with this instance's defn
       [RenamedSig]	-- User pragmas recorded for generating specialised instances
 \end{code}
@@ -78,22 +76,30 @@ data InstInfo
 %************************************************************************
 
 \begin{code}
-mkInstanceRelatedIds :: Bool
-		     -> SrcLoc
-		     -> Module
-                     -> RenamedInstancePragmas
+mkInstanceRelatedIds :: Name		-- Name to use for the dict fun;
 		     -> Class 
 		     -> [TyVar]
 		     -> Type
 		     -> ThetaType
-		     -> [RenamedSig]
-		     -> TcM s (Id, ThetaType, [Id])
+		     -> NF_TcM s (Id, ThetaType)
 
-mkInstanceRelatedIds from_here src_loc inst_mod inst_pragmas
-		     clas inst_tyvars inst_ty inst_decl_theta uprags
-  = 	-- MAKE THE DFUN ID
+mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
+  = tcLookupGlobalValueMaybe dfun_name	`thenNF_Tc` \ maybe_id ->
     let
-	dfun_theta = case inst_decl_theta of
+	-- Extract the dfun's IdInfo from the interface file,
+	-- provided it's imported.
+	-- We have to be lazy here; people look at the dfun Id itself
+	dfun_info = case maybe_id of
+			Nothing		      -> noIdInfo
+			Just imported_dfun_id -> getIdInfo imported_dfun_id
+    in
+    returnNF_Tc (new_dfun_id `replaceIdInfo` dfun_info, dfun_theta)
+
+  where
+    (_, super_classes, _, _, _, _) = classBigSig clas
+    super_class_theta = super_classes `zip` repeat inst_ty
+
+    dfun_theta = case inst_decl_theta of
 			[]    -> []	-- If inst_decl_theta is empty, then we don't
 					-- want to have any dict arguments, so that we can
 					-- expose the constant methods.
@@ -102,73 +108,9 @@ mkInstanceRelatedIds from_here src_loc inst_mod inst_pragmas
 					-- Otherwise we pass the superclass dictionaries to
 					-- the dictionary function; the Mark Jones optimisation.
 
-	dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_ty)
-    in
-    tcGetUnique 			`thenNF_Tc` \ dfun_uniq ->
-    fixTc ( \ rec_dfun_id ->
+    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_ty)
 
-{- LATER
-	tcDictFunPragmas dfun_ty rec_dfun_id inst_pragmas
-					`thenNF_Tc` \ dfun_pragma_info ->
-	let
-	    dfun_specenv = mkInstSpecEnv clas inst_ty inst_tyvars dfun_theta
-	    dfun_id_info = dfun_pragma_info `addInfo` dfun_specenv
-	in
--}
-	let dfun_id_info = noIdInfo in	-- For now
-
-	returnTc (mkDictFunId dfun_uniq clas inst_ty dfun_ty from_here src_loc inst_mod dfun_id_info)
-    ) `thenTc` \ dfun_id ->
-
---  pprTrace "DFUN: " (ppr PprDebug dfun_id) $
-
-	-- MAKE THE CONSTANT-METHOD IDS
-	-- if there are no type variables involved
-    (if (null inst_decl_theta)
-     then
-	mapTc mk_const_meth_id class_ops
-     else
-	returnTc []
-    )					`thenTc` \ const_meth_ids ->
-
-    returnTc (dfun_id, dfun_theta, const_meth_ids)
-  where
-    (class_tyvar, super_classes, _, class_ops, _, _) = classBigSig clas
-    tenv = [(class_tyvar, inst_ty)]
-  
-    super_class_theta = super_classes `zip` repeat inst_ty
-
-    mk_const_meth_id op
-	= tcGetUnique		`thenNF_Tc` \ uniq ->
-	  fixTc (\ rec_const_meth_id ->
-
-{- LATER
-		-- Figure out the IdInfo from the pragmas
-	     (case assocMaybe opname_prag_pairs (getName op) of
-		Nothing   -> returnTc inline_info
-		Just prag -> tcGenPragmas (Just meth_ty) rec_const_meth_id prag
-	     )			`thenNF_Tc` \ id_info ->
--}
-	     let id_info = noIdInfo 	-- For now
-	     in
-	     returnTc (mkConstMethodId uniq clas op inst_ty meth_ty
-				       from_here src_loc inst_mod id_info)
-	  )
-	where
-	  op_ty       = classOpLocalType op
-	  meth_ty     = mkForAllTys inst_tyvars (instantiateTy tenv op_ty)
-{- LATER
-	  inline_me   = isIn "mkInstanceRelatedIds" op ops_to_inline
-	  inline_info = if inline_me
-			then noIdInfo `addInfo_UF` (iWantToBeINLINEd UnfoldAlways)
-			else noIdInfo
-
-    opname_prag_pairs = case inst_pragmas of
-			   ConstantInstancePragma _ name_prag_pairs -> name_prag_pairs
-			   other_inst_pragmas			    -> []
-
-    ops_to_inline = [op | (InlineSig op _) <- uprags]
--}
+    new_dfun_id = mkDictFunId dfun_name dfun_ty clas inst_ty
 \end{code}
 
 
@@ -185,7 +127,7 @@ buildInstanceEnvs :: Bag InstInfo
 buildInstanceEnvs info
   = let
     	icmp :: InstInfo -> InstInfo -> TAG_
-    	(InstInfo c1 _ _ _ _ _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _ _ _ _ _)
+    	(InstInfo c1 _ _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _ _)
 	  = c1 `cmp` c2
 
 	info_by_class = equivClasses icmp (bagToList info)
@@ -202,7 +144,7 @@ buildInstanceEnvs info
 buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
 		 -> TcM s (Class, (ClassInstEnv, (ClassOp -> SpecEnv)))
 
-buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _ _ _ _) : _)
+buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _) : _)
   = foldlTc addClassInstance
 	    (nullMEnv, [(op, nullSpecEnv) | op <- classOps clas])
 	    inst_infos
@@ -223,9 +165,9 @@ addClassInstance
     -> TcM s (ClassInstEnv, [(ClassOp,SpecEnv)])
 
 addClassInstance
-    (class_inst_env, op_spec_envs)
+    input_stuff@(class_inst_env, op_spec_envs)
     (InstInfo clas inst_tyvars inst_ty _ _ 
-	      dfun_id const_meth_ids _ _ _ src_loc _)
+	      dfun_id _ src_loc _)
   = 
 
 -- We only add specialised/overlapped instances
@@ -240,9 +182,14 @@ addClassInstance
 
 	-- Add the instance to the class's instance environment
     case insertMEnv matchTy class_inst_env inst_ty dfun_id of {
-	Failed (ty', dfun_id')    -> dupInstFailure clas (inst_ty, src_loc) 
+	Failed (ty', dfun_id')    -> recoverTc (returnTc input_stuff) $
+				     dupInstFailure clas (inst_ty, src_loc) 
 							 (ty', getSrcLoc dfun_id');
 	Succeeded class_inst_env' -> 
+
+	    returnTc (class_inst_env', op_spec_envs)
+
+{- 		OLD STUFF FOR CONSTANT METHODS 
 
 	-- If there are any constant methods, then add them to 
 	-- the SpecEnv of each class op (ie selector)
@@ -283,6 +230,8 @@ addClassInstance
 	  rhs = mkValLam [dict] (mkTyApp (Var meth_id) (mkTyVarTys inst_tyvars))
     in
     returnTc (class_inst_env', op_spec_envs')
+		END OF OLD STUFF -}
+
     }
 \end{code}
 

@@ -87,6 +87,7 @@ module Unique (
 	foreignObjTyConKey,
 	forkIdKey,
 	fractionalClassKey,
+	fromEnumClassOpKey,
 	fromIntClassOpKey,
 	fromIntegerClassOpKey,
 	fromRationalClassOpKey,
@@ -212,6 +213,7 @@ module Unique (
 	, parAtRelIdKey
 	, parGlobalIdKey
 	, parLocalIdKey
+	, unboundKey
     ) where
 
 import PreludeGlaST
@@ -664,4 +666,7 @@ eqClassOpKey		= mkPreludeMiscIdUnique 60
 geClassOpKey		= mkPreludeMiscIdUnique 61
 zeroClassOpKey		= mkPreludeMiscIdUnique 62
 thenMClassOpKey		= mkPreludeMiscIdUnique 63 -- (>>=)
+unboundKey		= mkPreludeMiscIdUnique 64	-- Just a place holder for unbound
+							-- variables produced by the renamer
+fromEnumClassOpKey	= mkPreludeMiscIdUnique 65
 \end{code}

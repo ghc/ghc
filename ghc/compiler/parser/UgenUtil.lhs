@@ -26,8 +26,8 @@ import PreludeGlaST
 # define PACK_BYTES _packCBytes
 #endif
 
-import Name		( RdrName(..) )
-import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc, SrcLoc )
+import RdrHsSyn		( RdrName(..) )
+import SrcLoc		( mkSrcLoc, noSrcLoc, SrcLoc )
 \end{code}
 
 \begin{code}
@@ -47,7 +47,7 @@ thenUgn x y stuff
 initUgn :: UgnM a -> IO a
 initUgn action
   = let
-	do_it = action (SLIT(""),SLIT(""),mkUnknownSrcLoc)
+	do_it = action (SLIT(""),SLIT(""),noSrcLoc)
     in
 #if __GLASGOW_HASKELL__ >= 200
     primIOToIO do_it
@@ -105,7 +105,7 @@ mkSrcLocUgn :: U_long -> (SrcLoc -> UgnM a) -> UgnM a
 mkSrcLocUgn ln action (file,mod,_)
   = action loc (file,mod,loc)
   where
-    loc = mkSrcLoc2 file ln
+    loc = mkSrcLoc file ln
 
 getSrcLocUgn :: UgnM SrcLoc
 getSrcLocUgn stuff@(file,mod,loc) = returnUgn loc stuff

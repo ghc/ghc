@@ -10,35 +10,40 @@ module TcDefaults ( tcDefaults ) where
 
 IMP_Ubiq()
 
-import HsSyn		( DefaultDecl(..), MonoType,
+import HsSyn		( HsDecl(..), TyDecl, ClassDecl, InstDecl, HsBinds,
+			  DefaultDecl(..), HsType, IfaceSig,
 			  HsExpr, HsLit, ArithSeqInfo, Fake, InPat)
-import RnHsSyn		( RenamedDefaultDecl(..) )
+import RnHsSyn		( RenamedHsDecl(..), RenamedDefaultDecl(..) )
 import TcHsSyn		( TcIdOcc )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( InstOrigin(..) )
 import TcEnv		( tcLookupClassByKey )
 import SpecEnv		( SpecEnv )
-import TcMonoType	( tcMonoType )
+import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( intTy, doubleTy, unitTy )
 import Unique		( numClassKey )
+import Pretty		( ppStr, ppAboves )
+import ErrUtils		( addShortErrLocLine )
 import Util
 \end{code}
 
 \begin{code}
-tcDefaults :: [RenamedDefaultDecl]
+default_default = [intTy, doubleTy] 	    -- language-specified default `default'
+
+tcDefaults :: [RenamedHsDecl]
 	   -> TcM s [Type] 	    -- defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
+tcDefaults decls = tc_defaults [default_decl | DefD default_decl <- decls]
 
-tcDefaults []
-  = returnTc [intTy, doubleTy] 	    -- language-specified default `default'
+tc_defaults [] = returnTc default_default
 
-tcDefaults [DefaultDecl mono_tys locn]
+tc_defaults [DefaultDecl mono_tys locn]
   = tcAddSrcLoc locn $
-    mapTc tcMonoType mono_tys	`thenTc` \ tau_tys ->
+    mapTc tcHsType mono_tys	`thenTc` \ tau_tys ->
 
     case tau_tys of
       [] -> returnTc []		-- no defaults
@@ -52,5 +57,20 @@ tcDefaults [DefaultDecl mono_tys locn]
 		[ (num, ty) | ty <- tau_tys ]		`thenTc_`
 
 	returnTc tau_tys
+
+tc_defaults decls
+  = failTc (dupDefaultDeclErr decls)
+
+
+dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
+  = ppAboves (item1 : map dup_item dup_things)
+  where
+    item1
+      = addShortErrLocLine locn1 (\ sty ->
+	ppStr "multiple default declarations") sty
+
+    dup_item (DefaultDecl _ locn)
+      = addShortErrLocLine locn (\ sty ->
+	ppStr "here was another default declaration") sty
 
 \end{code}

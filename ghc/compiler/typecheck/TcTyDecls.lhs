@@ -17,39 +17,39 @@ IMP_Ubiq(){-uitous-}
 import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
 			  HsBinds(..), HsLit, Stmt, Qualifier, ArithSeqInfo,
-			  PolyType, Fake, InPat,
-			  Bind(..), MonoBinds(..), Sig, 
-			  MonoType )
-import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..),
-			  RnName{-instance Outputable-}
+			  HsType, Fake, InPat, HsTyVar,
+			  Bind(..), MonoBinds(..), Sig 
 			)
+import HsTypes		( getTyVarName )
+import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
 			  SYN_IE(TcHsBinds), TcIdOcc(..)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
-import TcMonoType	( tcMonoTypeKind, tcMonoType, tcPolyType, tcContext )
+import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
 import TcSimplify	( tcSimplifyThetas )
 import TcType		( tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 			  newLocalId, newLocalIds, tcLookupClassByKey
 			)
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
 
 import PprType		( GenClass, GenType{-instance Outputable-},
 			  GenTyVar{-instance Outputable-}{-ToDo:possibly rm-}
 			)
+import CoreUnfold	( getUnfoldingTemplate )
 import Class		( GenClass{-instance Eq-}, classInstEnv )
 import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			  dataConFieldLabels, dataConStrictMarks,
-			  StrictnessMark(..),
+			  StrictnessMark(..), getIdUnfolding,
 			  GenId{-instance NamedThing-}
 			)
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import SpecEnv		( SpecEnv, nullSpecEnv )
-import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
-			  Name{-instance Ord3-}
+import Name		( nameSrcLoc, isLocallyDefined, getSrcLoc,
+			  OccName(..), Name{-instance Ord3-}
 			)
 import Outputable	( Outputable(..), interpp'SP )
 import Pretty
@@ -80,11 +80,12 @@ tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
     tcAddErrCtxt (tySynCtxt tycon_name) $
 
 	-- Look up the pieces
-    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  _, rec_tycon) ->
-    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
+    tcLookupTyCon tycon_name			`thenTc` \ (tycon_kind,  _, rec_tycon) ->
+    mapAndUnzipNF_Tc (tcLookupTyVar.getTyVarName) tyvar_names
+						`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
 
 	-- Look at the rhs
-    tcMonoTypeKind rhs				`thenTc` \ (rhs_kind, rhs_ty) ->
+    tcHsTypeKind rhs				`thenTc` \ (rhs_kind, rhs_ty) ->
 
 	-- Unify tycon kind with (k1->...->kn->rhs)
     unifyKind tycon_kind
@@ -118,7 +119,7 @@ tcTyDecl (TyData context tycon_name tyvar_names con_decls derivings pragmas src_
   = tcTyDataOrNew DataType context tycon_name tyvar_names con_decls derivings pragmas src_loc
 
 tcTyDecl (TyNew context tycon_name tyvar_names con_decl derivings pragmas src_loc)
-  = tcTyDataOrNew NewType  context tycon_name tyvar_names con_decl  derivings pragmas src_loc
+  = tcTyDataOrNew NewType  context tycon_name tyvar_names [con_decl] derivings pragmas src_loc
 
 
 tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc
@@ -126,9 +127,10 @@ tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pra
     tcAddErrCtxt (tyDataCtxt tycon_name) $
 
 	-- Lookup the pieces
-    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind, _, rec_tycon) ->
-    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
-    tc_derivs derivings				`thenNF_Tc` \ derived_classes ->
+    tcLookupTyCon tycon_name			`thenTc` \ (tycon_kind, _, rec_tycon) ->
+    mapAndUnzipNF_Tc (tcLookupTyVar.getTyVarName)
+				 tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
+    tc_derivs derivings				`thenTc` \ derived_classes ->
 
 	-- Typecheck the context
     tcContext context				`thenTc` \ ctxt ->
@@ -156,12 +158,12 @@ tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pra
     in
     returnTc tycon
 
-tc_derivs Nothing   = returnNF_Tc []
-tc_derivs (Just ds) = mapNF_Tc tc_deriv ds
+tc_derivs Nothing   = returnTc []
+tc_derivs (Just ds) = mapTc tc_deriv ds
 
 tc_deriv name
-  = tcLookupClass name `thenNF_Tc` \ (_, clas) ->
-    returnNF_Tc clas
+  = tcLookupClass name `thenTc` \ (_, clas) ->
+    returnTc clas
 \end{code}
 
 Generating constructor/selector bindings for data declarations
@@ -178,14 +180,20 @@ mkDataBinds (tycon : tycons)
 
 mkDataBinds_one tycon
   = ASSERT( isDataTyCon tycon || isNewTyCon tycon )
-    mapAndUnzipTc mkConstructor data_cons		`thenTc` \ (con_ids, con_binds) ->	
-    mapAndUnzipTc (mkRecordSelector tycon) groups	`thenTc` \ (sel_ids, sel_binds) ->
-    returnTc (con_ids ++ sel_ids, 
-	      SingleBind $ NonRecBind $
-	      foldr AndMonoBinds 
-		    (foldr AndMonoBinds EmptyMonoBinds sel_binds)
-		    con_binds
-    )
+    mapTc checkConstructorContext data_cons	`thenTc_` 
+    mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
+    let
+	data_ids = data_cons ++ sel_ids
+
+	-- For the locally-defined things
+	-- we need to turn the unfoldings inside the Ids into bindings,
+	binds = [ CoreMonoBind (RealId data_id) (getUnfoldingTemplate (getIdUnfolding data_id))
+		| data_id <- data_ids, isLocallyDefined data_id
+		]
+    in	
+    returnTc (data_ids,
+	      SingleBind (NonRecBind (foldr AndMonoBinds EmptyMonoBinds binds))
+	     )
   where
     data_cons = tyConDataCons tycon
     fields = [ (con, field) | con   <- data_cons,
@@ -198,153 +206,56 @@ mkDataBinds_one tycon
 	= fieldLabelName field1 `cmp` fieldLabelName field2
 \end{code}
 
-We're going to build a constructor that looks like:
-
-	data (Data a, C b) =>  T a b = T1 !a !Int b
-
-	T1 = /\ a b -> 
-	     \d1::Data a, d2::C b ->
-	     \p q r -> case p of { p ->
-		       case q of { q ->
-		       HsCon T1 [a,b] [p,q,r]}}
-
-Notice that
-
-* d2 is thrown away --- a context in a data decl is used to make sure
-  one *could* construct dictionaries at the site the constructor
-  is used, but the dictionary isn't actually used.
-
-* We have to check that we can construct Data dictionaries for
-  the types a and Int.  Once we've done that we can throw d1 away too.
-
-* We use (case p of ...) to evaluate p, rather than "seq" because
-  all that matters is that the arguments are evaluated.  "seq" is 
-  very careful to preserve evaluation order, which we don't need
-  to be here.
+-- Check that all the types of all the strict arguments are in Eval
 
 \begin{code}
-mkConstructor con_id
-  | not (isLocallyDefinedName (getName con_id))
-  = returnTc (con_id, EmptyMonoBinds)
+checkConstructorContext con_id
+  | not (isLocallyDefined con_id)
+  = returnTc ()
 
   | otherwise	-- It is locally defined
-  = tcInstId con_id			`thenNF_Tc` \ (tc_tyvars, tc_theta, tc_tau) ->
-    newDicts DataDeclOrigin tc_theta	`thenNF_Tc` \ (_, dicts) ->
+  = tcLookupClassByKey evalClassKey	`thenNF_Tc` \ eval_clas ->
     let
-	(tc_arg_tys, tc_result_ty) = splitFunTy tc_tau
-	n_args = length tc_arg_tys
-    in
-    newLocalIds (nOfThem n_args SLIT("con")) tc_arg_tys	`thenNF_Tc` \ args ->
+	strict_marks         = dataConStrictMarks con_id
+	(tyvars,theta,tau)   = splitSigmaTy (idType con_id)
+	(arg_tys, result_ty) = splitFunTy tau
 
-	-- Check that all the types of all the strict arguments are in Eval
-    tcLookupClassByKey evalClassKey	`thenNF_Tc` \ eval_clas ->
-    let
-	(_,theta,tau) = splitSigmaTy (idType con_id)
-	(arg_tys, _)  = splitFunTy tau
-	strict_marks  = dataConStrictMarks con_id
-	eval_theta    = [ (eval_clas,arg_ty) 
-		        | (arg_ty, MarkedStrict) <- zipEqual "strict_args" 
+	eval_theta = [ (eval_clas,arg_ty) 
+		     | (arg_ty, MarkedStrict) <- zipEqual "strict_args" 
 							arg_tys strict_marks
-			]
+		     ]
     in
     tcSimplifyThetas classInstEnv theta eval_theta	`thenTc` \ eval_theta' ->
     checkTc (null eval_theta')
-	    (missingEvalErr con_id eval_theta')		`thenTc_`
-
-	-- Build the data constructor
-    let
-	con_rhs = mkHsTyLam tc_tyvars $
-		  mkHsDictLam dicts $
-		  mk_pat_match args $
-		  mk_case (zipEqual "strict_args" args strict_marks) $
-		  HsCon con_id (mkTyVarTys tc_tyvars) (map HsVar args)
-
-	mk_pat_match []         body = body
-	mk_pat_match (arg:args) body = HsLam $
-				       PatMatch (VarPat arg) $
-				       SimpleMatch (mk_pat_match args body)
-
-	mk_case [] body = body
-	mk_case ((arg,MarkedStrict):args) body = HsCase (HsVar arg) 
-							 [PatMatch (VarPat arg) $
-						          SimpleMatch (mk_case args body)]
-							 src_loc
-	mk_case (_:args) body = mk_case args body
-
-	src_loc = nameSrcLoc (getName con_id)
-    in
-
-    returnTc (con_id, VarMonoBind (RealId con_id) con_rhs)		 
+	    (missingEvalErr con_id eval_theta')
 \end{code}
-
-We're going to build a record selector that looks like this:
-
-	data T a b c = T1 { op :: a, ...}
-		     | T2 { op :: a, ...}
-		     | T3
-
-	sel :: forall a b c. T a b c -> a
-	sel = /\ a b c -> \ T1 { sel = x } -> x
-			    T2 { sel = 2 } -> x
-
-Note that the selector Id itself is used as the field
-label; it has to be an Id, you see!
 
 \begin{code}
 mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 		-- These fields all have the same name, but are from
 		-- different constructors in the data type
-  = let
-	field_ty   = fieldLabelType first_field_label
-	field_name = fieldLabelName first_field_label
-	other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
-	(tyvars, _, _, _) = dataConSig first_con
-        data_ty  = applyTyCon tycon (mkTyVarTys tyvars)
-	-- tyvars of first_con may be free in field_ty
-    in
-   
 	-- Check that all the fields in the group have the same type
 	-- This check assumes that all the constructors of a given
 	-- data type use the same type variables
-    checkTc (all (eqTy field_ty) other_tys)
+  = checkTc (all (eqTy field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
-    
-	-- Create an Id for the field itself
-    tcInstTyVars tyvars			`thenNF_Tc` \ (tyvars', tyvar_tys, tenv) ->
-    tcInstType tenv field_ty		`thenNF_Tc` \ field_ty' ->
-    let
-      data_ty' = applyTyCon tycon tyvar_tys
-    in
-    newLocalId SLIT("x") field_ty'	`thenNF_Tc` \ field_id ->
-    newLocalId SLIT("r") data_ty'	`thenNF_Tc` \ record_id ->
+    returnTc selector_id
+  where
+    field_ty   = fieldLabelType first_field_label
+    field_name = fieldLabelName first_field_label
+    other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
+    (tyvars, _, _, _) = dataConSig first_con
+    data_ty  = applyTyCon tycon (mkTyVarTys tyvars)
+    -- tyvars of first_con may be free in field_ty
+    -- Now build the selector
 
-	-- Now build the selector
-    let
-      selector_ty :: Type
-      selector_ty  = mkForAllTys tyvars $	
-		     mkFunTy data_ty $
-		     field_ty
+    selector_ty :: Type
+    selector_ty  = mkForAllTys tyvars $	
+		   mkFunTy data_ty $
+		   field_ty
       
-      selector_id :: Id
-      selector_id = mkRecordSelId first_field_label selector_ty
-
-	-- HsSyn is dreadfully verbose for defining the selector!
-      selector_rhs = mkHsTyLam tyvars' $
-		     HsLam $
-		     PatMatch (VarPat record_id) $
-		     SimpleMatch $
-		     selector_body
-
-      selector_body = HsCase (HsVar record_id) (map mk_match fields) (getSrcLoc tycon)
-
-      mk_match (con_id, field_label) 
-    	= PatMatch (RecPat con_id data_ty' [(selector_id, VarPat field_id, False)]) $
-	  SimpleMatch $
-    	  HsVar field_id
-    in
-    returnTc (selector_id, if isLocallyDefinedName (getName tycon)
-			   then VarMonoBind (RealId selector_id) selector_rhs
-			   else EmptyMonoBinds)
+    selector_id :: Id
+    selector_id = mkRecordSelId first_field_label selector_ty
 \end{code}
 
 Constructors
@@ -360,7 +271,7 @@ tcConDecl tycon tyvars ctxt (ConOpDecl bty1 op bty2 src_loc)
 
 tcConDecl tycon tyvars ctxt (NewConDecl name ty src_loc)
   = tcAddSrcLoc src_loc	$
-    tcMonoType ty `thenTc` \ arg_ty ->
+    tcHsType ty `thenTc` \ arg_ty ->
     let
       data_con = mkDataCon (getName name)
 			   [NotMarkedStrict]
@@ -396,7 +307,7 @@ tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
     returnTc data_con
 
 tcField (field_label_names, bty)
-  = tcPolyType (get_pty bty)	`thenTc` \ field_ty ->
+  = tcHsType (get_pty bty)	`thenTc` \ field_ty ->
     returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
 
 tcDataCon tycon tyvars ctxt name btys src_loc
@@ -405,7 +316,7 @@ tcDataCon tycon tyvars ctxt name btys src_loc
 	stricts = map get_strictness btys
 	tys	= map get_pty btys
     in
-    mapTc tcPolyType tys `thenTc` \ arg_tys ->
+    mapTc tcHsType tys `thenTc` \ arg_tys ->
     let
       data_con = mkDataCon (getName name)
 			   stricts

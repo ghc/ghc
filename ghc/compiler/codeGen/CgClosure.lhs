@@ -26,7 +26,7 @@ import CgBindery	( getCAddrMode, getArgAmodes,
 			  bindNewToReg, bindArgsToRegs,
 			  stableAmodeIdInfo, heapIdInfo, CgIdInfo
 			)
-import CgCompInfo	( spARelToInt, spBRelToInt )
+import Constants	( spARelToInt, spBRelToInt )
 import CgUpdate		( pushUpdateFrame )
 import CgHeapery	( allocDynClosure, heapCheck
 			  , heapCheckOnly, fetchAndReschedule, yield  -- HWL
@@ -41,7 +41,7 @@ import CgUsages		( getVirtSps, setRealAndVirtualSps,
 			  getSpARelOffset, getSpBRelOffset,
 			  getHpRelOffset
 			)
-import CLabel		( mkClosureLabel, mkConUpdCodePtrVecLabel,
+import CLabel		( mkClosureLabel, mkConUpdCodePtrVecLabel, mkFastEntryLabel,
 			  mkStdUpdCodePtrVecLabel, mkStdUpdVecTblLabel,
 			  mkErrorStdEntryLabel, mkRednCountsLabel
 			)
@@ -313,7 +313,8 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 	-- If f is not top-level, then f is one of the free variables too,
 	-- hence "payload_ids" isn't the same as "arg_ids".
 	--
-	vap_entry_rhs = StgApp (StgVarArg fun) (map StgVarArg args) emptyIdSet
+	stg_args      = map StgVarArg args
+	vap_entry_rhs = StgApp (StgVarArg fun) stg_args emptyIdSet
 									-- Empty live vars
 
 	arg_ids_w_info = [(name,mkLFArgument) | name <- args]
@@ -323,8 +324,7 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 	payload_ids | fun_in_payload = fun : args		-- Sigh; needed for mkClosureLFInfo
 		    | otherwise	     = args
 
-	vap_lf_info   = mkClosureLFInfo False {-not top level-} payload_ids
-					upd_flag [] vap_entry_rhs
+	vap_lf_info   = mkVapLFInfo payload_ids upd_flag fun stg_args fun_in_payload
 		-- It's not top level, even if we're currently compiling a top-level
 		-- function, because any VAP *use* of this function will be for a
 		-- local thunk, thus
@@ -434,10 +434,6 @@ closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention id lf_info
 		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
     let
-	is_concurrent = opt_ForConcurrent
-
-	stg_arity = length all_args
-
 	-- Arg mapping for standard (slow) entry point; all args on stack
     	(spA_all_args, spB_all_args, all_bxd_w_offsets, all_ubxd_w_offsets)
 	   = mkVirtStkOffsets
@@ -510,8 +506,12 @@ closureCodeBody binder_info closure_info cc all_args body
 		    mkIntCLit spA_stk_args,	-- # passed on A stk
 		    mkIntCLit spB_stk_args,	-- B stk (rest in regs)
 		    CString (_PK_ (map (showTypeCategory . idType) all_args)),
-		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
-		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
+		    CString SLIT(""), CString SLIT("")
+
+-- Nuked for now; see comment at end of file
+--		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
+--		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
+
 		]			`thenC`
 
 		-- Bind args to regs/stack as appropriate, and
@@ -544,6 +544,8 @@ closureCodeBody binder_info closure_info cc all_args body
 	CCodeBlock fast_label fast_abs_c
     )
   where
+    is_concurrent = opt_ForConcurrent
+    stg_arity = length all_args
     lf_info = closureLFInfo closure_info
 
     cl_descr mod_name = closureDescription mod_name id all_args body
@@ -554,11 +556,10 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	-- Manufacture labels
     id	       = closureId closure_info
+    fast_label = mkFastEntryLabel id stg_arity
+    stdUpd     = CLbl mkErrorStdEntryLabel CodePtrRep
 
-    fast_label = fastLabelFromCI closure_info
-
-    stdUpd = CLbl mkErrorStdEntryLabel CodePtrRep
-
+{- OLD... see note at end of file
     wrapper_maybe = get_ultimate_wrapper Nothing id
       where
     	get_ultimate_wrapper deflt x -- walk all the way up a "wrapper chain"
@@ -574,6 +575,7 @@ closureCodeBody binder_info closure_info cc all_args body
       = case (getWrapperArgTypeCategories (idType xx) (getIdStrictness xx)) of
 	  Nothing  -> ""
 	  Just str -> str
+-}
 \end{code}
 
 For lexically scoped profiling we have to load the cost centre from
@@ -943,3 +945,46 @@ chooseDynCostCentres cc args fvs body
     in
     (use_cc, blame_cc)
 \end{code}
+
+
+
+========================================================================
+OLD CODE THAT EMITTED INFORMATON FOR QUANTITATIVE ANALYSIS
+
+It's pretty wierd, so I've nuked it for now.  SLPJ Nov 96
+
+\begin{pseudocode}
+getWrapperArgTypeCategories
+	:: Type				-- wrapper's type
+	-> StrictnessInfo bdee		-- strictness info about its args
+	-> Maybe String
+
+getWrapperArgTypeCategories _ NoStrictnessInfo	    = Nothing
+getWrapperArgTypeCategories _ BottomGuaranteed
+  = trace "getWrapperArgTypeCategories:BottomGuaranteed!" Nothing  -- wrong
+getWrapperArgTypeCategories _ (StrictnessInfo [] _) = Nothing
+
+getWrapperArgTypeCategories ty (StrictnessInfo arg_info _)
+  = Just (mkWrapperArgTypeCategories ty arg_info)
+
+mkWrapperArgTypeCategories
+	:: Type		-- wrapper's type
+	-> [Demand]	-- info about its arguments
+	-> String	-- a string saying lots about the args
+
+mkWrapperArgTypeCategories wrapper_ty wrap_info
+  = case (splitFunTyExpandingDicts wrapper_ty) of { (arg_tys,_) ->
+    map do_one (wrap_info `zip` (map showTypeCategory arg_tys)) }
+  where
+    -- ToDo: this needs FIXING UP (it was a hack anyway...)
+    do_one (WwPrim, _) = 'P'
+    do_one (WwEnum, _) = 'E'
+    do_one (WwStrict, arg_ty_char) = arg_ty_char
+    do_one (WwUnpack _, arg_ty_char)
+      = if arg_ty_char `elem` "CIJFDTS"
+	then toLower arg_ty_char
+	else if arg_ty_char == '+' then 't'
+	else trace ("mkWrapp..:funny char:"++[arg_ty_char]) '-'
+    do_one (other_wrap_info, _) = '-'
+\end{pseudocode}
+

@@ -14,8 +14,6 @@ module BinderInfo (
 	BinderInfo(..),
 	FunOrArg, DuplicationDanger, InsideSCC,  -- NB: all abstract (yay!)
 
-	inlineUnconditionally, okToInline,
-
 	addBinderInfo, orBinderInfo, andBinderInfo,
 
 	argOccurrence, funOccurrence, dangerousArgOcc, noBinderInfo,
@@ -28,7 +26,6 @@ module BinderInfo (
 
 IMP_Ubiq(){-uitous-}
 
-import CoreUnfold	( FormSummary(..) )
 import Pretty
 import Util		( panic )
 \end{code}
@@ -101,48 +98,23 @@ noBinderInfo = ManyOcc 0	-- A non-committal value
 \end{code}
 
 
-Predicates
-~~~~~~~~~~
 
 \begin{code}
-okToInline
-	:: FormSummary	-- What the thing to be inlined is like
-	-> BinderInfo 	-- How the thing to be inlined occurs
-	-> Bool		-- True => it's small enough to inline
-	-> Bool		-- True => yes, inline it
+isFun :: FunOrArg -> Bool
+isFun FunOcc = True
+isFun _ = False
 
--- Always inline bottoms
-okToInline BottomForm occ_info small_enough
-  = True	-- Unless one of the type args is unboxed??
-		-- This used to be checked for, but I can't
-		-- see why so I've left it out.
-
--- A WHNF can be inlined if it occurs once, or is small
-okToInline form occ_info small_enough
- | is_whnf_form form
- = small_enough || one_occ
- where
-   one_occ = case occ_info of
-		OneOcc _ _ _ n_alts _ -> n_alts <= 1
-		other		      -> False
-   	
-   is_whnf_form VarForm   = True
-   is_whnf_form ValueForm = True
-   is_whnf_form other     = False
-    
--- A non-WHNF can be inlined if it doesn't occur inside a lambda,
--- and occurs exactly once or 
---     occurs once in each branch of a case and is small
-okToInline OtherForm (OneOcc _ NoDupDanger _ n_alts _) small_enough 
-  = n_alts <= 1 || small_enough
-
-okToInline form any_occ small_enough = False
+isDupDanger :: DuplicationDanger -> Bool
+isDupDanger DupDanger = True
+isDupDanger _ = False
 \end{code}
 
 @inlineUnconditionally@ decides whether a let-bound thing can
 definitely be inlined.
 
 \begin{code}
+{-	NOT USED
+
 inlineUnconditionally :: Bool -> BinderInfo -> Bool
 
 --inlineUnconditionally ok_to_dup DeadCode = True
@@ -153,16 +125,7 @@ inlineUnconditionally ok_to_dup (OneOcc FunOcc NoDupDanger NotInsideSCC n_alt_oc
 	    -- damage, e.g., limit to M alternatives.
 
 inlineUnconditionally _ _ = False
-\end{code}
-
-\begin{code}
-isFun :: FunOrArg -> Bool
-isFun FunOcc = True
-isFun _ = False
-
-isDupDanger :: DuplicationDanger -> Bool
-isDupDanger DupDanger = True
-isDupDanger _ = False
+-}
 \end{code}
 
 

@@ -8,7 +8,7 @@
 
 module PprStyle (
 	PprStyle(..),
-	codeStyle,
+	codeStyle, ifaceStyle,
 	showUserishTypes
     ) where
 
@@ -39,19 +39,22 @@ style).  The most likely ones are variations on how much type info is
 shown.
 
 The following test decides whether or not we are actually generating
-code (either C or assembly).
+code (either C or assembly), or generating interface files.
 \begin{code}
 codeStyle :: PprStyle -> Bool
 
 codeStyle PprForC	  = True
 codeStyle (PprForAsm _ _) = True
 codeStyle _		  = False
+
+ifaceStyle :: PprStyle -> Bool
+ifaceStyle PprInterface	  = True
+ifaceStyle other	  = False
 \end{code}
 
 \begin{code}
 -- True means types like   (Eq a, Text b) => a -> b
 -- False means types like  _forall_ a b => Eq a -> Text b -> a -> b
 showUserishTypes PprForUser   = True	
-showUserishTypes PprInterface = True
 showUserishTypes other	      = False
 \end{code}

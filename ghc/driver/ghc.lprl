@@ -410,9 +410,13 @@ require special handling.
 
 @SysImport_dir	= ( $(INSTALLING) )
 		    ? ( "$InstDataDirGhc/imports" )
-		    : ( "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/prelude"
+		    : ( "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/ghc"
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/glaExts"
 		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/required"
 		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/concurrent" );
+
+# We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
+# we should really *not* look there for explicitly imported modules.
 
 $GhcVersionInfo  = int ($(PROJECTVERSION) * 100);
 $Haskell1Version = 3; # i.e., Haskell 1.3
@@ -899,10 +903,7 @@ arg: while($_ = $ARGV[0]) {
     /^-user-prelude-force/	&& do { # ignore if not -user-prelude
 				        next arg; };
 
-    /^-split-objs(.*)/	&& do {
-			local($sname) = &grab_arg_arg('-split-objs', $1);
-			$sname =~ s/ //g; # no spaces
-
+    /^-split-objs/	&& do {
 			if ( $TargetPlatform !~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|sparc)-/ ) {
 			    $SplitObjFiles = 0;
 			    print STDERR "WARNING: don't know how to split objects on this platform: $TargetPlatform\n`-split-objs' option ignored\n";
@@ -910,7 +911,7 @@ arg: while($_ = $ARGV[0]) {
 			    $SplitObjFiles = 1;
     			    $HscOut = '-C=';
 
-			    push(@HsC_flags, "-fglobalise-toplev-names=$sname"); 
+			    push(@HsC_flags, "-fglobalise-toplev-names"); 
 			    push(@CcBoth_flags, '-DUSE_SPLIT_MARKERS');
 
 			    require('ghc-split.prl')
@@ -1031,6 +1032,7 @@ arg: while($_ = $ARGV[0]) {
     /^-d(dump|ppr)-/         && do { push(@HsC_flags, $_); next arg; };
     /^-dverbose-(simpl|stg)/ && do { push(@HsC_flags, $_); next arg; };
     /^-dshow-passes/	     && do { push(@HsC_flags, $_); next arg; };
+    /^-dshow-rn-trace/	     && do { push(@HsC_flags, $_); next arg; };
     /^-dsource-stats/        && do { push(@HsC_flags, $_); next arg; };
     /^-dsimplifier-stats/    && do { push(@HsC_flags, $_); next arg; };
     /^-dstg-stats/	     && do { $Oopt_StgStats = $_; next arg; };
@@ -1400,7 +1402,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	    '-fdo-case-elim',
 	    '-fcase-merge',
 	    '-fdo-eta-reduction',
-	    '-fdo-lambda-eta-expansion',
+	    '-fdo-lambda-eta-expansion',	# After full laziness
 	    '-freuse-con',
 	    $Oopt_PedanticBottoms,
 	    $Oopt_MonadEtaExpansion,
@@ -1490,7 +1492,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 #LATER:	'-fcalc-inlinings2', -- pointless for 2.01
 
       # stg2stg passes
-#LATER:	'-fupdate-analysis',
+	'-fupdate-analysis',
 	'-flambda-lift',
 	$Oopt_FinalStgProfilingMassage,
 	$Oopt_StgStats,
@@ -1706,14 +1708,15 @@ $Under = (   $TargetPlatform =~ /^alpha-/
 unshift(@Ld_flags,
       (($Ld_main) ? (
         '-u', "${Under}Main_" . $Ld_main . '_closure',
-       ) : (),
-       '-u', "${Under}GHCbase_unsafePerformPrimIO_fast1",
-       '-u', "${Under}Prelude_Z91Z93_closure", # i.e., []
-       '-u', "${Under}Prelude_IZh_static_info",
-       '-u', "${Under}Prelude_False_inregs_info",
-       '-u', "${Under}Prelude_True_inregs_info",
-       '-u', "${Under}Prelude_CZh_static_info",
-       '-u', "${Under}DEBUG_REGS"))
+       ) : ()
+#       , '-u', "${Under}STbase_unsafePerformPrimIO_fast1"
+#       , '-u', "${Under}Prelude_Z91Z93_closure"	 # i.e., []
+#       , '-u', "${Under}Prelude_IZh_static_info"
+#       , '-u', "${Under}Prelude_False_inregs_info"
+#       , '-u', "${Under}Prelude_True_inregs_info"
+#       , '-u', "${Under}Prelude_CZh_static_info"
+#       , '-u', "${Under}DEBUG_REGS"
+	))
        ; # just for fun, now...
 \end{code}
 
@@ -2084,57 +2087,13 @@ phase) to @"$ifile_root.<suffix>"@.
 
 \end{code}
 
-Check if hsc needs to be run at all.
+
+Now the Haskell compiler, C compiler, and assembler
 
 \begin{code}
-    local($more_processing_required) = 1;
-
-    if ( $Do_recomp_chkr  && $do_hsc && ! $going_interactive ) {
-	# recompilation-checking is important enough to live off by itself
-	require('ghc-recomp.prl')
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-recomp.prl!\n");
-
-	$more_processing_required
-	    = &runRecompChkr($ifile, $hscpp_hsc, $ifile_root, $ofile_target, $hifile_target);
-
-	if ( ! $more_processing_required ) {
-	    print STDERR "$Pgm:recompile: NOT NEEDED!\n"; # Yay!
-	    # propagate dependency:
-	    &run_something("touch $ofile_target", "Touch $ofile_target, to propagate dependencies");
-	}
-    }
-
-    $do_hsc = 0, $do_cc = 0, $do_as = 0 if ! $more_processing_required;
-\end{code}
-
-\begin{code}
-    if ( $do_hsc ) {
-
-	&runHsc($ifile_root, $hsc_out, $hsc_hi, $going_interactive);
-
-	# interface-handling is important enough to live off by itself
-	require('ghc-iface.prl')
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
-
-	&postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
-
-	# save a copy of the .hc file, even if we are carrying on...
-	if ($HscOut eq '-C=' && $do_cc && $Keep_hc_file_too) {
-	    local($to_do) = "$Rm $ifile_root.hc; $Cp $hsc_out $ifile_root.hc";
-	    &run_something($to_do, 'Saving copy of .hc file');
-	}
-
-	# save a copy of the .s file, even if we are carrying on...
-	if ($HscOut eq '-S=' && $do_as && $Keep_s_file_too) {
-	    local($to_do) = "$Rm $ifile_root.s; $Cp $hsc_out $ifile_root.s";
-	    &run_something($to_do, 'Saving copy of .s file');
-	}
-
-	# if we're going to split up object files,
-	# we inject split markers into the .hc file now
-	if ( $HscOut eq '-C=' && $SplitObjFiles ) {
-	    &inject_split_markers ( $hsc_out );
-	}
+   if ($do_hsc) {
+	&runHscAndProcessInterfaces( $ifile, $hscpp_hsc, $ifile_root, 
+				     $ofile_target, $hifile_target);
     }
 
     if ($do_cc) {
@@ -2205,6 +2164,117 @@ sub runHscpp {
 \end{code}
 
 \begin{code}
+sub runHscAndProcessInterfaces {
+    local($ifile, $hscpp_hsc, $ifiel_root, $ofile_target, $hifile_target) = @_;
+
+	# $ifile 		is the original input file
+	# $hscpp_hsc		post-unlit, post-cpp, etc., input file
+	# $ifile_root		input filename minus suffix
+	# $ofile_target		the output file that we ultimately hope to produce
+	# $hifile_target	the .hi file ... (ditto)
+	
+    local($source_unchanged) = 1;
+
+# Check if the source file is up to date relative to the target; in
+#  that case we say "source is unchanged" and let the compiler bale out
+# early if the import usage information allows it.
+
+    ($i_dev,$i_ino,$i_mode,$i_nlink,$i_uid,$i_gid,$i_rdev,$i_size,
+     $i_atime,$i_mtime,$i_ctime,$i_blksize,$i_blocks) = stat($ifile);
+
+    if ( ! -f $ofile_target ) {
+	print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n";
+	$source_unchanged = 0;
+    }
+
+    ($o_dev,$o_ino,$o_mode,$o_nlink,$o_uid,$o_gid,$o_rdev,$o_size,
+     $o_atime,$o_mtime,$o_ctime,$o_blksize,$o_blocks) = stat(_); # stat info from -f test
+
+    if ( ! -f $hifile_target ) {
+	print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n";
+	$source_unchanged = 0;
+    }
+
+    ($hi_dev,$hi_ino,$hi_mode,$hi_nlink,$hi_uid,$hi_gid,$hi_rdev,$hi_size,
+     $hi_atime,$hi_mtime,$hi_ctime,$hi_blksize,$hi_blocks) = stat(_); # stat info from -f test
+
+    if ($i_mtime > $o_mtime) {
+	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n";
+	$source_unchanged = 0;
+    }
+
+    # So if source_unchanged is still "1", we pass on the good news to the compiler
+    # The -recomp flag can disable this, forcing recompilation
+    if ($Do_recomp_chkr && $source_unchanged) {
+	push(@HsC_flags, '-fsource-unchanged');	
+    }	
+
+# Run the compiler
+
+    &runHsc($ifile_root, $hsc_out, $hsc_hi, $going_interactive);
+
+# See if it baled out early, saying nothing needed doing.  
+# We work this out by seeing if it created an output .hi file
+
+    if ( ! -f $hsc_hi ) {
+	# Doesn't exist, so we baled out early.
+	# Tell the C compiler and assembler not to run
+	$do_cc = 0; $do_as = 0;
+
+	# Update dependency info
+	&run_something("touch $ofile_target", "Touch $ofile_target, to propagate dependencies");
+
+    } else {	
+
+# Didn't bale out early (new .hi file) so we thunder on
+    
+    	# If non-interactive, heave in the consistency info at the end
+    	# NB: pretty hackish (depends on how $output is set)
+    	if ( ! $going_interactive ) {
+	    if ( $HscOut eq '-C=' ) {
+	    $to_do = "echo 'static char ghc_hsc_ID[] = \"\@(#)hsc $ifile\t$HsC_major_version.$HsC_minor_version,$HsC_consist_options\";' >> $hsc_out";
+    
+	    } elsif ( $HscOut eq '-S=' ) {
+		local($consist) = "hsc.$ifile.$HsC_major_version.$HsC_minor_version.$HsC_consist_options";
+		$consist =~ s/,/./g;
+		$consist =~ s/\//./g;
+		$consist =~ s/-/_/g;
+		$consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
+		$to_do = "echo '\n\t.text\n$consist:' >> $hsc_out";
+	    }
+	    &run_something($to_do, 'Pin on Haskell consistency info');	
+    	}   
+
+
+	# Interface-handling is important enough to live off by itself
+	require('ghc-iface.prl')
+	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
+	
+	&postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
+	
+	# save a copy of the .hc file, even if we are carrying on...
+	if ($HscOut eq '-C=' && $do_cc && $Keep_hc_file_too) {
+	    local($to_do) = "$Rm $ifile_root.hc; $Cp $hsc_out $ifile_root.hc";
+	    &run_something($to_do, 'Saving copy of .hc file');
+	}
+	
+	# save a copy of the .s file, even if we are carrying on...
+	if ($HscOut eq '-S=' && $do_as && $Keep_s_file_too) {
+	    local($to_do) = "$Rm $ifile_root.s; $Cp $hsc_out $ifile_root.s";
+	    &run_something($to_do, 'Saving copy of .s file');
+	}
+	
+	# if we're going to split up object files,
+	# we inject split markers into the .hc file now
+	if ( $HscOut eq '-C=' && $SplitObjFiles ) {
+	    &inject_split_markers ( $hsc_out );
+        }
+    }
+}
+\end{code}
+
+
+\begin{code}
 sub runHsc {
     local($ifile_root, $hsc_out, $hsc_hi, $going_interactive) = @_;
 
@@ -2212,7 +2282,9 @@ sub runHsc {
     foreach $a ( @HsP_flags ) { $a = ",$a" unless $a =~ /^,/; }
 
     &makeHiMap() unless $HiMapDone;
-    push(@HsC_flags, "-himap=$HiMapFile");
+#    print STDERR "HiIncludes: $HiIncludeString\n";
+    push(@HsC_flags, "-himap=$HiIncludeString");
+#    push(@HsC_flags, "-himap=$HiMapFile");
 
     # here, we may produce .hc/.s and/or .hi files
     local($output) = '';
@@ -2254,23 +2326,6 @@ sub runHsc {
 
     # finish business w/ nofibbish time/bytes-alloc stats
     &process_ghc_timings() if $CollectGhcTimings;
-
-    # if non-interactive, heave in the consistency info at the end
-    # NB: pretty hackish (depends on how $output is set)
-    if ( ! $going_interactive ) {
-	if ( $HscOut eq '-C=' ) {
-	$to_do = "echo 'static char ghc_hsc_ID[] = \"\@(#)hsc $ifile\t$HsC_major_version.$HsC_minor_version,$HsC_consist_options\";' >> $hsc_out";
-
-	} elsif ( $HscOut eq '-S=' ) {
-	    local($consist) = "hsc.$ifile.$HsC_major_version.$HsC_minor_version.$HsC_consist_options";
-	    $consist =~ s/,/./g;
-	    $consist =~ s/\//./g;
-	    $consist =~ s/-/_/g;
-	    $consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
-	    $to_do = "echo '\n\t.text\n$consist:' >> $hsc_out";
-	}
-	&run_something($to_do, 'Pin on Haskell consistency info');	
-    }
 }
 \end{code}
 
@@ -2280,6 +2335,7 @@ of (module-name, pathname) pairs, one per line, separated by a space.
 %HiMap     = ();
 $HiMapDone = 0;
 $HiMapFile = '';
+$HiIncludeString = ();		# dir1:dir2:dir3, to pass to GHC
 
 sub makeHiMap {
 
@@ -2288,6 +2344,9 @@ sub makeHiMap {
     local($mod, $path, $d, $e);
     
     foreach $d ( @Import_dir ) {
+	if ($HiIncludeString) { $HiIncludeString = "$HiIncludeString:$d";
+	} else { $HiIncludeString = $d; }
+
 	opendir(DIR, $d) || &tidy_up_and_die(1,"$Pgm: error when reading directory: $d\n");
 	local(@entry) = readdir(DIR);
 	foreach $e ( @entry ) {
@@ -2306,6 +2365,9 @@ sub makeHiMap {
     }
 
     foreach $d ( @SysImport_dir ) {
+	if ($HiIncludeString) { $HiIncludeString = "$HiIncludeString:$d";
+	} else { $HiIncludeString = $d; }
+
 	opendir(DIR, $d) || &tidy_up_and_die(1,"$Pgm: error when reading directory: $d\n");
 	local(@entry) = readdir(DIR);
 	foreach $e ( @entry ) {

@@ -11,39 +11,40 @@ module TcBinds ( tcBindsAndThen, tcPragmaSigs ) where
 IMP_Ubiq()
 
 import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..), 
-			  HsExpr, Match, PolyType, InPat, OutPat(..),
+			  HsExpr, Match, HsType, InPat, OutPat(..),
 			  GRHSsAndBinds, ArithSeqInfo, HsLit, Fake,
 			  collectBinders )
 import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedBind), RenamedSig(..), 
-			  SYN_IE(RenamedMonoBinds), RnName(..) 
+			  SYN_IE(RenamedMonoBinds)
 			)
 import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcMonoBinds),
 			  TcIdOcc(..), SYN_IE(TcIdBndr) )
 
-import TcMonad		hiding ( rnMtoTcM )	
+import TcMonad
 import GenSpecEtc	( checkSigTyVars, genBinds, TcSigInfo(..) )
 import Inst		( Inst, SYN_IE(LIE), emptyLIE, plusLIE, InstOrigin(..) )
 import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds )
 import SpecEnv		( SpecEnv )
 IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcMatches	( tcMatchesFun )
-import TcMonoType	( tcPolyType )
+import TcMonoType	( tcHsType )
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( newTcTyVar, tcInstSigType )
+import TcType		( newTcTyVar, tcInstSigType, newTyVarTys )
 import Unify		( unifyTauTy )
 
 import Kind		( mkBoxedTypeKind, mkTypeKind )
-import Id		( GenId, idType, mkUserId )
+import Id		( GenId, idType, mkUserLocal, mkUserId )
 import IdInfo		( noIdInfo )
 import Maybes		( assocMaybe, catMaybes )
-import Name		( pprNonSym, Name )
+import Name		( pprNonSym, getOccName, getSrcLoc, Name )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
 			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
-import Util		( isIn, zipEqual, panic )
+import Bag		( bagToList )
+import Util		( isIn, zipEqual, zipWith3Equal, panic )
 \end{code}
 
 %************************************************************************
@@ -175,15 +176,11 @@ tcBindAndThen combiner bind sigs do_next
     )					`thenTc` \ (_, result) ->
     returnTc result
   where
-    binder_names = collectBinders bind
+    binder_names = map fst (bagToList (collectBinders bind))
 
 
-tcBindAndSigs binder_rn_names bind sigs prag_info_fn
-  = let
-	binder_names = map de_rn binder_rn_names
-	de_rn (RnName n) = n
-    in
-    recoverTc (
+tcBindAndSigs binder_names bind sigs prag_info_fn
+  = recoverTc (
 	-- If typechecking the binds fails, then return with each
 	-- binder given type (forall a.a), to minimise subsequent
 	-- error messages
@@ -197,17 +194,24 @@ tcBindAndSigs binder_rn_names bind sigs prag_info_fn
     ) $
 
 	-- Create a new identifier for each binder, with each being given
-	-- a type-variable type.
-    newMonoIds binder_rn_names kind (\ mono_ids ->
+	-- a fresh unique, and a type-variable type.
+    tcGetUniques no_of_binders			`thenNF_Tc` \ uniqs ->
+    newTyVarTys no_of_binders kind		`thenNF_Tc` \ tys ->
+    let
+	mono_ids           = zipWith3Equal "tcBindAndSigs" mk_id binder_names uniqs tys
+	mk_id name uniq ty = mkUserLocal (getOccName name) uniq ty (getSrcLoc name)
+    in
+    tcExtendLocalValEnv binder_names mono_ids (
 	    tcTySigs sigs		`thenTc` \ sig_info ->
 	    tc_bind bind		`thenTc` \ (bind', lie) ->
-	    returnTc (mono_ids, bind', lie, sig_info)
+	    returnTc (bind', lie, sig_info)
     )
-	    `thenTc` \ (mono_ids, bind', lie, sig_info) ->
+	    `thenTc` \ (bind', lie, sig_info) ->
 
 	    -- Notice that genBinds gets the old (non-extended) environment
     genBinds binder_names mono_ids bind' lie sig_info prag_info_fn
   where
+    no_of_binders = length binder_names
     kind = case bind of
 	  	NonRecBind _ -> mkTypeKind	-- Recursive, so no unboxed types
 		RecBind _    -> mkBoxedTypeKind	-- Non-recursive, so we permit unboxed types
@@ -219,7 +223,7 @@ tcBindAndSigs binder_rn_names bind sigs prag_info_fn
 {-
 
 data SigInfo
-  = SigInfo	RnName
+  = SigInfo	Name
 		(TcIdBndr s)		-- Polymorpic version
 		(TcIdBndr s)		-- Monomorphic verstion
 		[TcType s] [TcIdOcc s] 	-- Instance information for the monomorphic version
@@ -238,7 +242,7 @@ data SigInfo
 
 	-- Typecheck the binding group
     tcExtendLocalEnv poly_sigs		(
-    newMonoIds nosig_binders kind	(\ nosig_local_ids ->
+    newLocalIds nosig_binders kind	(\ nosig_local_ids ->
 	    tcMonoBinds mono_sigs mono_binds	`thenTc` \ binds_w_lies ->
 	    returnTc (nosig_local_ids, binds_w_lies)
     ))					`thenTc` \ (nosig_local_ids, binds_w_lies) ->
@@ -448,9 +452,9 @@ split up, and have fresh type variables installed.  All non-type-signature
 \begin{code}
 tcTySigs :: [RenamedSig] -> TcM s [TcSigInfo s]
 
-tcTySigs (Sig v ty _ src_loc : other_sigs)
+tcTySigs (Sig v ty src_loc : other_sigs)
  = tcAddSrcLoc src_loc (
-	tcPolyType ty			`thenTc` \ sigma_ty ->
+	tcHsType ty			`thenTc` \ sigma_ty ->
 	tcInstSigType sigma_ty		`thenNF_Tc` \ sigma_ty' ->
 	let
 	    (tyvars', theta', tau') = splitSigmaTy sigma_ty'
@@ -506,11 +510,11 @@ Here are the easy cases for tcPragmaSigs
 
 \begin{code}
 tcPragmaSig (DeforestSig name loc)
-  = returnTc ((name, addInfo DoDeforest),EmptyBinds,emptyLIE)
+  = returnTc ((name, addDeforestInfo DoDeforest),EmptyBinds,emptyLIE)
 tcPragmaSig (InlineSig name loc)
-  = returnTc ((name, addInfo_UF (iWantToBeINLINEd UnfoldAlways)), EmptyBinds, emptyLIE)
+  = returnTc ((name, addUnfoldInfo (iWantToBeINLINEd UnfoldAlways)), EmptyBinds, emptyLIE)
 tcPragmaSig (MagicUnfoldingSig name string loc)
-  = returnTc ((name, addInfo_UF (mkMagicUnfolding string)), EmptyBinds, emptyLIE)
+  = returnTc ((name, addUnfoldInfo (mkMagicUnfolding string)), EmptyBinds, emptyLIE)
 \end{code}
 
 The interesting case is for SPECIALISE pragmas.  There are two forms.
@@ -567,7 +571,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
     tcAddErrCtxt (valSpecSigCtxt name spec_ty)	$
 
 	-- Get and instantiate its alleged specialised type
-    tcPolyType poly_ty				`thenTc` \ sig_sigma ->
+    tcHsType poly_ty				`thenTc` \ sig_sigma ->
     tcInstSigType  sig_sigma			`thenNF_Tc` \ sig_ty ->
     let
 	(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
@@ -642,7 +646,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 	   		 VarMonoBind spec_pragma_id (HsVar (TcId local_spec_id))
 	    spec_info  = SpecInfo spec_tys (length main_theta) local_spec_id
 	in
-	returnTc ((name, addInfo spec_info), spec_binds, spec_lie)
+	returnTc ((name, addSpecInfo spec_info), spec_binds, spec_lie)
 -}
 \end{code}
 
@@ -656,6 +660,8 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 Not exported:
 
 \begin{code}
+{-	 In GenSpec at the moment
+
 isUnRestrictedGroup :: [TcIdBndr s]		-- Signatures given for these
 		    -> TcBind s
 		    -> Bool
@@ -673,6 +679,7 @@ isUnResMono sigs (FunMonoBind _ _ _ _)			= True
 isUnResMono sigs (AndMonoBinds mb1 mb2)			= isUnResMono sigs mb1 &&
 							  isUnResMono sigs mb2
 isUnResMono sigs EmptyMonoBinds				= True
+-}
 \end{code}
 
 

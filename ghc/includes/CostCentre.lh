@@ -394,6 +394,15 @@ extern F_ *register_stack;
 	} while(0);							\
 	FUNEND; }
 
+#else	/* PROFILING */
+
+/* When things are working these shouldn't be emitted when not profiling,
+   but it was convenient at one point to have them expand to nothing 
+    when not profiling.  SLPJ Dec 96 */
+
+#define START_REGISTER_CCS(reg_mod_name)
+#define END_REGISTER_CCS()
+
 #endif  /* PROFILING */
 \end{code}
 

@@ -18,11 +18,7 @@ module CoreUtils (
 	, maybeErrorApp
 	, nonErrorRHSs
 	, squashableDictishCcExpr
-{-	
-	coreExprArity,
-	isWrapperFor,
-
--}  ) where
+    ) where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)	-- for pananoia-checking purposes
@@ -30,14 +26,13 @@ IMPORT_DELOOPER(IdLoop)	-- for pananoia-checking purposes
 import CoreSyn
 
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
-import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
+import Id		( idType, mkSysLocal, isBottomingId,
 			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, SYN_IE(IdEnv),
 			  GenId{-instances-}
 			)
-import IdInfo		( arityMaybe )
 import Literal		( literalType, isNoRepLit, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
 import PprCore
@@ -46,7 +41,7 @@ import PprType		( GenType{-instances-} )
 import Pretty		( ppAboves, ppStr )
 import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpType, PrimOp(..) )
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
 			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
 			)
@@ -209,7 +204,7 @@ co_thing thing arg_exprs
 	in
 	getUnique `thenUs` \ uniq ->
 	let
-	    new_var  = mkSysLocal SLIT("a") uniq e_ty mkUnknownSrcLoc
+	    new_var  = mkSysLocal SLIT("a") uniq e_ty noSrcLoc
 	in
 	returnUs (VarArg new_var, Just (NonRec new_var other_expr))
 \end{code}
@@ -220,94 +215,6 @@ argToExpr ::
 
 argToExpr (VarArg v)   = Var v
 argToExpr (LitArg lit) = Lit lit
-\end{code}
-
-\begin{code}
-{-LATER:
-coreExprArity
-	:: (Id -> Maybe (GenCoreExpr bndr Id))
-	-> GenCoreExpr bndr Id
-	-> Int
-coreExprArity f (Lam _ expr) = coreExprArity f expr + 1
-coreExprArity f (CoTyLam _ expr) = coreExprArity f expr
-coreExprArity f (App expr arg) = max (coreExprArity f expr - 1) 0
-coreExprArity f (CoTyApp expr _) = coreExprArity f expr
-coreExprArity f (Var v) = max further info
-   where
-	further
-	     = case f v of
-		Nothing -> 0
-		Just expr -> coreExprArity f expr
-	info = case (arityMaybe (getIdArity v)) of
-		Nothing    -> 0
-		Just arity -> arity
-coreExprArity f _ = 0
-\end{code}
-
-@isWrapperFor@: we want to see exactly:
-\begin{verbatim}
-/\ ... \ args -> case <arg> of ... -> case <arg> of ... -> wrkr <stuff>
-\end{verbatim}
-
-Probably a little too HACKY [WDP].
-
-\begin{code}
-isWrapperFor :: CoreExpr -> Id -> Bool
-
-expr `isWrapperFor` var
-  = case (collectBinders  expr) of { (_, _, args, body) -> -- lambdas off the front
-    unravel_casing args body
-    --NO, THANKS: && not (null args)
-    }
-  where
-    var's_worker = getWorkerId (getIdStrictness var)
-
-    is_elem = isIn "isWrapperFor"
-
-    --------------
-    unravel_casing case_ables (Case scrut alts)
-      = case (collectArgs scrut) of { (fun, _, _, vargs) ->
-	case fun of
-	  Var scrut_var -> let
-				answer =
-				     scrut_var /= var && all (doesn't_mention var) vargs
-				  && scrut_var `is_elem` case_ables
-				  && unravel_alts case_ables alts
-			     in
-			     answer
-
-	  _ -> False
-	}
-
-    unravel_casing case_ables other_expr
-      = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
-	case fun of
-	  Var wrkr -> let
-			    answer =
-				-- DOESN'T WORK: wrkr == var's_worker
-				wrkr /= var
-			     && isWorkerId wrkr
-			     && all (doesn't_mention var)  vargs
-			     && all (only_from case_ables) vargs
-			in
-			answer
-
-	  _ -> False
-	}
-
-    --------------
-    unravel_alts case_ables (AlgAlts [(_,params,rhs)] NoDefault)
-      = unravel_casing (params ++ case_ables) rhs
-    unravel_alts case_ables other = False
-
-    -------------------------
-    doesn't_mention var (ValArg (VarArg v)) = v /= var
-    doesn't_mention var other = True
-
-    -------------------------
-    only_from case_ables (ValArg (VarArg v)) = v `is_elem` case_ables
-    only_from case_ables other = True
--}
 \end{code}
 
 All the following functions operate on binders, perform a uniform

@@ -198,9 +198,9 @@ SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED
 /* Question: this is just an amusing hex code isn't it
    -- or does it mean something? ADR */
 P_ realWorldZh_closure = (P_) 0xbadbadbaL;
-P_ GHCbuiltins_void_closure = (P_) 0xbadbadbaL;
+P_ GHC_void_closure = (P_) 0xbadbadbaL;
 
-SET_STATIC_HDR(WorldStateToken_closure,GHCbase_SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
+SET_STATIC_HDR(WorldStateToken_closure,STBase_SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
 , (W_) 0xbadbadbaL
 };
 

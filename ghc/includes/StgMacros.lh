@@ -390,12 +390,13 @@ even for 8-bit chars).
 #define ltCharZh(r,a,b)	r=(I_)((a)< (b))
 #define leCharZh(r,a,b)	r=(I_)((a)<=(b))
 
-#define gtIntZh(r,a,b)	r=(I_)((a) >(b))
-#define geIntZh(r,a,b)	r=(I_)((a)>=(b))
-#define eqIntZh(r,a,b)	r=(I_)((a)==(b))
-#define neIntZh(r,a,b)	r=(I_)((a)!=(b))
-#define ltIntZh(r,a,b)	r=(I_)((a) <(b))
-#define leIntZh(r,a,b)	r=(I_)((a)<=(b))
+/* Int comparisons: >#, >=# etc */
+#define ZgZh(r,a,b)	r=(I_)((a) >(b))
+#define ZgZeZh(r,a,b)	r=(I_)((a)>=(b))
+#define ZeZeZh(r,a,b)	r=(I_)((a)==(b))
+#define ZdZeZh(r,a,b)	r=(I_)((a)!=(b))
+#define ZlZh(r,a,b)	r=(I_)((a) <(b))
+#define ZlZeZh(r,a,b)	r=(I_)((a)<=(b))
 
 #define gtWordZh(r,a,b)	r=(I_)((a) >(b))
 #define geWordZh(r,a,b)	r=(I_)((a)>=(b))
@@ -418,12 +419,13 @@ even for 8-bit chars).
 #define ltFloatZh(r,a,b)  r=(I_)((a)< (b))
 #define leFloatZh(r,a,b)  r=(I_)((a)<=(b))
 
-#define gtDoubleZh(r,a,b) r=(I_)((a)> (b))
-#define geDoubleZh(r,a,b) r=(I_)((a)>=(b))
-#define eqDoubleZh(r,a,b) r=(I_)((a)==(b))
-#define neDoubleZh(r,a,b) r=(I_)((a)!=(b))
-#define ltDoubleZh(r,a,b) r=(I_)((a)< (b))
-#define leDoubleZh(r,a,b) r=(I_)((a)<=(b))
+/* Double comparisons: >##, >=#@ etc */
+#define ZgZhZh(r,a,b)	r=(I_)((a) >(b))
+#define ZgZeZhZh(r,a,b)	r=(I_)((a)>=(b))
+#define ZeZeZhZh(r,a,b)	r=(I_)((a)==(b))
+#define ZdZeZhZh(r,a,b)	r=(I_)((a)!=(b))
+#define ZlZhZh(r,a,b)	r=(I_)((a) <(b))
+#define ZlZeZhZh(r,a,b)	r=(I_)((a)<=(b))
 \end{code}
 
 %************************************************************************
@@ -448,11 +450,11 @@ even for 8-bit chars).
 \begin{code}
 I_ stg_div PROTO((I_ a, I_ b));
 
-#define plusIntZh(r,a,b)	r=(a)+(b)
-#define minusIntZh(r,a,b)	r=(a)-(b)
-#define timesIntZh(r,a,b)	r=(a)*(b)
+#define ZpZh(r,a,b)		r=(a)+(b)
+#define ZmZh(r,a,b)		r=(a)-(b)
+#define ZtZh(r,a,b)		r=(a)*(b)
 #define quotIntZh(r,a,b)	r=(a)/(b)
-#define divIntZh(r,a,b)		r=ULTRASAFESTGCALL2(I_,(void *, I_, I_),stg_div,(a),(b))
+#define ZdZh(r,a,b)		r=ULTRASAFESTGCALL2(I_,(void *, I_, I_),stg_div,(a),(b))
 #define remIntZh(r,a,b)		r=(a)%(b)
 #define negateIntZh(r,a)	r=-(a)
 \end{code}
@@ -530,10 +532,10 @@ I_ stg_div PROTO((I_ a, I_ b));
 %************************************************************************
 
 \begin{code}
-#define plusDoubleZh(r,a,b)	r=(a)+(b)
-#define minusDoubleZh(r,a,b)	r=(a)-(b)
-#define timesDoubleZh(r,a,b)	r=(a)*(b)
-#define divideDoubleZh(r,a,b)	r=(a)/(b)
+#define ZpZhZh(r,a,b)		r=(a)+(b)
+#define ZmZhZh(r,a,b)		r=(a)-(b)
+#define ZtZhZh(r,a,b)		r=(a)*(b)
+#define ZdZhZh(r,a,b)		r=(a)/(b)
 #define negateDoubleZh(r,a)	r=-(a)
 
 #define int2DoubleZh(r,a)	r=(StgDouble)(a)
@@ -554,7 +556,8 @@ I_ stg_div PROTO((I_ a, I_ b));
 #define sinhDoubleZh(r,a)	r=(StgDouble) SAFESTGCALL1(StgDouble,(void *, StgDouble),sinh,a)
 #define coshDoubleZh(r,a)	r=(StgDouble) SAFESTGCALL1(StgDouble,(void *, StgDouble),cosh,a)
 #define tanhDoubleZh(r,a)	r=(StgDouble) SAFESTGCALL1(StgDouble,(void *, StgDouble),tanh,a)
-#define powerDoubleZh(r,a,b)	r=(StgDouble) SAFESTGCALL2(StgDouble,(void *, StgDouble,StgDouble),pow,a,b)
+/* Power: **## */
+#define ZtZtZhZh(r,a,b)	r=(StgDouble) SAFESTGCALL2(StgDouble,(void *, StgDouble,StgDouble),pow,a,b)
 \end{code}
 
 %************************************************************************

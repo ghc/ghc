@@ -110,6 +110,7 @@ you will screw up the layout where they are used in case expressions!
 #  define FAST_STRING	_PackedString
 #  define SLIT(x)	(_packCString (A# x#))
 #  define _CMP_STRING_	cmpPString
+	/* cmpPString defined in utils/Util.lhs */
 #  define _NULL_	_nullPS
 #  define _NIL_		_nilPS
 #  define _CONS_	_consPS

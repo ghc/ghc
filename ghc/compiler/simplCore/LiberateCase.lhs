@@ -17,7 +17,7 @@ liberateCase = panic "LiberateCase.liberateCase: ToDo"
 
 {- LATER: to end of file:
 import CoreUnfold	( UnfoldingGuidance(..) )
-import Id		( localiseId, toplevelishId{-debugging-} )
+import Id		( localiseId )
 import Maybes
 import Outputable
 import Pretty
@@ -169,7 +169,7 @@ libCaseBind env (Rec pairs)
 
 	-- Why "localiseId" above?  Because we're creating a new local
 	-- copy of the original binding.  In particular, the original
-	-- binding might have been for a TopLevId, and this copy clearly
+	-- binding might have been for a top-level, and this copy clearly
 	-- will not be top-level!
 
 	-- It is enough to change just the binder, because subsequent
@@ -180,12 +180,11 @@ libCaseBind env (Rec pairs)
 	-- to think that something is top-level when it isn't.
 
     rhs_small_enough rhs
-      = case (calcUnfoldingGuidance True{-sccs OK-} lIBERATE_BOMB_SIZE cON_DISCOUNT rhs) of
+      = case (calcUnfoldingGuidance True{-sccs OK-} lIBERATE_BOMB_SIZE rhs) of
 	  UnfoldNever -> False
 	  _ 	      -> True	-- we didn't BOMB, so it must be OK
 
     lIBERATE_BOMB_SIZE = bombOutSize env
-    cON_DISCOUNT = error "libCaseBind"
 \end{code}
 
 
@@ -307,8 +306,7 @@ addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
     scruts'  = (scrut_var, lvl) : scruts
     bind_lvl = case lookupIdEnv lvl_env scrut_var of
 		 Just lvl -> lvl
-		 Nothing  -> --false: ASSERT(toplevelishId scrut_var)
-			     topLevel
+		 Nothing  -> topLevel
 
 lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBinding
 lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
@@ -317,16 +315,14 @@ lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
 #else
   = case (lookupIdEnv rec_env id) of
       xxx@(Just _) -> xxx
-      xxx	   -> --false: ASSERT(toplevelishId id)
-		      xxx
+      xxx	   -> xxx
 #endif
 
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
 lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
   = case lookupIdEnv lvl_env id of
       Just lvl -> lvl
-      Nothing  -> ASSERT(toplevelishId id)
-		  topLevel
+      Nothing  -> topLevel
 
 freeScruts :: LibCaseEnv
 	   -> LibCaseLevel 	-- Level of the recursive Id

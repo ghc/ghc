@@ -136,7 +136,7 @@ dictionary deconstruction.
 >	(vs,es) = unzip bs
 >	vs'  = map mkDeforestable vs
 >	s = zip vs (map (Var . DefArgVar) vs')
->	mkDeforestable v = replaceIdInfo v (addInfo (getIdInfo v) DoDeforest)
+>	mkDeforestable v = replaceIdInfo v (addDeforestInfo (getIdInfo v) DoDeforest)
 
 > convAtom :: DefAtom -> UniqSM DefAtom
 >

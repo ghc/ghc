@@ -19,8 +19,7 @@ module HsPragmas where
 IMP_Ubiq()
 
 -- friends:
-import HsCore		( UnfoldingCoreExpr )
-import HsTypes		( MonoType )
+import HsTypes		( HsType )
 
 -- others:
 import IdInfo
@@ -28,6 +27,48 @@ import SpecEnv		( SpecEnv )
 import Outputable	( Outputable(..) )
 import Pretty
 \end{code}
+
+All the pragma stuff has changed.  Here are some placeholders!
+
+\begin{code}
+data GenPragmas name  = NoGenPragmas
+data DataPragmas name = NoDataPragmas
+data InstancePragmas name = NoInstancePragmas
+data ClassOpPragmas name  = NoClassOpPragmas
+data ClassPragmas name  = NoClassPragmas
+
+noClassPragmas = NoClassPragmas
+isNoClassPragmas NoClassPragmas = True
+
+noDataPragmas = NoDataPragmas
+isNoDataPragmas NoDataPragmas = True
+
+noGenPragmas = NoGenPragmas
+isNoGenPragmas NoGenPragmas = True
+
+noInstancePragmas = NoInstancePragmas
+isNoInstancePragmas NoInstancePragmas = True
+
+noClassOpPragmas = NoClassOpPragmas
+isNoClassOpPragmas NoClassOpPragmas = True
+
+instance Outputable name => Outputable (ClassPragmas name) where
+    ppr sty NoClassPragmas = ppNil
+
+instance Outputable name => Outputable (ClassOpPragmas name) where
+    ppr sty NoClassOpPragmas = ppNil
+
+instance Outputable name => Outputable (InstancePragmas name) where
+    ppr sty NoInstancePragmas = ppNil
+
+instance Outputable name => Outputable (GenPragmas name) where
+    ppr sty NoGenPragmas = ppNil
+\end{code}
+
+========================= OLD CODE SCEDULED FOR DELETION SLPJ Nov 96 ==============
+
+\begin{code}
+{-		COMMENTED OUT 
 
 Certain pragmas expect to be pinned onto certain constructs.
 
@@ -38,12 +79,10 @@ For a @data@ declaration---indicates which specialisations exist.
 \begin{code}
 data DataPragmas name
   = NoDataPragmas
-  | DataPragmas	[[Maybe (MonoType name)]]  -- types to which specialised
+  | DataPragmas	[[Maybe (HsType name)]]  -- types to which specialised
 
 noDataPragmas = NoDataPragmas
-
 isNoDataPragmas NoDataPragmas = True
-isNoDataPragmas _             = False
 \end{code}
 
 These are {\em general} things you can know about any value:
@@ -55,7 +94,7 @@ data GenPragmas name
 		DeforestInfo		-- deforest info
 		(ImpStrictness name)	-- strictness, worker-wrapper
 		(ImpUnfolding name)	-- unfolding (maybe)
-		[([Maybe (MonoType name)], -- Specialisations: types to which spec'd;
+		[([Maybe (HsType name)], -- Specialisations: types to which spec'd;
 		  Int,			   -- # dicts to ignore
 		  GenPragmas name)] 	   -- Gen info about the spec'd version
 
@@ -119,7 +158,7 @@ data InstancePragmas name
 
   | SpecialisedInstancePragma
 	(GenPragmas name)	   -- for its "dfun"
-	[([Maybe (MonoType name)], -- specialised instance; type...
+	[([Maybe (HsType name)], -- specialised instance; type...
 	  Int,			   -- #dicts to ignore
 	  InstancePragmas name)]   -- (no SpecialisedInstancePragma please!)
 
@@ -175,7 +214,7 @@ instance Outputable name => Outputable (GenPragmas name) where
 	pp_arity (Just i) = ppBeside (ppStr "ARITY=") (ppInt i)
 
 	pp_upd Nothing  = ppNil
-	pp_upd (Just u) = ppInfo sty id u
+	pp_upd (Just u) = ppUpdateInfo sty u
 
 	pp_str NoImpStrictness = ppNil
 	pp_str (ImpStrictness is_bot demands wrkr_prags)
@@ -196,4 +235,9 @@ instance Outputable name => Outputable (GenPragmas name) where
 
 	    pp_MaB Nothing  = ppStr "_N_"
 	    pp_MaB (Just x) = ppr sty x
+\end{code}
+
+
+\begin{code}
+-}
 \end{code}

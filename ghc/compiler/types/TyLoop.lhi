@@ -8,8 +8,9 @@ import PreludeStdIO ( Maybe )
 import Unique ( Unique )
 
 import FieldLabel ( FieldLabel )
-import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
+import Id      ( Id, GenId, StrictnessMark, mkDataCon, mkTupleCon,
 		 isNullaryDataCon, dataConArgTys, idType )
+import TysWiredIn ( tupleCon, tupleTyCon )
 import PprType ( specMaybeTysSuffix )
 import Name    ( Name )
 import TyCon   ( TyCon )
@@ -31,7 +32,7 @@ type Class = GenClass (GenTyVar (GenUsage Unique)) Unique
 type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
 
 -- Needed in TyCon
-mkTupleCon :: Int -> Id
+tupleCon :: Int -> Id
 isNullaryDataCon :: Id -> Bool
 specMaybeTysSuffix :: [Maybe Type] -> _PackedString
 idType :: Id -> Type
@@ -40,6 +41,7 @@ splitFunTy   :: GenType t u -> ([GenType t u], GenType t u)
 instance Eq (GenClass a b)
 
 -- Needed in Type
+tupleTyCon :: Int -> TyCon
 dataConArgTys :: Id -> [Type] -> [Type]
 voidTy :: Type
 
@@ -48,4 +50,5 @@ data StrictnessMark = MarkedStrict | NotMarkedStrict
 mkDataCon :: Name -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> [(Class,Type)] -> [Type] -> TyCon
 	  -> Id
+mkTupleCon ::  Int -> Name -> Type -> Id
 \end{code}

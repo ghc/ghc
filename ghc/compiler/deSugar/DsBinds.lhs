@@ -452,6 +452,10 @@ dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (AndMonoBinds  binds_1 bin
 %==============================================
 
 \begin{code}
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (CoreMonoBind var core_expr)
+  = doSccAuto auto_scc [var] core_expr	`thenDs` \ sccd_core_expr -> 
+    returnDs [(binder_subst var, mkLam tyvars dicts sccd_core_expr)]
+
 dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (VarMonoBind var expr)
   = dsExpr expr		`thenDs` \ core_expr ->
     doSccAuto auto_scc [var] core_expr	`thenDs` \ sccd_core_expr -> 

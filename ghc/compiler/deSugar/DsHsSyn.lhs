@@ -62,6 +62,7 @@ collectTypedMonoBinders EmptyMonoBinds	      = []
 collectTypedMonoBinders (PatMonoBind pat _ _) = collectTypedPatBinders pat
 collectTypedMonoBinders (FunMonoBind f _ _ _) = [f]
 collectTypedMonoBinders (VarMonoBind v _)     = [v]
+collectTypedMonoBinders (CoreMonoBind v _)     = [v]
 collectTypedMonoBinders (AndMonoBinds bs1 bs2)
  = collectTypedMonoBinders bs1 ++ collectTypedMonoBinders bs2
 

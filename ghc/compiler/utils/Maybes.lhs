@@ -38,9 +38,10 @@ module Maybes (
 
 #if defined(COMPILING_GHC)
 
-CHK_Ubiq() -- debugging consistency check
+CHK_Ubiq()			-- debugging consistency check
 
-import Unique (Unique) -- only for specialising
+IMPORT_DELOOPER( SpecLoop )	-- Specialisation
+import Unique  (Unique)		-- only for specialising
 
 #else
 import Maybe -- renamer will tell us if there are any conflicts
@@ -140,7 +141,6 @@ assocMaybe alist key
 	:: [(FAST_STRING,   b)] -> FAST_STRING -> Maybe b
 	 , [(Int,           b)] -> Int         -> Maybe b
 	 , [(Unique,        b)] -> Unique      -> Maybe b
-	 , [(RdrName,       b)] -> RdrName     -> Maybe b
   #-}
 #endif
 \end{code}

@@ -7,20 +7,33 @@
 #include "HsVersions.h"
 
 module PrelInfo (
-
 	-- finite maps for built-in things (for the renamer and typechecker):
-	builtinNameInfo, builtinNameMaps,
-	builtinValNamesMap, builtinTcNamesMap,
-	builtinKeysMap,
+	builtinNames, builtinKeys, derivingOccurrences,
 	SYN_IE(BuiltinNames),
-	SYN_IE(BuiltinKeys), SYN_IE(BuiltinIdInfos),
 
-	maybeCharLikeTyCon, maybeIntLikeTyCon
+	maybeCharLikeTyCon, maybeIntLikeTyCon,
+
+	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, compare_RDR, 
+	minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, 
+	enumFromThenTo_RDR, fromEnum_RDR,
+	range_RDR, index_RDR, inRange_RDR, readsPrec_RDR, readList_RDR, 
+	showsPrec_RDR, showList_RDR, plus_RDR, times_RDR, ltTag_RDR, eqTag_RDR, gtTag_RDR, 
+	eqH_Char_RDR, ltH_Char_RDR, eqH_Word_RDR, ltH_Word_RDR, eqH_Addr_RDR, ltH_Addr_RDR, 
+	eqH_Float_RDR, ltH_Float_RDR, eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR, ltH_Int_RDR, 
+	geH_RDR, leH_RDR, minusH_RDR, false_RDR, true_RDR, and_RDR, not_RDR, append_RDR, 
+	map_RDR, compose_RDR, mkInt_RDR, error_RDR, showString_RDR, showParen_RDR, readParen_RDR, 
+	lex_RDR, showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
+
+	numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR, creturnableClass_RDR,
+	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
+
+	needsDataDeclCtxtClassKeys, cCallishClassKeys, isNoDictClass,
+	isNumericClass, isStandardClass, isCcallishClass
     ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(PrelLoop) ( primOpNameInfo )
-IMPORT_DELOOPER(IdLoop)	  ( SpecEnv )
+IMPORT_DELOOPER(PrelLoop) ( primOpName )
+-- IMPORT_DELOOPER(IdLoop)	  ( SpecEnv )
 
 -- friends:
 import PrelMods		-- Prelude module names
@@ -31,16 +44,18 @@ import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
-import FiniteMap	( FiniteMap, emptyFM, listToFM )
-import Id		( mkTupleCon, GenId, SYN_IE(Id) )
-import Maybes		( catMaybes )
-import Name		( origName, OrigName(..), Name )
-import RnHsSyn		( RnName(..) )
-import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
+import SpecEnv		( SpecEnv )
+import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
+import Id		( GenId, SYN_IE(Id) )
+import Name		( Name, OccName(..), DefnInfo(..), Provenance(..),
+			  getName, mkGlobalName, modAndOcc )
+import Class		( Class(..), GenClass, classKey )
+import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
 import Type
-import UniqFM		( UniqFM, emptyUFM, listToUFM )
+import Bag
 import Unique		-- *Key stuff
-import Util		( nOfThem, panic )
+import UniqFM		( UniqFM, listToUFM ) 
+import Util		( isIn )
 \end{code}
 
 %************************************************************************
@@ -53,61 +68,29 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 @Classes@, the other to look up values.
 
 \begin{code}
-builtinNameInfo :: ( BuiltinNames, BuiltinKeys, BuiltinIdInfos )
+type BuiltinNames = Bag Name
 
-type BuiltinNames   = (FiniteMap OrigName RnName, -- WiredIn Ids
-		       FiniteMap OrigName RnName) -- WiredIn TyCons
-			-- Two maps because "[]" is in both...
+builtinNames :: BuiltinNames
+builtinNames
+  = 	-- Wired in TyCons
+    unionManyBags (map getTyConNames wired_in_tycons)	`unionBags`
 
-type BuiltinKeys    = FiniteMap OrigName (Unique, Name -> RnName)
-						     -- Names with known uniques
+	-- Wired in Ids
+    listToBag (map getName wired_in_ids)		`unionBags`
 
-type BuiltinIdInfos = UniqFM IdInfo		     -- Info for known unique Ids
+	-- PrimOps
+    listToBag (map (getName.primOpName) allThePrimOps)	`unionBags`
 
-builtinNameMaps    = case builtinNameInfo of { (x,_,_) -> x }
-builtinKeysMap	   = case builtinNameInfo of { (_,x,_) -> x }
-builtinValNamesMap = fst builtinNameMaps
-builtinTcNamesMap  = snd builtinNameMaps
+	-- Other names with magic keys
+    listToBag builtinKeys
+\end{code}
 
-builtinNameInfo
-  = ( (listToFM assoc_val_wired, listToFM assoc_tc_wired)
-    , listToFM assoc_keys
-    , listToUFM assoc_id_infos
-    )
-  where
-    assoc_val_wired
-    	= concat [
-	    -- data constrs
-	    concat (map pcDataConWiredInInfo g_con_tycons),
-	    concat (map pcDataConWiredInInfo data_tycons),
 
-	    -- values
-	    map pcIdWiredInInfo wired_in_ids,
-	    primop_ids
-	  ]
-    assoc_tc_wired
-    	= concat [
-	    -- tycons
-	    map pcTyConWiredInInfo prim_tycons,
-	    map pcTyConWiredInInfo g_tycons,
-	    map pcTyConWiredInInfo data_tycons
-	  ]
-
-    assoc_keys
-	= concat
-	  [
-	    id_keys,
-	    tysyn_keys,
-	    class_keys,
-	    class_op_keys
-	  ]
-
-    id_keys = map id_key id_keys_infos
-    id_key (str_mod, uniq, info) = (str_mod, (uniq, RnImplicit))
-
-    assoc_id_infos = catMaybes (map assoc_info id_keys_infos)
-    assoc_info (str_mod, uniq, Just info) = Just (uniq, info)
-    assoc_info (str_mod, uniq, Nothing)   = Nothing
+\begin{code}
+getTyConNames :: TyCon -> Bag Name
+getTyConNames tycon
+    =  getName tycon `consBag` listToBag (map getName (tyConDataCons tycon))
+	-- Synonyms return empty list of constructors
 \end{code}
 
 
@@ -115,8 +98,18 @@ We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
 
-The WiredIn TyCons and DataCons ...
+%************************************************************************
+%*									*
+\subsection{Wired in TyCons}
+%*									*
+%************************************************************************
+
+
 \begin{code}
+wired_in_tycons = [mkFunTyCon] ++
+		  prim_tycons ++
+		  tuple_tycons ++
+		  data_tycons
 
 prim_tycons
   = [ addrPrimTyCon
@@ -136,27 +129,12 @@ prim_tycons
     , wordPrimTyCon
     ]
 
-g_tycons
-  = mkFunTyCon : g_con_tycons
-
-g_con_tycons
-  = listTyCon : mkTupleTyCon 0 : [mkTupleTyCon i | i <- [2..37] ]
-
-min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
-  = [ boolTyCon
-    , charTyCon
-    , intTyCon
-    , floatTyCon
-    , doubleTyCon
-    , integerTyCon
-    , liftTyCon
-    , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
-    , returnIntAndGMPTyCon
-    ]
+tuple_tycons = unitTyCon : [tupleTyCon i | i <- [2..37] ]
 
 
 data_tycons
-  = [ addrTyCon
+  = [ listTyCon
+    , addrTyCon
     , boolTyCon
     , charTyCon
     , doubleTyCon
@@ -188,20 +166,37 @@ data_tycons
     , voidTyCon
     , wordTyCon
     ]
+
+min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
+  = [ boolTyCon
+    , charTyCon
+    , intTyCon
+    , floatTyCon
+    , doubleTyCon
+    , integerTyCon
+    , liftTyCon
+    , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
+    , returnIntAndGMPTyCon
+    ]
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Wired in Ids}
+%*									*
+%************************************************************************
 
 The WiredIn Ids ...
 ToDo: Some of these should be moved to id_keys_infos!
+
 \begin{code}
 wired_in_ids
   = [ aBSENT_ERROR_ID
     , augmentId
     , buildId
---  , copyableId
     , eRROR_ID
     , foldlId
     , foldrId
---  , forkId
     , iRREFUT_PAT_ERROR_ID
     , integerMinusOneId
     , integerPlusOneId
@@ -210,10 +205,23 @@ wired_in_ids
     , nON_EXHAUSTIVE_GUARDS_ERROR_ID
     , nO_DEFAULT_METHOD_ERROR_ID
     , nO_EXPLICIT_METHOD_ERROR_ID
---  , noFollowId
     , pAR_ERROR_ID
     , pAT_ERROR_ID
     , packStringForCId
+    , rEC_CON_ERROR_ID
+    , rEC_UPD_ERROR_ID
+    , realWorldPrimId
+    , runSTId
+    , tRACE_ID
+    , unpackCString2Id
+    , unpackCStringAppendId
+    , unpackCStringFoldrId
+    , unpackCStringId
+    , voidId
+
+--  , copyableId
+--  , forkId
+--  , noFollowId
 --    , parAtAbsId
 --    , parAtForNowId
 --    , parAtId
@@ -221,134 +229,264 @@ wired_in_ids
 --    , parGlobalId
 --    , parId
 --    , parLocalId
-    , rEC_CON_ERROR_ID
-    , rEC_UPD_ERROR_ID
-    , realWorldPrimId
-    , runSTId
 --    , seqId
-    , tRACE_ID
-    , unpackCString2Id
-    , unpackCStringAppendId
-    , unpackCStringFoldrId
-    , unpackCStringId
-    , voidId
-    ]
-
-pcTyConWiredInInfo :: TyCon -> (OrigName, RnName)
-pcTyConWiredInInfo tc = (origName "pcTyConWiredInInfo" tc, WiredInTyCon tc)
-
-pcDataConWiredInInfo :: TyCon -> [(OrigName, RnName)]
-pcDataConWiredInInfo tycon
-  = [ (origName "pcDataConWiredInInfo" con, WiredInId con) | con <- tyConDataCons tycon ]
-
-pcIdWiredInInfo :: Id -> (OrigName, RnName)
-pcIdWiredInInfo id = (origName "pcIdWiredInInfo" id, WiredInId id)
-\end{code}
-
-WiredIn primitive numeric operations ...
-\begin{code}
-primop_ids
-  = map prim_fn allThePrimOps ++ map funny_fn funny_name_primops
-  where
-    prim_fn  op     = case (primOpNameInfo op) of (s,n) -> ((OrigName gHC_BUILTINS s),n)
-    funny_fn (op,s) = case (primOpNameInfo op) of (_,n) -> ((OrigName gHC_BUILTINS s),n)
-
-funny_name_primops
-  = [ (IntAddOp,      SLIT("+#"))
-    , (IntSubOp,      SLIT("-#"))
-    , (IntMulOp,      SLIT("*#"))
-    , (IntGtOp,       SLIT(">#"))
-    , (IntGeOp,       SLIT(">=#"))
-    , (IntEqOp,       SLIT("==#"))
-    , (IntNeOp,       SLIT("/=#"))
-    , (IntLtOp,       SLIT("<#"))
-    , (IntLeOp,       SLIT("<=#"))
-    , (DoubleAddOp,   SLIT("+##"))
-    , (DoubleSubOp,   SLIT("-##"))
-    , (DoubleMulOp,   SLIT("*##"))
-    , (DoubleDivOp,   SLIT("/##"))
-    , (DoublePowerOp, SLIT("**##"))
-    , (DoubleGtOp,    SLIT(">##"))
-    , (DoubleGeOp,    SLIT(">=##"))
-    , (DoubleEqOp,    SLIT("==##"))
-    , (DoubleNeOp,    SLIT("/=##"))
-    , (DoubleLtOp,    SLIT("<##"))
-    , (DoubleLeOp,    SLIT("<=##"))
     ]
 \end{code}
 
 
-Ids, Synonyms, Classes and ClassOps with builtin keys.
-For the Ids we may also have some builtin IdInfo.
+%************************************************************************
+%*									*
+\subsection{Built-in keys}
+%*									*
+%************************************************************************
+
+Ids, Synonyms, Classes and ClassOps with builtin keys. 
+
 \begin{code}
-id_keys_infos :: [(OrigName, Unique, Maybe IdInfo)]
-id_keys_infos
-  = [ -- here because we use them in derived instances
-      (OrigName pRELUDE SLIT("&&"),		andandIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("."),		composeIdKey,	Nothing)
-    , (OrigName gHC__   SLIT("lex"),		lexIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("not"),		notIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("readParen"),	readParenIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("showParen"),	showParenIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("showString"),	showStringIdKey,Nothing)
-    , (OrigName gHC__   SLIT("readList__"),	ureadListIdKey,	Nothing)
-    , (OrigName gHC__   SLIT("showList__"),	ushowListIdKey,	Nothing)
-    , (OrigName gHC__   SLIT("showSpace"),	showSpaceIdKey,	Nothing)
+getKeyOrig :: (Module, OccName, Unique) -> Name
+getKeyOrig (mod, occ, uniq) = mkGlobalName uniq mod occ VanillaDefn Implicit
+
+builtinKeys :: [Name]
+builtinKeys
+  = map getKeyOrig
+    [
+	-- Type constructors (synonyms especially)
+      (iO_BASE,		TCOcc SLIT("IO"),       iOTyConKey)
+    , (pREL_BASE,	TCOcc SLIT("Ordering"), orderingTyConKey)
+    , (pREL_NUM,	TCOcc SLIT("Rational"), rationalTyConKey)
+    , (pREL_NUM,	TCOcc SLIT("Ratio"),    ratioTyConKey)
+
+
+	--  Classes.  *Must* include:
+	--  	classes that are grabbed by key (e.g., eqClassKey)
+	--  	classes in "Class.standardClassKeys" (quite a few)
+    , (pREL_BASE, TCOcc SLIT("Eq"),		eqClassKey)		-- mentioned, derivable
+    , (pREL_BASE, TCOcc SLIT("Eval"),		evalClassKey)		-- mentioned
+    , (pREL_BASE, TCOcc SLIT("Ord"),		ordClassKey)		-- derivable
+    , (pREL_BASE, TCOcc SLIT("Bounded"),	boundedClassKey)	-- derivable
+    , (pREL_BASE, TCOcc SLIT("Num"),		numClassKey)		-- mentioned, numeric
+    , (pREL_BASE, TCOcc SLIT("Enum"),		enumClassKey)		-- derivable
+    , (pREL_BASE, TCOcc SLIT("Monad"),		monadClassKey)
+    , (pREL_BASE, TCOcc SLIT("MonadZero"),		monadZeroClassKey)
+    , (pREL_BASE, TCOcc SLIT("MonadPlus"),		monadPlusClassKey)
+    , (pREL_BASE, TCOcc SLIT("Functor"),		functorClassKey)
+    , (pREL_BASE, TCOcc SLIT("Show"),		showClassKey)		-- derivable
+    , (pREL_NUM, TCOcc SLIT("Real"),		realClassKey)		-- numeric
+    , (pREL_NUM, TCOcc SLIT("Integral"),	integralClassKey)	-- numeric
+    , (pREL_NUM, TCOcc SLIT("Fractional"),	fractionalClassKey)	-- numeric
+    , (pREL_NUM, TCOcc SLIT("Floating"),	floatingClassKey)	-- numeric
+    , (pREL_NUM, TCOcc SLIT("RealFrac"),	realFracClassKey)	-- numeric
+    , (pREL_NUM, TCOcc SLIT("RealFloat"),	realFloatClassKey)	-- numeric
+    , (pREL_READ, TCOcc SLIT("Read"),		readClassKey)		-- derivable
+    , (iX,	TCOcc SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
+    , (fOREIGN,	TCOcc SLIT("CCallable"),	cCallableClassKey)	-- mentioned, ccallish
+    , (fOREIGN,   TCOcc SLIT("CReturnable"), 	cReturnableClassKey)	-- mentioned, ccallish
+
+
+	-- ClassOps 
+    , (pREL_BASE, VarOcc SLIT("fromInt"),	fromIntClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("fromInteger"),	fromIntegerClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("enumFrom"),	enumFromClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("enumFromThen"),	enumFromThenClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("enumFromTo"),	enumFromToClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("enumFromThenTo"), enumFromThenToClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("fromEnum"),	fromEnumClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("=="),		eqClassOpKey)
+    , (pREL_BASE, VarOcc SLIT(">>="),		thenMClassOpKey)
+    , (pREL_BASE, VarOcc SLIT("zero"),		zeroClassOpKey)
+    , (pREL_NUM, VarOcc SLIT("fromRational"),	fromRationalClassOpKey)
     ]
-
-tysyn_keys
-  = [ (OrigName gHC__   SLIT("IO"),       (iOTyConKey, RnImplicitTyCon))
-    , (OrigName pRELUDE SLIT("Ordering"), (orderingTyConKey, RnImplicitTyCon))
-    , (OrigName rATIO   SLIT("Rational"), (rationalTyConKey, RnImplicitTyCon))
-    , (OrigName rATIO   SLIT("Ratio"),    (ratioTyConKey, RnImplicitTyCon))
-    ]
-
--- this "class_keys" list *must* include:
---  classes that are grabbed by key (e.g., eqClassKey)
---  classes in "Class.standardClassKeys" (quite a few)
-
-class_keys
-  = [ (str_mod, (k, RnImplicitClass)) | (str_mod,k) <-
-    [ (OrigName pRELUDE SLIT("Eq"),		eqClassKey)		-- mentioned, derivable
-    , (OrigName pRELUDE SLIT("Eval"),		evalClassKey)		-- mentioned
-    , (OrigName pRELUDE SLIT("Ord"),		ordClassKey)		-- derivable
-    , (OrigName pRELUDE SLIT("Num"),		numClassKey)		-- mentioned, numeric
-    , (OrigName pRELUDE SLIT("Real"),		realClassKey)		-- numeric
-    , (OrigName pRELUDE SLIT("Integral"),	integralClassKey)	-- numeric
-    , (OrigName pRELUDE SLIT("Fractional"),	fractionalClassKey)	-- numeric
-    , (OrigName pRELUDE SLIT("Floating"),	floatingClassKey)	-- numeric
-    , (OrigName pRELUDE SLIT("RealFrac"),	realFracClassKey)	-- numeric
-    , (OrigName pRELUDE SLIT("RealFloat"),	realFloatClassKey)	-- numeric
-    , (OrigName iX	SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
-    , (OrigName pRELUDE SLIT("Bounded"),	boundedClassKey)	-- derivable
-    , (OrigName pRELUDE SLIT("Enum"),		enumClassKey)		-- derivable
-    , (OrigName pRELUDE SLIT("Show"),		showClassKey)		-- derivable
-    , (OrigName pRELUDE SLIT("Read"),		readClassKey)		-- derivable
-    , (OrigName pRELUDE SLIT("Monad"),		monadClassKey)
-    , (OrigName pRELUDE SLIT("MonadZero"),	monadZeroClassKey)
-    , (OrigName pRELUDE SLIT("MonadPlus"),	monadPlusClassKey)
-    , (OrigName pRELUDE SLIT("Functor"),	functorClassKey)
-    , (OrigName gHC__	SLIT("CCallable"),	cCallableClassKey)	-- mentioned, ccallish
-    , (OrigName gHC__   SLIT("CReturnable"), 	cReturnableClassKey)	-- mentioned, ccallish
-    ]]
-
-class_op_keys
-  = [ (str_mod, (k, RnImplicit)) | (str_mod,k) <-
-    [ (OrigName pRELUDE SLIT("fromInt"),	fromIntClassOpKey)
-    , (OrigName pRELUDE SLIT("fromInteger"),	fromIntegerClassOpKey)
-    , (OrigName pRELUDE SLIT("fromRational"),	fromRationalClassOpKey)
-    , (OrigName pRELUDE SLIT("enumFrom"),	enumFromClassOpKey)
-    , (OrigName pRELUDE SLIT("enumFromThen"),	enumFromThenClassOpKey)
-    , (OrigName pRELUDE SLIT("enumFromTo"),	enumFromToClassOpKey)
-    , (OrigName pRELUDE SLIT("enumFromThenTo"),enumFromThenToClassOpKey)
-    , (OrigName pRELUDE SLIT("=="),		eqClassOpKey)
-    , (OrigName pRELUDE SLIT(">>="),		thenMClassOpKey)
-    , (OrigName pRELUDE SLIT("zero"),		zeroClassOpKey)
-    ]]
 \end{code}
 
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
+
 \begin{code}
 maybeCharLikeTyCon tc = if (uniqueOf tc == charDataConKey) then Just charDataCon else Nothing
 maybeIntLikeTyCon  tc = if (uniqueOf tc == intDataConKey)  then Just intDataCon  else Nothing
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Commonly-used RdrNames}
+%*									*
+%************************************************************************
+
+These RdrNames are not really "built in", but some parts of the compiler
+(notably the deriving mechanism) need to mention their names, and it's convenient
+to write them all down in one place.
+
+\begin{code}
+prelude_primop op = qual (modAndOcc (primOpName op))
+
+eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
+ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
+evalClass_RDR 		= tcQual (pREL_BASE, SLIT("Eval"))
+monadZeroClass_RDR	= tcQual (pREL_BASE, SLIT("MonadZero"))
+enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
+numClass_RDR		= tcQual (pREL_BASE, SLIT("Num"))
+fractionalClass_RDR	= tcQual (pREL_NUM,  SLIT("Fractional"))
+ccallableClass_RDR	= tcQual (fOREIGN,   SLIT("CCallable"))
+creturnableClass_RDR	= tcQual (fOREIGN,   SLIT("CReturnable"))
+
+negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
+eq_RDR		   = varQual (pREL_BASE, SLIT("=="))
+ne_RDR		   = varQual (pREL_BASE, SLIT("/="))
+le_RDR		   = varQual (pREL_BASE, SLIT("<="))
+lt_RDR		   = varQual (pREL_BASE, SLIT("<"))
+ge_RDR		   = varQual (pREL_BASE, SLIT(">="))
+gt_RDR		   = varQual (pREL_BASE, SLIT(">"))
+ltTag_RDR	   = varQual (pREL_BASE,  SLIT("LT"))
+eqTag_RDR	   = varQual (pREL_BASE,  SLIT("EQ"))
+gtTag_RDR	   = varQual (pREL_BASE,  SLIT("GT"))
+max_RDR		   = varQual (pREL_BASE, SLIT("max"))
+min_RDR		   = varQual (pREL_BASE, SLIT("min"))
+compare_RDR	   = varQual (pREL_BASE, SLIT("compare"))
+minBound_RDR	   = varQual (pREL_BASE, SLIT("minBound"))
+maxBound_RDR	   = varQual (pREL_BASE, SLIT("maxBound"))
+false_RDR	   = varQual (pREL_BASE,  SLIT("False"))
+true_RDR	   = varQual (pREL_BASE,  SLIT("True"))
+and_RDR		   = varQual (pREL_BASE,  SLIT("&&"))
+not_RDR		   = varQual (pREL_BASE,  SLIT("not"))
+compose_RDR	   = varQual (pREL_BASE, SLIT("."))
+append_RDR	   = varQual (pREL_BASE, SLIT("++"))
+map_RDR		   = varQual (pREL_BASE, SLIT("map"))
+
+showList___RDR     = varQual (pREL_BASE,  SLIT("showList__"))
+showsPrec_RDR	   = varQual (pREL_BASE, SLIT("showsPrec"))
+showList_RDR	   = varQual (pREL_BASE, SLIT("showList"))
+showSpace_RDR	   = varQual (pREL_BASE,  SLIT("showSpace"))
+showString_RDR	   = varQual (pREL_BASE, SLIT("showString"))
+showParen_RDR	   = varQual (pREL_BASE, SLIT("showParen"))
+
+range_RDR	   = varQual (iX,   SLIT("range"))
+index_RDR	   = varQual (iX,   SLIT("index"))
+inRange_RDR	   = varQual (iX,   SLIT("inRange"))
+
+readsPrec_RDR	   = varQual (pREL_READ, SLIT("readsPrec"))
+readList_RDR	   = varQual (pREL_READ, SLIT("readList"))
+readParen_RDR	   = varQual (pREL_READ, SLIT("readParen"))
+lex_RDR		   = varQual (pREL_READ,  SLIT("lex"))
+readList___RDR     = varQual (pREL_READ,  SLIT("readList__"))
+
+fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
+enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
+enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
+enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
+enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
+plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
+times_RDR	   = varQual (pREL_BASE, SLIT("*"))
+mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
+
+error_RDR	   = varQual (iO_BASE, SLIT("error"))
+
+eqH_Char_RDR	= prelude_primop CharEqOp
+ltH_Char_RDR	= prelude_primop CharLtOp
+eqH_Word_RDR	= prelude_primop WordEqOp
+ltH_Word_RDR	= prelude_primop WordLtOp
+eqH_Addr_RDR	= prelude_primop AddrEqOp
+ltH_Addr_RDR	= prelude_primop AddrLtOp
+eqH_Float_RDR	= prelude_primop FloatEqOp
+ltH_Float_RDR	= prelude_primop FloatLtOp
+eqH_Double_RDR	= prelude_primop DoubleEqOp
+ltH_Double_RDR	= prelude_primop DoubleLtOp
+eqH_Int_RDR	= prelude_primop IntEqOp
+ltH_Int_RDR	= prelude_primop IntLtOp
+geH_RDR		= prelude_primop IntGeOp
+leH_RDR		= prelude_primop IntLeOp
+minusH_RDR	= prelude_primop IntSubOp
+
+intType_RDR = qual (modAndOcc intTyCon)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Class-std-groups]{Standard groups of Prelude classes}
+%*									*
+%************************************************************************
+
+@derivableClassKeys@ is also used in checking \tr{deriving} constructs
+(@TcDeriv@).
+
+@derivingOccurrences@ maps a class name to a list of the (qualified) occurrences
+that will be mentioned by  the derived code for the class when it is later generated.
+We don't need to put in things that are WiredIn (because they are already mapped to their
+correct name by the @NameSupply@.  The class itself, and all its class ops, is
+already flagged as an occurrence so we don't need to mention that either.
+
+@derivingOccurrences@ has an item for every derivable class, even if that item is empty,
+because we treat lookup failure as indicating that the class is illegal in a deriving clause.
+
+\begin{code}
+derivingOccurrences :: UniqFM [RdrName]
+derivingOccurrences = listToUFM deriving_occ_info
+
+derivableClassKeys  = map fst deriving_occ_info
+
+deriving_occ_info
+  = [ (eqClassKey, 	[intType_RDR, and_RDR, not_RDR])
+    , (ordClassKey, 	[intType_RDR, compose_RDR])
+    , (enumClassKey, 	[intType_RDR, map_RDR])
+    , (evalClassKey,	[intType_RDR])
+    , (boundedClassKey,	[intType_RDR])
+    , (showClassKey,	[intType_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
+			 showParen_RDR, showSpace_RDR, showList___RDR])
+    , (readClassKey,	[intType_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
+			 lex_RDR, readParen_RDR, readList___RDR])
+    , (ixClassKey,	[intType_RDR, numClass_RDR, and_RDR, map_RDR])
+    ]
+	-- intType: Practically any deriving needs Int, either for index calculations, 
+	--		or for taggery.
+	-- ordClass: really it's the methods that are actually used.
+	-- numClass: for Int literals
+\end{code}
+
+
+NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
+even though every numeric class has these two as a superclass,
+because the list of ambiguous dictionaries hasn't been simplified.
+
+\begin{code}
+isCcallishClass, isNoDictClass, isNumericClass, isStandardClass :: Class -> Bool
+
+isNumericClass   clas = classKey clas `is_elem` numericClassKeys
+isStandardClass  clas = classKey clas `is_elem` standardClassKeys
+isCcallishClass	 clas = classKey clas `is_elem` cCallishClassKeys
+isNoDictClass    clas = classKey clas `is_elem` noDictClassKeys
+is_elem = isIn "is_X_Class"
+
+numericClassKeys
+  = [ numClassKey
+    , realClassKey
+    , integralClassKey
+    , fractionalClassKey
+    , floatingClassKey
+    , realFracClassKey
+    , realFloatClassKey
+    ]
+
+needsDataDeclCtxtClassKeys -- see comments in TcDeriv
+  = [ readClassKey
+    ]
+
+cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
+
+standardClassKeys
+  = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
+    --
+    -- We have to have "CCallable" and "CReturnable" in the standard
+    -- classes, so that if you go...
+    --
+    --	    _ccall_ foo ... 93{-numeric literal-} ...
+    --
+    -- ... it can do The Right Thing on the 93.
+
+noDictClassKeys 	-- These classes are used only for type annotations;
+			-- they are not implemented by dictionaries, ever.
+  = cCallishClassKeys
+	-- I used to think that class Eval belonged in here, but
+	-- we really want functions with type (Eval a => ...) and that
+	-- means that we really want to pass a placeholder for an Eval
+	-- dictionary.  The unit tuple is what we'll get if we leave things
+	-- alone, and that'll do for now.  Could arrange to drop that parameter
+	-- in the end.
 \end{code}

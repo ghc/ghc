@@ -1,0 +1,269 @@
+/* This is the Jmakefile for the library stuff.
+   This stuff is all written in (Glasgow-extended) Haskell.
+
+Everything here *must* be compiled w/ the Glasgow Haskell compiler.
+(Hence the use of $(GHC), rather than $(HC) [the latter is your "standard"
+Haskell compiler -- whatever you've configured]).
+
+If you use EXTRA_HC_OPTS on the command line (which you shouldn't,
+strictly speaking), it will probably work -- it is pinned onto
+GHC_OPTS, just for fun.
+*/
+
+/****************************************************************
+*								*
+* Jmakefile preamble-y things					*
+*								*
+****************************************************************/
+
+#define IHaveSubdirs
+
+#if IncludeTestDirsInBuild == YES
+#define __ghc_lib_tests_dir tests
+#else
+#define __ghc_lib_tests_dir /* nothing */
+#endif
+
+SUBDIRS = cbits __ghc_lib_tests_dir
+
+#define NoDocsTargetForSubdirs
+#define NoInstallDocsTargetForSubdirs
+#define NoDependTargetForSubdirs
+
+GhcDriverNeededHere(depend all)
+EtagsNeededHere(tags)
+
+/****************************************************************
+*								*
+* options used for compiling/etc. things			*
+*								*
+****************************************************************/
+
+/* The driver will give warnings if -split-objs, but that's cool... */
+GHC_OPTS=-recomp -cpp 		\
+	 -dcore-lint 		\
+	 -irequired:glaExts:ghc	\
+	 HcMaxHeapFlag $(EXTRA_HC_OPTS)
+
+EXTRA_MKDEPENDHS_OPTS = -irequired:prelude:ghc:hbc:glaExts:concurrent
+
+PREL_OPTS=
+
+/* per-build options: shared with RTS */
+#define rts_or_lib(r,l) l
+#include "../mkworld/GHC_OPTS"
+
+/* this is just friendliness to "hstags" */
+HSTAGS_OPTS=-fglasgow-exts
+
+/***************************************************************/
+
+/****************************************************************
+*								*
+* what it is we are compiling;					*
+*   these are long and tedious lists, but c'est la guerre	*
+*								*
+****************************************************************/
+
+BASIC_HS =		\
+required/Prelude.lhs	\
+required/Array.lhs		\
+required/Char.lhs		\
+required/Complex.lhs		\
+required/Directory.lhs		\
+required/IO.lhs			\
+required/Ix.lhs			\
+required/List.lhs		\
+required/Maybe.lhs		\
+required/Monad.lhs		\
+required/Ratio.lhs		\
+required/System.lhs		\
+\
+ghc/PrelBase.lhs	\
+ghc/GHCerr.lhs          \
+ghc/PrelIO.lhs		\
+ghc/IOHandle.lhs	\
+ghc/IOBase.lhs		\
+ghc/STBase.lhs		\
+ghc/ArrBase.lhs		\
+ghc/PrelRead.lhs	\
+ghc/GHCmain.lhs		\
+ghc/PrelList.lhs	\
+ghc/PrelNum.lhs		\
+ghc/PrelTup.lhs		\
+\
+glaExts/ST.lhs		\
+glaExts/Foreign.lhs	\
+glaExts/PackedString.lhs	\
+
+# Leave out concurrency for now
+# \
+ghc/ConcBase.lhs        \
+# concurrent/Channel.lhs		\
+# concurrent/ChannelVar.lhs	\
+# concurrent/Merge.lhs		\
+# concurrent/Parallel.lhs		\
+# concurrent/SampleVar.lhs	\
+# concurrent/Semaphore.lhs	\
+# concurrent/Concurrent.lhs
+
+BASIC_HIs = $(BASIC_HS:.lhs=.hi)
+
+BASIC_OBJS_DIRS	= $(BASIC_HS:.lhs=)
+
+/* easy way to make many many Make variables: */
+WayThingVars(BASIC)
+
+/************************************************************************
+*									*
+* Macros for creating and installing libHS<x>.a (in its many flavors).	*
+*									*
+*************************************************************************/
+
+/****************************************************************
+*								*
+* Creating and installing...					*
+*	libHS_<tag>.a		standard Prelude library	*
+*								*
+****************************************************************/
+
+/* make sure install's target dir is there */
+#if DoInstallGHCSystem == YES
+MakeDirectories(install, $(INSTLIBDIR_GHC) $(INSTDATADIR_GHC)/imports)
+
+InstallDataTarget(MODULES,$(INSTDATADIR_GHC)/imports)
+#endif /* installing */
+
+BasicEverything(libHS, $(INSTLIBDIR_GHC), $(INSTDATADIR_GHC))
+
+/****************************************************************
+*								*
+* Creating the individual .hc files: 				*
+*								*
+*   For the just-vary-the-GC-thanks flavors, we only need to	*
+*   compile .hs->.hc once; then re-use the .hc file each time.	*
+*								*
+*   For the profiling one (_p) and all the user-specified	*
+*   ones, we recompile the Haskell each time.			*
+*								*
+*  NB: old (WDP 95/06)						*
+****************************************************************/
+
+/* some "helpful" internal macros first... */
+
+#if GhcWithHscBuiltViaC == YES && HaskellCompilerType == HC_USE_HC_FILES
+#define CompileWayishly__(hc,file,isuf,way,flags)	@@\
+clean  ::						@@\
+	$(RM) CAT3(file,way,.hc)
+#endif
+
+/* now use the macro: */
+
+/* NB: the -Onots are only because -O would not go through on
+   a reasonably-sized machine (i.e., one I have)
+*/
+
+
+CompileWayishly(GHC,required/Prelude,lhs,	/*-split-objs Prelude*/		-fglasgow-exts)
+CompileWayishly(GHC,required/Array,lhs,		/*-split-objs Array*/		-fglasgow-exts)
+CompileWayishly(GHC,required/Char,lhs,  	/*-split-objs Char*/)
+CompileWayishly(GHC,required/Complex,lhs,	/*-split-objs Complex*/)
+CompileWayishly(GHC,required/Ix,lhs,		/*-split-objs Ix*/		-fglasgow-exts)
+CompileWayishly(GHC,required/List,lhs,		/*-split-objs List*/)
+CompileWayishly(GHC,required/Maybe,lhs,		/*-split-objs Maybe*/)
+CompileWayishly(GHC,required/Monad,lhs,		/*-split-objs Monad*/)
+CompileWayishly(GHC,required/Ratio,lhs,		/*-split-objs Ratio*/)
+
+CompileWayishly(GHC,required/Directory,lhs,	/*-split-objs Directory*/	-fglasgow-exts \
+						'-#include"cbits/stgio.h"' -monly-3-regs)
+CompileWayishly(GHC,required/IO,lhs,		/*-split-objs IO*/		-fglasgow-exts \
+						'-#include"cbits/stgio.h"')
+CompileWayishly(GHC,required/System,lhs,	/*-split-objs System*/		-fglasgow-exts \
+						 '-#include"cbits/stgio.h"')
+
+
+CompileWayishly(GHC,ghc/ConcBase,lhs,		/*-split-objs ConcBase*/	-fglasgow-exts)
+CompileWayishly(GHC,ghc/PrelBase,lhs,		/*-split-objs PrelBase*/	-fglasgow-exts)
+CompileWayishly(GHC,ghc/STBase,lhs,		/*-split-objs STBase*/ 		-fglasgow-exts)
+CompileWayishly(GHC,ghc/IOBase,lhs,		/*-split-objs IOBase*/ 		-fglasgow-exts)
+CompileWayishly(GHC,ghc/ArrBase,lhs,		/*-split-objs ArrBase*/		-fglasgow-exts)
+CompileWayishly(GHC,ghc/PrelRead,lhs,		/*-split-objs PrelRead*/ 	-fglasgow-exts)
+CompileWayishly(GHC,ghc/PrelList,lhs,		/*-split-objs PrelList*/)
+CompileWayishly(GHC,ghc/PrelNum,lhs,		/*-split-objs PrelNum*/ 	-fglasgow-exts)
+CompileWayishly(GHC,ghc/PrelTup,lhs,		/*-split-objs PrelTup*/)
+CompileWayishly(GHC,ghc/PrelIO,lhs,		/*-split-objs PrelIO*/ 		-fglasgow-exts)
+CompileWayishly(GHC,ghc/IOHandle,lhs,		/*-split-objs IOHandle*/	-fglasgow-exts)
+CompileWayishly(GHC,ghc/GHCerr,lhs,		/*-split-objs GHCerr*/ 		-fglasgow-exts)
+CompileWayishly(GHC,ghc/GHCmain,lhs,		/*-split-objs GHCmain*/ 	-fglasgow-exts)
+
+CompileWayishly(GHC,glaExts/Foreign,lhs,	/*-split-objs Foreign*/ 	-fglasgow-exts)
+CompileWayishly(GHC,glaExts/ST,lhs,		/*-split-objs ST*/ 		-fglasgow-exts)
+CompileWayishly(GHC,glaExts/PackedString,lhs,	/*-split-objs PackedString*/ 	-fglasgow-exts)
+
+
+CompileWayishly(GHC,concurrent/Channel,lhs,)
+CompileWayishly(GHC,concurrent/ChannelVar,lhs,)
+CompileWayishly(GHC,concurrent/Merge,lhs,-iconcurrent)
+CompileWayishly(GHC,concurrent/Parallel,lhs,-fglasgow-exts)
+CompileWayishly(GHC,concurrent/SampleVar,lhs,)
+CompileWayishly(GHC,concurrent/Semaphore,lhs,)
+CompileWayishly(GHC,concurrent/Concurrent,lhs,-iconcurrent)
+
+/****************************************************************
+*								*
+* misc "make" targets -- depend, clean, tags			*
+*								*
+****************************************************************/
+
+hc-files : $(BASIC_HS:.lhs=.hc)
+
+/* this is a BAD idea!
+ExtraStuffToClean( $(SRCS_C) )
+   without the .hc files, the distrib cannot boot itself
+*/
+ExtraStuffToBeVeryClean( $(SRCS_C) )
+ExtraStuffToBeVeryClean( $(STD_VERY_CLEAN) )
+
+ClearTagsFile()
+/* Ugly but OK? [WDP 94/09] */
+HsTagsTarget( */[A-Z]*.*hs )
+HSTAGS_OPTS=-cpp -fglasgow-exts
+
+/* should be *LAST* */
+#if HaskellCompilerType != HC_USE_HC_FILES
+    /* otherwise, the dependencies jeopardize our .hc files --
+	which are all we have! */
+MAIN_INCLUDE_DIR = $(TOP_PWD)/$(CURRENT_DIR)/$(GHC_INCLUDES)
+
+MKDEPENDHS_OPTS= \
+IfBuild_mc(-s mc) \
+IfBuild_mr(-s mr) \
+IfBuild_mt(-s mt) \
+IfBuild_mp(-s mp) \
+IfBuild_mg(-s mg) \
+IfBuild_2s(-s 2s) \
+IfBuild_1s(-s 1s) \
+IfBuild_du(-s du) \
+IfBuild_p(-s p) \
+IfBuild_t(-s t) \
+IfBuild_a(-s a) \
+IfBuild_b(-s b) \
+IfBuild_c(-s c) \
+IfBuild_d(-s d) \
+IfBuild_e(-s e) \
+IfBuild_f(-s f) \
+IfBuild_g(-s g) \
+IfBuild_h(-s h) \
+IfBuild_i(-s i) \
+IfBuild_j(-s j) \
+IfBuild_k(-s k) \
+IfBuild_l(-s l) \
+IfBuild_m(-s m) \
+IfBuild_n(-s n) \
+IfBuild_o(-s o) \
+IfBuild_A(-s A) \
+IfBuild_B(-s B) \
+-o hc -I$(MAIN_INCLUDE_DIR) 
+
+HaskellDependTarget( $(BASIC_HS) )
+#endif

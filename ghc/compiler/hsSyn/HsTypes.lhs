@@ -11,33 +11,36 @@ you get part of GHC.
 #include "HsVersions.h"
 
 module HsTypes (
-	PolyType(..), MonoType(..),
+	HsType(..), HsTyVar(..),
 	SYN_IE(Context), SYN_IE(ClassAssertion)
 
-#ifdef COMPILING_GHC
-	, pprParendPolyType
-	, pprParendMonoType, pprContext
-	, extractMonoTyNames, extractCtxtTyNames
-	, cmpPolyType, cmpMonoType, cmpContext
-#endif
+	, mkHsForAllTy
+	, getTyVarName, replaceTyVarName
+	, pprParendHsType
+	, pprContext
+	, cmpHsType, cmpContext
     ) where
 
-#ifdef COMPILING_GHC
 IMP_Ubiq()
 
 import Outputable	( interppSP, ifnotPprForUser )
+import Kind		( Kind {- instance Outputable -} )
 import Pretty
 import Util		( thenCmp, cmpList, isIn, panic# )
-
-#endif {- COMPILING_GHC -}
 \end{code}
 
 This is the syntax for types as seen in type signatures.
 
 \begin{code}
-data PolyType name
+type Context name = [ClassAssertion name]
+
+type ClassAssertion name = (name, HsType name)
+	-- The type is usually a type variable, but it
+	-- doesn't have to be when reading interface files
+
+data HsType name
   = HsPreForAllTy	(Context name)
-			(MonoType name)
+			(HsType name)
 
 	-- The renamer turns HsPreForAllTys into HsForAllTys when they
 	-- occur in signatures, to make the binding of variables
@@ -45,90 +48,99 @@ data PolyType name
 	-- non-COMPILING_GHC code, because you probably want to do the
 	-- same thing.
 
-  | HsForAllTy		[name]
+  | HsForAllTy		[HsTyVar name]
 			(Context name)
-			(MonoType name)
+			(HsType name)
 
-type Context name = [ClassAssertion name]
-
-type ClassAssertion name = (name, name)
-
-data MonoType name
-  = MonoTyVar		name		-- Type variable
+  | MonoTyVar		name		-- Type variable
 
   | MonoTyApp		name		-- Type constructor or variable
-			[MonoType name]
+			[HsType name]
 
     -- We *could* have a "MonoTyCon name" equiv to "MonoTyApp name []"
     -- (for efficiency, what?)  WDP 96/02/18
 
-  | MonoFunTy		(MonoType name) -- function type
-			(MonoType name)
+  | MonoFunTy		(HsType name) -- function type
+			(HsType name)
 
-  | MonoListTy		(MonoType name) -- list type
-  | MonoTupleTy		[MonoType name] -- tuple type (length gives arity)
+  | MonoListTy		name		-- The list TyCon name
+			(HsType name)	-- Element type
 
-#ifdef COMPILING_GHC
+  | MonoTupleTy		name		-- The tuple TyCon name
+			[HsType name]	-- Element types (length gives arity)
+
   -- these next two are only used in unfoldings in interfaces
   | MonoDictTy		name	-- Class
-			(MonoType name)
+			(HsType name)
 
-  | MonoForAllTy	[(name, Kind)]
-			(MonoType name)
+mkHsForAllTy []  []   ty = ty
+mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
+
+data HsTyVar name
+  = UserTyVar name
+  | IfaceTyVar name Kind
 	-- *** NOTA BENE *** A "monotype" in a pragma can have
 	-- for-alls in it, (mostly to do with dictionaries).  These
 	-- must be explicitly Kinded.
 
-#endif {- COMPILING_GHC -}
+getTyVarName (UserTyVar n)    = n
+getTyVarName (IfaceTyVar n _) = n
+
+replaceTyVarName :: HsTyVar name1 -> name2 -> HsTyVar name2
+replaceTyVarName (UserTyVar n)    n' = UserTyVar n'
+replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
 \end{code}
 
-This is used in various places:
+
+%************************************************************************
+%*									*
+\subsection{Pretty printing}
+%*									*
+%************************************************************************
+
 \begin{code}
-#ifdef COMPILING_GHC
+
+instance (Outputable name) => Outputable (HsType name) where
+    ppr = pprHsType
+
+instance (Outputable name) => Outputable (HsTyVar name) where
+    ppr sty (UserTyVar name) = ppr sty name
+    ppr sty (IfaceTyVar name kind) = ppCat [ppr sty name, ppStr "::", ppr sty kind]
+
+
+ppr_forall sty ctxt_prec [] [] ty
+   = ppr_mono_ty sty ctxt_prec ty
+ppr_forall sty ctxt_prec tvs ctxt ty
+   = ppSep [ppStr "_forall_", ppBracket (interppSP sty tvs),
+	    pprContext sty ctxt,  ppStr "=>",
+	    pprHsType sty ty]
+
 pprContext :: (Outputable name) => PprStyle -> (Context name) -> Pretty
-
-pprContext sty []	    = ppNil
-pprContext sty [(clas, ty)] = ppCat [ppr sty clas, ppr sty ty, ppStr "=>"]
+pprContext sty []	        = ppNil
 pprContext sty context
-  = ppBesides [ppLparen,
-	   ppInterleave ppComma (map pp_assert context),
-	   ppRparen, ppStr " =>"]
+  = ppCat [ppCurlies (ppIntersperse pp'SP (map ppr_assert context))]
   where
-    pp_assert (clas, ty)
-      = ppCat [ppr sty clas, ppr sty ty]
+    ppr_assert (clas, ty) = ppCat [ppr sty clas, ppr sty ty]
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (PolyType name) where
-    ppr sty (HsPreForAllTy ctxt ty)
-      = print_it sty ppNil ctxt ty
-    ppr sty (HsForAllTy [] ctxt ty)
-      = print_it sty ppNil ctxt ty
-    ppr sty (HsForAllTy tvs ctxt ty)
-      = print_it sty
-	    (ppBesides [ppStr "_forall_ ", interppSP sty tvs, ppStr " => "])
-	    ctxt ty
-
-print_it sty pp_forall ctxt ty
-  = ppCat [ifnotPprForUser sty pp_forall, -- print foralls unless PprForUser
-	   pprContext sty ctxt, ppr sty ty]
-
-pprParendPolyType :: Outputable name => PprStyle -> PolyType name -> Pretty
-pprParendPolyType sty ty = ppr sty ty -- ToDo: more later
-
-instance (Outputable name) => Outputable (MonoType name) where
-    ppr = pprMonoType
-
 pREC_TOP = (0 :: Int)
 pREC_FUN = (1 :: Int)
 pREC_CON = (2 :: Int)
 
+maybeParen :: Bool -> Pretty -> Pretty
+maybeParen True  p = ppParens p
+maybeParen False p = p
+	
 -- printing works more-or-less as for Types
 
-pprMonoType, pprParendMonoType :: (Outputable name) => PprStyle -> MonoType name -> Pretty
+pprHsType, pprParendHsType :: (Outputable name) => PprStyle -> HsType name -> Pretty
 
-pprMonoType sty ty  	 = ppr_mono_ty sty pREC_TOP ty
-pprParendMonoType sty ty = ppr_mono_ty sty pREC_CON ty
+pprHsType sty ty       = ppr_mono_ty sty pREC_TOP ty
+pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
+
+ppr_mono_ty sty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall sty ctxt_prec [] ctxt ty
+ppr_mono_ty sty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall sty ctxt_prec tvs ctxt ty
 
 ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr sty name
 
@@ -136,130 +148,98 @@ ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
   = let p1 = ppr_mono_ty sty pREC_FUN ty1
 	p2 = ppr_mono_ty sty pREC_TOP ty2
     in
-    if ctxt_prec < pREC_FUN then -- no parens needed
-	ppSep [p1, ppBeside (ppStr "-> ") p2]
-    else
-	ppSep [ppBeside ppLparen p1, ppBesides [ppStr "-> ", p2, ppRparen]]
+    maybeParen (ctxt_prec >= pREC_FUN)
+	       (ppSep [p1, ppBeside (ppStr "-> ") p2])
 
-ppr_mono_ty sty ctxt_prec (MonoTupleTy tys)
- = ppBesides [ppLparen, ppInterleave ppComma (map (ppr sty) tys), ppRparen]
+ppr_mono_ty sty ctxt_prec (MonoTupleTy _ tys)
+ = ppParens (ppInterleave ppComma (map (ppr sty) tys))
 
-ppr_mono_ty sty ctxt_prec (MonoListTy ty)
+ppr_mono_ty sty ctxt_prec (MonoListTy _ ty)
  = ppBesides [ppLbrack, ppr_mono_ty sty pREC_TOP ty, ppRbrack]
 
 ppr_mono_ty sty ctxt_prec (MonoTyApp tycon tys)
   = let pp_tycon = ppr sty tycon in
     if null tys then
 	pp_tycon
-    else if ctxt_prec < pREC_CON then -- no parens needed
-	ppCat [pp_tycon, ppInterleave ppNil (map (ppr_mono_ty sty pREC_CON) tys)]
-    else
-	ppBesides [ ppLparen, pp_tycon, ppSP,
-	       ppInterleave ppNil (map (ppr_mono_ty sty pREC_CON) tys), ppRparen ]
+    else 
+	maybeParen (ctxt_prec >= pREC_CON)
+		   (ppCat [pp_tycon, ppInterleave ppNil (map (ppr_mono_ty sty pREC_CON) tys)])
 
--- unfoldings only
 ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
-  = ppBesides [ppStr "{{", ppr sty clas, ppSP, ppr_mono_ty sty ctxt_prec ty, ppStr "}}"]
-
-#endif {- COMPILING_GHC -}
+  = ppCurlies (ppCat [ppr sty clas, ppr_mono_ty sty pREC_CON ty])
+	-- Curlies are temporary
 \end{code}
 
-\begin{code}
-#ifdef COMPILING_GHC
 
-extractCtxtTyNames :: Eq name => Context  name -> [name]
-extractMonoTyNames :: Eq name => (name -> Bool) -> MonoType name -> [name]
-
-extractCtxtTyNames ctxt
-  = foldr get [] ctxt
-  where
-    get (clas, tv) acc
-      | tv `is_elem` acc = acc
-      | otherwise        = tv : acc
-
-    is_elem = isIn "extractCtxtTyNames"
-
-extractMonoTyNames is_tyvar_name ty
-  = get ty []
-  where
-    get (MonoTyApp con tys) acc = let
-				     rest = foldr get acc tys
-				  in
-				  if is_tyvar_name con && not (con `is_elem` rest)
-				  then con : rest
-				  else rest
-    get (MonoListTy ty)	    acc = get ty acc
-    get (MonoFunTy ty1 ty2) acc = get ty1 (get ty2 acc)
-    get (MonoDictTy _ ty)   acc = get ty acc
-    get (MonoTupleTy tys)   acc = foldr get acc tys
-    get (MonoTyVar tv)      acc
-      | tv `is_elem` acc	= acc
-      | otherwise		= tv : acc
-
-    is_elem = isIn "extractMonoTyNames"
-
-#endif {- COMPILING_GHC -}
-\end{code}
+%************************************************************************
+%*									*
+\subsection{Comparison}
+%*									*
+%************************************************************************
 
 We do define a specialised equality for these \tr{*Type} types; used
 in checking interfaces.  Most any other use is likely to be {\em
 wrong}, so be careful!
-\begin{code}
-#ifdef COMPILING_GHC
 
-cmpPolyType :: (a -> a -> TAG_) -> PolyType a -> PolyType a -> TAG_
-cmpMonoType :: (a -> a -> TAG_) -> MonoType a -> MonoType a -> TAG_
+\begin{code}
+cmpHsTyVar :: (a -> a -> TAG_) -> HsTyVar a -> HsTyVar a -> TAG_
+cmpHsType :: (a -> a -> TAG_) -> HsType a -> HsType a -> TAG_
 cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
+
+cmpHsTyVar cmp (UserTyVar v1)    (UserTyVar v2)    = v1 `cmp` v2
+cmpHsTyVar cmp (IfaceTyVar v1 _) (IfaceTyVar v2 _) = v1 `cmp` v2
+cmpHsTyVar cmp (UserTyVar _)	 other		   = LT_
+cmpHsTyVar cmp other1	 	 other2		   = GT_
+
 
 -- We assume that HsPreForAllTys have been smashed by now.
 # ifdef DEBUG
-cmpPolyType _ (HsPreForAllTy _ _) _ = panic# "cmpPolyType:HsPreForAllTy:1st arg"
-cmpPolyType _ _ (HsPreForAllTy _ _) = panic# "cmpPolyType:HsPreForAllTy:2nd arg"
+cmpHsType _ (HsPreForAllTy _ _) _ = panic# "cmpHsType:HsPreForAllTy:1st arg"
+cmpHsType _ _ (HsPreForAllTy _ _) = panic# "cmpHsType:HsPreForAllTy:2nd arg"
 # endif
 
-cmpPolyType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
-  = cmpList cmp tvs1 tvs2   `thenCmp`
-    cmpContext cmp c1 c2    `thenCmp`
-    cmpMonoType cmp t1 t2
+cmpHsType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
+  = cmpList (cmpHsTyVar cmp) tvs1 tvs2  `thenCmp`
+    cmpContext cmp c1 c2    		`thenCmp`
+    cmpHsType cmp t1 t2
 
------------
-cmpMonoType cmp (MonoTyVar n1) (MonoTyVar n2)
+cmpHsType cmp (MonoTyVar n1) (MonoTyVar n2)
   = cmp n1 n2
 
-cmpMonoType cmp (MonoTupleTy tys1) (MonoTupleTy tys2)
-  = cmpList (cmpMonoType cmp) tys1 tys2
-cmpMonoType cmp (MonoListTy ty1) (MonoListTy ty2)
-  = cmpMonoType cmp ty1 ty2
+cmpHsType cmp (MonoTupleTy _ tys1) (MonoTupleTy _ tys2)
+  = cmpList (cmpHsType cmp) tys1 tys2
+cmpHsType cmp (MonoListTy _ ty1) (MonoListTy _ ty2)
+  = cmpHsType cmp ty1 ty2
 
-cmpMonoType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
+cmpHsType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
   = cmp tc1 tc2 `thenCmp`
-    cmpList (cmpMonoType cmp) tys1 tys2
+    cmpList (cmpHsType cmp) tys1 tys2
 
-cmpMonoType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
-  = cmpMonoType cmp a1 a2 `thenCmp` cmpMonoType cmp b1 b2
+cmpHsType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
+  = cmpHsType cmp a1 a2 `thenCmp` cmpHsType cmp b1 b2
 
-cmpMonoType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
-  = cmp c1 c2 `thenCmp` cmpMonoType cmp ty1 ty2
+cmpHsType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
+  = cmp c1 c2 `thenCmp` cmpHsType cmp ty1 ty2
 
-cmpMonoType cmp ty1 ty2 -- tags must be different
+cmpHsType cmp ty1 ty2 -- tags must be different
   = let tag1 = tag ty1
 	tag2 = tag ty2
     in
     if tag1 _LT_ tag2 then LT_ else GT_
   where
     tag (MonoTyVar n1)		= (ILIT(1) :: FAST_INT)
-    tag (MonoTupleTy tys1)	= ILIT(2)
-    tag (MonoListTy ty1)	= ILIT(3)
+    tag (MonoTupleTy _ tys1)	= ILIT(2)
+    tag (MonoListTy _ ty1)	= ILIT(3)
     tag (MonoTyApp tc1 tys1)	= ILIT(4)
     tag (MonoFunTy a1 b1)	= ILIT(5)
     tag (MonoDictTy c1 ty1)	= ILIT(7)
+    tag (HsForAllTy _ _ _)	= ILIT(8)
+    tag (HsPreForAllTy _ _)	= ILIT(9)
 
 -------------------
 cmpContext cmp a b
   = cmpList cmp_ctxt a b
   where
-    cmp_ctxt (c1, tv1) (c2, tv2)
-      = cmp c1 c2 `thenCmp` cmp tv1 tv2
-
-#endif {- COMPILING_GHC -}
+    cmp_ctxt (c1, ty1) (c2, ty2)
+      = cmp c1 c2 `thenCmp` cmpHsType cmp ty1 ty2
 \end{code}

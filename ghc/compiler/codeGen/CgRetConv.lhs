@@ -29,7 +29,7 @@ import AbsCSyn		-- quite a few things
 import AbsCUtils	( mkAbstractCs, getAmodeRep,
 			  amodeCanSurviveGC
 			)
-import CgCompInfo	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
+import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG
 			)

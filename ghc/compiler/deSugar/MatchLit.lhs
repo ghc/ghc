@@ -12,7 +12,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- break match-ish and dsExpr-ish loops
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..),
-			  Match, HsBinds, Stmt, Qualifier, PolyType, ArithSeqInfo )
+			  Match, HsBinds, Stmt, Qualifier, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
 			  SYN_IE(TypecheckedPat)
 			)

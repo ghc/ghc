@@ -6,7 +6,10 @@ x%
 \begin{code}
 #include "HsVersions.h"
 
-module StgUtils ( mapStgBindeesRhs ) where
+module StgUtils
+	-- 	( mapStgBindeesRhs )		Dead code SLPJ Nov 96
+   where
+{-		DEAD CODE	SLPJ Nov 96
 
 IMP_Ubiq(){-uitous-}
 
@@ -19,6 +22,7 @@ This utility function simply applies the given function to every
 bindee in the program.
 
 \begin{code}
+
 mapStgBindeesBind :: (Id -> Id) -> StgBinding -> StgBinding
 
 mapStgBindeesBind fn (StgNonRec b rhs) = StgNonRec b (mapStgBindeesRhs fn rhs)
@@ -87,4 +91,6 @@ mapStgBindeesArg :: (Id -> Id) -> StgArg -> StgArg
 
 mapStgBindeesArg fn a@(StgLitArg _)	= a
 mapStgBindeesArg fn a@(StgVarArg id)  = StgVarArg (fn id)
+
+-}
 \end{code}

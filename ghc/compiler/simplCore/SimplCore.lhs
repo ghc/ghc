@@ -14,11 +14,6 @@ IMPORT_1_3(IO(hPutStr,stderr))
 import AnalFBWW		( analFBWW )
 import Bag		( isEmptyBag, foldBag )
 import BinderInfo	( BinderInfo{-instance Outputable-} )
-import CgCompInfo	( uNFOLDING_CREATION_THRESHOLD,
-			  uNFOLDING_USE_THRESHOLD,
-			  uNFOLDING_OVERRIDE_THRESHOLD,
-			  uNFOLDING_CON_DISCOUNT_WEIGHT
-			)
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 			  opt_D_show_passes,
 			  opt_D_simplifier_stats,
@@ -27,29 +22,34 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 			  opt_FoldrBuildOn,
 			  opt_ReportWhyUnfoldingsDisallowed,
 			  opt_ShowImportSpecs,
-			  opt_UnfoldingCreationThreshold,
-			  opt_UnfoldingOverrideThreshold,
-			  opt_UnfoldingUseThreshold
+			  opt_LiberateCaseThreshold
 			)
 import CoreLint		( lintCoreBindings )
 import CoreSyn
+import CoreUtils	( coreExprType )
 import CoreUnfold
-import CoreUtils	( substCoreBindings )
+import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( ghcExit )
 import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
-import Id		( idType, toplevelishId, idWantsToBeINLINEd,
-			  unfoldingUnfriendlyId, isWrapperId,
+import Id		( mkSysLocal, setIdVisibility,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
-			  lookupIdEnv, SYN_IE(IdEnv),
+ 			  lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
 			)
-import IdInfo		( mkUnfolding )
+import Name		( isExported, isLocallyDefined )
+import TyCon		( TyCon )
+import PrimOp		( PrimOp(..) )
+import PrelVals		( unpackCStringId, unpackCString2Id,
+			  integerZeroId, integerPlusOneId,
+			  integerPlusTwoId, integerMinusOneId
+			)
+import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts )
+import TysWiredIn	( stringTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
-import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
 import PprStyle		( PprStyle(..) )
@@ -62,16 +62,20 @@ import Specialise
 import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
 import TyVar		( nullTyVarEnv, GenTyVar{-instance Eq-} )
-import Unique		( Unique{-instance Eq-} )
-import UniqSupply	( splitUniqSupply )
-import Util		( panic{-ToDo:rm-} )
+import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
+import UniqSupply	( splitUniqSupply, getUnique )
+import Util		( mapAccumL, assertPanic, panic{-ToDo:rm-}, pprTrace, pprPanic )
+import SrcLoc		( noSrcLoc )
+import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
+import Bag
+import Maybes
+
 
 #ifndef OMIT_DEFORESTER
 import Deforest		( deforestProgram )
 import DefUtils		( deforestable )
 #endif
 
-isWrapperFor = panic "SimplCore.isWrapperFor (ToDo)"
 \end{code}
 
 \begin{code}
@@ -83,49 +87,38 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> FiniteMap TyCon [(Bool, [Maybe Type])]
 	  -> [CoreBinding]		-- input...
 	  -> IO
-	      ([CoreBinding],	-- results: program, plus...
-	       IdEnv Unfolding,	--  unfoldings to be exported from here
+	      ([CoreBinding],		-- results: program, plus...
 	      SpecialiseData)		--  specialisation data
 
 core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
-  = if null core_todos then -- very rare, I suspect...
-	-- well, we still must do some renumbering
-	return (
-	(substCoreBindings nullIdEnv nullTyVarEnv binds us,
-	 nullIdEnv,
-	 init_specdata)
-	)
-    else
-	(if do_verbose_core2core then
+  = 	-- Print heading
+     (if opt_D_verbose_core2core then
 	    hPutStr stderr "VERBOSE CORE-TO-CORE:\n"
-	 else return ()) >>
+      else return ())					 >>
 
-	-- better do the main business
-	foldl_mn do_core_pass
-		(binds, us, nullIdEnv, init_specdata, zeroSimplCount)
+	-- Do the main business
+     foldl_mn do_core_pass
+		(binds, us1, init_specdata, zeroSimplCount)
 		core_todos
-		>>= \ (processed_binds, _, inline_env, spec_data, simpl_stats) ->
+		>>= \ (processed_binds, _, spec_data, simpl_stats) ->
 
-	(if  opt_D_simplifier_stats
-	 then hPutStr stderr ("\nSimplifier Stats:\n")
-		>>
-	      hPutStr stderr (showSimplCount simpl_stats)
-		>>
-	      hPutStr stderr "\n"
-	 else return ()
-	) >>
+	-- Do the final tidy-up
+     let
+	final_binds = tidyCorePgm module_name us2 processed_binds
+     in
 
-	return (processed_binds, inline_env, spec_data)
+	-- Report statistics
+     (if  opt_D_simplifier_stats then
+	 hPutStr stderr ("\nSimplifier Stats:\n")	>>
+	 hPutStr stderr (showSimplCount simpl_stats)	>>
+	 hPutStr stderr "\n"
+      else return ())						>>
+
+	-- 
+    return (final_binds, spec_data)
   where
+    (us1, us2) = splitUniqSupply us
     init_specdata = initSpecData local_tycons tycon_specs
-
-    do_verbose_core2core = opt_D_verbose_core2core
-
-    lib_case_threshold	-- ToDo: HACK HACK HACK : FIX ME FIX ME FIX ME
-			-- Use 4x a known threshold
-      = case opt_UnfoldingOverrideThreshold of
-	  Nothing -> 4 * uNFOLDING_USE_THRESHOLD
-	  Just xx -> 4 * xx
 
     -------------
     core_linter = if opt_DoCoreLinting
@@ -133,7 +126,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 		  else ( \ whodunnit spec_done binds -> binds )
 
     --------------
-    do_core_pass info@(binds, us, inline_env, spec_data, simpl_stats) to_do
+    do_core_pass info@(binds, us, spec_data, simpl_stats) to_do
       = let
 	    (us1, us2) = splitUniqSupply us
     	in
@@ -144,7 +137,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 					 then " (foldr/build)" else "") >>
 	       case (simplifyPgm binds simpl_sw_chkr simpl_stats us1) of
 		 (p, it_cnt, simpl_stats2)
-		   -> end_pass False us2 p inline_env spec_data simpl_stats2
+		   -> end_pass False us2 p spec_data simpl_stats2
 			       ("Simplify (" ++ show it_cnt ++ ")"
 				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
 				    then " foldr/build" else "")
@@ -153,49 +146,37 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	    -> _scc_ "CoreDoFoldrBuildWorkerWrapper"
 	       begin_pass "FBWW" >>
 	       case (mkFoldrBuildWW us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW" }
+	       end_pass False us2 binds2 spec_data simpl_stats "FBWW" }
 
 	  CoreDoFoldrBuildWWAnal
 	    -> _scc_ "CoreDoFoldrBuildWWAnal"
 	       begin_pass "AnalFBWW" >>
 	       case (analFBWW binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW" }
+	       end_pass False us2 binds2 spec_data simpl_stats "AnalFBWW" }
 
 	  CoreLiberateCase
 	    -> _scc_ "LiberateCase"
 	       begin_pass "LiberateCase" >>
-	       case (liberateCase lib_case_threshold binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "LiberateCase" }
-
-	  CoreDoCalcInlinings1	-- avoid inlinings w/ cost-centres
-	    -> _scc_ "CoreInlinings1"
-	       begin_pass "CalcInlinings" >>
-	       case (calcInlinings False inline_env binds) of { inline_env2 ->
-	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings" }
-
-	  CoreDoCalcInlinings2  -- allow inlinings w/ cost-centres
-	    -> _scc_ "CoreInlinings2"
-	       begin_pass "CalcInlinings" >>
-	       case (calcInlinings True inline_env binds) of { inline_env2 ->
-	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings" }
+	       case (liberateCase opt_LiberateCaseThreshold binds) of { binds2 ->
+	       end_pass False us2 binds2 spec_data simpl_stats "LiberateCase" }
 
 	  CoreDoFloatInwards
 	    -> _scc_ "FloatInwards"
 	       begin_pass "FloatIn" >>
 	       case (floatInwards binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn" }
+	       end_pass False us2 binds2 spec_data simpl_stats "FloatIn" }
 
 	  CoreDoFullLaziness
 	    -> _scc_ "CoreFloating"
 	       begin_pass "FloatOut" >>
 	       case (floatOutwards us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatOut" }
+	       end_pass False us2 binds2 spec_data simpl_stats "FloatOut" }
 
 	  CoreDoStaticArgs
 	    -> _scc_ "CoreStaticArgs"
 	       begin_pass "StaticArgs" >>
 	       case (doStaticArgs binds us1) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StaticArgs" }
+	       end_pass False us2 binds2 spec_data simpl_stats "StaticArgs" }
 		-- Binds really should be dependency-analysed for static-
 		-- arg transformation... Not to worry, they probably are.
 		-- (I don't think it *dies* if they aren't [WDP 94/04/15])
@@ -204,7 +185,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	    -> _scc_ "CoreStranal"
 	       begin_pass "StrAnal" >>
 	       case (saWwTopBinds us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StrAnal" }
+	       end_pass False us2 binds2 spec_data simpl_stats "StrAnal" }
 
 	  CoreDoSpecialising
 	    -> _scc_ "Specialise"
@@ -227,7 +208,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 		   else
 			return ()) >>
 
-		   end_pass False us2 p inline_env spec_data2 simpl_stats "Specialise"
+		   end_pass False us2 p spec_data2 simpl_stats "Specialise"
 	       }
 
 	  CoreDoDeforest
@@ -237,11 +218,11 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	    -> _scc_ "Deforestation"
 	       begin_pass "Deforestation" >>
 	       case (deforestProgram binds us1) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation" }
+	       end_pass False us2 binds2 spec_data simpl_stats "Deforestation" }
 #endif
 
 	  CoreDoPrintCore	-- print result of last pass
-	    -> end_pass True us2 binds inline_env spec_data simpl_stats "Print"
+	    -> end_pass True us2 binds spec_data simpl_stats "Print"
 
     -------------------------------------------------
 
@@ -250,12 +231,12 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	then \ what -> hPutStr stderr ("*** Core2Core: "++what++"\n")
 	else \ what -> return ()
 
-    end_pass print us2 binds2 inline_env2
+    end_pass print us2 binds2
 	     spec_data2@(SpecData spec_done _ _ _ _ _ _ _)
 	     simpl_stats2 what
       = -- report verbosely, if required
-	(if (do_verbose_core2core && not print) ||
-	    (print && not do_verbose_core2core)
+	(if (opt_D_verbose_core2core && not print) ||
+	    (print && not opt_D_verbose_core2core)
 	 then
 	    hPutStr stderr ("\n*** "++what++":\n")
 		>>
@@ -271,7 +252,6 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	return
 	(linted_binds,	-- processed binds, possibly run thru CoreLint
 	 us2,		-- UniqueSupply for the next guy
-	 inline_env2,	-- possibly-updated inline env
 	 spec_data2,	-- possibly-updated specialisation info
 	 simpl_stats2	-- accumulated simplifier stats
 	)
@@ -279,265 +259,433 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 -- here so it can be inlined...
 foldl_mn f z []     = return z
 foldl_mn f z (x:xs) = f z x	>>= \ zz ->
-		     foldl_mn f zz xs
+		      foldl_mn f zz xs
 \end{code}
 
---- ToDo: maybe move elsewhere ---
 
-For top-level, exported binders that either (a)~have been INLINEd by
-the programmer or (b)~are sufficiently ``simple'' that they should be
-inlined, we want to record this info in a suitable IdEnv.
 
-But: if something has a ``wrapper unfolding,'' we do NOT automatically
-give it a regular unfolding (exception below).  We usually assume its
-worker will get a ``regular'' unfolding.  We can then treat these two
-levels of unfolding separately (we tend to be very friendly towards
-wrapper unfoldings, for example), giving more fine-tuned control.
+%************************************************************************
+%*									*
+\subsection[SimplCore-indirections]{Eliminating indirections in Core code, and globalising}
+%*									*
+%************************************************************************
 
-The exception is: If the ``regular unfolding'' mentions no other
-global Ids (i.e., it's all PrimOps and cases and local Ids) then we
-assume it must be really good and we take it anyway.
+Several tasks are done by @tidyCorePgm@
 
-We also need to check that everything in the RHS (values and types)
-will be visible on the other side of an interface, too.
+1.  Eliminate indirections.  The point here is to transform
+	x_local = E
+	x_exported = x_local
+    ==>
+	x_exported = E
+
+2.  Make certain top-level bindings into Globals. The point is that 
+    Global things get externally-visible labels at code generation
+    time
+
+3.  Make the representation of NoRep literals explicit, and
+    float their bindings to the top level
+
+4.  Convert
+	case x of {...; x' -> ...x'...}
+    ==>
+	case x of {...; _  -> ...x... }
+    See notes in SimplCase.lhs, near simplDefault for the reasoning here.
+
+5.  *Mangle* cases involving fork# and par# in the discriminant.  The
+    original templates for these primops (see @PrelVals.lhs@) constructed
+    case expressions with boolean results solely to fool the strictness
+    analyzer, the simplifier, and anyone else who might want to fool with
+    the evaluation order.  At this point in the compiler our evaluation
+    order is safe.  Therefore, we convert expressions of the form:
+
+    	case par# e of
+    	  True -> rhs
+    	  False -> parError#
+    ==>
+    	case par# e of
+    	  _ -> rhs
+
+6.	Eliminate polymorphic case expressions.  We can't generate code for them yet.
+
+Eliminate indirections
+~~~~~~~~~~~~~~~~~~~~~~
+In @elimIndirections@, we look for things at the top-level of the form...
+\begin{verbatim}
+	x_local = ....
+	x_exported = x_local
+\end{verbatim}
+In cases we find like this, we go {\em backwards} and replace
+\tr{x_local} with \tr{x_exported}.  This save a gratuitous jump
+(from \tr{x_exported} to \tr{x_local}), and makes strictness
+information propagate better.
+
+We rely on prior eta reduction to simplify things like
+\begin{verbatim}
+	x_exported = /\ tyvars -> x_local tyvars
+==>
+	x_exported = x_local
+\end{verbatim}
+
+If more than one exported thing is equal to a local thing (i.e., the
+local thing really is shared), then we do one only:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local
+	x_exported2 = x_local
+==>
+	x_exported1 = ....
+
+	x_exported2 = x_exported1
+\end{verbatim}
+
+There's a possibility of leaving unchanged something like this:
+\begin{verbatim}
+	x_local = ....
+	x_exported1 = x_local Int
+\end{verbatim}
+By the time we've thrown away the types in STG land this 
+could be eliminated.  But I don't think it's very common
+and it's dangerous to do this fiddling in STG land 
+because we might elminate a binding that's mentioned in the
+unfolding for something.
+
+General Strategy: first collect the info; then make a \tr{Id -> Id} mapping.
+Then blast the whole program (LHSs as well as RHSs) with it.
+
+
 
 \begin{code}
-calcInlinings :: Bool	-- True => inlinings with _scc_s are OK
-	      -> IdEnv Unfolding
-	      -> [CoreBinding]
-	      -> IdEnv Unfolding
+tidyCorePgm :: Module -> UniqSupply -> [CoreBinding] -> [CoreBinding]
 
-calcInlinings scc_s_OK inline_env_so_far top_binds
-  = let
-	result = foldl calci inline_env_so_far top_binds
-    in
-    --pprTrace "inline env:\n" (ppAboves (map pp_item (getIdEnvMapping result)))
-    result
+tidyCorePgm mod us binds_in
+  = initTM mod indirection_env us $
+    tidyTopBindings (catMaybes reduced_binds)	`thenTM` \ binds ->
+    returnTM (bagToList binds)
   where
-    pp_item (binder, details)
-      = ppCat [ppr PprDebug binder, ppStr "=>", pp_det details]
-      where
-    	pp_det NoUnfolding   = ppStr "_N_"
---LATER:	pp_det (IWantToBeINLINEd _) = ppStr "INLINE"
-    	pp_det (CoreUnfolding (SimpleUnfolding _ guide expr))
-    	  = ppAbove (ppr PprDebug guide) (ppr PprDebug expr)
-    	pp_det other	    	    = ppStr "???"
+    (indirection_env, reduced_binds) = mapAccumL try_bind nullIdEnv binds_in
 
-    ------------
-    my_trace =  if opt_ReportWhyUnfoldingsDisallowed
-		then trace
-		else \ msg stuff -> stuff
+    try_bind :: IdEnv Id -> CoreBinding -> (IdEnv Id, Maybe CoreBinding)
+    try_bind env_so_far
+	     (NonRec exported_binder (Var local_id))
+	| isExported exported_binder &&		-- Only if this is exported
+	  isLocallyDefined local_id &&		-- Only if this one is defined in this
+	  not (isExported local_id) &&		-- 	module, so that we *can* change its
+					  	-- 	binding to be the exported thing!
+	  not (maybeToBool (lookupIdEnv env_so_far local_id))
+						-- Only if not already substituted for
+	= (addOneToIdEnv env_so_far local_id exported_binder, Nothing)
 
-    (unfolding_creation_threshold, explicit_creation_threshold)
-      = case opt_UnfoldingCreationThreshold of
-    	  Nothing -> (uNFOLDING_CREATION_THRESHOLD, False)
-	  Just xx -> (xx, True)
-
-    unfold_use_threshold
-      = case opt_UnfoldingUseThreshold of
-	  Nothing -> uNFOLDING_USE_THRESHOLD
-	  Just xx -> xx
-
-    unfold_override_threshold
-      = case opt_UnfoldingOverrideThreshold of
-	  Nothing -> uNFOLDING_OVERRIDE_THRESHOLD
-	  Just xx -> xx
-
-    con_discount_weight = uNFOLDING_CON_DISCOUNT_WEIGHT
-
-    calci inline_env (Rec pairs)
-      = foldl (calc True{-recursive-}) inline_env pairs
-
-    calci inline_env bind@(NonRec binder rhs)
-      = calc False{-not recursive-} inline_env (binder, rhs)
-
-    ---------------------------------------
-
-    calc is_recursive inline_env (binder, rhs)
-      | not (toplevelishId binder)
-      = --pprTrace "giving up on not top-level:" (ppr PprDebug binder)
-	ignominious_defeat
-
-      | rhs_mentions_an_unmentionable
-      || (not explicit_INLINE_requested
-	  && (rhs_looks_like_a_caf || guidance_size_too_big))
-      = let
-	    my_my_trace
-	      = if explicit_INLINE_requested
-		&& not (isWrapperId binder) -- these always claim to be INLINEd
-		&& not have_inlining_already
-		then trace  		    -- we'd better have a look...
-		else my_trace
-
-	    which = if scc_s_OK then " (late):" else " (early):"
-    	in
-	my_my_trace ("unfolding disallowed for"++which++(ppShow 80 (ppr PprDebug binder))) (
-	ignominious_defeat
-	)
-
-      | rhs `isWrapperFor` binder
-	-- Don't add an explicit "unfolding"; let the worker/wrapper
-	-- stuff do its thing.  INLINE things don't get w/w'd, so
-	-- they will be OK.
-      = ignominious_defeat
-
-#if ! OMIT_DEFORESTER
-	-- For the deforester: bypass the barbed wire for recursive
-	-- functions that want to be inlined and are tagged deforestable
-	-- by the user, allowing these things to be communicated
-	-- across module boundaries.
-
-      | is_recursive &&
-	explicit_INLINE_requested &&
-	deforestable binder &&
-	scc_s_OK			-- hack, only get them in
-					-- calc_inlinings2
-      = glorious_success UnfoldAlways
-#endif
-
-      | is_recursive && not rhs_looks_like_a_data_val
-	-- The only recursive defns we are prepared to tolerate at the
-	-- moment is top-level very-obviously-a-data-value ones.
-	-- We *need* these for dictionaries to be exported!
-      = --pprTrace "giving up on rec:" (ppr PprDebug binder)
-    	ignominious_defeat
-
-	-- Not really interested unless it's exported, but doing it
-	-- this way (not worrying about export-ness) gets us all the
-	-- workers/specs, etc., too; which we will need for generating
-	-- interfaces.  We are also not interested if this binder is
-	-- in the environment we already have (perhaps from a previous
-	-- run of calcInlinings -- "earlier" is presumed to mean
-	-- "better").
-
-      | explicit_INLINE_requested
-      = glorious_success UnfoldAlways
-
-      | otherwise
-      = glorious_success guidance
-
-      where
-	guidance
-	  = calcUnfoldingGuidance scc_s_OK max_out_threshold rhs
-	  where
-    	    max_out_threshold = if explicit_INLINE_requested
-				then 100000 -- you asked for it, you got it
-				else unfolding_creation_threshold
-
-	guidance_size
-	  = case guidance of
-	      UnfoldAlways  	    	  -> 0 -- *extremely* small
-	      UnfoldIfGoodArgs _ _ _ size -> size
-
-	guidance_size_too_big
-	    -- Does the guidance suggest that this unfolding will
-	    -- be of no use *no matter* the arguments given to it?
-	    -- Could be more sophisticated...
-	  = not (couldBeSmallEnoughToInline con_discount_weight unfold_use_threshold guidance)
-
-
-	rhs_looks_like_a_caf = not (whnfOrBottom rhs)
-
-	rhs_looks_like_a_data_val
-	  = case (collectBinders rhs) of
-	      (_, _, [], Con _ _) -> True
-	      other		  -> False
-
-	rhs_arg_tys
-	  = case (collectBinders rhs) of
-	      (_, _, val_binders, _) -> map idType val_binders
-
-	(mentioned_ids, _, _, mentions_litlit)
-	  = mentionedInUnfolding (\x -> x) rhs
-
-	rhs_mentions_an_unmentionable
-	  = foldBag (||) unfoldingUnfriendlyId False mentioned_ids
-	    || mentions_litlit
-	    -- ToDo: probably need to chk tycons/classes...
-
-	mentions_no_other_ids = isEmptyBag mentioned_ids
-
-	explicit_INLINE_requested
-	    -- did it come from a user {-# INLINE ... #-}?
-	    -- (Warning: must avoid including wrappers.)
-	  = idWantsToBeINLINEd binder
-	    && not (rhs `isWrapperFor` binder)
-
-	have_inlining_already = maybeToBool (lookupIdEnv inline_env binder)
-
-	ignominious_defeat = inline_env  -- just give back what we got
-
-	{-
-	    "glorious_success" is ours if we've found a suitable unfolding.
-
-	    But we check for a couple of fine points.
-
-	    (1) If this Id already has an inlining in the inline_env,
-		we don't automatically take it -- the earlier one is
-		"likely" to be better.
-
-		But if the new one doesn't mention any other global
-		Ids, and it's pretty small (< UnfoldingOverrideThreshold),
-		then we take the chance that the new one *is* better.
-
-	    (2) If we have an Id w/ a worker/wrapper split (with
-		an unfolding for the wrapper), we tend to want to keep
-		it -- and *nuke* any inlining that we conjured up
-		earlier.
-
-		But, again, if this unfolding doesn't mention any
-		other global Ids (and small enough), then it is
-		probably better than the worker/wrappery, so we take
-		it.
-	-}
-	glorious_success guidance
-	  = let
-		new_env = addOneToIdEnv inline_env binder (mkUnfolding guidance rhs)
-
-		foldr_building = opt_FoldrBuildOn
-	    in
-	    if (not have_inlining_already) then
-		-- Not in env: we take it no matter what
-		-- NB: we could check for worker/wrapper-ness,
-		-- but the truth is we probably haven't run
-		-- the strictness analyser yet.
-		new_env
-
-	    else if explicit_INLINE_requested then
-		-- If it was a user INLINE, then we know it's already
-		-- in the inline_env; we stick with what we already
-		-- have.
-		--pprTrace "giving up on INLINE:" (ppr PprDebug binder)
-		ignominious_defeat
-
-	    else if isWrapperId binder then
-		-- It's in the env, but we have since worker-wrapperised;
-		-- we either take this new one (because it's so good),
-		-- or we *undo* the one in the inline_env, so the
-		-- wrapper-inlining will take over.
-
-		if mentions_no_other_ids {- *** && size <= unfold_override_threshold -} then
-		    new_env
-		else
-		    delOneFromIdEnv inline_env binder
-
-	    else
-		-- It's in the env, nothing to do w/ worker wrapper;
-		-- we'll take it if it is better.
-
-		if not foldr_building	-- ANDY hates us... (see below)
-		&& mentions_no_other_ids
-		&& guidance_size <= unfold_override_threshold then
-		    new_env
-		else
-		    --pprTrace "giving up on final hurdle:" (ppCat [ppr PprDebug binder, ppInt guidance_size, ppInt unfold_override_threshold])
-		    ignominious_defeat -- and at the last hurdle, too!
+    try_bind env_so_far bind
+	= (env_so_far, Just bind)
 \end{code}
 
-ANDY, on the hatred of the check above; why obliterate it?  Consider
+Top level bindings
+~~~~~~~~~~~~~~~~~~
+\begin{code}
+tidyTopBindings [] = returnTM emptyBag
+tidyTopBindings (b:bs)
+  = tidyTopBinding  b		$
+    tidyTopBindings bs
 
- head xs = foldr (\ x _ -> x) (_|_) xs
+tidyTopBinding :: CoreBinding
+	       -> TidyM (Bag CoreBinding)
+	       -> TidyM (Bag CoreBinding)
 
-This then is exported via a pragma. However,
-*if* you include the extra code above, you will
-export the non-foldr/build version.
+tidyTopBinding (NonRec bndr rhs) thing_inside
+  = getFloats (tidyCoreExpr rhs)		`thenTM` \ (rhs',floats) ->
+    mungeTopBinder bndr				$ \ bndr' ->
+    thing_inside 				`thenTM` \ binds ->
+    returnTM ((floats `snocBag` NonRec bndr' rhs') `unionBags` binds)
+
+tidyTopBinding (Rec pairs) thing_inside
+  = mungeTopBinders binders			$ \ binders' ->
+    getFloats (mapTM tidyCoreExpr rhss)		`thenTM` \ (rhss', floats) ->
+    thing_inside				`thenTM` \ binds_inside ->
+    returnTM ((floats `snocBag` Rec (binders' `zip` rhss')) `unionBags` binds_inside)
+  where
+    (binders, rhss) = unzip pairs
+\end{code}
+
+
+Local Bindings
+~~~~~~~~~~~~~~
+\begin{code}
+tidyCoreBinding (NonRec bndr rhs)
+  = tidyCoreExpr rhs		`thenTM` \ rhs' ->
+    returnTM (NonRec bndr rhs')
+
+tidyCoreBinding (Rec pairs)
+  = mapTM do_one pairs	`thenTM` \ pairs' ->
+    returnTM (Rec pairs')
+  where
+    do_one (bndr,rhs) = tidyCoreExpr rhs	`thenTM` \ rhs' ->
+			returnTM (bndr, rhs')
+
+\end{code}
+
+
+Expressions
+~~~~~~~~~~~
+\begin{code}
+tidyCoreExpr (Var v) = lookupTM v	`thenTM` \ v' ->
+		       returnTM (Var v')
+
+tidyCoreExpr (Lit lit)
+  = litToRep lit	`thenTM` \ (_, lit_expr) ->
+    returnTM lit_expr
+
+tidyCoreExpr (App fun arg)
+  = tidyCoreExpr fun	`thenTM` \ fun' ->
+    tidyCoreArg arg	`thenTM` \ arg' ->
+    returnTM (App fun' arg')
+
+tidyCoreExpr (Con con args)
+  = mapTM tidyCoreArg args	`thenTM` \ args' ->
+    returnTM (Con con args')
+
+tidyCoreExpr (Prim prim args)
+  = mapTM tidyCoreArg args	`thenTM` \ args' ->
+    returnTM (Prim prim args')
+
+tidyCoreExpr (Lam bndr body)
+  = tidyCoreExpr body		`thenTM` \ body' ->
+    returnTM (Lam bndr body')
+
+tidyCoreExpr (Let bind body)
+  = tidyCoreBinding bind	`thenTM` \ bind' ->
+    tidyCoreExpr body		`thenTM` \ body' ->
+    returnTM (Let bind' body')
+
+tidyCoreExpr (SCC cc body)
+  = tidyCoreExpr body		`thenTM` \ body' ->
+    returnTM (SCC cc body')
+
+tidyCoreExpr (Coerce coercion ty body)
+  = tidyCoreExpr body		`thenTM` \ body' ->
+    returnTM (Coerce coercion ty body')
+
+-- Wierd case for par, seq, fork etc. See notes above.
+tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
+  | funnyParallelOp op
+  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
+    tidyCoreExpr rhs			`thenTM` \ rhs' ->
+    returnTM (Case scrut' (PrimAlts [] (BindDefault binder rhs')))
+
+-- Eliminate polymorphic case, for which we can't generate code just yet
+tidyCoreExpr (Case scrut (AlgAlts [] (BindDefault deflt_bndr rhs)))
+  | not (maybeToBool (maybeAppSpecDataTyConExpandingDicts (coreExprType scrut)))
+  = pprTrace "Warning: discarding polymophic case:" (ppr PprDebug scrut) $
+    case scrut of
+	Var v -> extendEnvTM deflt_bndr v (tidyCoreExpr rhs)
+	other -> tidyCoreExpr (Let (NonRec deflt_bndr scrut) rhs)
+  
+tidyCoreExpr (Case scrut alts)
+  = tidyCoreExpr scrut			`thenTM` \ scrut' ->
+    tidy_alts alts			`thenTM` \ alts' ->
+    returnTM (Case scrut' alts')
+  where
+    tidy_alts (AlgAlts alts deflt)
+	= mapTM tidy_alg_alt alts	`thenTM` \ alts' ->
+	  tidy_deflt deflt		`thenTM` \ deflt' ->
+	  returnTM (AlgAlts alts' deflt')
+
+    tidy_alts (PrimAlts alts deflt)
+	= mapTM tidy_prim_alt alts	`thenTM` \ alts' ->
+	  tidy_deflt deflt		`thenTM` \ deflt' ->
+	  returnTM (PrimAlts alts' deflt')
+
+    tidy_alg_alt (con,bndrs,rhs) = tidyCoreExpr rhs	`thenTM` \ rhs' ->
+				   returnTM (con,bndrs,rhs')
+
+    tidy_prim_alt (lit,rhs) = tidyCoreExpr rhs	`thenTM` \ rhs' ->
+			      returnTM (lit,rhs')
+
+	-- We convert	case x of {...; x' -> ...x'...}
+	--	to
+	--		case x of {...; _  -> ...x... }
+	--
+	-- See notes in SimplCase.lhs, near simplDefault for the reasoning.
+	-- It's quite easily done: simply extend the environment to bind the
+	-- default binder to the scrutinee.
+
+    tidy_deflt NoDefault = returnTM NoDefault
+    tidy_deflt (BindDefault bndr rhs)
+	= extend_env (tidyCoreExpr rhs)	`thenTM` \ rhs' ->
+	  returnTM (BindDefault bndr rhs')
+	where
+ 	  extend_env = case scrut of
+			    Var v -> extendEnvTM bndr v
+			    other -> \x -> x
+\end{code}
+
+Arguments
+~~~~~~~~~
+\begin{code}
+tidyCoreArg :: CoreArg -> TidyM CoreArg
+
+tidyCoreArg (VarArg v)
+  = lookupTM v	`thenTM` \ v' ->
+    returnTM (VarArg v')
+
+tidyCoreArg (LitArg lit)
+  = litToRep lit		`thenTM` \ (lit_ty, lit_expr) ->
+    case lit_expr of
+	Var v -> returnTM (VarArg v)
+	Lit l -> returnTM (LitArg l)
+	other -> addTopFloat lit_ty lit_expr	`thenTM` \ v ->
+		 returnTM (VarArg v)
+
+tidyCoreArg (TyArg ty)   = returnTM (TyArg ty)
+tidyCoreArg (UsageArg u) = returnTM (UsageArg u)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[coreToStg-lits]{Converting literals}
+%*									*
+%************************************************************************
+
+Literals: the NoRep kind need to be de-no-rep'd.
+We always replace them with a simple variable, and float a suitable
+binding out to the top level.
+
+\begin{code}
+		     
+litToRep :: Literal -> TidyM (Type, CoreExpr)
+
+litToRep (NoRepStr s)
+  = returnTM (stringTy, rhs)
+  where
+    rhs = if (any is_NUL (_UNPK_ s))
+
+	  then	 -- Must cater for NULs in literal string
+		mkGenApp (Var unpackCString2Id)
+			 [LitArg (MachStr s),
+		      	  LitArg (mkMachInt (toInteger (_LENGTH_ s)))]
+
+	  else	-- No NULs in the string
+		App (Var unpackCStringId) (LitArg (MachStr s))
+
+    is_NUL c = c == '\0'
+\end{code}
+
+If an Integer is small enough (Haskell implementations must support
+Ints in the range $[-2^29+1, 2^29-1]$), wrap it up in @int2Integer@;
+otherwise, wrap with @litString2Integer@.
+
+\begin{code}
+litToRep (NoRepInteger i integer_ty)
+  = returnTM (integer_ty, rhs)
+  where
+    rhs | i == 0    = Var integerZeroId	  -- Extremely convenient to look out for
+  	| i == 1    = Var integerPlusOneId  -- a few very common Integer literals!
+  	| i == 2    = Var integerPlusTwoId
+  	| i == (-1) = Var integerMinusOneId
+  
+  	| i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
+	  i < tARGET_MAX_INT
+	= Prim Int2IntegerOp [LitArg (mkMachInt i)]
+  
+  	| otherwise 			-- Big, so start from a string
+	= Prim Addr2IntegerOp [LitArg (MachStr (_PK_ (show i)))]
+
+
+litToRep (NoRepRational r rational_ty)
+  = tidyCoreArg (LitArg (NoRepInteger (numerator   r) integer_ty))	`thenTM` \ num_arg ->
+    tidyCoreArg (LitArg (NoRepInteger (denominator r) integer_ty))	`thenTM` \ denom_arg ->
+    returnTM (rational_ty, Con ratio_data_con [num_arg, denom_arg])
+  where
+    (ratio_data_con, integer_ty)
+      = case (maybeAppDataTyCon rational_ty) of
+	  Just (tycon, [i_ty], [con])
+	    -> ASSERT(is_integer_ty i_ty && uniqueOf tycon == ratioTyConKey)
+	       (con, i_ty)
+
+	  _ -> (panic "ratio_data_con", panic "integer_ty")
+
+    is_integer_ty ty
+      = case (maybeAppDataTyCon ty) of
+	  Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
+	  _		      -> False
+
+litToRep other_lit = returnTM (literalType other_lit, Lit other_lit)
+\end{code}
+
+\begin{code}
+funnyParallelOp SeqOp  = True
+funnyParallelOp ParOp  = True
+funnyParallelOp ForkOp = True
+funnyParallelOp _      = False
+\end{code}  
+
+
+%************************************************************************
+%*									*
+\subsection{The monad}
+%*									*
+%************************************************************************
+
+\begin{code}
+type TidyM a =  Module
+	     -> IdEnv Id
+	     -> (UniqSupply, Bag CoreBinding)
+	     -> (a, (UniqSupply, Bag CoreBinding))
+
+initTM mod env us m
+  = case m mod env (us,emptyBag) of
+	(result, (us',floats)) -> result
+
+returnTM v mod env usf = (v, usf)
+thenTM m k mod env usf = case m mod env usf of
+			   (r, usf') -> k r mod env usf'
+
+mapTM f []     = returnTM []
+mapTM f (x:xs) = f x	`thenTM` \ r ->
+		 mapTM f xs	`thenTM` \ rs ->
+		 returnTM (r:rs)
+\end{code}
+
+
+\begin{code}
+getFloats :: TidyM a -> TidyM (a, Bag CoreBinding)
+getFloats m mod env (us,floats)
+  = case m mod env (us,emptyBag) of
+	(r, (us',floats')) -> ((r, floats'), (us',floats))
+
+
+-- Need to extend the environment when we munge a binder, so that occurrences
+-- of the binder will print the correct way (i.e. as a global not a local)
+mungeTopBinder :: Id -> (Id -> TidyM a) -> TidyM a
+mungeTopBinder id thing_inside mod env usf
+  = case lookupIdEnv env id of
+	Just global -> thing_inside global mod env usf
+	Nothing     -> thing_inside new_global mod new_env usf
+		    where
+		       new_env    = addOneToIdEnv env id new_global
+		       new_global = setIdVisibility mod id
+
+mungeTopBinders []     k = k []
+mungeTopBinders (b:bs) k = mungeTopBinder b	$ \ b' ->
+			   mungeTopBinders bs	$ \ bs' ->
+			   k (b' : bs')
+
+addTopFloat :: Type -> CoreExpr -> TidyM Id
+addTopFloat lit_ty lit_rhs mod env (us, floats)
+  = (lit_id, (us', floats `snocBag` NonRec lit_id lit_rhs))
+  where
+    lit_local = mkSysLocal SLIT("nrlit") uniq lit_ty noSrcLoc
+    lit_id = setIdVisibility mod lit_local
+    (us', us1) = splitUniqSupply us
+    uniq = getUnique us1
+
+lookupTM v mod env usf
+  = case lookupIdEnv env v of
+	Nothing -> (v, usf)
+	Just v' -> (v', usf)
+
+extendEnvTM v v' m mod env usf
+  = m mod (addOneToIdEnv env v v') usf
+\end{code}
+
+

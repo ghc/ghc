@@ -7,8 +7,8 @@ import PreludePS	( _PackedString )
 
 import Class		( GenClass )
 import CoreUnfold	( mkMagicUnfolding, Unfolding )
-import IdUtils		( primOpNameInfo )
-import Name		( Name, OrigName, mkPrimitiveName, mkWiredInName, ExportFlag )
+import IdUtils		( primOpName )
+import Name		( Name, ExportFlag )
 import PrimOp		( PrimOp )
 import RnHsSyn		( RnName )
 import Type		( mkSigmaTy, mkFunTy, mkFunTys, GenType )
@@ -17,11 +17,9 @@ import Unique		( Unique )
 import Usage		( GenUsage )
 
 mkMagicUnfolding :: Unique -> Unfolding
-mkPrimitiveName :: Unique -> OrigName -> Name
-mkWiredInName :: Unique -> OrigName -> ExportFlag -> Name
 mkSigmaTy :: [a] -> [(GenClass (GenTyVar (GenUsage Unique)) Unique, GenType a b)] -> GenType a b -> GenType a b
 mkFunTys :: [GenType a b] -> GenType a b -> GenType a b
 mkFunTy  :: GenType a b   -> GenType a b -> GenType a b
 
-primOpNameInfo	:: PrimOp -> (_PackedString, RnName)
+primOpName :: PrimOp -> Name
 \end{code}

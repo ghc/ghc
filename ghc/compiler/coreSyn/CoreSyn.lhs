@@ -133,6 +133,7 @@ desugarer sets up constructors as applications of global @Vars@s.
 
      | Prim	PrimOp [GenCoreArg val_occ tyvar uvar]
 		-- saturated primitive operation;
+
 		-- comment on Cons applies here, too.
 \end{code}
 

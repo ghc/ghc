@@ -10,7 +10,7 @@ module FreeVars (
 	freeVars,
 
 	-- cheap and cheerful variant...
-	addTopBindsFVs,
+	addTopBindsFVs, addExprFVs,
 
 	freeVarsOf, freeTyVarsOf,
 	SYN_IE(FVCoreExpr), SYN_IE(FVCoreBinding),
@@ -30,7 +30,7 @@ import Id		( idType, getIdArity, isBottomingId,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
 			  SYN_IE(IdSet)
 			)
-import IdInfo		( arityMaybe )
+import IdInfo		( ArityInfo(..) )
 import PrimOp		( PrimOp(..) )
 import Type		( tyVarsOfType )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
@@ -144,9 +144,10 @@ fvExpr id_cands tyvar_cands (Var v)
   where
     leakiness
       | isBottomingId v = lEAK_FREE_BIG	-- Hack
-      | otherwise       = case arityMaybe (getIdArity v) of
-			    Nothing    -> lEAK_FREE_0
-			    Just arity -> LeakFree arity
+      | otherwise       = case getIdArity v of
+			    UnknownArity       -> lEAK_FREE_0
+			    ArityAtLeast arity -> LeakFree arity
+			    ArityExactly arity -> LeakFree arity
 
 fvExpr id_cands tyvar_cands (Lit k)
   = (FVInfo noFreeIds noFreeTyVars lEAK_FREE_0, AnnLit k)

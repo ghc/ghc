@@ -12,14 +12,18 @@ IMP_Ubiq(){-uitous-}
 IMPORT_1_3(IO(hGetContents,stdin,stderr,hPutStr,hClose,openFile,IOMode(..)))
 
 import HsSyn
+import RdrHsSyn		( RdrName )
 
 import ReadPrefix	( rdModule )
 import Rename		( renameModule )
+import RnMonad		( ExportEnv )
+
 import MkIface		-- several functions
 import TcModule		( typecheckModule )
 import Desugar		( deSugar, DsMatchContext, pprDsWarnings )
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
+import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 #if ! OMIT_NATIVE_CODEGEN
@@ -33,7 +37,6 @@ import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
 import ErrUtils		( pprBagOfErrors, ghcExit )
 import Maybes		( maybeToBool, MaybeErr(..) )
-import RdrHsSyn		( getRawExportees )
 import Specialise	( SpecialiseData(..) )
 import StgSyn		( pprPlainStgBinding, GenStgBinding )
 import TcInstUtil	( InstInfo )
@@ -46,9 +49,8 @@ import PprStyle		( PprStyle(..) )
 import Pretty
 
 import Id		( GenId )		-- instances
-import Name		( Name, RdrName )	-- instances
+import Name		( Name )		-- instances
 import PprType		( GenType, GenTyVar )	-- instances
-import RnHsSyn		( RnName )		-- instances
 import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique )		-- instances
 \end{code}
@@ -66,7 +68,7 @@ main
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.01, for Haskell 1.3" "" >>
+  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.02, for Haskell 1.3" "" >>
 
     -- ******* READER
     show_pass "Reader"	>>
@@ -94,25 +96,19 @@ doIt (core_cmds, stg_cmds) input_pgm
     _scc_     "Renamer"
 
     renameModule rn_uniqs rdr_module >>=
-	\ (rn_mod, rn_env, import_names,
-	   export_stuff, usage_stuff,
-	   rn_errs_bag, rn_warns_bag) ->
+	\ (maybe_rn_stuff, rn_errs_bag, rn_warns_bag) ->
 
-    if (not (isEmptyBag rn_errs_bag)) then
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_errs_bag))
-	>> hPutStr stderr "\n" >>
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
-	>> hPutStr stderr "\n" >>
-	ghcExit 1
+    checkErrors rn_errs_bag rn_warns_bag	>>
+    case maybe_rn_stuff of {
+	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
+			-- go any further
+			hPutStr stderr "No recompilation required!\n"	>>
+			ghcExit 0 ;
 
-    else -- No renaming errors ...
+		-- Oh well, we've got to recompile for real
+	Just (rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
 
-    (if (isEmptyBag rn_warns_bag) then
-	return ()
-     else
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
-	>> hPutStr stderr "\n"
-    )   					>>
+
 
     doDump opt_D_dump_rn "Renamer:"
 	(pp_show (ppr pprStyle rn_mod))		>>
@@ -121,20 +117,14 @@ doIt (core_cmds, stg_cmds) input_pgm
     -- (the iface file is produced incrementally, as we have
     -- the information that we need...; we use "iface<blah>")
     -- "endIface" finishes the job.
-    let
-	(usages_map, version_info, instance_modules) = usage_stuff
-    in
-    startIface mod_name				    >>= \ if_handle ->
-    ifaceUsages		 if_handle usages_map	    >>
-    ifaceVersions	 if_handle version_info	    >>
-    ifaceExportList	 if_handle export_stuff rn_env >>
-    ifaceFixities	 if_handle rn_mod	    >>
-    ifaceInstanceModules if_handle instance_modules >>
+    startIface mod_name					>>= \ if_handle ->
+    ifaceMain if_handle iface_file_stuff		>>
+
 
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 			>>
     _scc_     "TypeCheck"
-    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_env rn_mod) of
+    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_name_supply rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
 	    Failed (errs, warns)
@@ -142,26 +132,12 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     of { (tc_errs_bag, tc_warns_bag, tc_results) ->
 
-    if (not (isEmptyBag tc_errs_bag)) then
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
-	>> hPutStr stderr "\n" >>
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
-	>> hPutStr stderr "\n" >>
-	ghcExit 1
-
-    else ( -- No typechecking errors ...
-
-    (if (isEmptyBag tc_warns_bag) then
-	return ()
-     else
-	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
-	>> hPutStr stderr "\n"
-    )   					>>
+    checkErrors tc_errs_bag tc_warns_bag	>>
 
     case tc_results
     of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
-	   interface_stuff@(_,local_tycons,_,_),
-	   pragma_tycon_specs, ddump_deriv) ->
+	   local_tycons, inst_info, pragma_tycon_specs,
+	   ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
 	(pp_show (ppAboves [
@@ -174,12 +150,12 @@ doIt (core_cmds, stg_cmds) input_pgm
     doDump opt_D_dump_deriv "Derived instances:"
 	(pp_show (ddump_deriv pprStyle))	>>
 
-    -- OK, now do the interface stuff that relies on typechecker output:
-    ifaceDecls     if_handle interface_stuff	>>
-    ifaceInstances if_handle interface_stuff	>>
+	-- Now (and alas only now) we have the derived-instance information
+	-- so we can put instance information in the interface file
+    ifaceInstances if_handle inst_info			>>
 
     -- ******* DESUGARER
-    show_pass "DeSugar" 			>>
+    show_pass "DeSugar " 			>>
     _scc_     "DeSugar"
     let
 	(desugared,ds_warnings)
@@ -206,7 +182,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	      sm_uniqs local_data_tycons pragma_tycon_specs desugared
 						>>=
 
-	 \ (simplified, inlinings_env,
+	 \ (simplified,
 	    SpecData _ _ _ gen_tycons all_tycon_specs _ _ _) ->
 
     doDump opt_D_dump_simpl "Simplified:" (pp_show (ppAboves
@@ -231,19 +207,25 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppAboves (map (pprPlainStgBinding pprStyle) stg_binds2)))
 						>>
 
+	-- Dump type signatures into the interface file
+    let
+	final_ids = collectFinalStgBinders stg_binds2
+    in
+    ifaceDecls if_handle rn_mod final_ids simplified	>>
+    endIface if_handle					>>
     -- We are definitely done w/ interface-file stuff at this point:
     -- (See comments near call to "startIface".)
-    endIface if_handle				>>
+    
 
     -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
     show_pass "CodeGen" 			>>
     _scc_     "CodeGen"
     let
-	abstractC      = codeGen mod_name     -- module name for CC labelling
+	abstractC      = codeGen mod_name		-- module name for CC labelling
 				 cost_centre_info
-				 import_names -- import names for CC registering
-				 gen_tycons	 -- type constructors generated locally
-				 all_tycon_specs -- tycon specialisations
+				 imported_modules	-- import names for CC registering
+				 gen_tycons		-- type constructors generated locally
+				 all_tycon_specs	-- tycon specialisations
 				 stg_binds2
 
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
@@ -285,24 +267,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     doOutput opt_ProduceC c_output_w 		>>
 
     ghcExit 0
-    } ) }
+    } } }
   where
     -------------------------------------------------------------
     -- ****** printing styles and column width:
 
-    pprCols = (80 :: Int) -- could make configurable
-
-    (pprStyle, pprErrorsStyle)
-      = if      opt_PprStyle_All   then
-		(PprShowAll, PprShowAll)
-	else if opt_PprStyle_Debug then
-		(PprDebug, PprDebug)
-	else if opt_PprStyle_User  then
-		(PprForUser, PprForUser)
-	else -- defaults...
-		(PprDebug, PprForUser)
-
-    pp_show p = ppShow {-WAS:pprCols-}10000{-random-} p
 
     -------------------------------------------------------------
     -- ****** help functions:
@@ -328,9 +297,32 @@ doIt (core_cmds, stg_cmds) input_pgm
 	else return ()
 
 
-ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
-		      classdecls instdecls instsigs defdecls binds
-		      [{-no sigs-}] src_loc)
+pprCols = (80 :: Int) -- could make configurable
+
+(pprStyle, pprErrorsStyle)
+  | opt_PprStyle_All   = (PprShowAll, PprShowAll)
+  | opt_PprStyle_Debug = (PprDebug,   PprDebug)
+  | opt_PprStyle_User  = (PprForUser, PprForUser)
+  | otherwise	       = (PprDebug,   PprForUser)
+
+pp_show p = ppShow {-WAS:pprCols-}10000{-random-} p
+
+checkErrors errs_bag warns_bag
+  | not (isEmptyBag errs_bag)
+  = 	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle errs_bag))
+	>> hPutStr stderr "\n" >>
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle warns_bag))
+	>> hPutStr stderr "\n" >>
+	ghcExit 1
+
+  | not (isEmptyBag warns_bag)
+  = hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle warns_bag))	>> 
+    hPutStr stderr "\n"
+ 
+  | otherwise = return ()
+
+
+ppSourceStats (HsModule name version exports imports fixities decls src_loc)
  = ppAboves (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list
 		("ExportDecls      ", export_ds),
@@ -342,7 +334,7 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
 		("  ImpPartial     ", import_partial),
 		("  ImpHiding      ", import_hiding),
 		("FixityDecls      ", fixity_ds),
-		("DefaultDecls     ", defalut_ds),
+		("DefaultDecls     ", default_ds),
 	      	("TypeDecls        ", type_ds),
 	      	("DataDecls        ", data_ds),
 	      	("NewTypeDecls     ", newt_ds),
@@ -358,8 +350,8 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
 	      	("FunBinds         ", fn_bind_ds),
 	      	("InlineMeths      ", method_inlines),
 		("InlineBinds      ", bind_inlines),
-	      	("SpecialisedData  ", data_specs),
-	      	("SpecialisedInsts ", inst_specs),
+--	      	("SpecialisedData  ", data_specs),
+--	      	("SpecialisedInsts ", inst_specs),
 	      	("SpecialisedMeths ", method_specs),
 	      	("SpecialisedBinds ", bind_specs)
 	       ])
@@ -367,37 +359,38 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
     pp_val (str, 0) = ppNil
     pp_val (str, n) = ppBesides [ppStr str, ppInt n]
 
-    (export_decls, export_mods) = getRawExportees exports
-    type_decls = filter is_type_decl typedecls
-    data_decls = filter is_data_decl typedecls
-    newt_decls = filter is_newt_decl typedecls
+    fixity_ds   = length fixities
+    type_decls 	= [d | TyD d@(TySynonym _ _ _ _)    <- decls]
+    data_decls 	= [d | TyD d@(TyData _ _ _ _ _ _ _) <- decls]
+    newt_decls 	= [d | TyD d@(TyNew  _ _ _ _ _ _ _) <- decls]
+    type_ds	= length type_decls
+    data_ds	= length data_decls
+    newt_ds	= length newt_decls
+    class_decls = [d | ClD d <- decls]
+    class_ds    = length class_decls
+    inst_decls  = [d | InstD d <- decls]
+    inst_ds     = length inst_decls
+    default_ds  = length [() | DefD _ <- decls]
+    val_decls   = [d | ValD d <- decls]
 
-    export_ds  = length export_decls
-    export_ms  = length export_mods
-    export_all = if export_ds == 0 && export_ms == 0 then 1 else 0
-
-    fixity_ds  = length fixities
-    defalut_ds = length defdecls
-    type_ds    = length type_decls
-    data_ds    = length data_decls
-    newt_ds    = length newt_decls
-    class_ds   = length classdecls
-    inst_ds    = length instdecls
+    real_exports = case exports of { Nothing -> []; Just es -> es }
+    n_exports  	 = length real_exports
+    export_ms  	 = length [() | IEModuleContents _ <- real_exports]
+    export_ds  	 = n_exports - export_ms
+    export_all 	 = case exports of { Nothing -> 1; other -> 0 }
 
     (val_bind_ds, fn_bind_ds, bind_tys, bind_specs, bind_inlines)
-	= count_binds binds
+	= count_binds (foldr ThenBinds EmptyBinds val_decls)
 
     (import_no, import_qual, import_as, import_all, import_partial, import_hiding)
 	= foldr add6 (0,0,0,0,0,0) (map import_info imports)
     (data_constrs, data_derivs)
 	= foldr add2 (0,0) (map data_info (newt_decls ++ data_decls))
     (class_method_ds, default_method_ds)
-	= foldr add2 (0,0) (map class_info classdecls)
+	= foldr add2 (0,0) (map class_info class_decls)
     (inst_method_ds, method_specs, method_inlines)
-	= foldr add3 (0,0,0) (map inst_info instdecls)
+	= foldr add3 (0,0,0) (map inst_info inst_decls)
 
-    data_specs  = length typesigs
-    inst_specs  = length instsigs
 
     count_binds EmptyBinds        = (0,0,0,0,0)
     count_binds (ThenBinds b1 b2) = count_binds b1 `add5` count_binds b2
@@ -418,7 +411,7 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
-    sig_info (Sig _ _ _ _)        = (1,0,0,0)
+    sig_info (Sig _ _ _)          = (1,0,0,0)
     sig_info (ClassOpSig _ _ _ _) = (0,1,0,0)
     sig_info (SpecSig _ _ _ _)    = (0,0,1,0)
     sig_info (InlineSig _ _)      = (0,0,0,1)
@@ -437,24 +430,17 @@ ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
     data_info (TyData _ _ _ constrs derivs _ _)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info (TyNew _ _ _ constr derivs _ _)
-	= (length constr, case derivs of {Nothing -> 0; Just ds -> length ds})
+	= (1, case derivs of {Nothing -> 0; Just ds -> length ds})
 
     class_info (ClassDecl _ _ _ meth_sigs def_meths _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))
 
-    inst_info (InstDecl _ _ inst_meths _ _ inst_sigs _ _)
+    inst_info (InstDecl _ inst_meths inst_sigs _ _)
 	= case count_sigs inst_sigs of
 	    (_,_,ss,is) ->
 	       (addpr (count_monobinds inst_meths), ss, is)
-
-    is_type_decl (TySynonym _ _ _ _)     = True
-    is_type_decl _		         = False
-    is_data_decl (TyData _ _ _ _ _ _ _)  = True
-    is_data_decl _		         = False
-    is_newt_decl (TyNew  _ _ _ _ _ _ _)  = True
-    is_newt_decl _		         = False
 
     addpr (x,y) = x+y
     add1 x1 y1  = x1+y1

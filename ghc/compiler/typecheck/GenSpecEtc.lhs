@@ -14,7 +14,7 @@ module GenSpecEtc (
 
 IMP_Ubiq()
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
 import TcEnv		( tcGetGlobalTyVars, tcExtendGlobalTyVars )
@@ -34,7 +34,7 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds), SYN_IE(TcBin
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )
 import Class		( GenClass )
 import Id		( GenId, SYN_IE(Id), mkUserId, idType )
-import Kind		( isUnboxedKind, isTypeKind, mkBoxedTypeKind )
+import Kind		( isUnboxedTypeKind, isTypeKind, mkBoxedTypeKind )
 import ListSetOps	( minusList, unionLists, intersectLists )
 import Maybes		( allMaybes )
 import Name		( Name{--O only-} )
@@ -163,7 +163,7 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
     let
 	tyvars = tyVarSetToList reduced_tyvars_to_gen	-- Commit to a particular order
 
-        unboxed_kind_tyvars    = filter (isUnboxedKind . tyVarKind) tyvars
+        unboxed_kind_tyvars    = filter (isUnboxedTypeKind . tyVarKind) tyvars
 	unresolved_kind_tyvars = filter (isTypeKind    . tyVarKind) tyvars
 
 	box_it tyvar = newTyVarTy mkBoxedTypeKind	`thenNF_Tc` \ boxed_ty ->

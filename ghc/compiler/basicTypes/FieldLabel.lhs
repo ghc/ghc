@@ -10,7 +10,7 @@ module FieldLabel where
 
 IMP_Ubiq(){-uitous-}
 
-import Name		( Name{-instance Eq/Outputable-} )
+import Name		( Name{-instance Eq/Outputable-}, nameUnique )
 import Type		( SYN_IE(Type) )
 \end{code}
 
@@ -42,4 +42,7 @@ instance Outputable FieldLabel where
 
 instance NamedThing FieldLabel where
     getName (FieldLabel n _ _) = n
+
+instance Uniquable FieldLabel where
+    uniqueOf (FieldLabel n _ _) = nameUnique n
 \end{code}

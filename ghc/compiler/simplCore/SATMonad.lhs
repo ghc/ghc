@@ -37,7 +37,7 @@ import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
 			  InstTyEnv(..)
 			)
 import Id		( mkSysLocal, idType )
-import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqSupply
 import Util
 
@@ -138,9 +138,9 @@ getSATInfo var us env
 newSATName :: Id -> Type -> SatM Id
 newSATName id ty us env
   = case (getUnique us) of { unique ->
-    (mkSysLocal new_str unique ty mkUnknownSrcLoc, env) }
+    (mkSysLocal new_str unique ty noSrcLoc, env) }
   where
-    new_str = panic "SATMonad.newSATName (ToDo)" -- getOccName id _APPEND_ SLIT("_sat")
+    new_str = getOccName id _APPEND_ SLIT("_sat")
 
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
@@ -218,7 +218,7 @@ saTransform binder rhs
 			    (getOccName binder _APPEND_ SLIT("_fsat"))
 			    (uniqueOf binder)
 			    (idType binder)
-			    mkUnknownSrcLoc
+			    noSrcLoc
 	    rec_body = mkValLam non_static_args
 			       ( Let (NonRec fake_binder nonrec_rhs)
 				 {-in-} (dropArgs rhs))

@@ -290,22 +290,16 @@ isAsmTemp _ 	    	   = False
 \end{code}
 
 C ``static'' or not...
+From the point of view of the code generator, a name is
+externally visible if it should be given put in the .o file's 
+symbol table; that is, made static.
+
 \begin{code}
 externallyVisibleCLabel (TyConLabel tc _) = True
 externallyVisibleCLabel (CaseLabel _ _)	  = False
 externallyVisibleCLabel (AsmTempLabel _)  = False
 externallyVisibleCLabel (RtsLabel _)	  = True
-externallyVisibleCLabel (IdLabel (CLabelId id) _)
-  | isDataCon id 	  = True
-  | is_ConstMethodId id   = True  -- These are here to ensure splitting works
-  | isDictFunId id 	  = True  -- when these values have not been exported
-  | is_DefaultMethodId id = True
-  | is_SuperDictSelId id  = True
-  | otherwise    	  = externallyVisibleId id
-  where
-    is_ConstMethodId   id = maybeToBool (isConstMethodId_maybe   id)
-    is_DefaultMethodId id = maybeToBool (isDefaultMethodId_maybe id)
-    is_SuperDictSelId  id = maybeToBool (isSuperDictSelId_maybe  id)
+externallyVisibleCLabel (IdLabel (CLabelId id) _) = externallyVisibleId id
 \end{code}
 
 OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the

@@ -24,7 +24,7 @@ import Id		( idType, mkSysLocal,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instances-}
 			)
-import Name		( isLocallyDefined, getSrcLoc )
+import Name		( isLocallyDefined, getSrcLoc, getOccString )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyConExpandingDicts, eqTy )
 import TysPrim		( statePrimTyCon )
@@ -213,8 +213,7 @@ liftDeflt (BindDefault binder rhs)
 type LiftM a
   = IdEnv (Id, Id)	-- lifted Ids are mapped to:
 			--   * lifted Id with the same Unique
-			--     (top-level bindings must keep their
-			--	unique (see TopLevId in Id.lhs))
+			--     (top-level bindings must keep their unique
 			--   * unlifted version with a new Unique
     -> UniqSupply	-- unique supply
     -> a		-- result
@@ -279,7 +278,7 @@ mkLiftedId id u
   = ASSERT (isUnboxedButNotState unlifted_ty)
     (lifted_id, unlifted_id)
   where
-    id_name     = panic "CoreLift.mkLiftedId:id_name" --LATER: getOccName id
+    id_name     = _PK_ (getOccString id)		-- yuk!
     lifted_id   = updateIdType id lifted_ty
     unlifted_id = mkSysLocal id_name u unlifted_ty (getSrcLoc id)
 

@@ -32,7 +32,7 @@
 > import Pretty
 > import PrimOp	( PrimOp )	-- for Eq PrimOp
 > import UniqSupply
-> import SrcLoc		( mkUnknownSrcLoc )
+> import SrcLoc		( noSrcLoc )
 > import Util
 
 -----------------------------------------------------------------------------
@@ -492,19 +492,19 @@ Grab a new Id and tag it as coming from the Deforester.
 > newDefId :: Type -> UniqSM Id
 > newDefId t =
 > 	getUnique	`thenUs` \u ->
->	returnUs (mkSysLocal SLIT("def") u t mkUnknownSrcLoc)
+>	returnUs (mkSysLocal SLIT("def") u t noSrcLoc)
 
 > newTmpId :: Type -> UniqSM Id
 > newTmpId t =
 > 	getUnique	`thenUs` \u ->
->	returnUs (mkSysLocal SLIT("tmp") u t mkUnknownSrcLoc)
+>	returnUs (mkSysLocal SLIT("tmp") u t noSrcLoc)
 
 -----------------------------------------------------------------------------
 Check whether an Id was given a `DEFOREST' annotation by the programmer.
 
 > deforestable :: Id -> Bool
 > deforestable id =
-> 	case getInfo (getIdInfo id) of
+> 	case getDeforestInfo (getIdInfo id) of
 >		DoDeforest -> True
 >		Don'tDeforest -> False
 

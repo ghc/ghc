@@ -15,7 +15,7 @@ module ClosureInfo (
 
 	EntryConvention(..),
 
-	mkClosureLFInfo, mkConLFInfo,
+	mkClosureLFInfo, mkConLFInfo, mkSelectorLFInfo, mkVapLFInfo,
 	mkLFImported, mkLFArgument, mkLFLetNoEscape,
 
 	closureSize, closureHdrSize,
@@ -28,15 +28,15 @@ module ClosureInfo (
 	mkVirtHeapOffsets,
 
 	nodeMustPointToIt, getEntryConvention,
-	blackHoleOnEntry,
+	blackHoleOnEntry, lfArity_maybe,
 
 	staticClosureRequired,
 	slowFunEntryCodeRequired, funInfoTableRequired,
 	stdVapRequired, noUpdVapRequired,
 
-	closureId, infoTableLabelFromCI,
+	closureId, infoTableLabelFromCI, fastLabelFromCI,
 	closureLabelFromCI,
-	entryLabelFromCI, fastLabelFromCI,
+	entryLabelFromCI, 
 	closureLFInfo, closureSMRep, closureUpdReqd,
 	closureSingleEntry, closureSemiTag, closureType,
 	closureReturnsUnboxedType, getStandardFormThunkInfo,
@@ -58,8 +58,7 @@ import AbsCSyn
 import StgSyn
 import CgMonad
 
-import CgCompInfo	( mAX_SPEC_SELECTEE_SIZE,
-			  mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
+import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
 			  mAX_SPEC_ALL_PTRS, mAX_SPEC_MIXED_FIELDS,
 			  mAX_SPEC_ALL_NONPTRS,
 			  oTHER_TAG
@@ -76,27 +75,26 @@ import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
 			)
 import CmdLineOpts	( opt_SccProfilingOn, opt_ForConcurrent )
 import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
-			  intOffsetIntoGoods,
 			  SYN_IE(VirtualHeapOffset)
 			)
-import Id		( idType, idPrimRep, getIdArity,
+import Id		( idType, getIdArity,
 			  externallyVisibleId,
 			  dataConTag, fIRST_TAG,
-			  isDataCon, isNullaryDataCon, dataConTyCon,
+			  isDataCon, isNullaryDataCon, dataConTyCon, dataConArity,
 			  isTupleCon, SYN_IE(DataCon),
 			  GenId{-instance Eq-}
 			)
-import IdInfo		( arityMaybe )
-import Maybes		( assocMaybe, maybeToBool )
-import Name		( isLocallyDefined, nameOf, origName )
+import IdInfo		( ArityInfo(..) )
+import Maybes		( maybeToBool )
+import Name		( getOccString )
 import PprStyle		( PprStyle(..) )
 import PprType		( getTyDescription, GenType{-instance Outputable-} )
---import Pretty--ToDo:rm
+import Pretty		--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
-import TyCon		( maybeTyConSingleCon, TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
+import TyCon		( TyCon{-instance NamedThing-} )
+import Type		( isPrimType, expandTy, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
 			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
@@ -361,11 +359,11 @@ mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  = case arityMaybe (getIdArity id) of
-      Nothing  	-> LFImported
-      Just 0	-> LFThunk True{-top-lev-} True{-no fvs-}
-			True{-updatable-} NonStandardThunk
-      Just n	-> LFReEntrant True n True  -- n > 0
+  = case getIdArity id of
+      ArityExactly 0	-> LFThunk True{-top-lev-} True{-no fvs-}
+				   True{-updatable-} NonStandardThunk
+      ArityExactly n	-> LFReEntrant True n True  -- n > 0
+      other	   	-> LFImported	-- Not sure of exact arity
 \end{code}
 
 %************************************************************************
@@ -381,90 +379,15 @@ mkClosureLFInfo :: Bool 	-- True of top level
 		-> [Id]		-- Free vars
 		-> UpdateFlag 	-- Update flag
 		-> [Id] 	-- Args
-		-> StgExpr	-- Body of closure: passed so we
-				-- can look for selector thunks!
 		-> LambdaFormInfo
 
-mkClosureLFInfo top fvs upd_flag args@(_:_) body -- Non-empty args
+mkClosureLFInfo top fvs upd_flag args@(_:_)  -- Non-empty args
   = LFReEntrant top (length args) (null fvs)
 
-mkClosureLFInfo top fvs ReEntrant [] body
+mkClosureLFInfo top fvs ReEntrant []
   = LFReEntrant top 0 (null fvs)
-\end{code}
 
-OK, this is where we look at the body of the closure to see if it's a
-selector---turgid, but nothing deep.  We are looking for a closure of
-{\em exactly} the form:
-\begin{verbatim}
-...  = [the_fv] \ u [] ->
-	 case the_fv of
-	   con a_1 ... a_n -> a_i
-\end{verbatim}
-Here we go:
-\begin{code}
-mkClosureLFInfo False	    -- don't bother if at top-level
-		[the_fv]    -- just one...
-		Updatable
-		[]	    -- no args (a thunk)
-		(StgCase (StgApp (StgVarArg scrutinee) [{-no args-}] _)
-		  _ _ _   -- ignore live vars and uniq...
-		  (StgAlgAlts case_ty
-		     [(con, params, use_mask,
-			(StgApp (StgVarArg selectee) [{-no args-}] _))]
-		     StgNoDefault))
-  |  the_fv == scrutinee			-- Scrutinee is the only free variable
-  && maybeToBool maybe_offset			-- Selectee is a component of the tuple
-  && maybeToBool offset_into_int_maybe
-  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
-  =
-    -- ASSERT(is_single_constructor) 		-- Should be true, by causes error for SpecTyCon
-    LFThunk False False True (SelectorThunk scrutinee con offset_into_int)
-  where
-    (_, params_w_offsets) = layOutDynCon con idPrimRep params
-    maybe_offset	  = assocMaybe params_w_offsets selectee
-    Just the_offset 	  = maybe_offset
-    offset_into_int_maybe = intOffsetIntoGoods the_offset
-    Just offset_into_int  = offset_into_int_maybe
-    is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
-    tycon		  = dataConTyCon con
-\end{code}
-
-Same kind of thing, looking for vector-apply thunks, of the form:
-
-	x = [...] \ .. [] -> f a1 .. an
-
-where f has arity n.  We rely on the arity info inside the Id being correct.
-
-\begin{code}
-mkClosureLFInfo top_level
-		fvs
-		upd_flag
-		[]			-- No args; a thunk
-		(StgApp (StgVarArg fun_id) args _)
-  | not top_level			-- A top-level thunk would require a static
-					-- vap_info table, which we don't generate just
-					-- now; so top-level thunks are never standard
-					-- form.
-  && isLocallyDefined fun_id		-- Must be defined in this module
-  && maybeToBool arity_maybe		-- A known function with known arity
-  && fun_arity > 0			-- It'd better be a function!
-  && fun_arity == length args		-- Saturated application
-  = LFThunk top_level (null fvs) (isUpdatable upd_flag) (VapThunk fun_id args store_fun_in_vap)
-  where
-    arity_maybe      = arityMaybe (getIdArity fun_id)
-    Just fun_arity   = arity_maybe
-
-	-- If the function is a free variable then it must be stored
-	-- in the thunk too; if it isn't a free variable it must be
-	-- because it's constant, so it doesn't need to be stored in the thunk
-    store_fun_in_vap = fun_id `is_elem` fvs
-
-    is_elem = isIn "mkClosureLFInfo"
-\end{code}
-
-Finally, the general updatable-thing case:
-\begin{code}
-mkClosureLFInfo top fvs upd_flag [] body
+mkClosureLFInfo top fvs upd_flag []
   = LFThunk top (null fvs) (isUpdatable upd_flag) NonStandardThunk
 
 isUpdatable ReEntrant   = False
@@ -480,6 +403,12 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con
   = -- the isNullaryDataCon will do this: ASSERT(isDataCon con)
     (if isTupleCon con then LFTuple else LFCon) con (isNullaryDataCon con)
+
+mkSelectorLFInfo scrutinee con offset
+  = LFThunk False False True (SelectorThunk scrutinee con offset)
+
+mkVapLFInfo fvs upd_flag fun_id args fun_in_vap
+  = LFThunk False (null fvs) (isUpdatable upd_flag) (VapThunk fun_id args fun_in_vap)
 \end{code}
 
 
@@ -1086,6 +1015,15 @@ noUpdVapRequired binder_info
       _					   -> False
 \end{code}
 
+@lfArity@ extracts the arity of a function from its LFInfo
+
+\begin{code}
+lfArity_maybe (LFReEntrant _ arity _) = Just arity
+lfArity_maybe (LFCon con _)	      = Just (dataConArity con)
+lfArity_maybe (LFTuple con _)	      = Just (dataConArity con)
+lfArity_maybe other		      = Nothing
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection[ClosureInfo-misc-funs]{Misc functions about @ClosureInfo@, etc.}
@@ -1158,11 +1096,10 @@ closureReturnsUnboxedType other_closure = False
 -- ToDo: need anything like this in Type.lhs?
 fun_result_ty arity id
   = let
-	(_, de_foralld_ty) = splitForAllTy (idType id)
-	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking de_foralld_ty
+	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking (idType id)
     in
-    ASSERT(arity >= 0 && length arg_tys >= arity)
---    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
+--    ASSERT(arity >= 0 && length arg_tys >= arity)
+    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
     mkFunTys (drop arity arg_tys) res_ty
 \end{code}
 
@@ -1189,8 +1126,13 @@ isToplevClosure (MkClosureInfo _ lf_info _)
 Label generation.
 
 \begin{code}
-infoTableLabelFromCI :: ClosureInfo -> CLabel
+fastLabelFromCI :: ClosureInfo -> CLabel
+fastLabelFromCI (MkClosureInfo id lf_info _)
+  = case lfArity_maybe lf_info of
+	Just arity -> mkFastEntryLabel id arity
+	other	   -> pprPanic "fastLabelFromCI" (ppr PprDebug id)
 
+infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI (MkClosureInfo id lf_info rep)
   = case lf_info of
 	LFCon con _ 	-> mkConInfoPtr con rep
@@ -1254,14 +1196,6 @@ thunkEntryLabel thunk_id (VapThunk fun_id args _) is_updatable
   = mkVapEntryLabel fun_id is_updatable
 thunkEntryLabel thunk_id _ is_updatable
   = mkStdEntryLabel thunk_id
-
-fastLabelFromCI :: ClosureInfo -> CLabel
-fastLabelFromCI (MkClosureInfo id _ _) = mkFastEntryLabel id fun_arity
-  where
-    arity_maybe = arityMaybe (getIdArity id)
-    fun_arity	= case arity_maybe of
-		    Just x -> x
-		    _	   -> panic "fastLabelFromCI:no arity:" --(ppr PprShowAll id)
 \end{code}
 
 \begin{code}
@@ -1331,8 +1265,8 @@ closureKind (MkClosureInfo _ lf _)
 
 closureTypeDescr :: ClosureInfo -> String
 closureTypeDescr (MkClosureInfo id lf _)
-  = if (isDataCon id) then			     -- DataCon has function types
-	_UNPK_ (nameOf (origName "closureTypeDescr" (dataConTyCon id))) -- We want the TyCon not the ->
+  = if (isDataCon id) then			 -- DataCon has function types
+	getOccString (dataConTyCon id)		 -- We want the TyCon not the ->
     else
 	getTyDescription (idType id)
 \end{code}

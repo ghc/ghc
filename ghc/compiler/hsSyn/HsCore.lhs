@@ -8,23 +8,24 @@
 %************************************************************************
 
 We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
-@TyVars@ as well.  Currently trying the former.
+@TyVars@ as well.  Currently trying the former... MEGA SIGH.
 
 \begin{code}
 #include "HsVersions.h"
 
 module HsCore (
-	UnfoldingCoreExpr(..), UnfoldingCoreAlts(..),
-	UnfoldingCoreDefault(..), UnfoldingCoreBinding(..),
-	UnfoldingCoreAtom(..), UfId(..), SYN_IE(UnfoldingType),
-	UnfoldingPrimOp(..), UfCostCentre(..)
+	UfExpr(..), UfAlts(..), UfBinder(..), UfCoercion(..),
+	UfDefault(..), UfBinding(..),
+	UfArg(..), UfPrimOp(..)
     ) where
 
 IMP_Ubiq()
 
 -- friends:
-import HsTypes		( MonoType, PolyType )
+import HsTypes		( HsType, pprParendHsType )
 import PrimOp		( PrimOp, tagOf_PrimOp )
+import Kind		( Kind {- instance Outputable -} )
+import Type		( GenType {- instance Outputable -} )
 
 -- others:
 import Literal		( Literal )
@@ -40,89 +41,56 @@ import Util		( panic )
 %************************************************************************
 
 \begin{code}
-data UnfoldingCoreExpr name
-  = UfVar 	(UfId name)
+data UfExpr name
+  = UfVar 	name
   | UfLit	Literal
-  | UfCon 	name -- must be a "BoringUfId"...
-		[UnfoldingType name]
-		[UnfoldingCoreAtom name]
-  | UfPrim	(UnfoldingPrimOp name)
-		[UnfoldingType name]
-		[UnfoldingCoreAtom name]
-  | UfLam 	(UfBinder name)
-		(UnfoldingCoreExpr name)
-  | UfApp 	(UnfoldingCoreExpr name)
-		(UnfoldingCoreAtom name)
-  | UfCase	(UnfoldingCoreExpr name)
-		(UnfoldingCoreAlts name)
-  | UfLet	(UnfoldingCoreBinding name)
-		(UnfoldingCoreExpr name)
-  | UfSCC	(UfCostCentre name)
-		(UnfoldingCoreExpr name)
+  | UfCon 	name [UfArg name]
+  | UfPrim	(UfPrimOp name) [UfArg name]
+  | UfLam 	(UfBinder name)	  (UfExpr name)
+  | UfApp 	(UfExpr name) (UfArg name)
+  | UfCase	(UfExpr name) (UfAlts name)
+  | UfLet	(UfBinding name)  (UfExpr name)
+  | UfSCC	CostCentre (UfExpr name)
+  | UfCoerce	(UfCoercion name) (HsType name) (UfExpr name)
 
-data UnfoldingPrimOp name
+data UfPrimOp name
   = UfCCallOp	FAST_STRING	     -- callee
 		Bool		     -- True <=> casm, rather than ccall
 		Bool		     -- True <=> might cause GC
-		[UnfoldingType name] -- arg types, incl state token
+		[HsType name] -- arg types, incl state token
 				     -- (which will be first)
-		(UnfoldingType name) -- return type
-  | UfOtherOp	PrimOp
+		(HsType name) -- return type
 
-data UnfoldingCoreAlts name
-  = UfCoAlgAlts	 [(name, [UfBinder name], UnfoldingCoreExpr name)]
-		 (UnfoldingCoreDefault name)
-  | UfCoPrimAlts [(Literal, UnfoldingCoreExpr name)]
-		 (UnfoldingCoreDefault name)
+  | UfOtherOp	name
 
-data UnfoldingCoreDefault name
-  = UfCoNoDefault
-  | UfCoBindDefault (UfBinder name)
-		    (UnfoldingCoreExpr name)
+data UfCoercion name = UfIn name | UfOut name
 
-data UnfoldingCoreBinding name
-  = UfCoNonRec	(UfBinder name)
-		(UnfoldingCoreExpr name)
-  | UfCoRec 	[(UfBinder name, UnfoldingCoreExpr name)]
+data UfAlts name
+  = UfAlgAlts  [(name, [UfBinder name], UfExpr name)]
+		(UfDefault name)
+  | UfPrimAlts [(Literal, UfExpr name)]
+		(UfDefault name)
 
-data UnfoldingCoreAtom name
-  = UfCoVarAtom	(UfId name)
-  | UfCoLitAtom	Literal
+data UfDefault name
+  = UfNoDefault
+  | UfBindDefault (UfBinder name)
+		  (UfExpr name)
 
-data UfCostCentre name
-  = UfPreludeDictsCC
-		Bool	-- True <=> is dupd
-  | UfAllDictsCC FAST_STRING	-- module and group
-		FAST_STRING
-		Bool	-- True <=> is dupd
-  | UfUserCC	FAST_STRING
-		FAST_STRING FAST_STRING -- module and group
-		Bool	-- True <=> is dupd
-		Bool	-- True <=> is CAF
-  | UfAutoCC	(UfId name)
-		FAST_STRING FAST_STRING -- module and group
-		Bool Bool -- as above
-  | UfDictCC	(UfId name)
-		FAST_STRING FAST_STRING -- module and group
-		Bool Bool -- as above
+data UfBinding name
+  = UfNonRec	(UfBinder name)
+		(UfExpr name)
+  | UfRec 	[(UfBinder name, UfExpr name)]
 
-type UfBinder name = (name, UnfoldingType name)
+data UfBinder name
+  = UfValBinder	name (HsType name)
+  | UfTyBinder	name Kind
+  | UfUsageBinder name
 
-data UfId name
-  = BoringUfId		name
-  | SuperDictSelUfId	name name	-- class and superclass
-  | ClassOpUfId		name name	-- class and class op
-  | DictFunUfId		name		-- class and type
-			(UnfoldingType name)
-  | ConstMethodUfId	name name	-- class, class op, and type
-			(UnfoldingType name)
-  | DefaultMethodUfId	name name	-- class and class op
-  | SpecUfId		(UfId name)	-- its unspecialised "parent"
-			[Maybe (MonoType name)]
-  | WorkerUfId		(UfId name)	-- its non-working "parent"
-  -- more to come?
-
-type UnfoldingType name = PolyType name
+data UfArg name
+  = UfVarArg	name
+  | UfLitArg	Literal
+  | UfTyArg	(HsType name)
+  | UfUsageArg	name
 \end{code}
 
 %************************************************************************
@@ -132,39 +100,45 @@ type UnfoldingType name = PolyType name
 %************************************************************************
 
 \begin{code}
-instance Outputable name => Outputable (UnfoldingCoreExpr name) where
-    ppr sty (UfVar v) = pprUfId sty v
+instance Outputable name => Outputable (UfExpr name) where
+    ppr sty (UfVar v) = ppr sty v
     ppr sty (UfLit l) = ppr sty l
 
-    ppr sty (UfCon c tys as)
-      = ppCat [ppStr "(UfCon", ppr sty c, ppr sty tys, ppr sty as, ppStr ")"]
-    ppr sty (UfPrim o tys as)
-      = ppCat [ppStr "(UfPrim", ppr sty o, ppr sty tys, ppr sty as, ppStr ")"]
+    ppr sty (UfCon c as)
+      = ppCat [ppStr "(UfCon", ppr sty c, ppr sty as, ppStr ")"]
+    ppr sty (UfPrim o as)
+      = ppCat [ppStr "(UfPrim", ppr sty o, ppr sty as, ppStr ")"]
 
-    ppr sty (UfLam bs body)
-      = ppCat [ppChar '\\', ppr sty bs, ppStr "->", ppr sty body]
+    ppr sty (UfLam b body)
+      = ppCat [ppChar '\\', ppr sty b, ppStr "->", ppr sty body]
 
-    ppr sty (UfApp fun arg)
-      = ppCat [ppStr "(UfApp", ppr sty fun, ppr sty arg, ppStr ")"]
+    ppr sty (UfApp fun (UfTyArg ty))
+      = ppCat [ppr sty fun, ppStr "@", pprParendHsType sty ty]
+
+    ppr sty (UfApp fun (UfLitArg lit))
+      = ppCat [ppr sty fun, ppr sty lit]
+
+    ppr sty (UfApp fun (UfVarArg var))
+      = ppCat [ppr sty fun, ppr sty var]
 
     ppr sty (UfCase scrut alts)
       = ppCat [ppStr "case", ppr sty scrut, ppStr "of {", pp_alts alts, ppStr "}"]
       where
-    	pp_alts (UfCoAlgAlts alts deflt)
+    	pp_alts (UfAlgAlts alts deflt)
 	  = ppCat [ppInterleave ppSemi (map pp_alt alts), pp_deflt deflt]
 	  where
 	   pp_alt (c,bs,rhs) = ppCat [ppr sty c, ppr sty bs, ppStr "->", ppr sty rhs]
-    	pp_alts (UfCoPrimAlts alts deflt)
+    	pp_alts (UfPrimAlts alts deflt)
 	  = ppCat [ppInterleave ppSemi (map pp_alt alts), pp_deflt deflt]
 	  where
 	   pp_alt (l,rhs) = ppCat [ppr sty l, ppStr "->", ppr sty rhs]
 
-	pp_deflt UfCoNoDefault = ppNil
-	pp_deflt (UfCoBindDefault b rhs) = ppCat [ppr sty b, ppStr "->", ppr sty rhs]
+	pp_deflt UfNoDefault = ppNil
+	pp_deflt (UfBindDefault b rhs) = ppCat [ppr sty b, ppStr "->", ppr sty rhs]
 
-    ppr sty (UfLet (UfCoNonRec b rhs) body)
+    ppr sty (UfLet (UfNonRec b rhs) body)
       = ppCat [ppStr "let", ppr sty b, ppEquals, ppr sty rhs, ppStr "in", ppr sty body]
-    ppr sty (UfLet (UfCoRec pairs) body)
+    ppr sty (UfLet (UfRec pairs) body)
       = ppCat [ppStr "letrec {", ppInterleave ppSemi (map pp_pair pairs), ppStr "} in", ppr sty body]
       where
 	pp_pair (b,rhs) = ppCat [ppr sty b, ppEquals, ppr sty rhs]
@@ -172,41 +146,27 @@ instance Outputable name => Outputable (UnfoldingCoreExpr name) where
     ppr sty (UfSCC uf_cc body)
       = ppCat [ppStr "_scc_ <cost-centre[ToDo]>", ppr sty body]
 
-instance Outputable name => Outputable (UnfoldingPrimOp name) where
+instance Outputable name => Outputable (UfPrimOp name) where
     ppr sty (UfCCallOp str is_casm can_gc arg_tys result_ty)
       = let
 	    before = ppStr (if is_casm then "_casm_ ``" else "_ccall_ ")
 	    after  = if is_casm then ppStr "'' " else ppSP
 	in
 	ppBesides [before, ppPStr str, after,
-		ppLbrack, ppr sty arg_tys, ppRbrack, ppSP, ppr sty result_ty]
+		  ppLbrack, ppr sty arg_tys, ppRbrack, ppSP, ppr sty result_ty]
+
     ppr sty (UfOtherOp op)
       = ppr sty op
 
-instance Outputable name => Outputable (UnfoldingCoreAtom name) where
-    ppr sty (UfCoVarAtom v) = pprUfId sty v
-    ppr sty (UfCoLitAtom l)	    = ppr sty l
+instance Outputable name => Outputable (UfArg name) where
+    ppr sty (UfVarArg v)	= ppr sty v
+    ppr sty (UfLitArg l)	= ppr sty l
+    ppr sty (UfTyArg ty)	= pprParendHsType sty ty
+    ppr sty (UfUsageArg name)	= ppr sty name
 
-pprUfId sty (BoringUfId v) = ppr sty v
-pprUfId sty (SuperDictSelUfId c sc)
-  = ppBesides [ppStr "({-superdict-}", ppr sty c, ppSP, ppr sty sc, ppStr ")"]
-pprUfId sty (ClassOpUfId c op)
-  = ppBesides [ppStr "({-method-}", ppr sty c, ppSP, ppr sty op, ppStr ")"]
-pprUfId sty (DictFunUfId c ty)
-  = ppBesides [ppStr "({-dfun-}", ppr sty c, ppSP, ppr sty ty, ppStr ")"]
-pprUfId sty (ConstMethodUfId c op ty)
-  = ppBesides [ppStr "({-constm-}", ppr sty c, ppSP, ppr sty op, ppSP, ppr sty ty, ppStr ")"]
-pprUfId sty (DefaultMethodUfId c ty)
-  = ppBesides [ppStr "({-defm-}", ppr sty c, ppSP, ppr sty ty, ppStr ")"]
-
-pprUfId sty (SpecUfId unspec ty_maybes)
-  = ppBesides [ppStr "({-spec-} ", pprUfId sty unspec,
-		ppInterleave ppSP (map pp_ty_maybe ty_maybes), ppStr ")"]
-  where
-    pp_ty_maybe Nothing  = ppStr "_N_"
-    pp_ty_maybe (Just t) = ppr sty t
-
-pprUfId sty (WorkerUfId unwrkr)
-  = ppBesides [ppStr "({-wrkr-}", pprUfId sty unwrkr, ppStr ")"]
+instance Outputable name => Outputable (UfBinder name) where
+    ppr sty (UfValBinder name ty)  = ppCat [ppr sty name, ppStr "::", ppr sty ty]
+    ppr sty (UfTyBinder name kind) = ppCat [ppr sty name, ppStr "::", ppr sty kind]
+    ppr sty (UfUsageBinder name)   = ppr sty name
 \end{code}
 

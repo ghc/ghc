@@ -17,7 +17,7 @@
 >			  TyVarTemplate
 >			)
 > import Digraph	( dfs )
-> import Id		( idType, toplevelishId, updateIdType,
+> import Id		( idType, updateIdType,
 > 			  getIdInfo, replaceIdInfo, eqId, Id
 >			)
 > import IdInfo
@@ -145,7 +145,7 @@ type of the expression itself.
 >		newDefId type_of_f	`thenUs` \f' ->
 >		let
 > 		       f = replaceIdInfo f'
->		       		(addInfo (getIdInfo f') DoDeforest)
+>		       		(addDeforestInfo (getIdInfo f') DoDeforest)
 >		in
 >		loop ((f,e,val_args,ty_args):ls) e1
 >					`thenUs` \res@(ls',bs,bls,e') ->

@@ -31,7 +31,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..),
-			  Match, HsBinds, Stmt, Qualifier, PolyType, ArithSeqInfo )
+			  Match, HsBinds, Stmt, Qualifier, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -41,19 +41,21 @@ import DsMonad
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
-import Pretty		( ppShow )
-import Id		( idType, dataConArgTys, mkTupleCon,
+import Pretty		( ppShow, ppBesides, ppStr )
+import Id		( idType, dataConArgTys, 
 --			  pprId{-ToDo:rm-},
 			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
-import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
+import TyCon		( isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
 import TysPrim		( voidTy )
+import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
 import Usage		( SYN_IE(UVar) )
+import SrcLoc		( SrcLoc {- instance Outputable -} )
 --import PprCore{-ToDo:rm-}
 --import PprType--ToDo:rm
 --import Pretty--ToDo:rm
@@ -312,9 +314,9 @@ mkErrorAppDs :: Id 		-- The error function
 	     -> DsM CoreExpr
 
 mkErrorAppDs err_id ty msg
-  = getSrcLocDs			`thenDs` \ (file, line) ->
+  = getSrcLocDs			`thenDs` \ src_loc ->
     let
-	full_msg = file ++ "|" ++ line ++ "|" ++msg
+	full_msg = ppShow 80 (ppBesides [ppr PprForUser src_loc, ppStr ": ", ppStr msg])
 	msg_lit  = NoRepStr (_PK_ full_msg)
     in
     returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
@@ -449,7 +451,7 @@ mkTupleBind tyvars dicts local_global_prs tuple_expr
     tuple_var_ty
       = mkForAllTys tyvars $
 	mkRhoTy theta	   $
-	applyTyCon (mkTupleTyCon no_of_binders)
+	applyTyCon (tupleTyCon no_of_binders)
 		   (map idType locals)
       where
 	theta = mkTheta (map idType dicts)
@@ -477,9 +479,9 @@ has only one element, it is the identity function.
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
 
-mkTupleExpr []	 = Con (mkTupleCon 0) []
+mkTupleExpr []	 = Con unitDataCon []
 mkTupleExpr [id] = Var id
-mkTupleExpr ids	 = mkCon (mkTupleCon (length ids))
+mkTupleExpr ids	 = mkCon (tupleCon (length ids))
 			 [{-usages-}]
 			 (map idType ids)
 			 [ VarArg i | i <- ids ]
@@ -508,7 +510,7 @@ mkTupleSelector expr [var] should_be_the_same_var
     expr
 
 mkTupleSelector expr vars the_var
- = Case expr (AlgAlts [(mkTupleCon arity, vars, Var the_var)]
+ = Case expr (AlgAlts [(tupleCon arity, vars, Var the_var)]
 			  NoDefault)
  where
    arity = length vars

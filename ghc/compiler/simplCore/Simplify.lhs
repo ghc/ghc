@@ -21,12 +21,13 @@ import CoreSyn
 import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr
 			)
-import Id		( idType, idWantsToBeINLINEd,
-			  externallyVisibleId,
+import Id		( idType, idWantsToBeINLINEd, addIdArity, 
 			  getIdDemandInfo, addIdDemandInfo,
 			  GenId{-instance NamedThing-}
 			)
-import IdInfo		( willBeDemanded, DemandInfo )
+import Name		( isExported )
+import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
+			  atLeastArity, unknownArity )
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
 --import Name		( isExported )
@@ -43,7 +44,7 @@ import Type		( mkTyVarTy, mkTyVarTys, mkAppTy,
 			  splitFunTy, getFunTy_maybe, eqTy
 			)
 import TysWiredIn	( realWorldStateTy )
-import Util		( isSingleton, zipEqual, panic, pprPanic, assertPanic )
+import Util		( isSingleton, zipEqual, zipWithEqual, panic, pprPanic, assertPanic )
 \end{code}
 
 The controlling flags, and what they do
@@ -194,8 +195,8 @@ simplTopBinds env [] = returnSmpl []
 simplTopBinds env (NonRec binder@(in_id,occ_info) rhs : binds)
   = 	-- No cloning necessary at top level
  	-- Process the binding
-    simplRhsExpr env binder rhs 		`thenSmpl` \ rhs' ->
-    completeNonRec env binder in_id rhs'	`thenSmpl` \ (new_env, binds1') ->
+    simplRhsExpr env binder rhs 				`thenSmpl` \ (rhs',arity) ->
+    completeNonRec env binder (in_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds1') ->
 
 	-- Process the other bindings
     simplTopBinds new_env binds	`thenSmpl` \ binds2' ->
@@ -379,6 +380,8 @@ simplExpr env expr@(Lam (ValBinder binder) body) orig_args
 	    new_env = markDangerousOccs env (take n orig_args)
         in
         simplValLam new_env expr 0 {- Guaranteed applied to at least 0 args! -}
+				`thenSmpl` \ (expr', arity) ->
+	returnSmpl expr'
 
     go n env non_val_lam_expr args     	-- The lambda had enough arguments
       = simplExpr env non_val_lam_expr args
@@ -487,11 +490,12 @@ simplRhsExpr
 	:: SimplEnv
 	-> InBinder
 	-> InExpr
-	-> SmplM OutExpr
+	-> SmplM (OutExpr, ArityInfo)
 
 simplRhsExpr env binder@(id,occ_info) rhs
   | dont_eta_expand rhs
-  = simplExpr rhs_env rhs []
+  = simplExpr rhs_env rhs []	`thenSmpl` \ rhs' ->
+    returnSmpl (rhs', unknownArity)
 
   | otherwise	-- Have a go at eta expansion
   = 	-- Deal with the big lambda part
@@ -504,17 +508,20 @@ simplRhsExpr env binder@(id,occ_info) rhs
 	-- Deal with the little lambda part
 	-- Note that we call simplLam even if there are no binders,
 	-- in case it can do arity expansion.
-    simplValLam lam_env body (getBinderInfoArity occ_info)	`thenSmpl` \ lambda' ->
+    simplValLam lam_env body (getBinderInfoArity occ_info)	`thenSmpl` \ (lambda', arity) ->
 
 	-- Put it back together
     returnSmpl (
        (if switchIsSet env SimplDoEtaReduction
        then mkTyLamTryingEta
-       else mkTyLam) tyvars' lambda'
+       else mkTyLam) tyvars' lambda',
+      arity
     )
   where
 
-    rhs_env | not (switchIsSet env IgnoreINLINEPragma) &&
+    rhs_env | 	-- not (switchIsSet env IgnoreINLINEPragma) &&
+		-- No!  Don't ever inline in a INLINE thing's rhs, because
+		-- doing so will inline a worker straight back into its wrapper!
 	      idWantsToBeINLINEd id
 	    = switchOffInlining env
 	    | otherwise	
@@ -579,7 +586,10 @@ the abstraction will always be applied to at least min_no_of_args.
 \begin{code}
 simplValLam env expr min_no_of_args
   | not (switchIsSet env SimplDoLambdaEtaExpansion) ||	-- Bale out if eta expansion off
-    null binders				    ||  -- or it's a thunk
+
+-- We used to disable eta expansion for thunks, but I don't see why.
+--    null binders				    ||  -- or it's a thunk
+
     null potential_extra_binder_tys		    ||	-- or ain't a function
     no_of_extra_binders <= 0				-- or no extra binders needed
   = cloneIds env binders		`thenSmpl` \ binders' ->
@@ -590,7 +600,8 @@ simplValLam env expr min_no_of_args
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
        then mkValLamTryingEta
-       else mkValLam) binders' body'
+       else mkValLam) binders' body',
+      atLeastArity no_of_binders
     )
 
   | otherwise				-- Eta expansion possible
@@ -604,11 +615,13 @@ simplValLam env expr min_no_of_args
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
        then mkValLamTryingEta
-       else mkValLam) (binders' ++ extra_binders') body'
+       else mkValLam) (binders' ++ extra_binders') body',
+      atLeastArity (no_of_binders + no_of_extra_binders)
     )
 
   where
     (binders,body) = collectValBinders expr
+    no_of_binders  = length binders
     (potential_extra_binder_tys, res_ty)
 	= splitFunTy (simplTy env (coreExprType (unTagBinders body)))
 	-- Note: it's possible that simplValLam will be applied to something
@@ -620,8 +633,14 @@ simplValLam env expr min_no_of_args
     extra_binder_tys = take no_of_extra_binders potential_extra_binder_tys
 
     no_of_extra_binders =	-- First, use the info about how many args it's
-				-- always applied to in its scope
-			   (min_no_of_args - length binders)
+				-- always applied to in its scope; but ignore this
+				-- if it's a thunk!  To see why we ignore it for thunks,
+				-- consider  	let f = lookup env key in (f 1, f 2)
+				-- We'd better not eta expand f just because it is 
+				-- always applied!
+			   (if null binders
+			    then 0 
+			    else min_no_of_args - no_of_binders)
 
 				-- Next, try seeing if there's a lambda hidden inside
 				-- something cheap
@@ -635,7 +654,6 @@ simplValLam env expr min_no_of_args
 			   case potential_extra_binder_tys of
 				[ty] | ty `eqTy` realWorldStateTy -> 1
 				other				  -> 0
-
 \end{code}
 
 
@@ -728,6 +746,10 @@ ToDo: check this is OK with andy
 -- Dead code is now discarded by the occurrence analyser,
 
 simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
+  | idWantsToBeINLINEd id
+  = complete_bind env rhs	-- Don't messa bout with floating or let-to-case on
+				-- INLINE things
+  | otherwise
   = simpl_bind env rhs
   where
     -- Try let-to-case; see notes below about let-to-case
@@ -774,9 +796,10 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
     simpl_bind env rhs = complete_bind env rhs
  
     complete_bind env rhs
-      = simplRhsExpr env binder rhs 		`thenSmpl` \ rhs' ->
+      = simplRhsExpr env binder rhs 		`thenSmpl` \ (rhs',arity) ->
 	cloneId env binder			`thenSmpl` \ new_id ->
-	completeNonRec env binder new_id rhs'	`thenSmpl` \ (new_env, binds) ->
+	completeNonRec env binder 
+		(new_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds) ->
         body_c new_env				`thenSmpl` \ body' ->
         returnSmpl (mkCoLetsAny binds body')
 
@@ -997,6 +1020,9 @@ simplBind env (Rec pairs) body_c body_ty
 					      (pairs', body') = do_float body
     do_float other			    = ([], other)
 
+
+-- The env passed to simplRecursiveGroup already has 
+-- bindings that clone the variables of the group.
 simplRecursiveGroup env new_ids pairs 
   = 	-- Add unfoldings to the new_ids corresponding to their RHS
     let
@@ -1007,17 +1033,33 @@ simplRecursiveGroup env new_ids pairs
 		               env new_ids_w_pairs
     in
 
-    mapSmpl (\(binder,rhs) -> simplRhsExpr rhs_env binder rhs) pairs	`thenSmpl` \ new_rhss ->
+    mapSmpl (\(binder,rhs) -> simplRhsExpr rhs_env binder rhs) pairs	`thenSmpl` \ new_rhss_w_arities ->
 
     let
-       new_pairs	= zipEqual "simplRecGp" new_ids new_rhss
+       new_pairs = zipWithEqual "simplRecGp" mk_new_pair new_ids new_rhss_w_arities
+       mk_new_pair id (rhs,arity) = (id `withArity` arity, rhs)
+		-- NB: the new arity isn't used when processing its own
+		-- right hand sides, nor in the subsequent code
+		-- The latter is something of a pity, and not hard to fix; but
+		-- the info will percolate on the next iteration anyway
+
+{-	THE NEXT FEW LINES ARE PLAIN WRONG
        occs_w_new_pairs = zipEqual "simplRecGp" occs new_pairs
        new_env      	= foldl add_binding env occs_w_new_pairs
 
        add_binding env (occ_info,(new_id,new_rhs)) 
 	  = extendEnvGivenBinding env occ_info new_id new_rhs
+
+Here's why it's wrong: consider
+	let f x = ...f x'...
+	in
+	f 3
+
+If the RHS is small we'll inline f in the body of the let, then
+again, then again...URK
+-}
     in
-    returnSmpl (Rec new_pairs, new_env)
+    returnSmpl (Rec new_pairs, rhs_env)
 \end{code}
 
 
@@ -1105,9 +1147,9 @@ completeNonRec env binder new_id rhs@(Lit lit)
 completeNonRec env binder new_id rhs@(Con con con_args)
   | switchIsSet env SimplReuseCon && 
     maybeToBool maybe_existing_con &&
-    not (externallyVisibleId new_id)		-- Don't bother for exported things
-						-- because we won't be able to drop
-						-- its binding.
+    not (isExported new_id)		-- Don't bother for exported things
+					-- because we won't be able to drop
+					-- its binding.
   = tick ConReused		`thenSmpl_`
     returnSmpl (extendIdEnvWithAtom env binder (VarArg it), [NonRec new_id rhs])
   where
@@ -1153,7 +1195,7 @@ fix_up_demandedness False {- May not be demanded -} (NonRec binder rhs)
 fix_up_demandedness False {- May not be demanded -} (Rec pairs)
    = Rec [(un_demandify binder, rhs) | (binder,rhs) <- pairs]
 
-un_demandify (id, occ_info) = (id `addIdDemandInfo` noInfo, occ_info)
+un_demandify (id, occ_info) = (id `addIdDemandInfo` noDemandInfo, occ_info)
 
 is_cheap_prim_app (Prim op _) = primOpOkForSpeculation op
 is_cheap_prim_app other	      = False
@@ -1170,5 +1212,8 @@ computeResultType env expr args
     go ty (a:args) | isValArg a = case (getFunTy_maybe ty) of
 				    Just (_, res_ty) -> go res_ty args
 				    Nothing	     -> panic "computeResultType"
+
+var `withArity` UnknownArity = var
+var `withArity` arity	     = var `addIdArity` arity
 \end{code}
 

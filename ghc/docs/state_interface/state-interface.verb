@@ -8,23 +8,112 @@
 
 \begin{document}
 
-\title{GHC prelude: types and operations}
-\author{Simon L Peyton Jones \and John Launchbury \and Will Partain}
+\title{The GHC Prelude and Libraries}
+\author{Simon L Peyton Jones \and Will Partain}
 
 \maketitle
 \tableofcontents
 
-This ``state interface document'' corresponds to Glasgow Haskell
-version~2.01.
+\section{Introduction}
 
-\section{Really primitive stuff}
+This document describes GHC's prelude and libraries.  The basic story is that of
+the Haskell 1.3 Report and Libraries document (which we do not reproduce here),
+but this document describes in addition:
+\begin{itemize}
+\item	GHC's additional non-standard libraries and types, such as state transformers,
+	packed strings, foreign objects, stable pointers, and so on.
+
+\item	GHC's primitive types and operations.  The standard Haskell functions are implemented
+	on top of these, and it is sometimes useful to use them directly.
+
+\item	The organsiation of these libraries into directories.
+\end{itemize}
+
+\section{Overview}
+
+The libraries are organised into the following three groups, each of which
+is kept in a separate sub-directory of GHC's installed @lib/@ directory:
+\begin{description}
+\item[@lib/required/@]  These are the libraries {\em required} by the Haskell
+definition.  All are defined by the Haskell Report, or by the Haskell Libraries Report.
+They currently comprise:
+\begin{itemize}
+\item @Prelude@.
+\item @List@: more functions on lists.
+\item @Char@: more functions on characters.
+\item @Maybe@: more functions on @Maybe@ types.
+\item @Complex@: functions on complex numbers.
+\item @Ratio@: functions on rational numbers.
+\item @Monad@: functions on characters.
+\item @Ix@: the @Ix@ class of indexing operations.
+\item @Array@: monolithic arrays.
+\item @IO@: basic input/output functions.
+\item @Directory@: basic functions for accessing the file system.
+\item @System@: basic operating-system interface functions.
+\end{itemize}
+
+\item[@lib/glaExts@]  GHC extension libraries, currently comprising:
+\begin{itemize}
+\item @PackedString@: functions that manipulate strings packed efficiently, one character per byte.
+\item @ST@: the state transformer monad.
+\item @Foreign@: types and operations for GHC's foreign-language interface.
+\end{itemize}
+
+\item[@lib/concurrent@] GHC extension libraries to support Concurrent Haskell, currently comprising:
+\begin{itemize}
+\item @Concurrent.hs@: main library.
+\item @Parallel.hs@: stuff for multi-processor parallelism.
+\item @Channel.hs@
+\item @ChannelVar.hs@
+\item @Merge.hs@
+\item @SampleVar.hs@
+\item @Semaphore.hs@
+\end{itemize}
+
+\item[@lib/ghc@] These libraries are the pieces on which all the others are built.
+They aren't typically imported by Joe Programmer, but there's nothing to stop you
+doing so if you want.  In general, the modules prefixed by @Prel@ are pieces that go
+towards building @Prelude@.
+
+\begin{itemize}
+\item @GHC@: this ``library'' brings into scope all the primitive types and operations, such as
+@Int#@, @+#@,  @encodeFloat#@, etc etc.  It is unique in that there is no Haskell
+source code for it.  Details in Section \ref{sect:ghc}.
+
+\item @PrelBase@: defines the basic types and classes without which very few Haskell programs can work.
+The classes are: @Eq@, @Ord@, @Enum@, @Bounded@, @Num@, @Show@, @Eval@, @Monad@, @MonadZero@, @MonadPlus@.
+The types are: list, @Bool@, @Char@, @Ordering@, @String@, @Int@, @Integer@, @Maybe@, @Either@.
+
+\item @PrelTup@: defines tuples and their instances.
+\item @PrelList@: defines most of the list operations required by @Prelude@.  (A few are in @PrelBase@.
+
+\item @PrelNum@ defines: the numeric classes beyond @Num@ (namely @Real@, @Integral@, 
+@Fractional@, @Floating@, @RealFrac@, @RealFloat@; instances for appropriate classes 
+for @Int@ and @Integer@; the types @Float@, @Double@, and @Ratio@ and their instances.
+
+\item @PrelRead@: the @Read@ class and all its instances.  It's kept separate because many programs
+don't use @Read@ at all, so we don't even want to link in its code.
+
+\item @ConcBase@: substrate stuff for Concurrent Haskell.
+
+\item @IOBase@: substrate stuff for the main I/O libraries.
+\item @IOHandle@: large blob of code for doing I/O on handles.
+\item @PrelIO@: the remaining small pieces to produce the I/O stuff needed by @Prelude@.
+\item @GHCerr@: error reporting code, called from code that the compiler plants in compiled programs.
+\item @GHCmain@: the definition of @mainPrimIO@, which is what {\em really} gets
+	called by the runtime system.  @mainPrimIO@ in turn calls @main@.
+\end{itemize}
+\end{description}
+
+\section{The module @GHC@: really primitive stuff}
+\label{sect:ghc}
 
 This section defines all the types which are primitive in Glasgow Haskell, and the
 operations provided for them.
 
-A primitive type is one which cannot be defined in Haskell, and which is 
-therefore built into the language and compiler.
-Primitive types are always unboxed; that is, a value of primitive type cannot be 
+A primitive type is one which cannot be defined in Haskell, and which
+is therefore built into the language and compiler.  Primitive types
+are always unboxed; that is, a value of primitive type cannot be
 bottom.
 
 Primitive values are often represented by a simple bit-pattern, such as @Int#@, 

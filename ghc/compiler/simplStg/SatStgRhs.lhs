@@ -69,8 +69,7 @@ import Id		( idType, getIdArity, addIdArity, mkSysLocal,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  lookupIdEnv, SYN_IE(IdEnv)
 			)
-import IdInfo		( arityMaybe )
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, splitForAllTy, splitFunTyExpandingDicts )
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import Util		( panic, assertPanic )
@@ -99,6 +98,10 @@ This pass
 
 \begin{code}
 satStgRhs :: [StgBinding] -> UniqSM [StgBinding]
+satStgRhs = panic "satStgRhs"
+
+{- 		NUKED FOR NOW  SLPJ Dec 96
+
 
 satStgRhs p = satProgram nullIdEnv p
 
@@ -305,5 +308,7 @@ lookupVar env v = case lookupIdEnv env v of
 newName :: Type -> UniqSM Id
 newName ut
   = getUnique	`thenUs` \ uniq ->
-    returnUs (mkSysLocal SLIT("sat") uniq ut mkUnknownSrcLoc)
+    returnUs (mkSysLocal SLIT("sat") uniq ut noSrcLoc)
+
+-}
 \end{code}

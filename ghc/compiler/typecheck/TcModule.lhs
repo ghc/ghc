@@ -10,15 +10,14 @@ module TcModule (
 	typecheckModule,
 	SYN_IE(TcResults),
 	SYN_IE(TcResultBinds),
-	SYN_IE(TcIfaceInfo),
 	SYN_IE(TcSpecialiseRequests),
 	SYN_IE(TcDDumpDeriv)
     ) where
 
 IMP_Ubiq(){-uitous-}
 
-import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
-			  TyDecl, SpecDataSig, ClassDecl, InstDecl,
+import HsSyn		( HsDecl(..), HsModule(..), HsBinds(..), Bind, HsExpr,
+			  TyDecl, SpecDataSig, ClassDecl, InstDecl, IfaceSig,
 			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
  			  FixityDecl, IE, ImportDecl
 			)
@@ -26,7 +25,7 @@ import RnHsSyn		( SYN_IE(RenamedHsModule), RenamedFixityDecl(..) )
 import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
 			  TcIdOcc(..), zonkBinds, zonkDictBinds )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( Inst, plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )
@@ -42,14 +41,14 @@ import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls1 )
 import TcTyDecls	( mkDataBinds )
 
+import RnMonad		( RnNameSupply(..) )
 import Bag		( listToBag )
 import Class		( GenClass, classSelIds )
 import ErrUtils		( SYN_IE(Warning), SYN_IE(Error) )
-import Id		( idType, isMethodSelId, isTopLevId, GenId, SYN_IE(IdEnv), nullIdEnv )
+import Id		( idType, GenId, SYN_IE(IdEnv), nullIdEnv )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined )
 import Pretty
-import RnUtils		( SYN_IE(RnEnv) )
 import TyCon		( TyCon )
 import Type		( applyTyCon )
 import TysWiredIn	( unitTy, mkPrimIoTy )
@@ -69,7 +68,8 @@ Outside-world interface:
 -- Convenient type synonyms first:
 type TcResults
   = (TcResultBinds,
-     TcIfaceInfo,
+     [TyCon], 
+     Bag InstInfo,		-- Instance declaration information
      TcSpecialiseRequests,
      TcDDumpDeriv)
 
@@ -83,9 +83,6 @@ type TcResultBinds
 
      [(Id, TypecheckedHsExpr)]) -- constant instance binds
 
-type TcIfaceInfo -- things for the interface generator
-  = ([Id], [TyCon], [Class], Bag InstInfo)
-
 type TcSpecialiseRequests
   = FiniteMap TyCon [(Bool, [Maybe Type])]
     -- source tycon specialisation requests
@@ -96,7 +93,7 @@ type TcDDumpDeriv
 ---------------
 typecheckModule
 	:: UniqSupply
-	-> RnEnv		-- for renaming derivings
+	-> RnNameSupply
 	-> RenamedHsModule
 	-> MaybeErr
 	    (TcResults,		-- if all goes well...
@@ -104,24 +101,19 @@ typecheckModule
 	    (Bag Error,		-- if we had errors...
 	     Bag Warning)
 
-typecheckModule us rn_env mod
-  = initTc us (tcModule rn_env mod)
+typecheckModule us rn_name_supply mod
+  = initTc us (tcModule rn_name_supply mod)
 \end{code}
 
 The internal monster:
 \begin{code}
-tcModule :: RnEnv		-- for renaming derivings
+tcModule :: RnNameSupply	-- for renaming derivings
 	 -> RenamedHsModule	-- input
 	 -> TcM s TcResults	-- output
 
-tcModule rn_env
-	(HsModule mod_name verion exports imports fixities
-		  ty_decls specdata_sigs cls_decls inst_decls specinst_sigs
-		  default_decls val_decls sigs src_loc)
-
-  = ASSERT(null imports)
-
-    tcAddSrcLoc src_loc $	-- record where we're starting
+tcModule rn_name_supply
+	(HsModule mod_name verion exports imports fixities decls src_loc)
+  = tcAddSrcLoc src_loc $	-- record where we're starting
 
 	-- Tie the knot for inteface-file value declaration signatures
 	-- This info is only used inside the knot for type-checking the
@@ -140,30 +132,28 @@ tcModule rn_env
 	fixTc ( \ ~(rec_inst_mapper, _, _, _, _) ->
 
 	     -- Type-check the type and class decls
-	    --trace "tcTyAndClassDecls:"	$
-	    tcTyAndClassDecls1 rec_inst_mapper ty_decls_bag cls_decls_bag
-					`thenTc` \ env ->
+	    -- trace "tcTyAndClassDecls:"	$
+	    tcTyAndClassDecls1 rec_inst_mapper decls	`thenTc` \ env ->
 
-	    --trace "tc3" $
+	    -- trace "tc3" $
 		-- Typecheck the instance decls, includes deriving
 	    tcSetEnv env (
-	    --trace "tcInstDecls:"	$
-	    tcInstDecls1 inst_decls_bag specinst_sigs
-			 mod_name rn_env fixities 
-	    )				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
+	    -- trace "tcInstDecls:"	$
+	    tcInstDecls1 decls mod_name rn_name_supply
+	    )					`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
 
-	    --trace "tc4" $
+	    -- trace "tc4" $
 	    buildInstanceEnvs inst_info	`thenTc` \ inst_mapper ->
 
 	    returnTc (inst_mapper, env, inst_info, deriv_binds, ddump_deriv)
 
 	) `thenTc` \ (_, env, inst_info, deriv_binds, ddump_deriv) ->
 
-	--trace "tc5" $
+	-- trace "tc5" $
 	tcSetEnv env (
 
 	    -- Default declarations
-	tcDefaults default_decls	`thenTc` \ defaulting_tys ->
+	tcDefaults decls		`thenTc` \ defaulting_tys ->
 	tcSetDefaultTys defaulting_tys 	( -- for the iface sigs...
 
 	-- Create any necessary record selector Ids and their bindings
@@ -187,29 +177,29 @@ tcModule rn_env
 	    -- What we rely on is that pragmas are typechecked lazily; if
 	    --   any type errors are found (ie there's an inconsistency)
 	    --   we silently discard the pragma
-	tcInterfaceSigs sigs		`thenTc` \ sig_ids ->
+	tcInterfaceSigs decls		`thenTc` \ sig_ids ->
 	tcGetEnv			`thenNF_Tc` \ env ->
-	--trace "tc6" $
+	-- trace "tc6" $
 
 	returnTc (env, inst_info, data_binds, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
 
     )))) `thenTc` \ (env, inst_info, data_binds, deriv_binds, ddump_deriv, defaulting_tys, _) ->
 
-    --trace "tc7" $
+    -- trace "tc7" $
     tcSetEnv env (				-- to the end...
     tcSetDefaultTys defaulting_tys (		-- ditto
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
-    --trace "tcBinds:"			$
+    -- trace "tcBinds:"			$
     tcBindsAndThen
 	(\ binds1 (binds2, thing) -> (binds1 `ThenBinds` binds2, thing))
-	(val_decls `ThenBinds` deriv_binds)
+	(get_val_decls decls `ThenBinds` deriv_binds)
 	(	-- Second pass over instance declarations,
 		-- to compile the bindings themselves.
-	    --trace "tc8" $
+	    -- trace "tc8" $
 	    tcInstDecls2  inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-	    tcClassDecls2 cls_decls_bag	`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
+	    tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
 	    tcGetEnv			`thenNF_Tc` \ env ->
 	    returnTc ( (EmptyBinds, (inst_binds, cls_binds, env)),
 		       lie_instdecls `plusLIE` lie_clasdecls,
@@ -223,7 +213,7 @@ tcModule rn_env
 	-- restriction, and no subsequent decl instantiates its
 	-- type.  (Usually, ambiguous type variables are resolved
 	-- during the generalisation step.)
-    --trace "tc9" $
+    -- trace "tc9" $
     tcSimplifyTop lie_alldecls			`thenTc` \ const_insts ->
 
 	-- Backsubstitution.  Monomorphic top-level decls may have
@@ -252,22 +242,15 @@ tcModule rn_env
 
 	local_tycons  = filter isLocallyDefined tycons
 	local_classes = filter isLocallyDefined classes
-	local_vals    = [ v | v <- eltsUFM ve2, isLocallyDefined v && isTopLevId v ]
-			-- the isTopLevId is doubtful...
     in
 	-- FINISHED AT LAST
     returnTc (
 	(data_binds', cls_binds', inst_binds', val_binds', const_insts'),
 
-	     -- the next collection is just for mkInterface
-	(local_vals, local_tycons, local_classes, inst_info),
-
-	tycon_specs,
+	local_tycons, inst_info, tycon_specs,
 
 	ddump_deriv
     )))
-  where
-    ty_decls_bag   = listToBag ty_decls
-    cls_decls_bag  = listToBag cls_decls
-    inst_decls_bag = listToBag inst_decls
+
+get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 \end{code}

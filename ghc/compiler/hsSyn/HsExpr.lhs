@@ -15,7 +15,7 @@ IMPORT_DELOOPER(HsLoop) -- for paranoia checking
 import HsBinds		( HsBinds )
 import HsLit		( HsLit )
 import HsMatches	( pprMatches, pprMatch, Match )
-import HsTypes		( PolyType )
+import HsTypes		( HsType )
 
 -- others:
 import Id		( SYN_IE(DictVar), GenId, SYN_IE(Id) )
@@ -119,7 +119,7 @@ data HsExpr tyvar uvar id pat
 
   | ExprWithTySig		-- signature binding
 		(HsExpr tyvar uvar id pat)
-		(PolyType id)
+		(HsType id)
   | ArithSeqIn			-- arithmetic sequence
 		(ArithSeqInfo tyvar uvar id pat)
   | ArithSeqOut
@@ -401,8 +401,8 @@ pp_rbinds :: (NamedThing id, Outputable id, Outputable pat,
 	      -> HsRecordBinds tyvar uvar id pat -> Pretty
 
 pp_rbinds sty thing rbinds
-  = ppHang thing 4
-	(ppBesides [ppChar '{', ppInterleave ppComma (map (pp_rbind sty) rbinds), ppChar '}'])
+  = ppHang thing 
+	 4 (ppCurlies (ppIntersperse pp'SP (map (pp_rbind sty) rbinds)))
   where
     pp_rbind PprForUser (v, _, True) = ppr PprForUser v
     pp_rbind sty        (v, e, _)    = ppCat [ppr sty v, ppStr "=", ppr sty e]

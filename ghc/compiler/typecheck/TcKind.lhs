@@ -19,7 +19,7 @@ module TcKind (
 IMP_Ubiq(){-uitous-}
 
 import Kind
-import TcMonad	hiding ( rnMtoTcM )
+import TcMonad
 
 import Unique	( Unique, pprUnique10 )
 import Pretty

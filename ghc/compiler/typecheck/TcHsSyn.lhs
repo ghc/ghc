@@ -15,7 +15,7 @@ module TcHsSyn (
 	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcPat),
 	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
 	SYN_IE(TcQual), SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
-	SYN_IE(TcHsModule),
+	SYN_IE(TcHsModule), SYN_IE(TcCoreExpr),
 	
 	SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedBind),
 	SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedPat),
@@ -44,7 +44,7 @@ import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
 
 -- others:
 import Name	( Name{--O only-} )
-import TcMonad	hiding ( rnMtoTcM )
+import TcMonad
 import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
@@ -56,6 +56,7 @@ import Type	( mkTyVarTy, tyVarsOfType )
 import TyVar	( GenTyVar {- instances -},
 		  SYN_IE(TyVarEnv), growTyVarEnvList, emptyTyVarSet )
 import TysPrim	( voidTy )
+import CoreSyn  ( GenCoreExpr )
 import Unique	( Unique )		-- instances
 import UniqFM
 import PprStyle
@@ -91,6 +92,8 @@ type TcStmt s		= Stmt (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcArithSeqInfo s	= ArithSeqInfo (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcRecordBinds s	= HsRecordBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcHsModule s	= HsModule (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+
+type TcCoreExpr s	= GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcTyVar s) UVar
 
 type TypecheckedPat		= OutPat	TyVar UVar Id
 type TypecheckedMonoBinds 	= MonoBinds	TyVar UVar Id TypecheckedPat
@@ -283,6 +286,10 @@ zonkMonoBinds te ve (VarMonoBind var expr)
   = zonkIdBndr te var    	`thenNF_Tc` \ new_var ->
     zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
     returnNF_Tc (VarMonoBind new_var new_expr, [new_var])
+
+zonkMonoBinds te ve (CoreMonoBind var core_expr)
+  = zonkIdBndr te var    	`thenNF_Tc` \ new_var ->
+    returnNF_Tc (CoreMonoBind new_var core_expr, [new_var])
 
 zonkMonoBinds te ve (FunMonoBind var inf ms locn)
   = zonkIdBndr te var			`thenNF_Tc` \ new_var ->

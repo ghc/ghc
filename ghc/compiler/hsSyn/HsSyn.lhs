@@ -30,7 +30,13 @@ IMP_Ubiq()
 
 -- friends:
 import HsBinds
-import HsDecls
+import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..), 
+			  DefaultDecl(..), 
+			  FixityDecl(..), Fixity(..), FixityDirection(..), 
+			  ConDecl(..), BangType(..),
+			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), SpecInstSig(..),
+			  hsDeclName
+			)
 import HsExpr
 import HsImpExp
 import HsLit
@@ -39,6 +45,8 @@ import HsPat
 import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
 			  DataPragmas, GenPragmas, InstancePragmas )
+import HsCore
+
 -- others:
 import FiniteMap	( FiniteMap )
 import Outputable	( ifPprShowAll, ifnotPprForUser, interpp'SP, Outputable(..) )
@@ -69,14 +77,7 @@ data HsModule tyvar uvar name pat
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
 	[FixityDecl name]
-	[TyDecl name]
-	[SpecDataSig name]		-- user pragmas that modify TyDecls
-	[ClassDecl tyvar uvar name pat]
-	[InstDecl  tyvar uvar name pat]
-	[SpecInstSig name] 		-- user pragmas that modify InstDecls
-	[DefaultDecl name]
-	(HsBinds tyvar uvar name pat)	-- the main stuff, includes source sigs
-	[Sig name]			-- interface sigs
+	[HsDecl tyvar uvar name pat]	-- Type, class, value, and interface signature decls
 	SrcLoc
 \end{code}
 
@@ -86,8 +87,7 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	=> Outputable (HsModule tyvar uvar name pat) where
 
     ppr sty (HsModule name iface_version exports imports fixities
-		      typedecls typesigs classdecls instdecls instsigs
-		      defdecls binds sigs src_loc)
+		      decls src_loc)
       = ppAboves [
 	    ifPprShowAll sty (ppr sty src_loc),
 	    ifnotPprForUser sty (pp_iface_version iface_version),
@@ -100,14 +100,7 @@ instance (NamedThing name, Outputable name, Outputable pat,
 			  ],
 	    pp_nonnull imports,
 	    pp_nonnull fixities,
-	    pp_nonnull typedecls,
-	    pp_nonnull typesigs,
-	    pp_nonnull classdecls,
-	    pp_nonnull instdecls,
-	    pp_nonnull instsigs,
-	    pp_nonnull defdecls,
-	    ppr sty binds,
-	    pp_nonnull sigs
+	    pp_nonnull decls
 	]
       where
 	pp_nonnull [] = ppNil

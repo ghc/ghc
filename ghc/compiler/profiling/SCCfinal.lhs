@@ -38,7 +38,7 @@ import CostCentre	-- lots of things
 import Id		( idType, mkSysLocal, emptyIdSet )
 import Maybes		( maybeToBool )
 import PprStyle		-- ToDo: rm
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, getFunTy_maybe )
 import UniqSupply	( getUnique, splitUniqSupply )
 import Util		( removeDups, assertPanic )
@@ -301,7 +301,7 @@ boxHigherOrderArgs almost_expr args live_vars
 	    -- make a trivial let-binding for the top-level function
 	    getUniqueMM		`thenMM` \ uniq ->
 	    let
-		new_var = mkSysLocal SLIT("ho") uniq var_type mkUnknownSrcLoc
+		new_var = mkSysLocal SLIT("ho") uniq var_type noSrcLoc
 	    in
 	    returnMM ( (new_var, old_var) : bindings, StgVarAtom new_var )
 	else

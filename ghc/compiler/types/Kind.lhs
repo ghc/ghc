@@ -17,7 +17,9 @@ module Kind (
 	hasMoreBoxityInfo,
 	resultKind, argKind,
 
-	isUnboxedKind, isTypeKind,
+	pprKind, pprParendKind,
+
+	isUnboxedTypeKind, isTypeKind, isBoxedTypeKind,
 	notArrowKind
     ) where
 
@@ -45,9 +47,13 @@ isTypeKind :: Kind -> Bool
 isTypeKind TypeKind = True
 isTypeKind other    = False
 
-isUnboxedKind :: Kind -> Bool
-isUnboxedKind UnboxedTypeKind 	= True
-isUnboxedKind other		= False
+isBoxedTypeKind :: Kind -> Bool
+isBoxedTypeKind BoxedTypeKind = True
+isBoxedTypeKind other         = False
+
+isUnboxedTypeKind :: Kind -> Bool
+isUnboxedTypeKind UnboxedTypeKind = True
+isUnboxedTypeKind other	 	  = False
 
 hasMoreBoxityInfo :: Kind -> Kind -> Bool
 
@@ -85,11 +91,11 @@ Printing
 instance Outputable Kind where
   ppr sty kind = pprKind kind
 
-pprKind TypeKind        = ppStr "*"
-pprKind BoxedTypeKind   = ppStr "*b"
-pprKind UnboxedTypeKind = ppStr "*u"
-pprKind (ArrowKind k1 k2) = ppSep [pprKind_parend k1, ppStr "->", pprKind k2]
+pprKind TypeKind        = ppStr "**"	-- Can be boxed or unboxed
+pprKind BoxedTypeKind   = ppStr "*"
+pprKind UnboxedTypeKind = ppStr "*#"	-- Unboxed
+pprKind (ArrowKind k1 k2) = ppSep [pprParendKind k1, ppStr "->", pprKind k2]
 
-pprKind_parend k@(ArrowKind _ _) = ppBesides [ppLparen, pprKind k, ppRparen]
-pprKind_parend k		 = pprKind k
+pprParendKind k@(ArrowKind _ _) = ppBesides [ppLparen, pprKind k, ppRparen]
+pprParendKind k		 	= pprKind k
 \end{code}

@@ -15,11 +15,11 @@ module TcSimplify (
 IMP_Ubiq()
 
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
-			  Match, HsBinds, Qualifier, PolyType, ArithSeqInfo,
+			  Match, HsBinds, Qualifier, HsType, ArithSeqInfo,
 			  GRHSsAndBinds, Stmt, Fake )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), SYN_IE(TcMonoBinds) )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( lookupInst, lookupSimpleInst,
 			  tyVarsOfInst, isTyVarDict, isDict,
 			  matchesInst, instToId, instBindingRequired,
@@ -36,19 +36,20 @@ import Unify		( unifyTauTy )
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
 			  snocBag, consBag, unionBags, isEmptyBag )
 import Class		( GenClass, SYN_IE(Class), SYN_IE(ClassInstEnv),
-			  isNumericClass, isStandardClass, isCcallishClass,
 			  isSuperClassOf, classSuperDictSelId, classInstEnv
 			)
 import Id		( GenId )
+import PrelInfo		( isNumericClass, isStandardClass, isCcallishClass )
+
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
 --import PprStyle--ToDo:rm
 import PprType		( GenType, GenTyVar )
 import Pretty
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import Type		( GenType, SYN_IE(Type), SYN_IE(TauType), mkTyVarTy, getTyVar, eqSimpleTy,
 			  getTyVar_maybe )
-import TysWiredIn	( intTy )
+import TysWiredIn	( intTy, unitTy )
 import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), 
 			  elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
 			  isEmptyTyVarSet, tyVarSetToList )
@@ -660,10 +661,7 @@ Since we're not using the result of @foo@, the result if (presumably)
 disambigOne :: [SimpleDictInfo s] -> TcM s ()
 
 disambigOne dict_infos
-  | not (isStandardNumericDefaultable classes)
-  = failTc (ambigErr dicts) -- no default
-
-  | otherwise -- isStandardNumericDefaultable dict_infos
+  |  any isNumericClass classes && all isStandardClass classes
   = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
 	-- SO, TRY DEFAULT TYPES IN ORDER
 
@@ -674,7 +672,7 @@ disambigOne dict_infos
     tcGetDefaultTys			`thenNF_Tc` \ default_tys ->
     let
       try_default [] 	-- No defaults work, so fail
-	= failTc (defaultErr dicts default_tys) 
+	= failTc (ambigErr dicts) 
 
       try_default (default_ty : default_tys)
 	= tryTc (try_default default_tys) $	-- If default_ty fails, we try
@@ -689,24 +687,19 @@ disambigOne dict_infos
     tcInstType [] chosen_default_ty	`thenNF_Tc` \ chosen_default_tc_ty ->	-- Tiresome!
     unifyTauTy chosen_default_tc_ty (mkTyVarTy tyvar)
 
+  | all isCcallishClass classes
+  = 	-- Default CCall stuff to (); we don't even both to check that () is an 
+	-- instance of CCallable/CReturnable, because we know it is.
+    unifyTauTy (mkTyVarTy tyvar) unitTy    
+    
+  | otherwise -- No defaults
+  = failTc (ambigErr dicts)
+
   where
     (_,_,tyvar) = head dict_infos		-- Should be non-empty
     dicts   = [dict | (dict,_,_) <- dict_infos]
     classes = [clas | (_,clas,_) <- dict_infos]
 
-\end{code}
-
-@isStandardNumericDefaultable@ sees whether the dicts have the
-property required for defaulting; namely at least one is numeric, and
-all are standard; or all are CcallIsh.
-
-\begin{code}
-isStandardNumericDefaultable :: [Class] -> Bool
-
-isStandardNumericDefaultable classes
-  = --pprTrace "isStdNumeric:\n" (ppAboves [ppCat (map (ppr PprDebug) classes), ppCat (map (ppr PprDebug . isNumericClass) classes), ppCat (map (ppr PprDebug . isStandardClass) classes), ppCat (map (ppr PprDebug . isCcallishClass) classes)]) $
-     (any isNumericClass classes && all isStandardClass classes)
-  || (all isCcallishClass classes)
 \end{code}
 
 
@@ -737,14 +730,4 @@ reduceErr insts sty
 	          (bagToList insts))
 \end{code}
 
-\begin{code}
-defaultErr dicts defaulting_tys sty
-  = ppHang (ppStr "Ambiguously-overloaded types could not be resolved:")
-	 4 (ppAboves [
-	     ppHang (ppStr "Conflicting:")
-		  4 (ppInterleave ppSemi (map (pprInst sty ""{-???-}) dicts)),
-	     ppHang (ppStr "Defaulting types :")
-		  4 (ppr sty defaulting_tys),
-	     ppStr "([Int, Double] is the default list of defaulting types.)" ])
-\end{code}
 

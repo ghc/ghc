@@ -28,7 +28,7 @@ IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
 import Id		( mkSysLocal, mkIdWithNewUniq )
 import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
-import SrcLoc		( mkUnknownSrcLoc )
+import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			  UniqSupply
@@ -312,7 +312,7 @@ combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
 \begin{code}
 newId :: Type -> SmplM Id
 newId ty us sc
-  = (mkSysLocal SLIT("s") uniq ty mkUnknownSrcLoc, sc)
+  = (mkSysLocal SLIT("s") uniq ty noSrcLoc, sc)
   where
     uniq = getUnique us
 
@@ -321,7 +321,7 @@ newIds tys us sc
   = (zipWithEqual "newIds" mk_id tys uniqs, sc)
   where
     uniqs  = getUniques (length tys) us
-    mk_id ty uniq = mkSysLocal SLIT("s") uniq ty mkUnknownSrcLoc
+    mk_id ty uniq = mkSysLocal SLIT("s") uniq ty noSrcLoc
 
 cloneTyVarSmpl :: TyVar -> SmplM TyVar
 

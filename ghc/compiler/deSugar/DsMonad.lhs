@@ -37,7 +37,7 @@ import Id		( mkSysLocal, mkIdWithNewUniq,
 import PprType		( GenType, GenTyVar )
 import PprStyle		( PprStyle(..) )
 import Pretty
-import SrcLoc		( unpackSrcLoc, mkUnknownSrcLoc, SrcLoc )
+import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import TyVar		( nullTyVarEnv, cloneTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instances-} )
@@ -75,7 +75,7 @@ initDs  :: UniqSupply
 	-> (a, DsWarnings)
 
 initDs init_us env mod_name action
-  = action init_us mkUnknownSrcLoc module_and_group env emptyBag
+  = action init_us noSrcLoc module_and_group env emptyBag
   where
     module_and_group = (mod_name, grp_name)
     grp_name  = case opt_SccGroup of
@@ -173,10 +173,9 @@ uniqSMtoDsM :: UniqSM a -> DsM a
 uniqSMtoDsM u_action us loc mod_and_grp env warns
   = (u_action us, warns)
 
-getSrcLocDs :: DsM (String, String)
+getSrcLocDs :: DsM SrcLoc
 getSrcLocDs us loc mod_and_grp env warns
-  = case (unpackSrcLoc loc) of { (x,y) ->
-    ((_UNPK_ x, _UNPK_ y), warns) }
+  = (loc, warns)
 
 putSrcLocDs :: SrcLoc -> DsM a -> DsM a
 putSrcLocDs new_loc expr us old_loc mod_and_grp env warns

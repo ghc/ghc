@@ -13,7 +13,7 @@ module UniqSupply (
 	getUnique, getUniques,	-- basic ops
 
 	SYN_IE(UniqSM),		-- type: unique supply monad
-	initUs, thenUs, returnUs,
+	initUs, thenUs, returnUs, fixUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
 
@@ -147,6 +147,10 @@ initUs init_us m
 
 @thenUs@ is where we split the @UniqSupply@.
 \begin{code}
+fixUs :: (a -> UniqSM a) -> UniqSM a
+fixUs m us
+  = r  where  r = m r us
+
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 
 thenUs expr cont us

@@ -13,7 +13,7 @@ IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), Match(..), Qualifier, HsBinds, PolyType,
+			  Stmt(..), Match(..), Qualifier, HsBinds, HsType,
 			  GRHSsAndBinds
 			)
 import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
@@ -32,17 +32,15 @@ import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
 			)
 import Match		( matchWrapper )
 
-import CoreUnfold	( Unfolding )
 import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
 			  mkCoreIfThenElse, unTagBinders )
 import CostCentre	( mkUserCC )
 import FieldLabel	( fieldLabelType, FieldLabel )
-import Id		( mkTupleCon, idType, nullIdEnv, addOneToIdEnv,
-			  getIdUnfolding, dataConArgTys, dataConFieldLabels,
+import Id		( idType, nullIdEnv, addOneToIdEnv,
+			  dataConArgTys, dataConFieldLabels,
 			  recordSelectorFieldLabel
 			)
 import Literal		( mkMachInt, Literal(..) )
-import MagicUFs		( MagicUnfoldingFun )
 import Name		( Name{--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
@@ -54,7 +52,7 @@ import Type		( splitSigmaTy, splitFunTy, typePrimRep,
 			  maybeBoxedPrimType
 			)
 import TysPrim		( voidTy )
-import TysWiredIn	( mkTupleTy, nilDataCon, consDataCon,
+import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
@@ -309,7 +307,7 @@ dsExpr (ExplicitListOut ty xs)
 
 dsExpr (ExplicitTuple expr_list)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
-    mkConDs (mkTupleCon (length expr_list))
+    mkConDs (tupleCon (length expr_list))
 	    (map (TyArg . coreExprType) core_exprs ++ map VarArg core_exprs)
 
 -- Two cases, one for ordinary constructors and one for newtype constructors
@@ -505,7 +503,7 @@ dsExpr (Dictionary dicts methods)
       1 -> returnDs (head core_d_and_ms) -- just a single Id
 
       _ ->	    -- tuple 'em up
-	   mkConDs (mkTupleCon num_of_d_and_ms)
+	   mkConDs (tupleCon num_of_d_and_ms)
 		   (map (TyArg . coreExprType) core_d_and_ms ++ map VarArg core_d_and_ms)
     )
   where
@@ -533,8 +531,8 @@ dsExpr (ClassDictLam dicts methods expr)
   where
     num_of_d_and_ms	    = length dicts + length methods
     dicts_and_methods	    = dicts ++ methods
-    tuple_ty		    = mkTupleTy    num_of_d_and_ms (map idType dicts_and_methods)
-    tuple_con		    = mkTupleCon   num_of_d_and_ms
+    tuple_ty		    = mkTupleTy  num_of_d_and_ms (map idType dicts_and_methods)
+    tuple_con		    = tupleCon   num_of_d_and_ms
 
 #ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:

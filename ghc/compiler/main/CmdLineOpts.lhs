@@ -23,7 +23,6 @@ module CmdLineOpts (
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
 	opt_CompilingGhcInternals,
-	opt_UsingGhcInternals,
 	opt_D_dump_absC,
 	opt_D_dump_asm,
 	opt_D_dump_deforest,
@@ -40,6 +39,7 @@ module CmdLineOpts (
 	opt_D_dump_stranal,
 	opt_D_dump_tc,
 	opt_D_show_passes,
+	opt_D_show_rn_trace,
 	opt_D_simplifier_stats,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
@@ -59,7 +59,7 @@ module CmdLineOpts (
 	opt_IgnoreStrictnessPragmas,
 	opt_IrrefutableEverything,
 	opt_IrrefutableTuples,
-	opt_NoImplicitPrelude,
+	opt_LiberateCaseThreshold,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
 	opt_OmitDefaultInstanceMethods,
@@ -77,15 +77,19 @@ module CmdLineOpts (
 	opt_ShowImportSpecs,
 	opt_ShowPragmaNameErrs,
 	opt_SigsRequired,
+	opt_SourceUnchanged,
 	opt_SpecialiseAll,
 	opt_SpecialiseImports,
 	opt_SpecialiseOverloaded,
 	opt_SpecialiseTrace,
 	opt_SpecialiseUnboxed,
 	opt_StgDoLetNoEscapes,
+
+	opt_InterfaceUnfoldThreshold,
 	opt_UnfoldingCreationThreshold,
-	opt_UnfoldingOverrideThreshold,
+	opt_UnfoldingConDiscount,
 	opt_UnfoldingUseThreshold,
+
 	opt_Verbose,
 	opt_WarnNameShadowing
     ) where
@@ -96,7 +100,7 @@ import Argv
 
 CHK_Ubiq() -- debugging consistency check
 
-import CgCompInfo	-- Default values for some flags
+import Constants	-- Default values for some flags
 
 import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Util		( startsWith, panic, panic#, assertPanic )
@@ -194,10 +198,6 @@ data SimplifierSwitch
 
   | MaxSimplifierIterations Int
 
-  | SimplUnfoldingUseThreshold      Int -- per-simplification variants
-  | SimplUnfoldingConDiscount       Int
-  | SimplUnfoldingCreationThreshold Int
-
   | KeepSpecPragmaIds	    -- We normally *toss* Ids we can do without
   | KeepUnusedBindings
 
@@ -226,9 +226,10 @@ data SimplifierSwitch
 %************************************************************************
 
 \begin{code}
-lookUp	   :: FAST_STRING -> Bool
-lookup_int :: String -> Maybe Int
-lookup_str :: String -> Maybe String
+lookUp	       :: FAST_STRING -> Bool
+lookup_int     :: String -> Maybe Int
+lookup_def_int :: String -> Int -> Int
+lookup_str     :: String -> Maybe String
 
 lookUp     sw = maybeToBool (assoc_opts sw)
 	
@@ -237,6 +238,10 @@ lookup_str sw = firstJust (map (startsWith sw) unpacked_opts)
 lookup_int sw = case (lookup_str sw) of
 		  Nothing -> Nothing
 		  Just xx -> Just (read xx)
+
+lookup_def_int sw def = case (lookup_str sw) of
+			    Nothing -> def		-- Use default
+		  	    Just xx -> read xx
 
 assoc_opts    = assocMaybe [ (a, True) | a <- argv ]
 unpacked_opts = map _UNPK_ argv
@@ -248,6 +253,8 @@ opt_AllStrict			= lookUp  SLIT("-fall-strict")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
+opt_CompilingGhcInternals	= maybeToBool maybe_CompilingGhcInternals
+maybe_CompilingGhcInternals	= lookup_str "-fcompiling-ghc-internals="
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
 opt_D_dump_deforest		= lookUp  SLIT("-ddump-deforest")
@@ -264,6 +271,7 @@ opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
+opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
 opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
 opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
@@ -271,16 +279,18 @@ opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_FoldrBuildTrace		= lookUp  SLIT("-ffoldr-build-trace")
 opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
+opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
+opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
-opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitDefaultInstanceMethods	= lookUp  SLIT("-fomit-default-instance-methods")
@@ -288,34 +298,35 @@ opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_PprStyle_All		= lookUp  SLIT("-dppr-all")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
 opt_PprStyle_User		= lookUp  SLIT("-dppr-user")
+opt_ProduceC  			= lookup_str "-C="
+opt_ProduceS  			= lookup_str "-S="
+opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
 opt_ReportWhyUnfoldingsDisallowed= lookUp SLIT("-freport-disallowed-unfoldings")
 opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
 opt_ShowImportSpecs		= lookUp  SLIT("-fshow-import-specs")
 opt_ShowPragmaNameErrs		= lookUp  SLIT("-fshow-pragma-name-errs")
 opt_SigsRequired		= lookUp  SLIT("-fsignatures-required")
+opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
 opt_SpecialiseAll		= lookUp  SLIT("-fspecialise-all")
 opt_SpecialiseImports		= lookUp  SLIT("-fspecialise-imports")
 opt_SpecialiseOverloaded	= lookUp  SLIT("-fspecialise-overloaded")
 opt_SpecialiseTrace		= lookUp  SLIT("-ftrace-specialisation")
 opt_SpecialiseUnboxed		= lookUp  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
-opt_Verbose			= lookUp  SLIT("-v")
-opt_UsingGhcInternals		= lookUp  SLIT("-fusing-ghc-internals")
-opt_CompilingGhcInternals	= maybeToBool maybe_CompilingGhcInternals
-maybe_CompilingGhcInternals	= lookup_str "-fcompiling-ghc-internals="
-opt_SccGroup  			= lookup_str "-G="
-opt_ProduceC  			= lookup_str "-C="
-opt_ProduceS  			= lookup_str "-S="
-opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
-opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
-opt_EnsureSplittableC		= lookup_str "-fglobalise-toplev-names="
-opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
-opt_UnfoldingCreationThreshold	= lookup_int "-funfolding-creation-threshold"
-opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
+opt_SccGroup  			= lookup_str "-G="
+opt_Verbose			= lookUp  SLIT("-v")
 
-opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
-opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
+opt_InterfaceUnfoldThreshold	= lookup_def_int "-funfolding-interface-threshold" iNTERFACE_UNFOLD_THRESHOLD
+opt_UnfoldingCreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  uNFOLDING_CREATION_THRESHOLD
+opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLDING_USE_THRESHOLD
+opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDING_CON_DISCOUNT_WEIGHT
+			
+opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
+opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
+
+-- opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
+-- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}
 
 \begin{code}
@@ -421,21 +432,9 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fno-let-from-strict-let"	    -> SIMPL_SW(SimplNoLetFromStrictLet)
 
 	  o | starts_with_msi  -> SIMPL_SW(MaxSimplifierIterations (read after_msi))
-	    | starts_with_suut -> SIMPL_SW(SimplUnfoldingUseThreshold (read after_suut))
-	    | starts_with_suct -> SIMPL_SW(SimplUnfoldingCreationThreshold (read after_suct))
-	    | starts_with_sucd -> SIMPL_SW(SimplUnfoldingConDiscount (read after_sucd))
 	   where
-	    maybe_suut		= startsWith "-fsimpl-uf-use-threshold"      o
-	    maybe_suct		= startsWith "-fsimpl-uf-creation-threshold" o
-	    maybe_sucd		= startsWith "-fsimpl-uf-con-discount" o
 	    maybe_msi		= startsWith "-fmax-simplifier-iterations"   o
-	    starts_with_suut	= maybeToBool maybe_suut
-	    starts_with_suct	= maybeToBool maybe_suct
-	    starts_with_sucd	= maybeToBool maybe_sucd
 	    starts_with_msi	= maybeToBool maybe_msi
-	    (Just after_suut)	= maybe_suut
-	    (Just after_suct)	= maybe_suct
-	    (Just after_sucd)	= maybe_sucd
 	    (Just after_msi)	= maybe_msi
 
 	  _ -> -- NB: the driver is really supposed to handle bad options
@@ -478,9 +477,6 @@ tagOf_SimplSwitch SimplDoEtaReduction		= ILIT(18)
 tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
 tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)
-tagOf_SimplSwitch (SimplUnfoldingUseThreshold _)      = ILIT(22)
-tagOf_SimplSwitch (SimplUnfoldingConDiscount _)       = ILIT(23)
-tagOf_SimplSwitch (SimplUnfoldingCreationThreshold _) = ILIT(24)
 tagOf_SimplSwitch KeepSpecPragmaIds		= ILIT(25)
 tagOf_SimplSwitch KeepUnusedBindings		= ILIT(26)
 tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
@@ -540,9 +536,6 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
     }
   where
     mk_assoc_elem k@(MaxSimplifierIterations lvl)       = IBOX(tagOf_SimplSwitch k) SET_TO SwInt lvl
-    mk_assoc_elem k@(SimplUnfoldingUseThreshold      i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
-    mk_assoc_elem k@(SimplUnfoldingConDiscount       i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
-    mk_assoc_elem k@(SimplUnfoldingCreationThreshold i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
 
     mk_assoc_elem k = IBOX(tagOf_SimplSwitch k) SET_TO SwBool   True -- I'm here, Mom!
 
@@ -560,10 +553,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 Default settings for simplifier switches
 
 \begin{code}
-defaultSimplSwitches = [SimplUnfoldingCreationThreshold uNFOLDING_CREATION_THRESHOLD,
-			SimplUnfoldingUseThreshold	uNFOLDING_USE_THRESHOLD,
-			SimplUnfoldingConDiscount	uNFOLDING_CON_DISCOUNT_WEIGHT,
-			MaxSimplifierIterations		1
+defaultSimplSwitches = [MaxSimplifierIterations		1
 		       ]
 \end{code}
 

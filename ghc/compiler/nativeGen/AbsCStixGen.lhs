@@ -19,7 +19,7 @@ import MachRegs
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
 			)
-import CgCompInfo   	( mIN_UPD_SIZE )
+import Constants   	( mIN_UPD_SIZE )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd
 			)

@@ -37,7 +37,7 @@ module Type (
 
 	isTauTy,
 
-	tyVarsOfType, tyVarsOfTypes, typeKind
+	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind
     ) where
 
 IMP_Ubiq()
@@ -48,7 +48,7 @@ IMPORT_DELOOPER(TyLoop)
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
-import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon,
+import TyCon	( mkFunTyCon, isFunTyCon,
 		  isPrimTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
@@ -58,6 +58,10 @@ import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
 import Usage	( usageOmega, GenUsage, SYN_IE(Usage), SYN_IE(UVar), SYN_IE(UVarEnv),
 		  nullUVarEnv, addOneToUVarEnv, lookupUVarEnv, eqUVar,
 		  eqUsage )
+
+import Name	( NamedThing(..), 
+		  NameSet(..), unionNameSets, emptyNameSet, unitNameSet, minusNameSet
+		)
 
 -- others
 import Maybes	( maybeToBool, assocMaybe )
@@ -159,7 +163,7 @@ expandTy (DictTy clas ty u)
 		-- no methods!
 
 	other -> ASSERT(not (null all_arg_tys))
-	    	foldl AppTy (TyConTy (mkTupleTyCon (length all_arg_tys)) u) all_arg_tys
+	    	foldl AppTy (TyConTy (tupleTyCon (length all_arg_tys)) u) all_arg_tys
 
 		-- A tuple of 'em
 		-- Note: length of all_arg_tys can be 0 if the class is
@@ -245,6 +249,10 @@ getFunTyExpandingDicts_maybe peek
 	(AppTy (AppTy (TyConTy tycon _) arg) res) | isFunTyCon tycon = Just (arg, res)
 getFunTyExpandingDicts_maybe peek (SynTy _ _ t)	    = getFunTyExpandingDicts_maybe peek t
 getFunTyExpandingDicts_maybe peek ty@(DictTy _ _ _) = getFunTyExpandingDicts_maybe peek (expandTy ty)
+
+getFunTyExpandingDicts_maybe True (ForAllTy _ ty)   = getFunTyExpandingDicts_maybe True ty
+	-- Ignore for-alls when peeking.  See note with defn of getFunTyExpandingDictsAndPeeking
+
 getFunTyExpandingDicts_maybe peek other
   | not peek = Nothing -- that was easy
   | otherwise
@@ -266,6 +274,12 @@ splitFunTyExpandingDictsAndPeeking :: Type	  -> ([Type], Type)
 splitFunTy		           t = split_fun_ty getFunTy_maybe			 t
 splitFunTyExpandingDicts           t = split_fun_ty (getFunTyExpandingDicts_maybe False) t
 splitFunTyExpandingDictsAndPeeking t = split_fun_ty (getFunTyExpandingDicts_maybe True)  t
+	-- This "peeking" stuff is used only by the code generator.
+	-- It's interested in the representation type of things, ignoring:
+	--	newtype
+	--	foralls
+	-- 	expanding dictionary reps
+	--	synonyms, of course
 
 split_fun_ty get t = go t []
   where
@@ -534,6 +548,19 @@ tyVarsOfType (ForAllUsageTy _ _ ty)	= tyVarsOfType ty
 
 tyVarsOfTypes :: [GenType (GenTyVar flexi) uvar] -> GenTyVarSet flexi
 tyVarsOfTypes tys = foldr (unionTyVarSets.tyVarsOfType) emptyTyVarSet tys
+
+-- Find the free names of a type, including the type constructors and classes it mentions
+namesOfType :: GenType (GenTyVar flexi) uvar -> NameSet
+namesOfType (TyVarTy tv)		= unitNameSet (getName tv)
+namesOfType (TyConTy tycon usage)	= unitNameSet (getName tycon)
+namesOfType (SynTy tycon tys ty)	= unitNameSet (getName tycon) `unionNameSets`
+					  namesOfType ty
+namesOfType (FunTy arg res _)		= namesOfType arg `unionNameSets` namesOfType res
+namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
+namesOfType (DictTy clas ty _)		= unitNameSet (getName clas) `unionNameSets`
+					  namesOfType ty
+namesOfType (ForAllTy tyvar ty)		= namesOfType ty `minusNameSet` unitNameSet (getName tyvar)
+namesOfType (ForAllUsageTy _ _ ty)	= panic "forall usage"
 \end{code}
 
 

@@ -18,17 +18,22 @@ import HsMatches	( pprMatches, pprGRHSsAndBinds,
 			  Match, GRHSsAndBinds )
 import HsPat		( collectPatBinders, InPat )
 import HsPragmas	( GenPragmas, ClassOpPragmas )
-import HsTypes		( PolyType )
+import HsTypes		( HsType )
+import CoreSyn		( SYN_IE(CoreExpr) )
 
 --others:
 import Id		( SYN_IE(DictVar), SYN_IE(Id), GenId )
-import Name		( pprNonSym )
+import Name		( pprNonSym, getOccName, OccName )
 import Outputable	( interpp'SP, ifnotPprForUser,
 			  Outputable(..){-instance * (,)-}
 			)
+import PprCore		( GenCoreExpr {- instance Outputable -} )
+import PprType		( GenTyVar {- instance Outputable -} )
 import Pretty
+import Bag
 import SrcLoc		( SrcLoc{-instances-} )
---import TyVar		( GenTyVar{-instances-} )
+import TyVar		( GenTyVar{-instances-} )
+import Unique		( Unique {- instance Eq -} )
 \end{code}
 
 %************************************************************************
@@ -56,7 +61,7 @@ data HsBinds tyvar uvar id pat		-- binders and bindees
 
   | BindWith		-- Bind with a type signature.
 			-- These appear only on typechecker input
-			-- (PolyType [in Sigs] can't appear on output)
+			-- (HsType [in Sigs] can't appear on output)
 		(Bind tyvar uvar id pat)
 		[Sig id]
 
@@ -121,24 +126,22 @@ serves for both.
 \begin{code}
 data Sig name
   = Sig		name		-- a bog-std type signature
-		(PolyType name)
-		(GenPragmas name) -- only interface ones have pragmas
+		(HsType name)
 		SrcLoc
 
   | ClassOpSig	name		-- class-op sigs have different pragmas
-		(PolyType name)
+		(HsType name)
 		(ClassOpPragmas name)	-- only interface ones have pragmas
 		SrcLoc
 
   | SpecSig 	name		-- specialise a function or datatype ...
-		(PolyType name) -- ... to these types
+		(HsType name) -- ... to these types
 		(Maybe name)	-- ... maybe using this as the code for it
 		SrcLoc
 
   | InlineSig	name		  -- INLINE f
 		SrcLoc
 
-  -- ToDo: strictly speaking, could omit based on -DOMIT_DEFORESTER
   | DeforestSig name            -- Deforest using this function definition
 	      	SrcLoc
 
@@ -150,13 +153,12 @@ data Sig name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
-    ppr sty (Sig var ty pragmas _)
+    ppr sty (Sig var ty _)
       = ppHang (ppCat [pprNonSym sty var, ppPStr SLIT("::")])
-	     4 (ppHang (ppr sty ty)
-		     4 (ifnotPprForUser sty (ppr sty pragmas)))
+	     4 (ppr sty ty)
 
     ppr sty (ClassOpSig var ty pragmas _)
-      = ppHang (ppCat [pprNonSym sty var, ppPStr SLIT("::")])
+      = ppHang (ppCat [ppr sty (getOccName var), ppPStr SLIT("::")])
 	     4 (ppHang (ppr sty ty)
 		     4 (ifnotPprForUser sty (ppr sty pragmas)))
 
@@ -240,8 +242,12 @@ data MonoBinds tyvar uvar id pat
 		    Bool			-- True => infix declaration
 		    [Match tyvar uvar id pat]	-- must have at least one Match
 		    SrcLoc
+
   | VarMonoBind	    id			-- TRANSLATION
 		    (HsExpr tyvar uvar id pat)
+
+  | CoreMonoBind    id			-- TRANSLATION
+		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
 \end{code}
 
 \begin{code}
@@ -269,6 +275,9 @@ instance (NamedThing id, Outputable id, Outputable pat,
 
     ppr sty (VarMonoBind name expr)
       = ppHang (ppCat [pprNonSym sty name, ppEquals]) 4 (ppr sty expr)
+
+    ppr sty (CoreMonoBind name expr)
+      = ppHang (ppCat [pprNonSym sty name, ppEquals]) 4 (ppr sty expr)
 \end{code}
 
 %************************************************************************
@@ -289,45 +298,24 @@ where
 it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
-collectTopLevelBinders :: HsBinds tyvar uvar name (InPat name) -> [name]
-collectTopLevelBinders EmptyBinds     = []
-collectTopLevelBinders (SingleBind b) = collectBinders b
-collectTopLevelBinders (BindWith b _) = collectBinders b
-collectTopLevelBinders (ThenBinds b1 b2)
- = collectTopLevelBinders b1 ++ collectTopLevelBinders b2
+collectTopBinders :: HsBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectTopBinders EmptyBinds     = emptyBag
+collectTopBinders (SingleBind b) = collectBinders b
+collectTopBinders (BindWith b _) = collectBinders b
+collectTopBinders (ThenBinds b1 b2)
+ = collectTopBinders b1 `unionBags` collectTopBinders b2
 
-collectBinders :: Bind tyvar uvar name (InPat name) -> [name]
-collectBinders EmptyBind 	      = []
+collectBinders :: Bind tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectBinders EmptyBind 	      = emptyBag
 collectBinders (NonRecBind monobinds) = collectMonoBinders monobinds
 collectBinders (RecBind monobinds)    = collectMonoBinders monobinds
 
-collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> [name]
-collectMonoBinders EmptyMonoBinds		     = []
-collectMonoBinders (PatMonoBind pat grhss_w_binds _) = collectPatBinders pat
-collectMonoBinders (FunMonoBind f _ matches _)	     = [f]
-collectMonoBinders (VarMonoBind v expr) 	     = error "collectMonoBinders"
+collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
+collectMonoBinders EmptyMonoBinds		       = emptyBag
+collectMonoBinders (PatMonoBind pat grhss_w_binds loc) = listToBag (map (\v->(v,loc)) (collectPatBinders pat))
+collectMonoBinders (FunMonoBind f _ matches loc)       = unitBag (f,loc)
+collectMonoBinders (VarMonoBind v expr) 	       = error "collectMonoBinders"
+collectMonoBinders (CoreMonoBind v expr) 	       = error "collectMonoBinders"
 collectMonoBinders (AndMonoBinds bs1 bs2)
- = collectMonoBinders bs1 ++ collectMonoBinders bs2
-
--- We'd like the binders -- and where they came from --
--- so we can make new ones with equally-useful origin info.
-
-collectMonoBindersAndLocs
-	:: MonoBinds tyvar uvar name (InPat name) -> [(name, SrcLoc)]
-
-collectMonoBindersAndLocs EmptyMonoBinds = []
-
-collectMonoBindersAndLocs (AndMonoBinds bs1 bs2)
-  = collectMonoBindersAndLocs bs1 ++ collectMonoBindersAndLocs bs2
-
-collectMonoBindersAndLocs (PatMonoBind pat grhss_w_binds locn)
-  = collectPatBinders pat `zip` repeat locn
-
-collectMonoBindersAndLocs (FunMonoBind f _ matches locn) = [(f, locn)]
-
-#ifdef DEBUG
-collectMonoBindersAndLocs (VarMonoBind v expr)
-  = trace "collectMonoBindersAndLocs:VarMonoBind" []
-	-- ToDo: this is dubious, i.e., wrong, but harmless?
-#endif
+ = collectMonoBinders bs1 `unionBags` collectMonoBinders bs2
 \end{code}

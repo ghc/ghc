@@ -12,7 +12,7 @@ module PprEnv (
 	initPprEnv,
 
 	pCon, pLit, pMajBndr, pMinBndr, pOcc, pPrim, pSCC, pStyle,
-	pTy, pTyVar, pUVar, pUse,
+	pTy, pTyVarB, pTyVarO, pUVar, pUse,
 	
 	NmbrEnv(..),
 	SYN_IE(NmbrM), initNmbr,
@@ -45,7 +45,9 @@ data PprEnv tyvar uvar bndr occ
 	(PrimOp     -> Pretty)
 	(CostCentre -> Pretty)
 
-	(tyvar -> Pretty)	-- to print tyvars
+	(tyvar -> Pretty)	-- to print tyvar binders
+	(tyvar -> Pretty)	-- to print tyvar occurrences
+
 	(uvar -> Pretty)	-- to print usage vars
 
 	(bndr -> Pretty)	-- to print "major" val_bdrs
@@ -64,6 +66,7 @@ initPprEnv
 	-> Maybe (PrimOp  -> Pretty)
 	-> Maybe (CostCentre -> Pretty)
 	-> Maybe (tyvar -> Pretty)
+	-> Maybe (tyvar -> Pretty)
 	-> Maybe (uvar -> Pretty)
 	-> Maybe (bndr -> Pretty)
 	-> Maybe (bndr -> Pretty)
@@ -75,13 +78,14 @@ initPprEnv
 -- you can specify all the printers individually; if
 -- you don't specify one, you get bottom
 
-initPprEnv sty l d p c tv uv maj_bndr min_bndr occ ty use
+initPprEnv sty l d p c tvb tvo uv maj_bndr min_bndr occ ty use
   = PE sty
        (demaybe l)
        (demaybe d)
        (demaybe p)
        (demaybe c)
-       (demaybe tv)
+       (demaybe tvb)
+       (demaybe tvo)
        (demaybe uv)
        (demaybe maj_bndr)
        (demaybe min_bndr)
@@ -112,21 +116,22 @@ initPprEnv sty pmaj pmin pocc
 \end{code}
 
 \begin{code}
-pStyle	 (PE s  _  _  _  _  _  _  _  _  _  _  _) = s
-pLit	 (PE _ pp  _  _  _  _  _  _  _  _  _  _) = pp
-pCon	 (PE _	_ pp  _  _  _  _  _  _  _  _  _) = pp
-pPrim	 (PE _	_  _ pp  _  _  _  _  _  _  _  _) = pp
-pSCC	 (PE _	_  _  _ pp  _  _  _  _  _  _  _) = pp
-	     				       
-pTyVar	 (PE _	_  _  _  _ pp  _  _  _  _  _  _) = pp
-pUVar	 (PE _	_  _  _  _  _ pp  _  _  _  _  _) = pp
-      	     				       
-pMajBndr (PE _	_  _  _  _  _  _ pp  _  _  _  _) = pp
-pMinBndr (PE _	_  _  _  _  _  _  _ pp  _  _  _) = pp
-pOcc     (PE _	_  _  _  _  _  _  _  _ pp  _  _) = pp
-	     		       
-pTy      (PE _	_  _  _  _  _  _  _  _  _ pp  _) = pp
-pUse	 (PE _	_  _  _  _  _  _  _  _  _  _ pp) = pp
+pStyle	 (PE s  _  _  _  _  _  _  _  _  _  _  _  _) = s
+pLit	 (PE _ pp  _  _  _  _  _  _  _  _  _  _  _) = pp
+pCon	 (PE _	_ pp  _  _  _  _  _  _  _  _  _  _) = pp
+pPrim	 (PE _	_  _ pp  _  _  _  _  _  _  _  _  _) = pp
+pSCC	 (PE _	_  _  _ pp  _  _  _  _  _  _  _  _) = pp
+	     					 
+pTyVarB	 (PE _	_  _  _  _  pp _  _  _  _  _  _  _) = pp
+pTyVarO	 (PE _	_  _  _  _  _  pp _  _  _  _  _  _) = pp
+pUVar	 (PE _	_  _  _  _  _  _  pp _  _  _  _  _) = pp
+      	     					 
+pMajBndr (PE _	_  _  _  _  _  _  _ pp  _  _  _  _) = pp
+pMinBndr (PE _	_  _  _  _  _  _  _  _ pp  _  _  _) = pp
+pOcc     (PE _	_  _  _  _  _  _  _  _  _ pp  _  _) = pp
+	     		       	 
+pTy      (PE _	_  _  _  _  _  _  _  _  _  _ pp  _) = pp
+pUse	 (PE _	_  _  _  _  _  _  _  _  _  _  _ pp) = pp
 \end{code}
 
 We tend to {\em renumber} everything before printing, so that

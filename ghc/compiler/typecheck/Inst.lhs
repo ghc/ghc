@@ -33,32 +33,31 @@ IMPORT_1_3(Ratio(Rational))
 
 import HsSyn	( HsLit(..), HsExpr(..), HsBinds, 
 		  InPat, OutPat, Stmt, Qualifier, Match,
-		  ArithSeqInfo, PolyType, Fake )
-import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr),
-		  RnName{-instance NamedThing-}
-		)
+		  ArithSeqInfo, HsType, Fake )
+import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr) )
 import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr),
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars )
 
-import TcMonad	hiding ( rnMtoTcM )
+import TcMonad
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
 import TcType	( SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
 		  tcInstType, zonkTcType )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
-import Class	( isCcallishClass, isNoDictClass, classInstEnv,
+import Class	( classInstEnv,
 		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv), SYN_IE(ClassOp)
 		)
 import ErrUtils ( addErrLoc, SYN_IE(Error) )
 import Id	( GenId, idType, mkInstId )
+import PrelInfo	( isCcallishClass, isNoDictClass )
 import MatchEnv	( lookupMEnv, insertMEnv )
-import Name	( mkLocalName, getLocalName, Name )
+import Name	( OccName(..), Name, mkLocalName, mkSysLocalName, occNameString )
 import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar, pprParendGenType )	
 import PprStyle	( PprStyle(..) )
 import Pretty
 import SpecEnv	( SpecEnv )
-import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
+import SrcLoc	( SrcLoc, noSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,
 		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes,
@@ -236,17 +235,18 @@ newOverloadedLit orig lit ty
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
 instToId (Dict u clas ty orig loc)
-  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str False{-emph name-} loc))
+  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str loc))
   where
-    str = SLIT("d.") _APPEND_ (getLocalName clas)
+    str = VarOcc (SLIT("d.") _APPEND_ (occNameString (getOccName clas)))
+
 instToId (Method u id tys rho_ty orig loc)
-  = TcId (mkInstId u tau_ty (mkLocalName u str False{-emph name-} loc))
+  = TcId (mkInstId u tau_ty (mkLocalName u str loc))
   where
     (_, tau_ty) = splitRhoTy rho_ty	-- NB The method Id has just the tau type
-    str = SLIT("m.") _APPEND_ (getLocalName id)
+    str = VarOcc (SLIT("m.") _APPEND_ (occNameString (getOccName id)))
 
 instToId (LitInst u list ty orig loc)
-  = TcId (mkInstId u ty (mkLocalName u SLIT("lit") True{-emph uniq-} loc))
+  = TcId (mkInstId u ty (mkSysLocalName u SLIT("lit") loc))
 \end{code}
 
 \begin{code}

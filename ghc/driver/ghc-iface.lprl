@@ -5,6 +5,15 @@
 %************************************************************************
 
 \begin{code}
+%OldVersion = ();
+%Decl	 = (); # details about individual definitions
+%Stuff	 = (); # where we glom things together
+%HiExists      = ('old',-1,  'new',-1); # 1 <=> definitely exists; 0 <=> doesn't
+%HiHasBeenRead = ('old', 0,  'new', 0);
+%ModuleVersion = ('old', 0,  'new', 0);
+
+
+
 sub postprocessHiFile {
     local($hsc_hi,		# The iface info produced by hsc.
 	  $hifile_target,	# The name both of the .hi file we
@@ -14,7 +23,7 @@ sub postprocessHiFile {
 
     local($new_hi) = "$Tmp_prefix.hi-new";
 
-#   print STDERR `$Cat $hsc_hi`;
+#    print STDERR `$Cat $hsc_hi`;
 
     &constructNewHiFile($hsc_hi, $hifile_target, $new_hi);
 
@@ -53,16 +62,16 @@ sub deUsagifyHi {
     open(OLDHIF, "< $ifile") || &tidy_up_and_die(1,"Can't open $ifile (read)\n");
     open(NEWHIF, "> $ofile") || &tidy_up_and_die(1,"Can't open $ofile (write)\n");
 
-    # read up to __usages__ line
+    # read up to _usages_ line
     $_ = <OLDHIF>;
-    while ($_ ne '' && ! /^__usages__/) {
-	print NEWHIF $_ unless /^(interface |\{-# GHC_PRAGMA)/;
+    while ($_ ne '' && ! /^_usages_/) {
+	print NEWHIF $_ unless /^(_interface_ |\{-# GHC_PRAGMA)/;
 	$_ = <OLDHIF>;
     }
     if ( $_ ne '' ) {
-	# skip to next __<anything> line
+	# skip to next _<anything> line
 	$_ = <OLDHIF>;
-	while ($_ ne '' && ! /^__/) { $_ = <OLDHIF>; }
+	while ($_ ne '' && ! /^_/) { $_ = <OLDHIF>; }
 
 	# print the rest
 	while ($_ ne '') {
@@ -87,67 +96,48 @@ sub constructNewHiFile {
 
     open(NEWHI, "> $new_hi") || &tidy_up_and_die(1,"Can't open $new_hi (write)\n");
 
-    local($new_module_version) = &calcNewModuleVersion();
-    print NEWHI "interface ", $ModuleName{'new'}, " $new_module_version\n";
-
-    print NEWHI "__usages__\n", $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
-
-    local(@version_keys) = sort (keys %Version);
-    local($num_ver_things) = 0;
-    foreach $v (@version_keys) {
+    local(@decl_names) = ();	# Entities in _declarations_ section of new module
+    foreach $v (sort (keys %Decl)) {
 	next unless $v =~ /^new:(.*$)/;
-	last if $num_ver_things >= 1;
-	$num_ver_things++;
+	push(@decl_names,$1);
     }
 
-    print NEWHI "__versions__\n" unless $num_ver_things < 1;
-    foreach $v (@version_keys) {
-	next unless $v =~ /^new:(.*$)/;
-	$v = $1;
-
-	&printNewItemVersion($v, $new_module_version), "\n";
-    }
-
-    print NEWHI "__exports__\n";
-    print NEWHI $Stuff{'new:exports'};
+    local($new_module_version) = &calcNewModuleVersion(@decl_names);
+    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version\n";
 
     if ( $Stuff{'new:instance_modules'} ) {
-	print NEWHI "__instance_modules__\n";
+	print NEWHI "_instance_modules_\n";
 	print NEWHI $Stuff{'new:instance_modules'};
     }
 
+    print NEWHI "_usages_\n", $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
+
+    print NEWHI "_exports_\n";
+    print NEWHI $Stuff{'new:exports'};
+
     if ( $Stuff{'new:fixities'} ) {
-	print NEWHI "__fixities__\n";
+	print NEWHI "_fixities_\n";
 	print NEWHI $Stuff{'new:fixities'};
     }
 
-    if ( $Stuff{'new:declarations'} ) {
-	print NEWHI "__declarations__\n";
-	print NEWHI $Stuff{'new:declarations'};
-    }
-
     if ( $Stuff{'new:instances'} ) {
-	print NEWHI "__instances__\n";
+	print NEWHI "_instances_\n";
 	print NEWHI $Stuff{'new:instances'};
     }
 
-    if ( $Stuff{'new:pragmas'} ) {
-	print NEWHI "__pragmas__\n";
-	print NEWHI $Stuff{'new:pragmas'};
+    print NEWHI "_declarations_\n";
+    foreach $v (@decl_names) {
+	&printNewItemVersion(NEWHI, $v, $new_module_version);		# Print new version number
+	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
     }
+
+    
 
     close(NEWHI) || &tidy_up_and_die(1,"Failed writing to $new_hi\n");
 }
 \end{code}
 
 \begin{code}
-%Version = ();
-%Decl	 = (); # details about individual definitions
-%Stuff	 = (); # where we glom things together
-%HiExists      = ('old',-1,  'new',-1); # 1 <=> definitely exists; 0 <=> doesn't
-%HiHasBeenRead = ('old', 0,  'new', 0);
-%ModuleVersion = ('old', 0,  'new', 0);
-
 sub readHiFile {
     local($mod,		    # module to read; can be special tag 'old'
 			    # (old .hi file for module being compiled) or
@@ -158,13 +148,12 @@ sub readHiFile {
     $HiExists{$mod}      = -1; # 1 <=> definitely exists; 0 <=> doesn't
     $HiHasBeenRead{$mod} = 0;
     $ModuleVersion{$mod} = 0;
+    $Stuff{"$mod:instance_modules"} = '';
     $Stuff{"$mod:usages"}	    = ''; # stuff glommed together
     $Stuff{"$mod:exports"}	    = '';
-    $Stuff{"$mod:instance_modules"} = '';
-    $Stuff{"$mod:instances"}	    = '';
     $Stuff{"$mod:fixities"}	    = '';
+    $Stuff{"$mod:instances"}	    = '';
     $Stuff{"$mod:declarations"}	    = '';
-    $Stuff{"$mod:pragmas"}	    = '';
 
     if (! -f $hifile) { # no pre-existing .hi file
 	$HiExists{$mod} = 0;
@@ -185,52 +174,65 @@ sub readHiFile {
 	    last hi_line;
 	}
 
-	if ( /^interface ([A-Z]\S*) (\d+)/ ) {
+	if ( /^_interface_ ([A-Z]\S*) (\d+)/ ) {
 	    $ModuleName{$mod}	 = $1; # not sure this is used much...
 	    $ModuleVersion{$mod} = $2;
 
-	} elsif ( /^interface ([A-Z]\S*)/ && $mod eq 'new' ) { # special case: no version
+	} elsif ( /^_interface_ ([A-Z]\S*)/ && $mod eq 'new' ) { # special case: no version
 	    $ModuleName{'new'} = $1;
 
-	} elsif ( /^__([a-z]+)__$/ ) {
+	} elsif ( /^_([a-z_]+)_$/ ) {
 	    $now_in = $1;
 
 	} elsif ( $now_in eq 'usages' && /^(\S+)\s+(\d+)\s+:: (.*)/ ) {
 	    $Stuff{"$mod:usages"} .= $_; # save the whole thing
 
-	} elsif ( $now_in eq 'versions' && /^(\S+) (\d+)/ ) {
-	    local($item) = $1;
-	    local($n)    = $2;
-#print STDERR "version read:item=$item, n=$n, line=$_";
-	    $Version{"$mod:$item"} = $n;
 
-	} elsif ( $now_in eq 'versions' && /^(\S+)/ && $mod eq 'new') { # doesn't have versions
-	    local($item) = $1;
-#print STDERR "new version read:item=$item, line=$_";
-	    $Version{"$mod:$item"} = 'y'; # stub value...
-
-	} elsif ( $now_in =~ /^(exports|instance_modules|instances|fixities|pragmas)$/ ) {
+	} elsif ( $now_in =~ /^(exports|instance_modules|instances|fixities)$/ ) {
 	    $Stuff{"$mod:$1"} .= $_; # just save it up
 
 	} elsif ( $now_in eq 'declarations' ) { # relatively special treatment needed...
-	    $Stuff{"$mod:declarations"} .= $_; # just save it up
+	# We're in a declaration
 
-	    if ( /^[A-Z][A-Za-z0-9_']*\.(\S+)\s+::\s+/ ) {
-		$Decl{"$mod:$1"} = $_;
+	# Strip off the initial version number, if any
+	   if ( /^([0-9]+) (.*\n)/ ) {
+		# The "\n" is because we need to keep the newline at the end, so that
+		# it looks the same as if there's no version number and this if statement
+		# doesn't fire.
 
-	    } elsif ( /^type\s+[A-Z][A-Za-z0-9_']*\.(\S+)/ ) {
-		$Decl{"$mod:$1"} = $_;
+		# So there's an initial version number
+		$version = $1;
+		$_ = $2;
+	   }
+	
+	    if ( /^(\S+)\s+::\s+/ ) {
+		$current_name = $1;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+/ ) {
-		$Decl{"$mod:$3"} = $_;
+	    } elsif ( /^type\s+(\S+)/ ) {
+		$current_name = $1;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /class\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+.*where\s+\{.*\};/ ) {
-		$Decl{"$mod:$2"} = $_; # must be wary of => bit matching after "where"...
-	    } elsif ( /class\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+/ ) {
-		$Decl{"$mod:$2"} = $_;
+	    } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
+		$current_name = $3;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } else { # oh, well...
-		print STDERR "$Pgm: decl line didn't match?\n$_";
+	    } elsif ( /class\s+(.*\s+=>\s+)?(\S+)\s+.*where\s+\{.*\};/ ) {
+		# must be wary of => bit matching after "where"...
+		$current_name = $2;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
+
+	    } elsif ( /class\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
+		$current_name = $2;
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
+
+	    } else { # Continuation line
+		$Decl{"$mod:$current_name"} .= $_
 	    }
 
 	} else {
@@ -249,6 +251,7 @@ sub readHiFile {
 
 \begin{code}
 sub calcNewModuleVersion {
+    local (@decl_names) = @_;
 
     return(&mv_change(1,'no old .hi file')) if $HiExists{'old'} == 0;
 	# could use "time()" as initial version; if a module existed, then was deleted,
@@ -259,43 +262,49 @@ sub calcNewModuleVersion {
     local($unchanged_version) = $ModuleVersion{'old'}; # will return one of these two
     local($changed_version)   = $unchanged_version + 1;
 
-    return(&mv_change($changed_version,'usages changed')) if $Stuff{'old:usages'} ne $Stuff{'new:usages'};
+# This statement is curious; it is subsumed by the foreach!
+#    return(&mv_change($changed_version,'usages changed')) if $Stuff{'old:usages'} ne $Stuff{'new:usages'};
 
-    foreach $t ( 'exports', 'instance_modules', 'instances', 'fixities', 'declarations', 'pragmas' ) {
+    foreach $t ( 'usages' , 'exports', 'instance_modules', 'instances', 'fixities' ) {
 	return(&mv_change($changed_version,"$t changed")) if $Stuff{"old:$t"} ne $Stuff{"new:$t"};
     }
 
+# Decl need separate treatment; they aren't in $Stuff
+    foreach $v (@decl_names) {
+	return(&mv_change($changed_version,"$v changed")) if $Decl{"old:$v"} ne $Decl{"new:$v"};
+    }
+    
+    print STDERR "Module version unchanged at $unchanged_version\n";
     return($unchanged_version);
 }
 
 sub mv_change {
     local($mv, $str) = @_;
 
-#print STDERR "$Pgm: module version changed to $mv; reason: $str\n";
+    print STDERR "$Pgm: module version changed to $mv; reason: $str\n";
     return($mv);
 }
 
 sub printNewItemVersion {
-    local($item, $mod_version) = @_;
-
-    if (! defined($Decl{"new:$item"}) ) {
-# it's OK, because the thing is almost-certainly wired-in
-#	print STDERR "$item: no decl?! (nothing into __versions__)\n";
-	return;
-    }
-
+    local($hifile, $item, $mod_version) = @_;
     local($idecl) = $Decl{"new:$item"};
 
-    if (! defined($Decl{"old:$item"})) {
-#print STDERR "new: $item\n";
-	print NEWHI  "$item $mod_version\n";
-    } elsif ($idecl ne $Decl{"old:$item"})  {
-#print STDERR "changed: $item\n";
-	print NEWHI  "$item $mod_version\n";
-    } elsif (! defined($Version{"old:$item"}) ) {
-#print STDERR "$item: no old version?!\n" 
-    } else {
-	print NEWHI  "$item ", $Version{"old:$item"}, "\n";
+    if (! defined($Decl{"old:$item"})) {	# Old decl doesn't exist
+	print STDERR "new: $item\n";
+	print $hifile  "$mod_version ";		# Use module version
+
+    } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
+	local($odecl) = $Decl{"old:$item"};
+#	print STDERR "changed: $item\nOld: $odecl\nNew: $idecl\n";
+	print $hifile  "$mod_version ";		# Use module version
+
+    } elsif (! defined($OldVersion{"$item"}) ) {
+	print STDERR "$item: no old version?!\n";
+	print $hifile  "$mod_version ";			# Use module version
+
+    } else {					# Identical decls, so use old version number
+	print STDERR "$item: unchanged\n";
+	print $hifile  $OldVersion{"$item"}, " ";
     }
     return;
 }

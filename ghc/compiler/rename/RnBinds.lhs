@@ -12,11 +12,9 @@ they may be affected by renaming (which isn't fully worked out yet).
 #include "HsVersions.h"
 
 module RnBinds (
-	rnTopBinds,
+	rnTopBinds, rnTopMonoBinds,
 	rnMethodBinds,
-	rnBinds,
-	SYN_IE(FreeVars),
-	SYN_IE(DefinedVars)
+	rnBinds, rnMonoBinds
    ) where
 
 IMP_Ubiq()
@@ -28,18 +26,25 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
+import RnEnv		( bindLocatedLocalsRn, lookupRn, lookupOccRn, isUnboundName )
 
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
-import Name		( getLocalName, RdrName )
+import Name		( OccName(..), Provenance, 
+			  Name {- instance Eq -},
+			  NameSet(..), emptyNameSet, mkNameSet, unionNameSets, 
+		 	  minusNameSet, unionManyNameSets, elemNameSet, unitNameSet, nameSetToList
+			)
 import Maybes		( catMaybes )
 --import PprStyle--ToDo:rm
 import Pretty
-import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
-			  unionUniqSets, unionManyUniqSets,
-			  elementOfUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic )
+import UniqSet		( SYN_IE(UniqSet) )
+import ListSetOps	( minusList )
+import Bag		( bagToList )
+import UniqFM		( UniqFM )
+import ErrUtils		( SYN_IE(Error) )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -64,15 +69,6 @@ This is precisely what the function @rnBinds@ does.
 ToDo: deal with case where a single monobinds binds the same variable
 twice.
 
-Sets of variable names are represented as sets explicitly, rather than lists.
-
-\begin{code}
-type DefinedVars = UniqSet RnName
-type FreeVars    = UniqSet RnName
-\end{code}
-
-i.e., binders.
-
 The vertag tag is a unique @Int@; the tags only need to be unique
 within one @MonoBinds@, so that unique-Int plumbing is done explicitly
 (heavy monad machinery not needed).
@@ -88,6 +84,7 @@ type Edge	= (VertexTag, VertexTag)
 %* naming conventions							*
 %*									*
 %************************************************************************
+
 \subsection[name-conventions]{Name conventions}
 
 The basic algorithm involves walking over the tree and returning a tuple
@@ -114,6 +111,7 @@ a set of variables free in @Exp@ is written @fvExp@
 %* analysing polymorphic bindings (HsBinds, Bind, MonoBinds)		*
 %*									*
 %************************************************************************
+
 \subsubsection[dep-HsBinds]{Polymorphic bindings}
 
 Non-recursive expressions are reconstructed without any changes at top
@@ -154,52 +152,52 @@ instance declarations.	It expects only to see @FunMonoBind@s, and
 it expects the global environment to contain bindings for the binders
 (which are all class operations).
 
-\begin{code}
-rnTopBinds    :: RdrNameHsBinds -> RnM_Fixes s RenamedHsBinds
-rnMethodBinds :: RnName{-class-} -> RdrNameMonoBinds -> RnM_Fixes s RenamedMonoBinds
-rnBinds	      :: RdrNameHsBinds -> RnM_Fixes s (RenamedHsBinds, FreeVars, [RnName])
+%************************************************************************
+%*									*
+%* 		Top-level bindings
+%*									*
+%************************************************************************
 
-rnTopBinds EmptyBinds		       	   = returnRn EmptyBinds
+@rnTopBinds@ and @rnTopMonoBinds@ assume that the environment already
+contains bindings for the binders of this particular binding.
+
+\begin{code}
+rnTopBinds    :: RdrNameHsBinds -> RnMS s RenamedHsBinds
+
+rnTopBinds EmptyBinds		       	  = returnRn EmptyBinds
 rnTopBinds (SingleBind (RecBind bind))    = rnTopMonoBinds bind []
 rnTopBinds (BindWith (RecBind bind) sigs) = rnTopMonoBinds bind sigs
-  -- the parser doesn't produce other forms
+  -- The parser doesn't produce other forms
 
--- ********************************************************************
 
-rnMethodBinds class_name EmptyMonoBinds = returnRn EmptyMonoBinds
+rnTopMonoBinds :: RdrNameMonoBinds 
+	       -> [RdrNameSig] 
+	       -> RnMS s RenamedHsBinds
 
-rnMethodBinds class_name (AndMonoBinds mb1 mb2)
-  = andRn AndMonoBinds (rnMethodBinds class_name mb1)
-		       (rnMethodBinds class_name mb2)
+rnTopMonoBinds EmptyMonoBinds sigs 
+  = returnRn EmptyBinds
 
-rnMethodBinds class_name (FunMonoBind occname inf matches locn)
-  = pushSrcLocRn locn				   $
-    lookupClassOp class_name occname  		   `thenRn` \ op_name ->
-    mapAndUnzipRn rnMatch matches		   `thenRn` \ (new_matches, _) ->
-    mapRn (checkPrecMatch inf op_name) new_matches `thenRn_`
-    returnRn (FunMonoBind op_name inf new_matches locn)
-
-rnMethodBinds class_name (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
-  = pushSrcLocRn locn			$
-    lookupClassOp class_name occname	`thenRn` \ op_name ->
-    rnGRHSsAndBinds grhss_and_binds	`thenRn` \ (grhss_and_binds', _) ->
-    returnRn (PatMonoBind (VarPatIn op_name) grhss_and_binds' locn)
-
--- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBinds _ mbind@(PatMonoBind other_pat _ locn)
-  = failButContinueRn EmptyMonoBinds (methodBindErr mbind locn)
-
--- ********************************************************************
-
-rnBinds EmptyBinds			= returnRn (EmptyBinds,emptyUniqSet,[])
-rnBinds (SingleBind (RecBind bind))	= rnNestedMonoBinds bind []
-rnBinds (BindWith (RecBind bind) sigs) = rnNestedMonoBinds bind sigs
-  -- the parser doesn't produce other forms
+rnTopMonoBinds mbinds sigs
+ =  mapRn lookupRn binder_rdr_names	`thenRn` \ binder_names ->
+    let
+	binder_set = mkNameSet binder_names
+    in
+    rn_mono_binds True {- top level -}
+		  binder_set mbinds sigs		`thenRn` \ (new_binds, fv_set) ->
+    returnRn new_binds
+  where
+    binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
 \end{code}
 
-@rnNestedMonoBinds@
+%************************************************************************
+%*									*
+%* 		Nested binds
+%*									*
+%************************************************************************
+
+@rnMonoBinds@
 	- collects up the binders for this declaration group,
-	- checkes that they form a set
+	- checks that they form a set
 	- extends the environment to bind them to new local names
 	- calls @rnMonoBinds@ to do the real work
 
@@ -208,102 +206,78 @@ already done in pass3.	All it does is call @rnMonoBinds@ and discards
 the free var info.
 
 \begin{code}
-rnTopMonoBinds :: RdrNameMonoBinds -> [RdrNameSig] -> RnM_Fixes s RenamedHsBinds
+rnBinds	      :: RdrNameHsBinds 
+	      -> (RenamedHsBinds -> RnMS s (result, FreeVars))
+	      -> RnMS s (result, FreeVars)
 
-rnTopMonoBinds EmptyMonoBinds sigs = returnRn EmptyBinds
-
-rnTopMonoBinds mbs sigs
- = rnBindSigs True{-top-level-} (collectMonoBinders mbs) sigs `thenRn` \ siglist ->
-   rnMonoBinds mbs siglist `thenRn` \ (new_binds, fv_set) ->
-   returnRn new_binds
+rnBinds EmptyBinds		       thing_inside = thing_inside EmptyBinds
+rnBinds (SingleBind (RecBind bind))    thing_inside = rnMonoBinds bind []   thing_inside
+rnBinds (BindWith (RecBind bind) sigs) thing_inside = rnMonoBinds bind sigs thing_inside
+  -- the parser doesn't produce other forms
 
 
-rnNestedMonoBinds :: RdrNameMonoBinds -> [RdrNameSig]
-		  -> RnM_Fixes s (RenamedHsBinds, FreeVars, [RnName])
+rnMonoBinds :: RdrNameMonoBinds -> [RdrNameSig]
+	    -> (RenamedHsBinds -> RnMS s (result, FreeVars))
+	    -> RnMS s (result, FreeVars)
 
-rnNestedMonoBinds EmptyMonoBinds sigs
-  = returnRn (EmptyBinds, emptyUniqSet, [])
+rnMonoBinds EmptyMonoBinds sigs thing_inside = thing_inside EmptyBinds
 
-rnNestedMonoBinds mbinds sigs	-- Non-empty monobinds
-  =
-	-- Extract all the binders in this group,
+rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
+  =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
+    bindLocatedLocalsRn "binding group" mbinders_w_srclocs		$ \ new_mbinders ->
     let
-	mbinders_w_srclocs = collectMonoBindersAndLocs mbinds
-	mbinders    	   = map fst mbinders_w_srclocs
+	binder_set = mkNameSet new_mbinders
     in
-    newLocalNames "variable"
-		  mbinders_w_srclocs	`thenRn` \ new_mbinders ->
+    rn_mono_binds False {- not top level -}
+		  binder_set mbinds sigs	`thenRn` \ (binds,bind_fvs) ->
 
-    extendSS2 new_mbinders (
-	 rnBindSigs False{-not top- level-} mbinders sigs `thenRn` \ siglist ->
-	 rnMonoBinds mbinds  siglist
-    )					`thenRn` \ (new_binds, fv_set) ->
-    returnRn (new_binds, fv_set, new_mbinders)
+	-- Now do the "thing inside", and deal with the free-variable calculations
+    thing_inside binds					`thenRn` \ (result,result_fvs) ->
+    returnRn (result, (result_fvs `unionNameSets` bind_fvs) `minusNameSet` binder_set)
+  where
+    mbinders_w_srclocs = bagToList (collectMonoBinders mbinds)
 \end{code}
+
+
+%************************************************************************
+%*									*
+%* 		MonoBinds -- the main work is done here
+%*									*
+%************************************************************************
 
 @rnMonoBinds@ is used by *both* top-level and nested bindings.  It
 assumes that all variables bound in this group are already in scope.
-This is done *either* by pass 3 (for the top-level bindings),
-*or* by @rnNestedMonoBinds@ (for the nested ones).
+This is done *either* by pass 3 (for the top-level bindings), *or* by
+@rnNestedMonoBinds@ (for the nested ones).
 
 \begin{code}
-rnMonoBinds :: RdrNameMonoBinds
-	    -> [RenamedSig]	-- Signatures attached to this group
-	    -> RnM_Fixes s (RenamedHsBinds, FreeVars)
+rn_mono_binds :: Bool			-- True <=> top level
+	      -> NameSet		-- Binders of this group
+	      -> RdrNameMonoBinds	
+	      -> [RdrNameSig]		-- Signatures attached to this group
+	      -> RnMS s (RenamedHsBinds, 	-- 
+		         FreeVars)	-- Free variables
 
-rnMonoBinds mbinds siglist
+rn_mono_binds is_top_lev binders mbinds sigs
   =
 	 -- Rename the bindings, returning a MonoBindsInfo
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
+    rnBindSigs is_top_lev binders sigs	`thenRn` \ siglist ->
     flattenMonoBinds 0 siglist mbinds	`thenRn` \ (_, mbinds_info) ->
 
 	 -- Do the SCC analysis
-    let vertices = mkVertices mbinds_info
-	edges	= mkEdges     mbinds_info
-
-	scc_result = stronglyConnComp (==) edges vertices
+    let vertices    = mkVertices mbinds_info
+	edges	    = mkEdges     mbinds_info
+	scc_result  = stronglyConnComp (==) edges vertices
+	final_binds = foldr1 ThenBinds (map (reconstructCycle edges mbinds_info) scc_result)
 
 	 -- Deal with bound and free-var calculation
-	rhs_free_vars = foldr f emptyUniqSet mbinds_info
-
-	final_binds = reconstructRec scc_result edges mbinds_info
-
-	happy_answer = returnRn (final_binds, rhs_free_vars)
+	rhs_fvs = unionManyNameSets [fvs | (_,_,fvs,_,_) <- mbinds_info]
     in
-    case (inline_sigs_in_recursive_binds final_binds) of
-      Nothing -> happy_answer
-      Just names_n_locns ->
--- SLPJ: sometimes want recursive INLINE for worker wrapper style stuff
--- 	addErrRn (inlineInRecursiveBindsErr names_n_locns) `thenRn_`
-	{-not so-}happy_answer
-  where
-    f :: (a,b, FreeVars, c,d) -> FreeVars -> FreeVars
-
-    f (_, _, fvs_body, _, _) fvs_sofar = fvs_sofar `unionUniqSets` fvs_body
-
-    inline_sigs_in_recursive_binds (BindWith (RecBind _) sigs)
-      = case [(n, locn) | (InlineSig n locn) <- sigs ] of
-	  []   -> Nothing
-	  sigh ->
-#if OMIT_DEFORESTER
-		Just sigh
-#else
-    		-- Allow INLINEd recursive functions if they are
-		-- designated DEFORESTable too.
-		case [(n, locn) | (DeforestSig n locn) <- sigs ] of
-	  		[]   -> Just sigh
-	  		sigh -> Nothing
-#endif
-
-    inline_sigs_in_recursive_binds (ThenBinds b1 b2)
-      = case (inline_sigs_in_recursive_binds b1) of
-	  Nothing -> inline_sigs_in_recursive_binds b2
-	  Just  x -> Just x -- NB: won't report error(s) in b2
-
-    inline_sigs_in_recursive_binds anything_else = Nothing
+    returnRn (final_binds, rhs_fvs)
 \end{code}
 
 @flattenMonoBinds@ is ever-so-slightly magical in that it sticks
@@ -313,7 +287,7 @@ unique ``vertex tags'' on its output; minor plumbing required.
 flattenMonoBinds :: Int				-- Next free vertex tag
 		 -> [RenamedSig]		-- Signatures
 		 -> RdrNameMonoBinds
-		 -> RnM_Fixes s (Int, FlatMonoBindsInfo)
+		 -> RnMS s (Int, FlatMonoBindsInfo)
 
 flattenMonoBinds uniq sigs EmptyMonoBinds = returnRn (uniq, [])
 
@@ -329,64 +303,80 @@ flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
 
 	 -- Find which things are bound in this group
     let
-	names_bound_here = collectPatBinders pat'
-
-	sigs_etc_for_here = foldl (sig_for_here (\ n -> n `is_elem` names_bound_here))
-				  [] sigs
-
-	sigs_fvs = foldr sig_fv emptyUniqSet sigs_etc_for_here
-
-	is_elem = isIn "flattenMonoBinds"
+	names_bound_here = mkNameSet (collectPatBinders pat')
+	sigs_for_me      = filter ((`elemNameSet` names_bound_here) . sig_name) sigs
+	sigs_fvs         = foldr sig_fv emptyNameSet sigs_for_me
     in
     returnRn (
 	uniq + 1,
 	[(uniq,
-	  mkUniqSet names_bound_here,
-	   fvs `unionUniqSets` sigs_fvs,
-	   PatMonoBind pat' grhss_and_binds' locn,
-	   sigs_etc_for_here
+	  names_bound_here,
+	  fvs `unionNameSets` sigs_fvs,
+	  PatMonoBind pat' grhss_and_binds' locn,
+	  sigs_for_me
 	 )]
     )
 
 flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				 $
-    lookupValue name				 `thenRn` \ name' ->
-    mapAndUnzipRn rnMatch matches		 `thenRn` \ (new_matches, fv_lists) ->
-    mapRn (checkPrecMatch inf name') new_matches `thenRn_`
+    mapRn (checkPrecMatch inf name) matches	`thenRn_`
+    lookupRn name				`thenRn` \ name' ->
+    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, fv_lists) ->
     let
-	fvs = unionManyUniqSets fv_lists
-
-	sigs_for_me = foldl (sig_for_here (\ n -> n == name')) [] sigs
-
-	sigs_fvs = foldr sig_fv emptyUniqSet sigs_for_me
+	fvs	    = unionManyNameSets fv_lists
+	sigs_for_me = filter ((name' ==) . sig_name) sigs
+	sigs_fvs    = foldr sig_fv emptyNameSet sigs_for_me
     in
     returnRn (
       uniq + 1,
       [(uniq,
-	unitUniqSet name',
-	fvs `unionUniqSets` sigs_fvs,
+	unitNameSet name',
+	fvs `unionNameSets` sigs_fvs,
 	FunMonoBind name' inf new_matches locn,
 	sigs_for_me
 	)]
     )
 \end{code}
 
-Grab type-signatures/user-pragmas of interest:
-\begin{code}
-sig_for_here want_me acc s@(Sig n _ _ _)     | want_me n = s:acc
-sig_for_here want_me acc s@(InlineSig n _)   | want_me n = s:acc
-sig_for_here want_me acc s@(DeforestSig n _) | want_me n = s:acc
-sig_for_here want_me acc s@(SpecSig n _ _ _) | want_me n = s:acc
-sig_for_here want_me acc s@(MagicUnfoldingSig n _ _)
-					     | want_me n = s:acc
-sig_for_here want_me acc other_wise			 = acc
 
+@rnMethodBinds@ is used for the method bindings of an instance
+declaration.   like @rnMonoBinds@ but without dependency analysis.
+
+\begin{code}
+rnMethodBinds :: RdrNameMonoBinds -> RnMS s RenamedMonoBinds
+
+rnMethodBinds EmptyMonoBinds = returnRn EmptyMonoBinds
+
+rnMethodBinds (AndMonoBinds mb1 mb2)
+  = andRn AndMonoBinds (rnMethodBinds mb1)
+		       (rnMethodBinds mb2)
+
+rnMethodBinds (FunMonoBind occname inf matches locn)
+  = pushSrcLocRn locn				   $
+    mapRn (checkPrecMatch inf occname) matches	`thenRn_`
+    lookupRn occname		  		`thenRn` \ op_name ->
+    mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, _) ->
+    returnRn (FunMonoBind op_name inf new_matches locn)
+
+rnMethodBinds (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
+  = pushSrcLocRn locn			$
+    lookupRn  occname			`thenRn` \ op_name ->
+    rnGRHSsAndBinds grhss_and_binds	`thenRn` \ (grhss_and_binds', _) ->
+    returnRn (PatMonoBind (VarPatIn op_name) grhss_and_binds' locn)
+
+-- Can't handle method pattern-bindings which bind multiple methods.
+rnMethodBinds mbind@(PatMonoBind other_pat _ locn)
+  = pushSrcLocRn locn	$
+    failWithRn EmptyMonoBinds (methodBindErr mbind)
+\end{code}
+
+\begin{code}
 -- If a SPECIALIZE pragma is of the "... = blah" form,
 -- then we'd better make sure "blah" is taken into
 -- acct in the dependency analysis (or we get an
 -- unexpected out-of-scope error)! WDP 95/07
 
-sig_fv (SpecSig _ _ (Just blah) _) acc = acc `unionUniqSets` unitUniqSet blah
+sig_fv (SpecSig _ _ (Just blah) _) acc = acc `unionNameSets` (unitNameSet blah)
 sig_fv _			   acc = acc
 \end{code}
 
@@ -400,55 +390,40 @@ This @MonoBinds@- and @ClassDecls@-specific code is segregated here,
 as the two cases are similar.
 
 \begin{code}
-reconstructRec	:: [Cycle]	-- Result of SCC analysis; at least one
-		-> [Edge]	-- Original edges
-		-> FlatMonoBindsInfo
-		-> RenamedHsBinds
+reconstructCycle :: [Edge]	-- Original edges
+		 -> FlatMonoBindsInfo
+	 	 -> Cycle
+		 -> RenamedHsBinds
 
-reconstructRec cycles edges mbi
-  = foldr1 ThenBinds (map (reconstructCycle mbi) cycles)
+reconstructCycle edges mbi cycle
+  = mk_binds this_gp_binds this_gp_sigs (isCyclic edges cycle)
   where
-    reconstructCycle :: FlatMonoBindsInfo -> Cycle -> RenamedHsBinds
-
-    reconstructCycle mbi2 cycle
-      = case [(binds,sigs) | (vertex, _, _, binds, sigs) <- mbi2, vertex `is_elem` cycle]
-		  of { relevant_binds_and_sigs ->
-
-	case (unzip relevant_binds_and_sigs) of { (binds, sig_lists) ->
-
-	case (foldr AndMonoBinds EmptyMonoBinds binds) of { this_gp_binds ->
-	let
-	    this_gp_sigs	= foldr1 (++) sig_lists
-	    have_sigs		= not (null sig_lists)
-		-- ToDo: this might not be the right
-		-- thing to call this predicate;
-		-- e.g. "have_sigs [[], [], []]" ???????????
-	in
-	mk_binds this_gp_binds this_gp_sigs (isCyclic edges cycle) have_sigs
-	}}}
-      where
-	is_elem = isIn "reconstructRec"
-
-	mk_binds :: RenamedMonoBinds -> [RenamedSig]
-		 -> Bool -> Bool -> RenamedHsBinds
-
-	mk_binds bs ss True  False		= SingleBind (RecBind    bs)
-	mk_binds bs ss True  True{-have sigs-}	= BindWith   (RecBind    bs) ss
-	mk_binds bs ss False False		= SingleBind (NonRecBind bs)
-	mk_binds bs ss False True{-have sigs-}	= BindWith   (NonRecBind bs) ss
-
-	-- moved from Digraph, as this is the only use here
-	-- (avoid overloading cost).  We have to use elem
-	-- (not FiniteMaps or whatever), because there may be
-	-- many edges out of one vertex.  We give it its own
-	-- "elem" just for speed.
-
-	isCyclic es []  = panic "isCyclic: empty component"
-	isCyclic es [v] = (v,v) `elem` es
-	isCyclic es vs  = True
-
-	elem _ []	= False
-	elem x (y:ys)	= x==y || elem x ys
+    relevant_binds_and_sigs = [(binds,sigs) | (vertex, _, _, binds, sigs) <- mbi,
+  					      vertex `is_elem` cycle]
+    (binds, sig_lists) = unzip relevant_binds_and_sigs
+    this_gp_binds      = foldr1 AndMonoBinds binds
+    this_gp_sigs       = foldr1 (++) sig_lists
+  
+    is_elem = isIn "reconstructRec"
+  
+    mk_binds :: RenamedMonoBinds -> [RenamedSig] -> Bool -> RenamedHsBinds
+    mk_binds bs [] True  = SingleBind (RecBind    bs)
+    mk_binds bs ss True  = BindWith   (RecBind    bs) ss
+    mk_binds bs [] False = SingleBind (NonRecBind bs)
+    mk_binds bs ss False = BindWith   (NonRecBind bs) ss
+  
+  	-- moved from Digraph, as this is the only use here
+  	-- (avoid overloading cost).  We have to use elem
+  	-- (not FiniteMaps or whatever), because there may be
+  	-- many edges out of one vertex.  We give it its own
+  	-- "elem" just for speed.
+  
+    isCyclic es []  = panic "isCyclic: empty component"
+    isCyclic es [v] = (v,v) `elem` es
+    isCyclic es vs  = True
+  
+    elem _ []	  = False
+    elem x (y:ys) = x==y || elem x ys
 \end{code}
 
 %************************************************************************
@@ -465,8 +440,8 @@ renamed.
 \begin{code}
 type FlatMonoBindsInfo
   = [(VertexTag,		-- Identifies the vertex
-      UniqSet RnName,		-- Set of names defined in this vertex
-      UniqSet RnName,		-- Set of names used in this vertex
+      NameSet,			-- Set of names defined in this vertex
+      NameSet,			-- Set of names used in this vertex
       RenamedMonoBinds,		-- Binding for this vertex (always just one binding, either fun or pat)
       [RenamedSig])		-- Signatures, if any, for this vertex
     ]
@@ -476,12 +451,10 @@ mkEdges    :: FlatMonoBindsInfo -> [Edge]
 
 mkVertices info = [ vertex | (vertex,_,_,_,_) <- info]
 
-mkEdges flat_info
- -- An edge (v,v') indicates that v depends on v'
-  = -- pprTrace "mkEdges:" (ppAboves [ppAboves[ppInt v, ppCat [ppr PprDebug d|d <- uniqSetToList defd], ppCat [ppr PprDebug u|u <- uniqSetToList used]] | (v,defd,used,_,_) <- flat_info]) $
-    [ (source_vertex, target_vertex)
+mkEdges flat_info	 -- An edge (v,v') indicates that v depends on v'
+  = [ (source_vertex, target_vertex)
     | (source_vertex, _, used_names, _, _) <- flat_info,
-      target_name   <- uniqSetToList used_names,
+      target_name   <- nameSetToList used_names,
       target_vertex <- vertices_defining target_name flat_info
     ]
     where
@@ -491,8 +464,8 @@ mkEdges flat_info
     -- error) needs more thought.
 
     vertices_defining name flat_info2
-     = [ vertex |  (vertex, names_defined, _, _, _) <- flat_info2,
-		 name `elementOfUniqSet` names_defined
+     = [ vertex | (vertex, names_defined, _, _, _) <- flat_info2,
+		  name `elemNameSet` names_defined
        ]
 \end{code}
 
@@ -509,139 +482,94 @@ flaggery, that all top-level things have type signatures.
 
 \begin{code}
 rnBindSigs :: Bool		    	-- True <=> top-level binders
-	    -> [RdrName]	    	-- Binders for this decl group
+	    -> NameSet			-- Set of names bound in this group
 	    -> [RdrNameSig]
-	    -> RnM_Fixes s [RenamedSig] -- List of Sig constructors
+	    -> RnMS s [RenamedSig]		 -- List of Sig constructors
 
-rnBindSigs is_toplev binder_occnames sigs
-  =
-	 -- Rename the signatures
-	 -- Will complain about sigs for variables not in this group
-    mapRn rename_sig sigs   	`thenRn` \ sigs_maybe ->
+rnBindSigs is_toplev binders sigs
+  =	 -- Rename the signatures
+    mapRn renameSig sigs   	`thenRn` \ sigs' ->
+
+	-- Check for (a) duplicate signatures
+	--	     (b) signatures for things not in this group
+	--	     (c) optionally, bindings with no signature
     let
-	sigs' = catMaybes sigs_maybe
-
-	 -- Discard unbound ones we've already complained about, so we
-	 -- complain about duplicate ones.
-
-	(goodies, dups) = removeDups compare (filter (\ x -> not_unbound x && not_main x) sigs')
+	(goodies, dups) = removeDups cmp_sig (filter (not.isUnboundName.sig_name) sigs')
+	not_this_group  = filter (\sig -> not (sig_name sig `elemNameSet` binders)) goodies
+	type_sig_vars	= [n | Sig n _ _ <- goodies]
+	un_sigd_binders 
+	    | is_toplev && opt_SigsRequired = nameSetToList binders `minusList` type_sig_vars
+	    | otherwise			    = []
     in
-    mapRn (addErrRn . dupSigDeclErr) dups `thenRn_`
-
-    getSrcLocRn			`thenRn` \ locn ->
-
-    (if (is_toplev && opt_SigsRequired) then
-	let
-	    sig_frees = catMaybes (map (sig_free sigs) binder_occnames)
-	in
-	mapRn (addErrRn . missingSigErr locn) sig_frees
-     else
-	returnRn []
-    )				`thenRn_`
+    mapRn dupSigDeclErr dups 				`thenRn_`
+    mapRn unknownSigErr not_this_group			`thenRn_`
+    mapRn (addErrRn.missingSigErr) un_sigd_binders	`thenRn_`
 
     returnRn sigs' -- bad ones and all:
 		   -- we need bindings of *some* sort for every name
+
+
+renameSig (Sig v ty src_loc)
+  = pushSrcLocRn src_loc $
+    lookupRn v			`thenRn` \ new_v ->
+    rnHsType ty			`thenRn` \ new_ty ->
+    returnRn (Sig new_v new_ty src_loc)
+
+renameSig (SpecSig v ty using src_loc)
+  = pushSrcLocRn src_loc $
+    lookupRn v			`thenRn` \ new_v ->
+    rnHsType ty			`thenRn` \ new_ty ->
+    rn_using using		`thenRn` \ new_using ->
+    returnRn (SpecSig new_v new_ty new_using src_loc)
   where
-    rename_sig (Sig v ty pragmas src_loc)
-      = pushSrcLocRn src_loc $
-	if not (v `elem` binder_occnames) then
-	   addErrRn (unknownSigDeclErr "type signature" v src_loc) `thenRn_`
-	   returnRn Nothing
-	else
-	   lookupValue v			`thenRn` \ new_v ->
-	   rnPolyType nullTyVarNamesEnv ty	`thenRn` \ new_ty ->
+    rn_using Nothing  = returnRn Nothing
+    rn_using (Just x) = lookupOccRn x `thenRn` \ new_x ->
+			returnRn (Just new_x)
 
-	   ASSERT(isNoGenPragmas pragmas)
-	   returnRn (Just (Sig new_v new_ty noGenPragmas src_loc))
+renameSig (InlineSig v src_loc)
+  = pushSrcLocRn src_loc $
+    lookupRn v		`thenRn` \ new_v ->
+    returnRn (InlineSig new_v src_loc)
 
-    -- and now, the various flavours of value-modifying user-pragmas:
+renameSig (DeforestSig v src_loc)
+  = pushSrcLocRn src_loc $
+    lookupRn v        `thenRn` \ new_v ->
+    returnRn (DeforestSig new_v src_loc)
 
-    rename_sig (SpecSig v ty using src_loc)
-      = pushSrcLocRn src_loc $
-	if not (v `elem` binder_occnames) then
-	   addErrRn (unknownSigDeclErr "SPECIALIZE pragma" v src_loc) `thenRn_`
-	   returnRn Nothing
-	else
-	   lookupValue v			`thenRn` \ new_v ->
-	   rnPolyType nullTyVarNamesEnv ty	`thenRn` \ new_ty ->
-	   rn_using using			`thenRn` \ new_using ->
-	   returnRn (Just (SpecSig new_v new_ty new_using src_loc))
-      where
-	rn_using Nothing  = returnRn Nothing
-	rn_using (Just x) = lookupValue x `thenRn` \ new_x ->
-			    returnRn (Just new_x)
+renameSig (MagicUnfoldingSig v str src_loc)
+  = pushSrcLocRn src_loc $
+    lookupRn v		`thenRn` \ new_v ->
+    returnRn (MagicUnfoldingSig new_v str src_loc)
+\end{code}
 
-    rename_sig (InlineSig v src_loc)
-      = pushSrcLocRn src_loc $
-	if not (v `elem` binder_occnames) then
-	   addErrRn (unknownSigDeclErr "INLINE pragma" v src_loc) `thenRn_`
-	   returnRn Nothing
-	else
-	   lookupValue v	`thenRn` \ new_v ->
-	   returnRn (Just (InlineSig new_v src_loc))
+Checking for distinct signatures; oh, so boring
 
-    rename_sig (DeforestSig v src_loc)
-      = pushSrcLocRn src_loc $
-	if not (v `elem` binder_occnames) then
-	   addErrRn (unknownSigDeclErr "DEFOREST pragma" v src_loc) `thenRn_`
-	   returnRn Nothing
-	else
-	   lookupValue v        `thenRn` \ new_v ->
-	   returnRn (Just (DeforestSig new_v src_loc))
-
-    rename_sig (MagicUnfoldingSig v str src_loc)
-      = pushSrcLocRn src_loc $
-	if not (v `elem` binder_occnames) then
-	   addErrRn (unknownSigDeclErr "MAGIC_UNFOLDING pragma" v src_loc) `thenRn_`
-	   returnRn Nothing
-	else
-	   lookupValue v	`thenRn` \ new_v ->
-	   returnRn (Just (MagicUnfoldingSig new_v str src_loc))
-
-    not_unbound, not_main :: RenamedSig -> Bool
-
-    not_unbound (Sig n _ _ _)		  = not (isRnUnbound n)
-    not_unbound (SpecSig n _ _ _)	  = not (isRnUnbound n)
-    not_unbound (InlineSig n _)		  = not (isRnUnbound n)
-    not_unbound (DeforestSig n _)	  = not (isRnUnbound n)
-    not_unbound (MagicUnfoldingSig n _ _) = not (isRnUnbound n)
-
-    not_main (Sig n _ _ _)  = let str = getLocalName n in
-			      not (str == SLIT("main") || str == SLIT("mainPrimIO"))
-    not_main _		    = True
-
-    -------------------------------------
-    sig_free :: [RdrNameSig] -> RdrName -> Maybe RdrName
-	-- Return "Just x" if "x" has no type signature in
-	-- sigs.  Nothing, otherwise.
-
-    sig_free [] ny = Just ny
-    sig_free (Sig nx _ _ _ : rest) ny
-      = if (nx == ny) then Nothing else sig_free rest ny
-    sig_free (_ : rest) ny = sig_free rest ny
-
-    -------------------------------------
-    compare :: RenamedSig -> RenamedSig -> TAG_
-    compare (Sig n1 _ _ _)	       (Sig n2 _ _ _)    	  = n1 `cmp` n2
-    compare (InlineSig n1 _)  	       (InlineSig n2 _) 	  = n1 `cmp` n2
-    compare (MagicUnfoldingSig n1 _ _) (MagicUnfoldingSig n2 _ _) = n1 `cmp` n2
-    compare (SpecSig n1 ty1 _ _)       (SpecSig n2 ty2 _ _)
-      = -- may have many specialisations for one value;
+\begin{code}
+cmp_sig :: RenamedSig -> RenamedSig -> TAG_
+cmp_sig (Sig n1 _ _)	           (Sig n2 _ _)    	  = n1 `cmp` n2
+cmp_sig (InlineSig n1 _)  	   (InlineSig n2 _) 	  = n1 `cmp` n2
+cmp_sig (MagicUnfoldingSig n1 _ _) (MagicUnfoldingSig n2 _ _) = n1 `cmp` n2
+cmp_sig (SpecSig n1 ty1 _ _)       (SpecSig n2 ty2 _ _)
+  = -- may have many specialisations for one value;
 	-- but not ones that are exactly the same...
-	thenCmp (n1 `cmp` n2) (cmpPolyType cmp ty1 ty2)
+	thenCmp (n1 `cmp` n2) (cmpHsType cmp ty1 ty2)
 
-    compare other_1 other_2	-- tags *must* be different
-      = let tag1 = tag other_1
-	    tag2 = tag other_2
-	in
-	if tag1 _LT_ tag2 then LT_ else GT_
+cmp_sig other_1 other_2					-- Tags *must* be different
+  | (sig_tag other_1) _LT_ (sig_tag other_2) = LT_ 
+  | otherwise				     = GT_
 
-    tag (Sig n1 _ _ _)    	   = (ILIT(1) :: FAST_INT)
-    tag (SpecSig n1 _ _ _)    	   = ILIT(2)
-    tag (InlineSig n1 _)  	   = ILIT(3)
-    tag (MagicUnfoldingSig n1 _ _) = ILIT(4)
-    tag (DeforestSig n1 _)         = ILIT(5)
-    tag _ = panic# "tag(RnBinds)"
+sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
+sig_tag (SpecSig n1 _ _ _)    	   = ILIT(2)
+sig_tag (InlineSig n1 _)  	   = ILIT(3)
+sig_tag (MagicUnfoldingSig n1 _ _) = ILIT(4)
+sig_tag (DeforestSig n1 _)         = ILIT(5)
+sig_tag _			   = panic# "tag(RnBinds)"
+
+sig_name (Sig        n _ _) 	   = n
+sig_name (ClassOpSig n _ _ _) 	   = n
+sig_name (SpecSig    n _ _ _) 	   = n
+sig_name (InlineSig  n     _) 	   = n  
+sig_name (MagicUnfoldingSig n _ _) = n
 \end{code}
 
 %************************************************************************
@@ -651,46 +579,31 @@ rnBindSigs is_toplev binder_occnames sigs
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr sigs
-  = let
-	undup_sigs = fst (removeDups cmp_sig sigs)
-    in
-    addErrLoc locn1
-	("more than one "++what_it_is++"\n\thas been given for these variables") ( \ sty ->
-    ppAboves (map (ppr sty) undup_sigs) )
+dupSigDeclErr (sig:sigs)
+  = pushSrcLocRn loc $
+    addErrRn (\sty -> ppSep [ppStr "more than one", 
+		      	    ppStr what_it_is, ppStr "given for", 
+			    ppQuote (ppr sty (sig_name sig))])
   where
-    (what_it_is, locn1)
-      = case (head sigs) of
-	  Sig        _ _ _ loc -> ("type signature",loc)
-	  ClassOpSig _ _ _ loc -> ("class-method type signature", loc)
-	  SpecSig    _ _ _ loc -> ("SPECIALIZE pragma",loc)
-	  InlineSig  _     loc -> ("INLINE pragma",loc)
-	  MagicUnfoldingSig _ _ loc -> ("MAGIC_UNFOLDING pragma",loc)
+    (what_it_is, loc) = sig_doc sig
 
-    cmp_sig a b = get_name a `cmp` get_name b
+unknownSigErr sig
+  = pushSrcLocRn loc $
+    addErrRn (\sty -> ppSep [ppStr flavour, ppStr "but no definition for",
+			     ppQuote (ppr sty (sig_name sig))])
+  where
+    (flavour, loc) = sig_doc sig
 
-    get_name (Sig        n _ _ _) = n
-    get_name (ClassOpSig n _ _ _) = n
-    get_name (SpecSig    n _ _ _) = n
-    get_name (InlineSig  n     _) = n
-    get_name (MagicUnfoldingSig n _ _) = n
+sig_doc (Sig        _ _ loc) 	    = ("type signature",loc)
+sig_doc (ClassOpSig _ _ _ loc) 	    = ("class-method type signature", loc)
+sig_doc (SpecSig    _ _ _ loc) 	    = ("SPECIALIZE pragma",loc)
+sig_doc (InlineSig  _     loc) 	    = ("INLINE pragma",loc)
+sig_doc (MagicUnfoldingSig _ _ loc) = ("MAGIC_UNFOLDING pragma",loc)
 
-------------------------
-methodBindErr mbind locn
- = addErrLoc locn "Can't handle multiple methods defined by one pattern binding"
-	(\ sty -> ppr sty mbind)
+missingSigErr var sty
+  = ppSep [ppStr "a definition but no type signature for", ppQuote (ppr sty var)]
 
---------------------------
-missingSigErr locn var
-  = addShortErrLocLine locn ( \ sty ->
-    ppBesides [ppStr "a definition but no type signature for `",
-	       ppr sty var,
-	       ppStr "'."])
-
---------------------------------
-unknownSigDeclErr flavor var locn
-  = addShortErrLocLine locn ( \ sty ->
-    ppBesides [ppStr flavor, ppStr " but no definition for `",
-	       ppr sty var,
-	       ppStr "'."])
+methodBindErr mbind sty
+ =  ppHang (ppStr "Can't handle multiple methods defined by one pattern binding")
+	   4 (ppr sty mbind)
 \end{code}

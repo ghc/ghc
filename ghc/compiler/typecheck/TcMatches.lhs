@@ -13,16 +13,17 @@ IMP_Ubiq()
 import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 			  HsExpr, HsBinds, OutPat, Fake,
 			  collectPatBinders, pprMatch )
-import RnHsSyn		( SYN_IE(RenamedMatch), RnName{-instance Outputable-} )
+import RnHsSyn		( SYN_IE(RenamedMatch) )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcEnv		( newMonoIds )
 IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcPat		( tcPat )
 import TcType		( SYN_IE(TcType), TcMaybe, zonkTcType )
 import Unify		( unifyTauTy, unifyTauTyList )
+import Name		( Name {- instance Outputable -} )
 
 import Kind		( Kind, mkTypeKind )
 import Pretty
@@ -36,7 +37,7 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
-tcMatchesFun :: RnName
+tcMatchesFun :: Name
 	     -> TcType s 		-- Expected type
 	     -> [RenamedMatch]
 	     -> TcM s ([TcMatch s], LIE s)
@@ -80,7 +81,7 @@ tcMatchesCase expected_ty matches = tcMatchesExpected expected_ty MCase matches
 
 
 \begin{code}
-data FunOrCase = MCase | MFun RnName	-- Records whether doing  fun or case rhss;
+data FunOrCase = MCase | MFun Name	-- Records whether doing  fun or case rhss;
 					-- used to produced better error messages
 
 tcMatchesExpected :: TcType s

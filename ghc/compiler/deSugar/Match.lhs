@@ -26,7 +26,7 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 
 import FieldLabel	( FieldLabel {- Eq instance -} )
-import Id		( idType, mkTupleCon, dataConFieldLabels,
+import Id		( idType, dataConFieldLabels,
 			  dataConArgTys, recordSelectorFieldLabel,
 			  GenId{-instance-}
 			)
@@ -43,7 +43,7 @@ import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 			)
 import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
-			  floatTy, floatDataCon, doubleTy,
+			  floatTy, floatDataCon, doubleTy, tupleCon,
 			  doubleDataCon, stringTy, addrTy,
 			  addrDataCon, wordTy, wordDataCon
 			)
@@ -363,7 +363,7 @@ tidy1 v (TuplePat pats) match_result
   where
     arity = length pats
     tuple_ConPat
-      = ConPat (mkTupleCon arity)
+      = ConPat (tupleCon arity)
 	       (mkTupleTy arity (map outPatType pats))
 	       pats
 

@@ -11,16 +11,17 @@ module TcPat ( tcPat ) where
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Match, HsBinds, Qualifier, PolyType,
+			  Match, HsBinds, Qualifier, HsType,
 			  ArithSeqInfo, Stmt, Fake )
-import RnHsSyn		( SYN_IE(RenamedPat), RnName{-instance Outputable-} )
+import RnHsSyn		( SYN_IE(RenamedPat) )
 import TcHsSyn		( SYN_IE(TcPat), TcIdOcc(..) )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  emptyLIE, plusLIE, plusLIEs, SYN_IE(LIE),
 			  newMethod, newOverloadedLit
 			)
+import Name		( Name {- instance Outputable -} )
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
 			  tcLookupLocalValueOK )
 import SpecEnv		( SpecEnv )
@@ -326,7 +327,7 @@ tcPats (pat:pats)
 unifies the actual args against the expected ones.
 
 \begin{code}
-matchConArgTys :: RnName -> [TcType s] -> TcM s (Id, TcType s)
+matchConArgTys :: Name -> [TcType s] -> TcM s (Id, TcType s)
 
 matchConArgTys con arg_tys
   = tcLookupGlobalValue con		`thenNF_Tc` \ con_id ->

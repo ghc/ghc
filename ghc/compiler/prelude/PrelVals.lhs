@@ -10,7 +10,7 @@ module PrelVals where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), nullSpecEnv, SpecEnv )
-import Id		( SYN_IE(Id), GenId, mkImported, mkUserId, mkTemplateLocals )
+import Id		( SYN_IE(Id), GenId, mkImported, mkTemplateLocals )
 IMPORT_DELOOPER(PrelLoop)
 
 -- friends:
@@ -23,7 +23,7 @@ import CmdLineOpts	( maybe_CompilingGhcInternals )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
-import Name		( ExportFlag(..) )
+import Name		( mkWiredInIdName )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
 import Type		( mkTyVarTy )
@@ -34,11 +34,11 @@ import Util		( panic )
 
 \begin{code}
 -- only used herein:
-pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo -> Id
+pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 
-pcMiscPrelId key m n ty info
+pcMiscPrelId key mod occ ty info
   = let
-	name = mkWiredInName key (OrigName m n) ExportAll
+	name = mkWiredInIdName key mod occ imp
 	imp  = mkImported name ty info -- the usual case...
     in
     imp
@@ -73,14 +73,14 @@ templates, but we don't ever expect to generate code for it.
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = noIdInfo `addInfo` mkBottomStrictnessInfo
+    bottoming_info = noIdInfo `addStrictnessInfo` mkBottomStrictnessInfo
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
-  = pc_bottoming_Id errorIdKey pRELUDE SLIT("error") errorTy
+  = pc_bottoming_Id errorIdKey iO_BASE SLIT("error") errorTy
 
 generic_ERROR_ID u n
-  = pc_bottoming_Id u SLIT("GHCerr") n errorTy
+  = pc_bottoming_Id u gHC_ERR n errorTy
 
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
@@ -98,11 +98,11 @@ nO_EXPLICIT_METHOD_ERROR_ID
   = generic_ERROR_ID nonExplicitMethodErrorIdKey SLIT("noExplicitMethodError")
 
 aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey SLIT("GHCerr") SLIT("absentErr")
+  = pc_bottoming_Id absentErrorIdKey gHC_ERR SLIT("absentErr")
 	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
 
 pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey SLIT("GHCerr") SLIT("parError")
+  = pcMiscPrelId parErrorIdKey gHC_ERR SLIT("parError")
     (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noIdInfo
 
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -120,8 +120,8 @@ decide that the second argument is strict, evaluate that first (!!),
 and make a jolly old mess.
 \begin{code}
 tRACE_ID
-  = pcMiscPrelId traceIdKey gHC__ SLIT("trace") traceTy
-	(noIdInfo `addInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
+  = pcMiscPrelId traceIdKey iO_BASE SLIT("trace") traceTy
+	(noIdInfo `addSpecInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
   where
     traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
 \end{code}
@@ -134,54 +134,55 @@ tRACE_ID
 
 \begin{code}
 packStringForCId
-  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} gHC__ SLIT("packStringForC__")
+  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pACKED_STRING SLIT("packCString#")
 	(mkFunTys [stringTy] byteArrayPrimTy) noIdInfo
 
 --------------------------------------------------------------------
 
 unpackCStringId
-  = pcMiscPrelId unpackCStringIdKey gHC__ SLIT("unpackPS__")
+  = pcMiscPrelId unpackCStringIdKey pACKED_STRING SLIT("unpackCString#")
 		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
---	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
+--	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` exactArity 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey gHC__ SLIT("unpackPS2__")
+  = pcMiscPrelId unpackCString2IdKey pACKED_STRING SLIT("unpackCString2#")
 		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
 		 noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringAppendIdKey gHC__ SLIT("unpackAppendPS__")
+  = pcMiscPrelId unpackCStringAppendIdKey pACKED_STRING SLIT("unpackAppendCString#")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
 		((noIdInfo
-		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey-})
-		 `addInfo` mkArityInfo 2)
+		 {-LATER:`addUnfoldInfo` mkMagicUnfolding unpackCStringAppendIdKey-})
+		 `addArityInfo` exactArity 2)
 
 unpackCStringFoldrId
-  = pcMiscPrelId unpackCStringFoldrIdKey gHC__ SLIT("unpackFoldrPS__")
+  = pcMiscPrelId unpackCStringFoldrIdKey pACKED_STRING SLIT("unpackFoldrCString#")
 		(mkSigmaTy [alphaTyVar] []
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},
 			   mkFunTys [charTy, alphaTy] alphaTy,
 			   alphaTy]
 			  alphaTy))
 		((noIdInfo
-		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringFoldrIdKey-})
-		 `addInfo` mkArityInfo 3)
+		 {-LATER:`addUnfoldInfo` mkMagicUnfolding unpackCStringFoldrIdKey-})
+		 `addArityInfo` exactArity 3)
 \end{code}
 
 OK, this is Will's idea: we should have magic values for Integers 0,
 +1, +2, and -1 (go ahead, fire me):
+
 \begin{code}
 integerZeroId
-  = pcMiscPrelId integerZeroIdKey     gHC__ SLIT("integer_0")  integerTy noIdInfo
+  = pcMiscPrelId integerZeroIdKey     pREL_NUM SLIT("integer_0")  integerTy noIdInfo
 integerPlusOneId
-  = pcMiscPrelId integerPlusOneIdKey  gHC__ SLIT("integer_1")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusOneIdKey  pREL_NUM SLIT("integer_1")  integerTy noIdInfo
 integerPlusTwoId
-  = pcMiscPrelId integerPlusTwoIdKey  gHC__ SLIT("integer_2")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusTwoIdKey  pREL_NUM SLIT("integer_2")  integerTy noIdInfo
 integerMinusOneId
-  = pcMiscPrelId integerMinusOneIdKey gHC__ SLIT("integer_m1") integerTy noIdInfo
+  = pcMiscPrelId integerMinusOneIdKey pREL_NUM SLIT("integer_m1") integerTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -207,10 +208,10 @@ integerMinusOneId
 
 -}
 
-seqId = pcMiscPrelId seqIdKey gHC__ SLIT("seq")
+seqId = pcMiscPrelId seqIdKey pRELUDE SLIT("seq")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding seq_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True seq_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -242,10 +243,10 @@ seqId = pcMiscPrelId seqIdKey gHC__ SLIT("seq")
     par = /\ a b -> \ x::a y::b -> case par# x of { 0# -> parError#; _ -> y; }
 
 -}
-parId = pcMiscPrelId parIdKey gHC__ SLIT("par")
+parId = pcMiscPrelId parIdKey cONC_BASE SLIT("par")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding par_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True par_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -265,10 +266,10 @@ parId = pcMiscPrelId parIdKey gHC__ SLIT("par")
 {-
    _fork_ = /\ a b -> \ x::a y::b -> case fork# x of { 0# -> parError#; _ -> y; }
 -}
-forkId = pcMiscPrelId forkIdKey gHC__ SLIT("fork")
+forkId = pcMiscPrelId forkIdKey cONC_BASE SLIT("fork")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding fork_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True fork_template))
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -289,10 +290,10 @@ forkId = pcMiscPrelId forkIdKey gHC__ SLIT("fork")
 GranSim ones:
 \begin{code}
 {- OUT:
-parLocalId = pcMiscPrelId parLocalIdKey gHC__ SLIT("parLocal")
+parLocalId = pcMiscPrelId parLocalIdKey cONC_BASE SLIT("parLocal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parLocal_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parLocal_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -313,10 +314,10 @@ parLocalId = pcMiscPrelId parLocalIdKey gHC__ SLIT("parLocal")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parGlobalId = pcMiscPrelId parGlobalIdKey gHC__ SLIT("parGlobal")
+parGlobalId = pcMiscPrelId parGlobalIdKey cONC_BASE SLIT("parGlobal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parGlobal_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parGlobal_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -338,11 +339,11 @@ parGlobalId = pcMiscPrelId parGlobalIdKey gHC__ SLIT("parGlobal")
 		    (BindDefault z (Var y))))
 
 
-parAtId = pcMiscPrelId parAtIdKey gHC__ SLIT("parAt")
+parAtId = pcMiscPrelId parAtIdKey cONC_BASE SLIT("parAt")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 		               alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAt_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAt_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -364,10 +365,10 @@ parAtId = pcMiscPrelId parAtIdKey gHC__ SLIT("parAt")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [gammaTy])]
 		    (BindDefault z (Var y))))
 
-parAtAbsId = pcMiscPrelId parAtAbsIdKey gHC__ SLIT("parAtAbs")
+parAtAbsId = pcMiscPrelId parAtAbsIdKey cONC_BASE SLIT("parAtAbs")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtAbs_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtAbs_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -389,10 +390,10 @@ parAtAbsId = pcMiscPrelId parAtAbsIdKey gHC__ SLIT("parAtAbs")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parAtRelId = pcMiscPrelId parAtRelIdKey gHC__ SLIT("parAtRel")
+parAtRelId = pcMiscPrelId parAtRelIdKey cONC_BASE SLIT("parAtRel")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtRel_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtRel_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -414,11 +415,11 @@ parAtRelId = pcMiscPrelId parAtRelIdKey gHC__ SLIT("parAtRel")
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
 
-parAtForNowId = pcMiscPrelId parAtForNowIdKey gHC__ SLIT("parAtForNow")
+parAtForNowId = pcMiscPrelId parAtForNowIdKey cONC_BASE SLIT("parAtForNow")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 				alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtForNow_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True parAtForNow_template))
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -443,10 +444,10 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey gHC__ SLIT("parAtForNow")
 -- copyable and noFollow are currently merely hooks: they are translated into
 -- calls to the macros COPYABLE and NOFOLLOW                            -- HWL 
 
-copyableId = pcMiscPrelId copyableIdKey gHC__ SLIT("copyable")
+copyableId = pcMiscPrelId copyableIdKey cONC_BASE SLIT("copyable")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding copyable_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True copyable_template))
   where
     -- Annotations: x: closure that's tagged to by copyable
     [x, z]
@@ -458,10 +459,10 @@ copyableId = pcMiscPrelId copyableIdKey gHC__ SLIT("copyable")
     copyable_template
       = mkLam [alphaTyVar] [x] ( Prim CopyableOp [TyArg alphaTy, VarArg x] )
 
-noFollowId = pcMiscPrelId noFollowIdKey gHC__ SLIT("noFollow")
+noFollowId = pcMiscPrelId noFollowIdKey cONC_BASE SLIT("noFollow")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding noFollow_template))
+		  (noIdInfo `addUnfoldInfo` (mkUnfolding True noFollow_template))
   where
     -- Annotations: x: closure that's tagged to not follow
     [x, z]
@@ -494,7 +495,7 @@ runST a m = case m _RealWorld (S# _RealWorld realWorld#) of
 We unfold always, just for simplicity:
 \begin{code}
 runSTId
-  = pcMiscPrelId runSTIdKey gHC__ SLIT("runST") run_ST_ty id_info
+  = pcMiscPrelId runSTIdKey sT_BASE SLIT("runST") run_ST_ty id_info
   where
     s_tv = betaTyVar
     s	 = betaTy
@@ -507,10 +508,10 @@ runSTId
 
     id_info
       = noIdInfo
-	`addInfo` mkArityInfo 1
-	`addInfo` mkStrictnessInfo [WwStrict] Nothing
-	`addInfo` mkArgUsageInfo [ArgUsage 1]
-	-- ABSOLUTELY NO UNFOLDING, e.g.: (mkUnfolding EssentialUnfolding run_ST_template)
+	`addArityInfo` exactArity 1
+	`addStrictnessInfo` mkStrictnessInfo [WwStrict] Nothing
+	`addArgUsageInfo` mkArgUsageInfo [ArgUsage 1]
+	-- ABSOLUTELY NO UNFOLDING, e.g.: (mkUnfolding True run_ST_template)
 	-- see example below
 {- OUT:
     [m, t, r, wild]
@@ -526,7 +527,7 @@ runSTId
 	    Let (NonRec t (Con stateDataCon [TyArg realWorldTy, VarArg realWorldPrimId])) (
 	      Case (App (mkTyApp (Var m) [realWorldTy]) (VarArg t)) (
 		AlgAlts
-		  [(mkTupleCon 2, [r, wild], Var r)]
+		  [(pairDataCon, [r, wild], Var r)]
 		  NoDefault)))
 -}
 \end{code}
@@ -564,13 +565,13 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 nasty as-is, change it back to a literal (@Literal@).
 \begin{code}
 realWorldPrimId
-  = pcMiscPrelId realWorldPrimIdKey gHC_BUILTINS SLIT("realWorld#")
+  = pcMiscPrelId realWorldPrimIdKey gHC__ SLIT("realWorld#")
 	realWorldStatePrimTy
 	noIdInfo
 \end{code}
 
 \begin{code}
-voidId = pcMiscPrelId voidIdKey gHC_BUILTINS SLIT("void") voidTy noIdInfo
+voidId = pcMiscPrelId voidIdKey gHC__ SLIT("void") voidTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -581,12 +582,12 @@ voidId = pcMiscPrelId voidIdKey gHC_BUILTINS SLIT("void") voidTy noIdInfo
 
 \begin{code}
 buildId
-  = pcMiscPrelId buildIdKey SLIT("GHCerr") SLIT("build") buildTy
+  = pcMiscPrelId buildIdKey gHC_ERR SLIT("build") buildTy
 	((((noIdInfo
-		{-LATER:`addInfo_UF` mkMagicUnfolding buildIdKey-})
-		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
-		`addInfo` mkArgUsageInfo [ArgUsage 2])
-		`addInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
+		{-LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey-})
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict] Nothing)
+		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2])
+		`addSpecInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
 	-- cheating, but since _build never actually exists ...
   where
     -- The type of this strange object is:
@@ -626,11 +627,11 @@ mkBuild ty tv c n g expr
 
 \begin{code}
 augmentId
-  = pcMiscPrelId augmentIdKey SLIT("GHCerr") SLIT("augment") augmentTy
+  = pcMiscPrelId augmentIdKey gHC_ERR SLIT("augment") augmentTy
 	(((noIdInfo
-		{-LATER:`addInfo_UF` mkMagicUnfolding augmentIdKey-})
-		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
-		`addInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
+		{-LATER:`addUnfoldInfo` mkMagicUnfolding augmentIdKey-})
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
 	-- cheating, but since _augment never actually exists ...
   where
     -- The type of this strange object is:
@@ -643,7 +644,7 @@ augmentId
 \end{code}
 
 \begin{code}
-foldrId = pcMiscPrelId foldrIdKey pRELUDE SLIT("foldr")
+foldrId = pcMiscPrelId foldrIdKey pREL_BASE SLIT("foldr")
 		 foldrTy idInfo
   where
 	foldrTy =
@@ -651,13 +652,13 @@ foldrId = pcMiscPrelId foldrIdKey pRELUDE SLIT("foldr")
 		(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
 
 	idInfo = (((((noIdInfo
-			{-LATER:`addInfo_UF` mkMagicUnfolding foldrIdKey-})
-			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
-			`addInfo` mkArityInfo 3)
-			`addInfo` mkUpdateInfo [2,2,1])
-			`addInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
+			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldrIdKey-})
+			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
+			`addArityInfo` exactArity 3)
+			`addUpdateInfo` mkUpdateInfo [2,2,1])
+			`addSpecInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
 
-foldlId = pcMiscPrelId foldlIdKey pRELUDE SLIT("foldl")
+foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 		 foldlTy idInfo
   where
 	foldlTy =
@@ -665,11 +666,11 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE SLIT("foldl")
 		(mkFunTys [mkFunTys [alphaTy, betaTy] alphaTy, alphaTy, mkListTy betaTy] alphaTy)
 
 	idInfo = (((((noIdInfo
-			{-LATER:`addInfo_UF` mkMagicUnfolding foldlIdKey-})
-			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
-			`addInfo` mkArityInfo 3)
-			`addInfo` mkUpdateInfo [2,2,1])
-			`addInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
+			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldlIdKey-})
+			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
+			`addArityInfo` exactArity 3)
+			`addUpdateInfo` mkUpdateInfo [2,2,1])
+			`addSpecInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
 
 -- A bit of magic goes no here. We translate appendId into ++,
 -- you have to be carefull when you actually compile append:
@@ -686,15 +687,15 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE SLIT("foldl")
 --
 {- OLD: doesn't apply with 1.3
 appendId
-  = pcMiscPrelId appendIdKey pRELUDE_LIST SLIT("++") appendTy idInfo
+  = pcMiscPrelId appendIdKey mONAD SLIT("++") appendTy idInfo
   where
     appendTy =
       (mkSigmaTy [alphaTyVar] []
 	    (mkFunTys [mkListTy alphaTy, mkListTy alphaTy] (mkListTy alphaTy)))
     idInfo = (((noIdInfo
-		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
-		`addInfo` mkArityInfo 2)
-		`addInfo` mkUpdateInfo [1,2])
+		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addArityInfo` exactArity 2)
+		`addUpdateInfo` mkUpdateInfo [1,2])
 -}
 \end{code}
 

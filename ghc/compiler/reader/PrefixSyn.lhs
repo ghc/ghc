@@ -55,7 +55,7 @@ data RdrBinding
 			-- tell if its a Sig or a ClassOpSig,
 			-- so we just save the pieces:
   | RdrTySig		[RdrName]	    -- vars getting sigs
-			RdrNamePolyType     -- the type
+			RdrNameHsType     -- the type
 			SrcLoc
 
   -- user pragmas come in in a Sig-ish way/form...

@@ -52,12 +52,13 @@ module UniqFM (
     ) where
 
 #if defined(COMPILING_GHC)
-IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER( SpecLoop )
 #endif
 
 import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
 import Pretty		( SYN_IE(Pretty), PrettyRep )
+import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
 
@@ -141,26 +142,19 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 
 {-# SPECIALIZE
     addListToUFM :: UniqFM elt -> [(Name,   elt)] -> UniqFM elt
-		  , UniqFM elt -> [(RnName, elt)] -> UniqFM elt
   #-}
 {-# SPECIALIZE
     addListToUFM_C :: (elt -> elt -> elt) -> UniqFM elt -> [(Name,  elt)] -> UniqFM elt
-		    , (elt -> elt -> elt) -> UniqFM elt -> [(RnName,elt)] -> UniqFM elt
   #-}
 {-# SPECIALIZE
     addToUFM	:: UniqFM elt -> Unique -> elt  -> UniqFM elt
   #-}
 {-# SPECIALIZE
     listToUFM	:: [(Unique, elt)]     -> UniqFM elt
-		 , [(RnName, elt)]     -> UniqFM elt
   #-}
 {-# SPECIALIZE
     lookupUFM	:: UniqFM elt -> Name   -> Maybe elt
-		 , UniqFM elt -> RnName -> Maybe elt
 		 , UniqFM elt -> Unique -> Maybe elt
-  #-}
-{-# SPECIALIZE
-    lookupWithDefaultUFM :: UniqFM elt -> elt -> RnName -> elt
   #-}
 
 #endif {- __GLASGOW_HASKELL__ -}

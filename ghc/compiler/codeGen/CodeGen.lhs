@@ -57,7 +57,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
   = let
 	doing_profiling   = opt_SccProfilingOn
 	compiling_prelude = opt_CompilingGhcInternals
-	maybe_split       = if maybeToBool (opt_EnsureSplittableC)
+	maybe_split       = if opt_EnsureSplittableC
 			    then CSplitMarker
 			    else AbsCNop
 
@@ -167,5 +167,5 @@ cgTopRhs name (StgRhsClosure cc bi fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables
     forkStatics (cgTopRhsClosure name cc bi args body lf_info)
   where
-    lf_info = mkClosureLFInfo True{-top level-} [{-no fvs-}] upd_flag args body
+    lf_info = mkClosureLFInfo True{-top level-} [{-no fvs-}] upd_flag args
 \end{code}

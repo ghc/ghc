@@ -152,22 +152,21 @@ pprInPat sty (TuplePatIn pats)
   = ppParens (interpp'SP sty pats)
 
 pprInPat sty (RecPatIn con rpats)
-  = ppBesides [ppr sty con, ppSP, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
+  = ppCat [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
   where
     pp_rpat PprForUser (v, _, True) = ppr PprForUser v
     pp_rpat sty        (v, p, _)    = ppCat [ppr sty v, ppStr "=", ppr sty p]
 \end{code}
 
 \begin{code}
-instance (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar,
-	  NamedThing id, Outputable id)
+instance (Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar, Outputable id)
        => Outputable (OutPat tyvar uvar id) where
     ppr = pprOutPat
 \end{code}
 
 \begin{code}
 pprOutPat sty (WildPat ty)	= ppChar '_'
-pprOutPat sty (VarPat var)	= pprNonSym sty var
+pprOutPat sty (VarPat var)	= ppr sty var
 pprOutPat sty (LazyPat pat)	= ppBesides [ppChar '~', ppr sty pat]
 pprOutPat sty (AsPat name pat)
   = ppBesides [ppLparen, ppr sty name, ppChar '@', ppr sty pat, ppRparen]
@@ -190,7 +189,7 @@ pprOutPat sty (TuplePat pats)
   = ppParens (interpp'SP sty pats)
 
 pprOutPat sty (RecPat con ty rpats)
-  = ppBesides [ppr sty con, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
+  = ppBesides [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
   where
     pp_rpat PprForUser (v, _, True) = ppr PprForUser v
     pp_rpat sty (v, p, _)           = ppCat [ppr sty v, ppStr "=", ppr sty p]

@@ -9,7 +9,7 @@ import PreludeStdIO	( Maybe )
 import BinderInfo	( BinderInfo )
 import CoreSyn		( CoreExpr(..), GenCoreExpr, GenCoreArg )
 import CoreUnfold 	( Unfolding(..), UnfoldingGuidance(..), 
-			  SimpleUnfolding(..), FormSummary(..)  )
+			  SimpleUnfolding(..), FormSummary(..), noUnfolding  )
 import CoreUtils	( unTagBinders )
 import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
 			  unfoldingUnfriendlyId, getIdInfo, nmbrId,
@@ -34,11 +34,16 @@ import Unique		( Unique )
 import Usage		( GenUsage )
 import Util		( Ord3(..) )
 import WwLib		( mAX_WORKER_ARGS )
+import StdIdInfo	( addStandardIdInfo )	-- Used in Id, but StdIdInfo needs lots of stuff from Id
+
+addStandardIdInfo :: Id -> Id
 
 nullSpecEnv   :: SpecEnv
 isNullSpecEnv :: SpecEnv -> Bool
 
-occurAnalyseGlobalExpr  :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique
+-- occurAnalyseGlobalExpr  :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique
+-- unTagBinders :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), a) b c d -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) b c d
+
 externallyVisibleId	:: Id	    -> Bool
 isDataCon		:: GenId ty -> Bool
 isWorkerId		:: GenId ty -> Bool
@@ -49,9 +54,7 @@ nullIdEnv		:: UniqFM a
 lookupIdEnv		:: UniqFM b -> GenId a -> Maybe b
 mAX_WORKER_ARGS		:: Int
 nmbrId			:: Id -> NmbrEnv -> (NmbrEnv, Id)
-pprParendGenType		:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
-unTagBinders :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), a) b c d -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) b c d
-
+pprParendGenType	:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
 mkMagicUnfoldingFun	:: Unique -> MagicUnfoldingFun
 
 type IdEnv a = UniqFM a
@@ -73,13 +76,15 @@ data NmbrEnv
 data MagicUnfoldingFun
 data FormSummary = VarForm | ValueForm | BottomForm | OtherForm
 
+-- data Unfolding
+--  = NoUnfolding
+--  | CoreUnfolding SimpleUnfolding
+--  | MagicUnfolding Unique MagicUnfoldingFun
+
 data Unfolding
-  = NoUnfolding
-  | CoreUnfolding SimpleUnfolding
-  | MagicUnfolding Unique MagicUnfoldingFun
+noUnfolding :: Unfolding
 
-
-data SimpleUnfolding = SimpleUnfolding FormSummary UnfoldingGuidance (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) 
+-- data SimpleUnfolding = SimpleUnfolding FormSummary UnfoldingGuidance (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) 
 
 
 data UnfoldingGuidance

@@ -13,19 +13,19 @@ module SimplVar (
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(SmplLoop)		( simplExpr )
 
-import CgCompInfo	( uNFOLDING_USE_THRESHOLD,
+import Constants	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
 			)
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding(..),
+import CoreUnfold	( Unfolding(..), UfExpr, RdrName, UnfoldingGuidance(..), SimpleUnfolding(..),
 			  FormSummary,
-			  smallEnoughToInline )
-import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
+			  okToInline, smallEnoughToInline )
+import BinderInfo	( BinderInfo, noBinderInfo )
 
 import CostCentre	( CostCentre, noCostCentreAttached )
 import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
-			  GenId{-instance Outputable-}
+			  idMustBeINLINEd, GenId{-instance Outputable-}
 			)
 import SpecEnv		( SpecEnv, lookupSpecEnv )
 import IdInfo		( DeforestInfo(..) )
@@ -58,7 +58,15 @@ completeVar env var args
 
   | not do_deforest &&
     maybeToBool maybe_unfolding_info &&
-    (always_inline || (ok_to_inline && not essential_unfoldings_only)) && 
+    (not essential_unfoldings_only || idMustBeINLINEd var) && 
+    ok_to_inline &&
+	-- If "essential_unfolds_only" is true we do no inlinings at all,
+	-- EXCEPT for things that absolutely have to be done
+	-- (see comments with idMustBeINLINEd)
+	--
+	-- Need to be careful: the RHS of INLINE functions is protected against inlining
+	-- by essential_unfoldings_only being set true; we must not inline workers back into
+	-- wrappers, even thouth the former have an unfold-always guidance.
     costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
   = tick UnfoldingDone	`thenSmpl_`
     simplExpr unfold_env unf_template args
@@ -110,19 +118,16 @@ completeVar env var args
     ok_to_inline	      = okToInline form 
 			      		   occ_info
 			      		   small_enough
-    small_enough = smallEnoughToInline con_disc unf_thresh arg_evals guidance
+    small_enough = smallEnoughToInline arg_evals guidance
     arg_evals = [is_evald arg | arg <- args, isValArg arg]
   
     is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)
     is_evald (LitArg l) = True
 
-    con_disc   = getSimplIntSwitch sw_chkr SimplUnfoldingConDiscount
-    unf_thresh = getSimplIntSwitch sw_chkr SimplUnfoldingUseThreshold
-
 #if OMIT_DEFORESTER
     do_deforest = False
 #else
-    do_deforest = case (getInfo (getIdInfo var)) of { DoDeforest -> True; _ -> False }
+    do_deforest = case (getDeforestInfo (getIdInfo var)) of { DoDeforest -> True; _ -> False }
 #endif
 
 

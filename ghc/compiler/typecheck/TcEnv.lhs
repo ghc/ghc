@@ -6,7 +6,7 @@ module TcEnv(
 
 	initEnv, getEnv_LocalIds, getEnv_TyCons, getEnv_Classes,
 	
-	tcTyVarScope, tcTyVarScopeGivenKinds, tcLookupTyVar, 
+	tcExtendTyVarEnv, tcLookupTyVar, 
 
 	tcExtendTyConEnv, tcLookupTyCon, tcLookupTyConByKey, 
 	tcExtendClassEnv, tcLookupClass, tcLookupClassByKey,
@@ -14,7 +14,7 @@ module TcEnv(
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
-	tcLookupGlobalValue, tcLookupGlobalValueByKey,
+	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
 
 	newMonoIds, newLocalIds, newLocalId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars
@@ -24,23 +24,26 @@ module TcEnv(
 IMP_Ubiq()
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 
-import Id	( SYN_IE(Id), GenId, idType, mkUserLocal )
+import HsTypes	( HsTyVar(..) )
+import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId )
+import PragmaInfo ( PragmaInfo(..) )
 import TcHsSyn	( SYN_IE(TcIdBndr), TcIdOcc(..) )
-import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
+import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind )
 import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars
 		)
-import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
+import TyVar	( unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes, splitForAllTy )
 import TyCon	( TyCon, tyConKind, synTyConArity )
 import Class	( SYN_IE(Class), GenClass, classSig )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 
-import Name		( getOccName, getSrcLoc, Name{-instance NamedThing-} )
+import Name		( Name, OccName(..), getSrcLoc, occNameString,
+			  maybeWiredInTyConName, maybeWiredInIdName, pprSym
+			)
 import PprStyle
 import Pretty
-import RnHsSyn		( RnName(..) )
 import Unique		( pprUnique10{-, pprUnique ToDo:rm-} )
 import UniqFM	     
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
@@ -74,42 +77,17 @@ getEnv_TyCons   (TcEnv _ ts _ _ _ _) = [tycon | (_, _, tycon) <- eltsUFM ts]
 getEnv_Classes  (TcEnv _ _ cs _ _ _) = [clas  | (_, clas)     <- eltsUFM cs]
 \end{code}
 
-Making new TcTyVars, with knot tying!
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type variable env
+~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyVarScopeGivenKinds 
-	:: [Name]		-- Names of some type variables
-	-> [TcKind s]
-	-> ([TyVar] -> TcM s a)	-- Thing to type check in their scope
-	-> TcM s a		-- Result
-
-tcTyVarScopeGivenKinds names kinds thing_inside
-  = fixTc (\ ~(rec_tyvars, _) ->
-		-- Ok to look at names, kinds, but not tyvars!
-
-	tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-	let
-	    tve' = addListToUFM tve (zipEqual "tcTyVarScopeGivenKinds" names (kinds `zipLazy` rec_tyvars))
-	in
-	tcSetEnv (TcEnv tve' tce ce gve lve gtvs) 
-		 (thing_inside rec_tyvars)	`thenTc` \ result ->
- 
-		-- Get the tyvar's Kinds from their TcKinds
-	mapNF_Tc tcDefaultKind kinds		`thenNF_Tc` \ kinds' ->
-
-		-- Construct the real TyVars
-	let
-	  tyvars = zipWithEqual "tcTyVarScopeGivenKinds" mkTyVar names kinds'
-	in
-	returnTc (tyvars, result)
-    )					`thenTc` \ (_,result) ->
-    returnTc result
-
-tcTyVarScope names thing_inside
-  = newKindVars (length names) 	`thenNF_Tc` \ kinds ->
-    tcTyVarScopeGivenKinds names kinds thing_inside
+tcExtendTyVarEnv :: [Name] -> [(TcKind s, TyVar)] -> TcM s r -> TcM s r
+tcExtendTyVarEnv names kinds_w_types scope
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    let
+	tve' = addListToUFM tve (zipEqual "tcTyVarScope" names kinds_w_types)
+    in
+    tcSetEnv (TcEnv tve' tce ce gve lve gtvs) scope
 \end{code}
-
 
 The Kind, TyVar, Class and TyCon envs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +96,7 @@ Extending the environments.  Notice the uses of @zipLazy@, which makes sure
 that the knot-tied TyVars, TyCons and Classes aren't looked at too early.
 
 \begin{code}
-tcExtendTyConEnv :: [(RnName,Maybe Arity)] -> [TyCon] -> TcM s r -> TcM s r
+tcExtendTyConEnv :: [(Name,Maybe Arity)] -> [TyCon] -> TcM s r -> TcM s r
 
 tcExtendTyConEnv names_w_arities tycons scope
   = newKindVars (length names_w_arities)	`thenNF_Tc` \ kinds ->
@@ -134,7 +112,7 @@ tcExtendTyConEnv names_w_arities tycons scope
     returnTc result 
 
 
-tcExtendClassEnv :: [RnName] -> [Class] -> TcM s r -> TcM s r
+tcExtendClassEnv :: [Name] -> [Class] -> TcM s r -> TcM s r
 tcExtendClassEnv names classes scope
   = newKindVars (length names)	`thenNF_Tc` \ kinds ->
     tcGetEnv			`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -155,12 +133,16 @@ tcLookupTyVar name
     returnNF_Tc (lookupWithDefaultUFM tve (pprPanic "tcLookupTyVar:" (ppr PprShowAll name)) name)
 
 
-tcLookupTyCon (WiredInTyCon tc)		-- wired in tycons
-  = returnNF_Tc (kindToTcKind (tyConKind tc), synTyConArity tc, tc)
-
 tcLookupTyCon name
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM tce (pprPanic "tcLookupTyCon:" (ppr PprShowAll name)) name)
+  = case maybeWiredInTyConName name of
+	Just tc -> returnTc (kindToTcKind (tyConKind tc), synTyConArity tc, tc)
+	Nothing -> tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+		   case lookupUFM tce name of
+			Just stuff -> returnTc stuff
+			Nothing    -> 	-- Could be that he's using a class name as a type constructor
+				      case lookupUFM ce name of
+					Just _  -> failTc (classAsTyConErr name)
+					Nothing -> pprPanic "tcLookupTyCon:" (ppr PprDebug name)
 
 tcLookupTyConByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -175,7 +157,12 @@ tcLookupClass name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
 --  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique10 (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique10 . fst) (ufmToList ce))]) $
 --  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique . fst) (ufmToList ce))]) $
-    returnNF_Tc (lookupWithDefaultUFM ce (pprPanic "tcLookupClass:" (ppr PprShowAll name)) name)
+    case lookupUFM ce name of
+	Just stuff -> returnTc stuff
+	Nothing	   -> 	-- Could be that he's using a type constructor as a class
+			case lookupUFM tce name of
+			  Just _ ->  failTc (tyConAsClassErr name)
+			  Nothing -> pprPanic "tcLookupClass:" (ppr PprShowAll name)
 
 tcLookupClassByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -242,7 +229,7 @@ tcExtendGlobalTyVars extra_global_tvs scope
 \end{code}
 
 \begin{code}
-tcLookupLocalValue :: RnName -> NF_TcM s (Maybe (TcIdBndr s))
+tcLookupLocalValue :: Name -> NF_TcM s (Maybe (TcIdBndr s))
 tcLookupLocalValue name
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM lve name)
@@ -252,26 +239,30 @@ tcLookupLocalValueByKey uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM_Directly lve uniq)
 
-tcLookupLocalValueOK :: String -> RnName -> NF_TcM s (TcIdBndr s)
+tcLookupLocalValueOK :: String -> Name -> NF_TcM s (TcIdBndr s)
 tcLookupLocalValueOK err name
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupWithDefaultUFM lve (panic err) name)
 
 
-tcLookupGlobalValue :: RnName -> NF_TcM s Id
-
-tcLookupGlobalValue (WiredInId id)	-- wired in ids
-  = returnNF_Tc id
+tcLookupGlobalValue :: Name -> NF_TcM s Id
 
 tcLookupGlobalValue name
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-    returnNF_Tc (lookupWithDefaultUFM gve def name)
+  = case maybeWiredInIdName name of
+	Just id -> returnNF_Tc id
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+		   returnNF_Tc (lookupWithDefaultUFM gve def name)
   where
-#ifdef DEBUG
     def = pprPanic "tcLookupGlobalValue:" (ppr PprDebug name)
-#else
-    def = panic "tcLookupGlobalValue"
-#endif
+
+tcLookupGlobalValueMaybe :: Name -> NF_TcM s (Maybe Id)
+
+tcLookupGlobalValueMaybe name
+  = case maybeWiredInIdName name of
+	Just id -> returnNF_Tc (Just id)
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+		   returnNF_Tc (lookupUFM gve name)
+
 
 tcLookupGlobalValueByKey :: Unique -> NF_TcM s Id
 tcLookupGlobalValueByKey uniq
@@ -291,39 +282,40 @@ Constructing new Ids
 ~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-newMonoIds :: [RnName] -> Kind -> ([TcIdBndr s] -> TcM s a) -> TcM s a
+-- Uses the Name as the Name of the Id
+newMonoIds :: [Name] -> Kind -> ([TcIdBndr s] -> TcM s a) -> TcM s a
 
 newMonoIds names kind m
   = newTyVarTys no_of_names kind	`thenNF_Tc` \ tys ->
-    tcGetUniques no_of_names		`thenNF_Tc` \ uniqs ->
     let
-	new_ids = zipWith3Equal "newMonoIds" mk_id names uniqs tys
-
-	mk_id name uniq ty
-	  = let
-		name_str = case (getOccName name) of { Unqual n -> n; Qual m n -> n }
-	    in
-	    mkUserLocal name_str uniq ty (getSrcLoc name)
+	new_ids       = zipWithEqual "newMonoIds" mk_id names tys
+	mk_id name ty = mkUserId name ty NoPragmaInfo
     in
     tcExtendLocalValEnv names new_ids (m new_ids)
   where
     no_of_names = length names
 
-newLocalId :: FAST_STRING -> TcType s -> NF_TcM s (TcIdOcc s)
+newLocalId :: OccName -> TcType s -> NF_TcM s (TcIdBndr s)
 newLocalId name ty
   = tcGetSrcLoc		`thenNF_Tc` \ loc ->
     tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (TcId (mkUserLocal name uniq ty loc))
+    returnNF_Tc (mkUserLocal name uniq ty loc)
 
-newLocalIds :: [FAST_STRING] -> [TcType s] -> NF_TcM s [TcIdOcc s]
+newLocalIds :: [OccName] -> [TcType s] -> NF_TcM s [TcIdBndr s]
 newLocalIds names tys
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUniques (length names) `thenNF_Tc` \ uniqs ->
     let
 	new_ids            = zipWith3Equal "newLocalIds" mk_id names uniqs tys
-	mk_id name uniq ty = TcId (mkUserLocal name uniq ty loc)
+	mk_id name uniq ty = mkUserLocal name uniq ty loc
     in
     returnNF_Tc new_ids
 \end{code}
 
+\begin{code}
+classAsTyConErr name sty
+  = ppBesides [ppStr "Class used as a type constructor: ", pprSym sty name]
 
+tyConAsClassErr name sty
+  = ppBesides [ppStr "Type constructor used as a class: ", pprSym sty name]
+\end{code}

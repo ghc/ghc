@@ -12,27 +12,28 @@ module TcTyClsDecls (
 
 IMP_Ubiq(){-uitous-}
 
-import HsSyn		( TyDecl(..),  ConDecl(..), BangType(..),
-			  ClassDecl(..), MonoType(..), PolyType(..),
-			  Sig(..), MonoBinds, Fake, InPat, HsBinds(..), Bind, HsExpr )
-import RnHsSyn		( isRnTyCon, RenamedTyDecl(..), RenamedClassDecl(..),
-			  RnName(..){-instance Uniquable-}
+import HsSyn		( HsDecl(..), TyDecl(..),  ConDecl(..), BangType(..),
+			  ClassDecl(..), HsType(..), HsTyVar, DefaultDecl, InstDecl,
+			  IfaceSig, Sig(..), MonoBinds, Fake, InPat, HsBinds(..), Bind, HsExpr,
+			  hsDeclName
+			)
+import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), SYN_IE(RenamedHsDecl)
 			)
 import TcHsSyn		( SYN_IE(TcHsBinds), TcIdOcc(..) )
 
-import TcMonad		hiding ( rnMtoTcM )
+import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 import TcClassDcl	( tcClassDecl1 )
-import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
-			  tcTyVarScope )
+import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv )
 import SpecEnv		( SpecEnv )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
+import TcMonoType	( tcTyVarScope )
 
 import Bag	
 import Class		( SYN_IE(Class), classSelIds )
 import Digraph		( findSCCs, SCC(..) )
-import Name		( getSrcLoc )
+import Name		( Name, getSrcLoc, isTvOcc, nameOccName )
 import PprStyle
 import Pretty
 import UniqSet		( SYN_IE(UniqSet), emptyUniqSet,
@@ -48,23 +49,13 @@ import Util		( panic{-, pprTrace-} )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-data Decl = TyD RenamedTyDecl | ClD RenamedClassDecl
-
 tcTyAndClassDecls1 :: InstanceMapper
-		   -> Bag RenamedTyDecl -> Bag RenamedClassDecl
+		   -> [RenamedHsDecl]
 		   -> TcM s (TcEnv s)
 
-tcTyAndClassDecls1 inst_mapper rnty_decls rncls_decls
-  = sortByDependency syn_decls cls_decls decls `thenTc` \ groups ->
+tcTyAndClassDecls1 inst_mapper decls
+  = sortByDependency decls 		`thenTc` \ groups ->
     tcGroups inst_mapper groups
-  where
-    cls_decls = mapBag ClD rncls_decls
-    ty_decls  = mapBag TyD rnty_decls
-    syn_decls = filterBag is_syn_decl ty_decls
-    decls     = ty_decls `unionBags` cls_decls
-
-    is_syn_decl (TyD (TySynonym _ _ _ _)) = True
-    is_syn_decl _		          = False
 
 tcGroups inst_mapper []
   = tcGetEnv	`thenNF_Tc` \ env ->
@@ -83,7 +74,7 @@ tcGroups inst_mapper (group:groups)
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s)
+tcGroup :: InstanceMapper -> Bag RenamedHsDecl -> TcM s (TcEnv s)
 tcGroup inst_mapper decls
   = -- pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
 
@@ -119,10 +110,7 @@ tcGroup inst_mapper decls
     returnTc final_env
 
   where
-    (tyvar_rn_names, tycon_names_w_arities, class_names) = get_binders decls
-
-    tyvar_names = map de_rn tyvar_rn_names
-    de_rn (RnName n) = n
+    (tyvar_names, tycon_names_w_arities, class_names) = get_binders decls
 
     combine do_a do_b
       = do_a `thenTc` \ (a1,a2) ->
@@ -134,7 +122,7 @@ Dealing with one decl
 ~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tcDecl  :: InstanceMapper
-	-> Decl
+	-> RenamedHsDecl
 	-> TcM s (Bag TyCon, Bag Class)
 
 tcDecl inst_mapper (TyD decl)
@@ -149,54 +137,73 @@ tcDecl inst_mapper (ClD decl)
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-sortByDependency :: Bag Decl -> Bag Decl -> Bag Decl -> TcM s [Bag Decl]
-sortByDependency syn_decls cls_decls decls
+sortByDependency :: [RenamedHsDecl] -> TcM s [Bag RenamedHsDecl]
+sortByDependency decls
   = let		-- CHECK FOR SYNONYM CYCLES
 	syn_sccs   = findSCCs mk_edges syn_decls
-	syn_cycles = [map fmt_decl (bagToList decls)
-	                | CyclicSCC decls <- syn_sccs]
+	syn_cycles = [ map fmt_decl (bagToList decls)
+	             | CyclicSCC decls <- syn_sccs]
 
     in
     checkTc (null syn_cycles) (typeCycleErr syn_cycles)		`thenTc_`
 
     let		-- CHECK FOR CLASS CYCLES
 	cls_sccs   = findSCCs mk_edges cls_decls
-	cls_cycles = [map fmt_decl (bagToList decls)
-		        | CyclicSCC decls <- cls_sccs]
+	cls_cycles = [ map fmt_decl (bagToList decls)
+		     | CyclicSCC decls <- cls_sccs]
 
     in
     checkTc (null cls_cycles) (classCycleErr cls_cycles)	`thenTc_`
 
 		-- DO THE MAIN DEPENDENCY ANALYSIS
     let
-	decl_sccs  = findSCCs mk_edges decls
+	decl_sccs  = findSCCs mk_edges ty_cls_decls
 	scc_bags   = map bag_acyclic decl_sccs
     in
     returnTc (scc_bags)
-    
+
   where
-   bag_acyclic (AcyclicSCC scc) = unitBag scc
-   bag_acyclic (CyclicSCC sccs) = sccs
+    syn_decls    = listToBag (filter is_syn_decl decls)
+    ty_cls_decls = listToBag (filter is_ty_cls_decl decls)
+    cls_decls    = listToBag (filter is_cls_decl decls)	
+
+    
+
+bag_acyclic (AcyclicSCC scc) = unitBag scc
+bag_acyclic (CyclicSCC sccs) = sccs
+
+is_syn_decl (TyD (TySynonym _ _ _ _)) = True
+is_syn_decl _		          = False
+
+is_ty_cls_decl (TyD _) = True
+is_ty_cls_decl (ClD _) = True
+is_ty_cls_decl other   = False
+
+is_cls_decl (ClD _) = True
+is_cls_decl other   = False
 
 fmt_decl decl
   = (ppr PprForUser name, getSrcLoc name)
   where
-    name = get_name decl
-    get_name (TyD (TyData _ name _ _ _ _ _))    = name
-    get_name (TyD (TyNew  _ name _ _ _ _ _))    = name
-    get_name (TyD (TySynonym name _ _ _))       = name
-    get_name (ClD (ClassDecl _ name _ _ _ _ _)) = name
+    name = hsDeclName decl
 \end{code}
 
 Edges in Type/Class decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 mk_edges (TyD (TyData ctxt name _ condecls derivs _ _))
-  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecls `unionUniqSets` get_deriv derivs))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` 
+		    get_cons condecls `unionUniqSets` 
+		    get_deriv derivs))
+
 mk_edges (TyD (TyNew  ctxt name _ condecl derivs _ _))
-  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecl  `unionUniqSets` get_deriv derivs))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` 
+				get_con condecl  `unionUniqSets` 
+				get_deriv derivs))
+
 mk_edges (TyD (TySynonym name _ rhs _))
   = (uniqueOf name, set_to_bag (get_ty rhs))
+
 mk_edges (ClD (ClassDecl ctxt name _ sigs _ _ _))
   = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_sigs sigs))
 
@@ -208,35 +215,33 @@ get_deriv (Just clss) = unionManyUniqSets (map set_name clss)
 
 get_cons cons
   = unionManyUniqSets (map get_con cons)
-  where
-    get_con (ConDecl _ btys _)
-      = unionManyUniqSets (map get_bty btys)
-    get_con (ConOpDecl bty1 _ bty2 _)
-      = unionUniqSets (get_bty bty1) (get_bty bty2)
-    get_con (NewConDecl _ ty _)
-      = get_ty ty
-    get_con (RecConDecl _ nbtys _)
-      = unionManyUniqSets (map (get_bty.snd) nbtys)
 
-    get_bty (Banged ty)   = get_pty ty
-    get_bty (Unbanged ty) = get_pty ty
+get_con (ConDecl _ btys _)
+  = unionManyUniqSets (map get_bty btys)
+get_con (ConOpDecl bty1 _ bty2 _)
+  = unionUniqSets (get_bty bty1) (get_bty bty2)
+get_con (NewConDecl _ ty _)
+  = get_ty ty
+get_con (RecConDecl _ nbtys _)
+  = unionManyUniqSets (map (get_bty.snd) nbtys)
+
+get_bty (Banged ty)   = get_ty ty
+get_bty (Unbanged ty) = get_ty ty
 
 get_ty (MonoTyVar tv)
   = emptyUniqSet
 get_ty (MonoTyApp name tys)
-  = (if isRnTyCon name then set_name name else emptyUniqSet)
+  = (if isTvOcc (nameOccName name) then emptyUniqSet else set_name name)
     `unionUniqSets` get_tys tys
 get_ty (MonoFunTy ty1 ty2)	
   = unionUniqSets (get_ty ty1) (get_ty ty2)
-get_ty (MonoListTy ty)
-  = get_ty ty			-- careful when defining [] (,,) etc as
-get_ty (MonoTupleTy tys)	-- [ty] (ty,ty,ty) will not give edges!
-  = get_tys tys
-get_ty other = panic "TcTyClsDecls:get_ty"
-
-get_pty (HsForAllTy _ ctxt mty)
+get_ty (MonoListTy tc ty)
+  = set_name tc `unionUniqSets` get_ty ty
+get_ty (MonoTupleTy tc tys)
+  = set_name tc `unionUniqSets` get_tys tys
+get_ty (HsForAllTy _ ctxt mty)
   = get_ctxt ctxt `unionUniqSets` get_ty mty
-get_pty other = panic "TcTyClsDecls:get_pty"
+get_ty other = panic "TcTyClsDecls:get_ty"
 
 get_tys tys
   = unionManyUniqSets (map get_ty tys)
@@ -244,7 +249,7 @@ get_tys tys
 get_sigs sigs
   = unionManyUniqSets (map get_sig sigs)
   where 
-    get_sig (ClassOpSig _ ty _ _) = get_pty ty
+    get_sig (ClassOpSig _ ty _ _) = get_ty ty
     get_sig other = panic "TcTyClsDecls:get_sig"
 
 set_name name = unitUniqSet (uniqueOf name)
@@ -276,10 +281,10 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 
 
 \begin{code}
-get_binders :: Bag Decl
-	    -> ([RnName],		-- TyVars;  no dups
-		[(RnName, Maybe Arity)],-- Tycons;  no dups; arities for synonyms
-		[RnName])		-- Classes; no dups
+get_binders :: Bag RenamedHsDecl
+	    -> ([HsTyVar Name],		-- TyVars;  no dups
+		[(Name, Maybe Arity)],	-- Tycons;  no dups; arities for synonyms
+		[Name])			-- Classes; no dups
 
 get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
   where
@@ -304,6 +309,7 @@ sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
   where 
     sig_tvs (ClassOpSig _ ty  _ _) = pty_tvs ty
     pty_tvs (HsForAllTy tvs _ _)   = listToBag tvs 	-- tvs doesn't include the class tyvar
+    pty_tvs other		   = emptyBag
 \end{code}
 
 

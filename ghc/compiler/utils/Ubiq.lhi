@@ -21,24 +21,23 @@ import CostCentre	( CostCentre )
 import FieldLabel	( FieldLabel )
 import FiniteMap	( FiniteMap )
 import HeapOffs		( HeapOffset )
-import HsCore		( UnfoldingCoreExpr )
 import HsPat		( OutPat )
 import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas, InstancePragmas )
 import Id		( StrictnessMark, GenId, Id(..) )
-import IdInfo		( IdInfo, OptIdInfo(..), ArityInfo, DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
+import IdInfo		( IdInfo, ArityInfo, DeforestInfo, StrictnessInfo, UpdateInfo )
+import Demand		( Demand )
 import Kind		( Kind )
 import Literal		( Literal )
 import MachRegs		( Reg )
 import Maybes		( MaybeErr )
 import MatchEnv 	( MatchEnv )
-import Name		( Module(..), OrigName, RdrName, Name, ExportFlag, NamedThing(..) )
+import Name		( Module(..), OccName, Name, ExportFlag, NamedThing(..) )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
 import PragmaInfo	( PragmaInfo )
 import Pretty		( PrettyRep )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep )
-import RnHsSyn		( RnName )
 import SMRep		( SMRep )
 import SrcLoc		( SrcLoc )
 import TcType		( TcMaybe )
@@ -55,12 +54,9 @@ import Util		( Ord3(..) )
 -- to try to contain their visibility.
 
 class NamedThing a where
-	getName :: a -> Name
-class OptIdInfo a where
-	noInfo	:: a
-	getInfo	:: IdInfo -> a
-	addInfo	:: IdInfo -> a -> IdInfo
-	ppInfo	:: PprStyle -> (Id -> Id) -> a -> Int -> Bool -> PrettyRep
+	getOccName :: a -> OccName
+	getName    :: a -> Name
+
 class Ord3 a where
 	cmp :: a -> a -> Int#
 class Outputable a where
@@ -111,8 +107,7 @@ data Literal
 data MaybeErr a b
 data MatchEnv a b
 data Name
-data OrigName = OrigName _PackedString _PackedString
-data RdrName = Unqual _PackedString | Qual _PackedString _PackedString
+data OccName
 data Reg
 data OutPat a b c
 data PprStyle
@@ -120,16 +115,14 @@ data PragmaInfo
 data PrettyRep
 data PrimOp
 data PrimRep	-- NB: an enumeration
-data RnName
 data SimplifierSwitch
 data SMRep
 data SrcLoc
-data StrictnessInfo
+data StrictnessInfo bdee
 data StrictnessMark
 data SwitchResult
 data TcMaybe s
 data TyCon
-data UnfoldingCoreExpr a
 data UniqFM a
 data UpdateInfo
 data UniqSupply
@@ -150,19 +143,13 @@ type Usage = GenUsage Unique
 
 -- These are here only for SPECIALIZing in FiniteMap (ToDo:move?)
 instance Ord Reg
-instance Ord OrigName
-instance Ord RdrName
 instance Ord CLabel
 instance Ord TyCon
 instance Eq Reg
-instance Eq OrigName
-instance Eq RdrName
 instance Eq CLabel
 instance Eq TyCon
 -- specializing in UniqFM, UniqSet
 instance Uniquable Unique
-instance Uniquable RnName
 instance Uniquable Name
 -- specializing in Name
-instance NamedThing RnName
 \end{code}

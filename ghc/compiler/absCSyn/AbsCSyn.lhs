@@ -37,7 +37,7 @@ module AbsCSyn {- (
 
 IMP_Ubiq(){-uitous-}
 
-import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG,
+import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,
 			  lIVENESS_R3, lIVENESS_R4, lIVENESS_R5,
 			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8

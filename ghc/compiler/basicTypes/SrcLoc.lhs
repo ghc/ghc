@@ -11,15 +11,17 @@
 #include "HsVersions.h"
 
 module SrcLoc (
-	SrcLoc,			-- abstract
+	SrcLoc,			-- Abstract
 
-	mkSrcLoc, mkSrcLoc2,	-- the usual
-	mkUnknownSrcLoc,	-- "I'm sorry, I haven't a clue"
+	mkSrcLoc,
+	noSrcLoc, isNoSrcLoc,	-- "I'm sorry, I haven't a clue"
+
 	mkIfaceSrcLoc,		-- Unknown place in an interface
 				-- (this one can die eventually ToDo)
-	mkBuiltinSrcLoc,	-- something wired into the compiler
-	mkGeneratedSrcLoc,	-- code generated within the compiler
-	unpackSrcLoc
+
+	mkBuiltinSrcLoc,	-- Something wired into the compiler
+
+	mkGeneratedSrcLoc	-- Code generated within the compiler
     ) where
 
 IMP_Ubiq()
@@ -38,10 +40,12 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
 data SrcLoc
-  = SrcLoc	FAST_STRING	-- source file name
-		FAST_STRING	-- line number in source file
-  | SrcLoc2	FAST_STRING	-- same, but w/ an Int line#
+  = NoSrcLoc
+
+  | SrcLoc	FAST_STRING	-- A precise location
 		FAST_INT
+
+  | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
 \end{code}
 
 Note that an entity might be imported via more than one route, and
@@ -57,15 +61,15 @@ rare case.
 
 Things to make 'em:
 \begin{code}
-mkSrcLoc	    = SrcLoc
-mkSrcLoc2 x IBOX(y) = SrcLoc2 x y
-mkUnknownSrcLoc	    = SrcLoc SLIT("<unknown>") SLIT("<unknown>")
-mkIfaceSrcLoc	    = SrcLoc SLIT("<an interface file>") SLIT("<unknown>")
-mkBuiltinSrcLoc	    = SrcLoc SLIT("<built-into-the-compiler>") SLIT("<none>")
-mkGeneratedSrcLoc   = SrcLoc SLIT("<compiler-generated-code>") SLIT("<none>")
+noSrcLoc	    = NoSrcLoc
+mkSrcLoc x IBOX(y)  = SrcLoc x y
 
-unpackSrcLoc (SrcLoc  src_file src_line) = (src_file, src_line)
-unpackSrcLoc (SrcLoc2 src_file src_line) = (src_file, _PK_ (show IBOX(src_line)))
+mkIfaceSrcLoc	    = UnhelpfulSrcLoc SLIT("<an interface file>")
+mkBuiltinSrcLoc	    = UnhelpfulSrcLoc SLIT("<built-into-the-compiler>")
+mkGeneratedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
+
+isNoSrcLoc NoSrcLoc = True
+isNoSrcLoc other    = False
 \end{code}
 
 %************************************************************************
@@ -77,12 +81,13 @@ unpackSrcLoc (SrcLoc2 src_file src_line) = (src_file, _PK_ (show IBOX(src_line))
 \begin{code}
 instance Outputable SrcLoc where
     ppr PprForUser (SrcLoc src_file src_line)
-      = ppBesides [ ppChar '"', ppPStr src_file, ppStr "\", line ", ppPStr src_line ]
+      = ppBesides [ ppPStr src_file, ppStr ": ", ppStr (show IBOX(src_line)) ]
 
     ppr sty (SrcLoc src_file src_line)
-      = ppBesides [ppPStr SLIT("{-# LINE "), ppPStr src_line, ppSP,
+      = ppBesides [ppPStr SLIT("{-# LINE "), ppStr (show IBOX(src_line)), ppSP,
 		   ppChar '"', ppPStr src_file, ppPStr SLIT("\" #-}")]
 
-    ppr sty (SrcLoc2 src_file src_line)
-      = ppr sty (SrcLoc src_file (_PK_ (show IBOX(src_line))))
+    ppr sty (UnhelpfulSrcLoc s) = ppPStr s
+
+    ppr sty NoSrcLoc = ppStr "<NoSrcLoc>"
 \end{code}

@@ -10,7 +10,8 @@ module TcMonad(
 	foldrTc, foldlTc, mapAndUnzipTc, mapAndUnzip3Tc,
 	mapBagTc, fixTc, tryTc,
 
-	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc,
+	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc, forkNF_Tc,
+
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
@@ -25,8 +26,6 @@ module TcMonad(
 	tcAddErrCtxt, tcSetErrCtxt,
 
 	tcNewMutVar, tcReadMutVar, tcWriteMutVar,
-
-	rnMtoTcM,
 
 	SYN_IE(TcError), SYN_IE(TcWarning),
 	mkTcErr, arityErr,
@@ -50,18 +49,11 @@ import Usage		( SYN_IE(Usage), GenUsage )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Message), SYN_IE(Warning) )
 
 import SST
-import RnMonad		( SYN_IE(RnM), RnDown, initRn, setExtraRn,
-			  returnRn, thenRn, getImplicitUpRn
-			)
-import RnUtils		( SYN_IE(RnEnv) )
-
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM{-, keysFM ToDo:rm-} )
---import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import Maybes		( MaybeErr(..) )
---import Name		( Name )
-import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply )
 import Unique		( Unique )
@@ -103,7 +95,7 @@ initTc us do_this
       newMutVarSST emptyUFM		`thenSST` \ tvs_var ->
       let
           init_down = TcDown [] us_var
-			     mkUnknownSrcLoc
+			     noSrcLoc
 			     [] errs_var
 	  init_env  = initEnv tvs_var
       in
@@ -229,12 +221,20 @@ fixTc :: (a -> TcM s a) -> TcM s a
 fixTc m env down = fixFSST (\ loop -> m loop env down)
 \end{code}
 
-@forkNF_Tc@ runs a sub-typecheck action in a separate state thread.
-This elegantly ensures that it can't zap any type variables that
-belong to the main thread.  We throw away any error messages!
+@forkNF_Tc@ runs a sub-typecheck action *lazily* in a separate state
+thread.  Ideally, this elegantly ensures that it can't zap any type
+variables that belong to the main thread.  But alas, the environment
+contains TyCon and Class environments that include (TcKind s) stuff,
+which is a Royal Pain.  By the time this fork stuff is used they'll
+have been unified down so there won't be any kind variables, but we
+can't express that in the current typechecker framework.
 
-\begin{pseudocode}
-forkNF_Tc :: NF_TcM s' r -> NF_TcM s r
+So we compromise and use unsafeInterleaveSST.
+
+We throw away any error messages!
+
+\begin{code}
+forkNF_Tc :: NF_TcM s r -> NF_TcM s r
 forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
   = 	-- Get a fresh unique supply
     readMutVarSST u_var		`thenSST` \ us ->
@@ -242,39 +242,18 @@ forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
 	(us1, us2) = splitUniqSupply us
     in
     writeMutVarSST u_var us1	`thenSST_`
-    returnSST ( runSST (
-	newMutVarSST us2 			`thenSST` \ u_var'   ->
+    
+    unsafeInterleaveSST (
+	newMutVarSST us2 			`thenSST` \ us_var'   ->
       	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ err_var' ->
       	newMutVarSST emptyUFM			`thenSST` \ tv_var'  ->
 	let
-            down' = TcDown deflts us_var src_loc err_cxt err_var'
-	    env'  = forkEnv env tv_var'
+            down' = TcDown deflts us_var' src_loc err_cxt err_var'
 	in
-	m down' env'
-
+	m down' env
 	-- ToDo: optionally dump any error messages
-    ))
-\end{pseudocode}
-
-@forkTcDown@ makes a new "down" blob for a lazily-computed fork
-of the type checker.
-
-\begin{pseudocode}
-forkTcDown (TcDown deflts u_var src_loc err_cxt err_var)
-  = 	-- Get a fresh unique supply
-    readMutVarSST u_var		`thenSST` \ us ->
-    let
-	(us1, us2) = splitUniqSupply us
-    in
-    writeMutVarSST u_var us1	`thenSST_`
-
-	-- Make fresh MutVars for the unique supply and errors
-    newMutVarSST us2			`thenSST` \ u_var' ->
-    newMutVarSST (emptyBag, emptyBag)	`thenSST` \ err_var' ->
-
-	-- Done
-    returnSST (TcDown deflts u_var' src_loc err_cxt err_var')
-\end{pseudocode}
+    )
+\end{code}
 
 
 Error handling
@@ -470,39 +449,6 @@ getErrCtxt (TcDown def us loc ctxt errs)     = ctxt
 \end{code}
 
 
-\section{rn4MtoTcM}
-%~~~~~~~~~~~~~~~~~~
-
-\begin{code}
-rnMtoTcM :: RnEnv -> RnM REAL_WORLD a -> NF_TcM s (a, Bag Error)
-
-rnMtoTcM rn_env rn_action down env
-  = readMutVarSST u_var				`thenSST` \ uniq_supply ->
-    let
-      (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
-    in
-    writeMutVarSST u_var new_uniq_supply	`thenSST_`
-    let
-	(rn_result, rn_errs, rn_warns)
-	  = initRn False{-*interface* mode! so we can see the builtins-}
-		   (panic "rnMtoTcM:module")
-		   rn_env uniq_s (
-		rn_action	`thenRn` \ result ->
-
-		-- Though we are in "interface mode", we must
-		-- not have added anything to the ImplicitEnv!
-		getImplicitUpRn	`thenRn` \ implicit_env@(v_env,tc_env) ->
-		if (isEmptyFM v_env && isEmptyFM tc_env)
-		then returnRn result
-		else panic "rnMtoTcM: non-empty ImplicitEnv!"
---			(ppAboves ([ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM v_env]
---				++ [ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM tc_env]))
-	    )
-    in
-    returnSST (rn_result, rn_errs)
-  where
-    u_var = getUniqSupplyVar down
-\end{code}
 
 
 TypeChecking Errors

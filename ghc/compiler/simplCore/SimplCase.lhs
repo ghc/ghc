@@ -16,9 +16,7 @@ IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..),
-			  SimpleUnfolding, FormSummary
-			)
+import CoreUnfold	( Unfolding, SimpleUnfolding )
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts
 			)

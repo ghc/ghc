@@ -40,9 +40,9 @@ module StgSyn (
 IMP_Ubiq(){-uitous-}
 
 import CostCentre	( showCostCentre )
-import Id		( externallyVisibleId, idPrimRep, GenId{-instance NamedThing-} )
+import Id		( idPrimRep, GenId{-instance NamedThing-} )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Name		( isSymLexeme )
+import Name		( pprNonSym )
 import Outputable	( ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
@@ -478,24 +478,11 @@ latest/greatest pragma info.
 \begin{code}
 collectFinalStgBinders
 	:: [StgBinding]	-- input program
-	-> [Id]		-- final externally-visible top-level Ids
+	-> [Id]
 
-collectFinalStgBinders binds
-  = ex [] binds
-  where
-    ex es [] = es
-
-    ex es ((StgNonRec b _) : binds)
-      = if not (externallyVisibleId b) then
-	    ex es binds
-	else
-	    ex (b:es) binds
-
-    ex es ((StgRec []) : binds) = ex es binds
-
-    ex es ((StgRec ((b, rhs) : pairs)) : binds)
-      = ex es (StgNonRec b rhs : (StgRec pairs : binds))
-	    -- OK, a total hack; laziness rules
+collectFinalStgBinders [] = []
+collectFinalStgBinders (StgNonRec b _ : binds) = b : collectFinalStgBinders binds
+collectFinalStgBinders (StgRec bs     : binds) = map fst bs ++ collectFinalStgBinders binds
 \end{code}
 
 %************************************************************************
@@ -643,6 +630,12 @@ pprStgExpr sty (StgCase expr lvs_whole lvs_rhss uniq alts)
 	   ppNest 2 (ppr_alts sty alts),
 	   ppStr "}"]
   where
+    ppr_default sty StgNoDefault = ppNil
+    ppr_default sty (StgBindDefault bndr used expr)
+      = ppHang (ppCat [pp_binder, ppStr "->"]) 4 (ppr sty expr)
+      where
+    	pp_binder = if used then ppr sty bndr else ppChar '_'
+
     pp_ty (StgAlgAlts  ty _ _) = ppr sty ty
     pp_ty (StgPrimAlts ty _ _) = ppr sty ty
 
@@ -651,13 +644,8 @@ pprStgExpr sty (StgCase expr lvs_whole lvs_rhss uniq alts)
 		   ppr_default sty deflt ]
       where
 	ppr_bxd_alt sty (con, params, use_mask, expr)
-	  = ppHang (ppCat [ppr_con sty con, interppSP sty params, ppStr "->"])
+	  = ppHang (ppCat [pprNonSym sty con, interppSP sty params, ppStr "->"])
 		   4 (ppBeside (ppr sty expr) ppSemi)
-	  where
-	    ppr_con sty con
-	      = if isSymLexeme con
-		then ppBesides [ppLparen, ppr sty con, ppRparen]
-		else ppr sty con
 
     ppr_alts sty (StgPrimAlts ty alts deflt)
       = ppAboves [ ppAboves (map (ppr_ubxd_alt sty) alts),
@@ -666,12 +654,6 @@ pprStgExpr sty (StgCase expr lvs_whole lvs_rhss uniq alts)
 	ppr_ubxd_alt sty (lit, expr)
 	  = ppHang (ppCat [ppr sty lit, ppStr "->"])
 		 4 (ppBeside (ppr sty expr) ppSemi)
-
-    ppr_default sty StgNoDefault = ppNil
-    ppr_default sty (StgBindDefault bndr used expr)
-      = ppHang (ppCat [pp_binder, ppStr "->"]) 4 (ppr sty expr)
-      where
-    	pp_binder = if used then ppr sty bndr else ppChar '_'
 \end{code}
 
 \begin{code}

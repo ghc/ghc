@@ -15,10 +15,10 @@ module ConFold	( completePrim ) where
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( Unfolding(..), SimpleUnfolding )
+import CoreUnfold	( Unfolding, SimpleUnfolding )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
-import MagicUFs		( MagicUnfoldingFun )
+-- import MagicUFs		( MagicUnfoldingFun )
 import PrimOp		( PrimOp(..) )
 import SimplEnv
 import SimplMonad

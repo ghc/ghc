@@ -129,8 +129,11 @@ deListComp expr (FilterQual filt : quals) list	-- rule B above
     deListComp expr quals list `thenDs` \ core_rest ->
     returnDs ( mkCoreIfThenElse core_filt core_rest list )
 
+-- [e | let B, qs] = let B in [e | qs]
 deListComp expr (LetQual binds : quals) list
-  = panic "deListComp:LetQual"
+  = dsBinds False binds		`thenDs` \ core_binds ->
+    deListComp expr quals list	`thenDs` \ core_rest ->
+    returnDs (mkCoLetsAny core_binds core_rest)
 
 deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
   = dsExpr list1		    `thenDs` \ core_list1 ->

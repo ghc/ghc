@@ -476,6 +476,10 @@ to identify the closure type.
 #define INFO_BF_TYPE		(MAKE_BASE_INFO_TYPE(21L) | _NS | _MU | _BH)
 #define INFO_INTERNAL_TYPE	(MAKE_BASE_INFO_TYPE(22L))
 
+/* S = single-entry thunk
+   U = updatable thunk
+   N = head normal form */
+
 #define INFO_SPEC_N_TYPE	(INFO_SPEC_TYPE | _NF | _NS)
 #define INFO_SPEC_S_TYPE	(INFO_SPEC_TYPE | _TH)
 #define INFO_SPEC_U_TYPE	(INFO_SPEC_TYPE | _UP | _TH)
@@ -1742,7 +1746,7 @@ during a return.
 
 /* Declare the phantom info table vectors (just Bool at the moment) */
 #ifndef COMPILING_GHC
-EXTDATA_RO(Prelude_Bool_itblvtbl);
+EXTDATA_RO(PrelBase_Bool_itblvtbl);
 #endif
 
 \end{code}

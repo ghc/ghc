@@ -35,11 +35,11 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
-import Name		( mkLocalName, changeUnique, Name, RdrName(..) )
+import Name		( mkSysLocalName, changeUnique, Name )
 import Pretty		( SYN_IE(Pretty), PrettyRep, ppBeside, ppPStr )
 import PprStyle		( PprStyle )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
+import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( showUnique, mkAlphaTyVarUnique, Unique )
 import Util		( panic, Ord3(..) )
 \end{code}
@@ -162,5 +162,5 @@ instance Uniquable (GenTyVar a) where
 
 instance NamedThing (GenTyVar a) where
     getName (TyVar _ _ (Just n) _) = n
-    getName (TyVar u _ _        _) = mkLocalName u (showUnique u) True{-emph uniq-} mkUnknownSrcLoc
+    getName (TyVar u _ _        _) = mkSysLocalName u SLIT("t") noSrcLoc
 \end{code}

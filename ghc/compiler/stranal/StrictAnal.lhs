@@ -404,13 +404,6 @@ addStrictnessInfoToId
 
 addStrictnessInfoToId strflags str_val abs_val binder body
 
-{-		SCHEDULED FOR NUKING 
-  | isWrapperId binder
-  = binder	-- Avoid clobbering existing strictness info
-		-- (and, more importantly, worker info).
-		-- Deeply suspicious (SLPJ)
--}
-
   | isBot str_val
   = binder `addIdStrictness` mkBottomStrictnessInfo
 

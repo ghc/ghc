@@ -461,8 +461,8 @@ NL  	    	    	[\n\r]
 %{
 /* These SHOULDNAE work in "Code" (sigh) */
 %}
-<Code,GlaExt,UserPragma>{Id}"#" { 
-			 if (! nonstandardFlag) {
+<GlaExt,UserPragma>{Id}"#" { 
+			if (! nonstandardFlag) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "Non-standard identifier (trailing `#'): %s\n", yytext);
 			    hsperror(errbuf);

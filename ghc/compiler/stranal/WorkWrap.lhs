@@ -11,16 +11,16 @@ module WorkWrap ( workersAndWrappers ) where
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding )
-import MagicUFs		( MagicUnfoldingFun )
+import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
+import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 
 import CoreUtils	( coreExprType )
 import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
 			  addIdStrictness, addInlinePragma,
 			  GenId
 			)
-import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
-			  mkStrictnessInfo, StrictnessInfo(..)
+import IdInfo		( noIdInfo, addUnfoldInfo,  
+			  mkStrictnessInfo, addStrictnessInfo, StrictnessInfo(..)
 			)
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
@@ -184,7 +184,10 @@ tryWW	:: Id				-- the fn binder
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW fn_id rhs
-  | idWantsToBeINLINEd fn_id
+  | certainlySmallEnoughToInline $
+    calcUnfoldingGuidance (idWantsToBeINLINEd fn_id) 
+			  opt_UnfoldingCreationThreshold
+			  rhs
     -- No point in worker/wrappering something that is going to be
     -- INLINEd wholesale anyway.  If the strictness analyser is run
     -- twice, this test also prevents wrappers (which are INLINEd)
@@ -196,14 +199,8 @@ tryWW fn_id rhs
 
       NoStrictnessInfo    -> do_nothing
       BottomGuaranteed    -> do_nothing
-      StrictnessInfo [] _ -> do_nothing -- V weird (but possible?)
 
       StrictnessInfo args_info _ ->
-	if not (indicatesWorker args_info) then
-	    do_nothing
-	else
-
-	-- OK, it looks as if a worker is worth a try
 	let
 	     (uvars, tyvars, args, body) = collectBinders rhs
 	     body_ty			 = coreExprType body
@@ -211,12 +208,9 @@ tryWW fn_id rhs
 	mkWwBodies body_ty tyvars args args_info `thenUs` \ result ->
 	case result of
 
-	  Nothing -> 	-- Very peculiar. This can only happen if we hit an
-			-- abstract type, which we shouldn't have since we've
-			-- constructed the args_info in this module!
-
-			-- False. We might hit the all-args-absent-and-the-
-			-- body-is-unboxed case.  A Nothing is legit. (WDP 94/10)
+	  Nothing -> 	-- We've hit the all-args-absent-and-the-body-is-unboxed case,
+			-- or there are too many args for a w/w split,
+			-- or there's no benefit from w/w (e.g. SSS)
 			do_nothing
 
 	  Just (wrapper_w_hole, worker_w_hole, worker_strictness, worker_ty_w_hole) ->
@@ -227,7 +221,7 @@ tryWW fn_id rhs
 		worker_ty   = worker_ty_w_hole body_ty
 
 		worker_id   = mkWorkerId worker_uniq fn_id worker_ty
-				(noIdInfo `addInfo` worker_strictness)
+				(noIdInfo `addStrictnessInfo` worker_strictness)
 
 		wrapper_rhs = wrapper_w_hole worker_id
 		worker_rhs  = worker_w_hole body

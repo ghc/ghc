@@ -22,7 +22,7 @@
 > import CmdLineOpts	( SwitchResult, switchIsOn )
 > import CoreUnfold	( Unfolding(..) )
 > import CoreUtils	( mkValLam, unTagBinders, coreExprType )
-> import Id		( applyTypeEnvToId, getIdUnfolding, isTopLevId, Id,
+> import Id		( applyTypeEnvToId, getIdUnfolding, Id,
 > 			  isInstId_maybe
 >			)
 > import Inst		-- Inst(..)

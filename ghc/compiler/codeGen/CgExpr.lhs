@@ -15,12 +15,13 @@ module CgExpr ( cgExpr, getPrimOpArgAmodes ) where
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(CgLoop2)	-- here for paranoia-checking
 
+import Constants	( mAX_SPEC_SELECTEE_SIZE )
 import StgSyn
 import CgMonad
 import AbsCSyn
 
 import AbsCUtils	( mkAbsCStmts, mkAbstractCs )
-import CgBindery	( getArgAmodes, CgIdInfo )
+import CgBindery	( getArgAmodes, getCAddrModeAndInfo, CgIdInfo )
 import CgCase		( cgCase, saveVolatileVarsAndRegs )
 import CgClosure	( cgRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
@@ -34,17 +35,23 @@ import CgTailCall	( cgTailCall, performReturn,
 			  mkDynamicAlgReturnCode, mkPrimReturnCode
 			)
 import CLabel		( mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
-import ClosureInfo	( mkClosureLFInfo )
+import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo, mkVapLFInfo, lfArity_maybe,
+			  layOutDynCon )
 import CostCentre	( sccAbleCostCentre, isDictCC, isSccCountCostCentre )
-import HeapOffs		( SYN_IE(VirtualSpBOffset) )
-import Id		( mkIdSet, unionIdSets, GenId{-instance Outputable-} )
+import HeapOffs		( SYN_IE(VirtualSpBOffset), intOffsetIntoGoods )
+import Id		( dataConTyCon, idPrimRep, getIdArity, 
+			  mkIdSet, unionIdSets, GenId{-instance Outputable-}
+			)
+import IdInfo		( ArityInfo(..) )
+import Name		( isLocallyDefined )
 import PprStyle		( PprStyle(..) )
 import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
 			)
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import TyCon		( tyConDataCons )
-import Util		( panic, pprPanic, assertPanic )
+import TyCon		( tyConDataCons, maybeTyConSingleCon  )
+import Maybes		( assocMaybe, maybeToBool )
+import Util		( panic, isIn, pprPanic, assertPanic )
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -289,9 +296,6 @@ ToDo: counting of dict sccs ...
 %********************************************************
 \subsection[non-top-level-bindings]{Converting non-top-level bindings}
 
-@cgBinding@ is only used for let/letrec, not for unboxed bindings.
-So the kind should always be @PtrRep@.
-
 We rely on the support code in @CgCon@ (to do constructors) and
 in @CgClosure@ (to do closures).
 
@@ -308,11 +312,125 @@ cgRhs name (StgRhsCon maybe_cc con args)
     zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag args body)
-  = cgRhsClosure name cc bi fvs args body lf_info
-  where
-    lf_info = mkClosureLFInfo False{-not top level-} fvs upd_flag args body
+  = mkRhsLFInfo fvs upd_flag args body 	`thenFC` \ lf_info ->
+    cgRhsClosure name cc bi fvs args body lf_info
 \end{code}
 
+mkRhsLFInfo looks for two special forms of the right-hand side:
+	a) selector thunks.
+	b) VAP thunks
+
+If neither happens, it just calls mkClosureLFInfo.  You might think
+that mkClosureLFInfo should do all this, but
+	(a) it seems wrong for the latter to look at the structure 
+		of an expression
+	(b) mkRhsLFInfo has to be in the monad since it looks up in
+		the environment, and it's very tiresome for mkClosureLFInfo to
+		be.  Apart from anything else it would make a loop between
+		CgBindery and ClosureInfo.
+
+Selectors
+~~~~~~~~~
+We look at the body of the closure to see if it's a selector---turgid,
+but nothing deep.  We are looking for a closure of {\em exactly} the
+form:
+\begin{verbatim}
+...  = [the_fv] \ u [] ->
+	 case the_fv of
+	   con a_1 ... a_n -> a_i
+\end{verbatim}
+
+\begin{code}
+mkRhsLFInfo	[the_fv]   		-- Just one free var
+		Updatable		-- Updatable thunk
+		[]			-- A thunk
+		(StgCase (StgApp (StgVarArg scrutinee) [{-no args-}] _)
+		      _ _ _   -- ignore live vars and uniq...
+		      (StgAlgAlts case_ty
+		  	 [(con, params, use_mask,
+			    (StgApp (StgVarArg selectee) [{-no args-}] _))]
+		  	 StgNoDefault))
+  |  the_fv == scrutinee			-- Scrutinee is the only free variable
+  && maybeToBool maybe_offset			-- Selectee is a component of the tuple
+  && maybeToBool offset_into_int_maybe
+  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
+  = -- ASSERT(is_single_constructor) 		-- Should be true, but causes error for SpecTyCon
+    returnFC (mkSelectorLFInfo scrutinee con offset_into_int)
+  where
+    (_, params_w_offsets) = layOutDynCon con idPrimRep params
+    maybe_offset	  = assocMaybe params_w_offsets selectee
+    Just the_offset 	  = maybe_offset
+    offset_into_int_maybe = intOffsetIntoGoods the_offset
+    Just offset_into_int  = offset_into_int_maybe
+    is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
+    tycon		  = dataConTyCon con
+\end{code}
+
+
+Vap thunks
+~~~~~~~~~~
+Same kind of thing, looking for vector-apply thunks, of the form:
+
+	x = [...] \ .. [] -> f a1 .. an
+
+where f has arity n.  We rely on the arity info inside the Id being correct.
+
+\begin{code}
+mkRhsLFInfo 	fvs
+		upd_flag
+		[]			-- No args; a thunk
+		(StgApp (StgVarArg fun_id) args _)
+  | isLocallyDefined fun_id		-- Must be defined in this module
+  = 	-- Get the arity of the fun_id.  We could find out from the
+	-- looking in the Id, but it's more certain just to look in the code
+	-- generator's environment.
+
+----------------------------------------------
+-- Sadly, looking in the environment, as suggested above,
+-- causes a black hole (because cgRhsClosure depends on the LFInfo 
+-- returned here to determine its control flow.
+-- So I wimped out and went back to looking at the arity inside the Id.
+-- That means beefing up Core2Stg to propagate it.  Sigh.
+--     getCAddrModeAndInfo fun_id		`thenFC` \ (_, fun_lf_info) ->
+--     let arity_maybe = lfArity_maybe fun_lf_info
+----------------------------------------------
+
+     let
+	arity_maybe = case getIdArity fun_id of
+			ArityExactly n  -> Just n
+			other		-> Nothing
+     in
+     returnFC (case arity_maybe of
+		Just arity
+		    | arity > 0 &&			-- It'd better be a function!
+		      arity == length args		-- Saturated application
+		    -> 		-- Ha!  A VAP thunk
+			mkVapLFInfo fvs upd_flag fun_id args store_fun_in_vap
+
+		other -> mkClosureLFInfo False{-not top level-} fvs upd_flag []
+     )
+
+  where	
+	-- If the function is a free variable then it must be stored
+	-- in the thunk too; if it isn't a free variable it must be
+	-- because it's constant, so it doesn't need to be stored in the thunk
+    store_fun_in_vap = fun_id `is_elem` fvs
+    is_elem 	     = isIn "mkClosureLFInfo"
+\end{code}
+
+The default case
+~~~~~~~~~~~~~~~~
+\begin{code}
+mkRhsLFInfo fvs upd_flag args body
+  = returnFC (mkClosureLFInfo False{-not top level-} fvs upd_flag args)
+\end{code}
+
+
+%********************************************************
+%*							*
+%*		Let-no-escape bindings
+%*							*
+%********************************************************
 \begin{code}
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgNonRec binder rhs)
   = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot binder rhs

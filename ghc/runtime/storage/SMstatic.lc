@@ -11,15 +11,15 @@ are built by the compiler from {\tr uTys.hs}.
 #define NULL_REG_MAP
 #include "SMinternal.h"
 
-EXTDATA_RO(Prelude_CZh_static_info);
-EXTDATA_RO(Prelude_IZh_static_info);
+EXTDATA_RO(PrelBase_CZh_static_info);
+EXTDATA_RO(PrelBase_IZh_static_info);
 
 #define __CHARLIKE_CLOSURE(n) (CHARLIKE_closures+((n)*(CHARLIKE_HS+1)))
 #define __INTLIKE_CLOSURE(n)  (INTLIKE_closures_def+(((n)-MIN_INTLIKE)*(INTLIKE_HS+1)))
 
-#define CHARLIKE_HDR(n)	    SET_STATIC_FIXED_HDR(__CHARLIKE_CLOSURE(n),Prelude_CZh_static_info,CC_DONTZuCARE), (W_) n
+#define CHARLIKE_HDR(n)	    SET_STATIC_FIXED_HDR(__CHARLIKE_CLOSURE(n),PrelBase_CZh_static_info,CC_DONTZuCARE), (W_) n
 
-#define INTLIKE_HDR(n)	    SET_STATIC_FIXED_HDR(__INTLIKE_CLOSURE(n),Prelude_IZh_static_info,CC_DONTZuCARE), (W_) n
+#define INTLIKE_HDR(n)	    SET_STATIC_FIXED_HDR(__INTLIKE_CLOSURE(n),PrelBase_IZh_static_info,CC_DONTZuCARE), (W_) n
 
 const W_ CHARLIKE_closures[] = {
     CHARLIKE_HDR(0),

@@ -14,7 +14,7 @@ import MachMisc
 import MachRegs
 
 import AbsCSyn		( CStmtMacro(..), MagicId(..), mkIntCLit, CAddrMode )
-import CgCompInfo	( uF_RET, uF_SUA, uF_SUB, uF_UPDATEE,
+import Constants	( uF_RET, uF_SUA, uF_SUB, uF_UPDATEE,
 			  sTD_UF_SIZE
 			)
 import OrdList		( OrdList )
