@@ -573,6 +573,7 @@ MKDEPENDC_SRCS =
 
 # Make doesn't work this out for itself, it seems
 parser/Parser.y : parser/Parser.y.pp
+EXTRA_SRCS += parser/Parser.y
 
 include $(TOP)/mk/target.mk
 
