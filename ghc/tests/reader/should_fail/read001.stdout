@@ -82,6 +82,6 @@ class (Ord a) => OrdClass a where {
 instance (Eq a) => {EqClass (EqTree a)} where
     []
     eqc x = 'a'
-default (Rational, Integer)
+default (Integer, Rational)
 
 
