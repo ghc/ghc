@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.92 2002/02/28 08:53:58 sof Exp $
+ * $Id: PrimOps.hc,v 1.93 2002/02/28 18:44:29 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1012,6 +1012,17 @@ FN_(yieldzh_fast)
   JMP_(stg_yield_noregs);
   FE_
 }
+
+FN_(myThreadIdzh_fast)
+{
+  /* no args. */
+  FB_
+  RET_N((P_)CurrentTSO);
+  FE_
+}
+
+
+
 
 /* -----------------------------------------------------------------------------
  * MVar primitives

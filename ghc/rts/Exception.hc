@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.23 2001/12/05 17:35:15 sewardj Exp $
+ * $Id: Exception.hc,v 1.24 2002/02/28 18:44:28 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -208,16 +208,6 @@ FN_(killThreadzh_fast)
 	STGCALL2(raiseAsync, R1.t, R2.cl);
   }
 
-  JMP_(ENTRY_CODE(Sp[0]));
-  FE_
-}
-
-
-FN_(myThreadIdzh_fast)
-{
-  /* no args. */
-  FB_
-  R1.p = (P_)CurrentTSO;
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
