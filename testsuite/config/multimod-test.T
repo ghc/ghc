@@ -16,17 +16,6 @@ $expect = "pass"
 include ($confdir ++ "/" ++ $conffilename)
 include ($confdir ++ "/../std-macros.T")
 
--- (eg) "run.stdout"  -->  "testdir/testname.run.stdout"
-def qualify ( $_filename_frag )
-{
-   if   $_filename_frag == ""
-   then
-      return $testdir ++ "/" ++ $testname
-   else
-      return $testdir ++ "/" ++ $testname ++ "." ++ $_filename_frag
-   fi
-}
-
 -- (eg) "fooble"  --> "testdir/fooble"
 def testdirify ( $basename )
 {
@@ -109,51 +98,6 @@ def simple_build_Main_WRK ( $_extra_args )
 --- RUNNING, AND ASSESSING RUN RESULTS                      ---
 ---------------------------------------------------------------
 
--- Run testname.  If testname.stdin exists, route input from that, else
--- from /dev/null.  Route output to testname.run.stdout and 
--- testname.run.stderr.  Returns the exit code of the run.
-
-def simple_run_main( $_extra_args )
-{
-   -- figure out what to use for stdin
-   $devnull = "/dev/null"
-   if $stdin == "" then
-	$stdin = qualify("stdin")
-   fi
-   $use_stdin = if exists($stdin) then $stdin else $devnull
-
-   $run_stdout = qualify("run.stdout")
-   $run_stderr = qualify("run.stderr")
-
-   rm_or_fail($run_stdout)
-   rm_or_fail($run_stderr)
-   $cmd = qualify("") 
-          ++ " " ++ $_extra_args
-          ++ " < " ++ $use_stdin
-          ++ " > " ++ $run_stdout
-          ++ " 2> " ++ $run_stderr
-   $res = runCmd($cmd)
-   return $res
-}
-
-
--- returns True if both files exist and are identical.
-def same ( $_file1, $_file2 )
-{
-   if defined $verbose 
-	then print "vanilla-test: comparing " ++ $_file1
-		 ++ " and " ++ $_file2
-   fi
-   $cts1 = contents($_file1)
-   $cts2 = contents($_file2)
-   $same = $cts1 == $cts2
-   if not($same) then 
-	say_fail_because_noteq($_file1, $_file2) 
-   fi
-   return $same
-}
-
-
 -- Check that the run.stdout file matches at least one spec'd stdout.
 def check_stdout_ok()
 {
@@ -208,14 +152,12 @@ def multimod-run-test-actions ( $extra_compile_args,
         return False 
    fi
 
-   $res = simple_run_main( $extra_run_args )
-   if   $res /= "0" && $res /= $allowable_nonzero_exit_code
-   then print "multimod-test: unexpected exit code (" ++ $res 
-              ++ ") from testee"
-        return False
-   fi
-   $test_passed = check_stdout_ok() && check_stderr_ok()
-   return $test_passed
+   $exit_code = 
+      if $allowable_nonzero_exit_code /= "" then 
+	  $allowable_nonzero_exit_code 
+      else "0"
+
+   return simple_run_pgm( $extra_run_args, $exit_code )
 }
 
 
