@@ -104,7 +104,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|netbsd|nextstep3|cygwin32|mingw32)$/ ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -135,12 +135,12 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd3)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd3|netbsd_elf)$/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
-		      ($TargetPlatform =~ /-(linux|freebsd3)$/) ? '#' : '/' ;
+		      ($TargetPlatform =~ /-(linux|freebsd3|netbsd_elf)$/) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
     $T_X86_PRE_LLBL_PAT = '\.L';
@@ -150,7 +150,7 @@ sub init_TARGET_STUFF {
     $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.size\s+.*|\.ident.*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
-    if ( $TargetPlatform =~ /freebsd3/ ) {
+    if ( $TargetPlatform =~ /freebsd3|netbsd_elf/ ) {
         $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
     } else {
         $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
