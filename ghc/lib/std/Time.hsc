@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.3 2001/01/12 16:44:13 simonmar Exp $
+-- $Id: Time.hsc,v 1.4 2001/01/12 17:04:00 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -327,11 +327,11 @@ normalizeTimeDiff td =
         }
 
 -- -----------------------------------------------------------------------------
--- toCalendarTime t converts t to a local time, modified by
--- the current timezone and daylight savings time settings.  toUTCTime
--- t converts t into UTC time.  toClockTime l converts l into the 
--- corresponding internal ClockTime.  The wday, yday, tzname, and isdst fields
--- are ignored.
+-- How do we deal with timezones on this architecture?
+
+-- The POSIX way to do it is through the global variable tzname[].
+-- But that's crap, so we do it The BSD Way if we can: namely use the
+-- tm_zone and tm_gmtoff fields of struct tm, if they're available.
 
 #if HAVE_TM_ZONE
 zone x      = (#peek struct tm,tm_zone) x   :: IO (Ptr CChar)
@@ -374,6 +374,13 @@ gmtoff x = do
   if dst then return (fromIngtegral tz - 3600) else return tz
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
+
+-- -----------------------------------------------------------------------------
+-- toCalendarTime t converts t to a local time, modified by
+-- the current timezone and daylight savings time settings.  toUTCTime
+-- t converts t into UTC time.  toClockTime l converts l into the 
+-- corresponding internal ClockTime.  The wday, yday, tzname, and isdst fields
+-- are ignored.
 
 
 toCalendarTime :: ClockTime -> IO CalendarTime
