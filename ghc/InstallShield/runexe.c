@@ -4,7 +4,7 @@
 
 const char *prog = "runexe";
 
-#define BUFLEN 1025
+#define BUFLEN 65537
 
 void die(char *fmt, ...)
 {
@@ -26,12 +26,13 @@ void warn(char *fmt, ...)
   fprintf(stderr, "\n");
   va_end(ap);
 }
-  
+
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdParam, int nCmdShow)
 {
   STARTUPINFO sInfo;
   PROCESS_INFORMATION pInfo;
   TCHAR buf[BUFLEN];
+  DWORD retCode;
 
   sInfo.cb              = sizeof(STARTUPINFO);
   sInfo.lpReserved      = NULL;
@@ -41,10 +42,18 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmd
   sInfo.lpTitle         = NULL;
   sInfo.dwFlags         = 0;
 
-  if (GetCurrentDirectory(BUFLEN, buf) == 0) die("no parameters given");
-  if (strlen(lpszCmdParam) == 0) warn("couldn't get current directory");
+  if (GetCurrentDirectory(BUFLEN, buf) == 0) die("couldn't get current directory");
+  if (strlen(lpszCmdParam) == 0) die("no parameters given");
   warn("cwd: %s\n", buf);
   warn("runexing >>>%s<<<\n", lpszCmdParam);
-  CreateProcess(NULL, lpszCmdParam, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo);
-  return 0;
+  if (!CreateProcess(NULL, lpszCmdParam, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo))
+    die("could not create process");
+
+  WaitForSingleObject(pInfo.hProcess, INFINITE);
+  if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) retCode = -1;
+  CloseHandle(pInfo.hProcess);
+  CloseHandle(pInfo.hThread);
+  printf("return code %ld\n", retCode);
+
+  return retCode;
 }
