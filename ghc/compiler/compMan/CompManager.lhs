@@ -16,10 +16,12 @@ module CompManager (
     cmGetContext, -- :: CmState -> IO String
 
 #ifdef GHCI
-    cmRunStmt,	  --  :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+    cmInfoThing,  -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
 
-    cmTypeOfExpr, --  :: CmState -> DynFlags -> String
-		  --  -> IO (CmState, Maybe String)
+    cmRunStmt,	  -- :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+
+    cmTypeOfExpr, -- :: CmState -> DynFlags -> String
+		  -- -> IO (CmState, Maybe String)
 
     cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
 
@@ -39,7 +41,7 @@ import DriverFlags	( getDynFlags )
 import DriverPhases
 import DriverUtil
 import Finder
-import HscMain		( initPersistentCompilerState )
+import HscMain		( initPersistentCompilerState, hscThing )
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
@@ -170,6 +172,11 @@ moduleNameToModule mn
 -- cmRunStmt:  Run a statement/expr.
 
 #ifdef GHCI
+cmInfoThing :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
+cmInfoThing CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } dflags id
+   = do (pcs, thing) <- hscThing dflags hst hit pcs icontext id
+	return thing
+
 cmRunStmt :: CmState -> DynFlags -> String
 	-> IO (CmState,			-- new state
 	       [Name])			-- names bound by this evaluation

@@ -7,7 +7,8 @@
 \begin{code}
 module MkIface ( 
 	mkFinalIface,
-	pprModDetails, pprIface, pprUsage
+	pprModDetails, pprIface, pprUsage,
+	ifaceTyCls,
   ) where
 
 #include "HsVersions.h"

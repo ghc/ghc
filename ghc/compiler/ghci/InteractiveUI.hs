@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.81 2001/07/17 14:53:48 rrt Exp $
+-- $Id: InteractiveUI.hs,v 1.82 2001/07/18 16:06:10 rrt Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,6 +16,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 import Packages
 import CompManager
 import HscTypes		( GhciMode(..) )
+import MkIface          ( ifaceTyCls )
 import ByteCodeLink
 import DriverFlags
 import DriverState
@@ -71,6 +72,7 @@ builtin_commands = [
   ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
   ("?",		keepGoing help),
+  ("info",      keepGoing info),
   ("load",	keepGoing loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
@@ -88,12 +90,14 @@ shortHelpText = "use :? for help.\n"
 
 helpText = "\ 
 \ Commands available from the prompt:\n\ 
-\\  
+\\
 \   <stmt>		   evaluate/run <stmt>\n\ 
 \   :add <filename> ...    add module(s) to the current target set\n\ 
 \   :cd <dir>		   change directory to <dir>\n\ 
 \   :def <cmd> <expr>      define a command :<cmd>\n\ 
 \   :help, :?		   display this list of commands\n\ 
+\   :info [<name> ...]     display information about the given names, or\n\ 
+\                          about currently loaded files if no names given\n\ 
 \   :load <filename> ...   load module(s) and their dependents\n\ 
 \   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
 \   :reload		   reload the current module set\n\ 
@@ -200,11 +204,10 @@ runGHCi = do
 -- and aren't world writable.  Otherwise, we could be accidentally 
 -- running code planted by a malicious third party.
 
--- Furthermore, We only read ./.ghci if both . and ./.ghci are
--- owned by the current user and aren't writable by anyone else.  I
--- think this is sufficient: we don't need to check .. and
--- ../.. etc. because "."  always refers to the same directory while a
--- process is running.
+-- Furthermore, We only read ./.ghci if . is owned by the current user
+-- and isn't writable by anyone else.  I think this is sufficient: we
+-- don't need to check .. and ../.. etc. because "."  always refers to
+-- the same directory while a process is running.
 
 checkPerms :: String -> IO Bool
 checkPerms name =
@@ -363,6 +366,19 @@ noArgs c = throwDyn (CmdLineError ("command `" ++ c ++ "' takes no arguments"))
 
 help :: String -> GHCi ()
 help _ = io (putStr helpText)
+
+info :: String -> GHCi ()
+info "" = do io (putStr "dunno, mate")
+info s = do
+  let names = words s
+  st <- getGHCiState
+  let cmst = cmstate st
+  dflags <- io getDynFlags
+  things <- io (mapM (cmInfoThing cmst dflags) names)
+  let real_things = [ x | Just x <- things ]
+  let descs = map (`ifaceTyCls` []) real_things
+  let strings = map (showSDoc . ppr) descs
+  io (mapM_ putStr strings)
 
 addModule :: String -> GHCi ()
 addModule str = do
@@ -643,7 +659,8 @@ unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
-io m = GHCi $ \s -> m >>= \a -> return a
+io :: IO a -> GHCi a
+io m = GHCi { unGHCi = \s -> m >>= return }
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers

@@ -511,7 +511,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 			DoExpr   -> True
 			ListComp -> False
 	
-	-- For ExprStmt, see the comments near HsExpr.HsStmt about 
+	-- For ExprStmt, see the comments near HsExpr.Stmt about 
 	-- exactly what ExprStmts mean!
 	--
 	-- In dsDo we can only see DoStmt and ListComp (no gaurds)

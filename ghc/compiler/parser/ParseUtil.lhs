@@ -20,7 +20,7 @@ module ParseUtil (
 	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns		-- SrcLoc -> [HsExp] -> P [HsPat]
-	, checkDo		-- [HsStmt] -> P [HsStmt]
+	, checkDo		-- [Stmt] -> P [Stmt]
 	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
  ) where

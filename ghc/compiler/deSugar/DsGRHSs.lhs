@@ -74,7 +74,7 @@ matchGuard :: [TypecheckedStmt] 	-- Guard
            -> DsMatchContext            -- Context
 	   -> DsM MatchResult
 
--- See comments with HsExpr.HsStmt re what an ExprStmt means
+-- See comments with HsExpr.Stmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
 matchGuard [ResultStmt expr locn] ctx 

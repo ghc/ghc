@@ -7,7 +7,7 @@
 \begin{code}
 module HscMain ( HscResult(..), hscMain, 
 #ifdef GHCI
-		 hscStmt,
+		 hscStmt, hscThing,
 #endif
 		 initPersistentCompilerState ) where
 
@@ -17,14 +17,18 @@ module HscMain ( HscResult(..), hscMain,
 import ByteCodeGen	( byteCodeGen )
 import CoreTidy		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
+import SrcLoc           ( noSrcLoc )
 import Rename		( renameStmt )
+import RdrName          ( mkUnqual )
 import RdrHsSyn		( RdrNameStmt )
+import OccName          ( dataName )
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
+import FastString       ( mkFastString )
 #endif
 
 import HsSyn
@@ -550,6 +554,31 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 	; return (pcs2, Just (global_bound_ids, ty, bcos))
 
      }}}}}
+
+hscThing -- like hscStmt, but deals with a single identifier
+  :: DynFlags
+  -> HomeSymbolTable	
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> InteractiveContext		-- Context for compiling
+  -> String			-- The identifier
+  -> IO ( PersistentCompilerState, 
+	  Maybe TyThing )
+hscThing dflags hst hit pcs0 icontext id
+   = let 
+	InteractiveContext { 
+	     ic_rn_env   = rn_env, 
+	     ic_type_env = type_env,
+	     ic_module   = scope_mod } = icontext
+	fname = mkFastString id
+	rn = mkUnqual dataName fname -- need to guess correct namespace
+	stmt = ResultStmt (HsVar rn) noSrcLoc
+     in
+     do { (pcs, err, maybe_stmt) <- renameStmt dflags hit hst pcs0 scope_mod scope_mod rn_env stmt
+	; case maybe_stmt of
+	     Nothing -> return (pcs, Nothing)
+	     Just (n:ns, _) -> return (pcs, lookupType hst type_env n)
+	}
 
 hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
 hscParseStmt dflags str
