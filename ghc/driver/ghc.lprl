@@ -591,7 +591,7 @@ $LinkChk = 1;	# set to 0 if the link check should *not* be done
 
 # major & minor version numbers; major numbers must always agree;
 # minor disagreements yield a warning.
-$HsC_major_version = 32;
+$HsC_major_version = 33;
 $HsC_minor_version = 0;
 $Cc_major_version  = 36;
 $Cc_minor_version  = 1;
@@ -2490,7 +2490,7 @@ arg: while($_ = $args[0]) {
     # sigh, we have to deal with these -option arg specially here.
     /^-(tmpdir|odir|o|isuf|osuf|hisuf|hisuf-prelude|odump|syslib)$/ && 
        do { push(@Cmd_opts, $_); push(@Cmd_opts,$args[0]); shift(@args); next arg; };
-    /^-./  && do { push(@Cmd_opts, $_); next arg; };
+    /^--?./  && do { push(@Cmd_opts, $_); next arg; };
 
     if (/\.[oa]$/) {
 	push(@Link_file, $_);
@@ -2958,7 +2958,10 @@ arg: while($_ = $Args[0]) {
 		    && do { push(@HsC_flags, $_); next arg; };
 
     # for now, just -fwarn-name-shadowing
-    /^-fwarn-(.*)$/   && do { push(@HsC_flags, $_); next arg; };
+    /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_);   next arg; };
+
+    /^-fno-warn-(.*)$/   && do { push(@HsC_flags, "-fno-warn-$1"); next arg; };
+
     /^-fno-(.*)$/   && do { push(@HsC_antiflags, "-f$1");
 			    &squashHscFlag("-f$1");
 			    next arg; };
@@ -2992,6 +2995,7 @@ arg: while($_ = $Args[0]) {
     /^-d(dump|ppr)-/         && do { push(@HsC_flags, $_); next arg; };
     /^-dverbose-(simpl|stg)/ && do { push(@HsC_flags, $_); next arg; };
     /^-dshow-passes/	     && do { push(@HsC_flags, $_); next arg; };
+    /^-dshow-rn-stats/	     && do { push(@HsC_flags, $_); next arg; };
     /^-dshow-rn-trace/	     && do { push(@HsC_flags, $_); next arg; };
     /^-dsource-stats/        && do { push(@HsC_flags, $_); next arg; };
     /^-dsimplifier-stats/    && do { push(@HsC_flags, $_); next arg; };
