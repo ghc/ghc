@@ -31,7 +31,7 @@ import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
 			  CLabel{-instance Ord-}
 			)
-import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls )
+import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls, opt_GranMacros )
 import CostCentre	( uppCostCentre, uppCostCentreDecl )
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
@@ -69,7 +69,9 @@ writeRealC handle absC postlude =
  printForC handle (pprAbsC absC (costs absC) $$ postlude)
 
 dumpRealC :: AbstractC -> SDoc -> SDoc
-dumpRealC absC postlude = pprCode CStyle (pprAbsC absC (costs absC) $$ postlude)
+dumpRealC absC postlude 
+ | opt_GranMacros = pprCode CStyle (pprAbsC absC (costs absC)    $$ postlude)
+ | otherwise	  = pprCode CStyle (pprAbsC absC (panic "costs") $$ postlude)
 \end{code}
 
 This emits the macro,  which is used in GrAnSim  to compute the total costs
