@@ -639,6 +639,34 @@
 	  module is shown in the right-hand column.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <indexterm><primary><option>--ignore-all-exports</option></primary>
+	  </indexterm>
+	  <option>--ignore-all-exports</option>
+	</term>
+	<listitem>
+	  <para>Causes Haddock to behaves as if every module has the
+	    <literal>ignore-exports</literal> attribute (<xref
+	      linkend="module-attributes" />).  This might be useful for
+	    generating implementation documentation rather than interface
+	    documetnation, for example.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <indexterm><primary><option>--hide</option></primary>
+	  </indexterm>
+	  <option>--hide</option>&nbsp;<replaceable>module</replaceable>
+	</term>
+	<listitem>
+	  <para>Causes Haddock to behaves as if module
+	    <replaceable>module</replaceable> has the <literal>hide</literal>
+	    atribute. (<xref linkend="module-attributes" />).</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
 
     <section id="cpp">
@@ -1063,7 +1091,7 @@ module Foo (
       </itemizedlist>
     </section>
 
-    <section>
+    <section id="hyperlinking">
       <title>Hyperlinking and re-exported entities</title>
 
       <para>When Haddock renders a type in the generated
@@ -1096,40 +1124,50 @@ import B
       <para>Module <literal>A</literal> exports a datatype
       <literal>T</literal>.  Module <literal>B</literal> imports
       <literal>A</literal> and exports a function <literal>f</literal>
-      whose type refers to <literal>T</literal>: the hyperlink in
-      <literal>f</literal>'s signature will point to the definition of
-      <literal>T</literal> in the documentation for module
-      <literal>A</literal>.</para>
+      whose type refers to <literal>T</literal>.  Also, both
+	<literal>T</literal> and <literal>f</literal> are re-exported from
+	module C.</para>
 
-      <para>Now, module <literal>C</literal> exports both
-      <literal>T</literal> and <literal>f</literal>.  We have a choice
-      about where to point the hyperlink to <literal>T</literal> in
-      <literal>f</literal>'s type: either the definition exported by
-      module <literal>C</literal> or the definition exported by module
-      <literal>A</literal>.  Haddock takes the view that in this case
-      pointing to the definition in <literal>C</literal> is better,
-      because the programmer might not wish to expose
-      <literal>A</literal> to the programmer at all:
-      <literal>A</literal> might be a module internal to the
-      implementation of the library in which <literal>C</literal> is
-      the external interface, so linking to definitions in the current
-      module is preferrable over an imported module.</para>
+      <para>Haddock takes the view that each entity has a
+	<emphasis>home</emphasis> module; that is, the module that the library
+	designer would most like to direct the user to, to find the
+	documentation for that entity.  So, Haddock makes all links to an entity
+	point to the home module.  The one exception is when the entity is also
+      exported by the current module: Haddock makes a local link if it
+	can.</para>
 
-      <para>The general rule is this: when attempting to link an
-      instance of a type constructor or class to its definition, the
-      link is made to</para>
+      <para>How is the home module for an entity determined?
+	Haddock uses the following rules:</para>
+
       <itemizedlist>
 	<listitem>
-	  <para>the current module, if the current module exports the
-	  relevant definition, or</para>
+	  <para>If modules A and B both export the entity, and module A imports
+	    (directly or indirectly) module B, then B is preferred.</para>
 	</listitem>
 	<listitem>
-	  <para>the module that the entity was imported from,
-	  otherwise.  If the entity was imported via multiple routes,
-	  then Haddock picks the module listed earliest in the imports
-	  of the current module.</para>
+	  <para>A module with the <literal>hide</literal> attribute is never
+	    chosen as the home.</para>
+	</listitem>
+	<listitem>
+	  <para>A module with the <literal>not-home</literal> atribute is only
+	    chosen if there are no other modules to choose.</para>
 	</listitem>
       </itemizedlist>
+
+      <para>If multiple modules fit the criteria, then one is chosen at
+	random.  If no modules fit the criteria (because the candidates are all
+      hidden), then Haddock will issue a warning for each reference to an
+	entity without a home.</para>
+
+      <para>In the example above, module <literal>A</literal> is chosen as the
+	home for <literal>T</literal> because it does not import any other
+	module that exports <literal>T</literal>.  The link from
+	<literal>f</literal>'s
+	type in module <literal>B</literal> will therefore point to
+	<literal>A.T</literal>.  However, <literal>C</literal> also exports
+	<literal>T</literal> and <literal>f</literal>, and the link from
+	<literal>f</literal>'s type in <literal>C</literal> will therefore
+	point locally to <literal>C.T</literal>.</para>
     </section>
 
     <section id="module-attributes">
@@ -1180,7 +1218,7 @@ module A where
 
 	<varlistentry>
           <term>
-            <indexterm><primary><literal>hide</literal></primary></indexterm>
+            <indexterm><primary><literal>ignore-exports</literal></primary></indexterm>
             <literal>ignore-exports</literal>
           </term>
 	  <listitem>
@@ -1190,7 +1228,21 @@ module A where
 	    given in the body of the module.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term>
+	    <indexterm><primary><literal>not-home</literal></primary>
+	    </indexterm>
+	  </term>
+	  <listitem>
+	    <para>Indicates that the current module should not be considered to
+	      be the home module for each entity it exports,
+	      unless that entity is not exported from any other module.  See
+	      <xref linkend="hyperlinking" /> for more details.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
+
     </section>
 
     <section>
