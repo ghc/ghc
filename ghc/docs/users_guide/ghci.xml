@@ -664,6 +664,9 @@ Wed Mar 14 12:23:13 GMT 2001
    and at least one is either a numeric class <emphasis>or the <literal>Show</literal>, 
    <literal>Eq</literal>, or <literal>Ord</literal> class</emphasis>,
    GHCi will try to use one of the <literal>default</literal> types, just as described in the Report.
+   The standard defaulting rules require that one of the classes is numeric; the difference here
+   is that defaulting is also triggered at least one is <literal>Show</literal>, 
+   <literal>Eq</literal>, or <literal>Ord</literal>.  
    </para>
     </sect2>
   </sect1>
