@@ -735,7 +735,7 @@ runSomething phase_name pgm args = do
         case toArgs pgm of
 	  []     -> (pgm, real_args) -- let rawSystem be the bearer of bad news..
 	  (x:xs) -> (x, xs ++ real_args)
-  traceCmd phase_name (unwords (pgm:real_args)) $ do
+  traceCmd phase_name (unwords (real_pgm : argv)) $ do
   exit_code <- rawSystem real_pgm argv
   if (exit_code /= ExitSuccess)
 	then throwDyn (PhaseFailed phase_name exit_code)
