@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.18 1999/03/17 13:19:24 simonm Exp $
+ * $Id: Schedule.c,v 1.19 1999/03/20 17:33:07 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -515,7 +515,7 @@ threadStackOverflow(StgTSO *tso)
   StgTSO *dest;
 
   if (tso->stack_size >= tso->max_stack_size) {
-#ifdef 0
+#if 0
     /* If we're debugging, just print out the top of the stack */
     printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 				     tso->sp+64));
