@@ -463,7 +463,7 @@ tcSubPat does the work
 tcSubPat :: TcSigmaType -> TcSigmaType -> TcM (PatCoFn, LIE)
 
 tcSubPat sig_ty exp_ty
- = tcSub exp_ty sig_ty			`thenTc` \ (co_fn, lie) ->
+ = tcSub sig_ty exp_ty			`thenTc` \ (co_fn, lie) ->
 	-- co_fn is a coercion on *expressions*, and we
 	-- need to make a coercion on *patterns*
    if isIdCoercion co_fn then
