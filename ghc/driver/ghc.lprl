@@ -956,8 +956,7 @@ if ( $OptLevel <= 0 ) {
     &add_Hsc_flags( @HsC_minusO_flags );
     push(@CcBoth_flags, ($MinusO2ForC || $OptLevel == 2) ? '-O2' : '-O'); # not optional!
     # -O? to GCC is not optional! -O2 probably isn't worth it generally,
-    # but it *is* useful in compiling the garbage collectors (so said
-    # Patrick many moons ago...).
+    # but it *is* useful in compiling the garbage collector.
 
 } else { # -Ofile, then...
 
@@ -1106,12 +1105,11 @@ sub setupMachOpts {
   } elsif ($TargetPlatform =~ /^i386-/) {
       # -fno-defer-pop : basically the same game as for m68k
       #
-      # -fomit-frame-pointer : *must* ; because we're stealing
-      #	 the fp (%ebp) for our register maps.  *All* register
-      #	 maps (in MachRegs.lh) must steal it.
+      # -fomit-frame-pointer : *must* in .hc files; because we're stealing
+      #	 the fp (%ebp) for our register maps.
 
       unshift(@CcRegd_flags_hc, '-fno-defer-pop');
-      unshift(@CcRegd_flags,    '-fomit-frame-pointer');
+      unshift(@CcRegd_flags_hc, '-fomit-frame-pointer');
       unshift(@CcRegd_flags,    "-DSTOLEN_X86_REGS=$StolenX86Regs");
 
   } elsif ($TargetPlatform =~ /^m68k-/) {
@@ -2290,7 +2288,7 @@ sub process_ghc_timings {
     local($tot_samples) = 0;
 
     while (<STATS>) {
-	if (! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+\%/ ) {
+	if (! /Gen:\s+0/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
 	 	$max_live = $1 if $max_live < $1;
 		$tot_live += $1;
 		$tot_samples += 1;
