@@ -55,7 +55,11 @@ module MutableArray
 
     unsafeFreezeArray,     -- :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
     unsafeFreezeByteArray, -- :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-    thawArray,             -- :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
+
+    thawArray,             -- :: Ix ix => Array ix elt -> ST s (MutableArray s ix)
+    thawByteArray,         -- :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
+    unsafeThawArray,       -- :: Ix ix => Array ix elt -> ST s (MutableArray s ix)
+    unsafeThawByteArray,   -- :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
 
      -- the sizes are reported back are *in bytes*.
     sizeofMutableByteArray, -- :: Ix ix => MutableByteArray s ix -> Int
@@ -376,5 +380,35 @@ writeInt64Array mb n w = do
 {-# SPECIALIZE boundsOfMutableByteArray :: MutableByteArray s Int -> IPr #-}
 boundsOfMutableByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
 boundsOfMutableByteArray (MutableByteArray ixs _) = ixs
+
+\end{code}
+
+\begin{code}
+thawByteArray :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
+thawByteArray (ByteArray ixs barr#) =
+     {- 
+        The implementation is made more complex by the
+        fact that the indexes are in units of whatever
+        base types that's stored in the byte array.
+     -}
+   case (sizeofByteArray# barr#) of 
+     i# -> do
+       marr <- newCharArray (0,I# i#)
+       mapM_ (\ idx@(I# idx#) -> 
+                 writeCharArray marr idx (C# (indexCharArray# barr# idx#)))
+  	     [0..]
+       let (MutableByteArray _ arr#) = marr
+       return (MutableByteArray ixs arr#) 
+
+{-
+  in-place conversion of immutable arrays to mutable ones places
+  a proof obligation on the user: no other parts of your code can
+  have a reference to the array at the point where you unsafely
+  thaw it (and, subsequently mutate it, I suspect.)
+-}
+unsafeThawByteArray :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
+unsafeThawByteArray (ByteArray ixs barr#) = ST $ \ s# ->
+   case unsafeThawByteArray# barr# s# of
+      (# s2#, arr# #) -> (# s2#, MutableByteArray ixs arr# #)
 
 \end{code}

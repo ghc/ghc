@@ -30,6 +30,10 @@ module IOExts
 	, writeIOArray
 	, freezeIOArray
 	, thawIOArray
+#ifndef __HUGS__
+	, unsafeFreezeIOArray
+	, unsafeThawIOArray
+#endif
 	
 #ifdef __HUGS__
 #else
@@ -111,6 +115,10 @@ readIOArray         :: Ix ix => IOArray ix elt -> ix -> IO elt
 writeIOArray        :: Ix ix => IOArray ix elt -> ix -> elt -> IO ()
 freezeIOArray       :: Ix ix => IOArray ix elt -> IO (Array ix elt)
 thawIOArray	    :: Ix ix => Array ix elt -> IO (IOArray ix elt)
+#ifndef __HUGS__
+unsafeFreezeIOArray :: Ix ix => IOArray ix elt -> IO (Array ix elt)
+unsafeThawIOArray   :: Ix ix => Array ix elt -> IO (IOArray ix elt)
+#endif
 
 #ifdef __HUGS__
 type IOArray ix elt = STArray RealWorld ix elt
@@ -138,6 +146,11 @@ freezeIOArray (IOArray arr) = stToIO (freezeArray arr)
 
 thawIOArray arr = do 
 	marr <- stToIO (thawArray arr)
+	return (IOArray marr)
+
+unsafeFreezeIOArray (IOArray arr) = stToIO (unsafeFreezeArray arr)
+unsafeThawIOArray   arr = do
+        marr <- stToIO (unsafeThawArray arr)
 	return (IOArray marr)
 #endif
 \end{code}

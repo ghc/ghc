@@ -25,7 +25,8 @@ writeArray    :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s ()
 freezeArray   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
 thawArray     :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
 
-unsafeFreezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
+unsafeFreezeArray   :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
+unsafeThawArray     :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
 </code></tscreen>
 <nidx>newArray</nidx>
 <nidx>boundsOfArray</nidx>
@@ -34,6 +35,7 @@ unsafeFreezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
 <nidx>freezeArray</nidx>
 <nidx>thawArray</nidx>
 <nidx>unsafeFreezeArray</nidx>
+<nidx>unsafeThawArray</nidx>
 
 <bf/Remarks:/
 
@@ -49,8 +51,9 @@ array in the process. Please don't :-)
 <item>
 The operation <tt/thawArray/ goes the other way, converting
 an immutable <tt/Array/ into a mutable one. This is done by
-copying. The operation <tt/unsafeThawArray/ is not provided
-(allthough it conceivably could be.)
+copying. The operation <tt/unsafeThawArray/ is also provided,
+which places the same kind of proof obligation on the programmer
+as <tt/unsafeFreezeArray/ does.
 </itemize>
 
 <sect3> <idx/Mutable byte arrays/
@@ -111,6 +114,9 @@ unsafeFreezeByteArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 
 sizeofMutableByteArray :: Ix ix => MutableByteArray s ix -> Int
 
+thawByteArray       :: Ix ix => ByteArray ixt -> ST s (MutableByteArray s ix)
+unsafeThawByteArray :: Ix ix => ByteArray ixt -> ST s (MutableByteArray s ix)
+
 </code></tscreen>
 <nidx>newCharArray</nidx>
 <nidx>newAddrArray</nidx>
@@ -150,6 +156,8 @@ sizeofMutableByteArray :: Ix ix => MutableByteArray s ix -> Int
 <nidx>freezeFloatArray</nidx>
 <nidx>freezeDoubleArray</nidx>
 <nidx>unsafeFreezeByteArray</nidx>
+<nidx>unsafeThawByteArray</nidx>
+<nidx>thawByteArray</nidx>
 
 <bf/Remarks:/
 <itemize>
@@ -192,7 +200,10 @@ into immutable byte arrays are also provided by the <tt/freeze*/
 class of actions. There's also the non-copying
 <tt/unsafeFreezeByteArray/. 
 <p>
-Thawing of byte arrays is currently not supported.
+<item>
+Operations for going the other way, where an immutable byte
+array is 'thawed' are also provided. <tt/thawByteArray/ does
+this by copying, whereas <tt/unsafeThawByteArray/ does not
 
 <item>
 The operation <tt/sizeofMutableByteArray/ returns the size of

@@ -152,6 +152,7 @@ data PrimOp
     | IndexOffForeignObjOp PrimRep
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
+    | UnsafeThawArrayOp   | UnsafeThawByteArrayOp
     | SizeofByteArrayOp   | SizeofMutableByteArrayOp
 
     -- Mutable variables
@@ -497,48 +498,50 @@ tagOf_PrimOp (WriteOffAddrOp Word64Rep)       = ILIT(195)
 
 tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(196)
 tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(197)
-tagOf_PrimOp SizeofByteArrayOp		      = ILIT(198)
-tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(199)
+tagOf_PrimOp UnsafeThawArrayOp		      = ILIT(198)
+tagOf_PrimOp UnsafeThawByteArrayOp	      = ILIT(199)
+tagOf_PrimOp SizeofByteArrayOp		      = ILIT(200)
+tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(201)
 
-tagOf_PrimOp NewMVarOp			      = ILIT(200)
-tagOf_PrimOp TakeMVarOp		    	      = ILIT(201)
-tagOf_PrimOp PutMVarOp		    	      = ILIT(202)
-tagOf_PrimOp SameMVarOp		    	      = ILIT(203)
-tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(204)
-tagOf_PrimOp MakeForeignObjOp		      = ILIT(205)
-tagOf_PrimOp WriteForeignObjOp		      = ILIT(206)
-tagOf_PrimOp MkWeakOp			      = ILIT(207)
-tagOf_PrimOp DeRefWeakOp		      = ILIT(208)
-tagOf_PrimOp FinalizeWeakOp		      = ILIT(209)
-tagOf_PrimOp MakeStableNameOp		      = ILIT(210)
-tagOf_PrimOp EqStableNameOp		      = ILIT(211)
-tagOf_PrimOp StableNameToIntOp		      = ILIT(212)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(213)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(214)
-tagOf_PrimOp EqStablePtrOp		      = ILIT(215)
-tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(216)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(217)
-tagOf_PrimOp SeqOp			      = ILIT(218)
-tagOf_PrimOp ParOp			      = ILIT(219)
-tagOf_PrimOp ForkOp			      = ILIT(220)
-tagOf_PrimOp KillThreadOp		      = ILIT(221)
-tagOf_PrimOp DelayOp			      = ILIT(222)
-tagOf_PrimOp WaitReadOp			      = ILIT(223)
-tagOf_PrimOp WaitWriteOp		      = ILIT(224)
-tagOf_PrimOp ParGlobalOp		      = ILIT(225)
-tagOf_PrimOp ParLocalOp			      = ILIT(226)
-tagOf_PrimOp ParAtOp			      = ILIT(227)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(228)
-tagOf_PrimOp ParAtRelOp			      = ILIT(229)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(230)
-tagOf_PrimOp CopyableOp			      = ILIT(231)
-tagOf_PrimOp NoFollowOp			      = ILIT(232)
-tagOf_PrimOp NewMutVarOp		      = ILIT(233)
-tagOf_PrimOp ReadMutVarOp		      = ILIT(234)
-tagOf_PrimOp WriteMutVarOp		      = ILIT(235)
-tagOf_PrimOp SameMutVarOp		      = ILIT(236)
-tagOf_PrimOp CatchOp			      = ILIT(237)
-tagOf_PrimOp RaiseOp			      = ILIT(238)
+tagOf_PrimOp NewMVarOp			      = ILIT(202)
+tagOf_PrimOp TakeMVarOp		    	      = ILIT(203)
+tagOf_PrimOp PutMVarOp		    	      = ILIT(204)
+tagOf_PrimOp SameMVarOp		    	      = ILIT(205)
+tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(206)
+tagOf_PrimOp MakeForeignObjOp		      = ILIT(207)
+tagOf_PrimOp WriteForeignObjOp		      = ILIT(208)
+tagOf_PrimOp MkWeakOp			      = ILIT(209)
+tagOf_PrimOp DeRefWeakOp		      = ILIT(210)
+tagOf_PrimOp FinalizeWeakOp		      = ILIT(211)
+tagOf_PrimOp MakeStableNameOp		      = ILIT(212)
+tagOf_PrimOp EqStableNameOp		      = ILIT(213)
+tagOf_PrimOp StableNameToIntOp		      = ILIT(214)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(215)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(216)
+tagOf_PrimOp EqStablePtrOp		      = ILIT(217)
+tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(218)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(219)
+tagOf_PrimOp SeqOp			      = ILIT(220)
+tagOf_PrimOp ParOp			      = ILIT(221)
+tagOf_PrimOp ForkOp			      = ILIT(222)
+tagOf_PrimOp KillThreadOp		      = ILIT(223)
+tagOf_PrimOp DelayOp			      = ILIT(224)
+tagOf_PrimOp WaitReadOp			      = ILIT(225)
+tagOf_PrimOp WaitWriteOp		      = ILIT(226)
+tagOf_PrimOp ParGlobalOp		      = ILIT(227)
+tagOf_PrimOp ParLocalOp			      = ILIT(228)
+tagOf_PrimOp ParAtOp			      = ILIT(229)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(230)
+tagOf_PrimOp ParAtRelOp			      = ILIT(231)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(232)
+tagOf_PrimOp CopyableOp			      = ILIT(233)
+tagOf_PrimOp NoFollowOp			      = ILIT(234)
+tagOf_PrimOp NewMutVarOp		      = ILIT(235)
+tagOf_PrimOp ReadMutVarOp		      = ILIT(236)
+tagOf_PrimOp WriteMutVarOp		      = ILIT(237)
+tagOf_PrimOp SameMutVarOp		      = ILIT(238)
+tagOf_PrimOp CatchOp			      = ILIT(239)
+tagOf_PrimOp RaiseOp			      = ILIT(240)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -760,6 +763,8 @@ allThePrimOps
 	WriteOffAddrOp Word64Rep,
 	UnsafeFreezeArrayOp,
 	UnsafeFreezeByteArrayOp,
+	UnsafeThawArrayOp,
+	UnsafeThawByteArrayOp,
 	SizeofByteArrayOp,
 	SizeofMutableByteArrayOp,
 	NewMutVarOp,
@@ -1328,6 +1333,24 @@ primOpInfo UnsafeFreezeByteArrayOp
 	[mkMutableByteArrayPrimTy s, state]
 	(unboxedPair [state, byteArrayPrimTy])
 
+primOpInfo UnsafeThawArrayOp
+  = let {
+	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
+	state = mkStatePrimTy s
+    } in
+    mkGenPrimOp SLIT("unsafeThawArray#") [s_tv, elt_tv]
+	[mkArrayPrimTy elt, state]
+	(unboxedPair [state, mkMutableArrayPrimTy s elt])
+
+primOpInfo UnsafeThawByteArrayOp
+  = let { 
+	s = alphaTy; s_tv = alphaTyVar;
+	state = mkStatePrimTy s
+    } in
+    mkGenPrimOp SLIT("unsafeThawByteArray#") [s_tv]
+	[byteArrayPrimTy, state]
+	(unboxedPair [state, mkMutableByteArrayPrimTy s])
+
 ---------------------------------------------------------------------------
 primOpInfo SizeofByteArrayOp
   = mkGenPrimOp
@@ -1838,6 +1861,11 @@ primOpOutOfLine op
 	ForkOp			-> True
 	KillThreadOp		-> True
 	CCallOp _ _ may_gc@True _ -> True	-- _ccall_GC_
+	  -- the next one doesn't perform any heap checks,
+	  -- but it is of such an esoteric nature that
+	  -- it is done out-of-line rather than require
+	  -- the NCG to implement it.
+	UnsafeThawArrayOp       -> True
 	_           		-> False
 \end{code}
 

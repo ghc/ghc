@@ -15,16 +15,13 @@ module LazyST (
 	runST,
 	unsafeInterleaveST,
 
-        -- ST is one, so you'll likely need some Monad bits
-        module Monad,
-
 	ST.STRef,
 	newSTRef, readSTRef, writeSTRef,
 
 	STArray,
 	newSTArray, readSTArray, writeSTArray, boundsSTArray, 
 	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
-	Ix,
+	unsafeThawSTArray,
 
 	ST.unsafeIOToST, ST.stToIO,
 
@@ -117,6 +114,9 @@ thawSTArray arr	=
 
 freezeSTArray (STArray arr) = strictToLazyST (freezeArray arr)
 unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
+unsafeThawSTArray arr =
+	    strictToLazyST (unsafeThawArray arr) >>= \ marr -> 
+	    return (STArray marr)
 
 strictToLazyST :: PrelST.ST s a -> ST s a
 strictToLazyST m = ST $ \s ->

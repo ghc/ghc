@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.22 1999/03/02 19:44:12 sof Exp $
+ * $Id: PrimOps.h,v 1.23 1999/03/05 10:21:29 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -575,6 +575,9 @@ extern I_ resetGenSymZh(void);
 	}
 
 #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
+#define unsafeThawByteArrayzh(r,a)	r=(a)
+
+EF_(unsafeThawArrayzh_fast);
 
 #define sizzeofByteArrayzh(r,a) \
      r = (((StgArrWords *)(a))->words * sizeof(W_))

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.20 1999/03/03 19:11:43 sof Exp $
+ * $Id: PrimOps.hc,v 1.21 1999/03/05 10:21:27 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -296,6 +296,18 @@ FN_(makeForeignObjzh_fast)
   FE_
 }
 #endif
+
+/* These two are out-of-line for the benefit of the NCG */
+FN_(unsafeThawArrayzh_fast)
+{
+  FB_
+  SET_INFO((StgClosure *)R1.cl,&MUT_ARR_PTRS_info);
+  recordMutable((StgMutClosure*)R1.cl);
+
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(R1.p);
+  FE_
+}
 
 /* -----------------------------------------------------------------------------
    Weak Pointer Primitives

@@ -637,4 +637,12 @@ thawArray (Array ixs arr#) = ST $ \ s# ->
 	      case writeArray# to#   cur# ele st# of { s1# ->
 	      copy (cur# +# 1#) end# from# to# s1#
 	      }}
+
+-- this is a quicker version of the above, just flipping the type
+-- (& representation) of an immutable array. And placing a
+-- proof obligation on the programmer.
+unsafeThawArray :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
+unsafeThawArray (Array ixs arr#) = ST $ \ s# ->
+   case unsafeThawArray# arr# s# of
+      (# s2#, marr# #) -> (# s2#, MutableArray ixs marr# #)
 \end{code}

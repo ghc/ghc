@@ -277,6 +277,9 @@ __export PrelGHC
   unsafeFreezzeArrayzh		-- Note zz in the middle
   unsafeFreezzeByteArrayzh	-- Ditto
 
+  unsafeThawArrayzh
+  unsafeThawByteArrayzh
+
   sizzeofByteArrayzh		-- Ditto
   sizzeofMutableByteArrayzh	-- Ditto
 

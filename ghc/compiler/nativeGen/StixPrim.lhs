@@ -109,6 +109,8 @@ primCode [lhs] UnsafeFreezeArrayOp [rhs]
 
 primCode [lhs] UnsafeFreezeByteArrayOp [rhs]
   = simpleCoercion PtrRep lhs rhs
+primCode [lhs] UnsafeThawByteArrayOp [rhs]
+  = simpleCoercion PtrRep lhs rhs
 \end{code}
 
 Returning the size of (mutable) byte arrays is just

@@ -6,29 +6,35 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module ST (
+module ST 
+      (
+	ST                  -- abstract, instance of Functor, Monad.
+      , runST		    -- :: (forall s. ST s a) -> a
+      , fixST		    -- :: (a -> ST s a) -> ST s a
+      , unsafeInterleaveST  -- :: ST s a -> ST s a
 
-	ST,
+      , STRef
+      , newSTRef
+      , readSTRef
+      , writeSTRef
+      
+      , unsafeIOToST
+      , stToIO
+      
+      , STArray
+      , newSTArray
+      , readSTArray
+      , writeSTArray
+      , boundsSTArray
+      , thawSTArray
+      , freezeSTArray
+      , unsafeFreezeSTArray
+#ifndef __HUGS__
+-- no 'good' reason, just doesn't support it right now.
+      , unsafeThawSTArray
+#endif
 
-	runST,				-- :: (forall s. ST s a) -> a
-	fixST,				-- :: (a -> ST s a) -> ST s a
-
-	unsafeInterleaveST,
-
-        -- ST is one, so you'll likely need some Monad bits
-        module Monad,
-
-	STRef,
-	newSTRef, readSTRef, writeSTRef,
-
-	unsafeIOToST, stToIO,
-
-	STArray,
-	newSTArray, readSTArray, writeSTArray, boundsSTArray, 
-	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
-	Ix
-
-    ) where
+      ) where
 
 #ifdef __HUGS__
 import PreludeBuiltin
@@ -81,6 +87,11 @@ boundsSTArray     	:: Ix ix => STArray s ix elt -> (ix, ix)
 thawSTArray 		:: Ix ix => Array ix elt -> ST s (STArray s ix elt)
 freezeSTArray	  	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 unsafeFreezeSTArray 	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
+
+#ifndef __HUGS__
+-- see export list comment..
+unsafeThawSTArray 	:: Ix ix => Array ix elt -> ST s (STArray s ix elt)
+#endif
 
 #ifdef __HUGS__
 data STArray s ix elt = STArray (ix,ix) (PrimMutableArray s elt)
@@ -149,6 +160,8 @@ thawSTArray arr = thawArray arr >>= \starr -> return (STArray starr)
 freezeSTArray (STArray arr) = freezeArray arr
 
 unsafeFreezeSTArray (STArray arr) = unsafeFreezeArray arr
+unsafeThawSTArray arr = unsafeThawArray arr >>= \ marr -> return (STArray marr)
+
 #endif
 \end{code}
 
