@@ -21,7 +21,8 @@ module PrelInfo (
 	ltH_Float_RDR, eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR, 
 	ltH_Int_RDR, geH_RDR, leH_RDR, minusH_RDR, false_RDR, true_RDR,
 	and_RDR, not_RDR, append_RDR, map_RDR, compose_RDR, mkInt_RDR,
-	error_RDR, showString_RDR, showParen_RDR, readParen_RDR, lex_RDR,
+	error_RDR, assert_RDR,
+	showString_RDR, showParen_RDR, readParen_RDR, lex_RDR,
 	showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
 
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
@@ -431,7 +432,8 @@ plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
 times_RDR	   = varQual (pREL_BASE, SLIT("*"))
 mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
 
-error_RDR	   = varQual (eRROR, SLIT("error"))
+error_RDR	   = varQual (gHC_ERR, SLIT("error"))
+assert_RDR         = varQual (gHC_ERR, SLIT("assert__"))
 
 eqH_Char_RDR	= prelude_primop CharEqOp
 ltH_Char_RDR	= prelude_primop CharLtOp

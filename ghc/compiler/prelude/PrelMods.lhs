@@ -15,7 +15,7 @@ module PrelMods
          gHC__, pRELUDE, pREL_BASE,
          pREL_READ , pREL_NUM, pREL_LIST,
 	 pREL_TUP  , pACKED_STRING, cONC_BASE,
-         iO_BASE   , eRROR, mONAD, rATIO, iX,
+         iO_BASE   , mONAD, rATIO, iX,
          sT_BASE   , aRR_BASE, fOREIGN, mAIN,
          gHC_MAIN  , gHC_ERR,
 	 cCALL     , aDDR
@@ -42,7 +42,6 @@ pREL_TUP     = SLIT("PrelTup")
 pACKED_STRING= SLIT("PackBase")
 cONC_BASE    = SLIT("ConcBase")
 iO_BASE	     = SLIT("IOBase")
-eRROR	     = SLIT("Error")
 mONAD	     = SLIT("Monad")
 rATIO	     = SLIT("Ratio")
 iX	     = SLIT("Ix")

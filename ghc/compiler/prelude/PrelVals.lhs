@@ -80,7 +80,7 @@ pc_bottoming_Id key mod name ty
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
-  = pc_bottoming_Id errorIdKey eRROR SLIT("error") errorTy
+  = pc_bottoming_Id errorIdKey gHC_ERR SLIT("error") errorTy
 
 generic_ERROR_ID u n
   = pc_bottoming_Id u gHC_ERR n errorTy
