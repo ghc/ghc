@@ -221,6 +221,7 @@ readIface filename = do
 		   iface_filename     = "",
 		   iface_env          = listToFM env,
 		   iface_sub	      = listToFM sub,
+		   iface_reexported   = emptyFM,
 		   iface_exports      = [],
 		   iface_orig_exports = [],
 		   iface_insts	      = [],
@@ -362,6 +363,10 @@ mkInterface no_implicit_prelude mod_map filename
 
      name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
 
+     -- find the names exported by this module that other modules should *not*
+     -- link to (and point them to where they should).
+     reexports = getReExports mdl mod_map orig_exports
+
   let
      (orig_module_doc, missing_names4)
         = runRnFM orig_env (renameMaybeDoc maybe_doc)
@@ -384,6 +389,7 @@ mkInterface no_implicit_prelude mod_map filename
   return (mdl, Interface { 
 		   iface_filename     = filename,
 		   iface_env          = name_env,
+		   iface_reexported    = reexports,
 		   iface_exports      = renamed_export_list,
 		   iface_sub	      = sub_map,
 		   iface_orig_exports = pruned_export_list,
@@ -648,7 +654,7 @@ exportedNames :: Module -> ModuleMap -> [HsName]
 
 exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
   | Nothing <- maybe_exps 	    = all_local_names_pr
-  | OptIgnoreExports `elem` opts = all_local_names_pr
+  | OptIgnoreExports `elem` opts    = all_local_names_pr
   | Just expspecs <- maybe_exps     = 
 	(concat (map extract expspecs), 
 	 concat (map extract_vis expspecs))
@@ -694,7 +700,6 @@ exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
 		-> trace ("Warning: module not found: " ++ show m) $ []
     _ -> extract e
 
-
 -- for a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
@@ -705,6 +710,29 @@ all_subs_of_qname mod_map (Qual mdl nm) =
 	Nothing    -> []
 all_subs_of_qname _ n@(UnQual _) =
     error $ "Main.all_subs_of_qname: unexpected unqual'd name:" ++ show n
+
+-- ----------------------------------------------------------------------------
+-- Get a list of names exported by this module that are not actually
+-- documented here, and build a mapping to point to where the
+-- documentation for those names can be found.  This is used for
+-- constructing the iface_reexports field of the Interface.
+
+getReExports :: Module -> ModuleMap -> Maybe [HsExportSpec] -> FiniteMap HsName HsQName
+getReExports mdl mod_map Nothing = emptyFM
+getReExports mdl mod_map (Just exps)
+  = foldr plusFM emptyFM (map extract exps)
+  where
+    extract (HsEModuleContents m) | m /= mdl =
+	  case lookupFM mod_map m of
+	    Nothing -> emptyFM
+	    Just iface
+		| OptHide `elem` iface_options iface -> emptyFM
+		| otherwise -> listToFM (map get_name (keysFM (iface_env iface)))
+		where
+		   get_name n = case lookupFM (iface_reexported iface) n of
+				   Just somewhere_else -> (n, somewhere_else)
+				   Nothing -> (n, Qual m n)
+    extract _ = emptyFM
 
 -- ----------------------------------------------------------------------------
 -- Building name environments
@@ -775,10 +803,19 @@ buildImportEnv mod_map this_mod exported_names imp_decls
     = case lookupFM mod_map mdl of
        Nothing    -> emptyFM
        Just iface -> listToFM (map import_map (fmToList (iface_env iface)))
-    where
-	import_map (nm,qnm) = (qnm, maps_to)
- 	  where maps_to | qnm `elem` exported_names = Qual this_mod nm
-		        | otherwise = Qual mdl nm
+        where
+	 reexport_env = iface_reexported iface
+
+	 import_map (nm,qnm) = (qnm, maps_to)
+ 	  where 
+		maps_to
+		 -- we re-export it: just link to this module
+		 | qnm `elem` exported_names = Qual this_mod nm
+		 -- re-exported from the other module, but not documented there:
+		 -- find the right place using the iface_reexported environment.
+		 | Just new_qnm <- lookupFM reexport_env nm = new_qnm
+		 -- otherwise, it's documented in the other module
+		 | otherwise = Qual mdl nm
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures

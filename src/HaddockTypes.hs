@@ -28,6 +28,12 @@ data Interface
 	iface_env :: NameEnv,
 		-- ^ environment mapping names to *original* names
 
+	iface_reexported :: NameEnv,
+		-- ^ For names exported by this module, but not actually documented
+		-- in this module's documentation (perhaps because they are reexported via
+		-- 'module M' in the export list), this mapping gives the location of
+		-- documentation for the name in another module.
+
 	iface_sub :: FiniteMap HsName [HsName],
 		-- ^ maps names to "subordinate" names 
 		-- (eg. tycon to constrs & fields, class to methods)
