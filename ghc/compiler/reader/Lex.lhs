@@ -289,9 +289,6 @@ lexIface cont buf =
         _    -> cont ITobrack (stepOn buf)
     ']'# -> cont ITcbrack (stepOn buf)
     ','# -> cont ITcomma  (stepOn buf)
-    ':'# -> case lookAhead# buf 1# of
-              ':'# -> cont ITdcolon (stepOnBy# buf 2#)
-              _    -> lex_id cont (incLexeme buf)
     ';'#  -> cont ITsemi (stepOn buf)
     '\"'# -> case untilEndOfString# (stepOn buf) of
 	      buf' ->
@@ -572,10 +569,10 @@ is_id_char (C# c#) =
 
 --OLD: is_id_char c@(C# c#)  = isAlphanum c || is_sym c#
 
-is_sym c#=
+is_sym c# =
  case c# of {
    ':'# -> True; '_'#  -> True; '\''# -> True; '!'# -> True; 
-   '#'# -> True; '$'#  -> True; ':'#  -> True; '%'# -> True; 
+   '#'# -> True; '$'#  -> True; '%'# -> True; 
    '&'# -> True; '*'#  -> True; '+'#  -> True; '.'# -> True; 
    '/'# -> True; '<'#  -> True; '='#  -> True; '>'# -> True; 
    '?'# -> True; '\\'# -> True; '^'#  -> True; '|'# -> True; 
@@ -830,6 +827,7 @@ haskellKeywordsFM = listToUFM $
        ,("!",			ITbang)
        ,("=>",			ITdarrow)
        ,("=",			ITequal)
+       ,("::",			ITdcolon)
        ]
 
 
