@@ -28,7 +28,7 @@ import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 			, narrow8WordLit, narrow16WordLit, narrow32WordLit
 			, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-			, nullAddrLit, float2DoubleLit, double2FloatLit
+			, float2DoubleLit, double2FloatLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
@@ -64,7 +64,6 @@ primOpRules op = primop_rule op
     -- ToDo:	something for integer-shift ops?
     --		NotOp
 
-    primop_rule AddrNullOp  = one_rule nullAddrRule	
     primop_rule SeqOp	    = one_rule seqRule
     primop_rule TagToEnumOp = one_rule tagToEnumRule
     primop_rule DataToTagOp = one_rule dataToTagRule
@@ -347,10 +346,6 @@ mkIntVal    i = Lit (mkMachInt  i)
 mkWordVal   w = Lit (mkMachWord w)
 mkFloatVal  f = Lit (convFloating (MachFloat  f))
 mkDoubleVal d = Lit (convFloating (MachDouble d))
-\end{code}
-
-\begin{code}
-nullAddrRule _ = Just(Lit nullAddrLit)
 \end{code}
 
 						

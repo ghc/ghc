@@ -52,7 +52,7 @@ __export PrelGHC
   isEmptyMVarzh
 
   -- Seq
-  seq
+  seq		-- Defined in MkId
 
   -- Parallel
   seqzh
@@ -136,7 +136,7 @@ __export PrelGHC
 #endif
 
   Addrzh
-  nullAddrzh
+  nullAddrzh	-- Defined in MkId
   plusAddrzh
   minusAddrzh
   remAddrzh
@@ -424,7 +424,7 @@ __export PrelGHC
   BCOzh
   mkApUpd0zh
 
-  unsafeCoercezh
+  unsafeCoercezh	-- Defined in MkId
   addrToHValuezh
 ;
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PrelPtr.lhs,v 1.3 2001/08/17 17:18:54 apt Exp $
+-- $Id: PrelPtr.lhs,v 1.4 2001/10/17 11:26:04 simonpj Exp $
 -- 
 -- (c) 2000
 -- 
@@ -17,7 +17,7 @@ import PrelBase
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 
 nullPtr :: Ptr a
-nullPtr = Ptr (nullAddr# 0#)
+nullPtr = Ptr nullAddr#
 
 castPtr :: Ptr a -> Ptr b
 castPtr (Ptr addr) = Ptr addr
@@ -43,7 +43,7 @@ instance CReturnable (Ptr a)
 data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 
 nullFunPtr :: FunPtr a
-nullFunPtr = FunPtr (nullAddr# 0#)
+nullFunPtr = FunPtr nullAddr#
 
 castFunPtr :: FunPtr a -> FunPtr b
 castFunPtr (FunPtr addr) = FunPtr addr

@@ -22,7 +22,7 @@ module MkId (
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds,
-	unsafeCoerceId, realWorldPrimId,
+	unsafeCoerceId, realWorldPrimId, nullAddrId,
 	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
 	rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID,
 	nO_METHOD_BINDING_ERROR_ID, aBSENT_ERROR_ID, pAR_ERROR_ID
@@ -47,7 +47,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 import Module		( Module )
 import CoreUtils	( mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
-import Literal		( Literal(..) )
+import Literal		( Literal(..), nullAddrLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
                           tyConTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon, classTyVars, classSelIds )
@@ -121,9 +121,11 @@ wiredInIds
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
 
-	-- These three can't be defined in Haskell
+	-- These can't be defined in Haskell, but they have
+	-- perfectly reasonable unfoldings in Core
     , realWorldPrimId
     , unsafeCoerceId
+    , nullAddrId
     , getTagId
     , seqId
     ]
@@ -756,7 +758,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
 These Ids can't be defined in Haskell.  They could be defined in 
 unfoldings in PrelGHC.hi-boot, but we'd have to ensure that they
 were definitely, definitely inlined, because there is no curried
-identifier for them.  Thats what mkCompulsoryUnfolding does.
+identifier for them.  That's what mkCompulsoryUnfolding does.
 If we had a way to get a compulsory unfolding from an interface file,
 we could do that, but we don't right now.
 
@@ -781,6 +783,15 @@ unsafeCoerceId
     [x] = mkTemplateLocals [openAlphaTy]
     rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
 	  Note (Coerce openBetaTy openAlphaTy) (Var x)
+
+-- nullAddr# :: Addr#
+-- The reason is is here is because we don't provide 
+-- a way to write this literal in Haskell.
+nullAddrId 
+  = pcMiscPrelId nullAddrIdKey pREL_GHC SLIT("nullAddr#") addrPrimTy info
+  where
+    info = noCafNoTyGenIdInfo `setUnfoldingInfo` 
+	   mkCompulsoryUnfolding (Lit nullAddrLit)
 
 seqId
   = pcMiscPrelId seqIdKey pREL_GHC SLIT("seq") ty info

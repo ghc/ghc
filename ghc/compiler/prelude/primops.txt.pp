@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.7 2001/10/16 13:31:56 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.8 2001/10/17 11:26:04 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -13,7 +13,7 @@
 --
 -- To add a new primop, you currently need to update the following files:
 --
---	- this file (ghc/compiler/prelude/primops.txt), which includes
+--	- this file (ghc/compiler/prelude/primops.txt.pp), which includes
 --	  the type of the primop, and various other properties (its
 --	  strictness attributes, whether it is defined as a macro
 --	  or as out-of-line code, etc.)
@@ -934,12 +934,12 @@ primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
 ------------------------------------------------------------------------
 section "Addr#"
 	{Addr\# is an arbitrary machine address assumed to point outside
-	 the garbage-collected heap.}
+	 the garbage-collected heap.  
+
+	 NB: {\tt nullAddr\#::Addr\#} is not a primop, but is defined in MkId.lhs.
+	 It is the null address.}
 ------------------------------------------------------------------------
 
-primop	 AddrNullOp "nullAddr#" GenPrimOp  Int# -> Addr#
-	 {Returns null address. Argument is ignored (nullary primops 
-	  don't quite work!)}
 primop	 AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
 primop	 AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 	 {Result is meaningless if two Addr\#s are so far apart that their
@@ -1604,6 +1604,13 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    with
    has_side_effects = True
    out_of_line      = True
+
+------------------------------------------------------------------------
+section "Coercion" 
+	{{\tt unsafeCoerce# :: a -> b} is not a primop, but is defined in MkId.lhs.}
+
+------------------------------------------------------------------------
+
 
 ------------------------------------------------------------------------
 ---                                                                  ---
