@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.45 2000/01/22 18:00:03 simonmar Exp $
+ * $Id: Schedule.c,v 1.46 2000/01/30 10:25:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -597,6 +597,7 @@ schedule( void )
     /* grab a thread from the run queue
      */
     t = POP_RUN_QUEUE();
+    IF_DEBUG(sanity,checkTSO(t));
 
 #endif
     
@@ -704,6 +705,7 @@ schedule( void )
 	    m->tso = new_t;
 	  }
 	}
+	threadPaused(new_t);
 	ready_to_gc = rtsTrue;
 	context_switch = 1;
 	PUSH_ON_RUN_QUEUE(new_t);
@@ -1598,6 +1600,7 @@ threadStackOverflow(StgTSO *tso)
   StgPtr new_sp;
   StgTSO *dest;
 
+  IF_DEBUG(sanity,checkTSO(tso));
   if (tso->stack_size >= tso->max_stack_size) {
 #if 0
     /* If we're debugging, just print out the top of the stack */
@@ -2159,25 +2162,27 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
     StgAP_UPD * ap;
 
     /* If we find a CATCH_FRAME, and we've got an exception to raise,
-     * then build PAP(handler,exception), and leave it on top of
-     * the stack ready to enter.
+     * then build PAP(handler,exception,realworld#), and leave it on
+     * top of the stack ready to enter.
      */
     if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
       StgCatchFrame *cf = (StgCatchFrame *)su;
       /* we've got an exception to raise, so let's pass it to the
        * handler in this frame.
        */
-      ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 1);
-      TICK_ALLOC_UPD_PAP(2,0);
+      ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 2);
+      TICK_ALLOC_UPD_PAP(3,0);
       SET_HDR(ap,&PAP_info,cf->header.prof.ccs);
 	      
-      ap->n_args = 1;
-      ap->fun = cf->handler;
+      ap->n_args = 2;
+      ap->fun = cf->handler;	/* :: Exception -> IO a */
       ap->payload[0] = (P_)exception;
+      ap->payload[1] = ARG_TAG(0); /* realworld token */
 
-      /* sp currently points to the word above the CATCH_FRAME on the stack.
+      /* throw away the stack from Sp up to and including the
+       * CATCH_FRAME.
        */
-      sp += sizeofW(StgCatchFrame);
+      sp = (P_)su + sizeofW(StgCatchFrame) - 1; 
       tso->su = cf->link;
 
       /* Restore the blocked/unblocked state for asynchronous exceptions

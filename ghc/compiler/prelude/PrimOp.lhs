@@ -886,6 +886,9 @@ unboxedPair	 = mkUnboxedTupleTy 2
 unboxedTriple    = mkUnboxedTupleTy 3
 unboxedQuadruple = mkUnboxedTupleTy 4
 
+mkIOTy ty = mkFunTy realWorldStatePrimTy 
+		    (unboxedPair [realWorldStatePrimTy,ty])
+
 integerMonadic name = mkGenPrimOp name [] one_Integer_ty 
 			(unboxedPair one_Integer_ty)
 
@@ -1481,8 +1484,10 @@ primOpInfo SameMutVarOp
 %*									*
 %************************************************************************
 
-catch  :: IO a -> (IOError -> IO a) -> IO a
-catch# :: a  -> (b -> a) -> a
+catch# :: (State# RealWorld -> (# State# RealWorld, a))
+       -> (b -> State# RealWorld -> (# State# RealWorld, a)) 
+       -> State# RealWorld
+       -> (# State# RealWorld, a)
 
 throw  :: Exception -> a
 raise# :: a -> b
@@ -1495,8 +1500,11 @@ primOpInfo CatchOp
   = let
 	a = alphaTy; a_tv = alphaTyVar
 	b = betaTy;  b_tv = betaTyVar;
+	io_a = mkIOTy a
     in
-    mkGenPrimOp SLIT("catch#") [a_tv, b_tv] [a, mkFunTy b a] a
+    mkGenPrimOp SLIT("catch#") [a_tv, b_tv] 
+	  [io_a, mkFunTy b io_a, realWorldStatePrimTy]
+	  (unboxedPair [realWorldStatePrimTy, a])
 
 primOpInfo RaiseOp
   = let
@@ -1510,9 +1518,7 @@ primOpInfo BlockAsyncExceptionsOp
       a = alphaTy; a_tv = alphaTyVar
     in
     mkGenPrimOp SLIT("blockAsyncExceptions#") [a_tv]
-	[ mkFunTy realWorldStatePrimTy (unboxedPair [realWorldStatePrimTy,a]),
-	  realWorldStatePrimTy
-	]
+	[ mkIOTy a, realWorldStatePrimTy ]
 	(unboxedPair [realWorldStatePrimTy,a])
 	
 primOpInfo UnblockAsyncExceptionsOp
@@ -1520,9 +1526,7 @@ primOpInfo UnblockAsyncExceptionsOp
       a = alphaTy; a_tv = alphaTyVar
     in
     mkGenPrimOp SLIT("unblockAsyncExceptions#") [a_tv]
-	[ mkFunTy realWorldStatePrimTy (unboxedPair [realWorldStatePrimTy,a]),
-	  realWorldStatePrimTy
-	]
+	[ mkIOTy a, realWorldStatePrimTy ]
 	(unboxedPair [realWorldStatePrimTy,a])
 \end{code}
 

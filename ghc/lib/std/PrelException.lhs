@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.10 1999/11/11 15:20:29 simonmar Exp $
+% $Id: PrelException.lhs,v 1.11 2000/01/30 10:25:28 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -96,22 +96,24 @@ throw exception = raise# exception
 #endif
 \end{code}
 
-catch handles the passing around of the state in the IO monad; if we
-don't actually apply (and hence run) an IO computation, we don't get
-any exceptions!  Hence a large mantrap to watch out for is
+catchException used to handle the passing around of the state to the
+action and the handler.  This turned out to be a bad idea - it meant
+that we had to wrap both arguments in thunks so they could be entered
+as normal (remember IO returns an unboxed pair...).
 
-	catch# (m :: IO ()) (handler :: NDSet Exception -> IO ())
+Now catch# has type
 
-since the computation 'm' won't actually be performed in the context
-of the 'catch#'.  In fact, don't use catch# at all.
+    catch# :: IO a -> (b -> IO a) -> IO a
+
+(well almost; the compiler doesn't know about the IO newtype so we
+have to work around that in the definition of catchException below).
 
 \begin{code}
 catchException :: IO a -> (Exception -> IO a) -> IO a
 #ifdef __HUGS__
 catchException m k =  ST (\s -> unST m s `primCatch'` \ err -> unST (k err) s)
 #else
-catchException m k =  IO $ \s -> case catch# (liftIO m s) (\exs -> liftIO (k exs) s)
-			  of STret s1 r -> (# s1, r #)
+catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
 #endif
 
 catch           :: IO a -> (IOError -> IO a) -> IO a 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.5 2000/01/22 18:00:03 simonmar Exp $
+ * $Id: Exception.hc,v 1.6 2000/01/30 10:25:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,9 +52,11 @@ FN_(blockAsyncExceptionszh_fast)
     if (CurrentTSO->blocked_exceptions == NULL) {
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
       /* avoid growing the stack unnecessarily */
-      if (Sp[0] != (W_)&blockAsyncExceptionszh_ret_info) {
+      if (Sp[0] == (W_)&blockAsyncExceptionszh_ret_info) {
+	Sp++;
+      } else {
 	Sp--;
-	Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
+	Sp[0] = (W_)&unblockAsyncExceptionszh_ret_info;
       }
     }
     Sp--;
@@ -106,7 +108,9 @@ FN_(unblockAsyncExceptionszh_fast)
       CurrentTSO->blocked_exceptions = NULL;
 
       /* avoid growing the stack unnecessarily */
-      if (Sp[0] != (W_)&blockAsyncExceptionszh_ret_info) {
+      if (Sp[0] == (W_)&unblockAsyncExceptionszh_ret_info) {
+	Sp++;
+      } else {
 	Sp--;	
 	Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
       }
@@ -254,8 +258,10 @@ FN_(catchzh_fast)
   StgCatchFrame *fp;
   FB_
 
-    /* args: R1 = m, R2 = handler */
-    STK_CHK_GEN(sizeofW(StgCatchFrame), R1_PTR | R2_PTR, catchzh_fast, );
+    /* args: R1 = m :: IO a, R2 = handler :: Exception -> IO a */
+    STK_CHK_GEN(sizeofW(StgCatchFrame) + 1, R1_PTR | R2_PTR, catchzh_fast, );
+  
+    /* Set up the catch frame */
     Sp -= sizeofW(StgCatchFrame);
     fp = (StgCatchFrame *)Sp;
     SET_HDR(fp,(StgInfoTable *)&catch_frame_info,CCCS);
@@ -264,6 +270,10 @@ FN_(catchzh_fast)
     fp -> link = Su;
     Su = (StgUpdateFrame *)fp;
     TICK_CATCHF_PUSHED();
+
+    /* Push realworld token and enter R1. */
+    Sp--;
+    Sp[0] = ARG_TAG(0);
     TICK_ENT_VIA_NODE();
     JMP_(GET_ENTRY(R1.cl));
     
@@ -356,7 +366,7 @@ FN_(raisezh_fast)
     Su = ((StgCatchFrame *)p)->link; 
     handler = ((StgCatchFrame *)p)->handler;
     
-    Sp = (P_)p + sizeofW(StgCatchFrame) - 1;
+    Sp = (P_)p + sizeofW(StgCatchFrame);
 
     /* Restore the blocked/unblocked state for asynchronous exceptions
      * at the CATCH_FRAME.  
@@ -366,7 +376,7 @@ FN_(raisezh_fast)
      * unblockAsyncExceptions_ret stack frame.
      */
     if (! ((StgCatchFrame *)p)->exceptions_blocked) {
-      *(Sp--) = (W_)&unblockAsyncExceptionszh_ret_info;
+      *(--Sp) = (W_)&unblockAsyncExceptionszh_ret_info;
     }
 
     /* Ensure that async excpetions are blocked when running the handler.
@@ -375,9 +385,12 @@ FN_(raisezh_fast)
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
     }
 
-    /* Enter the handler, passing the exception value as an argument.
+    /* Enter the handler, passing the exception value and a realworld
+     * token as arguments.
      */
-    *Sp = R1.w;
+    Sp -= 2;
+    Sp[0] = R1.w;
+    Sp[1] = ARG_TAG(0);
     TICK_ENT_VIA_NODE();
     R1.cl = handler;
     JMP_(GET_ENTRY(R1.cl));

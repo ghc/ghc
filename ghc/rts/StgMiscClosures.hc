@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.33 2000/01/14 13:22:21 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.34 2000/01/30 10:25:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -705,7 +705,7 @@ FN_(forceIO_ret_entry)
 }
 
 
-INFO_TABLE(forceIO_info,forceIO_entry,1,0,FUN,,EF_,0,0);
+INFO_TABLE(forceIO_info,forceIO_entry,1,0,FUN_STATIC,,EF_,0,0);
 FN_(forceIO_entry)
 {
   FB_
