@@ -59,7 +59,7 @@ intsToReverseBitmap size slots{- must be sorted -}
   | size <= 0 = []
   | otherwise = 
     (foldr xor init (map (1 `shiftL`) these)) : 
-	intsToBitmap (size - wORD_SIZE_IN_BITS) 
+	intsToReverseBitmap (size - wORD_SIZE_IN_BITS) 
 	     (map (\x -> x - wORD_SIZE_IN_BITS) rest)
    where (these,rest) = span (<wORD_SIZE_IN_BITS) slots
 	 init
