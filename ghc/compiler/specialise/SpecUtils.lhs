@@ -23,7 +23,7 @@ module SpecUtils (
 IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
-			  opt_SpecialiseAll
+			  opt_SpecialiseAll, opt_PprUserLength
 			)
 import Bag		( isEmptyBag, bagToList, Bag )
 import Class		( GenClass{-instance NamedThing-}, SYN_IE(Class),
@@ -37,7 +37,7 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
 import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar, GenClassOp
 			)
@@ -51,10 +51,6 @@ import Unique		( Unique{-instance Eq-} )
 import Util		( equivClasses, zipWithEqual, cmpPString,
 			  assertPanic, panic{-ToDo:rm-}
 			)
-
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 
 cmpType = panic "SpecUtils.cmpType (ToDo: get rid of)"
 mkSameSpecCon = panic "SpecUtils.mkSameSpecCon (ToDo)"
@@ -283,7 +279,7 @@ pp_tyspec :: PprStyle -> Doc -> (OccName, TyCon, [Maybe Type]) -> Doc
 pp_tyspec sty pp_mod (_, tycon, tys)
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE data",
-	   ppr PprForUser tycon, hsep (map (pprParendGenType sty) spec_tys),
+	   ppr (PprForUser opt_PprUserLength) tycon, hsep (map (pprParendGenType sty) spec_tys),
 	   text "-} {- Essential -}"
 	   ]
   where
@@ -330,7 +326,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | otherwise
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE",
-	   ppr PprForUser id, ptext SLIT("::"),
+	   ppr (PprForUser opt_PprUserLength) id, ptext SLIT("::"),
 	   pprGenType sty spec_ty,
 	   text "#-}", pp_essential ]
   where
