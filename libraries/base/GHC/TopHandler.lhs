@@ -9,9 +9,8 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- Top-level IO actions want to catch exceptions (e.g., 'forkIO' and 
--- 'GHC.Main.mainIO') and report them - 'topHandler' is the exception
--- handler they should use for this.
+-- Support for catching exceptions raised during top-level computations
+-- (e.g. @Main.main@, 'Control.Concurrent.forkIO', and foreign exports)
 --
 -----------------------------------------------------------------------------
 
