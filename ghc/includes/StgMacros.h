@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.17 1999/11/09 15:47:09 simonmar Exp $
+ * $Id: StgMacros.h,v 1.18 1999/11/09 15:57:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -681,7 +681,7 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
    we have one).
    -------------------------------------------------------------------------- */
 
-#ifdef IN_STG_CODE
+#if IN_STG_CODE
 
 static __inline__ void
 SaveThreadState(void)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.20 1999/11/09 15:47:08 simonmar Exp $
+ * $Id: Stg.h,v 1.21 1999/11/09 15:57:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,12 +21,14 @@
  * with that.  If "Stg.h" is included via "Rts.h", we're assumed to
  * be in vanilla C.
  */
-#if ! IN_STG_CODE
+#ifndef IN_STG_CODE
+# define IN_STG_CODE 1
+#endif
+
+#if IN_STG_CODE == 0
 # ifndef NO_REGS
 #  define NO_REGS			/* don't define fixed registers */
 # endif
-#else
-# define IN_STG_CODE 1
 #endif
 
 /* Configuration */

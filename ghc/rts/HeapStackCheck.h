@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.h,v 1.4 1999/08/25 16:11:48 simonmar Exp $
+ * $Id: HeapStackCheck.h,v 1.5 1999/11/09 15:57:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,6 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 EXTFUN(stg_gc_entertop);
+EXTFUN(stg_gc_enter_1_hponly);
 EXTFUN(stg_gc_enter_1);
 EXTFUN(stg_gc_enter_2);
 EXTFUN(stg_gc_enter_3);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.6 1999/11/09 15:47:08 simonmar Exp $
+ * $Id: Regs.h,v 1.7 1999/11/09 15:57:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,7 +63,7 @@ typedef struct StgRegTable_ {
 extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
 #endif
 
-#ifdef IN_STG_CODE
+#if IN_STG_CODE
 
 /*
  * Registers Hp and HpLim are global across the entire system, and are
@@ -519,7 +519,7 @@ GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
    Handy bunches of saves/restores 
    ------------------------------------------------------------------------  */
 
-#ifdef IN_STG_CODE
+#if IN_STG_CODE
 
 #define CALLER_SAVE_USER			\
   CALLER_SAVE_R1				\
