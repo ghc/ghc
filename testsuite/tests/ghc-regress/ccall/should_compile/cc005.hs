@@ -1,7 +1,7 @@
 -- !!! cc005 -- foreign export declarations
 module ShouldCompile (d8) where
 
-import GHC.Ptr   --import Foreign
+import Foreign.Ptr   --import Foreign
                  --import GlaExts
                  --import Int
                  --import Word
