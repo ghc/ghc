@@ -136,13 +136,9 @@ peekArray size ptr | size <= 0 = return []
 -- |Convert an array terminated by the given end marker into a Haskell list
 --
 peekArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO [a]
-peekArray0 marker ptr  = loop 0
-  where
-    loop i = do
-        val <- peekElemOff ptr i
-        if val == marker then return [] else do
-            rest <- loop (i+1)
-            return (val:rest)
+peekArray0 marker ptr  = do
+  size <- lengthArray0 marker ptr
+  peekArray size ptr
 
 -- |Write the list elements consecutive into memory
 --
