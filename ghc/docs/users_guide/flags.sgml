@@ -457,6 +457,12 @@
 	      <entry><option>-fno-ffi</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-farrows</option></entry>
+	      <entry>Enable arrow notation extension
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-arrows</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fwith</option></entry>
 	      <entry>Enable deprecated <literal>with</literal> keyword</entry>
 	      <entry>dynamic</entry>

@@ -110,6 +110,15 @@ with GHC.
       </varlistentry>
 
       <varlistentry>
+	<term><option>-farrows</option></term>
+	<indexterm><primary><option>-farrows</option></primary></indexterm>
+	<listitem>
+	  <para>See <xref LinkEnd="arrow-notation">.  Independent of
+          <option>-fglasgow-exts</option>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fgenerics</option></term>
 	<indexterm><primary><option>-fgenerics</option></primary></indexterm>
 	<listitem>
@@ -3335,6 +3344,457 @@ Hello
 
 </sect2>
  
+</sect1>
+
+<!-- ===================== Arrow notation ===================  -->
+
+<sect1 id="arrow-notation">
+<title>Arrow notation
+</title>
+
+<para>Arrows are a generalization of monads introduced by John Hughes.
+For more details, see
+<itemizedlist>
+
+<listitem>
+<para>
+&ldquo;Generalising Monads to Arrows&rdquo;,
+John Hughes, in <citetitle>Science of Computer Programming</citetitle> 37,
+pp67&ndash;111, May 2000.
+</para>
+</listitem>
+
+<listitem>
+<para>
+&ldquo;<ulink url="http://www.soi.city.ac.uk/~ross/papers/notation.html">A New Notation for Arrows</ulink>&rdquo;,
+Ross Paterson, in <citetitle>ICFP</citetitle>, Sep 2001.
+</para>
+</listitem>
+
+<listitem>
+<para>
+&ldquo;<ulink url="http://www.soi.city.ac.uk/~ross/papers/fop.html">Arrows and Computation</ulink>&rdquo;,
+Ross Paterson, in <citetitle>The Fun of Programming</citetitle>,
+Palgrave, 2003.
+</para>
+</listitem>
+
+</itemizedlist>
+and the arrows web page at
+<ulink url="http://www.haskell.org/arrows/"><literal>http://www.haskell.org/arrows/</literal></ulink>.
+With the <option>-farrows</option> flag, GHC supports the arrow
+notation described in the second of these papers.
+What follows is a brief introduction to the notation;
+it won't make much sense unless you've read Hughes's paper.
+This notation is translated to ordinary Haskell,
+using combinators from the
+<ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+module.
+</para>
+
+<para>The extension adds a new kind of expression for defining arrows,
+of the form <literal>proc pat -> cmd</literal>,
+where <literal>proc</literal> is a new keyword.
+The variables of the pattern are bound in the body of the 
+<literal>proc</literal>-expression,
+which is a new sort of thing called a <firstterm>command</firstterm>.
+The syntax of commands is as follows:
+<screen>
+cmd   ::= exp1 -&lt;  exp2
+       |  exp1 -&lt;&lt; exp2
+       |  do { cstmt1 .. cstmtn ; cmd }
+       |  let decls in cmd
+       |  if exp then cmd1 else cmd2
+       |  case exp of { calts }
+       |  cmd1 qop cmd2
+       |  (| exp |) cmd1 .. cmdn
+       |  \ pat1 .. patn -> cmd
+       |  ( cmd )
+
+cstmt ::= let decls
+       |  pat &lt;- cmd
+       |  rec { cstmt1 .. cstmtn }
+       |  cmd
+</screen>
+Commands produce values, but (like monadic computations)
+may yield more than one value,
+or none, and may do other things as well.
+For the most part, familiarity with monadic notation is a good guide to
+using commands.
+However the values of expressions, even monadic ones,
+are determined by the values of the variables they contain;
+this is not necessarily the case for commands.
+</para>
+
+<para>
+A simple example of the new notation is the expression
+<screen>
+proc x -> f -&lt; x+1
+</screen>
+We call this a <firstterm>procedure</firstterm> or
+<firstterm>arrow abstraction</firstterm>.
+As with a lambda expression, the variable <literal>x</literal>
+is a new variable bound within the <literal>proc</literal>-expression.
+It refers to the input to the arrow.
+In the above example, <literal>-&lt;</literal> is not an identifier but an
+new reserved symbol used for building commands from an expression of arrow
+type and an expression to be fed as input to that arrow.
+(The weird look will make more sense later.)
+It may be read as analogue of application for arrows.
+The above example is equivalent to the Haskell expression
+<screen>
+arr (\ x -> x+1) >>> f
+</screen>
+That would make no sense if the expression to the left of
+<literal>-&lt;</literal> involves the bound variable <literal>x</literal>.
+More generally, the expression to the left of <literal>-&lt;</literal>
+may not involve any <firstterm>local variable</firstterm>,
+i.e. a variable bound in the current arrow abstraction.
+For such a situation there is a variant <literal>-&lt;&lt;</literal>, as in
+<screen>
+proc x -> f x -&lt;&lt; x+1
+</screen>
+which is equivalent to
+<screen>
+arr (\ x -> (f, x+1)) >>> app
+</screen>
+so in this case the arrow must belong to the <literal>ArrowApply</literal>
+class.
+Such an arrow is equivalent to a monad, so if you're using this form
+you may find a monadic formulation more convenient.
+</para>
+
+<sect2>
+<title>do-notation for commands</title>
+
+<para>
+Another form of command is a form of <literal>do</literal>-notation.
+For example, you can write
+<screen>
+proc x -> do
+        y &lt;- f -&lt; x+1
+        g -&lt; 2*y
+        let z = x+y
+        t &lt;- h -&lt; x*z
+        returnA -&lt; t+z
+</screen>
+You can read this much like ordinary <literal>do</literal>-notation,
+but with commands in place of monadic expressions.
+The first line sends the value of <literal>x+1</literal> as an input to
+the arrow <literal>f</literal>, and matches its output against
+<literal>y</literal>.
+In the next line, the output is discarded.
+The arrow <literal>returnA</literal> is defined in the
+<ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+module as <literal>arr id</literal>.
+The above example is treated as an abbreviation for
+<screen>
+arr (\ x -> (x, x)) >>>
+        first (arr (\ x -> x+1) >>> f) >>>
+        arr (\ (y, x) -> (y, (x, y))) >>>
+        first (arr (\ y -> 2*y) >>> g) >>>
+        arr snd >>>
+        arr (\ (x, y) -> let z = x+y in ((x, z), z)) >>>
+        first (arr (\ (x, z) -> x*z) >>> h) >>>
+        arr (\ (t, z) -> t+z) >>>
+        returnA
+</screen>
+Note that variables not used later in the composition are projected out.
+After simplification using rewrite rules (see <xref linkEnd="rewrite-rules">)
+defined in the
+<ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+module, this reduces to
+<screen>
+arr (\ x -> (x+1, x)) >>>
+        first f >>>
+        arr (\ (y, x) -> (2*y, (x, y))) >>>
+        first g >>>
+        arr (\ (_, (x, y)) -> let z = x+y in (x*z, z)) >>>
+        first h >>>
+        arr (\ (t, z) -> t+z)
+</screen>
+which is what you might have written by hand.
+With arrow notation, GHC keeps track of all those tuples of variables for you.
+</para>
+
+<para>
+Note that although the above translation suggests that
+<literal>let</literal>-bound variables like <literal>z</literal> must be
+monomorphic, the actual translation produces Core,
+so polymorphic variables are allowed.
+</para>
+
+<para>
+It's also possible to have mutually recursive bindings,
+using the new <literal>rec</literal> keyword, as in the following example:
+<screen>
+counter :: ArrowCircuit a => a Bool Int
+counter = proc reset -> do
+        rec     output &lt;- returnA -&lt; if reset then 0 else next
+                next &lt;- delay 0 -&lt; output+1
+        returnA -&lt; output
+</screen>
+The translation of such forms uses the <literal>loop</literal> combinator,
+so the arrow concerned must belong to the <literal>ArrowLoop</literal> class.
+</para>
+
+</sect2>
+
+<sect2>
+<title>Conditional commands</title>
+
+<para>
+In the previous example, we used a conditional expression to construct the
+input for an arrow.
+Sometimes we want to conditionally execute different commands, as in
+<screen>
+proc (x,y) ->
+        if f x y
+        then g -&lt; x+1
+        else h -&lt; y+2
+</screen>
+which is translated to
+<screen>
+arr (\ (x,y) -> if f x y then Left x else Right y) >>>
+        (arr (\x -> x+1) >>> f) ||| (arr (\y -> y+2) >>> g)
+</screen>
+Since the translation uses <literal>|||</literal>,
+the arrow concerned must belong to the <literal>ArrowChoice</literal> class.
+</para>
+
+<para>
+There are also <literal>case</literal> commands, like
+<screen>
+case input of
+    [] -> f -&lt; ()
+    [x] -> g -&lt; x+1
+    x1:x2:xs -> do
+        y &lt;- h -&lt; (x1, x2)
+        ys &lt;- k -&lt; xs
+        returnA -&lt; y:ys
+</screen>
+The syntax is the same as for <literal>case</literal> expressions,
+except that the bodies of the alternatives are commands rather than expressions.
+The translation is similar to that of <literal>if</literal> commands.
+</para>
+
+</sect2>
+
+<sect2>
+<title>Defining your own control structures</title>
+
+<para>
+As we're seen, arrow notation provides constructs,
+modelled on those for expressions,
+for sequencing, value recursion and conditionals.
+But suitable combinators,
+which you can define in ordinary Haskell,
+may also be used to build new commands out of existing ones.
+The basic idea is that a command defines an arrow from environments to values.
+These environments assign values to the free local variables of the command.
+Thus combinators that produce arrows from arrows
+may also be used to build commands from commands.
+For example, the <literal>ArrowChoice</literal> class includes a combinator
+<programlisting>
+ArrowChoice a => (&lt;+>) :: a e c -> a e c -> a e c
+</programlisting>
+so we can use it to build commands:
+<programlisting>
+expr' = proc x ->
+                returnA -&lt; x
+        &lt;+> do
+                symbol Plus -&lt; ()
+                y &lt;- term -&lt; ()
+                expr' -&lt; x + y
+        &lt;+> do
+                symbol Minus -&lt; ()
+                y &lt;- term -&lt; ()
+                expr' -&lt; x - y
+</programlisting>
+This is equivalent to
+<programlisting>
+expr' = (proc x -> returnA -&lt; x)
+        &lt;+> (proc x -> do
+                symbol Plus -&lt; ()
+                y &lt;- term -&lt; ()
+                expr' -&lt; x + y)
+        &lt;+> (proc x -> do
+                symbol Minus -&lt; ()
+                y &lt;- term -&lt; ()
+                expr' -&lt; x - y)
+</programlisting>
+It is essential that this operator be polymorphic in <literal>e</literal>
+(representing the environment input to the command
+and thence to its subcommands)
+and satisfy the corresponding naturality property
+<screen>
+arr k >>> (f &lt;+> g) = (arr k >>> f) &lt;+> (arr k >>> g)
+</screen>
+at least for strict <literal>k</literal>.
+(This should be automatic if you're not using <literal>seq</literal>.)
+This ensures that environments seen by the subcommands are environments
+of the whole command,
+and also allows the translation to safely trim these environments.
+The operator must also not use any variable defined within the current
+arrow abstraction.
+</para>
+
+<para>
+We could define our own operator
+<programlisting>
+untilA :: ArrowChoice a => a e () -> a e Bool -> a e ()
+untilA body cond = proc x ->
+        if cond x then returnA -&lt; ()
+        else do
+                body -&lt; x
+                untilA body cond -&lt; x
+</programlisting>
+and use it in the same way.
+Of course this infix syntax only makes sense for binary operators;
+there is also a more general syntax involving special brackets:
+<screen>
+proc x -> do
+        y &lt;- f -&lt; x+1
+        (|untilA|) (increment -&lt; x+y) (within 0.5 -&lt; x)
+</screen>
+</para>
+
+<para>
+Some operators will need to pass additional inputs to their subcommands.
+For example, in an arrow type supporting exceptions,
+the operator that attaches an exception handler will wish to pass the
+exception that occurred to the handler.
+Such an operator might have a type
+<screen>
+handleA :: ... => a e c -> a (e,Ex) c -> a e c
+</screen>
+where <literal>Ex</literal> is the type of exceptions handled.
+You could then use this with arrow notation by writing a command
+<screen>
+body `handleA` \ ex -> handler
+</screen>
+so that if an exception is raised in the command <literal>body</literal>,
+the variable <literal>ex</literal> is bound to the value of the exception
+and the command <literal>handler</literal>,
+which typically refers to <literal>ex</literal>, is entered.
+Though the syntax here looks like a functional lambda,
+we are talking about commands, and something different is going on.
+The input to the arrow represented by a command consists of values for
+the free local variables in the command, plus a stack of anonymous values.
+In all the prior examples, this stack was empty.
+In the second argument to <literal>handleA</literal>,
+this stack consists of one value, the value of the exception.
+The command form of lambda merely gives this value a name.
+</para>
+
+<para>
+More concretely,
+the values on the stack are paired to the right of the environment.
+So when designing operators like <literal>handleA</literal> that pass
+extra inputs to their subcommands,
+More precisely, the type of each argument of the operator (and its result)
+should have the form
+<screen>
+a (...(e,t1), ... tn) t
+</screen>
+where <replaceable>e</replaceable> is the polymorphic variable
+(representing the environment)
+and <replaceable>ti</replaceable> are the types of the values on the stack,
+with <replaceable>t1</replaceable> being the <quote>top</quote>.
+The polymorphic variable <replaceable>e</replaceable> must not occur in
+<replaceable>a</replaceable>, <replaceable>ti</replaceable> or
+<replaceable>t</replaceable>.
+However the arrows involved need not be the same.
+Here are some more examples of suitable operators:
+<screen>
+bracketA :: ... => a e b -> a (e,b) c -> a (e,c) d -> a e d
+runReader :: ... => a e c -> a' (e,State) c
+runState :: ... => a e c -> a' (e,State) (c,State)
+</screen>
+How can we supply the extra input required by the last two?
+We can define yet another operator, a counterpart of the monadic
+<literal>>>=</literal> operator:
+<programlisting>
+bind :: Arrow a => a e b -> a (e,b) c -> a e c
+u `bind` f = returnA &&& u >>> f
+</programlisting>
+and then build commands like
+<screen>
+proc x ->
+        (mkState -< x) `bind` (|runReader|) (do { ... })
+</screen>
+which uses the arrow <literal>mkState</literal> to create a state,
+and then provides this as an extra input to the command built using
+<literal>runReader</literal>.
+</para>
+
+</sect2>
+
+<sect2>
+<title>Differences with the paper</title>
+
+<itemizedlist>
+
+<listitem>
+<para>Instead of a single form of arrow application (arrow tail) with two
+translations, the implementation provides two forms
+<quote><literal>-&lt;</literal></quote> (first-order)
+and <quote><literal>-&lt;&lt;</literal></quote> (higher-order).
+</para>
+</listitem>
+
+<listitem>
+<para>User-defined operators are flagged with banana brackets instead of
+a new <literal>form</literal> keyword.
+</para>
+</listitem>
+
+</itemizedlist>
+
+</sect2>
+
+<sect2>
+<title>Portability</title>
+
+<para>
+Although only GHC implements arrow notation directly,
+there is also a preprocessor
+(available from the 
+<ulink url="http://www.haskell.org/arrows/">arrows web page></ulink>)
+that translates arrow notation into Haskell 98
+for use with other Haskell systems.
+You would still want to check arrow programs with GHC;
+tracing type errors in the preprocessor output is not easy.
+Modules intended for both GHC and the preprocessor must observe some
+additional restrictions:
+<itemizedlist>
+
+<listitem>
+<para>
+The module must import
+<ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>.
+</para>
+</listitem>
+
+<listitem>
+<para>
+The preprocessor cannot cope with other Haskell extensions.
+These would have to go in separate modules.
+</para>
+</listitem>
+
+<listitem>
+<para>
+Because the preprocessor targets Haskell (rather than Core),
+<literal>let</literal>-bound variables are monomorphic.
+</para>
+</listitem>
+
+</itemizedlist>
+</para>
+
+</sect2>
+
 </sect1>
 
 <!-- ==================== ASSERTIONS =================  -->
