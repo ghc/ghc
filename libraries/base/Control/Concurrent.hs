@@ -62,9 +62,9 @@ module Control.Concurrent (
 #endif
 	-- $merge
 
+#ifdef __GLASGOW_HASKELL__
 	-- * Bound Threads
 	-- $boundthreads
-#ifdef __GLASGOW_HASKELL__
 	rtsSupportsBoundThreads,
 	forkOS,
 	isCurrentThreadBound,
@@ -307,6 +307,7 @@ nmergeIO lss
     mapIO f xs = sequence (map f xs)
 #endif /* __HUGS__ */
 
+#ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------
 -- Bound Threads
 
@@ -344,8 +345,6 @@ libraries (OpenGL, for example) will not work from a thread created using
 'forkIO'. They work fine in threads created using 'forkOS' or when called
 from @main@ or from a @foreign export@.
 -}
-
-#ifdef __GLASGOW_HASKELL__
 
 -- | 'True' if bound threads are supported.
 -- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'
@@ -456,7 +455,7 @@ runInUnboundThread action = do
 			Right result -> return result
 		else action
 	
-#endif
+#endif /* __GLASGOW_HASKELL__ */
 
 -- ---------------------------------------------------------------------------
 -- More docs
