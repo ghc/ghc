@@ -535,7 +535,7 @@ findAndReadIface doc_str mod_name hi_boot_file
 		   	   (hiModuleNameMismatchWarn wanted_mod read_mod)
 					`thenRn_`
 			 -- check that the package names agree
-			 checkRn 
+			 warnCheckRn 
 			   (modulePackage wanted_mod == modulePackage read_mod)
 		   	   (packageNameMismatchWarn wanted_mod read_mod)
 					 `thenRn_`
