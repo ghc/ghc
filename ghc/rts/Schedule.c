@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.136 2002/04/10 11:43:45 stolz Exp $
+ * $Id: Schedule.c,v 1.137 2002/04/13 05:33:02 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -364,12 +364,10 @@ schedule( void )
   ACQUIRE_LOCK(&sched_mutex);
  
 #if defined(RTS_SUPPORTS_THREADS)
-  /* Check to see whether there are any worker threads
-     waiting to deposit external call results. If so,
-     yield our capability */
-  yieldToReturningWorker(&sched_mutex, cap);
-
   waitForWorkCapability(&sched_mutex, &cap, rtsFalse);
+#else
+  /* simply initialise it in the non-threaded case */
+  grabCapability(&cap);
 #endif
 
 #if defined(GRAN)
@@ -406,6 +404,13 @@ schedule( void )
 #endif
 
     IF_DEBUG(scheduler, printAllThreads());
+
+#if defined(RTS_SUPPORTS_THREADS)
+    /* Check to see whether there are any worker threads
+       waiting to deposit external call results. If so,
+       yield our capability */
+    yieldToReturningWorker(&sched_mutex, cap);
+#endif
 
     /* If we're interrupted (the user pressed ^C, or some other
      * termination condition occurred), kill all the currently running
@@ -631,11 +636,11 @@ schedule( void )
 	    for (m = main_threads; m != NULL; m = m->link) {
 		switch (m->tso->why_blocked) {
 		case BlockedOnBlackHole:
-		    raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
+		    raiseAsyncWithLock(m->tso, (StgClosure *)NonTermination_closure);
 		    break;
 		case BlockedOnException:
 		case BlockedOnMVar:
-		    raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
+		    raiseAsyncWithLock(m->tso, (StgClosure *)Deadlock_closure);
 		    break;
 		default:
 		    barf("deadlock: main thread blocked in a strange way");
@@ -645,11 +650,11 @@ schedule( void )
 	    m = main_threads;
 	    switch (m->tso->why_blocked) {
 	    case BlockedOnBlackHole:
-		raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
+		raiseAsyncWithLock(m->tso, (StgClosure *)NonTermination_closure);
 		break;
 	    case BlockedOnException:
 	    case BlockedOnMVar:
-		raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
+		raiseAsyncWithLock(m->tso, (StgClosure *)Deadlock_closure);
 		break;
 	    default:
 		barf("deadlock: main thread blocked in a strange way");
@@ -982,7 +987,6 @@ schedule( void )
     IF_DEBUG(sanity,checkTSO(t));
 #endif
     
-    grabCapability(&cap);
     cap->r.rCurrentTSO = t;
     
     /* context switches are now initiated by the timer signal, unless
@@ -1330,11 +1334,6 @@ schedule( void )
     default:
       barf("schedule: invalid thread return code %d", (int)ret);
     }
-    
-#if defined(RTS_SUPPORTS_THREADS)
-    /* I don't understand what this re-grab is doing -- sof */
-    grabCapability(&cap);
-#endif
 
 #ifdef PROFILING
     if (RtsFlags.ProfFlags.profileInterval==0 || performHeapProfile) {
@@ -1476,7 +1475,7 @@ void deleteAllThreads ( void )
 StgInt
 suspendThread( StgRegTable *reg, 
 	       rtsBool concCall
-#if !defined(RTS_SUPPORTS_THREADS)
+#if !defined(RTS_SUPPORTS_THREADS) && !defined(DEBUG)
 	       STG_UNUSED
 #endif
 	       )
@@ -1492,7 +1491,7 @@ suspendThread( StgRegTable *reg,
   ACQUIRE_LOCK(&sched_mutex);
 
   IF_DEBUG(scheduler,
-	   sched_belch("thread %d did a _ccall_gc", cap->r.rCurrentTSO->id));
+	   sched_belch("thread %d did a _ccall_gc (is_concurrent: %d)", cap->r.rCurrentTSO->id,concCall));
 
   threadPaused(cap->r.rCurrentTSO);
   cap->r.rCurrentTSO->link = suspended_ccalling_threads;
@@ -1542,6 +1541,7 @@ resumeThread( StgInt tok,
 #if defined(RTS_SUPPORTS_THREADS)
   /* Wait for permission to re-enter the RTS with the result. */
   if ( concCall ) {
+    ACQUIRE_LOCK(&sched_mutex);
     grabReturnCapability(&sched_mutex, &cap);
   } else {
     grabCapability(&cap);
@@ -2119,6 +2119,7 @@ finishAllThreads ( void )
 SchedulerStatus
 waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 { 
+  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
 #if defined(THREADED_RTS)
   return waitThread_(tso,ret, rtsFalse);
 #else
@@ -2138,6 +2139,7 @@ waitThread_(StgTSO *tso,
   SchedulerStatus stat;
 
   ACQUIRE_LOCK(&sched_mutex);
+  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
   
   m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
 
@@ -2833,6 +2835,9 @@ interruptStgRts(void)
   NB: only the type of the blocking queue is different in GranSim and GUM
       the operations on the queue-elements are the same
       long live polymorphism!
+
+  Locks: sched_mutex is held upon entry and exit.
+
 */
 static void
 unblockThread(StgTSO *tso)
@@ -2968,12 +2973,14 @@ static void
 unblockThread(StgTSO *tso)
 {
   StgTSO *t, **last;
+  
+  /* To avoid locking unnecessarily. */
+  if (tso->why_blocked == NotBlocked) {
+    return;
+  }
 
   ACQUIRE_LOCK(&sched_mutex);
   switch (tso->why_blocked) {
-
-  case NotBlocked:
-    return;  /* not blocked */
 
   case BlockedOnMVar:
     ASSERT(get_itbl(tso->block_info.closure)->type == MVAR);
@@ -3120,12 +3127,24 @@ unblockThread(StgTSO *tso)
  * CATCH_FRAME on the stack.  In either case, we strip the entire
  * stack and replace the thread with a zombie.
  *
+ * Locks: sched_mutex not held upon entry nor exit.
+ *
  * -------------------------------------------------------------------------- */
  
 void 
 deleteThread(StgTSO *tso)
 {
   raiseAsync(tso,NULL);
+}
+
+void
+raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
+{
+  /* When raising async exs from contexts where sched_mutex is held;
+     use raiseAsyncWithLock(). */
+  RELEASE_LOCK(&sched_mutex);
+  raiseAsync(tso,exception);
+  ACQUIRE_LOCK(&sched_mutex);
 }
 
 void
@@ -3144,6 +3163,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
   /* Remove it from any blocking queues */
   unblockThread(tso);
 
+  IF_DEBUG(scheduler, sched_belch("raising exception in thread %ld.", tso->id));
   /* The stack freezing code assumes there's a closure pointer on
    * the top of the stack.  This isn't always the case with compiled
    * code, so we have to push a dummy closure on the top which just
@@ -3327,6 +3347,8 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
    up and sent a signal: BlockedOnDeadMVar if the thread was blocked
    on an MVar, or NonTermination if the thread was blocked on a Black
    Hole.
+
+   Locks: sched_mutex isn't held upon entry nor exit.
    -------------------------------------------------------------------------- */
 
 void
@@ -3343,10 +3365,11 @@ resurrectThreads( StgTSO *threads )
     switch (tso->why_blocked) {
     case BlockedOnMVar:
     case BlockedOnException:
-      raiseAsync(tso,(StgClosure *)BlockedOnDeadMVar_closure);
+      /* Called by GC - sched_mutex lock is currently held. */
+      raiseAsyncWithLock(tso,(StgClosure *)BlockedOnDeadMVar_closure);
       break;
     case BlockedOnBlackHole:
-      raiseAsync(tso,(StgClosure *)NonTermination_closure);
+      raiseAsyncWithLock(tso,(StgClosure *)NonTermination_closure);
       break;
     case NotBlocked:
       /* This might happen if the thread was blocked on a black hole
@@ -3367,6 +3390,8 @@ resurrectThreads( StgTSO *threads )
  *
  * This is only done in a deadlock situation in order to avoid
  * performance overhead in the normal case.
+ *
+ * Locks: sched_mutex is held upon entry and exit.
  * -------------------------------------------------------------------------- */
 
 static void
@@ -3399,7 +3424,7 @@ detectBlackHoles( void )
 		     */
 		    IF_DEBUG(scheduler, 
 			     sched_belch("thread %d is blocked on itself", t->id));
-		    raiseAsync(t, (StgClosure *)NonTermination_closure);
+		    raiseAsyncWithLock(t, (StgClosure *)NonTermination_closure);
 		    goto done;
 		}
 		else {

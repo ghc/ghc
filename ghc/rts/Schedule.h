@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.32 2002/04/10 11:43:46 stolz Exp $
+ * $Id: Schedule.h,v 1.33 2002/04/13 05:33:03 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -58,6 +58,7 @@ StgTSO *unblockOne(StgTSO *tso);
  * Locks assumed   :  none
  */
 void raiseAsync(StgTSO *tso, StgClosure *exception);
+void raiseAsyncWithLock(StgTSO *tso, StgClosure *exception);
 
 /* awaitEvent()
  *
