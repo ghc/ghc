@@ -189,7 +189,9 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 
     stop_phase = case todo of 
 			StopBefore As | split -> SplitAs
+#ifdef ILX
                                       | real_lang == HscILX -> Ilasm
+#endif
 			StopBefore phase      -> phase
 			DoMkDependHS	      -> Ln
 			DoLink                -> Ln
@@ -237,7 +239,9 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
      			     Mangle | keep_raw_s -> Persistent
      			     As     | keep_s     -> Persistent
      			     HCc    | keep_hc    -> Persistent
+#ifdef ILX
 			     Ilasm  | keep_il    -> Persistent
+#endif
      			     _other              -> Temporary
 
 	-- add information about output files to the pipeline
