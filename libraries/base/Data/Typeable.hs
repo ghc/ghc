@@ -18,6 +18,15 @@
 -- and type-safe cast (but not dynamics) to support the \"Scrap your
 -- boilerplate\" style of generic programming.
 --
+-- Note, only relevant if you use dynamic linking. If you have a program
+-- that is statically linked with Data.Typeable, and then dynamically link
+-- a program that also uses Data.Typeable, you'll get two copies of the module.
+-- That's fine, but behind the scenes, the module uses a mutable variable to
+-- allocate unique Ids to type constructors.  So in the situation described,
+-- there'll be two separate Id allocators, which aren't comparable to each other.
+-- This can lead to chaos.  (It's a bug that we will fix.)  None of
+-- this matters if you aren't using dynamic linking.
+--
 -----------------------------------------------------------------------------
 
 module Data.Typeable
