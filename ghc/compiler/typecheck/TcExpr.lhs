@@ -335,8 +335,8 @@ tcExpr in_expr@(ExplicitList exprs) res_ty	-- Non-empty list
 
 tcExpr (ExplicitTuple exprs) res_ty
     -- ToDo: more direct way of testing if res_ty is a tuple type (cf. unifyListTy)?
-  = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..len]	 `thenNF_Tc` \ ty_vars ->
-    unifyTauTy (mkTupleTy len ty_vars) res_ty                    `thenTc_`
+  = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..len]	`thenNF_Tc` \ ty_vars ->
+    unifyTauTy (mkTupleTy len ty_vars) res_ty			`thenTc_`
     mapAndUnzipTc (\ (expr,ty_var) -> tcExpr expr ty_var)
                (exprs `zip` ty_vars) -- we know they're of equal length.
                							 `thenTc` \ (exprs', lies) ->
