@@ -618,7 +618,15 @@ newtype TA = MkTA GHC.Base.Int
 	  particular, most <literal>Prelude</literal> entities aren't
 	  actually defined in the <literal>Prelude</literal> (see for
 	  example <literal>GHC.Base.Int</literal> in the above
-	  example).</para>
+	  example).  HINT: to find out the fully-qualified name for
+	  entities in the <literal>Prelude</literal> (or anywhere for
+	  that matter), try using GHCi's
+	  <literal>:info</literal> command, eg.</para>
+<programlisting>Prelude> :m -Prelude
+> :i IO.IO
+-- GHC.IOBase.IO is a type constructor
+newtype GHC.IOBase.IO a
+...</programlisting>
 	</listitem>
 	<listitem>
 	  <para>Only <literal>data</literal>, <literal>type</literal>,
