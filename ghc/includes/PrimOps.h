@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.82 2001/08/18 11:55:48 qrczak Exp $
+ * $Id: PrimOps.h,v 1.83 2001/09/24 00:22:59 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -27,49 +27,49 @@
    Comparison PrimOps.
    -------------------------------------------------------------------------- */
 
-#define gtCharzh(r,a,b)	r=(a)> (b)
-#define geCharzh(r,a,b)	r=(a)>=(b)
-#define eqCharzh(r,a,b)	r=(a)==(b)
-#define neCharzh(r,a,b)	r=(a)!=(b)
-#define ltCharzh(r,a,b)	r=(a)< (b)
-#define leCharzh(r,a,b)	r=(a)<=(b)
+#define gtCharzh(r,a,b)	r=((C_)(a))> ((C_)(b))
+#define geCharzh(r,a,b)	r=((C_)(a))>=((C_)(b))
+#define eqCharzh(r,a,b)	r=((C_)(a))==((C_)(b))
+#define neCharzh(r,a,b)	r=((C_)(a))!=((C_)(b))
+#define ltCharzh(r,a,b)	r=((C_)(a))< ((C_)(b))
+#define leCharzh(r,a,b)	r=((C_)(a))<=((C_)(b))
 
 /* Int comparisons: >#, >=# etc */
-#define zgzh(r,a,b)	r=(a)> (b)
-#define zgzezh(r,a,b)	r=(a)>=(b)
-#define zezezh(r,a,b)	r=(a)==(b)
-#define zszezh(r,a,b)	r=(a)!=(b)
-#define zlzh(r,a,b)	r=(a)< (b)
-#define zlzezh(r,a,b)	r=(a)<=(b)
+#define zgzh(r,a,b)	r=((I_)(a))> ((I_)(b))
+#define zgzezh(r,a,b)	r=((I_)(a))>=((I_)(b))
+#define zezezh(r,a,b)	r=((I_)(a))==((I_)(b))
+#define zszezh(r,a,b)	r=((I_)(a))!=((I_)(b))
+#define zlzh(r,a,b)	r=((I_)(a))< ((I_)(b))
+#define zlzezh(r,a,b)	r=((I_)(a))<=((I_)(b))
 
-#define gtWordzh(r,a,b)	r=(a)> (b)
-#define geWordzh(r,a,b)	r=(a)>=(b)
-#define eqWordzh(r,a,b)	r=(a)==(b)
-#define neWordzh(r,a,b)	r=(a)!=(b)
-#define ltWordzh(r,a,b)	r=(a)< (b)
-#define leWordzh(r,a,b)	r=(a)<=(b)
+#define gtWordzh(r,a,b)	r=((W_)(a))> ((W_)(b))
+#define geWordzh(r,a,b)	r=((W_)(a))>=((W_)(b))
+#define eqWordzh(r,a,b)	r=((W_)(a))==((W_)(b))
+#define neWordzh(r,a,b)	r=((W_)(a))!=((W_)(b))
+#define ltWordzh(r,a,b)	r=((W_)(a))< ((W_)(b))
+#define leWordzh(r,a,b)	r=((W_)(a))<=((W_)(b))
 
-#define gtAddrzh(r,a,b)	r=(a)> (b)
-#define geAddrzh(r,a,b)	r=(a)>=(b)
-#define eqAddrzh(r,a,b)	r=(a)==(b)
-#define neAddrzh(r,a,b)	r=(a)!=(b)
-#define ltAddrzh(r,a,b)	r=(a)< (b)
-#define leAddrzh(r,a,b)	r=(a)<=(b)
+#define gtAddrzh(r,a,b)	r=((A_)(a))> ((A_)(b))
+#define geAddrzh(r,a,b)	r=((A_)(a))>=((A_)(b))
+#define eqAddrzh(r,a,b)	r=((A_)(a))==((A_)(b))
+#define neAddrzh(r,a,b)	r=((A_)(a))!=((A_)(b))
+#define ltAddrzh(r,a,b)	r=((A_)(a))< ((A_)(b))
+#define leAddrzh(r,a,b)	r=((A_)(a))<=((A_)(b))
 
-#define gtFloatzh(r,a,b)  r=(a)> (b)
-#define geFloatzh(r,a,b)  r=(a)>=(b)
-#define eqFloatzh(r,a,b)  r=(a)==(b)
-#define neFloatzh(r,a,b)  r=(a)!=(b)
-#define ltFloatzh(r,a,b)  r=(a)< (b)
-#define leFloatzh(r,a,b)  r=(a)<=(b)
+#define gtFloatzh(r,a,b)  r=((StgFloat)(a))> ((StgFloat)(b))
+#define geFloatzh(r,a,b)  r=((StgFloat)(a))>=((StgFloat)(b))
+#define eqFloatzh(r,a,b)  r=((StgFloat)(a))==((StgFloat)(b))
+#define neFloatzh(r,a,b)  r=((StgFloat)(a))!=((StgFloat)(b))
+#define ltFloatzh(r,a,b)  r=((StgFloat)(a))< ((StgFloat)(b))
+#define leFloatzh(r,a,b)  r=((StgFloat)(a))<=((StgFloat)(b))
 
 /* Double comparisons: >##, >=## etc */
-#define zgzhzh(r,a,b)	r=(a)> (b)
-#define zgzezhzh(r,a,b)	r=(a)>=(b)
-#define zezezhzh(r,a,b)	r=(a)==(b)
-#define zszezhzh(r,a,b)	r=(a)!=(b)
-#define zlzhzh(r,a,b)	r=(a)< (b)
-#define zlzezhzh(r,a,b)	r=(a)<=(b)
+#define zgzhzh(r,a,b)	r=((StgDouble)(a))> ((StgDouble)(b))
+#define zgzezhzh(r,a,b)	r=((StgDouble)(a))>=((StgDouble)(b))
+#define zezezhzh(r,a,b)	r=((StgDouble)(a))==((StgDouble)(b))
+#define zszezhzh(r,a,b)	r=((StgDouble)(a))!=((StgDouble)(b))
+#define zlzhzh(r,a,b)	r=((StgDouble)(a))< ((StgDouble)(b))
+#define zlzezhzh(r,a,b)	r=((StgDouble)(a))<=((StgDouble)(b))
 
 /* -----------------------------------------------------------------------------
    Char# PrimOps.
@@ -82,12 +82,12 @@
    Int# PrimOps.
    -------------------------------------------------------------------------- */
 
-#define zpzh(r,a,b)		r=(a)+(b)
-#define zmzh(r,a,b)		r=(a)-(b)
-#define ztzh(r,a,b)		r=(a)*(b)
-#define quotIntzh(r,a,b)	r=(a)/(b)
-#define remIntzh(r,a,b)		r=(a)%(b)
-#define negateIntzh(r,a)	r=-(a)
+#define zpzh(r,a,b)		r=((I_)(a))+((I_)(b))
+#define zmzh(r,a,b)		r=((I_)(a))-((I_)(b))
+#define ztzh(r,a,b)		r=((I_)(a))*((I_)(b))
+#define quotIntzh(r,a,b)	r=((I_)(a))/((I_)(b))
+#define remIntzh(r,a,b)		r=((I_)(a))%((I_)(b))
+#define negateIntzh(r,a)	r=-((I_)(a))
 
 /* -----------------------------------------------------------------------------
  * Int operations with carry.
@@ -104,17 +104,17 @@
  * could be improved by making r and c the correct values for
  * plugging into a new J#.  
  */
-#define addIntCzh(r,c,a,b)			\
-{ r = (I_)a + (I_)b;				\
-  c = ((StgWord)(~((I_)a^(I_)b) & ((I_)a^r)))	\
-    >> (BITS_IN (I_) - 1);			\
+#define addIntCzh(r,c,a,b)					\
+{ r = ((I_)(a)) + ((I_)(b));					\
+  c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
+    >> (BITS_IN (I_) - 1);					\
 }
 
 
-#define subIntCzh(r,c,a,b)			\
-{ r = a - b;					\
-  c = ((StgWord)((a^b) & (a^r)))		\
-    >> (BITS_IN (I_) - 1);			\
+#define subIntCzh(r,c,a,b)					\
+{ r = ((I_)(a)) - ((I_)(b));					\
+  c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
+    >> (BITS_IN (I_) - 1);					\
 }
 
 /* Multiply with overflow checking.
@@ -177,9 +177,9 @@ typedef union {
 
 #else
 
-#define HALF_INT  (1LL << (BITS_IN (I_) / 2))
+#define HALF_INT  (((I_)1) << (BITS_IN (I_) / 2))
 
-#define stg_abs(a) ((a) < 0 ? -(a) : (a))
+#define stg_abs(a) (((I_)(a)) < 0 ? -((I_)(a)) : ((I_)(a)))
 
 #define mulIntCzh(r,c,a,b)			\
 {						\
@@ -187,7 +187,7 @@ typedef union {
       stg_abs(b) >= HALF_INT) {			\
     c = 1;					\
   } else {					\
-    r = a * b;					\
+    r = ((I_)(a)) * ((I_)(b));			\
     c = 0;					\
   }						\
 }
@@ -197,16 +197,16 @@ typedef union {
    Word# PrimOps.
    -------------------------------------------------------------------------- */
 
-#define plusWordzh(r,a,b)	r=(a)+(b)
-#define minusWordzh(r,a,b)	r=(a)-(b)
-#define timesWordzh(r,a,b)	r=(a)*(b)
-#define quotWordzh(r,a,b)	r=(a)/(b)
-#define remWordzh(r,a,b)	r=(a)%(b)
+#define plusWordzh(r,a,b)	r=((W_)(a))+((W_)(b))
+#define minusWordzh(r,a,b)	r=((W_)(a))-((W_)(b))
+#define timesWordzh(r,a,b)	r=((W_)(a))*((W_)(b))
+#define quotWordzh(r,a,b)	r=((W_)(a))/((W_)(b))
+#define remWordzh(r,a,b)	r=((W_)(a))%((W_)(b))
 
-#define andzh(r,a,b)		r=(a)&(b)
-#define orzh(r,a,b)		r=(a)|(b)
-#define xorzh(r,a,b)            r=(a)^(b)
-#define notzh(r,a)		r=~(a)
+#define andzh(r,a,b)		r=((W_)(a))&((W_)(b))
+#define orzh(r,a,b)		r=((W_)(a))|((W_)(b))
+#define xorzh(r,a,b)            r=((W_)(a))^((W_)(b))
+#define notzh(r,a)		r=~((W_)(a))
 
 /* The extra tests below properly define the behaviour when shifting
  * by offsets larger than the width of the value being shifted.  Doing
@@ -214,29 +214,29 @@ typedef union {
  * on whether the operation is constant folded or not with gcc on x86!)
  */
 
-#define shiftLzh(r,a,b)	  	r=((b) >= BITS_IN(W_)) ? 0 : (a)<<(b)
-#define shiftRLzh(r,a,b)  	r=((b) >= BITS_IN(W_)) ? 0 : (a)>>(b)
-#define iShiftLzh(r,a,b)  	r=((b) >= BITS_IN(W_)) ? 0 : (a)<<(b)
+#define shiftLzh(r,a,b)	  	r=(((I_)(b)) >= BITS_IN(W_)) ? 0 : ((W_)(a))<<((I_)(b))
+#define shiftRLzh(r,a,b)  	r=(((I_)(b)) >= BITS_IN(W_)) ? 0 : ((W_)(a))>>((I_)(b))
+#define iShiftLzh(r,a,b)  	r=(((I_)(b)) >= BITS_IN(W_)) ? 0 : ((W_)(a))<<((I_)(b))
 /* Right shifting of signed quantities is not portable in C, so
    the behaviour you'll get from using these primops depends
    on the whatever your C compiler is doing. ToDo: fix/document. -- sof 8/98
 */
-#define iShiftRAzh(r,a,b) 	r=((b) >= BITS_IN(I_)) ? (((a) < 0) ? -1 : 0) : (a)>>(b)
-#define iShiftRLzh(r,a,b) 	r=((b) >= BITS_IN(I_)) ? 0 : (I_)((W_)(a)>>(b))
+#define iShiftRAzh(r,a,b) 	r=(((I_)(b)) >= BITS_IN(I_)) ? ((((I_)(a)) < 0) ? -1 : 0) : ((I_)(a))>>((I_)(b))
+#define iShiftRLzh(r,a,b) 	r=(((I_)(b)) >= BITS_IN(I_)) ? 0 : (I_)((W_)((I_)(a))>>((I_)(b)))
 
-#define int2Wordzh(r,a) 	r=(W_)(a)
-#define word2Intzh(r,a) 	r=(I_)(a)
+#define int2Wordzh(r,a) 	r=(W_)((I_)(a))
+#define word2Intzh(r,a) 	r=(I_)((W_)(a))
 
 /* -----------------------------------------------------------------------------
    Explicitly sized Int# and Word# PrimOps.
    -------------------------------------------------------------------------- */
 
-#define narrow8Intzh(r,a)	r=(StgInt8)(a)
-#define narrow16Intzh(r,a)	r=(StgInt16)(a)
-#define narrow32Intzh(r,a)	r=(StgInt32)(a)
-#define narrow8Wordzh(r,a)	r=(StgWord8)(a)
-#define narrow16Wordzh(r,a)	r=(StgWord16)(a)
-#define narrow32Wordzh(r,a)	r=(StgWord32)(a)
+#define narrow8Intzh(r,a)	r=(StgInt8)((I_)(a))
+#define narrow16Intzh(r,a)	r=(StgInt16)((I_)(a))
+#define narrow32Intzh(r,a)	r=(StgInt32)((I_)(a))
+#define narrow8Wordzh(r,a)	r=(StgWord8)((W_)(a))
+#define narrow16Wordzh(r,a)	r=(StgWord16)((W_)(a))
+#define narrow32Wordzh(r,a)	r=(StgWord32)((W_)(a))
 
 /* -----------------------------------------------------------------------------
    Addr# PrimOps.
@@ -320,59 +320,59 @@ typedef union {
    Float PrimOps.
    -------------------------------------------------------------------------- */
 
-#define plusFloatzh(r,a,b)   r=(a)+(b)
-#define minusFloatzh(r,a,b)  r=(a)-(b)
-#define timesFloatzh(r,a,b)  r=(a)*(b)
-#define divideFloatzh(r,a,b) r=(a)/(b)
-#define negateFloatzh(r,a)   r=-(a)
+#define plusFloatzh(r,a,b)   r=((StgFloat)(a))+((StgFloat)(b))
+#define minusFloatzh(r,a,b)  r=((StgFloat)(a))-((StgFloat)(b))
+#define timesFloatzh(r,a,b)  r=((StgFloat)(a))*((StgFloat)(b))
+#define divideFloatzh(r,a,b) r=((StgFloat)(a))/((StgFloat)(b))
+#define negateFloatzh(r,a)   r=-((StgFloat)(a))
 			     
-#define int2Floatzh(r,a)     r=(StgFloat)(a)
-#define float2Intzh(r,a)     r=(I_)(a)
+#define int2Floatzh(r,a)     r=(StgFloat)((I_)(a))
+#define float2Intzh(r,a)     r=(I_)((StgFloat)(a))
 			     
-#define expFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,exp,a)
-#define logFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,log,a)
-#define sqrtFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sqrt,a)
-#define sinFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sin,a)
-#define cosFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,cos,a)
-#define tanFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,tan,a)
-#define asinFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,asin,a)
-#define acosFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,acos,a)
-#define atanFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,atan,a)
-#define sinhFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sinh,a)
-#define coshFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,cosh,a)
-#define tanhFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,tanh,a)
-#define powerFloatzh(r,a,b)  r=(StgFloat) RET_PRIM_STGCALL2(StgDouble,pow,a,b)
+#define expFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,exp,((StgFloat)(a)))
+#define logFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,log,((StgFloat)(a)))
+#define sqrtFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sqrt,((StgFloat)(a)))
+#define sinFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sin,((StgFloat)(a)))
+#define cosFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,cos,((StgFloat)(a)))
+#define tanFloatzh(r,a)	     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,tan,((StgFloat)(a)))
+#define asinFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,asin,((StgFloat)(a)))
+#define acosFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,acos,((StgFloat)(a)))
+#define atanFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,atan,((StgFloat)(a)))
+#define sinhFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,sinh,((StgFloat)(a)))
+#define coshFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,cosh,((StgFloat)(a)))
+#define tanhFloatzh(r,a)     r=(StgFloat) RET_PRIM_STGCALL1(StgDouble,tanh,((StgFloat)(a)))
+#define powerFloatzh(r,a,b)  r=(StgFloat) RET_PRIM_STGCALL2(StgDouble,pow,((StgFloat)(a)),((StgFloat)(b)))
 
 /* -----------------------------------------------------------------------------
    Double PrimOps.
    -------------------------------------------------------------------------- */
 
-#define zpzhzh(r,a,b)	     r=(a)+(b)
-#define zmzhzh(r,a,b)	     r=(a)-(b)
-#define ztzhzh(r,a,b)	     r=(a)*(b)
-#define zszhzh(r,a,b)	     r=(a)/(b)
-#define negateDoublezh(r,a)  r=-(a)
+#define zpzhzh(r,a,b)	     r=((StgDouble)(a))+((StgDouble)(b))
+#define zmzhzh(r,a,b)	     r=((StgDouble)(a))-((StgDouble)(b))
+#define ztzhzh(r,a,b)	     r=((StgDouble)(a))*((StgDouble)(b))
+#define zszhzh(r,a,b)	     r=((StgDouble)(a))/((StgDouble)(b))
+#define negateDoublezh(r,a)  r=-((StgDouble)(a))
 			     
-#define int2Doublezh(r,a)    r=(StgDouble)(a)
-#define double2Intzh(r,a)    r=(I_)(a)
+#define int2Doublezh(r,a)    r=(StgDouble)((I_)(a))
+#define double2Intzh(r,a)    r=(I_)((StgDouble)(a))
 			     
-#define float2Doublezh(r,a)  r=(StgDouble)(a)
-#define double2Floatzh(r,a)  r=(StgFloat)(a)
+#define float2Doublezh(r,a)  r=(StgDouble)((StgFloat)(a))
+#define double2Floatzh(r,a)  r=(StgFloat)((StgDouble)(a))
 			     
-#define expDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,exp,a)
-#define logDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,log,a)
-#define sqrtDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sqrt,a)
-#define sinDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sin,a)
-#define cosDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,cos,a)
-#define tanDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,tan,a)
-#define asinDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,asin,a)
-#define acosDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,acos,a)
-#define atanDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,atan,a)
-#define sinhDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sinh,a)
-#define coshDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,cosh,a)
-#define tanhDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,tanh,a)
+#define expDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,exp,((StgDouble)(a)))
+#define logDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,log,((StgDouble)(a)))
+#define sqrtDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sqrt,((StgDouble)(a)))
+#define sinDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sin,((StgDouble)(a)))
+#define cosDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,cos,((StgDouble)(a)))
+#define tanDoublezh(r,a)     r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,tan,((StgDouble)(a)))
+#define asinDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,asin,((StgDouble)(a)))
+#define acosDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,acos,((StgDouble)(a)))
+#define atanDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,atan,((StgDouble)(a)))
+#define sinhDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,sinh,((StgDouble)(a)))
+#define coshDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,cosh,((StgDouble)(a)))
+#define tanhDoublezh(r,a)    r=(StgDouble) RET_PRIM_STGCALL1(StgDouble,tanh,((StgDouble)(a)))
 /* Power: **## */
-#define ztztzhzh(r,a,b)	r=(StgDouble) RET_PRIM_STGCALL2(StgDouble,pow,a,b)
+#define ztztzhzh(r,a,b)	r=(StgDouble) RET_PRIM_STGCALL2(StgDouble,pow,((StgDouble)(a)),((StgDouble)(b)))
 
 /* -----------------------------------------------------------------------------
    Integer PrimOps.
