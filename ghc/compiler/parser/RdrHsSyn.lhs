@@ -172,7 +172,7 @@ mkHsNegApp (L loc e) = f e
   where f (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))    
 	f (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 	f (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
-	f expr	    		   = NegApp (L loc e) placeHolderName
+	f expr	    		   = NegApp (L loc e) noSyntaxExpr
 \end{code}
 
 %************************************************************************
@@ -468,23 +468,23 @@ checkDictTy (L spn ty) = check ty []
 -- 	We parse   do { e1 ; e2 ; }
 -- 	as [ExprStmt e1, ExprStmt e2]
 -- checkDo (a) checks that the last thing is an ExprStmt
---	   (b) transforms it to a ResultStmt
+--	   (b) returns it separately
 -- same comments apply for mdo as well
 
 checkDo	 = checkDoMDo "a " "'do'"
 checkMDo = checkDoMDo "an " "'mdo'"
 
-checkDoMDo :: String -> String -> SrcSpan -> [LStmt RdrName] -> P [LStmt RdrName]
+checkDoMDo :: String -> String -> SrcSpan -> [LStmt RdrName] -> P ([LStmt RdrName], LHsExpr RdrName)
 checkDoMDo pre nm loc []   = parseError loc ("Empty " ++ nm ++ " construct")
 checkDoMDo pre nm loc ss   = do 
   check ss
   where 
-	check  [L l (ExprStmt e _)] = return [L l (ResultStmt e)]
+	check  [L l (ExprStmt e _ _)] = return ([], e)
 	check  [L l _] = parseError l ("The last statement in " ++ pre ++ nm ++
 					 " construct must be an expression")
 	check (s:ss) = do
-	  ss' <-  check ss
-	  return (s:ss')
+	  (ss',e') <-  check ss
+	  return ((s:ss'),e')
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -524,9 +524,9 @@ checkAPat loc e = case e of
    -- Negation is recorded separately, so that the literal is zero or +ve
    -- NB. Negative *primitive* literals are already handled by
    --     RdrHsSyn.mkHsNegApp
-   HsOverLit pos_lit            -> return (NPatIn pos_lit Nothing)
+   HsOverLit pos_lit            -> return (mkNPat pos_lit Nothing)
    NegApp (L _ (HsOverLit pos_lit)) _ 
-			-> return (NPatIn pos_lit (Just placeHolderName))
+			-> return (mkNPat pos_lit (Just noSyntaxExpr))
    
    ELazyPat e	   -> checkLPat e >>= (return . LazyPat)
    EAsPat n e	   -> checkLPat e >>= (return . AsPat n)
@@ -564,7 +564,7 @@ checkAPat loc e = case e of
    ExplicitTuple es b -> mapM (\e -> checkLPat e) es >>= \ps ->
    			 return (TuplePat ps b)
    
-   RecordCon c fs     -> mapM checkPatField fs >>= \fs ->
+   RecordCon c _ fs   -> mapM checkPatField fs >>= \fs ->
 			 return (ConPatIn c (RecCon fs))
 -- Generics 
    HsType ty          -> return (TypePat ty) 
@@ -644,9 +644,9 @@ mkRecConstrOrUpdate
 	-> P (HsExpr RdrName)
 
 mkRecConstrOrUpdate (L l (HsVar c)) loc fs | isRdrDataCon c
-  = return (RecordCon (L l c) fs)
+  = return (RecordCon (L l c) noPostTcExpr fs)
 mkRecConstrOrUpdate exp loc fs@(_:_)
-  = return (RecordUpd exp fs)
+  = return (RecordUpd exp fs placeHolderType placeHolderType)
 mkRecConstrOrUpdate _ loc []
   = parseError loc "Empty record update"
 

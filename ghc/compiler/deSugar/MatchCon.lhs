@@ -10,7 +10,7 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( Pat(..), HsConDetails(..), isEmptyLHsBinds )
+import HsSyn		( Pat(..), HsConDetails(..) )
 import DsBinds		( dsHsNestedBinds )
 import DataCon		( isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
 import TcType		( tcTyConAppArgs )

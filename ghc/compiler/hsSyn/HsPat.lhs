@@ -13,24 +13,25 @@ module HsPat (
 
 	isWildPat, 
 	patsAreAllCons, isConPat, isSigPat,
-	patsAreAllLits,	isLitPat
+	patsAreAllLits,	isLitPat, isIrrefutableHsPat
     ) where
 
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} HsExpr		( HsExpr )
+import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
 import HsBinds		( DictBinds, emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
-import HsTypes		( LHsType, SyntaxName, PostTcType )
+import HsTypes		( LHsType, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
 -- others:
 import PprCore		( {- instance OutputableBndr TyVar -} )
 import TysWiredIn	( nilDataCon, charDataCon, charTy )
 import Var		( TyVar )
-import DataCon		( DataCon )
+import DataCon		( DataCon, dataConTyCon )
+import TyCon		( isProductTyCon )
 import Outputable	
 import Type		( Type )
 import SrcLoc		( Located(..), unLoc, noLoc )
@@ -78,28 +79,16 @@ data Pat id
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
 					-- Int#, Char#, Int, Char, String, etc.
 
-  | NPatIn	    HsOverLit 		-- Always positive
-		    (Maybe SyntaxName)	-- Just (Name of 'negate') for negative
-					-- patterns, Nothing otherwise
+  | NPat	    (HsOverLit id)		-- *Always* positive
+		    (Maybe (SyntaxExpr id))	-- Just (Name of 'negate') for negative
+						-- patterns, Nothing otherwise
+		    (SyntaxExpr id)		-- Equality checker, of type t->t->Bool
+		    PostTcType			-- Type of the pattern
 
-  | NPatOut	    HsLit		-- Used for literal patterns where there's an equality function to call
-		    			-- The literal is retained so that the desugarer can readily identify
-					-- equations with identical literal-patterns
-					-- Always HsInteger, HsRat or HsString.
-					--  *Unlike* NPatIn, for negative literals, the
-					-- 	literal is acutally negative!
-		    Type	 	-- Type of pattern, t
-   	    	    (HsExpr id)		-- Of type t -> Bool; detects match
-
-  | NPlusKPatIn	    (Located id)	-- n+k pattern
-		    HsOverLit		-- It'll always be an HsIntegral
-		    SyntaxName		-- Name of '-' (see RnEnv.lookupSyntaxName)
-
-  | NPlusKPatOut    (Located id)
-		    Integer
-   	    	    (HsExpr id)	 	-- Of type t -> Bool; detects match
-   	    	    (HsExpr id) 	-- Of type t -> t; subtracts k
-
+  | NPlusKPat	    (Located id)	-- n+k pattern
+		    (HsOverLit id)	-- It'll always be an HsIntegral
+		    (SyntaxExpr id)	-- (>=) function, of type t->t->Bool
+		    (SyntaxExpr id)	-- Name of '-' (see RnEnv.lookupSyntaxName)
 
 	------------ Generics ---------------
   | TypePat	    (LHsType id)	-- Type pattern for generic definitions
@@ -177,10 +166,8 @@ pprPat (ConPatOut con tvs dicts binds details _)
     else pprUserCon con details
 
 pprPat (LitPat s)	      = ppr s
-pprPat (NPatIn l _)	      = ppr l
-pprPat (NPatOut l _ _)        = ppr l
-pprPat (NPlusKPatIn n k _)    = hcat [ppr n, char '+', ppr k]
-pprPat (NPlusKPatOut n k _ _) = hcat [ppr n, char '+', integer k]
+pprPat (NPat l _ _ _)	      = ppr l
+pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
@@ -278,10 +265,41 @@ patsAreAllLits pat_list = all isLitPat pat_list
 
 isLitPat (AsPat _ pat)	        = isLitPat (unLoc pat)
 isLitPat (LitPat _)	        = True
-isLitPat (NPatIn _ _)	        = True
-isLitPat (NPatOut   _ _ _)      = True
-isLitPat (NPlusKPatIn _ _ _)    = True
-isLitPat (NPlusKPatOut _ _ _ _) = True
+isLitPat (NPat _ _ _ _)	        = True
+isLitPat (NPlusKPat _ _ _ _)    = True
 isLitPat other		        = False
+
+isIrrefutableHsPat :: LPat id -> Bool
+-- This function returns False if it's in doubt; specifically
+-- on a ConPatIn it doesn't know th size of the constructor family
+-- But if it returns True, the pattern is definitely irrefutable
+isIrrefutableHsPat pat
+  = go pat
+  where
+    go (L _ pat)	 = go1 pat
+
+    go1 (WildPat _)       = True
+    go1 (VarPat _)        = True
+    go1 (VarPatOut _ _)   = True
+    go1 (LazyPat _)       = True
+    go1 (ParPat pat)      = go pat
+    go1 (AsPat _ pat)     = go pat
+    go1 (SigPatIn pat _)  = go pat
+    go1 (SigPatOut pat _) = go pat
+    go1 (ListPat pats _)  = all go pats
+    go1 (TuplePat pats _) = all go pats
+    go1 (PArrPat pats _)  = all go pats
+
+    go1 (ConPatIn _ _) = False	-- Conservative
+    go1 (ConPatOut (L _ con) _ _ _ details _) 
+	=  isProductTyCon (dataConTyCon con)
+	&& all go (hsConArgs details)
+
+    go1 (LitPat _) 	   = False
+    go1 (NPat _ _ _ _)	   = False
+    go1 (NPlusKPat _ _ _ _) = False
+
+    go1 (TypePat _)   = panic "isIrrefutableHsPat: type pattern"
+    go1 (DictPat _ _) = panic "isIrrefutableHsPat: type pattern"
 \end{code}
 

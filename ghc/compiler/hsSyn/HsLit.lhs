@@ -8,8 +8,8 @@ module HsLit where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} HsExpr( SyntaxExpr )
 import Type	( Type )
-import HsTypes	( SyntaxName )
 import Outputable
 import FastString
 import Ratio	( Rational )
@@ -52,20 +52,24 @@ instance Eq HsLit where
   (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
   lit1		    == lit2		 = False
 
-data HsOverLit 			-- An overloaded literal
-  = HsIntegral	    Integer  SyntaxName	-- Integer-looking literals;
-					-- The name is fromInteger
-  | HsFractional    Rational SyntaxName	-- Frac-looking literals
-					-- The name is fromRational
+data HsOverLit id 	-- An overloaded literal
+  = HsIntegral	 Integer  (SyntaxExpr id)	-- Integer-looking literals;
+  | HsFractional Rational (SyntaxExpr id)	-- Frac-looking literals
+  -- Before type checking, the SyntaxExpr is 'fromInteger' or 'fromRational'
+  -- After type checking, it is (fromInteger 3) or lit_78; that is,
+  -- the expression that should replace the literal.
+  -- This is unusual, because we're replacing 'fromInteger' with a call 
+  -- to fromInteger.  Reason: it allows commoning up of the fromInteger
+  -- calls, which wouldn't be possible if the desguarar made the application
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
-instance Eq HsOverLit where
+instance Eq (HsOverLit id) where
   (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
   (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
   l1		      == l2		     = False
 
-instance Ord HsOverLit where
+instance Ord (HsOverLit id) where
   compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
   compare (HsIntegral _ _)    (HsFractional _ _)  = LT
   compare (HsFractional f1 _) (HsFractional f2 _) = f1 `compare` f2
@@ -86,7 +90,7 @@ instance Outputable HsLit where
     ppr (HsDoublePrim d) = rational d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
 
-instance Outputable HsOverLit where
+instance Outputable (HsOverLit id) where
   ppr (HsIntegral i _)   = integer i
   ppr (HsFractional f _) = rational f
 \end{code}

@@ -25,7 +25,7 @@ import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
 import TcRnMonad
 import RdrName		( RdrName, elemLocalRdrEnv )
-import PrelNames	( eqClassName, integralClassName, 
+import PrelNames	( eqClassName, integralClassName, geName, eqName,
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
 			  ratioDataConName, fromRationalName )
@@ -365,23 +365,25 @@ rnPat (LitPat lit)
   = rnLit lit 	`thenM_` 
     returnM (LitPat lit, emptyFVs) 
 
-rnPat (NPatIn lit mb_neg) 
+rnPat (NPat lit mb_neg eq _) 
   = rnOverLit lit			`thenM` \ (lit', fvs1) ->
     (case mb_neg of
 	Nothing -> returnM (Nothing, emptyFVs)
 	Just _  -> lookupSyntaxName negateName	`thenM` \ (neg, fvs) ->
 		   returnM (Just neg, fvs)
     )					`thenM` \ (mb_neg', fvs2) ->
-    returnM (NPatIn lit' mb_neg', 
-	      fvs1 `plusFV` fvs2 `addOneFV` eqClassName)	
+    lookupSyntaxName eqName		`thenM` \ (eq', fvs3) -> 
+    returnM (NPat lit' mb_neg' eq' placeHolderType, 
+	      fvs1 `plusFV` fvs2 `plusFV` fvs3 `addOneFV` eqClassName)	
 	-- Needed to find equality on pattern
 
-rnPat (NPlusKPatIn name lit _)
+rnPat (NPlusKPat name lit _ _)
   = rnOverLit lit			`thenM` \ (lit', fvs1) ->
     lookupLocatedBndrRn name		`thenM` \ name' ->
     lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
-    returnM (NPlusKPatIn name' lit' minus, 
-	      fvs1 `plusFV` fvs2 `addOneFV` integralClassName)
+    lookupSyntaxName geName		`thenM` \ (ge, fvs3) ->
+    returnM (NPlusKPat name' lit' ge minus,
+	     fvs1 `plusFV` fvs2 `plusFV` fvs3 `addOneFV` integralClassName)
 	-- The Report says that n+k patterns must be in Integral
 
 rnPat (LazyPat pat)

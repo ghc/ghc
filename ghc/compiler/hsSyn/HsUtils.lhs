@@ -63,7 +63,7 @@ mkSimpleMatch pats rhs
 		(pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
 unguardedRHS :: LHsExpr id -> [LGRHS id]
-unguardedRHS rhs@(L loc _) = [L loc (GRHS [L loc (ResultStmt rhs)])]
+unguardedRHS rhs@(L loc _) = [L loc (GRHS [] rhs)]
 
 mkHsAppTy :: LHsType name -> LHsType name -> LHsType name
 mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
@@ -111,18 +111,25 @@ mkSimpleHsAlt pat expr
   = mkSimpleMatch [pat] expr
 
 glueBindsOnGRHSs :: HsBindGroup id -> GRHSs id -> GRHSs id
--- gaw 2004
 glueBindsOnGRHSs binds1 (GRHSs grhss binds2)
   = GRHSs grhss (binds1 : binds2)
 
+-------------------------------
 -- These are the bits of syntax that contain rebindable names
 -- See RnEnv.lookupSyntaxName
 
-mkHsIntegral   i      = HsIntegral   i  placeHolderName
-mkHsFractional f      = HsFractional f  placeHolderName
-mkNPlusKPat n k       = NPlusKPatIn n k placeHolderName
-mkHsDo ctxt stmts     = HsDo ctxt stmts [] placeHolderType
+mkHsIntegral   i       = HsIntegral   i  noSyntaxExpr
+mkHsFractional f       = HsFractional f  noSyntaxExpr
+mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 
+mkNPat lit neg     = NPat lit neg noSyntaxExpr placeHolderType
+mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
+
+mkExprStmt expr	    = ExprStmt expr noSyntaxExpr placeHolderType
+mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
+mkRecStmt stmts	    = RecStmt stmts [] [] [] emptyLHsBinds
+
+-------------------------------
 --- A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
@@ -188,8 +195,8 @@ nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 nlTuplePat pats box = noLoc (TuplePat pats box)
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
-nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id
-nlHsDo ctxt stmts = noLoc (mkHsDo ctxt stmts)
+nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> LHsExpr id
+nlHsDo ctxt stmts body = noLoc (mkHsDo ctxt stmts body)
 
 nlHsOpApp e1 op e2 = noLoc (mkHsOpApp e1 op e2)
 
@@ -203,12 +210,6 @@ nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
 nlHsAppTy f t		= noLoc (HsAppTy f t)
 nlHsTyVar x		= noLoc (HsTyVar x)
 nlHsFunTy a b		= noLoc (HsFunTy a b)
-
-nlExprStmt expr		= noLoc (ExprStmt expr placeHolderType)
-nlBindStmt pat expr	= noLoc (BindStmt pat expr)
-nlLetStmt binds	 	= noLoc (LetStmt binds)
-nlResultStmt expr	= noLoc (ResultStmt expr)
-nlParStmt stuff		= noLoc (ParStmt stuff)
 \end{code}
 
 
@@ -335,19 +336,22 @@ collectSigTysFromHsBind bind
 %************************************************************************
 
 \begin{code}
-collectStmtsBinders :: [LStmt id] -> [Located id]
-collectStmtsBinders = concatMap collectLStmtBinders
+collectLStmtsBinders :: [LStmt id] -> [Located id]
+collectLStmtsBinders = concatMap collectLStmtBinders
 
+collectStmtsBinders :: [Stmt id] -> [Located id]
+collectStmtsBinders = concatMap collectStmtBinders
+
+collectLStmtBinders :: LStmt id -> [Located id]
 collectLStmtBinders = collectStmtBinders . unLoc
 
 collectStmtBinders :: Stmt id -> [Located id]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
-collectStmtBinders (BindStmt pat _)   = collectLocatedPatBinders pat
-collectStmtBinders (LetStmt binds)    = collectGroupBinders binds
-collectStmtBinders (ExprStmt _ _)     = []
-collectStmtBinders (ResultStmt _)     = []
-collectStmtBinders (RecStmt ss _ _ _) = collectStmtsBinders ss
-collectStmtBinders other              = panic "collectStmtBinders"
+collectStmtBinders (BindStmt pat _ _ _) = collectLocatedPatBinders pat
+collectStmtBinders (LetStmt binds)      = collectGroupBinders binds
+collectStmtBinders (ExprStmt _ _ _)   	= []
+collectStmtBinders (RecStmt ss _ _ _ _)	= collectLStmtsBinders ss
+collectStmtBinders other              	= panic "collectStmtBinders"
 \end{code}
 
 
@@ -378,37 +382,34 @@ collectLocatedPatsBinders :: [LPat a] -> [Located a]
 collectLocatedPatsBinders pats = foldr collectl [] pats
 
 ---------------------
-collectl (L l (VarPat var)) bndrs = L l var : bndrs
-collectl (L l (VarPatOut var bs)) bndrs = L l var : collectHsBindLocatedBinders bs 
-					  ++ bndrs
-collectl (L l pat) bndrs = collect pat bndrs
+collectl (L l pat) bndrs
+  = go pat
+  where
+    go (VarPat var) 	   	  = L l var : bndrs
+    go (VarPatOut var bs) 	  = L l var : collectHsBindLocatedBinders bs 
+				    ++ bndrs
+    go (WildPat _)	      	  = bndrs
+    go (LazyPat pat)     	  = collectl pat bndrs
+    go (AsPat a pat)     	  = a : collectl pat bndrs
+    go (ParPat  pat)     	  = collectl pat bndrs
+				  
+    go (ListPat pats _)    	  = foldr collectl bndrs pats
+    go (PArrPat pats _)    	  = foldr collectl bndrs pats
+    go (TuplePat pats _)  	  = foldr collectl bndrs pats
+				  
+    go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConArgs ps)
+    go (ConPatOut c _ ds bs ps _) = map noLoc ds
+				    ++ collectHsBindLocatedBinders bs
+				    ++ foldr collectl bndrs (hsConArgs ps)
+    go (LitPat _)	      	  = bndrs
+    go (NPat _ _ _ _)		  = bndrs
+    go (NPlusKPat n _ _ _)        = n : bndrs
 
----------------------
-collect (WildPat _)	      	   bndrs = bndrs
-collect (LazyPat pat)     	   bndrs = collectl pat bndrs
-collect (AsPat a pat)     	   bndrs = a : collectl pat bndrs
-collect (ParPat  pat)     	   bndrs = collectl pat bndrs
-
-collect (ListPat pats _)    	   bndrs = foldr collectl bndrs pats
-collect (PArrPat pats _)    	   bndrs = foldr collectl bndrs pats
-collect (TuplePat pats _)  	   bndrs = foldr collectl bndrs pats
-
-collect (ConPatIn c ps)   	   bndrs = foldr collectl bndrs (hsConArgs ps)
-collect (ConPatOut c _ ds bs ps _) bndrs = map noLoc ds
-					   ++ collectHsBindLocatedBinders bs
-					   ++ foldr collectl bndrs (hsConArgs ps)
-collect (LitPat _)	      	 bndrs = bndrs
-collect (NPatIn _ _)		 bndrs = bndrs
-collect (NPatOut _ _ _)		 bndrs = bndrs
-
-collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
-collect (NPlusKPatOut n _ _ _)   bndrs = n : bndrs
-
-collect (SigPatIn pat _)	 bndrs = collectl pat bndrs
-collect (SigPatOut pat _)	 bndrs = collectl pat bndrs
-collect (TypePat ty)             bndrs = bndrs
-collect (DictPat ids1 ids2)      bndrs = map noLoc ids1 ++ map noLoc ids2
-					   ++ bndrs
+    go (SigPatIn pat _)	 	  = collectl pat bndrs
+    go (SigPatOut pat _)	  = collectl pat bndrs
+    go (TypePat ty)               = bndrs
+    go (DictPat ids1 ids2)        = map noLoc ids1 ++ map noLoc ids2
+				    ++ bndrs
 \end{code}
 
 \begin{code}

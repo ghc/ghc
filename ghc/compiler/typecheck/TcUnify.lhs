@@ -6,7 +6,7 @@
 \begin{code}
 module TcUnify (
 	-- Full-blown subsumption
-  tcSubPat, tcSubExp, tcGen, 
+  tcSubPat, tcSubExp, tcSub, tcGen, 
   checkSigTyVars, checkSigTyVarsWrt, bleatEscapedTvs, sigCtxt, 
 
 	-- Various unifications
@@ -43,7 +43,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  pprType, tidySkolemTyVar, isSkolemTyVar )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
-			  openTypeKind, liftedTypeKind, mkArrowKind, kindFunResult,
+			  openTypeKind, liftedTypeKind, mkArrowKind, 
 			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
 			  isSubKind, pprKind, splitKindFunTys )
 import Inst		( newDicts, instToId, tcInstCall )
@@ -274,7 +274,6 @@ unify_tc_app use_refinement tc ty
 
 unify_tc_app use_refinement tc ty = unify_tc_app_help tc ty
 
-----------
 unify_tc_app_help tc ty		-- Revert to ordinary unification
   = do	{ (tc_app, arg_tys) <- newTyConApp tc
 	; if not (isTauTy ty) then	-- Can happen if we call zapToTyConApp tc (forall a. ty)
@@ -285,31 +284,34 @@ unify_tc_app_help tc ty		-- Revert to ordinary unification
 
 
 ----------------------
-unifyAppTy :: TcType 		-- Expected type function: m
-	   -> TcType		-- Type to split: 	   m a
-	   -> TcM TcType	-- Type arg: 		   a
-unifyAppTy tc ty = unify_app_ty True tc ty
+unifyAppTy :: TcType			-- Type to split: m a
+	   -> TcM (TcType, TcType)	-- (m,a)
+-- Assumes (m:*->*)
 
-unify_app_ty use tc (NoteTy _ ty) = unify_app_ty use tc ty
+unifyAppTy ty = unify_app_ty True ty
 
-unify_app_ty use tc ty@(TyVarTy tyvar)
+unify_app_ty use (NoteTy _ ty) = unify_app_ty use ty
+
+unify_app_ty use ty@(TyVarTy tyvar)
   = do	{ details <- condLookupTcTyVar use tyvar
 	; case details of
-	    IndirectTv use' ty' -> unify_app_ty use' tc ty'
-	    other	 	-> unify_app_ty_help tc ty
+	    IndirectTv use' ty' -> unify_app_ty use' ty'
+	    other	 	-> unify_app_ty_help ty
 	}
 
-unify_app_ty use tc ty
+unify_app_ty use ty
   | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-  = do	{ unifyTauTy tc fun_ty
-	; wobblify use arg_ty }
+  = do	{ fun' <- wobblify use fun_ty
+	; arg' <- wobblify use arg_ty
+	; return (fun', arg') }
 
-  | otherwise = unify_app_ty_help tc ty
+  | otherwise = unify_app_ty_help ty
 
-unify_app_ty_help tc ty		-- Revert to ordinary unification
-  = do	{ arg_ty <- newTyFlexiVarTy (kindFunResult (typeKind tc))
-	; unifyTauTy (mkAppTy tc arg_ty) ty
-	; return arg_ty }
+unify_app_ty_help ty		-- Revert to ordinary unification
+  = do	{ fun_ty <- newTyFlexiVarTy (mkArrowKind liftedTypeKind liftedTypeKind)
+	; arg_ty <- newTyFlexiVarTy liftedTypeKind
+	; unifyTauTy (mkAppTy fun_ty arg_ty) ty
+	; return (fun_ty, arg_ty) }
 
 
 ----------------------

@@ -9,6 +9,7 @@ module Util (
 	-- general list processing
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
+	mapFst, mapSnd,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, filterOut,
 	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
@@ -223,6 +224,12 @@ stretchZipWith p z f (x:xs) ys
 
 
 \begin{code}
+mapFst :: (a->c) -> [(a,b)] -> [(c,b)]
+mapSnd :: (b->c) -> [(a,b)] -> [(a,c)]
+
+mapFst f xys = [(f x, y) | (x,y) <- xys]
+mapSnd f xys = [(x, f y) | (x,y) <- xys]
+
 mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
 
 mapAndUnzip f [] = ([],[])

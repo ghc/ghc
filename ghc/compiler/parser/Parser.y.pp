@@ -953,8 +953,7 @@ gdrhs :: { Located [LGRHS RdrName] }
 	| gdrh			{ L1 [$1] }
 
 gdrh :: { LGRHS RdrName }
-	: '|' quals '=' exp  	{ LL $ GRHS (reverse (L (getLoc $4) (ResultStmt $4) : 
-							unLoc $2)) }
+	: '|' quals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (reverse (unLoc $2)) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	: infixexp '::' sigtype
@@ -1002,12 +1001,11 @@ exp10 :: { LHsExpr RdrName }
 	| '-' fexp				{ LL $ mkHsNegApp $2 }
 
   	| 'do' stmtlist			{% let loc = comb2 $1 $2 in
-					   checkDo loc (unLoc $2)  >>= \ stmts ->
-					   return (L loc (mkHsDo DoExpr stmts)) }
+					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
+					   return (L loc (mkHsDo DoExpr stmts body)) }
   	| 'mdo' stmtlist		{% let loc = comb2 $1 $2 in
-					   checkMDo loc (unLoc $2)  >>= \ stmts ->
-					   return (L loc (mkHsDo MDoExpr stmts)) }
-
+					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
+					   return (L loc (mkHsDo (MDoExpr noPostTcTable) stmts body)) }
         | scc_annot exp		    		{ LL $ if opt_SccProfilingOn
 							then HsSCC (unLoc $1) $2
 							else HsPar $2 }
@@ -1116,13 +1114,11 @@ texps :: { [LHsExpr RdrName] }
 list :: { LHsExpr RdrName }
 	: exp			{ L1 $ ExplicitList placeHolderType [$1] }
 	| lexps 		{ L1 $ ExplicitList placeHolderType (reverse (unLoc $1)) }
-	| exp '..'		{ LL $ ArithSeqIn (From $1) }
-	| exp ',' exp '..' 	{ LL $ ArithSeqIn (FromThen $1 $3) }
-	| exp '..' exp	 	{ LL $ ArithSeqIn (FromTo $1 $3) }
-	| exp ',' exp '..' exp	{ LL $ ArithSeqIn (FromThenTo $1 $3 $5) }
-	| exp pquals		{ LL $ mkHsDo ListComp 
-					(reverse (L (getLoc $1) (ResultStmt $1) : 
-					   unLoc $2)) }
+	| exp '..'		{ LL $ ArithSeq noPostTcExpr (From $1) }
+	| exp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
+	| exp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
+	| exp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
+	| exp pquals		{ sL (comb2 $1 $>) $ mkHsDo ListComp (reverse (unLoc $2)) $1 }
 
 lexps :: { Located [LHsExpr RdrName] }
 	: lexps ',' exp 		{ LL ($3 : unLoc $1) }
@@ -1162,12 +1158,9 @@ parr :: { LHsExpr RdrName }
 	| exp				{ L1 $ ExplicitPArr placeHolderType [$1] }
 	| lexps 			{ L1 $ ExplicitPArr placeHolderType 
 						       (reverse (unLoc $1)) }
-	| exp '..' exp	 		{ LL $ PArrSeqIn (FromTo $1 $3) }
-	| exp ',' exp '..' exp		{ LL $ PArrSeqIn (FromThenTo $1 $3 $5) }
-	| exp pquals			{ LL $ mkHsDo PArrComp 
-					    (reverse (L (getLoc $1) (ResultStmt $1) :
-						 unLoc $2))
-					}
+	| exp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
+	| exp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
+	| exp pquals			{ sL (comb2 $1 $>) $ mkHsDo PArrComp (reverse (unLoc $2)) $1 }
 
 -- We are reusing `lexps' and `pquals' from the list case.
 
@@ -1203,8 +1196,7 @@ gdpats :: { Located [LGRHS RdrName] }
 	| gdpat				{ L1 [$1] }
 
 gdpat	:: { LGRHS RdrName }
-	: '|' quals '->' exp	 	{ let r = L (getLoc $4) (ResultStmt $4)
-					  in LL $ GRHS (reverse (r : unLoc $2)) }
+	: '|' quals '->' exp	 	{ sL (comb2 $1 $>) $ GRHS (reverse (unLoc $2)) $4 }
 
 -----------------------------------------------------------------------------
 -- Statement sequences
@@ -1214,7 +1206,7 @@ stmtlist :: { Located [LStmt RdrName] }
 	|     vocurly   stmts close	{ $2 }
 
 --	do { ;; s ; s ; ; s ;; }
--- The last Stmt should be a ResultStmt, but that's hard to enforce
+-- The last Stmt should be an expression, but that's hard to enforce
 -- here, because we need too much lookahead if we see do { e ; }
 -- So we use ExprStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
@@ -1236,13 +1228,13 @@ maybe_stmt :: { Maybe (LStmt RdrName) }
 stmt  :: { LStmt RdrName }
 	: qual				{ $1 }
 	| infixexp '->' exp		{% checkPattern $3 >>= \p ->
-					   return (LL $ BindStmt p $1) }
-  	| 'rec' stmtlist		{ LL $ RecStmt (unLoc $2) undefined undefined undefined }
+					   return (LL $ mkBindStmt p $1) }
+  	| 'rec' stmtlist		{ LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName }
 	: infixexp '<-' exp		{% checkPattern $1 >>= \p ->
-					   return (LL $ BindStmt p $3) }
-	| exp				{ L1 $ ExprStmt $1 placeHolderType }
+					   return (LL $ mkBindStmt p $3) }
+	| exp				{ L1 $ mkExprStmt $1 }
   	| 'let' binds			{ LL $ LetStmt (unLoc $2) }
 
 -----------------------------------------------------------------------------

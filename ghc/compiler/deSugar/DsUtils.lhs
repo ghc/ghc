@@ -16,8 +16,8 @@ module DsUtils (
 	cantFailMatchResult, alwaysFailMatchResult,
 	extractMatchResult, combineMatchResults, 
 	adjustMatchResult,  adjustMatchResultDs,
-	mkCoLetMatchResult,
-	mkGuardedMatchResult, 
+	mkCoLetMatchResult, mkGuardedMatchResult, 
+	matchCanFail,
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 	wrapBind, wrapBinds,
 
@@ -29,7 +29,7 @@ module DsUtils (
 	mkTupleType, mkTupleCase, mkBigCoreTup,
 	mkCoreTup, mkCoreTupTy,
 	
-	dsReboundNames, lookupReboundName,
+	dsSyntaxTable, lookupEvidence,
 
 	selectSimpleMatchVarL, selectMatchVars
     ) where
@@ -85,11 +85,11 @@ import FastString
 %************************************************************************
 
 \begin{code}
-dsReboundNames :: ReboundNames Id 
+dsSyntaxTable :: SyntaxTable Id 
 	       -> DsM ([CoreBind], 	-- Auxiliary bindings
 		       [(Name,Id)])	-- Maps the standard name to its value
 
-dsReboundNames rebound_ids
+dsSyntaxTable rebound_ids
   = mapAndUnzipDs mk_bind rebound_ids	`thenDs` \ (binds_s, prs) ->
     return (concat binds_s, prs)
   where
@@ -101,11 +101,11 @@ dsReboundNames rebound_ids
      	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
      	   return ([NonRec id rhs], (std_name, id))
 
-lookupReboundName :: [(Name,Id)] -> Name -> CoreExpr
-lookupReboundName prs std_name
-  = Var (assocDefault (mk_panic std_name) prs std_name)
+lookupEvidence :: [(Name, Id)] -> Name -> Id
+lookupEvidence prs std_name
+  = assocDefault (mk_panic std_name) prs std_name
   where
-    mk_panic std_name = pprPanic "dsReboundNames" (ptext SLIT("Not found:") <+> ppr std_name)
+    mk_panic std_name = pprPanic "dsSyntaxTable" (ptext SLIT("Not found:") <+> ppr std_name)
 \end{code}
 
 
@@ -198,6 +198,10 @@ shiftEqns eqns = [ eqn { eqn_pats = tail (eqn_pats eqn) } | eqn <- eqns ]
 Functions on MatchResults
 
 \begin{code}
+matchCanFail :: MatchResult -> Bool
+matchCanFail (MatchResult CanFail _)  = True
+matchCanFail (MatchResult CantFail _) = False
+
 alwaysFailMatchResult :: MatchResult
 alwaysFailMatchResult = MatchResult CanFail (\fail -> returnDs fail)
 
@@ -407,6 +411,7 @@ mkErrorAppDs err_id ty msg
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
 	core_msg = Lit (mkStringLit full_msg)
+	-- mkStringLit returns a result of type String#
     in
     returnDs (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}

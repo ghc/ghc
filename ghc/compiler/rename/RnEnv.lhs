@@ -13,7 +13,7 @@ module RnEnv (
 	lookupTopFixSigNames, lookupSrcOcc_maybe,
 	lookupFixityRn, lookupLocatedSigOccRn, 
 	lookupLocatedInstDeclBndr,
-	lookupSyntaxName, lookupSyntaxNames, lookupImportedName,
+	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,
@@ -32,7 +32,7 @@ module RnEnv (
 
 import LoadIface	( loadHomeInterface, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
-import HsSyn		( FixitySig(..), ReboundNames, HsExpr(..), 
+import HsSyn		( FixitySig(..), HsExpr(..), SyntaxExpr, SyntaxTable,
 			  HsType(..), HsExplicitForAll(..), LHsTyVarBndr, LHsType, 
 			  LSig, Sig(..), Fixity, hsLTyVarName, hsLTyVarLocNames, replaceTyVarName )
 import RdrHsSyn		( extractHsTyRdrTyVars )
@@ -485,7 +485,7 @@ At the moment this just happens for
 We store the relevant Name in the HsSyn tree, in 
   * HsIntegral/HsFractional	
   * NegApp
-  * NPlusKPatIn
+  * NPlusKPat
   * HsDo
 respectively.  Initially, we just store the "standard" name (PrelNames.fromIntegralName,
 fromRationalName etc), but the renamer changes this to the appropriate user
@@ -495,21 +495,21 @@ We treat the orignal (standard) names as free-vars too, because the type checker
 checks the type of the user thing against the type of the standard thing.
 
 \begin{code}
-lookupSyntaxName :: Name 			-- The standard name
-	         -> RnM (Name, FreeVars)	-- Possibly a non-standard name
+lookupSyntaxName :: Name 				-- The standard name
+	         -> RnM (SyntaxExpr Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
   = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
     if implicit_prelude then normal_case
     else
 	-- Get the similarly named thing from the local environment
     lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
-    returnM (usr_name, unitFV usr_name)
+    returnM (HsVar usr_name, unitFV usr_name)
   where
-    normal_case = returnM (std_name, emptyFVs)
+    normal_case = returnM (HsVar std_name, emptyFVs)
 
-lookupSyntaxNames :: [Name]				-- Standard names
-		  -> RnM (ReboundNames Name, FreeVars)	-- See comments with HsExpr.ReboundNames
-lookupSyntaxNames std_names
+lookupSyntaxTable :: [Name]				-- Standard names
+		  -> RnM (SyntaxTable Name, FreeVars)	-- See comments with HsExpr.ReboundNames
+lookupSyntaxTable std_names
   = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
     if implicit_prelude then normal_case 
     else

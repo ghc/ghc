@@ -13,8 +13,8 @@ import {-# SOURCE #-}	TcExpr( tcCheckRho, tcInferRho )
 import HsSyn
 import TcHsSyn	(  mkHsLet )
 
-import TcMatches ( TcStmtCtxt(..), tcMatchPats, matchCtxt, tcStmts,
-		  TcMatchCtxt(..), tcMatchesCase )
+import TcMatches ( tcMatchPats, matchCtxt, tcStmts, tcMDoStmt, tcGuardStmt,
+		   TcMatchCtxt(..), tcMatchesCase )
 
 import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType, 
@@ -195,39 +195,33 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
     n_pats     = length pats
     stk'       = drop n_pats cmd_stk
     match_ctxt = LambdaExpr 	-- Maybe KappaExpr?
+    pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs grhss binds)
-	= tcBindsAndThen glueBindsOnGRHSs binds 	$
+	= tcBindsAndThen glueBindsOnGRHSs binds $
 	  do { grhss' <- mappM (wrapLocM tc_grhs) grhss
 	     ; return (GRHSs grhss' []) }
 
-    stmt_ctxt = SC { sc_what = PatGuard match_ctxt, 
-		     sc_rhs  = tcInferRho, 
-		     sc_body = \ body -> tcCmd env body (stk', res_ty),
-		     sc_ty   = res_ty }	-- ToDo: Is this right?
-    tc_grhs (GRHS guarded)
-	= do { guarded' <- tcStmts stmt_ctxt guarded	
-	     ; return (GRHS guarded') }
+    tc_grhs (GRHS guards body)
+	= do { (guards', rhs') <- tcStmts pg_ctxt
+					  (tcGuardStmt res_ty)
+					  guards
+					  (tcCmd env body (stk', res_ty))
+	     ; return (GRHS guards' rhs') }
 
 -------------------------------------------
 -- 		Do notation
 
-tc_cmd env cmd@(HsDo do_or_lc stmts _ ty) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsDo do_or_lc stmts body ty) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
-	; stmts' <- tcStmts stmt_ctxt stmts 
-	; return (HsDo do_or_lc stmts' [] res_ty) }
-	-- The 'methods' needed for the HsDo are in the enclosing HsCmd
-	-- hence the empty list here
+	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts $
+			     tcCmd env body ([], res_ty)
+	; return (HsDo do_or_lc stmts' body' res_ty) }
   where
-    stmt_ctxt = SC { sc_what = do_or_lc,
-		     sc_rhs  = tc_rhs,
-		     sc_body = tc_ret,
-		     sc_ty   = res_ty }
-
+    tc_stmt = tcMDoStmt res_ty tc_rhs
     tc_rhs rhs = do { ty <- newTyFlexiVarTy liftedTypeKind
 		    ; rhs' <- tcCmd env rhs ([], ty)
 		    ; return (rhs', ty) }
-    tc_ret body = tcCmd env body ([], res_ty)
 
 
 -----------------------------------------------------------------

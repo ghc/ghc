@@ -13,7 +13,7 @@ import DsUtils		( mkErrorAppDs,
 			  mkCoreTupTy, mkCoreTup, selectSimpleMatchVarL,
 			  mkTupleCase, mkBigCoreTup, mkTupleType,
 			  mkTupleExpr, mkTupleSelector,
-			  dsReboundNames, lookupReboundName )
+			  dsSyntaxTable, lookupEvidence )
 import DsMonad
 
 import HsSyn
@@ -57,17 +57,17 @@ data DsCmdEnv = DsCmdEnv {
 	arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
     }
 
-mkCmdEnv :: ReboundNames Id -> DsM DsCmdEnv
+mkCmdEnv :: SyntaxTable Id -> DsM DsCmdEnv
 mkCmdEnv ids
-  = dsReboundNames ids			`thenDs` \ (meth_binds, ds_meths) ->
+  = dsSyntaxTable ids			`thenDs` \ (meth_binds, ds_meths) ->
     return $ DsCmdEnv {
 		meth_binds = meth_binds,
-		arr_id	   = lookupReboundName ds_meths arrAName,
-		compose_id = lookupReboundName ds_meths composeAName,
-		first_id   = lookupReboundName ds_meths firstAName,
-		app_id	   = lookupReboundName ds_meths appAName,
-		choice_id  = lookupReboundName ds_meths choiceAName,
-		loop_id	   = lookupReboundName ds_meths loopAName
+		arr_id	   = Var (lookupEvidence ds_meths arrAName),
+		compose_id = Var (lookupEvidence ds_meths composeAName),
+		first_id   = Var (lookupEvidence ds_meths firstAName),
+		app_id	   = Var (lookupEvidence ds_meths appAName),
+		choice_id  = Var (lookupEvidence ds_meths choiceAName),
+		loop_id	   = Var (lookupEvidence ds_meths loopAName)
 	    }
 
 bindCmdEnv :: DsCmdEnv -> CoreExpr -> CoreExpr
@@ -388,7 +388,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
 --		---> arr (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) >>> c
 
 dsCmd ids local_vars env_ids stack res_ty
-    (HsLam (MatchGroup [L _ (Match pats _ (GRHSs [L _ (GRHS [L _ (ResultStmt body)])] _ ))] _))
+    (HsLam (MatchGroup [L _ (Match pats _ (GRHSs [L _ (GRHS [] body)] _ ))] _))
   = let
 	pat_vars = mkVarSet (collectPatsBinders pats)
 	local_vars' = local_vars `unionVarSet` pat_vars
@@ -575,8 +575,8 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body)
 			core_body,
 	exprFreeVars core_binds `intersectVarSet` local_vars)
 
-dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _)
-  = dsCmdDo ids local_vars env_ids res_ty stmts
+dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts body _)
+  = dsCmdDo ids local_vars env_ids res_ty stmts body
 
 --	A |- e :: forall e. a1 (e*ts1) t1 -> ... an (e*tsn) tn -> a (e*ts) t
 --	A | xs |- ci :: [tsi] ti
@@ -650,7 +650,8 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 				-- This is typically fed back,
 				-- so don't pull on it too early
 	-> Type			-- return type of the statement
-	-> [LStmt Id]	-- statements to desugar
+	-> [LStmt Id]		-- statements to desugar
+	-> LHsExpr Id		-- body
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
@@ -658,16 +659,16 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 --	--------------------------
 --	A | xs |- do { c } :: [] t
 
-dsCmdDo ids local_vars env_ids res_ty [L _ (ResultStmt cmd)]
-  = dsLCmd ids local_vars env_ids [] res_ty cmd
+dsCmdDo ids local_vars env_ids res_ty [] body
+  = dsLCmd ids local_vars env_ids [] res_ty body
 
-dsCmdDo ids local_vars env_ids res_ty (stmt:stmts)
+dsCmdDo ids local_vars env_ids res_ty (stmt:stmts) body
   = let
 	bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
 	local_vars' = local_vars `unionVarSet` bound_vars
     in
     fixDs (\ ~(_,_,env_ids') ->
-	dsCmdDo ids local_vars' env_ids' res_ty stmts
+	dsCmdDo ids local_vars' env_ids' res_ty stmts body
 					`thenDs` \ (core_stmts, fv_stmts) ->
 	returnDs (core_stmts, fv_stmts, varSetElems fv_stmts))
 				`thenDs` \ (core_stmts, fv_stmts, env_ids') ->
@@ -708,7 +709,7 @@ dsCmdStmt
 --		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
 --			arr snd >>> ss
 
-dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty)
+dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ c_ty)
   = dsfixCmd ids local_vars [] c_ty cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     matchEnvStack env_ids []
@@ -740,7 +741,7 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty)
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
 
-dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd)
+dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _ _)
   = dsfixCmd ids local_vars [] (hsPatType pat) cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     let
@@ -820,8 +821,8 @@ dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds)
 --			first (loop (arr (\((ys1),~(ys2)) -> (ys)) >>> ss)) >>>
 --			arr (\((xs1),(xs2)) -> (xs')) >>> ss'
 
-dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
-  = let
+dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss binds)
+  = let		-- ****** binds not desugared; ROSS PLEASE FIX ********
 	env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
 	env2_ids = varSetElems env2_id_set
 	env2_ty = mkTupleType env2_ids
@@ -885,7 +886,7 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
 
     -- mk_pair_fn = \ (out_ids) -> ((later_ids),(rhss))
 
-    mappM dsLExpr rhss		`thenDs` \ core_rhss ->
+    mappM dsExpr rhss		`thenDs` \ core_rhss ->
     let
 	later_tuple = mkTupleExpr later_ids
 	later_ty = mkTupleType later_ids
@@ -1011,10 +1012,9 @@ leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
 		       mkVarSet (map unLoc (collectGroupBinders binds))
     in
     [(expr, 
-      mkVarSet (map unLoc (collectStmtsBinders stmts)) 
+      mkVarSet (map unLoc (collectLStmtsBinders stmts)) 
 	`unionVarSet` defined_vars) 
-    | L _ (GRHS stmts) <- grhss,
-      let L _ (ResultStmt expr) = last stmts]
+    | L _ (GRHS stmts expr) <- grhss]
 \end{code}
 
 Replace the leaf commands in a match
@@ -1037,8 +1037,8 @@ replaceLeavesGRHS
 	-> LGRHS Id	-- rhss of a case command
 	-> ([LHsExpr Id],-- remaining leaf expressions
 	    LGRHS Id)	-- updated GRHS
-replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts))
-  = (leaves, L loc (GRHS (init stmts ++ [L (getLoc leaf) (ResultStmt leaf)])))
+replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts rhs))
+  = (leaves, L loc (GRHS stmts leaf))
 \end{code}
 
 Balanced fold of a non-empty list.

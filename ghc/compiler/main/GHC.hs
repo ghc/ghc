@@ -975,6 +975,10 @@ topSortModuleGraph
 	  -> Maybe Module
 	  -> [SCC ModSummary]
 -- Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
+-- The resulting list of strongly-connected-components is in topologically
+-- sorted order, starting with the module(s) at the bottom of the
+-- dependency graph (ie compile them first) and ending with the ones at
+-- the top.
 --
 -- Drop hi-boot nodes (first boolean arg)? 
 --

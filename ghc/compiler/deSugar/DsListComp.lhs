@@ -44,9 +44,10 @@ There will be at least one ``qualifier'' in the input.
 
 \begin{code}
 dsListComp :: [LStmt Id] 
+	   -> LHsExpr Id
 	   -> Type		-- Type of list elements
 	   -> DsM CoreExpr
-dsListComp lquals elt_ty
+dsListComp lquals body elt_ty
   = getDOptsDs  `thenDs` \dflags ->
     let
 	quals = map unLoc lquals
@@ -58,7 +59,7 @@ dsListComp lquals elt_ty
   	|| isParallelComp quals
 		-- Foldr-style desugaring can't handle
 		-- parallel list comprehensions
-  	then deListComp quals (mkNilExpr elt_ty)
+  	then deListComp quals body (mkNilExpr elt_ty)
 
    else		-- Foldr/build should be enabled, so desugar 
 		-- into foldrs and builds
@@ -68,7 +69,7 @@ dsListComp lquals elt_ty
         c_ty = mkFunTys [elt_ty, n_ty] n_ty
     in
     newSysLocalsDs [c_ty,n_ty]		`thenDs` \ [c, n] ->
-    dfListComp c n quals		`thenDs` \ result ->
+    dfListComp c n quals body		`thenDs` \ result ->
     dsLookupGlobalId buildName	`thenDs` \ build_id ->
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
@@ -142,15 +143,15 @@ The introduced tuples are Boxed, but only because I couldn't get it to work
 with the Unboxed variety.
 
 \begin{code}
-deListComp :: [Stmt Id] -> CoreExpr -> DsM CoreExpr
+deListComp :: [Stmt Id] -> LHsExpr Id -> CoreExpr -> DsM CoreExpr
 
-deListComp (ParStmt stmtss_w_bndrs : quals) list
+deListComp (ParStmt stmtss_w_bndrs : quals) body list
   = mappM do_list_comp stmtss_w_bndrs	`thenDs` \ exps ->
     mkZipBind qual_tys			`thenDs` \ (zip_fn, zip_rhs) ->
 
 	-- Deal with [e | pat <- zip l1 .. ln] in example above
     deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
-		   quals list
+		   quals body list
 
   where 
 	bndrs_s = map snd stmtss_w_bndrs
@@ -163,35 +164,35 @@ deListComp (ParStmt stmtss_w_bndrs : quals) list
 	qual_tys = map mk_bndrs_tys bndrs_s
 
 	do_list_comp (stmts, bndrs)
-	  = dsListComp (stmts ++ [noLoc $ ResultStmt (mk_hs_tuple_expr bndrs)])
+	  = dsListComp stmts (mk_hs_tuple_expr bndrs)
 		       (mk_bndrs_tys bndrs)
 
 	mk_bndrs_tys bndrs = mkCoreTupTy (map idType bndrs)
 
 	-- Last: the one to return
-deListComp [ResultStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
-  = dsLExpr expr		`thenDs` \ core_expr ->
-    returnDs (mkConsExpr (exprType core_expr) core_expr list)
+deListComp [] body list		-- Figure 7.4, SLPJ, p 135, rule C above
+  = dsLExpr body		`thenDs` \ core_body ->
+    returnDs (mkConsExpr (exprType core_body) core_body list)
 
 	-- Non-last: must be a guard
-deListComp (ExprStmt guard ty : quals) list	-- rule B above
+deListComp (ExprStmt guard _ _ : quals) body list	-- rule B above
   = dsLExpr guard      		`thenDs` \ core_guard ->
-    deListComp quals list	`thenDs` \ core_rest ->
+    deListComp quals body list	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest list)
 
 -- [e | let B, qs] = let B in [e | qs]
-deListComp (LetStmt binds : quals) list
-  = deListComp quals list	`thenDs` \ core_rest ->
+deListComp (LetStmt binds : quals) body list
+  = deListComp quals body list	`thenDs` \ core_rest ->
     dsLet binds core_rest
 
-deListComp (BindStmt pat list1 : quals) core_list2 -- rule A' above
+deListComp (BindStmt pat list1 _ _ : quals) body core_list2 -- rule A' above
   = dsLExpr list1		    `thenDs` \ core_list1 ->
-    deBindComp pat core_list1 quals core_list2
+    deBindComp pat core_list1 quals body core_list2
 \end{code}
 
 
 \begin{code}
-deBindComp pat core_list1 quals core_list2
+deBindComp pat core_list1 quals body core_list2
   = let
 	u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
@@ -208,7 +209,7 @@ deBindComp pat core_list1 quals core_list2
 	core_fail   = App (Var h) (Var u3)
 	letrec_body = App (Var h) core_list1
     in
-    deListComp quals core_fail			`thenDs` \ rest_expr ->
+    deListComp quals body core_fail		`thenDs` \ rest_expr ->
     matchSimply (Var u2) (StmtCtxt ListComp) pat
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
@@ -289,25 +290,26 @@ TE[ e | p <- l , q ] c n = let
 \begin{code}
 dfListComp :: Id -> Id			-- 'c' and 'n'
 	   -> [Stmt Id] 	-- the rest of the qual's
+	   -> LHsExpr Id
 	   -> DsM CoreExpr
 
 	-- Last: the one to return
-dfListComp c_id n_id [ResultStmt expr]
-  = dsLExpr expr			`thenDs` \ core_expr ->
-    returnDs (mkApps (Var c_id) [core_expr, Var n_id])
+dfListComp c_id n_id [] body
+  = dsLExpr body		`thenDs` \ core_body ->
+    returnDs (mkApps (Var c_id) [core_body, Var n_id])
 
 	-- Non-last: must be a guard
-dfListComp c_id n_id (ExprStmt guard ty  : quals)
-  = dsLExpr guard              			`thenDs` \ core_guard ->
-    dfListComp c_id n_id quals	`thenDs` \ core_rest ->
+dfListComp c_id n_id (ExprStmt guard _ _  : quals) body
+  = dsLExpr guard              		`thenDs` \ core_guard ->
+    dfListComp c_id n_id quals body	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest (Var n_id))
 
-dfListComp c_id n_id (LetStmt binds : quals)
+dfListComp c_id n_id (LetStmt binds : quals) body
   -- new in 1.3, local bindings
-  = dfListComp c_id n_id quals	`thenDs` \ core_rest ->
+  = dfListComp c_id n_id quals body	`thenDs` \ core_rest ->
     dsLet binds core_rest
 
-dfListComp c_id n_id (BindStmt pat list1 : quals)
+dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) body
     -- evaluate the two lists
   = dsLExpr list1			`thenDs` \ core_list1 ->
 
@@ -320,7 +322,7 @@ dfListComp c_id n_id (BindStmt pat list1 : quals)
     newSysLocalsDs [b_ty,x_ty]			`thenDs` \ [b,x] ->
 
     -- build rest of the comprehesion
-    dfListComp c_id b quals			`thenDs` \ core_rest ->
+    dfListComp c_id b quals body		`thenDs` \ core_rest ->
 
     -- build the pattern match
     matchSimply (Var x) (StmtCtxt ListComp)
@@ -350,26 +352,28 @@ dfListComp c_id n_id (BindStmt pat list1 : quals)
 --   [:e | qss:] = <<[:e | qss:]>> () [:():]
 --
 dsPArrComp      :: [Stmt Id] 
+		-> LHsExpr Id
 	        -> Type		    -- Don't use; called with `undefined' below
 	        -> DsM CoreExpr
-dsPArrComp qs _  =
+dsPArrComp qs body _  =
   dsLookupGlobalId replicatePName			  `thenDs` \repP ->
   let unitArray = mkApps (Var repP) [Type unitTy, 
 				     mkIntExpr 1, 
 				     mkCoreTup []]
   in
-  dePArrComp qs (mkTuplePat []) unitArray
+  dePArrComp qs body (mkTuplePat []) unitArray
 
 -- the work horse
 --
 dePArrComp :: [Stmt Id] 
+	   -> LHsExpr Id
 	   -> LPat Id		-- the current generator pattern
 	   -> CoreExpr		-- the current generator expression
 	   -> DsM CoreExpr
 --
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
-dePArrComp [ResultStmt e'] pa cea =
+dePArrComp [] e' pa cea =
   dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
   let ty = parrElemType cea
   in
@@ -379,19 +383,19 @@ dePArrComp [ResultStmt e'] pa cea =
 --
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
-dePArrComp (ExprStmt b _ : qs) pa cea =
+dePArrComp (ExprStmt b _ _ : qs) body pa cea =
   dsLookupGlobalId filterPName			  `thenDs` \filterP  ->
   let ty = parrElemType cea
   in
   deLambda ty pa b				  `thenDs` \(clam,_) ->
-  dePArrComp qs pa (mkApps (Var filterP) [Type ty, clam, cea])
+  dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
 --
 --  <<[:e' | p <- e, qs:]>> pa ea = 
 --    let ef = filterP (\x -> case x of {p -> True; _ -> False}) e
 --    in
 --    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
 --
-dePArrComp (BindStmt p e : qs) pa cea =
+dePArrComp (BindStmt p e _ _ : qs) body pa cea =
   dsLookupGlobalId filterPName			  `thenDs` \filterP ->
   dsLookupGlobalId crossPName			  `thenDs` \crossP  ->
   dsLExpr e					  `thenDs` \ce      ->
@@ -406,7 +410,7 @@ dePArrComp (BindStmt p e : qs) pa cea =
       ty'cef = ty'ce				-- filterP preserves the type
       pa'    = mkTuplePat [pa, p]
   in
-  dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
+  dePArrComp qs body pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
 --
 --  <<[:e' | let ds, qs:]>> pa ea = 
 --    <<[:e' | qs:]>> (pa, (x_1, ..., x_n)) 
@@ -414,7 +418,7 @@ dePArrComp (BindStmt p e : qs) pa cea =
 --  where
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
-dePArrComp (LetStmt ds : qs) pa cea =
+dePArrComp (LetStmt ds : qs) body pa cea =
   dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
   let xs     = map unLoc (collectGroupBinders ds)
       ty'cea = parrElemType cea
@@ -432,7 +436,7 @@ dePArrComp (LetStmt ds : qs) pa cea =
   let pa'    = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
       proj   = mkLams [v] ccase
   in
-  dePArrComp qs pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
+  dePArrComp qs body pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
 --
 --  <<[:e' | qs | qss:]>> pa ea = 
 --    <<[:e' | qss:]>> (pa, (x_1, ..., x_n)) 
@@ -440,7 +444,7 @@ dePArrComp (LetStmt ds : qs) pa cea =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrComp (ParStmt qss            : qs) pa cea = 
+dePArrComp (ParStmt qss : qs) body pa cea = 
   dsLookupGlobalId crossPName				`thenDs` \crossP  ->
   deParStmt qss						`thenDs` \(pQss, 
 								   ceQss) ->
@@ -448,26 +452,26 @@ dePArrComp (ParStmt qss            : qs) pa cea =
       ty'ceQss = parrElemType ceQss
       pa'      = mkTuplePat [pa, pQss]
   in
-  dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'ceQss, 
-					  cea, ceQss])
+  dePArrComp qs body pa' (mkApps (Var crossP) [Type ty'cea, Type ty'ceQss, 
+					       cea, ceQss])
   where
     deParStmt []             =
       -- empty parallel statement lists have not source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
     deParStmt ((qs, xs):qss) =          -- first statement
-      let resStmt = ResultStmt $ mkExplicitTuple (map nlHsVar xs)
+      let res_expr = mkExplicitTuple (map nlHsVar xs)
       in
-      dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
+      dsPArrComp (map unLoc qs) res_expr undefined	  `thenDs` \cqs     ->
       parStmts qss (mkTuplePat (map nlVarPat xs)) cqs
     ---
     parStmts []             pa cea = return (pa, cea)
     parStmts ((qs, xs):qss) pa cea =    -- subsequent statements (zip'ed)
       dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
-      let pa'     = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
-	  ty'cea  = parrElemType cea
-	  resStmt = ResultStmt $ mkExplicitTuple (map nlHsVar xs)
+      let pa'      = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
+	  ty'cea   = parrElemType cea
+	  res_expr = mkExplicitTuple (map nlHsVar xs)
       in
-      dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
+      dsPArrComp (map unLoc qs) res_expr undefined	  `thenDs` \cqs     ->
       let ty'cqs = parrElemType cqs
 	  cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
       in

@@ -43,7 +43,7 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 
 import Var		( Id )
 import Module		( emptyModuleEnv )
-import RdrName		( RdrName )
+import RdrName		( GlobalRdrEnv, RdrName )
 import HsSyn		( HsModule, LHsBinds )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer )
@@ -56,7 +56,6 @@ import TcIface		( typecheckIface )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
-import RdrName		( GlobalRdrEnv )
 import MkIface		( checkOldIface, mkIface )
 import Desugar
 import Flattening       ( flatten )
@@ -630,7 +629,7 @@ hscTcExpr hsc_env expr
 	; let icontext = hsc_IC hsc_env
 	; case maybe_stmt of {
 	     Nothing      -> return Nothing ;	-- Parse error
-	     Just (Just (L _ (ExprStmt expr _)))
+	     Just (Just (L _ (ExprStmt expr _ _)))
 			-> tcRnExpr hsc_env icontext expr ;
 	     Just other -> do { errorMsg ("not an expression: `" ++ expr ++ "'") ;
 			        return Nothing } ;

@@ -11,6 +11,7 @@ data MatchGroup a
 data GRHSs a
 
 type LHsExpr a = Located (HsExpr a)
+type SyntaxExpr a = HsExpr a
 
 pprExpr :: (OutputableBndr i) => 
 	HsExpr i -> SDoc

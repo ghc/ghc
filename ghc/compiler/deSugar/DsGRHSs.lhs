@@ -12,7 +12,7 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
-			  HsMatchContext(..), Pat(..) )
+			  LHsExpr, HsMatchContext(..), Pat(..) )
 import CoreSyn		( CoreExpr )
 import Var		( Id )
 import Type		( Type )
@@ -64,8 +64,9 @@ dsGRHSs kind pats (GRHSs grhss binds) rhs_ty
     in
     returnDs match_result2
 
-dsGRHS kind pats rhs_ty (L loc (GRHS guard))
-  = matchGuard (map unLoc guard) (DsMatchContext kind pats loc) rhs_ty
+dsGRHS kind pats rhs_ty (L loc (GRHS guards rhs))
+  = matchGuard (map unLoc guards) (DsMatchContext kind pats loc)
+	       rhs rhs_ty
 \end{code}
 
 
@@ -78,41 +79,42 @@ dsGRHS kind pats rhs_ty (L loc (GRHS guard))
 \begin{code}
 matchGuard :: [Stmt Id] 	-- Guard
            -> DsMatchContext	-- Context
+	   -> LHsExpr Id	-- RHS
 	   -> Type		-- Type of RHS of guard
 	   -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
-matchGuard [ResultStmt expr] ctx rhs_ty
-  = do	{ core_expr <- dsLExpr expr
-	; return (cantFailMatchResult core_expr) }
+matchGuard [] ctx rhs rhs_ty
+  = do	{ core_rhs <- dsLExpr rhs
+	; return (cantFailMatchResult core_rhs) }
 
 	-- ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (ExprStmt (L _ (HsVar v)) _ : stmts) ctx rhs_ty
+matchGuard (ExprStmt (L _ (HsVar v)) _ _ : stmts) ctx rhs rhs_ty
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` getUnique trueDataConId	
 	-- trueDataConId doesn't have the same 
 	-- unique as trueDataCon
-  = matchGuard stmts ctx rhs_ty
+  = matchGuard stmts ctx rhs rhs_ty
 
-matchGuard (ExprStmt expr _ : stmts) ctx rhs_ty
-  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
-    dsLExpr expr		`thenDs` \ pred_expr ->
+matchGuard (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty
+  = matchGuard stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
+    dsLExpr expr			`thenDs` \ pred_expr ->
     returnDs (mkGuardedMatchResult pred_expr match_result)
 
-matchGuard (LetStmt binds : stmts) ctx rhs_ty
-  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
+matchGuard (LetStmt binds : stmts) ctx rhs rhs_ty
+  = matchGuard stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
     returnDs (adjustMatchResultDs (dsLet binds) match_result)
 	-- NB the dsLet occurs inside the match_result
 	-- Reason: dsLet takes the body expression as its argument
 	--	   so we can't desugar the bindings without the
 	--	   body expression in hand
 
-matchGuard (BindStmt pat bind_rhs : stmts) ctx rhs_ty
-  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
-    dsLExpr bind_rhs		`thenDs` \ core_rhs ->
+matchGuard (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty
+  = matchGuard stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
+    dsLExpr bind_rhs			`thenDs` \ core_rhs ->
     matchSinglePat core_rhs ctx pat rhs_ty match_result
 \end{code}
 

@@ -512,13 +512,17 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; z <- repLetE ds e2
 			       ; wrapGenSyns ss z }
 -- FIXME: I haven't got the types here right yet
-repE (HsDo DoExpr sts _ ty) 
+repE (HsDo DoExpr sts body ty) 
  = do { (ss,zs) <- repLSts sts; 
-        e       <- repDoE (nonEmptyCoreList zs);
+	body'	<- repLE body;
+	ret	<- repNoBindSt body';	
+        e       <- repDoE (nonEmptyCoreList (zs ++ [ret]));
         wrapGenSyns ss e }
-repE (HsDo ListComp sts _ ty) 
+repE (HsDo ListComp sts body ty) 
  = do { (ss,zs) <- repLSts sts; 
-        e       <- repComp (nonEmptyCoreList zs);
+	body'	<- repLE body;
+	ret	<- repNoBindSt body';	
+        e       <- repComp (nonEmptyCoreList (zs ++ [ret]));
         wrapGenSyns ss e }
 repE (HsDo _ _ _ _) = panic "DsMeta.repE: Can't represent mdo and [: :] yet"
 repE (ExplicitList ty es) = do { xs <- repLEs es; repListExp xs } 
@@ -527,11 +531,11 @@ repE (ExplicitPArr ty es) =
 repE (ExplicitTuple es boxed) 
   | isBoxed boxed         = do { xs <- repLEs es; repTup xs }
   | otherwise		  = panic "DsMeta.repE: Can't represent unboxed tuples"
-repE (RecordCon c flds)
+repE (RecordCon c _ flds)
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd e flds)
+repE (RecordUpd e flds _ _)
  = do { x <- repLE e;
         fs <- repFields flds;
         repRecUpd x fs }
@@ -592,7 +596,7 @@ repClauseTup (L _ (Match ps ty (GRHSs guards wheres))) =
      ; wrapGenSyns (ss1++ss2) clause }}}
 
 repGuards ::  [LGRHS Name] ->  DsM (Core TH.BodyQ)
-repGuards [L _ (GRHS [L _ (ResultStmt e)])]
+repGuards [L _ (GRHS [] e)]
   = do {a <- repLE e; repNormal a }
 repGuards other 
   = do { zs <- mapM process other;
@@ -601,14 +605,13 @@ repGuards other
      wrapGenSyns (concat xs) gd }
   where 
     process :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
-    process (L _ (GRHS [])) = panic "No guards in guarded body"
-    process (L _ (GRHS [L _ (ExprStmt e1 ty),
-			L _ (ResultStmt e2)]))
+    process (L _ (GRHS [L _ (ExprStmt e1 _ _)] e2))
            = do { x <- repLNormalGE e1 e2;
                   return ([], x) }
-    process (L _ (GRHS ss))
+    process (L _ (GRHS ss rhs))
            = do (gs, ss') <- repLSts ss
-                g <- repPatGE (nonEmptyCoreList ss')
+		rhs' <- repLE rhs
+                g <- repPatGE (nonEmptyCoreList ss') rhs'
                 return (gs, g)
 
 repFields :: [(Located Name, LHsExpr Name)] -> DsM (Core [TH.Q TH.FieldExp])
@@ -648,11 +651,7 @@ repLSts :: [LStmt Name] -> DsM ([GenSymBind], [Core TH.StmtQ])
 repLSts stmts = repSts (map unLoc stmts)
 
 repSts :: [Stmt Name] -> DsM ([GenSymBind], [Core TH.StmtQ])
-repSts [ResultStmt e] = 
-   do { a <- repLE e
-      ; e1 <- repNoBindSt a
-      ; return ([], [e1]) }
-repSts (BindStmt p e : ss) =
+repSts (BindStmt p e _ _ : ss) =
    do { e2 <- repLE e 
       ; ss1 <- mkGenSyms (collectPatBinders p) 
       ; addBinds ss1 $ do {
@@ -665,7 +664,7 @@ repSts (LetStmt bs : ss) =
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
       ; return (ss1++ss2, z : zs) } 
-repSts (ExprStmt e ty : ss) =       
+repSts (ExprStmt e _ _ : ss) =       
    do { e2 <- repLE e
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
@@ -774,7 +773,7 @@ rep_bind (L loc (VarBind v e))
 -- (\ p1 .. pn -> exp) by causing an error.  
 
 repLambda :: LMatch Name -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [L _ (ResultStmt e)])] [])))
+repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [])] [])))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
@@ -821,8 +820,8 @@ repP (ConPatIn dc details)
                                 p2' <- repLP p2;
                                 repPinfix p1' con_str p2' }
    }
-repP (NPatIn l (Just _)) = panic "Can't cope with negative overloaded patterns yet (repP (NPatIn _ (Just _)))"
-repP (NPatIn l Nothing) = do { a <- repOverloadedLiteral l; repPlit a }
+repP (NPat l (Just _) _ _) = panic "Can't cope with negative overloaded patterns yet (repP (NPat _ (Just _)))"
+repP (NPat l Nothing _ _)  = do { a <- repOverloadedLiteral l; repPlit a }
 repP (SigPatIn p t)  = do { p' <- repLP p; t' <- repLTy t; repPsig p' t' }
 repP other = panic "Exotic pattern inside meta brackets"
 
@@ -1107,8 +1106,8 @@ repLNormalGE g e = do g' <- repLE g
 repNormalGE :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
 repNormalGE (MkC g) (MkC e) = rep2 normalGEName [g, e]
 
-repPatGE :: Core [TH.StmtQ] -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
-repPatGE (MkC ss) = rep2 patGEName [ss]
+repPatGE :: Core [TH.StmtQ] -> Core TH.ExpQ -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
+repPatGE (MkC ss) = rep2 patGName [ss]
 
 ------------- Stmts -------------------
 repBindSt :: Core TH.PatQ -> Core TH.ExpQ -> DsM (Core TH.StmtQ)
@@ -1255,7 +1254,7 @@ mk_integer  i = do integer_ty <- lookupType integerTyConName
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 
-repOverloadedLiteral :: HsOverLit -> DsM (Core TH.Lit)
+repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (HsIntegral i _)   = do { lit <- mk_integer  i; repLiteral lit }
 repOverloadedLiteral (HsFractional f _) = do { lit <- mk_rational f; repLiteral lit }
 	-- The type Rational will be in the environment, becuase 

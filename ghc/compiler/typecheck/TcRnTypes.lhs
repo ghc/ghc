@@ -672,10 +672,11 @@ data Inst
 
   | LitInst
 	Name
-	HsOverLit	-- The literal from the occurrence site
-			--	INVARIANT: never a rebindable-syntax literal
-			--	Reason: tcSyntaxName does unification, and we
-			--		don't want to deal with that during tcSimplify
+	(HsOverLit Name)	-- The literal from the occurrence site
+				-- INVARIANT: never a rebindable-syntax literal
+				-- Reason: tcSyntaxName does unification, and we
+				--	   don't want to deal with that during tcSimplify,
+				--	   when resolving LitInsts
 	TcType		-- The type at which the literal is used
 	InstLoc
 \end{code}
@@ -763,7 +764,7 @@ data InstOrigin
 
   | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
 
-  | LiteralOrigin HsOverLit	-- Occurrence of a literal
+  | LiteralOrigin (HsOverLit Name)	-- Occurrence of a literal
 
   | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]

@@ -411,11 +411,18 @@ get_used_lits qs = remove_dups' all_literals
 get_used_lits' :: [(EqnNo, EquationInfo)] -> [HsLit]
 get_used_lits' [] = []
 get_used_lits' (q:qs) 
-  | LitPat lit      <- first_pat = lit : get_used_lits qs
-  | NPatOut lit _ _ <- first_pat = lit : get_used_lits qs
-  | otherwise		         = get_used_lits qs
+  | LitPat lit     <- first_pat = lit : get_used_lits qs
+  | NPat lit _ _ _ <- first_pat = over_lit_lit lit : get_used_lits qs
+  | otherwise		        = get_used_lits qs
   where
     first_pat = firstPatN q
+
+over_lit_lit :: HsOverLit id -> HsLit
+-- Get a representative HsLit to stand for the OverLit
+-- It doesn't matter which one, because they will only be compared
+-- with other HsLits gotten in the same way
+over_lit_lit (HsIntegral i   _) = HsIntPrim   i
+over_lit_lit (HsFractional f _) = HsFloatPrim f
 
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = unused_cons
@@ -462,7 +469,7 @@ is_con _                     = False
 
 is_lit :: Pat Id -> Bool
 is_lit (LitPat _)      = True
-is_lit (NPatOut _ _ _) = True
+is_lit (NPat _ _ _ _)  = True
 is_lit _               = False
 
 is_var :: Pat Id -> Bool
@@ -475,10 +482,10 @@ is_var_con con (ConPatOut (L _ id) _ _ _ _ _) | id == con = True
 is_var_con con _                                    = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
-is_var_lit lit (WildPat _)	                = True
-is_var_lit lit (LitPat lit')      | lit == lit' = True
-is_var_lit lit (NPatOut lit' _ _) | lit == lit' = True
-is_var_lit lit _                                = False
+is_var_lit lit (WildPat _)	 = True
+is_var_lit lit (LitPat lit')     = lit == lit'
+is_var_lit lit (NPat lit' _ _ _) = lit == over_lit_lit lit'
+is_var_lit lit _                 = False
 \end{code}
 
 The difference beteewn @make_con@ and @make_whole_con@ is that
@@ -608,19 +615,19 @@ simplify_pat (TuplePat ps boxity)
   where
     arity = length ps
 
-simplify_pat pat@(LitPat lit) = unLoc (tidyLitPat lit (noLoc pat))
-
 -- unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
-simplify_pat pat@(NPatOut (HsString s) _ _) = 
+simplify_pat pat@(LitPat (HsString s)) = 
    foldr (\c pat -> mk_simple_con_pat consDataCon (PrefixCon [mk_char_lit c,noLoc pat]) stringTy)
 	 (mk_simple_con_pat nilDataCon (PrefixCon []) stringTy) (unpackFS s)
   where
     mk_char_lit c = noLoc (mk_simple_con_pat charDataCon (PrefixCon [nlLitPat (HsCharPrim c)]) charTy)
 
-simplify_pat pat@(NPatOut lit lit_ty hsexpr) = unLoc (tidyNPat lit lit_ty (noLoc pat))
+simplify_pat pat@(LitPat lit) = unLoc (tidyLitPat lit (noLoc pat))
 
-simplify_pat (NPlusKPatOut id hslit hsexpr1 hsexpr2)
+simplify_pat pat@(NPat lit mb_neg _ lit_ty) = unLoc (tidyNPat lit mb_neg lit_ty (noLoc pat))
+
+simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
    = WildPat (idType (unLoc id))
 
 simplify_pat (DictPat dicts methods)

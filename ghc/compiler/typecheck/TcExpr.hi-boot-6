@@ -18,3 +18,9 @@ tcMonoExpr ::
   	  HsExpr.LHsExpr Name.Name
        -> TcType.Expected TcType.TcType
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
+
+tcSyntaxOp :: 
+	  TcRnTypes.InstOrigin
+       -> HsExpr.HsExpr Name.Name
+       -> TcType.TcType
+       -> TcRnTypes.TcM (HsExpr.HsExpr Var.Id)

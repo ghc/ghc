@@ -4,7 +4,7 @@ import HsSyn	( LHsExpr )
 import Name	( Name )
 import Var	( Id )
 import TcType	( TcType, Expected )
-import TcRnTypes( TcM )
+import TcRnTypes( TcM, InstOrigin )
 
 tcCheckSigma :: 
 	  LHsExpr Name
@@ -24,4 +24,10 @@ tcMonoExpr ::
   	  LHsExpr Name
        -> Expected TcType
        -> TcM (LHsExpr Id)
+
+tcSyntaxOp :: 
+	  InstOrigin
+       -> HsExpr Name
+       -> TcType
+       -> TcM (HsExpr Id)
 \end{code}

@@ -8,14 +8,13 @@ module TcPat ( tcPat, tcPats, PatCtxt(..), badFieldCon, polyPatSig, refineTyVars
 
 #include "HsVersions.h"
 
-import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..), HsOverLit(..), 
-			  HsExpr(..), LHsBinds, emptyLHsBinds, isEmptyLHsBinds )
-import HsUtils
+import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
+import HsSyn		( Pat(..), LPat, HsConDetails(..), 
+			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds )
 import TcHsSyn		( TcId, hsLitType )
 import TcRnMonad
-import Inst		( InstOrigin(..),
-			  newMethodFromName, newOverloadedLit, newDicts,
-			  instToId, tcInstStupidTheta, tcSyntaxName
+import Inst		( InstOrigin(..), tcOverloadedLit, 
+			  newDicts, instToId, tcInstStupidTheta
 			)
 import Id		( Id, idType, mkLocalId )
 import Var		( tyVarName )
@@ -25,23 +24,23 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
 import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
-			  SkolemInfo(PatSkol), isSkolemTyVar, isMetaTyVar, pprTcTyVar, 
+			  SkolemInfo(PatSkol), isMetaTyVar, pprTcTyVar, 
 			  TvSubst, mkOpenTvSubst, substTyVar, substTy, MetaDetails(..),
-			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )
+			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy,
+			  mkFunTy, mkFunTys )
 import VarEnv		( mkVarEnv )	-- ugly
 import Kind		( argTypeKind, liftedTypeKind )
 import TcUnify		( tcSubPat, Expected(..), zapExpectedType, 
 			  zapExpectedTo, zapToListTy, zapToTyConApp )  
 import TcHsType		( UserTypeCtxt(..), TcSigInfo( sig_tau ), TcSigFun, tcHsPatSigType )
-import TysWiredIn	( stringTy, parrTyCon, tupleTyCon )
+import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import Unify		( MaybeErr(..), gadtRefineTys, BindFlag(..) )
 import Type		( substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon )
 import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, dataConInstOrigArgTys,
 			  dataConFieldLabels, dataConSourceArity, dataConSig )
-import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
-			  integralClassName )
+import PrelNames	( integralClassName )
 import BasicTypes	( isBoxed )
 import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc )
 import Maybes		( catMaybes )
@@ -293,16 +292,8 @@ tc_pat ctxt pat_in@(ConPatIn (L con_span con_name) arg_pats) pat_ty thing_inside
 	; (pat', tvs, res) <- tcConPat ctxt con_span data_con tycon ty_args arg_pats thing_inside
 	; return (pat', tvs, res) }
 
-
 ------------------------
 -- Literal patterns
-tc_pat ctxt pat@(LitPat lit@(HsString _)) pat_ty thing_inside
-  = do	{ 	-- Strings are mapped to NPatOuts, which have a guard expression
-    	  zapExpectedTo pat_ty stringTy
-	; eq_id <- tcLookupId eqStringName
-	; res <- thing_inside
-	; returnM (NPatOut lit stringTy (nlHsVar eq_id `HsApp` nlHsLit lit), [], res) }
-
 tc_pat ctxt (LitPat simple_lit) pat_ty thing_inside
   = do	{ 	-- All other simple lits
 	  zapExpectedTo pat_ty (hsLitType simple_lit)
@@ -311,52 +302,38 @@ tc_pat ctxt (LitPat simple_lit) pat_ty thing_inside
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat ctxt pat@(NPatIn over_lit mb_neg) pat_ty thing_inside
+tc_pat ctxt pat@(NPat over_lit mb_neg eq _) pat_ty thing_inside
   = do	{ pat_ty' <- zapExpectedType pat_ty liftedTypeKind
-	; let origin = LiteralOrigin over_lit
-	; pos_lit_expr <- newOverloadedLit origin over_lit pat_ty'
-	; eq <- newMethodFromName origin pat_ty' eqName	
-	; lit_expr <- case mb_neg of
-			Nothing  -> returnM pos_lit_expr	-- Positive literal
+	; let orig = LiteralOrigin over_lit
+	; lit'    <- tcOverloadedLit orig over_lit pat_ty'
+	; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty', pat_ty'] boolTy)
+	; mb_neg' <- case mb_neg of
+			Nothing  -> return Nothing	-- Positive literal
 			Just neg -> 	-- Negative literal
 					-- The 'negate' is re-mappable syntax
-			    do { (_, neg_expr) <- tcSyntaxName origin pat_ty' 
-							       (negateName, HsVar neg)
-			       ; returnM (mkHsApp (noLoc neg_expr) pos_lit_expr) }
-
-	; let	-- The literal in an NPatIn is always positive...
-		-- But in NPatOut, the literal is used to find identical patterns
-		-- 	so we must negate the literal when necessary!
-	    	lit' = case (over_lit, mb_neg) of
- 			 (HsIntegral i _,   Nothing) -> HsInteger i pat_ty'
-	 		 (HsIntegral i _,   Just _)  -> HsInteger (-i) pat_ty'
-	 		 (HsFractional f _, Nothing) -> HsRat f pat_ty'
-	 		 (HsFractional f _, Just _)  -> HsRat (-f) pat_ty'
-
+ 			    do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty' pat_ty')
+			       ; return (Just neg') }
 	; res <- thing_inside
-	; returnM (NPatOut lit' pat_ty' (HsApp (nlHsVar eq) lit_expr), [], res) }
+	; returnM (NPat lit' mb_neg' eq' pat_ty', [], res) }
 
-tc_pat ctxt pat@(NPlusKPatIn (L nm_loc name) lit@(HsIntegral i _) minus_name) pat_ty thing_inside
+tc_pat ctxt pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr ctxt name pat_ty)
  	; let pat_ty' = idType bndr_id
-	      origin = LiteralOrigin lit
-	; over_lit_expr <- newOverloadedLit origin lit pat_ty'
-	; ge <- newMethodFromName origin pat_ty' geName
+	      orig    = LiteralOrigin lit
+	; lit' <- tcOverloadedLit orig lit pat_ty'
 
-	-- The '-' part is re-mappable syntax
-	; (_, minus_expr) <- tcSyntaxName origin pat_ty' (minusName, HsVar minus_name)
+	-- The '>=' and '-' parts are re-mappable syntax
+	; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
+	; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
 
 	-- The Report says that n+k patterns must be in Integral
 	-- We may not want this when using re-mappable syntax, though (ToDo?)
 	; icls <- tcLookupClass integralClassName
-	; dicts <- newDicts origin [mkClassPred icls [pat_ty']]	
+	; dicts <- newDicts orig [mkClassPred icls [pat_ty']]	
 	; extendLIEs dicts
     
 	; res <- tcExtendIdEnv1 name bndr_id thing_inside
-	; returnM (NPlusKPatOut (L nm_loc bndr_id) i 
-				(SectionR (nlHsVar ge) over_lit_expr)
-				(SectionR (noLoc minus_expr) over_lit_expr),
-	     	   [], res) }
+	; returnM (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
 \end{code}
 
 

@@ -289,6 +289,13 @@ data IdInfo
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
 #endif
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
+						-- Within one module this is irrelevant; the 
+						-- inlining of a worker is handled via the Unfolding
+						-- WorkerInfo is used *only* to indicate the form of
+						-- the RHS, so that interface files don't actually 
+						-- need to contain the RHS; it can be derived from
+						-- the strictness info
+
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
 	cafInfo		:: CafInfo,		-- CAF info
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable

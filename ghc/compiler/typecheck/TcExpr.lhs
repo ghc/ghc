@@ -4,12 +4,15 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
+module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, 
+	        tcMonoExpr, tcExpr, tcSyntaxOp
+   ) where
 
 #include "HsVersions.h"
 
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
+import HsSyn		( nlHsVar )
 import Id		( Id )
 import Name		( isExternalName )
 import TcType		( isTauTy )
@@ -19,13 +22,14 @@ import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), LHsExpr, HsLit(..), ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, mkHsApp, nlHsVar )
+			  HsMatchContext(..), HsRecordBinds, mkHsApp )
 import TcHsSyn		( hsLitType, (<$>) )
 import TcRnMonad
-import TcUnify		( Expected(..), tcInfer, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
+import TcUnify		( Expected(..), tcInfer, zapExpectedType, zapExpectedTo, 
+			  tcSubExp, tcGen, tcSub,
 			  unifyFunTys, zapToListTy, zapToTyConApp )
 import BasicTypes	( isMarkedStrict )
-import Inst		( newOverloadedLit, newMethodFromName, newIPDict,
+import Inst		( tcOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta, tcInstCall )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookup, tcLookupId, checkProcLevel,
@@ -44,7 +48,8 @@ import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType,
 import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
 
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
-import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
+import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, 
+			  dataConWrapId, dataConWorkId )
 import Name		( Name )
 import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
 			  tyConDataCons, tyConFields )
@@ -54,7 +59,7 @@ import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import PrelNames	( enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
-			  enumFromToPName, enumFromThenToPName
+			  enumFromToPName, enumFromThenToPName, negateName
 			)
 import ListSetOps	( minusList )
 import DynFlags
@@ -108,8 +113,17 @@ tcCheckRho expr rho_ty = tcMonoExpr expr (Check rho_ty)
 
 tcInferRho :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
 tcInferRho (L loc (HsVar name)) = setSrcSpan loc $ do 
-				  { (e,_,ty) <- tcId name; return (L loc e, ty)}
+				  { (e,_,ty) <- tcId (OccurrenceOf name) name
+				  ; return (L loc e, ty) }
 tcInferRho expr		        = tcInfer (tcMonoExpr expr)
+
+tcSyntaxOp :: InstOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
+-- Typecheck a syntax operator, checking that it has the specified type
+-- The operator is always a variable at this stage (i.e. renamer output)
+tcSyntaxOp orig (HsVar op) ty = do { (expr', _, id_ty) <- tcId orig op
+				   ; co_fn <- tcSub ty id_ty
+				   ; returnM (co_fn <$> expr') }
+tcSyntaxOp orig other 	   ty = pprPanic "tcSyntaxOp" (ppr other)
 \end{code}
 
 
@@ -128,16 +142,16 @@ tcMonoExpr :: LHsExpr Name		-- Expession to type check
 	   -> TcM (LHsExpr TcId)
 
 tcMonoExpr (L loc expr) res_ty
-  = setSrcSpan loc (do { expr' <- tc_expr expr res_ty
+  = setSrcSpan loc (do { expr' <- tcExpr expr res_ty
 		       ; return (L loc expr') })
 
-tc_expr :: HsExpr Name -> Expected TcRhoType -> TcM (HsExpr TcId)
-tc_expr (HsVar name) res_ty
-  = do	{ (expr', _, id_ty) <- tcId name
+tcExpr :: HsExpr Name -> Expected TcRhoType -> TcM (HsExpr TcId)
+tcExpr (HsVar name) res_ty
+  = do	{ (expr', _, id_ty) <- tcId (OccurrenceOf name) name
 	; co_fn <- tcSubExp res_ty id_ty
 	; returnM (co_fn <$> expr') }
 
-tc_expr (HsIPVar ip) res_ty
+tcExpr (HsIPVar ip) res_ty
   = 	-- Implicit parameters must have a *tau-type* not a 
 	-- type scheme.  We enforce this by creating a fresh
 	-- type variable as its type.  (Because res_ty may not
@@ -158,13 +172,13 @@ tc_expr (HsIPVar ip) res_ty
 %************************************************************************
 
 \begin{code}
-tc_expr in_expr@(ExprWithTySig expr poly_ty) res_ty
+tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = addErrCtxt (exprCtxt in_expr)			$
    tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
    tcThingWithSig sig_tc_ty (tcCheckRho expr) res_ty	`thenM` \ (co_fn, expr') ->
    returnM (co_fn <$> ExprWithTySigOut expr' poly_ty)
 
-tc_expr (HsType ty) res_ty
+tcExpr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
 	-- This is the syntax for type applications that I was planning
 	-- but there are difficulties (e.g. what order for type args)
@@ -181,32 +195,35 @@ tc_expr (HsType ty) res_ty
 %************************************************************************
 
 \begin{code}
-tc_expr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
+tcExpr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
 				  returnM (HsPar expr')
-tc_expr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
+tcExpr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
 				  returnM (HsSCC lbl expr')
-tc_expr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' ->  -- hdaume: core annotation
+tcExpr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' ->  -- hdaume: core annotation
                                          returnM (HsCoreAnn lbl expr')
 
-tc_expr (HsLit lit) res_ty  = tcLit lit res_ty
+tcExpr (HsLit lit) res_ty  = tcLit lit res_ty
 
-tc_expr (HsOverLit lit) res_ty  
+tcExpr (HsOverLit lit) res_ty  
   = zapExpectedType res_ty liftedTypeKind		`thenM` \ res_ty' ->
  	-- Overloaded literals must have liftedTypeKind, because
  	-- we're instantiating an overloaded function here,
  	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
-    newOverloadedLit (LiteralOrigin lit) lit res_ty'	`thenM` \ lit_expr ->
-    returnM (unLoc lit_expr) 	-- ToDo: nasty unLoc
+    tcOverloadedLit (LiteralOrigin lit) lit res_ty'	`thenM` \ lit' ->
+    returnM (HsOverLit lit')
 
-tc_expr (NegApp expr neg_name) res_ty
-  = tc_expr (HsApp (nlHsVar neg_name) expr) res_ty
-	-- ToDo: use tcSyntaxName
+tcExpr (NegApp expr neg_expr) res_ty
+  = do	{ res_ty' <- zapExpectedType res_ty liftedTypeKind
+	; neg_expr' <- tcSyntaxOp (OccurrenceOf negateName) neg_expr
+				  (mkFunTy res_ty' res_ty')
+	; expr' <- tcCheckRho expr res_ty'
+	; return (NegApp expr' neg_expr') }
 
-tc_expr (HsLam match) res_ty
+tcExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenM` \ match' ->
     returnM (HsLam match')
 
-tc_expr (HsApp e1 e2) res_ty 
+tcExpr (HsApp e1 e2) res_ty 
   = tcApp e1 [e2] res_ty
 \end{code}
 
@@ -221,7 +238,7 @@ a type error will occur if they aren't.
 -- or just
 -- 	op e
 
-tc_expr in_expr@(SectionL arg1 op) res_ty
+tcExpr in_expr@(SectionL arg1 op) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
@@ -232,7 +249,7 @@ tc_expr in_expr@(SectionL arg1 op) res_ty
 -- Right sections, equivalent to \ x -> x op expr, or
 --	\ x -> op x expr
 
-tc_expr in_expr@(SectionR op arg2) res_ty
+tcExpr in_expr@(SectionR op arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
@@ -242,7 +259,7 @@ tc_expr in_expr@(SectionR op arg2) res_ty
 
 -- equivalent to (op e1) e2:
 
-tc_expr in_expr@(OpApp arg1 op fix arg2) res_ty
+tcExpr in_expr@(OpApp arg1 op fix arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
@@ -253,15 +270,15 @@ tc_expr in_expr@(OpApp arg1 op fix arg2) res_ty
 \end{code}
 
 \begin{code}
-tc_expr (HsLet binds (L loc expr)) res_ty
+tcExpr (HsLet binds (L loc expr)) res_ty
   = tcBindsAndThen
 	glue
 	binds 			-- Bindings to check
-	(setSrcSpan loc $ tc_expr expr res_ty)
+	(setSrcSpan loc $ tcExpr expr res_ty)
   where
     glue bind expr = HsLet [bind] (L loc expr)
 
-tc_expr in_expr@(HsCase scrut matches) exp_ty
+tcExpr in_expr@(HsCase scrut matches) exp_ty
   =	-- We used to typecheck the case alternatives first.
 	-- The case patterns tend to give good type info to use
 	-- when typechecking the scrutinee.  For example
@@ -281,9 +298,9 @@ tc_expr in_expr@(HsCase scrut matches) exp_ty
     match_ctxt = MC { mc_what = CaseAlt,
 		      mc_body = tcMonoExpr }
 
-tc_expr (HsIf pred b1 b2) res_ty
-  = addErrCtxt (predCtxt pred) (
-    tcCheckRho pred boolTy	)	`thenM`    \ pred' ->
+tcExpr (HsIf pred b1 b2) res_ty
+  = addErrCtxt (predCtxt pred)
+	(tcCheckRho pred boolTy)	`thenM`    \ pred' ->
 
     zapExpectedType res_ty openTypeKind	`thenM`    \ res_ty' ->
 	-- C.f. the call to zapToType in TcMatches.tcMatches
@@ -292,13 +309,10 @@ tc_expr (HsIf pred b1 b2) res_ty
     tcCheckRho b2 res_ty'		`thenM`    \ b2' ->
     returnM (HsIf pred' b1' b2')
 
-tc_expr (HsDo do_or_lc stmts method_names _) res_ty
-  = zapExpectedType res_ty liftedTypeKind		`thenM` \ res_ty' ->
-	-- All comprehensions yield a monotype of kind *
-    tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (stmts', methods') ->
-    returnM (HsDo do_or_lc stmts' methods' res_ty')
+tcExpr (HsDo do_or_lc stmts body _) res_ty
+  = tcDoStmts do_or_lc stmts body res_ty
 
-tc_expr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
+tcExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
   = zapToListTy res_ty                `thenM` \ elt_ty ->  
     mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
     returnM (ExplicitList elt_ty exprs')
@@ -307,7 +321,7 @@ tc_expr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
       = addErrCtxt (listCtxt expr) $
 	tcCheckRho expr elt_ty
 
-tc_expr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
+tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
   = do	{ [elt_ty] <- zapToTyConApp parrTyCon res_ty
 	; exprs' <- mappM (tc_elt elt_ty) exprs	
 	; return (ExplicitPArr elt_ty exprs') }
@@ -315,20 +329,20 @@ tc_expr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
     tc_elt elt_ty expr
       = addErrCtxt (parrCtxt expr) (tcCheckRho expr elt_ty)
 
-tc_expr (ExplicitTuple exprs boxity) res_ty
+tcExpr (ExplicitTuple exprs boxity) res_ty
   = do	{ arg_tys <- zapToTyConApp (tupleTyCon boxity (length exprs)) res_ty
 	; exprs' <-  tcCheckRhos exprs arg_tys
 	; return (ExplicitTuple exprs' boxity) }
 
-tc_expr (HsProc pat cmd) res_ty
+tcExpr (HsProc pat cmd) res_ty
   = tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
     returnM (HsProc pat' cmd')
 
-tc_expr e@(HsArrApp _ _ _ _ _) _
+tcExpr e@(HsArrApp _ _ _ _ _) _
   = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
                       ptext SLIT("was found where an expression was expected")])
 
-tc_expr e@(HsArrForm _ _ _) _
+tcExpr e@(HsArrForm _ _ _) _
   = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
                       ptext SLIT("was found where an expression was expected")])
 \end{code}
@@ -340,9 +354,9 @@ tc_expr e@(HsArrForm _ _ _) _
 %************************************************************************
 
 \begin{code}
-tc_expr expr@(RecordCon con@(L loc con_name) rbinds) res_ty
+tcExpr expr@(RecordCon con@(L loc con_name) _ rbinds) res_ty
   = addErrCtxt (recordConCtxt expr)		$
-    addLocM tcId con			`thenM` \ (con_expr, _, con_tau) ->
+    addLocM (tcId (OccurrenceOf con_name)) con	`thenM` \ (con_expr, _, con_tau) ->
     let
 	(_, record_ty)   = tcSplitFunTys con_tau
 	(tycon, ty_args) = tcSplitTyConApp record_ty
@@ -367,7 +381,7 @@ tc_expr expr@(RecordCon con@(L loc con_name) rbinds) res_ty
  	-- Check for missing fields
     checkMissingFields data_con rbinds		`thenM_` 
 
-    returnM (RecordConOut data_con (L loc con_expr) rbinds')
+    returnM (RecordCon (L loc (dataConWorkId data_con)) con_expr rbinds')
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -395,7 +409,7 @@ tc_expr expr@(RecordCon con@(L loc con_name) rbinds) res_ty
 --
 -- All this is done in STEP 4 below.
 
-tc_expr expr@(RecordUpd record_expr rbinds) res_ty
+tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
   = addErrCtxt (recordUpdCtxt	expr)		$
 
 	-- STEP 0
@@ -489,7 +503,7 @@ tc_expr expr@(RecordUpd record_expr rbinds) res_ty
     extendLIEs dicts			`thenM_`
 
 	-- Phew!
-    returnM (RecordUpdOut record_expr' record_ty result_record_ty rbinds') 
+    returnM (RecordUpd record_expr' rbinds' record_ty result_record_ty) 
 \end{code}
 
 
@@ -502,16 +516,16 @@ tc_expr expr@(RecordUpd record_expr rbinds) res_ty
 %************************************************************************
 
 \begin{code}
-tc_expr (ArithSeqIn seq@(From expr)) res_ty
+tcExpr (ArithSeq _ seq@(From expr)) res_ty
   = zapToListTy res_ty 				`thenM` \ elt_ty ->  
     tcCheckRho expr elt_ty		 	`thenM` \ expr' ->
 
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromName	`thenM` \ enum_from ->
 
-    returnM (ArithSeqOut (nlHsVar enum_from) (From expr'))
+    returnM (ArithSeq (HsVar enum_from) (From expr'))
 
-tc_expr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
+tcExpr in_expr@(ArithSeq _ seq@(FromThen expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $ 
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -519,10 +533,10 @@ tc_expr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenName		`thenM` \ enum_from_then ->
 
-    returnM (ArithSeqOut (nlHsVar enum_from_then) (FromThen expr1' expr2'))
+    returnM (ArithSeq (HsVar enum_from_then) (FromThen expr1' expr2'))
 
 
-tc_expr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
+tcExpr in_expr@(ArithSeq _ seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -530,9 +544,9 @@ tc_expr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 	  	      elt_ty enumFromToName		`thenM` \ enum_from_to ->
 
-    returnM (ArithSeqOut (nlHsVar enum_from_to) (FromTo expr1' expr2'))
+    returnM (ArithSeq (HsVar enum_from_to) (FromTo expr1' expr2'))
 
-tc_expr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+tcExpr in_expr@(ArithSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (arithSeqCtxt in_expr) $
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -541,9 +555,9 @@ tc_expr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenToName		`thenM` \ eft ->
 
-    returnM (ArithSeqOut (nlHsVar eft) (FromThenTo expr1' expr2' expr3'))
+    returnM (ArithSeq (HsVar eft) (FromThenTo expr1' expr2' expr3'))
 
-tc_expr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
+tcExpr in_expr@(PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (parrSeqCtxt in_expr) $
     zapToTyConApp parrTyCon res_ty     			`thenM`    \ [elt_ty] ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -551,9 +565,9 @@ tc_expr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
     newMethodFromName (PArrSeqOrigin seq) 
 		      elt_ty enumFromToPName 		`thenM` \ enum_from_to ->
 
-    returnM (PArrSeqOut (nlHsVar enum_from_to) (FromTo expr1' expr2'))
+    returnM (PArrSeq (HsVar enum_from_to) (FromTo expr1' expr2'))
 
-tc_expr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+tcExpr in_expr@(PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (parrSeqCtxt in_expr) $
     zapToTyConApp parrTyCon res_ty     			`thenM`    \ [elt_ty] ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -562,9 +576,9 @@ tc_expr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     newMethodFromName (PArrSeqOrigin seq)
 		      elt_ty enumFromThenToPName	`thenM` \ eft ->
 
-    returnM (PArrSeqOut (nlHsVar eft) (FromThenTo expr1' expr2' expr3'))
+    returnM (PArrSeq (HsVar eft) (FromThenTo expr1' expr2' expr3'))
 
-tc_expr (PArrSeqIn _) _ 
+tcExpr (PArrSeq _ _) _ 
   = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer shouldn't have
     -- let it through
@@ -580,8 +594,8 @@ tc_expr (PArrSeqIn _) _
 \begin{code}
 #ifdef GHCI	/* Only if bootstrapped */
 	-- Rename excludes these cases otherwise
-tc_expr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
-tc_expr (HsBracket brack)  res_ty = do	{ e <- tcBracket brack res_ty
+tcExpr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
+tcExpr (HsBracket brack)  res_ty = do	{ e <- tcBracket brack res_ty
 					; return (unLoc e) }
 #endif /* GHCI */
 \end{code}
@@ -594,7 +608,7 @@ tc_expr (HsBracket brack)  res_ty = do	{ e <- tcBracket brack res_ty
 %************************************************************************
 
 \begin{code}
-tc_expr other _ = pprPanic "tcMonoExpr" (ppr other)
+tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 \end{code}
 
 
@@ -672,7 +686,7 @@ tcFun :: LHsExpr Name -> TcM (LHsExpr TcId, [TcTyVar], TcRhoType)
 -- If the function isn't simple, infer its type, and return no 
 -- type variables
 tcFun (L loc (HsVar f)) = setSrcSpan loc $ do
-			  { (fun', tvs, fun_tau) <- tcId f
+			  { (fun', tvs, fun_tau) <- tcId (OccurrenceOf f) f
 			  ; return (L loc fun', tvs, fun_tau) }
 tcFun fun = do { (fun', fun_tau) <- tcInfer (tcMonoExpr fun)
 	       ; return (fun', [], fun_tau) }
@@ -756,11 +770,11 @@ This gets a bit less sharing, but
 	b) perhaps fewer separated lambdas
 
 \begin{code}
-tcId :: Name -> TcM (HsExpr TcId, [TcTyVar], TcRhoType)
+tcId :: InstOrigin -> Name -> TcM (HsExpr TcId, [TcTyVar], TcRhoType)
 	-- Return the type variables at which the function
 	-- is instantiated, as well as the translated variable and its type
 
-tcId id_name	-- Look up the Id and instantiate its type
+tcId orig id_name	-- Look up the Id and instantiate its type
   = tcLookup id_name	`thenM` \ thing ->
     case thing of {
     	AGlobal (ADataCon con)	-- Similar, but instantiate the stupid theta too
@@ -872,8 +886,6 @@ tcId id_name	-- Look up the Id and instantiate its type
 	| otherwise	      = case tcSplitSigmaTy fun_ty of
 				  (_,[],_)    -> False 	-- Not overloaded
 				  (_,theta,_) -> not (any isLinearPred theta)
-
-    orig = OccurrenceOf id_name
 \end{code}
 
 %************************************************************************

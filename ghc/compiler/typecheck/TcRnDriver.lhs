@@ -60,7 +60,6 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import VarEnv		( varEnvElts )
 import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, lookupModuleEnv )
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName, isWiredInName )
@@ -82,7 +81,7 @@ import Outputable
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
 			  LStmt, LHsExpr, LHsType, mkMatchGroup,
 			  collectStmtsBinders, mkSimpleMatch, 
-			  nlLetStmt, nlExprStmt, nlBindStmt, nlResultStmt, nlVarPat )
+			  mkExprStmt, mkBindStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
 			  lookupLocalRdrEnv, extendLocalRdrEnv )
@@ -99,7 +98,7 @@ import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType,
 			  isUnLiftedType, tyClsNamesOfDFunHead )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
-import Inst		( tcStdSyntaxName, tcGetInstEnvs )
+import Inst		( tcGetInstEnvs )
 import InstEnv		( DFunId, classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
@@ -883,7 +882,7 @@ Here is the grand plan, implemented in tcUserStmt
 \begin{code}
 ---------------------------
 tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
-tcUserStmt (L _ (ExprStmt expr _))
+tcUserStmt (L loc (ExprStmt expr _))
   = newUnique 		`thenM` \ uniq ->
     let 
 	fresh_it = itName uniq
@@ -892,18 +891,18 @@ tcUserStmt (L _ (ExprStmt expr _))
     in
     tryTcLIE_ (do { 	-- Try this if the other fails
 		traceTc (text "tcs 1b") ;
-		tc_stmts [
-		    nlLetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
-		    nlExprStmt (nlHsApp (nlHsVar printName) 
-					      (nlHsVar fresh_it)) 	
-	] })
+		tc_stmts (map (L loc) [
+		    LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
+		    mkExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+	]) })
 	  (do { 	-- Try this first 
 		traceTc (text "tcs 1a") ;
-		tc_stmts [nlBindStmt (nlVarPat fresh_it) expr] })
+		tc_stmts [L loc (mkBindStmt (nlVarPat fresh_it) expr)] })
 
 tcUserStmt stmt = tc_stmts [stmt]
 
 ---------------------------
+tc_stmts :: [Stmt RdrName] -> 
 tc_stmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
 	let {
@@ -913,13 +912,16 @@ tc_stmts stmts
 	    names = map unLoc (collectStmtsBinders stmts) ;
 
 	    stmt_ctxt = SC { sc_what = DoExpr, 
-			     sc_rhs  = infer_rhs,
+			     sc_bind = infer_rhs,
+			     sc_expr = infer_rhs,
 			     sc_body = check_body,
 			     sc_ty   = ret_ty } ;
 
-	    infer_rhs rhs   = do { (rhs', rhs_ty) <- tcInferRho rhs
-				 ; [pat_ty] <- unifyTyConApp ioTyCon rhs_ty
-				 ; return (rhs', pat_ty) } ;
+	    infer_rhs _bind_op rhs
+		= do { (rhs', rhs_ty) <- tcInferRho rhs
+		     ; [pat_ty] <- unifyTyConApp ioTyCon rhs_ty
+		     ; return (noSyntaxExpr, rhs', pat_ty) } ;
+
 	    check_body body = tcCheckRho body io_ret_ty ;
 
 		-- mk_return builds the expression
@@ -944,16 +946,15 @@ tc_stmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_expr), lie) <- getLIE $ do {
-	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt stmts	$ 
+	    (tc_stmts, ids) <- tcStmtsAndThen combine stmt_ctxt stmts $ 
 			do {
 			    -- Look up the names right in the middle,
 			    -- where they will all be in scope
 			    ids <- mappM tcLookupId names ;
-			    ret_id <- tcLookupId returnIOName ;		-- return @ IO
-			    return (ids, [nlResultStmt (mk_return ret_id ids)]) } ;
+			    return ids } ;
 
-	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
-	    return (ids, noLoc (HsDo DoExpr tc_stmts io_ids io_ret_ty))
+	    ret_id <- tcLookupId returnIOName ;		-- return @ IO
+	    return (ids, noLoc (HsDo DoExpr tc_stmts (mk_return ret_id ids) io_ret_ty))
 	} ;
 
 	-- Simplify the context right here, so that we fail

@@ -284,19 +284,19 @@ match vars@(v:_) ty eqns_info
  
     match_block eqns
       = case firstPat (head eqns) of
-	  WildPat {}      -> matchVariables  vars ty eqns
-	  ConPatOut {}    -> matchConFamily  vars ty eqns
-	  NPlusKPatOut {} -> matchNPlusKPats vars ty eqns
-	  NPatOut {}	  -> matchNPats	     vars ty eqns
-	  LitPat {}	  -> matchLiterals   vars ty eqns
+	  WildPat {}   -> matchVariables  vars ty eqns
+	  ConPatOut {} -> matchConFamily  vars ty eqns
+	  NPlusKPat {} -> matchNPlusKPats vars ty eqns
+	  NPat {}      -> matchNPats	  vars ty eqns
+	  LitPat {}    -> matchLiterals   vars ty eqns
 
 -- After tidying, there are only five kinds of patterns
-samePatFamily (WildPat {})	(WildPat {})	  = True
-samePatFamily (ConPatOut {})	(ConPatOut {})	  = True
-samePatFamily (NPlusKPatOut {}) (NPlusKPatOut {}) = True
-samePatFamily (NPatOut {})	(NPatOut {}) 	  = True
-samePatFamily (LitPat {})       (LitPat {})	  = True
-samePatFamily _			_		  = False
+samePatFamily (WildPat {})   (WildPat {})   = True
+samePatFamily (ConPatOut {}) (ConPatOut {}) = True
+samePatFamily (NPlusKPat {}) (NPlusKPat {}) = True
+samePatFamily (NPat {})	     (NPat {}) 	    = True
+samePatFamily (LitPat {})    (LitPat {})    = True
+samePatFamily _		     _		    = False
 
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -474,8 +474,8 @@ tidy1 v wrap pat@(LitPat lit)
   = returnDs (wrap, unLoc (tidyLitPat lit (noLoc pat)))
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v wrap pat@(NPatOut lit lit_ty _)
-  = returnDs (wrap, unLoc (tidyNPat lit lit_ty (noLoc pat)))
+tidy1 v wrap pat@(NPat lit mb_neg _ lit_ty)
+  = returnDs (wrap, unLoc (tidyNPat lit mb_neg lit_ty (noLoc pat)))
 
 -- and everything else goes through unchanged...
 
@@ -700,33 +700,35 @@ matchSimply :: CoreExpr			-- Scrutinee
 	    -> CoreExpr			-- Return this if it doesn't
 	    -> DsM CoreExpr
 
-matchSimply scrut kind pat result_expr fail_expr
-  = getSrcSpanDs			        `thenDs` \ locn ->
-    let
-      ctx 	   = DsMatchContext kind [unLoc pat] locn
+matchSimply scrut hs_ctx pat result_expr fail_expr
+  = let
       match_result = cantFailMatchResult result_expr
       rhs_ty	   = exprType fail_expr
 	-- Use exprType of fail_expr, because won't refine in the case of failure!
     in 
-    matchSinglePat scrut ctx pat rhs_ty match_result	`thenDs` \ match_result' ->
+    matchSinglePat scrut hs_ctx pat rhs_ty match_result	`thenDs` \ match_result' ->
     extractMatchResult match_result' fail_expr
 
 
-matchSinglePat :: CoreExpr -> DsMatchContext -> LPat Id
+matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 	       -> Type -> MatchResult -> DsM MatchResult
-matchSinglePat (Var var) ctx pat ty match_result
-  = getDOptsDs					`thenDs` \ dflags ->
+matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result
+  = getDOptsDs				`thenDs` \ dflags ->
+    getSrcSpanDs			`thenDs` \ locn ->
+    let
+	match_fn dflags
+           | dopt Opt_WarnSimplePatterns dflags = matchCheck ds_ctx
+  	   | otherwise	       		        = match
+	   where
+	     ds_ctx = DsMatchContext hs_ctx [pat] locn
+    in
     match_fn dflags [var] ty [EqnInfo { eqn_wrap = idWrapper,
-					eqn_pats = [unLoc pat],
+					eqn_pats = [pat],
 					eqn_rhs  = match_result }]
-  where
-    match_fn dflags
-       | dopt Opt_WarnSimplePatterns dflags = matchCheck ctx
-       | otherwise	                    = match
 
-matchSinglePat scrut ctx pat ty match_result
+matchSinglePat scrut hs_ctx pat ty match_result
   = selectSimpleMatchVarL pat 		 		`thenDs` \ var ->
-    matchSinglePat (Var var) ctx pat ty match_result	`thenDs` \ match_result' ->
+    matchSinglePat (Var var) hs_ctx pat ty match_result	`thenDs` \ match_result' ->
     returnDs (adjustMatchResult (bindNonRec var scrut) match_result')
 \end{code}
 

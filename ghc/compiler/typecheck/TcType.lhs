@@ -45,7 +45,7 @@ module TcType (
   -- Again, newtypes are opaque
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
   isSigmaTy, isOverloadedTy, 
-  isDoubleTy, isFloatTy, isIntTy,
+  isDoubleTy, isFloatTy, isIntTy, isStringTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
 

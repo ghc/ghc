@@ -196,23 +196,32 @@ cvt (LitE l)
 
 cvt (AppE x y)     = HsApp (cvtl x) (cvtl y)
 cvt (LamE ps e)    = HsLam (mkMatchGroup [mkSimpleMatch (map cvtlp ps) (cvtl e)])
-cvt (TupE [e])	  = cvt e
-cvt (TupE es)	  = ExplicitTuple(map cvtl es) Boxed
+cvt (TupE [e])	   = cvt e
+cvt (TupE es)	   = ExplicitTuple(map cvtl es) Boxed
 cvt (CondE x y z)  = HsIf (cvtl x) (cvtl y) (cvtl z)
-cvt (LetE ds e)	  = HsLet (cvtdecs ds) (cvtl e)
+cvt (LetE ds e)	   = HsLet (cvtdecs ds) (cvtl e)
 cvt (CaseE e ms)   = HsCase (cvtl e) (mkMatchGroup (map cvtm ms))
-cvt (DoE ss)	  = HsDo DoExpr (cvtstmts ss) [] void
-cvt (CompE ss)     = HsDo ListComp (cvtstmts ss) [] void
-cvt (ArithSeqE dd) = ArithSeqIn (cvtdd dd)
-cvt (ListE xs)  = ExplicitList void (map cvtl xs)
+cvt (DoE ss)	   = cvtHsDo DoExpr   ss
+cvt (CompE ss)     = cvtHsDo ListComp ss
+cvt (ArithSeqE dd) = ArithSeq noPostTcExpr (cvtdd dd)
+cvt (ListE xs)     = ExplicitList void (map cvtl xs)
 cvt (InfixE (Just x) s (Just y))
     = HsPar (noLoc $ OpApp (cvtl x) (cvtl s) undefined (cvtl y))
 cvt (InfixE Nothing  s (Just y)) = SectionR (cvtl s) (cvtl y)
 cvt (InfixE (Just x) s Nothing ) = SectionL (cvtl x) (cvtl s)
 cvt (InfixE Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
 cvt (SigE e t)		= ExprWithTySig (cvtl e) (cvtType t)
-cvt (RecConE c flds) = RecordCon (noLoc (cName c)) (map (\(x,y) -> (noLoc (vName x), cvtl y)) flds)
+cvt (RecConE c flds) = RecordCon (noLoc (cName c)) noPostTcExpr
+				 (map (\(x,y) -> (noLoc (vName x), cvtl y)) flds)
 cvt (RecUpdE e flds) = RecordUpd (cvtl e) (map (\(x,y) -> (noLoc (vName x), cvtl y)) flds)
+				 placeHolderType placeHolderType
+
+cvtHsDo do_or_lc stmts
+  = HsDo do_or_ld (init stmts') body void
+  where
+    stmts' = cvtstmts ss
+    body = case last stmts' of
+		L _ (ExprStmt body _) -> body
 
 cvtdecs :: [TH.Dec] -> [HsBindGroup RdrName]
 cvtdecs [] = []
@@ -259,12 +268,11 @@ cvtdd (FromThenToR x y z) = (FromThenTo (cvtl x) (cvtl y) (cvtl z))
 
 
 cvtstmts :: [TH.Stmt] -> [Hs.LStmt RdrName]
-cvtstmts []		       = [] -- this is probably an error as every [stmt] should end with ResultStmt
-cvtstmts [NoBindS e]           = [nlResultStmt (cvtl e)]      -- when its the last element use ResultStmt
-cvtstmts (NoBindS e : ss)      = nlExprStmt (cvtl e)     : cvtstmts ss
-cvtstmts (TH.BindS p e : ss) = nlBindStmt (cvtlp p) (cvtl e) : cvtstmts ss
-cvtstmts (TH.LetS ds : ss)   = nlLetStmt (cvtdecs ds)	    : cvtstmts ss
-cvtstmts (TH.ParS dss : ss)  = nlParStmt [(cvtstmts ds, undefined) | ds <- dss] : cvtstmts ss
+cvtstmts []		     = []
+cvtstmts (NoBindS e : ss)    = noLoc (mkExprStmt (cvtl e))	     : cvtstmts ss
+cvtstmts (TH.BindS p e : ss) = noLoc (mkBindStmt (cvtlp p) (cvtl e)) : cvtstmts ss
+cvtstmts (TH.LetS ds : ss)   = noLoc (LetStmt (cvtdecs ds))	     : cvtstmts ss
+cvtstmts (TH.ParS dss : ss)  = noLoc (ParStmt [(cvtstmts ds, undefined) | ds <- dss]) : cvtstmts ss
 
 cvtm :: TH.Match -> Hs.LMatch RdrName
 cvtm (TH.Match p body wheres)
@@ -272,14 +280,14 @@ cvtm (TH.Match p body wheres)
 
 cvtguard :: TH.Body -> [LGRHS RdrName]
 cvtguard (GuardedB pairs) = map cvtpair pairs
-cvtguard (NormalB e) 	 = [noLoc (GRHS [  nlResultStmt (cvtl e) ])]
+cvtguard (NormalB e) 	 = [noLoc (GRHS [] (cvtl e))]
 
 cvtpair :: (TH.Guard,TH.Exp) -> LGRHS RdrName
-cvtpair (NormalG x,y) = noLoc (GRHS [nlBindStmt truePat (cvtl x),
-                               nlResultStmt (cvtl y)])
-cvtpair (PatG x,y) = noLoc (GRHS (cvtstmts x ++ [nlResultStmt (cvtl y)]))
+cvtpair (NormalG x,y) = noLoc (GRHS [nlBindStmt truePat (cvtl x)]
+				    (cvtl y))
+cvtpair (PatG x,y) = noLoc (GRHS (cvtstmts x) (cvtl y))
 
-cvtOverLit :: Lit -> HsOverLit
+cvtOverLit :: Lit -> HsOverLit RdrName
 cvtOverLit (IntegerL i)  = mkHsIntegral i
 cvtOverLit (RationalL r) = mkHsFractional r
 -- An Integer is like an an (overloaded) '3' in a Haskell source program
@@ -297,7 +305,7 @@ cvtlp pat = noLoc (cvtp pat)
 
 cvtp :: TH.Pat -> Hs.Pat RdrName
 cvtp (TH.LitP l)
-  | overloadedLit l = NPatIn (cvtOverLit l) Nothing	-- Not right for negative
+  | overloadedLit l = mkNPat (cvtOverLit l) Nothing	-- Not right for negative
 							-- patterns; need to think
 							-- about that!
   | otherwise	    = Hs.LitPat (cvtLit l)

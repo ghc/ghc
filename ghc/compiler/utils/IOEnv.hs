@@ -8,7 +8,7 @@ module IOEnv (
 
 	-- Standard combinators, specialised
 	returnM, thenM, thenM_, failM,
-	mappM, mappM_, sequenceM, foldlM, 
+	mappM, mappM_, mapSndM, sequenceM, foldlM, 
 	mapAndUnzipM, mapAndUnzip3M, 
 	checkM, ifM, zipWithM, zipWithM_,
 
@@ -148,6 +148,7 @@ updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 
 mappM  	      :: (a -> IOEnv env b) -> [a] -> IOEnv env [b]
 mappM_ 	      :: (a -> IOEnv env b) -> [a] -> IOEnv env ()
+mapSndM       :: (b -> IOEnv env c) -> [(a,b)] -> IOEnv env [(a,c)]
 	-- Funny names to avoid clash with Prelude
 sequenceM     :: [IOEnv env a] -> IOEnv env [a]
 foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a
@@ -158,6 +159,9 @@ ifM	      :: Bool -> IOEnv env () -> IOEnv env ()	-- Perform arg if bool is True
 
 mappM f []     = return []
 mappM f (x:xs) = do { r <- f x; rs <- mappM f xs; return (r:rs) }
+
+mapSndM f []     = return []
+mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
 
 mappM_ f []     = return ()
 mappM_ f (x:xs) = f x >> mappM_ f xs

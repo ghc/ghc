@@ -12,15 +12,14 @@ module HsExpr where
 import HsDecls		( HsGroup )
 import HsPat		( LPat )
 import HsLit		( HsLit(..), HsOverLit )
-import HsTypes		( LHsType, PostTcType, SyntaxName )
+import HsTypes		( LHsType, PostTcType )
 import HsImpExp		( isOperator, pprHsVar )
-import HsBinds		( HsBindGroup )
+import HsBinds		( HsBindGroup, DictBinds )
 
 -- others:
 import Type		( Type, pprParendType )
 import Var		( TyVar, Id )
 import Name		( Name )
-import DataCon		( DataCon )
 import BasicTypes	( IPName, Boxity, tupleParens, Fixity(..) )
 import SrcLoc		( Located(..), unLoc )
 import Outputable	
@@ -37,10 +36,56 @@ import FastString
 \begin{code}
 type LHsExpr id = Located (HsExpr id)
 
+-------------------------
+-- PostTcExpr is an evidence expression attached to the
+-- syntax tree by the type checker (c.f. postTcType)
+-- We use a PostTcTable where there are a bunch of pieces of 
+-- evidence, more than is convenient to keep individually
+type PostTcExpr  = HsExpr Id
+type PostTcTable = [(Name, Id)]
+
+noPostTcExpr :: PostTcExpr
+noPostTcExpr = HsLit (HsString FSLIT("noPostTcExpr"))
+
+noPostTcTable :: PostTcTable
+noPostTcTable = []
+
+-------------------------
+-- SyntaxExpr is like PostTcExpr, but it's filled in a little earlier,
+-- by the renamer.  It's used for rebindable syntax.  
+-- E.g. (>>=) is filled in before the renamer by the appropriate Name
+--      for (>>=), and then instantiated by the type checker with its
+--	type args tec
+
+type SyntaxExpr id = HsExpr id
+
+noSyntaxExpr :: SyntaxExpr id	-- Before renaming, and sometimes after,
+				-- (if the syntax slot makes no sense)
+noSyntaxExpr = HsLit (HsString FSLIT("noSyntaxExpr"))
+
+
+type SyntaxTable id = [(Name, SyntaxExpr id)]
+--	*** Currently used only for CmdTop (sigh) ***
+-- * Before the renamer, this list is noSyntaxTable
+--
+-- * After the renamer, it takes the form [(std_name, HsVar actual_name)]
+--   For example, for the 'return' op of a monad
+--	normal case:		(GHC.Base.return, HsVar GHC.Base.return)
+--	with rebindable syntax:	(GHC.Base.return, return_22)
+--		where return_22 is whatever "return" is in scope
+--
+-- * After the type checker, it takes the form [(std_name, <expression>)]
+--	where <expression> is the evidence for the method
+
+noSyntaxTable :: SyntaxTable id
+noSyntaxTable = []
+
+
+-------------------------
 data HsExpr id
   = HsVar	id		-- variable
   | HsIPVar	(IPName id)	-- implicit parameter
-  | HsOverLit	HsOverLit	-- Overloaded literals; eliminated by type checker
+  | HsOverLit	(HsOverLit id)	-- Overloaded literals
   | HsLit	HsLit		-- Simple (non-overloaded) literals
 
   | HsLam	(MatchGroup  id)	-- Currently always a single match
@@ -63,7 +108,7 @@ data HsExpr id
   -- They are eventually removed by the type checker.
 
   | NegApp	(LHsExpr id)	-- negated expr
-		SyntaxName	-- Name of 'negate' (see RnEnv.lookupSyntaxName)
+		(SyntaxExpr id)	-- Name of 'negate'
 
   | HsPar	(LHsExpr id)	-- parenthesised expr
 
@@ -86,8 +131,9 @@ data HsExpr id
 					-- because in this context we never use
 					-- the PatGuard or ParStmt variant
 		[LStmt id]		-- "do":one or more stmts
-		(ReboundNames id)	-- Ids for [return,fail,>>=,>>]
-			PostTcType	-- Type of the whole expression
+		(LHsExpr id)		-- The body; the last expression in the 'do'
+					--	     of [ body | ... ] in a list comp
+		PostTcType		-- Type of the whole expression
 
   | ExplicitList		-- syntactic list
 		PostTcType	-- Gives type of components of list
@@ -106,23 +152,17 @@ data HsExpr id
 
 
 	-- Record construction
-  | RecordCon	(Located id)		-- The constructor
+  | RecordCon	(Located id)		-- The constructor.  After type checking
+					-- it's the *worker* Id of the constructor
+		PostTcExpr		-- Data con Id applied to type args
 		(HsRecordBinds id)
-
-  | RecordConOut DataCon
-		(LHsExpr id)		-- Data con Id applied to type args
-		(HsRecordBinds id)
-
 
 	-- Record update
   | RecordUpd	(LHsExpr id)
 		(HsRecordBinds id)
-
-  | RecordUpdOut (LHsExpr id)	-- TRANSLATION
-		 Type			-- Type of *input* record
-		 Type			-- Type of *result* record (may differ from
+		PostTcType		-- Type of *input* record
+		PostTcType		-- Type of *result* record (may differ from
 					-- 	type of input record)
-		 (HsRecordBinds id)
 
   | ExprWithTySig			-- e :: type
 		(LHsExpr id)
@@ -132,15 +172,12 @@ data HsExpr id
 		(LHsExpr id)
 		(LHsType Name)		-- Retain the signature for round-tripping purposes
 
-  | ArithSeqIn				-- arithmetic sequence
+  | ArithSeq				-- arithmetic sequence
+		PostTcExpr
 		(ArithSeqInfo id)
-  | ArithSeqOut
-		(LHsExpr id)		-- (typechecked, of course)
-		(ArithSeqInfo id)
-  | PArrSeqIn           		-- arith. sequence for parallel array
-		(ArithSeqInfo id)	-- [:e1..e2:] or [:e1, e2..e3:]
-  | PArrSeqOut
-		(LHsExpr id)		-- (typechecked, of course)
+
+  | PArrSeq	           		-- arith. sequence for parallel array
+		PostTcExpr		-- [:e1..e2:] or [:e1, e2..e3:]
 		(ArithSeqInfo id)
 
   | HsSCC	FastString	-- "set cost centre" (_scc_) annotation
@@ -222,23 +259,6 @@ Everything from here on appears only in typechecker output.
 
 type PendingSplice = (Name, LHsExpr Id)	-- Typechecked splices, waiting to be 
 					-- pasted back in by the desugarer
-\end{code}
-
-Table of bindings of names used in rebindable syntax.
-This gets filled in by the renamer.
-
-\begin{code}
-type ReboundNames id = [(Name, HsExpr id)]
---  * Before the renamer, this list is empty
---
---  * After the renamer, it takes the form [(std_name, HsVar actual_name)]
---   For example, for the 'return' op of a monad
---	normal case:		(GHC.Base.return, HsVar GHC.Base.return)
---	with rebindable syntax:	(GHC.Base.return, return_22)
---		where return_22 is whatever "return" is in scope
---
---  * After the type checker, it takes the form [(std_name, <expression>)]
---	where <expression> is the evidence for the method
 \end{code}
 
 A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
@@ -338,7 +358,7 @@ ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
-ppr_expr (HsDo do_or_list_comp stmts _ _) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo do_or_list_comp stmts body _) = pprDo do_or_list_comp stmts body
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -349,14 +369,10 @@ ppr_expr (ExplicitPArr _ exprs)
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon con_id rbinds)
+ppr_expr (RecordCon con_id con_expr rbinds)
   = pp_rbinds (ppr con_id) rbinds
-ppr_expr (RecordConOut data_con con rbinds)
-  = pp_rbinds (ppr con) rbinds
 
-ppr_expr (RecordUpd aexp rbinds)
-  = pp_rbinds (pprParendExpr aexp) rbinds
-ppr_expr (RecordUpdOut aexp _ _ rbinds)
+ppr_expr (RecordUpd aexp rbinds _ _)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)
@@ -366,17 +382,10 @@ ppr_expr (ExprWithTySigOut expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
 	 4 (ppr sig)
 
-ppr_expr (ArithSeqIn info)
-  = brackets (ppr info)
-ppr_expr (ArithSeqOut expr info)
-  = brackets (ppr info)
+ppr_expr (ArithSeq expr info) = brackets (ppr info)
+ppr_expr (PArrSeq expr info)  = pa_brackets (ppr info)
 
-ppr_expr (PArrSeqIn info)
-  = pa_brackets (ppr info)
-ppr_expr (PArrSeqOut expr info)
-  = pa_brackets (ppr info)
-
-ppr_expr EWildPat = char '_'
+ppr_expr EWildPat     = char '_'
 ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 
@@ -529,7 +538,6 @@ The legal constructors for commands are:
 					-- because in this context we never use
 					-- the PatGuard or ParStmt variant
 		[Stmt id]	-- HsExpr's are really HsCmd's
-		(ReboundNames id)
 		PostTcType	-- Type of the whole expression
 		SrcLoc
 
@@ -544,7 +552,7 @@ data HsCmdTop id
   = HsCmdTop	(LHsCmd id)
 		[PostTcType]	-- types of inputs on the command's stack
 		PostTcType	-- return type of the command
-		(ReboundNames id)
+		(SyntaxTable id)
 				-- after type checking:
 				-- names used in the command's desugaring
 \end{code}
@@ -608,7 +616,6 @@ data Match id
 				--	Nothing after typechecking
 	(GRHSs id)
 
--- gaw 2004
 hsLMatchPats :: LMatch id -> [LPat id]
 hsLMatchPats (L _ (Match pats _ _)) = pats
 
@@ -616,13 +623,11 @@ hsLMatchPats (L _ (Match pats _ _)) = pats
 data GRHSs id	
   = GRHSs [LGRHS id]		-- Guarded RHSs
 	  [HsBindGroup id]	-- The where clause
--- gaw 2004
---	  PostTcType		-- Type of RHS (after type checking)
 
 type LGRHS id = Located (GRHS id)
 
-data GRHS id
-  = GRHS  [LStmt id]		-- The RHS is the final ResultStmt
+data GRHS id = GRHS [LStmt id]		-- Guards
+		    (LHsExpr id)	-- Right hand side
 \end{code}
 
 We know the list must have at least one @Match@ in it.
@@ -642,7 +647,6 @@ pprPatBind pat grhss = sep [ppr pat, nest 4 (pprGRHSs PatBindRhs grhss)]
 
 
 pprMatch :: OutputableBndr id => HsMatchContext id -> Match id -> SDoc
--- gaw 2004
 pprMatch ctxt (Match pats maybe_ty grhss)
   = pp_name ctxt <+> sep [sep (map ppr pats), 
 		     ppr_maybe_ty, 
@@ -659,7 +663,6 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 
 
 pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
--- gaw 2004
 pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
     $$
@@ -668,15 +671,11 @@ pprGRHSs ctxt (GRHSs grhss binds)
 
 pprGRHS :: OutputableBndr id => HsMatchContext id -> GRHS id -> SDoc
 
-pprGRHS ctxt (GRHS [L _ (ResultStmt expr)])
+pprGRHS ctxt (GRHS [] expr)
  =  pp_rhs ctxt expr
 
-pprGRHS ctxt (GRHS guarded)
+pprGRHS ctxt (GRHS guards expr)
  = sep [char '|' <+> interpp'SP guards, pp_rhs ctxt expr]
- where
-    ResultStmt expr = unLoc (last guarded)
-	-- Last stmt should be a ResultStmt for guards
-    guards	    = init guarded
 
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 \end{code}
@@ -690,12 +689,21 @@ pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 \begin{code}
 type LStmt id = Located (Stmt id)
 
+-- The SyntaxExprs in here are used *only* for do-notation, which
+-- has rebindable syntax.  Otherwise they are unused.
 data Stmt id
-  = BindStmt	(LPat id) (LHsExpr id)
+  = BindStmt	(LPat id)		
+		(LHsExpr id) 
+		(SyntaxExpr id)		-- The (>>=) operator
+		(SyntaxExpr id)		-- The fail operator 
+		-- The fail operator is noSyntaxExpr 
+		-- if the pattern match can't fail
+
+  | ExprStmt	(LHsExpr id)
+		(SyntaxExpr id)		-- The (>>) operator
+		PostTcType		-- Element type of the RHS (used for arrows)
+
   | LetStmt	[HsBindGroup id]
-  | ResultStmt	(LHsExpr id)			-- See notes that follow
-  | ExprStmt	(LHsExpr id)	PostTcType	-- See notes that follow
-	-- The type is the *element type* of the expression
 
 	-- ParStmts only occur in a list comprehension
   | ParStmt	[([LStmt id], [id])]	-- After remaing, the ids are the binders
@@ -711,15 +719,17 @@ data Stmt id
 			-- are used before they are bound in the stmts of the RecStmt
 			-- From a type-checking point of view, these ones have to be monomorphic
 
-		--- This field is only valid after typechecking
-	     [LHsExpr id]	-- These expressions correspond
+		--- These fields are only valid after typechecking
+	     [PostTcExpr]	-- These expressions correspond
 				-- 1-to-1 with the "recursive" [id], and are the expresions that 
 				-- should be returned by the recursion.  They may not quite be the
 				-- Ids themselves, because the Id may be *polymorphic*, but
 				-- the returned thing has to be *monomorphic*.
+	     (DictBinds id)	-- Method bindings of Ids bound by the RecStmt,
+				-- and used afterwards
 \end{code}
 
-ExprStmts and ResultStmts are a bit tricky, because what they mean
+ExprStmts are a bit tricky, because what they mean
 depends on the context.  Consider the following contexts:
 
 	A do expression of type (m res_ty)
@@ -727,10 +737,6 @@ depends on the context.  Consider the following contexts:
 	* ExprStmt E any_ty:   do { ....; E; ... }
 		E :: m any_ty
 	  Translation: E >> ...
-	
-	* ResultStmt E:   do { ....; E }
-		E :: m res_ty
-	  Translation: E
 	
 	A list comprehensions of type [elt_ty]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -740,20 +746,12 @@ depends on the context.  Consider the following contexts:
 		E :: Bool
 	  Translation: if E then fail else ...
 
-	* ResultStmt E:   [ E | ... ]
-		E :: elt_ty
-	  Translation: return E
-	
 	A guard list, guarding a RHS of type rhs_ty
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	* ExprStmt E Bool:   f x | ..., E, ... = ...rhs...
 		E :: Bool
 	  Translation: if E then fail else ...
 	
-	* ResultStmt E:   f x | ...guards... = E
-		E :: rhs_ty
-	  Translation: E
-
 Array comprehensions are handled like list comprehensions -=chak
 
 Note [RecStmt]
@@ -784,27 +782,23 @@ have the same Name.
 instance OutputableBndr id => Outputable (Stmt id) where
     ppr stmt = pprStmt stmt
 
-pprStmt (BindStmt pat expr) 	= hsep [ppr pat, ptext SLIT("<-"), ppr expr]
-pprStmt (LetStmt binds)       	= hsep [ptext SLIT("let"), pprBinds binds]
-pprStmt (ExprStmt expr _)   	= ppr expr
-pprStmt (ResultStmt expr)   	= ppr expr
-pprStmt (ParStmt stmtss)        = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
-pprStmt (RecStmt segment _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
+pprStmt (BindStmt pat expr _ _)	  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
+pprStmt (LetStmt binds)       	  = hsep [ptext SLIT("let"), pprBinds binds]
+pprStmt (ExprStmt expr _ _)   	  = ppr expr
+pprStmt (ParStmt stmtss)          = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
+pprStmt (RecStmt segment _ _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
 
-pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> SDoc
-pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
-pprDo MDoExpr stmts  = hang (ptext SLIT("mdo")) 3 (vcat (map ppr stmts))
-pprDo ListComp stmts = pprComp brackets   stmts
-pprDo PArrComp stmts = pprComp pa_brackets stmts
+pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
+pprDo DoExpr      stmts body = hang (ptext SLIT("do"))  2 (vcat (map ppr stmts) $$ ppr body)
+pprDo (MDoExpr _) stmts body = hang (ptext SLIT("mdo")) 3 (vcat (map ppr stmts) $$ ppr body)
+pprDo ListComp    stmts body = pprComp brackets    stmts body
+pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
 
-pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> SDoc
-pprComp brack stmts
+pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> LHsExpr id -> SDoc
+pprComp brack quals body
   = brack $
-	hang (ppr expr <+> char '|')
+	hang (ppr body <+> char '|')
 	     4 (interpp'SP quals)
-  where
-      ResultStmt expr = unLoc (last stmts)  -- Last stmt should
-      quals	      = init stmts  -- be an ResultStmt
 \end{code}
 
 %************************************************************************
@@ -900,7 +894,9 @@ data HsMatchContext id	-- Context of a Match
 data HsStmtContext id
   = ListComp 
   | DoExpr 
-  | MDoExpr				-- Recursive do-expression
+  | MDoExpr PostTcTable			-- Recursive do-expression
+					-- (tiresomely, it needs table
+					--  of its return/bind ops)
   | PArrComp				-- Parallel array comprehension
   | PatGuard (HsMatchContext id)	-- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)	-- A branch of a parallel stmt 
@@ -908,9 +904,9 @@ data HsStmtContext id
 
 \begin{code}
 isDoExpr :: HsStmtContext id -> Bool
-isDoExpr DoExpr  = True
-isDoExpr MDoExpr = True
-isDoExpr other   = False
+isDoExpr DoExpr      = True
+isDoExpr (MDoExpr _) = True
+isDoExpr other       = False
 \end{code}
 
 \begin{code}
@@ -942,7 +938,7 @@ pprMatchRhsContext RecUpd	= panic "pprMatchRhsContext"
 pprStmtContext (ParStmtCtxt c) = sep [ptext SLIT("a parallel branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
 pprStmtContext DoExpr          = ptext SLIT("a 'do' expression")
-pprStmtContext MDoExpr         = ptext SLIT("an 'mdo' expression")
+pprStmtContext (MDoExpr _)     = ptext SLIT("an 'mdo' expression")
 pprStmtContext ListComp        = ptext SLIT("a list comprehension")
 pprStmtContext PArrComp        = ptext SLIT("an array comprehension")
 
@@ -963,7 +959,7 @@ matchContextErrString ProcExpr      	      	 = "proc"
 matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _)) 	 = "pattern guard"
 matchContextErrString (StmtCtxt DoExpr)       	 = "'do' expression"
-matchContextErrString (StmtCtxt MDoExpr)      	 = "'mdo' expression"
+matchContextErrString (StmtCtxt (MDoExpr _))   	 = "'mdo' expression"
 matchContextErrString (StmtCtxt ListComp)     	 = "list comprehension"
 matchContextErrString (StmtCtxt PArrComp)     	 = "array comprehension"
 \end{code}

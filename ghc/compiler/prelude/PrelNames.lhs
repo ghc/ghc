@@ -103,7 +103,6 @@ wired in ones are defined in TysWiredIn etc.
 basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
- ++ monadNames
  ++ typeableClassNames
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
@@ -146,6 +145,7 @@ basicKnownKeyNames
 
 	-- Monad stuff
 	thenIOName, bindIOName, returnIOName, failIOName,
+	failMName, bindMName, thenMName, returnMName,
 
 	-- MonadRec stuff
 	mfixName,
@@ -206,9 +206,6 @@ basicKnownKeyNames
 	, objectTyConName, marshalObjectName, unmarshalObjectName
 	, marshalStringName, unmarshalStringName, checkDotnetResName
     ]
-
-monadNames :: [Name]	-- The monad ops need by a HsDo
-monadNames = [returnMName, failMName, bindMName, thenMName]
 
 genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
@@ -372,6 +369,8 @@ maxBound_RDR            = varQual_RDR pREL_ENUM FSLIT("maxBound")
 range_RDR               = varQual_RDR pREL_ARR FSLIT("range")
 inRange_RDR             = varQual_RDR pREL_ARR FSLIT("inRange")
 index_RDR		= varQual_RDR pREL_ARR FSLIT("index")
+unsafeIndex_RDR		= varQual_RDR pREL_ARR FSLIT("unsafeIndex")
+unsafeRangeSize_RDR	= varQual_RDR pREL_ARR FSLIT("unsafeRangeSize")
 
 readList_RDR            = varQual_RDR pREL_READ FSLIT("readList")
 readListDefault_RDR     = varQual_RDR pREL_READ FSLIT("readListDefault")
@@ -453,18 +452,18 @@ unpackCStringUtf8Name   = varQual pREL_BASE FSLIT("unpackCStringUtf8#") unpackCS
 eqStringName	 	= varQual pREL_BASE FSLIT("eqString")  eqStringIdKey
 
 -- Base classes (Eq, Ord, Functor)
-eqClassName	  = clsQual pREL_BASE FSLIT("Eq") eqClassKey
-eqName		  = methName eqClassName FSLIT("==") eqClassOpKey
-ordClassName	  = clsQual pREL_BASE FSLIT("Ord") ordClassKey
-geName		  = methName ordClassName FSLIT(">=") geClassOpKey
+eqClassName	  = clsQual pREL_BASE FSLIT("Eq")      eqClassKey
+eqName		  = methName eqClassName FSLIT("==")   eqClassOpKey
+ordClassName	  = clsQual pREL_BASE FSLIT("Ord")     ordClassKey
+geName		  = methName ordClassName FSLIT(">=")  geClassOpKey
 functorClassName  = clsQual pREL_BASE FSLIT("Functor") functorClassKey
 
 -- Class Monad
-monadClassName	   = clsQual pREL_BASE FSLIT("Monad") monadClassKey
-thenMName	   = methName monadClassName FSLIT(">>")  thenMClassOpKey
-bindMName	   = methName monadClassName FSLIT(">>=") bindMClassOpKey
+monadClassName	   = clsQual pREL_BASE FSLIT("Monad")        monadClassKey
+thenMName	   = methName monadClassName FSLIT(">>")     thenMClassOpKey
+bindMName	   = methName monadClassName FSLIT(">>=")    bindMClassOpKey
 returnMName	   = methName monadClassName FSLIT("return") returnMClassOpKey
-failMName	   = methName monadClassName FSLIT("fail") failMClassOpKey
+failMName	   = methName monadClassName FSLIT("fail")   failMClassOpKey
 
 -- Random PrelBase functions
 otherwiseIdName   = varQual pREL_BASE FSLIT("otherwise") otherwiseIdKey
@@ -472,8 +471,8 @@ foldrName	  = varQual pREL_BASE FSLIT("foldr")     foldrIdKey
 buildName	  = varQual pREL_BASE FSLIT("build")     buildIdKey
 augmentName	  = varQual pREL_BASE FSLIT("augment")   augmentIdKey
 appendName	  = varQual pREL_BASE FSLIT("++")        appendIdKey
-andName		  = varQual pREL_BASE FSLIT("&&")	      andIdKey
-orName		  = varQual pREL_BASE FSLIT("||")	      orIdKey
+andName		  = varQual pREL_BASE FSLIT("&&")	 andIdKey
+orName		  = varQual pREL_BASE FSLIT("||")	 orIdKey
 assertName        = varQual pREL_BASE FSLIT("assert")    assertIdKey
 
 -- PrelTup

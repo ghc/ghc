@@ -6,6 +6,8 @@ data MatchGroup a
 data GRHSs a
 
 type LHsExpr a = SrcLoc.Located (HsExpr a)
+type SyntaxExpr a = HsExpr a
+type PostTcExpr = HsExpr Var.Id
 
 pprExpr :: (Outputable.OutputableBndr i) => 
 	HsExpr.HsExpr i -> Outputable.SDoc

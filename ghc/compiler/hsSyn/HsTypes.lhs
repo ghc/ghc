@@ -22,9 +22,6 @@ module HsTypes (
 	-- Type place holder
 	PostTcType, placeHolderType,
 
-	-- Name place holder
-	SyntaxName, placeHolderName,
-
 	-- Printing
 	pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
     ) where
@@ -36,11 +33,8 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 import Type		( Type )
 import Kind		( {- instance Outputable Kind -}, Kind,
 			  pprParendKind, pprKind, isLiftedTypeKind )
-import Name		( Name, mkInternalName )
-import OccName		( mkVarOcc )
 import BasicTypes	( IPName, Boxity, tupleParens )
-import PrelNames	( unboundKey )
-import SrcLoc		( noSrcLoc, Located(..), unLoc, noSrcSpan )
+import SrcLoc		( Located(..), unLoc, noSrcSpan )
 import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 \end{code}
@@ -60,18 +54,6 @@ type PostTcType = Type		-- Used for slots in the abstract syntax
 
 placeHolderType :: PostTcType	-- Used before typechecking
 placeHolderType  = panic "Evaluated the place holder for a PostTcType"
-
-
-type SyntaxName = Name		-- These names are filled in by the renamer
-				-- Before then they are a placeHolderName (so that
-				--	we can still print the HsSyn)
-				-- They correspond to "rebindable syntax";
-				-- See RnEnv.lookupSyntaxName
-
-placeHolderName :: SyntaxName
-placeHolderName = mkInternalName unboundKey 
-			(mkVarOcc FSLIT("syntaxPlaceHolder")) 
-			noSrcLoc
 \end{code}
 
 %************************************************************************

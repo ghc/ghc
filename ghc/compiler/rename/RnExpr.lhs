@@ -11,7 +11,7 @@ free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatchGroup, rnMatch, rnGRHSs, rnLExpr, rnExpr, rnStmts,
+	rnMatchGroup, rnMatch, rnGRHSs, rnLExpr, rnExpr, 
 	checkPrecMatch, checkTH
    ) where
 
@@ -36,7 +36,7 @@ import DynFlags	( DynFlag(..) )
 import BasicTypes	( Fixity(..), FixityDirection(..), negateFixity, compareFixity )
 import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
-			  negateName, monadNames, mfixName )
+			  negateName, thenMName, bindMName, failMName )
 import Name		( Name, nameOccName )
 import NameSet
 import RdrName		( RdrName )
@@ -113,20 +113,21 @@ rnGRHSs ctxt (GRHSs grhss binds)
 rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
 rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
 
-rnGRHS' ctxt (GRHS guarded)
-  = doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
-    checkM (opt_GlasgowExts || is_standard_guard guarded)
-	   (addWarn (nonStdGuardErr guarded))	`thenM_` 
+rnGRHS' ctxt (GRHS guards rhs)
+  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
+	; checkM (opt_GlasgowExts || is_standard_guard guards)
+	  	 (addWarn (nonStdGuardErr guards))
 
-    rnStmts (PatGuard ctxt) guarded	`thenM` \ (guarded', fvs) ->
-    returnM (GRHS guarded', fvs)
+	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
+				    rnLExpr rhs
+	; return (GRHS guards' rhs', fvs) }
   where
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard [L _ (ResultStmt _)]                     = True
-    is_standard_guard [L _ (ExprStmt _ _), L _ (ResultStmt _)] = True
-    is_standard_guard other	      		               = False
+    is_standard_guard []                     = True
+    is_standard_guard [L _ (ExprStmt _ _ _)] = True
+    is_standard_guard other	      	     = False
 \end{code}
 
 %************************************************************************
@@ -267,24 +268,10 @@ rnExpr (HsLet binds expr)
     rnLExpr expr			 `thenM` \ (expr',fvExpr) ->
     returnM (HsLet binds' expr', fvExpr)
 
-rnExpr e@(HsDo do_or_lc stmts _ _)
-  = rnStmts do_or_lc stmts		`thenM` \ (stmts', fvs) ->
-
-	-- Check the statement list ends in an expression
-    case last stmts' of {
-	L _ (ResultStmt _) -> returnM () ;
-	other              -> addLocErr other (doStmtListErr do_or_lc)
-    }					`thenM_`
-
-	-- Generate the rebindable syntax for the monad
-    lookupSyntaxNames syntax_names	`thenM` \ (syntax_names', monad_fvs) ->
-
-    returnM (HsDo do_or_lc stmts' syntax_names' placeHolderType, fvs `plusFV` monad_fvs)
-  where
-    syntax_names = case do_or_lc of
-			DoExpr  -> monadNames
-			MDoExpr -> monadNames ++ [mfixName]
-			other   -> []
+rnExpr e@(HsDo do_or_lc stmts body _)
+  = do 	{ ((stmts', body'), fvs) <- rnStmts do_or_lc stmts $
+				    rnLExpr body
+	; return (HsDo do_or_lc stmts' body' placeHolderType, fvs) }
 
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
@@ -302,15 +289,17 @@ rnExpr e@(ExplicitTuple exps boxity)
     tup_size   = length exps
     tycon_name = tupleTyCon_name boxity tup_size
 
-rnExpr (RecordCon con_id rbinds)
+rnExpr (RecordCon con_id _ rbinds)
   = lookupLocatedOccRn con_id		`thenM` \ conname ->
     rnRbinds "construction" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordCon conname rbinds', fvRbinds `addOneFV` unLoc conname)
+    returnM (RecordCon conname noPostTcExpr rbinds', 
+	     fvRbinds `addOneFV` unLoc conname)
 
-rnExpr (RecordUpd expr rbinds)
+rnExpr (RecordUpd expr rbinds _ _)
   = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
     rnRbinds "update" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordUpd expr' rbinds', fvExpr `plusFV` fvRbinds)
+    returnM (RecordUpd expr' rbinds' placeHolderType placeHolderType, 
+	     fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
   = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
@@ -331,13 +320,13 @@ rnExpr (HsType a)
   where 
     doc = text "In a type argument"
 
-rnExpr (ArithSeqIn seq)
+rnExpr (ArithSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (ArithSeqIn new_seq, fvs)
+    returnM (ArithSeq noPostTcExpr new_seq, fvs)
 
-rnExpr (PArrSeqIn seq)
+rnExpr (PArrSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (PArrSeqIn new_seq, fvs)
+    returnM (PArrSeq noPostTcExpr new_seq, fvs)
 \end{code}
 
 These three are pattern syntax appearing in expressions.
@@ -391,6 +380,9 @@ rnExpr (HsArrForm op fixity cmds)
   = rnLExpr op		`thenM` \ (op',fvOp) ->
     rnCmdArgs cmds	`thenM` \ (cmds',fvCmds) ->
     returnM (HsArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
+
+rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
+	-- DictApp, DictLam, TyApp, TyLam
 
 ---------------------------
 -- Deal with fixity (cf mkOpAppRn for the method)
@@ -447,7 +439,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
 		    nameSetToList (methodNamesCmd (unLoc cmd'))
      in
 	-- Generate the rebindable syntax for the monad
-     lookupSyntaxNames cmd_names	`thenM` \ (cmd_names', cmd_fvs) ->
+     lookupSyntaxTable cmd_names	`thenM` \ (cmd_names', cmd_fvs) ->
 
      returnM (HsCmdTop cmd' [] placeHolderType cmd_names', 
 	     fvCmd `plusFV` cmd_fvs)
@@ -481,22 +473,21 @@ convertOpFormsCmd (HsIf exp c1 c2)
 convertOpFormsCmd (HsLet binds cmd)
   = HsLet binds (convertOpFormsLCmd cmd)
 
-convertOpFormsCmd (HsDo ctxt stmts ids ty)
-  = HsDo ctxt (map (fmap convertOpFormsStmt) stmts) ids ty
+convertOpFormsCmd (HsDo ctxt stmts body ty)
+  = HsDo ctxt (map (fmap convertOpFormsStmt) stmts)
+	      (convertOpFormsLCmd body) ty
 
 -- Anything else is unchanged.  This includes HsArrForm (already done),
 -- things with no sub-commands, and illegal commands (which will be
 -- caught by the type checker)
 convertOpFormsCmd c = c
 
-convertOpFormsStmt (BindStmt pat cmd)
-  = BindStmt pat (convertOpFormsLCmd cmd)
-convertOpFormsStmt (ResultStmt cmd)
-  = ResultStmt (convertOpFormsLCmd cmd)
-convertOpFormsStmt (ExprStmt cmd ty)
-  = ExprStmt (convertOpFormsLCmd cmd) ty
-convertOpFormsStmt (RecStmt stmts lvs rvs es)
-  = RecStmt (map (fmap convertOpFormsStmt) stmts) lvs rvs es
+convertOpFormsStmt (BindStmt pat cmd _ _)
+  = BindStmt pat (convertOpFormsLCmd cmd) noSyntaxExpr noSyntaxExpr
+convertOpFormsStmt (ExprStmt cmd _ _)
+  = ExprStmt (convertOpFormsLCmd cmd) noSyntaxExpr placeHolderType
+convertOpFormsStmt (RecStmt stmts lvs rvs es binds)
+  = RecStmt (map (fmap convertOpFormsStmt) stmts) lvs rvs es binds
 convertOpFormsStmt stmt = stmt
 
 convertOpFormsMatch (MatchGroup ms ty)
@@ -508,11 +499,8 @@ convertOpFormsGRHSs (GRHSs grhss binds)
   = GRHSs (map convertOpFormsGRHS grhss) binds
 
 convertOpFormsGRHS = fmap convert
- where convert (GRHS stmts)
-	  = let
-		(L loc (ResultStmt cmd)) = last stmts
-	    in
-	    GRHS (init stmts ++ [L loc (ResultStmt (convertOpFormsLCmd cmd))])
+ where 
+   convert (GRHS stmts cmd) = GRHS stmts (convertOpFormsLCmd cmd)
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars	-- Only inhabitants are 
@@ -537,7 +525,8 @@ methodNamesCmd (HsIf p c1 c2)
 
 methodNamesCmd (HsLet b c) = methodNamesLCmd c
 
-methodNamesCmd (HsDo sc stmts rbs ty) = methodNamesStmts stmts
+methodNamesCmd (HsDo sc stmts body ty) 
+  = methodNamesStmts stmts `plusFV` methodNamesLCmd body
 
 methodNamesCmd (HsApp c e) = methodNamesLCmd c
 
@@ -562,7 +551,7 @@ methodNamesMatch (MatchGroup ms ty)
 methodNamesGRHSs (GRHSs grhss binds) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
-methodNamesGRHS (L _ (GRHS stmts)) = methodNamesLStmt (last stmts)
+methodNamesGRHS (L _ (GRHS stmts rhs)) = methodNamesLCmd rhs
 
 ---------------------------------------------------
 methodNamesStmts stmts = plusFVs (map methodNamesLStmt stmts)
@@ -570,10 +559,9 @@ methodNamesStmts stmts = plusFVs (map methodNamesLStmt stmts)
 ---------------------------------------------------
 methodNamesLStmt = methodNamesStmt . unLoc
 
-methodNamesStmt (ResultStmt cmd) = methodNamesLCmd cmd
-methodNamesStmt (ExprStmt cmd ty) = methodNamesLCmd cmd
-methodNamesStmt (BindStmt pat cmd ) = methodNamesLCmd cmd
-methodNamesStmt (RecStmt stmts lvs rvs es)
+methodNamesStmt (ExprStmt cmd _ _)     = methodNamesLCmd cmd
+methodNamesStmt (BindStmt pat cmd _ _) = methodNamesLCmd cmd
+methodNamesStmt (RecStmt stmts _ _ _ _)
   = methodNamesStmts stmts `addOneFV` loopAName
 methodNamesStmt (LetStmt b)  = emptyFVs
 methodNamesStmt (ParStmt ss) = emptyFVs
@@ -677,49 +665,61 @@ rnBracket (DecBr group)
 %************************************************************************
 
 \begin{code}
-rnStmts :: HsStmtContext Name -> [LStmt RdrName] -> RnM ([LStmt Name], FreeVars)
+rnStmts :: HsStmtContext Name -> [LStmt RdrName] 
+	-> RnM (thing, FreeVars)
+	-> RnM (([LStmt Name], thing), FreeVars)
 
-rnStmts MDoExpr = rnMDoStmts
-rnStmts ctxt    = rnNormalStmts ctxt
+rnStmts (MDoExpr _) = rnMDoStmts
+rnStmts ctxt        = rnNormalStmts ctxt
 
-rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName] -> RnM ([LStmt Name], FreeVars)	
+rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
+	      -> RnM (thing, FreeVars)
+	      -> RnM (([LStmt Name], thing), FreeVars)	
 -- Used for cases *other* than recursive mdo
 -- Implements nested scopes
 
-rnNormalStmts ctxt [] = returnM ([], emptyFVs)
-	-- Happens at the end of the sub-lists of a ParStmts
+rnNormalStmts ctxt [] thing_inside 
+  = do	{ (thing, fvs) <- thing_inside
+	; return (([],thing), fvs) } 
 
-rnNormalStmts ctxt (L loc (ExprStmt expr _) : stmts)
-  = rnLExpr expr		        `thenM` \ (expr', fv_expr) ->
-    rnNormalStmts ctxt stmts	`thenM` \ (stmts', fvs) ->
-    returnM (L loc (ExprStmt expr' placeHolderType) : stmts',
-	     fv_expr `plusFV` fvs)
+rnNormalStmts ctxt (L loc stmt : stmts) thing_inside
+  = do	{ ((stmt', (stmts', thing)), fvs) 
+		<- rnStmt ctxt stmt 	$
+		   rnNormalStmts ctxt stmts thing_inside
+	; return (((L loc stmt' : stmts'), thing), fvs) }
+    
+rnStmt :: HsStmtContext Name -> Stmt RdrName
+       -> RnM (thing, FreeVars)
+       -> RnM ((Stmt Name, thing), FreeVars)
 
-rnNormalStmts ctxt [L loc (ResultStmt expr)]
-  = rnLExpr expr		`thenM` \ (expr', fv_expr) ->
-    returnM ([L loc (ResultStmt expr')], fv_expr)
+rnStmt ctxt (ExprStmt expr _ _) thing_inside
+  = do	{ (expr', fv_expr) <- rnLExpr expr
+	; (then_op, fvs1)  <- lookupSyntaxName thenMName
+	; (thing, fvs2)    <- thing_inside
+	; return ((ExprStmt expr' then_op placeHolderType, thing),
+		  fv_expr `plusFV` fvs1 `plusFV` fvs2) }
 
-rnNormalStmts ctxt (L loc (BindStmt pat expr) : stmts) 
-  = rnLExpr expr				`thenM` \ (expr', fv_expr) ->
-	-- The binders do not scope over the expression
+rnStmt ctxt (BindStmt pat expr _ _) thing_inside
+  = do	{ (expr', fv_expr) <- rnLExpr expr
+		-- The binders do not scope over the expression
+	; (bind_op, fvs1) <- lookupSyntaxName bindMName
+	; (fail_op, fvs2) <- lookupSyntaxName failMName
 
-    let
-     reportUnused = 
-       case ctxt of
-         ParStmtCtxt{} -> False
-	 _ -> True
-    in
-    rnPatsAndThen (StmtCtxt ctxt) reportUnused [pat] $ \ [pat'] ->
-    rnNormalStmts ctxt stmts		             `thenM` \ (stmts', fvs) ->
-    returnM (L loc (BindStmt pat' expr') : stmts',
-	     fv_expr `plusFV` fvs)	-- fv_expr shouldn't really be filtered by
-					-- the rnPatsAndThen, but it does not matter
+	; let reportUnused = case ctxt of
+			         ParStmtCtxt{} -> False
+				 _ -> True
+	; rnPatsAndThen (StmtCtxt ctxt) reportUnused [pat] $ \ [pat'] -> do
+	{ (thing, fvs3) <- thing_inside
+	; return ((BindStmt pat' expr' bind_op fail_op, thing),
+		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
+	-- fv_expr shouldn't really be filtered by
+	-- the rnPatsAndThen, but it does not matter
 
-rnNormalStmts ctxt (L loc (LetStmt binds) : stmts)
-  = checkErr (ok ctxt binds) (badIpBinds binds)	`thenM_`
-    rnBindGroupsAndThen binds			( \ binds' ->
-    rnNormalStmts ctxt stmts			`thenM` \ (stmts', fvs) ->
-    returnM (L loc (LetStmt binds') : stmts', fvs))
+rnStmt ctxt (LetStmt binds) thing_inside
+  = do	{ checkErr (ok ctxt binds) (badIpBinds binds)
+	; rnBindGroupsAndThen binds		$ \ binds' -> do
+	{ (thing, fvs) <- thing_inside
+	; return ((LetStmt binds', thing), fvs) }}
   where
 	-- We do not allow implicit-parameter bindings in a parallel
 	-- list comprehension.  I'm not sure what it might mean.
@@ -729,51 +729,52 @@ rnNormalStmts ctxt (L loc (LetStmt binds) : stmts)
     is_ip_bind (HsIPBinds _) = True
     is_ip_bind _	     = False
 
-rnNormalStmts ctxt (L loc (ParStmt stmtss) : stmts)
-  = doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
-    checkM opt_GlasgowExts parStmtErr 	`thenM_`
-    mapFvRn rn_branch stmtss 		`thenM` \ (stmtss', fv_stmtss) ->
-    let
-	bndrss :: [[Name]]	-- NB: Name, not RdrName
-	bndrss = map (map unLoc . collectStmtsBinders) stmtss'
-	(bndrs, dups) = removeDups cmpByOcc (concat bndrss)
-    in
-    mappM dupErr dups			`thenM` \ _ ->
-    bindLocalNamesFV bndrs		$
+rnStmt ctxt (ParStmt stmtss) thing_inside
+  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
+	; checkM opt_GlasgowExts parStmtErr
+	; (stmtss'_w_unit, fv_stmtss) <- mapFvRn rn_branch stmtss
+	; let
+	    bndrss :: [[Name]]	-- NB: Name, not RdrName
+  	    bndrss 	  = map (map unLoc . collectLStmtsBinders) stmtss'
+	    (bndrs, dups) = removeDups cmpByOcc (concat bndrss)
+	    stmtss'       = map fst stmtss'_w_unit
+	; mappM dupErr dups
+
+	; bindLocalNamesFV bndrs $ do
+	{ (thing, fvs) <- thing_inside
 	-- Note: binders are returned in scope order, so one may
 	--       shadow the next; e.g. x <- xs; x <- ys
-    rnNormalStmts ctxt stmts			`thenM` \ (stmts', fvs) ->
 
 	-- Cut down the exported binders to just the ones needed in the body
-    let
-	used_bndrs_s = map (filter (`elemNameSet` fvs)) bndrss
-	unused_bndrs = filter (not . (`elemNameSet` fvs)) bndrs
-    in
+	; let	used_bndrs_s = map (filter (`elemNameSet` fvs)) bndrss
+		unused_bndrs = filter (not . (`elemNameSet` fvs)) bndrs
+
      -- With processing of the branches and the tail of comprehension done,
      -- we can finally compute&report any unused ParStmt binders.
-    warnUnusedMatches unused_bndrs  `thenM_`
-    returnM (L loc (ParStmt (stmtss' `zip` used_bndrs_s)) : stmts', 
-	     fv_stmtss `plusFV` fvs)
+	; warnUnusedMatches unused_bndrs
+	; return ((ParStmt (stmtss' `zip` used_bndrs_s), thing),
+	          fv_stmtss `plusFV` fvs) }}
   where
-    rn_branch (stmts, _) = rnNormalStmts (ParStmtCtxt ctxt) stmts
+    rn_branch (stmts, _) = rnNormalStmts (ParStmtCtxt ctxt) stmts $
+			   return ((), emptyFVs)
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
     dupErr (v:_) = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
 			    <+> quotes (ppr v))
 
-rnNormalStmts ctxt (L loc (RecStmt rec_stmts _ _ _) : stmts)
-  = bindLocatedLocalsRn doc (collectStmtsBinders rec_stmts)	$ \ _ ->
-    rn_rec_stmts rec_stmts				`thenM` \ segs ->
-    rnNormalStmts ctxt stmts				`thenM` \ (stmts', fvs) ->
+rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
+  = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ _ ->
+    rn_rec_stmts rec_stmts		`thenM` \ segs ->
+    thing_inside 			`thenM` \ (thing, fvs) ->
     let
 	segs_w_fwd_refs     	 = addFwdRefs segs
 	(ds, us, fs, rec_stmts') = unzip4 segs_w_fwd_refs
 	later_vars = nameSetToList (plusFVs ds `intersectNameSet` fvs)
 	fwd_vars   = nameSetToList (plusFVs fs)
 	uses	   = plusFVs us
+	rec_stmt   = RecStmt rec_stmts' later_vars fwd_vars [] emptyLHsBinds
     in	
-    returnM (L loc (RecStmt rec_stmts' later_vars fwd_vars []) : stmts', 
-	     uses `plusFV` fvs)
+    returnM ((rec_stmt, thing), uses `plusFV` fvs)
   where
     doc = text "In a recursive do statement"
 \end{code}
@@ -796,42 +797,46 @@ type Segment stmts = (Defs,
 
 
 ----------------------------------------------------
-rnMDoStmts :: [LStmt RdrName] -> RnM ([LStmt Name], FreeVars)
-rnMDoStmts stmts
+rnMDoStmts :: [LStmt RdrName]
+	   -> RnM (thing, FreeVars)
+	   -> RnM (([LStmt Name], thing), FreeVars)	
+rnMDoStmts stmts thing_inside
   = 	-- Step1: bring all the binders of the mdo into scope
 	-- Remember that this also removes the binders from the
 	-- finally-returned free-vars
-    bindLocatedLocalsRn doc (collectStmtsBinders stmts)	$ \ _ ->
-	
+    bindLocatedLocalsRn doc (collectLStmtsBinders stmts)	$ \ _ ->
+    do	{ 
 	-- Step 2: Rename each individual stmt, making a
 	--	   singleton segment.  At this stage the FwdRefs field
 	--	   isn't finished: it's empty for all except a BindStmt
 	--	   for which it's the fwd refs within the bind itself
 	-- 	   (This set may not be empty, because we're in a recursive 
 	--	    context.)
-    rn_rec_stmts stmts					`thenM` \ segs ->
-    let
+	  segs <- rn_rec_stmts stmts
+
+	; (thing, fvs_later) <- thing_inside
+
+	; let
 	-- Step 3: Fill in the fwd refs.
 	-- 	   The segments are all singletons, but their fwd-ref
 	--	   field mentions all the things used by the segment
 	--	   that are bound after their use
-	segs_w_fwd_refs = addFwdRefs segs
+	    segs_w_fwd_refs = addFwdRefs segs
 
 	-- Step 4: Group together the segments to make bigger segments
 	--	   Invariant: in the result, no segment uses a variable
 	--	   	      bound in a later segment
-	grouped_segs = glomSegments segs_w_fwd_refs
+	    grouped_segs = glomSegments segs_w_fwd_refs
 
 	-- Step 5: Turn the segments into Stmts
 	--	   Use RecStmt when and only when there are fwd refs
 	--	   Also gather up the uses from the end towards the
 	--	   start, so we can tell the RecStmt which things are
 	--	   used 'after' the RecStmt
-	stmts_w_fvs = segsToStmts grouped_segs
-    in
-    returnM stmts_w_fvs
-  where
+	    (stmts', fvs) = segsToStmts grouped_segs fvs_later
 
+	; return ((stmts', thing), fvs) }
+  where
     doc = text "In a recursive mdo-expression"
 
 
@@ -841,32 +846,30 @@ rn_rec_stmt :: LStmt RdrName -> RnM [Segment (LStmt Name)]
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
 
-rn_rec_stmt (L loc (ExprStmt expr _))
+rn_rec_stmt (L loc (ExprStmt expr _ _))
   = rnLExpr expr 		`thenM` \ (expr', fvs) ->
-    returnM [(emptyNameSet, fvs, emptyNameSet,
-	      L loc (ExprStmt expr' placeHolderType))]
+    lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
+    returnM [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
+	      L loc (ExprStmt expr' then_op placeHolderType))]
 
-rn_rec_stmt (L loc (ResultStmt expr))
-  = rnLExpr expr			`thenM` \ (expr', fvs) ->
-    returnM [(emptyNameSet, fvs, emptyNameSet,
-	      L loc (ResultStmt expr'))]
-
-rn_rec_stmt (L loc (BindStmt pat expr))
+rn_rec_stmt (L loc (BindStmt pat expr _ _))
   = rnLExpr expr		`thenM` \ (expr', fv_expr) ->
-    rnLPat pat		`thenM` \ (pat', fv_pat) ->
+    rnLPat pat			`thenM` \ (pat', fv_pat) ->
+    lookupSyntaxName bindMName	`thenM` \ (bind_op, fvs1) ->
+    lookupSyntaxName failMName	`thenM` \ (fail_op, fvs2) ->
     let
 	bndrs = mkNameSet (collectPatBinders pat')
-	fvs   = fv_expr `plusFV` fv_pat
+	fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
     in
     returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-	      L loc (BindStmt pat' expr'))]
+	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
 rn_rec_stmt (L loc (LetStmt binds))
   = rnBindGroups binds		`thenM` \ (binds', du_binds) ->
     returnM [(duDefs du_binds, duUses du_binds, 
 	      emptyNameSet, L loc (LetStmt binds'))]
 
-rn_rec_stmt (L loc (RecStmt stmts _ _ _))	-- Flatten Rec inside Rec
+rn_rec_stmt (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
   = rn_rec_stmts stmts
 
 rn_rec_stmt stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
@@ -959,17 +962,20 @@ glomSegments ((defs,uses,fwds,stmt) : segs)
 
 
 ----------------------------------------------------
-segsToStmts :: [Segment [LStmt Name]] -> ([LStmt Name], FreeVars)
+segsToStmts :: [Segment [LStmt Name]] 
+	    -> FreeVars			-- Free vars used 'later'
+	    -> ([LStmt Name], FreeVars)
 
-segsToStmts [] = ([], emptyFVs)
-segsToStmts ((defs, uses, fwds, ss) : segs)
+segsToStmts [] fvs_later = ([], fvs_later)
+segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
   = ASSERT( not (null ss) )
     (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
-    (later_stmts, later_uses) = segsToStmts segs
+    (later_stmts, later_uses) = segsToStmts segs fvs_later
     new_stmt | non_rec	 = head ss
 	     | otherwise = L (getLoc (head ss)) $ 
-			   RecStmt ss (nameSetToList used_later) (nameSetToList fwds) []
+			   RecStmt ss (nameSetToList used_later) (nameSetToList fwds) 
+				      [] emptyLHsBinds
 	     where
 	       non_rec    = isSingleton ss && isEmptyNameSet fwds
 	       used_later = defs `intersectNameSet` later_uses
@@ -1056,7 +1062,7 @@ right_op_ok fix1 other
 
 -- Parser initially makes negation bind more tightly than any other operator
 -- And "deriving" code should respect this (use HsPar if not)
-mkNegAppRn :: LHsExpr id -> SyntaxName -> RnM (HsExpr id)
+mkNegAppRn :: LHsExpr id -> SyntaxExpr id -> RnM (HsExpr id)
 mkNegAppRn neg_arg neg_name
   = ASSERT( not_op_app (unLoc neg_arg) )
     returnM (NegApp neg_arg neg_name)
@@ -1157,14 +1163,6 @@ nonStdGuardErr guard
 patSynErr e 
   = sep [ptext SLIT("Pattern syntax in expression context:"),
 	 nest 4 (ppr e)]
-
-doStmtListErr do_or_lc e
-  = sep [quotes (text binder_name) <+> ptext SLIT("statements must end in expression:"),
-	 nest 4 (ppr e)]
-  where
-    binder_name = case do_or_lc of
-			MDoExpr -> "mdo"
-			other   -> "do"
 
 #ifdef GHCI 
 checkTH e what = returnM ()	-- OK
