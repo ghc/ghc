@@ -31,7 +31,7 @@ module GHC.Handle (
   stdin, stdout, stderr,
   IOMode(..), IOModeEx(..), openFile, openFileEx, openFd, fdToHandle,
   hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
-  hFlush, 
+  hFlush, hDuplicate, hDuplicateTo,
 
   hClose, hClose_help,
 
@@ -958,7 +958,7 @@ hFlush handle =
 		writeIORef (haBuffer handle_) flushed_buf
 	else return ()
 
- 
+
 -- -----------------------------------------------------------------------------
 -- Repositioning Handles
 
@@ -1215,6 +1215,68 @@ hSetBinaryMode handle bin =
   
 foreign import ccall unsafe "__hscore_setmode"
   setmode :: CInt -> Bool -> IO CInt
+
+-- -----------------------------------------------------------------------------
+-- Duplicating a Handle
+
+-- |Returns a duplicate of the original handle, with its own buffer
+-- and file pointer.  The original handle's buffer is flushed, including
+-- discarding any input data, before the handle is duplicated.
+
+hDuplicate :: Handle -> IO Handle
+hDuplicate h@(FileHandle m) = do
+  new_h_ <- withHandle' "hDuplicate" h m (dupHandle_ Nothing)
+  new_m <- newMVar new_h_
+  return (FileHandle new_m)
+hDuplicate h@(DuplexHandle r w) = do
+  new_w_ <- withHandle' "hDuplicate" h w (dupHandle_ Nothing)
+  new_w <- newMVar new_w_
+  new_r_ <- withHandle' "hDuplicate" h r (dupHandle_ (Just new_w))
+  new_r <- newMVar new_r_
+  return (DuplexHandle new_r new_w)
+
+dupHandle_ other_side h_ = do
+  -- flush the buffer first, so we don't have to copy its contents
+  flushBuffer h_
+  new_fd <- c_dup (fromIntegral (haFD h_))
+  buffer <- allocateBuffer dEFAULT_BUFFER_SIZE (initBufferState (haType h_))
+  ioref <- newIORef buffer
+  ioref_buffers <- newIORef BufferListNil
+
+  let new_handle_ = h_{ haFD = fromIntegral new_fd, 
+	         	haBuffer = ioref, 
+	          	haBuffers = ioref_buffers,
+	          	haOtherSide = other_side }
+  return (h_, new_handle_)
+
+-- -----------------------------------------------------------------------------
+-- Replacing a Handle
+
+{- |
+Makes the second handle a duplicate of the first handle.  The second 
+handle will be closed first, if it is not already.
+
+This can be used to retarget the standard Handles, for example:
+
+> do h <- openFile "mystdout" WriteMode
+>    hDuplicateTo h stdout
+-}
+
+hDuplicateTo :: Handle -> Handle -> IO ()
+hDuplicateTo h1@(FileHandle m1) h2@(FileHandle m2)  = do
+ withHandle__' "hDuplicateTo" h2 m2 $ \h2_ -> do
+   _ <- hClose_help h2_
+   withHandle' "hDuplicateTo" h1 m1 (dupHandle_ Nothing)
+hDuplicateTo h1@(DuplexHandle r1 w1) h2@(DuplexHandle r2 w2)  = do
+ withHandle__' "hDuplicateTo" h2 w2  $ \w2_ -> do
+   _ <- hClose_help w2_
+   withHandle' "hDuplicateTo" h1 r1 (dupHandle_ Nothing)
+ withHandle__' "hDuplicateTo" h2 r2  $ \r2_ -> do
+   _ <- hClose_help r2_
+   withHandle' "hDuplicateTo" h1 r1 (dupHandle_ (Just w1))
+hDuplicateTo h1 _ =
+   ioException (IOError (Just h1) IllegalOperation "hDuplicateTo" 
+		"handles are incompatible" Nothing)
 
 -- ---------------------------------------------------------------------------
 -- debugging
