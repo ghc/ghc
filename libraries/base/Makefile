@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.17 2002/02/14 14:08:25 simonmar Exp $
+# $Id: Makefile,v 1.18 2002/02/17 20:05:35 panne Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -74,6 +74,7 @@ GHC/Prim.$(way_)hi	: GHC/Prim.hi-boot
 	cp $< $@
 
 ALL_PRIMS = GHC/Prim.hi $(foreach way, $(WAYS), GHC/Prim.$(way)_hi)
+INSTALL_DATAS_WITH_DIRS += GHC/Prim.$(way_)hi
 
 lib  : $(ALL_PRIMS)
 
