@@ -134,15 +134,15 @@ dsFImport :: Module
 	  -> Id
 	  -> ForeignImport
 	  -> DsM ([Binding], SDoc, SDoc, [FAST_STRING])
-dsFImport modName id (CImport cconv safety header lib spec) = 
-  dsCImport modName id spec cconv safety	  `thenDs` \(ids, h, c) ->
-  returnDs (ids, h, c, if _NULL_ header then [] else [header])
+dsFImport modName id (CImport cconv safety header lib spec)
+  = dsCImport modName id spec cconv safety	  `thenDs` \(ids, h, c) ->
+    returnDs (ids, h, c, if _NULL_ header then [] else [header])
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
   --	    support such calls yet; if `_NULL_ lib', the value was not given
-dsFImport modName id (DNImport spec)                        = 
-  dsFCall modName id (DNCall spec)	          `thenDs` \(ids, h, c) ->
-  returnDs (ids, h, c, [])
+dsFImport modName id (DNImport spec)
+  = dsFCall modName id (DNCall spec)	          `thenDs` \(ids, h, c) ->
+    returnDs (ids, h, c, [])
 
 dsCImport :: Module
 	  -> Id
@@ -150,16 +150,16 @@ dsCImport :: Module
 	  -> CCallConv
 	  -> Safety
 	  -> DsM ([Binding], SDoc, SDoc)
-dsCImport modName id (CLabel cid)       _     _      =
- ASSERT(fromJust res_ty `eqType` addrPrimTy)    -- typechecker ensures this
- returnDs ([(id, rhs)], empty, empty)
+dsCImport modName id (CLabel cid)       _     _
+ = ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
+   returnDs ([(id, rhs)], empty, empty)
  where
    (resTy, foRhs) = resultWrapper (idType id)
    rhs		  = foRhs (mkLit (MachLabel cid))
-dsCImport modName id (CFunction target) cconv safety =
-  dsFCall modName id (CCall (CCallSpec target cconv safety))
-dsCImport modName id CWrapper           cconv _      =
-  dsFExportDynamic modName id cconv
+dsCImport modName id (CFunction target) cconv safety
+  = dsFCall modName id (CCall (CCallSpec target cconv safety))
+dsCImport modName id CWrapper           cconv _
+  = dsFExportDynamic modName id cconv
 \end{code}
 
 
