@@ -32,6 +32,7 @@ module Text.ParserCombinators.ReadPrec
   get,           -- :: ReadPrec Char
   look,          -- :: ReadPrec String
   (+++),         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
+  (<++),         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
   pfail,         -- :: ReadPrec a
   choice,        -- :: [ReadPrec a] -> ReadPrec a
 
@@ -53,7 +54,7 @@ import Text.ParserCombinators.ReadP
 import qualified Text.ParserCombinators.ReadP as ReadP
   ( get
   , look
-  , (+++)
+  , (+++), (<++)
   , pfail
   )
 
@@ -122,6 +123,9 @@ look = lift ReadP.look
 
 (+++) :: ReadPrec a -> ReadPrec a -> ReadPrec a
 P f1 +++ P f2 = P (\n -> f1 n ReadP.+++ f2 n)
+
+(<++) :: ReadPrec a -> ReadPrec a -> ReadPrec a
+P f1 <++ P f2 = P (\n -> f1 n ReadP.<++ f2 n)
 
 pfail :: ReadPrec a
 pfail = lift ReadP.pfail
