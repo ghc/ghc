@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.135 2001/02/11 17:12:35 simonmar Exp $
+# $Id: Makefile,v 1.136 2001/02/11 17:14:48 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -281,12 +281,6 @@ SRC_HAPPY_OPTS += +RTS -K2m -H16m -RTS  $(GHC_HAPPY_OPTS)
 # 		Linking
 
 SRC_LD_OPTS += -no-link-chk 
-
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-ifeq "$(GhcReportCompiles)" "YES"
-SRC_LD_OPTS += -syslib misc -syslib exts
-endif
-endif
 
 # -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
