@@ -72,12 +72,13 @@ completeVar env inline_call var args result_ty
 	-- Look for an unfolding. There's a binding for the
 	-- thing, but perhaps we want to inline it anyway
   |    has_unfolding
-    && (not essential_unfoldings_only || idMustBeINLINEd var)
-	-- If "essential_unfoldings_only" is true we do no inlinings at all,
-	-- EXCEPT for things that absolutely have to be done
-	-- (see comments with idMustBeINLINEd)
-    && (inline_call || ok_to_inline)
-    && costCentreOk (getEnclosingCC env) (coreExprCc unf_template)
+    && (idMustBeINLINEd var || 
+	(not essential_unfoldings_only 
+		-- If "essential_unfoldings_only" is true we do no inlinings at all,
+		-- EXCEPT for things that absolutely have to be done
+		-- (see comments with idMustBeINLINEd)
+         && (inline_call || ok_to_inline)
+         && costCentreOk (getEnclosingCC env) (coreExprCc unf_template)))
   =
 {-
     pprTrace "Unfolding" (ppr var) $

@@ -322,9 +322,11 @@ mkDictSelId name clas ty
     field_lbl = mkFieldLabel name ty tag
     tag       = assoc "MkId.mkDictSelId" ((sc_sel_ids ++ op_sel_ids) `zip` allFieldLabelTags) sel_id
 
-    info      = setInlinePragInfo IWantToBeINLINEd $
+    info      = setInlinePragInfo IMustBeINLINEd $
 		setUnfoldingInfo  unfolding noIdInfo
 	-- The always-inline thing means we don't need any other IdInfo
+	-- We need "Must" inline because we don't create any bindigs for
+	-- the selectors.
 
     unfolding = mkUnfolding rhs
 
