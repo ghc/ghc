@@ -1,13 +1,54 @@
-/* config.h.in.  Generated automatically from configure.in by autoheader.  */
+/* mk/config.h.in.  Generated automatically from configure.in by autoheader.  */
+/* acconfig.h
+
+   Descriptive text for the C preprocessor macros that
+   the fptools configuration script can define.
+   The current version may not use all of them; autoheader copies the ones
+   your configure.in uses into your configuration header file templates.
+
+   The entries are in sort -df order: alphabetical, case insensitive,
+   ignoring punctuation (such as underscores).  Although this order
+   can split up related entries, it makes it easier to check whether
+   a given entry is in the file.
+
+   Leave the following blank line there!!  Autoheader needs it.  */
+
+
+
+/* Define if using alloca.c.  */
+#undef C_ALLOCA
 
 /* Define to empty if the keyword does not work.  */
 #undef const
 
+/* Define to one of _getb67, GETB67, getb67 for Cray-2 and Cray-YMP systems.
+   This function is required for alloca.c support on those systems.  */
+#undef CRAY_STACKSEG_END
+
+/* Define if you have alloca, as a function or macro.  */
+#undef HAVE_ALLOCA
+
+/* Define if you have <alloca.h> and it should be used (not on Ultrix).  */
+#undef HAVE_ALLOCA_H
+
+/* Define if your struct tm has tm_zone.  */
+#undef HAVE_TM_ZONE
+
+/* Define if you don't have tm_zone but do have the external array
+   tzname.  */
+#undef HAVE_TZNAME
+
 /* Define as the return type of signal handlers (int or void).  */
 #undef RETSIGTYPE
 
-/* Define as the type of timezone.  */
-#undef TYPE_TIMEZONE
+/* If using the C implementation of alloca, define if you know the
+   direction of stack growth for your system; otherwise it will be
+   automatically deduced at run-time.
+ STACK_DIRECTION > 0 => grows toward higher addresses
+ STACK_DIRECTION < 0 => grows toward lower addresses
+ STACK_DIRECTION = 0 => direction of growth unknown
+ */
+#undef STACK_DIRECTION
 
 /* Define if you have the ANSI C header files.  */
 #undef STDC_HEADERS
@@ -15,56 +56,93 @@
 /* Define if you can safely include both <sys/time.h> and <time.h>.  */
 #undef TIME_WITH_SYS_TIME
 
-/* Define if you have access.  */
+/* Define if your <sys/time.h> declares struct tm.  */
+#undef TM_IN_SYS_TIME
+
+/* Define if your processor stores words with the most significant
+   byte first (like Motorola and SPARC, unlike Intel and VAX).  */
+#undef WORDS_BIGENDIAN
+
+/* Define if time.h or sys/time.h define the altzone variable */
+#undef HAVE_ALTZONE
+
+/* Define to the type of the timezone variable (usually long or time_t) */
+#undef TYPE_TIMEZONE
+
+/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_DOUBLE
+
+/* Define to alignment constraint on floats or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_FLOAT
+
+/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+#undef ALIGNMENT_LONG
+
+/* Define to alignment constraint on unsigned int - whichever is the greater */
+#undef ALIGNMENT_UNSIGNED_INT
+
+/* Define if C Symbols have a leading underscore added by the compiler */
+#undef LEADING_UNDERSCORE
+
+/* The number of bytes in a double.  */
+#undef SIZEOF_DOUBLE
+
+/* The number of bytes in a float.  */
+#undef SIZEOF_FLOAT
+
+/* The number of bytes in a long.  */
+#undef SIZEOF_LONG
+
+/* The number of bytes in a unsigned int.  */
+#undef SIZEOF_UNSIGNED_INT
+
+/* The number of bytes in a void *.  */
+#undef SIZEOF_VOID_P
+
+/* Define if you have the access function.  */
 #undef HAVE_ACCESS
 
-/* Define if you have ftime.  */
+/* Define if you have the ftime function.  */
 #undef HAVE_FTIME
 
-/* Define if you have getclock.  */
+/* Define if you have the getclock function.  */
 #undef HAVE_GETCLOCK
 
-/* Define if you have getpagesize.  */
+/* Define if you have the getpagesize function.  */
 #undef HAVE_GETPAGESIZE
 
-/* Define if you have getrusage.  */
+/* Define if you have the getrusage function.  */
 #undef HAVE_GETRUSAGE
 
-/* Define if you have gettimeofday.  */
+/* Define if you have the gettimeofday function.  */
 #undef HAVE_GETTIMEOFDAY
 
-/* Define if you have mktime.  */
+/* Define if you have the mktime function.  */
 #undef HAVE_MKTIME
 
-/* Define if you have mprotect.  */
+/* Define if you have the mprotect function.  */
 #undef HAVE_MPROTECT
 
-/* Define if you have setitimer.  */
+/* Define if you have the setitimer function.  */
 #undef HAVE_SETITIMER
 
-/* Define if you have stat.  */
+/* Define if you have the stat function.  */
 #undef HAVE_STAT
 
-/* Define if you have sysconf.  */
+/* Define if you have the sysconf function.  */
 #undef HAVE_SYSCONF
 
-/* Define if you have timelocal.  */
+/* Define if you have the timelocal function.  */
 #undef HAVE_TIMELOCAL
 
-/* Define if you have times.  */
+/* Define if you have the times function.  */
 #undef HAVE_TIMES
 
-/* Define if you have vadvise.  */
+/* Define if you have the vadvise function.  */
 #undef HAVE_VADVISE
 
-/* Define if you have vfork.  */
+/* Define if you have the vfork function.  */
 #undef HAVE_VFORK
-
-/* Define if you have alloca.  */
-#undef HAVE_ALLOCA
-
-/* Define if you have the <alloca.h> header file.  */
-#undef HAVE_ALLOCA_H
 
 /* Define if you have the <dirent.h> header file.  */
 #undef HAVE_DIRENT_H
@@ -87,7 +165,7 @@
 /* Define if you have the <pwd.h> header file.  */
 #undef HAVE_PWD_H
 
-/* Define if you have the <readline/readline.h> header file. */
+/* Define if you have the <readline/readline.h> header file.  */
 #undef HAVE_READLINE_READLINE_H
 
 /* Define if you have the <siginfo.h> header file.  */
@@ -95,9 +173,6 @@
 
 /* Define if you have the <signal.h> header file.  */
 #undef HAVE_SIGNAL_H
-
-/* Define if you have the <sys/socket.h> header file.  */
-#undef HAVE_SYS_SOCKET_H
 
 /* Define if you have the <stdlib.h> header file.  */
 #undef HAVE_STDLIB_H
@@ -111,7 +186,7 @@
 /* Define if you have the <sys/file.h> header file.  */
 #undef HAVE_SYS_FILE_H
 
-/* Define if you have the <sys/file.h> header file.  */
+/* Define if you have the <sys/mman.h> header file.  */
 #undef HAVE_SYS_MMAN_H
 
 /* Define if you have the <sys/param.h> header file.  */
@@ -125,6 +200,9 @@
 
 /* Define if you have the <sys/signal.h> header file.  */
 #undef HAVE_SYS_SIGNAL_H
+
+/* Define if you have the <sys/socket.h> header file.  */
+#undef HAVE_SYS_SOCKET_H
 
 /* Define if you have the <sys/stat.h> header file.  */
 #undef HAVE_SYS_STAT_H
@@ -173,48 +251,3 @@
 
 /* Define if you have the <vfork.h> header file.  */
 #undef HAVE_VFORK_H
-
-/* Define if you have the fl library (-lfl).  */
-#undef HAVE_LIBFL
-
-/* Define if you have the l library (-ll).  */
-#undef HAVE_LIBL
-
-/* Define if you have tm_zone in struct tm.  */
-#undef HAVE_TM_ZONE
-
-/* Define if you have extern char *tzname[2].  */
-#undef HAVE_TZNAME
-
-/* Define this if your time.h defines altzone */
-#undef HAVE_ALTZONE
-
-/* sizeof(unsigned int) */
-#undef SIZEOF_UNSIGNED_INT
-
-/* sizeof(long) */
-#undef SIZEOF_LONG
-
-/* sizeof(void *) */
-#undef SIZEOF_VOID_P
-
-/* sizeof(float) */
-#undef SIZEOF_FLOAT
-
-/* sizeof(double) */
-#undef SIZEOF_DOUBLE
-
-/* minimum alignment of unsigned int */
-#undef ALIGNMENT_UNSIGNED_INT
-
-/* minimum alignment of long */
-#undef ALIGNMENT_LONG
-
-/* minimum alignment of float */
-#undef ALIGNMENT_FLOAT
-
-/* minimum alignment of double */
-#undef ALIGNMENT_DOUBLE
-
-/* need a leading underscore? */
-#undef LEADING_UNDERSCORE
