@@ -5,46 +5,6 @@
 %************************************************************************
 
 \begin{code}
-sub inject_split_markers {
-    local($hc_file) = @_;
-
-    unlink("$Tmp_prefix.unmkd");
-    local($to_do) = "$Cp $hc_file $Tmp_prefix.unmkd";
-    &run_something($to_do, 'Prepare to number split markers');
-
-    open(TMPI, "< $Tmp_prefix.unmkd") || &tidy_up_and_die(1,"$Pgm: failed to open `$Tmp_prefix.unmkd' (to read)\n");
-    open(TMPO, "> $hc_file") || &tidy_up_and_die(1,"$Pgm: failed to open `$hc_file' (to write)\n");
-
-    local($marker_no) = 1;
-
-    # make sure there is a split marker before any "real" code
-    $_ = <TMPI>;
-    while ( $_ ne '' && ( /^$/ || /^#/ ) ) {
-	print TMPO $_;
-	$_ = <TMPI>;
-    }
-    print TMPO "__STG_SPLIT_MARKER(1)\n";
-    print TMPO $_ if ! /^\s*\/\* SPLIT \*\/\s*$/;
-
-	# Have to be a bit careful detecting /* SPLIT */ comments
-	# since a progam may use a string containing "/* SPLIT */"
-	# We check that there is nothing else on the line
-
-    while (<TMPI>) {
-	if (/^\s*\/\* SPLIT \*\/\s*$/) {
-	    $marker_no++;
-	    print TMPO "__STG_SPLIT_MARKER($marker_no)\n";
- 	    next;
-	}
-	print TMPO $_;
-    }
-
-    close(TMPI) || &tidy_up_and_die(1,"Failed reading $Tmp_prefix.unmkd\n");
-    close(TMPO) || &tidy_up_and_die(1,"Failed writing $hc_file\n");
-}
-\end{code}
-
-\begin{code}
 sub split_asm_file {
     local($asm_file) = @_;
 

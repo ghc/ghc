@@ -72,7 +72,8 @@ codeGen mod_name imported_modules cost_centre_info fe_binders
 	init_stuff        = mkModuleInit fe_binders mod_name imported_modules 
 					 cost_centre_info
 
-	abstractC = mkAbstractCs [ init_stuff, 
+	abstractC = mkAbstractCs [ maybe_split,
+				   init_stuff, 
 				   code_stuff,
 				   datatype_stuff]
 		-- Put datatype_stuff after code_stuff, because the

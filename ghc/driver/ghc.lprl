@@ -233,7 +233,6 @@ These are the default values, which may be changed by user flags.
 \begin{code}
 sub setupOptFlags {
    $Oopt_MaxSimplifierIterations  = '-fmax-simplifier-iterations4';
-   $Oopt_PedanticBottoms	  = '-fpedantic-bottoms'; # ON by default
    $Oopt_FinalStgProfilingMassage = '';
    $Oopt_StgStats		  = '';
    $Oopt_DoSpecialise		  = '-fspecialise';
@@ -719,7 +718,6 @@ sub setupOptimiseFlags {
 	'-fcase-of-case',
  	'-fcase-merge',
 	'-flet-to-case',
-	$Oopt_PedanticBottoms,
 
 	# initial simplify: mk specialiser happy: minimum effort please
 
@@ -820,7 +818,7 @@ sub setupOptimiseFlags {
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
+#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
 
 #	'-fliberate-case',
 
@@ -1731,12 +1729,6 @@ sub runHscAndProcessInterfaces {
 		# print STDERR "Oh ho! Hi file unchanged\n" ;
 	}
 
-
-	# if we're going to split up object files,
-	# we inject split markers into the .hc file now
-	if ( $HscLang eq 'C' && $SplitObjFiles ) {
-	    &inject_split_markers ( $hsc_out );
-        }
 
 	# save a copy of the .hc file, even if we are carrying on...
 	if ($HscLang eq 'C' && $do_cc && $Keep_hc_file_too) {
@@ -3291,9 +3283,6 @@ arg: while($_ = $Args[0]) {
     /^(-fmax-simplifier-iterations)(.*)$/
 		    && do { $Oopt_MaxSimplifierIterations = $1 . &grab_arg_arg(*Args,$1, $2);
 			    next arg; };
-
-    /^-fno-pedantic-bottoms$/
-		    && do { $Oopt_PedanticBottoms = ''; next arg; };
 
     /^-fno-pre-inlining$/
 		    && do { push(@HsC_flags, $_); next arg };
