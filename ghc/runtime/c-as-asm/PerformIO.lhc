@@ -107,24 +107,24 @@ STGFUN(startPerformIO)
     
     /* first off, check for stk space.. */
 #if defined(CONCURRENT) || !defined(STACK_CHECK_BY_PAGE_FAULT) 
-    STK_CHK(LivenessReg,1/*A*/,1/*B*/, 0, 0, 0/*prim*/, 0/*re-enter*/);
+    STK_CHK(LivenessReg,0/*A*/,2/*B*/, 0, 0, 0/*prim*/, 0/*re-enter*/);
 #else
-    STK_CHK(LivenessReg,1/*A*/,0, 0, 0, 0/*prim*/, 0/*re-enter*/);
+    STK_CHK(LivenessReg,0/*A*/,1, 0, 0, 0/*prim*/, 0/*re-enter*/);
 #endif
 
     /* Put a suitable return address on the B stack */
     RetReg = (StgRetAddr) UNVEC(stopPerformIODirectReturn,vtbl_stopPerformIO);
 
-    /* Put a World State Token on the A stack */
-    /* This is necessary because we've not unboxed it (to reveal a void) yet */
-    SpA -= AREL(1);
-    *SpA = (P_) realWorldZh_closure;
-
     /* Save away C stack pointer so that we can restore it when we leave
        the Haskell world.
     */
-    SpB[1] = (W_)SAVE_esp;
-    SpB    = SpB + 1;
+    SpB -= BREL(1);
+    *SpB = (W_)SAVE_esp;
+
+    /* Put a World State Token on the B stack */
+    /* This is necessary because we've not unboxed it (to reveal a void) yet */
+    SpB -= BREL(1);
+    *SpB = (W_) realWorldZh_closure;
 
     Node = unstable_Closure; /* Point to the closure for main/errorIO-arg */
     ENT_VIA_NODE();
