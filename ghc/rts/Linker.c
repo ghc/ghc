@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.122 2003/06/24 08:29:13 stolz Exp $
+ * $Id: Linker.c,v 1.123 2003/06/26 20:48:59 panne Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -575,7 +575,7 @@ typedef struct _RtsSymbolVal {
 #endif
 
 /* entirely bogus claims about types of these symbols */
-#define Sym(vvv)  extern void vvv();
+#define Sym(vvv)  extern void vvv(void);
 #define SymX(vvv) /**/
 #define SymX_redirect(vvv,xxx) /**/
 RTS_SYMBOLS
