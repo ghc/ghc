@@ -272,10 +272,10 @@ On old Linux a.out systems: should be the same.
 \index{i386-*-linuxaout: registerised port}
 
 %-------------------------------------------------------------------
-\item[\tr{i386-*-*bsd} (PCs running FreeBSD (and NetBSD?):]
-\index{i386-*-freebsd: registerised port}
-GHC~2.01 works registerised. Supports same set of bundles
-as the above.
+\item[\tr{i386-*-freebsd} (PCs running FreeBSD 2.2 or higher, and
+NetBSD/OpenBSD using FreeBSD emulation):] \index{i386-*-freebsd:
+registerised port} GHC~2.01 works registerised. Supports same set of
+bundles as the above.
 
 \index{i386-*-freebsd: profiling---yes}
 \index{i386-*-freebsd: concurrent---yes}
@@ -463,7 +463,7 @@ diff to see if the values match your expectations is always a Good Idea.
 @Makefile.in@ to @Makefile@ and set all these variables directly
 yourself.  But do it right!}
 
-\item Run @make install@.  This {\em  should} works with ordinary Unix
+\item Run @make install@.  This {\em  should} work with ordinary Unix
 @make@ -- no need for fancy stuff like GNU @make@. 
 
 \item \tr{rehash} (t?csh users), so your shell will see the new stuff
@@ -764,7 +764,9 @@ Each build tree is initially an exact copy of the source tree,
 except that each file is a symbolic link to the source file, 
 rather than being a copy of the source file.  There are ``standard''
 Unix utilities that make such copies, so standard that they go by
-different names: @lndir@, @mkshadowdir@ are two.  
+different names: @lndir@, @mkshadowdir@ are two (If you don't have
+either, the source distribution includes sources for the \tr{X11}
+\tr{lndir} --- check out \tr{fptools/glafp-utils/lndir} ).
 
 The build
 tree does not need to be anywhere near the source tree in the
