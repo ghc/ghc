@@ -8,7 +8,7 @@ This sits on top of the sequencing/arrays world, notably @ByteArray#@s.
 Glorious hacking (all the hard work) by Bryan O'Sullivan.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude '-#include "cbits/stgio.h"' #-}
 
 module PackedString (
         PackedString,      -- abstract
