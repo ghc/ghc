@@ -290,7 +290,7 @@ isFunLhs (OpApp l (HsVar op) fix r) es  | not (isRdrDataCon op)
 isFunLhs (HsVar f) es | not (isRdrDataCon f)
 			 	= Just (f,False,es)
 isFunLhs (HsApp f e) es 	= isFunLhs f (e:es)
-isFunLhs (HsPar e)   es 	= isFunLhs e es
+isFunLhs (HsPar e)   es@(_:_) 	= isFunLhs e es
 isFunLhs _ _ 			= Nothing
 
 ---------------------------------------------------------------------------
