@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 2002/02/14 14:05:48 simonmar Exp $
+# $Id: Makefile,v 1.7 2002/02/14 15:14:02 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -9,7 +9,6 @@ ifneq "$(HavePosixRegex)" "YES"
 ALL_DIRS      += regex
 SRC_CC_OPTS   += -Iregex
 EXCLUDED_SRCS += regex/engine.c
-INSTALL_DATAS += regex/regex.h
 endif
 
 EXCLUDED_SRCS += ilxstubs.c
