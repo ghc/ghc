@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.34 1999/02/16 12:52:32 simonm Exp $
+ * $Id: GC.c,v 1.35 1999/02/17 15:04:40 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -90,6 +90,11 @@ static rtsBool failed_to_evac;
 /* Old to-space (used for two-space collector only)
  */
 bdescr *old_to_space;
+
+/* Data used for allocation area sizing.
+ */
+lnat new_blocks;		/* blocks allocated during this GC */
+lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
 
 /* -----------------------------------------------------------------------------
    Static function declarations
@@ -203,6 +208,11 @@ void GarbageCollect(void (*get_roots)(void))
     old_to_space = g0s0->to_space;
     g0s0->to_space = NULL;
   }
+
+  /* Keep a count of how many new blocks we allocated during this GC
+   * (used for resizing the allocation area, later).
+   */
+  new_blocks = 0;
 
   /* Initialise to-space in all the generations/steps that we're
    * collecting.
@@ -503,8 +513,11 @@ void GarbageCollect(void (*get_roots)(void))
 	 *                      oldest_gen
 	 */
 	if (g != 0) {
+#if 0
 	  generations[g].max_blocks = (oldest_gen->max_blocks * g)
 	       / (RtsFlags.GcFlags.generations-1);
+#endif
+	  generations[g].max_blocks = oldest_gen->max_blocks;
 	}
 
       /* for older generations... */
@@ -592,25 +605,28 @@ void GarbageCollect(void (*get_roots)(void))
       nat needed = calcNeeded(); 	/* approx blocks needed at next GC */
 
       /* Guess how much will be live in generation 0 step 0 next time.
-       * A good approximation is the amount of data that was live this
-       * time:  this assumes (1) that the size of G0S0 will be roughly
-       * the same as last time, and (2) that the promotion rate will be
-       * constant.
-       *
-       * If we don't know how much was live in G0S0 (because there's no
-       * step 1), then assume 30% (which is usually an overestimate).
+       * A good approximation is the obtained by finding the
+       * percentage of g0s0 that was live at the last minor GC.
        */
-      if (g0->n_steps == 1) {
-	needed += (g0s0->n_blocks * 30) / 100;
-      } else {
-	needed += g0->steps[1].n_blocks;
+      if (N == 0) {
+	g0s0_pcnt_kept = (new_blocks * 100) / g0s0->n_blocks;
       }
 
-      /* Now we have a rough guess at the number of blocks needed for
-       * the next GC, subtract this from the user's suggested heap size
-       * and use the rest for the allocation area.
+      /* Estimate a size for the allocation area based on the
+       * information available.  We might end up going slightly under
+       * or over the suggested heap size, but we should be pretty
+       * close on average.
+       *
+       * Formula:            suggested - needed
+       *                ----------------------------
+       *                    1 + g0s0_pcnt_kept/100
+       *
+       * where 'needed' is the amount of memory needed at the next
+       * collection for collecting all steps except g0s0.
        */
-      blocks = (int)RtsFlags.GcFlags.heapSizeSuggestion - (int)needed;
+      blocks = 
+	(((int)RtsFlags.GcFlags.heapSizeSuggestion - (int)needed) * 100) /
+	(100 + (int)g0s0_pcnt_kept);
       
       if (blocks < (int)RtsFlags.GcFlags.minAllocAreaSize) {
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
@@ -823,6 +839,7 @@ static void addBlock(step *step)
   step->hpLim = step->hp + BLOCK_SIZE_W;
   step->hp_bd = bd;
   step->to_blocks++;
+  new_blocks++;
 }
 
 static __inline__ StgClosure *
@@ -1857,7 +1874,7 @@ scavenge_mut_once_list(generation *gen)
       ((StgIndOldGen *)p)->indirectee = 
         evacuate(((StgIndOldGen *)p)->indirectee);
       
-#if 0  
+#if 0
       /* Debugging code to print out the size of the thing we just
        * promoted 
        */
