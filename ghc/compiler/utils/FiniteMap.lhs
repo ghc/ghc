@@ -60,6 +60,7 @@ module FiniteMap (
 import GlaExts
 import Maybes
 import Bag	  ( Bag, foldrBag )
+import Util
 import Outputable
 
 #if ! OMIT_NATIVE_CODEGEN
@@ -220,7 +221,7 @@ addToFM_C combiner (Branch key elt size fm_l fm_r) new_key new_elt
 addListToFM fm key_elt_pairs = addListToFM_C (\ old new -> new) fm key_elt_pairs
 
 addListToFM_C combiner fm key_elt_pairs
-  = foldl add fm key_elt_pairs	-- foldl adds from the left
+  = foldl' add fm key_elt_pairs	-- foldl adds from the left
   where
     add fmap (key,elt) = addToFM_C combiner fmap key elt
 \end{code}
@@ -233,7 +234,7 @@ delFromFM (Branch key elt size fm_l fm_r) del_key
 	LT -> mkBalBranch key elt (delFromFM fm_l del_key) fm_r
 	EQ -> glueBal fm_l fm_r
 
-delListFromFM fm keys = foldl delFromFM fm keys
+delListFromFM fm keys = foldl' delFromFM fm keys
 \end{code}
 
 %************************************************************************
