@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.26 2001/03/26 16:56:27 simonmar Exp $
+# $Id: Makefile,v 1.27 2001/05/18 21:19:11 qrczak Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -14,7 +14,5 @@ endif
 
 # -----------------------------------------------------------------------------
 # Installation
-
-INSTALL_DATAS += stgio.h stgerror.h fileObject.h
 
 include $(TOP)/mk/target.mk
