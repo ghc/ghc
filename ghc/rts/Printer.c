@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.47 2001/10/02 15:27:15 sewardj Exp $
+ * $Id: Printer.c,v 1.48 2001/11/20 16:17:23 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -54,13 +54,13 @@ void printPtr( StgPtr p )
     if (lookupGHCName( p, &raw )) {
         printZcoded(raw);
     } else {
-        fprintf(stderr, "%p", p);
+        fprintf(stdout, "%p", p);
     }
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stderr,"Object "); printPtr((StgPtr)obj); fprintf(stderr," = ");
+    fprintf(stdout,"Object "); printPtr((StgPtr)obj); fprintf(stdout," = ");
     printClosure(obj);
 }
 
@@ -68,19 +68,19 @@ static void printStdObject( StgClosure *obj, char* tag )
 {
     StgWord i, j;
     const StgInfoTable* info = get_itbl(obj);
-    fprintf(stderr,"%s(",tag);
+    fprintf(stdout,"%s(",tag);
     printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
-    fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
+    fprintf(stdout,", %s", obj->header.prof.ccs->cc->label);
 #endif
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
-        fprintf(stderr,", ");
+        fprintf(stdout,", ");
         printPtr((StgPtr)obj->payload[i]);
     }
     for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        fprintf(stderr,", %pd#",obj->payload[i+j]);
+        fprintf(stdout,", %pd#",obj->payload[i+j]);
     }
-    fprintf(stderr,")\n");
+    fprintf(stdout,")\n");
 }
 
 void printClosure( StgClosure *obj )
@@ -107,12 +107,12 @@ void printClosure( StgClosure *obj )
         {
 	    StgAP_UPD* ap = stgCast(StgAP_UPD*,obj);
             StgWord i;
-            fprintf(stderr,"AP_UPD("); printPtr((StgPtr)ap->fun);
+            fprintf(stdout,"AP_UPD("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {
-                fprintf(stderr,", ");
+                fprintf(stdout,", ");
                 printPtr((P_)ap->payload[i]);
             }
-            fprintf(stderr,")\n");
+            fprintf(stdout,")\n");
             break;
         }
 
@@ -120,12 +120,12 @@ void printClosure( StgClosure *obj )
         {
 	    StgPAP* pap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stderr,"PAP("); printPtr((StgPtr)pap->fun);
+            fprintf(stdout,"PAP("); printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
-                fprintf(stderr,", ");
+                fprintf(stdout,", ");
                 printPtr((StgPtr)pap->payload[i]);
             }
-            fprintf(stderr,")\n");
+            fprintf(stdout,")\n");
             break;
         }
 
@@ -136,87 +136,87 @@ void printClosure( StgClosure *obj )
             break;
 
     case IND:
-            fprintf(stderr,"IND("); 
+            fprintf(stdout,"IND("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case IND_STATIC:
-            fprintf(stderr,"IND_STATIC("); 
+            fprintf(stdout,"IND_STATIC("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case IND_OLDGEN:
-            fprintf(stderr,"IND_OLDGEN("); 
+            fprintf(stdout,"IND_OLDGEN("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case CAF_BLACKHOLE:
-            fprintf(stderr,"CAF_BH("); 
+            fprintf(stdout,"CAF_BH("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case SE_BLACKHOLE:
-            fprintf(stderr,"SE_BH\n"); 
+            fprintf(stdout,"SE_BH\n"); 
             break;
 
     case SE_CAF_BLACKHOLE:
-            fprintf(stderr,"SE_CAF_BH\n"); 
+            fprintf(stdout,"SE_CAF_BH\n"); 
             break;
 
     case BLACKHOLE:
-            fprintf(stderr,"BH\n"); 
+            fprintf(stdout,"BH\n"); 
             break;
 
     case BLACKHOLE_BQ:
-            fprintf(stderr,"BQ("); 
+            fprintf(stdout,"BQ("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case TSO:
-      fprintf(stderr,"TSO("); 
-      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,"TSO("); 
+      fprintf(stdout,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
+      fprintf(stdout,")\n"); 
       break;
 
 #if defined(PAR)
     case BLOCKED_FETCH:
-      fprintf(stderr,"BLOCKED_FETCH("); 
+      fprintf(stdout,"BLOCKED_FETCH("); 
       printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
       printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,")\n"); 
       break;
 
     case FETCH_ME:
-      fprintf(stderr,"FETCH_ME("); 
+      fprintf(stdout,"FETCH_ME("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,")\n"); 
       break;
 
 #ifdef DIST      
     case REMOTE_REF:
-      fprintf(stderr,"REMOTE_REF("); 
+      fprintf(stdout,"REMOTE_REF("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,")\n"); 
       break;
 #endif
   
     case FETCH_ME_BQ:
-      fprintf(stderr,"FETCH_ME_BQ("); 
+      fprintf(stdout,"FETCH_ME_BQ("); 
       // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
       printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,")\n"); 
       break;
 #endif
 #if defined(GRAN) || defined(PAR)
     case RBH:
-      fprintf(stderr,"RBH("); 
+      fprintf(stdout,"RBH("); 
       printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
+      fprintf(stdout,")\n"); 
       break;
 
 #endif
@@ -234,21 +234,21 @@ void printClosure( StgClosure *obj )
 	     */
             StgWord i, j;
 #ifdef PROFILING
-	    fprintf(stderr,"%s(", info->prof.closure_desc);
-	    fprintf(stderr,"%s", obj->header.prof.ccs->cc->label);
+	    fprintf(stdout,"%s(", info->prof.closure_desc);
+	    fprintf(stdout,"%s", obj->header.prof.ccs->cc->label);
 #else
-            fprintf(stderr,"CONSTR(");
+            fprintf(stdout,"CONSTR(");
             printPtr((StgPtr)obj->header.info);
-            fprintf(stderr,"(tag=%d)",info->srt_len);
+            fprintf(stdout,"(tag=%d)",info->srt_len);
 #endif
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
-		fprintf(stderr,", ");
+		fprintf(stdout,", ");
                 printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
-                fprintf(stderr,", %p#", obj->payload[i+j]);
+                fprintf(stdout,", %p#", obj->payload[i+j]);
             }
-            fprintf(stderr,")\n");
+            fprintf(stdout,")\n");
             break;
         }
 
@@ -259,12 +259,12 @@ void printClosure( StgClosure *obj )
             StgWord i;
             StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
 
-            fprintf(stderr,"Row<%i>(",p->ptrs);
+            fprintf(stdout,"Row<%i>(",p->ptrs);
             for (i = 0; i < p->ptrs; ++i) {
-                if (i > 0) fprintf(stderr,", ");
+                if (i > 0) fprintf(stdout,", ");
                 printPtr((StgPtr)(p->payload[i]));
             }
-            fprintf(stderr,")\n");
+            fprintf(stdout,")\n");
             break;
           }
 #endif  
@@ -295,7 +295,7 @@ void printClosure( StgClosure *obj )
     case ARR_WORDS:
         {
             StgWord i;
-            fprintf(stderr,"ARR_WORDS(\"");
+            fprintf(stdout,"ARR_WORDS(\"");
             /* ToDo: we can't safely assume that this is a string! 
             for (i = 0; arrWordsGetChar(obj,i); ++i) {
                 putchar(arrWordsGetChar(obj,i));
@@ -309,51 +309,51 @@ void printClosure( StgClosure *obj )
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = stgCast(StgUpdateFrame*,obj);
-            fprintf(stderr,"UpdateFrame(");
+            fprintf(stdout,"UpdateFrame(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,",");
+            fprintf(stdout,",");
             printPtr((StgPtr)u->updatee);
-            fprintf(stderr,",");
+            fprintf(stdout,",");
             printPtr((StgPtr)u->link);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
         }
 
     case CATCH_FRAME:
         {
             StgCatchFrame* u = stgCast(StgCatchFrame*,obj);
-            fprintf(stderr,"CatchFrame(");
+            fprintf(stdout,"CatchFrame(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,",");
+            fprintf(stdout,",");
             printPtr((StgPtr)u->handler);
-            fprintf(stderr,",");
+            fprintf(stdout,",");
             printPtr((StgPtr)u->link);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
         }
 
     case SEQ_FRAME:
         {
             StgSeqFrame* u = stgCast(StgSeqFrame*,obj);
-            fprintf(stderr,"SeqFrame(");
+            fprintf(stdout,"SeqFrame(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,",");
+            fprintf(stdout,",");
             printPtr((StgPtr)u->link);
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
         }
 
     case STOP_FRAME:
         {
             StgStopFrame* u = stgCast(StgStopFrame*,obj);
-            fprintf(stderr,"StopFrame(");
+            fprintf(stdout,"StopFrame(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
         }
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
-            fprintf(stderr, "*** printClosure: unknown type %d ****\n",
+            fprintf(stdout, "*** printClosure: unknown type %d ****\n",
                     get_itbl(obj)->type );
             barf("printClosure %d",get_itbl(obj)->type);
             return;
@@ -369,41 +369,41 @@ void printGraph( StgClosure *obj )
 
 StgPtr printStackObj( StgPtr sp )
 {
-    /*fprintf(stderr,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
+    /*fprintf(stdout,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
 
     if (IS_ARG_TAG(*sp)) {
         nat i;
         StgWord tag = *sp++;
-        fprintf(stderr,"Tagged{");
+        fprintf(stdout,"Tagged{");
         for (i = 0; i < tag; i++) {
-            fprintf(stderr,"0x%x#", (unsigned)(*sp++));
-            if (i < tag-1) fprintf(stderr, ", ");
+            fprintf(stdout,"0x%x#", (unsigned)(*sp++));
+            if (i < tag-1) fprintf(stdout, ", ");
         }
-        fprintf(stderr, "}\n");
+        fprintf(stdout, "}\n");
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
         if (c == (StgClosure*)&stg_ctoi_ret_R1p_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
+           fprintf(stdout, "\t\t\tstg_ctoi_ret_R1p_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_R1n_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1n_info\n" );
+           fprintf(stdout, "\t\t\tstg_ctoi_ret_R1n_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_F1_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_F1_info\n" );
+           fprintf(stdout, "\t\t\tstg_ctoi_ret_F1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_D1_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
+           fprintf(stdout, "\t\t\tstg_ctoi_ret_D1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_V_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_V_info\n" );
+           fprintf(stdout, "\t\t\tstg_ctoi_ret_V_info\n" );
 	} else
         if (get_itbl(c)->type == BCO) {
-           fprintf(stderr, "\t\t\t");
-           fprintf(stderr, "BCO(...)\n"); 
+           fprintf(stdout, "\t\t\t");
+           fprintf(stdout, "BCO(...)\n"); 
         }
         else {
-           fprintf(stderr, "\t\t\t");
+           fprintf(stdout, "\t\t\t");
            printClosure ( (StgClosure*)(*sp));
         }
         sp += 1;
@@ -444,15 +444,15 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	    continue;
 
 	case RET_DYN:
-	  fprintf(stderr, "RET_DYN (%p)\n", sp);
+	  fprintf(stdout, "RET_DYN (%p)\n", sp);
 	  bitmap = *++sp;
 	  ++sp;
-	  fprintf(stderr, "Bitmap: 0x%x\n", bitmap);
+	  fprintf(stdout, "Bitmap: 0x%x\n", bitmap);
 	  goto small_bitmap;
 
 	case RET_SMALL:
 	case RET_VEC_SMALL:
-	  fprintf(stderr, "RET_SMALL (%p)\n", sp);
+	  fprintf(stdout, "RET_SMALL (%p)\n", sp);
 	  bitmap = info->layout.bitmap;
 	  sp++;
 	small_bitmap:
@@ -460,7 +460,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	    fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-sp, sp);
 	    if ((bitmap & 1) == 0) {
 	      printPtr((P_)*sp);
-	      fprintf(stderr,"\n");
+	      fprintf(stdout,"\n");
 	    } else {
 	      fprintf(stderr,"Word# %ld\n", *sp);
 	    }	      
@@ -817,10 +817,10 @@ static void printZcoded( const char *raw )
     
     while ( raw[j] != '\0' ) {
         if (raw[j] == 'Z') {
-            fputc(unZcode(raw[j+1]),stderr);
+            fputc(unZcode(raw[j+1]),stdout);
             j = j + 2;
         } else {
-            fputc(raw[j],stderr);
+            fputc(raw[j],stdout);
             j = j + 1;
         }
     }
@@ -904,14 +904,14 @@ extern void DEBUG_LoadSymbols( char *name )
         for( i = 0; i != number_of_symbols; ++i ) {
             symbol_info info;
             bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            /*fprintf(stderr,"\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
+            /*fprintf(stdout,"\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
             if (isReal(info.type, info.name)) {
                 num_real_syms += 1;
             }
         }
     
         IF_DEBUG(evaluator,
-                 fprintf(stderr,"Loaded %ld symbols. Of which %ld are real symbols\n", 
+                 fprintf(stdout,"Loaded %ld symbols. Of which %ld are real symbols\n", 
                          number_of_symbols, num_real_syms)
                  );
 
@@ -966,7 +966,7 @@ findPtr(P_ p, int follow)
 		      if (i < arr_size) {
 			  r = q;
 			  while (!LOOKS_LIKE_GHC_INFO(*r)) { r--; };
-			  fprintf(stderr, "%p = ", r);
+			  fprintf(stdout, "%p = ", r);
 			  printClosure((StgClosure *)r);
 			  arr[i++] = r;
 		      } else {
@@ -978,7 +978,7 @@ findPtr(P_ p, int follow)
       }
   }
   if (follow && i == 1) {
-      fprintf(stderr, "-->\n");
+      fprintf(stdout, "-->\n");
       findPtr(arr[0], 1);
   }
 }
@@ -986,11 +986,11 @@ findPtr(P_ p, int follow)
 #else /* DEBUG */
 void printPtr( StgPtr p )
 {
-    fprintf(stderr, "ptr 0x%p (enable -DDEBUG for more info) " , p );
+    fprintf(stdout, "ptr 0x%p (enable -DDEBUG for more info) " , p );
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stderr, "obj 0x%p (enable -DDEBUG for more info) " , obj );
+    fprintf(stdout, "obj 0x%p (enable -DDEBUG for more info) " , obj );
 }
 #endif /* DEBUG */
