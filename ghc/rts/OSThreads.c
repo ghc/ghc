@@ -78,7 +78,10 @@ startProcWrapper(void* pProc)
 int
 createOSThread ( OSThreadId* pId, void (*startProc)(void))
 {
-  return pthread_create(pId, NULL, startProcWrapper, (void*)startProc);
+  int result = pthread_create(pId, NULL, startProcWrapper, (void*)startProc);
+  if(!result)
+    pthread_detach(*pId);
+  return result;
 }
 
 OSThreadId
