@@ -15,10 +15,11 @@ import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
+import TcUnify		( Expected(..) )
 import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
-import TcExpr		( tcMonoExpr )
+import TcExpr		( tcCheckRho )
 import TcEnv		( tcExtendLocalValEnv, tcLookupGlobalId, tcLookupId )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
@@ -63,8 +64,8 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 	tcExtendLocalValEnv ids			$
 	
 		-- Now LHS and RHS
-	getLIE (tcMonoExpr lhs rule_ty)		`thenM` \ (lhs', lhs_lie) ->
-	getLIE (tcMonoExpr rhs rule_ty)		`thenM` \ (rhs', rhs_lie) ->
+	getLIE (tcCheckRho lhs rule_ty)	`thenM` \ (lhs', lhs_lie) ->
+	getLIE (tcCheckRho rhs rule_ty)	`thenM` \ (rhs', rhs_lie) ->
 	
 	returnM (ids, lhs', rhs', lhs_lie, rhs_lie)
     )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->

@@ -26,7 +26,7 @@ module TcType (
 
   --------------------------------
   -- TyVarDetails
-  TyVarDetails(..), isUserTyVar, isSkolemTyVar, isHoleTyVar, 
+  TyVarDetails(..), isUserTyVar, isSkolemTyVar, 
   tyVarBindingInfo,
 
   --------------------------------
@@ -253,12 +253,7 @@ why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 
 \begin{code}
 data TyVarDetails
-  = HoleTv	-- Used *only* by the type checker when passing in a type
-		-- variable that should be side-effected to the result type.
-		-- Always has kind openTypeKind.
-		-- Never appears in types
-
-  | SigTv	-- Introduced when instantiating a type signature,
+  = SigTv	-- Introduced when instantiating a type signature,
 		-- prior to checking that the defn of a fn does 
 		-- have the expected type.  Should not be instantiated.
 		--
@@ -290,14 +285,6 @@ isSkolemTyVar tv = case mutTyVarDetails tv of
 		      InstTv -> True
 		      oteher -> False
 
-isHoleTyVar :: TcTyVar -> Bool
--- NB:  the hole might be filled in by now, and this
---	function does not check for that
-isHoleTyVar tv = ASSERT( isMutTyVar tv )
-		 case mutTyVarDetails tv of
-			HoleTv -> True
-			other  -> False
-
 tyVarBindingInfo :: TyVar -> SDoc	-- Used in checkSigTyVars
 tyVarBindingInfo tv
   | isMutTyVar tv
@@ -310,7 +297,6 @@ tyVarBindingInfo tv
     details ClsTv     = ptext SLIT("class declaration")
     details InstTv    = ptext SLIT("instance declaration")
     details PatSigTv  = ptext SLIT("pattern type signature")
-    details HoleTv    = ptext SLIT("//hole//")		-- Should not happen
     details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 

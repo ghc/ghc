@@ -10,7 +10,7 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcMonoExpr )
+import {-# SOURCE #-}	TcExpr( tcCheckRho, tcMonoExpr )
 
 import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsStmtContext(..),
@@ -29,13 +29,14 @@ import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( tcSyntaxName, tcInstCall )
 import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
-import TcMType		( newTyVarTy, newTyVarTys, zonkTcType, zapToType )
+import TcMType		( newTyVarTy, newTyVarTys, zonkTcType ) 
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
 			  tyVarsOfType, tidyOpenTypes, tidyOpenType, isSigmaTy,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
-import TcUnify		( unifyPArrTy,subFunTy, unifyListTy, unifyTauTy,
+import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedBranches, readExpectedType,
+			  unifyTauTy, subFunTy, unifyPArrTy, unifyListTy, unifyFunTy,
 			  checkSigTyVarsWrt, tcSubExp, tcGen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
@@ -66,11 +67,11 @@ same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
 tcMatchesFun :: Name
-	     -> TcType 		-- Expected type
 	     -> [RenamedMatch]
+	     -> Expected TcRhoType 		-- Expected type
 	     -> TcM [TcMatch]
 
-tcMatchesFun fun_name expected_ty matches@(first_match:_)
+tcMatchesFun fun_name matches@(first_match:_) expected_ty
   =	 -- Check that they all have the same no of arguments
 	 -- Set the location to that of the first equation, so that
 	 -- any inter-equation error messages get some vaguely
@@ -95,16 +96,29 @@ parser guarantees that each equation has exactly one argument.
 
 \begin{code}
 tcMatchesCase :: [RenamedMatch]		-- The case alternatives
-	      -> TcType 		-- Type of whole case expressions
-	      -> TcM (TcType,		-- Inferred type of the scrutinee
-			[TcMatch]) 	-- Translated alternatives
+	      -> Expected TcRhoType 	-- Type of whole case expressions
+	      -> TcM (TcRhoType,	-- Inferred type of the scrutinee
+		      [TcMatch]) 	-- Translated alternatives
 
-tcMatchesCase matches expr_ty
-  = newTyVarTy openTypeKind 					`thenM` \ scrut_ty ->
-    tcMatches CaseAlt matches (mkFunTy scrut_ty expr_ty)	`thenM` \ matches' ->
+tcMatchesCase matches (Check expr_ty)
+  = 	-- This case is a bit yukky, because it prevents the
+	-- scrutinee being higher-ranked, which might just possible
+	-- matter if we were seq'ing on it.  But it's awkward to fix.
+    newTyVarTy openTypeKind 						`thenM` \ scrut_ty ->
+    tcMatches CaseAlt matches (Check (mkFunTy scrut_ty expr_ty))	`thenM` \ matches' ->
     returnM (scrut_ty, matches')
 
-tcMatchLambda :: RenamedMatch -> TcType -> TcM TcMatch
+tcMatchesCase matches (Infer hole)
+  = newHole					`thenM` \ fun_hole ->
+    tcMatches CaseAlt matches (Infer fun_hole)	`thenM` \ matches' ->
+    readMutVar fun_hole				`thenM` \ fun_ty ->
+	-- The result of tcMatches is bound to be a function type
+    unifyFunTy fun_ty				`thenM` \ (scrut_ty, res_ty) ->
+    writeMutVar hole res_ty			`thenM_` 
+    returnM (scrut_ty, matches')
+    
+
+tcMatchLambda :: RenamedMatch -> Expected TcRhoType -> TcM TcMatch
 tcMatchLambda match res_ty = tcMatch LambdaExpr match res_ty
 \end{code}
 
@@ -112,21 +126,17 @@ tcMatchLambda match res_ty = tcMatch LambdaExpr match res_ty
 \begin{code}
 tcMatches :: RenamedMatchContext 
 	  -> [RenamedMatch]
-	  -> TcType
+	  -> Expected TcRhoType
 	  -> TcM [TcMatch]
 
-tcMatches ctxt matches expected_ty
-  = 	-- If there is more than one branch, and expected_ty is a 'hole',
+tcMatches ctxt matches exp_ty
+  = 	-- If there is more than one branch, and exp_ty is a 'hole',
 	-- all branches must be types, not type schemes, otherwise the
-	-- in which we check them would affect the result.
-    (if lengthExceeds matches 1 then
-	zapToType expected_ty
-     else
-	returnM expected_ty)			`thenM` \ expected_ty' ->
-
-    mappM (tc_match expected_ty') matches
+	-- order in which we check them would affect the result.
+    zapExpectedBranches matches exp_ty 	`thenM` \ exp_ty' ->
+    mappM (tc_match exp_ty') matches
   where
-    tc_match expected_ty match = tcMatch ctxt match expected_ty
+    tc_match exp_ty match = tcMatch ctxt match exp_ty
 \end{code}
 
 
@@ -139,7 +149,7 @@ tcMatches ctxt matches expected_ty
 \begin{code}
 tcMatch :: RenamedMatchContext
 	-> RenamedMatch
-	-> TcType 	-- Expected result-type of the Match.
+	-> Expected TcRhoType 	-- Expected result-type of the Match.
 			-- Early unification with this guy gives better error messages
 			-- We regard the Match as having type 
 			--	(ty1 -> ... -> tyn -> result_ty)
@@ -160,14 +170,17 @@ tcMatch ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 
 	    Just sig ->	 tcAddScopedTyVars [sig]	$
 				-- Bring into scope the type variables in the signature
-			 tcHsSigType ResSigCtxt sig				`thenM` \ sig_ty ->
-			 tcThingWithSig sig_ty (tcGRHSs ctxt grhss) rhs_ty	`thenM` \ (co_fn, grhss') ->
-			 returnM (lift_grhss co_fn rhs_ty grhss')
+			 tcHsSigType ResSigCtxt sig					`thenM` \ sig_ty ->
+			 tcThingWithSig sig_ty (tcGRHSs ctxt grhss . Check) rhs_ty	`thenM` \ (co_fn, grhss') ->
 
--- lift_grhss pushes the coercion down to the right hand sides,
--- because there is no convenient place to hang it otherwise.
-lift_grhss co_fn rhs_ty grhss 
-  | isIdCoercion co_fn = grhss
+			-- Pushes the coercion down to the right hand sides,
+			-- because there is no convenient place to hang it otherwise.
+			 if isIdCoercion co_fn then
+				returnM grhss'
+			 else
+			 readExpectedType rhs_ty		`thenM` \ rhs_ty' ->
+			 returnM (lift_grhss co_fn rhs_ty' grhss')
+
 lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
   = GRHSs (map lift_grhs grhss) binds rhs_ty	-- Change the type, since the coercion does
   where
@@ -183,29 +196,44 @@ glue_on binds1 (GRHSs grhss binds2 ty)
 
 
 tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
-	-> TcType
+	-> Expected TcRhoType
 	-> TcM TcGRHSs
 
-tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
-  = tcBindsAndThen glue_on binds (tc_grhss grhss)
-  where
-    m_ty =  (\ty -> ty, expected_ty) 
+  -- Special case when there is just one equation with a degenerate 
+  -- guard; then we pass in the full Expected type, so that we get
+  -- good inference from simple things like
+  --	f = \(x::forall a.a->a) -> <stuff>
+  -- This is a consequence of the fact that tcStmts takes a TcType,
+  -- not a Expected TcType, a decision we could revisit if necessary
+tcGRHSs ctxt (GRHSs [GRHS [ResultStmt rhs loc1] loc2] binds _) exp_ty
+  = tcBindsAndThen glue_on binds 	$
+    tcMonoExpr rhs exp_ty		`thenM` \ rhs' ->
+    readExpectedType exp_ty		`thenM` \ exp_ty' ->
+    returnM (GRHSs [GRHS [ResultStmt rhs' loc1] loc2] EmptyBinds exp_ty')
 
-    tc_grhss grhss
-	= mappM tc_grhs grhss	    `thenM` \ grhss' ->
-	  returnM (GRHSs grhss' EmptyBinds expected_ty)
-
-    tc_grhs (GRHS guarded locn)
+tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
+  = tcBindsAndThen glue_on binds 	$
+    zapExpectedType exp_ty		`thenM` \ exp_ty' ->
+	-- Even if there is only one guard, we zap the RHS type to
+	-- a monotype.  Reason: it makes tcStmts much easier,
+	-- and even a one-armed guard has a notional second arm
+    let
+      tc_grhs (GRHS guarded locn)
 	= addSrcLoc locn			$
 	  tcStmts (PatGuard ctxt) m_ty guarded	`thenM` \ guarded' ->
 	  returnM (GRHS guarded' locn)
+
+      m_ty =  (\ty -> ty, exp_ty') 
+    in
+    mappM tc_grhs grhss			`thenM` \ grhss' ->
+    returnM (GRHSs grhss' EmptyBinds exp_ty')
 \end{code}
 
 
 \begin{code}
 tcThingWithSig :: TcSigmaType 		-- Type signature
 	       -> (TcRhoType -> TcM r) 	-- How to type check the thing inside
-	       -> TcRhoType 		-- Overall expected result type
+	       -> Expected TcRhoType 	-- Overall expected result type
 	       -> TcM (ExprCoFn, r)
 -- Used for expressions with a type signature, and for result type signatures
 
@@ -235,8 +263,8 @@ tcThingWithSig sig_ty thing_inside res_ty
 
 \begin{code}	  
 tcMatchPats
-	:: [RenamedPat] -> TcType
-	-> (TcType -> TcM a)
+	:: [RenamedPat] -> Expected TcRhoType
+	-> (Expected TcRhoType -> TcM a)
 	-> TcM ([TcPat], a, TcHsBinds)
 -- Typecheck the patterns, extend the environment to bind the variables,
 -- do the thing inside, use any existentially-bound dictionaries to 
@@ -260,8 +288,9 @@ tcMatchPats pats expected_ty thing_inside
 	-- I'm a bit concerned that lie_req1 from an 'inner' pattern in the list
 	-- might need (via lie_req2) something made available from an 'outer' 
 	-- pattern.  But it's inconvenient to deal with, and I can't find an example
-    tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req expected_ty	`thenM` \ ex_binds ->
-	-- NB: we *must* pass "expected_ty" not "result_ty" to tcCheckExistentialPat
+    readExpectedType expected_ty				`thenM` \ exp_ty ->
+    tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req exp_ty	`thenM` \ ex_binds ->
+	-- NB: we *must* pass "exp_ty" not "result_ty" to tcCheckExistentialPat
 	-- For example, we must reject this program:
 	--	data C = forall a. C (a -> Int) 
 	-- 	f (C g) x = g x
@@ -341,7 +370,8 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req match_ty
 %************************************************************************
 
 \begin{code}
-tcDoStmts :: HsStmtContext Name -> [RenamedStmt] -> [Name] -> TcType
+tcDoStmts :: HsStmtContext Name -> [RenamedStmt] -> [Name] 
+	  -> TcRhoType		-- To keep it simple, we don't have an "expected" type here
 	  -> TcM (TcMonoBinds, [TcStmt], [Id])
 tcDoStmts PArrComp stmts method_names res_ty
   = unifyPArrTy res_ty				  `thenM` \elt_ty ->
@@ -425,7 +455,9 @@ tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner
 	-> HsStmtContext Name
         -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
-					-- elt_ty, where type of the comprehension is (m elt_ty)
+					-- res_ty, the type of the entire comprehension
+					--	   used at the end for the type of (return x)
+					-- 	   or the final expression in do-notation
         -> [RenamedStmt]
 	-> TcM thing
         -> TcM thing
@@ -446,11 +478,11 @@ tcStmtAndThen combine do_or_lc m_ty (LetStmt binds) thing_inside
   	thing_inside
 
 tcStmtAndThen combine do_or_lc m_ty@(m,elt_ty) stmt@(BindStmt pat exp src_loc) thing_inside
-  = addSrcLoc src_loc					$
-    addErrCtxt (stmtCtxt do_or_lc stmt)		$
-    newTyVarTy liftedTypeKind				`thenM` \ pat_ty ->
-    tcMonoExpr exp (m pat_ty)				`thenM` \ exp' ->
-    tcMatchPats [pat] (mkFunTy pat_ty (m elt_ty))	(\ _ ->
+  = addSrcLoc src_loc						$
+    addErrCtxt (stmtCtxt do_or_lc stmt)				$
+    newTyVarTy liftedTypeKind					`thenM` \ pat_ty ->
+    tcCheckRho exp (m pat_ty)					`thenM` \ exp' ->
+    tcMatchPats [pat] (Check (mkFunTy pat_ty (m elt_ty)))	(\ _ ->
 	popErrCtxt thing_inside
     )							`thenM` \ ([pat'], thing, dict_binds) ->
     returnM (combine (BindStmt pat' exp' src_loc)
@@ -499,21 +531,21 @@ tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts _) thing_inside
 
     -- Unify the types of the "final" Ids with those of "knot-tied" Ids
     tc_ret (rec_name, mono_ty)
-	= tcLookupId rec_name			`thenM` \ poly_id ->
+	= tcLookupId rec_name				`thenM` \ poly_id ->
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable
-	  tcSubExp mono_ty (idType poly_id) 	`thenM` \ co_fn ->
+	  tcSubExp (Check mono_ty) (idType poly_id) 	`thenM` \ co_fn ->
 	  returnM (co_fn <$> HsVar poly_id) 
 
 	-- ExprStmt
-tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside
+tcStmtAndThen combine do_or_lc m_ty@(m, _) stmt@(ExprStmt exp _ locn) thing_inside
   = addErrCtxt (stmtCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
 		newTyVarTy openTypeKind 	`thenM` \ any_ty ->
-		tcMonoExpr exp (m any_ty)	`thenM` \ exp' ->
+		tcCheckRho exp (m any_ty)	`thenM` \ exp' ->
 		returnM (ExprStmt exp' any_ty locn)
 	else
-		tcMonoExpr exp boolTy		`thenM` \ exp' ->
+		tcCheckRho exp boolTy		`thenM` \ exp' ->
 		returnM (ExprStmt exp' boolTy locn)
     )						`thenM` \ stmt' ->
 
@@ -525,9 +557,9 @@ tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) t
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ResultStmt exp locn) thing_inside
   = addErrCtxt (resCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
-		tcMonoExpr exp (m res_elt_ty)
+		tcCheckRho exp (m res_elt_ty)
 	else
-		tcMonoExpr exp res_elt_ty
+		tcCheckRho exp res_elt_ty
     )						`thenM` \ exp' ->
 
     thing_inside 				`thenM` \ thing ->

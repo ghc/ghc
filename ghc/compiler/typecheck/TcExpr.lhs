@@ -4,7 +4,7 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
+module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 
 #include "HsVersions.h"
 
@@ -21,8 +21,8 @@ import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields )
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet, (<$>) )
 import TcRnMonad
-import TcUnify		( tcSubExp, tcGen,
-			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy )
+import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
+			  unifyFunTy, zapToListTy, zapToPArrTy, zapToTupleTy )
 import BasicTypes	( isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  newOverloadedLit, newMethodFromName, newIPDict,
@@ -36,8 +36,7 @@ import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
-import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
-			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
+import TcMType		( tcInstTyVars, tcInstType, newTyVarTy, newTyVarTys, zonkTcType )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkFunTys,
@@ -76,24 +75,43 @@ import FastString
 %************************************************************************
 
 \begin{code}
-tcExpr :: RenamedHsExpr		-- Expession to type check
-	-> TcSigmaType 		-- Expected type (could be a polytpye)
-	-> TcM TcExpr		-- Generalised expr with expected type
+-- tcCheckSigma does type *checking*; it's passed the expected type of the result
+tcCheckSigma :: RenamedHsExpr		-- Expession to type check
+       	     -> TcSigmaType		-- Expected type (could be a polytpye)
+       	     -> TcM TcExpr		-- Generalised expr with expected type
 
-tcExpr expr expected_ty 
+tcCheckSigma expr expected_ty 
   = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenM_`
     tc_expr' expr expected_ty
 
-tc_expr' expr expected_ty
-  | not (isSigmaTy expected_ty)  -- Monomorphic case
-  = tcMonoExpr expr expected_ty
-
-  | otherwise
-  = tcGen expected_ty emptyVarSet (
-	tcMonoExpr expr
+tc_expr' expr sigma_ty
+  | isSigmaTy sigma_ty
+  = tcGen sigma_ty emptyVarSet (
+	\ rho_ty -> tcCheckRho expr rho_ty
     )				`thenM` \ (gen_fn, expr') ->
     returnM (gen_fn <$> expr')
+
+tc_expr' expr rho_ty	-- Monomorphic case
+  = tcCheckRho expr rho_ty
 \end{code}
+
+Typecheck expression which in most cases will be an Id.
+The expression can return a higher-ranked type, such as
+	(forall a. a->a) -> Int
+so we must create a hole to pass in as the expected tyvar.
+
+\begin{code}
+tcCheckRho :: RenamedHsExpr -> TcRhoType -> TcM TcExpr
+tcCheckRho expr rho_ty = tcMonoExpr expr (Check rho_ty)
+
+tcInferRho :: RenamedHsExpr -> TcM (TcExpr, TcRhoType)
+tcInferRho (HsVar name) = tcId name
+tcInferRho expr         = newHole			`thenM` \ hole ->
+			  tcMonoExpr expr (Infer hole)	`thenM` \ expr' ->
+			  readMutVar hole		`thenM` \ rho_ty ->
+		          returnM (expr', rho_ty) 
+\end{code}
+
 
 
 %************************************************************************
@@ -104,7 +122,7 @@ tc_expr' expr expected_ty
 
 \begin{code}
 tcMonoExpr :: RenamedHsExpr		-- Expession to type check
-	   -> TcRhoType 		-- Expected type (could be a type variable)
+	   -> Expected TcRhoType 	-- Expected type (could be a type variable)
 					-- Definitely no foralls at the top
 					-- Can be a 'hole'.
 	   -> TcM TcExpr
@@ -137,7 +155,7 @@ tcMonoExpr (HsIPVar ip) res_ty
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = addErrCtxt (exprSigCtxt in_expr)			$
    tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
-   tcThingWithSig sig_tc_ty (tcMonoExpr expr) res_ty	`thenM` \ (co_fn, expr') ->
+   tcThingWithSig sig_tc_ty (tcCheckRho expr) res_ty	`thenM` \ (co_fn, expr') ->
    returnM (co_fn <$> expr')
 
 tcMonoExpr (HsType ty) res_ty
@@ -158,7 +176,8 @@ tcMonoExpr (HsType ty) res_ty
 
 \begin{code}
 tcMonoExpr (HsLit lit)     res_ty  = tcLit lit res_ty
-tcMonoExpr (HsOverLit lit) res_ty  = newOverloadedLit (LiteralOrigin lit) lit res_ty
+tcMonoExpr (HsOverLit lit) res_ty  = zapExpectedType res_ty	`thenM` \ res_ty' ->
+				     newOverloadedLit (LiteralOrigin lit) lit res_ty'
 tcMonoExpr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
 				     returnM (HsPar expr')
 tcMonoExpr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
@@ -190,7 +209,7 @@ a type error will occur if they aren't.
 -- 	op e
 
 tcMonoExpr in_expr@(SectionL arg1 op) res_ty
-  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+  = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
     addErrCtxt (exprCtxt in_expr)		$
@@ -201,7 +220,7 @@ tcMonoExpr in_expr@(SectionL arg1 op) res_ty
 --	\ x -> op x expr
 
 tcMonoExpr in_expr@(SectionR op arg2) res_ty
-  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+  = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
     addErrCtxt (exprCtxt in_expr)		$
@@ -211,7 +230,7 @@ tcMonoExpr in_expr@(SectionR op arg2) res_ty
 -- equivalent to (op e1) e2:
 
 tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
-  = tcExpr_id op				`thenM` \ (op', op_ty) ->
+  = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
@@ -237,19 +256,11 @@ tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
 	--	case (map f) of
 	--	  (x:xs) -> ...
 	-- will report that map is applied to too few arguments
-	--
-	-- Not only that, but it's better to check the matches on their
-	-- own, so that we get the expected results for scoped type variables.
-	--	f x = case x of
-	--		(p::a, q::b) -> (q,p)
-	-- The above should work: the match (p,q) -> (q,p) is polymorphic as
-	-- claimed by the pattern signatures.  But if we typechecked the
-	-- match with x in scope and x's type as the expected type, we'd be hosed.
 
     tcMatchesCase matches res_ty	`thenM`    \ (scrut_ty, matches') ->
 
     addErrCtxt (caseScrutCtxt scrut)	(
-      tcMonoExpr scrut scrut_ty
+      tcCheckRho scrut scrut_ty
     )					`thenM`    \ scrut' ->
 
     returnM (HsCase scrut' matches' src_loc)
@@ -257,41 +268,43 @@ tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
 tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
   = addSrcLoc src_loc	$
     addErrCtxt (predCtxt pred) (
-    tcMonoExpr pred boolTy	)	`thenM`    \ pred' ->
+    tcCheckRho pred boolTy	)	`thenM`    \ pred' ->
 
-    zapToType res_ty			`thenM`    \ res_ty' ->
+    zapExpectedType res_ty		`thenM`    \ res_ty' ->
 	-- C.f. the call to zapToType in TcMatches.tcMatches
 
-    tcMonoExpr b1 res_ty'		`thenM`    \ b1' ->
-    tcMonoExpr b2 res_ty'		`thenM`    \ b2' ->
+    tcCheckRho b1 res_ty'		`thenM`    \ b1' ->
+    tcCheckRho b2 res_ty'		`thenM`    \ b2' ->
     returnM (HsIf pred' b1' b2' src_loc)
 
 tcMonoExpr (HsDo do_or_lc stmts method_names _ src_loc) res_ty
-  = addSrcLoc src_loc		$
-    tcDoStmts do_or_lc stmts method_names res_ty	`thenM` \ (binds, stmts', methods') ->
-    returnM (mkHsLet binds (HsDo do_or_lc stmts' methods' res_ty src_loc))
+  = addSrcLoc src_loc					$
+    zapExpectedType res_ty				`thenM` \ res_ty' ->
+	-- All comprehensions yield a monotype
+    tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (binds, stmts', methods') ->
+    returnM (mkHsLet binds (HsDo do_or_lc stmts' methods' res_ty' src_loc))
 
 tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
-  = unifyListTy res_ty                `thenM` \ elt_ty ->  
+  = zapToListTy res_ty                `thenM` \ elt_ty ->  
     mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
     returnM (ExplicitList elt_ty exprs')
   where
     tc_elt elt_ty expr
       = addErrCtxt (listCtxt expr) $
-	tcMonoExpr expr elt_ty
+	tcCheckRho expr elt_ty
 
 tcMonoExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
-  = unifyPArrTy res_ty                `thenM` \ elt_ty ->  
+  = zapToPArrTy res_ty                `thenM` \ elt_ty ->  
     mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
     returnM (ExplicitPArr elt_ty exprs')
   where
     tc_elt elt_ty expr
       = addErrCtxt (parrCtxt expr) $
-	tcMonoExpr expr elt_ty
+	tcCheckRho expr elt_ty
 
 tcMonoExpr (ExplicitTuple exprs boxity) res_ty
-  = unifyTupleTy boxity (length exprs) res_ty	`thenM` \ arg_tys ->
-    tcMonoExprs exprs arg_tys 			`thenM` \ exprs' ->
+  = zapToTupleTy boxity (length exprs) res_ty	`thenM` \ arg_tys ->
+    tcCheckRhos exprs arg_tys 			`thenM` \ exprs' ->
     returnM (ExplicitTuple exprs' boxity)
 \end{code}
 
@@ -339,7 +352,7 @@ tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
 		| otherwise  = [1..length args]
     in
     newTyVarTys (length tv_idxs) openTypeKind		`thenM` \ arg_tys ->
-    tcMonoExprs args arg_tys		   		`thenM` \ args' ->
+    tcCheckRhos args arg_tys		   		`thenM` \ args' ->
 
 	-- The argument types can be unlifted or lifted; the result
 	-- type must, however, be lifted since it's an argument to the IO
@@ -348,7 +361,7 @@ tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
     let
 	io_result_ty = mkTyConApp ioTyCon [result_ty]
     in
-    unifyTauTy res_ty io_result_ty		`thenM_`
+    zapExpectedTo res_ty io_result_ty	`thenM_`
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
@@ -374,11 +387,11 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 	(tycon, ty_args) = tcSplitTyConApp record_ty
     in
     ASSERT( isAlgTyCon tycon )
-    unifyTauTy res_ty record_ty          `thenM_`
+    zapExpectedTo res_ty record_ty      `thenM_`
 
 	-- Check that the record bindings match the constructor
 	-- con_name is syntactically constrained to be a data constructor
-    tcLookupDataCon con_name	`thenM` \ data_con ->
+    tcLookupDataCon con_name		`thenM` \ data_con ->
     let
 	bad_fields = badFields rbinds data_con
     in
@@ -466,7 +479,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	result_record_ty = mkTyConApp tycon result_inst_tys
     in
-    unifyTauTy res_ty result_record_ty          `thenM_`
+    zapExpectedTo res_ty result_record_ty	`thenM_`
     tcRecordBinds tycon result_inst_tys rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 4
@@ -498,7 +511,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	record_ty = mkTyConApp tycon inst_tys
     in
-    tcMonoExpr record_expr record_ty		`thenM` \ record_expr' ->
+    tcCheckRho record_expr record_ty		`thenM` \ record_expr' ->
 
 	-- STEP 6
 	-- Figure out the LIE we need.  We have to generate some 
@@ -528,8 +541,8 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 
 \begin{code}
 tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
-  = unifyListTy res_ty 				`thenM` \ elt_ty ->  
-    tcMonoExpr expr elt_ty		 	`thenM` \ expr' ->
+  = zapToListTy res_ty 				`thenM` \ elt_ty ->  
+    tcCheckRho expr elt_ty		 	`thenM` \ expr' ->
 
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromName	`thenM` \ enum_from ->
@@ -538,9 +551,9 @@ tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $ 
-    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
-    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
+    zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
+    tcCheckRho expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenName		`thenM` \ enum_from_then ->
 
@@ -549,9 +562,9 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
-    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
+    zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
+    tcCheckRho expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (ArithSeqOrigin seq) 
 	  	      elt_ty enumFromToName		`thenM` \ enum_from_to ->
 
@@ -559,10 +572,10 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         			`thenM`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
-    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
-    tcMonoExpr expr3 elt_ty				`thenM`    \ expr3' ->
+    zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
+    tcCheckRho expr2 elt_ty				`thenM`    \ expr2' ->
+    tcCheckRho expr3 elt_ty				`thenM`    \ expr3' ->
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenToName		`thenM` \ eft ->
 
@@ -570,9 +583,9 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
 
 tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (parrSeqCtxt in_expr) $
-    unifyPArrTy  res_ty         			`thenM`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
-    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
+    zapToPArrTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
+    tcCheckRho expr2 elt_ty				`thenM`    \ expr2' ->
     newMethodFromName (PArrSeqOrigin seq) 
 		      elt_ty enumFromToPName 		`thenM` \ enum_from_to ->
 
@@ -580,10 +593,10 @@ tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
 
 tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (parrSeqCtxt in_expr) $
-    unifyPArrTy  res_ty         			`thenM`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty				`thenM`    \ expr1' ->
-    tcMonoExpr expr2 elt_ty				`thenM`    \ expr2' ->
-    tcMonoExpr expr3 elt_ty				`thenM`    \ expr3' ->
+    zapToPArrTy  res_ty         			`thenM`    \ elt_ty ->  
+    tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
+    tcCheckRho expr2 elt_ty				`thenM`    \ expr2' ->
+    tcCheckRho expr3 elt_ty				`thenM`    \ expr3' ->
     newMethodFromName (PArrSeqOrigin seq)
 		      elt_ty enumFromThenToPName	`thenM` \ eft ->
 
@@ -611,8 +624,8 @@ tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack res_ty)
 
 tcMonoExpr (HsReify (Reify flavour name)) res_ty
   = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$
-    tcMetaTy  tycon_name	`thenM` \ reify_ty ->
-    unifyTauTy res_ty reify_ty	`thenM_`
+    tcMetaTy  tycon_name		`thenM` \ reify_ty ->
+    zapExpectedTo res_ty reify_ty	`thenM_`
     returnM (HsReify (ReifyOut flavour name))
   where
     tycon_name = case flavour of
@@ -643,7 +656,7 @@ tcMonoExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 \begin{code}
 
 tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
-      -> TcType			    		-- Expected result type of application
+      -> Expected TcRhoType	    		-- Expected result type of application
       -> TcM TcExpr			    	-- Translated fun and args
 
 tcApp (HsApp e1 e2) args res_ty 
@@ -651,7 +664,7 @@ tcApp (HsApp e1 e2) args res_ty
 
 tcApp fun args res_ty
   = 	-- First type-check the function
-    tcExpr_id fun  				`thenM` \ (fun', fun_ty) ->
+    tcInferRho fun  				`thenM` \ (fun', fun_ty) ->
 
     addErrCtxt (wrongArgsCtxt "too many" fun args) (
 	traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_ty)) 	`thenM_`
@@ -691,8 +704,10 @@ tcApp fun args res_ty
 
 -- If an error happens we try to figure out whether the
 -- function has been given too many or too few arguments,
--- and say so
-checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
+-- and say so.
+-- The ~(Check...) is because in the Infer case the tcSubExp 
+-- definitely won't fail, so we can be certain we're in the Check branch
+checkArgsCtxt fun args ~(Check expected_res_ty) actual_res_ty tidy_env
   = zonkTcType expected_res_ty	  `thenM` \ exp_ty' ->
     zonkTcType actual_res_ty	  `thenM` \ act_ty' ->
     let
@@ -711,7 +726,7 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
     returnM (env2, message)
 
 
-split_fun_ty :: TcType		-- The type of the function
+split_fun_ty :: TcRhoType	-- The type of the function
 	     -> Int		-- Number of arguments
 	     -> TcM ([TcType],	-- Function argument types
 		     TcType)	-- Function result types
@@ -733,7 +748,7 @@ tcArg :: RenamedHsExpr				-- The function (for error messages)
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
   = addErrCtxt (funAppCtxt the_fun arg arg_no) $
-    tcExpr arg expected_arg_ty
+    tcCheckSigma arg expected_arg_ty
 \end{code}
 
 
@@ -766,7 +781,7 @@ This gets a bit less sharing, but
 	b) perhaps fewer separated lambdas
 
 \begin{code}
-tcId :: Name -> TcM (TcExpr, TcType)
+tcId :: Name -> TcM (TcExpr, TcRhoType)
 tcId name	-- Look up the Id and instantiate its type
   = 	-- First check whether it's a DataCon
 	-- Reason: we must not forget to chuck in the
@@ -871,21 +886,6 @@ tcId name	-- Look up the Id and instantiate its type
 		 mkFunTys arg_tys result_ty)
 \end{code}
 
-Typecheck expression which in most cases will be an Id.
-The expression can return a higher-ranked type, such as
-	(forall a. a->a) -> Int
-so we must create a HoleTyVarTy to pass in as the expected tyvar.
-
-\begin{code}
-tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, TcType)
-tcExpr_id (HsVar name) = tcId name
-tcExpr_id expr         = newHoleTyVarTy			`thenM` \ id_ty ->
-			 tcMonoExpr expr id_ty		`thenM` \ expr' ->
-			 readHoleResult id_ty		`thenM` \ id_ty' ->
-		         returnM (expr', id_ty') 
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection{Record bindings}
@@ -936,7 +936,7 @@ tcRecordBinds tycon ty_args rbinds
 		-- The caller of tcRecordBinds has already checked
 		-- that all the fields come from the same type
 
-	tcExpr rhs field_ty 			`thenM` \ rhs' ->
+	tcCheckSigma rhs field_ty 		`thenM` \ rhs' ->
 
 	returnM (sel_id, rhs')
 
@@ -990,17 +990,17 @@ checkMissingFields data_con rbinds
 
 %************************************************************************
 %*									*
-\subsection{@tcMonoExprs@ typechecks a {\em list} of expressions}
+\subsection{@tcCheckRhos@ typechecks a {\em list} of expressions}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcMonoExprs :: [RenamedHsExpr] -> [TcType] -> TcM [TcExpr]
+tcCheckRhos :: [RenamedHsExpr] -> [TcType] -> TcM [TcExpr]
 
-tcMonoExprs [] [] = returnM []
-tcMonoExprs (expr:exprs) (ty:tys)
- = tcMonoExpr  expr  ty		`thenM` \ expr' ->
-   tcMonoExprs exprs tys	`thenM` \ exprs' ->
+tcCheckRhos [] [] = returnM []
+tcCheckRhos (expr:exprs) (ty:tys)
+ = tcCheckRho  expr  ty		`thenM` \ expr' ->
+   tcCheckRhos exprs tys	`thenM` \ exprs' ->
    returnM (expr':exprs')
 \end{code}
 
@@ -1014,16 +1014,17 @@ tcMonoExprs (expr:exprs) (ty:tys)
 Overloaded literals.
 
 \begin{code}
-tcLit :: HsLit -> TcType -> TcM TcExpr
+tcLit :: HsLit -> Expected TcRhoType -> TcM TcExpr
 tcLit (HsLitLit s _) res_ty
-  = tcLookupClass cCallableClassName			`thenM` \ cCallableClass ->
+  = zapExpectedType res_ty				`thenM` \ res_ty' ->
+    tcLookupClass cCallableClassName			`thenM` \ cCallableClass ->
     newDicts (LitLitOrigin (unpackFS s))
-	     [mkClassPred cCallableClass [res_ty]]	`thenM` \ dicts ->
+	     [mkClassPred cCallableClass [res_ty']]	`thenM` \ dicts ->
     extendLIEs dicts					`thenM_`
-    returnM (HsLit (HsLitLit s res_ty))
+    returnM (HsLit (HsLitLit s res_ty'))
 
 tcLit lit res_ty 
-  = unifyTauTy res_ty (hsLitType lit)		`thenM_`
+  = zapExpectedTo res_ty (hsLitType lit)		`thenM_`
     returnM (HsLit lit)
 \end{code}
 

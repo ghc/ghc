@@ -9,7 +9,7 @@ module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds, tcSpecSigs ) where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
-import {-# SOURCE #-} TcExpr  ( tcExpr, tcMonoExpr )
+import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 
 import CmdLineOpts	( DynFlag(Opt_NoMonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
@@ -23,7 +23,7 @@ import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
 import TcRnMonad
 import Inst		( InstOrigin(..), newDicts, newIPDict, instToId )
 import TcEnv		( tcExtendLocalValEnv, tcExtendLocalValEnv2, newLocalName )
-import TcUnify		( unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
+import TcUnify		( Expected(..), newHole, unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
 			  tcSimplifyToDicts, tcSimplifyIPs )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..), 
@@ -31,9 +31,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..),
 			)
 import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newTyVar, newTyVarTy, newHoleTyVarTy,
-			  zonkTcTyVarToTyVar, readHoleResult
-			)
+import TcMType		( newTyVar, newTyVarTy, zonkTcTyVarToTyVar )
 import TcType		( TcTyVar, mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, eqKind
@@ -141,7 +139,7 @@ tc_binds_and_then top_lvl combiner (IPBinds binds is_with) do_next
       = newTyVarTy openTypeKind		`thenM` \ ty ->
   	getSrcLocM			`thenM` \ loc ->
   	newIPDict (IPBind ip) ip ty	`thenM` \ (ip', ip_inst) ->
-  	tcMonoExpr expr ty		`thenM` \ expr' ->
+  	tcCheckRho expr ty		`thenM` \ expr' ->
   	returnM (ip_inst, (ip', expr'))
 
 tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
@@ -660,8 +658,8 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		-- the RHS has the appropriate type (with outer for-alls stripped off)
 	   mono_id = tcSigMonoId sig
 	   mono_ty = idType mono_id
-	   complete_it = addSrcLoc locn				$
-			 tcMatchesFun name mono_ty matches	`thenM` \ matches' ->
+	   complete_it = addSrcLoc locn					$
+			 tcMatchesFun name matches (Check mono_ty)	`thenM` \ matches' ->
 			 returnM (FunMonoBind mono_id inf matches' locn, 
 				  unitBag (name, mono_id))
 	in
@@ -676,8 +674,8 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	newTyVarTy openTypeKind		`thenM` \ mono_ty ->
 	let
 	   mono_id     = mkLocalId mono_name mono_ty
-	   complete_it = addSrcLoc locn				$
-			 tcMatchesFun name mono_ty matches	`thenM` \ matches' ->
+	   complete_it = addSrcLoc locn					$
+			 tcMatchesFun name matches (Check mono_ty)	`thenM` \ matches' ->
 			 returnM (FunMonoBind mono_id inf matches' locn, 
 				  unitBag (name, mono_id))
 	in
@@ -686,13 +684,13 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
       | otherwise	-- (c) No type signature, and non-recursive
       =	let		-- So we can use a 'hole' type to infer a higher-rank type
 	   complete_it 
-		= addSrcLoc locn			$
-		  newHoleTyVarTy 			`thenM` \ fun_ty -> 
-		  tcMatchesFun name fun_ty matches	`thenM` \ matches' ->
-		  readHoleResult fun_ty			`thenM` \ fun_ty' ->
-	  	  newLocalName name			`thenM` \ mono_name ->
+		= addSrcLoc locn				$
+		  newHole	 				`thenM` \ hole -> 
+		  tcMatchesFun name matches (Infer hole)	`thenM` \ matches' ->
+		  readMutVar hole				`thenM` \ fun_ty ->
+	  	  newLocalName name				`thenM` \ mono_name ->
 		  let
-		     mono_id = mkLocalId mono_name fun_ty'
+		     mono_id = mkLocalId mono_name fun_ty
 		  in
 		  returnM (FunMonoBind mono_id inf matches' locn, 
 			   unitBag (name, mono_id))
@@ -710,18 +708,18 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		-- The type variables are brought into scope in tc_binds_and_then,
 		-- so we don't have to do anything here.
 
-	newHoleTyVarTy 			`thenM` \ pat_ty -> 
-	tcPat tc_pat_bndr pat pat_ty	`thenM` \ (pat', tvs, ids, lie_avail) ->
-	readHoleResult pat_ty		`thenM` \ pat_ty' ->
+	newHole 				`thenM` \ hole -> 
+	tcPat tc_pat_bndr pat (Infer hole)	`thenM` \ (pat', tvs, ids, lie_avail) ->
+	readMutVar hole				`thenM` \ pat_ty ->
 
 	-- Don't know how to deal with pattern-bound existentials yet
         checkTc (isEmptyBag tvs && null lie_avail) 
 	        (existentialExplode bind)	`thenM_` 
 
 	let
-	   complete_it = addSrcLoc locn		 		$
-			 addErrCtxt (patMonoBindsCtxt bind)	$
-			 tcGRHSs PatBindRhs grhss pat_ty'	`thenM` \ grhss' ->
+	   complete_it = addSrcLoc locn		 			$
+			 addErrCtxt (patMonoBindsCtxt bind)		$
+			 tcGRHSs PatBindRhs grhss (Check pat_ty)	`thenM` \ grhss' ->
 			 returnM (PatMonoBind pat' grhss' locn, ids)
 	in
 	returnM (complete_it, if isRec is_rec then ids else emptyBag)
@@ -800,7 +798,7 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
 
 	-- Check that f has a more general type, and build a RHS for
 	-- the spec-pragma-id at the same time
-    getLIE (tcExpr (HsVar name) sig_ty)		`thenM` \ (spec_expr, spec_lie) ->
+    getLIE (tcCheckSigma (HsVar name) sig_ty)	`thenM` \ (spec_expr, spec_lie) ->
 
 	-- Squeeze out any Methods (see comments with tcSimplifyToDicts)
     tcSimplifyToDicts spec_lie			`thenM` \ spec_binds ->

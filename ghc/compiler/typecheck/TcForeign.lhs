@@ -28,7 +28,7 @@ import RnHsSyn		( RenamedForeignDecl )
 import TcRnMonad
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignDecl )
-import TcExpr		( tcExpr )			
+import TcExpr		( tcCheckSigma )			
 
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId, mkVanillaGlobal, setIdLocalExported )
@@ -197,7 +197,7 @@ tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
    addErrCtxt (foreignDeclCtxt fo)	$
 
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM` \ sig_ty ->
-   tcExpr (HsVar nm) sig_ty		`thenM` \ rhs ->
+   tcCheckSigma (HsVar nm) sig_ty	`thenM` \ rhs ->
 
    tcCheckFEType sig_ty spec		`thenM_`
 

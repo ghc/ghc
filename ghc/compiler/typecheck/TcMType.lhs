@@ -18,8 +18,6 @@ module TcMType (
   putTcTyVar, getTcTyVar,
   newMutTyVar, readMutTyVar, writeMutTyVar, 
 
-  newHoleTyVarTy, readHoleResult, zapToType,
-
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars, tcInstType, 
@@ -54,7 +52,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, mkTyConApp,
-			  isUnLiftedType, isIPPred, isHoleTyVar, isTyVarTy,
+			  isUnLiftedType, isIPPred, isTyVarTy,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
@@ -85,7 +83,7 @@ import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
 import Name		( Name, setNameUnique, mkSystemTvNameEncoded )
 import VarSet
 import CmdLineOpts	( dopt, DynFlag(..) )
-import Util		( nOfThem, isSingleton, equalLength, notNull )
+import Util		( nOfThem, isSingleton, equalLength, notNull, lengthExceeds )
 import ListSetOps	( equivClasses, removeDups )
 import Outputable
 \end{code}
@@ -138,42 +136,6 @@ newOpenTypeKind
     returnM (mkTyConApp typeCon [TyVarTy kv])
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{'hole' type variables}
-%*									*
-%************************************************************************
-
-\begin{code}
-newHoleTyVarTy :: TcM TcType
-  = newUnique 	`thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("h")) openTypeKind HoleTv	`thenM` \ tv ->
-    returnM (TyVarTy tv)
-
-readHoleResult :: TcType -> TcM TcType
--- Read the answer out of a hole, constructed by newHoleTyVarTy
-readHoleResult (TyVarTy tv)
-  = ASSERT( isHoleTyVar tv )
-    getTcTyVar tv		`thenM` \ maybe_res ->
-    case maybe_res of
-	Just ty -> returnM ty
-	Nothing ->  pprPanic "readHoleResult: empty" (ppr tv)
-readHoleResult ty = pprPanic "readHoleResult: not hole" (ppr ty)
-
-zapToType :: TcType -> TcM TcType
-zapToType (TyVarTy tv)
-  | isHoleTyVar tv
-  = getTcTyVar tv		`thenM` \ maybe_res ->
-    case maybe_res of
-	Nothing -> newTyVarTy openTypeKind	`thenM` \ ty ->
-		   putTcTyVar tv ty		`thenM_`
-		   returnM ty
-	Just ty  -> returnM ty	-- No need to loop; we never
-					-- have chains of holes
-
-zapToType other_ty = returnM other_ty
-\end{code}		   
 
 %************************************************************************
 %*									*

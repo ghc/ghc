@@ -36,7 +36,7 @@ module Inst (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcExpr )
+import {-# SOURCE #-}	TcExpr( tcCheckSigma )
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
 import TcHsSyn	( TcExpr, TcId, TcIdSet, 
@@ -46,7 +46,7 @@ import TcHsSyn	( TcExpr, TcId, TcIdSet,
 import TcRnMonad
 import TcEnv	( tcGetInstEnv, tcLookupId, tcLookupTyCon, checkWellStaged, topIdLvl )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
-import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
+import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, 
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
@@ -353,13 +353,7 @@ newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
 		 -> TcM TcExpr
-newOverloadedLit orig lit expected_ty
-  = zapToType expected_ty	`thenM_` 
-	-- The expected type might be a 'hole' type variable, 
-	-- in which case we must zap it to an ordinary type variable
-    new_over_lit orig lit expected_ty
-
-new_over_lit orig lit@(HsIntegral i fi) expected_ty
+newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
   | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable
 				-- syntax.  Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
@@ -372,7 +366,7 @@ new_over_lit orig lit@(HsIntegral i fi) expected_ty
   | otherwise
   = newLitInst orig lit expected_ty
 
-new_over_lit orig lit@(HsFractional r fr) expected_ty
+newOverloadedLit orig lit@(HsFractional r fr) expected_ty
   | fr /= fromRationalName	-- c.f. HsIntegral case
   = tcSyntaxName orig expected_ty fromRationalName fr	`thenM` \ (expr, _) ->
     mkRatLit r						`thenM` \ rat_lit ->
@@ -665,9 +659,11 @@ tcSyntaxName orig ty std_nm user_nm
 	-- C.f. newMethodAtLoc
 	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
  	tau1		= substTyWith [tv] [ty] tau
+	-- Actually, the "tau-type" might be a sigma-type in the
+	-- case of locally-polymorphic methods.
     in
     addErrCtxtM (syntaxNameCtxt user_nm orig tau1)	$
-    tcExpr (HsVar user_nm) tau1				`thenM` \ user_fn ->
+    tcCheckSigma (HsVar user_nm) tau1			`thenM` \ user_fn ->
     returnM (user_fn, tau1)
 
 syntaxNameCtxt name orig ty tidy_env

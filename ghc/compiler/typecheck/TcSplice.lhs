@@ -21,7 +21,7 @@ import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
 import RdrHsSyn		( RdrNameHsExpr, RdrNameHsDecl )
 import RnHsSyn		( RenamedHsExpr )
-import TcExpr		( tcMonoExpr )
+import TcExpr		( tcCheckRho )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( unifyTauTy )
@@ -97,8 +97,8 @@ tcBracket brack res_ty
 
 tc_bracket :: HsBracket Name -> TcM TcType
 tc_bracket (ExpBr expr) 
-  = newTyVarTy openTypeKind		`thenM` \ any_ty ->
-    tcMonoExpr expr any_ty		`thenM_`
+  = newTyVarTy openTypeKind	`thenM` \ any_ty ->
+    tcCheckRho expr any_ty	`thenM_`
     tcMetaTy exprTyConName
 	-- Result type is Expr (= Q Exp)
 
@@ -148,7 +148,7 @@ tcSpliceExpr name expr res_ty
     tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $
-	tcMonoExpr expr meta_exp_ty
+	tcCheckRho expr meta_exp_ty
     )						`thenM` \ expr' ->
 
 	-- Write the pending splice into the bucket
@@ -162,7 +162,7 @@ tcSpliceExpr name expr res_ty
 -- Note that we do not decrement the level (to -1) before 
 -- typechecking the expression.  For example:
 --	f x = $( ...$(g 3) ... )
--- The recursive call to tcMonoExpr will simply expand the 
+-- The recursive call to tcCheckRho will simply expand the 
 -- inner escape before dealing with the outer one
 
 tcTopSplice expr res_ty
@@ -188,7 +188,7 @@ tcTopSplice expr res_ty
     initRn SourceMode (rnExpr expr2)		`thenM` \ (exp3, fvs) ->
     importSupportingDecls fvs			`thenM` \ env ->
 
-    setGblEnv env (tcMonoExpr exp3 res_ty)
+    setGblEnv env (tcCheckRho exp3 res_ty)
 
 
 tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr
@@ -201,7 +201,7 @@ tcTopSpliceExpr expr meta_ty
     setStage topSpliceStage $
 
 	-- Typecheck the expression
-    getLIE (tcMonoExpr expr meta_ty)	`thenM` \ (expr', lie) ->
+    getLIE (tcCheckRho expr meta_ty)	`thenM` \ (expr', lie) ->
 
 	-- Solve the constraints
     tcSimplifyTop lie			`thenM` \ const_binds ->

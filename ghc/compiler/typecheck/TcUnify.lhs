@@ -6,13 +6,21 @@
 \begin{code}
 module TcUnify (
 	-- Full-blown subsumption
-  tcSubOff, tcSubExp, tcGen, subFunTy, TcHoleType,
+  tcSubOff, tcSubExp, tcGen, 
   checkSigTyVars, checkSigTyVarsWrt, sigCtxt, findGlobals,
 
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-  unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy,
-  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind
+  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind,
+
+  --------------------------------
+  -- Holes
+  Expected(..), newHole, readExpectedType, 
+  zapExpectedType, zapExpectedTo, zapExpectedBranches,
+  subFunTy,    	unifyFunTy, 
+  zapToListTy, 	unifyListTy, 
+  zapToPArrTy, 	unifyPArrTy, 
+  zapToTupleTy, unifyTupleTy
 
   ) where
 
@@ -32,14 +40,14 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  tcGetTyVar_maybe, tcGetTyVar, 
 			  mkFunTy, tyVarsOfType, mkPhiTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
-			  isHoleTyVar, isSkolemTyVar, isUserTyVar, 
+			  isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
 			  hasMoreBoxityInfo, allDistinctTyVars
 			)
 import Inst		( newDicts, instToId, tcInstCall )
-import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult, newKindVar,
-			  newTyVarTy, newTyVarTys, newOpenTypeKind, newHoleTyVarTy, 
+import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
+			  newTyVarTy, newTyVarTys, newOpenTypeKind, 
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
@@ -53,13 +61,211 @@ import VarEnv
 import Name		( isSystemName )
 import ErrUtils		( Message )
 import BasicTypes	( Boxity, Arity, isBoxed )
-import Util		( equalLength, notNull )
+import Util		( equalLength, lengthExceeds, notNull )
 import Outputable
 \end{code}
 
 Notes on holes
 ~~~~~~~~~~~~~~
 * A hole is always filled in with an ordinary type, not another hole.
+
+%************************************************************************
+%*									*
+\subsection{'hole' type variables}
+%*									*
+%************************************************************************
+
+\begin{code}
+data Expected ty = Infer (TcRef ty)	-- The hole to fill in for type inference
+		 | Check ty		-- The type to check during type checking
+
+newHole :: TcM (TcRef ty)
+newHole = newMutVar (error "Empty hole in typechecker")
+
+readExpectedType :: Expected ty -> TcM ty
+readExpectedType (Infer hole) = readMutVar hole
+readExpectedType (Check ty)   = returnM ty
+
+zapExpectedType :: Expected TcType -> TcM TcTauType
+-- In the inference case, ensure we have a monotype
+zapExpectedType (Infer hole)
+  = do { ty <- newTyVarTy openTypeKind ;
+	 writeMutVar hole ty ;
+	 return ty }
+
+zapExpectedType (Check ty) = return ty
+
+zapExpectedTo :: Expected TcType -> TcTauType -> TcM ()
+zapExpectedTo (Infer hole) ty2 = writeMutVar hole ty2
+zapExpectedTo (Check ty1)  ty2 = unifyTauTy ty1 ty2
+
+zapExpectedBranches :: [a] -> Expected TcType -> TcM (Expected TcType)
+-- Zap the expected type to a monotype if there is more than one branch
+zapExpectedBranches branches exp_ty
+  | lengthExceeds branches 1 = zapExpectedType exp_ty 	`thenM` \ exp_ty' -> 
+			       return (Check exp_ty')
+  | otherwise		     = returnM exp_ty		
+
+instance Outputable ty => Outputable (Expected ty) where
+  ppr (Check ty)   = ptext SLIT("Expected type") <+> ppr ty
+  ppr (Infer hole) = ptext SLIT("Inferring type")
+\end{code}		   
+
+
+%************************************************************************
+%*									*
+\subsection[Unify-fun]{@unifyFunTy@}
+%*									*
+%************************************************************************
+
+@subFunTy@ and @unifyFunTy@ is used to avoid the fruitless 
+creation of type variables.
+
+* subFunTy is used when we might be faced with a "hole" type variable,
+  in which case we should create two new holes. 
+
+* unifyFunTy is used when we expect to encounter only "ordinary" 
+  type variables, so we should create new ordinary type variables
+
+\begin{code}
+subFunTy :: Expected TcRhoType	-- Fail if ty isn't a function type
+				-- If it's a hole, make two holes, feed them to...
+	 -> (Expected TcRhoType -> Expected TcRhoType -> TcM a)	-- the thing inside
+	 -> TcM a	-- and bind the function type to the hole
+
+subFunTy (Infer hole) thing_inside
+  = 	-- This is the interesting case
+    newHole	  		`thenM` \ arg_hole ->
+    newHole			`thenM` \ res_hole ->
+
+	-- Do the business
+    thing_inside (Infer arg_hole) (Infer res_hole)	`thenM` \ answer ->
+
+	-- Extract the answers
+    readMutVar arg_hole		`thenM` \ arg_ty ->
+    readMutVar res_hole		`thenM` \ res_ty ->
+
+	-- Write the answer into the incoming hole
+    writeMutVar hole (mkFunTy arg_ty res_ty)	`thenM_` 
+
+	-- And return the answer
+    returnM answer
+
+subFunTy (Check ty) thing_inside
+  = unifyFunTy ty 	`thenM` \ (arg,res) ->
+    thing_inside (Check arg) (Check res)
+
+		 
+unifyFunTy :: TcRhoType	 		-- Fail if ty isn't a function type
+	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
+
+unifyFunTy ty@(TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
+    case maybe_ty of
+	Just ty' -> unifyFunTy ty'
+	Nothing  -> unify_fun_ty_help ty
+
+unifyFunTy ty
+  = case tcSplitFunTy_maybe ty of
+	Just arg_and_res -> returnM arg_and_res
+	Nothing 	 -> unify_fun_ty_help ty
+
+unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
+  = newTyVarTy openTypeKind	`thenM` \ arg ->
+    newTyVarTy openTypeKind	`thenM` \ res ->
+    unifyTauTy ty (mkFunTy arg res)	`thenM_`
+    returnM (arg,res)
+\end{code}
+
+\begin{code}
+zapToListTy :: Expected TcType -- expected list type
+	    -> TcM TcType      -- list element type
+
+zapToListTy (Check ty)   = unifyListTy ty
+zapToListTy (Infer hole) = do { elt_ty <- newTyVarTy liftedTypeKind ;
+				writeMutVar hole (mkListTy elt_ty) ;
+				return elt_ty }
+
+unifyListTy :: TcType -> TcM TcType
+unifyListTy ty@(TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
+    case maybe_ty of
+	Just ty' -> unifyListTy ty'
+	other	 -> unify_list_ty_help ty
+
+unifyListTy ty
+  = case tcSplitTyConApp_maybe ty of
+	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnM arg_ty
+	other					    -> unify_list_ty_help ty
+
+unify_list_ty_help ty	-- Revert to ordinary unification
+  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
+    unifyTauTy ty (mkListTy elt_ty)	`thenM_`
+    returnM elt_ty
+
+-- variant for parallel arrays
+--
+zapToPArrTy :: Expected TcType     -- Expected list type
+	    -> TcM TcType	   -- List element type
+
+zapToPArrTy (Check ty)   = unifyPArrTy ty
+zapToPArrTy (Infer hole) = do { elt_ty <- newTyVarTy liftedTypeKind ;
+				writeMutVar hole (mkPArrTy elt_ty) ;
+				return elt_ty }
+
+unifyPArrTy :: TcType -> TcM TcType
+
+unifyPArrTy ty@(TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
+    case maybe_ty of
+      Just ty' -> unifyPArrTy ty'
+      _        -> unify_parr_ty_help ty
+unifyPArrTy ty
+  = case tcSplitTyConApp_maybe ty of
+      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnM arg_ty
+      _  					  -> unify_parr_ty_help ty
+
+unify_parr_ty_help ty	-- Revert to ordinary unification
+  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
+    unifyTauTy ty (mkPArrTy elt_ty)	`thenM_`
+    returnM elt_ty
+\end{code}
+
+\begin{code}
+zapToTupleTy :: Boxity -> Arity -> Expected TcType -> TcM [TcType]
+zapToTupleTy boxity arity (Check ty)   = unifyTupleTy boxity arity ty
+zapToTupleTy boxity arity (Infer hole) = do { (tup_ty, arg_tys) <- new_tuple_ty boxity arity ;
+					      writeMutVar hole tup_ty ;
+				 	      return arg_tys }
+
+unifyTupleTy boxity arity ty@(TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
+    case maybe_ty of
+	Just ty' -> unifyTupleTy boxity arity ty'
+	other	 -> unify_tuple_ty_help boxity arity ty
+
+unifyTupleTy boxity arity ty
+  = case tcSplitTyConApp_maybe ty of
+	Just (tycon, arg_tys)
+		|  isTupleTyCon tycon 
+		&& tyConArity tycon == arity
+		&& tupleTyConBoxity tycon == boxity
+		-> returnM arg_tys
+	other -> unify_tuple_ty_help boxity arity ty
+
+unify_tuple_ty_help boxity arity ty
+  = new_tuple_ty boxity arity	`thenM` \ (tup_ty, arg_tys) ->
+    unifyTauTy ty tup_ty	`thenM_`
+    returnM arg_tys
+
+new_tuple_ty boxity arity
+  = newTyVarTys arity kind	`thenM` \ arg_tys ->
+    return (mkTupleTy boxity arity arg_tys, arg_tys)
+  where
+    kind | isBoxed boxity = liftedTypeKind
+	 | otherwise      = openTypeKind
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -82,12 +288,8 @@ which takes an HsExpr of type offered_ty into one of type
 expected_ty.
 
 \begin{code}
-type TcHoleType = TcSigmaType	-- Either a TcSigmaType, 
-				-- or else a hole
-
-tcSubExp :: TcHoleType  -> TcSigmaType -> TcM ExprCoFn
-tcSubOff :: TcSigmaType -> TcHoleType  -> TcM ExprCoFn
-tcSub    :: TcSigmaType -> TcSigmaType -> TcM ExprCoFn
+tcSubExp :: Expected TcRhoType -> TcRhoType  -> TcM ExprCoFn
+tcSubOff :: TcSigmaType  -> Expected TcSigmaType -> TcM ExprCoFn
 \end{code}
 
 These two check for holes
@@ -106,22 +308,17 @@ tcSubOff expected_ty offered_ty
 -- Otherwise it calls thing_inside, passing the two args, looking
 -- through any instantiated hole
 
-checkHole (TyVarTy tv) other_ty thing_inside
-  | isHoleTyVar tv
-  = getTcTyVar tv	`thenM` \ maybe_ty ->
-    case maybe_ty of
-	Just ty -> thing_inside ty other_ty
-	Nothing -> traceTc (text "checkHole" <+> ppr tv)	`thenM_`
-		   putTcTyVar tv other_ty	`thenM_`
-		   returnM idCoercion
+checkHole (Infer hole) other_ty thing_inside
+  = do { writeMutVar hole other_ty; return idCoercion }
 
-checkHole ty other_ty thing_inside 
+checkHole (Check ty) other_ty thing_inside 
   = thing_inside ty other_ty
 \end{code}
 
 No holes expected now.  Add some error-check context info.
 
 \begin{code}
+tcSub :: TcSigmaType -> TcSigmaType -> TcM ExprCoFn	-- Locally used only
 tcSub expected_ty actual_ty
   = traceTc (text "tcSub" <+> details)		`thenM_`
     addErrCtxtM (unifyCtxt "type" expected_ty actual_ty)
@@ -210,16 +407,14 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 -- I'm not quite sure what to do about this!
 
 tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ (TyVarTy tv)
-  = ASSERT( not (isHoleTyVar tv) )
-    getTcTyVar tv	`thenM` \ maybe_ty ->
+  = getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub exp_sty exp_ty ty ty
 	Nothing -> imitateFun tv exp_sty	`thenM` \ (act_arg, act_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 tc_sub _ (TyVarTy tv) act_sty act_ty@(FunTy act_arg act_res)
-  = ASSERT( not (isHoleTyVar tv) )
-    getTcTyVar tv	`thenM` \ maybe_ty ->
+  = getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub ty ty act_sty act_ty
 	Nothing -> imitateFun tv act_sty	`thenM` \ (exp_arg, exp_res) ->
@@ -265,8 +460,7 @@ tcSub_fun exp_arg exp_res act_arg act_res
 
 imitateFun :: TcTyVar -> TcType -> TcM (TcType, TcType)
 imitateFun tv ty
-  = ASSERT( not (isHoleTyVar tv) )
-	-- NB: tv is an *ordinary* tyvar and so are the new ones
+  = 	-- NB: tv is an *ordinary* tyvar and so are the new ones
 
    	-- Check that tv isn't a type-signature type variable
 	-- (This would be found later in checkSigTyVars, but
@@ -702,146 +896,6 @@ okToUnifyWith tv ty
     Nothing `and` m = m
     Just p  `and` m = Just p
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-fun]{@unifyFunTy@}
-%*									*
-%************************************************************************
-
-@subFunTy@ and @unifyFunTy@ is used to avoid the fruitless 
-creation of type variables.
-
-* subFunTy is used when we might be faced with a "hole" type variable,
-  in which case we should create two new holes. 
-
-* unifyFunTy is used when we expect to encounter only "ordinary" 
-  type variables, so we should create new ordinary type variables
-
-\begin{code}
-subFunTy :: TcHoleType	-- Fail if ty isn't a function type
-			-- If it's a hole, make two holes, feed them to...
-	 -> (TcHoleType -> TcHoleType -> TcM a)	-- the thing inside
-	 -> TcM a	-- and bind the function type to the hole
-
-subFunTy ty@(TyVarTy tyvar) thing_inside
-  | isHoleTyVar tyvar
-  = 	-- This is the interesting case
-    getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of {
-	Just ty' -> subFunTy ty' thing_inside ;
-	Nothing  -> 
-
-    newHoleTyVarTy 		`thenM` \ arg_ty ->
-    newHoleTyVarTy 		`thenM` \ res_ty ->
-
-	-- Do the business
-    thing_inside arg_ty res_ty	`thenM` \ answer ->
-
-	-- Extract the answers
-    readHoleResult arg_ty	`thenM` \ arg_ty' ->
-    readHoleResult res_ty	`thenM` \ res_ty' ->
-
-	-- Write the answer into the incoming hole
-    putTcTyVar tyvar (mkFunTy arg_ty' res_ty')	`thenM_` 
-
-	-- And return the answer
-    returnM answer }
-
-subFunTy ty thing_inside
-  = unifyFunTy ty 	`thenM` \ (arg,res) ->
-    thing_inside arg res
-
-		 
-unifyFunTy :: TcRhoType	 		-- Fail if ty isn't a function type
-	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
-
-unifyFunTy ty@(TyVarTy tyvar)
-  = ASSERT( not (isHoleTyVar tyvar) )
-    getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyFunTy ty'
-	Nothing  -> unify_fun_ty_help ty
-
-unifyFunTy ty
-  = case tcSplitFunTy_maybe ty of
-	Just arg_and_res -> returnM arg_and_res
-	Nothing 	 -> unify_fun_ty_help ty
-
-unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
-  = newTyVarTy openTypeKind	`thenM` \ arg ->
-    newTyVarTy openTypeKind	`thenM` \ res ->
-    unifyTauTy ty (mkFunTy arg res)	`thenM_`
-    returnM (arg,res)
-\end{code}
-
-\begin{code}
-unifyListTy :: TcType              -- expected list type
-	    -> TcM TcType      -- list element type
-
-unifyListTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyListTy ty'
-	other	 -> unify_list_ty_help ty
-
-unifyListTy ty
-  = case tcSplitTyConApp_maybe ty of
-	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnM arg_ty
-	other					    -> unify_list_ty_help ty
-
-unify_list_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
-    unifyTauTy ty (mkListTy elt_ty)	`thenM_`
-    returnM elt_ty
-
--- variant for parallel arrays
---
-unifyPArrTy :: TcType              -- expected list type
-	    -> TcM TcType	   -- list element type
-
-unifyPArrTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-      Just ty' -> unifyPArrTy ty'
-      _        -> unify_parr_ty_help ty
-unifyPArrTy ty
-  = case tcSplitTyConApp_maybe ty of
-      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnM arg_ty
-      _  					  -> unify_parr_ty_help ty
-
-unify_parr_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
-    unifyTauTy ty (mkPArrTy elt_ty)	`thenM_`
-    returnM elt_ty
-\end{code}
-
-\begin{code}
-unifyTupleTy :: Boxity -> Arity -> TcType -> TcM [TcType]
-unifyTupleTy boxity arity ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyTupleTy boxity arity ty'
-	other	 -> unify_tuple_ty_help boxity arity ty
-
-unifyTupleTy boxity arity ty
-  = case tcSplitTyConApp_maybe ty of
-	Just (tycon, arg_tys)
-		|  isTupleTyCon tycon 
-		&& tyConArity tycon == arity
-		&& tupleTyConBoxity tycon == boxity
-		-> returnM arg_tys
-	other -> unify_tuple_ty_help boxity arity ty
-
-unify_tuple_ty_help boxity arity ty
-  = newTyVarTys arity kind				`thenM` \ arg_tys ->
-    unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenM_`
-    returnM arg_tys
-  where
-    kind | isBoxed boxity = liftedTypeKind
-	 | otherwise      = openTypeKind
-\end{code}
-
 
 %************************************************************************
 %*									*

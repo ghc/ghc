@@ -45,7 +45,7 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
 			  zonkTopExpr, zonkTopBndrs
 			)
 
-import TcExpr 		( tcExpr_id )
+import TcExpr 		( tcInferRho )
 import TcRnMonad
 import TcMType		( newTyVarTy, zonkTcType )
 import TcType		( Type, liftedTypeKind, 
@@ -444,8 +444,7 @@ tcRnExpr hsc_env pcs ictxt rdr_expr
     
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-	-- Hence the hole type (c.f. TcExpr.tcExpr_id)
-    ((tc_expr, res_ty), lie)	   <- getLIE (tcExpr_id rn_expr) ;
+    ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
     ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
     tcSimplifyTop lie_top ;
 
@@ -1116,7 +1115,7 @@ check_main ghci_mode tcg_env
 	
 	-- $main :: IO () = runIO main
 	let { rhs = HsApp (HsVar runIOName) (HsVar main_name) } ;
-	(main_expr, ty) <- tcExpr_id rhs ;
+	(main_expr, ty) <- tcInferRho rhs ;
 
 	let { dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty) ;
 	      main_bind      = VarMonoBind dollar_main_id main_expr ;
