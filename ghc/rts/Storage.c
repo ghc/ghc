@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.22 2000/01/12 15:15:18 simonmar Exp $
+ * $Id: Storage.c,v 1.23 2000/02/14 10:58:05 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -179,10 +179,8 @@ initStorage (void)
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
-#ifdef COMPILER
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
-#endif
 
 #ifdef SMP
   pthread_mutex_init(&sm_mutex, NULL);
