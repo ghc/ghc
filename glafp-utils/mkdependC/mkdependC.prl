@@ -2,10 +2,7 @@
 # This stub of perl assumes that the following two
 # variables are prepended:
 #
-#  RAWCPP
-#  HOSTPLATFORM
-#
-# tries to work like mkdependC
+# TMPDIR CPP
 #
 # ToDo: strip out all the .h junk
 #
@@ -21,26 +18,24 @@ $End_magic_str = "# DO NOT DELETE: End of C dependencies\n";
 $Obj_suffix = '.o';
 @Defines = ();
 $Include_dirs = '';
-$Col_width = 78; # ignored
 $Makefile = '';
 @Src_files = ();
 
-# the following is a hack, so we can use RAWCPP, but there you go;
-# put in just enough #defines that mkdependC will not barf.
-$HostPlatform = ${HOSTPLATFORM};
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependC$$";
+} else {
+    $Tmp_prefix ="${TMPDIR}/mkdependC$$";
+    $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
+}
 
-if ( $HostPlatform =~ /^i386-/ ) {
-    push(@Defines, '-D__i386__');
+sub quit_upon_signal { 
+  if (-f "$Tmp_prefix.i") {
+	print STDERR "Deleting $Tmp_prefix.i .. \n"; 
+	unlink "$Tmp_prefix.i"; 
+   }
 }
-if ( $HostPlatform =~ /linux/ ) {
-    push(@Defines, '-D__linux__');
-}
-if ( $HostPlatform =~ /^sparc-/ ) {
-    push(@Defines, '-D__sparc__');
-}
-if ( $HostPlatform =~ /-solaris2$/ ) {
-    push(@Defines, '-D__svr4__');
-}
+$SIG{'INT'}  = 'quit_upon_signal';
+$SIG{'QUIT'} = 'quit_upon_signal';
 
 &mangle_command_line_args();
 
@@ -55,7 +50,6 @@ if ( ! $Makefile && -f 'makefile' ) {
 @Depend_lines = ();
 %Depend_seen = ();
 
-print STDERR "CPP defines=@Defines\n" if $Verbose;
 print STDERR "Include_dirs=$Include_dirs\n" if $Verbose;
 
 foreach $sf (@Src_files) {
@@ -156,9 +150,17 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    unless (open($fhandle, "${RAWCPP} $Include_dirs @Defines $fname |")) {
-         die "$Pgm: Can't open $fname: $!\n";
-    }
+    $tempfile = "$Tmp_prefix.i";
+
+    # ${CPP} better be 'gcc -E', or the -x option will fail...
+    $result = system("${CPP} $Include_dirs @Defines -x c $fname -o $tempfile");
+    if ($result != 0) {
+	unlink($tempfile);
+	exit($result);
+    };
+
+    open($fhandle, $tempfile) || die "$Pgm: Can't open $fname: $!\n";
+
     line: while (<$fhandle>) {
 	next line if ! /^#/;
 	next line if /^#(ident|pragma)/;
@@ -200,6 +202,8 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 	$Depend_seen{$depend} = 1;
     }
     close($fhandle);
+    unlink($tempname);
+    $tempname = '';  # for quit_upon_signal
 }
 
 sub tidy_dir_names { # rm various pernicious dir-name combinations...
