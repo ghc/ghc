@@ -229,7 +229,7 @@ MKDEPENDC_SRCS=$(C_SRCS)
 #
 # make TAGS defaults
 #
-# The default set of files for the dependency generators to work on
+# The default set of files for the TAGS file generators to work on
 # is just their source equivalents.
 #
 TAGS_HS_SRCS=$(HS_SRCS)
