@@ -49,17 +49,29 @@ NHC/SizedTypes.hs: NHC/SizedTypes.hs.cpp
 
 # Here are the dependencies.
 $(OBJDIR)/Data/FiniteMap.$O: $(OBJDIR)/Data/Maybe.$O
-$(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
+$(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/List.$O \
+	$(OBJDIR)/Data/Typeable.$O
 $(OBJDIR)/Data/Array.$O: $(OBJDIR)/Data/Ix.$O $(OBJDIR)/Data/Typeable.$O
 $(OBJDIR)/Data/Dynamic.$O: $(OBJDIR)/Data/HashTable.$O \
 	$(OBJDIR)/Data/Typeable.$O
-$(OBJDIR)/Data/HashTable.$O: $(OBJDIR)/Control/Monad.$O
+$(OBJDIR)/Data/Typeable.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/Either.$O
+	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/Word.$O $(OBJDIR)/Data/List.$O
+	$(OBJDIR)/Data/HashTable.$O
+$(OBJDIR)/Data/HashTable.$O: $(OBJDIR)/Control/Monad.$O \
+	$(OBJDIR)/Data/Tuple.$O $(OBJDIR)/Data/Bits.$O $(OBJDIR)/Data/List.$O \
+	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/Char.$O \
+	$(OBJDIR)/Data/IORef.$O
 $(OBJDIR)/Data/Int.$O: $(OBJDIR)/NHC/SizedTypes.$O
 $(OBJDIR)/Data/Word.$O: $(OBJDIR)/NHC/SizedTypes.$O
-$(OBJDIR)/Data/Tree.$O: $(OBJDIR)/Control/Monad.$O $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/Queue.$O
-$(OBJDIR)/Data/Map.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Set.$O $(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
-$(OBJDIR)/Data/IntMap.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O $(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/IntSet.$O $(OBJDIR)/Data/Typeable.$O
-$(OBJDIR)/Data/IntSet.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O $(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
+$(OBJDIR)/Data/Tree.$O: $(OBJDIR)/Control/Monad.$O $(OBJDIR)/Data/Maybe.$O \
+	$(OBJDIR)/Data/Queue.$O
+$(OBJDIR)/Data/Map.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Set.$O \
+	$(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
+$(OBJDIR)/Data/IntMap.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O \
+	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/IntSet.$O \
+	$(OBJDIR)/Data/Typeable.$O
+$(OBJDIR)/Data/IntSet.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/Bits.$O \
+	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/List.$O $(OBJDIR)/Data/Typeable.$O
 $(OBJDIR)/Data/FunctorM.$O: $(OBJDIR)/Data/Array.$O
 $(OBJDIR)/NHC/SizedTypes.$O: $(OBJDIR)/Data/Bits.$O
 $(OBJDIR)/System/IO.$O: $(OBJDIR)/System/IO/Error.$O
@@ -88,13 +100,17 @@ Data/FiniteMap.$C: Data/Maybe.$C
 Data/Set.$C:       Data/Monoid.$C Data/List.$C Data/Typeable.$C
 Data/Array.$C:     Data/Ix.$C Data/Typeable.$C
 Data/Dynamic.$C:   Data/HashTable.$C Data/Typeable.$C
+Data/Typeable.$C:  Data/Maybe.$C Data/Either.$C Data/Int.$C Data/Word.$C \
+		   Data/List.$C Data/HashTable.$C
 Data/HashTable.$C: Control/Monad.$C
 Data/Int.$C:       NHC/SizedTypes.$C
 Data/Word.$C:      NHC/SizedTypes.$C
 Data/Tree.$C:      Control/Monad.$C Data/Maybe.$C Data/Queue.$C
 Data/Map.$C:       Data/Monoid.$C Data/Set.$C Data/List.$C Data/Typeable.$C
-Data/IntMap.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/IntSet.$C Data/Typeable.$C
-Data/IntSet.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/List.$C Data/Typeable.$C
+Data/IntMap.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/IntSet.$C \
+		   Data/Typeable.$C
+Data/IntSet.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/List.$C \
+		   Data/Typeable.$C
 Data/FunctorM.$C:  Data/Array.$C
 NHC/SizedTypes.$C: Data/Bits.$C
 System/IO.$C:      System/IO/Error.$C
@@ -102,13 +118,13 @@ System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
 Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
 Control/Monad/Fix.$C:      System/IO.$C
 Foreign/Marshal/Alloc.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
-	Foreign/C/Types.$C
+			   Foreign/C/Types.$C
 Foreign/Marshal/Array.$C:  Control/Monad.$C Foreign/Ptr.$C Foreign/Storable.$C \
-	Foreign/Marshal/Alloc.$C Foreign/Marshal/Utils.$C
+			   Foreign/Marshal/Alloc.$C Foreign/Marshal/Utils.$C
 Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
-	Foreign/C/Types.$C Foreign/Marshal/Alloc.$C
+			   Foreign/C/Types.$C Foreign/Marshal/Alloc.$C
 Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
 Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
-	Foreign/Marshal/Array.$C
+			   Foreign/Marshal/Array.$C
 Foreign/C.$C:      Foreign/C/Types.$C Foreign/C/Error.$C Foreign/C/String.$C
 Text/Regex.$C:     Text/Regex/Posix.$C
