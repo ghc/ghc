@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.14 2001/08/02 16:35:10 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.15 2001/08/03 07:44:47 sof Exp $
 --
 -- GHC Driver
 --
@@ -19,7 +19,7 @@ import qualified SysTools
 import Module
 import Config
 import Module		( isHomeModule )
-import Finder		( findModule )
+import Finder		( findModuleDep )
 import HscTypes		( ModuleLocation(..) )
 import Util
 import Panic
@@ -169,7 +169,7 @@ findDependency is_source src imp = do
    if imp_mod `elem` excl_mods 
       then return Nothing
       else do
-	r <- findModule imp
+	r <- findModuleDep imp is_source
 	case r of 
 	   Just (mod,loc)
 		| isHomeModule mod || include_prelude

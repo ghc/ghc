@@ -7,6 +7,7 @@
 module Finder (
     initFinder, 	-- :: [PackageConfig] -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    findModuleDep,	-- :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
     findPackageModule,	-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     mkHomeModuleLocn,	-- :: ModuleName -> String -> Maybe FilePath 
 			--	-> IO ModuleLocation
@@ -49,69 +50,57 @@ emptyHomeDirCache :: IO ()
 emptyHomeDirCache = return ()
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findModule name
-  = do	{ j <- maybeHomeModule name
+findModule name = findModuleDep name False
+
+findModuleDep :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
+findModuleDep name is_source
+  = do	{ j <- maybeHomeModule name is_source
 	; case j of
 	    Just home_module -> return (Just home_module)
-	    Nothing	     -> findPackageModule name
+	    Nothing	     -> findPackageMod name False
 	}
 
-maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-maybeHomeModule mod_name = do
+maybeHomeModule :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
+maybeHomeModule mod_name is_source = do
    home_path <- readIORef v_Import_paths
+   hisuf     <- readIORef v_Hi_suf
 
    let mod_str  = moduleNameUserString mod_name 
        basename = map (\c -> if c == '.' then '/' else c) mod_str
-       hs  = basename ++ ".hs"
-       lhs = basename ++ ".lhs"
+          -- last chance: .hi-boot-<ver> and .hi-boot
+       hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
+       
+       std_exts =
+        [ (hisuf,
+	   \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	, ("hs",      
+	   \ _ fName path -> mkHomeModuleLocn mod_name path (Just fName))
+	, ("lhs",
+	   \ _ fName path -> mkHomeModuleLocn mod_name path (Just fName))
+	]
 
-   found <- findOnPath home_path hs
-   case found of {
-	  -- special case to avoid getting "./foo.hs" all the time
-	Just "."  -> mkHomeModuleLocn mod_name basename (Just hs);
-	Just path -> mkHomeModuleLocn mod_name 
-			(path ++ '/':basename) (Just (path ++ '/':hs));
-	Nothing -> do
+       boot_exts = 
+       		[ (hi_boot_ver, \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+		, ("hi-boot", \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+		]
 
-   found <- findOnPath home_path lhs
-   case found of {
-	  -- special case to avoid getting "./foo.hs" all the time
-	Just "."  -> mkHomeModuleLocn mod_name basename (Just lhs);
-	Just path ->  mkHomeModuleLocn mod_name
-			(path ++ '/':basename) (Just (path ++ '/':lhs));
-	Nothing -> do
+   searchPathExts  
+   		(map ((,) undefined) home_path)
+		basename
+		(if is_source then (boot_exts++std_exts) else std_exts ++ boot_exts)
+			-- for SOURCE imports, check the hi-boot extensions
+			-- before the source/iface ones, to avoid
+			-- creating circ Makefile deps.
 
-   -- can't find a source file anywhere, check for a lone .hi file.
-   hisuf <- readIORef v_Hi_suf
-   let hi = basename ++ '.':hisuf
-   found <- findOnPath home_path hi
-   case found of {
-	Just path ->  mkHiOnlyModuleLocn mod_name hi;
-	Nothing -> do
-
-   -- last chance: .hi-boot-<ver> and .hi-boot
-   let hi_boot = basename ++ ".hi-boot"
-   let hi_boot_ver = basename ++ ".hi-boot-" ++ cHscIfaceFileVersion
-   found <- findOnPath home_path hi_boot_ver
-   case found of {
-	Just path -> mkHiOnlyModuleLocn mod_name hi;
-	Nothing -> do
-   found <- findOnPath home_path hi_boot
-   case found of {
-	Just path -> mkHiOnlyModuleLocn mod_name hi;
-	Nothing -> return Nothing
-   }}}}}
-
-
-mkHiOnlyModuleLocn mod_name hi_file = do
-   return (Just (mkHomeModule mod_name,
-                 ModuleLocation{
-                    ml_hspp_file = Nothing,
-		    ml_hs_file   = Nothing,
-		    ml_hi_file   = hi_file,
-		    ml_obj_file  = Nothing
-	         }
-	))
+mkHiOnlyModuleLocn mod_name hi_file =
+ return
+   ( mkHomeModule mod_name
+   , ModuleLocation{ ml_hspp_file = Nothing
+    		   , ml_hs_file   = Nothing
+		   , ml_hi_file   = hi_file
+		   , ml_obj_file  = Nothing
+	           }
+   )
 
 -- The .hi file always follows the module name, whereas the object
 -- file may follow the name of the source file in the case where the
@@ -130,61 +119,71 @@ mkHomeModuleLocn mod_name basename maybe_source_fn = do
    -- as the source, but can be overriden by a -odir flag.
    o_file <- odir_ify (basename ++ '.':phaseInputExt Ln) >>= osuf_ify
 
-   return (Just (mkHomeModule mod_name,
-                 ModuleLocation{
-                    ml_hspp_file = Nothing,
-		    ml_hs_file   = maybe_source_fn,
-		    ml_hi_file   = hi_file,
-		    ml_obj_file  = Just o_file
-	         }
-	))
+   return (mkHomeModule mod_name,
+           ModuleLocation{ ml_hspp_file = Nothing
+	   		 , ml_hs_file   = maybe_source_fn
+			 , ml_hi_file   = hi_file
+			 , ml_obj_file  = Just o_file
+			 })
 
-
-findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findPackageModule mod_name = do
+findPackageMod :: ModuleName
+	       -> Bool
+	       -> IO (Maybe (Module, ModuleLocation))
+findPackageMod mod_name hiOnly = do
   pkgs <- getPackageInfo
 
-  -- hi-suffix for packages depends on the build tag.
+   -- hi-suffix for packages depends on the build tag.
   package_hisuf <-
 	do tag <- readIORef v_Build_tag
 	   if null tag
 		then return "hi"
 		else return (tag ++ "_hi")
-
-  let mod_str  = moduleNameUserString mod_name 
+  let imp_dirs = concatMap (\ pkg -> map ((,) pkg) (import_dirs pkg)) pkgs
+      mod_str  = moduleNameUserString mod_name 
       basename = map (\c -> if c == '.' then '/' else c) mod_str
-      hi = basename ++ '.':package_hisuf
-
-  found <- findOnPackagePath pkgs hi
-  case found of
-	Nothing -> return Nothing
-	Just (pkg_name,path) ->
-	    return (Just (mkModule mod_name pkg_name,
-			  ModuleLocation{ 
-                                ml_hspp_file = Nothing,
-				ml_hs_file   = Nothing,
-				ml_hi_file   = path ++ '/':hi,
-				ml_obj_file  = Nothing
-			   }
-		   ))
-
-findOnPackagePath :: [PackageConfig] -> String
-   -> IO (Maybe (PackageName,FilePath))
-findOnPackagePath pkgs file = loop pkgs
+  searchPathExts
+  	imp_dirs basename
+        ((package_hisuf,\ pkg fName path -> mkPackageModule mod_name pkg Nothing path) :
+      	  -- can packages contain hi-boots?
+	 (if hiOnly then [] else
+	  [ ("hs",  \ pkg fName path -> mkPackageModule mod_name pkg (Just fName) path)
+	  , ("lhs", \ pkg fName path -> mkPackageModule mod_name pkg (Just fName) path)
+	  ]))
  where
-  loop [] = return Nothing
-  loop (p:ps) = do
-    found <- findOnPath (import_dirs p) file
-    case found of
-	Nothing   -> loop ps
-	Just path -> return (Just (mkFastString (name p), path))
+  mkPackageModule mod_name pkg mbFName path =
+    return ( mkModule mod_name (mkFastString (name pkg))
+           , ModuleLocation{ ml_hspp_file = Nothing
+		 	   , ml_hs_file   = mbFName
+			   , ml_hi_file   = path ++".hi"
+			   , ml_obj_file  = Nothing
+			   })
 
-findOnPath :: [String] -> String -> IO (Maybe FilePath)
+findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findPackageModule mod_name = findPackageMod mod_name True
+
+searchPathExts :: [(a, FilePath)]
+	       -> String
+	       -> [(String, a -> FilePath -> String -> IO (Module, ModuleLocation))] 
+	       -> IO (Maybe (Module, ModuleLocation))
+searchPathExts path basename exts = search exts
+  where
+    search         [] = return Nothing
+    search ((x,f):xs) = do
+        let fName = (basename ++ '.':x)
+        found <- findOnPath path fName
+        case found of
+   	    -- special case to avoid getting "./foo.<ext>" all the time
+	  Just (v,".")  -> fmap Just (f v fName basename)
+	  Just (v,path) -> fmap Just (f v (path ++ '/':fName)
+	  		                  (path ++ '/':basename))
+	  Nothing   -> search xs
+
+findOnPath :: [(a,String)] -> String -> IO (Maybe (a, FilePath))
 findOnPath path s = loop path
  where
   loop [] = return Nothing
-  loop (d:ds) = do
+  loop ((a,d):ds) = do
     let file = d ++ '/':s
     b <- doesFileExist file
-    if b then return (Just d) else loop ds
+    if b then return (Just (a,d)) else loop ds
 \end{code}

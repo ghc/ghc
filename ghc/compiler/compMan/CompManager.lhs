@@ -1046,7 +1046,7 @@ summariseFile file
 
         let (path, basename, ext) = splitFilename3 file
 
-	Just (mod, location)
+	(mod, location)
 	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) (Just file)
 
         src_timestamp
