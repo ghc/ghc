@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.18 2001/11/21 10:09:16 simonmar Exp $
+ * $Id: Stable.c,v 1.19 2001/12/20 16:12:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -231,6 +231,18 @@ getStablePtr(StgPtr p)
   sn = lookupStableName(p);
   stable_ptr_table[sn].ref++;
   return (StgStablePtr)(sn);
+}
+
+void
+freeStablePtr(StgStablePtr sp)
+{
+    StgWord sn = (StgWord)sp;
+    
+    ASSERT(sn < SPT_size
+	   && stable_ptr_table[sn].addr != NULL
+	   && stable_ptr_table[sn].ref > 0);
+    
+    stable_ptr_table[sn].ref --;
 }
 
 void

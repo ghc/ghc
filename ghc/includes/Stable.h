@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.11 2001/12/12 14:03:30 simonmar Exp $
+ * $Id: Stable.h,v 1.12 2001/12/20 16:12:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -42,30 +42,13 @@ extern DLL_IMPORT_RTS snEntry *stable_ptr_free;
 
 extern DLL_IMPORT_RTS unsigned int SPT_size;
 
+extern void freeStablePtr(StgStablePtr sp);
+
 extern inline StgPtr
 deRefStablePtr(StgStablePtr sp)
 {
     ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);
     return stable_ptr_table[(StgWord)sp].addr;
-}
-    
-extern inline void
-freeStablePtr(StgStablePtr sp)
-{
-    StgWord sn = (StgWord)sp;
-    
-    ASSERT(sn < SPT_size
-	   && stable_ptr_table[sn].addr != NULL
-	   && stable_ptr_table[sn].ref > 0);
-    
-    stable_ptr_table[sn].ref --;
-}
-
-extern inline StgStablePtr
-splitStablePtr(StgStablePtr sp)
-{
-    stable_ptr_table[(StgWord)sp].ref ++;
-    return sp;
 }
 
 /* No deRefStableName, because the existence of a stable name doesn't
