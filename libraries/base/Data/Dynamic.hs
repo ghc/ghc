@@ -37,8 +37,7 @@ module Data.Dynamic
 	-- | This section is useful if you need to define your own
 	-- instances of 'Typeable'.
 
-	Typeable(
-	     typeOf),	-- :: a -> TypeRep
+	Typeable( typeOf ),	-- :: a -> TypeRep
 
 	-- ** Building concrete type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -76,6 +75,7 @@ import GHC.Err
 import GHC.Num
 import GHC.Float
 import GHC.IOBase
+import GHC.List( lookup, foldl )
 #endif
 
 #ifdef __HUGS__
@@ -96,6 +96,12 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 #else
 #include "Dynamic.h"
 #endif
+
+-------------------------------------------------------------
+--
+--		The type Dynamic
+--
+-------------------------------------------------------------
 
 {-|
   A value of type 'Dynamic' is an object encapsulated together with its type.
@@ -132,45 +138,6 @@ type Obj = forall a . a
 #elif !defined(__HUGS__)
 data Obj = Obj
 #endif
-
--- | A concrete representation of a (monomorphic) type.  'TypeRep'
--- supports reasonably efficient equality.
-#ifndef __HUGS__
-data TypeRep
- = App TyCon   [TypeRep] 
- | Fun TypeRep TypeRep
-   deriving ( Eq )
-#endif
-
-instance Show TypeRep where
-  showsPrec p (App tycon tys) =
-    case tys of
-      [] -> showsPrec p tycon
-      [x] | tycon == listTc    -> showChar '[' . shows x . showChar ']'
-      xs  
-        | isTupleTyCon tycon -> showTuple tycon xs
-	| otherwise	     ->
-	    showParen (p > 9) $
-   	    showsPrec p tycon . 
-	    showChar ' '      . 
-	    showArgs tys
-
-  showsPrec p (Fun f a) =
-     showParen (p > 8) $
-     showsPrec 9 f . showString " -> " . showsPrec 8 a
-
--- | An abstract representation of a type constructor.  'TyCon' objects can
--- be built using 'mkTyCon'.
-#ifndef __HUGS__
-data TyCon = TyCon Int String
-
-instance Eq TyCon where
-  (TyCon t1 _) == (TyCon t2 _) = t1 == t2
-#endif
-
-instance Show TyCon where
-  showsPrec _ (TyCon _ s) = showString s
-
 
 -- | Converts an arbitrary value into an object of type 'Dynamic'.  
 --
@@ -209,14 +176,59 @@ fromDynamic (Dynamic t v) =
     r | t == typeOf r -> Just r
       | otherwise     -> Nothing
 
--- | The class 'Typeable' allows a concrete representation of a type to
--- be calculated.
-class Typeable a where
-  typeOf :: a -> TypeRep
-  -- ^ Takes a value of type @a@ and returns a concrete representation
-  -- of that type.  The /value/ of the argument should be ignored by
-  -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
-  -- the argument.
+-- (f::(a->b)) `dynApply` (x::a) = (f a)::b
+dynApply :: Dynamic -> Dynamic -> Maybe Dynamic
+dynApply (Dynamic t1 f) (Dynamic t2 x) =
+  case applyTy t1 t2 of
+    Just t3 -> Just (Dynamic t3 ((unsafeCoerce f) x))
+    Nothing -> Nothing
+
+dynApp :: Dynamic -> Dynamic -> Dynamic
+dynApp f x = case dynApply f x of 
+             Just r -> r
+             Nothing -> error ("Type error in dynamic application.\n" ++
+                               "Can't apply function " ++ show f ++
+                               " to argument " ++ show x)
+
+-------------------------------------------------------------
+--
+--		Type representations
+--
+-------------------------------------------------------------
+
+-- | A concrete representation of a (monomorphic) type.  'TypeRep'
+-- supports reasonably efficient equality.
+#ifndef __HUGS__
+data TypeRep = TypeRep !Key TyCon [TypeRep] 
+
+-- Compare keys for equality
+instance Eq TypeRep where
+  (TypeRep k1 _ _) == (TypeRep k2 _ _) = k1 == k2
+
+-- | An abstract representation of a type constructor.  'TyCon' objects can
+-- be built using 'mkTyCon'.
+data TyCon = TyCon !Key String
+
+instance Eq TyCon where
+  (TyCon t1 _) == (TyCon t2 _) = t1 == t2
+#endif
+
+instance Show TypeRep where
+  showsPrec p (TypeRep _ tycon tys) =
+    case tys of
+      [] -> showsPrec p tycon
+      [x]   | tycon == listTc -> showChar '[' . shows x . showChar ']'
+      [a,r] | tycon == funTc  -> showParen (p > 8) $
+			         showsPrec 9 a . showString " -> " . showsPrec 8 r
+      xs | isTupleTyCon tycon -> showTuple tycon xs
+	 | otherwise	     ->
+	    showParen (p > 9) $
+   	    showsPrec p tycon . 
+	    showChar ' '      . 
+	    showArgs tys
+
+instance Show TyCon where
+  showsPrec _ (TyCon _ s) = showString s
 
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TyCon _ (',':_)) = True
@@ -244,19 +256,11 @@ isTupleTyCon _		       = False
 -- 'Typeable', try to ensure that only one call to 'mkTyCon' exists
 -- for each type constructor (put it at the top level, and annotate the
 -- corresponding definition with a @NOINLINE@ pragma).
-mkTyCon
-	:: String	-- ^ the name of the type constructor (should be unique
+mkTyCon :: String	-- ^ the name of the type constructor (should be unique
 			-- in the program, so it might be wise to use the
 			-- fully qualified name).
 	-> TyCon	-- ^ A unique 'TyCon' object
-mkTyCon str = unsafePerformIO $ do
-   v <- readIORef uni
-   writeIORef uni (v+1)
-   return (TyCon v str)
-
-{-# NOINLINE uni #-}
-uni :: IORef Int
-uni = unsafePerformIO ( newIORef 0 )
+mkTyCon str = TyCon (mkTyConKey str) str
 
 -- Some (Show.TypeRep) helpers:
 
@@ -275,46 +279,57 @@ showTuple (TyCon _ str) args = showChar '(' . go str args
 
 
 -- | Applies a type constructor to a sequence of types
-mkAppTy  :: TyCon   -> [TypeRep] -> TypeRep
-mkAppTy tyc args = App tyc args
+mkAppTy  :: TyCon -> [TypeRep] -> TypeRep
+mkAppTy tc@(TyCon tc_k _) args 
+  = TypeRep (appKeys tc_k arg_ks) tc args
+  where
+    arg_ks = [k | TypeRep k _ _ <- args]
+
+funTc :: TyCon
+funTc = mkTyCon "->"
 
 -- | A special case of 'mkAppTy', which applies the function type constructor to
 -- a pair of types.
 mkFunTy  :: TypeRep -> TypeRep   -> TypeRep
-mkFunTy f a = Fun f a
+mkFunTy f a = mkAppTy funTc [f,a]
 
 -- Auxillary functions
-
--- (f::(a->b)) `dynApply` (x::a) = (f a)::b
-dynApply :: Dynamic -> Dynamic -> Maybe Dynamic
-dynApply (Dynamic t1 f) (Dynamic t2 x) =
-  case applyTy t1 t2 of
-    Just t3 -> Just (Dynamic t3 ((unsafeCoerce f) x))
-    Nothing -> Nothing
-
-dynApp :: Dynamic -> Dynamic -> Dynamic
-dynApp f x = case dynApply f x of 
-             Just r -> r
-             Nothing -> error ("Type error in dynamic application.\n" ++
-                               "Can't apply function " ++ show f ++
-                               " to argument " ++ show x)
 
 -- | Applies a type to a function type.  Returns: @'Just' u@ if the
 -- first argument represents a function of type @t -> u@ and the
 -- second argument represents a function of type @t@.  Otherwise,
 -- returns 'Nothing'.
 applyTy :: TypeRep -> TypeRep -> Maybe TypeRep
-applyTy (Fun t1 t2) t3
-  | t1 == t3    = Just t2
-applyTy _ _     = Nothing
+applyTy (TypeRep _ tc [t1,t2]) t3
+  | tc == funTc && t1 == t3	= Just t2
+applyTy _ _     		= Nothing
+
+
+-------------------------------------------------------------
+--
+--	The Typeable class and some instances
+--
+-------------------------------------------------------------
+
+-- | The class 'Typeable' allows a concrete representation of a type to
+-- be calculated.
+class Typeable a where
+  typeOf :: a -> TypeRep
+  -- ^ Takes a value of type @a@ and returns a concrete representation
+  -- of that type.  The /value/ of the argument should be ignored by
+  -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
+  -- the argument.
 
 -- Prelude types
-
 listTc :: TyCon
 listTc = mkTyCon "[]"
 
 instance Typeable a => Typeable [a] where
-  typeOf ls = mkAppTy listTc [typeOf ((undefined:: [a] -> a) ls)]
+  typeOf ls = mkAppTy listTc [typeOf ((undefined :: [a] -> a) ls)]
+	-- In GHC we can say
+	--	typeOf (undefined :: a)
+	-- using scoped type variables, but we use the 
+	-- more verbose form here, for compatibility with Hugs
 
 unitTc :: TyCon
 unitTc = mkTyCon "()"
@@ -348,7 +363,6 @@ instance ( Typeable a
 			      typeOf ((undefined :: (a,b,c,d) -> b) tu),
 			      typeOf ((undefined :: (a,b,c,d) -> c) tu),
 			      typeOf ((undefined :: (a,b,c,d) -> d) tu)]
-
 tup5Tc :: TyCon
 tup5Tc = mkTyCon ",,,,"
 
@@ -382,7 +396,7 @@ INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
 INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
 
-INSTANCE_TYPEABLE0(Int8,int8Tc, "Int8")
+INSTANCE_TYPEABLE0(Int8,int8Tc,"Int8")
 INSTANCE_TYPEABLE0(Int16,int16Tc,"Int16")
 INSTANCE_TYPEABLE0(Int32,int32Tc,"Int32")
 INSTANCE_TYPEABLE0(Int64,int64Tc,"Int64")
@@ -392,10 +406,44 @@ INSTANCE_TYPEABLE0(Word16,word16Tc,"Word16")
 INSTANCE_TYPEABLE0(Word32,word32Tc,"Word32")
 INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
-INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
+INSTANCE_TYPEABLE0(TyCon,tyconTc,  "TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 #endif
+
+---------------------------------------------
+--
+--		Internals 
+--
+---------------------------------------------
+
+newtype Key = Key Int deriving( Eq )
+
+appKeys :: Key -> [Key] -> Key
+appKeys k ks = foldl appKey k ks
+
+appKey :: Key -> Key -> Key
+appKey (Key k1) (Key k2)
+  = unsafePerformIO $ do
+	(v, cache) <- readIORef memo
+	case lookup (k1,k2) cache of
+	  Just k  -> return (Key k)
+	  Nothing -> do writeIORef memo (v+1, ((k1,k2),v) : cache)
+			return (Key v)
+
+memo :: IORef (Int, [((Int,Int),Int)])
+memo = unsafePerformIO (newIORef (1000, []))
+	-- 1000, yuk!
+
+mkTyConKey :: String -> Key
+mkTyConKey str = unsafePerformIO $ do
+		   v <- readIORef uni
+		   writeIORef uni (v+1)
+		   return (str `seq` Key v)
+
+{-# NOINLINE uni #-}
+uni :: IORef Int
+uni = unsafePerformIO ( newIORef 0 )
