@@ -915,7 +915,6 @@ sub setupOptimiseFlags {
 #LATER:	'-fcalc-inlinings2', -- pointless for 2.01
 
       # stg2stg passes
-	'-fupdate-analysis',
 	'-flambda-lift',
 	$Oopt_FinalStgProfilingMassage,
 	$Oopt_StgStats,
@@ -925,6 +924,7 @@ sub setupOptimiseFlags {
 
       # SPECIAL FLAGS for -O2
 	($OptLevel == 2) ? (
+	  '-fupdate-analysis',	# virtually useless; relegated to -O2
 	  '-fsemi-tagging',
 	) : (),
       );
