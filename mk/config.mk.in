@@ -233,6 +233,22 @@ GhcLibHcOpts=-O -Rghc-timing
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 DLLized=@EnableWin32DLLs@
 
+# Win32 only: are we building a compiler that tries to reduce external
+# dependencies? i.e., one that doesn't assume that the user has got
+# the cygwin toolchain installed on his/her Win32 box.
+#
+# GHC is still dependent on GNU tools in the backend (gcc to further process
+# .c/.hc/.s/.o files + 'perl' to mangle and split), but using this
+# option a GHC distribution can be put together which includes a minimal
+# set of these open source tools).
+#
+# One reason why this is a good thing is that it saves the user installing
+# something like cygwin first. Another positive effect of a GHC install now
+# being self-contained is that it will continue to work even if the user
+# installs a different C compiler (this has caused version problems in the
+# past).
+MinimalUnixDeps=@MinimalUnixDeps@
+
 # Don't split object files for libs if we're building DLLs, or booting from
 # .hc files.
 SplitObjs=YES
