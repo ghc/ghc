@@ -1,5 +1,3 @@
-* doc strings for: function arguments
-
 * more compact rendering for datatypes, like
 	data T = -- comment for T
 	   A	 -- comment for A
@@ -8,11 +6,14 @@
 * instances: list relevant instances in the documentation for classes and
   datatypes.
 
+* attributes for individual declarations, eg.
+    -- #abstract
+  or targetted to a specific decl:
+    -- #T: abstract
+
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
   we should inline just the exported bits).
-
-* Put SrcLocs in DocComments
 
 * facilities for saving interfaces so that you can run Haddock against
   something that isn't the Prelude.
@@ -25,14 +26,10 @@
 
 * Add back-references from the definition to the uses of types/classes
   (perhaps in the index?)
-
 * In the contents page, indicate portability/stability of each module
   somehow.
 
 * remove extra whitespace from the generated HTML to save space
-
-* To clean up: various warnings are emitted with trace rather than
-  being propagated back to the top level properly.
 
 * split large modules into several pages (perhaps split at each
   section 1 heading?)
@@ -56,6 +53,3 @@
 * clean up the layout: don't use table cellspacing, use CSS instead
 
 * implicit parameter support in the parser.
-
-* Allow a qualified name in a doc string to point to the entity even if it
-  isn't in scope.
