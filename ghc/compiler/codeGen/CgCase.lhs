@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.55 2001/12/05 17:35:13 sewardj Exp $
+% $Id: CgCase.lhs,v 1.56 2001/12/17 12:33:45 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -185,7 +185,17 @@ cgCase (StgOpApp op args _)
     absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
 \end{code}
 
-Special case #2: inline PrimOps.
+Special case #2: case of literal.
+
+\begin{code}
+cgCase (StgLit lit) live_in_whole_case live_in_alts bndr srt alts =
+  absC (CAssign (CTemp (getUnique bndr) (idPrimRep bndr)) (CLit lit)) `thenC`
+  case alts of 
+      StgPrimAlts tycon alts deflt -> cgPrimInlineAlts bndr tycon alts deflt
+      other -> pprPanic "cgCase: case of literal has strange alts" (pprStgAlts alts)
+\end{code}
+
+Special case #3: inline PrimOps.
 
 \begin{code}
 cgCase (StgOpApp op@(StgPrimOp primop) args _) 
