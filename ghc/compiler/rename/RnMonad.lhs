@@ -405,6 +405,7 @@ thenRn   :: RnM s d a -> (a -> RnM s d b) -> RnM s d b
 thenRn_  :: RnM s d a -> RnM s d b -> RnM s d b
 andRn    :: (a -> a -> a) -> RnM s d a -> RnM s d a -> RnM s d a
 mapRn    :: (a -> RnM s d b) -> [a] -> RnM s d [b]
+mapMaybeRn :: (a -> RnM s d b) -> b -> Maybe a -> RnM s d b
 sequenceRn :: [RnM s d a] -> RnM s d [a]
 foldlRn :: (b  -> a -> RnM s d b) -> b -> [a] -> RnM s d b
 mapAndUnzipRn :: (a -> RnM s d (b,c)) -> [a] -> RnM s d ([b],[c])
@@ -445,6 +446,9 @@ mapAndUnzip3Rn f (x:xs)
   = f x		    	`thenRn` \ (r1,  r2,  r3)  ->
     mapAndUnzip3Rn f xs	`thenRn` \ (rs1, rs2, rs3) ->
     returnRn (r1:rs1, r2:rs2, r3:rs3)
+
+mapMaybeRn f def Nothing  = returnRn def
+mapMaybeRn f def (Just v) = f v
 \end{code}
 
 
