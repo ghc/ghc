@@ -283,7 +283,8 @@ data ParsedIface
       pi_exports   :: [ExportItem],			-- Exports
       pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
-      pi_rules	   :: [RdrNameRuleDecl]			-- Rules
+      pi_rules	   :: [RdrNameRuleDecl],		-- Rules
+      pi_deprecs   :: [(Maybe FAST_STRING, FAST_STRING)] -- Deprecations, the type is currently only a hack
     }
 
 type InterfaceDetails = (WhetherHasOrphans,

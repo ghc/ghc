@@ -109,6 +109,7 @@ import Ratio ( (%) )
  '__U'		{ ITunfold $$ }
  '__S'		{ ITstrict $$ }
  '__R'		{ ITrules }
+ '__D'		{ ITdeprecated }
  '__M'		{ ITcprinfo $$ }
 
  '..'		{ ITdotdot }  			-- reserved symbols
@@ -166,9 +167,10 @@ import Ratio ( (%) )
 
 iface_stuff :: { IfaceStuff }
 iface_stuff : iface		{ let (nm, iff) = $1 in PIface nm iff }
-      	    | type		{ PType   $1 }
-      	    | id_info		{ PIdInfo $1 }
-	    | '__R' rules	{ PRules  $2 }
+      	    | type		{ PType    $1 }
+      	    | id_info		{ PIdInfo  $1 }
+	    | '__R' rules	{ PRules   $2 }
+	    | '__D' deprecs	{ PDeprecs $2 }
 
 
 iface		:: { (ModuleName, ParsedIface) }
@@ -177,7 +179,7 @@ iface		: '__interface' mod_fs INTEGER orphans checkVersion 'where'
                   import_part
 		  instance_decl_part
 		  decls_part
-		  rules_part
+		  rules_and_deprecs
 		  { ( $2                        -- Module name
 		    , ParsedIface {
 			pi_mod = fromInteger $3, 	-- Module version
@@ -186,7 +188,8 @@ iface		: '__interface' mod_fs INTEGER orphans checkVersion 'where'
 			pi_usages  = $8,	-- Usages
 			pi_insts   = $9,	-- Local instances
 			pi_decls   = $10,	-- Decls
-		 	pi_rules   = $11	-- Rules 
+		 	pi_rules   = fst $11,	-- Rules 
+		 	pi_deprecs = snd $11	-- Deprecations 
 		      } ) }
 
 --------------------------------------------------------------------------
@@ -312,31 +315,41 @@ decl    : src_loc var_name '::' type maybe_idinfo
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
-	      | src_loc PRAGMA	{ \x -> 
-				   case parseIface $2
-				           PState{bol = 0#, atbol = 1#,
-						  context = [],
-						  glasgow_exts = 1#,
-						  loc = $1 } of
+	      | pragma		{ \x -> case $1 of
 				     POk _ (PIdInfo id_info) -> id_info
 				     PFailed err -> 
 				        pprPanic "IdInfo parse failed" 
 				            (vcat [ppr x, err])
 				}
 
+pragma	:: { ParseResult IfaceStuff }
+pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,
+							context = [],
+							glasgow_exts = 1#,
+							loc = $1 }
+				}
+
 -----------------------------------------------------------------------------
 
-rules_part :: { [RdrNameRuleDecl] }
-rules_part : {- empty -}	{ [] }
-	   | src_loc PRAGMA	{ case parseIface $2 
-				           PState{bol = 0#, atbol = 1#,
-						  context = [],
-						  glasgow_exts = 1#,
-						  loc = $1 }  of
-				     POk _ (PRules rules) -> rules
-				     PFailed err -> 
-					  pprPanic "Rules parse failed" err
+rules_and_deprecs :: { ([RdrNameRuleDecl], [(Maybe FAST_STRING, FAST_STRING)]) }
+rules_and_deprecs : {- empty -}	{ ([], []) }
+		  | rules_and_deprecs rule_or_deprec
+				{ let
+				     append2 (xs1,ys1) (xs2,ys2) =
+					(xs1 `app` xs2, ys1 `app` ys2)
+				     xs `app` [] = xs -- performance paranoia
+				     xs `app` ys = xs ++ ys
+				  in append2 $1 $2
 				}
+
+rule_or_deprec :: { ([RdrNameRuleDecl], [(Maybe FAST_STRING, FAST_STRING)]) }
+rule_or_deprec : pragma	{ case $1 of
+			     POk _ (PRules   rules)   -> (rules,[])
+			     POk _ (PDeprecs deprecs) -> ([],deprecs)
+			     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
+			}
+
+-----------------------------------------------------------------------------
 
 rules	   :: { [RdrNameRuleDecl] }
 	   : {- empty -}	{ [] }
@@ -349,6 +362,20 @@ rule	   : src_loc STRING rule_forall qvar_name
 rule_forall	:: { [UfBinder RdrName] }
 rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
 		  
+-----------------------------------------------------------------------------
+
+deprecs 	:: { [(Maybe FAST_STRING, FAST_STRING)] }
+deprecs		: {- empty -}		{ [] }
+		| deprecs ';' deprec	{ $3 : $1 }
+
+deprec		:: { (Maybe FAST_STRING, FAST_STRING) }
+deprec		: STRING		{ (Nothing, $1) }
+		| deprec_name STRING	{ (Just $1, $2) }
+
+deprec_name	:: { FAST_STRING }
+		: var_fs		{ $1 }
+		| tc_fs			{ $1 }
+
 -----------------------------------------------------------------------------
 
 version		:: { Version }
@@ -826,6 +853,7 @@ data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]
 		| PType		RdrNameHsType
 		| PRules	[RdrNameRuleDecl]
+		| PDeprecs	[(Maybe FAST_STRING, FAST_STRING)]
 
 mkConDecl name (ex_tvs, ex_ctxt) details loc = ConDecl name ex_tvs ex_ctxt details loc
 }
