@@ -23,6 +23,7 @@ import Distribution.ParseUtils	( showError )
 import Distribution.Package
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory )
+import Compat.RawSystem 	( rawSystem )
 import Control.Exception	( evaluate )
 import qualified Control.Exception as Exception
 
@@ -46,8 +47,7 @@ import Data.Char	( isSpace )
 import Monad
 import Directory
 import System	( getArgs, getProgName,
-		  system, exitWith,
-		  ExitCode(..)
+		  exitWith, ExitCode(..)
 		)
 import System.IO
 import Data.List ( isPrefixOf, isSuffixOf, intersperse )
@@ -603,15 +603,12 @@ autoBuildGHCiLib dir batch_file ghci_file = do
       batch_lib_file = dir ++ '/':batch_file
   hPutStr stderr ("building GHCi library " ++ ghci_lib_file ++ "...")
 #if defined(darwin_TARGET_OS)
-  r <- system("ld -r -x -o " ++ ghci_lib_file ++ 
-		 " -all_load " ++ batch_lib_file)
+  r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"-all_load",batch_lib_file]
 #elif defined(mingw32_HOST_OS)
   execDir <- getExecDir "/bin/ghc-pkg.exe"
-  r <- system (maybe "" (++"/gcc-lib/") execDir++"ld -r -x -o " ++ 
-		ghci_lib_file ++ " --whole-archive " ++ batch_lib_file)
+  r <- rawSystem (maybe "" (++"/gcc-lib/") execDir++"ld") ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
 #else
-  r <- system("ld -r -x -o " ++ ghci_lib_file ++ 
-		 " --whole-archive " ++ batch_lib_file)
+  r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
 #endif
   when (r /= ExitSuccess) $ exitWith r
   hPutStrLn stderr (" done.")
