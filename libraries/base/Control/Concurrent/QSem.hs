@@ -22,6 +22,9 @@ module Control.Concurrent.QSem
 
 import Prelude
 import Control.Concurrent.MVar
+import Data.Typeable
+
+#include "Typeable.h"
 
 -- General semaphores are also implemented readily in terms of shared
 -- @MVar@s, only have to catch the case when the semaphore is tried
@@ -33,6 +36,8 @@ import Control.Concurrent.MVar
 -- |A 'QSem' is a simple quantity semaphore, in which the available
 -- \"quantity\" is always dealt with in units of one.
 newtype QSem = QSem (MVar (Int, [MVar ()]))
+
+INSTANCE_TYPEABLE0(QSem,qSemTc,"QSem")
 
 -- |Build a new 'QSem'
 newQSem :: Int -> IO QSem
