@@ -752,6 +752,11 @@ PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 # build system for ghc/compiler isn't set up to handle it.
 SplitObjs = NO
 
+# the package build system likes to set WAYS=$(GhcLibWays), but we don't 
+# really want to build the whole of GHC multiple ways... if you do,
+# set GhcCompilerWays instead.
+GhcLibWays = $(GhcCompilerWays)
+
 # override default definition of HS_IFACES so we can add $(odir)
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 endif
