@@ -98,7 +98,7 @@ getEnv name = do
         else ioError (IOError Nothing NoSuchThing "getEnv"
 			("environment variable: " ++ name))
 
-foreign import ccall "libHS_cbits.so" "getenv" primGetEnv :: PrimByteArray -> IO Addr
+foreign import ccall "libHS_cbits.so" "getenv" unsafe primGetEnv :: PrimByteArray -> IO Addr
 \end{code}
 
 Computation $system cmd$ returns the exit code
@@ -124,7 +124,7 @@ system cmd = do
         -1 -> constructErrorAndFailWithInfo "system" cmd
         n  -> return (ExitFailure n)
 
-foreign import ccall "libHS_cbits.so" "systemCmd" primSystem :: PrimByteArray -> IO Int
+foreign import ccall "libHS_cbits.so" "systemCmd" unsafe primSystem :: PrimByteArray -> IO Int
 \end{code}
 
 @exitWith code@ terminates the program, returning {\em code} to the program's caller.
@@ -142,7 +142,7 @@ exitWith (ExitFailure n)
     primExit n
     ioError (IOError Nothing OtherError "exitWith" "exit should not return")
 
-foreign import ccall "libHS_cbits.so" "exit" primExit :: Int -> IO ()
+foreign import ccall "libHS_cbits.so" "exit" unsafe primExit :: Int -> IO ()
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
