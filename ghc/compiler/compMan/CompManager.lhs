@@ -70,10 +70,11 @@ cmGetExpr :: CmState
 	  -> DynFlags
           -> ModuleName
           -> String
+          -> Bool
           -> IO (CmState, Maybe (HValue, PrintUnqualified, Type))
-cmGetExpr cmstate dflags modname expr
+cmGetExpr cmstate dflags modname expr wrap_print
    = do (new_pcs, maybe_stuff) <- 
-	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr
+	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr wrap_print
         case maybe_stuff of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
 	   Just (bcos, print_unqual, ty) -> do

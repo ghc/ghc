@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.25 2001/01/10 17:19:01 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.26 2001/01/16 17:09:43 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -14,7 +14,6 @@ module InteractiveUI (interactiveUI) where
 import CompManager
 import CmStaticInfo
 import DriverFlags
-import DriverUtil
 import DriverState
 import Linker
 import Module
@@ -36,6 +35,7 @@ import CPUTime
 import Directory
 import IO
 import Char
+import Monad ( when )
 
 
 -----------------------------------------------------------------------------
@@ -118,7 +118,8 @@ interactiveUI cmstate mod = do
 			      current_module = this_mod,
 	  	              target = mod,
 			      cmstate = cmstate',
-			      options = [ShowTiming]}
+			      options = [ShowTiming],
+                              last_expr = Nothing}
    return ()
 
 uiLoop :: GHCi ()
@@ -162,23 +163,34 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand expr            = do timeIt (evalExpr expr
-                                       >> evalExpr "Prelude.putStr \"\n\"")
-                               return False
+doCommand expr
+   = do expr_expanded <- expandExpr expr
+        -- io (putStrLn ( "Before: " ++ expr ++ "\nAfter:  " ++ expr_expanded))
+        expr_ok <- timeIt (do ok <- evalExpr expr_expanded
+                              when ok (evalExpr "PrelIO.putChar \'\\n\'" >> return ())
+                              return ok)
+        when expr_ok (rememberExpr expr_expanded)
+        return False
 
+-- Returned Bool indicates whether or not the expr was successfully
+-- parsed, renamed and typechecked.
+evalExpr :: String -> GHCi Bool
 evalExpr expr
+ | null (filter (not.isSpace) expr)
+ = return False
+ | otherwise
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
       (new_cmstate, maybe_stuff) <- 
-      	 io (cmGetExpr (cmstate st) dflags (current_module st) expr)
+      	 io (cmGetExpr (cmstate st) dflags (current_module st) expr True)
       setGHCiState st{cmstate = new_cmstate}
       case maybe_stuff of
-      	 Nothing -> return ()
+      	 Nothing -> return False
       	 Just (hv, unqual, ty)
 	   -> do io (cmRunExpr hv)
 		 b <- isOptionSet ShowType
-		 if b then io (printForUser stdout unqual (text "::" <+> ppr ty))
-		      else return ()
+		 io (when b (printForUser stdout unqual (text "::" <+> ppr ty)))
+                 return True
 	
 {-
   let (mod,'.':str) = break (=='.') expr
@@ -275,7 +287,7 @@ typeOfExpr str
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
        (st, maybe_ty) <- io (cmGetExpr (cmstate st) dflags 
-				(current_module st) str)
+				(current_module st) str False)
        case maybe_ty of
 	 Nothing -> return ()
 	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty)) 
@@ -374,6 +386,45 @@ optToStr :: GHCiOption -> String
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 
+
+-----------------------------------------------------------------------------
+-- Code to do last-expression-entered stuff.  (a.k.a the $$ facility)
+
+-- Take a string and replace $$s in it with the last expr, if any.
+expandExpr :: String -> GHCi String
+expandExpr str
+   = do mle <- getLastExpr
+        return (outside mle str)
+     where
+        outside mle ('$':'$':cs)
+           = case mle of
+                Just le -> " (" ++ le ++ ") " ++ outside mle cs
+                Nothing -> outside mle cs
+
+        outside mle []           = []
+        outside mle ('"':str)    = '"' : inside2 mle str   -- "
+        outside mle ('\'':str)   = '\'' : inside1 mle str   -- '
+        outside mle (c:cs)       = c : outside mle cs
+
+        inside2 mle ('"':cs)  = '"' : outside mle cs   -- "
+        inside2 mle (c:cs)    = c : inside2 mle cs
+        inside2 mle []        = []
+
+        inside1 mle ('\'':cs) = '\'': outside mle cs
+        inside1 mle (c:cs)    = c : inside1 mle cs
+        inside1 mle []        = []
+
+
+rememberExpr :: String -> GHCi ()
+rememberExpr str
+   = do let cleaned = (clean . reverse . clean . reverse) str
+        let forget_me_not | null cleaned = Nothing
+                          | otherwise    = Just cleaned
+        setLastExpr forget_me_not
+     where
+        clean = dropWhile isSpace
+
+
 -----------------------------------------------------------------------------
 -- GHCi monad
 
@@ -383,7 +434,8 @@ data GHCiState = GHCiState
 	current_module :: ModuleName,
 	target         :: Maybe FilePath,
 	cmstate        :: CmState,
-	options        :: [GHCiOption]
+	options        :: [GHCiOption],
+        last_expr      :: Maybe String
      }
 
 data GHCiOption = ShowTiming | ShowType deriving Eq
@@ -413,6 +465,14 @@ unsetOption :: GHCiOption -> GHCi ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
+
+getLastExpr :: GHCi (Maybe String)
+getLastExpr
+ = do st <- getGHCiState ; return (last_expr st)
+
+setLastExpr :: Maybe String -> GHCi ()
+setLastExpr last_expr
+ = do st <- getGHCiState ; setGHCiState (st{last_expr = last_expr})
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 

@@ -398,10 +398,11 @@ hscExpr
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module			-- Context for compiling
   -> String			-- The expression
+  -> Bool			-- Should we wrap print if not IO-typed?
   -> IO ( PersistentCompilerState, 
 	  Maybe (UnlinkedBCOExpr, PrintUnqualified, Type) )
 
-hscExpr dflags hst hit pcs0 this_module expr
+hscExpr dflags hst hit pcs0 this_module expr wrap_print
    = do {
 	maybe_parsed <- hscParseExpr dflags expr;
 	case maybe_parsed of
@@ -429,10 +430,10 @@ hscExpr dflags hst hit pcs0 this_module expr
 			    Nothing -> False }
             };
 
-        if (not is_IO_type)
+        if (wrap_print && not is_IO_type)
 		then do (new_pcs, maybe_stuff)
-			  <- hscExpr dflags hst hit pcs2 this_module 
-				("print (" ++ expr ++ ")")
+			  <- hscExpr dflags hst hit pcs2 this_module
+				("print (" ++ expr ++ ")") False
 		        case maybe_stuff of
 			   Nothing -> return (new_pcs, maybe_stuff)
 			   Just (bcos, _, _) ->
