@@ -251,10 +251,10 @@ instantiated before use.
 \begin{code}
 mkTemplateLocals :: [Type] -> [Id]
 mkTemplateLocals tys
-  = zipWith mk (getBuiltinUniques (length tys)) tys
+  = zipWith3 mk (getBuiltinUniques (length tys)) tys [1..]
   where
-    mk uniq ty = mkVanillaId (mkSysLocalName uniq SLIT("tpl") mkBuiltinSrcLoc)
-			     ty noIdInfo
+    mk uniq ty n = mkVanillaId (mkSysLocalName uniq (_PK_ ("x"++show n)) mkBuiltinSrcLoc)
+			       ty noIdInfo
 \end{code}
 
 

@@ -40,7 +40,7 @@ import MkId		( mkDataCon, mkSuperDictSelId,
 			  mkMethodSelId, mkDefaultMethodId
 			)
 import Id		( Id, StrictnessMark(..),
-			  getIdUnfolding, idType
+			  getIdUnfolding, idType, idName
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
@@ -404,28 +404,27 @@ tcDefaultMethodBinds clas default_binds
 
 	-- Typecheck the default bindings
     let
-	tc_dm meth_bind
-	  | not (maybeToBool maybe_stuff)
-	  =	-- Binding for something that isn't in the class signature
-	    failWithTc (badMethodErr bndr_name clas)
+	tc_dm meth_bind 
+ 	  = case [pair | pair@(sel_id,_) <- sel_ids_w_dms,
+		  	 idName sel_id == bndr_name] of
 
-	  | otherwise
-	  =	-- Normal case
-	    tcMethodBind clas origin inst_tys clas_tyvars sel_id meth_bind [{- No prags -}]
+		[] -> 	-- Binding for something that isn't in the class signature
+		       failWithTc (badMethodErr bndr_name clas)
+	
+		((sel_id, Just dm_id):_) ->
+			-- We're looking at a default-method binding, so the dm_id
+			-- is sure to be there!  Hence the inner "Just".
+			-- Normal case
+
+			tcMethodBind clas origin inst_tys clas_tyvars
+				     sel_id meth_bind [{- No prags -}]
 						`thenTc` \ (bind, insts, (_, local_dm_id)) ->
-	    returnTc (bind, insts, (clas_tyvars, RealId dm_id, local_dm_id))
+			returnTc (bind, insts, (clas_tyvars, RealId dm_id, local_dm_id))
 	  where
 	    bndr_name  = case meth_bind of
 				FunMonoBind name _ _ _		-> name
 				PatMonoBind (VarPatIn name) _ _ -> name
 				
-	    maybe_stuff = assocMaybe assoc_list (nameOccName bndr_name)
-	    assoc_list  = [ (getOccName sel_id, pair) 
-			  | pair@(sel_id, dm_ie) <- op_sel_ids `zip` defm_ids
-			  ]
-	    Just (sel_id, Just dm_id) = maybe_stuff
-		 -- We're looking at a default-method binding, so the dm_id
-		 -- is sure to be there!  Hence the inner "Just".
     in	   
     mapAndUnzip3Tc tc_dm 
 	(flatten default_binds [])		`thenTc` \ (defm_binds, insts_needed, abs_bind_stuff) ->
@@ -454,6 +453,7 @@ tcDefaultMethodBinds clas default_binds
 
   where
     (tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
+    sel_ids_w_dms =  op_sel_ids `zip` defm_ids
     origin = ClassDeclOrigin
 
     flatten EmptyMonoBinds rest	      = rest
@@ -481,19 +481,25 @@ tcMethodBind
 
 tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind prags
  = tcAddSrcLoc src_loc	 		        $
-   newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
-   tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
+   newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
+   tcInstSigTcType (idType meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
    let
 	(theta', tau')  = splitRhoTy rho_ty'
-	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' src_loc
+	sig_info        = TySigInfo meth_name meth_id tyvars' theta' tau' src_loc
+	meth_name	= idName meth_id
+	meth_bind'	= case meth_bind of
+			    FunMonoBind _ fix matches loc    -> FunMonoBind meth_name fix matches loc
+			    PatMonoBind (VarPatIn _) rhs loc -> PatMonoBind (VarPatIn meth_name) rhs loc
+		-- The renamer just puts the selector ID as the binder in the method binding
+		-- but we must use the method name; so we substitute it here.  Crude but simple.
    in
-   tcExtendLocalValEnv [bndr_name] [local_meth_id] (
+   tcExtendLocalValEnv [meth_name] [meth_id] (
 	tcPragmaSigs prags
    )						`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
 
    tcExtendGlobalTyVars inst_tyvars (
      tcAddErrCtxt (methodCtxt sel_id)		$
-     tcBindWithSigs NotTopLevel [bndr_name] meth_bind [sig_info]
+     tcBindWithSigs NotTopLevel [meth_name] meth_bind' [sig_info]
 		    NonRecursive prag_info_fn 	
    )							`thenTc` \ (binds, insts, _) ->
 
@@ -502,16 +508,16 @@ tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind prags
 	-- have not been unified with anything in the environment
    tcAddErrCtxt (monoCtxt sel_id) (
      tcAddErrCtxt (sigCtxt sel_id) $
-     checkSigTyVars inst_tyvars (idType local_meth_id)
+     checkSigTyVars inst_tyvars (idType meth_id)
    )							`thenTc_` 
 
    returnTc (binds `AndMonoBinds` prag_binds, 
 	     insts `plusLIE` prag_lie, 
 	     meth)
  where
-   (bndr_name, src_loc) = case meth_bind of
-				FunMonoBind name _ _ loc	  -> (name, loc)
-				PatMonoBind (VarPatIn name) _ loc -> (name, loc)
+   src_loc = case meth_bind of
+		FunMonoBind name _ _ loc	  -> loc
+		PatMonoBind (VarPatIn name) _ loc -> loc
 \end{code}
 
 Contexts and errors

@@ -12,7 +12,7 @@ module Specialise (
 #include "HsVersions.h"
 
 import MkId		( mkUserLocal )
-import Id		( Id, DictVar, idType, 
+import Id		( Id, DictVar, idType, mkTemplateLocals,
 
 			  getIdSpecialisation, setIdSpecialisation, isSpecPragmaId,
 
@@ -26,7 +26,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, instantiateTy, isDictTy,
 			  tyVarsOfType, tyVarsOfTypes, applyTys, mkForAllTys
 			)
 import TyCon		( TyCon )
-import TyVar		( TyVar,
+import TyVar		( TyVar, alphaTyVars,
 			  TyVarSet, mkTyVarSet, isEmptyTyVarSet, intersectTyVarSets,
 			   	    elementOfTyVarSet, unionTyVarSets, emptyTyVarSet,
 			  TyVarEnv, mkTyVarEnv, delFromTyVarEnv
@@ -710,7 +710,7 @@ specBind (NonRec bndr rhs) body_uds
 
   | isSpecPragmaId bndr
   = specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
-    returnSM ([], rhs_uds)
+    returnSM ([], rhs_uds `plusUDs` body_uds)
 
   | otherwise
   =   -- Deal with the RHS, specialising it according
@@ -779,7 +779,7 @@ specDefn calls (fn, rhs)
     (tyvars, theta, tau) = splitSigmaTy fn_type
     n_tyvars		 = length tyvars
     n_dicts		 = length theta
-    mk_spec_tys call_ts  = zipWith mk_spec_ty call_ts tyvars
+    mk_spec_tys call_ts  = zipWith mk_spec_ty call_ts alphaTyVars
                          where
                            mk_spec_ty (Just ty) _     = ty
                            mk_spec_ty Nothing   tyvar = mkTyVarTy tyvar
@@ -793,11 +793,6 @@ specDefn calls (fn, rhs)
     calls_for_me = case lookupFM calls fn of
 			Nothing -> []
 			Just cs -> fmToList cs
-
-    -- Filter out calls for which we already have a specialisation
-    calls_to_spec        = filter spec_me calls_for_me
-    spec_me (call_ts, _) = not (maybeToBool (lookupSpecEnv id_spec_env (mk_spec_tys call_ts)))
-    id_spec_env          = getIdSpecialisation fn
 
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
@@ -817,13 +812,14 @@ specDefn calls (fn, rhs)
 		-- 	f1 = /\ b d -> (..rhs of f..) t1 b t3 d d1 d2
 		-- and the type of this binder
         let
-           spec_tyvars = [tyvar | (tyvar, Nothing) <- tyvars `zip` call_ts]
+           spec_tyvars = [tyvar | (tyvar, Nothing) <- alphaTyVars `zip` call_ts]
 	   spec_tys    = mk_spec_tys call_ts
 	   spec_rhs    = mkTyLam spec_tyvars $
                          mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds)
   	   spec_id_ty  = mkForAllTys spec_tyvars (instantiateTy ty_env tau)
 	   ty_env      = mkTyVarEnv (zipEqual "spec_call" tyvars spec_tys)
 	in
+
 	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
 
 
@@ -833,8 +829,11 @@ specDefn calls (fn, rhs)
 		-- dictionaries, so it's tidier to make new local variables
 		-- for the lambdas in the RHS, rather than lambda-bind the
 		-- dictionaries themselves.
-	mapSM (\d -> newIdSM d (idType d)) call_ds	`thenSM` \ arg_ds ->
+		--
+		-- In fact we use the standard template locals, so that the
+		-- they don't need to be "tidied" before putting in interface files
 	let
+	   arg_ds	 = mkTemplateLocals (map idType call_ds)
 	   spec_env_rhs  = mkValLam arg_ds $
 			   mkTyApp (Var spec_f) $
 			   map mkTyVarTy spec_tyvars
@@ -1074,6 +1073,7 @@ dictRhsFVs e
   = go e
   where
     go (App e1 (VarArg a)) = go e1 `addOneToIdSet` a
+    go (App e1 (LitArg l)) = go e1
     go (App e1 (TyArg t))  = go e1
     go (Var v)	           = unitIdSet v
     go (Lit l)	           = emptyIdSet

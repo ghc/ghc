@@ -39,6 +39,7 @@ import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon,
 import Name
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet, unionManyUniqSets, UniqSet )
+import Unique		( assertIdKey )
 import Util		( removeDups )
 import Outputable
 \end{code}
@@ -249,23 +250,15 @@ rnExpr :: RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
   = lookupOccRn v	`thenRn` \ name ->
-    case res of
-      Left (nm,err) 
-        | opt_GlasgowExts && v == assertRdrName -> 
-            -- if `assert' is not in scope,
-	    -- we expand it to (GHCerr.assert__ location)
-           mkAssertExpr  `thenRn` \ (expr, assert_name) ->
-	   returnRn (expr, unitNameSet assert_name)
-
-        | otherwise -> -- a failure after all.
-	   failWithRn nm err `thenRn_`
-           returnRn (HsVar nm, if isLocallyDefined nm
-			       then unitNameSet nm
-			       else emptyUniqSet)
-      Right vname -> 
-       returnRn (HsVar vname, if isLocallyDefined vname
-			      then unitNameSet vname
-			      else emptyUniqSet)
+    if nameUnique name == assertIdKey then
+	-- We expand it to (GHCerr.assert__ location)
+        mkAssertExpr  `thenRn` \ expr ->
+	returnRn (expr, emptyUniqSet)
+    else
+        -- The normal case
+       returnRn (HsVar name, if isLocallyDefined name
+			     then unitNameSet name
+			     else emptyUniqSet)
 
 rnExpr (HsLit lit) 
   = litOccurrence lit		`thenRn_`
@@ -732,7 +725,7 @@ litOccurrence (HsLitLit _)
 %************************************************************************
 
 \begin{code}
-mkAssertExpr :: RnMS s (RenamedHsExpr, Name)
+mkAssertExpr :: RnMS s RenamedHsExpr
 mkAssertExpr =
   newImportedGlobalName mod occ HiFile `thenRn` \ name ->
   addOccurrenceName name	       `thenRn_`
@@ -741,7 +734,7 @@ mkAssertExpr =
    expr = HsApp (HsVar name)
 	        (HsLit (HsString (_PK_ (showSDoc (ppr sloc)))))
   in
-  returnRn (expr, name)
+  returnRn expr
 
   where
    mod = rdrNameModule assertErr_RDR

@@ -484,7 +484,7 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id
 	sel_name	  = idName sel_id
 	meth_occ	  = getOccName sel_name
 	default_meth_name = mkLocalName uniq meth_occ loc
-	maybe_meth_bind   = find meth_occ meth_binds 
+	maybe_meth_bind   = find sel_name meth_binds 
         the_meth_bind     = case maybe_meth_bind of
 				  Just stuff -> stuff
 				  Nothing    -> mk_default_bind default_meth_name loc
@@ -503,14 +503,14 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id
   where
     origin = InstanceDeclOrigin 	-- Poor
 
-    find occ EmptyMonoBinds 	  = Nothing
-    find occ (AndMonoBinds b1 b2) = find occ b1 `seqMaybe` find occ b2
+    find sel EmptyMonoBinds 	  = Nothing
+    find sel (AndMonoBinds b1 b2) = find sel b1 `seqMaybe` find sel b2
 
-    find occ b@(FunMonoBind op_name _ _ _)          | nameOccName op_name == occ = Just b
-						    | otherwise		  = Nothing
-    find occ b@(PatMonoBind (VarPatIn op_name) _ _) | nameOccName op_name == occ = Just b
-						    | otherwise		  = Nothing
-    find occ other = panic "Urk! Bad instance method binding"
+    find sel b@(FunMonoBind op_name _ _ _)          | op_name == sel = Just b
+						    | otherwise	     = Nothing
+    find sel b@(PatMonoBind (VarPatIn op_name) _ _) | op_name == sel = Just b
+						    | otherwise      = Nothing
+    find sel other = panic "Urk! Bad instance method binding"
 
 
     mk_default_bind local_meth_name loc

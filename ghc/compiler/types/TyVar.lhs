@@ -37,7 +37,7 @@ import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM, delFromUFM,
 import BasicTypes	( Unused, unused )
 import Name		( mkSysLocalName, mkLocalName, Name, NamedThing(..), OccName )
 import SrcLoc		( noSrcLoc, SrcLoc )
-import Unique		( mkAlphaTyVarUnique, Unique, Uniquable(..) )
+import Unique		( initTyVarUnique, incrUnique, Unique, Uniquable(..) )
 import Util		( zipEqual )
 import Outputable
 \end{code}
@@ -95,10 +95,10 @@ Fixed collection of type variables
 	-- openAlphaTyVar is prepared to be instantiated
 	-- to a boxed or unboxed type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
-openAlphaTyVar = TyVar (mkAlphaTyVarUnique 1) mkTypeKind Nothing unused
+openAlphaTyVar = TyVar initTyVarUnique mkTypeKind Nothing unused
 
 alphaTyVars = [ TyVar u mkBoxedTypeKind Nothing unused
-	      | u <- map mkAlphaTyVarUnique [2..] ]
+	      | u <- iterate incrUnique initTyVarUnique]
 
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
 

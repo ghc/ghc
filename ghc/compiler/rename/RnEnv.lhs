@@ -276,37 +276,61 @@ ifaceFlavour name = case getNameProvenance name of
 Looking up a name in the RnEnv.
 
 \begin{code}
-lookupRn :: NameEnv -> RdrName -> RnMS s Name
-lookupRn name_env rdr_name
-  = case lookupFM name_env rdr_name of
+checkUnboundRn :: RdrName -> Maybe Name -> RnMS s Name
+checkUnboundRn rdr_name (Just name) 
+  = 	-- Found it!
+     returnRn name
 
-	-- Found it!
-	Just name -> returnRn name
-
-	-- Not found
-	Nothing -> getModeRn	`thenRn` \ mode ->
-		   case mode of 
-			-- Not found when processing source code; so fail
-			SourceMode    -> failWithRn (mkUnboundName rdr_name)
-					            (unknownNameErr rdr_name)
+checkUnboundRn rdr_name Nothing
+  =	-- Not found by lookup
+    getModeRn	`thenRn` \ mode ->
+    case mode of 
+	-- Not found when processing source code; so fail
+	SourceMode    -> failWithRn (mkUnboundName rdr_name)
+			            (unknownNameErr rdr_name)
 		
-			-- Not found when processing an imported declaration,
-			-- so we create a new name for the purpose
-			InterfaceMode _ -> 
-			    case rdr_name of
+	-- Not found when processing an imported declaration,
+	-- so we create a new name for the purpose
+	InterfaceMode _ _ -> 
+	    case rdr_name of
+		Qual mod_name occ hif -> newImportedGlobalName mod_name occ hif
 
-				Qual mod_name occ hif -> newGlobalName mod_name occ hif
-
-				-- An Unqual is allowed; interface files contain 
-				-- unqualified names for locally-defined things, such as
-				-- constructors of a data type.
-				Unqual occ -> getModuleRn 	`thenRn ` \ mod_name ->
-					      newGlobalName mod_name occ HiFile
+		-- An Unqual is allowed; interface files contain 
+		-- unqualified names for locally-defined things, such as
+		-- constructors of a data type.
+		Unqual occ -> getModuleRn 	`thenRn ` \ mod_name ->
+			      newImportedGlobalName mod_name occ HiFile
 
 
 lookupBndrRn rdr_name
-  = getNameEnv 			`thenRn` \ name_env ->
-    lookupRn name_env rdr_name
+  = lookupNameRn rdr_name		`thenRn` \ maybe_name ->
+    checkUnboundRn rdr_name maybe_name	`thenRn` \ name ->
+
+    if isLocalName name then
+	returnRn name
+    else
+
+	----------------------------------------------------
+	-- OK, so we're at the binding site of a top-level defn
+	-- Check to see whether its an imported decl
+    getModeRn		`thenRn` \ mode ->
+    case mode of {
+	  SourceMode -> returnRn name ;
+
+	  InterfaceMode _ print_unqual_fn -> 
+
+	----------------------------------------------------
+	-- OK, the binding site of an *imported* defn
+	-- so we can make the provenance more informative
+    getSrcLocRn		`thenRn` \ src_loc ->
+    let
+	name' = case getNameProvenance name of
+		    NonLocalDef _ hif _ -> setNameProvenance name 
+						(NonLocalDef src_loc hif (print_unqual_fn name'))
+		    other		-> name
+    in
+    returnRn name'
+    }
 
 -- Just like lookupRn except that we record the occurrence too
 -- Perhaps surprisingly, even wired-in names are recorded.
@@ -314,17 +338,25 @@ lookupBndrRn rdr_name
 -- deciding which instance declarations to import.
 lookupOccRn :: RdrName -> RnMS s Name
 lookupOccRn rdr_name
-  = getNameEnv 			`thenRn` \ name_env ->
-    lookupRn name_env rdr_name	`thenRn` \ name ->
-    addOccurrenceName name
+  = lookupNameRn rdr_name		`thenRn` \ maybe_name ->
+    checkUnboundRn rdr_name maybe_name	`thenRn` \ name ->
+    let
+	name' = mungePrintUnqual rdr_name name
+    in
+    addOccurrenceName name'
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment.  It's used for record field names only.
+-- environment.  It's used only for
+--	record field names
+--	class op names in class and instance decls
 lookupGlobalOccRn :: RdrName -> RnMS s Name
 lookupGlobalOccRn rdr_name
-  = getGlobalNameEnv		`thenRn` \ name_env ->
-    lookupRn name_env rdr_name	`thenRn` \ name ->
-    addOccurrenceName name
+  = lookupGlobalNameRn rdr_name		`thenRn` \ maybe_name ->
+    checkUnboundRn rdr_name maybe_name	`thenRn` \ name ->
+    let
+	name' = mungePrintUnqual rdr_name name
+    in
+    addOccurrenceName name'
 
 
 -- mungePrintUnqual is used to make *imported* *occurrences* print unqualified

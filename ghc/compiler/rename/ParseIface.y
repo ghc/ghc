@@ -486,8 +486,13 @@ id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
 		| strict_info				{ HsStrictness $1 }
 		| BOTTOM 				{ HsStrictness HsBottom }
 		| UNFOLD_PART core_expr			{ HsUnfold $1 $2 }
-                | SPECIALISE OBRACK tv_bndrs CBRACK 
-                     atypes EQUAL core_expr             { HsSpecialise $3 $5 $7 }
+                | SPECIALISE spec_tvs
+                     atypes EQUAL core_expr             { HsSpecialise $2 $3 $5 }
+
+
+spec_tvs	:: { [HsTyVar RdrName] }
+spec_tvs	: OBRACK tv_bndrs CBRACK 		{ $2 }
+	
 
 arity_info	:: { ArityInfo }
 arity_info	: INTEGER					{ exactArity (fromInteger $1) }

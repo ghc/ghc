@@ -198,7 +198,7 @@ simplBinder env (id, occ_info)
 
        -- id2 has its SpecEnv zapped
        id2 | isEmptySpecEnv spec_env = id1
-           | otherwise               = setIdSpecialisation id spec_env'
+           | otherwise               = setIdSpecialisation id1 spec_env'
     in
     if not_in_scope then
 	-- No need to clone, but we *must* zap any current substitution

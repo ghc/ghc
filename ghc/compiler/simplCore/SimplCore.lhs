@@ -34,7 +34,7 @@ import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
 import MkId		( mkSysLocal, mkUserId )
-import Id		( setIdVisibility, 
+import Id		( setIdVisibility, getIdSpecialisation, setIdSpecialisation,
                           getIdDemandInfo, idType,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
  			  lookupIdEnv, IdEnv, 
@@ -62,8 +62,9 @@ import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
 import Specialise
+import SpecEnv		( substSpecEnv, isEmptySpecEnv )
 import StrictAnal	( saWwTopBinds )
-import TyVar		( TyVar, nameTyVar )
+import TyVar		( TyVar, nameTyVar, emptyTyVarEnv )
 import Unique		( Unique{-instance Eq-}, Uniquable(..),
 			  integerTyConKey, ratioTyConKey,
 			  mkUnique, incrUnique,
@@ -72,7 +73,7 @@ import Unique		( Unique{-instance Eq-}, Uniquable(..),
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, 
                           splitUniqSupply, getUnique
 		        )
-import UniqFM           ( UniqFM, lookupUFM, addToUFM )
+import UniqFM           ( UniqFM, lookupUFM, addToUFM, delFromUFM )
 import Util		( mapAccumL )
 import SrcLoc		( noSrcLoc )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
@@ -608,19 +609,49 @@ mapTM f (x:xs) = f x	`thenTM` \ r ->
 
 \begin{code}
 -- Need to extend the environment when we munge a binder, so that occurrences
--- of the binder will print the correct way (i.e. as a global not a local)
+-- of the binder will print the correct way (e.g. as a global not a local)
 mungeTopBinder :: Id -> (Id -> TopTidyM a) -> TopTidyM a
 mungeTopBinder id thing_inside mod env us
   =  	-- Give it a new print-name unless it's an exported thing
 	-- setNameVisibility also does the local/global thing
     let
-	(id', us')  | isExported id = (id, us)
+	(id1, us')  | isExported id = (id, us)
 		    | otherwise
 		    = (setIdVisibility (Just mod) us id, 
 		       incrUnique us)
-	new_env    = addToUFM env id (ValBinder id')
+
+	-- Tidy the Id's SpecEnv
+	spec_env   = getIdSpecialisation id
+	id2 | isEmptySpecEnv spec_env = id1
+	    | otherwise		      = setIdSpecialisation id1 (tidySpecEnv env spec_env)
+
+	new_env    = addToUFM env id (ValBinder id2)
     in
-    thing_inside id' mod new_env us'
+    thing_inside id2 mod new_env us'
+
+tidySpecEnv env spec_env
+  = substSpecEnv 
+	emptyTyVarEnv		-- Top level only
+	(tidy_spec_rhs env)
+	spec_env
+  where
+	-- tidy_spec_rhs is another horrid little hacked-up function for
+	-- the RHS of specialisation templates.
+	-- It assumes there is no type substitution.
+	--
+	-- See also SimplVar.substSpecEnvRhs Urgh
+    tidy_spec_rhs env (Var v) = case lookupUFM env v of
+				  Just (ValBinder v') -> Var v'
+				  Nothing	      -> Var v
+    tidy_spec_rhs env (App f (VarArg v)) = App (tidy_spec_rhs env f) (case lookupUFM env v of
+								        Just (ValBinder v') -> VarArg v'
+								        Nothing	            -> VarArg v)
+    tidy_spec_rhs env (App f arg) = App (tidy_spec_rhs env f) arg
+    tidy_spec_rhs env (Lam b e)   = Lam b (tidy_spec_rhs env' e)
+				  where
+				    env' = case b of
+					     ValBinder id -> delFromUFM env id
+					     TyBinder _   -> env
 
 mungeTopBinders []     k = k []
 mungeTopBinders (b:bs) k = mungeTopBinder b	$ \ b' ->

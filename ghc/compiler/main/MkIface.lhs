@@ -315,10 +315,12 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------  Specialisations --------------
     spec_pretty = hsep (map pp_spec (specEnvToList (getIdSpecialisation id)))
     pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("_P_"),
-				       brackets (interpp'SP tyvars),
+				       if null tyvars then ptext SLIT("[ ]")
+						      else brackets (interpp'SP tyvars),
+					-- The lexer interprets "[]" as a CONID.  Sigh.
 				       hsep (map pprParendType tys),
 				       ptext SLIT("="),
-				       ppr rhs
+				       pprIfaceUnfolding rhs
 				 ]					
     
     ------------  Extra free Ids  --------------

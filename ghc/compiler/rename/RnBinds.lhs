@@ -25,7 +25,7 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, 
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, lookupGlobalOccRn,
 			  newLocalNames, isUnboundName, warnUnusedBinds
 			)
 import CmdLineOpts	( opt_SigsRequired )
@@ -341,23 +341,21 @@ rnMethodBinds (AndMonoBinds mb1 mb2)
   = andRn AndMonoBinds (rnMethodBinds mb1)
 		       (rnMethodBinds mb2)
 
-rnMethodBinds (FunMonoBind occname inf matches locn)
+rnMethodBinds (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				   $
-    mapRn (checkPrecMatch inf occname) matches	`thenRn_`
+    mapRn (checkPrecMatch inf name) matches	`thenRn_`
 
-    newLocalNames [(occname, locn)]		`thenRn` \ [op_name] ->
-	-- Make a fresh local for the bound variable; it must be different
-	-- to occurrences of the same thing on the LHS, which refer to the global
-	-- selectors.
+    lookupGlobalOccRn name			`thenRn` \ sel_name -> 
+	-- We use the selector name as the binder
 
     mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, _) ->
-    returnRn (FunMonoBind op_name inf new_matches locn)
+    returnRn (FunMonoBind sel_name inf new_matches locn)
 
-rnMethodBinds (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
+rnMethodBinds (PatMonoBind (VarPatIn name) grhss_and_binds locn)
   = pushSrcLocRn locn			$
-    newLocalNames [(occname, locn)]	`thenRn` \ [op_name] ->
+    lookupGlobalOccRn name			`thenRn` \ sel_name -> 
     rnGRHSsAndBinds grhss_and_binds	`thenRn` \ (grhss_and_binds', _) ->
-    returnRn (PatMonoBind (VarPatIn op_name) grhss_and_binds' locn)
+    returnRn (PatMonoBind (VarPatIn sel_name) grhss_and_binds' locn)
 
 -- Can't handle method pattern-bindings which bind multiple methods.
 rnMethodBinds mbind@(PatMonoBind other_pat _ locn)

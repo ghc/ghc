@@ -53,6 +53,7 @@ import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
 			  IdSet )
 import PrimOp		( fragilePrimOp, primOpCanTriggerGC )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..) )
+import Name		( isExported )
 import Literal		( isNoRepLit )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
@@ -513,7 +514,9 @@ rule this out.  Since ManyOcc doesn't record FunOcc/ArgOcc
 inlineUnconditionally :: (Id,BinderInfo) -> Bool
 
 inlineUnconditionally (id, occ_info)
-  |  idMustNotBeINLINEd id = False
+  |  idMustNotBeINLINEd id 
+  || isExported id
+  =  False
 
   |  isOneSameSCCFunOcc occ_info
   && idWantsToBeINLINEd id = True
