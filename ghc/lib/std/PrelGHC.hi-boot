@@ -391,11 +391,6 @@ __export PrelGHC
   eqStableNamezh
   stableNameToIntzh
 
-  indexPtrOffClosurezh
-  indexWordOffClosurezh
-  setPtrOffClosurezh
-  setWordOffClosurezh
-
   reallyUnsafePtrEqualityzh
 
   newBCOzh
