@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.14 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: Prelude.h,v 1.15 2001/02/14 12:59:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -67,7 +67,6 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 
 #define stackOverflow_closure     (&PrelIOBase_stackOverflow_closure)
 #define heapOverflow_closure      (&PrelIOBase_heapOverflow_closure)
-#define PutFullMVar_closure       (&PrelIOBase_PutFullMVar_closure)
 #define BlockedOnDeadMVar_closure (&PrelIOBase_BlockedOnDeadMVar_closure)
 #define NonTermination_closure    (&PrelIOBase_NonTermination_closure)
 

@@ -46,6 +46,7 @@ __export PrelGHC
   takeMVarzh
   putMVarzh
   tryTakeMVarzh
+  tryPutMVarzh
   isEmptyMVarzh
   
   -- Parallel

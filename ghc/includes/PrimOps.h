@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.73 2001/01/24 15:37:34 simonmar Exp $
+ * $Id: PrimOps.h,v 1.74 2001/02/14 12:59:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -698,9 +698,9 @@ EXTFUN_RTS(newMutVarzh_fast);
 #define isEmptyMVarzh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &stg_EMPTY_MVAR_info )
 EXTFUN_RTS(newMVarzh_fast);
 EXTFUN_RTS(takeMVarzh_fast);
-EXTFUN_RTS(tryTakeMVarzh_fast);
 EXTFUN_RTS(putMVarzh_fast);
-
+EXTFUN_RTS(tryTakeMVarzh_fast);
+EXTFUN_RTS(tryPutMVarzh_fast);
 
 /* -----------------------------------------------------------------------------
    Delay/Wait PrimOps

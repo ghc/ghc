@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.15 2001/01/15 16:55:24 sewardj Exp $
+-- $Id: primops.txt,v 1.16 2001/02/14 12:59:35 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1001,8 +1001,23 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
+   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   with
+   usage            = { mangle TryTakeMVarOp [mkM, mkP] mkM }
+   has_side_effects = True
+   out_of_line      = True
+
 primop  PutMVarOp "putMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> State# s
+   with
+   strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
+   usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
+   has_side_effects = True
+   out_of_line      = True
+
+primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
+   MVar# s a -> a -> State# s -> (# State# s, Int# #)
    with
    strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
    usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
@@ -1013,13 +1028,6 @@ primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Bool
    with
    usage = { mangle SameMVarOp [mkP, mkP] mkM }
-
-primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
-   with
-   usage            = { mangle TryTakeMVarOp [mkM, mkP] mkM }
-   has_side_effects = True
-   out_of_line      = True
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)

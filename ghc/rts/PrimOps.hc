@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.71 2001/02/11 17:51:07 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.72 2001/02/14 12:59:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -876,6 +876,21 @@ FN_(takeMVarzh_fast)
   val = mvar->value;
   mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
+  /* wake up the first thread on the queue
+   */
+  if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+#if defined(GRAN) || defined(PAR)
+      /* ToDo: check 2nd arg (mvar) is right */
+      mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+#else
+      mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+#endif
+      if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+      }
+  }
+
   /* do this last... we might have locked the MVar in the SMP case,
    * and writing the info pointer will unlock it.
    */
@@ -917,6 +932,21 @@ FN_(tryTakeMVarzh_fast)
   val = mvar->value;
   mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
+  /* wake up the first thread on the queue
+   */
+  if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+#if defined(GRAN) || defined(PAR)
+      /* ToDo: check 2nd arg (mvar) is right */
+      mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+#else
+      mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+#endif
+      if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+      }
+  }
+
   /* do this last... we might have locked the MVar in the SMP case,
    * and writing the info pointer will unlock it.
    */
@@ -944,8 +974,21 @@ FN_(putMVarzh_fast)
 #endif
 
   if (info == &stg_FULL_MVAR_info) {
-    R1.cl = (StgClosure *)PutFullMVar_closure;
-    JMP_(raisezh_fast);
+    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      mvar->head = CurrentTSO;
+    } else {
+      mvar->tail->link = CurrentTSO;
+    }
+    CurrentTSO->link = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+    CurrentTSO->why_blocked = BlockedOnMVar;
+    CurrentTSO->block_info.closure = (StgClosure *)mvar;
+    mvar->tail = CurrentTSO;
+
+#ifdef SMP
+    /* unlock the MVar */
+    mvar->header.info = &stg_FULL_MVAR_info;
+#endif
+    BLOCK( R1_PTR | R2_PTR, putMVarzh_fast );
   }
   
   mvar->value = R2.cl;
@@ -955,10 +998,8 @@ FN_(putMVarzh_fast)
    */
   if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
     ASSERT(mvar->head->why_blocked == BlockedOnMVar);
-#if defined(GRAN)
-    mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
-#elif defined(PAR)
-    // ToDo: check 2nd arg (mvar) is right
+#if defined(GRAN) || defined(PAR)
+    /* ToDo: check 2nd arg (mvar) is right */
     mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
 #else
     mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
@@ -973,6 +1014,59 @@ FN_(putMVarzh_fast)
 
   /* ToDo: yield here for better communication performance? */
   JMP_(ENTRY_CODE(Sp[0]));
+  FE_
+}
+
+FN_(tryPutMVarzh_fast)
+{
+  StgMVar *mvar;
+  const StgInfoTable *info;
+
+  FB_
+  /* args: R1 = MVar, R2 = value */
+
+  mvar = (StgMVar *)R1.p;
+
+#ifdef SMP
+  info = LOCK_CLOSURE(mvar);
+#else
+  info = GET_INFO(mvar);
+#endif
+
+  if (info == &stg_FULL_MVAR_info) {
+
+#ifdef SMP
+    /* unlock the MVar */
+    mvar->header.info = &stg_FULL_MVAR_info;
+#endif
+
+    /* HACK: we need a pointer to pass back, so we abuse NO_FINALIZER_closure */
+    RET_N(0);
+  }
+  
+  mvar->value = R2.cl;
+
+  /* wake up the first thread on the queue, it will continue with the
+   * takeMVar operation and mark the MVar empty again.
+   */
+  if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+    ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+#if defined(GRAN) || defined(PAR)
+    /* ToDo: check 2nd arg (mvar) is right */
+    mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+#else
+    mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+#endif
+    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+    }
+  }
+
+  /* unlocks the MVar in the SMP case */
+  SET_INFO(mvar,&stg_FULL_MVAR_info);
+
+  /* ToDo: yield here for better communication performance? */
+  RET_N(1);
   FE_
 }
 
