@@ -282,7 +282,7 @@ knownKeyNames
 	-- Others
 	unsafeCoerceName, otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
-	eqStringName, assertName, runSTRepName,
+	eqStringName, assertName, assertErrorName, runSTRepName,
 	printName, splitName, fstName, sndName,
 	errorName,
 
@@ -611,7 +611,7 @@ augmentName	  = varQual pREL_BASE_Name FSLIT("augment")   augmentIdKey
 appendName	  = varQual pREL_BASE_Name FSLIT("++")        appendIdKey
 andName		  = varQual pREL_BASE_Name FSLIT("&&")	      andIdKey
 orName		  = varQual pREL_BASE_Name FSLIT("||")	      orIdKey
-assertName        = varQual pREL_BASE_Name FSLIT("assert")   assertIdKey
+assertName        = varQual pREL_BASE_Name FSLIT("assert")    assertIdKey
 lazyIdName	  = wVarQual pREL_BASE_Name FSLIT("lazy")     lazyIdKey
 
 -- PrelTup
@@ -791,6 +791,7 @@ newStablePtrName      = varQual  pREL_STABLE_Name FSLIT("newStablePtr") newStabl
 
 -- Error module
 errorName		 = wVarQual pREL_ERR_Name FSLIT("error")	        errorIdKey
+assertErrorName		 = wVarQual pREL_ERR_Name FSLIT("assertError")	        assertErrorIdKey
 recSelErrorName		 = wVarQual pREL_ERR_Name FSLIT("recSelError") 	        recSelErrorIdKey
 runtimeErrorName	 = wVarQual pREL_ERR_Name FSLIT("runtimeError")         runtimeErrorIdKey
 irrefutPatErrorName	 = wVarQual pREL_ERR_Name FSLIT("irrefutPatError")      irrefutPatErrorIdKey
@@ -1091,6 +1092,7 @@ andIdKey		      = mkPreludeMiscIdUnique 57
 orIdKey			      = mkPreludeMiscIdUnique 58
 thenIOIdKey		      = mkPreludeMiscIdUnique 59
 lazyIdKey		      = mkPreludeMiscIdUnique 60
+assertErrorIdKey	      = mkPreludeMiscIdUnique 61
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 80

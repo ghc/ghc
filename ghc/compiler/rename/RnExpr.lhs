@@ -37,7 +37,7 @@ import PrelNames	( hasKey, assertIdKey,
 			  ioDataConName, plusIntegerName, timesIntegerName,
 			  replicatePName, mapPName, filterPName,
 			  crossPName, zipPName, lengthPName, indexPName, toPName,
-			  enumFromToPName, enumFromThenToPName, assertName,
+			  enumFromToPName, enumFromThenToPName, assertErrorName,
 			  fromIntegerName, fromRationalName, minusName, negateName,
 			  qTyConName, monadNames )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
@@ -292,11 +292,13 @@ rnExpr :: RdrNameHsExpr -> RnM (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
   = lookupOccRn v	`thenM` \ name ->
-    if name `hasKey` assertIdKey then
-	-- We expand it to (GHCerr.assert__ location)
-        mkAssertExpr
+    if name `hasKey` assertIdKey && not opt_IgnoreAsserts then
+	-- We expand it to (GHC.Err.assertError location_string)
+        mkAssertErrorExpr
     else
-        -- The normal case
+        -- The normal case.  Even if the Id was 'assert', if we are 
+	-- ignoring assertions we leave it as GHC.Base.assert; 
+	-- this function just ignores its first arg.
        returnM (HsVar name, unitFV name)
 
 rnExpr (HsIPVar v)
@@ -930,30 +932,15 @@ rnOverLit (HsFractional i _)
 %************************************************************************
 
 \begin{code}
-mkAssertExpr :: RnM (RenamedHsExpr, FreeVars)
-mkAssertExpr
+mkAssertErrorExpr :: RnM (RenamedHsExpr, FreeVars)
+-- Return an expression for (assertError "Foo.hs:27")
+mkAssertErrorExpr
   = getSrcLocM    			`thenM` \ sloc ->
-
-    -- if we're ignoring asserts, return (\ _ e -> e)
-    -- if not, return (assertError "src-loc")
-
-    if opt_IgnoreAsserts then
-      newUnique				`thenM` \ uniq ->
-      let
-       vname = mkSystemName uniq FSLIT("v")
-       expr  = HsLam ignorePredMatch
-       loc   = nameSrcLoc vname
-       ignorePredMatch = mkSimpleMatch [WildPat placeHolderType, VarPat vname] 
- 				       (HsVar vname) placeHolderType loc
-      in
-      returnM (expr, emptyFVs)
-    else
-      let
-        expr = 
-          HsApp (HsVar assertName)
-	        (HsLit (HsStringPrim (mkFastString (stringToUtf8 (showSDoc (ppr sloc))))))
-      in
-      returnM (expr, unitFV assertName)
+    let
+	expr = HsApp (HsVar assertErrorName) (HsLit msg)
+	msg  = HsStringPrim (mkFastString (stringToUtf8 (showSDoc (ppr sloc))))
+    in
+    returnM (expr, unitFV assertErrorName)
 \end{code}
 
 %************************************************************************
