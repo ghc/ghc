@@ -13,7 +13,8 @@ import {-# SOURCE #-} RnHiFiles
 import HsSyn
 import RdrHsSyn		( RdrNameIE, RdrNameHsType, extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv, rdrEnvToList,
+			  mkRdrUnqual, mkRdrQual, 
+			  lookupRdrEnv, foldRdrEnv, rdrEnvToList, elemRdrEnv,
 			  unqualifyRdrName
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
@@ -492,13 +493,11 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
     	-- Warn about shadowing, but only in source modules
     let
       check_shadow (rdr_name,loc)
-	| isJust local || isJust global
+	|  rdr_name `elemRdrEnv` local_env 
+ 	|| rdr_name `elemRdrEnv` global_env 
 	= pushSrcLocRn loc $ addWarnRn (shadowedNameWarn rdr_name)
         | otherwise 
 	= returnRn ()
-	where
-	  local  = lookupRdrEnv local_env rdr_name
-	  global = lookupRdrEnv global_env rdr_name
     in
 
     (case mode of
