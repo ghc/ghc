@@ -38,8 +38,8 @@ SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
 
 #
 # Profiling options
-WAY_p_HC_OPTS += -prof -GPrelude
-WAY_mr_HC_OPTS += -prof -GPrelude
+WAY_p_HC_OPTS += -GPrelude
+WAY_mr_HC_OPTS += -GPrelude
 
 #
 # Object and interface files have suffixes tagged with their ways
@@ -49,11 +49,11 @@ SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
 # per-module flags
-
+ghc/ArrBase_HC_OPTS	     += -monly-2-regs
 glaExts/PackedString_HC_OPTS += -monly-3-regs
 required/Directory_HC_OPTS   += -monly-3-regs 
 concurrent/Parallel_HC_OPTS  += -fglasgow-exts
-required/Time_HC_OPTS        += -monly-3-regs -H10m
+required/Time_HC_OPTS        += -monly-3-regs -H12m
 
 # Far too much heap is needed to compile PrelNum with -O at the
 # moment, but there you go..
