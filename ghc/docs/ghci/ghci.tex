@@ -380,56 +380,57 @@ by supplying the package info the @newFinder@.
 
 \subsubsection{Implementing \mbox{\tt cmLoadModule}}
 
-\begin{itemize}
+\begin{enumerate}
 \item {\bf Downsweep:} using @finder@ and @summarise@, chase from 
       the given module to
       establish the new home module graph (MG).  Do not chase into
       package modules.
-\item Remove from the old module graph the upward closure of 
-      all modules which are now out of date.  Also remove any 
-      modules which wouldn't be reachable from the new root module.
-      \ToDo{De-woollify this.}
+\item Remove from HIT, HST, UI any modules in the old MG which are
+      not in the new one.  The old MG is then replaced by the new one.
+\item Topologically sort MG to generate a bottom-to-top traversal
+      order, giving a worklist.
+\item {\bf Upsweep:} call @compile@ on each module in the worklist in 
+      turn, passing it
+      the ``correct'' HST, PCS, the old @ModIFace@ if
+      available, and the summary.  ``Correct'' HST in the sense that
+      HST contains only the modules in the this module's downward
+      closure, so that @compile@ can construct the correct instance
+      and rule environments simply as the union of those in 
+      the module's downward closure.
 
-      Removing a module means also removing it from HST, UI and PLS,
-      but not from HIT.
+      If @compile@ doesn't return a new interface/linkable pair,
+      compilation wasn't necessary.  Either way, update HST with
+      the new @ModDetails@, and UI and HIT respectively if a 
+      compilation {\em did} occur.
 
-      Result: an up-to-date module graph, partitioned into 
-      modules which are in-date, and those needing recompiling.
+      Keep going until the root module is successfully done, or
+      compilation fails.
+      
+\item If the previous step terminated because compilation failed,
+      define the successful set as those modules in successfully
+      completed SCCs, i.e. all @Linkable@s returned by @compile@ excluding
+      those from modules in any cycle which includes the module which failed.
+      Remove from HST, HIT, UI and MG all modules mentioned in MG which 
+      are not in the successful set.  Call @link@ with the successful
+      set,
+      which should succeed.  The net effect is to back off to a point
+      in which those modules which are still aboard are correctly
+      compiled and linked.
 
-      Burble burble.
-\end{itemize}
-
-Pretty much as before.  \ToDo{... and what was Before?}
-
-Plus: detect module cycles during the downsweep.  During the upsweep,
-ensure that compilation failures for modules in cycles do not leave
-any of the global structures in an inconsistent state.  
-\begin{itemize}
-\item 
-   For PCS, that's never a problem because PCS doesn't hold any
-   information pertaining to home modules.
-\item 
-   HST and HIT: CM knows that these are mappings from @Module@ to
-   whatever, and can throw away entries from failed cycles, or,
-   equivalently, not commit updates to them until cycles succeed,
-   remembering of course to synthesise appropriate HSTs during
-   compilation of a cycle.
-\item 
-   UI -- a collection of @Linkable@s, between which there are no
-   direct refererences, so CM can remove additions from failed cycles
-   with no difficulty.
-\item 
-   OST -- linking is not carried out until the upsweep has
-   succeeded, so there's no problem here.
-\end{itemize}
-
-Plus: clear out the global data structures after the downsweep but
-before the upsweep.
-
-\ToDo{CM needs to supply a way for @compile@ to know which modules in
-      HST are in its downwards closure, and which not, so it can
-      correctly construct its instance environment.}
-
+      If the previous step terminated successfully, 
+      call @link@ passing it the @Linkable@s in the upward closure of
+      all those modules for which @compile@ produced a new @Linkable@.
+\end{enumerate}
+As a small optimisation, do this:
+\begin{enumerate}
+\item[3a.] Remove from the worklist any module M where M's source
+     hasn't changed and neither has the source of any module in M's
+     downward closure.  This has the effect of not starting the upsweep
+     right at the bottom of the graph when that's not needed.
+     Source-change checking can be done quickly by CM by comparing
+     summaries of modules in MG against corresponding 
+     summaries from the old MG.
+\end{enumerate}
 
 
 %%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
@@ -515,16 +516,15 @@ date.  There are three parts to it:
 
 \subsubsection{What {\tt compile} does}
 @compile@ is necessarily somewhat complex.  We've decided to do away
-with private global variables -- they make the design harder to
-understand and may interfere with CM's need to roll the system back
-to a consistent state following compilation failure for modules in 
-a cycle.  Without further ado:
+with private global variables -- they make the design specification
+less clear, although the implementation might use them.  Without
+further ado:
 \begin{verbatim}
    compile :: FLAGS       -- obvious
            -> Finder      -- to find modules
            -> ModSummary  -- summary, including source
-           -> Maybe (ModIFace, Linkable)
-                          -- former summary and code, if avail
+           -> Maybe ModIFace
+                          -- former summary, if avail
            -> HST         -- for home module ModDetails
            -> PCS         -- IN: the persistent compiler state
 
@@ -532,8 +532,9 @@ a cycle.  Without further ado:
 
    data CompResult
       = CompOK  ModDetails   -- new details (== HST additions)
-                (ModIFace, Linkable)
-                             -- summary and code; same as went in if
+                Maybe (ModIFace, Linkable)
+                             -- summary and code; Nothing => compilation
+                             -- not needed (old summary and code are still valid)
                              -- compilation was not needed
                 PCS          -- updated PCS
                 [SDoc]       -- warnings
@@ -573,10 +574,10 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
 
 \item
    If recompilation is not needed, create a new @ModDetails@ from the
-   old @ModIFace@, looking up information in HST and PCS.PST as necessary.
-   Return the new details, the old @ModIFace@ and @Linkable@, the PCS
-   \ToDo{I don't think the PCS should be updated, but who knows?}, and
-   an empty warning list.
+   old @ModIFace@, looking up information in HST and PCS.PST as
+   necessary.  Return the new details, a @Nothing@ denoting
+   compilation was not needed, the PCS \ToDo{I don't think the PCS
+   should be updated, but who knows?}, and an empty warning list.
 
 \item
    Otherwise, compilation is needed.  
