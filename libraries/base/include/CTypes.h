@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.5 2002/09/04 16:05:29 simonmar Exp $
+ * $Id: CTypes.h,v 1.6 2002/09/04 16:46:40 ross Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -21,7 +21,7 @@ INSTANCE_NUM(T) ; \
 INSTANCE_READ(T) ; \
 INSTANCE_SHOW(T) ; \
 INSTANCE_ENUM(T) ; \
-INSTANCE_STORABLE(T) : \
+INSTANCE_STORABLE(T) ; \
 INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
