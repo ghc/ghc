@@ -45,8 +45,6 @@ import GHC.Read (readLitChar, lexLitChar)
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude
-
-isLatin1 c = True
+import Hugs.Char
 #endif
 
