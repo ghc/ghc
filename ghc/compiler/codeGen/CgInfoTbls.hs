@@ -212,7 +212,7 @@ emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)
 				--    	(empty for vectored returns)
-   -> [CLabel]			-- Vector of return points 
+   -> [CmmLit]			-- Vector of return points 
 				-- 	(empty for non-vectored returns)
    -> SRT
    -> FCode CLabel
@@ -244,7 +244,7 @@ mkRetInfoTable
   :: Liveness		-- liveness
   -> C_SRT		-- SRT Info
   -> Int		-- type (eg. rET_SMALL)
-  -> [CLabel]		-- vector
+  -> [CmmLit]		-- vector
   -> ([CmmLit],[CmmLit])
 mkRetInfoTable liveness srt_info cl_type vector
   =  (std_info, extra_bits)
@@ -261,7 +261,7 @@ mkRetInfoTable liveness srt_info cl_type vector
  
 	liveness_lit = mkLivenessCLit liveness
 	std_info = mkStdInfoTable zeroCLit zeroCLit cl_type srt_len liveness_lit
-        extra_bits = srt_slot ++ map CmmLabel vector
+        extra_bits = srt_slot ++ vector
 
 
 emitDirectReturnTarget
@@ -302,24 +302,24 @@ emitAlgReturnTarget name branches mb_deflt srt ret_conv
     uniq = getUnique name 
     tag_expr = getConstrTag (CmmReg nodeReg)
 
-    emit_alt :: (Int, CgStmts) -> FCode (Int, CLabel)
+    emit_alt :: (Int, CgStmts) -> FCode (Int, CmmLit)
 	-- Emit the code for the alternative as a top-level
 	-- code block returning a label for it
     emit_alt (tag, stmts) = do	 { let lbl = mkAltLabel uniq tag
 				 ; blks <- cgStmtsToBlocks stmts
 				 ; emitProc [] lbl [] blks
-				 ; return (tag, lbl) }
+				 ; return (tag, CmmLabel lbl) }
 
     emit_deflt (Just stmts) = do { let lbl = mkDefaultLabel uniq
 				 ; blks <- cgStmtsToBlocks stmts
 				 ; emitProc [] lbl [] blks
-				 ; return lbl }
-    emit_deflt Nothing = return mkErrorStdEntryLabel
+				 ; return (CmmLabel lbl) }
+    emit_deflt Nothing = return (mkIntCLit 0)
 		-- Nothing case: the simplifier might have eliminated a case
 		-- 		 so we may have e.g. case xs of 
 		--					 [] -> e
 		-- In that situation the default should never be taken, 
-		-- so we just use mkErrorStdEntryLabel
+		-- so we just use a NULL pointer
 
 --------------------------------
 emitDirectReturnInstr :: Code

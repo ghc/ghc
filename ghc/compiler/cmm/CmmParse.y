@@ -229,9 +229,9 @@ info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' INT ',' INT maybe_vec ')'
 		{ retInfo $3 $5 $7 $9 $10 }
 
-maybe_vec :: { [CLabel] }
+maybe_vec :: { [CmmLit] }
 	: {- empty -}			{ [] }
-	| ',' NAME maybe_vec		{ mkRtsCodeLabelFS $2 : $3 }
+	| ',' NAME maybe_vec		{ CmmLabel (mkRtsCodeLabelFS $2) : $3 }
 
 body	:: { ExtCode }
 	: {- empty -}			{ return () }

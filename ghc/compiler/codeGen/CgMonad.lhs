@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.40 2004/08/13 13:06:03 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.41 2004/09/10 14:53:47 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -169,8 +169,8 @@ data Sequel
 
 type SemiTaggingStuff
   = Maybe			-- Maybe[1] we don't have any semi-tagging stuff...
-     ([(ConTagZ, CLabel)],	-- Alternatives
-      CLabel)			-- Default (will be a can't happen RTS label if can't happen)
+     ([(ConTagZ, CmmLit)],	-- Alternatives
+      CmmLit)			-- Default (will be a can't happen RTS label if can't happen)
 
 type ConTagZ = Int	-- A *zero-indexed* contructor tag
 

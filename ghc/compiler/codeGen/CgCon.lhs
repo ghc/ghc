@@ -296,7 +296,7 @@ cgReturnDataCon con amodes
 	      ->    -- Ho! We know the constructor so we can
 		    -- go straight to the right alternative
 		 case assocMaybe alts (dataConTagZ con) of {
-		    Just join_lbl -> build_it_then (jump_to join_lbl) ;
+		    Just join_lbl -> build_it_then (jump_to join_lbl);
 		    Nothing
 			-- Special case!  We're returning a constructor to the default case
 			-- of an enclosing case.  For example:
@@ -317,7 +317,7 @@ cgReturnDataCon con amodes
               | otherwise -> build_it_then (emitKnownConReturnCode con)
 	}
   where
-    jump_to lbl = stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+    jump_to lbl = stmtC (CmmJump (CmmLit lbl) [])
     build_it_then return_code
       = do { 	-- BUILD THE OBJECT IN THE HEAP
 	   	-- The first "con" says that the name bound to this
