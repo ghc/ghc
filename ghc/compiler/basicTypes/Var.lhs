@@ -9,7 +9,6 @@ module Var (
 	varName, varUnique, varInfo, varType,
 	setVarName, setVarUnique, setVarType, setVarOcc,
 
-
 	-- TyVars
 	TyVar,
 	tyVarName, tyVarKind,
@@ -157,9 +156,7 @@ mkTyVar name kind = Var { varName    = name
 			, realUnique = getKey (nameUnique name)
 			, varType    = kind
 			, varDetails = TyVar
-#ifdef DEBUG
-			, varInfo = pprPanic "looking at IdInfo of a tyvar" (ppr name)
-#endif
+			, varInfo    = pprPanic "mkTyVar" (ppr name)
 			}
 
 mkSysTyVar :: Unique -> Kind -> TyVar
@@ -167,9 +164,7 @@ mkSysTyVar uniq kind = Var { varName    = name
 			   , realUnique = getKey uniq
 			   , varType    = kind
 			   , varDetails = TyVar
-#ifdef DEBUG
-			   , varInfo = pprPanic "mkSysTyVar" (ppr name)
-#endif
+			   , varInfo    = pprPanic "mkSysTyVar" (ppr name)
 			   }
 		     where
 		       name = mkSysLocalName uniq SLIT("t")
@@ -177,18 +172,22 @@ mkSysTyVar uniq kind = Var { varName    = name
 newMutTyVar :: Name -> Kind -> IO TyVar
 newMutTyVar name kind = 
   do loc <- newIORef Nothing
-     return (Var { varName = name, 
-		   realUnique = getKey (nameUnique name),
-		   varType = kind, 
-		   varDetails = MutTyVar loc False})
+     return (Var { varName    = name
+		 , realUnique = getKey (nameUnique name)
+		 , varType    = kind
+		 , varDetails = MutTyVar loc False
+		 , varInfo    = pprPanic "newMutTyVar" (ppr name)
+		 })
 
 newSigTyVar :: Name -> Kind -> IO TyVar
 newSigTyVar name kind = 
   do loc <- newIORef Nothing
-     return (Var { varName = name, 
-		   realUnique = getKey (nameUnique name),
-		   varType = kind, 
-		   varDetails = MutTyVar loc True})
+     return (Var { varName    = name 
+		 , realUnique = getKey (nameUnique name)
+		 , varType    = kind
+		 , varDetails = MutTyVar loc True
+		 , varInfo    = pprPanic "newSigTyVar" (ppr name)
+		 })
 
 readMutTyVar :: TyVar -> IO (Maybe Type)
 readMutTyVar (Var {varDetails = MutTyVar loc _}) = readIORef loc
@@ -227,18 +226,20 @@ type UVar = Var
 
 \begin{code}
 mkUVar :: Unique -> UVar
-mkUVar unique = Var { varName    = mkSysLocalName unique SLIT("u"),
-		      realUnique = getKey unique,
-		      varDetails = UVar }
+mkUVar unique = Var { varName    = name
+		    , realUnique = getKey unique
+		    , varDetails = UVar
+		    , varType    = pprPanic "mkUVar (varType)" (ppr name)
+		    , varInfo    = pprPanic "mkUVar (varInfo)" (ppr name)
+		    }
+	      where name = mkSysLocalName unique SLIT("u")
 
 mkNamedUVar :: Name -> UVar
 mkNamedUVar name = Var { varName    = name
 		       , realUnique = getKey (nameUnique name)
 		       , varDetails = UVar
-#ifdef DEBUG
-		       , varType = pprPanic "looking at Type of a uvar" (ppr name)
-		       , varInfo = pprPanic "looking at IdInfo of a uvar" (ppr name)
-#endif
+		       , varType    = pprPanic "mkNamedUVar (varType)" (ppr name)
+		       , varInfo    = pprPanic "mkNamedUVar (varInfo)" (ppr name)
 		       }
 \end{code}
 
