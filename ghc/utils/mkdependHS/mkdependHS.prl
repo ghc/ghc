@@ -110,7 +110,7 @@ sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tm
 $SIG{'INT'}  = 'quit_upon_signal';
 $SIG{'QUIT'} = 'quit_upon_signal';
 
-&mangle_command_line_args();
+&mangle_command_line_args(@ARGV);
 
 if ( $Status ) {
     print stderr $Usage;
@@ -120,37 +120,9 @@ if ( $Status ) {
 @Import_dirs  = split(/:/,$Import_dirs);
 @Include_dirs = split(/\s+/,$Include_dirs); # still has -I's in it
 
-# set up array of ignored modules
-local(@dirs) = ($INSTALLING) ? 
-    	       ("$InstLibDirGhc/imports/std")
-	     : ("$TopPwd/ghc/lib/std");
-if (!$Include_prelude) {
-    push(@Ignore_dirs, @dirs);
-} else {
-    push(@Import_dirs, @dirs);
-}
-
-foreach $lib ( @Syslibs ) {
-    local($dir);
-
-    # Yuck ^ 2
-    if ( $lib eq 'win32' && ! $INSTALLING ) {
-      $dir = "${TopPwd}/hslibs/${lib}/src";
-    } elsif ( $lib eq 'com' && ! $INSTALLING ) {
-      $dir = "${TopPwd}/hdirect/lib";
-    } else {
-      $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
-	                   : "${TopPwd}/ghc/lib/${lib}";
-    }
-    if (!$Include_prelude) {
-       push(@Ignore_dirs,$dir);
-    } else {
-       push(@Import_dirs, $dir);
-    }
-}
-
-
 # NB: We keep the scalar-variable equivalents to use in error messages
+
+&gather_import_dirs();
 
 if ( ! $Makefile && -f 'makefile' ) {
     $Makefile = 'makefile';
@@ -237,8 +209,10 @@ close(OMKF) || exit(1);
 exit 0;
 
 sub mangle_command_line_args {
-    while($_ = $ARGV[0]) {
-	shift(@ARGV);
+    local(@Args) = @_;
+        
+    while($_ = $Args[0]) {
+	shift(@Args);
 
 	if ( /^--$/ ) {
 	    $Dashdashes_seen++;
@@ -254,7 +228,7 @@ sub mangle_command_line_args {
 	} elsif ( /^-I/ ) {
 	    $Include_dirs .= " $_";
 	} elsif ( /^-syslib$/ ) {
-	    push(@Syslibs, &grab_arg_arg($_,''));
+	    push(@Syslibs, &grab_arg_arg(*Args,$_,''));
 	} elsif ( /^-fglasgow-exts$/ ) {
 	    push(@Syslibs, 'exts');
 	} elsif ( /^-concurrent$/ ) {
@@ -265,9 +239,9 @@ sub mangle_command_line_args {
 	    } elsif ( /^-w$/ ) {
 		$Warnings     = 0;
 	    } elsif ( /^-f(.*)/ ) {
-		$Makefile	= &grab_arg_arg('-f',$1);
+		$Makefile	= &grab_arg_arg(*Args,'-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
-		local($suff)	= &grab_arg_arg('-o',$1);
+		local($suff)	= &grab_arg_arg(*Args,'-o',$1);
 		# Weed out existing entry .. there must be a better way of doing this
 		# with arrays (non-assoc) ! -- sof
 		@Obj_suffix	= grep(!/$suff/,@Obj_suffix);
@@ -276,19 +250,19 @@ sub mangle_command_line_args {
 	    # --exclude-module=mod => it's stable, trust me!
             
 	    } elsif ( /^-(x|-exclude-module=)(.*)/ ) { 
-		local($thing) = &grab_arg_arg($1,$2);
+		local($thing) = &grab_arg_arg(*Args,$1,$2);
 		$IgnoreMe{$thing} = 'Y';
 	    } elsif ( /^-(X|-exclude-directory=)(.*)/ ) { 
-		foreach $d ( split(/:/,&grab_arg_arg($1, $2)) ) {
+		foreach $d ( split(/:/,&grab_arg_arg(*Args,$1, $2)) ) {
                    push(@Ignore_dirs,"$d");
                 }
 	    } elsif ( /^--include-module=(.*)/ ) { 
-		local($thing) = &grab_arg_arg($1,$2);
+		local($thing) = &grab_arg_arg(*Args,$1,$2);
 		$IgnoreMe{$thing} = 'n';
 	    } elsif ( /^--include-prelude$/ ) { 
 		$Include_prelude = 1;
 	    } elsif ( /^-s(.*)/ ) {
-		local($suff)	=  &grab_arg_arg('-s',$1);
+		local($suff)	=  &grab_arg_arg(*Args,'-s',$1);
 		push(@File_suffix, $suff);
 	    } elsif ( /^-/ ) {
 		print STDERR "$Pgm: unknown option ignored: $_\n";
@@ -311,18 +285,53 @@ sub mangle_command_line_args {
 }
 
 sub grab_arg_arg {
-    local($option, $rest_of_arg) = @_;
+    local(*Args, $option, $rest_of_arg) = @_;
     
     if ($rest_of_arg) {
 	return($rest_of_arg);
-    } elsif ($#ARGV >= 0) {
-	local($temp) = $ARGV[0]; shift(@ARGV); 
+    } elsif ($#Args >= 0) {
+	local($temp) = $Args[0]; shift(@Args); 
 	return($temp);
     } else {
 	print STDERR "$Pgm: no argument following $option option\n";
 	$Status++;
     }
 }
+
+sub gather_import_dirs {
+
+	# set up array of ignored modules
+	local(@dirs) = ($INSTALLING) ? 
+    		       ("$InstLibDirGhc/imports/std")
+	     	     : ("$TopPwd/ghc/lib/std");
+
+	if (!$Include_prelude) {
+    	   push(@Ignore_dirs, @dirs);
+	} else {
+    	   push(@Import_dirs, @dirs);
+        }
+
+	foreach $lib ( @Syslibs ) {
+	   local($dir);
+
+           # Yuck ^ 2
+           if ( $lib eq 'win32' && ! $INSTALLING ) {
+              $dir = "${TopPwd}/hslibs/${lib}/src";
+           } elsif ( $lib eq 'com' && ! $INSTALLING ) {
+              $dir = "${TopPwd}/hdirect/lib";
+           } else {
+              $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
+	                           : "${TopPwd}/ghc/lib/${lib}";
+           }
+    	   if (!$Include_prelude) {
+              push(@Ignore_dirs,$dir);
+           } else {
+              push(@Import_dirs, $dir);
+           }
+	}
+}
+
+
 
 sub preprocess_import_dirs {
     # it's probably cheaper to find out what's in all
@@ -377,6 +386,10 @@ sub slurp_file_for_imports {
     local($follow_file,$read_from_file);
     local($cleanup)=0;
 
+    local(@Old_Syslibs, $options);
+    local(@Old_Ignore_dirs);
+    local($found_options)=0;
+
     local($last_seen_dir) = $orig_src_file;
     $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
     $last_seen_dir = '.' if ($last_seen_dir eq $orig_src_file);
@@ -391,6 +404,24 @@ sub slurp_file_for_imports {
 
     &process_dependency('import',0,'Prelude') if ($Include_prelude);
 
+    #
+    # Check for {-# OPTIONS in the file-to-be-processed. If any syslib related options
+    # *only* are found, add them to the module search list (and take them off once
+    # we're through with this module.)
+    #
+
+    $options = &check_for_source_options($file_to_read);
+    if ($options ne "") {
+      @Old_Syslibs=@Syslibs;
+      &mangle_command_line_args(split(/ /,$options));
+      if (@Old_Syslibs ne @Syslibs) {
+        $found_options=1;
+	@Old_Ignore_dirs = @Ignore_dirs;
+        &gather_import_dirs();
+	&preprocess_import_dirs();
+      }
+    }
+    
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
     
@@ -421,6 +452,9 @@ sub slurp_file_for_imports {
         next if $modname eq '';
 	&process_dependency($todo,$source,$modname);
     }
+
+    @Ignore_dirs = @Old_Ignore_dirs if ($found_options);
+
     close(SRCFILE) || exit(1);
     # remove temporary file, if any.
     if ($cleanup) {
@@ -634,4 +668,41 @@ sub run_something {
 	print STDERR $die_msg;
 	exit $return_val;
     }
+}
+
+# out of the driver too.
+sub check_for_source_options {
+    local($file) = @_;
+    local($comment_start,$comment_end);
+
+    # Assume it is a file containing Haskell source
+    $comment_start = "{-#";
+    $comment_end   = "#-}";
+
+    open(FILE,$file) || return ""; # No big loss
+    
+    while (<FILE>) {
+	if ( /^${comment_start} OPTIONS (.*)${comment_end}/ ) {
+           # return the options.
+	   local($stuff) = $1;
+	   print STDERR "Found OPTIONS $stuff in $file\n" if $Verbose;
+	   close(FILE);
+	   return $stuff;
+	}
+        elsif ( /^$/ ) { # ignore empty lines
+           ;
+        }
+        elsif ( /^#line.+$/ ) { # ignore comment lines (unused..ToDo: rm )
+           ;
+        }
+        elsif ( /^{-# LINE.+$/ ) { # ignore line pragmas
+           ;
+        }
+        else { # stop looking, something non-empty / not
+	       # ${comment_start} OPTIONS .. ${comment_end} encountered.
+	    close(FILE);return "";
+        }
+    }
+    close(FILE);
+    return "";
 }
