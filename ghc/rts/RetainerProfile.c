@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.2 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.3 2001/12/12 14:25:03 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -21,6 +21,7 @@
 #include "RtsFlags.h"
 #include "Weak.h"
 #include "Sanity.h"
+#include "StablePriv.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "BlockAlloc.h"
@@ -60,8 +61,8 @@ StgWord flip = 0;     // flip bit
 #define setRetainerSetToNull(c)   \
   (c)->header.prof.hp.rs = (RetainerSet *)((StgWord)NULL | flip)
 
-static void retainStack(StgClosure *, StgClosure *, StgClosure *, StgPtr, StgPtr);
-static void retainClosure(StgClosure *, StgClosure *, StgClosure *);
+static void retainStack(StgClosure *, retainer, StgClosure *, StgPtr, StgPtr);
+static void retainClosure(StgClosure *, StgClosure *, retainer);
 #ifdef DEBUG_RETAINER
 static void belongToHeap(StgPtr p);
 #endif
@@ -135,7 +136,7 @@ typedef struct {
 
 typedef struct {
     StgClosure *c;
-    StgClosure *c_child_r;
+    retainer c_child_r;
     stackPos info;
 } stackElement;
 
@@ -344,7 +345,7 @@ find_srt( stackPos *info )
  *  Note: SRTs are considered to  be children as well.
  * -------------------------------------------------------------------------- */
 static inline void
-push( StgClosure *c, StgClosure *c_child_r, StgClosure **first_child )
+push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 {
     stackElement se;
     bdescr *nbd;      // Next Block Descriptor
@@ -660,7 +661,7 @@ popOff(void) {
  *    is empty.
  * -------------------------------------------------------------------------- */
 static inline void
-pop( StgClosure **c, StgClosure **cp, StgClosure **r )
+pop( StgClosure **c, StgClosure **cp, retainer *r )
 {
     stackElement *se;
 
@@ -1048,7 +1049,7 @@ associate( StgClosure *c, RetainerSet *s )
  *    retainClosure() is invoked instead of evacuate().
  * -------------------------------------------------------------------------- */
 static void
-retainStack( StgClosure *c, StgClosure *c_child_r,
+retainStack( StgClosure *c, retainer c_child_r,
 	     StgClosure *stackOptionalFun, StgPtr stackStart,
 	     StgPtr stackEnd )
 {
@@ -1234,16 +1235,16 @@ retainStack( StgClosure *c, StgClosure *c_child_r,
  *    *c0 can be TSO (as well as PAP and AP_UPD).
  * -------------------------------------------------------------------------- */
 static void
-retainClosure( StgClosure *c0, StgClosure *cp0, StgClosure *r0 )
+retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
 {
     // c = Current closure
     // cp = Current closure's Parent
     // r = current closures' most recent Retainer
     // c_child_r = current closure's children's most recent retainer
     // first_child = first child of c
-    StgClosure *c, *cp, *r, *c_child_r, *first_child;
+    StgClosure *c, *cp, *first_child;
     RetainerSet *s, *retainerSetOfc;
-    retainer R_r;
+    retainer r, c_child_r;
     StgWord typeOfc;
 
 #ifdef DEBUG_RETAINER
@@ -1391,7 +1392,6 @@ inner_loop:
 	s = retainerSetOf(cp);
 
     // (c, cp, r, s) is available.
-    R_r = getRetainerFrom(r);
 
     // (c, cp, r, s, R_r) is available, so compute the retainer set for *c.
     if (retainerSetOfc == NULL) {
@@ -1399,20 +1399,20 @@ inner_loop:
 	numObjectVisited++;
 
 	if (s == NULL)
-	    associate(c, singleton(R_r));
+	    associate(c, singleton(r));
 	else
 	    // s is actually the retainer set of *c!
 	    associate(c, s);
 
 	// compute c_child_r
-	c_child_r = isRetainer(c) ? c : r;
+	c_child_r = isRetainer(c) ? getRetainerFrom(c) : r;
     } else {
 	// This is not the first visit to *c.
-	if (isMember(R_r, retainerSetOfc))
+	if (isMember(r, retainerSetOfc))
 	    goto loop;          // no need to process child
 
 	if (s == NULL)
-	    associate(c, addElement(R_r, retainerSetOfc));
+	    associate(c, addElement(r, retainerSetOfc));
 	else {
 	    // s is not NULL and cp is not a retainer. This means that
 	    // each time *cp is visited, so is *c. Thus, if s has
@@ -1423,7 +1423,7 @@ inner_loop:
 	    }
 	    // Otherwise, just add R_r to the current retainer set of *c.
 	    else {
-		associate(c, addElement(R_r, retainerSetOfc));
+		associate(c, addElement(r, retainerSetOfc));
 	    }
 	}
 
@@ -1490,7 +1490,11 @@ retainRoot( StgClosure **tl )
     ASSERT(isEmptyRetainerStack());
     currentStackBoundary = stackTop;
 
-    retainClosure(*tl, *tl, *tl);
+    if (isRetainer(*tl)) {
+	retainClosure(*tl, *tl, getRetainerFrom(*tl));
+    } else {
+	retainClosure(*tl, *tl, CCS_SYSTEM);
+    }
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
     // *tl might be a TSO which is ThreadComplete, in which
@@ -1521,6 +1525,9 @@ computeRetainerSet( void )
     for (weak = weak_ptr_list; weak != NULL; weak = weak->link)
 	// retainRoot((StgClosure *)weak);
 	retainRoot((StgClosure **)&weak);
+
+    // Consider roots from the stable ptr table.
+    markStablePtrTable(retainRoot);
 
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when
