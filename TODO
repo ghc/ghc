@@ -1,9 +1,26 @@
+For 1.0:
+
+* parse module headers, augment Interface with info from header
+
+* Short contents at the top of each module?
+
+* IDoc compatibility, as far as possible
+
+* named chunks of documentation?
+
+* sort the names in the module tree
+
+* Handle parse errors better in doc strings
+
+* Do the unlitting/CPPing from Haddock itself
+
+-----------------------------------------------------------------------------
+Post 1.0:
+
 * pay attention to import specs!
 
 * instances: list relevant instances in the documentation for classes and
   datatypes.
-
-* parse module headers, augment Interface with info from header
 
 * include file revision info in module headers
 
@@ -25,23 +42,11 @@
 
 * Horizontal lines?
 
-* Short contents at the top of each module?
-
 * enhance the doc string parser:
 	* @...@ for monospaced text
 	* an apostrophe inside a string shouldn't be considered to be a quote
-	* the lexer should deal with <...> so that special chars
-	  inside don't need to be escaped.
-
-* Handle parse errors better in doc strings
 
 * Do proper dependency analysis rather than relying on laziness to
   sort it out.
 
-* Do the unlitting/CPPing from Haddock itself
-
 * clean up the layout: don't use table cellspacing, use CSS instead
-
-* omit the synopsis for modules with no doc
-
-* named chunks of documentation?
