@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.151 2003/03/26 14:52:02 simonmar Exp $
+ * $Id: GC.c,v 1.152 2003/03/26 15:56:25 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -139,7 +139,14 @@ static lnat thunk_selector_depth = 0;
 
 static bdescr *     gc_alloc_block          ( step *stp );
 static void         mark_root               ( StgClosure **root );
-static StgClosure * evacuate                ( StgClosure *q );
+
+// Use a register argument for evacuate, if available.
+#if __GNUC__ >= 2
+static StgClosure * evacuate (StgClosure *q) __attribute__((regparm(1)));
+#else
+static StgClosure * evacuate (StgClosure *q);
+#endif
+
 static void         zero_static_object_list ( StgClosure* first_static );
 static void         zero_mutable_list       ( StgMutClosure *first );
 
