@@ -56,9 +56,8 @@ while ($ARGV[0] =~ /^-./) {
     push(@Files, $_);
 }
 
-$ghc_version_info = ${ProjectVersionInt};
 $DoHsCpp = ( ! $DoCpp ) ? 'cat'
-			: "$HsCpp -D__HASKELL1__=2 -D__GLASGOW_HASKELL__=$ghc_version_info $Cpp_opts";
+			: "$HsCpp -D__HASKELL1__=2 -D__GLASGOW_HASKELL__=$ProjectVersionInt $Cpp_opts";
 
 # to find Prelude.hi and friends.
 $HsP_opts .= ( $INSTALLING  ? 

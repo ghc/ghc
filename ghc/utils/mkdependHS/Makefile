@@ -1,5 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/version.mk
 INSTALLING=0
 
 boot :: all

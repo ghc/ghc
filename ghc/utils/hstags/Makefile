@@ -1,5 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/version.mk
 
 # Note: might be overridden from cmd-line (see install rule below)
 INSTALLING=0

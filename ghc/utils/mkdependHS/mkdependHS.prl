@@ -88,7 +88,6 @@ $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
 @Obj_suffix =  ("o");
 @File_suffix = ();
-$ghc_version_info = ${ProjectVersionInt};
 
 $Import_dirs = '.';
 %Syslibs = ();
@@ -116,7 +115,7 @@ if ( $Status ) {
 
 push(@Defines,
      ( #OLD: "-D__HASKELL1__=$Haskell_1",
-      "-D__GLASGOW_HASKELL__=$ghc_version_info"));
+      "-D__GLASGOW_HASKELL__=$ProjectVersionInt"));
 
 @Import_dirs  = split(/:/,$Import_dirs);
 @Include_dirs = split(/\s+/,$Include_dirs); # still has -I's in it
