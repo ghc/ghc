@@ -254,6 +254,7 @@ whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           	{ NothingAtAll }
 		    | '::' version					{ Everything $2 }
                     | '::' version version version name_version_pairs   { Specifically $2 (Just $3) $5 $4 }
+                    | '::' version version name_version_pairs		{ Specifically $2 Nothing $4 $3 }
 
 name_version_pairs  ::	{ [(OccName, Version)] }
 name_version_pairs  :  						{ [] }

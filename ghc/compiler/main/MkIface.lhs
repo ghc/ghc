@@ -578,9 +578,7 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
     pp_versions (Specifically vm ve nvs vr) = dcolon <+> int vm <+> pp_export_version ve <+> int vr 
 					      <+> hsep [ pprOcc n <+> int v | (n,v) <- nvs ]
 
-	-- HACK for the moment: print the export-list version even if
-	-- we don't use it, so that syntax of interface files doesn't change
-    pp_export_version Nothing  = int 1
+    pp_export_version Nothing  = empty
     pp_export_version (Just v) = int v
 \end{code}
 

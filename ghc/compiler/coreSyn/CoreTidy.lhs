@@ -23,7 +23,8 @@ import Id		( idType, idInfo, idName, isExportedId,
 			  mkVanillaId, mkId, isLocalId, omitIfaceSigForId,
 			  setIdStrictness, setIdDemandInfo,
 			) 
-import IdInfo		( constantIdInfo,
+import IdInfo		( mkIdInfo,
+			  IdFlavour(..), flavourInfo, ppFlavourInfo,
 			  specInfo, setSpecInfo, 
 			  cprInfo, setCprInfo,
 			  inlinePragInfo, setInlinePragInfo, isNeverInlinePrag,
@@ -326,19 +327,31 @@ tidyTopBinder mod ext_ids env_idinfo rhs env@(orig_env, occ_env, subst_env) id
 
 tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
   | opt_OmitInterfacePragmas || not is_external
-	-- No IdInfo if the Id isn't 
-  = constantIdInfo
+	-- No IdInfo if the Id isn't external, or if we don't have -O
+  = mkIdInfo new_flavour
+	`setStrictnessInfo` strictnessInfo core_idinfo
+	-- Keep strictness info; it's used by the code generator
 
   | otherwise
-  = constantIdInfo `setCprInfo`   	 cprInfo core_idinfo
-		   `setStrictnessInfo`	 strictnessInfo core_idinfo
-		   `setInlinePragInfo`   inlinePragInfo core_idinfo
-		   `setUnfoldingInfo`	 unfold_info
-		   `setWorkerInfo`	 tidyWorker tidy_env (workerInfo core_idinfo)
-		   `setSpecInfo`	 tidyRules tidy_env (specInfo core_idinfo)
+  = mkIdInfo new_flavour
+	`setCprInfo`	    cprInfo core_idinfo
+	`setStrictnessInfo` strictnessInfo core_idinfo
+	`setInlinePragInfo` inlinePragInfo core_idinfo
+	`setUnfoldingInfo`  unfold_info
+	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
+	`setSpecInfo`	    tidyRules  tidy_env (specInfo core_idinfo)
   where
     tidy_env    = (occ_env, subst_env)
     core_idinfo = idInfo id
+
+	-- A DFunId must stay a DFunId, so that we can gather the
+	-- DFunIds up later.  Other local things become ConstantIds.
+    new_flavour = case flavourInfo core_idinfo of
+		    VanillaId  -> ConstantId
+		    ExportedId -> ConstantId
+		    DictFunId  -> DictFunId
+		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
+				  flavour
 
 tidyTopName mod orig_env occ_env external name
   | global && internal = (orig_env, occ_env,  localiseName name)

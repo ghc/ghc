@@ -20,7 +20,7 @@ import StgSyn		-- output
 import CoreUtils	( exprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
-import Id		( Id, mkSysLocal, idType, idStrictness, isExportedId, 
+import Id		( Id, mkSysLocal, idType, idStrictness, 
 			  mkVanillaId, idName, idDemandInfo, idArity, setIdType,
 			  idFlavour
 			)
@@ -29,7 +29,7 @@ import IdInfo		( StrictnessInfo(..), IdFlavour(..) )
 import DataCon		( dataConWrapId, dataConTyCon )
 import TyCon		( isAlgTyCon )
 import Demand		( Demand, isStrict, wwLazy )
-import Name	        ( setNameUnique, globaliseName, isLocalName )
+import Name	        ( setNameUnique, globaliseName, isLocalName, isGlobalName )
 import VarEnv
 import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
@@ -258,8 +258,13 @@ coreBindToStg :: TopLvl -> StgEnv -> CoreBind -> UniqSM (StgFloatBind, StgEnv)
 coreBindToStg top_lev env (NonRec binder rhs)
   = coreExprToStgFloat env rhs			`thenUs` \ (floats, stg_rhs) ->
     case (floats, stg_rhs) of
-	([], StgApp var []) | not (isExportedId binder)
-		     -> returnUs (NoBindF, extendVarEnv env binder var)
+	([], StgApp var [])
+		|  not (isGlobalName (idName binder))
+		-> returnUs (NoBindF, extendVarEnv env binder var)
+
+		|  otherwise
+		-> newBinder top_lev env binder		`thenUs` \ (new_env, new_binder) ->
+		   returnUs (NonRecF new_binder stg_rhs dem floats, extendVarEnv new_env binder var)
 		-- A trivial binding let x = y in ...
 		-- can arise if postSimplExpr floats a NoRep literal out
 		-- so it seems sensible to deal with it well.
