@@ -933,7 +933,7 @@ primOpStrictness WriteMutVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
 
 primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
 
-primOpStrictness CatchOp	  = ([wwLazy, wwLazy], False)
+primOpStrictness CatchOp	  = ([wwStrict, wwLazy, wwPrim], False)
 primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
 primOpStrictness BlockAsyncExceptionsOp    = ([wwLazy], False)
 primOpStrictness UnblockAsyncExceptionsOp  = ([wwLazy], False)
@@ -2286,7 +2286,7 @@ primOpUsg op
       SameMutVarOp         -> mangle [mkP, mkP          ] mkM
 
       CatchOp              -> --     [mkO, mkO . (inFun mkM mkO)] mkO
-                              mangle [mkM, mkM . (inFun mkM mkM)] mkM
+                              mangle [mkM, mkM . (inFun mkM mkM), mkP] mkM
                               -- might use caught action multiply
       RaiseOp              -> mangle [mkM               ] mkM
 
