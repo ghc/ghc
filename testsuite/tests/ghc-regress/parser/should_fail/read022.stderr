@@ -1,2 +1,1 @@
-
-read022.hs:4: Variable not in scope: `#'
+read022.hs:4: Parse error in pattern

@@ -1,9 +1,1 @@
-
-read007.hs:6:
-    `+' is not a data constructor
-    When checking the pattern: 2 + 2
-    In a 'do' expression pattern binding: (2 + 2) <- 2
-    In the definition of `f':
-	do
-	  (2 + 2) <- 2
-	  return x
+read007.hs:6: Parse error in pattern
