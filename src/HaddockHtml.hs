@@ -62,7 +62,9 @@ ppHtml doctitle source_url ifaces odir prologue do_ms_help
 
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_index_url 
-	(map fst visible_ifaces) prologue
+	[ (m,iface{iface_package=Nothing}) | (m,iface) <- visible_ifaces ]
+	-- we don't want to display the packages in a single-package contents
+	prologue
 
   when (not (isJust maybe_index_url)) $ 
     ppHtmlIndex odir doctitle maybe_contents_url visible_ifaces
@@ -186,50 +188,61 @@ moduleInfo iface =
 ppHtmlContents
    :: FilePath -> String
    -> Maybe String
-   -> [Module] -> Maybe Doc
+   -> [(Module,Interface)] -> Maybe Doc
    -> IO ()
 ppHtmlContents odir doctitle maybe_index_url
   mdls prologue = do
-  let tree = mkModuleTree mdls  
+  let tree = mkModuleTree [(mod,iface_package iface) | (mod,iface) <- mdls]
       html = 
 	header (thetitle (toHtml doctitle) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
    	    simpleHeader doctitle Nothing maybe_index_url </>
-	    ppPrologue prologue </>
+	    ppPrologue doctitle prologue </>
 	    ppModuleTree doctitle tree </>
 	    s15 </>
 	    footer
 	  )
   writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html)
 
-ppPrologue :: Maybe Doc -> HtmlTable
-ppPrologue Nothing = Html.emptyTable
-ppPrologue (Just doc) = 
-  (tda [theclass "section1"] << toHtml "Description") </>
+ppPrologue :: String -> Maybe Doc -> HtmlTable
+ppPrologue title Nothing = Html.emptyTable
+ppPrologue title (Just doc) = 
+  (tda [theclass "section1"] << toHtml title) </>
   docBox (docToHtml doc)
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  td <<  table ! [cellpadding 0, cellspacing 2] << aboves (map (mkNode []) ts)
+  td <<  table ! [cellpadding 0, cellspacing 2] << 
+	(aboves (map (mkNode 0 []) ts) <-> mkPackages ts)
 
-mkNode :: [String] -> ModuleTree -> HtmlTable
-mkNode ss (Node s leaf []) =
-  td << mkLeaf s ss leaf
-mkNode ss (Node s leaf ts) = 
-  (td << mkLeaf s ss leaf)
+mkNode :: Int -> [String] -> ModuleTree -> HtmlTable
+mkNode n ss (Node s leaf pkg []) =
+  mkLeaf n s ss leaf
+mkNode n ss (Node s leaf pkg ts) = 
+  mkLeaf n s ss leaf
   </>
-  (tda [theclass "children"] << 
-     vanillaTable (toHtml (aboves (map (mkNode (s:ss)) ts))))
+  aboves (map (mkNode (n+1) (s:ss)) ts)
 
-mkLeaf :: String -> [String] -> Bool -> Html
-mkLeaf s _ False = toHtml s
-mkLeaf s ss True  = ppHsModule mdl
+mkLeaf :: Int -> String -> [String] -> Bool -> HtmlTable
+mkLeaf n s _ False = pad_td n << toHtml s
+mkLeaf n s ss True = pad_td n << ppHsModule mdl
   where mdl = foldr (++) "" (s' : map ('.':) ss')
 	(s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
+
+pad_td 0 = td
+pad_td n = tda [thestyle ("padding-left:" ++ show (n*20) ++ "px")]
+
+mkPackages :: [ModuleTree] -> HtmlTable
+mkPackages ts = aboves (map go ts)
+  where go (Node s leaf pkg ts) = tda [theclass "pkg"] << mkPkg pkg </> aboves (map go ts)
+
+mkPkg :: Maybe String -> Html
+mkPkg Nothing = empty
+mkPkg (Just p) = toHtml p
 
 -- ---------------------------------------------------------------------------
 -- Generate the index

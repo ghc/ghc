@@ -20,7 +20,7 @@ indexHHFile = "index.hhk"
 
 ppHHContents :: FilePath -> [Module] -> IO ()
 ppHHContents odir mods = do
-  let tree = mkModuleTree mods
+  let tree = mkModuleTree (zip mods (repeat Nothing)) --TODO: packages
       html =
       	text "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">" $$
 	text "<HTML>" $$
@@ -47,9 +47,9 @@ ppHHContents odir mods = do
         fn _  []     = error "HaddockHH.ppHHContents.fn: no module trees given"
 
 	ppNode :: [String] -> ModuleTree -> Doc
-	ppNode ss (Node s leaf []) =
+	ppNode ss (Node s leaf _pkg []) =
 	  ppLeaf s ss leaf
-	ppNode ss (Node s leaf ts) =
+	ppNode ss (Node s leaf _pkg ts) =
 	  ppLeaf s ss leaf $$
 	  text "<UL>" $+$
 	  nest 4 (fn (s:ss) ts) $+$

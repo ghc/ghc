@@ -69,6 +69,7 @@ data Flag
 --  | Flag_DocBook
   | Flag_DumpInterface FilePath
   | Flag_Heading String
+  | Flag_Package String
   | Flag_Html
   | Flag_Lib String
   | Flag_MSHtmlHelp
@@ -111,6 +112,8 @@ options =
 	"file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
+    Option ['k']  ["package"]  (ReqArg Flag_Package "PACKAGE")
+	"package name (optional)",
     Option ['n']  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
  	"do not assume Prelude is imported",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
@@ -146,6 +149,10 @@ run flags files = do
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
 		(t:_) -> t
+
+      package = case [str | Flag_Package str <- flags] of
+		[] -> Nothing
+		(t:_) -> Just t
 
       source_url = case [str | Flag_SourceURL str <- flags] of
 			[] -> Nothing
@@ -187,23 +194,24 @@ run flags files = do
 
   read_ifaces_s <- mapM readIface (map snd ifaces_to_read)
 
+  let read_ifaces = concat read_ifaces_s
+      visible_read_ifaces = filter ((OptHide `notElem`) . iface_options . snd) 
+				read_ifaces
+      external_mods = map fst read_ifaces
+
   updateHTMLXRefs (map fst ifaces_to_read) read_ifaces_s
 
   writeIORef saved_flags flags
 
   when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title maybe_index_url 
-		(map fst (concat read_ifaces_s)) prologue
+	ppHtmlContents odir title maybe_index_url visible_read_ifaces prologue
         copyHtmlBits odir libdir css_file
 
   when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title maybe_contents_url (concat read_ifaces_s)
+	ppHtmlIndex odir title maybe_contents_url visible_read_ifaces
         copyHtmlBits odir libdir css_file
 
   parsed_mods <- mapM parse_file files
-
-  let read_ifaces = concat read_ifaces_s
-      external_mods = map fst read_ifaces
 
   sorted_mod_files <- sortModules (zip parsed_mods files)
 	-- emits an error message if there are recursive modules
@@ -214,7 +222,8 @@ run flags files = do
 	loop ifaces [] = return ifaces
 	loop ifaces ((hsmod,file):mdls)  = do 
 	   let ((mdl,iface),msgs) = runWriter $
-		   mkInterface no_implicit_prelude verbose ifaces file hsmod
+		   mkInterface no_implicit_prelude verbose ifaces 
+			file package hsmod
 	       new_ifaces = addToFM ifaces mdl iface
 	   mapM (hPutStrLn stderr) msgs
 	   loop new_ifaces mdls
@@ -251,7 +260,9 @@ run flags files = do
 	writeBinMem bh fn
       where
 	prepared_ifaces = 
-	  [ (mdl, fmToList (iface_env iface), 
+	  [ (mdl, iface_package iface,
+		  OptHide `elem` iface_options iface,
+		  fmToList (iface_env iface), 
 		  fmToList (iface_reexported iface),
 		  fmToList (iface_sub iface))
 	  | (mdl, iface) <- these_mod_ifaces ]
@@ -268,9 +279,10 @@ readIface filename = do
   stuff <- get bh
   return (map to_interface stuff)
  where 
-   to_interface (mdl, env, reexported, sub) = 
+   to_interface (mdl, package, hide, env, reexported, sub) = 
 	  (mdl, Interface { 
 		   iface_filename     = "",
+		   iface_package      = package,
 		   iface_env          = listToFM env,
 		   iface_import_env   = emptyFM,
 		   iface_sub	      = listToFM sub,
@@ -281,7 +293,7 @@ readIface filename = do
 		   iface_decls        = emptyFM,
 		   iface_info	      = Nothing,
 		   iface_doc          = Nothing,
-		   iface_options      = []
+		   iface_options      = if hide then [OptHide] else []
 		}
       	  )
 		
@@ -290,7 +302,7 @@ updateHTMLXRefs :: [FilePath] -> [[(Module,Interface)]] -> IO ()
 updateHTMLXRefs paths ifaces_s =
   writeIORef html_xrefs_ref (listToFM mapping)
  where
-  mapping = [ (mdl,fpath) 
+  mapping = [ (mdl, fpath)
 	    | (fpath, ifaces) <- zip paths ifaces_s,
 	      (mdl, _iface) <- ifaces
 	    ]
@@ -323,13 +335,13 @@ getPrologue flags
 mkInterface
    :: Bool				-- no implicit prelude
    -> Bool				-- verbose
-   -> ModuleMap -> FilePath -> HsModule
+   -> ModuleMap -> FilePath -> Maybe String -> HsModule
    -> ErrMsgM (
 	       Module, 		-- the module name
 	       Interface	-- its "interface"
 	      )
 
-mkInterface no_implicit_prelude verbose mod_map filename 
+mkInterface no_implicit_prelude verbose mod_map filename package
 	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
   -- Process the options, if available
@@ -453,6 +465,7 @@ mkInterface no_implicit_prelude verbose mod_map filename
 
   return (mdl, Interface { 
 		   iface_filename     = filename,
+		   iface_package      = package,
 		   iface_env          = name_env,
 		   iface_import_env   = import_env,
 		   iface_reexported   = reexports,

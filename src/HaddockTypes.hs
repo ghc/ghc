@@ -30,6 +30,8 @@ data Interface
 	iface_filename :: FilePath,
 		-- ^ the filename that contains the source code for this module
 
+	iface_package :: Maybe String,
+
 	iface_env :: NameEnv,
 		-- ^ environment mapping names to *original* names
 
