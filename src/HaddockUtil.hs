@@ -26,6 +26,8 @@ import List	( intersect )
 import IO	( hPutStr, stderr )
 import System
 import RegexString
+import Binary
+import IOExts
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities
@@ -219,4 +221,37 @@ mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
 mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 mapMaybeM f Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
+
+-----------------------------------------------------------------------------
+-- Binary instances for stuff
+
+instance Binary Module where
+  put_ bh (Module m) = putString bh m
+  get bh = do m <- getString bh; return $! (Module m)
+
+instance Binary HsQName where
+  put_ bh (Qual m s) = do putByte bh 0; put_ bh m; put_ bh s
+  put_ bh (UnQual s) = do putByte bh 1; put_ bh s
+  get bh = do b <- getByte bh
+	      case b of
+		0 -> do m <- get bh; s <- get bh; return (Qual m s)
+		_ -> do s <- get bh; return (UnQual s)
+
+instance Binary HsName where
+  put_ bh (HsTyClsName s) = do putByte bh 0; put_ bh s
+  put_ bh (HsVarName s)   = do putByte bh 1; put_ bh s
+  get bh = do b <- getByte bh
+	      case b of
+		0 -> do s <- get bh; return (HsTyClsName s)
+		_ -> do s <- get bh; return (HsVarName s)
+
+instance Binary HsIdentifier where
+  put_ bh (HsIdent s)   = do putByte bh 0; putString bh s
+  put_ bh (HsSymbol s)  = do putByte bh 1; putString bh s
+  put_ bh (HsSpecial s) = do putByte bh 2; putString bh s
+  get bh = do b <- getByte bh
+	      case b of
+		0 -> do s <- getString bh; return (HsIdent s)
+		1 -> do s <- getString bh; return (HsSymbol s)
+		_ -> do s <- getString bh; return (HsSpecial s)
 

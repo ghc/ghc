@@ -14,6 +14,7 @@ import HaddockHtml
 import HaddockTypes
 import HaddockUtil
 import Digraph
+import Binary
 
 import HsParser
 import HsParseMonad
@@ -29,7 +30,10 @@ import List	( nub )
 import Monad	( when )
 import Char	( isSpace )
 import IO
+
+#ifdef __GLASGOW_HASKELL__
 import IOExts
+#endif
 
 import MonadWriter
 
@@ -60,6 +64,9 @@ data Flag
   | Flag_CSS String
   | Flag_Lib String
   | Flag_OutputDir FilePath
+  | Flag_ReadInterface FilePath
+  | Flag_DumpInterface FilePath
+  | Flag_NoImplicitPrelude
   deriving (Eq)
 
 options =
@@ -78,10 +85,16 @@ options =
 	"page heading",
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
 	"be verbose",
+    Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
+	"read an interface from FILE",
+    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
+        "dump an interface for these modules in FILE",
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"The CSS file to use for HTML output",
     Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
-	"Directory containing Haddock's auxiliary files"
+	"Directory containing Haddock's auxiliary files",
+    Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
+ 	"Do not assume Prelude is imported"
   ]
 
 saved_flags :: IORef [Flag]
@@ -108,10 +121,23 @@ run flags files = do
 		[] -> return "."
 		fs -> return (last fs)
 
+  let dump_iface = case [str | Flag_DumpInterface str <- flags] of
+		  	[] -> Nothing
+		  	fs -> Just (last fs)
+
+      ifaces_to_read = [str | Flag_ReadInterface str <- flags]
+
+      no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
+
   prologue <- getPrologue flags
 
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
+
+  read_ifaces_s <- mapM readIface ifaces_to_read  
+
+  let read_ifaces = concat read_ifaces_s
+      external_mods = map fst read_ifaces
 
   sorted_mod_files <- sortModules (zip parsed_mods files)
 	-- emits an error message if there are recursive modules
@@ -121,21 +147,59 @@ run flags files = do
   let 
 	loop ifaces [] = return ifaces
 	loop ifaces ((hsmod,file):mods)  = do 
-	   let ((mod,iface),msgs) = runWriter (mkInterface ifaces file hsmod)
+	   let ((mod,iface),msgs) = runWriter $
+		   mkInterface no_implicit_prelude ifaces file hsmod
 	       new_ifaces = addToFM ifaces mod iface
 	   mapM (hPutStrLn stderr) msgs
 	   loop new_ifaces mods
 
-  module_map <- loop emptyFM sorted_mod_files
+  module_map <- loop (listToFM read_ifaces) sorted_mod_files
   let mod_ifaces = fmToList module_map
+
+      these_mod_ifaces = [ (mod, iface) 
+			 | (mod, iface) <- mod_ifaces,
+			   mod `notElem` external_mods ]
 
 --  when (Flag_DocBook `elem` flags) $
 --    putStr (ppDocBook odir mod_ifaces)
 
-  let inst_maps = collectInstances mod_ifaces
+  let inst_maps = collectInstances these_mod_ifaces
 
   when (Flag_Html `elem` flags) $
-    ppHtml title source_url mod_ifaces odir css_file libdir inst_maps prologue
+    ppHtml title source_url these_mod_ifaces odir css_file 
+	libdir inst_maps prologue
+
+  -- dump an interface if requested
+  case dump_iface of
+     Nothing -> return ()
+     Just fn -> do
+	bh <- openBinMem 100000
+	put_ bh prepared_ifaces
+	writeBinMem bh fn
+      where
+	prepared_ifaces = [ (mod, fmToList (iface_env iface))
+		          | (mod, iface) <- these_mod_ifaces ]
+
+readIface :: FilePath -> IO [(Module,Interface)]
+readIface filename = do
+  bh <- readBinMem filename
+  stuff <- get bh
+  return (map to_interface stuff)
+ where 
+   to_interface (mod, env) = 
+	  (mod, Interface { 
+		   iface_filename     = "",
+		   iface_env          = listToFM env,
+		   iface_exports      = [],
+		   iface_orig_exports = [],
+		   iface_insts	      = [],
+		   iface_decls        = emptyFM,
+		   iface_info	      = Nothing,
+		   iface_doc          = Nothing,
+		   iface_options      = []
+		}
+      	  )
+		
 
 parse_file file = do
   bracket 
@@ -163,13 +227,14 @@ getPrologue flags
 -- Figuring out the definitions that are exported from a module
 
 mkInterface
-   :: ModuleMap -> FilePath -> HsModule
+   :: Bool				-- no implicit prelude
+   -> ModuleMap -> FilePath -> HsModule
    -> ErrMsgM (
 	       Module, 		-- the module name
 	       Interface	-- its "interface"
 	      )
 
-mkInterface mod_map filename 
+mkInterface no_implicit_prelude mod_map filename 
 	(HsModule mod exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
   -- Process the options, if available
@@ -191,9 +256,16 @@ mkInterface mod_map filename
 			        zip qual_local_names   qual_local_names)
 	 -- both qualified and unqualifed names are in scope for local things
 
+     implicit_imps
+	| no_implicit_prelude || any is_prel_import imps = imps
+	| otherwise = HsImportDecl loc prelude_mod False Nothing Nothing : imps
+	where 
+		loc = SrcLoc 0 0
+	 	is_prel_import (HsImportDecl _ mod _ _ _ ) = mod == prelude_mod
+
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
-     orig_env = buildOrigEnv mod_map imps `plusFM` local_orig_env
+     orig_env = buildOrigEnv mod_map implicit_imps `plusFM` local_orig_env
 
      -- convert names in source code to original, fully qualified, names
      (orig_exports, missing_names1) 
@@ -214,7 +286,8 @@ mkInterface mod_map filename
      -- build the import env, which maps original names to import names
      local_import_env = listToFM (zip qual_local_names qual_local_names)
      import_env = local_import_env `plusFM`
-		   buildImportEnv mod_map mod exported_visible_names imps
+		   buildImportEnv mod_map mod exported_visible_names 
+			implicit_imps
 
   let
      final_decls = concat (map expandDecl orig_decls)
