@@ -1,7 +1,8 @@
 -- !!! Testing NumExts
 module Main(main) where
 
-import NumExts
+import Numeric
+import Data.Char
 
 main :: IO ()
 main = tst
@@ -34,6 +35,12 @@ test_doubleToFloat = do
   putStrLn (show doubles)
   putStrLn (show $ map doubleToFloat doubles)
 
+doubleToFloat :: Double -> Float
+doubleToFloat = realToFrac
+
+floatToDouble :: Float -> Double
+floatToDouble = realToFrac
+
 test_floatToDouble :: IO ()
 test_floatToDouble = do
   test_banner "doubleToFloat"
@@ -56,6 +63,8 @@ test_showBin = do
   putStrLn (showList' (map showBin ints))
   putStrLn (show integers)
   putStrLn (showList' (map showBin integers))
+
+showBin i = showIntAtBase 2 intToDigit i
 
 showList' :: [ShowS] -> String
 showList' [] = "[]"

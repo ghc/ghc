@@ -8,7 +8,7 @@ test('arith002', normal, compile_and_run, [''])
 test('arith003', normal, compile_and_run, [''])
 test('arith004', normal, compile_and_run, [''])
 test('arith005', normal, compile_and_run, [''])
-test('arith006', normal, compile_and_run, ['-package lang'])
+test('arith006', normal, compile_and_run, [''])
 test('arith007', normal, compile_and_run, [''])
 
 # This test generates slightly different results with the NCG on x86,
@@ -17,10 +17,10 @@ test('arith007', normal, compile_and_run, [''])
 test('arith008', expect_fail_for(['optasm']), compile_and_run, [''])
 
 test('arith009', normal, compile_and_run, [''])
-test('arith010', normal, compile_and_run, ['-package lang'])
+test('arith010', normal, compile_and_run, [''])
 test('arith011', normal, compile_and_run, [''])
 
-test('arith012', expect_fail_for(['optasm']), compile_and_run, ['-package lang'])
+test('arith012', expect_fail_for(['optasm']), compile_and_run, [''])
 
 test('arith013', normal, compile_and_run, [''])
 test('arith014', normal, compile_and_run, [''])
