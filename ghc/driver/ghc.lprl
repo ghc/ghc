@@ -3101,6 +3101,7 @@ arg: while($_ = $Args[0]) {
     /^-fno-speciali[sz]e$/
 		&& do { $Oopt_DoSpecialise = ''; next arg; };
 
+    /^-fcompiling-prelude$/ && do { push(@HsC_flags, $_); next arg; };
 
 # Now the foldr/build options, which are *on* by default (for -O).
 
