@@ -1,10 +1,10 @@
 
 module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
-                   TopDef(..), Stmt(..), Expr(..),
+                   TopDef(..), Stmt(..), Expr(..), freeVars,
                    Op(..), Result(..),
                    panic, officialMsg, my_system,
                    isJust, isNothing, unJust,
-                   isTInclude, isTTest, isTMacroDef,
+                   isTInclude, isTTest, isTMacroDef, isTAssign,
                    isLeft, isRight, unLeft, unRight
                  )
 where
@@ -66,6 +66,17 @@ data Expr
    | EFFail     Expr
      deriving Show
 
+freeVars :: Expr -> [Var]
+freeVars (EOp op l r)  = freeVars l ++ freeVars r
+freeVars (EVar v)      = [v]
+freeVars (EString _)   = []
+freeVars (EBool _)     = []
+freeVars (EContents e) = freeVars e
+freeVars (EExists e)   = freeVars e
+freeVars (EMacro _ es) = concatMap freeVars es
+freeVars (EDefined v)  = []	-- we don't actually use v here
+freeVars (EFFail e)    = freeVars e
+
 data Stmt
    = SAssign    Var Expr
    | SPrint     Expr
@@ -83,6 +94,7 @@ data TopDef
    = TInclude   Expr
    | TMacroDef  MacroName MacroDef
    | TTest      TestName [Stmt]
+   | TAssign    Var Expr
      deriving Show
 
 data Op
@@ -97,6 +109,9 @@ isTTest other       = False
 
 isTMacroDef (TMacroDef _ _) = True
 isTMacroDef other           = False
+
+isTAssign (TAssign _ _) = True
+isTAssign other         = False
 
 data Result
    = Pass 		-- test passed

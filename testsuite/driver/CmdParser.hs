@@ -54,7 +54,8 @@ pTopDef
         p4 (\d mnm formals stmts -> TMacroDef mnm (MacroDef formals stmts))
            (pKW L_Def) pText pFormals pStmtBlock,
         p3 (\t testname stmts -> TTest testname stmts)
-           (pKW L_Test) pString pStmtBlock
+           (pKW L_Test) pString pStmtBlock,
+        p3 (\var eq expr -> TAssign var expr) pVar (pKW L_Assign) pExpr
      ]
      where
         pFormals

@@ -75,7 +75,7 @@ main
 imain arg_str
    = main_really (words arg_str)
 test
-   = imain "--tool=ghc --config=../config/cam-02-unx ../tests/"
+   = imain "--tool=ghc --config=../config/msrc/cam-02-unx.T ../tests/"
 
 main_really arg_ws0
    = do { let (arg_ws1, maybe_tool) = fish arg_ws0 "--tool="
@@ -103,9 +103,10 @@ main_really arg_ws0
      do { -- Find all the .T files
         ; all_tfiles <- findTFiles root_dir
         ; putStr "\n"
-        ; officialMsg ("Found " ++ show (length all_tfiles) ++ " tfiles:")
+        ; officialMsg ("Found " ++ show (length all_tfiles) 
+                       ++ " test description files:")
         ; putStr "\n"
-        ; putStrLn (unlines (map show all_tfiles))
+        ; putStrLn (unlines (map ("   "++) all_tfiles))
         -- Parse them all
         ; all_parsed 
              <- mapM (\tfpath -> parseOneTFile
@@ -113,8 +114,8 @@ main_really arg_ws0
                      all_tfiles
         ; let parse_fails = filter isLeft all_parsed
         ; when (not (null parse_fails)) (
-             do officialMsg ("Parse errors for the following .T files:")
-                putStr (unlines (map unLeft parse_fails))
+             do officialMsg ("Parse errors for the following .T files:\n")
+                putStr (unlines (map (("   "++).unLeft) parse_fails))
           )
         ; let parsed_ok = map unRight (filter isRight all_parsed)
         -- Run all the tests in each successfully-parsed .T file.   

@@ -5,9 +5,11 @@ where
 import CmdSyntax
 import CmdLexer		( isVarChar )
 import CmdParser	( parseScript )
+import TopSort		( topSort )
 import Monad		( when )
 import Directory	( doesFileExist )
 import System		( ExitCode(..) )
+import List		( nub )
 
 #ifdef __NHC__
 import NonStdTrace(trace)
@@ -197,17 +199,47 @@ processParsedTFile :: [(Var,String)]
                              (Either String{-framefail-} 
                                      (Result, Result){-outcomes-})
                          )]
-processParsedTFile global_env topdefs
-   = do let tests = filter isTTest     topdefs
-        let macs  = filter isTMacroDef topdefs
-        let incls = filter isTInclude  topdefs
+processParsedTFile initial_global_env topdefs
+   = do let tests     = filter isTTest     topdefs
+        let macs      = filter isTMacroDef topdefs
+        let incls     = filter isTInclude  topdefs -- should be []
+        let topbinds  = [(var,expr) | TAssign var expr <- topdefs]
         let macro_env = map (\(TMacroDef mnm mrhs) -> (mnm,mrhs)) macs
-        let doOne (TTest tname stmts)
-               = do r <- doOneTest (("testname", tname):global_env)
-                                   macro_env stmts
-                    return (tname, r)
-        all_done <- mapM doOne tests
-        return all_done
+        maybe_global_env <- evalTopBinds initial_global_env topbinds
+        case maybe_global_env of
+           Left barfage -> 
+              return [(tname, Left barfage) | TTest tname trhs <- tests]
+           Right global_env -> 
+              do let doOne (TTest tname stmts)
+                        = do r <- doOneTest (("testname", tname):global_env)
+                                            macro_env stmts
+                             return (tname, r)
+                 all_done <- mapM doOne tests
+                 return all_done
+
+
+
+evalTopBinds :: [(Var, String)]		-- pre-set global bindings
+             -> [(Var, Expr)] 		-- top-level binds got from script
+             -> IO (Either String{-complaint of some kind-}
+                           [(Var, String)]{-augmented global binds-})
+
+evalTopBinds globals binds
+   = let f_map      = [(v, nub (freeVars e)) | (v,e) <- binds]
+         eval_order = topSort f_map
+         in_order   = [ (v, unJust (lookup v binds)) | v <- eval_order ]
+     in 
+         loop globals in_order
+     where
+        loop acc [] 
+           = return (Right acc)
+        loop acc ((v,e):rest)
+           = do let initial_env = initialEnv acc []
+                (final_env, res) <- evalExpr e initial_env
+                case res of
+                   Value r       -> loop ((v,r):acc) rest
+                   Results ress  -> panic "evalTopBinds"
+                   FrameFail msg -> return (Left msg)
 
         
 ---------------------------------------------------------------------
@@ -229,11 +261,12 @@ parseOneTFile global_env tfile
               Left errmsg -> return (Left errmsg) ;
               Right topdefs -> 
      do { -- filter out the includes and recurse on them
-          let here_topdefs  = filter isTInclude topdefs
-        ; let here_includes = filter (not.isTInclude) topdefs
+          let here_topdefs  = filter (not.isTInclude) topdefs
+        ; let here_includes = filter isTInclude topdefs
         ; incl_paths
              <- mapM ( \i -> case i of 
-                                TInclude expr -> evalIncludeExpr global_env expr
+                                TInclude expr -> evalIncludeExpr tfile 
+                                                    global_env expr
                      ) here_includes
         ; let bad_incl_exprs = filter isLeft incl_paths
         ; if not (null bad_incl_exprs)
@@ -253,16 +286,19 @@ parseOneTFile global_env tfile
 
 -- Simplistically evaluate an expression, using just the global
 -- value env.  Used for evaluating the args of include statements.
-evalIncludeExpr :: [(Var,String)] 
+evalIncludeExpr :: FilePath		-- only used for making err msgs
+                -> [(Var,String)] 
                 -> Expr 
                 -> IO (Either String{-errmsg-} String{-result-})
-evalIncludeExpr global_env expr
+evalIncludeExpr tfilepath global_env expr
    = do let initial_env = initialEnv global_env []
         (final_env, res) <- evalExpr expr initial_env
         case res of
-           FrameFail msg -> return (Left ("invalid include expr: " ++ msg))
            Value v       -> return (Right v)
            Results ress  -> panic "evalIncludeExpr"
+           FrameFail msg 
+              -> return (Left (tfilepath ++ ": invalid include expr:\n      " 
+                               ++ msg))
         
           
 

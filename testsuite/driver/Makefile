@@ -2,8 +2,8 @@
 # Yes, it's a hack.  Complaints to /dev/null.
 
 RUNTESTS_SRCS= \
-	CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs Main.hs \
-	RunOneTest.hs basicRxLib/AbsTreeDefs.hs basicRxLib/Assertions.hs  \
+	TopSort.hs CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs Main.hs \
+	basicRxLib/AbsTreeDefs.hs basicRxLib/Assertions.hs  \
 	basicRxLib/AugTreeDefs.hs basicRxLib/AugmentTree.hs \
 	basicRxLib/BagRE.hs basicRxLib/CompileREP.hs \
 	basicRxLib/CompileREPB.hs basicRxLib/CompileRES.hs \
