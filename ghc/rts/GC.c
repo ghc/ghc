@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.37 1999/02/17 17:47:09 simonm Exp $
+ * $Id: GC.c,v 1.38 1999/02/23 15:45:06 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -144,7 +144,7 @@ void GarbageCollect(void (*get_roots)(void))
 {
   bdescr *bd;
   step *step;
-  lnat live, allocated, collected = 0;
+  lnat live, allocated, collected = 0, copied = 0;
   nat g, s;
 
 #ifdef PROFILING
@@ -243,11 +243,12 @@ void GarbageCollect(void (*get_roots)(void))
       step->hpLim     = step->hp + BLOCK_SIZE_W;
       step->hp_bd     = bd;
       step->to_space  = bd;
-      step->to_blocks = 1; /* ???? */
+      step->to_blocks = 1;
       step->scan      = bd->start;
       step->scan_bd   = bd;
       step->new_large_objects = NULL;
       step->scavenged_large_objects = NULL;
+      new_blocks++;
       /* mark the large objects as not evacuated yet */
       for (bd = step->large_objects; bd; bd = bd->link) {
 	bd->evacuated = 0;
@@ -272,6 +273,7 @@ void GarbageCollect(void (*get_roots)(void))
 	step->hp_bd = bd;
 	step->blocks = bd;
 	step->n_blocks = 1;
+	new_blocks++;
       }
       /* Set the scan pointer for older generations: remember we
        * still have to scavenge objects that have been promoted. */
@@ -399,7 +401,7 @@ void GarbageCollect(void (*get_roots)(void))
     loop2:
       for (gen = RtsFlags.GcFlags.generations-1; gen >= 0; gen--) {
 	for (st = generations[gen].n_steps-1; st >= 0 ; st--) {
-	  if (gen == 0 && st == 0) { 
+	  if (gen == 0 && st == 0 && RtsFlags.GcFlags.generations > 1) { 
 	    continue; 
 	  }
 	  step = &generations[gen].steps[st];
@@ -456,6 +458,7 @@ void GarbageCollect(void (*get_roots)(void))
 
   /* run through all the generations/steps and tidy up 
    */
+  copied = new_blocks * BLOCK_SIZE_W;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 
     if (g <= N) {
@@ -470,6 +473,11 @@ void GarbageCollect(void (*get_roots)(void))
 	/* Tidy the end of the to-space chains */
 	step->hp_bd->free = step->hp;
 	step->hp_bd->link = NULL;
+	/* stats information: how much we copied */
+	if (g <= N) {
+	  copied -= step->hp_bd->start + BLOCK_SIZE_W -
+	    step->hp_bd->free;
+	}
       }
 
       /* for generations we collected... */
@@ -544,6 +552,16 @@ void GarbageCollect(void (*get_roots)(void))
   
   /* Guess the amount of live data for stats. */
   live = calcLive();
+
+  /* Free the small objects allocated via allocate(), since this will
+   * all have been copied into G0S1 now.  
+   */
+  if (small_alloc_list != NULL) {
+    freeChain(small_alloc_list);
+  }
+  small_alloc_list = NULL;
+  alloc_blocks = 0;
+  alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
   /* Two-space collector:
    * Free the old to-space, and estimate the amount of live data.
@@ -661,16 +679,6 @@ void GarbageCollect(void (*get_roots)(void))
   }
   current_nursery = g0s0->blocks;
 
-  /* Free the small objects allocated via allocate(), since this will
-   * all have been copied into G0S1 now.  
-   */
-  if (small_alloc_list != NULL) {
-    freeChain(small_alloc_list);
-  }
-  small_alloc_list = NULL;
-  alloc_blocks = 0;
-  alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
-
   /* start any pending finalizers */
   scheduleFinalizers(old_weak_ptr_list);
   
@@ -694,7 +702,7 @@ void GarbageCollect(void (*get_roots)(void))
   IF_DEBUG(sanity, memInventory());
 
   /* ok, GC over: tell the stats department what happened. */
-  stat_endGC(allocated, collected, live, N);
+  stat_endGC(allocated, collected, live, copied, N);
 }
 
 /* -----------------------------------------------------------------------------

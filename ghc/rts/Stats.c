@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.8 1999/02/23 12:02:57 simonm Exp $
+ * $Id: Stats.c,v 1.9 1999/02/23 15:45:08 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -85,6 +85,7 @@ static double InitUserTime = 0.0;
 static double InitElapsedTime = 0.0;
 
 static ullong GC_tot_alloc = 0;
+static ullong GC_tot_copied = 0;
 
 static double GC_start_time,  GC_tot_time = 0;  /* User GC Time */
 static double GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
@@ -271,7 +272,7 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC(lnat alloc, lnat collect, lnat live, lnat gen)
+stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 {
     FILE *sf = RtsFlags.GcFlags.statsFile;
 
@@ -299,9 +300,10 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat gen)
 
 	GC_coll_times[gen] += time-GC_start_time;
 
-	GC_tot_alloc += (ullong) alloc;
-	GC_tot_time  += time-GC_start_time;
-	GCe_tot_time += etime-GCe_start_time;
+	GC_tot_copied += (ullong) copied;
+	GC_tot_alloc  += (ullong) alloc;
+	GC_tot_time   += time-GC_start_time;
+	GCe_tot_time  += etime-GCe_start_time;
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	  if (live > MaxResidency) {
@@ -349,6 +351,9 @@ stat_exit(int alloc)
 
 	ullong_format_string(GC_tot_alloc*sizeof(W_), temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes allocated in the heap\n", temp);
+
+	ullong_format_string(GC_tot_copied*sizeof(W_), temp, rtsTrue/*commas*/);
+	fprintf(sf, "%11s bytes copied during GC\n", temp);
 
 	if ( ResidencySamples > 0 ) {
 	    ullong_format_string(MaxResidency*sizeof(W_), temp, rtsTrue/*commas*/);
