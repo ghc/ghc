@@ -176,40 +176,59 @@ foreach $sf (@Src_files) {
     }
 }
 
-
 #
-# Create backup version of output file.
-# 
-if ( ! -f $Makefile ) {
-   # truncate() may not be implemented, so we
-   # play it safe here.
-   local(*TRUNC);
-   open(TRUNC,"> $Makefile.bak") && close(TRUNC);
+# print dependencies
+#
+if ( $Makefile eq "-" ) {
+   #
+   # print dependencies to STDOUT
+   #
+   &print_deps();
+} elsif ( ! -f $Makefile ) {
+   #
+   # $Makefile does not exist, just print the deps.
+   #
+   open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
+   select(NMKF);
+   &print_deps();
+   close(NMKF);
 } else {
-   rename($Makefile,"$Makefile.bak");
-}
-# now copy Makefile.bak into Makefile, rm'ing old dependencies
-# and adding the new
-open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
-open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
-select(NMKF);
-$_ = <OMKF>;
-while ($_ && $_ ne $Begin_magic_str) { # copy through, 'til Begin_magic_str
-    print $_;
-    $_ = <OMKF>;
-}
-while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
-    $_ = <OMKF>;
-}
-# insert dependencies
-print "$Begin_magic_str", @Depend_lines, $End_magic_str || die "Failed to write out dependencies ($!)";
+   #
+   # Create backup version of output file, then generate a new one.
+   # 
+   rename($Makefile,"$Makefile.bak") || die "$Pgm: can't rename $Makefile: $!\n";
+   
+   # now copy Makefile.bak into Makefile, rm'ing old dependencies
+   # and adding the new
+   open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
+   open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
+   select(NMKF);
 
-while (<OMKF>) { # copy the rest through
-    print $_ || die "Failed to write out dependencies ($!)";
+   $_ = <OMKF>;
+   while ($_ && $_ ne $Begin_magic_str) { # copy through, 'til Begin_magic_str
+       print $_;
+       $_ = <OMKF>;
+   }
+   while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
+       $_ = <OMKF>;
+   }
+
+   &print_deps();
+   
+   while (<OMKF>) { # copy the rest through
+       print $_ || die "Failed to write out dependencies ($!)";
+   }
+   close(NMKF) || exit(1);
+   close(OMKF) || exit(1);
 }
-close(NMKF) || exit(1);
-close(OMKF) || exit(1);
+
 exit 0;
+
+
+sub print_deps {
+    # insert dependencies
+    print "$Begin_magic_str", @Depend_lines, $End_magic_str || die "Failed to write out dependencies ($!)";
+}
 
 sub mangle_command_line_args {
     local(@Args) = @_;
