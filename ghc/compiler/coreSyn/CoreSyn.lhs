@@ -77,7 +77,7 @@ data Expr b	-- "b" for the type of binders,
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b [Alt b]  	-- Binder gets bound to value of scrutinee
-				-- DEFAULT case must be last, if it occurs at all
+				-- DEFAULT case must be *first*, if it occurs at all
   | Note  Note (Expr b)
   | Type  Type			-- This should only show up at the top
 				-- level of an Arg

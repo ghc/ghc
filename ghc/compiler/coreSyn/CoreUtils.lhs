@@ -11,7 +11,7 @@ module CoreUtils (
         mkPiType,
 
 	-- Taking expressions apart
-	findDefault, findAlt,
+	findDefault, findAlt, hasDefault,
 
 	-- Properties of expressions
 	exprType, coreAltsType, 
@@ -60,7 +60,7 @@ import IdInfo		( LBVarInfo(..),
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
-			  splitForAllTy_maybe, splitNewType_maybe, isForAllTy
+			  splitForAllTy_maybe, isForAllTy, eqType
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -185,13 +185,13 @@ mkInlineMe e	   = Note InlineMe e
 mkCoerce :: Type -> Type -> CoreExpr -> CoreExpr
 
 mkCoerce to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
-  = ASSERT( from_ty == to_ty2 )
+  = ASSERT( from_ty `eqType` to_ty2 )
     mkCoerce to_ty from_ty2 expr
 
 mkCoerce to_ty from_ty expr
-  | to_ty == from_ty = expr
-  | otherwise	     = ASSERT( from_ty == exprType expr )
-		       Note (Coerce to_ty from_ty) expr
+  | to_ty `eqType` from_ty = expr
+  | otherwise	  	   = ASSERT( from_ty `eqType` exprType expr )
+			     Note (Coerce to_ty from_ty) expr
 \end{code}
 
 \begin{code}
@@ -251,25 +251,31 @@ mkIfThenElse guard then_expr else_expr
 %*									*
 %************************************************************************
 
+The default alternative must be first, if it exists at all.
+This makes it easy to find, though it makes matching marginally harder.
 
 \begin{code}
+hasDefault :: [CoreAlt] -> Bool
+hasDefault ((DEFAULT,_,_) : alts) = True
+hasDefault _			  = False
+
 findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
-findDefault []				= ([], Nothing)
-findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null alts && null args ) 
-					  ([], Just rhs)
-findDefault (alt : alts) 	        = case findDefault alts of 
-					    (alts', deflt) -> (alt : alts', deflt)
+findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
+findDefault alts			= 		      (alts, Nothing)
 
 findAlt :: AltCon -> [CoreAlt] -> CoreAlt
 findAlt con alts
-  = go alts
-  where
-    go [] 	    = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
-    go (alt : alts) | matches alt = alt
-    		    | otherwise   = go alts
+  = case alts of
+	(deflt@(DEFAULT,_,_):alts) -> go alts deflt
+	other			   -> go alts panic_deflt
 
-    matches (DEFAULT, _, _) = True
-    matches (con1, _, _)    = con == con1
+  where
+    panic_deflt = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
+
+    go []	 	       deflt 		   = deflt
+    go (alt@(con1,_,_) : alts) deflt | con == con1 = alt
+				     | otherwise   = ASSERT( not (con1 == DEFAULT) )
+						     go alts deflt
 \end{code}
 
 
@@ -755,13 +761,8 @@ etaExpand n us expr ty
  				   (us1, us2) = splitUniqSupply us
 				   uniq	      = uniqFromSupply us1 
 				   
-	; Nothing -> 
-  
-    	case splitNewType_maybe ty of {
- 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty') ;
-  
- 	  Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
-    	}}}
+	; Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
+    	}}
 \end{code}
 
 
@@ -818,7 +819,7 @@ cheapEqExpr :: Expr b -> Expr b -> Bool
 
 cheapEqExpr (Var v1)   (Var v2)   = v1==v2
 cheapEqExpr (Lit lit1) (Lit lit2) = lit1 == lit2
-cheapEqExpr (Type t1)  (Type t2)  = t1 == t2
+cheapEqExpr (Type t1)  (Type t2)  = t1 `eqType` t2
 
 cheapEqExpr (App f1 a1) (App f2 a2)
   = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
@@ -838,6 +839,9 @@ exprIsBig other	       = True
 \begin{code}
 eqExpr :: CoreExpr -> CoreExpr -> Bool
 	-- Works ok at more general type, but only needed at CoreExpr
+	-- Used in rule matching, so when we find a type we use
+	-- eqTcType, which doesn't look through newtypes
+	-- [And it doesn't risk falling into a black hole either.]
 eqExpr e1 e2
   = eq emptyVarEnv e1 e2
   where
@@ -868,7 +872,7 @@ eqExpr e1 e2
 				       env' = extendVarEnv env v1 v2
 
     eq env (Note n1 e1) (Note n2 e2) = eq_note env n1 n2 && eq env e1 e2
-    eq env (Type t1)    (Type t2)    = t1 == t2
+    eq env (Type t1)    (Type t2)    = t1 `eqType` t2
     eq env e1		e2	     = False
 				         
     eq_list env []	 []	  = True
@@ -879,7 +883,7 @@ eqExpr e1 e2
 					 eq (extendVarEnvList env (vs1 `zip` vs2)) r1 r2
 
     eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
-    eq_note env (Coerce t1 f1) (Coerce t2 f2) = t1==t2 && f1==f2
+    eq_note env (Coerce t1 f1) (Coerce t2 f2) = t1 `eqType` t2 && f1 `eqType` f2
     eq_note env InlineCall     InlineCall     = True
     eq_note env other1	       other2	      = False
 \end{code}

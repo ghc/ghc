@@ -40,9 +40,10 @@ import Demand		( isStrict )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, repType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
-			  isDictTy, isDataType, isUnLiftedType,
+			  isUnLiftedType,
 			  splitRepFunTys
 			)
+import TcType		( isStrictType )
 import TyCon		( tyConDataConsIfAvailable )
 import DataCon		( dataConRepArity )
 import VarEnv		( SubstEnv )
@@ -246,19 +247,6 @@ getContArgs fun orig_cont
 
 	  other -> vanilla_stricts	-- Not enough args, or no strictness
 
-
--------------------
-isStrictType :: Type -> Bool
-	-- isStrictType computes whether an argument (or let RHS) should
-	-- be computed strictly or lazily, based only on its type
-isStrictType ty
-  | isUnLiftedType ty				    = True
-  | opt_DictsStrict && isDictTy ty && isDataType ty = True
-  | otherwise					    = False 
-	-- Return true only for dictionary types where the dictionary
-	-- has more than one component (else we risk poking on the component
-	-- of a newtype dictionary)
-
 -------------------
 interestingArg :: InScopeSet -> InExpr -> SubstEnv -> Bool
 	-- An argument is interesting if it has *some* structure
@@ -402,21 +390,16 @@ canUpdateInPlace :: Type -> Bool
 -- small arity.  But arity zero isn't good -- we share the single copy
 -- for that case, so no point in sharing.
 
--- Note the repType: we want to look through newtypes for this purpose
-
 canUpdateInPlace ty 
   | not opt_UF_UpdateInPlace = False
   | otherwise
-  = case splitTyConApp_maybe (repType ty) of {
-			Nothing		-> False ;
-			Just (tycon, _) -> 
-
-		      case tyConDataConsIfAvailable tycon of
-			[dc]  -> arity == 1 || arity == 2
-			      where
-				 arity = dataConRepArity dc
-			other -> False
-		      }
+  = case splitTyConApp_maybe ty of 
+	Nothing		-> False 
+	Just (tycon, _) -> case tyConDataConsIfAvailable tycon of
+				[dc]  -> arity == 1 || arity == 2
+				      where
+					 arity = dataConRepArity dc
+				other -> False
 \end{code}
 
 
@@ -774,11 +757,12 @@ mkCase scrut outer_bndr outer_alts
 	-- Secondly, if you do, you get an infinite loop, because the bindNonRec
 	-- in munge_rhs puts a case into the DEFAULT branch!
   where
-    new_alts = outer_alts_without_deflt ++ munged_inner_alts
+    new_alts = add_default maybe_inner_default
+			   (outer_alts_without_deflt ++ inner_con_alts)
+
     maybe_case_in_default = case findDefault outer_alts of
 				(outer_alts_without_default,
 				 Just (Case (Var scrut_var) inner_bndr inner_alts))
-				 
 				   | outer_bndr == scrut_var
 				   -> Just (outer_alts_without_default, inner_bndr, inner_alts)
 				other -> Nothing
@@ -793,12 +777,17 @@ mkCase scrut outer_bndr outer_alts
 			   not (con `elem` outer_cons)	-- Eliminate shadowed inner alts
 		        ]
     munge_rhs rhs = bindNonRec inner_bndr (Var outer_bndr) rhs
+
+    (inner_con_alts, maybe_inner_default) = findDefault munged_inner_alts
+
+    add_default (Just rhs) alts = (DEFAULT,[],rhs) : alts
+    add_default Nothing    alts = alts
 \end{code}
 
 Now the identity-case transformation:
 
 	case e of 		===> e
-		True -> True;
+		True  -> True;
 		False -> False
 
 and similar friends.
@@ -831,11 +820,43 @@ mkCase scrut case_bndr alts
 			other		      -> scrut
 \end{code}
 
-The catch-all case
+The catch-all case.  We do a final transformation that I've
+occasionally seen making a big difference:
 
+	case e of		=====>     case e of
+	  C _ -> f x			     D v -> ....v....
+	  D v -> ....v....		     DEFAULT -> f x
+	  DEFAULT -> f x
+
+The point is that we merge common RHSs, at least for the DEFAULT case.
+[One could do something more elaborate but I've never seen it needed.]
+The case where this came up was like this (lib/std/PrelCError.lhs):
+
+	x | p `is` 1 -> e1
+	  | p `is` 2 -> e2
+	...etc...
+
+where @is@ was something like
+	
+	p `is` n = p /= (-1) && p == n
+
+This gave rise to a horrible sequence of cases
+
+	case p of
+	  (-1) -> $j p
+	  1    -> e1
+	  DEFAULT -> $j p
+
+and similarly in cascade for all the join points!
+	  
 \begin{code}
 mkCase other_scrut case_bndr other_alts
-  = returnSmpl (Case other_scrut case_bndr other_alts)
+  = returnSmpl (Case other_scrut case_bndr (mergeDefault other_alts))
+
+mergeDefault (deflt_alt@(DEFAULT,_,deflt_rhs) : con_alts)
+  = deflt_alt : [alt | alt@(con,_,rhs) <- con_alts, not (rhs `cheapEqExpr` deflt_rhs)]
+	-- NB: we can neglect the binders because we won't get equality if the
+	-- binders are mentioned in rhs (no shadowing)
+mergeDefault other_alts
+  = other_alts
 \end{code}
-
-
