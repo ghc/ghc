@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.8 2001/06/27 11:11:03 simonmar Exp $
+-- $Id: GetImports.hs,v 1.9 2002/07/16 06:42:04 sof Exp $
 --
 -- GHC Driver program
 --
@@ -83,6 +83,10 @@ clean s
         keep acc ('-':'-':cs)         = cons acc (linecomment cs)
         keep acc ('{':'-':'#':' ':cs) = cons acc (cons "#-{" (keep "" cs))
         keep acc ('{':'-':cs)         = cons acc (runcomment (0::Int) cs)	-- -}
+	keep acc ('{':cs)             = cons acc (keep "" cs)
+	keep acc (';':cs)             = cons acc (keep "" cs)
+             -- treat ';' and '{' as word separators so that stuff
+	     -- like "{import A;" and ";;;;import B;" are handled correctly.
         keep acc (c:cs)               = keep (c:acc) cs
 
         cons [] xs = xs
