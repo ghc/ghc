@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.47 2000/03/17 12:40:03 simonmar Exp $
+ * $Id: PrimOps.h,v 1.48 2000/03/31 03:09:35 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -729,50 +729,61 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
    A par in the Haskell code is ultimately translated to a parzh macro
    (with a case wrapped around it to guarantee that the macro is actually 
     executed; see compiler/prelude/PrimOps.lhs)
+   In GUM and SMP we only add a pointer to the spark pool.
+   In GranSim we call an RTS fct, forwarding additional parameters which
+   supply info on granularity of the computation, size of the result value
+   and the degree of parallelism in the sparked expression.
    ---------------------------------------------------------------------- */
 
 #if defined(GRAN)
-// hash coding changed from 2.10 to 4.00
-#define parzh(r,node)             parZh(r,node)
+//@cindex _par_
+#define parzh(r,node)             PAR(r,node,1,0,0,0,0,0)
 
-#define parZh(r,node)				\
-	PARZh(r,node,1,0,0,0,0,0)
-
+//@cindex _parAt_
 #define parAtzh(r,node,where,identifier,gran_info,size_info,par_info,rest) \
-	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,1)
+	parAT(r,node,where,identifier,gran_info,size_info,par_info,rest,1)
 
+//@cindex _parAtAbs_
 #define parAtAbszh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
-	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,2)
+	parAT(r,node,proc,identifier,gran_info,size_info,par_info,rest,2)
 
+//@cindex _parAtRel_
 #define parAtRelzh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
-	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,3)
+	parAT(r,node,proc,identifier,gran_info,size_info,par_info,rest,3)
 
+//@cindex _parAtForNow_
 #define parAtForNowzh(r,node,where,identifier,gran_info,size_info,par_info,rest)	\
-	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,0)
+	parAT(r,node,where,identifier,gran_info,size_info,par_info,rest,0)
 
-#define parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,local)	\
-{							\
-  rtsSparkQ result;						\
-  if (closure_SHOULD_SPARK((StgClosure*)node)) {				\
+#define parAT(r,node,where,identifier,gran_info,size_info,par_info,rest,local)	\
+{							        \
+  if (closure_SHOULD_SPARK((StgClosure*)node)) {		\
     rtsSparkQ result;						\
-    STGCALL6(newSpark, node,identifier,gran_info,size_info,par_info,local);	\
-    if (local==2) {         /* special case for parAtAbs */   \
-      STGCALL3(GranSimSparkAtAbs, result,(I_)where,identifier);\
-    } else if (local==3) {  /* special case for parAtRel */   \
-      STGCALL3(GranSimSparkAtAbs, result,(I_)(CurrentProc+where),identifier);	\
-    } else {       \
-      STGCALL3(GranSimSparkAt, result,where,identifier);	\
-    }        \
-  }                                                     \
+    PEs p;                                                      \
+                                                                \
+    STGCALL6(newSpark, node,identifier,gran_info,size_info,par_info,local); \
+    switch (local) {                                                        \
+      case 2: p = where;  /* parAtAbs means absolute PE no. expected */     \
+              break;                                                        \
+      case 3: p = CurrentProc+where; /* parAtRel means rel PE no. expected */\
+              break;                                                        \
+      default: p = where_is(where); /* parAt means closure expected */      \
+              break;                                                        \
+    }                                                                       \
+    /* update GranSim state according to this spark */                      \
+    STGCALL3(GranSimSparkAtAbs, result, (I_)p, identifier);                 \
+  }                                                                         \
 }
 
+//@cindex _parLocal_
 #define parLocalzh(r,node,identifier,gran_info,size_info,par_info,rest)	\
-	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,1)
+	PAR(r,node,rest,identifier,gran_info,size_info,par_info,1)
 
+//@cindex _parGlobal_
 #define parGlobalzh(r,node,identifier,gran_info,size_info,par_info,rest) \
-	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,0)
+	PAR(r,node,rest,identifier,gran_info,size_info,par_info,0)
 
-#define PARZh(r,node,rest,identifier,gran_info,size_info,par_info,local) \
+#define PAR(r,node,rest,identifier,gran_info,size_info,par_info,local) \
 {                                                                        \
   if (closure_SHOULD_SPARK((StgClosure*)node)) {                         \
     rtsSpark *result;						         \
@@ -789,9 +800,8 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 #define noFollowzh(r,node)				\
   /* noFollow not yet implemented!! */
 
-#endif  /* GRAN */
+#elif defined(SMP) || defined(PAR)
 
-#if defined(SMP) || defined(PAR)
 #define parzh(r,node)					\
 {							\
   extern unsigned int context_switch; 			\
@@ -801,7 +811,7 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
   }							\
   r = context_switch = 1;				\
 }
-#else
+#else /* !GRAN && !SMP && !PAR */
 #define parzh(r,node) r = 1
 #endif
 

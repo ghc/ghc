@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.27 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.28 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -58,6 +58,36 @@ char   *rts_argv[MAX_RTS_ARGS];
 #define RTS 1
 #define PGM 0
 
+char *debug_opts_strs[] = {
+  "DEBUG (-D1): scheduler\n",
+  "DEBUG (-D2): evaluator\n",
+  "DEBUG (-D4): codegen\n",
+  "DEBUG (-D8): weak\n",
+  "DEBUG (-D16): gccafs\n",
+  "DEBUG (-D32): gc\n",
+  "DEBUG (-D64): block\n",
+  "DEBUG (-D128): sanity\n",
+  "DEBUG (-D256): stable\n",
+  "DEBUG (-D512): prof\n",
+  "DEBUG (-D1024): gran\n",
+  "DEBUG (-D2048): par\n"
+};
+
+char *debug_opts_prefix[] = {
+  "_-", /* scheduler */
+  "_.", /* evaluator */
+  "_,", /* codegen */
+  "_;", /* weak */
+  "_~", /* gccafs */
+  "_@", /* gc */
+  "_#", /* block */
+  "_&", /* sanity */
+  "_:", /* stable */
+  "_!", /* prof */
+  "_=", /* gran */
+  "_=" /* par */
+};
+
 #if defined(GRAN)
 
 char *gran_debug_opts_strs[] = {
@@ -110,17 +140,19 @@ char *par_debug_opts_strs[] = {
   "DEBUG (-qDs, -qD4): schedule; scheduling of parallel threads.\n",
   "DEBUG (-qDe, -qD8): free; free messages.\n",
   "DEBUG (-qDr, -qD16): resume; resume messages.\n",
-  "DEBUG (-qDw, -qD32): weight; print weights for GC.\n",
+  "DEBUG (-qDw, -qD32): weight; print weights and distrib GC stuff.\n",
   "DEBUG (-qDF, -qD64): fetch; fetch messages.\n",
-  "DEBUG (-qDa, -qD128): ack; ack messages.\n",
-  "DEBUG (-qDf, -qD256): fish; fish messages.\n",
-  "DEBUG (-qDo, -qD512): forward; forwarding messages to other PEs.\n",
+  // "DEBUG (-qDa, -qD128): ack; ack messages.\n",
+  "DEBUG (-qDf, -qD128): fish; fish messages.\n",
+  //"DEBUG (-qDo, -qD512): forward; forwarding messages to other PEs.\n",
+  "DEBUG (-qDl, -qD256): tables; print internal LAGA etc tables.\n",
+  "DEBUG (-qDo, -qD512): packet; packets and graph structures when packing.\n",
   "DEBUG (-qDp, -qD1024): pack; packing and unpacking graphs.\n"
 };
 
 /* one character codes for the available debug options */
 char par_debug_opts_flags[] = {
-  'v', 't', 's', 'e', 'r', 'w', 'F', 'a', 'f', 'o', 'p'  
+  'v', 't', 's', 'e', 'r', 'w', 'F', 'f', 'l', 'o', 'p'  
 };
 
 /* prefix strings printed with the debug messages of the corresponding type */
@@ -132,9 +164,10 @@ char *par_debug_opts_prefix[] = {
   "[]", /* resume */
   ";;", /* weight */
   "%%", /* fetch */
-  ",,", /* ack */
+  //",,", /* ack */
   "$$", /* fish */
-  "", /* forward */
+  "", /* tables */
+  "**", /* packet */
   "**" /* pack */
 };
 
@@ -167,6 +200,8 @@ static void process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool
 static void set_par_debug_options(nat n);
 static void help_par_debug_options(nat n);
 #endif
+static void set_debug_options(nat n);
+static void help_debug_options(nat n);
 
 //@node Command-line option parsing routines, GranSim specific options, Static function decls
 //@subsection Command-line option parsing routines
@@ -244,10 +279,10 @@ void initRtsFlagsDefaults(void)
 #if defined(GRAN)
     /* ToDo: check defaults for GranSim and GUM */
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
-    RtsFlags.ConcFlags.maxThreads	= 65536; // refers to mandatory threads
     RtsFlags.GcFlags.maxStkSize		= (1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
+    RtsFlags.GranFlags.maxThreads	= 65536; // refers to mandatory threads
     RtsFlags.GranFlags.GranSimStats.Full	= rtsFalse;
     RtsFlags.GranFlags.GranSimStats.Suppressed	= rtsFalse;
     RtsFlags.GranFlags.GranSimStats.Binary      = rtsFalse;
@@ -584,22 +619,11 @@ error = rtsTrue;
 	      
 #ifdef DEBUG
 	      case 'D':
-  	        /* hack warning: interpret the flags as a binary number */
-		{ 
-                   I_ n = decode(rts_argv[arg]+2);
-                   if (n     &1) RtsFlags.DebugFlags.scheduler   = rtsTrue;
-                   if ((n>>1)&1) RtsFlags.DebugFlags.evaluator   = rtsTrue;
-                   if ((n>>2)&1) RtsFlags.DebugFlags.codegen     = rtsTrue;
-                   if ((n>>3)&1) RtsFlags.DebugFlags.weak        = rtsTrue;
-                   if ((n>>4)&1) RtsFlags.DebugFlags.gccafs      = rtsTrue;
-                   if ((n>>5)&1) RtsFlags.DebugFlags.gc          = rtsTrue;
-                   if ((n>>6)&1) RtsFlags.DebugFlags.block_alloc = rtsTrue;
-                   if ((n>>7)&1) RtsFlags.DebugFlags.sanity      = rtsTrue;
-                   if ((n>>8)&1) RtsFlags.DebugFlags.stable      = rtsTrue;
-                   if ((n>>9)&1) RtsFlags.DebugFlags.prof        = rtsTrue;
-                   if ((n>>10)&1) RtsFlags.DebugFlags.gran       = rtsTrue;
-                   if ((n>>11)&1) RtsFlags.DebugFlags.par        = rtsTrue;
-                }
+		if (isdigit(rts_argv[arg][2])) {/* Set all debugging options in one */
+	    	/* hack warning: interpret the flags as a binary number */
+		  nat n = decode(rts_argv[arg]+2);
+		  set_debug_options(n);
+		}
 		break;
 #endif
 
@@ -1862,9 +1886,10 @@ set_par_debug_options(nat n) {
         case 4: RtsFlags.ParFlags.Debug.resume        = rtsTrue;  break;
         case 5: RtsFlags.ParFlags.Debug.weight        = rtsTrue;  break;
         case 6: RtsFlags.ParFlags.Debug.fetch         = rtsTrue;  break;
-        case 7: RtsFlags.ParFlags.Debug.ack           = rtsTrue;  break;
-        case 8: RtsFlags.ParFlags.Debug.fish          = rtsTrue;  break;
-        case 9: RtsFlags.ParFlags.Debug.forward       = rtsTrue;  break;
+	  //case 7: RtsFlags.ParFlags.Debug.ack           = rtsTrue;  break;
+        case 7: RtsFlags.ParFlags.Debug.fish          = rtsTrue;  break;
+        case 8: RtsFlags.ParFlags.Debug.tables        = rtsTrue;  break;
+        case 9: RtsFlags.ParFlags.Debug.packet        = rtsTrue;  break;
         case 10: RtsFlags.ParFlags.Debug.pack          = rtsTrue;  break;
         default: barf("set_par_debug_options: only %d debug options expected");
       } /* switch */
@@ -1885,6 +1910,39 @@ help_par_debug_options(nat n) {
 }
 
 #endif /* GRAN */
+
+static void
+set_debug_options(nat n) {
+  nat i;
+
+  for (i=0; i<=MAX_DEBUG_OPTION; i++) 
+    if ((n>>i)&1) {
+      fprintf(stderr, debug_opts_strs[i]);
+      switch (i) {
+        case 0: RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
+        case 1: RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
+        case 2: RtsFlags.DebugFlags.codegen     = rtsTrue; break;
+        case 3: RtsFlags.DebugFlags.weak        = rtsTrue; break;
+        case 4: RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
+        case 5: RtsFlags.DebugFlags.gc          = rtsTrue; break;
+        case 6: RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
+        case 7: RtsFlags.DebugFlags.sanity      = rtsTrue; break;
+        case 8: RtsFlags.DebugFlags.stable      = rtsTrue; break;
+        case 9: RtsFlags.DebugFlags.prof        = rtsTrue; break;
+        case 10:  RtsFlags.DebugFlags.gran       = rtsTrue; break;
+        case 11:  RtsFlags.DebugFlags.par        = rtsTrue; break;
+      } /* switch */
+    } /* if */
+}
+
+static void
+help_debug_options(nat n) {
+  nat i;
+
+  for (i=0; i<=MAX_DEBUG_OPTION; i++) 
+    if ((n>>i)&1) 
+      fprintf(stderr, debug_opts_strs[i]);
+}
 
 //@node Aux fcts,  , GranSim specific options
 //@subsection Aux fcts

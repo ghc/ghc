@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.16 2000/01/18 12:36:38 simonmar Exp $
+ * $Id: Closures.h,v 1.17 2000/03/31 03:09:35 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -227,6 +227,15 @@ typedef struct {
     StgMutClosure *mut_link;
 } StgMutVar;
 
+/* 
+   A collective typedef for all linkable stack frames i.e.
+     StgUpdateFrame, StgSeqFrame, StgCatchFrame
+*/
+typedef struct _StgFrame {
+    StgHeader  header;
+    struct _StgFrame *link;
+} StgFrame;
+
 typedef struct _StgUpdateFrame {
     StgHeader  header;
     struct _StgUpdateFrame *link;
@@ -311,35 +320,40 @@ typedef struct {
 
 #if defined(PAR) || defined(GRAN)
 /*
-  StgBlockingQueueElement represents the types of closures that can be 
-  found on a blocking queue: StgTSO, StgRBHSave, StgBlockedFetch.
-  (StgRBHSave can only appear at the end of a blocking queue).  
-  Logically, this is a union type, but defining another struct with a common
-  layout is easier to handle in the code (same as for StgMutClosures).
+  StgBlockingQueueElement is a ``collective type'' representing the types
+  of closures that can be found on a blocking queue: StgTSO, StgRBHSave,
+  StgBlockedFetch.  (StgRBHSave can only appear at the end of a blocking
+  queue).  Logically, this is a union type, but defining another struct
+  with a common layout is easier to handle in the code (same as for
+  StgMutClosures).  
+  Note that in the standard setup only StgTSOs can be on a blocking queue.
+  This is one of the main reasons for slightly different code in files
+  such as Schedule.c.
 */
 typedef struct StgBlockingQueueElement_ {
   StgHeader                         header;
-  struct StgBlockingQueueElement_  *link;
-  StgMutClosure                    *mut_link;
-  struct StgClosure_               *payload[0];
+  struct StgBlockingQueueElement_  *link;      /* next elem in BQ */
+  StgMutClosure                    *mut_link;  /* next elem in mutable list */
+  struct StgClosure_               *payload[0];/* contents of the closure */
 } StgBlockingQueueElement;
 
+/* only difference to std code is type of the elem in the BQ */
 typedef struct StgBlockingQueue_ {
   StgHeader                 header;
-  struct StgBlockingQueueElement_ *blocking_queue;
-  StgMutClosure            *mut_link;
+  struct StgBlockingQueueElement_ *blocking_queue; /* start of the BQ */
+  StgMutClosure            *mut_link;              /* next elem in mutable list */
 } StgBlockingQueue;
 
-/* this closure is hanging at the end of a blocking queue in (par setup only) */
+/* this closure is hanging at the end of a blocking queue in (see RBH.c) */
 typedef struct StgRBHSave_ {
   StgHeader    header;
-  StgPtr       payload[0];
-} StgRBHSave;
-
+  StgPtr       payload[0];     /* 2 words ripped out of the guts of the */
+} StgRBHSave;                  /*  closure holding the blocking queue */
+ 
 typedef struct StgRBH_ {
-  StgHeader                                header;
-  struct StgBlockingQueueElement_         *blocking_queue;
-  StgMutClosure                           *mut_link;
+  StgHeader                         header;
+  struct StgBlockingQueueElement_  *blocking_queue; /* start of the BQ */
+  StgMutClosure                    *mut_link;       /* next elem in mutable list */
 } StgRBH;
 
 #else
@@ -356,25 +370,30 @@ typedef struct StgBlockingQueue_ {
 /* global indirections aka FETCH_ME closures */
 typedef struct StgFetchMe_ {
   StgHeader              header;
-  globalAddr            *ga;		/* type globalAddr is abstract here */
-  StgMutClosure         *mut_link;
+  globalAddr            *ga;        /* ptr to unique id for a closure */
+  StgMutClosure         *mut_link;  /* next elem in mutable list */
 } StgFetchMe;
 
 /* same contents as an ordinary StgBlockingQueue */
 typedef struct StgFetchMeBlockingQueue_ {
   StgHeader                          header;
-  struct StgBlockingQueueElement_   *blocking_queue;
-  StgMutClosure                     *mut_link;
+  struct StgBlockingQueueElement_   *blocking_queue; /* start of the BQ */
+  StgMutClosure                     *mut_link;       /* next elem in mutable list */
 } StgFetchMeBlockingQueue;
 
-/* entry in a blocking queue, indicating a request from a TSO on another PE */
+/* This is an entry in a blocking queue. It indicates a fetch request from a 
+   TSO on another PE demanding the value of this closur. Note that a
+   StgBlockedFetch can only occur in a BQ. Once the node is evaluated and
+   updated with the result, the result will be sent back (the PE is encoded
+   in the globalAddr) and the StgBlockedFetch closure will be nuked.
+*/
 typedef struct StgBlockedFetch_ {
   StgHeader                         header;
-  struct StgBlockingQueueElement_  *link;
-  StgMutClosure                    *mut_link;
-  StgClosure                       *node;
-  globalAddr                        ga;
-} StgBlockedFetch;
+  struct StgBlockingQueueElement_  *link;     /* next elem in the BQ */
+  StgMutClosure                    *mut_link; /* next elem in mutable list */
+  StgClosure                       *node;     /* node to fetch */
+  globalAddr                        ga;       /* where to send the result to */
+} StgBlockedFetch;                            /* NB: not just a ptr to a GA */
 #endif
 
 #endif /* CLOSURES_H */

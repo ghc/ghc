@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.22 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.23 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -62,6 +62,10 @@ struct DEBUG_FLAGS {
   rtsBool gran        : 1; /* 1024 */
   rtsBool par         : 1; /* 2048 */
 };
+
+#define MAX_DEBUG_OPTION     11
+#define DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
+#define MAX_DEBUG_MASK       ((nat)(ldexp(1,(MAX_DEBUG_OPTION+1))-1))
 
 #if defined(PROFILING) || defined(PAR)
     /* with PROFILING, full cost-centre stuff (also PROFILING_FLAGS);
@@ -139,9 +143,9 @@ struct PAR_DEBUG_FLAGS {
   rtsBool resume     : 1; /*   16 */
   rtsBool weight     : 1; /*   32 */
   rtsBool fetch      : 1; /*   64 */
-  rtsBool ack        : 1; /*  128 */
-  rtsBool fish       : 1; /*  256 */
-  rtsBool forward    : 1; /*  512 */
+  rtsBool fish       : 1; /*  128 */
+  rtsBool tables     : 1; /*  256 */
+  rtsBool packet     : 1; /*  512 */
   rtsBool pack       : 1; /* 1024 */
 };
 
@@ -241,6 +245,7 @@ struct GRAN_FLAGS {
   struct GRAN_COST_FLAGS Costs;          /* cost metric for simulation */
   struct GRAN_DEBUG_FLAGS Debug;         /* debugging options */
 
+  nat  maxThreads;              // ToDo: share with SMP and GUM
   // rtsBool labelling;
   nat  packBufferSize;
   nat  packBufferSize_internal;

@@ -1,8 +1,8 @@
 /* 
-   Time-stamp: <Fri Jan 14 2000 13:47:43 Stardate: [-30]4202.87 hwloidl>
+   Time-stamp: <Tue Mar 14 2000 17:15:59 Stardate: [-30]4503.59 hwloidl>
 
    Prototypes of all parallel debugging functions.
-   */
+*/
 
 #ifndef PARALLEL_DEBUG_H
 #define PARALLEL_DEBUG_H
@@ -37,9 +37,15 @@ void GIT(StgPtr node);
 #if defined(GRAN) || defined(PAR)
 
 char  *display_info_type(StgClosure *closure, char *str);
+void   info_hdr_type(StgClosure *closure, char *res);
+char  *info_type(StgClosure *closure);
+char  *info_type_by_ip(StgInfoTable *ip);
 
 void   PrintPacket(rtsPackBuffer *buffer);
 void   PrintGraph(StgClosure *p, int indent_level);
+void   checkGraph(StgClosure *p, int rec_level);
+
+void   checkPacket(rtsPackBuffer *packBuffer);
 
 #endif /* GRAN || PAR */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.22 2000/03/17 14:37:21 simonmar Exp $
+ * $Id: Printer.c,v 1.23 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -203,12 +203,41 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
 
+    case TSO:
+      fprintf(stderr,"TSO("); 
+      fprintf(stderr,"%d (%x)", 
+              stgCast(StgTSO*,obj)->id, stgCast(StgTSO*,obj));
+      fprintf(stderr,")\n"); 
+      break;
+
+#if defined(PAR)
+    case BLOCKED_FETCH:
+      fprintf(stderr,"BLOCKED_FETCH("); 
+      printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
+      printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
+      fprintf(stderr,")\n"); 
+      break;
+
+    case FETCH_ME:
+      fprintf(stderr,"FETCH_ME("); 
+      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      fprintf(stderr,")\n"); 
+      break;
+
+    case FETCH_ME_BQ:
+      fprintf(stderr,"FETCH_ME_BQ("); 
+      // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
 #if defined(GRAN) || defined(PAR)
     case RBH:
       fprintf(stderr,"RBH("); 
       printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
       fprintf(stderr,")\n"); 
       break;
+
 #endif
 
     case CONSTR:
@@ -252,19 +281,25 @@ void printClosure( StgClosure *obj )
             /* ToDo: will this work for THUNK_STATIC too? */
             printStdObject(obj,"THUNK");
             break;
-#if 0
+
+    case THUNK_SELECTOR:
+            printStdObject(obj,"THUNK_SELECTOR");
+            break;
+
     case ARR_WORDS:
         {
             StgWord i;
             fprintf(stderr,"ARR_WORDS(\"");
-            /* ToDo: we can't safely assume that this is a string! */
+            /* ToDo: we can't safely assume that this is a string! 
             for (i = 0; arrWordsGetChar(obj,i); ++i) {
                 putchar(arrWordsGetChar(obj,i));
-            }
+		} */
+	    for (i=0; i<((StgArrWords *)obj)->words; i++)
+	      fprintf(stderr, "%d", ((StgArrWords *)obj)->payload[i]);
             fprintf(stderr,"\")\n");
             break;
         }
-#endif
+
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = stgCast(StgUpdateFrame*,obj);
@@ -543,11 +578,11 @@ static char *closure_type_names[] = {
   "STABLE_NAME",	        /* 58 */
   "TSO",		        /* 59 */
   "BLOCKED_FETCH",	        /* 60 */
-  "FETCH_ME",                	/* 61 */
-  "EVACUATED",               	/* 62 */
-  "N_CLOSURE_TYPES",         	/* 63 */
-  "FETCH_ME_BQ",             	/* 64 */
-  "RBH"                     	/* 65 */
+  "FETCH_ME",                   /* 61 */
+  "FETCH_ME_BQ",                /* 62 */
+  "RBH",                        /* 63 */
+  "EVACUATED",                  /* 64 */
+  "N_CLOSURE_TYPES"         	/* 65 */
 };
 
 char *
@@ -787,7 +822,8 @@ static void printZcoded( const char *raw )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now. 
 */
-#if defined(HAVE_BFD_H) && !defined(_WIN32)
+/* For now, BFD support is unconditionally disabled -- HWL */
+#if 0 /* HWL */ && defined(HAVE_BFD_H) && !defined(_WIN32)
 
 #include <bfd.h>
 

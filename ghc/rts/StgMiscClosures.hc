@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.38 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.39 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -241,26 +241,10 @@ STGFUN(BLACKHOLE_entry)
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
 
-#if defined(PAR)
-    /* Save the Thread State here, before calling RTS routines below! */
-    SAVE_THREAD_STATE(1);
+    /* PAR: dumping of event now done in blockThread -- HWL */
 
-    /* if collecting stats update the execution time etc */
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      /* Note that CURRENT_TIME may perform an unsafe call */
-      //rtsTime now = CURRENT_TIME; /* Now */
-      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-      CurrentTSO->par.blockcount++;
-      CurrentTSO->par.blockedat = CURRENT_TIME;
-      DumpRawGranEvent(CURRENT_PROC, thisPE,
-		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
-    }
-
-    THREAD_RETURN(1);  /* back to the scheduler */  
-#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
-#endif
 
   FE_
 }
@@ -300,26 +284,10 @@ STGFUN(BLACKHOLE_BQ_entry)
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
 #endif
 
-#if defined(PAR)
-    /* Save the Thread State here, before calling RTS routines below! */
-    SAVE_THREAD_STATE(1);
+    /* PAR: dumping of event now done in blockThread -- HWL */
 
-    /* if collecting stats update the execution time etc */
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      /* Note that CURRENT_TIME may perform an unsafe call */
-      //rtsTime now = CURRENT_TIME; /* Now */
-      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-      CurrentTSO->par.blockcount++;
-      CurrentTSO->par.blockedat = CURRENT_TIME;
-      DumpRawGranEvent(CURRENT_PROC, thisPE,
-		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
-    }
-
-    THREAD_RETURN(1);  /* back to the scheduler */  
-#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
-#endif
   FE_
 }
 
@@ -354,28 +322,10 @@ STGFUN(RBH_entry)
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
 
-#if defined(PAR)
-    /* Save the Thread State here, before calling RTS routines below! */
-    SAVE_THREAD_STATE(1);
+    /* PAR: dumping of event now done in blockThread -- HWL */
 
-    /* if collecting stats update the execution time etc */
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      /* Note that CURRENT_TIME may perform an unsafe call */
-      //rtsTime now = CURRENT_TIME; /* Now */
-      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-      CurrentTSO->par.blockcount++;
-      CurrentTSO->par.blockedat = CURRENT_TIME;
-      DumpRawGranEvent(CURRENT_PROC, thisPE,
-		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
-    }
-
-    THREAD_RETURN(1);  /* back to the scheduler */  
-#else
-    /* saves thread state and leaves thread in ThreadEnterGHC state; */
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1); 
-#endif
-
   FE_
 }
 
@@ -432,27 +382,10 @@ STGFUN(CAF_BLACKHOLE_entry)
     /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
 
-#if defined(PAR)
-    /* Save the Thread State here, before calling RTS routines below! */
-    SAVE_THREAD_STATE(1);
+    /* PAR: dumping of event now done in blockThread -- HWL */
 
-    /* if collecting stats update the execution time etc */
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      /* Note that CURRENT_TIME may perform an unsafe call */
-      //rtsTime now = CURRENT_TIME; /* Now */
-      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-      CurrentTSO->par.blockcount++;
-      CurrentTSO->par.blockedat = CURRENT_TIME;
-      DumpRawGranEvent(CURRENT_PROC, thisPE,
-		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
-    }
-
-    THREAD_RETURN(1);  /* back to the scheduler */  
-#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
-#endif
-
   FE_
 }
 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.9 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: InfoMacros.h,v 1.10 2000/03/31 03:09:35 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -32,7 +32,7 @@
 #endif
 
 /*
-  On the GRAN/PAR specific parts of the InfoTables:
+  On the GranSim/GUM specific parts of the InfoTables (GRAN/PAR):
 
   In both GranSim and GUM we use revertible black holes (RBH) when putting
   an updatable closure into a packet for communication. The entry code for
@@ -70,7 +70,7 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 	       prof_descr, prof_type)		/* profiling info */	\
         entry_class(RBH_##entry);                                      \
         entry_class(entry);                                             \
-	info_class INFO_TBL_CONST StgInfoTable info; \
+	ED_RO_ StgInfoTable info; \
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
 		layout : { payload : {ptrs,nptrs} },			\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  \
@@ -117,7 +117,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		      prof_descr, prof_type)				\
         entry_class(RBH_##entry);                                      \
         entry_class(entry);                                             \
-	info_class INFO_TBL_CONST StgInfoTable info; \
+	ED_RO_ StgInfoTable info; \
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
 		layout : { bitmap : (StgWord32)bitmap_ },		\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
@@ -157,7 +157,7 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
 	   entry_class, prof_descr, prof_type)		\
         entry_class(RBH_##entry);                                      \
         entry_class(entry);                                             \
-	info_class INFO_TBL_CONST StgInfoTable info; \
+	ED_RO_ StgInfoTable info; \
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
 		layout : { payload : {ptrs,nptrs} },	\
 		STD_INFO(RBH),				\
@@ -198,7 +198,7 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
 		    entry_class, prof_descr, prof_type)	\
         entry_class(RBH_##entry);                                      \
         entry_class(entry);                                             \
-	info_class INFO_TBL_CONST StgInfoTable info; \
+	ED_RO_ StgInfoTable info; \
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
 		layout : { selector_offset : offset },	\
 		STD_INFO(RBH),		                \

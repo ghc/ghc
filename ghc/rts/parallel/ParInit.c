@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
-   Time-stamp: <Sat Dec 04 1999 18:26:22 Stardate: [-30]3998.84 hwloidl>
-   $Id: ParInit.c,v 1.2 2000/01/13 14:34:08 hwloidl Exp $
+   Time-stamp: <Fri Mar 24 2000 17:42:24 Stardate: [-30]4553.68 hwloidl>
+   $Id: ParInit.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
 
    Initialising the parallel RTS
 
@@ -68,19 +68,6 @@ rtsSpark *pending_sparks_hd[SPARK_POOLS],  /* ptr to start of a spark pool */
    see RtsFlags.ParFlags.maxLocalSparks */
 nat spark_limit[SPARK_POOLS];
 
-globalAddr theGlobalFromGA, theGlobalToGA;
-/*
-  HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACK !! see FETCH_ME_entry
-  Only used within FETCH_ME_entry as local vars, but they shouldn't
-  be defined locally in there -- that would move %esp and you'll never
-  return from STG land.
-  -- HWL
-*/
-globalAddr *rga_GLOBAL;
-globalAddr *lga_GLOBAL;
-globalAddr fmbqga_GLOBAL;
-StgClosure *p_GLOBAL;
-
 //@cindex PendingFetches
 /* A list of fetch reply messages not yet processed; this list is filled
    by awaken_blocked_queue and processed by processFetches */
@@ -99,24 +86,14 @@ nat sparksIgnored = 0, sparksCreated = 0,
 //@cindex advisory_thread_count
 nat advisory_thread_count = 0;
 
-/* Where to write the log file 
-   This is now in Parallel.c 
-FILE *gr_file = NULL;
-char gr_filename[STATS_FILENAME_MAXLEN];
-*/
+/* For flag handling see RtsFlags.h */
 
-/* Flag handling. */
+//@node Prototypes
+//@subsection Prototypes
 
-#if 0
-/* that's now all done via RtsFlags.ParFlags... */
-rtsBool TraceSparks =    rtsFalse;		/* Enable the spark trace mode 		*/
-rtsBool SparkLocally =   rtsFalse;		/* Use local threads if possible 	*/
-rtsBool DelaySparks =    rtsFalse;		/* Use delayed sparking 		*/
-rtsBool LocalSparkStrategy =   rtsFalse;	/* Either delayed threads or local threads*/
-rtsBool GlobalSparkStrategy =  rtsFalse;	/* Export all threads	    	     	*/
-
-rtsBool DeferGlobalUpdates =   rtsFalse;	/* Defer updating of global nodes	*/
-#endif
+/* Needed for FISH messages (initialisation of random number generator) */
+void srand48 (long);
+time_t time (time_t *);
 
 //@node Initialisation Routines,  , Global variables
 //@subsection Initialisation Routines
@@ -133,7 +110,7 @@ rtsBool DeferGlobalUpdates =   rtsFalse;	/* Defer updating of global nodes	*/
 void
 shutdownParallelSystem(StgInt n)
 {
-  belch("   entered shutdownParallelSystem ...");
+  belch("==== entered shutdownParallelSystem ...");
   ASSERT(GlobalStopPending = rtsTrue);
   sendOp(PP_FINISH, SysManTask);
   if (n != 0) 
@@ -145,19 +122,14 @@ shutdownParallelSystem(StgInt n)
 	       belch("--++ shutting down PE %lx, %ld sparks created, %ld sparks Ignored, %ld threads created, %ld threads Ignored", 
 		     (W_) mytid, sparksCreated, sparksIgnored,
 		     threadsCreated, threadsIgnored));
-  exit(n);
+  if (n!=0)
+    exit(n);
 }
-
-/* Some prototypes */
-void srand48 (long);
-time_t time (time_t *);
 
 //@cindex initParallelSystem
 void
 initParallelSystem(void)
 {
-  belch("entered initParallelSystem ...");
-
   /* Don't buffer standard channels... */
   setbuf(stdout,NULL);
   setbuf(stderr,NULL);
@@ -165,21 +137,12 @@ initParallelSystem(void)
   srand48(time(NULL) * getpid());  /*Initialise Random-number generator seed*/
                                    /* Used to select target of FISH message*/
 
-  theGlobalFromGA.payload.gc.gtid = 0;
-  theGlobalToGA.payload.gc.gtid = 0;
+  if (!InitPackBuffer())
+    barf("InitPackBuffer");
 
-  //IF_PAR_DEBUG(verbose,
-	       belch("initPackBuffer ...");
-  if (!initPackBuffer())
-    barf("initPackBuffer");
-
-  // IF_PAR_DEBUG(verbose,
-	       belch("initMoreBuffers ...");
   if (!initMoreBuffers())
     barf("initMoreBuffers");
 
-  // IF_PAR_DEBUG(verbose,
-	       belch("initSparkPools ...");
   if (!initSparkPools())
     barf("initSparkPools");
 }
@@ -195,11 +158,11 @@ SynchroniseSystem(void)
 {
   int i;
 
-  fprintf(stderr, "SynchroniseSystem: nPEs=%d\n", nPEs); 
+  fprintf(stderr, "==== SynchroniseSystem: nPEs=%d\n", nPEs); 
 
   initEachPEHook();                  /* HWL: hook to be execed on each PE */
 
-  fprintf(stderr, "SynchroniseSystem: initParallelSystem\n");
+  fprintf(stderr, "==== SynchroniseSystem: initParallelSystem\n");
   initParallelSystem();
   allPEs = startUpPE(nPEs);
 
@@ -208,7 +171,7 @@ SynchroniseSystem(void)
 
   /* Record the shortened the PE identifiers for LAGA etc. tables */
   for (i = 0; i < nPEs; ++i) {
-    fprintf(stderr, "[%x] registering %d-th PE as %x\n", mytid, i, allPEs[i]);
+    fprintf(stderr, "==== [%x] registering %d-th PE as %x\n", mytid, i, allPEs[i]);
     registerTask(allPEs[i]);
   }
 }

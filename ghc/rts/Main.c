@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.19 2000/03/30 12:03:30 simonmar Exp $
+ * $Id: Main.c,v 1.20 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 
 #  if defined(PAR)
 
-#   if DEBUG
+#   if defined(DEBUG)
     { /* a wait loop to allow attachment of gdb to UNIX threads */
       nat i, j, s;
 
@@ -81,15 +81,15 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Main Thread Started ...\n");
 
       /* ToDo: Dump event for the main thread */
-      status = rts_evalIO(mainIO_closure, NULL);
+      status = rts_evalIO((HaskellObj)mainIO_closure, NULL);
     } else {
       /* Just to show we're alive */
       IF_PAR_DEBUG(verbose,
-		   fprintf(stderr, "== [%x] Non-Main PE enters scheduler without work ...\n",
+		   fprintf(stderr, "== [%x] Non-Main PE enters scheduler via taskStart() without work ...\n",
 			   mytid));
      
       /* all non-main threads enter the scheduler without work */
-      status = schedule( /* nothing */ );
+      status = rts_evalNothing((StgClosure*)NULL);
     }
 
 #  elif defined(GRAN)
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 #  else /* !PAR && !GRAN */
 
     /* ToDo: want to start with a larger stack size */
-    status = rts_evalIO((StgClosure *)mainIO_closure, NULL);
+    status = rts_evalIO(mainIO_closure, NULL);
 
 #  endif /* !PAR && !GRAN */
 

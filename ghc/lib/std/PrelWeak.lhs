@@ -7,8 +7,6 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-#ifndef __PARALLEL_HASKELL__
-
 module PrelWeak where
 
 import PrelGHC
@@ -16,6 +14,8 @@ import PrelBase
 import PrelMaybe
 import PrelIOBase
 import PrelForeign
+
+#ifndef __PARALLEL_HASKELL__
 
 data Weak v = Weak (Weak# v)
 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.12 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.13 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -366,6 +366,21 @@ rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
   scheduleThread(tso);
   return waitThread(tso, ret);
 }
+
+#if defined(PAR) || defined(SMP)
+/*
+  Needed in the parallel world for non-Main PEs, which do not get a piece
+  of work to start with --- they have to humbly ask for it
+*/
+
+SchedulerStatus
+rts_evalNothing(unsigned int stack_size)
+{
+  /* ToDo: propagate real SchedulerStatus back to caller */
+  scheduleThread(END_TSO_QUEUE);
+  return Success;
+}
+#endif
 
 /* Convenience function for decoding the returned status. */
 

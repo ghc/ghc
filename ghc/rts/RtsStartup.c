@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.36 2000/03/30 12:03:30 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.37 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -267,6 +267,10 @@ shutdownHaskell(void)
   resetNonBlockingFd(1);
   resetNonBlockingFd(2);
 
+#if defined(PAR)
+  shutdownParallelSystem(0);
+#endif
+
   /* stop timing the shutdown, we're about to print stats */
   stat_endExit();
 
@@ -288,10 +292,6 @@ shutdownHaskell(void)
 #endif
 
   rts_has_started_up=0;
-
-#if defined(PAR)
-  shutdownParallelSystem(0);
-#endif
 
 }
 

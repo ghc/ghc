@@ -1,18 +1,12 @@
 /*
-  Time-stamp: <Fri Dec 10 1999 17:15:01 Stardate: [-30]4028.38 software>
+  Time-stamp: <Tue Mar 28 2000 23:50:54 Stardate: [-30]4574.76 hwloidl>
+  $Id: Parallel.h,v 1.3 2000/03/31 03:09:35 hwloidl Exp $
  
-  Definitions for parallel machines.
+  Definitions for GUM i.e. running on a parallel machine.
 
   This section contains definitions applicable only to programs compiled
   to run on a parallel machine, i.e. on GUM. Some of these definitions
   are also used when simulating parallel execution, i.e. on GranSim.
-*/
-
-/*
-  ToDo: Check the PAR specfic part of this file 
-        Move stuff into Closures.h and ClosureMacros.h 
-	Clean-up GRAN specific code
-  -- HWL
 */
 
 #ifndef PARALLEL_H
@@ -32,6 +26,9 @@
 //@node Basic definitions, GUM, Parallel definitions, Parallel definitions
 //@subsection Basic definitions
 
+/* This clashes with TICKY, but currently TICKY and PAR hate each other anyway */
+#define _HS  sizeofW(StgHeader)
+
 /* SET_PAR_HDR and SET_STATIC_PAR_HDR now live in ClosureMacros.h */
 
 /* Needed for dumping routines */
@@ -39,8 +36,8 @@
 # define NODE_STR_LEN              20
 # define TIME_STR_LEN              120
 # define TIME                      rtsTime
-# define CURRENT_TIME              msTime()
-# define TIME_ON_PROC(p)           msTime()
+# define CURRENT_TIME              (msTime() - startTime)
+# define TIME_ON_PROC(p)           (msTime() - startTime)
 # define CURRENT_PROC              thisPE
 # define BINARY_STATS              RtsFlags.ParFlags.ParStats.Binary
 #elif defined(GRAN)
@@ -77,10 +74,10 @@
 
 #if defined(PAR) 
 /*
-Symbolic constants for the packing code.
-
-This constant defines how many words of data we can pack into a single
-packet in the parallel (GUM) system.
+  Symbolic constants for the packing code.
+  
+  This constant defines how many words of data we can pack into a single
+  packet in the parallel (GUM) system.
 */
 
 //@menu
@@ -144,23 +141,18 @@ extern rtsSpark *pending_sparks_base[];
 extern nat spark_limit[];
 
 extern rtsPackBuffer *PackBuffer;      /* size: can be set via option */
-extern rtsPackBuffer *buffer;             /* HWL_ */
-extern rtsPackBuffer *freeBuffer;           /* HWL_ */
-extern rtsPackBuffer *packBuffer;           /* HWL_ */
+extern rtsPackBuffer *buffer;
+extern rtsPackBuffer *freeBuffer;
+extern rtsPackBuffer *packBuffer;
 extern rtsPackBuffer *gumPackBuffer;
 
-extern int thisPE;
+extern nat thisPE;
 
-/* From Global.c */
+/* From Global.c 
 extern GALA *freeGALAList;
 extern GALA *freeIndirections;
 extern GALA *liveIndirections;
 extern GALA *liveRemoteGAs;
-
-/*
-extern HashTable *taskIDtoPEtable;
-extern HashTable *LAtoGALAtable;
-extern HashTable *pGAtoGALAtable;
 */
 
 //@node Prototypes, Macros, Externs, GUM
@@ -184,6 +176,13 @@ void          initGAtables (void);
 void          RebuildLAGAtable (void);
 StgWord       PackGA (StgWord pe, int slot);
 
+# if defined(DEBUG)
+/* from Global.c */
+/* highest_slot breaks the abstraction of the slot counter for GAs; it is
+   only used for sanity checking and should used nowhere else */
+StgInt highest_slot (void); 
+# endif
+
 //@node Macros,  , Prototypes, GUM
 //@subsubsection Macros
 
@@ -194,14 +193,14 @@ StgWord       PackGA (StgWord pe, int slot);
 
 // ToDo: check which of these is actually needed!
 
-#    define PACK_HEAP_REQUIRED  ((RtsFlags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (MIN_UPD_SIZE + 2))
+#    define PACK_HEAP_REQUIRED  ((RtsFlags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _HS) * (MIN_UPD_SIZE + 2))
 
 #  define MAX_GAS 	(RtsFlags.ParFlags.packBufferSize / PACK_GA_SIZE)
 
 
 #  define PACK_GA_SIZE	3	/* Size of a packed GA in words */
 			        /* Size of a packed fetch-me in words */
-#  define PACK_FETCHME_SIZE (PACK_GA_SIZE + FIXED_HS)
+#  define PACK_FETCHME_SIZE (PACK_GA_SIZE + _HS)
 
 #  define PACK_HDR_SIZE	1	/* Words of header in a packet */
 
@@ -231,6 +230,41 @@ StgWord       PackGA (StgWord pe, int slot);
 /* At the moment, there is no activity profiling for GUM.  This may change. */
 #  define SET_TASK_ACTIVITY(act)        /* nothing */
 
+/* 
+   The following macros are only needed for sanity checking (see Sanity.c).
+*/
+
+/* NB: this is PVM specific and should be updated for MPI etc
+       in PVM a task id (tid) is split into 2 parts: the id for the 
+       physical processor it is running on and an index of tasks running
+       on a processor; PVM_PE_MASK indicates which part of a tid holds the 
+       id of the physical processor (the other part of the word holds the 
+       index on that processor)
+       MAX_PVM_PES and MAX_PVM_TIDS are maximal values for these 2 components
+       in GUM we have an upper bound for the total number of PVM PEs allowed:
+       it's MAX_PE defined in Parallel.h
+       to check the slot field of a GA we call a fct highest_slot which just
+       returns the internal counter 
+*/
+#define PVM_PE_MASK    0xfffc0000
+#define MAX_PVM_PES    MAX_PES
+#define MAX_PVM_TIDS   MAX_PES
+
+#if 0
+#define LOOKS_LIKE_TID(tid)  (((tid & PVM_PE_MASK) != 0) && \
+                              (((tid & PVM_PE_MASK) + (tid & ~PVM_PE_MASK)) < MAX_PVM_TIDS))
+#define LOOKS_LIKE_SLOT(slot) (slot<=highest_slot())
+
+#define LOOKS_LIKE_GA(ga)    (LOOKS_LIKE_TID((ga)->payload.gc.gtid) && \
+                             LOOKS_LIKE_SLOT((ga)->payload.gc.slot))
+#else
+rtsBool looks_like_tid(StgInt tid);
+rtsBool looks_like_slot(StgInt slot);
+rtsBool looks_like_ga(globalAddr *ga);
+#define LOOKS_LIKE_TID(tid)  looks_like_tid(tid)
+#define LOOKS_LIKE_GA(ga)    looks_like_ga(ga)
+#endif /* 0 */
+
 #endif /* PAR */
 
 //@node GranSim,  , GUM, Parallel definitions
@@ -249,44 +283,14 @@ StgWord       PackGA (StgWord pe, int slot);
 //@node Types, Prototypes, GranSim, GranSim
 //@subsubsection Types
 
+typedef StgWord *StgBuffer;
 typedef struct rtsPackBuffer_ {
   StgInt /* nat */           id;
   StgInt /* nat */           size;
   StgInt /* nat */           unpacked_size;
   StgTSO       *tso;
-  StgClosure  **buffer;  
+  StgBuffer    *buffer;  
 } rtsPackBuffer;
-
-//@node Prototypes, Macros, Types, GranSim
-//@subsubsection Prototypes
-
-
-/* main packing functions */
-/*
-rtsPackBuffer *PackNearbyGraph(StgClosure* closure, StgTSO* tso, nat *packbuffersize);
-rtsPackBuffer *PackOneNode(StgClosure* closure, StgTSO* tso, nat *packbuffersize);
-void PrintPacket(rtsPackBuffer *buffer);
-StgClosure *UnpackGraph(rtsPackBuffer* buffer);
-*/
-/* important auxiliary functions */
-
-/* 
-OLD CODE -- HWL
-void  InitPackBuffer(void);
-P_    AllocateHeap (W_ size);
-P_    PackNearbyGraph (P_ closure, P_ tso, W_ *packbuffersize);
-P_    PackOneNode (P_ closure, P_ tso, W_ *packbuffersize);
-P_    UnpackGraph (P_ buffer);
-
-void    InitClosureQueue (void);
-P_      DeQueueClosure(void);
-void    QueueClosure (P_ closure);
-// rtsBool QueueEmpty();
-void    PrintPacket (P_ buffer);
-*/
-
-// StgInfoTable *get_closure_info(StgClosure* node, unsigned int /* nat */ *size, unsigned int /* nat */ *ptrs, unsigned int /* nat */ *nonptrs, unsigned int /* nat */ *vhs, char *info_hdr_ty);
-// int /* rtsBool */ IS_BLACK_HOLE(StgClosure* node)          ;
 
 //@node Macros,  , Prototypes, GranSim
 //@subsubsection Macros
@@ -308,7 +312,7 @@ void    PrintPacket (P_ buffer);
 #  define MAX_GAS 	(RtsFlags.GranFlags.packBufferSize / PACK_GA_SIZE)
 #  define PACK_GA_SIZE	3	/* Size of a packed GA in words */
 			        /* Size of a packed fetch-me in words */
-#  define PACK_FETCHME_SIZE (PACK_GA_SIZE + FIXED_HS)
+#  define PACK_FETCHME_SIZE (PACK_GA_SIZE + _HS)
 #  define PACK_HDR_SIZE	4	/* Words of header in a packet */
 
 #    define PACK_HEAP_REQUIRED  \

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.14 2000/03/08 10:58:38 simonmar Exp $
+ * $Id: StgCRun.c,v 1.15 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -118,7 +118,7 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
     char* nm;
     while (1) {
 
-#define STACK_DETAILS 0
+// #define STACK_DETAILS 0  // I like details -- HWL
 
 #if STACK_DETAILS
    {

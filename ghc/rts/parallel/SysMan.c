@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
-   Time-stamp: <Sat Dec 04 1999 19:29:57 Stardate: [-30]3999.06 hwloidl>
-   $Id: SysMan.c,v 1.2 2000/01/13 14:34:09 hwloidl Exp $
+   Time-stamp: <Tue Mar 21 2000 20:25:55 Stardate: [-30]4539.25 hwloidl>
+   $Id: SysMan.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
 
    GUM System Manager Program
    Handles startup, shutdown and global synchronisation of the parallel system.

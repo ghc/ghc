@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Fri Jan 14 2000 13:52:00 Stardate: [-30]4202.88 hwloidl>
+  Time-stamp: <Mon Mar 20 2000 19:27:38 Stardate: [-30]4534.05 hwloidl>
 
 Various debugging routines for GranSim and GUM
 */
@@ -347,8 +347,10 @@ StgInt verbose;
 
  fprintf(stderr,"> Id:   \t%#lx",closure->id);
  // fprintf(stderr,"\tstate: \t%#lx",closure->state);
- fprintf(stderr,"\twhatNext: \t%#lx",closure->whatNext);
+ fprintf(stderr,"\twhat_next: \t%#lx",closure->what_next);
  fprintf(stderr,"\tlink: \t%#lx\n",closure->link);
+ fprintf(stderr,"\twhy_blocked: \t%d", closure->why_blocked);
+ fprintf(stderr,"\tblock_info: \t%p\n", closure->block_info);
  // fprintf(stderr,"\tType: \t%s\n",type_name[TSO_TYPE(closure)]);
  fprintf(stderr,">PRI: \t%#lx", closure->gran.pri);
  fprintf(stderr,"\tMAGIC: \t%#lx %s\n", closure->gran.magic, 
@@ -770,8 +772,10 @@ PrintGraph(StgClosure *p, int indent_level)
   for (j=0; j<indent_level; j++)
     fputs(" ", stderr);
 
-  ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p))
-              || IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p))));
+  ASSERT(p!=(StgClosure*)NULL);
+  ASSERT(LOOKS_LIKE_STATIC(p) ||
+	 LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p)) ||
+         IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p)));
 
   printClosure(p); // prints contents of this one closure
 
@@ -1044,7 +1048,7 @@ PrintGraph(StgClosure *p, int indent_level)
 	//p += sizeofW(StgCAF);
   	break;
     }
-  
+
   case MUT_VAR:
     /* ignore MUT_CONSs */
     fprintf(stderr, "MUT_VAR (%p) pointing to %p\n", p, ((StgMutVar *)p)->var);
@@ -1179,18 +1183,18 @@ PrintGraph(StgClosure *p, int indent_level)
   
 	fprintf(stderr, "PAP (%p) pointing to %p\n", p, pap->fun);
   	// pap->fun = 
-	PrintGraph(pap->fun, indent_level+1);
+	//PrintGraph(pap->fun, indent_level+1);
   	//scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
   	//p += pap_sizeW(pap);
   	break;
     }
     
   case ARR_WORDS:
-    fprintf(stderr, "ARR_WORDS (%p) with 0 pointers\n", p);
-    /* nothing to follow */
-    //p += arr_words_sizeW(stgCast(StgArrWords*,p));
+    /* an array of (non-mutable) words */
+    fprintf(stderr, "ARR_WORDS (%p) of %d non-ptrs (maybe a string?)\n", 
+	    p, ((StgArrWords *)q)->words);
     break;
-  
+
   case MUT_ARR_PTRS:
     /* follow everything */
     {
@@ -1296,6 +1300,267 @@ PrintGraph(StgClosure *p, int indent_level)
   //  mkMutCons((StgClosure *)q, &generations[evac_gen]);
   //  failed_to_evac = rtsFalse;
   //}
+}    
+
+/*
+  Do a sanity check on the whole graph, down to a recursion level of level.
+  Same structure as PrintGraph (nona).
+*/
+void
+checkGraph(StgClosure *p, int rec_level)
+{
+  StgPtr x, q;
+  nat i, j;
+  const StgInfoTable *info;
+  
+  if (rec_level==0)
+    return;
+
+  q = p;			/* save ptr to object */
+
+  /* First, the obvious generic checks */
+  ASSERT(p!=(StgClosure*)NULL);
+  checkClosure(p);              /* see Sanity.c for what's actually checked */
+
+  info = get_itbl((StgClosure *)p);
+  /* the rest of this fct recursively traverses the graph */
+  switch (info -> type) {
+  
+  case BCO:
+    {
+  	StgBCO* bco = stgCast(StgBCO*,p);
+  	nat i;
+  	for (i = 0; i < bco->n_ptrs; i++) {
+	  checkGraph(bcoConstCPtr(bco,i), rec_level-1);
+  	}
+  	break;
+    }
+  
+  case MVAR:
+    /* treat MVars specially, because we don't want to PrintGraph the
+     * mut_link field in the middle of the closure.
+     */
+    { 
+  	StgMVar *mvar = ((StgMVar *)p);
+	checkGraph((StgClosure *)mvar->head, rec_level-1);
+	checkGraph((StgClosure *)mvar->tail, rec_level-1);
+	checkGraph((StgClosure *)mvar->value, rec_level-1);
+  	break;
+    }
+  
+  case THUNK_2_0:
+  case FUN_2_0:
+  case CONSTR_2_0:
+    checkGraph(((StgClosure *)p)->payload[0], rec_level-1);
+    checkGraph(((StgClosure *)p)->payload[1], rec_level-1);
+    break;
+  
+  case THUNK_1_0:
+    checkGraph(((StgClosure *)p)->payload[0], rec_level-1);
+    break;
+  
+  case FUN_1_0:
+  case CONSTR_1_0:
+    checkGraph(((StgClosure *)p)->payload[0], rec_level-1);
+    break;
+  
+  case THUNK_0_1:
+    break;
+  
+  case FUN_0_1:
+  case CONSTR_0_1:
+    break;
+  
+  case THUNK_0_2:
+  case FUN_0_2:
+  case CONSTR_0_2:
+    break;
+  
+  case THUNK_1_1:
+  case FUN_1_1:
+  case CONSTR_1_1:
+    checkGraph(((StgClosure *)p)->payload[0], rec_level-1);
+    break;
+  
+  case FUN:
+  case THUNK:
+  case CONSTR:
+    for (i=0; i<info->layout.payload.ptrs; i++)
+      checkGraph(((StgClosure *)p)->payload[i], rec_level-1);
+    break;
+  
+  case WEAK:
+  case FOREIGN:
+  case STABLE_NAME:
+    {
+      StgPtr end;
+      
+      end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+      for (p = (StgPtr)((StgClosure *)p)->payload; p < end; p++) {
+	checkGraph(*(StgClosure **)p, rec_level-1);
+      }
+      break;
+    }
+  
+  case IND_PERM:
+  case IND_OLDGEN_PERM:
+    checkGraph(((StgIndOldGen *)p)->indirectee, rec_level-1);
+    break;
+  
+  case CAF_UNENTERED:
+    {
+  	StgCAF *caf = (StgCAF *)p;
+  
+	fprintf(stderr, "CAF_UNENTERED (%p) pointing to %p\n", p, caf->body);
+  	checkGraph(caf->body, rec_level-1);
+  	break;
+    }
+  
+  case CAF_ENTERED:
+    {
+  	StgCAF *caf = (StgCAF *)p;
+  
+	fprintf(stderr, "CAF_ENTERED (%p) pointing to %p and %p\n", 
+		p, caf->body, caf->value);
+	checkGraph(caf->body, rec_level-1);
+	checkGraph(caf->value, rec_level-1);
+  	break;
+    }
+
+  case MUT_VAR:
+    /* ignore MUT_CONSs */
+    if (((StgMutVar *)p)->header.info != &MUT_CONS_info) {
+      checkGraph(((StgMutVar *)p)->var, rec_level-1);
+    }
+    break;
+  
+  case CAF_BLACKHOLE:
+  case SE_CAF_BLACKHOLE:
+  case SE_BLACKHOLE:
+  case BLACKHOLE:
+    break;
+  
+  case BLACKHOLE_BQ:
+    break;
+  
+  case THUNK_SELECTOR:
+    { 
+      StgSelector *s = (StgSelector *)p;
+      checkGraph(s->selectee, rec_level-1);
+      break;
+    }
+  
+  case IND:
+    checkGraph(((StgInd*)p)->indirectee, rec_level-1);
+    break;
+
+  case IND_OLDGEN:
+    checkGraph(((StgIndOldGen*)p)->indirectee, rec_level-1);
+    break;
+  
+  case CONSTR_INTLIKE:
+    break;
+  case CONSTR_CHARLIKE:
+    break;
+  case CONSTR_STATIC:
+    break;
+  case CONSTR_NOCAF_STATIC:
+    break;
+  case THUNK_STATIC:
+    break;
+  case FUN_STATIC:
+    break;
+  case IND_STATIC:
+    break;
+  
+  case RET_BCO:
+    break;
+  case RET_SMALL:
+    break;
+  case RET_VEC_SMALL:
+    break;
+  case RET_BIG:
+    break;
+  case RET_VEC_BIG:
+    break;
+  case RET_DYN:
+    break;
+  case UPDATE_FRAME:
+    break;
+  case STOP_FRAME:
+    break;
+  case CATCH_FRAME:
+    break;
+  case SEQ_FRAME:
+    break;
+  
+  case AP_UPD: /* same as PAPs */
+  case PAP:
+    /* Treat a PAP just like a section of stack, not forgetting to
+     * checkGraph the function pointer too...
+     */
+    { 
+  	StgPAP* pap = stgCast(StgPAP*,p);
+  
+	checkGraph(pap->fun, rec_level-1);
+  	break;
+    }
+    
+  case ARR_WORDS:
+    break;
+
+  case MUT_ARR_PTRS:
+    /* follow everything */
+    {
+  	StgPtr next;
+  
+  	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+  	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	  checkGraph(*(StgClosure **)p, rec_level-1);
+  	}
+  	break;
+    }
+  
+  case MUT_ARR_PTRS_FROZEN:
+    /* follow everything */
+    {
+  	StgPtr start = p, next;
+  
+  	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+  	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	  checkGraph(*(StgClosure **)p, rec_level-1);
+  	}
+  	break;
+    }
+  
+  case TSO:
+    { 
+  	StgTSO *tso;
+  	
+  	tso = (StgTSO *)p;
+	checkGraph((StgClosure *)tso->link, rec_level-1);
+  	break;
+    }
+  
+#if defined(GRAN) || defined(PAR)
+  case RBH:
+    break;
+#endif
+#if defined(PAR)
+  case BLOCKED_FETCH:
+    break;
+  case FETCH_ME:
+    break;
+  case FETCH_ME_BQ:
+    break;
+#endif
+  case EVACUATED:
+    barf("checkGraph: found EVACUATED closure %p (%s)",
+	 p, info_type(p));
+    break;
+  
+  default:
+  }
 }    
 
 #endif /* GRAN */

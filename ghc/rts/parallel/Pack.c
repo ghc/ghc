@@ -1,6 +1,6 @@
 /* 
-   Time-stamp: <Thu Dec 16 1999 18:21:17 Stardate: [-30]4058.61 software>
-   $Id: Pack.c,v 1.3 2000/03/17 14:37:22 simonmar Exp $
+   Time-stamp: <Thu Mar 30 2000 22:53:32 Stardate: [-30]4584.56 hwloidl>
+   $Id: Pack.c,v 1.4 2000/03/31 03:09:37 hwloidl Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -15,14 +15,13 @@
    @UnpackGraph@ routine is called and the buffer can be discarded
    afterwards.
 
-   Note that in GranSim we need many buffers, not just one per PE.  */
+   Note that in GranSim we need many buffers, not just one per PE.
+*/
 
 //@node Graph packing, , ,
 //@section Graph packing
 
 #if defined(PAR) || defined(GRAN)   /* whole file */
-
-#define _HS (sizeofW(StgHeader))
 
 //@menu
 //* Includes::			
@@ -72,7 +71,6 @@
 //@node ADT of closure queues, Init for packing, Prototypes, Prototypes
 //@subsubsection ADT of closure queues
 
-static inline void    	  AllocClosureQueue(nat size);
 static inline void    	  InitClosureQueue(void);
 static inline rtsBool 	  QueueEmpty(void);
 static inline void    	  QueueClosure(StgClosure *closure);
@@ -81,9 +79,9 @@ static inline StgClosure *DeQueueClosure(void);
 //@node Init for packing, Packing routines, ADT of closure queues, Prototypes
 //@subsubsection Init for packing
 
-static void     initPacking(void);
+static void     InitPacking(rtsBool unpack);
 # if defined(PAR)
-rtsBool         initPackBuffer(void);
+rtsBool         InitPackBuffer(void);
 # elif defined(GRAN)
 rtsPackBuffer  *InstantiatePackBuffer (void);
 static void     reallocPackBuffer (void);
@@ -98,12 +96,19 @@ static void    PackClosure (StgClosure *closure);
 //@subsubsection Low level packing fcts
 
 # if defined(GRAN)
-static inline void    Pack (StgClosure *data);
+static  void    Pack (StgClosure *data);
 # else
-static inline void    Pack (StgWord data);
+static  void    Pack (StgWord data);
 
+static void    PackGeneric(StgClosure *closure);
+static void    PackArray(StgClosure *closure);
 static void    PackPLC (StgPtr addr);
 static void    PackOffset (int offset);
+static void    PackPAP(StgPAP *pap);
+static rtsPackBuffer *PackTSO(StgTSO *tso, nat *packBufferSize);
+static rtsPackBuffer *PackStkO(StgPtr stko, nat *packBufferSize);
+static void           PackFetchMe(StgClosure *closure);
+
 static void    GlobaliseAndPackGA (StgClosure *closure);
 # endif
 
@@ -113,9 +118,22 @@ static void    GlobaliseAndPackGA (StgClosure *closure);
 # if defined(PAR)
 void        InitPendingGABuffer(nat size); 
 void        CommonUp(StgClosure *src, StgClosure *dst);
-StgClosure *UnpackGraph(rtsPackBuffer *packBuffer,
-			globalAddr **gamap,
-			nat *nGAs);
+static StgClosure *SetGAandCommonUp(globalAddr *gaP, StgClosure *closure, 
+				  rtsBool hasGA);
+static nat         FillInClosure(StgWord ***bufptrP, StgClosure *graph);
+static void        LocateNextParent(StgClosure **parentP,
+				    nat *pptrP, nat *pptrsP, nat *sizeP);
+StgClosure        *UnpackGraph(rtsPackBuffer *packBuffer,
+			       globalAddr **gamap,
+			       nat *nGAs);
+static  StgClosure *UnpackClosure (StgWord ***bufptrP, StgClosure **graphP, 
+				   globalAddr *ga);
+static  StgWord   **UnpackGA(StgWord **bufptr, globalAddr *ga);
+static  StgClosure *UnpackOffset(globalAddr *ga);
+static  StgClosure *UnpackPLC(globalAddr *ga);
+static  void        UnpackArray(StgWord ***bufptrP, StgClosure *graph);
+static  nat         UnpackPAP(StgWord ***bufptrP, StgClosure *graph);
+
 # elif defined(GRAN)
 void        CommonUp(StgClosure *src, StgClosure *dst);
 StgClosure *UnpackGraph(rtsPackBuffer* buffer);
@@ -132,6 +150,7 @@ static rtsBool  NotYetPacking(int offset);
 static rtsBool  RoomToPack (nat size, nat ptrs);
        rtsBool  isOffset(globalAddr *ga);
        rtsBool  isFixed(globalAddr *ga);
+       rtsBool  isConstr(globalAddr *ga);
 # elif defined(GRAN)
 static void     DonePacking(void);
 static rtsBool  NotYetPacking(StgClosure *closure);
@@ -147,19 +166,16 @@ static nat     pack_locn,           /* ptr to first free loc in pack buffer */
                clq_size, clq_pos,
                buf_id = 1;          /* identifier for buffer */
 static nat     unpacked_size;
-static nat     reservedPAsize;        /* Space reserved for primitive arrays */
-static rtsBool RoomInBuffer;
+static rtsBool roomInBuffer;
 
-# if defined(GRAN)
 /* 
    The pack buffer
    To be pedantic: in GrAnSim we're packing *addresses* of closures,
    not the closures themselves.
 */
-static rtsPackBuffer *Bonzo = NULL;                /* size: can be set via option */
-# else
-static rtsPackBuffer *Bonzo = NULL;                /* size: can be set via option */
-# endif
+static rtsPackBuffer *globalPackBuffer = NULL,    /* for packing a graph */
+                     *globalUnpackBuffer = NULL;  /* for unpacking a graph */
+
 
 /*
   Bit of a hack for testing if a closure is the root of the graph. This is
@@ -178,9 +194,10 @@ static StgClosure  *graph_root;
 static HashTable *offsetTable;
 
 //@cindex PendingGABuffer
-static globalAddr *PendingGABuffer;  
-/* is initialised in main; */
+static globalAddr *PendingGABuffer, *gaga;
+
 # endif /* PAR */
+
 
 //@node ADT of Closure Queues, Initialisation for packing, Global variables, Graph packing
 //@subsection ADT of Closure Queues
@@ -206,16 +223,7 @@ static StgClosure **ClosureQueue = NULL;   /* HWL: init in main */
 //@node Init routines, Basic routines, Closure Queues, ADT of Closure Queues
 //@subsubsection Init routines
 
-/* @InitClosureQueue@ initialises the closure queue. */
-
-//@cindex AllocClosureQueue
-static inline void
-AllocClosureQueue(size)
-nat size;
-{
-  ASSERT(ClosureQueue == NULL);
-  ClosureQueue = (StgClosure**) stgMallocWords(size, "AllocClosureQueue");
-}
+/* @InitClosureQueue@ allocates and initialises the closure queue. */
 
 //@cindex InitClosureQueue
 static inline void
@@ -223,8 +231,9 @@ InitClosureQueue(void)
 {
   clq_pos = clq_size = 0;
 
-  if ( ClosureQueue == NULL ) 
-     AllocClosureQueue(RTS_PACK_BUFFER_SIZE);
+  if (ClosureQueue==NULL)
+    ClosureQueue = (StgClosure**) stgMallocWords(RTS_PACK_BUFFER_SIZE, 
+						 "InitClosureQueue");
 }
 
 //@node Basic routines,  , Init routines, ADT of Closure Queues
@@ -267,6 +276,21 @@ DeQueueClosure(void)
     return((StgClosure*)NULL);
 }
 
+/* DeQueueClosure returns the head of the closure queue. */
+
+//@cindex DeQueueClosure
+static inline StgClosure * 
+PrintQueueClosure(void)
+{
+  nat i;
+
+  fputs("Closure queue:", stderr);
+  for (i=clq_pos; i < clq_size; i++)
+    fprintf(stderr, "%p (%s), ", 
+	    ClosureQueue[clq_pos++], info_type(ClosureQueue[clq_pos++]));
+  fputc('\n', stderr);
+}
+
 //@node Initialisation for packing, Packing Functions, ADT of Closure Queues, Graph packing
 //@subsection Initialisation for packing
 /*
@@ -281,22 +305,23 @@ DeQueueClosure(void)
   packet strategy implemented, so in the case of an overflow we just stop
   adding closures to the closure queue.  If an overflow of the simulated
   packet occurs, we just realloc some more space for it and carry on as
-  usual.  -- HWL */
+  usual.  -- HWL
+*/
 
 # if defined(GRAN)
 rtsPackBuffer *
 InstantiatePackBuffer (void) {
-  extern rtsPackBuffer *Bonzo;
+  extern rtsPackBuffer *globalPackBuffer;
 
-  Bonzo = (rtsPackBuffer *) stgMallocWords(sizeofW(rtsPackBuffer), 
+  globalPackBuffer = (rtsPackBuffer *) stgMallocWords(sizeofW(rtsPackBuffer), 
 			 "InstantiatePackBuffer: failed to alloc packBuffer");
-  Bonzo->size = RtsFlags.GranFlags.packBufferSize_internal;
-  Bonzo->buffer = (StgWord **) stgMallocWords(RtsFlags.GranFlags.packBufferSize_internal,
+  globalPackBuffer->size = RtsFlags.GranFlags.packBufferSize_internal;
+  globalPackBuffer->buffer = (StgWord **) stgMallocWords(RtsFlags.GranFlags.packBufferSize_internal,
 				 "InstantiatePackBuffer: failed to alloc GranSim internal packBuffer");
   /* NB: gransim_pack_buffer_size instead of pack_buffer_size -- HWL */
   /* stgMallocWords is now simple allocate in Storage.c */
 
-  return (Bonzo);
+  return (globalPackBuffer);
 }
 
 /* 
@@ -306,61 +331,69 @@ InstantiatePackBuffer (void) {
 static void
 reallocPackBuffer (void) {
 
-  ASSERT(pack_locn >= (int)Bonzo->size+sizeofW(rtsPackBuffer));
+  ASSERT(pack_locn >= (int)globalPackBuffer->size+sizeofW(rtsPackBuffer));
 
   IF_GRAN_DEBUG(packBuffer,
 		belch("** Increasing size of PackBuffer %p to %d words (PE %u @ %d)\n",
-		      Bonzo, Bonzo->size+REALLOC_SZ,
+		      globalPackBuffer, globalPackBuffer->size+REALLOC_SZ,
 		      CurrentProc, CurrentTime[CurrentProc]));
   
-  Bonzo = (rtsPackBuffer*)realloc(Bonzo, 
+  globalPackBuffer = (rtsPackBuffer*)realloc(globalPackBuffer, 
 				  sizeof(StgClosure*)*(REALLOC_SZ +
-						       (int)Bonzo->size +
+						       (int)globalPackBuffer->size +
 						       sizeofW(rtsPackBuffer))) ;
-  if (Bonzo==(rtsPackBuffer*)NULL) 
+  if (globalPackBuffer==(rtsPackBuffer*)NULL) 
     barf("Failing to realloc %d more words for PackBuffer %p (PE %u @ %d)\n", 
-	 REALLOC_SZ, Bonzo, CurrentProc, CurrentTime[CurrentProc]);
+	 REALLOC_SZ, globalPackBuffer, CurrentProc, CurrentTime[CurrentProc]);
   
-  Bonzo->size += REALLOC_SZ;
+  globalPackBuffer->size += REALLOC_SZ;
 
-  ASSERT(pack_locn < Bonzo->size+sizeofW(rtsPackBuffer));
+  ASSERT(pack_locn < globalPackBuffer->size+sizeofW(rtsPackBuffer));
 }
 # endif
 
 # if defined(PAR)
 /* @initPacking@ initialises the packing buffer etc. */
-//@cindex initPackBuffer
+//@cindex InitPackBuffer
 rtsBool
-initPackBuffer(void)
+InitPackBuffer(void)
 {
-  if (Bonzo == NULL) { /* not yet allocated */
-
-      if ((Bonzo = (rtsPackBuffer *) 
-	             stgMallocWords(sizeofW(rtsPackBuffer)+RtsFlags.ParFlags.packBufferSize,
-					       "initPackBuffer")) == NULL)
-	return rtsFalse;
-      
-      InitPendingGABuffer(RtsFlags.ParFlags.packBufferSize);
-      AllocClosureQueue(RtsFlags.ParFlags.packBufferSize);
+  if (globalPackBuffer==(rtsPackBuffer*)NULL) {
+    if ((globalPackBuffer = (rtsPackBuffer *) 
+	 stgMallocWords(sizeofW(rtsPackBuffer)+RtsFlags.ParFlags.packBufferSize,
+			"InitPackBuffer")) == NULL)
+      return rtsFalse;
   }
   return rtsTrue;
 }
-# endif 
 
+# endif 
+//@cindex InitPacking
 static void
-initPacking(void)
+InitPacking(rtsBool unpack)
 {
 # if defined(GRAN)
-  Bonzo = InstantiatePackBuffer();     /* for GrAnSim only -- HWL */
+  globalPackBuffer = InstantiatePackBuffer();     /* for GrAnSim only -- HWL */
                                        /* NB: free in UnpackGraph */
+# elif defined(PAR)
+  if (unpack) {
+    /* allocate a GA-to-GA map (needed for ACK message) */
+    InitPendingGABuffer(RtsFlags.ParFlags.packBufferSize);
+  } else {
+    /* allocate memory to pack the graph into */
+    InitPackBuffer();
+  }
 # endif
+  /* init queue of closures seen during packing */
+  InitClosureQueue();
 
-  Bonzo->id = buf_id++;  /* buffer id are only used for debugging! */
+  if (unpack) 
+    return;
+
+  globalPackBuffer->id = buf_id++;  /* buffer id are only used for debugging! */
   pack_locn = 0;         /* the index into the actual pack buffer */
   unpacked_size = 0;     /* the size of the whole graph when unpacked */
-  reservedPAsize = 0;
-  RoomInBuffer = rtsTrue;
-  InitClosureQueue();
+  roomInBuffer = rtsTrue;
   packed_thunks = 0;   /* total number of thunks packed so far */
 # if defined(PAR)
   offsetTable = allocHashTable();
@@ -399,9 +432,6 @@ StgClosure* closure;
 StgTSO* tso;
 nat *packBufferSize;
 {
-  extern rtsPackBuffer *Bonzo;
-  /* Ensure enough heap for all possible RBH_Save closures */
-
   ASSERT(RTS_PACK_BUFFER_SIZE > 0);
 
   /* ToDo: check that we have enough heap for the packet
@@ -410,26 +440,26 @@ nat *packBufferSize;
      return NULL;
   */
 
-  initPacking();
+  InitPacking(rtsFalse);
 # if defined(GRAN)
   graph_root = closure;
 # endif
 
   IF_GRAN_DEBUG(pack,
 		belch(">>> Packing <<%d>> (buffer @ %p); graph root @ %p [PE %d]\n    demanded by TSO %d (%p) [PE %u]",
-		      Bonzo->id, Bonzo, closure, where_is(closure), 
+		      globalPackBuffer->id, globalPackBuffer, closure, where_is(closure), 
 		      tso->id, tso, where_is((StgClosure*)tso)));
 
   IF_GRAN_DEBUG(pack,
 		belch("** PrintGraph of %p is:", closure); 
 		PrintGraph(closure,0));
 
-  IF_PAR_DEBUG(pack,
+  IF_PAR_DEBUG(packet,
 	       belch(">>> Packing <<%d>> (buffer @ %p); graph root @ %p [%x]\n    demanded by TSO %d (%p)",
-		     Bonzo->id, Bonzo, closure, mytid,
+		     globalPackBuffer->id, globalPackBuffer, closure, mytid,
 		     tso->id, tso)); 
 
-  IF_PAR_DEBUG(pack,
+  IF_PAR_DEBUG(packet,
 	       belch("** PrintGraph of %p is:", closure); 
 	       belch("** pack_locn=%d", pack_locn);
 	       PrintGraph(closure,0));
@@ -442,9 +472,9 @@ nat *packBufferSize;
 # if defined(PAR)
 
   /* Record how much space is needed to unpack the graph */
-  Bonzo->tso = tso; // ToDo: check: used in GUM or only for debugging?
-  Bonzo->unpacked_size = unpacked_size;
-  Bonzo->size = pack_locn;
+  globalPackBuffer->tso = tso; // ToDo: check: used in GUM or only for debugging?
+  globalPackBuffer->unpacked_size = unpacked_size;
+  globalPackBuffer->size = pack_locn;
 
   /* Set the size parameter */
   ASSERT(pack_locn <= RtsFlags.ParFlags.packBufferSize);
@@ -454,15 +484,15 @@ nat *packBufferSize;
 
   /* Record how much space is needed to unpack the graph */
   // PackBuffer[PACK_FLAG_LOCN] = (P_) MAGIC_PACK_FLAG;  for testing
-  Bonzo->tso = tso;
-  Bonzo->unpacked_size = unpacked_size;
+  globalPackBuffer->tso = tso;
+  globalPackBuffer->unpacked_size = unpacked_size;
 
   // ASSERT(pack_locn <= PackBuffer[PACK_SIZE_LOCN]+PACK_HDR_SIZE);
   /* ToDo: Print an earlier, more meaningful message */
   if (pack_locn==0)   /* i.e. packet is empty */
     barf("EMPTY PACKET! Can't transfer closure %p at all!!\n",
 	 closure);
-  Bonzo->size = pack_locn;
+  globalPackBuffer->size = pack_locn;
   *packBufferSize = pack_locn;
 
 # endif
@@ -472,21 +502,24 @@ nat *packBufferSize;
 # if defined(GRAN)
   IF_GRAN_DEBUG(pack ,
 		belch("** Finished <<%d>> packing graph %p; closures packed: %d; thunks packed: %d; size of graph: %d",
-		      Bonzo->id, closure, Bonzo->size, packed_thunks, Bonzo->unpacked_size));
+		      globalPackBuffer->id, closure, globalPackBuffer->size, packed_thunks, globalPackBuffer->unpacked_size));
   if (RtsFlags.GranFlags.GranSimStats.Global) {
     globalGranStats.tot_packets++; 
     globalGranStats.tot_packet_size += pack_locn; 
   }
   
-  IF_GRAN_DEBUG(pack, PrintPacket(Bonzo));
+  IF_GRAN_DEBUG(pack, PrintPacket(globalPackBuffer));
 # elif defined(PAR)
-  IF_GRAN_DEBUG(pack ,
+  IF_PAR_DEBUG(packet,
 		belch("** Finished <<%d>> packing graph %p; closures packed: %d; thunks packed: %d; size of graph: %d",
-		      Bonzo->id, closure, Bonzo->size, packed_thunks, Bonzo->unpacked_size);
-		PrintPacket(Bonzo));
-# endif   /* GRAN */
+		      globalPackBuffer->id, closure, globalPackBuffer->size, packed_thunks, globalPackBuffer->unpacked_size);
+		PrintPacket(globalPackBuffer));
 
-  return (Bonzo);
+  IF_DEBUG(sanity, // do a sanity check on the packet just constructed 
+	   checkPacket(globalPackBuffer));
+# endif   /* GRAN */
+  
+  return (globalPackBuffer);
 }
 
 //@cindex PackOneNode
@@ -500,10 +533,10 @@ StgClosure* closure;
 StgTSO* tso;
 nat *packBufferSize;
 {
-  extern rtsPackBuffer *Bonzo;
+  extern rtsPackBuffer *globalPackBuffer;
   int i, clpack_locn;
 
-  initPacking();
+  InitPacking(rtsFalse);
 
   IF_GRAN_DEBUG(pack,
 		belch("** PackOneNode: %p (%s)[PE %d] requested by TSO %d (%p) [PE %d]",
@@ -513,12 +546,12 @@ nat *packBufferSize;
   Pack(closure);
 
   /* Record how much space is needed to unpack the graph */
-  Bonzo->tso = tso;
-  Bonzo->unpacked_size = unpacked_size;
+  globalPackBuffer->tso = tso;
+  globalPackBuffer->unpacked_size = unpacked_size;
 
   /* Set the size parameter */
   ASSERT(pack_locn <= RTS_PACK_BUFFER_SIZE);
-  Bonzo->size =  pack_locn;
+  globalPackBuffer->size =  pack_locn;
   *packBufferSize = pack_locn;
 
   if (RtsFlags.GranFlags.GranSimStats.Global) {
@@ -526,9 +559,9 @@ nat *packBufferSize;
     globalGranStats.tot_packet_size += pack_locn; 
   }
   IF_GRAN_DEBUG(pack,
-    PrintPacket(Bonzo));
+    PrintPacket(globalPackBuffer));
 
-  return (Bonzo);
+  return (globalPackBuffer);
 }
 # endif  /* GRAN */
 
@@ -547,29 +580,29 @@ PackTSO(tso, packBufferSize)
 StgTSO *tso;
 nat *packBufferSize;
 {
-  extern rtsPackBuffer *Bonzo;
+  extern rtsPackBuffer *globalPackBuffer;
   IF_GRAN_DEBUG(pack,
 		belch("** Packing TSO %d (%p)", tso->id, tso));
   *packBufferSize = 0;
   // PackBuffer[0] = PackBuffer[1] = 0; ???
-  return(Bonzo);
+  return(globalPackBuffer);
 }
 
 //@cindex PackStkO
-rtsPackBuffer*
+static rtsPackBuffer*
 PackStkO(stko, packBufferSize)
 StgPtr stko;
 nat *packBufferSize;
 {
-  extern rtsPackBuffer *Bonzo;
+  extern rtsPackBuffer *globalPackBuffer;
   IF_GRAN_DEBUG(pack,
 		belch("** Packing STKO %p", stko));
   *packBufferSize = 0;
   // PackBuffer[0] = PackBuffer[1] = 0;
-  return(Bonzo);
+  return(globalPackBuffer);
 }
 
-void
+static void
 PackFetchMe(StgClosure *closure)
 {
   barf("{PackFetchMe}Daq Qagh: no FetchMe closures in GRAN!");
@@ -577,12 +610,13 @@ PackFetchMe(StgClosure *closure)
 
 #elif defined(PAR)
 
-rtsPackBuffer*
+static rtsPackBuffer*
 PackTSO(tso, packBufferSize)
 StgTSO *tso;
 nat *packBufferSize;
 {
-  barf("{PackTSO}Daq Qagh: trying to pack a TSO; thread migrations not supported, yet");
+  barf("{PackTSO}Daq Qagh: trying to pack a TSO %d (%p) of size %d; thread migrations not supported, yet",
+       tso->id, tso, packBufferSize);
 }
 
 rtsPackBuffer*
@@ -590,19 +624,42 @@ PackStkO(stko, packBufferSize)
 StgPtr stko;
 nat *packBufferSize;
 {
-  barf("{PackStkO}Daq Qagh: trying to pack a STKO; thread migrations not supported, yet");
+  barf("{PackStkO}Daq Qagh: trying to pack a STKO (%p) of size %d; thread migrations not supported, yet",
+       stko, packBufferSize);
 }
 
 //@cindex PackFetchMe
-void
+static void
 PackFetchMe(StgClosure *closure)
 {
   StgInfoTable *ip;
   nat i;
+  int offset;
 
 #if defined(GRAN)
   barf("{PackFetchMe}Daq Qagh: no FetchMe closures in GRAN!");
 #else
+  offset = OffsetFor(closure);
+  if (!NotYetPacking(offset)) {
+    IF_PAR_DEBUG(pack,
+		 belch("*>.. Packing FETCH_ME for closure %p (s) as offset to %d",
+		       closure, info_type(closure), offset));
+    PackOffset(offset);
+    unpacked_size += 2;
+    return;
+  }
+
+  /* Need a GA even when packing a constructed FETCH_ME (cruel world!) */
+  AmPacking(closure);
+  GlobaliseAndPackGA(closure);
+
+  IF_PAR_DEBUG(pack,
+	       belch("*>.. Packing FETCH_ME for closure %p (%s) with GA: ((%x, %d, %x))",
+		     closure, info_type(closure), 
+		     globalPackBuffer->buffer[pack_locn-2],
+		     globalPackBuffer->buffer[pack_locn-1],
+		     globalPackBuffer->buffer[pack_locn-3]));
+
   /* Pack a FetchMe closure instead of closure */
   ip = &FETCH_ME_info;
   /* this assumes that the info ptr is always the first word in a closure*/
@@ -610,7 +667,7 @@ PackFetchMe(StgClosure *closure)
   for (i = 1; i < _HS; ++i)               // pack rest of fixed header
     Pack((StgWord)*(((StgPtr)closure)+i));
   
-  unpacked_size += _HS; // ToDo: check
+  unpacked_size += PACK_FETCHME_SIZE;
 #endif
 }
 
@@ -644,78 +701,32 @@ PackClosure(closure)
 StgClosure *closure;
 {
   StgInfoTable *info;
-  StgClosure *indirectee, *rbh;
-  nat size, ptrs, nonptrs, vhs, i, clpack_locn;
-  rtsBool is_CONSTR = rtsFalse;
-  char str[80];
+  StgClosure *indirectee;
+  nat clpack_locn;
 
-  ASSERT(closure!=NULL);
-  indirectee = closure;
-  do {
-    /* Don't pack indirection closures */
-    closure =  indirectee;
-    indirectee = IS_INDIRECTION(closure);
-    IF_PAR_DEBUG(pack,
-		 if (indirectee) 
-		   belch("** Shorted an indirection (%s) at %p (-> %p)", 
-			 info_type(closure), closure, indirectee));
-  } while (indirectee);
+  ASSERT(LOOKS_LIKE_GHC_INFO(get_itbl(closure)));
+
+  closure = UNWIND_IND(closure);
+  /* now closure is the thing we want to pack */
+  info = get_itbl(closure);
 
   clpack_locn = OffsetFor(closure);
 
   /* If the closure has been packed already, just pack an indirection to it
      to guarantee that the graph doesn't become a tree when unpacked */
   if (!NotYetPacking(clpack_locn)) {
-    StgInfoTable *info;
-
     PackOffset(clpack_locn);
     return;
   }
 
-  /*
-   * PLCs reside on all of the PEs already. Just pack the
-   * address as a GA (a bit of a kludge, since an address may
-   * not fit in *any* of the individual GA fields). Const,
-   * charlike and small intlike closures are converted into
-   * PLCs.
-   */
-  switch (get_itbl(closure)->type) {
-
-#  ifdef DEBUG
-    // check error cases only in a debugging setup
-  case RET_BCO:
-  case RET_SMALL:
-  case RET_VEC_SMALL:
-  case RET_BIG:
-  case RET_VEC_BIG:
-  case RET_DYN:
-    barf("** {Pack}Daq Qagh: found return vector %p (%s) when packing (thread migration not implemented)", 
-	 closure, info_type(closure));
-    /* never reached */
-    
-  case UPDATE_FRAME:
-  case STOP_FRAME:
-  case CATCH_FRAME:
-  case SEQ_FRAME:
-    barf("** {Pack}Daq Qagh: found stack frame %p (%s) when packing (thread migration not implemented)", 
-	 closure, info_type(closure));
-    /* never reached */
-
-  case TSO:
-  case BLOCKED_FETCH:
-  case EVACUATED:
-    /* something's very wrong */
-    barf("** {Pack}Daq Qagh: found %s (%p) when packing", 
-	 info_type(closure), closure);
-    /* never reached */
-#  endif
+  switch (info->type) {
 
   case CONSTR_CHARLIKE:
     IF_PAR_DEBUG(pack,
-		 belch("** Packing a charlike closure %d", 
+		 belch("*>^^ Packing a charlike closure %d", 
 		       ((StgIntCharlikeClosure*)closure)->data));
     
-    PackPLC(CHARLIKE_CLOSURE(((StgIntCharlikeClosure*)closure)->data));
+    PackPLC((StgPtr)CHARLIKE_CLOSURE(((StgIntCharlikeClosure*)closure)->data));
     return;
       
   case CONSTR_INTLIKE:
@@ -724,14 +735,15 @@ StgClosure *closure;
       
       if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {
 	IF_PAR_DEBUG(pack,
-		     belch("** Packing a small intlike %d as a PLC", val));
-	PackPLC(INTLIKE_CLOSURE(val));
+		     belch("*>^^ Packing a small intlike %d as a PLC", val));
+	PackPLC((StgPtr)INTLIKE_CLOSURE(val));
 	return;
       } else {
 	IF_PAR_DEBUG(pack,
-		     belch("** Packing a big intlike %d as a normal closure", 
+		     belch("*>^^ Packing a big intlike %d as a normal closure", 
 			   val));
-	break;
+	PackGeneric(closure);
+	return;
       }
     }
 
@@ -741,43 +753,82 @@ StgClosure *closure;
   case CONSTR_2_0:
   case CONSTR_1_1:
   case CONSTR_0_2:
-    /* it's a constructor (i.e. plain data) but we don't know 
-       how many ptrs, non-ptrs there are => use generic code */
+    /* it's a constructor (i.e. plain data) */
     IF_PAR_DEBUG(pack,
-		 belch("** Packing a CONSTR %p (%s) using generic packing with GA", 
+		 belch("*>^^ Packing a CONSTR %p (%s) using generic packing", 
 		       closure, info_type(closure)));
-    // is_CONSTR = rtsTrue;
-    break;
-    /* fall through to generic packing code */
+    PackGeneric(closure);
+    return;
 
+  case THUNK_STATIC:       // ToDo: check whether that's ok
+  case FUN_STATIC:       // ToDo: check whether that's ok
   case CONSTR_STATIC:
   case CONSTR_NOCAF_STATIC:// For now we ship indirections to CAFs: They are
 			   // evaluated on each PE if needed
     IF_PAR_DEBUG(pack,
-      belch("** Packing a %p (%s) as a PLC", 
+      belch("*>~~ Packing a %p (%s) as a PLC", 
 	    closure, info_type(closure)));
 
-    PackPLC(closure);
+    PackPLC((StgPtr)closure);
     return;
 
-  case MVAR:
-    /* MVARs may not be copied; they are sticky objects in the new RTS */
-    /* therefore we treat them just as RBHs etc (what a great system!) */
-    IF_PAR_DEBUG(pack,
-		 belch("** Found an MVar at %p (%s)", 
-		       closure, info_type(closure)));
-    /* fall through !! */
+  case THUNK_SELECTOR: 
+    {
+      StgClosure *selectee = ((StgSelector *)closure)->selectee;
 
-  case THUNK_SELECTOR: // ToDo: fix packing of this strange beast
-    IF_PAR_DEBUG(pack,
-		 belch("** Found an THUNK_SELECTORE at %p (%s)", 
-		       closure, info_type(closure)));
-    /* fall through !! */
+      IF_PAR_DEBUG(pack,
+		   belch("*>** Found THUNK_SELECTOR at %p (%s) pointing to %p (%s); using PackGeneric", 
+			 closure, info_type(closure), 
+			 selectee, info_type(selectee)));
+      PackGeneric(closure);
+      /* inlined code; probably could use PackGeneric
+      Pack((StgWord)(*(StgPtr)closure));  
+      Pack((StgWord)(selectee));
+      QueueClosure(selectee);
+      unpacked_size += 2;
+      */
+    }
+    return;
 
+  case  FUN:
+  case	FUN_1_0:
+  case	FUN_0_1:
+  case	FUN_2_0:
+  case	FUN_1_1:
+  case	FUN_0_2:
+  case  THUNK:
+  case	THUNK_1_0:
+  case	THUNK_0_1:
+  case	THUNK_2_0:
+  case	THUNK_1_1:
+  case	THUNK_0_2:
+    PackGeneric(closure);
+    return;
+
+  case AP_UPD:
+  case PAP:
+    /* 
+    barf("*>   Packing of PAP not implemented %p (%s)",
+		       closure, info_type(closure));
+	 
+       Currently we don't pack PAPs; we pack a FETCH_ME to the closure, 
+       instead. Note that since PAPs contain a chunk of stack as payload,
+       implementing packing of PAPs is a first step towards thread migration.
+    IF_PAR_DEBUG(pack,
+		 belch("*>.. Packing a PAP closure at %p (%s) as a FETCH_ME", 
+		       closure, info_type(closure)));
+    PackFetchMe(closure);
+    */
+    PackPAP((StgPAP *)closure);
+    return;
+
+  case CAF_UNENTERED:
+  case CAF_ENTERED:
   case CAF_BLACKHOLE:
-  case SE_CAF_BLACKHOLE:
-  case SE_BLACKHOLE:
   case BLACKHOLE:
+  case BLACKHOLE_BQ:
+  case SE_BLACKHOLE:
+  case SE_CAF_BLACKHOLE:
   case RBH:
   case FETCH_ME:
   case FETCH_ME_BQ:
@@ -786,19 +837,173 @@ StgClosure *closure;
     //ASSERT(pack_locn > PACK_HDR_SIZE);
     
     IF_PAR_DEBUG(pack,
-		 belch("** Packing a BH or FM at %p (%s) of (fixed size %d)", 
-		       closure, info_type(closure), _HS));
-
-    /* Need a GA even when packing a constructed FETCH_ME (cruel world!) */
-    GlobaliseAndPackGA(closure);
-
+		 belch("*>.. Packing a BH-like closure at %p (%s) as a FETCH_ME", 
+		       closure, info_type(closure)));
+    /* NB: in case of a FETCH_ME this might build up a chain of FETCH_MEs;
+           phps short-cut the GA here */
     PackFetchMe(closure);
     return;
 
+  case MVAR:
+    barf("*>   Pack: packing of MVARs not implemented",
+		       closure, info_type(closure));
+	 
+    /* MVARs may not be copied; they are sticky objects in the new RTS */
+    /* therefore we treat them just as RBHs etc (what a great system!) 
+    IF_PAR_DEBUG(pack,
+		 belch("** Found an MVar at %p (%s)", 
+		 closure, info_type(closure))); */
+    IF_PAR_DEBUG(pack,
+		 belch("*>.. Packing an MVAR at %p (%s) as a FETCH_ME", 
+		       closure, info_type(closure)));
+    /* NB: in case of a FETCH_ME this might build up a chain of FETCH_MEs;
+           phps short-cut the GA here */
+    PackFetchMe(closure);
+    return;
+
+  case ARR_WORDS:
+    PackArray(closure);
+    return;
+
+  case MUT_ARR_PTRS:
+  case MUT_ARR_PTRS_FROZEN:
+  case MUT_VAR:
+    /* 
+       Eventually, this should use the same packing routine as ARR_WRODS
+
+       GlobaliseAndPackGA(closure);
+       PackArray(closure);
+       return;
+    */
+    barf("Qagh{Pack}Doq: packing of mutable closures not yet implemented: %p (%s)",
+	 closure, info_type(closure));
+
+#  ifdef DEBUG
+  case BCO:
+    barf("{Pack}Daq Qagh: found BCO closure %p (%s); GUM hates interpreted code", 
+	 closure, info_type(closure));
+    /* never reached */
+    
+    // check error cases only in a debugging setup
+  case RET_BCO:
+  case RET_SMALL:
+  case RET_VEC_SMALL:
+  case RET_BIG:
+  case RET_VEC_BIG:
+  case RET_DYN:
+    barf("{Pack}Daq Qagh: found return vector %p (%s) when packing (thread migration not implemented)", 
+	 closure, info_type(closure));
+    /* never reached */
+    
+  case UPDATE_FRAME:
+  case STOP_FRAME:
+  case CATCH_FRAME:
+  case SEQ_FRAME:
+    barf("{Pack}Daq Qagh: found stack frame %p (%s) when packing (thread migration not implemented)", 
+	 closure, info_type(closure));
+    /* never reached */
+
+  case TSO:
+  case BLOCKED_FETCH:
+  case EVACUATED:
+    /* something's very wrong */
+    barf("{Pack}Daq Qagh: found %s (%p) when packing", 
+	 info_type(closure), closure);
+    /* never reached */
+
+  case IND:
+  case IND_OLDGEN:
+  case IND_PERM:
+  case IND_OLDGEN_PERM:
+  case IND_STATIC:
+    barf("Pack: found IND_... after shorting out indirections %d (%s)", 
+	 (nat)(info->type), info_type(closure));
+
+  case WEAK:
+  case FOREIGN:
+  case STABLE_NAME:
+    barf("Pack: found foreign thingy; not yet implemented in %d (%s)", 
+	 (nat)(info->type), info_type(closure));
+#endif
+
   default:
-/*      IF_PAR_DEBUG(pack, */
-/*  		 belch("** Not a PLC or BH ... ")); */
+    barf("Pack: strange closure %d", (nat)(info->type));
   } /* switch */
+}
+
+/*
+  Pack a constructor of unknown size.
+  Similar to PackGeneric but without creating GAs.
+*/
+#if 0
+//@cindex PackConstr
+static void
+PackConstr(StgClosure *closure)
+{
+  StgInfoTable *info;
+  nat size, ptrs, nonptrs, vhs, i;
+  char str[80];
+
+  ASSERT(LOOKS_LIKE_GHC_INFO(closure->header.info));
+
+  /* get info about basic layout of the closure */
+  info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+
+  ASSERT(info->type == CONSTR ||
+         info->type == CONSTR_1_0 ||
+         info->type == CONSTR_0_1 ||
+         info->type == CONSTR_2_0 ||
+         info->type == CONSTR_1_1 ||
+         info->type == CONSTR_0_2);
+
+  IF_PAR_DEBUG(pack,
+	       fprintf(stderr, "*>^^ packing a constructor at %p (%s) (size=%d, ptrs=%d, nonptrs=%d)\n",
+		       closure, info_type(closure), size, ptrs, nonptrs));
+
+  /* Primitive arrays have gone; now we have (MUT_)ARR_WORDS etc */
+
+  if (!RoomToPack(PACK_GA_SIZE + _HS + vhs + nonptrs, ptrs)) {
+    IF_PAR_DEBUG(pack,
+		 belch("*>&& pack buffer is full; packing FETCH_ME for closure %p (%s)",
+		       closure, info_type(closure)));
+    PackFetchMe(closure);
+    return;
+  }
+
+  /* Record the location of the GA */
+  AmPacking(closure);
+
+  /* Pack Constructor marker */
+  Pack((StgWord)2);
+
+  /* pack fixed and variable header */
+  for (i = 0; i < _HS + vhs; ++i)
+    Pack((StgWord)*(((StgPtr)closure)+i));
+      
+  /* register all ptrs for further packing */
+  for (i = 0; i < ptrs; ++i)
+    QueueClosure(((StgClosure *) *(((StgPtr)closure)+(_HS+vhs)+i)));
+
+  /* pack non-ptrs */
+  for (i = 0; i < nonptrs; ++i)
+    Pack((StgWord)*(((StgPtr)closure)+(_HS+vhs)+ptrs+i));
+}
+#endif
+
+/*
+  Generic packing code.
+  This code is performed for `ordinary' closures such as CONSTR, THUNK etc.
+*/
+//@cindex PackGeneric
+static void
+PackGeneric(StgClosure *closure)
+{
+  StgInfoTable *info;
+  StgClosure *rbh;
+  nat size, ptrs, nonptrs, vhs, i, m;
+  char str[80];
+
+  ASSERT(LOOKS_LIKE_COOL_CLOSURE(closure));
 
   /* get info about basic layout of the closure */
   info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
@@ -806,81 +1011,30 @@ StgClosure *closure;
   ASSERT(!IS_BLACK_HOLE(closure));
 
   IF_PAR_DEBUG(pack,
-	       fprintf(stderr, "** packing %p (%s) (size=%d, ptrs=%d, nonptrs=%d)\n",
+	       fprintf(stderr, "*>== generic packing of %p (%s) (size=%d, ptrs=%d, nonptrs=%d)\n",
 		       closure, info_type(closure), size, ptrs, nonptrs));
 
-  /*
-   * Now peek ahead to see whether the closure has any primitive array
-   * children
-   */
-  /*
-      ToDo: fix this code -- HWL
-    for (i = 0; i < ptrs; ++i) {
-      StgInfoTable * childInfo;
-      nat childSize, childPtrs, childNonPtrs, childVhs;
-      
-      // extract i-th pointer out of closure 
-      childInfo = get_closure_info(((PP_) (closure))[i + FIXED_HS + vhs],
-				   &childSize, &childPtrs, &childNonPtrs, &childVhs, str);
-      if (IS_BIG_MOTHER(childInfo)) {
-	reservedPAsize += PACK_GA_SIZE + FIXED_HS + childVhs + childNonPtrs
-	  + childPtrs * PACK_FETCHME_SIZE;
-      }
-    }
-    */
-  /* Record the location of the GA */
-  AmPacking(closure);
+  /* Primitive arrays have gone; now we have (MUT_)ARR_WORDS etc */
 
-  /* Pack the global address */
-  if (!is_CONSTR) {
-    GlobaliseAndPackGA(closure);
-  } else {
+  if (!RoomToPack(PACK_GA_SIZE + _HS + vhs + nonptrs, ptrs)) {
     IF_PAR_DEBUG(pack,
-		 belch("** No GA allocated for CONSTR %p (%s)",
+		 belch("*>&& pack buffer is full; packing FETCH_ME for closure %p (%s)",
 		       closure, info_type(closure)));
+    PackFetchMe(closure);
+    return;
   }
 
-  /*
-   * Pack a fetchme to the closure if it's a black hole, or the buffer is full
-   * and it isn't a primitive array. N.B. Primitive arrays are always packed
-   * (because their parents index into them directly)
-   */
+  /* Record the location of the GA */
+  AmPacking(closure);
+  /* Allocate a GA for this closure and put it into the buffer */
+  GlobaliseAndPackGA(closure);
 
-  // ToDo: pack FMs if no more room available in packet (see below)
-  if (!(RoomToPack(PACK_GA_SIZE + _HS + vhs + nonptrs, ptrs)))
-    barf("** Qagh: Pack: not enough room in packet to pack closure %p (%s)",
-	 closure, info_type(closure));
-
-  /*
-    Has been moved into the switch statement
-    
-    if (IS_BLACK_HOLE(closure)) 
-    !(RoomToPack(PACK_GA_SIZE + FIXED_HS + vhs + nonptrs, ptrs)
-    || IS_BIG_MOTHER(info))) 
-    {
-      
-      ASSERT(pack_locn > PACK_HDR_SIZE);
-      
-      info = FetchMe_info;
-      for (i = 0; i < FIXED_HS; ++i) {
-	if (i == INFO_HDR_POSN)
-	  Pack((StgWord) FetchMe_info);
-	else
-	  Pack(closure[i]);
-      }
-
-      unpacked_size += FIXED_HS + FETCHME_CLOSURE_SIZE(dummy);
-
-    } else {
-  */
-  if (info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
-      info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR)
-    belch("** ghuH: found %s; packing of primitive arrays not yet implemented",
-	  info_type(closure));
+  ASSERT(!(info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
+	   info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR));
 
   /* At last! A closure we can actually pack! */
   if (ip_MUTABLE(info) && (info->type != FETCH_ME))
-    fprintf(stderr, "** ghuH: Replicated a Mutable closure!\n");
+    barf("*>// PackClosure: trying to replicate a Mutable closure!");
       
   /* 
      Remember, the generic closure layout is as follows:
@@ -894,13 +1048,23 @@ StgClosure *closure;
       
   /* register all ptrs for further packing */
   for (i = 0; i < ptrs; ++i)
-    QueueClosure(((StgClosure *) *(((StgPtr)closure)+(i+_HS+vhs))));
+    QueueClosure(((StgClosure *) *(((StgPtr)closure)+(_HS+vhs)+i)));
 
   /* pack non-ptrs */
   for (i = 0; i < nonptrs; ++i)
-    Pack((StgWord)*(((StgPtr)closure)+(i+_HS+vhs+ptrs)));
+    Pack((StgWord)*(((StgPtr)closure)+(_HS+vhs)+ptrs+i));
       
-  unpacked_size += _HS + (size < MIN_UPD_SIZE ? MIN_UPD_SIZE : size);
+  // ASSERT(_HS+vhs+ptrs+nonptrs==size);
+  if ((m=_HS+vhs+ptrs+nonptrs)<size) {
+    IF_PAR_DEBUG(pack,
+		 belch("*>** WARNING: slop in closure %p (%s); filling %d words; SHOULD NEVER HAPPEN",
+		       closure, info_type(closure), size-m));
+    for (i=m; i<size; i++) 
+      Pack((StgWord)*(((StgPtr)closure)+i));
+  }
+
+  unpacked_size += size;
+  // unpacked_size += (size < MIN_UPD_SIZE) ? MIN_UPD_SIZE : size;
 
   /*
    * Record that this is a revertable black hole so that we can fill in
@@ -916,7 +1080,355 @@ StgClosure *closure;
     packed_thunks++;
   }
 }
+/*
+  Pack an array of words.
+  ToDo: implement packing of MUT_ARRAYs
+*/
 
+//@cindex PackArray
+static void
+PackArray(StgClosure *closure)
+{
+  StgInfoTable *info;
+  nat size, ptrs, nonptrs, vhs, i, n;
+  char str[80];
+
+#if DEBUG
+  /* we don't really need all that get_closure_info delivers; however, for
+     debugging it's useful to have the stuff anyway */
+
+  /* get info about basic layout of the closure */
+  info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+
+  ASSERT(info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
+	 info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR);
+#endif
+  /* record offset of the closure and allocate a GA */
+  AmPacking(closure);
+  GlobaliseAndPackGA(closure);
+
+  n = ((StgArrWords *)closure)->words;
+  // this includes the header!: arr_words_sizeW(stgCast(StgArrWords*,q)); 
+
+  IF_PAR_DEBUG(pack,
+	       belch("*>== packing an array of %d words %p (%s) (size=%d)\n",
+		     n, closure, info_type(closure), 
+		     arr_words_sizeW((StgArrWords *)closure)));
+
+  /* Pack the header (2 words: info ptr and the number of words to follow) */
+  Pack((StgWord)*(StgPtr)closure);
+  Pack(((StgArrWords *)closure)->words);
+
+  /* pack the payload of the closure (all non-ptrs) */
+  for (i=0; i<n; i++)
+    Pack((StgWord)((StgArrWords *)closure)->payload[i]);
+
+  unpacked_size += arr_words_sizeW((StgArrWords *)closure);
+}
+
+/*
+   Pack a PAP closure.
+   Note that the representation of a PAP in the buffer is different from
+   its representation in the heap. In particular, pointers to local
+   closures are packed directly as FETCHME closures, using
+   PACK_FETCHME_SIZE words to represent q 1 word pointer in the orig graph
+   structure. To account for the difference in size we store the packed
+   size of the closure as part of the PAP's variable header in the buffer.
+*/
+
+//@cindex PackPAP
+static void
+PackPAP(StgPAP *pap) {
+  nat m, n, i, j, pack_start;
+  StgPtr p, q,  end/*dbg*/;
+  const StgInfoTable* info;
+  StgWord32 bitmap;
+  /* debugging only */
+  nat size, ptrs, nonptrs, vhs;
+  char str[80];
+
+  /* This is actually a setup invariant; checked here 'cause it affects PAPs*/
+  ASSERT(PACK_FETCHME_SIZE == 1 + sizeofW(StgFetchMe));
+  ASSERT(NotYetPacking(OffsetFor((StgClosure *)pap)));
+
+  /* record offset of the closure and allocate a GA */
+  AmPacking((StgClosure *)pap);
+  GlobaliseAndPackGA((StgClosure *)pap);
+
+  /* get info about basic layout of the closure */
+  info = get_closure_info((StgClosure *)pap, &size, &ptrs, &nonptrs, &vhs, str);
+  ASSERT(ptrs==0 && nonptrs==0 && size==pap_sizeW(pap));
+
+  n = (nat)(pap->n_args);
+
+  IF_PAR_DEBUG(pack,
+	       belch("*>** PackPAP: packing PAP @ %p with %d words (size=%d; ptrs=%d; nonptrs=%d:", 
+			 (StgClosure *)pap, n,  size, ptrs, nonptrs);
+               printClosure((StgClosure *)pap));
+
+  /* Pack the PAP header */
+  Pack((StgWord)(pap->header.info));
+  Pack((StgWord)(pap->n_args));
+  Pack((StgWord)(pap->fun));
+  pack_start = pack_locn;   // to compute size of PAP in buffer
+  Pack((StgWord)0);    // this will be filled in later (size of PAP in buffer)
+
+  /* Pack the payload of a PAP i.e. a stack chunk */
+  /* pointers to start of stack chunk */
+  p = (StgPtr)(pap->payload);
+  end = (StgPtr)((nat)pap+pap_sizeW(pap)*sizeof(StgWord)); // (StgPtr)((nat)pap+sizeof(StgPAP)+sizeof(StgPtr)*n);
+  while (p<end) {
+    /* the loop body has been borrowed from scavenge_stack */
+    q = (StgPtr)*p;
+
+    /* If we've got a tag, pack all words in that block */
+    if (IS_ARG_TAG((W_)q)) {   // q stands for the no. of non-ptrs to follow
+      nat m = ARG_TAG(q);      // first word after this block
+      IF_PAR_DEBUG(pack,
+		   belch("*>** PackPAP @ %p: packing %d words (tagged), starting @ %p", 
+			 p, m, p));
+      for (i=0; i<m+1; i++)
+	Pack((StgWord)*(p+i));
+      p += m+1;                // m words + the tag
+      continue;
+    }
+     
+    /* If q is is a pointer to a (heap allocated) closure we pack a FETCH_ME
+       ToDo: provide RTS flag to also pack these closures
+    */
+    if (! LOOKS_LIKE_GHC_INFO(q) ) {
+      /* distinguish static closure (PLC) from other closures (FM) */
+      switch (get_itbl((StgClosure*)q)->type) {
+      case CONSTR_CHARLIKE:
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP: packing a charlike closure %d", 
+			   ((StgIntCharlikeClosure*)q)->data));
+    
+	PackPLC((StgPtr)CHARLIKE_CLOSURE(((StgIntCharlikeClosure*)q)->data));
+	p++;
+	break;
+      
+      case CONSTR_INTLIKE:
+	{
+	  StgInt val = ((StgIntCharlikeClosure*)q)->data;
+      
+	  if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {
+	    IF_PAR_DEBUG(pack,
+			 belch("*>** PackPAP: Packing ptr to a small intlike %d as a PLC", val));
+	    PackPLC((StgPtr)INTLIKE_CLOSURE(val));
+	    p++;
+	    break;
+	  } else {
+	    IF_PAR_DEBUG(pack,
+			 belch("*>** PackPAP: Packing a ptr to a big intlike %d as a FM", 
+			       val));
+	    Pack((StgWord)(ARGTAG_MAX+1));
+	    PackFetchMe((StgClosure *)q);
+	    p++;
+	    break;
+	  }
+	}
+	case THUNK_STATIC:       // ToDo: check whether that's ok
+	case FUN_STATIC:       // ToDo: check whether that's ok
+	case CONSTR_STATIC:
+	case CONSTR_NOCAF_STATIC:
+	  {
+	    IF_PAR_DEBUG(pack,
+			 belch("*>** PackPAP: packing a ptr to a %p (%s) as a PLC", 
+			       q, info_type((StgClosure *)q)));
+	    
+	    PackPLC((StgPtr)q);
+	    p++;
+	    break;
+	  }
+      default:
+	  IF_PAR_DEBUG(pack,
+		       belch("*>** PackPAP @ %p: packing FM to %p (%s)", 
+			     p, q, info_type((StgClosure*)q)));
+	  Pack((StgWord)(ARGTAG_MAX+1));
+	  PackFetchMe((StgClosure *)q);
+	  p++;
+	  break;
+      }
+      continue;
+    }
+	
+    /* 
+     * Otherwise, q must be the info pointer of an activation
+     * record.  All activation records have 'bitmap' style layout
+     * info.
+     */
+    info  = get_itbl((StgClosure *)p);
+    switch (info->type) {
+	
+      /* Dynamic bitmap: the mask is stored on the stack */
+    case RET_DYN:
+      IF_PAR_DEBUG(pack,
+		   belch("*>** PackPAP @ %p: RET_DYN", 
+			 p));
+
+      /* Pack the header as is */
+      Pack((StgWord)(((StgRetDyn *)p)->info));
+      Pack((StgWord)(((StgRetDyn *)p)->liveness));
+      Pack((StgWord)(((StgRetDyn *)p)->ret_addr));
+
+      bitmap = ((StgRetDyn *)p)->liveness;
+      p      = (P_)&((StgRetDyn *)p)->payload[0];
+      goto small_bitmap;
+
+      /* probably a slow-entry point return address: */
+    case FUN:
+    case FUN_STATIC:
+      {
+      IF_PAR_DEBUG(pack,
+		   belch("*>** PackPAP @ %p: FUN or FUN_STATIC", 
+			 p));
+
+      Pack((StgWord)(((StgClosure *)p)->header.info));
+      p++;
+
+      goto follow_srt; //??
+      }
+
+      /* Using generic code here; could inline as in scavenge_stack */
+    case UPDATE_FRAME:
+      {
+	StgUpdateFrame *frame = (StgUpdateFrame *)p;
+	nat type = get_itbl(frame->updatee)->type;
+
+	ASSERT(type==BLACKHOLE || type==CAF_BLACKHOLE || type==BLACKHOLE_BQ);
+
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP @ %p: UPDATE_FRAME (updatee=%p; link=%p)", 
+			   p, frame->updatee, frame->link));
+
+	Pack((StgWord)(frame->header.info));
+	Pack((StgWord)(frame->link));     // ToDo: fix intra-stack pointer
+	Pack((StgWord)(frame->updatee));  // ToDo: follow link 
+
+	p += 3;
+      }
+
+      /* small bitmap (< 32 entries, or 64 on a 64-bit machine) */
+    case STOP_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP @ %p: STOP_FRAME", 
+			   p));
+	Pack((StgWord)((StgStopFrame *)p)->header.info);
+	p++;
+      }
+
+    case CATCH_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP @ %p: CATCH_FRAME (handler=%p)", 
+			   p, ((StgCatchFrame *)p)->handler));
+
+	Pack((StgWord)((StgCatchFrame *)p)->header.info);
+	Pack((StgWord)((StgCatchFrame *)p)->link); // ToDo: fix intra-stack pointer
+	Pack((StgWord)((StgCatchFrame *)p)->exceptions_blocked);
+	Pack((StgWord)((StgCatchFrame *)p)->handler);
+	p += 4;
+      }
+
+    case SEQ_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP @ %p: UPDATE_FRAME (link=%p)", 
+			   p, ((StgSeqFrame *)p)->link));
+
+	Pack((StgWord)((StgSeqFrame *)p)->header.info);
+	Pack((StgWord)((StgSeqFrame *)p)->link); // ToDo: fix intra-stack pointer
+
+        // ToDo: handle bitmap
+        bitmap = info->layout.bitmap;
+
+        p = (StgPtr)&(((StgClosure *)p)->payload);
+        goto small_bitmap;
+      }
+    case RET_BCO:
+    case RET_SMALL:
+    case RET_VEC_SMALL:
+      IF_PAR_DEBUG(pack,
+		   belch("*>** PackPAP @ %p: RET_{BCO,SMALL,VEC_SMALL} (bitmap=%o)", 
+			 p, info->layout.bitmap));
+
+
+      Pack((StgWord)((StgClosure *)p)->header.info);
+      p++;
+      // ToDo: handle bitmap
+      bitmap = info->layout.bitmap;
+      /* this assumes that the payload starts immediately after the info-ptr */
+
+    small_bitmap:
+      while (bitmap != 0) {
+	if ((bitmap & 1) == 0) {
+	  Pack((StgWord)(ARGTAG_MAX+1));
+	  PackFetchMe((StgClosure *)*p++); // pack a FetchMe to the closure
+	} else {
+	  Pack((StgWord)*p++);
+	}
+	bitmap = bitmap >> 1;
+      }
+      
+    follow_srt:
+      belch("*>-- PackPAP: nothing to do for follow_srt");
+      continue;
+
+      /* large bitmap (> 32 entries) */
+    case RET_BIG:
+    case RET_VEC_BIG:
+      {
+	StgPtr q;
+	StgLargeBitmap *large_bitmap;
+
+	IF_PAR_DEBUG(pack,
+		     belch("*>** PackPAP @ %p: RET_{BIG,VEC_BIG} (large_bitmap=%p)", 
+			   p, info->layout.large_bitmap));
+
+
+	Pack((StgWord)((StgClosure *)p)->header.info);
+	p++;
+
+	large_bitmap = info->layout.large_bitmap;
+
+	for (j=0; j<large_bitmap->size; j++) {
+	  bitmap = large_bitmap->bitmap[j];
+	  q = p + sizeof(W_) * 8;
+	  while (bitmap != 0) {
+	    if ((bitmap & 1) == 0) {
+	      Pack((StgWord)(ARGTAG_MAX+1));
+	      PackFetchMe((StgClosure *)*p++); // ToDo: pack pointer(StgClosure *)*p = evacuate((StgClosure *)*p);
+	    } else {
+	      Pack((StgWord)*p++);
+	    }
+	    bitmap = bitmap >> 1;
+	  }
+	  if (j+1 < large_bitmap->size) {
+	    while (p < q) {
+	      Pack((StgWord)(ARGTAG_MAX+1));
+	      PackFetchMe((StgClosure *)*p++); // ToDo: pack pointer (StgClosure *)*p = evacuate((StgClosure *)*p);
+	    }
+	  }
+	}
+
+	/* and don't forget to follow the SRT */
+	goto follow_srt;
+      }
+
+    default:
+      barf("PackPAP: weird activation record found on stack (@ %p): %d", 
+	   p, (int)(info->type));
+    }
+  }
+  // fill in size of the PAP (only the payload!) in buffer
+  globalPackBuffer->buffer[pack_start] = (StgWord)(pack_locn - pack_start - 1*sizeofW(StgWord));
+  // add the size of the whole packed closure; this relies on the fact that
+  // the size of the unpacked PAP + size of all unpacked FMs is the same as
+  // the size of the packed PAP!!
+  unpacked_size += sizeofW(pap) + (nat)(globalPackBuffer->buffer[pack_start]);
+}
 # else  /* GRAN */
 
 /* Fake the packing of a closure */
@@ -992,15 +1504,15 @@ StgClosure *closure;
 
     case THUNK_SELECTOR:
       {
-	StgClosure *sel = ((StgSelector *)closure)->selectee;
+	StgClosure *selectee = ((StgSelector *)closure)->selectee;
 
 	IF_GRAN_DEBUG(pack,
 		      belch("**    Avoid packing THUNK_SELECTOR (%p, %s) but queuing %p (%s)!", 
-			    closure, info_type(closure), sel, info_type(sel)));
-	QueueClosure(sel);
+			    closure, info_type(closure), selectee, info_type(selectee)));
+	QueueClosure(selectee);
 	IF_GRAN_DEBUG(pack,
 		      belch("**    [%p (%s) (Queueing closure) ....]",
-			    sel, info_type(sel)));
+			    selectee, info_type(selectee)));
       }
       return;
 
@@ -1216,17 +1728,17 @@ StgClosure *closure;
 //@cindex Pack
 
 # if defined(PAR)
-static inline void
+static  void
 Pack(data)
 StgWord data;
 {
   ASSERT(pack_locn < RtsFlags.ParFlags.packBufferSize);
-  Bonzo->buffer[pack_locn++] = data;
+  globalPackBuffer->buffer[pack_locn++] = data;
 }
 #endif
 
 #if defined(GRAN)
-static inline void
+static  void
 Pack(closure)
 StgClosure *closure;
 {
@@ -1236,14 +1748,15 @@ StgClosure *closure;
 
   /* This checks the size of the GrAnSim internal pack buffer. The simulated
      pack buffer is checked via RoomToPack (as in GUM) */
-  if (pack_locn >= (int)Bonzo->size+sizeofW(rtsPackBuffer)) 
+  if (pack_locn >= (int)globalPackBuffer->size+sizeofW(rtsPackBuffer)) 
     reallocPackBuffer();
 
   if (closure==(StgClosure*)NULL) 
     belch("Qagh {Pack}Daq: Trying to pack 0");
-  Bonzo->buffer[pack_locn++] = closure;
+  globalPackBuffer->buffer[pack_locn++] = closure;
   /* ASSERT: Data is a closure in GrAnSim here */
   info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+  // ToDo: is check for MIN_UPD_SIZE really needed? */
   unpacked_size += _HS + (size < MIN_UPD_SIZE ? 
 				        MIN_UPD_SIZE : 
 				        size);
@@ -1255,7 +1768,7 @@ StgClosure *closure;
    export.  The GA is then packed into the pack buffer.  */
 
 # if defined(PAR)
-
+//@cindex GlobaliseAndPackGA
 static void
 GlobaliseAndPackGA(closure)
 StgClosure *closure;
@@ -1265,11 +1778,12 @@ StgClosure *closure;
 
   if ((ga = LAGAlookup(closure)) == NULL)
     ga = makeGlobal(closure, rtsTrue);
+  ASSERT(ga->weight==MAX_GA_WEIGHT || ga->weight > 2);
   splitWeight(&packGA, ga);
   ASSERT(packGA.weight > 0);
 
   IF_PAR_DEBUG(pack,
-	       fprintf(stderr, "** Globalising closure %p (%s) with GA", 
+	       fprintf(stderr, "*>## Globalising closure %p (%s) with GA ", 
 		       closure, info_type(closure));
 	       printGA(&packGA);
 	       fputc('\n', stderr));
@@ -1303,9 +1817,11 @@ static void
 PackOffset(offset)
 int offset;
 {
+  /*
   IF_PAR_DEBUG(pack,
 	       belch("** Packing Offset %d at pack location %u",
 		     offset, pack_locn));
+  */
   Pack(1L);			/* weight */
   Pack(0L);			/* pe */
   Pack(offset);		        /* slot/offset */
@@ -1337,9 +1853,13 @@ void
 InitPendingGABuffer(size)
 nat size; 
 {
-  PendingGABuffer = (globalAddr *) 
-                      stgMallocBytes(size*2*sizeof(globalAddr),
-				     "InitPendingGABuffer");
+  if (PendingGABuffer==(globalAddr *)NULL)
+    PendingGABuffer = (globalAddr *) 
+      stgMallocBytes(size*2*sizeof(globalAddr),
+		     "InitPendingGABuffer");
+
+  /* current location in the buffer */
+  gaga = PendingGABuffer; 
 }
 
 /*
@@ -1355,8 +1875,8 @@ CommonUp(StgClosure *src, StgClosure *dst)
   ASSERT(src != (StgClosure *)NULL && dst != (StgClosure *)NULL);
   ASSERT(src != dst);
 
-  IF_PAR_DEBUG(verbose,
-	       belch("__ CommonUp %p (%s) with %p (%s)",
+  IF_PAR_DEBUG(pack,
+	       belch("*___ CommonUp %p (%s) --> %p (%s)",
 		     src, info_type(src), dst, info_type(dst)));
   
   switch (get_itbl(src)->type) {
@@ -1377,6 +1897,21 @@ CommonUp(StgClosure *src, StgClosure *dst)
     bqe = END_BQ_QUEUE;
     break;
 
+    /* currently we also common up 2 CONSTRs; this should reduce heap 
+     * consumption but also does more work; not sure whether it's worth doing 
+     */ 
+  case CONSTR:
+  case CONSTR_1_0:
+  case CONSTR_0_1:
+  case CONSTR_2_0:
+  case CONSTR_1_1:
+  case CONSTR_0_2:
+  case ARR_WORDS:
+  case MUT_ARR_PTRS:
+  case MUT_ARR_PTRS_FROZEN:
+  case MUT_VAR:
+    break;
+
   default:
     /* Don't common up anything else */
     return;
@@ -1387,8 +1922,283 @@ CommonUp(StgClosure *src, StgClosure *dst)
   /*
     ASSERT(!IS_BIG_MOTHER(INFO_PTR(dst)));
     if (bqe != END_BQ_QUEUE)
-    awaken_blocked_queue(bqe, src);
+    awakenBlockedQueue(bqe, src);
   */
+}
+
+/*
+ * Common up the new closure with any existing closure having the same
+ * GA
+ */
+//@cindex SetGAandCommonUp
+static StgClosure *
+SetGAandCommonUp(globalAddr *ga, StgClosure *closure, rtsBool hasGA)
+{
+  StgClosure *existing;
+  StgInfoTable *ip, *oldip;
+  globalAddr *newGA;
+
+  if (!hasGA)
+    return closure;
+
+  ip = get_itbl(closure);
+  if ((existing = GALAlookup(ga)) == NULL) {
+    /* Just keep the new object */
+    IF_PAR_DEBUG(pack,
+		 belch("*<## Unpacking new GA ((%x, %d, %x))", 
+		       ga->payload.gc.gtid, ga->payload.gc.slot, ga->weight));
+
+    // make an entry binding closure to ga in the RemoteGA table
+    newGA = setRemoteGA(closure, ga, rtsTrue);
+    if (ip->type == FETCH_ME)
+      ((StgFetchMe *)closure)->ga = newGA;
+  } else {
+    /* Two closures, one global name.  Someone loses */
+    oldip = get_itbl(existing);
+    if ((oldip->type == FETCH_ME || 
+	 /* If we pack GAs for CONSTRs we have to check for them, too */
+	 IS_BLACK_HOLE(existing)) &&
+	ip->type != FETCH_ME) 
+    {
+      IF_PAR_DEBUG(pack,
+		   belch("*<#- Unpacking old GA ((%x, %d, %x)); redirecting %p -> %p",
+			 ga->payload.gc.gtid, ga->payload.gc.slot, ga->weight,
+			 existing, closure));
+
+      /* 
+       * What we had wasn't worth keeping, so make the old closure an
+       * indirection to the new closure (copying BQs if necessary) and
+       * make sure that the old entry is not the preferred one for this
+       * closure.
+       */
+      CommonUp(existing, closure);
+      //GALAdeprecate(ga);
+      /* now ga indirectly refers to the new closure */
+      ASSERT(UNWIND_IND(GALAlookup(ga))==closure);
+    } else {
+      /*
+       * Either we already had something worthwhile by this name or
+       * the new thing is just another FetchMe.  However, the thing we
+       * just unpacked has to be left as-is, or the child unpacking
+       * code will fail.  Remember that the way pointer words are
+       * filled in depends on the info pointers of the parents being
+       * the same as when they were packed.
+       */
+      IF_PAR_DEBUG(pack,
+		   belch("*<#@ Unpacking old GA ((%x, %d, %x)); keeping %p (%s) nuking unpacked %p (%s)", 
+			 ga->payload.gc.gtid, ga->payload.gc.slot, ga->weight,
+			 existing, info_type(existing), closure, info_type(closure)));
+
+      closure = existing;
+#if 0
+      // HACK
+      ty = get_itbl(closure)->type;
+      if (ty == CONSTR ||
+	  ty == CONSTR_1_0 ||
+	  ty == CONSTR_0_1 ||
+	  ty == CONSTR_2_0 ||
+	  ty == CONSTR_1_1 ||
+	  ty == CONSTR_0_2)
+	CommonUp(closure, graph);
+#endif
+    }
+    /* Pool the total weight in the stored ga */
+    (void) addWeight(ga);
+  }
+
+  /* ToDo: check this assertion!!
+     if we have unpacked a FETCH_ME, we have a GA, too 
+  ASSERT(get_itbl(*closureP)->type!=FETCH_ME || 
+	 looks_like_ga(((StgFetchMe *)*closureP)->ga));
+  */
+  /* Sort out the global address mapping */
+  if (ip_THUNK(ip)){ 
+    // || // (ip_THUNK(ip) && !ip_UNPOINTED(ip)) || 
+    //(ip_MUTABLE(ip) && ip->type != FETCH_ME)) {
+    /* Make up new GAs for single-copy closures */
+    globalAddr *newGA = makeGlobal(closure, rtsTrue);
+    
+    // It's a new GA and therefore has the full weight
+    ASSERT(newGA->weight==0);
+
+    /* Create an old GA to new GA mapping */
+    *gaga++ = *ga;
+    splitWeight(gaga, newGA);
+    /* inlined splitWeight; we know that newGALA has full weight 
+    newGA->weight = gaga->weight = 1L << (BITS_IN(unsigned) - 1);    
+    gaga->payload = newGA->payload;
+    */
+    ASSERT(gaga->weight == 1L << (BITS_IN(unsigned) - 1));
+    gaga++;
+  }
+  return closure;
+}
+
+/*
+  Copies a segment of the buffer, starting at @bufptr@, representing a closure
+  into the heap at @graph@.
+ */
+//@cindex FillInClosure
+static nat
+FillInClosure(StgWord ***bufptrP, StgClosure *graph)
+{
+  StgInfoTable *ip;
+  StgWord **bufptr = *bufptrP;
+  nat ptrs, nonptrs, vhs, i, size;
+  char str[80];
+
+  ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure*)bufptr)->header.info));
+
+  /*
+   * Close your eyes.  You don't want to see where we're looking. You
+   * can't get closure info until you've unpacked the variable header,
+   * but you don't know how big it is until you've got closure info.
+   * So...we trust that the closure in the buffer is organized the
+   * same way as they will be in the heap...at least up through the
+   * end of the variable header.
+   */
+  ip = get_closure_info((StgClosure *)bufptr, &size, &ptrs, &nonptrs, &vhs, str);
+	  
+  /* Make sure that nothing sans the fixed header is filled in
+     The ga field of the FETCH_ME is filled in in SetGAandCommonUp */
+  if (ip->type == FETCH_ME) {
+    ASSERT(size>=MIN_UPD_SIZE);    // size of the FM in the heap
+    ptrs = nonptrs = vhs = 0;      // i.e. only unpack FH from buffer
+  }
+  /* ToDo: check whether this is really needed */
+  if (ip->type == ARR_WORDS) {
+    UnpackArray(bufptrP, graph);
+    return arr_words_sizeW((StgArrWords *)bufptr);
+  }
+
+  if (ip->type == PAP || ip->type == AP_UPD) {
+    return UnpackPAP(bufptrP, graph); // includes size of unpackes FMs
+  }
+
+  /* 
+     Remember, the generic closure layout is as follows:
+     +-------------------------------------------------+
+     | FIXED HEADER | VARIABLE HEADER | PTRS | NON-PRS |
+     +-------------------------------------------------+
+  */
+  /* Fill in the fixed header */
+  for (i = 0; i < _HS; i++)
+    ((StgPtr)graph)[i] = (StgWord)*bufptr++;
+
+  /* Fill in the packed variable header */
+  for (i = 0; i < vhs; i++)
+    ((StgPtr)graph)[_HS + i] = (StgWord)*bufptr++;
+  
+  /* Pointers will be filled in later */
+  
+  /* Fill in the packed non-pointers */
+  for (i = 0; i < nonptrs; i++)
+    ((StgPtr)graph)[_HS + i + vhs + ptrs] = (StgWord)*bufptr++;
+
+  /* Indirections are never packed */
+  // ASSERT(INFO_PTR(graph) != (W_) Ind_info_TO_USE);
+  // return bufptr;
+   *bufptrP = bufptr;
+   ASSERT((ip->type==FETCH_ME && sizeofW(StgFetchMe)==size) ||
+	  _HS+vhs+ptrs+nonptrs == size);
+   return size; 
+}
+
+/*
+  Find the next pointer field in the parent closure.
+  If the current parent has been completely unpacked already, get the
+  next closure from the global closure queue.
+*/
+//@cindex LocateNextParent
+static void
+LocateNextParent(parentP, pptrP, pptrsP, sizeP)
+StgClosure **parentP;
+nat *pptrP, *pptrsP, *sizeP;
+{
+  StgInfoTable *ip; // debugging
+  nat nonptrs, pvhs;
+  char str[80];
+
+  /* pptr as an index into the current parent; find the next pointer field
+     in the parent by increasing pptr; if that takes us off the closure
+     (i.e. *pptr + 1 > *pptrs) grab a new parent from the closure queue
+  */
+  (*pptrP)++;
+  while (*pptrP + 1 > *pptrsP) {
+    /* *parentP has been constructed (all pointer set); so check it now */
+    IF_DEBUG(sanity,
+	     if (*parentP!=(StgClosure*)NULL &&
+		 get_itbl(*parentP)->type != FETCH_ME)
+	       checkClosure(*parentP));
+
+    *parentP = DeQueueClosure();
+    
+    if (*parentP == NULL)
+      break;
+    else {
+      ip = get_closure_info(*parentP, sizeP, pptrsP, &nonptrs,
+			    &pvhs, str);
+      *pptrP = 0;
+    }
+  }
+  /* *parentP points to the new (or old) parent; */
+  /* *pptr, *pptrs and *size have been updated referring to the new parent */
+}
+
+/* 
+   UnpackClosure is the heart of the unpacking routine. It is called for 
+   every closure found in the packBuffer. Any prefix such as GA, PLC marker
+   etc has been unpacked into the *ga structure. 
+   UnpackClosure does the following:
+     - check for the kind of the closure (PLC, Offset, std closure)
+     - copy the contents of the closure from the buffer into the heap
+     - update LAGA tables (in particular if we end up with 2 closures 
+       having the same GA, we make one an indirection to the other)
+     - set the GAGA map in order to send back an ACK message
+
+   At the end of this function *graphP has been updated to point to the
+   next free word in the heap for unpacking the rest of the graph and
+   *bufptrP points to the next word in the pack buffer to be unpacked.
+*/
+
+static  StgClosure*
+UnpackClosure (StgWord ***bufptrP, StgClosure **graphP, globalAddr *ga) {
+  StgClosure *closure;
+  nat size;
+  rtsBool hasGA = rtsFalse;
+
+  /* Now unpack the closure body, if there is one; three cases:
+     - PLC: closure is just a pointer to a static closure
+     - Offset: closure has been unpacked already
+     - else: copy data from packet into closure
+  */
+  if (isFixed(ga)) {
+    closure = UnpackPLC(ga);
+  } else if (isOffset(ga)) {
+    closure = UnpackOffset(ga);
+  } else {
+    ASSERT(LOOKS_LIKE_GA(ga));
+    /* Now we have to build something. */
+    hasGA = !isConstr(ga);
+    /* the new closure will be built here */
+    closure = *graphP;
+    
+    /* fill in the closure from the buffer */
+    size = FillInClosure(/*in/out*/bufptrP, /*in*/closure);
+    
+    /* Add to queue for processing */
+    QueueClosure(closure);
+    
+    /* common up with other graph if necessary */
+    closure = SetGAandCommonUp(ga, closure, hasGA);
+
+    /* if we unpacked a THUNK, check that it is large enough to update */
+    ASSERT(!closure_THUNK(closure) || size>=MIN_UPD_SIZE);
+    /* graph shall point to next free word in the heap */
+    *graphP += size;
+    //graph += (size < MIN_UPD_SIZE) ? MIN_UPD_SIZE : size;
+  }
+  return closure;
 }
 
 /*
@@ -1407,196 +2217,44 @@ rtsPackBuffer *packBuffer;
 globalAddr **gamap;
 nat *nGAs;
 {
-  nat size, ptrs, nonptrs, vhs;
-  StgWord **buffer, **bufptr, **slotptr;
-  globalAddr ga, *gaga;
-  StgClosure *closure, *existing,
-             *graphroot, *graph, *parent;
-  StgInfoTable *ip, *oldip;
-  nat bufsize, i,
-      pptr = 0, pptrs = 0, pvhs;
-  rtsBool hasGA;
-  char str[80];
+  StgWord **bufptr, **slotptr;
+  globalAddr gaS;
+  StgClosure *closure, *graphroot, *graph, *parent;
+  nat size, heapsize, bufsize, 
+      pptr = 0, pptrs = 0, pvhs = 0;
 
-  initPackBuffer();                  /* in case it isn't already init'd */
+  /* Initialisation */
+  InitPacking(rtsTrue);      // same as in PackNearbyGraph
+  globalUnpackBuffer = packBuffer;
+
+  IF_DEBUG(sanity, // do a sanity check on the incoming packet
+	   checkPacket(packBuffer));
+
+  ASSERT(gaga==PendingGABuffer); 
   graphroot = (StgClosure *)NULL;
-
-  gaga = PendingGABuffer;
-
-  InitClosureQueue();
 
   /* Unpack the header */
   bufsize = packBuffer->size;
-  buffer = packBuffer->buffer;
-  bufptr = buffer;
+  heapsize = packBuffer->unpacked_size;
+  bufptr = packBuffer->buffer;
 
   /* allocate heap */
-  if (bufsize > 0) {
-    graph = allocate(bufsize);
+  if (heapsize > 0) {
+    graph = (StgClosure *)allocate(heapsize);
     ASSERT(graph != NULL);
   }
 
+  /* iterate over the buffer contents and unpack all closures */
   parent = (StgClosure *)NULL;
-
   do {
     /* This is where we will ultimately save the closure's address */
     slotptr = bufptr;
 
-    /* First, unpack the next GA or PLC */
-    ga.weight = (rtsWeight) *bufptr++;
+    /* fill in gaS from buffer; gaS may receive GA, PLC- or offset-marker */
+    bufptr = UnpackGA(/*in*/bufptr, /*out*/&gaS);
 
-    if (ga.weight > 0) {
-      ga.payload.gc.gtid = (GlobalTaskId) *bufptr++;
-      ga.payload.gc.slot = (int) *bufptr++;
-    } else {
-      ga.payload.plc = (StgPtr) *bufptr++;
-    }
-
-    /* Now unpack the closure body, if there is one */
-    if (isFixed(&ga)) {
-      /* No more to unpack; just set closure to local address */
-      IF_PAR_DEBUG(pack,
-		   belch("_* Unpacked PLC at %x", ga.payload.plc)); 
-      hasGA = rtsFalse;
-      closure = ga.payload.plc;
-    } else if (isOffset(&ga)) {
-      /* No more to unpack; just set closure to cached address */
-      IF_PAR_DEBUG(pack,
-		   belch("_* Unpacked indirection to %p (was offset %x)", 
-			 (StgClosure *) buffer[ga.payload.gc.slot],
-			 ga.payload.gc.slot)); 
-      ASSERT(parent != (StgClosure *)NULL);
-      hasGA = rtsFalse;
-      closure = (StgClosure *) buffer[ga.payload.gc.slot];
-    } else {
-      /* Now we have to build something. */
-      hasGA = rtsTrue;
-
-      ASSERT(bufsize > 0);
-
-      /*
-       * Close your eyes.  You don't want to see where we're looking. You
-       * can't get closure info until you've unpacked the variable header,
-       * but you don't know how big it is until you've got closure info.
-       * So...we trust that the closure in the buffer is organized the
-       * same way as they will be in the heap...at least up through the
-       * end of the variable header.
-       */
-      ip = get_closure_info(bufptr, &size, &ptrs, &nonptrs, &vhs, str);
-	  
-      /* 
-	 Remember, the generic closure layout is as follows:
-	 +-------------------------------------------------+
-	 | FIXED HEADER | VARIABLE HEADER | PTRS | NON-PRS |
-	 +-------------------------------------------------+
-      */
-      /* Fill in the fixed header */
-      for (i = 0; i < _HS; i++)
-	((StgPtr)graph)[i] = (StgWord)*bufptr++;
-
-      if (ip->type == FETCH_ME)
-	size = ptrs = nonptrs = vhs = 0;
-
-      /* Fill in the packed variable header */
-      for (i = 0; i < vhs; i++)
-	((StgPtr)graph)[_HS + i] = (StgWord)*bufptr++;
-
-      /* Pointers will be filled in later */
-
-      /* Fill in the packed non-pointers */
-      for (i = 0; i < nonptrs; i++)
-	((StgPtr)graph)[_HS + i + vhs + ptrs] = (StgWord)*bufptr++;
-                
-      /* Indirections are never packed */
-      // ASSERT(INFO_PTR(graph) != (W_) Ind_info_TO_USE);
-
-      /* Add to queue for processing */
-      QueueClosure(graph);
-	
-      /*
-       * Common up the new closure with any existing closure having the same
-       * GA
-       */
-
-      if ((existing = GALAlookup(&ga)) == NULL) {
-	globalAddr *newGA;
-	/* Just keep the new object */
-	IF_PAR_DEBUG(pack,
-		     belch("_* Unpacking new GA ((%x, %d, %x))", 
-			   ga.payload.gc.gtid, ga.payload.gc.slot, ga.weight));
-
-	closure = graph;
-	newGA = setRemoteGA(graph, &ga, rtsTrue);
-	if (ip->type == FETCH_ME)
-	  // FETCHME_GA(closure) = newGA;
-	  ((StgFetchMe *)closure)->ga = newGA;
-      } else {
-	/* Two closures, one global name.  Someone loses */
-	oldip = get_itbl(existing);
-
-	if ((oldip->type == FETCH_ME || 
-	     // ToDo: don't pack a GA for these in the first place
-             oldip->type == CONSTR ||
-             oldip->type == CONSTR_1_0 ||
-             oldip->type == CONSTR_0_1 ||
-             oldip->type == CONSTR_2_0 ||
-             oldip->type == CONSTR_1_1 ||
-             oldip->type == CONSTR_0_2 ||
-	     IS_BLACK_HOLE(existing)) &&
-	    ip->type != FETCH_ME) {
-
-	  /* What we had wasn't worth keeping */
-	  closure = graph;
-	  CommonUp(existing, graph);
-	} else {
-	  StgWord ty;
-
-	  /*
-	   * Either we already had something worthwhile by this name or
-	   * the new thing is just another FetchMe.  However, the thing we
-	   * just unpacked has to be left as-is, or the child unpacking
-	   * code will fail.  Remember that the way pointer words are
-	   * filled in depends on the info pointers of the parents being
-	   * the same as when they were packed.
-	   */
-	  IF_PAR_DEBUG(pack,
-		       belch("_* Unpacking old GA ((%x, %d, %x)), keeping %#lx", 
-			     ga.payload.gc.gtid, ga.payload.gc.slot, ga.weight,
-			     existing));
-
-	  closure = existing;
-	  // HACK
-	  ty = get_itbl(closure)->type;
-	  if (ty == CONSTR ||
-	      ty == CONSTR_1_0 ||
-	      ty == CONSTR_0_1 ||
-	      ty == CONSTR_2_0 ||
-	      ty == CONSTR_1_1 ||
-	      ty == CONSTR_0_2)
-	    CommonUp(closure, graph);
-	  
-	}
-	/* Pool the total weight in the stored ga */
-	(void) addWeight(&ga);
-      }
-
-      /* Sort out the global address mapping */
-      if (hasGA || // (ip_THUNK(ip) && !ip_UNPOINTED(ip)) || 
-	  (ip_MUTABLE(ip) && ip->type != FETCH_ME)) {
-	/* Make up new GAs for single-copy closures */
-	globalAddr *newGA = makeGlobal(closure, rtsTrue);
-	
-	// keep this assertion!
-	// ASSERT(closure == graph);
-
-	/* Create an old GA to new GA mapping */
-	*gaga++ = ga;
-	splitWeight(gaga, newGA);
-	ASSERT(gaga->weight == 1L << (BITS_IN(unsigned) - 1));
-	gaga++;
-      }
-      graph += _HS + (size < MIN_UPD_SIZE ? MIN_UPD_SIZE : size);
-    }
+    /* this allocates heap space, updates LAGA tables etc */
+    closure = UnpackClosure (/*in/out*/&bufptr, /*in/out*/&graph, /*in*/&gaS);
 
     /*
      * Set parent pointer to point to chosen closure.  If we're at the top of
@@ -1613,29 +2271,488 @@ nat *nGAs;
     *slotptr = (StgWord) closure;
 
     /* Locate next parent pointer */
-    pptr++;
-    while (pptr + 1 > pptrs) {
-      parent = DeQueueClosure();
+    LocateNextParent(&parent, &pptr, &pptrs, &size);
 
-      if (parent == NULL)
-	break;
-      else {
-	(void) get_closure_info(parent, &size, &pptrs, &nonptrs,
-					&pvhs, str);
-	pptr = 0;
-      }
-    }
+    IF_DEBUG(sanity,
+	     gaS.weight          = 0xdeadffff;
+	     gaS.payload.gc.gtid = 0xdead;
+	     gaS.payload.gc.slot = 0xdeadbeef;);
   } while (parent != NULL);
 
-  //ASSERT(bufsize == 0 || graph - 1 <= SAVE_Hp);
+  /* we unpacked exactly as many words as there are in the buffer */
+  ASSERT(bufsize == bufptr-(packBuffer->buffer) &&
+	 heapsize >= graph-graphroot); // should be ==
 
   *gamap = PendingGABuffer;
   *nGAs = (gaga - PendingGABuffer) / 2;
 
+  IF_PAR_DEBUG(tables,
+	       belch("**   LAGA table after unpacking closure %p:",
+		     graphroot);
+	       printLAGAtable());
+
   /* ToDo: are we *certain* graphroot has been set??? WDP 95/07 */
   ASSERT(graphroot!=NULL);
+
+  IF_DEBUG(sanity,
+           {
+	     StgPtr p;
+
+	     /* check the unpacked graph */
+	     checkHeapChunk(graphroot,graph-sizeof(StgWord));
+
+	     // if we do sanity checks, then wipe the pack buffer after unpacking
+	     for (p=packBuffer->buffer; p<(packBuffer->buffer)+(packBuffer->size); )
+	       *p++ = 0xdeadbeef;
+            });
+
+  /* reset the global variable */
+  globalUnpackBuffer = (rtsPackBuffer*)NULL;
   return (graphroot);
 }
+
+//@cindex UnpackGA
+static  StgWord **
+UnpackGA(StgWord **bufptr, globalAddr *ga)
+{
+  /* First, unpack the next GA or PLC */
+  ga->weight = (rtsWeight) *bufptr++;
+
+  if (ga->weight > 0) {
+    ga->payload.gc.gtid = (GlobalTaskId) *bufptr++;
+    ga->payload.gc.slot = (int) *bufptr++;
+  } else {
+    ga->payload.plc = (StgPtr) *bufptr++;
+  }
+  return bufptr;
+}
+
+//@cindex UnpackPLC
+static  StgClosure *
+UnpackPLC(globalAddr *ga)
+{
+  /* No more to unpack; just set closure to local address */
+  IF_PAR_DEBUG(pack,
+	       belch("*<^^ Unpacked PLC at %x", ga->payload.plc)); 
+  return ga->payload.plc;
+}
+
+//@cindex UnpackOffset
+static  StgClosure *
+UnpackOffset(globalAddr *ga)
+{
+  /* globalUnpackBuffer is a global var init in UnpackGraph */
+  ASSERT(globalUnpackBuffer!=(rtsPackBuffer*)NULL);
+  /* No more to unpack; just set closure to cached address */
+  IF_PAR_DEBUG(pack,
+	       belch("*<__ Unpacked indirection to %p (was offset %d)", 
+		     (StgClosure *)((globalUnpackBuffer->buffer)[ga->payload.gc.slot]),
+		     ga->payload.gc.slot)); 
+return (StgClosure *)(globalUnpackBuffer->buffer)[ga->payload.gc.slot];
+}
+
+/*
+  Input: *bufptrP, *graphP  ... ptrs to the pack buffer and into the heap.
+
+  *bufptrP points to something that should be unpacked as a FETCH_ME:
+    |
+    v
+    +-------------------------------
+    |    GA    | FH of FM
+    +-------------------------------
+
+  The first 3 words starting at *bufptrP are the GA address; the next
+  word is the generic FM info ptr followed by the remaining FH (if any)
+  The result after unpacking will be a FETCH_ME closure, pointed to by
+  *graphP at the start of the fct;
+    |
+    v
+    +------------------------+
+    | FH of FM | ptr to a GA |
+    +------------------------+
+
+   The ptr field points into the RemoteGA table, which holds the actual GA.
+   *bufptrP has been updated to point to the next word in the buffer.
+   *graphP has been updated to point to the first free word at the end.
+*/
+
+static StgClosure*
+UnpackFetchMe (StgWord ***bufptrP, StgClosure **graphP) {
+  StgClosure *closure, *foo;
+  globalAddr gaS;
+
+  /* This fct relies on size of FM < size of FM in pack buffer */
+  ASSERT(sizeofW(StgFetchMe)<=PACK_FETCHME_SIZE);
+
+  /* fill in gaS from buffer */
+  *bufptrP = UnpackGA(*bufptrP, &gaS);
+  /* might be an offset to a closure in the pack buffer */
+  if (isOffset(&gaS)) {
+    belch("*<   UnpackFetchMe: found OFFSET to %d when unpacking FM at buffer loc %p",
+		  gaS.payload.gc.slot, *bufptrP);
+
+    closure = UnpackOffset(&gaS);
+    /* return address of previously unpacked closure; leaves *graphP unchanged */
+    return closure;
+  }
+
+  /* we have a proper GA at hand */
+  ASSERT(LOOKS_LIKE_GA(&gaS));
+
+  IF_DEBUG(sanity,
+	   if (isFixed(&gaS)) 
+	   barf("*<   UnpackFetchMe: found PLC where FM was expected %p (%s)",
+		*bufptrP, info_type(*bufptrP)));
+
+  IF_PAR_DEBUG(pack,
+	       belch("*<_- Unpacked @ %p a FETCH_ME to GA ", 
+		     *graphP);
+	       printGA(&gaS));
+
+  /* the next thing must be the IP to a FETCH_ME closure */
+  ASSERT(get_itbl((StgClosure *)*bufptrP)->type == FETCH_ME);
+  
+  closure = *graphP;
+  /* fill in the closure from the buffer */
+  FillInClosure(bufptrP, closure);
+  
+  /* the newly built closure is a FETCH_ME */
+  ASSERT(get_itbl(closure)->type == FETCH_ME);
+  
+  /* common up with other graph if necessary 
+     this also assigns the contents of gaS to the ga field of the FM closure */
+  foo = SetGAandCommonUp(&gaS, closure, rtsTrue);
+  
+  ASSERT(foo!=closure || LOOKS_LIKE_GA(((StgFetchMe*)closure)->ga));
+  
+  IF_PAR_DEBUG(pack,
+	       belch("*<_- current FM @ %p next FM @ %p; unpacked FM @ %p is ", 
+		     *graphP, *graphP+sizeofW(StgFetchMe), closure);
+	       printClosure(closure));
+  *graphP += sizeofW(StgFetchMe);
+  return foo;
+}
+
+/*
+  Unpack an array of words.
+  Could use generic unpack most of the time, but cleaner to separate it.
+  ToDo: implement packing of MUT_ARRAYs
+*/
+
+//@cindex UnackArray
+static void
+UnpackArray(StgWord ***bufptrP, StgClosure *graph)
+{
+  StgInfoTable *info;
+  StgWord **bufptr=*bufptrP;
+  nat size, ptrs, nonptrs, vhs, i, n;
+  char str[80];
+
+  /* yes, I know I am paranoid; but who's asking !? */
+  IF_DEBUG(sanity,
+	   info = get_closure_info((StgClosure*)bufptr, 
+				   &size, &ptrs, &nonptrs, &vhs, str);
+	   ASSERT(info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
+		  info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR));
+
+  n = ((StgArrWords *)bufptr)->words;
+  // this includes the header!: arr_words_sizeW(stgCast(StgArrWords*,q)); 
+
+  IF_PAR_DEBUG(pack,
+	       belch("*<== unpacking an array of %d words %p (%s) (size=%d)\n",
+		     n, (StgClosure*)bufptr, info_type((StgClosure*)bufptr), 
+		     arr_words_sizeW((StgArrWords *)bufptr)));
+
+  /* Unpack the header (2 words: info ptr and the number of words to follow) */
+  ((StgArrWords *)graph)->header.info = *bufptr++;  // assumes _HS==1; yuck!
+  ((StgArrWords *)graph)->words = *bufptr++;
+
+  /* unpack the payload of the closure (all non-ptrs) */
+  for (i=0; i<n; i++)
+    ((StgArrWords *)graph)->payload[i] = *bufptr++;
+
+  ASSERT(bufptr==*bufptrP+arr_words_sizeW((StgArrWords *)*bufptrP));
+  *bufptrP = bufptr;
+}
+
+/* 
+   Unpack a PAP in the buffer into a heap closure.
+   For each FETCHME we find in the packed PAP we have to unpack a separate
+   FETCHME closure and insert a pointer to this closure into the PAP. 
+   We unpack all FETCHMEs into an area after the PAP proper (the `FM area').
+   Note that the size of a FETCHME in the buffer is exactly the same as
+   the size of an unpacked FETCHME plus 1 word for the pointer to it.
+   Therefore, we just allocate packed_size words in the heap for the unpacking.
+   After this routine the heap starting from *graph looks like this:
+
+   graph
+     |
+     v             PAP closure                 |   FM area        |
+     +------------------------------------------------------------+
+     | PAP header | n_args | fun | payload ... | FM_1 | FM_2 .... |
+     +------------------------------------------------------------+
+
+   where payload contains pointers to each of the unpacked FM_1, FM_2 ...
+   The size of the PAP closure plus all FMs is _HS+2+packed_size.
+*/
+
+//@cindex UnpackPAP
+static nat
+UnpackPAP(StgWord ***bufptrP, StgClosure *graph) 
+{
+  nat n, i, j, packed_size = 0;
+  StgPtr p, q, end, payload_start, p_FMs;
+  const StgInfoTable* info;
+  StgWord32 bitmap;
+  StgWord **bufptr = *bufptrP;
+
+  IF_PAR_DEBUG(pack,
+	       belch("*<** UnpackPAP: unpacking PAP @ %p with %d words to closure %p", 
+			 *bufptr, *(bufptr+1), graph));
+
+  /* Unpack the PAP header (both fixed and variable) */
+  ((StgPAP *)graph)->header.info = *bufptr++;
+  n = ((StgPAP *)graph)->n_args = *bufptr++;
+  ((StgPAP *)graph)->fun = *bufptr++;
+  packed_size = *bufptr++;
+
+  IF_PAR_DEBUG(pack,
+	       belch("*<** UnpackPAP: PAP header is [%p, %d, %p] %d",
+		     ((StgPAP *)graph)->header.info,
+		     ((StgPAP *)graph)->n_args,
+		     ((StgPAP *)graph)->fun,
+		     packed_size));
+
+  payload_start = bufptr;
+  /* p points to the current word in the heap */
+  p = ((StgPAP *)graph)->payload;      // payload of PAP will be unpacked here
+  p_FMs = graph+pap_sizeW((StgPAP*)graph);  // FMs will be unpacked here
+  end = (StgPtr) payload_start+packed_size;
+  /*
+    The main loop unpacks the PAP in *bufptr into *p, with *p_FMS as the
+    FM area for unpacking all FETCHMEs encountered during unpacking.
+  */
+  while (bufptr<end) {
+    /* be sure that we don't write more than we allocated for this closure */
+    ASSERT(p_FMs <= graph+_HS+2+packed_size);
+    /* be sure that the unpacked PAP doesn't run into the FM area */
+    ASSERT(p < graph+pap_sizeW((StgPAP*)graph));
+    /* the loop body has been borrowed from scavenge_stack */
+    q = *bufptr; // let q be the contents of the current pointer into the buffer
+
+    /* Test whether the next thing is a FETCH_ME.
+       In PAPs FETCH_ME are encoded via a starting marker of ARGTAG_MAX+1
+    */
+    if (q==(StgPtr)(ARGTAG_MAX+1)) {
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: unpacking FM to %p", 
+			 p, q));
+      bufptr++;         // skip ARGTAG_MAX+1 marker
+      // Unpack a FM into the FM area after the PAP proper and insert pointer
+      *p++ = UnpackFetchMe(&bufptr, &p_FMs); 
+      continue;
+    }
+
+    /* Test whether it is a PLC */
+    if (q==(StgPtr)0) { // same as isFixed(q)
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: unpacking PLC to %p", 
+			 p, *(bufptr+1)));
+      bufptr++;          // skip 0 marker
+      *p++ = *bufptr++;
+      continue;
+    }
+
+    /* If we've got a tag, pack all words in that block */
+    if (IS_ARG_TAG((W_)q)) {   // q stands for the no. of non-ptrs to follow
+      nat m = i+ARG_SIZE(q);   // first word after this block
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: unpacking %d words (tagged), starting @ %p", 
+			 p, m, p));
+      for (i=0; i<m+1; i++)
+	*p++ = *bufptr++;
+      continue;
+    }
+
+    /* 
+     * Otherwise, q must be the info pointer of an activation
+     * record.  All activation records have 'bitmap' style layout
+     * info.
+     */
+    info  = get_itbl((StgClosure *)q);
+    switch (info->type) {
+	
+      /* Dynamic bitmap: the mask is stored on the stack */
+    case RET_DYN:
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: RET_DYN", 
+			 p));
+
+      /* Pack the header as is */
+      ((StgRetDyn *)p)->info = *bufptr++;
+      ((StgRetDyn *)p)->liveness = *bufptr;
+      ((StgRetDyn *)p)->ret_addr= *bufptr;
+
+      //bitmap = ((StgRetDyn *)p)->liveness;
+      //p      = (P_)&((StgRetDyn *)p)->payload[0];
+      goto small_bitmap;
+
+      /* probably a slow-entry point return address: */
+    case FUN:
+    case FUN_STATIC:
+      {
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: FUN or FUN_STATIC", 
+			 p));
+
+      ((StgClosure *)p)->header.info = *bufptr;
+      p++;
+
+      goto follow_srt; //??
+      }
+
+      /* Using generic code here; could inline as in scavenge_stack */
+    case UPDATE_FRAME:
+      {
+	StgUpdateFrame *frame = (StgUpdateFrame *)p;
+	//nat type = get_itbl(frame->updatee)->type;
+
+	//ASSERT(type==BLACKHOLE || type==CAF_BLACKHOLE || type==BLACKHOLE_BQ);
+
+	IF_PAR_DEBUG(pack,
+		     belch("*<** UnackPAP @ %p: UPDATE_FRAME", 
+			   p));
+
+	((StgUpdateFrame *)p)->header.info = *bufptr;
+	((StgUpdateFrame *)p)->link= *bufptr++;     // ToDo: fix intra-stack pointer
+	((StgUpdateFrame *)p)->updatee = *bufptr;   // ToDo: follow link 
+
+	p += 3;
+      }
+
+      /* small bitmap (< 32 entries, or 64 on a 64-bit machine) */
+    case STOP_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*<** UnpackPAP @ %p: STOP_FRAME", 
+			   p));
+	((StgStopFrame *)p)->header.info = *bufptr;
+	p++;
+      }
+
+    case CATCH_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*<** UnpackPAP @ %p: CATCH_FRAME",
+			   p));
+
+	((StgCatchFrame *)p)->header.info = *bufptr++;
+	((StgCatchFrame *)p)->link = *bufptr++;
+	((StgCatchFrame *)p)->exceptions_blocked = *bufptr++;
+	((StgCatchFrame *)p)->handler = *bufptr++;
+	p += 4;
+      }
+
+    case SEQ_FRAME:
+      {
+	IF_PAR_DEBUG(pack,
+		     belch("*<** UnpackPAP @ %p: UPDATE_FRAME",
+			   p));
+
+	((StgSeqFrame *)p)->header.info = *bufptr++;
+	((StgSeqFrame *)p)->link = *bufptr++;
+
+        // ToDo: handle bitmap
+        bitmap = info->layout.bitmap;
+
+        p = (StgPtr)&(((StgClosure *)p)->payload);
+        goto small_bitmap;
+      }
+    case RET_BCO:
+    case RET_SMALL:
+    case RET_VEC_SMALL:
+      IF_PAR_DEBUG(pack,
+		   belch("*<** UnpackPAP @ %p: RET_{BCO,SMALL,VEC_SMALL}",
+			 p));
+
+
+      ((StgClosure *)p)->header.info = *bufptr++;
+      p++;
+      // ToDo: handle bitmap
+      bitmap = info->layout.bitmap;
+      /* this assumes that the payload starts immediately after the info-ptr */
+
+    small_bitmap:
+      while (bitmap != 0) {
+	if ((bitmap & 1) == 0) {
+	  *p++ = UnpackFetchMe(&bufptr, &p_FMs);
+	} else {
+	  *p++ = *bufptr++;
+	}
+	bitmap = bitmap >> 1;
+      }
+      
+    follow_srt:
+      belch("*<-- UnpackPAP: nothing to do for follow_srt");
+      continue;
+
+      /* large bitmap (> 32 entries) */
+    case RET_BIG:
+    case RET_VEC_BIG:
+      {
+	StgPtr q;
+	StgLargeBitmap *large_bitmap;
+	nat i;
+
+	IF_PAR_DEBUG(pack,
+		     belch("*<** UnpackPAP @ %p: RET_{BIG,VEC_BIG} (large_bitmap=%p)", 
+			   p, info->layout.large_bitmap));
+
+
+	((StgClosure *)p)->header.info = *bufptr++;
+	p++;
+
+	large_bitmap = info->layout.large_bitmap;
+
+	for (j=0; j<large_bitmap->size; j++) {
+	  bitmap = large_bitmap->bitmap[j];
+	  q = p + sizeof(W_) * 8;
+	  while (bitmap != 0) {
+	    if ((bitmap & 1) == 0) {
+	      *p++ = UnpackFetchMe(&bufptr, &p_FMs);
+	    } else {
+	      *p++ = *bufptr;
+	    }
+	    bitmap = bitmap >> 1;
+	  }
+	  if (j+1 < large_bitmap->size) {
+	    while (p < q) {
+	      *p++ = UnpackFetchMe(&bufptr, &p_FMs);
+	    }
+	  }
+	}
+
+	/* and don't forget to follow the SRT */
+	goto follow_srt;
+      }
+
+    default:
+      barf("UnpackPAP: weird activation record found on stack: %d", 
+	   (int)(info->type));
+    }
+  }
+  IF_PAR_DEBUG(pack,
+	       belch("*<** UnpackPAP finished; unpacked closure @ %p is:",
+		     (StgClosure *)graph);
+	       printClosure((StgClosure *)graph));
+
+  IF_DEBUG(sanity,               /* check sanity of unpacked PAP */
+	   checkClosure(graph));
+
+  *bufptrP = bufptr;
+  return _HS+2+packed_size;
+}
+
 #endif  /* PAR */
 
 //@node GranSim Code,  , Local Definitions, Unpacking routines
@@ -1788,10 +2905,6 @@ static void
 AmPacking(closure)
 StgClosure *closure;
 {
-/*    IF_PAR_DEBUG(pack, */
-/*  	       fprintf(stderr, "** AmPacking %p (%s)(IP %p) at %u\n",  */
-/*  		       closure, info_type(closure), get_itbl(closure), pack_locn)); */
-
   insertHashTable(offsetTable, (StgWord) closure, (void *) (StgWord) pack_locn);
 }
 
@@ -1838,7 +2951,7 @@ StgClosure *closure;
   rtsBool found = rtsFalse;
 
   for (i=0; (i<pack_locn) && !found; i++)
-    found = Bonzo->buffer[i]==closure;
+    found = globalPackBuffer->buffer[i]==closure;
 
   return (!found);
 }
@@ -1856,7 +2969,7 @@ StgClosure *closure;
   o the size and number of pointers held by any primitive arrays that it 
     points to
   
-    It has a *side-effect* (naughty, naughty) in assigning RoomInBuffer 
+    It has a *side-effect* (naughty, naughty) in assigning roomInBuffer 
     to rtsFalse.
 */
 
@@ -1866,26 +2979,28 @@ RoomToPack(size, ptrs)
 nat size, ptrs;
 {
 # if defined(PAR)
-  if (RoomInBuffer &&
-      (pack_locn + reservedPAsize + size +
-       ((clq_size - clq_pos) + ptrs) * PACK_FETCHME_SIZE >= RTS_PACK_BUFFER_SIZE))
+  if (roomInBuffer &&
+      (pack_locn + // where we are in the buffer right now
+       size +      // space needed for the current closure
+       ((clq_size - clq_pos) + ptrs) * PACK_FETCHME_SIZE // space for queued closures
+       >= 
+       RTS_PACK_BUFFER_SIZE))
     {
       IF_PAR_DEBUG(pack,
-		   fprintf(stderr, "Buffer full\n"));
-
-      RoomInBuffer = rtsFalse;
+		   belch("*>** pack buffer full"));
+      roomInBuffer = rtsFalse;
     }
 # else   /* GRAN */
-  if (RoomInBuffer &&
-      (unpacked_size + reservedPAsize + size +
+  if (roomInBuffer &&
+      (unpacked_size + size +
        ((clq_size - clq_pos) + ptrs) * PACK_FETCHME_SIZE >= RTS_PACK_BUFFER_SIZE))
     {
-      IF_GRAN_DEBUG(packBuffer,
-		    fprintf(stderr, "Buffer full\n"));
-      RoomInBuffer = rtsFalse;
+      IF_GRAN_DEBUG(pack,
+		   belch("*>** pack buffer full"));
+      roomInBuffer = rtsFalse;
     }
 # endif
-  return (RoomInBuffer);
+  return (roomInBuffer);
 }
 
 //@node Types of Global Addresses, Closure Info, Packet size, Aux fcts for packing
@@ -1900,19 +3015,24 @@ nat size, ptrs;
 
 # if defined(PAR)
 //@cindex isOffset
-rtsBool
-isOffset(ga)
-globalAddr *ga;
+rtsBool inline
+isOffset(globalAddr *ga)
 {
     return (ga->weight == 1 && ga->payload.gc.gtid == 0);
 }
 
 //@cindex isFixed
-rtsBool
-isFixed(ga)
-globalAddr *ga;
+rtsBool inline
+isFixed(globalAddr *ga)
 {
     return (ga->weight == 0);
+}
+
+//@cindex isConstr
+rtsBool inline
+isConstr(globalAddr *ga)
+{
+    return (ga->weight == 2);
 }
 # endif
 
@@ -2325,15 +3445,13 @@ PrintPacket(packBuffer)
 rtsPackBuffer *packBuffer;
 {
   StgClosure *parent, *graphroot, *closure_start;
-  StgInfoTable *ip, *oldip;
+  const StgInfoTable *ip;
   globalAddr ga;
   StgWord **buffer, **bufptr, **slotptr;
 
   nat bufsize;
   nat pptr = 0, pptrs = 0, pvhs;
-  nat unpack_locn = 0;
-  nat gastart = unpack_locn;
-  nat closurestart = unpack_locn;
+  nat locn = 0;
   nat i;
   nat size, ptrs, nonptrs, vhs;
   char str[80];
@@ -2342,28 +3460,19 @@ rtsPackBuffer *packBuffer;
      unpacking components replaced by printing fcts
      Long live higher-order fcts!
   */
-  initPackBuffer();                  /* in case it isn't already init'd */
-  graphroot = (StgClosure *)NULL;
-
-  // gaga = PendingGABuffer;
-
+  /* Initialisation */
+  //InitPackBuffer();                  /* in case it isn't already init'd */
   InitClosureQueue();
+  // ASSERT(gaga==PendingGABuffer); 
+  graphroot = (StgClosure *)NULL;
 
   /* Unpack the header */
   bufsize = packBuffer->size;
-  buffer = packBuffer->buffer;
-  bufptr = buffer;
+  bufptr = packBuffer->buffer;
 
-  /* allocate heap 
-  if (bufsize > 0) {
-    graph = allocate(bufsize);
-    ASSERT(graph != NULL);
-  }
-  */
-
-  fprintf(stderr, ".* Printing <<%d>> (buffer @ %p):\n", 
+  fprintf(stderr, "*. Printing <<%d>> (buffer @ %p):\n", 
 	  packBuffer->id, packBuffer);
-  fprintf(stderr, ".*   size: %d; unpacked_size: %d; tso: %p; buffer: %p\n",
+  fprintf(stderr, "*.   size: %d; unpacked_size: %d; tso: %p; buffer: %p\n",
 	  packBuffer->size, packBuffer->unpacked_size, 
 	  packBuffer->tso, packBuffer->buffer);
 
@@ -2372,6 +3481,7 @@ rtsPackBuffer *packBuffer;
   do {
     /* This is where we will ultimately save the closure's address */
     slotptr = bufptr;
+    locn = slotptr-(packBuffer->buffer); // index of closure in buffer
 
     /* First, unpack the next GA or PLC */
     ga.weight = (rtsWeight) *bufptr++;
@@ -2384,22 +3494,43 @@ rtsPackBuffer *packBuffer;
     
     /* Now unpack the closure body, if there is one */
     if (isFixed(&ga)) {
-      fprintf(stderr, ".* [%u]: PLC @ %p\n", gastart, ga.payload.plc);
+      fprintf(stderr, "*. %u: PLC @ %p\n", locn, ga.payload.plc);
       // closure = ga.payload.plc;
     } else if (isOffset(&ga)) {
-      fprintf(stderr, ".* [%u]: OFFSET TO [%d]\n", gastart, ga.payload.gc.slot);
+      fprintf(stderr, "*. %u: OFFSET TO %d\n", locn, ga.payload.gc.slot);
       // closure = (StgClosure *) buffer[ga.payload.gc.slot];
     } else {
       /* Print normal closures */
 
       ASSERT(bufsize > 0);
 
-      fprintf(stderr, ".* [%u]: ((%x, %d, %x)) ", gastart, 
+      fprintf(stderr, "*. %u: ((%x, %d, %x)) ", locn,
               ga.payload.gc.gtid, ga.payload.gc.slot, ga.weight);
 
       closure_start = bufptr;
-      ip = get_closure_info(bufptr, &size, &ptrs, &nonptrs, &vhs, str);
+      ip = get_closure_info((StgClosure *)bufptr, 
+			    &size, &ptrs, &nonptrs, &vhs, str);
 	  
+      /* ToDo: check whether this is really needed */
+      if (ip->type == FETCH_ME) {
+	size = _HS;
+	ptrs = nonptrs = vhs = 0;
+      }
+      /* ToDo: check whether this is really needed */
+      if (ip->type == ARR_WORDS) {
+	ptrs = vhs = 0;
+	nonptrs = ((StgArrWords *)bufptr)->words;
+	size = arr_words_sizeW((StgArrWords *)bufptr);
+      }
+
+      /* special code for printing a PAP in a buffer */
+      if (ip->type == PAP || ip->type == AP_UPD) {
+        vhs = 3; 
+	ptrs = 0;
+        nonptrs = ((StgPAP *)bufptr)->payload[0];
+	size = _HS+vhs+ptrs+nonptrs;
+      }
+
       /* 
 	 Remember, the generic closure layout is as follows:
 	 +-------------------------------------------------+
@@ -2414,16 +3545,18 @@ rtsPackBuffer *packBuffer;
       if (ip->type == FETCH_ME)
 	size = ptrs = nonptrs = vhs = 0;
 
+      // VH is always empty in the new RTS
+      ASSERT(vhs==0 ||
+             ip->type == PAP || ip->type == AP_UPD);
       /* Print variable header */
       fprintf(stderr, "] VH ["); 
       for (i = 0; i < vhs; i++)
 	fprintf(stderr, " %p", *bufptr++);
 
-      fprintf(stderr, "] %d PTRS [", ptrs); 
-
+      //fprintf(stderr, "] %d PTRS [", ptrs); 
       /* Pointers will be filled in later */
 
-      fprintf(stderr, " ] %d NON-PTRS [", nonptrs); 
+      fprintf(stderr, " ] (%d, %d) [", ptrs, nonptrs); 
       /* Print non-pointers */
       for (i = 0; i < nonptrs; i++)
 	fprintf(stderr, " %p", *bufptr++);
@@ -2462,7 +3595,125 @@ rtsPackBuffer *packBuffer;
       }
     }
   } while (parent != NULL);
-  fprintf(stderr, ".* --- End packet <<%d>> ---\n", packBuffer->id);
+  fprintf(stderr, "*. --- End packet <<%d>> (claimed size=%d; real size=%d)---\n", 
+	  packBuffer->id, packBuffer->size, size);
+
+}
+
+/*
+  Doing a sanity check on a packet.
+  This does a full iteration over the packet, as in PrintPacket.
+*/
+//@cindex checkPacket
+void
+checkPacket(packBuffer)
+rtsPackBuffer *packBuffer;
+{
+  StgClosure *parent, *graphroot, *closure_start;
+  const StgInfoTable *ip;
+  globalAddr ga;
+  StgWord **buffer, **bufptr, **slotptr;
+
+  nat bufsize;
+  nat pptr = 0, pptrs = 0, pvhs;
+  nat locn = 0;
+  nat size, ptrs, nonptrs, vhs;
+  char str[80];
+
+  /* NB: this whole routine is more or less a copy of UnpackGraph with all
+     unpacking components replaced by printing fcts
+     Long live higher-order fcts!
+  */
+  /* Initialisation */
+  //InitPackBuffer();                  /* in case it isn't already init'd */
+  InitClosureQueue();
+  // ASSERT(gaga==PendingGABuffer); 
+  graphroot = (StgClosure *)NULL;
+
+  /* Unpack the header */
+  bufsize = packBuffer->size;
+  bufptr = packBuffer->buffer;
+  parent = (StgClosure *)NULL;
+  ASSERT(bufsize > 0);
+  do {
+    /* This is where we will ultimately save the closure's address */
+    slotptr = bufptr;
+    locn = slotptr-(packBuffer->buffer); // index of closure in buffer
+    ASSERT(locn<=bufsize);
+  
+    /* First, check whether we have a GA, a PLC, or an OFFSET at hand */
+    ga.weight = (rtsWeight) *bufptr++;
+    if (ga.weight > 0) {
+      ga.payload.gc.gtid = (GlobalTaskId) *bufptr++;
+      ga.payload.gc.slot = (int) *bufptr++;
+    } else
+      ga.payload.plc = (StgPtr) *bufptr++;
+    
+    /* Now unpack the closure body, if there is one */
+    if (isFixed(&ga)) {
+      /* It's a PLC */
+      ASSERT(LOOKS_LIKE_STATIC(ga.payload.plc));
+    } else if (isOffset(&ga)) {
+      ASSERT(ga.payload.gc.slot<=bufsize);
+    } else {
+      /* normal closure */
+      ASSERT(LOOKS_LIKE_GA(&ga));
+
+      closure_start = bufptr;
+      ASSERT(LOOKS_LIKE_GHC_INFO((StgPtr)*bufptr));
+      ip = get_closure_info((StgClosure *)bufptr, 
+			    &size, &ptrs, &nonptrs, &vhs, str);
+
+      /* ToDo: check whether this is really needed */
+      if (ip->type == FETCH_ME) {
+	size = _HS;
+	ptrs = nonptrs = vhs = 0;
+      }
+      /* ToDo: check whether this is really needed */
+      if (ip->type == ARR_WORDS) {
+	ptrs = vhs = 0;
+	nonptrs = ((StgArrWords *)bufptr)->words+1; // payload+words
+	size = arr_words_sizeW((StgArrWords *)bufptr);
+	ASSERT(size==_HS+vhs+nonptrs);
+      }
+      /* special code for printing a PAP in a buffer */
+      if (ip->type == PAP || ip->type == AP_UPD) {
+        vhs = 3; 
+	ptrs = 0;
+        nonptrs = ((StgPAP *)bufptr)->payload[0];
+	size = _HS+vhs+ptrs+nonptrs;
+      }
+
+      /* no checks on contents of closure (pointers aren't packed anyway) */
+      ASSERT(_HS+vhs+nonptrs>=MIN_NONUPD_SIZE);
+      bufptr += _HS+vhs+nonptrs;
+
+      /* Add to queue for processing */
+      QueueClosure((StgClosure *)closure_start);
+	
+      /* No Common up needed for checking */
+
+      /* No Sort out the global address mapping for checking */
+
+    } /* normal closure case */
+
+    /* Locate next parent pointer */
+    pptr++;
+    while (pptr + 1 > pptrs) {
+      parent = DeQueueClosure();
+
+      if (parent == NULL)
+	break;
+      else {
+	//ASSERT(LOOKS_LIKE_GHC_INFO((StgPtr)*parent));
+	(void) get_closure_info(parent, &size, &pptrs, &nonptrs,
+					&pvhs, str);
+	pptr = 0;
+      }
+    }
+  } while (parent != NULL);
+  /* we unpacked exactly as many words as there are in the buffer */
+  ASSERT(packBuffer->size == bufptr-(packBuffer->buffer));
 }
 #else  /* GRAN */
 void
@@ -2578,23 +3829,30 @@ rtsPackBuffer *buffer;
 
 //@node End of file,  , Printing Packet Contents, Graph packing
 //@subsection End of file
+
 //@index
-//* AllocClosureQueue::  @cindex\s-+AllocClosureQueue
 //* AllocateHeap::  @cindex\s-+AllocateHeap
 //* AmPacking::  @cindex\s-+AmPacking
 //* CommonUp::  @cindex\s-+CommonUp
 //* DeQueueClosure::  @cindex\s-+DeQueueClosure
+//* DeQueueClosure::  @cindex\s-+DeQueueClosure
 //* DonePacking::  @cindex\s-+DonePacking
+//* FillInClosure::  @cindex\s-+FillInClosure
 //* IS_BLACK_HOLE::  @cindex\s-+IS_BLACK_HOLE
 //* IS_INDIRECTION::  @cindex\s-+IS_INDIRECTION
 //* InitClosureQueue::  @cindex\s-+InitClosureQueue
 //* InitPendingGABuffer::  @cindex\s-+InitPendingGABuffer
+//* LocateNextParent::  @cindex\s-+LocateNextParent
 //* NotYetPacking::  @cindex\s-+NotYetPacking
 //* OffsetFor::  @cindex\s-+OffsetFor
 //* Pack::  @cindex\s-+Pack
+//* PackArray::  @cindex\s-+PackArray
 //* PackClosure::  @cindex\s-+PackClosure
+//* PackFetchMe::  @cindex\s-+PackFetchMe
+//* PackGeneric::  @cindex\s-+PackGeneric
 //* PackNearbyGraph::  @cindex\s-+PackNearbyGraph
 //* PackOneNode::  @cindex\s-+PackOneNode
+//* PackPAP::  @cindex\s-+PackPAP
 //* PackPLC::  @cindex\s-+PackPLC
 //* PackStkO::  @cindex\s-+PackStkO
 //* PackTSO::  @cindex\s-+PackTSO
@@ -2603,12 +3861,16 @@ rtsPackBuffer *buffer;
 //* QueueClosure::  @cindex\s-+QueueClosure
 //* QueueEmpty::  @cindex\s-+QueueEmpty
 //* RoomToPack::  @cindex\s-+RoomToPack
+//* SetGAandCommonUp::  @cindex\s-+SetGAandCommonUp
+//* UnpackGA::  @cindex\s-+UnpackGA
 //* UnpackGraph::  @cindex\s-+UnpackGraph
+//* UnpackOffset::  @cindex\s-+UnpackOffset
+//* UnpackPLC::  @cindex\s-+UnpackPLC
 //* doGlobalGC::  @cindex\s-+doGlobalGC
 //* get_closure_info::  @cindex\s-+get_closure_info
-//* get_closure_info::  @cindex\s-+get_closure_info
-//* initPackBuffer::  @cindex\s-+initPackBuffer
+//* InitPackBuffer::  @cindex\s-+initPackBuffer
 //* isFixed::  @cindex\s-+isFixed
 //* isOffset::  @cindex\s-+isOffset
 //* offsetTable::  @cindex\s-+offsetTable
 //@end index
+

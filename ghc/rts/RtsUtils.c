@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.13 2000/01/13 14:34:04 hwloidl Exp $
+ * $Id: RtsUtils.c,v 1.14 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -224,7 +224,6 @@ resetNonBlockingFd(int fd)
 #endif
 }
 
-#if 0
 static ullong startTime = 0;
 
 /* used in a parallel setup */
@@ -259,8 +258,6 @@ msTime(void)
     return t * LL(1000) - startTime;
 # endif
 }
-#endif
-
 
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.

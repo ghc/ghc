@@ -1,6 +1,6 @@
 /*
-  Time-stamp: <Tue Jan 11 2000 11:29:41 Stardate: [-30]4188.43 hwloidl>
-  $Id: GranSim.h,v 1.2 2000/01/13 14:34:00 hwloidl Exp $
+  Time-stamp: <Fri Mar 24 2000 23:55:42 Stardate: [-30]4554.98 hwloidl>
+  $Id: GranSim.h,v 1.3 2000/03/31 03:09:35 hwloidl Exp $
   
   Headers for GranSim specific objects.
   
@@ -9,14 +9,15 @@
   run_queue_hd to be relative to CurrentProc. The main arrays of runnable
   and blocking queues are defined in Schedule.c.  The important STG-called
   GranSim macros (e.g. for fetching nodes) are at the end of this
-  file. Usually they are just wrappers to proper C functions in GranSim.c.  */
+  file. Usually they are just wrappers to proper C functions in GranSim.c.  
+*/
 
 #ifndef GRANSIM_H
 #define GRANSIM_H
 
 #if !defined(GRAN)
 
-//Dummy definitions for basic GranSim macros (see GranSim.h)
+/* Dummy definitions for basic GranSim macros called from STG land */
 #define DO_GRAN_ALLOCATE(n)     			  /* nothing */
 #define DO_GRAN_UNALLOCATE(n)   			  /* nothing */
 #define DO_GRAN_FETCH(node)     			  /* nothing */
@@ -28,13 +29,12 @@
 
 #if defined(GRAN)  /* whole file */
 
-extern StgTSO *CurrentTSOs[];
+extern StgTSO *CurrentTSO;
 
 //@node Headers for GranSim specific objects, , ,
 //@section Headers for GranSim specific objects
 
 //@menu
-//* Includes::			
 //* Externs and prototypes::	
 //* Run and blocking queues::	
 //* Spark queues::		
@@ -43,15 +43,6 @@ extern StgTSO *CurrentTSOs[];
 //* STG called GranSim functions::  
 //* STG-called routines::	
 //@end menu
-
-//@node Includes, Externs and prototypes, Headers for GranSim specific objects, Headers for GranSim specific objects
-//@subsection Includes
-
-/*
-#include "Closures.h"
-#include "TSO.h"
-#include "Rts.h"
-*/
 
 //@node Externs and prototypes, Run and blocking queues, Includes, Headers for GranSim specific objects
 //@subsection Externs and prototypes
@@ -93,20 +84,20 @@ extern StgTSO *ccalling_threadss[];
 //@subsection Spark queues
 
 /*
-In GranSim we use a double linked list to represent spark queues.
-
-This is more flexible, but slower, than the array of pointers
-representation used in GUM. We use the flexibility to define new fields in
-the rtsSpark structure, representing e.g. granularity info (see HWL's PhD
-thesis), or info about the parent of a spark.
+  In GranSim we use a double linked list to represent spark queues.
+  
+  This is more flexible, but slower, than the array of pointers
+  representation used in GUM. We use the flexibility to define new fields in
+  the rtsSpark structure, representing e.g. granularity info (see HWL's PhD
+  thesis), or info about the parent of a spark.
 */
 
 /* Sparks and spark queues */
 typedef struct rtsSpark_
 {
   StgClosure    *node;
-  StgInt         name, global;
-  StgInt         gran_info;      /* for granularity improvement mechanisms */
+  nat            name, global;
+  nat            gran_info;      /* for granularity improvement mechanisms */
   PEs            creator;        /* PE that created this spark (unused) */
   struct rtsSpark_  *prev, *next;
 } rtsSpark;
@@ -120,9 +111,9 @@ extern rtsSparkQ pending_sparks_tls[];
 /* Prototypes of those spark routines visible to compiler generated .hc */
 /* Routines only used inside the RTS are defined in rts/parallel GranSimRts.h */
 rtsSpark    *newSpark(StgClosure *node, 
-		      StgInt name, StgInt gran_info, StgInt size_info, 
-		      StgInt par_info, StgInt local);
-void         add_to_spark_queue(rtsSpark *spark);
+		      nat name, nat gran_info, nat size_info, 
+		      nat par_info, nat local);
+// void         add_to_spark_queue(rtsSpark *spark);
 
 //@node Processor related stuff, GranSim costs, Spark queues, Headers for GranSim specific objects
 //@subsection Processor related stuff
@@ -137,7 +128,7 @@ extern rtsTime CurrentTime[];
 //#error MAX_PROC should be 32 on this architecture 
 //#endif 
 
-#define CurrentTSO           CurrentTSOs[CurrentProc]
+// #define CurrentTSO           CurrentTSOs[CurrentProc]
 
 /* Processor numbers to bitmasks and vice-versa */
 #define MainProc	     0           /* Id of main processor */

@@ -705,11 +705,7 @@ hIsWritable handle =
     isWritable _	       = False
 
 
-#ifndef __PARALLEL_HASKELL__
-getBMode__ :: ForeignObj -> IO (BufferMode, Int)
-#else
-getBMode__ :: Addr -> IO (BufferMode, Int)
-#endif
+getBMode__ :: FILE_OBJECT -> IO (BufferMode, Int)
 getBMode__ fo = do
   rc <- getBufferMode fo    -- ConcHask: SAFE, won't block
   case (rc::Int) of
@@ -827,13 +823,6 @@ hConnectHdl_ hW hR is_tty =
   wantRWHandle "hConnectTo" hW $ \ hW_ ->
   wantRWHandle "hConnectTo" hR $ \ hR_ -> do
   setConnectedTo (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
-
-#ifndef __PARALLEL_HASKELL__
-#define FILE_OBJECT     ForeignObj
-#else
-#define FILE_OBJECT     Addr
-#endif
-
 \end{code}
 
 As an extension, we also allow characters to be pushed back.
@@ -1115,12 +1104,7 @@ Internal helper functions for Concurrent Haskell implementation
 of IO:
 
 \begin{code}
-#ifndef __PARALLEL_HASKELL__
-mayBlock :: ForeignObj -> IO Int -> IO Int
-#else
-mayBlock :: Addr  -> IO Int -> IO Int
-#endif
-
+mayBlock :: FILE_OBJECT -> IO Int -> IO Int
 mayBlock fo act = do
    rc <- act
    case rc of
@@ -1144,7 +1128,7 @@ data MayBlock
   | BlockWrite Int
   | NoBlock Int
 
-mayBlockRead :: String -> Handle -> (ForeignObj -> IO Int) -> IO Int
+mayBlockRead :: String -> Handle -> (FILE_OBJECT -> IO Int) -> IO Int
 mayBlockRead fname handle fn = do
     r <- wantReadableHandle fname handle $ \ handle_ -> do
 	 let fo = haFO__ handle_
@@ -1172,7 +1156,7 @@ mayBlockRead fname handle fn = do
 	   mayBlockRead fname handle fn
 	NoBlock c -> return c
 
-mayBlockWrite :: String -> Handle -> (ForeignObj -> IO Int) -> IO Int
+mayBlockWrite :: String -> Handle -> (FILE_OBJECT -> IO Int) -> IO Int
 mayBlockWrite fname handle fn = do
     r <- wantWriteableHandle fname handle $ \ handle_ -> do
 	 let fo = haFO__ handle_

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.72 2000/03/23 17:45:17 simonpj Exp $
+# $Id: Makefile,v 1.73 2000/03/31 03:09:35 hwloidl Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -161,6 +161,7 @@ rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= 
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 simplCore/Simplify_HC_OPTS	= -H15m	
+simplCore/OccurAnal_HC_OPTS	= -H10m
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
 
 # tmp, -- SDM

@@ -1,6 +1,6 @@
 /* 
-   Time-stamp: <Sat Dec 11 1999 17:25:27 Stardate: [-30]4033.42 software>
-   $Id: GranSim.c,v 1.2 2000/01/13 14:34:06 hwloidl Exp $
+   Time-stamp: <Mon Mar 20 2000 19:18:25 Stardate: [-30]4534.02 hwloidl>
+   $Id: GranSim.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.
@@ -53,6 +53,7 @@
 #include "GranSim.h"
 #include "ParallelRts.h"
 #include "ParallelDebug.h"
+#include "Sparks.h"
 #include "Storage.h"       // for recordMutable
 
 
@@ -68,8 +69,8 @@ static inline nat      idlers(void);
        PEs             where_is(StgClosure *node);
 
 static rtsBool         stealSomething(PEs proc, rtsBool steal_spark, rtsBool steal_thread);
-static inline rtsBool  stealSpark(PEs proc);
-static inline rtsBool  stealThread(PEs proc);
+static rtsBool         stealSpark(PEs proc);
+static rtsBool         stealThread(PEs proc);
 static rtsBool         stealSparkMagic(PEs proc);
 static rtsBool         stealThreadMagic(PEs proc);
 /* subsumed by stealSomething
@@ -325,7 +326,7 @@ ga_to_proc(StgWord ga)
 {
     PEs i;
     for (i = 0; i < RtsFlags.GranFlags.proc && !IS_LOCAL_TO(ga, i); i++);
-    ASSERT(0<=i && i<RtsFlags.GranFlags.proc);
+    ASSERT(i<RtsFlags.GranFlags.proc);
     return (i);
 }
 
@@ -631,7 +632,7 @@ markEventQueue(void)
 	  // ToDo: traverse_eventw_for_gc if GUM-Fetching!!! HWL
 	  belch("ghuH: packets in BulkFetching not marked as roots; mayb be fatal");
 	else
-	  event->node = (StgTSO *)MarkRoot((StgClosure *)event->node);
+	  event->node = (StgClosure *)MarkRoot((StgClosure *)event->node);
 	break;
       case GlobalBlock:
 	event->tso = (StgTSO *)MarkRoot((StgClosure *)event->tso);
@@ -652,7 +653,7 @@ markEventQueue(void)
   Prune all ContinueThread events related to tso or node in the eventq.
   Currently used if a thread leaves STG land with ThreadBlocked status,
   i.e. it blocked on a closure and has been put on its blocking queue.  It
-  will be reawakended via a call to awaken_blocked_queue. Until then no
+  will be reawakended via a call to awakenBlockedQueue. Until then no
   event effecting this tso should appear in the eventq.  A bit of a hack,
   because ideally we shouldn't generate such spurious ContinueThread events
   in the first place.  
@@ -987,7 +988,7 @@ void
 endThread(StgTSO *tso, PEs proc) 
 {
   ASSERT(procStatus[proc]==Busy);        // coming straight out of STG land
-  ASSERT(tso->whatNext==ThreadComplete);
+  ASSERT(tso->what_next==ThreadComplete);
   // ToDo: prune ContinueThreads for this TSO from event queue
   DumpEndEvent(proc, tso, rtsFalse /* not mandatory */);
 
@@ -1178,11 +1179,12 @@ do_the_fetchnode(rtsEvent* event)
        fprintf(RtsFlags.GcFlags.statsFile,"*****   veQ boSwI'  PackNearbyGraph(node %p, tso %p (%d))\n",
      	        node, tso, tso->id);
 # endif
+     barf("//// do_the_fetchnode: out of heap after handleFetchRequest; ToDo: call GarbageCollect()");
      prepend_event(event);
-     GarbageCollect(GetRoots); 
+     performGC(); // GarbageCollect(GetRoots); 
      // HWL: ToDo: check whether a ContinueThread has to be issued
      // HWL old: ReallyPerformThreadGC(PACK_HEAP_REQUIRED, rtsFalse);
-# if defined(GRAN_CHECK)  && defined(GRAN)
+# if 0 && defined(GRAN_CHECK)  && defined(GRAN)
      if (RtsFlags.GcFlags.giveStats) {
        fprintf(RtsFlags.GcFlags.statsFile,"*****      SAVE_Hp=%p, SAVE_HpLim=%p, PACK_HEAP_REQUIRED=%d\n",
      	        Hp, HpLim, 0) ; // PACK_HEAP_REQUIRED);  ???
@@ -1232,9 +1234,9 @@ do_the_fetchreply(rtsEvent* event)
      within GranSimBlock; 
      since tso is both in the EVQ and the BQ for node, we have to take it out 
      of the BQ first before we can handle the FetchReply;
-     ToDo: special cases in awaken_blocked_queue, since the BQ magically moved.
+     ToDo: special cases in awakenBlockedQueue, since the BQ magically moved.
   */
-  if (tso->blocked_on!=(StgClosure*)NULL) {
+  if (tso->block_info.closure!=(StgClosure*)NULL) {
     IF_GRAN_DEBUG(bq,
 		  belch("## ghuH: TSO %d (%p) in FetchReply is blocked on node %p (shouldn't happen AFAIK)",
 			tso->id, tso, node));
@@ -1305,8 +1307,8 @@ do_the_fetchreply(rtsEvent* event)
                         tso->gran.sparkname, spark_queue_len(proc));
     */
 
+    ASSERT(OutstandingFetches[proc] > 0);
     --OutstandingFetches[proc];
-    ASSERT(OutstandingFetches[proc] >= 0);
     new_event(proc, proc, CurrentTime[proc],
 	      ResumeThread,
 	      event->tso, (RtsFlags.GranFlags.DoBulkFetching ? 
@@ -1498,8 +1500,12 @@ do_the_findwork(rtsEvent* event)
       creator = event->creator; /* proc that requested work */
   rtsSparkQ spark = event->spark;
   /* ToDo: check that this size is safe -- HWL */
+#if 0
+ ToDo: check available heap
+
   nat req_heap = sizeofW(StgTSO) + MIN_STACK_WORDS;
                  // add this? -- HWL:RtsFlags.ConcFlags.stkChunkSize;
+#endif
 
   IF_DEBUG(gran, fprintf(stderr, "GRAN: doing the Findwork\n"));
 
@@ -1511,7 +1517,10 @@ do_the_findwork(rtsEvent* event)
      thread. This is a conservative estimate of the required heap.
      This eliminates special checks for GC around NewThread within
      ActivateSpark.                                                 */
-  
+
+#if 0
+ ToDo: check available heap
+
   if (Hp + req_heap > HpLim ) {
     IF_DEBUG(gc, 
 	     belch("GC: Doing GC from within Findwork handling (that's bloody dangerous if you ask me)");)
@@ -1522,6 +1531,7 @@ do_the_findwork(rtsEvent* event)
 	procStatus[CurrentProc]=Idle;
       return;
   }
+#endif
   
   if ( RtsFlags.GranFlags.DoAlwaysCreateThreads ||
        RtsFlags.GranFlags.Fishing ||
@@ -1788,7 +1798,7 @@ StgTSO* tso;        // the tso which needs the node
 	graph = PackOneNode(node, tso, &size); 
 	new_event(from, to, CurrentTime[to],
 		  FetchReply,
-		  tso, graph, (rtsSpark*)NULL);
+		  tso, (StgClosure *)graph, (rtsSpark*)NULL);
       } else {
 	new_event(from, to, CurrentTime[to],
 		  FetchReply,
@@ -1827,8 +1837,9 @@ StgTSO* tso;        // the tso which needs the node
 
 	/* The tso requesting the node is blocked and cannot be on a run queue */
 	ASSERT(!is_on_queue(tso, from));
-
-	if ((graph = PackNearbyGraph(node, tso, &size)) == NULL) 
+	
+	// ToDo: check whether graph is ever used as an rtsPackBuffer!!
+	if ((graph = (StgClosure *)PackNearbyGraph(node, tso, &size)) == NULL) 
 	  return (OutOfHeap);  /* out of heap */
 
 	/* Actual moving/copying of node is done on arrival; see FETCHREPLY */
@@ -1969,7 +1980,7 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
 	/* Put ourselves on the blocking queue for this black hole */
 	// tso->link=END_TSO_QUEUE;   not necessary; see assertion above
 	((StgBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)tso;
-	tso->blocked_on = bh;
+	tso->block_info.closure = bh;
 	recordMutable((StgMutClosure *)bh);
 	break;
 
@@ -2002,7 +2013,7 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
 	{
 	  G_PRINT_NODE(bh);
 	  barf("Qagh: thought %p was a black hole (IP %p (%s))",
-		  bh, info, info_type(get_itbl(bh)));
+		  bh, info, info_type(bh));
 	}
       }
     return (Ok);
@@ -2178,14 +2189,14 @@ nat *firstp, *np;
    Steal a spark (piece of work) from any processor and bring it to proc.
 */
 //@cindex stealSpark
-static inline rtsBool 
+static rtsBool 
 stealSpark(PEs proc) { stealSomething(proc, rtsTrue, rtsFalse); }
 
 /* 
    Steal a thread from any processor and bring it to proc i.e. thread migration
 */
 //@cindex stealThread
-static inline rtsBool 
+static rtsBool 
 stealThread(PEs proc) { stealSomething(proc, rtsFalse, rtsTrue); }
 
 /* 
@@ -2274,8 +2285,8 @@ static rtsBool
 stealSparkMagic(proc)
 PEs proc;
 {
-  PEs p, i, j, n, first, upb;
-  rtsSpark *spark, *next;
+  PEs p=0, i=0, j=0, n=0, first, upb;
+  rtsSpark *spark=NULL, *next;
   PEs pes_by_time[MAX_PROC];
   rtsBool stolen = rtsFalse;
   rtsTime stealtime;
@@ -2432,8 +2443,8 @@ static rtsBool
 stealThreadMagic(proc)
 PEs proc;
 {
-  PEs p, i, j, n, first, upb;
-  StgTSO *tso;
+  PEs p=0, i=0, j=0, n=0, first, upb;
+  StgTSO *tso=END_TSO_QUEUE;
   PEs pes_by_time[MAX_PROC];
   rtsBool stolen = rtsFalse;
   rtsTime stealtime;
@@ -2551,7 +2562,7 @@ sparkStealTime(void)
   double fishdelay, sparkdelay, latencydelay;
   fishdelay =  (double)RtsFlags.GranFlags.proc/2;
   sparkdelay = fishdelay - 
-          ((fishdelay-1)/(double)(RtsFlags.GranFlags.proc-1))*(double)idlers();
+          ((fishdelay-1.0)/(double)(RtsFlags.GranFlags.proc-1))*((double)idlers());
   latencydelay = sparkdelay*((double)RtsFlags.GranFlags.Costs.latency);
 
   return((rtsTime)latencydelay);
@@ -2898,7 +2909,8 @@ StgTSO *tso;
 PEs proc;
 StgClosure *node;
 {
-  PEs node_proc = where_is(node), tso_proc = where_is(tso);
+  PEs node_proc = where_is(node), 
+      tso_proc = where_is((StgClosure *)tso);
 
   ASSERT(tso_proc==CurrentProc);
   // ASSERT(node_proc==CurrentProc);

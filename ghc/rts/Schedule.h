@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.16 2000/03/16 17:27:13 simonmar Exp $
+ * $Id: Schedule.h,v 1.17 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -58,10 +58,8 @@ void awakenBlockedQueue(StgTSO *tso);
  * Called from STG : yes
  * Locks assumed   : none
  */
-#if defined(GRAN)
-StgTSO *unblockOne(StgTSO *tso, StgClosure *node);
-#elif defined(PAR)
-StgTSO *unblockOne(StgTSO *tso, StgClosure *node);
+#if defined(GRAN) || defined(PAR)
+StgBlockingQueueElement *unblockOne(StgBlockingQueueElement *bqe, StgClosure *node);
 #else
 StgTSO *unblockOne(StgTSO *tso);
 #endif
@@ -132,9 +130,16 @@ extern Capability MainRegTable;
 
 /* Thread queues.
  * Locks required  : sched_mutex
+ *
+ * In GranSim we have one run/blocked_queue per PE.
  */
+#if defined(GRAN)
+// run_queue_hds defined in GranSim.h
+#else
 extern  StgTSO *run_queue_hd, *run_queue_tl;
 extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
+#endif
+/* Linked list of all threads. */
 extern  StgTSO *all_threads;
 
 #ifdef SMP
@@ -160,16 +165,10 @@ typedef struct {
 extern task_info *task_ids;
 #endif
 
-#if !defined(GRAN)
-extern  StgTSO *run_queue_hd, *run_queue_tl;
-extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
-#endif
-
 /* Needed by Hugs.
  */
 void interruptStgRts ( void );
 
-// ?? needed -- HWL
 void raiseAsync(StgTSO *tso, StgClosure *exception);
 nat  run_queue_len(void);
 
@@ -191,8 +190,16 @@ void print_bq (StgClosure *node);
  * Some convenient macros...
  */
 
+/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
+/* this is the NIL ptr for a list CAFs */
 #define END_CAF_LIST   ((StgCAF *)(void*)&END_TSO_QUEUE_closure)
+#if defined(PAR) || defined(GRAN)
+/* this is the NIL ptr for a blocking queue */
+# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)
+/* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
+# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&END_TSO_QUEUE_closure)
+#endif
 
 //@cindex APPEND_TO_RUN_QUEUE
 /* Add a thread to the end of the run queue.
@@ -218,7 +225,7 @@ void print_bq (StgClosure *node);
       run_queue_tl = tso;			\
     }
 
-//@cindex POP_RUN_QUEUE    
+//@cindex POP_RUN_QUEUE
 /* Pop the first thread off the runnable queue.
  */
 #define POP_RUN_QUEUE()				\

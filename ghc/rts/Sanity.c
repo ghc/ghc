@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.18 2000/03/17 14:37:21 simonmar Exp $
+ * $Id: Sanity.c,v 1.19 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,11 +35,14 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Sanity.h"
+#include "StoragePriv.h"   // for END_OF_STATIC_LIST
 
 //@node Macros, Stack sanity, Includes
 //@subsection Macros
 
-#define LOOKS_LIKE_PTR(r) (LOOKS_LIKE_STATIC_CLOSURE(r) || ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1)))
+#define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
+			    ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1))) && \
+			     ((StgWord)(*(StgPtr)r)!=0xaaaaaaaa))
 
 //@node Stack sanity, Heap Sanity, Macros
 //@subsection Stack sanity
@@ -115,9 +118,16 @@ checkStackClosure( StgClosure* c )
             return 1 + checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
       
     case UPDATE_FRAME:
+      ASSERT(LOOKS_LIKE_PTR(((StgUpdateFrame*)c)->updatee));
     case CATCH_FRAME:
-    case STOP_FRAME:
     case SEQ_FRAME:
+      /* check that the link field points to another stack frame */
+      ASSERT(get_itbl(((StgFrame*)c)->link)->type == UPDATE_FRAME ||
+	     get_itbl(((StgFrame*)c)->link)->type == CATCH_FRAME ||
+	     get_itbl(((StgFrame*)c)->link)->type == STOP_FRAME ||
+	     get_itbl(((StgFrame*)c)->link)->type == SEQ_FRAME);
+      /* fall through */
+    case STOP_FRAME:
 #if defined(GRAN)
             return 2 +
 #else
@@ -234,6 +244,13 @@ checkClosure( StgClosure* p )
 	ASSERT(LOOKS_LIKE_PTR(mvar->head));
 	ASSERT(LOOKS_LIKE_PTR(mvar->tail));
 	ASSERT(LOOKS_LIKE_PTR(mvar->value));
+#if 0
+#if defined(PAR)
+	checkBQ((StgBlockingQueueElement *)mvar->head, p);
+#else
+	checkBQ(mvar->head, p);
+#endif
+#endif
 	return sizeofW(StgMVar);
       }
 
@@ -251,6 +268,9 @@ checkClosure( StgClosure* p )
 	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
       }
 
+    case BLACKHOLE_BQ:
+      checkBQ(((StgBlockingQueue *)p)->blocking_queue, p);
+      /* fall through to basic ptr check */
     case FUN:
     case FUN_1_0:
     case FUN_0_1:
@@ -274,7 +294,6 @@ checkClosure( StgClosure* p )
     case SE_BLACKHOLE:
 #endif
     case BLACKHOLE:
-    case BLACKHOLE_BQ:
     case FOREIGN:
     case STABLE_NAME:
     case MUT_VAR:
@@ -284,7 +303,6 @@ checkClosure( StgClosure* p )
     case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:
     case FUN_STATIC:
-    case IND_STATIC:
 	{
 	    nat i;
 	    for (i = 0; i < info->layout.payload.ptrs; i++) {
@@ -292,6 +310,10 @@ checkClosure( StgClosure* p )
 	    }
 	    return sizeW_fromITBL(info);
 	}
+
+    case IND_STATIC: /* (1, 0) closure */
+      ASSERT(LOOKS_LIKE_PTR(((StgIndStatic*)p)->indirectee));
+      return sizeW_fromITBL(info);
 
     case WEAK:
       /* deal with these specially - the info table isn't
@@ -365,16 +387,78 @@ checkClosure( StgClosure* p )
         checkTSO((StgTSO *)p);
         return tso_sizeW((StgTSO *)p);
 
+#if defined(PAR)
+
     case BLOCKED_FETCH:
+      ASSERT(LOOKS_LIKE_GA(&(((StgBlockedFetch *)p)->ga)));
+      ASSERT(LOOKS_LIKE_PTR((((StgBlockedFetch *)p)->node)));
+      return sizeofW(StgBlockedFetch);  // see size used in evacuate()
+
     case FETCH_ME:
+      ASSERT(LOOKS_LIKE_GA(((StgFetchMe *)p)->ga));
+      return sizeofW(StgFetchMe);  // see size used in evacuate()
+
+    case FETCH_ME_BQ:
+      checkBQ(((StgFetchMeBlockingQueue *)p)->blocking_queue, (StgClosure *)p);
+      return sizeofW(StgFetchMeBlockingQueue); // see size used in evacuate()
+
+    case RBH:
+      /* In an RBH the BQ may be empty (ie END_BQ_QUEUE) but not NULL */
+      ASSERT(((StgRBH *)p)->blocking_queue!=NULL);
+      if (((StgRBH *)p)->blocking_queue!=END_BQ_QUEUE)
+	checkBQ(((StgRBH *)p)->blocking_queue, p);
+      ASSERT(LOOKS_LIKE_GHC_INFO(REVERT_INFOPTR(get_itbl((StgClosure *)p))));
+      return BLACKHOLE_sizeW();   // see size used in evacuate()
+      // sizeW_fromITBL(REVERT_INFOPTR(get_itbl((StgClosure *)p)));
+
+#endif
+      
     case EVACUATED:
-	    barf("checkClosure: unimplemented/strange closure type %d",
+	    barf("checkClosure: found EVACUATED closure %d",
 		 info->type);
     default:
 	    barf("checkClosure (closure type %d)", info->type);
     }
-#undef LOOKS_LIKE_PTR
 }
+
+#if defined(PAR)
+
+#define PVM_PE_MASK    0xfffc0000
+#define MAX_PVM_PES    MAX_PES
+#define MAX_PVM_TIDS   MAX_PES
+#define MAX_SLOTS      100000
+
+rtsBool
+looks_like_tid(StgInt tid)
+{
+  StgInt hi = (tid & PVM_PE_MASK) >> 18;
+  StgInt lo = (tid & ~PVM_PE_MASK);
+  rtsBool ok = (hi != 0) && (lo < MAX_PVM_TIDS) && (hi < MAX_PVM_TIDS);
+  return ok;
+}
+
+rtsBool
+looks_like_slot(StgInt slot)
+{
+  /* if tid is known better use looks_like_ga!! */
+  rtsBool ok = slot<MAX_SLOTS;
+  // This refers only to the no. of slots on the current PE
+  // rtsBool ok = slot<=highest_slot();
+  return ok; 
+}
+
+rtsBool
+looks_like_ga(globalAddr *ga)
+{
+  rtsBool is_tid = looks_like_tid((ga)->payload.gc.gtid);
+  rtsBool is_slot = ((ga)->payload.gc.gtid==mytid) ? 
+                     (ga)->payload.gc.slot<=highest_slot() : 
+                     (ga)->payload.gc.slot<MAX_SLOTS;
+  rtsBool ok = is_tid && is_slot;
+  return ok;
+}
+
+#endif
 
 //@node Heap Sanity, TSO Sanity, Stack sanity
 //@subsection Heap Sanity
@@ -393,6 +477,7 @@ extern void
 checkHeap(bdescr *bd, StgPtr start)
 {
     StgPtr p;
+    nat xxx = 0; // tmp -- HWL
 
     if (start == NULL) {
       p = bd->start;
@@ -405,6 +490,8 @@ checkHeap(bdescr *bd, StgPtr start)
         nat size = checkClosure(stgCast(StgClosure*,p));
         /* This is the smallest size of closure that can live in the heap. */
         ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+	if (get_itbl(stgCast(StgClosure*,p))->type == IND_STATIC)
+	  xxx++;
 	p += size;
 
 	/* skip over slop */
@@ -416,6 +503,25 @@ checkHeap(bdescr *bd, StgPtr start)
 	p = bd->start;
       }
     }
+    fprintf(stderr,"@@@@ checkHeap: Heap ok; %d IND_STATIC closures checked\n",
+	    xxx);
+}
+
+/* 
+   Check heap between start and end. Used after unpacking graphs.
+*/
+extern void 
+checkHeapChunk(StgPtr start, StgPtr end)
+{
+  StgPtr p;
+  nat size;
+
+  for (p=start; p<end; p+=size) {
+    ASSERT(LOOKS_LIKE_GHC_INFO((void*)*p));
+    size = checkClosure(stgCast(StgClosure*,p));
+    /* This is the smallest size of closure that can live in the heap. */
+    ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+  }
 }
 
 //@cindex checkChain
@@ -486,6 +592,52 @@ checkTSO(StgTSO *tso)
     ASSERT(stack <= sp && sp < stack_end);
     ASSERT(sp <= stgCast(StgPtr,su));
 
+#if defined(PAR)
+    ASSERT(tso->par.magic==TSO_MAGIC);
+
+    switch (tso->why_blocked) {
+    case BlockedOnGA: 
+      checkClosureShallow(tso->block_info.closure);
+      ASSERT(/* Can't be a FETCH_ME because *this* closure is on its BQ */
+	     get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
+      break;
+    case BlockedOnGA_NoSend: 
+      checkClosureShallow(tso->block_info.closure);
+      ASSERT(get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
+      break;
+    case BlockedOnBlackHole: 
+      checkClosureShallow(tso->block_info.closure);
+      ASSERT(/* Can't be a BLACKHOLE because *this* closure is on its BQ */
+	     get_itbl(tso->block_info.closure)->type==BLACKHOLE_BQ ||
+             get_itbl(tso->block_info.closure)->type==RBH);
+      break;
+    case BlockedOnRead:
+    case BlockedOnWrite:
+    case BlockedOnDelay:
+      /* isOnBQ(blocked_queue) */
+      break;
+    case BlockedOnException:
+      /* isOnSomeBQ(tso) */
+      ASSERT(get_itbl(tso->block_info.tso)->type==TSO);
+      break;
+    case BlockedOnMVar:
+      ASSERT(get_itbl(tso->block_info.closure)->type==MVAR);
+      break;
+    default:
+      /* 
+	 Could check other values of why_blocked but I am more 
+	 lazy than paranoid (bad combination) -- HWL 
+      */
+    }
+
+    /* if the link field is non-nil it most point to one of these
+       three closure types */
+    ASSERT(tso->link == END_TSO_QUEUE ||
+	   get_itbl(tso->link)->type == TSO ||
+	   get_itbl(tso->link)->type == BLOCKED_FETCH ||
+	   get_itbl(tso->link)->type == CONSTR);
+#endif
+
     checkStack(sp, stack_end, su);
 }
 
@@ -549,7 +701,23 @@ checkThreadQsSanity (rtsBool check_TSO_too)
 }
 #endif /* GRAN */
 
-//@node Blackhole Sanity, Index, Thread Queue Sanity
+/* 
+   Check that all TSOs have been evacuated.
+   Optionally also check the sanity of the TSOs.
+*/
+void
+checkGlobalTSOList (rtsBool checkTSOs)
+{
+  extern  StgTSO *all_threads;
+  StgTSO *tso;
+  for (tso=all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
+    ASSERT(Bdescr((P_)tso)->evacuated == 1);
+    if (checkTSOs)
+      checkTSO(tso);
+  }
+}
+
+//@node Blackhole Sanity, GALA table sanity, Thread Queue Sanity
 //@subsection Blackhole Sanity
 
 /* -----------------------------------------------------------------------------
@@ -591,10 +759,199 @@ isBlackhole( StgTSO* tso, StgClosure* p )
   } while (1);
 }
 
-//@node Index,  , Blackhole Sanity
+/*
+  Check the static objects list.
+*/
+extern void
+checkStaticObjects ( void ) {
+  extern StgClosure* static_objects;
+  StgClosure *p = static_objects;
+  StgInfoTable *info;
+
+  while (p != END_OF_STATIC_LIST) {
+    checkClosure(p);
+    info = get_itbl(p);
+    switch (info->type) {
+    case IND_STATIC:
+      { 
+	StgClosure *indirectee = stgCast(StgIndStatic*,p)->indirectee;
+
+	ASSERT(LOOKS_LIKE_PTR(indirectee));
+	ASSERT(LOOKS_LIKE_GHC_INFO(indirectee->header.info));
+	p = IND_STATIC_LINK((StgClosure *)p);
+	break;
+      }
+
+    case THUNK_STATIC:
+      p = THUNK_STATIC_LINK((StgClosure *)p);
+      break;
+
+    case FUN_STATIC:
+      p = FUN_STATIC_LINK((StgClosure *)p);
+      break;
+
+    case CONSTR_STATIC:
+      p = STATIC_LINK(info,(StgClosure *)p);
+      break;
+
+    default:
+      barf("checkStaticObjetcs: strange closure %p (%s)", 
+	   p, info_type(p));
+    }
+  }
+}
+
+/* 
+   Check the sanity of a blocking queue starting at bqe with closure being
+   the closure holding the blocking queue.
+   Note that in GUM we can have several different closure types in a 
+   blocking queue 
+*/
+//@cindex checkBQ
+#if defined(PAR)
+void
+checkBQ (StgBlockingQueueElement *bqe, StgClosure *closure) 
+{
+  rtsBool end = rtsFalse;
+  StgInfoTable *info = get_itbl(closure);
+
+  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR
+	 || info->type == FETCH_ME_BQ || info->type == RBH);
+
+  do {
+    switch (get_itbl(bqe)->type) {
+    case BLOCKED_FETCH:
+    case TSO:
+      checkClosure((StgClosure *)bqe);
+      bqe = bqe->link;
+      end = (bqe==END_BQ_QUEUE);
+      break;
+    
+    case CONSTR:
+      checkClosure((StgClosure *)bqe);
+      end = rtsTrue;
+      break;
+
+    default:
+      barf("checkBQ: strange closure %d in blocking queue for closure %p (%s)\n", 
+	   get_itbl(bqe)->type, closure, info_type(closure));
+    }
+  } while (!end);
+}
+#elif defined(GRAN)
+void
+checkBQ (StgTSO *bqe, StgClosure *closure) 
+{  
+  rtsBool end = rtsFalse;
+  StgInfoTable *info = get_itbl(closure);
+
+  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR);
+
+  do {
+    switch (get_itbl(bqe)->type) {
+    case BLOCKED_FETCH:
+    case TSO:
+      checkClosure((StgClosure *)bqe);
+      bqe = bqe->link;
+      end = (bqe==END_BQ_QUEUE);
+      break;
+    
+    default:
+      barf("checkBQ: strange closure %d in blocking queue for closure %p (%s)\n", 
+	   get_itbl(bqe)->type, closure, info_type(closure));
+    }
+  } while (!end);
+}
+#else
+void
+checkBQ (StgTSO *bqe, StgClosure *closure) 
+{  
+  rtsBool end = rtsFalse;
+  StgInfoTable *info = get_itbl(closure);
+
+  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR);
+
+  do {
+    switch (get_itbl(bqe)->type) {
+    case TSO:
+      checkClosure((StgClosure *)bqe);
+      bqe = bqe->link;
+      end = (bqe==END_TSO_QUEUE);
+      break;
+
+    default:
+      barf("checkBQ: strange closure %d in blocking queue for closure %p\n", 
+	   get_itbl(bqe)->type, closure, info->type);
+    }
+  } while (!end);
+}
+    
+#endif
+    
+
+//@node GALA table sanity, Index, Blackhole Sanity
+//@subsection GALA table sanity
+
+/*
+  This routine checks the sanity of the LAGA and GALA tables. They are 
+  implemented as lists through one hash table, LAtoGALAtable, because entries 
+  in both tables have the same structure:
+   - the LAGA table maps local addresses to global addresses; it starts
+     with liveIndirections
+   - the GALA table maps global addresses to local addresses; it starts 
+     with liveRemoteGAs
+*/
+
+#if defined(PAR)
+#include "Hash.h"
+
+/* hidden in parallel/Global.c; only accessed for testing here */
+extern GALA *liveIndirections;
+extern GALA *liveRemoteGAs;
+extern HashTable *LAtoGALAtable;
+
+//@cindex checkLAGAtable
+void
+checkLAGAtable(rtsBool check_closures)
+{
+  GALA *gala, *gala0;
+  nat n=0, m=0; // debugging
+
+  for (gala = liveIndirections; gala != NULL; gala = gala->next) {
+    n++;
+    gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
+    ASSERT(!gala->preferred || gala == gala0);
+    ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
+    ASSERT(gala->next!=gala); // detect direct loops
+    /*
+    if ( check_closures ) {
+      checkClosure(stgCast(StgClosure*,gala->la));
+    }
+    */
+  }
+
+  for (gala = liveRemoteGAs; gala != NULL; gala = gala->next) {
+    m++;
+    gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
+    ASSERT(!gala->preferred || gala == gala0);
+    ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
+    ASSERT(gala->next!=gala); // detect direct loops
+    /*
+    if ( check_closures ) {
+      checkClosure(stgCast(StgClosure*,gala->la));
+    }
+    */
+  }
+}
+#endif
+
+//@node Index,  , GALA table sanity
 //@subsection Index
 
+#endif /* DEBUG */
+
 //@index
+//* checkBQ::  @cindex\s-+checkBQ
 //* checkChain::  @cindex\s-+checkChain
 //* checkClosureShallow::  @cindex\s-+checkClosureShallow
 //* checkHeap::  @cindex\s-+checkHeap
@@ -611,6 +968,3 @@ isBlackhole( StgTSO* tso, StgClosure* p )
 //* checkThreadQsSanity::  @cindex\s-+checkThreadQsSanity
 //* isBlackhole::  @cindex\s-+isBlackhole
 //@end index
-
-#endif /* DEBUG */
-

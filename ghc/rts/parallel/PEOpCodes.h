@@ -8,6 +8,10 @@
 *       It's based on the GRAPH for PVM version                         *
 *       Phil Trinder, Glasgow University 8th December 1994              *
 *									*
+   RFPointon, December 1999
+     - removed PP_SYSMAN_TID, introduced PP_READY
+     - removed PP_MAIN_TASK, introduced PP_NEWPE
+     - added PP_REVAL
 ************************************************************************/
 
 #define REPLY_OK		0x00

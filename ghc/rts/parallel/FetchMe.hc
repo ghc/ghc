@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
- Time-stamp: <Fri Jan 14 2000 09:41:07 Stardate: [-30]4202.01 hwloidl>
- $Id: FetchMe.hc,v 1.4 2000/01/14 16:15:08 simonmar Exp $
+ Time-stamp: <Thu Feb 24 2000 21:31:41 Stardate: [-30]4409.48 hwloidl>
+ $Id: FetchMe.hc,v 1.5 2000/03/31 03:09:37 hwloidl Exp $
 
  Entry code for a FETCH_ME closure
 
@@ -40,6 +40,15 @@
    another PE.  We issue a fetch message, and wait for the data to be
    retrieved.
 
+   A word on the ptr/nonptr fields in the macros: they are unused at the
+   moment; all closures defined here have constant size (ie. no payload
+   that varies from closure to closure). Therefore, all routines that 
+   need to know the size of these closures have to do a sizeofW(StgFetchMe) 
+   etc to get the closure size. See get_closure_info(), evacuate() and
+   checkClosure() (using the same fcts for determining the size of the 
+   closures would be a good idea; at least it would be a nice step towards
+   making this code bug free).
+
    About the difference between std and PAR in returning to the RTS:
    in PAR we call RTS functions from within the entry code (see also
    BLACKHOLE_entry and friends in StgMiscClosures.hc); therefore, we
@@ -59,11 +68,14 @@ INFO_TABLE(FETCH_ME_info, FETCH_ME_entry, 0,2, FETCH_ME, const, EF_,0,0);
 //@cindex FETCH_ME_entry
 STGFUN(FETCH_ME_entry)
 {
+  /* 
+     Not needed any more since we call blockThread in the scheduler
+     (via BLOCK_NP(1) which returns with BlockedOnGA
+
   extern globalAddr *rga_GLOBAL;
   extern globalAddr *lga_GLOBAL;
   extern globalAddr fmbqga_GLOBAL;
   extern StgClosure *p_GLOBAL;
-  /* 
   globalAddr *rga;
   globalAddr *lga;
   globalAddr fmbqga;
@@ -71,63 +83,34 @@ STGFUN(FETCH_ME_entry)
   */
 
   FB_
-  rga_GLOBAL = ((StgFetchMe *)R1.p)->ga;
-  ASSERT(rga->payload.gc.gtid != mytid);
+    /*
+      rga_GLOBAL = ((StgFetchMe *)R1.p)->ga;
+      ASSERT(rga->payload.gc.gtid != mytid);
+    */
+    ASSERT(((StgFetchMe *)R1.p)->ga->payload.gc.gtid != mytid);
+  
+    /* Turn the FETCH_ME into a FETCH_ME_BQ, and place the current thread
+     * on the blocking queue.
+     */
+    // R1.cl->header.info = FETCH_ME_BQ_info;
+    SET_INFO((StgClosure *)R1.cl, &FETCH_ME_BQ_info);
+  
+    /* Put ourselves on the blocking queue for this black hole */
+    // This is really, really BAD; tmp HACK to remember ga (checked in blockThread)
+    ASSERT(looks_like_ga(((StgFetchMe *)R1.p)->ga));
+    CurrentTSO->link = (StgBlockingQueueElement *)((StgFetchMe *)R1.p)->ga; // END_BQ_QUEUE;
+    ((StgFetchMeBlockingQueue *)R1.cl)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
+  
+    /* jot down why and on what closure we are blocked */
+    CurrentTSO->why_blocked = BlockedOnGA;
+    CurrentTSO->block_info.closure = R1.cl;
+    //recordMutable((StgMutClosure *)R1.cl);
+    //p_GLOBAL = R1.cl;
 
-  /* Turn the FETCH_ME into a FETCH_ME_BQ, and place the current thread
-   * on the blocking queue.
-   */
-  // R1.cl->header.info = FETCH_ME_BQ_info;
-  SET_INFO((StgClosure *)R1.cl, &FETCH_ME_BQ_info);
+    /* sendFetch etc is now done in blockThread, which is called from the
+       scheduler -- HWL */
 
-  CurrentTSO->link = END_BQ_QUEUE;
-  ((StgFetchMeBlockingQueue *)R1.cl)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
-
-  /* record onto which closure the current thread is blcoking */
-  CurrentTSO->block_info.closure = R1.cl;
-  //recordMutable((StgMutClosure *)R1.cl);
-  p_GLOBAL = R1.cl;
-
-  /* Save the Thread State here, before calling RTS routines below! */
-  //BLOCK_NP_NO_JUMP(1);
-  SAVE_THREAD_STATE(1);
-
-  /* unknown junk... needed? --SDM  yes, want to see what's happening -- HWL */
-  if (RtsFlags.ParFlags.ParStats.Full) {
-    /* Note that CURRENT_TIME may perform an unsafe call */
-    //rtsTime now = CURRENT_TIME; /* Now */
-    CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-    CurrentTSO->par.fetchcount++;
-    /* TSO_QUEUE(CurrentTSO) = Q_FETCHING; */
-    CurrentTSO->par.blockedat = CURRENT_TIME;
-    /* we are about to send off a FETCH message, so dump a FETCH event */
-    /* following should be an STGCALL --SDM */
-    DumpRawGranEvent(CURRENT_PROC, taskIDtoPE(rga_GLOBAL->payload.gc.gtid),
-		     GR_FETCH, CurrentTSO, (StgClosure *)R1.p, 0);
-  }
-
-  /* Phil T. claims that this was a workaround for a hard-to-find
-   * bug, hence I'm leaving it out for now --SDM 
-   */
-  /* Assign a brand-new global address to the newly created FMBQ */
-  lga_GLOBAL = makeGlobal(p_GLOBAL, rtsFalse);
-  splitWeight(&fmbqga_GLOBAL, lga_GLOBAL);
-  ASSERT(fmbqga_GLOBAL.weight == 1L << (BITS_IN(unsigned) - 1));
-
-  STGCALL3(sendFetch, rga_GLOBAL, &fmbqga_GLOBAL, 0/*load*/);
-
-  // sendFetch now called from processTheRealFetch, to make SDM happy
-  //theGlobalFromGA.payload.gc.gtid = rga->payload.gc.gtid;
-  //theGlobalFromGA.payload.gc.slot = rga->payload.gc.slot;
-  //theGlobalFromGA.weight = rga->weight;
-  //theGlobalToGA.payload.gc.gtid = fmbqga.payload.gc.gtid;
-  //theGlobalToGA.payload.gc.slot = fmbqga.payload.gc.slot;
-  //theGlobalToGA.weight = fmbqga.weight;
-
-  // STGCALL6(fprintf,stderr,"%% Fetching %p from remote PE ((%x,%d,%x))\n",R1.p,rga->payload.gc.gtid, rga->payload.gc.slot, rga->weight);
-
-  THREAD_RETURN(1); /* back to the scheduler */  
-  // was: BLOCK_NP(1); 
+    BLOCK_NP(1); 
   FE_
 }
 
@@ -150,30 +133,16 @@ STGFUN(FETCH_ME_BQ_entry)
   FB_
     TICK_ENT_BH();
 
-    /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->block_info.closure = R1.cl;
+    /* Put ourselves on the blocking queue for this node */
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 
-#if defined(PAR)
-    /* Save the Thread State here, before calling RTS routines below! */
-    SAVE_THREAD_STATE(1);
+    /* jot down why and on what closure we are blocked */
+    CurrentTSO->why_blocked = BlockedOnGA_NoSend;
+    CurrentTSO->block_info.closure = R1.cl;
 
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      /* Note that CURRENT_TIME may perform an unsafe call */
-      //rtsTime now = CURRENT_TIME; /* Now */
-      CurrentTSO->par.exectime += CURRENT_TIME - CurrentTSO->par.blockedat;
-      CurrentTSO->par.blockcount++;
-      CurrentTSO->par.blockedat = CURRENT_TIME;
-      DumpRawGranEvent(CURRENT_PROC, thisPE,
-		       GR_BLOCK, CurrentTSO, (StgClosure *)R1.p, 0);
-    }
-
-    THREAD_RETURN(1);  /* back to the scheduler */  
-#else
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
-#endif
   FE_
 }
 
@@ -184,7 +153,7 @@ STGFUN(FETCH_ME_BQ_entry)
    globally visible closure i.e. one with a GA. A BLOCKED_FETCH closure
    indicates that a TSO on another PE is waiting for the result of this
    computation. Thus, when updating the closure, the result has to be sent
-   to that PE. The relevant routines handling that are awaken_blocked_queue
+   to that PE. The relevant routines handling that are awakenBlockedQueue
    and blockFetch (for putting BLOCKED_FETCH closure into a BQ).
 */
 
@@ -195,7 +164,7 @@ STGFUN(BLOCKED_FETCH_entry)
 {
   FB_
     /* see NON_ENTERABLE_ENTRY_CODE in StgMiscClosures.hc */
-    DUMP_ERRMSG("BLOCKED_FETCH object entered!\n");
+    STGCALL2(fprintf,stderr,"BLOCKED_FETCH object entered!\n");
     STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
   FE_
 }

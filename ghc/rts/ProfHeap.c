@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.8 2000/03/23 16:01:16 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.9 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -331,7 +331,10 @@ heapCensus(void)
     clear_table_data();
     break;
   case HEAP_BY_CLOSURE_TYPE:
+#if 0
+#   error fix me      
     memset(closure_types, 0, N_CLOSURE_TYPES * sizeof(nat));
+#endif
     break;
   default:
     return;

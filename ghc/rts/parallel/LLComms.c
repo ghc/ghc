@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
- * Time-stamp: <Wed Jan 12 2000 12:29:53 Stardate: [-30]4193.64 hwloidl>
- * $Id: LLComms.c,v 1.2 2000/01/13 14:34:07 hwloidl Exp $
+ * Time-stamp: <Tue Mar 21 2000 20:23:41 Stardate: [-30]4539.24 hwloidl>
+ * $Id: LLComms.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
  *
  * GUM Low-Level Inter-Task Communication
  *

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.13 2000/03/17 13:30:24 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.14 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -122,6 +122,7 @@
   CurrentTSO->what_next = ThreadEnterGHC;\
   R1.i = ThreadBlocked;			\
   JMP_(StgReturn);
+
 
 /* -----------------------------------------------------------------------------
    Heap Checks

@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
-   Time-stamp: <Sat Dec 04 1999 01:26:45 Stardate: [-30]3995.30 hwloidl>
-   $Id: GranSimRts.h,v 1.2 2000/01/13 14:34:07 hwloidl Exp $
+   Time-stamp: <Wed Mar 29 2000 19:09:41 Stardate: [-30]4578.78 hwloidl>
+   $Id: GranSimRts.h,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
 
    Variables and functions specific to GranSim.
    ----------------------------------------------------------------------- */
@@ -235,7 +235,6 @@ void GranSimLight_leave_system(rtsEvent *event, StgTSO **ActiveTSOp);
 /* Communication related routines */
 rtsFetchReturnCode fetchNode(StgClosure* node, PEs from, PEs to);
 rtsFetchReturnCode handleFetchRequest(StgClosure* node, PEs curr_proc, PEs p, StgTSO* tso);
-rtsFetchReturnCode blockFetch(StgTSO* tso, PEs proc, StgClosure* bh);
 void               handleIdlePEs(void);
 
 long int random(void); /* used in stealSpark() and stealThread() in GranSim.c */

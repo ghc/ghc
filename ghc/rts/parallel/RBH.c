@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Sun Dec 12 1999 20:39:04 Stardate: [-30]4039.09 software>
+  Time-stamp: <Mon Mar 13 2000 18:50:36 Stardate: [-30]4498.92 hwloidl>
 
   Revertible Black Hole Manipulation.
   Used in GUM and GranSim during the packing of closures. These black holes
@@ -34,7 +34,6 @@
 //* Conversion Functions::	
 //* Index::			
 //@end menu
-//*/
 
 //@node Externs and prototypes, Conversion Functions
 //@section Externs and prototypes
@@ -76,10 +75,10 @@ StgClosure *closure;
      RBH_Save_N closures, with N being the number of pointers for this
      closure.  */
   IF_GRAN_DEBUG(pack,
-		belch(":*   Converting closure %p (%s) into an RBH",
+		belch("*>:: Converting closure %p (%s) into an RBH",
 		      closure, info_type(closure))); 
   IF_PAR_DEBUG(pack,
-		belch(":*   Converting closure %p (%s) into an RBH",
+		belch("*>:: Converting closure %p (%s) into an RBH",
 		      closure, info_type(closure))); 
 
   ASSERT(closure_THUNK(closure));
@@ -118,9 +117,9 @@ StgClosure *closure;
   /*
     add closure to the mutable list!
     do this after having turned the closure into an RBH, because an
-    RBH is mutable but the think it was previously isn't
+    RBH is mutable but the closure it was before wasn't mutable
   */
-  //recordMutable((StgMutClosure *)closure);
+  recordMutable((StgMutClosure *)closure);
 
   //IF_GRAN_DEBUG(pack,
 		/* sanity check; make sure that reverting the RBH yields the 
@@ -180,12 +179,12 @@ globalAddr *ga;
   ASSERT(get_itbl(rbh)->type==RBH);
 
   IF_PAR_DEBUG(pack,
-	       belch(":*   Converting RBH %p (%s) into a FETCH_ME for GA ((%x, %d, %x))",
+	       belch("**:: Converting RBH %p (%s) into a FETCH_ME for GA ((%x, %d, %x))",
 		     rbh, info_type(rbh), 
 	             ga->payload.gc.gtid, ga->payload.gc.slot, ga->weight)); 
 
   /* put closure on mutables list, while it is still a RBH */
-  //recordMutable((StgMutClosure *)rbh);
+  recordMutable((StgMutClosure *)rbh);
 
   /* actually turn it into a FETCH_ME */
   SET_INFO((StgClosure *)rbh, &FETCH_ME_info);
@@ -195,12 +194,12 @@ globalAddr *ga;
 
   IF_PAR_DEBUG(pack,
 	       if (get_itbl(bqe)->type==TSO || get_itbl(bqe)->type==BLOCKED_FETCH)
-	         belch(":*     Awakening non-empty BQ of RBH closure %p (first TSO is %d (%p)",
+	         belch("**:: Awakening non-empty BQ of RBH closure %p (first TSO is %d (%p)",
 		      rbh, ((StgTSO *)bqe)->id, ((StgTSO *)bqe))); 
 
   /* awaken all TSOs and BLOCKED_FETCHES on the blocking queue */
   if (get_itbl(bqe)->type==TSO || get_itbl(bqe)->type==BLOCKED_FETCH)
-    awaken_blocked_queue(bqe, (StgClosure *)rbh);
+    awakenBlockedQueue(bqe, (StgClosure *)rbh);
 }
 # else  /* GRAN */
 /* Prototype */
@@ -225,23 +224,23 @@ StgClosure *closure;
 			  ((StgTSO *)bqe)->id, ((StgTSO *)bqe));
 		else 
 		  strcpy(str, "empty");
-		belch(":*   Reverting RBH %p (%s) into a ??? closure again; BQ start: %s",
+		belch("*<:: Reverting RBH %p (%s) into a ??? closure again; BQ start: %s",
 		      closure, info_type(closure), str));
 
   ASSERT(get_itbl(closure)->type==RBH);
 
-  /* awaken_blocked_queue also restores the RBH_Save closure
+  /* awakenBlockedQueue also restores the RBH_Save closure
      (have to call it even if there are no TSOs in the queue!) */
-  awaken_blocked_queue(bqe, closure);
+  awakenBlockedQueue(bqe, closure);
 
   /* Put back old info pointer (grabbed from the RBH's info table).
      We do that *after* awakening the BQ to be sure node is an RBH when
-     calling awaken_blocked_queue (different in GUM!)
+     calling awakenBlockedQueue (different in GUM!)
   */
   SET_INFO(closure, REVERT_INFOPTR(get_itbl(closure)));
 
   /* put closure on mutables list */
-  //recordMutable((StgMutClosure *)closure);
+  recordMutable((StgMutClosure *)closure);
 
 # if 0 /* rest of this fct */
     /* ngoq ngo' */

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
- * Time-stamp: <Wed Jan 12 2000 13:32:25 Stardate: [-30]4193.86 hwloidl>
- * $Id: HLComms.c,v 1.2 2000/01/13 14:34:07 hwloidl Exp $
+ * Time-stamp: <Wed Mar 29 2000 19:35:36 Stardate: [-30]4578.87 hwloidl>
+ * $Id: HLComms.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
  *
  * High Level Communications Routines (HLComms.lc)
  *
@@ -248,7 +248,7 @@ sendAck(GlobalTaskId task, int ngas, globalAddr *gagamap)
     p[5] = (long) gagamap->payload.gc.slot;
     gagamap++;
   }
-  IF_PAR_DEBUG(ack,
+  IF_PAR_DEBUG(schedule,
 	       belch(",, [%x] Sending Ack (%d pairs) to PE %x\n", 
 		     mytid, ngas, task));
 
@@ -272,7 +272,7 @@ unpackAck(int *ngas, globalAddr *gagamap)
   
   *ngas = GAarraysize / 6;
   
-  IF_PAR_DEBUG(ack,
+  IF_PAR_DEBUG(schedule,
 	       belch(",, [%x] Unpacking Ack (%d pairs) on %x\n", 
 		     mytid, *ngas, mytid));
 
@@ -454,76 +454,6 @@ unpackSchedule(int *nelem, rtsPackBuffer *data)
  */
 
 /*
- * blockFetch blocks a BlockedFetch node on some kind of black hole.
- */
-//@cindex blockFetch
-static void
-blockFetch(StgBlockedFetch *bf, StgClosure *bh) {
-  bf->node = bh;
-  switch (get_itbl(bh)->type) {
-  case BLACKHOLE:
-    bf->link = END_BQ_QUEUE;
-    //((StgBlockingQueue *)bh)->header.info = &BLACKHOLE_BQ_info;
-    SET_INFO(bh, &BLACKHOLE_BQ_info);  // turn closure into a blocking queue
-    ((StgBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
-    
-    // put bh on the mutables list
-    recordMutable((StgMutClosure *)bh);
-
-# if 0
-    /*
-     * If we modify a black hole in the old generation, we have to
-     * make sure it goes on the mutables list
-     */
-    
-    if (bh <= StorageMgrInfo.OldLim) {
-      MUT_LINK(bh) = (StgWord) StorageMgrInfo.OldMutables;
-      StorageMgrInfo.OldMutables = bh;
-    } else
-      MUT_LINK(bh) = MUT_NOT_LINKED;
-# endif
-    break;
-    
-  case BLACKHOLE_BQ:
-    /* enqueue bf on blocking queue of closure bh */
-    bf->link = ((StgBlockingQueue *)bh)->blocking_queue;
-    ((StgBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
-
-    // put bh on the mutables list; ToDo: check
-    recordMutable((StgMutClosure *)bh);
-    break;
-
-  case FETCH_ME_BQ:
-    /* enqueue bf on blocking queue of closure bh */
-    bf->link = ((StgFetchMeBlockingQueue *)bh)->blocking_queue;
-    ((StgFetchMeBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
-
-    // put bh on the mutables list; ToDo: check
-    recordMutable((StgMutClosure *)bh);
-    break;
-    
-  case RBH:
-    /* enqueue bf on blocking queue of closure bh */
-    bf->link = ((StgRBH *)bh)->blocking_queue;
-    ((StgRBH *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
-
-    // put bh on the mutables list; ToDo: check
-    recordMutable((StgMutClosure *)bh);
-    break;
-    
-  default:
-    barf("Panic (blockFetch): thought %p was a black hole (IP %#lx, %s)",
-	 (StgClosure *)bh, get_itbl((StgClosure *)bh), 
-	 info_type((StgClosure *)bh));
-  }
-  IF_PAR_DEBUG(verbose,
-	       belch("## blockFetch: after block the BQ of %p (%s) is:",
-		     bh, info_type(bh));
-	       print_bq(bh));
-}
-
-
-/*
  * processFetches constructs and sends resume messages for every
  * BlockedFetch which is ready to be awakened.
  * awaken_blocked_queue (in Schedule.c) is responsible for moving 
@@ -547,21 +477,23 @@ pending_fetches_len(void)
 //@cindex processFetches
 void
 processFetches(void) {
-  StgBlockedFetch *bf;
-  StgClosure *closure, *next;
+  StgBlockedFetch *bf, *next;
+  StgClosure *closure;
   StgInfoTable *ip;
   globalAddr rga;
   static rtsPackBuffer *packBuffer;
     
   IF_PAR_DEBUG(verbose,
-	       belch("__ processFetches: %d  pending fetches",
-		     pending_fetches_len()));
+	       belch("____ processFetches: %d pending fetches (root @ %p)",
+		     pending_fetches_len(), PendingFetches));
   
   for (bf = PendingFetches; 
        bf != END_BF_QUEUE;
-       bf=(StgBlockedFetch *)(bf->link)) {
+       bf=next) {
     /* the PendingFetches list contains only BLOCKED_FETCH closures */
     ASSERT(get_itbl(bf)->type==BLOCKED_FETCH);
+    /* store link (we might overwrite it via blockFetch later on */
+    next = (StgBlockedFetch *)(bf->link);
 
     /*
      * Find the target at the end of the indirection chain, and
@@ -571,16 +503,15 @@ processFetches(void) {
      */
     closure = bf->node;
     /*
-      HACK 312: bf->node may have been evacuated since filling it; follow
-       the evacuee in this case; the proper way to handle this is to
-       traverse the blocking queue and update the node fields of
-       BLOCKED_FETCH entries when evacuating an BLACKHOLE_BQ, FETCH_ME_BQ
-       or RBH (but it's late and I'm tired) 
+      We evacuate BQs and update the node fields where necessary in GC.c
+      So, if we find an EVACUATED closure, something has gone Very Wrong
+      (and therefore we let the RTS crash most ungracefully).
     */
-    if (get_itbl(closure)->type == EVACUATED)
-      closure = ((StgEvacuated *)closure)->evacuee;
+    ASSERT(get_itbl(closure)->type != EVACUATED);
+      //  closure = ((StgEvacuated *)closure)->evacuee;
 
-    while ((next = IS_INDIRECTION(closure)) != NULL) { closure = next; }
+    closure = UNWIND_IND(closure);
+    //while ((ind = IS_INDIRECTION(closure)) != NULL) { closure = ind; }
 
     ip = get_itbl(closure);
     if (ip->type == FETCH_ME) {
@@ -591,13 +522,13 @@ processFetches(void) {
       
       sendFetch(((StgFetchMe *)closure)->ga, &rga, 0 /* load */);
 
-      IF_PAR_DEBUG(forward,
-		   belch("__ processFetches: Forwarding fetch from %lx to %lx",
+      IF_PAR_DEBUG(fetch,
+		   belch("__-> processFetches: Forwarding fetch from %lx to %lx",
 			 mytid, rga.payload.gc.gtid));
 
     } else if (IS_BLACK_HOLE(closure)) {
       IF_PAR_DEBUG(verbose,
-		   belch("__ processFetches: trying to send a BLACK_HOLE => doign a blockFetch on closure %p (%s)",
+		   belch("__++ processFetches: trying to send a BLACK_HOLE => doing a blockFetch on closure %p (%s)",
 			 closure, info_type(closure)));
       bf->node = closure;
       blockFetch(bf, closure);
@@ -607,7 +538,7 @@ processFetches(void) {
 
       packBuffer = gumPackBuffer;
       IF_PAR_DEBUG(verbose,
-		   belch("__ processFetches: PackNearbyGraph of closure %p (%s)",
+		   belch("__*> processFetches: PackNearbyGraph of closure %p (%s)",
 			 closure, info_type(closure)));
 
       if ((packBuffer = PackNearbyGraph(closure, END_TSO_QUEUE, &size)) == NULL) {
@@ -615,6 +546,7 @@ processFetches(void) {
 	bf->link = (StgBlockingQueueElement *)PendingFetches;
 	PendingFetches = (StgBlockedFetch *)bf;
 	// ToDo: check that nothing more has to be done to prepare for GC!
+	barf("processFetches: out of heap while packing graph; ToDo: call GC here");
 	GarbageCollect(GetRoots); 
 	bf = PendingFetches;
 	PendingFetches = (StgBlockedFetch *)(bf->link);
@@ -657,10 +589,6 @@ processTheRealFetches(void) {
   /* the old version did this in the FETCH_ME entry code */
   sendFetch(&theGlobalFromGA, &theGlobalToGA, 0/*load*/);
   
-#if DEBUG
-  theGlobalFromGA.payload.gc.gtid = 0;
-  theGlobalToGA.payload.gc.gtid = 0;
-#endif DEBUG
 }
 #endif
 
@@ -689,9 +617,9 @@ processFish(void)
 
   ASSERT(origPE != mytid);
   IF_PAR_DEBUG(fish,
-	       belch("$$ [%x] processing fish; %d sparks available",
-		     mytid, spark_queue_len(ADVISORY_POOL)));
-  while ((spark = findLocalSpark(rtsTrue)) != NULL) {
+	       belch("$$__ processing fish; %d sparks available",
+		     spark_queue_len(&(MainRegTable.rSparks))));
+  while ((spark = findSpark()) != NULL) {
     nat size;
     // StgClosure *graph;
 
@@ -701,12 +629,13 @@ processFish(void)
       IF_PAR_DEBUG(fish,
 		   belch("$$ GC while trying to satisfy FISH via PackNearbyGraph of node %p",
 			 (StgClosure *)spark));
+      barf("processFish: out of heap while packing graph; ToDo: call GC here");
       GarbageCollect(GetRoots);
       /* Now go back and try again */
     } else {
       IF_PAR_DEBUG(fish,
-		   belch("$$ [%x] Replying to FISH from %x by sending graph @ %p (%s)",
-			 mytid, origPE, 
+		   belch("$$-- Replying to FISH from %x by sending graph @ %p (%s)",
+			 origPE, 
 			 (StgClosure *)spark, info_type((StgClosure *)spark)));
       sendSchedule(origPE, size, packBuffer);
       disposeSpark(spark);
@@ -715,8 +644,8 @@ processFish(void)
   }
   if (spark == (rtsSpark)NULL) {
     IF_PAR_DEBUG(fish,
-		 belch("$$ [%x] No sparks available for FISH from %x",
-		       mytid, origPE));
+		 belch("$$^^ No sparks available for FISH from %x",
+		       origPE));
     /* We have no sparks to give */
     if (age < FISH_LIFE_EXPECTANCY)
       /* and the fish is atill young, send it to another PE to look for work */
@@ -745,8 +674,7 @@ processFetch(void)
 
   unpackFetch(&ga, &rga, &load);
   IF_PAR_DEBUG(fetch,
-	       belch("%% [%x] Rcvd Fetch for ((%x, %d, 0)), Resume ((%x, %d, %x)) (load %d) from %x",
-		     mytid, 
+	       belch("%%%%__ Rcvd Fetch for ((%x, %d, 0)), Resume ((%x, %d, %x)) (load %d) from %x",
 		     ga.payload.gc.gtid, ga.payload.gc.slot,
 		     rga.payload.gc.gtid, rga.payload.gc.slot, rga.weight, load,
 		     rga.payload.gc.gtid));
@@ -762,8 +690,8 @@ processFetch(void)
     StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)GALAlookup(&rga);
     
     IF_PAR_DEBUG(fetch,
-		 belch("%% [%x] Fetch returned to sending PE; closure=%p (%s); receiver=%p (%s)",
-		       mytid, closure, info_type(closure), fmbq, info_type(fmbq)));
+		 belch("%%%%== Fetch returned to sending PE; closure=%p (%s); receiver=%p (%s)",
+		       closure, info_type(closure), fmbq, info_type(fmbq)));
     /* We may have already discovered that the fetch target is our own. */
     if ((StgClosure *)fmbq != closure) 
       CommonUp((StgClosure *)fmbq, closure);
@@ -781,8 +709,7 @@ processFetch(void)
     blockFetch(bf, closure);
 
     IF_PAR_DEBUG(fetch,
-		 belch("%% [%x] Blocking Fetch ((%x, %d, %x)) on %p (%s)",
-		       mytid, 
+		 belch("%%++ Blocking Fetch ((%x, %d, %x)) on %p (%s)",
 		       rga.payload.gc.gtid, rga.payload.gc.slot, rga.weight, 
 		       closure, info_type(closure)));
     } else {			
@@ -792,6 +719,7 @@ processFetch(void)
       rtsPackBuffer *buffer = (rtsPackBuffer *)NULL;
 
       if ((buffer = PackNearbyGraph(closure, END_TSO_QUEUE, &size)) == NULL) {
+	barf("processFetch: out of heap while packing graph; ToDo: call GC here");
 	GarbageCollect(GetRoots); 
 	closure = GALAlookup(&ga);
 	buffer = PackNearbyGraph(closure, END_TSO_QUEUE, &size);
@@ -816,14 +744,14 @@ processFree(void)
   buffer = (StgWord *)gumPackBuffer;
   unpackFree(&nelem, buffer);
   IF_PAR_DEBUG(free,
-	       belch("!! [%x] Rcvd Free (%d GAs)", mytid, nelem / 2));
+	       belch("!!__ Rcvd Free (%d GAs)", nelem / 2));
 
   ga.payload.gc.gtid = mytid;
   for (i = 0; i < nelem;) {
     ga.weight = (rtsWeight) buffer[i++];
     ga.payload.gc.slot = (int) buffer[i++];
     IF_PAR_DEBUG(free,
-		 fprintf(stderr, "!! [%x] Processing free ", mytid); 
+		 fprintf(stderr, "!!-- Processing free "); 
 		 printGA(&ga);
 		 fputc('\n', stderr);
 		 );
@@ -854,7 +782,7 @@ processResume(GlobalTaskId sender)
   unpackResume(&lga, &nelem, (StgPtr)packBuffer);
 
   IF_PAR_DEBUG(resume,
-	       fprintf(stderr, "[] [%x] Rcvd Resume for ", mytid); 
+	       fprintf(stderr, "[]__ Rcvd Resume for "); 
 	       printGA(&lga);
 	       fputc('\n', stderr);
 	       PrintPacket((rtsPackBuffer *)packBuffer));
@@ -892,7 +820,7 @@ processResume(GlobalTaskId sender)
 	if (get_itbl((StgClosure *)bqe)->type == TSO)
 	  DumpRawGranEvent(CURRENT_PROC, taskIDtoPE(sender), 
 			   GR_REPLY, ((StgTSO *)bqe), ((StgTSO *)bqe)->block_info.closure,
-			   0, spark_queue_len(ADVISORY_POOL));
+			   0, spark_queue_len(&(MainRegTable.rSparks)));
   }
 
   newGraph = UnpackGraph(packBuffer, &gagamap, &nGAs);
@@ -906,7 +834,7 @@ processResume(GlobalTaskId sender)
   if (get_itbl(old)->type == FETCH_ME_BQ)
     CommonUp(old, newGraph);
 
-  IF_PAR_DEBUG(resume,
+  IF_PAR_DEBUG(tables,
 	       DebugPrintGAGAMap(gagamap, nGAs));
   
   sendAck(sender, nGAs, gagamap);
@@ -931,8 +859,8 @@ processSchedule(GlobalTaskId sender)
   packBuffer = gumPackBuffer;		/* HWL */
   unpackSchedule(&nelem, packBuffer);
 
-  IF_PAR_DEBUG(schedule,
-	       belch("-- [%x] Rcvd Schedule (%d elems)", mytid, nelem);
+  IF_PAR_DEBUG(packet,
+	       belch("--__ Rcvd Schedule (%d elems)", nelem);
 	       PrintPacket(packBuffer));
 
   /*
@@ -948,23 +876,23 @@ processSchedule(GlobalTaskId sender)
     SAVE_Hp -= space_required;
   }
   */
-  // ToDo: check whether GC is necessary !!!!!!!!!!!!!!!!!!!!!1
+  // ToDo: check whether GC is necessary !!!!!!!!!!!!!!!!!!!!!
   newGraph = UnpackGraph(packBuffer, &gagamap, &nGAs);
   ASSERT(newGraph != NULL);
-  success = add_to_spark_queue(newGraph, rtsFalse);
+  success = add_to_spark_queue(newGraph, &(MainRegTable.rSparks));
 
-  IF_PAR_DEBUG(pack,
+  IF_PAR_DEBUG(packet,
 	       if (success)
-  	         belch("+* added spark to unpacked graph %p; %d sparks available on [%x]", 
-		     newGraph, spark_queue_len(ADVISORY_POOL), mytid);
+  	         belch("--^^ added spark to unpacked graph %p; %d sparks available on [%x]", 
+		     newGraph, spark_queue_len(&(MainRegTable.rSparks)), mytid);
 	       else
-                 belch("+* received non-sparkable closure %p; nothing added to spark pool; %d sparks available on [%x]", 
-		     newGraph, spark_queue_len(ADVISORY_POOL), mytid);
-	       belch("-* Unpacked graph with root at %p (%s):", 
+                 belch("--^^ received non-sparkable closure %p; nothing added to spark pool; %d sparks available on [%x]", 
+		     newGraph, spark_queue_len(&(MainRegTable.rSparks)), mytid);
+	       belch("*<    Unpacked graph with root at %p (%s):", 
 		     newGraph, info_type(newGraph));
 	       PrintGraph(newGraph, 0));
 
-  IF_PAR_DEBUG(pack,
+  IF_PAR_DEBUG(tables,
   	       DebugPrintGAGAMap(gagamap, nGAs));
 
   if (nGAs > 0)
@@ -990,9 +918,12 @@ processAck(void)
 
   unpackAck(&nGAs, gagamap);
 
-  IF_PAR_DEBUG(ack,
-	       belch(",, [%x] Rcvd Ack (%d pairs)", mytid, nGAs);
+  IF_PAR_DEBUG(tables,
+	       belch(",,,, Rcvd Ack (%d pairs)", nGAs);
 	       DebugPrintGAGAMap(gagamap, nGAs));
+
+  IF_DEBUG(sanity,
+	   checkGAGAMap(gagamap, nGAs));
 
   /*
    * For each (oldGA, newGA) pair, set the GA of the corresponding
@@ -1032,6 +963,9 @@ processAck(void)
     }
     (void) addWeight(gaga);
   }
+
+  /* check the sanity of the LAGA and GALA tables after mincing them */
+  IF_DEBUG(sanity, checkLAGAtable(rtsFalse));
 }
 
 //@node GUM Message Processor, Miscellaneous Functions, Message-Processing Functions, High Level Communications Routines
@@ -1062,7 +996,7 @@ processMessages(void)
     switch (opcode) {
     case PP_FINISH:
       IF_PAR_DEBUG(verbose,
-		   belch("== [%x] received FINISH", mytid));
+		   belch("==== received FINISH [%p]", mytid));
       /* setting this global variables eventually terminates the main
          scheduling loop for this PE and causes a shut-down, sending 
 	 PP_FINISH to SysMan */
@@ -1092,7 +1026,7 @@ processMessages(void)
     case PP_SCHEDULE:
       processSchedule(task);
       break;
-
+    
     default:
       /* Anything we're not prepared to deal with. */
       barf("Task %x: Unexpected opcode %x from %x",
@@ -1104,6 +1038,178 @@ processMessages(void)
 
 //@node Miscellaneous Functions, Index, GUM Message Processor, High Level Communications Routines
 //@subsection Miscellaneous Functions
+
+/*
+ * blockFetch blocks a BlockedFetch node on some kind of black hole.
+ */
+//@cindex blockFetch
+void
+blockFetch(StgBlockedFetch *bf, StgClosure *bh) {
+  bf->node = bh;
+  switch (get_itbl(bh)->type) {
+  case BLACKHOLE:
+    bf->link = END_BQ_QUEUE;
+    //((StgBlockingQueue *)bh)->header.info = &BLACKHOLE_BQ_info;
+    SET_INFO(bh, &BLACKHOLE_BQ_info);  // turn closure into a blocking queue
+    ((StgBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
+    
+    // put bh on the mutables list
+    recordMutable((StgMutClosure *)bh);
+    break;
+    
+  case BLACKHOLE_BQ:
+    /* enqueue bf on blocking queue of closure bh */
+    bf->link = ((StgBlockingQueue *)bh)->blocking_queue;
+    ((StgBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
+
+    // put bh on the mutables list; ToDo: check
+    recordMutable((StgMutClosure *)bh);
+    break;
+
+  case FETCH_ME_BQ:
+    /* enqueue bf on blocking queue of closure bh */
+    bf->link = ((StgFetchMeBlockingQueue *)bh)->blocking_queue;
+    ((StgFetchMeBlockingQueue *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
+
+    // put bh on the mutables list; ToDo: check
+    recordMutable((StgMutClosure *)bh);
+    break;
+    
+  case RBH:
+    /* enqueue bf on blocking queue of closure bh */
+    bf->link = ((StgRBH *)bh)->blocking_queue;
+    ((StgRBH *)bh)->blocking_queue = (StgBlockingQueueElement *)bf;
+
+    // put bh on the mutables list; ToDo: check
+    recordMutable((StgMutClosure *)bh);
+    break;
+    
+  default:
+    barf("blockFetch: thought %p was a black hole (IP %#lx, %s)",
+	 (StgClosure *)bh, get_itbl((StgClosure *)bh), 
+	 info_type((StgClosure *)bh));
+  }
+  IF_PAR_DEBUG(schedule,
+	       belch("##++ blockFetch: after block the BQ of %p (%s) is:",
+		     bh, info_type(bh));
+	       print_bq(bh));
+}
+
+
+/*
+  blockThread is called from the main scheduler whenever tso returns with
+  a ThreadBlocked return code; tso has already been added to a blocking
+  queue (that's done in the entry code of the closure, because it is a 
+  cheap operation we have to do in any case); the main purpose of this
+  routine is to send a Fetch message in case we are blocking on a FETCHME(_BQ)
+  closure, which is indicated by the tso.why_blocked field;
+  we also write an entry into the log file if we are generating one
+
+  Should update exectime etc in the entry code already; but we don't have
+  something like ``system time'' in the log file anyway, so this should
+  even out the inaccuracies.
+*/
+
+//@cindex blockThread
+void
+blockThread(StgTSO *tso)
+{
+  globalAddr *remote_ga;
+  globalAddr *local_ga;
+  globalAddr fmbq_ga;
+
+  // ASSERT(we are on some blocking queue)
+  ASSERT(tso->block_info.closure != (StgClosure *)NULL);
+
+  /*
+    We have to check why this thread has been blocked.
+  */
+  switch (tso->why_blocked) {
+    case BlockedOnGA:
+      /* the closure must be a FETCH_ME_BQ; tso came in here via 
+	 FETCH_ME entry code */
+      ASSERT(get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
+
+      /* HACK: the link field is used to hold the GA between FETCH_ME_entry
+	 end this point; if something (eg. GC) happens inbetween the whole
+	 thing will blow up 
+	 The problem is that the ga field of the FETCH_ME has been overwritten
+	 with the head of the blocking (which is tso). 
+      */
+      //ASSERT(looks_like_ga((globalAddr *)tso->link));
+      ASSERT(tso->link!=END_TSO_QUEUE && tso->link!=NULL);
+      remote_ga = (globalAddr *)tso->link; // ((StgFetchMe *)tso->block_info.closure)->ga;
+      tso->link = END_BQ_QUEUE;
+      /* it was tso which turned node from FETCH_ME into FETCH_ME_BQ =>
+	 we have to send a Fetch message here! */
+      if (RtsFlags.ParFlags.ParStats.Full) {
+	/* Note that CURRENT_TIME may perform an unsafe call */
+	//rtsTime now = CURRENT_TIME; /* Now */
+	tso->par.exectime += CURRENT_TIME - tso->par.blockedat;
+	tso->par.fetchcount++;
+	tso->par.blockedat = CURRENT_TIME;
+	/* we are about to send off a FETCH message, so dump a FETCH event */
+	DumpRawGranEvent(CURRENT_PROC, 
+			 taskIDtoPE(remote_ga->payload.gc.gtid),
+			 GR_FETCH, tso, tso->block_info.closure, 0);
+      }
+      /* Phil T. claims that this was a workaround for a hard-to-find
+       * bug, hence I'm leaving it out for now --SDM 
+       */
+      /* Assign a brand-new global address to the newly created FMBQ  */
+      local_ga = makeGlobal(tso->block_info.closure, rtsFalse);
+      splitWeight(&fmbq_ga, local_ga);
+      ASSERT(fmbq_ga.weight == 1L << (BITS_IN(unsigned) - 1));
+      
+      sendFetch(remote_ga, &fmbq_ga, 0/*load*/);
+
+      break;
+
+    case BlockedOnGA_NoSend:
+      /* the closure must be a FETCH_ME_BQ; tso came in here via 
+	 FETCH_ME_BQ entry code */
+      ASSERT(get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
+
+      /* Fetch message has been sent already */
+      if (RtsFlags.ParFlags.ParStats.Full) {
+	/* Note that CURRENT_TIME may perform an unsafe call */
+	//rtsTime now = CURRENT_TIME; /* Now */
+	tso->par.exectime += CURRENT_TIME - tso->par.blockedat;
+	tso->par.blockcount++;
+	tso->par.blockedat = CURRENT_TIME;
+	/* dump a block event, because fetch has been sent already */
+	DumpRawGranEvent(CURRENT_PROC, thisPE,
+			 GR_BLOCK, tso, tso->block_info.closure, 0);
+      }
+      break;
+
+    case BlockedOnBlackHole:
+      /* the closure must be a BLACKHOLE_BQ or an RBH; tso came in here via 
+	 BLACKHOLE(_BQ) or CAF_BLACKHOLE or RBH entry code */
+      ASSERT(get_itbl(tso->block_info.closure)->type==BLACKHOLE_BQ ||
+	     get_itbl(tso->block_info.closure)->type==RBH);
+
+      /* if collecting stats update the execution time etc */
+      if (RtsFlags.ParFlags.ParStats.Full) {
+	/* Note that CURRENT_TIME may perform an unsafe call */
+	//rtsTime now = CURRENT_TIME; /* Now */
+	tso->par.exectime += CURRENT_TIME - tso->par.blockedat;
+	tso->par.blockcount++;
+	tso->par.blockedat = CURRENT_TIME;
+	DumpRawGranEvent(CURRENT_PROC, thisPE,
+			 GR_BLOCK, tso, tso->block_info.closure, 0);
+      }
+      break;
+      
+    default:
+      barf("blockThread: impossible why_blocked code %d for TSO %d",
+	   tso->why_blocked, tso->id);
+  }
+
+  IF_PAR_DEBUG(schedule,
+	       belch("##++ blockThread: TSO %d blocked on closure %p (%s)",
+		     tso->id, tso->block_info.closure, info_type(tso->block_info.closure)));
+}
 
 /*
  * ChoosePE selects a GlobalTaskId from the array of PEs 'at random'.
@@ -1141,6 +1247,7 @@ createBlockedFetch (globalAddr ga, globalAddr rga)
 
   closure = GALAlookup(&ga);
   if ((bf = (StgBlockedFetch *)allocate(FIXED_HS + sizeofW(StgBlockedFetch))) == NULL) {
+    barf("createBlockedFetch: out of heap while allocating heap for a BlocekdFetch; ToDo: call GC here");
     GarbageCollect(GetRoots); 
     closure = GALAlookup(&ga);
     bf = (StgBlockedFetch *)allocate(FIXED_HS + sizeofW(StgBlockedFetch));
@@ -1156,9 +1263,9 @@ createBlockedFetch (globalAddr ga, globalAddr rga)
   bf->ga.weight = rga.weight;
   // bf->link = NULL;  debugging
 
-  IF_PAR_DEBUG(fetch,
-	       fprintf(stderr, "%% [%x] created BF: closure=%p (%s), GA: ",
-		       mytid, closure, info_type(closure));
+  IF_PAR_DEBUG(schedule,
+	       fprintf(stderr, "%%%%// created BF: bf=%p (%s) of closure , GA: ",
+		       bf, info_type(bf), closure);
 	       printGA(&(bf->ga));
 	       fputc('\n',stderr));
   return bf;
@@ -1183,29 +1290,41 @@ waitForTermination(void)
 void
 DebugPrintGAGAMap(globalAddr *gagamap, int nGAs)
 {
-  int i;
+  nat i;
   
   for (i = 0; i < nGAs; ++i, gagamap += 2)
-    fprintf(stderr, "gagamap[%d] = ((%x, %d, %x)) -> ((%x, %d, %x))\n", i,
+    fprintf(stderr, "__ gagamap[%d] = ((%x, %d, %x)) -> ((%x, %d, %x))\n", i,
 	    gagamap[0].payload.gc.gtid, gagamap[0].payload.gc.slot, gagamap[0].weight,
 	    gagamap[1].payload.gc.gtid, gagamap[1].payload.gc.slot, gagamap[1].weight);
+}
+
+//@cindex checkGAGAMap
+void
+checkGAGAMap(globalAddr *gagamap, int nGAs)
+{
+  nat i;
+  
+  for (i = 0; i < nGAs; ++i, gagamap += 2) {
+    ASSERT(looks_like_ga(gagamap));
+    ASSERT(looks_like_ga(gagamap+1));
+  }
 }
 #endif
 
 //@cindex freeMsgBuffer
 static StgWord **freeMsgBuffer = NULL;
 //@cindex freeMsgIndex
-static int      *freeMsgIndex  = NULL;
+static nat      *freeMsgIndex  = NULL;
 
 //@cindex prepareFreeMsgBuffers
 void
 prepareFreeMsgBuffers(void)
 {
-  int i;
+  nat i;
   
   /* Allocate the freeMsg buffers just once and then hang onto them. */
   if (freeMsgIndex == NULL) {
-    freeMsgIndex = (int *) stgMallocBytes(nPEs * sizeof(int), 
+    freeMsgIndex = (nat *) stgMallocBytes(nPEs * sizeof(nat), 
 					  "prepareFreeMsgBuffers (Index)");
     freeMsgBuffer = (StgWord **) stgMallocBytes(nPEs * sizeof(long *), 
 					  "prepareFreeMsgBuffers (Buffer)");
@@ -1226,13 +1345,13 @@ prepareFreeMsgBuffers(void)
 void
 freeRemoteGA(int pe, globalAddr *ga)
 {
-  int i;
+  nat i;
   
   ASSERT(GALAlookup(ga) == NULL);
   
   if ((i = freeMsgIndex[pe]) + 2 >= RtsFlags.ParFlags.packBufferSize) {
     IF_PAR_DEBUG(free,
-		 belch("Filled a free message buffer (sending remaining messages indivisually)"));	
+		 belch("!! Filled a free message buffer (sending remaining messages indivisually)"));	
 
     sendFree(ga->payload.gc.gtid, i, freeMsgBuffer[pe]);
     i = 0;
@@ -1241,18 +1360,17 @@ freeRemoteGA(int pe, globalAddr *ga)
   freeMsgBuffer[pe][i++] = (StgWord) ga->payload.gc.slot;
   freeMsgIndex[pe] = i;
 
-#ifdef DEBUG
-  ga->weight = 0x0f0f0f0f;
-  ga->payload.gc.gtid = 0x666;
-  ga->payload.gc.slot = 0xdeaddead;
-#endif
+  IF_DEBUG(sanity,
+	   ga->weight = 0xdead0add;
+	   ga->payload.gc.gtid = 0xbbbbbbbb;
+	   ga->payload.gc.slot = 0xbbbbbbbb;);
 }
 
 //@cindex sendFreeMessages
 void
 sendFreeMessages(void)
 {
-  int i;
+  nat i;
   
   for (i = 0; i < nPEs; i++) 
     if (freeMsgIndex[i] > 0)

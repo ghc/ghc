@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.14 2000/03/20 09:42:49 andy Exp $
+ * $Id: TSO.h,v 1.15 2000/03/31 03:09:35 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,8 +11,11 @@
 #define TSO_H
 
 #if defined(GRAN) || defined(PAR)
+
+#if DEBUG // && PARANOIA_LEVEL>999
 // magic marker for TSOs; debugging only
 #define TSO_MAGIC 4321
+#endif
 
 typedef struct {
   StgInt   pri;
@@ -122,7 +125,8 @@ typedef enum {
   BlockedOnWrite,
   BlockedOnDelay
 #if defined(PAR)
-  , BlockedOnGA    // blocked on a remote closure represented by a Global Address
+  , BlockedOnGA  // blocked on a remote closure represented by a Global Address
+  , BlockedOnGA_NoSend // same as above but without sending a Fetch message
 #endif
 } StgTSOBlockReason;
 
@@ -134,9 +138,6 @@ typedef union {
   unsigned int target;
 #else
   unsigned int delay;
-#endif
-#if defined(PAR)
-  globalAddr ga;
 #endif
 } StgTSOBlockInfo;
 
@@ -189,7 +190,7 @@ typedef struct StgTSO_ {
         (a) smaller than a block, or
 	(b) a multiple of BLOCK_SIZE
 
-	tso->block_reason      tso->block_info      location
+	tso->why_blocked       tso->block_info      location
         ----------------------------------------------------------------------
 	NotBlocked             NULL                 runnable_queue, or running
 	
@@ -202,6 +203,8 @@ typedef struct StgTSO_ {
         BlockedOnRead          NULL                 blocked_queue
         BlockedOnWrite         NULL		    blocked_queue
         BlockedOnDelay         NULL                 blocked_queue
+	BlockedOnGA            closure TSO blocks on   BQ of that closure
+	BlockedOnGA_NoSend     closure TSO blocks on   BQ of that closure
 
       tso->link == END_TSO_QUEUE, if the thread is currently running.
 
@@ -226,6 +229,13 @@ typedef struct StgTSO_ {
 
       (StgTSO *)tso    if threads are currently awaiting delivery of
                        exceptions to this thread.
+
+   The 2 cases BlockedOnGA and BlockedOnGA_NoSend are needed in a GUM
+   setup only. They mark a TSO that has entered a FETCH_ME or
+   FETCH_ME_BQ closure, respectively; only the first TSO hitting the 
+   closure will send a Fetch message.
+   Currently we have no separate code for blocking on an RBH; we use the
+   BlockedOnBlackHole case for that.   -- HWL
 
  ---------------------------------------------------------------------------- */
 

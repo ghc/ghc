@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.76 2000/03/30 16:07:53 simonmar Exp $
+ * $Id: GC.c,v 1.77 2000/03/31 03:09:36 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -200,7 +200,7 @@ void GarbageCollect(void (*get_roots)(void))
 
 #if defined(DEBUG) && defined(GRAN)
   IF_DEBUG(gc, belch("@@ Starting garbage collection at %ld (%lx)\n", 
-		     Now, Now))
+		     Now, Now));
 #endif
 
   /* tell the stats department that we've started a GC */
@@ -229,7 +229,7 @@ void GarbageCollect(void (*get_roots)(void))
 #if defined(GRAN)
   // ToDo!: check sanity  IF_DEBUG(sanity, checkTSOsSanity());
 #endif
-    IF_DEBUG(sanity, checkFreeListSanity());
+  IF_DEBUG(sanity, checkFreeListSanity());
 
   /* Initialise the static object lists
    */
@@ -426,6 +426,8 @@ void GarbageCollect(void (*get_roots)(void))
 
     /* scavenge static objects */
     if (major_gc && static_objects != END_OF_STATIC_LIST) {
+      IF_DEBUG(sanity,
+	       checkStaticObjects());
       scavenge_static();
     }
 
@@ -482,6 +484,13 @@ void GarbageCollect(void (*get_roots)(void))
   /* revert dead CAFs and update enteredCAFs list */
   revert_dead_CAFs();
   
+#if defined(PAR)
+  /* Reconstruct the Global Address tables used in GUM */
+  rebuildGAtables(major_gc);
+  IF_DEBUG(sanity, checkGlobalTSOList(rtsTrue/*check TSOs, too*/));
+  IF_DEBUG(sanity, checkLAGAtable(rtsTrue/*check closures, too*/));
+#endif
+
   /* Set the maximum blocks for the oldest generation, based on twice
    * the amount of live data now, adjusted to fit the maximum heap
    * size if necessary.  
@@ -724,11 +733,6 @@ void GarbageCollect(void (*get_roots)(void))
    */
   resetNurseries();
 
-#if defined(PAR)
-  /* Reconstruct the Global Address tables used in GUM */
-  RebuildGAtables(major_gc);
-#endif
-
   /* start any pending finalizers */
   scheduleFinalizers(old_weak_ptr_list);
   
@@ -967,14 +971,10 @@ isAlive(StgClosure *p)
      * for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
      */
 
-#if 1 || !defined(PAR)
     /* ignore closures in generations that we're not collecting. */
-    /* In GUM we use this routine when rebuilding GA tables; for some
-       reason it has problems with the LOOKS_LIKE_STATIC macro -- HWL */
     if (LOOKS_LIKE_STATIC(p) || Bdescr((P_)p)->gen->no > N) {
       return p;
     }
-#endif
     
     switch (info->type) {
       
@@ -1029,7 +1029,14 @@ isAlive(StgClosure *p)
 StgClosure *
 MarkRoot(StgClosure *root)
 {
+# if 0 && defined(PAR) && defined(DEBUG)
+  StgClosure *foo = evacuate(root);
+  // ASSERT(closure_STATIC(foo) || maybeLarge(foo) || Bdescr(foo)->evacuated);
+  ASSERT(isAlive(foo));   // must be in to-space 
+  return foo;
+# else
   return evacuate(root);
+# endif
 }
 
 //@cindex addBlock
@@ -1783,7 +1790,12 @@ scavengeTSO (StgTSO *tso)
   (StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
   if (   tso->why_blocked == BlockedOnMVar
 	 || tso->why_blocked == BlockedOnBlackHole
-	 || tso->why_blocked == BlockedOnException) {
+	 || tso->why_blocked == BlockedOnException
+#if defined(PAR)
+	 || tso->why_blocked == BlockedOnGA
+	 || tso->why_blocked == BlockedOnGA_NoSend
+#endif
+	 ) {
     tso->block_info.closure = evacuate(tso->block_info.closure);
   }
   if ( tso->blocked_exceptions != NULL ) {
@@ -2179,10 +2191,12 @@ scavenge(step *step)
 #endif
 
     case EVACUATED:
-      barf("scavenge: unimplemented/strange closure type\n");
+      barf("scavenge: unimplemented/strange closure type %d @ %p", 
+	   info->type, p);
 
     default:
-      barf("scavenge");
+      barf("scavenge: unimplemented/strange closure type %d @ %p", 
+	   info->type, p);
     }
 
     /* If we didn't manage to promote all the objects pointed to by
@@ -2294,7 +2308,7 @@ scavenge_one(StgClosure *p)
     break;
 
   default:
-    barf("scavenge_one: strange object");
+    barf("scavenge_one: strange object %d", (int)(info->type));
   }    
 
   no_luck = failed_to_evac;
@@ -2481,10 +2495,6 @@ scavenge_mutable_list(generation *gen)
       {
 	StgPtr end, q;
 	
-	IF_DEBUG(gc,
-		 belch("@@ scavenge_mut_list: scavenging MUT_ARR_PTRS_FROZEN %p; size: %#x ; next: %p",
-		       p, mut_arr_ptrs_sizeW((StgMutArrPtrs*)p), p->mut_link));
-
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	evac_gen = gen->no;
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
@@ -2507,10 +2517,6 @@ scavenge_mutable_list(generation *gen)
       {
 	StgPtr end, q;
 	
-	IF_DEBUG(gc,
-		 belch("@@ scavenge_mut_list: scavenging MUT_ARR_PTRS %p; size: %#x ; next: %p",
-		       p, mut_arr_ptrs_sizeW((StgMutArrPtrs*)p), p->mut_link));
-
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
 	  (StgClosure *)*q = evacuate((StgClosure *)*q);
@@ -2523,10 +2529,6 @@ scavenge_mutable_list(generation *gen)
        * it from the mutable list if possible by promoting whatever it
        * points to.
        */
-	IF_DEBUG(gc,
-		 belch("@@ scavenge_mut_list: scavenging MUT_VAR %p; var: %p ; next: %p",
-		       p, ((StgMutVar *)p)->var, p->mut_link));
-
       ASSERT(p->header.info != &MUT_CONS_info);
       ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
       p->mut_link = gen->mut_list;
@@ -2536,11 +2538,6 @@ scavenge_mutable_list(generation *gen)
     case MVAR:
       {
 	StgMVar *mvar = (StgMVar *)p;
-
-	IF_DEBUG(gc,
-		 belch("@@ scavenge_mut_list: scavenging MAVR %p; head: %p; tail: %p; value: %p ; next: %p",
-		       mvar, mvar->head, mvar->tail, mvar->value, p->mut_link));
-
 	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
 	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
 	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
@@ -2567,11 +2564,6 @@ scavenge_mutable_list(generation *gen)
     case BLACKHOLE_BQ:
       { 
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
-
-	IF_DEBUG(gc,
-		 belch("@@ scavenge_mut_list: scavenging BLACKHOLE_BQ (%p); next: %p",
-		       p, p->mut_link));
-
 	(StgClosure *)bh->blocking_queue = 
 	  evacuate((StgClosure *)bh->blocking_queue);
 	p->mut_link = gen->mut_list;
@@ -2600,7 +2592,60 @@ scavenge_mutable_list(generation *gen)
       }
       continue;
 
-    // HWL: old PAR code deleted here
+#if defined(PAR)
+    // HWL: check whether all of these are necessary
+
+    case RBH: // cf. BLACKHOLE_BQ
+      { 
+	// nat size, ptrs, nonptrs, vhs;
+	// char str[80];
+	// StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
+	StgRBH *rbh = (StgRBH *)p;
+	(StgClosure *)rbh->blocking_queue = 
+	  evacuate((StgClosure *)rbh->blocking_queue);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)rbh);
+	}
+	// ToDo: use size of reverted closure here!
+	p += BLACKHOLE_sizeW(); 
+	break;
+      }
+
+    case BLOCKED_FETCH:
+      { 
+	StgBlockedFetch *bf = (StgBlockedFetch *)p;
+	/* follow the pointer to the node which is being demanded */
+	(StgClosure *)bf->node = 
+	  evacuate((StgClosure *)bf->node);
+	/* follow the link to the rest of the blocking queue */
+	(StgClosure *)bf->link = 
+	  evacuate((StgClosure *)bf->link);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)bf);
+	}
+	p += sizeofW(StgBlockedFetch);
+	break;
+      }
+
+    case FETCH_ME:
+      p += sizeofW(StgFetchMe);
+      break; // nothing to do in this case
+
+    case FETCH_ME_BQ: // cf. BLACKHOLE_BQ
+      { 
+	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
+	(StgClosure *)fmbq->blocking_queue = 
+	  evacuate((StgClosure *)fmbq->blocking_queue);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordMutable((StgMutClosure *)fmbq);
+	}
+	p += sizeofW(StgFetchMeBlockingQueue);
+	break;
+      }
+#endif
 
     default:
       /* shouldn't have anything else on the mutables list */
@@ -2680,12 +2725,12 @@ scavenge_static(void)
       }
       
     default:
-      barf("scavenge_static");
+      barf("scavenge_static: strange closure %d", (int)(info->type));
     }
 
     ASSERT(failed_to_evac == rtsFalse);
 
-    /* get the next static object from the list.  Remeber, there might
+    /* get the next static object from the list.  Remember, there might
      * be more stuff on this list now that we've done some evacuating!
      * (static_objects is a global)
      */
@@ -2879,7 +2924,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       }
 
     default:
-      barf("scavenge_stack: weird activation record found on stack.\n");
+      barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->type));
     }
   }
 }
@@ -2984,7 +3029,7 @@ scavenge_large(step *step)
       }
 
     default:
-      barf("scavenge_large: unknown/strange object");
+      barf("scavenge_large: unknown/strange object  %d", (int)(info->type));
     }
   }
 }
@@ -3441,7 +3486,6 @@ threadSqueezeStack(StgTSO *tso)
  * turned on.
  * -------------------------------------------------------------------------- */
 //@cindex threadPaused
-
 void
 threadPaused(StgTSO *tso)
 {
@@ -3479,16 +3523,33 @@ printMutableList(generation *gen)
 {
   StgMutClosure *p, *next;
 
-  p = gen->saved_mut_list;
+  p = gen->mut_list;
   next = p->mut_link;
 
-  fprintf(stderr, "@@ Mutable list %p: ", gen->saved_mut_list);
+  fprintf(stderr, "@@ Mutable list %p: ", gen->mut_list);
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
     fprintf(stderr, "%p (%s), ",
 	    p, info_type((StgClosure *)p));
   }
   fputc('\n', stderr);
 }
+
+//@cindex maybeLarge
+static inline rtsBool
+maybeLarge(StgClosure *closure)
+{
+  StgInfoTable *info = get_itbl(closure);
+
+  /* closure types that may be found on the new_large_objects list; 
+     see scavenge_large */
+  return (info->type == MUT_ARR_PTRS ||
+	  info->type == MUT_ARR_PTRS_FROZEN ||
+	  info->type == TSO ||
+	  info->type == ARR_WORDS ||
+	  info->type == BCO);
+}
+
+  
 #endif /* DEBUG */
 
 //@node Index,  , Pausing a thread
@@ -3506,7 +3567,10 @@ printMutableList(generation *gen)
 //* evacuate_large::  @cindex\s-+evacuate_large
 //* gcCAFs::  @cindex\s-+gcCAFs
 //* isAlive::  @cindex\s-+isAlive
+//* maybeLarge::  @cindex\s-+maybeLarge
 //* mkMutCons::  @cindex\s-+mkMutCons
+//* printMutOnceList::  @cindex\s-+printMutOnceList
+//* printMutableList::  @cindex\s-+printMutableList
 //* relocate_TSO::  @cindex\s-+relocate_TSO
 //* revert_dead_CAFs::  @cindex\s-+revert_dead_CAFs
 //* scavenge::  @cindex\s-+scavenge

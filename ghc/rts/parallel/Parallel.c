@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Sat Dec 04 1999 19:43:39 Stardate: [-30]3999.10 hwloidl>
+  Time-stamp: <Thu Mar 23 2000 18:20:17 Stardate: [-30]4548.82 hwloidl>
 
   Basic functions for use in either GranSim or GUM.
 */
@@ -21,7 +21,6 @@
 #include "RtsUtils.h"
 #include "GranSimRts.h"
 #include "ParallelRts.h"
-
 
 //@node Variables and constants, Writing to the log-file, Includes
 //@subsection Variables and constants
@@ -240,13 +239,11 @@ int prog_argc, rts_argc;
   ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
   fprintf(gr_file, "PE %2u [%s]: TIME\n", thisPE, time_string);
 
-  /*
+# if 0
+    ngoq Dogh'q' vImuS
   IF_PAR_DEBUG(verbose,
 	       belch("== Start-time: %ld (%s)",
 		     startTime, time_string));
-  */
-# if 0
-    ngoq Dogh'q' vImuS
 
     if (startTime > LL(1000000000)) {
       fprintf(gr_file, "PE %2u [%lu%lu]: TIME\n", thisPE, 
@@ -428,16 +425,26 @@ StgInt sparkname, len;
   FILE *output_file; // DEBUGGING ONLY !!!!!!!!!!!!!!!!!!!!!!!!!1
   StgWord id;
   char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
-  ullong_format_string(TIME_ON_PROC(proc), time_string, rtsFalse/*no commas!*/);
-
-  output_file = gr_file;
-  ASSERT(output_file!=NULL);
 # if defined(GRAN)
+  ullong_format_string(TIME_ON_PROC(proc), 
+		       time_string, rtsFalse/*no commas!*/);
+# elif defined(PAR)
+  ullong_format_string(CURRENT_TIME,
+		       time_string, rtsFalse/*no commas!*/);
+# endif
+  output_file = gr_file;
+# if defined(GRAN)
+  if (RtsFlags.GranFlags.GranSimStats.Full) 
+    ASSERT(output_file!=NULL);
+
   IF_DEBUG(gran,
 	   fprintf(stderr, "GRAN: Dumping info to file with handle %#x\n", output_file))
 		   
   if (RtsFlags.GranFlags.GranSimStats.Suppressed)
     return;
+# elif defined(PAR)
+  if (RtsFlags.ParFlags.ParStats.Full) 
+    ASSERT(output_file!=NULL);
 # endif
 
   id = tso == NULL ? -1 : tso->id;
@@ -528,8 +535,14 @@ StgTSO *tso;
 rtsBool mandatory_thread;
 {
   FILE *output_file; // DEBUGGING ONLY !!!!!!!!!!!!!!!!!!!!!!!!!1
-    char time_string[TIME_STR_LEN];
-    ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
+  char time_string[TIME_STR_LEN];
+# if defined(GRAN)
+  ullong_format_string(TIME_ON_PROC(proc), 
+		       time_string, rtsFalse/*no commas!*/);
+# elif defined(PAR)
+  ullong_format_string(CURRENT_TIME,
+		       time_string, rtsFalse/*no commas!*/);
+# endif
 
   output_file = gr_file;
   ASSERT(output_file!=NULL);
@@ -772,5 +785,177 @@ rtsTime v;
     }
 }
 #endif /* 0 */
+
+/* 
+   extracting specific info out of a closure; used in packing (GranSim, GUM)
+*/
+//@cindex get_closure_info
+StgInfoTable*
+get_closure_info(StgClosure* node, nat *size, nat *ptrs, nat *nonptrs, 
+		 nat *vhs, char *info_hdr_ty)
+{
+  StgInfoTable *info;
+
+  ASSERT(LOOKS_LIKE_COOL_CLOSURE(node)); 
+  info = get_itbl(node);
+  /* the switch shouldn't be necessary, really; just use default case */
+  switch (info->type) {
+  case RBH:
+    {
+      StgInfoTable *rip = REVERT_INFOPTR(info); // closure to revert to
+      *size = sizeW_fromITBL(rip);
+      *ptrs = (nat) (rip->layout.payload.ptrs);
+      *nonptrs = (nat) (rip->layout.payload.nptrs);
+      *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+      info_hdr_type(node, info_hdr_ty);
+#else
+      strcpy(info_hdr_ty, "RBH");
+#endif
+      return rip;  // NB: we return the reverted info ptr for a RBH!!!!!!
+    }
+
+#if defined(PAR)
+  /* Closures specific to GUM */
+  case FETCH_ME:
+    *size = sizeofW(StgFetchMe);
+    *ptrs = (nat)0;
+    *nonptrs = (nat)0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+    info_hdr_type(node, info_hdr_ty);
+#else
+    strcpy(info_hdr_ty, "FETCH_ME");
+#endif
+    return info;
+
+  case FETCH_ME_BQ:
+    *size = sizeofW(StgFetchMeBlockingQueue);
+    *ptrs = (nat)0;
+    *nonptrs = (nat)0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+    info_hdr_type(node, info_hdr_ty);
+#else
+    strcpy(info_hdr_ty, "FETCH_ME_BQ");
+#endif
+    return info;
+
+  case BLOCKED_FETCH:
+    *size = sizeofW(StgBlockedFetch);
+    *ptrs = (nat)0;
+    *nonptrs = (nat)0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+    info_hdr_type(node, info_hdr_ty);
+#else
+    strcpy(info_hdr_ty, "BLOCKED_FETCH");
+#endif
+    return info;
+#endif /* PAR */
+    
+  /* these magic constants are outrageous!! why does the ITBL lie about it? */
+  case THUNK_SELECTOR:
+    *size = THUNK_SELECTOR_sizeW();
+    *ptrs = 1;
+    *nonptrs = MIN_UPD_SIZE-*ptrs;   // weird
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+    return info;
+
+  case ARR_WORDS:
+    /* ToDo: check whether this can be merged with the default case */
+    *size = arr_words_sizeW((StgArrWords *)node); 
+    *ptrs = 0;
+    *nonptrs = ((StgArrWords *)node)->words;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+    return info;
+
+  case PAP:
+    /* ToDo: check whether this can be merged with the default case */
+    *size = pap_sizeW((StgPAP *)node); 
+    *ptrs = 0;
+    *nonptrs = 0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+    return info;
+
+  case AP_UPD:
+    /* ToDo: check whether this can be merged with the default case */
+    *size = AP_sizeW(((StgAP_UPD *)node)->n_args); 
+    *ptrs = 0;
+    *nonptrs = 0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+    return info;
+
+  default:
+    *size = sizeW_fromITBL(info);
+    *ptrs = (nat) (info->layout.payload.ptrs);
+    *nonptrs = (nat) (info->layout.payload.nptrs);
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+      info_hdr_type(node, info_hdr_ty);
+#else
+      strcpy(info_hdr_ty, "UNKNOWN");
+#endif
+    return info;
+  }
+} 
+
+//@cindex IS_BLACK_HOLE
+rtsBool
+IS_BLACK_HOLE(StgClosure* node)          
+{ 
+  // StgInfoTable *info;
+  ASSERT(LOOKS_LIKE_COOL_CLOSURE(node));
+  switch (get_itbl(node)->type) {
+  case BLACKHOLE:
+  case BLACKHOLE_BQ:
+  case RBH:
+  case FETCH_ME:
+  case FETCH_ME_BQ:
+    return rtsTrue;
+  default:
+    return rtsFalse;
+  }
+//return ((info->type == BLACKHOLE || info->type == RBH) ? rtsTrue : rtsFalse);
+}
+
+//@cindex IS_INDIRECTION
+StgClosure *
+IS_INDIRECTION(StgClosure* node)          
+{ 
+  StgInfoTable *info;
+  ASSERT(LOOKS_LIKE_COOL_CLOSURE(node));
+  info = get_itbl(node);
+  switch (info->type) {
+    case IND:
+    case IND_OLDGEN:
+    case IND_PERM:
+    case IND_OLDGEN_PERM:
+    case IND_STATIC:
+      /* relies on indirectee being at same place for all these closure types */
+      return (((StgInd*)node) -> indirectee);
+#if 0
+    case EVACUATED:           // counting as ind to use in GC routines, too
+      // could use the same code as above (evacuee is at same pos as indirectee)
+      return (((StgEvacuated *)node) -> evacuee);
+#endif
+    default:
+      return NULL;
+  }
+}
+
+//@cindex unwindInd
+StgClosure *
+UNWIND_IND (StgClosure *closure)
+{
+  StgClosure *next;
+
+  while ((next = IS_INDIRECTION((StgClosure *)closure)) != NULL) 
+    closure = next;
+
+  ASSERT(next==(StgClosure *)NULL);
+  ASSERT(LOOKS_LIKE_COOL_CLOSURE(closure)); 
+  return closure;
+}
 
 #endif /* GRAN || PAR   whole file */
