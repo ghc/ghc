@@ -1,11 +1,13 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.43 2000/12/18 15:17:46 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.44 2000/12/20 15:44:29 rrt Exp $
 --
 -- GHC Driver
 --
 -- (c) Simon Marlow 2000
 --
 -----------------------------------------------------------------------------
+
+#include "../includes/config.h"
 
 module DriverPipeline (
 
