@@ -77,7 +77,7 @@ Generally speaking we now type-check types in three phases
 
 	1.  Kind check the HsType [kcHsType]
 	2.  Convert from HsType to Type, and hoist the foralls [tcHsType]
-	3.  Check the validity of the resultint type [checkValidType]
+	3.  Check the validity of the resulting type [checkValidType]
 
 Often these steps are done one after the othe (tcHsSigType).
 But in mutually recursive groups of type and class decls we do
@@ -445,12 +445,8 @@ tc_fun_type name arg_tys
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
 	AGlobal (ATyCon tc)
-		| isSynTyCon tc ->  returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
-						       (drop arity arg_tys))
+		| isSynTyCon tc ->  returnTc (mkSynTy tc arg_tys)
 		| otherwise	->  returnTc (mkTyConApp tc arg_tys)
-		where
-	  	    arity = tyConArity tc
-
 
 	other -> failWithTc (wrongThingErr "type constructor" thing name)
 \end{code}

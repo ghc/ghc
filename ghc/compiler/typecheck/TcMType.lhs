@@ -522,7 +522,8 @@ to a Type, performing kind checking, and then check various things that should
 be true about it.  We don't want to perform these checks at the same time
 as the initial translation because (a) they are unnecessary for interface-file
 types and (b) when checking a mutually recursive group of type and class decls,
-we can't "look" at the tycons/classes yet.
+we can't "look" at the tycons/classes yet.  Also, the checks are are rather
+diverse, and used to really mess up the other code.
 
 One thing we check for is 'rank'.  
 
@@ -537,7 +538,13 @@ One thing we check for is 'rank'.
 	r1  ::= forall tvs. cxt => r0
 	r0  ::= r0 -> r0 | basic
 	
+Another thing is to check that type synonyms are saturated. 
+This might not necessarily show up in kind checking.
+	type A i = i
+	data T k = MkT (k Int)
+	f :: T A	-- BAD!
 
+	
 \begin{code}
 data UserTypeCtxt 
   = FunSigCtxt Name	-- Function type signature

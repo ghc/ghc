@@ -368,13 +368,26 @@ splitTyConApp_maybe other	      = Nothing
 				~~~~~
 
 \begin{code}
-mkSynTy syn_tycon tys
-  = ASSERT( isSynTyCon syn_tycon )
-    ASSERT( length tyvars == length tys )
-    NoteTy (SynNote (TyConApp syn_tycon tys))
-	   (substTyWith tyvars tys body)
+mkSynTy tycon tys
+  | n_args == arity	-- Exactly saturated
+  = mk_syn tys
+  | n_args >  arity	-- Over-saturated
+  = foldl AppTy (mk_syn (take arity tys)) (drop arity tys)
+  | otherwise		-- Un-saturated
+  = TyConApp tycon tys
+	-- For the un-saturated case we build TyConApp directly
+	-- (mkTyConApp ASSERTs that the tc isn't a SynTyCon).
+	-- Here we are relying on checkValidType to find
+	-- the error.  What we can't do is use mkSynTy with
+	-- too few arg tys, because that is utterly bogus.
+
   where
-    (tyvars, body) = getSynTyConDefn syn_tycon
+    mk_syn tys = NoteTy (SynNote (TyConApp tycon tys))
+			(substTyWith tyvars tys body)
+
+    (tyvars, body) = ASSERT( isSynTyCon tycon ) getSynTyConDefn tycon
+    arity 	   = tyConArity tycon
+    n_args	   = length tys
 \end{code}
 
 Notes on type synonyms
