@@ -33,7 +33,7 @@ import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcUnify		( unifyKinds )
 import TcMonad
-import TcMonoType	( tcHsType, tcHsTopType, tcExtendTopTyVarScope, 
+import TcMonoType	( kcHsType, tcHsTopType, tcExtendTopTyVarScope, 
 			  tcContext, checkSigTyVars, sigCtxt, mkTcSig
 			)
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
@@ -128,7 +128,7 @@ kcClassDecl (ClassDecl	context class_name
   where
     the_class_sigs = filter isClassOpSig class_sigs
   
-    kc_sig (ClassOpSig _ _ _ op_ty loc) = tcAddSrcLoc loc (tcHsType op_ty)
+    kc_sig (ClassOpSig _ _ _ op_ty loc) = tcAddSrcLoc loc (kcHsType op_ty)
 \end{code}
 
 

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.28 2000/03/23 17:45:22 simonpj Exp $
+$Id: Parser.y,v 1.29 2000/03/24 17:49:30 simonpj Exp $
 
 Haskell grammar.
 
@@ -326,7 +326,7 @@ topdecls :: { [RdrBinding] }
 	| topdecl			{ [$1] }
 
 topdecl :: { RdrBinding }
-	: srcloc 'type' simpletype '=' type	
+	: srcloc 'type' simpletype '=' sigtype	
 		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
 
 	| srcloc 'data' ctype '=' constrs deriving

@@ -35,7 +35,7 @@ import TcEnv		( tcInstId,
 			  tcLookupTyCon, tcLookupDataCon
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
-import TcMonoType	( tcHsType, checkSigTyVars, sigCtxt )
+import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, partitionPredsOfLIE )
 import TcType		( TcType, TcTauType,
@@ -699,7 +699,7 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = tcSetErrCtxt (exprSigCtxt in_expr)	$
-   tcHsType  poly_ty		`thenTc` \ sig_tc_ty ->
+   tcHsSigType  poly_ty		`thenTc` \ sig_tc_ty ->
 
    if not (isForAllTy sig_tc_ty) then
 	-- Easy case

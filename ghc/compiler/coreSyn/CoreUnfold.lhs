@@ -220,7 +220,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE cpr_info expr
     let
 	n_val_binders = length val_binders
 
---	max_inline_size = n_val_binders+2
+	max_inline_size = n_val_binders+2
 	-- The idea is that if there is an INLINE pragma (inline is True)
 	-- and there's a big body, we give a size of n_val_binders+2.  This
 	-- This is just enough to fail the no-size-increase test in callSiteInline,
@@ -228,9 +228,9 @@ calcUnfoldingGuidance bOMB_OUT_SIZE cpr_info expr
 	--   but no more.
 
 -- Experimental thing commented in for now
-        max_inline_size = case cpr_info of
-			NoCPRInfo  -> n_val_binders + 2
-			ReturnsCPR -> n_val_binders + 1
+--        max_inline_size = case cpr_info of
+--			NoCPRInfo  -> n_val_binders + 2
+--			ReturnsCPR -> n_val_binders + 1
 
 	-- However, the wrapper for a CPR'd function is particularly good to inline,
 	-- even in a boring context, because we may get to do update in place:
@@ -624,7 +624,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 		-- Constructors have compulsory unfoldings, but
 		-- may have rules, in which case they are 
 		-- black listed till later
-	CoreUnfolding unf_template is_top is_cheap _ is_bot guidance ->
+	CoreUnfolding unf_template is_top is_cheap is_value is_bot guidance ->
 
     let
 	result | yes_or_no = Just unf_template
@@ -632,8 +632,8 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 
 	n_val_args  = length arg_infos
 
-	ok_inside_lam = is_cheap || is_bot	-- I'm experimenting with is_cheap
-						-- instead of is_value
+	ok_inside_lam = is_value || is_bot || (is_cheap && not is_top)
+				-- I'm experimenting with is_cheap && not is_top
 
  	yes_or_no 
 	  | black_listed = False
@@ -718,6 +718,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
+				   text "is value:" <+> ppr is_value,
 				   text "is cheap:" <+> ppr is_cheap,
 				   text "is bottom:" <+> ppr is_bot,
 				   text "is top-level:"    <+> ppr is_top,

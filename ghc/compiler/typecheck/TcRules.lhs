@@ -16,7 +16,7 @@ import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
 import TcType		( zonkTcTypes, newTyVarTy_OpenKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
-import TcMonoType	( tcHsType, tcHsTyVar, checkSigTyVars )
+import TcMonoType	( tcHsSigType, tcHsTyVar, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, newLocalId,
 			  tcExtendTyVarEnv
@@ -104,7 +104,7 @@ tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
   where
     new_id (RuleBndr var) 	   = newTyVarTy_OpenKind	`thenNF_Tc` \ ty ->
 		          	     returnNF_Tc (mkVanillaId var ty)
-    new_id (RuleBndrSig var rn_ty) = tcHsType rn_ty	`thenTc` \ ty ->
+    new_id (RuleBndrSig var rn_ty) = tcHsSigType rn_ty	`thenTc` \ ty ->
 				     returnNF_Tc (mkVanillaId var ty)
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 

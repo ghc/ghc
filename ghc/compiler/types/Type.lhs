@@ -41,10 +41,10 @@ module Type (
 	repType, splitRepFunTys, splitNewType_maybe, typePrimRep,
 
         UsageAnn(..), mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
-        mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy,
+        mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy, 
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	isForAllTy, applyTy, applyTys, mkPiType,
+	isForAllTy, applyTy, applyTys, mkPiType, hoistForAllTys,
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
@@ -669,6 +669,22 @@ applyTys fun_ty arg_tys
 Note that we allow applications to be of usage-annotated- types, as an
 extension: we handle them by lifting the annotation outside.  The
 argument, however, must still be unannotated.
+
+\begin{code}
+hoistForAllTys :: Type -> Type
+	-- Move all the foralls to the top
+	-- e.g.  T -> forall a. a  ==>   forall a. T -> a
+hoistForAllTys ty
+  = case hoist ty of { (tvs, body) -> mkForAllTys tvs body }
+  where
+    hoist :: Type -> ([TyVar], Type)
+    hoist ty = case splitFunTys    ty  of { (args, res) -> 
+	       case splitForAllTys res of {
+		  ([], body)  -> ([], ty) ;
+		  (tvs1, body1) -> case hoist body1 of { (tvs2,body2) ->
+				   (tvs1 ++ tvs2, mkFunTys args body2)
+	       }}}
+\end{code}
 
 
 %************************************************************************

@@ -25,7 +25,7 @@ import TcEnv		( tcLookupValue, tcLookupClassByKey,
 			  tcLookupValueByKey, newLocalId, badCon
 			)
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
-import TcMonoType	( tcHsType )
+import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy,
 			  unifyTupleTy, unifyUnboxedTupleTy
 			)
@@ -142,7 +142,7 @@ tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
 
 tcPat tc_bndr (SigPatIn pat sig) pat_ty
-  = tcHsType sig					`thenTc` \ sig_ty ->
+  = tcHsSigType sig					`thenTc` \ sig_ty ->
 
 	-- Check that the signature isn't a polymorphic one, which
 	-- we don't permit (at present, anyway)

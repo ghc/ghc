@@ -30,7 +30,7 @@ import TcEnv		( tcExtendLocalValEnv,
 			)
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
 import TcImprove	( tcImprove )
-import TcMonoType	( tcHsType, checkSigTyVars,
+import TcMonoType	( tcHsSigType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
 import TcPat		( tcPat )
@@ -857,7 +857,7 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
     tcAddErrCtxt (valSpecSigCtxt name poly_ty)	$
 
 	-- Get and instantiate its alleged specialised type
-    tcHsType poly_ty				`thenTc` \ sig_ty ->
+    tcHsSigType poly_ty				`thenTc` \ sig_ty ->
 
 	-- Check that f has a more general type, and build a RHS for
 	-- the spec-pragma-id at the same time

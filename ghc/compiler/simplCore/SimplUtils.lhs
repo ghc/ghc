@@ -34,8 +34,9 @@ import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocalName, setNameUnique )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
-			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
+			  splitTyConApp_maybe, splitAlgTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
+import DataCon		( dataConRepArity )
 import TysPrim		( statePrimTyCon )
 import Var		( setVarUnique )
 import VarSet
@@ -247,7 +248,7 @@ analyseCont in_scope cont
     analyse_arg subst (Note _ a)	= analyse_arg subst a
     analyse_arg subst other	        = True
 
-    interesting_call_context (Stop _)	     		 = False
+    interesting_call_context (Stop ty)	     		 = canUpdateInPlace ty
     interesting_call_context (InlinePlease _)	         = True
     interesting_call_context (Select _ _ _ _ _)          = True
     interesting_call_context (CoerceIt _ cont)           = interesting_call_context cont
@@ -274,6 +275,20 @@ discardInline :: SimplCont -> SimplCont
 discardInline (InlinePlease cont)  = cont
 discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
 discardInline cont		   = cont
+
+-- Consider   let x = <wurble> in ...
+-- If <wurble> returns an explicit constructor, we might be able
+-- to do update in place.  So we treat even a thunk RHS context
+-- as interesting if update in place is possible.  We approximate
+-- this by seeing if the type has a single constructor with a
+-- small arity.  But arity zero isn't good -- we share the single copy
+-- for that case, so no point in sharing.
+
+canUpdateInPlace ty = case splitAlgTyConApp_maybe ty of
+			Just (_, _, [dc]) -> arity == 1 || arity == 2
+					  where
+					     arity = dataConRepArity dc
+			other -> False
 \end{code}
 
 

@@ -21,7 +21,7 @@ import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope, 
-			  tcHsTypeKind, tcHsType, tcHsTopType, tcHsTopBoxedType,
+			  tcHsTypeKind, kcHsType, tcHsTopType, tcHsTopBoxedType,
 			  tcContext, tcHsTopTypeKind
 			)
 import TcType		( zonkTcTyVarToTyVar, zonkTcClassConstraints )
@@ -35,18 +35,16 @@ import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
 			  markedStrict, notMarkedStrict, markedUnboxed
 			)
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
-import Id		( idUnfolding )
-import CoreUnfold	( unfoldingTemplate )
 import FieldLabel
 import Var		( Id, TyVar )
 import Name		( Name, isLocallyDefined, OccName, NamedThing(..), nameUnique )
 import Outputable
-import TyCon		( TyCon, ArgVrcs, mkSynTyCon, mkAlgTyCon, isAlgTyCon, 
+import TyCon		( TyCon, ArgVrcs, mkSynTyCon, mkAlgTyCon, 
 			  isSynTyCon, tyConDataCons, isNewTyCon
 			)
 import Type		( getTyVar, tyVarsOfTypes,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
-			  mkTyVarTy,
+			  mkTyVarTy, splitForAllTys, isForAllTy,
 			  mkArrowKind, mkArrowKinds, boxedTypeKind,
 			  isUnboxedType, Type, ThetaType, classesOfPreds
 			)
@@ -54,6 +52,7 @@ import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import Util		( equivClasses )
 import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
+import CmdLineOpts	( opt_GlasgowExts )
 \end{code}
 
 %************************************************************************
@@ -88,12 +87,12 @@ kcConDecl (ConDecl _ _ ex_tvs ex_ctxt details loc)
   where
     kc_con (VanillaCon btys)    = mapTc kc_bty btys		`thenTc_` returnTc ()
     kc_con (InfixCon bty1 bty2) = mapTc kc_bty [bty1,bty2]	`thenTc_` returnTc ()
-    kc_con (NewCon ty _)        = tcHsType ty			`thenTc_` returnTc ()
+    kc_con (NewCon ty _)        = kcHsType ty
     kc_con (RecCon flds)        = mapTc kc_field flds		`thenTc_` returnTc ()
 
-    kc_bty (Banged ty)   = tcHsType ty
-    kc_bty (Unbanged ty) = tcHsType ty
-    kc_bty (Unpacked ty) = tcHsType ty
+    kc_bty (Banged ty)   = kcHsType ty
+    kc_bty (Unbanged ty) = kcHsType ty
+    kc_bty (Unpacked ty) = kcHsType ty
 
     kc_field (_, bty)    = kc_bty bty
 \end{code}
@@ -112,6 +111,10 @@ tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, Just arity, _) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
     tcHsTopTypeKind rhs					`thenTc` \ (_, rhs_ty) ->
+	-- If the RHS mentions tyvars that aren't in scope, we'll 
+	-- quantify over them.  With gla-exts that's right, but for H98
+	-- we should complain. We can't do that here without falling into
+	-- a black hole, so we do it in rnDecl (TySynonym case)
     let
 	-- Construct the tycon
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)

@@ -122,6 +122,9 @@ ltLvl (Level maj1 min1) (Level maj2 min2)
 
 ltMajLvl :: Level -> Level -> Bool
     -- Tells if one level belongs to a difft *lambda* level to another
+    -- But it returns True regardless if l1 is the top level
+    -- We always like to float to the top!	
+ltMajLvl (Level 0 0)    _	       = True
 ltMajLvl (Level maj1 _) (Level maj2 _) = maj1 < maj2
 
 isTopLvl :: Level -> Bool
@@ -202,9 +205,14 @@ lvlExpr _ env (_, AnnVar v)   = returnLvl (lookupVar env v)
 lvlExpr _ env (_, AnnLit lit) = returnLvl (Lit lit)
 
 lvlExpr ctxt_lvl env (_, AnnApp fun arg)
-  = lvlExpr ctxt_lvl env fun		`thenLvl` \ fun' ->
+  = lvl_fun fun				`thenLvl` \ fun' ->
     lvlMFE  False ctxt_lvl env arg	`thenLvl` \ arg' ->
     returnLvl (App fun' arg')
+  where
+    lvl_fun (_, AnnCase _ _ _) = lvlMFE True ctxt_lvl env fun
+    lvl_fun other 	       = lvlExpr ctxt_lvl env fun
+	-- We don't do MFE on partial applications generally,
+	-- but we do if the function is big and hairy, like a case
 
 lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr)
 	-- Don't float anything out of an InlineMe
@@ -284,16 +292,7 @@ lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   |  isUnLiftedType ty				-- Can't let-bind it
-  || not (dest_lvl `ltMajLvl` ctxt_lvl)		-- Does not escape a value lambda
-	-- A decision to float entails let-binding this thing, and we only do 
-	-- that if we'll escape a value lambda.  I considered doing it if it
-	-- would make the thing go to top level, but I found things like
-	--	concat = /\ a -> foldr ..a.. (++) []
-	-- was getting turned into
-	--	concat = /\ a -> lvl a
-	--	lvl    = /\ a -> foldr ..a.. (++) []
-	-- which is pretty stupid.  So for now at least, I don't let-bind things
-	-- simply because they could go to top level.
+  || not good_destination
   || exprIsTrivial expr				-- Is trivial
   || (strict_ctxt && exprIsBottom expr)		-- Strict context and is bottom
   = 	-- Don't float it out
@@ -309,6 +308,17 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
     ty       = exprType expr
     dest_lvl = destLevel env fvs (isFunction ann_expr)
     abs_vars = abstractVars dest_lvl env fvs
+
+    good_destination =  dest_lvl `ltMajLvl` ctxt_lvl		-- Escapes a value lambda
+		     || (isTopLvl dest_lvl && not strict_ctxt)	-- Goes to the top
+	-- A decision to float entails let-binding this thing, and we only do 
+	-- that if we'll escape a value lambda, or will go to the top level.
+	-- But beware
+	--	concat = /\ a -> foldr ..a.. (++) []
+	-- was getting turned into
+	--	concat = /\ a -> lvl a
+	--	lvl    = /\ a -> foldr ..a.. (++) []
+	-- which is pretty stupid.  Hence the strict_ctxt test
 \end{code}
 
 

@@ -33,7 +33,7 @@ import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl, RdrNameRuleD
 import RnEnv		( mkImportedGlobalName, newImportedBinder, mkImportedGlobalFromRdrName,
 			  lookupOccRn, lookupImplicitOccRn,
 			  pprAvail,
-			  availName, availNames, addAvailToNameSet,
+			  availName, availNames, addAvailToNameSet, addSysAvails,
 			  FreeVars, emptyFVs
 			)
 import RnMonad
@@ -265,10 +265,15 @@ loadDecl mod decls_map (version, decl)
 
     getDeclSysBinders new_name decl	`thenRn` \ sys_bndrs ->
     let
+	full_avail    = addSysAvails avail sys_bndrs
+		-- Add the sys-binders to avail.  When we import the decl,
+		-- it's full_avail that will get added to the 'already-slurped' set (iSlurp)
+		-- If we miss out sys-binders, we'll read the decl multiple times!
+
 	main_name     = availName avail
 	new_decls_map = foldl add_decl decls_map
-				       [ (name, (version, avail, name==main_name, (mod, decl'))) 
-				       | name <- sys_bndrs ++ availNames avail]
+				       [ (name, (version, full_avail, name==main_name, (mod, decl'))) 
+				       | name <- availNames full_avail]
 	add_decl decls_map (name, stuff)
 	  = WARN( name `elemNameEnv` decls_map, ppr name )
 	    addToNameEnv decls_map name stuff

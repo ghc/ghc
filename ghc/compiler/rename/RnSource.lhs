@@ -49,7 +49,7 @@ import Bag		( bagToList )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
-import CmdLineOpts	( opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
+import CmdLineOpts	( opt_GlasgowExts, opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import UniqFM		( lookupUFM )
 import ErrUtils		( Message )
@@ -159,10 +159,15 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
     lookupBndrRn name				`thenRn` \ name' ->
     bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType syn_doc ty				`thenRn` \ (ty', ty_fvs) ->
+    rnHsPolyType syn_doc (unquantify ty)	`thenRn` \ (ty', ty_fvs) ->
     returnRn (TyClD (TySynonym name' tyvars' ty' src_loc), ty_fvs)
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
+
+	-- For H98 we do *not* universally quantify on the RHS of a synonym
+	-- Silently discard context... but the tyvars in the rest won't be in scope
+    unquantify (HsForAllTy Nothing ctxt ty) | not opt_GlasgowExts = ty
+    unquantify ty				   	          = ty
 
 rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
                tname dname dwname snames src_loc))
@@ -553,7 +558,7 @@ rnHsPolyType, rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars
 
 ---------------------------------------
 rnHsPolyType doc (HsForAllTy Nothing ctxt ty)
-	-- From source code (no kinds on tyvars)
+	-- Implicit quantifiction in source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalNameEnv		`thenRn` \ name_env ->

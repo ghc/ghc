@@ -51,7 +51,6 @@ import TcMonad
 import TcType	( TcType, TcTyVar,
 		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcTyVarBndr, zonkTcType
 		)
-import TyCon	( isDataTyCon )
 import Type	( mkTyVarTy, splitAlgTyConApp_maybe, isUnLiftedType, Type )
 import Name	( isLocallyDefined )
 import Var	( TyVar )

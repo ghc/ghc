@@ -4,8 +4,8 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsTopTypeKind,
-		    tcContext, tcHsTyVar, kcHsTyVar,
+module TcMonoType ( tcHsType, tcHsSigType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsTopTypeKind,
+		    tcContext, tcHsTyVar, kcHsTyVar, kcHsType,
 		    tcExtendTyVarScope, tcExtendTopTyVarScope,
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
@@ -32,7 +32,7 @@ import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
 import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
-                          mkUsForAllTy, zipFunTys,
+                          mkUsForAllTy, zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
@@ -72,6 +72,18 @@ tcHsType and tcHsTypeKind
 tcHsType checks that the type really is of kind Type!
 
 \begin{code}
+kcHsType :: RenamedHsType -> TcM c ()
+  -- Kind-check the type
+kcHsType ty = tc_type ty	`thenTc_`
+	      returnTc ()
+
+tcHsSigType :: RenamedHsType -> TcM s TcType
+  -- Used for type sigs written by the programmer
+  -- Hoist any inner for-alls to the top
+tcHsSigType ty
+  = tcHsType ty		`thenTc` \ ty' ->
+    returnTc (hoistForAllTys ty')
+
 tcHsType :: RenamedHsType -> TcM s TcType
 tcHsType ty
   = -- tcAddErrCtxt (typeCtxt ty)		$
@@ -100,20 +112,22 @@ tcHsTopType :: RenamedHsType -> TcM s Type
 tcHsTopType ty
   = -- tcAddErrCtxt (typeCtxt ty)		$
     tc_type ty				`thenTc` \ ty' ->
-    forkNF_Tc (zonkTcTypeToType ty')
+    forkNF_Tc (zonkTcTypeToType ty')	`thenTc` \ ty'' ->
+    returnTc (hoistForAllTys ty'')
+
+tcHsTopBoxedType :: RenamedHsType -> TcM s Type
+tcHsTopBoxedType ty
+  = -- tcAddErrCtxt (typeCtxt ty)		$
+    tc_boxed_type ty			`thenTc` \ ty' ->
+    forkNF_Tc (zonkTcTypeToType ty')	`thenTc` \ ty'' ->
+    returnTc (hoistForAllTys ty'')
 
 tcHsTopTypeKind :: RenamedHsType -> TcM s (TcKind, Type)
 tcHsTopTypeKind ty
   = -- tcAddErrCtxt (typeCtxt ty)		$
     tc_type_kind ty				`thenTc` \ (kind, ty') ->
     forkNF_Tc (zonkTcTypeToType ty')		`thenTc` \ zonked_ty ->
-    returnNF_Tc (kind, zonked_ty)
-
-tcHsTopBoxedType :: RenamedHsType -> TcM s Type
-tcHsTopBoxedType ty
-  = -- tcAddErrCtxt (typeCtxt ty)		$
-    tc_boxed_type ty			`thenTc` \ ty' ->
-    forkNF_Tc (zonkTcTypeToType ty')
+    returnNF_Tc (kind, hoistForAllTys zonked_ty)
 \end{code}
 
 
@@ -415,7 +429,7 @@ tcTySig :: RenamedSig -> TcM s TcSigInfo
 
 tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc $
-   tcHsType ty					`thenTc` \ sigma_tc_ty ->
+   tcHsSigType ty				`thenTc` \ sigma_tc_ty ->
    mkTcSig (mkVanillaId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
 

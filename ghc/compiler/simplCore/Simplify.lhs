@@ -226,15 +226,18 @@ simplExprF (App fun arg) cont
     simplExprF fun (ApplyTo NoDup arg se cont)
 
 simplExprF (Case scrut bndr alts) cont
-  = getSubst			`thenSmpl` \ subst ->
+  = getSubstEnv			`thenSmpl` \ subst_env ->
     getSwitchChecker 		`thenSmpl` \ chkr ->
-    if switchIsOn chkr NoCaseOfCase then
-	-- If case-of-case is off, simply simplify the scrutinee and rebuild
-	simplExprC scrut (Stop (substTy subst (idType bndr)))	`thenSmpl` \ scrut' ->
-	rebuild_case False scrut' bndr alts (substEnv subst) cont
+    if not (switchIsOn chkr NoCaseOfCase) then
+	-- Simplify the scrutinee with a Select continuation
+	simplExprF scrut (Select NoDup bndr alts subst_env cont)
+
     else
-	-- But if it's on, we simplify the scrutinee with a Select continuation
-	simplExprF scrut (Select NoDup bndr alts (substEnv subst) cont)
+	-- If case-of-case is off, simply simplify the case expression
+	-- in a vanilla Stop context, and rebuild the result around it
+	simplExprC scrut (Select NoDup bndr alts subst_env 
+				 (Stop (contResultType cont)))	`thenSmpl` \ case_expr' ->
+	rebuild case_expr' cont
 
 
 simplExprF (Let (Rec pairs) body) cont
@@ -694,9 +697,14 @@ wantToExpose :: Int -> CoreExpr -> Bool
 --	v = E
 --	z = \w -> g v w
 -- Which is what we want; chances are z will be inlined now.
+--
+-- This defn isn't quite like 
+--	exprIsCheap (it ignores non-cheap args)
+--	exprIsValue (may not say True for a lone variable)
+-- which is slightly weird
 wantToExpose n (Var v)		= idAppIsCheap v n
 wantToExpose n (Lit l)		= True
-wantToExpose n (Lam _ e)	= ASSERT( n==0 ) True	-- We won't have applied \'s
+wantToExpose n (Lam _ e)	= True
 wantToExpose n (Note _ e)	= wantToExpose n e
 wantToExpose n (App f (Type _))	= wantToExpose n f
 wantToExpose n (App f a)	= wantToExpose (n+1) f
@@ -737,10 +745,13 @@ simplVar var cont
 
 completeCall var occ cont
   = getBlackList	`thenSmpl` \ black_list_fn ->
-    getSwitchChecker 	`thenSmpl` \ chkr ->
     getInScope		`thenSmpl` \ in_scope ->
+    getSwitchChecker 	`thenSmpl` \ chkr ->
     let
-	black_listed      			   = black_list_fn var
+	dont_use_rules	   = switchIsOn chkr DontApplyRules
+	no_case_of_case	   = switchIsOn chkr NoCaseOfCase
+	black_listed       = black_list_fn var
+
 	(arg_infos, interesting_cont, inline_call) = analyseCont in_scope cont
 	discard_inline_cont | inline_call = discardInline cont
 		            | otherwise   = cont
@@ -772,10 +783,10 @@ completeCall var occ cont
 	-- won't occur for things that have specialisations till a later phase, so
 	-- it's ok to try for inlining first.
 
-    prepareArgs (switchIsOn chkr NoCaseOfCase) var cont	$ \ args' cont' ->
+    prepareArgs no_case_of_case var cont	$ \ args' cont' ->
     let
-	maybe_rule | switchIsOn chkr DontApplyRules = Nothing
-		   | otherwise			    = lookupRule in_scope var args' 
+	maybe_rule | dont_use_rules = Nothing
+		   | otherwise	    = lookupRule in_scope var args' 
     in
     case maybe_rule of {
 	Just (rule_name, rule_rhs) -> 
@@ -1026,7 +1037,7 @@ rebuild expr (InlinePlease cont)
   = rebuild (Note InlineCall expr) cont
 
 rebuild scrut (Select _ bndr alts se cont)
-  = rebuild_case True scrut bndr alts se cont
+  = rebuild_case scrut bndr alts se cont
 \end{code}
 
 Case elimination [see the code above]
@@ -1114,7 +1125,7 @@ Blob of helper functions for the "case-of-something-else" situation.
 ---------------------------------------------------------
 -- 	Eliminate the case if possible
 
-rebuild_case add_eval_info scrut bndr alts se cont
+rebuild_case scrut bndr alts se cont
   | maybeToBool maybe_con_app
   = knownCon scrut (DataAlt con) args bndr alts se cont
 
@@ -1127,7 +1138,7 @@ rebuild_case add_eval_info scrut bndr alts se cont
     simplExprF (head (rhssOfAlts alts)) cont)
 
   | otherwise
-  = complete_case add_eval_info scrut bndr alts se cont
+  = complete_case scrut bndr alts se cont
 
   where
     maybe_con_app    = analyse (collectArgs scrut)
@@ -1192,7 +1203,7 @@ canEliminateCase scrut bndr alts
 ---------------------------------------------------------
 -- 	Case of something else
 
-complete_case add_eval_info scrut case_bndr alts se cont
+complete_case scrut case_bndr alts se cont
   = 	-- Prepare case alternatives
     prepareCaseAlts case_bndr (splitTyConApp_maybe (idType case_bndr))
 		    impossible_cons alts		`thenSmpl` \ better_alts ->
@@ -1206,7 +1217,10 @@ complete_case add_eval_info scrut case_bndr alts se cont
 	
 
 	-- Deal with variable scrutinee
-    (	simplCaseBinder add_eval_info scrut case_bndr 	$ \ case_bndr' zap_occ_info ->
+    (	
+        getSwitchChecker 				`thenSmpl` \ chkr ->
+	simplCaseBinder (switchIsOn chkr NoCaseOfCase)
+			scrut case_bndr 		$ \ case_bndr' zap_occ_info ->
 
 	-- Deal with the case alternatives
 	simplAlts zap_occ_info impossible_cons

@@ -57,7 +57,7 @@ import NativeInfo       ( os, arch )
 \end{code}
 
 \begin{code}
-main =
+main = stderr `seq`	-- Bug fix.  Sigh
  --  _scc_ "main" 
  doIt classifyOpts
 \end{code}

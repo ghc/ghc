@@ -374,7 +374,3 @@ pp_cycle str decls
      where
         name = tyClDeclName decl
 \end{code}
-
-
-
-

@@ -432,7 +432,7 @@ opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	--
 opt_UF_ScrutConDiscount		= lookup_def_int "-funfolding-con-discount"	   (2::Int)
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
 opt_UF_PrimArgDiscount		= lookup_def_int "-funfolding-prim-discount"	   (1::Int)
-opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.0::Float)
+opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
 
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)

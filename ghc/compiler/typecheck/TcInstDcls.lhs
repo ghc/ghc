@@ -49,7 +49,7 @@ import NameSet		( emptyNameSet )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint )
 import SrcLoc		( SrcLoc )
-import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
+import TyCon		( isSynTyCon, tyConDerivings )
 import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,

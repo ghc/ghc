@@ -19,7 +19,7 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 
 import TcMonad
-import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsType, sigPatCtxt )
+import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsSigType, sigPatCtxt )
 import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
 import TcEnv		( tcExtendLocalValEnv, tcExtendGlobalTyVars, tcExtendTyVarEnv, tcGetGlobalTyVars )
 import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
@@ -175,7 +175,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- STEP 3: Unify with the rhs type signature if any
 	(case maybe_rhs_sig of
 	    Nothing  -> returnTc ()
-	    Just sig -> tcHsType sig	`thenTc` \ sig_ty ->
+	    Just sig -> tcHsSigType sig	`thenTc` \ sig_ty ->
 
 			-- Check that the signature isn't a polymorphic one, which
 			-- we don't permit (at present, anyway)
