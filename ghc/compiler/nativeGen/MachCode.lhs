@@ -91,6 +91,11 @@ stmtsToInstrs stmts
    ie, the Str is planted in-line, when what we really meant was to place
    a _reference_ to the string there.  liftStrings will lift out all such
    strings in top-level data and place them at the end of the block.
+
+   This is still a rather half-baked solution -- to do the job entirely right
+   would mean a complete traversal of all the Stixes, but there's currently no
+   real need for it, and it would be slow.  Also, potentially there could be
+   literal types other than strings which need lifting out?
 -}
 
 liftStrings :: [StixTree]    -- originals
