@@ -183,6 +183,7 @@ data Token
   | ITdarrow
   | ITminus
   | ITbang
+  | ITstar
   | ITdot
 
   | ITbiglam			-- GHC-extension symbols
@@ -381,6 +382,7 @@ haskellKeySymsFM = listToUFM $
        ,("=>",		ITdarrow)
        ,("-",		ITminus)
        ,("!",		ITbang)
+       ,("*",		ITstar)
        ,(".",		ITdot)		-- sadly, for 'forall a . t'
        ]
 \end{code}

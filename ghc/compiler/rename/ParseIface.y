@@ -144,6 +144,7 @@ import FastString	( tailFS )
  '=>'		{ ITdarrow }
  '-'		{ ITminus }
  '!'		{ ITbang }
+ '*'		{ ITstar }
 
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
@@ -682,9 +683,8 @@ kind		:: { Kind }
 		| akind '->' kind	{ mkArrowKind $1 $3 }
 
 akind		:: { Kind }
-		: VARSYM		{ if $1 == SLIT("*") then
-						liftedTypeKind
-					  else if $1 == SLIT("?") then
+                : '*'                   { liftedTypeKind }
+		| VARSYM		{ if $1 == SLIT("?") then
 						openTypeKind
 					  else if $1 == SLIT("\36") then
                                                 usageTypeKind  -- dollar

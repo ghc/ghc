@@ -84,6 +84,7 @@ extractHsTyNames ty
 				 unitNameSet tycon
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
+    get (HsKindSig ty k)       = get ty
     get (HsForAllTy (Just tvs) 
 		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`

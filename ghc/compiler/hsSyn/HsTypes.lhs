@@ -41,7 +41,7 @@ import Name		( Name, getName )
 import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
 import Subst		( substTyWith )
-import PprType		( {- instance Outputable Kind -}, pprParendKind )
+import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
 import PrelNames	( mkTupConRdrName, listTyConKey, parrTyConKey,
 			  usOnceTyConKey, usManyTyConKey, hasKey,
@@ -108,6 +108,9 @@ data HsType name
 
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
+
+  | HsKindSig		(HsType name)	-- (ty :: kind)
+			Kind		-- A type with a kind signature
 
 
 -----------------------
@@ -276,6 +279,7 @@ ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)
 	       (sep [p1, (<>) (ptext SLIT("-> ")) p2])
 
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = hsTupParens con (interpp'SP tys)
+ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_ty pREC_TOP ty <+> dcolon <+> pprKind kind)
 ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_ty pREC_TOP ty)
 ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_ty pREC_TOP ty)
   where
@@ -454,6 +458,9 @@ eq_hsType env (HsTupleTy c1 tys1) (HsTupleTy c2 tys2)
 
 eq_hsType env (HsListTy ty1) (HsListTy ty2)
   = eq_hsType env ty1 ty2
+
+eq_hsType env (HsKindSig ty1 k1) (HsKindSig ty2 k2)
+  = eq_hsType env ty1 ty2 && k1 `eqKind` k2
 
 eq_hsType env (HsPArrTy ty1) (HsPArrTy ty2)
   = eq_hsType env ty1 ty2

@@ -113,11 +113,12 @@ checkInstType t
 	ty ->   checkDictTy ty [] `thenP` \ dict_ty->
 	      	returnP (HsForAllTy Nothing [] dict_ty)
 
-checkTyVars :: [RdrNameHsTyVar] -> P [RdrNameHsType]
+checkTyVars :: [RdrNameHsType] -> P [RdrNameHsTyVar]
 checkTyVars tvs = mapP chk tvs
 	        where
-		  chk (UserTyVar tv) = returnP (HsTyVar tv)
-		  chk other	     = parseError "Illegal kinded type variable"
+		  chk (HsKindSig (HsTyVar tv) k) = returnP (IfaceTyVar tv k)
+		  chk (HsTyVar tv) 	         = returnP (UserTyVar tv)
+		  chk other	 		 = parseError "Type found where type variable expected"
 
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
@@ -131,9 +132,12 @@ checkContext t
     returnP [p]
 
 checkPred :: RdrNameHsType -> P (HsPred RdrName)
+-- Watch out.. in ...deriving( Show )... we use checkPred on 
+-- the list of partially applied predicates in the deriving,
+-- so there can be zero args.
 checkPred (HsPredTy (HsIParam n ty)) = returnP (HsIParam n ty)
-checkPred (HsAppTy l r)
-  = go l [r]
+checkPred ty
+  = go ty []
   where
     go (HsTyVar t) args   | not (isRdrTyVar t) 
 		  	  = returnP (HsClassP t args)

@@ -263,6 +263,11 @@ kcHsLiftedSigType = kcLiftedType
 kcHsType :: RenamedHsType -> TcM TcKind
 kcHsType (HsTyVar name)	      = kcTyVar name
 
+kcHsType (HsKindSig ty k)
+  = kcHsType ty			`thenTc` \ k' ->
+    unifyKind k k' 		`thenTc_`
+    returnTc k
+
 kcHsType (HsListTy ty)
   = kcLiftedType ty		`thenTc` \ tau_ty ->
     returnTc liftedTypeKind
@@ -399,6 +404,9 @@ tc_type :: RenamedHsType -> TcM Type
 
 tc_type ty@(HsTyVar name)
   = tc_app ty []
+
+tc_type (HsKindSig ty k)
+  = tc_type ty	-- Kind checking done already
 
 tc_type (HsListTy ty)
   = tc_type ty	`thenTc` \ tau_ty ->

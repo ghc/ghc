@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.85 2002/02/11 09:27:22 simonpj Exp $
+$Id: Parser.y,v 1.86 2002/02/11 15:16:26 simonpj Exp $
 
 Haskell grammar.
 
@@ -28,6 +28,7 @@ import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn )
+import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  NewOrData(..), StrictnessMark(..), Activation(..) )
 import Panic
@@ -45,10 +46,14 @@ import Outputable
 -----------------------------------------------------------------------------
 Conflicts: 21 shift/reduce, -=chak[4Feb2]
 
-8 for abiguity in 'if x then y else z + 1'
+9 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
+	8 because op might be: - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
 1 for ambiguity in 'if x then y else z :: T'
 	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
+1 for ambiguity in 'if x then y else z with ?x=3'
+	(shift parses as 'if x then y else (z with ?x=3)'
+
 3 for ambiguity in 'case x of y :: a -> b'
 	(don't know whether to reduce 'a' as a btype or shift the '->'.
 	 conclusion:  bogus expression anyway, doesn't matter)
@@ -166,6 +171,7 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
  '=>'		{ ITdarrow }
  '-'		{ ITminus }
  '!'		{ ITbang }
+ '*'		{ ITstar }
  '.'		{ ITdot }
 
  '{'		{ ITocurly } 			-- special symbols
@@ -341,12 +347,13 @@ topdecls :: { [RdrBinding] }
 	| topdecl			{ [$1] }
 
 topdecl :: { RdrBinding }
-	: srcloc 'type' simpletype '=' ctype	
+ 	: srcloc 'type' tycon tv_bndrs '=' ctype	
 		-- Note ctype, not sigtype.
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
 		-- Instead we just say b is out of scope
-		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
+ 		{ RdrHsDecl (TyClD (TySynonym $3 $4 $6 $1)) }
+
 
 	| srcloc 'data' tycl_hdr constrs deriving
 		{% returnP (RdrHsDecl (TyClD
@@ -369,7 +376,7 @@ topdecl :: { RdrBinding }
 				(groupBindings $4)
 		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
 
-	| srcloc 'default' '(' types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
+	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
@@ -382,13 +389,15 @@ topdecl :: { RdrBinding }
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
-	: '(' types ')' '=>' tycon tyvars	{% mapP checkPred $2		`thenP` \ cxt ->
-						   returnP (cxt, $5, $6) }
-	| tycon tyvars '=>' tycon tyvars	{% checkTyVars $2	`thenP` \ args ->
-						   returnP ([HsClassP $1 args], $4, $5) }
-	| qtycon tyvars '=>' tycon tyvars	{% checkTyVars $2	`thenP` \ args ->
-						   returnP ([HsClassP $1 args], $4, $5) }
-	| tycon tyvars				{ ([], $1, $2) }
+	: '(' comma_types1 ')' '=>' tycon tv_bndrs	{% mapP checkPred $2	`thenP` \ cxt ->
+							   returnP (cxt, $5, $6) }
+	| qtycon atypes1 '=>' tycon atypes0		{% checkTyVars $5	`thenP` \ tvs ->
+						  	   returnP ([HsClassP $1 $2], $4, tvs) }
+	| qtycon  atypes0				{% checkTyVars $2	`thenP` \ tvs ->
+						  	   returnP ([], $1, tvs) }
+		-- We have to have qtycon in this production to avoid s/r conflicts
+		-- with the previous one.  The renamer will complain if we use
+		-- a qualified tycon.
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }
@@ -642,7 +651,7 @@ sigtypes :: { [RdrNameHsType] }
 	| sigtypes ',' sigtype		{ $3 : $1 }
 
 sigtype :: { RdrNameHsType }
-	: ctype				{ (mkHsForAllTy Nothing [] $1) }
+	: ctype				{ mkHsForAllTy Nothing [] $1 }
 
 sig_vars :: { [RdrName] }
 	 : sig_vars ',' var		{ $3 : $1 }
@@ -653,7 +662,7 @@ sig_vars :: { [RdrName] }
 
 -- A ctype is a for-all type
 ctype	:: { RdrNameHsType }
-	: 'forall' tyvars '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
+	: 'forall' tv_bndrs '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
 	| context '=>' type		{ mkHsForAllTy Nothing   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
@@ -676,17 +685,18 @@ gentype :: { RdrNameHsType }
         | atype tyconop atype           { HsOpTy $1 $2 $3 }
 
 btype :: { RdrNameHsType }
-	: btype atype			{ (HsAppTy $1 $2) }
+	: btype atype			{ HsAppTy $1 $2 }
 	| atype				{ $1 }
 
 atype :: { RdrNameHsType }
 	: gtycon			{ HsTyVar $1 }
 	| tyvar				{ HsTyVar $1 }
-	| '(' type ',' types ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2 : reverse $4) }
-	| '(#' types '#)'		{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) (reverse $2)	 }
+	| '(' type ',' comma_types1 ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2:$4) }
+	| '(#' comma_types1 '#)'	{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) $2      }
 	| '[' type ']'			{ HsListTy $2 }
 	| '[:' type ':]'		{ HsPArrTy $2 }
 	| '(' ctype ')'		        { $2 }
+	| '(' ctype '::' kind ')'	{ HsKindSig $2 $4 }
 -- Generics
         | INTEGER                       { HsNumTy $1 }
 
@@ -697,20 +707,29 @@ atype :: { RdrNameHsType }
 inst_type :: { RdrNameHsType }
 	: ctype				{% checkInstType $1 }
 
-types0  :: { [RdrNameHsType] }
-	: types				{ reverse $1 }
+comma_types0  :: { [RdrNameHsType] }
+	: comma_types1			{ $1 }
 	| {- empty -}			{ [] }
 
-types	:: { [RdrNameHsType] }
+comma_types1	:: { [RdrNameHsType] }
 	: type				{ [$1] }
-	| types  ',' type		{ $3 : $1 }
+	| type  ',' comma_types1	{ $1 : $3 }
 
-simpletype :: { (RdrName, [RdrNameHsTyVar]) }
-	: tycon tyvars			{ ($1, reverse $2) }
-
-tyvars :: { [RdrNameHsTyVar] }
-	: tyvar tyvars			{ UserTyVar $1 : $2 }
+atypes0	:: { [RdrNameHsType] }
+	: atypes1			{ $1 }
 	| {- empty -}			{ [] }
+
+atypes1	:: { [RdrNameHsType] }
+	: atype				{ [$1] }
+	| atype atypes1			{ $1 : $2 }
+
+tv_bndrs :: { [RdrNameHsTyVar] }
+	 : tv_bndr tv_bndrs		{ $1 : $2 }
+	 | {- empty -}			{ [] }
+
+tv_bndr :: { RdrNameHsTyVar }
+	: tyvar				{ UserTyVar $1 }
+	| '(' tyvar '::' kind ')'	{ IfaceTyVar $2 $4 }
 
 fds :: { [([RdrName], [RdrName])] }
 	: {- empty -}			{ [] }
@@ -726,6 +745,18 @@ fd :: { ([RdrName], [RdrName]) }
 varids0	:: { [RdrName] }
 	: {- empty -}			{ [] }
 	| varids0 tyvar			{ $2 : $1 }
+
+-----------------------------------------------------------------------------
+-- Kinds
+
+kind	:: { Kind }
+	: akind			{ $1 }
+	| akind '->' kind	{ mkArrowKind $1 $3 }
+
+akind	:: { Kind }
+	: '*'			{ liftedTypeKind }
+	| '(' kind ')'		{ $2 }
+
 
 -----------------------------------------------------------------------------
 -- Datatype declarations
@@ -750,7 +781,7 @@ constr :: { RdrNameConDecl }
 		{ mkConDecl (fst $3) $2 [] (snd $3) $1 }
 
 forall :: { [RdrNameHsTyVar] }
-	: 'forall' tyvars '.'		{ $2 }
+	: 'forall' tv_bndrs '.'		{ $2 }
 	| {- empty -}			{ [] }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
@@ -878,7 +909,7 @@ fexp 	:: { RdrNameHsExpr }
   	| aexp					{ $1 }
 
 aexps0 	:: { [RdrNameHsExpr] }
-	: aexps					{ (reverse $1) }
+	: aexps					{ reverse $1 }
 
 aexps 	:: { [RdrNameHsExpr] }
 	: aexps aexp				{ $2 : $1 }
@@ -1006,7 +1037,7 @@ alt 	:: { RdrNameMatch }
 
 ralt :: { [RdrNameGRHS] }
 	: '->' srcloc exp		{ [GRHS [ResultStmt $3 $2] $2] }
-	| gdpats			{ (reverse $1) }
+	| gdpats			{ reverse $1 }
 
 gdpats :: { [RdrNameGRHS] }
 	: gdpats gdpat			{ $2 : $1 }
@@ -1093,9 +1124,7 @@ deprec_var : var			{ $1 }
 	   | tycon			{ $1 }
 
 gtycon 	:: { RdrName }
-	: tycon				{ $1 }
-	| qtycon			{ $1 }
- 	| '(' tyconop ')'		{ $2 }
+	: qtycon			{ $1 }
  	| '(' qtyconop ')'		{ $2 }
 	| '(' ')'			{ unitTyCon_RDR }
 	| '(' '->' ')'			{ funTyCon_RDR }
@@ -1103,7 +1132,7 @@ gtycon 	:: { RdrName }
 	| '[:' ':]'			{ parrTyCon_RDR }
 	| '(' commas ')'		{ tupleTyCon_RDR $2 }
 
-gcon 	:: { RdrName }
+gcon 	:: { RdrName }	-- Data constructor namespace
 	: '(' ')'		{ unitCon_RDR }
 	| '[' ']'		{ nilCon_RDR }
 	| '(' commas ')'	{ tupleCon_RDR $2 }
@@ -1247,6 +1276,7 @@ varsym_no_minus :: { RdrName } -- varsym not including '-'
 special_sym :: { UserFS }
 special_sym : '!'	{ SLIT("!") }
 	    | '.' 	{ SLIT(".") }
+ 	    | '*' 	{ SLIT("*") }
 
 -----------------------------------------------------------------------------
 -- Literals
@@ -1290,11 +1320,13 @@ tycon 	:: { RdrName }
 tyconop	:: { RdrName }
 	: CONSYM		{ mkUnqual tcClsName $1 }
 
-qtycon :: { RdrName }	-- Just the qualified kind
+qtycon :: { RdrName }	-- Qualified or unqualified
 	: QCONID		{ mkQual tcClsName $1 }
+	| tycon			{ $1 }
 
-qtyconop :: { RdrName }	-- Just the qualified kind
+qtyconop :: { RdrName }	-- Qualified or unqualified
 	  : QCONSYM		{ mkQual tcClsName $1 }
+	  | tyconop		{ $1 }
 
 commas :: { Int }
 	: commas ','			{ $1 + 1 }

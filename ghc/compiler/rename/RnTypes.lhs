@@ -115,6 +115,10 @@ rnHsType doc (HsListTy ty)
   = rnHsType doc ty				`thenRn` \ ty' ->
     returnRn (HsListTy ty')
 
+rnHsType doc (HsKindSig ty k)
+  = rnHsType doc ty				`thenRn` \ ty' ->
+    returnRn (HsKindSig ty' k)
+
 rnHsType doc (HsPArrTy ty)
   = rnHsType doc ty				`thenRn` \ ty' ->
     returnRn (HsPArrTy ty')
