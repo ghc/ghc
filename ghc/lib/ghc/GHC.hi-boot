@@ -187,9 +187,16 @@ GHC
 --  indexOffAddr#
 indexCharOffAddr#
 indexIntOffAddr#
+indexAddrOffAddr#
 indexFloatOffAddr#
 indexDoubleOffAddr#
-indexAddrOffAddr#
+
+--  indexOffForeignObj#
+indexCharOffForeignObj#
+indexIntOffForeignObj#
+indexAddrOffForeignObj#
+indexFloatOffForeignObj#
+indexDoubleOffForeignObj#
   
   writeArray#
   writeCharArray#
