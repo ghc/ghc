@@ -111,14 +111,16 @@ hscMain
   -> DynFlags
   -> Module
   -> ModuleLocation		-- location info
-  -> Bool			-- source unchanged?
+  -> Bool			-- True <=> source unchanged
+  -> Bool			-- True <=> have an object file (for msgs only)
   -> Maybe ModIface		-- old interface, if available
   -> HomeSymbolTable		-- for home module ModDetails
   -> HomeIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain ghci_mode dflags mod location source_unchanged maybe_old_iface hst hit pcs
+hscMain ghci_mode dflags mod location source_unchanged have_object 
+	maybe_old_iface hst hit pcs
  = do {
       showPass dflags ("Checking old interface for hs = " 
 			++ show (ml_hs_file location)
@@ -137,13 +139,14 @@ hscMain ghci_mode dflags mod location source_unchanged maybe_old_iface hst hit p
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      what_next ghci_mode dflags mod location maybe_checked_iface
-                hst hit pcs_ch
+      what_next ghci_mode dflags have_object mod location 
+		maybe_checked_iface hst hit pcs_ch
       }}
 
 
 -- we definitely expect to have the old interface available
-hscNoRecomp ghci_mode dflags mod location (Just old_iface) hst hit pcs_ch
+hscNoRecomp ghci_mode dflags have_object 
+	    mod location (Just old_iface) hst hit pcs_ch
  | ghci_mode == OneShot
  = do {
       hPutStrLn stderr "compilation IS NOT required";
@@ -153,7 +156,8 @@ hscNoRecomp ghci_mode dflags mod location (Just old_iface) hst hit pcs_ch
  | otherwise
  = do {
       when (verbosity dflags >= 1) $
-		hPutStrLn stderr ("Skipping  " ++ compMsg mod location);
+		hPutStrLn stderr ("Skipping  " ++ 
+			compMsg have_object mod location);
 
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -173,19 +177,25 @@ hscNoRecomp ghci_mode dflags mod location (Just old_iface) hst hit pcs_ch
       return (HscNoRecomp pcs_tc new_details old_iface)
       }}}
 
-compMsg mod location =
+compMsg use_object mod location =
     mod_str ++ take (max 0 (16 - length mod_str)) (repeat ' ')
-    ++ " (" ++ unJust "hscRecomp" (ml_hs_file location) ++ ")"
+    ++" ( " ++ unJust "hscRecomp" (ml_hs_file location) ++ ", "
+    ++ (if use_object
+	  then unJust "hscRecomp" (ml_obj_file location)
+	  else "interpreted")
+    ++ " )"
  where mod_str = moduleUserString mod
 
 
-hscRecomp ghci_mode dflags mod location maybe_checked_iface hst hit pcs_ch
+hscRecomp ghci_mode dflags have_object 
+	  mod location maybe_checked_iface hst hit pcs_ch
  = do	{
-      	; when (verbosity dflags >= 1) $
-		hPutStrLn stderr ("Compiling " ++ compMsg mod location);
-
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
+
+      	; when (verbosity dflags >= 1) $
+		hPutStrLn stderr ("Compiling " ++ 
+			compMsg (not toInterp) mod location);
 
  	    -------------------
  	    -- PARSE

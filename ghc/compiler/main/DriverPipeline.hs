@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.54 2001/03/13 14:58:26 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.55 2001/03/15 11:26:27 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -483,6 +483,7 @@ run_phase Hsc basename suff input_fn output_fn
 			  mod
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
+			  False
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
 			  emptyModuleEnv -- HomeIfaceTable
@@ -842,7 +843,8 @@ preprocess filename =
 
 compile :: GhciMode                -- distinguish batch from interactive
         -> ModSummary              -- summary, including source
-	-> Bool			   -- source unchanged?
+	-> Bool			   -- True <=> source unchanged
+	-> Bool			   -- True <=> have object
         -> Maybe ModIface          -- old interface, if available
         -> HomeSymbolTable         -- for home module ModDetails
 	-> HomeIfaceTable	   -- for home module Ifaces
@@ -860,7 +862,8 @@ data CompResult
    | CompErrs PersistentCompilerState	-- updated PCS
 
 
-compile ghci_mode summary source_unchanged old_iface hst hit pcs = do 
+compile ghci_mode summary source_unchanged have_object 
+	old_iface hst hit pcs = do 
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
 
@@ -891,7 +894,7 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
    -- run the compiler
    hsc_result <- hscMain ghci_mode dyn_flags{ hscOutName = output_fn } 
 			 (ms_mod summary) location
-			 source_unchanged old_iface hst hit pcs
+			 source_unchanged have_object old_iface hst hit pcs
 
    case hsc_result of
       HscFail pcs -> return (CompErrs pcs)

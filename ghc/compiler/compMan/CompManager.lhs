@@ -801,7 +801,7 @@ upsweep_mod :: GhciMode
             -> [ModuleName]
             -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
+upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
    = do 
         let mod_name = name_of_summary summary1
 	let verb = verbosity dflags
@@ -813,54 +813,40 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
 
             source_unchanged = isJust maybe_old_linkable
 
+	    reachable_only = filter (/= (name_of_summary summary1)) 
+				reachable_inc_me
+
 	   -- in interactive mode, all home modules below us *must* have an
 	   -- interface in the HIT.  We never demand-load home interfaces in
 	   -- interactive mode.
             (hst1_strictDC, hit1_strictDC)
                = ASSERT(ghci_mode == Batch || 
-		        all (`elemUFM` hit1) reachable_from_here)
-		 retainInTopLevelEnvs 
-                    (filter (/= (name_of_summary summary1)) reachable_from_here)
-                    (hst1,hit1)
+			all (`elemUFM` hit1) reachable_only)
+		 retainInTopLevelEnvs reachable_only (hst1,hit1)
 
             old_linkable 
                = unJust "upsweep_mod:old_linkable" maybe_old_linkable
 
+	    have_object 
+	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
+	       | otherwise = False
+
         compresult <- compile ghci_mode summary1 source_unchanged
-                         old_iface hst1_strictDC hit1_strictDC pcs1
+			 have_object old_iface hst1_strictDC hit1_strictDC pcs1
 
         case compresult of
 
-           -- Compilation "succeeded", but didn't return a new
-           -- linkable, meaning that compilation wasn't needed, and the
-           -- new details were manufactured from the old iface.
-           CompOK pcs2 new_details new_iface Nothing
-              -> do let hst2         = addToUFM hst1 mod_name new_details
-                        hit2         = addToUFM hit1 mod_name new_iface
-                        threaded2    = CmThreaded pcs2 hst2 hit2
-
-		    if ghci_mode == Interactive && verb >= 1 then
-		      -- if we're using an object file, tell the user
-		      case old_linkable of
-			(LM _ _ objs@(DotO _:_))
-			   -> do hPutStrLn stderr (showSDoc (space <> 
-				   parens (hsep (text "using": 
-					punctuate comma 
-					  [ text o | DotO o <- objs ]))))
-			_ -> return ()
-		      else
-			return ()
-
-                    return (threaded2, Just old_linkable)
-
-           -- Compilation really did happen, and succeeded.  A new
-           -- details, iface and linkable are returned.
-           CompOK pcs2 new_details new_iface (Just new_linkable)
+           -- Compilation "succeeded", and may or may not have returned a new
+           -- linkable (depending on whether compilation was actually performed
+	   -- or not).
+           CompOK pcs2 new_details new_iface maybe_new_linkable
               -> do let hst2      = addToUFM hst1 mod_name new_details
                         hit2      = addToUFM hit1 mod_name new_iface
                         threaded2 = CmThreaded pcs2 hst2 hit2
 
-	            return (threaded2, Just new_linkable)
+                    return (threaded2, if isJust maybe_new_linkable
+					  then maybe_new_linkable
+					  else Just old_linkable)
 
            -- Compilation failed.  compile may still have updated
            -- the PCS, tho.
