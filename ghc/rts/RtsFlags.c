@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.6 1999/01/21 10:31:48 simonm Exp $
+ * $Id: RtsFlags.c,v 1.7 1999/01/26 16:16:28 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -67,6 +67,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
+    RtsFlags.GcFlags.steps              = 2;
 
     RtsFlags.GcFlags.forceGC		= rtsFalse;
     RtsFlags.GcFlags.forcingInterval	= 5000000; /* 5MB (or words?) */
@@ -214,6 +215,7 @@ usage_text[] = {
 "  -M<size> Sets the maximum heap size (default 64M)  Egs: -H256k -H1G",
 "  -m<n>%   Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
+"  -T<n>    Number of steps in younger generations (default: 2)",
 "  -s<file> Summary GC statistics   (default file: <program>.stat)",
 "  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
 "",
@@ -265,8 +267,6 @@ usage_text[] = {
 "  -r<file>  Produce reduction profiling statistics (with -rstderr for stderr)",
 "",
 #endif
-"  -T<level> Trace garbage collection execution (debugging)",
-"",
 # ifdef PAR
 "  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
 /* NB: the -N<n> is implemented by the driver!! */
@@ -480,6 +480,13 @@ error = rtsTrue;
 	      case 'G':
 		RtsFlags.GcFlags.generations = decode(rts_argv[arg]+2);
 		if (RtsFlags.GcFlags.generations < 1) {
+		  bad_option(rts_argv[arg]);
+		}
+		break;
+
+	      case 'T':
+		RtsFlags.GcFlags.steps = decode(rts_argv[arg]+2);
+		if (RtsFlags.GcFlags.steps < 1) {
 		  bad_option(rts_argv[arg]);
 		}
 		break;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.7 1999/01/26 11:12:46 simonm Exp $
+ * $Id: PrimOps.hc,v 1.8 1999/01/26 16:16:25 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -871,3 +871,4 @@ FN_(makeStableNameZh_fast)
 }
 
 #endif /* COMPILER */
+

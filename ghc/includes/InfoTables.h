@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.6 1999/01/26 11:12:55 simonm Exp $
+ * $Id: InfoTables.h,v 1.7 1999/01/26 16:16:21 simonm Exp $
  * 
  * Info Tables
  *
@@ -85,18 +85,32 @@ typedef struct {
 typedef enum {
 
     INVALID_OBJECT /* Object tag 0 raises an internal error */
+
     , CONSTR
-    /* CONSTR_p_np */
+    , CONSTR_1_0
+    , CONSTR_0_1
+    , CONSTR_2_0
+    , CONSTR_1_1
+    , CONSTR_0_2
     , CONSTR_INTLIKE
     , CONSTR_CHARLIKE
     , CONSTR_STATIC
     , CONSTR_NOCAF_STATIC
 
     , FUN
+    , FUN_1_0
+    , FUN_0_1
+    , FUN_2_0
+    , FUN_1_1
+    , FUN_0_2
     , FUN_STATIC
 
     , THUNK
-    /* THUNK_p_np */
+    , THUNK_1_0
+    , THUNK_0_1
+    , THUNK_2_0
+    , THUNK_1_1
+    , THUNK_0_2
     , THUNK_STATIC
     , THUNK_SELECTOR
 
@@ -176,11 +190,26 @@ typedef enum {
 /*				    HNF  BTM   NS  STA  THU MUT UPT SRT */
 				                                    
 #define FLAGS_CONSTR  		   (_HNF|     _NS                        )	
+#define FLAGS_CONSTR_1_0	   (_HNF|     _NS                        )	
+#define FLAGS_CONSTR_0_1	   (_HNF|     _NS                        )	
+#define FLAGS_CONSTR_2_0	   (_HNF|     _NS                        )	
+#define FLAGS_CONSTR_1_1	   (_HNF|     _NS                        )	
+#define FLAGS_CONSTR_0_2	   (_HNF|     _NS                        )	
 #define FLAGS_CONSTR_STATIC	   (_HNF|     _NS|_STA                   )	
 #define FLAGS_CONSTR_NOCAF_STATIC  (_HNF|     _NS|_STA                   )	
 #define FLAGS_FUN		   (_HNF|     _NS|                  _SRT )	
+#define FLAGS_FUN_1_0		   (_HNF|     _NS                        )	
+#define FLAGS_FUN_0_1		   (_HNF|     _NS                        )	
+#define FLAGS_FUN_2_0		   (_HNF|     _NS                        )	
+#define FLAGS_FUN_1_1		   (_HNF|     _NS                        )	
+#define FLAGS_FUN_0_2		   (_HNF|     _NS                        )	
 #define FLAGS_FUN_STATIC	   (_HNF|     _NS|_STA|             _SRT )	
 #define FLAGS_THUNK		   (     _BTM|         _THU|        _SRT )	
+#define FLAGS_THUNK_1_0		   (     _BTM|         _THU|        _SRT )	
+#define FLAGS_THUNK_0_1		   (     _BTM|         _THU|        _SRT )	
+#define FLAGS_THUNK_2_0		   (     _BTM|         _THU|        _SRT )	
+#define FLAGS_THUNK_1_1		   (     _BTM|         _THU|        _SRT )	
+#define FLAGS_THUNK_0_2		   (     _BTM|         _THU|        _SRT )	
 #define FLAGS_THUNK_STATIC	   (     _BTM|    _STA|_THU|        _SRT )	
 #define FLAGS_THUNK_SELECTOR	   (     _BTM|         _THU|        _SRT )	
 #define FLAGS_BCO		   (_HNF|     _NS                        )	

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.6 1999/01/26 11:12:55 simonm Exp $
+ * $Id: ClosureTypes.h,v 1.7 1999/01/26 16:16:19 simonm Exp $
  * 
  * Closure Type Constants
  *
@@ -13,52 +13,65 @@
 /* Object tag 0 raises an internal error */
 #define INVALID_OBJECT          0
 #define CONSTR                  1
-/* #define CONSTR_p_np */       
-#define CONSTR_INTLIKE	        2
-#define CONSTR_CHARLIKE	        3
-#define CONSTR_STATIC	        4
-#define CONSTR_NOCAF_STATIC     5
-#define FUN		        6
-#define FUN_STATIC	        7
-#define THUNK		        8
-/* #define THUNK_p_np */        
-#define THUNK_STATIC	        9
-#define THUNK_SELECTOR	        10
-#define BCO		        11
-#define AP_UPD		        12
-#define PAP			13
-#define IND		        14
-#define IND_OLDGEN	        15
-#define IND_PERM	        16
-#define IND_OLDGEN_PERM	        17
-#define IND_STATIC	        18
-#define CAF_UNENTERED           19
-#define CAF_ENTERED		20
-#define CAF_BLACKHOLE		21
-#define RET_BCO                 22
-#define RET_SMALL	        23
-#define RET_VEC_SMALL	        24
-#define RET_BIG		        25
-#define RET_VEC_BIG	        26
-#define RET_DYN		        27
-#define UPDATE_FRAME	        28
-#define CATCH_FRAME	        29
-#define STOP_FRAME	        30
-#define SEQ_FRAME	        31
-#define BLACKHOLE	        32
-#define BLACKHOLE_BQ	        33
-#define MVAR		        34
-#define ARR_WORDS	        35
-#define MUT_ARR_WORDS	        36
-#define MUT_ARR_PTRS	        37
-#define MUT_ARR_PTRS_FROZEN     38
-#define MUT_VAR		        49
-#define WEAK		        40
-#define FOREIGN		        41
-#define STABLE_NAME	        42
-#define TSO		        43
-#define BLOCKED_FETCH	        44
-#define FETCH_ME                45
-#define EVACUATED               46
+#define	CONSTR_1_0		2
+#define	CONSTR_0_1		3
+#define	CONSTR_2_0		4
+#define	CONSTR_1_1		5
+#define	CONSTR_0_2		6
+#define CONSTR_INTLIKE	        7 
+#define CONSTR_CHARLIKE	        8 
+#define CONSTR_STATIC	        9 
+#define CONSTR_NOCAF_STATIC     10
+#define FUN		        11
+#define	FUN_1_0		  	12
+#define	FUN_0_1		  	13
+#define	FUN_2_0		  	14
+#define	FUN_1_1		  	15
+#define	FUN_0_2			16
+#define FUN_STATIC	        17
+#define THUNK		        18
+#define	THUNK_1_0	  	19
+#define	THUNK_0_1	  	20
+#define	THUNK_2_0	  	21
+#define	THUNK_1_1	  	22
+#define	THUNK_0_2		23
+#define THUNK_STATIC	        24
+#define THUNK_SELECTOR	        25
+#define BCO		        26
+#define AP_UPD		        27
+#define PAP			28
+#define IND		        29
+#define IND_OLDGEN	        30
+#define IND_PERM	        31
+#define IND_OLDGEN_PERM	        32
+#define IND_STATIC	        33
+#define CAF_UNENTERED           34
+#define CAF_ENTERED		35
+#define CAF_BLACKHOLE		36
+#define RET_BCO                 37
+#define RET_SMALL	        38
+#define RET_VEC_SMALL	        39
+#define RET_BIG		        40
+#define RET_VEC_BIG	        41
+#define RET_DYN		        42
+#define UPDATE_FRAME	        43
+#define CATCH_FRAME	        44
+#define STOP_FRAME	        45
+#define SEQ_FRAME	        46
+#define BLACKHOLE	        47
+#define BLACKHOLE_BQ	        48
+#define MVAR		        49
+#define ARR_WORDS	        50
+#define MUT_ARR_WORDS	        51
+#define MUT_ARR_PTRS	        52
+#define MUT_ARR_PTRS_FROZEN     53
+#define MUT_VAR		        54
+#define WEAK		        55
+#define FOREIGN		        56
+#define STABLE_NAME	        57
+#define TSO		        58
+#define BLOCKED_FETCH	        59
+#define FETCH_ME                60
+#define EVACUATED               61
 
 #endif CLOSURETYPES_H

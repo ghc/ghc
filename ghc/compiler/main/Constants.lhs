@@ -18,6 +18,9 @@ module Constants (
 	mAX_CONTEXT_REDUCTION_DEPTH,
 	mAX_TUPLE_SIZE,
 
+	mAX_SPEC_THUNK_SIZE,
+	mAX_SPEC_FUN_SIZE,
+	mAX_SPEC_CONSTR_SIZE,
 	mAX_SPEC_SELECTEE_SIZE,
 	mAX_SPEC_AP_SIZE,
 
@@ -106,6 +109,11 @@ uNFOLDING_KEENESS_FACTOR      = ( 2.0 :: Float)
 \end{code}
 
 \begin{code}
+
+-- specialised fun/thunk/constr closure types
+mAX_SPEC_THUNK_SIZE   = (MAX_SPEC_THUNK_SIZE :: Int)
+mAX_SPEC_FUN_SIZE     = (MAX_SPEC_FUN_SIZE :: Int)
+mAX_SPEC_CONSTR_SIZE  = (MAX_SPEC_CONSTR_SIZE :: Int)
 
 -- pre-compiled thunk types
 mAX_SPEC_SELECTEE_SIZE	= (MAX_SPEC_SELECTEE_SIZE :: Int)

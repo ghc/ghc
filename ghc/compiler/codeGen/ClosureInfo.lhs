@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.32 1998/12/18 17:40:54 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.33 1999/01/26 16:16:33 simonm Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -59,7 +59,8 @@ import AbsCSyn		( MagicId, node, VirtualHeapOffset, HeapOffset )
 import StgSyn
 import CgMonad
 
-import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject )
+import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
+			  mAX_SPEC_FUN_SIZE, mAX_SPEC_THUNK_SIZE, mAX_SPEC_CONSTR_SIZE )
 import CgRetConv	( assignRegs )
 import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkInfoTableLabel,
@@ -393,18 +394,19 @@ layOutStaticClosure name kind_fn things lf_info
     (tot_wds,		 -- #ptr_wds + #nonptr_wds
      ptr_wds,		 -- #ptr_wds
      things_w_offsets) = mkVirtHeapOffsets (StaticRep bot bot bot) kind_fn things
+
     -- constructors with no pointer fields will definitely be NOCAF things.
     -- this is a compromise until we can generate both kinds of constructor
     -- (a normal static kind and the NOCAF_STATIC kind).
     closure_type = case lf_info of
 			LFCon _ _ | ptr_wds == 0 -> CONSTR_NOCAF
-			_ -> getClosureType lf_info
+			_ -> getStaticClosureType lf_info
 
     bot = panic "layoutStaticClosure"
 
 layOutStaticNoFVClosure :: Name -> LambdaFormInfo -> ClosureInfo
 layOutStaticNoFVClosure name lf_info
-  = MkClosureInfo name lf_info (StaticRep 0 0 (getClosureType lf_info))
+  = MkClosureInfo name lf_info (StaticRep 0 0 (getStaticClosureType lf_info))
 \end{code}
 
 %************************************************************************
@@ -422,24 +424,48 @@ chooseDynSMRep
 chooseDynSMRep lf_info tot_wds ptr_wds
   = let
 	 nonptr_wds = tot_wds - ptr_wds
-	 closure_type = getClosureType lf_info
+	 closure_type = getClosureType tot_wds ptr_wds nonptr_wds lf_info
     in
     case lf_info of
 	LFTuple _ True -> ConstantRep
 	LFCon _ True   -> ConstantRep
 	_	       -> GenericRep ptr_wds nonptr_wds closure_type	
 
-getClosureType :: LambdaFormInfo -> ClosureType
-getClosureType lf_info =
+getStaticClosureType :: LambdaFormInfo -> ClosureType
+getStaticClosureType lf_info =
     case lf_info of
         LFCon con True       -> CONSTR_NOCAF
-	LFCon con False      -> CONSTR 
+	LFCon con False      -> CONSTR
   	LFReEntrant _ _ _ _  -> FUN
 	LFTuple _ _	     -> CONSTR
 	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
 	LFThunk _ _ _ _ _    -> THUNK
 	_                    -> panic "getClosureType"
-		-- ToDo: could be anything else here?
+
+getClosureType :: Int -> Int -> Int -> LambdaFormInfo -> ClosureType
+getClosureType tot_wds ptrs nptrs lf_info =
+    case lf_info of
+        LFCon con True       -> CONSTR_NOCAF
+
+	LFCon con False 
+		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
+		| otherwise -> CONSTR
+
+  	LFReEntrant _ _ _ _ 
+		| tot_wds > 0 && tot_wds <= mAX_SPEC_FUN_SIZE -> FUN_p_n ptrs nptrs
+		| otherwise -> FUN
+
+	LFTuple _ _
+		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
+		| otherwise -> CONSTR
+
+	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
+
+	LFThunk _ _ _ _ _
+		| tot_wds > 0 && tot_wds <= mAX_SPEC_THUNK_SIZE -> THUNK_p_n ptrs nptrs
+		| otherwise -> THUNK
+
+	_                    -> panic "getClosureType"
 \end{code}
 
 %************************************************************************

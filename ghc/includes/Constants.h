@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.3 1999/01/21 10:31:41 simonm Exp $
+ * $Id: Constants.h,v 1.4 1999/01/26 16:16:20 simonm Exp $
  *
  * Constants
  *
@@ -87,6 +87,12 @@
  */
 
 #define MAX_SPEC_AP_SIZE       8
+
+/* Specialised FUN/THUNK/CONSTR closure types */
+
+#define MAX_SPEC_THUNK_SIZE    2
+#define MAX_SPEC_FUN_SIZE      2
+#define MAX_SPEC_CONSTR_SIZE   2
 
 /* -----------------------------------------------------------------------------
    Update Frame Layout

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.12 1999/01/21 10:31:56 simonm Exp $
+% $Id: CgHeapery.lhs,v 1.13 1999/01/26 16:16:33 simonm Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -21,7 +21,7 @@ import CLabel
 import CgMonad
 
 import CgStackery	( getFinalStackHW, mkTaggedStkAmodes, mkTagAssts )
-import SMRep		( fixedHdrSize, getSMRepStr )
+import SMRep		( fixedHdrSize )
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
 			  initHeapUsage
@@ -446,7 +446,6 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
 
 	-- GENERATE CC PROFILING MESSAGES
     costCentresC SLIT("CCS_ALLOC") [blame_cc, mkIntCLit closure_size]
-	-- CLitLit (_PK_ type_str) IntRep] -- not necessary? --SDM
 					 		`thenC`
 
 	-- BUMP THE VIRTUAL HEAP POINTER
@@ -457,7 +456,6 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
   where
     closure_size = closureSize closure_info
     slop_size    = slopSize closure_info
-    type_str     = getSMRepStr (closureSMRep closure_info)
 
 -- Avoid hanging on to anything in the CC field when we're not profiling.
 

@@ -43,7 +43,7 @@ import Const		( Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
-import SMRep		( getSMRepStr )
+import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, UniqSet
@@ -450,7 +450,7 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast srt cl_descr) _
 		  else empty,
 		  type_str ]
 
-    type_str = text (getSMRepStr (closureSMRep cl_info))
+    type_str = pprSMRep (closureSMRep cl_info)
 
     pp_descr = hcat [char '"', text (stringToC cl_descr), char '"']
     pp_type  = hcat [char '"', text (stringToC (closureTypeDescr cl_info)), char '"']

@@ -10,7 +10,7 @@ Other modules should access this info through ClosureInfo.
 module SMRep (
 	SMRep(..), ClosureType(..),
 	isConstantRep, isStaticRep,
-	fixedHdrSize, arrHdrSize, fixedItblSize, getSMRepStr, getClosureTypeStr
+	fixedHdrSize, arrHdrSize, fixedItblSize, pprSMRep
 
 #ifndef OMIT_NATIVE_CODEGEN
 	, getSMRepClosureTypeInt
@@ -67,9 +67,12 @@ data SMRep
 
 data ClosureType
     = CONSTR
+    | CONSTR_p_n Int Int
     | CONSTR_NOCAF
     | FUN
+    | FUN_p_n Int Int
     | THUNK
+    | THUNK_p_n Int Int
     | THUNK_SELECTOR
   deriving (Eq,Ord)
 
@@ -135,18 +138,22 @@ instance Text SMRep where
 	   ConstantRep				 -> "")
 
 instance Outputable SMRep where
-    ppr rep = text (show rep)
+    ppr rep = pprSMRep rep
 
-getSMRepStr (GenericRep _ _ t) 	   = getClosureTypeStr t
-getSMRepStr (StaticRep _ _ t)  	   = getClosureTypeStr t ++ "_STATIC"
-getSMRepStr ConstantRep        	   = "CONSTR_NOCAF_STATIC"
-getSMRepStr BlackHoleRep       	   = "BLACKHOLE"
+pprSMRep :: SMRep -> SDoc
+pprSMRep (GenericRep _ _ t) 	= pprClosureType t
+pprSMRep (StaticRep _ _ t)  	= pprClosureType t <> ptext SLIT("_STATIC")
+pprSMRep ConstantRep        	= ptext SLIT("CONSTR_NOCAF_STATIC")
+pprSMRep BlackHoleRep       	= ptext SLIT("BLACKHOLE")
 
-getClosureTypeStr CONSTR	   = "CONSTR"
-getClosureTypeStr CONSTR_NOCAF	   = "CONSTR_NOCAF"
-getClosureTypeStr FUN		   = "FUN"
-getClosureTypeStr THUNK		   = "THUNK"
-getClosureTypeStr THUNK_SELECTOR   = "THUNK_SELECTOR"
+pprClosureType CONSTR	   	= ptext SLIT("CONSTR")
+pprClosureType (CONSTR_p_n p n) = ptext SLIT("CONSTR_") <> int p <> char '_' <> int n
+pprClosureType CONSTR_NOCAF	= ptext SLIT("CONSTR_NOCAF")
+pprClosureType FUN		= ptext SLIT("FUN")
+pprClosureType (FUN_p_n p n)	= ptext SLIT("FUN_") <> int p <> char '_' <> int n
+pprClosureType THUNK		= ptext SLIT("THUNK")
+pprClosureType (THUNK_p_n p n)  = ptext SLIT("THUNK_") <> int p <> char '_' <> int n
+pprClosureType THUNK_SELECTOR   = ptext SLIT("THUNK_SELECTOR")
 
 #ifndef OMIT_NATIVE_CODEGEN
 getSMRepClosureTypeInt :: SMRep -> Int

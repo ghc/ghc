@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.6 1999/01/21 10:31:51 simonm Exp $
+ * $Id: Storage.c,v 1.7 1999/01/26 16:16:30 simonm Exp $
  *
  * Storage manager front end
  *
@@ -82,9 +82,10 @@ initStorage (void)
 
     /* set up all except the oldest generation with 2 steps */
     for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
-      generations[g].n_steps = 2;
-      generations[g].steps  = stgMallocBytes (2 * sizeof(struct _step),
-					      "initStorage: steps");
+      generations[g].n_steps = RtsFlags.GcFlags.steps;
+      generations[g].steps  = 
+	stgMallocBytes (RtsFlags.GcFlags.steps * sizeof(struct _step),
+			"initStorage: steps");
     }
     
   } else {
@@ -112,14 +113,10 @@ initStorage (void)
   
   /* Set up the destination pointers in each younger gen. step */
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      step = &generations[g].steps[s];
-      if ( s == 1 ) {
-	step->to = &generations[g+1].steps[0];
-      } else {
-	step->to = &generations[g].steps[s+1];
-      }
+    for (s = 0; s < generations[g].n_steps-1; s++) {
+      generations[g].steps[s].to = &generations[g].steps[s+1];
     }
+    generations[g].steps[s].to = &generations[g+1].steps[0];
   }
   
   /* The oldest generation has one step and its destination is the
