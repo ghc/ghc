@@ -1,0 +1,47 @@
+Package {
+        name           = PACKAGE,
+	auto	       = False,
+#ifdef INSTALLING
+	import_dirs    = [ "$libdir/ghc-package" ],
+#else
+	import_dirs    = [ FPTOOLS_TOP_ABS"/ghc/compiler/stage1/utils",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/basicTypes",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/types",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/hsSyn",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/prelude",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/rename",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/typecheck",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/deSugar",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/coreSyn",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/specialise",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/simplCore",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/stranal",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/stgSyn",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/simplStg",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/codeGen",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/absCSyn",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/main",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/profiling",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/parser",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cprAnalysis",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/compMan",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/ndpFlatten",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cbits",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/iface",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/nativeGen" ],
+#endif
+        source_dirs    = [],
+#ifdef INSTALLING
+        library_dirs   = [ "$libdir" ],
+#else
+        library_dirs   = [ FPTOOLS_TOP_ABS"/ghc/compiler" ],
+#endif
+
+        hs_libraries    = [ LIBRARY ],
+	extra_libraries = [],
+        c_includes      = [],
+        package_deps    = [ PACKAGE_DEPS ],
+        extra_ghc_opts  = [],
+        extra_cc_opts   = [],
+        extra_ld_opts   = []
+}
