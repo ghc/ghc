@@ -36,6 +36,15 @@ import RdrHsSyn		( RdrNameDeprecation, RdrNameRuleDecl, RdrNameFixitySig,
 
 
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The main compiler interface}
+%*									*
+%************************************************************************
+
+
 \begin{code}
 cmCompile :: Finder                  -- to find modules
           -> ModSummary              -- summary, including source
@@ -69,12 +78,6 @@ data CompResult
               [SDoc]                  -- errors
               [SDoc]                  -- warnings
 
-emptyPCS :: IO PersistentCompilerState
-emptyPCS = return (PersistentCompilerState 
-                      { pcs_modmap = emptyFM,
-                        pcs_pit    = emptyPIT,
-                        pcs_pst    = emptyPST,
-                        pcs_hp     = emptyHoldingPen })
 
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
@@ -83,25 +86,88 @@ type ModuleEnv a = UniqFM a   -- Domain is Module
 type HomeModMap         = FiniteMap ModuleName Module -- domain: home mods only
 type HomeSymbolTable    = ModuleEnv ModDetails        -- ditto
 type HomeInterfaceTable = ModuleEnv ModIFace
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Module details}
+%*									*
+%************************************************************************
+
+A @ModDetails@ summarises everything we know about a compiled module
+
+\begin{code}
+data ModDetails
+   = ModDetails {
+        moduleExports :: Avails,		-- What it exports
+        moduleEnv     :: GlobalRdrEnv,		-- Its top level environment
+
+        fixityEnv     :: NameEnv Fixity,
+	deprecEnv     :: NameEnv DeprecTxt,
+        typeEnv       :: NameEnv TyThing,	-- TyThing is in TcEnv.lhs
+
+        instEnv       :: InstEnv,
+        ruleEnv       :: IdEnv [CoreRule]	-- Domain includes Ids from other modules
+     }
+\end{code}
+
+Auxiliary definitions
+
+\begin{code}
+type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
+
+type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
+					-- These only get reported on lookup,
+					-- not on construction
+
+data GenAvailInfo name	= Avail name	 -- An ordinary identifier
+			| AvailTC name 	 -- The name of the type or class
+				  [name] -- The available pieces of type/class.
+					 -- NB: If the type or class is itself
+					 -- to be in scope, it must be in this list.
+					 -- Thus, typically: AvailTC Eq [Eq, ==, /=]
+			deriving( Eq )
+			-- Equality used when deciding if the interface has changed
+
+type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
+type AvailInfo    = GenAvailInfo Name
+type RdrAvailInfo = GenAvailInfo OccName
+type Avails	  = [AvailInfo]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The persistent compiler state}
+%*									*
+%************************************************************************
+
+\begin{code}
 data PersistentCompilerState 
-   = PersistentCompilerState {
-        pcs_modmap :: PackageModMap,         -- domain: package mods only
-        pcs_pit    :: PackageInterfaceTable, -- Package interface table
-        pcs_pst    :: PackageSymbolTable,    -- Package symbol table
-        pcs_hp     :: HoldingPen             -- pre slurped interface bits and pieces
+   = PCS {
+        pcsPST    :: PackageSymbolTable,	-- Domain = non-home-package modules
+        pcsHP     :: HoldingPen, 		-- Pre-slurped interface bits and pieces
+	pcsNS	  :: NameSupply			-- Allocate uniques for names
      }
 
-type PackageModMap         = FiniteMap ModuleName Module
-type PackageInterfaceTable = ModuleEnv ModIFace
-type PackageSymbolTable    = ModuleEnv ModDetails
+type PackageSymbolTable = ModuleEnv ModDetails
 
-emptyPIT :: PackageInterfaceTable
-emptyPIT = emptyFM
+data NameSupply
+ = NS { nsUniqs  :: UniqSupply,
+	nsNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
+	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
+   }
+\end{code}
 
-emptyPST :: PackageSymbolTable
-emptyPST = emptyFM
 
+%************************************************************************
+%*									*
+\subsection{ModIface}
+%*									*
+%************************************************************************
+
+\begin{code}
 -- ModIFace is nearly the same as RnMonad.ParsedIface.
 -- Right now it's identical :)
 data ModIFace 
@@ -119,31 +185,4 @@ data ModIFace
         mi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
      }
 
-data ModDetails
-   = ModDetails {
-        moduleExports :: Avails,
-        moduleEnv     :: GlobalRdrEnv,           -- == FM RdrName [Name]
-        typeEnv       :: FiniteMap Name TyThing, -- TyThing is in TcEnv.lhs
-        instEnv       :: InstEnv,
-        fixityEnv     :: FiniteMap Name Fixity,
-        ruleEnv       :: FiniteMap Id [CoreRule]
-     }
-
--- This should eventually replace RnMonad.Ifaces
-data HoldingPen
-   = HoldingPen {
-        iDecls :: DeclsMap,     -- A single, global map of Names to decls
-
-        iInsts :: IfaceInsts,
-        -- The as-yet un-slurped instance decls; this bag is depleted when we
-        -- slurp an instance decl so that we don't slurp the same one twice.
-        -- Each is 'gated' by the names that must be available before
-        -- this instance decl is needed.
-
-        iRules :: IfaceRules
-        -- Similar to instance decls, only for rules
-     }
-
-emptyHoldingPen :: HoldingPen
-emptyHoldingPen = error "emptyHoldingPen:unimp"
 \end{code}
