@@ -565,10 +565,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 		   | otherwise    = new_bndr_info `setUnfoldingInfo` unfolding
 	unfolding = mkUnfolding (isTopLevel top_lvl) new_rhs
 
-		-- Don't fiddle with the IdInfo of a constructor
-		-- wrapper or other GlobalId.
-	final_id | isLocalId new_bndr = new_bndr `setIdInfo` info_w_unf
-		 | otherwise	      = new_bndr
+	final_id = new_bndr `setIdInfo` info_w_unf
     in
 		-- These seqs forces the Id, and hence its IdInfo,
 		-- and hence any inner substitutions
