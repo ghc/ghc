@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.50 2001/07/17 03:53:25 qrczak Exp $
+ * $Id: Linker.c,v 1.51 2001/07/20 00:44:33 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -151,6 +151,10 @@ typedef struct _RtsSymbolVal {
       SymX(GetExitCodeProcess)                  \
       SymX(WaitForSingleObject)                 \
       SymX(CreateProcessA)                      \
+      Sym(__divdi3)                             \
+      Sym(__udivdi3)                            \
+      Sym(__moddi3)                             \
+      Sym(__umoddi3)                            \
       SymX(_errno)
 #endif
 
