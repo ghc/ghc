@@ -62,8 +62,8 @@ include-dirs:		FPTOOLS_TOP_ABS"/ghc/includes"
 
 includes:		Stg.h
 depends:	 	
-extra-hugs-opts:
-extra-cc-opts:
+hugs-options:
+cc-options:
 
 ld-options:
 #ifdef LEADING_UNDERSCORE
@@ -139,9 +139,9 @@ ld-options:
 framework-dirs:
 
 #ifdef HAVE_FRAMEWORK_HASKELLSUPPORT
-extra-frameworks:	"HaskellSupport"
+frameworks:	"HaskellSupport"
 #else
-extra-frameworks:
+frameworks:
 #endif
 
 haddock-interfaces:
