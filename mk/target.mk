@@ -413,8 +413,18 @@ endif
 ifneq "$(SCRIPT_LINK)" ""
 all :: $(SCRIPT_LINK)
 
+# The use of -L is non-standard, but I've yet to find
+# an implementation of `test' that doesn't like it.
 $(SCRIPT_LINK) : $(SCRIPT_PROG)
-	$(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK)
+	@if ( test ! -f $(SCRIPT_LINK) -o -L $(SCRIPT_LINK) ); then \
+	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
+	   $(RM) $(SCRIPT_LINK); \
+	   $(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK); \
+	 else \
+	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) failed: \`$(SCRIPT_LINK)' already exists"; \
+	   echo "Perhaps remove \`$(SCRIPT_LINK)' manually?"; \
+	   exit 1; \
+	 fi;
 endif
 
 
