@@ -200,7 +200,7 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
     res <- allocWords (``sizeof(time_t)'')
     ptr <- _ccall_ toClockSec year mon day hour min sec 0 res 
     let (A# ptr#) = ptr
-    if ptr /= ``NULL'' 
+    if ptr /= nullAddr
      then let
 	    diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
 	    diff_psec = psec
@@ -213,14 +213,14 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 diffClockTimes tod_a tod_b =
   let
-   CalendarTime year_a mon_a day_a hour_a min_a sec_a psec_a _ _ _ _ _ = toCalendarTime tod_a
-   CalendarTime year_b mon_b day_b hour_b min_b sec_b psec_b _ _ _ _ _ = toCalendarTime tod_b
+   CalendarTime year_a mon_a day_a hour_a min_a sec_a psec_a _ _ _ _ _ = toUTCTime tod_a
+   CalendarTime year_b mon_b day_b hour_b min_b sec_b psec_b _ _ _ _ _ = toUTCTime tod_b
   in
   TimeDiff (year_a - year_b) 
 	   (mon_a  - mon_b) 
 	   (day_a  - day_b)
 	   (hour_a - hour_b)
-	   (min_b  - min_a)
+	   (min_a  - min_b)
 	   (sec_a  - sec_b)
 	   (psec_a - psec_b)
 \end{code}
@@ -233,14 +233,14 @@ converts {\em l} into the corresponding internal @ClockTime@.  The
 ignored.
 
 \begin{code}
-toCalendarTime :: ClockTime -> CalendarTime
-toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
+toCalendarTime :: ClockTime -> IO CalendarTime
+toCalendarTime (TOD sec@(J# a# s# d#) psec) = do
     res    <- allocWords (``sizeof(struct tm)''::Int)
     zoneNm <- allocChars 32
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
     tm     <- _ccall_ toLocalTime (I# s#) (ByteArray bottom d#) res
-    if tm == (``NULL''::Addr) 
-     then error "Time.toCalendarTime: out of range"
+    if tm == nullAddr
+     then constructErrorAndFail "Time.toCalendarTime: out of range"
      else do
        sec   <-  _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
        min   <-  _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm
