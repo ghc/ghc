@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.17 2004/11/21 22:25:24 desrt Exp $
+ * $Id: MachRegs.h,v 1.18 2005/01/13 16:04:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -15,9 +15,15 @@
  * only in here please.
  */
 
-/* define NO_REGS to omit register declarations - used in RTS C code
- * that needs all the STG definitions but not the global register 
- * settings.
+/* 
+ * Defining NO_REGS causes no global registers to be used.  NO_REGS is
+ * typically defined by GHC, via a command-line option passed to gcc,
+ * when the -funregisterised flag is given.
+ *
+ * NB. When NO_REGS is on, calling & return conventions may be
+ * different.  For example, all function arguments will be passed on
+ * the stack, and components of an unboxed tuple will be returned on
+ * the stack rather than in registers.
  */
 #ifndef NO_REGS
 
