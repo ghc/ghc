@@ -296,19 +296,20 @@ hc-file-bundle : project-check
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
+	     $(ProjectNameShort)-$(ProjectVersion)/libraries \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
-	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
-	  -name "*.hsc" -print | sed 's/hsc$$/hs/g' >> hc-files-to-go
+	@for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/driver $(ProjectNameShort)-$(ProjectVersion)/libraries $(ProjectNameShort)-$(ProjectVersion)/hslibs -name "*.hsc" -print` ""; do \
+	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
+	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
+	     fi; \
+	done;
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/*.hs-incl >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/ParserCore.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/main/ParsePkgConf.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/hslibs/hssource/HsParser.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/haskell-src/Language/Haskell/Parser.hs >> hc-files-to-go
 	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
