@@ -313,7 +313,7 @@ qualifyImports this_mod qual_imp unqual_imp as_mod hides
 	fixity_env = foldl (add_fixity name_env2) emptyFixityEnv fixities
 
 	-- Create the export-availability info
-	export_avails = mkExportAvails unqual_imp qual_mod avails
+	export_avails = mkExportAvails qual_mod unqual_imp name_env2 avails
     in
     returnRn (RnEnv name_env2 fixity_env, export_avails)
   where

@@ -484,16 +484,29 @@ pprFixityProvenance (fixity, how_in_scope) = ppr how_in_scope
 
 
 
-===============  Avails  ================
+===============  ExportAvails  ================
 \begin{code}
-mkExportAvails :: Bool -> Module -> [AvailInfo] -> ExportAvails
-mkExportAvails unqualified_import mod_name avails
+mkExportAvails :: Module -> Bool -> GlobalNameEnv -> [AvailInfo] -> ExportAvails
+mkExportAvails mod_name unqual_imp name_env avails
   = (mod_avail_env, entity_avail_env)
   where
-	-- The "module M" syntax only applies to *unqualified* imports (1.4 Report, Section 5.1.1)
-    mod_avail_env | unqualified_import = unitFM mod_name avails 
-		  | otherwise	       = emptyFM
-   
+    mod_avail_env = unitFM mod_name unqual_avails 
+
+	-- unqual_avails is the Avails that are visible in *unqualfied* form
+	-- (1.4 Report, Section 5.1.1)
+	-- For example, in 
+	--	import T hiding( f )
+	-- we delete f from avails
+
+    unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
+		  | otherwise      = [prune avail | avail <- avails]
+
+    prune (Avail n) | unqual_in_scope n = Avail n
+    prune (Avail n) | otherwise		= NotAvailable
+    prune (AvailTC n ns) 		= AvailTC n (filter unqual_in_scope ns)
+
+    unqual_in_scope n = Unqual (nameOccName n) `elemFM` name_env
+
     entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
 			  	   		  name  <- availEntityNames avail]
 
@@ -556,8 +569,8 @@ filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
     avail_occs	   = map nameOccName ns
     wanted_occs    = map rdrNameOcc (want:wants)
 
-filterAvail (IEThingAbs _) (AvailTC n ns)      
-  | n `elem` ns = AvailTC n [n]
+filterAvail (IEThingAbs _) (AvailTC n ns)       = ASSERT( n `elem` ns ) 
+						  AvailTC n [n]
 
 filterAvail (IEThingAbs _) avail@(Avail n)      = avail		-- Type synonyms
 
