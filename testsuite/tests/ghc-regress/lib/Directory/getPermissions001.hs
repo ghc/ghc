@@ -5,5 +5,5 @@ main = do
   print p
   p <- getPermissions "getPermissions001.hs"
   print p
-  p <- getPermissions "getPermissions001"
-  print p
+--  p <- getPermissions "getPermissions001"
+--  print p
