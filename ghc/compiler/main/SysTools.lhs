@@ -801,6 +801,12 @@ rawSystem cmd args = do
        n  -> return (ExitFailure n)
 
 translate :: String -> String
+-- Returns a string wrapped in double-quotes
+-- If the input string starts with double-quote, don't touch it
+-- If not, wrap it in double-quotes and double any backslashes
+-- 	foo\baz    -->  "foo\\baz"
+--	"foo\baz"  -->  "foo\baz"
+
 translate str@('"':_) = str -- already escaped.
 translate str = '"' : foldr escape "\"" str
   where escape '"'  str = '\\' : '"'  : str
