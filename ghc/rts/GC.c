@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.107 2001/07/24 16:36:43 simonmar Exp $
+ * $Id: GC.c,v 1.108 2001/07/25 09:14:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -813,7 +813,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, fprintf(stderr, "@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      IF_DEBUG(gc, fprintf(stderr, "@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
       pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
       if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
 	heapOverflow();
@@ -1771,7 +1771,6 @@ loop:
     if (evac_gen > 0) {		// optimisation 
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
       if (Bdescr((P_)p)->gen_no < evac_gen) {
-	IF_DEBUG(gc, belch("@@ evacuate: evac of EVACUATED node %p failed!", p));
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
       }
@@ -2787,23 +2786,21 @@ scavenge_mut_once_list(generation *gen)
 	p->mut_link = NULL;
       }
       continue;
-      
+
     case MUT_CONS:
 	/* MUT_CONS is a kind of MUT_VAR, except it that we try to remove
 	 * it from the mutable list if possible by promoting whatever it
 	 * points to.
 	 */
-	scavenge_one((StgClosure *)((StgMutVar *)p)->var);
-	if (failed_to_evac == rtsTrue) {
+	if (scavenge_one((StgClosure *)((StgMutVar *)p)->var)) {
 	    /* didn't manage to promote everything, so put the
 	     * MUT_CONS back on the list.
 	     */
-	    failed_to_evac = rtsFalse;
 	    p->mut_link = new_list;
 	    new_list = p;
 	}
 	continue;
-      
+
     default:
       // shouldn't have anything else on the mutables list 
       barf("scavenge_mut_once_list: strange object? %d", (int)(info->type));
