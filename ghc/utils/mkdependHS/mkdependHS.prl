@@ -65,25 +65,7 @@ $Verbose    = 0; # 1 => verbose, 2 => very verbose
 $Warnings   = 1; # 1 => warn about duplicate interface files
 $Dashdashes_seen = 0;
 
-# Try to guess how to run gcc's CPP directly -------------
-
-$OrigCpp = ${RAWCPP};
-if ( $OrigCpp !~ /(\S+)\s+(.*)/ ) {
-    $Cpp = $OrigCpp;
-} else {
-    $cmd  = $1;
-    $rest = $2;
-    if ( -x $cmd ) { # cool
-	$Cpp = $OrigCpp;
-    } else { # oops; try to guess
-	$GccV = `gcc -v 2>&1`;
-	if ( $GccV =~ /Reading specs from (.*)\/specs/ ) {
-	    $Cpp = "$1/cpp $rest";
-	} else {
-	    die "mkdependHS: don't know how to run cpp: $OrigCpp\n";
-	}
-    }
-}
+$Cpp = ${RAWCPP};
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependHS$$";
@@ -375,7 +357,7 @@ sub slurp_file_for_imports {
     $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
     $last_seen_dir = '.' if ($last_seen_dir eq $orig_src_file);
 
-    process_dependency('import',0,'Prelude') if ($Include_prelude);
+    &process_dependency('import',0,'Prelude') if ($Include_prelude);
 
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
@@ -397,7 +379,7 @@ sub slurp_file_for_imports {
 	$modname = $4;
 
         next if $modname eq '';
-	process_dependency($todo,$source,$modname);
+	&process_dependency($todo,$source,$modname);
     }
     close(SRCFILE) || exit(1);
 }
