@@ -84,7 +84,7 @@ module PrelPrim (
     Real(toRational),
 --  Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
     Integral(quot, rem, div, mod, quotRem, divMod, even, odd, toInteger, toInt),
-    Fractional((/), recip, fromRational), fromDouble,
+    Fractional((/), recip, fromRational, fromDouble),
     Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
              asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
     RealFrac(properFraction, truncate, round, ceiling, floor),
@@ -307,13 +307,11 @@ class (Num a) => Fractional a where
     (/)          :: a -> a -> a
     recip        :: a -> a
     fromRational :: Rational -> a
+    fromDouble   :: Double -> a
 
     -- Minimal complete definition: fromRational and ((/) or recip)
     recip x       = 1 / x
     x / y         = x * recip y
-
-fromDouble :: Fractional a => Double -> a
-fromDouble n = fromRational (toRational n)
 
 class (Fractional a) => Floating a where
     pi                  :: a
@@ -930,10 +928,12 @@ realFloatToRational x = (m%1)*(b%1)^^n
 instance Fractional Float where
     (/)           = primDivideFloat
     fromRational  = rationalToRealFloat
+    fromDouble    = primDoubleToFloat
 
 instance Fractional Double where
     (/)          = primDivideDouble
     fromRational = rationalToRealFloat
+    fromDouble x = x
 
 rationalToRealFloat x = x'
  where x'    = f e
@@ -1115,6 +1115,7 @@ instance Integral a => Fractional (Ratio a) where
     (x:%y) / (x':%y')   = (x*y') % (y*x')
     recip (x:%y)        = if x < 0 then (-y) :% (-x) else y :% x
     fromRational (x:%y) = fromInteger x :% fromInteger y
+    fromDouble          = doubleToRatio
 
 -- Hugs optimises code of the form fromRational (doubleToRatio x)
 doubleToRatio :: Integral a => Double -> Ratio a

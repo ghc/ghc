@@ -68,7 +68,7 @@ module Prelude (
     Real(toRational),
 --  Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
     Integral(quot, rem, div, mod, quotRem, divMod, even, odd, toInteger, toInt),
-    Fractional((/), recip, fromRational), fromDouble,
+    Fractional((/), recip, fromRational, fromDouble),
     Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
              asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
     RealFrac(properFraction, truncate, round, ceiling, floor),
