@@ -427,6 +427,12 @@ mkLocalNonRec bndr dem floats rhs
 	--     code compiled without -O.  The case in point is data constructor
 	--     wrappers.
 	--
+	-- NB2: we have to be careful that the result of etaExpand doesn't
+	--    invalidate any of the assumptions that CorePrep is attempting
+	--    to establish.  One possible cause is eta expanding inside of
+	--    an SCC note - we're now careful in etaExpand to make sure the
+	--    SCC is pushed inside any new lambdas that are generated.
+	--
     getUniquesUs		`thenUs` \ us ->
     let
 	rhs' = etaExpand (exprArity rhs) us rhs bndr_ty
