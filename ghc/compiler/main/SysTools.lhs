@@ -65,6 +65,7 @@ module SysTools (
 #include "HsVersions.h"
 
 import DriverUtil
+import DriverPhases     ( haskellish_user_src_file )
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
@@ -81,7 +82,7 @@ import IO		( try, catch,
 			  openFile, hPutChar, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
 			  stderr )
 import Directory	( doesFileExist, removeFile )
-import List             ( intersperse )
+import List             ( intersperse, partition )
 
 #include "../includes/config.h"
 
@@ -681,10 +682,25 @@ addFilesToClean files = mapM_ (add v_FilesToClean) files
 
 removeTmpFiles :: Int -> [FilePath] -> IO ()
 removeTmpFiles verb fs
-  = traceCmd "Deleting temp files" 
-	     ("Deleting: " ++ unwords fs)
-	     (mapM_ rm fs)
+  = warnNon $
+    traceCmd "Deleting temp files" 
+	     ("Deleting: " ++ unwords deletees)
+	     (mapM_ rm deletees)
   where
+     -- Flat out refuse to delete files that are likely to be source input
+     -- files (is there a worse bug than having a compiler delete your source
+     -- files?)
+     -- 
+     -- Deleting source files is a sign of a bug elsewhere, so prominently flag
+     -- the condition.
+    warnNon act
+     | null non_deletees = act
+     | otherwise         = do
+        hPutStrLn stderr ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
+	act
+
+    (non_deletees, deletees) = partition haskellish_user_src_file fs
+
     rm f = removeFile f `IO.catch` 
 		(\_ignored -> 
 		    when (verb >= 2) $

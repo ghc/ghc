@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.26 2003/06/05 10:11:22 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.27 2003/06/26 21:55:47 sof Exp $
 --
 -- GHC Driver
 --
@@ -20,6 +20,7 @@ module DriverPhases (
    objish_file, objish_suffix,
    cish_file, cish_suffix,
    isExtCore_file, extcoreish_suffix,
+   haskellish_user_src_file,
    isSourceFile         -- :: FilePath -> Bool
  ) where
 
@@ -106,10 +107,11 @@ phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
 #endif
 
-haskellish_suffix     = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ])
-haskellish_src_suffix = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
-cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
-extcoreish_suffix     = (`elem` [ "hcr" ])
+haskellish_suffix          = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ])
+haskellish_src_suffix      = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
+cish_suffix                = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
+extcoreish_suffix          = (`elem` [ "hcr" ])
+haskellish_user_src_suffix = (`elem` [ "hs", "lhs" ])
 
 -- Use the appropriate suffix for the system on which 
 -- the GHC-compiled code will run
@@ -119,11 +121,12 @@ objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
 objish_suffix     = (`elem` [ "o" ])
 #endif
 
-haskellish_file     = haskellish_suffix     . getFileSuffix
-haskellish_src_file = haskellish_src_suffix . getFileSuffix
-cish_file           = cish_suffix           . getFileSuffix
-isExtCore_file      = extcoreish_suffix     . getFileSuffix
-objish_file         = objish_suffix         . getFileSuffix
+haskellish_file          = haskellish_suffix     . getFileSuffix
+haskellish_src_file      = haskellish_src_suffix . getFileSuffix
+cish_file                = cish_suffix           . getFileSuffix
+isExtCore_file           = extcoreish_suffix     . getFileSuffix
+objish_file              = objish_suffix         . getFileSuffix
+haskellish_user_src_file = haskellish_user_src_suffix . getFileSuffix
 
 isSourceFile :: FilePath -> Bool
 isSourceFile   f    =
