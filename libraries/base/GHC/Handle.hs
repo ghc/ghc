@@ -551,46 +551,124 @@ foreign import ccall unsafe "__hscore_PrelHandle_write"
 foreign import ccall unsafe "__hscore_PrelHandle_write"
    write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
-#else
-readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-readRawBuffer loc fd is_stream buf off len = do
-  (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) (fromIntegral len) off buf
-  if l == (-1)
-   then 
-    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
-    else return (fromIntegral l)
+#else /* mingw32_TARGET_OS.... */
 
-readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-readRawBufferNoBlock loc fd is_stream buf off len = do
-  (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) (fromIntegral len) off buf
-  if l == (-1)
-   then 
-    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
-    else return (fromIntegral l)
+readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBuffer loc fd is_stream buf off len
+  | threaded  = blockingReadRawBuffer loc fd is_stream buf off len
+  | otherwise = asyncReadRawBuffer loc fd is_stream buf off len
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-readRawBufferPtr loc fd is_stream buf off len = do
-  (l, rc) <- asyncRead fd (if is_stream then 1 else 0) (fromIntegral len) (buf `plusPtr` off)
-  if l == (-1)
-   then 
-    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
-    else return (fromIntegral l)
+readRawBufferPtr loc fd is_stream buf off len
+  | threaded  = blockingReadRawBufferPtr loc fd is_stream buf off len
+  | otherwise = asyncReadRawBufferPtr loc fd is_stream buf off len
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-writeRawBuffer loc fd is_stream buf off len = do
-  (l, rc) <- asyncWriteBA fd (if is_stream then 1 else 0) (fromIntegral len) off buf
-  if l == (-1)
-   then 
-    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
-    else return (fromIntegral l)
+writeRawBuffer loc fd is_stream buf off len
+  | threaded =  blockingWriteRawBuffer loc fd is_stream buf off len
+  | otherwise = asyncWriteRawBuffer    loc fd is_stream buf off len
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-writeRawBufferPtr loc fd is_stream buf off len = do
-  (l, rc) <- asyncWrite fd (if is_stream then 1 else 0) (fromIntegral len) (buf `plusPtr` off)
-  if l == (-1)
-   then 
-    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
-    else return (fromIntegral l)
+writeRawBufferPtr loc fd is_stream buf off len
+  | threaded  = blockingWriteRawBufferPtr loc fd is_stream buf off len
+  | otherwise = asyncWriteRawBufferPtr    loc fd is_stream buf off len
+
+-- ToDo: we don't have a non-blocking primitve read on Win32
+readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBufferNoBlock = readRawBufferNoBlock
+
+-- Async versions of the read/write primitives, for the non-threaded RTS
+
+asyncReadRawBuffer loc fd is_stream buf off len = do
+    (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) 
+		 (fromIntegral len) off buf
+    if l == (-1)
+      then 
+	ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      else return (fromIntegral l)
+
+asyncReadRawBufferPtr loc fd is_stream buf off len = do
+    (l, rc) <- asyncRead fd (if is_stream then 1 else 0) 
+			(fromIntegral len) (buf `plusPtr` off)
+    if l == (-1)
+      then 
+        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      else return (fromIntegral l)
+
+asyncWriteRawBuffer loc fd is_stream buf off len = do
+    (l, rc) <- asyncWriteBA fd (if is_stream then 1 else 0) 
+			(fromIntegral len) off buf
+    if l == (-1)
+      then 
+        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      else return (fromIntegral l)
+
+asyncWriteRawBufferPtr loc fd is_stream buf off len = do
+    (l, rc) <- asyncWrite fd (if is_stream then 1 else 0) 
+		  (fromIntegral len) (buf `plusPtr` off)
+    if l == (-1)
+      then 
+        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      else return (fromIntegral l)
+
+-- Blocking versions of the read/write primitives, for the threaded RTS
+
+blockingReadRawBuffer loc fd True buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    recv_rawBuffer fd buf off len
+blockingReadRawBuffer loc fd False buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    read_rawBuffer fd buf off len
+
+blockingReadRawBufferPtr loc fd True buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    recv_off fd buf off len
+blockingReadRawBufferPtr loc fd False buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    read_off fd buf off len
+
+blockingWriteRawBuffer loc fd True buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    send_rawBuffer (fromIntegral fd) buf off len
+blockingWriteRawBuffer loc fd False buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    write_rawBuffer (fromIntegral fd) buf off len
+
+blockingWriteRawBufferPtr loc fd True buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    send_off (fromIntegral fd) buf off len
+blockingWriteRawBufferPtr loc fd False buf off len = 
+  throwErrnoIfMinus1Retry loc $
+    write_off (fromIntegral fd) buf off len
+
+-- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
+-- These calls may block, but that's ok.
+
+foreign import ccall safe "__hscore_PrelHandle_read"
+   read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_read"
+   read_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_write"
+   write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_write"
+   write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_recv"
+   recv_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_recv"
+   recv_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_send"
+   send_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_send"
+   send_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall "rtsSupportsBoundThreads" threaded :: Bool
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -713,7 +791,7 @@ openFile' filepath mode binary =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    openFd fd Nothing filepath mode binary truncate
+    openFd fd Nothing False filepath mode binary truncate
 	`catchException` \e -> do c_close (fromIntegral fd); throw e
 	-- NB. don't forget to close the FD if openFd fails, otherwise
 	-- this FD leaks.
@@ -732,8 +810,8 @@ append_flags = write_flags  .|. o_APPEND
 -- ---------------------------------------------------------------------------
 -- openFd
 
-openFd :: FD -> Maybe FDType -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
-openFd fd mb_fd_type filepath mode binary truncate = do
+openFd :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> Bool -> IO Handle
+openFd fd mb_fd_type is_socket filepath mode binary truncate = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -750,15 +828,15 @@ openFd fd mb_fd_type filepath mode binary truncate = do
       case mb_fd_type of
         Just x  -> return x
 	Nothing -> fdType fd
-    let is_stream = fd_type == Stream
+
     case fd_type of
 	Directory -> 
 	   ioException (IOError Nothing InappropriateType "openFile"
 			   "is a directory" Nothing) 
 
 	Stream
-	   | ReadWriteHandle <- ha_type -> mkDuplexHandle fd is_stream filepath binary
-	   | otherwise                  -> mkFileHandle fd is_stream filepath ha_type binary
+	   | ReadWriteHandle <- ha_type -> mkDuplexHandle fd is_socket filepath binary
+	   | otherwise                  -> mkFileHandle fd is_socket filepath ha_type binary
 
 	-- regular files need to be locked
 	RegularFile -> do
@@ -770,14 +848,14 @@ openFd fd mb_fd_type filepath mode binary truncate = do
 	   -- truncate the file if necessary
 	   when truncate (fileTruncate filepath)
 
-	   mkFileHandle fd is_stream filepath ha_type binary
+	   mkFileHandle fd is_socket filepath ha_type binary
 
 
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
-   openFd fd Nothing fd_str mode True{-bin mode-} False{-no truncate-}
+   openFd fd Nothing False{-XXX!-} fd_str mode True{-bin mode-} False{-no truncate-}
 
 foreign import ccall unsafe "lockFile"
   lockFile :: CInt -> CInt -> CInt -> IO CInt
