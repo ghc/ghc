@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.48 2002/08/16 13:28:22 simonmar Exp $
+ * $Id: StgMacros.h,v 1.49 2002/10/12 23:19:54 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -680,7 +680,7 @@ extern DLL_IMPORT_RTS const StgPolyInfoTable stg_seq_frame_info;
    -------------------------------------------------------------------------- */
 
 #if defined(USE_SPLIT_MARKERS)
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
+#if defined(LEADING_UNDERSCORE)
 #define __STG_SPLIT_MARKER __asm__("\n___stg_split_marker:");
 #else
 #define __STG_SPLIT_MARKER __asm__("\n__stg_split_marker:");

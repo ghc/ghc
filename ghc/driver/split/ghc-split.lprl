@@ -30,6 +30,7 @@ sub split_asm_file {
 
     &collectExports_hppa() if $TargetPlatform =~ /^hppa/;
     &collectExports_mips() if $TargetPlatform =~ /^mips/;
+    &collectDyldStuff_powerpc() if $TargetPlatform =~ /^powerpc-apple/;
 
     $octr = 0;	# output file counter
     $* = 1; 	# multi-line matches are OK
@@ -105,6 +106,54 @@ sub collectExports_mips { # Note: MIPS only
     seek(TMPI, 0, 0);
 }
 
+sub collectDyldStuff_powerpc { # Note: Darwin/PowerPC only
+    local($chunk_label,$label,$cur_section,$section,$chunk,$alignment,$cur_alignment);
+    
+    %DyldChunks = (); # NB: global table
+    %DyldChunksDefined = (); # NB: global table
+        
+    $cur_section = '';
+    $section = '';
+    $label = '';
+    $chunk = '';
+    $alignment = '';
+    $cur_alignment = '';
+    
+    while ( 1 ) {
+	$_ = <TMPI>;
+	if ( $_ eq '' || /^L(_.+)\$.+:/ ) {
+	    if ( $label ne '' ) {
+		$DyldChunksDefined{$label} .= $section . $chunk_label . $alignment . $ chunk;
+		if( $section =~ s/\.data/\.non_lazy_symbol_pointer/ ) {
+		    $chunk = "\t.indirect_symbol $label\n\t.long 0\n";
+		}
+		$DyldChunks{$label} .= $section . $chunk_label . $chunk;
+		# don't use $alignment, it's only needed for .data, which we change into .non_lazy_symbol_pointer
+		print STDERR "### dyld chunk: $label\n$section$alignment$chunk\n###\n" if $Dump_asm_splitting_info;
+	    }
+	    last if ($_ eq '');
+		
+	    $chunk = '';
+	    $chunk_label = $_;
+	    $label = $1;
+	    $section = $cur_section;
+	    $alignment = $cur_alignment;
+	    print STDERR "label: $label\n" if $Dump_asm_splitting_info;
+	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data)/ ) {
+	    $cur_section = $_;
+	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
+	    $cur_alignment = ''
+	} elsif ( /^\s*\.align.*/ ) { 
+	    $cur_alignment = $_;
+	    printf STDERR "alignment: $cur_alignment\n" if $Dump_asm_splitting_info;
+	} else {
+	    $chunk .= $_;
+	}
+    }
+    
+    seek(TMPI, 0, 0);
+}
+
 sub ReadTMPIUpToAMarker {
     local($str, $count) = @_; # already read bits
 
@@ -158,7 +207,7 @@ sub process_asm_block {
     return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
     return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
     return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
-    return(&process_asm_block_powerpc($str))   if $TargetPlatform =~ /^powerpc-|^rs6000-/;
+    return(&process_asm_block_powerpc($str))   if $TargetPlatform =~ /^powerpc-apple-/;
 
     # otherwise...
     &tidy_up_and_die(1,"$Pgm: no process_asm_block for $TargetPlatform\n");
@@ -425,13 +474,15 @@ sub process_asm_block_mips {
 \begin{code}
 sub process_asm_block_powerpc {
     local($str) = @_;
+    local($dyld_stuff) = '';
 
     # strip the marker
     $str =~ s/___stg_split_marker.*\n//;
-    $str =~ s/___stg_split_marker.*\n//; # yes, twice.
+
+    $str =~ s/L_.*\$.*:\n(.|\n)*//;
 
     # remove/record any literal constants defined here
-    while ( $str =~ /^(.csect .data[RW]\n\s+\.align.*\n(LC\.\.\d+):\n(\s\.byte .*\n)+)/ ) {
+    while ( $str =~ s/^(\s+.const_data\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)// ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -439,8 +490,6 @@ sub process_asm_block_powerpc {
 	    if $LocalConstant{$label};
 
 	$LocalConstant{$label} = $body;
-	
-	$str =~ s/^.csect .data[RW]\n\s+\.align.*\nLC\.\.\d+:\n(\s\.byte .*\n)+//;
     }
 
     # inject definitions for any local constants now used herein
@@ -449,10 +498,20 @@ sub process_asm_block_powerpc {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
+    
+    foreach $k (keys %DyldChunks) {
+	if ( $str =~ /\bL$k\$/ ) {
+	    if ( $str =~ /^$k:$/ ) {
+		$dyld_stuff .= $DyldChunksDefined{$k};
+	    } else {
+		$dyld_stuff .= $DyldChunks{$k};
+	    }
+	}
+    }
 
-    print STDERR "### STRIPPED BLOCK (powerpc/rs6000):\n$str" if $Dump_asm_splitting_info;
+    $str .= "\n" . $dyld_stuff;
 
-    $str = ".toc\n" . $str;
+    print STDERR "### STRIPPED BLOCK (powerpc):\n$str" if $Dump_asm_splitting_info;
 
     $str;
 }
