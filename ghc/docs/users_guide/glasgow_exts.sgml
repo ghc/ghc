@@ -34,11 +34,36 @@ of Bytes).  Please see <XRef LinkEnd="glasgow-unboxed"> and following.
 </VarListEntry>
 
 <VarListEntry>
+<Term>Type system extensions:</Term>
+<ListItem>
+<Para> GHC supports a large number of extensions to Haskell's type
+system.  Specifically:
+</Para>
+
+<VariableList>
+<VarListEntry>
 <Term>Multi-parameter type classes:</Term>
 <ListItem>
 <Para>
-GHC's type system supports extended type classes with multiple
-parameters.  Please see <XRef LinkEnd="multi-param-type-classes">.
+<XRef LinkEnd="multi-param-type-classes">
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term>Functional dependencies:</Term>
+<ListItem>
+<Para>
+<XRef LinkEnd="functional-dependencies">
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term>Implicit parameters:</Term>
+<ListItem>
+<Para>
+<XRef LinkEnd="implicit parameters">
 </Para>
 </ListItem>
 </VarListEntry>
@@ -47,9 +72,7 @@ parameters.  Please see <XRef LinkEnd="multi-param-type-classes">.
 <Term>Local universal quantification:</Term>
 <ListItem>
 <Para>
-GHC's type system supports explicit universal quantification in
-constructor fields and function arguments.  This is useful for things
-like defining <Literal>runST</Literal> from the state-thread world.  See <XRef LinkEnd="universal-quantification">.
+<XRef LinkEnd="universal-quantification">
 </Para>
 </ListItem>
 </VarListEntry>
@@ -58,8 +81,7 @@ like defining <Literal>runST</Literal> from the state-thread world.  See <XRef L
 <Term>Extistentially quantification in data types:</Term>
 <ListItem>
 <Para>
-Some or all of the type variables in a datatype declaration may be
-<Emphasis>existentially quantified</Emphasis>.  More details in <XRef LinkEnd="existential-quantification">.
+<XRef LinkEnd="existential-quantification">
 </Para>
 </ListItem>
 </VarListEntry>
@@ -74,6 +96,8 @@ for some nested declarations, where this would not be legal in Haskell
 </Para>
 </ListItem>
 </VarListEntry>
+</VarListEntry>
+
 
 <VarListEntry>
 <Term>Pattern guards</Term>
@@ -2284,13 +2308,64 @@ with <Option>-fcontext-stack</Option><Emphasis>N</Emphasis>.
 
 </Sect1>
 
+<Sect1 id="implicit-parameters">
+<Title>Implicit parameters
+</Title>
+
+<Para> Implicit paramters are implemented as described in 
+"Implicit parameters: dynamic scoping with static types", 
+J Lewis, MB Shields, E Meijer, J Launchbury,
+27th ACM Symposium on Principles of Programming Languages (POPL'00),
+Boston, Jan 2000.
+</Para>
+
+<Para>
+There should be more documentation, but there isn't (yet).  Yell if you need it.
+</Para>
+<ItemizedList>
+<ListItem>
+<Para> You can't have an implicit parameter in the context of a class or instance
+declaration.  For example, both these declarations are illegal:
+<ProgramListing>
+  class (?x::Int) => C a where ...
+  instance (?x::a) => Foo [a] where ...
+</ProgramListing>
+Reason: exactly which implicit parameter you pick up depends on exactly where
+you invoke a function. But the ``invocation'' of instance declarations is done
+behind the scenes by the compiler, so it's hard to figure out exactly where it is done.
+Easiest thing is to outlaw the offending types.
+</ListItem>
+
+</ItemizedList>
+
+</Sect1>
+
+
+<Sect1 id="functional-dependencies">
+<Title>Functional dependencies
+</Title>
+
+<Para> Functional dependencies are implemented as described by Mark Jones
+in "Type Classes with Functional Dependencies", Mark P. Jones, 
+In Proceedings of the 9th European Symposium on Programming, 
+ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782.
+</Para>
+
+<Para>
+There should be more documentation, but there isn't (yet).  Yell if you need it.
+</Para>
+</Sect1>
+
+
 <Sect1 id="universal-quantification">
 <Title>Explicit universal quantification
 </Title>
 
 <Para>
-GHC now allows you to write explicitly quantified types.  GHC's
-syntax for this now agrees with Hugs's, namely:
+GHC's type system supports explicit universal quantification in
+constructor fields and function arguments.  This is useful for things
+like defining <Literal>runST</Literal> from the state-thread world. 
+GHC's syntax for this now agrees with Hugs's, namely:
 </Para>
 
 <Para>
