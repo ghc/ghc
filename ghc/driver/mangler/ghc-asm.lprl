@@ -1229,7 +1229,7 @@ sub mangle_asm {
 				push(@o,$l);
 				next;
 			    }
-			    next if $l =~ /^\s*\..*$symb.*\n/;
+                            next if $l =~ /^\s*\..*$symb.*\n?/;
 			    push(@o,$l);
 			}
 			$c = join("\n",@o) . "\n";
