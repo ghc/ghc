@@ -158,13 +158,13 @@ lex :: ReadS String		-- As defined by H98
 lex s  = readP_to_S L.hsLex s
 
 lexLitChar :: ReadS String	-- As defined by H98
-lexLitChar = readP_to_S (do { P.skipSpaces ;
-			      (s, L.Char _) <- P.gather L.lex ;
+lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
 			      return s })
+	-- There was a skipSpaces before the P.gather L.lexChar,
+	-- but that seems inconsistent with readLitChar
 
 readLitChar :: ReadS Char	-- As defined by H98
-readLitChar = readP_to_S (do { L.Char c <- L.lex ;
-			       return c })
+readLitChar = readP_to_S L.lexChar
 
 lexDigits :: ReadS String
 lexDigits = readP_to_S (P.munch1 isDigit)
