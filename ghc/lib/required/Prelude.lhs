@@ -1,5 +1,10 @@
+We add the option -fno-implicit-prelude here to tell the reader that
+special names such as () and -> shouldn't be resolved to Prelude.()
+and Prelude.-> (as they are normally). -- SDM 8/10/97
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+
 module Prelude (
 
 	-- Everything from these modules
