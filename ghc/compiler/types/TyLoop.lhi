@@ -49,7 +49,7 @@ voidTy :: Type
 -- Needed in TysWiredIn
 data StrictnessMark = MarkedStrict | NotMarkedStrict
 mkDataCon :: Name -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> [(Class,Type)] -> [Type] -> TyCon
+	  -> [TyVar] -> [(Class,Type)] -> [TyVar] -> [(Class,Type)] -> [Type] -> TyCon
 	  -> Id
 mkTupleCon ::  Int -> Name -> Type -> Id
 \end{code}
