@@ -86,7 +86,7 @@ ghcExit :: Int -> IO ()
 
 ghcExit val
   = if val /= 0
-    then hPutStr stderr "Compilation had errors\n"
+    then hPutStr stderr "\nCompilation had errors\n\n"
     else return ()
 \end{code}
 
