@@ -1,4 +1,4 @@
-Abstract syntax for Java subset that is the target of Mondrian.
+bstract syntax for Java subset that is the target of Mondrian.
 The syntax has been taken from "The Java Language Specification".
 
 (c) Erik Meijer & Arjan van IJzendoorn
@@ -22,9 +22,11 @@ data CompilationUnit
     deriving (Show)
     
 data Decl
- = Import Name
+ = Import [Name]
  | Field [Modifier] Type Name (Maybe Expr)   
  | Constructor [Modifier] Name [Parameter] [Statement]
+				-- Add Throws (list of Names)
+				-- to Method
  | Method [Modifier] Type Name [Parameter] [Statement]
  | Comment [String]
  | Interface [Modifier] Name [Name] [Decl]
@@ -54,13 +56,8 @@ data Expr
   | InstanceOf Expr Type
   | Call Expr Name [Expr]
   | Op Expr String Expr
-  | New Name [Expr] (Maybe [Decl]) -- anonymous innerclass
-  | NewArray Name [Expr]
-    deriving (Show)
-    
-data Type 
-  = Type Name
-  | Array Type
+  | New Type [Expr] (Maybe [Decl]) -- anonymous innerclass
+  | NewArray Type [Expr]
     deriving (Show)
     
 data Modifier 
@@ -69,7 +66,15 @@ data Modifier
   | Abstract | Final | Native | Synchronized | Transient | Volatile
   deriving (Show, Eq, Ord)
   
-type Name = [String]
+data Type 
+  = PrimType String
+  | ArrayType Type
+  | Type [Name]
+    deriving (Show)
+
+-- If you want qualified names, use Access <expr> <name> 
+-- Type's are already qualified.
+type Name = String
 
 data Lit
   = IntLit Int		-- Boxed
@@ -78,6 +83,14 @@ data Lit
   | UCharLit Char	-- Unboxed
   | StringLit String
   deriving Show
+
+data OType 
+  = ObjectType		-- Object *
+  | UnboxedIntType	-- int
+  | UnboxedCharType	-- char
+
+data OVar = OVar Name OType
+			-- Object x.y
 
 addModifier :: Modifier -> Decl -> Decl
 addModifier = \m -> \d ->

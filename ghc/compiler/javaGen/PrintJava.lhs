@@ -36,7 +36,7 @@ decls (d:ds) = decl d $$ decls ds
     
 decl = \d ->
   case d of
-    { Import n -> importDecl (name n)
+    { Import n -> importDecl (hcat (punctuate dot (map text n)))
     ; Field mfs t n e -> field (modifiers mfs) (typ t) (name n) e  
     ; Constructor mfs n as ss -> constructor (modifiers mfs) (name n) (parameters as) (statements ss)
     ; Method mfs t n as ss -> method (modifiers mfs) (typ t) (name n) (parameters as) (statements ss)
@@ -96,14 +96,15 @@ extends xs = text "extends" <+> hsep (punctuate comma (map name xs))
 implements [] = empty
 implements xs = text "implements" <+> hsep (punctuate comma (map name xs))
 
-name ns = hcat (punctuate dot (map text ns))
+name ns = text ns
 
 parameters as = map parameter as
 
 parameter (Parameter mfs t n) = modifiers mfs <+> typ t <+> name n
 
-typ (Type n)  = name n
-typ (Array t) = typ t <> text "[]"
+typ (PrimType s)  = text s
+typ (Type n)      = hcat (punctuate dot (map text n))
+typ (ArrayType t) = typ t <> text "[]"
 
 statements ss = vcat (map statement ss)
   
@@ -162,11 +163,11 @@ expr = \e ->
    ; Cast t e -> cast (typ t) e
    ; Access e n -> expr e <> text "." <> name n
    ; Assign l r -> assign (expr l) r
-   ; New n es ds -> new (name n) es (maybeClass ds)
+   ; New n es ds -> new (typ n) es (maybeClass ds)
    ; Call e n es -> call (expr e) (name n) es
    ; Op e1 o e2 -> op e1 o e2
    ; InstanceOf e t -> expr e <+> text "instanceof" <+> typ t
-   ; NewArray n es -> newArray (name n) es
+   ; NewArray n es -> newArray (typ n) es
    }
    
 op = \e1 -> \o -> \e2 ->
