@@ -50,8 +50,6 @@ extern void heapCheckFail( void );
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-#if defined(openbsd_TARGET_OS)
 extern int genericRaise(int sig);
-#endif
 
 #endif // RTSUTILS_H

@@ -304,12 +304,10 @@ heapCheckFail( void )
  * when we have a threaded rts. So System.Posix.Signals will call
  * genericRaise(), rather than raise(3).
  */
-#if defined(openbsd_TARGET_OS)
 int genericRaise(int sig) {
-# if defined(THREADED_RTS)
+#if defined(THREADED_RTS) && defined(openbsd_TARGET_OS)
         return pthread_kill(pthread_self(), sig);
-# else
+#else
         return raise(sig);
-# endif
-}
 #endif
+}
