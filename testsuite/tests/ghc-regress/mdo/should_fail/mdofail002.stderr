@@ -1,4 +1,6 @@
 
-mdofail002.hs:11:8:
+mdofail002.hs:10:8:
     Conflicting definitions for `x'
+    Bound at: mdofail002.hs:10:8
+	      mdofail002.hs:11:8
     In a mdo-expression
