@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.82 2001/08/03 20:40:43 sof Exp $
+-- $Id: Main.hs,v 1.83 2001/08/03 23:38:50 ken Exp $
 --
 -- GHC Driver program
 --
@@ -115,8 +115,10 @@ main =
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
 		IOException _   ->  hPutStr stderr (show exception)
+#if __GLASGOW_HASKELL__ >= 501
 		  -- let exit exceptions bubble all the way out.
 		ExitException e ->  exitWith e
+#endif
 		_other 	        ->  hPutStr stderr (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $ do
