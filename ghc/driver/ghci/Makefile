@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 2001/08/03 17:03:48 sof Exp $
+# $Id: Makefile,v 1.9 2001/10/12 14:28:08 rrt Exp $
 #
 
 TOP=../..
@@ -36,7 +36,11 @@ endif
 SCRIPT_OBJS	  = ghci.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
+else
+INSTALL_PROGS    += $(C_PROG)
+endif
 TOPDIROPT 	  = -B$(GHCLIB)
 
 ifeq "$(INSTALLING)" "1"

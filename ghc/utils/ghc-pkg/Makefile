@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 2001/08/21 14:38:04 sewardj Exp $
+# $Id: Makefile,v 1.12 2001/10/12 14:28:46 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -14,11 +14,13 @@ HS_PROG           = ghc-pkg.bin
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -package lang \
 		    -package util -package text
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+INSTALL_LIBEXECS += $(HS_PROG)
+else
+INSTALL_PROGS    += $(HS_PROG)
 SRC_HC_OPTS      += -package win32
 endif
 
-INSTALL_LIBEXECS = $(HS_PROG)
 
 # -----------------------------------------------------------------------------
 # ghc-pkg script
@@ -42,7 +44,9 @@ INPLACE_SCRIPT_PROG    = ghc-pkg-inplace
 SCRIPT_OBJS	  = ghc-pkg.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCPKGBIN PKGCONFOPT
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
+endif
 PKGCONFOPT 	  = -f $(PKGCONF)
 
 ifeq "$(INSTALLING)" "1"

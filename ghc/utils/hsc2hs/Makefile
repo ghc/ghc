@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.22 2001/09/12 11:16:05 rrt Exp $
+# $Id: Makefile,v 1.23 2001/10/12 14:29:11 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -55,8 +55,12 @@ SCRIPT_SUBST_VARS = HSC2HS_BINDIR HSC2HS_DIR HS_PROG HSC2HS_EXTRA
 SCRIPT_OBJS=hsc2hs.sh
 INTERP=$(SHELL)
 
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 INSTALL_LIBEXECS += $(HS_PROG)
+else
+INSTALL_PROGS    += $(HS_PROG)
+endif
 
 override datadir=$(libdir)
 INSTALL_DATAS += template-hsc.h
