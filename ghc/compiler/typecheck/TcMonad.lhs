@@ -49,6 +49,7 @@ import HsSyn		( HsLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
+import PprType		( {- instance Outputable Type -} )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, pprBagOfErrors, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_Debug )
 

@@ -31,6 +31,7 @@ import Id               ( mayHaveNoBinding, isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
+import PprType		( {- instance Outputable Type -} )
 import Subst		( substTy, mkTyVarSubst )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv

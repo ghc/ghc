@@ -25,6 +25,7 @@ import Type             ( UsageAnn(..),
                           mkUsgTy, splitUsgTy, isUsgTy, isNotUsgTy, unUsgTy, tyUsg,
                           splitUsForAllTys, substUsTy,
                           mkFunTy, mkForAllTy )
+import PprType		( {- instance Outputable Type -} )
 import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import Literal          ( Literal(..), literalType )
 import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )

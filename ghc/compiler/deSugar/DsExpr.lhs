@@ -18,6 +18,7 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 			  TypecheckedStmt
 			)
 import CoreSyn
+import PprCore		( {- instance Outputable Expr -} )
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import DsMonad

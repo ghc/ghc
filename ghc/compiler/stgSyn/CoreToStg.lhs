@@ -17,6 +17,7 @@ module CoreToStg ( topCoreBindsToStg ) where
 import CoreSyn		-- input
 import StgSyn		-- output
 
+import PprCore		( {- instance Outputable Bind/Expr -} )
 import CoreUtils	( exprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )

@@ -39,6 +39,7 @@ import Type		( Type, Kind, tyVarsOfType,
 			  isUnboxedTupleType,
 			  hasMoreBoxityInfo
 			)
+import PprType		( {- instance Outputable Type -} )
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
 import BasicTypes	( RecFlag(..), isNonRec )
 import Outputable

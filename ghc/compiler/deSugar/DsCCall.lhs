@@ -31,6 +31,7 @@ import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  isNewType, repType, isUnLiftedType, mkFunTy,
 			  Type
 			)
+import PprType		( {- instance Outputable Type -} )
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon, intPrimTy
 			)

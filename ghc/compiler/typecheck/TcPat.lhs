@@ -37,6 +37,7 @@ import DataCon		( DataCon, dataConSig, dataConFieldLabels,
 			)
 import Id		( Id, idType, isDataConWrapId_maybe )
 import Type		( Type, isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
+import PprType		( {- instance Outputable Type -} )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy

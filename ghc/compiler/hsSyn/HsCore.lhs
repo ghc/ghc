@@ -30,6 +30,7 @@ import Demand		( Demand )
 import Literal		( Literal )
 import PrimOp		( CCall, pprCCallOp )
 import Type		( Kind )
+import PprType		( {- instance Outputable Type -} )
 import CostCentre
 import SrcLoc		( SrcLoc )
 import Outputable

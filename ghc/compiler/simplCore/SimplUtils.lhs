@@ -21,6 +21,7 @@ module SimplUtils (
 import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
+import PprCore		( {- instance Outputable Expr -} )
 import CoreUnfold	( isValueUnfolding )
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
@@ -36,6 +37,7 @@ import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
 			  splitTyConApp_maybe, splitAlgTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
+import PprType		( {- instance Outputable Type -} )
 import DataCon		( dataConRepArity )
 import TysPrim		( statePrimTyCon )
 import Var		( setVarUnique )

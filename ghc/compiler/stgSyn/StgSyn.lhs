@@ -53,6 +53,7 @@ import PrimOp		( PrimOp )
 import PrimRep		( PrimRep(..) )
 import Outputable
 import Type             ( Type )
+import PprType		( {- instance Outputable Type -} )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 \end{code}
 

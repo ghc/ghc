@@ -22,6 +22,7 @@ import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErr
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
+import PprType		( {- instance Outputable Type -} )
 import TyCon		( TyCon, isDataTyCon )
 import Util		( zipEqual )
 import Outputable
