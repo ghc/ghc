@@ -1,4 +1,4 @@
-module Int10 where
+module Imp10Aux where
 data T1 a 
 data T2 a b 
 data T3 a b c 

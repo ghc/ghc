@@ -1,2 +1,2 @@
 module Imp10 where
-import {-# SOURCE #-} Int10
+import {-# SOURCE #-} Imp10Aux

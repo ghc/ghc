@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 module RnAux017 where
 
 data Wibble 
