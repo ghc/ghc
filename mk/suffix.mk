@@ -219,6 +219,10 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.lhs,%.texi,$<) 
 	@touch $@
 
+%.info:: %.texi
+	@$(RM) $@
+	$(MAKEINFO) $(MAKEINFO_OPTS) $< && $(POSTMAKEINFO) $@
+
 %.hs : %.lhs
 	@$(RM) $@
 	$(LIT2PGM) $(LIT2PGM_OPTS) -o $@ $<
