@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 2002/02/11 17:30:57 simonmar Exp $
+# $Id: Makefile,v 1.14 2002/02/12 10:52:47 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -37,7 +37,7 @@ ALL_DIRS = \
 	Text/Regex \
 	Text/Show
 
-PKG = base
+PACKAGE = base
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
 SRC_HSC2HS_OPTS += -Iinclude
