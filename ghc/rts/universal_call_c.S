@@ -3,12 +3,17 @@
  *
  * Copyright (c) 1994-2001.
  *
- * $Id: universal_call_c.S,v 1.10 2001/02/09 17:15:20 simonmar Exp $
+ * $Id: universal_call_c.S,v 1.11 2001/02/12 12:08:44 sewardj Exp $
  * ------------------------------------------------------------------------*/
 	
-#if 0 /* later:	 GHCI */
-
 #include "config.h"
+
+#if sparc_TARGET_ARCH
+	.text
+only_here_to_work_around_a_bug_in_GNU_ld_291_on_sparc:
+#endif
+	
+#if 0 /* later:	 GHCI */
 	
 	.file "universal_call_c.S"
 
