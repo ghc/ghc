@@ -41,7 +41,7 @@ module CoreSyn (
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	IdCoreRule,
+	IdCoreRule(..), isOrphanRule,
 	RuleName,
 	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules,
 	isBuiltinRule, ruleName
@@ -186,7 +186,12 @@ rulesRules (Rules rules _) = rules
 
 \begin{code}
 type RuleName = FastString
-type IdCoreRule = (Id,CoreRule)		-- Rules don't have their leading Id inside them
+data IdCoreRule = IdCoreRule Id 	-- A rule for this Id
+			     Bool 	-- True <=> orphan rule
+			     CoreRule	-- The rule itself
+
+isOrphanRule :: IdCoreRule -> Bool
+isOrphanRule (IdCoreRule _ is_orphan _) = is_orphan
 
 data CoreRule
   = Rule RuleName

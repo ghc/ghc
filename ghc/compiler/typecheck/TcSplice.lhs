@@ -397,7 +397,7 @@ To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 
 \begin{code}
 instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
-  qNewName s = do  { u <- newUnique 
+  qNewName s = do { u <- newUnique 
 		  ; let i = getKey u
 		  ; return (TH.mkNameU s i) }
 

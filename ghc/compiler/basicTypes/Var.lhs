@@ -93,6 +93,8 @@ data LocalIdDetails
   | Exported	-- Exported
   | SpecPragma	-- Not exported, but not to be discarded either
 		-- It's unclean that this is so deeply built in
+  -- Exported and SpecPragma Ids are kept alive; 
+  -- NotExported things may be discarded as dead code.
 \end{code}
 
 LocalId and GlobalId

@@ -30,8 +30,9 @@ module DsMonad (
 import TcRnMonad
 import HsSyn		( HsExpr, HsMatchContext, Pat )
 import TcIface		( tcIfaceGlobal )
+import RdrName		( GlobalRdrEnv )
 import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
-			  tyThingId, tyThingTyCon, tyThingDataCon  )
+			  tyThingId, tyThingTyCon, tyThingDataCon, unQualInScope )
 import Bag		( emptyBag, snocBag, Bag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
@@ -47,6 +48,8 @@ import Name		( Name, nameOccName )
 import NameEnv
 import OccName          ( occNameFS )
 import CmdLineOpts	( DynFlags )
+import ErrUtils		( WarnMsg, mkWarnMsg )
+import Bag		( mapBag )
 
 import DATA_IOREF	( newIORef, readIORef )
 
@@ -100,11 +103,11 @@ data DsMetaVal
 -- initDs returns the UniqSupply out the end (not just the result)
 
 initDs  :: HscEnv
-	-> Module -> TypeEnv
+	-> Module -> GlobalRdrEnv -> TypeEnv
 	-> DsM a
-	-> IO (a, Bag DsWarning)
+	-> IO (a, Bag WarnMsg)
 
-initDs hsc_env mod type_env thing_inside
+initDs hsc_env mod rdr_env type_env thing_inside
   = do 	{ warn_var <- newIORef emptyBag
 	; let { if_env = IfGblEnv { if_rec_types = Just (mod, return type_env) }
 	      ; gbl_env = DsGblEnv { ds_mod = mod, 
@@ -116,8 +119,13 @@ initDs hsc_env mod type_env thing_inside
 	; res <- initTcRnIf 'd' hsc_env gbl_env lcl_env thing_inside
 
 	; warns <- readIORef warn_var
-	; return (res, warns)
+	; return (res, mapBag mk_warn warns)
 	}
+   where
+    print_unqual = unQualInScope rdr_env
+
+    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
+    mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc
 \end{code}
 
 And all this mysterious stuff is so we can occasionally reach out and

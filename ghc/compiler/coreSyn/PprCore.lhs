@@ -352,7 +352,7 @@ pprIdRules :: [IdCoreRule] -> SDoc
 pprIdRules rules = vcat (map pprIdRule rules)
 
 pprIdRule :: IdCoreRule -> SDoc
-pprIdRule (id,rule) = pprCoreRule (ppr id) rule
+pprIdRule (IdCoreRule id _ rule) = pprCoreRule (ppr id) rule
 
 pprCoreRule :: SDoc -> CoreRule -> SDoc
 pprCoreRule pp_fn (BuiltinRule name _)

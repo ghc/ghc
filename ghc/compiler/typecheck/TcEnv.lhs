@@ -485,7 +485,7 @@ topIdLvl id | isLocalId id = topLevel
 -- Indicates the legal transitions on bracket( [| |] ).
 bracketOK :: ThStage -> Maybe ThLevel
 bracketOK (Brack _ _ _) = Nothing	-- Bracket illegal inside a bracket
-bracketOK stage         = (Just (thLevel stage + 1))
+bracketOK stage         = Just (thLevel stage + 1)
 
 -- Indicates the legal transitions on splice($).
 spliceOK :: ThStage -> Maybe ThLevel

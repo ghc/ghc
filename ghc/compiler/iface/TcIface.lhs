@@ -549,11 +549,18 @@ tcIfaceRule (IfaceRule {ifRuleName = rule_name, ifActivation = act, ifRuleBndrs 
     do	{ fn <- tcIfaceExtId fn_rdr
 	; args' <- mappM tcIfaceExpr args
 	; rhs'  <- tcIfaceExpr rhs
-	; returnM (fn, (Rule rule_name act bndrs' args' rhs')) }
+	; let rule = Rule rule_name act bndrs' args' rhs'
+	; returnM (IdCoreRule fn (isOrphNm fn_rdr) rule) }
+  where
 
 tcIfaceRule (IfaceBuiltinRule fn_rdr core_rule)
   = do	{ fn <- tcIfaceExtId fn_rdr
-	; returnM (fn, core_rule) }
+	; returnM (IdCoreRule fn (isOrphNm fn_rdr) core_rule) }
+
+isOrphNm :: IfaceExtName -> Bool
+isOrphNm (LocalTop _)      = False
+isOrphNm (LocalTopSub _ _) = False
+isOrphNm other		   = True
 \end{code}
 
 

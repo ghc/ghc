@@ -94,10 +94,10 @@ tidyNote env note            = note
 ------------  Rules  --------------
 tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
 tidyIdRules env [] = []
-tidyIdRules env ((fn,rule) : rules)
+tidyIdRules env (IdCoreRule fn is_orph rule : rules)
   = tidyRule env rule  		=: \ rule ->
     tidyIdRules env rules 	=: \ rules ->
-     ((tidyVarOcc env fn, rule) : rules)
+    (IdCoreRule (tidyVarOcc env fn) is_orph rule : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
 tidyRule env rule@(BuiltinRule _ _) = rule

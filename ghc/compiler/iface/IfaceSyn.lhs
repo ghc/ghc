@@ -618,14 +618,14 @@ toIfaceIdInfo ext id_info
 
 --------------------------
 coreRuleToIfaceRule :: ModuleName -> (Name -> IfaceExtName) -> IdCoreRule -> IfaceRule
-coreRuleToIfaceRule mod ext (id, BuiltinRule _ _)
+coreRuleToIfaceRule mod ext (IdCoreRule id _ (BuiltinRule _ _))
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule (mkIfaceExtName (getName id)))
 
-coreRuleToIfaceRule mod ext (id, Rule name act bndrs args rhs)
-  = IfaceRule { ifRuleName = name, ifActivation = act, 
+coreRuleToIfaceRule mod ext (IdCoreRule id _ (Rule name act bndrs args rhs))
+  = IfaceRule { ifRuleName  = name, ifActivation = act, 
 		ifRuleBndrs = map (toIfaceBndr ext) bndrs,
-		ifRuleHead = ext (idName id), 
-		ifRuleArgs = map (toIfaceExpr (mkLhsNameFn mod)) args,
+		ifRuleHead  = ext (idName id), 
+		ifRuleArgs  = map (toIfaceExpr (mkLhsNameFn mod)) args,
 			-- Use LHS name-fn for the args
 		ifRuleRhs = toIfaceExpr ext rhs }
 

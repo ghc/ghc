@@ -150,21 +150,6 @@ data TcGblEnv
 	
 	tcg_inst_env :: InstEnv,	-- Instance envt for *home-package* modules
 					-- Includes the dfuns in tcg_insts
-	tcg_inst_uses :: TcRef NameSet,	-- Home-package Dfuns actually used 
-		-- Used to generate version dependencies
-		-- This records usages, rather like tcg_dus, but it has to
-		-- be a mutable variable so it can be augmented 
-		-- when we look up an instance.  These uses of dfuns are
-		-- rather like the free variables of the program, but
-		-- are implicit instead of explicit.
-
-	tcg_th_used :: TcRef Bool,	-- True <=> Template Haskell syntax used
-		-- We need this so that we can generate a dependency on the
-		-- Template Haskell package, becuase the desugarer is going to
-		-- emit loads of references to TH symbols.  It's rather like 
-		-- tcg_inst_uses; the reference is implicit rather than explicit,
-		-- so we have to zap a mutable variable.
-
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 
@@ -180,11 +165,33 @@ data TcGblEnv
 				--		things have not changed version stamp
 				-- 	(b) unused-import info
 
-	tcg_keep :: NameSet,	-- Set of names to keep alive, and to expose in the 
-				-- interface file (but not to export to the user).
-				-- These are typically extra definitions generated from
-				-- data type declarations which would otherwise be
-				-- dropped as dead code.  
+	tcg_keep :: TcRef NameSet,	-- Locally-defined top-level names to keep alive
+		-- "Keep alive" means give them an Exported flag, so
+		-- that the simplifier does not discard them as dead 
+		-- code, and so that they are exposed in the interface file
+		-- (but not to export to the user).
+		--
+		-- Some things, like dict-fun Ids and default-method Ids are 
+		-- "born" with the Exported flag on, for exactly the above reason,
+		-- but some we only discover as we go.  Specifically:
+		--	* The to/from functions for generic data types
+		--	* Top-level variables appearing free in the RHS of an orphan rule
+		--	* Top-level variables appearing free in a TH bracket
+
+	tcg_inst_uses :: TcRef NameSet,	-- Home-package Dfuns actually used 
+		-- Used to generate version dependencies
+		-- This records usages, rather like tcg_dus, but it has to
+		-- be a mutable variable so it can be augmented 
+		-- when we look up an instance.  These uses of dfuns are
+		-- rather like the free variables of the program, but
+		-- are implicit instead of explicit.
+
+	tcg_th_used :: TcRef Bool,	-- True <=> Template Haskell syntax used
+		-- We need this so that we can generate a dependency on the
+		-- Template Haskell package, becuase the desugarer is going to
+		-- emit loads of references to TH symbols.  It's rather like 
+		-- tcg_inst_uses; the reference is implicit rather than explicit,
+		-- so we have to zap a mutable variable.
 
 		-- The next fields accumulate the payload of the module
 		-- The binds, rules and foreign-decl fiels are collected
@@ -312,7 +319,21 @@ pass it inwards.
 -- Template Haskell levels 
 ---------------------------
 
-type ThLevel = Int	-- Always >= 0
+type ThLevel = Int	
+	-- Indicates how many levels of brackets we are inside
+	-- 	(always >= 0)
+	-- Incremented when going inside a bracket,
+	-- decremented when going inside a splice
+
+impLevel, topLevel :: ThLevel
+topLevel = 1	-- Things defined at top level of this module
+impLevel = 0	-- Imported things; they can be used inside a top level splice
+--
+-- For example: 
+--	f = ...
+--	g1 = $(map ...)		is OK
+--	g2 = $(f ...)		is not OK; because we havn't compiled f yet
+
 
 data ThStage
   = Comp   				-- Ordinary compiling, at level topLevel
@@ -323,16 +344,6 @@ data ThStage
 topStage, topSpliceStage :: ThStage
 topStage       = Comp
 topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level splice
-
-
-impLevel, topLevel :: ThLevel
-topLevel = 1	-- Things defined at top level of this module
-impLevel = 0	-- Imported things; they can be used inside a top level splice
---
--- For example: 
---	f = ...
---	g1 = $(map ...)		is OK
---	g2 = $(f ...)		is not OK; because we havn't compiled f yet
 
 
 ---------------------------

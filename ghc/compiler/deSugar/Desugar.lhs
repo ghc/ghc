@@ -15,7 +15,7 @@ import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
-import Id		( Id, setIdLocalExported, idName )
+import Id		( Id, setIdLocalExported, idName, idIsFrom, isLocalId )
 import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
@@ -65,34 +65,53 @@ deSugar hsc_env
 		    	    tcg_dus	  = dus, 
 		    	    tcg_inst_uses = dfun_uses_var,
 			    tcg_th_used   = th_var,
+			    tcg_keep	  = keep_var,
 		    	    tcg_rdr_env   = rdr_env,
 		    	    tcg_fix_env   = fix_env,
 	    	    	    tcg_deprecs   = deprecs,
+			    tcg_binds     = binds,
+			    tcg_fords     = fords,
+			    tcg_rules     = rules,
 		    	    tcg_insts     = insts })
   = do	{ showPass dflags "Desugar"
 
-	-- Do desugaring
-	; (results, warnings) <- initDs hsc_env mod type_env $
-				 dsProgram ghci_mode tcg_env
+	-- Desugar the program
+	; ((all_prs, ds_rules, ds_fords), warns) 
+		<- initDs hsc_env mod rdr_env type_env $ do
+		{ core_prs <- dsHsBinds auto_scc binds []
+		; (ds_fords, foreign_prs) <- dsForeigns fords
+		; let all_prs = foreign_prs ++ core_prs
+		      local_bndrs = mkVarSet (map fst all_prs)
+		; ds_rules <- mappM (dsRule mod local_bndrs) rules
+		; return (all_prs, ds_rules, ds_fords) }
 
-	; let { (ds_binds, ds_rules, ds_fords) = results
-	      ; warns    = mapBag mk_warn warnings
-	      }
+
 
 	-- If warnings are considered errors, leave.
 	; if errorsFound dflags (warns, emptyBag)
 	   then return (warns, Nothing)
 	   else do
 
+	{ 	-- Add export flags to bindings
+	  keep_alive <- readIORef keep_var
+	; let final_prs = addExportFlags ghci_mode exports keep_alive 
+				   	 all_prs ds_rules
+	      ds_binds  = [Rec final_prs]
+	-- Notice that we put the whole lot in a big Rec, even the foreign binds
+	-- When compiling PrelFloat, which defines data Float = F# Float#
+	-- we want F# to be in scope in the foreign marshalling code!
+	-- You might think it doesn't matter, but the simplifier brings all top-level
+	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
+
 	-- Lint result if necessary
-	{ endPass dflags "Desugar" Opt_D_dump_ds ds_binds
+	; endPass dflags "Desugar" Opt_D_dump_ds ds_binds
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
 		  (printDump (ppr_ds_rules ds_rules))
 
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
-	; th_used   <- readIORef th_var
+	; th_used   <- readIORef th_var			-- Whether TH is used
 	; let used_names = allUses dus `unionNameSets` dfun_uses
 	      pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
 	      	   | otherwise = imp_dep_pkgs imports
@@ -143,13 +162,8 @@ deSugar hsc_env
   where
     dflags       = hsc_dflags hsc_env
     ghci_mode    = hsc_mode hsc_env
-    print_unqual = unQualInScope rdr_env
-
-	-- Desugarer warnings are SDocs; here we
-	-- add the info about whether or not to print unqualified
-    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
-    mk_warn (loc, sdoc) = mkWarnMsg loc print_unqual sdoc
-
+    auto_scc | opt_SccProfilingOn = TopLevel
+	     | otherwise          = NoSccs
 
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
@@ -160,13 +174,13 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; (core_expr, ds_warns) <- initDs hsc_env this_mod type_env $
+	; (core_expr, ds_warns) <- initDs hsc_env this_mod rdr_env type_env $
 				   dsLExpr tc_expr
 
 	-- Display any warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs (pprBagOfWarnings (mapBag mk_warn ds_warns)))
+		  (printErrs (pprBagOfWarnings ds_warns))
 
 	-- Dump output
 	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)
@@ -175,38 +189,7 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	}
   where
     dflags       = hsc_dflags hsc_env
-    print_unqual = unQualInScope rdr_env
 
-    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
-    mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc
-
-
-dsProgram ghci_mode (TcGblEnv { tcg_exports = exports,
-		      		tcg_keep    = keep_alive,
-		      		tcg_binds   = binds,
-		      		tcg_fords   = fords,
-		      		tcg_rules   = rules })
-  = dsHsBinds auto_scc binds []	`thenDs` \ core_prs ->
-    dsForeigns fords			`thenDs` \ (ds_fords, foreign_prs) ->
-    let
-	all_prs = foreign_prs ++ core_prs
-	local_bndrs = mkVarSet (map fst all_prs)
-    in
-    mappM (dsRule local_bndrs) rules	`thenDs` \ ds_rules ->
-    let
-	final_prs = addExportFlags ghci_mode exports keep_alive 
-				   local_bndrs all_prs ds_rules
-	ds_binds  = [Rec final_prs]
-	-- Notice that we put the whole lot in a big Rec, even the foreign binds
-	-- When compiling PrelFloat, which defines data Float = F# Float#
-	-- we want F# to be in scope in the foreign marshalling code!
-	-- You might think it doesn't matter, but the simplifier brings all top-level
-	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
-    in
-    returnDs (ds_binds, ds_rules, ds_fords)
-  where
-    auto_scc | opt_SccProfilingOn = TopLevel
-	     | otherwise          = NoSccs
 
 --		addExportFlags
 -- Set the no-discard flag if either 
@@ -224,19 +207,22 @@ dsProgram ghci_mode (TcGblEnv { tcg_exports = exports,
 -- it's just because the type checker is rather busy already and
 -- I didn't want to pass in yet another mapping.
 
-addExportFlags ghci_mode exports keep_alive bndrs prs rules
+addExportFlags ghci_mode exports keep_alive prs rules
   = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
   where
-    add_export bndr | dont_discard bndr = setIdLocalExported bndr
-		    | otherwise	        = bndr
+    add_export bndr
+	| isLocalId bndr && dont_discard bndr  = setIdLocalExported bndr
+		-- The isLocalId check is to avoid fiddling with
+		-- locally-defined Ids like data cons and class ops
+		-- which are "born" as GlobalIds
+	| otherwise	 		       = bndr
 
     orph_rhs_fvs = unionVarSets [ ruleRhsFreeVars rule
-			        | (id, rule) <- rules, 
-				  not (id `elemVarSet` bndrs) ]
-	-- An orphan rule must keep alive the free vars 
-	-- of its right-hand side.  
-	-- Non-orphan rules are attached to the Id (bndr_with_rules above)
-	-- and that keeps the rhs free vars alive
+			        | IdCoreRule _ is_orphan_rule rule <- rules, 
+				  is_orphan_rule ]
+	-- An orphan rule keeps alive the free vars of its right-hand side.  
+	-- Non-orphan rules are (later, after gentle simplification) 
+	-- attached to the Id and that keeps the rhs free vars alive
 
     dont_discard bndr = is_exported name
 		     || name `elemNameSet` keep_alive
@@ -270,15 +256,18 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: IdSet -> LRuleDecl Id -> DsM (Id, CoreRule)
-dsRule in_scope (L loc (HsRule name act vars lhs rhs))
+dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM IdCoreRule
+dsRule mod in_scope (L loc (HsRule name act vars lhs rhs))
   = putSrcSpanDs loc $ 
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
     dsLExpr rhs			`thenDs` \ core_rhs ->
-    returnDs (fn, Rule name act tpl_vars args core_rhs)
+    returnDs (IdCoreRule fn (is_orphan fn) (Rule name act tpl_vars args core_rhs))
   where
-    tpl_vars = [var | RuleBndr (L _ var) <- vars]
-    all_vars = mkInScopeSet (extendVarSetList in_scope tpl_vars)
+    tpl_vars  = [var | RuleBndr (L _ var) <- vars]
+    all_vars  = mkInScopeSet (extendVarSetList in_scope tpl_vars)
+    is_orphan id = not (idIsFrom mod id)
+	-- NB we can't use isLocalId in the orphan test, 
+	-- because isLocalId isn't true of class methods
 
 ds_lhs all_vars lhs
   = let
@@ -288,7 +277,7 @@ ds_lhs all_vars lhs
 		other			 	       -> (emptyBag, lhs)
     in
     mappM ds_dict_bind (bagToList dict_binds) 	`thenDs` \ dict_binds' ->
-    dsLExpr body			`thenDs` \ body' ->
+    dsLExpr body				`thenDs` \ body' ->
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form

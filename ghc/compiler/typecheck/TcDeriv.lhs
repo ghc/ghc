@@ -205,11 +205,10 @@ And then translate it to:
 \begin{code}
 tcDeriving  :: [LTyClDecl Name]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
-		    [HsBindGroup Name],	-- Extra generated top-level bindings
-		    NameSet)		-- Binders to keep alive
+		    [HsBindGroup Name])	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], [], emptyNameSet)) $
+  = recoverM (returnM ([], [])) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
 	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns tycl_decls
@@ -227,18 +226,20 @@ tcDeriving tycl_decls
 	-- Rename these extra bindings, discarding warnings about unused bindings etc
 	-- Set -fglasgow exts so that we can have type signatures in patterns,
 	-- which is used in the generic binds
-	; (rn_binds, gen_bndrs) 
+	; rn_binds
 		<- discardWarnings $ setOptM Opt_GlasgowExts $ do
 			{ (rn_deriv, _dus1) <- rnTopBinds deriv_binds []
 			; (rn_gen, dus_gen) <- rnTopBinds gen_binds   []
-			; return (rn_deriv ++ rn_gen, duDefs dus_gen) }
+			; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to
+								-- be kept alive
+			; return (rn_deriv ++ rn_gen) }
 
 
 	; dflags <- getDOpts
 	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
 	  	   (ddump_deriving inst_info rn_binds))
 
-	; returnM (inst_info, rn_binds, gen_bndrs)
+	; returnM (inst_info, rn_binds)
 	}
   where
     ddump_deriving :: [InstInfo] -> [HsBindGroup Name] -> SDoc

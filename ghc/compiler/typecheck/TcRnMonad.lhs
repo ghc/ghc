@@ -32,7 +32,7 @@ import ErrUtils		( Message, Messages, emptyMessages, errorsFound,
 			  mkLocMessage, mkLongErrMsg )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
-import NameSet		( emptyDUs, emptyNameSet )
+import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSet )
 import OccName		( emptyOccEnv )
 import Module		( moduleName )
 import Bag		( emptyBag )
@@ -75,6 +75,7 @@ initTc hsc_env mod do_this
       	tvs_var      <- newIORef emptyVarSet ;
 	type_env_var <- newIORef emptyNameEnv ;
 	dfuns_var    <- newIORef emptyNameSet ;
+	keep_var     <- newIORef emptyNameSet ;
 	th_var	     <- newIORef False ;
 
       	let {
@@ -96,7 +97,7 @@ initTc hsc_env mod do_this
 		tcg_insts    = [],
 		tcg_rules    = [],
 		tcg_fords    = [],
-		tcg_keep     = emptyNameSet
+		tcg_keep     = keep_var
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,
@@ -770,6 +771,14 @@ setLclTypeEnv lcl_env thing_inside
 \begin{code}
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeMutVar (tcg_th_used env) True }
+
+keepAliveTc :: Name -> TcM ()  	-- Record the name in the keep-alive set
+keepAliveTc n = do { env <- getGblEnv; 
+		   ; updMutVar (tcg_keep env) (`addOneToNameSet` n) }
+
+keepAliveSetTc :: NameSet -> TcM ()  	-- Record the name in the keep-alive set
+keepAliveSetTc ns = do { env <- getGblEnv; 
+		       ; updMutVar (tcg_keep env) (`unionNameSets` ns) }
 
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }

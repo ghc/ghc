@@ -209,7 +209,7 @@ prepareRules :: HscEnv
 					-- 	(b) Rules are now just orphan rules
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     guts@(ModGuts { mg_binds = binds, mg_rules = local_rules, mg_module = this_mod })
+	     guts@(ModGuts { mg_binds = binds, mg_rules = local_rules })
 	     us 
   = do	{ eps <- hscEPS hsc_env
 
@@ -219,8 +219,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	      env	       = setInScopeSet (emptySimplEnv SimplGently []) local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
-	      (rules_for_locals, orphan_rules) = partition is_local_rule better_rules
-	      is_local_rule (id,_)             = idIsFrom this_mod id
+	      (orphan_rules, rules_for_locals) = partition isOrphanRule better_rules
 		-- Get the rules for locally-defined Ids out of the RuleBase
 		-- If we miss any rules for Ids defined here, then we end up
 		-- giving the local decl a new Unique (because the in-scope-set is (hackily) the
@@ -230,8 +229,6 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		--	Example:	class Foo a where
 		--			  op :: a -> a
 		--			{-# RULES "op" op x = x #-}
-		-- 
-		-- NB we can't use isLocalId, because isLocalId isn't true of class methods.
 
 		-- NB: we assume that the imported rules dont include 
 		--     rules for Ids in this module; if there is, the above bad things may happen
@@ -265,7 +262,8 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		       text "Imported rules", pprRuleBase imp_rule_base])
 
 #ifdef DEBUG
-	; let bad_rules = filter (idIsFrom this_mod) (varSetElems (ruleBaseIds imp_rule_base))
+	; let bad_rules = filter (idIsFrom (mg_mod guts)) 
+				 (varSetElems (ruleBaseIds imp_rule_base))
 	; WARN( not (null bad_rules), ppr bad_rules ) return ()
 #endif
 	; return (imp_rule_base, guts { mg_binds = binds_w_rules, mg_rules = orphan_rules })
@@ -295,13 +293,13 @@ which without simplification looked like:
 This doesn't match unless you do eta reduction on the build argument.
 
 \begin{code}
-simplRule env rule@(id, BuiltinRule _ _)
+simplRule env rule@(IdCoreRule id _ (BuiltinRule _ _))
   = returnSmpl rule
-simplRule env rule@(id, Rule act name bndrs args rhs)
+simplRule env (IdCoreRule id is_orph (Rule act name bndrs args rhs))
   = simplBinders env bndrs		`thenSmpl` \ (env, bndrs') -> 
     mapSmpl (simplExprGently env) args	`thenSmpl` \ args' ->
     simplExprGently env rhs		`thenSmpl` \ rhs' ->
-    returnSmpl (id, Rule act name bndrs' args' rhs')
+    returnSmpl (IdCoreRule id is_orph (Rule act name bndrs' args' rhs'))
 
 -- It's important that simplExprGently does eta reduction.
 -- For example, in a rule like:

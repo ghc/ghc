@@ -43,9 +43,9 @@ import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType, MetaDetails(..),
 			)
 import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
 
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector, idName )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
-import Name		( Name )
+import Name		( Name, isExternalName )
 import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
 			  tyConDataCons, tyConFields )
 import Type		( zipTopTvSubst, mkTopTvSubst, substTheta, substTy )
@@ -773,24 +773,24 @@ tcId :: Name -> TcM (HsExpr TcId, [TcTyVar], TcRhoType)
 	-- Return the type variables at which the function
 	-- is instantiated, as well as the translated variable and its type
 
-tcId name	-- Look up the Id and instantiate its type
-  = tcLookup name	`thenM` \ thing ->
+tcId id_name	-- Look up the Id and instantiate its type
+  = tcLookup id_name	`thenM` \ thing ->
     case thing of {
-    	AGlobal (AnId id) -> instantiate id
-		-- A global cannot possibly be ill-staged
-		-- nor does it need the 'lifting' treatment
-
-    ;	AGlobal (ADataCon con)	-- Similar, but instantiate the stupid theta too
+    	AGlobal (ADataCon con)	-- Similar, but instantiate the stupid theta too
 	  -> do { (expr, tvs, tau) <- instantiate (dataConWrapId con)
 		; tcInstStupidTheta con (mkTyVarTys tvs)
 		-- Remember to chuck in the constraints from the "silly context"
 		; return (expr, tvs, tau) }
 
+    ;	AGlobal (AnId id) -> instantiate id
+		-- A global cannot possibly be ill-staged
+		-- nor does it need the 'lifting' treatment
+
     ;	ATcId id th_level proc_level 
 	  -> do	{ checkProcLevel id proc_level
 		; tc_local_id id th_level }
 
-    ;	other -> pprPanic "tcId" (ppr name $$ ppr thing)
+    ;	other -> pprPanic "tcId" (ppr id_name $$ ppr thing)
     }
   where
 
@@ -805,33 +805,48 @@ tcId name	-- Look up the Id and instantiate its type
 	  case use_stage of
 	      Brack use_lvl ps_var lie_var
 		| use_lvl > th_bind_lvl 
-		-> 	-- E.g. \x -> [| h x |]
-		-- We must behave as if the reference to x was
-		--	h $(lift x)	
-		-- We use 'x' itself as the splice proxy, used by 
-		-- the desugarer to stitch it all back together.
-		-- If 'x' occurs many times we may get many identical
-		-- bindings of the same splice proxy, but that doesn't
-		-- matter, although it's a mite untidy.
-		let
-		    id_ty = idType id
-		in
-		checkTc (isTauTy id_ty)	(polySpliceErr id)	`thenM_` 
-		    -- If x is polymorphic, its occurrence sites might
-		    -- have different instantiations, so we can't use plain
-		    -- 'x' as the splice proxy name.  I don't know how to 
-		    -- solve this, and it's probably unimportant, so I'm
-		    -- just going to flag an error for now
+		-> if isExternalName id_name then	
+			-- Top-level identifiers in this module,
+			-- (which have External Names)
+		  	-- are just like the imported case:
+			-- no need for the 'lifting' treatment
+			-- E.g.  this is fine:
+			--   f x = x
+			--   g y = [| f 3 |]
+			-- But we do need to put f into the keep-alive
+			-- set, because after desugaring the code will
+			-- only mention f's *name*, not f itself.
+			keepAliveTc id_name	`thenM_` 
+			instantiate id
 
-		setLIEVar lie_var	(
-		newMethodFromName orig id_ty DsMeta.liftName	`thenM` \ lift ->
-			-- Put the 'lift' constraint into the right LIE
-	
-		-- Update the pending splices
-	        readMutVar ps_var			`thenM` \ ps ->
-	        writeMutVar ps_var ((name, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)	`thenM_`
-	
-		returnM (HsVar id, [], id_ty))
+		   else	-- Nested identifiers, such as 'x' in
+			-- E.g. \x -> [| h x |]
+	   		-- We must behave as if the reference to x was
+			--	h $(lift x)	
+			-- We use 'x' itself as the splice proxy, used by 
+			-- the desugarer to stitch it all back together.
+			-- If 'x' occurs many times we may get many identical
+			-- bindings of the same splice proxy, but that doesn't
+			-- matter, although it's a mite untidy.
+		   let
+		       id_ty = idType id
+		   in
+		   checkTc (isTauTy id_ty)	(polySpliceErr id)	`thenM_` 
+		       -- If x is polymorphic, its occurrence sites might
+		       -- have different instantiations, so we can't use plain
+		       -- 'x' as the splice proxy name.  I don't know how to 
+		       -- solve this, and it's probably unimportant, so I'm
+		       -- just going to flag an error for now
+   
+		   setLIEVar lie_var	(
+		   newMethodFromName orig id_ty DsMeta.liftName	`thenM` \ lift ->
+			   -- Put the 'lift' constraint into the right LIE
+	   
+		   -- Update the pending splices
+	           readMutVar ps_var			`thenM` \ ps ->
+	           writeMutVar ps_var ((id_name, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)	`thenM_`
+	   
+		   returnM (HsVar id, [], id_ty))
 
 	      other -> 
 		checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage	`thenM_`
@@ -870,7 +885,7 @@ tcId name	-- Look up the Id and instantiate its type
 				  (_,[],_)    -> False 	-- Not overloaded
 				  (_,theta,_) -> not (any isLinearPred theta)
 
-    orig = OccurrenceOf name
+    orig = OccurrenceOf id_name
 \end{code}
 
 %************************************************************************

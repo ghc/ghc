@@ -161,8 +161,8 @@ make the whole module an orphan module, which is bad.
 
 \begin{code}
 ruleLhsFreeNames :: IdCoreRule -> NameSet
-ruleLhsFreeNames (fn, BuiltinRule _ _) = unitNameSet (varName fn)
-ruleLhsFreeNames (fn, Rule _ _ tpl_vars tpl_args rhs)
+ruleLhsFreeNames (IdCoreRule fn _ (BuiltinRule _ _)) = unitNameSet (varName fn)
+ruleLhsFreeNames (IdCoreRule fn _ (Rule _ _ tpl_vars tpl_args rhs))
   = addOneToNameSet (exprsFreeNames tpl_args `del_binders` tpl_vars) (varName fn)
 
 exprFreeNames :: CoreExpr -> NameSet
@@ -211,11 +211,10 @@ ruleRhsFreeVars (Rule str _ tpl_vars tpl_args rhs)
     rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
 
 ruleLhsFreeIds :: CoreRule -> VarSet
--- This finds all the free Ids on the LHS of the rule
--- *including* imported ids
+-- This finds all locally-defined free Ids on the LHS of the rule
 ruleLhsFreeIds (BuiltinRule _ _) = noFVs
 ruleLhsFreeIds (Rule _ _ tpl_vars tpl_args rhs)
-  = foldl delVarSet (exprsSomeFreeVars isId tpl_args) tpl_vars
+  = foldl delVarSet (exprsFreeVars tpl_args) tpl_vars
 \end{code}
 
 

@@ -11,7 +11,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 import CmdLineOpts	( DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
-import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
+import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
 import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
 import PprCore 		( pprIdRules )
 import CoreLint		( showPass, endPass )
@@ -128,13 +128,14 @@ tidyCorePgm hsc_env
 	; showPass dflags "Tidy Core"
 
 	; let omit_iface_prags = dopt Opt_OmitInterfacePragmas dflags
-	; let ext_ids   = findExternalSet   omit_iface_prags binds_in orphans_in
+	; let ext_ids   = findExternalSet   omit_iface_prags binds_in
 	; let ext_rules = findExternalRules omit_iface_prags binds_in orphans_in ext_ids
 		-- findExternalRules filters ext_rules to avoid binders that 
 		-- aren't externally visible; but the externally-visible binders 
 		-- are computed (by findExternalSet) assuming that all orphan
-		-- rules are exported.  So in fact we may export more than we
-		-- need.  (It's a sort of mutual recursion.)
+		-- rules are exported (they get their Exported flag set in the desugarer)
+		-- So in fact we may export more than we need. 
+		-- (It's a sort of mutual recursion.)
 
 	-- We also make sure to avoid any exported binders.  Consider
 	--	f{-u1-} = 1	-- Local decl
@@ -272,25 +273,29 @@ findExternalRules :: Bool	  -- Omit interface pragmas
 findExternalRules omit_iface_prags binds orphan_rules ext_ids
   | omit_iface_prags = []
   | otherwise
-  = filter needed_rule (orphan_rules ++ local_rules)
+  = filter (not . internal_rule) (orphan_rules ++ local_rules)
   where
     local_rules  = [ rule
  		   | id <- bindersOfBinds binds,
 		     id `elemVarEnv` ext_ids,
 		     rule <- idCoreRules id
 		   ]
-    needed_rule (id, rule)
-	=  not (isBuiltinRule rule)
+    internal_rule (IdCoreRule id is_orphan rule)
+	=  isBuiltinRule rule
 	 	-- We can't print builtin rules in interface files
 		-- Since they are built in, an importing module
 		-- will have access to them anyway
 
-	&& not (any internal_id (varSetElems (ruleLhsFreeIds rule)))
+	|| (not is_orphan && internal_id id)
+		-- Rule for an Id in this module; internal if the
+		-- Id is not exported
+
+	|| any internal_id (varSetElems (ruleLhsFreeIds rule))
 		-- Don't export a rule whose LHS mentions an Id that
 		-- is completely internal (i.e. not visible to an
 		-- importing module)
 
-    internal_id id = isLocalId id && not (id `elemVarEnv` ext_ids)
+    internal_id id = not (id `elemVarEnv` ext_ids)
 \end{code}
 
 %************************************************************************
@@ -300,24 +305,14 @@ findExternalRules omit_iface_prags binds orphan_rules ext_ids
 %************************************************************************
 
 \begin{code}
-findExternalSet :: Bool -- omit interface pragmas
-		-> [CoreBind] -> [IdCoreRule]
+findExternalSet :: Bool		-- Omit interface pragmas
+		-> [CoreBind]
 		-> IdEnv Bool	-- In domain => external
 				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
-findExternalSet omit_iface_prags binds orphan_rules
-  = foldr find init_needed binds
+findExternalSet omit_iface_prags binds
+  = foldr find emptyVarEnv binds
   where
-    orphan_rule_ids :: IdSet
-    orphan_rule_ids = unionVarSets [ ruleRhsFreeVars rule 
-				   | (_, rule) <- orphan_rules]
-    init_needed :: IdEnv Bool
-    init_needed = mapUFM (\_ -> False) orphan_rule_ids
-	-- The mapUFM is a bit cheesy.  It is a cheap way
-	-- to turn the set of orphan_rule_ids, which we use to initialise
-	-- the sweep, into a mapping saying 'don't expose unfolding'	
-	-- (When we come to the binding site we may change our mind, of course.)
-
     find (NonRec id rhs) needed
 	| need_id needed id = addExternal omit_iface_prags (id,rhs) needed
 	| otherwise 	    = needed

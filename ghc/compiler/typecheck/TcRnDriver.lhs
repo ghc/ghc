@@ -197,19 +197,6 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 		-- Process the export list
 	exports <- exportsFromAvail (isJust maybe_mod) exports ;
 
-{- 	Jan 04: I don't think this is necessary any more; usage info is derived from tcg_dus
-		-- Get any supporting decls for the exports that have not already
-		-- been sucked in for the declarations in the body of the module.
-		-- (This can happen if something is imported only to be re-exported.)
-		--
-		-- Importing these supporting declarations is required 
-		--	*only* to gether usage information
-		--	(see comments with MkIface.mkImportInfo for why)
-		-- We don't need the results, but sucking them in may side-effect
-		-- the ExternalPackageState, apart from recording usage
-	mappM (tcLookupGlobal . availName) export_avails ;
--}
-
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
 	let { mod_deprecs = checkModDeprec mod_deprec } ;
@@ -635,9 +622,6 @@ check_main ghci_mode tcg_env main_mod main_fn
      -- If we are in module Main, check that 'main' is defined.
      -- It may be imported from another module!
      --
-     -- ToDo: We have to return the main_name separately, because it's a
-     -- bona fide 'use', and should be recorded as such, but the others
-     -- aren't 
      -- 
      -- Blimey: a whole page of code to do this...
  | mod_name /= main_mod
@@ -665,6 +649,8 @@ check_main ghci_mode tcg_env main_mod main_fn
 					`snocBag` main_bind,
 			    tcg_dus   = tcg_dus tcg_env
 				        `plusDU` usesOnly (unitFV main_name)
+			-- Record the use of 'main', so that we don't 
+			-- complain about it being defined but not used
 		 }) 
     }}}
   where

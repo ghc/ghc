@@ -613,12 +613,12 @@ data RuleBase = RuleBase
 ruleBaseIds (RuleBase ids) = ids
 emptyRuleBase = RuleBase emptyVarSet
 
-extendRuleBaseList :: RuleBase -> [(Id,CoreRule)] -> RuleBase
+extendRuleBaseList :: RuleBase -> [IdCoreRule] -> RuleBase
 extendRuleBaseList rule_base new_guys
   = foldl extendRuleBase rule_base new_guys
 
-extendRuleBase :: RuleBase -> (Id,CoreRule) -> RuleBase
-extendRuleBase (RuleBase rule_ids) (id, rule)
+extendRuleBase :: RuleBase -> IdCoreRule -> RuleBase
+extendRuleBase (RuleBase rule_ids) (IdCoreRule id _ rule)
   = RuleBase (extendVarSet rule_ids new_id)
   where
     new_id    = setIdSpecialisation id (addRule id old_rules rule)
