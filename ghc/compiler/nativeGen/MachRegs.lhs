@@ -17,7 +17,7 @@ module MachRegs (
 
 	Reg(..),
 	Imm(..),
-	Addr(..),
+	Address(..),
 	RegLoc(..),
 	SYN_IE(RegNo),
 
@@ -60,7 +60,7 @@ module MachRegs (
     ) where
 
 #if __GLASGOW_HASKELL__ >= 202
-import GlaExts hiding (Addr)
+import GlaExts
 import FastString
 #else
 IMP_Ubiq(){-uitous-}
@@ -108,7 +108,7 @@ dblImmLit r
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 \begin{code}
-data Addr
+data Address
 #if alpha_TARGET_ARCH
   = AddrImm	Imm
   | AddrReg	Reg
@@ -116,7 +116,7 @@ data Addr
 #endif
 
 #if i386_TARGET_ARCH
-  = Addr	Base Index Displacement
+  = Address	Base Index Displacement
   | ImmAddr	Imm Int
 
 type Base         = Maybe Reg
@@ -129,7 +129,7 @@ type Displacement = Imm
   | AddrRegImm	Reg Imm
 #endif
 
-addrOffset :: Addr -> Int -> Maybe Addr
+addrOffset :: Address -> Int -> Maybe Address
 
 addrOffset addr off
   = case addr of
@@ -137,10 +137,10 @@ addrOffset addr off
       _ -> panic "MachMisc.addrOffset not defined for Alpha"
 #endif
 #if i386_TARGET_ARCH
-      ImmAddr i off0	  -> Just (ImmAddr i (off0 + off))
-      Addr r i (ImmInt n) -> Just (Addr r i (ImmInt (n + off)))
-      Addr r i (ImmInteger n)
-	-> Just (Addr r i (ImmInt (fromInteger (n + toInteger off))))
+      ImmAddr i off0	     -> Just (ImmAddr i (off0 + off))
+      Address r i (ImmInt n) -> Just (Address r i (ImmInt (n + off)))
+      Address r i (ImmInteger n)
+	-> Just (Address r i (ImmInt (fromInteger (n + toInteger off))))
       _ -> Nothing
 #endif
 #if sparc_TARGET_ARCH
@@ -226,9 +226,16 @@ stgReg x
       BaseReg		-> sStLitLbl SLIT("MainRegTable")
 	-- these Hp&HpLim cases perhaps should
 	-- not be here for i386 (???) WDP 96/03
+#ifndef i386_TARGET_ARCH
+	-- Yup, Hp&HpLim are not mapped into registers for x86's at the mo, so
+	-- fetching Hp off BaseReg is the sensible option, since that's
+	-- where gcc generated code stuffs/expects it (RTBL_Hp & RTBL_HpLim).
+	--  SOF 97/09
+	-- In fact, why use StorageMgrInfo at all?
       Hp		-> StInd PtrRep (sStLitLbl SLIT("StorageMgrInfo"))
       HpLim		-> StInd PtrRep (sStLitLbl
 				(_PK_ ("StorageMgrInfo+" ++ BYTES_PER_WORD_STR)))
+#endif
       TagReg		-> StInd IntRep (StPrim IntSubOp [infoptr,
 				StInt (1*BYTES_PER_WORD)])
 			where
@@ -249,17 +256,17 @@ applicable, is the same but for the frame pointer.
 
 \begin{code}
 spRel :: Int	-- desired stack offset in words, positive or negative
-      -> Addr
+      -> Address
 
 spRel n
 #if i386_TARGET_ARCH
-  = Addr (Just esp) Nothing (ImmInt (n * BYTES_PER_WORD))
+  = Address (Just esp) Nothing (ImmInt (n * BYTES_PER_WORD))
 #else
   = AddrRegImm sp (ImmInt (n * BYTES_PER_WORD))
 #endif
 
 #if sparc_TARGET_ARCH
-fpRel :: Int -> Addr
+fpRel :: Int -> Address
     -- Duznae work for offsets greater than 13 bits; we just hope for
     -- the best
 fpRel n
