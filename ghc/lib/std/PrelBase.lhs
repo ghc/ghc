@@ -224,6 +224,8 @@ class  (Eq a, Show a, Eval a) => Num a  where
 \end{code}
 
 \begin{code}
+{-# SPECIALISE succ :: Int -> Int #-}
+{-# SPECIALISE pred :: Int -> Int #-}
 succ, pred              :: Enum a => a -> a
 succ                    =  toEnum . (+1) . fromEnum
 pred                    =  toEnum . (subtract 1) . fromEnum
