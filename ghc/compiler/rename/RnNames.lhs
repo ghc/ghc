@@ -200,10 +200,13 @@ importsFromImportDecl this_mod
 	(dependent_mods, dependent_pkgs) 
 	   | isHomeModule imp_mod 
 	   = 	-- Imported module is from the home package
-		-- Take its dependent modules and
-		--	(a) remove this_mod (might be there as a hi-boot)
-		--	(b) add imp_mod itself
+		-- Take its dependent modules and add imp_mod itself
 		-- Take its dependent packages unchanged
+		-- NB: (dep_mods deps) might include a hi-boot file for the module being
+		--	compiled, CM. Do *not* filter this out (as we used to), because when 
+		--	we've finished dealing with the direct imports we want to know if any 
+		--	of them depended on CM.hi-boot, in which case we should do the hi-boot
+		--	consistency check.  See LoadIface.loadHiBootInterface
 	     ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
 
 	   | otherwise	

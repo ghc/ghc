@@ -225,6 +225,7 @@ import BinIface		( writeBinIface, v_IgnoreHiWay )
 import Unique		( Unique, Uniquable(..) )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Digraph		( stronglyConnComp, SCC(..) )
+import SrcLoc		( SrcSpan )
 import FiniteMap
 import FastString
 
@@ -663,20 +664,22 @@ bump_unless False v = bumpVersion v
 
 
 \begin{code}
-mkUsageInfo :: HscEnv -> ImportAvails -> NameSet -> IO [Usage]
-mkUsageInfo hsc_env
-	    (ImportAvails { imp_mods = dir_imp_mods,
-			    imp_dep_mods = dep_mods })
-	    used_names
+mkUsageInfo :: HscEnv 
+	    -> ModuleEnv (Module, Maybe Bool, SrcSpan)
+	    -> [(ModuleName, IsBootInterface)]
+	    -> NameSet -> IO [Usage]
+mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
   = do	{ eps <- hscEPS hsc_env
-	; return (mk_usage_info (eps_PIT eps) (hsc_HPT hsc_env) 
-				dir_imp_mods dep_mods used_names) }
+	; let usages = mk_usage_info (eps_PIT eps) (hsc_HPT hsc_env) 
+				     dir_imp_mods dep_mods used_names
+	; usages `seqList`  return usages }
+	 -- seq the list of Usages returned: occasionally these
+	 -- don't get evaluated for a while and we can end up hanging on to
+	 -- the entire collection of Ifaces.
 
 mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
-  = -- seq the list of Usages returned: occasionally these
-    -- don't get evaluated for a while and we can end up hanging on to
-    -- the entire collection of Ifaces.
-    usages `seqList` usages
+  = mapCatMaybes mkUsage dep_mods
+	-- ToDo: do we need to sort into canonical order?
   where
     used_names = mkNameSet $			-- Eliminate duplicates
 		 [ nameParent n			-- Just record usage on the 'main' names
@@ -695,9 +698,6 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
     		     mod = nameModule name
     		     add_item occs _ = occ:occs
     
-    usages = mapCatMaybes mkUsage (moduleEnvElts dep_mods)
-	-- ToDo: do we need to sort into canonical order?
-
     import_all mod = case lookupModuleEnv dir_imp_mods mod of
     			Just (_,imp_all,_) -> isNothing imp_all
     			Nothing		   -> False

@@ -92,18 +92,24 @@ deSugar hsc_env
 		  (printDump (ppr_ds_rules ds_rules))
 
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
+	; th_used   <- readIORef th_var
 	; let used_names = allUses dus `unionNameSets` dfun_uses
-	; usages <- mkUsageInfo hsc_env imports used_names
+	      pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
+	      	   | otherwise = imp_dep_pkgs imports
 
-	; th_used <- readIORef th_var
-	; let 
-	     pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
-		  | otherwise = imp_dep_pkgs imports
-
-	     mods = moduleEnvElts (delModuleEnv (imp_dep_mods imports) mod)
+	      dep_mods = moduleEnvElts (delModuleEnv (imp_dep_mods imports) mod)
 		-- M.hi-boot can be in the imp_dep_mods, but we must remove
 		-- it before recording the modules on which this one depends!
+		-- (We want to retain M.hi-boot in imp_dep_mods so that 
+		--  loadHiBootInterface can see if M's direct imports depend 
+		--  on M.hi-boot, and hence that we should do the hi-boot consistency 
+		--  check.)
 
+	      dir_imp_mods = imp_mods imports
+
+	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
+
+	; let 
 		-- ModuleNames don't compare lexicographically usually, 
 		-- but we want them to do so here.
 	     le_mod :: ModuleName -> ModuleName -> Bool	 
@@ -111,7 +117,7 @@ deSugar hsc_env
 	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
 	     le_dep_mod (m1,_) (m2,_) = m1 `le_mod` m2
 
-	     deps = Deps { dep_mods  = sortLe le_dep_mod mods,
+	     deps = Deps { dep_mods  = sortLe le_dep_mod dep_mods,
 			   dep_pkgs  = sortLe (<=)   pkgs,	
 			   dep_orphs = sortLe le_mod (imp_orphs imports) }
 		-- sort to get into canonical order
@@ -121,7 +127,7 @@ deSugar hsc_env
 		mg_exports  = exports,
 		mg_deps	    = deps,
 		mg_usages   = usages,
-		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts (imp_mods imports)],
+		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
 	        mg_rdr_env  = rdr_env,
 		mg_fix_env  = fix_env,
 		mg_deprecs  = deprecs,

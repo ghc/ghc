@@ -121,9 +121,14 @@ rnSrcDecls (HsGroup { hs_valds  = [HsBindGroup binds sigs _],
 	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, 
 				src_fvs4, src_fvs5] ;
 	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
+		-- Note: src_dus will contain *uses* for locally-defined types
+		-- and classes, but no *defs* for them.  (Because rnTyClDecl 
+		-- returns only the uses.)  This is a little 
+		-- surprising but it doesn't actually matter at all.
 	} ;
 
 	traceRn (text "finish rnSrc" <+> ppr rn_group) ;
+	traceRn (text "finish Dus" <+> ppr src_dus ) ;
 	tcg_env <- getGblEnv ;
 	return (tcg_env `addTcgDUs` src_dus, rn_group)
     }}}

@@ -424,6 +424,8 @@ the hi-boot interface as our checklist.
 checkHiBootIface :: TypeEnv -> [Name] -> TcM ()
 -- Compare the hi-boot file for this module (if there is one)
 -- with the type environment we've just come up with
+-- In the common case where there is no hi-boot file, the list
+-- of boot_names is empty.
 checkHiBootIface env boot_names
   = mapM_ (check_one env) boot_names
 

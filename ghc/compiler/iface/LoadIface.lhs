@@ -108,7 +108,7 @@ loadHiBootInterface
   = do 	{ eps <- getEps
 	; mod <- getModule
 
-	; traceIf (text "loadBootIface" <+> ppr mod)
+	; traceIf (text "loadHiBootInterface" <+> ppr mod)
 
 	-- We're read all the direct imports by now, so eps_is_boot will
 	-- record if any of our imports mention us by way of hi-boot file
