@@ -248,7 +248,7 @@ splitWithPS pred (PS ps) =
          : splitify (break_pt + 1)
 
 first_pos_that_satisfies pred ps len n = 
-   case [ m | m <- [n..len], pred (ps ! m) ] of
+   case [ m | m <- [n..len-1], pred (ps ! m) ] of
 	[]    -> len
 	(m:_) -> m
 
