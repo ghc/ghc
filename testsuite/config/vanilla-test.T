@@ -1,4 +1,3 @@
-
 -----------------------------------------------------------------------
 --- Stuff to do with simple single-source-file tests.  We assume    ---
 --- that the name of the test is to be used as the basename         ---
@@ -8,6 +7,9 @@
 $diff = "diff -c2"
 $rm   = "rm -f"
 $cp   = "cp"
+
+-- global variables:
+$stdin = ""
 
 ---------------------------------------------------------------
 -- Define the following things on the command line:
@@ -92,8 +94,14 @@ def say_fail_because_noteq ( $filename1, $filename2 )
 	runCmdDontFail($cp ++ " " ++ $filename2 ++ " " ++ $filename1)
    fi
    if defined $verbose then
-	runCmd($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
+	$ignore = runCmd($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
    fi
+}
+
+def say_fail_because_output_produced ( $filename1 )
+{
+   print "--- FAIL because the program produced non-empty output:"
+   print "---      " ++ $filename1
 }
 
 def say_fail_because_nonempty ( $filename1 )
@@ -187,12 +195,15 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
 
 def simple_run_main( $_extra_args )
 {
+   -- figure out what to use for stdin
    $devnull = "/dev/null"
-   $spec_stdin = qualify("stdin")
+   if $stdin == "" then
+	$stdin = qualify("stdin")
+   fi
+   $use_stdin = if exists($stdin) then $stdin else $devnull
+
    $run_stdout = qualify("run.stdout")
    $run_stderr = qualify("run.stderr")
-   $use_stdin
-      = if exists($spec_stdin) then $spec_stdin else $devnull
 
    rm_or_fail($run_stdout)
    rm_or_fail($run_stderr)
@@ -230,7 +241,11 @@ def check_stdout_ok()
    $s_stdout  = qualify("stdout")
 
    if   not ( exists($s_stdout) )
-   then return (contents($r_stdout) == "")
+   then if ((contents $r_stdout) == "")
+	   then return True
+	   else say_fail_because_output_produced($r_stdout)
+		return False
+	fi
    fi
 
    return same($s_stdout, $r_stdout)
@@ -245,7 +260,11 @@ def check_stderr_ok()
    $s_stderr  = qualify("stderr")
 
    if   not ( exists($s_stderr) )
-   then return ((contents $r_stderr) == "")
+   then if ((contents $r_stderr) == "")
+	   then return True
+	   else say_fail_because_output_produced($r_stdout)
+		return False
+	fi
    fi
 
    return same($s_stderr, $r_stderr)
@@ -313,7 +332,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
 
    -- There's no expected stderr, so just insist that the compiler
    -- produced nothing on stderr.
-   if   contents($actual_stderr) /= "" 
+   if   (contents $actual_stderr) /= "" 
    then say_fail_because_nonempty($actual_stderr)
         return False
    fi
