@@ -167,6 +167,7 @@ main/Main_HC_OPTS 		= -fvia-C -DPROJECTVERSION=$(GhcProjectVersion)
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
 nativeGen/PprMach_HC_OPTS 	= -K2m
 nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
+nativeGen/MachCode_HC_OPTS 	= -H10m
 parser/UgenAll_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/UgenUtil_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_constr_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
@@ -178,9 +179,9 @@ parser/U_literal_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_maybe_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_either_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
-parser/U_tree_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
-prelude/PrimOp_HC_OPTS 		= -K3m
+prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 rename/ParseIface_HC_OPTS 	+= -Onot -H16m
@@ -209,6 +210,7 @@ rename/RnMonad_HC_OPTS		= -fvia-C
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
+typecheck/TcHsSyn_HC_OPTS	= -H10m
 typecheck/TcExpr_HC_OPTS	= -H10m
 typecheck/TcEnv_HC_OPTS		= -H10m
 ifeq "$(Ghc2_0)" "NO"
