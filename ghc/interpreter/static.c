@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/03/09 02:47:13 $
+ * $Revision: 1.26 $
+ * $Date: 2000/03/09 06:14:38 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -34,8 +34,8 @@ static List   local checkSubentities    Args((List,List,List,String,Text));
 static List   local checkExportTycon    Args((List,Text,Cell,Tycon));
 static List   local checkExportClass    Args((List,Text,Cell,Class));
 static List   local checkExport         Args((List,Text,Cell));
-static List   local checkImportEntity   Args((List,Module,Cell));
-static List   local resolveImportList   Args((Module,Cell));
+static List   local checkImportEntity   Args((List,Module,Bool,Cell));
+static List   local resolveImportList   Args((Module,Cell,Bool));
 static Void   local checkImportList     Args((Pair));
 
 static Void   local importEntity        Args((Module,Cell));
@@ -354,15 +354,28 @@ Text   textParent; {
     return imports;
 }
 
-static List local checkImportEntity(imports,exporter,entity)
+static List local checkImportEntity(imports,exporter,priv,entity)
 List   imports; /* Accumulated list of things to import */
 Module exporter;
-Cell   entity; { /* Entry from import list */
+Bool priv;
+Cell entity; { /* Entry from import list */
     List oldImports = imports;
     Text t  = isIdent(entity) ? textOf(entity) : textOf(fst(entity));
-    List es = module(exporter).exports; 
+    List es = NIL;
+    if (priv) {
+      es = module(exporter).names;
+      es = dupOnto(module(exporter).tycons,es);
+      es = dupOnto(module(exporter).classes,es);
+    } else {
+      es = module(exporter).exports; 
+    }
+
     for(; nonNull(es); es=tl(es)) {
-        Cell e = hd(es); /* :: Entity | (Entity, NIL|DOTDOT) */
+        Cell e = hd(es); /* :: Entity
+			     | (Entity, NIL|DOTDOT)
+			     | tycon 
+			     | class
+			  */
         if (isPair(e)) {
             Cell f = fst(e);
             if (isTycon(f)) {
@@ -403,6 +416,18 @@ Cell   entity; { /* Entry from import list */
             if (isIdent(entity) && name(e).text == t) {
                 imports = cons(e,imports);
             }
+        } else if (isTycon(e) && priv) {
+	    if (tycon(e).text == t) {
+	        imports = cons(e,imports);
+		return dupOnto(tycon(e).defn,imports);
+	    }
+        } else if (isClass(e) && priv) {
+	    if (cclass(e).text == t) {
+	        imports = cons(e,imports);
+		return dupOnto(cclass(e).members,imports);
+	    }
+        } else if (whatIs(e) == TUPLE && priv) {
+	  // do nothing
         } else {
             internal("checkImportEntity3");
         }
@@ -416,9 +441,10 @@ Cell   entity; { /* Entry from import list */
     return imports;
 }
 
-static List local resolveImportList(m,impList)
+static List local resolveImportList(m,impList,priv)
 Module m;  /* exporting module */
-Cell   impList; {
+Cell impList; 
+Bool priv; {
     List imports = NIL;
     if (DOTDOT == impList) {
         List es = module(m).exports;
@@ -441,6 +467,7 @@ Cell   impList; {
                 }
             }
         }
+#if 0
     } else if (STAR == impList) {
       List xs;
       for(xs=module(m).names; nonNull(xs); xs=tl(xs)) {
@@ -460,8 +487,9 @@ Cell   impList; {
 		|| tycon(t).what == NEWTYPE))
 	  imports = dupOnto(tycon(t).defn,imports);
       }
+#endif
     } else {
-        map1Accum(checkImportEntity,imports,m,impList);
+        map2Accum(checkImportEntity,imports,m,priv,impList);
     }
     return imports;
 }
@@ -483,10 +511,15 @@ Pair importSpec; {
         /* Somewhat inefficient - but obviously correct:
          * imports = importsOf("module Foo") `setDifference` hidden;
          */
-        hidden  = resolveImportList(m, snd(impList));
-        imports = resolveImportList(m, DOTDOT);
+        hidden  = resolveImportList(m, snd(impList),FALSE);
+        imports = resolveImportList(m, DOTDOT,FALSE);
+    } else if (isPair(impList) && STAR == fst(impList)) {
+        /* Somewhat inefficient - but obviously correct:
+         * imports = importsOf("module Foo") `setDifference` hidden;
+         */
+      imports = resolveImportList(m, snd(impList),TRUE);
     } else {
-        imports = resolveImportList(m, impList);
+        imports = resolveImportList(m, impList,FALSE);
     }
 
     for(; nonNull(imports); imports=tl(imports)) {

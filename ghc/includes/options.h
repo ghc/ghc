@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.18 $
- * $Date: 2000/03/06 08:42:56 $
+ * $Revision: 1.19 $
+ * $Date: 2000/03/09 06:14:38 $
  * ------------------------------------------------------------------------*/
 
 
@@ -172,6 +172,7 @@
 #undef  PROVIDE_PTREQUALITY
 #undef  PROVIDE_COERCE
 
+#define  PROVIDE_COERCE     1
 #define PROVIDE_PTREQUALITY 1
 
 /* Set to 1 to use a non-GMP implementation of integer, in the

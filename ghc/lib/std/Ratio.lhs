@@ -80,8 +80,16 @@ approxRational rat eps	=  simplest (rat-eps) (rat+eps)
 					   nd''       =  simplest' d' r' d r
 					   n''        =  numerator nd''
 					   d''        =	 denominator nd''
+
 \end{code}
 
+#else
+
+\begin{code}
+-- Hugs already has this functionally inside its prelude
+\end{code}
 
 #endif
+
+
 

@@ -60,7 +60,7 @@ module Prelude (
 --  module Ratio,
     Ratio, Rational, (%), numerator, denominator, approxRational,
 --  Non-standard exports
-    IO(..), IOResult(..), Addr, StablePtr,
+    IO, IOResult(..), Addr, StablePtr,
     makeStablePtr, freeStablePtr, deRefStablePtr,
 
     Bool(False, True),
@@ -101,49 +101,6 @@ module Prelude (
     fst, snd, curry, uncurry, id, const, (.), flip, ($), until,
     asTypeOf, error, undefined,
     seq, ($!)
-
-    , MVar, newEmptyMVar, newMVar, putMVar, takeMVar, readMVar, swapMVar
-    , ThreadId, forkIO
-    , trace
-
-
-    , ST(..)
-    , STRef, newSTRef, readSTRef, writeSTRef
-    , IORef, newIORef, readIORef, writeIORef
-    , PrimMutableArray, PrimMutableByteArray
-    , RealWorld
-
-    -- This lot really shouldn't be exported, but are needed to
-    -- implement various libs.
-    , runST , fixST, unsafeInterleaveST 
-    , stToIO , ioToST
-    , unsafePerformIO
-    , primReallyUnsafePtrEquality
-    ,hugsprimCompAux,PrimArray, primNewArray,primWriteArray
-    ,primReadArray, primIndexArray, primSizeMutableArray
-    ,primSizeArray
-    ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
-    ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
-    ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
-    ,unsafeInterleaveIO,nh_write,primCharToInt,
-    nullAddr, incAddr, isNullAddr, 
-    nh_filesize, nh_iseof, nh_system, nh_exitwith, nh_getPID,
-    nh_getCPUtime, nh_getCPUprec, prelCleanupAfterRunAction,
-
-    Word,
-    primGtWord, primGeWord, primEqWord, primNeWord,
-    primLtWord, primLeWord, primMinWord, primMaxWord,
-    primPlusWord, primMinusWord, primTimesWord, primQuotWord,
-    primRemWord, primQuotRemWord, primNegateWord, primAndWord,
-    primOrWord, primXorWord, primNotWord, primShiftLWord,
-    primShiftRAWord, primShiftRLWord, primIntToWord, primWordToInt,
-
-    primAndInt, primOrInt, primXorInt, primNotInt,
-    primShiftLInt, primShiftRAInt,  primShiftRLInt,
-
-    primAddrToInt, primIntToAddr,
-
-    primDoubleToFloat, primFloatToDouble,
 
   ) where
 
@@ -1658,11 +1615,9 @@ print :: Show a => a -> IO ()
 print = putStrLn . show
 
 getChar :: IO Char
-getChar = unsafeInterleaveIO (
-          nh_stdin  >>= \h -> 
+getChar = nh_stdin  >>= \h -> 
           nh_read h >>= \ci -> 
           return (primIntToChar ci)
-          )
 
 getLine :: IO String
 getLine    = do c <- getChar
@@ -1906,12 +1861,6 @@ hugsprimRunIO_toplevel m
            = primCatch (protect (n-1) comp)
                        (\e -> fst (unIO (putStr (show e ++ "\n")) realWorld))
 
-trace, trace_quiet :: String -> a -> a
-trace s x
-   = trace_quiet ("trace: " ++ s) x
-trace_quiet s x
-   = (unsafePerformIO (putStr (s ++ "\n"))) `seq` x
-
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO m = IO (\ s -> (fst (unIO m s), s))
 
@@ -2064,6 +2013,8 @@ forkIO computation
      where
         realWorld = error "primForkIO: entered the RealWorld"
 
+trace_quiet s x
+   = (unsafePerformIO (putStr (s ++ "\n"))) `seq` x
 
 -- showFloat ------------------------------------------------------------------
 

@@ -45,6 +45,15 @@ import PrelShow
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 #else
+import Prelude
+import privileged Prelude ( PrimArray
+			  , runST
+		          , primNewArray
+	                  , primWriteArray
+			  , primReadArray
+			  , primUnsafeFreezeArray
+			  , primIndexArray
+			  )
 import Ix
 import List( (\\) )
 #endif
@@ -89,7 +98,7 @@ ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
 data Array ix elt = Array (ix,ix) (PrimArray elt)
 
 array :: Ix a => (a,a) -> [(a,b)] -> Array a b
-array ixs@(ix_start, ix_end) ivs = primRunST (do
+array ixs@(ix_start, ix_end) ivs = runST (do
   { mut_arr <- primNewArray (rangeSize ixs) arrEleBottom
   ; mapM_ (\ (i,v) -> primWriteArray mut_arr (index ixs i) v) ivs 
   ; arr <- primUnsafeFreezeArray mut_arr

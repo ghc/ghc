@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/09 02:47:13 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/09 06:14:38 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -529,9 +529,9 @@ impDecl   : IMPORT modid impspec        {addQualImport($2,$2);
           | IMPORT QUALIFIED modid impspec
                                         {addQualImport($3,$3);
                                          $$ = gc4($3);}
-          | IMPORT PRIVILEGED modid     {addQualImport($3,$3);
-                                         addUnqualImport($3,gc0(STAR));
-					 $$ = gc4($3);}
+          | IMPORT PRIVILEGED modid '(' imports ')'
+	                                {addUnqualImport($3,ap(STAR,$5));
+					 $$ = gc6($3);}
           | IMPORT error                {syntaxError("import declaration");}
           ;
 impspec   : /* empty */                 {$$ = gc0(DOTDOT);}

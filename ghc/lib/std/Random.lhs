@@ -36,10 +36,19 @@ import PrelRead		( readDec )
 import PrelIOBase	( unsafePerformIO, stToIO )
 import PrelArr		( MutableVar, newVar, readVar, writeVar )
 import PrelReal		( toInt )
-import CPUTime		( getCPUTime )
 import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
 #endif
+import CPUTime		( getCPUTime )
+import Prelude
+import privileged Prelude
+			( IORef
+			, newIORef
+			, readIORef
+			, writeIORef
+			, unsafePerformIO
+			)
+
 
 import Char ( isSpace, chr, ord )
 \end{code}
@@ -184,7 +193,9 @@ instance Random Float where
 \begin{code}
 #ifdef __HUGS__
 mkStdRNG :: Integer -> IO StdGen
-mkStdRNG o = return (createStdGen o)
+mkStdRNG o = do
+    ct          <- getCPUTime
+    return (createStdGen (ct + o))
 #else
 mkStdRNG :: Integer -> IO StdGen
 mkStdRNG o = do
@@ -270,7 +281,7 @@ getStdGen :: IO StdGen
 getStdGen  = readIORef theStdGen
 
 theStdGen :: IORef StdGen
-theStdGen  = primRunST (newIORef (createStdGen 0))
+theStdGen  = unsafePerformIO (newIORef (createStdGen 0))
 
 #else
 

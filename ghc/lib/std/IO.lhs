@@ -94,6 +94,32 @@ module IO (
 
 #ifdef __HUGS__
 import Ix(Ix)
+import Prelude
+import privileged Prelude ( IORef
+			  , unsafePerformIO
+			  , prelCleanupAfterRunAction
+			  , copy_String_to_cstring
+			  , primIntToChar
+			  , primWriteCharOffAddr
+			  , nullAddr
+			  , newIORef
+			  , writeIORef
+			  , readIORef
+			  , nh_close
+			  , nh_errno
+			  , nh_stdin
+			  , nh_stdout
+			  , nh_stderr
+			  , nh_flush
+			  , nh_open
+			  , nh_free
+			  , nh_read
+			  , nh_write
+			  , nh_filesize
+			  , nh_iseof
+			  )
+			
+
 #else
 --import PrelST
 import PrelBase
@@ -156,7 +182,7 @@ hWaitForInput handle msecs =
 @hGetChar hdl@ reads the next character from handle @hdl@,
 blocking until a character is available.
 
-\begin{code}
+]\begin{code}
 hGetChar :: Handle -> IO Char
 hGetChar handle = do
   c <- mayBlockRead "hGetChar" handle fileGetc
@@ -731,24 +757,24 @@ mkErr h msg
 stdin
    = Handle {
         name = "stdin",
-        file = primRunST nh_stdin,
-        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        file = unsafePerformIO nh_stdin,
+        mut  = unsafePerformIO (newIORef (Handle_Mut { state = HOpen })),
         mode = ReadMode
      }
 
 stdout
    = Handle {
         name = "stdout",
-        file = primRunST nh_stdout,
-        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        file = unsafePerformIO nh_stdout,
+        mut  = unsafePerformIO (newIORef (Handle_Mut { state = HOpen })),
         mode = WriteMode
      }
 
 stderr
    = Handle {
         name = "stderr",
-        file = primRunST nh_stderr,
-        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        file = unsafePerformIO nh_stderr,
+        mut  = unsafePerformIO (newIORef (Handle_Mut { state = HOpen })),
         mode = WriteMode
      }
 
@@ -790,7 +816,7 @@ data HState = HOpen | HSemiClosed | HClosed
 -- once handles appear in the list.
 
 allHandles :: IORef [Handle]
-allHandles  = primRunST (newIORef [])
+allHandles  = unsafePerformIO (newIORef [])
 
 elemWriterHandles :: FilePath -> IO Bool
 elemAllHandles    :: FilePath -> IO Bool

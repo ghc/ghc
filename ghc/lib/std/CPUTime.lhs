@@ -65,6 +65,12 @@ foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 #else
 
 \begin{code}
+import Prelude
+import privileged Prelude ( nh_getCPUtime
+			  , nh_getCPUprec
+		          , unsafePerformIO
+			  )
+
 getCPUTime :: IO Integer
 getCPUTime 
    = do seconds <- nh_getCPUtime
@@ -72,7 +78,7 @@ getCPUTime
 
 cpuTimePrecision :: Integer
 cpuTimePrecision
-   = primRunST (
+   = unsafePerformIO (
         do resolution <- nh_getCPUprec
            return (round (resolution * 1.0e+12))
      )
