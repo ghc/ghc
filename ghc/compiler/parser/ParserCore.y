@@ -98,6 +98,11 @@ vdefg	:: { [RdrNameHsDecl] }
 	: '%rec' '{' vdefs1 '}' { $3   }
 	|  vdef                 { [$1] }
 
+let_bind :: { UfBinding RdrName }
+	: '%rec' '{' vdefs1 '}' { UfRec (map convBind $3)   }
+	|  vdef                 { let (b,r) = convBind $1
+				  in UfNonRec b r }
+
 vdefs1	:: { [RdrNameHsDecl] }
 	: vdef		        { [$1] }
 	| vdef ';' vdefs1       { $1:$3 }
@@ -176,7 +181,7 @@ fexp	:: { UfExpr RdrName }
 exp	:: { UfExpr RdrName }
 	: fexp		           { $1 }
 	| '\\' binds1 '->' exp 	   { foldr UfLam $4 $2 }
-	| '%let' vdefg '%in' exp   { UfLet (toUfBinder $2) $4 }
+	| '%let' let_bind '%in' exp   { UfLet $2 $4 }
 	| '%case' aexp '%of' vbind
 	  '{' alts1 '}'		   { UfCase $2 (fst $4) $6 }
 	| '%coerce' aty exp   	   { UfNote (UfCoerce $2) $3 } -- what about the 'from' type?
@@ -235,16 +240,10 @@ q_d_name	:: { RdrName }
 
 
 {
-toUfBinder :: [RdrNameHsDecl] -> UfBinding RdrName
-toUfBinder xs  = 
- case xs of 
-   [x] -> uncurry UfNonRec (conv x)
-   _   -> UfRec (map conv xs)
- where
-  conv (TyClD (CoreDecl n ty rhs _)) = (UfValBinder n ty, rhs)
+convBind :: RdrNameHsDecl -> (UfBinder RdrName, UfExpr RdrName)
+convBind (TyClD (CoreDecl n ty rhs _)) = (UfValBinder n ty, rhs)
 
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l
-
 }
 
