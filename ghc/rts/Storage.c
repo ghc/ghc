@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.81 2003/10/24 09:52:51 simonmar Exp $
+ * $Id: Storage.c,v 1.82 2003/10/24 09:56:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -475,6 +475,7 @@ allocate( nat n )
     nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
     bd = allocGroup(req_blocks);
     dbl_link_onto(bd, &g0s0->large_objects);
+    g0s0->n_large_blocks += req_blocks;
     bd->gen_no  = 0;
     bd->step = g0s0;
     bd->flags = BF_LARGE;
