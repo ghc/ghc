@@ -332,6 +332,15 @@ install ::
 	      fi; \
 	done
 
+install-docs ::
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
+	   if [ -d $$i ]; then \
+	      $(MAKE) -C $$i install-docs; \
+	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	      fi; \
+	done
+
 # Turn off target.mk's rules for 'all', 'boot' and 'install'.
 NO_BOOT_TARGET=YES
 NO_ALL_TARGET=YES
