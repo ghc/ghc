@@ -49,3 +49,5 @@ test('conc036', normal, compile_and_run, [''])
 
 test('conc037', skip, compile_and_run, [''])
 test('conc038', skip, compile_and_run, [''])
+
+test('conc039', normal, compile_and_run, [''])
