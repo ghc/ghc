@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.154 2002/09/17 12:20:15 simonmar Exp $
+ * $Id: Schedule.c,v 1.155 2002/09/18 06:34:07 mthomas Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2473,8 +2473,10 @@ GetRoots(evac_fn evac)
   markSparkQueue(evac);
 #endif
 
+#ifndef mingw32_TARGET_OS
   // mark the signal handlers (signals should be already blocked)
   markSignalHandlers(evac);
+#endif
 }
 
 /* -----------------------------------------------------------------------------
