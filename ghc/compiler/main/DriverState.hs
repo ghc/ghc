@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.72 2002/03/15 13:57:31 simonmar Exp $
+-- $Id: DriverState.hs,v 1.73 2002/03/29 20:14:31 krasimir Exp $
 --
 -- Settings for the driver
 --
@@ -497,6 +497,7 @@ getPackageLibraries = do
      -- See driver/PackageSrc.hs for the HSbase1/HSbase2 split definition.
      -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
      -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
+     -- KAA 29 Mar  02: Same appalling hack for HSobjectio[1,2,3,4]
      hACK libs
 #      ifndef mingw32_TARGET_OS
        = libs
@@ -506,6 +507,9 @@ getPackageLibraries = do
          else
          if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
          then "HSwin32" : filter (not.(isPrefixOf "HSwin32")) libs
+         else 
+         if   "HSobjectio1" `elem` libs && "HSobjectio2" `elem` libs && "HSobjectio3" `elem` libs && "HSobjectio4" `elem` libs
+	 then "HSobjectio" : filter (not.(isPrefixOf "HSobjectio")) libs
          else 
          libs
 #      endif
