@@ -264,9 +264,13 @@ endif
 	$(RM) -rf $(dir $@)
 	$(XSLTPROC) --stringparam base.dir $(dir $@) \
 		    --stringparam manifest.in.base.dir 1 \
-		    --stringparam htmlhelp.chm $(basename $<).chm \
+		    --stringparam htmlhelp.chm "..\\"$(basename $<).chm \
 		    $(XSLTPROC_OPTS) \
 		    $(DIR_DOCBOOK_XSL)/htmlhelp/htmlhelp.xsl $<
+
+# TODO: Detect hhc via autoconf
+%.chm : %-htmlhelp/index.html
+	( cd $(dir $<) && hhc htmlhelp.hhp )
 
 %.fo : %.xml
 	$(XSLTPROC) --output $@ \

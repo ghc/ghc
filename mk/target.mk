@@ -811,23 +811,19 @@ install-docs:: $(INSTALL_DOCS)
 endif
 endif
 
-# The following could be an entry for an Obfuscated Makefile Contest...
+# TODO: The following could be an entry for an Obfuscated Makefile Contest...
 ifneq "$(INSTALL_XML_DOC)" ""
 ifneq "$(XMLDocWays)" ""
-install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%-htmlhelp/index.html,$(patsubst %.html,%-html/index.html,.$(i)))))
+install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%.chm,$(patsubst %.html,%-html/index.html,.$(i)))))
 	@$(INSTALL_DIR) $(datadir)	
 	@for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
 			$(INSTALL_DIR) $(datadir)/html; \
 			echo "( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html )" ; \
 			( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html ) ; \
-		elif [ $$i = "htmlhelp" ]; then \
-			$(INSTALL_DIR) $(datadir)/htmlhelp; \
-			echo "( cd $(INSTALL_XML_DOC)-htmlhelp && $(CP) * $(datadir)/htmlhelp )" ; \
-			( cd $(INSTALL_XML_DOC)-htmlhelp && $(CP) * $(datadir)/htmlhelp ) ; \
 		else \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir); \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir); \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
 		fi; \
 		if [ $$i = "html-no-chunks" ]; then \
 			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
