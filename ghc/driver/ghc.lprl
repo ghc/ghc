@@ -287,6 +287,7 @@ these are turned off by -Wnot.
 		     '-fwarn-unused-imports');
 @MinusWallOpts 	  = (@MinusWOpts, 
 		     '-fwarn-unused-matches',
+		     '-fwarn-type-defaults',
 		     '-fwarn-name-shadowing',
 		     '-fwarn-missing-signatures');
 \end{code}
@@ -2331,7 +2332,6 @@ sub process_ghc_timings {
     print STDERR "Warning: MutElapsed not found in stats file\n" unless defined($MutElapsed);
     print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
     print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
-    print STDERR "Warning: total memory not found in stats file\n" unless defined($TotMem);
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
@@ -3261,7 +3261,7 @@ arg: while($_ = $Args[0]) {
 
     #---------- Linker (gcc, really) ---------------------------------------
 
-    /^-static$/		&& do { push(@Ld_flags, $_); next arg; };
+    /^-static$/		&& do { push(@HsC_flags, $_); push(@Ld_flags, $_); next arg; };
     /^-no-hs-main$/	&& do { $NoHaskellMain=1; next arg;    };
 
     #---------- mixed cc and linker magic ----------------------------------
