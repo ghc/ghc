@@ -159,6 +159,16 @@ i[[3456]]86-*-cygwin32*)
         HostOS_CPP='cygwin32'
 	exeext='.exe'
         ;;
+i[[3456]]86-*-mingw32*)
+	HostPlatform=i386-unknown-mingw32 # hack again
+	TargetPlatform=i386-unknown-mingw32
+	BuildPlatform=i386-unknown-mingw32
+        HostPlatform_CPP='i386_unknown_mingw32'
+        HostArch_CPP='i386'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='mingw32'
+	exeext='.exe'
+        ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
         HostArch_CPP='m68k'

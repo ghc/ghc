@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.36 1999/01/11 10:15:04 sof Exp $
+dnl $Id: aclocal.m4,v 1.37 1999/01/26 09:59:18 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -77,7 +77,8 @@ changequote(<<, >>)dnl
 <<
 case $HostPlatform in
 alpha-dec-osf*) fptools_cv_lead_uscore='no';;
-*cygwin32)      fptools_cv_lead_uscore='yes';;
+*cygwin32) fptools_cv_lead_uscore='yes';;
+*mingw32) fptools_cv_lead_uscore='yes';;
 *) >>
 changequote([, ])dnl
 AC_TRY_RUN([#ifdef HAVE_NLIST_H
