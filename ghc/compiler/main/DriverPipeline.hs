@@ -1027,6 +1027,30 @@ staticLink o_files dep_packages = do
 
     [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, basePackage]
 
+    ways <- readIORef v_Ways
+
+    -- Here are some libs that need to be linked at the *end* of
+    -- the command line, because they contain symbols that are referred to
+    -- by the RTS.  We can't therefore use the ordinary way opts for these.
+    let
+	debug_opts | WayDebug `elem` ways = [ 
+#if defined(HAVE_LIBBFD)
+			"-lbfd", "-liberty"
+#endif
+			 ]
+		   | otherwise            = []
+
+    let
+	thread_opts | WayThreaded `elem` ways = [ 
+#if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
+			"-lpthread"
+#endif
+#if defined(osf3_TARGET_OS)
+			, "-lexc"
+#endif
+			]
+		    | otherwise               = []
+
     let extra_os = if static || no_hs_main
                    then []
                    else [ head (library_dirs rts_pkg) ++ "/Main.dll_o",
@@ -1054,6 +1078,8 @@ staticLink o_files dep_packages = do
 	 	      ++ pkg_framework_path_opts
 	 	      ++ pkg_framework_opts
 #endif
+		      ++ debug_opts
+		      ++ thread_opts
 		    ))
 
     -- parallel only: move binary to another dir -- HWL

@@ -201,7 +201,10 @@ static_flags =
   ,  ( "smp"		, NoArg (addNoDups v_Ways	WaySMP) )
   ,  ( "debug"		, NoArg (addNoDups v_Ways	WayDebug) )
   ,  ( "ndp"		, NoArg (addNoDups v_Ways	WayNDP) )
+  ,  ( "threaded"	, NoArg (addNoDups v_Ways	WayThreaded) )
  	-- ToDo: user ways
+
+	------ RTS ways -----------------------------------------------------
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dppr-noprags",     PassFlag (add v_Opt_C) )

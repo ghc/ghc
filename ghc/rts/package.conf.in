@@ -1,8 +1,15 @@
 #include "config.h"
 #include "Derived.h"
 
+/* The RTS is just another package! */
 Package {
-	name           = "rts",  /* The RTS is just another package! */
+#ifdef THREADED_RTS
+	name           = "rts_thr",
+#elif defined(DEBUG)
+	name           = "rts_debug",
+#else
+	name           = "rts",
+#endif
         import_dirs    = [],
         source_dirs    = [],
 
@@ -20,7 +27,13 @@ Package {
 #endif
 			  ],
 
+#ifdef THREADED_RTS
+        hs_libraries      = [ "HSrts_thr" ],
+#elif defined(DEBUG)
+        hs_libraries      = [ "HSrts_debug" ],
+#else
         hs_libraries      = [ "HSrts" ],
+#endif
 	extra_libraries   = [
 			    "m"		/* for ldexp() */
 #ifndef HAVE_FRAMEWORK_HASKELLSUPPORT

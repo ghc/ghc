@@ -24,11 +24,41 @@ UseGhcForCc = YES
 
 include $(TOP)/mk/boilerplate.mk
 
+PACKAGE = rts
+
 HC=$(GHC_INPLACE)
 
-WAYS=$(GhcLibWays)
+# -----------------------------------------------------------------------------
+# RTS ways
 
-PACKAGE = rts
+WAYS=$(GhcLibWays) thr debug
+
+ifneq "$(findstring p, $(GhcLibWays))" ""
+WAYS += thr_p debug_p
+endif
+
+# Way 'thr':
+WAY_thr_NAME=threaded
+WAY_thr_HC_OPTS=-optc-DTHREADED_RTS
+
+# Way 'thr_p':
+WAY_thr_p_NAME=threaded profiled
+WAY_thr_p_HC_OPTS=-optc-DTHREADED_RTS -prof
+
+# Way 'debug':
+WAY_debug_NAME=debug
+WAY_debug_HC_OPTS=-optc-DDEBUG
+
+# Way 'debug_p':
+WAY_debug_p_NAME=debug profiled
+WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
+
+ifneq "$(findstring $(way), debug debug_p)" ""
+GhcRtsHcOpts=
+GhcRtsCcOpts=-g
+endif
+
+# -----------------------------------------------------------------------------
 
 # Tells the build system not to add various Haskellish options to $(SRC_HC_OPTS)
 NON_HS_PACKAGE = YES
@@ -108,21 +138,6 @@ endif
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
-endif
-
-# You get 'threads support' in the normal
-# and profiling ways.
-ifeq "$(GhcRtsThreaded)" "YES"
-ifeq "$(way)" ""
-SRC_CC_OPTS += -DTHREADED_RTS
-SRC_HC_OPTS += -optc-DTHREADED_RTS
-PACKAGE_CPP_OPTS += -DTHREADED_RTS
-endif
-ifeq "$(way)" "p"
-SRC_CC_OPTS += -DTHREADED_RTS
-SRC_HC_OPTS += -optc-DTHREADED_RTS
-PACKAGE_CPP_OPTS += -DTHREADED_RTS
-endif
 endif
 
 # If -DDEBUG is in effect, adjust package conf accordingly..

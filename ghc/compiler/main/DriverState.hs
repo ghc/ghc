@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.97 2003/09/23 14:33:00 simonmar Exp $
+-- $Id: DriverState.hs,v 1.98 2004/02/24 17:33:34 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -379,16 +379,23 @@ getPackageLinkOpts :: [PackageName] -> IO [String]
 getPackageLinkOpts pkgs = do
   ps <- getExplicitPackagesAnd pkgs
   tag <- readIORef v_Build_tag
+  rts_tag <- readIORef v_RTS_Build_tag
   static <- readIORef v_Static
   let 
 	imp        = if static then "" else "_imp"
-	suffix     = if null tag then "" else '_':tag
-      	libs p     = map (++suffix) (hACK (hs_libraries p)) ++ extra_libraries p
+      	libs p     = map addSuffix (hACK (hs_libraries p)) ++ extra_libraries p
 	imp_libs p = map (++imp) (libs p)
 	all_opts p = map ("-l" ++) (imp_libs p) ++ extra_ld_opts p
 
+	suffix     = if null tag then "" else  '_':tag
+	rts_suffix = if null rts_tag then "" else  '_':rts_tag
+
+        addSuffix rts@"HSrts"    = rts       ++ rts_suffix
+        addSuffix other_lib      = other_lib ++ suffix
+
   return (concat (map all_opts ps))
   where
+
      -- This is a totally horrible (temporary) hack, for Win32.  Problem is
      -- that package.conf for Win32 says that the main prelude lib is 
      -- split into HSbase1, HSbase2 and HSbase3, which is needed due to a bug
@@ -476,15 +483,20 @@ getExplicitAndAutoPackageConfigs = do
 
 GLOBAL_VAR(v_Build_tag, "", String)
 
+-- The RTS has its own build tag, because there are some ways that
+-- affect the RTS only.
+GLOBAL_VAR(v_RTS_Build_tag, "", String)
+
 data WayName
-  = WayProf
+  = WayThreaded
+  | WayDebug
+  | WayProf
   | WayUnreg
   | WayTicky
   | WayPar
   | WayGran
   | WaySMP
   | WayNDP
-  | WayDebug
   | WayUser_a
   | WayUser_b
   | WayUser_c
@@ -506,35 +518,36 @@ data WayName
 
 GLOBAL_VAR(v_Ways, [] ,[WayName])
 
-allowed_combination way = way `elem` combs
-  where  -- the sub-lists must be ordered according to WayName, 
-         -- because findBuildTag sorts them
-    combs                = [ [WayProf, WayUnreg], 
-			     [WayProf, WaySMP]  ,
-			     [WayProf, WayNDP]  ]
+allowed_combination way = and [ x `allowedWith` y 
+			      | x <- way, y <- way, x < y ]
+  where
+	-- debug is allowed with everything
+	_ `allowedWith` WayDebug		= True
+	WayDebug `allowedWith` _		= True
+
+	WayProf `allowedWith` WayThreaded	= True
+	WayProf `allowedWith` WayUnreg		= True
+	WayProf `allowedWith` WaySMP		= True
+	WayProf `allowedWith` WayNDP		= True
+
 
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
   way_names <- readIORef v_Ways
-  case sort way_names of
-     []  -> do  -- writeIORef v_Build_tag ""
-	        return []
-
-     [w] -> do let details = lkupWay w
-	       writeIORef v_Build_tag (wayTag details)
-	       return (wayOpts details)
-
-     ws  -> if not (allowed_combination ws)
-		then throwDyn (CmdLineError $
-				"combination not supported: "  ++
-   				foldr1 (\a b -> a ++ '/':b) 
-				(map (wayName . lkupWay) ws))
-		else let stuff = map lkupWay ws
-			 tag   = concat (map wayTag stuff)
-			 flags = map wayOpts stuff
-		     in do
-		     writeIORef v_Build_tag tag
-		     return (concat flags)
+  let ws = sort way_names
+  if not (allowed_combination ws)
+      then throwDyn (CmdLineError $
+      		    "combination not supported: "  ++
+      		    foldr1 (\a b -> a ++ '/':b) 
+      		    (map (wayName . lkupWay) ws))
+      else let stuff   = map lkupWay ws
+      	       tag     = concat [ wayTag w | w <- stuff, not (wayRTSOnly w) ]
+      	       rts_tag = concat (map wayTag stuff)
+      	       flags   = map wayOpts stuff
+      	   in do
+      	   writeIORef v_Build_tag tag
+      	   writeIORef v_RTS_Build_tag rts_tag
+      	   return (concat flags)
 
 lkupWay w = 
    case lookup w way_details of
@@ -542,30 +555,39 @@ lkupWay w =
 	Just details -> details
 
 data Way = Way {
-  wayTag   :: String,
-  wayName  :: String,
-  wayOpts  :: [String]
+  wayTag     :: String,
+  wayRTSOnly :: Bool,
+  wayName    :: String,
+  wayOpts    :: [String]
   }
 
 way_details :: [ (WayName, Way) ]
 way_details =
-  [ (WayProf, Way  "p" "Profiling"  
+  [ (WayThreaded, Way "thr" True "Threaded" [
+#if defined(freebsd_TARGET_OS)
+	, "-optc-pthread"
+#endif
+	] ),
+
+    (WayDebug, Way "debug" True "Debug" [] ),
+
+    (WayProf, Way  "p" False "Profiling"
 	[ "-fscc-profiling"
 	, "-DPROFILING"
 	, "-optc-DPROFILING"
 	, "-fvia-C" ]),
 
-    (WayTicky, Way  "t" "Ticky-ticky Profiling"  
+    (WayTicky, Way  "t" False "Ticky-ticky Profiling"  
 	[ "-fticky-ticky"
 	, "-DTICKY_TICKY"
 	, "-optc-DTICKY_TICKY"
 	, "-fvia-C" ]),
 
-    (WayUnreg, Way  "u" "Unregisterised" 
+    (WayUnreg, Way  "u" False "Unregisterised" 
 	unregFlags ),
 
     -- optl's below to tell linker where to find the PVM library -- HWL
-    (WayPar, Way  "mp" "Parallel" 
+    (WayPar, Way  "mp" False "Parallel" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -577,7 +599,7 @@ way_details =
 	, "-fvia-C" ]),
 
     -- at the moment we only change the RTS and could share compiler and libs!
-    (WayPar, Way  "mt" "Parallel ticky profiling" 
+    (WayPar, Way  "mt" False "Parallel ticky profiling" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -589,7 +611,7 @@ way_details =
         , "-optl-lgpvm3"
 	, "-fvia-C" ]),
 
-    (WayPar, Way  "md" "Distributed" 
+    (WayPar, Way  "md" False "Distributed" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-D__DISTRIBUTED_HASKELL__"
@@ -602,14 +624,14 @@ way_details =
         , "-optl-lgpvm3"
 	, "-fvia-C" ]),
 
-    (WayGran, Way  "mg" "GranSim" 
+    (WayGran, Way  "mg" False "GranSim"
 	[ "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
 	, "-package concurrent"
 	, "-fvia-C" ]),
 
-    (WaySMP, Way  "s" "SMP"
+    (WaySMP, Way  "s" False "SMP"
 	[ "-fsmp"
 	, "-optc-pthread"
 #ifndef freebsd_TARGET_OS
@@ -618,27 +640,27 @@ way_details =
 	, "-optc-DSMP"
 	, "-fvia-C" ]),
 
-    (WayNDP, Way  "ndp" "Nested data parallelism"
+    (WayNDP, Way  "ndp" False "Nested data parallelism"
 	[ "-fparr"
 	, "-fflatten"]),
 
-    (WayUser_a,  Way  "a"  "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
-    (WayUser_b,  Way  "b"  "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	
-    (WayUser_c,  Way  "c"  "User way 'c'"  ["$WAY_c_REAL_OPTS"]),	
-    (WayUser_d,  Way  "d"  "User way 'd'"  ["$WAY_d_REAL_OPTS"]),	
-    (WayUser_e,  Way  "e"  "User way 'e'"  ["$WAY_e_REAL_OPTS"]),	
-    (WayUser_f,  Way  "f"  "User way 'f'"  ["$WAY_f_REAL_OPTS"]),	
-    (WayUser_g,  Way  "g"  "User way 'g'"  ["$WAY_g_REAL_OPTS"]),	
-    (WayUser_h,  Way  "h"  "User way 'h'"  ["$WAY_h_REAL_OPTS"]),	
-    (WayUser_i,  Way  "i"  "User way 'i'"  ["$WAY_i_REAL_OPTS"]),	
-    (WayUser_j,  Way  "j"  "User way 'j'"  ["$WAY_j_REAL_OPTS"]),	
-    (WayUser_k,  Way  "k"  "User way 'k'"  ["$WAY_k_REAL_OPTS"]),	
-    (WayUser_l,  Way  "l"  "User way 'l'"  ["$WAY_l_REAL_OPTS"]),	
-    (WayUser_m,  Way  "m"  "User way 'm'"  ["$WAY_m_REAL_OPTS"]),	
-    (WayUser_n,  Way  "n"  "User way 'n'"  ["$WAY_n_REAL_OPTS"]),	
-    (WayUser_o,  Way  "o"  "User way 'o'"  ["$WAY_o_REAL_OPTS"]),	
-    (WayUser_A,  Way  "A"  "User way 'A'"  ["$WAY_A_REAL_OPTS"]),	
-    (WayUser_B,  Way  "B"  "User way 'B'"  ["$WAY_B_REAL_OPTS"]) 
+    (WayUser_a,  Way  "a"  False "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
+    (WayUser_b,  Way  "b"  False "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	
+    (WayUser_c,  Way  "c"  False "User way 'c'"  ["$WAY_c_REAL_OPTS"]),	
+    (WayUser_d,  Way  "d"  False "User way 'd'"  ["$WAY_d_REAL_OPTS"]),	
+    (WayUser_e,  Way  "e"  False "User way 'e'"  ["$WAY_e_REAL_OPTS"]),	
+    (WayUser_f,  Way  "f"  False "User way 'f'"  ["$WAY_f_REAL_OPTS"]),	
+    (WayUser_g,  Way  "g"  False "User way 'g'"  ["$WAY_g_REAL_OPTS"]),	
+    (WayUser_h,  Way  "h"  False "User way 'h'"  ["$WAY_h_REAL_OPTS"]),	
+    (WayUser_i,  Way  "i"  False "User way 'i'"  ["$WAY_i_REAL_OPTS"]),	
+    (WayUser_j,  Way  "j"  False "User way 'j'"  ["$WAY_j_REAL_OPTS"]),	
+    (WayUser_k,  Way  "k"  False "User way 'k'"  ["$WAY_k_REAL_OPTS"]),	
+    (WayUser_l,  Way  "l"  False "User way 'l'"  ["$WAY_l_REAL_OPTS"]),	
+    (WayUser_m,  Way  "m"  False "User way 'm'"  ["$WAY_m_REAL_OPTS"]),	
+    (WayUser_n,  Way  "n"  False "User way 'n'"  ["$WAY_n_REAL_OPTS"]),	
+    (WayUser_o,  Way  "o"  False "User way 'o'"  ["$WAY_o_REAL_OPTS"]),	
+    (WayUser_A,  Way  "A"  False "User way 'A'"  ["$WAY_A_REAL_OPTS"]),	
+    (WayUser_B,  Way  "B"  False "User way 'B'"  ["$WAY_B_REAL_OPTS"]) 
   ]
 
 unregFlags = 
