@@ -7,7 +7,8 @@
 \begin{code}
 module HscMain ( 
 	HscResult(..),
-	hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
+	hscMain, newHscEnv, hscCmmFile, 
+	hscBufferCheck, hscFileCheck,
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscKcType
 	, hscGetInfo, GetInfoResult
@@ -132,9 +133,7 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked
-	(Located (HsModule RdrName))	-- parse tree
-	(Maybe TcGblEnv)		-- typechecker output, if succeeded
+   | HscChecked (Located (HsModule RdrName)) (Maybe TcGblEnv)
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -221,10 +220,11 @@ hscRecomp hsc_env msg_act have_object
 		compilationProgressMsg dflags $
 		  ("Compiling " ++ showModMsg (not toInterp) mod location);
 			
+	; let hspp_file = expectJust "hscFrontEnd:hspp" (ml_hspp_file location)
 	; front_res <- if toCore then 
-			  hscCoreFrontEnd hsc_env msg_act location
+			  hscCoreFrontEnd hsc_env msg_act hspp_file
 		       else 
-			  hscFileFrontEnd hsc_env msg_act location
+			  hscFileFrontEnd hsc_env msg_act hspp_file
 
 	; case front_res of
 	    Left flure -> return flure;
@@ -328,11 +328,11 @@ hscRecomp hsc_env msg_act have_object
       			    maybe_bcos)
       	 }}
 
-hscCoreFrontEnd hsc_env msg_act location = do {
+hscCoreFrontEnd hsc_env msg_act hspp_file = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; inp <- readFile (expectJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
+	; inp <- readFile hspp_file
 	; case parseCore inp 1 of
 	    FailP s        -> putMsg s{-ToDo: wrong-} >> return (Left HscFail)
 	    OkP rdr_module -> do {
@@ -350,46 +350,18 @@ hscCoreFrontEnd hsc_env msg_act location = do {
 	}}}
 	 
 
-hscFileFrontEnd hsc_env msg_act location = do {
+hscFileFrontEnd hsc_env msg_act hspp_file = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) 
-                             (expectJust "hscFrontEnd:hspp" (ml_hspp_file location))
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file
 
 	; case maybe_parsed of {
       	     Left err -> do { msg_act (unitBag err, emptyBag) ;
 			    ; return (Left HscFail) ;
 			    };
-      	     Right rdr_module -> hscFrontEnd hsc_env msg_act rdr_module
-    }}
+      	     Right rdr_module -> do {
 
--- Perform static/dynamic checks on the source code in a StringBuffer
--- This is a temporary solution: it'll read in interface files lazily, whereas
--- we probably want to use the compilation manager to load in all the modules
--- in a project.
-hscBufferFrontEnd :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
-hscBufferFrontEnd hsc_env buffer msg_act = do
-	let loc  = mkSrcLoc (mkFastString "*edit*") 1 0
-        showPass (hsc_dflags hsc_env) "Parser"
-	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
-		PFailed span err -> do
-		   msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
-		   return HscFail
-		POk _ rdr_module -> do
-		   hscBufferTypecheck hsc_env rdr_module msg_act
-
-hscBufferTypecheck hsc_env rdr_module msg_act = do
-	(tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
-					tcRnModule hsc_env rdr_module
-	msg_act tc_msgs
-	case maybe_tc_result of
-	    Nothing  -> return (HscChecked rdr_module Nothing)
-	    Just r   -> return (HscChecked rdr_module (Just r))
-				-- space leak on rdr_module!
-
-
-hscFrontEnd hsc_env msg_act rdr_module  = do {
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
@@ -409,7 +381,47 @@ hscFrontEnd hsc_env msg_act rdr_module  = do {
 	; case maybe_ds_result of
 	    Nothing        -> return (Left HscFail);
 	    Just ds_result -> return (Right ds_result);
-	}}}
+	}}}}}
+
+
+hscFileCheck hsc_env msg_act hspp_file = do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file
+
+	; case maybe_parsed of {
+      	     Left err -> do { msg_act (unitBag err, emptyBag) ;
+			    ; return HscFail ;
+			    };
+      	     Right rdr_module -> hscBufferTypecheck hsc_env rdr_module msg_act
+	}}
+
+
+-- Perform static/dynamic checks on the source code in a StringBuffer
+-- This is a temporary solution: it'll read in interface files lazily, whereas
+-- we probably want to use the compilation manager to load in all the modules
+-- in a project.
+hscBufferCheck :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
+hscBufferCheck hsc_env buffer msg_act = do
+	let loc  = mkSrcLoc (mkFastString "*edit*") 1 0
+        showPass (hsc_dflags hsc_env) "Parser"
+	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
+		PFailed span err -> do
+		   msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
+		   return HscFail
+		POk _ rdr_module -> do
+		   hscBufferTypecheck hsc_env rdr_module msg_act
+
+hscBufferTypecheck hsc_env rdr_module msg_act = do
+	(tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
+					tcRnModule hsc_env rdr_module
+	msg_act tc_msgs
+	case maybe_tc_result of
+	    Nothing  -> return (HscChecked rdr_module Nothing)
+				-- space leak on rdr_module!
+	    Just r -> return (HscChecked rdr_module (Just r))
+
 
 hscBackEnd dflags 
     ModGuts{  -- This is the last use of the ModGuts in a compilation.
