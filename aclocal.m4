@@ -557,18 +557,25 @@ rm -f conftest
 # output variables HaveGcc and GccVersion.
 AC_DEFUN([FP_HAVE_GCC],
 [AC_REQUIRE([AC_PROG_CC])
-AC_CACHE_CHECK([whether your gcc is OK], [fp_cv_have_gcc],
-[if test -z "$GCC"; then
-  fp_cv_have_gcc='no'
-  AC_MSG_WARN([You would be better off with gcc, perhaps it is already installed, but not in your PATH?])
+if test -z "$GCC"; then
+   fp_have_gcc=NO
 else
-  fp_cv_have_gcc='yes'
-  gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9]][[0-9]]*\)\.\([[0-9]][[0-9]]*\).*/\1\.\2/g' `"
-  FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
-    [AC_MSG_ERROR([Need at least gcc version 2.0 (2.95.3 recommend)])])
-fi])
-AC_SUBST([HaveGcc], [`echo $fp_cv_have_gcc | sed 'y/yesno/YESNO/'`])
-AC_SUBST([GccVersion], [`gcc --version | grep mingw | cut -f 3 -d ' '`])
+   fp_have_gcc=YES
+fi
+if test "$fp_have_gcc" = "NO" -a -d $srcdir/ghc; then
+  AC_MSG_ERROR([gcc is required])
+fi
+AC_CACHE_CHECK([version of gcc], [fp_gcc_version],
+[if test "$fp_have_gcc" = "YES"; then
+   fp_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9]][[0-9]]*\(\.[[0-9]][[0-9]]*\)*\).*/\1/g' `"
+   FP_COMPARE_VERSIONS([$fp_gcc_version], [-lt], [2.0],
+     [AC_MSG_ERROR([Need at least gcc version 2.0 (3.4+ recommended)])])
+ else
+   fp_gcc_version="not-installed"
+ fi
+])
+AC_SUBST([HaveGcc], [$fp_have_gcc])
+AC_SUBST([GccVersion], [$fp_gcc_version])
 ])# FP_HAVE_GCC
 
 AC_DEFUN([FP_MINGW_GCC],
