@@ -20,7 +20,7 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  mkVanillaId, mkId, exportWithOrigOccName,
+			  mkVanillaId, mkId, 
 			  idStrictness, setIdStrictness,
 			  idDemandInfo, setIdDemandInfo,
 			) 
@@ -29,7 +29,7 @@ import IdInfo		( specInfo, setSpecInfo,
 			  workerInfo, setWorkerInfo, WorkerInfo(..)
 			)
 import Demand		( wwLazy )
-import Name		( getOccName, tidyTopName, mkLocalName )
+import Name		( getOccName, tidyTopName, mkLocalName, isGlobalName )
 import OccName		( initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module )
@@ -100,7 +100,7 @@ tidyCorePgm dflags module_name binds_in orphans_in
 	-- decl.  tidyTopId then does a no-op on exported binders.
     init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
     avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
-				       exportWithOrigOccName bndr]
+				       isGlobalName (idName bndr)]
 
 tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> TidyEnv

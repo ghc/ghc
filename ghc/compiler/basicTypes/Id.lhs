@@ -23,7 +23,6 @@ module Id (
 
 	-- Predicates
 	omitIfaceSigForId, isDeadBinder,
-	exportWithOrigOccName,
 	externallyVisibleId,
 	isIP,
 	isSpecPragmaId,	isRecordSelector,
@@ -292,12 +291,6 @@ omitIfaceSigForId' id
 		-- the instance decl
 
 	other	       -> False	-- Don't omit!
-
--- Certain names must be exported with their original occ names, because
--- these names are bound by either a class declaration or a data declaration
--- or an explicit user export.
-exportWithOrigOccName :: Id -> Bool
-exportWithOrigOccName id = omitIfaceSigForId id || isExportedId id
 \end{code}
 
 \begin{code}

@@ -275,6 +275,9 @@ tidyTopName mod env is_exported
   = case sort of
 	Global _ | is_exported -> (env, name)
 		 | otherwise   -> (env, name { n_sort = new_sort })
+		-- Don't change the occurrnce names of globals, because many of them
+		-- are bound by either a class declaration or a data declaration
+		-- or an explicit user export.
 
 	other    | is_exported -> (env', name { n_sort = Global mod, n_occ = occ' })
 		 | otherwise   -> (env', name { n_sort = new_sort,   n_occ = occ' })
