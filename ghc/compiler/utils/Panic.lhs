@@ -121,7 +121,7 @@ showGhcException (Panic s)
 	         ++ "to glasgow-haskell-bugs@haskell.org,\n"
 		 ++ "or http://sourceforge.net/projects/ghc/.\n\n")
 
-#if __GLASGOW_HASKELL__ < 630
+#if __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy
 #else 
 myMkTyConApp = mkTyConApp
