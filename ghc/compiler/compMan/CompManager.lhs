@@ -705,27 +705,11 @@ cmLoadFinish ok Succeeded hpt mods ghci_mode pcs
 
        return (new_cmstate, ok, mods_loaded)
 
--- used to fish out the preprocess output files for the purposes
--- of cleaning up.
+-- used to fish out the preprocess output files for the purposes of
+-- cleaning up.  The preprocessed file *might* be the same as the
+-- source file, but that doesn't do any harm.
 ppFilesFromSummaries summaries
-  = [ fn | Just fn <- map toPpFile summaries ]
-  where
-   toPpFile sum
-     | not (isSameFilePath hspp hs) = hspp
-     | otherwise                    = Nothing
-    where
-      loc  = ms_location sum
-      hspp = ml_hspp_file loc
-      hs   = ml_hs_file loc
-      
-       -- better make extra sure 'a' and 'b' are in canonical form 
-       -- before using this equality test.
-      isSameFilePath a b = fmap normalise a == fmap normalise b
-
-      -- a hack, because sometimes we strip off the leading "./" from a 
-      -- a filename.
-      normalise ('.':'/':f) = f
-      normalise f = f
+  = [ fn | Just fn <- map (ml_hspp_file.ms_location) summaries ]
 
 -----------------------------------------------------------------------------
 -- getValidLinkables
