@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/20 16:55:26 $
+ * $Revision: 1.23 $
+ * $Date: 2000/01/07 16:56:47 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -554,7 +554,7 @@ extern Void  interface        Args((Int));
 extern Void getFileSize       Args((String, Long *));
 
 extern ZPair readInterface      Args((String,Long));
-extern Void  processInterfaces  Args((Void));
+extern Bool  processInterfaces  Args((Void));
 
 extern List /* of ZTriple(I_INTERFACE, 
                           Text--name of obj file, 

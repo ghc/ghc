@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.22 $
- * $Date: 2000/01/07 15:31:12 $
+ * $Revision: 1.23 $
+ * $Date: 2000/01/07 16:56:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -537,8 +537,10 @@ Void ppModule ( Text modt )
 /* ifaces_outstanding holds a list of parsed interfaces
    for which we need to load objects and create symbol
    table entries.
+
+   Return TRUE if Prelude `elem` ifaces_outstanding, else FALSE.
 */
-Void processInterfaces ( void )
+Bool processInterfaces ( void )
 {
     List    tmp;
     List    xs;
@@ -551,12 +553,13 @@ Void processInterfaces ( void )
     Module  mod;
     List    all_known_types;
     Int     num_known_types;
+    Bool    didPrelude;
 
     List ifaces       = NIL;  /* :: List I_INTERFACE */
     List iface_sizes  = NIL;  /* :: List Int         */
     List iface_onames = NIL;  /* :: List Text        */
 
-    if (isNull(ifaces_outstanding)) return;
+    if (isNull(ifaces_outstanding)) return FALSE;
 
     fprintf ( stderr, 
               "processInterfaces: %d interfaces to process\n", 
@@ -841,6 +844,7 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        calling the finishGHC* functions.  But don't process
        the export lists; those must wait for later.
     */
+    didPrelude = FALSE;
     for (xs = ifaces; nonNull(xs); xs = tl(xs)) {
        iface   = unap(I_INTERFACE,hd(xs));
        mname   = textOf(zfst(iface));
@@ -848,6 +852,8 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        if (isNull(mod)) internal("processInterfaces(3)");
        setCurrModule(mod);
        ppModule ( module(mod).text );
+
+       if (mname == textPrelude) didPrelude = TRUE;
 
        for (decls = zsnd(iface); nonNull(decls); decls = tl(decls)) {
           Cell decl = hd(decls);
@@ -909,6 +915,8 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
 
     /* Finished! */
     ifaces_outstanding = NIL;
+
+    return didPrelude;
 }
 
 
@@ -1733,6 +1741,7 @@ List  mems0; {    /* [((VarId, Type))]     */
            Name  mn;
 
            /* Stick the new context on the member type */
+           memT = dictapsToQualtype(memT);
            if (whatIs(memT)==POLYTYPE) internal("startGHCClass");
            if (whatIs(memT)==QUAL) {
               memT = pair(QUAL,

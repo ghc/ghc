@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/01/05 19:10:21 $
+ * $Revision: 1.33 $
+ * $Date: 2000/01/07 16:56:47 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -965,6 +965,7 @@ String s; {                            /* to be read in ...                */
 /* Return TRUE if no imports were needed; FALSE otherwise. */
 static Bool local addScript(stacknum)   /* read single file                */
 Int stacknum; {
+   Bool didPrelude;
    static char name[FILENAME_MAX+1];
    Int len = scriptInfo[stacknum].size;
 
@@ -984,7 +985,13 @@ Int stacknum; {
    scriptFile = name;
 
    if (scriptInfo[stacknum].fromSource) {
-      if (lastWasObject) processInterfaces();
+      if (lastWasObject) {
+         didPrelude = processInterfaces();
+         if (didPrelude) {
+            preludeLoaded = TRUE;
+            everybody(POSTPREL);
+         }
+      }
       lastWasObject = FALSE;
       Printf("Reading script \"%s\":\n",name);
       needsImports = FALSE;
@@ -1025,10 +1032,6 @@ Int stacknum; {
  
    scriptFile = 0;
 
-   if (strcmp(scriptInfo[stacknum].modName, "Prelude")==0) {
-      preludeLoaded = TRUE;
-      everybody(POSTPREL);
-   }
    return TRUE;
 }
 
@@ -1149,6 +1152,7 @@ Int n; {                                /* loading everything after and    */
     Time timeStamp;                     /* including the first script which*/
     Long fileSize;                      /* has been either changed or added*/
     static char name[FILENAME_MAX+1];
+    Bool didPrelude;
 
     lastWasObject = FALSE;
     ppSmStack("readscripts-begin");
@@ -1246,7 +1250,12 @@ Int n; {                                /* loading everything after and    */
        if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
     }
 
-    processInterfaces();
+    didPrelude = processInterfaces();
+    if (didPrelude) {
+       preludeLoaded = TRUE;
+       everybody(POSTPREL);
+    }
+
 
     { Int  m     = namesUpto-1;
       Text mtext = findText(scriptInfo[m].modName);

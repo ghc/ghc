@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/01/06 16:33:10 $
+ * $Revision: 1.32 $
+ * $Date: 2000/01/07 16:56:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -312,7 +312,7 @@ Text unZcodeThenFindText ( String s )
             if (*s != 'T') goto parse_error;
             s++;
             p[n++] = '(';
-            while (i >= 0) { p[n++] = ','; i--; };
+            while (i > 0) { p[n++] = ','; i--; };
             p[n++] = ')';
             break;
          default: 
@@ -812,7 +812,7 @@ Tycon addTupleTycon ( Int n )
       if (tycon(i).tuple == n) return i;
 
    if (combined)
-      m = findFakeModule(findText(n<=1 ? "PrelBase" : "PrelTup")); else
+      m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
       m = findModule(findText("Prelude"));
 
    setCurrModule(m);
