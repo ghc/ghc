@@ -418,10 +418,7 @@ sub slurp_file_for_imports {
     close(SRCFILE) || exit(1);
     # remove temporary file, if any.
     if ($cleanup) {
-	   # truncate() may not be implemented, so we
-	   # play it safe here.
-	   local(*TRUNC);
-	   open(TRUNC,"> $read_from_file") && close(TRUNC);
+	   unlink("$read_from_file");
     }
 }
 
