@@ -13,8 +13,6 @@
 
 * Add a link to the defining location of a re-exported entity
 
-* Add an index page to the HTML output
-
 * fixities
 
 * we don't deal with records properly - exporting record selectors etc.
@@ -25,12 +23,25 @@
 
 * check handling of special types ([], (), (,) etc.)
 
+* Horizontal lines?
+
+* Short contents at the top of each module?
+
 * enhance the doc string parser:
 	* @...@ for monospaced text
 	* an apostrophe inside a string shouldn't be considered to be a quote
-	* `..' instead of '..' ?
+	* the lexer should deal with <...> so that special chars
+	  inside don't need to be escaped.
 
 * Handle parse errors better in doc strings
 
 * Do proper dependency analysis rather than relying on laziness to
   sort it out.
+
+* Do the unlitting/CPPing from Haddock itself
+
+* clean up the layout: don't use table cellspacing, use CSS instead
+
+* omit the synopsis for modules with no doc
+
+* named chunks of documentation?
