@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.80 2003/09/23 15:38:36 simonmar Exp $
+ * $Id: Storage.c,v 1.81 2003/10/24 09:52:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -479,11 +479,6 @@ allocate( nat n )
     bd->step = g0s0;
     bd->flags = BF_LARGE;
     bd->free = bd->start + n;
-    /* don't add these blocks to alloc_blocks, since we're assuming
-     * that large objects are likely to remain live for quite a while
-     * (eg. running threads), so garbage collecting early won't make
-     * much difference.
-     */
     alloc_blocks += req_blocks;
     RELEASE_SM_LOCK;
     return bd->start;
