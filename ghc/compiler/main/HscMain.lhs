@@ -412,14 +412,14 @@ hscExpr dflags hst hit pcs0 this_module expr
 	(pcs1, maybe_renamed_expr) <- 
 		renameExpr dflags hit hst pcs0 this_module parsed_expr;
 	case maybe_renamed_expr of
-		Nothing -> return (pcs1, Nothing)
+		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing)
 		Just (print_unqual, rn_expr) -> do {
 
 		-- Typecheck it
 	maybe_tc_return
 	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of {
-		Nothing -> return (pcs1, Nothing);
+		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
 		Just (pcs2, tc_expr, ty) -> do
 
 	-- if it isn't an IO-typed expression, 
