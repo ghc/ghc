@@ -307,6 +307,11 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 		    returnRn []
 
     get_item :: RdrNameIE -> RnMG [(AvailInfo, [Name])]
+	-- Empty list for a bad item.
+	-- Singleton is typical case.
+	-- Can have two when we are hiding, and mention C which might be
+	--	both a class and a data constructor.  
+	-- The [Name] is the list of explicitly-mentioned names
     get_item item@(IEModuleContents _) = bale_out item
 
     get_item item@(IEThingAll _)
@@ -391,7 +396,12 @@ mkExportAvails mod_name unqual_imp gbl_env avails
     unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
 		  | otherwise      = pruneAvails (unQualInScope gbl_env) avails
 
-    entity_avail_env  = mkNameEnv [(availName avail, avail) | avail <- avails]
+    entity_avail_env = foldl insert emptyAvailEnv avails
+    insert env avail = extendNameEnv_C plusAvail env (availName avail) avail
+	-- 'avails' may have several items with the same availName
+	-- E.g  import Ix( Ix(..), index )
+	-- will give Ix(Ix,index,range) and Ix(index)
+	-- We want to combine these
 \end{code}
 
 
