@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.72 2001/06/06 14:33:13 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.73 2001/06/07 16:00:18 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -363,8 +363,10 @@ addModule _ = throwDyn (InstallationError ":add not implemented")
 setContext :: String -> GHCi ()
 setContext ""
   = throwDyn (CmdLineError "syntax: `:m <module>'")
-setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
+setContext m | not (isUpper (head m)) || not (all isAlphaNumEx (tail m))
   = throwDyn (CmdLineError ("strange looking module name: `" ++ m ++ "'"))
+    where
+       isAlphaNumEx c = isAlphaNum c || c == '_'
 setContext str
   = do st <- getGHCiState
        new_cmstate <- io (cmSetContext (cmstate st) str)
