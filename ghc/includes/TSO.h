@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.8 1999/08/25 16:11:44 simonmar Exp $
+ * $Id: TSO.h,v 1.9 1999/12/01 14:34:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -82,6 +82,7 @@ typedef enum {
   NotBlocked,
   BlockedOnMVar,
   BlockedOnBlackHole,
+  BlockedOnException,
   BlockedOnRead,
   BlockedOnWrite,
   BlockedOnDelay
@@ -89,6 +90,7 @@ typedef enum {
 
 typedef union {
   StgClosure *closure;
+  struct StgTSO_ *tso;
   int fd;
   unsigned int delay;
 } StgTSOBlockInfo;
@@ -106,6 +108,7 @@ typedef struct StgTSO_ {
   StgTSOWhatNext     whatNext;
   StgTSOBlockReason  why_blocked;
   StgTSOBlockInfo    block_info;
+  struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;
@@ -121,8 +124,6 @@ typedef struct StgTSO_ {
   
   StgWord            stack[0];
 } StgTSO;
-
-extern DLL_IMPORT_RTS StgTSO      *CurrentTSO;
 
 /* -----------------------------------------------------------------------------
    Invariants:
@@ -140,15 +141,22 @@ extern DLL_IMPORT_RTS StgTSO      *CurrentTSO;
         (a) smaller than a block, or
 	(b) a multiple of BLOCK_SIZE
 
-      tso->link
-          == END_TSO_QUEUE  , iff the thread is currently running.
-          == (StgTSO *)     , otherwise, and it is linked onto either:
+	tso->block_reason      tso->block_info      location
+        ----------------------------------------------------------------------
+	NotBlocked             NULL                 runnable_queue, or running
+	
+        BlockedOnBlackHole     the BLACKHOLE_BQ     the BLACKHOLE_BQ's queue
+	
+        BlockedOnMVar          the MVAR             the MVAR's queue
+	
+        BlockedOnException     the TSO              TSO->blocked_exception
 
-          - the runnable_queue       tso->blocked_on == END_TSO_QUEUE
-          - the blocked_queue	     tso->blocked_on == END_TSO_QUEUE
-          - a BLACKHOLE_BQ,          tso->blocked_on == the BLACKHOLE_BQ
-          - an MVAR,                 tso->blocked_on == the MVAR
-				
+        BlockedOnRead          NULL                 blocked_queue
+        BlockedOnWrite         NULL		    blocked_queue
+        BlockedOnDelay         NULL                 blocked_queue
+
+      tso->link == END_TSO_QUEUE, if the thread is currently running.
+
    A zombie thread has the following properties:
       
       tso->whatNext == ThreadComplete or ThreadKilled
@@ -161,7 +169,17 @@ extern DLL_IMPORT_RTS StgTSO      *CurrentTSO;
       (tso->sp is left pointing at the top word on the stack so that
       the return value or exception will be retained by a GC).
 
-   ---------------------------------------------------------------------------- */
+   tso->blocked_exceptions is either:
+
+      NULL             if async exceptions are unblocked.
+
+      END_TSO_QUEUE    if async exceptions are blocked, but no threads
+                       are currently waiting to deliver.
+
+      (StgTSO *)tso    if threads are currently awaiting delivery of
+                       exceptions to this thread.
+
+ ---------------------------------------------------------------------------- */
 
 /* Workaround for a bug/quirk in gcc on certain architectures.
  * symptom is that (&tso->stack - &tso->header) /=  sizeof(StgTSO)

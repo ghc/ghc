@@ -173,6 +173,8 @@ data PrimOp
     -- exceptions
     | CatchOp
     | RaiseOp
+    | BlockAsyncExceptionsOp
+    | UnblockAsyncExceptionsOp
 
     -- foreign objects
     | MakeForeignObjOp
@@ -560,8 +562,10 @@ tagOf_PrimOp WriteMutVarOp		      = ILIT(239)
 tagOf_PrimOp SameMutVarOp		      = ILIT(240)
 tagOf_PrimOp CatchOp			      = ILIT(241)
 tagOf_PrimOp RaiseOp			      = ILIT(242)
-tagOf_PrimOp DataToTagOp		      = ILIT(243)
-tagOf_PrimOp TagToEnumOp		      = ILIT(244)
+tagOf_PrimOp BlockAsyncExceptionsOp	      = ILIT(243)
+tagOf_PrimOp UnblockAsyncExceptionsOp	      = ILIT(244)
+tagOf_PrimOp DataToTagOp		      = ILIT(245)
+tagOf_PrimOp TagToEnumOp		      = ILIT(246)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -793,6 +797,8 @@ allThePrimOps
 	SameMutVarOp,
         CatchOp,
         RaiseOp,
+	BlockAsyncExceptionsOp,
+	UnblockAsyncExceptionsOp,
     	NewMVarOp,
 	TakeMVarOp,
 	PutMVarOp,
@@ -927,6 +933,8 @@ primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
 
 primOpStrictness CatchOp	  = ([wwLazy, wwLazy], False)
 primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
+primOpStrictness BlockAsyncExceptionsOp    = ([wwLazy], False)
+primOpStrictness UnblockAsyncExceptionsOp  = ([wwLazy], False)
 
 primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
 primOpStrictness MakeStableNameOp = ([wwLazy, wwPrim], False)
@@ -1473,6 +1481,12 @@ primOpInfo SameMutVarOp
 catch  :: IO a -> (IOError -> IO a) -> IO a
 catch# :: a  -> (b -> a) -> a
 
+throw  :: Exception -> a
+raise# :: a -> b
+
+blockAsyncExceptions#   :: IO a -> IO a
+unblockAsyncExceptions# :: IO a -> IO a
+
 \begin{code}
 primOpInfo CatchOp   
   = let
@@ -1487,6 +1501,26 @@ primOpInfo RaiseOp
 	b = betaTy;  b_tv = betaTyVar;
     in
     mkGenPrimOp SLIT("raise#") [a_tv, b_tv] [a] b
+
+primOpInfo BlockAsyncExceptionsOp
+  = let
+      a = alphaTy; a_tv = alphaTyVar
+    in
+    mkGenPrimOp SLIT("blockAsyncExceptions#") [a_tv]
+	[ mkFunTy realWorldStatePrimTy (unboxedPair [realWorldStatePrimTy,a]),
+	  realWorldStatePrimTy
+	]
+	(unboxedPair [realWorldStatePrimTy,a])
+	
+primOpInfo UnblockAsyncExceptionsOp
+  = let
+      a = alphaTy; a_tv = alphaTyVar
+    in
+    mkGenPrimOp SLIT("unblockAsyncExceptions#") [a_tv]
+	[ mkFunTy realWorldStatePrimTy (unboxedPair [realWorldStatePrimTy,a]),
+	  realWorldStatePrimTy
+	]
+	(unboxedPair [realWorldStatePrimTy,a])
 \end{code}
 
 %************************************************************************
@@ -1927,37 +1961,39 @@ perform a heap check or they block.
 \begin{code}
 primOpOutOfLine op
   = case op of
-    	TakeMVarOp    		-> True
-	PutMVarOp     		-> True
-	DelayOp       		-> True
-	WaitReadOp    		-> True
-	WaitWriteOp   		-> True
-	CatchOp	      		-> True
-	RaiseOp	      		-> True
-	NewArrayOp    		-> True
-	NewByteArrayOp _ 	-> True
-	IntegerAddOp    	-> True
-	IntegerSubOp    	-> True
-	IntegerMulOp    	-> True
-	IntegerGcdOp    	-> True
-	IntegerQuotRemOp    	-> True
-	IntegerDivModOp    	-> True
-	Int2IntegerOp		-> True
-	Word2IntegerOp  	-> True
-	Addr2IntegerOp		-> True
-	Word64ToIntegerOp       -> True
-	Int64ToIntegerOp        -> True
-	FloatDecodeOp		-> True
-	DoubleDecodeOp		-> True
-	MkWeakOp		-> True
-	FinalizeWeakOp		-> True
-	MakeStableNameOp	-> True
-	MakeForeignObjOp	-> True
-	NewMutVarOp		-> True
-	NewMVarOp		-> True
-	ForkOp			-> True
-	KillThreadOp		-> True
-	YieldOp			-> True
+    	TakeMVarOp    		  -> True
+	PutMVarOp     		  -> True
+	DelayOp       		  -> True
+	WaitReadOp    		  -> True
+	WaitWriteOp   		  -> True
+	CatchOp	      		  -> True
+	RaiseOp	      		  -> True
+	BlockAsyncExceptionsOp    -> True
+	UnblockAsyncExceptionsOp  -> True
+	NewArrayOp    		  -> True
+	NewByteArrayOp _ 	  -> True
+	IntegerAddOp    	  -> True
+	IntegerSubOp    	  -> True
+	IntegerMulOp    	  -> True
+	IntegerGcdOp    	  -> True
+	IntegerQuotRemOp    	  -> True
+	IntegerDivModOp    	  -> True
+	Int2IntegerOp		  -> True
+	Word2IntegerOp  	  -> True
+	Addr2IntegerOp		  -> True
+	Word64ToIntegerOp         -> True
+	Int64ToIntegerOp          -> True
+	FloatDecodeOp		  -> True
+	DoubleDecodeOp		  -> True
+	MkWeakOp		  -> True
+	FinalizeWeakOp		  -> True
+	MakeStableNameOp	  -> True
+	MakeForeignObjOp	  -> True
+	NewMutVarOp		  -> True
+	NewMVarOp		  -> True
+	ForkOp			  -> True
+	KillThreadOp		  -> True
+	YieldOp			  -> True
 	CCallOp _ _ may_gc@True _ -> True	-- _ccall_GC_
 	  -- the next one doesn't perform any heap checks,
 	  -- but it is of such an esoteric nature that

@@ -34,6 +34,8 @@ __export PrelGHC
   forkzh
   yieldzh
   killThreadzh
+  blockAsyncExceptionszh
+  unblockAsyncExceptionszh
   delayzh
   waitReadzh
   waitWritezh

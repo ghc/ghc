@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.35 1999/11/19 12:39:49 simonmar Exp $
+ * $Id: Schedule.c,v 1.36 1999/12/01 14:34:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,6 +40,7 @@
 #include "StgMiscClosures.h"
 #include "Storage.h"
 #include "Evaluator.h"
+#include "Exception.h"
 #include "Printer.h"
 #include "Main.h"
 #include "Signals.h"
@@ -983,6 +984,10 @@ void printThreadBlockage(StgTSO *tso)
   case BlockedOnMVar:
     fprintf(stderr,"blocked on an MVar");
     break;
+  case BlockedOnException:
+    fprintf(stderr,"blocked on delivering an exception to thread %d",
+	    tso->block_info.tso->id);
+    break;
   case BlockedOnBlackHole:
     fprintf(stderr,"blocked on a black hole");
     break;
@@ -1259,6 +1264,25 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (BLACKHOLE): TSO not found");
     }
 
+  case BlockedOnException:
+    {
+      StgTSO *tso  = tso->block_info.tso;
+
+      ASSERT(get_itbl(tso)->type == TSO);
+      ASSERT(tso->blocked_exceptions != NULL);
+
+      last = &tso->blocked_exceptions;
+      for (t = tso->blocked_exceptions; t != END_TSO_QUEUE; 
+	   last = &t->link, t = t->link) {
+	ASSERT(get_itbl(t)->type == TSO);
+	if (t == tso) {
+	  *last = tso->link;
+	  goto done;
+	}
+      }
+      barf("unblockThread (Exception): TSO not found");
+    }
+
   case BlockedOnDelay:
   case BlockedOnRead:
   case BlockedOnWrite:
@@ -1381,13 +1405,32 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       ap->fun = cf->handler;
       ap->payload[0] = (P_)exception;
 
-      /* sp currently points to the word above the CATCH_FRAME on the
-       * stack.  Replace the CATCH_FRAME with a pointer to the new handler
-       * application.
+      /* sp currently points to the word above the CATCH_FRAME on the stack.
        */
       sp += sizeofW(StgCatchFrame);
-      sp[0] = (W_)ap;
       tso->su = cf->link;
+
+      /* Restore the blocked/unblocked state for asynchronous exceptions
+       * at the CATCH_FRAME.  
+       *
+       * If exceptions were unblocked at the catch, arrange that they
+       * are unblocked again after executing the handler by pushing an
+       * unblockAsyncExceptions_ret stack frame.
+       */
+      if (!cf->exceptions_blocked) {
+	*(sp--) = (W_)&unblockAsyncExceptionszh_ret_info;
+      }
+      
+      /* Ensure that async exceptions are blocked when running the handler.
+       */
+      if (tso->blocked_exceptions == NULL) {
+	tso->blocked_exceptions = END_TSO_QUEUE;
+      }
+      
+      /* Put the newly-built PAP on top of the stack, ready to execute
+       * when the thread restarts.
+       */
+      sp[0] = (W_)ap;
       tso->sp = sp;
       tso->whatNext = ThreadEnterGHC;
       return;

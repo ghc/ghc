@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.34 1999/11/09 15:46:53 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.35 1999/12/01 14:34:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -803,43 +803,6 @@ FN_(yieldzh_fast)
 {
   FB_
   JMP_(stg_yield_noregs);
-  FE_
-}
-
-FN_(killThreadzh_fast)
-{
-  FB_
-  /* args: R1.p = TSO to kill, R2.p = Exception */
-
-  /* The thread is dead, but the TSO sticks around for a while.  That's why
-   * we don't have to explicitly remove it from any queues it might be on.
-   */
-
-  /* We might have killed ourselves.  In which case, better be *very*
-   * careful.  If the exception killed us, then return to the scheduler.
-   * If the exception went to a catch frame, we'll just continue from
-   * the handler.
-   */
-  if (R1.t == CurrentTSO) {
-	SaveThreadState();	/* inline! */
-	STGCALL2(raiseAsync, R1.t, R2.cl);
-	if (CurrentTSO->whatNext == ThreadKilled) {
-		R1.w = ThreadYielding;
-		JMP_(StgReturn);
-	}
-	LoadThreadState();
-	if (CurrentTSO->whatNext == ThreadEnterGHC) {
-		R1.w = Sp[0];
-		Sp++;
-		JMP_(GET_ENTRY(R1.cl));
-	} else {
-	  	barf("killThreadzh_fast");
-	}
-  } else {
-	STGCALL2(raiseAsync, R1.t, R2.cl);
-  }
-
-  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 

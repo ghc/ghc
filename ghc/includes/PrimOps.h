@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.39 1999/11/09 10:05:07 sewardj Exp $
+ * $Id: PrimOps.h,v 1.40 1999/12/01 14:34:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -703,19 +703,15 @@ EF_(makeStableNamezh_fast);
 #endif
 
 /* -----------------------------------------------------------------------------
-   Parallel PrimOps.
+   Concurrency/Exception PrimOps.
    -------------------------------------------------------------------------- */
 
 EF_(forkzh_fast);
 EF_(yieldzh_fast);
 EF_(killThreadzh_fast);
 EF_(seqzh_fast);
-EF_(unblockExceptionszh_fast);
-
-#define blockExceptionszh_fast						\
-  if (CurrentTSO->pending_exceptions == NULL) {				\
-     CurrentTSO->pending_exceptions = &END_EXCEPTION_LIST_closure;	\
-  }
+EF_(blockAsyncExceptionszh_fast);
+EF_(unblockAsyncExceptionszh_fast);
 
 #define myThreadIdzh(t) (t = CurrentTSO)
 

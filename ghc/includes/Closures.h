@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.13 1999/05/11 16:47:40 keithw Exp $
+ * $Id: Closures.h,v 1.14 1999/12/01 14:34:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -226,6 +226,7 @@ typedef struct {
 typedef struct {
     StgHeader  header;
     struct _StgUpdateFrame *link;
+    StgInt      exceptions_blocked;
     StgClosure *handler;
 } StgCatchFrame;
 
