@@ -410,7 +410,7 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
         return (concat exps)
   where
     everything_local_exported =  -- everything exported
-	return (fullContentsOfThisModule this_mod decl_map)
+	return (fullContentsOfThisModule this_mod decls)
 
     lookupExport (HsEVar x)            = declWith x (Just [])
     lookupExport (HsEAbs t)            = declWith t (Just [])
@@ -449,7 +449,7 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 		       | otherwise       = all_subs_of_qname mod_map t
 
     fullContentsOf m
-	| m == this_mod  = return (fullContentsOfThisModule this_mod decl_map)
+	| m == this_mod  = return (fullContentsOfThisModule this_mod decls)
 	| otherwise = 
 	   case lookupFM mod_map m of
 	     Just iface
@@ -469,10 +469,11 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing -> Nothing
 
-fullContentsOfThisModule mod decl_map = 
-  map mkExportItem (filter (keepDecl.snd) (fmToList decl_map))
-  where mkExportItem (x,HsDocGroup loc lev doc) = ExportGroup lev "" doc
-	mkExportItem (x,decl) = ExportDecl (Qual mod x) decl
+fullContentsOfThisModule mod decls = 
+  map mkExportItem (filter keepDecl decls)
+  where mkExportItem (HsDocGroup loc lev doc) = ExportGroup lev "" doc
+	mkExportItem decl = ExportDecl (Qual mod x) decl
+	     where Just x = declMainBinder decl
 
 keepDecl HsTypeSig{}       = True
 keepDecl HsTypeDecl{}      = True
