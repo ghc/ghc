@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.34 1998/02/25 19:48:54 sof Exp $
+# $Id: Makefile,v 1.35 1998/03/05 09:21:47 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -66,23 +66,23 @@ HS_SRCS = $(SRCS_UGNHS) \
 # NB: it's no good to include *.hs in the top-line wildcard, because the .hs files
 #     in parser/ may not have been created at that point.
 
-
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
 #
-# When booting using a ghc-2.xx compiler, the loop breakers are actually written in
-# Haskell, source stubs just re-exporting info from the various .hi-boot files.
-# (Reason: we don't want to fiddle with the imports in the sources). We give them
-# the suffix .hs, since they're special and don't fall under the umbrella of $(HS_SRCS)
-
+# There's no need to compute dependencies when booting from .hc files
+#
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
 MKDEPENDHS_SRCS = $(HS_SRCS)
- 
+else
+MKDEPENDHS_SRCS =
+endif
+
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
   parser/hsclink.o parser/hschooks.o libhsp.a
 
 
-DESTDIR         = $(INSTALL_LIBRARY_DIR_GHC)
+DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
 SRCS_UGN      = $(wildcard parser/*.ugn)
 SRCS_UGNC     = $(patsubst %.ugn, %.c, $(SRCS_UGN))
@@ -125,8 +125,6 @@ SRC_HC_OPTS += \
   -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS))
-
-# -syslib ghc just needed for use of PackedString.hPutPS
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
@@ -280,8 +278,6 @@ SRC_MKDEPENDHS_OPTS += -optdep-o -optdephc
 # .l?hs -> .o, so that the .hc -> .o is used instead.
 %.$(way_)o : %.lhs
 %.$(way_)o : %.hs
-else
-  SRCS_MKDEPENDHS = $(SRCS_HC) # should add $(LOOPS) ?
 endif
 
 
