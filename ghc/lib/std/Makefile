@@ -25,7 +25,12 @@ endif
 HC 	   = $(GHC_INPLACE)
 MKDEPENDHS = $(GHC_INPLACE)
 
-PACKAGE = std
+ifneq "$(way)" "dll"
+PACKAGE = -package-name std
+else
+# Hack by SPJ to delay if-then-else until the pattern rule when we have $*
+PACKAGE = $(subst ~, ,$(word $(words dummy $(findstr $(notdir $*), PrelMain )), -package-name~std))
+endif
 LIBRARY = libHS$(PACKAGE)$(_way).a
 
 LIBOBJS = $(HS_OBJS)
@@ -36,7 +41,7 @@ endif
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts) -package-name $(PACKAGE)
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts) $(PACKAGE)
 ifneq "$(way)" "dll"
 SRC_HC_OPTS += -static
 endif
@@ -100,28 +105,6 @@ all :: PrelMain.dll_o DllVersionInfo.o
 endif
 
 CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
-
-#
-# Building PrelMain.dll_o is, unfortunately, somewhat tricky
-# with the current DLL setup. PrelMain.dll_o should refer to
-# all its imports bar Main.main_closure as residing in DLLs.
-# But, since the .hi's of PrelBase et al. is in the same
-# directory as PrelMain, the compiler will assume that they
-# reside in the same DLL as PrelMain & generate code accordingly.
-# 
-# So, we copy out PrelMain.lhs to ".." and build it there &
-# copy the gen'ed object file back in again.
-# 
-ifeq "$(way)" "dll"
-SplitObjs = NO
-PrelMain.dll_o : PrelMain.lhs
-	$(RM) ../PrelMain.lhs
-	$(CP) PrelMain.lhs ../
-	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude, $(HC_OPTS))"
-	$(MV) ../PrelMain.dll_o .
-	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
-endif
-
 
 #
 # If we're building the unregisterised way, it may well be for Hugs.
