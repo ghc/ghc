@@ -239,7 +239,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -- CONVERT TO STG
  	    -------------------
 	; (stg_binds, cost_centre_info) 
-		<- myCoreToStg dflags this_mod tidy_binds
+		<- myCoreToStg dflags this_mod tidy_binds env_tc
 
  	    -------------------
  	    -- COMPLETE CODE GENERATION
@@ -365,15 +365,14 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
                        (ppr nm)
 
 
-myCoreToStg dflags this_mod tidy_binds
+myCoreToStg dflags this_mod tidy_binds env_tc
  = do 
       () <- coreBindsSize tidy_binds `seq` return ()
       -- TEMP: the above call zaps some space usage allocated by the
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      --let bcos = byteCodeGen tidy_binds
-      --putStrLn ("\n\n" ++ showSDocDebug (vcat (intersperse (char ' ') (map ppr bcos))))
+      let bcos = byteCodeGen dflags tidy_binds local_tycons local_classes
 
       -- _scc_     "Core2Stg"
       stg_binds <- coreToStg dflags this_mod tidy_binds
@@ -382,6 +381,9 @@ myCoreToStg dflags this_mod tidy_binds
       (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
+   where
+      local_tycons  = typeEnvTyCons env_tc
+      local_classes = typeEnvClasses env_tc
 \end{code}
 
 

@@ -14,46 +14,79 @@ import Id		( Id, idType, isDataConId_maybe )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM, 
-			  addToFM, lookupFM, fmToList, emptyFM )
+			  addToFM, lookupFM, fmToList, emptyFM, plusFM )
 import CoreSyn
 import PprCore		( pprCoreExpr, pprCoreAlt )
 import Literal		( Literal(..) )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
-import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon )
-import TyCon		( tyConFamilySize )
+import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
+			  dataConRepArgTys )
+import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import Constants	( wORD_SIZE )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
+import ErrUtils		( showPass, dumpIfSet_dyn )
+import UniqSet		( emptyUniqSet )
+import ClosureInfo	( mkVirtHeapOffsets )
 
+import List		( intersperse )
 import Monad		( foldM )
-import Foreign		( Addr, Word16, Word32 )
 import ST		( runST )
---import MutableArray	( readWord32Array,
---			  newFloatArray, writeFloatArray,
---			  newDoubleArray, writeDoubleArray,
---			  newIntArray, writeIntArray,
---			  newAddrArray, writeAddrArray )
-
-import MArray
+import MArray		( MArray(..), IOArray, IOUArray, HasBounds(..),
+			  castSTUArray, readWord32Array,
+			  newFloatArray, writeFloatArray,
+			  newDoubleArray,  writeDoubleArray,
+			  newIntArray, writeIntArray,
+			  newAddrArray, writeAddrArray )
+import Foreign		( Storable(..), Word8, Word16, Word32, Ptr, 
+			  malloc, castPtr, plusPtr )
+import Addr		( Addr, addrToInt, nullAddr )
+import Bits		( Bits(..), shiftR )
+--import CTypes		( )
 \end{code}
 
 Entry point.
 
 \begin{code}
-byteCodeGen :: [CoreBind] -> [ProtoBCO Name]
-byteCodeGen binds
-   = let flatBinds = concatMap getBind binds
-         getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
-         getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
-         final_state = runBc (BcM_State [] 0) 
-                             (mapBc schemeR flatBinds `thenBc_` returnBc ())
-     in  
-         case final_state of
-            BcM_State bcos final_ctr -> bcos
+-- visible from outside
+byteCodeGen :: DynFlags
+            -> [CoreBind] 
+            -> [TyCon] -> [Class]
+            -> IO ([UnlinkedBCO], ItblEnv)
+byteCodeGen dflags binds local_tycons local_classes
+   = do showPass dflags "ByteCodeGen"
+        let tycs = local_tycons ++ map classTyCon local_classes
+        itblenv <- mkITbls tycs
+
+        let flatBinds = concatMap getBind binds
+            getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
+            getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
+            final_state = runBc (BcM_State [] 0) 
+                                (mapBc schemeR flatBinds `thenBc_` returnBc ())
+            (BcM_State proto_bcos final_ctr) = final_state
+
+        dumpIfSet_dyn dflags Opt_D_dump_BCOs
+           "Proto-bcos" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+
+        bcos <- mapM assembleBCO proto_bcos
+
+        return (bcos, itblenv)
+        
+-- TEMPORARY !
+data UnlinkedBCO 
+   = UnlinkedBCO (IOUArray Int Word16)	-- insns
+                 (IOUArray Int Word32)	-- literals
+                 (IOArray Int Name)	-- ptrs
+                 (IOArray Int Name)	-- itbl refs
+
+-- needs a proper home
+type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
 \end{code}
 
 
@@ -96,6 +129,8 @@ data BCInstr
 			-- unpack N non-ptr words from offset M in constructor
 			-- K words down the stack
    | PACK      DataCon Int
+			-- after assembly, the DataCon is an index into the
+			-- itbl array
    -- For doing case trees
    | LABEL     LocalLabel
    | TESTLT_I  Int    LocalLabel
@@ -359,7 +394,8 @@ schemeT :: Bool 	-- do tagging?
         -> Sequel 	-- Sequel depth
         -> Int 		-- # arg words so far
         -> BCEnv 	-- stack env
-        -> AnnExpr Id VarSet -> BCInstrList
+        -> AnnExpr Id VarSet 
+        -> BCInstrList
 
 schemeT enTag d s narg_words p (_, AnnApp f a)
    = case snd a of
@@ -714,13 +750,9 @@ index into the literal table (eg PUSH_I/D/L), or a bytecode address in
 this BCO.
 
 \begin{code}
--- An (almost) assembled BCO.
-data BCO a = BCO [Word16] 	-- instructions
-                 [Word32] 	-- literal pool
-                 [a] 		-- Names or HValues
-
 -- Top level assembler fn.
-assembleBCO :: ProtoBCO Name -> IO AsmState
+assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
+
 assembleBCO (ProtoBCO nm instrs origin)
    = let
          -- pass 1: collect up the offsets of the local labels
@@ -738,22 +770,30 @@ assembleBCO (ProtoBCO nm instrs origin)
                  Nothing -> pprPanic "assembleBCO.findLabel" (int lab)
 
          init_n_insns = 10
-         init_n_lits = 4
-         init_n_ptrs = 4
+         init_n_lits  = 4
+         init_n_ptrs  = 4
+         init_n_itbls = 4
      in
      do  insns <- newXIOUArray init_n_insns :: IO (XIOUArray Word16)
          lits  <- newXIOUArray init_n_lits  :: IO (XIOUArray Word32)
          ptrs  <- newXIOArray  init_n_ptrs  -- :: IO (XIOArray Name)
+         itbls <- newXIOArray  init_n_itbls -- :: IO (XIOArray Name)
 
          -- pass 2: generate the instruction, ptr and nonptr bits
-         let init_asm_state = (insns,lits,ptrs)
+         let init_asm_state = (insns,lits,ptrs,itbls)
          final_asm_state <- mkBits findLabel init_asm_state instrs         
-     
-         return final_asm_state
+
+         -- unwrap the expandable arrays
+         let final_insns = stuffXIOU insns
+             final_nptrs = stuffXIOU lits
+             final_ptrs  = stuffXIO  ptrs
+             final_itbls = stuffXIO  itbls
+
+         return (UnlinkedBCO final_insns final_nptrs final_ptrs final_itbls)
 
 
--- instrs nonptrs ptrs
-type AsmState = (XIOUArray Word16, XIOUArray Word32, XIOArray Name)
+-- instrs nonptrs ptrs itbls
+type AsmState = (XIOUArray Word16, XIOUArray Word32, XIOArray Name, XIOArray Name)
 
 
 -- This is where all the action is (pass 2 of the assembler)
@@ -785,8 +825,8 @@ mkBits findLabel st proto_insns
                MKAP      off sz   -> instr3 st i_MKAP off sz
                UNPACK    n        -> instr2 st i_UNPACK n
                UPK_TAG   n m k    -> instr4 st i_UPK_TAG n m k
-               PACK      dcon sz  -> do (np,st2) <- itbl st dcon
-                                        instr3 st2 i_PACK np sz
+               PACK      dcon sz  -> do (itbl_no,st2) <- itbl st dcon
+                                        instr3 st2 i_PACK itbl_no sz
                LABEL     lab      -> return st
                TESTLT_I  i l      -> do (np, st2) <- int st i
                                         instr3 st2 i_TESTLT_I np (findLabel l)
@@ -811,59 +851,76 @@ mkBits findLabel st proto_insns
        i2s :: Int -> Word16
        i2s = fromIntegral
 
-       instr1 (st_i0,st_l0,st_p0) i1
+       instr1 (st_i0,st_l0,st_p0,st_I0) i1
           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
-               return (st_i1,st_l0,st_p0)
+               return (st_i1,st_l0,st_p0,st_I0)
 
-       instr2 (st_i0,st_l0,st_p0) i1 i2
+       instr2 (st_i0,st_l0,st_p0,st_I0) i1 i2
           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
                st_i2 <- addToXIOUArray st_i1 (i2s i2)
-               return (st_i2,st_l0,st_p0)
+               return (st_i2,st_l0,st_p0,st_I0)
 
-       instr3 (st_i0,st_l0,st_p0) i1 i2 i3
+       instr3 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3
           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
                st_i2 <- addToXIOUArray st_i1 (i2s i2)
                st_i3 <- addToXIOUArray st_i2 (i2s i3)
-               return (st_i3,st_l0,st_p0)
+               return (st_i3,st_l0,st_p0,st_I0)
 
-       instr4 (st_i0,st_l0,st_p0) i1 i2 i3 i4
+       instr4 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3 i4
           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
                st_i2 <- addToXIOUArray st_i1 (i2s i2)
                st_i3 <- addToXIOUArray st_i2 (i2s i3)
                st_i4 <- addToXIOUArray st_i3 (i2s i4)
-               return (st_i4,st_l0,st_p0)
+               return (st_i4,st_l0,st_p0,st_I0)
 
-       float (st_i0,st_l0,st_p0) f
+       float (st_i0,st_l0,st_p0,st_I0) f
           = do let w32s = mkLitF f
                st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
 
-       double (st_i0,st_l0,st_p0) d
+       double (st_i0,st_l0,st_p0,st_I0) d
           = do let w32s = mkLitD d
                st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
 
-       int (st_i0,st_l0,st_p0) i
+       int (st_i0,st_l0,st_p0,st_I0) i
           = do let w32s = mkLitI i
                st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
 
-       addr (st_i0,st_l0,st_p0) a
+       addr (st_i0,st_l0,st_p0,st_I0) a
           = do let w32s = mkLitA a
                st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
 
-       ptr (st_i0,st_l0,st_p0) p
+       ptr (st_i0,st_l0,st_p0,st_I0) p
           = do st_p1 <- addToXIOArray st_p0 p
-               return (usedXIO st_p0, (st_i0,st_l0,st_p1))
+               return (usedXIO st_p0, (st_i0,st_l0,st_p1,st_I0))
+
+       itbl (st_i0,st_l0,st_p0,st_I0) dcon
+          = do st_I1 <- addToXIOArray st_I0 (getName dcon)
+               return (usedXIO st_I0, (st_i0,st_l0,st_p0,st_I1))
 
        literal st (MachInt j)    = int st (fromIntegral j)
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
 
-       ret_itbl st pk = panic "ret_itbl" -- return (65535, st)
-       itbl st dcon = panic "itbl" -- return (65536, st)
-
+       ret_itbl st pk
+          = addr st ret_itbl_addr
+            where
+               ret_itbl_addr 
+                  = case pk of
+                       IntRep    -> stg_ret_R1_info
+                       FloatRep  -> stg_ret_F1_info
+                       DoubleRep -> stg_ret_D1_info
+                    where  -- TEMP HACK
+                       stg_ret_R1_info = nullAddr
+                       stg_ret_F1_info = nullAddr
+                       stg_ret_D1_info = nullAddr
+                     
+--foreign label "stg_ret_R1_info" stg_ret_R1_info :: Addr
+--foreign label "stg_ret_F1_info" stg_ret_F1_info :: Addr
+--foreign label "stg_ret_D1_info" stg_ret_D1_info :: Addr
 
 -- The size in bytes of an instruction.
 instrSizeB :: BCInstr -> Int
@@ -1027,6 +1084,211 @@ addToXIOArray (XIOArray n_arr arr) x
                             writeArray dst n nx
                             copy (n-1) src dst
 
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Manufacturing of info tables for DataCons}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+#if __GLASGOW_HASKELL__ <= 408
+type ItblPtr = Addr
+#else
+type ItblPtr = Ptr StgInfoTable
+#endif
+
+-- Make info tables for the data decls in this module
+mkITbls :: [TyCon] -> IO ItblEnv
+mkITbls [] = return emptyFM
+mkITbls (tc:tcs) = do itbls  <- mkITbl tc
+                      itbls2 <- mkITbls tcs
+                      return (itbls `plusFM` itbls2)
+
+mkITbl :: TyCon -> IO ItblEnv
+mkITbl tc
+--   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
+--   = error "?!?!"
+   | not (isDataTyCon tc) 
+   = return emptyFM
+   | n == length dcs  -- paranoia; this is an assertion.
+   = make_constr_itbls dcs
+     where
+        dcs = tyConDataCons tc
+        n   = tyConFamilySize tc
+
+cONSTR :: Int
+cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
+
+-- Assumes constructors are numbered from zero, not one
+make_constr_itbls :: [DataCon] -> IO ItblEnv
+make_constr_itbls cons
+   | length cons <= 8
+   = do is <- mapM mk_vecret_itbl (zip cons [0..])
+	return (listToFM is)
+   | otherwise
+   = do is <- mapM mk_dirret_itbl (zip cons [0..])
+	return (listToFM is)
+     where
+        mk_vecret_itbl (dcon, conNo)
+           = mk_itbl dcon conNo (vecret_entry conNo)
+        mk_dirret_itbl (dcon, conNo)
+           = mk_itbl dcon conNo mci_constr_entry
+
+        mk_itbl :: DataCon -> Int -> Addr -> IO (Name,ItblPtr)
+        mk_itbl dcon conNo entry_addr
+           = let (tot_wds, ptr_wds, _) 
+                    = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
+                 ptrs = ptr_wds
+                 nptrs  = tot_wds - ptr_wds
+                 itbl  = StgInfoTable {
+                           ptrs = fromIntegral ptrs, nptrs = fromIntegral nptrs,
+                           tipe = fromIntegral cONSTR,
+                           srtlen = fromIntegral conNo,
+                           code0 = fromIntegral code0, code1 = fromIntegral code1,
+                           code2 = fromIntegral code2, code3 = fromIntegral code3,
+                           code4 = fromIntegral code4, code5 = fromIntegral code5,
+                           code6 = fromIntegral code6, code7 = fromIntegral code7 
+                        }
+                 -- Make a piece of code to jump to "entry_label".
+                 -- This is the only arch-dependent bit.
+                 -- On x86, if entry_label has an address 0xWWXXYYZZ,
+                 -- emit   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
+                 -- which is
+                 -- B8 ZZ YY XX WW FF E0
+                 (code0,code1,code2,code3,code4,code5,code6,code7)
+                    = (0xB8, byte 0 entry_addr_w, byte 1 entry_addr_w, 
+                             byte 2 entry_addr_w, byte 3 entry_addr_w, 
+                       0xFF, 0xE0, 
+                       0x90 {-nop-})
+
+                 entry_addr_w :: Word32
+                 entry_addr_w = fromIntegral (addrToInt entry_addr)
+             in
+                 do addr <- malloc
+                    --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
+                    --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
+                    --putStrLn ("# nptrs of itbl is " ++ show nptrs)
+                    poke addr itbl
+                    return (getName dcon, addr `plusPtr` 8)
+
+
+byte :: Int -> Word32 -> Word32
+byte 0 w = w .&. 0xFF
+byte 1 w = (w `shiftR` 8) .&. 0xFF
+byte 2 w = (w `shiftR` 16) .&. 0xFF
+byte 3 w = (w `shiftR` 24) .&. 0xFF
+
+
+vecret_entry 0 = mci_constr1_entry
+vecret_entry 1 = mci_constr2_entry
+vecret_entry 2 = mci_constr3_entry
+vecret_entry 3 = mci_constr4_entry
+vecret_entry 4 = mci_constr5_entry
+vecret_entry 5 = mci_constr6_entry
+vecret_entry 6 = mci_constr7_entry
+vecret_entry 7 = mci_constr8_entry
+
+-- entry point for direct returns for created constr itbls
+foreign label "stg_mci_constr_entry" mci_constr_entry :: Addr
+-- and the 8 vectored ones
+foreign label "stg_mci_constr1_entry" mci_constr1_entry :: Addr
+foreign label "stg_mci_constr2_entry" mci_constr2_entry :: Addr
+foreign label "stg_mci_constr3_entry" mci_constr3_entry :: Addr
+foreign label "stg_mci_constr4_entry" mci_constr4_entry :: Addr
+foreign label "stg_mci_constr5_entry" mci_constr5_entry :: Addr
+foreign label "stg_mci_constr6_entry" mci_constr6_entry :: Addr
+foreign label "stg_mci_constr7_entry" mci_constr7_entry :: Addr
+foreign label "stg_mci_constr8_entry" mci_constr8_entry :: Addr
+
+
+
+data Constructor = Constructor Int{-ptrs-} Int{-nptrs-}
+
+
+-- Ultra-minimalist version specially for constructors
+data StgInfoTable = StgInfoTable {
+   ptrs :: Word16,
+   nptrs :: Word16,
+   srtlen :: Word16,
+   tipe :: Word16,
+   code0, code1, code2, code3, code4, code5, code6, code7 :: Word8
+}
+
+
+instance Storable StgInfoTable where
+
+   sizeOf itbl 
+      = (sum . map (\f -> f itbl))
+        [fieldSz ptrs, fieldSz nptrs, fieldSz srtlen, fieldSz tipe,
+         fieldSz code0, fieldSz code1, fieldSz code2, fieldSz code3, 
+         fieldSz code4, fieldSz code5, fieldSz code6, fieldSz code7]
+
+   alignment itbl 
+      = (sum . map (\f -> f itbl))
+        [fieldAl ptrs, fieldAl nptrs, fieldAl srtlen, fieldAl tipe,
+         fieldAl code0, fieldAl code1, fieldAl code2, fieldAl code3, 
+         fieldAl code4, fieldAl code5, fieldAl code6, fieldAl code7]
+
+   poke a0 itbl
+      = do a1 <- store (ptrs   itbl) (castPtr a0)
+           a2 <- store (nptrs  itbl) a1
+           a3 <- store (tipe   itbl) a2
+           a4 <- store (srtlen itbl) a3
+           a5 <- store (code0  itbl) a4
+           a6 <- store (code1  itbl) a5
+           a7 <- store (code2  itbl) a6
+           a8 <- store (code3  itbl) a7
+           a9 <- store (code4  itbl) a8
+           aA <- store (code5  itbl) a9
+           aB <- store (code6  itbl) aA
+           aC <- store (code7  itbl) aB
+           return ()
+
+   peek a0
+      = do (a1,ptrs)   <- load (castPtr a0)
+           (a2,nptrs)  <- load a1
+           (a3,tipe)   <- load a2
+           (a4,srtlen) <- load a3
+           (a5,code0)  <- load a4
+           (a6,code1)  <- load a5
+           (a7,code2)  <- load a6
+           (a8,code3)  <- load a7
+           (a9,code4)  <- load a8
+           (aA,code5)  <- load a9
+           (aB,code6)  <- load aA
+           (aC,code7)  <- load aB
+           return StgInfoTable { ptrs = ptrs, nptrs = nptrs, 
+                                 srtlen = srtlen, tipe = tipe,
+                                 code0 = code0, code1 = code1, code2 = code2,
+                                 code3 = code3, code4 = code4, code5 = code5,
+                                 code6 = code6, code7 = code7 }
+
+fieldSz :: (Storable a, Storable b) => (a -> b) -> a -> Int
+fieldSz sel x = sizeOf (sel x)
+
+fieldAl :: (Storable a, Storable b) => (a -> b) -> a -> Int
+fieldAl sel x = alignment (sel x)
+
+store :: Storable a => a -> Ptr a -> IO (Ptr b)
+store x addr = do poke addr x
+                  return (castPtr (addr `plusPtr` sizeOf x))
+
+load :: Storable a => Ptr a -> IO (Ptr b, a)
+load addr = do x <- peek addr
+               return (castPtr (addr `plusPtr` sizeOf x), x)
+
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Connect to actual values for bytecode opcodes}
+%*									*
+%************************************************************************
+
+\begin{code}
 
 #include "Bytecodes.h"
 

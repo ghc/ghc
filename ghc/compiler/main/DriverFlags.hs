@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.34 2000/12/12 14:35:08 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.35 2000/12/14 12:52:40 sewardj Exp $
 --
 -- Driver flags
 --
@@ -404,6 +404,7 @@ dynamic_flags = [
   ,  ( "ddump-stix",             NoArg (setDynFlag Opt_D_dump_stix) )
   ,  ( "ddump-simpl-stats",      NoArg (setDynFlag Opt_D_dump_simpl_stats) )
   ,  ( "ddump-interpsyn",        NoArg (setDynFlag Opt_D_dump_InterpSyn) )
+  ,  ( "ddump-bcos",             NoArg (setDynFlag Opt_D_dump_BCOs) )
   ,  ( "dsource-stats",          NoArg (setDynFlag Opt_D_source_stats) )
   ,  ( "dverbose-core2core",     NoArg (setDynFlag Opt_D_verbose_core2core) )
   ,  ( "dverbose-stg2stg",       NoArg (setDynFlag Opt_D_verbose_stg2stg) )
