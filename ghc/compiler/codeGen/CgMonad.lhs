@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.32 2001/11/23 11:46:31 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.33 2002/01/03 11:44:17 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -607,6 +607,10 @@ getEndOfBlockInfo = do
 	(MkCgInfoDown c_info statics _ _ eob_info) <- getInfoDown
 	return eob_info
 \end{code}
+
+There is just one SRT for each top level binding; all the nested
+bindings use sub-sections of this SRT.  The label is passed down to
+the nested bindings via the monad.
 
 \begin{code}
 getSRTInfo :: SRT -> FCode C_SRT
