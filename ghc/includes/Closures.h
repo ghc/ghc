@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.20 2000/12/11 12:36:59 simonmar Exp $
+ * $Id: Closures.h,v 1.21 2000/12/11 12:59:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -176,9 +176,9 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
-    StgPtr      literals;	/* a pointer to an ArrWords */
-    StgPtr      instrs;		/* a pointer to an ArrWords */
-    StgPtr      ptrs;		/* a pointer to a MutArrPtrs */
+    StgClosure *literals;	/* a pointer to an ArrWords */
+    StgClosure *instrs;		/* a pointer to an ArrWords */
+    StgClosure *ptrs;		/* a pointer to a MutArrPtrs */
 } StgBCO;
 
 typedef struct {

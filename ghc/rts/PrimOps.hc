@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.61 2000/12/11 12:56:14 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.62 2000/12/11 12:59:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1040,14 +1040,14 @@ FN_(newBCOzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgBCO)); /* ccs prof */
 
   bco = (StgBCO *) (Hp + 1 - sizeof(StgBCO));
-  SET_HDR(w, &stg_BCO_info, CCCS);
+  SET_HDR(bco, &stg_BCO_info, CCCS);
 
-  w->instrs     = R1.cl;
-  w->literals   = R2.cl;
-  w->ptrs       = R3.cl;
+  bco->instrs     = R1.cl;
+  bco->literals   = R2.cl;
+  bco->ptrs       = R3.cl;
 
   TICK_RET_UNBOXED_TUP(1);
-  RET_P(w);
+  RET_P(bco);
   FE_
 }
 
