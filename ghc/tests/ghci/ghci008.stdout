@@ -1,6 +1,6 @@
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.01, for Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.03, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
@@ -44,10 +44,10 @@ class (RealFrac a, Floating a) => RealFloat a where {
     }
 Prelude> :info []
 -- [] is a data constructor
-[] :: forall t_12. [t_12]
+[] :: forall a. [a]
 
 -- [] is a type constructor
-data [] t_12 = [] | : t_12 [t_12]
+data [] a = [] | (:) a [a]
 Prelude> :info ()
 -- () is a data constructor
 () :: ()
@@ -56,10 +56,10 @@ Prelude> :info ()
 data () = ()
 Prelude> :info (,)
 -- (,) is a data constructor
-(,) :: forall t_12 t_13. t_12 -> t_13 -> (t_12, t_13)
+(,) :: forall a b. a -> b -> (a, b)
 
 -- (,) is a type constructor
-data (,) t_12 t_13 = (,) t_12 t_13
+data (,) a b = (,) a b
 Prelude> :info `List.isPrefixOf`
 -- List.isPrefixOf is a variable
 List.isPrefixOf :: forall a. (Eq a) => [a] -> [a] -> Bool

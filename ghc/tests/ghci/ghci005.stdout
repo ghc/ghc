@@ -1,6 +1,6 @@
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.01, for Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.03, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
@@ -11,12 +11,12 @@ Prelude> let void m = m >> return ""
 Prelude> let echo s = void (putStrLn s)
 Prelude> :def echo echo
 Prelude> :echo hello, world!
+hello, world!
 Prelude> 
 Prelude> let echo s = return (":! echo " ++ map Char.toUpper s)
-hello, world!
 Prelude> :echo hello, world!
-Prelude> :def echo echo
 hello, world!
+Prelude> :def echo echo
 command `echo' is already defined
 Prelude> :undef echo
 Prelude> :def echo echo
