@@ -463,7 +463,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
          parameterArea = sum [ getPrimRepSize a_rep * bytes_per_word
                         | (_, a_rep) <- arg_offs_n_reps ]
          savedRegisterArea = 4
-         frameSize = padTo16 (linkageArea + min parameterArea 32 + savedRegisterArea)
+         frameSize = padTo16 (linkageArea + max parameterArea 32 + savedRegisterArea)
          padTo16 x = case x `mod` 16 of
             0 -> x
             y -> x - y + 16
@@ -475,7 +475,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                offsetW' = offsetW + getPrimRepSize a_rep
                
                pass_word w 
-                   | w < 8 =
+                   | offsetW + w < 8 =
                       [0x801f0000    -- lwz rX, src(r31)
                         .|. (fromIntegral src .&. 0xFFFF)
                         .|. (fromIntegral (offsetW+w+3) `shiftL` 21)]
