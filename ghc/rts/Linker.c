@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.125 2003/07/20 21:28:04 panne Exp $
+ * $Id: Linker.c,v 1.126 2003/08/18 09:27:54 dons Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -59,7 +59,7 @@
 #include <sys/mman.h>
 #endif
 
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS) || defined(netbsd_TARGET_OS)
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS) || defined(netbsd_TARGET_OS) || defined(openbsd_TARGET_OS)
 #  define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #  define OBJFORMAT_PEi386
@@ -735,7 +735,11 @@ addDLL( char *dll_name )
 
    initLinker();
 
+#if !defined(openbsd_TARGET_OS)
    hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);
+#else
+   hdl= dlopen(dll_name, RTLD_LAZY);
+#endif
    if (hdl == NULL) {
       /* dlopen failed; return a ptr to the error msg. */
       errmsg = dlerror();
@@ -2012,7 +2016,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #  define ELF_NEED_PLT      /* needs Procedure Linkage Tables */
 #endif
 
+#if !defined(openbsd_TARGET_OS)
 #include <elf.h>
+#else
+/* openbsd elf has things in different places, with diff names */
+#include <elf_abi.h>
+#include <machine/reloc.h>
+#define R_386_32    RELOC_32
+#define R_386_PC32  RELOC_PC32
+#endif
 
 /*
  * Define a set of types which can be used for both ELF32 and ELF64
