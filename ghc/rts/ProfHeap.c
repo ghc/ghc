@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.34 2001/12/12 15:01:25 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.35 2001/12/12 15:59:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -489,6 +489,8 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	return;
     }
 
+    fprintf(fp, "(%d)", ccs->ccsID);
+
     // keep printing components of the stack until we run out of space
     // in the buffer.  If we run out of space, end with "...".
     for (; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack) {
@@ -748,7 +750,7 @@ dumpCensus( Census *census )
 #ifdef PROFILING
 	switch (RtsFlags.ProfFlags.doHeapProfile) {
 	case HEAP_BY_CCS:
-	    fprint_ccs(hp_file, (CostCentreStack *)ctr->identity, 30);
+	    fprint_ccs(hp_file, (CostCentreStack *)ctr->identity, 25);
 	    break;
 	case HEAP_BY_MOD:
 	case HEAP_BY_DESCR:
