@@ -1265,6 +1265,7 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
       MO_NatP_to_NatS -> conversionNop IntRep    x
 
       -- sign-extending widenings
+      MO_8U_to_32U    -> integerExtend False 24 x
       MO_8U_to_NatU   -> integerExtend False 24 x
       MO_8S_to_NatS   -> integerExtend True  24 x
       MO_16U_to_NatU  -> integerExtend False 16 x
