@@ -60,6 +60,7 @@ import Util		( notNull, splitLongestPrefix, split, normalisePath )
 import DATA_IOREF	( readIORef )
 import EXCEPTION	( throwDyn )
 import Monad		( when )
+import Data.List	( isPrefixOf )
 import Maybe		( fromJust )
 import Char		( isDigit, isUpper )
 
@@ -1092,20 +1093,20 @@ splitPathList s = filter notNull (splitUp s)
      -- that this will cause too much breakage for users & ':' will
      -- work fine even with DOS paths, if you're not insisting on being silly.
      -- So, use either.
-    splitUp []         = []
-    splitUp (x:':':div:xs) 
-      | div `elem` dir_markers = do
-          let (p,rs) = findNextPath xs
-          in ((x:':':div:p): splitUp rs)
+    splitUp []             = []
+    splitUp (x:':':div:xs) | div `elem` dir_markers
+			   = ((x:':':div:p): splitUp rs)
+			   where
+			      (p,rs) = findNextPath xs
 	  -- we used to check for existence of the path here, but that
 	  -- required the IO monad to be threaded through the command-line
    	  -- parser which is quite inconvenient.  The 
-    splitUp xs = do
-      let (p,rs) = findNextPath xs
-      return (cons p (splitUp rs))
+    splitUp xs = cons p (splitUp rs)
+	       where
+		 (p,rs) = findNextPath xs
     
-    cons "" xs = xs
-    cons x  xs = x:xs
+		 cons "" xs = xs
+		 cons x  xs = x:xs
 
     -- will be called either when we've consumed nought or the
     -- "<Drive>:/" part of a DOS path, so splitting is just a Q of
