@@ -27,7 +27,6 @@ module GHC.Num where
 
 import {-# SOURCE #-} GHC.Err
 import GHC.Base
-import GHC.List
 import GHC.Enum
 import GHC.Show
 
