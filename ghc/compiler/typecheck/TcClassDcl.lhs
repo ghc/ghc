@@ -6,16 +6,16 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcClassDcl ( tcClassDecl1, tcClassDecls2 ) where
+module TcClassDcl ( tcClassDecl1, tcClassDecls2, tcMethodBind ) where
 
 IMP_Ubiq()
 
 import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
 			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
-			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar,
+			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar, InPat(..),
 			  SYN_IE(RecFlag), nonRecursive, andMonoBinds, collectMonoBinders,
-			  Stmt, DoOrListComp, ArithSeqInfo, InPat, Fake )
+			  Stmt, DoOrListComp, ArithSeqInfo, Fake )
 import HsTypes		( getTyVarName )
 import HsPragmas	( ClassPragmas(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
@@ -37,7 +37,7 @@ import TcType		( TcIdOcc(..), SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcIns
 			  tcInstSigType, tcInstSigTcType )
 import PragmaInfo	( PragmaInfo(..) )
 
-import Bag		( bagToList )
+import Bag		( bagToList, unionManyBags )
 import Class		( GenClass, mkClass, classBigSig, 
 			  classDefaultMethodId,
 			  classOpTagByOccName, SYN_IE(Class)
@@ -49,7 +49,7 @@ import Id		( GenId, mkSuperDictSelId, mkMethodSelId,
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, moduleString, getSrcLoc,
+import Name		( Name, isLocallyDefined, moduleString, getSrcLoc, nameOccName,
 			  nameString, NamedThing(..) )
 import Outputable
 import Pretty
@@ -308,7 +308,7 @@ tcClassDecl2 (ClassDecl context class_name
     	final_sel_binds = andMonoBinds sel_binds
     in
 	-- Generate bindings for the default methods
-    buildDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
+    tcDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
 
     returnTc (const_insts, 
 	      final_sel_binds `AndMonoBinds` meth_binds)
@@ -388,38 +388,36 @@ dfun.Foo.List
 \end{verbatim}
 
 \begin{code}
-buildDefaultMethodBinds
+tcDefaultMethodBinds
 	:: Class
 	-> RenamedMonoBinds
 	-> TcM s (LIE s, TcMonoBinds s)
 
-buildDefaultMethodBinds clas default_binds
+tcDefaultMethodBinds clas default_binds
   = 	-- Construct suitable signatures
     tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], [inst_ty], inst_env) ->
-    let
-	mk_sig (bndr_name, locn)
-	  = let
-	        idx	   = classOpTagByOccName clas (getOccName bndr_name) - 1
-	        sel_id     = op_sel_ids !! idx
-	        Just dm_id = defm_ids !! idx
-	    in
-	    newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_dm_id) ->
-	    tcInstSigTcType (idType local_dm_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
-	    let
-		(theta', tau') = splitRhoTy rho_ty'
-		sig_info       = TySigInfo bndr_name local_dm_id tyvars' theta' tau' locn
-	    in
-	    returnNF_Tc (sig_info, ([clas_tyvar], RealId dm_id, TcId local_dm_id))
-    in
-    mapAndUnzipNF_Tc mk_sig bndrs	`thenNF_Tc` \ (sigs, abs_bind_stuff) ->
 
 	-- Typecheck the default bindings
     let
-	clas_tyvar_set    = unitTyVarSet clas_tyvar
-    in
+	clas_tyvar_set = unitTyVarSet clas_tyvar
+
+	tc_dm meth_bind
+	  = let
+		bndr_name  = case meth_bind of
+				FunMonoBind name _ _ _		-> name
+				PatMonoBind (VarPatIn name) _ _ -> name
+				
+		idx    	   = classOpTagByOccName clas (nameOccName bndr_name) - 1
+		sel_id 	   = op_sel_ids !! idx
+		Just dm_id = defm_ids !! idx
+	    in
+	    tcMethodBind clas origin inst_ty sel_id meth_bind
+						`thenTc` \ (bind, insts, (_, local_dm_id)) ->
+	    returnTc (bind, insts, ([clas_tyvar], RealId dm_id, local_dm_id))
+    in	   
     tcExtendGlobalTyVars clas_tyvar_set (
-	tcBindWithSigs (map fst bndrs) default_binds sigs nonRecursive (\_ -> NoPragmaInfo)
-    )						`thenTc` \ (defm_binds, insts_needed, _) ->
+	mapAndUnzip3Tc tc_dm (flatten default_binds [])
+    )						`thenTc` \ (defm_binds, insts_needed, abs_bind_stuff) ->
 
 	-- Check the context
     newDicts origin [(clas,inst_ty)]		`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
@@ -429,24 +427,57 @@ buildDefaultMethodBinds clas default_binds
     tcSimplifyAndCheck
 	clas_tyvar_set
 	avail_insts
-	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
+	(unionManyBags insts_needed)		`thenTc` \ (const_lie, dict_binds) ->
 
     let
 	full_binds = AbsBinds
 		 	[clas_tyvar]
 			[this_dict_id]
 			abs_bind_stuff
-			(dict_binds `AndMonoBinds` defm_binds)
+			(dict_binds `AndMonoBinds` andMonoBinds defm_binds)
     in
     returnTc (const_lie, full_binds)
 
   where
     (tyvar, scs, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
     origin = ClassDeclOrigin
-    bndrs  = bagToList (collectMonoBinders default_binds)
+
+    flatten EmptyMonoBinds rest	      = rest
+    flatten (AndMonoBinds b1 b2) rest = flatten b1 (flatten b2 rest)
+    flatten a_bind rest		      = a_bind : rest
 \end{code}
 
+@tcMethodBind@ is used to type-check both default-method and
+instance-decl method declarations.  We must type-check methods one at a
+time, because their signatures may have different contexts and
+tyvar sets.
 
+\begin{code}
+tcMethodBind 
+	:: Class
+	-> InstOrigin s
+	-> TcType s					-- Instance type
+	-> Id						-- The method selector
+	-> RenamedMonoBinds				-- Method binding (just one)
+	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
+
+tcMethodBind clas origin inst_ty sel_id meth_bind
+ = tcAddSrcLoc src_loc	 		        $
+   newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
+   tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
+   let
+	(theta', tau')  = splitRhoTy rho_ty'
+	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' src_loc
+   in
+   tcBindWithSigs [bndr_name] meth_bind [sig_info]
+		  nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
+
+   returnTc (binds, insts, meth)
+  where
+   (bndr_name, src_loc) = case meth_bind of
+				FunMonoBind name _ _ loc	  -> (name, loc)
+				PatMonoBind (VarPatIn name) _ loc -> (name, loc)
+\end{code}
 
 Contexts
 ~~~~~~~~
