@@ -410,7 +410,7 @@ copy purpose from to =
       h <- openFile to WriteMode
       ls <- readFile from -- inefficient, but it'll do for now.
 	    		      -- ToDo: speed up via slurping.
-      hPutStrLn h ls
+      hPutStr h ls
       hClose h) `catchAllIO`
 		 (\_ -> throwDyn (PhaseFailed purpose (ExitFailure 1)))
 \end{code}
