@@ -61,11 +61,11 @@ expr' :: ExprParser Int Int
 expr' = proc x -> do
 		returnA -< x
 	<+> do
-		(|symbol Plus|)
+		(|(symbol Plus)|)
 		y <- term -< ()
 		expr' -< x + y
 	<+> do
-		(|symbol Minus|)
+		(|(symbol Minus)|)
 		y <- term -< ()
 		expr' -< x - y
 
@@ -78,26 +78,26 @@ term' :: ExprParser Int Int
 term' = proc x -> do
 		returnA -< x
 	<+> do
-		(|symbol Mult|)
+		(|(symbol Mult)|)
 		y <- factor -< ()
 		term' -< x * y
 	<+> do
-		(|symbol Div|)
+		(|(symbol Div)|)
 		y <- factor -< ()
 		term' -< x `div` y
 
 factor :: ExprParser () Int
 factor = proc () -> do
-		v <- (|symbol Number|)
+		v <- (|(symbol Number)|)
 		returnA -< read v::Int
 	<+> do
-		(|symbol Minus|)
+		(|(symbol Minus)|)
 		v <- factor -< ()
 		returnA -< -v
 	<+> do
-		(|symbol LPar|)
+		(|(symbol LPar)|)
 		v <- expr -< ()
-		(|symbol RPar|)
+		(|(symbol RPar)|)
 		returnA -< v
 
 -- Lexical analysis

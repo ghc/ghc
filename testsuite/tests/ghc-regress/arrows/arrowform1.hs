@@ -9,23 +9,22 @@ handle f h = proc b -> (f -< b) <+> (h -< (b,""))
 
 f :: ArrowPlus a => a (Int,Int) String
 f = proc (x,y) ->
-	(|handle|) (returnA -< show y) (\s -> returnA -< s ++ show x)
-
-inject :: Arrow a => v -> a (b,v) c -> a b c
-inject v f = proc b -> f -< (b,v)
+	(|handle
+		(returnA -< show y)
+		(\s -> returnA -< s ++ show x)
+	|)
 
 g :: ArrowPlus a => a (Int,Int) String
 g = proc (x,y) ->
-	(|inject "hello"|) (
-		(|handle|)
-			(\msg -> returnA -< msg ++ show y)
-			(\s msg -> returnA -< s ++ show x)
-	)
-
-h :: ArrowPlus a => a (Int,Int) String
-h = proc (x,y) ->
-	(|inject "hello"|) (
+	(|handle
 		(\msg -> returnA -< msg ++ show y)
+		(\s msg -> returnA -< s ++ show x)
+	|) ("hello " ++ show x)
+
+h :: ArrowPlus a => a (Int,Int) Int
+h = proc (x,y) ->
+	(
+		(\z -> returnA -< x + z)
 		<+>
-		(\msg -> returnA -< msg ++ show x)
-	)
+		(\z -> returnA -< y + z)
+	) (x*y)
