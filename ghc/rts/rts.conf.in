@@ -30,7 +30,7 @@ Package {
 #ifdef USING_LIBBFD
 			      ,"bfd", "iberty"	/* for debugging */
 #endif
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS) && !defined(mingw32_TARGET_OS)
 			      ,"pthread"
 #endif
 			    ],
