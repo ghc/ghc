@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.c,v 1.3 1999/09/12 14:23:52 sof Exp $
+ * $Id: timezone.c,v 1.4 1999/09/12 14:26:32 sof Exp $
  *
  * Timezone Runtime Support
  */
@@ -40,6 +40,7 @@ get_ZONE (StgAddr x)
    * unless tzset() is called, so better do it here.
    */
   tzset();
+
 #endif
   return (ZONE(x));
 }
