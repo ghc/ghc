@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.37 2000/03/13 10:53:55 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.38 2000/03/14 09:55:05 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Entry code for various built-in closure types.
  *
@@ -774,31 +774,6 @@ VEC_POLY_INFO_TABLE(ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,
 
 #endif /* INTERPRETER */
 
-#ifndef COMPILER
-
-INFO_TABLE_CONSTR(Czh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(Izh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(I64zh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(Fzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(Dzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(Azh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(Wzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR,,EF_,0,0);
-INFO_TABLE_CONSTR(StablePtr_con_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR,,EF_,0,0);
-
-/* These might seem redundant but {I,C}zh_static_info are used in
- * {INT,CHAR}LIKE and the rest are used in RtsAPI.c
- */
-INFO_TABLE_CONSTR(Czh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(Izh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(I64zh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(Fzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(Dzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(Azh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(Wzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
-
-#endif /* !defined(COMPILER) */
-
 /* -----------------------------------------------------------------------------
    CHARLIKE and INTLIKE closures.  
 
@@ -807,7 +782,7 @@ INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr
    replace them with references to the static objects.
    -------------------------------------------------------------------------- */
 
-#ifdef ENABLE_WIN32_DLL_SUPPORT
+#if defined(INTERPRETER) || defined(ENABLE_WIN32_DLL_SUPPORT)
 /*
  * When sticking the RTS in a DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only
@@ -819,8 +794,8 @@ static INFO_TBL_CONST StgInfoTable izh_static_info;
 #define Char_hash_static_info czh_static_info
 #define Int_hash_static_info izh_static_info
 #else
-#define Char_hash_static_info Czh_static_info
-#define Int_hash_static_info Izh_static_info
+#define Char_hash_static_info PrelBase_Czh_static_info
+#define Int_hash_static_info PrelBase_Izh_static_info
 #endif
 
 #define CHARLIKE_HDR(n)						\

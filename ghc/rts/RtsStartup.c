@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.32 2000/03/09 11:49:34 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.33 2000/03/14 09:55:05 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Main function for a standalone Haskell program.
  *
@@ -21,6 +21,7 @@
 #include "Ticky.h"
 #include "StgRun.h"
 #include "StgStartup.h"
+#include "Prelude.h"		/* fixupPreludeRefs */
 
 #if defined(PROFILING) || defined(DEBUG)
 # include "ProfRts.h"
@@ -53,10 +54,6 @@ static void initModules ( void );
 void
 startupHaskell(int argc, char *argv[])
 {
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-    int i;
-#endif
-
     /* To avoid repeated initialisations of the RTS */
    if (rts_has_started_up)
      return;
@@ -160,21 +157,9 @@ startupHaskell(int argc, char *argv[])
     init_default_handlers();
 #endif
  
-    /* When the RTS and Prelude live in separate DLLs,
-       we need to patch up the char- and int-like tables
-       that the RTS keep after both DLLs have been loaded,
-       filling in the tables with references to where the
-       static info tables have been loaded inside the running
-       process.
-    */
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-    for(i=0;i<=255;i++)
-       (CHARLIKE_closure[i]).header.info = (const StgInfoTable*)&Czh_static_info;
+    /* Initialise pointers from the RTS to the prelude */
+    fixupPreludeRefs();
 
-    for(i=0;i<=32;i++)
-       (INTLIKE_closure[i]).header.info = (const StgInfoTable*)&Izh_static_info;
-       
-#endif
     /* Record initialization times */
     end_init();
 }

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.2 2000/03/13 13:00:00 sewardj Exp $
+ * $Id: Prelude.h,v 1.3 2000/03/14 09:55:05 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *
@@ -10,11 +10,11 @@
 #ifndef PRELUDE_H
 #define PRELUDE_H
 
-#ifdef COMPILING_RTS
+/* Define canonical names so we can abstract away from the actual
+ * module these names are defined in.
+ */
 
-#ifdef COMPILER
-extern DLL_IMPORT const StgClosure PrelBase_Z91Z93_static_closure;
-extern DLL_IMPORT const StgClosure PrelBase_Z40Z41_static_closure;
+#ifndef INTERPRETER
 extern DLL_IMPORT const StgClosure PrelBase_True_static_closure;
 extern DLL_IMPORT const StgClosure PrelBase_False_static_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
@@ -41,66 +41,89 @@ extern DLL_IMPORT const StgInfoTable PrelAddr_W64zh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_static_info;
 extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 
-/* Define canonical names so we can abstract away from the actual
- * module these names are defined in.
+#define True_closure           (&PrelBase_True_static_closure)
+#define False_closure          (&PrelBase_False_static_closure)
+#define stackOverflow_closure  (&PrelException_stackOverflow_closure)
+#define heapOverflow_closure   (&PrelException_heapOverflow_closure)
+#define PutFullMVar_closure    (&PrelException_PutFullMVar_static_closure)
+#define NonTermination_closure (&PrelException_NonTermination_static_closure)
+#define Czh_static_info        (&PrelBase_Czh_static_info)
+#define Izh_static_info        (&PrelBase_Izh_static_info)
+#define Fzh_static_info        (&PrelFloat_Fzh_static_info)
+#define Dzh_static_info        (&PrelFloat_Dzh_static_info)
+#define Azh_static_info        (&PrelAddr_Azh_static_info)
+#define Wzh_static_info        (&PrelAddr_Wzh_static_info)
+#define Czh_con_info           (&PrelBase_Czh_con_info)
+#define Izh_con_info           (&PrelBase_Izh_con_info)
+#define Fzh_con_info           (&PrelFloat_Fzh_con_info)
+#define Dzh_con_info           (&PrelFloat_Dzh_con_info)
+#define Azh_con_info           (&PrelAddr_Azh_con_info)
+#define Wzh_con_info           (&PrelAddr_Wzh_con_info)
+#define W64zh_con_info         (&PrelAddr_W64zh_con_info)
+#define I64zh_con_info         (&PrelAddr_I64zh_con_info)
+#define StablePtr_static_info  (&PrelStable_StablePtr_static_info)
+#define StablePtr_con_info     (&PrelStable_StablePtr_con_info)
+#define mainIO_closure         (&PrelMain_mainIO_closure)
+#define unpackCString_closure  (&PrelPack_unpackCString_closure)
+
+#else /* INTERPRETER */
+
+/* We need indirections to the Prelude stuff, because we can't link
+ * these symbols statically.
  */
+extern const StgClosure *ind_True_static_closure;
+extern const StgClosure *ind_False_static_closure;
+extern const StgClosure *ind_unpackCString_closure;
+extern const StgClosure *ind_stackOverflow_closure;
+extern const StgClosure *ind_heapOverflow_closure;
+extern const StgClosure *ind_PutFullMVar_static_closure;
+extern const StgClosure *ind_NonTermination_static_closure;
+extern const StgClosure *ind_mainIO_closure;
 
-#define Nil_closure            PrelBase_ZMZN_static_closure
-#define Unit_closure           PrelBase_Z0T_static_closure
-#define True_closure           PrelBase_True_static_closure
-#define False_closure          PrelBase_False_static_closure
-#define stackOverflow_closure  PrelException_stackOverflow_closure
-#define heapOverflow_closure   PrelException_heapOverflow_closure
-#define PutFullMVar_closure    PrelException_PutFullMVar_static_closure
-#define NonTermination_closure PrelException_NonTermination_static_closure
-#define Czh_static_info        PrelBase_Czh_static_info
-#define Izh_static_info        PrelBase_Izh_static_info
-#define Fzh_static_info        PrelFloat_Fzh_static_info
-#define Dzh_static_info        PrelFloat_Dzh_static_info
-#define Azh_static_info        PrelAddr_Azh_static_info
-#define Wzh_static_info        PrelAddr_Wzh_static_info
-#define Czh_con_info           PrelBase_Czh_con_info
-#define Izh_con_info           PrelBase_Izh_con_info
-#define Fzh_con_info           PrelFloat_Fzh_con_info
-#define Dzh_con_info           PrelFloat_Dzh_con_info
-#define Azh_con_info           PrelAddr_Azh_con_info
-#define Wzh_con_info           PrelAddr_Wzh_con_info
-#define W64zh_con_info         PrelAddr_W64zh_con_info
-#define I64zh_con_info         PrelAddr_I64zh_con_info
-#define StablePtr_static_info  PrelStable_StablePtr_static_info
-#define StablePtr_con_info     PrelStable_StablePtr_con_info
+extern const StgInfoTable *ind_Czh_static_info;
+extern const StgInfoTable *ind_Izh_static_info;
+extern const StgInfoTable *ind_Fzh_static_info;
+extern const StgInfoTable *ind_Dzh_static_info;
+extern const StgInfoTable *ind_Azh_static_info;
+extern const StgInfoTable *ind_Wzh_static_info;
+extern const StgInfoTable *ind_Czh_con_info;
+extern const StgInfoTable *ind_Izh_con_info;
+extern const StgInfoTable *ind_Fzh_con_info;
+extern const StgInfoTable *ind_Dzh_con_info;
+extern const StgInfoTable *ind_Azh_con_info;
+extern const StgInfoTable *ind_Wzh_con_info;
+extern const StgInfoTable *ind_I64zh_con_info;
+extern const StgInfoTable *ind_W64zh_con_info;
+extern const StgInfoTable *ind_StablePtr_static_info;
+extern const StgInfoTable *ind_StablePtr_con_info;
 
-#define mainIO_closure         PrelMain_mainIO_closure
-#define unpackCString_closure  PrelPack_unpackCString_closure
-
-#else /* INTERPRETER, I guess */
-
-extern const StgInfoTable Czh_con_info;
-extern const StgInfoTable Izh_con_info;
-extern const StgInfoTable I64zh_con_info;
-extern const StgInfoTable Fzh_con_info;
-extern const StgInfoTable Dzh_con_info;
-extern const StgInfoTable Azh_con_info;
-extern const StgInfoTable Wzh_con_info;
-extern const StgInfoTable StablePtr_con_info;
-
-extern const StgInfoTable Czh_static_info;
-extern const StgInfoTable Izh_static_info;
-extern const StgInfoTable I64zh_static_info;
-extern const StgInfoTable Fzh_static_info;
-extern const StgInfoTable Dzh_static_info;
-extern const StgInfoTable Azh_static_info;
-extern const StgInfoTable Wzh_static_info;
-extern const StgInfoTable StablePtr_static_info;
-
-#define W64zh_con_info        I64zh_con_info
-#define W64zh_static_info     I64zh_con_info
-
-#define PutFullMVar_closure    PrelException_PutFullMVar_static_closure
-extern const StgInfoTable PutFullMVar_closure;
+#define True_closure           ind_True_static_closure
+#define False_closure          ind_False_static_closure
+#define stackOverflow_closure  ind_stackOverflow_closure
+#define heapOverflow_closure   ind_heapOverflow_closure
+#define PutFullMVar_closure    ind_PutFullMVar_static_closure
+#define NonTermination_closure ind_NonTermination_static_closure
+#define Czh_static_info        ind_Czh_static_info
+#define Izh_static_info        ind_Izh_static_info
+#define Fzh_static_info        ind_Fzh_static_info
+#define Dzh_static_info        ind_Dzh_static_info
+#define Azh_static_info        ind_Azh_static_info
+#define Wzh_static_info        ind_Wzh_static_info
+#define Czh_con_info           ind_Czh_con_info
+#define Izh_con_info           ind_Izh_con_info
+#define Fzh_con_info           ind_Fzh_con_info
+#define Dzh_con_info           ind_Dzh_con_info
+#define Azh_con_info           ind_Azh_con_info
+#define Wzh_con_info           ind_Wzh_con_info
+#define W64zh_con_info         ind_W64zh_con_info
+#define I64zh_con_info         ind_I64zh_con_info
+#define StablePtr_static_info  ind_StablePtr_static_info
+#define StablePtr_con_info     ind_StablePtr_con_info
+#define mainIO_closure         ind_mainIO_closure
+#define unpackCString_closure  ind_unpackCString_closure
 
 #endif
 
-#endif /* COMPILING_RTS */
+void fixupPreludeRefs(void);
 
 #endif /* PRELUDE_H */

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.45 2000/03/13 13:00:00 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.46 2000/03/14 09:55:05 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Primitive functions / data
  *
@@ -908,7 +908,7 @@ FN_(putMVarzh_fast)
     fprintf(stderr, "fatal: put on a full MVar in Hugs; aborting\n" );
     exit(1);
 #else
-    R1.cl = (StgClosure *)&PutFullMVar_closure;
+    R1.cl = (StgClosure *)PutFullMVar_closure;
     JMP_(raisezh_fast);
 #endif
   }

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.17 2000/03/13 10:53:55 simonmar Exp $
+ * $Id: Main.c,v 1.18 2000/03/14 09:55:05 simonmar Exp $
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2000
  *
  * Main function for a standalone Haskell program.
  *
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Main Thread Started ...\n");
 
       /* ToDo: Dump event for the main thread */
-      status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
+      status = rts_evalIO(mainIO_closure, NULL);
     } else {
       /* Just to show we're alive */
       IF_PAR_DEBUG(verbose,
@@ -94,12 +94,12 @@ int main(int argc, char *argv[])
 #  elif defined(GRAN)
 
     /* ToDo: Dump event for the main thread */
-    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
+    status = rts_evalIO(mainIO_closure, NULL);
 
 #  else /* !PAR && !GRAN */
 
     /* ToDo: want to start with a larger stack size */
-    status = rts_evalIO((StgClosure *)&mainIO_closure, NULL);
+    status = rts_evalIO((StgClosure *)mainIO_closure, NULL);
 
 #  endif /* !PAR && !GRAN */
 

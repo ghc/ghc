@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.51 2000/03/13 10:53:56 simonmar Exp $
+ * $Id: Schedule.c,v 1.52 2000/03/14 09:55:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1622,7 +1622,7 @@ threadStackOverflow(StgTSO *tso)
     exit(1);
 #else
     /* Send this thread the StackOverflow exception */
-    raiseAsync(tso, (StgClosure *)&stackOverflow_closure);
+    raiseAsync(tso, (StgClosure *)stackOverflow_closure);
 #endif
     return tso;
   }
