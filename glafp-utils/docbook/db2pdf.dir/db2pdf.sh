@@ -33,14 +33,17 @@ fi
 
 $JADE -t tex -d ${DB_STYLESHEET}\#print -o ${output}.tex -c $DOCBOOK_CATALOG $1
 
-pdfjadetex ${output}
+jadetex ${output}
 
-# See if running pdfjadetex twice cures the problem.
+# See if running jadetex twice cures the problem.
 if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
 then
-  pdfjadetex ${output}
-  pdfjadetex ${output}
+  jadetex ${output}
+  jadetex ${output}
 fi
+
+dvips ${output}.dvi ${output}.ps
+ps2pdf ${output}.ps ${output}.pdf
 
 # clean out 
 rm -f ${output}.log
