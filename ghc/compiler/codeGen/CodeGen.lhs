@@ -112,33 +112,37 @@ mkModuleInit
 	-> AbstractC
 mkModuleInit way cost_centre_info
 	     (ModGuts { mg_module  = mod,
-			mg_foreign = ForeignStubs _ _ _ fe_binders,
+			mg_foreign = for_stubs,
 			mg_dir_imps = imported_modules })
   = let
-	register_fes = 
-	   map (\f -> CMacroStmt REGISTER_FOREIGN_EXPORT [f]) fe_labels
-
-    	fe_labels = 
-	   map (\f -> CLbl (mkClosureLabel (idName f)) PtrRep) fe_binders
-
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
-	-- we don't want/need to init GHC.Prim, so filter it out
+	register_foreign_exports 
+		= case for_stubs of
+			NoStubs			    -> []
+			ForeignStubs _ _ _ fe_bndrs -> map mk_export_register fe_bndrs
+
+	mk_export_register bndr
+	  = CMacroStmt REGISTER_FOREIGN_EXPORT [lbl]
+	  where
+	    lbl = CLbl (mkClosureLabel (idName bndr)) PtrRep
+		-- we don't want/need to init GHC.Prim, so filter it out
+
 	mk_import_register mod
 	    | mod == gHC_PRIM = AbsCNop
 	    | otherwise	      = CMacroStmt REGISTER_IMPORT [
 				   CLbl (mkModuleInitLabel mod way) AddrRep
 				]
 
-	register_imports = map mk_import_register imported_modules
+	register_mod_imports = map mk_import_register imported_modules
     in
     mkAbstractCs [
 	cc_decls,
         CModuleInitBlock (mkPlainModuleInitLabel mod)
 			 (mkModuleInitLabel mod way)
-		         (mkAbstractCs (register_fes ++
+		         (mkAbstractCs (register_foreign_exports ++
 				        cc_regs :
-				        register_imports))
+				        register_mod_imports))
     ]
 \end{code}
 
