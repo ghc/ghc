@@ -27,5 +27,6 @@ test('read021', normal, compile_fail, [''])
 
 test('read022', normal, compile_fail, [''])
 test('read023', normal, compile_fail, [''])
-test('read024', expect_fail, compile_fail, [''])
+test('read024', normal, compile_fail, [''])
 test('read025', normal, compile_fail, [''])
+test('read026', normal, compile_fail, [''])
