@@ -169,15 +169,19 @@ importsFromImportDecl :: (Name -> Bool)		-- OK to omit qualifier
 
 importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails) ->
+    getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails_by_module) ->
 
-    if null avails then
+    if null avails_by_module then
 	-- If there's an error in getInterfaceExports, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
 	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod_name)
     else
 
-    filterImports imp_mod_name import_spec avails   `thenRn` \ (filtered_avails, hides, explicits) ->
+    let
+	avails :: Avails
+	avails = concat (map snd avails_by_module)
+    in
+    filterImports imp_mod_name import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
     let
 	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
@@ -295,7 +299,7 @@ filterImports :: ModuleName			-- The module being imported
 filterImports mod Nothing imports
   = returnRn (imports, [], emptyNameSet)
 
-filterImports mod (Just (want_hiding, import_items)) avails
+filterImports mod (Just (want_hiding, import_items)) total_avails
   = flatMapRn get_item import_items		`thenRn` \ avails_w_explicits ->
     let
 	(item_avails, explicits_s) = unzip avails_w_explicits
@@ -304,14 +308,14 @@ filterImports mod (Just (want_hiding, import_items)) avails
     if want_hiding 
     then	
 	-- All imported; item_avails to be hidden
-	returnRn (avails, item_avails, emptyNameSet)
+	returnRn (total_avails, item_avails, emptyNameSet)
     else
 	-- Just item_avails imported; nothing to be hidden
 	returnRn (item_avails, [], explicits)
   where
     import_fm :: FiniteMap OccName AvailInfo
     import_fm = listToFM [ (nameOccName name, avail) 
-			 | avail <- avails,
+			 | avail <- total_avails,
 			   name  <- availNames avail]
 	-- Even though availNames returns data constructors too,
 	-- they won't make any difference because naked entities like T

@@ -126,7 +126,7 @@ data ModIface
 						-- (changing usages doesn't affect the version of
 						--  this module)
 
-        mi_exports  :: Avails,			-- What it exports
+        mi_exports  :: [(ModuleName,Avails)],	-- What it exports
 						-- Kept sorted by (mod,occ),
 						-- to make version comparisons easier
 

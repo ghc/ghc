@@ -240,16 +240,16 @@ addModDeps mod new_deps mod_deps
 --	Loading the export list
 -----------------------------------------------------
 
-loadExports :: (Version, [ExportItem]) -> RnM d (Version, Avails)
+loadExports :: (Version, [ExportItem]) -> RnM d (Version, [(ModuleName,Avails)])
 loadExports (vers, items)
   = getModuleRn 				`thenRn` \ this_mod ->
     mapRn (loadExport this_mod) items		`thenRn` \ avails_s ->
-    returnRn (vers, concat avails_s)
+    returnRn (vers, avails_s)
 
 
-loadExport :: Module -> ExportItem -> RnM d [AvailInfo]
+loadExport :: Module -> ExportItem -> RnM d (ModuleName, Avails)
 loadExport this_mod (mod, entities)
-  | mod == moduleName this_mod = returnRn []
+  | mod == moduleName this_mod = returnRn (mod, [])
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
 	-- for the thing, and an error gets reported.  Easiest thing is just to
@@ -267,7 +267,8 @@ loadExport this_mod (mod, entities)
 	-- but it's a bogus thing to do!
 
   | otherwise
-  = mapRn (load_entity mod) entities
+  = mapRn (load_entity mod) entities	`thenRn` \ avails ->
+    returnRn (mod, avails)
   where
     new_name mod occ = newGlobalName mod occ
 

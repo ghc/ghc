@@ -27,7 +27,7 @@ import Name		( Name, NamedThing(..),
 			)
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
-import Module		( ModuleName, moduleName, mkVanillaModule )
+import Module		( ModuleName, moduleName, mkVanillaModule, mkSysModuleNameFS, moduleNameFS )
 import FiniteMap
 import Unique		( Unique )
 import UniqSupply
@@ -38,6 +38,7 @@ import Util		( sortLt )
 import List		( nub )
 import PrelNames	( mkUnboundName )
 import CmdLineOpts
+import FastString	( FastString )
 \end{code}
 
 %*********************************************************
@@ -638,18 +639,28 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
 filterAvail ie avail = Nothing
 
 -------------------------------------
-sortAvails :: Avails -> Avails
-sortAvails avails = sortLt lt avails
+groupAvails :: Avails -> [(ModuleName, Avails)]
+  -- Group by module and sort by occurrence
+  -- This keeps the list in canonical order
+groupAvails avails 
+  = [ (mkSysModuleNameFS fs, sortLt lt avails)
+    | (fs,avails) <- fmToList groupFM
+    ]
   where
-    a1 `lt` a2 = mod1 < mod2 ||
-	         (mod1 == mod2 && occ1 < occ2)
+    groupFM :: FiniteMap FastString Avails
+	-- Deliberatey use the FastString so we
+	-- get a canonical ordering
+    groupFM = foldl add emptyFM avails
+
+    add env avail = addToFM_C combine env mod_fs [avail]
+		  where
+		    mod_fs = moduleNameFS (moduleName (nameModule (availName avail)))
+		    combine old _ = avail:old
+
+    a1 `lt` a2 = occ1 < occ2
 	       where
-		 name1 = availName a1
-		 name2 = availName a2
-		 mod1  = nameModule name1
-		 mod2  = nameModule name2
-		 occ1  = nameOccName name1
-		 occ2  = nameOccName name2
+		 occ1  = nameOccName (availName a1)
+		 occ2  = nameOccName (availName a2)
 				
 -------------------------------------
 pprAvail :: AvailInfo -> SDoc

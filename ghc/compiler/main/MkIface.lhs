@@ -5,7 +5,7 @@
 
 \begin{code}
 module MkIface ( 
-	mkModDetails, mkModDetailsFromIface, completeIface
+	mkModDetails, mkModDetailsFromIface, completeIface, writeIface
   ) where
 
 #include "HsVersions.h"
@@ -108,6 +108,7 @@ mkModDetailsFromIface type_env dfun_ids rules
   where
     rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
 	-- All the rules from an interface are of the IfaceRuleOut form
+
 
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
@@ -585,4 +586,130 @@ diffDecls old_vers old_fixities new_fixities old new
     only_new d   = ptext SLIT("Only in new iface:") <+> ppr d
     changed d nd = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr d) $$ 
 							 (ptext SLIT("New:") <+> ppr nd))
+\end{code}
+
+
+
+%************************************************************************
+%*				 					*
+\subsection{Writing an interface file}
+%*				 					*
+%************************************************************************
+
+\begin{code}
+writeIface :: Finder -> ModIface -> IO ()
+writeIface finder mod_iface
+  = do	{ let filename = error "... find the right file..."
+	; if_hdl <- openFile filename WriteMode
+	; printForIface if_hdl (pprIface mod_iface)
+	; hClose if_hdl
+	}
+
+pprIface iface
+ = vcat [ ptext SLIT("__interface")
+		<+> doubleQuotes (ptext opt_InPackage)
+		<+> ppr (mi_module iface) <+> ppr (vers_module version_info)
+		<+> pp_sub_vers
+		<+> (if mi_orphan iface then char '!' else empty)
+		<+> int opt_HiVersion
+		<+> ptext SLIT("where")
+
+	, pprExports (mi_exports iface)
+	, vcat (map pprUsage (mi_usages iface))
+
+	, pprIfaceDecls (vers_decls version_info) 
+			(mi_fixities iface)
+			(mi_decls iface)
+
+	, pprDeprecs (mi_deprecs iface)
+	]
+  where
+    version_info = mi_version mod_iface
+    exp_vers     = vers_exports version_info
+    rule_vers	 = vers_rules version_info
+
+    pp_sub_vers | exp_vers == initialVersion && rule_vers == initialVersion = empty
+		| otherwise = brackets (ppr exp_vers <+> ppr rule_vers)
+\end{code}
+
+When printing export lists, we print like this:
+	Avail   f		f
+	AvailTC C [C, x, y]	C(x,y)
+	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
+
+\begin{code}
+pprExport :: (ModuleName, Avails) -> SDoc
+pprExport (mod, items)
+ = hsep [ ptext SLIT("__export "), ppr mod, hsep (map upp_avail items) ] <> semi
+  where
+    pp_avail :: RdrAvailInfo -> SDoc
+    pp_avail (Avail name)      = pprOccName name
+    pp_avail (AvailTC name []) = empty
+    pp_avail (AvailTC name ns) = hcat [pprOccName name, bang, upp_export ns']
+				where
+				  bang | name `elem` ns = empty
+				       | otherwise	= char '|'
+				  ns' = filter (/= name) ns
+    
+    pp_export []    = empty
+    pp_export names = braces (hsep (map pprOccName names))
+\end{code}
+
+
+\begin{code}
+pprUsage :: ImportVersion Name -> SDoc
+pprUsage (m, has_orphans, is_boot, whats_imported)
+  = hsep [ptext SLIT("import"), pprModuleName m, 
+	  pp_orphan, pp_boot,
+	  pp_versions whats_imported
+    ] <> semi
+  where
+    pp_orphan | has_orphans = char '!'
+	      | otherwise   = empty
+    pp_boot   | is_boot     = char '@'
+              | otherwise   = empty
+
+	-- Importing the whole module is indicated by an empty list
+    pp_versions NothingAtAll   		    = empty
+    pp_versions (Everything v) 		    = dcolon <+> int v
+    pp_versions (Specifically vm ve nvs vr) = dcolon <+> int vm <+> pp_export_version ve <+> int vr 
+					      <+> hsep [ ppr n <+> int v | (n,v) <- nvs ]
+
+	-- HACK for the moment: print the export-list version even if
+	-- we don't use it, so that syntax of interface files doesn't change
+    pp_export_version Nothing  = int 1
+    pp_export_version (Just v) = int v
+\end{code}
+
+\begin{code}
+pprIfaceDecls version_map fixity_map decls
+  = vcat [ vcat [ppr i <+> semi | i <- dcl_insts decls]
+	 , vcat (map ppr_decl (dcl_tycl decls))
+	 , pprRules (dcl_rules decls)
+	 ]
+  where
+    ppr_decl d  = (ppr_vers d <+> ppr d <> semi) $$ ppr_fixes d
+
+	-- Print the version for the decl
+    ppr_vers d = case lookupNameEnv version_map (tyClDeclName d) of
+		   Nothing -> empty
+		   Just v  -> int v
+
+	-- Print fixities relevant to the decl
+    ppr_fixes d = vcat (map ppr_fix (fixities d))
+    fixities d  = [ ppr fix <+> ppr n <> semi
+		  | n <- tyClDeclNames d, 
+		    [Just fix] <- lookupNameEnv fixity_map n
+		  ]
+\end{code}
+
+\begin{code}
+pprRules []    = empty
+pprRules rules = hsep [ptext SLIT("{-## __R"), vcat (map ppr rules), ptext SLIT("##-}")]
+
+pprDeprecs []   = empty
+pprDeprecs deps = hsep [ ptext SLIT("{-## __D"), guts, ptext SLIT("##-}")]
+		where
+		  guts = hsep [ ppr ie <+> doubleQuotes (ppr txt) <> semi 
+			      | Deprecation ie txt _ <- deps ]
 \end{code}

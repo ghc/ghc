@@ -67,7 +67,7 @@ import List		( nub )
 @getInterfaceExports@ is called only for directly-imported modules.
 
 \begin{code}
-getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, Avails)
+getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, [(ModuleName,Avails)])
 getInterfaceExports mod_name from
   = getHomeIfaceTableRn 		`thenRn` \ hit ->
     case lookupModuleEnvByName hit mod_name of {

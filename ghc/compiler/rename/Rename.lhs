@@ -27,7 +27,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			)
 import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
 import RnEnv		( availName, availsToNameSet, 
-			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, sortAvails,
+			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, lookupGlobalRn, newGlobalName
 			)
@@ -168,7 +168,7 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
 
 
 	-- Sort the exports to make them easier to compare for versions
-	my_exports = sortAvails export_avails
+	my_exports = groupAvails export_avails
 	
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
@@ -664,13 +664,18 @@ printMinimalImports mod_name imps
     to_ie (Avail n)       = returnRn (IEVar n)
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
 			    returnRn (IEThingAbs n)
-    to_ie (AvailTC n ns)  = getInterfaceExports (moduleName (nameModule n)) 
-						ImportBySystem	 	`thenRn` \ (_, avails) ->
-			    case [ms | AvailTC m ms <- avails, m == n] of
-			      [ms] | all (`elem` ns) ms -> returnRn (IEThingAll n)
-				   | otherwise	        -> returnRn (IEThingWith n (filter (/= n) ns))
-			      other -> pprTrace "to_ie" (ppr n <+> ppr (nameModule n) <+> ppr other) $
-				       returnRn (IEVar n)
+    to_ie (AvailTC n ns)  
+	= getInterfaceExports n_mod ImportBySystem		`thenRn` \ (_, avails_by_module) ->
+	  case [xs | (m,as) <- avails_by_module,
+		     m == n_mod,
+		     AvailTC x xs <- as, 
+		     x == n] of
+	      [xs] | all (`elem` ns) xs -> returnRn (IEThingAll n)
+		   | otherwise	        -> returnRn (IEThingWith n (filter (/= n) ns))
+	      other			-> pprTrace "to_ie" (ppr n <+> ppr (nameModule n) <+> ppr other) $
+					   returnRn (IEVar n)
+	where
+	  n_mod = moduleName (nameModule n)
 
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls
