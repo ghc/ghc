@@ -15,7 +15,7 @@ import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
-			  Version, initialVersion, bumpVersion, isLoopBreaker
+			  Version, initialVersion, bumpVersion, 
 			)
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
@@ -295,7 +295,6 @@ ifaceTyCls (AnId id) so_far
     strict_hsinfo = case strictnessInfo id_info of
 			NoStrictnessInfo -> []
 			info		 -> [HsStrictness info]
-
 
     ------------  Worker  --------------
     work_info   = workerInfo id_info
