@@ -1,0 +1,6 @@
+ 
+rnfail015.hs:9:
+    Conflicting definitions for `TokLiteral' in the data type declaration for Token
+
+
+Compilation had errors
