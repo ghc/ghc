@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.17 2000/04/10 16:02:58 simonpj Exp $
+% $Id: PrelException.lhs,v 1.18 2000/04/13 08:58:27 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -209,5 +209,28 @@ ioError         :: IOError -> IO a
 ioError err	=  IO $ \s -> throw (IOException err) s
 	-- (ioError e) isn't an exception; we only throw
 	-- the exception when applied to a world
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Controlling asynchronous exception delivery}
+%*							*
+%*********************************************************
+
+\begin{code}
+#ifndef __HUGS__
+blockAsyncExceptions :: IO a -> IO a
+blockAsyncExceptions (IO io) = IO $ blockAsyncExceptions# io
+
+unblockAsyncExceptions :: IO a -> IO a
+unblockAsyncExceptions (IO io) = IO $ unblockAsyncExceptions# io
+#else
+-- Not implemented yet in Hugs.
+blockAsyncExceptions :: IO a -> IO a
+blockAsyncExceptions (IO io) = IO io
+
+unblockAsyncExceptions :: IO a -> IO a
+unblockAsyncExceptions (IO io) = IO io
+#endif
 \end{code}
 
