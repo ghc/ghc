@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.h,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:20:52 $
+ * $Revision: 1.3 $
+ * $Date: 1999/01/18 15:23:30 $
  *
  * NB This is one of the few files shared between Hugs and the runtime system,
  * so it is very important that it not conflict with either and that it not
@@ -118,6 +118,7 @@ typedef enum {
   PTR_REP      = 'P',      
   ALPHA_REP    = 'a',  /* a                        */
   BETA_REP     = 'b',  /* b			   */
+  GAMMA_REP    = 'c',  /* c                        */
   BOOL_REP     = 'B',  /* Bool			   */
   IO_REP       = 'i',  /* IO a	                   */
   HANDLER_REP  = 'H',  /* Exception -> IO a	   */
