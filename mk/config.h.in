@@ -429,9 +429,6 @@
 /* Define if you have the sigpoll() function */
 #undef HAVE_SIGPOLL
 
-/* Define if time.h or sys/time.h define the timezone variable */
-#undef HAVE_TIMEZONE
-
 /* Define if you support the production (and use) of Win32 DLLs. */
 #undef HAVE_WIN32_DLL_SUPPORT
 
@@ -581,9 +578,6 @@
 
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
-
-/* Define to the type of the timezone variable (usually long or time_t) */
-#undef TYPE_TIMEZONE
 
 /* Define if signal handlers have type void (*)(int)
  * (Otherwise, they're assumed to have type int (*)(void).)
