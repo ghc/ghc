@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.13 2000/05/12 12:48:36 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.14 2000/06/12 16:01:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -412,7 +412,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat components)
 
   } else {
     fprint_ccs(fp, ccs->prevStack,components-1);
-    fprintf(fp,"/%s (%d)",cc->label,ccs->ccsID);
+    fprintf(fp,"/%s",cc->label,ccs->ccsID);
   }
 }
 
