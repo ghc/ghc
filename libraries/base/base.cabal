@@ -1,7 +1,9 @@
 name:		base
 version:	1.0
 license:	BSD3
+license-file:	LICENSE
 maintainer:	libraries@haskell.org
+synopsis:	Basic libraries
 description:
 	This package contains the Prelude and its support libraries,
 	and a large collection of useful libraries ranging from data
