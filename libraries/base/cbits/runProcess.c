@@ -401,15 +401,26 @@ runProcess (char *cmd, char *workingDirectory, void *environment,
 	STARTUPINFO sInfo;
 	PROCESS_INFORMATION pInfo;
 	DWORD flags;
+	char buffer[256];
 
 	ZeroMemory(&sInfo, sizeof(sInfo));
-	sInfo.cb = sizeof(sInfo);
-	sInfo.dwFlags = STARTF_USESTDHANDLES;
+	sInfo.cb = sizeof(sInfo);	
 	sInfo.hStdInput = (HANDLE) _get_osfhandle(fdStdInput);
 	sInfo.hStdOutput= (HANDLE) _get_osfhandle(fdStdOutput);
 	sInfo.hStdError = (HANDLE) _get_osfhandle(fdStdError);
 
-	if (sInfo.hStdOutput != GetStdHandle(STD_OUTPUT_HANDLE) &&
+	if (sInfo.hStdInput == INVALID_HANDLE_VALUE)
+		sInfo.hStdInput = NULL;
+	if (sInfo.hStdOutput == INVALID_HANDLE_VALUE)
+		sInfo.hStdOutput = NULL;
+	if (sInfo.hStdError == INVALID_HANDLE_VALUE)
+		sInfo.hStdError = NULL;
+
+	if (sInfo.hStdInput || sInfo.hStdOutput || sInfo.hStdError)
+		sInfo.dwFlags = STARTF_USESTDHANDLES;
+
+	if (sInfo.hStdInput  != GetStdHandle(STD_INPUT_HANDLE)  &&
+	    sInfo.hStdOutput != GetStdHandle(STD_OUTPUT_HANDLE) &&
 	    sInfo.hStdError  != GetStdHandle(STD_ERROR_HANDLE))
 		flags = CREATE_NO_WINDOW;   // Run without console window only when both output and error are redirected
 	else
