@@ -6,5 +6,7 @@
 HaddockMainDir 		= haddock
 HaddockBinDistDirs 	= haddock
 HaddockBinDistDocs 	= haddock/doc
+HaddockBinDistShScripts	= haddock-$(ProjectVersion)
+HaddockBinDistLinks 	= haddock
 
 include $(HaddockMainDir)/mk/version.mk
