@@ -24,7 +24,10 @@ test('read016', normal, compile, [''])
 test('read017', normal, compile, [''])
 test('read018', normal, compile, [''])
 test('read019', normal, compile, [''])
-test('read020', normal, compile, [''])
+
+# Missing:
+# test('read020', normal, compile, [''])
+
 test('read021', normal, compile, [''])
 test('read022', normal, compile, ["-fglasgow-exts"])
 test('read023', normal, compile, [''])
