@@ -2621,7 +2621,7 @@ sub add_syslib {
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
 	       ? "$InstLibDirGhc/imports/text"
-	       : "$TopPwd/hslibs/text:$TopPwd/hslibs/text/html:$TopPwd/hslibs/text/haxml/lib"
+	       : "$TopPwd/hslibs/text:$TopPwd/hslibs/text/html:$TopPwd/hslibs/text/haxml/lib:$TopPwd/hslibs/text/parsec"
 	  )
 	, # where to find the archive to use when linking
 	  ( $INSTALLING 
