@@ -33,7 +33,7 @@ import PrelReal(Integral)
 import Prelude(fromIntegral)
 import IO(putStr,hFlush,stdout,stderr)
 import PrelException(catch,catchException)
-import PrelIOBase(IO,unsafePerformIO)
+import PrelIOBase(IO(..),unsafePerformIO)
 import PrelShow(show,shows,showString,showChar,Show,ShowS)
 import PrelRead(Read,ReadS,lex,reads)
 import PrelFloat(Double)
@@ -46,12 +46,33 @@ import PrelPack(unpackCString)
 -- They need to correspond exactly to versions written in 
 -- the Hugs standalone Prelude.
 
---hugs doesn't know about RealWorld and so throws this
---away if the original type signature is used
---hugsprimMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
+-- hugs doesn't know about RealWorld and so throws this
+-- away if the original type signature is used
+-- hugsprimMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
+--
+-- The first arg is an IO value created by Hugs, without the
+-- newtype ST wrapper.  What we do here place a wrapper around
+-- it, so that it can be called from GHC-land, which uses a
+-- different IO representation.
+--
+-- This is all very delicate and relies crucially on the non-inlined
+-- connectWorlds fn to create an artificial dependency of the hugs_ioaction
+-- on the grealworld.  That's needed to stop the simplifier floating
+-- the case outside of the \ grealworld.
 hugsprimMkIO :: (rw -> (a,rw)) -> IO a
-hugsprimMkIO
-   = error "hugsprimMkIO in combined mode: unimplemented"
+hugsprimMkIO hugs_ioaction 
+   = IO ( \ grealworld -> case hugs_ioaction 
+                                  (connectWorlds grealworld) of
+                             (res, hrealworld') -> (# grealworld, res #)
+        )
+
+{-# NOINLINE connectWorlds #-}
+connectWorlds :: State# RealWorld -> a    -- really, -> Hugs' RealWorld
+connectWorlds hrealworld
+   = error "connectWorlds: hugs entered the RealWorld"
+
+
+
 
 hugsprimCreateAdjThunk :: (a -> b) -> String -> Char -> IO Addr
 hugsprimCreateAdjThunk fun typestr callconv

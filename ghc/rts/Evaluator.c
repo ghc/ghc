@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/02/24 17:26:12 $
+ * $Revision: 1.36 $
+ * $Date: 2000/02/29 12:54:51 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2665,8 +2665,14 @@ static void* enterBCO_primop2 ( int primop2code,
                                 StgBCO** bco,
                                 Capability* cap )
 {
-        if (combined)
-           barf("enterBCO_primop1 in combined mode");
+        if (combined) {
+	   /* A small concession: we need to allow ccalls, 
+              even in combined mode.
+           */
+           if (primop2code != i_ccall_ccall_IO &&
+               primop2code != i_ccall_stdcall_IO)
+              barf("enterBCO_primop2 in combined mode");
+        }
 
         switch (primop2code) {
         case i_raise:  /* raise#{err} */
