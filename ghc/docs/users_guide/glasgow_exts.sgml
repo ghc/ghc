@@ -4463,6 +4463,32 @@ A generic method declaration must give a case for each of the three type constru
 
 <ListItem>
 <Para>
+The type for a generic method can be built only from:
+  <ItemizedList>
+  <ListItem> <Para> Function arrows </Para> </ListItem>
+  <ListItem> <Para> Type variables </Para> </ListItem>
+  <ListItem> <Para> Tuples </Para> </ListItem>
+  <ListItem> <Para> Arbitrary types not involving type variables </Para> </ListItem>
+  </ItemizedList>
+Here are some example type signatures for generic methods:
+<ProgramListing>
+    op1 :: a -> Bool
+    op2 :: Bool -> (a,Bool)
+    op3 :: [Int] -> a -> a
+    op4 :: [a] -> Bool
+</ProgramListing>
+Here, op1, op2, op3 are OK, but op4 is rejected, because it has a type variable
+inside a list.  
+</Para>
+<Para>
+This restriction is an implementation restriction: we just havn't got around to
+implementing the necessary bidirectional maps over arbitrary type constructors.
+It would be relatively easy to add specific type constructors, such as Maybe and list,
+to the ones that are allowed.
+</ListItem>
+
+<ListItem>
+<Para>
 In an instance declaration for a generic class, the idea is that the compiler
 will fill in the methods for you, based on the generic templates.  However it can only
 do so if
