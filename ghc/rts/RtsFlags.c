@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.7 1999/01/26 16:16:28 simonm Exp $
+ * $Id: RtsFlags.c,v 1.8 1999/01/27 16:41:16 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -64,6 +64,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= (64  * 1024 * 1024) / BLOCK_SIZE;
+    RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
@@ -492,7 +493,12 @@ error = rtsTrue;
 		break;
 
 	      case 'H':
-		/* ignore for compatibility with older versions */
+		RtsFlags.GcFlags.heapSizeSuggestion = 
+		  decode(rts_argv[arg]+2) / BLOCK_SIZE;
+
+		if (RtsFlags.GcFlags.heapSizeSuggestion <= 0) {
+		  bad_option(rts_argv[arg]);
+		}
 		break;
 
 	      case 'j': /* force GC option */

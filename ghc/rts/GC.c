@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.20 1999/01/26 16:16:22 simonm Exp $
+ * $Id: GC.c,v 1.21 1999/01/27 16:41:14 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -424,63 +424,6 @@ void GarbageCollect(void (*get_roots)(void))
 	}
       }
     }
-  } else {
-    /* For a two-space collector, we need to resize the nursery. */
-
-    /* set up a new nursery.  Allocate a nursery size based on a
-     * function of the amount of live data (currently a factor of 2,
-     * should be configurable (ToDo)).  Use the blocks from the old
-     * nursery if possible, freeing up any left over blocks.
-     *
-     * If we get near the maximum heap size, then adjust our nursery
-     * size accordingly.  If the nursery is the same size as the live
-     * data (L), then we need 3L bytes.  We can reduce the size of the
-     * nursery to bring the required memory down near 2L bytes.
-     * 
-     * A normal 2-space collector would need 4L bytes to give the same
-     * performance we get from 3L bytes, reducing to the same
-     * performance at 2L bytes.  
-     */
-    nat blocks = g0s0->to_blocks;
-
-    if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
-	 RtsFlags.GcFlags.maxHeapSize ) {
-      int adjusted_blocks;  /* signed on purpose */
-      int pc_free; 
-      
-      adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, fprintf(stderr, "Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
-      pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
-      if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
-	heapOverflow();
-      }
-      blocks = adjusted_blocks;
-      
-    } else {
-      blocks *= RtsFlags.GcFlags.oldGenFactor;
-      if (blocks < RtsFlags.GcFlags.minAllocAreaSize) {
-	blocks = RtsFlags.GcFlags.minAllocAreaSize;
-      }
-    }
-    
-    if (nursery_blocks < blocks) {
-      IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
-			   blocks));
-      g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
-    } else {
-      bdescr *next_bd;
-      
-      IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
-			   blocks));
-      for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
-	next_bd = bd->link;
-	freeGroup(bd);
-	bd = next_bd;
-      }
-      g0s0->blocks = bd;
-    }
-
-    g0s0->n_blocks = nursery_blocks = blocks;
   }
 
   /* run through all the generations/steps and tidy up 
@@ -540,16 +483,13 @@ void GarbageCollect(void (*get_roots)(void))
 	 * between the maximum size of the oldest and youngest
 	 * generations.
 	 *
-	 * max_blocks = alloc_area_size +  
-	 *                 (oldgen_max_blocks - alloc_area_size) * G
-	 *                 -----------------------------------------
-	 *                              oldest_gen
+	 * max_blocks =    oldgen_max_blocks * G
+	 *                 ----------------------
+	 *                      oldest_gen
 	 */
 	if (g != 0) {
-	  generations[g].max_blocks = 
-	    RtsFlags.GcFlags.minAllocAreaSize +
-	     (((oldest_gen->max_blocks - RtsFlags.GcFlags.minAllocAreaSize) * g)
-	       / (RtsFlags.GcFlags.generations-1));
+	  generations[g].max_blocks = (oldest_gen->max_blocks * g)
+	       / (RtsFlags.GcFlags.generations-1);
 	}
 
       /* for older generations... */
@@ -575,6 +515,8 @@ void GarbageCollect(void (*get_roots)(void))
    * Free the old to-space, and estimate the amount of live data.
    */
   if (RtsFlags.GcFlags.generations == 1) {
+    nat blocks;
+    
     if (old_to_space != NULL) {
       freeChain(old_to_space);
     }
@@ -584,10 +526,69 @@ void GarbageCollect(void (*get_roots)(void))
     live = g0s0->to_blocks * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
 
-  /* Generational collector:
-   * estimate the amount of live data.
-   */
+    /* For a two-space collector, we need to resize the nursery. */
+    
+    /* set up a new nursery.  Allocate a nursery size based on a
+     * function of the amount of live data (currently a factor of 2,
+     * should be configurable (ToDo)).  Use the blocks from the old
+     * nursery if possible, freeing up any left over blocks.
+     *
+     * If we get near the maximum heap size, then adjust our nursery
+     * size accordingly.  If the nursery is the same size as the live
+     * data (L), then we need 3L bytes.  We can reduce the size of the
+     * nursery to bring the required memory down near 2L bytes.
+     * 
+     * A normal 2-space collector would need 4L bytes to give the same
+     * performance we get from 3L bytes, reducing to the same
+     * performance at 2L bytes.  
+     */
+    blocks = g0s0->n_blocks;
+
+    if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
+	 RtsFlags.GcFlags.maxHeapSize ) {
+      int adjusted_blocks;  /* signed on purpose */
+      int pc_free; 
+      
+      adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
+      IF_DEBUG(gc, fprintf(stderr, "Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %d\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
+      if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
+	heapOverflow();
+      }
+      blocks = adjusted_blocks;
+      
+    } else {
+      blocks *= RtsFlags.GcFlags.oldGenFactor;
+      if (blocks < RtsFlags.GcFlags.minAllocAreaSize) {
+	blocks = RtsFlags.GcFlags.minAllocAreaSize;
+      }
+    }
+    
+    if (nursery_blocks < blocks) {
+      IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
+			   blocks));
+      g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+    } else {
+      bdescr *next_bd;
+      
+      IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
+			   blocks));
+      for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
+	next_bd = bd->link;
+	freeGroup(bd);
+	bd = next_bd;
+      }
+      g0s0->blocks = bd;
+    }
+    
+    g0s0->n_blocks = nursery_blocks = blocks;
+
   } else {
+    /* Generational collector:
+     * estimate the amount of live data, and adjust the allocation
+     * area size if the user has given us a suggestion (+RTS -H<blah>)
+     */
+
     live = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (s = 0; s < generations[g].n_steps; s++) {
@@ -599,6 +600,34 @@ void GarbageCollect(void (*get_roots)(void))
 	live += step->n_blocks * BLOCK_SIZE_W + 
 	  ((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
       }
+    }
+
+    if (RtsFlags.GcFlags.heapSizeSuggestion) {
+      nat avail_blocks = 
+	(RtsFlags.GcFlags.heapSizeSuggestion - live / BLOCK_SIZE_W) / 2;
+      nat blocks;
+      
+      if (avail_blocks > RtsFlags.GcFlags.minAllocAreaSize) {
+	blocks = avail_blocks;
+      } else {
+	blocks = RtsFlags.GcFlags.minAllocAreaSize;
+      }
+
+      if (blocks > g0s0->n_blocks) {
+	/* need to add some blocks on */
+	fprintf(stderr, "Increasing size of alloc area to %d blocks\n", blocks);
+	g0s0->blocks = allocNursery(g0s0->blocks, avail_blocks - g0s0->n_blocks);
+      } else {
+	bdescr *next_bd;
+	fprintf(stderr, "Decreasing size of alloc area to %d blocks\n", blocks);
+	for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
+	  next_bd = bd->link;
+	  freeGroup(bd);
+	  bd = next_bd;
+	}
+	g0s0->blocks = bd;
+      }
+      g0s0->n_blocks = nursery_blocks = blocks;
     }
   }
 
