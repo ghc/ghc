@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.73 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.74 $
+ * $Date: 2000/05/09 09:11:40 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -20,6 +20,7 @@
 #include "object.h"
 #include <setjmp.h>
 #include "Stg.h"
+#include "Storage.h"
 
 /*#define DEBUG_SHOWUSE*/
 
@@ -1947,7 +1948,7 @@ void markHugsObjects( void )
            Cell cl = name(nm).closure;
            if (nonNull(cl)) {
               assert(isCPtr(cl));
-              snd(cl) = MarkRoot ( snd(cl) );
+              snd(cl) = (Cell)MarkRoot ( (StgClosure*)(snd(cl)) );
 	   }
        }
     }
@@ -1958,7 +1959,7 @@ void markHugsObjects( void )
            Cell cl = tycon(tc).closure;
            if (nonNull(cl)) {
               assert(isCPtr(cl));
-              snd(cl) = MarkRoot ( snd(cl) );
+              snd(cl) = (Cell)MarkRoot ( (StgClosure*)(snd(cl)) );
 	   }
        }
     }
@@ -2220,78 +2221,31 @@ Cell c; {                               /* except that Cells refering to   */
  * Miscellaneous operations on heap cells:
  * ------------------------------------------------------------------------*/
 
+/* Reordered 2 May 00 to have most common options first. */
 Cell whatIs ( register Cell c )
 {
     if (isPair(c)) {
         register Cell fstc = fst(c);
         return isTag(fstc) ? fstc : AP;
     }
-    if (isOffset(c))           return OFFSET;
-    if (isChar(c))             return CHARCELL;
-    if (isInt(c))              return INTCELL;
-    if (isName(c))             return NAME;
     if (isTycon(c))            return TYCON;
+    if (isOffset(c))           return OFFSET;
+    if (isName(c))             return NAME;
+    if (isInt(c))              return INTCELL;
     if (isTuple(c))            return TUPLE;
+    if (isSpec(c))             return c;
     if (isClass(c))            return CLASS;
+    if (isChar(c))             return CHARCELL;
+    if (isNull(c))             return c;
     if (isInst(c))             return INSTANCE;
     if (isModule(c))           return MODULE;
     if (isText(c))             return TEXTCELL;
     if (isInventedVar(c))      return INVAR;
     if (isInventedDictVar(c))  return INDVAR;
-    if (isSpec(c))             return c;
-    if (isNull(c))             return c;
     fprintf ( stderr, "whatIs: unknown %d\n", c );
     internal("whatIs");
 }
 
-
-#if 0
-Cell whatIs(c)                         /* identify type of cell            */
-register Cell c; {
-    if (isPair(c)) {
-        register Cell fstc = fst(c);
-        return isTag(fstc) ? fstc : AP;
-    }
-    if (c<OFFMIN)    return c;
-#if TREX
-    if (isExt(c))    return EXT;
-#endif
-    if (c>=INTMIN)   return INTCELL;
-
-    if (c>=NAMEMIN){if (c>=CLASSMIN)   {if (c>=CHARMIN) return CHARCELL;
-                                        else            return CLASS;}
-                    else                if (c>=INSTMIN) return INSTANCE;
-                                        else            return NAME;}
-    else            if (c>=MODMIN)     {if (c>=TYCMIN)  return isTuple(c) ? TUPLE : TYCON;
-                                        else            return MODULE;}
-                    else                if (c>=OFFMIN)  return OFFSET;
-#if TREX
-                                        else            return (c>=EXTMIN) ?
-                                                                EXT : TUPLE;
-#else
-                                        else            return TUPLE;
-#endif
-
-
-/*  if (isPair(c)) {
-        register Cell fstc = fst(c);
-        return isTag(fstc) ? fstc : AP;
-    }
-    if (c>=INTMIN)   return INTCELL;
-    if (c>=CHARMIN)  return CHARCELL;
-    if (c>=CLASSMIN) return CLASS;
-    if (c>=INSTMIN)  return INSTANCE;
-    if (c>=NAMEMIN)  return NAME;
-    if (c>=TYCMIN)   return TYCON;
-    if (c>=MODMIN)   return MODULE;
-    if (c>=OFFMIN)   return OFFSET;
-#if TREX
-    if (c>=EXTMIN)   return EXT;
-#endif
-    if (c>=TUPMIN)   return TUPLE;
-    return c;*/
-}
-#endif
 
 
 /* A very, very simple printer.
