@@ -3,7 +3,7 @@ import Directory
 main = do
   p <- getPermissions "."
   print p
-  p <- getPermissions "io034.hs"
+  p <- getPermissions "getPermissions001.hs"
   print p
-  p <- getPermissions "io034.bin"
+  p <- getPermissions "getPermissions001.bin"
   print p

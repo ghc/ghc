@@ -7,7 +7,7 @@ main =
     case ec of
         ExitSuccess   -> putStr "What?!?\n" >> ioError (userError "dog succeeded")
         ExitFailure _ ->
-            system "cat io005.hs 2>/dev/null" >>= \ ec ->
+            system "cat system001.hs 2>/dev/null" >>= \ ec ->
 	    case ec of
 	        ExitSuccess   -> exitWith ExitSuccess
 	        ExitFailure _ -> putStr "What?!?\n" >> ioError (userError "cat failed")

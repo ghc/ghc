@@ -4,39 +4,38 @@ module Main(main) where
 import IO
 import IOExts
 
-getPos :: HandlePosn -> HandlePosition
-getPos (HandlePosn _ x) = x
-
 getPosnAndPrint h = do
-  x <- hGetPosn h
+  x <- hTell h
   v <- hGetChar h
-  putStrLn ("At position: " ++ show (getPos x) ++ ", found: " ++ show v)
+  putStrLn ("At position: " ++ show x ++ ", found: " ++ show v)
   return x
 
 recordDoAndRepos h a = do
   x <- getPosnAndPrint h
   a 
-  hSetPosn x
+  hSeek h AbsoluteSeek x
   getPosnAndPrint h
   return ()
 
 recordDoAndRepos2 h a = do
   x <- getPosnAndPrint h
   a 
-  hSeek h AbsoluteSeek (getPos x)
+  hSeek h AbsoluteSeek x
   getPosnAndPrint h
   return ()
 
 recordDoAndRepos3 h a = do
   x <- getPosnAndPrint h
   a 
-  hSeek h SeekFromEnd (negate (getPos x + 1))
+  hSeek h SeekFromEnd (negate (x + 1))
   getPosnAndPrint h
   return ()
 
+file = "hTell001.hs"
+
 main :: IO ()
 main = do
-  h  <- openFile "io001.hs" ReadMode
+  h  <- openFile file ReadMode
   recordDoAndRepos h $
    recordDoAndRepos h $
     recordDoAndRepos h $
@@ -45,7 +44,7 @@ main = do
        putStrLn ""
   hClose h
   putStrLn ""
-  h  <- openFileEx "io001.hs" (BinaryMode ReadMode)
+  h  <- openFileEx file (BinaryMode ReadMode)
   recordDoAndRepos h $
    recordDoAndRepos h $
     recordDoAndRepos h $
@@ -54,7 +53,7 @@ main = do
        putStrLn ""
   hClose h
   putStrLn "\nUsing hSeek/AbsoluteSeek: "
-  h  <- openFile "io001.hs" ReadMode
+  h  <- openFile file ReadMode
   recordDoAndRepos2 h $
    recordDoAndRepos2 h $
     recordDoAndRepos2 h $
@@ -65,7 +64,7 @@ main = do
   hClose h
   putStrLn "\nUsing hSeek/SeekFromEnd: "
   putStrLn "(Don't worry if you're seeing differing numbers here, it might be down to '\\n' vs '\\r\\n')"
-  h  <- openFile "io001.hs" ReadMode
+  h  <- openFile file ReadMode
   recordDoAndRepos3 h $
    recordDoAndRepos3 h $
     recordDoAndRepos3 h $

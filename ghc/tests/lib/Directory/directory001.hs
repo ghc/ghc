@@ -1,7 +1,6 @@
 import IO
 
 import Directory
-import IOExts (trace)
 
 main = do
     createDirectory "foo"

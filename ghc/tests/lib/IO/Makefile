@@ -1,14 +1,9 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2001/05/18 16:54:08 simonmar Exp $
+# $Id: Makefile,v 1.2 2001/05/21 15:25:24 simonmar Exp $
 
 TOP = ../..
 
 include $(TOP)/mk/boilerplate.mk
-
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-# io018 should run
-OMITTED_RUNTESTS = io005.run io018.run io033.run
-endif
 
 include $(TOP)/mk/should_run.mk
 

@@ -1,7 +1,9 @@
 import Directory (getDirectoryContents)
-import List (sort, isPrefixOf)
+import List (sort, isPrefixOf, isSuffixOf)
 
 main = do
     names <- getDirectoryContents "."
-    let names' = filter (isPrefixOf "io009") names
-    putStrLn (unlines (sort names'))
+    putStrLn (unlines (sort (filter ok names)))
+
+ok name = "getDirectoryContents" `isPrefixOf` name 
+	  && not ("bak" `isSuffixOf` name)
