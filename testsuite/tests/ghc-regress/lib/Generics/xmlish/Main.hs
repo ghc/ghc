@@ -97,13 +97,15 @@ content2data = result
            `extR` float
 
 
-  -- Map computation type to value type
-  myTypeOf :: ReadX a -> a
-  myTypeOf =  undefined
+  -- Determine type of data to be constructed
+  myType = myTypeOf result
+    where
+      myTypeOf :: ReadX a -> a
+      myTypeOf =  undefined
 
 
   -- Generic default
-  gdefault = if isList (myTypeOf result)
+  gdefault = if isList myType
                then list
                else element
 
@@ -113,23 +115,23 @@ content2data = result
                case c of
                  (CElem (Elem x as cs))
                     |    as == noAttrs
-                      && x  == elemtype (myTypeOf result)
+                      && x  == elemtype myType
                    -> alts cs
                  _ -> mzero
 
 
-  -- Retrieve all constructors of the requested type
-  consOf = dataTypeCons
-         $ dataTypeOf 
-         $ myTypeOf result
+  -- Fold over all alternatives, say constructors
+  alts cs = foldr (mplus . recurse cs) mzero shapes
 
 
   -- Possible top-level shapes
   shapes = map fromConstr consOf
 
 
-  -- Fold over all alternatives, say constructors
-  alts cs = foldr (mplus . recurse cs) mzero shapes
+  -- Retrieve all constructors of the requested type
+  consOf = dataTypeCons
+         $ dataTypeOf 
+         $ myType
 
 
   -- Recurse into subterms
@@ -142,8 +144,6 @@ content2data = result
   list =          gmapM (const content2data) mkCons
          `mplus`  return mkNil
 
-  list' :: Data a => ReadX [a]
-  list' = undefined
 
   -- A special case for strings
   string :: ReadX String
