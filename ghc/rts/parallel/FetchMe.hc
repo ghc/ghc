@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
- Time-stamp: <Wed Jan 12 2000 13:39:33 Stardate: [-30]4193.88 hwloidl>
- $Id: FetchMe.hc,v 1.2 2000/01/13 14:34:06 hwloidl Exp $
+ Time-stamp: <Fri Jan 14 2000 09:41:07 Stardate: [-30]4202.01 hwloidl>
+ $Id: FetchMe.hc,v 1.3 2000/01/14 11:45:22 hwloidl Exp $
 
  Entry code for a FETCH_ME closure
 
@@ -194,9 +194,8 @@ STGFUN(BLOCKED_FETCH_entry)
 {
   FB_
     /* see NON_ENTERABLE_ENTRY_CODE in StgMiscClosures.hc */
-    fprintf(stderr,"Qagh: BLOCKED_FETCH entered!\n");
-    STGCALL1(raiseError, errorHandler);
-    stg_exit(EXIT_FAILURE); /* not executed */
+    DUMP_ERRMSG("BLOCKED_FETCH object entered!\n");
+    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
   FE_
 }
 

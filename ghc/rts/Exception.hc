@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.3 2000/01/13 14:34:02 hwloidl Exp $
+ * $Id: Exception.hc,v 1.4 2000/01/14 11:45:21 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -66,7 +66,8 @@ FN_(unblockAsyncExceptionszh_ret_entry)
   FB_
     ASSERT(CurrentTSO->blocked_exceptions != NULL);
 #if defined(GRAN)
-# error FixME
+      awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
+	                 CurrentTSO->block_info.closure);
 #elif defined(PAR)
       // is CurrentTSO->block_info.closure always set to the node
       // holding the blocking queue !? -- HWL
@@ -89,7 +90,8 @@ FN_(unblockAsyncExceptionszh_fast)
 
     if (CurrentTSO->blocked_exceptions != NULL) {
 #if defined(GRAN)
-# error FixME
+      awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
+	                 CurrentTSO->block_info.closure);
 #elif defined(PAR)
       // is CurrentTSO->block_info.closure always set to the node
       // holding the blocking queue !? -- HWL

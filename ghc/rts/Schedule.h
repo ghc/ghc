@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.13 2000/01/13 14:34:05 hwloidl Exp $
+ * $Id: Schedule.h,v 1.14 2000/01/14 11:45:21 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -42,7 +42,7 @@ void startTasks( void );
  * Locks assumed   :  none
  */
 #if defined(GRAN)
-# error FixME
+void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #elif defined(PAR)
 void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #else
@@ -59,7 +59,7 @@ void awakenBlockedQueue(StgTSO *tso);
  * Locks assumed   : none
  */
 #if defined(GRAN)
-# error FixME
+StgTSO *unblockOne(StgTSO *tso, StgClosure *node);
 #elif defined(PAR)
 StgTSO *unblockOne(StgTSO *tso, StgClosure *node);
 #else

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.13 2000/01/13 14:33:58 hwloidl Exp $
+% $Id: CgStackery.lhs,v 1.14 2000/01/14 11:45:21 hwloidl Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -225,9 +225,9 @@ getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
 \end{code}
 
 \begin{code}
-updateFrameSize | opt_SccProfilingOn = trace ("updateFrameSize = " ++ (show sCC_UF_SIZE)) sCC_UF_SIZE
+updateFrameSize | opt_SccProfilingOn = sCC_UF_SIZE
 		| opt_GranMacros     = trace ("updateFrameSize = " ++ (show gRAN_UF_SIZE))gRAN_UF_SIZE
-		| otherwise          = trace ("updateFrameSize = " ++ (show uF_SIZE)) uF_SIZE
+		| otherwise          = uF_SIZE
 
 seqFrameSize    | opt_SccProfilingOn  = sCC_SEQ_FRAME_SIZE
 	        | opt_GranMacros      = gRAN_SEQ_FRAME_SIZE
