@@ -9,10 +9,12 @@
 
 module PrelAddr (
 	  Addr(..)
-	, Word(..)
 	, nullAddr			-- :: Addr
 	, plusAddr			-- :: Addr -> Int -> Addr
 	, indexAddrOffAddr	        -- :: Addr -> Int -> Addr
+
+	, Word(..)
+	, wordToInt
 
 	, Word64(..)
 	, Int64(..)
@@ -43,6 +45,9 @@ instance CReturnable Addr
 instance CCallable Word
 instance CCallable Word#
 instance CReturnable Word
+
+wordToInt :: Word -> Int
+wordToInt (W# w#) = I# (word2Int# w#)
 
 #if WORD_SIZE_IN_BYTES == 8
 data Word64 = W64# Word#

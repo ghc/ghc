@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.15 1999/02/11 17:15:22 simonm Exp $
+ * $Id: PrimOps.hc,v 1.16 1999/02/17 15:57:39 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -76,6 +76,10 @@ const
         R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); R4.w = (W_)d; \
         JMP_(ENTRY_CODE(Sp[0]));
 
+# define RET_NPNP(a,b,c,d) \
+        R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); R4.w = (W_)(d);
+	JMP_(ENTRY_CODE(Sp[0]));
+
 # define RET_NNPNNP(a,b,c,d,e,f) \
         R1.w = (W_)(a); R2.w = (W_)(b); R3.w = (W_)(c); \
         R4.w = (W_)(d); R5.w = (W_)(e); R6.w = (W_)(f); \
@@ -115,6 +119,15 @@ const
         Sp[-1] = (W_)(d); 			\
         Sp -= 5;				\
         JMP_(ENTRY_CODE(Sp[5]));
+
+# define RET_NPNP(a,b,c,d)			\
+	R1.w = (W_)(a); 			\
+        Sp[-4] = (W_)(b); 			\
+    /*  Sp[-3] = ARGTAG(1); */			\
+        Sp[-2] = (W_)(c); 			\
+        Sp[-1] = (W_)(d); 			\
+        Sp -= 4;				\
+        JMP_(ENTRY_CODE(Sp[4]));
 
 # define RET_NNPNNP(a,b,c,d,e,f)		\
         R1.w = (W_)(a);				\
@@ -163,6 +176,7 @@ const
 # define RET_NNP(a,b,c) PUSH_N(6,a); PUSH_N(4,b); PUSH_N(2,c); PUSHED(6)
 
 # define RET_NNNP(a,b,c,d) PUSH_N(7,a); PUSH_N(5,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(7)	
+# define RET_NPNP(a,b,c,d) PUSH_N(6,a); PUSH_P(4,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(6)	
 # define RET_NNPNNP(a,b,c,d,e,f) PUSH_N(10,a); PUSH_N(8,b); PUSH_P(6,c); PUSH_N(5,d); PUSH_N(3,e); PUSH_P(1,f); PUSHED(10)
 
 #endif
@@ -389,13 +403,12 @@ FN_(int2Integerzh_fast)
 	s = 0;
    }
 
-   /* returns (# alloc :: Int#, 
-		 size  :: Int#, 
+   /* returns (# size  :: Int#, 
 		 data  :: ByteArray# 
 	       #)
    */
-   TICK_RET_UNBOXED_TUP(3);
-   RET_NNP(1,s,p);
+   TICK_RET_UNBOXED_TUP(2);
+   RET_NP(s,p);
    FE_
 }
 
@@ -423,13 +436,12 @@ FN_(word2Integerzh_fast)
 	s = 0;
    }
 
-   /* returns (# alloc :: Int#, 
-		 size  :: Int#, 
+   /* returns (# size  :: Int#, 
 		 data  :: ByteArray# 
 	       #)
    */
-  TICK_RET_UNBOXED_TUP(3);
-   RET_NNP(1,s,p);
+   TICK_RET_UNBOXED_TUP(2);
+   RET_NP(s,p);
    FE_
 }
 
@@ -448,8 +460,12 @@ FN_(addr2Integerzh_fast)
   if (RET_STGCALL3(int, mpz_init_set_str,&result,(str),/*base*/10))
       abort();
 
-  TICK_RET_UNBOXED_TUP(3);
-  RET_NNP(result._mp_alloc, result._mp_size, 
+   /* returns (# size  :: Int#, 
+		 data  :: ByteArray# 
+	       #)
+   */
+  TICK_RET_UNBOXED_TUP(2);
+  RET_NP(result._mp_size, 
 	  result._mp_d - sizeofW(StgArrWords));
   FE_
 }
@@ -466,7 +482,7 @@ FN_(int64ToIntegerzh_fast)
 
    StgInt64  val; /* to avoid aliasing */
    W_ hi;
-   I_  s,a, neg, words_needed;
+   I_  s, neg, words_needed;
    StgArrWords* p;	/* address of array result */
    FB_
 
@@ -486,8 +502,6 @@ FN_(int64ToIntegerzh_fast)
    p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
 
-   a = words_needed;
-
    if ( val < 0LL ) {
      neg = 1;
      val = -val;
@@ -495,7 +509,7 @@ FN_(int64ToIntegerzh_fast)
 
    hi = (W_)((LW_)val / 0x100000000ULL);
 
-   if ( a == 2 )  { 
+   if ( words_needed == 2 )  { 
       s = 2; 
       Hp[-1] = (W_)val;
       Hp[0] = hi;
@@ -507,13 +521,12 @@ FN_(int64ToIntegerzh_fast)
    }
    s = ( neg ? -s : s );
 
-   /* returns (# alloc :: Int#, 
-		 size  :: Int#, 
+   /* returns (# size  :: Int#, 
 		 data  :: ByteArray# 
 	       #)
    */
-   TICK_RET_UNBOXED_TUP(3);
-   RET_NNP(a,s,p);
+   TICK_RET_UNBOXED_TUP(2);
+   RET_NP(s,p);
    FE_
 }
 
@@ -523,7 +536,7 @@ FN_(word64ToIntegerzh_fast)
 
    StgNat64 val; /* to avoid aliasing */
    StgWord hi;
-   I_  s,a,words_needed;
+   I_  s, words_needed;
    StgArrWords* p;	/* address of array result */
    FB_
 
@@ -540,8 +553,6 @@ FN_(word64ToIntegerzh_fast)
    p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
 
-   a = words_needed;
-
    hi = (W_)((LW_)val / 0x100000000ULL);
    if ( val >= 0x100000000ULL ) { 
      s = 2;
@@ -554,13 +565,12 @@ FN_(word64ToIntegerzh_fast)
       s = 0;
    }
 
-   /* returns (# alloc :: Int#, 
-		 size  :: Int#, 
+   /* returns (# size  :: Int#, 
 		 data  :: ByteArray# 
 	       #)
    */
-   TICK_RET_UNBOXED_TUP(3);
-   RET_NNP(a,s,p);
+   TICK_RET_UNBOXED_TUP(2);
+   RET_NP(s,p);
    FE_
 }
 
@@ -573,25 +583,23 @@ FN_(word64ToIntegerzh_fast)
 FN_(name)								\
 {									\
   MP_INT arg1, arg2, result;						\
-  I_ a1, s1, a2, s2;							\
+  I_ s1, s2;							\
   StgArrWords* d1;							\
   StgArrWords* d2;							\
   FB_									\
  									\
   /* call doYouWantToGC() */						\
-  MAYBE_GC(R3_PTR | R6_PTR, name);					\
+  MAYBE_GC(R2_PTR | R4_PTR, name);					\
 									\
-  a1 = R1.i;								\
-  s1 = R2.i;								\
-  d1 = stgCast(StgArrWords*,R3.p);					\
-  a2 = R4.i;								\
-  s2 = R5.i;								\
-  d2 = stgCast(StgArrWords*,R6.p);					\
+  d1 = (StgArrWords *)R2.p;						\
+  s1 = R1.i;								\
+  d2 = (StgArrWords *)R4.p;						\
+  s2 = R3.i;								\
 									\
-  arg1._mp_alloc	= (a1);						\
+  arg1._mp_alloc	= d1->words;					\
   arg1._mp_size		= (s1);						\
   arg1._mp_d		= (unsigned long int *) (BYTE_ARR_CTS(d1));	\
-  arg2._mp_alloc	= (a2);						\
+  arg2._mp_alloc	= d2->words;					\
   arg2._mp_size		= (s2);						\
   arg2._mp_d		= (unsigned long int *) (BYTE_ARR_CTS(d2));	\
 									\
@@ -600,10 +608,9 @@ FN_(name)								\
   /* Perform the operation */						\
   STGCALL3(mp_fun,&result,&arg1,&arg2);					\
 									\
-  TICK_RET_UNBOXED_TUP(3);						\
-  RET_NNP(result._mp_alloc, 						\
-	  result._mp_size, 						\
-          result._mp_d-sizeofW(StgArrWords));				\
+  TICK_RET_UNBOXED_TUP(2);						\
+  RET_NP(result._mp_size, 						\
+         result._mp_d-sizeofW(StgArrWords));				\
   FE_									\
 }
 
@@ -611,25 +618,23 @@ FN_(name)								\
 FN_(name)								\
 {									\
   MP_INT arg1, arg2, result1, result2;					\
-  I_ a1, s1, a2, s2;							\
+  I_ s1, s2;							\
   StgArrWords* d1;							\
   StgArrWords* d2;							\
   FB_									\
  									\
   /* call doYouWantToGC() */						\
-  MAYBE_GC(R3_PTR | R6_PTR, name);					\
+  MAYBE_GC(R2_PTR | R4_PTR, name);					\
 									\
-  a1 = R1.i;								\
-  s1 = R2.i;								\
-  d1 = stgCast(StgArrWords*,R3.p);					\
-  a2 = R4.i;								\
-  s2 = R5.i;								\
-  d2 = stgCast(StgArrWords*,R6.p);					\
+  d1 = (StgArrWords *)R2.p;						\
+  s1 = R1.i;								\
+  d2 = (StgArrWords *)R4.p;						\
+  s2 = R3.i;								\
 									\
-  arg1._mp_alloc	= (a1);						\
+  arg1._mp_alloc	= d1->words;					\
   arg1._mp_size		= (s1);						\
   arg1._mp_d		= (unsigned long int *) (BYTE_ARR_CTS(d1));	\
-  arg2._mp_alloc	= (a2);						\
+  arg2._mp_alloc	= d2->words;					\
   arg2._mp_size		= (s2);						\
   arg2._mp_d		= (unsigned long int *) (BYTE_ARR_CTS(d2));	\
 									\
@@ -639,13 +644,11 @@ FN_(name)								\
   /* Perform the operation */						\
   STGCALL4(mp_fun,&result1,&result2,&arg1,&arg2);			\
 									\
-  TICK_RET_UNBOXED_TUP(6);						\
-  RET_NNPNNP(result1._mp_alloc,						\
-	     result1._mp_size, 						\
-             result1._mp_d-sizeofW(StgArrWords),			\
-	     result2._mp_alloc,						\
-	     result2._mp_size, 						\
-             result2._mp_d-sizeofW(StgArrWords));			\
+  TICK_RET_UNBOXED_TUP(4);						\
+  RET_NPNP(result1._mp_size, 						\
+           result1._mp_d-sizeofW(StgArrWords),				\
+	   result2._mp_size, 						\
+           result2._mp_d-sizeofW(StgArrWords));				\
   FE_									\
 }
 
@@ -682,9 +685,9 @@ FN_(decodeFloatzh_fast)
   /* Perform the operation */
   STGCALL3(__decodeFloat,&mantissa,&exponent,arg);
 
-  /* returns: (R1 = Int# (expn), R2 = Int#, R3 = Int#, R4 = ByteArray#) */
-  TICK_RET_UNBOXED_TUP(4);
-  RET_NNNP(exponent,mantissa._mp_alloc,mantissa._mp_size,p);
+  /* returns: (Int# (expn), Int#, ByteArray#) */
+  TICK_RET_UNBOXED_TUP(3);
+  RET_NNP(exponent,mantissa._mp_size,p);
   FE_
 }
 #endif /* !FLOATS_AS_DOUBLES */
@@ -715,9 +718,9 @@ FN_(decodeDoublezh_fast)
   /* Perform the operation */
   STGCALL3(__decodeDouble,&mantissa,&exponent,arg);
 
-  /* returns: (R1 = Int# (expn), R2 = Int#, R3 = Int#, R4 = ByteArray#) */
-  TICK_RET_UNBOXED_TUP(4);
-  RET_NNNP(exponent,mantissa._mp_alloc,mantissa._mp_size,p);
+  /* returns: (Int# (expn), Int#, ByteArray#) */
+  TICK_RET_UNBOXED_TUP(3);
+  RET_NNP(exponent,mantissa._mp_size,p);
   FE_
 }
 

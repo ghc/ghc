@@ -78,6 +78,9 @@ __export PrelGHC
   iShiftLzh
   iShiftRAzh
   iShiftRLzh
+  addIntCzh
+  subIntCzh
+  mulIntCzh
   
   Wordzh
   gtWordzh
@@ -176,7 +179,7 @@ __export PrelGHC
   encodeDoublezh
   
   cmpIntegerzh
-  negateIntegerzh
+  cmpIntegerIntzh
   plusIntegerzh
   minusIntegerzh
   timesIntegerzh

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.18 1999/02/11 17:15:20 simonm Exp $
+ * $Id: PrimOps.h,v 1.19 1999/02/17 15:57:30 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -82,14 +82,63 @@ I_ stg_div (I_ a, I_ b);
 #define remIntzh(r,a,b)		r=(a)%(b)
 #define negateIntzh(r,a)	r=-(a)
 
-/* The following operations are the standard add,subtract and multiply
- * except that they return a carry if the operation overflows.
+/* -----------------------------------------------------------------------------
+ * Int operations with carry.
+ * -------------------------------------------------------------------------- */
+
+/* With some bit-twiddling, we can define int{Add,Sub}Czh portably in
+ * C, and without needing any comparisons.  This may not be the
+ * fastest way to do it - if you have better code, please send it! --SDM
  *
- * They are all defined in terms of 32-bit integers and use the GCC
- * 'long long' extension to get a 64-bit result.  We'd like to use
- * 64-bit integers on 64-bit architectures, but it seems that gcc's
- * 'long long' type is set at 64-bits even on a 64-bit machine.  
+ * Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
+ *
+ * We currently don't make use of the r value if c is != 0 (i.e. 
+ * overflow), we just convert to big integers and try again.  This
+ * could be improved by making r and c the correct values for
+ * plugging into a new J#.  
  */
+#define addIntCzh(r,c,a,b)			\
+{ r = a + b;					\
+  c = ((StgWord)(~(a^b) & (a^r)))		\
+    >> (BITS_PER_BYTE * sizeof(I_) - 1);	\
+}
+
+
+#define subIntCzh(r,c,a,b)			\
+{ r = a - b;					\
+  c = ((StgWord)((a^b) & (a^r)))		\
+    >> (BITS_PER_BYTE * sizeof(I_) - 1);	\
+}
+
+/* Multiply with overflow checking.
+ *
+ * This is slightly more tricky - the usual sign rules for add/subtract
+ * don't apply.  
+ *
+ * On x86 hardware we use a hand-crafted assembly fragment to do the job.
+ *
+ * On other 32-bit machines we use gcc's 'long long' types, finding
+ * overflow with some careful bit-twiddling.
+ *
+ * On 64-bit machines where gcc's 'long long' type is also 64-bits,
+ * we use a crude approximation, testing whether either operand is
+ * larger than 32-bits; if neither is, then we go ahead with the
+ * multiplication.
+ */
+
+#if i386_TARGET_ARCH
+
+#define mulIntCzh(r,c,a,b)				\
+{							\
+  __asm__("xor %1,%1\n\t				\
+	   imull %2,%3\n\t				\
+	   jno 1f\n\t					\
+	   movl $1,%1\n\t				\
+	   1:" 						\
+	: "=r" (r), "=r" (c) : "r" (a), "0" (b));	\
+}
+
+#elif SIZEOF_VOID_P == 4
 
 #ifdef WORDS_BIGENDIAN
 #define C 0
@@ -104,27 +153,37 @@ typedef union {
     StgInt32 i[2];
 } long_long_u ;
 
-#define addWithCarryzh(r,c,a,b)			\
-{ long_long_u z;				\
-  z.l = a + b;					\
-  r = z.i[R];					\
-  c = z.i[C];					\
+#define mulIntCzh(r,c,a,b)						\
+  long_long_u z;							\
+  z.l = (StgInt64)a * (StgInt64)b;					\
+  r = z.i[R];								\
+  c = z.i[C];								\
+  if (c == 0 || c == -1) {						\
+    c = ((StgWord)((a^b) ^ r))						\
+      >> (BITS_PER_BYTE * sizeof(I_) - 1);				\
+  }									\
 }
+/* Careful: the carry calculation above is extremely delicate.  Make sure
+ * you test it thoroughly after changing it.
+ */
 
+#else
 
-#define subWithCarryzh(r,c,a,b)			\
-{ long_long_u z;				\
-  z.l = a + b;					\
-  r = z.i[R];					\
-  c = z.i[C];					\
+#define HALF_INT  (1 << (BITS_PER_BYTE * sizeof(I_) / 2))
+
+#define stg_abs(a) ((a) < 0 ? -(a) : (a))
+
+#define mulIntCzh(r,c,a,b)			\
+{						\
+  if (stg_abs(a) >= HALF_INT			\
+      stg_abs(b) >= HALF_INT) {			\
+    c = 1;					\
+  } else {					\
+    r = a * b;					\
+    c = 0;					\
+  }						\
 }
-
-#define mulWithCarryzh(r,c,a,b)			\
-{ long_long_u z;				\
-  z.l = a * b;					\
-  r = z.i[R];					\
-  c = z.i[C];					\
-}
+#endif
 
 /* -----------------------------------------------------------------------------
    Word PrimOps.
@@ -248,50 +307,48 @@ typedef union {
  * to allocate any memory.
  */
 
-#define integer2Intzh(r, aa,sa,da)					\
-{ MP_INT arg;								\
-									\
-  arg._mp_alloc	= (aa);							\
-  arg._mp_size	= (sa);							\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));		\
-									\
-  (r) = RET_PRIM_STGCALL1(I_,mpz_get_si,&arg);				\
+#define integer2Intzh(r, sa,da)					\
+{ MP_INT arg;							\
+								\
+  arg._mp_size	= (sa);						\
+  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
+  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
+								\
+  (r) = RET_PRIM_STGCALL1(I_,mpz_get_si,&arg);			\
 }
 
-#define integer2Wordzh(r, aa,sa,da)					\
-{ MP_INT arg;								\
-									\
-  arg._mp_alloc	= (aa);							\
-  arg._mp_size	= (sa);							\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));		\
-									\
-  (r) = RET_PRIM_STGCALL1(I_,mpz_get_ui,&arg);				\
+#define integer2Wordzh(r, sa,da)				\
+{ MP_INT arg;							\
+								\
+  arg._mp_size	= (sa);						\
+  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
+  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
+								\
+  (r) = RET_PRIM_STGCALL1(I_,mpz_get_ui,&arg);			\
 }
 
-#define cmpIntegerzh(r, a1,s1,d1, a2,s2,d2)				\
-{ MP_INT arg1;								\
-  MP_INT arg2;								\
-									\
-  arg1._mp_alloc= (a1);							\
-  arg1._mp_size	= (s1);							\
-  arg1._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d1));		\
-  arg2._mp_alloc= (a2);							\
-  arg2._mp_size	= (s2);							\
-  arg2._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d2));		\
-									\
-  (r) = RET_PRIM_STGCALL2(I_,mpz_cmp,&arg1,&arg2);			\
+#define cmpIntegerzh(r, s1,d1, s2,d2)				\
+{ MP_INT arg1;							\
+  MP_INT arg2;							\
+								\
+  arg1._mp_size	= (s1);						\
+  arg1._mp_alloc= ((StgArrWords *)d1)->words;			\
+  arg1._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d1));	\
+  arg2._mp_size	= (s2);						\
+  arg2._mp_alloc= ((StgArrWords *)d2)->words;			\
+  arg2._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d2));	\
+								\
+  (r) = RET_PRIM_STGCALL2(I_,mpz_cmp,&arg1,&arg2);		\
 }
 
-/* A glorious hack: calling mpz_neg would entail allocation and
- * copying, but by looking at what mpz_neg actually does, we can
- * derive a better version:
- */
-
-#define negateIntegerzh(ra, rs, rd, a, s, d)				\
-{ 									\
-  (ra) = (a);								\
-  (rs) = -(s);								\
-  (rd) = d;								\
+#define cmpIntegerIntzh(r, s,d, i)				\
+{ MP_INT arg;							\
+								\
+  arg._mp_size	= (s);						\
+  arg._mp_alloc = ((StgArrWords *)d)->words;			\
+  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d));	\
+								\
+  (r) = RET_PRIM_STGCALL2(I_,mpz_cmp_si,&arg,i);		\
 }
 
 /* The rest are all out-of-line: -------- */
@@ -309,11 +366,8 @@ EF_(int2Integerzh_fast);
 EF_(word2Integerzh_fast);
 EF_(addr2Integerzh_fast);
 
-/* Floating-point encodings/decodings */
-EF_(encodeFloatzh_fast);
+/* Floating-point decodings */
 EF_(decodeFloatzh_fast);
-
-EF_(encodeDoublezh_fast);
 EF_(decodeDoublezh_fast);
 
 /* -----------------------------------------------------------------------------
@@ -322,37 +376,41 @@ EF_(decodeDoublezh_fast);
 
 #ifdef SUPPORT_LONG_LONGS
 
-#define integerToWord64zh(r, aa,sa,da)					\
-{ unsigned long int* d; 						\
-  StgNat64 res;								\
-									\
-  d		= (unsigned long int *) (BYTE_ARR_CTS(da));		\
-  if ( (aa) == 0 ) {							\
-     res = (LW_)0;							\
-  } else if ( (aa) == 1) {						\
-     res = (LW_)d[0];							\
-  } else {								\
-     res = (LW_)d[0] + (LW_)d[1] * 0x100000000ULL;			\
-  }									\
-  (r) = res;								\
+#define integerToWord64zh(r, sa,da)				\
+{ unsigned long int* d;						\
+  I_ aa;							\
+  StgNat64 res;							\
+								\
+  d		= (unsigned long int *) (BYTE_ARR_CTS(da));	\
+  aa = ((StgArrWords *)da)->words;				\
+  if ( (aa) == 0 ) {						\
+     res = (LW_)0;						\
+  } else if ( (aa) == 1) {					\
+     res = (LW_)d[0];						\
+  } else {							\
+     res = (LW_)d[0] + (LW_)d[1] * 0x100000000ULL;		\
+  }								\
+  (r) = res;							\
 }
 
-#define integerToInt64zh(r, aa,sa,da)					\
-{ unsigned long int* d; 						\
-  StgInt64 res;								\
-									\
-  d		= (unsigned long int *) (BYTE_ARR_CTS(da));		\
-  if ( (aa) == 0 ) {							\
-     res = (LI_)0;							\
-  } else if ( (aa) == 1) {						\
-     res = (LI_)d[0];							\
-  } else {								\
-     res = (LI_)d[0] + (LI_)d[1] * 0x100000000LL;			\
-     if ( sa < 0 ) {                                                    \
-	   res = (LI_)-res;                                             \
-     }                                                                  \
-  }									\
-  (r) = res;						                \
+#define integerToInt64zh(r, sa,da)				\
+{ unsigned long int* d;						\
+  I_ aa;							\
+  StgInt64 res;							\
+								\
+  d		= (unsigned long int *) (BYTE_ARR_CTS(da));	\
+  aa = ((StgArrWords *)da)->words;				\
+  if ( (aa) == 0 ) {						\
+     res = (LI_)0;						\
+  } else if ( (aa) == 1) {					\
+     res = (LI_)d[0];						\
+  } else {							\
+     res = (LI_)d[0] + (LI_)d[1] * 0x100000000LL;		\
+     if ( sa < 0 ) {						\
+	   res = (LI_)-res;					\
+     }								\
+  }								\
+  (r) = res;							\
 }
 
 /* Conversions */
@@ -539,29 +597,29 @@ EF_(newArrayzh_fast);
 #include "ieee-flpt.h"
 
 #if FLOATS_AS_DOUBLES  /* i.e. 64-bit machines */
-#define encodeFloatzh(r, aa,sa,da, expon)   encodeDoublezh(r, aa,sa,da, expon)
+#define encodeFloatzh(r, sa,da, expon)   encodeDoublezh(r, sa,da, expon)
 #else
-#define encodeFloatzh(r, aa,sa,da, expon)	\
-{ MP_INT arg;					\
-  /* Does not allocate memory */		\
-						\
-  arg._mp_alloc	= aa;				\
-  arg._mp_size	= sa;				\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da)); \
-						\
-  r = RET_PRIM_STGCALL2(StgFloat, __encodeFloat,&arg,(expon));\
+#define encodeFloatzh(r, sa,da, expon)				\
+{ MP_INT arg;							\
+  /* Does not allocate memory */				\
+								\
+  arg._mp_size	= sa;						\
+  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
+  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
+								\
+  r = RET_PRIM_STGCALL2(StgFloat, __encodeFloat,&arg,(expon));	\
 }
 #endif /* FLOATS_AS_DOUBLES */
 
-#define encodeDoublezh(r, aa,sa,da, expon)	\
-{ MP_INT arg;					\
-  /* Does not allocate memory */		\
-						\
-  arg._mp_alloc	= aa;				\
-  arg._mp_size	= sa;				\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da)); \
-						\
-  r = RET_PRIM_STGCALL2(StgDouble, __encodeDouble,&arg,(expon));\
+#define encodeDoublezh(r, sa,da, expon)					\
+{ MP_INT arg;								\
+  /* Does not allocate memory */					\
+									\
+  arg._mp_size	= sa;							\
+  arg._mp_alloc	= ((StgArrWords *)da)->words;				\
+  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));		\
+									\
+  r = RET_PRIM_STGCALL2(StgDouble, __encodeDouble,&arg,(expon));	\
 }
 
 /* The decode operations are out-of-line because they need to allocate

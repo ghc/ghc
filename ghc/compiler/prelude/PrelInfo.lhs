@@ -25,8 +25,7 @@ module PrelInfo (
 
 
 	-- Here are the thin-air Ids themselves
-	int2IntegerId, addr2IntegerId,
-	integerMinusOneId, integerZeroId, integerPlusOneId, integerPlusTwoId,
+	addr2IntegerId,
 	packStringForCId, unpackCStringId, unpackCString2Id,
 	unpackCStringAppendId, unpackCStringFoldrId,
 	foldrId,
@@ -258,16 +257,7 @@ thinAirIdNames
   = map mkKnownKeyGlobal
     [
 	-- Needed for converting literals to Integers (used in tidyCoreExpr)
-      (varQual pREL_BASE SLIT("int2Integer"),  int2IntegerIdKey)	
-    , (varQual pREL_BASE SLIT("addr2Integer"), addr2IntegerIdKey)
-
-	-- OK, this is Will's idea: we should have magic values for Integers 0,
-	-- +1, +2, and -1 (go ahead, fire me):
-    , (varQual pREL_BASE SLIT("integer_0"),  integerZeroIdKey)    
-    , (varQual pREL_BASE SLIT("integer_1"),  integerPlusOneIdKey) 
-    , (varQual pREL_BASE SLIT("integer_2"),  integerPlusTwoIdKey) 
-    , (varQual pREL_BASE SLIT("integer_m1"), integerMinusOneIdKey)
-
+      (varQual pREL_BASE SLIT("addr2Integer"), addr2IntegerIdKey)
 
 	-- String literals
     , (varQual pREL_PACK SLIT("packCString#"),   packCStringIdKey)
@@ -282,18 +272,11 @@ thinAirIdNames
 
 thinAirModules = [pREL_PACK]	-- See notes with RnIfaces.findAndReadIface
 
-noRepIntegerIds = [integerZeroId, integerPlusOneId, integerPlusTwoId, integerMinusOneId,
-		   int2IntegerId, addr2IntegerId]
+noRepIntegerIds = [addr2IntegerId]
 
 noRepStrIds = [unpackCString2Id, unpackCStringId]
 
-int2IntegerId  = lookupThinAirId int2IntegerIdKey
 addr2IntegerId = lookupThinAirId addr2IntegerIdKey
-
-integerMinusOneId = lookupThinAirId integerMinusOneIdKey
-integerZeroId     = lookupThinAirId integerZeroIdKey
-integerPlusOneId  = lookupThinAirId integerPlusOneIdKey
-integerPlusTwoId  = lookupThinAirId integerPlusTwoIdKey
 
 packStringForCId = lookupThinAirId packCStringIdKey
 unpackCStringId  = lookupThinAirId unpackCStringIdKey

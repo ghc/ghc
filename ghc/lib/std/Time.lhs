@@ -95,7 +95,9 @@ we use the C library routines based on 32 bit integers.
 instance Show ClockTime
 #else
 instance Show ClockTime where
-    showsPrec _ (TOD (J# _ s# d#) _nsec) = 
+    showsPrec p (TOD (S# i) _nsec) = 
+      case int2Integer# i of (# s, d #) -> showsPrec p (TOD (J# s d) _nsec)
+    showsPrec _ (TOD (J# s# d#) _nsec) = 
       showString $ unsafePerformIO $ do
 	    buf <- allocChars 38 -- exactly enough for error message
 	    str <- _ccall_ showTime (I# s#) d# buf
@@ -215,7 +217,7 @@ getClockTime = do
     --  The C routine fills in an unsigned word.  We don't have 
     --	`unsigned2Integer#,' so we freeze the data bits and use them 
     --	for an MP_INT structure.  Note that zero is still handled specially,
-    --	although (J# 1# 1# (ptr to 0#)) is probably acceptable to gmp.
+    --	although (J# 1# (ptr to 0#)) is probably acceptable to gmp.
 
     cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
 	case readIntArray# arr# 0# s# of 
@@ -224,7 +226,7 @@ getClockTime = do
 		then (# s2#, 0 #)
             	else case unsafeFreezeByteArray# arr# s2# of
                         (# s3#, frozen# #) -> 
-				(# s3#, J# 1# 1# frozen# #)
+				(# s3#, J# 1# frozen# #)
 #endif
 \end{code}
 
@@ -354,7 +356,9 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
      isDst = if isdst then (1::Int) else 0
 #else
 toCalendarTime :: ClockTime -> IO CalendarTime
-toCalendarTime (TOD (J# _ s# d#) psec) = do
+toCalendarTime (TOD (S# i) psec) 
+  = case int2Integer# i of (# s, d #) -> toCalendarTime (TOD (J# s d) psec)
+toCalendarTime (TOD (J# s# d#) psec) = do
     res    <- allocWords (``sizeof(struct tm)''::Int)
     zoneNm <- allocChars 32
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
@@ -378,7 +382,9 @@ toCalendarTime (TOD (J# _ s# d#) psec) = do
             		    (toEnum wday) yday tzname tz (isdst /= (0::Int)))
 
 toUTCTime :: ClockTime -> CalendarTime
-toUTCTime  (TOD (J# _ s# d#) psec) = unsafePerformIO $ do
+toUTCTime (TOD (S# i) psec) 
+  = case int2Integer# i of (# s, d #) -> toUTCTime (TOD (J# s d) psec)
+toUTCTime  (TOD (J# s# d#) psec) = unsafePerformIO $ do
        res    <- allocWords (``sizeof(struct tm)''::Int)
        zoneNm <- allocChars 32
        _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm

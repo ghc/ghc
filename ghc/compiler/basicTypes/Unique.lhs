@@ -107,7 +107,8 @@ module Unique (
 	int64DataConKey,
 	int64PrimTyConKey,
 	int64TyConKey,
-	integerDataConKey,
+	smallIntegerDataConKey,
+	largeIntegerDataConKey,
 	integerMinusOneIdKey,
 	integerPlusOneIdKey,
 	integerPlusTwoIdKey,
@@ -559,12 +560,13 @@ int8DataConKey				= mkPreludeDataConUnique  8
 int16DataConKey				= mkPreludeDataConUnique  9
 int32DataConKey				= mkPreludeDataConUnique 10
 int64DataConKey				= mkPreludeDataConUnique 11
-integerDataConKey			= mkPreludeDataConUnique 12
-foreignObjDataConKey			= mkPreludeDataConUnique 13
-nilDataConKey				= mkPreludeDataConUnique 14
-ratioDataConKey				= mkPreludeDataConUnique 15
-stablePtrDataConKey			= mkPreludeDataConUnique 16
-stableNameDataConKey			= mkPreludeDataConUnique 17
+smallIntegerDataConKey			= mkPreludeDataConUnique 12
+largeIntegerDataConKey			= mkPreludeDataConUnique 13
+foreignObjDataConKey			= mkPreludeDataConUnique 14
+nilDataConKey				= mkPreludeDataConUnique 15
+ratioDataConKey				= mkPreludeDataConUnique 16
+stablePtrDataConKey			= mkPreludeDataConUnique 17
+stableNameDataConKey			= mkPreludeDataConUnique 18
 trueDataConKey				= mkPreludeDataConUnique 34
 wordDataConKey				= mkPreludeDataConUnique 35
 word8DataConKey				= mkPreludeDataConUnique 36

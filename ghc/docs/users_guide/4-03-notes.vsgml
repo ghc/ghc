@@ -11,4 +11,10 @@
 	<item> <tt/mkWeak/ now takes a <tt/Maybe (IO ())/ for the finalizer,
 	       and <tt/mkWeakNoFinalizer/ is removed.
 	<itemize>
+
+<item> Changed representation of <tt/Integer/ type to speed up
+computations on small integers.  The performance of <tt/Integer/ is now
+only slightly slower than <tt/Int/ for values between <tt/minBound :: Int/
+and <tt/maxBound :: Int/.
+
 </itemize>

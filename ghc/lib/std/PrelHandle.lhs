@@ -435,7 +435,7 @@ hFileSize handle =
 	  -- expression --SDM
           _casm_ ``%r = 1;'' >>= \(I# hack#) ->
           case int2Integer hack# of
-            result@(J# _ _ d#) -> do
+            result@(J# _ d#) -> do
                 rc <- CCALL(fileSize) (haFO__ handle_) d#  -- ConcHask: SAFE, won't block
                 writeHandle handle handle_
                 if rc == (0::Int) then
@@ -641,7 +641,7 @@ hSeek handle mode offset =
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile_int64) fo whence (primIntegerToInt64 offset))  -- ConcHask: UNSAFE, may block
 #else
-hSeek handle mode (J# _ s# d#) =
+hSeek handle mode (J# s# d#) =
     wantSeekableHandle "hSeek" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile) fo whence (I# s#) d#)  -- ConcHask: UNSAFE, may block

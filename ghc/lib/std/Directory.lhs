@@ -499,35 +499,13 @@ getFileStatus name = do
 #ifndef __HUGS__
 modificationTime :: FileStatus -> IO ClockTime
 modificationTime stat = do
-      -- ToDo: better, this is ugly stuff.
-    i1 <- malloc1
+    i1 <- stToIO (newWordArray (0,1))
     setFileMode i1 stat
-    secs <- cvtUnsigned i1
-    return (TOD secs 0)
-  where
-    malloc1 = IO $ \ s# ->
-	case newIntArray# 1# s# of 
-          (# s2#, barr# #) -> (# s2#, MutableByteArray bnds barr# #)
-
-    bnds = (0,1)
-    -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
-    -- so we freeze the data bits and use them for an MP_INT structure.  Note that
-    -- zero is still handled specially, although (J# 1# 1# (ptr to 0#)) is probably
-    -- acceptable to gmp.
-
-    cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
-	case readIntArray# arr# 0# s# of 
-	  (# s2#, r# #) ->
-            if r# ==# 0# then
-                (# s2#, 0 #)
-            else
-                case unsafeFreezeByteArray# arr# s2# of
-                  (# s3#, frozen# #) -> 
-			(# s3#, J# 1# 1# frozen# #)
+    secs <- stToIO (readWordArray i1 0)
+    return (TOD (toInteger (wordToInt secs)) 0)
 
 foreign import ccall "libHS_cbits.so" "set_stat_st_mtime" unsafe
    setFileMode :: PrimMutableByteArray RealWorld -> FileStatus -> IO ()
-
 #endif
 
 isDirectory :: FileStatus -> Bool

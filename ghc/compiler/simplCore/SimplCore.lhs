@@ -44,18 +44,14 @@ import Name		( mkLocalName, tidyOccName, tidyTopName, initTidyOccEnv, isExported
 			)
 import TyCon		( TyCon, isDataTyCon )
 import PrimOp		( PrimOp(..) )
-import PrelInfo		( unpackCStringId, unpackCString2Id,
-			  integerZeroId, integerPlusOneId,
-			  integerPlusTwoId, integerMinusOneId,
-			  int2IntegerId, addr2IntegerId
-			)
+import PrelInfo		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import Type		( Type, splitAlgTyConApp_maybe, 
 			  isUnLiftedType,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
 			  Type
 			)
 import Class		( Class, classSelIds )
-import TysWiredIn	( isIntegerTy )
+import TysWiredIn	( smallIntegerDataCon, isIntegerTy )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
@@ -634,20 +630,15 @@ litToRep (NoRepStr s ty)
 
 If an Integer is small enough (Haskell implementations must support
 Ints in the range $[-2^29+1, 2^29-1]$), wrap it up in @int2Integer@;
-otherwise, wrap with @litString2Integer@.
+otherwise, wrap with @addr2Integer@.
 
 \begin{code}
 litToRep (NoRepInteger i integer_ty)
   = returnPM (integer_ty, rhs)
   where
-    rhs | i == 0    = Var integerZeroId		-- Extremely convenient to look out for
-  	| i == 1    = Var integerPlusOneId	-- a few very common Integer literals!
-  	| i == 2    = Var integerPlusTwoId
-  	| i == (-1) = Var integerMinusOneId
-  
-  	| i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
+    rhs | i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
 	  i < tARGET_MAX_INT
-	= App (Var int2IntegerId) (Con (Literal (mkMachInt i)) [])
+	= Con (DataCon smallIntegerDataCon) [Con (Literal (mkMachInt i)) []]
   
   	| otherwise 			-- Big, so start from a string
 	= App (Var addr2IntegerId) (Con (Literal (MachStr (_PK_ (show i)))) [])

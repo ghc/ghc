@@ -39,7 +39,9 @@ import Monad
 import Ix
 import PrelGHC
 
-newtype ST s a = ST (PrelST.State s -> (a,PrelST.State s))
+newtype ST s a = ST (State s -> (a, State s))
+
+data State s = S# (State# s)
 
 instance Functor (ST s) where
     fmap f m = ST $ \ s ->
@@ -65,7 +67,7 @@ instance Monad (ST s) where
 
 {-# NOINLINE runST #-}
 runST :: (forall s. ST s a) -> a
-runST st = case st of ST the_st -> let (r,_) = the_st (PrelST.S# realWorld#) in r
+runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
 \end{code}
 
 %*********************************************************
@@ -119,15 +121,15 @@ unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 strictToLazyST :: PrelST.ST s a -> ST s a
 strictToLazyST m = ST $ \s ->
         let 
-  	   pr = case s of { PrelST.S# s# -> PrelST.liftST m s# }
+  	   pr = case s of { S# s# -> PrelST.liftST m s# }
 	   r  = case pr of { PrelST.STret _ v -> v }
-	   s' = case pr of { PrelST.STret s2# _ -> PrelST.S# s2# }
+	   s' = case pr of { PrelST.STret s2# _ -> S# s2# }
 	in
 	(r, s')
 
 lazyToStrictST :: ST s a -> PrelST.ST s a
 lazyToStrictST (ST m) = PrelST.ST $ \s ->
-        case (m (PrelST.S# s)) of (a, PrelST.S# s') -> (# s', a #)
+        case (m (S# s)) of (a, S# s') -> (# s', a #)
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST

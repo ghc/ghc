@@ -120,8 +120,7 @@ class  (Eq a, Show a) => Num a  where
 
     x - y		= x + negate y
     negate x		= 0 - x
-    fromInt (I# i#)	= fromInteger (case int2Integer# i# of 
-					  (# a, s, d #) -> J# a s d)
+    fromInt (I# i#)	= fromInteger (S# i#)
 					-- Go via the standard class-op if the
 					-- non-standard one ain't provided
 \end{code}
@@ -563,8 +562,9 @@ instance  Num Int  where
 	     | n `eqInt` 0 = 0
 	     | otherwise   = 1
 
-    fromInteger (J# a# s# d#)
-      = case (integer2Int# a# s# d#) of { i# -> I# i# }
+    fromInteger (S# i#) = I# i#
+    fromInteger (J# s# d#)
+      = case (integer2Int# s# d#) of { i# -> I# i# }
 
     fromInt n		= n
 
@@ -583,15 +583,21 @@ instance  Show Int  where
 \begin{code}
 data Float	= F# Float#
 data Double	= D# Double#
-data Integer	= J# Int# Int# ByteArray#
+
+data Integer	
+   = S# Int#				-- small integers
+   | J# Int# ByteArray#			-- large integers
 
 instance  Eq Integer  where
-    (J# a1 s1 d1) == (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) ==# 0#
+    (S# i)     ==  (S# j)     = i ==# j
+    (S# i)     ==  (J# s d)   = cmpIntegerInt# s d i ==# 0#
+    (J# s d)   ==  (S# i)     = cmpIntegerInt# s d i ==# 0#
+    (J# s1 d1) ==  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==# 0#
 
-    (J# a1 s1 d1) /= (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) /=# 0#
-
+    (S# i)     /=  (S# j)     = i /=# j
+    (S# i)     /=  (J# s d)   = cmpIntegerInt# s d i /=# 0#
+    (J# s d)   /=  (S# i)     = cmpIntegerInt# s d i /=# 0#
+    (J# s1 d1) /=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=# 0#
 \end{code}
 
 %*********************************************************
@@ -763,13 +769,7 @@ it's nice to have them in PrelBase.
 {-# INLINE int2Integer #-}
 {-# INLINE addr2Integer #-}
 int2Integer :: Int# -> Integer
-int2Integer  i = case int2Integer#  i of (# a, s, d #) -> J# a s d
+int2Integer  i = S# i
 addr2Integer :: Addr# -> Integer
-addr2Integer x = case addr2Integer# x of (# a, s, d #) -> J# a s d
-
-integer_0, integer_1, integer_2, integer_m1 :: Integer
-integer_0  = int2Integer 0#
-integer_1  = int2Integer 1#
-integer_2  = int2Integer 2#
-integer_m1 = int2Integer (negateInt# 1#)
+addr2Integer x = case addr2Integer# x of (# s, d #) -> J# s d
 \end{code}

@@ -144,10 +144,11 @@ instance  RealFloat Float  where
 
     decodeFloat (F# f#)
       = case decodeFloat# f#	of
-	  (# exp#, a#, s#, d# #) -> (J# a# s# d#, I# exp#)
+	  (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
 
-    encodeFloat (J# a# s# d#) (I# e#)
-      = case encodeFloat# a# s# d# e# of { flt# -> F# flt# }
+    encodeFloat i@(S# _) j = encodeFloat (toBig i) j
+    encodeFloat (J# s# d#) (I# e#)
+      = case encodeFloat# s# d# e# of { flt# -> F# flt# }
 
     exponent x		= case decodeFloat x of
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x
@@ -295,10 +296,11 @@ instance  RealFloat Double  where
 
     decodeFloat (D# x#)
       = case decodeDouble# x#	of
-	  (# exp#, a#, s#, d# #) -> (J# a# s# d#, I# exp#)
+	  (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
 
-    encodeFloat (J# a# s# d#) (I# e#)
-      = case encodeDouble# a# s# d# e#	of { dbl# -> D# dbl# }
+    encodeFloat i@(S# _) j = encodeFloat (toBig i) j
+    encodeFloat (J# s# d#) (I# e#)
+      = case encodeDouble# s# d# e# of { dbl# -> D# dbl# }
 
     exponent x		= case decodeFloat x of
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x

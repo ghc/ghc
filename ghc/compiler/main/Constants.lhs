@@ -124,10 +124,20 @@ mIN_UPD_SIZE			= (MIN_UPD_SIZE::Int)
 mIN_SIZE_NonUpdHeapObject	= (MIN_NONUPD_SIZE::Int)
 \end{code}
 
+If we're compiling with GHC (and we're not cross-compiling), then we
+know that minBound and maxBound :: Int are the right values for the
+target architecture.  Otherwise, we assume -2^31 and 2^31-1
+respectively (which will be wrong on a 64-bit machine).
+
 \begin{code}
 tARGET_MIN_INT, tARGET_MAX_INT :: Integer
-tARGET_MIN_INT = -536870912
-tARGET_MAX_INT =  536870912
+#if __GLASGOW_HASKELL__
+tARGET_MIN_INT = toInteger (minBound :: Int)
+tARGET_MAX_INT = toInteger (maxBound :: Int)
+#else
+tARGET_MIN_INT = -2147483648
+tARGET_MAX_INT =  2147483647
+#endif
 \end{code}
  
 Constants for semi-tagging; the tags associated with the data

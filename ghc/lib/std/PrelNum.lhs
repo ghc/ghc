@@ -171,74 +171,115 @@ instance  Integral Int	where
 
 \begin{code}
 instance  Ord Integer  where
-    (J# a1 s1 d1) <= (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) <=# 0#
+    (S# i)     <=  (S# j)     = i <=# j
+    (J# s d)   <=  (S# i)     = cmpIntegerInt# s d i <=# 0#
+    (S# i)     <=  (J# s d)   = cmpIntegerInt# s d i >=# 0#
+    (J# s1 d1) <=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
 
-    (J# a1 s1 d1) <  (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) <# 0#
+    (S# i)     >   (S# j)     = i ># j
+    (J# s d)   >   (S# i)     = cmpIntegerInt# s d i ># 0#
+    (S# i)     >   (J# s d)   = cmpIntegerInt# s d i <# 0#
+    (J# s1 d1) >   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
 
-    (J# a1 s1 d1) >= (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) >=# 0#
+    (S# i)     <   (S# j)     = i <# j
+    (J# s d)   <   (S# i)     = cmpIntegerInt# s d i <# 0#
+    (S# i)     <   (J# s d)   = cmpIntegerInt# s d i ># 0#
+    (J# s1 d1) <   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
 
-    (J# a1 s1 d1) >  (J# a2 s2 d2)
-      = (cmpInteger# a1 s1 d1 a2 s2 d2) ># 0#
+    (S# i)     >=  (S# j)     = i >=# j
+    (J# s d)   >=  (S# i)     = cmpIntegerInt# s d i >=# 0#
+    (S# i)     >=  (J# s d)   = cmpIntegerInt# s d i <=# 0#
+    (J# s1 d1) >=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
 
-    x@(J# a1 s1 d1) `max` y@(J# a2 s2 d2)
-      = if ((cmpInteger# a1 s1 d1 a2 s2 d2) ># 0#) then x else y
-
-    x@(J# a1 s1 d1) `min` y@(J# a2 s2 d2)
-      = if ((cmpInteger# a1 s1 d1 a2 s2 d2) <# 0#) then x else y
-
-    compare (J# a1 s1 d1) (J# a2 s2 d2)
-       = case cmpInteger# a1 s1 d1 a2 s2 d2 of { res# ->
+    compare (S# i)  (S# j)
+       | i ==# j = EQ
+       | i <=# j = LT
+       | otherwise = GT
+    compare (J# s d) (S# i)
+       = case cmpIntegerInt# s d i of { res# ->
+	 if res# <# 0# then LT else 
+	 if res# ># 0# then GT else EQ
+	 }
+    compare (S# i) (J# s d)
+       = case cmpIntegerInt# s d i of { res# ->
+	 if res# ># 0# then LT else 
+	 if res# <# 0# then GT else EQ
+	 }
+    compare (J# s1 d1) (J# s2 d2)
+       = case cmpInteger# s1 d1 s2 d2 of { res# ->
 	 if res# <# 0# then LT else 
 	 if res# ># 0# then GT else EQ
 	 }
 
+toBig (S# i) = case int2Integer# i of { (# s, d #) -> J# s d }
+toBig i@(J# s d) = i
+
 instance  Num Integer  where
-    (+) (J# a1 s1 d1) (J# a2 s2 d2)
-      = case plusInteger# a1 s1 d1 a2 s2 d2 of (# a, s, d #) -> J# a s d
+    (+) i1@(S# i) i2@(S# j)
+	= case addIntC# i j of { (# r, c #) ->
+	  if c ==# 0# then S# r
+	  else toBig i1 + toBig i2 }
+    (+) i1@(J# s d) i2@(S# i)	= i1 + toBig i2
+    (+) i1@(S# i) i2@(J# s d)	= toBig i1 + i2
+    (+) (J# s1 d1) (J# s2 d2)
+      = case plusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-    (-) (J# a1 s1 d1) (J# a2 s2 d2)
-      = case minusInteger# a1 s1 d1 a2 s2 d2 of (# a, s, d #) -> J# a s d
+    (-) i1@(S# i) i2@(S# j)
+	= case subIntC# i j of { (# r, c #) ->
+	  if c ==# 0# then S# r
+	  else toBig i1 - toBig i2 }
+    (-) i1@(J# s d) i2@(S# i)	= i1 - toBig i2
+    (-) i1@(S# i) i2@(J# s d)	= toBig i1 - i2
+    (-) (J# s1 d1) (J# s2 d2)
+      = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-    negate (J# a s d) 
-      = case negateInteger# a s d of (# a1, s1, d1 #) -> J# a1 s1 d1
+    (*) i1@(S# i) i2@(S# j)
+	= case mulIntC# i j of { (# r, c #) ->
+	  if c ==# 0# then S# r
+	  else toBig i1 * toBig i2 }
+    (*) i1@(J# s d) i2@(S# i)	= i1 * toBig i2
+    (*) i1@(S# i) i2@(J# s d)	= toBig i1 * i2
+    (*) (J# s1 d1) (J# s2 d2)
+      = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-    (*) (J# a1 s1 d1) (J# a2 s2 d2)
-      = case timesInteger# a1 s1 d1 a2 s2 d2 of (# a, s, d #) -> J# a s d
+    negate (S# i) = S# (negateInt# i)
+    negate (J# s d) = J# (negateInt# s) d
 
     -- ORIG: abs n = if n >= 0 then n else -n
 
-    abs n@(J# a1 s1 d1)
-      = case 0 of { J# a2 s2 d2 ->
-	if (cmpInteger# a1 s1 d1 a2 s2 d2) >=# 0#
+    abs (S# i) = case abs (I# i) of I# j -> S# j
+    abs n@(J# s d)
+      = if (cmpIntegerInt# s d 0#) >=# 0#
 	then n
-	else case negateInteger# a1 s1 d1 of (# a, s, d #) -> J# a s d
-	}
+	else J# (negateInt# s) d
 
-    signum (J# a1 s1 d1)
-      = case 0 of { J# a2 s2 d2 ->
-	let
-	    cmp = cmpInteger# a1 s1 d1 a2 s2 d2
+    signum (S# i) = case signum (I# i) of I# j -> S# j
+    signum (J# s d)
+      = let
+	    cmp = cmpIntegerInt# s d 0#
 	in
-	if      cmp >#  0# then 1
-	else if cmp ==# 0# then 0
-	else			(negate 1)
-	}
+	if      cmp >#  0# then S# 1#
+	else if cmp ==# 0# then S# 0#
+	else			S# (negateInt# 1#)
 
     fromInteger	x	=  x
 
-    fromInt (I# i)	=  int2Integer i
+    fromInt (I# i)	=  S# i
 
 instance  Real Integer  where
     toRational x	=  x % 1
 
 instance  Integral Integer where
-    quotRem (J# a1 s1 d1) (J# a2 s2 d2)
-      = case (quotRemInteger# a1 s1 d1 a2 s2 d2) of
-	  (# a3, s3, d3, a4, s4, d4 #)
-	    -> (J# a3 s3 d3, J# a4 s4 d4)
+	-- ToDo:  a `rem`  b returns a small integer if b is small,
+	--	  a `quot` b returns a small integer if a is small.
+    quotRem (S# i) (S# j)         
+      = case quotRem (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
+    quotRem i1@(J# s d) i2@(S# i) = quotRem i1 (toBig i2)
+    quotRem i1@(S# i) i2@(J# s d) = quotRem (toBig i1) i2
+    quotRem (J# s1 d1) (J# s2 d2)
+      = case (quotRemInteger# s1 d1 s2 d2) of
+	  (# s3, d3, s4, d4 #)
+	    -> (J# s3 d3, J# s4 d4)
 
 {- USING THE UNDERLYING "GMP" CODE IS DUBIOUS FOR NOW:
 
@@ -248,17 +289,22 @@ instance  Integral Integer where
 	    -> (J# a3 s3 d3, J# a4 s4 d4)
 -}
     toInteger n	     = n
-    toInt (J# a s d) = case (integer2Int# a s d) of { n# -> I# n# }
+    toInt (S# i)     = I# i
+    toInt (J# s d)   = case (integer2Int# s d) of { n# -> I# n# }
 
     -- the rest are identical to the report default methods;
     -- you get slightly better code if you let the compiler
     -- see them right here:
+    (S# n) `quot` (S# d) = S# (n `quotInt#` d)
     n `quot` d	=  if d /= 0 then q else 
 		     error "Prelude.Integral.quot{Integer}: divide by 0"  
 		   where (q,_) = quotRem n d
+
+    (S# n) `rem` (S# d) = S# (n `remInt#` d)
     n `rem` d	=  if d /= 0 then r else 
 		     error "Prelude.Integral.rem{Integer}: divide by 0"  
 		   where (_,r) = quotRem n d
+
     n `div` d	=  q  where (q,_) = divMod n d
     n `mod` d	=  r  where (_,r) = divMod n d
 

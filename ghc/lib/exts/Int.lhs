@@ -209,8 +209,8 @@ instance Num Int8 where
 
   abs           = absReal
   signum        = signumReal
-  fromInteger (J# a# s# d#)
-                = case (integer2Int# a# s# d#) of { i# -> I8# (intToInt8# i#) }
+  fromInteger (J# s# d#)
+                = case (integer2Int# s# d#) of { i# -> I8# (intToInt8# i#) }
   fromInt       = intToInt8
 
 instance Bounded Int8 where
@@ -360,8 +360,8 @@ instance Num Int16 where
       else I16# (0x10000# -# x#)
   abs           = absReal
   signum        = signumReal
-  fromInteger (J# a# s# d#)
-                = case (integer2Int# a# s# d#) of { i# -> I16# (intToInt16# i#) }
+  fromInteger (J# s# d#)
+                = case (integer2Int# s# d#) of { i# -> I16# (intToInt16# i#) }
   fromInt       = intToInt16
 
 instance Bounded Int16 where
@@ -519,8 +519,8 @@ instance Num Int32 where
 #endif
   abs           = absReal
   signum        = signumReal
-  fromInteger (J# a# s# d#)
-                = case (integer2Int# a# s# d#) of { i# -> I32# (intToInt32# i#) }
+  fromInteger (J# s# d#)
+                = case (integer2Int# s# d#) of { i# -> I32# (intToInt32# i#) }
   fromInt       = intToInt32
 
 instance Bounded Int32 where 
@@ -664,7 +664,7 @@ instance Num Int64 where
   negate w@(I64# x)   = I64# (negateInt# x)
   abs x               = absReal
   signum              = signumReal
-  fromInteger (J# a# s# d#) = case (integer2Int# a# s# d#) of { i# -> I64# i# }
+  fromInteger (J# s# d#) = case (integer2Int# s# d#) of { i# -> I64# i# }
   fromInt       = intToInt64
 
 instance Bounded Int64 where
@@ -757,10 +757,10 @@ int64ToInt32 (I64# i#) = I32# (int64ToInt# i#)
 int64ToInteger :: Int64 -> Integer
 int64ToInteger (I64# x#) = 
    case int64ToInteger# x# of
-     (# a#, s#, p# #) -> J# a# s# p#
+     (# s#, p# #) -> J# s# p#
 
 integerToInt64 :: Integer -> Int64
-integerToInt64 (J# a# s# d#) = I64# (integerToInt64# a# s# d#)
+integerToInt64 (J# s# d#) = I64# (integerToInt64# s# d#)
 
 instance Eq  Int64     where 
   (I64# x) == (I64# y) = x `eqInt64#` y

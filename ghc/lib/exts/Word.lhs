@@ -168,9 +168,6 @@ word32ToInteger (W32# x) = word2Integer x
 integerToWord32 :: Integer -> Word32
 integerToWord32 = fromInteger
 
-wordToInt :: Word -> Int
-wordToInt (W# w#) = I# (word2Int# w#)
-
 \end{code}
 
 \subsection[Word8]{The @Word8@ interface}
@@ -236,7 +233,7 @@ instance Num Word8 where
       x' = word2Int# x
   abs x         = x
   signum        = signumReal
-  fromInteger (J# a# s# d#) = W8# (wordToWord8# (integer2Word# a# s# d#))
+  fromInteger (J# s# d#) = W8# (wordToWord8# (integer2Word# s# d#))
   fromInt       = intToWord8
 
 instance Bounded Word8 where
@@ -350,7 +347,7 @@ pow2# x# = word2Int# (shiftL# (int2Word# 1#) x#)
 
 word2Integer :: Word# -> Integer
 word2Integer w = case word2Integer# w of
-			(# a, s, d #) -> J# a s d
+			(# s, d #) -> J# s d
 
 pow2_64# :: Int# -> Int64#
 pow2_64# x# = word64ToInt64# (shiftL64# (wordToWord64# (int2Word# 1#)) x#)
@@ -416,7 +413,7 @@ instance Num Word16 where
         x' = word2Int# x
   abs x         = x
   signum        = signumReal
-  fromInteger (J# a# s# d#) = W16# (wordToWord16# (integer2Word# a# s# d#))
+  fromInteger (J# s# d#) = W16# (wordToWord16# (integer2Word# s# d#))
   fromInt       = intToWord16
 
 instance Bounded Word16 where
@@ -573,7 +570,7 @@ instance Num Word32 where
 #endif
   abs x           = x
   signum          = signumReal
-  fromInteger (J# a# s# d#) = W32# (integer2Word# a# s# d#)
+  fromInteger (J# s# d#) = W32# (integer2Word# s# d#)
   fromInt (I# x)  = W32# (intToWord32# x)
     -- ToDo: restrict fromInt{eger} range.
 
@@ -804,7 +801,7 @@ instance Num Word64 where
       x' = word2Int# x
   abs x         = x
   signum        = signumReal
-  fromInteger (J# a# s# d#) = W64# (integer2Word# a# s# d#)
+  fromInteger (J# s# d#) = W64# (integer2Word# s# d#)
   fromInt       = intToWord64
 
 -- Note: no need to mask results here 
@@ -895,7 +892,7 @@ word64ToWord16 (W64# w#) = W16# ((word64ToWord# w#) `and#` (int2Word# 0xffff#))
 word64ToInteger :: Word64 -> Integer
 word64ToInteger (W64# w#) = 
   case word64ToInteger# w# of
-    (# a#, s#, p# #) -> J# a# s# p#
+    (# s#, p# #) -> J# s# p#
 
 word64ToInt :: Word64 -> Int
 word64ToInt w = 
@@ -909,7 +906,7 @@ intToWord64 :: Int -> Word64
 intToWord64 (I# i#) = W64# (intToWord64# i#)
 
 integerToWord64 :: Integer -> Word64
-integerToWord64 (J# a# s# d#) = W64# (integerToWord64# a# s# d#)
+integerToWord64 (J# s# d#) = W64# (integerToWord64# s# d#)
 
 instance Eq  Word64     where 
   (W64# x) == (W64# y) = x `eqWord64#` y

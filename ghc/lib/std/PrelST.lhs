@@ -111,17 +111,3 @@ runST st =
 	ST m -> case m realWorld# of
       			(# _, r #) -> r
 \end{code}
-
-%*********************************************************
-%*							*
-\subsection{Ghastly return types}
-%*							*
-%*********************************************************
-
-The @State@ type is the return type of a _ccall_ with no result.  It
-never actually exists, since it's always deconstructed straight away;
-the desugarer ensures this.
-
-\begin{code}
-data State	     s     = S#		     (State# s)
-\end{code}

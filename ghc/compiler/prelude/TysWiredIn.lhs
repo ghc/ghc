@@ -44,7 +44,8 @@ module TysWiredIn (
 
 	integerTy,
 	integerTyCon,
-	integerDataCon,
+	smallIntegerDataCon,
+	largeIntegerDataCon,
 	isIntegerTy,
 
 	listTyCon,
@@ -409,10 +410,13 @@ foreignObjTyCon
 integerTy :: Type
 integerTy = mkTyConTy integerTyCon
 
-integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [integerDataCon]
+integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [smallIntegerDataCon, largeIntegerDataCon]
 
-integerDataCon = pcDataCon integerDataConKey pREL_BASE SLIT("J#")
-		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon
+smallIntegerDataCon = pcDataCon smallIntegerDataConKey pREL_BASE SLIT("S#")
+		[] [] [intPrimTy] integerTyCon
+largeIntegerDataCon = pcDataCon largeIntegerDataConKey pREL_BASE SLIT("J#")
+		[] [] [intPrimTy, byteArrayPrimTy] integerTyCon
+
 
 isIntegerTy :: Type -> Bool
 isIntegerTy ty
