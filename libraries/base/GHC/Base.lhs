@@ -209,14 +209,22 @@ Instances of 'Functor' should satisfy the following laws:
 > fmap id  ==  id
 > fmap (f . g)  ==  fmap f . fmap g
 
-The instances of 'Functor' for lists, 'Maybe' and 'IO' defined in the "Prelude"
-satisfy these laws.
+The instances of 'Functor' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
+defined in the "Prelude" satisfy these laws.
 -}
 
 class  Functor f  where
     fmap        :: (a -> b) -> f a -> f b
 
-{- | The 'Monad' class defines the basic operations over a /monad/.
+{- | The 'Monad' class defines the basic operations over a /monad/,
+a concept from a branch of mathematics known as /category theory/.
+From the perspective of a Haskell programmer, however, it is best to
+think of a monad as an /abstract datatype/ of actions.
+Haskell's @do@ expressions provide a convenient syntax for writing
+monadic expressions.
+
+Minimal complete definition: '>>=' and 'return'.
+
 Instances of 'Monad' should satisfy the following laws:
 
 > return a >>= k  ==  k a
@@ -227,16 +235,26 @@ Instances of both 'Monad' and 'Functor' should additionally satisfy the law:
 
 > fmap f xs  ==  xs >>= return . f
 
-The instances of 'Monad' for lists, 'Maybe' and 'IO' defined in the "Prelude"
-satisfy these laws.
+The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
+defined in the "Prelude" satisfy these laws.
 -}
 
 class  Monad m  where
+    -- | Sequentially compose two actions, passing any value produced
+    -- by the first as an argument to the second.
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
+    -- | Sequentially compose two actions, discarding any value produced
+    -- by the first, like sequencing operators (such as the semicolon)
+    -- in imperative languages.
     (>>)        :: forall a b. m a -> m b -> m b
 	-- Explicit for-alls so that we know what order to
 	-- give type arguments when desugaring
+
+    -- | Inject a value into the monadic type.
     return      :: a -> m a
+    -- | Fail with a message.  This operation is not part of the
+    -- mathematical definition of a monad, but is invoked on pattern-match
+    -- failure in a @do@ expression.
     fail	:: String -> m a
 
     m >> k      = m >>= \_ -> k

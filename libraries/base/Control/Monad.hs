@@ -56,7 +56,6 @@ module Control.Monad
     , unless        -- :: (Monad m) => Bool -> m () -> m ()
 
     -- ** Monadic lifting operators
-    -- $lifting
 
     , liftM         -- :: (Monad m) => (a -> b) -> (m a -> m b)
     , liftM2        -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
@@ -81,34 +80,50 @@ infixr 1 =<<
 -- -----------------------------------------------------------------------------
 -- Prelude monad functions
 
+-- | Same as '>>=', but with the arguments interchanged.
 {-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
 (=<<)           :: Monad m => (a -> m b) -> m a -> m b
 f =<< x		= x >>= f
 
+-- | Evaluate each action in the sequence from left to right,
+-- and collect the results.
 sequence       :: Monad m => [m a] -> m [a] 
 {-# INLINE sequence #-}
 sequence ms = foldr k (return []) ms
 	    where
 	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
 
+-- | Evaluate each action in the sequence from left to right,
+-- and ignore the results.
 sequence_        :: Monad m => [m a] -> m () 
 {-# INLINE sequence_ #-}
 sequence_ ms     =  foldr (>>) (return ()) ms
 
+-- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
 mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
 {-# INLINE mapM #-}
 mapM f as       =  sequence (map f as)
 
+-- | @'mapM_' f@ is equivalent to @'sequence_' . 'map' f@.
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
 #endif  /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
--- |The MonadPlus class definition
+-- The MonadPlus class definition
 
+-- | Monads that also support choice and failure.
 class Monad m => MonadPlus m where
-   mzero :: m a
+   -- | the identity of 'mplus'.  It should also satisfy the equations
+   --
+   -- > mzero >>= f  =  mzero
+   -- > v >> mzero   =  mzero
+   --
+   -- (but the instance for 'System.IO.IO' defined in "Control.Monad.Error"
+   -- does not satisfy the second one).
+   mzero :: m a	
+   -- | an associative operation
    mplus :: m a -> m a -> m a
 
 instance MonadPlus [] where
@@ -124,11 +139,13 @@ instance MonadPlus Maybe where
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
 
+-- | @'guard' b@ is @'return' ()@ if @b@ is 'True',
+-- and 'mzero' if @b@ is 'False'.
 guard           :: (MonadPlus m) => Bool -> m ()
 guard True      =  return ()
 guard False     =  mzero
 
--- This subsumes the list-based filter function.
+-- | This generalizes the list-based 'filter' function.
 
 filterM          :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
 filterM _ []     =  return []
@@ -137,7 +154,7 @@ filterM p (x:xs) =  do
    ys  <- filterM p xs
    return (if flg then x:ys else ys)
 
--- This subsumes the list-based concat function.
+-- | This generalizes the list-based 'concat' function.
 
 msum        :: MonadPlus m => [m a] -> m a
 {-# INLINE msum #-}
@@ -158,7 +175,7 @@ join x            =  x >>= id
 mapAndUnzipM      :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 mapAndUnzipM f xs =  sequence (map f xs) >>= return . unzip
 
--- | The 'zipWithM' function generalises 'zipWith' to arbitrary monads.
+-- | The 'zipWithM' function generalizes 'zipWith' to arbitrary monads.
 zipWithM          :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 zipWithM f xs ys  =  sequence (zipWith f xs ys)
 
@@ -189,12 +206,16 @@ foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldM _ a []      =  return a
 foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
 
+-- | Like 'foldM', but discards the result.
 foldM_            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
 foldM_ f a xs     = foldM f a xs >> return ()
 
+-- | @'replicateM' n act@ performs the action @n@ times,
+-- gathering the results.
 replicateM        :: (Monad m) => Int -> m a -> m [a]
 replicateM n x    = sequence (replicate n x)
 
+-- | Like 'replicateM', but discards the result.
 replicateM_       :: (Monad m) => Int -> m a -> m ()
 replicateM_ n x   = sequence_ (replicate n x)
 
@@ -214,26 +235,32 @@ when p s          =  if p then s else return ()
 unless            :: (Monad m) => Bool -> m () -> m ()
 unless p s        =  if p then return () else s
 
-{- $lifting
-
-The monadic lifting operators promote a function to a monad.
-The function arguments are scanned left to right. For example, 
-
->	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
->	liftM2 (+) (Just 1) Nothing = Nothing
-
--}
-
+-- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
-liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
-liftM3  :: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
-liftM4  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
-liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
-
 liftM f m1              = do { x1 <- m1; return (f x1) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right.  For example,
+--
+-- >	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
+-- >	liftM2 (+) (Just 1) Nothing = Nothing
+--
+liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
 liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM3  :: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
 liftM3 f m1 m2 m3       = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM4  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
 liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
 
 {- | In many situations, the 'liftM' operations can be replaced by uses of
@@ -254,20 +281,20 @@ ap                =  liftM2 id
 
 The functions in this library use the following naming conventions: 
 
-* A postfix \`M\' always stands for a function in the Kleisli category:
-  @m@ is added to function results (modulo currying) and nowhere else.
-  So, for example, 
+* A postfix \'@M@\' always stands for a function in the Kleisli category:
+  The monad type constructor @m@ is added to function results
+  (modulo currying) and nowhere else.  So, for example, 
 
 >  filter  ::              (a ->   Bool) -> [a] ->   [a]
 >  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
 
-* A postfix \`_\' changes the result type from @(m a)@ to @(m ())@.
-  Thus (in the "Prelude"): 
+* A postfix \'@_@\' changes the result type from @(m a)@ to @(m ())@.
+  Thus, for example: 
 
 >  sequence  :: Monad m => [m a] -> m [a] 
 >  sequence_ :: Monad m => [m a] -> m () 
 
-* A prefix \`m\' generalises an existing function to a monadic form.
+* A prefix \'@m@\' generalizes an existing function to a monadic form.
   Thus, for example: 
 
 >  sum  :: Num a       => [a]   -> a

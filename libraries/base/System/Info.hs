@@ -8,8 +8,8 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Misc information about the characteristics of the host 
--- architecture\/machine lucky enough to run your program.
+-- Information about the characteristics of the host 
+-- system lucky enough to run your program.
 --
 -----------------------------------------------------------------------------
 
@@ -24,11 +24,22 @@ module System.Info
 import Prelude
 import Data.Version
 
+-- | The version of 'compilerName' with which the program was compiled
+-- or is being interpreted.
 compilerVersion :: Version
 compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
   where (maj,min) = compilerVersionRaw `divMod` 100
 
-os, arch, compilerName :: String
+-- | The operating system on which the program is running.
+os :: String
+
+-- | The machine architecture on which the program is running.
+arch :: String
+
+-- | The Haskell implementation with which the program was compiled
+-- or is being interpreted.
+compilerName :: String
+
 compilerVersionRaw :: Int
 
 #if defined(__NHC__)

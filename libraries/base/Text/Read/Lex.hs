@@ -56,14 +56,15 @@ import Control.Monad
 -- -----------------------------------------------------------------------------
 -- Lexing types
 
+-- ^ Haskell lexemes.
 data Lexeme
-  = Char   Char		-- Quotes removed, 
-  | String String	-- 	escapes interpreted
-  | Punc   String 	-- Punctuation, eg "(", "::"
-  | Ident  String	-- Haskell identifiers, e.g. foo, baz
-  | Symbol String	-- Haskell symbols, e.g. >>, %
-  | Int Integer
-  | Rat Rational
+  = Char   Char		-- ^ Character literal
+  | String String	-- ^ String literal, with escapes interpreted
+  | Punc   String 	-- ^ Punctuation or reserved symbol, e.g. @(@, @::@
+  | Ident  String	-- ^ Haskell identifier, e.g. @foo@, @Baz@
+  | Symbol String	-- ^ Haskell symbol, e.g. @>>@, @:%@
+  | Int Integer		-- ^ Integer literal
+  | Rat Rational	-- ^ Floating point literal
   | EOF
  deriving (Eq, Show)
 
