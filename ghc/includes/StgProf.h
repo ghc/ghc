@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.9 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: StgProf.h,v 1.10 2000/05/12 13:01:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -65,12 +65,13 @@ typedef struct _CostCentreStack {
   struct _IndexTable *indexTable;
   
   unsigned long scc_count;
-  unsigned long sub_scc_count;
-  unsigned long sub_cafcc_count;
     
   unsigned long time_ticks;
   unsigned long mem_alloc;
   unsigned long mem_resid;
+
+  unsigned long inherited_ticks;
+  unsigned long inherited_alloc;
 
   CostCentre *root;
 } CostCentreStack;
@@ -192,11 +193,11 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    prevStack 		: NULL,				\
 	    indexTable 		: NULL,				\
 	    scc_count 		: 0,				\
-	    sub_scc_count 	: 0,				\
-	    sub_cafcc_count 	: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
 	    mem_resid 		: 0,				\
+	    inherited_ticks 	: 0,				\
+	    inherited_alloc	: 0,				\
 	    root 		: 0,				\
        }};
 
@@ -226,7 +227,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 
 # define SET_CCC_X(cc,do_subcc_count,do_scc_count)		\
 	do {							\
-	if (do_subcc_count)   { CCCS->sub_scc_count++; }	\
 	CCCS = PushCostCentre(CCCS,cc);				\
 	if (do_scc_count)     { CCCS->scc_count++; }		\
 	} while(0)
@@ -268,7 +268,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
         do {                              \
         (stack)->scc_count = 0;           \
         (stack)->time_ticks = 0;          \
-        (stack)->sub_cafcc_count = 0;     \
         (stack)->mem_alloc = 0;           \
         } while(0)
 
@@ -286,8 +285,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 
 #define ENTER_CCS_CAF_X(ccs)                                \
         do {                                                \
-        /* inc subcaf count of CCCS */                      \
-        CCCS->sub_cafcc_count++;                            \
         /* set CCCS to ident ccs */                         \
         CCCS = (CostCentreStack *)(ccs);                    \
         /* inc scc count of CAF ccs */                      \

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.19 2000/04/19 12:42:48 simonmar Exp $
+ * $Id: Profiling.c,v 1.20 2000/05/12 13:01:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -119,21 +119,21 @@ CCS_DECLARE(CCS_DONT_CARE,  CC_DONT_CARE, );
  * Static Functions
  */
 
-static CostCentreStack * ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, 
-				       CostCentreStack *new_ccs );
-
-static rtsBool ccs_to_ignore       ( CostCentreStack *ccs );
-static    void count_ticks         ( CostCentreStack *ccs );
-static    void reportCCS           ( CostCentreStack *ccs, nat indent );
-static    void DecCCS              ( CostCentreStack *ccs );
-static    void DecBackEdge ( CostCentreStack *ccs, CostCentreStack *oldccs );
-static    CostCentreStack *CheckLoop ( CostCentreStack *ccs, CostCentre *cc );
-static    CostCentreStack *pruneCCSTree ( CostCentreStack *ccs );
-
-static    CostCentreStack *ActualPush ( CostCentreStack *, CostCentre * );
-static    CostCentreStack *IsInIndexTable ( IndexTable *, CostCentre * );
-static    IndexTable *AddToIndexTable ( IndexTable *, CostCentreStack *, 
-					CostCentre *, unsigned int );
+static  CostCentreStack * ActualPush_     ( CostCentreStack *ccs, CostCentre *cc, 
+					    CostCentreStack *new_ccs );
+static  rtsBool           ccs_to_ignore   ( CostCentreStack *ccs );
+static  void              count_ticks     ( CostCentreStack *ccs );
+static  void              inherit_costs   ( CostCentreStack *ccs );
+static  void              reportCCS       ( CostCentreStack *ccs, nat indent );
+static  void              DecCCS          ( CostCentreStack *ccs );
+static  void              DecBackEdge     ( CostCentreStack *ccs, 
+					    CostCentreStack *oldccs );
+static  CostCentreStack * CheckLoop       ( CostCentreStack *ccs, CostCentre *cc );
+static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
+static  CostCentreStack * ActualPush      ( CostCentreStack *, CostCentre * );
+static  CostCentreStack * IsInIndexTable  ( IndexTable *, CostCentre * );
+static  IndexTable *      AddToIndexTable ( IndexTable *, CostCentreStack *, 
+					    CostCentre *, unsigned int );
 
 #ifdef DEBUG
 static    void printCCS            ( CostCentreStack *ccs );
@@ -431,14 +431,14 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   /* Initialise the various _scc_ counters to zero
    */
   new_ccs->scc_count        = 0;
-  new_ccs->sub_scc_count    = 0;
-  new_ccs->sub_cafcc_count  = 0;
   
   /* Initialize all other stats here.  There should be a quick way
    * that's easily used elsewhere too 
    */
   new_ccs->time_ticks = 0;
   new_ccs->mem_alloc = 0;
+  new_ccs->inherited_ticks = 0;
+  new_ccs->inherited_alloc = 0;
   
   new_ccs->root = ccs->root;
 
@@ -484,27 +484,6 @@ AddToIndexTable(IndexTable *it, CostCentreStack *new_ccs,
   new_it->next = it;
   new_it->back_edge = back_edge;
   return new_it;
-}
-
-
-void
-print_ccs (FILE *fp, CostCentreStack *ccs)
-{
-  if (ccs == CCCS) {
-    fprintf(fp, "Cost-Centre Stack: ");
-  }
-  
-  if (ccs != CCS_MAIN)
-    {
-      print_ccs(fp, ccs->prevStack);
-      fprintf(fp, "->[%s,%s]", ccs->cc->label, ccs->cc->module);
-    } else {
-      fprintf(fp, "[%s,%s]", ccs->cc->label, ccs->cc->module);
-    }
-      
-  if (ccs == CCCS) {
-    fprintf(fp, "\n");
-  }
 }
 
 
@@ -625,9 +604,10 @@ report_per_cc_costs( void )
 static void 
 fprint_header( void )
 {
-  fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%-24s %-10s           individual     inherited\n", "", "");
 
-  fprintf(prof_file, "%8s %5s %5s %8s %5s", "scc", "%time", "%alloc", "inner", "cafs");
+  fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%8s  %5s %5s   %5s %5s", "entries", "%time", "%alloc", "%time", "%alloc");
 
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
     fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -690,6 +670,8 @@ report_ccs_profiling( void )
 
     report_per_cc_costs();
 
+    inherit_costs(CCS_MAIN);
+
     fprint_header();
     reportCCS(pruneCCSTree(CCS_MAIN), 0);
 
@@ -714,12 +696,14 @@ reportCCS(CostCentreStack *ccs, nat indent)
     fprintf(prof_file, "%-*s%-*s %-10s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%8ld %5.1f %5.1f %8ld %5ld",
+    fprintf(prof_file, "%8ld  %5.1f %5.1f    %5.1f %5.1f",
 	    ccs->scc_count, 
 	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
-	    ccs->sub_scc_count, ccs->sub_cafcc_count);
-    
+	    total_prof_ticks == 0 ? 0.0 : (ccs->inherited_ticks / (StgFloat) total_prof_ticks * 100),
+	    total_alloc == 0 ? 0.0 : (ccs->inherited_alloc / (StgFloat) total_alloc * 100)
+	    );
+
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
       fprintf(prof_file, "  %5ld %9ld", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
 #if defined(PROFILING_DETAIL_COUNTS)
@@ -756,6 +740,28 @@ count_ticks(CostCentreStack *ccs)
     if (!i->back_edge) {
       count_ticks(i->ccs);
     }
+}
+
+/* Traverse the cost centre stack tree and inherit ticks & allocs.
+ */
+static void
+inherit_costs(CostCentreStack *ccs)
+{
+  IndexTable *i;
+
+  if (ccs_to_ignore(ccs)) { return; }
+
+  ccs->inherited_ticks += ccs->time_ticks;
+  ccs->inherited_alloc += ccs->mem_alloc;
+
+  for (i = ccs->indexTable; i != NULL; i = i->next)
+      if (!i->back_edge) {
+	  inherit_costs(i->ccs);
+	  ccs->inherited_ticks += i->ccs->inherited_ticks;
+	  ccs->inherited_alloc += i->ccs->inherited_alloc;
+      }
+  
+  return;
 }
 
 /* return rtsTrue if it is one of the ones that
@@ -797,17 +803,11 @@ pruneCCSTree( CostCentreStack *ccs )
 	/* force printing of *all* cost centres if -P -P */ )
        
        || ( ccs->indexTable != 0 )
-       || ( (ccs->scc_count || ccs->sub_scc_count || 
-	     ccs->time_ticks || ccs->mem_alloc
-	     || (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
-		 && (ccs->sub_cafcc_count
-#if defined(PROFILING_DETAIL_COUNTS)
-		     || cc->thunk_count || cc->function_count || cc->pap_count
-#endif
-		     ))))) {
-    return ccs;
+       || ( ccs->scc_count || ccs->time_ticks || ccs->mem_alloc )
+      ) {
+      return ccs;
   } else {
-    return NULL;
+      return NULL;
   }
 }
 
@@ -846,6 +846,27 @@ reportCCS_XML(CostCentreStack *ccs)
     }
   }
 }
+
+void
+print_ccs (FILE *fp, CostCentreStack *ccs)
+{
+  if (ccs == CCCS) {
+    fprintf(fp, "Cost-Centre Stack: ");
+  }
+  
+  if (ccs != CCS_MAIN)
+    {
+      print_ccs(fp, ccs->prevStack);
+      fprintf(fp, "->[%s,%s]", ccs->cc->label, ccs->cc->module);
+    } else {
+      fprintf(fp, "[%s,%s]", ccs->cc->label, ccs->cc->module);
+    }
+
+  if (ccs == CCCS) {
+    fprintf(fp, "\n");
+  }
+}
+
 
 #ifdef DEBUG
 static void
