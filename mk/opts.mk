@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.29 2002/02/04 12:21:45 simonmar Exp $
+# 	$Id: opts.mk,v 1.30 2002/06/24 14:35:28 simonmar Exp $
 #
 #################################################################################
 
@@ -72,6 +72,7 @@ CPP_OPTS           = $(SRC_CPP_OPTS) $(WAY$(_way)_CPP_OPTS) $(EXTRA_CPP_OPTS)
 CTAGS_OPTS         = $(SRC_CTAGS_OPTS) $(WAY$(_way)_CTAGS_OPTS) $(EXTRA_CTAGS_OPTS)
 CC_OPTS            = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
 FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
+HADDOCK_OPTS       = $(SRC_HADDOCK_OPTS) $(WAY$(_way)_HADDOCK_OPTS) $($*_HADDOCK_OPTS) $(EXTRA_HADDOCK_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
 GC_OPTS            = $(SRC_GC_OPTS) $(WAY$(_way)_GC_OPTS) $($*_GC_OPTS) $(EXTRA_GC_OPTS)
 HSTAGS_OPTS        = $(SRC_HSTAGS_OPTS) $(WAY$(_way)_HSTAGS_OPTS) $(EXTRA_HSTAGS_OPTS)
