@@ -693,11 +693,24 @@ both Err Bot = Err
 both Err Abs = Err
 both Err d   = d
 
-both Lazy Bot 	         = Lazy
-both Lazy Abs 	         = Lazy
-both Lazy Err 	         = Lazy 
-both Lazy (Seq k Now ds) = Seq Keep Now ds
-both Lazy d	         = d
+both Lazy Bot 	       = Lazy
+both Lazy Abs 	       = Lazy
+both Lazy Err 	       = Lazy 
+both Lazy (Seq k l ds) = Seq Keep l ds
+both Lazy d	       = d
+  -- Notice that the Seq case ensures that we have the
+  -- boxed value.  The equation originally said
+  --	both (Seq k Now ds) = Seq Keep Now ds
+  -- but it's important that the Keep is switched on even
+  -- for a deferred demand.  Otherwise a (Seq Drop Now [])
+  -- might both'd with the result, and then we won't pass
+  -- the boxed value.  Here's an example:
+  --	(x-1) `seq` (x+1, x)
+  -- From the (x+1, x) we get (U*(V) `both` L), which must give S*(V)
+  -- From (x-1) we get U(V). Combining, we must get S(V).
+  -- If we got U*(V) from the pair, we'd end up with U(V), and that
+  -- can be a disaster if a component of the data structure is absent.
+  -- [Disaster = enter an absent argument.]
 
 both Eval (Seq k l ds) = Seq Keep Now ds
 both Eval (Call d)     = Call d
