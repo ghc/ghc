@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.67 2002/02/14 15:11:28 simonmar Exp $
+# $Id: Makefile,v 1.68 2002/02/14 17:17:08 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -85,18 +85,16 @@ WARNING_OPTS += -Wcast-align
 #WARNING_OPTS += -Wredundant-decls 
 #WARNING_OPTS += -Wconversion
 
-STANDARD_OPTS+=-I../includes -I. -Iparallel -DCOMPILING_RTS
+STANDARD_OPTS += -I../includes -I. -Iparallel
+# COMPILING_RTS is only used when building Win32 DLL support.
+STANDARD_OPTS += -DCOMPILING_RTS
 
 # HC_OPTS is included in both .c and .hc compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which
 # must be included in both types of compilations.
 
 SRC_CC_OPTS += $(WARNING_OPTS)
-
-# Don't bother adding these to CC_OPTS; get them via HC_OPTS anyway.
-SRC_MKDEPENDC_OPTS += $(STANDARD_OPTS)
-
-SRC_HC_OPTS += $(STANDARD_OPTS)
+SRC_CC_OPTS += $(STANDARD_OPTS)
 
 SRC_CC_OPTS += $(GhcRtsCcOpts)
 SRC_HC_OPTS += $(GhcRtsHcOpts)
