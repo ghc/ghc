@@ -868,7 +868,7 @@ doLink o_files = do
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then
-			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure" ,
+			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure",
 			      "-u", prefixUnderscore "__init_PrelMain"] 
 			 else []))
 
