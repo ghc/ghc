@@ -36,9 +36,8 @@ module Digraph(
 
 import Util	( sortLt )
 
--- GHC extensions
+-- Extensions
 import ST
-import MutableArray
 
 -- std interfaces
 import Maybe
@@ -225,16 +224,16 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
 %************************************************************************
 
 \begin{code}
-type Set s    = MutableArray s Vertex Bool
+type Set s    = STArray s Vertex Bool
 
 mkEmpty      :: Bounds -> ST s (Set s)
-mkEmpty bnds  = newArray bnds False
+mkEmpty bnds  = newSTArray bnds False
 
 contains     :: Set s -> Vertex -> ST s Bool
-contains m v  = readArray m v
+contains m v  = readSTArray m v
 
 include      :: Set s -> Vertex -> ST s ()
-include m v   = writeArray m v True
+include m v   = writeSTArray m v True
 \end{code}
 
 \begin{code}
