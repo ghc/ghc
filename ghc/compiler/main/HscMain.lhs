@@ -145,8 +145,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
       }
  | otherwise
  = do {
-      hPutStr stderr "compilation IS NOT required";
-      when (verbosity dflags /= 1) $ hPutStrLn stderr "";
+      hPutStrLn stderr "compilation IS NOT required";
 
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -157,7 +156,8 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 
       -- TYPECHECK
       maybe_tc_result <- typecheckModule dflags pcs_cl hst 
-					 old_iface alwaysQualify cl_hs_decls;
+					 old_iface alwaysQualify cl_hs_decls
+					 False{-don't check for Main.main-};
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
          Just (pcs_tc, tc_result) -> do {
@@ -175,10 +175,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
       	; when (verbosity dflags >= 1) $
-		hPutStr stderr "compilation IS required";
-	  -- mode -v1 tries to keep everything on one line
-	  when (verbosity dflags > 1) $
-		hPutStrLn stderr "";
+		hPutStrLn stderr "compilation IS required";
 
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -200,7 +197,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       	     <- _scc_ "Rename" 
 		 renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
-      	     Nothing -> return (HscFail pcs_rn);
+      	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
     
  	    -- In interactive mode, we don't want to discard any top-level entities at
@@ -217,9 +214,10 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
 	; maybe_tc_result 
 	    <- _scc_ "TypeCheck" typecheckModule dflags pcs_rn hst new_iface 
-					     print_unqualified rn_hs_decls
+					     print_unqualified rn_hs_decls 
+					     True{-check for Main.main if necessary-}
 	; case maybe_tc_result of {
-      	     Nothing -> return (HscFail pcs_rn);
+      	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (pcs_tc, tc_result) -> do {
     
 	; let env_tc = tc_env tc_result
@@ -298,6 +296,7 @@ myParseModule dflags src_filename
   			           loc = mkSrcLoc (_PK_ src_filename) 1 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
+			    freeStringBuffer buf;
                             return Nothing };
 
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) -> do {
@@ -308,6 +307,7 @@ myParseModule dflags src_filename
 			   (ppSourceStats False rdr_module) ;
       
       return (Just rdr_module)
+	-- ToDo: free the string buffer later.
       }}
 
 

@@ -62,7 +62,6 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
 			)
-import IOExts
 \end{code}
 
 Outside-world interface:
@@ -86,14 +85,15 @@ typecheckModule
 	-> ModIface		-- Iface for this module
 	-> PrintUnqualified	-- For error printing
 	-> [RenamedHsDecl]
+	-> Bool			-- True <=> check for Main.main if Module==Main
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 			-- The new PCS is Augmented with imported information,
 						-- (but not stuff from this module)
 
 
-typecheckModule dflags pcs hst mod_iface unqual decls
+typecheckModule dflags pcs hst mod_iface unqual decls check_main
   = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
-			     tcModule pcs hst get_fixity this_mod decls
+			     tcModule pcs hst get_fixity this_mod decls check_main
 	; printTcDump dflags maybe_tc_result
 	; return maybe_tc_result }
   where
@@ -123,19 +123,9 @@ typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
 
     tcSetEnv env				$
-    tc_expr expr 					`thenTc` \ (expr', lie, expr_ty) ->
-    tcSimplifyInfer smpl_doc 
-	(varSetElems (tyVarsOfType expr_ty)) lie	`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
-    tcSimplifyTop lie_free				`thenTc` \ const_binds ->
-    let all_expr = mkHsLet const_binds	$
-		   TyLam qtvs  		$
-		   DictLam dict_ids	$
-		   mkHsLet dict_binds	$
-		   expr'
-	all_expr_ty = mkForAllTys qtvs (mkFunTys (map idType dict_ids) expr_ty)
-    in
-    zonkExpr all_expr					`thenNF_Tc` \ zonked_expr ->
-    zonkTcType all_expr_ty				`thenNF_Tc` \ zonked_ty ->
+    tc_expr expr 					`thenTc` \ (expr', expr_ty) ->
+    zonkExpr expr'					`thenNF_Tc` \ zonked_expr ->
+    zonkTcType expr_ty					`thenNF_Tc` \ zonked_ty ->
     ioToTc (dumpIfSet_dyn dflags 
 		Opt_D_dump_tc "Typechecked" (ppr zonked_expr)) `thenNF_Tc_`
     returnTc (new_pcs, zonked_expr, zonked_ty) 
@@ -154,8 +144,19 @@ typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
 			     (tc_io_expr e)				-- Main case
 	| otherwise = newTyVarTy openTypeKind	`thenTc` \ ty ->
 		      tcMonoExpr e ty 		`thenTc` \ (e', lie) ->
-		      returnTc (e', lie, ty)
-		      
+		      tcSimplifyInfer smpl_doc (varSetElems (tyVarsOfType ty)) lie 
+				`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
+    		      tcSimplifyTop lie_free	`thenTc` \ const_binds ->
+    		      let all_expr = mkHsLet const_binds	$
+		   		     TyLam qtvs  		$
+		   		     DictLam dict_ids		$
+		   		     mkHsLet dict_binds		$	
+		   		     e'
+			  all_expr_ty = mkForAllTys qtvs 	$
+					mkFunTys (map idType dict_ids) $
+					ty
+ 		      in
+		      returnTc (all_expr, all_expr_ty)
 	where
 	  tc_io_expr e = newTyVarTy openTypeKind	`thenTc` \ ty ->
 			 tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
@@ -163,7 +164,9 @@ typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
 			    res_ty = mkTyConApp ioTyCon [ty]
 			 in
 		 	 tcMonoExpr e res_ty	`thenTc` \ (e', lie) ->
-			 returnTc (e', lie, res_ty)
+			 tcSimplifyTop lie	`thenTc` \ const_binds ->
+		         let all_expr = mkHsLet const_binds e' in
+			 returnTc (all_expr, res_ty)
 
 ---------------
 typecheck :: DynFlags
@@ -195,9 +198,10 @@ tcModule :: PersistentCompilerState
 	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
+	 -> Bool			-- True <=> check for Main.main if Mod==Main
 	 -> TcM (PersistentCompilerState, TcResults)
 
-tcModule pcs hst get_fixity this_mod decls
+tcModule pcs hst get_fixity this_mod decls check_main
   = 	-- Type-check the type and class decls, and all imported decls
 	-- tcImports recovers internally, but if anything gave rise to
 	-- an error we'd better stop now, to avoid a cascade
@@ -248,7 +252,9 @@ tcModule pcs hst get_fixity this_mod decls
     tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
 
 	-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
-    tcCheckMain this_mod			`thenTc_`
+    (if check_main 
+	then tcCheckMain this_mod
+	else returnTc ())		`thenTc_`
     
         -- Backsubstitution.    This must be done last.
         -- Even tcSimplifyTop may do some unification.
