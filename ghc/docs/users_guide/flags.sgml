@@ -452,7 +452,7 @@
 	    <row>
 	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>
 	      <entry>set the limit for context reduction</entry>
-	      <entry>dynamic</entry>
+	      <entry>static</entry>
 	      <entry><option>-</option></entry>
 	    </row>
 	    <row>
@@ -808,7 +808,7 @@
 	      <entry><option>-fno-cpr</option></entry>
 	      <entry>Turn off CPR analysis</entry>
 	      <entry>static</entry>
-	      <entry>-</entry>
+	      <entry>-fcpr</entry>
 	    </row>
 
 	    <row>
@@ -820,9 +820,9 @@
 
 	    <row>
 	      <entry><option>-fno-full-laziness</option></entry>
-	      <entry>Turn off full laziness (floating bindings outwards)</entry>
+	      <entry>Turn off full laziness (floating bindings outwards).  It is on by default.</entry>
 	      <entry>dynamic</entry>
-	      <entry>-</entry>
+	      <entry>-ffull-laziness</entry>
 	    </row>
 
 	    <row>
