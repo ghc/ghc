@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.7 2003/02/22 04:51:52 sof Exp $
+ * $Id: RetainerProfile.c,v 1.8 2003/03/21 16:18:37 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -158,7 +158,7 @@ typedef struct {
     the topmost element on the previous block group so as to satisfy
     the invariants described above.
  */
-bdescr *firstStack = NULL;
+static bdescr *firstStack = NULL;
 static bdescr *currentStack;
 static stackElement *stackBottom, *stackTop, *stackLimit;
 
@@ -255,6 +255,21 @@ static inline rtsBool
 isEmptyRetainerStack( void )
 {
     return (firstStack == currentStack) && stackTop == stackLimit;
+}
+
+/* -----------------------------------------------------------------------------
+ * Returns size of stack
+ * -------------------------------------------------------------------------- */
+lnat
+retainerStackBlocks()
+{
+    bdescr* bd;
+    lnat res = 0;
+
+    for (bd = firstStack; bd != NULL; bd = bd->link) 
+      res += bd->blocks;
+
+    return res;
 }
 
 /* -----------------------------------------------------------------------------

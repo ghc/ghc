@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.76 2003/02/01 09:10:17 mthomas Exp $
+ * $Id: Storage.c,v 1.77 2003/03/21 16:18:38 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -832,8 +832,7 @@ memInventory(void)
 
 #ifdef PROFILING
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-    for (bd = firstStack; bd != NULL; bd = bd->link) 
-      total_blocks += bd->blocks;
+      total_blocks += retainerStackBlocks();
   }
 #endif
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.47 2002/12/13 14:43:06 simonmar Exp $
+ * $Id: Storage.h,v 1.48 2003/03/21 16:18:39 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -53,7 +53,7 @@ extern void exitStorage(void);
 
    lnat  allocated_bytes(void)  Returns the number of bytes allocated
                                 via allocate() since the last GC.
-				Used in the reoprting of statistics.
+				Used in the reporting of statistics.
 
    SMP: allocate and doYouWantToGC can be used from STG code, they are
    surrounded by a mutex.

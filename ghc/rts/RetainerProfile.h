@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.h,v 1.2 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: RetainerProfile.h,v 1.3 2003/03/21 16:18:38 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -38,9 +38,9 @@ retainerSetOf( StgClosure *c )
     return (RetainerSet *)((StgWord)RSET(c) ^ flip);
 }
 
-// firstStack is exported because memInventory() in Schedule.c uses it.
+// Used by Storage.c:memInventory()
 #ifdef DEBUG
-extern bdescr *firstStack;
+extern lnat retainerStackBlocks ( void );
 #endif
 
 #endif /* PROFILING */
