@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.63 2001/04/03 15:36:44 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.64 2001/04/05 09:17:15 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -366,8 +366,9 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
    src <- readFile input_fn
    let (import_sources, import_normals, module_name) = getImports src
 
-   deps_sources <- mapM (findDependency True  src)  import_sources
-   deps_normals <- mapM (findDependency False src) import_normals
+   let orig_fn = basename ++ '.':suff
+   deps_sources <- mapM (findDependency True  orig_fn) import_sources
+   deps_normals <- mapM (findDependency False orig_fn) import_normals
    let deps = deps_sources ++ deps_normals
 
    osuf_opt <- readIORef v_Object_suf
