@@ -1,0 +1,9 @@
+<sect1>Compiler release notes
+<p>
+
+<itemize>
+<item> To reflect the fact that the <tt/Pretty/ library is part of
+the common Hugs / GHC extension libraries, <tt/Pretty/ has been moved
+from the <tt/misc/ library to <tt/exts/, i.e., only <tt/syslib exts/
+should be required to get at these extension libraries.
+</itemize>
