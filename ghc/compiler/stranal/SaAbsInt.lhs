@@ -422,7 +422,7 @@ absEval anal (Con (Literal _) args) env
 absEval anal (Con (PrimOp op) args) env
   = 	-- Not all PrimOps evaluate all their arguments
     if or (zipWith (check_arg anal) 
-		   [absEval anal arg env | arg <- args]
+		   [absEval anal arg env | arg <- args, isValArg arg]
 		   arg_demands)
     then AbsBot
     else case anal of
