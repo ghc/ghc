@@ -41,7 +41,7 @@ endif
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts) $(PACKAGE)
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts-no-lang -fvia-C -Rghc-timing $(GhcLibHcOpts) $(PACKAGE)
 ifneq "$(way)" "dll"
 SRC_HC_OPTS += -static
 endif

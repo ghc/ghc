@@ -3214,13 +3214,19 @@ arg: while($_ = $Args[0]) {
     /^-fallow-undecidable-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fhistory-size.*$/ 	      && do { push(@HsC_flags, $_); next arg; };
     /^-fdicts-strict$/ 	  	      && do { push(@HsC_flags, $_); next arg; };
+
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
 
-			# -fglasgow-exts implies -syslib lang
+			# -fglasgow-exts implies -package lang
 			&add_syslib('lang');
 
 			next arg; };
+
+	# for compiling lib/std we can't add the implicit package lang,
+	# because it isn't built yet.
+    /^-fglasgow-exts-no-lang$/
+		&& do { push(@HsC_flags, "-fglasgow-exts"); next arg; };
 
     /^-fspeciali[sz]e$/
 		&& do { $Oopt_DoSpecialise = '-fspecialise'; next arg; };
@@ -3230,8 +3236,6 @@ arg: while($_ = $Args[0]) {
     /^-fusagesp$/
                 && do {  $Oopt_UsageSPInf = '-fusagesp';
                          push (@HsC_flags, '-fusagesp-on'); next arg; };
-
-    /^-fcompiling-prelude$/ && do { $CompilingPrelude=1; push(@HsC_flags, $_); next arg; };
 
 # Now the foldr/build options, which are *on* by default (for -O).
 
