@@ -46,7 +46,7 @@ module FiniteMap (
 	addToFM_C,
 	addListToFM,
 	addListToFM_C,
-	IF_NOT_GHC(delFromFM COMMA)
+	delFromFM,
 	delListFromFM,
 
 	plusFM,
@@ -70,6 +70,9 @@ module FiniteMap (
     ) where
 
 IMPORT_DELOOPER(SpecLoop)
+#if __GLASGOW_HASKELL__ >= 202
+import GlaExts
+#endif
 #if defined(USE_FAST_STRINGS)
 import FastString
 #endif
@@ -77,7 +80,7 @@ import Maybes
 import Bag	  ( Bag, foldrBag )
 import Outputable ( Outputable(..) )
 import PprStyle	( PprStyle )
-import Pretty	( SYN_IE(Pretty), PrettyRep )
+import Pretty	( Doc )
 
 #ifdef COMPILING_GHC
 
@@ -436,7 +439,7 @@ mkBranch which key elt fm_l fm_r
   = --ASSERT( left_ok && right_ok && balance_ok )
 #if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)
     if not ( left_ok && right_ok && balance_ok ) then
-	pprPanic ("mkBranch:"++show which) (ppAboves [ppr PprDebug [left_ok, right_ok, balance_ok],
+	pprPanic ("mkBranch:"++show which) (vcat [ppr PprDebug [left_ok, right_ok, balance_ok],
 				       ppr PprDebug key,
 				       ppr PprDebug fm_l,
 				       ppr PprDebug fm_r])
@@ -701,11 +704,11 @@ deleteMax (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt fm_l (deleteMax 
 instance (Outputable key) => Outputable (FiniteMap key elt) where
     ppr sty fm = pprX sty fm
 
-pprX sty EmptyFM = ppChar '!'
+pprX sty EmptyFM = char '!'
 pprX sty (Branch key elt sz fm_l fm_r)
- = ppBesides [ppLparen, pprX sty fm_l, ppSP,
-	      ppr sty key, ppSP, ppInt (IF_GHC(I# sz, sz)), ppSP,
-	      pprX sty fm_r, ppRparen]
+ = parens (hcat [pprX sty fm_l, space,
+		      ppr sty key, space, int (IF_GHC(I# sz, sz)), space,
+		      pprX sty fm_r])
 #endif
 
 #ifndef COMPILING_GHC
