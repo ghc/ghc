@@ -194,7 +194,6 @@ $HsCpp	 = # but this is re-set to "cat" (after options) if -cpp not seen
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSCPP}";
 
 @HsCpp_flags	= ();
-$genSPECS_flag	= '';		# See ../utils/hscpp/hscpp.prl
 $HsC	 = ( $INSTALLING ) ? "$InstLibExecDirGhc/hsc"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSC}";
 
@@ -1769,7 +1768,7 @@ sub runHscpp {
 	&run_something($to_do, 'Ineffective C pre-processor');
     } else {
 	local($includes) = '-I' . join(' -I',@Include_dir);
-	$to_do .= "$HsCpp $Verbose $genSPECS_flag @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
+	$to_do .= "$HsCpp $Verbose @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
 	push(@Files_to_tidy, $hscpp_hsc );
 	&run_something($to_do, 'Haskellised C pre-processor');
     }
@@ -2857,10 +2856,6 @@ arg: while($_ = $Args[0]) {
     #---------- Haskell C pre-processor (hscpp) ----------------------------
     /^-D(.*)/	    && do { push(@HsCpp_flags, "'-D".&grab_arg_arg(*Args,'-D',$1)."'"); next arg; };
     /^-U(.*)/	    && do { push(@HsCpp_flags, "'-U".&grab_arg_arg(*Args,'-U',$1)."'"); next arg; };
-
-    /^-genSPECS/   && do { $Cpp_flag_set = 1;
-			   $genSPECS_flag = $_;
-			    next arg; };
 
     #---------- post-Haskell "assembler"------------------------------------
     /^-ddump-raw-asm$/		  && do { $Dump_raw_asm	       = 1; next arg; };
