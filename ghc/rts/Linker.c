@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.67 2001/09/12 14:53:39 sewardj Exp $
+ * $Id: Linker.c,v 1.68 2001/10/01 13:10:53 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -16,6 +16,7 @@
 #include "LinkerInternals.h"
 #include "RtsUtils.h"
 #include "StoragePriv.h"
+#include "Schedule.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -162,21 +163,140 @@ typedef struct _RtsSymbolVal {
 
 
 #define RTS_SYMBOLS				\
-      SymX(MainRegTable)			\
-      Sym(stg_gc_enter_1)			\
-      Sym(stg_gc_noregs)			\
-      Sym(stg_gc_seq_1)				\
-      Sym(stg_gc_d1)				\
-      Sym(stg_gc_f1)				\
-      Sym(stg_gc_ut_1_0)			\
-      Sym(stg_gc_ut_0_1)			\
-      Sym(stg_gc_unpt_r1)			\
-      Sym(stg_gc_unbx_r1)			\
+      Maybe_ForeignObj				\
+      Maybe_Stable_Names			\
+      Sym(StgReturn)				\
+      Sym(__stginit_PrelGHC)			\
+      Sym(init_stack)				\
       Sym(stg_chk_0)				\
       Sym(stg_chk_1)				\
+      Sym(stg_enterStackTop)			\
+      Sym(stg_gc_d1)				\
+      Sym(stg_gc_enter_1)			\
+      Sym(stg_gc_f1)				\
+      Sym(stg_gc_noregs)			\
+      Sym(stg_gc_seq_1)				\
+      Sym(stg_gc_unbx_r1)			\
+      Sym(stg_gc_unpt_r1)			\
+      Sym(stg_gc_ut_0_1)			\
+      Sym(stg_gc_ut_1_0)			\
       Sym(stg_gen_chk)				\
-      SymX(stg_exit)				\
-      SymX(stg_update_PAP)			\
+      Sym(stg_yield_to_interpreter)		\
+      SymX(ErrorHdrHook)			\
+      SymX(MainRegTable)			\
+      SymX(MallocFailHook)			\
+      SymX(NoRunnableThreadsHook)		\
+      SymX(OnExitHook)				\
+      SymX(OutOfHeapHook)			\
+      SymX(PatErrorHdrHook)			\
+      SymX(PostTraceHook)			\
+      SymX(PreTraceHook)			\
+      SymX(StackOverflowHook)			\
+      SymX(__encodeDouble)			\
+      SymX(__encodeFloat)			\
+      SymX(__gmpn_gcd_1)			\
+      SymX(__gmpz_cmp)				\
+      SymX(__gmpz_cmp_si)			\
+      SymX(__gmpz_cmp_ui)			\
+      SymX(__gmpz_get_si)			\
+      SymX(__gmpz_get_ui)			\
+      SymX(__int_encodeDouble)			\
+      SymX(__int_encodeFloat)			\
+      SymX(andIntegerzh_fast)			\
+      SymX(blockAsyncExceptionszh_fast)		\
+      SymX(catchzh_fast)			\
+      SymX(cmp_thread)				\
+      SymX(complementIntegerzh_fast)		\
+      SymX(createAdjustor)			\
+      SymX(decodeDoublezh_fast)			\
+      SymX(decodeFloatzh_fast)			\
+      SymX(defaultsHook)			\
+      SymX(delayzh_fast)			\
+      SymX(divExactIntegerzh_fast)		\
+      SymX(divModIntegerzh_fast)		\
+      SymX(forkzh_fast)				\
+      SymX(freeHaskellFunctionPtr)		\
+      SymX(gcdIntegerzh_fast)			\
+      SymX(getProgArgv)				\
+      SymX(getStablePtr)			\
+      SymX(int2Integerzh_fast)			\
+      SymX(isDoubleDenormalized)		\
+      SymX(isDoubleInfinite)			\
+      SymX(isDoubleNaN)				\
+      SymX(isDoubleNegativeZero)		\
+      SymX(isFloatDenormalized)			\
+      SymX(isFloatInfinite)			\
+      SymX(isFloatNaN)				\
+      SymX(isFloatNegativeZero)			\
+      SymX(killThreadzh_fast)			\
+      SymX(minusIntegerzh_fast)			\
+      SymX(mkApUpd0zh_fast)			\
+      SymX(newArrayzh_fast)			\
+      SymX(newBCOzh_fast)			\
+      SymX(newByteArrayzh_fast)			\
+      SymX(newCAF)				\
+      SymX(newMVarzh_fast)			\
+      SymX(newMutVarzh_fast)			\
+      SymX(newPinnedByteArrayzh_fast)		\
+      SymX(orIntegerzh_fast)			\
+      SymX(performGC)				\
+      SymX(plusIntegerzh_fast)			\
+      SymX(prog_argc)				\
+      SymX(prog_argv)				\
+      SymX(putMVarzh_fast)			\
+      SymX(quotIntegerzh_fast)			\
+      SymX(quotRemIntegerzh_fast)		\
+      SymX(raisezh_fast)			\
+      SymX(remIntegerzh_fast)			\
+      SymX(resetNonBlockingFd)			\
+      SymX(resumeThread)			\
+      SymX(rts_apply)				\
+      SymX(rts_checkSchedStatus)		\
+      SymX(rts_eval)				\
+      SymX(rts_evalIO)				\
+      SymX(rts_evalLazyIO)			\
+      SymX(rts_eval_)				\
+      SymX(rts_getAddr)				\
+      SymX(rts_getBool)				\
+      SymX(rts_getChar)				\
+      SymX(rts_getDouble)			\
+      SymX(rts_getFloat)			\
+      SymX(rts_getInt)				\
+      SymX(rts_getInt32)			\
+      SymX(rts_getPtr)				\
+      SymX(rts_getStablePtr)			\
+      SymX(rts_getWord)				\
+      SymX(rts_getWord32)			\
+      SymX(rts_mkAddr)				\
+      SymX(rts_mkBool)				\
+      SymX(rts_mkChar)				\
+      SymX(rts_mkDouble)			\
+      SymX(rts_mkFloat)				\
+      SymX(rts_mkInt)				\
+      SymX(rts_mkInt16)				\
+      SymX(rts_mkInt32)				\
+      SymX(rts_mkInt64)				\
+      SymX(rts_mkInt8)				\
+      SymX(rts_mkPtr)				\
+      SymX(rts_mkStablePtr)			\
+      SymX(rts_mkString)			\
+      SymX(rts_mkWord)				\
+      SymX(rts_mkWord16)			\
+      SymX(rts_mkWord32)			\
+      SymX(rts_mkWord64)			\
+      SymX(rts_mkWord8)				\
+      SymX(run_queue_hd)			\
+      SymX(setProgArgv)				\
+      SymX(shutdownHaskellAndExit)		\
+      SymX(stable_ptr_table)			\
+      SymX(stackOverflow)			\
+      SymX(stg_CAF_BLACKHOLE_info)		\
+      SymX(stg_CHARLIKE_closure)		\
+      SymX(stg_EMPTY_MVAR_info)			\
+      SymX(stg_IND_STATIC_info)			\
+      SymX(stg_INTLIKE_closure)			\
+      SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
+      SymX(stg_WEAK_info)                       \
       SymX(stg_ap_1_upd_info)			\
       SymX(stg_ap_2_upd_info)			\
       SymX(stg_ap_3_upd_info)			\
@@ -185,7 +305,14 @@ typedef struct _RtsSymbolVal {
       SymX(stg_ap_6_upd_info)			\
       SymX(stg_ap_7_upd_info)			\
       SymX(stg_ap_8_upd_info)			\
+      SymX(stg_exit)				\
       SymX(stg_sel_0_upd_info)			\
+      SymX(stg_sel_10_upd_info)			\
+      SymX(stg_sel_11_upd_info)			\
+      SymX(stg_sel_12_upd_info)			\
+      SymX(stg_sel_13_upd_info)			\
+      SymX(stg_sel_14_upd_info)			\
+      SymX(stg_sel_15_upd_info)			\
       SymX(stg_sel_1_upd_info)			\
       SymX(stg_sel_2_upd_info)			\
       SymX(stg_sel_3_upd_info)			\
@@ -195,146 +322,21 @@ typedef struct _RtsSymbolVal {
       SymX(stg_sel_7_upd_info)			\
       SymX(stg_sel_8_upd_info)			\
       SymX(stg_sel_9_upd_info)			\
-      SymX(stg_sel_10_upd_info)			\
-      SymX(stg_sel_11_upd_info)			\
-      SymX(stg_sel_12_upd_info)			\
-      SymX(stg_sel_13_upd_info)			\
-      SymX(stg_sel_14_upd_info)			\
-      SymX(stg_sel_15_upd_info)			\
-      SymX(stg_upd_frame_info)			\
       SymX(stg_seq_frame_info)			\
-      SymX(stg_CAF_BLACKHOLE_info)		\
-      SymX(stg_IND_STATIC_info)			\
-      SymX(stg_EMPTY_MVAR_info)			\
-      SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
-      SymX(stg_WEAK_info)                       \
-      SymX(stg_CHARLIKE_closure)		\
-      SymX(stg_INTLIKE_closure)			\
-      SymX(newCAF)				\
-      SymX(newBCOzh_fast)			\
-      SymX(mkApUpd0zh_fast)			\
-      SymX(putMVarzh_fast)			\
-      SymX(newMVarzh_fast)			\
+      SymX(stg_upd_frame_info)			\
+      SymX(stg_update_PAP)			\
+      SymX(suspendThread)			\
       SymX(takeMVarzh_fast)			\
-      SymX(tryTakeMVarzh_fast)			\
+      SymX(timesIntegerzh_fast)			\
       SymX(tryPutMVarzh_fast)			\
-      SymX(catchzh_fast)			\
-      SymX(raisezh_fast)			\
-      SymX(forkzh_fast)				\
-      SymX(delayzh_fast)			\
-      SymX(yieldzh_fast)			\
-      SymX(killThreadzh_fast)			\
+      SymX(tryTakeMVarzh_fast)			\
+      SymX(unblockAsyncExceptionszh_fast)	\
+      SymX(unsafeThawArrayzh_fast)		\
       SymX(waitReadzh_fast)			\
       SymX(waitWritezh_fast)			\
-      SymX(suspendThread)			\
-      SymX(resumeThread)			\
-      SymX(stackOverflow)			\
-      SymX(int2Integerzh_fast)			\
       SymX(word2Integerzh_fast)			\
-      Maybe_ForeignObj				\
-      SymX(__encodeDouble)			\
-      SymX(decodeDoublezh_fast)			\
-      SymX(decodeFloatzh_fast)			\
-      SymX(gcdIntegerzh_fast)			\
-      SymX(newArrayzh_fast)			\
-      SymX(unsafeThawArrayzh_fast)		\
-      SymX(newByteArrayzh_fast)			\
-      SymX(newPinnedByteArrayzh_fast)		\
-      SymX(newMutVarzh_fast)			\
-      SymX(quotRemIntegerzh_fast)		\
-      SymX(quotIntegerzh_fast)			\
-      SymX(remIntegerzh_fast)			\
-      SymX(divExactIntegerzh_fast)		\
-      SymX(divModIntegerzh_fast)		\
-      SymX(timesIntegerzh_fast)			\
-      SymX(minusIntegerzh_fast)			\
-      SymX(plusIntegerzh_fast)			\
-      SymX(andIntegerzh_fast)			\
-      SymX(orIntegerzh_fast)			\
       SymX(xorIntegerzh_fast)			\
-      SymX(complementIntegerzh_fast)		\
-      Maybe_Stable_Names			\
-      SymX(blockAsyncExceptionszh_fast)		\
-      SymX(unblockAsyncExceptionszh_fast)	\
-      SymX(isDoubleNaN)				\
-      SymX(isDoubleInfinite)			\
-      SymX(isDoubleDenormalized)		\
-      SymX(isDoubleNegativeZero)		\
-      SymX(__encodeFloat)			\
-      SymX(isFloatNaN)				\
-      SymX(isFloatInfinite)			\
-      SymX(isFloatDenormalized)			\
-      SymX(isFloatNegativeZero)			\
-      SymX(__int_encodeFloat)			\
-      SymX(__int_encodeDouble)			\
-      SymX(__gmpz_cmp_si)			\
-      SymX(__gmpz_cmp_ui)			\
-      SymX(__gmpz_cmp)				\
-      SymX(__gmpn_gcd_1)			\
-      SymX(__gmpz_get_si)			\
-      SymX(__gmpz_get_ui)			\
-      SymX(prog_argv)				\
-      SymX(prog_argc)				\
-      SymX(getProgArgv)				\
-      SymX(setProgArgv)				\
-      SymX(resetNonBlockingFd)			\
-      SymX(performGC)				\
-      SymX(getStablePtr)			\
-      SymX(stable_ptr_table)			\
-      SymX(shutdownHaskellAndExit)		\
-      Sym(stg_enterStackTop)			\
-      Sym(stg_yield_to_interpreter)		\
-      Sym(StgReturn)				\
-      Sym(init_stack)				\
-      SymX(cmp_thread)				\
-      Sym(__stginit_PrelGHC)			\
-      SymX(freeHaskellFunctionPtr)		\
-      SymX(OnExitHook)				\
-      SymX(ErrorHdrHook)			\
-      SymX(NoRunnableThreadsHook)		\
-      SymX(StackOverflowHook)			\
-      SymX(OutOfHeapHook)			\
-      SymX(MallocFailHook)			\
-      SymX(PatErrorHdrHook)			\
-      SymX(defaultsHook)			\
-      SymX(PreTraceHook)			\
-      SymX(PostTraceHook)			\
-      SymX(createAdjustor)			\
-      SymX(rts_mkChar)				\
-      SymX(rts_mkInt)				\
-      SymX(rts_mkInt8)				\
-      SymX(rts_mkInt16)				\
-      SymX(rts_mkInt32)				\
-      SymX(rts_mkInt64)				\
-      SymX(rts_mkWord)				\
-      SymX(rts_mkWord8)				\
-      SymX(rts_mkWord16)			\
-      SymX(rts_mkWord32)			\
-      SymX(rts_mkWord64)			\
-      SymX(rts_mkPtr)				\
-      SymX(rts_mkFloat)				\
-      SymX(rts_mkDouble)			\
-      SymX(rts_mkStablePtr)			\
-      SymX(rts_mkBool)				\
-      SymX(rts_mkString)			\
-      SymX(rts_apply)				\
-      SymX(rts_mkAddr)				\
-      SymX(rts_getChar)				\
-      SymX(rts_getInt)				\
-      SymX(rts_getInt32)			\
-      SymX(rts_getWord)				\
-      SymX(rts_getWord32)			\
-      SymX(rts_getPtr)				\
-      SymX(rts_getFloat)			\
-      SymX(rts_getDouble)			\
-      SymX(rts_getStablePtr)			\
-      SymX(rts_getBool)				\
-      SymX(rts_getAddr)				\
-      SymX(rts_eval)				\
-      SymX(rts_eval_)				\
-      SymX(rts_evalIO)				\
-      SymX(rts_evalLazyIO)			\
-      SymX(rts_checkSchedStatus)
+      SymX(yieldzh_fast)
 
 #ifndef SUPPORT_LONG_LONGS
 #define RTS_LONG_LONG_SYMS /* nothing */
