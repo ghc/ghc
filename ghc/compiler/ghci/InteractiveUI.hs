@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.95 2001/10/16 14:44:51 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.96 2001/10/18 15:26:57 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -827,18 +827,24 @@ linkPackages cmdline_lib_specs pkgs
            = (throwDyn . CmdLineError)
                 "user specified .o/.so/.DLL could not be loaded."
 
+-- Packages that don't need loading, because the compiler shares them with
+-- the interpreted program.
+dont_load_these = [ "gmp", "rts" ]
+
 -- Packages that are already linked into GHCi.  For mingw32, we only
 -- skip gmp and rts, since std and after need to load the msvcrt.dll
 -- library which std depends on.
 loaded_in_ghci
 #          ifndef mingw32_TARGET_OS
-           = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
+           = [ "std", "concurrent", "posix", "text", "util" ]
 #          else
-           = [ "gmp", "rts" ]
+	   = [ ]
 #          endif
 
 linkPackage :: PackageConfig -> IO ()
 linkPackage pkg
+   | name pkg `elem` dont_load_these = return ()
+   | otherwise
    = do 
         -- For each obj, try obj.o and if that fails, obj.so.
         -- Complication: all the .so's must be loaded before any of the .o's.  
@@ -851,9 +857,6 @@ linkPackage pkg
 	let (so_libs, obj_libs) = partition isRight classifieds
         let sos_first | name pkg `elem` loaded_in_ghci = obj_libs
 		      | otherwise      		       = so_libs ++ obj_libs
-
-	-- nothing to do?
-	if null sos_first then return () else do
 
 	putStr ("Loading package " ++ name pkg ++ " ... ")
         mapM loadClassified sos_first
