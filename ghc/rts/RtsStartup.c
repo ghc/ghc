@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.40 2000/04/10 14:28:14 sewardj Exp $
+ * $Id: RtsStartup.c,v 1.41 2000/04/11 16:51:44 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -216,14 +216,13 @@ startupHaskell(int argc, char *argv[], void *init_root)
    StgRun to call this stuff.
    -------------------------------------------------------------------------- */
 
-#ifndef INTERPRETER
-
 /* The init functions use an explicit stack... 
  */
 #define INIT_STACK_SIZE  (BLOCK_SIZE * 4)
 F_ *init_stack = NULL;
 nat init_sp = 0;
 
+#ifndef INTERPRETER
 static void
 initModules ( void *init_root )
 {
