@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2001/02/05 18:01:39 rrt Exp $
+# $Id: Makefile,v 1.8 2001/02/10 10:43:25 qrczak Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,7 @@ INCLUDE_DIR=ghc/includes
 INSTALLING=1
 
 HS_PROG           = hsc2hs-bin
-SRC_HC_OPTS      += -package util -package text -cpp -fglasgow-exts
+SRC_HC_OPTS      += -package util -package text
 
 INSTALLED_SCRIPT_PROG  = hsc2hs
 INPLACE_SCRIPT_PROG    = hsc2hs-inplace
