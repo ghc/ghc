@@ -583,7 +583,7 @@ ppHsDataDecl summary instances is_newty
 			 aboves (map ppSideBySideConstr cons)
 			)
 
-	inst_id = "i:" ++ hsNameStr nm
+	inst_id = collapseId nm
 
 	instances_bit
 	   | null instances = Html.emptyTable
@@ -762,7 +762,7 @@ ppHsClassDecl summary instances orig_c
 			             ]
 			)
 
-	inst_id = "i:" ++ hsNameStr nm
+	inst_id = collapseId nm
 	instances_bit
 	   | null instances = Html.emptyTable
 	   | otherwise 
@@ -1126,3 +1126,8 @@ collapsebutton id =
 collapsed :: String -> Html -> Html
 collapsed id html =
   thediv ! [identifier id, thestyle "display:none;"] << html
+
+-- A quote is a valid part of a Haskell identifier, but it would interfere with
+-- the ECMA script string delimiter used in collapsebutton above.
+collapseId :: HsName -> String
+collapseId nm = "i:" ++ escapeString (hsNameStr nm) (/= '\'')
