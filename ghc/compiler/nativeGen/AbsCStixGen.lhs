@@ -14,11 +14,7 @@ import AbsCSyn
 import Stix
 
 import MachMisc
-#if __GLASGOW_HASKELL__ >= 202
-import MachRegs hiding (Addr)
-#else
 import MachRegs
-#endif
 
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
@@ -453,8 +449,8 @@ already finish with a jump to the join point.
     	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt highTag])
 
     	offset = StPrim IntSubOp [am, StInt lowTag]
-    	jump = StJump (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
 
+    	jump = StJump (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
     	tlbl = StLabel utlbl
     	table = StData PtrRep (mkTable branches [lowTag..highTag] [])
     in
