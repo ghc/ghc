@@ -385,11 +385,18 @@ uppCostCentre print_as_string cc
             basic_kind  = do_kind kind
 	    module_kind = do_caf is_caf (moduleString mod_name ++ '/':
 					       basic_kind)
-            grp_str   = if (_NULL_ grp_name) then mod_name else grp_name
-            full_kind = do_caf is_caf
-	                 (moduleString mod_name  ++ 
-			  ('/' : _UNPK_ grp_str) ++ 
-			  ('/' : basic_kind))
+            grp_str     = [] 
+            {- TODO: re-instate this once interface file lexer
+	       handles groups.
+              grp_str     = 
+                 if (_NULL_ grp_name) then 
+	            [] 
+		 else 
+		    '/' : (_UNPK_ grp_name)
+	    -}
+            full_kind   = do_caf is_caf
+	                         (moduleString mod_name  ++ 
+			          grp_str ++ ('/' : basic_kind))
 	in
         if (friendly_sty sty) then
 	   do_dupd sty is_dupd full_kind
@@ -406,8 +413,8 @@ uppCostCentre print_as_string cc
 	do_caf _       ls = ls
 
     	do_kind (UserCC name) = _UNPK_ name
-	do_kind (AutoCC id)   = do_id id ++ (if (friendly_sty sty) then "/AUTO" else "")
-	do_kind (DictCC id)   = do_id id ++ (if (friendly_sty sty) then "/DICT" else "")
+	do_kind (AutoCC id)   = do_id id ++ (if (debugStyle sty) then "/AUTO" else "")
+	do_kind (DictCC id)   = do_id id ++ (if (debugStyle sty) then "/DICT" else "")
 
         {-
 	 do_id is only applied in a (not print_as_string) context for local ids,
