@@ -11,7 +11,7 @@ IO monad.
 \begin{code}
 module Merge
 	(
-	  merge
+	  mergeIO
 	, nmergeIO
 	) where
 
