@@ -18,8 +18,7 @@ import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..),
 			  collectMonoBinders, andMonoBinds,
 			  collectSigTysFromMonoBinds
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds,
-                          RenamedTyClDecl )
+import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
@@ -263,13 +262,16 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	dict_tys = map idType zonked_dict_ids
 
 	inlines    = mkNameSet [name | InlineSig True name _ loc <- inline_sigs]
-        no_inlines = listToFM [(name, phase) | InlineSig _ name phase _ <- inline_sigs, 
-					       not (isAlwaysActive phase)]
+			-- Any INLINE sig (regardless of phase control) 
+			-- makes the RHS look small
+        inline_phases = listToFM [(name, phase) | InlineSig _ name phase _ <- inline_sigs, 
+						  not (isAlwaysActive phase)]
+			-- Set the IdInfo field to control the inline phase
 			-- AlwaysActive is the default, so don't bother with them
 
 	mk_export binder_name zonked_mono_id
 	  = (tyvars, 
-	     attachNoInlinePrag no_inlines poly_id,
+	     attachInlinePhase inline_phases poly_id,
 	     zonked_mono_id)
 	  where
 	    (tyvars, poly_id) = 
@@ -314,8 +316,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	lie_free, poly_ids
     )
 
-attachNoInlinePrag no_inlines bndr
-  = case lookupFM no_inlines (idName bndr) of
+attachInlinePhase inline_phases bndr
+  = case lookupFM inline_phases (idName bndr) of
 	Just prag -> bndr `setInlinePragma` prag
 	Nothing   -> bndr
 
