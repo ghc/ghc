@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.6 2001/08/02 15:33:35 ken Exp $
+ * $Id: GCCompact.c,v 1.7 2001/08/08 13:44:13 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -306,6 +306,8 @@ update_fwd_large( bdescr *bd )
     {
 	StgTSO *tso = (StgTSO *)p;
 	thread_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	thread((StgPtr)&tso->link);
+	thread((StgPtr)&tso->global_link);
 	continue;
     }
 
