@@ -10,9 +10,10 @@ def f( opts ):
 setTestOpts(f)
 
 test('fed001', normal, compile_and_run, [''])
-test('ffi001', normal, compile_and_run, [''])
 
-test('ffi002', normal, compile_and_run, ['ffi002_c.c -no-hs-main'])
+# Omit GHCi for these two, as they use foreign export
+test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
+test('ffi002', omit_ways(['ghci']), compile_and_run, ['ffi002_c.c -no-hs-main'])
 
 if config.platform == 'alpha-dec-osf3':
 	f = skip
