@@ -478,16 +478,14 @@ tcRnHsBootDecls decls
 
 		-- Typecheck value declarations
 	; traceTc (text "Tc5") 
-	; (tc_val_binds, lcl_env) <- tcHsBootSigs (hs_valds rn_group)
+	; new_ids <- tcHsBootSigs (hs_valds rn_group)
 
 		-- Wrap up
 		-- No simplification or zonking to do
 	; traceTc (text "Tc7a")
 	; gbl_env <- getGblEnv 
 	
-	; let { new_ids = [ id | ATcId id _ _ <- varEnvElts (tcl_env lcl_env) ]
-	      ; final_type_env = extendTypeEnvWithIds (tcg_type_env gbl_env) new_ids }
-
+	; let { final_type_env = extendTypeEnvWithIds (tcg_type_env gbl_env) new_ids }
 	; return (gbl_env { tcg_type_env = final_type_env }) 
    }}}}
 

@@ -40,11 +40,12 @@ import TcType		( TcTyVar, SkolemInfo(SigSkol),
 			  TcTauType, TcSigmaType, 
 			  mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkForAllTy, isUnLiftedType, tcGetTyVar, 
-			  mkTyVarTys, tidyOpenTyVar, tidyOpenType )
+			  mkTyVarTys, tidyOpenTyVar )
 import Kind		( argTypeKind )
 import VarEnv		( TyVarEnv, emptyVarEnv, lookupVarEnv, extendVarEnv, emptyTidyEnv ) 
 import TysPrim		( alphaTyVar )
-import Id		( mkLocalId, mkSpecPragmaId, setInlinePragma )
+import Id		( Id, mkLocalId, mkVanillaGlobal, mkSpecPragmaId, setInlinePragma )
+import IdInfo		( vanillaIdInfo )
 import Var		( idType, idName )
 import Name		( Name )
 import NameSet
@@ -106,18 +107,16 @@ tcTopBinds binds
     glue (HsIPBinds _) 		  _		= panic "Top-level HsIpBinds"
 	-- Can't have a HsIPBinds at top level
 
-tcHsBootSigs :: [HsBindGroup Name] -> TcM (LHsBinds TcId, TcLclEnv)
+tcHsBootSigs :: [HsBindGroup Name] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs [HsBindGroup _ sigs _]
-  = do	{ ids <- mapM (addLocM tc_sig) (filter isVanillaLSig sigs)
-	; tcExtendIdEnv ids $ do 
-	{ env <- getLclEnv
-	; return (emptyLHsBinds, env) }}
+  = mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs)
   where
-    tc_sig (Sig (L _ name) ty)
+    tc_boot_sig (Sig (L _ name) ty)
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-	   ; return (mkLocalId name sigma_ty) }
+	   ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
+	-- Notice that we make GlobalIds, not LocalIds
 
 tcBindsAndThen
 	:: (HsBindGroup TcId -> thing -> thing)		-- Combinator
