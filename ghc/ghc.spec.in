@@ -100,7 +100,7 @@ They should be installed when GHC's profiling subsystem is needed.
 cat >mk/build.mk <<END
 GhcLibWays = p
 SRC_HAPPY_OPTS += -agc
-#GhcWithInterpreter=No
+#GhcWithInterpreter=NO
 GhcWithInterpreter=YES
 END
 
@@ -109,7 +109,7 @@ END
 [ ! -x configure ] && autoconf && cd ghc && autoconf
 
 %build
-./configure --prefix=%{prefix} --libdir=%{prefix}/lib/ghc-%{version}
+./configure --prefix=%{prefix}
 make boot
 make -C glafp-utils sgmlverb
 make all
@@ -128,8 +128,7 @@ for j in docs ghc/docs; do
   cd $dir
 done
 rm -rf $RPM_BUILD_ROOT
-make prefix=$RPM_BUILD_ROOT%{prefix}\
-     libdir=$RPM_BUILD_ROOT%{prefix}/lib/ghc-%{version} install
+make prefix=$RPM_BUILD_ROOT%{prefix} install
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
