@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 1997/09/05 09:16:28 simonm Exp $
+# $Id: Makefile,v 1.11 1998/08/14 10:57:58 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -110,6 +110,7 @@ SRCS_RTS_LC = $(wildcard c-as-asm/*.lc) \
 	main/RtsFlags.lc		\
 	main/main.lc			\
 	prims/PrimArith.lc		\
+	prims/LongLong.lc		\
 	prims/PrimMisc.lc		\
 	profiling/CostCentre.lc		\
 	profiling/Hashing.lc		\
