@@ -50,6 +50,7 @@ import Type	  ( Type )
 import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
 import TysWiredIn ( mkListTy, mkTupleTy, unitTy )
 import CoreSyn    ( Expr )
+import Var	  ( isId )
 import BasicTypes ( RecFlag(..), Boxity(..) )
 import Bag
 import Outputable
@@ -717,12 +718,18 @@ zonkRules :: [TcRuleDecl] -> NF_TcM [TypecheckedRuleDecl]
 zonkRules rs = mapNF_Tc zonkRule rs
 
 zonkRule (HsRule name act vars lhs rhs loc)
-  = mapNF_Tc zonkIdBndr [v | RuleBndr v <- vars]	`thenNF_Tc` \ new_bndrs ->
-    tcExtendGlobalValEnv new_bndrs			$
+  = mapNF_Tc zonk_bndr vars				`thenNF_Tc` \ new_bndrs ->
+    tcExtendGlobalValEnv (filter isId new_bndrs)	$
+	-- Type variables don't need an envt
+	-- They are bound through the mutable mechanism
     zonkExpr lhs					`thenNF_Tc` \ new_lhs ->
     zonkExpr rhs					`thenNF_Tc` \ new_rhs ->
     returnNF_Tc (HsRule name act (map RuleBndr new_bndrs) new_lhs new_rhs loc)
 	-- I hate this map RuleBndr stuff
+  where
+   zonk_bndr (RuleBndr v) 
+	| isId v    = zonkIdBndr v
+	| otherwise = zonkTcTyVarToTyVar v
 
 zonkRule (IfaceRuleOut fun rule)
   = zonkIdOcc fun	`thenNF_Tc` \ fun' ->
