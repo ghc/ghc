@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.78 2002/01/23 11:29:12 sewardj Exp $
+ * $Id: Linker.c,v 1.79 2002/01/29 02:41:21 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -961,6 +961,7 @@ typedef
 /* From PE spec doc, section 4.1 */
 #define MYIMAGE_SCN_CNT_CODE             0x00000020
 #define MYIMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
+#define MYIMAGE_SCN_LNK_NRELOC_OVFL      0x01000000
 
 /* From PE spec doc, section 5.2.1 */
 #define MYIMAGE_REL_I386_DIR32           0x0006
@@ -1094,7 +1095,8 @@ zapTrailingAtSign ( UChar* sym )
 static int
 ocVerifyImage_PEi386 ( ObjectCode* oc )
 {
-   int i, j;
+   int i;
+   UInt32 j, noRelocs;
    COFF_header*  hdr;
    COFF_section* sectab;
    COFF_symbol*  symtab;
@@ -1137,13 +1139,15 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       there are more than 64k relocations, despite claims to the
       contrary.  Hence this test. */
    /* fprintf(stderr, "strtab size %d\n", * (UInt32*)strtab); */
-   if (* (UInt32*)strtab > 600000) {
+#if 0
+   if ( (*(UInt32*)strtab) > 600000 ) {
       /* Note that 600k has no special significance other than being
          big enough to handle the almost-2MB-sized lumps that
          constitute HSwin32*.o. */
       belch("PEi386 object has suspiciously large string table; > 64k relocs?");
       return 0;
    }
+#endif
 
    /* No further verification after this point; only debug printing. */
    i = 0;
@@ -1207,8 +1211,24 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       reltab = (COFF_reloc*) (
                   ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
                );
+	       
+      if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
+	/* If the relocation field (a short) has overflowed, the
+	 * real count can be found in the first reloc entry.
+	 * The PE spec (Rev 6.0) doesn't really cover this,
+	 * but as always header files provide the final word on
+	 * details like this (cf. WinNT.h).
+	 */
+        COFF_reloc* rel = (COFF_reloc*)
+                           myindex ( sizeof_COFF_reloc, reltab, 0 );
+	noRelocs = rel->VirtualAddress;
+	j = 1;
+      } else {
+	noRelocs = sectab_i->NumberOfRelocations;
+        j = 0;
+      }
 
-      for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
+      for (; j < noRelocs; j++) {
          COFF_symbol* sym;
          COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, j );
@@ -1218,6 +1238,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                    rel->VirtualAddress );
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol, symtab, rel->SymbolTableIndex );
+	 /* Hmm..mysterious looking offset - what's it for? SOF */
          printName ( sym->Name, strtab -10 );
          fprintf ( stderr, "'\n" );
       }
@@ -1414,9 +1435,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          /* fprintf(stderr, "BSS      section at 0x%x\n", addr); */
       }
 
-      if (addr != NULL) {
+      if (addr != NULL ) {
          sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
-         /* fprintf(stderr,"addSymbol %p `%s'\n", addr,sname); */
+         /* fprintf(stderr,"addSymbol %p `%s \n", addr,sname);  */
          IF_DEBUG(linker, belch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
@@ -1466,7 +1487,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
    UInt32        S;
    UInt32*       pP;
 
-   int i, j;
+   int i;
+   UInt32 j, noRelocs;
 
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
@@ -1501,7 +1523,25 @@ ocResolve_PEi386 ( ObjectCode* oc )
           || 0 == strcmp(".stabstr", sectab_i->Name))
          continue;
 
-      for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
+      if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
+	/* If the relocation field (a short) has overflowed, the
+	 * real count can be found in the first reloc entry.
+	 * The PE spec (Feb 99 version) doesn't really cover this,
+	 * but as always header files provide the final word on
+	 * details like this (cf. WinNT.h).
+	 */
+        COFF_reloc* rel = (COFF_reloc*)
+                           myindex ( sizeof_COFF_reloc, reltab, 0 );
+	noRelocs = rel->VirtualAddress;
+	fprintf(stderr, "Overflown relocs: %u\n", noRelocs);
+	j = 1;
+      } else {
+	noRelocs = sectab_i->NumberOfRelocations;
+        j = 0;
+      }
+
+
+      for (; j < noRelocs; j++) {
          COFF_symbol* sym;
          COFF_reloc* reltab_j 
             = (COFF_reloc*)
