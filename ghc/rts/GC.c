@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.75 2000/03/23 14:30:13 simonmar Exp $
+ * $Id: GC.c,v 1.76 2000/03/30 16:07:53 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1530,9 +1530,22 @@ loop:
 
   case AP_UPD:
   case PAP:
-    /* these are special - the payload is a copy of a chunk of stack,
-       tagging and all. */
-    return copy(q,pap_sizeW((StgPAP *)q),step);
+    /* PAPs and AP_UPDs are special - the payload is a copy of a chunk
+     * of stack, tagging and all.
+     *
+     * They can be larger than a block in size.  Both are only
+     * allocated via allocate(), so they should be chained on to the
+     * large_object list.
+     */
+    {
+      nat size = pap_sizeW((StgPAP*)q);
+      if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	evacuate_large((P_)q, rtsFalse);
+	return q;
+      } else {
+	return copy(q,size,step);
+      }
+    }
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
@@ -2956,8 +2969,19 @@ scavenge_large(step *step)
 
     case TSO:
 	scavengeTSO((StgTSO *)p);
-        // HWL: old PAR code deleted here
 	continue;
+
+    case AP_UPD:
+    case PAP:
+      { 
+	StgPAP* pap = (StgPAP *)p;
+	
+	evac_gen = saved_evac_gen; /* not really mutable */
+	pap->fun = evacuate(pap->fun);
+	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
+	evac_gen = 0;
+	continue;
+      }
 
     default:
       barf("scavenge_large: unknown/strange object");

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.58 2000/03/30 15:35:13 simonmar Exp $
+ * $Id: Schedule.c,v 1.59 2000/03/30 16:07:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2229,11 +2229,6 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      */
     ap = (StgAP_UPD *)allocate(AP_sizeW(words));
     
-    /* ToDo: allocating an AP_UPD more than a block in size doesn't
-     * work, and will cause the GC to break later on.
-     */
-    ASSERT(AP_sizeW(words) <= BLOCK_SIZE_W);
-
     ASSERT(words >= 0);
     
     ap->n_args = words;
