@@ -147,7 +147,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = '.L';
     $T_X86_BADJMP   = '^\tjmp [^\.\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.size\s+.*|\.ident.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.size\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.ident.*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
     if ( $TargetPlatform =~ /freebsd3/ ) {
@@ -478,11 +478,6 @@ sub mangle_asm {
 
 	    $srtchk{$1} = $i;
 
-	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_ct$TPOSTLBL[@]?$/o ) {
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'data';
-	    $chksymb[$i] = '';
-
 	} elsif ( /^$TUS[@]?ghc.*c_ID$TPOSTLBL/o ) {
 	    $chk[++$i]  = $_;
 	    $chkcat[$i] = 'consist';
@@ -689,7 +684,7 @@ sub mangle_asm {
 		}
 
 		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
-		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
+		    && $TargetPlatform !~ /^(powerpc-|i386-)/; #ToDo: remove test
 
 		# glue together what's left
 		$c = $p . $r;
@@ -709,6 +704,7 @@ sub mangle_asm {
 		    $e =~ s/^\tret\n//;
 		    $e =~ s/^\tpopl \%edi\n//;
 		    $e =~ s/^\tpopl \%esi\n//;
+		    $e =~ s/^\tpopl \%ebx\n//;
 		    $e =~ s/^\tpopl \%ecx\n//;
 		    $e =~ s/^\taddl \$\d+,\%esp\n//;
 		} elsif ($TargetPlatform =~ /^m68k-/) {
@@ -741,7 +737,7 @@ sub mangle_asm {
 	# toss the register-windowing save/restore/ret* instructions
 	# directly:
 	if ( $TargetPlatform =~ /^sparc-/ ) {
-	    $c =~ s/^\t(save.*|restore|ret|retl)\n//g;
+	    $c =~ s/^\t(save .*|restore|ret|retl)\n//g;
 	    # throw away PROLOGUE comments
 	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//;
 	}
@@ -749,7 +745,7 @@ sub mangle_asm {
 	# On Alphas, the prologue mangling is done a little later (below)
 
     	# toss all calls to __DISCARD__
-	$c =~ s/^\t(call|jbsr|jal)\s+$TUS[@]?__DISCARD__\n//go;
+	$c =~ s/^\t(call|jbsr|jal)\s+$TUS[@]?__DISCARD__(\@PLT)?\n//go;
 
 	# MIPS: that may leave some gratuitous asm macros around
 	# (no harm done; but we get rid of them to be tidier)
@@ -975,7 +971,9 @@ sub mangle_asm {
                   $chk[$infochk{$symb}] =~ s/\.long ([A-Za-z]\S+_upd)/\.long \.\1/;
                   print OUTASM $chk[$infochk{$symb}];
                 } else {
-		  print OUTASM &rev_tbl($symb, $chk[$infochk{$symb}], 1);
+# for shared libs --SDM
+                  print OUTASM $chk[$infochk{$symb}];
+#		  print OUTASM &rev_tbl($symb, $chk[$infochk{$symb}], 1);
                 }
 		# entry code will be put here!
 
@@ -1014,6 +1012,10 @@ sub mangle_asm {
 			# The next two only apply if we're not stealing %esi or %edi.
 			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d*,\%esi\n\tjmp \*\%esi\n// if ($StolenX86Regs < 3);
 			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d*,\%edi\n\tjmp \*\%edi\n// if ($StolenX86Regs < 4);
+			# for PIC code
+			$c =~ s/^\tleal ${T_US}${symb}_fast\d*\@GOTOFF\(\%ebx\),\%eax\n\tjmp \*\%eax\n//;
+			$c =~ s/^\tjmp \*${T_US}${symb}_fast\d*\@GOT\(\%ebx\)\n//;
+			$c =~ s/^\.LPR\d+\:\n\tmovl \(\%esp\),\%ebx\n\tret\n//;
 		    } elsif ( $TargetPlatform =~ /^mips-/ ) {
 			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
 		    } elsif ( $TargetPlatform =~ /^m68k-/ ) {
@@ -1022,8 +1024,8 @@ sub mangle_asm {
 		    } elsif ( $TargetPlatform =~ /^powerpc-|^rs6000-/ ) {
 			$c =~ s/^\tb \.${T_US}${symb}_fast\d+\n//;
 		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
-			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n\t\s*nop\n//;
-			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n(\t\s*[a-z].*\n)/$1/;
+			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n\tnop\n//;
+			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n(\t[a-z].*\n)/$1/;
 		    } else {
 			print STDERR "$Pgm: mystery slow-fast dropthrough: $TargetPlatform\n";
 		    }
@@ -1086,7 +1088,9 @@ sub mangle_asm {
 		  print OUTASM ".${symb}_vtbl:\n";
 		  print OUTASM $chk[$vectorchk{$symb}];
 		} else {
-  		  print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
+# for shared libs --SDM		  print OUTASM $chk[$vectorchk{$symb}];
+		  print OUTASM $chk[$vectorchk{$symb}];
+#  		  print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
 		}
 		# direct return code will be put here!
 		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';
