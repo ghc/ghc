@@ -15,8 +15,8 @@ import SimplMonad
 import SimplUtils	( mkCase, mkLam, newId,
 			  simplBinder, simplLamBinders, simplBinders, simplRecIds, simplLetId,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
-			  mkStop, mkBoringStop, 
-			  contResultType, discardInline, countArgs, contIsDupable, contIsRhsOrArg,
+			  mkStop, mkBoringStop,  pushContArgs,
+			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
 			)
 import Var		( mustHaveLocalBinding )
@@ -299,13 +299,8 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
     simplLetId env bndr				`thenSmpl` \ (env, bndr') ->
     simplStrictArg env AnRhs rhs rhs_se cont_ty	$ \ env rhs1 ->
 
-	-- Make the arguments atomic if necessary, 
-	-- adding suitable bindings
-    mkAtomicArgs True True rhs1		`thenSmpl` \ (aux_binds, rhs2) ->
-    addAtomicBindsE env aux_binds	$ \ env ->
-
 	-- Now complete the binding and simplify the body
-    completeNonRecX env bndr bndr' rhs2 thing_inside
+    completeNonRecX env True {- strict -} bndr bndr' rhs1 thing_inside
 
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
@@ -340,16 +335,24 @@ simplNonRecX env bndr new_rhs thing_inside
 
   | otherwise
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
-    completeNonRecX env bndr bndr' new_rhs thing_inside
+    completeNonRecX env False {- Non-strict; pessimistic -} 
+		    bndr bndr' new_rhs thing_inside
 
-completeNonRecX env old_bndr new_bndr new_rhs thing_inside
+completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
   | needsCaseBinding (idType new_bndr) new_rhs
   = thing_inside env 			`thenSmpl` \ (floats, body) ->
     returnSmpl (emptyFloats env, Case new_rhs new_bndr [(DEFAULT, [], wrapFloats floats body)])
 
   | otherwise
-  = completeLazyBind env NotTopLevel
-		     old_bndr new_bndr new_rhs	`thenSmpl` \ (floats, env) ->
+  = mkAtomicArgs is_strict 
+		 True {- OK to float unlifted -} 
+		 new_rhs			`thenSmpl` \ (aux_binds, rhs2) ->
+
+	-- Make the arguments atomic if necessary, 
+	-- adding suitable bindings
+    addAtomicBindsE env aux_binds		$ \ env ->
+    completeLazyBind env NotTopLevel
+		     old_bndr new_bndr rhs2	`thenSmpl` \ (floats, env) ->
     addFloats env floats thing_inside
 \end{code}
 
@@ -700,7 +703,7 @@ simplType env ty
 simplLam env fun cont
   = go env fun cont
   where
-    zap_it  = mkLamBndrZapper fun cont
+    zap_it  = mkLamBndrZapper fun (countArgs cont)
     cont_ty = contResultType cont
 
       	-- Type-beta reduction
@@ -713,10 +716,8 @@ simplLam env fun cont
 	-- Ordinary beta reduction
     go env (Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
       = tick (BetaReduction bndr)				`thenSmpl_`
-	simplNonRecBind env zapped_bndr arg arg_se cont_ty	$ \ env -> 
+	simplNonRecBind env (zap_it bndr) arg arg_se cont_ty	$ \ env -> 
 	go env body body_cont
-      where
-	zapped_bndr = zap_it bndr
 
 	-- Not enough args, so there are real lambdas left to put in the result
     go env lam@(Lam _ _) cont
@@ -732,16 +733,14 @@ simplLam env fun cont
     go env expr cont = simplExprF env expr cont
 
 mkLamBndrZapper :: CoreExpr 	-- Function
-		-> SimplCont	-- The context
+		-> Int		-- Number of args supplied, *including* type args
 		-> Id -> Id	-- Use this to zap the binders
-mkLamBndrZapper fun cont
+mkLamBndrZapper fun n_args
   | n_args >= n_params fun = \b -> b		-- Enough args
   | otherwise		   = \b -> zapLamIdInfo b
   where
 	-- NB: we count all the args incl type args
 	-- so we must count all the binders (incl type lambdas)
-    n_args = countArgs cont
-
     n_params (Note _ e) = n_params e
     n_params (Lam b e)  = 1 + n_params e
     n_params other	= 0::Int
@@ -846,41 +845,16 @@ simplVar env var cont
 		-- the inlined copy!!
 
 ---------------------------------------------------------
---	Dealing with a call
+--	Dealing with a call site
 
 completeCall env var occ_info cont
-  = getDOptsSmpl		`thenSmpl` \ dflags ->
+  =     -- Simplify the arguments
+    getDOptsSmpl					`thenSmpl` \ dflags ->
     let
-	in_scope = getInScope env
-	chkr	 = getSwitchChecker env
-
+	chkr			       = getSwitchChecker env
 	(args, call_cont, inline_call) = getContArgs chkr var cont
-
-	arg_infos = [ interestingArg in_scope arg (getSubstEnv arg_env)
-		    | (arg, arg_env, _) <- args, isValArg arg]
-
-	interesting_cont = interestingCallContext (not (null args)) 
-						  (not (null arg_infos))
-						  call_cont
-
-	inline_cont | inline_call = discardInline cont
-		    | otherwise   = cont
-
-    	active_inline = activeInline env var
-	maybe_inline = callSiteInline dflags active_inline inline_call occ_info
-				      var arg_infos interesting_cont
     in
-	-- First, look for an inlining
-    case maybe_inline of {
-	Just unfolding  	-- There is an inlining!
-	  ->  tick (UnfoldingDone var)		`thenSmpl_`
-	      simplExprF env unfolding inline_cont
-
-	;
-	Nothing -> 		-- No inlining!
-
-
-    simplifyArgs env args (contResultType call_cont)  $ \ env args' ->
+    simplifyArgs env args (contResultType call_cont)	$ \ env args ->
 
 	-- Next, look for rules or specialisations that match
 	--
@@ -892,9 +866,9 @@ completeCall env var occ_info cont
 	-- Some functions have specialisations *and* are strict; in this case,
 	-- we don't want to inline the wrapper of the non-specialised thing; better
 	-- to call the specialised thing instead.
-	-- But the black-listing mechanism means that inlining of the wrapper
-	-- won't occur for things that have specialisations till a later phase, so
-	-- it's ok to try for inlining first.
+	-- We used to use the black-listing mechanism to ensure that inlining of 
+	-- the wrapper didn't occur for things that have specialisations till a 
+	-- later phase, so but now we just try RULES first
 	--
 	-- You might think that we shouldn't apply rules for a loop breaker: 
 	-- doing so might give rise to an infinite loop, because a RULE is
@@ -909,9 +883,10 @@ completeCall env var occ_info cont
 	-- So it's up to the programmer: rules can cause divergence
 
     let
+	in_scope   = getInScope env
 	maybe_rule = case activeRule env of
 			Nothing     -> Nothing	-- No rules apply
-			Just act_fn -> lookupRule act_fn in_scope var args' 
+			Just act_fn -> lookupRule act_fn in_scope var args 
     in
     case maybe_rule of {
 	Just (rule_name, rule_rhs) -> 
@@ -919,7 +894,7 @@ completeCall env var occ_info cont
 		(if dopt Opt_D_dump_inlinings dflags then
 		   pprTrace "Rule fired" (vcat [
 			text "Rule:" <+> ptext rule_name,
-			text "Before:" <+> ppr var <+> sep (map pprParendExpr args'),
+			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
 			text "After: " <+> pprCoreExpr rule_rhs])
 		 else
 			id)		$
@@ -927,9 +902,64 @@ completeCall env var occ_info cont
 	
 	Nothing -> 		-- No rules
 
+	-- Next, look for an inlining
+    let
+	arg_infos = [ interestingArg arg | arg <- args, isValArg arg]
+
+	interesting_cont = interestingCallContext (not (null args)) 
+						  (not (null arg_infos))
+						  call_cont
+
+    	active_inline = activeInline env var
+	maybe_inline  = callSiteInline dflags active_inline inline_call occ_info
+				       var arg_infos interesting_cont
+    in
+    case maybe_inline of {
+	Just unfolding  	-- There is an inlining!
+	  ->  tick (UnfoldingDone var)		`thenSmpl_`
+	      makeThatCall env var unfolding args call_cont
+
+	;
+	Nothing -> 		-- No inlining!
+
 	-- Done
-    rebuild env (mkApps (Var var) args') call_cont
+    rebuild env (mkApps (Var var) args) call_cont
     }}
+
+makeThatCall :: SimplEnv
+	     -> Id
+	     -> InExpr		-- Inlined function rhs 
+	     -> [OutExpr]	-- Arguments, already simplified
+	     -> SimplCont	-- After the call
+	     -> SimplM FloatsWithExpr
+-- Similar to simplLam, but this time 
+-- the arguments are already simplified
+makeThatCall orig_env var fun@(Lam _ _) args cont
+  = go orig_env fun args
+  where
+    zap_it = mkLamBndrZapper fun (length args)
+
+      	-- Type-beta reduction
+    go env (Lam bndr body) (Type ty_arg : args)
+      =	ASSERT( isTyVar bndr )
+	tick (BetaReduction bndr)			`thenSmpl_`
+	go (extendSubst env bndr (DoneTy ty_arg)) body args
+
+	-- Ordinary beta reduction
+    go env (Lam bndr body) (arg : args)
+      = tick (BetaReduction bndr)			`thenSmpl_`
+	simplNonRecX env (zap_it bndr) arg 		$ \ env -> 
+	go env body args
+
+	-- Not enough args, so there are real lambdas left to put in the result
+    go env fun args
+      = simplExprF env fun (pushContArgs orig_env args cont)
+	-- NB: orig_env; the correct environment to capture with
+	-- the arguments.... env has been augmented with substitutions 
+	-- from the beta reductions.
+
+makeThatCall env var fun args cont
+  = simplExprF env fun (pushContArgs env args cont)
 \end{code}		   
 
 
@@ -1678,7 +1708,6 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
 	--	in
 	--	case (case e of ...) of
 	--	    C t xs::[t] -> j t xs
-
     let 
 	-- We make the lambdas into one-shot-lambdas.  The
 	-- join point is sure to be applied at most once, and doing so

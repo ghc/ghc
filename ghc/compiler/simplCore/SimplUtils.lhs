@@ -12,9 +12,9 @@ module SimplUtils (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 	contIsDupable, contResultType,
-	countValArgs, countArgs, 
+	countValArgs, countArgs, pushContArgs,
 	mkBoringStop, mkStop, contIsRhs, contIsRhsOrArg,
-	getContArgs, interestingCallContext, interestingArg, isStrictType, discardInline
+	getContArgs, interestingCallContext, interestingArg, isStrictType
 
     ) where
 
@@ -25,31 +25,25 @@ import CmdLineOpts	( SimplifierSwitch(..),
 			  opt_SimplCaseMerge, opt_UF_UpdateInPlace
 			)
 import CoreSyn
-import CoreFVs		( exprSomeFreeVars, exprsSomeFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, 
+import CoreUtils	( cheapEqExpr, exprType, 
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
-import Subst		( InScopeSet, mkSubst, substExpr )
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( Id, idType, idName, 
+import Id		( Id, idType, idInfo,
 			  mkSysLocal, hasNoBinding, isDeadBinder, idNewDemandInfo,
-			  idUnfolding, idNewStrictness,
-			  mkLocalId, idInfo
+			  idUnfolding, idNewStrictness
 			)
-import Name		( setNameUnique )
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
-import Type		( Type, mkForAllTys, seqType, 
+import Type		( Type, seqType, 
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
-			  isUnLiftedType, splitRepFunTys, isStrictType
+			  splitRepFunTys, isStrictType
 			)
 import OccName		( UserFS )
 import TyCon		( tyConDataConsIfAvailable, isDataTyCon )
 import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
-import VarEnv		( SubstEnv )
-import VarSet		( mkVarSet, varSetElems, intersectVarSet )
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
 \end{code}
@@ -144,12 +138,6 @@ contIsDupable (InlinePlease cont)	 = contIsDupable cont
 contIsDupable other			 = False
 
 -------------------
-discardInline :: SimplCont -> SimplCont
-discardInline (InlinePlease cont)  = cont
-discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
-discardInline cont		   = cont
-
--------------------
 discardableCont :: SimplCont -> Bool
 discardableCont (Stop _ _ _)	    = False
 discardableCont (CoerceIt _ cont)   = discardableCont cont
@@ -182,6 +170,12 @@ countValArgs other			   = 0
 countArgs :: SimplCont -> Int
 countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
 countArgs other			  = 0
+
+-------------------
+pushContArgs :: SimplEnv -> [OutArg] -> SimplCont -> SimplCont
+-- Pushes args with the specified environment
+pushContArgs env []           cont = cont
+pushContArgs env (arg : args) cont = ApplyTo NoDup arg env (pushContArgs env args cont)
 \end{code}
 
 
@@ -269,25 +263,19 @@ getContArgs chkr fun orig_cont
 	  other -> vanilla_stricts	-- Not enough args, or no strictness
 
 -------------------
-interestingArg :: InScopeSet -> InExpr -> SubstEnv -> Bool
+interestingArg :: OutExpr -> Bool
 	-- An argument is interesting if it has *some* structure
 	-- We are here trying to avoid unfolding a function that
 	-- is applied only to variables that have no unfolding
 	-- (i.e. they are probably lambda bound): f x y z
 	-- There is little point in inlining f here.
-interestingArg in_scope arg subst
-  = analyse (substExpr (mkSubst in_scope subst) arg)
-	-- 'analyse' only looks at the top part of the result
-	-- and substExpr is lazy, so this isn't nearly as brutal
-	-- as it looks.
-  where
-    analyse (Var v)	      = hasSomeUnfolding (idUnfolding v)
-				-- Was: isValueUnfolding (idUnfolding v')
-				-- But that seems over-pessimistic
-    analyse (Type _)	      = False
-    analyse (App fn (Type _)) = analyse fn
-    analyse (Note _ a)	      = analyse a
-    analyse other	      = True
+interestingArg (Var v)	         = hasSomeUnfolding (idUnfolding v)
+					-- Was: isValueUnfolding (idUnfolding v')
+					-- But that seems over-pessimistic
+interestingArg (Type _)	         = False
+interestingArg (App fn (Type _)) = interestingArg fn
+interestingArg (Note _ a)	 = interestingArg a
+interestingArg other	         = True
 	-- Consider 	let x = 3 in f x
 	-- The substitution will contain (x -> ContEx 3), and we want to
 	-- to say that x is an interesting argument.
