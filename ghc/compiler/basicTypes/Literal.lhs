@@ -99,6 +99,8 @@ data Literal
   | MachFloat	Rational
   | MachDouble	Rational
 
+        -- MachLabel is used (only) for the literal derived from a 
+	-- "foreign label" declaration.
 	-- string argument is the name of a symbol.  This literal
 	-- refers to the *address* of the label.
   | MachLabel   FAST_STRING		-- always an Addr#
