@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.39 2001/04/02 14:51:57 simonmar Exp $
+ * $Id: Printer.c,v 1.40 2001/04/03 10:09:23 rrt Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -919,7 +919,7 @@ extern void DEBUG_LoadSymbols( char *name )
 
 extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 {
-(  /* nothing, yet */
+  /* nothing, yet */
 }
 
 #endif /* HAVE_BFD_H */
