@@ -35,6 +35,7 @@ import PrelMaybe
 import PrelArr
 import PrelNum
 import PrelRead
+import PrelErr ( error )
 
 \end{code}
 
@@ -73,13 +74,17 @@ lexDigits      :: ReadS String
 \begin{code}
 showInt :: Integral a => a -> ShowS
 showInt n r
-  = case quotRem n 10 of                 { (n', d) ->
-    case chr (ord_0 + fromIntegral d) of { C# c# -> -- stricter than necessary
-    let
+  | n < 0     = error "Numeric.showInt: can't show negative numbers"
+  | otherwise = go n r
+    where
+     go n r = 
+      case quotRem n 10 of                 { (n', d) ->
+      case chr (ord_0 + fromIntegral d) of { C# c# -> -- stricter than necessary
+      let
 	r' = C# c# : r
-    in
-    if n' == 0 then r' else showInt n' r'
-    }}
+      in
+      if n' == 0 then r' else go n' r'
+      }}
 \end{code}
 
 Controlling the format and precision of floats. The code that
