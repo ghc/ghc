@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.185 2004/02/25 17:35:44 simonmar Exp $
+ * $Id: Schedule.c,v 1.186 2004/02/26 11:41:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -1986,7 +1986,9 @@ void scheduleThread(StgTSO* tso)
   RELEASE_LOCK(&sched_mutex);
 }
 
-static Condition bound_cond_cache = NULL;
+#if defined(RTS_SUPPORTS_THREADS)
+static Condition *bound_cond_cache = NULL;
+#endif
 
 SchedulerStatus
 scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
@@ -2004,7 +2006,7 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
     // cache one.  This is a pretty feeble hack, but it helps speed up
     // consecutive call-ins quite a bit.
     if (bound_cond_cache != NULL) {
-	m->bound_thread_cond = bound_cond_cache;
+	m->bound_thread_cond = *bound_cond_cache;
 	bound_cond_cache = NULL;
     } else {
 	initCondition(&m->bound_thread_cond);
@@ -2148,7 +2150,7 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
 #if defined(RTS_SUPPORTS_THREADS)
   // Free the condition variable, returning it to the cache if possible.
   if (bound_cond_cache == NULL) {
-      bound_cond_cache = m->bound_thread_cond;
+      *bound_cond_cache = m->bound_thread_cond;
   } else {
       closeCondition(&m->bound_thread_cond);
   }
