@@ -69,9 +69,10 @@ module Util (
 #include "../includes/config.h"
 #include "HsVersions.h"
 
+import qualified List	( elem, notElem )
 import List		( zipWith4 )
 import Maybe		( Maybe(..) )
-import Panic		( panic )
+import Panic		( panic, trace )
 import IOExts		( IORef, newIORef, unsafePerformIO )
 import FastTypes
 #if __GLASGOW_HASKELL__ <= 408
@@ -317,19 +318,19 @@ isIn msg x ys
   where
     elem i _ []	    = False
     elem i x (y:ys)
-      | i ># _ILIT 100 = panic ("Over-long elem in: " ++ msg)
-      | otherwise	 = x == y || elem (i +# _ILIT(1)) x ys
+      | i ># _ILIT 100 = trace ("Over-long elem in " ++ msg) $
+			 x `List.elem` (y:ys)
+      | otherwise      = x == y || elem (i +# _ILIT(1)) x ys
 
 isn'tIn msg x ys
   = notElem (_ILIT 0) x ys
   where
     notElem i x [] =  True
     notElem i x (y:ys)
-      | i ># _ILIT 100 = panic ("Over-long notElem in: " ++ msg)
-      | otherwise	 =  x /= y && notElem (i +# _ILIT(1)) x ys
-
+      | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg) $
+		         x `List.notElem` (y:ys)
+      | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
 # endif {- DEBUG -}
-
 \end{code}
 
 %************************************************************************
