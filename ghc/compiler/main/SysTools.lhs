@@ -557,8 +557,12 @@ runSomething phase_name pgm args
   where
     cmd_line = unwords (pgm : dosifyPaths (map quote args))
 	-- The pgm is already in native format (appropriate dir separators)
+#if defined(mingw32_TARGET_OS)
     quote "" = ""
     quote s  = "\"" ++ s ++ "\""
+#else
+    quote = id
+#endif
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
