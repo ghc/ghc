@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.19 2001/03/22 03:51:08 hwloidl Exp $
+-- $Id: primops.txt,v 1.20 2001/05/04 14:43:49 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1148,6 +1148,7 @@ primop ForeignObjToAddrOp "foreignObjToAddr#" GenPrimOp
 primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
    with
+   has_side_effects = True
    strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
 
 ------------------------------------------------------------------------
