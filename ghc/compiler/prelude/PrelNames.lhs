@@ -78,6 +78,7 @@ knownKeyNames
 	byteArrayTyConName,
 	mutableByteArrayTyConName,
 	foreignObjTyConName,
+	foreignPtrTyConName,
 	bcoPrimTyConName,
 	stablePtrTyConName,
 	stablePtrDataConName,
@@ -442,6 +443,8 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") m
 -- Forign objects and weak pointers
 foreignObjTyConName   = tcQual   pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjTyConKey
 foreignObjDataConName = dataQual pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjDataConKey
+foreignPtrTyConName   = tcQual   pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrTyConKey
+foreignPtrDataConName = dataQual pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrDataConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
@@ -653,17 +656,18 @@ integerTyConKey				= mkPreludeTyConUnique 21
 listTyConKey				= mkPreludeTyConUnique 22
 foreignObjPrimTyConKey			= mkPreludeTyConUnique 23
 foreignObjTyConKey			= mkPreludeTyConUnique 24
-weakPrimTyConKey			= mkPreludeTyConUnique 25
-mutableArrayPrimTyConKey		= mkPreludeTyConUnique 26
-mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 27
-orderingTyConKey			= mkPreludeTyConUnique 28
-mVarPrimTyConKey		    	= mkPreludeTyConUnique 29
-ratioTyConKey				= mkPreludeTyConUnique 30
-rationalTyConKey			= mkPreludeTyConUnique 31
-realWorldTyConKey			= mkPreludeTyConUnique 32
-stablePtrPrimTyConKey			= mkPreludeTyConUnique 33
-stablePtrTyConKey			= mkPreludeTyConUnique 34
-statePrimTyConKey			= mkPreludeTyConUnique 35
+foreignPtrTyConKey			= mkPreludeTyConUnique 25
+weakPrimTyConKey			= mkPreludeTyConUnique 26
+mutableArrayPrimTyConKey		= mkPreludeTyConUnique 27
+mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 28
+orderingTyConKey			= mkPreludeTyConUnique 29
+mVarPrimTyConKey		    	= mkPreludeTyConUnique 30
+ratioTyConKey				= mkPreludeTyConUnique 31
+rationalTyConKey			= mkPreludeTyConUnique 32
+realWorldTyConKey			= mkPreludeTyConUnique 33
+stablePtrPrimTyConKey			= mkPreludeTyConUnique 34
+stablePtrTyConKey			= mkPreludeTyConUnique 35
+statePrimTyConKey			= mkPreludeTyConUnique 36
 stableNamePrimTyConKey			= mkPreludeTyConUnique 50
 stableNameTyConKey		        = mkPreludeTyConUnique 51
 mutableByteArrayTyConKey		= mkPreludeTyConUnique 52
@@ -714,13 +718,14 @@ intDataConKey				= mkPreludeDataConUnique  6
 smallIntegerDataConKey			= mkPreludeDataConUnique  7
 largeIntegerDataConKey			= mkPreludeDataConUnique  8
 foreignObjDataConKey			= mkPreludeDataConUnique  9
-nilDataConKey				= mkPreludeDataConUnique 10
-ratioDataConKey				= mkPreludeDataConUnique 11
-stablePtrDataConKey			= mkPreludeDataConUnique 12
-stableNameDataConKey			= mkPreludeDataConUnique 13
-trueDataConKey				= mkPreludeDataConUnique 14
-wordDataConKey				= mkPreludeDataConUnique 15
-ioDataConKey				= mkPreludeDataConUnique 16
+foreignPtrDataConKey			= mkPreludeDataConUnique 10
+nilDataConKey				= mkPreludeDataConUnique 11
+ratioDataConKey				= mkPreludeDataConUnique 12
+stablePtrDataConKey			= mkPreludeDataConUnique 13
+stableNameDataConKey			= mkPreludeDataConUnique 14
+trueDataConKey				= mkPreludeDataConUnique 15
+wordDataConKey				= mkPreludeDataConUnique 16
+ioDataConKey				= mkPreludeDataConUnique 17
 
 -- Generic data constructors
 crossDataConKey		      		= mkPreludeDataConUnique 17
@@ -836,6 +841,7 @@ cCallishTyKeys =
 	, byteArrayTyConKey
 	, mutableByteArrayTyConKey
 	, foreignObjTyConKey
+	, foreignPtrTyConKey
 	, stablePtrTyConKey
 	, int8TyConKey
 	, int16TyConKey
