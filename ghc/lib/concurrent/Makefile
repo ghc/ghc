@@ -14,7 +14,7 @@ LIBRARY = libHSconc$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
-HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) GHC.$(way_)hi
+HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
 
 
 #-----------------------------------------------------------------------------
