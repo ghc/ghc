@@ -22,6 +22,8 @@ HADDOCKLIB=$(FPTOOLS_TOP_ABS)/haddock/html
 HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
 endif
 
+HAPPY_OPTS += $(GHC_HAPPY_OPTS)
+
 INSTALLED_SCRIPT_PROG  = haddock-$(ProjectVersion)
 INPLACE_SCRIPT_PROG    = haddock-inplace
 
