@@ -8,8 +8,7 @@
 
 module TcInstDcls (
 	tcInstDecls1,
-	tcInstDecls2,
-	tcMethodBind
+	tcInstDecls2
     ) where
 
 
@@ -34,7 +33,8 @@ import TcHsSyn		( SYN_IE(TcHsBinds),
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
-import TcBinds		( tcBindWithSigs, tcPragmaSigs, TcSigInfo(..), checkSigTyVars )
+import TcBinds		( tcPragmaSigs )
+import TcClassDcl	( tcMethodBind )
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
@@ -73,7 +73,7 @@ import Id		( GenId, idType, replacePragmaInfo,
 			  isNullaryDataCon, dataConArgTys, SYN_IE(Id) )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust, seqMaybe, catMaybes )
-import Name		( nameOccName, getOccString, occNameString, moduleString, getSrcLoc,
+import Name		( nameOccName, getSrcLoc, mkLocalName,
 			  isLocallyDefined, OccName, Name{--O only-}, SYN_IE(Module),
 			  NamedThing(..)
 			)
@@ -396,7 +396,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     tcExtendGlobalTyVars inst_tyvars_set' (
         tcExtendGlobalValEnv (catMaybes defm_ids) $
 		-- Default-method Ids may be mentioned in synthesised RHSs 
-	mapAndUnzip3Tc (tcMethodBind clas inst_ty' monobinds) 
+	mapAndUnzip3Tc (tcInstMethodBind clas inst_ty' monobinds) 
 		       (op_sel_ids `zip` defm_ids)
     )				 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
@@ -453,47 +453,43 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 %************************************************************************
 
 \begin{code}
-tcMethodBind 
+tcInstMethodBind 
 	:: Class
 	-> TcType s					-- Instance type
 	-> RenamedMonoBinds				-- Method binding
 	-> (Id, Maybe Id)				-- Selector id and default-method id
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcMethodBind clas inst_ty meth_binds (sel_id, maybe_dm_id)
-  = newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
-    tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
+tcInstMethodBind clas inst_ty meth_binds (sel_id, maybe_dm_id)
+  = tcGetSrcLoc			`thenNF_Tc` \ loc ->
+    tcGetUnique			`thenNF_Tc` \ uniq ->
     let
-	meth_name    = getName local_meth_id
-
-	maybe_meth_bind      = go (getOccName sel_id) meth_binds 
-        (bndr_name, op_bind) = case maybe_meth_bind of
+	meth_occ	  = getOccName sel_id
+	default_meth_name = mkLocalName uniq meth_occ loc
+	maybe_meth_bind   = find meth_occ meth_binds 
+        the_meth_bind     = case maybe_meth_bind of
 				  Just stuff -> stuff
-				  Nothing    -> (meth_name, mk_default_bind meth_name)
-
-	(theta', tau')  = splitRhoTy rho_ty'
-	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' noSrcLoc
+				  Nothing    -> mk_default_bind default_meth_name
     in
 
 	-- Warn if no method binding
-    warnTc (not (maybeToBool maybe_meth_bind) && not (maybeToBool maybe_dm_id))	
+    warnTc (not (maybeToBool maybe_meth_bind) &&
+	    not (maybeToBool maybe_dm_id))	
 	   (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
-    tcBindWithSigs [bndr_name] op_bind [sig_info]
-		   nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
-
-    returnTc (binds, insts, meth)
+	-- Typecheck the method binding
+    tcMethodBind clas origin inst_ty sel_id the_meth_bind
   where
     origin = InstanceDeclOrigin 	-- Poor
 
-    go occ EmptyMonoBinds 	= Nothing
-    go occ (AndMonoBinds b1 b2) = go occ b1 `seqMaybe` go occ b2
+    find occ EmptyMonoBinds 	  = Nothing
+    find occ (AndMonoBinds b1 b2) = find occ b1 `seqMaybe` find occ b2
 
-    go occ b@(FunMonoBind op_name _ _ locn)          | nameOccName op_name == occ = Just (op_name, b)
-						     | otherwise		  = Nothing
-    go occ b@(PatMonoBind (VarPatIn op_name) _ locn) | nameOccName op_name == occ = Just (op_name, b)
-						     | otherwise		  = Nothing
-    go occ other = panic "Urk! Bad instance method binding"
+    find occ b@(FunMonoBind op_name _ _ _)          | nameOccName op_name == occ = Just b
+						    | otherwise		  = Nothing
+    find occ b@(PatMonoBind (VarPatIn op_name) _ _) | nameOccName op_name == occ = Just b
+						    | otherwise		  = Nothing
+    find occ other = panic "Urk! Bad instance method binding"
 
 
     mk_default_bind local_meth_name
