@@ -404,8 +404,11 @@ dist-package :: dist-package-tar-gz
 
 SRC_DIST_PATHS = $(patsubst %, $(SRC_DIST_NAME)/%, $(SRC_DIST_FILES) $(SRC_DIST_DIRS))
 
+dist-package-tar-bz2 ::
+	BZIP2=-9 $(TAR) chjf $(SRC_DIST_NAME)-src.tar.bz2 $(SRC_DIST_NAME) || $(RM) $(SRC_DIST_NAME)-src.tar.bz2
+
 dist-package-tar-gz ::
-	$(TAR) chzf $(SRC_DIST_NAME)-src.tar.gz $(SRC_DIST_NAME)
+	$(TAR) chzf $(SRC_DIST_NAME)-src.tar.gz $(SRC_DIST_NAME) || $(RM) $(SRC_DIST_NAME)-src.tar.gz
 
 dist-package-zip ::
 	cd ..; $(LN_S) $(FPTOOLS_TOP_ABS) $(SRC_DIST_NAME) && \
