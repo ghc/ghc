@@ -64,6 +64,11 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HC_POST_OPTS)
 
+%.$(way_)s : %.$(way_)hc 
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -S $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC_POST_OPTS)
+
 %.$(way_)hc : %.lhc
 	@$(RM) $@
 	$(UNLIT) $< $@
@@ -122,6 +127,10 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 	$(AS) $(AS_OPTS) -o $@ $< || ( $(RM) $@ && exit 1 )
 
 %.$(way_)o : %.c
+	@$(RM) $@
+	$(CC) $(CC_OPTS) -c $< -o $@
+
+%.$(way_)o : %.S
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -c $< -o $@
 
