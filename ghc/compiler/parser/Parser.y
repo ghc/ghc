@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.66 2001/05/24 13:59:11 simonpj Exp $
+$Id: Parser.y,v 1.67 2001/06/11 12:21:17 simonpj Exp $
 
 Haskell grammar.
 
@@ -341,10 +341,10 @@ topdecl :: { RdrBinding }
 		-- Instead we just say b is out of scope
 		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
 
-	| srcloc 'data' ctype '=' constrs deriving
+	| srcloc 'data' ctype constrs deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
-		      (mkTyData DataType cs c ts (reverse $5) (length $5) $6 $1))) }
+		      (mkTyData DataType cs c ts (reverse $4) (length $4) $5 $1))) }
 
 	| srcloc 'newtype' ctype '=' newconstr deriving
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
@@ -605,7 +605,11 @@ newconstr :: { RdrNameConDecl }
 				{ mkConDecl $2 [] [] (RecCon [([$4], unbangedType $6)]) $1 }
 
 constrs :: { [RdrNameConDecl] }
-	: constrs '|' constr		{ $3 : $1 }
+        : {- empty; a GHC extension -}  { [] }
+        | '=' constrs1                  { $2 }
+
+constrs1 :: { [RdrNameConDecl] }
+	: constrs1 '|' constr		{ $3 : $1 }
 	| constr			{ [$1] }
 
 constr :: { RdrNameConDecl }

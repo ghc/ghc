@@ -464,7 +464,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		 tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = ncons,
 		 tcdDerivs = derivings})
-      = pp_tydecl (ptext keyword <+> pp_decl_head context tycon tyvars <+> equals)
+      = pp_tydecl (ptext keyword <+> pp_decl_head context tycon tyvars)
 		  (pp_condecls condecls ncons)
 		  derivings
       where
@@ -490,7 +490,7 @@ pp_decl_head :: Outputable name => HsContext name -> name -> [HsTyVarBndr name] 
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 
 pp_condecls []     ncons = ptext SLIT("{- abstract with") <+> int ncons <+> ptext SLIT("constructors -}")
-pp_condecls (c:cs) ncons = sep (ppr c : map (\ c -> ptext SLIT("|") <+> ppr c) cs)
+pp_condecls (c:cs) ncons = equals <+> sep (ppr c : map (\ c -> ptext SLIT("|") <+> ppr c) cs)
 
 pp_tydecl pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
