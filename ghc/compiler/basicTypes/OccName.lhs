@@ -441,8 +441,11 @@ The basic encoding scheme is this.
 	fooZ		fooZZ	
 	:+		Zczp
 	()		Z0T
-	(,,,,)		Z4T
-
+	(,,,,)		Z4T	5-tuple
+	(#,,,,#)	Z4H	unboxed 5-tuple
+		(NB: the number is one different to the number of 
+		elements.  No real reason except that () is a zero-tuple,
+		while (,) is a 2-tuple.)
 
 \begin{code}
 -- alreadyEncoded is used in ASSERTs to check for encoded
@@ -463,20 +466,23 @@ alreadyEncodedFS fs = alreadyEncoded (_UNPK_ fs)
 
 encode :: UserString -> EncodedString
 encode cs = case maybe_tuple cs of
-		Just n  -> 'Z' : show n ++ "T"		-- Tuples go to Z2T etc
+		Just n  -> n		-- Tuples go to Z2T etc
 		Nothing -> go cs
 	  where
 		go []     = []
 		go (c:cs) = encode_ch c ++ go cs
 
--- ToDo: Unboxed tuples too, perhaps?
-maybe_tuple ('(' : cs) = check_tuple (0::Int) cs
-maybe_tuple other      = Nothing
+maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
+				 (n, '#' : ')' : cs) -> Just ('Z' : shows n "H")
+				 other		     -> Nothing
+maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
+				 (n, ')' : cs) -> Just ('Z' : shows n "T")
+				 other	       -> Nothing
+maybe_tuple other    	     = Nothing
 
-check_tuple :: Int -> String -> Maybe Int
-check_tuple n (',' : cs) = check_tuple (n+1) cs
-check_tuple n ")"	 = Just n
-check_tuple n other      = Nothing
+count_commas :: Int -> String -> (Int, String)
+count_commas n (',' : cs) = count_commas (n+1) cs
+count_commas n cs	  = (n,cs)
 
 encodeFS :: UserFS -> EncodedFS
 encodeFS fast_str  | all unencodedChar str = fast_str
@@ -571,6 +577,7 @@ decode_escape (c : rest)
   where
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
     go n ('T' : rest)		= '(' : replicate n ',' ++ ')' : decode rest
+    go n ('H' : rest)		= '(' : '#' : replicate n ',' ++ '#' : ')' : decode rest
     go n ('U' : rest)           = chr n : decode rest
     go n other = pprPanic "decode_escape" (ppr n <+> text (c:rest))
 
