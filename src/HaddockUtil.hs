@@ -140,8 +140,9 @@ restrictTo names decl = case decl of
 	HsDataDecl loc ctxt n xs (restrictCons names cons) drv doc
      decl@(HsNewTypeDecl loc ctxt n xs con drv doc) ->
 	case restrictCons names [con] of
-	   [] -> HsDataDecl loc ctxt n xs [] drv doc
-	   _  -> decl
+	   []     -> HsDataDecl loc ctxt n xs [] drv doc
+	   [con'] -> HsNewTypeDecl loc ctxt n xs con' drv doc
+		-- an abstract newtype decl appears as a data decl.
      HsClassDecl loc ctxt n tys fds decls doc ->
 	HsClassDecl loc ctxt n tys fds (restrictDecls names decls) doc
      _ -> decl
