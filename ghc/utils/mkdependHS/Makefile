@@ -59,4 +59,4 @@ include $(TOP)/mk/target.mk
 #
 install ::
 	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) $(SCRIPT_PROG)
+	@$(MAKE) $(MFLAGS) BIN_DIST=0 INSTALLING=0 $(SCRIPT_PROG)
