@@ -30,7 +30,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  TyThing(..), DFunId, TypeEnv,
 			  GenAvailInfo,
 			  WhatsImported(..), GenAvailInfo(..), 
-			  ImportVersion, AvailInfo, Deprecations(..),
+			  ImportVersion, Deprecations(..),
 			  lookupVersion, typeEnvIds
 			)
 
@@ -45,7 +45,7 @@ import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import PprCore		( pprIdRules )
-import Name		( getName, nameModule, toRdrName, isExternalName, 
+import Name		( getName, toRdrName, isExternalName, 
 			  nameIsLocalOrFrom, Name, NamedThing(..) )
 import NameEnv
 import NameSet
@@ -64,7 +64,7 @@ import ErrUtils		( dumpIfSet_dyn )
 
 import Monad		( when )
 import Maybe		( catMaybes )
-import IO		( IOMode(..), openFile, hClose, putStrLn )
+import IO		( putStrLn )
 \end{code}
 
 
