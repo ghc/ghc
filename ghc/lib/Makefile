@@ -77,10 +77,10 @@ SRC_MKDEPENDHS_OPTS += -ighc:required:glaExts:concurrent -I$(GHC_INCLUDE_DIR)
 #-----------------------------------------------------------------------------
 # 	Rules
 
-GHC.$(way_)hi	: GHC.hi-boot
-	cp GHC.hi-boot GHC.$(way_)hi
+ghc/GHC.$(way_)hi	: ghc/GHC.hi-boot
+	cp $< $@
 
-
+boot :: ghc/GHC.hi $(foreach way, $(WAYS), ghc/GHC.$(way)_hi)
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
