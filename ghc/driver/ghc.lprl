@@ -158,6 +158,23 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
+# Some shells run into real trouble when command line and environment
+# gets big (e.g., cmd lines of >4K to /bin/sh causes havoc on our 
+# Solaris-2.5.1 boxes - even though sysconf(_SC_ARG_MAX) reports 1M ...).
+# To work around any such */bin/sh* problems, we will scribble such
+# awfully long command lines into a temp file and exec that temp file
+# with $(REAL_SHELL) (don't use the SHELL variable directly as this
+# will normally get you the wrong thing when the driver is invoked
+# from within `make'). If the REAL_SHELL variable isn't set, you'll
+# get SHELL. This is all a terrible hack. (in case you hadn't reached
+# the same conclusion by now :-)
+#
+# TBC..
+#
+if ( ! $ENV{'REAL_SHELL'} ) {
+    $ENV{'REAL_SHELL'} = $ENV{'SHELL'};
+}
+
 @Files_to_tidy = (); # files we nuke in the case of abnormal termination
 
 $Unlit = ( $INSTALLING ) ? "$InstLibexecDirGhc/unlit"
@@ -554,6 +571,9 @@ $NoImplicitPrelude = 0;
 # and whatever else
 @Cmd_opts  = ();
 
+# cmd line options prefixing the unit we're compiling
+@File_options = ();
+
 \end{code}
 
 We inject consistency-checking information into \tr{.hc} files (both
@@ -568,10 +588,10 @@ $LinkChk = 1;	# set to 0 if the link check should *not* be done
 
 # major & minor version numbers; major numbers must always agree;
 # minor disagreements yield a warning.
-$HsC_major_version = 31;
+$HsC_major_version = 32;
 $HsC_minor_version = 0;
 $Cc_major_version  = 36;
-$Cc_minor_version  = 0;
+$Cc_minor_version  = 1;
 
 # options: these must always agree
 $HsC_consist_options = '';    # we record, in this order:
@@ -737,18 +757,24 @@ sub setupOptimiseFlags {
     = (	'-fsimplify',
 	  '\(',
 	  $Oopt_FB_Support,
-#	  '-falways-float-lets-from-lets',	# no idea why this was here (WDP 95/09)
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
 #	  '-fdo-lambda-eta-expansion',	# too complicated
 	  '-freuse-con',
-#	  '-flet-to-case',	# no strictness analysis, so...
+#	  '-flet-to-case',		# no strictness analysis, so...
 	  $Oopt_PedanticBottoms,
 #	  $Oopt_MonadEtaExpansion,	# no thanks
-	  '-fsimpl-uf-use-threshold0',
-	  '-fessential-unfoldings-only',
-#	  $Oopt_UnfoldingUseThreshold,	# no thanks
+
+# These two work fine, if you really want no simplification at all,
+# for bizarre test reasons.  But you get really terrible code if you use them,
+#	for example: let x = e in x
+# with dozens of redundant thunks etc.  So I'm leaving them out.
+#
+#	  '-fsimpl-uf-use-threshold0',
+#	  '-fessential-unfoldings-only',
+
+	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  '\)',
 	$Oopt_AddAutoSccs,
@@ -766,8 +792,23 @@ sub setupOptimiseFlags {
 	  '\(', 
 	  $Oopt_FB_Support,
 	  '-fkeep-spec-pragma-ids',	# required before specialisation
-	  '-fsimpl-uf-use-threshold0',
-	  '-fessential-unfoldings-only',
+
+# I don't understand why we want -fessential-unfoldings-only here
+# If we have it, the following nasty thing happens:
+#	f  = E
+#	g* = f
+#	...g...
+# where "*" means exported.
+# In the essential-unfoldings pass we still substitute f for g
+# but we don't substitute E for f first.  So we get
+#	f  = E
+#	g* = f
+#	...f...
+# The g=f will get reverse-substituted later, but it's untidy.
+#
+#	  '-fessential-unfoldings-only',
+#	  '-fsimpl-uf-use-threshold0',
+
 	  '-fmax-simplifier-iterations1',
 	  $Oopt_PedanticBottoms,
 	  '\)',
@@ -1082,8 +1123,8 @@ Decide what the consistency-checking options are in force for this run:
        $Tag = "${Tag}_" if $Tag ne '';
        $HiSuffix_prelude="${Tag}hi";
   }
-  push(@HsC_flags, "-hisuf-prelude=.${HiSuffix_prelude}"); # use appropriate Prelude .hi files
-  push(@HsC_flags, "-hisuf=.${HiSuffix}");
+  #push(@HsC_flags, "-hisuf-prelude=.${HiSuffix_prelude}"); # use appropriate Prelude .hi files
+  #push(@HsC_flags, "-hisuf=.${HiSuffix}");
 
 } # setupBuildFlags
 \end{code}
@@ -1128,9 +1169,7 @@ sub setupMachOpts {
   } elsif ($TargetPlatform =~ /^i386-/) {
       # we know how to *mangle* asm for X86
       unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-      unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
-      			if $StkChkByPageFaultOK
-			   && $TargetPlatform !~ /nextstep/;
+      unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK && $TargetPlatform !~ /nextstep/;
       # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
       # on NeXTs (my fault, not theirs), so I don't.
       # CaS
@@ -1148,9 +1187,7 @@ sub setupMachOpts {
   } elsif ($TargetPlatform =~ /^m68k-/) {
       # we know how to *mangle* asm for m68k
       unshift (@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-      unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
-			if $StkChkByPageFaultOK
-		           && $TargetPlatform !~ /nextstep/;
+      unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK && $TargetPlatform !~ /nextstep/;
       # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
       # on NeXTs (my fault, not theirs), so I don't.
       # CaS
@@ -1178,10 +1215,12 @@ sub setupMachOpts {
 
   } elsif ($TargetPlatform =~ /^powerpc-/) {
       # we know how to *mangle* asm for PowerPC
-      unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
+# :-(   unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
       unshift(@CcBoth_flags,  ('-static')); # always easier to start with
       unshift(@CcRegd_flags, ('-finhibit-size-directive')); # avoids traceback tables
+#      unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); # we have lots of toc entries..
+      unshift(@Ld_flags, ('-Xlinker -bbigtoc')); # we have lots of toc entries...
 
   } elsif ($TargetPlatform =~ /^sparc-/) {
       # we know how to *mangle* asm for SPARC
@@ -1204,19 +1243,17 @@ sub setupLinkOpts {
   local($uscore) = ( ${LeadingUnderscore} eq 'YES' ) ? '_' : '';
 
   unshift(@Ld_flags,
-        (($Ld_main) ? (
-          '-u', "${uscore}Main_" . $Ld_main . '_closure',
-        ) : ()
-# What are these? -- SOF
-#         , '-u', "${uscore}STbase_unsafePerformPrimIO_fast1"
-#         , '-u', "${uscore}Prelude_Z91Z93_closure"	 # i.e., []
-#         , '-u', "${uscore}Prelude_IZh_static_info"
-#         , '-u', "${uscore}Prelude_False_inregs_info"
-#         , '-u', "${uscore}Prelude_True_inregs_info"
-#         , '-u', "${uscore}Prelude_CZh_static_info"
-#         , '-u', "${uscore}DEBUG_REGS"
-	))
-         ; # just for fun, now...
+        (($Ld_main) ? ( '-u', "${uscore}Main_" . $Ld_main . '_closure' ) : ()));
+  unshift(@Ld_flags,
+	(  '-u', "${uscore}PrelBase_Z91Z93_closure"	 # i.e., []
+          ,'-u', "${uscore}PrelBase_IZh_static_info"
+          ,'-u', "${uscore}PrelBase_CZh_static_info"
+          ,'-u', "${uscore}PrelBase_False_inregs_info"
+          ,'-u', "${uscore}PrelBase_True_inregs_info"
+	  ,'-u', "${uscore}STBase_SZh_static_info"
+          ,'-u', "${uscore}DEBUG_REGS"
+	));
+
 
 } # end of setupLinkOpts
 
@@ -1552,26 +1589,31 @@ Again, we'll do the post-recompilation-checker parts of this later.
 
     local($is_hc_file) = 1; #Is the C code .hc or .c? Assume .hc for now
 
-    $lit2pgm_hscpp = $ifile if ($ifile =~ /\.hs$/);
+    # OK, let's strip off some literate junk..
+    if ($ifile =~ /\.lhs$/) {
+        &runLit2pgm($in_lit2pgm, $lit2pgm_hscpp)
+    } else {
+        $lit2pgm_hscpp = $ifile;
+    }
 
-    # OK, let's strip off some literate junk:
-    &runLit2pgm($in_lit2pgm, $lit2pgm_hscpp) if ($ifile =~ /\.lhs$/);
     #
     @File_options = ();
 
     # Scan the top of the de-litted file for {-# OPTIONS #-} pragmas
-    &check_for_source_options($lit2pgm_hscpp);
+    &check_for_source_options($lit2pgm_hscpp,$ifile);
     # options found in the source file take a back seat, i.e., we scan
     # them first. Only process the command line again if source file
     # contained anything of interest *or* there's more than one
     # input file (we have to reset the options).
     #
     if ( $#Input_file >= 0 || $#File_options >= 0) {
-        @File_options = (@File_options, @Cmd_opts);
+        #@File_options = (@File_options, @Cmd_opts);
 
         # Now process the command line
         &initDriverGlobals();
-        &processArgs(@File_options);
+        &processArgs((@File_options,@Cmd_opts));
+	print STDERR "\nEffective command line: " .
+		     join(' ',(@File_options,@Cmd_opts)) . "\n" if $Verbose;
     }
     #
     # Having got the effective command line scanned, set up
@@ -1672,6 +1714,8 @@ Now the Haskell compiler, C compiler, and assembler
 
     &split_asm_file($cc_as)  if $do_as && $SplitObjFiles;
 
+    # save a copy of the .s file..
+    &saveIntermediate($ifile_root , "s" , $cc_as) if ($do_as && $Keep_s_file_too);
     &runAs($as_out, $ifile_root) if $do_as;
 \end{code}
 
@@ -1746,15 +1790,16 @@ sub runHscAndProcessInterfaces {
 	
     local($source_unchanged) = 1;
 
-# Check if the source file is up to date relative to the target; in
-# that case we say "source is unchanged" and let the compiler bail out
-# early if the import usage information allows it.
+    # Check if the source file is up to date relative to the target; in
+    # that case we say "source is unchanged" and let the compiler bail out
+    # early if the import usage information allows it.
 
     ($i_dev,$i_ino,$i_mode,$i_nlink,$i_uid,$i_gid,$i_rdev,$i_size,
      $i_atime,$i_mtime,$i_ctime,$i_blksize,$i_blocks) = stat($ifile);
 
+    # The informational messages below are now conditional on -v being set -- SOF
     if ( ! -f $ofile_target ) {
-#	print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n";
+        print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n" if $Verbose;
 	$source_unchanged = 0;
     }
 
@@ -1762,7 +1807,7 @@ sub runHscAndProcessInterfaces {
      $o_atime,$o_mtime,$o_ctime,$o_blksize,$o_blocks) = stat(_); # stat info from -f test
 
     if ( ! -f $hifile_target ) {
-#	print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n";
+        print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n" if $Verbose;
 	$source_unchanged = 0;
     }
 
@@ -1770,7 +1815,7 @@ sub runHscAndProcessInterfaces {
      $hi_atime,$hi_mtime,$hi_ctime,$hi_blksize,$hi_blocks) = stat(_); # stat info from -f test
 
     if ($i_mtime > $o_mtime) {
-#	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n";
+    	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n" if $Verbose;
 	$source_unchanged = 0;
     }
 
@@ -1780,12 +1825,12 @@ sub runHscAndProcessInterfaces {
 	push(@HsC_flags, '-fsource-unchanged');	
     }	
 
-# Run the compiler
+    # Run the compiler
 
     &runHsc($ifile_root, $hsc_out, $hsc_hi, $going_interactive);
 
-# See if it bailed out early, saying nothing needed doing.  
-# We work this out by seeing if it created an output .hi file
+   # See if it bailed out early, saying nothing needed doing.  
+   # We work this out by seeing if it created an output .hi file
 
     if ( ! -f $hsc_hi ) {
 	# Doesn't exist, so we bailed out early.
@@ -1831,28 +1876,20 @@ sub runHscAndProcessInterfaces {
 
 
 	# Interface-handling is important enough to live off by itself
-	require('ghc-iface.prl')
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
-	
+	require('ghc-iface.prl') || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
 	&postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
-	
-	# save a copy of the .hc file, even if we are carrying on...
-	if ($HscOut eq '-C=' && $do_cc && $Keep_hc_file_too) {
-	    local($to_do) = "$Rm $ifile_root.hc; $Cp $hsc_out $ifile_root.hc";
-	    &run_something($to_do, 'Saving copy of .hc file');
-	}
-	
-	# save a copy of the .s file, even if we are carrying on...
-	if ($HscOut eq '-S=' && $do_as && $Keep_s_file_too) {
-	    local($to_do) = "$Rm $ifile_root.s; $Cp $hsc_out $ifile_root.s";
-	    &run_something($to_do, 'Saving copy of .s file');
-	}
 	
 	# if we're going to split up object files,
 	# we inject split markers into the .hc file now
 	if ( $HscOut eq '-C=' && $SplitObjFiles ) {
 	    &inject_split_markers ( $hsc_out );
         }
+
+	# save a copy of the .hc file, even if we are carrying on...
+	if ($HscOut eq '-C=' && $do_cc && $Keep_hc_file_too) {
+            &saveIntermediate($ifile_root , "hc" , $hsc_out);
+	}
+
     }
 }
 \end{code}
@@ -1866,9 +1903,8 @@ sub runHsc {
     foreach $a ( @HsP_flags ) { $a = ",$a" unless $a =~ /^,/; }
 
     &makeHiMap() unless $HiMapDone;
-#    print STDERR "HiIncludes: $HiIncludeString\n";
+    #print STDERR "HiIncludes: $HiIncludeString\n";
     push(@HsC_flags, "-himap=$HiIncludeString");
-#    push(@HsC_flags, "-himap=$HiMapFile");
 
     # here, we may produce .hc/.s and/or .hi files
     local($output) = '';
@@ -1916,9 +1952,7 @@ sub runHsc {
 Use \tr{@Import_dir} and \tr{@SysImport_dir} to make a tmp file
 of (module-name, pathname) pairs, one per line, separated by a space.
 \begin{code}
-#%HiMap     = ();
 $HiMapDone = 0;
-$HiMapFile = '';
 $HiIncludeString = ();		# dir1:dir2:dir3, to pass to GHC
 
 sub makeHiMap {
@@ -1928,86 +1962,29 @@ sub makeHiMap {
     local($mod, $path, $d, $e);
 
     # reset the global variables:
-    #%HiMap     = ();
     $HiMapDone = 0;
-    $HiMapFile = '';
     $HiIncludeString = ();		# dir1:dir2:dir3, to pass to GHC
     
     foreach $d ( @Import_dir ) {
-	if ($HiIncludeString) { $HiIncludeString = "$HiIncludeString:$d";
-	} else { $HiIncludeString = $d; }
+	if ($HiIncludeString) { 
+	   $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix}";
+	} else { 
+	   $HiIncludeString = "$d%.${HiSuffix}"; 
+	}
 
-# The compiler does the searching now
-#
-#	opendir(DIR, $d) || &tidy_up_and_die(1,"$Pgm: error when reading directory: $d\n");
-#	local(@entry) = readdir(DIR);
-#	foreach $e ( @entry ) {
-#	    next unless $e =~ /\b([A-Z][A-Za-z0-9_]*)\.${HiSuffix_prelude}$/o;
-#	    $mod  = $1;
-#	    $path = "$d/$e";
-#	    $path =~ s,^\./,,;
-#
-#	    if ( ! defined($HiMap{$mod}) ) {
-#		$HiMap{$mod} = $path;
-#	    } else {
-#		&already_mapped_err($mod, $HiMap{$mod}, $path);
-#	    }
-#	}
-#	closedir(DIR); # || &tidy_up_and_die(1,"$Pgm: error when closing directory: $d\n");
     }
 
     foreach $d ( @SysImport_dir ) {
-	if ($HiIncludeString) { $HiIncludeString = "$HiIncludeString:$d";
-	} else { $HiIncludeString = $d; }
-
-#	opendir(DIR, $d) || &tidy_up_and_die(1,"$Pgm: error when reading directory: $d\n");
-#	local(@entry) = readdir(DIR);
-#	foreach $e ( @entry ) {
-#	    next unless $e =~ /([A-Z][A-Za-z0-9_]*)\.$HiSuffix$/o;
-#	    next if $NoImplicitPrelude && $e =~ /Prelude\.$HiSuffix$/o;
-#
-#	    $mod  = $1;
-#	    $path = "$d/$e";
-#	    $path =~ s,^\./,,;
-#
-#	    if ( ! defined($HiMap{$mod}) ) {
-#		$HiMap{$mod} = $path;
-#	    } elsif ( $mod ne 'Main' )  { # saves useless warnings...
-#		&already_mapped_err($mod, $HiMap{$mod}, $path);
-#	    }
-#	}
-#	closedir(DIR); # || &tidy_up_and_die(1,"$Pgm: error when closing directory: $d\n");
+	if ($HiIncludeString) { 
+	    $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix_prelude}";
+	} else { 
+	    $HiIncludeString = "${d}%.${HiSuffix_prelude}";
+        }
     }
-
-#
-# Not currently used:
-#
-#    $HiMapFile = "$Tmp_prefix.himap";
-#    unlink($HiMapFile);
-#    open(HIMAP, "> $HiMapFile") || &tidy_up_and_die(1,"$Pgm: can't open $HiMapFile\n");
-#    foreach $d (keys %HiMap) {
-#	print HIMAP $d, ' ', $HiMap{$d}, "\n";
-#    }
-#    close(HIMAP) || &tidy_up_and_die(1,"$Pgm: error when closing $HiMapFile\n");
 
     $HiMapDone = 1;
 }
 
-sub already_mapped_err {
-    local($mod, $mapped_to, $path) = @_;
-
-    # OK, it isn't really an error if $mapped_to and $path turn
-    # out to be the same thing.
-    ($m_dev,$m_ino,$m_mode,$m_nlink,$m_uid,$m_gid,$m_rdev,$m_size,
-     $m_atime,$m_mtime,$m_ctime,$m_blksize,$m_blocks) = stat($mapped_to);
-    ($p_dev,$p_ino,$p_mode,$p_nlink,$p_uid,$p_gid,$p_rdev,$p_size,
-     $p_atime,$p_mtime,$p_ctime,$p_blksize,$p_blocks) = stat($path);
-
-    return if $m_ino == $p_ino; # same inode number
-
-    print STDERR "$Pgm: module $mod already mapped to $mapped_to";
-    print STDERR ";\n\tignoring: $path\n";
-}
 \end{code}
 
 %************************************************************************
@@ -2057,7 +2034,7 @@ sub runGcc {
     local($cc_help_s) = "ghc$$.s";
 
     $cc       = $CcRegd;
-    $s_output = ($is_hc_file || $TargetPlatform =~ /^(hppa|i386)/) ? $cc_as_o : $cc_as;
+    $s_output = ($is_hc_file || $TargetPlatform =~ /^(powerpc|hppa|i386)/) ? $cc_as_o : $cc_as;
     $c_flags .= " @CcRegd_flags";
     $c_flags .= ($is_hc_file) ? " @CcRegd_flags_hc"  : " @CcRegd_flags_c";
 
@@ -2138,6 +2115,11 @@ sub runMangler {
 	|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-hppa.prl!\n");
 	&mini_mangle_asm_hppa($cc_as_o, $cc_as);
 
+    } elsif ($TargetPlatform =~ /^powerpc/) {
+	# minor mangling of non-threaded files for hp-pa only
+	require('ghc-asm.prl')
+	|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-powerpc.prl!\n");
+	&mini_mangle_asm_powerpc($cc_as_o, $cc_as);
     } elsif ($TargetPlatform =~ /^i386/) {
 	# extremely-minor OFFENSIVE mangling of non-threaded just one file
 	require('ghc-asm.prl')
@@ -2146,10 +2128,9 @@ sub runMangler {
     }
 
     # save a copy of the .s file, even if we are carrying on...
-    if ($do_as && $Keep_s_file_too) {
-	local($to_do) = "$Rm $ifile_root.s; $Cp $cc_as $ifile_root.s";
-	&run_something($to_do, 'Saving copy of .s file');
-    }
+    #if ($do_as && $Keep_s_file_too) {
+    #    &saveIntermediate($ifile_root , "s" , $cc_as);
+    #}
 }
 \end{code}
 
@@ -2211,8 +2192,29 @@ sub run_something {
     }
 
     local($return_val) = 0;
-    system("$Time $str_to_do");
-    $return_val = $?;
+
+    if ( length($str_to_do) > 4000) { 
+      # 4000 - on the random side, just like the *real* ARG_MAX 
+      # for some shells.
+
+      # With some shells, command lines of this length may
+      # very well cause trouble. To safeguard against this, we squirrel the
+      # command into a file and exec that.
+      local ($sh) = $ENV{'REAL_SHELL'};
+      print STDERR "Backup plan A: saving cmd line in ${Tmp_prefix}.sh and executing that with $sh\n" if $Verbose;
+      open (TEMP, "> ${Tmp_prefix}.sh") || 
+		&tidy_up_and_die(1,"$Pgm: failed to open `$Tmp_prefix.sh'\n");
+      print TEMP "$Time $str_to_do\n";
+      close (TEMP) ||
+      		&tidy_up_and_die(1,"$Pgm: failed closing `$Tmp_prefix.sh'\n");
+      system("$sh $Tmp_prefix.sh");
+      $return_val = $?;
+      
+      unlink "${Tmp_prefix}.sh";
+    } else {
+      system("$Time $str_to_do");
+      $return_val = $?;
+    }
 
     if ( $PostprocessCcOutput ) { # hack, continued
 	open(CCOUT, "< $Tmp_prefix.ccout")
@@ -2249,7 +2251,7 @@ sub run_something {
 
 %************************************************************************
 %*									*
-\subsection[Driver-ghctiming]{Emit nofibbish GHC timings}
+\subsection[Driver-ghc-timing]{Emit nofibbish GHC timings}
 %*									*
 %************************************************************************
 
@@ -2423,22 +2425,38 @@ file for any such pragmas:
 
 \begin{code}
 sub check_for_source_options {
-    local($file) = @_;
+    local($file,$ifile) = @_;
+    local($comment_start,$comment_end);
+
+    if ($ifile =~ /\.hc$/ || 
+        $ifile =~ /_hc$/  || 
+	$ifile =~ /\.s$/  || 
+	$ifile =~ /_s$/ ) {  # `Real' C intermediate
+       $comment_start = "/\\*";
+       $comment_end   = "\\*/";
+    } else { # Assume it is a file containing Haskell source
+       $comment_start = "{-#";
+       $comment_end   = "#-}";
+    }
 
     open(FILE,$file) || return(1); # No big loss
-
+    
     while (<FILE>) {
-	if ( /^{-# OPTIONS (.*)#-}/ ) {
+	if ( /^${comment_start} OPTIONS (.*)${comment_end}$/ ) {
            # add the options found at the back of the command line.
 	   local(@entries) = split(/\s+/,$1);
+	   print STDERR "Found OPTIONS " . join(' ',@entries) . " in $file\n" if $Verbose;
 	   push(@File_options, @entries);
 	}
         elsif ( /^$/ ) { # ignore empty lines
            ;
         }
+        elsif ( /^#line.+$/ ) { # ignore comment lines
+           ;
+        }
         else { # stop looking, something non-empty / not
-	       # {-# OPTIONS .. #-} encountered.
-	    break;
+	       # ${comment_start} OPTIONS .. ${comment_end} encountered.
+	    close(FILE);return(0);
         }
     }
     close(FILE);
@@ -2482,6 +2500,35 @@ arg: while($_ = $args[0]) {
 }    
 
 \end{code}
+
+When saving an intermediate file (.hc or .s) away, we 
+have to prefix any OPTIONS found in the original source file.
+
+\begin{code}
+sub saveIntermediate { 
+  local ($final,$suffix,$tmp)= @_ ;
+  local ($to_do);
+
+  # $final  -- root of where to park ${final}.${suffix}
+  # $tmp    -- temporary file where hsc put the intermediate file.
+
+  # Delete the old file
+  $to_do = "$Rm ${final}.${suffix}"; &run_something($to_do, "Removing old .${suffix} file");
+
+  if ( $#File_options >= 0 ) { # OPTIONS found in Haskell source unit
+    # Add OPTION comment to the top of the generated .${suffix} file
+    open(TEMP, "> ${final}.${suffix}") || &tidy_up_and_die(1,"Can't open ${final}.${suffix}\n");
+    print TEMP "/* OPTIONS " . join(' ',@File_options) . " */\n";
+    close(TEMP);
+    print STDERR "Prepending OPTIONS: " . join(' ',@File_options) . " to ${final}.${suffix}\n" if $Verbose;
+  }
+  $to_do = "$Cat $tmp  >> ${final}.${suffix}";
+  &run_something($to_do, "Saving copy of .${suffix} file");
+
+}
+
+\end{code}
+
 
 Command-line processor
 
@@ -2855,6 +2902,12 @@ arg: while($_ = $Args[0]) {
     /^-fno-snapback-to-append$/
 		    && do { $Oopt_FoldrBuildInline .= ' -fdo-not-fold-back-append '; 
 			    next arg; };
+
+    # --------------- Renamer -------------
+
+
+    /^-fno-tycon-pruning$/ 
+		    && do { push(@HsC_flags, $_); next arg; };
 
     # ---------------
 
