@@ -631,62 +631,55 @@ defines the mapping between Haskell and C types.
 <Literal>Char</Literal> </Entry>
 <Entry> <Literal>HsChar</Literal> </Entry>
 <Entry> unspec. integral type </Entry>
-<Entry> <Literal>HS&lowbar;CHAR&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;CHAR&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;CHAR&lowbar;MIN</Literal> .. <Literal>HS&lowbar;CHAR&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Int</Literal> </Entry>
 <Entry> <Literal>HsInt</Literal> </Entry>
 <Entry> signed integral of unspec. size(4) </Entry>
-<Entry> <Literal>HS&lowbar;INT&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;INT&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;INT&lowbar;MIN</Literal> ..
+<Literal>HS&lowbar;INT&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Int8</Literal> (2) </Entry>
 <Entry> <Literal>HsInt8</Literal> </Entry>
 <Entry> 8 bit signed integral </Entry>
-<Entry> <Literal>HS&lowbar;INT8&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;INT8&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;INT8&lowbar;MIN</Literal> 
+..
+<Literal>HS&lowbar;INT8&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Int16</Literal> (2) </Entry>
 <Entry> <Literal>HsInt16</Literal> </Entry>
 <Entry> 16 bit signed integral </Entry>
-<Entry> <Literal>HS&lowbar;INT16&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;INT16&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;INT16&lowbar;MIN</Literal>
+.. <Literal>HS&lowbar;INT16&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Int32</Literal> (2) </Entry>
 <Entry> <Literal>HsInt32</Literal> </Entry>
 <Entry> 32 bit signed integral </Entry>
-<Entry> <Literal>HS&lowbar;INT32&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;INT32&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;INT32&lowbar;MIN</Literal> ..
+<Literal>HS&lowbar;INT32&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Int64</Literal> (2,3) </Entry>
 <Entry> <Literal>HsInt64</Literal> </Entry>
 <Entry> 64 bit signed integral (3) </Entry>
-<Entry> <Literal>HS&lowbar;INT64&lowbar;MIN</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;INT64&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>HS&lowbar;INT64&lowbar;MIN</Literal> ..
+<Literal>HS&lowbar;INT64&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Word8</Literal> (2) </Entry>
 <Entry> <Literal>HsWord8</Literal> </Entry>
 <Entry> 8 bit unsigned integral </Entry>
-<Entry> <Literal>0</Literal> </Entry>
-<Entry>..</Entry>
+<Entry> <Literal>0</Literal> ..
 <Entry> <Literal>HS&lowbar;WORD8&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
@@ -694,8 +687,7 @@ defines the mapping between Haskell and C types.
 <Literal>Word16</Literal> (2) </Entry>
 <Entry> <Literal>HsWord16</Literal> </Entry>
 <Entry> 16 bit unsigned integral </Entry>
-<Entry> <Literal>0</Literal> </Entry>
-<Entry>..</Entry>
+<Entry> <Literal>0</Literal> ..
 <Entry> <Literal>HS&lowbar;WORD16&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
@@ -703,18 +695,16 @@ defines the mapping between Haskell and C types.
 <Literal>Word32</Literal> (2) </Entry>
 <Entry> <Literal>HsWord32</Literal> </Entry>
 <Entry> 32 bit unsigned integral </Entry>
-<Entry> <Literal>0</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;WORD32&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>0</Literal> ..
+<Literal>HS&lowbar;WORD32&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Word64</Literal> (2,3) </Entry>
 <Entry> <Literal>HsWord64</Literal> </Entry>
 <Entry> 64 bit unsigned integral (3) </Entry>
-<Entry> <Literal>0</Literal> </Entry>
-<Entry>..</Entry>
-<Entry> <Literal>HS&lowbar;WORD64&lowbar;MAX</Literal></Entry>
+<Entry> <Literal>0</Literal> ..
+<Literal>HS&lowbar;WORD64&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
@@ -722,8 +712,6 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsFloat</Literal> </Entry>
 <Entry> floating point of unspec. size (5) </Entry>
 <Entry> (10) </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 </Row>
 <Row>
 <Entry>
@@ -731,8 +719,6 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsDouble</Literal> </Entry>
 <Entry> floating point of unspec. size (5) </Entry>
 <Entry> (10) </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 </Row>
 <Row>
 <Entry>
@@ -740,16 +726,12 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsBool</Literal> </Entry>
 <Entry> unspec. integral type </Entry>
 <Entry> (11) </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>Addr</Literal> </Entry>
 <Entry> <Literal>HsAddr</Literal> </Entry>
 <Entry> void* (6) </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 <Entry> </Entry>
 </Row>
 <Row>
@@ -758,16 +740,12 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsForeignObj</Literal> </Entry>
 <Entry> void* (7) </Entry>
 <Entry> </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 </Row>
 <Row>
 <Entry>
 <Literal>StablePtr</Literal> </Entry>
 <Entry> <Literal>HsStablePtr</Literal> </Entry>
 <Entry> void* (8) </Entry>
-<Entry> </Entry>
-<Entry> </Entry>
 <Entry> </Entry>
 </Row>
 <Row>
