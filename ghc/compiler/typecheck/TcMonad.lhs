@@ -730,7 +730,7 @@ pprInstLoc (orig, locn, ctxt)
     pp_orig (PatOrigin pat)
 	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
     pp_orig (InstanceDeclOrigin)
-	=  ptext SLIT("an instance declaration")
+	=  ptext SLIT("the instance declaration")
     pp_orig (ArithSeqOrigin seq)
 	= hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
     pp_orig (SignatureOrigin)
