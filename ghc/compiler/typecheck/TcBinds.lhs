@@ -88,6 +88,9 @@ dictionaries, which we resolve at the module level.
 
 \begin{code}
 tcTopBinds :: RenamedHsBinds -> TcM (TcMonoBinds, TcLclEnv)
+	-- Note: returning the TcLclEnv is more than we really
+	--       want.  The bit we care about is the local bindings
+	--	 and the free type variables thereof
 tcTopBinds binds
   = tc_binds_and_then TopLevel glue binds	$
     getLclEnv					`thenM` \ env ->
@@ -151,32 +154,24 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 
       tcBindWithSigs top_lvl bind sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
   
-      getLIE (
-	  -- Extend the environment to bind the new polymorphic Ids
-	  tcExtendLocalValEnv poly_ids			$
-  
-	  -- Build bindings and IdInfos corresponding to user pragmas
-	  tcSpecSigs sigs		`thenM` \ prag_binds ->
-
-	  -- Now do whatever happens next, in the augmented envt
-	  do_next			`thenM` \ thing ->
-
-	  returnM (prag_binds, thing)
-      )	  `thenM` \ ((prag_binds, thing), lie) ->
-
       case top_lvl of
-
-		-- For the top level don't bother will all this bindInstsOfLocalFuns stuff
-		-- All the top level things are rec'd together anyway, so it's fine to
-		-- leave them to the tcSimplifyTop, and quite a bit faster too
-	TopLevel
-		-> extendLIEs lie	`thenM_`
+	TopLevel	-- For the top level don't bother will all this
+			--  bindInstsOfLocalFuns stuff. All the top level 
+			-- things are rec'd together anyway, so it's fine to
+			-- leave them to the tcSimplifyTop, and quite a bit faster too
+			--
+			-- Subtle (and ugly) point: furthermore at top level we
+			-- return the TcLclEnv, which contains the LIE var; we
+			-- don't want to return the wrong one!
+		-> tc_body poly_ids			`thenM` \ (prag_binds, thing) ->
 		   returnM (combiner (mkMonoBind Recursive (poly_binds `andMonoBinds` prag_binds)) 
 				     thing)
 
-	NotTopLevel
-		-> bindInstsOfLocalFuns lie poly_ids	`thenM` \ lie_binds ->
+	NotTopLevel	-- For nested bindings we must
+		-> getLIE (tc_body poly_ids)		`thenM` \ ((prag_binds, thing), lie) ->
+
 			-- Create specialisations of functions bound here
+		    bindInstsOfLocalFuns lie poly_ids	`thenM` \ lie_binds ->
 
 			-- We want to keep non-recursive things non-recursive
 			-- so that we desugar unlifted bindings correctly
@@ -196,6 +191,18 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 				-- aren't guaranteed in dependency order (though we could change
 				-- that); hence the Recursive marker.
 			thing)
+  where
+    tc_body poly_ids 	-- Type check the pragmas and "thing inside"
+      =   -- Extend the environment to bind the new polymorphic Ids
+	  tcExtendLocalValEnv poly_ids			$
+  
+	  -- Build bindings and IdInfos corresponding to user pragmas
+	  tcSpecSigs sigs		`thenM` \ prag_binds ->
+
+	  -- Now do whatever happens next, in the augmented envt
+	  do_next			`thenM` \ thing ->
+
+	  returnM (prag_binds, thing)
 \end{code}
 
 
