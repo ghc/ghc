@@ -4,14 +4,19 @@
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
 
 \begin{code}
-module Literal (
-	Literal(..),
+module Literal
+       (
+       	 Literal(..)
 
-	mkMachInt, mkMachWord,
-	literalType, literalPrimRep,
-	showLiteral,
-	isNoRepLit, isLitLitLit
-    ) where
+       , mkMachInt
+       , mkMachInt_safe
+       , mkMachWord
+       , literalType
+       , literalPrimRep
+       , showLiteral
+       , isNoRepLit
+       , isLitLitLit
+       ) where
 
 #include "HsVersions.h"
 
@@ -29,7 +34,6 @@ import TysWiredIn	( stringTy )
 import Outputable
 import Util		( thenCmp )
 
-import GlaExts		( (<#) )
 \end{code}
 
 So-called @Literals@ are {\em either}:
@@ -52,6 +56,9 @@ data Literal
   | MachAddr	Integer	-- whatever this machine thinks is a "pointer"
 
   | MachInt	Integer	-- for the numeric types, these are
+		Bool	-- True <=> signed (Int#); False <=> unsigned (Word#)
+
+  | MachInt64	Integer	-- guaranteed 64-bit versions of the above.
 		Bool	-- True <=> signed (Int#); False <=> unsigned (Word#)
 
   | MachFloat	Rational
@@ -78,6 +85,22 @@ mkMachInt, mkMachWord :: Integer -> Literal
 mkMachInt  x = MachInt x True{-signed-}
 mkMachWord x = MachInt x False{-unsigned-}
 
+-- check if the int is within range
+mkMachInt_safe :: Integer -> Literal
+mkMachInt_safe i
+ | out_of_range = 
+   pprPanic "mkMachInt_safe" 
+	    (hsep [text "ERROR: Int ", text (show i), text "out of range",
+		   brackets (int minInt <+> text ".." <+> int maxInt)])
+ | otherwise = MachInt i True{-signed-}
+ where
+  out_of_range =
+--    i < fromInt minBound ||
+    i > fromInt maxInt
+
+mkMachInt64  x = MachInt64 x True{-signed-}
+mkMachWord64 x = MachInt64 x False{-unsigned-}
+
 cmpLit (MachChar      a)   (MachChar	   b)   = a `compare` b
 cmpLit (MachStr       a)   (MachStr	   b)   = a `compare` b
 cmpLit (MachAddr      a)   (MachAddr	   b)   = a `compare` b
@@ -97,14 +120,14 @@ cmpLit other_1 other_2
     tag1 = tagof other_1
     tag2 = tagof other_2
 
-    tagof (MachChar      _)	  = ILIT(1)
-    tagof (MachStr       _)	  = ILIT(2)
-    tagof (MachAddr      _)	  = ILIT(3)
+    tagof (MachChar      _)   = ILIT(1)
+    tagof (MachStr       _)   = ILIT(2)
+    tagof (MachAddr      _)   = ILIT(3)
     tagof (MachInt       _ _) = ILIT(4)
-    tagof (MachFloat     _)	  = ILIT(5)
-    tagof (MachDouble    _)	  = ILIT(6)
+    tagof (MachFloat     _)   = ILIT(5)
+    tagof (MachDouble    _)   = ILIT(6)
     tagof (MachLitLit    _ _) = ILIT(7)
-    tagof (NoRepStr      _)	  = ILIT(8)
+    tagof (NoRepStr      _)   = ILIT(8)
     tagof (NoRepInteger  _ _) = ILIT(9)
     tagof (NoRepRational _ _) = ILIT(10)
     
@@ -152,6 +175,7 @@ literalPrimRep (MachChar _)	= CharRep
 literalPrimRep (MachStr _)	= AddrRep  -- specifically: "char *"
 literalPrimRep (MachAddr  _)	= AddrRep
 literalPrimRep (MachInt _ signed) = if signed then IntRep else WordRep
+literalPrimRep (MachInt64 _ signed) = if signed then Int64Rep else Word64Rep
 literalPrimRep (MachFloat _)	= FloatRep
 literalPrimRep (MachDouble _)	= DoubleRep
 literalPrimRep (MachLitLit _ k)	= k
@@ -188,7 +212,9 @@ pprLit lit
       NoRepStr s | code_style -> pprPanic "NoRep in code style" (ppr lit)
 	         | otherwise  -> ptext SLIT("_string_") <+> text (show (_UNPK_ s))
 
-      MachInt i signed | code_style && out_of_range 
+      MachInt i _ -> integer i
+{-
+		| code_style && out_of_range 
 		       -> pprPanic "" (hsep [text "ERROR: Int ", text (show i), text "out of range",
 				             brackets (ppr range_min <+> text ".." <+> ppr range_max)])
 		       | otherwise -> integer i
@@ -197,6 +223,7 @@ pprLit lit
 		        range_min = if signed then minInt else 0
 			range_max = maxInt
 			out_of_range = not (i >= toInteger range_min && i <= toInteger range_max)
+-}
 
       MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> rational f
                   | otherwise  -> ptext SLIT("_float_") <+> rational f
