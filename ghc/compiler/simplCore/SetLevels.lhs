@@ -27,7 +27,7 @@ import AnnCoreSyn
 import CoreSyn
 
 import CoreUtils	( coreExprType )
-import CoreUnfold	( whnfOrBottom )
+import CoreUnfold	( FormSummary, whnfOrBottom, mkFormSummary )
 import FreeVars		-- all of it
 import Id		( idType, mkSysLocal, 
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
@@ -37,12 +37,12 @@ import Id		( idType, mkSysLocal,
 			)
 import Pretty		( ptext, hcat, char, int )
 import SrcLoc		( noSrcLoc )
-import Type		( isPrimType, mkTyVarTys, mkForAllTys, SYN_IE(Type) )
+import Type		( isPrimType, mkTyVarTys, mkForAllTys, tyVarsOfTypes, SYN_IE(Type) )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
-			  tyVarSetToList,
+			  tyVarSetToList, 
 			  SYN_IE(TyVarEnv), SYN_IE(TyVar),
-			  unionManyTyVarSets
+			  unionManyTyVarSets, unionTyVarSets
 			)
 import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 			  mapAndUnzip3Us, getUnique, SYN_IE(UniqSM),
@@ -482,7 +482,7 @@ setFloatLevel alreadyLetBound ctxt_lvl envs@(venv, tenv)
 
     offending tyvar = ids_only_lvl `ltLvl` tyvarLevel tenv tyvar
 
-    manifestly_whnf = whnfOrBottom de_ann_expr
+    manifestly_whnf = whnfOrBottom (mkFormSummary de_ann_expr)
 
     maybe_unTopify Top | not (canFloatToTop (ty, expr)) = Level 0 0
     maybe_unTopify lvl                                  = lvl
@@ -635,7 +635,8 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
 			| rhs' <- rhss'	-- mkCoLet* requires Core...
 			]
 
-	poly_binds  = zipEqual "poly_binds" [(poly_var, ids_only_lvl) | poly_var <- poly_vars] poly_var_rhss
+	poly_binds  = zipEqual "poly_binds" [(poly_var, ids_only_lvl) | poly_var <- poly_vars] 
+					    poly_var_rhss
 
     in
     returnLvl (ctxt_lvl, [Rec poly_binds], d_rhss)
@@ -656,6 +657,20 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
 
     fvs  = unionManyIdSets [freeVarsOf   rhs | rhs <- rhss] `minusIdSet` mkIdSet ids
     tfvs = unionManyTyVarSets [freeTyVarsOf rhs | rhs <- rhss]
+	   `unionTyVarSets`
+	   tyVarsOfTypes tys
+	-- Why the "tyVarsOfTypes" part?  Consider this:
+	--	/\a -> letrec x::a = x in E
+	-- Now, there are no explicit free type variables in the RHS of x,
+	-- but nevertheless "a" is free in its definition.  So we add in
+	-- the free tyvars of the types of the binders.
+	-- This actually happened in the defn of errorIO in IOBase.lhs:
+	-- 	errorIO (ST io) = case (errorIO# io) of
+	--	    		    _ -> bottom
+	--			  where
+	--			    bottom = bottom -- Never evaluated
+	-- I don't think this can every happen for non-recursive bindings.
+
     fv_list = idSetToList fvs
     tv_list = tyVarSetToList tfvs
 
