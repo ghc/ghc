@@ -294,12 +294,18 @@ hc-file-bundle : project-check
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
-	  -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" > hc-files-to-go
+	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
 	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
-	  -name "*.hsc" | sed 's/hsc$$/hs/g' >> hc-files-to-go
+	  -name "*.hsc" -print | sed 's/hsc$$/hs/g' >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/lib/std/PrelPrimopWrappers.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/*.hs-incl >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/rename/ParseIface.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/main/ParsePkgConf.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/hslibs/hssource/HsParser.hs >> hc-files-to-go
 	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz

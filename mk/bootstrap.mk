@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.17 2001/09/25 18:08:48 ken Exp $
+# $Id: bootstrap.mk,v 1.18 2002/01/15 05:39:15 sof Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -66,6 +66,13 @@ SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/st
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
 
+ifeq "$(LeadingUnderscore)" "YES"
+UNDERSCORE=_
+else
+UNDERSCORE=
+endif
+
+
 HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp		\
@@ -81,38 +88,38 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/text/cbits	\
-   -u "PrelBase_Izh_static_info"		\
-   -u "PrelBase_Czh_static_info"		\
-   -u "PrelFloat_Fzh_static_info"		\
-   -u "PrelFloat_Dzh_static_info"		\
-   -u "PrelPtr_Ptr_static_info"			\
-   -u "PrelWord_Wzh_static_info"		\
-   -u "PrelInt_I8zh_static_info"		\
-   -u "PrelInt_I16zh_static_info"		\
-   -u "PrelInt_I32zh_static_info"		\
-   -u "PrelInt_I64zh_static_info"		\
-   -u "PrelWord_W8zh_static_info"		\
-   -u "PrelWord_W16zh_static_info"		\
-   -u "PrelWord_W32zh_static_info"		\
-   -u "PrelWord_W64zh_static_info"		\
-   -u "PrelStable_StablePtr_static_info"	\
-   -u "PrelBase_Izh_con_info"			\
-   -u "PrelBase_Czh_con_info"			\
-   -u "PrelFloat_Fzh_con_info"			\
-   -u "PrelFloat_Dzh_con_info"			\
-   -u "PrelPtr_Ptr_con_info"			\
-   -u "PrelStable_StablePtr_con_info"		\
-   -u "PrelBase_False_closure"			\
-   -u "PrelBase_True_closure"			\
-   -u "PrelPack_unpackCString_closure"		\
-   -u "PrelIOBase_stackOverflow_closure"	\
-   -u "PrelIOBase_heapOverflow_closure"		\
-   -u "PrelIOBase_NonTermination_closure"	\
-   -u "PrelIOBase_BlockedOnDeadMVar_closure"	\
-   -u "PrelWeak_runFinalizzerBatch_closure"	\
-   -u "__stginit_Prelude"			\
-   -u "PrelMain_mainIO_closure"			\
-   -u "__stginit_PrelMain"
+   -u "$(UNDERSCORE)PrelBase_Izh_static_info"		\
+   -u "$(UNDERSCORE)PrelBase_Czh_static_info"		\
+   -u "$(UNDERSCORE)PrelFloat_Fzh_static_info"		\
+   -u "$(UNDERSCORE)PrelFloat_Dzh_static_info"		\
+   -u "$(UNDERSCORE)PrelPtr_Ptr_static_info"		\
+   -u "$(UNDERSCORE)PrelWord_Wzh_static_info"		\
+   -u "$(UNDERSCORE)PrelInt_I8zh_static_info"		\
+   -u "$(UNDERSCORE)PrelInt_I16zh_static_info"		\
+   -u "$(UNDERSCORE)PrelInt_I32zh_static_info"		\
+   -u "$(UNDERSCORE)PrelInt_I64zh_static_info"		\
+   -u "$(UNDERSCORE)PrelWord_W8zh_static_info"		\
+   -u "$(UNDERSCORE)PrelWord_W16zh_static_info"		\
+   -u "$(UNDERSCORE)PrelWord_W32zh_static_info"		\
+   -u "$(UNDERSCORE)PrelWord_W64zh_static_info"		\
+   -u "$(UNDERSCORE)PrelStable_StablePtr_static_info"	\
+   -u "$(UNDERSCORE)PrelBase_Izh_con_info"		\
+   -u "$(UNDERSCORE)PrelBase_Czh_con_info"		\
+   -u "$(UNDERSCORE)PrelFloat_Fzh_con_info"		\
+   -u "$(UNDERSCORE)PrelFloat_Dzh_con_info"		\
+   -u "$(UNDERSCORE)PrelPtr_Ptr_con_info"		\
+   -u "$(UNDERSCORE)PrelStable_StablePtr_con_info"	\
+   -u "$(UNDERSCORE)PrelBase_False_closure"		\
+   -u "$(UNDERSCORE)PrelBase_True_closure"		\
+   -u "$(UNDERSCORE)PrelPack_unpackCString_closure"	\
+   -u "$(UNDERSCORE)PrelIOBase_stackOverflow_closure"	\
+   -u "$(UNDERSCORE)PrelIOBase_heapOverflow_closure"	\
+   -u "$(UNDERSCORE)PrelIOBase_NonTermination_closure"	\
+   -u "$(UNDERSCORE)PrelIOBase_BlockedOnDeadMVar_closure"	\
+   -u "$(UNDERSCORE)PrelWeak_runFinalizzerBatch_closure"	\
+   -u "$(UNDERSCORE)__stginit_Prelude"				\
+   -u "$(UNDERSCORE)PrelMain_mainIO_closure"			\
+   -u "$(UNDERSCORE)__stginit_PrelMain"
 
 HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHSstd -lHSstd_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 

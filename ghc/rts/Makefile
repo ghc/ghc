@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.55 2001/10/19 09:33:28 sewardj Exp $
+# $Id: Makefile,v 1.56 2002/01/15 05:39:15 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -105,6 +105,7 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 ifeq "$(BootingFromHc)" "YES"
 # use the normal $(CC) when booting from .hc files
 SRC_CC_OPTS += $(HC_OPTS)
+SRC_CC_OPTS += -I../includes -I. -Iparallel -DCOMPILING_RTS
 else
 # otherwise, use $(GHC_INPLACE) as the C compiler.
 CC=$(GHC_INPLACE)

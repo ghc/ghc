@@ -9,6 +9,7 @@
 # useful with --prefix).
 
 configopts="$*"         # e.g., --enable-hc-boot-unregisterised
+PWD=`pwd`
 
 # check for GNU make
 #
@@ -34,6 +35,11 @@ END
 touch ghc/compiler/rename/ParseIface.hs
 touch ghc/compiler/parser/Parser.hs
 touch ghc/compiler/main/ParsePkgConf.hs
+touch hslibs/hssource/HsParser.hs
+
+# We don't have genprimopcode yet so don't try to use it
+touch ghc/compiler/prelude/primops.txt
+touch ghc/lib/std/PrelPrimopWrappers.hs
 
 echo "*** Building hsc..."
 ./configure --enable-hc-boot $configopts
@@ -63,12 +69,12 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd ghc/compiler; touch $PRIMOP_BITS prelude/PrimOp.o main/Config.{hs,o} ghc-*)
+(cd ghc/compiler; touch $PRIMOP_BITS prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
 
 # Remove the old libraries.  Don't use make clean, because we don't
 # want to delete the .hs files generated from the .hsc files, because
 # we don't have hsc2hs built yet.
-/usr/bin/find ghc/lib/std hslibs | grep '\.\(o\|a\)' | /usr/bin/xargs rm -f
+find ghc/lib/std hslibs | grep '\.\(o\|a\)' | xargs rm -f
 
 # Do includes and RTS now
 $MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
