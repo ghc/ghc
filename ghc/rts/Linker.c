@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.26 2001/02/12 16:40:34 sewardj Exp $
+ * $Id: Linker.c,v 1.27 2001/02/13 13:11:07 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -46,6 +46,35 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
 #endif
+
+int ocAddDLL ( char* dll_name );
+
+
+/* -----------------------------------------------------------------------------
+ * Add a DLL from which symbols may be found.  In the ELF case, just
+ * do RTLD_GLOBAL-style add, so no further messing around needs to
+ * happen in order that symbols in the loaded .so are findable --
+ * lookupSymbol() will subsequently see them by dlsym on the program's
+ * dl-handle.  Returns 0 if fail, 1 if success.
+ */
+int ocAddDLL ( char* dll_name )
+{
+#  if defined(OBJFORMAT_ELF)
+   void* hdl;
+   char  buf[100];
+   if (strlen(dll_name) > 50)
+      barf("ocAddDLL: excessively long .so/.DLL name `%s'", dll_name);
+   sprintf(buf, "lib%s.so", dll_name);
+   hdl = dlopen(buf, RTLD_NOW | RTLD_GLOBAL);
+   return (hdl == NULL) ? 0 : 1;
+#  elif defined(OBJFORMAT_PEi386)
+   barf("ocAddDLL: not implemented on PEi386 yet");
+   return 0;
+#  else
+   barf("ocAddDLL: not implemented on this platform");
+#  endif
+}
+
 
 /* -----------------------------------------------------------------------------
  * Built-in symbols from the RTS
