@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.83 2001/07/24 04:41:40 ken Exp $
+-- $Id: InteractiveUI.hs,v 1.84 2001/08/09 10:55:53 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -369,7 +369,7 @@ help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
 info :: String -> GHCi ()
-info "" = do io (putStr "dunno, mate")
+info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
 info s = do
   let names = words s
   st <- getGHCiState
