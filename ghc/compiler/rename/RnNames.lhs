@@ -305,7 +305,7 @@ importsFromLocalDecls group
 	-- The complaint will come out as "Multiple declarations of Foo.f" because
 	-- since 'f' is in the env twice, the unQualInScope used by the error-msg
 	-- printer returns False.  It seems awkward to fix, unfortunately.
-    mappM_ (addErr . dupDeclErr) dups			`thenM_` 
+    mappM_ (addErr . dupDeclErr) dups		`thenM_` 
 
     doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
