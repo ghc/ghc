@@ -1,6 +1,6 @@
 module ShouldFail where
 
--- !!! Do-notation requires an *expression* at the end.
+-- !!! Test for parse error in do/let expression
 
 foo = do let foo = True
 	     return () 
