@@ -1277,7 +1277,10 @@ sub setupSyslibs {
   # to implement the itimers, since cygwin.dll does not
   # support it. Only reqd. for `ways' that use itimers.
   #
-  push(@SysLibrary, '-lwinmm') if $TargetPlatform eq 'i386-unknown-cygwin32';
+  push(@SysLibrary, '-lwinmm')   if $TargetPlatform eq 'i386-unknown-cygwin32';
+   # Note: currently only tested with mingw, may cause conflicts when linking
+   #       with libcygwin.a
+  push(@SysLibrary, '-lwsock32') if ($TargetPlatform =~ /-(mingw32|cygwin32)$/);
 
   # Push the pvm libraries
   if ($BuildTag eq '_mp') {
