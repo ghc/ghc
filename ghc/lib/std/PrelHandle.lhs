@@ -830,6 +830,36 @@ slurpFile fname = do
 	 then constructErrorAndFail "slurpFile"
 	 else return (chunk, rc)
 
+hFillBufBA :: Handle -> ByteArray Int -> Int -> IO Int
+hFillBufBA handle buf sz
+  | sz <= 0 = fail (IOError (Just handle)
+			    InvalidArgument
+		            "hFillBufBA"
+			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
+  | otherwise = do
+    handle_ <- wantReadableHandle "hFillBufBA" handle
+    let fo  = haFO__ handle_
+    rc      <- mayBlock fo (_ccall_ readChunk fo buf sz)    -- ConcHask: UNSAFE, may block.
+    writeHandle handle handle_
+    if rc >= 0
+     then return rc
+     else constructErrorAndFail "hFillBufBA"
+
+hFillBuf :: Handle -> Addr -> Int -> IO Int
+hFillBuf handle buf sz
+  | sz <= 0 = fail (IOError (Just handle)
+			    InvalidArgument
+		            "hFillBuf"
+			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
+  | otherwise = do
+    handle_ <- wantReadableHandle "hFillBuf" handle
+    let fo  = haFO__ handle_
+    rc      <- mayBlock fo (_ccall_ readChunk fo buf sz)    -- ConcHask: UNSAFE, may block.
+    writeHandle handle handle_
+    if rc >= 0
+     then return rc
+     else constructErrorAndFail "hFillBuf"
+
 \end{code}
 
 The @hPutBuf hdl buf len@ action writes an already packed sequence of
