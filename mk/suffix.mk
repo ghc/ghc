@@ -146,7 +146,7 @@ endif
 #-----------------------------------------------------------------------------
 # C-related suffix rules
 
-ifeq "$(UseGhcForCc)" "YES"
+ifeq "$(UseGhcForCc) $(BootingFromHc)" "YES NO"
 
 $(odir_)%.$(way_)o : %.c
 	@$(RM) $@
