@@ -894,22 +894,6 @@ work with symlinks.
 
 <Question>
 <Para>
-I'm having trouble with <Option>-static</Option>.
-</Para>
-</Question>
-
-<Answer>
-<Para>
-Static linking is no longer supported under Windows, and probably won't work.
-</Para>
-</Answer>
-
-</QandAEntry>
-
-<QandAEntry>
-
-<Question>
-<Para>
 I'm getting ``permission denied'' messages from <Command>rm</Command> or
 <Command>mv</Command>.
 </Para>
