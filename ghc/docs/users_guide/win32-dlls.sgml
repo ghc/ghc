@@ -15,8 +15,6 @@ require filenames containing spaces to be escaped using quotes:
 <programlisting>
   c:\ghc\bin\ghci "c:\\Program Files\\Haskell\\Project.hs"
 </programlisting>
-
-<para>
 If the quotes are left off in the above command, <command>ghci</command> will
 interpret the filename as two, "c:\\Program" and "Files\\Haskell\\Project.hs".
 </para>
