@@ -4,6 +4,6 @@ Match match matchExport matchSimply matchSinglePat;
 _declarations_
 1 match _:_ [Var.Id] -> [DsUtils.EquationInfo] -> DsMonad.DsM DsUtils.MatchResult ;;
 1 matchExport _:_ [Var.Id] -> [DsUtils.EquationInfo] -> DsMonad.DsM DsUtils.MatchResult ;;
-1 matchSimply _:_ CoreSyn.CoreExpr -> DsMonad.DsMatchKind -> TcHsSyn.TypecheckedPat -> CoreSyn.CoreExpr -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;;
+1 matchSimply _:_ CoreSyn.CoreExpr -> HsExpr.HsMatchContext -> TcHsSyn.TypecheckedPat -> CoreSyn.CoreExpr -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;;
 1 matchSinglePat _:_ CoreSyn.CoreExpr -> DsMonad.DsMatchContext -> TcHsSyn.TypecheckedPat -> DsUtils.MatchResult -> DsMonad.DsM DsUtils.MatchResult ;;
 

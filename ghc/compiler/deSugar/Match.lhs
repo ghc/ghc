@@ -111,73 +111,19 @@ pp_context NoMatchContext msg rest_of_msg_fun
   = dontAddErrLoc (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
 
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
-  = case pp_match kind pats of
-      (ppr_match, pref) ->
-          addWarnLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
-	where
-	  message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
- where
-    pp_match (FunMatch fun) pats
-      = let ppr_fun = ppr fun in
-        ( hsep [ptext SLIT("in the definition of function"), quotes ppr_fun]
-	, (\ x -> ppr_fun <+> x)
-	)
-
-    pp_match CaseMatch pats
-      = (hang (ptext SLIT("in a group of case alternatives beginning"))
-	   4 (ppr_pats pats)
-	, id
-	)
-
-    pp_match RecUpdMatch pats
-      = (hang (ptext SLIT("in a record-update construct"))
-	   4 (ppr_pats pats)
-	, id
-	)
-
-    pp_match PatBindMatch pats
-      = ( hang (ptext SLIT("in a pattern binding"))
-	    4 (ppr_pats pats)
-	, id
-	)
-
-    pp_match LambdaMatch pats
-      = ( hang (ptext SLIT("in a lambda abstraction"))
-	    4 (ppr_pats pats)
-	, id
-	)
-
-    pp_match DoBindMatch pats
-      = ( hang (ptext SLIT("in a `do' pattern binding"))
-	     4 (ppr_pats pats)
-	, id
-	)
-
-    pp_match ListCompMatch pats
-      = ( hang (ptext SLIT("in a `list comprension' pattern binding"))
-	     4 (ppr_pats pats)
-	, id
-	) 
-
-    pp_match LetMatch pats
-      = ( hang (ptext SLIT("in a `let' pattern binding"))
-	     4 (ppr_pats pats)
-	, id
-	)
+  = addWarnLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
+  where
+    (ppr_match, pref)
+	= case kind of
+	     FunRhs fun -> (pprMatchContext kind,		    \ pp -> ppr fun <+> pp)
+	     other	-> (pprMatchContext kind <+> ppr_pats pats, \ pp -> pp)
+          
+    message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
 
 ppr_pats pats = sep (map ppr pats)
 
-separator (FunMatch _)    = SLIT("=")
-separator (CaseMatch)     = SLIT("->") 
-separator (LambdaMatch)   = SLIT("->") 
-separator (PatBindMatch)  = panic "When is this used?"
-separator (RecUpdMatch)   = panic "When is this used?"
-separator (DoBindMatch)   = SLIT("<-")  
-separator (ListCompMatch) = SLIT("<-")  
-separator (LetMatch)      = SLIT("=")
-                 
 ppr_shadow_pats kind pats
-  = sep [ppr_pats pats, ptext (separator kind), ptext SLIT("...")]
+  = sep [ppr_pats pats, ptext (matchSeparator kind), ptext SLIT("...")]
     
 ppr_incomplete_pats kind (pats,[]) = ppr_pats pats
 ppr_incomplete_pats kind (pats,constraints) = 
@@ -676,9 +622,9 @@ Call @match@ with all of this information!
 \end{enumerate}
 
 \begin{code}
-matchWrapper :: DsMatchKind			-- For shadowing warning messages
-	     -> [TypecheckedMatch]		-- Matches being desugared
-	     -> String 				-- Error message if the match fails
+matchWrapper :: HsMatchContext		-- For shadowing warning messages
+	     -> [TypecheckedMatch]	-- Matches being desugared
+	     -> String 			-- Error message if the match fails
 	     -> DsM ([Id], CoreExpr) 	-- Results
 \end{code}
 
@@ -719,9 +665,9 @@ matchWrapper kind matches error_string
     returnDs (new_vars, result_expr)
   where match_fun dflags
            = case kind of 
-                LambdaMatch | dopt Opt_WarnSimplePatterns dflags -> matchExport 
-                            | otherwise                          -> match
-                _                                                -> matchExport
+                LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchExport 
+                           | otherwise                          -> match
+                _                                               -> matchExport
 \end{code}
 
 %************************************************************************
@@ -735,11 +681,11 @@ situation where we want to match a single expression against a single
 pattern. It returns an expression.
 
 \begin{code}
-matchSimply :: CoreExpr			-- Scrutinee
-	    -> DsMatchKind              -- Match kind
-	    -> TypecheckedPat		-- Pattern it should match
-	    -> CoreExpr			-- Return this if it matches
-	    -> CoreExpr			-- Return this if it doesn't
+matchSimply :: CoreExpr		-- Scrutinee
+	    -> HsMatchContext	-- Match kind
+	    -> TypecheckedPat	-- Pattern it should match
+	    -> CoreExpr		-- Return this if it matches
+	    -> CoreExpr		-- Return this if it doesn't
 	    -> DsM CoreExpr
 
 matchSimply scrut kind pat result_expr fail_expr
@@ -780,10 +726,9 @@ matchSinglePat scrut ctx pat match_result
 This is actually local to @matchWrapper@.
 
 \begin{code}
-flattenMatches
-	:: DsMatchKind
-	-> [TypecheckedMatch]
-	-> DsM (Type, [EquationInfo])
+flattenMatches :: HsMatchContext
+	       -> [TypecheckedMatch]
+	       -> DsM (Type, [EquationInfo])
 
 flattenMatches kind matches
   = mapAndUnzipDs flatten_match (matches `zip` [1..])	`thenDs` \ (result_tys, eqn_infos) ->

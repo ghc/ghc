@@ -34,7 +34,8 @@ module Outputable (
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForIface, printForUser,
 	pprCode, pprCols,
-	showSDoc, showSDocDebug, showSDocIface, showSDocUnqual, showsPrecSDoc,
+	showSDoc, showSDocForUser, showSDocDebug, showSDocIface, 
+	showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
 
 
@@ -202,6 +203,9 @@ pprCode cs d = withPprStyle (PprCode cs) d
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
 showSDoc d = show (d defaultUserStyle)
+
+showSDocForUser :: PrintUnqualified -> SDoc -> String
+showSDocForUser unqual doc = show (doc (mkUserStyle unqual AllTheWay))
 
 showSDocUnqual :: SDoc -> String
 -- Only used in the gruesome HsExpr.isOperator

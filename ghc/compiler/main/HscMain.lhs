@@ -6,18 +6,15 @@
 \begin{code}
 module HscMain ( HscResult(..), hscMain, 
 #ifdef GHCI
-		 hscExpr,
+		 hscStmt,
 #endif
 		 initPersistentCompilerState ) where
 
 #include "HsVersions.h"
 
 #ifdef GHCI
-import RdrHsSyn		( RdrNameHsExpr )
-import Rename		( renameExpr )
-import Unique		( Uniquable(..) )
-import Type		( Type, splitTyConApp_maybe, tidyType )
-import PrelNames	( ioTyConKey )
+import RdrHsSyn		( RdrNameStmt )
+import Rename		( renameStmt )
 import ByteCodeGen	( byteCodeGen )
 #endif
 
@@ -46,6 +43,8 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
+import Id		( Id, idName, idFlavour, modifyIdInfo )
+import IdInfo		( setFlavourInfo, makeConstantFlavour )
 import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
@@ -59,14 +58,16 @@ import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
-			  HomeSymbolTable, 
+			  HomeSymbolTable, InteractiveContext(..), TyThing(..),
 			  NameSupply(..), PackageRuleBase, HomeIfaceTable, 
-			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
+			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable,
+			  extendLocalRdrEnv
+			)
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
-import VarEnv		( emptyTidyEnv )
 import Name		( Name, nameModule, nameOccName, getName, isGlobalName,
-			  emptyNameEnv )
+			  emptyNameEnv, extendNameEnvList
+			)
 import Module		( Module, lookupModuleEnvByName )
 
 import Monad		( when )
@@ -146,7 +147,9 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
       }
  | otherwise
  = do {
-      hPutStrLn stderr "compilation IS NOT required";
+      when (verbosity dflags >= 1) $
+      	  hPutStrLn stderr ("Skipping  " ++ 
+			(unJust "hscNoRecomp" (ml_hs_file location)));
 
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -173,7 +176,8 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
       	; when (verbosity dflags >= 1) $
-		hPutStrLn stderr "compilation IS required";
+		hPutStrLn stderr ("Compiling " ++ 
+			(unJust "hscRecomp" (ml_hs_file location)))
 
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -191,12 +195,12 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- RENAME
  	    -------------------
-	; (pcs_rn, maybe_rn_result) 
+	; (pcs_rn, print_unqualified, maybe_rn_result) 
       	     <- _scc_ "Rename" 
 		 renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
-      	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
+      	     Just (is_exported, new_iface, rn_hs_decls) -> do {
     
  	    -- In interactive mode, we don't want to discard any top-level entities at
 	    -- all (eg. do not inline them away during simplification), and retain them
@@ -394,66 +398,116 @@ myCoreToStg dflags this_mod tidy_binds env_tc
 
 %************************************************************************
 %*									*
-\subsection{Compiling an expression}
+\subsection{Compiling a do-statement}
 %*									*
 %************************************************************************
 
 \begin{code}
 #ifdef GHCI
-hscExpr
+hscStmt
   :: DynFlags
-  -> Bool			-- True <=> wrap in 'print' to get a result of IO type
   -> HomeSymbolTable	
   -> HomeIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
-  -> Module			-- Context for compiling
-  -> String			-- The expression
+  -> InteractiveContext		-- Context for compiling
+  -> String			-- The statement
   -> IO ( PersistentCompilerState, 
-	  Maybe (UnlinkedBCOExpr, PrintUnqualified, Type) )
+	  Maybe (InteractiveContext, 
+		 [Id], 
+		 UnlinkedBCOExpr) )
+\end{code}
 
-hscExpr dflags wrap_io hst hit pcs0 this_module expr
-   = do {
-	maybe_parsed <- hscParseExpr dflags expr;
-	case maybe_parsed of
+When the UnlinkedBCOExpr is linked you get an HValue of type
+	IO [HValue]
+When you run it you get a list of HValues that should be 
+the same length as the list of names; add them to the ClosureEnv.
+
+A naked expression returns a singleton Name [it].
+
+	What you type			The IO [HValue] that hscStmt returns
+	-------------			------------------------------------
+	let pat = expr		==> 	let pat = expr in return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	pat <- expr		==> 	expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	expr (of IO type)	==>	expr >>= \ v -> return [v]
+	  [NB: result not printed]	bindings: [it]
+	  
+
+	expr (of non-IO type, 
+	  result showable)	==>	let v = expr in print v >> return [v]
+	  				bindings: [it]
+
+	expr (of non-IO type, 
+	  result not showable)	==>	error
+
+\begin{code}
+hscStmt dflags hst hit pcs0 icontext stmt
+   = let 
+	InteractiveContext { 
+	     ic_rn_env = rn_env, 
+	     ic_type_env = type_env,
+	     ic_module   = this_mod } = icontext
+     in
+     do { maybe_stmt <- hscParseStmt dflags stmt
+	; case maybe_stmt of
       	     Nothing -> return (pcs0, Nothing)
-      	     Just parsed_expr -> do {
+      	     Just parsed_stmt -> do {
 
 		-- Rename it
-	(pcs1, maybe_renamed_expr) <- 
-		renameExpr dflags hit hst pcs0 this_module parsed_expr;
-	case maybe_renamed_expr of
-		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing)
-		Just (print_unqual, rn_expr) -> do {
+	  (pcs1, print_unqual, maybe_renamed_stmt)
+		 <- renameStmt dflags hit hst pcs0 this_mod rn_env parsed_stmt
+	; case maybe_renamed_stmt of
+		Nothing -> return (pcs0, Nothing)
+		Just (bound_names, rn_stmt) -> do {
 
 		-- Typecheck it
-	maybe_tc_return
-	   <- typecheckExpr dflags wrap_io pcs1 hst print_unqual this_module rn_expr;
-	case maybe_tc_return of {
-		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
-		Just (pcs2, tc_expr, ty) -> do
-
-	let tidy_ty = tidyType emptyTidyEnv ty;
+	  maybe_tc_return <- typecheckStmt dflags pcs1 hst type_env
+					   print_unqual this_mod bound_names rn_stmt
+	; case maybe_tc_return of {
+		Nothing -> return (pcs0, Nothing) ;
+		Just (pcs2, tc_expr, bound_ids) -> do {
 
 		-- Desugar it
-	ds_expr <- deSugarExpr dflags pcs2 hst this_module
-			print_unqual tc_expr;
+	  ds_expr <- deSugarExpr dflags pcs2 hst this_mod print_unqual tc_expr
 	
 		-- Simplify it
-	simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr;
+	; simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr
 
 		-- Saturate it
-	sat_expr <- coreSatExpr dflags simpl_expr;
-
-		-- ToDo: need to do SRTs?
+	; sat_expr <- coreSatExpr dflags simpl_expr
 
 		-- Convert to BCOs
-	bcos <- coreExprToBCOs dflags sat_expr
+	; bcos <- coreExprToBCOs dflags sat_expr
 
-	return (pcs2, Just (bcos, print_unqual, tidy_ty));
-     }}}}
+	; let
+		-- make all the bound ids "constant" ids, now that
+		-- they're notionally top-level bindings.  This is
+		-- important: otherwise when we come to compile an expression
+		-- using these ids later, the byte code generator will consider
+		-- the occurrences to be free rather than global.
+	     constant_bound_ids = map constantizeId bound_ids
+	     constantizeId id
+		 = modifyIdInfo (`setFlavourInfo` makeConstantFlavour 
+					(idFlavour id)) id
 
-hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
-hscParseExpr dflags str
+	     new_rn_env   = extendLocalRdrEnv rn_env 
+				(map idName constant_bound_ids)
+		-- Extend the renamer-env from bound_ids, not bound_names,
+		-- because the latter may contain [it] when the former is empty
+
+	     new_type_env = extendNameEnvList type_env 	
+			      [(getName id, AnId id) | id <- constant_bound_ids]
+
+	     new_icontext = icontext { ic_rn_env = new_rn_env, 
+				       ic_type_env = new_type_env }
+	; return (pcs2, Just (new_icontext, bound_ids, bcos))
+     }}}}}
+
+hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
+hscParseStmt dflags str
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
       _scc_ "Parser" do
@@ -461,23 +515,26 @@ hscParseExpr dflags str
       buf <- stringToStringBuffer str
 
       let glaexts | dopt Opt_GlasgowExts dflags = 1#
-       	          | otherwise  	          = 0#
+       	          | otherwise  	                = 0#
 
-      case parseExpr buf PState{ bol = 0#, atbol = 1#,
+      case parseStmt buf PState{ bol = 0#, atbol = 1#,
 	 		         context = [], glasgow_exts = glaexts,
 			         loc = mkSrcLoc SLIT("<no file>") 0 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
---	Not yet implemented in <4.11		    freeStringBuffer buf;
+--	Not yet implemented in <4.11    freeStringBuffer buf;
                             return Nothing };
 
-	POk _ rdr_expr -> do {
+	-- no stmt: the line consisted of just space or comments
+	POk _ Nothing -> return Nothing;
+
+	POk _ (Just rdr_stmt) -> do {
 
       --ToDo: can't free the string buffer until we've finished this
       -- compilation sweep and all the identifiers have gone away.
       --freeStringBuffer buf;
-      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_expr);
-      return (Just rdr_expr)
+      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_stmt);
+      return (Just rdr_stmt)
       }}
 #endif
 \end{code}

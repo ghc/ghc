@@ -39,9 +39,8 @@ import RnEnv
 import RnMonad
 import ParseIface	( parseIface )
 
-import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocalName, nameIsLocalOrFrom,
-			  NamedThing(..),
+import Name		( Name {-instance NamedThing-}, 
+			  nameModule, isLocalName, nameIsLocalOrFrom
 			 )
 import Name		( mkNameEnv, extendNameEnv )
 import Module		( Module, 
@@ -49,7 +48,7 @@ import Module		( Module,
 			  ModuleName, WhereFrom(..),
 			  extendModuleEnv, mkVanillaModule
 			)
-import RdrName		( RdrName, rdrNameOcc )
+import RdrName		( rdrNameOcc )
 import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
@@ -94,7 +93,10 @@ loadInterface doc mod from
   = tryLoadInterface doc mod from	`thenRn` \ (ifaces, maybe_err) ->
     case maybe_err of
 	Nothing  -> returnRn ifaces
-	Just err -> failWithRn ifaces err
+	Just err -> failWithRn ifaces (elaborate err)
+  where
+    elaborate err = hang (ptext SLIT("failed to load interface for") <+> quotes (ppr mod) <> colon)
+			 4 err
 
 tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (ModIface, Maybe Message)
   -- Returns (Just err) if an error happened

@@ -9,15 +9,13 @@ module HsExpr where
 #include "HsVersions.h"
 
 -- friends:
-import {-# SOURCE #-} HsMatches ( pprMatches, pprMatch, Match )
-
-import HsBinds		( HsBinds(..) )
+import HsBinds		( HsBinds(..), nullBinds )
 import HsLit		( HsLit, HsOverLit )
 import BasicTypes	( Fixity(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Name		( Name, isLexSym ) 
+import Name		( Name, isLexSym )
 import Outputable	
 import PprType		( pprParendType )
 import Type		( Type )
@@ -83,15 +81,15 @@ data HsExpr id pat
   | HsWith	(HsExpr id pat)	-- implicit parameter binding
   		[(id, HsExpr id pat)]
 
-  | HsDo	StmtCtxt
+  | HsDo	HsMatchContext
 		[Stmt id pat]	-- "do":one or more stmts
 		SrcLoc
 
-  | HsDoOut	StmtCtxt
+  | HsDoOut	HsMatchContext
 		[Stmt id pat]	-- "do":one or more stmts
 		id		-- id for return
 		id		-- id for >>=
-		id				-- id for zero
+		id		-- id for fail
 		Type		-- Type of the whole expression
 		SrcLoc
 
@@ -421,6 +419,116 @@ pp_rbinds thing rbinds
 	   hsep [ppr v, char '=', ppr e]
 \end{code}
 
+
+
+%************************************************************************
+%*									*
+\subsection{@Match@, @GRHSs@, and @GRHS@ datatypes}
+%*									*
+%************************************************************************
+
+@Match@es are sets of pattern bindings and right hand sides for
+functions, patterns or case branches. For example, if a function @g@
+is defined as:
+\begin{verbatim}
+g (x,y) = y
+g ((x:ys),y) = y+1,
+\end{verbatim}
+then \tr{g} has two @Match@es: @(x,y) = y@ and @((x:ys),y) = y+1@.
+
+It is always the case that each element of an @[Match]@ list has the
+same number of @pats@s inside it.  This corresponds to saying that
+a function defined by pattern matching must have the same number of
+patterns in each equation.
+
+\begin{code}
+data Match id pat
+  = Match
+	[id] 			-- Tyvars wrt which this match is universally quantified
+				-- empty after typechecking
+	[pat]			-- The patterns
+	(Maybe (HsType id))	-- A type signature for the result of the match
+				--	Nothing after typechecking
+
+	(GRHSs id pat)
+
+-- GRHSs are used both for pattern bindings and for Matches
+data GRHSs id pat	
+  = GRHSs [GRHS id pat]		-- Guarded RHSs
+	  (HsBinds id pat)	-- The where clause
+	  (Maybe Type)		-- Just rhs_ty after type checking
+
+data GRHS id pat
+  = GRHS  [Stmt id pat]		-- The RHS is the final ExprStmt
+				-- I considered using a RetunStmt, but
+				-- it printed 'wrong' in error messages 
+	  SrcLoc
+
+mkSimpleMatch :: [pat] -> HsExpr id pat -> Maybe Type -> SrcLoc -> Match id pat
+mkSimpleMatch pats rhs maybe_rhs_ty locn
+  = Match [] pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds maybe_rhs_ty)
+
+unguardedRHS :: HsExpr id pat -> SrcLoc -> [GRHS id pat]
+unguardedRHS rhs loc = [GRHS [ExprStmt rhs loc] loc]
+\end{code}
+
+@getMatchLoc@ takes a @Match@ and returns the
+source-location gotten from the GRHS inside.
+THis is something of a nuisance, but no more.
+
+\begin{code}
+getMatchLoc :: Match id pat -> SrcLoc
+getMatchLoc (Match _ _ _ (GRHSs (GRHS _ loc : _) _ _)) = loc
+\end{code}
+
+We know the list must have at least one @Match@ in it.
+
+\begin{code}
+pprMatches :: (Outputable id, Outputable pat)
+	   => (Bool, SDoc) -> [Match id pat] -> SDoc
+pprMatches print_info matches = vcat (map (pprMatch print_info) matches)
+
+
+pprMatch :: (Outputable id, Outputable pat)
+	   => (Bool, SDoc) -> Match id pat -> SDoc
+pprMatch print_info@(is_case, name) (Match _ pats maybe_ty grhss)
+  = maybe_name <+> sep [sep (map ppr pats), 
+			ppr_maybe_ty,
+			nest 2 (pprGRHSs is_case grhss)]
+  where
+    maybe_name | is_case   = empty
+	       | otherwise = name
+    ppr_maybe_ty = case maybe_ty of
+			Just ty -> dcolon <+> ppr ty
+			Nothing -> empty
+
+
+pprGRHSs :: (Outputable id, Outputable pat)
+	 => Bool -> GRHSs id pat -> SDoc
+pprGRHSs is_case (GRHSs grhss binds maybe_ty)
+  = vcat (map (pprGRHS is_case) grhss)
+    $$
+    (if nullBinds binds then empty
+     else text "where" $$ nest 4 (pprDeeper (ppr binds)))
+
+
+pprGRHS :: (Outputable id, Outputable pat)
+	=> Bool -> GRHS id pat -> SDoc
+
+pprGRHS is_case (GRHS [ExprStmt expr _] locn)
+ =  text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
+
+pprGRHS is_case (GRHS guarded locn)
+ = sep [char '|' <+> interpp'SP guards,
+	text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
+   ]
+ where
+    ExprStmt expr _ = last guarded	-- Last stmt should be a ExprStmt for guards
+    guards	    = init guarded
+\end{code}
+
+
+
 %************************************************************************
 %*									*
 \subsection{Do stmts and list comprehensions}
@@ -428,43 +536,50 @@ pp_rbinds thing rbinds
 %************************************************************************
 
 \begin{code}
-data StmtCtxt	-- Context of a Stmt
-  = DoStmt		-- Do Statment
-  | ListComp		-- List comprehension
-  | CaseAlt		-- Guard on a case alternative
-  | PatBindRhs		-- Guard on a pattern binding
-  | FunRhs Name		-- Guard on a function defn for f
-  | LambdaBody		-- Body of a lambda abstraction
-		
-pprDo DoStmt stmts
-  = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
-pprDo ListComp stmts
-  = brackets $
-    hang (pprExpr expr <+> char '|')
-       4 (interpp'SP quals)
-  where
-    ReturnStmt expr = last stmts	-- Last stmt should be a ReturnStmt for list comps
-    quals	    = init stmts
+data Stmt id pat
+  = BindStmt	pat (HsExpr id pat) SrcLoc
+  | LetStmt	(HsBinds id pat)
+  | ExprStmt	(HsExpr id pat)	SrcLoc	-- See notes that follow
+  | ParStmt	[[Stmt id pat]]		-- List comp only: parallel set of quals
+  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming
 \end{code}
 
+ExprStmts are a bit tricky, because what 
+they mean depends on the context.  Consider 
+		ExprStmt E
+in the following contexts:
+
+	A do expression of type (m res_ty)
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	* Non-last stmt in list:   do { ....; E; ... }
+		E :: m any_ty
+	  Translation: E >> ...
+	
+	* Last stmt in list:   do { ....; E }
+		E :: m res_ty
+	  Translation: E
+	
+	A list comprehensions of type [elt_ty]
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	* Non-last stmt in list:   [ .. | ..., E, ... ]
+		E :: Bool
+	  Translation: if E then fail else ...
+	
+	* Last stmt in list:   [ E | ... ]
+		E :: elt_ty
+	  Translation: return E
+	
+	A guard list, guarding a RHS of type rhs_ty
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	* Non-last stmt in list:   f x | ..., E, ... = ...rhs...
+		E :: Bool
+	  Translation: if E then fail else ...
+	
+	* Last stmt in list:   f x | ...guards... = E
+		E :: rhs_ty
+	  Translation: E
+
 \begin{code}
-data Stmt id pat
-  = ParStmt	[[Stmt id pat]]		-- List comp only: parallel set of quals
-  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming
-  | BindStmt	pat
-		(HsExpr id pat)
-		SrcLoc
-
-  | LetStmt	(HsBinds id pat)
-
-  | GuardStmt	(HsExpr id pat)		-- List comps only
-		SrcLoc
-
-  | ExprStmt	(HsExpr id pat)		-- Do stmts; and guarded things at the end
-		SrcLoc
-
-  | ReturnStmt	(HsExpr id pat)		-- List comps only, at the end
-
 consLetStmt :: HsBinds id pat -> [Stmt id pat] -> [Stmt id pat]
 consLetStmt EmptyBinds stmts = stmts
 consLetStmt binds      stmts = LetStmt binds : stmts
@@ -485,10 +600,15 @@ pprStmt (LetStmt binds)
  = hsep [ptext SLIT("let"), pprBinds binds]
 pprStmt (ExprStmt expr _)
  = ppr expr
-pprStmt (GuardStmt expr _)
- = ppr expr
-pprStmt (ReturnStmt expr)
- = hsep [ptext SLIT("return"), ppr expr]    
+
+pprDo :: (Outputable id, Outputable pat) => HsMatchContext -> [Stmt id pat] -> SDoc
+pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
+pprDo ListComp stmts = brackets $
+		       hang (pprExpr expr <+> char '|')
+			  4 (interpp'SP quals)
+		     where
+		       ExprStmt expr _ = last stmts	-- Last stmt should
+		       quals	       = init stmts	-- be an ExprStmt
 \end{code}
 
 %************************************************************************
@@ -519,4 +639,58 @@ instance (Outputable id, Outputable pat) =>
       = hcat [ppr e1, comma, space, ppr e2, pp_dotdot, ppr e3]
 
 pp_dotdot = ptext SLIT(" .. ")
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{HsMatchCtxt}
+%*									*
+%************************************************************************
+
+\begin{code}
+data HsMatchContext	-- Context of a Match or Stmt
+  = ListComp		-- List comprehension
+  | DoExpr		-- Do Statment
+
+  | FunRhs Name		-- Function binding for f
+  | CaseAlt		-- Guard on a case alternative
+  | LambdaExpr		-- Lambda
+  | PatBindRhs		-- Pattern binding
+  | RecUpd		-- Record update
+  deriving ()
+
+-- It's convenient to have FunRhs as a Name
+-- throughout so that HsMatchContext doesn't
+-- need to be parameterised.
+-- In the RdrName world we never use the FunRhs variant.
+\end{code}
+
+\begin{code}
+isDoExpr DoExpr = True
+isDoExpr other  = False
+
+isDoOrListComp ListComp = True
+isDoOrListComp DoExpr   = True
+isDoOrListComp other    = False
+\end{code}
+
+\begin{code}
+matchSeparator (FunRhs _)   = SLIT("=")
+matchSeparator CaseAlt      = SLIT("->") 
+matchSeparator LambdaExpr   = SLIT("->") 
+matchSeparator PatBindRhs   = SLIT("=") 
+matchSeparator DoExpr       = SLIT("<-")  
+matchSeparator ListComp     = SLIT("<-")  
+matchSeparator RecUpd       = panic "When is this used?"
+\end{code}
+
+\begin{code}
+pprMatchContext (FunRhs fun) = ptext SLIT("in the definition of function") <+> quotes (ppr fun)
+pprMatchContext CaseAlt	     = ptext SLIT("in a group of case alternatives beginning")
+pprMatchContext RecUpd	     = ptext SLIT("in a record-update construct")
+pprMatchContext PatBindRhs   = ptext SLIT("in a pattern binding")
+pprMatchContext LambdaExpr   = ptext SLIT("in a lambda abstraction")
+pprMatchContext DoExpr       = ptext SLIT("in a `do' expression pattern binding")
+pprMatchContext ListComp     = ptext SLIT("in a `list comprension' pattern binding")
 \end{code}

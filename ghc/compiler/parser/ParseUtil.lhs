@@ -37,7 +37,7 @@ import RdrHsSyn		( RdrBinding(..),
 			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails
 			)
 import RdrName
-import PrelNames	( unitTyCon_RDR, minus_RDR )
+import PrelNames	( unitTyCon_RDR )
 import CallConv
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )

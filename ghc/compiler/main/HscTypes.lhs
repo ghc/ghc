@@ -8,10 +8,13 @@ module HscTypes (
 	ModuleLocation(..),
 
 	ModDetails(..),	ModIface(..), 
-	HomeSymbolTable, PackageTypeEnv,
+	HomeSymbolTable, emptySymbolTable,
+	PackageTypeEnv,
 	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
 	lookupIface, lookupIfaceByModName,
 	emptyModIface,
+
+	InteractiveContext(..),
 
 	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
@@ -19,14 +22,15 @@ module HscTypes (
 
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
-	TypeEnv, lookupType, mkTypeEnv, extendTypeEnvList, 
+	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
+	extendTypeEnvList, extendTypeEnvWithIds,
 	typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
-	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
+	PersistentRenamerState(..), IsBootInterface, DeclsMap,
 	IfaceInsts, IfaceRules, GatedDecl, IsExported,
 	NameSupply(..), OrigNameCache, OrigIParamCache,
-	AvailEnv, AvailInfo, GenAvailInfo(..),
+	Avails, AvailEnv, GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	PersistentCompilerState(..),
 
 	Deprecations(..), lookupDeprec,
@@ -34,7 +38,9 @@ module HscTypes (
 	InstEnv, ClsInstEnv, DFunId,
 	PackageInstEnv, PackageRuleBase,
 
-	GlobalRdrEnv, GlobalRdrElt(..), RdrAvailInfo, pprGlobalRdrEnv,
+	GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
+	LocalRdrEnv, extendLocalRdrEnv,
+	
 
 	-- Provenance
 	Provenance(..), ImportReason(..), 
@@ -44,8 +50,8 @@ module HscTypes (
 
 #include "HsVersions.h"
 
-import RdrName		( RdrNameEnv, emptyRdrEnv, rdrEnvToList )
-import Name		( Name, NamedThing, getName, nameModule, nameSrcLoc )
+import RdrName		( RdrNameEnv, addListToRdrEnv, emptyRdrEnv, mkRdrUnqual, rdrEnvToList )
+import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import Name -- Env
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
@@ -199,6 +205,9 @@ type PackageIfaceTable  = IfaceTable
 
 type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
 
+emptySymbolTable :: SymbolTable
+emptySymbolTable = emptyModuleEnv
+
 emptyIfaceTable :: IfaceTable
 emptyIfaceTable = emptyModuleEnv
 \end{code}
@@ -217,6 +226,26 @@ lookupIfaceByModName :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> May
 -- We often have two IfaceTables, and want to do a lookup
 lookupIfaceByModName hit pit mod
   = lookupModuleEnvByName hit mod `seqMaybe` lookupModuleEnvByName pit mod
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The interactive context}
+%*									*
+%************************************************************************
+
+\begin{code}
+data InteractiveContext 
+  = InteractiveContext { 
+	ic_module :: Module,		-- The current module in which 
+					-- the  user is sitting
+
+	ic_rn_env :: LocalRdrEnv,	-- Lexical context for variables bound
+					-- during interaction
+
+	ic_type_env :: TypeEnv		-- Ditto for types
+    }
 \end{code}
 
 
@@ -275,10 +304,11 @@ mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
 		
 extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
 extendTypeEnvList env things
-  = foldl add_thing env things
-  where
-    add_thing :: TypeEnv -> TyThing -> TypeEnv
-    add_thing env thing = extendNameEnv env (getName thing) thing
+  = extendNameEnvList env [(getName thing, thing) | thing <- things]
+
+extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
+extendTypeEnvWithIds env ids
+  = extendNameEnvList env [(getName id, AnId id) | id <- ids]
 \end{code}
 
 \begin{code}
@@ -530,6 +560,16 @@ type GatedDecl  d = ([Name], (Module, d))
 \subsection{Provenance and export info}
 %*									*
 %************************************************************************
+
+A LocalRdrEnv is used for local bindings (let, where, lambda, case)
+
+\begin{code}
+type LocalRdrEnv = RdrNameEnv Name
+
+extendLocalRdrEnv :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendLocalRdrEnv env names
+  = addListToRdrEnv env [(mkRdrUnqual (nameOccName n), n) | n <- names]
+\end{code}
 
 The GlobalRdrEnv gives maps RdrNames to Names.  There is a separate
 one for each module, corresponding to that module's top-level scope.

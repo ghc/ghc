@@ -11,7 +11,7 @@ module DsListComp ( dsListComp ) where
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import HsSyn		( OutPat(..), HsExpr(..), Stmt(..) )
+import HsSyn		( OutPat(..), HsExpr(..), Stmt(..), HsMatchContext(..) )
 import TcHsSyn		( TypecheckedStmt )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -28,6 +28,7 @@ import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, tupleCon, mkListTy, mkTupleTy )
 import Match		( matchSimply )
 import PrelNames	( foldrName, buildName )
+import SrcLoc		( noSrcLoc )
 import List		( zip4 )
 \end{code}
 
@@ -144,7 +145,7 @@ deListComp (ParStmtOut bndrstmtss : quals) list
 	pat  = TuplePat pats Boxed
 
 	qualss = map mkQuals bndrstmtss
-	mkQuals (bndrs, stmts) = (bndrs, stmts ++ [ReturnStmt (myTupleExpr bndrs)])
+	mkQuals (bndrs, stmts) = (bndrs, stmts ++ [ExprStmt (myTupleExpr bndrs) noSrcLoc])
 
 	qualTys = map mkBndrsTy bndrss
 	mkBndrsTy bndrs = myTupleTy Boxed (length bndrs) (map idType bndrs)
@@ -176,11 +177,13 @@ deListComp (ParStmtOut bndrstmtss : quals) list
 	myTupleExpr [id] = HsVar id
 	myTupleExpr ids	 = ExplicitTuple [ HsVar i | i <- ids ] Boxed
 
-deListComp [ReturnStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
+	-- Last: the one to return
+deListComp [ExprStmt expr locn] list	-- Figure 7.4, SLPJ, p 135, rule C above
   = dsExpr expr			`thenDs` \ core_expr ->
     returnDs (mkConsExpr (exprType core_expr) core_expr list)
 
-deListComp (GuardStmt guard locn : quals) list	-- rule B above
+	-- Non-last: must be a guard
+deListComp (ExprStmt guard locn : quals) list	-- rule B above
   = dsExpr guard       		`thenDs` \ core_guard ->
     deListComp quals list	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest list)
@@ -212,7 +215,7 @@ deBindComp pat core_list1 quals core_list2
 	letrec_body = App (Var h) core_list1
     in
     deListComp quals core_fail			`thenDs` \ rest_expr ->
-    matchSimply (Var u2) ListCompMatch pat
+    matchSimply (Var u2) ListComp pat
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
@@ -247,11 +250,13 @@ dfListComp :: Id -> Id			-- 'c' and 'n'
 	   -> [TypecheckedStmt] 	-- the rest of the qual's
 	   -> DsM CoreExpr
 
-dfListComp c_id n_id [ReturnStmt expr]
+	-- Last: the one to return
+dfListComp c_id n_id [ExprStmt expr locn]
   = dsExpr expr			`thenDs` \ core_expr ->
     returnDs (mkApps (Var c_id) [core_expr, Var n_id])
 
-dfListComp c_id n_id (GuardStmt guard locn  : quals)
+	-- Non-last: must be a guard
+dfListComp c_id n_id (ExprStmt guard locn  : quals)
   = dsExpr guard               			`thenDs` \ core_guard ->
     dfListComp c_id n_id quals	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest (Var n_id))
@@ -277,7 +282,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     dfListComp c_id b quals			`thenDs` \ core_rest ->
 
     -- build the pattern match
-    matchSimply (Var x) ListCompMatch pat core_rest (Var b)	`thenDs` \ core_expr ->
+    matchSimply (Var x) ListComp pat core_rest (Var b)	`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
     dsLookupGlobalValue foldrName		`thenDs` \ foldr_id ->

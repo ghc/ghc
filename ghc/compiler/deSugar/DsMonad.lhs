@@ -20,11 +20,12 @@ module DsMonad (
 
 	dsWarn, 
 	DsWarnings,
-	DsMatchContext(..), DsMatchKind(..)
+	DsMatchContext(..)
     ) where
 
 #include "HsVersions.h"
 
+import HsSyn		( HsMatchContext )
 import Bag		( emptyBag, snocBag, Bag )
 import ErrUtils 	( WarnMsg )
 import Id		( mkSysLocal, setIdUnique, Id )
@@ -218,18 +219,7 @@ dsLookupGlobalValue name dflags us genv loc mod warns
 
 \begin{code}
 data DsMatchContext
-  = DsMatchContext DsMatchKind [TypecheckedPat] SrcLoc
+  = DsMatchContext HsMatchContext [TypecheckedPat] SrcLoc
   | NoMatchContext
-  deriving ()
-
-data DsMatchKind
-  = FunMatch Id
-  | CaseMatch
-  | LambdaMatch
-  | PatBindMatch
-  | DoBindMatch
-  | ListCompMatch
-  | LetMatch
-  | RecUpdMatch
   deriving ()
 \end{code}

@@ -14,7 +14,7 @@ import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 			  ForeignDecl(..), ForKind(..), isDynamicExtName,
-			  collectTopBinders
+			  collectLocatedHsBinders
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
@@ -35,7 +35,7 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv, 
 			  Deprecations(..), ModIface(..)
 			)
-import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc )
+import RdrName		( rdrNameOcc, setRdrNameOcc )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
@@ -236,7 +236,7 @@ getLocalDeclBinders mod (TyClD tycl_decl)
     returnRn [avail]
 
 getLocalDeclBinders mod (ValD binds)
-  = mapRn new (bagToList (collectTopBinders binds))	`thenRn` \ avails ->
+  = mapRn new (collectLocatedHsBinders binds)		`thenRn` \ avails ->
     returnRn avails
   where
     new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenRn` \ name ->

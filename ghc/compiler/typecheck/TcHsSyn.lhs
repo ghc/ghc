@@ -28,7 +28,7 @@ module TcHsSyn (
 	-- re-exported from TcEnv
 	TcId, 
 
-	zonkTopBinds, zonkId, zonkIdOcc, zonkExpr,
+	zonkTopBinds, zonkId, zonkIdBndr, zonkIdOcc, zonkExpr,
 	zonkForeignExports, zonkRules
   ) where
 
@@ -510,19 +510,10 @@ zonkStmts (ParStmtOut bndrstmtss : stmts)
     returnNF_Tc (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
   where (bndrss, stmtss) = unzip bndrstmtss
 
-zonkStmts [ReturnStmt expr]
-  = zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc [ReturnStmt new_expr]
-
 zonkStmts (ExprStmt expr locn : stmts)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
     zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
     returnNF_Tc (ExprStmt new_expr locn : new_stmts)
-
-zonkStmts (GuardStmt expr locn : stmts)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (GuardStmt new_expr locn : new_stmts)
 
 zonkStmts (LetStmt binds : stmts)
   = zonkBinds binds		`thenNF_Tc` \ (new_binds, new_env) ->

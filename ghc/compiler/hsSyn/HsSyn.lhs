@@ -19,12 +19,12 @@ module HsSyn (
 	module HsExpr,
 	module HsImpExp,
 	module HsLit,
-	module HsMatches,
 	module HsPat,
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	collectTopBinders, collectMonoBinders, collectLocatedMonoBinders,
+	collectHsBinders, collectLocatedHsBinders, 
+	collectMonoBinders, collectLocatedMonoBinders,
 	hsModuleName, hsModuleImports
      ) where
 
@@ -36,7 +36,6 @@ import HsBinds
 import HsExpr
 import HsImpExp
 import HsLit
-import HsMatches
 import HsPat
 import HsTypes
 import BasicTypes	( Fixity, Version, NewOrData )
@@ -45,7 +44,6 @@ import BasicTypes	( Fixity, Version, NewOrData )
 import Name		( NamedThing )
 import Outputable
 import SrcLoc		( SrcLoc )
-import Bag
 import Module		( ModuleName )
 \end{code}
 
@@ -119,10 +117,19 @@ where
 it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
-collectTopBinders :: HsBinds name (InPat name) -> Bag (name,SrcLoc)
-collectTopBinders EmptyBinds        = emptyBag
-collectTopBinders (MonoBind b _ _)  = listToBag (collectLocatedMonoBinders b)
-collectTopBinders (ThenBinds b1 b2) = collectTopBinders b1 `unionBags` collectTopBinders b2
+collectLocatedHsBinders :: HsBinds name (InPat name) -> [(name,SrcLoc)]
+collectLocatedHsBinders EmptyBinds = []
+collectLocatedHsBinders (MonoBind b _ _) 
+ = collectLocatedMonoBinders b
+collectLocatedHsBinders (ThenBinds b1 b2)
+ = collectLocatedHsBinders b1 ++ collectLocatedHsBinders b2
+
+collectHsBinders :: HsBinds name (InPat name) -> [name]
+collectHsBinders EmptyBinds = []
+collectHsBinders (MonoBind b _ _) 
+ = collectMonoBinders b
+collectHsBinders (ThenBinds b1 b2)
+ = collectHsBinders b1 ++ collectHsBinders b2
 
 collectLocatedMonoBinders :: MonoBinds name (InPat name) -> [(name,SrcLoc)]
 collectLocatedMonoBinders binds

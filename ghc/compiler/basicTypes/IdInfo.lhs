@@ -16,7 +16,7 @@ module IdInfo (
 	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, shortableIdInfo, copyIdInfo,
 
 	-- Flavour
-	IdFlavour(..), flavourInfo, 
+	IdFlavour(..), flavourInfo,  makeConstantFlavour,
 	setNoDiscardInfo, setFlavourInfo,
 	ppFlavourInfo,
 
@@ -265,6 +265,18 @@ data IdFlavour
 				--     Id back to the data con]
   | PrimOpId PrimOp		-- The Id for a primitive operator
   | RecordSelId FieldLabel	-- The Id for a record selector
+
+
+makeConstantFlavour :: IdFlavour -> IdFlavour
+makeConstantFlavour flavour = new_flavour
+  where new_flavour = case flavour of
+		        VanillaId  -> ConstantId
+		        ExportedId -> ConstantId
+		        ConstantId -> ConstantId	-- e.g. Default methods
+		        DictFunId  -> DictFunId
+		        flavour    -> pprTrace "makeConstantFlavour" 
+					(ppFlavourInfo flavour)
+				  	flavour
 
 
 ppFlavourInfo :: IdFlavour -> SDoc

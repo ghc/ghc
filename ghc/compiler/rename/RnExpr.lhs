@@ -11,7 +11,7 @@ free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatch, rnGRHSs, rnPat, rnExpr, rnExprs,
+	rnMatch, rnGRHSs, rnPat, rnExpr, rnExprs, rnStmt,
 	checkPrecMatch
    ) where
 
@@ -229,15 +229,15 @@ rnGRHS (GRHS guarded locn)
 		returnRn ()
     )		`thenRn_`
 
-    rnStmts rnExpr guarded	`thenRn` \ ((_, guarded'), fvs) ->
+    rnStmts guarded	`thenRn` \ ((_, guarded'), fvs) ->
     returnRn (GRHS guarded' locn, fvs)
   where
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard [ExprStmt _ _]                = True
-    is_standard_guard [GuardStmt _ _, ExprStmt _ _] = True
-    is_standard_guard other	      		    = False
+    is_standard_guard [ExprStmt _ _]               = True
+    is_standard_guard [ExprStmt _ _, ExprStmt _ _] = True
+    is_standard_guard other	      		   = False
 \end{code}
 
 %************************************************************************
@@ -375,11 +375,10 @@ rnExpr (HsWith expr binds)
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupOrigNames implicit_rdr_names	`thenRn` \ implicit_fvs ->
-    rnStmts rnExpr stmts		`thenRn` \ ((_, stmts'), fvs) ->
+    rnStmts stmts			`thenRn` \ ((_, stmts'), fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
 	ExprStmt _ _ -> returnRn () ;
-	ReturnStmt _ -> returnRn () ;	-- for list comprehensions
 	_            -> addErrRn (doStmtListErr e)
     }					`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
@@ -539,28 +538,28 @@ be @{r}@, and the free var set for the entire Quals will be @{r}@. This
 Quals.
 
 \begin{code}
-type RnExprTy = RdrNameHsExpr -> RnMS (RenamedHsExpr, FreeVars)
-
-rnStmts :: RnExprTy
-	-> [RdrNameStmt]
+rnStmts :: [RdrNameStmt]
 	-> RnMS (([Name], [RenamedStmt]), FreeVars)
 
-rnStmts rn_expr []
+rnStmts []
   = returnRn (([], []), emptyFVs)
 
-rnStmts rn_expr (stmt:stmts)
+rnStmts (stmt:stmts)
   = getLocalNameEnv 		`thenRn` \ name_env ->
-    rnStmt rn_expr stmt				$ \ stmt' ->
-    rnStmts rn_expr stmts			`thenRn` \ ((binders, stmts'), fvs) ->
+    rnStmt stmt				$ \ stmt' ->
+    rnStmts stmts			`thenRn` \ ((binders, stmts'), fvs) ->
     returnRn ((binders, stmt' : stmts'), fvs)
 
-rnStmt :: RnExprTy -> RdrNameStmt
+rnStmt :: RdrNameStmt
        -> (RenamedStmt -> RnMS (([Name], a), FreeVars))
        -> RnMS (([Name], a), FreeVars)
+-- The thing list of names returned is the list returned by the
+-- thing_inside, plus the binders of the arguments stmt
+
 -- Because of mutual recursion we have to pass in rnExpr.
 
-rnStmt rn_expr (ParStmt stmtss) thing_inside
-  = mapFvRn (rnStmts rn_expr) stmtss	`thenRn` \ (bndrstmtss, fv_stmtss) ->
+rnStmt (ParStmt stmtss) thing_inside
+  = mapFvRn rnStmts stmtss		`thenRn` \ (bndrstmtss, fv_stmtss) ->
     let binderss = map fst bndrstmtss
 	checkBndrs all_bndrs bndrs
 	  = checkRn (null (intersectBy eqOcc all_bndrs bndrs)) err `thenRn_`
@@ -568,45 +567,35 @@ rnStmt rn_expr (ParStmt stmtss) thing_inside
 	eqOcc n1 n2 = nameOccName n1 == nameOccName n2
 	err = text "duplicate binding in parallel list comprehension"
     in
-    foldlRn checkBndrs [] binderss	`thenRn` \ binders ->
-    bindLocalNamesFV binders		$
+    foldlRn checkBndrs [] binderss	`thenRn` \ new_binders ->
+    bindLocalNamesFV new_binders	$
     thing_inside (ParStmtOut bndrstmtss)`thenRn` \ ((rest_bndrs, result), fv_rest) ->
-    returnRn ((rest_bndrs ++ binders, result), fv_stmtss `plusFV` fv_rest)
+    returnRn ((new_binders ++ rest_bndrs, result), fv_stmtss `plusFV` fv_rest)
 
-rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
+rnStmt (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rn_expr expr				`thenRn` \ (expr', fv_expr) ->
+    rnExpr expr					`thenRn` \ (expr', fv_expr) ->
     bindLocalsFVRn doc binders			$ \ new_binders ->
     rnPat pat					`thenRn` \ (pat', fv_pat) ->
     thing_inside (BindStmt pat' expr' src_loc)	`thenRn` \ ((rest_binders, result), fvs) ->
     -- ZZ is shadowing handled correctly?
-    returnRn ((rest_binders ++ new_binders, result),
+    returnRn ((new_binders ++ rest_binders, result),
 	      fv_expr `plusFV` fvs `plusFV` fv_pat)
   where
     binders = collectPatBinders pat
     doc = text "a pattern in do binding" 
 
-rnStmt rn_expr (ExprStmt expr src_loc) thing_inside
+rnStmt (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
+    rnExpr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `plusFV` fvs)
 
-rnStmt rn_expr (GuardStmt expr src_loc) thing_inside
-  = pushSrcLocRn src_loc $
-    rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
-    thing_inside (GuardStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `plusFV` fvs)
-
-rnStmt rn_expr (ReturnStmt expr) thing_inside
-  = rn_expr expr				`thenRn` \ (expr', fv_expr) ->
-    thing_inside (ReturnStmt expr')		`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `plusFV` fvs)
-
-rnStmt rn_expr (LetStmt binds) thing_inside
+rnStmt (LetStmt binds) thing_inside
   = rnBinds binds				$ \ binds' ->
-    thing_inside (LetStmt binds')
-
+    let new_binders = collectHsBinders binds' in
+    thing_inside (LetStmt binds')    `thenRn` \ ((rest_binders, result), fvs) ->
+    returnRn ((new_binders ++ rest_binders, result), fvs )
 \end{code}
 
 %************************************************************************

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.51 2001/02/14 11:36:07 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.52 2001/02/26 15:06:58 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -18,13 +18,10 @@ import ByteCodeLink
 import DriverFlags
 import DriverState
 import DriverUtil
-import Type
 import Linker
-import Finder
-import Module
-import Outputable
 import Util
-import PprType		{- instance Outputable Type; do not delete -}
+import Name		( Name )
+import Outputable
 import Panic		( GhcException(..) )
 import Config
 
@@ -45,8 +42,6 @@ import Char
 import Monad 		( when )
 
 import PrelGHC 		( unsafeCoerce# )
-import PrelPack 	( packString )
-import PrelByteArr
 import Foreign		( nullPtr )
 import CString		( peekCString )
 
@@ -65,7 +60,7 @@ builtin_commands :: [(String, String -> GHCi Bool)]
 builtin_commands = [
   ("add",	keepGoing addModule),
   ("cd",    	keepGoing changeDirectory),
-  ("def",	keepGoing defineMacro),
+--  ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("load",	keepGoing loadModule),
@@ -86,7 +81,7 @@ shortHelpText = "use :? for help.\n"
 helpText = "\ 
 \ Commands available from the prompt:\n\ 
 \\  
-\   <expr>		evaluate <expr>\n\ 
+\   <stmt>		evaluate/run <stmt>\n\ 
 \   :add <filename>     add a module to the current set\n\ 
 \   :cd <dir>		change directory to <dir>\n\ 
 \   :help, :?		display this list of commands\n\ 
@@ -127,33 +122,25 @@ interactiveUI cmstate mod cmdline_libs = do
    Readline.initialize
 #endif
 
-   prel <- moduleNameToModule defaultCurrentModuleName
-   writeIORef defaultCurrentModule prel
-
    dflags <- getDynFlags
 
-   (cmstate, maybe_stuff) <- cmGetExpr cmstate dflags False prel 
-		  		"PrelHandle.hFlush PrelHandle.stdout"
+{-
+   (cmstate, _) <- cmRunStmt cmstate dflags False prel 
+		  	"PrelHandle.hFlush PrelHandle.stdout"
    case maybe_stuff of
 	Nothing -> return ()
 	Just (hv,_,_) -> writeIORef flush_stdout hv
    
-   (cmstate, maybe_stuff) <- cmGetExpr cmstate dflags False prel 
+   (cmstate, _) <- cmGetExpr cmstate dflags False prel 
 		  		"PrelHandle.hFlush PrelHandle.stdout"
    case maybe_stuff of
 	Nothing -> return ()
 	Just (hv,_,_) -> writeIORef flush_stderr hv
+-}
    
-   let this_mod = case mods of 
-	  	      []   -> prel
-  	  	      m:ms -> m
-
-   (unGHCi runGHCi) GHCiState{ modules = mods,
-			      current_module = this_mod,
-	  	              target = mod,
-			      cmstate = cmstate,
-			      options = [ShowTiming],
-                              last_expr = Nothing}
+   (unGHCi runGHCi) GHCiState{ target = mod,
+			       cmstate = cmstate,
+			       options = [ShowTiming] }
    return ()
 
 
@@ -189,7 +176,8 @@ runGHCi = do
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
    st <- getGHCiState
-   when prompt (io (hPutStr hdl (moduleUserString (current_module st) ++ "> ")))
+   mod <- io (cmGetContext (cmstate st))
+   when prompt (io (hPutStr hdl (mod ++ "> ")))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e -> return ()
@@ -213,7 +201,8 @@ stringLoop (s:ss) = do
 readlineLoop :: GHCi ()
 readlineLoop = do
    st <- getGHCiState
-   l <- io (readline (moduleUserString (current_module st) ++ "> "))
+   mod <- io (cmGetContext (cmstate st))
+   l <- io (readline (mod ++ "> "))
    case l of
 	Nothing -> return ()
 	Just l  ->
@@ -251,49 +240,49 @@ runCommand c =
 
 doCommand (':' : command) = specialCommand command
 doCommand ('-':'-':_) = return False	-- comments, useful in scripts
-doCommand expr
-   = do expr_expanded <- expandExpr expr
-        -- io (putStrLn ( "Before: " ++ expr ++ "\nAfter:  " ++ expr_expanded))
-        expr_ok <- timeIt (do stuff <- evalExpr expr_expanded
-			      finishEvalExpr expr_expanded stuff)
-        when expr_ok (rememberExpr expr_expanded)
+doCommand stmt
+   = do timeIt (do stuff <- runStmt stmt; finishEvalExpr stuff)
         return False
 
 -- Returns True if the expr was successfully parsed, renamed and
 -- typechecked.
-evalExpr :: String -> GHCi Bool
-evalExpr expr
- | null (filter (not.isSpace) expr)
- = return False
+runStmt :: String -> GHCi (Maybe [Name])
+runStmt stmt
+ | null (filter (not.isSpace) stmt)
+ = return Nothing
  | otherwise
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
-      (new_cmstate, maybe_stuff) <- 
-      	 io (cmGetExpr (cmstate st) dflags True (current_module st) expr)
+      (new_cmstate, names) <- io (cmRunStmt (cmstate st) dflags stmt)
       setGHCiState st{cmstate = new_cmstate}
-      case maybe_stuff of
-      	 Nothing -> return False
-      	 Just (hv, unqual, ty) -> 
-		do io (cmRunExpr hv)
-		   return True
+      return (Just names)
 
 -- possibly print the type and revert CAFs after evaluating an expression
-finishEvalExpr _ False = return False
-finishEvalExpr expr True
+finishEvalExpr Nothing = return False
+finishEvalExpr (Just names)
  = do b <- isOptionSet ShowType
-	-- re-typecheck, don't wrap with print this time
-      when b (io (putStr ":: ") >> typeOfExpr expr)
+      st <- getGHCiState
+      when b (mapM_ (showTypeOfName (cmstate st)) names)
+
       b <- isOptionSet RevertCAFs
       io (when b revertCAFs)
       flushEverything
       return True
 
+showTypeOfName :: CmState -> Name -> GHCi ()
+showTypeOfName cmstate n
+   = do maybe_str <- io (cmTypeOfName cmstate n)
+	case maybe_str of
+	  Nothing  -> return ()
+	  Just str -> io (putStrLn (showSDoc (ppr n) ++ " :: " ++ str))
+
 flushEverything :: GHCi ()
 flushEverything
-   = io $ do flush_so <- readIORef flush_stdout
+   = io $ {-do flush_so <- readIORef flush_stdout
      	     cmRunExpr flush_so
      	     flush_se <- readIORef flush_stdout
      	     cmRunExpr flush_se
+	  -} (return ())
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -327,28 +316,13 @@ setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
   = throwDyn (OtherError ("strange looking module name: `" ++ m ++ "'"))
 setContext str
   = do st <- getGHCiState
-
-       let mn = mkModuleName str
-       m <- case [ m | m <- modules st, moduleName m == mn ] of
-		(m:_) -> return m
-		[]    -> io (moduleNameToModule mn)
-
-       if (isHomeModule m && m `notElem` modules st)
-	  then throwDyn (OtherError (showSDoc (quotes (ppr (moduleName m))
-				<+> text "is not currently loaded, use :load")))
-	  else setGHCiState st{current_module = m}
-
-moduleNameToModule :: ModuleName -> IO Module
-moduleNameToModule mn
- = do maybe_stuff <- findModule mn
-      case maybe_stuff of
-	Nothing -> throwDyn (OtherError ("can't find module `"
-				    ++ moduleNameUserString mn ++ "'"))
-	Just (m,_) -> return m
+       new_cmstate <- io (cmSetContext (cmstate st) str)
+       setGHCiState st{cmstate=new_cmstate}
 
 changeDirectory :: String -> GHCi ()
 changeDirectory d = io (setCurrentDirectory d)
 
+{-
 defineMacro :: String -> GHCi ()
 defineMacro s = do
   let (macro_name, definition) = break isSpace s
@@ -369,13 +343,14 @@ defineMacro s = do
   st <- getGHCiState
   dflags <- io (getDynFlags)
   (new_cmstate, maybe_stuff) <- 
-      	 io (cmGetExpr (cmstate st) dflags False (current_module st) new_expr)
+      	 io (cmGetExpr (cmstate st) dflags new_expr)
   setGHCiState st{cmstate = new_cmstate}
   case maybe_stuff of
      Nothing -> return ()
      Just (hv, unqual, ty) 
 	-> io (writeIORef commands 
 		 ((macro_name, keepGoing (runMacro hv)) : cmds))
+-}
 
 runMacro :: HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
@@ -403,28 +378,11 @@ loadModule' path = do
   cmstate1 <- io (cmUnload (cmstate state))
   io (revertCAFs)			-- always revert CAFs on load.
   (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
-
-  def_mod <- io (readIORef defaultCurrentModule)
-
-  let new_state = state{
-  			cmstate = cmstate2,
-			modules = mods,
-			current_module = case mods of 
-					   [] -> def_mod
-					   xs -> head xs,
-			target = Just path
-		   }
+  let new_state = state{ cmstate = cmstate2,
+			 target = Just path
+		       }
   setGHCiState new_state
-
-  let mod_commas 
-	| null mods = text "none."
-	| otherwise = hsep (
-	    punctuate comma (map (text.moduleUserString) mods)) <> text "."
-  case ok of
-    False -> 
-       io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
-    True  -> 
-       io (putStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas)))
+  modulesLoadedMsg ok mods
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
@@ -434,27 +392,37 @@ reloadModule "" = do
    Just path
       -> do io (revertCAFs)		-- always revert CAFs on reload.
 	    (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
-	    def_mod <- io (readIORef defaultCurrentModule)
-            setGHCiState 
-               state{cmstate=new_cmstate,
-                     modules = mods,
-                     current_module = case mods of 
-                                         [] -> def_mod
-                                         xs -> head xs
-                    }
+            setGHCiState state{ cmstate=new_cmstate }
+	    modulesLoadedMsg ok mods
 
 reloadModule _ = noArgs ":reload"
+
+
+modulesLoadedMsg ok mods = do
+  let mod_commas 
+	| null mods = text "none."
+	| otherwise = hsep (
+	    punctuate comma (map text mods)) <> text "."
+  case ok of
+    False -> 
+       io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
+    True  -> 
+       io (putStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas)))
+
 
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
-       (new_cmstate, maybe_ty) <- io (cmGetExpr (cmstate st) dflags False
-					 (current_module st) str)
+       (new_cmstate, names) 
+	  <- io (cmRunStmt (cmstate st) dflags ("let it=" ++ str))
        setGHCiState st{cmstate = new_cmstate}
-       case maybe_ty of
-	 Nothing -> return ()
-	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty)) 
+       case names of
+	 [name] -> do maybe_tystr <- io (cmTypeOfName new_cmstate name)
+		      case maybe_tystr of
+			Nothing    -> return ()
+			Just tystr -> io (putStrLn (":: " ++  tystr))
+	 _other -> pprPanic "typeOfExpr" (ppr names)
 
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -557,54 +525,13 @@ optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
 
 -----------------------------------------------------------------------------
--- Code to do last-expression-entered stuff.  (a.k.a the $$ facility)
-
--- Take a string and replace $$s in it with the last expr, if any.
-expandExpr :: String -> GHCi String
-expandExpr str
-   = do mle <- getLastExpr
-        return (outside mle str)
-     where
-        outside mle ('$':'$':cs)
-           = case mle of
-                Just le -> " (" ++ le ++ ") " ++ outside mle cs
-                Nothing -> outside mle cs
-
-        outside mle []           = []
-        outside mle ('"':str)    = '"' : inside2 mle str   -- "
-        outside mle ('\'':str)   = '\'' : inside1 mle str   -- '
-        outside mle (c:cs)       = c : outside mle cs
-
-        inside2 mle ('"':cs)  = '"' : outside mle cs   -- "
-        inside2 mle (c:cs)    = c : inside2 mle cs
-        inside2 mle []        = []
-
-        inside1 mle ('\'':cs) = '\'': outside mle cs
-        inside1 mle (c:cs)    = c : inside1 mle cs
-        inside1 mle []        = []
-
-
-rememberExpr :: String -> GHCi ()
-rememberExpr str
-   = do let cleaned = (clean . reverse . clean . reverse) str
-        let forget_me_not | null cleaned = Nothing
-                          | otherwise    = Just cleaned
-        setLastExpr forget_me_not
-     where
-        clean = dropWhile isSpace
-
-
------------------------------------------------------------------------------
 -- GHCi monad
 
 data GHCiState = GHCiState
      { 
-	modules	       :: [Module],
-	current_module :: Module,
 	target         :: Maybe FilePath,
 	cmstate        :: CmState,
-	options        :: [GHCiOption],
-        last_expr      :: Maybe String
+	options        :: [GHCiOption]
      }
 
 data GHCiOption 
@@ -612,9 +539,6 @@ data GHCiOption
 	| ShowType		-- show the type of expressions
 	| RevertCAFs		-- revert CAFs after every evaluation
 	deriving Eq
-
-defaultCurrentModuleName = mkModuleName "Prelude"
-GLOBAL_VAR(defaultCurrentModule, error "no defaultCurrentModule", Module)
 
 GLOBAL_VAR(flush_stdout, error "no flush_stdout", HValue)
 GLOBAL_VAR(flush_stderr, error "no flush_stdout", HValue)
@@ -642,14 +566,6 @@ unsetOption :: GHCiOption -> GHCi ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
-
-getLastExpr :: GHCi (Maybe String)
-getLastExpr
- = do st <- getGHCiState ; return (last_expr st)
-
-setLastExpr :: Maybe String -> GHCi ()
-setLastExpr last_expr
- = do st <- getGHCiState ; setGHCiState (st{last_expr = last_expr})
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 

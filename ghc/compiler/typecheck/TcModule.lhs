@@ -5,56 +5,63 @@
 
 \begin{code}
 module TcModule (
-	typecheckModule, typecheckIface, typecheckExpr, TcResults(..)
+	typecheckModule, typecheckIface, typecheckStmt, TcResults(..)
     ) where
 
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
-			  isIfaceRuleDecl, nullBinds, andMonoBindList
+			  Stmt(..), InPat(..), HsMatchContext(..),
+			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch
 			)
 import HsTypes		( toHsType )
-import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName )
-import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedHsExpr )
+import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
+			  returnIOName, bindIOName, failIOName, 
+			  itName
+			)
+import MkId		( unsafeCoerceId )
+import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedStmt )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
-			  zonkExpr
+			  zonkExpr, zonkIdBndr
 			)
 
 
 import TcMonad
 import TcType		( newTyVarTy, zonkTcType, tcInstType )
+import TcMatches	( tcStmtsAndThen )
 import TcUnify		( unifyTauTy )
-import Inst		( plusLIE )
-import VarSet		( varSetElems )
+import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
-import TcExpr		( tcMonoExpr )
 import TcEnv		( TcEnv, RecTcEnv, InstInfo, tcExtendGlobalValEnv, tcLookup_maybe,
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv,
-			  TcTyThing(..), tcLookupTyCon
+			  tcExtendGlobalTypeEnv, tcLookupGlobalId, tcLookupTyCon,
+			  TcTyThing(..), tcLookupId
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
+import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
-import Type		( funResultTy, splitForAllTys, mkForAllTys, mkFunTys,
-			  liftedTypeKind, openTypeKind, mkTyConApp, tyVarsOfType, tidyType )
+import TysWiredIn	( mkListTy, unitTy )
+import Type		( funResultTy, splitForAllTys, 
+			  liftedTypeKind, mkTyConApp, tidyType )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
-import Id		( idType, idName, isLocalId, idUnfolding )
+import Id		( Id, idType, idName, isLocalId, idUnfolding )
 import Module           ( Module, isHomeModule, moduleName )
 import Name		( Name, toRdrName, isGlobalName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
 import Util
-import BasicTypes       ( EP(..), Fixity )
+import BasicTypes       ( EP(..), Fixity, RecFlag(..) )
+import SrcLoc		( noSrcLoc )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, ModIface(..),
@@ -64,10 +71,163 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 			)
 \end{code}
 
-Outside-world interface:
-\begin{code}
 
--- Convenient type synonyms first:
+%************************************************************************
+%*									*
+\subsection{The stmt interface}
+%*									*
+%************************************************************************
+
+\begin{code}
+typecheckStmt :: DynFlags
+	      -> PersistentCompilerState
+	      -> HomeSymbolTable
+	      -> TypeEnv		-- The interactive context's type envt 
+	      -> PrintUnqualified	-- For error printing
+	      -> Module			-- Is this really needed
+	      -> [Name]			-- Names bound by the Stmt (empty for expressions)
+	      -> (SyntaxMap,
+		  RenamedStmt, 		-- The stmt itself
+	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
+	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, [Id]))
+			-- The returned [Name] is the same as the input except for
+			-- ExprStmt, in which case the returned [Name] is [itName]
+
+typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (syn_map, stmt, iface_decls)
+  = typecheck dflags syn_map pcs hst unqual $
+
+ 	 -- use the default default settings, i.e. [Integer, Double]
+    tcSetDefaultTys defaultDefaultTys $
+
+	-- Typecheck the extra declarations
+    fixTc (\ ~(unf_env, _, _, _, _) ->
+	tcImports unf_env pcs hst get_fixity this_mod iface_decls
+    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+    ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+
+    tcSetEnv env				$
+    tcExtendGlobalTypeEnv ic_type_env		$
+
+	-- The real work is done here
+    tcUserStmt names stmt 		`thenTc` \ (expr, bound_ids) ->
+
+    traceTc (text "tcs 1") `thenNF_Tc_`
+    zonkExpr expr			`thenNF_Tc` \ zonked_expr ->
+    mapNF_Tc zonkIdBndr bound_ids	`thenNF_Tc` \ zonked_ids ->
+
+    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_tc "Bound Ids" (vcat (map ppr zonked_ids)))	`thenNF_Tc_`
+    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_tc "Typechecked" (ppr zonked_expr))		`thenNF_Tc_`
+
+    returnTc (new_pcs, zonked_expr, zonked_ids)
+
+  where
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity n = pprPanic "typecheckExpr" (ppr n)
+\end{code}
+
+Here is the grand plan, implemented in tcUserStmt
+
+	What you type			The IO [HValue] that hscStmt returns
+	-------------			------------------------------------
+	let pat = expr		==> 	let pat = expr in return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	pat <- expr		==> 	expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	expr (of IO type)	==>	expr >>= \ v -> return [v]
+	  [NB: result not printed]	bindings: [it]
+	  
+
+	expr (of non-IO type, 
+	  result showable)	==>	let v = expr in print v >> return [v]
+	  				bindings: [it]
+
+	expr (of non-IO type, 
+	  result not showable)	==>	error
+
+
+\begin{code}
+tcUserStmt :: [Name] -> RenamedStmt -> TcM (TypecheckedHsExpr, [Id])
+
+tcUserStmt names (ExprStmt expr loc)
+  = ASSERT( null names )
+    tryTc_ (traceTc (text "tcs 1b") `thenNF_Tc_`
+		tc_stmts [itName] [LetStmt (MonoBind the_bind [] NonRecursive),
+			       ExprStmt (HsApp (HsVar printName) (HsVar itName)) loc])
+	   (    traceTc (text "tcs 1a") `thenNF_Tc_`
+		tc_stmts [itName] [BindStmt (VarPatIn itName) expr loc])
+  where
+    the_bind = FunMonoBind itName False [mkSimpleMatch [] expr Nothing loc] loc
+
+tcUserStmt names stmt
+  = tc_stmts names [stmt]
+    
+
+tc_stmts names stmts
+  = tcLookupGlobalId returnIOName	`thenNF_Tc` \ return_id ->
+    tcLookupGlobalId bindIOName		`thenNF_Tc` \ bind_id ->
+    tcLookupGlobalId failIOName		`thenNF_Tc` \ fail_id ->
+    tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
+    newTyVarTy liftedTypeKind		`thenNF_Tc` \ res_ty ->
+    let
+	io_ty = (\ ty -> mkTyConApp ioTyCon [ty], res_ty)
+
+		-- mk_return builds the expression
+		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
+	mk_return ids = HsApp (TyApp (HsVar return_id) [mkListTy unitTy]) 
+			      (ExplicitListOut unitTy (map mk_item ids))
+
+	mk_item id = HsApp (TyApp (HsVar unsafeCoerceId) [idType id, unitTy])
+		  	   (HsVar id)
+    in
+
+    traceTc (text "tcs 2") `thenNF_Tc_`
+    tcStmtsAndThen combine DoExpr io_ty stmts	(
+	-- Look up the names right in the middle,
+	-- where they will all be in scope
+	mapNF_Tc tcLookupId names			`thenNF_Tc` \ ids ->
+	returnTc ((ids, [ExprStmt (mk_return ids) noSrcLoc]), emptyLIE)
+    )							`thenTc` \ ((ids, tc_stmts), lie) ->
+
+	-- Simplify the context right here, so that we fail
+	-- if there aren't enough instances.  Notably, when we see
+	--		e
+	-- we use tryTc_ to try		it <- e
+	-- and then			let it = e
+	-- It's the simplify step that rejects the first.
+
+    traceTc (text "tcs 3") `thenNF_Tc_`
+    tcSimplifyTop lie			`thenTc` \ const_binds ->
+    traceTc (text "tcs 4") `thenNF_Tc_`
+
+    returnTc (mkHsLet const_binds $
+	      HsDoOut DoExpr tc_stmts return_id bind_id fail_id 
+		      (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc,
+	      ids)
+  where
+    combine stmt (ids, stmts) = (ids, stmt:stmts)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Typechecking a module}
+%*									*
+%************************************************************************
+
+\begin{code}
+typecheckModule
+	:: DynFlags
+	-> PersistentCompilerState
+	-> HomeSymbolTable
+	-> ModIface		-- Iface for this module
+	-> PrintUnqualified	-- For error printing
+	-> (SyntaxMap, [RenamedHsDecl])
+	-> IO (Maybe (PersistentCompilerState, TcResults))
+			-- The new PCS is Augmented with imported information,
+						-- (but not stuff from this module)
+
 data TcResults
   = TcResults {
 	-- All these fields have info *just for this module*
@@ -76,18 +236,6 @@ data TcResults
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
 	tc_rules   :: [TypecheckedRuleDecl]	-- Transformation rules
     }
-
----------------
-typecheckModule
-	:: DynFlags
-	-> PersistentCompilerState
-	-> HomeSymbolTable
-	-> ModIface		-- Iface for this module (just module & fixities)
-	-> PrintUnqualified	-- For error printing
-	-> (SyntaxMap, [RenamedHsDecl])
-	-> IO (Maybe (PersistentCompilerState, TcResults))
-			-- The new PCS is Augmented with imported information,
-						-- (but not stuff from this module)
 
 
 typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls)
@@ -102,145 +250,7 @@ typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls)
     get_fixity :: Name -> Maybe Fixity
     get_fixity nm = lookupNameEnv fixity_env nm
 
----------------
-typecheckIface
-	:: DynFlags
-	-> PersistentCompilerState
-	-> HomeSymbolTable
-	-> ModIface		-- Iface for this module (just module & fixities)
-	-> (SyntaxMap, [RenamedHsDecl])
-	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedRuleDecl]))
-			-- The new PCS is Augmented with imported information,
-			-- (but not stuff from this module).
-			-- The TcResults returned contains only the environment
-			-- and rules.
 
-
-typecheckIface dflags pcs hst mod_iface (syn_map, decls)
-  = do	{ maybe_tc_stuff <- typecheck dflags syn_map pcs hst alwaysQualify $
-			    tcIfaceImports pcs hst get_fixity this_mod decls
-	; printIfaceDump dflags maybe_tc_stuff
-	; return maybe_tc_stuff }
-  where
-    this_mod   = mi_module   mod_iface
-    fixity_env = mi_fixities mod_iface
-
-    get_fixity :: Name -> Maybe Fixity
-    get_fixity nm = lookupNameEnv fixity_env nm
-
-    tcIfaceImports pcs hst get_fixity this_mod decls
-	= fixTc (\ ~(unf_env, _, _, _, _) ->
-	      tcImports unf_env pcs hst get_fixity this_mod decls
-          )	`thenTc` \ (env, new_pcs, local_inst_info, 
-			    deriv_binds, local_rules) ->
-	  ASSERT(nullBinds deriv_binds)
-	  let 
-	      local_things = filter (isLocalThing this_mod) 
-				 	(nameEnvElts (getTcGEnv env))
-	      local_type_env :: TypeEnv
-	      local_type_env = mkTypeEnv local_things
-	  in
-
-	  -- throw away local_inst_info
-          returnTc (new_pcs, local_type_env, local_rules)
-
----------------
-typecheckExpr :: DynFlags
-	      -> Bool			-- True <=> wrap in 'print' to get a result of IO type
-	      -> PersistentCompilerState
-	      -> HomeSymbolTable
-	      -> PrintUnqualified	-- For error printing
-	      -> Module
-	      -> (SyntaxMap,
-		  RenamedHsExpr, 	-- The expression itself
-	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
-	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, TcType))
-
-typecheckExpr dflags wrap_io pcs hst unqual this_mod (syn_map, expr, decls)
-  = typecheck dflags syn_map pcs hst unqual $
-
- 	 -- use the default default settings, i.e. [Integer, Double]
-    tcSetDefaultTys defaultDefaultTys $
-
-	-- Typecheck the extra declarations
-    fixTc (\ ~(unf_env, _, _, _, _) ->
-	tcImports unf_env pcs hst get_fixity this_mod decls
-    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
-    ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
-
-	-- Now typecheck the expression
-    tcSetEnv env				$
-    tc_expr expr 					`thenTc` \ (expr', expr_ty) ->
-    zonkExpr expr'					`thenNF_Tc` \ zonked_expr ->
-    zonkTcType expr_ty					`thenNF_Tc` \ zonked_ty ->
-    ioToTc (dumpIfSet_dyn dflags 
-		Opt_D_dump_tc "Typechecked" (ppr zonked_expr)) `thenNF_Tc_`
-    returnTc (new_pcs, zonked_expr, zonked_ty) 
-
-  where
-    get_fixity :: Name -> Maybe Fixity
-    get_fixity n = pprPanic "typecheckExpr" (ppr n)
-
-    smpl_doc = ptext SLIT("main expression")
-
-     	-- Typecheck it, wrapping in 'print' if necessary to
-	-- get a result of type IO t.  Returns the result type
-	-- that is free in the result type
-    tc_expr e 
-	| wrap_io   = tryTc_ (tc_io_expr (HsApp (HsVar printName) e))	-- Recovery case
-			     (tc_io_expr e)				-- Main case
-	| otherwise = newTyVarTy openTypeKind	`thenTc` \ ty ->
-		      tcMonoExpr e ty 		`thenTc` \ (e', lie) ->
-		      tcSimplifyInfer smpl_doc (varSetElems (tyVarsOfType ty)) lie 
-				`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
-    		      tcSimplifyTop lie_free	`thenTc` \ const_binds ->
-    		      let all_expr = mkHsLet const_binds	$
-		   		     TyLam qtvs  		$
-		   		     DictLam dict_ids		$
-		   		     mkHsLet dict_binds		$	
-		   		     e'
-			  all_expr_ty = mkForAllTys qtvs 	$
-					mkFunTys (map idType dict_ids) $
-					ty
- 		      in
-		      returnTc (all_expr, all_expr_ty)
-	where
-	  tc_io_expr e = newTyVarTy openTypeKind	`thenTc` \ ty ->
-			 tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
-			 let
-			    res_ty = mkTyConApp ioTyCon [ty]
-			 in
-		 	 tcMonoExpr e res_ty	`thenTc` \ (e', lie) ->
-			 tcSimplifyTop lie	`thenTc` \ const_binds ->
-		         let all_expr = mkHsLet const_binds e' in
-			 returnTc (all_expr, res_ty)
-
----------------
-typecheck :: DynFlags
-	  -> SyntaxMap
-	  -> PersistentCompilerState
-	  -> HomeSymbolTable
-	  -> PrintUnqualified	-- For error printing
-	  -> TcM r
-	  -> IO (Maybe r)
-
-typecheck dflags syn_map pcs hst unqual thing_inside 
- = do	{ showPass dflags "Typechecker";
-	; env <- initTcEnv syn_map hst (pcs_PTE pcs)
-
-	; (maybe_tc_result, errs) <- initTc dflags env thing_inside
-
-	; printErrorsAndWarnings unqual errs
-
-	; if errorsFound errs then 
-             return Nothing 
-           else 
-             return maybe_tc_result
-	}
-\end{code}
-
-The internal monster:
-\begin{code}
 tcModule :: PersistentCompilerState
 	 -> HomeSymbolTable
 	 -> (Name -> Maybe Fixity)
@@ -357,7 +367,55 @@ tcModule pcs hst get_fixity this_mod decls
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{Typechecking interface decls}
+%*									*
+%************************************************************************
+
 \begin{code}
+typecheckIface
+	:: DynFlags
+	-> PersistentCompilerState
+	-> HomeSymbolTable
+	-> ModIface		-- Iface for this module (just module & fixities)
+	-> (SyntaxMap, [RenamedHsDecl])
+	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedRuleDecl]))
+			-- The new PCS is Augmented with imported information,
+			-- (but not stuff from this module).
+			-- The TcResults returned contains only the environment
+			-- and rules.
+
+
+typecheckIface dflags pcs hst mod_iface (syn_map, decls)
+  = do	{ maybe_tc_stuff <- typecheck dflags syn_map pcs hst alwaysQualify $
+			    tcIfaceImports pcs hst get_fixity this_mod decls
+	; printIfaceDump dflags maybe_tc_stuff
+	; return maybe_tc_stuff }
+  where
+    this_mod   = mi_module   mod_iface
+    fixity_env = mi_fixities mod_iface
+
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity nm = lookupNameEnv fixity_env nm
+
+    tcIfaceImports pcs hst get_fixity this_mod decls
+	= fixTc (\ ~(unf_env, _, _, _, _) ->
+	      tcImports unf_env pcs hst get_fixity this_mod decls
+          )	`thenTc` \ (env, new_pcs, local_inst_info, 
+			    deriv_binds, local_rules) ->
+	  ASSERT(nullBinds deriv_binds)
+	  let 
+	      local_things = filter (isLocalThing this_mod) 
+				 	(nameEnvElts (getTcGEnv env))
+	      local_type_env :: TypeEnv
+	      local_type_env = mkTypeEnv local_things
+	  in
+
+	  -- throw away local_inst_info
+          returnTc (new_pcs, local_type_env, local_rules)
+
+
 tcImports :: RecTcEnv
 	  -> PersistentCompilerState
 	  -> HomeSymbolTable
@@ -442,6 +500,7 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     iface_rules = [d | RuleD d <- decls, isIfaceRuleDecl d]
 \end{code}    
 
+
 %************************************************************************
 %*									*
 \subsection{Checking the type of main}
@@ -491,6 +550,37 @@ mainTypeCtxt main_ty tidy_env
 
 noMainErr = hsep [ptext SLIT("Module") <+> quotes (ppr mAIN_Name), 
 	  	  ptext SLIT("must include a definition for") <+> quotes (ptext SLIT("main"))]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Interfacing the Tc monad to the IO monad}
+%*									*
+%************************************************************************
+
+\begin{code}
+typecheck :: DynFlags
+	  -> SyntaxMap
+	  -> PersistentCompilerState
+	  -> HomeSymbolTable
+	  -> PrintUnqualified	-- For error printing
+	  -> TcM r
+	  -> IO (Maybe r)
+
+typecheck dflags syn_map pcs hst unqual thing_inside 
+ = do	{ showPass dflags "Typechecker";
+	; env <- initTcEnv syn_map hst (pcs_PTE pcs)
+
+	; (maybe_tc_result, errs) <- initTc dflags env thing_inside
+
+	; printErrorsAndWarnings unqual errs
+
+	; if errorsFound errs then 
+             return Nothing 
+           else 
+             return maybe_tc_result
+	}
 \end{code}
 
 

@@ -17,7 +17,7 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl )
 import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
-import TcEnv		( TcEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
+import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
 			  tcLookupClass, tcLookupTyCon
 			)
 import TcGenDeriv	-- Deriv stuff

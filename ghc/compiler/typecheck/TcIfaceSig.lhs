@@ -11,7 +11,7 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 import HsSyn		( TyClDecl(..), HsTupCon(..) )
 import TcMonad
 import TcMonoType	( tcIfaceType )
-import TcEnv		( TcEnv, RecTcEnv, tcExtendTyVarEnv, 
+import TcEnv		( RecTcEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetEnv, tcEnvIds,
 			  tcLookupGlobal_maybe, tcLookupRecId_maybe
 			)

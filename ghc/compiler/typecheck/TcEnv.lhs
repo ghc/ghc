@@ -14,14 +14,14 @@ module TcEnv(
 	simpleInstInfoTy, simpleInstInfoTyCon, 
 
 	-- Global environment
-	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
+	tcExtendGlobalEnv, tcExtendGlobalValEnv, tcExtendGlobalTypeEnv,
 	tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
 	tcLookupGlobal_maybe, tcLookupGlobal, tcLookupSyntaxId, tcLookupSyntaxName,
 
 	-- Local environment
 	tcExtendKindEnv,  tcLookupLocalIds,
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, 
-	tcExtendLocalValEnv, tcLookup, tcLookup_maybe, 
+	tcExtendLocalValEnv, tcLookup, tcLookup_maybe, tcLookupId,
 
 	-- Global type variables
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
@@ -60,10 +60,14 @@ import Name		( Name, OccName, NamedThing(..),
 			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
 			  nameIsLocalOrFrom, nameModule_maybe
 			)
-import Name		( NameEnv, lookupNameEnv, nameEnvElts, extendNameEnvList, emptyNameEnv )
+import Name		( NameEnv, lookupNameEnv, nameEnvElts, 
+			  extendNameEnvList, emptyNameEnv, plusNameEnv )
 import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv,
-			  typeEnvTyCons, typeEnvClasses, typeEnvIds
+import HscTypes		( DFunId, 
+			  PackageTypeEnv, TypeEnv, 
+			  extendTypeEnvList, extendTypeEnvWithIds,
+			  typeEnvTyCons, typeEnvClasses, typeEnvIds,
+			  HomeSymbolTable
 			)
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
@@ -98,7 +102,8 @@ data TcEnv
 		 {- NameEnv TyThing-}	-- compiling this module:
 					--	types and classes (both imported and local)
 					-- 	imported Ids
-					-- (Ids defined in this module are in the local envt)
+					-- (Ids defined in this module start in the local envt, 
+					--  though they move to the global envt during zonking)
 
 	tcLEnv 	 :: NameEnv TcTyThing,	-- The local type environment: Ids and TyVars
 					-- defined in this module
@@ -277,7 +282,16 @@ tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
 tcExtendGlobalEnv things thing_inside
   = tcGetEnv				`thenNF_Tc` \ env ->
     let
-	ge' = extendNameEnvList (tcGEnv env) [(getName thing, thing) | thing <- things]
+	ge' = extendTypeEnvList (tcGEnv env) things
+    in
+    tcSetEnv (env {tcGEnv = ge'}) thing_inside
+
+
+tcExtendGlobalTypeEnv :: TypeEnv -> TcM r -> TcM r
+tcExtendGlobalTypeEnv extra_env thing_inside
+  = tcGetEnv				`thenNF_Tc` \ env ->
+    let
+	ge' = tcGEnv env `plusNameEnv` extra_env
     in
     tcSetEnv (env {tcGEnv = ge'}) thing_inside
 
@@ -285,7 +299,7 @@ tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
 tcExtendGlobalValEnv ids thing_inside
   = tcGetEnv				`thenNF_Tc` \ env ->
     let
-	ge' = extendNameEnvList (tcGEnv env) [(getName id, AnId id) | id <- ids]
+	ge' = extendTypeEnvWithIds (tcGEnv env) ids
     in
     tcSetEnv (env {tcGEnv = ge'}) thing_inside
 \end{code}
@@ -336,6 +350,14 @@ tcLookupTyCon name
     case maybe_tc of
 	Just (ATyCon tc) -> returnNF_Tc tc
 	other		 -> notFound "tcLookupTyCon" name
+
+tcLookupId :: Name -> NF_TcM Id
+tcLookupId name
+  = tcLookup name	`thenNF_Tc` \ thing -> 
+    case thing of
+	ATcId tc_id	  -> returnNF_Tc tc_id
+	AGlobal (AnId id) -> returnNF_Tc id
+	other		  -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupLocalIds :: [Name] -> NF_TcM [TcId]
 tcLookupLocalIds ns

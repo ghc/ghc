@@ -20,10 +20,11 @@ module Name (
 	toRdrName, hashName, 
 	globaliseName, localiseName,
 
-	nameSrcLoc, nameIsLocallyDefined, isDllName, nameIsFrom, nameIsLocalOrFrom,
+	nameSrcLoc, 
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
-	isTyVarName,
+	isTyVarName, isDllName, 
+	nameIsLocalOrFrom, isHomePackageName,
 	
 	-- Environment
 	NameEnv, mkNameEnv,
@@ -35,8 +36,7 @@ module Name (
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, getOccString, toRdrName,
-	isFrom, isLocalOrFrom
+	getSrcLoc, getOccString, toRdrName
     ) where
 
 #include "HsVersions.h"
@@ -121,26 +121,29 @@ nameModule_maybe name				= Nothing
 \end{code}
 
 \begin{code}
-nameIsLocallyDefined	:: Name -> Bool
-nameIsFrom		:: Module -> Name -> Bool
 nameIsLocalOrFrom	:: Module -> Name -> Bool
 isLocalName		:: Name -> Bool		-- Not globals
 isGlobalName		:: Name -> Bool
 isSystemName		:: Name -> Bool
 isExternallyVisibleName :: Name -> Bool
+isHomePackageName	:: Name -> Bool
 
 isGlobalName (Name {n_sort = Global _}) = True
 isGlobalName other	                = False
 
 isLocalName name = not (isGlobalName name)
 
-nameIsLocallyDefined name = isLocalName name
-
 nameIsLocalOrFrom from (Name {n_sort = Global mod}) = mod == from
 nameIsLocalOrFrom from other			    = True
 
-nameIsFrom from (Name {n_sort = Global mod}) = mod == from
-nameIsFrom from other			     = pprPanic "nameIsFrom" (ppr other)
+isHomePackageName (Name {n_sort = Global mod}) = isHomeModule mod
+isHomePackageName other			       = True 	-- Local and system names
+
+isDllName :: Name -> Bool	-- Does this name refer to something in a different DLL?
+isDllName nm = not opt_Static && not (isHomePackageName nm)
+
+isTyVarName :: Name -> Bool
+isTyVarName name = isTvOcc (nameOccName name)
 
 -- Global names are by definition those that are visible
 -- outside the module, *as seen by the linker*.  Externally visible
@@ -238,17 +241,6 @@ nameRdrName :: Name -> RdrName
 -- and an unqualified name just for Locals
 nameRdrName (Name { n_occ = occ, n_sort = Global mod }) = mkRdrOrig (moduleName mod) occ
 nameRdrName (Name { n_occ = occ })			= mkRdrUnqual occ
-
-isDllName :: Name -> Bool
-	-- Does this name refer to something in a different DLL?
-isDllName nm = not opt_Static &&
-	       not (isLocalName nm) &&				-- isLocalName test needed 'cos
-	       not (isHomeModule (nameModule nm))	-- nameModule won't work on local names
-
-
-
-isTyVarName :: Name -> Bool
-isTyVarName name = isTvOcc (nameOccName name)
 \end{code}
 
 
@@ -390,13 +382,9 @@ class NamedThing a where
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 getOccString	    :: NamedThing a => a -> String
 toRdrName	    :: NamedThing a => a -> RdrName
-isFrom		    :: NamedThing a => Module -> a -> Bool
-isLocalOrFrom	    :: NamedThing a => Module -> a -> Bool
 
 getSrcLoc	    = nameSrcLoc	   . getName
 getOccString 	    = occNameString	   . getOccName
 toRdrName	    = nameRdrName	   . getName
-isFrom mod x	    = nameIsFrom mod (getName x)
-isLocalOrFrom mod x = nameIsLocalOrFrom mod ( getName x)
 \end{code}
 

@@ -11,7 +11,7 @@ module DsGRHSs ( dsGuarded, dsGRHSs ) where
 import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
-import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..) )
+import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), HsMatchContext(..) )
 import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt )
 import CoreSyn		( CoreExpr )
 import Type		( Type )
@@ -37,7 +37,7 @@ necessary.  The type argument gives the type of the @ei@.
 dsGuarded :: TypecheckedGRHSs -> DsM CoreExpr
 
 dsGuarded grhss
-  = dsGRHSs PatBindMatch [] grhss 				`thenDs` \ (err_ty, match_result) ->
+  = dsGRHSs PatBindRhs [] grhss 				`thenDs` \ (err_ty, match_result) ->
     mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID err_ty ""	`thenDs` \ error_expr ->
     extractMatchResult match_result error_expr
 \end{code}
@@ -45,7 +45,7 @@ dsGuarded grhss
 In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 \begin{code}
-dsGRHSs :: DsMatchKind -> [TypecheckedPat]	-- These are to build a MatchContext from
+dsGRHSs :: HsMatchContext -> [TypecheckedPat]	-- These are to build a MatchContext from
 	-> TypecheckedGRHSs			-- Guarded RHSs
 	-> DsM (Type, MatchResult)
 
@@ -74,17 +74,21 @@ matchGuard :: [TypecheckedStmt] 	-- Guard
            -> DsMatchContext            -- Context
 	   -> DsM MatchResult
 
-matchGuard (ExprStmt expr locn : should_be_null) ctx 
+-- See comments with HsExpr.HsStmt re what an ExprStmt means
+-- Here we must be in a guard context (not do-expression, nor list-comp)	
+
+matchGuard [ExprStmt expr locn] ctx 
   = putSrcLocDs locn (dsExpr expr) 	`thenDs` \ core_expr ->
     returnDs (cantFailMatchResult core_expr)
 
+	-- Other ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (GuardStmt (HsVar v) _ : stmts) ctx
+matchGuard (ExprStmt (HsVar v) _ : stmts) ctx
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` trueDataConKey
   = matchGuard stmts ctx
 
-matchGuard (GuardStmt expr locn : stmts) ctx
+matchGuard (ExprStmt expr locn : stmts) ctx
   = matchGuard stmts ctx 		`thenDs` \ match_result ->
     putSrcLocDs locn (dsExpr expr)	`thenDs` \ pred_expr ->
     returnDs (mkGuardedMatchResult pred_expr match_result)

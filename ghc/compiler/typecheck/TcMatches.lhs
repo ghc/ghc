@@ -4,15 +4,17 @@
 \section[TcMatches]{Typecheck some @Matches@}
 
 \begin{code}
-module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda, tcStmts, tcGRHSs ) where
+module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda, 
+		   tcStmts, tcStmtsAndThen, tcGRHSs 
+       ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
-			  MonoBinds(..), StmtCtxt(..), Stmt(..),
-			  pprMatch, getMatchLoc, 
+			  MonoBinds(..), Stmt(..), HsMatchContext(..),
+			  pprMatch, getMatchLoc, pprMatchContext, isDoExpr,
 			  mkMonoBind, nullMonoBinds, collectSigTysFromPats
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
@@ -94,7 +96,7 @@ tcMatchesCase matches expr_ty
     returnTc (scrut_ty, matches', lie)
 
 tcMatchLambda :: RenamedMatch -> TcType -> TcM (TcMatch, LIE)
-tcMatchLambda match res_ty = tcMatch [] match res_ty LambdaBody
+tcMatchLambda match res_ty = tcMatch [] match res_ty LambdaExpr
 \end{code}
 
 
@@ -102,7 +104,7 @@ tcMatchLambda match res_ty = tcMatch [] match res_ty LambdaBody
 tcMatches :: [(Name,Id)]
 	  -> [RenamedMatch]
 	  -> TcType
-	  -> StmtCtxt
+	  -> HsMatchContext 
 	  -> TcM ([TcMatch], LIE)
 
 tcMatches xve matches expected_ty fun_or_case
@@ -124,7 +126,7 @@ tcMatch :: [(Name,Id)]
 	-> RenamedMatch
 	-> TcType 		-- Expected result-type of the Match.
 				-- Early unification with this guy gives better error messages
-	-> StmtCtxt
+	-> HsMatchContext
 	-> TcM (TcMatch, LIE)
 
 tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
@@ -205,7 +207,7 @@ glue_on is_rec mbinds (GRHSs grhss binds ty)
   = GRHSs grhss (mkMonoBind mbinds [] is_rec `ThenBinds` binds) ty
 
 tcGRHSs :: RenamedGRHSs
-	-> TcType -> StmtCtxt
+	-> TcType -> HsMatchContext
 	-> TcM (TcGRHSs, LIE)
 
 tcGRHSs (GRHSs grhss binds _) expected_ty ctxt
@@ -318,7 +320,7 @@ tcStmts do_or_lc m_ty stmts
 
 tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner
-	-> StmtCtxt
+	-> HsMatchContext
         -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
 					-- elt_ty, where type of the comprehension is (m elt_ty)
         -> [RenamedStmt]
@@ -390,50 +392,40 @@ tcStmtsAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s : stmts) do_next
     not_required = panic "tcStmtsAndThen: elt_ty"
 
 	-- The simple-statment case
-tcStmtsAndThen combine do_or_lc m_ty (stmt:stmts) do_next
+tcStmtsAndThen combine do_or_lc m_ty (stmt@(ExprStmt exp locn):stmts) do_next
   = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-	tcSimpleStmt do_or_lc m_ty stmt (null stmts)
-    )							`thenTc` \ (stmt', stmt_lie) ->
+	tcExprStmt do_or_lc m_ty exp (null stmts)
+    )							`thenTc` \ (exp', stmt_lie) ->
 
     tcStmtsAndThen combine do_or_lc m_ty stmts do_next	`thenTc` \ (thing, stmts_lie) ->
 
-    returnTc (combine stmt' thing,
+    returnTc (combine (ExprStmt exp' locn) thing,
 	      stmt_lie `plusLIE` stmts_lie)
 
 
 ------------------------------
-	-- ReturnStmt
-tcSimpleStmt do_or_lc (_,elt_ty) (ReturnStmt exp) is_last_stmt 
-  = ASSERT( is_last_stmt )
-    tcExpr exp elt_ty				`thenTc`    \ (exp', exp_lie) ->
-    returnTc (ReturnStmt exp', exp_lie)
+	-- ExprStmt; see comments with HsExpr.HsStmt 
+	-- 	     for meaning of ExprStmt
+tcExprStmt do_or_lc (m, res_elt_ty) exp is_last_stmt
+  = compute_expr_ty		`thenNF_Tc` \ expr_ty ->
+    tcExpr exp expr_ty
+  where
+    compute_expr_ty
+	| is_last_stmt = if isDoExpr do_or_lc then
+				returnNF_Tc (m res_elt_ty)
+			 else
+				returnNF_Tc res_elt_ty
 
-	-- ExprStmt
-tcSimpleStmt do_or_lc (m, elt_ty) (ExprStmt exp src_loc) is_last_stmt
-  = tcAddSrcLoc src_loc 		$
-    (if is_last_stmt then	-- do { ... ; wuggle }    	wuggle : m elt_ty
-	returnNF_Tc elt_ty	
-     else			-- do { ... ; wuggle ; .... } 	wuggle : m any_ty
-	ASSERT( isDoStmt do_or_lc )
-  	newTyVarTy openTypeKind	
-    )				`thenNF_Tc` \ arg_ty ->
-    tcExpr exp (m arg_ty)	`thenTc`    \ (exp', exp_lie) ->
-    returnTc (ExprStmt exp' src_loc, exp_lie)
-
-	-- GuardStmt
-tcSimpleStmt do_or_lc m_ty (GuardStmt exp src_loc) is_last_stmt
-  = ASSERT( not (isDoStmt do_or_lc) )
-    tcAddSrcLoc src_loc 		$
-    tcExpr exp boolTy			`thenTc` \ (exp', exp_lie) ->
-    returnTc (GuardStmt exp' src_loc, exp_lie)
+	| otherwise    = if isDoExpr do_or_lc then
+				newTyVarTy openTypeKind 	`thenNF_Tc` \ any_ty ->
+				returnNF_Tc (m any_ty)	
+			 else
+				returnNF_Tc boolTy	
 
 ------------------------------
 glue_binds combine is_rec binds thing 
   | nullMonoBinds binds = thing
   | otherwise		= combine (LetStmt (mkMonoBind binds [] is_rec)) thing
-
-isDoStmt DoStmt = True
-isDoStmt other  = False
 \end{code}
 
 
@@ -465,7 +457,7 @@ matchCtxt (FunRhs fun) match
   where
     ppr_fun = ppr fun
 
-matchCtxt LambdaBody match
+matchCtxt LambdaExpr match
   = hang (ptext SLIT("In the lambda expression"))
 	 4 (pprMatch (True, empty) match)
 
@@ -475,19 +467,5 @@ varyingArgsErr name matches
 lurkingRank2SigErr
   = ptext SLIT("Too few explicit arguments when defining a function with a rank-2 type")
 
-stmtCtxt do_or_lc stmt
-  = hang (ptext SLIT("In") <+> what <> colon)
-         4 (ppr stmt)
-  where
-    what = case do_or_lc of
-		ListComp -> ptext SLIT("a list-comprehension qualifier")
-		DoStmt   -> ptext SLIT("a do statement")
-		PatBindRhs -> thing <+> ptext SLIT("a pattern binding")
-		FunRhs f   -> thing <+> ptext SLIT("an equation for") <+> quotes (ppr f)
-		CaseAlt	   -> thing <+> ptext SLIT("a case alternative")
-		LambdaBody -> thing <+> ptext SLIT("a lambda abstraction")
-    thing = case stmt of
-		BindStmt _ _ _ -> ptext SLIT("a pattern guard for")
-		GuardStmt _ _  -> ptext SLIT("a guard for")
-		ExprStmt _ _   -> ptext SLIT("the right-hand side of")
+stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
 \end{code}

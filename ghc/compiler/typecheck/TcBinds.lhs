@@ -13,8 +13,9 @@ import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
 import CmdLineOpts	( opt_NoMonomorphismRestriction )
-import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), StmtCtxt(..),
-			  Match(..), collectMonoBinders, andMonoBinds
+import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
+			  Match(..), HsMatchContext(..), 
+			  collectMonoBinders, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )

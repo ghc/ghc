@@ -387,16 +387,9 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
 		-- after this!).
   where
     core_idinfo = idInfo id
-
+    new_flavour = makeConstantFlavour (flavourInfo core_idinfo)
 	-- A DFunId must stay a DFunId, so that we can gather the
 	-- DFunIds up later.  Other local things become ConstantIds.
-    new_flavour = case flavourInfo core_idinfo of
-		    VanillaId  -> ConstantId
-		    ExportedId -> ConstantId
-		    ConstantId -> ConstantId	-- e.g. Default methods
-		    DictFunId  -> DictFunId
-		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
-				  flavour
 
 
 -- This is where we set names to local/global based on whether they really are 

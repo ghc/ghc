@@ -28,7 +28,7 @@ module TcGenDeriv (
 
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
-			  HsBinds(..), StmtCtxt(..), HsType(..),
+			  HsBinds(..), HsType(..), HsMatchContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
 			)
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
@@ -63,7 +63,6 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool, orElse )
 import Constants
 import List		( partition, intersperse )
-import Outputable	( pprPanic, ppr, pprTrace )
 
 #if __GLASGOW_HASKELL__ >= 404
 import GlaExts		( fromInt )
@@ -719,7 +718,7 @@ gen_Ix_binds tycon
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 		++
-		[ReturnStmt con_expr]
+		[ExprStmt con_expr tycon_loc]
 
 	mk_qual a b c = BindStmt (VarPatIn c)
 				 (HsApp (HsVar range_RDR) 
@@ -908,7 +907,7 @@ gen_Read_binds get_fixity tycon
 	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
 	    | otherwise = con_qual:field_quals
 
-	   stmts = quals ++ [ReturnStmt result_expr]
+	   stmts = quals ++ [ExprStmt result_expr tycon_loc]
 		
 	    {-
 	      c.f. Figure 18 in Haskell 1.1 report.

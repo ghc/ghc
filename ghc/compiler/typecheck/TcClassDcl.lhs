@@ -26,7 +26,7 @@ import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  instToId, newDicts, newMethod )
-import TcEnv		( TcEnv, RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
+import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)

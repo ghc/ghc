@@ -21,7 +21,8 @@ import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), AvailEnv,
 			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..), 
-			  Deprecations(..), lookupDeprec
+			  Deprecations(..), lookupDeprec,
+			  extendLocalRdrEnv
 			)
 import RnMonad
 import Name		( Name,
@@ -42,7 +43,8 @@ import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
-			  hasKey, fractionalClassKey, numClassKey
+			  hasKey, fractionalClassKey, numClassKey,
+			  bindIOName, returnIOName, failIOName
 			)
 import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
@@ -376,8 +378,10 @@ addImplicitFVs gbl_env maybe_mod source_fvs
     returnRn (slurp_fvs, sugar_map)
 
   where
-    extra_implicits Nothing		-- Compiling an expression
-      = returnRn (unitFV printName)	-- print :: a -> IO () may be needed later
+    extra_implicits Nothing		-- Compiling a statement
+      = returnRn (mkFVs [printName, bindIOName, returnIOName, failIOName])
+		-- These are all needed implicitly when compiling a statement
+		-- See TcModule.tc_stmts
 
     extra_implicits (Just (mod_name, decls))	-- Compiling a module
       = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
@@ -540,10 +544,8 @@ bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
 
 bindLocalNames names enclosed_scope
   = getLocalNameEnv 		`thenRn` \ name_env ->
-    setLocalNameEnv (addListToRdrEnv name_env pairs)
+    setLocalNameEnv (extendLocalRdrEnv name_env names)
 		    enclosed_scope
-  where
-    pairs = [(mkRdrUnqual (nameOccName n), n) | n <- names]
 
 bindLocalNamesFV names enclosed_scope
   = bindLocalNames names $

@@ -10,8 +10,7 @@ module HsBinds where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
-import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
+import {-# SOURCE #-} HsExpr ( pprExpr, HsExpr, pprMatches, Match, pprGRHSs, GRHSs )
 
 -- friends:
 import HsTypes		( HsType )

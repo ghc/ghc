@@ -32,7 +32,7 @@ import RnEnv		( bindLocatedLocalsRn, lookupBndrRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( OccName, Name, nameOccName, nameSrcLoc )
+import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
@@ -237,7 +237,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     rn_mono_binds siglist mbinds	   `thenRn` \ (binds, bind_fvs) ->
 
     -- Now do the "thing inside", and deal with the free-variable calculations
-    thing_inside binds			   `thenRn` \ (result,result_fvs) ->
+    thing_inside binds 			   `thenRn` \ (result,result_fvs) ->
     let
 	all_fvs        = result_fvs `plusFV` bind_fvs `plusFV` sig_fvs
 	unused_binders = nameSetToList (binder_set `minusNameSet` all_fvs)

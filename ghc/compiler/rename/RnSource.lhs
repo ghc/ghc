@@ -14,7 +14,7 @@ import RnExpr
 import HsSyn
 import HscTypes		( GlobalRdrEnv )
 import HsTypes		( hsTyVarNames, pprHsContext )
-import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, elemRdrEnv )
+import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl, RdrNameTyClDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
 			  extractHsCtxtRdrTyVars, extractGenericPatTyVars
@@ -35,7 +35,7 @@ import RnMonad
 
 import Class		( FunDep, DefMeth (..) )
 import DataCon		( dataConId )
-import Name		( Name, OccName, nameOccName, NamedThing(..) )
+import Name		( Name, NamedThing(..) )
 import NameSet
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
 import PrelNames	( deRefStablePtr_RDR, newStablePtr_RDR,
@@ -83,7 +83,7 @@ rnSourceDecls :: GlobalRdrEnv -> LocalFixityEnv
 	-- The decls get reversed, but that's ok
 
 rnSourceDecls gbl_env local_fixity_env decls
-  = initRnMS gbl_env local_fixity_env SourceMode (go emptyFVs [] decls)
+  = initRnMS gbl_env emptyRdrEnv local_fixity_env SourceMode (go emptyFVs [] decls)
   where
 	-- Fixity and deprecations have been dealt with already; ignore them
     go fvs ds' []             = returnRn (ds', fvs)

@@ -483,7 +483,7 @@ mkSelectorBinds pat val_expr
   | otherwise
   = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))
     `thenDs` \ error_expr ->
-    matchSimply val_expr LetMatch pat local_tuple error_expr
+    matchSimply val_expr PatBindRhs pat local_tuple error_expr
     `thenDs` \ tuple_expr ->
     newSysLocalDs tuple_ty
     `thenDs` \ tuple_var ->
@@ -501,7 +501,7 @@ mkSelectorBinds pat val_expr
     -- (mk_bind sv bv) generates
     --		bv = case sv of { pat -> bv; other -> error-msg }
     -- Remember, pat binds bv
-      = matchSimply (Var scrut_var) LetMatch pat
+      = matchSimply (Var scrut_var) PatBindRhs pat
 		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
         returnDs (bndr_var, rhs_expr)
       where

@@ -39,7 +39,9 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module	  ( ModuleName, mkPrelModule, mkModuleName )
-import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, mkKindOccFS )
+import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, 
+		    mkKindOccFS, mkOccFS
+		  )
 import RdrName	  ( RdrName, mkOrig, mkUnqual )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
@@ -50,9 +52,32 @@ import BasicTypes ( Boxity(..), Arity )
 import UniqFM	  ( UniqFM, listToUFM )
 import Name	  ( Name, mkLocalName, mkKnownKeyGlobal, nameRdrName )
 import RdrName    ( rdrNameOcc )
-import SrcLoc     ( builtinSrcLoc )
+import SrcLoc     ( builtinSrcLoc, noSrcLoc )
 import Util	  ( nOfThem )
 import Panic	  ( panic )
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Local Names}
+%*									*
+%************************************************************************
+
+This *local* name is used by the interactive stuff
+
+\begin{code}
+itName = mkLocalName itIdKey (mkOccFS varName SLIT("it")) noSrcLoc
+\end{code}
+
+\begin{code}
+-- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
+-- during compiler debugging.
+mkUnboundName :: RdrName -> Name
+mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
+
+isUnboundName :: Name -> Bool
+isUnboundName name = name `hasKey` unboundKey
 \end{code}
 
 
@@ -129,6 +154,7 @@ knownKeyNames
 	newStablePtrName,
 	bindIOName,
 	returnIOName,
+	failIOName,
 
 	-- Strings and lists
 	mapName,
@@ -157,6 +183,7 @@ knownKeyNames
 	word64TyConName,
 
 	-- Others
+	unsafeCoerceName,
 	otherwiseIdName,
 	plusIntegerName,
 	timesIntegerName,
@@ -337,6 +364,7 @@ genUnitTyConName   = tcQual   pREL_BASE_Name SLIT("Unit") genUnitTyConKey
 genUnitDataConName = dataQual pREL_BASE_Name SLIT("Unit") genUnitDataConKey
 
 -- Random PrelBase functions
+unsafeCoerceName  = varQual pREL_BASE_Name SLIT("unsafeCoerce") unsafeCoerceIdKey
 otherwiseIdName   = varQual pREL_BASE_Name SLIT("otherwise") otherwiseIdKey
 appendName	  = varQual pREL_BASE_Name SLIT("++") appendIdKey
 foldrName	  = varQual pREL_BASE_Name SLIT("foldr") foldrIdKey
@@ -427,6 +455,7 @@ ioTyConName	  = tcQual   pREL_IO_BASE_Name SLIT("IO") ioTyConKey
 ioDataConName     = dataQual pREL_IO_BASE_Name SLIT("IO") ioDataConKey
 bindIOName	  = varQual  pREL_IO_BASE_Name SLIT("bindIO") bindIOIdKey
 returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
+failIOName	  = varQual  pREL_IO_BASE_Name SLIT("failIO") failIOIdKey
 
 -- IO things
 printName	  = varQual pREL_IO_Name SLIT("print") printIdKey
@@ -799,6 +828,7 @@ getTagIdKey		      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 printIdKey		      = mkPreludeMiscIdUnique 43
+failIOIdKey		      = mkPreludeMiscIdUnique 44
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
@@ -832,6 +862,7 @@ mapIdKey		      = mkPreludeMiscIdUnique 120
 \begin{code}
 assertIdKey		      = mkPreludeMiscIdUnique 121
 runSTRepIdKey		      = mkPreludeMiscIdUnique 122
+itIdKey			      = mkPreludeMiscIdUnique 123	-- "it" for the interactive interface
 \end{code}
 
 
@@ -1022,12 +1053,3 @@ noDictClassKeys 	-- These classes are used only for type annotations;
   = cCallishClassKeys
 \end{code}
 
-\begin{code}
--- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
--- during compiler debugging.
-mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
-
-isUnboundName :: Name -> Bool
-isUnboundName name = name `hasKey` unboundKey
-\end{code}

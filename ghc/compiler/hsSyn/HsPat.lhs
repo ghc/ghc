@@ -18,6 +18,7 @@ module HsPat (
 
 #include "HsVersions.h"
 
+
 -- friends:
 import HsLit		( HsLit, HsOverLit )
 import HsExpr		( HsExpr )

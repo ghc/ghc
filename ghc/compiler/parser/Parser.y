@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.54 2001/02/20 15:36:55 simonpj Exp $
+$Id: Parser.y,v 1.55 2001/02/26 15:06:59 simonmar Exp $
 
 Haskell grammar.
 
@@ -9,7 +9,7 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -}
 
 {
-module Parser ( parseModule, parseExpr ) where
+module Parser ( parseModule, parseStmt ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
@@ -200,7 +200,7 @@ Conflicts: 14 shift/reduce
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { ITeof }
 %name parseModule module
-%name parseExpr   exp
+%name parseStmt   maybe_stmt
 %tokentype { Token }
 %%
 
@@ -693,7 +693,7 @@ exp10 :: { RdrNameHsExpr }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
-  	| srcloc 'do' stmtlist			{ HsDo DoStmt $3 $1 }
+  	| srcloc 'do' stmtlist			{ HsDo DoExpr $3 $1 }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 False False cbot }
 	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 True  False cbot }
@@ -773,7 +773,7 @@ list :: { RdrNameHsExpr }
 					         body  qss = [ParStmt (map reverse qss)] }
 					   in
 					   returnP ( HsDo ListComp
-							   (reverse (ReturnStmt $1 : body $3))
+							   (reverse (ExprStmt $1 $2 : body $3))
 							   $2
 						  )
 					}
@@ -790,14 +790,8 @@ pquals :: { [[RdrNameStmt]] }
 	| '|' quals			{ [$2] }
 
 quals :: { [RdrNameStmt] }
-	: quals ',' qual		{ $3 : $1 }
-	| qual				{ [$1] }
-
-qual  :: { RdrNameStmt }
-	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->
-					   returnP (BindStmt p $4 $1) }
-	| srcloc exp			{ GuardStmt $2 $1 }
-  	| srcloc 'let' declbinds	{ LetStmt $3 }
+	: quals ',' stmt		{ $3 : $1 }
+	| stmt				{ [$1] }
 
 -----------------------------------------------------------------------------
 -- Case alternatives
@@ -851,6 +845,12 @@ stmts1 :: { [RdrNameStmt] }
 	: stmts1 ';' stmt		{ $3 : $1 }
 	| stmts1 ';'			{ $1 }
 	| stmt 				{ [$1] }
+
+-- for typing stmts at the GHCi prompt, where the input may consist of
+-- just comments.
+maybe_stmt :: { Maybe RdrNameStmt }
+	: stmt				{ Just $1 }
+	| {- nothing -}			{ Nothing }
 
 stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->

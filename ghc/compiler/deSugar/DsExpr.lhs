@@ -11,8 +11,8 @@ module DsExpr ( dsExpr, dsLet ) where
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), StmtCtxt(..), Match(..), HsBinds(..), MonoBinds(..), 
-			  mkSimpleMatch
+			  Stmt(..), HsMatchContext(..), Match(..), HsBinds(..), MonoBinds(..), 
+			  mkSimpleMatch, isDoExpr
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 			  TypecheckedStmt
@@ -95,7 +95,7 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples inlines
     in
     mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))
     `thenDs` \ error_expr ->
-    matchSimply rhs PatBindMatch pat body' error_expr
+    matchSimply rhs PatBindRhs pat body' error_expr
   where
     result_ty = exprType body
 
@@ -122,7 +122,7 @@ dsExpr (HsLit lit)       = dsLit lit
 -- HsOverLit has been gotten rid of by the type checker
 
 dsExpr expr@(HsLam a_Match)
-  = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
+  = matchWrapper LambdaExpr [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
     returnDs (mkLams binders matching_code)
 
 dsExpr expr@(HsApp fun arg)      
@@ -203,8 +203,8 @@ dsExpr (HsSCC cc expr)
 dsExpr (HsCase discrim matches src_loc)
  | all ubx_tuple_match matches
  =  putSrcLocDs src_loc $
-    dsExpr discrim			  `thenDs` \ core_discrim ->
-    matchWrapper CaseMatch matches "case" `thenDs` \ ([discrim_var], matching_code) ->
+    dsExpr discrim			`thenDs` \ core_discrim ->
+    matchWrapper CaseAlt matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
     case matching_code of
 	Case (Var x) bndr alts | x == discrim_var -> 
 		returnDs (Case core_discrim bndr alts)
@@ -215,8 +215,8 @@ dsExpr (HsCase discrim matches src_loc)
 
 dsExpr (HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
-    dsExpr discrim			  `thenDs` \ core_discrim ->
-    matchWrapper CaseMatch matches "case" `thenDs` \ ([discrim_var], matching_code) ->
+    dsExpr discrim			`thenDs` \ core_discrim ->
+    matchWrapper CaseAlt matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs (bindNonRec discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
@@ -248,8 +248,8 @@ dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
 		 -> Just elt_ty
 	    other -> Nothing
 	-- We need the ListComp form to use deListComp (rather than the "do" form)
-	-- because the "return" in a do block is a call to "PrelBase.return", and
-	-- not a ReturnStmt.  Only the ListComp form has ReturnStmts
+	-- because the interpretation of ExprStmt depends on what sort of thing
+	-- it is.
 
     Just elt_ty = maybe_list_comp
 
@@ -430,8 +430,8 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-    mapDs mk_alt cons_to_upd				`thenDs` \ alts ->
-    matchWrapper RecUpdMatch alts "record update"	`thenDs` \ ([discrim_var], matching_code) ->
+    mapDs mk_alt cons_to_upd			`thenDs` \ alts ->
+    matchWrapper RecUpd alts "record update"	`thenDs` \ ([discrim_var], matching_code) ->
 
     returnDs (bindNonRec discrim_var record_expr' matching_code)
 
@@ -490,7 +490,7 @@ dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
 Basically does the translation given in the Haskell~1.3 report:
 
 \begin{code}
-dsDo	:: StmtCtxt
+dsDo	:: HsMatchContext
 	-> [TypecheckedStmt]
 	-> Id		-- id for: return m
 	-> Id		-- id for: (>>=) m
@@ -502,34 +502,36 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
   = let
 	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
 	
-	go [ReturnStmt expr] 
-	  = dsExpr expr			`thenDs` \ expr2 ->
-	    returnDs (mkApps (Var return_id) [Type b_ty, expr2])
-    
-	go (GuardStmt expr locn : stmts)
-	  = do_expr expr locn			`thenDs` \ expr2 ->
-	    go stmts				`thenDs` \ rest ->
-	    let msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
-	    in
-	    mkStringLit msg			`thenDs` \ core_msg ->
-	    returnDs (mkIfThenElse expr2 
-				   rest 
-				   (App (App (Var fail_id) 
-					     (Type b_ty))
-					     core_msg))
-    
+	-- For ExprStmt, see the comments near HsExpr.HsStmt about 
+	-- exactly what ExprStmts mean!
+	--
+	-- In dsDo we can only see DoStmt and ListComp (no gaurds)
+
+	go [ExprStmt expr locn] 
+	  | isDoExpr do_or_lc = do_expr expr locn
+	  | otherwise	      = do_expr expr locn	`thenDs` \ expr2 ->
+				returnDs (mkApps (Var return_id) [Type b_ty, expr2])
+
 	go (ExprStmt expr locn : stmts)
+	   | isDoExpr do_or_lc
 	  = do_expr expr locn		`thenDs` \ expr2 ->
+	    go stmts     		`thenDs` \ rest  ->
 	    let
 		(_, a_ty) = splitAppTy (exprType expr2)  -- Must be of form (m a)
 	    in
-	    if null stmts then
-		returnDs expr2
-	    else
-		go stmts     		`thenDs` \ rest  ->
-		newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
-		returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
-					        Lam ignored_result_id rest])
+	    newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
+	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
+					    Lam ignored_result_id rest])
+
+	   | otherwise	-- List comprehension
+	  = do_expr expr locn			`thenDs` \ expr2 ->
+	    go stmts				`thenDs` \ rest ->
+	    let
+		msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+	    in
+	    mkStringLit msg			`thenDs` \ core_msg ->
+	    returnDs (mkIfThenElse expr2 rest 
+				   (App (App (Var fail_id) (Type b_ty)) core_msg))
     
 	go (LetStmt binds : stmts )
 	  = go stmts 		`thenDs` \ rest   ->
@@ -554,7 +556,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 		      , mkSimpleMatch [WildPat a_ty] fail_expr (Just result_ty) locn
 		      ]
 	    in
-	    matchWrapper DoBindMatch the_matches match_msg
+	    matchWrapper DoExpr the_matches match_msg
 				`thenDs` \ (binders, matching_code) ->
 	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2,
 				            mkLams binders matching_code])
@@ -565,7 +567,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
 
     match_msg = case do_or_lc of
-			DoStmt   -> "`do' statement"
+			DoExpr   -> "`do' statement"
 			ListComp -> "comprehension"
 \end{code}
 

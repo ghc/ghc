@@ -9,7 +9,7 @@ module TcExpr ( tcApp, tcExpr, tcMonoExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  StmtCtxt(..), mkMonoBind
+			  HsMatchContext(..), mkMonoBind
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, mkHsLet )
@@ -24,9 +24,8 @@ import Inst		( InstOrigin(..),
 			  instToId, tcInstId
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( TcTyThing(..), 
-			  tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
-			  tcLookupTyCon, tcLookupDataCon, tcLookup,
+import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId,
 			  tcExtendGlobalTyVars, tcLookupSyntaxName
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
@@ -645,22 +644,6 @@ tcIPBind (name, expr)
     returnTc ((ip, expr'), lie)
 \end{code}
 
-Typecheck expression which in most cases will be an Id.
-
-\begin{code}
-tcExpr_id :: RenamedHsExpr
-           -> TcM (TcExpr,
- 	       	     LIE,
-	             TcType)
-tcExpr_id id_expr
- = case id_expr of
-	HsVar name -> tcId name			`thenNF_Tc` \ stuff -> 
-		      returnTc stuff
-	other	   -> newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
-		      tcMonoExpr id_expr id_ty	`thenTc`    \ (id_expr', lie_id) ->
-		      returnTc (id_expr', lie_id, id_ty) 
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection{@tcApp@ typchecks an application}
@@ -753,14 +736,21 @@ tcArg the_fun (arg, expected_arg_ty, arg_no)
 
 \begin{code}
 tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
-
-tcId name
-  = 	-- Look up the Id and instantiate its type
-    tcLookup name			`thenNF_Tc` \ thing ->
-    case thing of
-	ATcId tc_id	  -> tcInstId tc_id
-	AGlobal (AnId id) -> tcInstId id
+tcId name	-- Look up the Id and instantiate its type
+  = tcLookupId name			`thenNF_Tc` \ id ->
+    tcInstId id
 \end{code}
+
+Typecheck expression which in most cases will be an Id.
+
+\begin{code}
+tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, LIE, TcType)
+tcExpr_id (HsVar name) = tcId name
+tcExpr_id expr         = newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
+			 tcMonoExpr expr id_ty	`thenTc`    \ (expr', lie_id) ->
+		         returnTc (expr', lie_id, id_ty) 
+\end{code}
+
 
 %************************************************************************
 %*									*

@@ -4,12 +4,19 @@
 \section[CompManager]{The Compilation Manager}
 
 \begin{code}
-module CompManager ( cmInit, cmLoadModule, cmUnload,
+module CompManager ( 
+    cmInit, 	  -- :: GhciMode -> IO CmState
+    cmLoadModule, -- :: CmState -> FilePath -> IO (CmState, [String])
+    cmUnload,	  -- :: CmState -> IO CmState
+    cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
+
+    cmSetContext, -- :: CmState -> String -> IO CmState
+    cmGetContext, -- :: CmState -> IO String
 #ifdef GHCI
-                     cmGetExpr, cmRunExpr,
+    cmRunStmt,	  --  :: CmState -> DynFlags -> String -> IO (CmState, [Name])
 #endif
-                     CmState, emptyCmState  -- abstract
-                   )
+    CmState, emptyCmState  -- abstract
+  )
 where
 
 #include "HsVersions.h"
@@ -17,16 +24,19 @@ where
 import CmLink
 import CmTypes
 import HscTypes
+import RnEnv		( unQualInScope )
+import Id		( idType, idName )
+import Name		( Name, lookupNameEnv )
+import RdrName		( emptyRdrEnv )
 import Module		( Module, ModuleName, moduleName, isHomeModule,
-			  mkModuleName, moduleNameUserString )
+			  mkModuleName, moduleNameUserString, moduleUserString )
 import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import GetImports
-import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
-			  PersistentCompilerState, ModDetails(..) )
+import HscTypes
 import HscMain		( initPersistentCompilerState )
 import Finder
-import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
+import UniqFM		( lookupUFM, addToUFM, delListFromUFM,
 			  UniqFM, listToUFM )
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
@@ -44,8 +54,7 @@ import IOExts
 
 #ifdef GHCI
 import Interpreter	( HValue )
-import HscMain		( hscExpr )
-import Type		( Type )
+import HscMain		( hscStmt )
 import PrelGHC		( unsafeCoerce# )
 #endif
 
@@ -63,43 +72,6 @@ import Maybe		( catMaybes, fromMaybe, isJust, fromJust )
 
 
 \begin{code}
-cmInit :: GhciMode -> IO CmState
-cmInit gmode
-   = emptyCmState gmode
-
-#ifdef GHCI
-cmGetExpr :: CmState
-	  -> DynFlags
-	  -> Bool	-- True <=> wrap in 'print' to get an IO-typed result
-          -> Module
-          -> String
-          -> IO (CmState, Maybe (HValue, PrintUnqualified, Type))
-cmGetExpr cmstate dflags wrap_io mod expr
-   = do (new_pcs, maybe_stuff) <- 
-	   hscExpr dflags wrap_io hst hit pcs mod expr
-        case maybe_stuff of
-	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
-	   Just (bcos, print_unqual, ty) -> do
-		hValue <- linkExpr pls bcos
-	        return (cmstate{ pcs=new_pcs }, 
-			Just (hValue, print_unqual, ty))
-
-   -- ToDo: check that the module we passed in is sane/exists?
-   where
-       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls } = cmstate
-
--- The HValue should represent a value of type IO () (Perhaps IO a?)
-cmRunExpr :: HValue -> IO ()
-cmRunExpr hval
-   = do unsafeCoerce# hval :: IO ()
-	-- putStrLn "done."
-#endif
-
-emptyHIT :: HomeIfaceTable
-emptyHIT = emptyUFM
-emptyHST :: HomeSymbolTable
-emptyHST = emptyUFM
-
 -- Persistent state for the entire system
 data CmState
    = CmState {
@@ -108,22 +80,32 @@ data CmState
         ui    :: UnlinkedImage,      -- the unlinked images
         mg    :: ModuleGraph,        -- the module graph
         gmode :: GhciMode,           -- NEVER CHANGES
+	ic    :: InteractiveContext, -- command-line binding info
 
         pcs    :: PersistentCompilerState, -- compile's persistent state
         pls    :: PersistentLinkerState    -- link's persistent state
      }
 
-emptyCmState :: GhciMode -> IO CmState
-emptyCmState gmode
+emptyCmState :: GhciMode -> Module -> IO CmState
+emptyCmState gmode mod
     = do pcs     <- initPersistentCompilerState
          pls     <- emptyPLS
-         return (CmState { hst = emptyHST,
-                           hit = emptyHIT,
-                           ui  = emptyUI,
-                           mg  = emptyMG, 
-                           gmode = gmode,
+         return (CmState { hst    = emptySymbolTable,
+                           hit    = emptyIfaceTable,
+                           ui     = emptyUI,
+                           mg     = emptyMG, 
+                           gmode  = gmode,
+			   ic     = emptyInteractiveContext mod,
                            pcs    = pcs,
                            pls    = pls })
+
+emptyInteractiveContext mod
+  = InteractiveContext { ic_module = mod, 
+			 ic_rn_env = emptyRdrEnv,
+			 ic_type_env = emptyTypeEnv }
+
+defaultCurrentModuleName = mkModuleName "Prelude"
+GLOBAL_VAR(defaultCurrentModule, error "no defaultCurrentModule", Module)
 
 -- CM internal types
 type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
@@ -134,12 +116,106 @@ type ModuleGraph = [ModSummary]  -- the module graph, topologically sorted
 emptyMG :: ModuleGraph
 emptyMG = []
 
-\end{code}
+-----------------------------------------------------------------------------
+-- Produce an initial CmState.
 
-Unload the compilation manager's state: everything it knows about the
-current collection of modules in the Home package.
+cmInit :: GhciMode -> IO CmState
+cmInit mode = do
+   prel <- moduleNameToModule defaultCurrentModuleName
+   writeIORef defaultCurrentModule prel
+   emptyCmState mode prel
 
-\begin{code}
+-----------------------------------------------------------------------------
+-- Setting the context doesn't throw away any bindings; the bindings
+-- we've built up in the InteractiveContext simply move to the new
+-- module.  They always shadow anything in scope in the current context.
+
+cmSetContext :: CmState -> String -> IO CmState
+cmSetContext cmstate str
+   = do let mn = mkModuleName str
+	    modules_loaded = [ (name_of_summary s, ms_mod s)  | s <- mg cmstate ]
+
+        m <- case lookup mn modules_loaded of
+		Just m  -> return m
+		Nothing -> do
+		   mod <- moduleNameToModule mn
+		   if isHomeModule mod 
+			then throwDyn (OtherError (showSDoc 
+				(quotes (ppr (moduleName mod))
+ 				  <+> text "is not currently loaded")))
+		   	else return mod
+
+	return cmstate{ ic = (ic cmstate){ic_module=m} }
+		
+cmGetContext :: CmState -> IO String
+cmGetContext cmstate = return (moduleUserString (ic_module (ic cmstate)))
+
+moduleNameToModule :: ModuleName -> IO Module
+moduleNameToModule mn
+ = do maybe_stuff <- findModule mn
+      case maybe_stuff of
+	Nothing -> throwDyn (OtherError ("can't find module `"
+				    ++ moduleNameUserString mn ++ "'"))
+	Just (m,_) -> return m
+
+-----------------------------------------------------------------------------
+-- cmRunStmt:  Run a statement/expr.
+
+#ifdef GHCI
+cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+cmRunStmt cmstate dflags expr
+   = do (new_pcs, maybe_stuff) <- hscStmt dflags hst hit pcs (ic cmstate) expr
+        case maybe_stuff of
+	   Nothing -> return (cmstate{ pcs=new_pcs }, [])
+	   Just (new_ic, ids, bcos) -> do
+		hval <- linkExpr pls bcos
+		hvals <- unsafeCoerce# hval :: IO [HValue]
+		let names = map idName ids
+		new_pls <- updateClosureEnv pls (zip names hvals)
+	        return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, names)
+
+   -- ToDo: check that the module we passed in is sane/exists?
+   where
+       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls } = cmstate
+#endif
+
+-----------------------------------------------------------------------------
+-- cmTypeOf: returns a string representing the type of a name.
+
+cmTypeOfName :: CmState -> Name -> IO (Maybe String)
+cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
+ = case lookupNameEnv (ic_type_env ic) name of
+	Nothing -> return Nothing
+	Just (AnId id) -> 
+	   let pit = pcs_PIT pcs
+	       modname = moduleName (ic_module ic)
+	       str = case lookupIfaceByModName hit pit modname of
+			Nothing    -> showSDoc (ppr (idType id))
+			Just iface -> showSDocForUser unqual (ppr (idType id))
+		  	   where unqual = unQualInScope (mi_globals iface)
+	   in return (Just str)
+
+	_ -> panic "cmTypeOfName"
+
+-----------------------------------------------------------------------------
+-- cmInfo: return "info" about an expression.  The info might be:
+--
+--	* its type, for an expression,
+--	* the class definition, for a class
+--	* the datatype definition, for a tycon (or synonym)
+--	* the export list, for a module
+--
+-- Can be used to find the type of the last expression compiled, by looking
+-- for "it".
+
+cmInfo :: CmState -> String -> IO (Maybe String)
+cmInfo cmstate str 
+ = do error "cmInfo not implemented yet"
+
+-----------------------------------------------------------------------------
+-- Unload the compilation manager's state: everything it knows about the
+-- current collection of modules in the Home package.
+
 cmUnload :: CmState -> IO CmState
 cmUnload state 
  = do -- Throw away the old home dir cache
@@ -149,18 +225,17 @@ cmUnload state
    where
      CmState{ hst=hst, hit=hit } = state
      (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
-\end{code}
 
-The real business of the compilation manager: given a system state and
-a module name, try and bring the module up to date, probably changing
-the system state at the same time.
+-----------------------------------------------------------------------------
+-- The real business of the compilation manager: given a system state and
+-- a module name, try and bring the module up to date, probably changing
+-- the system state at the same time.
 
-\begin{code}
 cmLoadModule :: CmState 
              -> FilePath
              -> IO (CmState,		-- new state
 		    Bool, 		-- was successful
-		    [Module])		-- list of modules loaded
+		    [String])		-- list of modules loaded
 
 cmLoadModule cmstate1 rootname
    = do -- version 1's are the original, before downsweep
@@ -172,6 +247,7 @@ cmLoadModule cmstate1 rootname
 	-- the previous pass, if any.
         let ui1       = ui     cmstate1
    	let mg1       = mg     cmstate1
+   	let ic1       = ic     cmstate1
 
         let ghci_mode = gmode cmstate1 -- this never changes
 
@@ -228,7 +304,7 @@ cmLoadModule cmstate1 rootname
 		    valid_linkables
 
         when (verb >= 2) $
-           putStrLn (showSDoc (text "STABLE MODULES:" 
+           putStrLn (showSDoc (text "Stable modules:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
 
 	-- unload any modules which aren't going to be re-linked this
@@ -289,19 +365,11 @@ cmLoadModule cmstate1 rootname
 	      -- clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries modsDone)
 
-              linkresult 
-                 <- link ghci_mode dflags a_root_is_Main ui3 pls2
-              case linkresult of
-                 LinkErrs _ _
-                    -> panic "cmLoadModule: link failed (1)"
-                 LinkOK pls3 
-                    -> do let cmstate3 
-                                 = CmState { hst=hst3, hit=hit3, 
-                                             ui=ui3, mg=modsDone, 
-                                             gmode=ghci_mode,
-					     pcs=pcs3, pls=pls3 }
-                          return (cmstate3, True, 
-                                  map ms_mod modsDone)
+	      -- link everything together
+              linkresult <- link ghci_mode dflags a_root_is_Main ui3 pls2
+
+	      cmLoadFinish True linkresult 
+			hst3 hit3 ui3 modsDone ghci_mode pcs3
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -313,34 +381,50 @@ cmLoadModule cmstate1 rootname
               let modsDone_names
                      = map name_of_summary modsDone
               let mods_to_zap_names 
-                     = findPartiallyCompletedCycles modsDone_names mg2_with_srcimps
-              let (hst4, hit4, ui4) 
+                     = findPartiallyCompletedCycles modsDone_names 
+			  mg2_with_srcimps
+              let (hst4, hit4, ui4)
                      = removeFromTopLevelEnvs mods_to_zap_names (hst3,hit3,ui3)
+
               let mods_to_keep
-                     = filter ((`notElem` mods_to_zap_names).name_of_summary) modsDone
-              let mods_to_keep_names 
-                     = map name_of_summary mods_to_keep
-              -- we could get the relevant linkables by filtering newLis, but
-              -- it seems easier to drag them out of the updated, cleaned-up UI
-              let linkables_to_link 
-                     = map (unJust "linkables_to_link" . findModuleLinkable_maybe ui4)
-                           mods_to_keep_names
+                     = filter ((`notElem` mods_to_zap_names).name_of_summary) 
+			  modsDone
 
 	      -- clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
 
-              linkresult <- link ghci_mode dflags False linkables_to_link pls2
-              case linkresult of
-                 LinkErrs _ _
-                    -> panic "cmLoadModule: link failed (2)"
-                 LinkOK pls3
-                    -> do let cmstate4 
-                                 = CmState { hst=hst4, hit=hit4, 
-                                             ui=ui4, mg=mods_to_keep,
-                                             gmode=ghci_mode, pcs=pcs3, pls=pls3 }
-                          return (cmstate4, False, 
-                                  map ms_mod mods_to_keep)
+	      -- link everything together
+              linkresult <- link ghci_mode dflags False ui4 pls2
 
+	      cmLoadFinish False linkresult 
+		    hst4 hit4 ui4 mods_to_keep ghci_mode pcs3
+
+
+-- Finish up after a cmLoad.
+--
+-- Empty the interactive context and set the module context to the topmost
+-- newly loaded module, or the Prelude if none were loaded.
+cmLoadFinish ok linkresult hst hit ui mods ghci_mode pcs
+  = do case linkresult of {
+          LinkErrs _ _ -> panic "cmLoadModule: link failed (2)";
+          LinkOK pls   -> do
+
+       def_mod <- readIORef defaultCurrentModule
+       let current_mod = case mods of 
+				[]    -> def_mod
+				(x:_) -> ms_mod x
+
+       	   new_ic = emptyInteractiveContext current_mod
+
+           new_cmstate = CmState{ hst=hst, hit=hit, 
+                                  ui=ui, mg=mods,
+                                  gmode=ghci_mode, pcs=pcs, 
+				  pls=pls,
+				  ic = new_ic }
+           mods_loaded = map (moduleNameUserString.name_of_summary) mods
+
+       return (new_cmstate, ok, mods_loaded)
+    }
 
 ppFilesFromSummaries summaries
   = [ fn | Just fn <- map (ml_hspp_file . ms_location) summaries ]

@@ -4,22 +4,23 @@
 \section[Rename]{Renaming and dependency analysis passes}
 
 \begin{code}
-module Rename ( renameModule, renameExpr, closeIfaceDecls, checkOldIface ) where
+module Rename ( renameModule, renameStmt, closeIfaceDecls, checkOldIface ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, RdrNameHsExpr,
-			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl, RdrNameImportDecl
+import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, 
+			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl, RdrNameImportDecl,
+			  RdrNameStmt
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
-			  extractHsTyNames, RenamedHsExpr,
+			  extractHsTyNames, RenamedStmt,
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
-import RnExpr		( rnExpr )
+import RnExpr		( rnStmt )
 import RnNames		( getGlobalNames, exportsFromAvail )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
@@ -28,7 +29,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 			)
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
-			  tryLoadInterface )
+			)
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
@@ -40,9 +41,7 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  moduleEnvElts
 			)
-import Name		( Name, NamedThing(..), 
-			  nameIsLocalOrFrom, nameOccName, nameModule,
-			)
+import Name		( Name, nameIsLocalOrFrom, nameModule )
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
 import RdrName		( foldRdrEnv, isQual )
 import NameSet
@@ -63,7 +62,8 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
 			  AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
 			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..) 
+			  Deprecations(..),
+			  LocalRdrEnv
 			 )
 import CmStaticInfo	( GhciMode(..) )
 import List		( partition, nub )
@@ -83,8 +83,8 @@ renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, 
-		    Maybe (PrintUnqualified, (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl]))))
+	     -> IO (PersistentCompilerState, PrintUnqualified,
+		    Maybe (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl])))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst pcs this_module rdr_module
@@ -94,54 +94,64 @@ renameModule dflags hit hst pcs this_module rdr_module
 
 
 \begin{code}
-renameExpr :: DynFlags
+renameStmt :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module -> RdrNameHsExpr
+	   -> Module			-- current context (module)
+	   -> LocalRdrEnv		-- current context (temp bindings)
+	   -> RdrNameStmt		-- parsed stmt
 	   -> IO ( PersistentCompilerState, 
-		   Maybe (PrintUnqualified, (SyntaxMap, RenamedHsExpr, [RenamedHsDecl]))
+		   PrintUnqualified,
+		   Maybe ([Name], (SyntaxMap, RenamedStmt, [RenamedHsDecl]))
                  )
 
-renameExpr dflags hit hst pcs this_module expr
+renameStmt dflags hit hst pcs this_module local_env stmt
   = renameSource dflags hit hst pcs this_module $
-	  tryLoadInterface doc (moduleName this_module) ImportByUser 
-						`thenRn` \ (iface, maybe_err) ->
-	  case maybe_err of {
-	    Just msg -> ioToRnM (printErrs alwaysQualify 
-			  	 (ptext SLIT("failed to load interface for") 
-			   	  <+> quotes (ppr this_module) 
-				  <>  char ':' <+> msg)) `thenRn_`
-		        returnRn Nothing;
-	    Nothing -> 
 
-	  let rdr_env      = mi_globals iface
-	      print_unqual = unQualInScope rdr_env
-	  in 
- 
-	  initRnMS rdr_env emptyLocalFixityEnv CmdLineMode (rnExpr expr)	
-						`thenRn` \ (e,fvs) -> 
+	-- Load the interface for the context module, so 
+	-- that we can get its top-level lexical environment
+	-- Bale out if we fail to do this
+    loadInterface doc (moduleName this_module) ImportByUser `thenRn` \ iface ->
+    let rdr_env       = mi_globals iface
+	print_unqual  = unQualInScope rdr_env
+    in 
+    checkErrsRn				`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+	returnRn (print_unqual, Nothing)
+    else
 
-	  checkErrsRn				`thenRn` \ no_errs_so_far ->
-    	  if not no_errs_so_far then
-		-- Found errors already, so exit now
-	        doDump e [] `thenRn_` 
-		returnRn Nothing
-	  else
+	-- Rename it
+    initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode (
+	rnStmt stmt	$ \ stmt' ->
+	returnRn (([], stmt'), emptyFVs)
+    )						`thenRn` \ ((binders, stmt), fvs) -> 
 
-	  addImplicitFVs rdr_env Nothing fvs		`thenRn` \ (slurp_fvs, syntax_map) ->
-	  slurpImpDecls slurp_fvs			`thenRn` \ decls ->
+	-- Bale out if we fail
+    checkErrsRn					`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+        doDump [] stmt [] `thenRn_` returnRn (print_unqual, Nothing)
+    else
 
-	  doDump e decls  `thenRn_`
-	  returnRn (Just (print_unqual, (syntax_map, e, decls)))
-	}
+    let filtered_fvs = fvs `delListFromNameSet` rdrEnvElts local_env in
+
+	-- Add implicit free vars, and close decls
+    addImplicitFVs rdr_env Nothing filtered_fvs
+				`thenRn` \ (slurp_fvs, syntax_map) ->
+    slurpImpDecls slurp_fvs	`thenRn` \ decls ->
+
+    doDump binders stmt decls  `thenRn_`
+    returnRn (print_unqual, Just (binders, (syntax_map, stmt, decls)))
+
   where
      doc = text "context for compiling expression"
 
-     doDump :: RenamedHsExpr -> [RenamedHsDecl] -> RnMG (Either IOError ())
-     doDump e decls = 
-	getDOptsRn  `thenRn` \ dflags ->
-	ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
-			(vcat (ppr e : map ppr decls)))
+     doDump :: [Name] -> RenamedStmt -> [RenamedHsDecl] -> RnMG (Either IOError ())
+     doDump bndrs stmt decls
+	= getDOptsRn  `thenRn` \ dflags ->
+	  ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
+			(vcat [text "Binders:" <+> ppr bndrs,
+			       ppr stmt, text "",
+			       vcat (map ppr decls)]))
 \end{code}
 
 
@@ -156,46 +166,45 @@ renameSource :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module 
-	     -> RnMG (Maybe (PrintUnqualified, r))
-	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, r))
+	     -> RnMG (PrintUnqualified, Maybe r)
+	     -> IO (PersistentCompilerState, PrintUnqualified, Maybe r)
 	-- Nothing => some error occurred in the renamer
 
 renameSource dflags hit hst old_pcs this_module thing_inside
   = do	{ showPass dflags "Renamer"
 
 		-- Initialise the renamer monad
-	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module thing_inside
+	; (new_pcs, msgs, (print_unqual, maybe_rn_stuff)) 
+		<- initRn dflags hit hst old_pcs this_module thing_inside
 
 	 	-- Print errors from renaming
-	;  let print_unqual = case maybe_rn_stuff of
-				Just (unqual, _) -> unqual
-				Nothing		 -> alwaysQualify
-
 	;  printErrorsAndWarnings print_unqual msgs ;
 
 		-- Return results.  No harm in updating the PCS
 	; if errorsFound msgs then
-	    return (new_pcs, Nothing)
+	    return (new_pcs, print_unqual, Nothing)
           else	    
-	    return (new_pcs, maybe_rn_stuff)
+	    return (new_pcs, print_unqual, maybe_rn_stuff)
     }
 \end{code}
 
 \begin{code}
 rename :: Module -> RdrNameHsModule 
-       -> RnMG (Maybe (PrintUnqualified, (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl]))))
+       -> RnMG (PrintUnqualified, Maybe (IsExported, ModIface, (SyntaxMap, [RenamedHsDecl])))
 rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_module contents 	`thenRn` \ (gbl_env, local_gbl_env, all_avails@(_, global_avail_env)) ->
-
+    let
+	print_unqualified = unQualInScope gbl_env
+    in
 	-- Exit if we've found any errors
     checkErrsRn				`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
 	rnDump [] []		`thenRn_`
-	returnRn Nothing 
+	returnRn (print_unqualified, Nothing)
     else
 	
 	-- PROCESS EXPORT LIST 
@@ -223,7 +232,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     if not no_errs_so_far then
 	-- Found errors already, so exit now
         rnDump [] rn_local_decls		`thenRn_` 
-	returnRn Nothing
+	returnRn (print_unqualified, Nothing)
     else
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
@@ -263,7 +272,6 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 				mi_decls    = panic "mi_decls"
 		    }
 
-	print_unqualified = unQualInScope gbl_env
 	is_exported name  = name `elemNameSet` exported_names
 	exported_names    = availsToNameSet export_avails
     in
@@ -273,7 +281,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 		      imports global_avail_env
 		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
-    returnRn (Just (print_unqualified, (is_exported, mod_iface, (sugar_map, final_decls))))
+    returnRn (print_unqualified, Just (is_exported, mod_iface, (sugar_map, final_decls)))
   where
     mod_name = moduleName this_module
 \end{code}

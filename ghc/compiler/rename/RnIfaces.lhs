@@ -38,7 +38,7 @@ import Id		( idType )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocalName, 
+			  nameModule, isLocalName, isHomePackageName,
 			  NamedThing(..)
 			 )
 import Name 		( elemNameEnv, delFromNameEnv )
@@ -313,10 +313,10 @@ recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
   where
     decls_map' = foldl delFromNameEnv decls_map (availNames avail)
     main_name  = availName avail
-    mod	       = nameModule main_name
     new_slurped_names = addAvailToNameSet slurped_names avail
-    new_vslurp | isHomeModule mod = (imp_mods, addOneToNameSet imp_names main_name)
-    	       | otherwise        = (extendModuleSet imp_mods mod, imp_names)
+    new_vslurp | isHomePackageName main_name = (imp_mods, addOneToNameSet imp_names main_name)
+    	       | otherwise       	     = (extendModuleSet imp_mods mod, imp_names)
+    mod	       = nameModule main_name
 
 recordLocalSlurps new_names
   = getIfacesRn 	`thenRn` \ ifaces ->

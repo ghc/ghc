@@ -42,7 +42,7 @@ import HscTypes		( AvailEnv, lookupType,
 			  PersistentRenamerState(..), Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
 			  HomeSymbolTable, TyThing,
-			  PersistentCompilerState(..), GlobalRdrEnv,
+			  PersistentCompilerState(..), GlobalRdrEnv, LocalRdrEnv,
 			  HomeIfaceTable, PackageIfaceTable,
 			  RdrAvailInfo )
 import BasicTypes	( Version, defaultFixity )
@@ -180,7 +180,6 @@ isInterfaceMode _ = False
 
 \begin{code}
 --------------------------------
-type LocalRdrEnv    = RdrNameEnv Name
 type LocalFixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
@@ -364,21 +363,21 @@ initRn dflags hit hst pcs mod do_rn
 	
 	return (new_pcs, (warns, errs), res)
 
-initRnMS :: GlobalRdrEnv -> LocalFixityEnv -> RnMode
+initRnMS :: GlobalRdrEnv -> LocalRdrEnv -> LocalFixityEnv -> RnMode
 	 -> RnMS a -> RnM d a
 
-initRnMS rn_env fixity_env mode thing_inside rn_down g_down
+initRnMS rn_env local_env fixity_env mode thing_inside rn_down g_down
 	-- The fixity_env appears in both the rn_fixenv field
 	-- and in the HIT.  See comments with RnHiFiles.lookupFixityRn
   = let
-	s_down = SDown { rn_genv = rn_env, rn_lenv = emptyRdrEnv, 
+	s_down = SDown { rn_genv = rn_env, rn_lenv = local_env, 
 			 rn_fixenv = fixity_env, rn_mode = mode }
     in
     thing_inside rn_down s_down
 
 initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
-  = initRnMS emptyRdrEnv emptyLocalFixityEnv InterfaceMode $
+  = initRnMS emptyRdrEnv emptyRdrEnv emptyLocalFixityEnv InterfaceMode $
     setModuleRn mod thing_inside
 \end{code}
 

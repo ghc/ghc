@@ -50,7 +50,7 @@ module TysPrim(
 
 import Var		( TyVar, mkSysTyVar )
 import Name		( Name )
-import PrimRep		( PrimRep(..), isFollowableRep )
+import PrimRep		( PrimRep(..) )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKinds

@@ -8,6 +8,7 @@ module CmLink ( Linkable(..),  Unlinked(..),
 		filterModuleLinkables, 
 		findModuleLinkable_maybe,
 		LinkResult(..),
+		updateClosureEnv,
                 link, 
 		unload,
                 PersistentLinkerState{-abstractly!-}, emptyPLS,
@@ -23,6 +24,7 @@ import CmTypes
 import CmStaticInfo	( GhciMode(..) )
 import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC )
+import Name		( Name )
 import Module		( ModuleName )
 import FiniteMap
 import Outputable
@@ -87,6 +89,11 @@ emptyPLS = return (PersistentLinkerState { closure_env = emptyFM,
 #else
 emptyPLS = return (PersistentLinkerState {})
 #endif
+
+updateClosureEnv :: PersistentLinkerState -> [(Name,HValue)] 
+	-> IO PersistentLinkerState
+updateClosureEnv pls new_bindings
+  = return pls{ closure_env = addListToFM (closure_env pls) new_bindings }
 
 -----------------------------------------------------------------------------
 -- Unloading old objects ready for a new compilation sweep.

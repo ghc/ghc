@@ -1205,6 +1205,10 @@ tcSimplifyTop wanted_lie
     mapTc disambigGroup std_oks		`thenTc` \ binds_ambig ->
 
 	-- And complain about the ones that don't
+	-- This group includes both non-existent instances 
+	--	e.g. Num (IO a) and Eq (Int -> Int)
+	-- and ambiguous dictionaries
+	--	e.g. Num a
     addTopAmbigErrs bad_guys		`thenNF_Tc_`
 
     returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
@@ -1264,7 +1268,8 @@ disambigGroup dicts
     in
 	-- See if any default works, and if so bind the type variable to it
 	-- If not, add an AmbigErr
-    recoverTc (addAmbigErrs dicts `thenNF_Tc_` returnTc EmptyMonoBinds)	$
+    recoverTc (addAmbigErrs dicts			`thenNF_Tc_` 
+	       returnTc EmptyMonoBinds)	$
 
     try_default default_tys		 	`thenTc` \ chosen_default_ty ->
 
@@ -1468,7 +1473,8 @@ addTopAmbigErrs dicts
     fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
     (tidy_env, tidy_dicts) = tidyInsts emptyTidyEnv dicts
     complain d | not (null (getIPs d))		      = addTopIPErr tidy_env d
-	       | tyVarsOfInst d `subVarSet` fixed_tvs = addTopInstanceErr tidy_env d
+	       | not (isTyVarDict d) ||
+	         tyVarsOfInst d `subVarSet` fixed_tvs = addTopInstanceErr tidy_env d
 	       | otherwise			      = addAmbigErr tidy_env d
 
 addTopIPErr tidy_env tidy_dict
