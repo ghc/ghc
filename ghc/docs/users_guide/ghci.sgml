@@ -609,7 +609,8 @@ $ ghci -lm
 	<listitem>
 	  <para>the standard library search path for your system,
 	  which on some systems may be overriden by setting the
-	  <literal>LD_LIBRARY_PATH</literal> environment variable.
+	  <literal>LD_LIBRARY_PATH</literal> environment
+	  variable.</para>
 	</listitem>
       </itemizedlist>
 
