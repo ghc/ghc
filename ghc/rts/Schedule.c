@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.194 2004/03/13 00:56:45 sof Exp $
+ * $Id: Schedule.c,v 1.195 2004/04/13 13:43:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -1062,7 +1062,6 @@ run_thread:
 	if (t->main != NULL) {
 	    t->main->tso = new_t;
 	}
-	threadPaused(new_t);
 	PUSH_ON_RUN_QUEUE(new_t);
       }
       break;
@@ -1473,9 +1472,15 @@ deleteAllThreads ( void )
       next = t->global_link;
       deleteThread(t);
   }      
-  run_queue_hd = run_queue_tl = END_TSO_QUEUE;
-  blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
-  sleeping_queue = END_TSO_QUEUE;
+
+  // The run queue now contains a bunch of ThreadKilled threads.  We
+  // must not throw these away: the main thread(s) will be in there
+  // somewhere, and the main scheduler loop has to deal with it.
+  // Also, the run queue is the only thing keeping these threads from
+  // being GC'd, and we don't want the "main thread has been GC'd" panic.
+
+  ASSERT(blocked_queue_hd == END_TSO_QUEUE);
+  ASSERT(sleeping_queue == END_TSO_QUEUE);
 }
 
 /* startThread and  insertThread are now in GranSim.c -- HWL */
