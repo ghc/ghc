@@ -8,6 +8,9 @@ OBJS = Main.o
 
 CLEAN_FILES += genprimopcode
 
+# genprimopcode is needed to boot in ghc/compiler...
+boot :: all
+
 all :: genprimopcode
 
 genprimopcode: Main.o
