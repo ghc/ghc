@@ -422,7 +422,7 @@ tcConPat tc_bndr pat con_name arg_pats pat_ty
 	-- Check arguments
     tcPats tc_bndr arg_pats arg_tys	`thenTc` \ (arg_pats', lie_req3, tvs, ids, lie_avail2) ->
 
-    returnTc (co_fn <$> ConPat data_con pat_ty ex_tvs ex_dicts arg_pats',
+    returnTc (co_fn <$> ConPat data_con con_res_ty ex_tvs ex_dicts arg_pats',
 	      lie_req1 `plusLIE` lie_req2 `plusLIE` lie_req3,
 	      listToBag ex_tvs `unionBags` tvs,
 	      ids,
