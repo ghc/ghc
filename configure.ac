@@ -406,6 +406,16 @@ powerpc-unknown-openbsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
+powerpc64-unknown-linux*)
+	HostPlatform=powerpc64-unknown-linux
+	TargetPlatform=powerpc64-unknown-linux
+	BuildPlatform=powerpc64-unknown-linux
+	HostPlatform_CPP='powerpc64_unknown_linux'
+	HostArch_CPP='powerpc64'
+        HostVendor_CPP='unknown'
+	HostOS_CPP='linux'
+	;;
+								
 s390-ibm-linux*)
        HostPlatform=s390-ibm-linux
        TargetPlatform=s390-ibm-linux #hack
