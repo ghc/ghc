@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.14 1999/06/29 13:04:40 panne Exp $
+ * $Id: RtsStartup.c,v 1.15 1999/07/02 09:31:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -168,21 +168,6 @@ shutdownHaskell(void)
 #if defined(TICKY_TICKY)
   if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
-
-  /*
-    This fflush is important, because: if "main" just returns,
-    then we will end up in pre-supplied exit code that will close
-    streams and flush buffers.  In particular we have seen: it
-    will close fd 0 (stdin), then flush fd 1 (stdout), then <who
-    cares>...
-    
-    But if you're playing with sockets, that "close fd 0" might
-    suggest to the daemon that all is over, only to be presented
-    with more stuff on "fd 1" at the flush.
-    
-    The fflush avoids this sad possibility.
-   */
-  fflush(stdout);
 
   rts_has_started_up=0;
 }
