@@ -3,7 +3,7 @@
 Package {
         name           = "base",
 #ifdef INSTALLING
-	import_dirs    = [ "$libdir/imports" ]
+	import_dirs    = [ "$libdir/imports/base" ]
 #else
 	import_dirs    = [ "$libdir/libraries/base" ],
 #endif
