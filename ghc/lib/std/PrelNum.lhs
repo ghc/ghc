@@ -242,11 +242,9 @@ instance  Num Integer  where
 
     -- ORIG: abs n = if n >= 0 then n else -n
 
+    abs (S# (-2147483648#)) = 2147483648
     abs (S# i) = case abs (I# i) of I# j -> S# j
-    abs n@(J# s d)
-      = if (cmpIntegerInt# s d 0#) >=# 0#
-	then n
-	else J# (negateInt# s) d
+    abs n@(J# s d) = if (s >=# 0#) then n else J# (negateInt# s) d
 
     signum (S# i) = case signum (I# i) of I# j -> S# j
     signum (J# s d)
