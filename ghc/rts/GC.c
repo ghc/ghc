@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.109 2001/07/25 12:18:26 simonmar Exp $
+ * $Id: GC.c,v 1.110 2001/07/26 14:29:26 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -137,7 +137,7 @@ static void         cleanup_weak_ptr_list   ( StgWeak **list );
 static void         scavenge                ( step * );
 static void         scavenge_mark_stack     ( void );
 static void         scavenge_stack          ( StgPtr p, StgPtr stack_end );
-static rtsBool      scavenge_one            ( StgClosure *p );
+static rtsBool      scavenge_one            ( StgPtr p );
 static void         scavenge_large          ( step * );
 static void         scavenge_static         ( void );
 static void         scavenge_mutable_list   ( generation *g );
@@ -159,6 +159,12 @@ static StgPtr *mark_stack;
 static StgPtr *mark_sp;
 static StgPtr *mark_splim;
 
+// Flag and pointers used for falling back to a linear scan when the
+// mark stack overflows.
+static rtsBool mark_stack_overflowed;
+static bdescr *oldgen_scan_bd;
+static StgPtr  oldgen_scan;
+
 static inline rtsBool
 mark_stack_empty(void)
 {
@@ -169,6 +175,12 @@ static inline rtsBool
 mark_stack_full(void)
 {
     return mark_sp >= mark_splim;
+}
+
+static inline void
+reset_mark_stack(void)
+{
+    mark_sp = mark_stack;
 }
 
 static inline void
@@ -349,7 +361,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	      stp->bitmap = bitmap_bdescr;
 	      bitmap = bitmap_bdescr->start;
 	      
-	      IF_DEBUG(gc, fprintf(stderr, "bitmap_size: %d, bitmap: %p\n",
+	      IF_DEBUG(gc, belch("bitmap_size: %d, bitmap: %p",
 				   bitmap_size, bitmap););
 	      
 	      // don't forget to fill it with zeros!
@@ -532,7 +544,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
     loop2:
       // scavenge objects in compacted generation
-      if (mark_stack_bdescr != NULL && !mark_stack_empty()) {
+      if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
+	  (mark_stack_bdescr != NULL && !mark_stack_empty())) {
 	  scavenge_mark_stack();
 	  flag = rtsTrue;
       }
@@ -814,7 +827,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, fprintf(stderr, "@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld\n", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      IF_DEBUG(gc, belch("@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
       pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
       if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
 	heapOverflow();
@@ -997,7 +1010,7 @@ traverse_weak_ptr_list(void)
       w->link = weak_ptr_list;
       weak_ptr_list = w;
       flag = rtsTrue;
-      IF_DEBUG(weak, fprintf(stderr,"Weak pointer still alive at %p -> %p\n", w, w->key));
+      IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", w, w->key));
       continue;
     }
     else {
@@ -1467,7 +1480,8 @@ loop:
 	if (!is_marked((P_)q,bd)) {
 	    mark((P_)q,bd);
 	    if (mark_stack_full()) {
-		barf("ToDo: mark stack full");
+		mark_stack_overflowed = rtsTrue;
+		reset_mark_stack();
 	    }
 	    push_mark_stack((P_)q);
 	}
@@ -2332,19 +2346,21 @@ scavenge(step *stp)
 static void
 scavenge_mark_stack(void)
 {
-    StgPtr p;
+    StgPtr p, q;
     StgInfoTable *info;
     nat saved_evac_gen;
 
     evac_gen = oldest_gen->no;
     saved_evac_gen = evac_gen;
 
+linear_scan:
     while (!mark_stack_empty()) {
 	p = pop_mark_stack();
 
 	info = get_itbl((StgClosure *)p);
 	ASSERT(p && (LOOKS_LIKE_GHC_INFO(info) || IS_HUGS_CONSTR_INFO(info)));
 	
+	q = p;
 	switch (info->type) {
 	    
 	case MVAR:
@@ -2569,7 +2585,7 @@ scavenge_mark_stack(void)
 			   p, info_type((StgClosure *)p)));
 	    break;
 	}
-#endif
+#endif // PAR
 
 	default:
 	    barf("scavenge_mark_stack: unimplemented/strange closure type %d @ %p", 
@@ -2578,11 +2594,52 @@ scavenge_mark_stack(void)
 
 	if (failed_to_evac) {
 	    failed_to_evac = rtsFalse;
-	    mkMutCons((StgClosure *)p, &generations[evac_gen]);
+	    mkMutCons((StgClosure *)q, &generations[evac_gen]);
 	}
+	
+	// mark the next bit to indicate "scavenged"
+	mark(q+1, Bdescr(q));
 
     } // while (!mark_stack_empty())
-}    
+
+    // start a new linear scan if the mark stack overflowed at some point
+    if (mark_stack_overflowed && oldgen_scan_bd == NULL) {
+	IF_DEBUG(gc, belch("scavenge_mark_stack: starting linear scan"));
+	mark_stack_overflowed = rtsFalse;
+	oldgen_scan_bd = oldest_gen->steps[0].blocks;
+	oldgen_scan = oldgen_scan_bd->start;
+    }
+
+    if (oldgen_scan_bd) {
+	// push a new thing on the mark stack
+    loop:
+	// find a closure that is marked but not scavenged, and start
+	// from there.
+	while (oldgen_scan < oldgen_scan_bd->free 
+	       && !is_marked(oldgen_scan,oldgen_scan_bd)) {
+	    oldgen_scan++;
+	}
+
+	if (oldgen_scan < oldgen_scan_bd->free) {
+
+	    // already scavenged?
+	    if (is_marked(oldgen_scan+1,oldgen_scan_bd)) {
+		oldgen_scan += sizeofW(StgHeader) + MIN_NONUPD_SIZE;
+		goto loop;
+	    }
+	    push_mark_stack(oldgen_scan);
+	    // ToDo: bump the linear scan by the actual size of the object
+	    oldgen_scan += sizeofW(StgHeader) + MIN_NONUPD_SIZE;
+	    goto linear_scan;
+	}
+
+	oldgen_scan_bd = oldgen_scan_bd->link;
+	if (oldgen_scan_bd != NULL) {
+	    oldgen_scan = oldgen_scan_bd->start;
+	    goto loop;
+	}
+    }
+}
 
 /* -----------------------------------------------------------------------------
    Scavenge one object.
@@ -2593,104 +2650,131 @@ scavenge_mark_stack(void)
    -------------------------------------------------------------------------- */
 
 static rtsBool
-scavenge_one(StgClosure *p)
+scavenge_one(StgPtr p)
 {
-  const StgInfoTable *info;
-  rtsBool no_luck;
-
-  ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
-	       || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
-
-  info = get_itbl(p);
-
-  switch (info -> type) {
-
-  case FUN:
-  case FUN_1_0:			// hardly worth specialising these guys
-  case FUN_0_1:
-  case FUN_1_1:
-  case FUN_0_2:
-  case FUN_2_0:
-  case THUNK:
-  case THUNK_1_0:
-  case THUNK_0_1:
-  case THUNK_1_1:
-  case THUNK_0_2:
-  case THUNK_2_0:
-  case CONSTR:
-  case CONSTR_1_0:
-  case CONSTR_0_1:
-  case CONSTR_1_1:
-  case CONSTR_0_2:
-  case CONSTR_2_0:
-  case WEAK:
-  case FOREIGN:
-  case IND_PERM:
-  case IND_OLDGEN_PERM:
+    const StgInfoTable *info;
+    nat saved_evac_gen = evac_gen;
+    rtsBool no_luck;
+    
+    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p))
+		 || IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p))));
+    
+    info = get_itbl((StgClosure *)p);
+    
+    switch (info->type) {
+	
+    case FUN:
+    case FUN_1_0:			// hardly worth specialising these guys
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
+    case WEAK:
+    case FOREIGN:
+    case IND_PERM:
+    case IND_OLDGEN_PERM:
     {
-      StgPtr q, end;
-      
-      end = (P_)p->payload + info->layout.payload.ptrs;
-      for (q = (P_)p->payload; q < end; q++) {
-	(StgClosure *)*q = evacuate((StgClosure *)*q);
-      }
-      break;
-    }
-
-  case CAF_BLACKHOLE:
-  case SE_CAF_BLACKHOLE:
-  case SE_BLACKHOLE:
-  case BLACKHOLE:
-      break;
-
-  case THUNK_SELECTOR:
-    { 
-      StgSelector *s = (StgSelector *)p;
-      s->selectee = evacuate(s->selectee);
-      break;
+	StgPtr q, end;
+	
+	end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+	for (q = (StgPtr)((StgClosure *)p)->payload; q < end; q++) {
+	    (StgClosure *)*q = evacuate((StgClosure *)*q);
+	}
+	break;
     }
     
-  case AP_UPD: /* same as PAPs */
-  case PAP:
-    /* Treat a PAP just like a section of stack, not forgetting to
-     * evacuate the function pointer too...
-     */
+    case CAF_BLACKHOLE:
+    case SE_CAF_BLACKHOLE:
+    case SE_BLACKHOLE:
+    case BLACKHOLE:
+	break;
+	
+    case THUNK_SELECTOR:
     { 
-      StgPAP* pap = (StgPAP *)p;
+	StgSelector *s = (StgSelector *)p;
+	s->selectee = evacuate(s->selectee);
+	break;
+    }
+    
+    case ARR_WORDS:
+	// nothing to follow 
+	break;
       
-      pap->fun = evacuate(pap->fun);
-      scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
-      break;
+    case MUT_ARR_PTRS:
+    {
+	// follow everything 
+	StgPtr next;
+      
+	evac_gen = 0;		// repeatedly mutable 
+	recordMutable((StgMutClosure *)p);
+	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	}
+	evac_gen = saved_evac_gen;
+	failed_to_evac = rtsFalse;
+	break;
     }
 
-  case IND_OLDGEN:
-      /* This might happen if for instance a MUT_CONS was pointing to a
-       * THUNK which has since been updated.  The IND_OLDGEN will
-       * be on the mutable list anyway, so we don't need to do anything
-       * here.
-       */
-      break;
+    case MUT_ARR_PTRS_FROZEN:
+    {
+	// follow everything 
+	StgPtr next;
+      
+	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	}
+	break;
+    }
 
-  case MUT_ARR_PTRS_FROZEN:
-      {
-	  // follow everything 
-	  StgPtr q, next;
+    case TSO:
+    {
+	StgTSO *tso = (StgTSO *)p;
+      
+	evac_gen = 0;		// repeatedly mutable 
+	scavengeTSO(tso);
+	recordMutable((StgMutClosure *)tso);
+	evac_gen = saved_evac_gen;
+	failed_to_evac = rtsFalse;
+	break;
+    }
+  
+    case AP_UPD:
+    case PAP:
+    { 
+	StgPAP* pap = (StgPAP *)p;
+	pap->fun = evacuate(pap->fun);
+	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
+	break;
+    }
 
-	  q = (StgPtr)p;
-	  next = q + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	  for (q = (P_)((StgMutArrPtrs *)p)->payload; q < next; q++) {
-	      (StgClosure *)*q = evacuate((StgClosure *)*q);
-	  }
-	  break;
-      }
+    case IND_OLDGEN:
+	// This might happen if for instance a MUT_CONS was pointing to a
+	// THUNK which has since been updated.  The IND_OLDGEN will
+	// be on the mutable list anyway, so we don't need to do anything
+	// here.
+	break;
 
-  default:
-    barf("scavenge_one: strange object %d", (int)(info->type));
-  }    
+    default:
+	barf("scavenge_one: strange object %d", (int)(info->type));
+    }    
 
-  no_luck = failed_to_evac;
-  failed_to_evac = rtsFalse;
-  return (no_luck);
+    no_luck = failed_to_evac;
+    failed_to_evac = rtsFalse;
+    return (no_luck);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2758,7 +2842,7 @@ scavenge_mut_once_list(generation *gen)
 	} else {
 	  size = gen->steps[0].scan - start;
 	}
-	fprintf(stderr,"evac IND_OLDGEN: %ld bytes\n", size * sizeof(W_));
+	belch("evac IND_OLDGEN: %ld bytes", size * sizeof(W_));
       }
 #endif
 
@@ -2788,7 +2872,7 @@ scavenge_mut_once_list(generation *gen)
 	 * it from the mutable list if possible by promoting whatever it
 	 * points to.
 	 */
-	if (scavenge_one((StgClosure *)((StgMutVar *)p)->var)) {
+	if (scavenge_one((StgPtr)((StgMutVar *)p)->var)) {
 	    /* didn't manage to promote everything, so put the
 	     * MUT_CONS back on the list.
 	     */
@@ -3039,7 +3123,7 @@ scavenge_static(void)
 	 */
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
-	  scavenged_static_objects = STATIC_LINK(info,p);
+	  scavenged_static_objects = IND_STATIC_LINK(p);
 	  ((StgMutClosure *)ind)->mut_link = oldest_gen->mut_once_list;
 	  oldest_gen->mut_once_list = (StgMutClosure *)ind;
 	}
@@ -3287,9 +3371,7 @@ static void
 scavenge_large(step *stp)
 {
   bdescr *bd;
-  StgPtr p, q;
-  const StgInfoTable* info;
-  nat saved_evac_gen = evac_gen; // used for temporarily changing evac_gen 
+  StgPtr p;
 
   bd = stp->new_large_objects;
 
@@ -3307,72 +3389,8 @@ scavenge_large(step *stp)
     stp->n_scavenged_large_blocks += bd->blocks;
 
     p = bd->start;
-    info  = get_itbl((StgClosure *)p);
-
-    // only certain objects can be "large"... 
-    q = p;
-    switch (info->type) {
-
-    case ARR_WORDS:
-	// nothing to follow 
-	break;
-
-    case MUT_ARR_PTRS:
-    {
-	// follow everything 
-	StgPtr next;
-	
-	evac_gen = 0;		// repeatedly mutable 
-	recordMutable((StgMutClosure *)p);
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
-	}
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsFalse;
-	break;
-    }
-
-    case MUT_ARR_PTRS_FROZEN:
-      {
-	  // follow everything 
-	  StgPtr next;
-	  
-	  next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	  for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	      (StgClosure *)*p = evacuate((StgClosure *)*p);
-	  }
-	  break;
-      }
-
-    case TSO:
-    {
-	StgTSO *tso = (StgTSO *)p;
-
-	evac_gen = 0;		// repeatedly mutable 
-	scavengeTSO(tso);
-	recordMutable((StgMutClosure *)tso);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsFalse;
-	break;
-    }
-
-    case AP_UPD:
-    case PAP:
-      { 
-	StgPAP* pap = (StgPAP *)p;
-	pap->fun = evacuate(pap->fun);
-	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
-	break;
-      }
-
-    default:
-      barf("scavenge_large: unknown/strange object  %d", (int)(info->type));
-    }
-
-    if (failed_to_evac) {
-	failed_to_evac = rtsFalse;
-	mkMutCons((StgClosure *)q, &generations[evac_gen]);
+    if (scavenge_one(p)) {
+	mkMutCons((StgClosure *)p, stp->gen);
     }
   }
 }
@@ -3480,7 +3498,7 @@ gcCAFs(void)
     ASSERT(info->type == IND_STATIC);
 
     if (STATIC_LINK(info,p) == NULL) {
-      IF_DEBUG(gccafs, fprintf(stderr, "CAF gc'd at 0x%04lx\n", (long)p));
+      IF_DEBUG(gccafs, belch("CAF gc'd at 0x%04lx", (long)p));
       // black hole it 
       SET_INFO(p,&stg_BLACKHOLE_info);
       p = STATIC_LINK2(info,p);
@@ -3494,7 +3512,7 @@ gcCAFs(void)
 
   }
 
-  //  fprintf(stderr, "%d CAFs live\n", i); 
+  //  belch("%d CAFs live", i); 
 }
 #endif
 
@@ -3541,7 +3559,7 @@ threadLazyBlackHole(StgTSO *tso)
       if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
 	  bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-        fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+        belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 	SET_INFO(bh,&stg_BLACKHOLE_info);
       }
@@ -3690,7 +3708,7 @@ threadSqueezeStack(StgTSO *tso)
       StgClosure *updatee_bypass = frame->updatee;
       
 #if DEBUG
-      IF_DEBUG(gc, fprintf(stderr, "@@ squeezing frame at %p\n", frame));
+      IF_DEBUG(gc, belch("@@ squeezing frame at %p", frame));
       squeezes++;
 #endif
 
@@ -3765,7 +3783,7 @@ threadSqueezeStack(StgTSO *tso)
 	    bh->header.info != &stg_BLACKHOLE_BQ_info &&
 	    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-          fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+          belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef DEBUG
 	  /* zero out the slop so that the sanity checker can tell
@@ -3804,10 +3822,10 @@ threadSqueezeStack(StgTSO *tso)
       else
 	next_frame_bottom = tso->sp - 1;
       
-#if DEBUG
+#if 0
       IF_DEBUG(gc,
-	       fprintf(stderr, "sliding [%p, %p] by %ld\n", sp, next_frame_bottom,
-		       displacement))
+	       belch("sliding [%p, %p] by %ld", sp, next_frame_bottom,
+		     displacement))
 #endif
       
       while (sp >= next_frame_bottom) {
@@ -3821,9 +3839,9 @@ threadSqueezeStack(StgTSO *tso)
 
   tso->sp += displacement;
   tso->su = prev_frame;
-#if DEBUG
+#if 0
   IF_DEBUG(gc,
-	   fprintf(stderr, "@@ threadSqueezeStack: squeezed %d update-frames; found %d BHs; found %d update-, %d stop-, %d catch, %d seq-frames\n",
+	   belch("@@ threadSqueezeStack: squeezed %d update-frames; found %d BHs; found %d update-, %d stop-, %d catch, %d seq-frames",
 		   squeezes, bhs, upd_frames, stop_frames, catch_frames, seq_frames))
 #endif
 }
