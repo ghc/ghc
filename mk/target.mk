@@ -350,8 +350,12 @@ C_SRCS += $(wildcard ../*_hsc.c)
 SRC_CC_OPTS += -I.. -I.
 endif
 
+ifneq "$(way)" "i"
 LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
 GHCI_LIBRARY = HS$(PACKAGE)$(_cbits)$(_way).o
+else
+LIBRARY      = $(PACKAGE).dll
+endif
 
 ifneq "$(IS_CBITS_LIB)" "YES"
 WAYS=$(GhcLibWays)
@@ -389,11 +393,18 @@ endif # PACKAGE
 ifneq "$(LIBRARY)" ""
 all :: $(LIBRARY)
 
+ifneq "$(way)" "i"
 define BUILD_LIB
 $(RM) $@
 $(AR) $(AR_OPTS) $@ $(STUBOBJS) $(LIBOBJS)
 $(RANLIB) $@
 endef
+else
+define BUILD_LIB
+$(RM) $@
+al -out:$@ $(STUBOBJS) $(LIBOBJS)
+endef
+endif
 
 #
 # For Haskell object files, we might have chosen to split
