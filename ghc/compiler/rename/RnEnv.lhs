@@ -79,10 +79,14 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	--	 the parser reads the special syntax and returns an Exact RdrName
    	-- We are at a binding site for the name, so check first that it 
 	-- the current module is the correct one; otherwise GHC can get
-	-- very confused indeed.
+	-- very confused indeed. This test rejects code like
+	--	data T = (,) Int Int
+	-- unless we are in GHC.Tup
     ASSERT2( isExternalName name,  ppr name )
-    ASSERT2( this_mod == nameModule name, ppr name )
-    returnM name
+    do	checkErr (this_mod == nameModule name)
+	         (badOrigBinding rdr_name)
+	returnM name
+
 
   | isOrig rdr_name
   = do	checkErr (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
