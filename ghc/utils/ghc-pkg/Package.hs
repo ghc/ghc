@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Package.hs,v 1.1 2001/03/15 15:51:38 simonmar Exp $
+-- $Id: Package.hs,v 1.2 2001/03/27 14:10:34 simonmar Exp $
 --
 -- Package configuration defn.
 -----------------------------------------------------------------------------
@@ -8,8 +8,10 @@
 module Package ( 
 	PackageConfig(..), defaultPackageConfig
 #ifdef WANT_PRETTY
-	,listPkgs 	-- :: [PackageConfig] -> String
-	,dumpPackages	-- :: [PackageConfig] -> String
+	, listPkgs	 	-- :: [PackageConfig] -> String
+	, dumpPackages		-- :: [PackageConfig] -> String
+	, dumpPkgGuts		-- :: PackageConfig -> Doc
+	, dumpFieldContents	-- :: [String] -> Doc
 #endif
  ) where
 #endif
@@ -83,8 +85,9 @@ dumpPkgGuts pkg =
       ])))
 
 dumpField :: String -> [String] -> Doc
-dumpField name val =
-   hang (text name <+> equals) 2
-        (brackets (sep (punctuate comma (map (text . show) val))))
+dumpField name val = hang (text name <+> equals) 2  (dumpFieldContents val)
+
+dumpFieldContents :: [String] -> Doc
+dumpFieldContents val = brackets (sep (punctuate comma (map (text . show) val)))
 #endif
 

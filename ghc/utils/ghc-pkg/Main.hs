@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.7 2001/03/27 13:38:03 simonmar Exp $
+-- $Id: Main.hs,v 1.8 2001/03/27 14:10:34 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -26,9 +26,10 @@ main = do
 	(_,_,errors) -> die (concat errors ++ 
 			     usageInfo usageHeader flags)
 
-data Flag = Config String | List | Add | Remove String
-isConfig (Config _) = True
-isConfig _ = False
+data Flag = Config String | List | Add | Remove String | Show String | Field String
+isConfigOrField (Config _) = True
+isConfigOrField (Field _) = True
+isConfigOrField _ = False
 
 usageHeader = "ghc-pkg [OPTION...]"
 
@@ -39,6 +40,10 @@ flags = [
  	"List the currently installed packages",
   Option ['a'] ["add-package"] (NoArg Add)
  	"Add a new package",
+  Option ['s'] ["show-package"] (ReqArg Show "NAME")
+ 	"Show the configuration for package NAME",
+  Option [] ["field"] (ReqArg Field "FIELD")
+ 	"(with --show-package) Show field FIELD only",
   Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
  	"Remove an installed package"
   ]
@@ -50,14 +55,30 @@ runit clis = do
         [f] -> return f
         _   -> die (usageInfo usageHeader flags)
 
+  let toField "import_dirs"     = return import_dirs
+      toField "source_dirs"     = return source_dirs
+      toField "library_dirs"    = return library_dirs
+      toField "hs_libraries"    = return hs_libraries
+      toField "extra_libraries" = return extra_libraries
+      toField "include_dirs"    = return include_dirs
+      toField "c_includes"      = return c_includes
+      toField "package_deps"    = return package_deps
+      toField "extra_ghc_opts"  = return extra_ghc_opts
+      toField "extra_cc_opts"   = return extra_cc_opts
+      toField "extra_ld_opts"   = return extra_ld_opts  
+      toField s			= die ("unknown field: `" ++ s ++ "'")
+
+  fields <- mapM toField [ f | Field f <- clis ]
+
   s <- readFile conf_file
   let details = read s :: [PackageConfig]
   eval_catch details (\_ -> die "parse error in package config file")
 
-  case [ c | c <- clis, not (isConfig c) ] of
+  case [ c | c <- clis, not (isConfigOrField c) ] of
     [ List ]     -> listPackages details
     [ Add  ]     -> addPackage details conf_file
     [ Remove p ] -> removePackage details conf_file p
+    [ Show p ]   -> showPackage details conf_file p fields
     _            -> die (usageInfo usageHeader flags)
 
 
@@ -66,6 +87,16 @@ listPackages details = do
   hPutStr stdout (listPkgs details)
   hPutChar stdout '\n'
   exitWith ExitSuccess
+
+showPackage :: [PackageConfig] -> FilePath -> String
+	 -> [PackageConfig->[String]] -> IO ()
+showPackage details pkgconf pkg_name fields =
+  case [ p | p <- details, name p == pkg_name ] of
+    []    -> die ("can't find package `" ++ pkg_name ++ "'")
+    [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
+	  | otherwise   -> hPutStrLn stdout (render (vcat 
+				(map (vcat . map text) (map ($pkg) fields))))
+    _     -> die "showPackage: internal error"
 
 addPackage :: [PackageConfig] -> FilePath -> IO ()
 addPackage details pkgconf = do
