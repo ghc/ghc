@@ -587,10 +587,10 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
   res <- do_select
   -- ToDo: check result
 
-  old <- atomicModifyIORef prodding (\old -> (False,old))
-  if old 
-	then alloca $ \p -> do c_read (fromIntegral wakeup) p 1; return ()
-	else return ()
+  b <- takeMVar prodding
+  if b then alloca $ \p -> do c_read (fromIntegral wakeup) p 1; return ()
+       else return ()
+  putMVar prodding False
 
   reqs' <- completeRequests reqs readfds writefds []
   service_loop wakeup readfds writefds ptimeval reqs' delays'
@@ -599,19 +599,18 @@ stick :: IORef Fd
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef 0)
 
-prodding :: IORef Bool
+prodding :: MVar Bool
 {-# NOINLINE prodding #-}
-prodding = unsafePerformIO (newIORef False)
+prodding = unsafePerformIO (newMVar False)
 
 prodServiceThread :: IO ()
 prodServiceThread = do
-  b <- atomicModifyIORef prodding (\old -> (True,old)) -- compare & swap!
-  if (not b)
-	then do
-	  fd <- readIORef stick
-	  with 42 $ \pbuf -> do c_write (fromIntegral fd) pbuf 1; return ()
-	else
-	  return ()
+  b <- takeMVar prodding
+  if (not b) 
+    then do fd <- readIORef stick
+	    with 42 $ \pbuf -> do c_write (fromIntegral fd) pbuf 1; return ()
+    else return ()
+  putMVar prodding True
 
 -- -----------------------------------------------------------------------------
 -- IO requests
