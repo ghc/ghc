@@ -17,7 +17,6 @@ module ParseUtil (
 	, checkContext		-- HsType -> P HsContext
 	, checkInstType		-- HsType -> P HsType
 	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
-	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns		-- SrcLoc -> [HsExp] -> P [HsPat]
 	, checkDo		-- [Stmt] -> P [Stmt]
@@ -81,7 +80,7 @@ tyConToDataCon tc
   | occNameSpace tc_occ == tcClsName
   = returnP (setRdrNameOcc tc (setOccNameSpace tc_occ dataName))
   | otherwise
-  = parseError (showSDoc (text "not a constructor:" <+> quotes (ppr tc)))
+  = parseError (showSDoc (text "Not a constructor:" <+> quotes (ppr tc)))
   where 
     tc_occ   = rdrNameOcc tc
 
@@ -126,27 +125,29 @@ checkDictTy _ _ = parseError "Malformed context in instance header"
 -- Put more comments!
 -- Checks that the lhs of a datatype declaration
 -- is of the form Context => T a b ... z
-checkDataHeader :: RdrNameHsType 
-	-> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
+checkDataHeader :: String	-- data/newtype/class
+		-> RdrNameHsType 
+		-> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
 
-checkDataHeader (HsForAllTy Nothing cs t) =
-   checkSimple t []	     `thenP` \(c,ts) ->
+checkDataHeader s (HsForAllTy Nothing cs t) =
+   checkSimple s t []	     `thenP` \(c,ts) ->
    returnP (cs,c,map UserTyVar ts)
-checkDataHeader t =
-   checkSimple t []	     `thenP` \(c,ts) ->
+checkDataHeader s t =
+   checkSimple s t []	     `thenP` \(c,ts) ->
    returnP ([],c,map UserTyVar ts)
 
--- Checks the type part of the lhs of a datatype declaration
-checkSimple :: RdrNameHsType -> [RdrName] -> P ((RdrName,[RdrName]))
-checkSimple (HsAppTy l (HsTyVar a)) xs | isRdrTyVar a 
-   = checkSimple l (a:xs)
-checkSimple (HsTyVar tycon) xs | not (isRdrTyVar tycon) = returnP (tycon,xs)
+-- Checks the type part of the lhs of 
+-- a data/newtype/class declaration
+checkSimple :: String -> RdrNameHsType -> [RdrName] -> P ((RdrName,[RdrName]))
+checkSimple s (HsAppTy l (HsTyVar a)) xs | isRdrTyVar a 
+   = checkSimple s l (a:xs)
+checkSimple s (HsTyVar tycon) xs | not (isRdrTyVar tycon) = returnP (tycon,xs)
 
-checkSimple (HsOpTy (HsTyVar t1) tycon (HsTyVar t2)) [] 
+checkSimple s (HsOpTy (HsTyVar t1) tycon (HsTyVar t2)) [] 
   | not (isRdrTyVar tycon) && isRdrTyVar t1 && isRdrTyVar t2
   = returnP (tycon,[t1,t2])
 
-checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration"
+checkSimple s t _ = parseError ("Malformed " ++ s ++ " declaration")
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression
@@ -282,7 +283,7 @@ isFunLhs _ _ 			= Nothing
 
 checkPrec :: Integer -> P ()
 checkPrec i | 0 <= i && i <= 9 = returnP ()
-	    | otherwise        = parseError "precedence out of range"
+	    | otherwise        = parseError "Precedence out of range"
 
 mkRecConstrOrUpdate 
 	:: RdrNameHsExpr 

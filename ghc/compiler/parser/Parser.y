@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.77 2001/11/26 09:20:26 simonpj Exp $
+$Id: Parser.y,v 1.78 2001/11/26 10:30:15 simonpj Exp $
 
 Haskell grammar.
 
@@ -345,17 +345,17 @@ topdecl :: { RdrBinding }
 		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
 
 	| srcloc 'data' ctype constrs deriving
-		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
+		{% checkDataHeader "data" $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
 		      (mkTyData DataType cs c ts (reverse $4) (length $4) $5 $1))) }
 
 	| srcloc 'newtype' ctype '=' newconstr deriving
-		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
+		{% checkDataHeader "newtype" $3 `thenP` \(cs,c,ts) ->
 		   returnP (RdrHsDecl (TyClD
 		      (mkTyData NewType cs c ts [$5] 1 $6 $1))) }
 
 	| srcloc 'class' ctype fds where
-		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
+		{% checkDataHeader "class" $3 `thenP` \(cs,c,ts) ->
 		   let 
 			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig (groupBindings $5) 
 		   in
