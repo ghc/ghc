@@ -553,7 +553,12 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         script.write('GHC.TopHandler.runIO Main.main\n')
     script.close()
 
-    stdin_file = qualify(name, 'stdin')
+    # figure out what to use for stdin
+    if testopts.stdin != '':
+        stdin_file = testopts.stdin
+    else:
+        stdin_file = qualify(name, 'stdin')
+
     if os.path.exists(stdin_file):
         stdin = open(stdin_file, 'r')
         os.system('cat ' + stdin_file + ' >>' + qscriptname)
