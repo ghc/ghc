@@ -30,7 +30,6 @@ module Numeric (
         showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
         showHex,          -- :: Integral a => a -> ShowS
         showOct,          -- :: Integral a => a -> ShowS
-        showBin,          -- :: Integral a => a -> ShowS
 
 	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
@@ -155,23 +154,6 @@ showIntAtBase base toChr n r
     if n' == 0 then r' else showIntAtBase base toChr n' r'
     }
 
-showHex :: Integral a => a -> ShowS
-showHex n r = 
- showString "0x" $
- showIntAtBase 16 (toChrHex) n r
- where  
-  toChrHex d
-    | d < 10    = chr (ord '0' + fromIntegral d)
-    | otherwise = chr (ord 'a' + fromIntegral (d - 10))
-
-showOct :: Integral a => a -> ShowS
-showOct n r = 
- showString "0o" $
- showIntAtBase 8 (toChrOct) n r
- where toChrOct d = chr (ord '0' + fromIntegral d)
-
-showBin :: Integral a => a -> ShowS
-showBin n r = 
- showString "0b" $
- showIntAtBase 2 (toChrOct) n r
- where toChrOct d = chr (ord '0' + fromIntegral d)
+showHex, showOct :: Integral a => a -> ShowS
+showHex = showIntAtBase 16 (intToDigit.fromIntegral)
+showOct = showIntAtBase 8  (intToDigit.fromIntegral)
