@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.25 1999/04/23 13:54:12 simonm Exp $
+ * $Id: PrimOps.h,v 1.26 1999/04/27 12:32:15 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -57,9 +57,6 @@
 #define zszezhzh(r,a,b)	r=(I_)((a)!=(b))
 #define zlzhzh(r,a,b)	r=(I_)((a) <(b))
 #define zlzezhzh(r,a,b)	r=(I_)((a)<=(b))
-
-/*  used by returning comparison primops, defined in Prims.hc. */
-extern DLL_IMPORT_RTS const StgClosure *PrelBase_Bool_closure_tbl[];
 
 /* -----------------------------------------------------------------------------
    Char# PrimOps.
