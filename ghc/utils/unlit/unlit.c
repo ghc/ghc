@@ -349,7 +349,7 @@ char **argv; {
 
     /* Prefix the output with line pragmas */
     if (prefix_str) {
-      fprintf(ostream, "#line 1 \"%s\"\n);{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
+      fprintf(ostream, "#line 1 \"%s\"\n{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
     }
 
     unlit(file, istream, ostream);
