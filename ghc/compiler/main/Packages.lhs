@@ -33,14 +33,16 @@ module Packages (
     )
 where
 
+#include "../includes/ghcconfig.h"
+-- Needed for mingw32_TARGET_OS defn
+
 #include "HsVersions.h"
 
 import PackageConfig	
 import DriverState	( v_Build_tag, v_RTS_Build_tag, v_Static )
 import SysTools		( getTopDir, getPackageConfigPath )
 import ParsePkgConf	( loadPackageConfig )
-import CmdLineOpts	( DynFlags(..), PackageFlag(..), verbosity,
-			  opt_Static )
+import CmdLineOpts	( DynFlags(..), PackageFlag(..), opt_Static )
 import Config		( cTARGETARCH, cTARGETOS, cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import Module		( Module, mkModule )
