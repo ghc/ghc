@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.206 2002/02/01 15:18:18 simonmar Exp $
+# $Id: Makefile,v 1.207 2002/02/06 11:41:01 simonmar Exp $
 
 TOP = ..
 
@@ -122,7 +122,7 @@ ifeq "$(BootingFromHc)" "YES"
 bootstrapped = YES
 compiling_with_4xx=NO
 else
-bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt)); then echo YES; else echo NO; fi)
+bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt) -a $(GhcPatchLevel) -ge $(ProjectPatchLevel)); then echo YES; else echo NO; fi)
 compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES; else echo NO; fi)
 ghc_502_at_least = $(shell if (test $(GhcCanonVersion) -ge 502); then echo YES; else echo NO; fi)
 endif
