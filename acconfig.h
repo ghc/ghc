@@ -364,25 +364,25 @@
 #undef HAVE_ALTZONE
 
 /* Define if you have /bin/sh */
-#define HAVE_BIN_SH 0
+#undef HAVE_BIN_SH
 
 /* Define if you have the GetModuleFileName function.  */
-#define HAVE_GETMODULEFILENAME 0
+#undef HAVE_GETMODULEFILENAME
 
 /* Define if you need -ldl to get dlopen() */
-#define HAVE_LIBDL
+#undef HAVE_LIBDL
 
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
 /* Define if you have dlopen() */
-#define HAVE_DLOPEN
+#undef HAVE_DLOPEN
 
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY
 
 /* Define if compiler supports prototypes. */
-#define HAVE_PROTOTYPES 0
+#undef HAVE_PROTOTYPES
 
 /* Define if readline/readline.h and readline/history.h exist */
 #undef HAVE_READLINE_HEADERS
@@ -397,7 +397,7 @@
 #undef HAVE_WIN32_DLL_SUPPORT
 
 /* Define if you have the WinExec function.  */
-#define HAVE_WINEXEC 0
+#undef HAVE_WINEXEC
 
 /* Define to Haskell type for char */
 #undef HTYPE_CHAR
@@ -513,7 +513,7 @@
 /* Define if signal handlers have type void (*)(int)
  * (Otherwise, they're assumed to have type int (*)(void).)
  */
-#define VOID_INT_SIGNALS 0
+#undef VOID_INT_SIGNALS
  
 
 /* Leave that blank line there!!  Autoheader needs it.
