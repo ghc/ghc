@@ -1,11 +1,13 @@
 /* --------------------------------------------------------------------------
- * $Id: mkDerivedConstants.c,v 1.4 2002/12/11 15:36:40 simonmar Exp $
+ * $Id: mkDerivedConstants.c,v 1.5 2004/03/08 10:31:00 stolz Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
  * Generate a header for the native code generator
  *
  * ------------------------------------------------------------------------*/
+
+#include <stdio.h>
 
 #define IN_STG_CODE 0
 #include "Stg.h"
