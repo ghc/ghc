@@ -11,8 +11,6 @@
  *
  * ------------------------------------------------------------------------*/
 
-#include <stdio.h>
-
 #define IN_STG_CODE 0
 
 // We need offsets of profiled things... better be careful that this
@@ -22,6 +20,8 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Storage.h"
+
+#include <stdio.h>
 
 #define str(a,b) #a "_" #b
 
