@@ -84,6 +84,8 @@ data HsExpr id pat
 
   | HsWith	(HsExpr id pat)	-- implicit parameter binding
   		[(IPName id, HsExpr id pat)]
+		Bool		-- True <=> this was a 'with' binding
+				--  (tmp, until 'with' is removed)
 
   | HsDo	HsDoContext
 		[Stmt id pat]	-- "do":one or more stmts
@@ -304,8 +306,9 @@ ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
-ppr_expr (HsWith expr binds)
-  = hsep [ppr expr, ptext SLIT("with"), pp_ipbinds binds]
+ppr_expr (HsWith expr binds is_with)
+  = sep [hang (ptext SLIT("let")) 2 (pp_ipbinds binds),
+	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
 ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
 ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts

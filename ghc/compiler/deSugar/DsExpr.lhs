@@ -254,7 +254,7 @@ dsExpr (HsLet binds body)
   = dsExpr body		`thenDs` \ body' ->
     dsLet binds body'
 
-dsExpr (HsWith expr binds)
+dsExpr (HsWith expr binds is_with)
   = dsExpr expr		`thenDs` \ expr' ->
     foldlDs dsIPBind expr' binds
     where

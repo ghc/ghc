@@ -604,7 +604,7 @@ tcMonoExpr (PArrSeqIn _) _
 %************************************************************************
 
 \begin{code}
-tcMonoExpr (HsWith expr binds) res_ty
+tcMonoExpr (HsWith expr binds is_with) res_ty
   = tcMonoExpr expr res_ty			`thenTc` \ (expr', expr_lie) ->
     mapAndUnzip3Tc tcIPBind binds		`thenTc` \ (avail_ips, binds', bind_lies) ->
 
@@ -614,7 +614,7 @@ tcMonoExpr (HsWith expr binds) res_ty
     let
 	expr'' = HsLet (mkMonoBind dict_binds [] Recursive) expr'
     in
-    returnTc (HsWith expr'' binds', expr_lie' `plusLIE` plusLIEs bind_lies)
+    returnTc (HsWith expr'' binds' is_with, expr_lie' `plusLIE` plusLIEs bind_lies)
 
 tcIPBind (ip, expr)
   = newTyVarTy openTypeKind		`thenTc` \ ty ->

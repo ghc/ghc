@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.94 2002/03/28 09:59:03 simonmar Exp $
+$Id: Parser.y,v 1.95 2002/04/02 13:56:32 simonmar Exp $
 
 Haskell grammar.
 
@@ -60,6 +60,11 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 	(don't know whether to reduce 'a' as a btype or shift the '->'.
 	 conclusion:  bogus expression anyway, doesn't matter)
 
+1 for ambiguity in '{-# RULES "name" [ ... #-}
+	we don't know whether the '[' starts the activation or not: it
+  	might be the start of the declaration with the activation being
+	empty.  --SDM 1/4/2002
+
 1 for ambiguity in '{-# RULES "name" forall = ... #-}' 
 	since 'forall' is a valid variable name, we don't know whether
 	to treat a forall on the input as the beginning of a quantifier
@@ -68,9 +73,10 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 	This saves explicitly defining a grammar for the rule lhs that
 	doesn't include 'forall'.
 
-1 for ambiguity in 'x @ Rec{..}'.  
-	Only sensible parse is 'x @ (Rec{..})', which is what resolving
-	to shift gives us.
+1 for ambiguity in 'let ?x ...'
+	the parser can't tell whether the ?x is the lhs of a normal binding or
+	an implicit binding.  Fortunately resolving as shift gives it the only
+	sensible meaning, namely the lhs of an implicit binding.
 
 6 for conflicts between `fdecl' and `fdeclDEPRECATED', which are resolved
   correctly, and moreover, should go away when `fdeclDEPRECATED' is removed.
@@ -501,6 +507,11 @@ declbinds :: { RdrNameHsBinds }
 decllist :: { [RdrBinding] }
 	: '{'            decls '}'	{ $2 }
 	|     layout_on  decls close	{ $2 }
+
+letbinds :: { RdrNameHsExpr -> RdrNameHsExpr }
+	: decllist		{ HsLet (cvBinds cvValSig (groupBindings $1)) }
+	| '{'            dbinds '}'	{ \e -> HsWith e $2 False{-not with-} }
+	|     layout_on  dbinds close	{ \e -> HsWith e $2 False{-not with-} }
 
 fixdecl :: { RdrBinding }
 	: srcloc infix prec ops	    	{ foldr1 RdrAndBindings
@@ -938,7 +949,7 @@ gdrh :: { RdrNameGRHS }
 
 exp   :: { RdrNameHsExpr }
 	: infixexp '::' sigtype		{ (ExprWithTySig $1 $3) }
-	| infixexp 'with' dbinding	{ HsWith $1 $3 }
+	| infixexp 'with' dbinding	{ HsWith $1 $3 True{-not a let-} }
 	| infixexp			{ $1 }
 
 infixexp :: { RdrNameHsExpr }
@@ -952,7 +963,7 @@ exp10 :: { RdrNameHsExpr }
 			   returnP (HsLam (Match ps $5 
 					    (GRHSs (unguardedRHS $8 $7) 
 						   EmptyBinds placeHolderType))) }
-  	| 'let' declbinds 'in' exp		{ HsLet $2 $4 }
+  	| 'let' letbinds 'in' exp		{ $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
@@ -990,16 +1001,21 @@ aexps 	:: { [RdrNameHsExpr] }
   	| {- empty -}				{ [] }
 
 aexp	:: { RdrNameHsExpr }
+	: qvar '@' aexp			{ EAsPat $1 $3 }
+	| '~' aexp			{ ELazyPat $2 }
+	| aexp1				{ $1 }
+
+aexp1	:: { RdrNameHsExpr }
         : var_or_con '{|' gentype '|}'          { (HsApp $1 (HsType $3)) }
-  	| aexp '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
+  	| aexp1 '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
 							(reverse $3)) }
-  	| aexp1					{ $1 }
+  	| aexp2					{ $1 }
 
 var_or_con :: { RdrNameHsExpr }
         : qvar                          { HsVar $1 }
         | gcon                          { HsVar $1 }
 
-aexp1	:: { RdrNameHsExpr }
+aexp2	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
 	| var_or_con			{ $1 }
 	| literal			{ HsLit $1 }
@@ -1012,9 +1028,7 @@ aexp1	:: { RdrNameHsExpr }
 	| '[:' parr ':]'                { $2 }
 	| '(' infixexp qop ')'		{ (SectionL $2 (HsVar $3))  }
 	| '(' qopm infixexp ')'		{ (SectionR $2 $3) }
-	| qvar '@' aexp			{ EAsPat $1 $3 }
 	| '_'				{ EWildPat }
-	| '~' aexp1			{ ELazyPat $2 }
 
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
@@ -1176,7 +1190,7 @@ dbinds 	:: { [(IPName RdrName, RdrNameHsExpr)] }
 	: dbinds ';' dbind		{ $3 : $1 }
 	| dbinds ';'			{ $1 }
 	| dbind				{ [$1] }
-	| {- empty -}			{ [] }
+--	| {- empty -}			{ [] }
 
 dbind	:: { (IPName RdrName, RdrNameHsExpr) }
 dbind	: ipvar '=' exp			{ ($1, $3) }

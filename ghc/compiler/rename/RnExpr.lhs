@@ -376,10 +376,11 @@ rnExpr (HsLet binds expr)
     rnExpr expr			 `thenRn` \ (expr',fvExpr) ->
     returnRn (HsLet binds' expr', fvExpr)
 
-rnExpr (HsWith expr binds)
-  = rnExpr expr			`thenRn` \ (expr',fvExpr) ->
+rnExpr (HsWith expr binds is_with)
+  = warnCheckRn (not is_with) withWarning `thenRn_`
+    rnExpr expr			`thenRn` \ (expr',fvExpr) ->
     rnIPBinds binds		`thenRn` \ (binds',fvBinds) ->
-    returnRn (HsWith expr' binds', fvExpr `plusFV` fvBinds)
+    returnRn (HsWith expr' binds' is_with, fvExpr `plusFV` fvBinds)
 
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
@@ -969,4 +970,10 @@ doStmtListErr e
 
 bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> int c <> char '\''
+
+withWarning
+  = sep [quotes (ptext SLIT("with")),
+	 ptext SLIT("is deprecated, use"),
+	 quotes (ptext SLIT("let")),
+	 ptext SLIT("instead")]
 \end{code}

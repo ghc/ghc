@@ -470,11 +470,11 @@ zonkExpr (HsLet binds expr)
     zonkExpr expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsLet new_binds new_expr)
 
-zonkExpr (HsWith expr binds)
+zonkExpr (HsWith expr binds is_with)
   = zonkIPBinds binds				`thenNF_Tc` \ new_binds ->
     tcExtendGlobalValEnv (map (ipNameName . fst) new_binds)	$
     zonkExpr expr				`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsWith new_expr new_binds)
+    returnNF_Tc (HsWith new_expr new_binds is_with)
     where
 	zonkIPBinds = mapNF_Tc zonkIPBind
 	zonkIPBind (n, e)
