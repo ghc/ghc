@@ -1,4 +1,4 @@
-# RPM spec file for GHC
+# RPM spec file for GHC					         -*-rpm-spec-*-
 #
 # Copyright [1998..2002] The GHC Team
 #
@@ -68,6 +68,9 @@ the documentation is available online at
 
 %changelog
 
+* Mon Sep 16 2002 Manuel Chakravarty
+- Use external Haddock installation
+
 * Wed Sep 26 2001 Manuel Chakravarty
 - small changes for 5.04
 
@@ -130,7 +133,7 @@ END
 %build
 ./configure --prefix=%{prefix}
 make boot
-make all ps html
+make HADDOCK_INPLACE=haddock all ps html
  
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -139,6 +142,7 @@ rm -rf $RPM_BUILD_ROOT
 make prefix=$RPM_BUILD_ROOT%{prefix} install-dirs
 
 make prefix=$RPM_BUILD_ROOT%{prefix} install
+
 mkdir -p $RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version}
 cp ghc/ANNOUNCE ghc/README $RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version}
 
