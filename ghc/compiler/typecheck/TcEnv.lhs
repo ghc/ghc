@@ -16,7 +16,7 @@ module TcEnv(
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
 	tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
-	tcLookupGlobal_maybe, tcLookupGlobal,
+	tcLookupGlobal_maybe, tcLookupGlobal, 
 
 	-- Local environment
 	tcExtendKindEnv, 
@@ -27,14 +27,14 @@ module TcEnv(
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	-- Random useful things
-	tcAddImportedIdInfo, tcInstId,
+	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcInstId,
 
 	-- New Ids
 	newLocalId, newSpecPragmaId,
 	newDefaultMethodName, newDFunName,
 
 	-- Misc
-	isLocalThing, tcSetEnv, explicitLookupId
+	isLocalThing, tcSetEnv
   ) where
 
 #include "HsVersions.h"
@@ -44,7 +44,7 @@ import TcMonad
 import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
 			  tcInstTyVars, zonkTcTyVars,
 			)
-import Id		( mkUserLocal, isDataConWrapId_maybe )
+import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import MkId	 	( mkSpecPragmaId )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
@@ -193,13 +193,30 @@ lookup_local env name
 	Nothing    -> case lookup_global env name of
 			Just thing -> Just (AGlobal thing)
 			Nothing	   -> Nothing
-
-explicitLookupId :: TcEnv -> Name -> Maybe Id
-explicitLookupId env name = case lookup_global env name of
-				Just (AnId id) -> Just id
-				other	       -> Nothing
 \end{code}
 
+\begin{code}
+type RecTcEnv = TcEnv
+-- This environment is used for getting the 'right' IdInfo 
+-- on imported things and for looking up Ids in unfoldings
+-- The environment doesn't have any local Ids in it
+
+tcAddImportedIdInfo :: RecTcEnv -> Id -> Id
+tcAddImportedIdInfo env id
+  = id `lazySetIdInfo` new_info
+	-- The Id must be returned without a data dependency on maybe_id
+  where
+    new_info = case tcLookupRecId env (idName id) of
+		  Nothing	   -> vanillaIdInfo
+		  Just imported_id -> idInfo imported_id
+		-- ToDo: could check that types are the same
+
+tcLookupRecId :: RecTcEnv -> Name -> Maybe Id
+tcLookupRecId env name = case lookup_global env name of
+			   Just (AnId id) -> Just id
+			   other	  -> Nothing
+
+\end{code}
 
 %************************************************************************
 %*									*
@@ -225,20 +242,6 @@ tcInstId id
 	(theta', tau') = splitRhoTy rho' 
     in
     returnNF_Tc (tyvars', theta', tau')
-
-tcAddImportedIdInfo :: TcEnv -> Id -> Id
-tcAddImportedIdInfo unf_env id
-  | isLocallyDefined id		-- Don't look up locally defined Ids, because they
-				-- have explicit local definitions, so we get a black hole!
-  = id
-  | otherwise
-  = id `lazySetIdInfo` new_info
-	-- The Id must be returned without a data dependency on maybe_id
-  where
-    new_info = case explicitLookupId unf_env (getName id) of
-		     Nothing	      -> vanillaIdInfo
-		     Just imported_id -> idInfo imported_id
-		-- ToDo: could check that types are the same
 \end{code}
 
 
@@ -275,6 +278,8 @@ newDFunName mod clas (ty:_) loc
   where
 	-- Any string that is somewhat unique will do
     dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
+
+newDFunName mod clas [] loc = pprPanic "newDFunName" (ppr mod <+> ppr clas <+> ppr loc)
 
 newDefaultMethodName :: Name -> SrcLoc -> NF_TcM Name
 newDefaultMethodName op_name loc

@@ -26,7 +26,7 @@ import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
 import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  newDicts, newMethod )
-import TcEnv		( TcId, TcEnv, TyThingDetails(..), tcAddImportedIdInfo,
+import TcEnv		( TcId, TcEnv, RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
@@ -101,7 +101,7 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 :: TcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcClassDecl1 :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcClassDecl1 rec_env
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods
@@ -237,7 +237,7 @@ tcSuperClasses clas context sc_sel_names
     is_tyvar other	 = False
 
 
-tcClassSig :: TcEnv			-- Knot tying only!
+tcClassSig :: RecTcEnv
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> [FunDep TyVar]
@@ -251,7 +251,7 @@ tcClassSig :: TcEnv			-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig rec_env clas clas_tyvars fds dm_info
+tcClassSig unf_env clas clas_tyvars fds dm_info
 	   (ClassOpSig op_name maybe_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
@@ -274,7 +274,7 @@ tcClassSig rec_env clas clas_tyvars fds dm_info
 	dm_info_id = case dm_info_name of 
 			NoDefMeth       -> NoDefMeth
 			GenDefMeth      -> GenDefMeth
-			DefMeth dm_name -> DefMeth (tcAddImportedIdInfo rec_env dm_id)
+			DefMeth dm_name -> DefMeth (tcAddImportedIdInfo unf_env dm_id)
 				        where
 					   dm_id = mkDefaultMethodId dm_name clas global_ty
     in

@@ -27,7 +27,7 @@ import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
 			  tcEnvTyCons, tcEnvClasses,  isLocalThing,
-			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
+			  RecTcEnv, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -41,13 +41,12 @@ import CoreUnfold	( unfoldingTemplate )
 import Type		( funResultTy, splitForAllTys )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
-import Id		( idType, idName, idUnfolding )
+import Id		( idType, idUnfolding )
 import Module           ( Module )
-import Name		( Name, nameOccName, isLocallyDefined, isGlobalName,
+import Name		( Name, isLocallyDefined, 
 			  toRdrName, nameEnvElts, lookupNameEnv, 
 			)
 import TyCon		( tyConGenInfo, isClassTyCon )
-import OccName		( isSysOcc )
 import Maybes		( thenMaybe )
 import Util
 import BasicTypes       ( EP(..), Fixity )
@@ -104,7 +103,7 @@ typecheckModule dflags this_mod pcs hst hit decls
            else 
              return Nothing 
   where
-    tc_module :: TcM (TcEnv, TcResults)
+    tc_module :: TcM (RecTcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
     pit = pcs_PIT pcs
@@ -121,10 +120,10 @@ tcModule :: PersistentCompilerState
 	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
-	 -> TcEnv		-- The knot-tied environment
+	 -> RecTcEnv		-- The knot-tied environment
 	 -> TcM (TcEnv, TcResults)
 
-  -- (unf_env :: TcEnv) is used for type-checking interface pragmas
+  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
   -- which is done lazily [ie failure just drops the pragma
   -- without having any global-failure effect].
   -- 
@@ -147,8 +146,8 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     tcSetInstEnv inst_env			$
     
         -- Default declarations
-    tcDefaults decls			`thenTc` \ defaulting_tys ->
-    tcSetDefaultTys defaulting_tys 	$
+    tcDefaults decls				`thenTc` \ defaulting_tys ->
+    tcSetDefaultTys defaulting_tys 		$
     
     -- Interface type signatures
     -- We tie a knot so that the Ids read out of interfaces are in scope
@@ -161,6 +160,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     -- imported
     tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
     tcExtendGlobalValEnv sig_ids		$
+    tcGetEnv					`thenTc` \ unf_env ->
     
     -- Create any necessary record selector Ids and their bindings
     -- "Necessary" includes data and newtype declarations
@@ -246,7 +246,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 			  pcs_rules = new_pcs_rules
 		    }
     in  
-    returnTc (final_env,
+    returnTc (unf_env,
 	      TcResults { tc_pcs     = final_pcs,
 			  tc_env     = local_type_env,
 			  tc_binds   = all_binds', 

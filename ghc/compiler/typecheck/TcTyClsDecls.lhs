@@ -21,7 +21,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
-import TcEnv		( TcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
+import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
 			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv )
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
@@ -61,7 +61,7 @@ import CmdLineOpts	( DynFlags )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls :: TcEnv		-- Knot tying stuff
+tcTyAndClassDecls :: RecTcEnv		-- Knot tying stuff
 		  -> [RenamedHsDecl]
 		  -> TcM TcEnv
 
@@ -75,7 +75,7 @@ tcGroups unf_env []
 
 tcGroups unf_env (group:groups)
   = tcGroup unf_env group	`thenTc` \ env ->
-    tcSetEnv env			$
+    tcSetEnv env		$
     tcGroups unf_env groups
 \end{code}
 
@@ -111,7 +111,7 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: TcEnv -> SCC RenamedTyClDecl -> TcM TcEnv
+tcGroup :: RecTcEnv -> SCC RenamedTyClDecl -> TcM TcEnv
 tcGroup unf_env scc
   = getDOptsTc							`thenTc` \ dflags ->
 	-- Step 1
