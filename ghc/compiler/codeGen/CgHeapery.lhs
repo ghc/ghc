@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.22 2000/07/14 08:14:53 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.23 2000/07/26 14:48:16 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -32,6 +32,7 @@ import ClosureInfo	( closureSize, closureGoodStuffSize,
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Unique )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
+import Constants	( bLOCK_SIZE_W )
 import GlaExts
 import Outputable
 
@@ -74,6 +75,8 @@ fastEntryChecks regs tags ret node_points code
      let stk_words = spHw - sp in
      initHeapUsage				 (\ hp_words  ->
 
+     let hHw = if hp_words > bLOCK_SIZE_W then hpChkTooBig else hp_words in
+
      getTickyCtrLabel `thenFC` \ ticky_ctr ->
 
      ( if all_pointers then -- heap checks are quite easy
@@ -81,7 +84,7 @@ fastEntryChecks regs tags ret node_points code
           --(if node `elem` regs
           --   then yield regs True
           --   else absC AbsCNop ) `thenC`
-	  absC (checking_code stk_words hp_words tag_assts 
+	  absC (checking_code stk_words hHw tag_assts 
 			free_reg (length regs) ticky_ctr)
 
        else -- they are complicated
@@ -103,7 +106,7 @@ fastEntryChecks regs tags ret node_points code
 
 	  let adjust_sp = CAssign (CReg Sp) (CAddr (spRel sp new_sp)) in
 
-	  absC (checking_code real_stk_words hp_words 
+	  absC (checking_code real_stk_words hHw 
 	            (mkAbstractCs [tag_assts, stk_assts, more_tag_assts,
 				   adjust_sp])
 	            (CReg node) 0 ticky_ctr)
@@ -251,7 +254,9 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
   = mkTagAssts tags `thenFC` \tag_assts1 ->
     let tag_assts = mkAbstractCs [fail_code, tag_assts1]
     in
-    initHeapUsage (\ hHw -> do_heap_chk hHw tag_assts `thenC` code)
+    initHeapUsage (\ hHw -> 
+	do_heap_chk (if hHw > bLOCK_SIZE_W then hpChkTooBig else hHw) tag_assts 
+		`thenC` code)
   where
     do_heap_chk words_required tag_assts
       = getTickyCtrLabel `thenFC` \ ctr ->
@@ -309,7 +314,9 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 -- normal algebraic and primitive case alternatives:
 
 altHeapCheck is_fun regs [] AbsCNop Nothing code
-  = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
+  = initHeapUsage (\ hHw -> 
+	do_heap_chk (if hHw > bLOCK_SIZE_W then hpChkTooBig else hHw) 
+		`thenC` code)
 		      
   where
     do_heap_chk :: HeapOffset -> Code
@@ -434,6 +441,10 @@ yield regs node_reqd =
      yield_code = 
        absC (CMacroStmt GRAN_YIELD 
                           [mkIntCLit (IBOX(word2Int# liveness_mask))])
+\end{code}
+
+\begin{code}
+hpChkTooBig = panic "Oversize heap check detected.  Please try compiling with -O."
 \end{code}
 
 %************************************************************************
