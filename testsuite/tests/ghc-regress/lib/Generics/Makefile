@@ -23,7 +23,7 @@ ghci:
 	gmake TEST_HC=${stage2} WAY=ghci
 
 # Should probably be reused from somewhere else
-myclean:
+clean:
 	find . -depth -name "core"       -exec rm -rf \{\} \;
 	find . -depth -name "Main"       -exec rm -rf \{\} \;
 	find . -depth -name "*~"         -exec rm -rf \{\} \;
