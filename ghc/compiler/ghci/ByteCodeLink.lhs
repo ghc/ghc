@@ -13,11 +13,12 @@ module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 import Outputable
 import Name		( Name, getName, nameModule, toRdrName )
 import RdrName		( rdrNameOcc, rdrNameModule )
-import OccName		( occNameString )
+import OccName		( occNameString, occNameUserString )
 import FiniteMap	( FiniteMap, addListToFM, filterFM,
 			  addToFM, lookupFM, emptyFM )
 import CoreSyn
 import Literal		( Literal(..) )
+import PrimOp		( PrimOp, primOpOcc )
 import PrimRep		( PrimRep(..) )
 import Util		( global )
 import Constants	( wORD_SIZE )
@@ -25,7 +26,7 @@ import Module		( ModuleName, moduleName, moduleNameFS )
 import Linker		( lookupSymbol )
 import FastString	( FastString(..) )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..) )
-import ByteCodeItbls	( ItblEnv )
+import ByteCodeItbls	( ItblEnv, ItblPtr )
 
 
 import Monad		( foldM )
@@ -36,10 +37,9 @@ import MArray		( castSTUArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Word16, Ptr(..) )
-import Addr		( Word )
+import Addr 		( Word, Addr )
 
 import PrelBase		( Int(..) )
-import PrelAddr		( Addr(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 import IOExts		( IORef, fixIO, readIORef, writeIORef )
@@ -77,10 +77,10 @@ linkSomeBCOs ie ce_in ul_bcos
 
 data UnlinkedBCO
    = UnlinkedBCO Name
-                 (SizedSeq Word16)	-- insns
-                 (SizedSeq Word)	-- literals
-                 (SizedSeq Name)	-- ptrs
-                 (SizedSeq Name)	-- itbl refs
+                 (SizedSeq Word16)		 -- insns
+                 (SizedSeq Word)		 -- literals
+                 (SizedSeq (Either Name PrimOp)) -- ptrs
+                 (SizedSeq Name)		 -- itbl refs
 
 nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _) = nm
 
@@ -146,7 +146,7 @@ assembleBCO (ProtoBCO nm instrs origin)
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
          lits  <- return emptySS :: IO (SizedSeq Word)
-         ptrs  <- return emptySS :: IO (SizedSeq Name)
+         ptrs  <- return emptySS :: IO (SizedSeq (Either Name PrimOp))
          itbls <- return emptySS :: IO (SizedSeq Name)
          let init_asm_state = (insns,lits,ptrs,itbls)
          (final_insns, final_lits, final_ptrs, final_itbls) 
@@ -155,7 +155,8 @@ assembleBCO (ProtoBCO nm instrs origin)
          return (UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls)
 
 -- instrs nonptrs ptrs itbls
-type AsmState = (SizedSeq Word16, SizedSeq Word, SizedSeq Name, SizedSeq Name)
+type AsmState = (SizedSeq Word16, SizedSeq Word, 
+                 SizedSeq (Either Name PrimOp), SizedSeq Name)
 
 data SizedSeq a = SizedSeq !Int [a]
 emptySS = SizedSeq 0 []
@@ -184,7 +185,7 @@ mkBits findLabel st proto_insns
                PUSH_LLL  o1 o2 o3 -> instr4 st i_PUSH_LLL o1 o2 o3
                PUSH_G    nm       -> do (p, st2) <- ptr st nm
                                         instr2 st2 i_PUSH_G p
-               PUSH_AS   nm pk    -> do (p, st2)  <- ptr st nm
+               PUSH_AS   nm pk    -> do (p, st2)  <- ptr st (Left nm)
                                         (np, st3) <- ctoi_itbl st2 pk
                                         instr3 st3 i_PUSH_AS p np
                PUSH_UBX  lit nws  -> do (np, st2) <- literal st lit
@@ -279,9 +280,9 @@ mkBits findLabel st proto_insns
           = addr st ret_itbl_addr
             where
                ret_itbl_addr = case pk of
-                                  PtrRep    -> stg_ctoi_ret_R1_info
-                                  IntRep    -> stg_ctoi_ret_R1_info
-                                  CharRep   -> stg_ctoi_ret_R1_info
+                                  PtrRep    -> stg_ctoi_ret_R1p_info
+                                  IntRep    -> stg_ctoi_ret_R1n_info
+                                  CharRep   -> stg_ctoi_ret_R1n_info
                                   FloatRep  -> stg_ctoi_ret_F1_info
                                   DoubleRep -> stg_ctoi_ret_D1_info
                                   _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
@@ -294,9 +295,10 @@ mkBits findLabel st proto_insns
                                   FloatRep  -> stg_gc_f1_info
                                   DoubleRep -> stg_gc_d1_info
                      
-foreign label "stg_ctoi_ret_R1_info" stg_ctoi_ret_R1_info :: Addr
-foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
-foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
+foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Addr
+foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Addr
+foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Addr
+foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Addr
 
 foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
 foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
@@ -432,7 +434,7 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
             ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
 
             itbls_arr = array (0, n_itbls-1) (indexify linked_itbls)
-                        :: UArray Int Addr
+                        :: UArray Int ItblPtr
             itbls_barr = case itbls_arr of UArray lo hi barr -> barr
 
             insns_arr | n_insns > 65535
@@ -452,9 +454,9 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
 
         BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
 
-        return (unsafeCoerce# bco#)
-        --case mkApUpd0# (unsafeCoerce# bco#) of
-        --   (# final_bco #) -> return final_bco
+        -- WAS: return (unsafeCoerce# bco#)
+        case mkApUpd0# (unsafeCoerce# bco#) of
+           (# final_bco #) -> return final_bco
 
 
 data BCO = BCO BCO#
@@ -464,22 +466,29 @@ newBCO a b c d
    = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
 
 
-lookupCE :: ClosureEnv -> Name -> IO HValue
-lookupCE ce nm 
+lookupCE :: ClosureEnv -> Either Name PrimOp -> IO HValue
+lookupCE ce (Right primop)
+   = do m <- lookupSymbol (primopToCLabel primop "closure")
+        case m of
+           Just (Ptr addr) -> case addrToHValue# addr of
+                                 (# hval #) -> do addCAF hval
+                                                  return hval
+           Nothing -> pprPanic "ByteCodeGen.lookupCE(primop)" (ppr primop)
+lookupCE ce (Left nm)
    = case lookupFM ce nm of
         Just aa -> return aa
         Nothing 
            -> do m <- lookupSymbol (nameToCLabel nm "closure")
                  case m of
-                    Just (A# addr) -> case addrToHValue# addr of
-                                         (# hval #) -> do addCAF hval
-                                                          return hval
+                    Just (Ptr addr) -> case addrToHValue# addr of
+                                          (# hval #) -> do addCAF hval
+                                                           return hval
                     Nothing        -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
 
-lookupIE :: ItblEnv -> Name -> IO Addr
+lookupIE :: ItblEnv -> Name -> IO (Ptr a)
 lookupIE ie con_nm 
    = case lookupFM ie con_nm of
-        Just (Ptr a) -> return a
+        Just (Ptr a) -> return (Ptr a)
         Nothing
            -> do -- try looking up in the object files.
                  m <- lookupSymbol (nameToCLabel con_nm "con_info")
@@ -492,12 +501,18 @@ lookupIE ie con_nm
                                 Just addr -> return addr
                                 Nothing -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
 
--- HACK!!!  ToDo: cleaner
+-- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
 nameToCLabel n suffix
    = _UNPK_(moduleNameFS (rdrNameModule rn)) 
      ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
      where rn = toRdrName n
+
+primopToCLabel :: PrimOp -> String{-suffix-} -> String
+primopToCLabel primop suffix
+   = let str = "PrelPrimopWrappers_" ++ occNameString (primOpOcc primop) ++ '_':suffix
+     in trace ("primopToCLabel: " ++ str)
+        str
 
 \end{code}
 

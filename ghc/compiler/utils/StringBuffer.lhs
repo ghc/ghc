@@ -199,9 +199,9 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
 stringToStringBuffer :: String -> IO StringBuffer
 stringToStringBuffer str =
   do let sz@(I# sz#) = length str + 1
-     (Ptr a@(A# a#)) <- mallocBytes sz
-     fill_in str a
-     writeCharOffAddr a (sz-1) '\0'		-- sentinel
+     (Ptr a#) <- mallocBytes sz
+     fill_in str (A# a#)
+     writeCharOffAddr (A# a#) (sz-1) '\0'		-- sentinel
      return (StringBuffer a# sz# 0# 0#)
  where
   fill_in [] _ = return ()
@@ -210,7 +210,7 @@ stringToStringBuffer str =
     fill_in cs (a `plusAddr` 1)
 
 freeStringBuffer :: StringBuffer -> IO ()
-freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr (A# a#))
+freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr a#)
 #endif
 \end{code}
 

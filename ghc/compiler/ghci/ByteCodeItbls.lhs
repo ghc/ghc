@@ -4,7 +4,7 @@
 \section[ByteCodeItbls]{Generate infotables for interpreter-made bytecodes}
 
 \begin{code}
-module ByteCodeItbls ( ItblEnv, mkITbls ) where
+module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
 
 #include "HsVersions.h"
 
@@ -18,12 +18,11 @@ import ClosureInfo	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 
 import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
-			  malloc, castPtr, plusPtr )
+			  malloc, castPtr, plusPtr, Addr )
 import Addr		( addrToInt )
 import Bits		( Bits(..), shiftR )
 
 import PrelBase		( Int(..) )
-import PrelAddr		( Addr(..) )
 import PrelIOBase	( IO(..) )
 
 \end{code}
@@ -36,13 +35,9 @@ import PrelIOBase	( IO(..) )
 
 \begin{code}
 
-type ItblEnv = FiniteMap Name (Ptr StgInfoTable)
-
-#if __GLASGOW_HASKELL__ <= 408
-type ItblPtr = Addr
-#else
 type ItblPtr = Ptr StgInfoTable
-#endif
+type ItblEnv = FiniteMap Name ItblPtr
+
 
 -- Make info tables for the data decls in this module
 mkITbls :: [TyCon] -> IO ItblEnv

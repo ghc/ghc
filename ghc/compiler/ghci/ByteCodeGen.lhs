@@ -14,7 +14,8 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 
 import Outputable
 import Name		( Name, getName, mkSysLocalName )
-import Id		( Id, idType, isDataConId_maybe, mkVanillaId )
+import Id		( Id, idType, isDataConId_maybe, mkVanillaId,
+			  isPrimOpId_maybe )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM,
@@ -23,6 +24,7 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
+import PrimOp		( PrimOp(..)  )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, dataConWrapId )
@@ -44,11 +46,10 @@ import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 
 import List		( intersperse, sortBy )
 import Foreign		( Ptr(..), mallocBytes )
-import Addr		( addrToInt, writeCharOffAddr )
+import Addr		( Addr(..), addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
 
 import PrelBase		( Int(..) )
-import PrelAddr		( Addr(..) )
 import PrelGHC		( ByteArray# )
 import IOExts		( unsafePerformIO )
 import PrelIOBase	( IO(..) )
@@ -297,7 +298,7 @@ schemeE d s p (fvs, AnnLet binds b)
 
          -- ToDo: don't build thunks for things with no free variables
          buildThunk dd ([], size, id, off)
-            = PUSH_G (getName id) 
+            = PUSH_G (Left (getName id))
               `consOL` unitOL (MKAP (off+size-1) size)
          buildThunk dd ((fv:fvs), size, id, off)
             = case pushAtom True dd p' (AnnVar fv) of
@@ -408,7 +409,7 @@ schemeT d s p app
 
    -- Handle case 1
    | is_con_call && null args_r_to_l
-   = (PUSH_G (getName con) `consOL` mkSLIDE 1 (d-s))
+   = (PUSH_G (Left (getName con)) `consOL` mkSLIDE 1 (d-s))
      `snocOL` ENTER
 
    -- Cases 2 and 3
@@ -570,7 +571,13 @@ mkUnpackCode vars d p
 -- 6 stack has valid words 0 .. 5.
 
 pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
-pushAtom tagged d p (AnnVar v) 
+pushAtom tagged d p (AnnVar v)
+   | Just primop <- isPrimOpId_maybe v
+   = case primop of
+        CCallOp _ -> panic "pushAtom: byte code generator can't handle CCalls"
+        other     -> (unitOL (PUSH_G (Right primop)), 1)
+
+   | otherwise
    = let str = "\npushAtom " ++ showSDocDebug (ppr v) 
                ++ " :: " ++ showSDocDebug (pprType (idType v))
                ++ ", depth = " ++ show d
@@ -586,7 +593,7 @@ pushAtom tagged d p (AnnVar v)
          result
             = case lookupBCEnv_maybe p v of
                  Just d_v -> (toOL (nOfThem nwords (PUSH_L (d-d_v+sz_t-2))), nwords)
-                 Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G nm), nwords)
+                 Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G (Left nm)), nwords)
 
          nm = case isDataConId_maybe v of
                  Just c  -> getName c
@@ -629,10 +636,10 @@ pushAtom False d p (AnnLit lit)
                             let n = I# l
                             -- CAREFUL!  Chars are 32 bits in ghc 4.09+
                             in  unsafePerformIO (
-                                   do a@(Ptr addr) <- mallocBytes (n+1)
-                                      strncpy a ba (fromIntegral n)
-                                      writeCharOffAddr addr n '\0'
-                                      return addr
+                                   do (Ptr a#) <- mallocBytes (n+1)
+                                      strncpy (Ptr a#) ba (fromIntegral n)
+                                      writeCharOffAddr (A# a#) n '\0'
+                                      return (A# a#)
                                    )
                          _ -> panic "StgInterp.lit2expr: unhandled string constant type"
 

@@ -8,11 +8,11 @@
 module Linker ( 
    loadObj,      -- :: String -> IO ()
    unloadObj,    -- :: String -> IO ()
-   lookupSymbol, -- :: String -> IO (Maybe Addr)
+   lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
    resolveObjs,  -- :: IO ()
   )  where
 
-import Addr
+import Foreign		( Ptr, nullPtr )
 import PrelByteArr
 import PrelPack 	(packString)
 import Panic		( panic )
@@ -23,7 +23,7 @@ import Panic		( panic )
 
 lookupSymbol str = do
    addr <- c_lookupSymbol (packString str)
-   if addr == nullAddr
+   if addr == nullPtr
 	then return Nothing
 	else return (Just addr)
 
@@ -49,7 +49,7 @@ resolveObjs = do
 type PackedString = ByteArray Int
 
 foreign import "lookupSymbol" unsafe
-   c_lookupSymbol :: PackedString -> IO Addr
+   c_lookupSymbol :: PackedString -> IO (Ptr a)
 
 foreign import "loadObj" unsafe
    c_loadObj :: PackedString -> IO Int

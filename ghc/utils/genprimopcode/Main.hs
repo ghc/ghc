@@ -75,8 +75,8 @@ main = getArgs >>= \args ->
                       "--primop-list" 
                          -> putStr (gen_primop_list p_o_specs)
 
-                      "--c-bytecode-enum" 
-                         -> putStr (gen_enum_decl p_o_specs)
+                      "--make-haskell-wrappers" 
+                         -> putStr (gen_wrappers p_o_specs)
 
                    )
 
@@ -93,13 +93,36 @@ known_args
        "--primop-primop-info",
        "--primop-tag",
        "--primop-list",
-
-       "--c-bytecode-enum"
+       "--make-haskell-wrappers"
      ]
 
 ------------------------------------------------------------------
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
+
+gen_wrappers (Info defaults pos)
+   = "module PrelPrimopWrappers where\n" 
+     ++ "import qualified PrelGHC\n" 
+     ++ unlines (map f (filter (not.dodgy) pos))
+     where
+        f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
+                     src_name = wrap (name spec)
+                 in "{-# NOINLINE " ++ src_name ++ " #-}\n" ++ 
+                    src_name ++ " " ++ unwords args 
+                     ++ " = (PrelGHC." ++ name spec ++ ") " ++ unwords args
+        wrap nm | isLower (head nm) = nm
+                | otherwise = "(" ++ nm ++ ")"
+
+        dodgy spec
+           = name spec `elem` 
+             [-- C code generator can't handle these
+              "seq#", 
+              "tagToEnum#",
+              -- not interested in parallel support
+              "par#", "parGlobal#", "parLocal#", "parAt#", 
+              "parAtAbs#", "parAtRel#", "parAtForNow#" 
+             ]
+
 
 gen_primop_list (Info defaults pos)
    = unlines (
@@ -115,11 +138,6 @@ gen_primop_tag (Info defaults pos)
      where
         f i n = "tagOf_PrimOp " ++ cons i 
                 ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
-
-gen_enum_decl (Info defaults pos)
-   = let conss = map cons pos
-     in  "enum PrimOp {\n     " ++ head conss ++ "\n"
-         ++ unlines (map ("     , "++) (tail conss)) ++ "};\n"
 
 gen_data_decl (Info defaults pos)
    = let conss = map cons pos
@@ -255,6 +273,8 @@ tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyApp tc tys) = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
+
+arity = length . fst . flatTys
 
 
 ------------------------------------------------------------------

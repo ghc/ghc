@@ -17,6 +17,7 @@ import Literal		( Literal )
 import PrimRep		( PrimRep )
 import DataCon		( DataCon )
 import VarSet		( VarSet )
+import PrimOp		( PrimOp )
 
 \end{code}
 
@@ -47,7 +48,7 @@ data BCInstr
    | PUSH_LL   Int Int{-2 offsets-}
    | PUSH_LLL  Int Int Int{-3 offsets-}
    -- Push a ptr
-   | PUSH_G    Name
+   | PUSH_G    (Either Name PrimOp)
    -- Push an alt continuation
    | PUSH_AS   Name PrimRep	-- push alts and BCO_ptr_ret_info
 				-- PrimRep so we know which itbl
@@ -96,7 +97,9 @@ instance Outputable BCInstr where
    ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
    ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
-   ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
+   ppr (PUSH_G (Left nm))    = text "PUSH_G  " <+> ppr nm
+   ppr (PUSH_G (Right op))   = text "PUSH_G  " <+> text "PrelPrimopWrappers." 
+                                               <> ppr op
    ppr (PUSH_AS nm pk)       = text "PUSH_AS " <+> ppr nm <+> ppr pk
    ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (int nw) <+> ppr lit
    ppr (PUSH_TAG n)          = text "PUSH_TAG" <+> int n

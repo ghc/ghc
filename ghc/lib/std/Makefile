@@ -66,10 +66,16 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 #-----------------------------------------------------------------------------
 # 	Rules
 
+PrelPrimopWrappers.hs: ../../compiler/prelude/primops.txt
+	rm -f PrelPrimopWrappers.hs
+	../../utils/genprimopcode/genprimopcode  --make-haskell-wrappers \
+		< ../../compiler/prelude/primops.txt > PrelPrimopWrappers.hs
+
 PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 	cp $< $@
 
-boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+boot :: PrelPrimopWrappers.hs PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+all :: PrelPrimopWrappers.hs
 
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 
@@ -83,7 +89,7 @@ ifeq "$(DLLized)" "YES"
 all :: PrelMain.dll_o
 endif
 
-CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+CLEAN_FILES += PrelPrimopWrappers.hs PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 #
 # If we're building the unregisterised way, it may well be for Hugs.
