@@ -44,7 +44,8 @@ dsListComp :: [TypecheckedStmt]
 	   -> DsM CoreExpr
 
 dsListComp quals elt_ty
-  | not opt_FoldrBuildOn 		 -- Be boring
+  |  not opt_FoldrBuildOn 		 -- Be boring
+  || isParallelComp quals
   = deListComp quals (mkNilExpr elt_ty)
 
   | otherwise				 -- foldr/build lives!
@@ -58,6 +59,9 @@ dsListComp quals elt_ty
     dsLookupGlobalValue buildName	`thenDs` \ build_id ->
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
+
+  where isParallelComp (ParStmtOut bndrstmtss : _) = True
+	isParallelComp _                           = False
 \end{code}
 
 %************************************************************************
