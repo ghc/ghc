@@ -488,17 +488,9 @@ rnField doc (names, ty)
     rnBangTy doc ty		`thenRn` \ new_ty ->
     returnRn (new_names, new_ty) 
 
-rnBangTy doc (Banged ty)
+rnBangTy doc (BangType s ty)
   = rnHsType doc ty		`thenRn` \ new_ty ->
-    returnRn (Banged new_ty)
-
-rnBangTy doc (Unbanged ty)
-  = rnHsType doc ty 		`thenRn` \ new_ty ->
-    returnRn (Unbanged new_ty)
-
-rnBangTy doc (Unpacked ty)
-  = rnHsType doc ty 		`thenRn` \ new_ty ->
-    returnRn (Unpacked new_ty)
+    returnRn (BangType s new_ty)
 
 -- This data decl will parse OK
 --	data T = a Int

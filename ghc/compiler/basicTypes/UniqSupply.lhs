@@ -66,7 +66,7 @@ mkSplitUniqSupply :: Char -> IO UniqSupply
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 uniqFromSupply  :: UniqSupply -> Unique
-uniqsFromSupply :: Int -> UniqSupply -> [Unique]
+uniqsFromSupply :: UniqSupply -> [Unique]	-- Infinite
 \end{code}
 
 \begin{code}
@@ -94,13 +94,8 @@ splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
 
 \begin{code}
-uniqFromSupply (MkSplitUniqSupply (I# n) _ _) = mkUniqueGrimily n
-
-uniqsFromSupply (I# i) supply = i `get_from` supply
-  where
-    get_from 0# _ = []
-    get_from n (MkSplitUniqSupply (I# u) _ s2)
-      = mkUniqueGrimily u : get_from (n -# 1#) s2
+uniqFromSupply  (MkSplitUniqSupply (I# n) _ _)  = mkUniqueGrimily n
+uniqsFromSupply (MkSplitUniqSupply (I# n) _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 \end{code}
 
 %************************************************************************
@@ -157,9 +152,9 @@ getUniqueUs :: UniqSM Unique
 getUniqueUs us = case splitUniqSupply us of
 		   (us1,us2) -> (uniqFromSupply us1, us2)
 
-getUniquesUs :: Int -> UniqSM [Unique]
-getUniquesUs n us = case splitUniqSupply us of
-		      (us1,us2) -> (uniqsFromSupply n us1, us2)
+getUniquesUs :: UniqSM [Unique]
+getUniquesUs us = case splitUniqSupply us of
+		      (us1,us2) -> (uniqsFromSupply us1, us2)
 \end{code}
 
 \begin{code}

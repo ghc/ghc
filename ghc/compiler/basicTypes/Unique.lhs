@@ -41,7 +41,7 @@ module Unique (
 	mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 	mkPreludeTyConUnique, mkPreludeClassUnique,
 
-	getNumBuiltinUniques, getBuiltinUniques, mkBuiltinUnique,
+	mkBuiltinUnique,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
     ) where
 
@@ -330,15 +330,5 @@ mkBuiltinUnique i = mkUnique 'B' i
 mkPseudoUnique1 i = mkUnique 'C' i -- used for getUnique on Regs
 mkPseudoUnique2 i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
 mkPseudoUnique3 i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
-
-
-
-getBuiltinUniques :: Int -> [Unique]
-getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
-
-getNumBuiltinUniques :: Int        -- First unique
-                     -> Int        -- Number required
-                     -> [Unique]
-getNumBuiltinUniques base n = map (mkUnique 'B') [base .. base+n-1]
 \end{code}
 

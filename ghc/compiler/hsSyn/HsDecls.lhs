@@ -12,7 +12,7 @@ module HsDecls (
 	DefaultDecl(..), ForeignDecl(..), ForKind(..),
 	ExtName(..), isDynamicExtName, extNameStatic,
 	ConDecl(..), ConDetails(..), 
-	BangType(..), getBangType,
+	BangType(..), getBangType, getBangStrictness, unbangedType,
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames, tyClDeclSysNames,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
@@ -32,6 +32,7 @@ import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 			)
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( NewOrData(..) )
+import Demand		( StrictnessMark(..) )
 import CallConv		( CallConv, pprCallConv )
 
 -- others:
@@ -556,19 +557,14 @@ eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
 \end{code}
   
 \begin{code}
-data BangType name
-  = Banged   (HsType name)	-- HsType: to allow Haskell extensions
-  | Unbanged (HsType name)	-- (MonoType only needed for straight Haskell)
-  | Unpacked (HsType name)	-- Field is strict and to be unpacked if poss.
+data BangType name = BangType StrictnessMark (HsType name)
 
-getBangType (Banged ty)   = ty
-getBangType (Unbanged ty) = ty
-getBangType (Unpacked ty) = ty
+getBangType       (BangType _ ty) = ty
+getBangStrictness (BangType s _)  = s
 
-eq_btype env (Banged t1)   (Banged t2)   = eq_hsType env t1 t2
-eq_btype env (Unbanged t1) (Unbanged t2) = eq_hsType env t1 t2
-eq_btype env (Unpacked t1) (Unpacked t2) = eq_hsType env t1 t2
-eq_btype env _		   _		 = False
+unbangedType ty = BangType NotMarkedStrict ty
+
+eq_btype env (BangType s1 t1) (BangType s2 t2) = s1==s2 && eq_hsType env t1 t2
 \end{code}
 
 \begin{code}
@@ -592,9 +588,7 @@ ppr_con_details con (RecCon fields)
 instance Outputable name => Outputable (BangType name) where
     ppr = ppr_bang
 
-ppr_bang (Banged   ty) = ptext SLIT("!") <> pprParendHsType ty
-ppr_bang (Unbanged ty) = pprParendHsType ty
-ppr_bang (Unpacked ty) = ptext SLIT("! !") <> pprParendHsType ty
+ppr_bang (BangType s ty) = ppr s <> pprParendHsType ty
 \end{code}
 
 

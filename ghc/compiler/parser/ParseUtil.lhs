@@ -42,7 +42,7 @@ import CallConv
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import FastString	( unpackFS )
-import UniqFM		( UniqFM, listToUFM, lookupUFM )
+import UniqFM		( UniqFM, listToUFM )
 import Outputable
 
 -----------------------------------------------------------------------------
@@ -68,7 +68,7 @@ mkVanillaCon :: RdrNameHsType -> [RdrNameBangType] -> P (RdrName, RdrNameConDeta
 mkVanillaCon ty tys
  = split ty tys
  where
-   split (HsAppTy t u)  ts = split t (Unbanged u : ts)
+   split (HsAppTy t u)  ts = split t (unbangedType u : ts)
    split (HsTyVar tc)   ts = tyConToDataCon tc	`thenP` \ data_con ->
 			     returnP (data_con, VanillaCon ts)
    split _		 _ = parseError "Illegal data/newtype declaration"

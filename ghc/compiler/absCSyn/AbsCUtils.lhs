@@ -289,8 +289,8 @@ mapAndUnzipFlt f (x:xs)
 getUniqFlt :: FlatM Unique
 getUniqFlt us = uniqFromSupply us
 
-getUniqsFlt :: Int -> FlatM [Unique]
-getUniqsFlt i us = uniqsFromSupply i us
+getUniqsFlt :: FlatM [Unique]
+getUniqsFlt us = uniqsFromSupply us
 \end{code}
 
 %************************************************************************
@@ -474,7 +474,7 @@ doSimultaneously1 vertices
 	    returnFlt (CAssign the_temp src, CAssign dest the_temp)
 
 	go_via_temps (COpStmt dests op srcs vol_regs)
-	  = getUniqsFlt (length dests)	`thenFlt` \ uniqs ->
+	  = getUniqsFlt			`thenFlt` \ uniqs ->
 	    let
 		the_temps = zipWith (\ u d -> CTemp u (getAmodeRep d)) uniqs dests
 	    in

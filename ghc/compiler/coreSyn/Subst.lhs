@@ -665,14 +665,14 @@ subst_clone_id rec_subst subst@(Subst in_scope env) (old_id, uniq)
 
 substAndCloneIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 substAndCloneIds subst us ids
-  = mapAccumL (subst_clone_id subst) subst (ids `zip` uniqsFromSupply (length ids) us)
+  = mapAccumL (subst_clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
 substAndCloneRecIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 substAndCloneRecIds subst us ids
   = (subst', ids')
   where
     (subst', ids') = mapAccumL (subst_clone_id subst') subst
-			       (ids `zip` uniqsFromSupply (length ids) us)
+			       (ids `zip` uniqsFromSupply us)
 
 substAndCloneId :: Subst -> UniqSupply -> Id -> (Subst, Id)
 substAndCloneId subst@(Subst in_scope env) us old_id

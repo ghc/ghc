@@ -17,7 +17,7 @@ module MkId (
 	mkDictSelId,
 
 	mkDataConId, mkDataConWrapId,
-	mkRecordSelId,
+	mkRecordSelId, rebuildConArgs,
 	mkPrimOpId, mkCCallOpId,
 
 	-- And some particular Ids; see below for why they are wired in
@@ -59,16 +59,17 @@ import PrimOp		( PrimOp(DataToTagOp, CCallOp),
 			  primOpSig, mkPrimOpIdName,
 			  CCall, pprCCallOp
 			)
-import Demand		( wwStrict, wwPrim, mkStrictnessInfo )
-import DataCon		( DataCon, StrictnessMark(..), 
+import Demand		( wwStrict, wwPrim, mkStrictnessInfo, 
+			  StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
+import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, dataConRepStrictness, 
 			  dataConInstOrigArgTys,
                           dataConName, dataConTheta,
 			  dataConSig, dataConStrictMarks, dataConId,
-			  maybeMarkedUnboxed, splitProductType_maybe
+			  splitProductType
 			)
-import Id		( idType, mkGlobalId, mkVanillaGlobal,
+import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idCprInfo
 			)
@@ -83,6 +84,7 @@ import FieldLabel	( mkFieldLabel, fieldLabelName,
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
 			)
 import CoreSyn
+import Unique		( mkBuiltinUnique )
 import Maybes
 import PrelNames
 import Maybe            ( isJust )
@@ -239,7 +241,7 @@ mkDataConWrapId data_con
 	       mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $
 	       Note (Coerce result_ty (head orig_arg_tys)) (Var id_arg1)
 
-	     | null dict_args && all not_marked_strict strict_marks
+	     | null dict_args && not (any isMarkedStrict strict_marks)
 	     = Var work_id	-- The common case.  Not only is this efficient,
 				-- but it also ensures that the wrapper is replaced
 				-- by the worker even when there are no args.
@@ -286,15 +288,12 @@ mkDataConWrapId data_con
     (id_arg1:_)   = id_args		-- Used for newtype only
 
     strict_marks  = dataConStrictMarks data_con
-    not_marked_strict NotMarkedStrict = True
-    not_marked_strict other	      = False
-
 
     mk_case 
-	   :: (Id, StrictnessMark)	-- arg, strictness
-	   -> (Int -> [Id] -> CoreExpr) -- body
-	   -> Int			-- next rep arg id
-	   -> [Id]			-- rep args so far
+	   :: (Id, StrictnessMark)	-- Arg, strictness
+	   -> (Int -> [Id] -> CoreExpr) -- Body
+	   -> Int			-- Next rep arg id
+	   -> [Id]			-- Rep args so far, reversed
 	   -> CoreExpr
     mk_case (arg,strict) body i rep_args
   	  = case strict of
@@ -304,11 +303,12 @@ mkDataConWrapId data_con
 		   | otherwise ->
 			Case (Var arg) arg [(DEFAULT,[], body i (arg:rep_args))]
 
-		MarkedUnboxed con tys ->
+		MarkedUnboxed ->
 		   Case (Var arg) arg [(DataAlt con, con_args,
-					body i' (reverse con_args++rep_args))]
+					body i' (reverse con_args ++ rep_args))]
 		   where 
-			(con_args,i') = mkLocals i tys
+			(con_args, i')   = mkLocals i tys
+			(_, _, con, tys) = splitProductType "mk_case" (idType arg)
 \end{code}
 
 
@@ -451,12 +451,12 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (DataAlt data_con, real_args, expr)
+		Just the_arg_id -> Just (DataAlt data_con, real_args, mkLets binds body)
 		  where
-	    	    body 	      = mkVarApps (mkVarApps (Var the_arg_id) field_tyvars) field_dict_ids
-	    	    strict_marks      = dataConStrictMarks data_con
-	    	    (expr, real_args) = rebuildConArgs data_con arg_ids strict_marks body
-						       unpack_base
+	    	    body 	       = mkVarApps (mkVarApps (Var the_arg_id) field_tyvars) field_dict_ids
+	    	    strict_marks       = dataConStrictMarks data_con
+	    	    (binds, real_args) = rebuildConArgs arg_ids strict_marks
+						        (map mkBuiltinUnique [unpack_base..])
 	where
             arg_ids = mkTemplateLocalsNum field_base (dataConInstOrigArgTys data_con tyvar_tys)
 
@@ -480,41 +480,42 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 
 
--- this rather ugly function converts the unpacked data con arguments back into
--- their packed form.  It is almost the same as the version in DsUtils, except that
--- we use template locals here rather than newDsId (ToDo: merge these).
+-- This rather ugly function converts the unpacked data con 
+-- arguments back into their packed form.
 
 rebuildConArgs
-  :: DataCon				-- the con we're matching on
-  -> [Id]				-- the source-level args
-  -> [StrictnessMark]			-- the strictness annotations (per-arg)
-  -> CoreExpr				-- the body
-  -> Int				-- template local
-  -> (CoreExpr, [Id])
+  :: [Id]			-- Source-level args
+  -> [StrictnessMark]		-- Strictness annotations (per-arg)
+  -> [Unique]			-- Uniques for the new Ids
+  -> ([CoreBind], [Id])		-- A binding for each source-level arg, plus
+				-- a list of the representation-level arguments 
+-- e.g.   data T = MkT Int !Int
+--
+-- rebuild [x::Int, y::Int] [Not, Unbox]
+--  = ([ y = I# t ], [x,t])
 
-rebuildConArgs con [] stricts body i = (body, [])
-rebuildConArgs con (arg:args) stricts body i | isTyVar arg
-  = let (body', args') = rebuildConArgs con args stricts body i
-    in  (body',arg:args')
-rebuildConArgs con (arg:args) (str:stricts) body i
-  = case maybeMarkedUnboxed str of
-	Just (pack_con1, _) -> 
-	    case splitProductType_maybe (idType arg) of
-		Just (_, tycon_args, pack_con, con_arg_tys) ->
-		    ASSERT( pack_con == pack_con1 )
-		    let unpacked_args = zipWith mkTemplateLocal [i..] con_arg_tys
-			(body', real_args) = rebuildConArgs con args stricts body 
-						(i + length con_arg_tys)
-		    in
-		    (
-			 Let (NonRec arg (mkConApp pack_con 
-				   	          (map Type tycon_args ++
-				        	   map Var  unpacked_args))) body', 
-			 unpacked_args ++ real_args
-		    )
+rebuildConArgs []	  stricts us = ([], [])
 
-	_ -> let (body', args') = rebuildConArgs con args stricts body i
-	     in  (body', arg:args')
+-- Type variable case
+rebuildConArgs (arg:args) stricts us 
+  | isTyVar arg
+  = let (binds, args') = rebuildConArgs args stricts us
+    in  (binds, arg:args')
+
+-- Term variable case
+rebuildConArgs (arg:args) (str:stricts) us
+  | isMarkedUnboxed str
+  = let
+	(_, tycon_args, pack_con, con_arg_tys) = splitProductType "rebuildConArgs" (idType arg)
+	unpacked_args  = zipWith (mkSysLocal SLIT("rb")) us con_arg_tys
+	(binds, args') = rebuildConArgs args stricts (drop (length con_arg_tys) us)
+	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var  unpacked_args)
+    in
+    (NonRec arg con_app : binds, unpacked_args ++ args')
+
+  | otherwise
+  = let (binds, args') = rebuildConArgs args stricts us
+    in  (binds, arg:args')
 \end{code}
 
 

@@ -111,14 +111,14 @@ pp_context NoMatchContext msg rest_of_msg_fun
   = dontAddErrLoc (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
 
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
-  = addWarnLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
+  = addWarnLocHdrLine loc 
+	(ptext SLIT("Pattern match(es)") <+> msg)
+	(sep [ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)])
   where
     (ppr_match, pref)
 	= case kind of
 	     FunRhs fun -> (pprMatchContext kind,		    \ pp -> ppr fun <+> pp)
 	     other	-> (pprMatchContext kind <+> ppr_pats pats, \ pp -> pp)
-          
-    message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
 
 ppr_pats pats = sep (map ppr pats)
 

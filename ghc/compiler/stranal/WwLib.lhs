@@ -308,7 +308,7 @@ mkWWargs fun_ty arity demands res_bot one_shots
 	-- build lots of wrapper args:
 	--	  \x. let v=E in \y. bottom
 	--	= \xy. let v=E in bottom
-  = getUniquesUs n_args		`thenUs` \ wrap_uniqs ->
+  = getUniquesUs 		`thenUs` \ wrap_uniqs ->
     let
       val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
@@ -421,7 +421,7 @@ mk_ww_str (arg : ds)
 
 	-- Unpack case
       WwUnpack new_or_data True cs ->
-	getUniquesUs (length inst_con_arg_tys)		`thenUs` \ uniqs ->
+	getUniquesUs 		`thenUs` \ uniqs ->
 	let
 	  unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
 	  unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs
@@ -481,7 +481,7 @@ mkWWcpr body_ty ReturnsCPR
 
     | n_con_args == 1 && isUnLiftedType con_arg_ty1
 	-- Special case when there is a single result of unlifted type
-    = getUniquesUs 2			`thenUs` \ [work_uniq, arg_uniq] ->
+    = getUniquesUs 			`thenUs` \ (work_uniq : arg_uniq : _) ->
       let
 	work_wild = mk_ww_local work_uniq body_ty
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
@@ -491,7 +491,7 @@ mkWWcpr body_ty ReturnsCPR
 		con_arg_ty1)
 
     | otherwise		-- The general case
-    = getUniquesUs (n_con_args + 2)  	`thenUs` \ uniqs ->
+    = getUniquesUs 	  	`thenUs` \ uniqs ->
       let
         (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
 	arg_vars		       = map Var args

@@ -17,6 +17,8 @@ module Demand(
 	noStrictnessInfo,
 	ppStrictnessInfo, seqStrictnessInfo,
 	isBottomingStrictness, appIsBottom,
+
+	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict
      ) where
 
 #include "HsVersions.h"
@@ -206,4 +208,36 @@ appIsBottom  NoStrictnessInfo	      n	= False
 ppStrictnessInfo NoStrictnessInfo		   = empty
 ppStrictnessInfo (StrictnessInfo wrapper_args bot) = hsep [pprDemands wrapper_args bot]
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Strictness indication}
+%*									*
+%************************************************************************
+
+The strictness annotations on types in data type declarations
+e.g. 	data T = MkT !Int !(Bool,Bool)
+
+\begin{code}
+data StrictnessMark
+   = MarkedUserStrict	-- "!"  in a source decl
+   | MarkedStrict	-- "!"  in an interface decl: strict but not unboxed
+   | MarkedUnboxed	-- "!!" in an interface decl: unboxed 
+   | NotMarkedStrict	-- No annotation at all
+   deriving( Eq )
+
+isMarkedUnboxed MarkedUnboxed = True
+isMarkedUnboxed other	      = False
+
+isMarkedStrict NotMarkedStrict = False
+isMarkedStrict other	       = True	-- All others are strict
+
+instance Outputable StrictnessMark where
+  ppr MarkedUserStrict = ptext SLIT("!u")
+  ppr MarkedStrict     = ptext SLIT("!")
+  ppr MarkedUnboxed    = ptext SLIT("! !")
+  ppr NotMarkedStrict  = empty
+\end{code}
+
 

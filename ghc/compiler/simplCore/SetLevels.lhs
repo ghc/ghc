@@ -716,7 +716,7 @@ mapLvl		= mapUs
 
 \begin{code}
 newPolyBndrs dest_lvl env abs_vars bndrs
-  = getUniquesUs (length bndrs)		`thenLvl` \ uniqs ->
+  = getUniquesUs 		`thenLvl` \ uniqs ->
     let
 	new_bndrs = zipWith mk_poly_bndr bndrs uniqs
     in

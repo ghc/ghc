@@ -11,7 +11,7 @@ module TcTyDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
-			  getBangType, conDetailsTys
+			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import BasicTypes	( NewOrData(..), RecFlag, isRec )
@@ -25,9 +25,7 @@ import TcEnv		( tcExtendTyVarEnv,
 			)
 import TcMonad
 
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels,  markedStrict, 
-		 	  notMarkedStrict, markedUnboxed, dataConRepType
-			)
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConRepType )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( TyVar )
@@ -183,10 +181,6 @@ thinContext arg_tys ctxt
       arg_tyvars = tyVarsOfTypes arg_tys
       in_arg_tys pred = not $ isEmptyVarSet $ 
 			tyVarsOfPred pred `intersectVarSet` arg_tyvars
-
-getBangStrictness (Banged   _) = markedStrict
-getBangStrictness (Unbanged _) = notMarkedStrict
-getBangStrictness (Unpacked _) = markedUnboxed
 \end{code}
 
 

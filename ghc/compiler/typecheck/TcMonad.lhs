@@ -544,11 +544,11 @@ tcGetUnique down env
   where
     u_var = getUniqSupplyVar down
 
-tcGetUniques :: Int -> NF_TcM [Unique]
-tcGetUniques n down env
+tcGetUniques :: NF_TcM [Unique]
+tcGetUniques down env
   = do	uniq_supply <- readIORef u_var
 	let (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
-	    uniqs		      = uniqsFromSupply n uniq_s
+	    uniqs		      = uniqsFromSupply uniq_s
 	writeIORef u_var new_uniq_supply
 	return uniqs
   where

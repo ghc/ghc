@@ -12,7 +12,6 @@ import {-# SOURCE #-} RnHiFiles
 
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
-import RnHsSyn		( RenamedTyClDecl )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv
 			)
@@ -39,11 +38,10 @@ import Module		( ModuleName, moduleName, mkVanillaModule,
 import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
 			  derivingOccurrences,
 			  mAIN_Name, pREL_MAIN_Name, 
-			  ioTyConName, integerTyConName, doubleTyConName, intTyConName, 
+			  ioTyConName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
-			  hasKey, fractionalClassKey, numClassKey,
 			  bindIOName, returnIOName, failIOName
 			)
 import TysWiredIn	( unitTyCon )	-- A little odd
@@ -458,9 +456,8 @@ newLocalsRn :: [(RdrName,SrcLoc)]
 newLocalsRn rdr_names_w_loc
  =  getNameSupplyRn		`thenRn` \ name_supply ->
     let
-	n	   = length rdr_names_w_loc
 	(us', us1) = splitUniqSupply (nsUniqs name_supply)
-	uniqs	   = uniqsFromSupply n us1
+	uniqs	   = uniqsFromSupply us1
 	names	   = [ mkLocalName uniq (rdrNameOcc rdr_name) loc
 		     | ((rdr_name,loc), uniq) <- rdr_names_w_loc `zip` uniqs
 		     ]

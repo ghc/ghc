@@ -508,10 +508,10 @@ mkHiPath hi_boot_file locn
 	if b then returnRn hi_boot_ver_path
 	     else returnRn hi_boot_path
   | otherwise    = returnRn hi_path
-	where (Just hi_path)    = ml_hi_file locn
-	      (hi_base, hi_suf) = splitFilename hi_path
-    	      hi_boot_path      = hi_base ++ ".hi-boot"
-    	      hi_boot_ver_path  = hi_base ++ ".hi-boot-" ++ cHscIfaceFileVersion
+	where (Just hi_path)     = ml_hi_file locn
+	      (hi_base, _hi_suf) = splitFilename hi_path
+    	      hi_boot_path       = hi_base ++ ".hi-boot"
+    	      hi_boot_ver_path   = hi_base ++ ".hi-boot-" ++ cHscIfaceFileVersion
 \end{code}
 
 @readIface@ tries just the one file.

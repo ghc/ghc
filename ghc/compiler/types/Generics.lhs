@@ -340,13 +340,6 @@ mk_sum_stuff i tyvars datacons
 	where
 	  datacon_app = mkTyApps (Var (dataConWrapId datacon)) rep_tys
 
-
--- This constructs the c_of datatype from a DataCon and a Type
--- The identity function at the moment.
-cOfConstr :: DataCon -> Type -> Type
-cOfConstr y z = z
-
-
 ----------------------------------------------------
 --	Dealing with products
 ----------------------------------------------------

@@ -103,7 +103,8 @@ import Name		( Name, nameRdrName, nameUnique, nameOccName,
 			  nameModule, mkWiredInName )
 import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import RdrName		( rdrNameOcc )
-import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
+import DataCon		( DataCon, mkDataCon, dataConId )
+import Demand		( StrictnessMark(..) )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
 			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyCon

@@ -42,6 +42,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			  NewOrData(..), Version, initialVersion, Boxity(..)
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
+import Demand		( StrictnessMark(..) )
 import CallConv         ( cCallConv )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
 import IdInfo           ( InlinePragInfo(..) )
@@ -477,9 +478,9 @@ constr		:  src_loc ex_stuff qdata_name batypes		{ mk_con_decl $3 $2 (VanillaCon 
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Not allowed to be empty -} }
-newtype_constr	: src_loc '=' ex_stuff qdata_name atype	{ [mk_con_decl $4 $3 (VanillaCon [Unbanged $5]) $1] }
+newtype_constr	: src_loc '=' ex_stuff qdata_name atype	{ [mk_con_decl $4 $3 (VanillaCon [unbangedType $5]) $1] }
 		| src_loc '=' ex_stuff qdata_name '{' qvar_name '::' atype '}'
-							{ [mk_con_decl $4 $3 (RecCon [([$6], Unbanged $8)]) $1] }
+							{ [mk_con_decl $4 $3 (RecCon [([$6], unbangedType $8)]) $1] }
 
 ex_stuff :: { ([HsTyVarBndr RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }
@@ -490,18 +491,18 @@ batypes		:  					{ [] }
 		|  batype batypes			{ $1 : $2 }
 
 batype		:: { RdrNameBangType }
-batype		:  tatype				{ Unbanged $1 }
-		|  '!' tatype				{ Banged   $2 }
-		|  '!' '!' tatype			{ Unpacked $3 }
+batype		:  tatype				{ unbangedType $1 }
+		|  '!' tatype				{ BangType MarkedStrict    $2 }
+		|  '!' '!' tatype			{ BangType MarkedUnboxed   $3 }
 
 fields1		:: { [([RdrName], RdrNameBangType)] }
 fields1		: field					{ [$1] }
 		| field ',' fields1			{ $1 : $3 }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  qvar_names1 '::' ttype		{ ($1, Unbanged $3) }
-		|  qvar_names1 '::' '!' ttype    	{ ($1, Banged   $4) }
-		|  qvar_names1 '::' '!' '!' ttype	{ ($1, Unpacked $5) }
+field		:  qvar_names1 '::' ttype		{ ($1, unbangedType $3) }
+		|  qvar_names1 '::' '!' ttype    	{ ($1, BangType MarkedStrict    $4) }
+		|  qvar_names1 '::' '!' '!' ttype	{ ($1, BangType MarkedUnboxed   $5) }
 
 --------------------------------------------------------------------------
 

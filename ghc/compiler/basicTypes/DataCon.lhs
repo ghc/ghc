@@ -18,9 +18,6 @@ module DataCon (
 	isExistentialDataCon, classDataCon,
 
 	splitProductType_maybe, splitProductType,
-
-	StrictnessMark(..), 	-- Representation visible to MkId only
-	markedStrict, notMarkedStrict, markedUnboxed, maybeMarkedUnboxed
     ) where
 
 #include "HsVersions.h"
@@ -40,14 +37,14 @@ import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity )
-import Demand		( Demand, wwStrict, wwLazy )
+import Demand		( Demand, StrictnessMark(..), wwStrict, wwLazy )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import PprType		()	-- Instances
-import Maybes		( maybeToBool )
 import Maybe
 import ListSetOps	( assoc )
+import Util		( zipEqual, zipWithEqual )
 \end{code}
 
 
@@ -118,18 +115,16 @@ data DataCon
 	dcRepArgTys :: [Type],		-- Final, representation argument types, after unboxing and flattening,
 					-- and including existential dictionaries
 
+	dcRepStrictness :: [Demand],	-- One for each representation argument	
+
 	dcTyCon  :: TyCon,		-- Result tycon
 
 	-- Now the strictness annotations and field labels of the constructor
-	dcUserStricts :: [StrictnessMark],
-		-- Strictness annotations, as placed on the data type defn,
-		-- in the same order as the argument types;
-		-- length = dataConSourceArity dataCon
-
-	dcRealStricts :: [StrictnessMark],
-		-- Strictness annotations as deduced by the compiler.  May
-		-- include some MarkedUnboxed fields that are merely MarkedStrict
-		-- in dcUserStricts.  Also includes the existential dictionaries.
+	dcStrictMarks :: [StrictnessMark],
+		-- Strictness annotations as deduced by the compiler.  
+		-- Has no MarkedUserStrict; they have been changed to MarkedStrict
+		-- or MarkedUnboxed by the compiler.
+		-- *Includes the existential dictionaries*
 		-- length = length dcExTheta + dataConSourceArity dataCon
 
 	dcFields  :: [FieldLabel],
@@ -170,26 +165,6 @@ Here
 but the rep type is
 	Trep :: Int# -> a -> T a
 Actually, the unboxed part isn't implemented yet!
-
-
-%************************************************************************
-%*									*
-\subsection{Strictness indication}
-%*									*
-%************************************************************************
-
-\begin{code}
-data StrictnessMark = MarkedStrict
-		    | MarkedUnboxed DataCon [Type]
-		    | NotMarkedStrict
-
-markedStrict    = MarkedStrict
-notMarkedStrict = NotMarkedStrict
-markedUnboxed   = MarkedUnboxed (panic "markedUnboxed1") (panic "markedUnboxed2")
-
-maybeMarkedUnboxed (MarkedUnboxed dc tys) = Just (dc,tys)
-maybeMarkedUnboxed other		  = Nothing
-\end{code}
 
 
 %************************************************************************
@@ -254,18 +229,23 @@ mkDataCon name arg_stricts fields
 		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
-		  dcRealStricts = all_stricts, dcUserStricts = user_stricts,
+		  dcStrictMarks = real_stricts, dcRepStrictness = rep_arg_demands,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
 		  dcId = work_id, dcWrapId = wrap_id}
 
-    (real_arg_stricts, strict_arg_tyss)
-	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
-    rep_arg_tys = mkPredTys ex_theta ++ concat strict_arg_tyss
-	
-    ex_dict_stricts = map mk_dict_strict_mark ex_theta
-	-- Add a strictness flag for the existential dictionary arguments
-    all_stricts     = ex_dict_stricts ++ real_arg_stricts
-    user_stricts    = ex_dict_stricts ++ arg_stricts
+	-- Strictness marks for source-args
+	--	*after unboxing choices*, 
+	-- but  *including existential dictionaries*
+    real_stricts = (map mk_dict_strict_mark ex_theta) ++
+		   zipWithEqual "mkDataCon1" (chooseBoxingStrategy tycon) 
+				orig_arg_tys arg_stricts 
+
+	-- Representation arguments and demands
+    (rep_arg_demands, rep_arg_tys) 
+	= unzip $ concat $ 
+	  zipWithEqual "mkDataCon2" unbox_strict_arg_ty 
+		       real_stricts 
+		       (mkPredTys ex_theta ++ orig_arg_tys)
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys (tyvars ++ ex_tyvars)
@@ -304,7 +284,7 @@ dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
-dataConStrictMarks = dcRealStricts
+dataConStrictMarks = dcStrictMarks
 
 -- Number of type-instantiation arguments
 -- All the remaining arguments of the DataCon are (notionally)
@@ -326,13 +306,7 @@ isNullaryDataCon con  = dataConRepArity con == 0
 dataConRepStrictness :: DataCon -> [Demand]
 	-- Give the demands on the arguments of a
 	-- Core constructor application (Con dc args)
-dataConRepStrictness dc
-  = go (dcRealStricts dc)
-  where
-    go []			  = []
-    go (MarkedStrict        : ss) = wwStrict : go ss
-    go (NotMarkedStrict     : ss) = wwLazy   : go ss
-    go (MarkedUnboxed con _ : ss) = go (dcRealStricts con ++ ss)
+dataConRepStrictness dc = dcRepStrictness dc
 
 dataConSig :: DataCon -> ([TyVar], ThetaType,
 			  [TyVar], ThetaType,
@@ -449,23 +423,36 @@ splitProductType str ty
 -- some without, the compiler doesn't get confused about the constructor
 -- representations.
 
-unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type])
-
-unbox_strict_arg_ty tycon strict_mark ty
-  | case strict_mark of
-	NotMarkedStrict   -> False
-	MarkedUnboxed _ _ -> True				-- !! From interface file
-	MarkedStrict      -> opt_UnboxStrictFields &&		-- !  From source
-			     maybeToBool maybe_product &&
-			     not (isRecursiveTyCon tycon) &&
-			     isDataTyCon arg_tycon
-	-- We can't look through newtypes in arguments (yet)
-  = (MarkedUnboxed con arg_tys, arg_tys)
-
-  | otherwise
-  = (strict_mark, [ty])
-
+chooseBoxingStrategy :: TyCon -> Type -> StrictnessMark -> StrictnessMark
+	-- Transforms any MarkedUserStricts into MarkUnboxed or MarkedStrict
+chooseBoxingStrategy tycon arg_ty strict
+  = case strict of
+	MarkedUserStrict | unbox arg_ty -> MarkedUnboxed
+			 | otherwise    -> MarkedStrict
+	other			  	-> strict
   where
-    maybe_product = splitProductType_maybe ty
-    Just (arg_tycon, _, con, arg_tys) = maybe_product
+    unbox ty = opt_UnboxStrictFields &&
+	       case splitTyConApp_maybe ty of
+		  Just (arg_tycon, _) -> not (isRecursiveTyCon arg_tycon) && 
+					 isProductTyCon arg_tycon && 
+					 isDataTyCon arg_tycon
+		  Nothing	      -> False
+	-- Recursion: check whether the *argument* type constructor is
+	-- recursive.  Checking the *parent* tycon is over-conservative
+	--
+	-- We can't look through newtypes in arguments (yet); hence isDataTyCon
+
+
+unbox_strict_arg_ty 
+	:: StrictnessMark	-- After strategy choice; can't be MkaredUserStrict
+	-> Type			-- Source argument type
+	-> [(Demand,Type)]	-- Representation argument types and demamds
+	
+unbox_strict_arg_ty NotMarkedStrict ty = [(wwLazy,   ty)]
+unbox_strict_arg_ty MarkedStrict    ty = [(wwStrict, ty)]
+unbox_strict_arg_ty MarkedUnboxed   ty 
+  = zipEqual "unbox_strict_arg_ty" (dataConRepStrictness arg_data_con) arg_tys
+  where
+    (_, _, arg_data_con, arg_tys) = splitProductType "unbox_strict_arg_ty" ty
+
 \end{code}

@@ -74,7 +74,7 @@ import TysWiredIn ( isIntTy,
 		    isIntegerTy
 		  ) 
 import PrelNames( fromIntegerName, fromRationalName )
-import Util	( thenCmp, zipWithEqual )
+import Util	( thenCmp )
 import Bag
 import Outputable
 \end{code}
@@ -310,8 +310,8 @@ newDictsAtLoc :: InstLoc
  	      -> TcThetaType
 	      -> NF_TcM [Inst]
 newDictsAtLoc inst_loc@(_,loc,_) theta
-  = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
-    returnNF_Tc (zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta)
+  = tcGetUniques 			`thenNF_Tc` \ new_uniqs ->
+    returnNF_Tc (zipWith mk_dict new_uniqs theta)
   where
     mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)) pred inst_loc
 

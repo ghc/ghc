@@ -36,11 +36,12 @@ import TcType		( TcType, TcTauType,
 			  tcInstTyVars, tcInstType, 
 			  newTyVarTy, newTyVarTys, zonkTcType )
 
-import FieldLabel	( fieldLabelName, fieldLabelType, fieldLabelTyCon )
+import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( dataConFieldLabels, dataConSig, 
-			  dataConStrictMarks, StrictnessMark(..)
+			  dataConStrictMarks
 			)
+import Demand		( isMarkedStrict )
 import Name		( Name )
 import Type		( mkFunTy, mkAppTy, mkTyConTy,
 			  splitFunTy_maybe, splitFunTys,
@@ -62,7 +63,7 @@ import PrelNames	( cCallableClassName,
 			  thenMName, failMName, returnMName, ioTyConName
 			)
 import Outputable
-import Maybes		( maybeToBool, mapMaybe )
+import Maybes		( maybeToBool )
 import ListSetOps	( minusList )
 import Util
 import CmdLineOpts
@@ -400,14 +401,11 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     tcRecordBinds tycon ty_args rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
     
     let
-      missing_s_fields = missingStrictFields rbinds data_con
+      (missing_s_fields, missing_fields) = missingFields rbinds data_con
     in
     checkTcM (null missing_s_fields)
 	(mapNF_Tc (addErrTc . missingStrictFieldCon con_name) missing_s_fields `thenNF_Tc_`
 	 returnNF_Tc ())  `thenNF_Tc_`
-    let
-      missing_fields = missingFields rbinds data_con
-    in
     doptsTc Opt_WarnMissingFields `thenNF_Tc` \ warn ->
     checkTcM (not (warn && not (null missing_fields)))
 	(mapNF_Tc ((warnTc True) . missingFieldCon con_name) missing_fields `thenNF_Tc_`
@@ -868,35 +866,32 @@ badFields rbinds data_con
   where
     field_names = map fieldLabelName (dataConFieldLabels data_con)
 
-missingStrictFields rbinds data_con
-  = [ fn | fn <- strict_field_names,
-  		 not (fn `elem` field_names_used)
-    ]
-  where
-    field_names_used = [ field_name | (field_name, _, _) <- rbinds ]
-    strict_field_names = mapMaybe isStrict field_info
-
-    isStrict (fl, MarkedStrict) = Just (fieldLabelName fl)
-    isStrict _			= Nothing
-
-    field_info = zip (dataConFieldLabels data_con)
-    		     (dataConStrictMarks data_con)
-
 missingFields rbinds data_con
-  = [ fn | fn <- non_strict_field_names, not (fn `elem` field_names_used) ]
+  | null field_labels = ([], [])	-- Not declared as a record;
+					-- But C{} is still valid
+  | otherwise	
+  = (missing_strict_fields, other_missing_fields)
   where
+    missing_strict_fields
+	= [ fl | (fl, str) <- field_info,
+	  	 isMarkedStrict str,
+	  	 not (fieldLabelName fl `elem` field_names_used)
+	  ]
+    other_missing_fields
+	= [ fl | (fl, str) <- field_info,
+	  	 not (isMarkedStrict str),
+	  	 not (fieldLabelName fl `elem` field_names_used)
+	  ]
+
     field_names_used = [ field_name | (field_name, _, _) <- rbinds ]
+    field_labels     = dataConFieldLabels data_con
 
-     -- missing strict fields have already been flagged as 
-     -- being so, so leave them out here.
-    non_strict_field_names = mapMaybe isn'tStrict field_info
-
-    isn'tStrict (fl, MarkedStrict) = Nothing
-    isn'tStrict (fl, _)            = Just (fieldLabelName fl)
-
-    field_info = zip (dataConFieldLabels data_con)
-    		     (dataConStrictMarks data_con)
-
+    field_info = zipEqual "missingFields"
+			  field_labels
+	  		  (drop (length ex_theta) (dataConStrictMarks data_con))
+	-- The 'drop' is because dataConStrictMarks
+	-- includes the existential dictionaries
+    (_, _, _, ex_theta, _, _) = dataConSig data_con
 \end{code}
 
 %************************************************************************
@@ -945,11 +940,6 @@ tcLit lit res_ty
 %************************************************************************
 
 Mini-utils:
-
-\begin{code}
-pp_nest_hang :: String -> SDoc -> SDoc
-pp_nest_hang lbl stuff = nest 2 (hang (text lbl) 4 stuff)
-\end{code}
 
 Boring and alphabetical:
 \begin{code}
@@ -1013,12 +1003,12 @@ recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
 
-missingStrictFieldCon :: Name -> Name -> SDoc
+missingStrictFieldCon :: Name -> FieldLabel -> SDoc
 missingStrictFieldCon con field
   = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
 	  ptext SLIT("does not have the required strict field"), quotes (ppr field)]
 
-missingFieldCon :: Name -> Name -> SDoc
+missingFieldCon :: Name -> FieldLabel -> SDoc
 missingFieldCon con field
   = hsep [ptext SLIT("Field") <+> quotes (ppr field),
 	  ptext SLIT("is not initialised")]

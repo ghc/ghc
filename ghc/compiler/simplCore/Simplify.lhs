@@ -63,7 +63,6 @@ import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import OrdList
 import Maybes		( maybeToBool )
-import Util		( zipWithEqual )
 import Outputable
 \end{code}
 
@@ -1390,9 +1389,9 @@ prepareCaseAlts bndr (Just (tycon, inst_tys)) scrut_cons alts
 		   let
 			(_,_,ex_tyvars,_,_,_) = dataConSig data_con
 		   in
-		   getUniquesSmpl (length ex_tyvars)				`thenSmpl` \ tv_uniqs ->
+		   getUniquesSmpl 			`thenSmpl` \ tv_uniqs ->
 		   let
-			ex_tyvars' = zipWithEqual "simpl_alt" mk tv_uniqs ex_tyvars
+			ex_tyvars' = zipWith mk tv_uniqs ex_tyvars
 			mk uniq tv = mkSysTyVar uniq (tyVarKind tv)
 			arg_tys    = dataConArgTys data_con
 					  	   (inst_tys ++ mkTyVarTys ex_tyvars')
@@ -1626,13 +1625,20 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs) thing_inside
 	-- Consider:	let j = if .. then I# 3 else I# 4
 	--		in case .. of { A -> j; B -> j; C -> ... }
 	--
-	-- Now CPR should not w/w j because it's a thunk, so
+	-- Now CPR doesn't w/w j because it's a thunk, so
 	-- that means that the enclosing function can't w/w either,
 	-- which is a lose.  Here's the example that happened in practice:
 	--	kgmod :: Int -> Int -> Int
 	--	kgmod x y = if x > 0 && y < 0 || x < 0 && y > 0
 	--	            then 78
 	--		    else 5
+	--
+	-- I have seen a case alternative like this:
+	--	True -> \v -> ...
+	-- It's a bit silly to add the realWorld dummy arg in this case, making
+	--	$j = \s v -> ...
+	--	   True -> $j s
+	-- (the \v alone is enough to make CPR happy) but I think it's rare
 
 	then newId SLIT("w") realWorldStatePrimTy  $ \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])

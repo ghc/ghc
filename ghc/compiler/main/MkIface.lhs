@@ -34,7 +34,7 @@ import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo,
 			  isLocalId, idName,
 			)
-import DataCon		( StrictnessMark(..), dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..) )
 import CoreFVs		( ruleLhsFreeNames )
@@ -202,20 +202,18 @@ ifaceTyCls (ATyCon tycon) so_far
 	where
 	  (tyvars1, _, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
           field_labels   = dataConFieldLabels data_con
-          strict_marks   = dataConStrictMarks data_con
+          strict_marks   = drop (length ex_theta) (dataConStrictMarks data_con)
+				-- The 'drop' is because dataConStrictMarks
+				-- includes the existential dictionaries
 	  details | null field_labels
 	    	  = ASSERT( tycon == tycon1 && tyvars == tyvars1 )
-	    	    VanillaCon (zipWith mk_bang_ty strict_marks arg_tys)
+	    	    VanillaCon (zipWith BangType strict_marks (map toHsType arg_tys))
 
     	    	  | otherwise
 	    	  = RecCon (zipWith mk_field strict_marks field_labels)
 
-    mk_bang_ty NotMarkedStrict     ty = Unbanged (toHsType ty)
-    mk_bang_ty (MarkedUnboxed _ _) ty = Unpacked (toHsType ty)
-    mk_bang_ty MarkedStrict        ty = Banged   (toHsType ty)
-
     mk_field strict_mark field_label
-	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
+	= ([getName field_label], BangType strict_mark (toHsType (fieldLabelType field_label)))
 
 ifaceTyCls (AnId id) so_far
   | isImplicitId id = so_far

@@ -283,10 +283,10 @@ getUniqueSmpl dflags env us sc
    = case splitUniqSupply us of
         (us1, us2) -> (uniqFromSupply us1, us2, sc)
 
-getUniquesSmpl :: Int -> SimplM [Unique]
-getUniquesSmpl n dflags env us sc 
+getUniquesSmpl :: SimplM [Unique]
+getUniquesSmpl dflags env us sc 
    = case splitUniqSupply us of
-        (us1, us2) -> (uniqsFromSupply n us1, us2, sc)
+        (us1, us2) -> (uniqsFromSupply us1, us2, sc)
 
 getDOptsSmpl :: SimplM DynFlags
 getDOptsSmpl dflags env us sc 
@@ -751,6 +751,5 @@ newIds fs tys m dflags env@(SimplEnv {seSubst = subst}) us sc
 	(us1, us2) -> m vs dflags (env {seSubst = Subst.extendNewInScopeList subst vs}) 
 			us2 sc
 		   where
-		      vs = zipWithEqual "newIds" (mkSysLocal fs) 
-					(uniqsFromSupply (length tys) us1) tys
+		      vs = zipWith (mkSysLocal fs) (uniqsFromSupply us1) tys
 \end{code}

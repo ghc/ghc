@@ -41,12 +41,11 @@ import DsMonad
 
 import CoreUtils	( exprType, mkIfThenElse )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
+import MkId		( rebuildConArgs )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
-			  dataConStrictMarks, dataConId, splitProductType_maybe
-			)
+import DataCon		( DataCon, dataConStrictMarks, dataConId )
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
 			  Type
 			)
@@ -298,10 +297,12 @@ mkCoAlgCaseMatchResult var match_alts
 		   returnDs (Case (Var var) wild_var (alts ++ mk_default fail))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
-	= body_fn fail		`thenDs` \ body ->
-	  rebuildConArgs con args (dataConStrictMarks con) body 
-				`thenDs` \ (body', real_args) ->
-	  returnDs (DataAlt con, real_args, body')
+	= body_fn fail						`thenDs` \ body ->
+	  getUniquesDs						`thenDs` \ us ->
+	  let
+	     (binds, real_args) = rebuildConArgs args (dataConStrictMarks con) us
+	  in
+	  returnDs (DataAlt con, real_args, mkDsLets binds body)
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -310,39 +311,7 @@ mkCoAlgCaseMatchResult var match_alts
         = mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- match_alts]
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
 \end{code}
-%
-For each constructor we match on, we might need to re-pack some
-of the strict fields if they are unpacked in the constructor.
-%
-\begin{code}
-rebuildConArgs
-  :: DataCon				-- the con we're matching on
-  -> [Id]				-- the source-level args
-  -> [StrictnessMark]			-- the strictness annotations (per-arg)
-  -> CoreExpr				-- the body
-  -> DsM (CoreExpr, [Id])
 
-rebuildConArgs con [] stricts body = returnDs (body, [])
-rebuildConArgs con (arg:args) stricts body | isTyVar arg
-  = rebuildConArgs con args stricts body `thenDs` \ (body', args') ->
-    returnDs (body',arg:args')
-rebuildConArgs con (arg:args) (str:stricts) body
-  = rebuildConArgs con args stricts body `thenDs` \ (body', real_args) ->
-    case maybeMarkedUnboxed str of
-	Just (pack_con1, _) -> 
-	    case splitProductType_maybe (idType arg) of
-		Just (_, tycon_args, pack_con, con_arg_tys) ->
-		    ASSERT( pack_con == pack_con1 )
-		    newSysLocalsDs con_arg_tys 		`thenDs` \ unpacked_args ->
-		    returnDs (
-			 mkDsLet (NonRec arg (mkConApp pack_con 
-				   	          (map Type tycon_args ++
-				        	   map Var  unpacked_args))) body', 
-			 unpacked_args ++ real_args
-		    )
-		
-	_ -> returnDs (body', arg:real_args)
-\end{code}
 
 %************************************************************************
 %*									*

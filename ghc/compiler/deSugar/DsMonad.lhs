@@ -14,7 +14,7 @@ module DsMonad (
 	newFailLocalDs,
 	getSrcLocDs, putSrcLocDs,
 	getModuleDs,
-	getUniqueDs,
+	getUniqueDs, getUniquesDs,
 	getDOptsDs,
 	dsLookupGlobalValue,
 
@@ -152,8 +152,11 @@ newFailLocalDs ty dflags us genv loc mod warns
 
 getUniqueDs :: DsM Unique
 getUniqueDs dflags us genv loc mod warns
-  = case (uniqFromSupply us) of { assigned_uniq ->
-    (assigned_uniq, warns) }
+  = (uniqFromSupply us, warns)
+
+getUniquesDs :: DsM [Unique]
+getUniquesDs dflags us genv loc mod warns
+  = (uniqsFromSupply us, warns)
 
 getDOptsDs :: DsM DynFlags
 getDOptsDs dflags us genv loc mod warns
@@ -166,16 +169,13 @@ duplicateLocalDs old_local dflags us genv loc mod warns
 
 cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
 cloneTyVarsDs tyvars dflags us genv loc mod warns
-  = case uniqsFromSupply (length tyvars) us of { uniqs ->
-    (zipWithEqual "cloneTyVarsDs" setTyVarUnique tyvars uniqs, warns) }
+  = (zipWith setTyVarUnique tyvars (uniqsFromSupply us), warns)
 \end{code}
 
 \begin{code}
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
-
 newTyVarsDs tyvar_tmpls dflags us genv loc mod warns
-  = case uniqsFromSupply (length tyvar_tmpls) us of { uniqs ->
-    (zipWithEqual "newTyVarsDs" setTyVarUnique tyvar_tmpls uniqs, warns) }
+  = (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply us), warns)
 \end{code}
 
 We can also reach out and either set/grab location information from

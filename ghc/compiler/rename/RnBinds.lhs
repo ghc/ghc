@@ -546,29 +546,6 @@ renameSig (NoInlineSig v p src_loc)
     returnRn (NoInlineSig new_v p src_loc)
 \end{code}
 
-\begin{code}
-renameIE :: (RdrName -> RnMS Name) -> IE RdrName -> RnMS (IE Name, FreeVars)
-renameIE lookup_occ_nm (IEVar v)
-  = lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (IEVar new_v, unitFV new_v)
-
-renameIE lookup_occ_nm (IEThingAbs v)
-  = lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (IEThingAbs new_v, unitFV new_v)
-
-renameIE lookup_occ_nm (IEThingAll v)
-  = lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (IEThingAll new_v, unitFV new_v)
-
-renameIE lookup_occ_nm (IEThingWith v vs)
-  = lookup_occ_nm v		`thenRn` \ new_v ->
-    mapRn lookup_occ_nm vs	`thenRn` \ new_vs ->
-    returnRn (IEThingWith new_v new_vs, plusFVs [ unitFV x | x <- new_v:new_vs ])
-
-renameIE lookup_occ_nm (IEModuleContents m)
-  = returnRn (IEModuleContents m, emptyFVs)
-\end{code}
-
 
 %************************************************************************
 %*									*

@@ -98,8 +98,7 @@ import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
 import Outputable
-import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
-			  getNumBuiltinUniques )
+import Unique		( Unique, mkBuiltinUnique )
 
 infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
@@ -173,15 +172,11 @@ mkWorkerId uniq unwrkr ty
 
 -- "Template locals" typically used in unfoldings
 mkTemplateLocals :: [Type] -> [Id]
-mkTemplateLocals tys = zipWith (mkSysLocal SLIT("tpl"))
-			       (getBuiltinUniques (length tys))
-			       tys
+mkTemplateLocals tys = zipWith mkTemplateLocal [1..] tys
 
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 -- The Int gives the starting point for unique allocation
-mkTemplateLocalsNum n tys = zipWith (mkSysLocal SLIT("tpl"))
-			    	    (getNumBuiltinUniques n (length tys))
-			       	    tys
+mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkSysLocal SLIT("tpl") (mkBuiltinUnique i) ty

@@ -40,7 +40,8 @@ import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Class		( classTyVars, classBigSig, classTyCon, 
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
-import DataCon		( mkDataCon, notMarkedStrict )
+import DataCon		( mkDataCon )
+import Demand		( StrictnessMark(..) )
 import Id		( Id, idType, idName )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
@@ -152,7 +153,7 @@ tcClassDecl1 is_rec rec_env
 	dict_component_tys = sc_tys ++ op_tys
 
         dict_con = mkDataCon datacon_name
-			     [notMarkedStrict | _ <- dict_component_tys]
+			     [NotMarkedStrict | _ <- dict_component_tys]
 			     [{- No labelled fields -}]
 		      	     tyvars
 		      	     [{-No context-}]
@@ -561,9 +562,9 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc (DefMeth dm_id)
 mkDefMethRhs is_inst_decl clas inst_tys sel_id loc NoDefMeth
   =  	-- No default method
 	-- Warn only if -fwarn-missing-methods
-    doptsTc Opt_WarnMissingMethods  `thenNF_Tc` \ warn -> 
+    doptsTc Opt_WarnMissingMethods 		`thenNF_Tc` \ warn -> 
     warnTc (is_inst_decl && warn)
-   	   (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
+   	   (omittedMethodWarn sel_id)		`thenNF_Tc_`
     returnTc error_rhs
   where
     error_rhs = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
@@ -578,7 +579,7 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc GenDefMeth
 	-- a type constructor applied to type arguments in the instance decl
 	-- 	(checkTc, so False provokes the error)
      checkTc (not is_inst_decl || simple_inst)
-	     (badGenericInstance sel_id clas)			`thenTc_`
+	     (badGenericInstance sel_id)			`thenTc_`
 
      ioToTc (dumpIfSet opt_PprStyle_Debug "Generic RHS" stuff)	`thenNF_Tc_`
      returnTc rhs
@@ -645,20 +646,18 @@ badMethodErr clas op
   = hsep [ptext SLIT("Class"), quotes (ppr clas), 
 	  ptext SLIT("does not have a method"), quotes (ppr op)]
 
-omittedMethodWarn sel_id clas
-  = sep [ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id), 
-	 ptext SLIT("in an instance declaration for") <+> quotes (ppr clas)]
+omittedMethodWarn sel_id
+  = ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id)
 
 badGenericMethodType op op_ty
   = hang (ptext SLIT("Generic method type is too complex"))
        4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
 		ptext SLIT("You can only use type variables, arrows, and tuples")])
 
-badGenericInstance sel_id clas
+badGenericInstance sel_id
   = sep [ptext SLIT("Can't derive generic code for") <+> quotes (ppr sel_id),
 	 ptext SLIT("because the instance declaration is not for a simple type (T a b c)"),
-	 ptext SLIT("(where T is a derivable type constructor)"),
-	 ptext SLIT("in an instance declaration for") <+> quotes (ppr clas)]
+	 ptext SLIT("(where T is a derivable type constructor)")]
 
 mixedGenericErr op
   = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)

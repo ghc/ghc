@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.63 2001/05/09 13:05:07 simonpj Exp $
+$Id: Parser.y,v 1.64 2001/05/18 08:46:20 simonpj Exp $
 
 Haskell grammar.
 
@@ -25,6 +25,7 @@ import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
+import Demand		( StrictnessMark(..) )
 import CmdLineOpts	( opt_SccProfilingOn )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..) )
 import Panic
@@ -574,9 +575,9 @@ varids0	:: { [RdrName] }
 -- Datatype declarations
 
 newconstr :: { RdrNameConDecl }
-	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [Unbanged $3]) $1 }
+	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [unbangedType $3]) $1 }
 	| srcloc conid '{' var '::' type '}'
-				{ mkConDecl $2 [] [] (RecCon [([$4], Unbanged $6)]) $1 }
+				{ mkConDecl $2 [] [] (RecCon [([$4], unbangedType $6)]) $1 }
 
 constrs :: { [RdrNameConDecl] }
 	: constrs '|' constr		{ $3 : $1 }
@@ -597,18 +598,18 @@ context :: { RdrNameContext }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkVanillaCon $1 []		    }
-	| btype '!' atype satypes	{% mkVanillaCon $1 (Banged $3 : $4) }
+	| btype '!' atype satypes	{% mkVanillaCon $1 (BangType MarkedUserStrict $3 : $4) }
 	| gtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
 
 satypes	:: { [RdrNameBangType] }
-	: atype satypes			{ Unbanged $1 : $2 }
-	| '!' atype satypes		{ Banged   $2 : $3 }
+	: atype satypes			{ unbangedType $1 : $2 }
+	| '!' atype satypes		{ BangType MarkedUserStrict $2 : $3 }
 	| {- empty -}			{ [] }
 
 sbtype :: { RdrNameBangType }
-	: btype				{ Unbanged $1 }
-	| '!' atype			{ Banged   $2 }
+	: btype				{ unbangedType $1 }
+	| '!' atype			{ BangType MarkedUserStrict $2 }
 
 fielddecls :: { [([RdrName],RdrNameBangType)] }
 	: fielddecl ',' fielddecls	{ $1 : $3 }
@@ -618,8 +619,8 @@ fielddecl :: { ([RdrName],RdrNameBangType) }
 	: sig_vars '::' stype		{ (reverse $1, $3) }
 
 stype :: { RdrNameBangType }
-	: ctype				{ Unbanged $1 }	
-	| '!' atype			{ Banged   $2 }
+	: ctype				{ unbangedType $1 }
+	| '!' atype			{ BangType MarkedUserStrict $2 }
 
 deriving :: { Maybe [RdrName] }
 	: {- empty -}			{ Nothing }

@@ -207,13 +207,6 @@ data ModDetails
 \end{code}
 
 \begin{code}
-emptyModDetails :: ModDetails
-emptyModDetails
-  = ModDetails { md_types = emptyTypeEnv,
-                 md_insts = [],
-                 md_rules = []
-    }
-
 emptyModIface :: Module -> ModIface
 emptyModIface mod
   = ModIface { mi_module   = mod,
