@@ -435,7 +435,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
 					       (idName id)
     ty'	   = tidyTopType (idType id)
     idinfo = tidyTopIdInfo rec_tidy_env is_external 
-			   (idInfo id) unfolding arity
+			   (idInfo id) unfold_info arity
 			   (lookupCgInfo cg_info_env name')
 
     id' = mkVanillaGlobal name' ty' idinfo
@@ -445,14 +445,20 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
     maybe_external = lookupVarEnv ext_ids id
     is_external    = isJust maybe_external
 
+    -- Expose an unfolding if ext_ids tells us to
+    -- Remember that ext_ids maps an Id to a Bool: 
+    --	True to show the unfolding, False to hide it
+    show_unfold = maybe_external `orElse` False
+    unfold_info | show_unfold = mkTopUnfolding rhs
+		| otherwise   = noUnfolding
+
     -- Usually the Id will have an accurate arity on it, because
     -- the simplifier has just run, but not always. 
     -- One case I found was when the last thing the simplifier
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
     -- fix it here.
-    arity     = exprArity rhs
-    unfolding = mkTopUnfolding rhs
+    arity = exprArity rhs
 
 
 
