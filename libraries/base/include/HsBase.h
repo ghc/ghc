@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.28 2003/09/24 10:32:12 simonmar Exp $
+ * $Id: HsBase.h,v 1.29 2003/09/24 11:06:54 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -128,9 +128,6 @@ int inputReady(int fd, int msecs, int isSock);
 
 /* in writeError.c */
 void writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len);
-
-/* in forkOS.c */
-int forkOS_createThread ( HsStablePtr entry );
 
 /* in Signals.c */
 extern HsInt nocldstop;
