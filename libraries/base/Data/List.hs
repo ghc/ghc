@@ -15,7 +15,7 @@
 
 module Data.List
    ( 
-    [] (..),
+    [] (..)
 
    , elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
    , elemIndices       -- :: (Eq a) => a -> [a] -> [Int]
