@@ -277,6 +277,7 @@ initSysTools minusB_args
 		  -- we only do this once).
 		  tmpdir =
 	            case last tdir of
+		      '/'  -> init tdir
 		      '\\' -> init tdir
 		      _   -> tdir
 		setTmpDir tmpdir
