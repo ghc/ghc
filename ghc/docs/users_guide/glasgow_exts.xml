@@ -2673,22 +2673,19 @@ for rank-2 types.
 </title>
 
 <para>
-A <emphasis>pattern type signature</emphasis> can introduce a <emphasis>scoped type
-variable</emphasis>.  For example
-</para>
-
-<para>
-
+A <emphasis>lexically scoped type variable</emphasis> can be bound by:
+<itemizedlist>
+<listitem><para>A declaration type signature (<xref linkend="decl-type-sigs"/>)</para></listitem>
+<listitem><para>A pattern type signature (<xref linkend="pattern-type-sigs"/>)</para></listitem>
+<listitem><para>A result type signature (<xref linkend="result-type-sigs"/>)</para></listitem>
+</itemizedlist>
+For example:
 <programlisting>
 f (xs::[a]) = ys ++ ys
            where
               ys :: [a]
               ys = reverse xs
 </programlisting>
-
-</para>
-
-<para>
 The pattern <literal>(xs::[a])</literal> includes a type signature for <varname>xs</varname>.
 This brings the type variable <literal>a</literal> into scope; it scopes over
 all the patterns and right hand sides for this equation for <function>f</function>.
@@ -2696,8 +2693,6 @@ In particular, it is in scope at the type signature for <varname>y</varname>.
 </para>
 
 <para>
- Pattern type signatures are completely orthogonal to ordinary, separate
-type signatures.  The two can be used independently or together.
 At ordinary type signatures, such as that for <varname>ys</varname>, any type variables
 mentioned in the type signature <emphasis>that are not in scope</emphasis> are
 implicitly universally quantified.  (If there are no type variables in
@@ -2720,10 +2715,10 @@ So much for the basic idea.  Here are the details.
 </para>
 
 <sect3>
-<title>What a pattern type signature means</title>
+<title>What a scoped type variable means</title>
 <para>
-A type variable brought into scope by a pattern type signature is simply
-the name for a type.   The restriction they express is that all occurrences
+A lexically-scoped type variable is simply
+the name for a type.   The restriction it expresses is that all occurrences
 of the same name mean the same type.  For example:
 <programlisting>
   f :: [Int] -> Int -> Int
@@ -2893,7 +2888,33 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 
 </sect3>
 
-<sect3>
+<sect3 id="decl-type-sigs">
+<title>Declaration type signatures</title>
+<para>A declaration type signature that has <emphasis>explicit</emphasis>
+quantification (using <literal>forall</literal>) brings into scope the
+explicitly-quantified
+type variables, in the definition of the named function(s).  For example:
+<programlisting>
+  f :: forall a. [a] -> [a]
+  f (x:xs) = xs ++ [ x :: a ]
+</programlisting>
+The "<literal>forall a</literal>" brings "<literal>a</literal>" into scope in
+the definition of "<literal>f</literal>".
+</para>
+<para>This only happens if the quantification in <literal>f</literal>'s type
+signature is explicit.  For example:
+<programlisting>
+  g :: [a] -> [a]
+  g (x:xs) = xs ++ [ x :: a ]
+</programlisting>
+This program will be rejected, because "<literal>a</literal>" does not scope
+over the definition of "<literal>f</literal>", so "<literal>x::a</literal>"
+means "<literal>x::forall a. a</literal>" by Haskell's usual implicit
+quantification rules.
+</para>
+</sect3>
+
+<sect3 id="pattern-type-sigs">
 <title>Where a pattern type signature can occur</title>
 
 <para>
@@ -3010,10 +3031,12 @@ in <literal>f4</literal>'s scope.
 </listitem>
 </itemizedlist>
 </para>
+<para>Pattern type signatures are completely orthogonal to ordinary, separate
+type signatures.  The two can be used independently or together.</para>
 
 </sect3>
 
-<sect3>
+<sect3 id="result-type-sigs">
 <title>Result type signatures</title>
 
 <para>
