@@ -6,6 +6,7 @@ module PackageConfig (
 	-- * PackageId
 	PackageId, 
 	mkPackageId, stringToPackageId, packageIdString, packageConfigId,
+	packageIdFS, fsToPackageId, 
 	
 	-- * The PackageConfig type: information about a package
 	PackageConfig,
@@ -43,12 +44,21 @@ defaultPackageConfig = emptyInstalledPackageInfo
 --
 -- A PackageId is a string of the form <pkg>-<version>.
 
-type PackageId = FastString  -- includes the version
+newtype PackageId = PId FastString deriving( Eq, Ord )  -- includes the version
 	-- easier not to use a newtype here, because we need instances of
 	-- Binary & Outputable, and we're too early to define them
 
+fsToPackageId :: FastString -> PackageId
+fsToPackageId = PId
+
+packageIdFS :: PackageId -> FastString
+packageIdFS (PId fs) = fs
+
 stringToPackageId :: String -> PackageId
-stringToPackageId = mkFastString
+stringToPackageId = fsToPackageId . mkFastString
+
+packageIdString :: PackageId -> String
+packageIdString = unpackFS . packageIdFS
 
 mkPackageId :: PackageIdentifier -> PackageId
 mkPackageId = stringToPackageId . showPackageId
@@ -56,5 +66,4 @@ mkPackageId = stringToPackageId . showPackageId
 packageConfigId :: PackageConfig -> PackageId
 packageConfigId = mkPackageId . package
 
-packageIdString :: PackageId -> String
-packageIdString = unpackFS
+

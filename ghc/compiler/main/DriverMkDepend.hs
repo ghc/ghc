@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.35 2005/01/14 17:57:46 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.36 2005/01/18 12:18:28 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -13,12 +13,12 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
-import HscTypes		( IfacePackage(..) )
 import GetImports	( getImportsFromFile )
 import CmdLineOpts	( DynFlags )
 import DriverState      
 import DriverUtil
 import DriverFlags
+import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
 import Module		( Module, ModLocation(..), moduleUserString)
@@ -248,7 +248,7 @@ findDependency dflags is_source src imp = do
 	case r of 
 	   Found loc pkg
 		-- not in this package: we don't need a dependency
-		| ExternalPackage _ <- pkg, not include_prelude
+		| ExtPackage _ <- pkg, not include_prelude
 		-> return Nothing
 
 		-- normal import: just depend on the .hi file

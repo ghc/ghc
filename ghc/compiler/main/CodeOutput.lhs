@@ -245,7 +245,7 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 	-- we need the #includes from the rts package for the stub files
 	let rtsid = rtsPackageId (pkgState dflags)
  	    rts_includes 
-		| Just pid <- rtsid = 
+		| ExtPackage pid <- rtsid = 
 			let rts_pkg = getPackageDetails (pkgState dflags) pid in
 			concatMap mk_include (includes rts_pkg)
 		| otherwise = []

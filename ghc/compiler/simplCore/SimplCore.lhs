@@ -15,11 +15,12 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 import CoreSyn
 import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
-			  ModDetails(..), HomeModInfo(..), hscEPS )
+			  ModDetails(..), HomeModInfo(..), HomePackageTable, Dependencies( dep_mods ), 
+			  hscEPS, hptRules )
 import CSE		( cseProgram )
 import Rules		( RuleBase, ruleBaseIds, emptyRuleBase,
 			  extendRuleBaseList, pprRuleBase, ruleCheckProgram )
-import Module		( moduleEnvElts )
+import Module		( elemModuleEnv, lookupModuleEnv )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
@@ -48,7 +49,7 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
 import List		( partition )
-import Maybes		( orElse )
+import Maybes		( orElse, fromJust )
 \end{code}
 
 %************************************************************************
@@ -214,7 +215,7 @@ prepareRules :: HscEnv
 					-- 	(b) Rules are now just orphan rules
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     guts@(ModGuts { mg_binds = binds, mg_rules = local_rules })
+	     guts@(ModGuts { mg_binds = binds, mg_deps = deps, mg_rules = local_rules })
 	     us 
   = do	{ eps <- hscEPS hsc_env
 
@@ -223,6 +224,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
+	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
 
 	      (orphan_rules, rules_for_locals) = partition isOrphanRule better_rules
 		-- Get the rules for locally-defined Ids out of the RuleBase
@@ -239,7 +241,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		--     rules for Ids in this module; if there is, the above bad things may happen
 
 	      pkg_rule_base = eps_rule_base eps
-	      hpt_rule_base = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
+	      hpt_rule_base = extendRuleBaseList pkg_rule_base home_pkg_rules
 	      imp_rule_base = extendRuleBaseList hpt_rule_base orphan_rules
 
 		-- Update the binders in the local bindings with the lcoal rules
@@ -273,8 +275,6 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 #endif
 	; return (imp_rule_base, guts { mg_binds = binds_w_rules, mg_rules = orphan_rules })
     }
-  where
-    add_rules rule_base mod_info = extendRuleBaseList rule_base (md_rules (hm_details mod_info))
 
 updateBinders :: RuleBase -> [CoreBind] -> [CoreBind]
 updateBinders rule_base binds

@@ -50,6 +50,7 @@ module Unique (
 #include "HsVersions.h"
 
 import BasicTypes	( Boxity(..) )
+import PackageConfig	( PackageId, packageIdFS )
 import FastString	( FastString, uniqueOfFS )
 import Outputable
 import FastTypes
@@ -157,6 +158,9 @@ x `hasKey` k	= getUnique x == k
 
 instance Uniquable FastString where
  getUnique fs = mkUniqueGrimily (I# (uniqueOfFS fs))
+
+instance Uniquable PackageId where
+ getUnique pid = getUnique (packageIdFS pid)
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i

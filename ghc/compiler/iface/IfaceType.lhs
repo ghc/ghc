@@ -51,7 +51,8 @@ data IfaceExtName
 					-- of whether they are home-pkg or not
 
   | HomePkg Module OccName Version	-- From another module in home package;
-					-- has version #
+					-- has version #; in all other respects,
+					-- HomePkg and ExtPkg are the same
 
   | LocalTop OccName			-- Top-level from the same module as 
 					-- the enclosing IfaceDecl

@@ -9,7 +9,7 @@ module TcRnTypes(
 	-- The environment types
 	Env(..), 
 	TcGblEnv(..), TcLclEnv(..), 
-	IfGblEnv(..), IfLclEnv(..),
+	IfGblEnv(..), IfLclEnv(..), 
 
 	-- Ranamer types
 	ErrCtxt,
@@ -231,6 +231,13 @@ data IfLclEnv
 	-- So if we see   f = \x -> x
 	-- it means M.f = \x -> x, where M is the if_mod
 	if_mod :: Module,
+
+	-- The field is used only for error reporting
+	-- if (say) there's a Lint error in it
+	if_loc :: SDoc,
+		-- Where the interface came from:
+		--	.hi file, or GHCi state, or ext core
+		-- plus which bit is currently being examined
 
 	if_tv_env  :: OccEnv TyVar,	-- Nested tyvar bindings
 	if_id_env  :: OccEnv Id		-- Nested id binding

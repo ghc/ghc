@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.182 2005/01/12 12:44:25 ross Exp $
+-- $Id: InteractiveUI.hs,v 1.183 2005/01/18 12:18:19 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -26,7 +26,6 @@ import DriverState
 import DriverUtil	( remove_spaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
-import Module		( showModMsg, lookupModuleEnv )
 import Name		( Name, NamedThing(..) )
 import OccName		( OccName, isSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
@@ -972,22 +971,10 @@ showCmd str =
 	["linker"]   -> io showLinkerState
 	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
 
-showModules = do
-  cms <- getCmState
-  let (mg, hpt) = cmGetModInfo cms
-  mapM_ (showModule hpt) mg
-
-
-showModule :: HomePackageTable -> ModSummary -> GHCi ()
-showModule hpt mod_summary
-  = case lookupModuleEnv hpt mod of
-	Nothing	      -> panic "missing linkable"
-	Just mod_info -> io (putStrLn (showModMsg obj_linkable mod locn))
-		      where
-			 obj_linkable = isObjectLinkable (hm_linkable mod_info)
-  where
-    mod = ms_mod mod_summary
-    locn = ms_location mod_summary
+showModules
+  = do	{ cms <- getCmState
+	; let show_one ms = io (putStrLn (cmShowModule cms ms))
+	; mapM_ show_one (cmGetModuleGraph cms) }
 
 showBindings = do
   cms <- getCmState

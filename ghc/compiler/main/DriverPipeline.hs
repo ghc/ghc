@@ -69,7 +69,7 @@ import Maybe
 
 preprocess :: DynFlags -> FilePath -> IO FilePath
 preprocess dflags filename =
-  ASSERT(isHaskellSrcFilename filename) 
+  ASSERT2(isHaskellSrcFilename filename, text filename) 
   do runPipeline (StopBefore Hsc) dflags ("preprocess") 
 	False{-temporary output file-}
 	Nothing{-no specific output file-}
@@ -1051,9 +1051,9 @@ staticLink dflags o_files dep_packages = do
     extra_ld_opts <- getStaticOpts v_Opt_l
 
     let pstate = pkgState dflags
-	rts_id | Just id <- rtsPackageId pstate = id
+	rts_id | ExtPackage id <- rtsPackageId pstate = id
 	       | otherwise = panic "staticLink: rts package missing"
-	base_id | Just id <- basePackageId pstate = id
+	base_id | ExtPackage id <- basePackageId pstate = id
 	        | otherwise = panic "staticLink: base package missing"
 	rts_pkg  = getPackageDetails pstate rts_id
         base_pkg = getPackageDetails pstate base_id
@@ -1147,9 +1147,9 @@ doMkDLL dflags o_files dep_packages = do
     extra_ld_opts <- getStaticOpts v_Opt_dll
 
     let pstate = pkgState dflags
-	rts_id | Just id <- rtsPackageId pstate = id
+	rts_id | ExtPackage id <- rtsPackageId pstate = id
 	       | otherwise = panic "staticLink: rts package missing"
-	base_id | Just id <- basePackageId pstate = id
+	base_id | ExtPackage id <- basePackageId pstate = id
 	        | otherwise = panic "staticLink: base package missing"
 	rts_pkg  = getPackageDetails pstate rts_id
         base_pkg = getPackageDetails pstate base_id

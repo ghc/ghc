@@ -14,6 +14,7 @@ import BasicTypes
 import NewDemand
 import IfaceSyn
 import VarEnv
+import Packages		( PackageIdH(..) )
 import Class		( DefMeth(..) )
 import CostCentre
 import DriverState	( v_Build_tag )
@@ -158,7 +159,7 @@ instance Binary ModIface where
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
 	rule_vers <- get bh
 	return (ModIface {
-		 mi_package   = ThisPackage, -- to be filled in properly later
+		 mi_package   = HomePackage, -- to be filled in properly later
 		 mi_module    = mod_name,
 		 mi_mod_vers  = mod_vers,
 		 mi_boot      = False,		-- Binary interfaces are never .hi-boot files!

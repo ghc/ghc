@@ -12,6 +12,7 @@ module HscTypes (
 	ModGuts(..), ModImports(..), ForeignStubs(..),
 
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
+	hptInstances, hptRules,
 
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
@@ -21,7 +22,7 @@ module HscTypes (
 	icPrintUnqual, unQualInScope,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
-	IfacePackage(..), emptyIfaceDepCache, 
+	emptyIfaceDepCache, 
 
 	Deprecs(..), IfaceDeprecs,
 
@@ -78,7 +79,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
-import Packages		( PackageId )
+import Packages		( PackageIdH, PackageId )
 import CmdLineOpts	( DynFlags )
 
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -88,7 +89,7 @@ import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( IdCoreRule )
-import Maybes		( orElse )
+import Maybes		( orElse, fromJust )
 import Outputable
 import SrcLoc		( SrcSpan )
 import UniqSupply	( UniqSupply )
@@ -125,6 +126,10 @@ data HscEnv
 		-- hsc_HPT is not mutable because we only demand-load 
 		-- external packages; the home package is eagerly 
 		-- loaded, module by module, by the compilation manager.
+		--	
+		-- The HPT may contain modules compiled earlier by --make
+		-- but not actually below the current module in the dependency
+		-- graph.  (This changes a previous invariant: changed Jan 05.)
 	
 		-- The next two are side-effected by compiling
 		-- to reflect sucking in interface files
@@ -182,6 +187,54 @@ lookupIfaceByModule hpt pit mod
 	Nothing       -> lookupModuleEnv pit mod
 \end{code}
 
+
+\begin{code}
+hptInstances :: HscEnv -> [(Module, IsBootInterface)] -> [DFunId]
+-- Find all the instance declarations that are in modules imported 
+-- by this one, directly or indirectly, and are in the Home Package Table
+-- This ensures that we don't see instances from modules --make compiled 
+-- before this one, but which are not below this one
+hptInstances hsc_env deps
+  | isOneShot (hsc_mode hsc_env) = []	-- In one-shot mode, the HPT is empty
+  | otherwise
+  = let 
+	hpt = hsc_HPT hsc_env
+    in
+    [ dfun 
+    |	-- Find each non-hi-boot module below me
+      (mod, False) <- deps
+
+	-- Look it up in the HPT
+    , let mod_info = ASSERT2( mod `elemModuleEnv` hpt, ppr mod $$ vcat (map ppr_hm (moduleEnvElts hpt)))
+		     fromJust (lookupModuleEnv hpt mod)
+
+	-- And get its dfuns
+    , dfun <- md_insts (hm_details mod_info) ]
+  where
+   ppr_hm hm = ppr (mi_module (hm_iface hm))
+
+hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [IdCoreRule]
+-- Get rules from modules "below" this one (in the dependency sense)
+-- C.f Inst.hptInstances
+hptRules hsc_env deps
+  | isOneShot (hsc_mode hsc_env) = []
+  | otherwise
+  = let 
+	hpt = hsc_HPT hsc_env
+    in
+    [ rule
+    |	-- Find each non-hi-boot module below me
+      (mod, False) <- deps
+
+	-- Look it up in the HPT
+    , let mod_info = ASSERT( mod `elemModuleEnv` hpt )
+		     fromJust (lookupModuleEnv hpt mod)
+
+	-- And get its dfuns
+    , rule <- md_rules (hm_details mod_info) ]
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection{Symbol tables and Module details}
@@ -200,7 +253,7 @@ the declarations into a single indexed map in the @PersistentRenamerState@.
 \begin{code}
 data ModIface 
    = ModIface {
-	mi_package  :: !IfacePackage,	    -- Which package the module comes from
+	mi_package  :: !PackageIdH,	    -- Which package the module comes from
         mi_module   :: !Module,
         mi_mod_vers :: !Version,	    -- Module version: changes when anything changes
 
@@ -253,8 +306,6 @@ data ModIface
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
      }
-
-data IfacePackage = ThisPackage | ExternalPackage PackageId
 
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
@@ -338,7 +389,7 @@ data ForeignStubs = NoStubs
 \end{code}
 
 \begin{code}
-emptyModIface :: IfacePackage -> Module -> ModIface
+emptyModIface :: PackageIdH -> Module -> ModIface
 emptyModIface pkg mod
   = ModIface { mi_package  = pkg,
 	       mi_module   = mod,
@@ -775,9 +826,10 @@ type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 \end{code}
 
 \begin{code}
-type Gated d = ([Name], (Module, d))	-- The [Name] 'gate' the declaration; always non-empty
-						-- Module records which iface file this
-						-- decl came from
+type Gated d = ([Name], (Module, SDoc, d))
+	-- The [Name] 'gate' the declaration; always non-empty
+	-- Module records which module this decl belongs to
+	-- SDoc records the pathname of the file, or similar err-ctxt info
 
 type RulePool = [Gated IfaceRule]
 

@@ -14,16 +14,15 @@ import HsSyn		( emptyLHsBinds )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TyThing, TypeEnv, emptyTypeEnv,
 			  ExternalPackageState(..), HomePackageTable,
-			  ModDetails(..), HomeModInfo(..), 
 			  Deprecs(..), FixityEnv, FixItem,
 			  GhciMode, lookupType, unQualInScope )
-import Module		( Module, unitModuleEnv, foldModuleEnv )
+import Module		( Module, unitModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
 import Name		( Name, isInternalName )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
-import InstEnv		( InstEnv, emptyInstEnv, extendInstEnvList )
+import InstEnv		( emptyInstEnv )
 
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
@@ -85,7 +84,7 @@ initTc hsc_env mod do_this
 		tcg_default  = Nothing,
 		tcg_type_env = emptyNameEnv,
 		tcg_type_env_var = type_env_var,
-		tcg_inst_env  = mkHomePackageInstEnv hsc_env,
+		tcg_inst_env  = emptyInstEnv,
 		tcg_inst_uses = dfuns_var,
 		tcg_th_used   = th_var,
 		tcg_exports  = emptyNameSet,
@@ -144,16 +143,6 @@ initTcPrintErrors env mod todo = do
   (msgs, res) <- initTc env mod todo
   printErrorsAndWarnings msgs
   return res
-
-mkHomePackageInstEnv :: HscEnv -> InstEnv
--- At the moment we (wrongly) build an instance environment from all the
--- home-package modules we have already compiled.
--- We should really only get instances from modules below us in the 
--- module import tree.
-mkHomePackageInstEnv (HscEnv {hsc_HPT = hpt})
-  = foldModuleEnv (add . md_insts . hm_details) emptyInstEnv hpt
-  where
-    add dfuns inst_env = extendInstEnvList inst_env dfuns
 
 -- mkImpTypeEnv makes the imported symbol table
 mkImpTypeEnv :: ExternalPackageState -> HomePackageTable
@@ -836,11 +825,16 @@ setLocalRdrEnv rdr_env thing_inside
 %************************************************************************
 
 \begin{code}
+mkIfLclEnv :: Module -> SDoc -> IfLclEnv
+mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
+			        if_loc     = loc,
+			        if_tv_env  = emptyOccEnv,
+			        if_id_env  = emptyOccEnv }
+
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv 
-	; let { if_env = IfGblEnv { 
-			if_rec_types = Just (tcg_mod tcg_env, get_type_env) }
+	; let { if_env = IfGblEnv { if_rec_types = Just (tcg_mod tcg_env, get_type_env) }
 	      ; get_type_env = readMutVar (tcg_type_env_var tcg_env) }
 	; setEnvs (if_env, ()) thing_inside }
 
@@ -848,11 +842,10 @@ initIfaceExtCore :: IfL a -> TcRn a
 initIfaceExtCore thing_inside
   = do  { tcg_env <- getGblEnv 
 	; let { mod = tcg_mod tcg_env
+	      ; doc = ptext SLIT("External Core file for") <+> quotes (ppr mod)
 	      ; if_env = IfGblEnv { 
 			if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
-	      ; if_lenv = IfLclEnv { if_mod     = mod,
-				     if_tv_env  = emptyOccEnv,
-				     if_id_env  = emptyOccEnv }
+	      ; if_lenv = mkIfLclEnv mod doc
 	  }
 	; setEnvs (if_env, if_lenv) thing_inside }
 
@@ -860,8 +853,7 @@ initIfaceCheck :: HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck hsc_env do_this
- = do	{ let { gbl_env = IfGblEnv { if_rec_types = Nothing } ;
-	   }
+ = do	{ let gbl_env = IfGblEnv { if_rec_types = Nothing }
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
 
@@ -872,14 +864,13 @@ initIfaceTc :: HscEnv -> ModIface
 initIfaceTc hsc_env iface do_this
  = do	{ tc_env_var <- newIORef emptyTypeEnv
 	; let { gbl_env = IfGblEnv { if_rec_types = Just (mod, readMutVar tc_env_var) } ;
-	      ; if_lenv = IfLclEnv { if_mod     = mod,
-				     if_tv_env  = emptyOccEnv,
-				     if_id_env  = emptyOccEnv }
+	      ; if_lenv = mkIfLclEnv mod doc
 	   }
 	; initTcRnIf 'i' hsc_env gbl_env if_lenv (do_this tc_env_var)
     }
   where
     mod = mi_module iface
+    doc = ptext SLIT("The interface for") <+> quotes (ppr mod)
 
 initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
 -- Used when sucking in new Rules in SimplCore
@@ -894,13 +885,23 @@ initIfaceRules hsc_env guts do_this
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
 
-initIfaceLcl :: Module -> IfL a -> IfM lcl a
-initIfaceLcl mod thing_inside 
-  = setLclEnv (IfLclEnv { if_mod      = mod,
-			   if_tv_env  = emptyOccEnv,
-			   if_id_env  = emptyOccEnv })
-	      thing_inside
+initIfaceLcl :: Module -> SDoc -> IfL a -> IfM lcl a
+initIfaceLcl mod loc_doc thing_inside 
+  = setLclEnv (mkIfLclEnv mod loc_doc) thing_inside
 
+getIfModule :: IfL Module
+getIfModule = do { env <- getLclEnv; return (if_mod env) }
+
+--------------------
+failIfM :: Message -> IfL a
+-- The Iface monad doesn't have a place to accumulate errors, so we
+-- just fall over fast if one happens; it "shouldnt happen".
+-- We use IfL here so that we can get context info out of the local env
+failIfM msg
+  = do 	{ env <- getLclEnv
+	; let full_msg = if_loc env $$ nest 2 msg
+	; ioToIOEnv (printErrs (full_msg defaultErrStyle))
+	; failM }
 
 --------------------
 forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)

@@ -5,9 +5,10 @@
 %
 \begin{code}
 module CompManager ( 
-    ModuleGraph, ModSummary(..),
+    ModSummary,		-- Abstract
+    ModuleGraph, 	-- All the modules from the home package
 
-    CmState, 		-- abstract
+    CmState, 		-- Abstract
 
     cmInit, 	   -- :: GhciMode -> IO CmState
 
@@ -27,6 +28,7 @@ module CompManager (
     cmGetInfo,    -- :: CmState -> String -> IO (CmState, [(TyThing,Fixity)])
     GetInfoResult,
     cmBrowseModule, -- :: CmState -> IO [TyThing]
+    cmShowModule,
 
     CmRunResult(..),
     cmRunStmt,		-- :: CmState -> String -> IO (CmState, CmRunResult)
@@ -37,9 +39,7 @@ module CompManager (
 
     HValue,
     cmCompileExpr,	-- :: CmState -> String -> IO (CmState, Maybe HValue)
-
-    cmGetModInfo,	-- :: CmState -> (ModuleGraph, HomePackageTable)
-
+    cmGetModuleGraph,	-- :: CmState -> ModuleGraph
     cmSetDFlags,
     cmGetDFlags,
 
@@ -51,7 +51,7 @@ where
 
 #include "HsVersions.h"
 
-import Packages		( isHomeModule )
+import Packages		( isHomePackage )
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
@@ -59,14 +59,12 @@ import DriverPhases
 import Finder
 import HscTypes
 import PrelNames        ( gHC_PRIM )
-import Module		( Module, mkModule,
-			  ModuleEnv, lookupModuleEnv, mkModuleEnv,
-			  moduleEnvElts, extendModuleEnvList, extendModuleEnv,
+import Module		( Module, mkModule, delModuleEnvList, mkModuleEnv,
+			  lookupModuleEnv, moduleEnvElts, extendModuleEnv,
 			  moduleUserString,
 			  ModLocation(..) )
 import GetImports
 import LoadIface	( noIfaceErr )
-import UniqFM
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
@@ -75,8 +73,9 @@ import StringBuffer	( hGetStringBuffer )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt_unset )
+import CmdLineOpts	( DynFlags(..) )
 import Maybes		( expectJust, orElse, mapCatMaybes )
+import FiniteMap
 
 import DATA_IOREF	( readIORef )
 
@@ -85,6 +84,7 @@ import HscMain		( hscGetInfo, GetInfoResult, hscStmt, hscTcExpr, hscKcType )
 import TcRnDriver	( mkExportEnv, getModuleContents )
 import IfaceSyn		( IfaceDecl )
 import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
+import Module		( showModMsg )
 import Name		( Name )
 import NameEnv
 import Id		( idType )
@@ -96,6 +96,7 @@ import GHC.Exts		( unsafeCoerce# )
 import Foreign
 import SrcLoc		( SrcLoc )
 import Control.Exception as Exception ( Exception, try )
+import CmdLineOpts	( DynFlag(..), dopt_unset )
 #endif
 
 import EXCEPTION	( throwDyn )
@@ -110,6 +111,83 @@ import Time		( ClockTime )
 \end{code}
 
 
+%************************************************************************
+%*									*
+		The module dependency graph
+		ModSummary, ModGraph, NodeKey, NodeMap
+%*									*
+%************************************************************************
+
+The nodes of the module graph are
+	EITHER a regular Haskell source module
+	OR     a hi-boot source module
+
+A ModuleGraph contains all the nodes from the home package (only).  
+There will be a node for each source module, plus a node for each hi-boot
+module.
+
+\begin{code}
+type ModuleGraph = [ModSummary]  -- The module graph, 
+				 -- NOT NECESSARILY IN TOPOLOGICAL ORDER
+
+emptyMG :: ModuleGraph
+emptyMG = []
+
+--------------------
+data ModSummary
+   = ModSummary {
+        ms_mod      :: Module,		-- Name of the module
+	ms_boot	    :: IsBootInterface,	-- Whether this is an hi-boot file
+        ms_location :: ModLocation,	-- Location
+        ms_srcimps  :: [Module],	-- Source imports
+        ms_imps     :: [Module],	-- Non-source imports
+        ms_hs_date  :: ClockTime	-- Timestamp of summarised file
+     }
+
+-- The ModLocation contains both the original source filename and the
+-- filename of the cleaned-up source file after all preprocessing has been
+-- done.  The point is that the summariser will have to cpp/unlit/whatever
+-- all files anyway, and there's no point in doing this twice -- just 
+-- park the result in a temp file, put the name of it in the location,
+-- and let @compile@ read from that file on the way back up.
+
+instance Outputable ModSummary where
+   ppr ms
+      = sep [text "ModSummary {",
+             nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
+                          text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
+                          text "ms_imps =" <+> ppr (ms_imps ms),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
+             char '}'
+            ]
+
+ms_allimps ms = ms_srcimps ms ++ ms_imps ms
+
+--------------------
+type NodeKey   = (Module, IsBootInterface)  -- The nodes of the graph are 
+type NodeMap a = FiniteMap NodeKey a	    -- keyed by (mod,boot) pairs
+
+msKey :: ModSummary -> NodeKey
+msKey (ModSummary { ms_mod = mod, ms_boot = boot }) = (mod,boot)
+
+emptyNodeMap :: NodeMap a
+emptyNodeMap = emptyFM
+
+mkNodeMap :: [(NodeKey,a)] -> NodeMap a
+mkNodeMap = listToFM
+	
+nodeMapElts :: NodeMap a -> [a]
+nodeMapElts = eltsFM
+\end{code}
+
+
+%************************************************************************
+%*									*
+		The compilation manager state
+%*									*
+%************************************************************************
+
+
 \begin{code}
 -- Persistent state for the entire system
 data CmState
@@ -120,7 +198,7 @@ data CmState
      }
 
 #ifdef GHCI
-cmGetModInfo	 cmstate = (cm_mg cmstate, hsc_HPT (cm_hsc cmstate))
+cmGetModuleGraph cmstate = cm_mg cmstate
 cmGetBindings    cmstate = nameEnvElts (ic_type_env (cm_ic cmstate))
 cmGetPrintUnqual cmstate = icPrintUnqual (cm_ic cmstate)
 cmHPT		 cmstate = hsc_HPT (cm_hsc cmstate)
@@ -238,6 +316,19 @@ cmBrowseModule cmstate str exports_only
 	   Just ds -> return ds
    }
 
+
+-----------------------------------------------------------------------------
+cmShowModule :: CmState -> ModSummary -> String
+cmShowModule cmstate mod_summary
+  = case lookupModuleEnv hpt mod of
+	Nothing	      -> panic "missing linkable"
+	Just mod_info -> showModMsg obj_linkable mod locn
+		      where
+			 obj_linkable = isObjectLinkable (hm_linkable mod_info)
+  where
+    hpt  = hsc_HPT (cm_hsc cmstate)
+    mod  = ms_mod mod_summary
+    locn = ms_location mod_summary
 
 -----------------------------------------------------------------------------
 -- cmRunStmt:  Run a statement/expr.
@@ -449,7 +540,7 @@ cmDepAnal cmstate rootnames
 -- the system state at the same time.
 
 cmLoadModules :: CmState 		-- The HPT may not be as up to date
-              -> ModuleGraph		-- Bang up to date
+              -> ModuleGraph		-- Bang up to date; but may contain hi-boot no
               -> IO (CmState,		-- new state
 		     SuccessFlag,	-- was successful
 		     [String])		-- list of modules loaded
@@ -474,17 +565,17 @@ cmLoadModules cmstate1 mg2unsorted
 
         let mg2unsorted_names = map ms_mod mg2unsorted
 
-        -- reachable_from follows source as well as normal imports
-        let reachable_from :: Module -> [Module]
-            reachable_from = downwards_closure_of_module mg2unsorted
- 
-        -- should be cycle free; ignores 'import source's
-        let mg2 = topological_sort False mg2unsorted
-        -- ... whereas this takes them into account.  Used for
+        -- mg2 should be cycle free; but it includes hi-boot ModSummary nodes
+        let mg2 :: [SCC ModSummary]
+	    mg2 = topological_sort False mg2unsorted
+
+        -- mg2_with_srcimps drops the hi-boot nodes, returning a 
+	-- graph with cycles.  Among other things, it is used for
         -- backing out partially complete cycles following a failed
         -- upsweep, and for removing from hpt all the modules
         -- not in strict downwards closure, during calls to compile.
-        let mg2_with_srcimps = topological_sort True mg2unsorted
+        let mg2_with_srcimps :: [SCC ModSummary]
+	    mg2_with_srcimps = topological_sort True mg2unsorted
 
 	-- Sort out which linkables we wish to keep in the unlinked image.
 	-- See getValidLinkables below for details.
@@ -494,7 +585,7 @@ cmLoadModules cmstate1 mg2unsorted
 
 	-- putStrLn (showSDoc (vcat [ppr valid_old_linkables, ppr new_linkables]))
 
-	let hpt2 = delListFromUFM hpt1 (map linkableModule new_linkables)
+	let hpt2 = delModuleEnvList hpt1 (map linkableModule new_linkables)
             hsc_env2 = hsc_env { hsc_HPT = hpt2 }
 
 	-- When (verb >= 2) $
@@ -511,15 +602,13 @@ cmLoadModules cmstate1 mg2unsorted
         -- 1.  All home imports of ms are either in ms or S
         -- 2.  A valid old linkable exists for each module in ms
 
-        stable_mods <- preUpsweep valid_old_linkables
-		 		  mg2unsorted_names [] mg2_with_srcimps
-
-        let stable_summaries
-               = concatMap (findInSummaries mg2unsorted) stable_mods
-
-	    stable_linkables
-	       = filter (\m -> linkableModule m `elem` stable_mods) 
-		    valid_old_linkables
+	-- mg2_with_srcimps has no hi-boot nodes, 
+	-- and hence neither does stable_mods 
+        stable_summaries <- preUpsweep valid_old_linkables
+		 		       mg2unsorted_names [] mg2_with_srcimps
+        let stable_mods      = map ms_mod stable_summaries
+	    stable_linkables = filter (\m -> linkableModule m `elem` stable_mods) 
+				      valid_old_linkables
 
         when (verb >= 2) $
            hPutStrLn stderr (showSDoc (text "Stable modules:" 
@@ -557,7 +646,7 @@ cmLoadModules cmstate1 mg2unsorted
 			  (ppFilesFromSummaries (flattenSCCs mg2))
 
         (upsweep_ok, hsc_env3, modsUpswept)
-           <- upsweep_mods hsc_env2 valid_linkables reachable_from 
+           <- upsweep_mods hsc_env2 valid_linkables
                            cleanup upsweep_these
 
         -- At this point, modsUpswept and newLis should have the same
@@ -688,16 +777,26 @@ getValidLinkables
 		[Linkable] 	-- new linkables we just found
 	      )
 
-getValidLinkables mode old_linkables all_home_mods module_graph = do
-  ls <- foldM (getValidLinkablesSCC mode old_linkables all_home_mods) 
-		[] module_graph
-  return (partition_it ls [] [])
+getValidLinkables mode old_linkables all_home_mods module_graph
+  = do	{ 	-- Process the SCCs in bottom-to-top order
+		-- (foldM works left-to-right)
+	  ls <- foldM (getValidLinkablesSCC mode old_linkables all_home_mods) 
+	  	      [] module_graph
+	; return (partition_it ls [] []) }
  where
   partition_it []         valid new = (valid,new)
   partition_it ((l,b):ls) valid new 
 	| b         = partition_it ls valid (l:new)
 	| otherwise = partition_it ls (l:valid) new
 
+
+getValidLinkablesSCC
+	:: GhciMode
+	-> [Linkable]		-- old linkables
+	-> [Module]		-- all home modules
+	-> [(Linkable,Bool)]
+	-> SCC ModSummary
+	-> IO [(Linkable,Bool)]
 
 getValidLinkablesSCC mode old_linkables all_home_mods new_linkables scc0
    = let 
@@ -709,10 +808,10 @@ getValidLinkablesSCC mode old_linkables all_home_mods new_linkables scc0
 		-- force a module's SOURCE imports to be already compiled for
 		-- its object linkable to be valid.
 
-	  has_object m = 
-		case findModuleLinkable_maybe (map fst new_linkables) m of
-		    Nothing -> False
-		    Just l  -> isObjectLinkable l
+		-- The new_linkables is only the *valid* linkables below here
+	  has_object m = case findModuleLinkable_maybe (map fst new_linkables) m of
+			    Nothing -> False
+			    Just l  -> isObjectLinkable l
 
           objects_allowed = mode == Batch || all has_object scc_allhomeimps
      in do
@@ -809,9 +908,9 @@ hptLinkables hpt = map hm_linkable (moduleEnvElts hpt)
 
 preUpsweep :: [Linkable]	-- new valid linkables
            -> [Module]		-- names of all mods encountered in downsweep
-           -> [Module]		-- accumulating stable modules
+           -> [ModSummary]	-- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
-           -> IO [Module]	-- stable modules
+           -> IO [ModSummary]	-- stable modules
 
 preUpsweep valid_lis all_home_mods stable []  = return stable
 preUpsweep valid_lis all_home_mods stable (scc0:sccs)
@@ -821,37 +920,22 @@ preUpsweep valid_lis all_home_mods stable (scc0:sccs)
                = nub (filter (`elem` all_home_mods) (concatMap ms_allimps scc))
             all_imports_in_scc_or_stable
                = all in_stable_or_scc scc_allhomeimps
-            scc_names
-		= map ms_mod scc
-            in_stable_or_scc m
-               = m `elem` scc_names || m `elem` stable
+	    scc_mods     = map ms_mod scc
+            stable_names = scc_mods ++ map ms_mod stable
+            in_stable_or_scc m = m `elem` stable_names
 
 	    -- now we check for valid linkables: each module in the SCC must 
 	    -- have a valid linkable (see getValidLinkables above).
-	    has_valid_linkable new_summary
-   	      = isJust (findModuleLinkable_maybe valid_lis modname)
-	       where modname = ms_mod new_summary
+	    has_valid_linkable scc_mod
+   	      = isJust (findModuleLinkable_maybe valid_lis scc_mod)
 
 	    scc_is_stable = all_imports_in_scc_or_stable
-			  && all has_valid_linkable scc
+			  && all has_valid_linkable scc_mods
 
         if scc_is_stable
-         then preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
-         else preUpsweep valid_lis all_home_mods stable sccs
+         then preUpsweep valid_lis all_home_mods (scc ++ stable) sccs
+         else preUpsweep valid_lis all_home_mods stable 	 sccs
 
-
--- Helper for preUpsweep.  Assuming that new_summary's imports are all
--- stable (in the sense of preUpsweep), determine if new_summary is itself
--- stable, and, if so, in batch mode, return its linkable.
-findInSummaries :: [ModSummary] -> Module -> [ModSummary]
-findInSummaries old_summaries mod_name
-   = [s | s <- old_summaries, ms_mod s == mod_name]
-
-findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
-findModInSummaries old_summaries mod
-   = case [s | s <- old_summaries, ms_mod s == mod] of
-	 [] -> Nothing
-	 (s:_) -> Just s
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
@@ -878,7 +962,6 @@ findPartiallyCompletedCycles modsDone theGraph
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep_mods :: HscEnv			-- Includes up-to-date HPT
              -> [Linkable]		-- Valid linkables
-             -> (Module -> [Module])  -- to construct downward closures
 	     -> IO ()		      -- how to clean up unwanted tmp files
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
@@ -886,31 +969,30 @@ upsweep_mods :: HscEnv			-- Includes up-to-date HPT
                     HscEnv,		-- With an updated HPT
                     [ModSummary])	-- Mods which succeeded
 
-upsweep_mods hsc_env oldUI reachable_from cleanup
+upsweep_mods hsc_env oldUI cleanup
      []
    = return (Succeeded, hsc_env, [])
 
-upsweep_mods hsc_env oldUI reachable_from cleanup
-     ((CyclicSCC ms):_)
+upsweep_mods hsc_env oldUI cleanup
+     (CyclicSCC ms:_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleUserString.ms_mod) ms))
         return (Failed, hsc_env, [])
 
-upsweep_mods hsc_env oldUI reachable_from cleanup
-     ((AcyclicSCC mod):mods)
+upsweep_mods hsc_env oldUI cleanup
+     (AcyclicSCC mod:mods)
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
-	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) (eltsUFM (hsc_HPT hsc_env)))
+	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
+	--		       (moduleEnvElts (hsc_HPT hsc_env)))
 
         (ok_flag, hsc_env1) <- upsweep_mod hsc_env oldUI mod 
-                  	    		    (reachable_from (ms_mod mod))
 
 	cleanup		-- Remove unwanted tmp files between compilations
 
         if failed ok_flag then
 	     return (Failed, hsc_env1, [])
 	  else do 
-	     (restOK, hsc_env2, modOKs) 
-                       <- upsweep_mods hsc_env1 oldUI reachable_from cleanup mods
+	     (restOK, hsc_env2, modOKs) <- upsweep_mods hsc_env1 oldUI cleanup mods
              return (restOK, hsc_env2, mod:modOKs)
 
 
@@ -919,11 +1001,15 @@ upsweep_mods hsc_env oldUI reachable_from cleanup
 upsweep_mod :: HscEnv
             -> UnlinkedImage
             -> ModSummary
-            -> [Module]
             -> IO (SuccessFlag, 
 		   HscEnv)		-- With updated HPT
 
-upsweep_mod hsc_env oldUI summary1 reachable_inc_me
+upsweep_mod hsc_env oldUI summary1
+   | ms_boot summary1 	-- The summary describes an hi-boot file, 
+   = 			-- so there is nothing to do
+     return (Succeeded, hsc_env)
+
+   | otherwise	-- The summary describes a regular source file, so compile it
    = do 
         let this_mod = ms_mod summary1
 	    location = ms_location summary1
@@ -936,23 +1022,13 @@ upsweep_mod hsc_env oldUI summary1 reachable_inc_me
         let maybe_old_linkable = findModuleLinkable_maybe oldUI this_mod
             source_unchanged   = isJust maybe_old_linkable
 
-	    reachable_only = filter (/= this_mod) reachable_inc_me
-
-	   -- In interactive mode, all home modules below us *must* have an
-	   -- interface in the HPT.  We never demand-load home interfaces in
-	   -- interactive mode.
-            hpt1_strictDC
-               = ASSERT(hsc_mode hsc_env == Batch || all (`elemUFM` hpt1) reachable_only)
-		 retainInTopLevelEnvs reachable_only hpt1
-	    hsc_env_strictDC = hsc_env { hsc_HPT = hpt1_strictDC }
-
             old_linkable = expectJust "upsweep_mod:old_linkable" maybe_old_linkable
 
 	    have_object 
 	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
 	       | otherwise = False
 
-        compresult <- compile hsc_env_strictDC this_mod location 
+        compresult <- compile hsc_env this_mod location 
 			(ms_hs_date summary1) 
 			source_unchanged have_object mb_old_iface
 
@@ -978,63 +1054,51 @@ upsweep_mod hsc_env oldUI summary1 reachable_inc_me
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [Module] -> HomePackageTable -> HomePackageTable
 retainInTopLevelEnvs keep_these hpt
-   = listToUFM (concatMap (maybeLookupUFM hpt) keep_these)
+   = mkModuleEnv [ (mod, fromJust mb_mod_info)
+		 | mod <- keep_these
+		 , let mb_mod_info = lookupModuleEnv hpt mod
+		 , isJust mb_mod_info ]
+
+-----------------------------------------------------------------------------
+topological_sort :: Bool 		-- Drop hi-boot nodes? (see below)
+		 -> [ModSummary]
+		 -> [SCC ModSummary]
+-- Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
+--
+-- Drop hi-boot nodes (first boolean arg)? 
+--
+--   False:	treat the hi-boot summaries as nodes of the graph,
+--		so the graph must be acyclic
+--
+--   True:	eliminate the hi-boot nodes, and instead pretend
+--		the a source-import of Foo is an import of Foo
+--		The resulting graph has no hi-boot nodes, but can by cyclic
+
+topological_sort drop_hi_boot_nodes summaries
+   = stronglyConnComp nodes
    where
-     maybeLookupUFM ufm u  = case lookupUFM ufm u of 
-				Nothing  -> []
-				Just val -> [(u, val)] 
+	keep_hi_boot_nodes = not drop_hi_boot_nodes
 
--- Needed to clean up HPT so that we don't get duplicates in inst env
-downwards_closure_of_module :: [ModSummary] -> Module -> [Module]
-downwards_closure_of_module summaries root
-   = let toEdge :: ModSummary -> (Module,[Module])
-         toEdge summ = (ms_mod summ, 
-			filter (`elem` all_mods) (ms_allimps summ))
+	-- We use integers as the keys for the SCC algorithm
+	nodes :: [(ModSummary, Int, [Int])]	
+	nodes = [(s, fromJust (lookup_key (ms_boot s) (ms_mod s)), 
+		     out_edge_keys keep_hi_boot_nodes (ms_srcimps s) ++
+		     out_edge_keys False	      (ms_imps s)    )
+		| s <- summaries
+		, not (ms_boot s) || keep_hi_boot_nodes ]
+		-- Drop the hi-boot ones if told to do so
 
-	 all_mods = map ms_mod summaries
+	key_map :: NodeMap Int
+	key_map = listToFM ([(ms_mod s, ms_boot s) | s <- summaries]
+			   `zip` [1..])
 
-         res = simple_transitive_closure (map toEdge summaries) [root]
-     in
---         trace (showSDoc (text "DC of mod" <+> ppr root
---                          <+> text "=" <+> ppr res)) $
-         res
+	lookup_key :: IsBootInterface -> Module -> Maybe Int
+	lookup_key hi_boot mod = lookupFM key_map (mod, hi_boot)
 
--- Calculate transitive closures from a set of roots given an adjacency list
-simple_transitive_closure :: Eq a => [(a,[a])] -> [a] -> [a]
-simple_transitive_closure graph set 
-   = let set2      = nub (concatMap dsts set ++ set)
-         dsts node = fromMaybe [] (lookup node graph)
-     in
-         if   length set == length set2
-         then set
-         else simple_transitive_closure graph set2
-
-
--- Calculate SCCs of the module graph, with or without taking into
--- account source imports.
-topological_sort :: Bool -> [ModSummary] -> [SCC ModSummary]
-topological_sort include_source_imports summaries
-   = let 
-         toEdge :: ModSummary -> (ModSummary,Module,[Module])
-         toEdge summ
-             = (summ, ms_mod summ, 
-                      (if include_source_imports 
-                       then ms_srcimps summ else []) ++ ms_imps summ)
-        
-         mash_edge :: (ModSummary,Module,[Module]) -> (ModSummary,Int,[Int])
-         mash_edge (summ, m, m_imports)
-            = case lookup m key_map of
-                 Nothing -> panic "reverse_topological_sort"
-                 Just mk -> (summ, mk, 
-                                -- ignore imports not from the home package
-                             mapCatMaybes (flip lookup key_map) m_imports)
-
-         edges     = map toEdge summaries
-         key_map   = zip [nm | (s,nm,imps) <- edges] [1 ..] :: [(Module,Int)]
-         scc_input = map mash_edge edges
-         sccs      = stronglyConnComp scc_input
-     in
-         sccs
+	out_edge_keys :: IsBootInterface -> [Module] -> [Int]
+        out_edge_keys hi_boot ms = mapCatMaybes (lookup_key hi_boot) ms
+		-- If we want keep_hi_boot_nodes, then we do lookup_key with
+		-- the IsBootInterface parameter True; else False
 
 
 -----------------------------------------------------------------------------
@@ -1052,15 +1116,11 @@ downsweep :: DynFlags -> [FilePath] -> [ModSummary] -> IO [ModSummary]
 downsweep dflags roots old_summaries
    = do rootSummaries <- mapM getRootSummary roots
 	checkDuplicates rootSummaries
-        all_summaries
-           <- loop (concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
-	   				    (ms_imps m)) rootSummaries))
-		(mkModuleEnv [ (mod, s) | s <- rootSummaries, 
-					  let mod = ms_mod s, 
-					  isHomeModule dflags mod 
-			     ])
-        return all_summaries
+        loop rootSummaries emptyNodeMap
      where
+	old_summary_map :: NodeMap ModSummary
+	old_summary_map = mkNodeMap [ (msKey s, s) | s <- old_summaries]
+
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
 	   | isHaskellSrcFilename file
@@ -1073,7 +1133,7 @@ downsweep dflags roots old_summaries
 		exists <- doesFileExist lhs_file
 		if exists then summariseFile dflags lhs_file else do
 		let mod_name = mkModule file
-		maybe_summary <- getSummary (file, mod_name)
+		maybe_summary <- getSummary file False {- Not hi-boot -} mod_name
 		case maybe_summary of
 		   Nothing -> packageModErr mod_name
 		   Just s  -> return s
@@ -1097,34 +1157,41 @@ downsweep dflags roots old_summaries
 			   [ fromJust (ml_hs_file (ms_location summ'))
 			   | summ' <- summaries, ms_mod summ' == modl ]
 
-        getSummary :: (FilePath,Module) -> IO (Maybe ModSummary)
-        getSummary (currentMod,mod)
-           = do found <- findModule dflags mod True{-explicit-}
+	loop :: [ModSummary]		-- Work list: process the imports of these modules
+	     -> NodeMap ModSummary 	-- Visited set
+	     -> IO [ModSummary]		-- The result includes the worklist, except 
+					-- for those mentioned in the visited set
+	loop [] done 	  = return (nodeMapElts done)
+	loop (s:ss) done | key `elemFM` done = loop ss done
+			 | otherwise	      = do { new_ss <- children s
+						   ; loop (new_ss ++ ss) (addToFM done key s) }
+			 where
+		   	    key = (ms_mod s, ms_boot s)
+
+	children :: ModSummary -> IO [ModSummary]
+	children s = do { mb_kids1 <- mapM (getSummary cur_path True)  (ms_srcimps s)
+			; mb_kids2 <- mapM (getSummary cur_path False) (ms_imps s)
+			; return (catMaybes mb_kids1 ++ catMaybes mb_kids2) }
+		-- The Nothings are the ones from other packages: ignore
+	  where
+	    cur_path = fromJust (ml_hs_file (ms_location s))
+
+        getSummary :: FilePath 		-- Import directive is in here [only used for err msg]
+		   -> IsBootInterface 	-- Look for an hi-boot file?
+		   -> Module		-- Look for this module
+		   -> IO (Maybe ModSummary)
+        getSummary cur_mod is_boot wanted_mod
+           = do found <- findModule dflags wanted_mod True {-explicit-}
 		case found of
-		   Found location pkg -> do
-			let old_summary = findModInSummaries old_summaries mod
-			summarise dflags mod location old_summary
+		   Found location pkg 
+			| isHomePackage pkg	-- Drop an external-package modules
+			-> do 	{ let old_summary = lookupFM old_summary_map (wanted_mod, is_boot)
+				; summarise dflags wanted_mod is_boot location old_summary }
+			| otherwise
+			-> return Nothing	-- External package module
 
-		   err -> throwDyn (noModError dflags currentMod mod err)
+		   err -> throwDyn (noModError dflags cur_mod wanted_mod err)
 
-        -- loop invariant: env doesn't contain package modules
-        loop :: [(FilePath,Module)] -> ModuleEnv ModSummary -> IO [ModSummary]
-	loop [] env = return (moduleEnvElts env)
-        loop imps env
-           = do -- imports for modules we don't already have
-                let needed_imps = nub (filter (not . (`elemUFM` env).snd) imps)
-
-		-- summarise them
-                needed_summaries <- mapM getSummary needed_imps
-
-		-- get just the "home" modules
-                let new_home_summaries = [ s | Just s <- needed_summaries ]
-
-		-- loop, checking the new imports
-		let new_imps = concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
-						       (ms_imps m)) new_home_summaries)
-                loop new_imps (extendModuleEnvList env 
-				[ (ms_mod s, s) | s <- new_home_summaries ])
 
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc mod_nm err
@@ -1165,51 +1232,55 @@ summariseFile dflags file
                  Nothing     -> noHsFileErr mod
                  Just src_fn -> getModificationTime src_fn
 
-        return (ModSummary { ms_mod = mod, 
-                             ms_location = location{ ml_hspp_file = Just hspp_fn,
-						     ml_hspp_buf  = Just buf },
+        return (ModSummary { ms_mod = mod, ms_boot = False,
+                             ms_location = location{ml_hspp_file=Just hspp_fn},
                              ms_srcimps = srcimps, ms_imps = the_imps,
 			     ms_hs_date = src_timestamp })
 
 -- Summarise a module, and pick up source and timestamp.
-summarise :: DynFlags -> Module -> ModLocation -> Maybe ModSummary
-	 -> IO (Maybe ModSummary)
-summarise dflags mod location old_summary
-   | not (isHomeModule dflags mod) = return Nothing
-   | otherwise
-   = do let hs_fn = expectJust "summarise" (ml_hs_file location)
+summarise :: DynFlags 
+	  -> Module 		-- Guaranteed a home-package module
+	  -> IsBootInterface 
+	  -> ModLocation -> Maybe ModSummary
+	  -> IO (Maybe ModSummary)
+summarise dflags mod is_boot location old_summary
+ = do 	{ -- Find the source file to summarise
+	  src_fn <- if is_boot then
+			hiBootFilePath location
+		    else
+		    case ml_hs_file location of
+		        Nothing     -> noHsFileErr mod
+			Just src_fn -> return src_fn
 
-        case ml_hs_file location of {
-           Nothing -> noHsFileErr mod;
-           Just src_fn -> do
-
-        src_timestamp <- getModificationTime src_fn
+	-- Find its timestamp
+	; src_timestamp <- getModificationTime src_fn
 
 	-- return the cached summary if the source didn't change
-	case old_summary of {
-	   Just s | ms_hs_date s == src_timestamp -> return (Just s);
-	   _ -> do
+	; case old_summary of {
+	     Just s | ms_hs_date s == src_timestamp -> return (Just s);
+	     _ -> do
 
-        hspp_fn <- preprocess dflags hs_fn
-	
-	buf <- hGetStringBuffer hspp_fn
-        (srcimps,imps,mod_name) <- getImports dflags buf hspp_fn
-	let
+	-- For now, we never pre-process hi-boot files
+	{ hspp_fn <- if is_boot then return src_fn
+			      else preprocess dflags src_fn
+
+	; buf <- hGetStringBuffer hspp_fn
+        ; (srcimps,imps,mod_name) <- getImports dflags buf hspp_fn
+	; let
 	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
-           the_imps = filter (/= gHC_PRIM) imps
+             the_imps = filter (/= gHC_PRIM) imps
 
-	when (mod_name /= mod) $
+	; when (mod_name /= mod) $
 		throwDyn (ProgramError 
-		   (showSDoc (text hs_fn
+		   (showSDoc (text src_fn
 			      <>  text ": file name does not match module name"
 			      <+> quotes (ppr mod))))
 
-        return (Just (ModSummary mod location{ ml_hspp_file = Just hspp_fn,
-					       ml_hspp_buf  = Just buf }
-                                 srcimps the_imps src_timestamp))
-        }
-      }
-
+	; let new_loc = location{ ml_hspp_file = Just hspp_fn,
+				  ml_hspp_buf  = Just buf }
+	; return (Just (ModSummary mod is_boot new_loc
+                                   srcimps the_imps src_timestamp))
+    }}}
 
 noHsFileErr mod
   = throwDyn (CmdLineError (showSDoc (text "no source file for module" <+> quotes (ppr mod))))
@@ -1227,44 +1298,3 @@ multiRootsErr mod files
 \end{code}
 
 
-%************************************************************************
-%*									*
-		The ModSummary Type
-%*									*
-%************************************************************************
-
-\begin{code}
--- The ModLocation contains both the original source filename and the
--- filename of the cleaned-up source file after all preprocessing has been
--- done.  The point is that the summariser will have to cpp/unlit/whatever
--- all files anyway, and there's no point in doing this twice -- just 
--- park the result in a temp file, put the name of it in the location,
--- and let @compile@ read from that file on the way back up.
-
-
-type ModuleGraph = [ModSummary]  -- the module graph, topologically sorted
-
-emptyMG :: ModuleGraph
-emptyMG = []
-
-data ModSummary
-   = ModSummary {
-        ms_mod      :: Module,			-- name, package
-        ms_location :: ModLocation,		-- location
-        ms_srcimps  :: [Module],		-- source imports
-        ms_imps     :: [Module],		-- non-source imports
-        ms_hs_date  :: ClockTime		-- timestamp of summarised file
-     }
-
-instance Outputable ModSummary where
-   ppr ms
-      = sep [text "ModSummary {",
-             nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
-                          text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
-                          text "ms_imps =" <+> ppr (ms_imps ms),
-                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
-             char '}'
-            ]
-
-ms_allimps ms = ms_srcimps ms ++ ms_imps ms
-\end{code}

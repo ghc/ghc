@@ -37,6 +37,7 @@ import TcExpr 		( tcInferRho )
 import TcRnMonad
 import TcType		( tidyTopType, tcEqType, mkTyVarTys, substTyWith )
 import Inst		( showLIE )
+import InstEnv		( extendInstEnvList )
 import TcBinds		( tcTopBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv )
@@ -57,7 +58,7 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import Module           ( mkModule, moduleEnvElts )
+import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts )
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
@@ -65,10 +66,10 @@ import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
-			  GhciMode(..), noDependencies, 
+			  GhciMode(..), IsBootInterface, noDependencies, 
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TyThing(..), 
-			  TypeEnv, lookupTypeEnv,
+			  TypeEnv, lookupTypeEnv, hptInstances,
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, 
 			  emptyFixityEnv
 			)
@@ -168,12 +169,19 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod export_ies
 		-- Record boot-file info in the EPS, so that it's 
 		-- visible to loadHiBootInterface in tcRnSrcDecls,
 		-- and any other incrementally-performed imports
-	updateEps_ (\eps -> eps { eps_is_boot = imp_dep_mods imports }) ;
+	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
+	    ; dep_mods = imp_dep_mods imports } ;
+
+	updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
 
 		-- Update the gbl env
-	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
-				   tcg_imports = tcg_imports gbl `plusImportAvails` imports }) 
-		     $ do {
+	let { home_insts = hptInstances hsc_env (moduleEnvElts dep_mods) } ;
+	updGblEnv ( \ gbl -> 
+		gbl { tcg_rdr_env  = rdr_env,
+		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
+		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports }) 
+		$ do {
+
 	traceRn (text "rn1" <+> ppr (imp_dep_mods imports)) ;
 		-- Fail if there are any errors so far
 		-- The error printing (if needed) takes advantage 
@@ -281,7 +289,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
    setGblEnv tcg_env $ do {
    
 	-- Now the core bindings
-   core_binds <- initIfaceExtCore (tcExtCoreBindings this_mod src_binds) ;
+   core_binds <- initIfaceExtCore (tcExtCoreBindings src_binds) ;
 
 	-- Wrap up
    let {

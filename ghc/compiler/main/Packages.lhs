@@ -12,7 +12,8 @@ module Packages (
 	extendPackageConfigMap,	dumpPackages,
 
 	-- * Reading the package config, and processing cmdline args
-	PackageState(..),
+	PackageIdH(..), isHomePackage,
+	PackageState(..), 
 	initPackages,
 	moduleToPackageConfig,
 	getPackageDetails,
@@ -147,11 +148,21 @@ data PackageState = PackageState {
 	-- exposed is True if the package exposes that module.
 
   -- The PackageIds of some known packages
-  basePackageId		:: Maybe PackageId,
-  rtsPackageId		:: Maybe PackageId,
-  haskell98PackageId	:: Maybe PackageId,
-  thPackageId		:: Maybe PackageId
+  basePackageId		:: PackageIdH,
+  rtsPackageId		:: PackageIdH,
+  haskell98PackageId	:: PackageIdH,
+  thPackageId		:: PackageIdH
   }
+
+data PackageIdH 
+   = HomePackage 		-- The "home" package is the package curently
+				-- being compiled
+   | ExtPackage PackageId	-- An "external" package is any other package
+
+
+isHomePackage :: PackageIdH -> Bool
+isHomePackage HomePackage    = True
+isHomePackage (ExtPackage _) = False
 
 -- A PackageConfigMap maps a PackageId to a PackageConfig
 type PackageConfigMap = UniqFM PackageConfig
@@ -311,12 +322,13 @@ mkPackageState dflags pkg_db = do
   -- Look up some known PackageIds
   --
   let
+	lookupPackageByName :: FastString -> PackageIdH
 	lookupPackageByName nm = 
 	  case [ conf | p <- dep_exposed,
 			Just conf <- [lookupPackage pkg_db p],
 			nm == mkFastString (pkgName (package conf)) ] of
-		[]     -> Nothing
-		(p:ps) -> Just (mkPackageId (package p))
+		[]     -> HomePackage
+		(p:ps) -> ExtPackage (mkPackageId (package p))
 
 	-- Get the PackageIds for some known packages (we know the names,
 	-- but we don't know the versions).  Some of these packages might
@@ -329,7 +341,7 @@ mkPackageState dflags pkg_db = do
 	-- add base & rts to the explicit packages
 	basicLinkedPackages = [basePackageId,rtsPackageId]
 	explicit' = addListToUniqSet explicit 
-			[ p | Just p <- basicLinkedPackages ]
+			[ p | ExtPackage p <- basicLinkedPackages ]
   --
   -- Close the explicit packages with their dependencies
   --

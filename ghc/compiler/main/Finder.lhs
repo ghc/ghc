@@ -12,6 +12,7 @@ module Finder (
     mkHomeModLocation,	-- :: ModuleName -> FilePath -> IO ModLocation
     findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 
+    hiBootFilePath,	-- :: ModLocation -> IO FilePath
     hiBootExt,		-- :: String
     hiBootVerExt,	-- :: String
 
@@ -21,7 +22,7 @@ module Finder (
 
 import Module
 import UniqFM		( filterUFM )
-import HscTypes		( Linkable(..), Unlinked(..), IfacePackage(..) )
+import HscTypes		( Linkable(..), Unlinked(..) )
 import Packages
 import DriverState
 import DriverUtil
@@ -86,7 +87,7 @@ lookupFinderCache mod_name = do
 -- that module: its source file, .hi file, object file, etc.
 
 data FindResult
-  = Found ModLocation IfacePackage
+  = Found ModLocation PackageIdH
 	-- the module was found
   | PackageHidden PackageId
 	-- for an explicit source import: the package containing the module is
@@ -122,9 +123,9 @@ cached fn dflags name explicit = do
 	| Just err <- visible explicit maybe_pkg  ->  return err
 	| otherwise -> return (Found loc (pkgInfoToId maybe_pkg))
   
-pkgInfoToId :: Maybe (PackageConfig,Bool) -> IfacePackage
-pkgInfoToId (Just (pkg,_)) = ExternalPackage (mkPackageId (package pkg))
-pkgInfoToId Nothing = ThisPackage
+pkgInfoToId :: Maybe (PackageConfig,Bool) -> PackageIdH
+pkgInfoToId (Just (pkg,_)) = ExtPackage (mkPackageId (package pkg))
+pkgInfoToId Nothing        = HomePackage
 
 -- Is a module visible or not?  Returns Nothing if the import is ok,
 -- or Just err if there's a visibility error.
@@ -269,7 +270,7 @@ mkHiOnlyModLocation hisuf mod path basename _ext = do
   -- basename == dots_to_slashes (moduleNameUserString mod)
   loc <- hiOnlyModLocation path basename hisuf
   addToFinderCache mod (loc, Nothing)
-  return (Found loc ThisPackage)
+  return (Found loc HomePackage)
 
 mkPackageModLocation pkg_info hisuf mod path basename _ext = do
   -- basename == dots_to_slashes (moduleNameUserString mod)
@@ -330,7 +331,7 @@ mkHomeModLocation mod src_filename = do
 
 mkHomeModLocationSearched mod path basename ext = do
    loc <- mkHomeModLocation' mod (path ++ '/':basename) ext
-   return (Found loc ThisPackage)
+   return (Found loc HomePackage)
 
 mkHomeModLocation' mod src_basename ext = do
    let mod_basename = dots_to_slashes (moduleUserString mod)
@@ -376,6 +377,19 @@ mkHiPath basename mod_basename
 	   	        | otherwise         = basename
 
         return (hi_basename ++ '.':hisuf)
+
+
+--------------------
+hiBootFilePath :: ModLocation -> IO FilePath
+-- Return Foo.hi-boot, or Foo.hi-boot-n, as appropriate
+hiBootFilePath (ModLocation { ml_hi_file = hi_path })
+  = do	{ hi_ver_exists <- doesFileExist hi_boot_ver_path
+	; if hi_ver_exists then return hi_boot_ver_path
+			   else return hi_boot_path }
+  where
+    hi_boot_path       = replaceFilenameSuffix hi_path hiBootExt ;
+    hi_boot_ver_path   = replaceFilenameSuffix hi_path hiBootVerExt 
+
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 

@@ -340,15 +340,29 @@ header_body :: { [LImportDecl RdrName] }
 iface   :: { ModIface }
 	: 'module' modid 'where' ifacebody  { mkBootIface (unLoc $2) $4 }
 
-ifacebody :: { [HsDecl RdrName] }
-	:  '{'            ifacedecls '}'		{ $2 }
- 	|      vocurly    ifacedecls close		{ $2 }
+ifacebody :: { ([(Module, IsBootInterface)], [HsDecl RdrName]) }
+	:  '{'            ifacetop  '}'		{ $2 }
+ 	|      vocurly    ifacetop  close	{ $2 }
 
-ifacedecls :: { [HsDecl RdrName] }
-	: ifacedecl ';' ifacedecls	{ $1 : $3 }
-	| ';' ifacedecls		{ $2 }
+ifacetop :: { ([(Module, IsBootInterface)], [HsDecl RdrName]) }
+	 : ifaceimps				{ ($1,[]) }
+	 | ifaceimps ';' ifacedecls		{ ($1,$3) }
+	 | ifacedecls				{ ([],$1) }
+
+ifaceimps :: { [(Module, IsBootInterface)] }	-- Reversed, but that's ok
+	: ifaceimps ';' ifaceimp	{ $3 : $1 }
+	| ifaceimp 			{ [$1] }
+
+ifaceimp :: { (Module, IsBootInterface) }
+	: 'import' maybe_src modid 	{ (unLoc $3, $2) }
+
+-- The defn of iface decls allows a trailing ';', which the lexer geneates for
+--	module Foo where
+--	foo :: ()
+ifacedecls :: { [HsDecl RdrName] }	-- Reversed, but doesn't matter
+	: ifacedecls ';' ifacedecl	{ $3 : $1 }
+	| ifacedecls ';'		{ $1 }
 	| ifacedecl			{ [$1] }
-	| {- empty -}			{ [] }
 
 ifacedecl :: { HsDecl RdrName }
 	: var '::' sigtype	

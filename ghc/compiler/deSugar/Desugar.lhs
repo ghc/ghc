@@ -15,7 +15,7 @@ import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
-import Id		( Id, setIdExported, idName, idIsFrom, isLocalId )
+import Id		( Id, setIdExported, idName, idIsFrom )
 import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
@@ -35,7 +35,7 @@ import VarSet
 import Bag		( Bag, isEmptyBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
-import Packages	  	( PackageState(thPackageId) )
+import Packages	  	( PackageState(thPackageId), PackageIdH(..) )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  errorsFound, WarnMsg )
 import ListSetOps	( insertList )
@@ -114,7 +114,7 @@ deSugar hsc_env
 	; th_used   <- readIORef th_var			-- Whether TH is used
 	; let used_names = allUses dus `unionNameSets` dfun_uses
 	      thPackage = thPackageId (pkgState dflags)
-	      pkgs | Just th_id <- thPackage, th_used
+	      pkgs | ExtPackage th_id <- thPackage, th_used
 		   = insertList th_id  (imp_dep_pkgs imports)
 	      	   | otherwise
 		   = imp_dep_pkgs imports

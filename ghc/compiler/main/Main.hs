@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.141 2004/11/26 16:21:00 simonmar Exp $
+-- $Id: Main.hs,v 1.142 2005/01/18 12:18:34 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -26,7 +26,7 @@ import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( initSysTools, cleanTempFiles, normalisePath )
-import Packages		( dumpPackages, initPackages, haskell98PackageId )
+import Packages		( dumpPackages, initPackages, haskell98PackageId, PackageIdH(..) )
 import DriverPipeline	( staticLink, doMkDLL, runPipeline )
 import DriverState	( buildStgToDo,
 			  findBuildTag, unregFlags, 
@@ -219,7 +219,7 @@ main =
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
    let link_pkgs
-	  | Just h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
+	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
 	  | otherwise = []
 
    case mode of

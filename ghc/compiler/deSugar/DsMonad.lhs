@@ -79,7 +79,7 @@ type DsWarning = (SrcSpan, SDoc)
 data DsGblEnv = DsGblEnv {
 	ds_mod	   :: Module,       		-- For SCC profiling
 	ds_warns   :: IORef (Bag DsWarning),	-- Warning messages
-	ds_if_env  :: IfGblEnv			-- Used for looking up global, 
+	ds_if_env  :: (IfGblEnv, IfLclEnv)	-- Used for looking up global, 
 						-- possibly-imported things
     }
 
@@ -109,9 +109,10 @@ initDs  :: HscEnv
 
 initDs hsc_env mod rdr_env type_env thing_inside
   = do 	{ warn_var <- newIORef emptyBag
-	; let { if_env = IfGblEnv { if_rec_types = Just (mod, return type_env) }
+	; let { if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
+	      ; if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
 	      ; gbl_env = DsGblEnv { ds_mod = mod, 
-				     ds_if_env = if_env, 
+				     ds_if_env = (if_genv, if_lenv),
 				     ds_warns = warn_var }
 	      ; lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
 				     ds_loc = noSrcSpan } }
@@ -192,7 +193,7 @@ dsLookupGlobal :: Name -> DsM TyThing
 -- Very like TcEnv.tcLookupGlobal
 dsLookupGlobal name 
   = do	{ env <- getGblEnv
-	; setEnvs (ds_if_env env, ())
+	; setEnvs (ds_if_env env)
 		  (tcIfaceGlobal name) }
 
 dsLookupGlobalId :: Name -> DsM Id

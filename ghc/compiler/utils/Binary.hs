@@ -56,6 +56,7 @@ import Unique
 import Panic
 import UniqFM
 import FastMutInt
+import PackageConfig		( PackageId, packageIdFS, fsToPackageId )
 
 #if __GLASGOW_HASKELL__ < 503
 import DATA_IOREF
@@ -748,6 +749,10 @@ getFS bh = do
   (I# l) <- get bh
   (BA ba) <- getByteArray bh (I# l)
   return $! (mkFastSubStringBA# ba 0# l)
+
+instance Binary PackageId where
+  put_ bh pid = put_ bh (packageIdFS pid)
+  get bh = do { fs <- get bh; return (fsToPackageId fs) }
 
 instance Binary FastString where
   put_ bh f@(FastString id l ba) =

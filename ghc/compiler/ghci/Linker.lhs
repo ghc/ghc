@@ -122,7 +122,7 @@ emptyPLS dflags = PersistentLinkerState {
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
   where init_pkgs
-	  | Just rts_id <- rtsPackageId (pkgState dflags) = [rts_id]
+	  | ExtPackage rts_id <- rtsPackageId (pkgState dflags) = [rts_id]
 	  | otherwise = []
 
 \end{code}
@@ -386,7 +386,7 @@ getLinkDeps dflags hpt pit mods
 	-- Get the things needed for the specified module
 	-- This is rather similar to the code in RnNames.importsFromImportDecl
     get_deps mod
-	| ExternalPackage p <- mi_package iface
+	| ExtPackage p <- mi_package iface
 	= ([], p : dep_pkgs deps)
 	| otherwise
 	= (mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)

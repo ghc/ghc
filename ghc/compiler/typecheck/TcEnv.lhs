@@ -48,11 +48,11 @@ module TcEnv(
 import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
 import TcIface		( tcImportDecl )
 import TcRnMonad
-import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
+import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
-			  tidyOpenType, tidyOpenTyVar, pprTyThingCategory
+			  tidyOpenType, pprTyThingCategory
 			)
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId )
@@ -105,8 +105,7 @@ tcLookupGlobal name
 	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of 
 	    Just thing -> return thing 
-	    Nothing    -> do { traceIf (text "tcLookupGlobal" <+> ppr name)
-			     ; initIfaceTcRn (tcImportDecl name) }
+	    Nothing    -> tcImportDecl name
     }}
 \end{code}
 

@@ -38,9 +38,9 @@ import HscTypes		( GenAvailInfo(..), AvailInfo, GhciMode(..),
 			  IfaceExport, HomePackageTable, PackageIfaceTable, 
 			  availNames, unQualInScope, 
 			  Deprecs(..), ModIface(..), Dependencies(..), 
-			  lookupIface, ExternalPackageState(..),
-			  IfacePackage(..)
+			  lookupIface, ExternalPackageState(..)
 			)
+import Packages		( PackageIdH(..) )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
 			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
@@ -199,7 +199,7 @@ importsFromImportDecl this_mod
 
 	(dependent_mods, dependent_pkgs) 
 	   = case mi_package iface of
-		ThisPackage ->
+		HomePackage ->
 	    	-- Imported module is from the home package
 		-- Take its dependent modules and add imp_mod itself
 		-- Take its dependent packages unchanged
@@ -213,7 +213,7 @@ importsFromImportDecl this_mod
 		-- check.  See LoadIface.loadHiBootInterface
 		  ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
 
-		ExternalPackage pkg ->
+		ExtPackage pkg ->
  	   	-- Imported module is from another package
 		-- Dump the dependent modules
 		-- Add the package imp_mod comes from to the dependent packages

@@ -510,8 +510,7 @@ tcLookupTh name
 	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of 
 	    Just thing -> return (AGlobal thing)
-	    Nothing    -> do { traceIf (text "tcLookupGlobal" <+> ppr name)
-			     ; thing <- initIfaceTcRn (tcImportDecl name)
+	    Nothing    -> do { thing <- tcImportDecl name
 			     ; return (AGlobal thing) }
 		-- Imported names should always be findable; 
 		-- if not, we fail hard in tcImportDecl

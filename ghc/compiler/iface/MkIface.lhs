@@ -174,7 +174,7 @@ compiled with -O.  I think this is the case.]
 #include "HsVersions.h"
 
 import HsSyn
-import Packages		( isHomeModule )
+import Packages		( isHomeModule, PackageIdH(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), IfaceTyCon(..),
 			  eqIfDecl, eqIfRule, eqIfInst, IfaceEq(..), (&&&), bool, 
@@ -185,7 +185,7 @@ import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( mkModDeps )
 import TcType		( isFFITy )
-import HscTypes		( ModIface(..), TyThing(..), IfacePackage(..),
+import HscTypes		( ModIface(..), TyThing(..), 
 			  ModGuts(..), ModGuts, IfaceExport,
 			  GhciMode(..), HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
@@ -234,7 +234,8 @@ import FastString
 import DATA_IOREF	( writeIORef )
 import Monad		( when )
 import List		( insert )
-import Maybes		( orElse, mapCatMaybes, isNothing, isJust, fromJust, expectJust )
+import Maybes		( orElse, mapCatMaybes, isNothing, isJust, 
+			  fromJust, expectJust, MaybeErr(..) )
 \end{code}
 
 
@@ -293,7 +294,7 @@ mkIface hsc_env location maybe_old_iface
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
-			mi_package  = ThisPackage,
+			mi_package  = HomePackage,
 			mi_boot     = False,
 			mi_deps     = deps,
 			mi_usages   = usages,
@@ -836,12 +837,12 @@ check_old_iface this_mod iface_path source_unchanged maybe_iface
 	-- from the .hi file left from the last time we compiled it
     readIface this_mod iface_path False		`thenM` \ read_result ->
     case read_result of {
-       Left err ->	-- Old interface file not found, or garbled; give up
+       Failed err ->	-- Old interface file not found, or garbled; give up
 		   traceIf (text "FYI: cannot read old interface file:"
 			   	 $$ nest 4 err) 	`thenM_`
 	           returnM (outOfDate, Nothing)
 
-    ;  Right iface ->	
+    ;  Succeeded iface ->	
 
 	-- We have got the old iface; check its versions
     checkVersions source_unchanged iface	`thenM` \ recomp ->
@@ -908,13 +909,13 @@ checkModUsage (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 	-- Instead, get an Either back which we can test
 
     case mb_iface of {
-	Left exn ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
+	Failed exn ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
 				       ppr mod_name]));
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
 		-- the current module doesn't need that import and it's been deleted
 
-	Right iface -> 
+	Succeeded iface -> 
     let
 	new_mod_vers    = mi_mod_vers  iface
 	new_decl_vers 	= mi_ver_fn    iface
@@ -1030,8 +1031,8 @@ pprModIface iface
 	, pprDeprecs (mi_deprecs iface)
 	]
   where
-    ppr_package ThisPackage = empty
-    ppr_package (ExternalPackage id) = doubleQuotes (ftext id)
+    ppr_package HomePackage = empty
+    ppr_package (ExtPackage id) = doubleQuotes (ppr id)
 
     exp_vers  = mi_exp_vers iface
     rule_vers = mi_rule_vers iface

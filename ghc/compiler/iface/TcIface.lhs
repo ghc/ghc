@@ -9,10 +9,11 @@ module TcIface (
 	loadImportedInsts, loadImportedRules,
 	tcExtCoreBindings
  ) where
+
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadHomeInterface, predInstGates, discardDeclPrags )
+import LoadIface	( loadHomeInterface, loadInterface, predInstGates, discardDeclPrags )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, lookupOrig,
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId,
@@ -56,6 +57,8 @@ import OccName		( OccName )
 import Module		( Module )
 import UniqSupply	( initUs_ )
 import Outputable	
+import ErrUtils		( Message )
+import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength, zipLazy )
 import CmdLineOpts	( DynFlag(..) )
@@ -105,36 +108,45 @@ where the code that e1 expands to might import some defns that
 also turn out to be needed by the code that e2 expands to.
 
 \begin{code}
-tcImportDecl :: Name -> IfG TyThing
+tcImportDecl :: Name -> TcM TyThing
+-- Entry point for source-code uses of importDecl
+tcImportDecl name 
+  = do 	{ traceIf (text "tcLookupGlobal" <+> ppr name)
+	; mb_thing <- initIfaceTcRn (importDecl name)
+	; case mb_thing of
+	    Succeeded thing -> return thing
+	    Failed err      -> failWithTc err }
+
+importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
 -- Get the TyThing for this Name from an interface file
-tcImportDecl name
+importDecl name 
   | Just thing <- wiredInNameTyThing_maybe name
 	-- This case only happens for tuples, because we pre-populate the eps_PTE
 	-- with other wired-in things.  We can't do that for tuples because we
 	-- don't know how many of them we'll find
   = do 	{ updateEps_ (\ eps -> eps { eps_PTE = extendTypeEnv (eps_PTE eps) thing })
-	; return thing }
+	; return (Succeeded thing) }
 
   | otherwise
   = do	{ traceIf nd_doc
 
 	-- Load the interface, which should populate the PTE
-	; loadHomeInterface nd_doc name	
+	; mb_iface <- loadInterface nd_doc (nameModule name) ImportBySystem
+	; case mb_iface of {
+		Failed err_msg  -> return (Failed err_msg) ;
+		Succeeded iface -> do
 
 	-- Now look it up again; this time we should find it
-	; eps <- getEps	
+	{ eps <- getEps	
 	; case lookupTypeEnv (eps_PTE eps) name of
-	    Just thing -> return thing
-	    Nothing    -> do { ioToIOEnv (printErrs (msg defaultErrStyle)); failM }
-				-- Declaration not found!
-				-- No errors-var to accumulate errors in, so just
-				-- print out the error right now
-    }
+	    Just thing -> return (Succeeded thing)
+	    Nothing    -> return (Failed not_found_msg)
+    }}}
   where
     nd_doc = ptext SLIT("Need decl for") <+> ppr name
-    msg = hang (ptext SLIT("Can't find interface-file declaration for") <+> ppr (nameParent name))
-	     2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
-		       ptext SLIT("Use -ddump-if-trace to get an idea of which file caused the error")])
+    not_found_msg = hang (ptext SLIT("Can't find interface-file declaration for") <+> ppr (nameParent name))
+	  	       2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
+		                ptext SLIT("Use -ddump-if-trace to get an idea of which file caused the error")])
 \end{code}
 
 %************************************************************************
@@ -428,7 +440,7 @@ loadImportedInsts cls tys
 		do { eps <- getEps; return (eps_inst_env eps) }
 	  else do
 	{ traceIf (sep [ptext SLIT("Importing instances for") <+> pprClassPred cls tys, 
-			nest 2 (vcat (map ppr iface_insts))])
+			nest 2 (vcat [ppr i | (_,_,i) <- iface_insts])])
 
 	-- Typecheck the new instances
 	; dfuns <- initIfaceTcRn (mappM tc_inst iface_insts)
@@ -443,13 +455,16 @@ loadImportedInsts cls tys
   where
     wired_doc = ptext SLIT("Need home inteface for wired-in thing")
 
-tc_inst (mod, inst) = initIfaceLcl mod (tcIfaceInst inst)
+tc_inst (mod, loc, inst) = initIfaceLcl mod full_loc (tcIfaceInst inst)
+  where
+    full_loc = loc $$ (nest 2 (ptext SLIT("instance decl") <+> ppr inst))
 
 tcIfaceInst :: IfaceInst -> IfL DFunId
 tcIfaceInst (IfaceInst { ifDFun = dfun_occ })
   = tcIfaceExtId (LocalTop dfun_occ)
 
-selectInsts :: Name -> [Name] -> ExternalPackageState -> (ExternalPackageState, [(Module, IfaceInst)])
+selectInsts :: Name -> [Name] -> ExternalPackageState 
+	    -> (ExternalPackageState, [(Module, SDoc, IfaceInst)])
 selectInsts cls tycons eps
   = (eps { eps_insts = insts', eps_stats = stats' }, iface_insts)
   where
@@ -499,9 +514,8 @@ loadImportedRules hsc_env guts
 	{ -- Get new rules
 	  if_rules <- updateEps selectRules
 
-	; traceIf (ptext SLIT("Importing rules:") <+> vcat (map ppr if_rules))
+	; traceIf (ptext SLIT("Importing rules:") <+> vcat [ppr r | (_,_,r) <- if_rules])
 
-	; let tc_rule (mod, rule) = initIfaceLcl mod (tcIfaceRule rule)
 	; core_rules <- mapM tc_rule if_rules
 
 	-- Debug print
@@ -520,8 +534,11 @@ loadImportedRules hsc_env guts
 	; return core_rules
     }
 
-
-selectRules :: ExternalPackageState -> (ExternalPackageState, [(Module, IfaceRule)])
+tc_rule (mod, loc, rule) = initIfaceLcl mod full_loc (tcIfaceRule rule)
+  where
+    full_loc = loc $$ (nest 2 (ptext SLIT("rule") <+> ppr rule))
+   
+selectRules :: ExternalPackageState -> (ExternalPackageState, [(Module, SDoc, IfaceRule)])
 -- Not terribly efficient.  Look at each rule in the pool to see if
 -- all its gates are in the type env.  If so, take it out of the pool.
 -- If not, trim its gates for next time.
@@ -740,20 +757,20 @@ tcVanillaAlt data_con inst_tys arg_occs rhs
 
 
 \begin{code}
-tcExtCoreBindings :: Module -> [IfaceBinding] -> IfL [CoreBind]	-- Used for external core
-tcExtCoreBindings mod []     = return []
-tcExtCoreBindings mod (b:bs) = do_one mod b (tcExtCoreBindings mod bs)
+tcExtCoreBindings :: [IfaceBinding] -> IfL [CoreBind]	-- Used for external core
+tcExtCoreBindings []     = return []
+tcExtCoreBindings (b:bs) = do_one b (tcExtCoreBindings bs)
 
-do_one :: Module -> IfaceBinding -> IfL [CoreBind] -> IfL [CoreBind]
-do_one mod (IfaceNonRec bndr rhs) thing_inside
+do_one :: IfaceBinding -> IfL [CoreBind] -> IfL [CoreBind]
+do_one (IfaceNonRec bndr rhs) thing_inside
   = do	{ rhs' <- tcIfaceExpr rhs
-	; bndr' <- newExtCoreBndr mod bndr
+	; bndr' <- newExtCoreBndr bndr
 	; extendIfaceIdEnv [bndr'] $ do 
 	{ core_binds <- thing_inside
 	; return (NonRec bndr' rhs' : core_binds) }}
 
-do_one mod (IfaceRec pairs) thing_inside
-  = do	{ bndrs' <- mappM (newExtCoreBndr mod) bndrs
+do_one (IfaceRec pairs) thing_inside
+  = do	{ bndrs' <- mappM newExtCoreBndr bndrs
 	; extendIfaceIdEnv bndrs' $ do
  	{ rhss' <- mappM tcIfaceExpr rhss
 	; core_binds <- thing_inside
@@ -865,28 +882,31 @@ tcPragExpr name expr
 %************************************************************************
 
 \begin{code}
-tcIfaceGlobal :: Name -> IfM a TyThing
+tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   = do	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of {
 	    Just thing -> return thing ;
-	    Nothing    -> 
+	    Nothing    -> do
 
-	setLclEnv () $ do	-- This gets us back to IfG, mainly to 
-				-- pacify get_type_env; rather untidy
 	{ env <- getGblEnv
 	; case if_rec_types env of
 	    Just (mod, get_type_env) 
 		| nameIsLocalOrFrom mod name
 		-> do 		-- It's defined in the module being compiled
-	  	{ type_env <- get_type_env
+	  	{ type_env <- setLclEnv () get_type_env		-- yuk
 		; case lookupNameEnv type_env name of
 			Just thing -> return thing
 			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
 						(ppr name $$ ppr type_env) }
 
-	    other -> tcImportDecl name 	-- It's imported; go get it
-    }}}
+	    other -> do
+
+	{ mb_thing <- importDecl name 	-- It's imported; go get it
+	; case mb_thing of
+	    Failed err      -> failIfM err
+	    Succeeded thing -> return thing
+    }}}}
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon IfaceIntTc  = return intTyCon
@@ -958,9 +978,10 @@ bindIfaceIds bndrs thing_inside
 
 
 -----------------------
-newExtCoreBndr :: Module -> (OccName, IfaceType) -> IfL Id
-newExtCoreBndr mod (occ, ty)
-  = do	{ name <- newGlobalBinder mod occ Nothing noSrcLoc
+newExtCoreBndr :: (OccName, IfaceType) -> IfL Id
+newExtCoreBndr (occ, ty)
+  = do	{ mod <- getIfModule
+	; name <- newGlobalBinder mod occ Nothing noSrcLoc
 	; ty' <- tcIfaceType ty
 	; return (mkLocalId name ty') }
 

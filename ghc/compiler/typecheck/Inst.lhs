@@ -23,7 +23,7 @@ module Inst (
 	instLoc, getDictClassTys, dictPred,
 
 	lookupInst, LookupInstResult(..),
-	tcExtendLocalInstEnv, tcGetInstEnvs,
+	tcExtendLocalInstEnv, tcGetInstEnvs, 
 
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
@@ -71,7 +71,8 @@ import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSub
 import Unify	( tcMatchTys )
 import Kind	( isSubKind )
 import Packages	( isHomeModule )
-import HscTypes	( ExternalPackageState(..) )
+import HscTypes	( HscEnv( hsc_HPT ), ExternalPackageState(..), 
+		  ModDetails( md_insts ), HomeModInfo( hm_details )  )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
@@ -83,13 +84,14 @@ import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind, setIdType )
 import VarEnv	( TidyEnv, emptyTidyEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
+import Module	( moduleEnvElts, elemModuleEnv, lookupModuleEnv )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
 import CmdLineOpts( DynFlags )
-import Maybes	( isJust )
+import Maybes	( isJust, fromJust )
 import Outputable
 \end{code}
 
@@ -615,6 +617,7 @@ addDictLoc dfun thing_inside
   where
    loc = getSrcLoc dfun
 \end{code}
+    
 
 %************************************************************************
 %*									*

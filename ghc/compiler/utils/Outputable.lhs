@@ -55,6 +55,7 @@ import {-# SOURCE #-} 	Module( Module )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
+import PackageConfig	( PackageId, packageIdString )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
@@ -356,6 +357,9 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
 instance Outputable FastString where
     ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
 					-- no double quotes or anything
+
+instance Outputable PackageId where
+   ppr pid = text (packageIdString pid)
 \end{code}
 
 

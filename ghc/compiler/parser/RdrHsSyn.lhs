@@ -50,8 +50,9 @@ module RdrHsSyn (
 
 import HsSyn		-- Lots of it
 import IfaceType
+import Packages		( PackageIdH(..) )
 import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache,
-			  IfacePackage(..) )
+			  Dependencies(..), IsBootInterface, noDependencies )
 import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..), IfaceConDecls(..) )
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
@@ -206,13 +207,14 @@ to get hi-boot files right!
 
 
 \begin{code}
-mkBootIface :: Module -> [HsDecl RdrName] -> ModIface
+mkBootIface :: Module -> ([(Module, IsBootInterface)], [HsDecl RdrName]) -> ModIface
 -- Make the ModIface for a hi-boot file
 -- The decls are of very limited form
 -- The package will be filled in later (see LoadIface.readIface)
-mkBootIface mod decls
-  = (emptyModIface ThisPackage{-fill in later-} mod) {
+mkBootIface mod (imports, decls)
+  = (emptyModIface HomePackage{-fill in later-} mod) {
 	mi_boot     = True,
+	mi_deps     = noDependencies { dep_mods = imports },
 	mi_exports  = [(mod, map mk_export decls')],
 	mi_decls    = decls_w_vers,
 	mi_ver_fn   = mkIfaceVerCache decls_w_vers }
@@ -320,7 +322,7 @@ hsStrictMark HsStrict = MarkedStrict
 hsStrictMark HsUnbox  = MarkedUnboxed
 
 hsIfaceName rdr_name	-- Qualify unqualifed occurrences
-				-- with the module name
+			-- with the module name
   | isUnqual rdr_name = LocalTop (rdrNameOcc rdr_name)
   | otherwise         = ExtPkg (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
 
