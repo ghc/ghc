@@ -25,8 +25,7 @@ module PrimRep
 
 #include "HsVersions.h"
 
-import Constants ( dOUBLE_SIZE, iNT64_SIZE, wORD64_SIZE )
-import Util
+import Constants ( dOUBLE_SIZE, iNT64_SIZE, wORD64_SIZE, wORD_SIZE )
 import Outputable
 \end{code}
 
@@ -175,7 +174,7 @@ getPrimRepSize other	  = 1
 
 retPrimRepSize = getPrimRepSize RetRep
 
--- size in bytes, ToDo: cpp in the right vals.
+-- sizes in bytes.
 -- (used in some settings to figure out how many bytes
 -- we have to push onto the stack when calling external
 -- entry points (e.g., stdcalling on win32)
@@ -184,19 +183,19 @@ getPrimRepSizeInBytes pr =
  case pr of
     CharRep        ->    4
     Int8Rep        ->    1
-    IntRep         ->    4
-    AddrRep        ->    4
-    FloatRep       ->    4
-    DoubleRep      ->    8
-    Word64Rep      ->    8
-    Int64Rep       ->    8
-    WeakPtrRep     ->    4
-    ForeignObjRep  ->    4
-    StablePtrRep   ->    4
-    StableNameRep  ->    4
-    ArrayRep       ->    4
-    ByteArrayRep   ->    4
-    _		   ->   panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
+    IntRep         ->    wORD_SIZE
+    AddrRep        ->    wORD_SIZE
+    FloatRep       ->    wORD_SIZE
+    DoubleRep      ->    dOUBLE_SIZE * wORD_SIZE
+    Word64Rep      ->    wORD64_SIZE * wORD_SIZE
+    Int64Rep       ->    iNT64_SIZE * wORD_SIZE
+    WeakPtrRep     ->    wORD_SIZE
+    ForeignObjRep  ->    wORD_SIZE
+    StablePtrRep   ->    wORD_SIZE
+    StableNameRep  ->    wORD_SIZE
+    ArrayRep       ->    wORD_SIZE
+    ByteArrayRep   ->    wORD_SIZE
+    _		   ->    panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
 
 \end{code}
 
