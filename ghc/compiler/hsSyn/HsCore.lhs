@@ -213,7 +213,7 @@ pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
 pprUfExpr add_par e@(UfLam _ _)   = add_par (char '\\' <+> hsep (map ppr bndrs)
                                              <+> ptext SLIT("->") <+> pprUfExpr noParens body)
                                   where (bndrs,body) = collectUfBndrs e
-pprUfExpr add_par (UfApp fun arg) = add_par (pprUfExpr noParens fun <+> pprUfExpr parens arg)
+pprUfExpr add_par app@(UfApp _ _) = add_par (pprUfApp app)
 pprUfExpr add_par (UfTuple c as)  = hsTupParens c (interpp'SP as)
 
 pprUfExpr add_par (UfCase scrut bndr alts)
@@ -242,6 +242,8 @@ pprUfExpr add_par (UfLet (UfRec pairs) body)
 
 pprUfExpr add_par (UfNote note body) = add_par (ppr note <+> pprUfExpr parens body)
 
+pprUfApp (UfApp fun arg) = pprUfApp fun <+> pprUfExpr parens arg
+pprUfApp fun	         = pprUfExpr parens fun
 
 collectUfBndrs :: UfExpr name -> ([UfBinder name], UfExpr name)
 collectUfBndrs expr
