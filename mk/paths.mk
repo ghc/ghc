@@ -155,7 +155,17 @@ INSTALL_BIN_OPTS  = \
 
 SRCS=$(wildcard *.lhs *.hs *.c *.lc *.prl *.lprl *.lit *.verb)
 
-HS_SRCS=$(filter %.lhs %.hs %.hc,$(SRCS))$(BOOT_SRCS)
+HS_SRCS=$(filter %.lhs %.hs %.hc,$(SRCS))
+#
+# Do not include BOOT_SRCS in the HS_SRCS defn above,
+# since this will make HS_SRCS always be non-empty,
+# which breaks rules like `depend'. Price is that
+# you have to define BOOT_SRCS before including
+# boilerplate.mk
+#
+ifneq "$(BOOT_SRCS)" ""
+HS_SRCS+=$(BOOT_SRCS)
+endif
 HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 HS_IFACES=$(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 

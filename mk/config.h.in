@@ -84,6 +84,9 @@
 /* Define if you have the <pwd.h> header file.  */
 #undef HAVE_PWD_H
 
+/* Define if you have the <readline/readline.h> header file. */
+#undef HAVE_READLINE_READLINE_H
+
 /* Define if you have the <siginfo.h> header file.  */
 #undef HAVE_SIGINFO_H
 

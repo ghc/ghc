@@ -180,7 +180,7 @@ GhcLibHcOpts= -split-objs -odir $(basename $*)
 
 # Build the Haskell Readline bindings?
 #
-HsLibsWithReadline=YES
+HsLibsWithReadline=NO
 #
 # Include path to readline.h
 # (no path == in standard include path)
@@ -516,7 +516,7 @@ RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
 LX			= @LxCmd@
 
-ifneq "$(HAPPY)" ""
+ifeq "$(HAPPY)" ""
 HAPPY			= $(HAPPY_PREFIX)happy
 endif
 
