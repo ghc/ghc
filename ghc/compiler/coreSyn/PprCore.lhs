@@ -12,7 +12,7 @@
 
 module PprCore (
 	pprCoreExpr, pprIfaceUnfolding, 
-	pprCoreBinding,
+	pprCoreBinding, pprCoreBindings,
 	pprBigCoreBinder,
 	pprTypedCoreBinder
 	
@@ -65,7 +65,8 @@ print something.
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 
 \begin{code}
-pprCoreBinding :: PprStyle -> CoreBinding -> Doc
+pprCoreBinding  :: PprStyle -> CoreBinding   -> Doc
+pprCoreBindings :: PprStyle -> [CoreBinding] -> Doc
 
 pprGenCoreBinding
 	:: (Eq tyvar,  Outputable tyvar,
@@ -117,6 +118,8 @@ init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
 		  | otherwise	   = ppr sty prim <> char '!'
 
 --------------
+pprCoreBindings sty binds = vcat (map (pprCoreBinding sty) binds)
+
 pprCoreBinding sty (NonRec binder expr)
   = hang (hsep [pprBigCoreBinder sty binder, equals])
     	 4 (pprCoreExpr sty (pprBigCoreBinder sty) (pprBabyCoreBinder sty) (ppr sty) expr)
