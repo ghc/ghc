@@ -199,11 +199,12 @@ mkCoerce to_ty from_ty expr
 \begin{code}
 mkSCC :: CostCentre -> Expr b -> Expr b
 	-- Note: Nested SCC's *are* preserved for the benefit of
-	--       cost centre stack profiling (Durham)
-
-mkSCC cc (Lit lit) = Lit lit
-mkSCC cc (Lam x e) = Lam x (mkSCC cc e)	-- Move _scc_ inside lambda
-mkSCC cc expr	   = Note (SCC cc) expr
+	--       cost centre stack profiling
+mkSCC cc (Lit lit)  	    = Lit lit
+mkSCC cc (Lam x e)  	    = Lam x (mkSCC cc e)  -- Move _scc_ inside lambda
+mkSCC cc (Note (SCC cc') e) = Note (SCC cc) (Note (SCC cc') e)
+mkSCC cc (Note n e) 	    = Note n (mkSCC cc e) -- Move _scc_ inside notes
+mkSCC cc expr	    	    = Note (SCC cc) expr
 \end{code}
 
 
