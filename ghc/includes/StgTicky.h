@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.7 1999/10/13 16:39:21 simonmar Exp $
+ * $Id: StgTicky.h,v 1.8 1999/10/14 13:12:22 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -559,7 +559,8 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 
 #else /* !TICKY_TICKY */
 
-#define TICK_ALLOC_HEAP(words)
+#define TICK_ALLOC_HEAP(words, f_ct)
+#define TICK_ALLOC_HEAP_NOCTR(words)
 
 #define TICK_ALLOC_FUN(g,s)
 #define TICK_ALLOC_UP_THK(g,s)
