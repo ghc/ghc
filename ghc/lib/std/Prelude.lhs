@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Prelude.lhs,v 1.26 2001/05/18 16:54:05 simonmar Exp $
+% $Id: Prelude.lhs,v 1.27 2001/11/14 11:15:53 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -95,7 +95,6 @@ import PrelFloat
 import PrelTup
 import PrelMaybe
 import PrelShow
-import PrelConc
 import PrelErr   ( error, undefined )
 
 infixr 0 $!
