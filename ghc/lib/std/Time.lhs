@@ -202,29 +202,31 @@ getClockTime = do
 	    return (TOD sec (nsec * 1000))
     	else
 	    constructErrorAndFail "getClockTime"
-  where
+
 #ifdef __HUGS__
-    malloc1 = primNewByteArray sizeof_int64
-    cvtUnsigned arr = primReadInt64Array arr 0
+malloc1 = primNewByteArray sizeof_int64
+cvtUnsigned arr = primReadInt64Array arr 0
 #else
-    malloc1 = IO $ \ s# ->
-	case newIntArray# 1# s# of 
-          (# s2#, barr# #) -> 
-		(# s2#, MutableByteArray bottom barr# #)
+malloc1 :: IO (MutableByteArray RealWorld Int)
+malloc1 = IO $ \ s# ->
+  case newIntArray# 1# s# of 
+   (# s2#, barr# #) -> (# s2#, MutableByteArray bottom barr# #)
 
-    --  The C routine fills in an unsigned word.  We don't have 
-    --	`unsigned2Integer#,' so we freeze the data bits and use them 
-    --	for an MP_INT structure.  Note that zero is still handled specially,
-    --	although (J# 1# (ptr to 0#)) is probably acceptable to gmp.
+bottom :: (Int,Int)
+bottom = error "Time.bottom"
 
-    cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
-	case readIntArray# arr# 0# s# of 
-	  (# s2#, r# #) ->
-            if r# ==# 0# 
-		then (# s2#, 0 #)
-            	else case unsafeFreezeByteArray# arr# s2# of
-                        (# s3#, frozen# #) -> 
-				(# s3#, J# 1# frozen# #)
+   --  The C routine fills in an unsigned word.  We don't have 
+   --	`unsigned2Integer#,' so we freeze the data bits and use them 
+   --	for an MP_INT structure.  Note that zero is still handled specially,
+   --	although (J# 1# (ptr to 0#)) is probably acceptable to gmp.
+
+cvtUnsigned :: MutableByteArray RealWorld Int -> IO Integer
+cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
+  case readIntArray# arr# 0# s# of 
+    (# s2#, r# #) | r# ==# 0#  -> (# s2#, 0 #)
+   	          | otherwise  ->
+            	     case unsafeFreezeByteArray# arr# s2# of
+                       (# s3#, frozen# #) -> (# s3#, J# 1# frozen# #)
 #endif
 \end{code}
 
@@ -236,35 +238,18 @@ t2} as a @TimeDiff@.
 
 
 \begin{code}
-#ifdef __HUGS__
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
-    res <- allocWords sizeof_int64
-    rc <- toClockSec year mon day hour min sec 0 res 
+    res <- malloc1
+    rc <- toClockSec year mon day hour min sec (0::Int) res 
     if rc /= (0::Int)
      then do
-            diff_sec <- primReadInt64Array res 0
+            diff_sec <- cvtUnsigned res
 	    let diff_psec = psec
             return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
      else
           error "Time.addToClockTime: can't perform conversion of TimeDiff"
-#else
-addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
-addToClockTime (TimeDiff year mon day hour min sec psec) 
-	       (TOD c_sec c_psec) = unsafePerformIO $ do
-    res <- stToIO (newIntArray (0,sizeof_time_t))
-    rc <- toClockSec year mon day hour min sec (0::Int) res 
-    if rc /= 0
-     then do
-          diff_sec_i <- stToIO (readIntArray res 0)
-          let
-	    diff_sec  = int2Integer (case diff_sec_i of I# i# -> i#)
-	    diff_psec = psec
-          return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
-     else
-          error "Time.addToClockTime: can't perform conversion of TimeDiff"
-#endif
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 diffClockTimes tod_a tod_b =
@@ -409,20 +394,17 @@ toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz
         error "Time.toClockTime: timezone offset out of range"
     else
         unsafePerformIO ( do
-	    res <- stToIO (newIntArray (0, sizeof_time_t))
+	    res <- malloc1
 	    rc  <- toClockSec year mon mday hour min sec isDst res
             if rc /= 0
              then do
-	       i <- stToIO (readIntArray res 0)
-	       return (TOD (int2Integer (case i of I# i# -> i#)) psec)
+	       i <- cvtUnsigned res
+	       return (TOD i psec)
 	     else error "Time.toClockTime: can't perform conversion"
         )
     where
      isDst = if isdst then (1::Int) else 0
 #endif
-
-bottom :: (Int,Int)
-bottom = error "Time.bottom"
 
 
 -- (copied from PosixUtil, for now)

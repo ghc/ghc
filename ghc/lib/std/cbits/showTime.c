@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: showTime.c,v 1.4 1999/09/30 12:42:26 sof Exp $
+ * $Id: showTime.c,v 1.5 1999/09/30 14:25:47 sof Exp $
  *
  * ClockTime.showsPrec Runtime Support
  */
@@ -20,18 +20,19 @@
 # endif
 #endif
 
-StgAddr
+StgInt
 showTime(I_ size, StgByteArray d, I_ maxsize, StgByteArray buf)
 {
     time_t t;
     struct tm *tm;
 
+    /*
+     * I allege that with the current (9/99) contents of Time.lhs,
+     * size will always be >= 0.   -- sof
+     */
     switch(size) {
 	case 0:
 	    t = 0;
-	    break;
-	case -1:
-	    t = - (time_t) ((StgInt *)d)[0];
 	    break;
 	case 1:
 	    t = (time_t) ((StgInt *)d)[0];
