@@ -17,6 +17,7 @@ import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import PprCore		( pprIdCoreRule )
 import CoreLint		( showPass, endPass )
+import CoreUtils	( exprArity )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
@@ -434,7 +435,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
 					       (idName id)
     ty'	   = tidyTopType (idType id)
     idinfo = tidyTopIdInfo rec_tidy_env is_external 
-			   (idInfo id) unfold_info
+			   (idInfo id) unfolding arity
 			   (lookupCgInfo cg_info_env name')
 
     id' = mkVanillaGlobal name' ty' idinfo
@@ -444,18 +445,21 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
     maybe_external = lookupVarEnv ext_ids id
     is_external    = isJust maybe_external
 
-    -- Expose an unfolding if ext_ids tells us to
-    show_unfold = maybe_external `orElse` False
-    unfold_info | show_unfold = mkTopUnfolding rhs
-		| otherwise   = noUnfolding
+    -- Usually the Id will have an accurate arity on it, because
+    -- the simplifier has just run, but not always. 
+    -- One case I found was when the last thing the simplifier
+    -- did was to let-bind a non-atomic argument and then float
+    -- it to the top level. So it seems more robust just to
+    -- fix it here.
+    arity     = exprArity rhs
+    unfolding = mkTopUnfolding rhs
+
 
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  There are two delicate pieces:
 --
---  * Arity.  We assume that the simplifier has just run, so
--- 	that there is a reasonable arity on each binder.
---	After CoreTidy, this arity must not change any more.
+--  * Arity.  After CoreTidy, this arity must not change any more.
 --	Indeed, CorePrep must eta expand where necessary to make
 --	the manifest arity equal to the claimed arity.
 --
@@ -471,7 +475,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
 -- 	An alterative would be to do a second pass over the unfoldings 
 -- 	of Ids, and rules, right at the top, but that would be a pain.
 
-tidyTopIdInfo tidy_env is_external idinfo unfold_info cg_info
+tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
   | opt_OmitInterfacePragmas || not is_external
 	-- Only basic info if the Id isn't external, or if we don't have -O
   = basic_info
@@ -488,7 +492,7 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info cg_info
 	-- baasic_info is attached to every top-level binder
     basic_info = vanillaIdInfo 
 			`setCgInfo` 	       cg_info
-			`setArityInfo`	       arityInfo idinfo
+			`setArityInfo`	       arity
 			`setNewStrictnessInfo` newStrictnessInfo idinfo
 
 -- This is where we set names to local/global based on whether they really are 
@@ -651,7 +655,7 @@ tidyLetBndr env (id,rhs)
     final_id = new_id `setIdInfo` new_info
     idinfo   = idInfo id
     new_info = vanillaIdInfo 
-		`setArityInfo`		arityInfo idinfo
+		`setArityInfo`		exprArity rhs
 		`setNewStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
 
