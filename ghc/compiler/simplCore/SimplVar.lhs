@@ -31,7 +31,7 @@ import SpecEnv		( SpecEnv, lookupSpecEnv )
 import IdInfo		( DeforestInfo(..) )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import SimplEnv
 import SimplMonad
