@@ -1,12 +1,13 @@
 This is the root directory for functional-programming tools
 distributed by the Computing Science Department at Glasgow University.
-Simon Peyton Jones <simonpj@dcs.gla.ac.uk> is the ringleader of this
+Simon Peyton Jones <simonpj@microsoft.com> is the ringleader of this
 effort.  The tools are:
 
     ghc		the Glasgow Haskell compilation system
     hslibs	collection of Haskell libraries
     haggis	the Haggis GUI toolkit
     happy	the Happy Haskell parser generator
+    hdirect     Haskell interop tool
     green-card	a foreign function interface pre-processor for Haskell.
     nofib	the NoFib Haskell benchmarking suite
     literate	the Glasgow "literate programming" system
@@ -15,10 +16,8 @@ effort.  The tools are:
     docs        documentation on the installing and using
                 the fptools suite.
 
-The "literate" stuff is usually distributed *with* other systems, but
-not necessarily.  Components which are always part of a distribution
-(never stand-alone) are "glafp-utils" and "mk" (a configuration
-system).
+Components which are always part of a distribution (never stand-alone)
+are "glafp-utils" and "mk" (a configuration system).
 
 There is usually an ANNOUNCE* file with any distribution.  Please
 consult that, or the <piece>/README file, to find out how to proceed.
