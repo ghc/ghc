@@ -26,7 +26,7 @@ module System.FilePath
          , changeFileExt
          , isRootedPath
          , isAbsolutePath
-         , dropAbsolutePrefix
+         , splitAbsolutePrefix
 
          , pathParents
          , commonParent
@@ -88,7 +88,9 @@ splitFileName :: FilePath -> (String, String)
 splitFileName p = (reverse (path2++drive), reverse fname)
   where
 #ifdef mingw32_TARGET_OS
-    (path,drive) = break (== ':') (reverse p)
+    (path,drive) = case p of
+       (c:':':p) -> (reverse p,[':',c])
+       _         -> (reverse p,"")
 #else
     (path,drive) = (reverse p,"")
 #endif
@@ -109,15 +111,14 @@ splitFileName p = (reverse (path2++drive), reverse fname)
 -- > splitFileExt "foo"     == ("foo", "")
 -- > splitFileExt "."       == (".",   "")
 -- > splitFileExt ".."      == ("..",  "")
+-- > splitFileExt "foo.bar."== ("foo.bar.", "")
 splitFileExt :: FilePath -> (String, String)
 splitFileExt p =
-  case pre of
-	[]      -> (p, [])
-	(_:pre) -> (reverse (pre++path), reverse suf)
+  case break (== '.') fname of
+	(suf@(_:_),_:pre) -> (reverse (pre++path), reverse suf)
+	_                 -> (p, [])
   where
     (fname,path) = break isPathSeparator (reverse p)
-    (suf,pre) | fname == "." || fname == ".." = (fname,"")
-              | otherwise                     = break (== '.') fname
 
 -- | Split the path into directory, file name and extension. 
 -- The function is an optimized version of the following equation:
@@ -133,7 +134,9 @@ splitFilePath p =
     (_:pre) -> (reverse real_dir, reverse pre, reverse suf)
   where
 #ifdef mingw32_TARGET_OS
-    (path,drive) = break (== ':') (reverse p)
+    (path,drive) = case p of
+       (c:':':p) -> (reverse p,[':',c])
+       _         -> (reverse p,"")
 #else
     (path,drive) = (reverse p,"")
 #endif
@@ -233,13 +236,13 @@ isAbsolutePath _ = False
 -- local path obtained by dropping the absolute prefix from the path.
 -- Under Windows the prefix is @\"\\\"@, @\"c:\"@ or @\"c:\\\"@.
 -- Under Unix the prefix is always @\"\/\"@.
-dropAbsolutePrefix :: FilePath -> FilePath
-dropAbsolutePrefix (c:cs) | isPathSeparator c = cs
+splitAbsolutePrefix :: FilePath -> (String,FilePath)
+splitAbsolutePrefix (c:cs) | isPathSeparator c = ([c],cs)
 #ifdef mingw32_TARGET_OS
-dropAbsolutePrefix (_:':':c:cs) | isPathSeparator c = cs  -- path with drive letter
-dropAbsolutePrefix (_:':':cs)                       = cs
+splitAbsolutePrefix (d:':':c:cs) | isPathSeparator c = ([d,':',c],cs)  -- path with drive letter
+splitAbsolutePrefix (d:':':cs)                       = ([d,':'],  cs)
 #endif
-dropAbsolutePrefix cs = cs
+splitAbsolutePrefix cs = ("",cs)
 
 -- | Gets this path and all its parents.
 -- The function is useful in case if you want to create 
