@@ -1413,7 +1413,7 @@ Again, we'll do the post-recompilation-checker parts of this later.
 			     ( $HscLang eq 'java' ) ? "java" : 
 				"" ;
     
-    local($hsc_out) 	   = $Tmp_prefix.$hsc_out_suffix ;
+    local($hsc_out) 	   = "$Tmp_prefix.$hsc_out_suffix" ;
     local($hsc_out_c_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.c" : "";
     local($hsc_out_h_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.h" : "";
 
