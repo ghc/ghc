@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.13 2001/10/26 00:53:27 sof Exp $
+-- $Id: DriverPhases.hs,v 1.14 2001/10/29 11:31:51 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -64,6 +64,10 @@ startPhase "hscpp" = HsPp
 startPhase "hspp"  = Hsc
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
+startPhase "cpp"   = Cc
+startPhase "C"     = Cc
+startPhase "cc"    = Cc
+startPhase "cxx"   = Cc
 startPhase "raw_s" = Mangle
 startPhase "s"     = As
 startPhase "S"     = As
@@ -91,7 +95,7 @@ phaseInputExt Ilasm       = "il"
 
 haskellish_suffix     = (`elem` [ "hs", "hspp", "hscpp", "lhs", "hc", "raw_s" ])
 haskellish_src_suffix = (`elem` [ "hs", "hspp", "hscpp", "lhs" ])
-cish_suffix           = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
+cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
 
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
