@@ -838,6 +838,7 @@ not one of the @forall@'d variables.
 validRuleLhs foralls lhs
   = check lhs
   where
+    check (OpApp _ op _ _)		  = check op
     check (HsApp e1 e2) 		  = check e1
     check (HsVar v) | v `notElem` foralls = True
     check other				  = False
@@ -882,7 +883,7 @@ badRuleLhsErr name lhs
     ptext SLIT("LHS must be of form (f e1 .. en) where f is not forall'd")
 
 badRuleVar name var
-  = sep [ptext SLIT("Rule") <+> ptext name <> colon,
+  = sep [ptext SLIT("Rule") <+> doubleQuotes (ptext name) <> colon,
 	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
 		ptext SLIT("does not appear on left hand side")]
 
