@@ -2289,7 +2289,7 @@ addTopIPErrs bndrs ips
     mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from the monomorphic top-level binding(s) of"),
 			    pprBinders bndrs <> colon],
 		       nest 2 (vcat (map ppr_ip ips)),
-		       ptext SLIT("Probably fix: add type signatures for the top-level binding(s)")]
+		       monomorphism_fix]
     ppr_ip ip = pprPred (dictPred ip) <+> pprInstLoc (instLoc ip)
 
 strangeTopIPErrs :: [Inst] -> TcM ()
@@ -2427,7 +2427,12 @@ mkMonomorphismMsg tidy_env inst_tvs
 			-- whre monomorphism doesn't play any role
     mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
 			nest 2 (vcat docs),
-			ptext SLIT("Probable fix: give these definition(s) an explicit type signature")]
+			monomorphism_fix
+		       ]
+monomorphism_fix :: SDoc
+monomorphism_fix = ptext SLIT("Probable fix:") <+> 
+		   (ptext SLIT("give these definition(s) an explicit type signature")
+		    $$ ptext SLIT("or use -fno-monomorphism-restriction"))
     
 warnDefault dicts default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
