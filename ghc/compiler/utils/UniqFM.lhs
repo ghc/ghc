@@ -47,7 +47,7 @@ module UniqFM (
 	isNullUFM,
 	lookupUFM, lookupUFM_Directly,
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-	eltsUFM,
+	eltsUFM, keysUFM,
 	ufmToList
 #if defined(COMPILING_GHC)
 	,FAST_STRING
@@ -57,10 +57,11 @@ module UniqFM (
 #if defined(COMPILING_GHC)
 IMPORT_DELOOPER( SpecLoop )
 #endif
+IMP_Ubiq()
 
 import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
-import Pretty		( SYN_IE(Pretty), PrettyRep )
+import Pretty		( Doc )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
@@ -129,6 +130,7 @@ lookupWithDefaultUFM
 lookupWithDefaultUFM_Directly
 		:: UniqFM elt -> elt -> Unique -> elt
 
+keysUFM		:: UniqFM elt -> [Int]		-- Get the keys
 eltsUFM		:: UniqFM elt -> [elt]
 ufmToList	:: UniqFM elt -> [(Unique, elt)]
 \end{code}
@@ -512,9 +514,12 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 Now the usual set of `collection' operators, like map, fold, etc.
 
 \begin{code}
-foldUFM fn a EmptyUFM = a
-foldUFM fn a fm	      = fold_tree fn a fm
+foldUFM f a (NodeUFM _ _ t1 t2) = foldUFM f (foldUFM f a t2) t1
+foldUFM f a (LeafUFM _ obj)     = f obj a
+foldUFM f a EmptyUFM	        = a
+\end{code}
 
+\begin{code}
 mapUFM fn EmptyUFM    = EmptyUFM
 mapUFM fn fm	      = map_tree fn fm
 
@@ -571,17 +576,15 @@ lookUp fm i	    = lookup_tree fm
 folds are *wonderful* things.
 
 \begin{code}
-eltsUFM EmptyUFM = []
-eltsUFM fm       = fold_tree (:) [] fm
+eltsUFM fm = foldUFM (:) [] fm
 
-ufmToList EmptyUFM = []
-ufmToList fm
-  = fold_tree (\ iu elt rest -> (mkUniqueGrimily iu, elt) : rest) [] fm
-  where
-    fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
-    fold_tree f a (LeafUFM iu obj)    = f iu obj a
+ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily iu, elt) : rest) [] fm
 
-    fold_tree f a EmptyUFM = panic "Should Never fold over an EmptyUFM"
+keysUFM fm = fold_tree (\ iu elt rest -> IBOX(iu) : rest) [] fm
+
+fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
+fold_tree f a (LeafUFM iu obj)    = f iu obj a
+fold_tree f a EmptyUFM		  = a
 \end{code}
 
 %************************************************************************
@@ -691,14 +694,7 @@ insert_ele f n@(NodeUFM j p t1 t2) i a
 		  (mkLeafUFM i a)
 \end{code}
 
-This has got a left to right ordering.
 
-\begin{code}
-fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
-fold_tree f a (LeafUFM _ obj)	  = f obj a
-
-fold_tree f a EmptyUFM = panic "Should Never fold over an EmptyUFM"
-\end{code}
 
 \begin{code}
 map_tree f (NodeUFM j p t1 t2)
@@ -716,6 +712,7 @@ filter_tree f nd@(NodeUFM j p t1 t2)
 filter_tree f lf@(LeafUFM i obj)
   | f obj = lf
   | otherwise = EmptyUFM
+filter_tree f _ = panic "filter_tree failed"
 \end{code}
 
 %************************************************************************
