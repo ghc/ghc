@@ -20,8 +20,12 @@ module AbsCUtils (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 200
+import AbsCLoop (mkReturnPtLabel, CLabel )
+#else
 import {-# SOURCE #-} CLabel	( mkReturnPtLabel, CLabel )
 	-- The loop here is (CLabel -> CgRetConv -> AbsCUtils -> CLabel)
+#endif
 
 import AbsCSyn
 
