@@ -10,20 +10,26 @@ internet.)
 
 Here is how it works.
 
-A constuctor is encoded as a bit stream. To this end, we view the list
-of all constructors as a right-associative binary tree, and we encode
-a given constructor as the path that leads to it in this tree. If
-there is just a single constructor, as for newtypes, for example, then
-the computed bit stream is empty.
+A constuctor is encoded as a bit stream. To this end, we encode the
+index of the constructor as a binary number of a fixed length taking
+into account the maximum index for the type at hand. (Similarly, we
+could view the list of constructors as a binary tree, and then encode
+a constructor as the path to the constructor in this tree.) If there
+is just a single constructor, as for newtypes, for example, then the
+computed bit stream is empty.
 
 Otherwise we just recurse into subterms.
 
 Well, we need to handle basic datatypes in a special way. We observe
-them by seeing that the datatype for the term at hand does not offer
-any constructors. Then, we turn the value into a string, which can now
-be encoded by first converting it into a list of bit streams.
+such basic datatypes by testing the maximum index to be 0 for the
+datatype at hand. An efficient encoding should be tuned per basic
+datatype. The following solution is generic, but it wastes space.
+That is, we turn the basic value into a string relying on the general
+Data API. This string can now be encoded by first converting it into a
+list of bit streams at the term level, which can then be easily
+encoded as a single bit stream (because lists and bits can be
+encoded).
 
- 
 -}
 
 
@@ -41,9 +47,44 @@ import CompanyDatatypes
 
 
 
--- | We need bits and streams
+-- | We need bits and bit streams.
 data Bit = Zero | One deriving (Show, Typeable, Data)
 type Bin = [Bit]
+
+
+
+-----------------------------------------------------------------------------
+
+
+
+-- Compute length of bit stream for a natural
+lengthNat :: Int -> Int
+lengthNat x = ceiling (logBase 2 (fromIntegral (x + 1)))
+
+
+-- Encode a natural as a bit stream
+varNat2bin :: Int -> Bin
+varNat2bin 0 = []
+varNat2bin x =
+  ( ( if even x then Zero else One )
+  : varNat2bin (x `div` 2)
+  ) 
+
+
+-- Encode a natural as a bit stream of fixed length
+fixedNat2bin :: Int -> Int -> Bin
+fixedNat2bin 0 0 = []
+fixedNat2bin p x | p>0 =
+  ( ( if even x then Zero else One )
+  : fixedNat2bin (p - 1) (x `div` 2)
+  ) 
+
+
+-- Decode a natural
+bin2nat :: Bin -> Int
+bin2nat []          = 0
+bin2nat (Zero : bs) = 2 * (bin2nat bs)
+bin2nat (One  : bs) = 2 * (bin2nat bs) + 1
 
 
 
@@ -55,38 +96,37 @@ type Bin = [Bit]
 showBin :: Data t => t -> Bin
 
 showBin t
-  = if null cons 
-      then showBin (map (int2bin . ord) (conString (toConstr t)))
-      else con2bin cons (toConstr t) ++ concat (gmapQ showBin t)
+  = if not (max == 0) 
+      then con2bin ++ concat (gmapQ showBin t)
+      else showBin base
 
  where
- 
-  -- Retrieve the list of all constructors
-  cons :: [Constr]
-  cons = dataTypeCons (dataTypeOf t)
 
-  -- Encode a constructor
-  con2bin :: [Constr] -> Constr -> Bin
-  con2bin [x]    y | x == y     = []
-  con2bin (x:_)  y | x == y     = [Zero]
-  con2bin (x:xs) y              = One:con2bin xs y
+  -- Obtain the maximum index for the type at hand
+  max :: Int
+  max = maxConIndex (dataTypeOf t)
 
--- Encode an integer as bit stream
-int2bin :: Int -> Bin
-int2bin 0          = []
-int2bin x | even x = (Zero : int2bin (x `div` 2))
-int2bin x | odd  x = (One  : int2bin (x `div` 2))
+  -- Obtain the index for the constructor at hand
+  idx :: Int
+  idx = conIndex (toConstr t)
 
+  -- Map basic values to strings, then to lists of bit streams
+  base = map (varNat2bin . ord) (conString (toConstr t))
+
+  -- Map constructors to bit streams of fixed length
+  con2bin = fixedNat2bin (lengthNat (max - 1)) (idx - 1)
 
 
 -----------------------------------------------------------------------------
 
 
 
--- | A reader monad on bit streams with failure
+-- | A monad on bit streams
 data ReadB a = ReadB (Bin -> (Maybe a, Bin))
 unReadB (ReadB f) = f
 
+
+-- It's a monad.
 instance Monad ReadB where
   return a = ReadB (\bs -> (Just a, bs))
   (ReadB c) >>= f = ReadB (\bs -> case c bs of
@@ -94,12 +134,22 @@ instance Monad ReadB where
                              (Nothing, bs') -> (Nothing, bs')
                           )
 
+
+-- It's a bit monad with 0 and +.
 instance MonadPlus ReadB where
   mzero = ReadB (\bs -> (Nothing, bs))
   (ReadB f) `mplus` (ReadB g) = ReadB (\bs -> case f bs of
                                          (Just a, bs') -> (Just a, bs')
                                          (Nothing, _)  -> g bs
                                       )
+
+
+-- Read a few bits
+readB :: Int -> ReadB Bin
+readB x = ReadB (\bs -> if length bs >= x
+                          then (Just (take x bs), drop x bs)
+                          else (Nothing, bs)
+                )
 
 
 
@@ -113,44 +163,34 @@ readBin = result
  where
 
   -- The worker, which we also use as type argument
-  result = if null cons
+  result = if not (max == 0)
 
-             then do chars <- readBin
-                     con   <- str2con (map (chr . bin2int) chars)
+             then do bin <- readB (lengthNat (max - 1))
+                     gunfoldM (bin2con bin) readBin
+
+             else do str <- readBin
+                     con <- str2con (map (chr . bin2nat) str)
                      return (fromConstr con)
 
-             else do con <- bin2con cons
-                     gunfoldM con readBin
-
-
   -- Get the datatype for the type at hand
-  myDataTypeOf :: Data a => ReadB a -> DataType
-  myDataTypeOf (_::ReadB a) = dataTypeOf (undefined::a)
+  myDataTypeOf :: DataType
+  myDataTypeOf = dataTypeOf (get result)
+   where
+    get :: ReadB a -> a
+    get _ = undefined
 
-  -- Retrieve the list of all constructors
-  cons :: [Constr]
-  cons = dataTypeCons (myDataTypeOf result)
+  -- Obtain the maximum index for the type at hand
+  max :: Int
+  max = maxConIndex myDataTypeOf
 
-  -- Construct a constructor from a string
+  -- Convert a bit stream into a constructor 
+  bin2con :: Bin -> Constr
+  bin2con bin = indexCon myDataTypeOf ((bin2nat bin) + 1)
+
+  -- Convert string to constructor; could fail
   str2con :: String -> ReadB Constr
   str2con = maybe mzero return
-                . stringCon (myDataTypeOf result)
-
-  -- Decode a constructor
-  bin2con :: [Constr] -> ReadB Constr
-  bin2con cs
-    = ReadB ( \bs -> case (bs,cs) of 
-                       (bs'     , [c]   ) -> (Just c, bs')
-                       (Zero:bs', c:_   ) -> (Just c, bs')
-                       (One :bs', _:cs' ) -> unReadB (bin2con cs') bs'
-                       (bs'     , _     ) -> (Nothing, bs') 
-            )
-
--- Decode an integer
-bin2int :: Bin -> Int
-bin2int []          = 0
-bin2int (Zero : bs) = 2 * (bin2int bs)
-bin2int (One  : bs) = 2 * (bin2int bs) + 1
+                . stringCon myDataTypeOf
 
 
 
