@@ -42,9 +42,8 @@ IMPORT_DELOOPER(AbsCLoop)
 # if  ! OMIT_NATIVE_CODEGEN
 import {-# SOURCE #-} MachMisc
 # endif
-import {-# SOURCE #-} CLabel
-import {-# SOURCE #-} ClosureInfo
-import {-# SOURCE #-} CgRetConv
+import {-# SOURCE #-} ClosureInfo ( ClosureInfo )
+import {-# SOURCE #-} CLabel	  ( CLabel )
 #endif
 
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
@@ -55,7 +54,6 @@ import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
 			  SYN_IE(VirtualHeapOffset), HeapOffset
 			)
-import CLabel           ( CLabel )
 import CostCentre       ( CostCentre )
 import Literal		( mkMachInt, Literal )
 import PrimRep		( isFollowableRep, PrimRep(..) )

@@ -20,10 +20,11 @@ module AbsCUtils (
     ) where
 
 IMP_Ubiq(){-uitous-}
+import {-# SOURCE #-} CLabel	( mkReturnPtLabel, CLabel )
+	-- The loop here is (CLabel -> CgRetConv -> AbsCUtils -> CLabel)
 
 import AbsCSyn
 
-import CLabel		( mkReturnPtLabel, CLabel )
 import Digraph		( stronglyConnComp, SCC(..) )
 import HeapOffs		( possiblyEqualHeapOffset )
 import Id		( fIRST_TAG, SYN_IE(ConTag) )
