@@ -25,11 +25,12 @@ Version:        %{version}
 Release:        %{release}
 License:        BSD-like
 Group:          Development/Languages/Haskell
-URL:            http://www.haskell.org/haddock/
-Source:         http://www.haskell.org/haddock/haddock-%{version}-src.tar.gz
-Packager:       Tom Moertel <tom-rpms@moertel.com>
+URL:            http://haskell.org/haddock/
+Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
+Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
+BuildRequires:  alex, happy, ghc, docbk31, jade, jadetex, dvips
 Summary:        A documentation tool for annotated Haskell source code
 
 %description
