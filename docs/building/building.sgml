@@ -3587,11 +3587,13 @@ We install it in <filename>c:/mingw</filename>.
 
 <listitem>
 <para>
-Install a version of GHC, and put it in your <constant>PATH</constant>. 
-
+Install a version of GHC, and put it in your
+<constant>PATH</constant> (the installer tells you the path element
+you need to add upon completion.)
 </para>
 </listitem>
 
+<!--
 <listitem>
 <para>
 Because of various hard-wired infelicities, you need to copy
@@ -3615,8 +3617,9 @@ bash.exe</filename> is also provided as <filename>sh.exe</filename>.
 
 
 <listitem>
-<para> You should not need to install <command>ssh</command> 
-and <command>cvs</command>: they come with Cygwin.</para>
+<para> Both <command>cvs</command> and <command>ssh</command>
+come with Cygwin, but make sure you select them when running
+the Cygwin installer.
 </listitem>
 
 <listitem>
