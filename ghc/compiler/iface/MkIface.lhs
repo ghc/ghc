@@ -218,7 +218,7 @@ import Outputable
 import DriverUtil	( createDirectoryHierarchy, directoryOf )
 import Util		( sortLt, seqList )
 import Binary		( getBinFileWithDict )
-import BinIface		( writeBinIface, v_IgnoreHiVersion )
+import BinIface		( writeBinIface, v_IgnoreHiWay )
 import Unique		( Unique, Uniquable(..) )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Digraph		( stronglyConnComp, SCC(..) )
@@ -936,7 +936,7 @@ showIface :: FilePath -> IO ()
 showIface filename = do
    -- skip the version check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
-   writeIORef v_IgnoreHiVersion True
+   writeIORef v_IgnoreHiWay True
    iface <- Binary.getBinFileWithDict filename
    printDump (pprModIface iface)
  where

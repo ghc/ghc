@@ -5,7 +5,7 @@
 -- 
 -- Binary interface file support.
 
-module BinIface ( writeBinIface, readBinIface, v_IgnoreHiVersion ) where
+module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
 
 #include "HsVersions.h"
 
@@ -112,8 +112,9 @@ instance Binary ModIface where
 		 mi_insts     = insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers }) = do
+	put_ bh (show opt_HiVersion)
 	build_tag <- readIORef v_Build_tag
-	put_ bh (show opt_HiVersion ++ build_tag)
+	put  bh build_tag
 	put_ bh pkg_name
 	put_ bh (moduleName mod)
 	put_ bh mod_vers
@@ -131,15 +132,23 @@ instance Binary ModIface where
 
    get bh = do
 	check_ver  <- get bh
-        ignore_ver <- readIORef v_IgnoreHiVersion
-	build_tag <- readIORef v_Build_tag
- 	let our_ver = show opt_HiVersion ++ build_tag
-        when (check_ver /= our_ver && not ignore_ver) $
+	let our_ver = show opt_HiVersion
+        when (check_ver /= our_ver) $
 	   -- use userError because this will be caught by readIface
 	   -- which will emit an error msg containing the iface module name.
 	   throwDyn (ProgramError (
 		"mismatched interface file versions: expected "
 		++ our_ver ++ ", found " ++ check_ver))
+
+	check_way <- get bh
+        ignore_way <- readIORef v_IgnoreHiWay
+	build_tag <- readIORef v_Build_tag
+        when (not ignore_way && check_way /= build_tag) $
+	   -- use userError because this will be caught by readIface
+	   -- which will emit an error msg containing the iface module name.
+	   throwDyn (ProgramError (
+		"mismatched interface file ways: expected "
+		++ build_tag ++ ", found " ++ check_way))
 
 	pkg_name  <- get bh
 	mod_name  <- get bh
@@ -181,7 +190,7 @@ instance Binary ModIface where
 		 mi_fix_fn = mkIfaceFixCache fixities,
 		 mi_ver_fn = mkIfaceVerCache decls })
 
-GLOBAL_VAR(v_IgnoreHiVersion, False, Bool)
+GLOBAL_VAR(v_IgnoreHiWay, False, Bool)
 
 -------------------------------------------------------------------------
 --		Types from: HscTypes
