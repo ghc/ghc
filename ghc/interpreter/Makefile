@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.14 1999/10/29 14:33:57 sewardj Exp $                        #
+# $Id: Makefile,v 1.15 1999/11/01 02:41:04 andy Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -27,7 +27,6 @@ YACC = bison -y
 	mv y.tab.c $@
 	rm -f input.o
 
-
 HS_SRCS =
 
 Y_SRCS = parser.y
@@ -46,7 +45,6 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
       ../rts/StgCRun.o
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty $(LIB_DL) -lm
-
 
 nHandle.$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
@@ -104,4 +102,21 @@ depend :: $(LOOPS) $(SRCS_UGNHS)
 
 include $(TOP)/mk/target.mk
 
+HUGSCPP = ../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
 
+libs:
+	$(HUGSCPP) ../lib/std/List.lhs > lib/List.lhs
+	$(HUGSCPP) ../lib/std/Ix.lhs > lib/Ix.lhs
+	$(HUGSCPP) ../lib/std/Complex.lhs > lib/Complex.lhs
+	$(HUGSCPP) ../lib/std/Char.lhs > lib/Char.lhs
+	$(HUGSCPP) ../lib/std/Ratio.lhs > lib/Ratio.lhs
+	$(HUGSCPP) ../lib/std/Random.lhs > lib/Random.lhs
+	$(HUGSCPP) ../lib/std/Array.lhs > lib/Array.lhs
+	$(HUGSCPP) ../lib/std/Maybe.lhs > lib/Maybe.lhs
+	$(HUGSCPP) ../lib/std/Monad.lhs > lib/Monad.lhs
+	$(HUGSCPP) ../lib/std/Numeric.lhs > lib/Numeric.lhs
+	$(HUGSCPP) ../lib/std/Directory.lhs > lib/Directory.lhs
+	$(HUGSCPP) ../lib/std/System.lhs > lib/System.lhs
+	$(HUGSCPP) ../lib/std/Locale.lhs > lib/Locale.lhs
+	$(HUGSCPP) ../lib/std/CPUTime.lhs > lib/CPUTime.lhs
+	$(HUGSCPP) ../lib/std/IO.lhs > lib/IO.lhs
