@@ -792,7 +792,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS(Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h inttypes.h limits.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stddef.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h bfd.h winsock.h pthread.h sys/uio.h)
+AC_CHECK_HEADERS(Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h inttypes.h limits.h locale.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stddef.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h bfd.h winsock.h pthread.h sys/uio.h)
 AC_CHECK_HEADER(unistd.h,[AC_CHECK_FUNCS(lchown)])
 
 AC_CHECK_HEADER(readline/readline.h, [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
@@ -1084,6 +1084,9 @@ dnl ** check whether this machine has BFD and liberty installed (used for debugg
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
+
+dnl ** check for wide-char classifications
+AC_CHECK_HEADERS(wctype.h)
 
 dnl ** check for readline, for Hugs and hslibs' Readline
 dnl ncurses supersedes termcap and curses, but for compatibility,
