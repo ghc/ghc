@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.55 $
- * $Date: 2000/06/15 13:23:51 $
+ * $Revision: 1.56 $
+ * $Date: 2000/06/23 12:09:00 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1357,6 +1357,20 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_VAR_WORD_big):
             Case(i_RETADDR_big):
             Case(i_ALLOC_PAP):
+
+            Case(i_UNPACK_INJ):
+            Case(i_UNPACK_ROW):
+            Case(i_TEST_INJ_CONST):
+            Case(i_TEST_INJ_big):
+            Case(i_TEST_INJ):
+            Case(i_PACK_INJ_CONST):
+            Case(i_PACK_INJ_big):
+            Case(i_PACK_INJ):
+            Case(i_PACK_ROW_big):
+            Case(i_PACK_ROW):
+            Case(i_ALLOC_ROW_big):
+            Case(i_ALLOC_ROW):
+
                     bciPtr--;
                     printf ( "\n\n" );
                     disInstr ( bco, PC );

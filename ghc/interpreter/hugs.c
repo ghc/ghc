@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.76 $
- * $Date: 2000/06/23 09:41:11 $
+ * $Revision: 1.77 $
+ * $Date: 2000/06/23 12:09:01 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -393,7 +393,7 @@ static List /*CONID*/ initialize ( Int argc, String argv[] )
    readOptions("-p\"%s> \" -r$$");
    readOptions(fromEnv("STGHUGSFLAGS",""));
 
-#  if DEBUG
+#  ifdef DEBUG
    { 
       char exe_name[N_INSTALLDIR + 6];
       strcpy(exe_name, installDir);
