@@ -154,8 +154,8 @@ genericTyCons :: [TyCon]
 genericTyCons = [ plusTyCon, crossTyCon, genUnitTyCon ]
 
 
-tuple_tycons = unitTyCon : [tupleTyCon Boxed i | i <- [2..37] ]
-unboxed_tuple_tycons = [tupleTyCon Unboxed i | i <- [1..37] ]
+tuple_tycons = unitTyCon : [tupleTyCon Boxed   i | i <- [2..mAX_TUPLE_SIZE] ]
+unboxed_tuple_tycons     = [tupleTyCon Unboxed i | i <- [1..mAX_TUPLE_SIZE] ]
 \end{code}
 
 

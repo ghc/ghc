@@ -483,7 +483,13 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
 	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
   where
     new_id = setIdSpecialisation id (addRule old_rules id rule)
+
     old_rules = idSpecialisation (fromMaybe id (lookupVarSet rule_ids id))
+	-- Get the old rules from rule_ids if the Id is already there, but
+	-- if not, use the Id from the incoming rule.  If may be a PrimOpId,
+	-- in which case it may have rules in its belly already.  Seems
+	-- dreadfully hackoid.
+
     lhs_fvs = ruleLhsFreeIds rule
 	-- Finds *all* the free Ids of the LHS, not just
 	-- locally defined ones!!

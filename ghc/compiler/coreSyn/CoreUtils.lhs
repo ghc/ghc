@@ -561,7 +561,12 @@ idAppIsValue id n_val_args
 \begin{code}
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 exprIsConApp_maybe (Note InlineMe expr) = exprIsConApp_maybe expr
-exprIsConApp_maybe expr                 = analyse (collectArgs expr)
+    -- We ignore InlineMe notes in case we have
+    --	x = __inline_me__ (a,b)
+    -- All part of making sure that INLINE pragmas never hurt
+    -- Marcin tripped on this one when making dictionaries more inlinable
+
+exprIsConApp_maybe expr = analyse (collectArgs expr)
   where
     analyse (Var fun, args)
 	| Just con <- isDataConId_maybe fun,

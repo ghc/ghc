@@ -603,6 +603,10 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 	scs_and_meths = map instToId (sc_dicts ++ meth_insts)
 	this_dict_id  = instToId this_dict
 	inlines       = unitNameSet (idName dfun_id)
+		-- Always inline the dfun; this is an experimental decision
+		-- because it makes a big performance difference sometimes.
+		-- Often it means we can do the method selection, and then
+		-- inline the method as well.  Marcin's idea.
 
 	dict_rhs
 	  | null scs_and_meths
