@@ -1,4 +1,5 @@
 
-Cycle in type declarations:
-    `T2' at mod27.hs:4
-    `T1' at mod27.hs:3
+mod27.hs:1:
+    Cycle in type declarations:
+	`T2' at mod27.hs:4
+	`T1' at mod27.hs:3

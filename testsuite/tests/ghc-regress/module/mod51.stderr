@@ -1,4 +1,5 @@
 
-Duplicate instance declarations:
-  mod51.hs:3: Eq T
-  mod51.hs:3: Eq T
+mod51.hs:2:
+    Duplicate instance declarations:
+      mod51.hs:3: Eq T
+      mod51.hs:3: Eq T
