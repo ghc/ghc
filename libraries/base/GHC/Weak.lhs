@@ -84,6 +84,17 @@ mkWeakPtr key finalizer = mkWeak key key finalizer
   returned is simply thrown away (however the finalizer will be
   remembered by the garbage collector, and will still be run
   when the key becomes unreachable).
+
+  Note: adding a finalizer to a 'Foreign.ForeignPtr.ForeignPtr' using
+  'addFinalizer' won't work as well as using the specialised version
+  'Foreign.ForeignPtr.addForeignPtrFinalizer' because the latter
+  version adds the finalizer to the primitive 'ForeignPtr#' object
+  inside, whereas the generic 'addFinalizer' will add the finalizer to
+  the box.  Optimisations tend to remove the box, which may cause the
+  finalizer to run earlier than you intended.  The same motivation
+  justifies the existence of
+  'Control.Concurrent.MVar.addMVarFinalizer' and
+  'Data.IORef.mkWeakIORef' (the non-unformity is accidental).
 -}
 addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do
