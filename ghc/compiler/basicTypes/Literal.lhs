@@ -8,7 +8,8 @@ module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
 	, mkMachInt64, mkMachWord64
-	, isLitLitLit, maybeLitLit, litSize, litIsDupable,
+	, isLitLitLit, maybeLitLit, litSize
+	, litIsDupable, litIsTrivial
 	, literalType, literalPrimRep
 	, hashLiteral
 
@@ -282,9 +283,17 @@ isLitLitLit _	    	     = False
 maybeLitLit (MachLitLit s t) = Just (s,t)
 maybeLitLit _		     = Nothing
 
+litIsTrivial :: Literal -> Bool
+-- True if there is absolutely no penalty to duplicating the literal
+--	c.f. CoreUtils.exprIsTrivial
+-- False principally of strings
+litIsTrivial (MachStr _) = False
+litIsTrivial other	 = True
+
 litIsDupable :: Literal -> Bool
-	-- True if code space does not go bad if we duplicate this literal
-	-- False principally of strings
+-- True if code space does not go bad if we duplicate this literal
+--	c.f. CoreUtils.exprIsDupable
+-- Currently we treat it just like litIsTrivial
 litIsDupable (MachStr _) = False
 litIsDupable other	 = True
 

@@ -45,7 +45,7 @@ import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
 import VarEnv
 import Name		( hashName )
-import Literal		( hashLiteral, literalType, litIsDupable, isZeroLit )
+import Literal		( hashLiteral, literalType, litIsDupable, litIsTrivial, isZeroLit )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
@@ -326,7 +326,7 @@ saturating them.
 \begin{code}
 exprIsTrivial (Var v)	   = True	-- See notes above
 exprIsTrivial (Type _)	   = True
-exprIsTrivial (Lit lit)    = True
+exprIsTrivial (Lit lit)    = litIsTrivial lit
 exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
 exprIsTrivial (Note _ e)   = exprIsTrivial e
 exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
