@@ -3,12 +3,11 @@
 module Main where
 
 import Foreign
-import Stable
 
 -- simple test for building/dereferencing stable ptrs
 
 main 
-  = do	l <- mapM makeStablePtr [1..100000]
+  = do	l <- mapM newStablePtr [1..100000]
    	sum <- stable_sum l
    	print sum
 
