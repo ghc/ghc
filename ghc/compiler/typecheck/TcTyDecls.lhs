@@ -333,11 +333,7 @@ calcTyConArgVrcs tyclss
     initial_oi :: NameEnv (TyCon, ArgVrcs)
     initial_oi = mkNameEnv [(tyConName tc, (tc, initial tc))
 			   | tc <- tycons]
-    initial tc = if isAlgTyCon tc && isNothing (tyConDataCons_maybe tc) then
-                         -- make pessimistic assumption (and warn)
-                         abstractVrcs tc
-                       else
-                         replicate (tyConArity tc) (False,False)
+    initial tc = replicate (tyConArity tc) (False,False)
 
     tcaoFix :: NameEnv (TyCon, ArgVrcs)   -- initial ArgVrcs per tycon
 	    -> NameEnv (TyCon, ArgVrcs)   -- fixpointed ArgVrcs per tycon
@@ -358,10 +354,7 @@ calcTyConArgVrcs tyclss
 	     -> ArgVrcs                   -- new ArgVrcs for tycon
 
     tcaoIter oi tc | isAlgTyCon tc
-      = if null data_cons then
-	    abstractVrcs tc		-- Data types with no constructors
-	else
-            map (\v -> anyVrc (vrcInTy (lookup oi) v) argtys) vs
+      = map (\v -> anyVrc (vrcInTy (lookup oi) v) argtys) vs
       where
        	data_cons = tyConDataCons tc
        	vs        = tyConTyVars tc
@@ -376,20 +369,6 @@ calcTyConArgVrcs tyclss
 			Just (_, pms) -> pms
 			Nothing	      -> tyConArgVrcs tc
 	 -- We use the already-computed result for tycons not in this SCC
-
-
-abstractVrcs :: TyCon -> ArgVrcs
-abstractVrcs tc = 
-#ifdef DEBUG
-                  pprTrace "Vrc: abstract tycon:" (ppr tc) $
-#endif
-                  warn_abstract_vrcs `seq` replicate (tyConArity tc) (True,True)
-
-warn_abstract_vrcs
--- we pull the message out as a CAF so the warning only appears *once*
-  = trace ("WARNING: tyConArgVrc info inaccurate due to unavailable constructors.\n"
-        ++ "         Use -fno-prune-tydecls to fix.") $
-                ()
 \end{code}
 
 

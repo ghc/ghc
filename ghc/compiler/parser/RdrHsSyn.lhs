@@ -360,6 +360,8 @@ hsIfaceDecl (TyClD decl@(TyData {}))
 		ifCtxt = hsIfaceCtxt (tcdCtxt decl),
 		ifCons = Unknown, ifRec = NonRecursive,
 		ifVrcs = [], ifGeneric = False }
+	-- I'm not sure that [] is right for ifVrcs, but
+	-- since we don't use them I'm not going to fiddle
 
 hsIfaceDecl (TyClD decl@(ClassDecl {}))
   = IfaceClass { ifName = rdrNameOcc (tcdName decl), 

@@ -195,8 +195,8 @@ data DataConDetails datacon
   = DataCons [datacon]	-- Its data constructors, with fully polymorphic types
 			-- A type can have zero constructors
 
-  | Unknown		-- We're importing this data type from an hi-boot file
-			-- and we don't know what its constructors are
+  | Unknown		-- Used only when We're importing this data type from an 
+			-- hi-boot file, so we don't know what its constructors are
 
 visibleDataCons (DataCons cs) = cs
 visibleDataCons other	      = []
@@ -452,7 +452,7 @@ tyConHasGenerics other				 = False	-- Synonyms
 tyConDataConDetails :: TyCon -> DataConDetails DataCon
 tyConDataConDetails (AlgTyCon {dataCons = cons}) = cons
 tyConDataConDetails (TupleTyCon {dataCon = con}) = DataCons [con]
-tyConDataConDetails other			 = Unknown
+tyConDataConDetails other			 = pprPanic "tyConDataConDetails" (ppr other)
 
 tyConDataCons :: TyCon -> [DataCon]
 -- It's convenient for tyConDataCons to return the
