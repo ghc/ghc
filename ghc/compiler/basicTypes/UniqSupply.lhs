@@ -15,6 +15,7 @@ module UniqSupply (
 	getUniqueUs, getUniquesUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
+	lazyThenUs, lazyMapUs,
 
 	mkSplitUniqSupply,
 	splitUniqSupply
@@ -121,6 +122,7 @@ initUs_ :: UniqSupply -> UniqSM a -> a
 initUs_ init_us m = case m init_us of { (r,us) -> r }
 
 {-# INLINE thenUs #-}
+{-# INLINE lazyThenUs #-}
 {-# INLINE returnUs #-}
 {-# INLINE splitUniqSupply #-}
 \end{code}
@@ -135,9 +137,14 @@ thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs expr cont us
   = case (expr us) of { (result, us') -> cont result us' }
 
+lazyThenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
+lazyThenUs expr cont us
+  = let (result, us') = expr us in cont result us'
+
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
 thenUs_ expr cont us
   = case (expr us) of { (_, us') -> cont us' }
+
 
 returnUs :: a -> UniqSM a
 returnUs result us = (result, us)
@@ -159,11 +166,17 @@ getUniquesUs n us = case splitUniqSupply us of
 
 \begin{code}
 mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-
 mapUs f []     = returnUs []
 mapUs f (x:xs)
   = f x         `thenUs` \ r  ->
     mapUs f xs  `thenUs` \ rs ->
+    returnUs (r:rs)
+
+lazyMapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
+lazyMapUs f []     = returnUs []
+lazyMapUs f (x:xs)
+  = f x             `lazyThenUs` \ r  ->
+    lazyMapUs f xs  `lazyThenUs` \ rs ->
     returnUs (r:rs)
 
 mapAndUnzipUs  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c])

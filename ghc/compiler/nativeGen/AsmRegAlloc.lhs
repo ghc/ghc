@@ -1,193 +1,232 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1998
+% (c) The AQUA Project, Glasgow University, 1993-2000
 %
 \section[AsmRegAlloc]{Register allocator}
 
 \begin{code}
-module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where	
+module AsmRegAlloc ( runRegAllocate ) where	
 
 #include "HsVersions.h"
 
 import MachCode		( InstrBlock )
 import MachMisc		( Instr(..) )
-import PprMach		( pprUserReg ) -- debugging
+import PprMach		( pprUserReg, pprInstr ) -- debugging
 import MachRegs
 import RegAllocInfo
 
-import FiniteMap	( emptyFM, addListToFM, delListFromFM, 
-                         lookupFM, keysFM )
+import FiniteMap	( FiniteMap, emptyFM, addListToFM, delListFromFM, 
+			  lookupFM, keysFM, eltsFM, mapFM, addToFM_C, addToFM,
+			  listToFM, fmToList, lookupWithDefaultFM )
 import Maybes		( maybeToBool )
 import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB )
 import OrdList		( unitOL, appOL, fromOL, concatOL )
 import Outputable
-import List		( mapAccumL )
+import Unique		( Unique, Uniquable(..), mkPseudoUnique3 )
+import CLabel		( CLabel, pprCLabel )
+
+import List		( mapAccumL, nub, sort )
+import Array		( Array, array, (!), bounds )
 \end{code}
 
-This is the generic register allocator.
+This is the generic register allocator.  It does allocation for all
+architectures.  Details for specific architectures are given in
+RegAllocInfo.lhs.  In practice the allocator needs to know next to
+nothing about an architecture to do its job:
+
+* It needs to be given a list of the registers it can allocate to.
+
+* It needs to be able to find out which registers each insn reads and
+  writes.
+
+* It needs be able to change registers in instructions into other
+  registers.
+
+* It needs to be able to find out where execution could go after an
+  in instruction.
+
+* It needs to be able to discover sets of registers which can be
+  used to attempt spilling.
 
 First we try something extremely simple.  If that fails, we have to do
 things the hard way.
 
 \begin{code}
 runRegAllocate
-    :: MRegsState
-    -> ([Instr] -> [[RegNo]])
+    :: [Reg]
+    -> ([Instr] -> [[Reg]])
     -> InstrBlock
     -> [Instr]
 
 runRegAllocate regs find_reserve_regs instrs
   = case simpleAlloc of
-	Just simple -> simple
-	Nothing     -> tryHairy reserves
+       Just simple -> --trace "SIMPLE" 
+                      simple
+       Nothing     -> --trace "GENERAL"
+                      (tryGeneral reserves)
   where
-    tryHairy [] 
-       = error "nativeGen: spilling failed.  Try -fvia-C.\n"
-    tryHairy (resv:resvs)
-       = case hairyAlloc resv of
+    tryGeneral [] 
+       = error "nativeGen: spilling failed.  Workaround: compile with -fvia-C.\n"
+    tryGeneral (resv:resvs)
+       = case generalAlloc resv of
             Just success -> success
-            Nothing      -> tryHairy resvs
+            Nothing      -> tryGeneral resvs
 
-    reserves         = find_reserve_regs flatInstrs
-    flatInstrs       = fromOL instrs
-    simpleAlloc      = simpleRegAlloc regs [] emptyFM flatInstrs
-    hairyAlloc resvd = hairyRegAlloc  regs resvd flatInstrs
-
-
-runHairyRegAllocate
-    :: MRegsState
-    -> [RegNo]
-    -> InstrBlock
-    -> Maybe [Instr]
-
-runHairyRegAllocate regs reserve_regs instrs
-  = hairyRegAlloc regs reserve_regs flatInstrs
-  where
-    flatInstrs	= fromOL instrs
+    reserves           = find_reserve_regs flatInstrs
+    flatInstrs         = fromOL instrs
+    simpleAlloc        = doSimpleAlloc regs flatInstrs
+    generalAlloc resvd = doGeneralAlloc regs resvd flatInstrs
 \end{code}
 
-Here is the simple register allocator.	Just dole out registers until
-we run out, or until one gets clobbered before its last use.  Don't
-do anything fancy with branches.  Just pretend that you've got a block
-of straight-line code and hope for the best.  Experience indicates that
-this approach will suffice for about 96 percent of the code blocks that
-we generate.
+Rather than invoke the heavyweight machinery in @doGeneralAlloc@ for
+each and every code block, we first try using this simple, fast and
+utterly braindead allocator.  In practice it handles about 60\% of the
+code blocks really fast, even with only 3 integer registers available.
+Since we can always give up and fall back to @doGeneralAlloc@,
+@doSimpleAlloc@ is geared to handling the common case as fast as
+possible.  It will succeed only if:
+
+* The code mentions registers only of integer class, not floating
+  class.
+
+* The code doesn't mention any real registers, so we don't have to
+  think about dodging and weaving to work around fixed register uses.
+
+* The code mentions at most N virtual registers, where N is the number
+  of real registers for allocation.
+
+If those conditions are satisfied, we simply trundle along the code, 
+doling out a real register every time we see mention of a new virtual
+register.  We either succeed at this, or give up when one of the above
+three conditions is no longer satisfied.
 
 \begin{code}
-simpleRegAlloc
-    :: MRegsState	-- registers to select from
-    -> [Reg]		-- live static registers
-    -> RegAssignment	-- mapping of dynamics to statics
-    -> [Instr]		-- code
-    -> Maybe [Instr]
+doSimpleAlloc :: [Reg] -> [Instr] -> Maybe [Instr]
+doSimpleAlloc available_real_regs instrs
+   = let available_iregs 
+            = filter ((== RcInteger).regClass) available_real_regs
 
-simpleRegAlloc _ _ _ [] = Just []
+         trundle :: [( {-Virtual-}Reg, {-Real-}Reg )]
+                    -> [ {-Real-}Reg ]
+                    -> [Instr]
+                    -> [Instr]
+                    -> Maybe [Instr]
+         trundle vreg_map uncommitted_rregs ris_done []
+            = Just (reverse ris_done)
+         trundle vreg_map uncommitted_rregs ris_done (i:is)
+            = case regUsage i of
+                 RU rds wrs
 
-simpleRegAlloc free live env (instr:instrs)
- | null deadSrcs        && 
-   maybeToBool newAlloc && 
-   maybeToBool instrs2 
- = Just (instr3 : instrs3)
- | otherwise
- = Nothing
-  where
-    instr3 = patchRegs instr (lookup env2)
+                    -- Mentions no regs?  Move on quickly
+                    |  null rds_l && null wrs_l
+                    -> trundle vreg_map uncommitted_rregs (i:ris_done) is
 
-    (srcs, dsts) = case regUsage instr of 
-                      (RU s d) -> (regSetToList s, regSetToList d)
+                    -- A case we can't be bothered to handle?
+                    |  any isFloatingOrReal rds_l || any isFloatingOrReal wrs_l
+                    -> Nothing
 
-    lookup env x = case lookupFM env x of Just y -> y; Nothing -> x
+                    -- Update the rreg commitments, and map the insn
+                    |  otherwise
+                    -> case upd_commitment (wrs_l++rds_l) 
+                                           vreg_map uncommitted_rregs of
+                          Nothing -- out of rregs; give up
+                             -> Nothing
+                          Just (vreg_map2, uncommitted_rregs2)
+                             -> let i2 = patchRegs i (subst_reg vreg_map2)
+                                in  trundle vreg_map2 uncommitted_rregs2 
+                                            (i2:ris_done) is
+                       where
+                          isFloatingOrReal reg
+                             = isRealReg reg || regClass reg == RcFloating
 
-    deadSrcs = [r | r@(UnmappedReg _ _) <- srcs, lookup env r `not_elem` live]
-    newDsts  = [r | r@(UnmappedReg _ _) <- dsts, r `not_elem` keysFM env]
+                          rds_l = regSetToList rds
+                          wrs_l = regSetToList wrs
 
-    newAlloc = foldr allocateNewReg (Just (free, [])) newDsts
-    (free2, new) = case newAlloc of Just x -> x
+                          upd_commitment [] vr_map uncomm
+                             = Just (vr_map, uncomm)
+                          upd_commitment (reg:regs) vr_map uncomm
+                             | isRealReg reg 
+                             = upd_commitment regs vr_map uncomm
+                             | reg `elem` (map fst vr_map)
+                             = upd_commitment regs vr_map uncomm
+                             | null uncomm
+                             = Nothing
+                             | otherwise
+                             = upd_commitment regs ((reg, head uncomm):vr_map) 
+                                                   (tail uncomm)
 
-    env2 = env `addListToFM` new
-
-    live2 = map snd new ++ [x | x <- live, x `not_elem` dsts]
-
-    instrs2 = simpleRegAlloc free2 live2 env2 instrs
-    instrs3 = case instrs2 of Just x -> x
-
-    allocateNewReg
-	:: Reg
-	-> Maybe (MRegsState, [(Reg, Reg)])
-	-> Maybe (MRegsState, [(Reg, Reg)])
-
-    allocateNewReg _ Nothing = Nothing
-
-    allocateNewReg d@(UnmappedReg _ pk) (Just (free, prs))
-      | null choices = Nothing
-      | otherwise    = Just (free2, prs2)
-      where
-	choices = possibleMRegs pk free
-	reg     = head choices
-	free2   = free `useMReg` (case reg of {IBOX(reg2) -> reg2} )
-	prs2    = ((d,  MappedReg (case reg of {IBOX(reg2) -> reg2})) : prs)
+                          subst_reg vreg_map r
+                             -- If it's a RealReg, it must be STG-specific one 
+                             -- (Hp,Sp,BaseReg,etc), since regUsage filters them out,
+                             -- so isFloatingOrReal would not have objected to it.
+                             | isRealReg r 
+                             = r
+                             | otherwise 
+                             = case [rr | (vr,rr) <- vreg_map, vr == r] of
+                                  [rr2] -> rr2
+                                  other -> pprPanic 
+                                              "doSimpleAlloc: unmapped VirtualReg"
+                                              (ppr r)
+     in
+         trundle [] available_iregs [] instrs
 \end{code}
 
-Here is the ``clever'' bit. First go backward (i.e. left), looking for
-the last use of dynamic registers. Then go forward (i.e. right), filling
-registers with static placements.
+From here onwards is the general register allocator and spiller.  For
+each flow edge (possible transition between instructions), we compute
+which virtual and real registers are live on that edge.  Then the
+mapping is inverted, to give a mapping from register (virtual+real) to
+sets of flow edges on which the register is live.  Finally, we can use
+those sets to decide whether a virtual reg v can be assigned to a real
+reg r, by checking that v's live-edge-set does not intersect with r's
+current live-edge-set.  Having made that assignment, we then augment
+r's current live-edge-set (its current commitment, you could say) with
+v's live-edge-set.
 
-hairyRegAlloc takes reserve_regs as the regs to use as spill
+doGeneralAlloc takes reserve_regs as the regs to use as spill
 temporaries.  First it tries to allocate using all regs except
 reserve_regs.  If that fails, it inserts spill code and tries again to
 allocate regs, but this time with the spill temporaries available.
 Even this might not work if there are insufficient spill temporaries:
-in the worst case on x86, we'd need 3 of them, for insns like
-addl (reg1,reg2,4) reg3, since this insn uses all 3 regs as input.
+in the worst case on x86, we'd need 3 of them, for insns like addl
+(%reg1,%reg2,4) %reg3, since this insn uses all 3 regs as input.
 
 \begin{code}
-hairyRegAlloc
-    :: MRegsState
-    -> [RegNo]
-    -> [Instr]
-    -> Maybe [Instr]
+doGeneralAlloc 
+    :: [Reg]            -- all allocatable regs
+    -> [Reg]            -- the reserve regs
+    -> [Instr]          -- instrs in
+    -> Maybe [Instr]    -- instrs out
 
-hairyRegAlloc regs reserve_regs instrs =
-  case mapAccumB (doRegAlloc reserve_regs) 
-                 (RH regs' 1 emptyFM) noFuture instrs of 
-     (RH _ mloc1 _, _, instrs')
-        -- succeeded w/out using reserves
-        | mloc1 == 1 -> Just instrs'
-        -- failed, and no reserves avail, so pointless to attempt spilling 
-        | null reserve_regs -> Nothing
-        -- failed, but we have reserves, so attempt to do spilling
-        | otherwise  
-        -> let instrs_patched = patchMem instrs'
-           in
-               case mapAccumB (doRegAlloc []) (RH regs'' mloc1 emptyFM) 
-                    noFuture instrs_patched of
-                  ((RH _ mloc2 _),_,instrs'') 
-                     -- successfully allocated the patched code
-        	     | mloc2 == mloc1 -> maybetrace (spillMsg True) (Just instrs'')
-                     -- no; we have to give up
-                     | otherwise      -> maybetrace (spillMsg False) Nothing 
-                       -- instrs''
-  where
-    regs'  = regs `useMRegs` reserve_regs
-    regs'' = mkMRegsState reserve_regs
+doGeneralAlloc all_regs reserve_regs instrs
+   -- succeeded without spilling
+   | prespill_ok        = Just prespill_insns
+   -- failed, and no spill regs avail, so pointless to attempt spilling 
+   | null reserve_regs  = Nothing
+   -- success after spilling
+   | postspill_ok       = maybetrace (spillMsg True) (Just postspill_insns)
+   -- still not enough reserves after spilling; we have to give up
+   | otherwise          = maybetrace (spillMsg False) Nothing
+     where
+         prespill_regs 
+            = filter (`notElem` reserve_regs) all_regs
+         (prespill_ok, prespill_insns)
+            = allocUsingTheseRegs instrs prespill_regs
+         instrs_with_spill_code
+            = insertSpillCode prespill_insns
+         (postspill_ok, postspill_insns)
+            = allocUsingTheseRegs instrs_with_spill_code all_regs
 
-    noFuture :: RegFuture
-    noFuture = RF emptyRegSet (FL emptyRegSet emptyFM) emptyFM
+         spillMsg success
+            = "nativeGen: spilling " 
+              ++ (if success then "succeeded" else "failed   ")
+              ++ " using " 
+              ++ showSDoc (hsep (map ppr reserve_regs))
 
-    spillMsg success
-       = "nativeGen: spilling " 
-         ++ (if success then "succeeded" else "failed   ")
-         ++ " using " 
-         ++ showSDoc (hsep (map (pprUserReg.toMappedReg) 
-                                (reverse reserve_regs)))
-         where
-            toMappedReg (I# i) = MappedReg i
-#ifdef DEBUG
-    maybetrace msg x = trace msg x
-#else
-    maybetrace msg x = x
-#endif
-
+#        ifdef DEBUG
+         maybetrace msg x = trace msg x
+#        else
+         maybetrace msg x = x
+#        endif
 \end{code}
 
 Here we patch instructions that reference ``registers'' which are
@@ -196,8 +235,9 @@ machine-specific code generator).  We place the appropriate load
 sequences before any instructions that use memory registers as
 sources, and we place the appropriate spill sequences after any
 instructions that use memory registers as destinations.  The offending
-instructions are rewritten with new dynamic registers, so we have to
-run register allocation again after all of this is said and done.
+instructions are rewritten with new dynamic registers, so generalAlloc
+has to run register allocation again after all of this is said and
+done.
 
 On some architectures (x86, currently), we do without a frame-pointer,
 and instead spill relative to the stack pointer (%esp on x86).
@@ -210,163 +250,673 @@ since they generate the actual spill code.  We expect the final delta
 to be the same as the starting one (zero), reflecting the fact that
 changes to the stack pointer should not extend beyond a basic block.
 
+Finally, there is the issue of mapping an arbitrary set of unallocated
+VirtualRegs into a contiguous sequence of spill slots.  The failed
+allocation will have left the code peppered with references to
+VirtualRegs, each of which contains a unique.  So we make an env which
+maps these VirtualRegs to integers, starting from zero, and pass that
+env through to loadReg and spillReg.  There, they are used to look up
+spill slot numbers for the uniques.
+
 \begin{code}
-patchMem :: [Instr] -> [Instr]
-patchMem cs
-   = let (final_stack_delta, css) = mapAccumL patchMem' 0 cs
+insertSpillCode :: [Instr] -> [Instr]
+insertSpillCode insns
+   = let uniques_in_insns
+            = map getUnique 
+                  (regSetToList 
+                     (foldl unionRegSets emptyRegSet 
+                            (map vregs_in_insn insns)))
+         vregs_in_insn i
+            = case regUsage i of
+                 RU rds wrs -> filterRegSet isVirtualReg 
+                                             (rds `unionRegSets` wrs)
+         vreg_to_slot_map :: FiniteMap Unique Int
+         vreg_to_slot_map
+            = listToFM (zip uniques_in_insns [0..])
+
+         ((final_stack_delta, final_ctr), insnss) 
+            = mapAccumL (patchInstr vreg_to_slot_map) (0,0) insns
      in
          if   final_stack_delta == 0
-         then concat css
+         then concat insnss
          else pprPanic "patchMem: non-zero final delta" 
                        (int final_stack_delta)
 
-patchMem' :: Int -> Instr -> (Int, [Instr])
-patchMem' delta instr
+
+-- patchInstr has as a running state two Ints, one the current stack delta,
+-- needed to figure out offsets to stack slots on archs where we spill relative
+-- to the stack pointer, as opposed to the frame pointer.  The other is a 
+-- counter, used to manufacture new temporary register names.
+
+patchInstr :: FiniteMap Unique Int -> (Int,Int) -> Instr -> ((Int,Int), [Instr])
+patchInstr vreg_to_slot_map (delta,ctr) instr
 
  | null memSrcs && null memDsts 
- = (delta', [instr])
+ = ((delta',ctr), [instr])
 
  | otherwise
- = (delta', loadSrcs ++ [instr'] ++ spillDsts)
+ = ((delta',ctr'), loadSrcs ++ [instr'] ++ spillDsts)
    where
         delta' = case instr of DELTA d -> d ; _ -> delta
 
-	(RU srcs dsts) = regUsage instr
+        (RU srcs dsts) = regUsage instr
 
-	memToDyn (MemoryReg i pk) = UnmappedReg (mkBuiltinUnique i) pk
-	memToDyn other		  = other
+        -- The instr being patched may mention several vregs -- those which
+        -- could not be assigned real registers.  For each such vreg, we 
+        -- invent a new vreg, used only around this instruction and nowhere
+        -- else.  These new vregs replace the unallocatable vregs; they are
+        -- loaded from the spill area, the instruction is done with them,
+        -- and results if any are then written back to the spill area.
+        vregs_in_instr 
+           = nub (filter isVirtualReg 
+                         (regSetToList srcs ++ regSetToList dsts))
+        n_vregs_in_instr
+           = length vregs_in_instr
+        ctr' 
+           = ctr + n_vregs_in_instr
+        vreg_env
+           = zip vregs_in_instr [ctr, ctr+1 ..]
 
-	memSrcs = [ r | r@(MemoryReg _ _) <- regSetToList srcs]
-	memDsts = [ r | r@(MemoryReg _ _) <- regSetToList dsts]
+        mkTmpReg vreg
+           | isVirtualReg vreg
+           = case [vi | (vreg', vi) <- vreg_env, vreg' == vreg] of
+                [i] -> if   regClass vreg == RcInteger
+                       then VirtualRegI (mkPseudoUnique3 i)
+                       else VirtualRegF (mkPseudoUnique3 i)
+                _   -> pprPanic "patchInstr: unmapped VReg" (ppr vreg)
+           | otherwise
+           = vreg
 
-	loadSrcs  = map load memSrcs
+	memSrcs   = filter isVirtualReg (regSetToList srcs)
+	memDsts   = filter isVirtualReg (regSetToList dsts)
+
+	loadSrcs  = map load  memSrcs
 	spillDsts = map spill memDsts
 
-	load mem  = loadReg  delta  mem (memToDyn mem)
-	spill mem = spillReg delta' (memToDyn mem) mem
+	load mem  = loadReg  vreg_to_slot_map delta  mem (mkTmpReg mem)
+	spill mem = spillReg vreg_to_slot_map delta' (mkTmpReg mem) mem
 
-	instr'    = patchRegs instr memToDyn
+	instr'    = patchRegs instr mkTmpReg
 \end{code}
 
+allocUsingTheseRegs is the register allocator proper.  It attempts
+to allocate dynamic regs to real regs, given a list of real regs
+which it may use.  If it fails due to lack of real regs, the returned
+instructions use what real regs there are, but will retain uses of
+dynamic regs for which a real reg could not be found.  It is these
+leftover dynamic reg references which insertSpillCode will later
+assign to spill slots.
+
+Some implementation notes.
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instructions are numbered sequentially, starting at zero.
+
+A flow edge (FE) is a pair of insn numbers (MkFE Int Int) denoting
+a possible flow of control from the first insn to the second.
+
+The input to the register allocator is a list of instructions, which
+mention Regs.  A Reg can be a RealReg -- a real machine reg -- or a
+VirtualReg, which carries a unique.  After allocation, all the 
+VirtualReg references will have been converted into RealRegs, and
+possible some spill code will have been inserted.
+
+The heart of the register allocator works in four phases.
+
+1.  (find_flow_edges) Calculate all the FEs for the code list.
+    Return them not as a [FE], but implicitly, as a pair of 
+    Array Int [Int], being the successor and predecessor maps
+    for instructions.
+
+2.  (calc_liveness) Returns a FiniteMap FE RegSet.  For each 
+    FE, indicates the set of registers live on that FE.  Note
+    that the set includes both RealRegs and VirtualRegs.  The
+    former appear because the code could mention fixed register
+    usages, and we need to take them into account from the start.
+
+3.  (calc_live_range_sets) Invert the above mapping, giving a 
+    FiniteMap Reg FeSet, indicating, for each virtual and real
+    reg mentioned in the code, which FEs it is live on.
+
+4.  (calc_vreg_to_rreg_mapping) For virtual reg, try and find
+    an allocatable real register for it.  Each real register has
+    a "current commitment", indicating the set of FEs it is 
+    currently live on.  A virtual reg v can be assigned to 
+    real reg r iff v's live-fe-set does not intersect with r's
+    current commitment fe-set.  If the assignment is made,
+    v's live-fe-set is union'd into r's current commitment fe-set.
+    There is also the minor restriction that v and r must be of
+    the same register class (integer or floating).
+
+    Once this mapping is established, we simply apply it to the
+    input insns, and that's it.
+
+    If no suitable real register can be found, the vreg is mapped
+    to itself, and we deem allocation to have failed.  The partially
+    allocated code is returned.  The higher echelons of the allocator
+    (doGeneralAlloc and runRegAlloc) then cooperate to insert spill
+    code and re-run allocation, until a successful allocation is found.
 \begin{code}
-doRegAlloc
-    :: [RegNo]
-    -> RegHistory MRegsState
-    -> RegFuture
-    -> Instr
-    -> (RegHistory MRegsState, RegFuture, Instr)
 
-doRegAlloc reserved_regs free_env in_use instr = (free_env', in_use', instr')
-  where
-      (free_env', instr') = doRegAlloc' reserved_regs free_env info instr
-      (in_use', info) = getUsage in_use instr
-\end{code}
+allocUsingTheseRegs :: [Instr] -> [Reg] -> (Bool, [Instr])
+allocUsingTheseRegs instrs available_real_regs
+   = let (all_vregs_mapped, v_to_r_mapping)
+            = calc_vreg_to_rreg_mapping instrs available_real_regs
+         new_insns
+            = map (flip patchRegs sr) instrs
+         sr reg
+            | isRealReg reg
+            = reg
+            | otherwise
+            = case lookupFM v_to_r_mapping reg of
+                 Just r  -> r
+                 Nothing -> pprPanic "allocateUsingTheseRegs: unmapped vreg: " 
+                                     (ppr reg)
+     in
+         --trace ("allocUsingTheseRegs: " ++ show available_real_regs) (
+         (all_vregs_mapped, new_insns)
+         --)
 
-\begin{code}
-getUsage
-    :: RegFuture
-    -> Instr
-    -> (RegFuture, RegInfo Instr)
 
-getUsage (RF next_in_use future reg_conflicts) instr
-  = (RF in_use' future' reg_conflicts',
-     RI in_use' srcs dsts last_used reg_conflicts')
-	 where (RU srcs dsts) = regUsage instr
-	       (RL in_use future') = regLiveness instr (RL next_in_use future)
-	       live_through = in_use `minusRegSet` dsts
-	       last_used = [ r | r <- regSetToList srcs,
-			     not (r `elementOfRegSet` (fstFL future) 
-                                  || r `elementOfRegSet` in_use)]
+-- the heart of the matter.  
+calc_vreg_to_rreg_mapping :: [Instr] -> [Reg] -> (Bool, FiniteMap Reg Reg)
+calc_vreg_to_rreg_mapping insns available_real_regs
+   = let 
+         lr_sets  :: FiniteMap Reg FeSet
+         lr_sets = calc_live_range_sets insns
 
-	       in_use' = srcs `unionRegSets` live_through
+         -- lr_sets maps: vregs mentioned in insns to sets of live FEs
+         -- and also:     rregs mentioned in insns to sets of live FEs
+         -- We need to extract the rreg mapping, and use it as the
+         -- initial real-register-commitment.  Also, add to the initial
+         -- commitment, empty commitments for any real regs not
+         -- mentioned in it.
 
-	       reg_conflicts' = 
-	        case new_conflicts of
-		  [] -> reg_conflicts
-		  _  -> addListToFM reg_conflicts new_conflicts
+         -- which real regs do we want to keep track of in the running
+         -- commitment mapping?  Precisely the available_real_regs.  
+         -- We don't care about real regs mentioned by insns which are
+         -- not in this list, since we're not allocating to them.
+         initial_rr_commitment :: FiniteMap Reg FeSet
+         initial_rr_commitment
+            = listToFM [(rreg,
+                         case lookupFM lr_sets rreg of
+                            Nothing            -> emptyFeSet
+                            Just fixed_use_fes -> fixed_use_fes
+                        )
+                        | rreg <- available_real_regs]
 
-	       new_conflicts
-	        | isEmptyRegSet live_dynamics = []
-		| otherwise =
-		  [ (r, merge_conflicts r)
-		  | r <- extractMappedRegNos (regSetToList dsts) ]
+         -- These are the vregs for which we actually have to (try to) 
+         -- assign a real register. (ie, the whole reason we're here at all :)
+         vreg_liveness_list :: [(Reg, FeSet)]
+         vreg_liveness_list = filter (not.isRealReg.fst) 
+                                     (fmToList lr_sets)
 
-	       merge_conflicts reg = 
-	        case lookupFM reg_conflicts reg of
-		  Nothing        -> live_dynamics
-		  Just conflicts -> conflicts `unionRegSets` live_dynamics
+         -- A loop, which attempts to assign each vreg to a rreg.
+         loop rr_commitment v_to_r_map [] 
+            = v_to_r_map
+         loop rr_commitment v_to_r_map ((vreg,vreg_live_fes):not_yet_done)
+            = let
+                  -- find a real reg which is not live for any of vreg_live_fes
+                  cand_reals
+                     = [rreg 
+                           | (rreg,rreg_live_FEs) <- fmToList rr_commitment,
+                              regClass vreg == regClass rreg,
+                              isEmptyFeSet (intersectionFeSets rreg_live_FEs 
+                                                               vreg_live_fes)
+                       ]
+              in
+                 case cand_reals of
+                    [] -> -- bummer.  No register is available.  Just go on to
+                          -- the next vreg, mapping the vreg to itself.
+                          loop rr_commitment (addToFM v_to_r_map vreg vreg)
+                               not_yet_done
+                    (r:_) 
+                       -> -- Hurrah!  Found a free reg of the right class.
+                          -- Now we need to update the RR commitment.
+                          loop rr_commitment2 (addToFM v_to_r_map vreg r)
+                               not_yet_done
+                          where
+                             rr_commitment2
+                                = addToFM_C unionFeSets rr_commitment r 
+                                            vreg_live_fes
 
-	       live_dynamics 
-                  = mkRegSet [ r | r@(UnmappedReg _ _) 
-                                      <- regSetToList live_through ]
+         -- the final vreg to rreg mapping
+         vreg_assignment
+            = loop initial_rr_commitment emptyFM vreg_liveness_list
+         -- did we succeed in mapping everyone to a real reg?
+         allocation_succeeded
+            = all isRealReg (eltsFM vreg_assignment)
+     in
+         (allocation_succeeded, vreg_assignment)
 
-doRegAlloc'
-    :: [RegNo]
-    -> RegHistory MRegsState
-    -> RegInfo Instr
-    -> Instr
-    -> (RegHistory MRegsState, Instr)
 
-doRegAlloc' reserved (RH frs loc env) 
-                     (RI in_use srcs dsts lastu conflicts) instr =
 
-    (RH frs'' loc' env'', patchRegs instr dynToStatic)
+-- calculate liveness, then produce the live range info
+-- as a mapping of VRegs to the set of FEs on which they are live.
+-- The difficult part is inverting the mapping of Reg -> FeSet
+-- to produce a mapping FE -> RegSet.
 
-    where
+calc_live_range_sets :: [Instr] -> FiniteMap Reg FeSet
+calc_live_range_sets insns
+   = let 
+         -- this is the "original" (old) mapping
+         lis :: FiniteMap FE RegSet
+         lis = calc_liveness insns
 
-      -- free up new registers
-      free :: [RegNo]
-      free = extractMappedRegNos (map dynToStatic lastu)
+         -- establish the totality of reg names mentioned by the
+         -- insns, by scanning over the insns.
+         all_mentioned_regs :: RegSet
+         all_mentioned_regs 
+            = foldl unionRegSets emptyRegSet
+                    (map (\i -> case regUsage i of
+                                   RU rds wrs -> unionRegSets rds wrs)
+                         insns)
 
-      -- (1) free registers that are used last as 
-      --     source operands in this instruction
-      frs_not_in_use = frs `useMRegs` 
-                       (extractMappedRegNos (regSetToList in_use))
-      frs' = (frs_not_in_use `freeMRegs` free) `useMRegs` reserved
+         -- Initial inverted mapping, from Reg to sets of FEs
+         initial_imap :: FiniteMap Reg FeSet
+         initial_imap
+            = listToFM [(reg, emptyFeSet) 
+                        | reg <- regSetToList all_mentioned_regs]
 
-      -- (2) allocate new registers for the destination operands
-      -- allocate registers for new dynamics
+         -- Update the new map with one element of the old map
+         upd_imap :: FiniteMap Reg FeSet -> (FE, RegSet)
+                     -> FiniteMap Reg FeSet
+         upd_imap imap (fe, regset)
+             = foldl upd_1_imap imap (regSetToList regset)
+               where
+                  upd_1_imap curr reg
+                     = addToFM_C unionFeSets curr reg (unitFeSet fe)
 
-      new_dynamix = [ r | r@(UnmappedReg _ _) <- regSetToList dsts, 
-                          r `not_elem` keysFM env ]
+         -- the complete inverse mapping
+         final_imap :: FiniteMap Reg FeSet
+         final_imap
+             = foldl upd_imap initial_imap (fmToList lis)
+     in
+         final_imap
 
-      (frs'', loc', new) = foldr allocateNewRegs (frs', loc, []) new_dynamix
 
-      env' = addListToFM env new
 
-      env'' = delListFromFM env' lastu
+-- Given the insns, calculate the FEs, and then doing fixpointing to
+-- figure out the set of live regs (virtual regs AND real regs) live
+-- on each FE.
 
-      dynToStatic :: Reg -> Reg
-      dynToStatic dyn@(UnmappedReg _ _) =
-	case lookupFM env' dyn of
-	    Just r -> r
-	    Nothing -> trace ("Lost register; possibly a floating point"
-                              ++" type error in a _ccall_?") dyn
-      dynToStatic other = other
+calc_liveness :: [Instr] -> FiniteMap FE RegSet
+calc_liveness insns
+   = let (pred_map, succ_map)
+            = find_flow_edges insns
 
-      allocateNewRegs :: Reg 
-                      -> (MRegsState, Int, [(Reg, Reg)]) 
-		      -> (MRegsState, Int, [(Reg, Reg)])
+         -- We use the convention that if the current approximation
+         -- doesn't give a mapping for some FE, that FE maps to the
+         -- empty set.
+         initial_approx, fixpoint :: FiniteMap FE RegSet
+         initial_approx
+            = mk_initial_approx 0 insns succ_map emptyFM
+         fixpoint 
+            = fix_set initial_approx 1
+              -- If you want to live dangerously, and promise that the code
+              -- doesn't contain any loops (ie, there are no back edges in
+              -- the flow graph), you should be able to get away with this:
+              -- = upd_liveness_info pred_map succ_map insn_array initial_approx
+              -- But since I'm paranoid, and since it hardly makes any difference
+              -- to the compiler run-time (about 0.1%), I prefer to do the
+              -- the full fixpointing game.
 
-      allocateNewRegs d@(UnmappedReg _ pk) (fs, mem, lst) 
-         = (fs', mem', (d, f) : lst)
-	where 
-	 (fs', f, mem') = 
-	   case acceptable fs of
-	    []           -> (fs, MemoryReg mem pk, mem + 1)
-	    (IBOX(x2):_) -> (fs `useMReg` x2, MappedReg x2, mem)
+         insn_array
+            = let n = length insns 
+              in  array (0, n-1) (zip [0..] insns)
+              
+         sameSets []     []       = True
+         sameSets (c:cs) (n:ns)   = eqRegSets c n && sameSets cs ns
+         sameSets _      _        = False
 
-         acceptable regs = filter no_conflict (possibleMRegs pk regs)
+         fix_set curr_approx iter_number
+            = let next_approx
+                     = upd_liveness_info pred_map succ_map insn_array curr_approx
+                  curr_sets
+                     = eltsFM curr_approx
+                  next_sets
+                     = eltsFM next_approx
+                  same
+                     = sameSets curr_sets next_sets
+                  final_approx
+                     = if same then curr_approx 
+                               else fix_set next_approx (iter_number+1)
+              in
+                  --trace (let qqq (fe, regset) 
+                  --             = show fe ++ "  " ++ show (regSetToList regset)
+                  --       in
+                  --          "\n::iteration " ++ show iter_number ++ "\n" 
+                  --          ++ (unlines . map qqq . fmToList) 
+                  --                               next_approx ++"\n"
+                  --      )
+                  final_approx
+     in
+         fixpoint
 
-	 no_conflict reg = 
-	   case lookupFM conflicts reg of
-	     Nothing        -> True
-	     Just conflicts -> not (d `elementOfRegSet` conflicts)
-\end{code}
 
-We keep a local copy of the Prelude function \tr{notElem},
-so that it can be specialised.  (Hack me gently.  [WDP 94/11])
-\begin{code}
-not_elem x []	    =  True
-not_elem x (y:ys)   =  x /= y && not_elem x ys
+-- Create a correct initial approximation.  For each instruction that
+-- writes a register, we deem that the register is live on the 
+-- flow edges leaving the instruction.  Subsequent iterations of
+-- the liveness AbI augment this based purely on reads of regs, not
+-- writes.  We need to start off with at least this minimal write-
+-- based information in order that writes to vregs which are never
+-- used have non-empty live ranges.  If we don't do that, we eventually
+-- wind up assigning such vregs to any old real reg, since they don't
+-- apparently conflict -- you can't conflict with an empty live range.
+-- This kludge is unfortunate, but we need to do it to cover not only
+-- writes to vregs which are never used, but also to deal correctly
+-- with the fact that calls to C will trash the callee saves registers.
+
+mk_initial_approx :: Int -> [Instr] -> Array Int [Int]
+                     -> FiniteMap FE RegSet
+                     -> FiniteMap FE RegSet
+mk_initial_approx ino [] succ_map ia_so_far 
+   = ia_so_far
+mk_initial_approx ino (i:is) succ_map ia_so_far
+   = let wrs 
+            = case regUsage i of RU rrr www -> www
+         new_fes 
+            = [case ino of      { I# inoh ->
+               case ino_succ of { I# ino_succh ->
+               MkFE inoh ino_succh 
+               }}
+                  | ino_succ <- succ_map ! ino]
+
+         loop [] ia = ia
+         loop (fe:fes) ia
+            = loop fes (addToFM_C unionRegSets ia fe wrs)
+
+         next_ia
+            = loop new_fes ia_so_far
+     in
+         mk_initial_approx (ino+1) is succ_map next_ia
+ 
+
+-- Do one step in the liveness info calculation (AbI :).  Given the
+-- prior approximation (which tells you a subset of live VRegs+RRegs 
+-- for each flow edge), calculate new information for all FEs.
+-- Rather than do this by iterating over FEs, it's easier to iterate
+-- over insns, and update their incoming FEs.
+
+upd_liveness_info :: Array Int [Int]         -- instruction pred map
+                     -> Array Int [Int]      -- instruction succ map
+                     -> Array Int Instr      -- array of instructions
+                     -> FiniteMap FE RegSet  -- previous approx
+                     -> FiniteMap FE RegSet  -- improved approx
+
+upd_liveness_info pred_map succ_map insn_array prev_approx
+   = do_insns hi prev_approx
+     where
+        (lo, hi) = bounds insn_array
+
+        enquireMapFE :: FiniteMap FE RegSet -> FE 
+                        -> RegSet
+        enquireMapFE fm fe
+           = case lookupFM fm fe of
+                Just set -> set
+                Nothing  -> emptyRegSet
+
+        -- Work backwards, from the highest numbered insn to the lowest.
+        -- This is a heuristic which causes faster convergence to the
+        -- fixed point.  In particular, for straight-line code with no
+        -- branches at all, arrives at the fixpoint in one iteration.
+        do_insns ino approx
+           | ino < lo
+           = approx
+           | otherwise
+           = let fes_to_futures
+                    = [case ino of        { I# inoh ->
+                       case future_ino of { I# future_inoh ->
+                       MkFE inoh future_inoh
+                       }}
+                          | future_ino <- succ_map ! ino]
+                 future_lives
+                    = map (enquireMapFE approx) fes_to_futures
+                 future_live
+                    = foldr unionRegSets emptyRegSet future_lives
+
+                 fes_from_histories
+                    = [case history_ino of { I# history_inoh ->
+                       case ino of         { I# inoh ->
+                       MkFE history_inoh inoh
+                       }}
+                          | history_ino <- pred_map ! ino]
+                 new_approx
+                    = foldl update_one_history approx fes_from_histories
+                 
+                 insn
+                    = insn_array ! ino
+                 history_independent_component
+                    = case regUsage insn of
+                         RU rds wrs
+                            -> unionRegSets rds
+                                  (minusRegSets future_live wrs)
+
+                 update_one_history :: FiniteMap FE RegSet
+                                       -> FE
+                                       -> FiniteMap FE RegSet
+                 update_one_history approx0 fe
+                      = addToFM_C unionRegSets approx0 fe 
+                                  history_independent_component
+
+                 rest_done
+                    = do_insns (ino-1) new_approx
+             in
+                 rest_done
+                 
+
+
+-- Extract the flow edges from a list of insns.  Express the information 
+-- as two mappings, from insn number to insn numbers of predecessors,
+-- and from insn number to insn numbers of successors.  (Since that's
+-- what we need to know when computing live ranges later).  Instructions
+-- are numbered starting at zero.  This function is long and complex 
+-- in order to be efficient; it could equally well be shorter and slower.
+
+find_flow_edges :: [Instr] -> (Array Int [Int],
+                               Array Int [Int])
+find_flow_edges insns
+   = let 
+         -- First phase: make a temp env which maps labels
+         -- to insn numbers, so the second pass can know the insn
+         -- numbers for jump targets.
+
+         label_env :: FiniteMap CLabel Int
+
+         mk_label_env n env [] = env
+         mk_label_env n env ((LABEL clbl):is)
+            = mk_label_env (n+1) (addToFM env clbl n) is
+         mk_label_env n env (i:is)
+            = mk_label_env (n+1) env is
+   
+         label_env = mk_label_env 0 emptyFM insns
+
+         find_label :: CLabel -> Int
+         find_label jmptarget
+            = case lookupFM label_env jmptarget of
+                 Just ino -> ino
+                 Nothing  -> pprPanic "find_flow_edges: unmapped label" 
+                                      (pprCLabel jmptarget)
+
+         -- Second phase: traverse the insns, and make up the successor map.
+
+         least_ino, greatest_ino :: Int
+         least_ino    = 0
+         greatest_ino = length insns - 1
+
+         mk_succ_map :: Int -> [(Int, [Int])] -> [Instr] -> [(Int, [Int])]
+
+         mk_succ_map i_num rsucc_map [] 
+            = reverse rsucc_map
+
+         mk_succ_map i_num rsucc_map (i:is)
+            = let i_num_1 = i_num + 1
+              in
+              case insnFuture i of
+
+                 NoFuture
+                    -> -- A non-local jump.  We can regard this insn as a terminal
+                       -- insn in the graph, so we don't add any edges.
+                       mk_succ_map i_num_1 ((i_num,[]):rsucc_map) is
+
+                 Next 
+                    |  null is -- this is the last insn, and it doesn't go anywhere
+                               -- (a meaningless scenario); handle it anyway
+                    -> mk_succ_map i_num_1 ((i_num,[]):rsucc_map) is
+
+                    |  otherwise -- flows to next insn; add fe i_num -> i_num+1
+                    -> mk_succ_map i_num_1 ((i_num, [i_num_1]): rsucc_map)
+                                           is
+
+                 Branch lab -- jmps to lab; add fe i_num -> i_target
+                    -> let i_target = find_label lab
+                       in 
+                       mk_succ_map i_num_1 ((i_num, [i_target]): rsucc_map)
+                                           is
+                 NextOrBranch lab
+                    |  null is   -- jmps to label, or falls through, and this is
+                                 -- the last insn (a meaningless scenario); 
+                                 -- flag an error
+                    -> error "find_flow_edges: NextOrBranch is last"
+
+                    |  otherwise -- add fes i_num -> i_num+1  
+                                 --     and i_num -> i_target
+                    -> let i_target = find_label lab
+                       in
+                       mk_succ_map i_num_1 ((i_num, [i_num_1, i_target]):rsucc_map)
+                                           is
+
+         -- Third phase: invert the successor map to get the predecessor
+         -- map, using an algorithm which is quadratic in the worst case,
+         -- but runs in almost-linear time, because of the nature of our
+         -- inputs: most insns have a single successor, the next insn.
+
+         invert :: [(Int, [Int])] -> [(Int, [Int])]
+         invert fmap
+            = let inverted_pairs
+                     = concatMap ( \ (a, bs) -> [(b,a) | b <- bs] ) fmap
+                  sorted_inverted_pairs
+                     = isort inverted_pairs
+         
+                  grp :: Int -> [Int] -> [(Int,Int)] -> [(Int,[Int])]
+                  grp k vs [] = [(k, vs)]
+                  grp k vs ((kk,vv):rest)
+                     | k == kk   = grp k (vv:vs) rest
+                     | otherwise = (k,vs) : grp kk [vv] rest
+
+                  grp_start []             = []
+                  grp_start ((kk,vv):rest) = grp kk [vv] rest
+
+                  grouped
+                     = grp_start sorted_inverted_pairs
+
+                  -- make sure that the reverse mapping maps all inos
+                  add_empties ino []
+                     | ino > greatest_ino  = []
+                     | otherwise           = (ino,[]): add_empties (ino+1) []
+                  add_empties ino ((k,vs):rest)
+                     | ino <  k   = (ino,[]): add_empties (ino+1) ((k,vs):rest)
+                     | ino == k   = (k,vs) : add_empties (ino+1) rest
+
+                  -- This is nearly linear provided that the fsts of the 
+                  -- list are nearly in order -- a critical assumption 
+                  -- for efficiency.
+                  isort :: [(Int,Int)] -> [(Int,Int)]
+                  isort []     = []
+                  isort (x:xs) = insert x (isort xs)
+
+                  insert :: (Int,Int) -> [(Int,Int)] -> [(Int,Int)]
+                  insert y []     = [y]
+                  insert y (z:zs)
+                     -- specifically, this first test should almost always
+                     -- be True in order for the near-linearity to happen
+                     | fst y <= fst z  = y:z:zs 
+                     | otherwise       = z: insert y zs
+              in
+                 add_empties least_ino grouped
+
+         -- Finally ...
+
+         succ_list
+            = mk_succ_map 0 [] insns
+         succ_map
+            = array (least_ino, greatest_ino) succ_list
+         pred_list
+            = invert succ_list
+         pred_map
+            = array (least_ino, greatest_ino) pred_list
+     in
+         (pred_map, succ_map)
+
+
+-- That's all, folks!  From here on is just some dull supporting stuff.
+
+-- A data type for flow edges
+data FE 
+   = MkFE Int# Int# deriving (Eq, Ord)
+
+-- deriving Show on types with unboxed fields doesn't work
+instance Show FE where
+    showsPrec _ (MkFE s d) 
+       = showString "MkFE" . shows (I# s) . shows ' ' . shows (I# d)
+
+-- Blargh.  Use ghc stuff soon!  Or: perhaps that's not such a good
+-- idea.  Most of these sets are either empty or very small, and it
+-- might be that the overheads of the FiniteMap based set implementation
+-- is a net loss.  The same might be true of RegSets.
+
+newtype FeSet = MkFeSet [FE]
+
+feSetFromList xs 
+   = MkFeSet (nukeDups (sort xs))
+     where nukeDups :: [FE] -> [FE]
+           nukeDups []  = []
+           nukeDups [x] = [x]
+           nukeDups (x:y:xys)
+              = if x == y then nukeDups (y:xys)
+                          else x : nukeDups (y:xys)
+
+feSetToList (MkFeSet xs)            = xs
+isEmptyFeSet (MkFeSet xs)           = null xs
+emptyFeSet                          = MkFeSet []
+eqFeSet (MkFeSet xs1) (MkFeSet xs2) = xs1 == xs2
+unitFeSet x                         = MkFeSet [x]
+
+elemFeSet x (MkFeSet xs) 
+   = f xs
+     where
+        f []     = False
+        f (y:ys) | x == y    = True
+                 | x < y     = False
+                 | otherwise = f ys
+
+unionFeSets (MkFeSet xs1) (MkFeSet xs2)
+   = MkFeSet (f xs1 xs2)
+     where
+        f [] bs = bs
+        f as [] = as
+        f (a:as) (b:bs)
+           | a < b      = a : f as (b:bs)
+           | a > b      = b : f (a:as) bs
+           | otherwise  = a : f as bs
+
+minusFeSets (MkFeSet xs1) (MkFeSet xs2)
+   = MkFeSet (f xs1 xs2)
+     where
+        f [] bs = []
+        f as [] = as
+        f (a:as) (b:bs)
+           | a < b      = a : f as (b:bs)
+           | a > b      = f (a:as) bs
+           | otherwise  = f as bs
+
+intersectionFeSets (MkFeSet xs1) (MkFeSet xs2)
+   = MkFeSet (f xs1 xs2)
+     where
+        f [] bs = []
+        f as [] = []
+        f (a:as) (b:bs)
+           | a < b      = f as (b:bs)
+           | a > b      = f (a:as) bs
+           | otherwise  = a : f as bs
+
 \end{code}

@@ -9,243 +9,117 @@ The (machine-independent) allocator itself is in @AsmRegAlloc@.
 #include "nativeGen/NCG.h"
 
 module RegAllocInfo (
-	MRegsState(..),
-	mkMRegsState,
-	freeMReg,
-	freeMRegs,
-	possibleMRegs,
-	useMReg,
-	useMRegs,
-
 	RegUsage(..),
 	noUsage,
-	endUsage,
 	regUsage,
+        InsnFuture(..),
+        insnFuture,
 
-	FutureLive(..),
-	RegAssignment,
-	RegConflicts,
-	RegFuture(..),
-	RegHistory(..),
-	RegInfo(..),
-	RegLiveness(..),
-
-	fstFL,
 	loadReg,
 	patchRegs,
-	regLiveness,
 	spillReg,
 	findReservedRegs,
 
 	RegSet,
-	elementOfRegSet,
-	emptyRegSet,
-	isEmptyRegSet,
-	minusRegSet,
-	mkRegSet,
-	regSetToList,
-	unionRegSets,
-
-	argRegSet,
-	callClobberedRegSet,
-	freeRegSet
+        regSetFromList,
+        regSetToList,
+        isEmptyRegSet,
+        emptyRegSet,
+	eqRegSets,
+	filterRegSet,
+        unitRegSet,
+        elemRegSet,
+        unionRegSets,
+        minusRegSets,
+        intersectionRegSets
     ) where
 
 #include "HsVersions.h"
 
-import List		( partition )
+import List		( partition, sort )
 import OrdList		( unitOL )
 import MachMisc
 import MachRegs
 import MachCode		( InstrBlock )
 
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
-import CLabel		( pprCLabel_asm, CLabel{-instance Ord-} )
+import CLabel		( pprCLabel_asm, isAsmTemp, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
 import PrimRep		( PrimRep(..) )
 import UniqSet		-- quite a bit of it
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
+import Unique		( Unique, Uniquable(..) )
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Register allocation information}
+\subsection{Sets of registers}
 %*									*
 %************************************************************************
 
 \begin{code}
-type RegSet = UniqSet Reg
 
-mkRegSet :: [Reg] -> RegSet
-emptyRegSet :: RegSet
-unionRegSets, minusRegSet :: RegSet -> RegSet -> RegSet
-elementOfRegSet :: Reg -> RegSet -> Bool
-isEmptyRegSet :: RegSet -> Bool
-regSetToList :: RegSet -> [Reg]
+-- Blargh.  Use ghc stuff soon!  Or: perhaps that's not such a good
+-- idea.  Most of these sets are either empty or very small, and it
+-- might be that the overheads of the FiniteMap based set implementation
+-- is a net loss.  The same might be true of FeSets.
 
-mkRegSet	= mkUniqSet
-emptyRegSet	= emptyUniqSet
-unionRegSets	= unionUniqSets
-minusRegSet	= minusUniqSet
-elementOfRegSet	= elementOfUniqSet
-isEmptyRegSet	= isEmptyUniqSet
-regSetToList	= uniqSetToList
+newtype RegSet = MkRegSet [Reg]
 
-freeRegSet, callClobberedRegSet :: RegSet
-argRegSet :: Int -> RegSet
+regSetFromList xs 
+   = MkRegSet (nukeDups (sort xs))
+     where nukeDups :: [Reg] -> [Reg]
+           nukeDups []  = []
+           nukeDups [x] = [x]
+           nukeDups (x:y:xys)
+              = if x == y then nukeDups (y:xys)
+                          else x : nukeDups (y:xys)
 
-freeRegSet	    = mkRegSet freeRegs
-callClobberedRegSet = mkRegSet callClobberedRegs
-argRegSet n	    = mkRegSet (argRegs n)
+regSetToList   (MkRegSet xs)                 = xs
+isEmptyRegSet  (MkRegSet xs)                 = null xs
+emptyRegSet                                  = MkRegSet []
+eqRegSets      (MkRegSet xs1) (MkRegSet xs2) = xs1 == xs2
+unitRegSet x                                 = MkRegSet [x]
+filterRegSet p (MkRegSet xs)                 = MkRegSet (filter p xs)
 
-type RegAssignment = FiniteMap Reg Reg
-type RegConflicts  = FiniteMap Int RegSet
+elemRegSet x (MkRegSet xs) 
+   = f xs
+     where
+        f []     = False
+        f (y:ys) | x == y    = True
+                 | x < y     = False
+                 | otherwise = f ys
 
-data FutureLive = FL RegSet (FiniteMap CLabel RegSet)
+unionRegSets (MkRegSet xs1) (MkRegSet xs2)
+   = MkRegSet (f xs1 xs2)
+     where
+        f [] bs = bs
+        f as [] = as
+        f (a:as) (b:bs)
+           | a < b      = a : f as (b:bs)
+           | a > b      = b : f (a:as) bs
+           | otherwise  = a : f as bs
 
-fstFL (FL a b)  = a
+minusRegSets (MkRegSet xs1) (MkRegSet xs2)
+   = MkRegSet (f xs1 xs2)
+     where
+        f [] bs = []
+        f as [] = as
+        f (a:as) (b:bs)
+           | a < b      = a : f as (b:bs)
+           | a > b      = f (a:as) bs
+           | otherwise  = f as bs
 
-data RegHistory a
-  = RH	a
-	Int
-	RegAssignment
-
-data RegFuture
-  = RF	RegSet		-- in use
-	FutureLive	-- future
-	RegConflicts
-
-data RegInfo a
-  = RI	RegSet		-- in use
-	RegSet		-- sources
-	RegSet		-- destinations
-	[Reg]		-- last used
-	RegConflicts
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Register allocation information}
-%*									*
-%************************************************************************
-
-COMMENT ON THE EXTRA BitSet FOR SPARC MRegsState: Getting the conflicts
-right is a bit tedious for doubles.  We'd have to add a conflict
-function to the MachineRegisters class, and we'd have to put a PrimRep
-in the MappedReg datatype, or use some kludge (e.g. register 64 + n is
-really the same as 32 + n, except that it's used for a double, so it
-also conflicts with 33 + n) to deal with it.  It's just not worth the
-bother, so we just partition the free floating point registers into
-two sets: one for single precision and one for double precision.  We
-never seem to run out of floating point registers anyway.
-
-\begin{code}
-data MRegsState
-  = MRs	BitSet	-- integer registers
-	BitSet	-- floating-point registers
-	IF_ARCH_sparc(BitSet,) -- double registers handled separately
-\end{code}
-
-\begin{code}
-#if alpha_TARGET_ARCH
-# define INT_FLPT_CUTOFF 32
-#endif
-#if i386_TARGET_ARCH
-# define INT_FLPT_CUTOFF 8
-#endif
-#if sparc_TARGET_ARCH
-# define INT_FLPT_CUTOFF 32
-# define SNGL_DBL_CUTOFF 48
-#endif
-
-mkMRegsState	:: [RegNo] -> MRegsState
-possibleMRegs   :: PrimRep -> MRegsState -> [RegNo]
-useMReg		:: MRegsState -> FAST_REG_NO -> MRegsState
-useMRegs	:: MRegsState -> [RegNo]     -> MRegsState
-freeMReg	:: MRegsState -> FAST_REG_NO -> MRegsState
-freeMRegs	:: MRegsState -> [RegNo]     -> MRegsState
-
-mkMRegsState xs
-  = MRs (mkBS is) (mkBS fs2) IF_ARCH_sparc((mkBS ds2),)
-  where
-    (is, fs) = partition (< INT_FLPT_CUTOFF) xs
-#if sparc_TARGET_ARCH
-    (ss, ds) = partition (< SNGL_DBL_CUTOFF) fs
-    fs2	 = map (subtract INT_FLPT_CUTOFF) ss
-    ds2	 = map (subtract INT_FLPT_CUTOFF) (filter even ds)
-#else
-    fs2      = map (subtract INT_FLPT_CUTOFF) fs
-#endif
-
-------------------------------------------------
-#if sparc_TARGET_ARCH
-possibleMRegs FloatRep  (MRs _ ss _) = [ x + INT_FLPT_CUTOFF | x <- listBS ss]
-possibleMRegs DoubleRep (MRs _ _ ds) = [ x + INT_FLPT_CUTOFF | x <- listBS ds]
-possibleMRegs _         (MRs is _ _) = listBS is
-#else
-possibleMRegs FloatRep  (MRs _ fs) = [ x + INT_FLPT_CUTOFF | x <- listBS fs]
-possibleMRegs DoubleRep (MRs _ fs) = [ x + INT_FLPT_CUTOFF | x <- listBS fs]
-possibleMRegs _	    (MRs is _) = listBS is
-#endif
-
-------------------------------------------------
-#if sparc_TARGET_ARCH
-useMReg (MRs is ss ds) n
-  = if (n _LT_ ILIT(INT_FLPT_CUTOFF)) then
-	MRs (is `minusBS` unitBS IBOX(n)) ss ds
-    else if (n _LT_ ILIT(SNGL_DBL_CUTOFF)) then
-	MRs is (ss `minusBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF)))) ds
-    else
-	MRs is ss (ds `minusBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF))))
-#else
-useMReg (MRs is fs) n
-  = if (n _LT_ ILIT(INT_FLPT_CUTOFF))
-    then MRs (is `minusBS` unitBS IBOX(n)) fs
-    else MRs is (fs `minusBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF))))
-#endif
-
-------------------------------------------------
-#if sparc_TARGET_ARCH
-useMRegs (MRs is ss ds) xs
-  = MRs (is `minusBS` is2) (ss `minusBS` ss2) (ds `minusBS` ds2)
-  where
-    MRs is2 ss2 ds2 = mkMRegsState xs
-#else
-useMRegs (MRs is fs) xs
-  = MRs (is `minusBS` is2) (fs `minusBS` fs2)
-  where
-    MRs is2 fs2 = mkMRegsState xs
-#endif
-
-------------------------------------------------
-#if sparc_TARGET_ARCH
-freeMReg (MRs is ss ds) n
-  = if (n _LT_ ILIT(INT_FLPT_CUTOFF)) then
-	MRs (is `unionBS` unitBS IBOX(n)) ss ds
-    else if (n _LT_ ILIT(SNGL_DBL_CUTOFF)) then
-	MRs is (ss `unionBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF)))) ds
-    else
-	MRs is ss (ds `unionBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF))))
-#else
-freeMReg (MRs is fs) n
-  = if (n _LT_ ILIT(INT_FLPT_CUTOFF))
-    then MRs (is `unionBS` unitBS IBOX(n)) fs
-    else MRs is (fs `unionBS` unitBS (IBOX(n _SUB_ ILIT(INT_FLPT_CUTOFF))))
-#endif
-
-------------------------------------------------
-#if sparc_TARGET_ARCH
-freeMRegs (MRs is ss ds) xs
-  = MRs (is `unionBS` is2) (ss `unionBS` ss2) (ds `unionBS` ds2)
-  where
-    MRs is2 ss2 ds2 = mkMRegsState xs
-#else
-freeMRegs (MRs is fs) xs
-  = MRs (is `unionBS` is2) (fs `unionBS` fs2)
-  where
-    MRs is2 fs2 = mkMRegsState xs
-#endif
+intersectionRegSets (MkRegSet xs1) (MkRegSet xs2)
+   = MkRegSet (f xs1 xs2)
+     where
+        f [] bs = []
+        f as [] = []
+        f (a:as) (b:bs)
+           | a < b      = f as (b:bs)
+           | a > b      = f (a:as) bs
+           | otherwise  = a : f as bs
 \end{code}
 
 %************************************************************************
@@ -258,21 +132,19 @@ freeMRegs (MRs is fs) xs
 particular instruction.  Machine registers that are pre-allocated to
 stgRegs are filtered out, because they are uninteresting from a
 register allocation standpoint.  (We wouldn't want them to end up on
-the free list!)
+the free list!)  As far as we are concerned, the fixed registers
+simply don't exist (for allocation purposes, anyway).
 
-An important point: The @regUsage@ function for a particular
-assembly language must not refer to fixed registers, such as Hp, SpA,
-etc.  The source and destination MRegsStates should only refer to
-dynamically allocated registers or static registers from the free
-list.  As far as we are concerned, the fixed registers simply don't
-exist (for allocation purposes, anyway).
+regUsage doesn't need to do any trickery for jumps and such.  Just
+state precisely the regs read and written by that insn.  The
+consequences of control flow transfers, as far as register allocation
+goes, are taken care of by @insnFuture@.
 
 \begin{code}
 data RegUsage = RU RegSet RegSet
 
-noUsage, endUsage :: RegUsage
+noUsage :: RegUsage
 noUsage  = RU emptyRegSet emptyRegSet
-endUsage = RU emptyRegSet freeRegSet
 
 regUsage :: Instr -> RegUsage
 
@@ -379,7 +251,7 @@ regUsage instr = case instr of
     CMP    sz src dst	-> mkRU (use_R src ++ use_R dst) []
     SETCC  cond op	-> mkRU [] (def_W op)
     JXX    cond lbl	-> mkRU [] []
-    JMP    op		-> mkRU (use_R op) freeRegs
+    JMP    op		-> mkRU (use_R op) []
     CALL   imm		-> mkRU [] callClobberedRegs
     CLTD		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
@@ -456,15 +328,16 @@ regUsage instr = case instr of
     use_EA (AddrBaseIndex Nothing  (Just (i,_)) _) = [i]
     use_EA (AddrBaseIndex (Just b) (Just (i,_)) _) = [b,i]
 
-    mkRU src dst = RU (mkRegSet (filter interesting src))
-  	    	      (mkRegSet (filter interesting dst))
+    mkRU src dst = RU (regSetFromList (filter interesting src))
+  	    	      (regSetFromList (filter interesting dst))
 
-    interesting (FixedReg _) = False
-    interesting _            = True
+    interesting (VirtualRegI _)  = True
+    interesting (VirtualRegF _)  = True
+    interesting (RealReg (I# i)) = _IS_TRUE_(freeReg i)
 
 
--- Allow the spiller to decide whether or not it can use 
--- %edx as spill temporaries.
+-- Allow the spiller to de\cide whether or not it can use 
+-- %edx as a spill temporary.
 hasFixedEDX instr
    = case instr of
         IDIV _ _ -> True
@@ -560,7 +433,7 @@ this isn't a concern; we just ignore the supplied code list and return
 a singleton list which we know will satisfy all spill demands.
 
 \begin{code}
-findReservedRegs :: [Instr] -> [[RegNo]]
+findReservedRegs :: [Instr] -> [[Reg]]
 findReservedRegs instrs
 #if alpha_TARGET_ARCH
   = --[[NCG_Reserved_I1, NCG_Reserved_I2,
@@ -593,43 +466,43 @@ findReservedRegs instrs
            = ecx : if any hasFixedEDX instrs then [] else [edx]
         possibilities
            = case intregs_avail of
-                [i1] -> [ [], [i1], [f1], [i1,f1], [f1,f2], [i1,f1,f2] ]
+                [i1] -> [ [], [i1], [f1], [i1,f1], [f1,f2], 
+                          [i1,f1,f2] ]
 
                 [i1,i2] -> [ [], [i1], [f1], [i1,i2], [i1,f1], [f1,f2],
                              [i1,i2,f1], [i1,f1,f2], [i1,i2,f1,f2] ]
     in
-        map (map mappedRegNo) possibilities
+        possibilities
 #endif
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{@RegLiveness@ type; @regLiveness@ function}
+\subsection{@InsnFuture@ type; @insnFuture@ function}
 %*									*
 %************************************************************************
 
-@regLiveness@ takes future liveness information and modifies it
-according to the semantics of branches and labels.  (An out-of-line
-branch clobbers the liveness passed back by the following instruction;
-a forward local branch passes back the liveness from the target label;
-a conditional branch merges the liveness from the target and the
-liveness from its successor; a label stashes away the current liveness
-in the future liveness environment).
+@insnFuture@ indicates the places we could get to following the
+current instruction.  This is used by the register allocator to
+compute the flow edges for a bunch of instructions.
 
 \begin{code}
-data RegLiveness = RL RegSet FutureLive
+data InsnFuture 
+   = NoFuture              -- makes a non-local jump; for the purposes of
+                           -- register allocation, it exits our domain
+   | Next                  -- falls through to next insn
+   | Branch CLabel         -- unconditional branch to the label
+   | NextOrBranch CLabel   -- conditional branch to the label
 
-regLiveness :: Instr -> RegLiveness -> RegLiveness
+--instance Outputable InsnFuture where
+--   ppr NoFuture            = text "NoFuture"
+--   ppr Next                = text "Next"
+--   ppr (Branch clbl)       = text "(Branch " <> ppr clbl <> char ')'
+--   ppr (NextOrBranch clbl) = text "(NextOrBranch " <> ppr clbl <> char ')'
 
-regLiveness instr info@(RL live future@(FL all env))
-  = let
-	lookup lbl
-	  = case (lookupFM env lbl) of
-	    Just rs -> rs
-	    Nothing -> pprTrace "Missing" (pprCLabel_asm lbl <+> text "in future?") 
-		       emptyRegSet
-    in
-    case instr of -- the rest is machine-specific...
+
+insnFuture insn
+ = case insn of
 
 #if alpha_TARGET_ARCH
 
@@ -648,11 +521,17 @@ regLiveness instr info@(RL live future@(FL all env))
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-    JXX _ lbl	-> RL (lookup lbl `unionRegSets` live) future
-    JMP _	-> RL emptyRegSet future
-    CALL _      -> RL live future
-    LABEL lbl   -> RL live (FL (all `unionRegSets` live) (addToFM env lbl live))
-    _		    -> info
+    -- conditional jump
+    JXX _ clbl | isAsmTemp clbl -> NextOrBranch clbl
+    JXX _ _ -> panic "insnFuture: conditional jump to non-local label"
+
+    -- unconditional jump to local label
+    JMP (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> Branch clbl
+    
+    -- unconditional jump to non-local label
+    JMP lbl	-> NoFuture
+
+    boring	-> Next
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -897,11 +776,19 @@ spillSlotToOffset slot
    = pprPanic "spillSlotToOffset:" 
               (text "invalid spill location: " <> int slot)
 
-spillReg, loadReg :: Int -> Reg -> Reg -> Instr
+vregToSpillSlot :: FiniteMap Unique Int -> Unique -> Int
+vregToSpillSlot vreg_to_slot_map u
+   = case lookupFM vreg_to_slot_map u of
+        Just xx -> xx
+        Nothing -> pprPanic "vregToSpillSlot: unmapped vreg" (ppr u)
 
-spillReg delta dyn (MemoryReg i pk)
-  = let	sz  = primRepToSize pk
-        off = spillSlotToOffset i
+
+spillReg, loadReg :: FiniteMap Unique Int -> Int -> Reg -> Reg -> Instr
+
+spillReg vreg_to_slot_map delta dyn vreg
+  | isVirtualReg vreg
+  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getUnique vreg)
+        off     = spillSlotToOffset slot_no
     in
 	{-Alpha: spill below the stack pointer (?)-}
 	 IF_ARCH_alpha( ST sz dyn (spRel (- (off `div` 8)))
@@ -909,25 +796,26 @@ spillReg delta dyn (MemoryReg i pk)
 	{-I386: spill above stack pointer leaving 3 words/spill-}
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
                         in
-                        if pk == FloatRep || pk == DoubleRep
+                        if   regClass vreg == RcFloating
                         then GST F80 dyn (spRel off_w)
-                        else MOV sz (OpReg dyn) (OpAddr (spRel off_w))
+                        else MOV L (OpReg dyn) (OpAddr (spRel off_w))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( ST sz dyn (fpRel (- (off `div` 4)))
         ,)))
 
    
-loadReg delta (MemoryReg i pk) dyn
-  = let	sz  = primRepToSize pk
-        off = spillSlotToOffset i
+loadReg vreg_to_slot_map delta vreg dyn
+  | isVirtualReg vreg
+  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getUnique vreg)
+        off     = spillSlotToOffset slot_no
     in
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
                         in
-                        if   pk == FloatRep || pk == DoubleRep
+                        if   regClass vreg == RcFloating
                         then GLD F80 (spRel off_w) dyn
-                        else MOV sz (OpAddr (spRel off_w)) (OpReg dyn)
+                        else MOV L (OpAddr (spRel off_w)) (OpReg dyn)
 	,IF_ARCH_sparc( LD  sz (fpRel (- (off `div` 4))) dyn
 	,)))
 \end{code}

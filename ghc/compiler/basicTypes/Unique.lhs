@@ -462,13 +462,15 @@ initTyVarUnique = mkUnique 't' 0
 initTidyUniques :: (Unique, Unique)	-- Global and local
 initTidyUniques = (mkUnique 'g' 0, mkUnique 'x' 0)
 
-mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
- mkBuiltinUnique :: Int -> Unique
+mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3, 
+   mkBuiltinUnique :: Int -> Unique
 
 mkBuiltinUnique i = mkUnique 'B' i
 mkPseudoUnique1 i = mkUnique 'C' i -- used for getUnique on Regs
-mkPseudoUnique2 i = mkUnique 'D' i -- ditto
-mkPseudoUnique3 i = mkUnique 'E' i -- ditto
+mkPseudoUnique2 i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
+mkPseudoUnique3 i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
+
+
 
 getBuiltinUniques :: Int -> [Unique]
 getBuiltinUniques n = map (mkUnique 'B') [1 .. n]

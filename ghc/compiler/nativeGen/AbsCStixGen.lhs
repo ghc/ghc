@@ -14,7 +14,7 @@ import Stix
 import MachMisc
 
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
-			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
+			  nonemptyAbsC, mkAbsCStmts
 			)
 import PprAbsC          ( dumpRealC )
 import SMRep		( fixedItblSize, 
@@ -54,11 +54,10 @@ We leave the chunks separated so that register allocation can be
 performed locally within the chunk.
 
 \begin{code}
-genCodeAbstractC :: AbstractC -> UniqSM [[StixTree]]
+genCodeAbstractC :: AbstractC -> UniqSM [StixTree]
 
 genCodeAbstractC absC
-  = mapUs gentopcode (mkAbsCStmtList absC) `thenUs` \ trees ->
-    returnUs ([StComment SLIT("Native Code")] : trees)
+  = gentopcode absC
  where
  a2stix      = amodeToStix
  a2stix'     = amodeToStix'

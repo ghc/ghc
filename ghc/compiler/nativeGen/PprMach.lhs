@@ -46,9 +46,9 @@ pprReg :: IF_ARCH_i386(Size ->,) Reg -> SDoc
 
 pprReg IF_ARCH_i386(s,) r
   = case r of
-      FixedReg  i -> ppr_reg_no IF_ARCH_i386(s,) i
-      MappedReg i -> ppr_reg_no IF_ARCH_i386(s,) i
-      other	  -> text (show other)   -- should only happen when debugging
+      RealReg (I# i) -> ppr_reg_no IF_ARCH_i386(s,) i
+      VirtualRegI u  -> text "%vI_" <> ppr u
+      VirtualRegF u  -> text "%vF_" <> ppr u      
   where
 #if alpha_TARGET_ARCH
     ppr_reg_no :: FAST_REG_NO -> SDoc
@@ -91,7 +91,7 @@ pprReg IF_ARCH_i386(s,) r
 #endif
 #if i386_TARGET_ARCH
     ppr_reg_no :: Size -> FAST_REG_NO -> SDoc
-    ppr_reg_no B i = ptext
+    ppr_reg_no B i= ptext
       (case i of {
 	ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
 	ILIT( 2) -> SLIT("%cl");  ILIT( 3) -> SLIT("%dl");
@@ -410,8 +410,7 @@ pprInstr (ASCII False{-no backslash conversion-} str)
   = hcat [ ptext SLIT("\t.asciz "), char '\"', text str, char '"' ]
 
 pprInstr (ASCII True str)
-  = --(<>) (text "\t.ascii \"") (asciify 60 str)
-    asciify str
+  = asciify str
   where
     asciify :: String -> SDoc
     asciify "" = text "\t.ascii \"\\0\""
@@ -430,44 +429,6 @@ pprInstr (ASCII True str)
             = [ tab !! (n `div` 16), tab !! (n `mod` 16)]
     tab = "0123456789abcdef"
 
-{-
-    asciify :: String -> Int -> SDoc
-    asciify [] _ = text "\\0\""
-    asciify s     n | n <= 0 = (<>) (text "\"\n\t.ascii \"") (asciify s 60)
-    asciify ('\\':cs)      n = (<>) (text "\\\\") (asciify cs (n-1))
-    asciify ('\"':cs)      n = (<>) (text "\\\"") (asciify cs (n-1))
-    asciify (c:cs) n | isPrint c = (<>) (char c) (asciify cs (n-1))
-    asciify [c]            _ = (<>) (text (charToC c)) (text ("\\0\"")){-"-}
-    asciify (c:(cs@(d:_))) n
-      | isDigit d = (<>) (text (charToC c)) (asciify cs 0)
-      | otherwise = (<>) (text (charToC c)) (asciify cs (n-1))
-    asciify [] _ = text "\\0\
--}
-
-#if 0
-pprInstr (DATA s xs)
-  = vcat [(<>) (ptext pp_size) (pprImm x) | x <- xs]
-  where
-    pp_size = case s of
-#if alpha_TARGET_ARCH
-	    B  -> SLIT("\t.byte\t")
-	    BU -> SLIT("\t.byte\t")
-	    Q  -> SLIT("\t.quad\t")
-	    TF -> SLIT("\t.t_floating\t")
-#endif
-#if i386_TARGET_ARCH
-	    B  -> SLIT("\t.byte\t")
-	    L  -> SLIT("\t.long\t")
-	    F  -> SLIT("\t.float\t")
-    	    DF -> SLIT("\t.double\t")
-#endif
-#if sparc_TARGET_ARCH
-	    B  -> SLIT("\t.byte\t")
-	    BU -> SLIT("\t.byte\t")
-	    W  -> SLIT("\t.word\t")
-    	    DF -> SLIT("\t.double\t")
-#endif
-#endif
 
 
 pprInstr (DATA s xs)
@@ -936,7 +897,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
   | src == dst
   =
-#ifdef DEBUG
+#if 0 /* #ifdef DEBUG */
     (<>) (ptext SLIT("# warning: ")) (pprSizeOpOp SLIT("mov") size s d)
 #else
     empty
@@ -1105,9 +1066,10 @@ greg reg offset = text "%st(" <> int (gregno reg - 8+offset) <> char ')'
 gsemi = text " ; "
 gtab  = char '\t'
 gsp   = char ' '
-gregno (FixedReg i) = I# i
-gregno (MappedReg i) = I# i
-gregno other = pprPanic "gregno" (text (show other))
+
+gregno (RealReg i) = i
+gregno other       = --pprPanic "gregno" (ppr other)
+                     999   -- bogus; only needed for debug printing
 
 pprG :: Instr -> SDoc -> SDoc
 pprG fake actual

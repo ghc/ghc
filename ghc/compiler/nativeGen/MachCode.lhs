@@ -241,7 +241,7 @@ getRegister (StReg (StixMagicId stgreg))
                   -- cannae be Nothing
 
 getRegister (StReg (StixTemp u pk))
-  = returnNat (Fixed pk (UnmappedReg u pk) nilOL)
+  = returnNat (Fixed pk (mkVReg u pk) nilOL)
 
 getRegister tree@(StIndex _ _ _) = getRegister (mangleIndexTree tree)
 

@@ -18,9 +18,10 @@ import PprMach
 
 import AbsCStixGen	( genCodeAbstractC )
 import AbsCSyn		( AbstractC, MagicId )
+import AbsCUtils	( mkAbsCStmtList )
 import AsmRegAlloc	( runRegAllocate )
 import PrimOp		( commutableOp, PrimOp(..) )
-import RegAllocInfo	( mkMRegsState, MRegsState, findReservedRegs )
+import RegAllocInfo	( findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
                           pprStixTrees, pprStixTree, CodeSegment(..),
                           stixCountTempUses, stixSubst,
@@ -29,7 +30,8 @@ import Stix		( StixTree(..), StixReg(..),
                           uniqOfNatM_State, deltaOfNatM_State )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
-                          initUs_, UniqSM, UniqSupply )
+                          initUs_, UniqSM, UniqSupply,
+			  lazyThenUs, lazyMapUs )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
 import OrdList		( fromOL, concatOL )
@@ -87,38 +89,47 @@ So, here we go:
 \begin{code}
 nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc)
 nativeCodeGen absC us
-   = let (stixRaw, us1) = initUs us (genCodeAbstractC absC)
-         stixOpt        = map genericOpt stixRaw
-         insns          = initUs_ us1 (codeGen stixOpt)
-         debug_stix     = vcat (map pprStixTrees stixOpt)
-     in {- trace "nativeGen: begin" -} (debug_stix, insns)
-\end{code}
+   = let absCstmts         = mkAbsCStmtList absC
+         (sdoc_pairs, us1) = initUs us (lazyMapUs absCtoNat absCstmts)
+         stix_sdocs        = map fst sdoc_pairs
+         insn_sdocs        = map snd sdoc_pairs
 
-@codeGen@ is the top-level code-generation function:
-\begin{code}
-codeGen :: [[StixTree]] -> UniqSM SDoc
+         insn_sdoc         = my_vcat insn_sdocs
+         stix_sdoc         = vcat stix_sdocs
 
-codeGen stixFinal
-  = mapUs genMachCode stixFinal	`thenUs` \ dynamic_codes ->
-    let
-        fp_kludge :: [Instr] -> [Instr]
-        fp_kludge = IF_ARCH_i386(i386_insert_ffrees,id)
+#        if DEBUG
+         my_trace m x = trace m x
+         my_vcat sds = vcat (intersperse (char ' ' 
+                                          $$ ptext SLIT("# ___stg_split_marker")
+                                          $$ char ' ') 
+                                          sds)
+#        else
+         my_vcat sds = vcat sds
+         my_trace m x = x
+#        endif
+     in  
+         my_trace "nativeGen: begin" 
+                  (stix_sdoc, insn_sdoc)
 
-        static_instrss :: [[Instr]]
-	static_instrss = map fp_kludge (scheduleMachCode dynamic_codes)
-        docs           = map (vcat . map pprInstr) static_instrss
 
-        -- for debugging only
-        docs_prealloc  = map (vcat . map pprInstr . fromOL) 
-                             dynamic_codes
-        text_prealloc  = vcat (intersperse (char ' ' $$ char ' ') docs_prealloc)
-    in
-    --trace (showSDoc text_prealloc) (
-    returnUs (vcat (intersperse (char ' ' 
-                                 $$ ptext SLIT("# ___stg_split_marker")
-                                 $$ char ' ') 
-                    docs))
-    --)
+absCtoNat :: AbstractC -> UniqSM (SDoc, SDoc)
+absCtoNat absC
+   = genCodeAbstractC absC                `thenUs` \ stixRaw ->
+     genericOpt stixRaw                   `bind`   \ stixOpt ->
+     genMachCode stixOpt                  `thenUs` \ pre_regalloc ->
+     regAlloc pre_regalloc                `bind`   \ almost_final ->
+     x86fp_kludge almost_final            `bind`   \ final_mach_code ->
+     vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
+     pprStixTrees stixOpt                 `bind`   \ stix_sdoc ->
+     returnUs (stix_sdoc, final_sdoc)
+     where
+        bind f x = x f
+
+        x86fp_kludge :: [Instr] -> [Instr]
+        x86fp_kludge = IF_ARCH_i386(i386_insert_ffrees,id)
+
+        regAlloc :: InstrBlock -> [Instr]
+        regAlloc = runRegAllocate allocatableRegs findReservedRegs
 \end{code}
 
 Top level code generator for a chunk of stix code.  For this part of
@@ -154,20 +165,6 @@ genMachCode stmts initial_us
                       (int final_delta)
 \end{code}
 
-The next bit does the code scheduling.  The scheduler must also deal
-with register allocation of temporaries.  Much parallelism can be
-exposed via the OrdList, but more might occur, so further analysis
-might be needed.
-
-\begin{code}
-scheduleMachCode :: [InstrBlock] -> [[Instr]]
-
-scheduleMachCode
-  = map (runRegAllocate freeRegsState findReservedRegs)
-  where
-    freeRegsState = mkMRegsState (extractMappedRegNos freeRegs)
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[NCOpt]{The Generic Optimiser}
@@ -197,24 +194,26 @@ stixPeep :: [StixTree] -> [StixTree]
 -- second assignment would be substituted for, giving nonsense
 -- code.  As far as I can see, StixTemps are only ever assigned
 -- to once.  It would be nice to be sure!
-{-
+
 stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
          : t2
          : ts )
    | stixCountTempUses u t2 == 1
      && sum (map (stixCountTempUses u) ts) == 0
-   = trace ("nativeGen: stixInline: " ++ showSDoc (pprStixTree rhs))
+   = 
+#    ifdef DEBUG
+     trace ("nativeGen: inlining " ++ showSDoc (pprStixTree rhs))
+#    endif
            (stixPeep (stixSubst u rhs t2 : ts))
 
 stixPeep (t1:t2:ts) = t1 : stixPeep (t2:ts)
 stixPeep [t1]       = [t1]
 stixPeep []         = []
--}
 
 -- disable stix inlining until we figure out how to fix the
 -- latent bugs in the register allocator which are exposed by
 -- the inliner.
-stixPeep = id
+--stixPeep = id
 \end{code}
 
 For most nodes, just optimize the children.

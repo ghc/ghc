@@ -32,7 +32,7 @@ import CmdLineOpts
 import Maybes		( maybeToBool )
 import ErrUtils		( doIfSet, dumpIfSet )
 import Outputable
-import IO		( IOMode(..), hClose, openFile )
+import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
 
 
@@ -69,6 +69,7 @@ codeOutput mod_name tycons classes core_binds stg_binds
 	} }
 
 
+doOutput :: (Handle -> IO ()) -> IO ()
 doOutput io_action
   = (do	handle <- openFile opt_OutputFile WriteMode
 	io_action handle
@@ -101,9 +102,9 @@ outputC flat_absC
 outputAsm flat_absC ncg_uniqs
 #ifndef OMIT_NATIVE_CODEGEN
 
-  = do	dumpIfSet opt_D_dump_stix "Final stix code" stix_final
-	dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d
-	doOutput (\ f -> printForAsm f ncg_output_d)
+  = do dumpIfSet opt_D_dump_stix "Final stix code" stix_final
+       dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d
+       doOutput ( \f -> printForAsm f ncg_output_d)
   where
     (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
 

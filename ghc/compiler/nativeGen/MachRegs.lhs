@@ -14,25 +14,21 @@ modules --- the pleasure has been foregone.)
 
 module MachRegs (
 
-	Reg(..),
+        RegClass(..), regClass,
+	Reg(..), isRealReg, isVirtualReg,
+        allocatableRegs,
+
 	Imm(..),
 	MachRegsAddr(..),
 	RegLoc(..),
-	RegNo,
 
 	addrOffset,
-	argRegs,
 	baseRegOffset,
-	callClobberedRegs,
 	callerSaves,
-	extractMappedRegNos,
-        mappedRegNo,
-	freeMappedRegs,
-	freeReg, freeRegs,
+	freeReg,
 	getNewRegNCG,
+	mkVReg,
 	magicIdRegMaybe,
-	mkReg,
-	realReg,
 	saveLoc,
 	spRel,
 	stgReg,
@@ -63,13 +59,10 @@ import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel, mkMainRegTableLabel )
 import PrimOp		( PrimOp(..) )
-import PrimRep		( PrimRep(..) )
+import PrimRep		( PrimRep(..), isFloatingRep )
 import Stix		( StixTree(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
-import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
-			  Uniquable(..), Unique
-			)
---import UniqSupply	( getUniqueUs, returnUs, thenUs, UniqSM )
+import Unique		( mkPseudoUnique2, Uniquable(..), Unique )
 import Outputable
 \end{code}
 
@@ -249,101 +242,78 @@ fpRel n
 %*									*
 %************************************************************************
 
-Static Registers correspond to actual machine registers.  These should
-be avoided until the last possible moment.
+RealRegs are machine regs which are available for allocation, in the
+usual way.  We know what class they are, because that's part of the
+processor's architecture.
 
-Dynamic registers are allocated on the fly, usually to represent a single
-value in the abstract assembly code (i.e. dynamic registers are usually
-single assignment).  Ultimately, they are mapped to available machine
-registers before spitting out the code.
+VirtualRegs are virtual registers.  The register allocator will
+eventually have to map them into RealRegs, or into spill slots.
+VirtualRegs are allocated on the fly, usually to represent a single
+value in the abstract assembly code (i.e. dynamic registers are
+usually single assignment).  With the new register allocator, the
+single assignment restriction isn't necessary to get correct code,
+although a better register allocation will result if single assignment
+is used -- because the allocator maps a VirtualReg into a single
+RealReg, even if the VirtualReg has multiple live ranges.
+
+Virtual regs can be of either class, so that info is attached.
 
 \begin{code}
+
+data RegClass 
+   = RcInteger 
+   | RcFloating
+     deriving Eq
+
 data Reg
-  = FixedReg  FAST_INT		-- A pre-allocated machine register
+   = RealReg     Int
+   | VirtualRegI Unique
+   | VirtualRegF Unique
 
-  | MappedReg FAST_INT		-- A dynamically allocated machine register
+mkVReg :: Unique -> PrimRep -> Reg
+mkVReg u pk
+   = if isFloatingRep pk then VirtualRegF u else VirtualRegI u
 
-  | MemoryReg Int PrimRep	-- A machine "register" actually held in
-				-- a memory allocated table of
-				-- registers which didn't fit in real
-				-- registers.
-
-  | UnmappedReg Unique PrimRep	-- One of an infinite supply of registers,
-				-- always mapped to one of the earlier
-				-- two (?)  before we're done.
-mkReg :: Unique -> PrimRep -> Reg
-mkReg = UnmappedReg
+isVirtualReg (RealReg _)     = False
+isVirtualReg (VirtualRegI _) = True
+isVirtualReg (VirtualRegF _) = True
+isRealReg = not . isVirtualReg
 
 getNewRegNCG :: PrimRep -> NatM Reg
 getNewRegNCG pk
-  = getUniqueNat `thenNat` \ u ->
-    returnNat (UnmappedReg u pk)
-
-instance Show Reg where
-    showsPrec _ (FixedReg i)	= showString "%"  . shows IBOX(i)
-    showsPrec _ (MappedReg i)	= showString "%"  . shows IBOX(i)
-    showsPrec _ (MemoryReg i _) = showString "%M"  . shows i
-    showsPrec _ (UnmappedReg i _) = showString "%U" . shows i
-
-#ifdef DEBUG
-instance Outputable Reg where
-    ppr r = text (show r)
-#endif
-
-cmpReg (FixedReg i)      (FixedReg i')      = cmp_ihash i i'
-cmpReg (MappedReg i)     (MappedReg i')     = cmp_ihash i i'
-cmpReg (MemoryReg i _)   (MemoryReg i' _)   = i `compare` i'
-cmpReg (UnmappedReg u _) (UnmappedReg u' _) = compare u u'
-cmpReg r1 r2
-  = let tag1 = tagReg r1
-	tag2 = tagReg r2
-    in
-	if tag1 _LT_ tag2 then LT else GT
-    where
-	tagReg (FixedReg _)	 = (ILIT(1) :: FAST_INT)
-	tagReg (MappedReg _)	 = ILIT(2)
-	tagReg (MemoryReg _ _)	 = ILIT(3)
-	tagReg (UnmappedReg _ _) = ILIT(4)
-
-cmp_ihash :: FAST_INT -> FAST_INT -> Ordering
-cmp_ihash a1 a2 = if a1 _EQ_ a2 then EQ else if a1 _LT_ a2 then LT else GT
+   = if   isFloatingRep pk 
+     then getUniqueNat `thenNat` \ u -> returnNat (VirtualRegF u)
+     else getUniqueNat `thenNat` \ u -> returnNat (VirtualRegI u)
 
 instance Eq Reg where
-    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False; _ -> True  }
+   (==) (RealReg i1)     (RealReg i2)     = i1 == i2
+   (==) (VirtualRegI u1) (VirtualRegI u2) = u1 == u2
+   (==) (VirtualRegF u1) (VirtualRegF u2) = u1 == u2
+   (==) reg1             reg2             = False
 
 instance Ord Reg where
-    a <= b = case (a `compare` b) of { LT -> True;	EQ -> True;  GT -> False }
-    a <	 b = case (a `compare` b) of { LT -> True;	EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = cmpReg a b
+   compare (RealReg i1)     (RealReg i2)     = compare i1 i2
+   compare (RealReg _)      (VirtualRegI _)  = LT
+   compare (RealReg _)      (VirtualRegF _)  = LT
+   compare (VirtualRegI _)  (RealReg _)      = GT
+   compare (VirtualRegI u1) (VirtualRegI u2) = compare u1 u2
+   compare (VirtualRegI _)  (VirtualRegF _)  = LT
+   compare (VirtualRegF _)  (RealReg _)      = GT
+   compare (VirtualRegF _)  (VirtualRegI _)  = GT
+   compare (VirtualRegF u1) (VirtualRegF u2) = compare u1 u2
+
+instance Show Reg where
+    showsPrec _ (RealReg i)     = showString (showReg i)
+    showsPrec _ (VirtualRegI u) = showString "%vI_"  . shows u
+    showsPrec _ (VirtualRegF u) = showString "%vF_"  . shows u
+
+instance Outputable Reg where
+    ppr r = text (show r)
 
 instance Uniquable Reg where
-    getUnique (UnmappedReg u _) = u
-    getUnique (FixedReg i)      = mkPseudoUnique1 IBOX(i)
-    getUnique (MappedReg i)     = mkPseudoUnique2 IBOX(i)
-    getUnique (MemoryReg i _)   = mkPseudoUnique3 i
-\end{code}
-
-\begin{code}
-type RegNo = Int
-
-realReg :: RegNo -> Reg
-realReg n@IBOX(i)
-  = if _IS_TRUE_(freeReg i) then MappedReg i else FixedReg i
-
-extractMappedRegNos :: [Reg] -> [RegNo]
-
-extractMappedRegNos regs
-  = foldr ex [] regs
-  where
-    ex (MappedReg i) acc = IBOX(i) : acc  -- we'll take it
-    ex _	     acc = acc		  -- leave it out
-
-mappedRegNo :: Reg -> RegNo
-mappedRegNo (MappedReg i) = IBOX(i)
-mappedRegNo _             = pprPanic "mappedRegNo" empty
+    getUnique (RealReg i)     = mkPseudoUnique2 i
+    getUnique (VirtualRegI u) = u
+    getUnique (VirtualRegF u) = u
 \end{code}
 
 ** Machine-specific Reg stuff: **
@@ -385,25 +355,35 @@ Intel x86 architecture:
 \begin{code}
 #if i386_TARGET_ARCH
 
-gReg,fReg :: Int -> Int
-gReg x = x
-fReg x = (8 + x)
+fake0, fake1, fake2, fake3, fake4, fake5, 
+       eax, ebx, ecx, edx, esp, ebp, esi, edi :: Reg
+eax   = RealReg 0
+ebx   = RealReg 1
+ecx   = RealReg 2
+edx   = RealReg 3
+esi   = RealReg 4
+edi   = RealReg 5
+ebp   = RealReg 6
+esp   = RealReg 7
+fake0 = RealReg 8
+fake1 = RealReg 9
+fake2 = RealReg 10
+fake3 = RealReg 11
+fake4 = RealReg 12
+fake5 = RealReg 13
 
-fake0, fake1, fake2, fake3, fake4, fake5, eax, ebx, ecx, edx, esp :: Reg
-eax = realReg (gReg 0)
-ebx = realReg (gReg 1)
-ecx = realReg (gReg 2)
-edx = realReg (gReg 3)
-esi = realReg (gReg 4)
-edi = realReg (gReg 5)
-ebp = realReg (gReg 6)
-esp = realReg (gReg 7)
-fake0 = realReg (fReg 0)
-fake1 = realReg (fReg 1)
-fake2 = realReg (fReg 2)
-fake3 = realReg (fReg 3)
-fake4 = realReg (fReg 4)
-fake5 = realReg (fReg 5)
+regClass (RealReg i)     = if i < 8 then RcInteger else RcFloating
+regClass (VirtualRegI u) = RcInteger
+regClass (VirtualRegF u) = RcFloating
+
+regNames 
+   = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
+      "%fake0", "%fake1", "%fake2", "%fake3", "%fake4", "%fake5", "%fake6"]
+showReg n
+   = if   n >= 0 && n < 14
+     then regNames !! n
+     else "%unknown_x86_real_reg_" ++ show n
+
 #endif
 \end{code}
 
@@ -675,95 +655,110 @@ callerSaves _				= False
 magicIdRegMaybe :: MagicId -> Maybe Reg
 
 #ifdef REG_Base
-magicIdRegMaybe BaseReg			= Just (FixedReg ILIT(REG_Base))
+magicIdRegMaybe BaseReg			= Just (RealReg REG_Base)
 #endif
 #ifdef REG_R1
-magicIdRegMaybe (VanillaReg _ ILIT(1)) 	= Just (FixedReg ILIT(REG_R1))
+magicIdRegMaybe (VanillaReg _ ILIT(1)) 	= Just (RealReg REG_R1)
 #endif 
 #ifdef REG_R2 
-magicIdRegMaybe (VanillaReg _ ILIT(2)) 	= Just (FixedReg ILIT(REG_R2))
+magicIdRegMaybe (VanillaReg _ ILIT(2)) 	= Just (RealReg REG_R2)
 #endif 
 #ifdef REG_R3 
-magicIdRegMaybe (VanillaReg _ ILIT(3)) 	= Just (FixedReg ILIT(REG_R3))
+magicIdRegMaybe (VanillaReg _ ILIT(3)) 	= Just (RealReg REG_R3)
 #endif 
 #ifdef REG_R4 
-magicIdRegMaybe (VanillaReg _ ILIT(4)) 	= Just (FixedReg ILIT(REG_R4))
+magicIdRegMaybe (VanillaReg _ ILIT(4)) 	= Just (RealReg REG_R4)
 #endif 
 #ifdef REG_R5 
-magicIdRegMaybe (VanillaReg _ ILIT(5)) 	= Just (FixedReg ILIT(REG_R5))
+magicIdRegMaybe (VanillaReg _ ILIT(5)) 	= Just (RealReg REG_R5)
 #endif 
 #ifdef REG_R6 
-magicIdRegMaybe (VanillaReg _ ILIT(6)) 	= Just (FixedReg ILIT(REG_R6))
+magicIdRegMaybe (VanillaReg _ ILIT(6)) 	= Just (RealReg REG_R6)
 #endif 
 #ifdef REG_R7 
-magicIdRegMaybe (VanillaReg _ ILIT(7)) 	= Just (FixedReg ILIT(REG_R7))
+magicIdRegMaybe (VanillaReg _ ILIT(7)) 	= Just (RealReg REG_R7)
 #endif 
 #ifdef REG_R8 
-magicIdRegMaybe (VanillaReg _ ILIT(8)) 	= Just (FixedReg ILIT(REG_R8))
+magicIdRegMaybe (VanillaReg _ ILIT(8)) 	= Just (RealReg REG_R8)
 #endif
 #ifdef REG_R9 
-magicIdRegMaybe (VanillaReg _ ILIT(9)) 	= Just (FixedReg ILIT(REG_R9))
+magicIdRegMaybe (VanillaReg _ ILIT(9)) 	= Just (RealReg REG_R9)
 #endif
 #ifdef REG_R10 
-magicIdRegMaybe (VanillaReg _ ILIT(10))	= Just (FixedReg ILIT(REG_R10))
+magicIdRegMaybe (VanillaReg _ ILIT(10))	= Just (RealReg REG_R10)
 #endif
 #ifdef REG_F1
-magicIdRegMaybe (FloatReg ILIT(1))	= Just (FixedReg ILIT(REG_F1))
+magicIdRegMaybe (FloatReg ILIT(1))	= Just (RealReg REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-magicIdRegMaybe (FloatReg ILIT(2))	= Just (FixedReg ILIT(REG_F2))
+magicIdRegMaybe (FloatReg ILIT(2))	= Just (RealReg REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-magicIdRegMaybe (FloatReg ILIT(3))	= Just (FixedReg ILIT(REG_F3))
+magicIdRegMaybe (FloatReg ILIT(3))	= Just (RealReg REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-magicIdRegMaybe (FloatReg ILIT(4))	= Just (FixedReg ILIT(REG_F4))
+magicIdRegMaybe (FloatReg ILIT(4))	= Just (RealReg REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-magicIdRegMaybe (DoubleReg ILIT(1))	= Just (FixedReg ILIT(REG_D1))
+magicIdRegMaybe (DoubleReg ILIT(1))	= Just (RealReg REG_D1)
 #endif				 	
 #ifdef REG_D2			 	
-magicIdRegMaybe (DoubleReg ILIT(2))	= Just (FixedReg ILIT(REG_D2))
+magicIdRegMaybe (DoubleReg ILIT(2))	= Just (RealReg REG_D2)
 #endif
 #ifdef REG_Sp	    
-magicIdRegMaybe Sp		   	= Just (FixedReg ILIT(REG_Sp))
+magicIdRegMaybe Sp		   	= Just (RealReg REG_Sp)
 #endif
 #ifdef REG_Lng1			 	
-magicIdRegMaybe (LongReg _ ILIT(1))	= Just (FixedReg ILIT(REG_Lng1))
+magicIdRegMaybe (LongReg _ ILIT(1))	= Just (RealReg REG_Lng1)
 #endif				 	
 #ifdef REG_Lng2			 	
-magicIdRegMaybe (LongReg _ ILIT(2))	= Just (FixedReg ILIT(REG_Lng2))
+magicIdRegMaybe (LongReg _ ILIT(2))	= Just (RealReg REG_Lng2)
 #endif
 #ifdef REG_Su	    			
-magicIdRegMaybe Su		   	= Just (FixedReg ILIT(REG_Su))
+magicIdRegMaybe Su		   	= Just (RealReg REG_Su)
 #endif	    				
 #ifdef REG_SpLim	    			
-magicIdRegMaybe SpLim		   	= Just (FixedReg ILIT(REG_SpLim))
+magicIdRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
 #endif	    				
 #ifdef REG_Hp	   			
-magicIdRegMaybe Hp		   	= Just (FixedReg ILIT(REG_Hp))
+magicIdRegMaybe Hp		   	= Just (RealReg REG_Hp)
 #endif	    				
 #ifdef REG_HpLim      			
-magicIdRegMaybe HpLim		   	= Just (FixedReg ILIT(REG_HpLim))
+magicIdRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
 #endif	    				
 #ifdef REG_CurrentTSO      			
-magicIdRegMaybe CurrentTSO	   	= Just (FixedReg ILIT(REG_CurrentTSO))
+magicIdRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
 #endif	    				
 #ifdef REG_CurrentNursery      			
-magicIdRegMaybe CurrentNursery	   	= Just (FixedReg ILIT(REG_CurrentNursery))
+magicIdRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
 #endif	    				
 magicIdRegMaybe _		   	= Nothing
 \end{code}
 
 \begin{code}
 -------------------------------
+#if 0
 freeRegs :: [Reg]
 freeRegs
   = freeMappedRegs IF_ARCH_alpha( [0..63],
 		   IF_ARCH_i386(  [0..13],
 		   IF_ARCH_sparc( [0..63],)))
+#endif
+-- allMachRegs is the complete set of machine regs.
+allMachRegNos :: [Int]
+allMachRegNos
+   = IF_ARCH_alpha( [0..63],
+     IF_ARCH_i386(  [0..13],
+     IF_ARCH_sparc( [0..63],)))
+-- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+allocatableRegs :: [Reg]
+allocatableRegs
+   = let isFree (RealReg (I# i)) = _IS_TRUE_(freeReg i)
+     in  filter isFree (map RealReg allMachRegNos)
+
 
 -------------------------------
+#if 0
 callClobberedRegs :: [Reg]
 callClobberedRegs
   = freeMappedRegs
@@ -783,8 +778,10 @@ callClobberedRegs
       [gReg i | i <- [1..7]] ++
       [fReg i | i <- [0..31]] )
 #endif {- sparc_TARGET_ARCH -}
+#endif
 
 -------------------------------
+#if 0
 argRegs :: Int -> [Reg]
 
 argRegs 0 = []
@@ -809,9 +806,11 @@ argRegs 6 = freeMappedRegs (map oReg [0,1,2,3,4,5])
 #endif {- sparc_TARGET_ARCH -}
 argRegs _ = panic "MachRegs.argRegs: don't know about >6 arguments!"
 #endif {- i386_TARGET_ARCH -}
+#endif
 
 -------------------------------
 
+#if 0
 #if alpha_TARGET_ARCH
 allArgRegs :: [(Reg, Reg)]
 
@@ -823,15 +822,7 @@ allArgRegs :: [Reg]
 
 allArgRegs = map realReg [oReg i | i <- [0..5]]
 #endif {- sparc_TARGET_ARCH -}
-
--------------------------------
-freeMappedRegs :: [Int] -> [Reg]
-
-freeMappedRegs nums
-  = foldr free [] nums
-  where
-    free IBOX(i) acc
-      = if _IS_TRUE_(freeReg i) then (MappedReg i) : acc else acc
+#endif
 \end{code}
 
 \begin{code}

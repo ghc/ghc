@@ -433,7 +433,12 @@ amodeToStix (CLit core)
       MachAddr a     -> StInt a
       MachInt i      -> StInt i
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
-      MachLitLit s _ -> litLitToStix (_UNPK_ s)
+      MachLitLit s _ -> trace ("\nnativeGen WARNING: Reference to C entity `" 
+                                ++ (_UNPK_ s) ++ "' cannot be reliably compiled."
+                                ++ "\n\t\t   It may well crash your program."
+                                ++ "\n\t\t   Workaround: compile via C (use -fvia-C).\n"
+                              )
+                              (litLitToStix (_UNPK_ s))
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"
