@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.23 1999/05/13 17:31:12 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.24 1999/05/21 14:46:19 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -18,6 +18,11 @@
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
+
+/* ToDo: make the printing of panics more Win32-friendly, i.e.,
+ *       pop up some lovely message boxes (as well).
+ */
+#define DUMP_ERRMSG(msg) STGCALL1(fflush,stdout); STGCALL2(fprintf,stderr,msg)
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.
@@ -54,7 +59,6 @@ STGFUN(IND_PERM_entry)
 {
     FB_
     /* Don't add INDs to granularity cost */
-
     /* Dont: TICK_ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
 
 #if defined(TICKY_TICKY) && !defined(PROFILING)
@@ -275,8 +279,7 @@ EF_(BCO_entry) {
 STGFUN(type##_entry)							\
 {									\
   FB_									\
-    STGCALL1(fflush,stdout);						\
-    STGCALL2(fprintf,stderr,#type " object entered!\n");		\
+    DUMP_ERRMSG(#type " object entered!\n");                            \
     STGCALL1(raiseError, errorHandler);					\
     stg_exit(EXIT_FAILURE); /* not executed */				\
   FE_									\
@@ -421,8 +424,7 @@ NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
 STGFUN(stg_error_entry)							\
 {									\
   FB_									\
-    STGCALL1(fflush,stdout);						\
-    STGCALL2(fprintf,stderr,"fatal: stg_error_entry");			\
+    DUMP_ERRMSG("fatal: stg_error_entry");                              \
     STGCALL1(raiseError, errorHandler);					\
     exit(EXIT_FAILURE); /* not executed */				\
   FE_									\
@@ -448,6 +450,48 @@ FN_(dummy_ret_entry)
 }
 SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
 };
+
+/* -----------------------------------------------------------------------------
+    Strict IO application - performing an IO action and entering its result.
+    
+    rts_evalIO() lets you perform Haskell IO actions from outside of Haskell-land,
+    returning back to you their result. Want this result to be evaluated to WHNF
+    by that time, so that we can easily get at the int/char/whatever using the
+    various get{Ty} functions provided by the RTS API.
+
+    forceIO takes care of this, performing the IO action and entering the
+    results that comes back.
+
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE_SRT_BITMAP(forceIO_ret_info,forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
+FN_(forceIO_ret_entry)
+{
+  FB_
+  Sp++;
+  Sp -= sizeofW(StgSeqFrame);
+  PUSH_SEQ_FRAME(Sp);
+  JMP_(GET_ENTRY(R1.cl));
+}
+
+
+INFO_TABLE(forceIO_info,forceIO_entry,1,0,FUN,,EF_,0,0);
+FN_(forceIO_entry)
+{
+  FB_
+  /* Sp[0] contains the IO action we want to perform */
+  R1.p  = (P_)Sp[0];
+  /* Replace it with the return continuation that enters the result. */
+  Sp[0] = (W_)&forceIO_ret_info;
+  Sp--;
+  /* Push the RealWorld# tag and enter */
+  Sp[0] =(W_)REALWORLD_TAG;
+  JMP_(GET_ENTRY(R1.cl));
+  FE_
+}
+SET_STATIC_HDR(forceIO_closure,forceIO_info,CCS_DONTZuCARE,,EI_)
+};
+
 
 /* -----------------------------------------------------------------------------
    Standard Infotables (for use in interpreter)

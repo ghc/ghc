@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.6 1999/05/04 10:19:18 sof Exp $
+ * $Id: RtsAPI.c,v 1.7 1999/05/21 14:46:19 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,12 +12,6 @@
 #include "RtsAPI.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
-
-/* This is a temporary fudge until the scheduler guarantees
-   that the result returned from an evalIO() is fully evaluated.
-*/
-#define CHASE_OUT_INDIRECTIONS(p) \
-   while ((p)->header.info == &IND_info || (p)->header.info == &IND_STATIC_info || (p)->header.info == &IND_OLDGEN_info || (p)->header.info == &IND_PERM_info || (p)->header.info == &IND_OLDGEN_PERM_info) { p=((StgInd*)p)->indirectee; }
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -214,8 +208,6 @@ rts_apply (HaskellObj f, HaskellObj arg)
 char
 rts_getChar (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( p->header.info == (const StgInfoTable*)&Czh_con_info || 
        p->header.info == (const StgInfoTable*)&Czh_static_info) {
     return (char)(StgWord)(p->payload[0]);
@@ -227,8 +219,6 @@ rts_getChar (HaskellObj p)
 int
 rts_getInt (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( 1 ||
        p->header.info == (const StgInfoTable*)&Izh_con_info || 
        p->header.info == (const StgInfoTable*)&Izh_static_info ) {
@@ -241,8 +231,6 @@ rts_getInt (HaskellObj p)
 int
 rts_getInt32 (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( 1 ||
        p->header.info == (const StgInfoTable*)&Izh_con_info || 
        p->header.info == (const StgInfoTable*)&Izh_static_info ) {
@@ -255,8 +243,6 @@ rts_getInt32 (HaskellObj p)
 unsigned int
 rts_getWord (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( 1 || /* see above comment */
        p->header.info == (const StgInfoTable*)&Wzh_con_info ||
        p->header.info == (const StgInfoTable*)&Wzh_static_info ) {
@@ -269,8 +255,6 @@ rts_getWord (HaskellObj p)
 unsigned int
 rts_getWord32 (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( 1 || /* see above comment */
        p->header.info == (const StgInfoTable*)&Wzh_con_info ||
        p->header.info == (const StgInfoTable*)&Wzh_static_info ) {
@@ -283,8 +267,6 @@ rts_getWord32 (HaskellObj p)
 float
 rts_getFloat (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( p->header.info == (const StgInfoTable*)&Fzh_con_info || 
        p->header.info == (const StgInfoTable*)&Fzh_static_info ) {
     return (float)(PK_FLT((P_)p->payload));
@@ -296,8 +278,6 @@ rts_getFloat (HaskellObj p)
 double
 rts_getDouble (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( p->header.info == (const StgInfoTable*)&Dzh_con_info || 
        p->header.info == (const StgInfoTable*)&Dzh_static_info ) {
     return (double)(PK_DBL((P_)p->payload));
@@ -309,8 +289,6 @@ rts_getDouble (HaskellObj p)
 StgStablePtr
 rts_getStablePtr (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( p->header.info == (const StgInfoTable*)&StablePtr_con_info || 
        p->header.info == (const StgInfoTable*)&StablePtr_static_info ) {
     return (StgStablePtr)(p->payload[0]);
@@ -322,8 +300,6 @@ rts_getStablePtr (HaskellObj p)
 void *
 rts_getAddr (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if ( p->header.info == (const StgInfoTable*)&Azh_con_info || 
        p->header.info == (const StgInfoTable*)&Azh_static_info ) {
   
@@ -337,8 +313,6 @@ rts_getAddr (HaskellObj p)
 int
 rts_getBool (HaskellObj p)
 {
-  CHASE_OUT_INDIRECTIONS(p);
-
   if (p == &True_closure) {
     return 1;
   } else if (p == &False_closure) {
@@ -366,15 +340,22 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
   return schedule(tso, ret);
 }
 
+/*
+ * rts_evalIO() evaluates a value of the form (IO a), forcing the action's
+ * result to WHNF before returning.
+ */
 SchedulerStatus
 rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 {
-  StgTSO *tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
+  StgTSO* tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
   return schedule(tso, ret);
 }
 
+/*
+ * Like rts_evalIO(), but doesn't force the action's result.
+ */
 SchedulerStatus
-rts_evalIO_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
+rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
   StgTSO *tso = createIOThread(stack_size, p);
   return schedule(tso, ret);

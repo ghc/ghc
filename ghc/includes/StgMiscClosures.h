@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.12 1999/05/11 16:47:41 keithw Exp $
+ * $Id: StgMiscClosures.h,v 1.13 1999/05/21 14:46:21 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,6 +97,7 @@ extern DLL_IMPORT_DATA StgClosure END_TSO_QUEUE_closure;
 extern DLL_IMPORT_DATA StgClosure END_MUT_LIST_closure;
 extern DLL_IMPORT_DATA StgClosure NO_FINALIZER_closure;
 extern DLL_IMPORT_DATA StgClosure dummy_ret_closure;
+extern DLL_IMPORT_DATA StgClosure forceIO_closure;
 
 extern DLL_IMPORT_DATA StgIntCharlikeClosure CHARLIKE_closure[];
 extern DLL_IMPORT_DATA StgIntCharlikeClosure INTLIKE_closure[];

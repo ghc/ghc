@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.2 1998/12/02 13:21:33 simonm Exp $
+ * $Id: SchedAPI.h,v 1.3 1999/05/21 14:46:21 sof Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -26,7 +26,7 @@ typedef enum {
 SchedulerStatus schedule(StgTSO *main_thread, /*out*/StgClosure **ret);
 
 /* 
- * Creating thraeds
+ * Creating threads
  */
 
 StgTSO *createThread   (nat stack_size);
@@ -56,6 +56,21 @@ createIOThread(nat stack_size,  StgClosure *closure) {
   pushClosure(t,closure);
   return t;
 }
+
+/*
+ * Same as above, but also evaluate the result of the IO action
+ * to whnf while we're at it.
+ */
+
+static inline StgTSO *
+createStrictIOThread(nat stack_size,  StgClosure *closure) {
+  StgTSO *t;
+  t = createThread(stack_size);
+  pushClosure(t,closure);
+  pushClosure(t,&forceIO_closure);
+  return t;
+}
+
 
 /* 
  * Killing threads
