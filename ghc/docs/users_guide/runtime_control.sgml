@@ -259,7 +259,7 @@
 	<indexterm><primary><option>-K</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>stack, maximum size</primary></indexterm>
 	<listitem>
-	  <para>&lsqb;Default: 1M&rsqb; Set the maximum stack size for
+	  <para>&lsqb;Default: 8M&rsqb; Set the maximum stack size for
           an individual thread to <replaceable>size</replaceable>
           bytes.  This option is there purely to stop the program
           eating up all the available memory in the machine if it gets
