@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.72 2001/06/15 08:29:58 simonpj Exp $
+-- $Id: Main.hs,v 1.73 2001/06/18 08:56:09 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -43,10 +43,8 @@ import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( Phase(Hsc, HCc), haskellish_src_file, objish_file )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename, unknownFlagErr, my_prefix_match )
-import CmdLineOpts	( dynFlag,
-			  DynFlags(verbosity, stgToDo, hscOutName, hscLang, coreToDo),
-			  HscLang(HscInterpreted, HscC), 
-			  defaultDynFlags, restoreDynFlags, saveDynFlags, setDynFlags, 
+import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags, saveDynFlags, setDynFlags, 
+			  DynFlags(..), HscLang(..), 
 			  v_Static_hsc_opts
 			)
 
@@ -63,7 +61,8 @@ import Exception	( throwDyn, Exception(DynException) )
 import System		( getArgs, exitWith, ExitCode(..) )
 
 #ifndef mingw32_TARGET_OS
-import Concurrent	( myThreadId, throwTo )
+import Concurrent	( myThreadId )
+import Exception	( throwTo )
 import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import Dynamic		( toDyn )
 #endif
