@@ -15,6 +15,7 @@ module Panic
      panic, panic#, assertPanic, trace 
    ) where
 
+import Config
 import FastTypes
 
 import Dynamic
@@ -56,7 +57,8 @@ showBarf (PhaseFailed phase code)
 showBarf (Interrupted)
    = showString "interrupted"
 showBarf (Panic s)
-   = showString ("panic! (the `impossible' happened):\n\t"
+   = showString ("panic! (the `impossible' happened, GHC version "
+		 ++ cProjectVersion ++ "):\n\t"
 	         ++ s ++ "\n\n"
 	         ++ "Please report it as a compiler bug "
 	         ++ "to glasgow-haskell-bugs@haskell.org.\n\n")
