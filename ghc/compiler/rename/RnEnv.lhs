@@ -57,8 +57,6 @@ import List		( nub )
 import UniqFM		( lookupWithDefaultUFM )
 import CmdLineOpts
 import FastString	( FastString )
-
-import Maybe		( isJust )
 \end{code}
 
 %*********************************************************

@@ -35,7 +35,7 @@ import TcMType		( newKindVar, tcInstSigTyVars,
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
-			  TcTyVar, TcTyVarSet, TcType, TcKind, TcThetaType, TcTauType,
+			  TcTyVar, TcTyVarSet, TcKind, TcThetaType, TcTauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
 			  tcSplitForAllTys, tcSplitRhoTy, 
 		 	  hoistForAllTys, allDistinctTyVars, zipFunTys, 
@@ -52,11 +52,11 @@ import PprType		( pprType )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, idName, idType )
-import Var		( Id, Var, TyVar, mkTyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
+import Var		( Var, TyVar, mkTyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
-import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
+import TyCon		( TyCon, isSynTyCon, tyConKind )
 import Class		( classTyCon )
 import Name		( Name, getSrcLoc )
 import NameSet

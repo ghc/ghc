@@ -22,7 +22,7 @@ import CoreUtils	( exprIsValue, exprIsDupable )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
 import Id		( isOneShotLambda )
-import Var		( Id, idType, isTyVar )
+import Var		( Id, idType )
 import Type		( isUnLiftedType )
 import VarSet
 import Util		( zipEqual, zipWithEqual, count )

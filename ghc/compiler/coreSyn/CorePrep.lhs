@@ -10,7 +10,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand, exprArity, exprOkForSpeculation )
+import CoreUtils( exprType, exprIsValue, etaExpand, exprArity, exprOkForSpeculation )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -29,7 +29,7 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		)
 import HscTypes ( ModDetails(..), implicitTyThingIds, typeEnvElts )
 import Unique	( mkBuiltinUnique )
-import BasicTypes ( Arity, TopLevelFlag(..), isTopLevel, isNotTopLevel,
+import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
 import UniqSupply

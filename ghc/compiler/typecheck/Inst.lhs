@@ -61,7 +61,6 @@ import Class	( Class )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
-import NameSet	( NameSet )
 import PprType	( pprPred )	
 import Subst	( emptyInScopeSet, mkSubst, 
 		  substTy, substTyWith, substTheta, mkTyVarSubst, mkTopTyVarSubst

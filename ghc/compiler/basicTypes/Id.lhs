@@ -90,9 +90,7 @@ import Type		( Type, typePrimRep, addFreeTyVars,
 import IdInfo 
 
 import qualified Demand	( Demand )
-import NewDemand	( Demand, DmdResult(..), StrictSig, topSig, isBotRes,
-			  isBottomingSig, splitStrictSig, strictSigResInfo
-			)
+import NewDemand	( Demand, StrictSig, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  getOccName, getSrcLoc

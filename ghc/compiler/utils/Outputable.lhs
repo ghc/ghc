@@ -57,7 +57,7 @@ import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
 import Panic
 
 import Word		( Word32 )
-import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
+import IO		( Handle, stderr, stdout )
 import Char             ( chr )
 #if __GLASGOW_HASKELL__ < 410
 import Char		( ord, isDigit )

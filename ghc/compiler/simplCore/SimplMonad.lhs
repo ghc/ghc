@@ -52,9 +52,7 @@ module SimplMonad (
 
 #include "HsVersions.h"
 
-import Id		( Id, idType, isDataConWrapId, 
-			  idOccInfo, idInlinePragma
-			)
+import Id		( Id, idType, idOccInfo, idInlinePragma	)
 import CoreSyn
 import CoreUtils	( needsCaseBinding, exprIsTrivial )
 import PprCore		()	-- Instances

@@ -31,7 +31,7 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
-import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs, equalLength )
+import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive )
 import Maybes		( orElse, expectJust )
 import Outputable

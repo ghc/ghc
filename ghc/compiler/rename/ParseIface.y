@@ -43,7 +43,6 @@ import BasicTypes	( Fixity(..), FixityDirection(..), StrictnessMark(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
-import IdInfo           ( InlinePragInfo(..) )
 import ForeignCall	( ForeignCall(..), CCallConv(..), CCallSpec(..), CCallTarget(..) )
 import Lex		
 

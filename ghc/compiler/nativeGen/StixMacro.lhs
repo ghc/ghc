@@ -21,7 +21,7 @@ import Stix
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
 			  mkIndInfoLabel, mkUpdInfoLabel, mkSeqInfoLabel,
-			  mkRtsGCEntryLabel, mkStgUpdatePAPLabel )
+			  mkRtsGCEntryLabel )
 \end{code}
 
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on

@@ -44,7 +44,7 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import HsLit		( HsOverLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import TcType		( Type, Kind, PredType, ThetaType, TyVarDetails )
+import TcType		( Type, Kind, TyVarDetails )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -53,7 +53,6 @@ import Class		( Class )
 import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
-import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )

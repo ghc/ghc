@@ -69,30 +69,31 @@ module StringBuffer
 
 #include "HsVersions.h"
 
-import GlaExts
+
 #if __GLASGOW_HASKELL__ < 411
 import PrelAddr 	( Addr(..) )
+import Panic		( panic )
 #else
 import Addr		( Addr(..) )
+import Ptr		( Ptr(..) )
 #endif
-import Foreign
+
+#if __GLASGOW_HASKELL__ >= 501
+import PrelIO		( hGetcBuffered )
+#else
 import Char		( chr )
-import Panic		( panic )
+#endif
+
+import GlaExts
+import Foreign
 
 import IO		( openFile  )
 import IOExts		( slurpFile )
 import PrelIOBase
 import PrelHandle
 import Addr
-#if __GLASGOW_HASKELL__ >= 411
-import Ptr		( Ptr(..) )
-#endif
 
 import PrelPack		( unpackCStringBA )
-
-#if __GLASGOW_HASKELL__ >= 501
-import PrelIO		( hGetcBuffered )
-#endif
 
 import Exception	( bracket )
 import PrimPacked

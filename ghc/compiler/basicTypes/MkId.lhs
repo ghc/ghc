@@ -45,7 +45,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
 			)
 import Module		( Module )
-import CoreUtils	( mkInlineMe, exprType )
+import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..), nullAddrLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
@@ -71,10 +71,9 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			)
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  setUnfoldingInfo, 
-			  setArityInfo, setSpecInfo,  setCgInfo, setCafInfo,
+			  setArityInfo, setSpecInfo, setCafInfo,
 			  newStrictnessFromOld, setAllStrictnessInfo,
-			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
-			  CgInfo 
+			  GlobalIdDetails(..), CafInfo(..), CprInfo(..)
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
 			  mkTopDmdType, topDmd, evalDmd, lazyDmd, 

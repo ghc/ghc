@@ -38,15 +38,15 @@ import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
-			  exprType, coreAltsType, exprIsValue, 
+			  exprType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, findDefault,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
-import Type		( isUnLiftedType, seqType, mkFunTy, tyConAppArgs, funArgTy,
-			  funResultTy, splitFunTy_maybe, splitFunTy, eqType
+import Type		( isUnLiftedType, seqType, tyConAppArgs, funArgTy,
+			  splitFunTy_maybe, splitFunTy, eqType
 			)
 import Subst		( mkSubst, substTy, substExpr,
 			  isInScope, lookupIdSubst, simplIdInfo

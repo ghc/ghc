@@ -17,15 +17,13 @@ import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  pprMatch, getMatchLoc, pprMatchContext, isDoExpr,
 			  mkMonoBind, nullMonoBinds, collectSigTysFromPats
 			)
-import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedHsType,
-			  RenamedMatchContext, extractHsTyVars )
+import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedMatchContext )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 
 import TcMonad
-import TcMonoType	( kcHsSigTypes, tcAddScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
+import TcMonoType	( tcAddScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars,
-			  tcInLocalScope )
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
 import TcMType		( newTyVarTy, unifyFunTy, unifyTauTy )
 import TcType		( TcType, TcTyVar, tyVarsOfType, isTauTy,  
@@ -36,7 +34,6 @@ import Name		( Name )
 import TysWiredIn	( boolTy )
 import Id		( idType )
 import BasicTypes	( RecFlag(..) )
-import NameSet
 import VarSet
 import Var		( Id )
 import Bag

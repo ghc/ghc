@@ -16,7 +16,6 @@ module StixInfo (
 #include "NCG.h"
 
 import AbsCSyn		( AbstractC(..), Liveness(..), C_SRT(..), needsSRT )
-import CLabel		( CLabel )
 import StgSyn		( SRT(..) )
 import ClosureInfo	( closurePtrsSize,
 			  closureNonHdrSize, closureSMRep,

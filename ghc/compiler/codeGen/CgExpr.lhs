@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.46 2001/10/25 02:13:11 sof Exp $
+% $Id: CgExpr.lhs,v 1.47 2001/11/19 16:34:12 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -41,8 +41,7 @@ import Id		( idPrimRep, idType, Id )
 import VarSet
 import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..) )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import TyCon		( maybeTyConSingleCon,
-			  isUnboxedTupleTyCon, isEnumerationTyCon )
+import TyCon		( isUnboxedTupleTyCon, isEnumerationTyCon )
 import Type		( Type, typePrimRep, tyConAppArgs, tyConAppTyCon, repType )
 import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )

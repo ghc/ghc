@@ -5,7 +5,6 @@
 
 module ExternalCore where
 
-import List (elemIndex)
 
 data Module 
  = Module Mname [Tdef] [Vdefg]

@@ -17,9 +17,7 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
-import DmdAnal		( both )
 import MkId		( realWorldPrimId, voidArgId, eRROR_CSTRING_ID )
-import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
@@ -27,7 +25,7 @@ import Type		( Type, isUnLiftedType, mkFunTys,
 import Literal		( Literal(MachStr) )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
-import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
+import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
 import Util		( zipWithEqual )
 import Outputable
 import List		( zipWith4 )

@@ -17,7 +17,7 @@ import Pretty
 import CmdLineOpts	( dynFlag, verbosity )
 import DriverUtil	( my_prefix_match )
 import ErrUtils		( dumpIfSet )
-import Outputable	( docToSDoc, trace )
+import Outputable	( docToSDoc )
 \end{code}
 
 \begin{code}

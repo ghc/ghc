@@ -30,7 +30,7 @@ import Util		( thenCmp )
 import Outputable
 import FastString	( unpackFS )
 import FastTypes
-import GlaExts		( Int(..), (+#) )
+import GlaExts		( (+#) )
 \end{code}
 
 %************************************************************************
