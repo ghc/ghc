@@ -461,6 +461,19 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>-no-link</option></term>
+	  <indexterm>
+	    <primary><option>-no-link</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Omit the link step.  This flag can be useful if you
+	    want to avoid linking in <option>--make</option> mode,
+	    where linking is normally done automatically if the program
+	    contains a <literal>Main</literal> module.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>-package</option> <replaceable>name</replaceable></term>
 	  <indexterm><primary><option>-package</option></primary></indexterm>
 	  <listitem>

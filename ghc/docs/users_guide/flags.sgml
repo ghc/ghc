@@ -1106,6 +1106,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-no-link</option></entry>
+	      <entry>Omit linking</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Link in package <replaceable>name</replaceable></entry>
 	      <entry>static</entry>
