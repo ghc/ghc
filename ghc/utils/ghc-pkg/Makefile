@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.20 2002/10/29 04:00:59 mthomas Exp $
+# $Id: Makefile,v 1.21 2002/11/18 10:45:45 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -18,12 +18,16 @@ ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif
 
-HS_PROG           = ghc-pkg.bin
-INSTALL_LIBEXECS += $(HS_PROG)
-
+# On Windows, ghc-pkg is a standalone program
+# ($bindir/ghc-pkg.exe), whereas on Unix it needs a wrapper script
+# to pass the appropriate flag to the real binary
+# ($libexecdir/ghc-pkg.bin) so that it can find package.conf.
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = ghc-pkg.exe
 INSTALL_PROGS    += $(HS_PROG)
+else
+HS_PROG           = ghc-pkg.bin
+INSTALL_LIBEXECS += $(HS_PROG)
 endif
 
 # -----------------------------------------------------------------------------
