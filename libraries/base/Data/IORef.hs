@@ -52,10 +52,6 @@ import NHC.IOExtras
     )
 #endif
 
-#ifndef __NHC__
--- import Data.Dynamic
-#endif
-
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef'
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
