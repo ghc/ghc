@@ -27,7 +27,7 @@ the details of where the different pieces of the bundle are heading when
 -- possibly helpful).
 
 For more information, please consult the installation guide in
-{html,dvi,info}/ghc-2.02/installing{.dvi,.info,_toc.html}.
+{html,dvi,info}/ghc-2.10/installing{.dvi,.info,_toc.html}.
 
 Bug reports/suggestions for improvement to the installation procedure/setup
 (as well as other GHC related troubles you're experiencing, of course),
@@ -43,30 +43,32 @@ up the Win32 environment into something more UNIX-like (which
 this initial port of ghc relies on being the case). The cygwin32 tools
 are available from
 
-    ftp://ftp.cygnus.com/pub/gnu-win32/gnu-win32-b17.1/   
+    ftp://ftp.cygnus.com/pub/gnu-win32/latest/
        (Cygnus Solutions; Mt. View, CA.)
     ftp://sunsite.doc.ic.ac.uk/pub/gnu/cygnus/gnu-win32/
         (Sunsite Northern Europe; Imperial College, London)
     ftp://ftp.crl.go.jp/pub/GNU/cygnus/gnu-win32/
 	(CRL, Ministry of Posts and Telecom., Japan)
 
-GHC was built with beta17 - you *might* get away with beta16 if you've already got it
-installed...not tested this though.
+GHC was built with beta18 of the cygwin32 tools and depends on
+it to work.
 
 The GHC tools are also quite picky about Perl, the commonly-used
 Hip/ActiveWare Win32 port of perl5 just ain't Cool Enough (main reason: 
 GHC scripts assume they are talking to an underlying UNIX command
-shell). A port of perl5.003 done on top of cygwin32-b17 is just
-the ticket though, it is available from 
+shell). A basic port of perl5.004 done on top of cygwin32-b18 is
+is available from 
 
-   http://www.edv.agrar.tu-muenchen.de/~syring/gnu-win32/
+   ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/working/perl5-004pl1.zip
 
-this port is not complete - but the binaries available from there
-are sufficiently wonderful.
+this port is by no means complete, but is sufficient for our needs.
+(more complete perl5 cygwin32 binary bundles are available
+ elsewhere - search the web if you need it.)
 
 Install both cygwin32&perl5 before continuing.
 
-Future releases of GHC for Win32 may very well avoid relying on
-cygwin32 to operate, for various reasons..
+NOTE: If you're planning to install ghc on a drive different from
+where you're going to compile programs, you need to change the TMPDIR
+variable in the Makefile to "."
 
 -------Win32 users only----------------------------------------
