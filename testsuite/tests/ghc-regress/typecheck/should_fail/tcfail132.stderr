@@ -1,0 +1,2 @@
+Kind error: Expecting kind `* -> * -> * -> *',
+            but `DUnit t' has kind `* -> * -> *'

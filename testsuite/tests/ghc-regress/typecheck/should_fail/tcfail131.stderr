@@ -1,0 +1,10 @@
+
+tcfail131.hs:7:2:
+    Inferred type is less polymorphic than expected
+      Quantified type variable `b' is mentioned in the environment:
+	f :: b -> b -> b (bound at tcfail131.hs:5:2)
+    When trying to generalise the type inferred for `g'
+      Signature type:     forall b. (Num b) => b -> b
+      Type to generalise: b -> b
+    In the type signature for `g'
+    When generalising the type(s) for `g'
