@@ -24,7 +24,7 @@ import NewDemand	( isTopSig )
 import TcRnMonad
 import TcRnTypes	( ImportAvails(..) )
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
-import HscTypes		( VersionInfo(..), ModIface(..), HomeModInfo(..),
+import HscTypes		( VersionInfo(..), ModIface(..), 
 			  ModGuts(..), ModGuts, 
 			  GhciMode(..), HscEnv(..), Dependencies(..),
 			  FixityEnv, lookupFixity, collectFixities,
@@ -59,8 +59,8 @@ import TcType		( tcSplitForAllTys, tcFunResultTy, tidyTopType, deNoteType, tyCls
 import SrcLoc		( noSrcLoc )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, 
-			  ModuleEnv, emptyModuleEnv, foldModuleEnv, lookupModuleEnv,
-			  extendModuleEnv_C, elemModuleSet, moduleEnvElts, elemModuleEnv
+			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
+			  extendModuleEnv_C, moduleEnvElts 
 			)
 import Outputable
 import Util		( sortLt, dropList, seqList )
