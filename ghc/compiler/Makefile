@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.156 2001/06/14 12:50:06 simonpj Exp $
+# $Id: Makefile,v 1.157 2001/06/14 14:14:53 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -29,7 +29,6 @@ endif
 # The 'echo' commands simply spit the values of various make variables
 # into Config.hs, whence they can be compiled and used by GHC itself
 
-CURRENT_DIR	= ghc/compiler
 CONFIG_HS 	= main/Config.hs
 boot :: $(CONFIG_HS)
 
@@ -181,7 +180,6 @@ ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
 else
 SRC_HC_OPTS += -package concurrent -package text -package util
-main/TmpFiles_HC_OPTS += -Dmingw32_TARGET_OS
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
