@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.22 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: Constants.h,v 1.23 2003/03/25 16:06:39 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -21,7 +21,7 @@
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
 
-   Here We define the minimum size for updatable closures. This must be at
+   Here we define the minimum size for updatable closures. This must be at
    least 2, to allow for cons cells and linked indirections. All updates
    will be performed on closures of this size. For non-updatable closures
    the minimum size is 1 to allow for a forwarding pointer.
@@ -49,10 +49,9 @@
    Constants to do with specialised closure types.
    -------------------------------------------------------------------------- */
 
-/* We have some pre-compiled selector thunks defined in
- * StgSelectors.hc in the runtime system.  This constant defines the
- * highest selectee index that we can replace with a reference to the
- * pre-compiled code.
+/* We have some pre-compiled selector thunks defined in rts/StgStdThunks.hc.
+ * This constant defines the highest selectee index that we can replace with a 
+ * reference to the pre-compiled code.
  */
 
 #define MAX_SPEC_SELECTEE_SIZE 15
@@ -120,7 +119,7 @@
 
 /* -----------------------------------------------------------------------------
    How much C stack to reserve for local temporaries when in the STG
-   world.  Used in StgRun.S and StgCRun.c.
+   world.  Used in StgCRun.c.
    -------------------------------------------------------------------------- */
 
 #define RESERVED_C_STACK_BYTES (2048 * SIZEOF_LONG)
