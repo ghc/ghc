@@ -87,12 +87,10 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 	--	RULE:  forall v. fst (ss v) = fst v
 	-- The type of the rhs of the rule is just a, but v::(a,(b,c))
 	--
-	-- We also need to get the free tyvars of the LHS; see notes 
-	-- below with ruleLhsTvs.
+	-- We also need to get the free tyvars of the LHS; but we do that
+	-- during zonking (see TcHsSyn.zonkRule)
 	--
 	forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
-			`unionVarSet`
-		     ruleLhsTvs lhs'
     in
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
@@ -113,48 +111,6 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 		          	     returnM (mkLocalId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenM` \ ty ->
 				     returnM (mkLocalId var ty)
-
-ruleLhsTvs :: TcExpr -> TcTyVarSet
--- We need to gather the type variables mentioned on the LHS so we can 
--- quantify over them.  Example:
---   data T a = C
--- 
---   foo :: T a -> Int
---   foo C = 1
---
---   {-# RULES "myrule"  foo C = 1 #-}
--- 
--- After type checking the LHS becomes (foo a (C a))
--- and we do not want to zap the unbound tyvar 'a' to (), because
--- that limits the applicability of the rule.  Instead, we
--- want to quantify over it!  
---
--- Fortunately the form of the LHS is pretty limited (see RnSource.validRuleLhs)
--- so we don't need to deal with the whole of HsSyn.
---
--- Uh oh!  validRuleLhs only checks the function part of rule LHSs!
-
-ruleLhsTvs (HsPar e)     = ruleLhsTvs e
-ruleLhsTvs (HsLit e)     = emptyVarSet
-ruleLhsTvs (HsOverLit e) = emptyVarSet
-ruleLhsTvs (HsVar v)     = emptyVarSet	-- I don't think we need the tyvars of the Id
-
-ruleLhsTvs (OpApp e1 op _ e2)   = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs op 
-				  `unionVarSet` ruleLhsTvs e2
-ruleLhsTvs (HsApp e1 e2)   	= ruleLhsTvs e1 `unionVarSet` ruleLhsTvs e2
-ruleLhsTvs (TyApp e1 tys)  	= ruleLhsTvs e1 `unionVarSet` tyVarsOfTypes tys
-ruleLhsTvs (DictApp e ds)  	= ruleLhsTvs e
-ruleLhsTvs (NegApp e _)    	= ruleLhsTvs e
-ruleLhsTvs (ExplicitList ty es) = tyVarsOfType ty `unionVarSet` ruleLhsTvs_s es
-ruleLhsTvs (ExplicitTuple es _) = ruleLhsTvs_s es
-
--- Type abstractions can occur in rules like 
---	"foldr k z (build g) = g k z"
-ruleLhsTvs (TyLam tvs e)   = ruleLhsTvs e `delVarSetList` tvs
-ruleLhsTvs (DictLam ids e) = ruleLhsTvs e
-ruleLhsTvs e = pprPanic "ruleLhsTvs" (ppr e)
-
-ruleLhsTvs_s es = foldr (unionVarSet . ruleLhsTvs) emptyVarSet es
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

@@ -34,7 +34,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedStmt, RenamedTyClDecl,
 			  ruleDeclFVs, instDeclFVs, tyClDeclFVs )
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkTopDecls, mkHsLet,
-			  zonkTopExpr, zonkIdBndr
+			  zonkTopExpr, zonkTopBndrs
 			)
 
 import TcExpr 		( tcExpr_id )
@@ -410,7 +410,7 @@ tc_stmts names stmts
 		     HsDo DoExpr tc_stmts io_ids
 		 	  (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc } ;
 	zonked_expr <- zonkTopExpr expr ;
-	zonked_ids  <- mappM zonkIdBndr ids ;
+	zonked_ids  <- zonkTopBndrs ids ;
 
 	return (zonked_ids, zonked_expr)
 	}

@@ -34,9 +34,10 @@ module TcMType (
 
   --------------------------------
   -- Zonking
+  zonkType,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
-  zonkTcPredType, zonkTcTypeToType, zonkTcTyVarToTyVar, zonkKindEnv,
+  zonkTcPredType, zonkTcTyVarToTyVar, zonkKindEnv,
 
   ) where
 
@@ -61,38 +62,33 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  liftedTypeKind, openTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, 
-			  eqKind, isTypeKind, isAnyTypeKind,
-
+			  eqKind, isTypeKind, 
 			  isFFIArgumentTy, isFFIImportResultTy
 			)
 import qualified Type	( splitFunTys )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, DefMeth(..), classArity, className, classBigSig )
-import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon, 
+import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName, tyConKind, tyConTheta, 
 			  getSynTyConDefn, tyConDataCons )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
 import FieldLabel	( fieldLabelName, fieldLabelType )
-import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, idType, idName, tyVarKind, tyVarName, isTyVar, 
 			  mkTyVar, mkMutTyVar, isMutTyVar, mutTyVarRef )
 
 -- others:
 import Generics		( validGenericMethodType )
 import TcRnMonad          -- TcType, amongst others
-import TysWiredIn	( voidTy, listTyCon, tupleTyCon )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
 import Name		( Name, NamedThing(..), setNameUnique, 
-			  mkInternalName, mkDerivedTyConOcc, 
 			  mkSystemTvNameEncoded,
 			)
 import VarSet
 import BasicTypes	( Boxity(Boxed) )
 import CmdLineOpts	( dopt, DynFlag(..) )
-import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( equivClasses, removeDups )
@@ -375,68 +371,6 @@ zonkKindEnv pairs
 			     | tyVarKind kv `eqKind` superBoxity = putTcTyVar kv liftedBoxity
 			     | otherwise		 	 = pprPanic "zonkKindEnv" (ppr kv)
 			
-zonkTcTypeToType :: TcType -> TcM Type
-zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
-  where
-	-- Zonk a mutable but unbound type variable to an arbitrary type
-	-- We know it's unbound even though we don't carry an environment,
-	-- because at the binding site for a type variable we bind the
-	-- mutable tyvar to a fresh immutable one.  So the mutable store
-	-- plays the role of an environment.  If we come across a mutable
-	-- type variable that isn't so bound, it must be completely free.
-    zonk_unbound_tyvar tv = putTcTyVar tv (mkArbitraryType tv)
-
-
--- When the type checker finds a type variable with no binding,
--- which means it can be instantiated with an arbitrary type, it
--- usually instantiates it to Void.  Eg.
--- 
--- 	length []
--- ===>
--- 	length Void (Nil Void)
--- 
--- But in really obscure programs, the type variable might have
--- a kind other than *, so we need to invent a suitably-kinded type.
--- 
--- This commit uses
--- 	Void for kind *
--- 	List for kind *->*
--- 	Tuple for kind *->...*->*
--- 
--- which deals with most cases.  (Previously, it only dealt with
--- kind *.)   
--- 
--- In the other cases, it just makes up a TyCon with a suitable
--- kind.  If this gets into an interface file, anyone reading that
--- file won't understand it.  This is fixable (by making the client
--- of the interface file make up a TyCon too) but it is tiresome and
--- never happens, so I am leaving it 
-
-mkArbitraryType :: TcTyVar -> Type
--- Make up an arbitrary type whose kind is the same as the tyvar.
--- We'll use this to instantiate the (unbound) tyvar.
-mkArbitraryType tv 
-  | isAnyTypeKind kind = voidTy		-- The vastly common case
-  | otherwise	       = TyConApp tycon []
-  where
-    kind       = tyVarKind tv
-    (args,res) = Type.splitFunTys kind	-- Kinds are simple; use Type.splitFunTys
-
-    tycon | kind `eqKind` tyConKind listTyCon 	-- *->*
-	  = listTyCon				-- No tuples this size
-
-	  | all isTypeKind args && isTypeKind res
-	  = tupleTyCon Boxed (length args)	-- *-> ... ->*->*
-
-	  | otherwise
-	  = pprTrace "Urk! Inventing strangely-kinded void TyCon:" (ppr tc_name $$ ppr kind) $
-	    mkPrimTyCon tc_name kind 0 [] VoidRep
-		-- Same name as the tyvar, apart from making it start with a colon (sigh)
-		-- I dread to think what will happen if this gets out into an 
-		-- interface file.  Catastrophe likely.  Major sigh.
-
-    tc_name = mkInternalName (getUnique tv) (mkDerivedTyConOcc (getOccName tv)) noSrcLoc
-
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.  It changes
 -- the *mutable* type variable into an *immutable* one.
