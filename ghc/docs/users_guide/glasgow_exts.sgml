@@ -98,7 +98,7 @@ Executive summary of our extensions:
     <varlistentry>
       <term>Data types with no constructors</term>
       <listitem>
-	<para>See <xref LinkEnd="nullary types">.</para>
+	<para>See <xref LinkEnd="nullary-types">.</para>
       </listitem>
     </varlistentry>
 
@@ -422,10 +422,10 @@ The libraries documentatation gives more details on all these
 </sect1>
 
 
-<sect1 id="nullary types">
+<sect1 id="nullary-types">
 <title>Data types with no constructors</title>
 
-<para>With the <option>-fglasgow-exts</options> flag, GHC lets you declare
+<para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
 a data type with no constructors.  For example:</para>
 <programlisting>
   data S      -- S :: *
@@ -2750,6 +2750,42 @@ pragma.
 The RULES pragma lets you specify rewrite rules.  It is described in
 <xref LinkEnd="rewrite-rules">.
 </para>
+
+</sect2>
+
+<sect2 id="deprecated-pragma">
+<title>DEPRECATED pragma</title>
+
+<para>
+The DEPRECATED pragma lets you specify that a particular function, class, or type, is deprecated.  
+There are two forms.  
+</para>
+<itemizedlist>
+<listitem><para>
+You can deprecate an entire module thus:</para>
+<programlisting>
+   module Wibble {-# DEPRECATED "Use Wobble instead" #-} where
+     ...
+</programlisting>
+<para>
+When you compile any module that import <literal>Wibble</literal>, GHC will print
+the specified message.</para>
+</listitem>
+
+<listitem>
+<para>
+You can deprecate a function, class, or type, with the following top-level declaration:
+</para>
+<programlisting>
+   {-# DEPRECATED f, C, T "Don't use these" #-}
+</programlisting>
+<para>
+When you compile any module that imports and uses any of the specifed entities, 
+GHC will print the specified message.
+</para>
+</listitem>
+</itemizedlist>
+<para>You can suppress the warnings with the flag <option>-fno-warn-deprecations</option>.</para>
 
 </sect2>
 

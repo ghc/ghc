@@ -17,12 +17,12 @@ having a Haskell compiler.)
 
 <Para>This guide is in several parts:</para>
 <itemizedlist>
-<listitem> Installing on Unix-a-likes (<Xref LinkEnd="sec-unix-a-likes">).  </listitem>
-<listitem> Installing on Windows  (<Xref LinkEnd="sec-install-windows">).  </listitem>
-<listitem> The layout of installed files  (<Xref LinkEnd="sec-install-files">).  
+<listitem> <para> Installing on Unix-a-likes (<Xref LinkEnd="sec-unix-a-likes">). </para>  </listitem>
+<listitem> <para> Installing on Windows  (<Xref LinkEnd="sec-install-windows">).   </para> </listitem>
+<listitem> <para> The layout of installed files  (<Xref LinkEnd="sec-install-files">).  
 You don't need to know this to install GHC,
-but it's useful if you are changing the implementation.   </listitem>
-<listitem> Installing or building the documentation (<Xref LinkEnd="building-docs">). </listitem>
+but it's useful if you are changing the implementation.   </para>  </listitem>
+<listitem> <para> Installing or building the documentation (<Xref LinkEnd="building-docs">).  </para> </listitem>
 </itemizedlist>
 
 
@@ -668,7 +668,7 @@ unfortunately. Anyway, better to install 4.08 binaries and use those.
 </Sect1>
 
 
-<Sect1 id="sec-install-files><Title>The layout of installed files</Title>
+<Sect1 id="sec-install-files"><Title>The layout of installed files</Title>
 
 <para>
 This section describes what files get installed where.  You don't need to know it
@@ -679,19 +679,21 @@ the implementation.
 <variablelist>
 <varlistentry>
 <term>Binary directory</term>
-<listitem> known as <Filename>$(bindir)</Filename>, holds executables that 
+<listitem> <para> known as <Filename>$(bindir)</Filename>, holds executables that 
 the user is expected to invoke.  Notably,
 <Filename>ghc</Filename> and <Filename>ghci</FileName>.  On Unix, this directory
 is typically something like <Filename>/usr/local/bin</Filename>.  On Windows,
 however, this directory is always <Filename>$(libdir)/bin</Filename>.
+</para>
 </listitem>
 </varlistentry>
 <varlistentry>
 <term>Library directory,</term>
-<listitem> known as <Filename>$(libdir)</Filename>, holds all the 
+<listitem> <para> known as <Filename>$(libdir)</Filename>, holds all the 
 support files needed to run GHC.  On Unix, this 
-directory is usually something like <Filename>/usr/lib/ghc/ghc-5.02</Filename>.
+directory is usually something like <Filename>/usr/lib/ghc/ghc-5.02</Filename>. </para>
 </listitem>
+</varlistentry>
 </variablelist>
 
 <para>
@@ -700,18 +702,20 @@ It finds this out in one of two ways:
 </para>
 <itemizedlist>
 <listitem>
+<para>
 <Filename>$(libdir)</Filename> is passed to GHC using the <option>-B</option> flag.
 On Unix (but not Windows), the installed <filename>ghc</filename> is just a one-line 
 shell script that invokes the real GHC, passing a suitable <option>-B</option> flag. 
 [All the user-supplied flags
 follow, and a later <option>-B</option> flag overrides an earlier one, so a user-supplied
 one wins.]
-
+</para>
 </listitem>
 <listitem>
-On Windows (but not Unix), if no <option>-B</option> flag is given, GHC uses a system
+<para> On Windows (but not Unix), if no <option>-B</option> flag is given, GHC uses a system
 call to find the directory in which the running GHC executable lives, and derives 
 <Filename>$(libdir)</Filename> from that. [Unix lacks such a system call.]
+</para>
 </listitem>
 </itemizedlist>
 
@@ -819,14 +823,12 @@ with the Win32 distribution of GHC. </para>
 <listitem> <para> The support programs <filename>ghc-split</filename> and <filename>ghc-asm</filename>
 are Perl scripts.  The first line says <literal>#!/bin/perl</literal>; on Unix, the script is
 indeed invoked as a shell script, which invokes Perl; on Windows, GHC invokes 
-<filename>$(libdir)/extra-bin/perl</filename>
-directly,
+<filename>$(libdir)/extra-bin/perl</filename> directly,
 which treats the <literal>#!/bin/perl</literal> as a comment.  Reason: on Windows we want
 to invoke the Perl distributed with GHC, rather than assume some installed one.
 </para> 
 </listitem>
-
-</itemizelist>
+</itemizedlist>
 
 </sect2>
 
