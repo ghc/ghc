@@ -280,7 +280,24 @@ lit2expr lit
 	MachChar i   -> case fromIntegral i of I# i -> LitI i
 	MachFloat f  -> case fromRational f of F# f -> LitF f
 	MachDouble f -> case fromRational f of D# f -> LitD f
-        MachStr s -> LitS s
+        MachStr s    -> 
+	   case s of
+     		CharStr s i -> LitI (addr2Int# s)
+
+		FastString _ l ba -> 
+		-- sigh, a string in the heap is no good to us.  We need a 
+		-- static C pointer, since the type of a string literal is 
+		-- Addr#.  So, copy the string into C land and introduce a 
+		-- memory leak at the same time.
+		  let n = I# l in
+		  case unsafePerformIO (do a <- malloc (n+1); 
+				 	   strncpy a ba (fromIntegral n); 
+				 	   writeCharOffAddr a n '\0'
+				 	   return a) 
+		  of  A# a -> LitI (addr2Int# a)
+
+     		_ -> error "StgInterp.lit2expr: unhandled string constant type"
+
         other -> pprPanic "lit2expr" (ppr lit)
 
 stg2expr :: UniqSet Id -> StgExpr -> UnlinkedIExpr
@@ -354,8 +371,8 @@ stg2expr ie stgexpr
 mkCasePrim RepI = CasePrimI
 mkCasePrim RepP = CasePrimP
 
-mkCaseAlg RepI = CaseAlgI
-mkCaseAlg RepP = CaseAlgP
+mkCaseAlg  RepI = CaseAlgI
+mkCaseAlg  RepP = CaseAlgP
 
 -- any var that isn't in scope is turned into a Native
 mkVar ie rep var
@@ -484,7 +501,8 @@ linkIExpr ie ce expr = case expr of
    RecI    binds expr -> RecI (linkIBinds' ie ce binds) (linkIExpr ie ce expr)
    
    LitI i -> LitI i
-   LitS s -> LitS s
+   LitF i -> LitF i
+   LitD i -> LitD i
 
    Native var -> lookupNative ce var
    
@@ -559,10 +577,12 @@ linkDefault ie ce (Just expr) = Just (linkIExpr ie ce expr)
 
 evalP :: LinkedIExpr -> UniqFM boxed -> boxed
 
+{-
 evalP expr de
 --   | trace ("evalP: " ++ showExprTag expr) False
    | trace ("evalP:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
    = error "evalP: ?!?!"
+-}
 
 evalP (Native p) de  = unsafeCoerce# p
 
@@ -581,22 +601,43 @@ evalP (VarP v) de
 -- always has pointer rep.
 evalP (AppIP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalI e2 de)
 evalP (AppPP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalP e2 de)
-
+evalP (AppFP e1 e2) de  = unsafeCoerce# (evalF e1 de) (evalI e2 de)
+evalP (AppDP e1 e2) de  = unsafeCoerce# (evalD e1 de) (evalP e2 de)
 
 -- Lambdas always return P-rep, but we need to do different things
 -- depending on both the argument and result representations.
 evalP (LamPP x b) de
-   = unsafeCoerce# 
-        (\ xP -> evalP b (addToUFM de x xP))
+   = unsafeCoerce# (\ xP -> evalP b (addToUFM de x xP))
 evalP (LamPI x b) de
-   = unsafeCoerce# 
-        (\ xP -> evalI b (addToUFM de x xP))
+   = unsafeCoerce# (\ xP -> evalI b (addToUFM de x xP))
+evalP (LamPF x b) de
+   = unsafeCoerce# (\ xP -> evalF b (addToUFM de x xP))
+evalP (LamPD x b) de
+   = unsafeCoerce# (\ xP -> evalD b (addToUFM de x xP))
 evalP (LamIP x b) de
-   = unsafeCoerce# 
-        (\ xI -> evalP b (addToUFM de x (unsafeCoerce# (I# xI))))
+   = unsafeCoerce# (\ xI -> evalP b (addToUFM de x (unsafeCoerce# (I# xI))))
 evalP (LamII x b) de
-   = unsafeCoerce#
-        (\ xI -> evalI b (addToUFM de x (unsafeCoerce# (I# xI))))
+   = unsafeCoerce# (\ xI -> evalI b (addToUFM de x (unsafeCoerce# (I# xI))))
+evalP (LamIF x b) de
+   = unsafeCoerce# (\ xI -> evalF b (addToUFM de x (unsafeCoerce# (I# xI))))
+evalP (LamID x b) de
+   = unsafeCoerce# (\ xI -> evalD b (addToUFM de x (unsafeCoerce# (I# xI))))
+evalP (LamFP x b) de
+   = unsafeCoerce# (\ xI -> evalP b (addToUFM de x (unsafeCoerce# (F# xI))))
+evalP (LamFI x b) de
+   = unsafeCoerce# (\ xI -> evalI b (addToUFM de x (unsafeCoerce# (F# xI))))
+evalP (LamFF x b) de
+   = unsafeCoerce# (\ xI -> evalF b (addToUFM de x (unsafeCoerce# (F# xI))))
+evalP (LamFD x b) de
+   = unsafeCoerce# (\ xI -> evalD b (addToUFM de x (unsafeCoerce# (F# xI))))
+evalP (LamDP x b) de
+   = unsafeCoerce# (\ xI -> evalP b (addToUFM de x (unsafeCoerce# (D# xI))))
+evalP (LamDI x b) de
+   = unsafeCoerce# (\ xI -> evalI b (addToUFM de x (unsafeCoerce# (D# xI))))
+evalP (LamDF x b) de
+   = unsafeCoerce# (\ xI -> evalF b (addToUFM de x (unsafeCoerce# (D# xI))))
+evalP (LamDD x b) de
+   = unsafeCoerce# (\ xI -> evalD b (addToUFM de x (unsafeCoerce# (D# xI))))
 
 
 -- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
@@ -663,7 +704,6 @@ evalP other de
 --- Evaluator for things of Int# representation
 --------------------------------------------------------
 
-
 -- Evaluate something which has an unboxed Int rep
 evalI :: LinkedIExpr -> UniqFM boxed -> Int#
 
@@ -673,24 +713,6 @@ evalI expr de
    = error "evalI: ?!?!"
 
 evalI (LitI i#) de = i#
-
-evalI (LitS s) de  = 
-  case s of
-     CharStr s i -> addr2Int# s
-
-     FastString _ l ba -> 
-	-- sigh, a string in the heap is no good to us.  We need a static
-	-- C pointer, since the type of a string literal is Addr#.  So,
-	-- copy the string into C land and introduce a memory leak at the
-	-- same time.
-	let n = I# l in
-	case unsafePerformIO (do a <- malloc n; 
-				 strncpy a ba (fromIntegral n); 
-				 writeCharOffAddr a n '\0'
-				 return a) 
-	of  A# a -> addr2Int# a
-
-     _           -> error "StgInterp.evalI: unhandled string constant type"
 
 evalI (VarI v) de = 
    case lookupUFM de v of
@@ -704,6 +726,10 @@ evalI (AppII e1 e2) de
    = unsafeCoerce# (evalP e1 de) (evalI e2 de)
 evalI (AppPI e1 e2) de
    = unsafeCoerce# (evalP e1 de) (evalP e2 de)
+evalI (AppFI e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalF e2 de)
+evalI (AppDI e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalD e2 de)
 
 -- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
 -- except in the sense that we go on and evaluate the body with whichever
@@ -732,6 +758,114 @@ evalI other de
    = error ("evalI: unhandled case: " ++ showExprTag other)
 
 --------------------------------------------------------
+--- Evaluator for things of Float# representation
+--------------------------------------------------------
+
+-- Evaluate something which has an unboxed Int rep
+evalF :: LinkedIExpr -> UniqFM boxed -> Float#
+
+evalF expr de
+--   | trace ("evalF: " ++ showExprTag expr) False
+   | trace ("evalF:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
+   = error "evalF: ?!?!"
+
+evalF (LitF f#) de = f#
+
+evalF (VarF v) de = 
+   case lookupUFM de v of
+	Just e  -> case unsafeCoerce# e of F# i -> i
+	Nothing -> error ("evalF: lookupUFM " ++ show v)
+
+-- Deal with application of a function returning an Int# rep
+-- to arguments of any persuasion.  Note that the function itself
+-- always has pointer rep.
+evalF (AppIF e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalI e2 de)
+evalF (AppPF e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalP e2 de)
+evalF (AppFF e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalF e2 de)
+evalF (AppDF e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalD e2 de)
+
+-- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
+-- except in the sense that we go on and evaluate the body with whichever
+-- evaluator was used for the expression as a whole.
+evalF (NonRecF bind b) de
+   = evalF b (augment_nonrec bind de)
+evalF (RecF binds b) de
+   = evalF b (augment_rec binds de)
+evalF (CaseAlgF bndr expr alts def) de
+   = case helper_caseAlg bndr expr alts def de of
+        (rhs, de') -> evalF rhs de'
+evalF (CasePrimF bndr expr alts def) de
+   = case helper_casePrim bndr expr alts def de of
+        (rhs, de') -> evalF rhs de'
+
+-- evalF can't be applied to a lambda term, by defn, since those
+-- are ptr-rep'd.
+
+evalF (PrimOpF op _) de 
+  = error ("evalF: unhandled primop: " ++ showSDoc (ppr op))
+
+evalF other de
+  = error ("evalF: unhandled case: " ++ showExprTag other)
+
+--------------------------------------------------------
+--- Evaluator for things of Double# representation
+--------------------------------------------------------
+
+-- Evaluate something which has an unboxed Int rep
+evalD :: LinkedIExpr -> UniqFM boxed -> Double#
+
+evalD expr de
+--   | trace ("evalD: " ++ showExprTag expr) False
+   | trace ("evalD:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
+   = error "evalD: ?!?!"
+
+evalD (LitD d#) de = d#
+
+evalD (VarD v) de = 
+   case lookupUFM de v of
+	Just e  -> case unsafeCoerce# e of D# i -> i
+	Nothing -> error ("evalD: lookupUFM " ++ show v)
+
+-- Deal with application of a function returning an Int# rep
+-- to arguments of any persuasion.  Note that the function itself
+-- always has pointer rep.
+evalD (AppID e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalI e2 de)
+evalD (AppPD e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalP e2 de)
+evalD (AppFD e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalF e2 de)
+evalD (AppDD e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalD e2 de)
+
+-- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
+-- except in the sense that we go on and evaluate the body with whichever
+-- evaluator was used for the expression as a whole.
+evalD (NonRecD bind b) de
+   = evalD b (augment_nonrec bind de)
+evalD (RecD binds b) de
+   = evalD b (augment_rec binds de)
+evalD (CaseAlgD bndr expr alts def) de
+   = case helper_caseAlg bndr expr alts def de of
+        (rhs, de') -> evalD rhs de'
+evalD (CasePrimD bndr expr alts def) de
+   = case helper_casePrim bndr expr alts def de of
+        (rhs, de') -> evalD rhs de'
+
+-- evalD can't be applied to a lambda term, by defn, since those
+-- are ptr-rep'd.
+
+evalD (PrimOpD op _) de
+  = error ("evalD: unhandled primop: " ++ showSDoc (ppr op))
+
+evalD other de 
+  = error ("evalD: unhandled case: " ++ showExprTag other)
+
+--------------------------------------------------------
 --- Helper bits and pieces
 --------------------------------------------------------
 
@@ -756,33 +890,40 @@ repOf (LamDF _ _)      = RepP
 repOf (LamDD _ _)      = RepP 
 
 repOf (AppPP _ _)      = RepP
-repOf (AppPI _ _)      = RepP
-repOf (AppPF _ _)      = RepP
-repOf (AppPD _ _)      = RepP
+repOf (AppPI _ _)      = RepI
+repOf (AppPF _ _)      = RepF
+repOf (AppPD _ _)      = RepD
 repOf (AppIP _ _)      = RepP
-repOf (AppII _ _)      = RepP
-repOf (AppIF _ _)      = RepP
-repOf (AppID _ _)      = RepP
+repOf (AppII _ _)      = RepI
+repOf (AppIF _ _)      = RepF
+repOf (AppID _ _)      = RepD
 repOf (AppFP _ _)      = RepP
-repOf (AppFI _ _)      = RepP
-repOf (AppFF _ _)      = RepP
-repOf (AppFD _ _)      = RepP
+repOf (AppFI _ _)      = RepI
+repOf (AppFF _ _)      = RepF
+repOf (AppFD _ _)      = RepD
 repOf (AppDP _ _)      = RepP
-repOf (AppDI _ _)      = RepP
-repOf (AppDF _ _)      = RepP
-repOf (AppDD _ _)      = RepP
+repOf (AppDI _ _)      = RepI
+repOf (AppDF _ _)      = RepF
+repOf (AppDD _ _)      = RepD
 
 repOf (NonRecP _ _)    = RepP
 repOf (NonRecI _ _)    = RepI
+repOf (NonRecF _ _)    = RepF
+repOf (NonRecD _ _)    = RepD
 
 repOf (LitI _)         = RepI
-repOf (LitS _)         = RepI
+repOf (LitF _)         = RepF
+repOf (LitD _)         = RepD
 
-repOf (VarI _)         = RepI
 repOf (VarP _)         = RepI
+repOf (VarI _)         = RepI
+repOf (VarF _)         = RepF
+repOf (VarD _)         = RepD
 
-repOf (PrimOpI _ _)    = RepI
 repOf (PrimOpP _ _)    = RepP
+repOf (PrimOpI _ _)    = RepI
+repOf (PrimOpF _ _)    = RepF
+repOf (PrimOpD _ _)    = RepD
 
 repOf (ConApp _)       = RepP
 repOf (ConAppI _ _)    = RepP
@@ -791,6 +932,14 @@ repOf (ConAppPP _ _ _) = RepP
 repOf (ConAppPPP _ _ _ _) = RepP
 
 repOf (CaseAlgP _ _ _ _) = RepP
+repOf (CaseAlgI _ _ _ _) = RepI
+repOf (CaseAlgF _ _ _ _) = RepF
+repOf (CaseAlgD _ _ _ _) = RepD
+
+repOf (CasePrimP _ _ _ _) = RepP
+repOf (CasePrimI _ _ _ _) = RepI
+repOf (CasePrimF _ _ _ _) = RepF
+repOf (CasePrimD _ _ _ _) = RepD
 
 repOf other         
    = error ("repOf: unhandled case: " ++ showExprTag other)
@@ -811,7 +960,8 @@ eval expr de
    = case repOf expr of
         RepI -> unsafeCoerce# (I# (evalI expr de))
         RepP -> evalP expr de
-
+        RepF -> unsafeCoerce# (F# (evalF expr de))
+        RepD -> unsafeCoerce# (D# (evalD expr de))
 
 -- Evaluate the scrutinee of a case, select an alternative,
 -- augment the environment appropriately, and return the alt
@@ -823,7 +973,6 @@ helper_caseAlg bndr expr alts def de
    = let exprEv = evalP expr de
      in  
      exprEv `seq` -- vitally important; otherwise exprEv is never eval'd
-     trace "returned" $
      case select_altAlg (tagOf exprEv) alts def of
         (vars,rhs) -> (rhs, augment_from_constr (addToUFM de bndr exprEv) 
                                                 exprEv (vars,1))

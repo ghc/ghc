@@ -41,6 +41,7 @@ data Rep
   -- we only need one rep for both.
 
   {- Not yet:
+  | RepV       -- void rep
   | RepI8
   | RepI64
   -}
@@ -55,9 +56,13 @@ data Rep
 data IExpr con var
    = CaseAlgP  Id (IExpr con var) [AltAlg  con var] (Maybe (IExpr con var))
    | CaseAlgI  Id (IExpr con var) [AltAlg  con var] (Maybe (IExpr con var))
+   | CaseAlgF  Id (IExpr con var) [AltAlg  con var] (Maybe (IExpr con var))
+   | CaseAlgD  Id (IExpr con var) [AltAlg  con var] (Maybe (IExpr con var))
 
    | CasePrimP Id (IExpr con var) [AltPrim con var] (Maybe (IExpr con var))
    | CasePrimI Id (IExpr con var) [AltPrim con var] (Maybe (IExpr con var))
+   | CasePrimF Id (IExpr con var) [AltPrim con var] (Maybe (IExpr con var))
+   | CasePrimD Id (IExpr con var) [AltPrim con var] (Maybe (IExpr con var))
 
    -- saturated constructor apps; args are in heap order.
    -- The Addrs are the info table pointers.  Descriptors refer to the
@@ -68,19 +73,24 @@ data IExpr con var
    | ConAppPP  con (IExpr con var) (IExpr con var)
    | ConAppPPP con (IExpr con var) (IExpr con var) (IExpr con var)
 
-   | PrimOpI PrimOp [(IExpr con var)]
    | PrimOpP PrimOp [(IExpr con var)]
+   | PrimOpI PrimOp [(IExpr con var)]
+   | PrimOpF PrimOp [(IExpr con var)]
+   | PrimOpD PrimOp [(IExpr con var)]
 
    | NonRecP (IBind con var) (IExpr con var)
-   | RecP    [IBind con var] (IExpr con var)
-
    | NonRecI (IBind con var) (IExpr con var)
+   | NonRecF (IBind con var) (IExpr con var)
+   | NonRecD (IBind con var) (IExpr con var)
+
+   | RecP    [IBind con var] (IExpr con var)
    | RecI    [IBind con var] (IExpr con var)
+   | RecF    [IBind con var] (IExpr con var)
+   | RecD    [IBind con var] (IExpr con var)
 
    | LitI   Int#
    | LitF   Float#
    | LitD   Double#
-   | LitS   FAST_STRING
 
    {- not yet:
    | LitB   Int8#
@@ -139,33 +149,83 @@ data IExpr con var
 showExprTag :: IExpr c v -> String
 showExprTag expr
    = case expr of
+
         CaseAlgP  _ _ _ _ -> "CaseAlgP"
-        CasePrimP _ _ _ _ -> "CasePrimP"
         CaseAlgI  _ _ _ _ -> "CaseAlgI"
+        CaseAlgF  _ _ _ _ -> "CaseAlgF"
+        CaseAlgD  _ _ _ _ -> "CaseAlgD"
+
+        CasePrimP _ _ _ _ -> "CasePrimP"
         CasePrimI _ _ _ _ -> "CasePrimI"
+        CasePrimF _ _ _ _ -> "CasePrimF"
+        CasePrimD _ _ _ _ -> "CasePrimD"
+
         ConApp _          -> "ConApp"
         ConAppI _ _       -> "ConAppI"
         ConAppP _ _       -> "ConAppP"
         ConAppPP _ _ _    -> "ConAppPP"
         ConAppPPP _ _ _ _ -> "ConAppPPP"
+
+        PrimOpP _ _       -> "PrimOpP"
         PrimOpI _ _       -> "PrimOpI"
+        PrimOpF _ _       -> "PrimOpF"
+        PrimOpD _ _       -> "PrimOpD"
+
         NonRecP _ _       -> "NonRecP"
-        RecP _ _          -> "RecP"
         NonRecI _ _       -> "NonRecI"
+        NonRecF _ _       -> "NonRecF"
+        NonRecD _ _       -> "NonRecD"
+
+        RecP _ _          -> "RecP"
         RecI _ _          -> "RecI"
+        RecF _ _          -> "RecF"
+        RecD _ _          -> "RecD"
+
         LitI _            -> "LitI"
-        LitS _            -> "LitS"
+        LitF _            -> "LitF"
+        LitD _            -> "LitD"
+
         Native _          -> "Native"
+
         VarP _            -> "VarP"
         VarI _            -> "VarI"
+        VarF _            -> "VarF"
+        VarD _            -> "VarD"
+
         LamPP _ _         -> "LamPP"
         LamPI _ _         -> "LamPI"
+        LamPF _ _         -> "LamPF"
+        LamPD _ _         -> "LamPD"
         LamIP _ _         -> "LamIP"
         LamII _ _         -> "LamII"
+        LamIF _ _         -> "LamIF"
+        LamID _ _         -> "LamID"
+        LamFP _ _         -> "LamFP"
+        LamFI _ _         -> "LamFI"
+        LamFF _ _         -> "LamFF"
+        LamFD _ _         -> "LamFD"
+        LamDP _ _         -> "LamDP"
+        LamDI _ _         -> "LamDI"
+        LamDF _ _         -> "LamDF"
+        LamDD _ _         -> "LamDD"
+
         AppPP _ _         -> "AppPP"
         AppPI _ _         -> "AppPI"
+        AppPF _ _         -> "AppPF"
+        AppPD _ _         -> "AppPD"
         AppIP _ _         -> "AppIP"
         AppII _ _         -> "AppII"
+        AppIF _ _         -> "AppIF"
+        AppID _ _         -> "AppID"
+        AppFP _ _         -> "AppFP"
+        AppFI _ _         -> "AppFI"
+        AppFF _ _         -> "AppFF"
+        AppFD _ _         -> "AppFD"
+        AppDP _ _         -> "AppDP"
+        AppDI _ _         -> "AppDI"
+        AppDF _ _         -> "AppDF"
+        AppDD _ _         -> "AppDD"
+
         other             -> "(showExprTag:unhandled case)"
 
 -----------------------------------------------------------------------------
@@ -219,7 +279,6 @@ pprIExpr (expr:: IExpr con var)
         VarI v    -> ppr v
         VarP v    -> ppr v
         LitI i#   -> int (I# i#) <> char '#'
-        LitS s    -> char '"' <> ptext s <> char '"'
 
         LamPP v e -> doLam "PP" v e
         LamPI v e -> doLam "PI" v e
