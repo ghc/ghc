@@ -22,7 +22,7 @@ module Id (
 	zapFragileIdInfo, zapLamIdInfo,
 
 	-- Predicates
-	omitIfaceSigForId, isDeadBinder,
+	isImplicitId, isDeadBinder,
 	externallyVisibleId,
 	isIP,
 	isSpecPragmaId,	isRecordSelector,
@@ -273,22 +273,22 @@ isLocalId id
 \end{code}
 
 
-omitIfaceSigForId tells whether an Id's info is implied by other declarations,
-so we don't need to put its signature in an interface file, even if it's mentioned
-in some other interface unfolding.
+isImplicitId tells whether an Id's info is implied by other
+declarations, so we don't need to put its signature in an interface
+file, even if it's mentioned in some other interface unfolding.
 
 \begin{code}
-omitIfaceSigForId :: Id -> Bool
-omitIfaceSigForId id
+isImplicitId :: Id -> Bool
+isImplicitId id
   = ASSERT2( not (omit && nameIsLocallyDefined (idName id)
                        && idTyGenInfo id /= TyGenNever),
              ppr id )
     -- mustn't omit type signature for a name whose type might change!
     omit
   where
-    omit = omitIfaceSigForId' id
+    omit = isImplicitId' id
 
-omitIfaceSigForId' id
+isImplicitId' id
   = case idFlavour id of
 	RecordSelId _   -> True	-- Includes dictionary selectors
         PrimOpId _      -> True

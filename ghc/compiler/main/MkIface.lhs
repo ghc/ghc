@@ -29,7 +29,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			)
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId, isDictFunId,
+import Id		( Id, idType, idInfo, isImplicitId, isDictFunId,
 			  idSpecialisation, setIdInfo, isLocalId, idName, hasNoBinding
 			)
 import Var		( isId )
@@ -261,8 +261,8 @@ ifaceTyCls (ATyCon tycon) so_far
 	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
 
 ifaceTyCls (AnId id) so_far
-  | omitIfaceSigForId id = so_far
-  | otherwise 		 = iface_sig : so_far
+  | isImplicitId id = so_far
+  | otherwise 	    = iface_sig : so_far
   where
     iface_sig = IfaceSig { tcdName   = getName id, 
 			   tcdType   = toHsType id_type,

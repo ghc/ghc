@@ -21,7 +21,7 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  idCafInfo, mkId, isLocalId, omitIfaceSigForId,
+			  idCafInfo, mkId, isLocalId, isImplicitId,
 			  idFlavour, modifyIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
@@ -314,8 +314,8 @@ tidyTopBinder :: Module -> IdEnv Bool
 tidyTopBinder mod ext_ids tidy_env rhs caf_info
 	      env@(us, orig_env2, occ_env2, subst_env2) id
 
-  | omitIfaceSigForId id	-- Don't mess with constructors, 
-  = (env, id)			-- record selectors, and the like
+  | isImplicitId id	-- Don't mess with constructors, 
+  = (env, id)		-- record selectors, and the like
 
   | otherwise
 	-- This function is the heart of Step 2
