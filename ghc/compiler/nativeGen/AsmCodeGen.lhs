@@ -20,7 +20,7 @@ import AsmRegAlloc	( runRegAllocate )
 import OrdList		( OrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState )
-import Stix		( StixTree(..), StixReg(..) )
+import Stix		( StixTree(..), StixReg(..), pprStixTrees )
 import PrimRep		( isFloatingRep )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs_, UniqSM, UniqSupply )
 import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
@@ -77,34 +77,39 @@ The machine-dependent bits break down as follows:
 
 So, here we go:
 \begin{code}
-nativeCodeGen :: AbstractC -> UniqSupply -> SDoc
+nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc, SDoc, SDoc)
 nativeCodeGen absC us = initUs_ us (runNCG absC)
 
+runNCG :: AbstractC -> UniqSM (SDoc, SDoc, SDoc, SDoc)
 runNCG absC
-  = genCodeAbstractC absC	`thenUs` \ treelists ->
+  = genCodeAbstractC absC	`thenUs` \ stixRaw ->
     let
-	stix = map (map genericOpt) treelists
-    in
+	stixOpt   = map (map genericOpt) stixRaw
 #if i386_TARGET_ARCH
-    let
-	stix' = map floatFix stix
-    in
-    codeGen stix'
+        stixFinal = map floatFix stixOpt
 #else
-    codeGen stix
+        stixFinal = stixOpt
 #endif
+    in
+        codeGen (stixRaw, stixOpt, stixFinal)
 \end{code}
 
 @codeGen@ is the top-level code-generation function:
 \begin{code}
-codeGen :: [[StixTree]] -> UniqSM SDoc
+codeGen :: ([[StixTree]],[[StixTree]],[[StixTree]]) 
+           -> UniqSM (SDoc, SDoc, SDoc, SDoc)
 
-codeGen trees
-  = mapUs genMachCode trees	`thenUs` \ dynamic_codes ->
+codeGen (stixRaw, stixOpt, stixFinal)
+  = mapUs genMachCode stixFinal	`thenUs` \ dynamic_codes ->
     let
 	static_instrs = scheduleMachCode dynamic_codes
     in
-    returnUs (vcat (map pprInstr static_instrs))
+    returnUs (
+       text "ppr'd stixRaw",
+       text "ppr'd stixOpt",
+       vcat (map pprStixTrees stixFinal),
+       vcat (map pprInstr static_instrs)
+    )
 \end{code}
 
 Top level code generator for a chunk of stix code:

@@ -36,6 +36,8 @@ codeOutput mod_name c_code h_code flat_abstractC ncg_uniqs
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
 
+    dumpIfSet opt_D_dump_stix "Final stix code" stix_final >>
+
     dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d 	>>
     doOutput opt_ProduceS ncg_output_w 			>>
 
@@ -73,7 +75,8 @@ codeOutput mod_name c_code h_code flat_abstractC ncg_uniqs
     ncg_output_d = error "*** GHC not built with a native-code generator ***"
     ncg_output_w = ncg_output_d
 #else
-    ncg_output_d = nativeCodeGen flat_absC_ncg ncg_uniqs
+    (stix_raw, stix_opt, stix_final, ncg_output_d)
+       = nativeCodeGen flat_absC_ncg ncg_uniqs
     ncg_output_w = (\ f -> printForAsm f ncg_output_d)
 #endif
 

@@ -360,6 +360,7 @@ pprAbsC (CCodeBlock lbl abs_C) _
     else
     case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
     vcat [
+        char ' ',
 	hcat [text (if (externallyVisibleCLabel lbl)
 			  then "FN_("	-- abbreviations to save on output
 			  else "IFN_("),
@@ -370,7 +371,8 @@ pprAbsC (CCodeBlock lbl abs_C) _
 	nest 8 (ptext SLIT("FB_")),
 	nest 8 (pprAbsC abs_C (costs abs_C)),
 	nest 8 (ptext SLIT("FE_")),
-	char '}' ]
+	char '}',
+        char ' ' ]
     }
 
 

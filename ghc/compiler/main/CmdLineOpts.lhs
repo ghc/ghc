@@ -43,6 +43,7 @@ module CmdLineOpts (
 	opt_D_show_passes,
 	opt_D_dump_rn_trace,
 	opt_D_dump_rn_stats,
+        opt_D_dump_stix,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
@@ -330,6 +331,7 @@ opt_D_dump_worker_wrapper	= opt_D_dump_most || lookUp  SLIT("-ddump-workwrap")
 opt_D_show_passes		= opt_D_dump_most || lookUp  SLIT("-dshow-passes")
 opt_D_dump_rn_trace		= opt_D_dump_all  || lookUp  SLIT("-ddump-rn-trace")
 opt_D_dump_rn_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-rn-stats")
+opt_D_dump_stix 		= opt_D_dump_all  || lookUp  SLIT("-ddump-stix")
 opt_D_dump_simpl_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-simpl-stats")
 opt_D_source_stats		= opt_D_dump_most || lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= opt_D_dump_all  || lookUp  SLIT("-dverbose-simpl")

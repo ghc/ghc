@@ -5,7 +5,7 @@
 \begin{code}
 module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
-	sStLitLbl,
+	sStLitLbl, pprStixTrees,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim, stgTagReg,
 	getUniqLabelNCG,
@@ -19,10 +19,10 @@ import Ratio		( Rational )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
-import CallConv		( CallConv )
-import CLabel		( mkAsmTempLabel, CLabel )
-import PrimRep          ( PrimRep )
-import PrimOp           ( PrimOp )
+import CallConv		( CallConv, pprCallConv )
+import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
+import PrimRep          ( PrimRep, showPrimRep )
+import PrimOp           ( PrimOp, pprPrimOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrHdrSize )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
@@ -105,6 +105,49 @@ data StixTree
 
 sStLitLbl :: FAST_STRING -> StixTree
 sStLitLbl s = StLitLbl (ptext s)
+
+
+pprStixTrees :: [StixTree] -> SDoc
+pprStixTrees ts 
+  = vcat [
+       vcat (map ppStixTree ts),
+       char ' ',
+       char ' '
+    ]
+
+paren t = char '(' <> t <> char ')'
+
+ppStixTree :: StixTree -> SDoc
+ppStixTree t 
+   = case t of
+       StSegment cseg -> paren (ppCodeSegment cseg)
+       StInt i        -> paren (integer i)
+       StDouble	rat   -> paren (text "Double" <+> rational rat)
+       StString str   -> paren (text "Str" <+> ptext str)
+       StComment str  -> paren (text "Comment" <+> ptext str)
+       StLitLbl sd    -> sd
+       StLitLit ll    -> paren (text "LitLit" <+> ptext ll)
+       StCLbl lbl     -> pprCLabel lbl
+       StReg reg      -> ppStixReg reg
+       StIndex k b o  -> paren (ppStixTree b <+> char '+' <> 
+                                pprPrimRep k <+> ppStixTree o)
+       StInd k t      -> pprPrimRep k <> char '[' <> ppStixTree t <> char ']'
+       StAssign k d s -> ppStixTree d <> text "  :=" <> pprPrimRep k 
+                                          <> text "  " <> ppStixTree s
+       StLabel ll     -> pprCLabel ll <+> char ':'
+       StFunBegin ll  -> char ' ' $$ paren (text "FunBegin" <+> pprCLabel ll)
+       StFunEnd ll    -> paren (text "FunEnd" <+> pprCLabel ll)
+       StJump t       -> paren (text "Jump" <+> ppStixTree t)
+       StFallThrough ll -> paren (text "FallThru" <+> pprCLabel ll)
+       StCondJump l t -> paren (text "JumpC" <+> pprCLabel l <+> ppStixTree t)
+       StData k ds -> paren (text "Data" <+> pprPrimRep k <+>
+                      hsep (map ppStixTree ds))
+       StPrim op ts -> paren (text "Prim" <+> pprPrimOp op <+> hsep (map ppStixTree ts))
+       StCall nm cc k args
+          -> paren (text "Call" <+> ptext nm <+>
+               pprCallConv cc <+> pprPrimRep k <+> hsep (map ppStixTree args))
+     where 
+        pprPrimRep = text . showPrimRep
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
@@ -116,6 +159,25 @@ data StixReg
 
   | StixTemp Unique PrimRep -- "Regs" which model local variables (CTemps) in
 					-- the abstract C.
+
+ppStixReg (StixMagicId mid)
+   = ppMId mid
+ppStixReg (StixTemp u pr)
+   = hcat [text "Temp(", ppr u, ppr pr, char ')']
+
+
+ppMId BaseReg              = text "BaseReg"
+ppMId (VanillaReg kind n)  = hcat [text "IntReg(", int (I# n), char ')']
+ppMId (FloatReg n)         = hcat [text "FltReg(", int (I# n), char ')']
+ppMId (DoubleReg n)        = hcat [text "DblReg(", int (I# n), char ')']
+ppMId (LongReg kind n)     = hcat [text "LongReg(", int (I# n), char ')']
+ppMId Sp                   = text "Sp"
+ppMId Su                   = text "Su"
+ppMId SpLim                = text "SpLim"
+ppMId Hp                   = text "Hp"
+ppMId HpLim                = text "HpLim"
+ppMId CurCostCentre        = text "CCC"
+ppMId VoidReg              = text "VoidReg"
 \end{code}
 
 We hope that every machine supports the idea of data segment and text
@@ -123,7 +185,8 @@ segment (or that it has no segments at all, and we can lump these
 together).
 
 \begin{code}
-data CodeSegment = DataSegment | TextSegment deriving Eq
+data CodeSegment = DataSegment | TextSegment deriving (Eq, Show)
+ppCodeSegment = text . show
 
 type StixTreeList = [StixTree] -> [StixTree]
 \end{code}
