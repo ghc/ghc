@@ -40,11 +40,15 @@
  * impedence matching:
  */
 #ifdef CMINUSMINUS
+#define BLOCK_BEGIN
+#define BLOCK_END
 #define DECLARE_IPTR(info)  W_ info
 #define FCALL               foreign "C"
 #define INFO_PTR(info)      info
 #define ARG_PTR             "ptr"
 #else
+#define BLOCK_BEGIN         {
+#define BLOCK_END           }
 #define DECLARE_IPTR(info)  const StgInfoTable *(info)
 #define FCALL               /* nothing */
 #define INFO_PTR(info)      &info
@@ -56,43 +60,51 @@
 /* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
    if you *really* need an IND use UPD_REAL_IND
  */
-#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)		\
-	DECLARE_IPTR(info);						\
-	info = GET_INFO(updclosure);					\
-        AWAKEN_BQ(info,updclosure);					\
-	updateWithIndirection(GET_INFO(updclosure), ind_info,		\
-			      updclosure,				\
-			      heapptr,					\
-			      and_then);
+#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
+        BLOCK_BEGIN						\
+	DECLARE_IPTR(info);					\
+	info = GET_INFO(updclosure);				\
+        AWAKEN_BQ(info,updclosure);				\
+	updateWithIndirection(GET_INFO(updclosure), ind_info,	\
+			      updclosure,			\
+			      heapptr,				\
+			      and_then);			\
+	BLOCK_END
 
 #if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)	\
+        BLOCK_BEGIN				\
 	DECLARE_IPTR(info);			\
 	info = GET_INFO(updclosure);		\
         AWAKEN_BQ(info,updclosure);		\
 	updateWithPermIndirection(info,		\
 				  updclosure,	\
-				  heapptr);
+				  heapptr);	\
+	BLOCK_END
 #endif
 
 #if defined(RTS_SUPPORTS_THREADS)
 
 # ifdef TICKY_TICKY
 #  define UPD_IND_NOLOCK(updclosure, heapptr)	\
+        BLOCK_BEGIN				\
 	DECLARE_IPTR(info);			\
 	info = GET_INFO(updclosure);		\
         AWAKEN_BQ_NOLOCK(info,updclosure);	\
 	updateWithPermIndirection(info,		\
 				  updclosure,	\
-				  heapptr)
+				  heapptr);	\
+	BLOCK_END
 # else
 #  define UPD_IND_NOLOCK(updclosure, heapptr)			\
+        BLOCK_BEGIN						\
 	DECLARE_IPTR(info);					\
 	info = GET_INFO(updclosure);				\
         AWAKEN_BQ_NOLOCK(info,updclosure);			\
 	updateWithIndirection(info, INFO_PTR(stg_IND_info),	\
 			      updclosure,			\
-			      heapptr,); 
+			      heapptr,); 			\
+	BLOCK_END
 # endif
 
 #else
