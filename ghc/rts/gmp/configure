@@ -4436,7 +4436,16 @@ for tmp_fn in ${gmp_mpn_functions} ; do
 # SLPJ trace
   echo "...$tmp_fn..." 1>&6
 
-  rm -f mpn/${tmp_fn}.[Ssc] mpn/${tmp_fn}.asm
+# This line was
+#    rm -f mpn/${tmp_fn}.[Ssc] mpn/${tmp_fn}.asm
+# but I found that on my NT workstation the command
+# would unpredictably hang.  rm wasn't an active process,
+# but absolutlely nothing was happening.  
+# I *think* that expanding the [Ssc] cures the problem
+#    SLPJ May 01
+  rm -f mpn/${tmp_fn}.S mpn/${tmp_fn}.s mpn/${tmp_fn}.c mpn/${tmp_fn}.asm
+
+  echo "...$tmp_fn (done rm)..." 1>&6
 
   # functions that can be provided by multi-function files
   tmp_mulfunc=
