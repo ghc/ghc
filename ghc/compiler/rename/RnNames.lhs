@@ -110,12 +110,13 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 
 		 | otherwise		   = [ImportDecl pRELUDE 
 							 False		{- Not qualified -}
+							 False		{- Not source imported -}
 							 Nothing	{- No "as" -}
 							 Nothing	{- No import list -}
 							 mod_loc]
     
     explicit_prelude_import
-      = not (null [ () | (ImportDecl mod qual _ _ _) <- imports, mod == pRELUDE ])
+      = not (null [ () | (ImportDecl mod qual _ _ _ _) <- imports, mod == pRELUDE ])
 \end{code}
 	
 \begin{code}
@@ -146,9 +147,9 @@ checkEarlyExit mod
 importsFromImportDecl :: RdrNameImportDecl
 		      -> RnMG (RnEnv, ModuleAvails, [AvailInfo])
 
-importsFromImportDecl (ImportDecl mod qual_only as_mod import_spec loc)
+importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc)
   = pushSrcLocRn loc $
-    getInterfaceExports mod			`thenRn` \ (avails, fixities) ->
+    getInterfaceExports mod as_source		`thenRn` \ (avails, fixities) ->
     filterImports mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
     let
 	filtered_avails' = map set_avail_prov filtered_avails
@@ -266,7 +267,7 @@ filterImports mod (Just (want_hiding, import_items)) avails
 
 @qualifyImports@ takes the @ExportEnv@ after filtering through the import spec
 of an import decl, and deals with producing an @RnEnv@ with the 
-right qaulified names.  It also turns the @Names@ in the @ExportEnv@ into
+right qualified names.  It also turns the @Names@ in the @ExportEnv@ into
 fully fledged @Names@.
 
 \begin{code}
@@ -279,11 +280,12 @@ qualifyImports :: Module				-- Imported module
 	       -> RnMG (RnEnv, ModuleAvails)
 
 qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) hides
-  = let
- 	-- Make the name environment.  Since we're talking about a single import module
-	-- there can't be name clashes, so we don't need to be in the monad
-	name_env1 = foldl add_avail emptyNameEnv avails
-
+  = 
+ 	-- Make the name environment.  Even though we're talking about a 
+	-- single import module there might still be name clashes, 
+	-- because it might be the module being compiled.
+    foldlRn add_avail emptyNameEnv avails	`thenRn` \ name_env1 ->
+    let
 	-- Delete things that are hidden
 	name_env2 = foldl del_avail name_env1 hides
 
@@ -300,13 +302,12 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) h
 		  Nothing  	    -> this_mod
 		  Just another_name -> another_name
 
-    add_avail env avail = foldl add_name env (availNames avail)
-    add_name env name   = env2
+    add_avail env avail = foldlRn add_name env (availNames avail)
+    add_name env name   = add qual_imp   env  (Qual qual_mod occ)	`thenRn` \ env1 ->
+			  add unqual_imp env1 (Unqual occ)
 			where
-			  env1 | qual_imp   = addOneToNameEnv env  (Qual qual_mod occ) name
-			       | otherwise  = env
-			  env2 | unqual_imp = addOneToNameEnv env1 (Unqual occ)	       name
-			       | otherwise  = env1
+			  add False env rdr_name = returnRn env
+			  add True  env rdr_name = addOneToNameEnv env rdr_name name
 			  occ  = nameOccName name
 
     del_avail env avail = foldl delOneFromNameEnv env rdr_names
@@ -524,11 +525,11 @@ exportItemErr export_item NotAvailable sty
 
 exportItemErr export_item avail sty
   = hang (ptext SLIT("Export item not fully in scope:"))
-	   4 (vcat [hsep [ptext SLIT("Wanted:    "), ppr sty export_item],
-			hsep [ptext SLIT("Available: "), ppr sty (ieOcc export_item), pprAvail sty avail]])
+	   4 (vcat [hsep [ptext SLIT("Wanted:   "), ppr sty export_item],
+		    hsep [ptext SLIT("Available:"), ppr sty (ieOcc export_item), pprAvail sty avail]])
 
 availClashErr (occ_name, ((ie1,avail1), (ie2,avail2))) sty
-  = hang (hsep [ptext SLIT("Conflicting exports for local name: "), ppr sty occ_name])
-	4 (vcat [ppr sty ie1, ppr sty ie2])
+  = hsep [ptext SLIT("The export items"), ppr sty ie1, ptext SLIT("and"), ppr sty ie2,
+	  ptext SLIT("create conflicting exports for"), ppr sty occ_name]
 \end{code}
 
