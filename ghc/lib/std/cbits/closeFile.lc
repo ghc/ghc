@@ -13,14 +13,33 @@ closeFile(fp)
 StgForeignObj fp;
 {
     int rc;
+    int unlocked=1;
 
-    if (unlockFile(fileno((FILE *) fp))) {
-       /* If it has been unlocked, don't bother fclose()ing */
-       return 0;
+    if ( unlockFile(fileno((FILE *) fp)) ) {
+      /* If the file has already been unlocked (or an entry
+         for it in the locking tables couldn't be fond), could
+         mean two things:
+
+	    - we're repeating an hClose on an already
+	      closed file (this is likely to be a bug
+	      in the implementation of hClose, as this 
+	      condition should have been caught before
+	      we ended up here.)
+	      
+	    - the file wasn't locked in the first place!
+	      (file descriptors to non regular files.)
+
+	 We proceed with attempting to close the file,
+	 but don't flag the error should fclose() return
+	 EBADF
+      */
+	unlocked=0;
+	
     }
 
     while ((rc = fclose((FILE *) fp)) != 0) {
-	if (errno != EINTR) {
+        /* See above comment */
+	if ( errno != EINTR && (!unlocked && errno != EBADF ) ) {
 	    cvtErrno();
 	    stdErrno();
 	    return rc;

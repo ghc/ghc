@@ -234,4 +234,86 @@ StgByteArray how;
     return (StgAddr) fp;
 }
 
+/*
+ fdopen() plus implement locking.
+*/
+StgAddr
+openFd(fd,how)
+StgInt fd;
+StgByteArray how;
+{
+    int exclusive;
+    int oflags;
+    FILE* fp;
+
+    /*
+     * Since we aren't supposed to succeed when we're opening for writing and
+     * there's another writer, we can't just do an fopen() for "w" mode.
+     */
+
+    switch (how[0]) {
+    case 'a':
+	oflags = O_WRONLY | O_NOCTTY | O_APPEND;
+	exclusive = 1;
+	break;
+    case 'w':
+	oflags = O_WRONLY | O_NOCTTY;
+	exclusive = 1;
+	break;
+    case 'r':
+#if defined(cygwin32_TARGET_OS)
+	/* With cygwin32-b19, fdopen() returns EBADF under some
+	   hard-to-reproduce situations (causing hsc's renamer
+	   to break on some ~10 modules when recompiling it.)
+	   As a temporary workaround, we open files that was requested
+	   opened as read-only instead as read-write, since fdopen()
+	   only appears to fail on RO file descriptors.
+
+	   This won't have any impact on the correctness of the Haskell IO
+	   implementation since the Handle in Haskell land will record the
+	   file as being read-only, so illegal writes will be caught.
+	   
+	   ToDo: isolate and report.
+	*/
+	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDWR | O_NOCTTY;
+#else
+	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDONLY | O_NOCTTY;
+#endif
+	exclusive = 0;
+	break;
+    default:
+	fprintf(stderr, "openFd: unknown mode `%s'\n", how);
+	EXIT(EXIT_FAILURE);
+    }
+
+
+    if (lockFile(fd, exclusive) < 0) {
+	cvtErrno();
+	switch (ghc_errno) {
+	default:
+	    stdErrno();
+	    break;
+	case GHC_EACCES:
+	case GHC_EAGAIN:
+	    ghc_errtype = ERR_RESOURCEBUSY;
+	    ghc_errstr = "file is locked";
+	    break;
+	}
+	(void) close(fd);
+	return NULL;
+    }
+
+    errno = 0;			/* Just in case fdopen() is lame */
+    while ((fp = fdopen(fd, how)) == NULL) {
+	if (errno != EINTR) {
+#if defined(cygwin32_TARGET_OS) && defined(DEBUG)
+	    fprintf(stderr, "openFd %s : %s : %d : %d\n", file, how, errno, fd);
+#endif
+	    cvtErrno();
+	    (void) close(fd);
+	    return NULL;
+	}
+    }
+    return (StgAddr) fp;
+}
 \end{code}

@@ -85,6 +85,7 @@ StgInt	inputReady  PROTO((StgForeignObj,StgInt));
 
 /* openFile.lc */
 StgAddr openFile PROTO((StgByteArray, StgByteArray));
+StgAddr openFd   PROTO((StgInt, StgByteArray));
 
 /* readFile.lc */
 StgInt	readBlock PROTO((StgAddr, StgForeignObj, StgInt));
