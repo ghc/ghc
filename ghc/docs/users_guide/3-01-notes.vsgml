@@ -6,10 +6,14 @@ Changes made since 3.00:
 
 <itemize>
 
-<item>  Fix interaction of "hiding" on import with "module M" on export.
+<item> Fix interaction of "hiding" on import with "module M" on export.
 
-<item>  Fix some floating point conversion problems in @floatExtreme.lc@.
+<item> Fix some floating point conversion problems in @floatExtreme.lc@.
 
-<item>  New Hugs/GHC interface <tt/NumExts/ added and documented.
+<item> New Hugs/GHC interface <tt/NumExts/ added and documented.
+
+<item> moved @showOct@ and @showHex@ from @Numeric@ to @NumExts@.
+
+<item> imported HBC's quick-sort algorithm from @QSort@ into @List@.
 
 </itemize>
