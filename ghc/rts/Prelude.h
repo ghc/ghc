@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.6 2000/03/23 17:45:32 simonpj Exp $
+ * $Id: Prelude.h,v 1.7 2000/03/28 10:10:17 andy Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -74,12 +74,12 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 /* We need indirections to the Prelude stuff, because we can't link
  * these symbols statically.
  */
-extern const StgClosure *ind_True_closure;
-extern const StgClosure *ind_False_closure;
+extern const StgClosure *ind_True_static_closure;
+extern const StgClosure *ind_False_static_closure;
 extern const StgClosure *ind_unpackCString_closure;
 extern const StgClosure *ind_stackOverflow_closure;
 extern const StgClosure *ind_heapOverflow_closure;
-extern const StgClosure *ind_PutFullMVar_closure;
+extern const StgClosure *ind_PutFullMVar_static_closure;
 extern const StgClosure *ind_BlockedOnDeadMVar_closure;
 extern const StgClosure *ind_NonTermination_closure;
 
@@ -100,11 +100,11 @@ extern const StgInfoTable *ind_W64zh_con_info;
 extern const StgInfoTable *ind_StablePtr_static_info;
 extern const StgInfoTable *ind_StablePtr_con_info;
 
-#define True_closure           ind_True_closure
-#define False_closure          ind_False_closure
+#define True_closure           ind_True_static_closure
+#define False_closure          ind_False_static_closure
 #define stackOverflow_closure  ind_stackOverflow_closure
 #define heapOverflow_closure   ind_heapOverflow_closure
-#define PutFullMVar_closure    ind_PutFullMVar_closure
+#define PutFullMVar_closure    ind_PutFullMVar_static_closure
 #define BlockedOnDeadMVar_closure ind_BlockedOnDeadMVar_closure
 #define NonTermination_closure ind_NonTermination_closure
 #define Czh_static_info        ind_Czh_static_info
