@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 1999/11/22 11:54:36 simonmar Exp $
+# $Id: Makefile,v 1.20 1999/12/08 09:48:33 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -22,7 +22,6 @@ INPLACE_SCRIPT_PROG    = mkdependHS-inplace
 ifeq "$(INSTALLING)" "1"
 TOP_PWD 	:= $(prefix)
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-SCRIPT_LINK 	=  ghc
 else
 TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
