@@ -112,12 +112,12 @@ tcImportDecl name
   = do	{ 
     -- Make sure the interface is loaded
 	; let { nd_doc = ptext SLIT("Need decl for") <+> ppr name }
-	; traceIf nd_doc
+	; traceIf (nd_doc <+> char '{')		-- Brace matches the later message
 	; loadHomeInterface nd_doc name
 
     -- Get the real name of the thing, with a correct nameParent field.
-    -- Before the interface is loaded, we may have a non-commital 'Nothing' in
-    -- the namePareent field (made up by IfaceEnv.lookupOrig), but 
+    -- Before the interface is loaded, we may have a non-committal 'Nothing'
+    -- in the namePareent field (made up by IfaceEnv.lookupOrig), but 
     -- loading the interface updates the name cache.
     -- We need the right nameParent field in getThing
   	; real_name <- lookupOrig (nameModuleName name) (nameOccName name)
@@ -132,7 +132,7 @@ tcImportDecl name
 
 	; let { extra | getName main_thing == real_name = empty
 		      | otherwise = brackets (ptext SLIT("when seeking") <+> ppr real_name) }
-	; traceIf (ptext SLIT("...imported decl for") <+> ppr main_thing <+> extra)
+	; traceIf (ptext SLIT(" ...imported decl for") <+> ppr main_thing <+> extra <+> char '}')
 
 
     -- Look up the wanted Name in the type envt; it might be
@@ -173,6 +173,7 @@ recordImportOf thing
 
     -- Now type-check those rules (which may side-effect the EPS again)
 	; traceIf (text "tcImport: extend type env" <+> ppr new_things)
+	; traceIf (text "tcImport: rules" <+> vcat (map ppr iface_rules))
 	; core_rules <- mapM tc_rule iface_rules
 	; updateEps_ (\ eps -> 
 	    eps { eps_rule_base = extendRuleBaseList (eps_rule_base eps) core_rules }

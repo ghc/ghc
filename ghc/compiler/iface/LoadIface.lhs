@@ -281,8 +281,9 @@ loadDecl ignore_prags mod decls_map (_version, decl)
     mk_new_bndr mb_parent occ = newGlobalBinder mod occ mb_parent loc
     loc = importedSrcLoc (moduleUserString mod)
 
-zapIdInfo decl@(IfaceId { ifIdInfo = HasInfo _ }) = decl { ifIdInfo = DiscardedInfo }
-zapIdInfo decl 					  = decl
+zapIdInfo decl@(IfaceId {ifIdInfo = HasInfo _}) = decl { ifIdInfo = DiscardedInfo }
+zapIdInfo decl 		    			= decl
+	-- Don't alter "NoInfo", just "HasInfo"
 
 -----------------
 ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
@@ -307,8 +308,8 @@ ifaceDeclSubBndrs (IfaceData {ifCons = DataCons cons})
 ifaceDeclSubBndrs other = []
 
 conDeclBndrs (IfaceConDecl con_occ _ _ _ _ fields)
-  = [con_occ, mkDataConWrapperOcc con_occ, mkDataConWorkerOcc con_occ]
-    ++ fields
+  = fields ++ 
+    [con_occ, mkDataConWrapperOcc con_occ, mkDataConWorkerOcc con_occ]
 
 
 -----------------------------------------------------
