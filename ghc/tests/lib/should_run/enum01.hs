@@ -81,7 +81,7 @@ main = do
   OK - on with the regression testing.
 -}
 
-#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
+#define printTest(x) (do{ putStr ( "    " ++ #x ++ " = " ) ; print (x) })
 
 
 testEnumInt :: IO ()

@@ -42,7 +42,7 @@ import PrelForeign  ( makeForeignObj )
 #endif /* ndef(__HUGS__) */
 
 #ifdef __HUGS__
-#define cat2(x,y)  x/**/y
+#define cat2(x,y)  x##y
 #define CCALL(fun) cat2(prim_,fun)
 #define __CONCURRENT_HASKELL__
 #define stToIO id
