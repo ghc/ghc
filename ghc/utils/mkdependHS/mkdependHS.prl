@@ -434,7 +434,7 @@ sub slurp_file_for_imports {
     if ($options ne "") {
       @Old_Syslibs=@Syslibs;
       $ProcessingOptions=1;
-      &mangle_command_line_args(split(/ /,$options));
+      &mangle_command_line_args(split(/\s+/,$options));
       if (@Old_Syslibs ne @Syslibs) {
         $found_options=1;
 	@Old_Ignore_dirs = @Ignore_dirs;
