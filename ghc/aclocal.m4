@@ -7,10 +7,10 @@ AC_SUBST([ProjectNameShort], [$PACKAGE_TARNAME])
 AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
 
 # Split PACKAGE_VERSION into (possibly empty) parts
-VERSION_MAJOR=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\?\(.*\)\)$/\1'/`
-VERSION_TMP=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\?\(.*\)\)$/\3'/`
-VERSION_MINOR=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\?\(.*\)\)$/\1'/`
-ProjectPatchLevel=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\?\(.*\)\)$/\3'/`
+VERSION_MAJOR=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
+VERSION_TMP=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
+VERSION_MINOR=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
+ProjectPatchLevel=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
 
 # Calculate project version as an integer, using 2 digits for minor version
 case $VERSION_MINOR in
