@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.50 2001/08/15 14:36:21 rrt Exp $
+-- $Id: SysTools.lhs,v 1.51 2001/08/15 14:59:34 rrt Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -74,13 +74,14 @@ import qualified Posix
 #else
 import List		( isPrefixOf )
 import MarshalArray
+#endif
+
 -- use the line below when we can be sure of compiling with GHC >=
 -- 5.02, and remove the implementation of rawSystem at the end of this
 -- file
 import PrelIOBase -- this can be removed when SystemExts is used
 import CError     ( throwErrnoIfMinus1 ) -- as can this
 -- import SystemExts       ( rawSystem )
-#endif
 
 #include "HsVersions.h"
 
