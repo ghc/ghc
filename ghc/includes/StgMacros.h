@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.33 2000/08/15 14:18:43 simonmar Exp $
+ * $Id: StgMacros.h,v 1.34 2000/08/15 14:22:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -726,8 +726,6 @@ LoadThreadState (void)
    Module initialisation
    -------------------------------------------------------------------------- */
 
-#if 1 /* old init stuff */
-
 #define PUSH_INIT_STACK(reg_function)		\
 	*(Sp++) = (W_)reg_function
 
@@ -753,29 +751,6 @@ LoadThreadState (void)
         }};					\
 	JMP_(POP_INIT_STACK());			\
 	FE_ }
-
-#else 
-
-#define PUSH_INIT_STACK(reg_function) /* nothing */
-#define POP_INIT_STACK()	      /* nothing */
-#define REGISTER_IMPORT(reg_mod_name) /* nothing */
-
-#define START_MOD_INIT(reg_mod_name)		\
-	FN_(reg_mod_name) {			\
-            EF_(StgReturn);			\
-            TEXT_SET(hs_init_set, reg_mod_name); \
-	    FB_;		
-	    /* extern decls go here, followed by init code */
-
-#define REGISTER_FOREIGN_EXPORT(reg_fe_binder)	\
-        STGCALL1(getStablePtr,reg_fe_binder)
-	
-	
-#define END_MOD_INIT()				\
-	    JMP_(StgReturn);			\
-	FE_ }					\
-
-#endif
 
 /* -----------------------------------------------------------------------------
    Support for _ccall_GC_ and _casm_GC.
