@@ -901,11 +901,11 @@ rdImport :: ParseTree
 	 -> UgnM RdrNameImportDecl
 
 rdImport pt
-  = rdU_binding pt `thenUgn` \ (U_import imod iqual ias ispec srcline) ->
+  = rdU_binding pt `thenUgn` \ (U_import imod iqual ias ispec isrc srcline) ->
     mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-    returnUgn (ImportDecl imod (cvFlag iqual) maybe_as maybe_spec src_loc)
+    returnUgn (ImportDecl imod (cvFlag iqual) (cvFlag isrc) maybe_as maybe_spec src_loc)
   where
     rd_spec pt = rdU_either pt 		`thenUgn` \ spec ->
       case spec of
