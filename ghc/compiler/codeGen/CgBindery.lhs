@@ -449,85 +449,58 @@ pointer has its own bitmap to describe the update frame).
 
 \begin{code}
 buildLivenessMask 
-	:: VirtualSpOffset	-- offset from which the bitmap should start
+	:: VirtualSpOffset	-- size of the stack frame
+	-> VirtualSpOffset	-- offset from which the bitmap should start
 	-> FCode LivenessMask	-- mask for free/unlifted slots
 
-buildLivenessMask sp = do {
-
-    -- find all unboxed stack-resident ids
+buildLivenessMask size sp = do {
+    -- find all live stack-resident pointers
     binds <- getBinds;
     ((vsp, _, free, _, _), heap_usage) <- getUsage;
-    
-    let { 
-	unboxed_slots = 
-    	    [ (ofs, size) | 
-    	    (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
-    	    let rep = idPrimRep id; size = getPrimRepSize rep,
-    	    not (isFollowableRep rep),
-    	    size > 0
-    	    ];
-      
-    -- flatten this list into a list of unboxed stack slots
-        flatten_slots = sortLt (<) 
-    	    (foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
-    		  unboxed_slots);
-    
-    -- merge in the free slots
-	all_slots = mergeSlots flatten_slots (map fst free) ++ 
-		    if vsp < sp then [vsp+1 .. sp] else [];
 
-    -- recalibrate the list to be sp-relative
-	rel_slots = reverse (map (sp-) all_slots);
+    let {
+	rel_slots = sortLt (<) 
+    	    [ sp - ofs  -- get slots relative to top of frame
+    	    | (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
+    	      isFollowableRep (idPrimRep id)
+    	    ];
     };
 
-    ASSERT(all (>=0) rel_slots && rel_slots == sortLt (<) rel_slots)
-     return (listToLivenessMask rel_slots)
+    ASSERT(all (>=0) rel_slots)
+     return (listToLivenessMask size rel_slots)
   }
 
+-- make a bitmap where the slots specified are the *zeros* in the bitmap.
+-- eg. [1,2,4], size 4 ==> 0x8  (we leave any bits outside the size as zero,
+-- just to make the bitmap easier to read).
+listToLivenessMask :: Int -> [Int] -> [BitSet]
+listToLivenessMask size slots{- must be sorted -}
+  | size <= 0 = []
+  | otherwise = init `minusBS` mkBS these : 
+	listToLivenessMask (size - 32) (map (\x -> x - 32) rest)
+   where (these,rest) = span (<32) slots
+	 init
+	   | size >= 32 = all_ones
+	   | otherwise  = mkBS [0..size-1]
 
-mergeSlots :: [Int] -> [Int] -> [Int]
-mergeSlots cs [] = cs
-mergeSlots [] ns = ns
-mergeSlots (c:cs) (n:ns)
- = if c < n then
-	c : mergeSlots cs (n:ns)
-   else if c > n then
-	n : mergeSlots (c:cs) ns
-   else
-	panic ("mergeSlots: equal slots: " ++ show (c:cs) ++ show (n:ns))
+	 all_ones = mkBS [0..31]
 
-listToLivenessMask :: [Int] -> LivenessMask
-listToLivenessMask []    = []
-listToLivenessMask slots = 
-   mkBS this : listToLivenessMask (map (\x -> x-32) rest)
-   where (this,rest) = span (<32) slots
-\end{code}
+-- In a continuation, we want a liveness mask that starts from just after
+-- the return address, which is on the stack at realSp.
 
-In a continuation, we want a liveness mask that starts from just after
-the return address, which is on the stack at realSp.
-
-\begin{code}
 buildContLivenessMask :: Name -> FCode Liveness
 buildContLivenessMask name = do
 	realSp <- getRealSp
-	mask <- buildLivenessMask (realSp-1)
-
-        let lbl = mkBitmapLabel name
 
 	frame_sp <- getStackFrame
-	let 
-	     -- realSp points to the frame-header for the current stack frame,
-	     -- and the end of this frame is frame_sp.  The size is therefore
-	     -- realSp - frame_sp - 1 (subtract one for the frame-header).
-	     frame_size = realSp - frame_sp - 1
+	-- realSp points to the frame-header for the current stack frame,
+	-- and the end of this frame is frame_sp.  The size is therefore
+	-- realSp - frame_sp - 1 (subtract one for the frame-header).
+	let frame_size = realSp - frame_sp - 1
 
-	     -- make sure the bitmap covers the full frame, by adding
-	     -- zero words at the end as necessary
-	     expand n []     = take ((n+31) `quot` 32) (repeat emptyBS)
-	     expand n (b:bs) = b : expand (n-32) bs
+	mask <- buildLivenessMask frame_size (realSp-1)
 
-	     liveness = Liveness lbl frame_size (expand frame_size mask)
-
+        let liveness = Liveness (mkBitmapLabel name) frame_size mask
 	absC (CBitmap liveness)
 	return liveness
 \end{code}
