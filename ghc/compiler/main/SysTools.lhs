@@ -54,16 +54,19 @@ import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-import System		( system, ExitCode(..), exitWith, getEnv )
+import System		( system, ExitCode(..), exitWith )
+import CString
+import Int
+import Addr
     
 #include "../includes/config.h"
 
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Win32DLL
-import List		( isPrefixOf, isSuffixOf )
+import List		( isPrefixOf )
 #endif
+import MarshalArray
 
 #include "HsVersions.h"
 
@@ -685,9 +688,15 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 #if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
-getExecDir = do h <- getModuleHandle Nothing
-		n <- getModuleFileName h
-		return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath n)))))
+getExecDir = do let len = 2048
+		buf <- mallocArray (fromIntegral len)
+		ret <- getModuleFileName nullAddr buf len
+		if ret == 0 then return Nothing
+		            else do s <- peekCString buf
+				    destructArray (fromIntegral len) buf
+				    return (Just (reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath s))))))
+
+foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int32 -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif

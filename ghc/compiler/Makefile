@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.175 2001/07/16 15:46:09 sof Exp $
+# $Id: Makefile,v 1.176 2001/07/17 17:27:20 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -224,7 +224,7 @@ SRC_HC_OPTS += \
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
 else
-SRC_HC_OPTS += -package concurrent -package win32 -package text -package util
+SRC_HC_OPTS += -package concurrent -package text -package util
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
