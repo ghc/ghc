@@ -34,7 +34,11 @@ endif
 
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
-ifeq "$(HOSTPLATFORM)$(ghc_le_600)" "i386-unknown-mingw32YES"
+
+# <= 6.0.x (double-)quotes all arguments when invoking utils, hence
+# the need to escape the string quotes here. >= 6.2.x does add a
+# layer of quoting.
+ifeq "$(ghc_le_600)" "YES"
 HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION=\"$(ProjectVersion)\"'
 else
 HaddockVersion_HC_OPTS = -D'HADDOCK_VERSION="$(ProjectVersion)"'
