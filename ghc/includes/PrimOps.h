@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.34 1999/08/24 09:33:08 simonmar Exp $
+ * $Id: PrimOps.h,v 1.35 1999/08/24 09:36:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -663,9 +663,7 @@ EF_(putMVarzh_fast);
    Delay/Wait PrimOps
    -------------------------------------------------------------------------- */
 
-EF_(waitReadzh_fast);
-EF_(waitWritezh_fast);
-EF_(delayzh_fast);
+/* Hmm, I'll think about these later. */
 
 /* -----------------------------------------------------------------------------
    Primitive I/O, error-handling PrimOps
@@ -712,8 +710,6 @@ EF_(killThreadzh_fast);
 EF_(seqzh_fast);
 
 #define myThreadIdzh(t) (t = CurrentTSO)
-
-extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 /* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------
