@@ -10,7 +10,7 @@ module Bag (
 	emptyBag, unitBag, unionBags, unionManyBags,
 	mapBag,
 	elemBag,
-	filterBag, partitionBag, concatBag, foldBag, foldrBag,
+	filterBag, partitionBag, concatBag, foldBag, foldrBag, foldlBag,
 	isEmptyBag, consBag, snocBag,
 	listToBag, bagToList
     ) where
@@ -129,6 +129,16 @@ foldrBag k z (UnitBag x)     = k x z
 foldrBag k z (TwoBags b1 b2) = foldrBag k (foldrBag k z b2) b1
 foldrBag k z (ListBag xs)    = foldr k z xs
 foldrBag k z (ListOfBags bs) = foldr (\b r -> foldrBag k r b) z bs
+
+foldlBag :: (r -> a -> r) -> r
+	 -> Bag a
+	 -> r
+
+foldlBag k z EmptyBag        = z
+foldlBag k z (UnitBag x)     = k z x
+foldlBag k z (TwoBags b1 b2) = foldlBag k (foldlBag k z b1) b2
+foldlBag k z (ListBag xs)    = foldl k z xs
+foldlBag k z (ListOfBags bs) = foldl (\r b -> foldlBag k r b) z bs
 
 
 mapBag :: (a -> b) -> Bag a -> Bag b

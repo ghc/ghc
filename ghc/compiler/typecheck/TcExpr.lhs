@@ -139,23 +139,23 @@ Primitive literals:
 
 \begin{code}
 tcExpr (HsLit lit@(HsCharPrim c)) res_ty
-  = unifyTauTy charPrimTy res_ty		`thenTc_`
+  = unifyTauTy res_ty charPrimTy		`thenTc_`
     returnTc (HsLitOut lit charPrimTy, emptyLIE)
 
 tcExpr (HsLit lit@(HsStringPrim s)) res_ty
-  = unifyTauTy addrPrimTy res_ty		`thenTc_`
+  = unifyTauTy res_ty addrPrimTy		`thenTc_`
     returnTc (HsLitOut lit addrPrimTy, emptyLIE)
 
 tcExpr (HsLit lit@(HsIntPrim i)) res_ty
-  = unifyTauTy intPrimTy res_ty		`thenTc_`
+  = unifyTauTy res_ty intPrimTy		`thenTc_`
     returnTc (HsLitOut lit intPrimTy, emptyLIE)
 
 tcExpr (HsLit lit@(HsFloatPrim f)) res_ty
-  = unifyTauTy floatPrimTy res_ty		`thenTc_`
+  = unifyTauTy res_ty floatPrimTy		`thenTc_`
     returnTc (HsLitOut lit floatPrimTy, emptyLIE)
 
 tcExpr (HsLit lit@(HsDoublePrim d)) res_ty
-  = unifyTauTy doublePrimTy res_ty		`thenTc_`
+  = unifyTauTy res_ty doublePrimTy		`thenTc_`
     returnTc (HsLitOut lit doublePrimTy, emptyLIE)
 \end{code}
 
@@ -163,11 +163,11 @@ Unoverloaded literals:
 
 \begin{code}
 tcExpr (HsLit lit@(HsChar c)) res_ty
-  = unifyTauTy charTy res_ty		`thenTc_`
+  = unifyTauTy res_ty charTy		`thenTc_`
     returnTc (HsLitOut lit charTy, emptyLIE)
 
 tcExpr (HsLit lit@(HsString str)) res_ty
-  = unifyTauTy stringTy res_ty		`thenTc_`
+  = unifyTauTy res_ty stringTy 		`thenTc_`
     returnTc (HsLitOut lit stringTy, emptyLIE)
 \end{code}
 
@@ -241,7 +241,7 @@ tcExpr in_expr@(SectionR op expr) res_ty
     tcAddErrCtxt (sectionRAppCtxt in_expr) $
     split_fun_ty op_ty 2 {- two args -}			`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcExpr expr	arg2_ty					`thenTc` \ (expr',lie2) ->
-    unifyTauTy (mkFunTy arg1_ty op_res_ty) res_ty	`thenTc_`
+    unifyTauTy res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc_`
     returnTc (SectionR op' expr', lie1 `plusLIE` lie2)
 \end{code}
 
@@ -280,7 +280,7 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	io_result_ty = mkTyConApp ioTyCon [result_ty]
     in
     case tyConDataCons ioTyCon of { [ioDataCon] ->
-    unifyTauTy io_result_ty res_ty   `thenTc_`
+    unifyTauTy res_ty io_result_ty		`thenTc_`
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
@@ -589,7 +589,7 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
 	-- mention variables free in the environment, and we'd get
 	-- bogus complaints about not being able to for-all the
 	-- sig_tyvars
-   unifyTauTy sig_tau' res_ty		`thenTc_`
+   unifyTauTy res_ty sig_tau'			`thenTc_`
 
 	-- If everything is ok, return the stuff unchanged, except for
 	-- the effect of any substutions etc.  We simply discard the
@@ -831,7 +831,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
       combine_stmts stmt		_     (stmts, ty) = (stmt:stmts, ty)
     in
     tc_stmts stmts			`thenTc`   \ ((stmts', result_ty), final_lie) ->
-    unifyTauTy result_ty res_ty		`thenTc_`
+    unifyTauTy res_ty result_ty		`thenTc_`
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,

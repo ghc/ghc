@@ -38,7 +38,7 @@ module FiniteMap (
 
 	intersectFM,
 	intersectFM_C,
-	mapFM, filterFM,
+	mapFM, filterFM, 
 
 	sizeFM, isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
 
@@ -138,6 +138,7 @@ foldFM		:: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a
 mapFM		:: (key -> elt1 -> elt2) -> FiniteMap key elt1 -> FiniteMap key elt2
 filterFM	:: (Ord key OUTPUTABLE_key) => (key -> elt -> Bool)
 			   -> FiniteMap key elt -> FiniteMap key elt
+
 
 --	INTERROGATING
 sizeFM		:: FiniteMap key elt -> Int

@@ -39,7 +39,6 @@ import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
 import ErrUtils		( pprBagOfErrors, ghcExit, doIfSet, dumpIfSet )
 import Maybes		( maybeToBool, MaybeErr(..) )
-import Specialise	( SpecialiseData(..) )
 import StgSyn		( GenStgBinding )
 import TcInstUtil	( InstInfo )
 import TyCon		( isDataTyCon )
@@ -148,9 +147,7 @@ doIt (core_cmds, stg_cmds)
     core2core core_cmds mod_name
 	      sm_uniqs local_data_tycons desugared
 						>>=
-	 \ (simplified, spec_data
-		{- SpecData _ _ _ gen_data_tycons all_tycon_specs _ _ _ -}
-	   ) ->
+	 \ simplified ->
 
 
     -- ******* STG-TO-STG SIMPLIFICATION

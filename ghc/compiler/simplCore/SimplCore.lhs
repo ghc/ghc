@@ -91,16 +91,14 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> UniqSupply		-- a name supply
 	  -> [TyCon]			-- local data tycons and tycon specialisations
 	  -> [CoreBinding]		-- input...
-	  -> IO
-	      ([CoreBinding],		-- results: program, plus...
-	      SpecialiseData)		--  specialisation data
+	  -> IO [CoreBinding]		-- results: program
 
 core2core core_todos module_name us local_tycons binds
   = 	-- Do the main business
      foldl_mn do_core_pass
-		(binds, us, init_specdata, zeroSimplCount)
+		(binds, us, zeroSimplCount)
 		core_todos
-		>>= \ (processed_binds, us', spec_data, simpl_stats) ->
+		>>= \ (processed_binds, us', simpl_stats) ->
 
 	-- Do the final tidy-up
      let
@@ -121,12 +119,10 @@ core2core core_todos module_name us local_tycons binds
 	  hPutStr stderr "\n")					>>
 
 	-- Return results
-    return (final_binds, spec_data)
+    return final_binds
   where
-    init_specdata = initSpecData local_tycons emptyFM {- tycon_specs -}
-
     --------------
-    do_core_pass info@(binds, us, spec_data, simpl_stats) to_do =
+    do_core_pass info@(binds, us, simpl_stats) to_do =
      case (splitUniqSupply us) of 
       (us1,us2) ->
     	case to_do of
@@ -136,7 +132,7 @@ core2core core_todos module_name us local_tycons binds
 					 then " (foldr/build)" else "") >>
 	       case (simplifyPgm binds simpl_sw_chkr simpl_stats us1) of
 		 (p, it_cnt, simpl_stats2)
-		   -> end_pass us2 p spec_data simpl_stats2
+		   -> end_pass us2 p simpl_stats2
 			       ("Simplify (" ++ show it_cnt ++ ")"
 				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
 				    then " foldr/build" else "")
@@ -145,37 +141,37 @@ core2core core_todos module_name us local_tycons binds
 	    -> _scc_ "CoreDoFoldrBuildWorkerWrapper"
 	       begin_pass "FBWW" >>
 	       case (mkFoldrBuildWW us1 binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "FBWW" }
+	       end_pass us2 binds2 simpl_stats "FBWW" }
 
 	  CoreDoFoldrBuildWWAnal
 	    -> _scc_ "CoreDoFoldrBuildWWAnal"
 	       begin_pass "AnalFBWW" >>
 	       case (analFBWW binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "AnalFBWW" }
+	       end_pass us2 binds2 simpl_stats "AnalFBWW" }
 
 	  CoreLiberateCase
 	    -> _scc_ "LiberateCase"
 	       begin_pass "LiberateCase" >>
 	       case (liberateCase opt_LiberateCaseThreshold binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "LiberateCase" }
+	       end_pass us2 binds2 simpl_stats "LiberateCase" }
 
 	  CoreDoFloatInwards
 	    -> _scc_ "FloatInwards"
 	       begin_pass "FloatIn" >>
 	       case (floatInwards binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "FloatIn" }
+	       end_pass us2 binds2 simpl_stats "FloatIn" }
 
 	  CoreDoFullLaziness
 	    -> _scc_ "CoreFloating"
 	       begin_pass "FloatOut" >>
 	       case (floatOutwards us1 binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "FloatOut" }
+	       end_pass us2 binds2 simpl_stats "FloatOut" }
 
 	  CoreDoStaticArgs
 	    -> _scc_ "CoreStaticArgs"
 	       begin_pass "StaticArgs" >>
 	       case (doStaticArgs binds us1) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "StaticArgs" }
+	       end_pass us2 binds2 simpl_stats "StaticArgs" }
 		-- Binds really should be dependency-analysed for static-
 		-- arg transformation... Not to worry, they probably are.
 		-- (I don't think it *dies* if they aren't [WDP 94/04/15])
@@ -184,32 +180,19 @@ core2core core_todos module_name us local_tycons binds
 	    -> _scc_ "CoreStranal"
 	       begin_pass "StrAnal" >>
 	       case (saWwTopBinds us1 binds) of { binds2 ->
-	       end_pass us2 binds2 spec_data simpl_stats "StrAnal" }
+	       end_pass us2 binds2 simpl_stats "StrAnal" }
 
 	  CoreDoSpecialising
 	    -> _scc_ "Specialise"
 	       begin_pass "Specialise" >>
-	       case (specProgram us1 binds spec_data) of {
-		 (p, spec_data2@(SpecData _ spec_noerrs _ _ _
-					  spec_errs spec_warn spec_tyerrs)) ->
-
-		   -- if we got errors, we die straight away
-		   doIfSet ((not spec_noerrs) ||
-			    (opt_ShowImportSpecs && not (isEmptyBag spec_warn)))
-			(printErrs
-			    (pprSpecErrs module_name spec_errs spec_warn spec_tyerrs))
-								>>
-
-		   doIfSet (not spec_noerrs) -- Stop here if specialisation errors occured
-			   (ghcExit 1)				>>
-
-		   end_pass us2 p spec_data2 simpl_stats "Specialise"
+	       case (specProgram us1 binds) of { p ->
+	       end_pass us2 p simpl_stats "Specialise"
 	       }
 
 	  CoreDoPrintCore	-- print result of last pass
 	    -> dumpIfSet (not opt_D_verbose_core2core) "Print Core"
 	 	  (pprCoreBindings binds)	>>
-	       return (binds, us1, spec_data, simpl_stats)
+	       return (binds, us1, simpl_stats)
 
     -------------------------------------------------
 
@@ -219,7 +202,6 @@ core2core core_todos module_name us local_tycons binds
 	else return ()
 
     end_pass us2 binds2
-	     spec_data2@(SpecData spec_done _ _ _ _ _ _ _)
 	     simpl_stats2 what
       = -- Report verbosely, if required
 	dumpIfSet opt_D_verbose_core2core what
@@ -234,7 +216,6 @@ core2core core_todos module_name us local_tycons binds
 	return
 	  (binds2,	-- processed binds, possibly run thru CoreLint
 	   us2,		-- UniqSupply for the next guy
-	   spec_data2,	-- possibly-updated specialisation info
 	   simpl_stats2	-- accumulated simplifier stats
 	  )
 

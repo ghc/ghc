@@ -29,7 +29,7 @@ import BasicTypes	( NewOrData(..) )
 import TyVar            ( TyVar )
 import PprType		( GenType, GenTyVar )
 import UniqSupply	( returnUs, thenUs, getUniques, getUnique, UniqSM )
-import Util		( zipEqual )
+import Util		( zipEqual, zipWithEqual )
 import Outputable
 \end{code}
 
@@ -241,7 +241,9 @@ mkWrapper fun_ty demands
 		-- and as such might have some strictness info attached.
 		-- Then we need to have enough args to zip to the strictness info
 	
-	wrap_args	   = zipWith mk_ww_local wrap_uniqs arg_tys
+	wrap_args	   = ASSERT( n_wrap_args <= length arg_tys )
+			     zipWith mk_ww_local wrap_uniqs arg_tys
+
 	leftover_arg_tys   = drop n_wrap_args arg_tys
 	final_body_ty	   = mkFunTys leftover_arg_tys body_ty
     in
