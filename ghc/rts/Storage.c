@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.9 1999/02/02 14:21:33 simonm Exp $
+ * $Id: Storage.c,v 1.10 1999/02/05 14:45:43 simonm Exp $
  *
  * Storage manager front end
  *
@@ -133,12 +133,17 @@ initStorage (void)
   /* generation 0 is special: that's the nursery */
   generations[0].max_blocks = 0;
 
-  /* G0S0: the allocation area */
+  /* G0S0: the allocation area.  Policy: keep the allocation area
+   * small to begin with, even if we have a large suggested heap
+   * size.  Reason: we're going to do a major collection first, and we
+   * don't want it to be a big one.  This vague idea is borne out by 
+   * rigorous experimental evidence.
+   */
   step = &generations[0].steps[0];
   g0s0 = step;
-  step->blocks   = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-  step->n_blocks = RtsFlags.GcFlags.minAllocAreaSize;
   nursery_blocks = RtsFlags.GcFlags.minAllocAreaSize;
+  step->blocks   = allocNursery(NULL, nursery_blocks);
+  step->n_blocks = nursery_blocks;
   current_nursery = step->blocks;
   /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
 

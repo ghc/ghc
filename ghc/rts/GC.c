@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.23 1999/02/02 14:21:29 simonm Exp $
+ * $Id: GC.c,v 1.24 1999/02/05 14:45:42 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -103,8 +103,8 @@ static void           scavenge_stack(StgPtr p, StgPtr stack_end);
 static void           scavenge_large(step *step);
 static void           scavenge(step *step);
 static void           scavenge_static(void);
-static StgMutClosure *scavenge_mutable_list(StgMutClosure *p, nat gen);
-static StgMutClosure *scavenge_mut_once_list(StgMutClosure *p, nat gen);
+static void           scavenge_mutable_list(generation *g);
+static void           scavenge_mut_once_list(generation *g);
 
 #ifdef DEBUG
 static void gcCAFs(void);
@@ -285,25 +285,27 @@ void GarbageCollect(void (*get_roots)(void))
    * it has already been evaced to gen 2.
    */
   { 
-    StgMutClosure *tmp, **pp;
-    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
+    int st;
+    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
       generations[g].saved_mut_list = generations[g].mut_list;
       generations[g].mut_list = END_MUT_LIST;
     }
 
     /* Do the mut-once lists first */
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      generations[g].mut_once_list = 
-	scavenge_mut_once_list(generations[g].mut_once_list, g);
+      scavenge_mut_once_list(&generations[g]);
+      evac_gen = g;
+      for (st = generations[g].n_steps-1; st >= 0; st--) {
+	scavenge(&generations[g].steps[st]);
+      }
     }
 
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      tmp = scavenge_mutable_list(generations[g].saved_mut_list, g);
-      pp = &generations[g].mut_list;
-      while (*pp != END_MUT_LIST) {
-	   pp = &(*pp)->mut_link;
+      scavenge_mutable_list(&generations[g]);
+      evac_gen = g;
+      for (st = generations[g].n_steps-1; st >= 0; st--) {
+	scavenge(&generations[g].steps[st]);
       }
-      *pp = tmp;
     }
   }
 
@@ -381,18 +383,21 @@ void GarbageCollect(void (*get_roots)(void))
 
     /* scavenge each step in generations 0..maxgen */
     { 
-      int gen; 
+      int gen, st; 
+    loop2:
       for (gen = RtsFlags.GcFlags.generations-1; gen >= 0; gen--) {
-	for (s = 0; s < generations[gen].n_steps; s++) {
-	  step = &generations[gen].steps[s];
+	for (st = generations[gen].n_steps-1; st >= 0 ; st--) {
+	  step = &generations[gen].steps[st];
 	  evac_gen = gen;
 	  if (step->hp_bd != step->scan_bd || step->scan < step->hp) {
 	    scavenge(step);
 	    flag = rtsTrue;
+	    goto loop2;
 	  }
 	  if (step->new_large_objects != NULL) {
 	    scavenge_large(step);
 	    flag = rtsTrue;
+	    goto loop2;
 	  }
 	}
       }
@@ -1821,20 +1826,20 @@ scavenge_one(StgClosure *p)
    remove non-mutable objects from the mutable list at this point.
    -------------------------------------------------------------------------- */
 
-static StgMutClosure *
-scavenge_mut_once_list(StgMutClosure *p, nat gen)
+static void
+scavenge_mut_once_list(generation *gen)
 {
   StgInfoTable *info;
-  StgMutClosure *start;
-  StgMutClosure **prev;
+  StgMutClosure *p, *next, *new_list;
 
-  prev = &start;
-  start = p;
+  p = gen->mut_once_list;
+  new_list = END_MUT_LIST;
+  next = p->mut_link;
 
-  evac_gen = gen;
+  evac_gen = gen->no;
   failed_to_evac = rtsFalse;
 
-  for (; p != END_MUT_LIST; p = *prev) {
+  for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
 
     /* make sure the info pointer is into text space */
     ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
@@ -1852,6 +1857,31 @@ scavenge_mut_once_list(StgMutClosure *p, nat gen)
       ((StgIndOldGen *)p)->indirectee = 
         evacuate(((StgIndOldGen *)p)->indirectee);
       
+#if 0  
+      /* Debugging code to print out the size of the thing we just
+       * promoted 
+       */
+      { 
+	StgPtr start = gen->steps[0].scan;
+	bdescr *start_bd = gen->steps[0].scan_bd;
+	nat size = 0;
+	scavenge(&gen->steps[0]);
+	if (start_bd != gen->steps[0].scan_bd) {
+	  size += (P_)BLOCK_ROUND_UP(start) - start;
+	  start_bd = start_bd->link;
+	  while (start_bd != gen->steps[0].scan_bd) {
+	    size += BLOCK_SIZE_W;
+	    start_bd = start_bd->link;
+	  }
+	  size += gen->steps[0].scan -
+	    (P_)BLOCK_ROUND_DOWN(gen->steps[0].scan);
+	} else {
+	  size = gen->steps[0].scan - start;
+	}
+	fprintf(stderr,"evac IND_OLDGEN: %d bytes\n", size * sizeof(W_));
+      }
+#endif
+
       /* failed_to_evac might happen if we've got more than two
        * generations, we're collecting only generation 0, the
        * indirection resides in generation 2 and the indirectee is
@@ -1859,9 +1889,9 @@ scavenge_mut_once_list(StgMutClosure *p, nat gen)
        */
       if (failed_to_evac) {
 	failed_to_evac = rtsFalse;
-	prev = &p->mut_link;
+	p->mut_link = new_list;
+	new_list = p;
       } else {
-	*prev = p->mut_link;
 	/* the mut_link field of an IND_STATIC is overloaded as the
 	 * static link field too (it just so happens that we don't need
 	 * both at the same time), so we need to NULL it out when
@@ -1880,13 +1910,12 @@ scavenge_mut_once_list(StgMutClosure *p, nat gen)
        */
       ASSERT(p->header.info == &MUT_CONS_info);
       if (scavenge_one(((StgMutVar *)p)->var) == rtsTrue) {
-	/* didn't manage to promote everything, so leave the
-	 * MUT_CONS on the list.
+	/* didn't manage to promote everything, so put the
+	 * MUT_CONS back on the list.
 	 */
-	prev = &p->mut_link;
-      } else {
-	*prev = p->mut_link;
-      }
+	p->mut_link = new_list;
+	new_list = p;
+      } 
       continue;
       
     default:
@@ -1894,25 +1923,25 @@ scavenge_mut_once_list(StgMutClosure *p, nat gen)
       barf("scavenge_mut_once_list: strange object?");
     }
   }
-  return start;
+
+  gen->mut_once_list = new_list;
 }
 
 
-static StgMutClosure *
-scavenge_mutable_list(StgMutClosure *p, nat gen)
+static void
+scavenge_mutable_list(generation *gen)
 {
   StgInfoTable *info;
-  StgMutClosure *start;
-  StgMutClosure **prev;
+  StgMutClosure *p, *next, *new_list;
+
+  p = gen->saved_mut_list;
+  new_list = END_MUT_LIST;
+  next = p->mut_link;
 
   evac_gen = 0;
-
-  prev = &start;
-  start = p;
-
   failed_to_evac = rtsFalse;
 
-  for (; p != END_MUT_LIST; p = *prev) {
+  for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
 
     /* make sure the info pointer is into text space */
     ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
@@ -1929,7 +1958,7 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 	StgPtr end, q;
 	
 	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	evac_gen = gen;
+	evac_gen = gen->no;
 	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
 	  (StgClosure *)*q = evacuate((StgClosure *)*q);
 	}
@@ -1937,16 +1966,16 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
-	  prev = &p->mut_link;
-	} else {
-	  *prev = p->mut_link;
-	}
+	  p->mut_link = new_list;
+	  new_list = p;
+	} 
 	continue;
       }
 
     case MUT_ARR_PTRS:
       /* follow everything */
-      prev = &p->mut_link;
+      p->mut_link = new_list;
+      new_list = p;
       {
 	StgPtr end, q;
 	
@@ -1964,7 +1993,8 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
        */
       ASSERT(p->header.info != &MUT_CONS_info);
       ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-      prev = &p->mut_link;
+      p->mut_link = new_list;
+      new_list = p;
       continue;
       
     case MVAR:
@@ -1973,7 +2003,8 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
 	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
 	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
-	prev = &p->mut_link;
+	p->mut_link = new_list;
+	new_list = p;
 	continue;
       }
 
@@ -1996,7 +2027,8 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 	 * point to some younger objects (because we set evac_gen to 0
 	 * above). 
 	 */
-	prev = &tso->mut_link;
+	tso->mut_link = new_list;
+	new_list = (StgMutClosure *)tso;
 	continue;
       }
       
@@ -2005,8 +2037,9 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
 	(StgClosure *)bh->blocking_queue = 
 	  evacuate((StgClosure *)bh->blocking_queue);
-	prev = &p->mut_link;
-	break;
+	p->mut_link = new_list;
+	new_list = p;
+	continue;
       }
 
     default:
@@ -2014,7 +2047,8 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
       barf("scavenge_mut_list: strange object?");
     }
   }
-  return start;
+
+  gen->mut_list = new_list;
 }
 
 static void
