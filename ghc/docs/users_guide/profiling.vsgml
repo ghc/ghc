@@ -171,10 +171,10 @@ report. Valid @<sort>@ options are:
 <tag>@C@:</tag> alphabetically by group, module and cost centre.
 </descrip>
 
-<tag>@-i<secs>@:</tag>
-<nidx>-i&lt;secs&gt; RTS option (profiling)</nidx>
-Set the profiling (sampling) interval to @<secs>@ seconds (the
-default is 1~second).
+<tag>@-i<secs>@:</tag> <nidx>-i&lt;secs&gt; RTS option
+(profiling)</nidx> Set the profiling (sampling) interval to @<secs>@
+seconds (the default is 1~second).  Fractions are allowed: for example
+@-i0.2@ will get 5 samples per second.
 
 <tag>@-h<break-down>@:</tag>
 <nidx>-h&lt;break-down&gt; RTS option (profiling)</nidx>
