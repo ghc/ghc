@@ -3,5 +3,5 @@ tcfail055.hs:3:
     Couldn't match `Float' against `Int'
 	Expected type: Float
 	Inferred type: Int
-    In an expression with a type signature: x + 1 :: Int
-    In an expression with a type signature: (x + 1 :: Int) :: Float
+    When checking the type signature of the expression: x + 1 :: Int
+    In the definition of `f': (x + 1 :: Int) :: Float

@@ -2,7 +2,8 @@
 tcfail067.hs:60:
     Could not deduce (Show (SubRange a)) from the context (Num a)
     Probable fix:
-	Add (Show (SubRange a)) to the instance declaration context
+	Add (Show (SubRange a))
+	to the instance declaration superclass context
 	Or add an instance declaration for (Show (SubRange a))
     arising from the instance declaration at tcfail067.hs:60
     In the instance declaration for `Num (SubRange a)'
@@ -14,9 +15,21 @@ tcfail067.hs:61:
 			  Eq (SubRange a),
 			  Show (SubRange a))
     Probable fix:
-	Add (Ord a) to the instance declaration context
+	Add (Ord a) to the class or instance method `negate'
     arising from use of `numSubRangeNegate' at tcfail067.hs:61
     In the definition of `negate': numSubRangeNegate
+
+tcfail067.hs:65:
+    Could not deduce (Ord a)
+	from the context (Num (SubRange a),
+			  Num a,
+			  Eq (SubRange a),
+			  Show (SubRange a))
+    Probable fix:
+	Add (Ord a) to the class or instance method `fromInteger'
+    arising from use of `SubRange' at tcfail067.hs:65
+    In the definition of `fromInteger':
+	SubRange (fromInteger a, fromInteger a) (fromInteger a)
 
 tcfail067.hs:74:
     Could not deduce (Ord a) from the context (Num a)

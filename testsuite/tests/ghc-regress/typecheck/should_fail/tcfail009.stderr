@@ -3,5 +3,5 @@ tcfail009.hs:3:
     Couldn't match `Int' against `Integer'
 	Expected type: Int
 	Inferred type: Integer
-    In an expression with a type signature: 2 :: Integer
+    When checking the type signature of the expression: 2 :: Integer
     In an arithmetic sequence: [(1 :: Int) .. (2 :: Integer)]

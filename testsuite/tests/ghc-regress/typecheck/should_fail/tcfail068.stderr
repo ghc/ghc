@@ -1,22 +1,16 @@
 
 tcfail068.hs:12:
     Inferred type is less polymorphic than expected
-    Quantified type variable `s' escapes
-    It is reachable from the type variable(s) `a'
-      which is free in the signature
-    Signature type:     forall s. ST s a
-    Type to generalise: ST s1 (STArray s1 (Int, Int) a1)
+	Quantified type variable `s' escapes
     In the first argument of `runST', namely
 	`(newSTArray ((1, 1), n) x)'
     In the definition of `itgen': runST (newSTArray ((1, 1), n) x)
 
 tcfail068.hs:17:
     Inferred type is less polymorphic than expected
-    Quantified type variable `s' escapes
-    It unifies with `s1', which is mentioned in the environment:
-      arr :: IndTree s1 a (bound at tcfail068.hs:17)
-    Signature type:     forall s. ST s a1
-    Type to generalise: ST s1 (IndTree s1 a)
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  arr :: IndTree s a (bound at tcfail068.hs:17)
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
@@ -26,28 +20,24 @@ tcfail068.hs:17:
 
 tcfail068.hs:23:
     Inferred type is less polymorphic than expected
-    Quantified type variable `s' escapes
-    It unifies with `s1', which is mentioned in the environment:
-      itrap' :: Int -> Int -> ST s1 (IndTree s1 a)
-	(bound at tcfail068.hs:25)
-      itrapsnd :: Int -> Int -> ST s1 (IndTree s1 a)
-	(bound at tcfail068.hs:28)
-      arr :: IndTree s1 a (bound at tcfail068.hs:23)
-    Signature type:     forall s. ST s a1
-    Type to generalise: ST s1 (IndTree s1 a)
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  itrap' :: Int -> Int -> ST s (IndTree s a)
+	    (bound at tcfail068.hs:25)
+	  itrapsnd :: Int -> Int -> ST s (IndTree s a)
+	    (bound at tcfail068.hs:28)
+	  arr :: IndTree s a (bound at tcfail068.hs:23)
     In the first argument of `runST', namely `(itrap' i k)'
     In the definition of `itrap': runST (itrap' i k)
 
 tcfail068.hs:35:
     Inferred type is less polymorphic than expected
-    Quantified type variable `s' escapes
-    It unifies with `s1', which is mentioned in the environment:
-      itrapstate' :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
-	(bound at tcfail068.hs:37)
-      itrapstatesnd :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
-	(bound at tcfail068.hs:40)
-      arr :: IndTree s1 b (bound at tcfail068.hs:35)
-    Signature type:     forall s. ST s a
-    Type to generalise: ST s1 (c, IndTree s1 b)
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  itrapstate' :: Int -> Int -> c -> ST s (c, IndTree s b)
+	    (bound at tcfail068.hs:37)
+	  itrapstatesnd :: Int -> Int -> c -> ST s (c, IndTree s b)
+	    (bound at tcfail068.hs:40)
+	  arr :: IndTree s b (bound at tcfail068.hs:35)
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the definition of `itrapstate': runST (itrapstate' i k s)
