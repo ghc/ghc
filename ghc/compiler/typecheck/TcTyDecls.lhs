@@ -224,7 +224,7 @@ tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_theta details
 	  field_label =
 	    case mb_f of
 	      Nothing -> []
-	      Just f  -> [mkFieldLabel (getName f) arg_ty (head allFieldLabelTags)]
+	      Just f  -> [mkFieldLabel (getName f) tycon arg_ty (head allFieldLabelTags)]
         in	      
 	mk_data_con [notMarkedStrict] [arg_ty] field_label
 
@@ -236,7 +236,7 @@ tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_theta details
 	    arg_stricts       = [strict | (_, _, strict) <- field_label_infos]
 	    arg_tys	      = [ty     | (_, ty, _)     <- field_label_infos]
 
-	    field_labels      = [ mkFieldLabel (getName name) ty tag 
+	    field_labels      = [ mkFieldLabel (getName name) tycon ty tag 
 			      | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
 	in
 	mk_data_con arg_stricts arg_tys field_labels

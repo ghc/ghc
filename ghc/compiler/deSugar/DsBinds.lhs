@@ -97,8 +97,16 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
     mapDs (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 
-	-- Common case: one exported variable
-	-- All non-recursive bindings come through this way
+	-- Common special case: no type or dictionary abstraction
+dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
+  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
+    let 
+	exports' = [(global, Var local) | (_, global, local) <- exports]
+    in
+    returnDs (addLocalInlines exports inlines core_prs ++ exports' ++ rest)
+
+	-- Another common case: one exported variable
+	-- Non-recursive bindings come through this way
 dsMonoBinds auto_scc
      (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
@@ -112,14 +120,6 @@ dsMonoBinds auto_scc
 	                      mkDsLets core_binds (Var local))
     in
     returnDs (global' : rest)
-
-	-- Another common special case: no type or dictionary abstraction
-dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
-  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
-    let 
-	exports' = [(global, Var local) | (_, global, local) <- exports]
-    in
-    returnDs (addLocalInlines exports inlines core_prs ++ exports' ++ rest)
 
 dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
   = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->

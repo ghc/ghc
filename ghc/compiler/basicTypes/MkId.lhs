@@ -464,7 +464,7 @@ mkDictSelId name clas
   where
     ty	      = exprType rhs
     sel_id    = mkId name ty info
-    field_lbl = mkFieldLabel name ty tag
+    field_lbl = mkFieldLabel name tycon ty tag
     tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
 
     info      = mkIdInfo (RecordSelId field_lbl)

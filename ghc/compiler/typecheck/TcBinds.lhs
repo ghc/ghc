@@ -675,7 +675,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		  lie_avail1 `plusLIE` lie_avail2)
 
     tc_mb_pats (FunMonoBind name inf matches locn)
-      = newTyVarTy boxedTypeKind	`thenNF_Tc` \ bndr_ty ->
+      = new_lhs_ty 			`thenNF_Tc` \ bndr_ty ->
 	tc_pat_bndr name bndr_ty	`thenTc` \ bndr_id ->
 	let
 	   complete_it xve = tcAddSrcLoc locn				$
@@ -686,13 +686,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 
     tc_mb_pats bind@(PatMonoBind pat grhss locn)
       = tcAddSrcLoc locn	 	$
-
-		-- Figure out the appropriate kind for the pattern,
-		-- and generate a suitable type variable 
-	(case is_rec of
-	     Recursive    -> newTyVarTy boxedTypeKind	-- Recursive, so no unboxed types
-	     NonRecursive -> newTyVarTy_OpenKind 	-- Non-recursive, so we permit unboxed types
-	)					`thenNF_Tc` \ pat_ty ->
+	new_lhs_ty			`thenNF_Tc` \ pat_ty -> 
 
 		-- 	Now typecheck the pattern
 		-- We don't support binding fresh type variables in the
@@ -713,6 +707,12 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 			     returnTc (PatMonoBind pat' grhss' locn, lie)
 	in
 	returnTc (complete_it, lie_req, tvs, ids, lie_avail)
+
+	-- Figure out the appropriate kind for the pattern,
+	-- and generate a suitable type variable 
+    new_lhs_ty = case is_rec of
+		     Recursive    -> newTyVarTy boxedTypeKind	-- Recursive, so no unboxed types
+		     NonRecursive -> newTyVarTy_OpenKind 	-- Non-recursive, so we permit unboxed types
 \end{code}
 
 %************************************************************************

@@ -45,10 +45,8 @@ import TcType		( TcType, TcTauType,
 			  newTyVarTy, newTyVarTy_OpenKind, zonkTcType )
 
 import Class		( Class )
-import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType
-			)
-import Id		( idType, recordSelectorFieldLabel,
-			  isRecordSelector,
+import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector,
 			  Id, mkVanillaId
 			)
 import DataCon		( dataConFieldLabels, dataConSig, 
@@ -65,7 +63,8 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  boxedTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
-import Subst		( mkTopTyVarSubst, substClasses )
+import TyCon		( tyConTyVars )
+import Subst		( mkTopTyVarSubst, substClasses, substTy )
 import UsageSPUtils     ( unannotTy )
 import VarSet		( emptyVarSet, unionVarSet, elemVarSet, mkVarSet )
 import TyCon		( tyConDataCons )
@@ -984,25 +983,20 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 
 Game plan for record bindings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For each binding 
-	field = value
-1. look up "field", to find its selector Id, which must have type
-	forall a1..an. T a1 .. an -> tau
-   where tau is the type of the field.  
+1. Find the TyCon for the bindings, from the first field label.
 
-2. Instantiate this type
+2. Instantiate its tyvars and unify (T a1 .. an) with expected_ty.
 
-3. Unify the (T a1 .. an) part with the "expected result type", which
-   is passed in.  This checks that all the field labels come from the
-   same type.
+For each binding field = value
 
-4. Type check the value using tcArg, passing tau as the expected
-   argument type.
+3. Instantiate the field type (from the field label) using the type
+   envt from step 2.
+
+4  Type check the value using tcArg, passing the field type as 
+   the expected argument type.
 
 This extends OK when the field types are universally quantified.
 
-Actually, to save excessive creation of fresh type variables,
-we 
 	
 \begin{code}
 tcRecordBinds
@@ -1011,27 +1005,34 @@ tcRecordBinds
 	-> TcM s (TcRecordBinds, LIE)
 
 tcRecordBinds expected_record_ty rbinds
-  = mapAndUnzipTc do_bind rbinds	`thenTc` \ (rbinds', lies) ->
+  = tcLookupValue first_field_lbl_name		`thenNF_Tc` \ first_sel_id ->
+    let
+	tycon = fieldLabelTyCon (recordSelectorFieldLabel first_sel_id)
+    in
+    tcInstTyVars (tyConTyVars tycon)		`thenTc` \ (_, arg_tys, tenv) ->
+    unifyTauTy expected_record_ty
+	       (mkTyConApp tycon arg_tys)	`thenTc_`
+    mapAndUnzipTc (do_bind tycon tenv) rbinds	`thenTc` \ (rbinds', lies) ->
     returnTc (rbinds', plusLIEs lies)
   where
-    do_bind (field_label, rhs, pun_flag)
-      = tcLookupValue field_label	`thenNF_Tc` \ sel_id ->
+    (first_field_lbl_name, _, _) = head rbinds
+
+    do_bind tycon tenv (field_lbl_name, rhs, pun_flag)
+      = tcLookupValue field_lbl_name	`thenNF_Tc` \ sel_id ->
+	let
+	    field_lbl = recordSelectorFieldLabel sel_id
+	    field_ty  = substTy tenv (fieldLabelType field_lbl)
+	in
 	ASSERT( isRecordSelector sel_id )
 		-- This lookup and assertion will surely succeed, because
 		-- we check that the fields are indeed record selectors
 		-- before calling tcRecordBinds
+	ASSERT2( fieldLabelTyCon field_lbl == tycon, ppr field_lbl )
+		-- The caller of tcRecordBinds has already checked
+		-- that all the fields come from the same type
 
-	tcInstId sel_id			`thenNF_Tc` \ (_, _, tau) ->
+	tcPolyExpr rhs field_ty 	`thenTc` \ (rhs', lie, _, _, _) ->
 
-		-- Record selectors all have type
-		-- 	forall a1..an.  T a1 .. an -> tau
-	ASSERT( maybeToBool (splitFunTy_maybe tau) )
-	let
-		-- Selector must have type RecordType -> FieldType
-	  Just (record_ty, field_ty) = splitFunTy_maybe tau
-	in
-	unifyTauTy expected_record_ty record_ty		`thenTc_`
-	tcPolyExpr rhs field_ty				`thenTc` \ (rhs', lie, _, _, _) ->
 	returnTc ((sel_id, rhs', pun_flag), lie)
 
 badFields rbinds data_con

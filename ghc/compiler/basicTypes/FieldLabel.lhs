@@ -4,11 +4,20 @@
 \section[FieldLabel]{The @FieldLabel@ type}
 
 \begin{code}
-module FieldLabel where
+module FieldLabel(
+	FieldLabel,	-- Abstract
+
+	mkFieldLabel, 
+	fieldLabelName,	fieldLabelTyCon, fieldLabelType, fieldLabelTag,
+
+	FieldLabelTag,
+	firstFieldLabelTag, allFieldLabelTags
+  ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type )	-- FieldLabel is compiled very early
+import {-# SOURCE #-}	TyCon( TyCon )	-- FieldLabel is compiled very early
 
 import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
 import Outputable
@@ -18,6 +27,9 @@ import Unique           ( Uniquable(..) )
 \begin{code}
 data FieldLabel
   = FieldLabel	Name	        -- Also used as the Name of the field selector Id
+
+		TyCon		-- Parent type constructor
+
 		Type		-- Type of the field; may have free type variables that
 				-- are the tyvars of its parent *data* constructor, and
 				-- those will be the same as the tyvars of its parent *type* constructor
@@ -41,19 +53,20 @@ firstFieldLabelTag = 1
 allFieldLabelTags :: [FieldLabelTag]
 allFieldLabelTags = [firstFieldLabelTag..]
 
-fieldLabelName (FieldLabel n _  _)   = n
-fieldLabelType (FieldLabel _ ty _)   = ty
-fieldLabelTag  (FieldLabel _ _  tag) = tag
+fieldLabelName  (FieldLabel n _ _  _)   = n
+fieldLabelTyCon (FieldLabel _ tc _ _)   = tc
+fieldLabelType  (FieldLabel _ _ ty _)   = ty
+fieldLabelTag   (FieldLabel _ _ _  tag) = tag
 
 instance Eq FieldLabel where
-    (FieldLabel n1 _ _) == (FieldLabel n2 _ _) = n1 == n2
+    fl1 == fl2 = fieldLabelName fl1 == fieldLabelName fl2
 
 instance Outputable FieldLabel where
-    ppr (FieldLabel n _ _) = ppr n
+    ppr fl = ppr (fieldLabelName fl)
 
 instance NamedThing FieldLabel where
-    getName (FieldLabel n _ _) = n
+    getName = fieldLabelName
 
 instance Uniquable FieldLabel where
-    getUnique (FieldLabel n _ _) = nameUnique n
+    getUnique fl = nameUnique (fieldLabelName fl)
 \end{code}
