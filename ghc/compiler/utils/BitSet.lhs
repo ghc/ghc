@@ -26,6 +26,9 @@ module BitSet (
     ) where
 
 #ifdef __GLASGOW_HASKELL__
+#if __GLASGOW_HASKELL__ >= 202
+import GlaExts
+#endif
 -- nothing to import
 #elif defined(__YALE_HASKELL__)
 {-hide import from mkdependHS-}
