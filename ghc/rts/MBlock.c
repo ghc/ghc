@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.44 2003/03/26 02:12:38 sof Exp $
+ * $Id: MBlock.c,v 1.45 2003/05/14 09:11:06 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -87,7 +87,7 @@ getMBlock(void)
 // the mmap() interface.
 
 static void *
-my_mmap (void *addr, int size)
+my_mmap (void *addr, lnat size)
 {
     void *ret;
 
@@ -126,11 +126,14 @@ my_mmap (void *addr, int size)
 #endif
 
     if (ret == (void *)-1) {
-	if (errno == ENOMEM) {
+	if (errno == ENOMEM || 
+	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
+	    // If we request more than 3Gig, then we get EINVAL
+	    // instead of ENOMEM (at least on Linux).
 	    prog_belch("out of memory (requested %d bytes)", size);
 	    stg_exit(EXIT_FAILURE);
 	} else {
-	    barf("getMBlock: mmap failed");
+	    barf("getMBlock: mmap: %s", sys_errlist[errno]);
 	}
     }
 
@@ -141,7 +144,7 @@ my_mmap (void *addr, int size)
 // mblocks.
 
 static void *
-gen_map_mblocks (int size)
+gen_map_mblocks (lnat size)
 {
     int slop;
     void *ret;
