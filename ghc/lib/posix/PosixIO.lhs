@@ -36,7 +36,7 @@ import PrelHandle (newHandle, getBMode__, getHandleFd,
 import IO
 import Addr
 import Foreign
-import Weak 	( addForeignFinaliser )
+import Weak 	( addForeignFinalizer )
 import CString ( freeze, allocChars, packStringIO, unpackNBytesBAIO )
 
 import PosixUtil
@@ -113,9 +113,9 @@ fdToHandle fd@(FD# fd#) = do
 #ifndef __PARALLEL_HASKELL__
 	 fo <- makeForeignObj fo
 	 if fd == stdInput || fd == stdOutput || fd == stdError then
-	      addForeignFinaliser fo (freeStdFileObject fo)
+	      addForeignFinalizer fo (freeStdFileObject fo)
 	  else
-	      addForeignFinaliser fo (freeFileObject fo)
+	      addForeignFinalizer fo (freeFileObject fo)
 #endif
 	 (bm, bf_size)  <- getBMode__ fo
          mkBuffer__ fo bf_size
