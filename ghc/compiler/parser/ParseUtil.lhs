@@ -391,8 +391,15 @@ groupBindings binds = group Nothing binds
   where group :: Maybe RdrNameMonoBinds -> [RdrBinding] -> RdrBinding
 	group (Just bind) [] = RdrValBinding bind
 	group Nothing [] = RdrNullBind
+
+		-- don't group together FunMonoBinds if they have
+		-- no arguments.  This is necessary now that variable bindings
+		-- with no arguments are now treated as FunMonoBinds rather
+		-- than pattern bindings (tests/rename/should_fail/rnfail002).
 	group (Just (FunMonoBind f inf1 mtchs ignore_srcloc))
-		    (RdrValBinding (FunMonoBind f' _ [mtch] loc) : binds)
+		    (RdrValBinding (FunMonoBind f' _ 
+					[mtch@(Match _ (_:_) _ _)] loc)
+			: binds)
 	    | f == f' = group (Just (FunMonoBind f inf1 (mtch:mtchs) loc)) binds
 
 	group (Just so_far) binds
