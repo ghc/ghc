@@ -52,6 +52,7 @@ module CLabel (
 
 	mkTopTickyCtrLabel,
 	mkBlackHoleInfoTableLabel,
+	mkBlackHoleBQInfoTableLabel,
         mkCAFBlackHoleInfoTableLabel,
         mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
@@ -270,6 +271,7 @@ mkEMPTY_MVAR_infoLabel		= RtsLabel (Rts_Info "stg_EMPTY_MVAR_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
 mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_info"))
+mkBlackHoleBQInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_BQ_info"))
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
                                     RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_SE_CAF_BLACKHOLE_info"))

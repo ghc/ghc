@@ -61,7 +61,6 @@ genCodeAbstractC absC
  a2stix'     = amodeToStix'
  volsaves    = volatileSaves
  volrestores = volatileRestores
- macro_code  = macroCode
  -- real code follows... ---------
 \end{code}
 
@@ -425,7 +424,7 @@ Finally, all of the disgusting AbstractC macros.
 
 \begin{code}
 
- gencode (CMacroStmt macro args) = macro_code macro args
+ gencode (CMacroStmt macro args) = macroCode macro (map amodeToStix args)
 
  gencode (CCallProfCtrMacro macro _)
   = returnUs (\xs -> StComment macro : xs)

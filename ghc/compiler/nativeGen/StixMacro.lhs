@@ -12,6 +12,7 @@ import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg, CCheckMacro(..) )
+import SMRep		( fixedHdrSize )
 import Constants	( uF_RET, uF_UPDATEE, uF_SIZE )
 import ForeignCall	( CCallConv(..) )
 import MachOp		( MachOp(..) )
@@ -20,9 +21,10 @@ import Stix
 import Panic		( panic )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
+			  mkBlackHoleBQInfoTableLabel,
 			  mkIndInfoLabel, mkUpdInfoLabel, mkRtsGCEntryLabel )
 \end{code}
-
+--------------------------------------------------------------------------------
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on
 the A stack, and perform a tail call to @UpdatePAP@ if the arguments are
 not there.  The @_LOAD_NODE@ version also loads R1 with an appropriate
@@ -31,7 +33,7 @@ closure address.
 \begin{code}
 macroCode
     :: CStmtMacro   	    -- statement macro
-    -> [CAddrMode]  	    -- args
+    -> [StixExpr]  	    -- args
     -> UniqSM StixStmtList
 \end{code}
 
@@ -42,9 +44,8 @@ Updating a CAF
 adding an indirection.
 
 \begin{code}
-macroCode UPD_CAF args
+macroCode UPD_CAF [cafptr,bhptr]
   = let
-	[cafptr,bhptr] = map amodeToStix args
 	new_caf = StVoidable (StCall (Left FSLIT("newCAF")) CCallConv VoidRep [cafptr])
 	a1 = StAssignMem PtrRep (StIndex PtrRep cafptr fixedHS) bhptr
 	a2 = StAssignMem PtrRep cafptr ind_static_info
@@ -74,7 +75,7 @@ macroCode UPD_BH_UPDATABLE args = returnUs id
 macroCode UPD_BH_SINGLE_ENTRY args = returnUs id
 {-
   = let
-    	update = StAssign PtrRep (StInd PtrRep (amodeToStix arg)) bh_info
+    	update = StAssign PtrRep (StInd PtrRep arg) bh_info
     in
     returnUs (\xs -> update : xs)
 -}
@@ -86,9 +87,8 @@ Update frames
 Push an update frame on the stack.
 
 \begin{code}
-macroCode PUSH_UPD_FRAME args
+macroCode PUSH_UPD_FRAME [bhptr, _{-0-}]
   = let
-	[bhptr, _{-0-}] = map amodeToStix args
     	frame n = StIndex PtrRep (StReg stgSp) (StInt (toInteger (n-uF_SIZE)))
 
         -- HWL: these values are *wrong* in a GranSim setup; ToDo: fix
@@ -109,8 +109,25 @@ macroCode SET_TAG [tag]
        Right baseRegAddr 
           -> returnUs id
        Left  realreg 
-          -> let a1 = StAssignReg IntRep (StixMagicId tagreg) (amodeToStix tag)
+          -> let a1 = StAssignReg IntRep (StixMagicId tagreg) tag
              in returnUs ( \xs -> a1 : xs )
+\end{code}
+
+-----------------------------------------------------------------------------
+
+\begin{code}
+macroCode AWAKEN_BQ_CLOSURE [arg]
+  =  getUniqLabelNCG		`thenUs` \ label ->
+     let
+	info = StInd AddrRep arg
+	cond = StMachOp MO_Nat_Ne [info, bq_info ]
+	jump = StCondJump label cond
+	blocking_queue = StInd PtrRep 
+			  (StIndex PtrRep arg (StInt (toInteger fixedHdrSize)))
+        call = StVoidable (StCall (Left FSLIT("awakenBlockedQueue")) 
+		 		CCallConv VoidRep [blocking_queue])
+     in
+     returnUs ( \xs -> jump : call : StLabel label : xs )
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -118,7 +135,7 @@ macroCode SET_TAG [tag]
 \begin{code}
 macroCode REGISTER_IMPORT [arg]
    = returnUs (
-	\xs -> StAssignMem WordRep (StReg stgSp) (amodeToStix arg)
+	\xs -> StAssignMem WordRep (StReg stgSp) arg
 	     : StAssignReg PtrRep  stgSp (StMachOp MO_Nat_Add [StReg stgSp, StInt 4])
 	     : xs
      )
@@ -127,7 +144,7 @@ macroCode REGISTER_FOREIGN_EXPORT [arg]
    = returnUs (
 	\xs -> StVoidable (
                   StCall (Left FSLIT("getStablePtr")) CCallConv VoidRep 
-                         [amodeToStix arg]
+                         [arg]
                )
 	     : xs
      )
@@ -148,6 +165,7 @@ Let's make sure that these CAFs are lifted out, shall we?
 bh_info, ind_static_info, ind_info :: StixExpr
 
 bh_info   	= StCLbl mkBlackHoleInfoTableLabel
+bq_info   	= StCLbl mkBlackHoleBQInfoTableLabel
 ind_static_info	= StCLbl mkIndStaticInfoLabel
 ind_info  	= StCLbl mkIndInfoLabel
 upd_frame_info	= StCLbl mkUpdInfoLabel
@@ -164,7 +182,7 @@ checkCode macro args assts
   = getUniqLabelNCG		`thenUs` \ ulbl_fail ->
     getUniqLabelNCG		`thenUs` \ ulbl_pass ->
 
-    let args_stix        = map amodeToStix args
+    let	args_stix        = map amodeToStix args
 	newHp wds        = StIndex PtrRep (StReg stgHp) wds
 	assign_hp wds    = StAssignReg PtrRep stgHp (newHp wds)
 	hp_alloc wds     = StAssignReg IntRep stgHpAlloc wds
