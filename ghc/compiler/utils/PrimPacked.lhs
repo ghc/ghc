@@ -238,22 +238,22 @@ eqCharStrPrefixBA a# b2# start# len# =
 \begin{code}
 #if __GLASGOW_HASKELL__ <= 408
 strLength (Ptr a#) = ghc_strlen a#
-foreign import ccall "ghc_strlen" unsafe
+foreign import ccall unsafe "ghc_strlen" 
   ghc_strlen :: Addr# -> Int
 #else
-foreign import ccall "ghc_strlen" unsafe
+foreign import ccall unsafe "ghc_strlen" 
   strLength :: Ptr () -> Int
 #endif
 
-foreign import ccall "ghc_memcmp" unsafe 
+foreign import ccall unsafe "ghc_memcmp"
   memcmp :: Addr# -> Addr# -> Int -> IO Int
 
-foreign import ccall "ghc_memcmp" unsafe 
+foreign import ccall unsafe "ghc_memcmp" 
   memcmp_ba :: Addr# -> ByteArray# -> Int -> IO Int
 
-foreign import ccall "ghc_memcmp_off" unsafe
+foreign import ccall unsafe "ghc_memcmp_off"
   memcmp_baoff :: ByteArray# -> Int -> Addr# -> Int -> IO Int
 
-foreign import ccall "ghc_memcmp_off" unsafe
+foreign import ccall unsafe "ghc_memcmp_off"
   memcmp_baoff_ba :: ByteArray# -> Int -> ByteArray# -> Int -> IO Int
 \end{code}
