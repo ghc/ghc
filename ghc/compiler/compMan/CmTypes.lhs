@@ -6,7 +6,7 @@
 \begin{code}
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
-   Linkable(..),
+   Linkable(..), isObjectLinkable, 
    ModSummary(..), ms_allimps, name_of_summary, pprSummaryTime
   ) where
 
@@ -50,6 +50,9 @@ data Linkable = LM {
   linkableUnlinked ::  [Unlinked]
  }
 
+isObjectLinkable :: Linkable -> Bool
+isObjectLinkable l = all isObject (linkableUnlinked l)
+
 instance Outputable Linkable where
    ppr (LM when_made mod_nm unlinkeds)
       = text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm 
@@ -70,6 +73,8 @@ data ModSummary
         ms_hs_date  :: Maybe ClockTime       -- timestamp of summarised
                                              -- file, if home && source
      }
+
+-- ToDo: shouldn't ms_srcimps and ms_imps be [Module]?  --SDM
 
 instance Outputable ModSummary where
    ppr ms

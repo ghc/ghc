@@ -201,17 +201,7 @@ cmLoadModule cmstate1 rootname
         let mg2_with_srcimps = topological_sort True mg2unsorted
 
 	-- Sort out which linkables we wish to keep in the unlinked image.
-	-- For each module, we take:
-	--
-	--	- the old in-core linkable, if available
-	--	- an on-disk linkable, if available
-	--
-	-- and we take the youngest of these, provided it is younger than the
-	-- source file.
-	--
-	-- If a module has a valid linkable, then it may be STABLE (see below),
-	-- and it is classified as SOURCE UNCHANGED for the purposes of calling
-	-- compile.
+	-- See getValidLinkables below for details.
 	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
 				mg2_with_srcimps
 
@@ -346,6 +336,21 @@ cmLoadModule cmstate1 rootname
 
 -----------------------------------------------------------------------------
 -- getValidLinkables
+
+-- For each module (or SCC of modules), we take:
+--
+--	- the old in-core linkable, if available
+--	- an on-disk linkable, if available
+--
+-- and we take the youngest of these, provided it is younger than the
+-- source file.  We ignore the on-disk linkables unless all of the
+-- dependents of this SCC also have on-disk linkables.
+--
+-- If a module has a valid linkable, then it may be STABLE (see below),
+-- and it is classified as SOURCE UNCHANGED for the purposes of calling
+-- compile.
+--
+-- ToDo: this pass could be merged with the preUpsweep.
 
 getValidLinkables
 	:: [Linkable]		-- old linkables
