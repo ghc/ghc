@@ -803,6 +803,9 @@ lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _)) rhs) : rest)
 		     Nothing    -> Nothing
 		     Just stmts -> Just (stmt:stmts)
 
+lookForInline u expr (CmmNop : rest)
+  = lookForInline u expr rest
+
 lookForInline u expr (stmt:stmts)
   = case lookupUFM (getStmtUses stmt) u of
 	Just 1 -> Just (inlineStmt u expr stmt : stmts)
