@@ -161,12 +161,10 @@ deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
     dflags   = hsc_dflags hsc_env
     hpt      = hsc_HPT hsc_env
     pte      = eps_PTE (pcs_EPS pcs)
-    lookup n = pprTrace "lookup" (ppr type_env) (
-	       lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
+    lookup n = lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
 							-- current module first
 	       lookupType hpt pte n 	`orElse`	-- Then other modules
 	       pprPanic "Desugar: lookup:" (ppr n)
-		)
 
     mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
     mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc
