@@ -741,7 +741,7 @@ sub setupOptimiseFlags {
 	# Specialisation is best done before full laziness
 	# so that overloaded functions have all their dictionary lambdas manifest
 	($Oopt_DoSpecialise) ? ( $Oopt_DoSpecialise, ) : (),
-#	'-ffloat-outwards',
+	'-ffloat-outwards',
 	'-ffloat-inwards',
 
 	'-fsimplify',
