@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: List.hs,v 1.2 2001/12/21 15:07:21 simonmar Exp $
+-- $Id: List.hs,v 1.3 2002/04/02 10:19:21 simonmar Exp $
 --
 -- Operations on lists.
 --
@@ -90,6 +90,7 @@ module Data.List
    , length	       -- :: [a] -> Int
    , (!!)	       -- :: [a] -> Int -> a
    , foldl	       -- :: (a -> b -> a) -> a -> [b] -> a
+   , foldl'	       -- :: (a -> b -> a) -> a -> [b] -> a
    , foldl1	       -- :: (a -> a -> a) -> [a] -> a
    , scanl             -- :: (a -> b -> a) -> a -> [b] -> [a]
    , scanl1            -- :: (a -> a -> a) -> [a] -> [a]
@@ -520,6 +521,14 @@ unfoldr f b  =
   case f b of
    Just (a,new_b) -> a : unfoldr f new_b
    Nothing        -> []
+
+
+-- -----------------------------------------------------------------------------
+-- strict version of foldl
+
+foldl'           :: (a -> b -> a) -> a -> [b] -> a
+foldl' f a []     = a
+foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
 
 -- -----------------------------------------------------------------------------
 -- List sum and product
