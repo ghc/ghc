@@ -4,14 +4,12 @@ module ShouldCompile where
 
 -- simple functions
 
-a :: IO Int
-a = _ccall_ a
+foreign import ccall unsafe "a" a :: IO Int
 
-b :: Int -> IO Int
-b x = _ccall_ b x
+foreign import ccall unsafe "b" b :: Int -> IO Int
 
-c :: Int -> Char -> Float -> Double -> IO Float
-c x1 x2 x3 x4 = _ccall_ c x1 x2 x3 x4
+foreign import ccall unsafe "c" 
+  c :: Int -> Char -> Float -> Double -> IO Float
 
 -- simple monadic code
 

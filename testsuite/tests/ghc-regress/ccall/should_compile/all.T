@@ -7,8 +7,6 @@ def f( opts ):
 setTestOpts(f)
 
 test('cc001', normal, compile, [''])
-test('cc002', normal, compile, [''])
-test('cc003', normal, compile, [''])
 # Non-static C call
 test('cc004', expect_fail_for(['extcore','optextcore']), compile, [''])
 # foreign label
