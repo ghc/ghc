@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.8 2001/07/23 10:47:16 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.9 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -62,6 +62,8 @@ allocGroup(nat n)
 {
   void *mblock;
   bdescr *bd, **last;
+
+  ASSERT(n != 0);
 
   if (n > BLOCKS_PER_MBLOCK) {
     return allocMegaGroup(BLOCKS_TO_MBLOCKS(n));

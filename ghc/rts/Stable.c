@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.14 2001/07/13 13:41:42 rrt Exp $
+ * $Id: Stable.c,v 1.15 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,7 +10,6 @@
 #include "Rts.h"
 #include "Hash.h"
 #include "StablePriv.h"
-#include "GC.h"
 #include "RtsUtils.h"
 #include "Storage.h"
 #include "RtsAPI.h"
@@ -133,6 +132,7 @@ initFreeList(snEntry *table, nat n, snEntry *free)
 
   for (p = table + n - 1; p >= table; p--) {
     p->addr   = (P_)free;
+    p->old    = NULL;
     p->weight = 0;
     p->sn_obj = NULL;
     free = p;
@@ -182,8 +182,7 @@ lookupStableName(StgPtr p)
   }
 
   /* removing indirections increases the likelihood
-   * of finding a match in the stable name
-   * hash table.
+   * of finding a match in the stable name hash table.
    */
   p = (StgPtr)removeIndirections((StgClosure*)p);
 
@@ -251,7 +250,7 @@ enlargeStablePtrTable(void)
   nat old_SPT_size = SPT_size;
   
   if (SPT_size == 0) {
-    /* 1st time */
+    // 1st time
     SPT_size = INIT_SPT_SIZE;
     stable_ptr_table = stgMallocWords(SPT_size * sizeof(snEntry), 
 				      "initStablePtrTable");
@@ -264,7 +263,7 @@ enlargeStablePtrTable(void)
     addrToStableHash = allocHashTable();
   }
   else {
-    /* 2nd and subsequent times */
+    // 2nd and subsequent times
     SPT_size *= 2;
     stable_ptr_table = 
       stgReallocWords(stable_ptr_table, SPT_size * sizeof(snEntry),
@@ -282,49 +281,63 @@ enlargeStablePtrTable(void)
  * -------------------------------------------------------------------------- */
 
 void
-markStablePtrTable(rtsBool full)
+markStablePtrTable(evac_fn evac)
 {
-  snEntry *p, *end_stable_ptr_table;
-  StgPtr q;
-  StgClosure *new;
+    snEntry *p, *end_stable_ptr_table;
+    StgPtr q;
+    
+    end_stable_ptr_table = &stable_ptr_table[SPT_size];
+    
+    // Mark all the stable *pointers* (not stable names).
+    // _starting_ at index 1; index 0 is unused.
+    for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
+	q = p->addr;
 
-  if (SPT_size == 0)
-    return;
+	// internal pointers or NULL are free slots 
+	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
 
-  if (full) {
-    freeHashTable(addrToStableHash,NULL);
-    addrToStableHash = allocHashTable();
-  }
+	    // save the current addr away: we need to be able to tell
+	    // whether the objects moved in order to be able to update
+	    // the hash table later.
+	    p->old = p->addr;
 
-  end_stable_ptr_table = &stable_ptr_table[SPT_size];
-
-  /* Mark all the stable *pointers* (not stable names).
-   * _starting_ at index 1; index 0 is unused.
-   */
-  for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
-    q = p->addr;
-    /* internal pointers or NULL are free slots 
-     */
-    if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
-      if (p->weight != 0) {
-	new = MarkRoot((StgClosure *)q);
-	/* Update the hash table */
-	if (full) {
-	  insertHashTable(addrToStableHash, (W_)new, 
-			  (void *)(p - stable_ptr_table));
-	  (StgClosure *)p->addr = new;
-	} else if ((P_)new != q) {
-	  removeHashTable(addrToStableHash, (W_)q, NULL);
-	  if (!lookupHashTable(addrToStableHash, (W_)new)) {
-	    insertHashTable(addrToStableHash, (W_)new, 
-			    (void *)(p - stable_ptr_table));
-	  }
-	  (StgClosure *)p->addr = new;
+	    // if the weight is non-zero, treat addr as a root
+	    if (p->weight != 0) {
+		evac((StgClosure **)&p->addr);
+	    }
 	}
-	IF_DEBUG(stable, fprintf(stderr,"Stable ptr %d still alive at %p, weight %u\n", p - stable_ptr_table, new, p->weight));
-      }
     }
-  }
+}
+
+/* -----------------------------------------------------------------------------
+ * Thread the stable pointer table for compacting GC.
+ * 
+ * Here we must call the supplied evac function for each pointer into
+ * the heap from the stable pointer table, because the compacting
+ * collector may move the object it points to.
+ * -------------------------------------------------------------------------- */
+
+void
+threadStablePtrTable( evac_fn evac )
+{
+    snEntry *p, *end_stable_ptr_table;
+    StgPtr q;
+    
+    end_stable_ptr_table = &stable_ptr_table[SPT_size];
+    
+    for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
+	q = p->addr;
+	
+	// internal pointers or NULL are free slots
+	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
+	    if (p->weight != 0) {
+		evac((StgClosure **)&p->addr);
+	    }
+	    if (p->sn_obj != NULL) {
+		evac((StgClosure **)&p->sn_obj);
+	    }
+	}
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -339,6 +352,47 @@ markStablePtrTable(rtsBool full)
  * name table entry.  We can re-use stable name table entries for live
  * heap objects, as long as the program has no StableName objects that
  * refer to the entry.
+ * -------------------------------------------------------------------------- */
+
+void
+gcStablePtrTable( void )
+{
+    snEntry *p, *end_stable_ptr_table;
+    StgPtr q;
+    
+    end_stable_ptr_table = &stable_ptr_table[SPT_size];
+    
+    // NOTE: _starting_ at index 1; index 0 is unused.
+    for (p = stable_ptr_table + 1; p < end_stable_ptr_table; p++) {
+	
+	// Update the pointer to the StableName object, if there is one
+	if (p->sn_obj != NULL) {
+	    p->sn_obj = isAlive(p->sn_obj);
+	}
+	
+	q = p->addr;
+	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
+
+	    // StableNames only:
+	    if (p->weight == 0) {
+		if (p->sn_obj == NULL) {
+		    // StableName object is dead
+		    freeStableName(p);
+		    IF_DEBUG(stable, fprintf(stderr,"GC'd Stable name %d\n", 
+					     p - stable_ptr_table));
+		    continue;
+		    
+		} else {
+		    (StgClosure *)p->addr = isAlive((StgClosure *)p->addr);
+		    IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, weight %d\n", p - stable_ptr_table, p->addr, p->weight));
+		}
+	    }
+	}
+    }
+}
+
+/* -----------------------------------------------------------------------------
+ * Update the StablePtr/StableName hash table
  *
  * The boolean argument 'full' indicates that a major collection is
  * being done, so we might as well throw away the hash table and build
@@ -347,65 +401,39 @@ markStablePtrTable(rtsBool full)
  * -------------------------------------------------------------------------- */
 
 void
-gcStablePtrTable(rtsBool full)
+updateStablePtrTable(rtsBool full)
 {
-  snEntry *p, *end_stable_ptr_table;
-  StgPtr q, new;
-
-  if (SPT_size == 0) {
-    return;
-  }
-
-  end_stable_ptr_table = &stable_ptr_table[SPT_size];
-
-  /* NOTE: _starting_ at index 1; index 0 is unused. */
-  for (p = stable_ptr_table + 1; p < end_stable_ptr_table; p++) {
-
-    /* Update the pointer to the StableName object, if there is one */
-    if (p->sn_obj != NULL) {
-      p->sn_obj = isAlive(p->sn_obj);
+    snEntry *p, *end_stable_ptr_table;
+    
+    if (full && addrToStableHash != NULL) {
+	freeHashTable(addrToStableHash,NULL);
+	addrToStableHash = allocHashTable();
     }
-
-    q = p->addr;
-    if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
-
-      /* We're only interested in Stable Names here.  The weight != 0
-       * case is handled in markStablePtrTable above.
-       */
-      if (p->weight == 0) {
+    
+    end_stable_ptr_table = &stable_ptr_table[SPT_size];
+    
+    // NOTE: _starting_ at index 1; index 0 is unused.
+    for (p = stable_ptr_table + 1; p < end_stable_ptr_table; p++) {
 	
-	if (p->sn_obj == NULL) {
-	  /* StableName object is dead */
-	  freeStableName(p);
-	  IF_DEBUG(stable, fprintf(stderr,"GC'd Stable name %d\n", p - stable_ptr_table));
-	} 
-	else {
-	  (StgClosure *)new = isAlive((StgClosure *)q);
-	  IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, weight %d\n", p - stable_ptr_table, new, p->weight));
-
-	  if (new == NULL) {
-	    /* The target has been garbage collected.  Remove its
-	     * entry from the hash table.
-	     */
-	    removeHashTable(addrToStableHash, (W_)q, NULL);
-
-	  } else {
-	    /* Target still alive, Re-hash this stable name 
-	     */
-	    if (full) {
-	      insertHashTable(addrToStableHash, (W_)new, (void *)(p - stable_ptr_table));
-	    } else if (new != q) {
-	      removeHashTable(addrToStableHash, (W_)q, NULL);
-	      insertHashTable(addrToStableHash, (W_)new, (void *)(p - stable_ptr_table));
+	if (p->addr == NULL) {
+	    if (p->old != NULL) {
+		// The target has been garbage collected.  Remove its
+		// entry from the hash table.
+		removeHashTable(addrToStableHash, (W_)p->old, NULL);
+		p->old = NULL;
 	    }
-	  }
-
-	  /* finally update the address of the target to point to its
-	   * new location.
-	   */
-	  p->addr = new;
 	}
-      }
+	else if (p->addr < (P_)stable_ptr_table 
+		 || p->addr >= (P_)end_stable_ptr_table) {
+	    // Target still alive, Re-hash this stable name 
+	    if (full) {
+		insertHashTable(addrToStableHash, (W_)p->addr, 
+				(void *)(p - stable_ptr_table));
+	    } else if (p->addr != p->old) {
+		removeHashTable(addrToStableHash, (W_)p->old, NULL);
+		insertHashTable(addrToStableHash, (W_)p->addr, 
+				(void *)(p - stable_ptr_table));
+	    }
+	}
     }
-  }
 }

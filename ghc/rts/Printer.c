@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.40 2001/04/03 10:09:23 rrt Exp $
+ * $Id: Printer.c,v 1.41 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -941,7 +941,7 @@ findPtr(P_ p, int follow)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (s = 0; s < generations[g].n_steps; s++) {
 	  if (RtsFlags.GcFlags.generations == 1) {
-	      bd = generations[g].steps[s].to_space;
+	      bd = generations[g].steps[s].to_blocks;
 	  } else {
 	      bd = generations[g].steps[s].blocks;
 	  }

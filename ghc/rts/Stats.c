@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.30 2001/07/08 17:04:04 sof Exp $
+ * $Id: Stats.c,v 1.31 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -617,14 +617,14 @@ stat_exit(int alloc)
    Produce some detailed info on the state of the generational GC.
    -------------------------------------------------------------------------- */
 void
-stat_describe_gens(void)
+statDescribeGens(void)
 {
   nat g, s, mut, mut_once, lge, live;
   StgMutClosure *m;
   bdescr *bd;
   step *step;
 
-  fprintf(stderr, "     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                         Objects\n");
+  fprintf(stderr, "     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (m = generations[g].mut_list, mut = 0; m != END_MUT_LIST; 
@@ -642,7 +642,7 @@ stat_describe_gens(void)
 	lge++;
       live = 0;
       if (RtsFlags.GcFlags.generations == 1) {
-	bd = step->to_space;
+	bd = step->to_blocks;
       } else {
 	bd = step->blocks;
       }

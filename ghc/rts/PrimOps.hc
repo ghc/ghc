@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.79 2001/07/06 14:11:38 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.80 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -594,8 +594,23 @@ FN_(word64ToIntegerzh_fast)
    FE_
 }
 
+#elif SIZEOF_VOID_P == 8
 
-#endif /* HAVE_LONG_LONG */
+FN_(word64ToIntegerzh_fast)
+{
+  FB_
+  JMP_(wordToIntegerzh_fast);
+  FE_
+}
+
+FN_(int64ToIntegerzh_fast)
+{
+  FB_
+  JMP_(intToIntegerzh_fast);
+  FE_
+}
+
+#endif /* SUPPORT_LONG_LONGS || SIZEOF_VOID_P == 8 */
 
 /* ToDo: this is shockingly inefficient */
 

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.96 2001/06/04 16:26:54 simonmar Exp $
+ * $Id: Schedule.c,v 1.97 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -81,7 +81,6 @@
 #include "Storage.h"
 #include "StgRun.h"
 #include "StgStartup.h"
-#include "GC.h"
 #include "Hooks.h"
 #include "Schedule.h"
 #include "StgMiscClosures.h"
@@ -181,7 +180,7 @@ StgTSO *all_threads;
  */
 static StgTSO *suspended_ccalling_threads;
 
-static void GetRoots(void);
+static void GetRoots(evac_fn);
 static StgTSO *threadStackOverflow(StgTSO *tso);
 
 /* KH: The following two flags are shared memory locations.  There is no need
@@ -911,7 +910,7 @@ schedule( void )
 #else
     cap = &MainRegTable;
 #endif
-    
+
     cap->rCurrentTSO = t;
     
     /* context switches are now initiated by the timer signal, unless
@@ -2093,7 +2092,7 @@ take_off_run_queue(StgTSO *tso) {
 	KH @ 25/10/99
 */
 
-static void GetRoots(void)
+static void GetRoots(evac_fn evac)
 {
   StgMainThread *m;
 
@@ -2102,16 +2101,16 @@ static void GetRoots(void)
     nat i;
     for (i=0; i<=RtsFlags.GranFlags.proc; i++) {
       if ((run_queue_hds[i] != END_TSO_QUEUE) && ((run_queue_hds[i] != NULL)))
-	run_queue_hds[i]    = (StgTSO *)MarkRoot((StgClosure *)run_queue_hds[i]);
+	  evac((StgClosure **)&run_queue_hds[i]);
       if ((run_queue_tls[i] != END_TSO_QUEUE) && ((run_queue_tls[i] != NULL)))
-	run_queue_tls[i]    = (StgTSO *)MarkRoot((StgClosure *)run_queue_tls[i]);
+	  evac((StgClosure **)&run_queue_tls[i]);
       
       if ((blocked_queue_hds[i] != END_TSO_QUEUE) && ((blocked_queue_hds[i] != NULL)))
-	blocked_queue_hds[i] = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_hds[i]);
+	  evac((StgClosure **)&blocked_queue_hds[i]);
       if ((blocked_queue_tls[i] != END_TSO_QUEUE) && ((blocked_queue_tls[i] != NULL)))
-	blocked_queue_tls[i] = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_tls[i]);
+	  evac((StgClosure **)&blocked_queue_tls[i]);
       if ((ccalling_threadss[i] != END_TSO_QUEUE) && ((ccalling_threadss[i] != NULL)))
-	ccalling_threadss[i] = (StgTSO *)MarkRoot((StgClosure *)ccalling_threadss[i]);
+	  evac((StgClosure **)&ccalling_threads[i]);
     }
   }
 
@@ -2119,31 +2118,31 @@ static void GetRoots(void)
 
 #else /* !GRAN */
   if (run_queue_hd != END_TSO_QUEUE) {
-    ASSERT(run_queue_tl != END_TSO_QUEUE);
-    run_queue_hd      = (StgTSO *)MarkRoot((StgClosure *)run_queue_hd);
-    run_queue_tl      = (StgTSO *)MarkRoot((StgClosure *)run_queue_tl);
+      ASSERT(run_queue_tl != END_TSO_QUEUE);
+      evac((StgClosure **)&run_queue_hd);
+      evac((StgClosure **)&run_queue_tl);
   }
-
+  
   if (blocked_queue_hd != END_TSO_QUEUE) {
-    ASSERT(blocked_queue_tl != END_TSO_QUEUE);
-    blocked_queue_hd  = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_hd);
-    blocked_queue_tl  = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_tl);
+      ASSERT(blocked_queue_tl != END_TSO_QUEUE);
+      evac((StgClosure **)&blocked_queue_hd);
+      evac((StgClosure **)&blocked_queue_tl);
   }
-
+  
   if (sleeping_queue != END_TSO_QUEUE) {
-    sleeping_queue  = (StgTSO *)MarkRoot((StgClosure *)sleeping_queue);
+      evac((StgClosure **)&sleeping_queue);
   }
 #endif 
 
   for (m = main_threads; m != NULL; m = m->link) {
-    m->tso = (StgTSO *)MarkRoot((StgClosure *)m->tso);
+      evac((StgClosure **)&m->tso);
   }
-  if (suspended_ccalling_threads != END_TSO_QUEUE)
-    suspended_ccalling_threads = 
-      (StgTSO *)MarkRoot((StgClosure *)suspended_ccalling_threads);
+  if (suspended_ccalling_threads != END_TSO_QUEUE) {
+      evac((StgClosure **)&suspended_ccalling_threads);
+  }
 
 #if defined(SMP) || defined(PAR) || defined(GRAN)
-  markSparkQueue();
+  markSparkQueue(evac);
 #endif
 }
 
@@ -2160,7 +2159,7 @@ static void GetRoots(void)
    This needs to be protected by the GC condition variable above.  KH.
    -------------------------------------------------------------------------- */
 
-void (*extra_roots)(void);
+void (*extra_roots)(evac_fn);
 
 void
 performGC(void)
@@ -2175,17 +2174,16 @@ performMajorGC(void)
 }
 
 static void
-AllRoots(void)
+AllRoots(evac_fn evac)
 {
-  GetRoots();			/* the scheduler's roots */
-  extra_roots();		/* the user's roots */
+    GetRoots(evac);		// the scheduler's roots
+    extra_roots(evac);		// the user's roots
 }
 
 void
-performGCWithRoots(void (*get_roots)(void))
+performGCWithRoots(void (*get_roots)(evac_fn))
 {
   extra_roots = get_roots;
-
   GarbageCollect(AllRoots,rtsFalse);
 }
 
@@ -2248,7 +2246,7 @@ threadStackOverflow(StgTSO *tso)
   dest->stack_size = new_stack_size;
 	
   /* and relocate the update frame list */
-  relocate_TSO(tso, dest);
+  relocate_stack(dest, diff);
 
   /* Mark the old TSO as relocated.  We have to check for relocated
    * TSOs in the garbage collector and any primops that deal with TSOs.

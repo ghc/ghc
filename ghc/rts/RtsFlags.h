@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.33 2001/07/19 07:28:00 andy Exp $
+ * $Id: RtsFlags.h,v 1.34 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,11 +33,10 @@ struct GC_FLAGS {
 
     nat     generations;
     nat     steps;
-
-    rtsBool ringBell;
-
+    rtsBool compact;      
     rtsBool squeezeUpdFrames;
 
+    rtsBool ringBell;
     rtsBool frontpanel;
 };
 

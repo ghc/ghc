@@ -1,11 +1,11 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.27 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Sanity.c,v 1.28 2001/07/23 17:23:19 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2001
  *
  * Sanity checking code for the heap and stack.
  *
- * Used when debugging: check that the stack looks reasonable.
+ * Used when debugging: check that everything reasonable.
  *
  *    - All things that are supposed to be pointers look like pointers.
  *
@@ -13,19 +13,6 @@
  *	in the heap are dynamic.
  *
  * ---------------------------------------------------------------------------*/
-
-//@menu
-//* Includes::			
-//* Macros::			
-//* Stack sanity::		
-//* Heap Sanity::		
-//* TSO Sanity::		
-//* Thread Queue Sanity::	
-//* Blackhole Sanity::		
-//@end menu
-
-//@node Includes, Macros
-//@subsection Includes
 
 #include "Rts.h"
 
@@ -40,34 +27,46 @@
 #include "Schedule.h"
 #include "StoragePriv.h"   // for END_OF_STATIC_LIST
 
-//@node Macros, Stack sanity, Includes
-//@subsection Macros
+/* -----------------------------------------------------------------------------
+   A valid pointer is either:
 
-#define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-			    ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1))) && \
-			     ((StgWord)(*(StgPtr)r)!=0xaaaaaaaa))
+     - a pointer to a static closure, or
+     - a pointer into the heap, and
+       - the block is not free
+       - either: - the object is large, or 
+                 - it is not after the free pointer in the block
+       - the contents of the pointer is not 0xaaaaaaaa
 
-//@node Stack sanity, Heap Sanity, Macros
-//@subsection Stack sanity
+   -------------------------------------------------------------------------- */
+
+#define LOOKS_LIKE_PTR(r)			\
+  ({ bdescr *bd = Bdescr((P_)r);		\
+     LOOKS_LIKE_STATIC_CLOSURE(r) ||		\
+	(HEAP_ALLOCED(r) 			\
+	 && bd != (void *)-1			\
+	 && ((StgWord)(*(StgPtr)r)!=0xaaaaaaaa)	\
+	);					\
+   })
+
+// NOT always true, but can be useful for spotting bugs: (generally
+// true after GC, but not for things just allocated using allocate(),
+// for example):
+//	    (bd->flags & BF_LARGE || bd->free > (P_)r) 
+
+/* -----------------------------------------------------------------------------
+   Forward decls.
+   -------------------------------------------------------------------------- */
+
+static StgOffset checkStackClosure   ( StgClosure* c );
+static StgOffset checkStackObject    ( StgPtr sp );
+static StgOffset checkSmallBitmap    ( StgPtr payload, StgWord32 bitmap );
+static StgOffset checkLargeBitmap    ( StgPtr payload, StgLargeBitmap* );
+static void      checkClosureShallow ( StgClosure* p );
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
    -------------------------------------------------------------------------- */
 
-StgOffset checkStackClosure( StgClosure* c );
-
-StgOffset checkStackObject( StgPtr sp );
-
-void      checkStackChunk( StgPtr sp, StgPtr stack_end );
-
-static StgOffset checkSmallBitmap(  StgPtr payload, StgWord32 bitmap );
-
-static StgOffset checkLargeBitmap( StgPtr payload, 
-				   StgLargeBitmap* large_bitmap );
-
-void checkClosureShallow( StgClosure* p );
-
-//@cindex checkSmallBitmap
 static StgOffset 
 checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
 {
@@ -76,13 +75,12 @@ checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
     i = 0;
     for(; bitmap != 0; ++i, bitmap >>= 1 ) {
 	if ((bitmap & 1) == 0) {
-	    checkClosure(stgCast(StgClosure*,payload[i]));
+	    checkClosure((StgClosure *)payload[i]);
 	}
     }
     return i;
 }
 
-//@cindex checkLargeBitmap
 static StgOffset 
 checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
 {
@@ -94,15 +92,14 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
 	StgWord32 bitmap = large_bitmap->bitmap[bmp];
 	for(; bitmap != 0; ++i, bitmap >>= 1 ) {
 	    if ((bitmap & 1) == 0) {
-		checkClosure(stgCast(StgClosure*,payload[i]));
+		checkClosure((StgClosure *)payload[i]);
 	    }
 	}
     }
     return i;
 }
 
-//@cindex checkStackClosure
-StgOffset 
+static StgOffset 
 checkStackClosure( StgClosure* c )
 {    
     const StgInfoTable* info = get_itbl(c);
@@ -163,12 +160,11 @@ checkStackClosure( StgClosure* c )
  * chunks.
  */
  
-//@cindex checkClosureShallow
 void 
 checkClosureShallow( StgClosure* p )
 {
     ASSERT(p);
-    ASSERT(LOOKS_LIKE_GHC_INFO(p->header.info)
+    ASSERT(LOOKS_LIKE_GHC_INFO(GET_INFO(p))
            || IS_HUGS_CONSTR_INFO(GET_INFO(p)));
 
     /* Is it a static closure (i.e. in the data segment)? */
@@ -180,27 +176,24 @@ checkClosureShallow( StgClosure* p )
     }
 }
 
-/* check an individual stack object */
-//@cindex checkStackObject
+// check an individual stack object
 StgOffset 
 checkStackObject( StgPtr sp )
 {
     if (IS_ARG_TAG(*sp)) {
-        /* Tagged words might be "stubbed" pointers, so there's no
-	 * point checking to see whether they look like pointers or
-	 * not (some of them will).
-	 */
+        // Tagged words might be "stubbed" pointers, so there's no
+	// point checking to see whether they look like pointers or
+	// not (some of them will).
 	return ARG_SIZE(*sp) + 1;
-    } else if (LOOKS_LIKE_GHC_INFO(*stgCast(StgPtr*,sp))) {
-        return checkStackClosure(stgCast(StgClosure*,sp));
-    } else { /* must be an untagged closure pointer in the stack */
-	checkClosureShallow(*stgCast(StgClosure**,sp));
+    } else if (LOOKS_LIKE_GHC_INFO(*(StgPtr *)sp)) {
+        return checkStackClosure((StgClosure *)sp);
+    } else { // must be an untagged closure pointer in the stack
+	checkClosureShallow(*(StgClosure **)sp);
 	return 1;
     }
 }
 
-/* check sections of stack between update frames */
-//@cindex checkStackChunk
+// check sections of stack between update frames
 void 
 checkStackChunk( StgPtr sp, StgPtr stack_end )
 {
@@ -213,7 +206,6 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
     // ASSERT( p == stack_end ); -- HWL
 }
 
-//@cindex checkStackChunk
 StgOffset 
 checkClosure( StgClosure* p )
 {
@@ -290,6 +282,7 @@ checkClosure( StgClosure* p )
     case BCO:
     case STABLE_NAME:
     case MUT_VAR:
+    case MUT_CONS:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
@@ -323,7 +316,7 @@ checkClosure( StgClosure* p )
       }
 
     case THUNK_SELECTOR:
-	    ASSERT(LOOKS_LIKE_PTR(stgCast(StgSelector*,p)->selectee));
+	    ASSERT(LOOKS_LIKE_PTR(((StgSelector *)p)->selectee));
 	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
 
     case IND:
@@ -332,7 +325,7 @@ checkClosure( StgClosure* p )
 	     * but they might appear during execution
 	     */
 	    P_ q;
-	    StgInd *ind = stgCast(StgInd*,p);
+	    StgInd *ind = (StgInd *)p;
 	    ASSERT(LOOKS_LIKE_PTR(ind->indirectee));
 	    q = (P_)p + sizeofW(StgInd);
 	    while (!*q) { q++; }; /* skip padding words (see GC.c: evacuate())*/
@@ -354,7 +347,7 @@ checkClosure( StgClosure* p )
     case AP_UPD: /* we can treat this as being the same as a PAP */
     case PAP:
 	{ 
-	    StgPAP *pap = stgCast(StgPAP*,p);
+	    StgPAP *pap = (StgPAP *)p;
 	    ASSERT(LOOKS_LIKE_PTR(pap->fun));
 	    checkStackChunk((StgPtr)pap->payload, 
 			    (StgPtr)pap->payload + pap->n_args
@@ -363,12 +356,12 @@ checkClosure( StgClosure* p )
 	}
 
     case ARR_WORDS:
-	    return arr_words_sizeW(stgCast(StgArrWords*,p));
+	    return arr_words_sizeW((StgArrWords *)p);
 
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
 	{
-	    StgMutArrPtrs* a = stgCast(StgMutArrPtrs*,p);
+	    StgMutArrPtrs* a = (StgMutArrPtrs *)p;
 	    nat i;
 	    for (i = 0; i < a->ptrs; i++) {
 		ASSERT(LOOKS_LIKE_PTR(a->payload[i]));
@@ -458,8 +451,6 @@ looks_like_ga(globalAddr *ga)
 
 #endif
 
-//@node Heap Sanity, TSO Sanity, Stack sanity
-//@subsection Heap Sanity
 
 /* -----------------------------------------------------------------------------
    Check Heap Sanity
@@ -470,46 +461,31 @@ looks_like_ga(globalAddr *ga)
    all the objects in the remainder of the chain.
    -------------------------------------------------------------------------- */
 
-//@cindex checkHeap
-extern void 
-checkHeap(bdescr *bd, StgPtr start)
+void 
+checkHeap(bdescr *bd)
 {
     StgPtr p;
-    nat xxx = 0; // tmp -- HWL
 
-    if (start == NULL) {
-      if (bd != NULL) p = bd->start;
-    } else {
-      p = start;
-    }
-
-    while (bd != NULL) {
-      while (p < bd->free) {
-        nat size = checkClosure(stgCast(StgClosure*,p));
-        /* This is the smallest size of closure that can live in the heap. */
-        ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-	if (get_itbl(stgCast(StgClosure*,p))->type == IND_STATIC)
-	  xxx++;
-	p += size;
-
-	/* skip over slop */
-	while (p < bd->free &&
-	       (*p < 0x1000 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
-      }
-      bd = bd->link;
-      if (bd != NULL) {
+    for (; bd != NULL; bd = bd->link) {
 	p = bd->start;
-      }
+	while (p < bd->free) {
+	    nat size = checkClosure((StgClosure *)p);
+	    /* This is the smallest size of closure that can live in the heap */
+	    ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+	    p += size;
+	    
+	    /* skip over slop */
+	    while (p < bd->free &&
+		   (*p < 0x1000 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
+	}
     }
-    fprintf(stderr,"@@@@ checkHeap: Heap ok; %d IND_STATIC closures checked\n",
-	    xxx);
 }
 
 #if defined(PAR)
 /* 
    Check heap between start and end. Used after unpacking graphs.
 */
-extern void 
+void 
 checkHeapChunk(StgPtr start, StgPtr end)
 {
   extern globalAddr *LAGAlookup(StgClosure *addr);
@@ -527,14 +503,14 @@ checkHeapChunk(StgPtr start, StgPtr end)
       *(p+2) = 0x0000ee11; /* mark slop in IND as garbage */
       size = MIN_UPD_SIZE;
     } else {
-      size = checkClosure(stgCast(StgClosure*,p));
+      size = checkClosure((StgClosure *)p);
       /* This is the smallest size of closure that can live in the heap. */
       ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
     }
   }
 }
 #else /* !PAR */
-extern void 
+void 
 checkHeapChunk(StgPtr start, StgPtr end)
 {
   StgPtr p;
@@ -542,15 +518,14 @@ checkHeapChunk(StgPtr start, StgPtr end)
 
   for (p=start; p<end; p+=size) {
     ASSERT(LOOKS_LIKE_GHC_INFO((void*)*p));
-    size = checkClosure(stgCast(StgClosure*,p));
+    size = checkClosure((StgClosure *)p);
     /* This is the smallest size of closure that can live in the heap. */
     ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
   }
 }
 #endif
 
-//@cindex checkChain
-extern void
+void
 checkChain(bdescr *bd)
 {
   while (bd != NULL) {
@@ -560,40 +535,36 @@ checkChain(bdescr *bd)
 }
 
 /* check stack - making sure that update frames are linked correctly */
-//@cindex checkStack
 void 
 checkStack(StgPtr sp, StgPtr stack_end, StgUpdateFrame* su )
 {
     /* check everything down to the first update frame */
-    checkStackChunk( sp, stgCast(StgPtr,su) );
-    while ( stgCast(StgPtr,su) < stack_end) {
-	sp = stgCast(StgPtr,su);
+    checkStackChunk( sp, (StgPtr)su );
+    while ( (StgPtr)su < stack_end) {
+	sp = (StgPtr)su;
 	switch (get_itbl(su)->type) {
 	case UPDATE_FRAME:
 		su = su->link;
 		break;
 	case SEQ_FRAME:
-		su = stgCast(StgSeqFrame*,su)->link;
+		su = ((StgSeqFrame *)su)->link;
 		break;
 	case CATCH_FRAME:
-		su = stgCast(StgCatchFrame*,su)->link;
+		su = ((StgCatchFrame *)su)->link;
 		break;
 	case STOP_FRAME:
-      	        /* not quite: ASSERT(stgCast(StgPtr,su) == stack_end); */
+      	        /* not quite: ASSERT((StgPtr)su == stack_end); */
 		return;
 	default:
 		barf("checkStack: weird record found on update frame list.");
 	}
-	checkStackChunk( sp, stgCast(StgPtr,su) );
+	checkStackChunk( sp, (StgPtr)su );
     }
-    ASSERT(stgCast(StgPtr,su) == stack_end);
+    ASSERT((StgPtr)su == stack_end);
 }
 
-//@node TSO Sanity, Thread Queue Sanity, Heap Sanity
-//@subsection TSO Sanity
 
-//@cindex checkTSO
-extern void
+void
 checkTSO(StgTSO *tso)
 {
     StgPtr sp = tso->sp;
@@ -615,7 +586,7 @@ checkTSO(StgTSO *tso)
     }
 
     ASSERT(stack <= sp && sp < stack_end);
-    ASSERT(sp <= stgCast(StgPtr,su));
+    ASSERT(sp <= (StgPtr)su);
 
 #if defined(PAR)
     ASSERT(tso->par.magic==TSO_MAGIC);
@@ -667,8 +638,7 @@ checkTSO(StgTSO *tso)
 }
 
 #if defined(GRAN)
-//@cindex checkTSOsSanity
-extern void  
+void  
 checkTSOsSanity(void) {
   nat i, tsos;
   StgTSO *tso;
@@ -687,13 +657,10 @@ checkTSOsSanity(void) {
   belch(" checked %d TSOs on %d PEs; ok\n", tsos, RtsFlags.GranFlags.proc);
 }
 
-//@node Thread Queue Sanity, Blackhole Sanity, TSO Sanity
-//@subsection Thread Queue Sanity
 
 // still GRAN only
 
-//@cindex checkThreadQSanity
-extern rtsBool
+rtsBool
 checkThreadQSanity (PEs proc, rtsBool check_TSO_too) 
 {
   StgTSO *tso, *prev;
@@ -715,8 +682,7 @@ checkThreadQSanity (PEs proc, rtsBool check_TSO_too)
   ASSERT(prev==run_queue_tls[proc]);
 }
 
-//@cindex checkThreadQsSanity
-extern rtsBool
+rtsBool
 checkThreadQsSanity (rtsBool check_TSO_too)
 {
   PEs p;
@@ -736,14 +702,56 @@ checkGlobalTSOList (rtsBool checkTSOs)
   extern  StgTSO *all_threads;
   StgTSO *tso;
   for (tso=all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
-    ASSERT(Bdescr((P_)tso)->evacuated == 1);
-    if (checkTSOs)
-      checkTSO(tso);
+      ASSERT(LOOKS_LIKE_PTR(tso));
+      ASSERT(get_itbl(tso)->type == TSO);
+      if (checkTSOs)
+	  checkTSO(tso);
   }
 }
 
-//@node Blackhole Sanity, GALA table sanity, Thread Queue Sanity
-//@subsection Blackhole Sanity
+/* -----------------------------------------------------------------------------
+   Check mutable list sanity.
+   -------------------------------------------------------------------------- */
+
+void
+checkMutableList( StgMutClosure *p, nat gen )
+{
+    bdescr *bd;
+
+    for (; p != END_MUT_LIST; p = p->mut_link) {
+	bd = Bdescr((P_)p);
+	ASSERT(closure_MUTABLE(p));
+	ASSERT(bd->gen_no == gen);
+	ASSERT(LOOKS_LIKE_PTR(p->mut_link));
+    }
+}
+
+void
+checkMutOnceList( StgMutClosure *p, nat gen )
+{
+    bdescr *bd;
+    StgInfoTable *info;
+
+    for (; p != END_MUT_LIST; p = p->mut_link) {
+	bd = Bdescr((P_)p);
+	info = get_itbl(p);
+
+	ASSERT(!closure_MUTABLE(p));
+	ASSERT(ip_STATIC(info) || bd->gen_no == gen);
+	ASSERT(LOOKS_LIKE_PTR(p->mut_link));
+
+	switch (info->type) {
+	case IND_STATIC:
+	case IND_OLDGEN:
+	case IND_OLDGEN_PERM:
+	case MUT_CONS:
+	    break;
+	default:
+	    barf("checkMutOnceList: strange closure %p (%s)", 
+		 p, info_type((StgClosure *)p));
+	}
+    }
+}
 
 /* -----------------------------------------------------------------------------
    Check Blackhole Sanity
@@ -756,7 +764,6 @@ checkGlobalTSOList (rtsBool checkTSOs)
    the update frame list.
 
    -------------------------------------------------------------------------- */
-//@cindex isBlackhole
 rtsBool 
 isBlackhole( StgTSO* tso, StgClosure* p )
 {
@@ -771,10 +778,10 @@ isBlackhole( StgTSO* tso, StgClosure* p )
       }
       break;
     case SEQ_FRAME:
-      su = stgCast(StgSeqFrame*,su)->link;
+      su = ((StgSeqFrame *)su)->link;
       break;
     case CATCH_FRAME:
-      su = stgCast(StgCatchFrame*,su)->link;
+      su = ((StgCatchFrame *)su)->link;
       break;
     case STOP_FRAME:
       return rtsFalse;
@@ -787,9 +794,9 @@ isBlackhole( StgTSO* tso, StgClosure* p )
 /*
   Check the static objects list.
 */
-extern void
-checkStaticObjects ( void ) {
-  extern StgClosure* static_objects;
+void
+checkStaticObjects ( StgClosure* static_objects )
+{
   StgClosure *p = static_objects;
   StgInfoTable *info;
 
@@ -799,7 +806,7 @@ checkStaticObjects ( void ) {
     switch (info->type) {
     case IND_STATIC:
       { 
-	StgClosure *indirectee = stgCast(StgIndStatic*,p)->indirectee;
+	StgClosure *indirectee = ((StgIndStatic *)p)->indirectee;
 
 	ASSERT(LOOKS_LIKE_PTR(indirectee));
 	ASSERT(LOOKS_LIKE_GHC_INFO(indirectee->header.info));
@@ -832,7 +839,6 @@ checkStaticObjects ( void ) {
    Note that in GUM we can have several different closure types in a 
    blocking queue 
 */
-//@cindex checkBQ
 #if defined(PAR)
 void
 checkBQ (StgBlockingQueueElement *bqe, StgClosure *closure) 
@@ -914,8 +920,6 @@ checkBQ (StgTSO *bqe, StgClosure *closure)
 #endif
     
 
-//@node GALA table sanity, Index, Blackhole Sanity
-//@subsection GALA table sanity
 
 /*
   This routine checks the sanity of the LAGA and GALA tables. They are 
@@ -935,7 +939,6 @@ extern GALA *liveIndirections;
 extern GALA *liveRemoteGAs;
 extern HashTable *LAtoGALAtable;
 
-//@cindex checkLAGAtable
 void
 checkLAGAtable(rtsBool check_closures)
 {
@@ -949,7 +952,7 @@ checkLAGAtable(rtsBool check_closures)
     ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
     ASSERT(gala->next!=gala); // detect direct loops
     if ( check_closures ) {
-      checkClosure(stgCast(StgClosure*,gala->la));
+      checkClosure((StgClosure *)gala->la);
     }
   }
 
@@ -961,33 +964,11 @@ checkLAGAtable(rtsBool check_closures)
     ASSERT(gala->next!=gala); // detect direct loops
     /*
     if ( check_closures ) {
-      checkClosure(stgCast(StgClosure*,gala->la));
+      checkClosure((StgClosure *)gala->la);
     }
     */
   }
 }
 #endif
 
-//@node Index,  , GALA table sanity
-//@subsection Index
-
 #endif /* DEBUG */
-
-//@index
-//* checkBQ::  @cindex\s-+checkBQ
-//* checkChain::  @cindex\s-+checkChain
-//* checkClosureShallow::  @cindex\s-+checkClosureShallow
-//* checkHeap::  @cindex\s-+checkHeap
-//* checkLargeBitmap::  @cindex\s-+checkLargeBitmap
-//* checkSmallBitmap::  @cindex\s-+checkSmallBitmap
-//* checkStack::  @cindex\s-+checkStack
-//* checkStackChunk::  @cindex\s-+checkStackChunk
-//* checkStackChunk::  @cindex\s-+checkStackChunk
-//* checkStackClosure::  @cindex\s-+checkStackClosure
-//* checkStackObject::  @cindex\s-+checkStackObject
-//* checkTSO::  @cindex\s-+checkTSO
-//* checkTSOsSanity::  @cindex\s-+checkTSOsSanity
-//* checkThreadQSanity::  @cindex\s-+checkThreadQSanity
-//* checkThreadQsSanity::  @cindex\s-+checkThreadQsSanity
-//* isBlackhole::  @cindex\s-+isBlackhole
-//@end index

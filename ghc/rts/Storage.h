@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.33 2001/07/23 10:47:16 simonmar Exp $
+ * $Id: Storage.h,v 1.34 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,8 +78,7 @@ extern void PleaseStopAllocating(void);
    MarkRoot(StgClosure *p)	Returns the new location of the root.
    -------------------------------------------------------------------------- */
 
-extern void   GarbageCollect(void (*get_roots)(void),rtsBool force_major_gc);
-extern StgClosure *MarkRoot(StgClosure *p);
+extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
@@ -250,6 +249,8 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs
    -------------------------------------------------------------------------- */
+
+void revertCAFs( void );
 
 #if defined(DEBUG)
 void printMutOnceList(generation *gen);

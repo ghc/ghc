@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.7 2000/11/07 17:05:47 simonmar Exp $
+ * $Id: Stable.h,v 1.8 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -33,6 +33,7 @@ extern StgStablePtr getStablePtr(StgPtr p);
 
 typedef struct { 
   StgPtr  addr;			/* Haskell object, free list, or NULL */
+  StgPtr  old;			/* old Haskell object, used during GC */
   StgWord weight;		/* used for reference counting */
   StgClosure *sn_obj;		/* the StableName object (or NULL) */
 } snEntry;

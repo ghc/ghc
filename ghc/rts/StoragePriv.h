@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.14 2001/01/24 15:39:50 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.15 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,7 +19,12 @@ extern step *g0s0;
 extern generation *oldest_gen;
 
 extern void newCAF(StgClosure*);
-extern StgTSO *relocate_TSO(StgTSO *src, StgTSO *dest);
+
+extern void move_TSO(StgTSO *src, StgTSO *dest);
+extern StgTSO *relocate_stack(StgTSO *dest, int diff);
+
+extern StgClosure *static_objects;
+extern StgClosure *scavenged_static_objects;
 
 extern StgWeak    *weak_ptr_list;
 extern StgClosure *caf_list;
@@ -53,9 +58,9 @@ static inline void
 dbl_link_onto(bdescr *bd, bdescr **list)
 {
   bd->link = *list;
-  bd->back = NULL;
+  bd->u.back = NULL;
   if (*list) {
-    (*list)->back = bd; /* double-link the list */
+    (*list)->u.back = bd; /* double-link the list */
   }
   *list = bd;
 }
@@ -68,7 +73,7 @@ dbl_link_onto(bdescr *bd, bdescr **list)
 
 #ifdef DEBUG
 extern void memInventory(void);
-extern void checkSanity(nat N);
+extern void checkSanity(void);
 #endif
 
 /* 
@@ -80,5 +85,10 @@ extern void checkSanity(nat N);
 int is_dynamically_loaded_code_or_rodata_ptr ( void* p );
 int is_dynamically_loaded_rwdata_ptr         ( void* p );
 int is_not_dynamically_loaded_ptr            ( void* p );
+
+/* Functions from GC.c 
+ */
+void threadPaused(StgTSO *);
+StgClosure *isAlive(StgClosure *p);
 
 #endif /* STORAGEPRIV_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.66 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.67 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -434,28 +434,29 @@ STGFUN(stg_BLACKHOLE_entry)
 #endif
     TICK_ENT_BH();
 
-    /* Put ourselves on the blocking queue for this black hole */
+    // Put ourselves on the blocking queue for this black hole
 #if defined(GRAN) || defined(PAR)
-    /* in fact, only difference is the type of the end-of-queue marker! */
+    // in fact, only difference is the type of the end-of-queue marker!
     CurrentTSO->link = END_BQ_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
 #else
     CurrentTSO->link = END_TSO_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 #endif
-    /* jot down why and on what closure we are blocked */
+    // jot down why and on what closure we are blocked
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
-    /* closure is mutable since something has just been added to its BQ */
-    recordMutable((StgMutClosure *)R1.cl);
-    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
+
+    // Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC
     ((StgBlockingQueue *)R1.p)->header.info = &stg_BLACKHOLE_BQ_info;
 
-    /* PAR: dumping of event now done in blockThread -- HWL */
+    // closure is mutable since something has just been added to its BQ
+    recordMutable((StgMutClosure *)R1.cl);
 
-    /* stg_gen_block is too heavyweight, use a specialised one */
+    // PAR: dumping of event now done in blockThread -- HWL
+
+    // stg_gen_block is too heavyweight, use a specialised one
     BLOCK_NP(1);
-
   FE_
 }
 
@@ -563,7 +564,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
     {
       bdescr *bd = Bdescr(R1.p);
       if (bd->back != (bdescr *)BaseReg) {
-	if (bd->gen->no >= 1 || bd->step->no >= 1) {
+	if (bd->gen_no >= 1 || bd->step->no >= 1) {
 	  CMPXCHG(R1.cl->header.info, &stg_CAF_BLACKHOLE_info, &stg_WHITEHOLE_info);
 	} else {
 	  EXTFUN_RTS(stg_gc_enter_1_hponly);
@@ -575,26 +576,28 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
 
     TICK_ENT_BH();
 
-    /* Put ourselves on the blocking queue for this black hole */
+    // Put ourselves on the blocking queue for this black hole
 #if defined(GRAN) || defined(PAR)
-    /* in fact, only difference is the type of the end-of-queue marker! */
+    // in fact, only difference is the type of the end-of-queue marker!
     CurrentTSO->link = END_BQ_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = (StgBlockingQueueElement *)CurrentTSO;
 #else
     CurrentTSO->link = END_TSO_QUEUE;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 #endif
-    /* jot down why and on what closure we are blocked */
+    // jot down why and on what closure we are blocked
     CurrentTSO->why_blocked = BlockedOnBlackHole;
     CurrentTSO->block_info.closure = R1.cl;
-    /* closure is mutable since something has just been added to its BQ */
-    recordMutable((StgMutClosure *)R1.cl);
-    /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC */
+
+    // Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC
     ((StgBlockingQueue *)R1.p)->header.info = &stg_BLACKHOLE_BQ_info;
 
-    /* PAR: dumping of event now done in blockThread -- HWL */
+    // closure is mutable since something has just been added to its BQ
+    recordMutable((StgMutClosure *)R1.cl);
 
-    /* stg_gen_block is too heavyweight, use a specialised one */
+    // PAR: dumping of event now done in blockThread -- HWL
+
+    // stg_gen_block is too heavyweight, use a specialised one
     BLOCK_NP(1);
   FE_
 }
@@ -727,7 +730,7 @@ NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,EI_)
 , /*payload*/{} };
 
-INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
+INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 2, 0, MUT_CONS, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------

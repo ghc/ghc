@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.9 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: ClosureFlags.c,v 1.10 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -25,7 +25,7 @@ StgWord16 closure_flags[] = {
 
 /*                             0    1    2    3    4   5   6   7 */
 /*			     HNF  BTM   NS  STA  THU MUT UPT SRT */
-				                                    
+
 [INVALID_OBJECT         ] = ( 0                                      	),
 [CONSTR  		] = (_HNF|     _NS                           	),
 [CONSTR_1_0	   	] = (_HNF|     _NS                           	),
@@ -60,7 +60,7 @@ StgWord16 closure_flags[] = {
 [IND_PERM		] = (          _NS                        |_IND ),
 [IND_OLDGEN_PERM	] = (          _NS                        |_IND ),
 [IND_STATIC	   	] = (          _NS|_STA                   |_IND ),
-[CAF_BLACKHOLE   	] = ( 	  _BTM|_NS|         _MUT|_UPT           ),
+[CAF_BLACKHOLE   	] = ( 	  _BTM|_NS|              _UPT           ),
 [RET_BCO		] = (     _BTM                                  ),
 [RET_SMALL		] = (     _BTM|                       _SRT      ),
 [RET_VEC_SMALL		] = (     _BTM|                       _SRT      ),
@@ -71,15 +71,16 @@ StgWord16 closure_flags[] = {
 [CATCH_FRAME	   	] = (     _BTM                                  ),
 [STOP_FRAME	   	] = (     _BTM                                  ),
 [SEQ_FRAME 	   	] = (     _BTM                                  ),
-[BLACKHOLE		] = ( 	       _NS|         _MUT|_UPT           ),
+[BLACKHOLE		] = ( 	       _NS|              _UPT           ),
 [BLACKHOLE_BQ	   	] = ( 	       _NS|         _MUT|_UPT           ),
 [SE_BLACKHOLE		] = ( 	       _NS|              _UPT           ),
 [SE_CAF_BLACKHOLE	] = ( 	       _NS|              _UPT           ),
 [MVAR		   	] = (_HNF|     _NS|         _MUT|_UPT           ),
 [ARR_WORDS		] = (_HNF|     _NS|              _UPT           ),
 [MUT_ARR_PTRS	   	] = (_HNF|     _NS|         _MUT|_UPT           ),
-[MUT_ARR_PTRS_FROZEN  	] = (_HNF|     _NS|         _MUT|_UPT           ),
+[MUT_ARR_PTRS_FROZEN  	] = (_HNF|     _NS|              _UPT           ),
 [MUT_VAR		] = (_HNF|     _NS|         _MUT|_UPT           ),
+[MUT_CONS		] = (_HNF|     _NS|              _UPT           ),
 [WEAK		   	] = (_HNF|     _NS|              _UPT           ),
 [FOREIGN		] = (_HNF|     _NS|              _UPT           ),
 [STABLE_NAME	   	] = (_HNF|     _NS|              _UPT           ),

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.15 2000/11/07 17:05:47 simonmar Exp $
+ * $Id: StgTypes.h,v 1.16 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -96,6 +96,8 @@ typedef StgWord32          StgWord;
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
 #endif
+
+#define W_MASK  (sizeof(W_)-1)
 
 typedef void*              StgAddr;
 

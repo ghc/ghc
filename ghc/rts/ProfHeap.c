@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.22 2001/07/19 07:28:00 andy Exp $
+ * $Id: ProfHeap.c,v 1.23 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -573,7 +573,7 @@ heapCensus(void)
 
   /* Only do heap profiling in a two-space heap */
   ASSERT(RtsFlags.GcFlags.generations == 1);
-  bd = g0s0->to_space;
+  bd = g0s0->to_blocks;
 
   fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", time);
   

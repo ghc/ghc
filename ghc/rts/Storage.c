@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.40 2001/07/23 10:47:16 simonmar Exp $
+ * $Id: Storage.c,v 1.41 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -148,6 +148,7 @@ initStorage (void)
       stp->large_objects = NULL;
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
+      stp->is_compacted = 0;
     }
   }
   
@@ -159,8 +160,10 @@ initStorage (void)
     generations[g].steps[s].to = &generations[g+1].steps[0];
   }
   
-  /* The oldest generation has one step and its destination is the
-   * same step. */
+  /* The oldest generation has one step and it is compacted. */
+  if (RtsFlags.GcFlags.compact) {
+      oldest_gen->steps[0].is_compacted = 1;
+  }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
 
   /* generation 0 is special: that's the nursery */
@@ -192,7 +195,7 @@ initStorage (void)
   pthread_mutex_init(&sm_mutex, NULL);
 #endif
 
-  IF_DEBUG(gc, stat_describe_gens());
+  IF_DEBUG(gc, statDescribeGens());
 }
 
 void
@@ -294,7 +297,7 @@ allocNurseries( void )
       cap->rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
       cap->rCurrentNursery = cap->rNursery;
       for (bd = cap->rNursery; bd != NULL; bd = bd->link) {
-	bd->back = (bdescr *)cap;
+	bd->u.back = (bdescr *)cap;
       }
     }
     /* Set the back links to be equal to the Capability,
@@ -302,10 +305,11 @@ allocNurseries( void )
      */
   }
 #else /* SMP */
-  nursery_blocks  = RtsFlags.GcFlags.minAllocAreaSize;
-  g0s0->blocks    = allocNursery(NULL, nursery_blocks);
-  g0s0->n_blocks  = nursery_blocks;
-  g0s0->to_space  = NULL;
+  nursery_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
+  g0s0->blocks      = allocNursery(NULL, nursery_blocks);
+  g0s0->n_blocks    = nursery_blocks;
+  g0s0->to_blocks   = NULL;
+  g0s0->n_to_blocks = 0;
   MainRegTable.rNursery        = g0s0->blocks;
   MainRegTable.rCurrentNursery = g0s0->blocks;
   /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
@@ -355,7 +359,7 @@ allocNursery (bdescr *last_bd, nat blocks)
     bd->link = last_bd;
     bd->step = g0s0;
     bd->gen_no = 0;
-    bd->evacuated = 0;
+    bd->flags = 0;
     bd->free = bd->start;
     last_bd = bd;
   }
@@ -425,7 +429,7 @@ allocate(nat n)
     dbl_link_onto(bd, &g0s0->large_objects);
     bd->gen_no  = 0;
     bd->step = g0s0;
-    bd->evacuated = 0;
+    bd->flags = BF_LARGE;
     bd->free = bd->start;
     /* don't add these blocks to alloc_blocks, since we're assuming
      * that large objects are likely to remain live for quite a while
@@ -446,12 +450,12 @@ allocate(nat n)
     small_alloc_list = bd;
     bd->gen_no = 0;
     bd->step = g0s0;
-    bd->evacuated = 0;
+    bd->flags = 0;
     alloc_Hp = bd->start;
     alloc_HpLim = bd->start + BLOCK_SIZE_W;
     alloc_blocks++;
   }
-  
+
   p = alloc_Hp;
   alloc_Hp += n;
   RELEASE_LOCK(&sm_mutex);
@@ -587,7 +591,7 @@ calcLive(void)
   step *stp;
 
   if (RtsFlags.GcFlags.generations == 1) {
-    live = (g0s0->to_blocks - 1) * BLOCK_SIZE_W + 
+    live = (g0s0->n_to_blocks - 1) * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
     return live;
   }
@@ -601,8 +605,11 @@ calcLive(void)
 	  continue; 
       }
       stp = &generations[g].steps[s];
-      live += (stp->n_blocks - 1) * BLOCK_SIZE_W +
-	((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) / sizeof(W_);
+      live += (stp->n_blocks - 1) * BLOCK_SIZE_W;
+      if (stp->hp_bd != NULL) {
+	  live += ((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) 
+	      / sizeof(W_);
+      }
     }
   }
   return live;
@@ -626,7 +633,8 @@ calcNeeded(void)
     for (s = 0; s < generations[g].n_steps; s++) {
       if (g == 0 && s == 0) { continue; }
       stp = &generations[g].steps[s];
-      if (generations[g].steps[0].n_blocks > generations[g].max_blocks) {
+      if (generations[g].steps[0].n_blocks > generations[g].max_blocks
+	  && stp->is_compacted == 0) {
 	needed += 2 * stp->n_blocks;
       } else {
 	needed += stp->n_blocks;
@@ -646,7 +654,7 @@ calcNeeded(void)
 
 #ifdef DEBUG
 
-extern void
+void
 memInventory(void)
 {
   nat g, s;
@@ -662,7 +670,7 @@ memInventory(void)
       total_blocks += stp->n_blocks;
       if (RtsFlags.GcFlags.generations == 1) {
 	/* two-space collector has a to-space too :-) */
-	total_blocks += g0s0->to_blocks;
+	total_blocks += g0s0->n_to_blocks;
       }
       for (bd = stp->large_objects; bd; bd = bd->link) {
 	total_blocks += bd->blocks;
@@ -689,45 +697,52 @@ memInventory(void)
   /* count the blocks on the free list */
   free_blocks = countFreeList();
 
-  ASSERT(total_blocks + free_blocks == mblocks_allocated * BLOCKS_PER_MBLOCK);
-
-#if 0
   if (total_blocks + free_blocks != mblocks_allocated *
       BLOCKS_PER_MBLOCK) {
     fprintf(stderr, "Blocks: %ld live + %ld free  = %ld total (%ld around)\n",
 	    total_blocks, free_blocks, total_blocks + free_blocks,
 	    mblocks_allocated * BLOCKS_PER_MBLOCK);
   }
-#endif
+
+  ASSERT(total_blocks + free_blocks == mblocks_allocated * BLOCKS_PER_MBLOCK);
+}
+
+static nat
+countBlocks(bdescr *bd)
+{
+    nat n;
+    for (n=0; bd != NULL; bd=bd->link) {
+	n++;
+    }
+    return n;
 }
 
 /* Full heap sanity check. */
-
-extern void
-checkSanity(nat N)
+void
+checkSanity( void )
 {
-  nat g, s;
+    nat g, s;
 
-  if (RtsFlags.GcFlags.generations == 1) {
-    checkHeap(g0s0->to_space, NULL);
-    checkChain(g0s0->large_objects);
-  } else {
-    
-    for (g = 0; g <= N; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	if (g == 0 && s == 0) { continue; }
-	checkHeap(generations[g].steps[s].blocks, NULL);
-      }
+    if (RtsFlags.GcFlags.generations == 1) {
+	checkHeap(g0s0->to_blocks);
+	checkChain(g0s0->large_objects);
+    } else {
+	
+	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	    for (s = 0; s < generations[g].n_steps; s++) {
+		if (g == 0 && s == 0) { continue; }
+		checkHeap(generations[g].steps[s].blocks);
+		ASSERT(countBlocks(generations[g].steps[s].blocks)
+		       == generations[g].steps[s].n_blocks);
+		checkChain(generations[g].steps[s].large_objects);
+		if (g > 0) {
+		    checkMutableList(generations[g].mut_list, g);
+		    checkMutOnceList(generations[g].mut_once_list, g);
+		}
+	    }
+	}
+	checkFreeListSanity();
     }
-    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	checkHeap(generations[g].steps[s].blocks,
-		  generations[g].steps[s].blocks->start);
-	checkChain(generations[g].steps[s].large_objects);
-      }
-    }
-    checkFreeListSanity();
-  }
 }
 
 #endif

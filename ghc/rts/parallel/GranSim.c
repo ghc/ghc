@@ -1,6 +1,6 @@
 /* 
    Time-stamp: <Tue Mar 06 2001 00:17:42 Stardate: [-30]6285.06 hwloidl>
-   $Id: GranSim.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
+   $Id: GranSim.c,v 1.5 2001/07/23 17:23:20 simonmar Exp $
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.
@@ -48,7 +48,6 @@
 #include "StgTypes.h"
 #include "Schedule.h"
 #include "SchedAPI.h"       // for pushClosure
-#include "GC.h"
 #include "GranSimRts.h"
 #include "GranSim.h"
 #include "ParallelRts.h"

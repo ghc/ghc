@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.8 2001/07/23 10:47:16 simonmar Exp $
+ * $Id: Block.h,v 1.9 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,11 +44,14 @@ typedef struct _bdescr {
   StgPtr start;			/* start addr of memory */
   StgPtr free;			/* first free byte of memory */
   struct _bdescr *link;		/* used for chaining blocks together */
-  struct _bdescr *back;		/* used (occasionally) for doubly-linked lists*/
+  union { 
+      struct _bdescr *back;	/* used (occasionally) for doubly-linked lists*/
+      StgWord *bitmap;
+  } u;
   unsigned int gen_no;		/* generation */
   struct _step *step;		/* step */
   StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
-  StgWord32 evacuated;           /* block is in to-space */
+  StgWord32 flags;              /* block is in to-space */
 #if SIZEOF_VOID_P == 8
   StgWord32 _padding[2];
 #else
@@ -65,6 +68,9 @@ typedef struct _bdescr {
 #define BDESCR_MASK  0x1f
 #define BDESCR_SHIFT 5
 #endif
+
+#define BF_EVACUATED 1
+#define BF_LARGE     2
 
 /* Finding the block descriptor for a given block -------------------------- */
 

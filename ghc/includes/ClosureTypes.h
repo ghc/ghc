@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.15 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: ClosureTypes.h,v 1.16 2001/07/23 17:23:19 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -67,20 +67,21 @@
 #define MUT_ARR_PTRS	        53
 #define MUT_ARR_PTRS_FROZEN     54
 #define MUT_VAR		        55
-#define WEAK		        56
-#define FOREIGN		        57
-#define STABLE_NAME	        58
+#define MUT_CONS                56
+#define WEAK		        57
+#define FOREIGN		        58
+#define STABLE_NAME	        59
 
-#define TSO		        59
-#define BLOCKED_FETCH	        60
-#define FETCH_ME                61
-#define FETCH_ME_BQ             62
-#define RBH                     63
+#define TSO		        60
+#define BLOCKED_FETCH	        61
+#define FETCH_ME                62
+#define FETCH_ME_BQ             63
+#define RBH                     64
 
-#define EVACUATED               64
+#define EVACUATED               65
 
-#define REMOTE_REF              65
+#define REMOTE_REF              66
 
-#define N_CLOSURE_TYPES         66
+#define N_CLOSURE_TYPES         67
 
 #endif /* CLOSURETYPES_H */

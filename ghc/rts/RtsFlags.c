@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.40 2001/07/23 10:42:37 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.41 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -235,6 +235,7 @@ void initRtsFlagsDefaults(void)
 #else
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.steps              = 2;
+    RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
 #endif
 #ifdef RTS_GTK_FRONTPANEL
@@ -387,6 +388,7 @@ usage_text[] = {
 "  -m<n>%   Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
 "  -T<n>    Number of steps in younger generations (default: 2)",
+"  -c       Enable compaction for the oldest generation",
 "",
 "  -t<file> One-line GC statistics  (default file: <program>.stat)",
 "  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
@@ -615,6 +617,10 @@ error = rtsTrue;
 
 	      case 'B':
 		RtsFlags.GcFlags.ringBell = rtsTrue;
+		break;
+
+	      case 'c':
+		RtsFlags.GcFlags.compact = rtsTrue;
 		break;
 
 	      case 'F':

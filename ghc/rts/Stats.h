@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.h,v 1.10 2000/12/19 14:30:39 simonmar Exp $
+ * $Id: Stats.h,v 1.11 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,8 +22,8 @@ extern void      stat_workerStop(void);
 
 extern void      initStats(void);
 
-extern void      stat_describe_gens(void);
 extern double    mut_user_time_during_GC(void);
 extern double    mut_user_time(void);
 
+extern void      statDescribeGens( void );
 extern HsInt     getAllocations( void );

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.8 2001/07/23 10:47:16 simonmar Exp $
+ * $Id: StgStorage.h,v 1.9 2001/07/23 17:23:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,17 +55,19 @@ typedef struct _step {
   struct _generation *gen;	/* generation this step belongs to */
   unsigned int gen_no;          /* generation number (cached) */
   bdescr *large_objects;	/* large objects (doubly linked) */
+  int is_compacted;             /* compact this step */
 
   /* temporary use during GC: */
   StgPtr  hp;			/* next free locn in to-space */
   StgPtr  hpLim;		/* end of current to-space block */
   bdescr *hp_bd;		/* bdescr of current to-space block */
-  bdescr *to_space;		/* bdescr of first to-space block */
-  unsigned int to_blocks;		/* number of blocks in to-space */
+  bdescr *to_blocks;		/* bdescr of first to-space block */
+  unsigned int n_to_blocks;	/* number of blocks in to-space */
   bdescr *scan_bd;		/* block currently being scanned */
   StgPtr  scan;			/* scan pointer in current block */
   bdescr *new_large_objects;    /* large objects collected so far */
   bdescr *scavenged_large_objects; /* live large objects after GC (dbl link) */
+  bdescr *bitmap;               /* bitmap for compacting collection */
 } step;
 
 typedef struct _generation {
@@ -105,11 +107,17 @@ typedef struct _generation {
 #define CloseNursery(hp)  (CurrentNursery->free = (P_)(hp)+1)
 
 /* -----------------------------------------------------------------------------
+   Prototype for an evacuate-like function
+   -------------------------------------------------------------------------- */
+
+typedef void (*evac_fn)(StgClosure **);
+
+/* -----------------------------------------------------------------------------
    Trigger a GC from Haskell land.
    -------------------------------------------------------------------------- */
 
 extern void performGC(void);
 extern void performMajorGC(void);
-extern void performGCWithRoots(void (*get_roots)(void));
+extern void performGCWithRoots(void (*get_roots)(evac_fn));
 
 #endif /* STGSTORAGE_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StablePriv.h,v 1.2 1999/02/05 16:02:56 simonm Exp $
+ * $Id: StablePriv.h,v 1.3 2001/07/23 17:23:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,8 +7,11 @@
  *
  * ---------------------------------------------------------------------------*/
 
-extern void initStablePtrTable(void);
-extern void markStablePtrTable(rtsBool full);
-extern void enlargeStablePtrTable(void);
-extern void gcStablePtrTable(rtsBool full);
-extern StgWord lookupStableName(StgPtr p);
+extern void    initStablePtrTable    ( void );
+extern void    enlargeStablePtrTable ( void );
+extern StgWord lookupStableName      ( StgPtr p );
+
+extern void    markStablePtrTable    ( evac_fn evac );
+extern void    threadStablePtrTable  ( evac_fn evac );
+extern void    gcStablePtrTable      ( void );
+extern void    updateStablePtrTable  ( rtsBool full );
