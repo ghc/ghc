@@ -21,7 +21,7 @@ module Foreign.C.TypesISO
 
 	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable
-	, CClock(..),   CTime(..),
+	, CClock(..),   CTime(..)
 
           -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf

@@ -17,7 +17,7 @@
 
 module Foreign.StablePtr
         ( -- * Stable references to Haskell values
-	  StablePtr,         -- abstract
+	  StablePtr          -- abstract
         , newStablePtr       -- :: a -> IO (StablePtr a)
         , deRefStablePtr     -- :: StablePtr a -> IO a
         , freeStablePtr      -- :: StablePtr a -> IO ()

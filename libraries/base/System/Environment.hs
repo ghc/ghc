@@ -14,7 +14,7 @@
 
 module System.Environment
     ( 
-    , getArgs	    -- :: IO [String]
+      getArgs	    -- :: IO [String]
     , getProgName   -- :: IO String
     , getEnv        -- :: String -> IO String
   ) where

@@ -18,7 +18,7 @@
 module Foreign.ForeignPtr
         ( 
 	-- * Finalised data pointers
-	  ForeignPtr,            -- abstract, instance of: Eq
+	  ForeignPtr             -- abstract, instance of: Eq
         , newForeignPtr          -- :: Ptr a -> IO () -> IO (ForeignPtr a)
         , addForeignPtrFinalizer -- :: ForeignPtr a -> IO () -> IO ()
 	, withForeignPtr         -- :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
