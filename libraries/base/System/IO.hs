@@ -161,8 +161,6 @@ module System.IO (
     openTempFile,
     openBinaryTempFile,
 #endif
-
-    module System.IO.Error,
   ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -170,7 +168,6 @@ import GHC.Base
 import GHC.IOBase	-- Together these four Prelude modules define
 import GHC.Handle	-- all the stuff exported by IO for the GHC version
 import GHC.IO
-import GHC.ST		( fixST )
 import GHC.Exception
 import GHC.Num
 import GHC.Read
@@ -223,25 +220,6 @@ import IO
   )
 import NHC.IOExtras (fixIO)
 #endif
-
-import System.IO.Error (
-    isAlreadyExistsError, isDoesNotExistError,  -- :: IOError -> Bool
-    isAlreadyInUseError, isFullError, 
-    isEOFError, isIllegalOperation, 
-    isPermissionError, isUserError, 
- 
-    ioeGetErrorString,         -- :: IOError -> String
-    ioeGetHandle,              -- :: IOError -> Maybe Handle
-    ioeGetFileName,            -- :: IOError -> Maybe FilePath
- 
-    try,                       -- :: IO a -> IO (Either IOError a)
- 
-    -- re-exports of Prelude names
-    IOError,
-    ioError,                   -- :: IOError -> IO a
-    userError,                 -- :: String  -> IOError
-    catch                      -- :: IO a    -> (IOError -> IO a) -> IO a
-  )
 
 -- -----------------------------------------------------------------------------
 -- Standard IO
