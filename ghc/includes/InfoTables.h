@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.7 1999/01/26 16:16:21 simonm Exp $
+ * $Id: InfoTables.h,v 1.8 1999/02/05 12:41:32 sof Exp $
  * 
  * Info Tables
  *
@@ -300,9 +300,15 @@ typedef StgClosure* StgSRT[];
 
 typedef struct _StgInfoTable {
     StgSRT         *srt;	/* pointer to the SRT table */
+#ifdef PAR
     StgParInfo	    par;
+#endif
+#ifdef PROFILING
     StgProfInfo     prof;
+#endif
+#ifdef DEBUG_CLOSURE
     StgDebugInfo    debug;
+#endif
     StgClosureInfo  layout;	/* closure layout info (pointer-sized) */
 #if SIZEOF_VOID_P == 8
     StgNat16        flags;	/* }                                   */

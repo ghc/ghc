@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.5 1999/01/26 11:12:55 simonm Exp $
+ * $Id: Closures.h,v 1.6 1999/02/05 12:41:31 sof Exp $
  *
  * Closures
  *
@@ -91,9 +91,15 @@ typedef struct {
 
 typedef struct {
 	const struct _StgInfoTable* info;
+#ifdef PROFILING
 	StgProfHeader         prof;
+#endif
+#ifdef GRAN
 	StgGranHeader         par;
+#endif
+#ifdef TICKY
 	StgTickyHeader        ticky;
+#endif
 } StgHeader;
 
 #define FIXED_HS (sizeof(StgHeader))
