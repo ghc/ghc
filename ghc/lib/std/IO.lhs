@@ -87,6 +87,7 @@ module IO (
 
 #ifdef __HUGS__
 import Ix(Ix)
+import Prelude
 import privileged Prelude ( IORef
 			  , unsafePerformIO
 			  , prelCleanupAfterRunAction

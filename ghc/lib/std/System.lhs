@@ -188,6 +188,7 @@ unpackProgName argv
 --
 -- Suitable for use with Hugs 98
 -----------------------------------------------------------------------------
+import Prelude
 import privileged Prelude ( primGetRawArgs
 			  , primGetEnv
 			  , prelCleanupAfterRunAction
