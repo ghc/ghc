@@ -18,7 +18,10 @@ test "ffi003"   { skip when $platform == "alpha-dec-osf3" -- no NCG on Alpha yet
 
 test "ffi004"   { vtr("-fglasgow-exts", "", "") }
 
-test "ffi005"   { vtr("-fglasgow-exts", "", "3") }
+-- skip this test for now: it is non-portable due to the use of literal values
+-- instead of CPP symbols for the flag arguments to open().
+test "ffi005"   { skip when True
+	 	  vtr("-fglasgow-exts", "", "3") }
 
 test "ffi006"   { vtr("-fglasgow-exts", "", "") }
 test "ffi007"   { vtr("-fglasgow-exts", "", "") }
