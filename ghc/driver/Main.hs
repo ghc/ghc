@@ -70,6 +70,11 @@ long_usage = do
      dump ('$':'$':s) = hPutStr stderr get_prog_name >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
 
+version_str = _ProjectVersion ++ 
+		( if _ProjectPatchLevel /= "0" && _ProjectPatchLevel /= ""
+			then '.':_ProjectPatchLevel
+			else "")
+
 -----------------------------------------------------------------------------
 -- Phases
 
@@ -1609,10 +1614,11 @@ opts =
   
 
       ------- version ----------------------------------------------------
-  ,  ( "-version"	, NoArg (do hPutStrLn stderr (_ProjectName
-				      ++ ", version " ++ _ProjectVersion
-				      ++ ", patchlevel " ++ _ProjectPatchLevel)
-				    exitWith ExitSuccess))
+  ,  ( "-version"	 , NoArg (do hPutStrLn stderr (_ProjectName
+				      ++ ", version " ++ version_str)
+				     exitWith ExitSuccess))
+  ,  ( "-numeric-version", NoArg (do hPutStrLn stderr version_str
+				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
   ,  ( "v"		, NoArg (writeIORef verbose True) )
