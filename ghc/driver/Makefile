@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.32 2000/06/13 16:07:20 simonmar Exp $
+# $Id: Makefile,v 1.33 2000/06/14 10:27:07 simonmar Exp $
 #
 
 TOP=..
@@ -20,6 +20,9 @@ MKDEPENDHS_SRCS = Config.hs Main.hs PackageSrc.hs
 LINK = ghc
 
 SUBDIRS = mangler split stats
+
+# we need the driver for generating dependencies...
+boot :: all
 
 # -----------------------------------------------------------------------------
 # Create driver configuration
@@ -72,22 +75,6 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 CLEAN_FILES += Config.hs
 
 # -----------------------------------------------------------------------------
-# Create link to from ghc-x.xx to ghc...
-
-all :: $(LINK)
-
-$(LINK) : $(HS_PROG)
-	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK)"; \
-	   $(RM) $(LINK); \
-	   $(LN_S) $(HS_PROG) $(LINK); \
-	 else \
-	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK) failed: \`$(LINK)' already exists"; \
-	   echo "Perhaps remove \`$(LINK)' manually?"; \
-	   exit 1; \
-	 fi;
-
-# -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
 
 all :: ghc-inplace
@@ -119,7 +106,7 @@ CLEAN_FILES += pkgconf package.conf.inplace package.conf
 # -----------------------------------------------------------------------------
 # installation...
 
-INSTALL_PROGS = ghc
+INSTALL_PROGS = ghc-$(ProjectVersion)
 
 override datadir=$(libdir)
 INSTALL_DATAS += ghc-usage.txt
@@ -127,3 +114,30 @@ INSTALL_DATAS += ghc-usage.txt
 # -----------------------------------------------------------------------------
 
 include $(TOP)/mk/target.mk
+
+# -----------------------------------------------------------------------------
+# Create link to from ghc-x.xx to ghc...
+
+all :: $(LINK)
+
+$(LINK) : $(HS_PROG)
+	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK)"; \
+	   $(RM) $(LINK); \
+	   $(LN_S) $(HS_PROG) $(LINK); \
+	 else \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK) failed: \`$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
+
+install ::
+	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbol link from $(HS_PROG) to $(LINK) in $(bindir)"; \
+	   $(RM) $(bindir)/$(LINK); \
+	   $(LN_S) $(HS_PROG) $(bindir)/$(LINK); \
+	 else \
+	   echo "Creating a symbol link from $(HS_PROG) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(bindir)/$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
