@@ -13,24 +13,24 @@ IMP_Ubiq(){-uitous-}
 import StgSyn
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag, foldBag )
-import Id		( idType, isDataCon, dataConArgTys,
+import Id		( idType, isAlgCon, dataConArgTys,
 			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
-			  mkIdSet, intersectIdSets,
+			  mkIdSet, intersectIdSets, 
 			  unionIdSets, idSetToList, SYN_IE(IdSet),
 			  GenId{-instanced NamedThing-}, SYN_IE(Id)
 			)
 import Literal		( literalType, Literal{-instance Outputable-} )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
-import Outputable	( Outputable(..){-instance * []-} )
+import Outputable	( PprStyle, Outputable(..){-instance * []-} )
 import PprType		( GenType{-instance Outputable-}, TyCon )
-import PprStyle         ( PprStyle )
 import Pretty		-- quite a bit of it
 import PrimOp		( primOpType )
 import SrcLoc		( SrcLoc{-instance Outputable-} )
 import Type		( mkFunTys, splitFunTy, maybeAppDataTyConExpandingDicts,
 			  isTyVarTy, eqTy, splitFunTyExpandingDicts, SYN_IE(Type)
 			)
+import TyCon		( isDataTyCon )
 import Util		( zipEqual, pprPanic, panic, panic# )
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
@@ -182,10 +182,10 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
 
 	-- Check that it is a data type
     case (maybeAppDataTyConExpandingDicts scrut_ty) of
-      Nothing -> addErrL (mkCaseDataConMsg e)	`thenL_`
-		 returnL Nothing
-      Just (tycon, _, _)
+      Just (tycon, _, _) | isDataTyCon tycon
 	      -> lintStgAlts alts scrut_ty tycon
+      other   -> addErrL (mkCaseDataConMsg e)	`thenL_`
+		 returnL Nothing
   where
     scrut_ty = get_ty alts
 
@@ -423,7 +423,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 \begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
-  = if isLocallyDefined id && not (isDataCon id) && not (id `elementOfIdSet` scope) then
+  = if isLocallyDefined id && not (isAlgCon id) && not (id `elementOfIdSet` scope) then
 	((), addErr errs (\ sty -> hsep [ppr sty id, ptext SLIT("is out of scope")]) loc)
     else
 	((), errs)
