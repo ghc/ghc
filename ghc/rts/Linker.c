@@ -2450,10 +2450,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    }
 
    if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) {
-       IF_DEBUG(linker,debugBelch( "Is little-endian" ));
+       IF_DEBUG(linker,debugBelch( "Is little-endian\n" ));
    } else
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
-       IF_DEBUG(linker,debugBelch( "Is big-endian" ));
+       IF_DEBUG(linker,debugBelch( "Is big-endian\n" ));
    } else {
        errorBelch("%s: unknown endiannness", oc->fileName);
        return 0;
@@ -2463,7 +2463,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       errorBelch("%s: not a relocatable object (.o) file", oc->fileName);
       return 0;
    }
-   IF_DEBUG(linker, debugBelch( "Is a relocatable object (.o) file" ));
+   IF_DEBUG(linker, debugBelch( "Is a relocatable object (.o) file\n" ));
 
    IF_DEBUG(linker,debugBelch( "Architecture is " ));
    switch (ehdr->e_machine) {
@@ -2479,7 +2479,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    }
 
    IF_DEBUG(linker,debugBelch(
-             "\nSection header table: start %d, n_entries %d, ent_size %d",
+             "\nSection header table: start %d, n_entries %d, ent_size %d\n",
              ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
@@ -2490,7 +2490,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       errorBelch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
-      IF_DEBUG(linker,debugBelch( "Section header string table is section %d",
+      IF_DEBUG(linker,debugBelch( "Section header string table is section %d\n",
                           ehdr->e_shstrndx));
       sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
    }
@@ -2541,11 +2541,11 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    IF_DEBUG(linker,debugBelch( "\nSymbol tables" ));
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
-      IF_DEBUG(linker,debugBelch( "section %d is a symbol table", i ));
+      IF_DEBUG(linker,debugBelch( "section %d is a symbol table\n", i ));
       nsymtabs++;
       stab = (Elf_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
-      IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%d rem)",
+      IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%d rem)\n",
                nent,
                shdr[i].sh_size % sizeof(Elf_Sym)
              ));
@@ -2592,6 +2592,38 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    return 1;
 }
 
+static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
+{
+    *is_bss = FALSE;
+
+    if (hdr->sh_type == SHT_PROGBITS
+	&& (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_EXECINSTR)) {
+	/* .text-style section */
+	return SECTIONKIND_CODE_OR_RODATA;
+    }
+
+    if (hdr->sh_type == SHT_PROGBITS
+	    && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
+	    /* .data-style section */
+	    return SECTIONKIND_RWDATA;
+    }
+
+    if (hdr->sh_type == SHT_PROGBITS
+	&& (hdr->sh_flags & SHF_ALLOC) && !(hdr->sh_flags & SHF_WRITE)) {
+	/* .rodata-style section */
+	return SECTIONKIND_CODE_OR_RODATA;
+    }
+
+    if (hdr->sh_type == SHT_NOBITS
+	&& (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
+	/* .bss-style section */
+	*is_bss = TRUE;
+	return SECTIONKIND_RWDATA;
+    }
+
+    return SECTIONKIND_OTHER;
+}
+
 
 static int
 ocGetNames_ELF ( ObjectCode* oc )
@@ -2616,34 +2648,8 @@ ocGetNames_ELF ( ObjectCode* oc )
       /* Figure out what kind of section it is.  Logic derived from
          Figure 1.14 ("Special Sections") of the ELF document
          ("Portable Formats Specification, Version 1.1"). */
-      Elf_Shdr    hdr    = shdr[i];
-      SectionKind kind   = SECTIONKIND_OTHER;
       int         is_bss = FALSE;
-
-      if (hdr.sh_type == SHT_PROGBITS
-          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_EXECINSTR)) {
-         /* .text-style section */
-         kind = SECTIONKIND_CODE_OR_RODATA;
-      }
-      else
-      if (hdr.sh_type == SHT_PROGBITS
-          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
-         /* .data-style section */
-         kind = SECTIONKIND_RWDATA;
-      }
-      else
-      if (hdr.sh_type == SHT_PROGBITS
-          && (hdr.sh_flags & SHF_ALLOC) && !(hdr.sh_flags & SHF_WRITE)) {
-         /* .rodata-style section */
-         kind = SECTIONKIND_CODE_OR_RODATA;
-      }
-      else
-      if (hdr.sh_type == SHT_NOBITS
-          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
-         /* .bss-style section */
-         kind = SECTIONKIND_RWDATA;
-         is_bss = TRUE;
-      }
+      SectionKind kind   = getSectionKind_ELF(&shdr[i], &is_bss);
 
       if (is_bss && shdr[i].sh_size > 0) {
          /* This is a non-empty .bss section.  Allocate zeroed space for
@@ -2748,7 +2754,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             }
          } else {
             /* Skip. */
-            IF_DEBUG(linker,debugBelch( "skipping `%s'",
+            IF_DEBUG(linker,debugBelch( "skipping `%s'\n",
                                    strtab + stab[j].st_name ));
             /*
             debugBelch(
@@ -2785,8 +2791,18 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    targ  = (Elf_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d",
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
                           target_shndx, symtab_shndx ));
+
+   /* Skip sections that we're not interested in. */
+   {
+       int is_bss;
+       SectionKind kind = getSectionKind_ELF(&shdr[target_shndx], &is_bss);
+       if (kind == SECTIONKIND_OTHER) {
+	   IF_DEBUG(linker,debugBelch( "skipping (target section not loaded)"));
+	   return 1;
+       }
+   }
 
    for (j = 0; j < nent; j++) {
       Elf_Addr offset = rtab[j].r_offset;
@@ -2825,10 +2841,10 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	    return 0;
          }
-         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p", symbol, (void*)S ));
+         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p\n", symbol, (void*)S ));
       }
 
-      IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p",
+      IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p\n",
 			     (void*)P, (void*)S, (void*)A ));
       checkProddableBlock ( oc, pP );
 
@@ -2866,7 +2882,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    targ  = (Elf_Addr) (ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d",
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
@@ -3065,7 +3081,6 @@ ocResolve_ELF ( ObjectCode* oc )
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
-   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
 
    /* first find "the" symbol table */
    stab = (Elf_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
@@ -3080,15 +3095,7 @@ ocResolve_ELF ( ObjectCode* oc )
 
    /* Process the relocation sections. */
    for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
-
-      /* Skip sections called ".rel.stab".  These appear to contain
-         relocation entries that, when done, make the stabs debugging
-         info point at the right places.  We ain't interested in all
-         dat jazz, mun. */
-      if (0 == memcmp(".rel.stab", sh_strtab + shdr[shnum].sh_name, 9))
-         continue;
-
-      if (shdr[shnum].sh_type == SHT_REL ) {
+      if (shdr[shnum].sh_type == SHT_REL) {
          ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr,
                                        shnum, stab, strtab );
          if (!ok) return ok;
