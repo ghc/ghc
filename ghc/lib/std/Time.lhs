@@ -83,7 +83,10 @@ external calendar time @CalendarTime@.
 -- In fact, I think one of Int32 or Word32 would do. - ADR
 data ClockTime = TOD Int64 Int64 deriving (Eq, Ord)
 #else
-data ClockTime = TOD Integer Integer deriving (Eq, Ord)
+data ClockTime = TOD Integer 		-- Seconds since 00:00:00 on 1 Jan 1970
+		     Integer		-- Picoseconds with the specified second
+	       deriving (Eq, Ord)
+		
 #endif
 \end{code}
 
