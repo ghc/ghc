@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.10 1999/03/15 16:30:29 simonm Exp $
+ * $Id: Printer.c,v 1.11 1999/04/27 12:27:49 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -52,7 +52,7 @@ char* lookupHugsItblName ( void* v )
 }
 #endif
 
-extern void printPtr( StgPtr p )
+void printPtr( StgPtr p )
 {
     char* str;
     const char *raw;
@@ -809,4 +809,14 @@ extern void DEBUG_LoadSymbols( char *name )
 
 #endif /* HAVE_BFD_H */
 
+#else /* DEBUG */
+void printPtr( StgPtr p )
+{
+    fprintf(stderr, "ptr 0x%p (enable -DDEBUG for more info) " , p );
+}
+  
+void printObj( StgClosure *obj )
+{
+    fprintf(stderr, "obj 0x%p (enable -DDEBUG for more info) " , obj );
+}
 #endif /* DEBUG */

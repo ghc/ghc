@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/04/27 10:07:16 $
+ * $Revision: 1.13 $
+ * $Date: 1999/04/27 12:27:50 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -68,13 +68,14 @@
 #define USE_GCC_LABELS 1
 #else
 #define USE_GCC_LABELS 0
+#error yo dudes
 #endif
 
 /* --------------------------------------------------------------------------
  * Crude profiling stuff (mainly to assess effect of optimiser)
  * ------------------------------------------------------------------------*/
 
-#if CRUDE_PROFILING
+#ifdef CRUDE_PROFILING
 
 #define M_CPTAB 10000
 #define CP_NIL (-1)
@@ -329,7 +330,7 @@ void      SloppifyIntegerEnd ( StgPtr );
 
 
 /* Macros to save/load local state. */
-#if DEBUG
+#ifdef DEBUG
 #define SSS { tSp=Sp = xSp; tSu=Su = xSu; tSpLim=SpLim = xSpLim; }
 #define LLL { tSp=xSp = Sp; tSu=xSu = Su; tSpLim=xSpLim = SpLim; }
 #else
@@ -438,7 +439,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
     register StgClosure*      obj;    /* object currently under evaluation */
              char             eCount; /* enter counter, for context switching */
 
-#if DEBUG
+#ifdef DEBUG
     /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
     StgPtr tSp = Sp; StgUpdateFrame* tSu = Su; StgPtr tSpLim = SpLim;
 #endif
@@ -454,7 +455,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 
     enterLoop:
 
-#if DEBUG
+#ifdef DEBUG
     assert(Sp == tSp);
     assert(Su == tSu);
     assert(SpLim == tSpLim);
@@ -1196,7 +1197,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                        IF_DEBUG(evaluator,
                                 fprintf(stderr, "object to enter is a constructor -- "
                                         "jumping directly to return continuation\n" );
-                               )
+                               );
                        goto bco_entry;
                     }
 
@@ -1571,7 +1572,7 @@ static inline StgStablePtr    taggedStackStable  ( StgStackOffset i )
 static inline StgPtr grabHpUpd( nat size )
 {
     ASSERT( size >= MIN_UPD_SIZE + sizeofW(StgHeader) );
-#if CRUDE_PROFILING
+#ifdef CRUDE_PROFILING
     cp_bill_words ( size );
 #endif
     return allocate(size);
@@ -1580,7 +1581,7 @@ static inline StgPtr grabHpUpd( nat size )
 static inline StgPtr grabHpNonUpd( nat size )
 {
     ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-#if CRUDE_PROFILING
+#ifdef CRUDE_PROFILING
     cp_bill_words ( size );
 #endif
     return allocate(size);

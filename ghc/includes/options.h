@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:07:22 $
+ * $Revision: 1.6 $
+ * $Date: 1999/04/27 12:27:56 $
  * ------------------------------------------------------------------------*/
 
 
@@ -232,13 +232,14 @@
 
 /* Turn on debugging output and some sanity checks
  */
-#define DEBUG  1
-/*#define NDEBUG */
+/*#define DEBUG 1*/
+#undef DEBUG
 
 /* Make stack tags more informative than just their size.
  * Helps when printing the stack and when running sanity checks.
  */
-#define DEBUG_EXTRA 1
+/*#define DEBUG_EXTRA 1*/
+#undef DEBUG_EXTRA
 
 /* Turn lazy blackholing on/off.
  * Warning: Lazy blackholing can't be disabled in GHC generated code.
