@@ -636,6 +636,9 @@ is_G_instr instr
 
 	      | ADD	      Bool Bool Reg RI Reg -- x?, cc?, src1, src2, dst
 	      | SUB	      Bool Bool Reg RI Reg -- x?, cc?, src1, src2, dst
+	      | UMUL	           Bool Reg RI Reg --     cc?, src1, src2, dst
+	      | SMUL	           Bool Reg RI Reg --     cc?, src1, src2, dst
+              | RDY           Reg	-- move contents of Y register to reg
 
 -- Simple bit-twiddling.
 

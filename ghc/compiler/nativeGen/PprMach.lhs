@@ -1527,6 +1527,10 @@ pprInstr (SLL reg1 ri reg2) = pprRegRIReg SLIT("sll") False reg1 ri reg2
 pprInstr (SRL reg1 ri reg2) = pprRegRIReg SLIT("srl") False reg1 ri reg2
 pprInstr (SRA reg1 ri reg2) = pprRegRIReg SLIT("sra") False reg1 ri reg2
 
+pprInstr (RDY rd) = ptext SLIT("\trd\t%y,") <> pprReg rd
+pprInstr (SMUL b reg1 ri reg2) = pprRegRIReg SLIT("smul")  b reg1 ri reg2
+pprInstr (UMUL b reg1 ri reg2) = pprRegRIReg SLIT("umul")  b reg1 ri reg2
+
 pprInstr (SETHI imm reg)
   = hcat [
 	ptext SLIT("\tsethi\t"),

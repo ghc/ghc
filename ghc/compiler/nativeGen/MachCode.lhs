@@ -1353,14 +1353,15 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Nat_Add -> trivialCode (ADD False False) x y
       MO_Nat_Sub -> trivialCode (SUB False False) x y
 
-	-- ToDo: teach about V8+ SPARC mul/div instructions
-      MO_NatS_Quot -> imul_div SLIT(".div")  x y
-      MO_NatS_Rem  -> imul_div SLIT(".rem")  x y
-      MO_NatU_Quot -> imul_div SLIT(".udiv")  x y
-      MO_NatU_Rem  -> imul_div SLIT(".urem")  x y
+      MO_NatS_Mul  -> trivialCode (SMUL False) x y
+      MO_NatU_Mul  -> trivialCode (UMUL False) x y
+      MO_NatS_MulMayOflo -> imulMayOflo x y
 
-      MO_NatS_Mul  -> imul_div SLIT(".umul") x y
-      MO_NatU_Mul  -> imul_div SLIT(".umul") x y
+      -- ToDo: teach about V8+ SPARC div instructions
+      MO_NatS_Quot -> idiv SLIT(".div")  x y
+      MO_NatS_Rem  -> idiv SLIT(".rem")  x y
+      MO_NatU_Quot -> idiv SLIT(".udiv")  x y
+      MO_NatU_Rem  -> idiv SLIT(".urem")  x y
 
       MO_Flt_Add   -> trivialFCode FloatRep  FADD x y
       MO_Flt_Sub   -> trivialFCode FloatRep  FSUB x y
@@ -1388,7 +1389,29 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
 
       other -> pprPanic "getRegister(sparc) - binary StMachOp (1)" (pprMachOp mop)
   where
-    imul_div fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
+    idiv fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
+
+    --------------------
+    imulMayOflo :: StixExpr -> StixExpr -> NatM Register
+    imulMayOflo a1 a2
+       = getNewRegNCG IntRep		`thenNat` \ t1 ->
+         getNewRegNCG IntRep		`thenNat` \ t2 ->
+         getNewRegNCG IntRep		`thenNat` \ res_lo ->
+         getNewRegNCG IntRep		`thenNat` \ res_hi ->
+         getRegister a1			`thenNat` \ reg1 ->
+         getRegister a2 		`thenNat` \ reg2 ->
+         let code1 = registerCode reg1 t1
+             code2 = registerCode reg2 t2
+             src1  = registerName reg1 t1
+             src2  = registerName reg2 t2
+             code dst = toOL [
+                           SMUL False src1 (RIReg src2) res_lo,
+                           RDY res_hi,
+                           SRA res_lo (RIImm (ImmInt 31)) res_lo,
+                           SUB False False res_lo (RIReg res_hi) dst
+                        ]
+         in
+            returnNat (Any IntRep code)
 
 getRegister (StInd pk mem)
   = getAmode mem    	    	    `thenNat` \ amode ->
