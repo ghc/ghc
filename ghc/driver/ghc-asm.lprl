@@ -782,7 +782,28 @@ sub mangle_asm {
 				                           # (this SEGVs perl4 on alphas, you see)
 
 	    $to_move = $1;
-	    if ( $i < ($numchks - 1)
+
+	    # on x86 we try not to copy any directives into a literal
+	    # chunk, rather we keep looking for the next real chunk.  This
+	    # is because we get things like
+	    #
+	    #    .globl blah_closure
+	    #    .LC32
+	    #    	.string "..."
+	    #    blah_closure:
+	    #		...
+            #
+	    if ( $TargetPlatform =~ /^i386/ && $to_move =~ /$TCOPYDIRVS/ ) {
+		$j = $i + 1;
+		while ( $j < ($numchks - 1)  && $chk[$j] =~ /$T_CONST_LBL/) {
+			$j++;
+		}
+		if ( $j < ($numchks - 1)) {
+			$chk[$j] = $to_move . $chk[$j];
+	        }
+	    }
+
+	    elsif ( $i < ($numchks - 1)
 	      && ( $to_move =~ /$TCOPYDIRVS/
 	        || ($TargetPlatform =~ /^hppa/ && $to_move =~ /align/ && $chkcat[$i+1] eq 'literal') )) {
 		$chk[$i + 1] = $to_move . $chk[$i + 1];
