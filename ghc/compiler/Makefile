@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.147 2001/03/27 00:43:04 qrczak Exp $
+# $Id: Makefile,v 1.148 2001/03/27 09:38:02 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -96,7 +96,12 @@ SRC_HC_OPTS += -DILX
 endif
 endif
 
+ifeq "$(BootingFromHc)" "YES"
+# HC files are always from a self-booted compiler
+ghc_411_at_least = 1
+else
 ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
+endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
@@ -117,7 +122,7 @@ endif
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
 ifeq "$(BootingFromHc)" "YES"
-HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hs
+HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hc
 endif
 
 HS_OBJS  = \
@@ -135,7 +140,7 @@ C_SRCS += parser/hschooks.c
 # Big Fudge to get around inherent problem that Makefile setup
 # has got with 'mkdependC'.
 # 
-SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDES)
 
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
@@ -149,8 +154,12 @@ HC=$(GHC)
 #
 # Use GHC for compiling C bits
 #
+ifeq "$(BootingFromHc)" "YES"
+SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+else
 CC = $(HC)
 CC_OPTS := $(addprefix -optc, $(CC_OPTS))
+endif
 
 # magic from GNU make manual to convert a list of values
 # into a colon-separated list
@@ -242,9 +251,13 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
 
+ifneq "$(BootingFromHc)" "YES"
 prelude/PrimOp.lhs prelude/PrimOp.o: $(PRIMOP_BITS)
+endif
 
+ifneq "$(BootingFromHc)" "YES"
 depend :: $(PRIMOP_BITS)
+endif
 
 primop-data-decl.hs-incl: prelude/primops.txt
 	$(GENPOC) --data-decl          < $< > $@
