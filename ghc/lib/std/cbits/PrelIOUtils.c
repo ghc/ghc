@@ -65,12 +65,12 @@ HsInt prel_setmode(HsInt fd, HsBool toBin)
 #endif  
 }
 
-HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
+HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, int sz)
 {
   return write(fd,ptr + off, sz);
 }
 
-HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
+HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, int sz)
 {
   return read(fd,ptr + off, sz);
 }
