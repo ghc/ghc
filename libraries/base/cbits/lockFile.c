@@ -1,15 +1,26 @@
 /* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-2004
  *
- * $Id: lockFile.c,v 1.2 2002/02/07 11:13:30 simonmar Exp $
+ * $Id: lockFile.c,v 1.3 2004/06/02 12:35:11 simonmar Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
 
 #include "HsBase.h"
+#include "Rts.h"
+#include "../../ghc/rts/RtsUtils.h" // for barf()
 
-#ifndef FD_SETSIZE
-#define FD_SETSIZE 256
+#ifdef mingw32_TARGET_OS
+   // The Win32 C runtime has a max of 2048 file descriptors (see
+   // _NHANDLE_ in the crt sources), but mingw defines FD_SETSIZE to
+   // 64.
+#  define NUM_FDS 2048
+#else
+#  ifndef FD_SETSIZE
+#    error No FD_SETSIZE defined!
+#  else
+#    define NUM_FDS FD_SETSIZE
+#  endif
 #endif
 
 typedef struct {
@@ -18,8 +29,8 @@ typedef struct {
     int fd;
 } Lock;
 
-static Lock readLock[FD_SETSIZE];
-static Lock writeLock[FD_SETSIZE];
+static Lock readLock[NUM_FDS];
+static Lock writeLock[NUM_FDS];
 
 static int readLocks = 0;
 static int writeLocks = 0;
@@ -29,6 +40,10 @@ lockFile(int fd, int for_writing, int exclusive)
 {
     struct stat sb;
     int i;
+
+    if (fd > NUM_FDS) {
+	barf("lockFile: fd out of range");
+    }
 
     while (fstat(fd, &sb) < 0) {
 	if (errno != EINTR) {
