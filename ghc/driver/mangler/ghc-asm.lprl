@@ -223,7 +223,10 @@ sub init_TARGET_STUFF {
 
     $T_DOT_WORD     = '\.(quad|long|value|byte|zero)';
     $T_DOT_GLOBAL   = '\.global';
+
+    $T_HDR_literal16 = "\.section\t\.rodata.cst16\n\t.align 16\n";
     $T_HDR_literal  = "\.section\t\.rodata\n";
+
     $T_HDR_misc     = "\.text\n\t\.align 8\n";
     $T_HDR_data     = "\.data\n\t\.align 8\n";
     $T_HDR_rodata   = "\.section\t\.rodata\n\t\.align 8\n";
@@ -1141,7 +1144,22 @@ sub mangle_asm {
     # print out all the literal strings next
     for ($i = 0; $i < $numchks; $i++) {
 	if ( $chkcat[$i] eq 'literal' ) {
-	    print OUTASM $T_HDR_literal, $chk[$i];
+
+	    # HACK: try to detect 16-byte constants and align them
+	    # on a 16-byte boundary.  x86_64 sometimes needs 128-bit
+	    # aligned constants.
+	    if ( $TargetPlatform =~ /^x86_64/ ) { 
+		$z = $chk[$i];
+ 		if ($z =~ /(\.long.*\n.*\.long.*\n.*\.long.*\n.*\.long|\.quad.*\n.*\.quad)/) {
+		    print OUTASM $T_HDR_literal16;
+		} else {
+		    print OUTASM $T_HDR_literal;
+		}
+ 	    } else {
+		print OUTASM $T_HDR_literal;
+	    }
+
+	    print OUTASM $chk[$i];
 	    print OUTASM "; end literal\n" if $TargetPlatform =~ /^hppa/; # for the splitter
 
 	    $chkcat[$i] = 'DONE ALREADY';
