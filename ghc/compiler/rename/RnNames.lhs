@@ -762,8 +762,9 @@ gre_is_used used_names gre = gre_name gre `elemNameSet` used_names
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: TcGblEnv -> RnM ()
-reportUnusedNames gbl_env 
+reportUnusedNames :: Maybe [Located (IE RdrName)] 	-- Export list
+		  -> TcGblEnv -> RnM ()
+reportUnusedNames export_decls gbl_env 
   = do	{ warnUnusedTopBinds   unused_locals
 	; warnUnusedModules    unused_imp_mods
 	; warnUnusedImports    unused_imports	
@@ -813,8 +814,10 @@ reportUnusedNames gbl_env
     -- To figure out the minimal set of imports, start with the things
     -- that are in scope (i.e. in gbl_env).  Then just combine them
     -- into a bunch of avails, so they are properly grouped
+    --
+    -- BUG WARNING: this does not deal properly with qualified imports!
     minimal_imports :: FiniteMap Module AvailEnv
-    minimal_imports0 = emptyFM
+    minimal_imports0 = foldr add_expall   emptyFM 	   expall_mods
     minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
     minimal_imports  = foldr add_inst_mod minimal_imports1 direct_import_mods
  	-- The last line makes sure that we retain all direct imports
@@ -841,6 +844,27 @@ reportUnusedNames gbl_env
     add_name other acc 
 	= acc
 
+	-- Modules mentioned as 'module M' in the export list
+    expall_mods = case export_decls of
+		    Nothing -> []
+		    Just es -> [m | L _ (IEModuleContents m) <- es]
+
+	-- This is really bogus.  The idea is that if we see 'module M' in 
+	-- the export list we must retain the import decls that drive it
+	-- If we aren't careful we might see
+	--	module A( module M ) where
+	--	  import M
+	--	  import N
+	-- and suppose that N exports everything that M does.  Then we 
+	-- must not drop the import of M even though N brings it all into
+	-- scope.
+	--
+	-- BUG WARNING: 'module M' exports aside, what if M.x is mentioned?!
+	--
+	-- The reason that add_expall is bogus is that it doesn't take
+	-- qualified imports into account.  But it's an improvement.
+    add_expall mod acc = addToFM_C plusAvailEnv acc mod emptyAvailEnv
+
 	-- n is the name of the thing, p is the name of its parent
     mk_avail n (Just p)			 	 = AvailTC p [p,n]
     mk_avail n Nothing | isTcOcc (nameOccName n) = AvailTC n [n]
@@ -863,6 +887,9 @@ reportUnusedNames gbl_env
     -- that are not mentioned in minimal_imports1
     -- [Note: not 'minimal_imports', because that includes directly-imported
     --	      modules even if we use nothing from them; see notes above]
+    --
+    -- BUG WARNING: does not deal correctly with multiple imports of the same module
+    --	 	    becuase direct_import_mods has only one entry per module
     unused_imp_mods = [(mod,loc) | (mod,imp,loc) <- direct_import_mods,
     		       not (mod `elemFM` minimal_imports1),
     		       mod /= pRELUDE,
