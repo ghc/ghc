@@ -36,6 +36,7 @@ import Module		( Module, ModuleName, moduleName,
 			)
 import Outputable	
 import CStrings		( pprStringInCStyle )
+import FastTypes
 import Util	        ( thenCmp )
 \end{code}
 
@@ -267,10 +268,10 @@ cmpCostCentre other_1 other_2
 	tag1 = tag_CC other_1
 	tag2 = tag_CC other_2
     in
-    if tag1 _LT_ tag2 then LT else GT
+    if tag1 <# tag2 then LT else GT
   where
-    tag_CC (NormalCC   {}) = (ILIT(1) :: FAST_INT)
-    tag_CC (AllCafsCC  {}) = ILIT(2)
+    tag_CC (NormalCC   {}) = (_ILIT 1 :: FastInt)
+    tag_CC (AllCafsCC  {}) = _ILIT 2
 
 cmp_caf NotCafCC CafCC     = LT
 cmp_caf NotCafCC NotCafCC  = EQ

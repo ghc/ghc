@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.33 2000/08/07 23:37:19 qrczak Exp $
+% $Id: AbsCSyn.lhs,v 1.34 2000/10/12 13:11:46 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -374,9 +374,9 @@ mkCCostCentreStack ccs = CLbl (mkCCS_Label ccs) DataPtrRep
 
 \begin{code}
 data RegRelative
-  = HpRel 	FAST_INT	-- }
-  | SpRel 	FAST_INT	-- }- offsets in StgWords
-  | NodeRel	FAST_INT	-- }
+  = HpRel 	FastInt	-- }
+  | SpRel 	FastInt	-- }- offsets in StgWords
+  | NodeRel	FastInt	-- }
   | CIndex	CAddrMode CAddrMode PrimRep	-- pointer arithmetic :-)
 						-- CIndex a b k === (k*)a[b]
 
@@ -388,16 +388,16 @@ data ReturnInfo
 hpRel :: VirtualHeapOffset 	-- virtual offset of Hp
       -> VirtualHeapOffset 	-- virtual offset of The Thing
       -> RegRelative		-- integer offset
-hpRel IBOX(hp) IBOX(off) = HpRel (hp _SUB_ off)
+hpRel _IBOX(hp) _IBOX(off) = HpRel (hp _SUB_ off)
 
 spRel :: VirtualSpOffset 	-- virtual offset of Sp
       -> VirtualSpOffset 	-- virtual offset of The Thing
       -> RegRelative		-- integer offset
-spRel sp off = SpRel (case spRelToInt sp off of { IBOX(i) -> i })
+spRel sp off = SpRel (case spRelToInt sp off of { _IBOX(i) -> i })
 
 nodeRel :: VirtualHeapOffset
         -> RegRelative
-nodeRel IBOX(off) = NodeRel off
+nodeRel _IBOX(off) = NodeRel off
 
 \end{code}
 
@@ -451,13 +451,13 @@ data MagicId
   -- Argument and return registers
   | VanillaReg		-- pointers, unboxed ints and chars
 	PrimRep
-	FAST_INT	-- its number (1 .. mAX_Vanilla_REG)
+	FastInt	-- its number (1 .. mAX_Vanilla_REG)
 
   | FloatReg		-- single-precision floating-point registers
-	FAST_INT	-- its number (1 .. mAX_Float_REG)
+	FastInt	-- its number (1 .. mAX_Float_REG)
 
   | DoubleReg		-- double-precision floating-point registers
-	FAST_INT	-- its number (1 .. mAX_Double_REG)
+	FastInt	-- its number (1 .. mAX_Double_REG)
 
   -- STG registers
   | Sp			-- Stack ptr; points to last occupied stack location.
@@ -470,14 +470,14 @@ data MagicId
 			--   no actual register
   | LongReg	        -- long int registers (64-bit, really)
 	PrimRep	        -- Int64Rep or Word64Rep
-	FAST_INT	-- its number (1 .. mAX_Long_REG)
+	FastInt	-- its number (1 .. mAX_Long_REG)
 
   | CurrentTSO		-- pointer to current thread's TSO
   | CurrentNursery	-- pointer to allocation area
 
 
-node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node
-tagreg  = VanillaReg WordRep    ILIT(2) -- A convenient alias for TagReg
+node 	= VanillaReg PtrRep     _ILIT(1) -- A convenient alias for Node
+tagreg  = VanillaReg WordRep    _ILIT(2) -- A convenient alias for TagReg
 
 nodeReg = CReg node
 \end{code}
@@ -486,26 +486,26 @@ We need magical @Eq@ because @VanillaReg@s come in multiple flavors.
 
 \begin{code}
 instance Eq MagicId where
-    reg1 == reg2 = tag reg1 _EQ_ tag reg2
+    reg1 == reg2 = tag reg1 ==# tag reg2
      where
-	tag BaseReg	     = (ILIT(0) :: FAST_INT)
-	tag Sp		     = ILIT(1)
-	tag Su		     = ILIT(2)
-	tag SpLim	     = ILIT(3)
-	tag Hp		     = ILIT(4)
-	tag HpLim	     = ILIT(5)
-	tag CurCostCentre    = ILIT(6)
-	tag VoidReg	     = ILIT(7)
+	tag BaseReg	     = (_ILIT(0) :: FastInt)
+	tag Sp		     = _ILIT(1)
+	tag Su		     = _ILIT(2)
+	tag SpLim	     = _ILIT(3)
+	tag Hp		     = _ILIT(4)
+	tag HpLim	     = _ILIT(5)
+	tag CurCostCentre    = _ILIT(6)
+	tag VoidReg	     = _ILIT(7)
 
-	tag (VanillaReg _ i) = ILIT(8) _ADD_ i
+	tag (VanillaReg _ i) = _ILIT(8) +# i
 
-	tag (FloatReg i)  = ILIT(8) _ADD_ maxv _ADD_ i
-	tag (DoubleReg i) = ILIT(8) _ADD_ maxv _ADD_ maxf _ADD_ i
-	tag (LongReg _ i) = ILIT(8) _ADD_ maxv _ADD_ maxf _ADD_ maxd _ADD_ i
+	tag (FloatReg i)  = _ILIT(8) +# maxv +# i
+	tag (DoubleReg i) = _ILIT(8) +# maxv +# maxf +# i
+	tag (LongReg _ i) = _ILIT(8) +# maxv +# maxf +# maxd +# i
 
-        maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
-        maxf = case mAX_Float_REG   of { IBOX(x) -> x }
-        maxd = case mAX_Double_REG of { IBOX(x) -> x }
+        maxv = iUnbox mAX_Vanilla_REG
+        maxf = iUnbox mAX_Float_REG
+        maxd = iUnbox mAX_Double_REG
 \end{code}
 
 Returns True for any register that {\em potentially} dies across

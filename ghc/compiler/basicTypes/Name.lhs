@@ -14,7 +14,6 @@ module Name (
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName, mkWiredInTyConName,
-	mkUnboundName, isUnboundName,
 
 	maybeWiredInIdName, maybeWiredInTyConName,
 	isWiredInName, hashName,
@@ -50,21 +49,20 @@ module Name (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Var   ( Id, setIdName )
-import {-# SOURCE #-} TyCon ( TyCon, setTyConName )
+import {-# SOURCE #-} Var   ( Id )
+import {-# SOURCE #-} TyCon ( TyCon )
 
 import OccName		-- All of it
 import Module		( Module, moduleName, pprModule, mkVanillaModule, isLocalModule )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
-import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
+import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, hasKey, pprUnique )
-import PrelNames	( unboundKey )
 import Maybes		( expectJust )
+import FastTypes
 import UniqFM
 import Outputable
-import GlaExts
 \end{code}
 
 
@@ -180,14 +178,6 @@ mkDerivedName :: (OccName -> OccName)
 	      -> Name		-- Result is always a value name
 
 mkDerivedName f name uniq = name {n_uniq = uniq, n_occ = f (n_occ name)}
-
--- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
--- during compiler debugging.
-mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
-
-isUnboundName :: Name -> Bool
-isUnboundName name = name `hasKey` unboundKey
 \end{code}
 
 \begin{code}
@@ -413,7 +403,7 @@ isExternallyVisibleName :: Name -> Bool
 
 
 hashName :: Name -> Int
-hashName name = IBOX( u2i (nameUnique name) )
+hashName name = iBox (u2i (nameUnique name))
 
 nameUnique name = n_uniq name
 nameOccName name = n_occ name

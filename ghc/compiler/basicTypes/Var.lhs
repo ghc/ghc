@@ -39,12 +39,11 @@ import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique, 
 			  mkSysLocalName, isExternallyVisibleName
 			)
-import BasicTypes	( Unused )
+import FastTypes
 import Outputable
 
 import IOExts		( IORef, newIORef, readIORef, writeIORef )
 \end{code}
-
 
 
 %************************************************************************
@@ -63,7 +62,7 @@ in its @VarDetails@.
 data Var
   = Var {
 	varName    :: Name,
-	realUnique :: Int#,		-- Key for fast comparison
+	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
 	varType    :: Type,

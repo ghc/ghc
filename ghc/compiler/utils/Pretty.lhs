@@ -204,12 +204,13 @@ allow you to use either GHC or Hugs.  To get GHC, just set the CPP variable
 
 #if defined(__GLASGOW_HASKELL__)
 
-
 -- Glasgow Haskell
 
 -- Disable ASSERT checks; they are expensive!
 #define LOCAL_ASSERT(x)
 
+#define ILIT(x) (x#)
+#define IBOX(x) (I# (x))
 #define INT     Int#
 #define MINUS   -#
 #define NEGATE  negateInt#

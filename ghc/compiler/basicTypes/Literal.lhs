@@ -30,9 +30,10 @@ import PprType		( pprParendType )
 import CStrings		( pprFSInCStyle )
 
 import Outputable
+import FastTypes
 import Util		( thenCmp )
 
-import Ratio 		( numerator, denominator )
+import Ratio 		( numerator )
 import FastString	( uniqueOfFS )
 import Char		( ord, chr )
 \end{code}
@@ -239,20 +240,20 @@ cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
 cmpLit (MachLabel     a)   (MachLabel      b)   = a `compare` b
 cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `compare` d)
-cmpLit lit1		   lit2		        | litTag lit1 _LT_ litTag lit2 = LT
+cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		       = GT
 
-litTag (MachChar      _)   = ILIT(1)
-litTag (MachStr       _)   = ILIT(2)
-litTag (MachAddr      _)   = ILIT(3)
-litTag (MachInt       _)   = ILIT(4)
-litTag (MachWord      _)   = ILIT(5)
-litTag (MachInt64     _)   = ILIT(6)
-litTag (MachWord64    _)   = ILIT(7)
-litTag (MachFloat     _)   = ILIT(8)
-litTag (MachDouble    _)   = ILIT(9)
-litTag (MachLabel     _)   = ILIT(10)
-litTag (MachLitLit    _ _) = ILIT(11)
+litTag (MachChar      _)   = _ILIT(1)
+litTag (MachStr       _)   = _ILIT(2)
+litTag (MachAddr      _)   = _ILIT(3)
+litTag (MachInt       _)   = _ILIT(4)
+litTag (MachWord      _)   = _ILIT(5)
+litTag (MachInt64     _)   = _ILIT(6)
+litTag (MachWord64    _)   = _ILIT(7)
+litTag (MachFloat     _)   = _ILIT(8)
+litTag (MachDouble    _)   = _ILIT(9)
+litTag (MachLabel     _)   = _ILIT(10)
+litTag (MachLitLit    _ _) = _ILIT(11)
 \end{code}
 
 	Printing
@@ -358,5 +359,5 @@ hashInteger i = 1 + abs (fromInteger (i `rem` 10000))
 		-- since we use * to combine hash values
 
 hashFS :: FAST_STRING -> Int
-hashFS s = IBOX( uniqueOfFS s )
+hashFS s = iBox (uniqueOfFS s)
 \end{code}

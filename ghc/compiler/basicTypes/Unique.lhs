@@ -52,6 +52,7 @@ import FastString	( FastString, uniqueOfFS )
 import GlaExts
 import ST
 import PrelBase ( Char(..), chr, ord )
+import FastTypes
 
 import Outputable
 \end{code}
@@ -70,7 +71,7 @@ data Unique = MkUnique Int#
 \end{code}
 
 \begin{code}
-u2i :: Unique -> FAST_INT
+u2i :: Unique -> FastInt
 u2i (MkUnique i) = i
 \end{code}
 

@@ -61,6 +61,7 @@ module Util (
 import List		( zipWith4 )
 import Panic		( panic )
 import IOExts		( IORef, newIORef, unsafePerformIO )
+import FastTypes
 
 infixr 9 `thenCmp`
 \end{code}
@@ -249,20 +250,20 @@ notElem__ x (y:ys) =  x /= y && notElem__ x ys
 
 # else {- DEBUG -}
 isIn msg x ys
-  = elem ILIT(0) x ys
+  = elem (_ILIT 0) x ys
   where
     elem i _ []	    = False
     elem i x (y:ys)
-      | i _GE_ ILIT(100) = panic ("Over-long elem in: " ++ msg)
-      | otherwise	 = x == y || elem (i _ADD_ ILIT(1)) x ys
+      | i ># _ILIT 100 = panic ("Over-long elem in: " ++ msg)
+      | otherwise	 = x == y || elem (i +# _ILIT(1)) x ys
 
 isn'tIn msg x ys
-  = notElem ILIT(0) x ys
+  = notElem (_ILIT 0) x ys
   where
     notElem i x [] =  True
     notElem i x (y:ys)
-      | i _GE_ ILIT(100) = panic ("Over-long notElem in: " ++ msg)
-      | otherwise	 =  x /= y && notElem (i _ADD_ ILIT(1)) x ys
+      | i ># _ILIT 100 = panic ("Over-long notElem in: " ++ msg)
+      | otherwise	 =  x /= y && notElem (i +# _ILIT(1)) x ys
 
 # endif {- DEBUG -}
 

@@ -51,13 +51,8 @@ import {-# SOURCE #-} Name	( Name )
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
 import Panic
 import GlaExts		-- Lots of Int# operations
+import FastTypes
 import Outputable
-
-#if ! OMIT_NATIVE_CODEGEN
-#define IF_NCG(a) a
-#else
-#define IF_NCG(a) {--}
-#endif
 \end{code}
 
 %************************************************************************
@@ -193,9 +188,9 @@ First, the DataType itself; which is either a Node, a Leaf, or an Empty.
 \begin{code}
 data UniqFM ele
   = EmptyUFM
-  | LeafUFM FAST_INT ele
-  | NodeUFM FAST_INT	    -- the switching
-	    FAST_INT	    -- the delta
+  | LeafUFM FastInt ele
+  | NodeUFM FastInt	    -- the switching
+	    FastInt	    -- the delta
 	    (UniqFM ele)
 	    (UniqFM ele)
 
@@ -275,11 +270,11 @@ delete fm       key = del_ele fm
     del_ele :: UniqFM a -> UniqFM a
 
     del_ele lf@(LeafUFM j _)
-      | j _EQ_ key	= EmptyUFM
+      | j ==# key	= EmptyUFM
       | otherwise	= lf	-- no delete!
 
     del_ele nd@(NodeUFM j p t1 t2)
-      | j _GT_ key
+      | j ># key
       = mkSLNodeUFM (NodeUFMData j p) (del_ele t1) t2
       | otherwise
       = mkLSNodeUFM (NodeUFMData j p) t1 (del_ele t2)
@@ -537,8 +532,8 @@ isNullUFM _	   = False
 -- hashing is used in VarSet.uniqAway, and should be fast
 -- We use a cheap and cheerful method for now
 hashUFM EmptyUFM          = 0
-hashUFM (NodeUFM n _ _ _) = IBOX(n)
-hashUFM (LeafUFM n _)     = IBOX(n)
+hashUFM (NodeUFM n _ _ _) = iBox n
+hashUFM (LeafUFM n _)     = iBox n
 \end{code}
 
 looking up in a hurry is the {\em whole point} of this binary tree lark.
@@ -568,10 +563,10 @@ lookUp fm i	    = lookup_tree fm
 	lookup_tree :: UniqFM a -> Maybe a
 
 	lookup_tree (LeafUFM j b)
-	  | j _EQ_ i	= Just b
+	  | j ==# i	= Just b
 	  | otherwise	= Nothing
 	lookup_tree (NodeUFM j p t1 t2)
-	  | j _GT_ i	= lookup_tree t1
+	  | j ># i	= lookup_tree t1
 	  | otherwise	= lookup_tree t2
 
 	lookup_tree EmptyUFM = panic "lookup Failed"
@@ -584,7 +579,7 @@ eltsUFM fm = foldUFM (:) [] fm
 
 ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily iu, elt) : rest) [] fm
 
-keysUFM fm = fold_tree (\ iu elt rest -> IBOX(iu) : rest) [] fm
+keysUFM fm = fold_tree (\ iu elt rest -> iBox iu : rest) [] fm
 
 fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
 fold_tree f a (LeafUFM iu obj)    = f iu obj a
@@ -609,7 +604,7 @@ If in doubt, use mkSSNodeUFM, which has the `strongest'
 functionality, but may do a few needless evaluations.
 
 \begin{code}
-mkLeafUFM :: FAST_INT -> a -> UniqFM a
+mkLeafUFM :: FastInt -> a -> UniqFM a
 mkLeafUFM i a	  = LeafUFM i a
 
 -- The *ONLY* ways of building a NodeUFM.
@@ -617,21 +612,21 @@ mkLeafUFM i a	  = LeafUFM i a
 mkSSNodeUFM (NodeUFMData j p) EmptyUFM t2 = t2
 mkSSNodeUFM (NodeUFMData j p) t1 EmptyUFM = t1
 mkSSNodeUFM (NodeUFMData j p) t1 t2
-  = ASSERT(correctNodeUFM (IBOX(j)) (IBOX(p)) t1 t2)
+  = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
 mkSLNodeUFM (NodeUFMData j p) EmptyUFM t2 = t2
 mkSLNodeUFM (NodeUFMData j p) t1 t2
-  = ASSERT(correctNodeUFM (IBOX(j)) (IBOX(p)) t1 t2)
+  = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
 mkLSNodeUFM (NodeUFMData j p) t1 EmptyUFM = t1
 mkLSNodeUFM (NodeUFMData j p) t1 t2
-  = ASSERT(correctNodeUFM (IBOX(j)) (IBOX(p)) t1 t2)
+  = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
 mkLLNodeUFM (NodeUFMData j p) t1 t2
-  = ASSERT(correctNodeUFM (IBOX(j)) (IBOX(p)) t1 t2)
+  = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
 correctNodeUFM
@@ -645,9 +640,9 @@ correctNodeUFM j p t1 t2
   = correct (j-p) (j-1) p t1 && correct j ((j-1)+p) p t2
   where
     correct low high _ (LeafUFM i _)
-      = low <= IBOX(i) && IBOX(i) <= high
+      = low <= iBox i && iBox i <= high
     correct low high above_p (NodeUFM j p _ _)
-      = low <= IBOX(j) && IBOX(j) <= high && above_p > IBOX(p)
+      = low <= iBox j && iBox j <= high && above_p > iBox p
     correct _ _ _ EmptyUFM = panic "EmptyUFM stored inside a tree"
 \end{code}
 
@@ -658,20 +653,20 @@ and if necessary do $\lambda$ lifting on our functions that are bound.
 insert_ele
 	:: (a -> a -> a)
 	-> UniqFM a
-	-> FAST_INT
+	-> FastInt
 	-> a
 	-> UniqFM a
 
 insert_ele f EmptyUFM i new = mkLeafUFM i new
 
 insert_ele f (LeafUFM j old) i new
-  | j _GT_ i =
+  | j ># i =
 	  mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
 			  (indexToRoot j))
 		 (mkLeafUFM i new)
 		 (mkLeafUFM j old)
-  | j _EQ_ i  = mkLeafUFM j (f old new)
+  | j ==# i  = mkLeafUFM j (f old new)
   | otherwise =
 	  mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
@@ -680,8 +675,8 @@ insert_ele f (LeafUFM j old) i new
 		 (mkLeafUFM i new)
 
 insert_ele f n@(NodeUFM j p t1 t2) i a
-  | i _LT_ j
-    = if (i _GE_ (j _SUB_ p))
+  | i <# j
+    = if (i >=# (j -# p))
       then mkSLNodeUFM (NodeUFMData j p) (insert_ele f t1 i a) t2
       else mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
@@ -689,7 +684,7 @@ insert_ele f n@(NodeUFM j p t1 t2) i a
 		  (mkLeafUFM i a)
 		  n
   | otherwise
-    = if (i _LE_ ((j _SUB_ ILIT(1)) _ADD_ p))
+    = if (i <=# ((j -# _ILIT(1)) +# p))
       then mkLSNodeUFM (NodeUFMData j p) t1 (insert_ele f t2 i a)
       else mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
@@ -732,8 +727,8 @@ consumer use.
 
 \begin{code}
 data NodeUFMData
-  = NodeUFMData FAST_INT
-		FAST_INT
+  = NodeUFMData FastInt
+		FastInt
 \end{code}
 
 This is the information used when computing new NodeUFMs.
@@ -751,43 +746,43 @@ data CommonRoot
 This specifies the relationship between NodeUFMData and CalcNodeUFMData.
 
 \begin{code}
-indexToRoot :: FAST_INT -> NodeUFMData
+indexToRoot :: FastInt -> NodeUFMData
 
 indexToRoot i
   = let
-	l = (ILIT(1) :: FAST_INT)
+	l = (_ILIT(1) :: FastInt)
     in
-    NodeUFMData (((i `shiftR_` l) `shiftL_` l) _ADD_ ILIT(1)) l
+    NodeUFMData (((i `shiftR_` l) `shiftL_` l) +# _ILIT(1)) l
 
 getCommonNodeUFMData :: NodeUFMData -> NodeUFMData -> NodeUFMData
 
 getCommonNodeUFMData (NodeUFMData i p) (NodeUFMData i2 p2)
-  | p _EQ_ p2	= getCommonNodeUFMData_ p j j2
-  | p _LT_ p2	= getCommonNodeUFMData_ p2 (j _QUOT_ (p2 _QUOT_ p)) j2
-  | otherwise	= getCommonNodeUFMData_ p j (j2 _QUOT_ (p _QUOT_ p2))
+  | p ==# p2	= getCommonNodeUFMData_ p j j2
+  | p <# p2	= getCommonNodeUFMData_ p2 (j `quotFastInt` (p2 `quotFastInt` p)) j2
+  | otherwise	= getCommonNodeUFMData_ p j (j2 `quotFastInt` (p `quotFastInt` p2))
   where
-    l  = (ILIT(1) :: FAST_INT)
-    j  = i  _QUOT_ (p  `shiftL_` l)
-    j2 = i2 _QUOT_ (p2 `shiftL_` l)
+    l  = (_ILIT(1) :: FastInt)
+    j  = i  `quotFastInt` (p  `shiftL_` l)
+    j2 = i2 `quotFastInt` (p2 `shiftL_` l)
 
-    getCommonNodeUFMData_ :: FAST_INT -> FAST_INT -> FAST_INT -> NodeUFMData
+    getCommonNodeUFMData_ :: FastInt -> FastInt -> FastInt -> NodeUFMData
 
     getCommonNodeUFMData_ p j j_
-      | j _EQ_ j_
-      = NodeUFMData (((j `shiftL_` l) _ADD_ l) _MUL_ p) p
+      | j ==# j_
+      = NodeUFMData (((j `shiftL_` l) +# l) *# p) p
       | otherwise
       = getCommonNodeUFMData_ (p `shiftL_`  l) (j `shiftR_` l) (j_ `shiftR_` l)
 
 ask_about_common_ancestor :: NodeUFMData -> NodeUFMData -> CommonRoot
 
 ask_about_common_ancestor x@(NodeUFMData j p) y@(NodeUFMData j2 p2)
-  | j _EQ_ j2 = SameRoot
+  | j ==# j2 = SameRoot
   | otherwise
   = case getCommonNodeUFMData x y of
       nd@(NodeUFMData j3 p3)
-	| j3 _EQ_ j  -> LeftRoot (decideSide (j _GT_ j2))
-	| j3 _EQ_ j2 -> RightRoot (decideSide (j _LT_ j2))
-	| otherwise   -> NewRoot nd (j _GT_ j2)
+	| j3 ==# j  -> LeftRoot (decideSide (j ># j2))
+	| j3 ==# j2 -> RightRoot (decideSide (j <# j2))
+	| otherwise   -> NewRoot nd (j ># j2)
     where
 	decideSide :: Bool -> Side
 	decideSide True	 = Leftt
@@ -799,8 +794,8 @@ This might be better in Util.lhs ?
 
 Now the bit twiddling functions.
 \begin{code}
-shiftL_ :: FAST_INT -> FAST_INT -> FAST_INT
-shiftR_ :: FAST_INT -> FAST_INT -> FAST_INT
+shiftL_ :: FastInt -> FastInt -> FastInt
+shiftR_ :: FastInt -> FastInt -> FastInt
 
 #if __GLASGOW_HASKELL__
 {-# INLINE shiftL_ #-}

@@ -32,6 +32,7 @@ module SrcLoc (
 import Util		( thenCmp )
 import Outputable
 import FastString	( unpackFS )
+import FastTypes
 import GlaExts		( Int(..), (+#) )
 \end{code}
 
@@ -48,7 +49,7 @@ data SrcLoc
   = NoSrcLoc
 
   | SrcLoc	FAST_STRING	-- A precise location (file name)
-		FAST_INT
+		FastInt
 
   | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
 \end{code}
@@ -67,7 +68,7 @@ rare case.
 Things to make 'em:
 \begin{code}
 noSrcLoc	    = NoSrcLoc
-mkSrcLoc x IBOX(y)  = SrcLoc x y
+mkSrcLoc x y        = SrcLoc x (iUnbox y)
 
 mkIfaceSrcLoc	    = UnhelpfulSrcLoc SLIT("<an interface file>")
 mkBuiltinSrcLoc	    = UnhelpfulSrcLoc SLIT("<built-into-the-compiler>")
@@ -79,14 +80,14 @@ isNoSrcLoc other    = False
 srcLocFile :: SrcLoc -> FAST_STRING
 srcLocFile (SrcLoc fname _) = fname
 
-srcLocLine :: SrcLoc -> FAST_INT
+srcLocLine :: SrcLoc -> FastInt
 srcLocLine (SrcLoc _ l) = l
 
 incSrcLine :: SrcLoc -> SrcLoc
 incSrcLine (SrcLoc s l) = SrcLoc s (l +# 1#)
 incSrcLine loc  	= loc
 
-replaceSrcLine :: SrcLoc -> FAST_INT -> SrcLoc
+replaceSrcLine :: SrcLoc -> FastInt -> SrcLoc
 replaceSrcLine (SrcLoc s _) l = SrcLoc s l
 \end{code}
 
@@ -124,12 +125,12 @@ instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line)
       = getPprStyle $ \ sty ->
         if userStyle sty then
-	   hcat [ text src_file, char ':', int IBOX(src_line) ]
+	   hcat [ text src_file, char ':', int (iBox src_line) ]
 	else
 	if debugStyle sty then
-	   hcat [ ptext src_path, char ':', int IBOX(src_line) ]
+	   hcat [ ptext src_path, char ':', int (iBox src_line) ]
 	else
-	   hcat [text "{-# LINE ", int IBOX(src_line), space,
+	   hcat [text "{-# LINE ", int (iBox src_line), space,
 		 char '\"', ptext src_path, text " #-}"]
       where
 	src_file = unpackFS src_path	-- Leave the directory prefix intact,

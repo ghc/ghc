@@ -12,6 +12,7 @@ some unnecessary loops in the module dependency graph.
 module Panic  ( panic, panic#, assertPanic, trace ) where
 
 import IOExts ( trace )
+import FastTypes
 
 #include "HsVersions.h"
 \end{code}
@@ -27,8 +28,8 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
 -- No, man -- Too Beautiful! (Will)
 
-panic# :: String -> FAST_INT
-panic# s = case (panic s) of () -> ILIT(0)
+panic# :: String -> FastInt
+panic# s = case (panic s) of () -> _ILIT 0
 
 assertPanic :: String -> Int -> a
 assertPanic file line = panic ("ASSERT failed! file " ++ file ++ ", line " ++ show line)

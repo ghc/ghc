@@ -161,6 +161,7 @@ import GlaExts
 import Argv
 import Constants	-- Default values for some flags
 import Util
+import FastTypes
 
 import Maybes		( firstJust )
 import Panic		( panic )
@@ -641,18 +642,18 @@ These things behave just like enumeration types.
 
 \begin{code}
 instance Eq SimplifierSwitch where
-    a == b = tagOf_SimplSwitch a _EQ_ tagOf_SimplSwitch b
+    a == b = tagOf_SimplSwitch a ==# tagOf_SimplSwitch b
 
 instance Ord SimplifierSwitch where
-    a <  b  = tagOf_SimplSwitch a _LT_ tagOf_SimplSwitch b
-    a <= b  = tagOf_SimplSwitch a _LE_ tagOf_SimplSwitch b
+    a <  b  = tagOf_SimplSwitch a <# tagOf_SimplSwitch b
+    a <= b  = tagOf_SimplSwitch a <=# tagOf_SimplSwitch b
 
 
-tagOf_SimplSwitch (SimplInlinePhase _)		= ILIT(1)
-tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(2)
-tagOf_SimplSwitch DontApplyRules		= ILIT(3)
-tagOf_SimplSwitch SimplLetToCase		= ILIT(4)
-tagOf_SimplSwitch NoCaseOfCase			= ILIT(5)
+tagOf_SimplSwitch (SimplInlinePhase _)		= _ILIT(1)
+tagOf_SimplSwitch (MaxSimplifierIterations _)	= _ILIT(2)
+tagOf_SimplSwitch DontApplyRules		= _ILIT(3)
+tagOf_SimplSwitch SimplLetToCase		= _ILIT(4)
+tagOf_SimplSwitch NoCaseOfCase			= _ILIT(5)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
@@ -700,9 +701,9 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 #endif
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl) = (IBOX(tagOf_SimplSwitch k), SwInt lvl)
-    mk_assoc_elem k@(SimplInlinePhase n)          = (IBOX(tagOf_SimplSwitch k), SwInt n)
-    mk_assoc_elem k 				  = (IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
+    mk_assoc_elem k@(MaxSimplifierIterations lvl) = (_IBOX(tagOf_SimplSwitch k), SwInt lvl)
+    mk_assoc_elem k@(SimplInlinePhase n)          = (_IBOX(tagOf_SimplSwitch k), SwInt n)
+    mk_assoc_elem k 				  = (_IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
     rm_dups switches_so_far switch
@@ -711,7 +712,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 	else switch : switches_so_far
       where
 	sw `is_elem` []     = False
-	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) _EQ_ (tagOf_SimplSwitch s)
+	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) ==# (tagOf_SimplSwitch s)
 			    || sw `is_elem` ss
 \end{code}
 

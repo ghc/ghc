@@ -1277,7 +1277,7 @@ pprMagicId HpLim		    = ptext SLIT("HpLim")
 pprMagicId CurCostCentre	    = ptext SLIT("CCCS")
 pprMagicId VoidReg		    = panic "pprMagicId:VoidReg!"
 
-pprVanillaReg :: FAST_INT -> SDoc
+pprVanillaReg :: FastInt -> SDoc
 pprVanillaReg n = (<>) (char 'R') (int IBOX(n))
 
 pprUnionTag :: PrimRep -> SDoc

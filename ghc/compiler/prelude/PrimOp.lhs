@@ -73,19 +73,19 @@ primOpTag :: PrimOp -> Int
 primOpTag op = IBOX( tagOf_PrimOp op )
 
 -- supplies   
--- tagOf_PrimOp :: PrimOp -> FAST_INT
+-- tagOf_PrimOp :: PrimOp -> FastInt
 #include "primop-tag.hs-incl"
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 
 
 instance Eq PrimOp where
-    op1 == op2 = tagOf_PrimOp op1 _EQ_ tagOf_PrimOp op2
+    op1 == op2 = tagOf_PrimOp op1 ==# tagOf_PrimOp op2
 
 instance Ord PrimOp where
-    op1 <  op2 =  tagOf_PrimOp op1 _LT_ tagOf_PrimOp op2
-    op1 <= op2 =  tagOf_PrimOp op1 _LE_ tagOf_PrimOp op2
-    op1 >= op2 =  tagOf_PrimOp op1 _GE_ tagOf_PrimOp op2
-    op1 >  op2 =  tagOf_PrimOp op1 _GT_ tagOf_PrimOp op2
+    op1 <  op2 =  tagOf_PrimOp op1 <# tagOf_PrimOp op2
+    op1 <= op2 =  tagOf_PrimOp op1 <=# tagOf_PrimOp op2
+    op1 >= op2 =  tagOf_PrimOp op1 >=# tagOf_PrimOp op2
+    op1 >  op2 =  tagOf_PrimOp op1 ># tagOf_PrimOp op2
     op1 `compare` op2 | op1 < op2  = LT
 		      | op1 == op2 = EQ
 		      | otherwise  = GT

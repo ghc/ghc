@@ -441,7 +441,7 @@ sameAmode :: CAddrMode -> CAddrMode -> Bool
 -- At the moment we put in just enough to catch the cases we want:
 -- 	the second (destination) argument is always a CVal.
 sameAmode (CReg r1)		     (CReg r2)		     = r1 == r2
-sameAmode (CVal (SpRel r1) _) (CVal (SpRel r2) _) 	     = r1 _EQ_ r2
+sameAmode (CVal (SpRel r1) _) (CVal (SpRel r2) _) 	     = r1 ==# r2
 sameAmode other1		     other2		     = False
 
 doSimultaneously1 :: [CVertex] -> FlatM AbstractC
@@ -520,7 +520,7 @@ other1		  `conflictsWith` other2		= False
 
 regConflictsWithRR :: MagicId -> RegRelative -> Bool
 
-regConflictsWithRR (VanillaReg k ILIT(1)) (NodeRel _)	= True
+regConflictsWithRR (VanillaReg k _ILIT(1)) (NodeRel _)	= True
 
 regConflictsWithRR Sp	(SpRel _)	= True
 regConflictsWithRR Hp	(HpRel _)	= True
@@ -533,14 +533,14 @@ rrConflictsWithRR :: Int -> Int			-- Sizes of two things
 rrConflictsWithRR (I# s1) (I# s2) rr1 rr2 = rr rr1 rr2
   where
     rr (SpRel o1)    (SpRel o2)
-	| s1 _EQ_ ILIT(0) || s2 _EQ_ ILIT(0) = False -- No conflict if either is size zero
-	| s1 _EQ_ ILIT(1)  && s2 _EQ_ ILIT(1) = o1 _EQ_ o2
-	| otherwise	     = (o1 _ADD_ s1) _GE_ o2  &&
-			       (o2 _ADD_ s2) _GE_ o1
+	| s1 ==# _ILIT(0) || s2 ==# _ILIT(0) = False -- No conflict if either is size zero
+	| s1 ==# _ILIT(1)  && s2 ==# _ILIT(1) = o1 ==# o2
+	| otherwise	     = (o1 +# s1) >=# o2  &&
+			       (o2 +# s2) >=# o1
 
     rr (NodeRel o1)	 (NodeRel o2)
-	| s1 _EQ_ ILIT(0) || s2 _EQ_ ILIT(0) = False -- No conflict if either is size zero
-	| s1 _EQ_ ILIT(1) && s2 _EQ_ ILIT(1) = o1 _EQ_ o2
+	| s1 ==# _ILIT(0) || s2 ==# _ILIT(0) = False -- No conflict if either is size zero
+	| s1 ==# _ILIT(1) && s2 ==# _ILIT(1) = o1 ==# o2
 	| otherwise	     = True		-- Give up
 
     rr (HpRel _)	 (HpRel _)    = True	-- Give up (ToDo)

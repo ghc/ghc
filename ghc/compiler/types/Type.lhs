@@ -103,7 +103,6 @@ import TyCon	( TyCon,
 
 -- others
 import SrcLoc		( noSrcLoc )
-import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, thenCmp )
