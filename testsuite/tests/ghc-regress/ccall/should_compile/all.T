@@ -9,15 +9,20 @@ setTestOpts(f)
 test('cc001', normal, compile, [''])
 test('cc002', normal, compile, [''])
 test('cc003', normal, compile, [''])
-test('cc004', normal, compile, [''])
-test('cc005', normal, compile, [''])
+# Non-static C call
+test('cc004', expect_fail_for(['extcore','optextcore']), compile, [''])
+# foreign label
+test('cc005', expect_fail_for(['extcore','optextcore']), compile, [''])
 
 # Missing:
 # test('cc006', normal, compile, [''])
 
 test('cc007', normal, compile, [''])
-test('cc008', normal, compile, [''])
-test('cc009', normal, compile, [''])
-test('cc010', normal, compile, [''])
+# foreign label
+test('cc008', expect_fail_for(['extcore','optextcore']), compile, [''])
+# foreign label
+test('cc009', expect_fail_for(['extcore','optextcore']), compile, [''])
+# Non-static C call
+test('cc010', expect_fail_for(['extcore','optextcore']), compile, [''])
 test('cc011', normal, compile, [''])
 test('cc012', normal, compile, [''])

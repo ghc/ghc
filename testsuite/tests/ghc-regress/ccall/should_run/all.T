@@ -9,7 +9,8 @@ def f( opts ):
 
 setTestOpts(f)
 
-test('fed001', normal, compile_and_run, [''])
+# Doesn't work with External Core due to __labels
+test('fed001', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
@@ -28,13 +29,16 @@ test('ffi004', normal, compile_and_run, [''])
 # instead of CPP symbols for the flag arguments to open().
 test('ffi005', compose(skip, exit_code(3)), compile_and_run, [''])
 
-test('ffi006', normal, compile_and_run, [''])
-test('ffi007', normal, compile_and_run, [''])
-test('ffi008', exit_code(1), compile_and_run, [''])
+# ffi[006-009] don't work with External Core due to non-static-C foreign calls
+
+test('ffi006', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('ffi007', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)), compile_and_run, [''])
 
 # expect fail for way optasm, because the native code generator
 # doesn't do -ffloat-store and gets different answers when
 # optimisation is on.
-test('ffi009', expect_fail_for(['optasm']), compile_and_run, [''])
+test('ffi009', expect_fail_for(['optasm','extcore', 'optextcore']), compile_and_run, [''])
 
-test('ffi010', normal, compile_and_run, [''])
+# Doesn't work with External Core due to __labels
+test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])

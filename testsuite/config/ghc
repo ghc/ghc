@@ -12,6 +12,9 @@ config.compiler_always_flags = ['-no-recomp', '-dcore-lint']
 config.compile_ways	     = ['normal', 'opt']
 config.run_ways		     = ['normal', 'opt']
 
+# ways that are not enabled by default, but can always be invoked explicitly
+config.other_ways            = ['extcore','optextcore']
+
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
 	config.run_ways.append('optasm')
@@ -28,6 +31,8 @@ config.way_flags = { 'normal' : [],
 		     'optasm' : ['-O -fasm'],
 	  	     'prof'   : ['-O -prof -auto-all'],
 		     'unreg'  : ['-unreg'],
-		     'ghci'   : ['--interactive', '-v0']
+		     'ghci'   : ['--interactive', '-v0'],
+                     'extcore' : ['-fext-core'],
+		     'optextcore' : ['-O -fext-core']
 		   }
 

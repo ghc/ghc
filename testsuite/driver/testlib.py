@@ -437,6 +437,8 @@ def compile_and_run( name, way, extra_hc_opts ):
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, '' )
+    elif way == 'extcore' or way == 'optextcore' :
+        return extcore_run( name, way, extra_hc_opts, 0, '' )
     else: # compiled...
         result = simple_build( name, way, extra_hc_opts, 0, '', 1 )
 
@@ -452,6 +454,8 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
+    elif way == 'extcore' or way == 'optextcore' :
+        return extcore_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
         result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
 
@@ -652,6 +656,94 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
         line = infile.readline()
     
 # -----------------------------------------------------------------------------
+# Generate External Core for the given program, then compile the resulting Core
+# and compare its output to the expected output
+
+def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
+ 
+    depsfilename = qualify(name, 'deps')
+    errname = add_suffix(name, 'comp.stderr')
+    qerrname = qualify(errname,'')
+    
+    hcname = qualify(name, 'hc')
+    oname = qualify(name, 'o')
+    
+    rm_no_fail( qerrname )
+    rm_no_fail( qualify(name, '') )
+
+    if (top_mod == ''):
+        srcname = add_suffix(name, 'hs')
+    else:
+        srcname = top_mod
+
+    qcorefilename = qualify(name, 'hcr')
+    corefilename = add_suffix(name, 'hcr')
+    rm_no_fail(qcorefilename)
+
+    # Generate External Core
+    
+    if (top_mod == ''):
+        to_do = ' ' + srcname + ' '
+    else:
+        to_do = ' --make ' + top_mod + ' ' 
+
+    cmd = 'cd ' + testdir + " && '" \
+          + config.compiler + "' " \
+          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(config.way_flags[way],' ') + ' ' \
+          + extra_hc_opts + ' ' \
+          + testopts.extra_hc_opts \
+          + to_do \
+          + '>' + errname + ' 2>&1'
+    result = runCmd(cmd)
+
+    exit_code = result >> 8
+
+    if exit_code != 0:
+         if_verbose(1,'Compiling to External Core failed (status ' + `result` + ') errors were:')
+         if_verbose(1,open(qerrname).read())
+         return 'fail'
+
+     # Compile the resulting files -- if there's more than one module, we need to read the output
+     # of the previous compilation in order to find the dependencies
+    if (top_mod == ''):
+        to_compile = corefilename
+    else:
+        result = runCmd('grep Compiling ' + qerrname + ' |  awk \'{print $4}\' > ' + depsfilename)
+        deps = open(depsfilename).read()
+        deplist = string.replace(deps, '\n',' ');
+        deplist2 = string.replace(deplist,'.lhs,', '.hcr');
+        to_compile = string.replace(deplist2,'.hs,', '.hcr');
+        
+    flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
+    
+    cmd = 'cd ' + testdir + " && '" \
+          + config.compiler + "' " \
+          + join(config.compiler_always_flags,' ') + ' ' \
+          + to_compile + ' ' \
+          + extra_hc_opts + ' ' \
+          + testopts.extra_hc_opts + ' ' \
+          + flags                   \
+          + ' -fglasgow-exts -o ' + name \
+          + '>' + errname + ' 2>&1'
+          
+    result = runCmd(cmd)
+    exit_code = result >> 8
+
+    if exit_code != 0:
+        if_verbose(1,'Compiling External Core file(s) failed (status ' + `result` + ') errors were:')
+        if_verbose(1,open(qerrname).read())
+        return 'fail'
+
+    # Clean up
+    rm_no_fail ( oname )
+    rm_no_fail ( hcname )
+    rm_no_fail ( qcorefilename )
+    rm_no_fail ( depsfilename )
+    
+    return simple_run ( name, './'+name, testopts.extra_run_opts, 0 )
+
+# -----------------------------------------------------------------------------
 # Utils
 
 def check_stdout_ok( name ):
@@ -814,9 +906,10 @@ def findTFiles(path):
 # Output a test summary to the specified file object
 
 def summary(t, file):
+
     file.write('\n')
     file.write('OVERALL SUMMARY for test run started at ' \
-               + t.start_time + '\n\n'\
+               + t.start_time + '\n'\
                + string.rjust(`t.total_tests`, 8) \
                + ' total tests, which gave rise to\n' \
                + string.rjust(`t.total_test_cases`, 8) \
