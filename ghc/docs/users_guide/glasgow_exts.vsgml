@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.12 1999/07/14 11:33:10 simonmar Exp $
+% $Id: glasgow_exts.vsgml,v 1.13 1999/08/02 09:52:43 simonmar Exp $
 %
 % GHC Language Extensions.
 %
@@ -2127,8 +2127,8 @@ policy is controlled by the per-simplification-pass flag @-finline-phase@n.
 <p>
 
 <itemize>
-<item> Use @-fddump-rules@ to see what transformation rules GHC is using.
-<item> Use @-fddump-simpl-stats@ to see what rules are being fired.
+<item> Use @-ddump-rules@ to see what transformation rules GHC is using.
+<item> Use @-ddump-simpl-stats@ to see what rules are being fired.
 <item> The defintion of (say) @build@ in @PrelBase.lhs@ looks llike this:
 <tscreen><verb>
 	build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
