@@ -8,12 +8,13 @@ C_SRCS=touchy.c
 C_PROG=touchy
 SRC_CC_OPTS += -O
 
-# Get it over with!
-boot :: all
-
 #
 # Install touchy in lib/.*
 #
 INSTALL_LIBEXECS += $(C_PROG)
 
 include $(TOP)/mk/target.mk
+
+# Get it over with!
+boot :: all
+
