@@ -50,6 +50,8 @@ When tidying up print names, we keep a mapping of in-scope occ-names
 
 \begin{code}
 type TidyEnv = (TidyOccEnv, VarEnv Var)
+
+emptyTidyEnv :: TidyEnv
 emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 \end{code}
 
