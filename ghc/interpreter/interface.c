@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/03/07 16:18:25 $
+ * $Revision: 1.35 $
+ * $Date: 2000/03/08 11:20:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2492,24 +2492,6 @@ Type type; {
  * General object symbol query stuff
  * ------------------------------------------------------------------------*/
 
-#if defined(linux_TARGET_OS)
-#define IF_linux(xxx)     xxx
-#define IF_cygwin32(xxx)  /**/
-#define IF_solaris2(xxx)  /**/
-#endif
-
-#if defined(solaris2_TARGET_OS)
-#define IF_linux(xxx)     /**/
-#define IF_cygwin32(xxx)  /**/
-#define IF_solaris2(xxx)  xxx
-#endif
-
-#if defined(cgywin32_TARGET_OS)
-#define IF_linux(xxx)     /**/
-#define IF_cygwin32(xxx)  xxx
-#define IF_solaris2(xxx)  /**/
-#endif
-
 #define EXTERN_SYMS_ALLPLATFORMS     \
       Sym(stg_gc_enter_1)            \
       Sym(stg_gc_noregs)             \
@@ -2688,18 +2670,17 @@ Type type; {
       Sym(stat)                      \
       Sym(fstat)
 
-
-#if 0
+#define EXTERN_SYMS_linux            \
       Sym(__errno_location)          \
       Sym(__xstat)                   \
       Sym(__fxstat)                  \
       Sym(__lxstat)                  \
       SymX(select)                   \
-      SymX(vfork)                    \
-      Sym(tzname)                    \
       SymX(stderr)                   \
+      SymX(vfork)                    \
+      SymX(_exit)                    \
+      Sym(tzname)                    \
 
-#endif
 
 
 #if defined(linux_TARGET_OS)
