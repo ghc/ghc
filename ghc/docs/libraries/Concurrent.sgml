@@ -2,9 +2,264 @@
 <label id="sec:Concurrent">
 <p>
 
-This library provides the Concurrent Haskell extensions as described
-in  <url name="Concurrent Haskell" 
-         url="http://research.microsoft.com/Users/simonpj/Papers/concurrent-haskell.ps.gz">.
+<sect1> <idx/Concurrent Haskell/
+<label id="sec:Concurrent Haskell">
+<p>
+
+GHC and Hugs both provide concurrency extensions, as described in
+<url name="Concurrent Haskell"
+url="http://research.microsoft.com/Users/simonpj/Papers/concurrent-haskell.ps.gz">.
+
+Concurrency in GHC and Hugs is "lightweight", which means that both
+thread creation and context switching overheads are extremely low.
+Scheduling of Haskell threads is done internally in the Haskell
+runtime system, and doesn't make use of any operating system-supplied
+thread packages.
+
+Haskell threads can communicate via <tt/MVar/s, a kind of synchronised
+mutable variable.  Several common concurrency abstractions can be
+built from <tt/MVar/s, and these are provided by the <tt/Concurrent/
+library, which is described in the later sections.  Threads may also
+communicate via exceptions.
+
+<sect1>  <idx/Concurrency Basics/
+<label id="sec:Concurrency Basics">
+<p>
+
+To gain access to the concurrency primitives, just  <tt/import Concurrent/
+in your Haskell module.  In GHC, you also need to add the <tt/-syslib
+concurrent/ option to the command line.
+
+To create a new thread, use <tt/forkIO/:
+
+<tscreen><verb>
+forkIO :: IO () -> IO ThreadId
+</verb></tscreen>
+
+This sparks off a new thread to run the <tt/IO/ computation passed as the
+first argument.  
+
+The returned <tt/ThreadId/ is an abstract type representing a handle
+to the newly created thread.  The <tt/ThreadId/ type is an instance of
+both <tt/Eq/ and <tt/Ord/, where the <tt/Ord/ instance implements an
+arbitrary total ordering over <tt/ThreadId/s.
+
+Threads may also be killed via the <tt/ThreadId/:
+
+<tscreen><verb>
+killThread :: ThreadId -> IO ()
+</verb></tscreen>
+
+this terminates the given thread (Note: <tt/killThread/ is not
+implemented in Hugs yet).  Any work already done by the thread isn't
+lost: the computation is suspended until required by another thread.
+The memory used by the thread will be garbage collected if it isn't
+referenced from anywhere else.
+
+More generally, an arbitrary exception (see Section <ref
+id="sec:Exception" name="Exceptions">) may be raised in any thread for
+which we have a <tt/ThreadId/, with <tt/raiseInThread/:
+
+<tscreen><verb>
+raiseInThread :: ThreadId -> Exception -> IO ()
+</verb></tscreen>
+
+Actually <tt/killThread/ just raises the <tt/ThreadKilled/ exception
+in the target thread, the normal action of which is to just terminate
+the thread.  The target thread will stop whatever it was doing (even
+if it was blocked on an <tt/MVar/ or other computation) and handle the
+exception.
+
+The <tt/ThreadId/ for the current thread can be obtained with
+<tt/myThreadId/:
+
+<tscreen><verb>
+myThreadId :: IO ThreadId
+</verb></tscreen>
+
+NOTE: if you have a <tt/ThreadId/, you essentially have a pointer to the
+thread itself.  This means the thread itself can't be garbage
+collected until you drop the <tt/ThreadId/.  This misfeature will
+hopefully be corrected at a later date.
+
+The <tt>yield</tt> action forces a context-switch to any other
+currently runnable threads (if any), and is occasionally useful when
+implementing concurrency abstractions:
+
+<tscreen><verb>
+yield :: IO ()
+</verb></tscreen>
+
+<sect1> <idx/Concurrency abstractions/
+<label id="sec:Concurrency-abstractions">
+<p>
+
+<sect2> <idx/MVars/
+<label id="sec:MVars">
+<p>
+
+The <tt/Concurrent/ interface provides access to ``M-Vars'', which are
+<em>synchronising variables</em>.
+
+<nidx>synchronising variables (Glasgow extension)</nidx>
+<nidx>concurrency -- synchronising variables</nidx>
+
+<tt/MVars/<nidx>MVars (Glasgow extension)</nidx> are rendezvous points,
+mostly for concurrent threads.  They begin either empty or full, and
+any attempt to read an empty <tt/MVar/ blocks.  When an <tt/MVar/ is
+written, a single blocked thread may be freed.  Reading an <tt/MVar/
+toggles its state from full back to empty.  Therefore, any value
+written to an <tt/MVar/ may only be read once.  Multiple reads and writes
+are allowed, but there must be at least one read between any two
+writes. Interface:
+
+<tscreen><verb>
+data MVar a -- abstract
+instance Eq (MVar a)
+
+newEmptyMVar     :: IO (MVar a)
+newMVar          :: a -> IO (MVar a)
+takeMVar         :: MVar a -> IO a
+putMVar          :: MVar a -> a -> IO ()
+readMVar         :: MVar a -> IO a
+swapMVar         :: MVar a -> a -> IO a
+isEmptyMVar      :: MVar a -> IO Bool
+</verb></tscreen>
+
+The operation <tt/isEmptyMVar/ returns a flag indicating
+whether the <tt/MVar/ is currently empty or filled in, i.e.,
+will a thread block when performing a <tt/takeMVar/ on that
+<tt/MVar/ or not?
+
+Please notice that the Boolean value returned from <tt/isEmptyMVar/
+represent just a snapshot of the state of the <tt/MVar/. By the
+time a thread gets to inspect the result and act upon it, other
+threads may have accessed the <tt/MVar/ and changed the 'filled-in'
+status of the variable. 
+
+The same proviso applies to <tt/isEmptyChan/.
+
+These two predicates are currently only supported by GHC.
+
+<sect2> <idx/Channel Variables/
+<label id="sec:CVars">
+<p>
+
+A <em>channel variable</em> (<tt/CVar/) is a one-element channel, as
+described in the paper:
+
+<tscreen><verb>
+data CVar a
+newCVar :: IO (CVar a)
+putCVar :: CVar a -> a -> IO ()
+getCVar :: CVar a -> IO a
+</verb></tscreen>
+
+<sect2> <idx/Channels/
+<label id="sec:Channels">
+<p>
+
+A <tt/Channel/ is an unbounded channel:
+
+<tscreen><verb>
+data Chan a 
+newChan         :: IO (Chan a)
+putChan         :: Chan a -> a -> IO ()
+getChan         :: Chan a -> IO a
+dupChan         :: Chan a -> IO (Chan a)
+unGetChan       :: Chan a -> a -> IO ()
+getChanContents :: Chan a -> IO [a]
+</verb></tscreen>
+
+<sect2> <idx/Semaphores/
+<label id="sec:Semaphores">
+<p>
+
+General and quantity semaphores:
+
+<tscreen><verb>
+data QSem
+newQSem     :: Int   -> IO QSem
+waitQSem    :: QSem  -> IO ()
+signalQSem  :: QSem  -> IO ()
+
+data QSemN
+newQSemN    :: Int   -> IO QSemN
+signalQSemN :: QSemN -> Int -> IO ()
+waitQSemN   :: QSemN -> Int -> IO ()
+</verb></tscreen>
+
+<sect2> <idx/Merging Streams/
+<label id="sec:Merging Streams">
+<p>
+
+Merging streams---binary and n-ary:
+
+<tscreen><verb>
+mergeIO  :: [a]   -> [a] -> IO [a]
+nmergeIO :: [[a]] -> IO [a]
+</verb></tscreen>
+
+Note: Hugs does not provide the functions <tt/mergeIO/ or
+<tt/nmergeIO/ since these require preemptive multitasking.
+
+<sect2> <idx/Sample Variables/
+<label id="sec:Sample-Variables">
+<p>
+
+A <em>Sample variable</em> (<tt/SampleVar/) is slightly different from a
+normal <tt/MVar/:
+
+<itemize>
+<item> Reading an empty <tt/SampleVar/ causes the reader to block
+    (same as <tt/takeMVar/ on empty <tt/MVar/).
+<item> Reading a filled <tt/SampleVar/ empties it and returns value.
+    (same as <tt/takeMVar/)
+<item> Writing to an empty <tt/SampleVar/ fills it with a value, and
+potentially, wakes up a blocked reader  (same as for <tt/putMVar/ on empty <tt/MVar/).
+<item> Writing to a filled <tt/SampleVar/ overwrites the current value.
+ (different from <tt/putMVar/ on full <tt/MVar/.)
+</itemize>
+
+<tscreen><verb>
+type SampleVar a = MVar (Int, MVar a)
+
+emptySampleVar :: SampleVar a -> IO ()
+newSampleVar   :: IO (SampleVar a)
+readSample     :: SampleVar a -> IO a
+writeSample    :: SampleVar a -> a -> IO ()
+</verb></tscreen>
+
+<sect2> <idx/Thread Waiting/
+<label id="sec:Channels">
+<p>
+
+Finally, there are operations to delay a concurrent thread, and to
+make one wait:<nidx>delay a concurrent thread</nidx>
+<nidx>wait for a file descriptor</nidx>
+
+<tscreen><verb>
+threadDelay     :: Int -> IO () -- delay rescheduling for N microseconds
+threadWaitRead  :: Int -> IO () -- wait for input on specified file descriptor
+threadWaitWrite :: Int -> IO () -- (read and write, respectively).
+</verb></tscreen>
+
+The <tt/threadDelay/ operation will cause the current thread to
+suspend for a given number of microseconds.  Note that the resolution
+used by the Haskell runtime system's internal timer together with the
+fact that the thread may take some time to be rescheduled after the
+time has expired, means that the accuracy is more like 1/50 second.
+
+<tt/threadWaitRead/ and <tt/threadWaitWrite/ can be used to block a
+thread until I/O is available on a given file descriptor.  These
+primitives are used by the I/O subsystem to ensure that a thread
+waiting on I/O doesn't hang the entire system.
+
+<sect2> The <tt/Concurrent/ library interface
+<p>
+
+The full interface for the <tt/Concurrent/ library is given below for
+reference:
 
 <tscreen><verb>
 module Concurrent where
@@ -19,6 +274,7 @@ killThread       :: ThreadId -> IO ()
 yield            :: IO ()
 
 data MVar a      -- Synchronisation variables
+instance Eq (MVar a)
 newEmptyMVar     :: IO (MVar a)
 newMVar          :: a -> IO (MVar a)
 takeMVar         :: MVar a -> IO a
@@ -26,7 +282,6 @@ putMVar          :: MVar a -> a -> IO ()
 swapMVar         :: MVar a -> a -> IO a
 readMVar         :: MVar a -> IO a 
 isEmptyMVar      :: MVar a -> IO Bool
-instance Eq (MVar a)
 
 
 data Chan a      -- channels
@@ -60,71 +315,86 @@ newSampleVar     :: a -> IO (SampleVar a)
 emptySampleVar   :: SampleVar a -> IO ()
 readSampleVar    :: SampleVar a -> IO a
 writeSampleVar   :: SampleVar a -> a -> IO ()
+
+threadDelay      :: Int -> IO ()
+threadWaitRead   :: Int -> IO ()
+threadWaitWrite  :: Int -> IO ()
 </verb></tscreen>
 
-Notes:
-<itemize>
+<sect1> Pre-emptive vs. Cooperative multitasking
+<p>
 
-<item> 
-  GHC uses preemptive multitasking:
-  Context switches can occur at any time, except if you call a C
-  function (like <tt/getchar/) that blocks waiting for input.
+GHC uses preemptive multitasking: Context switches can occur at any
+time, except if you call a C function (like <tt/getchar/) that blocks
+waiting for input.  Haskell I/O is unaffected by blocking operations
+(the GHC I/O system uses non-blocking I/O internally to implement
+thread-friendly I/O).
 
-  Hugs uses cooperative multitasking:
-  Context switches only occur when you use one of the primitives
-  defined in this module.  This means that programs such as:
+Hugs uses cooperative multitasking: Context switches only occur when
+you use one of the primitives defined in this module.  This means that
+programs such as:
 
 <tscreen><verb>
 main = forkIO (write 'a') >> write 'b'
  where write c = putChar c >> write c
 </verb></tscreen>
 
-  will print either <tt/aaaaaaaaaaaaaa.../ or <tt/bbbbbbbbbbbb.../,
-  instead of some random interleaving of <tt/a/s and <tt/b/s.
+will print either <tt/aaaaaaaaaaaaaa.../ or <tt/bbbbbbbbbbbb.../,
+instead of some random interleaving of <tt/a/s and <tt/b/s.
 
-  In practice, cooperative multitasking is sufficient for writing 
-  simple graphical user interfaces.
+In practice, cooperative multitasking is sufficient for writing simple
+graphical user interfaces.
 
-<item>
-The <tt>yield</tt> action forces a context-switch to any other
-currently runnable threads (if any), and is occasionally useful when
-implementing concurrency abstractions (especially so if the
-implementation of Concurrent Haskell uses cooperative multitasking).
+<sect1> GHC-specific concurrency issues
+<p>
 
-<item>
-Hugs does not provide the functions <tt/mergeIO/ or <tt/nmergeIO/ since these
-require preemptive multitasking.
+In a standalone GHC program, only the main thread is required to
+terminate in order for the process to terminate.  Thus all other
+forked threads will simply terminate at the same time as the main
+thread (the terminology for this kind of behaviour is ``daemonic
+threads'').
 
-<item>
-Thread identities and <tt/killThread/ have an experimental
-implementation in GHC, but are not yet implemented in Hugs. 
+If you want the program to wait for child threads to finish before
+exiting, you need to program this yourself.  A simple mechanism is to
+have each child thread write to an <tt/MVar/ when it completes, and
+have the main thread wait on all the <tt/MVar/s before exiting:
 
-Currently <tt/killThread/ simply kills the nominated thread, but the
-plan is that in the future <tt/killThread/ will raise an exception in
-the killed thread which it can catch --- perhaps allowing it to kill
-its children before exiting.
+<tscreen><verb>
+myForkIO :: IO () -> IO (MVar ())
+myForkIO io = do
+  mvar <- newEmptyMVar
+  forkIO (io `finally` putMVar mvar ())
+  return mvar
+</verb></tscreen>
 
-The action <tt/myThreadId/ returns the <tt/ThreadId/ of the thread
-which performs it.
+Note that we use <tt/finally/ from the <tt/Exception/ module to make
+sure that the <tt/MVar/ is written to even if the thread dies or is
+killed for some reason.
 
-<item>
-The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
-which might be used to build an ordered binary tree, say.  
+A better method is to keep a global list of all child threads which we
+should wait for at the end of the program:
 
-<item>
-The operation <tt/isEmptyMVar/ returns a flag indicating
-whether the <tt/MVar/ is currently empty or filled in, i.e.,
-will a thread block when performing a <tt/takeMVar/ on that
-<tt/MVar/ or not?
+<tscreen><verb>
+children :: MVar [MVar ()]
+children = unsafePerformIO (newMVar [])
 
-Please notice that the Boolean value returned from <tt/isEmptyMVar/
-represent just a snapshot of the state of the <tt/MVar/. By the
-time a thread gets to inspect the result and act upon it, other
-threads may have accessed the <tt/MVar/ and changed the 'filled-in'
-status of the variable. 
+waitForChildren :: IO ()
+waitForChildren = do
+  (mvar:mvars) <- takeMVar children
+  putMVar children mvars
+  takeMVar mvar
+  waitForChildren
 
-The same proviso applies to <tt/isEmptyChan/.
+forkChild :: IO () -> IO ()
+forkChild io = do
+   mvar <- newEmptyMVar
+   forkIO (p `finally` putMVar mvar ())
+   childs <- takeMVar children
+   putMVar children (mvar:childs)
 
-These two predicates are currently only supported by GHC.
+later = flip finally
 
-</itemize>
+main =
+  later waitForChildren $
+  ...
+</verb></tscreen>

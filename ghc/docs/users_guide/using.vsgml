@@ -951,11 +951,11 @@ The options you are most likely to want to turn off are:
 <itemize>
 <item>
 @-fno-strictness@<nidx>-fno-strictness option</nidx> (strictness
-analyser [because it is sometimes slow]),
+analyser, because it is sometimes slow),
 <item>
 @-fno-specialise@<nidx>-fno-specialise option</nidx> (automatic
-specialisation of overloaded functions [because it makes your code
-bigger]) [US spelling also accepted], and
+specialisation of overloaded functions, because it can make your code
+bigger) (US spelling also accepted), and
 <item>
 @-fno-cpr-analyse@<nidx>-fno-cpr-analyse option</nidx> switches off the CPR (constructed product
 result) analyser.

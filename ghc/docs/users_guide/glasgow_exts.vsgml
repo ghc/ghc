@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.15 1999/08/16 16:25:12 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.16 1999/08/26 15:59:07 simonmar Exp $
 %
 % GHC Language Extensions.
 %
@@ -2138,7 +2138,7 @@ intermediate list should be eliminated entirely.
 The following are good producers:
 <itemize>
 <item> List comprehensions
-<item> Enumerations of @Int@ and @Char@ (e.g. ['a'..'z']).
+<item> Enumerations of @Int@ and @Char@ (e.g. @['a'..'z']@).
 <item> Explicit lists (e.g. @[True, False]@)
 <item> The cons constructor (e.g @3:4:[]@)
 <item> @++@
