@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/11/16 17:38:58 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/22 17:18:02 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -611,10 +611,14 @@ static StgPrimAlt boxResults( String reps, StgVar state )
         }
         rs = cons(v,rs);
     }
+
     /* Construct tuple of results */
+    if (i == 0) {
+        e = nameUnit;
+    } else
     if (i == 1) {
         e = hd(bs);
-    } else { /* includes i==0 case */
+    } else {
         StgVar r = mkStgVar(mkStgCon(mkTuple(i),rev(bs)),NIL);
         rbinds = cons(r,rbinds);
         e = r;
