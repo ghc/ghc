@@ -8,26 +8,24 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- GHC Extensions: this is the Approved Way to get at GHC-specific stuff.
+-- GHC Extensions: this is the Approved Way to get at GHC-specific extensions.
 --
 -----------------------------------------------------------------------------
 
 module GHC.Exts
        (
-        -- the representation of some basic types:
+        -- * Representations of some basic types
         Int(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
 
-	-- Fusion
-	build, augment,
-
-	-- shifty wrappers from GHC.Base
+        -- * Primitive operations
+        module GHC.Prim
 	shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
 
-	-- for linear implicit parameters:
-	Splittable(..),
+	-- * Fusion
+	build, augment,
 
-        -- and finally, all the unboxed primops of GHC!
-        module GHC.Prim
+	-- * Linear implicit parameter support
+	Splittable(..),
 
        ) where
 
