@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.68 2001/06/13 10:23:23 simonmar Exp $
+-- $Id: Main.hs,v 1.69 2001/06/13 10:25:37 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -331,8 +331,7 @@ setTopDir args = do
 
 
 -- replace the string "$libdir" at the beginning of a path with the
--- current TOPDIR (obtained from the -B option if present, or the
--- wired-in libdir otherwise).
+-- current libdir (obtained from the -B option).
 mungePackagePaths top_dir ps = map munge_pkg ps
  where 
   munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
