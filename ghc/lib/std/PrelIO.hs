@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.6 2001/12/27 09:28:11 sof Exp $
+-- $Id: PrelIO.hs,v 1.7 2001/12/27 11:26:03 sof Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -21,6 +21,12 @@ module PrelIO (
    hPutStrLn, hPrint,
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
+   
+    -- helpers
+   memcpy_ba_ba,
+   memcpy_ba_ptr,
+   memcpy_ptr_ba,
+   memcpy_ptr_ptr
  ) where
 
 import PrelBase
@@ -593,7 +599,7 @@ commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
 
 		-- not flushing, and there's enough room in the buffer:
 		-- just copy the data in and update bufWPtr.
-	    then do memcpy_off old_raw w raw (fromIntegral count)
+	    then do memcpy_ba_ba old_raw w raw 0 (fromIntegral count)
 		    writeIORef ref old_buf{ bufWPtr = w + count }
 		    return (newEmptyBuffer raw WriteBuffer sz)
 
@@ -638,7 +644,16 @@ commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
 
 
 foreign import "prel_PrelIO_memcpy" unsafe 
-   memcpy_off :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
+   memcpy_ba_ba :: RawBuffer -> Int -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+
+foreign import "prel_PrelIO_memcpy" unsafe 
+   memcpy_ba_ptr :: RawBuffer -> Int -> Ptr a -> Int -> CSize -> IO (Ptr ())
+
+foreign import "prel_PrelIO_memcpy" unsafe 
+   memcpy_ptr_ba :: Ptr a -> Int -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+
+foreign import "prel_PrelIO_memcpy" unsafe 
+   memcpy_ptr_ptr :: Ptr a -> Int -> Ptr a -> Int -> CSize -> IO (Ptr ())
 
 -- ---------------------------------------------------------------------------
 -- hPutStrLn
