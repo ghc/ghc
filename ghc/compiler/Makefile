@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.144 2001/03/16 14:36:19 sewardj Exp $
+# $Id: Makefile,v 1.145 2001/03/24 14:58:04 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -210,15 +210,15 @@ utils/Digraph_HC_OPTS		= -fglasgow-exts
 #	because it contains a 'ccall strlen', which gets inlined by
 # 	gcc, causing a lack of registers.
 #
-# -optC-funfolding-interface-threshold7
-#	To stop the definition of 'strLength', which calls strlen, getting
-#	into the interface file and spreading the -monly-3-regs virus.
-#	We need -optC here because the driver before 3.02 didn't understand
-#	the -funfolding flags.
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
+
+# CSE interacts badly with the top-level IORefs in DriverState, causing some
+# of them to be commoned up.  We have a fix for this in 5.00+, but earlier
+# versions of the compiler will need CSE turned off on this module.
+main/DriverState_HC_OPTS	= -fno-cse
 
 # ----------------------------------------------------------------------------
 #		C compilations
