@@ -30,4 +30,6 @@ test('read023', normal, compile_fail, [''])
 test('read024', normal, compile_fail, [''])
 test('read025', normal, compile_fail, [''])
 test('read026', normal, compile_fail, [''])
-test('read027', normal, compile_fail, [''])
+
+# Fails in GHC 6.2+
+test('read027', expect_fail_if_compiler_type('ghc'), compile_fail, [''])
