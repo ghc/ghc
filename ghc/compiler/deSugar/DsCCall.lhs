@@ -33,12 +33,12 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  splitTyConApp_maybe, splitNewType_maybe
 			)
 
-import PrimOp		( PrimOp(TouchOp) )
+import PrimOp		( PrimOp(..) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
 			  intPrimTy, foreignObjPrimTy
 			)
-import TyCon		( tyConDataCons )
+import TyCon		( TyCon, tyConDataCons )
 import TysWiredIn	( unitDataConId,
 			  unboxedSingletonDataCon, unboxedPairDataCon,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
@@ -47,8 +47,12 @@ import TysWiredIn	( unitDataConId,
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
-import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey )
+import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey,
+			  int8TyConKey, int16TyConKey, int32TyConKey,
+			  word8TyConKey, word16TyConKey, word32TyConKey
+			)
 import VarSet		( varSetElems )
+import Constants	( wORD_SIZE)
 import Outputable
 \end{code}
 
@@ -327,17 +331,36 @@ resultWrapper result_ty
     (maybe_ty, \e -> mkCoerce result_ty rep_ty (wrapper e))
 
   -- Data types with a single constructor, which has a single arg
-  | Just (_, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
+  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
     dataConSourceArity data_con == 1
   = let
         (maybe_ty, wrapper)    = resultWrapper unwrapped_res_ty
 	(unwrapped_res_ty : _) = data_con_arg_tys
+	narrow_wrapper         = maybeNarrow tycon
     in
     (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
-			    (map Type tycon_arg_tys ++ [wrapper e]))
+			    (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
     maybe_tc_app = splitTyConApp_maybe result_ty
+
+-- When the result of a foreign call is smaller than the word size, we
+-- need to sign- or zero-extend the result up to the word size.  The C
+-- standard appears to say that this is the responsibility of the
+-- caller, not the callee.
+
+maybeNarrow :: TyCon -> (CoreExpr -> CoreExpr)
+maybeNarrow tycon
+  | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
+  | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
+  | tycon `hasKey` int32TyConKey
+	 && wORD_SIZE > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
+
+  | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
+  | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
+  | tycon `hasKey` word32TyConKey
+	 && wORD_SIZE > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
+  | otherwise			  = id
 \end{code}
