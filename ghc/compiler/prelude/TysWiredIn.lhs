@@ -349,21 +349,25 @@ being the )
 \begin{code}
 isFFIArgumentTy :: Bool -> Type -> Bool
 -- Checks for valid argument type for a 'foreign import'
-isFFIArgumentTy is_safe ty = checkTyCon (legalOutgoingTyCon is_safe) ty
+isFFIArgumentTy is_safe ty = checkRepTyCon (legalOutgoingTyCon is_safe) ty
 
 isFFIExternalTy :: Type -> Bool
 -- Types that are allowed as arguments of a 'foreign export'
-isFFIExternalTy ty = checkTyCon legalIncomingTyCon ty
+isFFIExternalTy ty = checkRepTyCon legalIncomingTyCon ty
 
 isFFIResultTy :: Type -> Bool
 -- Types that are allowed as a result of a 'foreign import' or of a 'foreign export'
 -- Maybe we should distinguish between import and export, but 
 -- here we just choose the more restrictive 'incoming' predicate
 -- But we allow () as well
-isFFIResultTy ty = checkTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
+isFFIResultTy ty = checkRepTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
+
+checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
+	-- look through newtypes
+checkRepTyCon check_tc ty = checkTyCon check_tc (repType ty)
 
 checkTyCon :: (TyCon -> Bool) -> Type -> Bool
-checkTyCon check_tc ty = case splitTyConApp_maybe (repType ty) of
+checkTyCon check_tc ty = case splitTyConApp_maybe ty of
 				Just (tycon, _) -> check_tc tycon
 				Nothing		-> False
 
