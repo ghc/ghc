@@ -42,15 +42,6 @@ option don't mix very well (see <XRef LinkEnd="c-pre-processor">).
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Very long literal lists:</Term>
-<ListItem>
-<Para>
-These may tickle a &ldquo;yacc stack overflow&rdquo; error in the parser.
-(It depends on the Yacc used to build your parser.)
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
 <Term>Single quotes in module names:</Term>
 <ListItem>
 <Para>
@@ -68,17 +59,7 @@ It might work, but it's just begging for trouble.
 </Title>
 
 <Para>
-<VariableList>
-
-<VarListEntry>
-<Term>Derived instances for records:</Term>
-<ListItem>
-<Para>
-Hmmm.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
+None known.
 </Para>
 
 </Sect2>
@@ -95,9 +76,9 @@ Hmmm.
 <ListItem>
 <Para>
 Several modules internal to GHC are visible in the standard namespace.
-All of these modules begin with <Literal>Prel</Literal>, so the rule is: don't use any
-modules beginning with <Literal>Prel</Literal> in your program, or you will be
-comprehensively screwed.
+All of these modules begin with <Literal>Prel</Literal>, so the rule
+is: don't use any modules beginning with <Literal>Prel</Literal> in
+your program, or you will be comprehensively screwed.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -117,17 +98,20 @@ comprehensively screwed.
 <Term>Unchecked arithmetic:</Term>
 <ListItem>
 <Para>
-Arguably <Emphasis>not</Emphasis> an infelicity, but&hellip; Bear in mind that
-operations on <Literal>Int</Literal>, <Literal>Float</Literal>, and <Literal>Double</Literal> numbers are
-<Emphasis>unchecked</Emphasis> for overflow, underflow, and other sad occurrences.
-(note, however that some architectures trap floating-point overflow
-and loss-of-precision and report a floating-point
-exception)<IndexTerm><Primary>floating-point exceptions</Primary></IndexTerm>.
+Arguably <Emphasis>not</Emphasis> an infelicity, but&hellip; Bear in
+mind that operations on <Literal>Int</Literal>,
+<Literal>Float</Literal>, and <Literal>Double</Literal> numbers are
+<Emphasis>unchecked</Emphasis> for overflow, underflow, and other sad
+occurrences.  (note, however that some architectures trap
+floating-point overflow and loss-of-precision and report a
+floating-point exception, probably terminating the
+program)<IndexTerm><Primary>floating-point
+exceptions</Primary></IndexTerm>.
 </Para>
 
 <Para>
-Use <Literal>Integer</Literal>, <Literal>Rational</Literal>, etc., numeric types if this stuff
-keeps you awake at night.
+Use <Literal>Integer</Literal>, <Literal>Rational</Literal>, etc.,
+numeric types if this stuff keeps you awake at night.
 </Para>
 </ListItem>
 </VarListEntry>
