@@ -15,6 +15,7 @@ B.g 42
 B.g 42
 
 -- swap A2 for A, compile & reload
+:! sleep 1
 :! cp A2.hs A.hs
 :! $HC $HC_OPTS -no-recomp -c A.hs
 :reload
