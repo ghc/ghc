@@ -34,9 +34,8 @@ endif
 
 HSLIB = std
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-LIBOBJS = $(filter-out PrelHugs.$(way_)o,$(HS_OBJS))
-endif
+# we don't want PrelMain in the GHCi library.
+GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
