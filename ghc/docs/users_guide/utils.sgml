@@ -473,6 +473,16 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
+	  <term><literal>#offset struct_type, field</literal></term>
+	  <listitem>
+	    <para>Computes the offset, in bytes, of
+ 	    <literal>field</literal> in
+ 	    <literal>struct_type</literal>. It will have type
+ 	    <literal>Int</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><literal>#enum type, constructor, value, value, ...</literal></term>
 	  <listitem>
 	    <para>A shortcut for multiple definitions which use
