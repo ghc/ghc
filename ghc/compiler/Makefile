@@ -1,7 +1,14 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.204 2002/01/17 09:15:16 sof Exp $
+# $Id: Makefile,v 1.205 2002/01/30 14:05:01 simonmar Exp $
 
 TOP = ..
+
+# Use GHC for compiling C bits (NB. must be before boilerplate include)
+#
+ifneq "$(BootingFromHc)" "YES"
+UseGhcForCc = YES
+endif
+
 include $(TOP)/mk/boilerplate.mk
 
 #-----------------------------------------------------------------------------
@@ -81,30 +88,31 @@ endif
 CLEAN_FILES += $(CONFIG_HS)
 
 # -----------------------------------------------------------------------------
-# 		Set SRCS, HCS, OBJS
+# Set SRCS etc.
 #
-# First figure out DIRS, the source sub-directories
-# Then derive SRCS by looking in them
-#
+# First figure out ALL_DIRS, the source sub-directories
 
-DIRS = \
+ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
   profiling parser usageSP cprAnalysis compMan
 
+# Make sure we include Config.hs even if it doesn't exist yet...
+ALL_SRCS += $(CONFIG_HS)
+
 ifeq ($(GhcWithNativeCodeGen),YES)
-DIRS += nativeGen
+ALL_DIRS += nativeGen
 else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
 endif
 
 ifeq ($(GhcWithIlx),YES)
-DIRS += ilxGen
+ALL_DIRS += ilxGen
 SRC_HC_OPTS += -DILX
 endif
 
 ifeq ($(GhcWithJavaGen),YES)
-DIRS += javaGen
+ALL_DIRS += javaGen
 SRC_HC_OPTS += -DJAVA
 endif
 
@@ -122,20 +130,22 @@ endif
 ifeq "$(GhcWithInterpreter)" "YES"
 ifeq "$(bootstrapped)" "YES"
 SRC_HC_OPTS += -DGHCI
-DIRS += ghci
+ALL_DIRS += ghci
 endif
 endif
-
-HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
-HS_SRCS += $(CONFIG_HS)
 
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(GhcVanonVersion) -ge 5010); then echo YES; else echo NO; fi)
+endif
+
+# There are some C files to include in HS_PROG, so add these to HS_OBJS
+HS_OBJS	 += $(C_OBJS)
 
 # -----------------------------------------------
+# system hack.
+#
 # GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 
 # does not have this.  Everything is fine if you are compiling
 # GHC with GHC 5.02 or better, but lacking that we have the following
@@ -144,39 +154,18 @@ ghc_501_at_least = $(shell if (test $(GhcVanonVersion) -ge 5010); then echo YES;
 #	into main/ (where it'll be compiled and linked with the compiler)
 #       (the Haskell-side code is ifdefed into main/SysTools.lhs)
 
-ifneq "$(ghc_502_at_least)" "YES"
-C_SRCS += main/rawSystem.c
+ifneq "$(bootstrapped)" "YES"
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
-HS_OBJS += main/rawSystem.o
+ALL_SRCS += main/rawSystem.c
 main/rawSystem.c : $(FPTOOLS_TOP)/hslibs/lang/cbits/rawSystem.c
 	$(CP) $< main
+else
+EXCLUDED_SRCS = main/rawSystem.c
 endif
-endif
-#		End of system hack
+
 # -----------------------------------------------
-
-ifneq "$(BootingFromHc)" "YES"
-HS_SRCS += rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs
-endif
-
-HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
-
-ifeq "$(BootingFromHc)" "YES"
-HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hc
-endif
-
-#
-# Add misc .c helper code (used by the frontend.)
-#
-C_SRCS += parser/hschooks.c
-
-HS_OBJS = \
-  $(patsubst %.hc, %.o, $(HCS)) \
-  $(patsubst %.c, %.o, $(C_SRCS))
-
-DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
-
+# mkdependC stuff
 #
 # Big Fudge to get around inherent problem that Makefile setup
 # has got with 'mkdependC'.
@@ -192,16 +181,6 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDE
 #
 HC=$(GHC)
 
-#
-# Use GHC for compiling C bits
-#
-ifeq "$(BootingFromHc)" "YES"
-SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-else
-CC = $(HC)
-CC_OPTS := $(addprefix -optc, $(CC_OPTS))
-endif
-
 # magic from GNU make manual to convert a list of values
 # into a colon-separated list
 empty:=
@@ -210,7 +189,7 @@ space:= $(empty) $(empty)
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
-  -i$(subst $(space),:,$(DIRS)) 
+  -i$(subst $(space),:,$(ALL_DIRS)) 
 
 # Omitted: 	-I$(GHC_INCLUDE_DIR)
 # We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 
@@ -236,6 +215,10 @@ endif
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts)
 SRC_HC_OPTS += -H16M
+
+ifeq "$(BootingFromHc)" "YES"
+SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+endif
 
 # 	Special flags for particular modules
 #	The standard suffix rule for compiling a Haskell file
@@ -304,16 +287,8 @@ main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
 
 # ----------------------------------------------------------------------------
-#		C compilations
-
-SRC_C_OPTS     += -O -I. -IcodeGen
-
-
-# ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.lhs 
 #		from prelude/primops.txt
-
-CLEAN_FILES += prelude/primops.txt
 
 GENPOC=$(TOP)/utils/genprimopcode/genprimopcode
 
@@ -328,6 +303,9 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-strictness.hs-incl  \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
+
+CLEAN_FILES += prelude/primops.txt
+CLEAN_FILES += $(PRIMOP_BITS)
 
 SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
 SRC_CPP_OPTS += ${GhcCppOpts}
@@ -395,6 +373,8 @@ CLEAN_FILES += ghc-inplace
 # but put it together with the libraries.
 # Also don't want any interface files installed
 
+DESTDIR = $(INSTALL_LIBRARY_DIR_GHC)
+
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_LIBEXECS += $(HS_PROG)
 else
@@ -404,13 +384,8 @@ endif
 #-----------------------------------------------------------------------------
 # 		clean
 
-CLEAN_FILES += $(wildcard */*.$(way_)o */*.$(way_)hi)
-CLEAN_FILES += $(PRIMOP_BITS)
-
-# Extra tidy, remove the .hc files (if you've got them).
-MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \
-	parser/Parser.info rename/ParseIface.info main/ParsePkgConf.info \
-	parser/Parser.hs rename/ParseIface.hs main/ParsePkgConf.hs
+MAINTAINER_CLEAN_FILES += \
+	parser/Parser.info rename/ParseIface.info main/ParsePkgConf.info
 
 #-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
