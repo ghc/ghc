@@ -340,7 +340,7 @@ sub gather_import_dirs {
            if ( $lib eq 'win32' && ! $INSTALLING ) {
               $dir = "${TopPwd}/hslibs/${lib}/src";
            } elsif ( $lib eq 'com' && ! $INSTALLING ) {
-              $dir = "${TopPwd}/hslibs/lib";
+              $dir = "${TopPwd}/hdirect/lib";
            } else {
               $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
 	                           : "${TopPwd}/hslibs/${lib}";
