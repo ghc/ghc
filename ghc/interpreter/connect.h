@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.40 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.41 $
+ * $Date: 2000/05/10 09:00:20 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -524,20 +524,6 @@ extern Void unlexVarStr         ( String );
 
 extern FILE *outputStream;             /* current output stream            */
 extern Int  outColumn;                 /* current output column number     */
-
-
-
-/*---------------------------------------------------------------------------
- * Crude profiling (probably doesn't work)
- *-------------------------------------------------------------------------*/
-
-#ifdef CRUDE_PROFILING
-extern void cp_init             ( void );
-extern void cp_enter            ( Cell /*StgVar*/ );
-extern void cp_bill_words       ( int );
-extern void cp_bill_insns       ( int );
-extern void cp_show             ( void );
-#endif
 
 
 /*---------------------------------------------------------------------------

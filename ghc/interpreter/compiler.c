@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.31 $
+ * $Date: 2000/05/10 09:00:20 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1484,11 +1484,6 @@ Void evalExp ( void )             /* compile and run input expression    */
        This all also seems to imply that doRevertCAFs should always
        be TRUE.
     */
-
-#   ifdef CRUDE_PROFILING
-    cp_init();
-#   endif
-
     {
         HaskellObj      result; /* ignored */
         SchedulerStatus status;
@@ -1537,10 +1532,6 @@ Void evalExp ( void )             /* compile and run input expression    */
         fflush(stdout);
         fflush(stderr);
     }
-#   ifdef CRUDE_PROFILING
-    cp_show();
-#   endif
-
 }
 
 

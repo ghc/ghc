@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.28 $
- * $Date: 2000/05/09 09:26:29 $
+ * $Revision: 1.29 $
+ * $Date: 2000/05/10 09:00:20 $
  * ------------------------------------------------------------------------*/
 
 
@@ -133,12 +133,6 @@
 #define PROVIDE_COERCE      1
 #define PROVIDE_PTREQUALITY 1
 #define PROVIDE_CONCURRENT  1
-
-/* Enable a crude profiler which counts BCO entries, bytes allocated
-   and bytecode insns executed on a per-fn basis.  Used for assessing
-   the effect of the simplifier/optimiser.
-*/
-#undef CRUDE_PROFILING
 
 /* Turn bytecode interpreter support on/off.
  */

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.51 $
- * $Date: 2000/05/09 10:00:36 $
+ * $Revision: 1.52 $
+ * $Date: 2000/05/10 09:00:20 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -74,164 +74,6 @@
 extern void* /* StgClosure* */ getHugs_BCO_cptr_for ( char* s );
 extern int   /* Bool */ combined;
 
-/* --------------------------------------------------------------------------
- * Crude profiling stuff (mainly to assess effect of optimiser)
- * ------------------------------------------------------------------------*/
-
-#ifdef CRUDE_PROFILING
-
-#define M_CPTAB 10000
-#define CP_NIL (-1)
-
-int cpInUse = -1;
-int cpCurr;
-
-typedef 
-   struct { int /*StgVar*/ who; 
-            int /*StgVar*/ twho; 
-            int enters; 
-            int bytes; 
-            int insns; 
-   }
-   CPRecord;
-
-CPRecord cpTab[M_CPTAB];
-
-void cp_init ( void )
-{
-   int i;
-   cpCurr = CP_NIL;
-   cpInUse = 0;
-   for (i = 0; i < M_CPTAB; i++)
-      cpTab[i].who = CP_NIL;
-}
-
-
-
-void cp_enter ( StgBCO* b )
-{
-   int is_ret_cont;
-   int h;
-   int /*StgVar*/ v = b->stgexpr;
-   if ((void*)v == NULL) return;
-
-   is_ret_cont = 0;
-   if (v > 500000000) {
-      is_ret_cont = 1;
-      v -= 1000000000;
-   }
-
-   if (v < 0) 
-      h = (-v) % M_CPTAB; else
-      h = v % M_CPTAB;
-  
-   assert (h >= 0 && h < M_CPTAB);
-   while (cpTab[h].who != v && cpTab[h].who != CP_NIL) { 
-      h++; if (h == M_CPTAB) h = 0;
-   };
-   cpCurr = h;
-   if (cpTab[cpCurr].who == CP_NIL) {
-      cpTab[cpCurr].who = v;
-      if (!is_ret_cont) cpTab[cpCurr].enters = 1;
-      cpTab[cpCurr].bytes = cpTab[cpCurr].insns = 0;
-      cpInUse++;
-      if (cpInUse * 2 > M_CPTAB) {
-         fprintf(stderr, "\nCRUDE_PROFILING hash table is too full\n" );
-         assert(0);
-      }
-   } else {
-      if (!is_ret_cont) cpTab[cpCurr].enters++;
-   }   
-
-
-}
-
-void cp_bill_words ( int nw )
-{
-   if (cpCurr == CP_NIL) return;
-   cpTab[cpCurr].bytes += sizeof(StgWord)*nw;
-}
-
-
-void cp_bill_insns ( int ni )
-{
-   if (cpCurr == CP_NIL) return;
-   cpTab[cpCurr].insns += ni;
-}
-
-
-static double percent ( double a, double b )
-{
-   return (100.0 * a) / b;
-}
-
-
-void cp_show ( void )
-{
-   int i, j, max, maxN, totE, totB, totI, cumE, cumB, cumI;
-   char nm[200];
-
-   if (cpInUse == -1) return;
-
-   fflush(stdout);fflush(stderr);
-   printf ( "\n\n" );
-
-   totE = totB = totI = 0;
-   for (i = 0; i < M_CPTAB; i++) {
-      cpTab[i].twho = cpTab[i].who;
-      if (cpTab[i].who != CP_NIL) {
-         totE += cpTab[i].enters;
-         totB += cpTab[i].bytes;
-         totI += cpTab[i].insns;
-      }
-   }
-  
-   printf ( "Totals:   "
-            "%6d (%7.3f M) enters,   "
-            "%6d (%7.3f M) insns,   "
-            "%6d  (%7.3f M) bytes\n\n", 
-            totE, totE/1000000.0, totI, totI/1000000.0, totB, totB/1000000.0 );
-
-   cumE = cumB = cumI = 0;
-   for (j = 0; j < 32; j++) {
-
-      maxN = max = -1;
-      for (i = 0; i < M_CPTAB; i++)
-         if (cpTab[i].who != CP_NIL &&
-             cpTab[i].enters > maxN) {
-            maxN = cpTab[i].enters;
-            max = i;
-         }
-      if (max == -1) break;
-
-      cumE += cpTab[max].enters;
-      cumB += cpTab[max].bytes;
-      cumI += cpTab[max].insns;
-
-      strcpy(nm, maybeName(cpTab[max].who));
-      if (strcmp(nm, "(unknown)")==0)
-         sprintf ( nm, "id%d", -cpTab[max].who);
-
-      printf ( "%20s %7d es (%4.1f%%, %4.1f%% c)    "
-                    "%7d bs (%4.1f%%, %4.1f%% c)    "
-                    "%7d is (%4.1f%%, %4.1f%% c)\n",
-                nm,
-                cpTab[max].enters, percent(cpTab[max].enters,totE), percent(cumE,totE),
-                cpTab[max].bytes,  percent(cpTab[max].bytes,totB),  percent(cumB,totB),
-                cpTab[max].insns,  percent(cpTab[max].insns,totI),  percent(cumI,totI)
-             );
-
-      cpTab[max].twho = cpTab[max].who;
-      cpTab[max].who  = CP_NIL;
-   }
-
-   for (i = 0; i < M_CPTAB; i++)
-      cpTab[i].who = cpTab[i].twho;
-
-   printf ( "\n" );
-}
-
-#endif
 
 
 /* --------------------------------------------------------------------------
@@ -590,11 +432,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 RETURN(HeapOverflow);
             }
 
-#           if CRUDE_PROFILING
-            cp_enter ( bco );
-#           endif
-
-
             bciPtr = &(bcoInstr(bco,0));
 
             LoopTopLabel
@@ -612,10 +449,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     fprintf(stderr,"\n");
                     LLL;
                    );
-
-#           if CRUDE_PROFILING
-            SSS; cp_bill_insns(1); LLL;
-#           endif
 
             Dispatch
 
@@ -1691,18 +1524,12 @@ static inline StgStablePtr    taggedStackStable  ( StgStackOffset i )
 static inline StgPtr grabHpUpd( nat size )
 {
     ASSERT( size >= MIN_UPD_SIZE + sizeofW(StgHeader) );
-#ifdef CRUDE_PROFILING
-    cp_bill_words ( size );
-#endif
     return allocate(size);
 }
 
 static inline StgPtr grabHpNonUpd( nat size )
 {
     ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-#ifdef CRUDE_PROFILING
-    cp_bill_words ( size );
-#endif
     return allocate(size);
 }
 

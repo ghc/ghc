@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.69 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.70 $
+ * $Date: 2000/05/10 09:00:20 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -569,8 +569,8 @@ static struct cmd cmds[] = {
  {":reload", RELOAD}, {":gc",   COLLECT}, {":edit",    EDIT},
  {":quit",   QUIT},   {":set",  SET},     {":find",    FIND},
  {":names",  NAMES},  {":info", INFO},    {":project", PROJECT},
- {":dump",   DUMP},   {":ztats", STATS},
- {":module",SETMODULE}, 
+ {":dump",   DUMP},
+ {":module", SETMODULE}, 
  {":browse", BROWSE},
 #if EXPLAIN_INSTANCE_RESOLUTION
  {":xplain", XPLAIN},
@@ -608,9 +608,6 @@ static Void local menu() {
     Printf(":gc                 force garbage collection\n");
     Printf(":version            print Hugs version\n");
     Printf(":dump <name>        print STG code for named fn\n");
-#ifdef CRUDE_PROFILING
-    Printf(":ztats <name>       print reduction stats\n");
-#endif
     Printf(":quit               exit Hugs interpreter\n");
 }
 
@@ -2448,11 +2445,6 @@ String argv[]; {
             case BADCMD : guidance();
                           break;
             case SET    : set();
-                          break;
-            case STATS:
-#ifdef CRUDE_PROFILING
-                          cp_show();
-#endif
                           break;
             case SYSTEM : if (shellEsc(readLine()))
                               Printf("Warning: Shell escape terminated abnormally\n");

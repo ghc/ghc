@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/05/09 10:00:35 $
+ * $Revision: 1.29 $
+ * $Date: 2000/05/10 09:00:20 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -367,14 +367,6 @@ void asmCopyAndLink ( void )
    }
 }
 
-
-#if 0
-void asmMarkObject ( AsmObject obj )
-{
-    ASSERT(obj->num_unresolved == 0 && obj->closure);
-    obj->closure = MarkRoot(obj->closure);
-}
-#endif
 
 /* --------------------------------------------------------------------------
  * Keeping track of the simulated stack pointer

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.24 $
+ * $Date: 2000/05/10 09:00:20 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -111,14 +111,10 @@ Still to do:
 
 * Profile and accelerate.  Code generation is slower because linking
   is slower.  Evaluation GC is slower because markHugsObjects has
-  sloweed down.
+  slowed down.
 
 * Make setCurrentModule ignore name table entries created by the
   lambda-lifter.
-
-* Zap various #if 0 in codegen.c/Assembler.c.
-
-* Zap CRUDE_PROFILING.
 */
 
 
@@ -205,23 +201,6 @@ static void cgAddPtrToObject ( AsmObject obj, Cell ptrish )
          internal("cgAddPtrToObject");
    }
 }
-
-#if 0
-static void cgPushRef ( AsmBCO bco, Cell c )
-{
-   switch (whatIs(c)) {
-      case CPTRCELL:
-         asmPushRefNoOp(bco,(StgPtr)cptrOf(c)); break;
-      case PTRCELL:
-         asmPushRefObject(bco,ptrOf(c)); break;
-      case NAME:
-      case TUPLE:
-         asmPushRefHugs(bco,c); break;
-      default:
-         internal("cgPushRef");
-   }
-}
-#endif
 
 /* Get a pointer to atom e onto the stack. */
 static Void pushAtom ( AsmBCO bco, StgAtom e )
@@ -314,11 +293,7 @@ static Void pushAtom ( AsmBCO bco, StgAtom e )
 
 static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
 {
-#ifdef CRUDE_PROFILING
-    AsmBCO bco = asmBeginContinuation(sp, currentTop + 1000000000);
-#else
     AsmBCO bco = asmBeginContinuation(sp, alts);
-#endif
     Bool omit_test
        = length(alts) == 2 &&
          isDefaultAlt(hd(tl(alts))) &&
@@ -650,31 +625,6 @@ static Void build( AsmBCO bco, StgVar v )
             }
             else
                internal("build: STGAPP");
-#if 0
-Looks like a hack to me.
-            if (isName(fun)) {
-                if (nonNull(name(fun).closure))
-                   fun = name(fun).closure; else
-                   fun = cptrFromName(fun);
-            }
-
-            if (isCPtr(fun)) {
-               assert(isName(fun0));
-               itsaPAP = name(fun0).arity > length(args);
-#              if DEBUG_CODEGEN
-               fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
-                         nameFromOPtr(cptrOf(fun)), name(fun0).arity,
-                         length(args) );
-#              endif
-            } else {
-               itsaPAP = FALSE;
-               if (nonNull(stgVarBody(fun))
-                   && whatIs(stgVarBody(fun)) == LAMBDA 
-                   && length(stgLambdaArgs(stgVarBody(fun))) > length(args)
-                  )
-                  itsaPAP = TRUE;
-            }
-#endif
 
             if (itsaPAP) {
                 AsmSp  start = asmBeginMkPAP(bco);
@@ -740,11 +690,7 @@ static void beginTop( StgVar v )
           setObj(v,asmBeginCon(stgConInfo(stgConCon(rhs))));
           break;
        case LAMBDA:
-#         ifdef CRUDE_PROFILING
-          setObj(v,asmBeginBCO(currentTop));
-#         else
           setObj(v,asmBeginBCO(rhs));
-#         endif
           break;
        default:
           setObj(v,asmBeginCAF());
