@@ -21,6 +21,9 @@ TOP:=$(TEST_TOP)
 # By default, we're testing the GHC in the build tree.
 HC=$(GHC_INPLACE)
 
+# we don't want recompilation checking in here
+SRC_HC_OPTS += -no-recomp
+
 # -----------------------------------------------------------------
 # Everything after this point
 # augments or overrides previously set variables.
