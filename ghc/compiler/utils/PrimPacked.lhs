@@ -34,6 +34,10 @@ import GlaExts
 import Addr	( Addr(..) )
 import ST
 import Foreign
+-- ForeignObj is now exported abstractly.
+#if __GLASGOW_HASKELL__ >= 303
+import PrelForeign   ( ForeignObj(..) )
+#endif
 
 #if __GLASGOW_HASKELL__ < 301
 import ArrBase  	( StateAndMutableByteArray#(..), 
