@@ -148,6 +148,9 @@ type DerivEqn = (Name, Class, TyCon, [TyVar], DerivRhs)
 		-- The Name is the name for the DFun we'll build
 		-- The tyvars bind all the variables in the RHS
 
+pprDerivEqn (n,c,tc,tvs,rhs)
+  = parens (hsep [ppr n, ppr c, ppr tc, ppr tvs] <+> equals <+> ppr rhs)
+
 type DerivRhs  = ThetaType
 type DerivSoln = DerivRhs
 \end{code}
@@ -486,7 +489,7 @@ solveDerivEqns :: InstEnv
 				-- This bunch is Absolutely minimal...
 
 solveDerivEqns inst_env_in orig_eqns
-  = iterateDeriv initial_solutions
+  = iterateDeriv 1 initial_solutions
   where
 	-- The initial solutions for the equations claim that each
 	-- instance has an empty context; this solution is certainly
@@ -499,8 +502,14 @@ solveDerivEqns inst_env_in orig_eqns
 	-- compares it with the current one; finishes if they are the
 	-- same, otherwise recurses with the new solutions.
 	-- It fails if any iteration fails
-    iterateDeriv :: [DerivSoln] ->TcM [DFunId]
-    iterateDeriv current_solns
+    iterateDeriv :: Int -> [DerivSoln] ->TcM [DFunId]
+    iterateDeriv n current_solns
+      | n > 20 	-- Looks as if we are in an infinite loop
+		-- This can happen if we have -fallow-undecidable-instances
+		-- (See TcSimplify.tcSimplifyDeriv.)
+      = pprPanic "solveDerivEqns: probable loop" 
+		 (vcat (map pprDerivEqn orig_eqns) $$ ppr current_solns)
+      | otherwise
       =	getDOptsTc				`thenNF_Tc` \ dflags ->
         let 
 	    dfuns    = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
@@ -515,7 +524,7 @@ solveDerivEqns inst_env_in orig_eqns
 	if (current_solns == new_solns) then
 	    returnTc dfuns
 	else
-	    iterateDeriv new_solns
+	    iterateDeriv (n+1) new_solns
 
     ------------------------------------------------------------------
 

@@ -1738,30 +1738,38 @@ tcSimplifyDeriv tyvars theta
     simpleReduceLoop doc reduceMe wanteds		`thenTc` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
+    doptsTc Opt_AllowUndecidableInstances		`thenNF_Tc` \ undecidable_ok ->
     let
  	tv_set      = mkVarSet tvs
 	simpl_theta = map dictPred irreds	-- reduceMe squashes all non-dicts
 
 	check_pred pred
+	  | isEmptyVarSet pred_tyvars	-- Things like (Eq T) should be rejected
+	  = addErrTc (noInstErr pred)
+
+	  | not undecidable_ok && not (isTyVarClassPred pred)
 	  -- Check that the returned dictionaries are all of form (C a b)
 	  -- 	(where a, b are type variables).  
-	  -- At one time we allowed this if we had -fallow-undecidable-instances,
-	  -- but that risks non-termination in the 'deriving' context-inference
-	  -- fixpoint loop. If you want fancy stuff you just have to write the
-	  -- instance decl yourself.
-	  | not (isTyVarClassPred pred)
+	  -- We allow this if we had -fallow-undecidable-instances,
+	  -- but note that risks non-termination in the 'deriving' context-inference
+	  -- fixpoint loop.   It is useful for situations like
+	  --	data Min h a = E | M a (h a)
+	  -- which gives the instance decl
+	  --	instance (Eq a, Eq (h a)) => Eq (Min h a)
           = addErrTc (noInstErr pred)
   
+	  | not (pred_tyvars `subVarSet` tv_set) 
 	  -- Check for a bizarre corner case, when the derived instance decl should
 	  -- have form 	instance C a b => D (T a) where ...
 	  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
 	  -- of problems; in particular, it's hard to compare solutions for
 	  -- equality when finding the fixpoint.  So I just rule it out for now.
-	  | not (tyVarsOfPred pred `subVarSet` tv_set) 
 	  = addErrTc (badDerivedPred pred)
   
 	  | otherwise
 	  = returnNF_Tc ()
+	  where
+	    pred_tyvars = tyVarsOfPred pred
 
 	rev_env = mkTopTyVarSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
