@@ -73,6 +73,7 @@ import HscMain		( initPersistentCompilerState )
 import HscTypes
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName, isGlobalName )
+import NameEnv
 import Rename		( mkGlobalContext )
 import RdrName		( emptyRdrEnv )
 import Module
@@ -92,7 +93,6 @@ import IOExts
 #ifdef GHCI
 import RdrName		( lookupRdrEnv )
 import Id		( idType, idName )
-import NameEnv
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import BasicTypes	( Fixity, defaultFixity )
