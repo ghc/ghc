@@ -1,5 +1,5 @@
-This is version 2.10 of the Glorious Glasgow Haskell compilation
-system (GHC).  GHC 2.10 is a compiler for Haskell 1.4.
+This is version 3.00 of the Glorious Glasgow Haskell compilation
+system (GHC).  GHC 3.00 is a compiler for Haskell 1.4.
 
 Haskell is "the" standard lazy functional programming language.
 Haskell 1.4 is the current version of the language, released in
