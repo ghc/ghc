@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.131 2002/02/18 13:26:13 sof Exp $
+ * $Id: Schedule.c,v 1.132 2002/02/18 17:27:24 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1426,7 +1426,12 @@ void deleteAllThreads ( void )
  * ------------------------------------------------------------------------- */
    
 StgInt
-suspendThread( StgRegTable *reg, rtsBool concCall )
+suspendThread( StgRegTable *reg, 
+	       rtsBool concCall
+#if !defined(RTS_SUPPORTS_THREADS)
+	       STG_UNUSED
+#endif
+	       )
 {
   nat tok;
   Capability *cap;
@@ -1476,7 +1481,12 @@ suspendThread( StgRegTable *reg, rtsBool concCall )
 }
 
 StgRegTable *
-resumeThread( StgInt tok, rtsBool concCall )
+resumeThread( StgInt tok,
+	      rtsBool concCall
+#if !defined(RTS_SUPPORTS_THREADS)
+	       STG_UNUSED
+#endif
+	      )
 {
   StgTSO *tso, **prev;
   Capability *cap;
