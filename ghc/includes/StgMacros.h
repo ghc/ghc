@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.42 2001/11/22 14:25:11 simonmar Exp $
+ * $Id: StgMacros.h,v 1.43 2001/11/23 11:58:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -670,7 +670,7 @@ extern DLL_IMPORT_RTS const StgPolyInfoTable stg_seq_frame_info;
 		StgSeqFrame *__frame;				\
 		TICK_SEQF_PUSHED();  				\
 		__frame = (StgSeqFrame *)(sp); 			\
-		SET_HDR_(__frame,&stg_seq_frame_info,CCCS);    	\
+		SET_HDR((StgClosure *)__frame,(StgInfoTable *)&stg_seq_frame_info,CCCS);\
 		__frame->link = Su;				\
 		Su = (StgUpdateFrame *)__frame;			\
 	}
@@ -693,11 +693,20 @@ extern DLL_IMPORT_RTS const StgPolyInfoTable stg_seq_frame_info;
    Closure and Info Macros with casting.
 
    We don't want to mess around with casts in the generated C code, so
-   we use these casting versions of the closure/info tables macros.
+   we use this casting versions of the closure macro.
+
+   This version of SET_HDR also includes CCS_ALLOC for profiling - the
+   reason we don't use two separate macros is that the cost centre
+   field is sometimes a non-simple expression and we want to share its
+   value between SET_HDR and CCS_ALLOC.
    -------------------------------------------------------------------------- */
 
-#define SET_HDR_(c,info,ccs) \
-   SET_HDR((StgClosure *)(c),(StgInfoTable *)(info),ccs)
+#define SET_HDR_(c,info,ccs,size)				\
+  {								\
+      CostCentreStack *tmp = (ccs);				\
+      SET_HDR((StgClosure *)(c),(StgInfoTable *)(info),tmp);	\
+      CCS_ALLOC(tmp,size);					\
+  }
 
 /* -----------------------------------------------------------------------------
    Saving context for exit from the STG world, and loading up context

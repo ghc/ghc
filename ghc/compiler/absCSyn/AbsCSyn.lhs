@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.39 2001/11/08 12:56:01 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.40 2001/11/23 11:58:00 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -115,6 +115,7 @@ stored in a mixed type location.)
 	CAddrMode	-- address of the info ptr
 	CAddrMode	-- cost centre to place in closure
 			--   CReg CurCostCentre or CC_HDR(R1.p{-Node-})
+	Int		-- size of closure, for profiling
 
   | COpStmt
 	[CAddrMode]	-- Results

@@ -12,9 +12,10 @@ module CostCentre (
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
 	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
+	isDerivedFromCurrentCCS,
 
 	mkUserCC, mkAutoCC, mkAllCafsCC, 
-	mkSingletonCCS, cafifyCC, dupifyCC,
+	mkSingletonCCS, cafifyCC, dupifyCC, pushCCOnCCS,
 	isCafCC, isDupdCC, isEmptyCC, isCafCCS,
 	isSccCountCostCentre,
 	sccAbleCostCentre,
@@ -85,14 +86,17 @@ data CostCentreStack
 			-- accumulate any costs.  But we still need
 			-- the placeholder.  This CCS is it.
 
-  | SingletonCCS CostCentre
-			-- This is primarily for CAF cost centres, which
-			-- are attached to top-level thunks right at the
-			-- end of STG processing, before code generation.
-			-- Hence, a CAF cost centre never appears as the
-			-- argument of an _scc_.
-			-- Also, we generate these singleton CCSs statically
-			-- as part of code generation.
+  | PushCC CostCentre CostCentreStack
+		-- These are used during code generation as the CCSs
+		-- attached to closures.  A PushCC never appears as
+		-- the argument to an _scc_.
+		--
+		-- The tail (2nd argument) is either NoCCS, indicating
+		-- a staticly allocated CCS, or CurrentCCS indicating
+		-- a dynamically created CCS.  We only support
+		-- statically allocated *singleton* CCSs at the
+		-- moment, for the purposes of initialising the CCS
+		-- field of a CAF.
 
   deriving (Eq, Ord)	-- needed for Ord on CLabel
 \end{code}
@@ -169,8 +173,12 @@ isCurrentCCS _	      			= False
 isSubsumedCCS SubsumedCCS 		= True
 isSubsumedCCS _		     		= False
 
-isCafCCS (SingletonCCS cc)		= isCafCC cc
+isCafCCS (PushCC cc NoCCS)		= isCafCC cc
 isCafCCS _				= False
+
+isDerivedFromCurrentCCS CurrentCCS	= True
+isDerivedFromCurrentCCS (PushCC _ ccs)	= isDerivedFromCurrentCCS ccs
+isDerivedFromCurrentCCS _		= False
 
 currentOrSubsumedCCS SubsumedCCS	= True
 currentOrSubsumedCCS CurrentCCS		= True
@@ -181,14 +189,12 @@ Building cost centres
 
 \begin{code}
 mkUserCC :: UserFS -> Module -> CostCentre
-
 mkUserCC cc_name mod
   = NormalCC { cc_name = encodeFS cc_name, cc_mod =  moduleName mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
     }
 
 mkAutoCC :: Id -> Module -> IsCafCC -> CostCentre
-
 mkAutoCC id mod is_caf
   = NormalCC { cc_name = occNameFS (getOccName id), cc_mod =  moduleName mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = is_caf
@@ -196,11 +202,15 @@ mkAutoCC id mod is_caf
 
 mkAllCafsCC m = AllCafsCC  { cc_mod = moduleName m }
 
+
+
 mkSingletonCCS :: CostCentre -> CostCentreStack
-mkSingletonCCS cc = SingletonCCS cc
+mkSingletonCCS cc = pushCCOnCCS cc NoCCS
+
+pushCCOnCCS :: CostCentre -> CostCentreStack -> CostCentreStack
+pushCCOnCCS = PushCC
 
 cafifyCC, dupifyCC  :: CostCentre -> CostCentre
-
 cafifyCC cc@(NormalCC {cc_is_caf = is_caf})
   = ASSERT(not_a_caf_already is_caf)
     cc {cc_is_caf = CafCC}
@@ -282,23 +292,28 @@ cmp_caf CafCC    NotCafCC  = GT
 -----------------------------------------------------------------------------
 Printing Cost Centre Stacks.
 
-There are two ways to print a CCS:
+The outputable instance for CostCentreStack prints the CCS as a C
+expression.
 
-	- for debugging output (i.e. -ddump-whatever),
-	- as a C label
+NOTE: Not all cost centres are suitable for using in a static
+initializer.  In particular, the PushCC forms where the tail is CCCS
+may only be used in inline C code because they expand to a
+non-constant C expression.
 
 \begin{code}
 instance Outputable CostCentreStack where
-  ppr ccs = case ccs of
-		NoCCS		-> ptext SLIT("NO_CCS")
-		CurrentCCS	-> ptext SLIT("CCCS")
-		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
-		DontCareCCS	-> ptext SLIT("CCS_DONT_CARE")
-		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
-		SingletonCCS cc -> ppr cc <> ptext SLIT("_ccs")
+  ppr NoCCS		= ptext SLIT("NO_CCS")
+  ppr CurrentCCS	= ptext SLIT("CCCS")
+  ppr OverheadCCS	= ptext SLIT("CCS_OVERHEAD")
+  ppr DontCareCCS	= ptext SLIT("CCS_DONT_CARE")
+  ppr SubsumedCCS	= ptext SLIT("CCS_SUBSUMED")
+  ppr (PushCC cc NoCCS) = ppr cc <> ptext SLIT("_ccs")
+  ppr (PushCC cc ccs)   = ptext SLIT("PushCostCentre") <> 
+			   parens (ppr ccs <> comma <> ppr cc)
 
+-- print the static declaration for a singleton CCS.
 pprCostCentreStackDecl :: CostCentreStack -> SDoc
-pprCostCentreStackDecl ccs@(SingletonCCS cc)
+pprCostCentreStackDecl ccs@(PushCC cc NoCCS)
   = hcat [ ptext SLIT("CCS_DECLARE"), char '(',
     	   ppr ccs,	 	comma,	-- better be codeStyle
     	   ppCostCentreLbl cc, 	comma,

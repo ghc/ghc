@@ -304,7 +304,7 @@ addresses, etc.)
 
 \begin{code}
 
- gencode (CInitHdr cl_info reg_rel _)
+ gencode (CInitHdr cl_info reg_rel _ _)
   = let
 	lhs = a2stix reg_rel
     	lbl = infoTableLabelFromCI cl_info

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.27 2001/11/19 16:34:12 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.28 2001/11/23 11:58:00 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -476,12 +476,10 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
 
 	-- GENERATE THE CODE
     absC ( mkAbstractCs (
-	   [ cInitHdr closure_info (hpRel realHp info_offset) use_cc ]
+	   [ CInitHdr closure_info 
+		(CAddr (hpRel realHp info_offset)) 
+		use_cc closure_size ]
 	   ++ (map do_move amodes_with_offsets)))	`thenC`
-
-	-- GENERATE CC PROFILING MESSAGES
-    costCentresC SLIT("CCS_ALLOC") [blame_cc, mkIntCLit closure_size]
-					 		`thenC`
 
 	-- BUMP THE VIRTUAL HEAP POINTER
     setVirtHp (virtHp + closure_size)			`thenC`
@@ -520,13 +518,6 @@ inPlaceAllocDynClosure closure_info head use_cc amodes_with_offsets
     in
 	-- GENERATE THE CODE
     absC ( mkAbstractCs (
-	   [ CInitHdr closure_info head use_cc ]
+	   [ CInitHdr closure_info head use_cc 0{-no alloc-} ]
 	   ++ (map do_move amodes_with_offsets)))
-
--- Avoid hanging on to anything in the CC field when we're not profiling.
-
-cInitHdr closure_info amode cc 
-  | opt_SccProfilingOn = CInitHdr closure_info (CAddr amode) cc
-  | otherwise          = CInitHdr closure_info (CAddr amode) (panic "absent cc")
-	
 \end{code}

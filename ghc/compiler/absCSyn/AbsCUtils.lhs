@@ -370,7 +370,7 @@ flatAbsC stmt@(CAssign dest source) 		 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CJump target) 			 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CFallThrough target) 		 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CReturn target return_info) 	 = returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CInitHdr a b cc) 		 = returnFlt (stmt, AbsCNop)
+flatAbsC stmt@(CInitHdr a b cc _) 		 = returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(COpStmt results op args vol_regs) = returnFlt (stmt, AbsCNop)
 
 -- Some statements only make sense at the top level, so we always float

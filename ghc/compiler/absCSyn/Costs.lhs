@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.29 2001/05/22 13:43:14 simonpj Exp $
+% $Id: Costs.lhs,v 1.30 2001/11/23 11:58:00 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ costs absC =
 
    CCodeBlock _ absC	      -> costs absC
 
-   CInitHdr cl_info reg_rel cost_centre -> initHdrCosts
+   CInitHdr cl_info reg_rel cost_centre _ -> initHdrCosts
 
 			{- This is more fancy but superflous: The addr modes
 			   are fixed and so the costs are const!

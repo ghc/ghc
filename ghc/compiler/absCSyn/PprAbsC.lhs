@@ -374,15 +374,16 @@ pprAbsC (CCodeBlock lbl abs_C) _
     }
 
 
-pprAbsC (CInitHdr cl_info amode cost_centre) _
+pprAbsC (CInitHdr cl_info amode cost_centre size) _
   = hcat [ ptext SLIT("SET_HDR_"), char '(',
 		ppr_amode amode, comma,
 		pprCLabelAddr info_lbl, comma,
-		if_profiling (pprAmode cost_centre),
+		if_profiling (pprAmode cost_centre), comma,
+		if_profiling (int size),
 		pp_paren_semi ]
   where
     info_lbl	= infoTableLabelFromCI cl_info
-
+  
 pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     vcat [
@@ -1481,7 +1482,7 @@ ppr_decls_AbsC (CSwitch discrim alts deflt)
 ppr_decls_AbsC (CCodeBlock lbl absC)
   = ppr_decls_AbsC absC
 
-ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre)
+ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre _)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = labelSeenTE info_lbl     `thenTE` \  label_seen ->
     returnTE (Nothing,
