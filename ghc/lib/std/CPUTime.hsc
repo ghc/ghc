@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.12 2001/09/05 15:15:33 sewardj Exp $
+-- $Id: CPUTime.hsc,v 1.13 2001/09/06 15:15:23 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -7,7 +7,7 @@
 module CPUTime 
 	(
          getCPUTime,       -- :: IO Integer
-	 cpuTimePrecision  -- :: Integer
+	 cpuTimePrecision  -- :: Integer
         ) where
 
 import PrelMarshalAlloc
@@ -51,10 +51,10 @@ getCPUTime = do
 
     let ru_utime = (#ptr struct rusage, ru_utime) p_rusage
     let ru_stime = (#ptr struct rusage, ru_stime) p_rusage
-    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO CInt
-    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CInt
-    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CInt
-    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CInt
+    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO CTime
+    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CTime
+    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CTime
+    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CTime
 
     return ((fromIntegral u_sec * 1000000 + fromIntegral u_usec + 
              fromIntegral s_sec * 1000000 + fromIntegral s_usec) 
