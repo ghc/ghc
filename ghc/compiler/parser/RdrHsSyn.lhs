@@ -385,11 +385,11 @@ getMonoBind (L loc (FunBind lf@(L _ f) inf mtchs)) binds
   = go mtchs loc binds
   where
     go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 mtchs2)) : binds)
-	| f == unLoc f2 = go (mtchs2 ++ mtchs1) loc binds
-	-- Remember binds is reversed, so glue mtchs2 on the front
-	-- and use loc2 as the final location
+	| f == unLoc f2 = go (mtchs2++mtchs1) loc binds
 	where loc = combineSrcSpans loc1 loc2
-    go mtchs1 loc binds = (L loc (FunBind lf inf mtchs1), binds)
+    go mtchs1 loc binds
+	= (L loc (FunBind lf inf (reverse mtchs1)), binds)
+	-- reverse the final matches, to get it back in the right order
 
 getMonoBind bind binds = (bind, binds)
 
