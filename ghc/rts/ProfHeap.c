@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.43 2003/02/20 15:39:59 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.44 2003/03/18 14:36:56 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2003
  *
  * Support for heap profiling
  *
@@ -479,13 +479,24 @@ endHeapProfiling(void)
 
 
 #ifdef PROFILING
+static size_t
+buf_append(char *p, const char *q, char *end)
+{
+    int m;
+
+    for (m = 0; p < end; p++, q++, m++) {
+	*p = *q;
+	if (*q == '\0') { break; }
+    }
+    return m;
+}
+
 static void
 fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 {
-    char buf[max_length+1];
+    char buf[max_length+1], *p, *buf_end;
     nat next_offset = 0;
     nat written;
-    char *template;
 
     // MAIN on its own gets printed as "MAIN", otherwise we ignore MAIN.
     if (ccs == CCS_MAIN) {
@@ -495,6 +506,9 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 
     fprintf(fp, "(%d)", ccs->ccsID);
 
+    p = buf;
+    buf_end = buf + max_length + 1;
+
     // keep printing components of the stack until we run out of space
     // in the buffer.  If we run out of space, end with "...".
     for (; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack) {
@@ -502,31 +516,16 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	// CAF cost centres print as M.CAF, but we leave the module
 	// name out of all the others to save space.
 	if (!strcmp(ccs->cc->label,"CAF")) {
-#ifdef HAVE_SNPRINTF
-	    written = snprintf(buf+next_offset, 
-			       (int)max_length-3-(int)next_offset,
-			       "%s.CAF", ccs->cc->module);
-#else
-	    written = sprintf(buf+next_offset, 
-			       "%s.CAF", ccs->cc->module);
-#endif
+	    p += buf_append(p, ccs->cc->module, buf_end);
+	    p += buf_append(p, ".CAF", buf_end);
 	} else {
 	    if (ccs->prevStack != NULL && ccs->prevStack != CCS_MAIN) {
-		template = "%s/";
-	    } else {
-		template = "%s";
+		p += buf_append(p, "/", buf_end);
 	    }
-#ifdef HAVE_SNPRINTF
-	    written = snprintf(buf+next_offset, 
-			       (int)max_length-3-(int)next_offset,
-			       template, ccs->cc->label);
-#else
-	    written = sprintf(buf+next_offset, 
-			       template, ccs->cc->label);
-#endif
+	    p += buf_append(p, ccs->cc->label, buf_end);
 	}
-
-	if (next_offset+written >= max_length-4) {
+	
+	if (p >= buf_end) {
 	    sprintf(buf+max_length-4, "...");
 	    break;
 	} else {
