@@ -22,7 +22,11 @@ PKGCONF_OPTS = "$(TARGETPLATFORM)"		\
 	       "$(GHC_LIB_DIR)"			\
 	       "$(GHC_RUNTIME_DIR)"		\
 	       "$(GHC_UTILS_DIR)"		\
-	       "$(GHC_INCLUDE_DIR)"
+	       "$(GHC_INCLUDE_DIR)"		\
+	       "$(X_CFLAGS)"			\
+	       "$(X_LIBS)"
+
+# the latter two are needed to setup the package details for hslibs/xlib
 
 SRC_HC_OPTS += -fglasgow-exts -cpp 
 

@@ -35,6 +35,8 @@ package_details installing
  , cGHC_RUNTIME_DIR
  , cGHC_UTILS_DIR
  , cGHC_INCLUDE_DIR
+ , cX_CFLAGS
+ , cX_LIBS
  ] =
 
  [
@@ -427,8 +429,8 @@ package_details installing
          c_includes     = [ "HsXlib.h" ],
          package_deps   = [ "greencard" ],
          extra_ghc_opts = [],
-         extra_cc_opts  = [],
-         extra_ld_opts  = []
+         extra_cc_opts  = [ cX_CFLAGS ],
+         extra_ld_opts  = [ cX_LIBS ]
         }
 
          ,Package {
@@ -437,7 +439,9 @@ package_details installing
                              then [ "$libdir/imports/HGL" ]
                              else [ "$libdir/hslibs/graphics/lib/x11" ],
          source_dirs    = [],
-         library_dirs   = [],
+         library_dirs   = if installing
+                             then [ "$libdir" ]
+                             else [ "$libdir/hslibs/graphics/lib/x11"],
          hs_libraries   = [ "HSHGL" ],
 	 extra_libraries= [],
          include_dirs   = [],
