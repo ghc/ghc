@@ -600,10 +600,10 @@ qualifier list has just one element, a boolean expression.
     <itemizedlist>
       <listitem>
 	<para>The Foreign Function Interface language specification
-	(included in this manual, in <xref linkend="ffi">).</para>  
+	(included in this manual, in <xref linkend="ffi">).
 	You must use the <option>-fglasgow-exts</option> command-line option
 	to make GHC understand the <literal>foreign</literal> declarations
-	defined by the FFI.
+	defined by the FFI.</para>
       </listitem>
 
       <listitem>
@@ -2199,10 +2199,10 @@ must be a list of things of some type <literal>a</literal>; and that <literal>y<
 must have this same type.  The type signature on the expression <literal>(head xs)</literal>
 specifies that this expression must have the same type <literal>a</literal>.
 <emphasis>There is no requirement that the type named by "<literal>a</literal>" is
-in fact a type variable.  Indeed, in this case, the type named by "<literal>a</literal>" is
+in fact a type variable</emphasis>.  Indeed, in this case, the type named by "<literal>a</literal>" is
 <literal>Int</literal>.  (This is a slight liberalisation from the original rather complex
 rules, which specified that a pattern-bound type variable should be universally quantified.)
-For example, all of these are legal:
+For example, all of these are legal:</para>
 
 <programlisting>
   t (x::a) (y::a) = x+y*2
@@ -2221,7 +2221,6 @@ For example, all of these are legal:
   w (x::a) = x                  -- a unifies with [b]
 </programlisting>
 
-</para>
 </sect2>
 
 <sect2>
