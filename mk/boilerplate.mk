@@ -39,7 +39,7 @@ $(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/config
 
 $(TOP)/configure : $(TOP)/configure.in $(TOP)/aclocal.m4
 	@echo "Regenerating $(FPTOOLS_TOP)/configure..."
-	@( cd $(FPTOOLS_TOP) && make -f Makefile.config ./configure )
+	@( cd $(FPTOOLS_TOP) && $(MAKE) -f Makefile.config ./configure )
 
 # -----------------------------------------------------------------------------
 # 	Now follow the pieces of boilerplate
