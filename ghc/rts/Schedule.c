@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.113 2002/01/24 07:50:02 sof Exp $
+ * $Id: Schedule.c,v 1.114 2002/01/31 11:18:07 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -10,10 +10,11 @@
  *
  * WAY  Name     CPP flag  What's it for
  * --------------------------------------
- * mp   GUM      PAR       Parallel execution on a distributed memory machine
- * s    SMP      SMP       Parallel execution on a shared memory machine
- * mg   GranSim  GRAN      Simulation of parallel execution
- * md   GUM/GdH  DIST      Distributed execution (based on GUM)
+ * mp   GUM      PAR          Parallel execution on a distributed memory machine
+ * s    SMP      SMP          Parallel execution on a shared memory machine
+ * mg   GranSim  GRAN         Simulation of parallel execution
+ * md   GUM/GdH  DIST         Distributed execution (based on GUM)
+ *
  * --------------------------------------------------------------------------*/
 
 //@node Main scheduling code, , ,
@@ -109,6 +110,8 @@
 # include "HLC.h"
 #endif
 #include "Sparks.h"
+#include "Capability.h"
+#include "OSThreads.h"
 
 #include <stdarg.h>
 
@@ -119,7 +122,7 @@
  *
  * These are the threads which clients have requested that we run.  
  *
- * In an SMP build, we might have several concurrent clients all
+ * In a 'threaded' build, we might have several concurrent clients all
  * waiting for results, and each one will wait on a condition variable
  * until the result is available.
  *
@@ -134,8 +137,8 @@ typedef struct StgMainThread_ {
   StgTSO *         tso;
   SchedulerStatus  stat;
   StgClosure **    ret;
-#ifdef SMP
-  pthread_cond_t wakeup;
+#if defined(RTS_SUPPORTS_THREADS)
+  CondVar          wakeup;
 #endif
   struct StgMainThread_ *link;
 } StgMainThread;
@@ -224,13 +227,8 @@ StgThreadID next_thread_id = 1;
 
 #define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 2)
 
-/* Free capability list.
- * Locks required: sched_mutex.
- */
-#ifdef SMP
-Capability *free_capabilities; /* Available capabilities for running threads */
-nat n_free_capabilities;       /* total number of available capabilities */
-#else
+
+#if !defined(SMP)
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
@@ -248,7 +246,7 @@ rtsBool ready_to_gc;
 
 /* All our current task ids, saved in case we need to kill them later.
  */
-#ifdef SMP
+#if defined(SMP)
 //@cindex task_ids
 task_info *task_ids;
 #endif
@@ -269,15 +267,14 @@ static void     detectBlackHoles  ( void );
 static void sched_belch(char *s, ...);
 #endif
 
-#ifdef SMP
-//@cindex sched_mutex
-//@cindex term_mutex
-//@cindex thread_ready_cond
-//@cindex gc_pending_cond
-pthread_mutex_t sched_mutex       = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t term_mutex        = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  thread_ready_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t  gc_pending_cond   = PTHREAD_COND_INITIALIZER;
+#if defined(RTS_SUPPORTS_THREADS)
+/* ToDo: carefully document the invariants that go together
+ *       with these synchronisation objects.
+ */
+MutexVar  sched_mutex       = INIT_MUTEX_VAR;
+MutexVar  term_mutex        = INIT_MUTEX_VAR;
+CondVar   thread_ready_cond = INIT_COND_VAR;
+CondVar   gc_pending_cond   = INIT_COND_VAR;
 
 nat await_death;
 #endif
@@ -430,7 +427,7 @@ schedule( void )
      * should be done more efficiently without a linear scan
      * of the main threads list, somehow...
      */
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
     { 
       StgMainThread *m, **prev;
       prev = &main_threads;
@@ -442,7 +439,7 @@ schedule( void )
 	  }
 	  *prev = m->link;
 	  m->stat = Success;
-	  pthread_cond_broadcast(&m->wakeup);
+	  broadcastCondVar(&m->wakeup);
 	  break;
 	case ThreadKilled:
 	  if (m->ret) *(m->ret) = NULL;
@@ -452,7 +449,7 @@ schedule( void )
 	  } else {
 	    m->stat = Killed;
 	  }
-	  pthread_cond_broadcast(&m->wakeup);
+	  broadcastCondVar(&m->wakeup);
 	  break;
 	default:
 	  break;
@@ -460,7 +457,7 @@ schedule( void )
       }
     }
 
-#else // not SMP
+#else /* not threaded */
 
 # if defined(PAR)
     /* in GUM do this only on the Main PE */
@@ -500,7 +497,7 @@ schedule( void )
      */
 #if 0 /* defined(SMP) */
     {
-      nat n = n_free_capabilities;
+      nat n = getFreeCapabilities();
       StgTSO *tso = run_queue_hd;
 
       /* Count the run queue */
@@ -527,8 +524,8 @@ schedule( void )
       /* We need to wake up the other tasks if we just created some
        * work for them.
        */
-      if (n_free_capabilities - n > 1) {
-	  pthread_cond_signal(&thread_ready_cond);
+      if (getFreeCapabilities() - n > 1) {
+   	  signalCondVar ( &thread_ready_cond );
       }
     }
 #endif // SMP
@@ -549,8 +546,8 @@ schedule( void )
     if (blocked_queue_hd != END_TSO_QUEUE || sleeping_queue != END_TSO_QUEUE) {
       awaitEvent(
 	   (run_queue_hd == END_TSO_QUEUE)
-#ifdef SMP
-	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes)
+#if defined(SMP)
+	&& allFreeCapabilities()
 #endif
 	);
     }
@@ -572,8 +569,8 @@ schedule( void )
     if (blocked_queue_hd == END_TSO_QUEUE
 	&& run_queue_hd == END_TSO_QUEUE
 	&& sleeping_queue == END_TSO_QUEUE
-#ifdef SMP
-	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes)
+#if defined(SMP)
+	&& allFreeCapabilities()
 #endif
 	)
     {
@@ -586,13 +583,14 @@ schedule( void )
 	    IF_DEBUG(scheduler, sched_belch("still deadlocked, checking for black holes..."));
 	    detectBlackHoles();
 
-	    // No black holes, so probably a real deadlock.  Send the
-	    // current main thread the Deadlock exception (or in the SMP
-	    // build, send *all* main threads the deadlock exception,
-	    // since none of them can make progress).
+	    /* No black holes, so probably a real deadlock.  Send the
+	     * current main thread the Deadlock exception (or in the SMP
+	     * build, send *all* main threads the deadlock exception,
+	     * since none of them can make progress).
+	     */
 	    if (run_queue_hd == END_TSO_QUEUE) {
 		StgMainThread *m;
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
 		for (m = main_threads; m != NULL; m = m->link) {
 		    switch (m->tso->why_blocked) {
 		    case BlockedOnBlackHole:
@@ -621,28 +619,36 @@ schedule( void )
 		}
 #endif
 	    }
+#if !defined(RTS_SUPPORTS_THREADS)
 	    ASSERT( run_queue_hd != END_TSO_QUEUE );
+#endif
 	}
     }
 #elif defined(PAR)
     /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
 #endif
 
-#ifdef SMP
+#if defined(SMP)
     /* If there's a GC pending, don't do anything until it has
      * completed.
      */
     if (ready_to_gc) {
       IF_DEBUG(scheduler,sched_belch("waiting for GC"));
-      pthread_cond_wait(&gc_pending_cond, &sched_mutex);
+      waitCondVar ( &gc_pending_cond, &sched_mutex );
     }
-    
+#endif    
+
+#if defined(RTS_SUPPORTS_THREADS)
     /* block until we've got a thread on the run queue and a free
      * capability.
      */
-    while (run_queue_hd == END_TSO_QUEUE || free_capabilities == NULL) {
+    while ( run_queue_hd == END_TSO_QUEUE 
+#if defined(SMP)
+	    || noFreeCapabilities() 
+#endif
+	    ) {
       IF_DEBUG(scheduler, sched_belch("waiting for work"));
-      pthread_cond_wait(&thread_ready_cond, &sched_mutex);
+      waitCondVar ( &thread_ready_cond, &sched_mutex );
       IF_DEBUG(scheduler, sched_belch("work now available"));
     }
 #endif
@@ -933,12 +939,8 @@ schedule( void )
 
 #endif
     
-    /* grab a capability
-     */
 #ifdef SMP
-    cap = free_capabilities;
-    free_capabilities = cap->link;
-    n_free_capabilities--;
+    grabCapability(&cap);
 #else
     cap = &MainCapability;
 #endif
@@ -1002,7 +1004,7 @@ schedule( void )
     ACQUIRE_LOCK(&sched_mutex);
 
 #ifdef SMP
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler (task %ld): ", pthread_self()););
+    IF_DEBUG(scheduler,fprintf(stderr,"scheduler (task %ld): ", osThreadId()););
 #elif !defined(GRAN) && !defined(PAR)
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler: "););
 #endif
@@ -1292,9 +1294,7 @@ schedule( void )
     }
     
 #ifdef SMP
-    cap->link = free_capabilities;
-    free_capabilities = cap;
-    n_free_capabilities++;
+    grabCapability(&cap);
 #endif
 
 #ifdef PROFILING
@@ -1307,7 +1307,7 @@ schedule( void )
 #endif
 
 #ifdef SMP
-    if (ready_to_gc && n_free_capabilities == RtsFlags.ParFlags.nNodes) 
+    if (ready_to_gc && allFreeCapabilities() )
 #else
     if (ready_to_gc) 
 #endif
@@ -1317,13 +1317,13 @@ schedule( void )
        * to do it in another thread.  Either way, we need to
        * broadcast on gc_pending_cond afterward.
        */
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
       IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
       GarbageCollect(GetRoots,rtsFalse);
       ready_to_gc = rtsFalse;
 #ifdef SMP
-      pthread_cond_broadcast(&gc_pending_cond);
+      broadcastCondVar(&gc_pending_cond);
 #endif
 #if defined(GRAN)
       /* add a ContinueThread event to continue execution of current thread */
@@ -1421,9 +1421,8 @@ suspendThread( StgRegTable *reg )
   tok = cap->r.rCurrentTSO->id;
 
 #ifdef SMP
-  cap->link = free_capabilities;
-  free_capabilities = cap;
-  n_free_capabilities++;
+  /* Hand back capability */
+  releaseCapability(&cap);
 #endif
 
   RELEASE_LOCK(&sched_mutex);
@@ -1453,14 +1452,12 @@ resumeThread( StgInt tok )
   tso->link = END_TSO_QUEUE;
 
 #ifdef SMP
-  while (free_capabilities == NULL) {
+  while ( noFreeCapabilities() ) {
     IF_DEBUG(scheduler, sched_belch("waiting to resume"));
-    pthread_cond_wait(&thread_ready_cond, &sched_mutex);
+    waitCondVar(&thread_ready_cond, &sched_mutex);
     IF_DEBUG(scheduler, sched_belch("resuming thread %d", tso->id));
   }
-  cap = free_capabilities;
-  free_capabilities = cap->link;
-  n_free_capabilities--;
+  grabCapability(&cap);
 #else  
   cap = &MainCapability;
 #endif
@@ -1825,18 +1822,9 @@ term_handler(int sig STG_UNUSED)
   ACQUIRE_LOCK(&term_mutex);
   await_death--;
   RELEASE_LOCK(&term_mutex);
-  pthread_exit(NULL);
+  shutdownThread();
 }
 #endif
-
-static void
-initCapability( Capability *cap )
-{
-    cap->f.stgChk0         = (F_)__stg_chk_0;
-    cap->f.stgChk1         = (F_)__stg_chk_1;
-    cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
-    cap->f.stgUpdatePAP    = (F_)__stg_update_PAP;
-}
 
 void 
 initScheduler(void)
@@ -1887,22 +1875,7 @@ initScheduler(void)
 
 #ifdef SMP
   /* Allocate N Capabilities */
-  {
-    nat i;
-    Capability *cap, *prev;
-    cap  = NULL;
-    prev = NULL;
-    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-      cap = stgMallocBytes(sizeof(Capability), "initScheduler:capabilities");
-      initCapability(cap);
-      cap->link = prev;
-      prev = cap;
-    }
-    free_capabilities = cap;
-    n_free_capabilities = RtsFlags.ParFlags.nNodes;
-  }
-  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Allocated %d capabilities\n",
-			     n_free_capabilities););
+  initCapabilities(RtsFlags.ParFlags.nNodes);
 #else
   initCapability(&MainCapability);
 #endif
@@ -1918,7 +1891,7 @@ startTasks( void )
 {
   nat i;
   int r;
-  pthread_t tid;
+  OSThreadId tid;
   
   /* make some space for saving all the thread ids */
   task_ids = stgMallocBytes(RtsFlags.ParFlags.nNodes * sizeof(task_info),
@@ -1926,7 +1899,7 @@ startTasks( void )
   
   /* and create all the threads */
   for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-    r = pthread_create(&tid,NULL,taskStart,NULL);
+    r = createOSThread(&tid,taskStart);
     if (r != 0) {
       barf("startTasks: Can't create new Posix thread");
     }
@@ -2048,8 +2021,8 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   m->tso = tso;
   m->ret = ret;
   m->stat = NoStatus;
-#ifdef SMP
-  pthread_cond_init(&m->wakeup, NULL);
+#if defined(RTS_SUPPORTS_THREADS)
+  initCondVar(&m->wakeup);
 #endif
 
   m->link = main_threads;
@@ -2060,7 +2033,7 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 
 #ifdef SMP
   do {
-    pthread_cond_wait(&m->wakeup, &sched_mutex);
+    waitCondVar(&m->wakeup, &sched_mutex);
   } while (m->stat == NoStatus);
 #elif defined(GRAN)
   /* GranSim specific init */
@@ -2076,8 +2049,8 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 
   stat = m->stat;
 
-#ifdef SMP
-  pthread_cond_destroy(&m->wakeup);
+#if defined(RTS_SUPPORTS_THREADS)
+  closeCondVar(&m->wakeup);
 #endif
 
   IF_DEBUG(scheduler, fprintf(stderr, "== scheduler: main thread (%d) finished\n", 
@@ -3582,7 +3555,7 @@ sched_belch(char *s, ...)
   va_list ap;
   va_start(ap,s);
 #ifdef SMP
-  fprintf(stderr, "scheduler (task %ld): ", pthread_self());
+  fprintf(stderr, "scheduler (task %ld): ", osThreadId());
 #elif defined(PAR)
   fprintf(stderr, "== ");
 #else
@@ -3606,11 +3579,9 @@ sched_belch(char *s, ...)
 //* blocked_queue_tl::  @cindex\s-+blocked_queue_tl
 //* context_switch::  @cindex\s-+context_switch
 //* createThread::  @cindex\s-+createThread
-//* free_capabilities::  @cindex\s-+free_capabilities
 //* gc_pending_cond::  @cindex\s-+gc_pending_cond
 //* initScheduler::  @cindex\s-+initScheduler
 //* interrupted::  @cindex\s-+interrupted
-//* n_free_capabilities::  @cindex\s-+n_free_capabilities
 //* next_thread_id::  @cindex\s-+next_thread_id
 //* print_bq::  @cindex\s-+print_bq
 //* run_queue_hd::  @cindex\s-+run_queue_hd

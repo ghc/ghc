@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.59 2002/01/30 16:27:34 simonmar Exp $
+# $Id: Makefile,v 1.60 2002/01/31 11:18:06 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -95,6 +95,14 @@ endif
 ifeq "$(BootingFromHc)" "YES"
 # use the normal $(CC) when booting from .hc files
 SRC_CC_OPTS += $(HC_OPTS)
+endif
+
+# Currently, you only get 'threads support' in the normal
+# way.
+ifeq "$(GhcRtsThreaded)" "YES"
+ifeq "$(way)" ""
+SRC_CC_OPTS += -DTHREADED_RTS
+endif
 endif
 
 #-----------------------------------------------------------------------------
