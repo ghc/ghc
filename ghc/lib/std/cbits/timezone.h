@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.h,v 1.5 1999/02/08 11:16:20 sof Exp $
+ * $Id: timezone.h,v 1.6 1999/02/09 09:43:08 simonm Exp $
  *
  * Time-zone support header
  */
@@ -26,6 +26,21 @@
  */
 # undef  HAVE_TM_ZONE
 # define HAVE_TZNAME  1
+
+/* Double sigh.  The timezone variable is only available under Linux
+ * when we're compiling NON_POSIX_SOURCE (or _GNU_SOURCE or whatever),
+ * but to make that work we have to make sure NON_POSIX_SOURCE is
+ * defined before anything from /usr/include is included.  To avoid
+ * infecting too much source with NON_POSIX_SOURCE, we frob it
+ * below...
+ */
+#undef HAVE_TIMEZONE
+
+/* The correct solution to this problem would appear to be to ditch
+ * the standard GNU configure tests for the time stuff, and hack up
+ * our own that test for POSIX-compliant time support first, then
+ * BSD-style time stuff.
+ */
 #endif
 
 #if TIME_WITH_SYS_TIME
