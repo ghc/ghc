@@ -76,7 +76,7 @@ module TysWiredIn (
  	isFFIDynResultTy,   -- :: Type -> Bool
  	isFFILabelTy,       -- :: Type -> Bool
 	isAddrTy,	    -- :: Type -> Bool
-	isForeignObjTy      -- :: Type -> Bool
+	isForeignPtrTy      -- :: Type -> Bool
 
     ) where
 
@@ -374,6 +374,19 @@ isForeignObjTy :: Type -> Bool
 isForeignObjTy = isTyCon foreignObjTyConKey
 \end{code}
 
+\begin{code}
+foreignPtrTyCon
+  = pcNonRecDataTyCon foreignPtrTyConName
+	alpha_tyvar  [(True,False)] [foreignPtrDataCon]
+  where
+    foreignPtrDataCon
+      = pcDataCon foreignPtrDataConName
+	    alpha_tyvar [] [foreignObjPrimTy] foreignPtrTyCon
+
+isForeignPtrTy :: Type -> Bool
+isForeignPtrTy = isTyCon foreignPtrTyConKey
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection[TysWiredIn-Integer]{@Integer@ and its related ``pairing'' types}
@@ -464,8 +477,8 @@ legalIncomingTyCon :: TyCon -> Bool
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
 legalIncomingTyCon tc
-  | getUnique tc `elem` [ foreignObjTyConKey, byteArrayTyConKey, 
-                                              mutableByteArrayTyConKey ] 
+  | getUnique tc `elem` [ foreignObjTyConKey, foreignPtrTyConKey,
+			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
   = False
   -- It's also illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
@@ -491,6 +504,7 @@ boxedMarshalableTyCon tc
 			 , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
 			 , addrTyConKey, charTyConKey, foreignObjTyConKey
+			 , foreignPtrTyConKey
 			 , stablePtrTyConKey
 			 , byteArrayTyConKey, mutableByteArrayTyConKey
 			 , boolTyConKey

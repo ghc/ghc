@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelForeign.lhs,v 1.15 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelForeign.lhs,v 1.16 2000/12/11 16:56:47 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -12,9 +12,11 @@
 module PrelForeign (
 	module PrelForeign,
 #ifndef __PARALLEL_HASKELL__
+	ForeignPtr(..),
+
+	-- the rest are deprecated
 	ForeignObj(..),
 	makeForeignObj,
-	-- SUP: deprecated
 	mkForeignObj,
 	writeForeignObj
 #endif
@@ -26,6 +28,16 @@ import PrelAddr
 import PrelWeak	( addForeignFinalizer )
 \end{code}
 
+%*********************************************************
+%*							*
+\subsection{ForeignPtr}
+%*							*
+%*********************************************************
+
+\begin{code}
+data ForeignPtr a = ForeignPtr ForeignObj#
+instance CCallable (ForeignPtr a)
+\end{code}
 
 %*********************************************************
 %*							*
@@ -98,3 +110,4 @@ unpackNBytesFO# fo len
 	ch = indexCharOffForeignObj# fo i
 #endif
 \end{code}
+
