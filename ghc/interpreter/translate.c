@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/10/28 14:32:07 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/01 11:07:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -203,7 +203,6 @@ StgExpr failExpr;
             }
         }
     case NUMCASE:
-#if OVERLOADED_CONSTANTS                
         {
             Triple nc    = snd(e);
             Offset o     = fst3(nc);
@@ -316,46 +315,7 @@ StgExpr failExpr;
                    );
             }
         }
-#else /* ! OVERLOADED_CONSTANTS */
-        {
-            Triple nc    = snd(e);
-            Offset o     = fst3(nc);
-            Cell   discr = snd3(nc);
-            Cell   r     = thd3(nc);
-            Cell   scrut = stgOffset(o,sc);
-            Cell   h     = getHead(discr);
-            Int    da    = discrArity(discr);
-            Cell   n     = discr;
-            List   binds = NIL;
-            Name   eq
-                = isInt(discr)    ? nameEqInt
-                : isBignum(discr) ? nameEqInteger
-                :                   nameEqDouble;
-            Name   box
-                = isInt(discr)    ? nameMkI
-                : isBignum(discr) ? nameMkBignum
-                :                   nameMkD;
-            StgExpr test = NIL;
-            Cell   altsc = sc;
-            Cell   vs    = NIL;
-            Int    i;
 
-            for(i=1; i<=da; ++i) {
-                Cell nv = mkStgVar(NIL,NIL);
-                vs    = cons(nv,vs);
-                altsc = cons(pair(mkOffset(co+i),nv),altsc);
-            }
-
-            /* bind number */
-            n = mkStgVar(mkStgCon(box,singleton(n)),NIL);
-            binds = cons(n,binds);
-            
-            test = mkStgLet(binds, mkStgApp(eq, doubleton(n,scrut)));
-            return makeStgIf(test,
-                             stgExpr(r,co+da,altsc,failExpr),
-                             failExpr);
-        }
-#endif /* ! OVERLOADED_CONSTANTS */
     case LETREC:
         {
             List binds = NIL;
@@ -401,6 +361,7 @@ StgExpr failExpr;
             }
             return mkStgLet(binds,stgRhs(snd(snd(e)),co,sc,failExpr/*namePMFail*/));
         }
+
     default: /* convert to an StgApp or StgVar plus some bindings */
         {   
             List args  = NIL;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/15 21:40:49 $
+ * $Revision: 1.7 $
+ * $Date: 1999/11/01 11:07:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -118,9 +118,11 @@ static List freeVarsExpr( List acc, StgExpr e )
     case NAME:
             return acc;  /* Names are never free vars */
     default:
-printf("\n");
-ppStgExpr(e);
-printf("\n");
+      /*
+            printf("\n");
+            ppStgExpr(e);
+            printf("\n");
+      */
             internal("freeVarsExpr");
     }
 }
