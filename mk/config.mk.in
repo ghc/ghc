@@ -639,10 +639,10 @@ SGML2RTF		= db2rtf
 
 SGMLSTYLESHEET          = $(FPTOOLS_TOP_ABS)/docs/fptools-both.dsl
 
-SGML2DVI_OPTS           = -d $(SGMLSTYLESHEET)
-SGML2HTML_OPTS          = -d $(SGMLSTYLESHEET)
-SGML2INFO_OPTS          = -d $(SGMLSTYLESHEET)
-SGML2RTF_OPTS           = -d $(SGMLSTYLESHEET)
+SRC_SGML2DVI_OPTS       = -d $(SGMLSTYLESHEET)
+SRC_SGML2HTML_OPTS      = -d $(SGMLSTYLESHEET)
+SRC_SGML2INFO_OPTS      = -d $(SGMLSTYLESHEET)
+SRC_SGML2RTF_OPTS       = -d $(SGMLSTYLESHEET)
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
