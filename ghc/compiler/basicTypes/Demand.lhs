@@ -102,7 +102,8 @@ showDemands wrap_args = show_demands wrap_args ""
 instance Read Demand where
     readList str = read_em [] str
 instance Show Demand where
-    showList wrap_args rest = show_demands wrap_args rest
+    showsPrec prec wrap rest = show_demand wrap rest
+    showList wrap_args rest  = show_demands wrap_args rest
 
 #else
 
@@ -130,24 +131,21 @@ do_unpack new_or_data wrapper_unpacks acc xs
 	      _ -> panic ("Demand.do_unpack:"++show acc++"::"++xs)
 
 show_demands wrap_args rest
-  = foldr show1 rest wrap_args
-  where
-	show1 (WwLazy False)  	 rest = 'L' : rest
-	show1 (WwLazy True)   	 rest = 'A' : rest
-	show1 WwStrict	      	 rest = 'S' : rest
-	show1 WwPrim	      	 rest = 'P' : rest
-	show1 WwEnum	      	 rest = 'E' : rest
-	show1 (WwUnpack nd wu args) rest = ch ++ "(" ++ showList args (')' : rest)
+  = foldr show_demand rest wrap_args
+
+show_demand (WwLazy False)  	  rest = 'L' : rest
+show_demand (WwLazy True)   	  rest = 'A' : rest
+show_demand WwStrict	      	  rest = 'S' : rest
+show_demand WwPrim	      	  rest = 'P' : rest
+show_demand WwEnum	      	  rest = 'E' : rest
+show_demand (WwUnpack nd wu args) rest = ch:'(':showList args (')' : rest)
 				      where
 					ch = case nd of
-						DataType | wu        -> "U"
-							 | otherwise -> "u"
-						NewType  | wu        -> "N"
-							 | otherwise -> "n"
+						DataType | wu        -> 'U'
+							 | otherwise -> 'u'
+						NewType  | wu        -> 'N'
+							 | otherwise -> 'n'
 
 instance Outputable Demand where
     ppr sty si = text (showList [si] "")
 \end{code}
-
-
-
