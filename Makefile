@@ -14,7 +14,16 @@ include $(TOP)/mk/boilerplate.mk
 # on whether we do `make install' or not. Having a $(ifeq ... ) would
 # be preferable..
 CURRENT_TARGET = $(MAKECMDGOALS)
-SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(ProjectsToInstall); else echo $(ProjectsToBuild); fi)
+
+# find the projects that actually exist...
+SUBDIRS = $(filter $(patsubst %/, %, $(wildcard */)), $(AllProjects))
+
+# and filter only those that the user requested, if necessary
+ifeq "$(ProjectsToBuild)" ""
+Projects = $(SUBDIRS)
+else
+Projects = $(filter $(ProjectsToBuild), $(SUBDIRS))
+endif
 
 ifneq "$(Project)" ""
    include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
@@ -240,7 +249,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += docs distrib $(ProjectsToBuild)
+SRC_DIST_DIRS += docs distrib $(Projects)
 SRC_DIST_FILES += \
 	configure.in config.guess config.sub configure \
 	aclocal.m4 acconfig.h README Makefile install-sh \
@@ -282,12 +291,6 @@ DIST_CLEAN_FILES += config.cache config.status
 
 MAINTAINER_CLEAN_FILES += configure
 
-ifeq "$(ProjectsToBuild)" ""
-Projects = $(AllProjects)
-else
-Projects = $(filter $(ProjectsToBuild), $(AllProjects))
-endif
-
 all ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(Projects); do \
@@ -303,9 +306,9 @@ boot ::
 
 install ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(filter-out $(ProjectsDontInstall), $(AllProjects)); do \
+	for i in $(filter-out $(ProjectsDontInstall), $(Projects)); do \
 	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i boot all; \
+	      $(MAKE) -C $$i install; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
 	done
