@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.8 2000/11/07 17:05:47 simonmar Exp $
+ * $Id: HsFFI.h,v 1.9 2000/11/13 17:17:40 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -25,6 +25,8 @@
  */
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
+#elif defined(HAVE_INTTYPES_H)
+#include <inttypes.h>
 #else
 /* second best guess (e.g. on Solaris) */
 #include <limits.h>
