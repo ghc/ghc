@@ -854,10 +854,11 @@ gen_Read_binds get_fixity tycon
     		        BindStmt (VarPat a) (mkHsVarApps reset_RDR [readPrec_RDR]) loc]
 
 	-- When reading field labels we might encounter
-	-- 	a = 3
+	-- 	a  = 3
+	-- 	_a = 3
 	-- or	(#) = 4
 	-- Note the parens!
-    read_lbl lbl | isAlpha (head lbl_str) 
+    read_lbl lbl | is_id_start (head lbl_str) 
 		 = [bindLex (ident_pat lbl_lit)]
 		 | otherwise
 		 = [read_punc "(", 
@@ -866,6 +867,7 @@ gen_Read_binds get_fixity tycon
 		 where	
 		   lbl_str = occNameUserString (getOccName (fieldLabelName lbl)) 
 		   lbl_lit = mkHsString lbl_str
+		   is_id_start c = isAlpha c || c == '_'
 \end{code}
 
 
