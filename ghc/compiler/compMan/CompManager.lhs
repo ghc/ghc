@@ -228,7 +228,7 @@ cmRunStmt cmstate dflags expr
 cmTypeOfExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe String)
 cmTypeOfExpr cmstate dflags expr
   = do (new_cmstate, names)
-	   <- cmRunStmt cmstate dflags ("let __cmTypeOfExpr=" ++ expr)
+	   <- cmRunStmt cmstate dflags ("let __cmTypeOfExpr = " ++ expr)
        case names of
 	 [name] -> do maybe_tystr <- cmTypeOfName new_cmstate name
 		      return (new_cmstate, maybe_tystr)
@@ -270,7 +270,7 @@ cmCompileExpr cmstate dflags expr
 
         (new_pcs, maybe_stuff) 
 	    <- hscStmt dflags hst hit pcs icontext 
-		  ("let __cmCompileExpr="++expr)
+		  ("let __cmCompileExpr = "++expr)
 
         case maybe_stuff of
 	   Nothing -> return (cmstate{ pcs=new_pcs }, Nothing)
