@@ -70,7 +70,7 @@ all :: $(DYN_LOADABLE_BITS)
 # ToDo: allow different install name for driver?
 #
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
-INSTALL_LIBS  += $(DYN_LOADABLE_BITS)
+INSTALL_LIBS    += $(DYN_LOADABLE_BITS)
 
 #
 # Before really installing the driver, we have to
