@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.63 2001/04/26 11:08:32 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.64 2001/04/26 11:38:53 qrczak Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -181,7 +181,7 @@ fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
    st <- getGHCiState
    mod <- io (cmGetContext (cmstate st))
-   when prompt (io (hPutStr hdl (mod ++ "> ")))
+   when prompt (io (putStr (mod ++ "> ")))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e -> return ()
