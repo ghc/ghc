@@ -24,9 +24,7 @@ import CmTypes
 import CmStaticInfo	( GhciMode(..) )
 import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC )
-import DriverUtil
 import Module		( ModuleName )
-import RdrName
 import FiniteMap
 import Outputable
 import ErrUtils		( showPass )
@@ -203,11 +201,11 @@ invalidLinkable = throwDyn (OtherError "linkable doesn't contain entirely object
 
 -- link all the interpreted code in one go.  We first remove from the
 -- various environments any previous versions of these modules.
-linkFinish pls mods ul_trees = do
+linkFinish pls mods ul_bcos = do
    resolveObjs
    let itbl_env'    = filterNameMap mods (itbl_env pls)
        closure_env' = filterNameMap mods (closure_env pls)
-       stuff        = [ (trees,itbls) | Trees trees itbls <- ul_trees ]
+       stuff        = [ (bcos,itbls) | BCOs bcos itbls <- ul_bcos ]
 
    (ibinds, new_itbl_env, new_closure_env) <-
 	linkIModules itbl_env' closure_env' stuff
@@ -222,8 +220,8 @@ linkFinish pls mods ul_trees = do
 unload :: PersistentLinkerState -> IO PersistentLinkerState
 unload pls = return pls{ closure_env = emptyFM, itbl_env = emptyFM }
 
-linkExpr :: PersistentLinkerState -> UnlinkedIExpr -> IO HValue
-linkExpr PersistentLinkerState{ itbl_env = ie, closure_env = ce } expr
-  = iExprToHValue ie ce expr
+linkExpr :: PersistentLinkerState -> UnlinkedBCOExpr -> IO HValue
+linkExpr PersistentLinkerState{ itbl_env = ie, closure_env = ce } bcos
+  = linkIExpr ie ce bcos
 #endif
 \end{code}

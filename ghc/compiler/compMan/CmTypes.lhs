@@ -13,7 +13,7 @@ module CmTypes (
 import Interpreter
 import HscTypes
 import Module
-import CmStaticInfo
+--import CmStaticInfo
 import Outputable
 
 import Time		( ClockTime )
@@ -23,14 +23,14 @@ data Unlinked
    = DotO FilePath
    | DotA FilePath
    | DotDLL FilePath
-   | Trees [UnlinkedIBind] ItblEnv  -- bunch of interpretable bindings, +
-				    -- a mapping from DataCons to their itbls
+   | BCOs [UnlinkedBCO] ItblEnv  -- bunch of interpretable bindings, +
+		                 -- a mapping from DataCons to their itbls
 
 instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (Trees binds _) = text "Trees" <+> ppr binds
+   ppr (BCOs bcos _) = text "BCOs" <+> vcat (map ppr bcos)
 
 isObject (DotO _) = True
 isObject (DotA _) = True
@@ -41,8 +41,8 @@ nameOfObject (DotO fn)   = fn
 nameOfObject (DotA fn)   = fn
 nameOfObject (DotDLL fn) = fn
 
-isInterpretable (Trees _ _) = True
-isInterpretable _ = False
+isInterpretable (BCOs _ _) = True
+isInterpretable _          = False
 
 data Linkable
    = LM ClockTime ModuleName [Unlinked]

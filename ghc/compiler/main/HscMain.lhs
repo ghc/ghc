@@ -15,7 +15,6 @@ module HscMain ( HscResult(..), hscMain,
 #ifdef GHCI
 import RdrHsSyn		( RdrNameHsExpr )
 import Rename		( renameExpr )
-import CoreToStg	( coreExprToStg )
 import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
 import Type		( Type, splitTyConApp_maybe )
@@ -72,7 +71,6 @@ import Module		( Module, lookupModuleEnvByName )
 import Monad		( when )
 import Maybe		( isJust )
 import IO
-import List		( intersperse )
 \end{code}
 
 
@@ -96,7 +94,7 @@ data HscResult
                  ModIface		 -- new iface (if any compilation was done)
 	         (Maybe String) 	 -- generated stub_h filename (in /tmp)
 	         (Maybe String)  	 -- generated stub_c filename (in /tmp)
-	         (Maybe ([UnlinkedIBind],ItblEnv)) -- interpreted code, if any
+	         (Maybe ([UnlinkedBCO],ItblEnv)) -- interpreted code, if any
              
 
 	-- no errors or warnings; the individual passes
@@ -236,24 +234,18 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
                                       maybe_checked_iface new_iface new_details
 
  	    -------------------
- 	    -- CONVERT TO STG
+ 	    -- CONVERT TO STG and COMPLETE CODE GENERATION
  	    -------------------
-	; (stg_binds, cost_centre_info) 
-		<- myCoreToStg dflags this_mod tidy_binds env_tc
-
- 	    -------------------
- 	    -- COMPLETE CODE GENERATION
- 	    -------------------
-	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
+	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_bcos)
       	     <- restOfCodeGeneration dflags toInterp this_mod
  		   (map ideclName (hsModuleImports rdr_module))
-      		   cost_centre_info foreign_stuff env_tc stg_binds tidy_binds
+      		   foreign_stuff env_tc tidy_binds
       		   hit (pcs_PIT pcs_simpl)       
 
       	  -- and the answer is ...
 	; return (HscRecomp pcs_simpl new_details final_iface
                             maybe_stub_h_filename maybe_stub_c_filename
-      			    maybe_ibinds)
+      			    maybe_bcos)
       	  }}}}}}}
 
 
@@ -313,7 +305,7 @@ simplThenTidy dflags pcs hst this_mod is_exported binds rules
          <- core2core dflags pcs hst is_exported binds rules
 
       -- Do saturation and convert to A-normal form
-      --    NOTE: future passes cannot transform the syntax, only annotate it
+      -- NOTE: subsequent passes may not transform the syntax, only annotate it
       saturated <- coreSatPgm dflags simplified
 
       -- Do the final tidy-up
@@ -323,17 +315,21 @@ simplThenTidy dflags pcs hst this_mod is_exported binds rules
       return (pcs', tidy_binds, tidy_orphan_rules)
 
 
-restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_info 
-                     foreign_stuff env_tc stg_binds tidy_binds
+restOfCodeGeneration dflags toInterp this_mod imported_module_names
+                     foreign_stuff env_tc tidy_binds
                      hit pit -- these last two for mapping ModNames to Modules
  | toInterp
- = do (ibinds,itbl_env) 
-         <- stgBindsToInterpSyn dflags (map fst stg_binds) 
-		local_tycons local_classes
-      return (Nothing, Nothing, Just (ibinds,itbl_env))
+ = do (bcos,itbl_env) 
+         <- byteCodeGen dflags tidy_binds local_tycons local_classes
+      return (Nothing, Nothing, Just (bcos,itbl_env))
 
  | otherwise
- = do --------------------------  Code generation -------------------------------
+ = do
+      --------------------------  Convert to STG -------------------------------
+      (stg_binds, cost_centre_info) 
+		<- myCoreToStg dflags this_mod tidy_binds env_tc
+
+      --------------------------  Code generation -------------------------------
       -- _scc_     "CodeGen"
       abstractC <- codeGen dflags this_mod imported_modules
                            cost_centre_info fe_binders
@@ -403,7 +399,7 @@ hscExpr
   -> Module			-- Context for compiling
   -> String			-- The expression
   -> IO ( PersistentCompilerState, 
-	  Maybe (UnlinkedIExpr, PrintUnqualified, Type) )
+	  Maybe (UnlinkedBCOExpr, PrintUnqualified, Type) )
 
 hscExpr dflags hst hit pcs0 this_module expr
    = do {
@@ -439,8 +435,8 @@ hscExpr dflags hst hit pcs0 this_module expr
 				("print (" ++ expr ++ ")")
 		        case maybe_stuff of
 			   Nothing -> return (new_pcs, maybe_stuff)
-			   Just (expr, _, _) ->
-			      return (new_pcs, Just (expr, print_unqual, ty))
+			   Just (bcos, _, _) ->
+			      return (new_pcs, Just (bcos, print_unqual, ty))
 		else do
 
 		-- Desugar it
@@ -453,15 +449,12 @@ hscExpr dflags hst hit pcs0 this_module expr
 		-- Saturate it
 	sat_expr <- coreSatExpr dflags simpl_expr;
 
-		-- Convert to STG
-	let stg_expr = coreExprToStg sat_expr;
-
 		-- ToDo: need to do SRTs?
 
-		-- Convert to InterpSyn
-	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
+		-- Convert to BCOs
+	bcos <- coreExprToBCOs dflags sat_expr
 
-	return (pcs2, Just (unlinked_iexpr, print_unqual, ty));
+	return (pcs2, Just (bcos, print_unqual, ty));
      }}}}
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)

@@ -4,16 +4,20 @@
 \section[ByteCodeGen]{Generate bytecode from Core}
 
 \begin{code}
-module ByteCodeGen ( byteCodeGen, linkIModules ) where
+module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
+		     filterNameMap,
+                     byteCodeGen, coreExprToBCOs, 
+		     linkIModules, linkIExpr
+		   ) where
 
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName )
+import Name		( Name, getName, nameModule )
 import Id		( Id, idType, isDataConId_maybe )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
-import FiniteMap	( FiniteMap, addListToFM, listToFM, 
+import FiniteMap	( FiniteMap, addListToFM, listToFM, filterFM,
 			  addToFM, lookupFM, fmToList, emptyFM, plusFM )
 import CoreSyn
 import PprCore		( pprCoreExpr, pprCoreAlt )
@@ -33,6 +37,7 @@ import Constants	( wORD_SIZE )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import ClosureInfo	( mkVirtHeapOffsets )
+import Module		( ModuleName, moduleName )
 
 import List		( intersperse )
 import Monad		( foldM )
@@ -54,12 +59,17 @@ import IOExts		( IORef, readIORef, writeIORef, fixIO )
 import ArrayBase	
 import PrelArr		( Array(..) )
 import PrelIOBase	( IO(..) )
+
 \end{code}
 
-Entry point.
+%************************************************************************
+%*									*
+\subsection{Functions visible from outside this module.}
+%*									*
+%************************************************************************
 
 \begin{code}
--- visible from outside
+
 byteCodeGen :: DynFlags
             -> [CoreBind] 
             -> [TyCon] -> [Class]
@@ -84,6 +94,35 @@ byteCodeGen dflags binds local_tycons local_classes
         return (bcos, itblenv)
         
 
+-- Returns: (the root BCO for this expression, 
+--           a list of auxilary BCOs resulting from compiling closures)
+coreExprToBCOs :: DynFlags
+	       -> CoreExpr
+               -> IO UnlinkedBCOExpr
+coreExprToBCOs dflags expr
+ = do showPass dflags "ByteCodeGen"
+      let invented_id = panic "invented_id" :: Id
+          (BcM_State all_proto_bcos final_ctr) 
+             = runBc (BcM_State [] 0) 
+                     (schemeR (invented_id, freeVars expr))
+      dumpIfSet_dyn dflags Opt_D_dump_InterpSyn
+         "Proto-bcos" (vcat (intersperse (char ' ') (map ppr all_proto_bcos)))
+
+      let invented_name = getName invented_id
+      let root_proto_bco 
+             = case filter ((== invented_name).nameOfProtoBCO) all_proto_bcos of
+                  [root_bco] -> root_bco
+          auxiliary_proto_bcos
+             = filter ((/= invented_name).nameOfProtoBCO) all_proto_bcos
+
+      auxiliary_bcos <- mapM assembleBCO auxiliary_proto_bcos
+      root_bco <- assembleBCO root_proto_bco
+
+      return (root_bco, auxiliary_bcos)
+
+
+
+
 data UnlinkedBCO
    = UnlinkedBCO Name
                  Int (IOUArray Int Word16)	-- insns
@@ -93,13 +132,29 @@ data UnlinkedBCO
 
 nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _ _ _ _ _) = nm
 
--- needs a proper home
+-- When translating expressions, we need to distinguish the root
+-- BCO for the expression
+type UnlinkedBCOExpr = (UnlinkedBCO, [UnlinkedBCO])
+
+instance Outputable UnlinkedBCO where
+   ppr (UnlinkedBCO nm n_insns insns n_lits lits n_ptrs ptrs n_itbls itbls)
+      = sep [text "BCO", ppr nm, text "with", 
+             int n_insns, text "insns",
+             int n_lits, text "lits",
+             int n_ptrs, text "ptrs",
+             int n_itbls, text "itbls"]
+
+
+-- these need a proper home
 type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
 type ClosureEnv = FiniteMap Name HValue
-data HValue = HValue  -- dummy type, actually a pointer to some Real Code.
+data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
 
+-- remove all entries for a given set of modules from the environment
+filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
+filterNameMap mods env 
+   = filterFM (\n _ -> moduleName (nameModule n) `notElem` mods) env
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -213,6 +268,8 @@ data ProtoBCO a
 					-- what the BCO came from
               (Either [AnnAlt Id VarSet]
                       (AnnExpr Id VarSet))
+
+nameOfProtoBCO (ProtoBCO nm insns origin) = nm
 
 
 type Sequel = Int	-- back off to this depth before ENTER
@@ -1130,6 +1187,12 @@ GLOBAL_VAR(v_cafTable, [], [HValue])
 addCAF :: HValue -> IO ()
 addCAF x = do xs <- readIORef v_cafTable; writeIORef v_cafTable (x:xs)
 
+bcosToHValue :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr -> IO HValue
+bcosToHValue ie ce (root_bco, other_bcos)
+   = do linked_expr <- linkIExpr ie ce (root_bco, other_bcos)
+	return linked_expr
+
+
 linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
 	     -> ClosureEnv -- incoming global closure env; returned updated
 	     -> [([UnlinkedBCO], ItblEnv)]
@@ -1142,15 +1205,27 @@ linkIModules gie gce mods = do
   
   (new_bcos, new_gce) <-
     fixIO (\ ~(new_bcos, new_gce) -> do
-
       new_bcos <- linkBCOs final_gie new_gce bcos
-
       let new_gce = addListToFM gce (zip top_level_binders new_bcos)
-
       return (new_bcos, new_gce))
 
   return (new_bcos, final_gie, new_gce)
 
+
+linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
+          -> IO HValue 	  -- IO BCO# really
+linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
+   = do let aux_ul_binders = map nameOfUnlinkedBCO aux_ul_bcos
+        (aux_bcos, aux_ce) 
+           <- fixIO 
+                (\ ~(aux_bcos, new_ce) 
+                 -> do new_bcos <- linkBCOs ie new_ce aux_ul_bcos
+                       let new_ce = addListToFM ce (zip aux_ul_binders new_bcos)
+                       return (new_bcos, new_ce)
+                )
+        [root_bco]
+           <- linkBCOs ie aux_ce [root_ul_bco]
+        return root_bco
 
 
 linkBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO] 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.41 2000/12/12 14:35:08 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.42 2000/12/18 12:43:04 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -827,8 +827,8 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 		-- as our "unlinked" object.
 		HscInterpreted -> 
 		    case maybe_interpreted_code of
-		       Just (code,itbl_env) -> do tm <- getClockTime 
-                                                  return ([Trees code itbl_env], tm)
+		       Just (bcos,itbl_env) -> do tm <- getClockTime 
+                                                  return ([BCOs bcos itbl_env], tm)
 		       Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.

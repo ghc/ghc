@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.8 2000/11/20 16:28:29 simonmar Exp $
+-- $Id: Interpreter.hs,v 1.9 2000/12/18 12:43:04 sewardj Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -9,8 +9,7 @@
 
 module Interpreter (
 #ifdef GHCI
-	module StgInterp,
-	module InterpSyn,
+	module ByteCodeGen,
 	module Linker
 #else
     ClosureEnv, emptyClosureEnv, 
@@ -29,8 +28,7 @@ module Interpreter (
 --	YES!  We have an interpreter
 ---------------------------------------------
 
-import StgInterp
-import InterpSyn
+import ByteCodeGen
 import Linker
 
 #else

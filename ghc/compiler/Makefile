@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.118 2000/12/11 16:42:26 sewardj Exp $
+# $Id: Makefile,v 1.119 2000/12/18 12:43:04 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -189,9 +189,7 @@ SRC_HC_OPTS += -recomp $(GhcHcOpts)
 # Was 6m with 2.10
 absCSyn/PprAbsC_HC_OPTS 	= -H10m
 
-basicTypes/IdInfo_HC_OPTS 	= -K2m
 codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
-hsSyn/HsExpr_HC_OPTS 		= -K2m
 main/Main_HC_OPTS 		= -fvia-C
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
@@ -200,25 +198,19 @@ main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
 endif
 endif
 
-main/CmdLineOpts_HC_OPTS 	= -K6m
-nativeGen/PprMach_HC_OPTS 	= -K2m
-nativeGen/MachMisc_HC_OPTS 	= -K2m 
 nativeGen/MachCode_HC_OPTS 	= -H10m
 
 # Avoids Bug in 3.02, it seems
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
-prelude/PrimOp_HC_OPTS 		= -H12m -K3m -no-recomp
+prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
 
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-parser/Lex_HC_OPTS		= -K2m -H16m 
-parser/Ctype_HC_OPTS		= -K2m
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
-
-parser/Parser_HC_OPTS 		+= -Onot -H80m -optCrts-M80m -K2m -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -H80m -fno-warn-incomplete-patterns
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C

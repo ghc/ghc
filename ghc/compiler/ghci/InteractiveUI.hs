@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.23 2000/12/13 12:18:40 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.24 2000/12/18 12:43:04 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -20,7 +20,7 @@ import Linker
 import Module
 import Outputable
 import Util
-import TypeRep	{- instance Outputable Type; do not delete -}
+import PprType	{- instance Outputable Type; do not delete -}
 import Panic	( GhcException(..) )
 
 import Exception

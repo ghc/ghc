@@ -17,21 +17,17 @@ where
 import CmLink
 import CmTypes
 import HscTypes
-import Module		( ModuleName, moduleName,
-			  isHomeModule, moduleEnvElts,
-			  moduleNameUserString )
+import Module		( Module, ModuleName, moduleName, isHomeModule,
+			  mkHomeModule, mkModuleName, moduleNameUserString )
 import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
-import Name		( lookupNameEnv )
-import Module
-import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
-			  UniqFM, listToUFM, eltsUFM )
+			  UniqFM, listToUFM )
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
 import DriverFlags	( getDynFlags )
@@ -60,7 +56,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, isJust, maybeToList )
+import Maybe		( catMaybes, fromMaybe, maybeToList )
 \end{code}
 
 
@@ -80,8 +76,8 @@ cmGetExpr cmstate dflags modname expr
 	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr
         case maybe_stuff of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
-	   Just (uiexpr, print_unqual, ty) -> do
-		hValue <- linkExpr pls uiexpr
+	   Just (bcos, print_unqual, ty) -> do
+		hValue <- linkExpr pls bcos
 	        return (cmstate{ pcs=new_pcs }, 
 			Just (hValue, print_unqual, ty))
 
