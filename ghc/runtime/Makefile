@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 1997/07/21 12:00:03 andre Exp $
+# $Id: Makefile,v 1.9 1997/08/25 21:32:14 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -143,6 +143,8 @@ HEADER_FILES = $(SRCS_RTS_LH:.lh=.h)
 
 C_SRCS = $(SRCS_RTS_LC:.lc=.c) $(SRCS_RTS_LHC:.lhc=.hc) $(SRCS_CLIB_LC:.lc=.c) $(HEADER_FILES)
 
+# To avoid having to redo these each time.
+.PRECIOUS : %.$(way_)hc
 
 #
 # Clean out header files when doing way `normal'
@@ -209,9 +211,6 @@ CLEAN_FILES  += main/TopClosure.o
 INSTALL_LIBS += main/TopClosure.o
 endif
 
-
-
-
 #-----------------------------------------------------------------------------
 #
 # Files to install
@@ -240,7 +239,7 @@ gum/SysMan : gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o
 	gcc -o $@ gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 $(__socket_libs)
 
 CLEAN_FILES  += gum/SysMan.mp_o gum/SysMan
-INSTALL_LIBS += gum/SysMan
+INSTALL_LIBEXECS += gum/SysMan
 endif
 
 include $(TOP)/mk/target.mk
