@@ -41,7 +41,7 @@ import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat, getUniqueNat,
-			  IF_OS_darwin(addImportNat COMMA,)
+			  IF_ARCH_powerpc(addImportNat COMMA,)
                           ncgPrimopMoan,
 			  ncg_target_is_32bit
 			)
