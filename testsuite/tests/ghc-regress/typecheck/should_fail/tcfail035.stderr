@@ -1,10 +1,5 @@
 
 tcfail035.hs:6:
-    Overlapping instances for Num NUM
-      arising from use of `GHC.Num.$dmnegate' at tcfail035.hs:6
-    Matching instances:
-      tcfail035.hs:7: instance Num NUM
+    Duplicate instance declarations:
       tcfail035.hs:6: instance Num NUM
-    In the definition of `negate': negate = GHC.Num.$dmnegate
-    In the definition for method `negate'
-    In the instance declaration for `Num NUM'
+      tcfail035.hs:7: instance Num NUM

@@ -4,6 +4,5 @@ tcfail032.hs:14:
 	Quantified type variable `a' escapes
 	It is mentioned in the environment:
 	  x :: a -> Int (bound at tcfail032.hs:14)
-    When checking the type signature of the expression:
-	  x :: forall a. (Eq a) => a -> Int
-    In the definition of `f': f x = (x :: forall a. (Eq a) => a -> Int)
+    In the type signature of the expression: x :: (Eq a) => a -> Int
+    In the definition of `f': f x = (x :: (Eq a) => a -> Int)

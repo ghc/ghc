@@ -5,7 +5,7 @@ module ShouldFail where
 data B = C
 
 class A a where
- op :: a -> a
+ op :: a -> Bool
 
 instance A B where
  op C = True

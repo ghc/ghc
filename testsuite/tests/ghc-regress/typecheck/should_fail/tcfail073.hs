@@ -2,7 +2,9 @@
 
 module ShouldFail where
 
-f x@(a,b) y@(c,d) = x == y
+f :: (Eq a) => (a,a) -> (a,a) -> Bool
+f x y = x == y
 
-instance Eq (a,b) where
+instance Eq a => Eq (a,b) where
     (m,n) == (o,p) = m == o
+
