@@ -1,19 +1,13 @@
 module HaddockDevHelp(ppDevHelpFile) where
 
+import HaddockModuleTree
+import HaddockTypes
+import HaddockUtil
 import HsSyn hiding(Doc)
 import qualified Map
-
-#if __GLASGOW_HASKELL__ < 503
-import Pretty
-#else
-import Text.PrettyPrint
-import Data.Char
-#endif
+import PrettyPrint
 
 import Maybe	( fromMaybe )
-import HaddockModuleTree
-import HaddockUtil
-import HaddockTypes
 
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()

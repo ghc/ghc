@@ -1,19 +1,17 @@
 module HaddockHH2(ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection) where
 
+import HaddockModuleTree
+import HaddockTypes
+import HaddockUtil
 import HsSyn hiding(Doc)
+import qualified Map
+import PrettyPrint
 
-#if __GLASGOW_HASKELL__ < 503
-import Pretty
-#else
-import Text.PrettyPrint
+#if __GLASGOW_HASKELL__ >= 503
 import Data.Char ( toUpper )
 #endif
 
 import Maybe	( fromMaybe )
-import HaddockModuleTree
-import HaddockUtil
-import HaddockTypes
-import qualified Map
 
 ppHH2Contents :: FilePath -> String -> Maybe String -> [ModuleTree] -> IO ()
 ppHH2Contents odir doctitle maybe_package tree = do

@@ -8,14 +8,8 @@ module HaddockDB (ppDocBook) where
 
 import HaddockTypes
 import HaddockUtil
-
 import HsSyn
-
-#if __GLASGOW_HASKELL__ < 503
-import Pretty
-#else
-import Text.PrettyPrint
-#endif
+import PrettyPrint
 
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format
