@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Console.GetOpt
--- Copyright   :  (c) Sven Panne Oct. 1996 (small changes Dec. 1997)
+-- Copyright   :  (c) Sven Panne Oct. 1996 (small changes Feb. 2003)
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -24,13 +24,17 @@ it...) and the recognition of long options with a single dash
 (e.g. '-help' is recognised as '--help', as long as there is no short
 option 'h').
 
-Other differences between GNU's getopt and this implementation: * To
-enforce a coherent description of options and arguments, there are
-explanation fields in the option/argument descriptor.  * Error
-messages are now more informative, but no longer POSIX
-compliant... :-( And a final Haskell advertisement: The GNU C
-implementation uses well over 1100 lines, we need only 195 here,
-including a 46 line example! :-)
+Other differences between GNU's getopt and this implementation:
+
+* To enforce a coherent description of options and arguments, there
+  are explanation fields in the option/argument descriptor.
+
+* Error messages are now more informative, but no longer POSIX
+  compliant... :-(
+
+And a final Haskell advertisement: The GNU C implementation uses well
+over 1100 lines, we need only 195 here, including a 46 line example! 
+:-)
 -}
 
 module System.Console.GetOpt (
@@ -161,7 +165,9 @@ getNext a            rest _        = (NonOpt a,rest)
 longOpt :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
 longOpt ls rs optDescr = long ads arg rs
    where (opt,arg) = break (=='=') ls
-         options   = [ o  | o@(Option _ ls _ _) <- optDescr, l <- ls, opt `isPrefixOf` l ]
+         getWith p = [ o  | o@(Option _ ls _ _) <- optDescr, l <- ls, opt `p` l ]
+         exact     = getWith (==)
+         options   = if null exact then getWith isPrefixOf else exact
          ads       = [ ad | Option _ _ ad _ <- options ]
          optStr    = ("--"++opt)
 
@@ -262,8 +268,8 @@ compiler:
 
 >    module Opts where
 >    
->    import GetOpt
->    import Maybe ( fromMaybe )
+>    import System.Console.GetOpt
+>    import Data.Maybe ( fromMaybe )
 >    
 >    data Flag 
 >     = Verbose  | Version 
@@ -287,7 +293,7 @@ compiler:
 >    compilerOpts argv = 
 >    	case (getOpt Permute options argv) of
 >    	   (o,n,[]  ) -> return (o,n)
->    	   (_,_,errs) -> failIO (concat errs ++ usageInfo header options)
+>    	   (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
 >      where header = "Usage: ic [OPTION...] files..."
 
 -}
