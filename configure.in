@@ -557,12 +557,17 @@ dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 
 dnl ** does the C compiler support the following options?
-FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
+case $TargetOS_CPP in
+mingw32)  
+	  FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
 
-EXTRA_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN"
-SRC_CC_OPTS="-O $EXTRA_CC_OPTS"
-CPPFLAGS="$EXTRA_CC_OPTS $CPPFLAGS"
-AC_SUBST(SRC_CC_OPTS)
+	  EXTRA_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN"
+	  SRC_CC_OPTS="-O $EXTRA_CC_OPTS"
+	  CPPFLAGS="$EXTRA_CC_OPTS $CPPFLAGS"
+	  AC_SUBST(SRC_CC_OPTS)
+	  ;;
+*)    ;;
+esac
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF
