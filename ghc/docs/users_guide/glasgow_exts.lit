@@ -45,9 +45,7 @@ sloshing \tr{MutableByteArray#}s around your program), you may wish to
 check if there are system libraries that provide a ``Haskellised
 veneer'' over the features you want.  See \Sectionref{syslibs}.
 
-The definitive guide for many of the low-level facilities in GHC is
-the ``state interface document'' (distributed in
-\tr{ghc/docs/state-interface.dvi}).  We do not repeat its details here.
+\Sectionref{ghc-prelude} is the definitive guide for many of the low-level facilities in GHC.
 
 %Pieter Hartel led an interesting comparison-of-many-compilers (and
 %many languages) in which GHC got to show off its extensions.  We did
@@ -73,8 +71,7 @@ A numerically-intensive program using unboxed types can go a {\em lot}
 faster than its ``standard'' counterpart---we saw a threefold speedup
 on one example.
 
-Please see the very first part of the ``state interface document''
-(distributed in \tr{ghc/docs/state-interface.dvi}) for the details of
+Please see \Sectionref{ghc-libs-ghc} for the details of
 unboxed types and the operations on them.
 
 %************************************************************************
@@ -90,8 +87,8 @@ and our implementation of I/O, including ``C calls''.
 You probably won't use the monad directly, but you might use all those
 other things!
 
-The ``state interface document'' defines the state-related types in
-sections~1.4 and~1.5, and the monad itself in section~2.1.
+More information on the state-related types can be found in the
+elsewhere, \Sectionref{ghc-prelude}.
 
 %************************************************************************
 %*                                                                      *
@@ -142,9 +139,9 @@ memory when you're done with it.''
 Please see \Sectionref{glasgow-foreignObjs} for more details.
 \end{description}
 
-See sections~1.4 and~1.6 of the ``state interface document'' for the
-details of all these ``primitive array'' types and the operations on
-them.
+The libraries section give more details on all these 
+``primitive array'' types and the operations on them,
+\Sectionref{ghc-prelude}.
 
 
 %************************************************************************
