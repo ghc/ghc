@@ -436,7 +436,7 @@ SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
 SRC_CPP_OPTS += ${GhcCppOpts}
 
 ifneq "$(BootingFromHc)" "YES"
-prelude/PrimOp.lhs prelude/PrimOp.o: $(PRIMOP_BITS)
+prelude/PrimOp.lhs $(odir)/prelude/PrimOp.o: $(PRIMOP_BITS)
 endif
 
 ifneq "$(BootingFromHc)" "YES"
