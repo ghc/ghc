@@ -26,7 +26,7 @@ import CLabel		( CLabel, mkSRTLabel, mkClosureLabel )
 
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, flattenAbsC )
-import CgBindery	( CgIdInfo )
+import CgBindery	( CgIdInfo, addBindC, addBindsC )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.26 1999/06/08 15:56:47 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.27 1999/06/09 14:28:38 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -22,7 +22,8 @@ import AbsCUtils	( mkAbstractCs )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
-import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, nukeDeadBindings)
+import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, 
+			  nukeDeadBindings, addBindC, addBindsC )
 import CgCase		( cgCase, saveVolatileVarsAndRegs, 
 			  restoreCurrentCostCentre )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )

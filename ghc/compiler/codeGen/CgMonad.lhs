@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.21 1999/06/08 15:56:47 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.22 1999/06/09 14:28:38 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -20,8 +20,6 @@ module CgMonad (
 	forkEvalHelp, forkAbsC,
 	SemiTaggingStuff,
 
-	addBindC, addBindsC, modifyBindC, lookupBindC,
-
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
@@ -29,7 +27,7 @@ module CgMonad (
 
 	StackUsage, Slot(..), HeapUsage,
 
-	profCtrC, cgPanic,
+	profCtrC,
 
 	costCentresC, moduleName,
 
@@ -43,13 +41,13 @@ module CgMonad (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CgBindery ( CgIdInfo(..), CgBindings, maybeStkLoc, nukeVolatileBinds )
+import {-# SOURCE #-} CgBindery ( CgIdInfo, CgBindings, nukeVolatileBinds )
 import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
-import CLabel           ( CLabel, mkUpdInfoLabel, pprCLabel )
+import CLabel           ( CLabel, mkUpdInfoLabel )
 import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
@@ -177,12 +175,18 @@ sequelToAmode (OnStack virt_sp_offset)
 
 sequelToAmode UpdateCode = returnFC (CLbl mkUpdInfoLabel RetRep)
 sequelToAmode (CaseAlts amode _) = returnFC amode
-sequelToAmode (SeqFrame _ _) = cgPanic (text "sequelToAmode: SeqFrame")
+sequelToAmode (SeqFrame _ _) = panic "sequelToAmode: SeqFrame"
 
 type CgStksAndHeapUsage		-- stacks and heap usage information
   = (StackUsage, HeapUsage)
 
-data Slot = Free | NonPointer deriving (Eq,Show)
+data Slot = Free | NonPointer 
+  deriving
+#ifdef DEBUG
+	(Eq,Show)
+#else
+	Eq
+#endif
 
 type StackUsage =
 	(Int,		   -- virtSp: Virtual offset of topmost allocated slot
@@ -563,61 +567,4 @@ getSRTLabel (MkCgInfoDown _ _ srt _) state
 setSRTLabel :: CLabel -> Code -> Code
 setSRTLabel srt code (MkCgInfoDown c_info statics _ eob_info) state
   = code (MkCgInfoDown c_info statics srt eob_info) state
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[CgMonad-bindery]{Monad things for fiddling with @CgBindings@}
-%*									*
-%************************************************************************
-
-There are three basic routines, for adding (@addBindC@), modifying
-(@modifyBindC@) and looking up (@lookupBindC@) bindings.
-
-A @Id@ is bound to a @(VolatileLoc, StableLoc)@ triple.
-The name should not already be bound. (nice ASSERT, eh?)
-
-\begin{code}
-addBindC :: Id -> CgIdInfo -> Code
-addBindC name stuff_to_bind info_down (MkCgState absC binds usage)
-  = MkCgState absC (extendVarEnv binds name stuff_to_bind) usage
-
-addBindsC :: [(Id, CgIdInfo)] -> Code
-addBindsC new_bindings info_down (MkCgState absC binds usage)
-  = MkCgState absC new_binds usage
-  where
-    new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
-		      binds
-		      new_bindings
-
-modifyBindC :: Id -> (CgIdInfo -> CgIdInfo) -> Code
-modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
-  = MkCgState absC (modifyVarEnv mangle_fn binds name) usage
-
-lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name info_down@(MkCgInfoDown _ static_binds srt _)
-		 state@(MkCgState absC local_binds usage)
-  = (val, state)
-  where
-    val = case (lookupVarEnv local_binds name) of
-	    Nothing	-> try_static
-	    Just this	-> this
-
-    try_static = 
-      case (lookupVarEnv static_binds name) of
-	Just this -> this
-	Nothing
-	  -> cgPanic (text "lookupBindC: no info for" <+> ppr name) info_down state
-
-cgPanic :: SDoc -> CgInfoDownwards -> CgState -> a
-cgPanic doc info_down@(MkCgInfoDown _ static_binds srt _)
-	    state@(MkCgState absC local_binds usage)
-  = pprPanic "cgPanic"
-	     (vcat [doc,
-		ptext SLIT("static binds for:"),
-		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv static_binds ],
-		ptext SLIT("local binds for:"),
-		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv local_binds ],
-	        ptext SLIT("SRT label") <+> pprCLabel srt
-	      ])
 \end{code}

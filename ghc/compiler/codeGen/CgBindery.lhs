@@ -5,13 +5,13 @@
 
 \begin{code}
 module CgBindery (
-	CgBindings, CgIdInfo(..){-dubiously concrete-},
+	CgBindings, CgIdInfo,
 	StableLoc, VolatileLoc,
-
-	maybeStkLoc,
 
 	stableAmodeIdInfo, heapIdInfo, newTempAmodeAndIdInfo,
 	letNoEscapeIdInfo, idInfoToAmode,
+
+	addBindC, addBindsC,
 
 	nukeVolatileBinds,
 	nukeDeadBindings,
@@ -34,7 +34,7 @@ import CgMonad
 import CgUsages		( getHpRelOffset, getSpRelOffset, getRealSp )
 import CgStackery	( freeStackSlots, addFreeSlots )
 import CLabel		( mkStaticClosureLabel, mkClosureLabel,
-			  mkBitmapLabel )
+			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
 import BitSet		( mkBS, emptyBS )
 import PrimRep		( isFollowableRep, getPrimRepSize )
@@ -161,6 +161,63 @@ idInfoPiecesToAmode kind NoVolatileLoc (VirStkLoc i)
 #ifdef DEBUG
 idInfoPiecesToAmode kind NoVolatileLoc NoStableLoc = panic "idInfoPiecesToAmode: no loc"
 #endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[CgMonad-bindery]{Monad things for fiddling with @CgBindings@}
+%*									*
+%************************************************************************
+
+There are three basic routines, for adding (@addBindC@), modifying
+(@modifyBindC@) and looking up (@lookupBindC@) bindings.
+
+A @Id@ is bound to a @(VolatileLoc, StableLoc)@ triple.
+The name should not already be bound. (nice ASSERT, eh?)
+
+\begin{code}
+addBindC :: Id -> CgIdInfo -> Code
+addBindC name stuff_to_bind info_down (MkCgState absC binds usage)
+  = MkCgState absC (extendVarEnv binds name stuff_to_bind) usage
+
+addBindsC :: [(Id, CgIdInfo)] -> Code
+addBindsC new_bindings info_down (MkCgState absC binds usage)
+  = MkCgState absC new_binds usage
+  where
+    new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
+		      binds
+		      new_bindings
+
+modifyBindC :: Id -> (CgIdInfo -> CgIdInfo) -> Code
+modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
+  = MkCgState absC (modifyVarEnv mangle_fn binds name) usage
+
+lookupBindC :: Id -> FCode CgIdInfo
+lookupBindC name info_down@(MkCgInfoDown _ static_binds srt _)
+		 state@(MkCgState absC local_binds usage)
+  = (val, state)
+  where
+    val = case (lookupVarEnv local_binds name) of
+	    Nothing	-> try_static
+	    Just this	-> this
+
+    try_static = 
+      case (lookupVarEnv static_binds name) of
+	Just this -> this
+	Nothing
+	  -> cgPanic (text "lookupBindC: no info for" <+> ppr name) info_down state
+
+cgPanic :: SDoc -> CgInfoDownwards -> CgState -> a
+cgPanic doc info_down@(MkCgInfoDown _ static_binds srt _)
+	    state@(MkCgState absC local_binds usage)
+  = pprPanic "cgPanic"
+	     (vcat [doc,
+		ptext SLIT("static binds for:"),
+		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv static_binds ],
+		ptext SLIT("local binds for:"),
+		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv local_binds ],
+	        ptext SLIT("SRT label") <+> pprCLabel srt
+	      ])
 \end{code}
 
 %************************************************************************
