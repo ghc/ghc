@@ -15,10 +15,9 @@ import TcMonoType	( tcHsType )
 				-- so tcHsType will do the Right Thing without
 				-- having to mess about with zonking
 
-import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
-			  tcExtendGlobalValEnv, tcSetValueEnv,
-			  tcLookupValueMaybe,
-			  explicitLookupValue, valueEnvIds
+import TcEnv		( TcEnv, tcExtendTyVarEnv, 
+			  tcExtendGlobalValEnv, tcSetEnv,
+			  tcLookupGlobal_maybe, explicitLookupId, valueEnvIds
 			)
 
 import RnHsSyn		( RenamedHsDecl )
@@ -53,7 +52,7 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: ValueEnv		-- Envt to use when checking unfoldings
+tcInterfaceSigs :: TcEnv		-- Envt to use when checking unfoldings
 		-> [RenamedHsDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM [Id]
 		
@@ -110,7 +109,7 @@ tcWorkerInfo unf_env ty info worker_name
   = uniqSMToTcM (mkWrapper ty arity demands res_bot cpr_info) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
-	info' = case explicitLookupValue unf_env worker_name of
+	info' = case explicitLookupId unf_env worker_name of
 			Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
                                                `setWorkerInfo`     HasWorker worker_id arity
 
@@ -144,11 +143,11 @@ tcPragExpr unf_env name in_scope_vars expr
   where
     doc = text "unfolding of" <+> ppr name
 
-tcDelay :: ValueEnv -> SDoc -> TcM a -> NF_TcM (Maybe a)
+tcDelay :: TcEnv -> SDoc -> TcM a -> NF_TcM (Maybe a)
 tcDelay unf_env doc thing_inside
   = forkNF_Tc (
 	recoverNF_Tc bad_value (
-		tcSetValueEnv unf_env thing_inside	`thenTc` \ r ->
+		tcSetEnv unf_env thing_inside	`thenTc` \ r ->
 		returnTc (Just r)
     ))			
   where
@@ -169,7 +168,7 @@ Variables in unfoldings
 \begin{code}
 tcVar :: Name -> TcM Id
 tcVar name
-  = tcLookupGlobalMaybe name	`thenNF_Tc` \ maybe_id ->
+  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of {
 	Just (AnId id)	-> returnTc id;
 	Nothing		-> failWithTc (noDecl name)

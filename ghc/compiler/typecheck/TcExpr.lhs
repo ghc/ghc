@@ -26,9 +26,9 @@ import Inst		( InstOrigin(..),
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
-			  tcLookupValue, tcLookupClass, tcLookupGlobalId,
-			  tcLookupTyCon, tcLookupDataCon,
-			  tcExtendGlobalTyVars, tcLookupValueMaybe,
+			  tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
+			  tcLookupTyCon, tcLookupDataCon, tcLookup,
+			  tcExtendGlobalTyVars
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )

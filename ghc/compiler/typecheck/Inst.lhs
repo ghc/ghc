@@ -44,7 +44,7 @@ import TcHsSyn	( TcExpr, TcId,
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
-		  tcLookupValue, tcLookupGlobalValue
+		  tcLookupGlobalId
 		)
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
@@ -685,7 +685,7 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
 
   | otherwise 
-  = tcLookupGlobalValue from_rat_name		`thenNF_Tc` \ from_rational ->
+  = tcLookupGlobalId from_rat_name		`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
 	rational_ty  = funArgTy (idType method_id)

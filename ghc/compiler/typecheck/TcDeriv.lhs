@@ -183,14 +183,13 @@ context to the instance decl.  The "offending classes" are
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: Module			-- name of module under scrutiny
-	    -> FixityEnv		-- for the deriving code (Show/Read.)
-	    -> RnNameSupply		-- for "renaming" bits of generated code
+tcDeriving  :: PersistentRenamerState
+	    -> Module			-- name of module under scrutiny
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving mod fixs rn_name_supply inst_decl_infos_in
+tcDeriving prs mod inst_decl_infos_in
   = recoverTc (returnTc (emptyBag, EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
@@ -214,17 +213,18 @@ tcDeriving mod fixs rn_name_supply inst_decl_infos_in
     gen_taggery_Names new_inst_infos		`thenTc` \ nm_alist_etc ->
 
 
+    tcGetEnv					`thenNF_Tc` \ env ->
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map (gen_bind fixs) new_inst_infos
+	method_binds_s   = map (gen_bind (tcGST env)) new_inst_infos
 	mbinders	 = collectLocatedMonoBinders extra_mbinds
 	
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope over the
 	-- method bindings for the instances.
 	(rn_method_binds_s, rn_extra_binds)
-		= renameSourceCode mod rn_name_supply (
+		= renameSourceCode mod prs (
 			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
 			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->
@@ -547,7 +547,7 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: FixityEnv -> InstInfo -> RdrNameMonoBinds
+gen_bind :: GlobalSymbolTable -> InstInfo -> RdrNameMonoBinds
 gen_bind fixities inst
   | not (isLocallyDefined tycon) = EmptyMonoBinds
   | clas `hasKey` showClassKey   = gen_Show_binds fixities tycon

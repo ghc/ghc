@@ -24,7 +24,8 @@ import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
 import TcMonad
-import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, tcLookupTy, 
+import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, 
+			  tcLookup, tcLookupGlobal,
 			  tcGetEnv, tcEnvTyVars, tcEnvTcIds,
 			  tcGetGlobalTyVars, 
 		 	  TyThing(..)
@@ -240,18 +241,6 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
 	returnTc boxedTypeKind
 
 ---------------------------
-kcTyVar name	-- Could be a tyvar or a tycon
-  = tcLookup name	`thenTc` \ thing ->
-    case thing of {
-	ATyVar tv -> returnTc (tyVarKind tv) ;
-	AThing k  -> returnTc k ;
-	AGlobal (ATyCon tc) -> returnTc (tyConKind tc) ;
-	other	  -> 
-
-    failWithTc (wrongThingErr "type" thing name)
-    }}
-
----------------------------
 kcFunResType :: RenamedHsType -> TcM TcKind
 -- The only place an unboxed tuple type is allowed
 -- is at the right hand end of an arrow
@@ -283,13 +272,25 @@ kcHsPred pred@(HsPIParam name ty)
 
 kcHsPred pred@(HsPClass cls tys)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
-    tcLookupTy cls 				`thenNF_Tc` \ thing -> 
-    (case thing of
-	AClass cls  -> returnTc (tyConKind (classTyCon cls))
-	AThing kind -> returnTc kind
-	other -> failWithTc (wrongThingErr "class" (pp_thing thing) cls))	`thenTc` \ kind ->
-    mapTc kcHsType tys							`thenTc` \ arg_kinds ->
+    kcClass cls					`thenTc` \ kind ->
+    mapTc kcHsType tys				`thenTc` \ arg_kinds ->
     unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)
+
+---------------------------
+kcTyVar name	-- Could be a tyvar or a tycon
+  = tcLookup name	`thenTc` \ thing ->
+    case thing of 
+	AThing kind 	    -> returnTc kind
+	ATyVar tv	    -> returnTc (tyVarKind tv)
+	AGlobal (ATyCon tc) -> returnTc (tyConKind tc) 
+	other		    -> failWithTc (wrongThingErr "type" thing name)
+
+kcClass cls	-- Must be a class
+  = tcLookup cls 				`thenNF_Tc` \ thing -> 
+    case thing of
+	AThing kind	      -> returnTc kind
+	AGlobal (AClass cls)  -> returnTc (tyConKind (classTyCon cls))
+	other		      -> failWithTc (wrongThingErr "class" thing cls)
 \end{code}
 
 %************************************************************************
@@ -454,16 +455,17 @@ tc_app ty tys
 -- 	hence the rather strange functionality.
 
 tc_fun_type name arg_tys
-  = tcLookupGlobal name			`thenTc` \ thing ->
+  = tcLookup name			`thenTc` \ thing ->
     case thing of
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
-	ATyCon tc | isSynTyCon tc ->  checkTc arity_ok err_msg	`thenTc_`
-				      returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
+	AGlobal (ATyCon tc)
+		| isSynTyCon tc ->  checkTc arity_ok err_msg	`thenTc_`
+				    returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
 							 (drop arity arg_tys))
 
-		  | otherwise	  ->  returnTc (mkTyConApp tc arg_tys)
-		  where
+		| otherwise	->  returnTc (mkTyConApp tc arg_tys)
+		where
 
 		    arity_ok = arity <= n_args 
 		    arity = tyConArity tc
@@ -474,7 +476,7 @@ tc_fun_type name arg_tys
 		    err_msg = arityErr "Type synonym" name arity n_args
 		    n_args  = length arg_tys
 
-	other -> failWithTc (wrongThingErr "type constructor" (pp_thing thing) name)
+	other -> failWithTc (wrongThingErr "type constructor" thing name)
 \end{code}
 
 
@@ -493,7 +495,7 @@ tcContext context = mapTc (tcClassAssertion False) context
 tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
     mapTc tcHsType tys				`thenTc` \ arg_tys ->
-    tcLookupTy class_name			`thenTc` \ thing ->
+    tcLookupGlobal class_name			`thenTc` \ thing ->
     case thing of
 	AClass clas -> checkTc (arity == n_tys) err				`thenTc_`
 		       returnTc (Class clas arg_tys)
@@ -502,7 +504,7 @@ tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
 		n_tys = length tys
 		err   = arityErr "Class" class_name arity n_tys
 
-	other -> failWithTc (wrongThingErr "class" (ppr_thing thing) class_name)
+	other -> failWithTc (wrongThingErr "class" (AGlobal thing) class_name)
 
 tcClassAssertion ccall_ok assn@(HsPIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
@@ -888,15 +890,14 @@ appKindCtxt :: SDoc -> Message
 appKindCtxt pp = ptext SLIT("When checking kinds in") <+> quotes pp
 
 wrongThingErr expected thing name
-  = thing <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
-
-pp_ty_thing (ATyCon _) = ptext SLIT("Type constructor")
-pp_ty_thing (AClass _) = ptext SLIT("Class")
-pp_ty_thing (AnId   _) = ptext SLIT("Identifier")
-
-pp_tc_ty_thing (ATyVar _) = ptext SLIT("Type variable")
-pp_tc_ty_thing (ATcId _)  = ptext SLIT("Local identifier")
-pp_tc_ty_thing (AThing _) = ptext SLIT("Utterly bogus")
+  = pp_thing thing <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
+  where
+    pp_thing (AGlobal (ATyCon _)) = ptext SLIT("Type constructor")
+    pp_thing (AGlobal (AClass _)) = ptext SLIT("Class")
+    pp_thing (AGlobal (AnId   _)) = ptext SLIT("Identifier")
+    pp_thing (ATyVar _) 	  = ptext SLIT("Type variable")
+    pp_thing (ATcId _)  	  = ptext SLIT("Local identifier")
+    pp_thing (AThing _) 	  = ptext SLIT("Utterly bogus")
 
 ambigErr pred ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),

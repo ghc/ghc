@@ -21,7 +21,7 @@ import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
 import TcEnv		( ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind,
-			  tcExtendTypeEnv, tcExtendKindEnv, tcLookupTy
+			  tcExtendTypeEnv, tcExtendKindEnv, tcLookupGlobal
 			)
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
@@ -249,9 +249,9 @@ kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its t
 -- the kind of the tycon/class.  Give it to the thing inside, and 
 -- check the result kind matches
 kcTyClDeclBody tc_name hs_tyvars thing_inside
-  = tcLookupTy tc_name		`thenNF_Tc` \ tc ->
+  = tcLookupGlobal tc_name		`thenNF_Tc` \ thing ->
     let
-	kind = case tc of
+	kind = case thing of
 		  ATyCon tc -> tyConKind tc
 		  AClass cl -> tyConKind (classTyCon cl)
 		-- For some odd reason, a class doesn't include its kind

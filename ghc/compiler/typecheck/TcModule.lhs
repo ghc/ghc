@@ -25,10 +25,9 @@ import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( tcExtendGlobalValEnv, 
+import TcEnv		( tcExtendGlobalValEnv, tcLookupGlobal_maybe,
 			  tcEnvTyCons, tcEnvClasses, 
-			  tcSetValueEnv, tcSetInstEnv, initEnv, 
-			  ValueEnv, 
+			  tcSetEnv, tcSetInstEnv, initEnv
 			)
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -45,7 +44,7 @@ import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet )
 import Id		( idType, idName, idUnfolding )
-import Module           ( pprModuleName, mkThisModule )
+import Module           ( pprModuleName, mkThisModule, plusModuleEnv )
 import Name		( nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, 
 			)
@@ -80,39 +79,42 @@ data TcResults
 
 ---------------
 typecheckModule
-	:: UniqSupply
-	-> RnNameSupply
-	-> FixityEnv
+	:: PersistentCompilerState
+	-> HomeSymbolTable
 	-> RenamedHsModule
 	-> IO (Maybe TcResults)
 
-typecheckModule us rn_name_supply fixity_env mod
-  = initTc us initEnv (tcModule rn_name_supply fixity_env mod) 	>>= \ (maybe_result, warns, errs) ->
-		
-    printErrorsAndWarnings errs warns		>>
-	
-    (case maybe_result of
-	Nothing -> return ()
-	Just results -> dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results) >>
-			dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
-    )						>>
-			
-    return (if isEmptyBag errs then 
-		maybe_result 
-	    else 
-		Nothing)
+typecheckModule pcs hst mod
+  = do { us <- mkSplitUniqSupply 'a' ;
 
+	 env <- initTcEnv gst inst_env ;
+
+	 (maybe_result, warns, errs) <- initTc us env (tcModule (pcsPRS pcs) mod)
+		
+	 printErrorsAndWarnings errs warns ;
+	
+	 (case maybe_result of
+		Nothing -> return ()
+		Just results -> do { dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results)
+				     dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
+	 }) ;
+			
+	return (if isEmptyBag errs then 
+			maybe_result 
+		else 
+			Nothing)
+    }
+  where
+    global_symbol_table = pcsPST pcs `plusModuleEnv` hst
 \end{code}
 
 The internal monster:
 \begin{code}
-tcModule :: RnNameSupply	-- for renaming derivings
-	 -> FixityEnv		-- needed for Show/Read derivings.
+tcModule :: PersistentRenamerState
 	 -> RenamedHsModule	-- input
 	 -> TcM TcResults	-- output
 
-tcModule rn_name_supply fixities
-	(HsModule mod_name _ _ _ decls _ src_loc)
+tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
     fixTc (\ ~(unf_env ,_) ->
@@ -128,9 +130,8 @@ tcModule rn_name_supply fixities
 	tcSetEnv env $
 
     		 -- Typecheck the instance decls, includes deriving
-	tcInstDecls1 unf_env decls 
-		     (mkThisModule mod_name)
-		     fixities rn_name_supply	`thenTc` \ (inst_info, deriv_binds) ->
+	tcInstDecls1 prs unf_env decls 
+		     (mkThisModule mod_name)	`thenTc` \ (inst_info, deriv_binds) ->
     
     	buildInstanceEnv inst_info	`thenNF_Tc` \ inst_env ->
 
@@ -243,7 +244,7 @@ tcModule rn_name_supply fixities
 			foe_binds
 	in
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
-	tcSetValueEnv really_final_env	$
+	tcSetEnv really_final_env	$
 	zonkForeignExports foe_decls    `thenNF_Tc` \ foe_decls' ->
 	zonkRules rules			`thenNF_Tc` \ rules' ->
 

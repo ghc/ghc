@@ -37,13 +37,41 @@ data ModDetails
 Symbol tables map modules to ModDetails:
 
 \begin{code}
-type HomeSymbolTable    = ModuleEnv ModDetails	-- Domain = modules in the home package
-type PackageSymbolTable = ModuleEnv ModDetails	-- Domain = modules in the some other package
-type GlobalSymbolTable  = ModuleEnv ModDetails	-- Domain = all modules
+type SymbolTable	= ModuleEnv ModDetails
+type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
+type PackageSymbolTable = SymbolTable	-- Domain = modules in the some other package
+type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 \end{code}
 
 
-Auxiliary definitions
+Simple lookups in the symbol table
+
+\begin{code}
+lookupFixityEnv :: SymbolTable -> Name -> Fixity
+	-- Returns defaultFixity if there isn't an explicit fixity
+lookupFixityEnv tbl name
+  = case lookupModuleEnv tbl (nameModule name) of
+	Nothing	     -> defaultFixity
+	Just details -> case lookupNameEnv (fixityEnv details) name of
+				Just fixity -> fixity
+				Nothing	    -> defaultFixity
+
+lookupTypeEnv :: SymbolTable -> Name -> Maybe TyThing
+lookupTypeEnv tbl name
+  = case lookupModuleEnv tbl (nameModule name) of
+	Just details -> lookupNameEnv (typeEnv details) name
+	Nothing	     -> Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Auxiliary types}
+%*									*
+%************************************************************************
+
+These types are defined here because they are mentioned in ModDetails,
+but they are mostly elaborated elsewhere
 
 \begin{code}
 data TyThing = AnId   Id
@@ -56,6 +84,16 @@ type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name c
 					-- These only get reported on lookup,
 					-- not on construction
 
+type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
+type ClsInstEnv = [(TyVarSet, [Type], Id)]	-- The instances for a particular class
+\end{code}
+
+
+\begin{code}
+type Avails	  = [AvailInfo]
+type AvailInfo    = GenAvailInfo Name
+type RdrAvailInfo = GenAvailInfo OccName
+
 data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			| AvailTC name 	 -- The name of the type or class
 				  [name] -- The available pieces of type/class.
@@ -66,9 +104,6 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			-- Equality used when deciding if the interface has changed
 
 type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
-type AvailInfo    = GenAvailInfo Name
-type RdrAvailInfo = GenAvailInfo OccName
-type Avails	  = [AvailInfo]
 \end{code}
 
 

@@ -33,7 +33,6 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			)
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkUnqual )
-import RnMonad		( FixityEnv, lookupFixity )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			, maxPrecedence
 			, Boxity(..)
@@ -774,7 +773,7 @@ gen_Ix_binds tycon
 \begin{code}
 gen_Read_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
-gen_Read_binds fixity_env tycon
+gen_Read_binds gst tycon
   = reads_prec `AndMonoBinds` read_list
   where
     tycon_loc = getSrcLoc tycon
@@ -902,7 +901,7 @@ gen_Read_binds fixity_env tycon
 						    then d_Expr 
 						    else HsVar (last bs_needed)] Boxed
 
-           [lp,rp] = getLRPrecs is_infix fixity_env dc_nm
+           [lp,rp] = getLRPrecs is_infix gst dc_nm
 
            quals
 	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
@@ -915,7 +914,7 @@ gen_Read_binds fixity_env tycon
 	    -}
 	   paren_prec_limit
 	     | not is_infix  = fromInt maxPrecedence
-	     | otherwise     = getFixity fixity_env dc_nm
+	     | otherwise     = getFixity gst dc_nm
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
@@ -929,9 +928,9 @@ gen_Read_binds fixity_env tycon
 %************************************************************************
 
 \begin{code}
-gen_Show_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: GlobalSymbolTable -> TyCon -> RdrNameMonoBinds
 
-gen_Show_binds fixity_env tycon
+gen_Show_binds gst tycon
   = shows_prec `AndMonoBinds` show_list
   where
     tycon_loc = getSrcLoc tycon
@@ -1002,7 +1001,7 @@ gen_Show_binds fixity_env tycon
              mk_showString_app str = HsApp (HsVar showString_RDR)
 					   (HsLit (mkHsString str))
 
-             prec_cons = getLRPrecs is_infix fixity_env dc_nm
+             prec_cons = getLRPrecs is_infix gst dc_nm
 
              real_show_thingies
 		| is_infix  = 
@@ -1028,20 +1027,20 @@ gen_Show_binds fixity_env tycon
 	      -}  
 	     paren_prec_limit
 		| not is_infix = fromInt maxPrecedence + 1
-		| otherwise    = getFixity fixity_env dc_nm + 1
+		| otherwise    = getFixity gst dc_nm + 1
 
 \end{code}
 
 \begin{code}
-getLRPrecs :: Bool -> FixityEnv -> Name -> [Integer]
-getLRPrecs is_infix fixity_env nm = [lp, rp]
+getLRPrecs :: Bool -> GlobalSymbolTable -> Name -> [Integer]
+getLRPrecs is_infix gst nm = [lp, rp]
     where
      {-
 	Figuring out the fixities of the arguments to a constructor,
 	cf. Figures 16-18 in Haskell 1.1 report.
      -}
-     (con_left_assoc, con_right_assoc) = isLRAssoc fixity_env nm
-     paren_con_prec = getFixity fixity_env nm
+     (con_left_assoc, con_right_assoc) = isLRAssoc gst nm
+     paren_con_prec = getFixity gst nm
      maxPrec	    = fromInt maxPrecedence
 
      lp
@@ -1054,9 +1053,9 @@ getLRPrecs is_infix fixity_env nm = [lp, rp]
       | con_right_assoc = paren_con_prec
       | otherwise       = paren_con_prec + 1
 		  
-getFixity :: FixityEnv -> Name -> Integer
-getFixity fixity_env nm = case lookupFixity fixity_env nm of
-			     Fixity x _ -> fromInt x
+getFixity :: GobalSymbolTable -> Name -> Integer
+getFixity gst nm = case lookupFixityEnv gst nm of
+			Fixity x _ -> fromInt x
 
 isLRAssoc :: FixityEnv -> Name -> (Bool, Bool)
 isLRAssoc fixs_assoc nm =

@@ -41,8 +41,8 @@ import HsSyn	-- oodles of it
 -- others:
 import Id	( idName, idType, idUnfolding, setIdType, omitIfaceSigForId, isIP, Id )
 import DataCon	( dataConWrapId )	
-import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
-		  ValueEnv, TcId, tcInstId
+import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, tcGetEnv,
+		  TcEnv, TcId, tcInstId
 		)
 
 import TcMonad
@@ -182,12 +182,12 @@ zonkIdOcc id
 
 
 \begin{code}
-zonkTopBinds :: TcMonoBinds -> NF_TcM (TypecheckedMonoBinds, ValueEnv)
+zonkTopBinds :: TcMonoBinds -> NF_TcM (TypecheckedMonoBinds, TcEnv)
 zonkTopBinds binds	-- Top level is implicitly recursive
   = fixNF_Tc (\ ~(_, new_ids) ->
 	tcExtendGlobalValEnv (bagToList new_ids)	$
 	zonkMonoBinds binds			`thenNF_Tc` \ (binds', new_ids) ->
-	tcGetValueEnv				`thenNF_Tc` \ env ->
+	tcGetEnv				`thenNF_Tc` \ env ->
 	returnNF_Tc ((binds', env), new_ids)
     )					`thenNF_Tc` \ (stuff, _) ->
     returnNF_Tc stuff

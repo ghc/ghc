@@ -77,8 +77,12 @@ infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_`
 \end{code}
 
 
-Types
-~~~~~
+%************************************************************************
+%*									*
+\subsection{Types}
+%*									*
+%************************************************************************
+
 \begin{code}
 type TcTyVar    = TyVar		-- Might be a mutable tyvar
 type TcTyVarSet = TyVarSet
@@ -97,8 +101,11 @@ type TcKind      = TcType
 \end{code}
 
 
-\section{TcM, NF_TcM: the type checker monads}
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{The main monads: TcM, NF_TcM}
+%*									*
+%************************************************************************
 
 \begin{code}
 type NF_TcM r =  TcDown -> TcEnv -> IO r	-- Can't raise UserError
@@ -432,8 +439,14 @@ discardErrsTc main down env
        main (setTcErrs down new_errs_var) env
 \end{code}
 
-Mutable variables
-~~~~~~~~~~~~~~~~~
+
+
+%************************************************************************
+%*									*
+\subsection{Mutable variables}
+%*									*
+%************************************************************************
+
 \begin{code}
 tcNewMutVar :: a -> NF_TcM (TcRef a)
 tcNewMutVar val down env = newIORef val
@@ -458,8 +471,12 @@ tcWriteMutTyVar tyvar val down env = writeMutTyVar tyvar val
 \end{code}
 
 
-Environment
-~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{The environment}
+%*									*
+%************************************************************************
+
 \begin{code}
 tcGetEnv :: NF_TcM TcEnv
 tcGetEnv down env = return env
@@ -469,8 +486,12 @@ tcSetEnv new_env m down old_env = m down new_env
 \end{code}
 
 
-Source location
-~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Source location}
+%*									*
+%************************************************************************
+
 \begin{code}
 tcGetDefaultTys :: NF_TcM [Type]
 tcGetDefaultTys down env = return (getDefaultTys down)
@@ -499,8 +520,12 @@ tcAddErrCtxt msg m down env = m (addErrCtxt down (\env -> returnNF_Tc (env, msg)
 \end{code}
 
 
-Unique supply
-~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Unique supply}
+%*									*
+%************************************************************************
+
 \begin{code}
 tcGetUnique :: NF_TcM Unique
 tcGetUnique down env
@@ -533,8 +558,6 @@ uniqSMToTcM m down env
 \end{code}
 
 
-\section{Dictionary function name supply
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tcGetDFunUniq :: String -> NF_TcM Int
 tcGetDFunUniq key down env
@@ -550,8 +573,11 @@ tcGetDFunUniq key down env
 \end{code}
 
 
-\section{TcDown}
-%~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{TcDown}
+%*									*
+%************************************************************************
 
 \begin{code}
 data TcDown
@@ -607,8 +633,11 @@ getErrCtxt (TcDown def us ds loc ctxt errs)     = ctxt
 
 
 
-TypeChecking Errors
-~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{TypeChecking Errors}
+%*									*
+%************************************************************************
 
 \begin{code}
 type TcError   = Message

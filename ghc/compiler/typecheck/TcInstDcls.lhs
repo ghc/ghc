@@ -30,7 +30,7 @@ import Inst		( InstOrigin(..),
 import TcDeriv		( tcDeriving )
 import TcEnv		( ValueEnv, tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, TyThing (..),
-			  tcAddImportedIdInfo, tcInstId, tcLookupTy,
+			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
 			)
 import TcInstUtil	( InstInfo(..), pprInstInfo, classDataCon, simpleInstInfoTyCon, simpleInstInfoTy )
@@ -163,7 +163,8 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
+tcInstDecls1 :: PersistentRenamerState
+	     -> TcEnv 			-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
 	     -> Module			-- Module for deriving
 	     -> FixityEnv		-- For derivings
@@ -171,7 +172,7 @@ tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> TcM (Bag InstInfo,
 		       RenamedHsBinds)
 
-tcInstDecls1 unf_env decls mod fixs rn_name_supply
+tcInstDecls1 prs unf_env decls mod 
   = 	-- (1) Do the ordinary instance declarations
     mapNF_Tc (tcInstDecl1 mod unf_env) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
@@ -181,7 +182,7 @@ tcInstDecls1 unf_env decls mod fixs rn_name_supply
 	-- (2) Instances from "deriving" clauses; note that we only do derivings
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces!
-    tcDeriving mod fixs rn_name_supply decl_inst_info  	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving prs mod decl_inst_info			`thenTc` \ (deriv_inst_info, deriv_binds) ->
 
 	-- (3) Instances from generic class declarations
     mapTc (getGenericInstances mod) 

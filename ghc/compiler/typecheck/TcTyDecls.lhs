@@ -23,7 +23,10 @@ import BasicTypes	( NewOrData(..) )
 import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, tcHsTyVars, tcClassContext,
 			  kcHsContext, kcHsSigType
 			)
-import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupGlobalId, TyThing(..), TyThingDetails(..) )
+import TcEnv		( tcExtendTyVarEnv, 
+			  tcLookupTyCon, tcLookupClass, tcLookupGlobalId, 
+			  TyThing(..), TyThingDetails(..)
+			)
 import TcMonad
 
 import Class		( ClassContext )
@@ -58,7 +61,7 @@ import ListSetOps	( equivClasses )
 \begin{code}
 tcTyDecl1 :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
-  = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
+  = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
     tcHsType rhs				`thenTc` \ rhs_ty ->
 	-- Note tcHsType not tcHsSigType; we allow type synonyms
@@ -76,7 +79,7 @@ tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
 tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings _ src_loc name1 name2)
-  = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
+  = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
     in
@@ -90,10 +93,7 @@ tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings _ src_l
     returnTc (tycon_name, DataTyDetails ctxt data_cons derived_classes)
   where
     tc_derivs Nothing   = returnTc []
-    tc_derivs (Just ds) = mapTc tc_deriv ds
-
-    tc_deriv name = tcLookupTy name `thenTc` \ (AClass clas) ->
-		    returnTc clas
+    tc_derivs (Just ds) = mapTc tcLookupClass ds
 \end{code}
 
 \begin{code}

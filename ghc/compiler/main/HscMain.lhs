@@ -92,7 +92,6 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
     mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
-    mkSplitUniqSupply 'a'	>>= \ tc_uniqs 	-> -- typechecker
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
     mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg

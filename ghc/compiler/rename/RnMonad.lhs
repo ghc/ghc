@@ -329,7 +329,6 @@ initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> Module -> SrcLoc
 
 initRn dflags finder gst prs mod loc do_rn = do
-  himaps    <- mkModuleHiMaps dirs
   names_var <- newIORef (prsNS pcs)
   errs_var  <- newIORef (emptyBag,emptyBag)
   iface_var <- newIORef (initIfaces prs)
@@ -408,11 +407,11 @@ once you must either split it, or install a fresh unique supply.
 \begin{code}
 renameSourceCode :: DynFlags 
 		 -> Module
-		 -> RnNameSupply
+		 -> PersistentRenamerState
 	         -> RnMS r
 	         -> r
 
-renameSourceCode dflags mod name_supply m
+renameSourceCode dflags mod prs m
   = unsafePerformIO (
 	-- It's not really unsafe!  When renaming source code we
 	-- only do any I/O if we need to read in a fixity declaration;
