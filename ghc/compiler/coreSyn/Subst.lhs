@@ -610,13 +610,13 @@ simplLetId subst@(Subst in_scope env) old_id
 	    | otherwise 
 	    = delSubstEnv env old_id
 
-simplIdInfo :: Subst -> IdInfo -> Id -> Id
+simplIdInfo :: Subst -> IdInfo -> IdInfo
   -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
   -- subsequent to simplLetId having zapped its IdInfo
-simplIdInfo subst old_info bndr
+simplIdInfo subst old_info
   = case substIdInfo subst isFragileOcc old_info of 
-	Just new_info -> bndr `setIdInfo` new_info
-	Nothing       -> bndr `setIdInfo` old_info
+	Just new_info -> new_info
+	Nothing       -> old_info
 \end{code}
 
 \begin{code}
