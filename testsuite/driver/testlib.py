@@ -193,6 +193,14 @@ def _omit_ways( opts, ways ):
 
 # -----
 
+def only_ways( ways ):
+    return lambda opts, w=ways: _only_ways( opts, w )
+
+def _only_ways( opts, ways ):
+    opts.only_ways = ways
+
+# -----
+
 def expect_fail_if_platform( plat ):
    return lambda opts, p=plat: _expect_fail_if_platform(opts, p)
 
