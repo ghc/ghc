@@ -49,7 +49,32 @@ inputReady(int fd, int msecs, int isSock)
     else {
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);
-	
+	DWORD avail;
+
+	// WaitForMultipleObjects() works for Console input, but it
+	// doesn't work for pipes (it always returns WAIT_OBJECT_0
+	// even when no data is available).  There doesn't seem to be
+	// an easy way to distinguish the two kinds of HANDLE, so we
+	// try to detect pipe input first, and if that fails we try
+	// WaitForMultipleObjects().
+	//
+	rc = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
+	if (rc != 0) {
+	    if (avail != 0) {
+		return 1;
+	    } else {
+		return 0;
+	    }
+	} else {
+	    rc = GetLastError();
+	    if (rc == ERROR_BROKEN_PIPE) {
+		return 1; // this is probably what we want
+	    }
+	    if (rc != ERROR_INVALID_HANDLE) {
+		return -1;
+	    }
+	}
+
 	rc = WaitForMultipleObjects( 1,
 				     &hFile,
 				     TRUE,   /* wait all */
