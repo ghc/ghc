@@ -37,7 +37,6 @@ module CLabel (
 	mkModuleInitLabel,
 	mkPlainModuleInitLabel,
 
-	mkErrorStdEntryLabel,
 	mkSplitMarkerLabel,
 	mkUpdInfoLabel,
 	mkSeqInfoLabel,
