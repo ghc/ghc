@@ -711,9 +711,26 @@ INLINE int __hscore_fstat(int fd, struct stat *buf) {
 }
 
 #if defined(mingw32_TARGET_OS)
-INLINE int __hscore_CSIDL_PROFILE() { return CSIDL_PROFILE; }
-INLINE int __hscore_CSIDL_APPDATA() { return CSIDL_APPDATA; }
-INLINE int __hscore_CSIDL_WINDOWS() { return CSIDL_WINDOWS; }
+
+/* Make sure we've got the reqd CSIDL_ constants in scope;
+ * w32api header files are lagging a bit in defining the full set.
+ */
+#if !defined(CSIDL_APPDATA)
+#define CSIDL_APPDATA 0x001a
+#endif
+#if !defined(CSIDL_PERSONAL)
+#define CSIDL_PERSONAL 0x0005
+#endif
+#if !defined(CSIDL_PROFILE)
+#define CSIDL_PROFILE 0x0028
+#endif
+#if !defined(CSIDL_WINDOWS)
+#define CSIDL_WINDOWS 0x0024
+#endif
+
+INLINE int __hscore_CSIDL_PROFILE()  { return CSIDL_PROFILE;  }
+INLINE int __hscore_CSIDL_APPDATA()  { return CSIDL_APPDATA;  }
+INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 #endif
 
