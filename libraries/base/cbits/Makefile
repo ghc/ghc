@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 2004/08/16 11:07:31 simonmar Exp $
+# $Id: Makefile,v 1.11 2004/08/16 11:08:47 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -21,7 +21,7 @@ EXCLUDED_SRCS += consUtils.c
 endif
 
 SRC_CC_OPTS += -Wall -DCOMPILING_STDLIB 
-SRC_CC_OPTS += -I$(GHC_RUNTIME_DIR) -I../include
+SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -I../include
 
 LIBRARY = libHSbase_cbits.a
 LIBOBJS = $(C_OBJS)
