@@ -1,5 +1,5 @@
 % 
-% $Id: libraries.vsgml,v 1.5 1999/02/22 10:22:35 sof Exp $
+% $Id: libraries.vsgml,v 1.6 1999/08/17 15:39:38 simonpj Exp $
 %
 % GHC Prelude and Libraries.
 %
@@ -118,7 +118,8 @@ data Addr    = A# Addr#
 data Word    = W# Word#
 data Float   = F# Float#
 data Double  = D# Double#
-data Integer = J# Int# Int# ByteArray#
+data Integer = S# Int#              -- small integers
+             | J# Int# ByteArray#   -- large integers
 
 module GHC  -- all primops and primitive types.
 </verb></tscreen>
@@ -408,37 +409,36 @@ decodeDouble#	:: Double# -> PrelNum.ReturnIntAndGMP
 We implement @Integers@ (arbitrary-precision integers) using the GNU
 multiple-precision (GMP) package (version 2.0.2).
 
-The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
+The data type for @Integer@ is either a small integer,
+represented by an @Int@, or a large integer represented
+using the pieces requird by GMP's @MP_INT@ in @gmp.h@
 (see @gmp.info@ in @ghc/includes/runtime/gmp@).  It comes out as:
 
 <tscreen><verb>
-data Integer = J# Int# Int# ByteArray#
+data Integer = S# Int#             -- small integers
+             | J# Int# ByteArray#  -- large integers
 </verb></tscreen>
 <nidx>Integer type</nidx>
-
-So, @Integer@ is really just a ``pairing'' type for a particular
-collection of primitive types.
-
-The primitive ops to support @Integers@ use the ``pieces'' of the
+The primitive ops to support large @Integers@ use the ``pieces'' of the
 representation, and are as follows:
 
 <tscreen><verb>
-negateInteger#	:: Int# -> Int# -> ByteArray# -> Integer
+negateInteger#	:: Int# -> ByteArray# -> Integer
 
-{plus,minus,times}Integer# :: Int# -> Int# -> ByteArray#
-			   -> Int# -> Int# -> ByteArray#
+{plus,minus,times}Integer# :: Int# -> ByteArray#
+			   -> Int# -> ByteArray#
 			   -> Integer
 
-cmpInteger# :: Int# -> Int# -> ByteArray#
-	    -> Int# -> Int# -> ByteArray#
+cmpInteger# :: Int# -> ByteArray#
+	    -> Int# -> ByteArray#
 	    -> Int# -- -1 for <; 0 for ==; +1 for >
 
 divModInteger#, quotRemInteger#
-	:: Int# -> Int# -> ByteArray#
-	-> Int# -> Int# -> ByteArray#
+	:: Int# -> ByteArray#
+	-> Int# -> ByteArray#
 	-> PrelNum.Return2GMPs
 
-integer2Int# :: Int# -> Int# -> ByteArray# -> Int# 
+integer2Int# :: Int# -> ByteArray# -> Int# 
 
 int2Integer#  :: Int#  -> Integer -- NB: no error-checking on these two!
 word2Integer# :: Word# -> Integer
