@@ -15,16 +15,17 @@
 
 module Text.Read.Lex
   -- lexing types
-  ( Lexeme(..)       -- :: *; Show, Eq
+  ( Lexeme(..)  -- :: *; Show, Eq
+  		
+  -- lexer	
+  , lex         -- :: ReadP Lexeme	Skips leading spaces
+  , hsLex	-- :: ReadP String
+  , lexChar	-- :: ReadP Char	Reads just one char, with H98 escapes
   
-  -- lexer
-  , lex              -- :: ReadP Lexeme	-- Skips leading spaces
-  , hsLex	     -- :: ReadP String
-  
-  , readIntP         -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
-  , readOctP         -- :: Num a => ReadP a 
-  , readDecP         -- :: Num a => ReadP a
-  , readHexP         -- :: Num a => ReadP a
+  , readIntP    -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
+  , readOctP    -- :: Num a => ReadP a 
+  , readDecP    -- :: Num a => ReadP a
+  , readHexP    -- :: Num a => ReadP a
   )
  where
 
@@ -133,13 +134,16 @@ lexId =
 lexLitChar :: ReadP Lexeme
 lexLitChar =
   do char '\''
-     (c,esc) <- lexChar
-     guard (esc || c /= '\'')
+     (c,esc) <- lexCharE
+     guard (esc || c /= '\'')	-- Eliminate '' possibility
      char '\''
      return (Char c)
 
-lexChar :: ReadP (Char, Bool)  -- "escaped or not"?
-lexChar =
+lexChar :: ReadP Char
+lexChar = do { (c,_) <- lexCharE; return c }
+
+lexCharE :: ReadP (Char, Bool)  -- "escaped or not"?
+lexCharE =
   do c <- get
      if c == '\\'
        then do c <- lexEsc; return (c, True)
@@ -276,9 +280,8 @@ lexString =
          else let s = f "" in
 	      return (String s)
 
-  lexStrItem =
-    (lexEmpty >> lexStrItem)
-      +++ lexChar
+  lexStrItem = (lexEmpty >> lexStrItem)
+	       +++ lexCharE
   
   lexEmpty =
     do char '\\'
