@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.126 2000/12/20 13:40:08 simonmar Exp $
+# $Id: Makefile,v 1.127 2000/12/20 15:54:51 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -204,9 +204,9 @@ prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -K2M -Onot -H45m -fno-warn-incomplete-patterns
 
-parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -K2M -Onot -fno-warn-incomplete-patterns
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
