@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.21 1999/11/23 18:08:17 sewardj Exp $                      #
+# $Id: Makefile,v 1.22 1999/11/24 10:12:47 andy Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -42,7 +42,7 @@ SRC_CC_OPTS = -g -O -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIM
 
 GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a
 
-all :: parser.c $(GHC_LIBS_NEEDED) nHandle.$(DYN_EXT) hugs
+all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) hugs
 
 ### EXTREMELY hacky
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
@@ -51,7 +51,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
 		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lm
 
-nHandle.$(DYN_EXT): nHandle.c
+nHandle$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 	gcc -mno-cygwin -O -Wall -o nHandle.o -c nHandle.c
 	dllwrap -mno-cygwin --target=i386-mingw32 -o nHandle.dll \
@@ -67,6 +67,9 @@ cleanish:
 	/bin/rm *.o
 rtsclean:
 	(cd $(GHC_RUNTIME_DIR) ; make clean)
+
+binaries:
+	tar cvzf stghugs.tar.gz hugs$(exeext) nHandle$(DYN_EXT) lib/*lhs lib/Prelude.hs
 
 snapshot:
 	/bin/rm -f snapshot.tar
