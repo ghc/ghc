@@ -189,6 +189,12 @@ defaultDefaultTys :: [Type]
 defaultDefaultTys = [integerTy, doubleTy]
 
 mkImpInstEnv :: DynFlags -> ExternalPackageState -> HomePackageTable -> InstEnv
+-- At the moment we (wrongly) build an instance environment from all the
+-- modules we have already compiled:
+--	(a) eps_inst_env from the external package state
+--	(b) all the md_insts in the home package table
+-- We should really only get instances from modules below us in the 
+-- module import tree.
 mkImpInstEnv dflags eps hpt
   = foldModuleEnv (add . md_insts . hm_details) 
 		  (eps_inst_env eps)
