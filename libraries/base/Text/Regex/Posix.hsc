@@ -42,6 +42,18 @@ module Text.Regex.Posix (
 
   ) where
 
+import Prelude
+
+import Foreign
+import Foreign.C
+
+type CRegex    = ()
+
+-- | A compiled regular expression
+newtype Regex = Regex (ForeignPtr CRegex)
+
+
+-- The C-library backend
 #include <sys/types.h>
 
 #if HAVE_REGEX_H && HAVE_REGCOMP
@@ -56,16 +68,6 @@ module Text.Regex.Posix (
 {-# CFILES cbits/regex/regexec.c #-}
 {-# CFILES cbits/regex/regfree.c #-}
 #endif
-
-import Prelude
-
-import Foreign
-import Foreign.C
-
-type CRegex    = ()
-
--- | A compiled regular expression
-newtype Regex = Regex (ForeignPtr CRegex)
 
 -- -----------------------------------------------------------------------------
 -- regcomp
