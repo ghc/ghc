@@ -77,54 +77,27 @@ import Foreign
 import Char		( chr )
 import Panic		( panic )
 
-#if __GLASGOW_HASKELL__ >= 303
-import IO		( openFile
-#if __GLASGOW_HASKELL__ < 407
-                        , slurpFile   -- comes from PrelHandle or IOExts now
-#endif
-                        )
+import IO		( openFile  )
+import IOExts		( slurpFile )
 import PrelIOBase
 import PrelHandle
-#if __GLASGOW_HASKELL__ >= 501
-import IOExts		( slurpFile )
-#endif
 import Addr
-#else
-import IO		( openFile, hFileSize, hClose, IOMode(..) )
-import Addr
-#endif
 #if __GLASGOW_HASKELL__ >= 411
 import Ptr		( Ptr(..) )
 #endif
 
-#if __GLASGOW_HASKELL__ < 301
-import IOBase		( Handle, IOError(..), IOErrorType(..),
-			  constructErrorAndFail )
-import IOHandle		( readHandle, writeHandle, filePtr )
-import PackBase 	( unpackCStringBA )
-#else
-# if __GLASGOW_HASKELL__ <= 302
-import PrelIOBase	( Handle, IOError(..), IOErrorType(..), 
-			  constructErrorAndFail )
-import PrelHandle	( readHandle, writeHandle, filePtr )
-# endif
 import PrelPack		( unpackCStringBA )
-#endif
+
 #if __GLASGOW_HASKELL__ >= 501
 import PrelIO		( hGetcBuffered )
 import PrelCError	( throwErrnoIfMinus1RetryMayBlock )
 import PrelConc		( threadWaitRead )
 #endif
 
-#if __GLASGOW_HASKELL__ < 402
-import Util 		( bracket )
-#else
 import Exception	( bracket )
-#endif
-
 import PrimPacked
 import FastString
-import Char 		(isDigit)
+import Char 		( isDigit )
 \end{code} 
 
 \begin{code}
@@ -159,33 +132,6 @@ hGetStringBuffer expand_tabs fname = do
          -- add sentinel '\NUL'
    _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' (A# a#) (I# (read# -# 1#))
    return (StringBuffer a# read# 0# 0#)
-
-#if __GLASGOW_HASKELL__ < 303
-slurpFile fname =
-    openFile fname ReadMode >>= \ hndl ->
-    hFileSize hndl          >>= \ len ->
-    let len_i = fromInteger len in
-      -- Allocate an array for system call to store its bytes into.
-      -- ToDo: make it robust
---    trace (show ((len_i::Int)+1)) $
-    _casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int)  >>= \ arr@(A# a#) ->
-    if addr2Int# a# ==# 0# then
-       fail (userError ("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
-    else
-    readHandle hndl        >>= \ hndl_ ->
-    writeHandle hndl hndl_ >>
-     let ptr = filePtr hndl_ in
-#if __GLASGOW_HASKELL__ <= 302
-     _ccall_ fread arr (1::Int) len_i (ptr::ForeignObj)               >>= \  (I# read#) ->
-#else
-     _ccall_ fread arr (1::Int) len_i (ptr::Addr)                     >>= \  (I# read#) ->
-#endif
-     hClose hndl		     >>
-     if read# ==# 0# then -- EOF or some other error
-        fail (userError ("hGetStringBuffer: failed to slurp in interface file "++fname))
-     else
-	return (arr, I# read#)
-#endif
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
 unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
@@ -234,20 +180,8 @@ We guess the size of the buffer required as 20% extra for
 expanded tabs, and enlarge it if necessary.
 
 \begin{code}
-#if __GLASGOW_HASKELL__ < 303
-mayBlock fo thing = thing
-
-writeCharOffAddr :: Addr -> Int -> Char -> IO ()
-writeCharOffAddr addr off c
-  = _casm_ ``*((char *)%0+(int)%1)=(char)%2;'' addr off c
-#endif
-
 getErrType :: IO Int
-#if __GLASGOW_HASKELL__ < 303
-getErrType = _casm_ ``%r = ghc_errtype;''
-#else
 getErrType =  _ccall_ getErrType__
-#endif
 
 slurpFileExpandTabs :: FilePath -> IO (Addr,Int)
 slurpFileExpandTabs fname = do
@@ -265,19 +199,12 @@ slurpFileExpandTabs fname = do
 
 trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
 trySlurp handle sz_i chunk =
-#if __GLASGOW_HASKELL__ < 303
-  readHandle handle        >>= \ handle_ ->
-  let fo = filePtr handle_ in
-#elif __GLASGOW_HASKELL__ == 303
-  wantReadableHandle "hGetChar" handle >>= \ handle_ ->
-  let fo = haFO__ handle_ in
-#elif __GLASGOW_HASKELL__ < 501
+#if __GLASGOW_HASKELL__ < 501
   wantReadableHandle "hGetChar" handle $ \ handle_ ->
   let fo = haFO__ handle_ in
 #else
-  wantReadableHandle "hGetChar" handle $ \handle_ ->
-  let fd = haFD handle_
-      ref = haBuffer handle_ in
+  wantReadableHandle "hGetChar" handle $ 
+      \ handle_@Handle__{ haFD=fd, haBuffer=ref, haBufferMode=mode } ->
 #endif
   let
 	(I# chunk_sz) = sz_i
@@ -306,24 +233,8 @@ trySlurp handle sz_i chunk =
 		buf <- readIORef ref
 		ch <- (if not (bufferEmpty buf)
 		      then hGetcBuffered fd ref buf
-		      else -- buffer is empty.
-			   case haBufferMode handle_ of
-		  LineBuffering    -> do
-		      new_buf <- fillReadBuffer fd True buf
-		      hGetcBuffered fd ref new_buf
-		  BlockBuffering _ -> do
-		      new_buf <- fillReadBuffer fd False buf
-		      hGetcBuffered fd ref new_buf
-		  NoBuffering -> do
-		      -- make use of the minimal buffer we already have
-		      let raw = bufBuf buf
-		      r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-		              (read_off (fromIntegral fd) raw 0 1)
-		              (threadWaitRead fd)
-		      if r == 0
-		         then ioe_EOF
-		         else do (c,_) <- readCharFromBuffer raw 0
-		                 return c)
+		      else do new_buf <- fillReadBuffer fd True buf
+		              hGetcBuffered fd ref new_buf)
 		    `catch` \e -> if isEOFError e
 			then return '\xFFFF'
 			else ioError e
@@ -363,20 +274,14 @@ reAllocMem :: Addr -> Int -> IO Addr
 reAllocMem ptr sz = do
    chunk <- _ccall_ realloc ptr sz
    if chunk == nullAddr 
-#if __GLASGOW_HASKELL__ >= 400
       then fail "reAllocMem"
-#else
-      then fail (userError "reAllocMem")
-#endif
       else return chunk
 
 allocMem :: Int -> IO Addr
 allocMem sz = do
    chunk <- _ccall_ malloc sz
    if chunk == nullAddr 
-#if __GLASGOW_HASKELL__ < 303
-      then fail (userError "allocMem")
-#elif __GLASGOW_HASKELL__ < 501
+#if __GLASGOW_HASKELL__ < 501
       then constructErrorAndFail "allocMem"
 #else
       then ioException (IOError Nothing ResourceExhausted "malloc"
