@@ -11,7 +11,7 @@ import HaddockVersion
 import HaddockTypes
 import HsSyn
 
-import Maybe	( fromJust, isNothing )
+import Maybe	( fromJust, isNothing, isJust )
 import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
@@ -283,24 +283,39 @@ ifaceToHtml mod iface
   | null exports = Html.emptyTable
   | otherwise =
     td << table ! [width "100%", cellpadding 0, cellspacing 15] << 
-	(body1 </> body2)
- where exports = iface_exports iface
-       doc_map = iface_name_docs iface
+	(description </> synopsis </> maybe_hr </> body)
+  where 
+	exports = iface_exports iface
+	doc_map = iface_name_docs iface
 
-       body1
+	has_doc (ExportDecl d)
+	 | Just x <- declMainBinder d = isJust (lookupFM doc_map x)
+	has_doc _ = True
+
+	no_doc_at_all = not (any has_doc exports)
+
+	description
          | Just doc <- iface_doc iface
          = (tda [theclass "section1"] << toHtml "Description") </>
 	   docBox (markup htmlMarkup doc)
 	 | otherwise
 	 = Html.emptyTable
 
-       body2 =
-         (tda [theclass "section1"] << toHtml "Synopsis") </>
-         (tda [width "100%", theclass "synopsis"] << 
-  	   table ! [width "100%", cellpadding 0, cellspacing 8, border 0] << 
-  	     aboves (map (processExport doc_map True)  exports)) </>
-         td << hr </>
-           aboves (map (processExport doc_map False) exports)
+	-- omit the synopsis if there are no documentation annotations at all
+	synopsis
+	  | no_doc_at_all = Html.emptyTable
+	  | otherwise
+	  = (tda [theclass "section1"] << toHtml "Synopsis") </>
+            (tda [width "100%", theclass "synopsis"] << 
+  	      table ! [width "100%", cellpadding 0, cellspacing 8, border 0] << 
+  	        aboves (map (processExport doc_map True)  exports))
+
+	maybe_hr
+	     | not (no_doc_at_all),  ExportGroup 1 _ <- head exports
+		 = td << hr
+	     | otherwise  = Html.emptyTable
+
+	body = aboves (map (processExport doc_map False) exports)
 
 processExport :: FiniteMap HsName Doc -> Bool -> ExportItem -> HtmlTable
 processExport doc_map summary (ExportGroup lev doc)
@@ -349,11 +364,12 @@ doDecl doc_map summary decl = do_decl decl
 		 ++ map ppHsName args) <+> equals <+> ppHsType ty)
 
      do_decl (HsNewTypeDecl loc ctx nm args con drv)
-	= ppHsDataDecl doc_map summary (HsDataDecl loc ctx nm args [con] drv)
+	= ppHsDataDecl doc_map summary True{-is newtype-}
+		(HsDataDecl loc ctx nm args [con] drv)
 	  -- print it as a single-constructor datatype
 
      do_decl decl@(HsDataDecl loc ctx nm args cons drv) 
-	= ppHsDataDecl doc_map summary decl
+	= ppHsDataDecl doc_map summary False{-not newtype-} decl
 
      do_decl decl@(HsClassDecl _ _ _)
 	= ppHsClassDecl doc_map summary decl
@@ -377,15 +393,17 @@ keepDecl _ = False
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
-ppShortDataDecl doc_map summary (HsDataDecl loc ctx nm args [con] drv) =
+ppShortDataDecl doc_map summary is_newty 
+	(HsDataDecl loc ctx nm args [con] drv) =
    declBox (  -- single constructor special case
-      ppHsDataHeader summary nm args      
+      ppHsDataHeader summary is_newty nm args      
       <+> equals <+> ppShortConstr summary con
    )
-ppShortDataDecl doc_map summary (HsDataDecl loc ctx nm args cons drv) = 
+ppShortDataDecl doc_map summary is_newty
+	(HsDataDecl loc ctx nm args cons drv) = 
    declBox << vanillaTable << (
      aboves (
-	(declBox (ppHsDataHeader summary nm args) :
+	(declBox (ppHsDataHeader summary is_newty nm args) :
  	zipWith do_constr ('=':repeat '|') cons
      )
     )
@@ -395,20 +413,20 @@ ppShortDataDecl doc_map summary (HsDataDecl loc ctx nm args cons drv) =
 
 -- First, the abstract case:
 
-ppHsDataDecl doc_map summary (HsDataDecl loc ctx nm args [] drv) = 
+ppHsDataDecl doc_map summary is_newty (HsDataDecl loc ctx nm args [] drv) = 
    declWithDoc summary (lookupFM doc_map nm)
-     (ppHsDataHeader summary nm args)
+     (ppHsDataHeader summary is_newty nm args)
 
 -- The rest of the cases:
 
-ppHsDataDecl doc_map summary decl@(HsDataDecl loc ctx nm args cons drv)
+ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
   | summary || (isNothing doc && all constr_has_no_doc cons)
-	= ppShortDataDecl doc_map summary decl
+	= ppShortDataDecl doc_map summary is_newty decl
 
   | otherwise
         = td << vanillaTable << (header </> datadoc </> constrs)
   where
-	header = declBox (ppHsDataHeader False nm args)
+	header = declBox (ppHsDataHeader False is_newty nm args)
 	datadoc = docBox (markup htmlMarkup (fromJust doc))
 
 	constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
@@ -427,6 +445,8 @@ ppHsDataDecl doc_map summary decl@(HsDataDecl loc ctx nm args cons drv)
 	doc = lookupFM doc_map c
 
 	constr_has_no_doc (HsConDecl _ nm _ _) 
+	   = isNothing (lookupFM doc_map nm)
+	constr_has_no_doc (HsRecDecl _ nm _ _) 
 	   = isNothing (lookupFM doc_map nm)
 
 
@@ -475,8 +495,9 @@ ppFullField _ _ = error "ppFullField"
 
 expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 
-ppHsDataHeader summary nm args = 
-  keyword "data" <+> ppHsBinder summary nm <+> hsep (map ppHsName args)
+ppHsDataHeader summary is_newty nm args = 
+  (if is_newty then keyword "newtype" else keyword "data") <+> 
+	ppHsBinder summary nm <+> hsep (map ppHsName args)
 
 ppHsBangType :: HsBangType -> Html
 ppHsBangType (HsBangedTy ty) = char '!' +++ ppHsAType ty

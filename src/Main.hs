@@ -6,6 +6,7 @@
 
 module Main (main) where
 
+import HaddockRename
 import HaddockParse
 import HaddockLex
 import HaddockDB
@@ -22,6 +23,7 @@ import FiniteMap
 
 --import Pretty
 
+import List	( nub )
 import Monad	( when )
 import Char	( isSpace )
 import IO
@@ -72,7 +74,8 @@ run flags files = do
   let ifaces = [ mkInterface module_map file parsed 
 	       | (file,parsed) <- zip files parsed_mods ]
 
-      module_map = listToFM ifaces
+      mod_ifaces = [ (m,i) | (m,i,_,_) <- ifaces ]
+      module_map = listToFM mod_ifaces
 
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -82,11 +85,14 @@ run flags files = do
 			[] -> Nothing
 			(t:ts) -> Just t
 
+  sequence [ reportMissingNames m ns_docs ns_decls 
+	   | (m, _, ns_docs, ns_decls) <- ifaces ]
+
   when (Flag_DocBook `elem` flags) $
-    putStr (ppDocBook ifaces)
+    putStr (ppDocBook mod_ifaces)
 
   when (Flag_Html `elem` flags) $
-    ppHtml title source_url ifaces
+    ppHtml title source_url mod_ifaces
 
 
 parse_file file = do
@@ -100,10 +106,23 @@ parse_file file = do
 				 exitWith (ExitFailure 1)
     )
 
+reportMissingNames m [] [] = return ()
+reportMissingNames (Module m) ns_docs ns_decls =  do
+  hPutStrLn stderr ("Warning: in module " ++ m ++ 
+		  ", the following names could not be resolved:")
+  let name_strings = nub (map show ns_decls ++ ns_docs)
+  hPutStrLn stderr ("   " ++ concat (map (' ':) name_strings))
+
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
 
-mkInterface :: ModuleMap -> FilePath -> HsModule -> (Module,Interface)
+mkInterface :: ModuleMap -> FilePath -> HsModule
+   -> (Module, 		-- the module name
+       Interface,	-- its "interface"
+       [String],	-- a list of names we couldn't resolve in the docs
+       [HsQName]	-- a list of names we couldn't resolve in the decls
+      )
+
 mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
   = (mod, Interface { 
 	   iface_filename = filename,
@@ -115,10 +134,18 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
 	   iface_maintainer  = "libraries@haskell.org",
 	   iface_stability   = "stable",
 	   iface_name_docs   = doc_map,
-	   iface_doc         = fmap (formatDocString (lookupForDoc import_env))
-				maybe_doc
-	} )
+	   iface_doc         = module_doc
+	},
+      missing_names_doc1 ++ missing_names_doc2,   
+      missing_names1 ++ missing_names2 --ignore missing_names3 for now,
+    )
   where
+  (module_doc, missing_names_doc1) = 
+    case maybe_doc of
+	Nothing  -> (Nothing, [])
+	Just doc -> (Just doc', ns)
+	  where (doc',ns) = formatDocString (lookupForDoc import_env) doc
+
   locally_defined_names = collectNames decls
 
   qual_local_names   = map (Qual mod) locally_defined_names
@@ -136,8 +163,11 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
   import_env = foldr plusFM local_env ext_import_envs  
 
   -- convert names in source code to original, fully qualified, names
-  orig_exports = fmap (renameExportList orig_env) exps
-  orig_decls   = map (renameDecl orig_env) decls
+  (orig_exports, missing_names1) 
+	= runRnFM orig_env (mapMaybeM renameExportList exps)
+
+  (orig_decls, missing_names2)
+	= runRnFM orig_env (mapM renameDecl decls)
 
   orig_decl_map :: FiniteMap HsName HsDecl
   orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
@@ -150,15 +180,24 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
   final_decls = concat (map expandDecl orig_decls)
 
   -- match documentation to names, and resolve identifiers in the documentation
-  local_docs :: [(HsName,Doc)]
-  local_docs = [ (n, formatDocString (lookupForDoc import_env) doc) 
-	       | (n, doc) <- collectDoc final_decls
-	       ]
+  local_docstrings :: [(HsName,DocString)]
+  local_docstrings = collectDoc final_decls
+
+  local_docs_formatted :: [(HsName,(Doc,[String]))]
+  local_docs_formatted = 
+      [ (n, formatDocString (lookupForDoc orig_env) doc) 
+      | (n, doc) <- local_docstrings ]
+
+  local_docs :: [(HsName,Doc)]		-- with *original* names
+  local_docs = [ (n,doc) | (n,(doc,_)) <- local_docs_formatted ]
+
+  -- collect the list of names which we couldn't resolve in the documentation
+  missing_names_doc2 = concat [ ns | (n,(doc,ns)) <- local_docs_formatted ]
 
   -- get the documentation associated with entities exported from this module
   -- ToDo: we should really store the documentation in both orig and imported
   -- forms, like the export items.
-  doc_map :: FiniteMap HsName Doc
+  doc_map :: FiniteMap HsName Doc	-- with *imported* names
   doc_map = listToFM 
     [ (nameOfQName n, doc)
     | n <- exported_names,
@@ -168,12 +207,13 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
   decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list = mkExportItems mod_map mod import_env
+  orig_export_list = mkExportItems mod_map mod orig_env
 			decl_map final_decls orig_exports 
 
   -- rename names in the exported declarations to point to things that
   -- are closer, or maybe even exported by, the current module.
-  renamed_export_list = renameExportItems import_env orig_export_list
+  (renamed_export_list, missing_names3)
+     = runRnFM import_env (renameExportItems orig_export_list)
 
   name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
 
@@ -187,12 +227,16 @@ lookupDoc mod_map this_mod local_doc env name
   = case name of
 	UnQual n -> Nothing
 	Qual mod n
-	  | mod == this_mod -> fmap (renameDoc env) (lookup n local_doc)
+	  | mod == this_mod -> 
+		fst (runRnFM env (mapMaybeM renameDoc (lookup n local_doc)))
+		-- ToDo: report missing names
 	  | otherwise       -> 
 		case lookupFM mod_map mod of
 		   Nothing -> Nothing
-		   Just iface -> fmap (renameDoc env)
-				  (lookupFM (iface_name_docs iface) n)
+		   Just iface -> 
+			fst (runRnFM env (mapMaybeM renameDoc
+				     (lookupFM (iface_name_docs iface) n)))
+		-- ToDo: report missing names
 
 -- -----------------------------------------------------------------------------
 -- Build the list of items that will become the documentation, from the
@@ -230,7 +274,9 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 	= [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev str)
-	= [ ExportGroup lev (formatDocHeading (lookupForDoc env) str) ]
+	= [ ExportGroup lev doc ]
+	where (doc, _names) = formatDocHeading (lookupForDoc env) str
+	-- ToDo: report the unresolved names
     lookupExport _ = [] -- didn't find it?
 
     fullContentsOf m
@@ -242,7 +288,7 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 
     findDecl :: HsQName -> Maybe HsDecl
     findDecl (UnQual n)
-	= trace ("Warning(mkExportItems): UnQual! " ++ show n) $ Nothing
+	= Nothing	-- must be a name we couldn't resolve
     findDecl (Qual m n)
 	| m == mod  = lookupFM decl_map n
 	| otherwise = 
@@ -251,18 +297,14 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 		Nothing -> 
 		   trace ("Warning: module not found: " ++ show m) Nothing
 
-renameExportItems env items = map rn items
-  where
- 	rn (ExportGroup lev doc) 
-	   = ExportGroup lev (renameDoc env doc)
-	rn (ExportDecl decl)
-	   = ExportDecl (renameDecl env decl)
-
 fullContentsOfThisModule decls env = 
   [ mkExportItem decl | decl <- decls, keepDecl decl ]
   where mkExportItem (HsDocGroup lev str) =
-	   ExportGroup lev (formatDocHeading (lookupForDoc env) str)
-	mkExportItem decl = ExportDecl (renameDecl env decl)
+	   ExportGroup lev doc
+	  where
+	   (doc, _names) = formatDocHeading (lookupForDoc env) str
+	   -- ToDo: report the unresolved names
+	mkExportItem decl = ExportDecl decl
 
 
 keepDecl HsTypeSig{}     = True
@@ -349,78 +391,6 @@ expandDecl (HsClassDecl loc ty decls)
   = [ HsClassDecl loc ty (concat (map expandDecl decls)) ]
 expandDecl d = [ d ]
 
--- -----------------------------------------------------------------------------
--- Renaming source code
-
-renameExportList :: FiniteMap HsQName HsQName -> [HsExportSpec]
-	-> [HsExportSpec]
-renameExportList env spec = map renameExport spec
-  where
-    renameExport (HsEVar x) = HsEVar (rnLookupName env x)
-    renameExport (HsEAbs x) = HsEAbs (rnLookupName env x)
-    renameExport (HsEThingAll x) = HsEThingAll (rnLookupName env x)
-    renameExport (HsEThingWith x cs)
-	 = HsEThingWith (rnLookupName env x) (map (rnLookupName env) cs)
-    renameExport (HsEModuleContents m) = HsEModuleContents m
-    renameExport (HsEGroup lev str) = HsEGroup lev str
-
-renameDecl :: FiniteMap HsQName HsQName -> HsDecl -> HsDecl
-renameDecl scope decl
-  = case decl of
-	HsTypeDecl loc t args ty -> 
-	    HsTypeDecl loc t args (renameType scope ty)
-	HsDataDecl loc ctx t args cons drv -> 
-	    HsDataDecl loc ctx t args (map (renameConDecl scope) cons) drv
-        HsNewTypeDecl loc ctx t args con drv ->
-	    HsNewTypeDecl loc ctx t args (renameConDecl scope con) drv
-        HsClassDecl loc qt decls -> 
-	    HsClassDecl loc (renameClassHead scope qt) 
-		(map (renameDecl scope) decls)
-	HsTypeSig loc fs qt ->
-	    HsTypeSig loc fs (renameType scope qt)
-	HsForeignImport loc cc safe ent n ty ->
-	    HsForeignImport loc cc safe ent n (renameType scope ty)
-	_ -> decl
-
-renameClassHead s (HsForAllType tvs ctx ty)
-  = HsForAllType tvs (map (renamePred s) ctx) ty
-renameClassHead s ty
-  = ty
-
-renameConDecl s (HsConDecl loc nm tys maybe_doc)
-  = HsConDecl loc nm (map (renameBangTy s) tys) maybe_doc
-renameConDecl s (HsRecDecl loc nm fields maybe_doc)
-  = HsRecDecl loc nm (map (renameField s) fields) maybe_doc
-
-renameField s (HsFieldDecl ns ty doc) = HsFieldDecl ns (renameBangTy s ty) doc
-
-renameBangTy s (HsBangedTy ty) = HsBangedTy (renameType s ty)
-renameBangTy s (HsUnBangedTy ty) = HsUnBangedTy (renameType s ty)
-
-renamePred s (c,tys) = (rnLookupName s c, map (renameType s) tys)
-
-renameType s (HsForAllType tvs ctx ty)
-  = HsForAllType tvs (map (renamePred s) ctx) (renameType s ty)
-renameType s (HsTyFun arg res)
-  = HsTyFun (renameType s arg) (renameType s res)
-renameType s (HsTyTuple b tys)
-  = HsTyTuple b (map (renameType s) tys)
-renameType s (HsTyApp ty arg)
-  = HsTyApp  (renameType s ty) (renameType s arg)
-renameType s (HsTyVar nm)
-  = HsTyVar nm
-renameType s (HsTyCon nm)
-  = HsTyCon (rnLookupName s nm)
-
-rnLookupName :: FiniteMap HsQName HsQName -> HsQName -> HsQName
-rnLookupName s nm
-  = case lookupFM s nm of
-	Just n -> n
-	Nothing -> trace ("Warning: unknown name: " ++ show nm) nm
-
-renameDoc env = markup (mapIdent ident)
-  where ident id = DocIdentifier (rnLookupName env id)
-
 -----------------------------------------------------------------------------
 -- Collecting documentation and associating it with declarations
 
@@ -486,25 +456,21 @@ docsFromField (HsFieldDecl nms ty Nothing) rest
 -- description to this function to get the marked-up text.
 
 -- this one formats a heading
-formatDocHeading :: (String -> Maybe HsQName) -> DocString -> Doc
+formatDocHeading :: (String -> Maybe HsQName) -> DocString
+  -> (Doc,[String])
 formatDocHeading lookup string = format parseString lookup string
 
 -- this one formats a sequence of paragraphs
-formatDocString :: (String -> Maybe HsQName) -> DocString -> Doc
+formatDocString :: (String -> Maybe HsQName) -> DocString
+  -> (Doc,[String])
 formatDocString lookup string = format parseParas lookup string
 
 format 	:: ([Token] -> ParsedDoc)
 	-> (String -> Maybe HsQName)
 	-> DocString
-       	-> Doc
-format parse lookup string = markup (mapIdent ident) parsed_doc
-  where
-	--parsed_doc :: DocMarkup String a -> a
-	parsed_doc = parse (tokenise string)
-
-	ident str = case lookup str of
-			Just n  -> DocIdentifier n
-			Nothing -> DocString str
+       	-> (Doc, [String])
+format parse lookup string
+  = runRn lookup $ resolveDoc $ parse $ tokenise $ string
 
 -- ---------------------------------------------------------------------------
 -- Looking up names in documentation
@@ -513,7 +479,7 @@ lookupForDoc :: FiniteMap HsQName HsQName -> (String -> Maybe HsQName)
 lookupForDoc fm str
   = case [ n | Just n <- map (lookupFM fm) (strToHsQNames str) ] of
 	(n:_) -> Just n
-	[] -> trace ("Warning: unknown name: " ++ str) Nothing
+	[] -> Nothing
  
 strToHsQNames :: String -> [ HsQName ]
 strToHsQNames str
@@ -545,3 +511,8 @@ strToHsQNames str
 
 mapSnd f [] = []
 mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
+
+mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
+mapMaybeM f Nothing = return Nothing
+mapMaybeM f (Just a) = f a >>= return . Just
+
