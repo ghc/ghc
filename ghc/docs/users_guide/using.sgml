@@ -905,17 +905,23 @@ It completely defeats that purpose if the literal "1" means "<Literal>Prelude.fr
 which is what the Haskell Report specifies.  So the <Option>-fno-implicit-prelude</Option> flag causes
 the following pieces of built-in syntax to refer to whatever is in scope, not the Prelude versions:
 <ItemizedList>
-<ListItem> 
+<ListItem>
+<Para>
 Integer and fractional literals mean "<Literal>fromInteger 1</Literal>" and "<Literal>fromRational 3.2</Literal>",
 not the Prelude-qualified versions; both in expressions and in patterns.
+</Para>
 </ListItem>
 <ListItem>
+<Para>
 Negation (e.g. "<Literal>- (f x)</Literal>") means "<Literal>negate (f x)</Literal>" (not <Literal>Prelude.negate</Literal>).
+</Para>
 </ListItem>
 <ListItem>
-In an n+k pattern, the standard Prelude <Literal>OrdK/Literal> class is used for comparison, but the 
+<Para>
+In an n+k pattern, the standard Prelude <Literal>Ord</Literal> class is used for comparison, but the 
 necessary subtraction uses 
 whatever "<Literal>(-)</Literal>" is in scope (not "<Literal>Prelude.(-)</Literal>").
+</Para>
 </ListItem>
 </ItemizedList>
 </Para>
@@ -2147,6 +2153,7 @@ apply (see <Option>-funfolding-con-discount</Option>).
 <VarListEntry>
 <Term><Option>-funfolding-update-in-place&lt;n&gt;</Option>:</Term>
 <ListItem>
+<Para>
 Switches on an experimental "optimisation".  Switching it on makes the compiler
 a little keener to inline a function that returns a constructor, if the context is
 that of a thunk.

@@ -4277,7 +4277,7 @@ Now you can make a data type into an instance of Bin like this:
 </ProgramListing>
 That is, just leave off the "where" clasuse.  Of course, you can put in the
 where clause and over-ride whichever methods you please.
-
+</Para>
 
 <Sect2> <Title> Using generics </Title>
 </Sect2>
@@ -4285,13 +4285,17 @@ where clause and over-ride whichever methods you please.
 To use generics you need to
 <ItemizedList>
 <ListItem>
+<Para>
 Use the <Option>-fgenerics</Option> flag.
+</Para>
 </ListItem>
 <ListItem>
+<Para>
 Import the module <Literal>Generics</Literal> from the <Literal>lang</Literal> package.
 This import brings into scope the data types <Literal>Unit</Literal>, <Literal>:*:</Literal>, 
 and <Literal>:+:</Literal>.  (You don't need this import if you don't mention these
 types explicitly; for example, if you are simply giving instance declarations.)
+</Para>
 </ListItem>
 </ItemizedList>
 
@@ -4316,17 +4320,27 @@ A "polymorphic default method" is a default method defined as in Haskell 98.
 A "generic class declaration" is a class declaration with at least one
 generic default method.
 </Para>
+
+<Para>
 Restrictions:
 <ItemizedList>
-<ListItem> Alas, we do not yet implement the stuff about constructor names and 
+<ListItem>
+<Para>
+Alas, we do not yet implement the stuff about constructor names and 
 field labels.
+</Para>
 </ListItem>
 
-<ListItem> A generic class can have only one parameter; you can't have a generic
+<ListItem>
+<Para>
+A generic class can have only one parameter; you can't have a generic
 multi-parameter class.
+</Para>
 </ListItem>
 
-<ListItem> A default method must be defined entirely using type patterns, or entirely
+<ListItem>
+<Para>
+A default method must be defined entirely using type patterns, or entirely
 without.  So this is illegal:
 <ProgramListing>
   class Foo a where
@@ -4336,19 +4350,25 @@ without.  So this is illegal:
 </ProgramListing>
 However it is perfectly OK for some methods of a generic class to have 
 generic default methods and others to have polymorphic default methods.
+</Para>
 </ListItem>
 
-<ListItem> The type variable(s) in the type pattern for a generic method declaration
-scope over the right hand side.  So this is legal (note the use of the type variable
-"p" in a type signature on the right hand side:
+<ListItem>
+<Para>
+The type variable(s) in the type pattern for a generic method declaration
+scope over the right hand side.  So this is legal (note the use of the type variable ``p'' in a type signature on the right hand side:
 <ProgramListing>
   class Foo a where
     op :: a -> Bool
     op {| p :*: q |} (x :*: y) = op (x :: p)
     ...
 </ProgramListing>
+</Para>
+</ListItem>
 
-<ListItem> The type patterns in a generic default method must take one of the forms:
+<ListItem>
+<Para>
+The type patterns in a generic default method must take one of the forms:
 <ProgramListing>
        a :+: b
        a :*: b
@@ -4375,26 +4395,41 @@ So this too is illegal:
 </ProgramListing>
 (The reason for this restriction is that we gather all the equations for a particular type consructor
 into a single generic instance declaration.)
+</Para>
 </ListItem>
 
-<ListItem> A generic method declaration must give a case for each of the three type constructors.
+<ListItem>
+<Para>
+A generic method declaration must give a case for each of the three type constructors.
+</Para>
 </ListItem>
 
-<ListItem> In an instance declaration for a generic class, the idea is that the compiler
+<ListItem>
+<Para>
+In an instance declaration for a generic class, the idea is that the compiler
 will fill in the methods for you, based on the generic templates.  However it can only
 do so if
   <ItemizedList>
-  <ListItem> The instance type is simple (a type constructor applied to type variables, as in Haskell 98).
-	     </ListItem>
-  <ListItem> No constructor of the instance type has unboxed fields. </ListItem>
+  <ListItem>
+  <Para>
+  The instance type is simple (a type constructor applied to type variables, as in Haskell 98).
+  </Para>
+  </ListItem>
+  <ListItem>
+  <Para>
+  No constructor of the instance type has unboxed fields.
+  </Para>
+  </ListItem>
   </ItemizedList>
 (Of course, these things can only arise if you are already using GHC extensions.)
 However, you can still give an instance declarations for types which break these rules,
 provided you give explicit code to override any generic default methods.
-
+</Para>
 </ListItem>
 
 </ItemizedList>
+</Para>
+
 <Para>
 The option <Option>-ddump-deriv</Option> dumps incomprehensible stuff giving details of 
 what the compiler does with generic declarations.
@@ -4418,6 +4453,7 @@ Just to finish with, here's another example I rather like:
     tag {| a :+: b |} (Inl x) = tag x
     tag {| a :+: b |} (Inr y) = nCons (bot::a) + tag y
 </ProgramListing>
+</Para>
 </Sect2>
 </Sect1>
 
