@@ -23,38 +23,6 @@ BOOLEAN hashIds = FALSE; 	  /* Set if Identifiers should be hashed.          */
 				  
 BOOLEAN ignoreSCC = TRUE;         /* Set if we ignore/filter scc expressions.      */
 				  
-BOOLEAN implicitPrelude = TRUE;   /* Set if we implicitly import the Prelude.      */
-BOOLEAN ignorePragmas = FALSE;    /* Set if we want to ignore pragmas		   */
-
-/* From time to time, the format of interface files may change.
-
-   So that we don't get gratuitous syntax errors or silently slurp in
-   junk info, two things: (a) the compiler injects a "this is a
-   version N interface":
-
-	{-# GHC_PRAGMA INTERFACE VERSION <n> #-}
-
-   (b) this parser has a "minimum acceptable version", below which it
-   refuses to parse the pragmas (it just considers them as comments).
-   It also has a "maximum acceptable version", above which...
-
-   The minimum is so a new parser won't try to grok overly-old
-   interfaces; the maximum (usually the current version number when
-   the parser was released) is so an old parser will not try to grok
-   since-upgraded interfaces.
-
-   If an interface has no INTERFACE VERSION line, it is taken to be
-   version 0.
-*/
-int minAcceptablePragmaVersion = 7;  /* 1.3-xx ONLY */
-int maxAcceptablePragmaVersion = 7;  /* 1.3-xx+ */
-int thisIfacePragmaVersion = 0;
-
-char *input_file_dir; /* The directory where the input file is. */
-
-char HiSuffix[64] = ".hi";		/* can be changed with -h flag */
-char PreludeHiSuffix[64] = ".hi";	/* can be changed with -g flag */
-
 static BOOLEAN verbose = FALSE;		/* Set for verbose messages. */
 
 /* Forward decls */
@@ -80,9 +48,6 @@ process_args(argc,argv)
 {
     BOOLEAN keep_munging_option = FALSE;
 
-    imports_dirlist     = mklnil();
-    sys_imports_dirlist = mklnil();
-
     argc--, argv++;
 
     while (argc > 0 && argv[0][0] == '-') {
@@ -91,28 +56,6 @@ process_args(argc,argv)
 
 	while (keep_munging_option && *++*argv != '\0') {
 	    switch(**argv) {
-
-	    /* -I dir */
-	    case 'I':
-		    imports_dirlist = lapp(imports_dirlist,*argv+1);
-		    keep_munging_option = FALSE;
-		    break;
-
-	    /* -J dir (for system imports) */
-	    case 'J':
-		    sys_imports_dirlist = lapp(sys_imports_dirlist,*argv+1);
-		    keep_munging_option = FALSE;
-		    break;
-
-	    case 'g':
-		    strcpy(PreludeHiSuffix, *argv+1);
-		    keep_munging_option = FALSE;
-		    break;
-
-	    case 'h':
-		    strcpy(HiSuffix, *argv+1);
-		    keep_munging_option = FALSE;
-		    break;
 
 	    case 'v':
 		    who_am_i(); /* identify myself */
@@ -130,14 +73,6 @@ process_args(argc,argv)
 
 	    case 'S':
 		    ignoreSCC = FALSE;
-		    break;
-
-	    case 'p':
-		    ignorePragmas = TRUE;
-		    break;
-
-	    case 'P':
-		    implicitPrelude = FALSE;
 		    break;
 
 	    case 'D':
@@ -172,41 +107,11 @@ process_args(argc,argv)
 	    exit(1);
     }
 
-
-    /* By default, imports come from the directory of the source file */
-    if ( argc >= 1 ) 
-      { 
-	char *endchar;
-
-	input_file_dir = xmalloc (strlen(argv[0]) + 1);
-	strcpy(input_file_dir, argv[0]);
-#ifdef macintosh
-	endchar = rindex(input_file_dir, (int) ':');
-#else
-	endchar = rindex(input_file_dir, (int) '/');
-#endif /* ! macintosh */
-
-	if ( endchar == NULL ) 
-	  {
-	    free(input_file_dir);
-	    input_file_dir = ".";
-	  } 
-	else
-	  *endchar = '\0';
-      } 
-
-    /* No input file -- imports come from the current directory first */
-    else
-      input_file_dir = ".";
-
-    imports_dirlist = mklcons( input_file_dir, imports_dirlist );
-
-    if (verbose)
-      {
+    if (verbose) {
 	fprintf(stderr,"Hash Table Contains %d entries\n",hash_table_size);
 	if(acceptPrim)
 	  fprintf(stderr,"Allowing special syntax for Unboxed Values\n");
-      }
+    }
 }
 
 void

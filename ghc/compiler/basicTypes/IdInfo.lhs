@@ -422,7 +422,7 @@ instance OptIdInfo (MatchEnv [Type] CoreExpr) where
       = ppSpecs sty True better_id_fn nullIdEnv (mEnvToList spec)
 
 ppSpecs sty print_spec_id_info better_id_fn inline_env spec_env
-  = panic "IdInfo:ppSpecs"
+  = if null spec_env then ppNil else panic "IdInfo:ppSpecs"
 \end{code}
 
 %************************************************************************

@@ -112,12 +112,15 @@ pprMatch sty is_case first_match
     (row_of_pats, grhss_etc_stuff) = ppr_match sty is_case first_match
 
     ppr_match sty is_case (PatMatch pat match)
-     = (pat:pats, grhss_stuff)
-     where
+      = (pat:pats, grhss_stuff)
+      where
 	(pats, grhss_stuff) = ppr_match sty is_case match
 
     ppr_match sty is_case (GRHSMatch grhss_n_binds)
-     = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
+      = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
+
+    ppr_match sty is_case (SimpleMatch expr)
+      = ([], ppr sty expr)
 
 ----------------------------------------------------------
 

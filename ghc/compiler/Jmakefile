@@ -114,6 +114,8 @@ types/Type.lhs			\
 \
 specialise/SpecEnv.lhs
 
+#define RENAMERSRCS_HS \
+rename/ParseIface.hs
 
 #define RENAMERSRCS_LHS \
 rename/RnHsSyn.lhs \
@@ -344,7 +346,7 @@ profiling/CostCentre.lhs \
 simplCore/BinderInfo.lhs \
 simplCore/MagicUFs.lhs
 
-ALLSRCS_HS = READERSRCS_HS
+ALLSRCS_HS = READERSRCS_HS RENAMERSRCS_HS
 ALLSRCS_LHS = /* all pieces of the compiler */ \
 VBASICSRCS_LHS		\
 NOT_SO_BASICSRCS_LHS	\
@@ -503,6 +505,10 @@ typecheck/TcLoop.hi : typecheck/TcLoop.lhi
 types/TyLoop.hi : types/TyLoop.lhi
 	$(GHC_UNLIT) types/TyLoop.lhi types/TyLoop.hi
 
+rename/ParseIface.hs : rename/ParseIface.y
+	$(RM) rename/ParseIface.hs
+	happy -g rename/ParseIface.y
+
 compile(absCSyn/AbsCUtils,lhs,)
 compile(absCSyn/CStrings,lhs,)
 compile(absCSyn/CLabel,lhs,)
@@ -615,6 +621,7 @@ compile(reader/PrefixToHs,lhs,)
 compile(reader/ReadPrefix,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser '-#include"hspincl.h"'))
 compile(reader/RdrHsSyn,lhs,)
 
+compile(rename/ParseIface,hs,)
 compile(rename/RnHsSyn,lhs,)
 compile(rename/RnMonad,lhs,)
 compile(rename/Rename,lhs,)
@@ -759,7 +766,6 @@ HSP_SRCS_C =    parser/constr.c		\
 		parser/hslexer.c	\
 		parser/hsparser.tab.c	\
 		parser/id.c		\
-		parser/import_dirlist.c	\
 		parser/infix.c		\
 		parser/list.c		\
 		parser/literal.c	\
@@ -779,7 +785,6 @@ HSP_OBJS_O =    parser/constr.o		\
 		parser/hslexer.o	\
 		parser/hsparser.tab.o	\
 		parser/id.o		\
-		parser/import_dirlist.o	\
 		parser/infix.o		\
 		parser/list.o		\
 		parser/literal.o	\
@@ -800,7 +805,6 @@ REAL_HSP_SRCS_C = parser/main.c 	\
 		parser/util.c 		\
 		parser/syntax.c 	\
 		parser/type2context.c 	\
-		parser/import_dirlist.c \
 		parser/infix.c 		\
 		parser/printtree.c
 

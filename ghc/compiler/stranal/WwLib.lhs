@@ -19,13 +19,13 @@ import Id		( idType, mkSysLocal, dataConArgTys )
 import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
 import PrelInfo		( aBSENT_ERROR_ID )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( isPrimType, mkTyVarTys, mkFunTys, maybeAppDataTyCon )
+import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
+			  maybeAppDataTyCon
+			)
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
 			  getUniques, UniqSM(..)
 			)
 import Util		( zipWithEqual, assertPanic, panic )
-
-quantifyTy = panic "WwLib.quantifyTy"
 \end{code}
 
 %************************************************************************
@@ -224,9 +224,8 @@ mkWwBodies body_ty tyvars args arg_infos
 			)
 
 	worker_ty_w_hole = \ body_ty ->
-				snd (quantifyTy tyvars (
+				mkForAllTys tyvars $
 				mkFunTys (map idType work_args) body_ty
-			   ))
     in
     returnUs (Just (wrapper_w_hole, worker_w_hole, wrkr_strictness, worker_ty_w_hole))
   where

@@ -49,9 +49,7 @@ import CLabel		( mkClosureLabel, mkConUpdCodePtrVecLabel,
 			  mkErrorStdEntryLabel, mkRednCountsLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
-import CmdLineOpts	( opt_EmitArityChecks, opt_ForConcurrent,
-			  opt_AsmTarget
-			)
+import CmdLineOpts	( opt_EmitArityChecks, opt_ForConcurrent )
 import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  noCostCentreAttached, costsAreSubsumed,
 			  isCafCC, overheadCostCentre
@@ -436,7 +434,6 @@ closureCodeBody binder_info closure_info cc all_args body
     let
 	do_arity_chks = opt_EmitArityChecks
 	is_concurrent = opt_ForConcurrent
-	native_code   = opt_AsmTarget
 
 	stg_arity = length all_args
 

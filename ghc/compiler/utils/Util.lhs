@@ -40,6 +40,7 @@ module Util (
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy,
 	nOfThem, lengthExceeds, isSingleton,
+	startsWith, endsWith,
 #if defined(COMPILING_GHC)
 	isIn, isn'tIn,
 #endif
@@ -196,6 +197,17 @@ isSingleton :: [a] -> Bool
 
 isSingleton [x] = True
 isSingleton  _  = False
+
+startsWith, endsWith :: String -> String -> Maybe String
+
+startsWith []     str = Just str
+startsWith (c:cs) (s:ss)
+  = if c /= s then Nothing else startsWith cs ss
+
+endsWith cs ss
+  = case (startsWith (reverse cs) (reverse ss)) of
+      Nothing -> Nothing
+      Just rs -> Just (reverse rs)
 \end{code}
 
 Debugging/specialising versions of \tr{elem} and \tr{notElem}

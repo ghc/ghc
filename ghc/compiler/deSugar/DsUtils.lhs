@@ -46,15 +46,13 @@ import Id		( idType, dataConArgTys, mkTupleCon,
 			  DataCon(..), DictVar(..), Id(..), GenId )
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon )
-import Type		( mkTyVarTys, mkRhoTy, mkFunTys, isUnboxedType,
-			  applyTyCon, getAppDataTyCon
+import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
+			  isUnboxedType, applyTyCon, getAppDataTyCon
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic )
 
-quantifyTy = panic "DsUtils.quantifyTy"
 splitDictType = panic "DsUtils.splitDictType"
-mkCoTyApps = panic "DsUtils.mkCoTyApps"
 \end{code}
 
 %************************************************************************
@@ -417,10 +415,10 @@ mkTupleBind tyvars dicts local_global_prs tuple_expr
 
     tuple_var_ty :: Type
     tuple_var_ty
-      = case (quantifyTy tyvars (mkRhoTy theta
-				  (applyTyCon (mkTupleTyCon no_of_binders)
-					      (map idType locals)))) of
-	  (_{-tossed templates-}, ty) -> ty
+      = mkForAllTys tyvars $
+	mkRhoTy theta	   $
+	applyTyCon (mkTupleTyCon no_of_binders)
+		   (map idType locals)
       where
 	theta = map (splitDictType . idType) dicts
 
@@ -434,16 +432,13 @@ mkTupleBind tyvars dicts local_global_prs tuple_expr
 	returnDs (
 	    global,
 	    mkLam tyvars dicts (
-		mkTupleSelector (mkApp_XX (mkCoTyApps tuple_var_expr tyvar_tys) dicts)
-				binders selected)
+		mkTupleSelector
+		    (mkValApp (mkTyApp tuple_var_expr tyvar_tys)
+			      (map VarArg dicts))
+		    binders
+		    selected)
 	)
-
-mkApp_XX :: CoreExpr -> [Id] -> CoreExpr
-mkApp_XX expr []	 = expr
-mkApp_XX expr (id:ids) = mkApp_XX (App expr (VarArg id)) ids
 \end{code}
-
-
 
 @mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
 has only one element, it is the identity function.

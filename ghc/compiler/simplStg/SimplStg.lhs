@@ -112,10 +112,10 @@ stg2stg stg_todos module_name ppr_style us binds
     (do_unlocalising, unlocal_tag)
       = case (opt_EnsureSplittableC) of
 	      Nothing  -> (False, panic "tag")
-	      Just tag -> (True,  tag)
+	      Just tag -> (True,  _PK_ tag)
 
     grp_name  = case (opt_SccGroup) of
-		  Just xx -> xx
+		  Just xx -> _PK_ xx
 		  Nothing -> module_name -- default: module name
 
     -------------

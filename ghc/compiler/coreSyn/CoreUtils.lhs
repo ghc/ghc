@@ -54,7 +54,7 @@ import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
 			)
 import UniqSupply	( initUs, returnUs, thenUs,
-			  mapUs, mapAndUnzipUs,
+			  mapUs, mapAndUnzipUs, getUnique,
 			  UniqSM(..), UniqSupply
 			)
 import Usage		( UVar(..) )
@@ -172,32 +172,10 @@ For making @Apps@ and @Lets@, we must take appropriate evasive
 action if the thing being bound has unboxed type.  @mkCoApp@ requires
 a name supply to do its work.
 
-@mkCoApp@, @mkCoCon@ and @mkCoPrim@ also handle the
+@mkCoApps@, @mkCoCon@ and @mkCoPrim@ also handle the
 arguments-must-be-atoms constraint.
 
 \begin{code}
-{- LATER:
---mkCoApp :: CoreExpr -> CoreExpr -> UniqSM CoreExpr
-
-mkCoApp e1 (Var v) = returnUs (App e1 (VarArg v))
-mkCoApp e1 (Lit l) = returnUs (App e1 (LitArg l))
-mkCoApp e1 e2
-  = let
-	e2_ty = coreExprType e2
-    in
-    panic "getUnique"	`thenUs` \ uniq ->
-    let
-	new_var = mkSysLocal SLIT("a") uniq e2_ty mkUnknownSrcLoc
-    in
-    returnUs (
-    	mkCoLetUnboxedToCase (NonRec new_var e2)
-			     (App e1 (VarArg new_var))
-    )
--}
-\end{code}
-
-\begin{code}
-{-
 data CoreArgOrExpr
   = AnArg   CoreArg
   | AnExpr  CoreExpr
@@ -206,30 +184,33 @@ mkCoApps :: CoreExpr -> [CoreArgOrExpr] -> UniqSM CoreExpr
 mkCoCon  :: Id       -> [CoreArgOrExpr] -> UniqSM CoreExpr
 mkCoPrim :: PrimOp   -> [CoreArgOrExpr] -> UniqSM CoreExpr
 
-mkCoApps fun args = mkCoThing (Con con) args
-mkCoCon  con args = mkCoThing (Con con) args
-mkCoPrim  op args = mkCoThing (Prim op) args
+mkCoApps fun args = co_thing (mkGenApp fun) args
+mkCoCon  con args = co_thing (Con  con)     args
+mkCoPrim  op args = co_thing (Prim op)      args 
 
-mkCoThing thing arg_exprs
+co_thing :: ([CoreArg] -> CoreExpr)
+	 -> [CoreArgOrExpr]
+	 -> UniqSM CoreExpr
+
+co_thing thing arg_exprs
   = mapAndUnzipUs expr_to_arg arg_exprs `thenUs` \ (args, maybe_binds) ->
     returnUs (mkCoLetsUnboxedToCase (catMaybes maybe_binds) (thing args))
   where
-    expr_to_arg :: CoreExpr
-	       -> UniqSM (CoreArg, Maybe CoreBinding)
+    expr_to_arg :: CoreArgOrExpr
+		-> UniqSM (CoreArg, Maybe CoreBinding)
 
-    expr_to_arg (Var v) = returnUs (VarArg v, Nothing)
-    expr_to_arg (Lit l) = returnUs (LitArg l, Nothing)
-    expr_to_arg other_expr
+    expr_to_arg (AnArg  arg)     = returnUs (arg,      Nothing)
+    expr_to_arg (AnExpr (Var v)) = returnUs (VarArg v, Nothing)
+    expr_to_arg (AnExpr (Lit l)) = returnUs (LitArg l, Nothing)
+    expr_to_arg (AnExpr other_expr)
       = let
 	    e_ty = coreExprType other_expr
 	in
-	panic "getUnique" `thenUs` \ uniq ->
+	getUnique `thenUs` \ uniq ->
 	let
 	    new_var  = mkSysLocal SLIT("a") uniq e_ty mkUnknownSrcLoc
-	    new_atom = VarArg new_var
 	in
-	returnUs (new_atom, Just (NonRec new_var other_expr))
--}
+	returnUs (VarArg new_var, Just (NonRec new_var other_expr))
 \end{code}
 
 \begin{code}
@@ -242,18 +223,6 @@ argToExpr (LitArg lit) = Lit lit
 
 \begin{code}
 {- LATER:
---mkCoApps ::
---  GenCoreExpr val_bdr val_occ tyvar uvar ->
---  [GenCoreExpr val_bdr val_occ tyvar uvar] ->
---  UniqSM(GenCoreExpr val_bdr val_occ tyvar uvar)
-
-mkCoApps fun []  = returnUs fun
-mkCoApps fun (arg:args)
-  = mkCoApp fun arg `thenUs` \ new_fun ->
-    mkCoApps new_fun args
-\end{code}
-
-\begin{code}
 exprSmallEnoughToDup :: GenCoreExpr binder Id -> Bool
 
 exprSmallEnoughToDup (Con _ _ _)   = True	-- Could check # of args
@@ -713,18 +682,19 @@ do_CoreBinding venv tenv (Rec binds)
 do_CoreArg :: ValEnv
 	    -> TypeEnv
 	    -> CoreArg
-	    -> UniqSM CoreExpr
+	    -> UniqSM CoreArgOrExpr
 
-do_CoreArg venv tenv (LitArg lit)     = returnUs (Lit lit)
-do_CoreArg venv tenv (TyArg ty)	      = panic "do_CoreArg: TyArg"
-do_CoreArg venv tenv (UsageArg usage) = panic "do_CoreArg: UsageArg"
-do_CoreArg venv tenv (VarArg v)
+do_CoreArg venv tenv a@(VarArg v)
   = returnUs (
       case (lookupIdEnv venv v) of
-	Nothing   -> --false:ASSERT(toplevelishId v)
-		     Var v
-	Just expr -> expr
+	Nothing   -> AnArg  a
+	Just expr -> AnExpr expr
     )
+
+do_CoreArg venv tenv (TyArg ty)
+  = returnUs (AnArg (TyArg (applyTypeEnvToTy tenv ty)))
+
+do_CoreArg venv tenv other_arg = returnUs (AnArg other_arg)
 \end{code}
 
 \begin{code}
@@ -744,15 +714,10 @@ do_CoreExpr venv tenv orig_expr@(Var var)
 do_CoreExpr venv tenv e@(Lit _) = returnUs e
 
 do_CoreExpr venv tenv (Con con as)
-  = panic "CoreUtils.do_CoreExpr:Con"
-{- LATER:
   = mapUs  (do_CoreArg venv tenv) as `thenUs`  \ new_as ->
     mkCoCon con new_as
--}
 
 do_CoreExpr venv tenv (Prim op as)
-  = panic "CoreUtils.do_CoreExpr:Prim"
-{- LATER:
   = mapUs  (do_CoreArg venv tenv) as 	`thenUs`  \ new_as ->
     do_PrimOp op			`thenUs`  \ new_op ->
     mkCoPrim new_op new_as
@@ -765,7 +730,6 @@ do_CoreExpr venv tenv (Prim op as)
 	returnUs (CCallOp label is_asm may_gc new_arg_tys new_result_ty)
 
     do_PrimOp other_op = returnUs other_op
--}
 
 do_CoreExpr venv tenv (Lam binder expr)
   = dup_binder tenv binder `thenUs` \(new_binder, (old,new)) ->
@@ -774,12 +738,9 @@ do_CoreExpr venv tenv (Lam binder expr)
     returnUs (Lam new_binder new_expr)
 
 do_CoreExpr venv tenv (App expr arg)
-  = panic "CoreUtils.do_CoreExpr:App"
-{-
   = do_CoreExpr venv tenv expr	`thenUs` \ new_expr ->
     do_CoreArg  venv tenv arg   `thenUs` \ new_arg  ->
-    mkCoApp new_expr new_arg
--}
+    mkCoApps new_expr [new_arg] -- ToDo: more efficiently?
 
 do_CoreExpr venv tenv (Case expr alts)
   = do_CoreExpr venv tenv expr	    `thenUs` \ new_expr ->

@@ -90,7 +90,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
   where
     -----------------
     grp_name  = case opt_SccGroup of
-		  Just xx -> xx
+		  Just xx -> _PK_ xx
 		  Nothing -> mod_name	-- default: module name
 
     -----------------

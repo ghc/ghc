@@ -45,11 +45,6 @@ hspmain()
     process_args(hsp_argc, hsp_argv); /* HACK */
 
     hash_init();
-
-#ifdef HSP_DEBUG
-    fprintf(stderr,"input_file_dir=%s\n",input_file_dir);
-#endif
-
     yyinit();
 
     if (yyparse() != 0) {

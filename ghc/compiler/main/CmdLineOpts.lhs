@@ -14,7 +14,7 @@ import Argv
 CHK_Ubiq() -- debugging consistency check
 
 import Maybes		( assocMaybe, firstJust, maybeToBool, Maybe(..) )
-import Util		( panic, panic#, assertPanic )
+import Util		( startsWith, panic, panic#, assertPanic )
 \end{code}
 
 A command-line {\em switch} is (generally) either on or off; e.g., the
@@ -140,30 +140,19 @@ data SimplifierSwitch
 
 \begin{code}
 lookup	   :: FAST_STRING -> Bool
-lookup_int :: FAST_STRING -> Maybe Int
-lookup_str :: FAST_STRING -> Maybe FAST_STRING 
+lookup_int :: String -> Maybe Int
+lookup_str :: String -> Maybe String
 
 lookup     sw = maybeToBool (assoc_opts sw)
 	
-lookup_str sw = let
-		    unpk_sw = _UNPK_ sw
-		in
-		case (firstJust (map (starts_with unpk_sw) unpacked_opts)) of
-		  Nothing -> Nothing
-		  Just xx -> Just (_PK_ xx)
+lookup_str sw = firstJust (map (startsWith sw) unpacked_opts)
 
 lookup_int sw = case (lookup_str sw) of
 		  Nothing -> Nothing
-		  Just xx -> Just (read (_UNPK_ xx))
+		  Just xx -> Just (read xx)
 
 assoc_opts    = assocMaybe [ (a, True) | a <- argv ]
 unpacked_opts = map _UNPK_ argv
-
-starts_with :: String -> String -> Maybe String
-
-starts_with []     str = Just str
-starts_with (c:cs) (s:ss)
-  = if c /= s then Nothing else starts_with cs ss
 \end{code}
 
 \begin{code}
@@ -229,16 +218,40 @@ opt_SpecialiseUnboxed		= lookup  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookup  SLIT("-flet-no-escape")
 opt_UseGetMentionedVars		= lookup  SLIT("-fuse-get-mentioned-vars")
 opt_Verbose			= lookup  SLIT("-v")
-opt_AsmTarget 			= lookup_str SLIT("-fasm-")
-opt_SccGroup  			= lookup_str SLIT("-G")
-opt_ProduceC  			= lookup_str SLIT("-C")
-opt_ProduceS  			= lookup_str SLIT("-S")
-opt_ProduceHi 			= lookup_str SLIT("-hi")
-opt_EnsureSplittableC		= lookup_str SLIT("-fglobalise-toplev-names")
-opt_UnfoldingUseThreshold	= lookup_int SLIT("-funfolding-use-threshold")
-opt_UnfoldingCreationThreshold	= lookup_int SLIT("-funfolding-creation-threshold")
-opt_UnfoldingOverrideThreshold	= lookup_int SLIT("-funfolding-override-threshold")
-opt_ReturnInRegsThreshold	= lookup_int SLIT("-freturn-in-regs-threshold")
+opt_AsmTarget 			= lookup_str "-fasm="
+opt_SccGroup  			= lookup_str "-G="
+opt_ProduceC  			= lookup_str "-C="
+opt_ProduceS  			= lookup_str "-S="
+opt_ProduceHi 			= lookup_str "-hifile="
+opt_ProduceHu 			= lookup_str "-hufile="
+opt_EnsureSplittableC		= lookup_str "-fglobalise-toplev-names="
+opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
+opt_UnfoldingCreationThreshold	= lookup_int "-funfolding-creation-threshold"
+opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
+opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
+
+opt_NoImplicitPrelude		= lookup  SLIT("-fno-implicit-prelude")
+opt_IgnoreIfacePragmas		= lookup  SLIT("-fignore-interface-pragmas")
+
+opt_HiSuffix	 = case (lookup_str "-hisuffix=")    of { Nothing -> ".hi" ; Just x -> x }
+opt_SysHiSuffix	 = case (lookup_str "-syshisuffix=") of { Nothing -> ".hi" ; Just x -> x }
+
+opt_HiDirList	 = get_dir_list "-i="
+opt_SysHiDirList = get_dir_list "-j="
+
+get_dir_list tag
+  = case (lookup_str tag) of
+      Nothing -> [{-no dirs to search???-}]
+      Just xs -> colon_split xs "" [] -- character and dir accumulators, both reversed...
+  where
+    colon_split []	   cacc dacc = reverse (reverse cacc : dacc)
+    colon_split (':' : xs) cacc dacc = colon_split xs "" (reverse cacc : dacc)
+    colon_split ( x  : xs) cacc dacc = colon_split xs (x : cacc) dacc
+
+-- -hisuf, -hisuf-prelude
+-- -fno-implicit-prelude
+-- -fignore-interface-pragmas
+-- importdirs and sysimport dirs
 \end{code}
 
 \begin{code}
@@ -348,9 +361,9 @@ classifyOpts = sep argv [] [] -- accumulators...
 	    | starts_with_suut -> SIMPL_SW(SimplUnfoldingUseThreshold (read after_suut))
 	    | starts_with_suct -> SIMPL_SW(SimplUnfoldingCreationThreshold (read after_suct))
 	   where
-	    maybe_suut		= starts_with "-fsimpl-uf-use-threshold"      o
-	    maybe_suct		= starts_with "-fsimpl-uf-creation-threshold" o
-	    maybe_msi		= starts_with "-fmax-simplifier-iterations"   o
+	    maybe_suut		= startsWith "-fsimpl-uf-use-threshold"      o
+	    maybe_suct		= startsWith "-fsimpl-uf-creation-threshold" o
+	    maybe_msi		= startsWith "-fmax-simplifier-iterations"   o
 	    starts_with_suut	= maybeToBool maybe_suut
 	    starts_with_suct	= maybeToBool maybe_suct
 	    starts_with_msi	= maybeToBool maybe_msi

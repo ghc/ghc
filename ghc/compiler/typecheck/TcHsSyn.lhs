@@ -255,6 +255,10 @@ zonkMatch (GRHSMatch grhss_w_binds)
   = zonkGRHSsAndBinds grhss_w_binds `thenNF_Tc` \ new_grhss_w_binds ->
     returnNF_Tc (GRHSMatch new_grhss_w_binds)
 
+zonkMatch (SimpleMatch expr)
+  = zonkExpr expr   `thenNF_Tc` \ new_expr ->
+    returnNF_Tc (SimpleMatch new_expr)
+
 -------------------------------------------------------------------------
 zonkGRHSsAndBinds :: TcGRHSsAndBinds s
 		   -> NF_TcM s TypecheckedGRHSsAndBinds
@@ -309,6 +313,9 @@ zonkExpr (OpApp e1 op e2)
     zonkExpr e2	`thenNF_Tc` \ new_e2 ->
     returnNF_Tc (OpApp new_e1 new_op new_e2)
 
+zonkExpr (NegApp _) = panic "zonkExpr:NegApp"
+zonkExpr (HsPar _)  = panic "zonkExpr:HsPar"
+
 zonkExpr (SectionL expr op)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
     zonkExpr op		`thenNF_Tc` \ new_op ->
@@ -319,24 +326,23 @@ zonkExpr (SectionR op expr)
     zonkExpr expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (SectionR new_op new_expr)
 
-zonkExpr (CCall fun args may_gc is_casm result_ty)
-  = mapNF_Tc zonkExpr args 	`thenNF_Tc` \ new_args ->
-    zonkTcTypeToType result_ty	`thenNF_Tc` \ new_result_ty ->
-    returnNF_Tc (CCall fun new_args may_gc is_casm new_result_ty)
-
-zonkExpr (HsSCC label expr)
-  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsSCC label new_expr)
-
 zonkExpr (HsCase expr ms src_loc)
   = zonkExpr expr    	    `thenNF_Tc` \ new_expr ->
     mapNF_Tc zonkMatch ms   `thenNF_Tc` \ new_ms ->
     returnNF_Tc (HsCase new_expr new_ms src_loc)
 
+zonkExpr (HsIf e1 e2 e3 src_loc)
+  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
+    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
+    zonkExpr e3	`thenNF_Tc` \ new_e3 ->
+    returnNF_Tc (HsIf new_e1 new_e2 new_e3 src_loc)
+
 zonkExpr (HsLet binds expr)
   = zonkBinds binds	`thenNF_Tc` \ new_binds ->
     zonkExpr expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsLet new_binds new_expr)
+
+zonkExpr (HsDo _ _) = panic "zonkExpr:HsDo"
 
 zonkExpr (HsDoOut stmts m_id mz_id src_loc)
   = zonkStmts stmts 	`thenNF_Tc` \ new_stmts ->
@@ -349,7 +355,7 @@ zonkExpr (ListComp expr quals)
     zonkQuals quals	`thenNF_Tc` \ new_quals ->
     returnNF_Tc (ListComp new_expr new_quals)
 
---ExplicitList: not in typechecked exprs
+zonkExpr (ExplicitList _) = panic "zonkExpr:ExplicitList"
 
 zonkExpr (ExplicitListOut ty exprs)
   = zonkTcTypeToType  ty	`thenNF_Tc` \ new_ty ->
@@ -364,17 +370,25 @@ zonkExpr (RecordCon con rbinds)
   = panic "zonkExpr:RecordCon"
 zonkExpr (RecordUpd exp rbinds)
   = panic "zonkExpr:RecordUpd"
+zonkExpr (RecordUpdOut exp ids rbinds)
+  = panic "zonkExpr:RecordUpdOut"
 
-zonkExpr (HsIf e1 e2 e3 src_loc)
-  = zonkExpr e1	`thenNF_Tc` \ new_e1 ->
-    zonkExpr e2	`thenNF_Tc` \ new_e2 ->
-    zonkExpr e3	`thenNF_Tc` \ new_e3 ->
-    returnNF_Tc (HsIf new_e1 new_e2 new_e3 src_loc)
+zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
+zonkExpr (ArithSeqIn _) = panic "zonkExpr:ArithSeqIn"
 
 zonkExpr (ArithSeqOut expr info)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
     zonkArithSeq info	`thenNF_Tc` \ new_info ->
     returnNF_Tc (ArithSeqOut new_expr new_info)
+
+zonkExpr (CCall fun args may_gc is_casm result_ty)
+  = mapNF_Tc zonkExpr args 	`thenNF_Tc` \ new_args ->
+    zonkTcTypeToType result_ty	`thenNF_Tc` \ new_result_ty ->
+    returnNF_Tc (CCall fun new_args may_gc is_casm new_result_ty)
+
+zonkExpr (HsSCC label expr)
+  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
+    returnNF_Tc (HsSCC label new_expr)
 
 zonkExpr (TyLam tyvars expr)
   = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
@@ -410,6 +424,11 @@ zonkExpr (Dictionary dicts methods)
 zonkExpr (SingleDict name)
   = zonkId name  	`thenNF_Tc` \ new_name ->
     returnNF_Tc (SingleDict new_name)
+
+zonkExpr (HsCon con tys vargs)
+  = mapNF_Tc zonkTcTypeToType tys `thenNF_Tc` \ new_tys   ->
+    mapNF_Tc zonkExpr vargs	  `thenNF_Tc` \ new_vargs ->
+    returnNF_Tc (HsCon con new_tys new_vargs)
 
 -------------------------------------------------------------------------
 zonkArithSeq :: TcArithSeqInfo s -> NF_TcM s TypecheckedArithSeqInfo

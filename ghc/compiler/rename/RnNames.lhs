@@ -19,8 +19,9 @@ import HsSyn
 import RdrHsSyn
 import RnHsSyn
 
+import ParseIface	( ParsedIface )
 import RnMonad
-import RnIfaces		( IfaceCache(..), cacheInterface, ParsedIface )
+import RnIfaces		( IfaceCache(..), cachedIface )
 import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv, qualNameErr, dupNamesErr )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags, mapBag, listToBag, bagToList )

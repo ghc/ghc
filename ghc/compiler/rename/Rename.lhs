@@ -16,14 +16,16 @@ import HsSyn
 import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
 import RnHsSyn		( RnName, RenamedHsModule(..), isRnTyCon, isRnClass )
 
+import ParseIface	( ParsedIface )
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
-import RnIfaces		( findHiFiles, rnInterfaces, finalIfaceInfo, VersionInfo(..), ParsedIface )
+import RnIfaces		( findHiFiles, rnIfaces, finalIfaceInfo, VersionInfo(..) )
 import RnUtils		( extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
 import MainMonad
 
 import Bag		( isEmptyBag, unionBags, bagToList, listToBag )
+import CmdLineOpts	( opt_HiDirList, opt_SysHiDirList )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM )
 import Name		( getOrigNameRdr, isLocallyDefined, Name, RdrName(..) )
@@ -31,8 +33,6 @@ import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( panic, assertPanic )
-
-opt_HiDirList = panic "opt_HiDirList"
 \end{code}
 
 \begin{code}
@@ -62,8 +62,9 @@ ToDo: Deal with instances (instance version, this module on instance list ???)
 \begin{code}
 renameModule b_names b_keys us
    	     input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
-  = findHiFiles opt_HiDirList	`thenPrimIO` \ hi_files ->
-    newVar (emptyFM, hi_files)	`thenPrimIO` \ iface_var ->
+
+  = findHiFiles opt_HiDirList opt_SysHiDirList	`thenMn`     \ hi_files ->
+    newVar (emptyFM, hi_files)			`thenPrimIO` \ iface_var ->
 
     fixPrimIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
     let
@@ -127,7 +128,7 @@ renameModule b_names b_keys us
 	-- ToDo: Do we need top-level names from this module in orig_env ???
     in
     ASSERT (isEmptyBag orig_dups)
-    rnInterfaces iface_var orig_env us3 rn_module imports_used
+    rnIfaces iface_var orig_env us3 rn_module imports_used
 		`thenPrimIO` \ (rn_module_with_imports,
 				(implicit_val_fm, implicit_tc_fm),
 				iface_errs, iface_warns) ->

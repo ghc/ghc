@@ -36,7 +36,7 @@ import Id		( idType, mkSysLocal, toplevelishId,
 			)
 import Pretty		( ppStr, ppBesides, ppChar, ppInt )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( isPrimType, mkTyVarTys )
+import Type		( isPrimType, mkTyVarTys, mkForAllTys )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
 			  tyVarSetToList,
@@ -49,7 +49,6 @@ import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 import Usage		( UVar(..) )
 import Util		( mapAccumL, zipWithEqual, panic, assertPanic )
 
-quantifyTy     = panic "SetLevels.quantifyTy (ToDo)"
 isLeakFreeType = panic "SetLevels.isLeakFreeType (ToDo)"
 \end{code}
 
@@ -514,7 +513,7 @@ abstractWrtTyVars offending_tyvars ty (venv,tenv) lvl expr
     in
     returnLvl final_expr
   where
-    poly_ty 	    = snd (quantifyTy offending_tyvars ty)
+    poly_ty = mkForAllTys offending_tyvars ty
 
 	-- These defns are just like those in the TyLam case of lvlExpr
     (incd_lvl, tyvar_lvls) = mapAccumL next (unTopify lvl) offending_tyvars
@@ -648,9 +647,7 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
 	| otherwise 			       = []
 
     offending_tyvar_tys = mkTyVarTys offending_tyvars
-    poly_tys 	        = [ snd (quantifyTy offending_tyvars ty)
-			  | ty <- tys
-			  ]
+    poly_tys = map (mkForAllTys offending_tyvars) tys
 
     offending tyvar = ids_only_lvl `ltLvl` tyvarLevel tenv tyvar
 \end{code}

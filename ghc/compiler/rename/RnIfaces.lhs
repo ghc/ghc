@@ -8,19 +8,20 @@
 
 module RnIfaces (
 	findHiFiles,
-	cacheInterface,
-	readInterface,
-	rnInterfaces,
+	cachedIface,
+	readIface,
+	rnIfaces,
 	finalIfaceInfo,
 	IfaceCache(..),
-	VersionInfo(..),
-	ParsedIface(..)
+	VersionInfo(..)
     ) where
 
-import PreludeGlaST	( returnPrimIO, thenPrimIO,
-			  readVar, writeVar, MutableVar(..) )
-
 import Ubiq
+
+import LibDirectory
+import PreludeGlaST	( returnPrimIO, thenPrimIO, seqPrimIO,
+			  readVar, writeVar, MutableVar(..)
+			)
 
 import HsSyn
 import RdrHsSyn
@@ -28,22 +29,24 @@ import RnHsSyn
 
 import RnMonad
 import RnUtils		( RnEnv(..) )
+import ParseIface	( parseIface, ParsedIface )
 
 import Bag		( emptyBag )
+import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, lookupFM, addToFM )
 import Pretty
 import Maybes		( MaybeErr(..) )
-import Util		( panic )
-
+import Util		( startsWith, panic )
 \end{code}
 
-
 \begin{code}
-type IfaceCache = MutableVar _RealWorld (FiniteMap Module ParsedIface,
-				         FiniteMap Module String)
+type ModuleToIfaceContents = FiniteMap Module ParsedIface
+type ModuleToIfaceFilePath = FiniteMap Module FilePath
 
-data ParsedIface = ParsedIface
+type IfaceCache
+  = MutableVar _RealWorld (ModuleToIfaceContents,
+			   ModuleToIfaceFilePath)
 \end{code}
 
 *********************************************************
@@ -52,9 +55,57 @@ data ParsedIface = ParsedIface
 *							*
 *********************************************************
 
+Return a mapping from module-name to
+absolute-filename-for-that-interface.
 \begin{code}
-findHiFiles :: [String] -> PrimIO (FiniteMap Module String)
-findHiFiles dirs = returnPrimIO emptyFM
+findHiFiles :: [FilePath] -> [FilePath] -> IO (FiniteMap Module FilePath)
+
+findHiFiles dirs sysdirs
+  = do_dirs emptyFM (dirs ++ sysdirs)
+  where
+    do_dirs env [] = return env
+    do_dirs env (dir:dirs)
+      = do_dir  env     dir	>>= \ new_env ->
+	do_dirs new_env dirs
+    -------
+    do_dir env dir
+      = --trace ("Having a go on..."++dir) $
+	getDirectoryContents dir    >>= \ entries ->
+	do_entries env entries
+    -------
+    do_entries env [] = return env
+    do_entries env (e:es)
+      = do_entry   env     e	>>= \ new_env ->
+        do_entries new_env es
+    -------
+    do_entry env e
+      = case (acceptable_hi (reverse e)) of
+	  Nothing  -> --trace ("Deemed uncool:"++e) $
+		      return env
+	  Just mod -> let
+			    pmod = _PK_ mod
+		      in
+		      case (lookupFM env pmod) of
+			Nothing -> --trace ("Adding "++mod++" -> "++e) $
+				   return (addToFM env pmod e)
+			Just xx -> trace ("Already mapped: "++mod++" -> "++xx) $
+				   return env
+    -------
+    acceptable_hi rev_e -- looking at pathname *backwards*
+      = case (startsWith (reverse opt_HiSuffix) rev_e) of
+	  Nothing -> Nothing
+	  Just xs -> plausible_modname xs{-reversed-}
+
+    -------
+    plausible_modname rev_e
+      = let
+	    cand = reverse (takeWhile is_modname_char rev_e)
+	in
+	if null cand || not (isUpper (head cand))
+	then Nothing
+	else Just cand
+      where
+	is_modname_char c = isAlphanum c || c == '_'
 \end{code}
 
 *********************************************************
@@ -63,49 +114,59 @@ findHiFiles dirs = returnPrimIO emptyFM
 *							*
 *********************************************************
 
-\begin{code}
-cacheInterface :: IfaceCache -> Module
-	       -> PrimIO (MaybeErr ParsedIface Error)
+Return cached info about a Module's interface; otherwise,
+read the interface (using our @ModuleToIfaceFilePath@ map
+to decide where to look).
 
-cacheInterface iface_var mod
+\begin{code}
+cachedIface :: IfaceCache
+	    -> Module
+	    -> IO (MaybeErr ParsedIface Error)
+
+cachedIface iface_var mod
   = readVar iface_var `thenPrimIO` \ (iface_fm, file_fm) ->
-    case lookupFM iface_fm mod of
-      Just iface -> returnPrimIO (Succeeded iface)
+
+    case (lookupFM iface_fm mod) of
+      Just iface -> return (Succeeded iface)
       Nothing    ->
-      	case lookupFM file_fm mod of
-	  Nothing   -> returnPrimIO (Failed (noIfaceErr mod))
+      	case (lookupFM file_fm mod) of
+	  Nothing   -> return (Failed (noIfaceErr mod))
 	  Just file ->
-	    readInterface file mod `thenPrimIO` \ read_iface ->
+	    readIface file mod >>= \ read_iface ->
 	    case read_iface of
-	      Failed err      -> returnPrimIO (Failed err)
+	      Failed err      -> return (Failed err)
 	      Succeeded iface ->
 		let
 		    iface_fm' = addToFM iface_fm mod iface
 		in
-		writeVar iface_var (iface_fm', file_fm) `thenPrimIO` \ _ ->
-		returnPrimIO (Succeeded iface)
+		writeVar iface_var (iface_fm', file_fm) `seqPrimIO`
+		return (Succeeded iface)
+\end{code}
 
+\begin{code}
+readIface :: FilePath -> Module
+	      -> IO (MaybeErr ParsedIface Error)
 
-readInterface :: String -> Module
-	      -> PrimIO (MaybeErr ParsedIface Error)
-
-readInterface file mod = panic "readInterface"
+readIface file mod
+  = readFile file   `thenPrimIO` \ read_result ->
+    case read_result of
+      Left  err      -> return (Failed    (cannaeReadErr file))
+      Right contents -> return (Succeeded (parseIface contents))
 \end{code}
 
 
 \begin{code}
-rnInterfaces ::
-	   IfaceCache				-- iface cache
-	-> RnEnv				-- original name env
-	-> UniqSupply
-	-> RenamedHsModule			-- module to extend with iface decls
-	-> [RnName]				-- imported names required
-	-> PrimIO (RenamedHsModule,		-- extended module
-	           ImplicitEnv,			-- implicit names required
-		   Bag Error,
-		   Bag Warning)
+rnIfaces :: IfaceCache				-- iface cache
+	 -> RnEnv				-- original name env
+	 -> UniqSupply
+	 -> RenamedHsModule			-- module to extend with iface decls
+	 -> [RnName]				-- imported names required
+	 -> PrimIO (RenamedHsModule,		-- extended module
+		    ImplicitEnv,		-- implicit names required
+		    Bag Error,
+		    Bag Warning)
 
-rnInterfaces iface_var occ_env us rn_module todo
+rnIfaces iface_var occ_env us rn_module todo
   = returnPrimIO (rn_module, (emptyFM, emptyFM), emptyBag, emptyBag)
 \end{code}
 
@@ -127,5 +188,8 @@ finalIfaceInfo iface_var imps_reqd imp_mods
 
 \begin{code}
 noIfaceErr mod sty
-  = ppCat [ppStr "Could not find interface for", ppPStr mod]
+  = ppCat [ppPStr SLIT("Could not find interface for:"), ppPStr mod]
+
+cannaeReadErr file sty
+  = ppCat [ppPStr SLIT("Failed in reading file:"), ppStr file]
 \end{code}

@@ -1800,17 +1800,23 @@ instance NamedThing (GenId ty) where
     getName this_id@(Id u _ details _ _)
       = get details
       where
-	get (LocalId      n _)  = n
-	get (SysLocalId   n _)  = n
-	get (SpecPragmaId n _ _)= n
-	get (ImportedId   n)	= n
-	get (PreludeId    n)	= n
-	get (TopLevId     n)	= n
-	get (InstId       n _)  = n
+	get (LocalId      n _)  	= n
+	get (SysLocalId   n _)  	= n
+	get (SpecPragmaId n _ _)	= n
+	get (ImportedId   n)		= n
+	get (PreludeId    n)		= n
+	get (TopLevId     n)		= n
+	get (InstId       n _)  	= n
 	get (DataConId n _ _ _ _ _ _ _) = n
-	get (TupleConId n _)	= n
-	get (RecordSelId l)	= getName l
---	get _ = pprPanic "Id.Id.NamedThing.getName:" (pprId PprDebug this_id)
+	get (TupleConId n _)		= n
+	get (RecordSelId l)		= getName l
+	get (SuperDictSelId c sc)	= panic "Id.getName.SuperDictSelId"
+	get (MethodSelId c op)		= panic "Id.getName.MethodSelId"
+	get (DefaultMethodId c op _)	= panic "Id.getName.DefaultMethodId"
+	get (DictFunId c ty _ _)	= panic "Id.getName.DictFunId"
+	get (ConstMethodId c ty op _ _)	= panic "Id.getName.ConstMethodId"
+	get (SpecId i tys _)		= panic "Id.getName.SpecId"
+	get (WorkerId i)		= panic "Id.getName.WorkerId"
 
 {- LATER:
 	get (MethodSelId c op)	= case (getOrigName c) of -- ToDo; better ???

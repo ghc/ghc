@@ -33,14 +33,13 @@ import ListSetOps	( minusList, intersectLists )
 import PprType		( GenType )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
-import Type		( mkTyVarTys, splitSigmaTy,
+import Type		( mkTyVarTys, mkForAllTys, splitSigmaTy,
 			  tyVarsOfType, tyVarsOfTypes
 			)
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
 isDictTy = panic "DsBinds.isDictTy"
-quantifyTy = panic "DsBinds.quantifyTy"
 \end{code}
 
 %************************************************************************
@@ -154,7 +153,7 @@ dsBinds (AbsBinds tyvars [] local_global_prs inst_binds val_binds)
 	-- local_global_prs.
     private_binders = binders `minusList` [local | (local,_) <- local_global_prs]
     binders	    = collectTypedBinders val_binds
-    mk_poly_private_binder id = newSysLocalDs (snd (quantifyTy tyvars (idType id)))
+    mk_poly_private_binder id = newSysLocalDs (mkForAllTys tyvars (idType id))
 
     tyvar_tys = mkTyVarTys tyvars
 \end{code}
@@ -244,7 +243,7 @@ dsBinds (AbsBinds all_tyvars dicts local_global_prs dict_binds val_binds)
     non_overloaded_tyvars = all_tyvars `minusList` (tyVarSetToList{-????-} overloaded_tyvars)
 
     binders      = collectTypedBinders val_binds
-    mk_binder id = newSysLocalDs (snd (quantifyTy non_overloaded_tyvars (idType id)))
+    mk_binder id = newSysLocalDs (mkForAllTys non_overloaded_tyvars (idType id))
 \end{code}
 
 @mkSatTyApp id tys@ constructs an expression whose value is (id tys).
@@ -343,8 +342,8 @@ dsInstBinds tyvars ((inst, expr) : bs)
   where
     inst_ty    = idType inst
     abs_tyvars = tyVarSetToList{-???sigh-} (tyVarsOfType inst_ty) `intersectLists` tyvars
-    abs_tys    = mkTyVarTys abs_tyvars
-    (_, poly_inst_ty) = quantifyTy abs_tyvars inst_ty
+    abs_tys      = mkTyVarTys  abs_tyvars
+    poly_inst_ty = mkForAllTys abs_tyvars inst_ty
 
     ------------------------
     -- Wrap a desugared expression in `_scc_ "DICT" <expr>' if

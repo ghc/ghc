@@ -23,8 +23,9 @@ import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..),
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..),
 			  RnName{-instance Outputable-}
 			)
-import TcHsSyn		( mkHsTyLam, tcIdType, zonkId, TcHsBinds(..), TcIdOcc(..) )
-
+import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType, zonkId,
+			  TcHsBinds(..), TcIdOcc(..)
+			)
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcMonoTypeKind, tcMonoType, tcContext )
 import TcType		( tcInstTyVars, tcInstType, tcInstId )
@@ -245,7 +246,7 @@ mkConstructor con_id
 	-- Build the data constructor
     let
 	con_rhs = mkHsTyLam tyvars $
-		  DictLam dicts $
+		  mkHsDictLam dicts $
 		  mk_pat_match args $
 		  mk_case strict_args $
 		  HsCon con_id arg_tys (map HsVar args)

@@ -17,21 +17,7 @@ extern BOOLEAN etags;
 				  
 extern BOOLEAN ignoreSCC;
 				  
-extern BOOLEAN implicitPrelude;
-extern BOOLEAN ignorePragmas;
-
-extern int minAcceptablePragmaVersion;
-extern int maxAcceptablePragmaVersion;
-extern int thisIfacePragmaVersion;
-
 extern unsigned hash_table_size;
-extern char *input_file_dir;
-
-extern list imports_dirlist;
-extern list sys_imports_dirlist;
-
-extern char HiSuffix[];
-extern char PreludeHiSuffix[];
 
 void process_args PROTO((int, char **));
 
@@ -129,7 +115,6 @@ void	checkprec PROTO((tree, qid, BOOLEAN));
 
 BOOLEAN	isconstr PROTO((char *));
 void	setstartlineno PROTO((void));
-void	find_module_on_imports_dirlist PROTO((char *, BOOLEAN, char *));
 
 /* mattson additions */
 char *xstrdup PROTO((char *));	    	  /* Duplicate a string */

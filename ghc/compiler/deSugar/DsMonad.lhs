@@ -79,7 +79,7 @@ initDs init_us env mod_name action
   where
     module_and_group = (mod_name, grp_name)
     grp_name  = case opt_SccGroup of
-		    Just xx -> xx
+		    Just xx -> _PK_ xx
 		    Nothing -> mod_name	-- default: module name
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b

@@ -58,9 +58,7 @@ rdU_long x = returnUgn x
 type U_stringId = FAST_STRING
 rdU_stringId :: _Addr -> UgnM U_stringId
 {-# INLINE rdU_stringId #-}
-rdU_stringId s
-  = -- ToDo (sometime): ioToUgnM (_ccall_ hash_index s) `thenUgn` \ (I# i) ->
-    returnUgn (_packCString s)
+rdU_stringId s = returnUgn (_packCString s)
 
 type U_numId = Int -- ToDo: Int
 rdU_numId :: _Addr -> UgnM U_numId

@@ -335,7 +335,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     doOutput switch io_action
       = case switch of
 	  Nothing -> returnMn ()
-	  Just fn -> let fname = _UNPK_ fn in
+	  Just fname ->
 	    fopen fname "a+"	`thenPrimIO` \ file ->
 	    if (file == ``NULL'') then
 		error ("doOutput: failed to open:"++fname)

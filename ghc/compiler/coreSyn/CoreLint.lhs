@@ -218,7 +218,7 @@ lintCoreExpr (Lam (ValBinder var) expr)
 lintCoreExpr (Lam (TyBinder tyvar) expr)
   = lintCoreExpr expr `thenMaybeL` \ty ->
     returnL (Just(mkForAllTy tyvar ty))
-    -- TODO: Should add in-scope type variable at this point
+    -- ToDo: Should add in-scope type variable at this point
 
 lintCoreExpr e@(Case scrut alts)
  = lintCoreExpr scrut `thenMaybeL` \ty ->
@@ -270,19 +270,20 @@ lintCoreArg _ e ty (VarArg v)
       _ -> addErrL (mkAppMsg ty (idType v) e) `seqL` returnL Nothing
 
 lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
-  = -- TODO: Check that ty is well-kinded and has no unbound tyvars
+  = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
     checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
     `seqL`
     case (getForAllTy_maybe ty) of
       Just (tyvar,body) | (getTyVarKind tyvar == getTypeKind arg_ty) ->
 	returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
+	| pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug (getTyVarKind tyvar), ppr PprDebug (getTypeKind arg_ty)]) False -> panic "impossible"
       _ -> addErrL (mkTyAppMsg ty arg_ty e) `seqL` returnL Nothing
 	
 lintCoreArg _ e ty (UsageArg u)
-  = -- TODO: Check that usage has no unbound usage variables
+  = -- ToDo: Check that usage has no unbound usage variables
     case (getForAllUsageTy ty) of
       Just (uvar,bounds,body) ->
-        -- TODO Check argument satisfies bounds
+        -- ToDo: Check argument satisfies bounds
         returnL(Just(panic "lintCoreArg:instantiateUsage uvar u body"))
       _ -> addErrL (mkUsageAppMsg ty u e) `seqL` returnL Nothing
 \end{code}

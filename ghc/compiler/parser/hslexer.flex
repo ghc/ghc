@@ -149,20 +149,11 @@ extern BOOLEAN etags;	                /* that which is saved */
 
 extern BOOLEAN nonstandardFlag;	        /* Glasgow extensions allowed */
 
-static BOOLEAN in_interface = FALSE;    /* TRUE if we are reading a .hi file */
-
-extern BOOLEAN ignorePragmas;		/* True when we should ignore pragmas */
-extern int minAcceptablePragmaVersion;	/* see documentation in main.c */
-extern int maxAcceptablePragmaVersion;
-extern int thisIfacePragmaVersion;
-
 static int hssttok = -1;	/* Stacked Token: -1   -- no token; -ve  -- ";"
 				 * inserted before token +ve  -- "}" inserted before
 				 * token */
 
 short icontexts = 0;		/* Which context we're in */
-
-
 
 /*
 	Table of indentations:  right bit indicates whether to use
@@ -468,7 +459,7 @@ NL  	    	    	[\n\r]
 /* These SHOULDNAE work in "Code" (sigh) */
 %}
 <Code,GlaExt,UserPragma>{Id}"#" { 
-			 if (! (nonstandardFlag || in_interface)) {
+			 if (! nonstandardFlag) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "Non-standard identifier (trailing `#'): %s\n", yytext);
 			    hsperror(errbuf);
@@ -477,7 +468,7 @@ NL  	    	    	[\n\r]
     	    	    	 RETURN(_isconstr(yytext) ? CONID : VARID);
 			}
 <Code,GlaExt,UserPragma>_+{Id} { 
-			 if (! (nonstandardFlag || in_interface)) {
+			 if (! nonstandardFlag) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "Non-standard identifier (leading underscore): %s\n", yytext);
 			    hsperror(errbuf);
@@ -557,7 +548,7 @@ NL  	    	    	[\n\r]
     	    	    	 addtext(yytext, yyleng - 2);
     	    	    	 text = fetchtext(&length);
 
-			 if (! (nonstandardFlag || in_interface)) {
+			 if (! nonstandardFlag) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "`Char-hash' literals are non-standard: %s\n", text);
 			    hsperror(errbuf);
@@ -634,7 +625,7 @@ NL  	    	    	[\n\r]
     	    	    	 addtext(yytext, yyleng-2);
     	    	    	 text = fetchtext(&length);
 
-			 if (! (nonstandardFlag || in_interface)) {
+			 if (! nonstandardFlag) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "`String-hash' literals are non-standard: %s\n", text);
 			    hsperror(errbuf);
@@ -1097,7 +1088,6 @@ yylex()
 	hscolno = hscolno_save;
 	hspcolno = hspcolno_save;
 	etags = etags_save;
-	in_interface = FALSE;
 	icontexts = icontexts_save - 1;
 	icontexts_save = 0;
 #ifdef HSP_DEBUG
@@ -1148,7 +1138,6 @@ setyyin(char *file)
     hscolno_save = hscolno;
     hspcolno_save = hspcolno;
     hscolno = hspcolno = 0;
-    in_interface = TRUE;
     etags_save = etags; /* do not do "etags" stuff in interfaces */
     etags = 0;		/* We remember whether we are doing it in
 			   the module, so we can restore it later [WDP 94/09] */

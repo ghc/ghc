@@ -47,7 +47,7 @@ addAutoCostCentres mod_name binds
 
     grp_name
       = case opt_SccGroup of
-	  Just xx -> xx
+	  Just xx -> _PK_ xx
 	  Nothing -> mod_name	-- default: module name
 
     -----------------------------

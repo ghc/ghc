@@ -66,7 +66,6 @@ data HsExpr tyvar uvar id pat
   | SectionR	(HsExpr tyvar uvar id pat)	-- operator
 		(HsExpr tyvar uvar id pat)	-- operand
 				
-
   | HsCase	(HsExpr tyvar uvar id pat)
 		[Match  tyvar uvar id pat]	-- must have at least one Match
 		SrcLoc
@@ -110,9 +109,9 @@ data HsExpr tyvar uvar id pat
   | RecordUpd	(HsExpr tyvar uvar id pat)
 		(HsRecordBinds tyvar uvar id pat)
 
-  | RecordUpdOut	(HsExpr tyvar uvar id pat)	-- TRANSLATION
-			[id]				-- Dicts needed for construction
-			(HsRecordBinds tyvar uvar id pat)
+  | RecordUpdOut (HsExpr tyvar uvar id pat)	-- TRANSLATION
+		 [id]				-- Dicts needed for construction
+		 (HsRecordBinds tyvar uvar id pat)
 
   | ExprWithTySig		-- signature binding
 		(HsExpr tyvar uvar id pat)
@@ -211,7 +210,6 @@ pprExpr sty expr@(HsApp e1 e2)
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
 
-
 pprExpr sty (OpApp e1 op e2)
   = case op of
       HsVar v -> pp_infixly v
@@ -231,7 +229,6 @@ pprExpr sty (NegApp e)
 
 pprExpr sty (HsPar e)
   = ppParens (pprExpr sty e)
-
 
 pprExpr sty (SectionL expr op)
   = case op of
@@ -259,23 +256,15 @@ pprExpr sty (SectionR op expr)
       = ppSep [ ppBeside ppLparen (pprOp sty v),
 		ppBeside pp_expr  ppRparen ]
 
-pprExpr sty (CCall fun args _ is_asm result_ty)
-  = ppHang (if is_asm
-	    then ppBesides [ppStr "_casm_ ``", ppPStr fun, ppStr "''"]
-	    else ppBeside  (ppPStr SLIT("_ccall_ ")) (ppPStr fun))
-	 4 (ppSep (map (pprParendExpr sty) args))
-
-pprExpr sty (HsSCC label expr)
-  = ppSep [ ppBeside (ppPStr SLIT("_scc_ ")) (ppBesides [ppChar '"', ppPStr label, ppChar '"']),
-	    pprParendExpr sty expr ]
-
 pprExpr sty (HsCase expr matches _)
   = ppSep [ ppSep [ppPStr SLIT("case"), ppNest 4 (pprExpr sty expr), ppPStr SLIT("of")],
 	    ppNest 2 (pprMatches sty (True, ppNil) matches) ]
 
-pprExpr sty (ListComp expr quals)
-  = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
-	 4 (ppSep [interpp'SP sty quals, ppRbrack])
+pprExpr sty (HsIf e1 e2 e3 _)
+  = ppSep [ppCat [ppPStr SLIT("if"), ppNest 2 (pprExpr sty e1), ppPStr SLIT("then")],
+	   ppNest 4 (pprExpr sty e2),
+	   ppPStr SLIT("else"),
+	   ppNest 4 (pprExpr sty e3)]
 
 -- special case: let ... in let ...
 pprExpr sty (HsLet binds expr@(HsLet _ _))
@@ -288,12 +277,12 @@ pprExpr sty (HsLet binds expr)
 
 pprExpr sty (HsDo stmts _)
   = ppCat [ppPStr SLIT("do"), ppAboves (map (ppr sty) stmts)]
+pprExpr sty (HsDoOut stmts _ _ _)
+  = ppCat [ppPStr SLIT("do"), ppAboves (map (ppr sty) stmts)]
 
-pprExpr sty (HsIf e1 e2 e3 _)
-  = ppSep [ppCat [ppPStr SLIT("if"), ppNest 2 (pprExpr sty e1), ppPStr SLIT("then")],
-	   ppNest 4 (pprExpr sty e2),
-	   ppPStr SLIT("else"),
-	   ppNest 4 (pprExpr sty e3)]
+pprExpr sty (ListComp expr quals)
+  = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
+	 4 (ppSep [interpp'SP sty quals, ppRbrack])
 
 pprExpr sty (ExplicitList exprs)
   = ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs))
@@ -303,15 +292,18 @@ pprExpr sty (ExplicitListOut ty exprs)
 
 pprExpr sty (ExplicitTuple exprs)
   = ppParens (ppInterleave ppComma (map (pprExpr sty) exprs))
-pprExpr sty (ExprWithTySig expr sig)
-  = ppHang (ppBesides [ppLparen, ppNest 2 (pprExpr sty expr), ppPStr SLIT(" ::")])
-	 4 (ppBeside  (ppr sty sig) ppRparen)
 
 pprExpr sty (RecordCon con  rbinds)
   = pp_rbinds sty (ppr sty con) rbinds
 
 pprExpr sty (RecordUpd aexp rbinds)
   = pp_rbinds sty (pprParendExpr sty aexp) rbinds
+pprExpr sty (RecordUpdOut aexp _ rbinds)
+  = pp_rbinds sty (pprParendExpr sty aexp) rbinds
+
+pprExpr sty (ExprWithTySig expr sig)
+  = ppHang (ppBesides [ppLparen, ppNest 2 (pprExpr sty expr), ppPStr SLIT(" ::")])
+	 4 (ppBeside  (ppr sty sig) ppRparen)
 
 pprExpr sty (ArithSeqIn info)
   = ppBracket (ppr sty info)
@@ -321,6 +313,16 @@ pprExpr sty (ArithSeqOut expr info)
     	  ppBracket (ppr sty info)
 	_   	   ->
     	  ppBesides [ppLbrack, ppParens (ppr sty expr), ppr sty info, ppRbrack]
+
+pprExpr sty (CCall fun args _ is_asm result_ty)
+  = ppHang (if is_asm
+	    then ppBesides [ppStr "_casm_ ``", ppPStr fun, ppStr "''"]
+	    else ppBeside  (ppPStr SLIT("_ccall_ ")) (ppPStr fun))
+	 4 (ppSep (map (pprParendExpr sty) args))
+
+pprExpr sty (HsSCC label expr)
+  = ppSep [ ppBeside (ppPStr SLIT("_scc_ ")) (ppBesides [ppChar '"', ppPStr label, ppChar '"']),
+	    pprParendExpr sty expr ]
 
 pprExpr sty (TyLam tyvars expr)
   = ppHang (ppCat [ppStr "/\\", interppSP sty tyvars, ppStr "->"])
@@ -352,12 +354,15 @@ pprExpr sty (ClassDictLam dicts methods expr)
 	 4 (pprExpr sty expr)
 
 pprExpr sty (Dictionary dicts methods)
- = ppSep [ppBesides [ppLparen, ppPStr SLIT("{-dict-}")],
-	  ppBracket (interpp'SP sty dicts),
-	  ppBesides [ppBracket (interpp'SP sty methods), ppRparen]]
+  = ppSep [ppBesides [ppLparen, ppPStr SLIT("{-dict-}")],
+	   ppBracket (interpp'SP sty dicts),
+	   ppBesides [ppBracket (interpp'SP sty methods), ppRparen]]
 
 pprExpr sty (SingleDict dname)
- = ppCat [ppPStr SLIT("{-singleDict-}"), ppr sty dname]
+  = ppCat [ppPStr SLIT("{-singleDict-}"), ppr sty dname]
+
+pprExpr sty (HsCon con tys exprs)
+  = ppCat [ppPStr SLIT("{-HsCon-}"), ppr sty con, interppSP sty tys, interppSP sty exprs]
 \end{code}
 
 Parenthesize unless very simple:

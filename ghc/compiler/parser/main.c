@@ -27,11 +27,6 @@ main(int argc, char **argv)
     process_args(argc,argv);
 
     hash_init();
-
-#ifdef HSP_DEBUG
-    fprintf(stderr,"input_file_dir=%s\n",input_file_dir);
-#endif
-
     yyinit();
 
     if(yyparse() == 0 && !etags)
