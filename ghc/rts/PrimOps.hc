@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.96 2002/04/23 09:56:29 stolz Exp $
+ * $Id: PrimOps.hc,v 1.97 2002/04/23 11:11:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -244,40 +244,40 @@ StgWord GHC_ZCCReturnable_static_info[1];
 
 #define BYTES_TO_STGWORDS(n) ((n) + sizeof(W_) - 1)/sizeof(W_)
 
-FN_(newByteArrayzh_fast)				\
- {							\
-   W_ size, stuff_size, n;				\
-   StgArrWords* p;					\
-   FB_							\
-     MAYBE_GC(NO_PTRS,newByteArrayzh_fast);		\
-     n = R1.w;						\
-     stuff_size = BYTES_TO_STGWORDS(n);			\
-     size = sizeofW(StgArrWords)+ stuff_size;		\
-     p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
-     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0); \
-     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);		\
-     p->words = stuff_size;				\
-     TICK_RET_UNBOXED_TUP(1)				\
-     RET_P(p);						\
-   FE_							\
+FN_(newByteArrayzh_fast)
+ {
+   W_ size, stuff_size, n;
+   StgArrWords* p;
+   FB_
+     MAYBE_GC(NO_PTRS,newByteArrayzh_fast);
+     n = R1.w;
+     stuff_size = BYTES_TO_STGWORDS(n);
+     size = sizeofW(StgArrWords)+ stuff_size;
+     p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);
+     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0);
+     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);
+     p->words = stuff_size;
+     TICK_RET_UNBOXED_TUP(1)
+     RET_P(p);
+   FE_
  }
 
-FN_(newPinnedByteArrayzh_fast)					\
- {								\
-   W_ size, stuff_size, n;					\
-   StgArrWords* p;						\
-   FB_								\
-     MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);		\
-     n = R1.w;							\
-     stuff_size = BYTES_TO_STGWORDS(n);				\
-     size = sizeofW(StgArrWords)+ stuff_size;			\
-     p = (StgArrWords *)RET_STGCALL1(P_,allocatePinned,size);	\
-     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0);	\
-     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);			\
-     p->words = stuff_size;					\
-     TICK_RET_UNBOXED_TUP(1)					\
-     RET_P(p);							\
-   FE_								\
+FN_(newPinnedByteArrayzh_fast)
+ {
+   W_ size, stuff_size, n;
+   StgArrWords* p;
+   FB_
+     MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);
+     n = R1.w;
+     stuff_size = BYTES_TO_STGWORDS(n);
+     size = sizeofW(StgArrWords)+ stuff_size;
+     p = (StgArrWords *)RET_STGCALL1(P_,allocatePinned,size);
+     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0);
+     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);
+     p->words = stuff_size;
+     TICK_RET_UNBOXED_TUP(1)
+     RET_P(p);
+   FE_
  }
 
 FN_(newArrayzh_fast)
