@@ -1438,7 +1438,7 @@ asyncReadzh_fast
     /* could probably allocate this on the heap instead */
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_asyncReadzh_malloc_str);
-    reqID = foreign "C" addIORequest(R1,FALSE,R2,R3,R4);
+    reqID = foreign "C" addIORequest(R1, 0/*FALSE*/,R2,R3,R4 "ptr");
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
@@ -1447,7 +1447,7 @@ asyncReadzh_fast
     jump stg_block_async;
 }
 
-STRING(asyncWritezh_malloc_str, "asyncWritezh_fast")
+STRING(stg_asyncWritezh_malloc_str, "asyncWritezh_fast")
 asyncWritezh_fast
 {
     W_ ares;
@@ -1458,8 +1458,8 @@ asyncWritezh_fast
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
 
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    asyncWritezh_malloc_str);
-    reqID = foreign "C" addIORequest(R1,TRUE,R2,R3,R4);
+					    stg_asyncWritezh_malloc_str);
+    reqID = foreign "C" addIORequest(R1, 1/*TRUE*/,R2,R3,R4 "ptr");
 
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -1469,7 +1469,7 @@ asyncWritezh_fast
     jump stg_block_async;
 }
 
-STRING(asyncDoProczh_malloc_str, "asyncDoProczh_fast")
+STRING(stg_asyncDoProczh_malloc_str, "asyncDoProczh_fast")
 asyncDoProczh_fast
 {
     W_ ares;
@@ -1481,8 +1481,8 @@ asyncDoProczh_fast
 
     /* could probably allocate this on the heap instead */
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    asyncDoProczh_malloc_str);
-    reqID = foreign "C" addDoProcRequest(R1,R2);
+					    stg_asyncDoProczh_malloc_str);
+    reqID = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr");
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;

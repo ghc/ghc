@@ -9,7 +9,6 @@
 #include "Schedule.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "StablePriv.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 

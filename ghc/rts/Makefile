@@ -302,6 +302,10 @@ SRC_HC_OPTS += \
   -\#include Profiling.h \
   -\#include Apply.h
 
+ifeq "$(Windows)" "YES"
+PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
+endif
+
 # Cmm must be compiled via-C for now, because the NCG can't handle loops
 SRC_HC_OPTS += -fvia-C
 
