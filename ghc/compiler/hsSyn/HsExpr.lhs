@@ -297,7 +297,7 @@ ppr_expr (HsLet binds expr)
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
 ppr_expr (HsWith expr binds)
-  = hsep [ppr expr, ptext SLIT("with"), ppr binds]
+  = hsep [ppr expr, ptext SLIT("with"), pp_ipbinds binds]
 
 ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
 ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
@@ -411,6 +411,13 @@ pp_rbinds thing rbinds
 	   hsep [ppr v, char '=', ppr e]
 \end{code}
 
+\begin{code}
+pp_ipbinds :: (Outputable id, Outputable pat)
+	   => [(id, HsExpr id pat)] -> SDoc
+pp_ipbinds pairs = hsep (punctuate semi (map pp_item pairs))
+		 where
+		   pp_item (id,rhs) = char '?' <> ppr id <+> equals <+> ppr_expr rhs
+\end{code}
 
 
 %************************************************************************
