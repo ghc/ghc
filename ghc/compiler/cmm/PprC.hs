@@ -682,7 +682,8 @@ pprCall ppr_fn cconv results args vols
   where 
      ppr_results []     = empty
      ppr_results [(one,hint)] 
-	 = pprExpr (CmmReg one) <> ptext SLIT(" = ") <> pprUnHint hint
+	 = pprExpr (CmmReg one) <> ptext SLIT(" = ")
+		 <> pprUnHint hint (cmmRegRep one)
      ppr_results _other = panic "pprCall: multiple results"
 
      pprArg (expr, PtrHint)
@@ -693,10 +694,10 @@ pprCall ppr_fn cconv results args vols
      pprArg (expr, _other)
 	= pprExpr expr
 
-     pprUnHint PtrHint    = mkW_
-     pprUnHint SignedHint = mkW_
-     pprUnHint _          = empty
-	
+     pprUnHint PtrHint    rep = parens (machRepCType rep)
+     pprUnHint SignedHint rep = parens (machRepCType rep)
+     pprUnHint _          _   = empty
+
      save    = save_restore SLIT("CALLER_SAVE")
      restore = save_restore SLIT("CALLER_RESTORE")
 
