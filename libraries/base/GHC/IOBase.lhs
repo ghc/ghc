@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.3 2001/09/13 11:38:54 simonmar Exp $
+% $Id: IOBase.lhs,v 1.4 2001/09/13 15:34:17 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -15,7 +15,6 @@ module GHC.IOBase where
 
 import GHC.ST
 import GHC.STRef
-import GHC.Arr
 import GHC.Base
 import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
 import Data.Maybe  ( Maybe(..) )
