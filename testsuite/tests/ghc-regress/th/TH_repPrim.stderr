@@ -1,8 +1,8 @@
-App (Con "GHC.Base:I#") (Lit (IntPrim 20))
+AppExp (ConExp "GHC.Base:I#") (LitExp (IntPrimLit 20))
 GHC.Base:I# 20#
-App (Con "GHC.Float:F#") (Lit (FloatPrim (123 % 10)))
+AppExp (ConExp "GHC.Float:F#") (LitExp (FloatPrimLit (123 % 10)))
 GHC.Float:F# 12.3#
-App (Con "GHC.Float:D#") (Lit (DoublePrim (123 % 5)))
+AppExp (ConExp "GHC.Float:D#") (LitExp (DoublePrimLit (123 % 5)))
 GHC.Float:D# 24.6##
 Loading package base ... linking ... done.
 Loading package haskell98 ... linking ... done.
