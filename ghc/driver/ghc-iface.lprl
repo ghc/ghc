@@ -158,6 +158,8 @@ sub constructNewHiFile {
     print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
     print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
 
+    print STDERR @decl_names ;
+
     foreach $v (@decl_names) {
 	&printNewItemVersion(NEWHI, $v, $new_module_version, $show_hi_diffs);		# Print new version number
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
@@ -254,8 +256,11 @@ sub readHiFile {
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	   } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
+	   } elsif ( /^(newtype|data)\s+({.*}\s+=>\s+)?(\S+)\s+/ ) {
 			# Data declaration	
+			# The (...)? parts skips over the context of a data decl
+			# to find the name of the type constructor.  The curly
+			# brackets are part of the iface file syntax for contexts
 		$current_name = "data $3";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
