@@ -334,7 +334,8 @@ deLam expr@(Lam _ _)
     (bndrs, body) = collectBinders expr
 
     eta expr@(App _ _)
-	| n_remaining >= 0 &&
+	| ok_to_eta_reduce f &&
+	  n_remaining >= 0 &&
 	  and (zipWith ok bndrs last_args) &&
 	  not (any (`elemVarSet` fvs_remaining) bndrs)
 	= Just remaining_expr
@@ -347,6 +348,14 @@ deLam expr@(Lam _ _)
 
 	  ok bndr (Var arg) = bndr == arg
 	  ok bndr other	    = False
+
+	  -- we can't eta reduce something which must be saturated.
+	  ok_to_eta_reduce (Var f)
+		 = case idFlavour f of
+		      PrimOpId op  -> False
+		      DataConId dc -> False
+		      other 	   -> True
+	  ok_to_eta_reduce _ = False --safe. ToDo: generalise
 
     eta (Let bind@(NonRec b r) body)
 	| not (any (`elemVarSet` fvs) bndrs)
