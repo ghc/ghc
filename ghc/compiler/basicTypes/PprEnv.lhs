@@ -32,7 +32,7 @@ import UniqFM		( emptyUFM, UniqFM )
 import Util		( panic )
 #if __GLASGOW_HASKELL__ >= 202
 IMPORT_DELOOPER(TyLoop)
-import PprStyle         ( PprStyle )
+import Outputable       ( PprStyle )
 import Literal          ( Literal )
 import Usage            ( GenUsage, SYN_IE(Usage) )
 import {-# SOURCE #-}   PrimOp (PrimOp)
