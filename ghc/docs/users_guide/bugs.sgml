@@ -97,12 +97,14 @@
 	<varlistentry>
 	  <term>Multiply-defined array elements&mdash;not checked:</term>
 	  <listitem>
-	    <para>This code fragment <emphasis>should</emphasis>
+	    <para>This code fragment should
 	    elicit a fatal error, but it does not:
 
 <programlisting>
 main = print (array (1,1) [(1,2), (1,3)])</programlisting>
-
+GHC's implemetation of <literal>array</literal> takes the value of an
+array slot from the last (index,value) pair in the list, and does no
+checking for duplicates.  The reason for this is efficiency, pure and simple.
             </para>
 	  </listitem>
 	</varlistentry>
