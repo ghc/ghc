@@ -3,7 +3,7 @@
 -- |
 -- Module      :  Numeric
 -- Copyright   :  (c) The University of Glasgow 2002
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional

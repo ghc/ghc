@@ -3,7 +3,7 @@
 -- Module      :  Text.Html.BlockTable
 -- Copyright   :  (c) Andy Gill, and the Oregon Graduate Institute of 
 --		  Science and Technology, 1999-2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  Andy Gill <andy@galconn.com>
 -- Stability   :  experimental

@@ -2,7 +2,7 @@
 -- |
 -- Module      :  Debug.QuickCheck
 -- Copyright   :  (c) Koen Claessen, John Hughes 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental

@@ -2,7 +2,7 @@
 -- |
 -- Module      :  Control.Monad.Error
 -- Copyright   :  (c) Michael Weber <michael.weber@post.rwth-aachen.de>, 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental

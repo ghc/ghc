@@ -2,7 +2,7 @@
 -- |
 -- Module      :  System.Console.GetOpt
 -- Copyright   :  (c) Sven Panne Oct. 1996 (small changes Dec. 1997)
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental

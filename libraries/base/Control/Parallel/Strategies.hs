@@ -2,7 +2,7 @@
 -- |
 -- Module      :  Control.Parallel.Strategies
 -- Copyright   :  (c) The University of Glasgow 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
@@ -14,7 +14,7 @@
 
 {-
 Time-stamp: <Wed Mar 21 2001 00:45:34 Stardate: [-30]6360.15 hwloidl>
-$Id: Strategies.hs,v 1.3 2002/04/26 13:34:06 simonmar Exp $
+$Id: Strategies.hs,v 1.4 2002/05/09 13:16:30 simonmar Exp $
 
 This module defines parallel strategy combinators
 
@@ -23,8 +23,8 @@ This module defines parallel strategy combinators
 	Based on Version VII (1/5/96) `Strategies96' of type a -> ()
 
 Author:    $Author: simonmar $
-Date:      $Date: 2002/04/26 13:34:06 $
-Revision:  $Revision: 1.3 $
+Date:      $Date: 2002/05/09 13:16:30 $
+Revision:  $Revision: 1.4 $
 Source:    $Source: /srv/cvs/cvs.haskell.org/fptools/libraries/base/Control/Parallel/Strategies.hs,v $
 State:     $State: Exp $
 
@@ -48,6 +48,9 @@ The history of the Strategies module:
 
 Changelog:
 $Log: Strategies.hs,v $
+Revision 1.4  2002/05/09 13:16:30  simonmar
+Rename libraries/core to libraries/base in the module headers.
+
 Revision 1.3  2002/04/26 13:34:06  simonmar
 Remove \$Id\$ from all files: it isn't particularly useful (see
 previous discussion on cvs-ghc@haskell.org), and it confuses Haddock.
@@ -65,7 +68,7 @@ to look at and so the NHC/Hugs guys can start playing around with it.
 
 There is no build system.  For GHC, the libraries tree is intended to
 be grafted onto an existing fptools/ tree, and the Makefile in
-libraries/core is a quick hack for that setup.  This won't work at the
+libraries/base is a quick hack for that setup.  This won't work at the
 moment without the other changes needed in fptools/ghc, which I
 haven't committed because they'll cause breakage.  However, with the
 changes required these sources build a working Prelude and libraries.
@@ -74,7 +77,7 @@ The layout mostly follows the one we agreed on, with one or two minor
 changes; in particular the Data/Array layout probably isn't final
 (there are several choices here).
 
-The document is in libraries/core/doc as promised.
+The document is in libraries/base/doc as promised.
 
 The cbits stuff is just a copy of ghc/lib/std/cbits and has
 GHC-specific stuff in it.  We should really separate the
@@ -283,8 +286,8 @@ declaration of @par@ and @seq@ despite renaming the imported versions.
 > infixl 6 $||, $|            -- strategic function application (seq and par)
 > infixl 9 .|, .||, -|, -||   -- strategic (inverse) function composition
 
-> strategy_version = "$Revision: 1.3 $"
-> strategy_id = "$Id: Strategies.hs,v 1.3 2002/04/26 13:34:06 simonmar Exp $"
+> strategy_version = "$Revision: 1.4 $"
+> strategy_id = "$Id: Strategies.hs,v 1.4 2002/05/09 13:16:30 simonmar Exp $"
 
 ------------------------------------------------------------------------------
 			Strategy Type, Application and Semantics	      

@@ -3,7 +3,7 @@
 -- |
 -- Module      :  Foreign.Marshal.Error
 -- Copyright   :  (c) The FFI task force 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
