@@ -172,9 +172,11 @@ import GHC.Err   ( error, undefined )
 import Hugs.Prelude
 #endif
 
+import Data.Eq
+import Data.Ord
+
 #ifndef __HUGS__
 infixr 0 $!
-
 
 -- -----------------------------------------------------------------------------
 -- Miscellaneous functions
