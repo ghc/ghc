@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.12 2000/03/02 10:10:34 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.13 2000/03/02 10:32:17 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -464,7 +464,7 @@ unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr,
       }
       argp++;
    }
-fprintf(stderr,"before rts_evalIO\n");
+
    if (combined) {
       sstat = rts_evalIO ( node, &nodeOut );
    } else {
@@ -473,7 +473,7 @@ fprintf(stderr,"before rts_evalIO\n");
                 node );
       sstat = rts_eval ( node, &nodeOut );
    }
-fprintf(stderr, "after rts_evalIO\n");
+
    if (sstat != Success)
       barf ("unpackArgsAndCallHaskell_x86_nocallconv: eval failed");
 
