@@ -18,8 +18,8 @@ import IO
 import Maybe	( fromJust, isJust )
 import FiniteMap
 import List 	( sortBy )
-import Char	( toUpper, toLower )
-import Monad	( when )
+import Char	( toUpper, toLower, isAlpha, ord )
+import Monad	( when, unless )
 
 import Html
 import qualified Html
@@ -82,7 +82,9 @@ contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
 
 subIndexHtmlFile :: Char -> Char -> String
-subIndexHtmlFile k a = "doc-index-" ++ k:a:".html"
+subIndexHtmlFile k a = "doc-index-" ++ [k] ++ b ++ ".html"
+   where b | isAlpha a = [a]
+           | otherwise = show (ord a)
 
 footer :: HtmlTable
 footer = 
@@ -229,8 +231,8 @@ ppHtmlIndex odir doctitle ifaces = do
 	   )
 
   when split_indices
-    (do mapM_ (do_sub_index "Type/Class" tycls_index 't') ['A'..'Z'] 
-        mapM_ (do_sub_index "Function/Constructor" var_index 'v') ['A'..'Z'] 
+    (do mapM_ (do_sub_index "Type/Class" tycls_index 't') initialChars
+        mapM_ (do_sub_index "Function/Constructor" var_index 'v') initialChars
     )
 
   writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html)
@@ -243,14 +245,16 @@ ppHtmlIndex odir doctitle ifaces = do
 	td << table ! [cellpadding 0, cellspacing 5] <<
 	    besides [ td << anchor ! [href (subIndexHtmlFile kind c)] <<
 			 toHtml [c]
-		    | c <- ['A'..'Z'] ]
+		    | c <- initialChars
+                    , any ((`nameBeginsWith` c) . fst) this_ix ]
    | otherwise =
 	td << table ! [cellpadding 0, cellspacing 5] <<
 	  aboves (map indexElt this_ix) 
  	
   do_sub_index descr this_ix kind c
-    = writeFile (odir ++ pathSeparator:subIndexHtmlFile kind c)
-	(renderHtml html)
+    = unless (null index_part) $
+        writeFile (odir ++ pathSeparator:subIndexHtmlFile kind c)
+                  (renderHtml html)
     where 
       html = header (thetitle (toHtml (doctitle ++ " (" ++ descr ++ "Index)")) +++
 		thelink ! [href cssFile, 
@@ -291,6 +295,8 @@ ppHtmlIndex odir doctitle ifaces = do
 		       else
 			 anchor ! [href (linkId (Module mdl) nm)] << toHtml mdl
 	             | (Module mdl, defining) <- entries ])
+
+  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
 
 nameBeginsWith :: HsName -> Char -> Bool
 nameBeginsWith (HsTyClsName id0) c = idBeginsWith id0 c
