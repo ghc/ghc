@@ -5,7 +5,8 @@ TARGET = ${DST}/hsc2hs$(EXE)
 
 SRCS   = Main.hs
 FROMC  = ../libraries/base/System/Console/GetOpt.$C \
-	 ../libraries/base/Data/List.$C
+	 ../libraries/base/Data/List.$C \
+	 ../libraries/base/System/Cmd.$C
 
 ifeq "$(findstring ghc, ${HC})" "ghc"
 HFLAGS = $(shell $(LOCAL)fixghc $(GHCSYM) -package base -package lang )
