@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.68 2001/01/16 11:57:06 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.69 2001/01/25 13:30:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1107,7 +1107,7 @@ FN_(delayzh_fast)
 
     ACQUIRE_LOCK(&sched_mutex);
 
-    target = (R1.i / (TICK_MILLISECS*1000)) + timestamp + ticks_since_timestamp;
+    target = (R1.i / (TICK_MILLISECS*1000)) + getourtimeofday();
     CurrentTSO->block_info.target = target;
 
     /* Insert the new thread in the sleeping queue. */
