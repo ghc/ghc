@@ -132,7 +132,7 @@ import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy
 import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
-import Unique		( Unique, Uniquable(..), mkTupleTyConUnique )
+import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp )
 import Maybes		( maybeToBool, expectJust )
@@ -559,7 +559,7 @@ isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
 isAddrTy       = is_tc addrTyConKey
 isBoolTy       = is_tc boolTyConKey
-isUnitTy       = is_tc (mkTupleTyConUnique Boxed 0)
+isUnitTy       = is_tc unitTyConKey
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this

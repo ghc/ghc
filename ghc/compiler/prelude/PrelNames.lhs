@@ -44,7 +44,8 @@ import RdrName	  ( RdrName, mkOrig, mkUnqual )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
-		    mkPreludeTyConUnique, mkPreludeClassUnique
+		    mkPreludeTyConUnique, mkPreludeClassUnique,
+		    mkTupleTyConUnique
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
 import UniqFM	  ( UniqFM, listToUFM )
@@ -752,6 +753,8 @@ usManyTyConKey				= mkPreludeTyConUnique 78
 crossTyConKey		      		= mkPreludeTyConUnique 79
 plusTyConKey		      		= mkPreludeTyConUnique 80
 genUnitTyConKey				= mkPreludeTyConUnique 81
+
+unitTyConKey = mkTupleTyConUnique Boxed 0
 \end{code}
 
 %************************************************************************
