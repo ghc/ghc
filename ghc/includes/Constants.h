@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.23 2003/03/25 16:06:39 sof Exp $
+ * $Id: Constants.h,v 1.24 2003/03/25 16:19:55 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -144,12 +144,6 @@
 
 /* The size of a megablock (2^MBLOCK_SHIFT bytes) */
 #define MBLOCK_SHIFT   20
-
-/* the largest size an object can be before we give it a block of its
- * own and treat it as an immovable object during GC, expressed as a
- * fraction of BLOCK_SIZE.
- */
-#define LARGE_OBJECT_THRESHOLD ((nat)(BLOCK_SIZE * 8 / 10))
 
 /* -----------------------------------------------------------------------------
    Bitmap/size fields (used in info tables)

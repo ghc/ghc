@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.11 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: Block.h,v 1.12 2003/03/25 16:19:56 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,6 +32,11 @@
 #define MBLOCK_ROUND_UP(p)   ((void *)(((W_)(p)+MBLOCK_SIZE-1) & ~MBLOCK_MASK))
 #define MBLOCK_ROUND_DOWN(p) ((void *)((W_)(p) & ~MBLOCK_MASK ))
 
+/* The largest size an object can be before we give it a block of its
+ * own and treat it as an immovable object during GC, expressed as a
+ * fraction of BLOCK_SIZE.
+ */
+#define LARGE_OBJECT_THRESHOLD ((nat)(BLOCK_SIZE * 8 / 10))
 
 /* -----------------------------------------------------------------------------
  * Block descriptor.  This structure *must* be the right length, so we
