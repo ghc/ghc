@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.46 2000/08/03 13:43:00 simonmar Exp $
+-- $Id: Main.hs,v 1.47 2000/08/03 16:47:51 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -606,7 +606,7 @@ GLOBAL_VAR(library_paths, [],	 [String])
 GLOBAL_VAR(cmdline_libraries,   [], [String])
 
 addToDirList :: IORef [String] -> String -> IO ()
-addToDirList ref paths
+addToDirList ref path
   = do paths <- readIORef ref
        writeIORef ref (paths ++ split split_marker path)
 
