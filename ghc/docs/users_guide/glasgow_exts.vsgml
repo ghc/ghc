@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.9 1999/04/29 12:21:50 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.10 1999/05/04 08:31:52 sof Exp $
 %
 % GHC Language Extensions.
 %
@@ -234,13 +234,16 @@ may be just the ticket (NB: <em>no chance</em> of such code going
 through a native-code generator):
 
 <tscreen><verb>
+import Addr
+import CString
+
 oldGetEnv name
-  = _casm_ ``%r = getenv((char *) %0);'' name >>= \ litstring@(A# str#) ->
+  = _casm_ ``%r = getenv((char *) %0);'' name >>= \ litstring ->
     return (
-        if (litstring == ``NULL'') then
+        if (litstring == nullAddr) then
             Left ("Fail:oldGetEnv:"++name)
         else
-            Right (unpackCString# str#)
+            Right (unpackCString litstring)
     )
 </verb></tscreen>
 
@@ -1545,10 +1548,10 @@ assertion was made,
 assert pred val ==> assertError "Main.hs|15" pred val
 </verb></tscreen>
 
-The rewrite is only performed by the compiler when applications of
-<tt>Exception.assert</tt> are spotted, so you can still define and use
-your own versions of <tt/assert/, should you so wish. If not, import
-<tt/Exception/ to make use <tt/assert/ in your code.
+The rewrite is only performed by the compiler when it spots
+applications of <tt>Exception.assert</tt>, so you can still define and
+use your own versions of <tt/assert/, should you so wish. If not,
+import <tt/Exception/ to make use <tt/assert/ in your code.
 
 To have the compiler ignore uses of assert, use the compiler option
 @-fignore-asserts@. <nidx>-fignore-asserts option</nidx> That is,

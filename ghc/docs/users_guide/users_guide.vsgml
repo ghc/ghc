@@ -17,6 +17,7 @@
 	<!ENTITY utils 		SYSTEM "utils.sgml" >
 	<!ENTITY mutablearray   SYSTEM "MutableArray.sgml">
 	<!ENTITY bytearray      SYSTEM "ByteArray.sgml">
+	<!ENTITY win32-dll      SYSTEM "win32-dlls.sgml">
 ]>
 <article>
 
@@ -41,5 +42,6 @@ Email: @glasgow-haskell-{bugs,users}-request@@haskell.org@
   &libmisc
 &wrong
 &utils
+&win32-dll
 
 </article>
