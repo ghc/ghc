@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.3 1999/02/05 16:02:31 simonm Exp $
+ * $Id: TailCalls.h,v 1.4 1999/03/01 17:40:55 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -89,13 +89,26 @@ register void *_procedure __asm__("$27");
 
 #endif alpha_TARGET_ARCH
 
-/*
+/* -----------------------------------------------------------------------------
+   Tail calling on HP
+   -------------------------------------------------------------------------- */
+
+#ifdef hppa1_1_hp_hpux_TARGET
+
+#define JMP_(cont)				\
+    do { void *_procedure = (void *)(cont);	\
+         goto *_procedure;			\
+       } while(0)
+
+#endif /* hppa1_1_hp_hpux_TARGET */
+
+/* -----------------------------------------------------------------------------
   FUNBEGIN and FUNEND.
 
   These are markers indicating the start and end of Real Code in a
   function.  All instructions between the actual start and end of the
   function and these markers is shredded by the mangler.
-  */
+  -------------------------------------------------------------------------- */
 
 #ifndef FB_
 #define FB_    __asm__ volatile ("--- BEGIN ---");
