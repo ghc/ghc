@@ -342,6 +342,11 @@ shutdownHaskell(STG_NO_ARGS)
     if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
+    /* Give the application a chance to do something sensible
+       on-exit
+    */
+    OnExitHook();
+
     fflush(stdout);
     /* This fflush is important, because: if "main" just returns,
        then we will end up in pre-supplied exit code that will close
