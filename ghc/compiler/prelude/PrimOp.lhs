@@ -1943,7 +1943,7 @@ primOpOutOfLine op
 	  -- it is done out-of-line rather than require
 	  -- the NCG to implement it.
 
-	CCallOp ccall -> ccallMayGC ccall
+	CCallOp c_call -> ccallMayGC c_call
 
 	other -> False
 \end{code}
@@ -2368,7 +2368,7 @@ Output stuff:
 \begin{code}
 pprPrimOp  :: PrimOp -> SDoc
 
-pprPrimOp (CCallOp ccall) = pprCCallOp ccall
+pprPrimOp (CCallOp c_call) = pprCCallOp c_call
 pprPrimOp other_op
   = getPprStyle $ \ sty ->
     if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
