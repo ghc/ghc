@@ -7,6 +7,8 @@ LIBS = $(FLEX_LIB)
 
 override SRC_FLEX_OPTS=-8
 
+CLEAN_FILES += sgmlverb.c
+
 #
 # For src distributions, include flex output.
 #
