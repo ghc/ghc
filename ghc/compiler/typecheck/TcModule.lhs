@@ -11,7 +11,7 @@ module TcModule (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags )
+import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), RuleDecl(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch
@@ -64,6 +64,7 @@ import TyCon		( tyConGenInfo )
 import BasicTypes       ( EP(..), Fixity, RecFlag(..) )
 import SrcLoc		( noSrcLoc )
 import Outputable
+import IO		( stdout )
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, ModIface(..),
 			  ModDetails(..), DFunId,
@@ -320,7 +321,7 @@ data TcResults
 typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls)
   = do	{ maybe_tc_result <- typecheck dflags syn_map pcs hst unqual $
 			     tcModule pcs hst get_fixity this_mod decls
-	; printTcDump dflags maybe_tc_result
+	; printTcDump dflags unqual maybe_tc_result
 	; return maybe_tc_result }
   where
     this_mod   = mi_module   mod_iface
@@ -673,10 +674,11 @@ typecheck dflags syn_map pcs hst unqual thing_inside
 %************************************************************************
 
 \begin{code}
-printTcDump dflags Nothing = return ()
-printTcDump dflags (Just (_, results))
-  = do dumpIfSet_dyn_or dflags [Opt_D_dump_types, Opt_D_dump_tc]
-                     "Interface" (dump_tc_iface results)
+printTcDump dflags unqual Nothing = return ()
+printTcDump dflags unqual (Just (_, results))
+  = do if dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags then
+	  printForUser stdout unqual (dump_tc_iface dflags results)
+          else return ()
 
        dumpIfSet_dyn dflags Opt_D_dump_tc    
                      "Typechecked" (ppr (tc_binds results))
@@ -687,13 +689,16 @@ printIfaceDump dflags (Just (_, details))
   = dumpIfSet_dyn_or dflags [Opt_D_dump_types, Opt_D_dump_tc]
                      "Interface" (pprModDetails details)
 
-dump_tc_iface results
+dump_tc_iface dflags results
   = vcat [pprModDetails (ModDetails {md_types = tc_env results, 
 				     md_insts = tc_insts results,
 				     md_rules = [], md_binds = []}) ,
 	  ppr_rules (tc_rules results),
 
-	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
+	  if dopt Opt_Generics dflags then
+		ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
+	  else 
+		empty
     ]
 
 ppr_rules [] = empty
