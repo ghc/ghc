@@ -995,10 +995,10 @@ rebuild scrut (Select _ bndr alts se cont)
 --		case (\x.e) of f -> ...  
 --	so better to always do it
 
-=   	-- Get rid of the case altogether
+   	-- Get rid of the case altogether
 	-- See the extensive notes on case-elimination below
 	-- Remember to bind the binder though!
-    tick (CaseElim bndr)		`thenSmpl_` (
+  = tick (CaseElim bndr)		`thenSmpl_` (
     setSubstEnv se			$			
     simplBinder bndr			$ \ bndr' ->
     completeBinding bndr bndr' scrut 	$
