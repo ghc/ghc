@@ -81,6 +81,7 @@ data Qual
 rdrNameModule :: RdrName -> ModuleName
 rdrNameModule (RdrName (Qual m) _) = m
 rdrNameModule (RdrName (Orig m) _) = m
+rdrNameModule n			   = pprPanic "rdrNameModule" (ppr n)
 
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (RdrName _ occ) = occ
