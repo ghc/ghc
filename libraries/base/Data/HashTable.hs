@@ -52,18 +52,23 @@ import GHC.IOBase	( IO, IOArray, newIOArray, readIOArray, writeIOArray,
 			  unsafeReadIOArray, unsafeWriteIOArray,
 			  IORef, newIORef, readIORef, writeIORef )
 import GHC.Err		( undefined )
-#elif defined(__HUGS__)
+#else
 import Data.Char	( ord )
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+#  if defined(__HUGS__)
 import Hugs.IOArray	( IOArray, newIOArray, readIOArray, writeIOArray,
 			  unsafeReadIOArray, unsafeWriteIOArray )
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+#  elif defined(__NHC__)
+import NHC.IOExtras	( IOArray, newIOArray, readIOArray, writeIOArray)
+#  endif
 #endif
 import Control.Monad	( when, mapM, sequence_ )
+
 
 -----------------------------------------------------------------------
 myReadArray  :: IOArray Int32 a -> Int32 -> IO a
 myWriteArray :: IOArray Int32 a -> Int32 -> a -> IO ()
-#ifdef DEBUG
+#if defined(DEBUG) || defined(__NHC__)
 myReadArray  = readIOArray
 myWriteArray = writeIOArray
 #else
