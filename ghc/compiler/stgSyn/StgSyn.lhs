@@ -43,10 +43,10 @@ import CostCentre	( showCostCentre, CostCentre )
 import Id		( idPrimRep, SYN_IE(DataCon), 
 			  GenId{-instance NamedThing-}, SYN_IE(Id) )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Outputable	( ifPprDebug, interppSP, interpp'SP,
+import Outputable	( PprStyle(..), userStyle,
+			  ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
-import PprStyle		( PprStyle(..), userStyle )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		-- all of it
 import PrimOp		( PrimOp{-instance Outputable-} )
