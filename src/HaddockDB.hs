@@ -6,7 +6,7 @@
 
 module HaddockDB (ppDocBook) where
 
-import HaddockTypes hiding (Doc)
+import HaddockTypes
 import HaddockUtil
 
 import HsSyn
@@ -16,6 +16,8 @@ import FiniteMap
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format
 
+ppDocBook = error "not working"
+{-
 ppDocBook :: FilePath -> [(Module, Interface)] -> String
 ppDocBook odir mods = render (ppIfaces mods)
 
@@ -55,22 +57,22 @@ ppIfaces mods
 	$$ text "</varlistentry>"
      do_export _ _ = empty
 
-     do_decl (HsTypeSig _ [nm] ty) 
+     do_decl (HsTypeSig _ [nm] ty _) 
 	=  ppHsName nm <> text " :: " <> ppHsType ty
-     do_decl (HsTypeDecl _ nm args ty)
+     do_decl (HsTypeDecl _ nm args ty _)
 	=  hsep ([text "type", ppHsName nm ]
 		 ++ map ppHsName args 
 		 ++ [equals, ppHsType ty])
-     do_decl (HsNewTypeDecl loc ctx nm args con drv)
+     do_decl (HsNewTypeDecl loc ctx nm args con drv _)
 	= hsep ([text "data", ppHsName nm] -- data, not newtype
 		++ map ppHsName args
 		) <+> equals <+> ppHsConstr con -- ToDo: derivings
-     do_decl (HsDataDecl loc ctx nm args cons drv)
+     do_decl (HsDataDecl loc ctx nm args cons drv _)
 	= hsep ([text "data", {-ToDo: context-}ppHsName nm]
 	        ++ map ppHsName args)
             <+> vcat (zipWith (<+>) (equals : repeat (char '|'))
                                     (map ppHsConstr cons))
-     do_decl (HsClassDecl loc ty fds decl)
+     do_decl (HsClassDecl loc ty fds decl _)
 	= hsep [text "class", ppHsType ty]
      do_decl decl
 	= empty
@@ -158,3 +160,4 @@ ubxParenList :: [Doc] -> Doc
 ubxParenList = ubxparens . fsep . punctuate comma
 
 ubxparens p = text "(#" <> p <> text "#)"
+-}

@@ -2,7 +2,9 @@
 module HaddockParse (parseParas, parseString) where
 
 import HaddockLex
-import HaddockTypes
+import HsSyn
+import HsLexer hiding (Token)
+import HsParseMonad
 }
 
 %tokentype { Token }
@@ -26,48 +28,48 @@ import HaddockTypes
 
 %%
 
-doc	:: { ParsedDoc }
+doc	:: { Doc }
 	: apara PARA doc	{ docAppend $1 $3 }
 	| PARA doc 		{ $2 }
 	| apara			{ $1 }
 	| {- empty -}		{ DocEmpty }
 
-apara	:: { ParsedDoc }
+apara	:: { Doc }
 	: ulpara		{ DocUnorderedList [$1] }
 	| olpara		{ DocOrderedList [$1] }
 	| para			{ $1 }
 
-ulpara  :: { ParsedDoc }
+ulpara  :: { Doc }
 	: '*' para		{ $2 }
 
-olpara  :: { ParsedDoc } 
+olpara  :: { Doc } 
 	: '(n)' para		{ $2 }
 
-para    :: { ParsedDoc }
+para    :: { Doc }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
 
-codepara :: { ParsedDoc }
+codepara :: { Doc }
 	: '>' seq codepara	{ docAppend $2 $3 }
 	| '>' seq		{ $2 }
 
-seq	:: { ParsedDoc }
+seq	:: { Doc }
 	: elem seq		{ docAppend $1 $2 }
 	| elem			{ $1 }
 
-elem	:: { ParsedDoc }
+elem	:: { Doc }
 	: elem1			{ $1 }
 	| '@' seq1 '@'		{ DocMonospaced $2 }
 
-seq1	:: { ParsedDoc }
+seq1	:: { Doc }
 	: elem1 seq1		{ docAppend $1 $2 }
 	| elem1			{ $1 }
 
-elem1	:: { ParsedDoc }
+elem1	:: { Doc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
-	| squo STRING squo	{ DocIdentifier $2 }
+	| squo STRING squo	{ DocIdentifier (strToHsQNames $2) }
 	| DQUO STRING DQUO	{ DocModule $2 }
 
 squo :: { () }
@@ -86,4 +88,29 @@ instance Monad (Either String) where
 	Left  l >>= _ = Left l
 	Right r >>= k = k r
 	fail msg      = Left msg
+
+strToHsQNames :: String -> [ HsQName ]
+strToHsQNames str
+ = case lexer (\t -> returnP t) str (SrcLoc 1 1) 1 1 [] of
+	Ok _ (VarId str)
+		-> [ UnQual (HsVarName (HsIdent str)) ]
+        Ok _ (QVarId (mod,str))
+		-> [ Qual (Module mod) (HsVarName (HsIdent str)) ]
+	Ok _ (ConId str)
+		-> [ UnQual (HsTyClsName (HsIdent str)),
+		     UnQual (HsVarName (HsIdent str)) ]
+        Ok _ (QConId (mod,str))
+		-> [ Qual (Module mod) (HsTyClsName (HsIdent str)),
+		     Qual (Module mod) (HsVarName (HsIdent str)) ]
+        Ok _ (VarSym str)
+		-> [ UnQual (HsVarName (HsSymbol str)) ]
+        Ok _ (ConSym str)
+		-> [ UnQual (HsTyClsName (HsSymbol str)),
+		     UnQual (HsVarName (HsSymbol str)) ]
+        Ok _ (QVarSym (mod,str))
+		-> [ Qual (Module mod) (HsVarName (HsSymbol str)) ]
+        Ok _ (QConSym (mod,str))
+		-> [ Qual (Module mod) (HsTyClsName (HsSymbol str)),
+		     Qual (Module mod) (HsVarName (HsSymbol str)) ]
+	other -> []
 }

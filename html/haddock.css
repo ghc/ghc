@@ -1,6 +1,7 @@
 BODY { 
   background-color: #ffffff;
-  color: #000000
+  color: #000000;
+  font-family: sans-serif;
   } 
 
 TD.topbar {
@@ -19,7 +20,8 @@ TD.topbut {
   padding-right: 5px;
   border-left-width: 1px;
   border-left-color: #ffffff;
-  border-left-style: solid
+  border-left-style: solid;
+  white-space: nowrap;
   }
 TD.topbut A:link {
   color: #ffffff
@@ -52,7 +54,9 @@ TD.synopsis {
 TD.decl { 
   padding: 2px;
   background-color: #f0f0f0; 
-  font-family: monospace
+  font-family: monospace;
+  white-space: nowrap;
+  vertical-align: top;
   }
 
 TD.condecl  { padding-left: 10px }
@@ -60,11 +64,19 @@ TD.recfield { padding-left: 20px }
 
 TD.doc  { 
   padding-top: 2px;
-  font-family: sans-serif;  
   padding-left: 10px
   }
 
-TD.cbody  { 
+TD.ndoc  { 
+  padding: 2px;
+  }
+
+TD.rdoc  { 
+  padding: 2px;
+  padding-left: 10px;
+  }
+
+TD.body  { 
   padding-left: 10px
   }
 
@@ -90,27 +102,23 @@ TD.botbar A:hover {
 
 TD.section1 {
   padding-top: 15px;
-  font-family: sans-serif;
   font-weight: bold;
   font-size: 150%
   }
 
 TD.section2 {
   padding-top: 10px;
-  font-family: sans-serif;
   font-weight: bold;
   font-size: 130%
   }
 
 TD.section3 {
   padding-top: 5px;
-  font-family: sans-serif;
   font-weight: bold;
   font-size: 110%
   }
 
 TD.section4 {
-  font-family: sans-serif;
   font-weight: bold;
   font-size: 100%
   }

@@ -10,7 +10,7 @@ module HaddockRename (
 	renameExportList, 
 	renameDecl,
 	renameExportItems,
-	renameDoc, resolveDoc,
+	renameDoc,
   ) where
 
 import HaddockTypes
@@ -64,37 +64,47 @@ renameExportList spec = mapM renameExport spec
     renameExport (HsEVar x) = lookupRn HsEVar x
     renameExport (HsEAbs x) = lookupRn HsEAbs x
     renameExport (HsEThingAll x) = lookupRn HsEThingAll x
-    renameExport (HsEThingWith x cs)
-	= do cs' <- mapM (lookupRn id) cs
-	     lookupRn (\x' -> HsEThingWith x' cs') x
+    renameExport (HsEThingWith x cs) = do
+	cs' <- mapM (lookupRn id) cs
+	lookupRn (\x' -> HsEThingWith x' cs') x
     renameExport (HsEModuleContents m) = return (HsEModuleContents m)
-    renameExport (HsEGroup lev str) = return (HsEGroup lev str)
-    renameExport (HsEDoc str) = return (HsEDoc str)
+    renameExport (HsEGroup lev doc) = do
+	doc <- renameDoc doc
+	return (HsEGroup lev doc)
+    renameExport (HsEDoc doc) = do
+	doc <- renameDoc doc
+	return (HsEDoc doc)
     renameExport (HsEDocNamed str) = return (HsEDocNamed str)
 
 
 renameDecl :: HsDecl -> RnM HsDecl
 renameDecl decl
   = case decl of
-	HsTypeDecl loc t args ty -> do
+	HsTypeDecl loc t args ty doc -> do
 	    ty <- renameType ty
-	    return (HsTypeDecl loc t args ty)
-	HsDataDecl loc ctx t args cons drv -> do
+	    doc <- renameMaybeDoc doc
+	    return (HsTypeDecl loc t args ty doc)
+	HsDataDecl loc ctx t args cons drv doc -> do
 	    cons <- mapM renameConDecl cons
-	    return (HsDataDecl loc ctx t args cons drv)
-        HsNewTypeDecl loc ctx t args con drv -> do
+	    doc <- renameMaybeDoc doc
+	    return (HsDataDecl loc ctx t args cons drv doc)
+        HsNewTypeDecl loc ctx t args con drv doc -> do
 	    con <- renameConDecl con
-	    return (HsNewTypeDecl loc ctx t args con drv)
-        HsClassDecl loc qt fds decls -> do
+	    doc <- renameMaybeDoc doc
+	    return (HsNewTypeDecl loc ctx t args con drv doc)
+        HsClassDecl loc qt fds decls doc -> do
 	    qt <- renameClassHead qt
 	    decls <- mapM renameDecl decls
-	    return (HsClassDecl loc qt fds decls)
-	HsTypeSig loc fs qt -> do
+	    doc <- renameMaybeDoc doc
+	    return (HsClassDecl loc qt fds decls doc)
+	HsTypeSig loc fs qt doc -> do
 	    qt <- renameType qt
-	    return (HsTypeSig loc fs qt)
-	HsForeignImport loc cc safe ent n ty -> do
+	    doc <- renameMaybeDoc doc
+	    return (HsTypeSig loc fs qt doc)
+	HsForeignImport loc cc safe ent n ty doc -> do
 	    ty <- renameType ty
-	    return (HsForeignImport loc cc safe ent n ty)
+	    doc <- renameMaybeDoc doc
+	    return (HsForeignImport loc cc safe ent n ty doc)
 	_ -> 
 	    return decl
 
@@ -104,15 +114,18 @@ renameClassHead (HsForAllType tvs ctx ty) = do
 renameClassHead ty = do
   return ty
 
-renameConDecl (HsConDecl loc nm tvs ctxt tys maybe_doc) = do
+renameConDecl (HsConDecl loc nm tvs ctxt tys doc) = do
   tys <- mapM renameBangTy tys
-  return (HsConDecl loc nm tvs ctxt tys maybe_doc)
-renameConDecl (HsRecDecl loc nm tvs ctxt fields maybe_doc) = do
+  doc <- renameMaybeDoc doc
+  return (HsConDecl loc nm tvs ctxt tys doc)
+renameConDecl (HsRecDecl loc nm tvs ctxt fields doc) = do
   fields <- mapM renameField fields
-  return (HsRecDecl loc nm tvs ctxt fields maybe_doc)
+  doc <- renameMaybeDoc doc
+  return (HsRecDecl loc nm tvs ctxt fields doc)
 
 renameField (HsFieldDecl ns ty doc) = do 
   ty <- renameBangTy ty
+  doc <- renameMaybeDoc doc
   return (HsFieldDecl ns ty doc)
 
 renameBangTy (HsBangedTy ty)   = HsBangedTy   `liftM` renameType ty
@@ -141,19 +154,23 @@ renameType (HsTyVar nm) =
   return (HsTyVar nm)
 renameType (HsTyCon nm) =
   lookupRn HsTyCon nm
+renameType (HsTyDoc ty doc) = do
+  ty <- renameType ty
+  doc <- renameDoc doc
+  return (HsTyDoc ty doc)
 
 -- -----------------------------------------------------------------------------
 -- Renaming documentation
 
 -- Renaming documentation is done by "marking it up" from ordinary Doc
 -- into (Rn Doc), which can then be renamed with runRn.
-markupRename :: DocMarkup HsQName (RnM Doc)
+markupRename :: DocMarkup [HsQName] (RnM Doc)
 markupRename = Markup {
   markupEmpty         = return DocEmpty,
   markupString        = return . DocString,
   markupParagraph     = liftM DocParagraph,
   markupAppend        = liftM2 DocAppend,
-  markupIdentifier    = lookupRn DocIdentifier,
+  markupIdentifier    = lookupForDoc,
   markupModule        = return . DocModule,
   markupEmphasis      = liftM DocEmphasis,
   markupMonospaced    = liftM DocMonospaced,
@@ -165,31 +182,32 @@ markupRename = Markup {
 
 renameDoc = markup markupRename
 
-markupResolveDoc :: DocMarkup String (GenRnM String Doc)
-markupResolveDoc = Markup {
-  markupEmpty         = return DocEmpty,
-  markupString        = return . DocString,
-  markupParagraph     = liftM DocParagraph,
-  markupAppend        = liftM2 DocAppend,
-  markupIdentifier    = lookupIdString,
-  markupModule        = return . DocModule,
-  markupEmphasis      = liftM DocEmphasis,
-  markupMonospaced    = liftM DocMonospaced,
-  markupUnorderedList = liftM DocUnorderedList . sequence,
-  markupOrderedList   = liftM DocOrderedList . sequence,
-  markupCodeBlock     = liftM DocCodeBlock,
-  markupURL	      = return . DocURL
-  }
+renameMaybeDoc Nothing = return Nothing
+renameMaybeDoc (Just doc) = Just `liftM` renameDoc doc
 
-resolveDoc = markup markupResolveDoc
+-- ---------------------------------------------------------------------------
+-- Looking up names in documentation
 
-lookupIdString :: String -> GenRnM String Doc
-lookupIdString str = do
-  fn <- getLookupRn
-  case fn str of
-	Nothing -> return (DocString str)
-	Just n  -> return (DocIdentifier n)
-
+lookupForDoc :: [HsQName] -> RnM Doc
+lookupForDoc qns = do
+  lkp <- getLookupRn
+  case [ n | Just n <- map lkp qns ] of
+	ns@(_:_) -> return (DocIdentifier ns)
+	[] -> -- if we were given a qualified name, but there's nothing
+	      -- matching that name in scope, then just assume its existence
+	      -- (this means you can use qualified names in doc strings wihout
+	      -- worrying about whether the entity is in scope).
+	      let quals = filter isQualified qns in
+	      if (not (null quals)) then
+		return (DocIdentifier quals)
+	      else
+		-- no qualified names: just replace this name with its
+		-- string representation.
+		return (DocString (show (head qns)))
+ where
+   isQualified (Qual m i) = True
+   isQualified _ = False
+   
 -- -----------------------------------------------------------------------------
 
 renameExportItems items = mapM rn items

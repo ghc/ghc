@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.10 2002/05/09 12:43:06 simonmar Exp $
+$Id: HsParser.ly,v 1.11 2002/05/15 13:03:02 simonmar Exp $
 
-(c) Simon Marlow, Sven Panne 1997-2000
+(c) Simon Marlow, Sven Panne 1997-2002
 
 Haskell grammar.
 -----------------------------------------------------------------------------
@@ -21,14 +21,10 @@ ToDo: Differentiate between record updates and labeled construction.
 > import HsParseMonad
 > import HsLexer
 > import HsParseUtils
-> 
-> #ifdef __HUGS__
-> {-
-> #endif
-> import GlaExts
-> #ifdef __HUGS__
-> -}
-> #endif
+> import HaddockLex 	hiding (Token)
+> import HaddockParse
+> import HaddockUtil	( parseModuleHeader )
+> import Char 		( isSpace )
 > }
 
 -----------------------------------------------------------------------------
@@ -71,7 +67,7 @@ Docs
 >	DOCNEXT    { DocCommentNext $$ }
 >	DOCPREV    { DocCommentPrev $$ }
 >	DOCNAMED   { DocCommentNamed $$ }
->	DOCGROUP   { DocSection _ _ }
+>	DOCSECTION { DocSection _ _ }
 >	DOCOPTIONS { DocOptions $$ }
 
 Symbols
@@ -153,18 +149,19 @@ Module Header
 
 > module :: { HsModule }
 > 	: optdoc 'module' modid maybeexports 'where' body
->	    { HsModule $3 $4 (reverse (fst $6)) (reverse (snd $6)) 
->		(fst $1) (snd $1) }
+>	    { case $1 of { (opts,info,doc) ->
+>	      HsModule $3 $4 (reverse (fst $6)) (reverse (snd $6)) 
+>		opts info doc } }
 >	| body
 >	    { HsModule main_mod Nothing (reverse (fst $1)) (reverse (snd $1))
->		Nothing Nothing }
+>		Nothing Nothing Nothing }
 
-> optdoc :: { (Maybe String, Maybe String) }
->	: DOCNEXT					{ (Nothing, Just $1) }
->	| DOCOPTIONS					{ (Just $1, Nothing) }
->	| DOCOPTIONS DOCNEXT 				{ (Just $1, Just $2) }
->	| DOCNEXT DOCOPTIONS 				{ (Just $2, Just $1) }
->	| {- empty -}					{ (Nothing, Nothing) }
+> optdoc :: { (Maybe String, Maybe ModuleInfo, Maybe Doc) }
+>	: moduleheader			{ (Nothing, fst $1, snd $1) }
+>	| DOCOPTIONS			{ (Just $1, Nothing, Nothing) }
+>	| DOCOPTIONS moduleheader	{ (Just $1, fst $2, snd $2) }
+>	| moduleheader DOCOPTIONS	{ (Just $2, fst $1, snd $1) }
+>	| {- empty -}			{ (Nothing, Nothing, Nothing) }
 
 > body :: { ([HsImportDecl],[HsDecl]) }
 >	:  '{' bodyaux '}'				{ $2 }
@@ -193,14 +190,14 @@ The Export List
 > exportlist :: { [HsExportSpec] }
 >	:  export ',' exportlist		{ $1 : $3 }
 >	|  docgroup exportlist			{ $1 : $2 }
->	|  DOCNAMED exportlist			{ HsEDocNamed $1 : $2 }
->	|  DOCNEXT  exportlist			{ HsEDoc $1 : $2 }
+>	|  docnamed exportlist			{ HsEDocNamed (fst $1) : $2 }
+>	|  docnext  exportlist			{ HsEDoc $1 : $2 }
 > 	|  ',' exportlist			{ $2 }
 >	|  export				{ [$1] }
 > 	|  {- empty -}				{ [] }
 
 > docgroup :: { HsExportSpec }
-> 	: DOCGROUP	{ case $1 of { DocSection i s -> HsEGroup i s } }
+> 	: docsection			{ case $1 of { (i,s) -> HsEGroup i s } }
 
 > export :: { HsExportSpec }
 > 	:  qvar					{ HsEVar $1 }
@@ -299,19 +296,19 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 
 > topdecl :: { HsDecl }
 >	: 'type' simpletype srcloc '=' ctype
->			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
+>		{ HsTypeDecl $3 (fst $2) (snd $2) $5 Nothing }
 >	| 'data' ctype srcloc constrs deriving
->			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
->			   returnP (HsDataDecl $3 cs c t (reverse $4) $5) }
+>		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
+>		   returnP (HsDataDecl $3 cs c t (reverse $4) $5 Nothing) }
 >	| 'newtype' ctype srcloc '=' constr deriving
->			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
->			   returnP (HsNewTypeDecl $3 cs c t $5 $6) }
+>		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
+>		   returnP (HsNewTypeDecl $3 cs c t $5 $6 Nothing) }
 >	| 'class' srcloc ctype fds optcbody
->			{ HsClassDecl $2 $3 $4 $5}
+>		{ HsClassDecl $2 $3 $4 $5 Nothing}
 >	| 'instance' srcloc ctype optvaldefs
->			{ HsInstDecl $2 $3 $4 }
+>		{ HsInstDecl $2 $3 $4 }
 >	| 'default' srcloc '(' typelist ')'
->			{ HsDefaultDecl $2 $4 }
+>		{ HsDefaultDecl $2 $4 }
 >	| 'foreign' fdecl { $2 }
 >       | decl		{ $1 }
 
@@ -329,21 +326,21 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| decl				{ [$1] }
 
 > decl :: { HsDecl }
->	: signdecl			{ $1 }
->	| fixdecl			{ $1 }
->	| valdef			{ $1 }
->	| DOCNEXT			{ HsDocCommentNext $1 }
->	| DOCPREV			{ HsDocCommentPrev $1 }
->	| DOCNAMED			{ HsDocCommentNamed $1 }
->	| DOCGROUP			{ case $1 of { DocSection i s -> 
->							HsDocGroup i s } }
+>	: signdecl		{ $1 }
+>	| fixdecl		{ $1 }
+>	| valdef		{ $1 }
+>	| srcloc docnext	{ HsDocCommentNext $1 $2 }
+>	| srcloc docprev	{ HsDocCommentPrev $1 $2 }
+>	| srcloc docnamed	{ case $2 of { (n,s) -> 
+>					HsDocCommentNamed $1 n s } }
+>	| srcloc docsection	{ case $2 of { (i,s) -> HsDocGroup $1 i s } }
 
 > decllist :: { [HsDecl] }
 >	: '{' decls '}'			{ $2 }
 >	|     layout_on  decls close	{ $2 }
 
 > signdecl :: { HsDecl }
->	: vars srcloc '::' ctype	{ HsTypeSig $2 (reverse $1) $4 }
+>	: vars srcloc '::' ctypedoc	{ HsTypeSig $2 (reverse $1) $4 Nothing }
 
 ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
 instead of qvar, we get another shift/reduce-conflict. Consider the
@@ -366,9 +363,9 @@ Foreign Declarations
 
 > fdecl :: { HsDecl }
 > fdecl : srcloc 'import' callconv safety fspec
->	  { case $5 of (spec,nm,ty) -> HsForeignImport $1 $3 $4 spec nm ty }
+>	  { case $5 of (spec,nm,ty) -> HsForeignImport $1 $3 $4 spec nm ty Nothing }
 > 	| srcloc 'import' callconv fspec
->	  { case $4 of (spec,nm,ty) -> HsForeignImport $1 $3 HsFISafe spec nm ty }
+>	  { case $4 of (spec,nm,ty) -> HsForeignImport $1 $3 HsFISafe spec nm ty Nothing }
 > 	| srcloc 'export' callconv fspec
 >	  { case $4 of (spec,nm,ty) -> HsForeignExport $1 $3 spec nm ty }
 
@@ -383,14 +380,22 @@ Foreign Declarations
 > 	  | 'threadsafe'		{ HsFIThreadSafe  }
 
 > fspec :: { (String, HsName, HsType) }
-> 	 : STRING varid '::' ctype      { ($1, $2, $4) }
-> 	 |        varid '::' ctype      { ("", $1, $3) }
+> 	 : STRING varid '::' ctypedoc   { ($1, $2, $4) }
+> 	 |        varid '::' ctypedoc   { ("", $1, $3) }
 
 -----------------------------------------------------------------------------
 Types
 
+> doctype :: { HsType }
+>	: tydoc '->' doctype		{ HsTyFun $1 $3 }
+>	| tydoc				{ $1 }
+
+> tydoc :: { HsType }
+> 	: btype				{ $1 }
+>	| btype docprev			{ HsTyDoc $1 $2 }
+
 > type :: { HsType }
->	: btype '->' type		{ HsTyFun $1 $3 }
+> 	: btype '->' type		{ HsTyFun $1 $3 }
 >	| btype				{ $1 }
 
 > btype :: { HsType }
@@ -428,6 +433,11 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 >	: 'forall' tyvars '.' ctype	{ mkHsForAllType (Just $2) [] $4 }
 >	| context '=>' type		{ mkHsForAllType Nothing $1 $3 }
 >	| type				{ $1 }
+
+> ctypedoc :: { HsType }
+>	: 'forall' tyvars '.' ctypedoc	{ mkHsForAllType (Just $2) [] $4 }
+>	| context '=>' doctype		{ mkHsForAllType Nothing $1 $3 }
+>	| doctype			{ $1 }
 
 > context :: { HsContext }
 > 	: btype				{% checkContext $1 }
@@ -471,14 +481,6 @@ Datatype declarations
 > constr_stuff :: { (HsName, [HsBangType]) }
 > 	: scontype 				{ $1 }
 >	| sbtype conop sbtype			{ ($2, [$1,$3]) }
-
-> maybe_docprev :: { Maybe String }
-> 	: DOCPREV			{ Just $1 }
->	| {- empty -}			{ Nothing }
-
-> maybe_docnext :: { Maybe String }
-> 	: DOCNEXT			{ Just $1 }
->	| {- empty -}			{ Nothing }
 
 > scontype :: { (HsName, [HsBangType]) }
 >	: btype				{% splitTyConApp $1 `thenP` \(c,ts) ->
@@ -925,6 +927,45 @@ Miscellaneous (mostly renamings)
 
 > tyvar :: { HsName }
 >	: varid_no_forall	{ $1 }
+
+-----------------------------------------------------------------------------
+Documentation comments
+
+> docnext :: { Doc }
+>	: DOCNEXT	{% case parseParas (tokenise $1) of {
+>				Left  err -> parseError err;
+>				Right doc -> returnP doc } }
+
+> docprev :: { Doc }
+>	: DOCPREV	{% case parseParas (tokenise $1) of {
+>				Left  err -> parseError err;
+>				Right doc -> returnP doc } }
+
+> docnamed :: { (String,Doc) }
+>	: DOCNAMED	{% let (name,rest) = break isSpace $1 in
+>			   case parseParas (tokenise rest) of {
+>				Left  err -> parseError err;
+>				Right doc -> returnP (name,doc) } }
+
+> docsection :: { (Int,Doc) }
+> 	: DOCSECTION	{% case $1 of { DocSection n s -> 
+>			   case parseString (tokenise s) of {
+>				Left err -> parseError err;
+>				Right doc -> returnP (n, doc) } } }
+
+> maybe_docprev :: { Maybe Doc }
+> 	: docprev			{ Just $1 }
+>	| {- empty -}			{ Nothing }
+
+> maybe_docnext :: { Maybe Doc }
+> 	: docnext			{ Just $1 }
+>	| {- empty -}			{ Nothing }
+
+> moduleheader :: { (Maybe ModuleInfo, Maybe Doc) }
+>	: DOCNEXT 	{% let (str, info) = parseModuleHeader $1 in
+>			   case parseParas (tokenise str) of {
+>				Left  err -> parseError err;
+>				Right doc -> returnP (info, Just doc); } }
 
 -----------------------------------------------------------------------------
 

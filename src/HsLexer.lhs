@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.8 2002/05/09 12:45:19 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.9 2002/05/15 13:03:02 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -17,7 +17,7 @@ module HsLexer (Token(..), lexer, parseError,isSymbol) where
 
 import HsParseMonad
 import HsParseUtils
-import HsSyn(SrcLoc(..))
+import HsSyn
 
 import Numeric	( readHex, readOct )
 import Char
@@ -64,11 +64,11 @@ data Token
 	
 -- Documentation annotations
 
-	| DocCommentNext String		-- something beginning '-- |'
-	| DocCommentPrev String		-- something beginning '-- ^'
+	| DocCommentNext  String	-- something beginning '-- |'
+	| DocCommentPrev  String	-- something beginning '-- ^'
 	| DocCommentNamed String	-- something beginning '-- $'
-	| DocSection Int String		-- a section heading
-	| DocOptions String
+	| DocSection      Int String	-- a section heading
+	| DocOptions      String	-- attributes '-- #'
 
 -- Reserved operators
 
@@ -280,10 +280,9 @@ lexToken cont s loc y x =
    -- trace ("lexer: y="++show y++" x="++show x++"\n") $ 
    case s of
 	-- First the doc comments
-	'-':'-':' ':s -> do_doc s docComment
-
-	'{':'-':' ':s -> do_doc s nestedDocComment
-	'{':'-':s     -> do_doc s nestedDocComment
+	'-':'-':' ':s -> do_doc s False
+	'{':'-':' ':s -> do_doc s True
+	'{':'-':s     -> do_doc s True
 
         -- Next the special symbols
         '(':'#':s -> forward 2 LeftUT s
@@ -346,16 +345,21 @@ lexToken cont s loc y x =
 
   where forward n t s = cont t s loc y (x+n)
 
-	do_doc ('|':s) f = f DocCommentNext  cont s loc y x
-	do_doc ('/':s) f = f DocCommentNext  cont s loc y x
-	do_doc ('^':s) f = f DocCommentPrev  cont s loc y x
-	do_doc ('$':s) f = f DocCommentNamed cont s loc y x
-	do_doc ('#':s) f = f DocOptions      cont s loc y x
-	do_doc ('*':s) f = section 1 s
+	-- this is all terribly ugly, sorry :(
+	do_doc ('|':s) nested  = multi nested DocCommentNext  cont s loc y x
+	do_doc ('/':s) nested  = multi nested DocCommentNext  cont s loc y x
+	do_doc ('^':s) nested  = multi nested DocCommentPrev  cont s loc y x
+	do_doc ('$':s) nested  = multi nested DocCommentNamed cont s loc y x
+	do_doc ('#':s) nested  = multi nested DocOptions      cont s loc y x
+	do_doc ('*':s) nested  = section 1 s
 	  where section n ('*':s) = section (n+1) s
-		section n s = f (DocSection n) cont s loc y x
+		section n s 
+		  | nested = nestedDocComment (DocSection n) cont s loc y x
+		  | otherwise = oneLineDocComment (DocSection n) cont s loc y x
 	do_doc _ _ = error "Internal error: HsLexer.do_doc"
 
+multi True  = nestedDocComment
+multi False = multiLineDocComment
 
 afterNum cont i ('#':s) loc y x = cont (PrimInt i) s loc y (x+1)
 afterNum cont i s loc y x = cont (IntTok i) s loc y x
@@ -593,10 +597,13 @@ nestedDocComment f cont s loc y x = go f cont "" y x s
       c:s       -> go f cont (c:acc) y (x+1) s
       []        -> error "Internal error: nestedComment"
 
+oneLineDocComment f cont s loc y x
+  = cont (f line) rest loc y x -- continue with the newline char
+  where (line, rest) = break (== '\n') s
 
-docComment f cont s loc y x 
-  = let (s', comment, y') = slurpExtraCommentLines s [] y in
-    cont (f comment) s' loc y' x  -- continue with the newline char
+multiLineDocComment f cont s loc y x 
+  = cont (f comment) s' loc y' x -- continue with the newline char
+  where (s', comment, y') = slurpExtraCommentLines s [] y
     
 slurpExtraCommentLines s lines y
   = case rest of

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.8 2002/05/09 10:35:00 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.9 2002/05/15 13:03:02 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -10,7 +10,7 @@
 \begin{code}
 module HsSyn (
     SrcLoc(..), Module(..), HsQName(..), HsName(..), HsIdentifier(..),
-    HsModule(..), HsExportSpec(..),
+    HsModule(..), HsExportSpec(..),  ModuleInfo(..),
     HsImportDecl(..), HsImportSpec(..), HsAssoc(..),
     HsDecl(..), HsMatch(..), HsConDecl(..), HsFieldDecl(..), 
     HsBangType(..), HsRhs(..),
@@ -28,8 +28,13 @@ module HsSyn (
     stdcall_name, ccall_name, dotnet_name,
     unit_tycon_name, fun_tycon_name, list_tycon_name, tuple_tycon_name,
     unit_tycon, fun_tycon, list_tycon, tuple_tycon,
+
+    GenDoc(..), Doc, DocMarkup(..),
+    markup, mapIdent, 
+    docAppend, docParagraph,
   ) where
 
+import Char (isSpace)
 
 data SrcLoc = SrcLoc Int Int -- (Line, Indentation)
   deriving (Eq,Ord,Show)
@@ -72,8 +77,15 @@ instance Show HsIdentifier where
 
 data HsModule = HsModule Module (Maybe [HsExportSpec])
                         [HsImportDecl] [HsDecl] 
-			(Maybe String)	-- the doc options
-			(Maybe String)	-- the module doc
+			(Maybe String)		-- the doc options
+			(Maybe ModuleInfo)	-- the info (portability etc.)
+			(Maybe Doc)		-- the module doc
+  deriving Show
+
+data ModuleInfo = ModuleInfo
+	{ portability :: String,
+	  stability   :: String,
+	  maintainer  :: String }
   deriving Show
 
 -- Export/Import Specifications
@@ -84,8 +96,8 @@ data HsExportSpec
 	 | HsEThingAll HsQName			-- T(..)
 	 | HsEThingWith HsQName [HsQName]	-- T(C_1,...,C_n)
 	 | HsEModuleContents Module		-- module M   (not for imports)
-	 | HsEGroup Int String			-- a doc section heading
-	 | HsEDoc String			-- some documentation
+	 | HsEGroup Int Doc			-- a doc section heading
+	 | HsEDoc Doc				-- some documentation
 	 | HsEDocNamed String			-- a reference to named doc
   deriving (Eq,Show)
 
@@ -120,22 +132,37 @@ data HsCallConv
   deriving (Eq,Show)
 
 data HsDecl
-	 = HsTypeDecl	 SrcLoc HsName [HsName] HsType
-	 | HsDataDecl	 SrcLoc HsContext HsName [HsName] [HsConDecl] [HsQName]
-	 | HsInfixDecl   SrcLoc HsAssoc Int [HsName]
-	 | HsNewTypeDecl SrcLoc HsContext HsName [HsName] HsConDecl [HsQName]
-	 | HsClassDecl	 SrcLoc HsType [HsFunDep] [HsDecl]
-	 | HsInstDecl	 SrcLoc HsType [HsDecl]
-	 | HsDefaultDecl SrcLoc [HsType]
-	 | HsTypeSig	 SrcLoc [HsName] HsType
-	 | HsFunBind     [HsMatch]
-	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
-	 | HsForeignImport SrcLoc HsCallConv HsFISafety String HsName HsType
-	 | HsForeignExport SrcLoc HsCallConv String HsName HsType
-	 | HsDocCommentNext String	-- a documentation annotation
-	 | HsDocCommentPrev String	-- a documentation annotation
-	 | HsDocCommentNamed String	-- a documentation annotation
-	 | HsDocGroup    Int String	-- a documentation group
+  = HsTypeDecl SrcLoc HsName [HsName] HsType (Maybe Doc)
+ 
+  | HsDataDecl SrcLoc HsContext HsName [HsName] [HsConDecl] [HsQName]
+ 		  (Maybe Doc)
+ 
+  | HsInfixDecl SrcLoc HsAssoc Int [HsName]
+ 
+  | HsNewTypeDecl SrcLoc HsContext HsName [HsName] HsConDecl [HsQName]
+ 		  (Maybe Doc)
+ 
+  | HsClassDecl SrcLoc HsType [HsFunDep] [HsDecl] (Maybe Doc)
+ 
+  | HsInstDecl SrcLoc HsType [HsDecl]
+ 
+  | HsDefaultDecl SrcLoc [HsType]
+ 
+  | HsTypeSig SrcLoc [HsName] HsType (Maybe Doc)
+ 
+  | HsFunBind [HsMatch]
+ 
+  | HsPatBind SrcLoc HsPat HsRhs {-where-} [HsDecl]
+ 
+  | HsForeignImport SrcLoc HsCallConv HsFISafety String HsName HsType
+ 		    (Maybe Doc)
+ 
+  | HsForeignExport SrcLoc HsCallConv String HsName HsType
+ 
+  | HsDocCommentNext  SrcLoc Doc	-- a documentation annotation
+  | HsDocCommentPrev  SrcLoc Doc	-- a documentation annotation
+  | HsDocCommentNamed SrcLoc String Doc	-- a documentation annotation
+  | HsDocGroup        SrcLoc Int Doc	-- a documentation group
   deriving (Eq,Show)
 
 data HsMatch 
@@ -143,12 +170,12 @@ data HsMatch
   deriving (Eq,Show)
 
 data HsConDecl
-     = HsConDecl SrcLoc HsName [HsName] HsContext [HsBangType] (Maybe String)
-     | HsRecDecl SrcLoc HsName [HsName] HsContext [HsFieldDecl] (Maybe String)
+     = HsConDecl SrcLoc HsName [HsName] HsContext [HsBangType] (Maybe Doc)
+     | HsRecDecl SrcLoc HsName [HsName] HsContext [HsFieldDecl] (Maybe Doc)
   deriving (Eq,Show)
 
 data HsFieldDecl
-	= HsFieldDecl [HsName] HsBangType (Maybe String)
+	= HsFieldDecl [HsName] HsBangType (Maybe Doc)
   deriving (Eq,Show)
 
 data HsBangType
@@ -172,6 +199,7 @@ data HsType
 	 | HsTyApp   HsType HsType
 	 | HsTyVar   HsName
 	 | HsTyCon   HsQName
+	 | HsTyDoc   HsType Doc
   deriving (Eq,Show)
 
 type HsFunDep  = ([HsName], [HsName])
@@ -317,4 +345,106 @@ unit_tycon	      = HsTyCon unit_tycon_name
 fun_tycon	      = HsTyCon fun_tycon_name
 list_tycon	      = HsTyCon list_tycon_name
 tuple_tycon i	      = HsTyCon (tuple_tycon_name i)
+
+-- -----------------------------------------------------------------------------
+-- Doc strings and formatting
+
+data GenDoc id
+  = DocEmpty 
+  | DocAppend (GenDoc id) (GenDoc id)
+  | DocString String
+  | DocParagraph (GenDoc id)
+  | DocIdentifier id
+  | DocModule String
+  | DocEmphasis (GenDoc id)
+  | DocMonospaced (GenDoc id)
+  | DocUnorderedList [GenDoc id]
+  | DocOrderedList [GenDoc id]
+  | DocCodeBlock (GenDoc id)
+  | DocURL String
+  deriving (Eq, Show)
+
+type Doc = GenDoc [HsQName]
+
+-- | DocMarkup is a set of instructions for marking up documentation.
+-- In fact, it's really just a mapping from 'GenDoc' to some other
+-- type [a], where [a] is usually the type of the output (HTML, say).
+
+data DocMarkup id a = Markup {
+  markupEmpty         :: a,
+  markupString        :: String -> a,
+  markupParagraph     :: a -> a,
+  markupAppend        :: a -> a -> a,
+  markupIdentifier    :: id -> a,
+  markupModule        :: String -> a,
+  markupEmphasis      :: a -> a,
+  markupMonospaced    :: a -> a,
+  markupUnorderedList :: [a] -> a,
+  markupOrderedList   :: [a] -> a,
+  markupCodeBlock     :: a -> a,
+  markupURL	      :: String -> a
+  }
+
+markup :: DocMarkup id a -> GenDoc id -> a
+markup m DocEmpty		= markupEmpty m
+markup m (DocAppend d1 d2)	= markupAppend m (markup m d1) (markup m d2)
+markup m (DocString s)		= markupString m s
+markup m (DocParagraph d)	= markupParagraph m (markup m d)
+markup m (DocIdentifier i)	= markupIdentifier m i
+markup m (DocModule mod)	= markupModule m mod
+markup m (DocEmphasis d)	= markupEmphasis m (markup m d)
+markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
+markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
+markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
+markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
+markup m (DocURL url)		= markupURL m url
+
+-- | Since marking up is just a matter of mapping 'Doc' into some
+-- other type, we can \'rename\' documentation by marking up 'Doc' into
+-- the same thing, modifying only the identifiers embedded in it.
+mapIdent f = Markup {
+  markupEmpty         = DocEmpty,
+  markupString        = DocString,
+  markupParagraph     = DocParagraph,
+  markupAppend        = DocAppend,
+  markupIdentifier    = f,
+  markupModule        = DocModule,
+  markupEmphasis      = DocEmphasis,
+  markupMonospaced    = DocMonospaced,
+  markupUnorderedList = DocUnorderedList,
+  markupOrderedList   = DocOrderedList,
+  markupCodeBlock     = DocCodeBlock,
+  markupURL	      = DocURL
+  }
+
+-- -----------------------------------------------------------------------------
+-- ** Smart constructors
+
+-- used to make parsing easier; we group the list items later
+docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) 
+  = DocUnorderedList (ds1++ds2)
+docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d)
+  = DocAppend (DocUnorderedList (ds1++ds2)) d
+docAppend (DocOrderedList ds1) (DocOrderedList ds2) 
+  = DocOrderedList (ds1++ds2)
+docAppend (DocOrderedList ds1) (DocAppend (DocOrderedList ds2) d)
+  = DocAppend (DocOrderedList (ds1++ds2)) d
+docAppend DocEmpty d = d
+docAppend d DocEmpty = d
+docAppend d1 d2 
+  = DocAppend d1 d2
+
+-- again to make parsing easier - we spot a paragraph whose only item
+-- is a DocMonospaced and make it into a DocCodeBlock
+docParagraph (DocMonospaced p)
+  = DocCodeBlock p
+docParagraph (DocAppend (DocString s1) (DocMonospaced p))
+  | all isSpace s1
+  = DocCodeBlock p
+docParagraph (DocAppend (DocString s1)
+		(DocAppend (DocMonospaced p) (DocString s2)))
+  | all isSpace s1 && all isSpace s2
+  = DocCodeBlock p
+docParagraph p
+  = DocParagraph p
 \end{code}
