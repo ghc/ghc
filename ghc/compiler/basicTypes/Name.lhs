@@ -350,7 +350,7 @@ pprGlobal sty name uniq mod occ
 pprLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = pprOccName occ <> 
-		     text "{-" <> pprUnique10 uniq <> text "-}"
+		     text "{-" <> pprUnique uniq <> text "-}"
   | otherwise      = pprOccName occ	-- User and Iface styles
 
 -- Like Local, except that we only omit the unique in Iface style
