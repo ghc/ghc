@@ -27,6 +27,7 @@ Options recognised wherever they occur (mkdependHS or GHC):
     -package <blah> This program uses this GHC system library; take
 		appropriate action (e.g., recognise when they are
 		"import"ing a module from that library).
+    -osuf <osuf> Use <osuf> as the "object file" suffix ( default: o)
 
 mkdependHS-specific options (not between --'s):
 
@@ -36,7 +37,6 @@ mkdependHS-specific options (not between --'s):
     -f blah	Use "blah" as the makefile, rather than "makefile"
 		or "Makefile".
     -cpp	Wash the input files through cpp(1).
-    -o <osuf>	Use <osuf> as the "object file" suffix ( default: o)
     -s <suf>	Make extra dependencies for files with
 		suffix <suf><osuf>; thus, "-o hc -s _a" will
 		make dependencies both for .hc files and for .a_hc
@@ -240,6 +240,13 @@ sub mangle_command_line_args {
 	    push(@Syslibs, 'concurrent');
 	} elsif (/^-#include(.*)/) {
 	    &grab_arg_arg(*Args,'-#include',$1);
+	} elsif ( /^-osuf(.*)/ ) {
+	    local($suff)	= &grab_arg_arg(*Args,'-osuf',$1);
+	    # Weed out existing entry .. there must be a better way of doing this
+	    # with arrays (non-assoc) ! -- sof
+	    @Obj_suffix	= grep(!/$suff/,@Obj_suffix);
+	    push(@Obj_suffix, $suff);
+
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
@@ -247,15 +254,8 @@ sub mangle_command_line_args {
 		$Warnings     = 0;
 	    } elsif ( /^-f(.*)/ && !$ProcessingOptions ) {
 		$Makefile	= &grab_arg_arg(*Args,'-f',$1);
-	    } elsif ( /^-o(.*)/ ) {
-		local($suff)	= &grab_arg_arg(*Args,'-o',$1);
-		# Weed out existing entry .. there must be a better way of doing this
-		# with arrays (non-assoc) ! -- sof
-		@Obj_suffix	= grep(!/$suff/,@Obj_suffix);
-		push(@Obj_suffix, $suff);
             #
 	    # --exclude-module=mod => it's stable, trust me!
-            
 	    } elsif ( /^-(x|-exclude-module=)(.*)/ ) { 
 		local($thing) = &grab_arg_arg(*Args,$1,$2);
 		$IgnoreMe{$thing} = 'Y';
