@@ -42,7 +42,7 @@ import ParsePkgConf	( loadPackageConfig )
 import CmdLineOpts	( DynFlags(..), PackageFlag(..), verbosity,
 			  opt_Static )
 import Config		( cTARGETARCH, cTARGETOS, cProjectVersion )
-import Name		( Name, nameModule )
+import Name		( Name, nameModule_maybe )
 import Module		( Module, mkModule )
 import UniqFM
 import UniqSet
@@ -530,9 +530,12 @@ isDllName :: DynFlags -> Name -> Bool
 isDllName dflags name
   | opt_Static = False
   | otherwise =
-    case lookupUFM (moduleToPkgConf (pkgState dflags)) (nameModule name) of
-	Just _  -> True   -- yes, its a package module
-	Nothing -> False  -- no, must be a home module
+    case nameModule_maybe name of
+        Nothing -> False  -- no, it is not even an external name
+        Just mod ->
+            case lookupUFM (moduleToPkgConf (pkgState dflags)) mod of
+                Just _  -> True   -- yes, its a package module
+                Nothing -> False  -- no, must be a home module
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages

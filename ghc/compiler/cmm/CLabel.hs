@@ -87,6 +87,7 @@ module CLabel (
         dynamicLinkerLabelInfo,
         
         mkPicBaseLabel,
+        mkDeadStripPreventer,
 
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, externallyVisibleCLabel,
@@ -100,10 +101,10 @@ module CLabel (
 #include "../includes/ghcconfig.h"
 
 import CmdLineOpts      ( DynFlags, opt_Static, opt_DoTickyProfiling )
-import Packages		( isHomeModule )
+import Packages		( isHomeModule, isDllName )
 import DataCon		( ConTag )
 import Module		( moduleFS, Module )
-import Name		( Name, isExternalName, nameModule )
+import Name		( Name, isExternalName )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp )
 import Config		( cLeadingUnderscore )
@@ -196,6 +197,10 @@ data CLabel
                                 -- assembler label '1'; it is pretty-printed
                                 -- as 1b, referring to the previous definition
                                 -- of 1: in the assembler source file.
+
+  | DeadStripPreventer CLabel
+    -- label before an info table to prevent excessive dead-stripping on darwin
+
   deriving (Eq, Ord)
 
 data IdLabelInfo
@@ -283,24 +288,20 @@ mkLocalEntryLabel	name 	= IdLabel name  Entry
 mkLocalClosureTableLabel name	= IdLabel name ClosureTable
 
 mkClosureLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name Closure
-  | otherwise				  = DynIdLabel name Closure
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name Closure
+  | otherwise             = IdLabel name Closure
 
 mkInfoTableLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name InfoTable
-  | otherwise				  = DynIdLabel name InfoTable
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name InfoTable
+  | otherwise		 = IdLabel name InfoTable
 
 mkEntryLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name Entry
-  | otherwise				  = DynIdLabel name Entry
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name Entry
+  | otherwise             = IdLabel name Entry
 
 mkClosureTableLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name ClosureTable
-  | otherwise				  = DynIdLabel name ClosureTable
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name ClosureTable
+  | otherwise             = IdLabel name ClosureTable
 
 mkLocalConInfoTableLabel     con = IdLabel con ConInfoTable
 mkLocalConEntryLabel	     con = IdLabel con ConEntry
@@ -314,14 +315,12 @@ mkStaticInfoTableLabel name False = IdLabel    name StaticInfoTable
 mkStaticInfoTableLabel name True  = DynIdLabel name StaticInfoTable
 
 mkConEntryLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name ConEntry
-  | otherwise				  = DynIdLabel name ConEntry
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name ConEntry
+  | otherwise             = IdLabel name ConEntry
 
 mkStaticConEntryLabel dflags name
-  | opt_Static || isHomeModule dflags mod = IdLabel    name StaticConEntry
-  | otherwise				  = DynIdLabel name StaticConEntry
-  where mod = nameModule name
+  | isDllName dflags name = DynIdLabel    name StaticConEntry
+  | otherwise             = IdLabel name StaticConEntry
 
 
 mkReturnPtLabel uniq		= CaseLabel uniq CaseReturnPt
@@ -406,6 +405,9 @@ dynamicLinkerLabelInfo _ = Nothing
         
 mkPicBaseLabel :: CLabel
 mkPicBaseLabel = PicBaseLabel
+
+mkDeadStripPreventer :: CLabel -> CLabel
+mkDeadStripPreventer lbl = DeadStripPreventer lbl
 
 -- -----------------------------------------------------------------------------
 -- Converting info labels to entry labels.
@@ -624,6 +626,9 @@ pprCLabel (DynamicLinkerLabel info lbl)
    
 pprCLabel PicBaseLabel
    = ptext SLIT("1b")
+   
+pprCLabel (DeadStripPreventer lbl)
+   = pprCLabel lbl <> ptext SLIT("_dsp")
 #endif
 
 pprCLabel lbl = 
