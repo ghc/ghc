@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.110 2001/07/26 14:29:26 simonmar Exp $
+ * $Id: GC.c,v 1.111 2001/07/30 12:54:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -132,7 +132,7 @@ static void         zero_static_object_list ( StgClosure* first_static );
 static void         zero_mutable_list       ( StgMutClosure *first );
 
 static rtsBool      traverse_weak_ptr_list  ( void );
-static void         cleanup_weak_ptr_list   ( StgWeak **list );
+static void         mark_weak_ptr_list      ( StgWeak **list );
 
 static void         scavenge                ( step * );
 static void         scavenge_mark_stack     ( void );
@@ -487,6 +487,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   /* Mark the weak pointer list, and prepare to detect dead weak
    * pointers.
    */
+  mark_weak_ptr_list(&weak_ptr_list);
   old_weak_ptr_list = weak_ptr_list;
   weak_ptr_list = NULL;
   weak_done = rtsFalse;
@@ -579,11 +580,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     }
   }
 
-  /* Final traversal of the weak pointer list (see comment by
-   * cleanUpWeakPtrList below).
-   */
-  cleanup_weak_ptr_list(&weak_ptr_list);
-
 #if defined(PAR)
   // Reconstruct the Global Address tables used in GUM 
   rebuildGAtables(major_gc);
@@ -606,13 +602,53 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
   // NO MORE EVACUATION AFTER THIS POINT!
   // Finally: compaction of the oldest generation.
-  if (major_gc && RtsFlags.GcFlags.compact) { 
+  if (major_gc && RtsFlags.GcFlags.compact) {
       // save number of blocks for stats
       oldgen_saved_blocks = oldest_gen->steps[0].n_blocks;
       compact(get_roots);
   }
 
   IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
+
+  /* Set the maximum blocks for the oldest generation, based on twice
+   * the amount of live data now, adjusted to fit the maximum heap
+   * size if necessary.  
+   *
+   * This is an approximation, since in the worst case we'll need
+   * twice the amount of live data plus whatever space the other
+   * generations need.
+   */
+  if (major_gc && RtsFlags.GcFlags.generations > 1) {
+      nat blocks = oldest_gen->steps[0].n_blocks +
+	  oldest_gen->steps[0].n_large_blocks;
+
+      oldest_gen->max_blocks = 
+	  stg_max(blocks * RtsFlags.GcFlags.oldGenFactor,
+		  RtsFlags.GcFlags.minOldGenSize);
+      if (RtsFlags.GcFlags.compact) {
+	  if ( oldest_gen->max_blocks >
+	       RtsFlags.GcFlags.maxHeapSize *
+	       (100 - RtsFlags.GcFlags.pcFreeHeap) / 100 ) {
+	      oldest_gen->max_blocks = 
+		  RtsFlags.GcFlags.maxHeapSize *
+		  (100 - RtsFlags.GcFlags.pcFreeHeap) / 100;
+	      if (oldest_gen->max_blocks < blocks) {
+		  belch("max_blocks: %ld, blocks: %ld, maxHeapSize: %ld",
+			oldest_gen->max_blocks,  blocks, RtsFlags.GcFlags.maxHeapSize);
+		  heapOverflow();
+	      }
+	  }
+      } else {
+	  if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
+	      oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
+	      if (((int)oldest_gen->max_blocks - (int)blocks) < 
+		  (RtsFlags.GcFlags.pcFreeHeap *
+		   RtsFlags.GcFlags.maxHeapSize / 200)) {
+		  heapOverflow();
+	      }
+	  }
+      }
+  }
 
   /* run through all the generations/steps and tidy up 
    */
@@ -733,29 +769,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	stp->n_large_blocks += stp->n_scavenged_large_blocks;
       }
     }
-  }
-
-  /* Set the maximum blocks for the oldest generation, based on twice
-   * the amount of live data now, adjusted to fit the maximum heap
-   * size if necessary.  
-   *
-   * This is an approximation, since in the worst case we'll need
-   * twice the amount of live data plus whatever space the other
-   * generations need.
-   */
-  if (major_gc && RtsFlags.GcFlags.generations > 1) {
-      oldest_gen->max_blocks = 
-	stg_max(oldest_gen->steps[0].n_blocks * RtsFlags.GcFlags.oldGenFactor,
-		RtsFlags.GcFlags.minOldGenSize);
-      if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
-	oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
-	if (((int)oldest_gen->max_blocks - 
-	     (int)oldest_gen->steps[0].n_blocks) < 
-	    (RtsFlags.GcFlags.pcFreeHeap *
-	     RtsFlags.GcFlags.maxHeapSize / 200)) {
-	  heapOverflow();
-	}
-      }
   }
 
   // Guess the amount of live data for stats. 
@@ -977,14 +990,6 @@ traverse_weak_ptr_list(void)
   last_w = &old_weak_ptr_list;
   for (w = old_weak_ptr_list; w != NULL; w = next_w) {
 
-    /* First, this weak pointer might have been evacuated.  If so,
-     * remove the forwarding pointer from the weak_ptr_list.
-     */
-    if (get_itbl(w)->type == EVACUATED) {
-      w = (StgWeak *)((StgEvacuated *)w)->evacuee;
-      *last_w = w;
-    }
-
     /* There might be a DEAD_WEAK on the list if finalizeWeak# was
      * called on a live weak pointer object.  Just remove it.
      */
@@ -1077,7 +1082,6 @@ traverse_weak_ptr_list(void)
    * of pending finalizers later on.
    */
   if (flag == rtsFalse) {
-    cleanup_weak_ptr_list(&old_weak_ptr_list);
     for (w = old_weak_ptr_list; w; w = w->link) {
       w->finalizer = evacuate(w->finalizer);
     }
@@ -1114,23 +1118,15 @@ traverse_weak_ptr_list(void)
 
 
 static void
-cleanup_weak_ptr_list ( StgWeak **list )
+mark_weak_ptr_list ( StgWeak **list )
 {
   StgWeak *w, **last_w;
 
   last_w = list;
   for (w = *list; w; w = w->link) {
-
-    if (get_itbl(w)->type == EVACUATED) {
-      w = (StgWeak *)((StgEvacuated *)w)->evacuee;
-      *last_w = w;
-    }
-
-    if ((Bdescr((P_)w)->flags & BF_EVACUATED) == 0) {
       (StgClosure *)w = evacuate((StgClosure *)w);
       *last_w = w;
-    }
-    last_w = &(w->link);
+      last_w = &(w->link);
   }
 }
 
