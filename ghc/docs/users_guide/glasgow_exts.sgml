@@ -127,34 +127,51 @@ with GHC.
 	</listitem>
       </varlistentry>
 
-	<varlistentry>
-	  <term><option>-fno-implicit-prelude</option></term>
-	  <listitem>
-	    <para><indexterm><primary>-fno-implicit-prelude
-            option</primary></indexterm> GHC normally imports
-            <filename>Prelude.hi</filename> files for you.  If you'd
-            rather it didn't, then give it a
-            <option>-fno-implicit-prelude</option> option.  The idea
-            is that you can then import a Prelude of your own.  (But
-            don't call it <literal>Prelude</literal>; the Haskell
-            module namespace is flat, and you must not conflict with
-            any Prelude module.)</para>
+      <varlistentry>
+	<term><option>-fno-implicit-prelude</option></term>
+	<listitem>
+	  <para><indexterm><primary>-fno-implicit-prelude
+          option</primary></indexterm> GHC normally imports
+          <filename>Prelude.hi</filename> files for you.  If you'd
+          rather it didn't, then give it a
+          <option>-fno-implicit-prelude</option> option.  The idea is
+          that you can then import a Prelude of your own.  (But don't
+          call it <literal>Prelude</literal>; the Haskell module
+          namespace is flat, and you must not conflict with any
+          Prelude module.)</para>
 
-	    <para>Even though you have not imported the Prelude, most of
-            the built-in syntax still refers to the built-in Haskell
-            Prelude types and values, as specified by the Haskell
-            Report.  For example, the type <literal>[Int]</literal>
-            still means <literal>Prelude.[] Int</literal>; tuples
-            continue to refer to the standard Prelude tuples; the
-            translation for list comprehensions continues to use
-            <literal>Prelude.map</literal> etc.</para>
+	  <para>Even though you have not imported the Prelude, most of
+          the built-in syntax still refers to the built-in Haskell
+          Prelude types and values, as specified by the Haskell
+          Report.  For example, the type <literal>[Int]</literal>
+          still means <literal>Prelude.[] Int</literal>; tuples
+          continue to refer to the standard Prelude tuples; the
+          translation for list comprehensions continues to use
+          <literal>Prelude.map</literal> etc.</para>
 
-	    <para>However, <option>-fno-implicit-prelude</option> does
-	    change the handling of certain built-in syntax: see
-	    <xref LinkEnd="rebindable-syntax">.</para>
+	  <para>However, <option>-fno-implicit-prelude</option> does
+	  change the handling of certain built-in syntax: see <xref
+	  LinkEnd="rebindable-syntax">.</para>
+	</listitem>
+      </varlistentry>
 
-	  </listitem>
-	</varlistentry>
+      <varlistentry>
+	<term><option>-fth</option></term>
+	<listitem>
+	  <para>Enables Template Haskell (see <xref
+	  linkend="template-haskell">).  Currently also implied by
+	  <option>-fglasgow-exts</option>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fimplicit-params</option></term>
+	<listitem>
+	  <para>Enables implicit parameters (see <xref
+	  linkend="implicit-parameters">).  Currently also implied by 
+	  <option>-fglasgow-exts</option>.</para>
+	</listitem>
+      </varlistentry>
 
     </variablelist>
   </sect1>
@@ -1833,7 +1850,13 @@ J Lewis, MB Shields, E Meijer, J Launchbury,
 27th ACM Symposium on Principles of Programming Languages (POPL'00),
 Boston, Jan 2000.
 </para>
-<para>(Most of the following, stil rather incomplete, documentation is due to Jeff Lewis.)</para>
+
+<para>(Most of the following, stil rather incomplete, documentation is
+due to Jeff Lewis.)</para>
+
+<para>Implicit parameter support is enabled with the option
+<option>-fimplicit-params</option>.</para>
+
 <para>
 A variable is called <emphasis>dynamically bound</emphasis> when it is bound by the calling
 context of a function and <emphasis>statically bound</emphasis> when bound by the callee's
@@ -3174,10 +3197,16 @@ The documentation here describes the realisation in GHC.  (It's rather sketchy j
 Tim Sheard is going to expand it.)
 </para>
 
-<sect2>  <title> Syntax </title>
-<para>
-    Template Haskell has the following new syntactic constructions.  You need to use the flag  
-	        <literal>-fglasgow-exts</literal> to switch these syntactic extensions on.
+    <sect2>
+      <title>Syntax</title>
+
+      <para> Template Haskell has the following new syntactic
+      constructions.  You need to use the flag
+      <option>-fth</option><indexterm><primary><option>-fth</option></primary>
+      </indexterm>to switch these syntactic extensions on
+      (<option>-fth</option> is currently implied by
+      <option>-fglasgow-exts</option>, but you are encouraged to
+      specify it explicitly).</para>
 
 	<itemizedlist>
 	      <listitem><para>
@@ -3224,7 +3253,6 @@ Tim Sheard is going to expand it.)
 
 		  
 	</itemizedlist>
-</para>
 </sect2>
 
 <sect2>  <title> Using Template Haskell </title>
@@ -3310,14 +3338,13 @@ pr :: String -> Expr
 pr s      = gen (parse s)
 </programlisting>
 
-<para>Now run the compiler (here we are using a "stage three" build of GHC, at a Cygwin prompt on Windows):
+<para>Now run the compiler (here we are a Cygwin prompt on Windows):
 </para>
 <programlisting>
-ghc/compiler/stage3/ghc-inplace --make -fglasgow-exts -package haskell-src main.hs -o main.exe
+$ ghc --make -fth main.hs -o main.exe
 </programlisting>
 
-<para>Run "main.exe" and here is your output:
-</para>
+<para>Run "main.exe" and here is your output:</para>
 
 <programlisting>
 $ ./main

@@ -433,15 +433,34 @@
 	  <tbody>
 	    <row>
 	      <entry><option>-fallow-overlapping-instances</option></entry>
-	      <entry></entry>
+	      <entry>Enable overlapping instances</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-allow-overlapping-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-farrows</option></entry>
+	      <entry>Enable arrow notation extension</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-arrows</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fallow-undecidable-instances</option></entry>
 	      <entry>Enable undecidable instances</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-allow-undecidable-instances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>
+	      <entry>set the limit for context reduction</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-ffi</option> or <option>-fffi</option></entry>
+	      <entry>Enable foreign function interface (implied by
+	      <option>-fglasgow-exts</option>)</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-ffi</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fgenerics</option></entry>
@@ -456,29 +475,22 @@
 	      <entry><option>-fno-glasgow-exts</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-ffi</option> or <option>-fffi</option></entry>
-	      <entry>Enable foreign function interface (implied by
-	      <option>-fglasgow-exts</option>)</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-ffi</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-farrows</option></entry>
-	      <entry>Enable arrow notation extension</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-arrows</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-fwith</option></entry>
-	      <entry>Enable deprecated <literal>with</literal> keyword</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-with</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-fignore-asserts</option></entry>
 	      <entry>Ignore assertions</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-ignore-asserts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fimplicit-params</option></entry>
+	      <entry>Enable Implicit Parameters</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-implicit-params</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-firrefutable-tuples</option></entry>
+	      <entry>Make tuple pattern matching irrefutable</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-irrefutable-tuples</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fno-implicit-prelude</option></entry>
@@ -493,16 +505,16 @@
 	      <entry><option>-</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-firrefutable-tuples</option></entry>
-	      <entry>Make tuple pattern matching irrefutable</entry>
+	      <entry><option>-fth</option></entry>
+	      <entry>Enable Template Haskell</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-irrefutable-tuples</option></entry>
+	      <entry><option>-fno-th</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>
-	      <entry>set the limit for context reduction</entry>
+	      <entry><option>-fwith</option></entry>
+	      <entry>Enable deprecated <literal>with</literal> keyword</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-</option></entry>
+	      <entry><option>-fno-with</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
