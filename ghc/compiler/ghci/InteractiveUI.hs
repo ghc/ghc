@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.36 2001/02/09 10:08:09 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.37 2001/02/09 15:33:51 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -46,12 +46,11 @@ import Monad ( when )
 -----------------------------------------------------------------------------
 
 ghciWelcomeMsg = "\ 
-\ _____  __   __  ____         _________________________________________________\n\ 
-\(|	 ||   || (|  |)        GHC Interactive, version 5.00   	                \n\ 
-\||  __  ||___|| ||     ()     For Haskell 98.                    		\n\ 
-\||   |) ||---|| ||     ||     http://www.haskell.org/ghc         		\n\ 
-\||   || ||   || ||     (|     Bug reports to: glasgow-haskell-bugs@haskell.org \n\ 
-\(|___|| ||   || (|__|) \\\\______________________________________________________\n"
+\   ___         ___ _ 							     \n\ 
+\  / _ \\ /\\  /\\/ __(_)      GHC Interactive, version 5.00, For Haskell 98.   \n\ 
+\ / /_\\// /_/ / /  | |      http://www.haskell.org/ghc                       \n\ 
+\/ /_\\\\/ __  / /___| |      Bug reports to: glasgow-haskell-bugs@haskell.org \n\ 
+\\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
 commands :: [(String, String -> GHCi Bool)]
 commands = [
