@@ -41,7 +41,7 @@ Running the testsuite with a compiler other than GHC
 	autoconf
 	./configure
 	cd testsuite
-	make TestCompiler=nhc98
+	make TEST_HC=nhc98 COMPILER=nhc98
 )
 
 
@@ -62,6 +62,8 @@ The following variables may be set on the make command line:
 	EXTRA_HC_OPTS		-- extra flags to send to the Haskell compiler
 	EXTRA_RUNTEST_OPTS 	-- extra flags to give the test driver
 	CONFIG			-- use a different configuration file
+	COMPILER		-- stem of a different configuration file
+				-- from the config directory [default: ghc]
 	WAY			-- just this way
 
 The following ways are defined (for GHC):

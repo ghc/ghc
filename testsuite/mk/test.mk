@@ -12,6 +12,7 @@
 #	EXTRA_HC_OPTS	-- extra flags to send to the Haskell compiler
 #	EXTRA_RUNTEST_OPTS -- extra flags to give the test driver
 #	CONFIG		-- use a different configuration file
+#	COMPILER	-- select a configuration file from config/
 #
 # -----------------------------------------------------------------------------
 
@@ -30,7 +31,8 @@ GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
 EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
   # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
 RUNTESTS     = $(TOP)/driver/runtests.py
-CONFIG       = $(TOP)/config/ghc
+COMPILER     = ghc
+CONFIG       = $(TOP)/config/$(COMPILER)
 
 # can be overriden from the command line
 TEST_HC = $(GHC_INPLACE_ABS)
