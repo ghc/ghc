@@ -18,7 +18,7 @@ module CoreUtils (
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, 
-	hasNoRedexes,
+	rhsIsStatic,
 
 	-- Arity and eta expansion
 	manifestArity, exprArity, 
@@ -1161,30 +1161,41 @@ If this happens we simply make the RHS into an updatable thunk,
 and 'exectute' it rather than allocating it statically.
 
 \begin{code}
-hasNoRedexes :: CoreExpr -> Bool
+rhsIsStatic :: CoreExpr -> Bool
 -- This function is called only on *top-level* right-hand sides
--- Returns True if 
---	the expression contains any redex that 
---	is not under a (value) lambda
--- and
--- 	it contains no cross-DLL references
---
--- The real reason: either
---	a) the rhs *is* a redex, in which case it's a CAF
---	   (remember the arg is always a top-level rhs)
--- or   b) the nested redex will ultimately be floated by CorePrep
---	   and will be a CAF, so this rhs *refers* to a CAF
+-- Returns True if the RHS can be allocated statically, with
+-- no thunks involved at all.
 --
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; and (ii) in CoreToStg to decide whether to put an
--- update flag on it.  In case (ii), the ANF-ising of CorePrep means that
--- (b) cannot be the case, so it must be (a)!
+-- update flag on it.
 --
--- NB: we treat partial applications as redexes,
--- because in fact we make a thunk for them that runs and builds a PAP
--- at run-time.  The only appliations that are treated as non-redexes
--- are saturated applications of constructors
+-- The basic idea is that rhsIsStatic returns True only if the RHS is
+--	(a) a value lambda
+--	(b) a saturated constructor application with static args
 --
+-- BUT watch out for
+--  (i)	Any cross-DLL references kill static-ness completely
+--	because they must be 'executed' not statically allocated
+--
+-- (ii) We treat partial applications as redexes, because in fact we 
+--	make a thunk for them that runs and builds a PAP
+-- 	at run-time.  The only appliations that are treated as 
+--	static are *saturated* applications of constructors.
+
+-- We used to try to be clever with nested structures like this:
+--		ys = (:) w ((:) w [])
+-- on the grounds that CorePrep will flatten ANF-ise it later.
+-- But supporting this special case made the function much more 
+-- complicated, because the special case only applies if there are no 
+-- enclosing type lambdas:
+--		ys = /\ a -> Foo (Baz ([] a))
+-- Here the nested (Baz []) won't float out to top level in CorePrep.
+--
+-- But in fact, even without -O, nested structures at top level are 
+-- flattened by the simplifier, so we don't need to be super-clever here.
+--
+-- Examples
 --
 --	f = \x::Int. x+7	TRUE
 --	p = (True,False)	TRUE
@@ -1208,25 +1219,36 @@ hasNoRedexes :: CoreExpr -> Bool
 --
 -- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
---
-hasNoRedexes (Lam b e)        = isRuntimeVar b || hasNoRedexes e
-hasNoRedexes (Note (SCC _) e) = False
-hasNoRedexes (Note _ e)       = hasNoRedexes e
-hasNoRedexes (Lit lit)        = not (isLitLitLit lit)
+
+rhsIsStatic rhs = is_static False rhs
+
+is_static :: Bool	-- True <=> in a constructor argument; must be atomic
+	  -> CoreExpr -> Bool
+
+is_static False (Lam b e) = isRuntimeVar b || is_static False e
+
+is_static in_arg (Note (SCC _) e) = False
+is_static in_arg (Note _ e)       = is_static in_arg e
+
+is_static in_arg (Lit lit)        = not (isLitLitLit lit)
 	-- lit-lit arguments cannot be used in static constructors either.  
 	-- (litlits are deprecated, so I'm not going to bother cleaning up this infelicity --SDM).
-hasNoRedexes other_expr	      = go other_expr 0
+
+is_static in_arg other_expr = go other_expr 0
   where
     go (Var f) n_val_args
 	| not (isDllName (idName f))
 	= n_val_args == 0 || saturated_data_con f n_val_args
 
     go (App f a) n_val_args
-	| isTypeArg a    = go f n_val_args
-	| hasNoRedexes a = go f (n_val_args + 1)
-	   -- NB. args sometimes not atomic.  eg.
-	   --   x = D# (1.0## /## 2.0##)
-	   -- can't float because /## can fail.
+	| isTypeArg a 			 = go f n_val_args
+	| not in_arg && is_static True a = go f (n_val_args + 1)
+	-- The (not in_arg) checks that we aren't in a constructor argument;
+	-- if we are, we don't allow (value) applications of any sort
+	-- 
+        -- NB. In case you wonder, args are sometimes not atomic.  eg.
+        --   x = D# (1.0## /## 2.0##)
+        -- can't float because /## can fail.
 
     go (Note (SCC _) f) n_val_args = False
     go (Note _ f) n_val_args       = go f n_val_args
@@ -1238,5 +1260,3 @@ hasNoRedexes other_expr	      = go other_expr 0
 	    Just dc -> n_val_args == dataConRepArity dc
 	    Nothing -> False
 \end{code}
-
-

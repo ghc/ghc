@@ -12,7 +12,7 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( hasNoRedexes, manifestArity, exprType )
+import CoreUtils	( rhsIsStatic, manifestArity, exprType )
 import StgSyn
 
 import Type
@@ -240,8 +240,8 @@ coreToTopStgRhs scope_fv_info (bndr, rhs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
-    upd  | hasNoRedexes rhs = SingleEntry
-	 | otherwise        = Updatable
+    upd  | rhsIsStatic rhs = SingleEntry
+	 | otherwise       = Updatable
 
 mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
 	-> StgRhs
