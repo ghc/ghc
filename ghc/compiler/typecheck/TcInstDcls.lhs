@@ -690,6 +690,17 @@ scrutiniseInstanceType dfun_name clas inst_tau
   = failTc (derivingWhenInstanceExistsErr clas inst_tycon)
 
   |	-- CCALL CHECK
+	-- To verify that a user declaration of a CCallable/CReturnable 
+	-- instance is OK, we must be able to see the constructor(s)
+	-- of the instance type (see next guard.)
+	--  
+        -- We flag this separately to give a more precise error msg.
+        --
+    (uniqueOf clas == cCallableClassKey   && not constructors_visible) ||
+    (uniqueOf clas == cReturnableClassKey && not constructors_visible)
+  = failTc (invisibleDataConPrimCCallErr clas inst_tau)
+
+  |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     (uniqueOf clas == cCallableClassKey   && not (ccallable_type   inst_tau)) ||
@@ -704,6 +715,11 @@ scrutiniseInstanceType dfun_name clas inst_tau
     inst_tycon_maybe	      = getTyCon_maybe possible_tycon
     inst_tycon 		      = expectJust "tcInstDecls1:inst_tycon" inst_tycon_maybe
     (_, tyvar_dups)	      = removeDups cmp (map (getTyVar "tcInstDecls1:getTyVarTy") arg_tys)
+
+    constructors_visible      =
+        case maybeAppDataTyCon inst_tau of
+           Just (_,_,[])   -> False
+	   everything_else -> True
 
 -- These conditions come directly from what the DsCCall is capable of.
 -- Totally grotesque.  Green card should solve this.
@@ -755,6 +771,18 @@ nonBoxedPrimCCallErr clas inst_ty sty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
 	 4 (hsep [ ptext SLIT("class"), ppr sty clas, ptext SLIT("type"),
     		        ppr sty inst_ty])
+
+{-
+  Declaring CCallable & CReturnable instances in a module different
+  from where the type was defined. Caused by importing data type
+  abstractly (either programmatically or by the renamer being over-eager
+  in its pruning.)
+-}
+invisibleDataConPrimCCallErr clas inst_ty sty
+  = hang (hsep [(ppr sty inst_ty <> ptext SLIT("s constructors not visible when checking")),
+                ppr sty clas, ptext SLIT("instance")])
+        4 (hsep [ptext SLIT("(Try either importing"), ppr sty inst_ty, 
+	         ptext SLIT("non-abstractly, or compile using -fno-prune-tydecls ..)")])
 
 omittedMethodWarn sel_id clas sty
   = sep [ptext SLIT("Warning: no explicit method nor default method for") <+> ppr sty sel_id, 
