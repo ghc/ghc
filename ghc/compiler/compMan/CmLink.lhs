@@ -226,7 +226,6 @@ filterModuleLinkables p (li:lis)
 
 #ifndef GHCI
 linkObjs      = panic "CmLink.linkObjs: no interpreter"
-lookupClosure = panic "CmLink.lookupClosure: no interpreter"
 #else
 linkObjs [] pls = linkFinish pls []
 linkObjs (l@(LM _ m uls) : ls) pls
