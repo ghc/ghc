@@ -961,7 +961,7 @@ install:: $(INSTALL_INCLUDES)
 	done
 endif
 
-ifneq "$(INSTALL_DOCS) $(INSTALL_SGML_DOC)" ""
+ifneq "$(INSTALL_DOCS)$(INSTALL_SGML_DOC)" ""
 install-docs:: $(INSTALL_DOCS) $(foreach j,$(SGMLDocWays),$(INSTALL_SGML_DOC).$j)
 	@$(INSTALL_DIR) $(datadir)
 	for i in $(INSTALL_DOCS); do \
