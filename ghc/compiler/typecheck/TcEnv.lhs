@@ -58,7 +58,7 @@ import TyCon		( TyCon )
 import Class		( Class, ClassOpItem, ClassContext )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
-			  nameIsLocalOrFrom, nameModule_maybe
+			  nameIsLocalOrFrom
 			)
 import Name		( NameEnv, lookupNameEnv, nameEnvElts, 
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )

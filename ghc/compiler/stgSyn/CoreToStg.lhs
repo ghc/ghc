@@ -876,9 +876,8 @@ minusFVBinders vs fv = foldr minusFVBinder fv vs
 minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
 minusFVBinder v fv | isId v && opt_KeepStgTypes
 		   = (fv `delVarEnv` v) `unionFVInfo` 
-			 tyvarFVInfo (tyVarsOfType (idType v))
-		   | otherwise
-		   =  fv `delVarEnv` v
+		     tyvarFVInfo (tyVarsOfType (idType v))
+		   | otherwise = fv `delVarEnv` v
 	-- When removing a binder, remember to add its type variables
 	-- c.f. CoreFVs.delBinderFV
 

@@ -16,6 +16,9 @@ module HscMain ( HscResult(..), hscMain,
 import RdrHsSyn		( RdrNameStmt )
 import Rename		( renameStmt )
 import ByteCodeGen	( byteCodeGen )
+import Id		( Id, idName, idFlavour, modifyIdInfo )
+import IdInfo		( setFlavourInfo, makeConstantFlavour )
+import HscTypes		( InteractiveContext(..), TyThing(..) )
 #endif
 
 import HsSyn
@@ -44,8 +47,6 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Id		( Id, idName, idFlavour, modifyIdInfo )
-import IdInfo		( setFlavourInfo, makeConstantFlavour )
 import Module		( ModuleName, moduleName, mkHomeModule, 
 			  moduleUserString )
 import CmdLineOpts
@@ -60,7 +61,7 @@ import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
-			  HomeSymbolTable, InteractiveContext(..),
+			  HomeSymbolTable, 
 			  NameSupply(..), PackageRuleBase, HomeIfaceTable, 
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable
 			)

@@ -263,8 +263,8 @@ This is done {\em either} by pass 3 (for the top-level bindings),
 \begin{code}
 rn_mono_binds :: [RenamedSig]	        -- Signatures attached to this group
 	      -> RdrNameMonoBinds	
-	      -> RnMS (RenamedHsBinds, 	-- 
-		         FreeVars)	-- Free variables
+	      -> RnMS (RenamedHsBinds, 	-- Dependency analysed
+		       FreeVars)	-- Free variables
 
 rn_mono_binds siglist mbinds
   =

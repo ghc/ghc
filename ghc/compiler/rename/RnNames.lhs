@@ -27,7 +27,6 @@ import RnMonad
 import FiniteMap
 import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR_Unqual, isUnboundName )
 import UniqFM		( lookupUFM )
-import Bag		( bagToList )
 import Module		( ModuleName, moduleName, WhereFrom(..) )
 import NameSet
 import Name		( Name, nameSrcLoc, nameOccName,  nameEnvElts )
