@@ -408,31 +408,14 @@ pprInstr (ASCII False{-no backslash conversion-} str)
   = hcat [ ptext SLIT("\t.asciz "), char '\"', text str, char '"' ]
 
 pprInstr (ASCII True str)
-#if 0
-  -- The Solaris assembler doesn't understand \x escapes in
-  -- strings.
-  = asciify str
-  where
-    asciify :: String -> SDoc
-    asciify "" = text "\t.ascii \"\\0\""
-    asciify str
-       = let fst  = take 16 str
-             rest = drop 16 str
-             this = text ("\t.ascii \"" 
-                          ++ concat (map asciify_char fst)
-                          ++ "\"")
-         in  this $$ asciify rest
-    asciify_char :: Char -> String
-    asciify_char c = '\\' : 'x' : hshow (ord c)
-#endif
   = vcat (map do1 (str ++ [chr 0]))
     where
        do1 :: Char -> SDoc
-       do1 c = text "\t.byte\t0x" <> text (hshow (ord c))
+       do1 c = ptext SLIT("\t.byte\t0x") <> hshow (ord c)
 
-       hshow :: Int -> String
+       hshow :: Int -> SDoc
        hshow n | n >= 0 && n <= 255
-               = [ tab !! (n `div` 16), tab !! (n `mod` 16)]
+               = char (tab !! (n `div` 16)) <> char (tab !! (n `mod` 16))
        tab = "0123456789ABCDEF"
 
 
@@ -445,24 +428,24 @@ pprInstr (DATA s xs)
 #endif
 #if sparc_TARGET_ARCH
         -- copy n paste of x86 version
-	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
-	ppr_item W  x = [text "\t.long\t" <> pprImm x]
+	ppr_item B  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item W  x = [ptext SLIT("\t.long\t") <> pprImm x]
 	ppr_item F  (ImmFloat r)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
     	ppr_item DF (ImmDouble r)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
 #endif
 #if i386_TARGET_ARCH
-	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
-	ppr_item L  x = [text "\t.long\t" <> pprImm x]
+	ppr_item B  x = [ptext SLIT("\t.byte\t") <> pprImm x]
+	ppr_item L  x = [ptext SLIT("\t.long\t") <> pprImm x]
 	ppr_item F  (ImmFloat r)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
     	ppr_item DF (ImmDouble r)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
 #endif
 
         -- floatToBytes and doubleToBytes convert to the host's byte
