@@ -1012,7 +1012,7 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
-	@case '${MFLAGS}' in -*[ik]*) set +e;; *) set -e;; esac; \
+	@case '${MFLAGS}' in *-[ik]*) set +e;; *) set -e;; esac; \
 	for i in $(SUBDIRS) ; do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) $@;"; \
@@ -1026,7 +1026,7 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	@echo "------------------------------------------------------------------------"
 
 dist ::
-	@case '${MFLAGS}' in -*[ik]*) set +e;; *) set -e;; esac; \
+	@case '${MFLAGS}' in *-[ik]*) set +e;; *) set -e;; esac; \
 	for i in $(SUBDIRS) ; do \
 	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
 	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
@@ -1054,7 +1054,7 @@ all docs runtests TAGS clean veryclean maintainer-clean install ::
 	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
-	@case '${MFLAGS}' in -*[ik]*) set +e;; *) set -e;; esac; \
+	@case '${MFLAGS}' in *-[ik]*) set +e;; *) set -e;; esac; \
 	for i in $(WAYS) ; do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) way=$$i $@;"; \
