@@ -50,11 +50,9 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import List		( intersperse, isPrefixOf )
+import List		( intersperse )
 import Exception	( throwDyn, catchAllIO )
-import IO		( openFile, hClose, IOMode(..),
-			  hPutStr, hPutChar, hPutStrLn, hFlush, stderr
-			)
+import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
@@ -130,7 +128,6 @@ GLOBAL_VAR(v_Pgm_a,   	error "pgm_a",   String)	-- as
 GLOBAL_VAR(v_Pgm_l,   	error "pgm_l",   String)	-- ld
 GLOBAL_VAR(v_Pgm_MkDLL, error "pgm_dll", String)	-- mkdll
 
-GLOBAL_VAR(v_Pgm_PERL, error "pgm_PERL", String)	-- perl
 GLOBAL_VAR(v_Pgm_T,    error "pgm_T",    String)	-- touch
 GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
 
@@ -164,35 +161,38 @@ initSysTools minusB_args
 		-- 	for "installed" this is the root of GHC's support files
 		--	for "in-place" it is the root of the build tree
 
-	; let installed   pgm = top_dir `slash` "extra-bin" `slash` pgm
-	      inplace dir pgm = top_dir `slash` dir         `slash` pgm
+	; let installed_bin pgm   =  top_dir `slash` "bin" `slash` pgm
+	      installed     file  =  top_dir `slash` file
+	      inplace dir   pgm   =  top_dir `slash` dir `slash` pgm
 
-	; let pkgconfig_path | am_installed = top_dir `slash` "package.conf"
-			     | otherwise    = top_dir `slash` cGHC_DRIVER_DIR `slash` "package.conf.inplace"
+	; let pkgconfig_path
+		| am_installed = installed "package.conf"
+		| otherwise    = inplace cGHC_DRIVER_DIR "package.conf.inplace"
 
-	-- Check that the in-place package config exists if 
-	-- the installed one does not (we need at least one!)
-	; config_exists <- doesFileExist pkgconfig_path
-	; if config_exists then return ()
-	  else throwDyn (InstallationError 
-		           ("Can't find package.conf in " ++ pkgconfig_path))
+	      ghc_usage_msg_path
+		| am_installed = installed "ghc-usage.txt"
+		| otherwise    = inplace cGHC_DRIVER_DIR "ghc-usage.txt"
 
-	-- The GHC usage help message is found similarly to the package configuration
-	; let ghc_usage_msg_path | am_installed = installed "ghc-usage.txt"
-				 | otherwise    = inplace cGHC_DRIVER_DIR "ghc-usage.txt"
-
-
-	-- For all systems, unlit, split, mangle are GHC utilities
-	-- architecture-specific stuff is done when building Config.hs
-	; let unlit_path  | am_installed = installed cGHC_UNLIT
-		       	  | otherwise    = inplace cGHC_UNLIT_DIR cGHC_UNLIT
+		-- For all systems, unlit, split, mangle are GHC utilities
+		-- architecture-specific stuff is done when building Config.hs
+	      unlit_path
+		| am_installed = installed_bin cGHC_UNLIT
+		| otherwise    = inplace cGHC_UNLIT_DIR cGHC_UNLIT
 
 		-- split and mangle are Perl scripts
-	      split_script  | am_installed = installed cGHC_SPLIT
-		       	    | otherwise    = inplace cGHC_SPLIT_DIR cGHC_SPLIT
-	      mangle_script | am_installed = installed cGHC_MANGLER
-		       	    | otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
+	      split_script
+		| am_installed = installed_bin cGHC_SPLIT
+		| otherwise    = inplace cGHC_SPLIT_DIR cGHC_SPLIT
 
+	      mangle_script
+		| am_installed = installed_bin cGHC_MANGLER
+		| otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
+
+	-- Check that the package config exists
+	; config_exists <- doesFileExist pkgconfig_path
+	; when (not config_exists) $
+	     throwDyn (InstallationError 
+		         ("Can't find package.conf in " ++ pkgconfig_path))
 
 #if defined(mingw32_TARGET_OS)
 	--		WINDOWS-SPECIFIC STUFF
@@ -225,14 +225,12 @@ initSysTools minusB_args
 	; let	cpp_path   = cRAWCPP
 		gcc_path   = cGCC
 		touch_path = cGHC_TOUCHY
-		perl_path  = cGHC_PERL
 		mkdll_path = panic "Cant build DLLs on a non-Win32 system"
 
-	-- On Unix, for some historical reason, we do an install-time
-	-- configure to find Perl, and slam that on the front of
-	-- the installed script; so we can invoke them directly 
-	-- (not via perl)
-	-- a call to Perl to get the invocation of split and mangle
+	-- On Unix, scripts are invoked using the '#!' method.  Binary
+	-- installations of GHC on Unix place the correct line on the front
+	-- of the script at installation time, so we don't want to wire-in
+	-- our knowledge of $(PERL) on the host system here.
 	; let split_path  = split_script
 	      mangle_path = mangle_script
 
@@ -265,7 +263,6 @@ initSysTools minusB_args
 	; writeIORef v_Pgm_MkDLL 	   mkdll_path
 	; writeIORef v_Pgm_T   	 	   touch_path
 	; writeIORef v_Pgm_CP  	 	   cp_path
-	; writeIORef v_Pgm_PERL	 	   perl_path
 
 	; return top_dir
 	}
@@ -330,10 +327,12 @@ getTopDir minusbs
     get_proto | not (null minusbs) 
 	      = return (dosifyPath (drop 2 (last minusbs)))
 	      | otherwise	   
-	      = do { maybe_exec_dir <- getExecDir	-- Get directory of executable
-		   ; case maybe_exec_dir of		-- (only works on Windows)
-			Nothing  -> throwDyn (InstallationError ("missing -B<dir> option"))
-			Just dir -> return dir }
+	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable
+		   ; case maybe_exec_dir of	  -- (only works on Windows)
+			Nothing  -> throwDyn (InstallationError 
+						"missing -B<dir> option")
+			Just dir -> return dir
+		   }
 
     remove_suffix dir	-- "/...stuff.../ghc/compiler" --> "/...stuff..."
 	= ASSERT2( not (null p1) && 
