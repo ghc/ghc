@@ -1,115 +1,129 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.31 2000/05/25 13:11:17 panne Exp $
-
-# We create two driver scripts: 
-#	- one to run in-place in the build tree for building libraries
-#	- one wired to the install locations for later installation
+# $Id: Makefile,v 1.32 2000/06/13 16:07:20 simonmar Exp $
 #
-# the installation script is built first, and we invoke make recursively
-# to build the in-place version.
 
 TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
 
-INSTALLING=1
-
-DYN_LOADABLE_BITS = \
-	ghc-asm.prl \
-	ghc-consist.prl \
-	ghc-split.prl
-
-INSTALLED_SCRIPT_PROG  = ghc-$(ProjectVersion)
-INPLACE_SCRIPT_PROG    = ghc-inplace
-
-ifeq "$(INSTALLING)" "1"
-TOP_PWD 	:= $(prefix)
-SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-SCRIPT_LINK 	=  ghc
+ifneq "$(GhcWithHscBuiltViaC)" "YES"
+HC=$(WithGhcHc)
 else
-TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
-SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
+HC=$(GHC_INPLACE)
 endif
 
-SCRIPT_OBJS = ghc.prl
- 
-INTERP=perl
+SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib text
 
-#
-# The driver needs to know the options and names for 
-# all possible ways, so we magically generate the
-# the make variable names for them here.
-#
+HS_PROG = ghc-$(ProjectVersion)
+HS_SRCS = Config.hs Package.hs Main.hs
+MKDEPENDHS_SRCS = Config.hs Main.hs PackageSrc.hs
+LINK = ghc
 
-USER_WAY_NAMES = $(foreach way,$(USER_WAYS),WAY_$(way)_NAME)
-USER_WAY_OPTS  = $(foreach way,$(USER_WAYS),WAY_$(way)_REAL_OPTS)
+SUBDIRS = mangler split stats
 
-SCRIPT_SUBST_VARS := \
-  INSTALLING \
-  ProjectName ProjectVersion ProjectVersionInt \
-  HscMajorVersion HscMinorVersion CcMajorVersion CcMinorVersion \
-  CURRENT_DIR HOSTPLATFORM TARGETPLATFORM \
-  GHC_LIB_DIR GHC_RUNTIME_DIR GHC_INCLUDE_DIR \
-  GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
-  GHC_UNLIT GHC_HSCPP GHC_MKDEPENDHS GHC_HSC GHC_SYSMAN EnableWin32DLLs \
-  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised LibsReadline \
-  $(USER_WAY_NAMES) $(USER_WAY_OPTS)
+# -----------------------------------------------------------------------------
+# Create driver configuration
 
-#
-# When creating a binary distribution, we prefix the driver script
-# with a short msg about what variables need to be set to get the
-# script going. 
-#
+boot :: Config.hs
 
-ifeq "$(BIN_DIST)" "1"
-SCRIPT_PREFIX_FILES=prefix.txt
-else
-SCRIPT_SUBST_VARS += libdir includedir libexecdir datadir bindir TMPDIR TOP_PWD
-endif
+Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@$(RM) -f Config.hs
+	@echo -n "Creating Config.hs ... "
+	@echo "module Config where" >>Config.hs
+	@echo "_ProjectName          = \"$(ProjectName)\"" >> Config.hs            
+	@echo "_ProjectVersion       = \"$(ProjectVersion)\"" >> Config.hs         
+	@echo "_ProjectVersionInt    = \"$(ProjectVersionInt)\"" >> Config.hs      
+	@echo "_ProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> Config.hs      
+	@echo "_HOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> Config.hs           
+	@echo "_TARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> Config.hs         
+	@echo "_CURRENT_DIR          = \"$(CURRENT_DIR)\"" >> Config.hs            
+	@echo "_GHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> Config.hs            
+	@echo "_GHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> Config.hs        
+	@echo "_GHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> Config.hs          
+	@echo "_GHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> Config.hs        
+	@echo "_GHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> Config.hs        
+	@echo "_GCC                  = \"$(WhatGccIsCalled)\"" >> Config.hs
+	@echo "_GhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> Config.hs   
+	@echo "_LeadingUnderscore    = \"$(LeadingUnderscore)\"" >> Config.hs      
+	@echo "_GHC_MKDEPENDHS       = \"$(GHC_MKDEPENDHS)\"" >> Config.hs
+	@echo "_GHC_UNLIT            = \"$(GHC_UNLIT)\"" >> Config.hs              
+	@echo "_GHC_HSCPP            = \"$(GHC_HSCPP)\"" >> Config.hs              
+	@echo "_GHC_HSC              = \"$(GHC_HSC)\"" >> Config.hs                
+	@echo "_GHC_MANGLER          = \"$(GHC_MANGLER)\"" >> Config.hs
+	@echo "_GHC_SPLIT            = \"$(GHC_SPLIT)\"" >> Config.hs
+	@echo "_GHC_STATS            = \"$(GHC_STATS)\"" >> Config.hs
+	@echo "_GHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> Config.hs             
+	@echo "_EnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> Config.hs        
+	@echo "_CP                   = \"$(CP)\"" >> Config.hs                     
+	@echo "_RM                   = \"$(RM)\"" >> Config.hs                     
+	@echo "_CONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> Config.hs           
+	@echo "_HaveLibGmp           = \"$(HaveLibGmp)\"" >> Config.hs
+	@echo "_GhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> Config.hs    
+	@echo "_USER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> Config.hs         
+	@echo "_USER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> Config.hs          
+	@echo "_libdir               = \"$(libdir)\"" >> Config.hs                 
+	@echo "_libexecdir           = \"$(libexecdir)\"" >> Config.hs             
+	@echo "_datadir              = \"$(datadir)\"" >> Config.hs                
+	@echo "_bindir               = \"$(bindir)\"" >> Config.hs                 
+	@echo "_TMPDIR               = \"$(TMPDIR)\"" >> Config.hs                 
+	@echo "_FPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> Config.hs
+	@echo done.
 
-all :: $(DYN_LOADABLE_BITS)
+CLEAN_FILES += Config.hs
 
-# don't recurse on 'make install'
-#
-ifeq "$(INSTALLING)" "1"
-all clean distclean mostlyclean maintainer-clean ::
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-endif
+# -----------------------------------------------------------------------------
+# Create link to from ghc-x.xx to ghc...
 
-#
-# Install setup:
-#   the driver goes in $(bindir), the perl script helpers
-#   in $(libdir)
-#
-# ToDo: allow different install name for driver?
-#
-INSTALL_SCRIPTS += $(SCRIPT_PROG)
-INSTALL_LIBS    += $(DYN_LOADABLE_BITS)
+all :: $(LINK)
 
-#
-# depend setup: other directories need the driver script to compute
-# their dependencies, so `depend' is simply an alias for `all' here.
-depend :: all
+$(LINK) : $(HS_PROG)
+	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK)"; \
+	   $(RM) $(LINK); \
+	   $(LN_S) $(HS_PROG) $(LINK); \
+	 else \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK) failed: \`$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
 
-#
-# Clean up
-#
-CLEAN_FILES += $(SCRIPT_OBJS) $(SCRIPT_LINK) $(DYN_LOADABLE_BITS) ghc-[0-9].*
+# -----------------------------------------------------------------------------
+# create ghc-inplace, a convenient way to run ghc from the build tree...
 
-#
-# Source distribution
-#
-SRC_DEST_FILES=$(patsubst %.prl,%.lprl,$(DYN_LOADABLE_BITS)) ghc.lprl ordering-passes test_mangler
+all :: ghc-inplace
+
+ghc-inplace : ghc
+	@$(RM) $@
+	echo '#!/bin/sh' >>$@
+	echo exec $(FPTOOLS_TOP_ABS)/ghc/driver/ghc -B$(FPTOOLS_TOP_ABS) $$\* >>$@
+	chmod 755 $@
+
+# -----------------------------------------------------------------------------
+# package configuration files...
+
+all :: package.conf package.conf.inplace
+
+pkgconf : Config.o Package.o PackageSrc.o
+	$(HC) $(HC_OPTS) $(LD_OPTS) Config.o Package.o PackageSrc.o -o pkgconf
+
+package.conf.inplace : pkgconf
+	./pkgconf in-place >$@
+
+package.conf : pkgconf
+	./pkgconf install >$@
+
+INSTALL_DATAS += package.conf
+
+CLEAN_FILES += pkgconf package.conf.inplace package.conf
+
+# -----------------------------------------------------------------------------
+# installation...
+
+INSTALL_PROGS = ghc
+
+override datadir=$(libdir)
+INSTALL_DATAS += ghc-usage.txt
+
+# -----------------------------------------------------------------------------
 
 include $(TOP)/mk/target.mk
-
-ghc.prl : $(TOP)/mk/version.mk
-
-#
-# Another hack (hmm..I can see a pattern developing here :-)
-# In ghc/driver, we create a symlink from ghc-<whatever-version> to
-# ghc, but we don't want this included in a source distribution.
-# We `solve' this by removing `ghc' from the dist tree here.
-dist ::
-	@echo "Patching dist tree: removing $(SRC_DIST_DIR)/ghc symlink"
-	$(RM) $(SRC_DIST_DIR)/ghc

@@ -5,6 +5,24 @@
 %************************************************************************
 
 \begin{code}
+$TargetPlatform = $TARGETPLATFORM;
+
+($Pgm = $0) =~ s|.*/||;
+$ifile      = $ARGV[0];
+$Tmp_prefix = $ARGV[1];
+$Output     = $ARGV[2];
+
+&split_asm_file($ifile);
+
+open(OUTPUT, "> $Output") ||  &tidy_up_and_die(1,"$Pgm: failed to open `$Output' (to write)\n");
+print OUTPUT "$NoOfSplitFiles\n";
+close(OUTPUT);
+
+exit(0);
+\end{code}
+
+
+\begin{code}
 sub split_asm_file {
     local($asm_file) = @_;
 
@@ -430,7 +448,9 @@ sub process_asm_block_powerpc {
 \end{code}
 
 \begin{code}
-# make "require"r happy...
-1;
+sub tidy_up_and_die {
+    local($return_val, $msg) = @_;
+    print STDERR $msg;
+    exit (($return_val == 0) ? 0 : 1);
+}
 \end{code}
-

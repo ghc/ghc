@@ -1,0 +1,85 @@
+%************************************************************************
+%*									*
+\section[Driver-stats]{Collecting garbage collection statistics for a ghc run}
+%*									*
+%************************************************************************
+
+\begin{code}
+$StatsFile = $ARGV[0];
+&process_ghc_timings();
+
+sub process_ghc_timings {
+    local($SysSpecificTiming) = 'ghc';
+
+    open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
+    local($max_live)    = 0; 
+    local($tot_live)    = 0; # for calculating residency stuff
+    local($tot_samples) = 0;
+
+    while (<STATS>) {
+	if (! /Gen:\s+0/ && ! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
+	 	$max_live = $1 if $max_live < $1;
+		$tot_live += $1;
+		$tot_samples += 1;
+	}
+        $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
+
+	if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
+	    $MaxResidency = $1; $ResidencySamples = $2;
+	}
+
+        $GCs = $1 if /^\s*([0-9,]+) (collections? in generation 0|garbage collections? performed)/;
+
+	if ( /^\s+([0-9]+)\s+Mb total memory/ ) {
+	    $TotMem = $1;
+        }
+
+	# The presence of -? in the following pattern is only there to
+	# accommodate 0.29 && <= 2.05 RTS'
+	if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*-?(\d+\.\d\d)s elapsed\)/ ) {
+	    $InitTime = $1; $InitElapsed = $2;
+	} elsif ( /^\s*MUT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	    $MutTime = $1; $MutElapsed = $2;
+	} elsif ( /^\s*GC\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	    $GcTime = $1; $GcElapsed = $2;
+	}
+    }
+    close(STATS) || die "Failed when closing $StatsFile\n";
+    if ( $tot_samples > 0 ) {
+	$ResidencySamples = $tot_samples;
+	$MaxResidency = $max_live;
+	$AvgResidency = int ($tot_live / $tot_samples) ;
+    }
+
+    # warn about what we didn't find
+    print STDERR "Warning: BytesAlloc not found in stats file\n" unless defined($BytesAlloc);
+    print STDERR "Warning: GCs not found in stats file\n" unless defined($GCs);
+    print STDERR "Warning: InitTime not found in stats file\n" unless defined($InitTime);
+    print STDERR "Warning: InitElapsed not found in stats file\n" unless defined($InitElapsed);
+    print STDERR "Warning: MutTime not found in stats file\n" unless defined($MutTime);
+    print STDERR "Warning: MutElapsed not found in stats file\n" unless defined($MutElapsed);
+    print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
+    print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
+
+    # things we didn't necessarily expect to find
+    $MaxResidency     = 0 unless defined($MaxResidency);
+    $AvgResidency     = 0 unless defined($AvgResidency);
+    $ResidencySamples = 0 unless defined($ResidencySamples);
+
+    # a bit of tidying
+    $BytesAlloc =~ s/,//g;
+    $MaxResidency =~ s/,//g;
+    $GCs =~ s/,//g;
+    $InitTime =~ s/,//g;
+    $InitElapsed =~ s/,//g;
+    $MutTime =~ s/,//g;
+    $MutElapsed =~ s/,//g;
+    $GcTime =~ s/,//g;
+    $GcElapsed =~ s/,//g;
+
+    # print out what we found
+    print STDERR "<<$SysSpecificTiming: ",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	" :$SysSpecificTiming>>\n";
+}
+\end{code}
