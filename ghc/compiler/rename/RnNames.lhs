@@ -414,7 +414,8 @@ addAvailEnv warn_dups ie env avail
     | otherwise = Nothing
 
 addListToAvailEnv :: AvailEnv -> RdrNameIE -> [AvailInfo] -> RnM s d AvailEnv
-addListToAvailEnv env ie items = foldlRn (addAvailEnv False ie) env items
+addListToAvailEnv env ie items 
+  = foldlRn (addAvailEnv False{-don't warn about dups-} ie) env items
 
 bad_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
    = availName avail1 /= availName avail2  -- Same OccName, different Name
@@ -553,8 +554,8 @@ checkForModuleExportDups ls
      where
       (ls_no_modules,modules) = foldr split_mods ([],[]) ls
 
-      split_mods i@(IEModuleContents _) ~(no_ms,ms) = (no_ms,i:ms)
-      split_mods i ~(no_ms,ms) = (i:no_ms,ms)
+      split_mods i@(IEModuleContents _) (no_ms,ms) = (no_ms,i:ms)
+      split_mods i (no_ms,ms) = (i:no_ms,ms)
 
       (no_module_dups, dups) = removeDups cmp_mods modules
 
