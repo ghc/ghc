@@ -13,7 +13,6 @@ import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
 import TcType		( isTauTy )
 import TcEnv		( bracketOK, tcMetaTy, checkWellStaged, metaLevel )
-import TcSimplify	( tcSimplifyBracket )
 import Name		( isExternalName )
 import qualified DsMeta
 #endif
@@ -616,7 +615,7 @@ tcMonoExpr (PArrSeqIn _) _
 	-- Rename excludes these cases otherwise
 
 tcMonoExpr (HsSplice n expr loc) res_ty = addSrcLoc loc (tcSpliceExpr n expr res_ty)
-tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack)
+tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack res_ty)
 
 tcMonoExpr (HsReify (Reify flavour name)) res_ty
   = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$

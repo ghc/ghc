@@ -16,16 +16,17 @@ import TcRnDriver	( importSupportingDecls, tcTopSrcDecls )
 import qualified Language.Haskell.THSyntax as Meta
 
 import HscTypes		( HscEnv(..), GhciMode(..), PersistentCompilerState(..), unQualInScope )
-import HsSyn		( HsBracket(..) )
+import HsSyn		( HsBracket(..), HsExpr(..) )
 import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
 import RdrHsSyn		( RdrNameHsExpr, RdrNameHsDecl )
 import RnHsSyn		( RenamedHsExpr )
 import TcExpr		( tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
-import TcSimplify	( tcSimplifyTop )
+import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
+import TcUnify		( unifyTauTy )
 import TcType		( TcType, openTypeKind, mkAppTy )
-import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv )
+import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv, bracketOK )
 import TcRnTypes	( TopEnv(..) )
 import TcMType		( newTyVarTy, zapToType )
 import Name		( Name )
@@ -68,8 +69,8 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %************************************************************************
 
 \begin{code}
-tcBracket :: HsBracket Name -> TcM TcType
-tcBracket brack
+tcBracket :: HsBracket Name -> TcType -> TcM TcExpr
+tcBracket brack res_ty
   = getStage 				`thenM` \ level ->
     case bracketOK level of {
 	Nothing         -> failWithTc (illegalBracket level) ;
