@@ -613,6 +613,8 @@ run_phase cc_phase basename suff input_fn output_fn
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
 	split_objs <- readIORef v_Split_object_files
+	let split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
+		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
 
@@ -635,6 +637,7 @@ run_phase cc_phase basename suff input_fn output_fn
 		       ++ [ verb, "-S", "-Wimplicit", opt_flag ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
+		       ++ split_opt
 		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
