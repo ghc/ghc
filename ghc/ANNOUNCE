@@ -17,8 +17,9 @@ related information is available from the Haskell home page at
 GHC 3.02 is a source-only release.  Major news items:
 
 	* A new specialiser,
-	* Many bugs fixed, including several performance-related ones,
 	* A new unsafeCoerce# primitive.
+	* A NOINLINE pragma.
+	* Many bugs fixed, including several performance-related ones,
 
 GHC 3.02 produces the fastest code since 0.29, but there's still
 plenty of tuning to do.
