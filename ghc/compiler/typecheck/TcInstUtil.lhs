@@ -32,7 +32,7 @@ import Id		( GenId, mkDictFunId, mkSysLocal, SYN_IE(Id) )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
-import PprType		( GenClass, GenType, GenTyVar )
+import PprType		( GenClass, GenType, GenTyVar, pprParendType )
 import Pretty
 import SpecEnv		( SpecEnv, nullSpecEnv, addOneToSpecEnv )
 import SrcLoc		( SrcLoc )
@@ -209,7 +209,7 @@ dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
     failTc (\sty -> ptext SLIT("Duplicate or overlapping instance declarations"))
   where
     ctxt sty = sep [hsep [ptext SLIT("for"), 
-			  pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty1],
+			  pprQuote sty $ \ sty -> ppr sty clas <+> pprParendType sty ty1],
 		    nest 4 (sep [ptext SLIT("at")  <+> ppr sty locn1,
 		    	         ptext SLIT("and") <+> ppr sty locn2])]
 \end{code}

@@ -20,7 +20,6 @@ module Id (
 	mkDictFunId,
 	mkIdWithNewUniq, mkIdWithNewName, mkIdWithNewType,
 	mkImported,
-	mkInstId,
 	mkMethodSelId,
 	mkRecordSelId,
 	mkSameSpecCon,
@@ -295,10 +294,6 @@ data IdDetails
 				-- actually do comparisons that way, we kindly supply
 				-- a Unique for that purpose.
 
-  | InstId			-- An instance of a dictionary, class operation,
-				-- or overloaded value (Local name)
-		Bool		-- as for LocalId
-
   | SpecId			-- A specialisation of another Id
 		Id		-- Id of which this is a specialisation
 		[Maybe Type]	-- Types at which it is specialised;
@@ -423,9 +418,6 @@ include dictionaries for the immediate superclasses of C at the type
 (T a b ..).
 
 %----------------------------------------------------------------------
-\item[@InstId@:]
-
-%----------------------------------------------------------------------
 \item[@SpecId@:]
 
 %----------------------------------------------------------------------
@@ -461,7 +453,7 @@ They are constants, so they are not free variables.  (When the STG
 machine makes a closure, it puts all the free variables in the
 closure; the above are not required.)
 \end{itemize}
-Note that @InstIds@, @Locals@ and @SysLocals@ {\em may} have the above
+Note that @Locals@ and @SysLocals@ {\em may} have the above
 properties, but they may not.
 \end{enumerate}
 
@@ -515,7 +507,6 @@ toplevelishId (Id _ _ _ details _ _)
     chk (DictFunId     _ _)	    = True
     chk (SpecId unspec _ _)	    = toplevelishId unspec
 				    -- depends what the unspecialised thing is
-    chk (InstId	      _)	    = False	-- these are local
     chk (LocalId      _)	    = False
     chk (SysLocalId   _)	    = False
     chk (SpecPragmaId _ _)	    = False
@@ -533,7 +524,6 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (DefaultMethodId _)       = True
     chk (DictFunId     _ _)	  = True
     chk (SpecId _     _   no_free_tvs) = no_free_tvs
-    chk (InstId         no_free_tvs) = no_free_tvs
     chk (LocalId        no_free_tvs) = no_free_tvs
     chk (SysLocalId     no_free_tvs) = no_free_tvs
     chk (SpecPragmaId _ no_free_tvs) = no_free_tvs
@@ -661,7 +651,7 @@ apply_to_Id ty_fn id@(Id u n ty details prag info)
 	    new_maybes = map apply_to_maybe ty_maybes
 	in
 	SpecId new_unspec new_maybes (no_free_tvs ty)
-	-- ToDo: gratuitous recalc no_ftvs???? (also InstId)
+	-- ToDo: gratuitous recalc no_ftvs????
       where
 	apply_to_maybe Nothing   = Nothing
 	apply_to_maybe (Just ty) = Just (ty_fn ty)
@@ -722,9 +712,6 @@ mkWorkerId u unwrkr ty info
     details = LocalId (no_free_tvs ty)
     name    = mkCompoundName name_fn u (getName unwrkr)
     name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
-
-mkInstId u ty name 
-  = Id u name ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 \end{code}
 
 %************************************************************************
@@ -991,7 +978,6 @@ dataConFieldLabels x@(Id _ _ _ idt _ _) =
       MethodSelId _ -> "m"
       DefaultMethodId _ -> "d"
       DictFunId _ _ -> "di"
-      InstId _ -> "in"
       SpecId _ _ _ -> "spec"))
 #endif
 

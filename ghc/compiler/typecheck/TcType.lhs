@@ -28,7 +28,7 @@ module TcType (
   tcInstTheta, tcInstId,
 
   zonkTcTyVars, zonkSigTyVar,
-  zonkTcType,
+  zonkTcType, zonkTcTheta,
   zonkTcTypeToType,
   zonkTcTyVar,
   zonkTcTyVarToTyVar
@@ -458,4 +458,10 @@ zonkTcType (FunTy ty1 ty2 u)
 zonkTcType (DictTy c ty u)
   = zonkTcType ty 		`thenNF_Tc` \ ty' ->
     returnNF_Tc (DictTy c ty' u)
+
+
+zonkTcTheta  theta = mapNF_Tc zonk theta
+	where
+	  zonk (c,t) = zonkTcType t	`thenNF_Tc` \ t' ->
+		       returnNF_Tc (c,t')
 \end{code}

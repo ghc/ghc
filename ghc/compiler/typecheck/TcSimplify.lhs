@@ -577,7 +577,7 @@ bindInstsOfLocalFuns ::	LIE s -> [TcIdBndr s] -> TcM s (LIE s, TcMonoBinds s)
 bindInstsOfLocalFuns init_lie local_ids
   = foldrTc bind_inst (emptyBag, EmptyMonoBinds) (bagToList init_lie)
   where
-    bind_inst inst@(Method uniq (TcId id) tys rho orig loc) (insts, binds)
+    bind_inst inst@(Method uniq (TcId id) tys _ _ orig loc) (insts, binds)
       | id `is_elem` local_ids
       = lookupInst inst		`thenTc` \ (dict_insts, bind) ->
 	returnTc (listToBag dict_insts `plusLIE` insts, 

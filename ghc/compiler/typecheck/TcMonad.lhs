@@ -432,7 +432,10 @@ tcGetDefaultTys down env = returnSST (getDefaultTys down)
 tcSetDefaultTys :: [Type] -> TcM s r -> TcM s r
 tcSetDefaultTys tys m down env = m (setDefaultTys down tys) env
 
-tcAddSrcLoc :: SrcLoc -> TcM s a -> TcM s a
+-- tcAddSrcLoc :: SrcLoc -> TcM s a -> TcM s a
+-- tcAddSrcLoc :: SrcLoc -> NF_TcM s a -> NF_TcM s a
+tcAddSrcLoc :: SrcLoc -> (TcDown s -> env -> result)
+		      -> (TcDown s -> env -> result)
 tcAddSrcLoc loc m down env = m (setLoc down loc) env
 
 tcGetSrcLoc :: NF_TcM s SrcLoc

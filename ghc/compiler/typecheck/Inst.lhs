@@ -17,7 +17,7 @@ module Inst (
 
 	newDicts, newDictsAtLoc, newMethod, newMethodWithGivenTy, newOverloadedLit,
 
-	instType, tyVarsOfInst, lookupInst, lookupSimpleInst,
+	tyVarsOfInst, lookupInst, lookupSimpleInst,
 
 	isDict, isTyVarDict, 
 
@@ -42,17 +42,18 @@ import TcHsSyn	( SYN_IE(TcExpr),
 
 import TcMonad
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
-import TcType	( TcIdOcc(..), SYN_IE(TcIdBndr), 
+import TcType	( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcThetaType), SYN_IE(TcTauType),
 		  SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
-		  tcInstType, zonkTcType, tcSplitForAllTy, tcSplitRhoTy )
-
+		  tcInstType, zonkTcType, zonkTcTheta,
+		  tcSplitForAllTy, tcSplitRhoTy
+		)
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, bagToList,
 		  listToBag, consBag, Bag )
 import Class	( classInstEnv,
 		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv) 
 		)
 import ErrUtils ( addErrLoc, SYN_IE(Error) )
-import Id	( GenId, idType, mkInstId, SYN_IE(Id) )
+import Id	( GenId, idType, mkUserLocal, mkSysLocal, SYN_IE(Id) )
 import PrelInfo	( isCcallishClass, isNoDictClass )
 import MatchEnv	( lookupMEnv, insertMEnv )
 import Name	( OccName(..), Name, mkLocalName, 
@@ -145,14 +146,16 @@ data Inst s
 			--	should be instantiated.
 			-- These types must saturate the Id's foralls.
 
-	(TcRhoType s)	-- Cached: (type-of-id applied to inst_tys)
-			-- If this type is (theta => tau) then the type of the Method
-			-- is tau, and the method can be built by saying 
-			--	id inst_tys dicts
-			-- where dicts are constructed from theta
+	(TcThetaType s)	-- The (types of the) dictionaries to which the function
+			-- must be applied to get the method
+
+	(TcTauType s)	-- The type of the method
 
 	(InstOrigin s)
 	SrcLoc
+
+	-- INVARIANT: in (Method u f tys theta tau loc)
+	--	type of (f tys dicts(from theta)) = tau
 
   | LitInst
 	Unique
@@ -165,9 +168,9 @@ data OverloadedLit
   = OverloadedIntegral	 Integer	-- The number
   | OverloadedFractional Rational	-- The number
 
-getInstOrigin (Dict   u clas ty     origin loc) = origin
-getInstOrigin (Method u clas ty rho origin loc) = origin
-getInstOrigin (LitInst u lit ty     origin loc) = origin
+getInstOrigin (Dict    u clas ty          origin loc) = origin
+getInstOrigin (Method  u fn tys theta tau origin loc) = origin
+getInstOrigin (LitInst u lit ty           origin loc) = origin
 \end{code}
 
 Construction
@@ -213,24 +216,29 @@ newMethod orig id tys
     (case id of
        RealId id -> let (tyvars, rho) = splitForAllTy (idType id)
 		    in
-		    (if length tyvars /= length tys then pprTrace "newMethod" (ppr PprDebug (idType id)) else \x->x) $
-		    tcInstType (zip{-Equal "newMethod"-} tyvars tys) rho
+		    tcInstType (zipEqual "newMethod" tyvars tys) rho
+
        TcId   id -> tcSplitForAllTy (idType id) 	`thenNF_Tc` \ (tyvars, rho) -> 
 		    returnNF_Tc (instantiateTy (zipEqual "newMethod(2)" tyvars tys) rho)
     )						`thenNF_Tc` \ rho_ty ->
+    let
+	(theta, tau) = splitRhoTy rho_ty
+    in
 	 -- Our friend does the rest
-    newMethodWithGivenTy orig id tys rho_ty
+    newMethodWithGivenTy orig id tys theta tau
 
 
-newMethodWithGivenTy orig id tys rho_ty
+newMethodWithGivenTy orig id tys theta tau
   = tcGetSrcLoc		`thenNF_Tc` \ loc ->
     tcGetUnique		`thenNF_Tc` \ new_uniq ->
     let
-	meth_inst = Method new_uniq id tys rho_ty orig loc
+	meth_inst = Method new_uniq id tys theta tau orig loc
     in
     returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
-newMethodAtLoc :: InstOrigin s -> SrcLoc -> Id -> [TcType s] -> NF_TcM s (Inst s, TcIdOcc s)
+newMethodAtLoc :: InstOrigin s -> SrcLoc
+	       -> Id -> [TcType s]
+	       -> NF_TcM s (Inst s, TcIdOcc s)
 newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but with 
 					-- slightly different interface
   =   	-- Get the Id type and instantiate it at the specified types
@@ -240,7 +248,8 @@ newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but 
     tcInstType (zipEqual "newMethodAtLoc" tyvars tys) rho `thenNF_Tc` \ rho_ty ->
     tcGetUnique						  `thenNF_Tc` \ new_uniq ->
     let
-	meth_inst = Method new_uniq (RealId real_id) tys rho_ty orig loc
+	(theta, tau) = splitRhoTy rho_ty
+	meth_inst    = Method new_uniq (RealId real_id) tys theta tau orig loc
     in
     returnNF_Tc (meth_inst, instToId meth_inst)
 
@@ -273,27 +282,15 @@ newOverloadedLit orig lit ty		-- The general case
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
 instToId (Dict u clas ty orig loc)
-  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str loc))
+  = TcId (mkUserLocal occ u (mkDictTy clas ty) loc)
   where
-    str = VarOcc (SLIT("d.") _APPEND_ (occNameString (getOccName clas)))
+    occ = VarOcc (SLIT("d.") _APPEND_ (occNameString (getOccName clas)))
 
-instToId (Method u id tys rho_ty orig loc)
-  = TcId (mkInstId u tau_ty (mkLocalName u occ loc))
-  where
-    occ = getOccName id
-    (_, tau_ty) = splitRhoTy rho_ty	
-		-- I hope we don't need tcSplitRhoTy...
-		-- NB The method Id has just the tau type
+instToId (Method u id tys theta tau orig loc)
+  = TcId (mkUserLocal (getOccName id) u tau loc)
     
 instToId (LitInst u list ty orig loc)
-  = TcId (mkInstId u ty (mkSysLocalName u SLIT("lit") loc))
-\end{code}
-
-\begin{code}
-instType :: Inst s -> TcType s
-instType (Dict _ clas ty _ _)     = mkDictTy clas ty
-instType (LitInst _ _ ty _ _)     = ty
-instType (Method _ id tys ty _ _) = ty
+  = TcId (mkSysLocal SLIT("lit") u ty loc)
 \end{code}
 
 
@@ -309,10 +306,11 @@ zonkInst (Dict u clas ty orig loc)
   = zonkTcType	ty			`thenNF_Tc` \ new_ty ->
     returnNF_Tc (Dict u clas new_ty orig loc)
 
-zonkInst (Method u id tys rho orig loc) 		-- Doesn't zonk the id!
+zonkInst (Method u id tys theta tau orig loc) 		-- Doesn't zonk the id!
   = mapNF_Tc zonkTcType tys		`thenNF_Tc` \ new_tys ->
-    zonkTcType rho			`thenNF_Tc` \ new_rho ->
-    returnNF_Tc (Method u id new_tys new_rho orig loc)
+    zonkTcTheta theta			`thenNF_Tc` \ new_theta ->
+    zonkTcType tau			`thenNF_Tc` \ new_tau ->
+    returnNF_Tc (Method u id new_tys new_theta new_tau orig loc)
 
 zonkInst (LitInst u lit ty orig loc)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
@@ -322,8 +320,8 @@ zonkInst (LitInst u lit ty orig loc)
 
 \begin{code}
 tyVarsOfInst :: Inst s -> TcTyVarSet s
-tyVarsOfInst (Dict _ _ ty _ _)        = tyVarsOfType  ty
-tyVarsOfInst (Method _ id tys rho _ _) = tyVarsOfTypes tys `unionTyVarSets` tcIdTyVars id
+tyVarsOfInst (Dict _ _ ty _ _)         = tyVarsOfType  ty
+tyVarsOfInst (Method _ id tys _ _ _ _) = tyVarsOfTypes tys `unionTyVarSets` tcIdTyVars id
 					 -- The id might not be a RealId; in the case of
 					 -- locally-overloaded class methods, for example
 tyVarsOfInst (LitInst _ _ ty _ _)     = tyVarsOfType  ty
@@ -338,7 +336,7 @@ matchesInst :: Inst s -> Inst s -> Bool
 matchesInst (Dict _ clas1 ty1 _ _) (Dict _ clas2 ty2 _ _)
   = clas1 == clas2 && ty1 `eqSimpleTy` ty2
 
-matchesInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _)
+matchesInst (Method _ id1 tys1 _ _ _ _) (Method _ id2 tys2 _ _ _ _)
   =  id1 == id2
   && and (zipWith eqSimpleTy tys1 tys2)
   && length tys1 == length tys2
@@ -402,7 +400,7 @@ pprInst sty (LitInst u lit ty orig loc)
 pprInst sty (Dict u clas ty orig loc)
   = hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u]
 
-pprInst sty (Method u id tys rho orig loc)
+pprInst sty (Method u id tys _ _ orig loc)
   = hsep [ppr sty id, ptext SLIT("at"), 
 	  interppSP sty tys,
 	  show_uniq sty u]
@@ -478,9 +476,8 @@ lookupInst dict@(Dict _ clas ty orig loc)
 
 -- Methods
 
-lookupInst inst@(Method _ id tys rho orig loc)
-  = tcSplitRhoTy rho			`thenNF_Tc` \ (theta, _) ->
-    newDictsAtLoc orig loc theta	`thenNF_Tc` \ (dicts, dict_ids) ->
+lookupInst inst@(Method _ id tys theta _ orig loc)
+  = newDictsAtLoc orig loc theta	`thenNF_Tc` \ (dicts, dict_ids) ->
     returnTc (dicts, VarMonoBind (instToId inst) (mkHsDictApp (mkHsTyApp (HsVar id) tys) dict_ids))
 
 -- Literals
@@ -671,9 +668,9 @@ pprOrigin sty inst
   = hsep [text "arising from", pp_orig orig, text "at", ppr sty locn]
   where
     (orig, locn) = case inst of
-			Dict _ _ _     orig loc -> (orig,loc)
-			Method _ _ _ _ orig loc -> (orig,loc)
-			LitInst _ _ _  orig loc -> (orig,loc)
+			Dict _ _ _       orig loc -> (orig,loc)
+			Method _ _ _ _ _ orig loc -> (orig,loc)
+			LitInst _ _ _    orig loc -> (orig,loc)
 			
     pp_orig (OccurrenceOf id)
       	= hsep [ptext SLIT("use of"), ppr sty id]

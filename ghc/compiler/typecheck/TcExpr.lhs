@@ -754,8 +754,8 @@ tcId name
 	else
 		-- Yes, it's overloaded
 	newMethodWithGivenTy (OccurrenceOf tc_id_occ)
-			     tc_id_occ arg_tys rho	`thenNF_Tc` \ (lie1, meth_id) ->
-	instantiate_it meth_id tau			`thenNF_Tc` \ (expr, lie2, final_tau) ->
+			     tc_id_occ arg_tys theta tau `thenNF_Tc` \ (lie1, meth_id) ->
+	instantiate_it meth_id tau			 `thenNF_Tc` \ (expr, lie2, final_tau) ->
 	returnNF_Tc (expr, lie1 `plusLIE` lie2, final_tau)
 
       where

@@ -29,10 +29,10 @@ import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds),
 			)
 
 import TcMonad
-import Inst		( Inst, SYN_IE(LIE), emptyLIE, plusLIE, InstOrigin(..),
-			  newDicts, tyVarsOfInst, instToId
+import Inst		( Inst, SYN_IE(LIE), emptyLIE, plusLIE, plusLIEs, InstOrigin(..),
+			  newDicts, tyVarsOfInst, instToId, newMethodWithGivenTy
 			)
-import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds,
+import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newLocalId,
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import SpecEnv		( SpecEnv )
@@ -44,13 +44,13 @@ import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcIdOcc(..), SYN_IE(TcIdBndr), 
 			  SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
 			  SYN_IE(TcTyVarSet), SYN_IE(TcTyVar),
-			  newTyVarTy, zonkTcType, zonkSigTyVar,
+			  newTyVarTy, zonkTcType, zonkTcTheta, zonkSigTyVar,
 			  newTcTyVar, tcInstSigType, newTyVarTys
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
 
 import Kind		( isUnboxedTypeKind, mkTypeKind, isTypeKind, mkBoxedTypeKind )
-import Id		( GenId, idType, mkUserLocal, mkUserId )
+import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
 import Maybes		( maybeToBool, assocMaybe, catMaybes )
 import Name		( getOccName, getSrcLoc, Name )
@@ -230,11 +230,12 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
 
       	-- Create a new identifier for each binder, with each being given
 	-- a fresh unique, and a type-variable type.
-    tcGetUniques no_of_binders			`thenNF_Tc` \ uniqs ->
-    mapNF_Tc mk_mono_id_ty binder_names 	`thenNF_Tc` \ mono_id_tys ->
+	-- For "mono_lies" see comments about polymorphic recursion at the 
+	-- end of the function.
+    mapAndUnzipNF_Tc mk_mono_id binder_names	`thenNF_Tc` \ (mono_lies, mono_ids) ->
     let
-	mono_ids           = zipWith3Equal "tcBindAndSigs" mk_id binder_names uniqs mono_id_tys
-	mk_id name uniq ty = mkUserLocal (getOccName name) uniq ty (getSrcLoc name)
+	mono_lie = plusLIEs mono_lies
+	mono_id_tys = map idType mono_ids
     in
 
 	-- TYPECHECK THE BINDINGS
@@ -251,10 +252,12 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
     getTyVarsToGen is_unrestricted mono_id_tys lie	`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
 	-- DEAL WITH TYPE VARIABLE KINDS
-    mapTc defaultUncommittedTyVar (tyVarSetToList tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
+    mapTc defaultUncommittedTyVar 
+	  (tyVarSetToList tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
     let
 	real_tyvars_to_gen = mkTyVarSet real_tyvars_to_gen_list
-		-- It's important that the final list (real_tyvars_to_gen and real_tyvars_to_gen_list) is fully
+		-- It's important that the final list 
+		-- (real_tyvars_to_gen and real_tyvars_to_gen_list) is fully
 		-- zonked, *including boxity*, because they'll be included in the forall types of
 		-- the polymorphic Ids, and instances of these Ids will be generated from them.
 		-- 
@@ -268,21 +271,30 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
     tcExtendGlobalTyVars tyvars_not_to_gen (
 	if null tc_ty_sigs then
 		-- No signatures, so just simplify the lie
+		-- NB: no signatures => no polymorphic recursion, so no
+		-- need to use mono_lies (which will be empty anyway)
 	    tcSimplify real_tyvars_to_gen lie		`thenTc` \ (lie_free, dict_binds, lie_bound) ->
 	    returnTc (lie_free, dict_binds, map instToId (bagToList lie_bound))
 
 	else
-	    zonk_theta sig_theta			`thenNF_Tc` \ sig_theta' ->
+	    zonkTcTheta sig_theta			`thenNF_Tc` \ sig_theta' ->
 	    newDicts SignatureOrigin sig_theta'		`thenNF_Tc` \ (dicts_sig, dict_ids) ->
 		-- It's important that sig_theta is zonked, because
 		-- dict_id is later used to form the type of the polymorphic thing,
 		-- and forall-types must be zonked so far as their bound variables
 		-- are concerned
 
+	    let
+		-- The "givens" is the stuff available.  We get that from
+		-- the context of the type signature, BUT ALSO the mono_lie
+		-- so that polymorphic recursion works right (see comments at end of fn)
+		givens = dicts_sig `plusLIE` mono_lie
+	    in
+
 		-- Check that the needed dicts can be expressed in
 		-- terms of the signature ones
 	    tcAddErrCtxt (sigsCtxt tysig_names) $
-	    tcSimplifyAndCheck real_tyvars_to_gen dicts_sig lie	`thenTc` \ (lie_free, dict_binds) ->
+	    tcSimplifyAndCheck real_tyvars_to_gen givens lie	`thenTc` \ (lie_free, dict_binds) ->
 	    returnTc (lie_free, dict_binds, dict_ids)
 
     )						`thenTc` \ (lie_free, dict_binds, dicts_bound) ->
@@ -326,23 +338,86 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
   where
     no_of_binders = length binder_names
 
-    mk_mono_id_ty binder_name = case maybeSig tc_ty_sigs binder_name of
-				  Just (TySigInfo name _ _ _ tau_ty _) -> returnNF_Tc tau_ty -- There's a signature
-				  otherwise			       -> newTyVarTy kind    -- No signature
+    mk_mono_id binder_name
+      |  theres_a_signature	-- There's a signature; and it's overloaded, 
+      && not (null sig_theta)	-- so make a Method
+      = tcAddSrcLoc sig_loc $
+	newMethodWithGivenTy SignatureOrigin 
+		(TcId poly_id) (mkTyVarTys sig_tyvars) 
+		sig_theta sig_tau			`thenNF_Tc` \ (mono_lie, TcId mono_id) ->
+							-- A bit turgid to have to strip the TcId
+	returnNF_Tc (mono_lie, mono_id)
+
+      | otherwise		-- No signature or not overloaded; 
+      = tcAddSrcLoc (getSrcLoc binder_name) $
+	(if theres_a_signature then
+		returnNF_Tc sig_tau	-- Non-overloaded signature; use its type
+	 else
+		newTyVarTy kind		-- No signature; use a new type variable
+	)					`thenNF_Tc` \ mono_id_ty ->
+
+	newLocalId (getOccName binder_name) mono_id_ty	`thenNF_Tc` \ mono_id ->
+	returnNF_Tc (emptyLIE, mono_id)
+      where
+	maybe_sig	   = maybeSig tc_ty_sigs binder_name
+	theres_a_signature = maybeToBool maybe_sig
+	Just (TySigInfo name poly_id sig_tyvars sig_theta sig_tau sig_loc) = maybe_sig
 
     tysig_names     = [name | (TySigInfo name _ _ _ _ _) <- tc_ty_sigs]
     is_unrestricted = isUnRestrictedGroup tysig_names mbind
 
     kind | is_rec    = mkBoxedTypeKind	-- Recursive, so no unboxed types
 	 | otherwise = mkTypeKind		-- Non-recursive, so we permit unboxed types
-
-zonk_theta theta = mapNF_Tc zonk theta
-	where
-	  zonk (c,t) = zonkTcType t	`thenNF_Tc` \ t' ->
-		       returnNF_Tc (c,t')
 \end{code}
 
-@getImplicitStuffToGen@ decides what type variables generalise over.
+Polymorphic recursion
+~~~~~~~~~~~~~~~~~~~~~
+The game plan for polymorphic recursion in the code above is 
+
+	* Bind any variable for which we have a type signature
+	  to an Id with a polymorphic type.  Then when type-checking 
+	  the RHSs we'll make a full polymorphic call.
+
+This fine, but if you aren't a bit careful you end up with a horrendous
+amount of partial application and (worse) a huge space leak. For example:
+
+	f :: Eq a => [a] -> [a]
+	f xs = ...f...
+
+If we don't take care, after typechecking we get
+
+	f = /\a -> \d::Eq a -> let f' = f a d
+			       in
+			       \ys:[a] -> ...f'...
+
+Notice the the stupid construction of (f a d), which is of course
+identical to the function we're executing.  In this case, the
+polymorphic recursion ins't being used (but that's a very common case).
+
+This can lead to a massive space leak, from the following top-level defn:
+
+	ff :: [Int] -> [Int]
+	ff = f dEqInt
+
+Now (f dEqInt) evaluates to a lambda that has f' as a free variable; but
+f' is another thunk which evaluates to the same thing... and you end
+up with a chain of identical values all hung onto by the CAF ff.
+
+Solution: when typechecking the RHSs we always have in hand the
+*monomorphic* Ids for each binding.  So we just need to make sure that
+if (Method f a d) shows up in the constraints emerging from (...f...)
+we just use the monomorphic Id.  We achieve this by adding monomorphic Ids
+to the "givens" when simplifying constraints.  Thats' what the "mono_lies"
+is doing.
+
+
+%************************************************************************
+%*									*
+\subsection{getTyVarsToGen}
+%*									*
+%************************************************************************
+
+@getTyVarsToGen@ decides what type variables generalise over.
 
 For a "restricted group" -- see the monomorphism restriction
 for a definition -- we bind no dictionaries, and
