@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.25 2003/06/04 15:47:59 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.26 2003/06/05 10:11:22 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -66,7 +66,7 @@ x `happensBefore` y
 	| x `elem` c_pipe       = y `elem` tail (dropWhile (/= x) c_pipe)
 	| otherwise = False
 
-haskell_pipe = [Unlit,Cpp,HsPp,Hsc,HCc,Mangle,As,Ln]
+haskell_pipe = [Unlit,Cpp,HsPp,Hsc,HCc,Mangle,SplitMangle,As,SplitAs,Ln]
 c_pipe       = [Cc,As,Ln]
 
 -- the first compilation phase for a given file is determined

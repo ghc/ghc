@@ -134,30 +134,18 @@ compile ghci_mode this_mod location
    processArgs dynamic_flags opts []
    dyn_flags <- getDynFlags
 
-   let hsc_lang      = hscLang dyn_flags
-       (basename, _) = splitFilename input_fn
+   let (basename, _) = splitFilename input_fn
        
-   keep_hc <- readIORef v_Keep_hc_files
-#ifdef ILX
-   keep_il <- readIORef v_Keep_il_files
-#endif
-   keep_s  <- readIORef v_Keep_s_files
+   -- figure out what lang we're generating
+   hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
+   -- figure out what the next phase should be
+   next_phase <- hscNextPhase hsc_lang
+   -- figure out what file to generate the output into
+   get_output_fn <- genOutputFilenameFunc False Nothing next_phase basename
+   output_fn <- get_output_fn next_phase
 
-   output_fn <- 
-	case hsc_lang of
-	   HscAsm  | keep_s    -> return (basename ++ '.':phaseInputExt As)
-		   | otherwise -> newTempName (phaseInputExt As)
-	   HscC    | keep_hc   -> return (basename ++ '.':phaseInputExt HCc)
-		   | otherwise -> newTempName (phaseInputExt HCc)
-           HscJava             -> newTempName "java" -- ToDo
-#ifdef ILX
-	   HscILX  | keep_il   -> return (basename ++ '.':phaseInputExt Ilasm)
-                   | otherwise -> newTempName (phaseInputExt Ilx2Il) 	
-#endif
-	   HscInterpreted      -> return (error "no output file")
-           HscNothing	       -> return (error "no output file")
-
-   let dyn_flags' = dyn_flags { hscOutName = output_fn,
+   let dyn_flags' = dyn_flags { hscLang = hsc_lang,
+				hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",
 				hscStubHOutName = basename ++ "_stub.h",
 				extCoreName = basename ++ ".hcr" }
@@ -363,14 +351,27 @@ runPipeline todo stop_flag keep_output maybe_output_filename input_fn
 
 pipeLoop :: Phase -> Phase -> FilePath -> String -> Suffix
   -> (Phase -> IO FilePath) -> IO FilePath
+
 pipeLoop phase stop_phase input_fn orig_basename orig_suff get_output_fn
   | phase == stop_phase  =  return input_fn  -- all done
+
+  | not (phase `happensBefore` stop_phase)  = 
+	-- Something has gone wrong.  We'll try to cover all the cases when
+	-- this could happen, so if we reach here it is a panic.
+	-- eg. it might happen if the -C flag is used on a source file that
+	-- has {-# OPTIONS -fasm #-}.
+	panic ("pipeLoop: at phase " ++ show phase ++ 
+		" but I wanted to stop at phase " ++ show stop_phase)
+
   | otherwise = do
 	maybe_next_phase <- runPhase phase orig_basename orig_suff input_fn
 				get_output_fn
 	case maybe_next_phase of
-	  (Nothing, output_fn) -> return output_fn
-	  (Just next_phase, output_fn) -> 
+	  (Nothing, output_fn) -> 
+		-- we stopped early, but return the *final* filename
+		-- (it presumably already exists)
+		get_output_fn stop_phase
+	  (Just next_phase, output_fn) ->
 		pipeLoop next_phase stop_phase output_fn
 			orig_basename orig_suff get_output_fn
 
@@ -595,18 +596,12 @@ runPhase Hsc basename suff input_fn get_output_fn = do
 
   -- get the DynFlags
         dyn_flags <- getDynFlags
-	let hsc_lang = hscLang dyn_flags
-	split <- readIORef v_Split_object_files
-
-	let next_phase = case hsc_lang of
-				HscC -> HCc
-				HscAsm | split -> SplitMangle
-				       | otherwise -> As
-				HscNothing -> HCc
-
+	hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
+	next_phase <- hscNextPhase hsc_lang
 	output_fn <- get_output_fn next_phase
 
-        let dyn_flags' = dyn_flags { hscOutName = output_fn,
+        let dyn_flags' = dyn_flags { hscLang = hsc_lang,
+				     hscOutName = output_fn,
 		   		     hscStubCOutName = basename ++ "_stub.c",
 				     hscStubHOutName = basename ++ "_stub.h",
 				     extCoreName = basename ++ ".hcr" }
@@ -815,7 +810,8 @@ runPhase SplitAs basename _suff _input_fn get_output_fn
 	
 	mapM_ assemble_file [1..n]
 
-	return (Just Ln, "**split_as**") -- we don't use the output file
+	output_fn <- get_output_fn Ln
+	return (Just Ln, output_fn)
 
 #ifdef ILX
 -----------------------------------------------------------------------------
@@ -1102,3 +1098,29 @@ doMkDLL o_files = do
 	       then [ "" ]
                else [ "--export-all" ])
 	))
+
+-- -----------------------------------------------------------------------------
+-- Misc.
+
+hscNextPhase :: HscLang -> IO Phase
+hscNextPhase hsc_lang = do
+  split <- readIORef v_Split_object_files
+  return (case hsc_lang of
+		HscC -> HCc
+		HscAsm | split -> SplitMangle
+		       | otherwise -> As
+		HscNothing -> HCc
+	)
+
+hscMaybeAdjustLang :: HscLang -> IO HscLang
+hscMaybeAdjustLang current_hsc_lang = do
+  todo    <- readIORef v_GhcMode
+  keep_hc <- readIORef v_Keep_hc_files
+  let hsc_lang
+	-- don't change the lang if we're interpreting
+	 | current_hsc_lang == HscInterpreted = current_hsc_lang
+	-- force -fvia-C if we are being asked for a .hc file
+	 | todo == StopBefore HCc  || keep_hc = HscC
+	-- otherwise, stick to the plan
+	 | otherwise = current_hsc_lang
+  return hsc_lang
