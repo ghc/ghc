@@ -54,9 +54,9 @@ import RdrHsSyn
 import RdrName
 import CallConv
 import PrelNames 	( pRELUDE_Name, mkTupNameStr )
-import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace, occNameUserString )
+import OccName  	( dataName, tcName, varName, tvName, tcClsName,
+			  occNameSpace, setOccNameSpace, occNameUserString )
 import CmdLineOpts 	( opt_NoImplicitPrelude )
-import StringBuffer 	( lexemeToString )
 import FastString	( unpackFS )
 import BasicTypes	( Boxity(..) )
 import UniqFM		( UniqFM, listToUFM, lookupUFM )
@@ -87,7 +87,13 @@ splitForConApp  t ts = split t ts
  where
 	split (HsAppTy t u) ts = split t (Unbanged u : ts)
 
-	split (HsTyVar t)   ts  = returnP (con, ts)
+	split (HsTyVar t)   ts  = 
+		-- check that we've got a type constructor at the head
+	   if occNameSpace t_occ /= tcClsName
+		then parseError 
+			(showSDoc (text "not a constructor: `" <> 
+					ppr t <> char '\''))
+		else returnP (con, ts)
 	   where t_occ = rdrNameOcc t
 		 con   = setRdrNameOcc t (setOccNameSpace t_occ dataName)
 
