@@ -46,6 +46,11 @@ Haskell side.
 #include <windows.h>
 #endif
 
+#if defined(openbsd_TARGET_OS)
+#include <unistd.h>
+#include <sys/mman.h>
+#endif
+
 /* Heavily arch-specific, I'm afraid.. */
 
 typedef enum { 
@@ -79,6 +84,15 @@ execPage (void* addr, pageMode mode)
 	barf("execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
     }
 #else
+
+#if defined(openbsd_TARGET_OS)
+    /* malloc memory isn't executable by default on OpenBSD */
+    unsigned long pagesize = sysconf(_SC_PAGESIZE);
+    unsigned long round    = (unsigned long)addr & (pagesize - 1);
+    if (mprotect(addr - round, pagesize, PROT_EXEC|PROT_READ|PROT_WRITE) == -1)
+        barf("execPage: failed to protect 0x%p\n", addr);
+#endif
+
     (void)addr;   (void)mode;   /* keep gcc -Wall happy */
 #endif
 }
