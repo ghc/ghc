@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.14 2001/01/24 22:37:15 qrczak Exp $
+-- $Id: Main.hs,v 1.15 2001/02/05 18:01:39 rrt Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -11,14 +11,21 @@
 --
 -- See the documentation in the Users' Guide for more details.
 
+#include "../../includes/config.h"
+
 import GetOpt
 import System      (getProgName, getArgs, ExitCode(..), system, exitWith, exitFailure)
 import Directory   (removeFile)
+import IO          (openFile, hClose, hPutStrLn, IOMode(..))
 import Parsec
 import ParsecError
 import Monad       (liftM, liftM2, when)
 import Char        (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
 import List        (intersperse)
+import Exception   (catchAllIO)
+#ifndef mingw32_TARGET_OS
+import Posix
+#endif
 
 version :: String
 version = "hsc2hs-0.64"
@@ -226,7 +233,7 @@ output flags name toks = let
         concatMap outTokenHs toks++
         "    return 0;\n}\n"
     
-    compilerStatus <- system $
+    compilerStatus <- kludgedSystem $
         compiler++
         " -c"++
         concat [" "++f | CompFlag f <- flags]++
@@ -237,7 +244,7 @@ output flags name toks = let
         _                 -> return ()
     removeFile cProgName
     
-    linkerStatus <- system $
+    linkerStatus <- kludgedSystem $
         linker++
         concat [" "++f | LinkFlag f <- flags]++
         " "++oProgName++
@@ -247,15 +254,15 @@ output flags name toks = let
         _                 -> return ()
     removeFile oProgName
     
-    system (execProgName++" >"++outHsName)
+    kludgedSystem (execProgName++" >"++outHsName)
     removeFile progName
     
     when needsH $ writeFile outHName $
-        "#ifndef "++includeGuard++"\n\
-        \#define "++includeGuard++"\n\
-        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
-        \#include <Rts.h>\n\
-        \#endif\n\
+        "#ifndef "++includeGuard++"\n\ 
+        \#define "++includeGuard++"\n\ 
+        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
+        \#include <Rts.h>\n\ 
+        \#endif\n\ 
         \#include <HsFFI.h>\n"++
         concat ["#include "++n++"\n" | Include n <- flags]++
         concatMap outTokenH specials++
@@ -286,7 +293,7 @@ outHeaderCProg =
             (header, _:body) -> case break isSpace header of
                 (name, args) ->
                     outCLine pos++
-                    "#define hsc_"++name++"("++dropWhile isSpace args++") \
+                    "#define hsc_"++name++"("++dropWhile isSpace args++") \ 
                     \printf ("++joinLines body++");\n"
         _ -> ""
     where
@@ -294,9 +301,9 @@ outHeaderCProg =
 
 outHeaderHs :: [Flag] -> Maybe String -> [(SourcePos, String, String)] -> String
 outHeaderHs flags inH toks =
-    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
-    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
-    \__GLASGOW_HASKELL__);\n\
+    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
+    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \ 
+    \__GLASGOW_HASKELL__);\n\ 
     \#endif\n"++
     includeH++
     concatMap outSpecial toks
@@ -358,11 +365,11 @@ outEnum arg =
                     (enum, rest) -> let
                         this = case break (== '=') $ dropWhile isSpace enum of
                             (name, []) ->
-                                "    hsc_enum ("++t++", "++f++", \
+                                "    hsc_enum ("++t++", "++f++", \ 
                                 \hsc_haskellize (\""++name++"\"), "++
                                 name++");\n"
                             (hsName, _:cName) ->
-                                "    hsc_enum ("++t++", "++f++", \
+                                "    hsc_enum ("++t++", "++f++", \ 
                                 \printf (\"%s\", \""++hsName++"\"), "++
                                 cName++");\n"
                         in this++enums rest
@@ -378,8 +385,8 @@ outTokenH (pos, key, arg) =
             's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
             't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
             'i':'n':'l':'i':'n':'e':' ':_ ->
-                "#ifdef __GNUC__\n\
-                \extern\n\
+                "#ifdef __GNUC__\n\ 
+                \extern\n\ 
                 \#endif\n"++
                 arg++"\n"
             _ -> "extern "++header++";\n"
@@ -395,12 +402,12 @@ outTokenC (pos, key, arg) =
             't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
             'i':'n':'l':'i':'n':'e':' ':_ ->
                 outCLine pos++
-                "#ifndef __GNUC__\n\
-                \extern\n\
+                "#ifndef __GNUC__\n\ 
+                \extern\n\ 
                 \#endif\n"++
                 header++
-                "\n#ifndef __GNUC__\n\
-                \;\n\
+                "\n#ifndef __GNUC__\n\ 
+                \;\n\ 
                 \#else\n"++
                 body++
                 "\n#endif\n"
@@ -457,3 +464,30 @@ showCString = concatMap showCChar
                       intToDigit (ord c `quot` 64),
                       intToDigit (ord c `quot` 8 `mod` 8),
                       intToDigit (ord c          `mod` 8)]
+
+-- system that works feasibly under Windows (i.e. passes the command line to sh,
+-- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
+kludgedSystem cmd
+ = do
+#ifndef mingw32_TARGET_OS
+   exit_code <- system cmd `catchAllIO` 
+		   (\_ -> exitFailure)
+#else
+   pid <- myGetProcessID
+   let tmp = "/tmp/sh" ++ show pid
+   h <- openFile tmp WriteMode
+   hPutStrLn h cmd
+   hClose h
+   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
+		   (\_ -> removeFile tmp >>
+                          exitFailure)
+   removeFile tmp
+#endif
+   return exit_code
+
+#ifdef mingw32_TARGET_OS
+foreign import "_getpid" myGetProcessID :: IO Int 
+#else
+myGetProcessID :: IO Int
+myGetProcessID = Posix.getProcessID
+#endif
