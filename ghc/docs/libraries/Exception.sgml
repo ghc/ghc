@@ -164,6 +164,7 @@ type; all other exceptions are re-thrown as with <tt/catchIO/ and
 friends above.
 
 <sect1> Other Utilities
+<p>
 
 The <tt/bracket/ functions are useful for making sure that resources are
 released properly by code that may raise exceptions:
