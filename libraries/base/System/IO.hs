@@ -32,7 +32,9 @@ module System.IO (
 
     hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
     hGetBuffering,	       -- :: Handle -> IO BufferMode
+#ifndef __HUGS__
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
+#endif
     hFlush,		       -- :: Handle -> IO ()
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
