@@ -409,9 +409,10 @@ data TcTyThing
 					--	tycons and clases in this recursive group
 
 instance Outputable TcTyThing where	-- Debugging only
-   ppr (AGlobal g)      = text "AGlobal" <+> ppr g
-   ppr (ATcId g tl pl)  = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
-   ppr (ATyVar tv ty)   = text "ATyVar" <+> ppr tv <+> pprParendType ty
+   ppr (AGlobal g)      = ppr g
+   ppr (ATcId g tl pl)  = text "Identifier" <> 
+			  ifPprDebug (brackets (ppr g <> comma <> ppr tl <> comma <> ppr pl))
+   ppr (ATyVar tv ty)   = text "Type variable" <+> quotes (ppr tv) <+> pprParendType ty
    ppr (AThing k)       = text "AThing" <+> ppr k
 \end{code}
 

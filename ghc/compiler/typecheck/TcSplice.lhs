@@ -19,10 +19,10 @@ import qualified Language.Haskell.TH.Syntax as TH
 
 import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
 		   	  HsType, LHsType )
-import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType )
+import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName )
 import RnExpr		( rnLExpr )
-import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe )
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, lookupLocalRdrEnv )
+import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
+import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, lookupLocalRdrEnv, isSrcRdrName )
 import RnTypes		( rnLHsType )
 import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( mkHsLet, zonkTopLExpr )
@@ -452,44 +452,37 @@ reify th_name
 	; thing <- tcLookupTh name
 		-- ToDo: this tcLookup could fail, which would give a
 		-- 	 rather unhelpful error message
+	; traceIf (text "reify" <+> text (show th_name) <+> brackets (ppr_ns th_name) <+> ppr name)
 	; reifyThing thing
     }
+  where
+    ppr_ns (TH.Name _ (TH.NameG TH.DataName mod)) = text "data"
+    ppr_ns (TH.Name _ (TH.NameG TH.TcClsName mod)) = text "tc"
+    ppr_ns (TH.Name _ (TH.NameG TH.VarName mod)) = text "var"
 
 lookupThName :: TH.Name -> TcM Name
-lookupThName (TH.Name occ (TH.NameG th_ns mod))
-  = lookupOrig (mkModule (TH.modString mod))
-	       (OccName.mkOccName ghc_ns (TH.occString occ))
-  where
-    ghc_ns = case th_ns of
-		TH.DataName  -> dataName
-		TH.TcClsName -> tcClsName
-		TH.VarName   -> varName
+lookupThName th_name
+  =  do { let rdr_name = thRdrName guessed_ns th_name
 
-lookupThName (TH.Name occ (TH.NameU uniq)) 
-  = return (mkInternalName (mk_uniq uniq) (OccName.mkOccFS bogus_ns occ_fs) noSrcLoc)
-  where
-    occ_fs = mkFastString (TH.occString occ)
-    bogus_ns = OccName.varName	-- Not yet recorded in the TH name
-				-- but only the unique matters
-
-lookupThName th_name@(TH.Name occ flavour) 	-- NameS or NameQ
-  =  do { let occ = OccName.mkOccFS ns occ_fs
-	      rdr_name = case flavour of
-			    TH.NameS   -> mkRdrUnqual occ
-			    TH.NameQ m -> mkRdrQual (mkModule (TH.modString m)) occ
+	-- Repeat much of lookupOccRn, becase we want
+	-- to report errors in a TH-relevant way
 	; rdr_env <- getLocalRdrEnv
 	; case lookupLocalRdrEnv rdr_env rdr_name of
-		Just name -> return name
-		Nothing   -> do
-	{ mb_name <- lookupSrcOcc_maybe rdr_name
-	; case mb_name of
-	    Just name -> return name ;
-	    Nothing   -> failWithTc (notInScope th_name)
-	}}
+	    Just name -> return name
+	    Nothing | not (isSrcRdrName rdr_name)	-- Exact, Orig
+		    -> lookupImportedName rdr_name
+		    | otherwise				-- Unqual, Qual
+		    -> do { 
+				  mb_name <- lookupSrcOcc_maybe rdr_name
+			  ; case mb_name of
+			      Just name -> return name ;
+			      Nothing   -> failWithTc (notInScope th_name) }
+	}
   where
-    ns | isLexCon occ_fs = OccName.dataName
-       | otherwise	 = OccName.varName
-    occ_fs = mkFastString (TH.occString occ)
+	-- guessed_ns is the name space guessed from looking at the TH name
+    guessed_ns | isLexCon occ_fs = OccName.dataName
+	       | otherwise	 = OccName.varName
+    occ_fs = mkFastString (TH.nameBase th_name)
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of TcEnv.tcLookup; specialised mainly in that

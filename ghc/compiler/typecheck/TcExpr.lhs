@@ -25,8 +25,7 @@ import TcRnMonad
 import TcUnify		( Expected(..), tcInfer, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
 			  unifyFunTys, zapToListTy, zapToTyConApp )
 import BasicTypes	( isMarkedStrict )
-import Inst		( InstOrigin(..), 
-			  newOverloadedLit, newMethodFromName, newIPDict,
+import Inst		( newOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta, tcInstCall )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookup, tcLookupId, checkProcLevel,
@@ -776,7 +775,8 @@ tcId id_name	-- Look up the Id and instantiate its type
 	  -> do	{ checkProcLevel id proc_level
 		; tc_local_id id th_level }
 
-    ;	other -> pprPanic "tcId" (ppr id_name $$ ppr thing)
+	-- THis 
+    ;	other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
     }
   where
 

@@ -6,7 +6,7 @@ This module converts Template Haskell syntax into HsSyn
 
 
 \begin{code}
-module Convert( convertToHsExpr, convertToHsDecls, convertToHsType ) where
+module Convert( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName ) where
 
 #include "HsVersions.h"
 
@@ -404,15 +404,18 @@ tconName = thRdrName OccName.tcName
 
 thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
 -- This turns a Name into a RdrName
+-- The passed-in name space tells what the context is expecting;
+--	use it unless the TH name knows what name-space it comes
+-- 	from, in which case use the latter
+thRdrName ctxt_ns (TH.Name occ (TH.NameG th_ns mod)) = mkOrig      (mk_mod mod) (mk_occ (mk_ghc_ns th_ns) occ)
+thRdrName ctxt_ns (TH.Name occ (TH.NameL uniq))      = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ctxt_ns occ) noSrcLoc)
+thRdrName ctxt_ns (TH.Name occ (TH.NameQ mod))       = mkRdrQual   (mk_mod mod) (mk_occ ctxt_ns occ)
+thRdrName ctxt_ns (TH.Name occ TH.NameS)             = mkRdrUnqual (mk_occ ctxt_ns occ)
+thRdrName ctxt_ns (TH.Name occ (TH.NameU uniq))      = mkRdrUnqual (mk_uniq_occ ctxt_ns occ uniq)
 
-thRdrName ns (TH.Name occ TH.NameS)           = mkRdrUnqual (mk_occ ns occ)
-thRdrName ns (TH.Name occ (TH.NameQ mod))     = mkRdrQual (mk_mod mod) (mk_occ ns occ)
-thRdrName ns (TH.Name occ (TH.NameG ns' mod)) = mkOrig    (mk_mod mod) (mk_occ ns occ)
-thRdrName ns (TH.Name occ (TH.NameL uniq))    = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
-thRdrName ns (TH.Name occ (TH.NameU uniq))    
-  = mkRdrUnqual (OccName.mkOccName ns uniq_str)
-  where
-    uniq_str = TH.occString occ ++ '[' : shows (mk_uniq uniq) "]"
+mk_uniq_occ :: OccName.NameSpace -> TH.OccName -> Int# -> OccName.OccName
+mk_uniq_occ ns occ uniq 
+  = OccName.mkOccName ns (TH.occString occ ++ '[' : shows (mk_uniq uniq) "]")
 	-- The idea here is to make a name that 
 	-- a) the user could not possibly write, and
 	-- b) cannot clash with another NameU
@@ -421,6 +424,11 @@ thRdrName ns (TH.Name occ (TH.NameU uniq))
 	-- top-level binders, which must have External Names, since they are
 	-- rapidly baked into data constructors and the like.  Baling out
 	-- and generating an unqualified RdrName here is the simple solution
+
+mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
+mk_ghc_ns DataName     = OccName.dataName
+mk_ghc_ns TH.TcClsName = OccName.tcClsName
+mk_ghc_ns TH.VarName   = OccName.varName
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> TH.OccName -> OccName.OccName
