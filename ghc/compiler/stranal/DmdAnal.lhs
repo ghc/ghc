@@ -487,11 +487,10 @@ We can't start with 'not-demanded' because then consider
 
 In the first iteration we'd have no demand info for x, so assume
 not-demanded; then we'd get TopRes for f's CPR info.  Next iteration
-we'd see that t was demanded, and so give it the CPR property, but
-by now f has TopRes, so it will stay TopRes.  
-ever_in
-Instead, with the Nothing setting the first time round, we say
-'yes t is demanded' the first time.  
+we'd see that t was demanded, and so give it the CPR property, but by
+now f has TopRes, so it will stay TopRes.  Instead, with the Nothing
+setting the first time round, we say 'yes t is demanded' the first
+time.
 
 However, this does mean that for non-recursive bindings we must
 iterate twice to be sure of not getting over-optimistic CPR info,
@@ -729,10 +728,15 @@ extendSigEnvList = extendVarEnvList
 
 extendSigsWithLam :: SigEnv -> Id -> SigEnv
 -- Extend the SigEnv when we meet a lambda binder
---  If the binder is marked demanded with a product demand, then give it a CPR 
+-- If the binder is marked demanded with a product demand, then give it a CPR 
 -- signature, because in the likely event that this is a lambda on a fn defn 
 -- [we only use this when the lambda is being consumed with a call demand],
--- it'll be w/w'd and so it will be CPR-ish.
+-- it'll be w/w'd and so it will be CPR-ish.  E.g.
+--	f = \x::(Int,Int).  if ...strict in x... then
+--				x
+--			    else
+--				(a,b)
+-- We want f to have the CPR property because x does, by the time f has been w/w'd
 --
 -- 	NOTE: see notes [CPR-AND-STRICTNESS]
 --

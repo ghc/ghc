@@ -420,6 +420,9 @@ mkWWcpr body_ty RetCPR
 
     | n_con_args == 1 && isUnLiftedType con_arg_ty1
 	-- Special case when there is a single result of unlifted type
+	--
+	-- Wrapper:	case (..call worker..) of x -> C x
+	-- Worker:	case (   ..body..    ) of C x -> x
     = getUniquesUs 			`thenUs` \ (work_uniq : arg_uniq : _) ->
       let
 	work_wild = mk_ww_local work_uniq body_ty
@@ -431,6 +434,8 @@ mkWWcpr body_ty RetCPR
 		con_arg_ty1)
 
     | otherwise		-- The general case
+	-- Wrapper: case (..call worker..) of (# a, b #) -> C a b
+	-- Worker:  case (   ...body...  ) of C a b -> (# a, b #)     
     = getUniquesUs 	  	`thenUs` \ uniqs ->
       let
         (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
@@ -440,7 +445,7 @@ mkWWcpr body_ty RetCPR
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
         con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)
       in
-      returnUs (\ wkr_call -> Case wkr_call wrap_wild [(DataAlt ubx_tup_con, args, con_app)],
+      returnUs (\ wkr_call -> Case wkr_call wrap_wild   [(DataAlt ubx_tup_con, args, con_app)],
 		\ body     -> workerCase body work_wild [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
     where
