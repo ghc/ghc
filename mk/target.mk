@@ -962,14 +962,14 @@ SGML_SRCS = $(wildcard *.sgml)
 endif
 endif
 
-SGML_TEX  = $(SGML_DOC).tex
-SGML_DVI  = $(SGML_DOC).dvi
-SGML_PS   = $(SGML_DOC).ps
-SGML_PDF  = $(SGML_DOC).pdf
-SGML_RTF  = $(SGML_DOC).rtf
-SGML_HTML = $(SGML_DOC).html
+SGML_TEX  = $(addsuffix .tex,$(SGML_DOC))
+SGML_DVI  = $(addsuffix .dvi,$(SGML_DOC))
+SGML_PS   = $(addsuffix .ps,$(SGML_DOC))
+SGML_PDF  = $(addsuffix .pdf,$(SGML_DOC))
+SGML_RTF  = $(addsuffix .rtf,$(SGML_DOC))
+SGML_HTML = $(addsuffix .html,$(SGML_DOC))
 # HTML output goes in a subdirectory on its own.
-SGML_TEXT = $(SGML_DOC).txt
+SGML_TEXT = $(addsuffix .txt,$(SGML_DOC))
 
 $(SGML_DVI) $(SGML_PS) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
 
