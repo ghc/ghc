@@ -481,9 +481,20 @@ annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    (DmdType fv' (dmd:ds) res, setIdNewDemandInfo id dmd)
+    (DmdType fv' (hacked_dmd:ds) res, setIdNewDemandInfo id hacked_dmd)
   where
     (fv', dmd) = removeFV fv id res
+    hacked_dmd = case dmd of
+		    Bot   -> Abs
+		    Err   -> Abs
+		    other -> dmd
+	-- This gross hack is needed because otherwise we label
+	-- a lambda binder with demand 'B'.  But in terms of calling
+	-- conventions that's Abs, because we don't pass it.  But
+	-- when we do a w/w split we get
+	--	fw x = (\x y:B -> ...) x (error "oops")
+	-- And then the simplifier things the 'B' is a strict demand
+	-- and evaluates the (error "oops").  Sigh
 
 removeFV fv var res = (fv', dmd)
 		where
@@ -603,6 +614,7 @@ defer = lub Abs
 
 lazify :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
+-- Ugly!  Ask John how to improve it.
 lazify (Seq k Defer ds) = Lazy
 lazify (Seq k Now   ds) = Seq k Now (map lazify ds)
 lazify Bot		= Abs	-- Don't pass args that are consumed by bottom/err
