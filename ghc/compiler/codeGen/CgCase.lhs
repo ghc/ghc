@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.64 2003/07/02 13:18:24 simonpj Exp $
+% $Id: CgCase.lhs,v 1.65 2003/07/21 11:01:06 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -361,7 +361,7 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
     
     forkAbsC (	-- forkAbsC for the RHS, so that the envt is
 		-- not changed for the mkRetDirect call
-  	restoreCurrentCostCentre cc_slot	`thenC` 
+  	restoreCurrentCostCentre cc_slot True	`thenC` 
 	bindUnboxedTupleComponents args		`thenFC` \ (live_regs, ptrs, nptrs, _) ->
 		-- Generate a heap check if necessary
   	unbxTupleHeapCheck live_regs ptrs nptrs AbsCNop $
@@ -374,7 +374,7 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
 cgEvalAlts cc_slot bndr srt alt_type@(PrimAlt tycon) alts
   = forkAbsC (	-- forkAbsC for the RHS, so that the envt is
 		-- not changed for the mkRetDirect call
-  	restoreCurrentCostCentre cc_slot		`thenC` 
+  	restoreCurrentCostCentre cc_slot True		`thenC` 
 	bindNewToReg bndr reg (mkLFArgument bndr)	`thenC`
 	cgPrimAlts GCMayHappen (CReg reg) alts alt_type
     ) 						`thenFC` \ abs_c ->
@@ -463,7 +463,7 @@ cgAlgAlt :: GCFlag
 cgAlgAlt gc_flag uniq cc_slot must_label_branch
          alt_type (con, args, use_mask, rhs)
   = getAbsC (bind_con_args con args		`thenFC` \ _ ->
-    	     restoreCurrentCostCentre cc_slot	`thenC`
+    	     restoreCurrentCostCentre cc_slot True	`thenC`
 	     maybeAltHeapCheck gc_flag alt_type (cgExpr rhs)
     ) 						`thenFC` \ abs_c -> 
     let
@@ -655,11 +655,13 @@ saveCurrentCostCentre
 	returnFC (Just slot,
 		  CAssign (CVal sp_rel CostCentreRep) (CReg CurCostCentre))
 
-restoreCurrentCostCentre :: Maybe VirtualSpOffset -> Code
-restoreCurrentCostCentre Nothing = nopC
-restoreCurrentCostCentre (Just slot)
- = getSpRelOffset slot				 `thenFC` \ sp_rel ->
-   freeStackSlots [slot]			 `thenC`
+-- Sometimes we don't free the slot containing the cost centre after restoring it
+-- (see CgLetNoEscape.cgLetNoEscapeBody).
+restoreCurrentCostCentre :: Maybe VirtualSpOffset -> Bool -> Code
+restoreCurrentCostCentre Nothing     _freeit = nopC
+restoreCurrentCostCentre (Just slot) freeit
+ = getSpRelOffset slot				     `thenFC` \ sp_rel ->
+   (if freeit then freeStackSlots [slot] else nopC)  `thenC`
    absC (CCallProfCCMacro FSLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCCS

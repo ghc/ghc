@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.23 2003/07/18 16:31:27 simonmar Exp $
+% $Id: CgLetNoEscape.lhs,v 1.24 2003/07/21 11:01:07 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -188,8 +188,10 @@ cgLetNoEscapeBody :: Id		-- Name of the joint point
 cgLetNoEscapeBody bndr cc cc_slot all_args body
    = bindUnboxedTupleComponents all_args	`thenFC` \ (arg_regs, ptrs, nptrs, ret_slot) ->
 
-     -- restore the saved cost centre
-     restoreCurrentCostCentre cc_slot	`thenC`
+     -- restore the saved cost centre.  BUT: we must not free the stack slot
+     -- containing the cost centre, because it might be needed for a
+     -- recursive call to this let-no-escape.
+     restoreCurrentCostCentre cc_slot False{-don't free-}	`thenC`
 
 	-- Enter the closures cc, if required
      --enterCostCentreCode closure_info cc IsFunction  `thenC`
