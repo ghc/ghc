@@ -228,7 +228,12 @@ BuildingProfilingConcurrent=$(subst mr,YES,$(filter mr,$(WAYS)))
 # What extra ways to build the libraries in
 # In addition to the normal sequential way, the default is to also build
 # profiled prelude libraries.
+# When booting from .hc files, turn this off.
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
+GhcLibWays
+else
 GhcLibWays=p
+endif
 
 # Option flags to pass to GHC when it's compiling prelude modules
 # Typically these are things like -O or -dcore-lint
