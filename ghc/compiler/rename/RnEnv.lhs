@@ -493,13 +493,14 @@ checkDupNames doc_str rdr_names_w_loc
 \begin{code}
 mkGlobalRdrEnv :: ModuleName		-- Imported module (after doing the "as M" name change)
 	       -> Bool			-- True <=> want unqualified import
+	       -> Bool			-- True <=> want qualified import
 	       -> [AvailInfo]		-- What's to be hidden (but only the unqualified 
 	 				-- 	version is hidden)
 	       -> (Name -> Provenance)
 	       -> Avails		-- Whats imported and how
 	       -> GlobalRdrEnv
 
-mkGlobalRdrEnv this_mod unqual_imp hides mk_provenance avails
+mkGlobalRdrEnv this_mod unqual_imp qual_imp hides mk_provenance avails
   = gbl_env2
   where
  	-- Make the name environment.  We're talking about a 
@@ -517,11 +518,14 @@ mkGlobalRdrEnv this_mod unqual_imp hides mk_provenance avails
     add_avail env avail = foldl add_name env (availNames avail)
 
     add_name env name
-	| unqual_imp = env2
-	| otherwise  = env1
+	| qual_imp && unqual_imp = env3
+	| unqual_imp             = env2
+	| qual_imp               = env1
+	| otherwise	         = env
 	where
 	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) (name,prov)
-	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
+	  env2 = addOneToGlobalRdrEnv env  (mkRdrUnqual occ) 	    (name,prov)
+	  env3 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
 	  occ  = nameOccName name
 	  prov = mk_provenance name
 
@@ -537,7 +541,7 @@ mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
 mkIfaceGlobalRdrEnv m_avails
   = foldl add emptyRdrEnv m_avails
   where
-    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True [] (\n -> LocalDef) avails)
+    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True False [] (\n -> LocalDef) avails)
 \end{code}
 
 \begin{code}

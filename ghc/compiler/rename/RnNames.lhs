@@ -164,8 +164,8 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 			Just another_name -> another_name
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp hides mk_prov filtered_avails
-	exports      = mkExportAvails qual_mod unqual_imp gbl_env       filtered_avails
+	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp True hides mk_prov filtered_avails
+	exports      = mkExportAvails qual_mod unqual_imp gbl_env            filtered_avails
     in
     returnRn (gbl_env, exports)
 \end{code}
@@ -195,8 +195,8 @@ importsFromLocalDecls this_mod decls
 	unqual_imp = True	-- Want unqualified names
 	mk_prov n  = LocalDef	-- Provenance is local
 	hides	   = []		-- Hide nothing
-	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp hides mk_prov avails
-	exports    = mkExportAvails mod_name unqual_imp gbl_env       avails
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp True hides mk_prov avails
+	exports    = mkExportAvails mod_name unqual_imp gbl_env            avails
     in
     returnRn (gbl_env, exports)
 
