@@ -941,7 +941,7 @@ pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
 #ifdef DEBUG
     (<>) (ptext SLIT("# warning: ")) (pprSizeOpOp SLIT("mov") size s d)
 #else
-    (ptext SLIT(""))
+    empty
 #endif
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
@@ -977,9 +977,9 @@ pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
 pprInstr (NOT size op) = pprSizeOp SLIT("not") size op
 pprInstr (NEGI size op) = pprSizeOp SLIT("neg") size op
 
-pprInstr (SHL size imm dst) = pprSizeByteOpOp SLIT("shl")  size imm dst
-pprInstr (SAR size imm dst) = pprSizeByteOpOp SLIT("sar")  size imm dst
-pprInstr (SHR size imm dst) = pprSizeByteOpOp SLIT("shr")  size imm dst
+pprInstr (SHL size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("shl")  size imm dst
+pprInstr (SAR size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("sar")  size imm dst
+pprInstr (SHR size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("shr")  size imm dst
 
 pprInstr (CMP size src dst) = pprSizeOpOp SLIT("cmp")  size src dst
 pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
@@ -989,6 +989,7 @@ pprInstr PUSHA = ptext SLIT("\tpushal")
 pprInstr POPA = ptext SLIT("\tpopal")
 
 pprInstr (NOP) = ptext SLIT("\tnop")
+pprInstr (BT size imm src) = pprSizeImmOp SLIT("bt") size imm src
 pprInstr (CLTD) = ptext SLIT("\tcltd")
 
 pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand B op)
@@ -1047,6 +1048,15 @@ pprInstr g@(GNEG sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
 pprInstr g@(GSQRT sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt ; ", gpop dst 1])
+pprInstr g@(GSIN sz src dst)
+   = pprG g (hcat [gtab, gpush src 0, text " ; fsin ; ", gpop dst 1])
+pprInstr g@(GCOS sz src dst)
+   = pprG g (hcat [gtab, gpush src 0, text " ; fcos ; ", gpop dst 1])
+
+pprInstr g@(GTAN sz src dst)
+   = pprG g (hcat [gtab, text "ffree %st(6) ; ",
+                   gpush src 0, text " ; fptan ; ", 
+                   text " fstp %st(0) ; ", gpop dst 1])
 
 pprInstr g@(GADD sz src1 src2 dst)
    = pprG g (hcat [gtab, gpush src1 0, 
@@ -1106,6 +1116,9 @@ pprGInstr (GCMP sz src dst) = pprSizeRegReg SLIT("gcmp") sz src dst
 pprGInstr (GABS sz src dst) = pprSizeRegReg SLIT("gabs") sz src dst
 pprGInstr (GNEG sz src dst) = pprSizeRegReg SLIT("gneg") sz src dst
 pprGInstr (GSQRT sz src dst) = pprSizeRegReg SLIT("gsqrt") sz src dst
+pprGInstr (GSIN sz src dst) = pprSizeRegReg SLIT("gsin") sz src dst
+pprGInstr (GCOS sz src dst) = pprSizeRegReg SLIT("gcos") sz src dst
+pprGInstr (GTAN sz src dst) = pprSizeRegReg SLIT("gtan") sz src dst
 
 pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg SLIT("gadd") sz src1 src2 dst
 pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg SLIT("gsub") sz src1 src2 dst
@@ -1124,6 +1137,19 @@ pprOperand s (OpReg r) = pprReg s r
 pprOperand s (OpImm i) = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
+pprSizeImmOp :: FAST_STRING -> Size -> Imm -> Operand -> SDoc
+pprSizeImmOp name size imm op1
+  = hcat [
+        char '\t',
+	ptext name,
+	pprSize size,
+	space,
+	char '$',
+	pprImm imm,
+	comma,
+	pprOperand size op1
+    ]
+	
 pprSizeOp :: FAST_STRING -> Size -> Operand -> SDoc
 pprSizeOp name size op1
   = hcat [

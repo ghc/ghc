@@ -26,13 +26,13 @@ module MachRegs (
 	callClobberedRegs,
 	callerSaves,
 	extractMappedRegNos,
+        mappedRegNo,
 	freeMappedRegs,
 	freeReg, freeRegs,
 	getNewRegNCG,
 	magicIdRegMaybe,
 	mkReg,
 	realReg,
-	reservedRegs,
 	saveLoc,
 	spRel,
 	stgReg,
@@ -336,6 +336,10 @@ extractMappedRegNos regs
   where
     ex (MappedReg i) acc = IBOX(i) : acc  -- we'll take it
     ex _	     acc = acc		  -- leave it out
+
+mappedRegNo :: Reg -> RegNo
+mappedRegNo (MappedReg i) = IBOX(i)
+mappedRegNo _             = pprPanic "mappedRegNo" empty
 \end{code}
 
 ** Machine-specific Reg stuff: **
@@ -733,40 +737,7 @@ magicIdRegMaybe HpLim		   	= Just (FixedReg ILIT(REG_HpLim))
 magicIdRegMaybe _		   	= Nothing
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Free, reserved, call-clobbered, and argument registers}
-%*									*
-%************************************************************************
-
-@freeRegs@ is the list of registers we can use in register allocation.
-@freeReg@ (below) says if a particular register is free.
-
-With a per-instruction clobber list, we might be able to get some of
-these back, but it's probably not worth the hassle.
-
-@callClobberedRegs@ ... the obvious.
-
-@argRegs@: assuming a call with N arguments, what registers will be
-used to hold arguments?  (NB: it doesn't know whether the arguments
-are integer or floating-point...)
-
 \begin{code}
-reservedRegs :: [RegNo]
-reservedRegs
-#if alpha_TARGET_ARCH
-  = [NCG_Reserved_I1, NCG_Reserved_I2,
-     NCG_Reserved_F1, NCG_Reserved_F2]
-#endif
-#if i386_TARGET_ARCH
-  = [{-certainly cannot afford any!-}]
-#endif
-#if sparc_TARGET_ARCH
-  = [NCG_Reserved_I1, NCG_Reserved_I2,
-     NCG_Reserved_F1, NCG_Reserved_F2,
-     NCG_Reserved_D1, NCG_Reserved_D2]
-#endif
-
 -------------------------------
 freeRegs :: [Reg]
 freeRegs

@@ -21,7 +21,7 @@ import AbsCSyn		( AbstractC, MagicId )
 import AsmRegAlloc	( runRegAllocate )
 import OrdList		( OrdList )
 import PrimOp		( commutableOp, PrimOp(..) )
-import RegAllocInfo	( mkMRegsState, MRegsState )
+import RegAllocInfo	( mkMRegsState, MRegsState, findReservedRegs )
 import Stix		( StixTree(..), StixReg(..), 
                           pprStixTrees, CodeSegment(..) )
 import PrimRep		( isFloatingRep, PrimRep(..) )
@@ -130,7 +130,7 @@ might be needed.
 scheduleMachCode :: [InstrList] -> [[Instr]]
 
 scheduleMachCode
-  = map (runRegAllocate freeRegsState reservedRegs)
+  = map (runRegAllocate freeRegsState findReservedRegs)
   where
     freeRegsState = mkMRegsState (extractMappedRegNos freeRegs)
 \end{code}

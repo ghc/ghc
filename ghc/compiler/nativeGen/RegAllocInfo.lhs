@@ -35,6 +35,7 @@ module RegAllocInfo (
 	patchRegs,
 	regLiveness,
 	spillReg,
+	IF_ARCH_i386(findReservedRegs COMMA,)
 
 	RegSet,
 	elementOfRegSet,
@@ -64,7 +65,6 @@ import OrdList		( mkUnitList )
 import PrimRep		( PrimRep(..) )
 import UniqSet		-- quite a bit of it
 import Outputable
-import PprMach		( pprInstr )
 \end{code}
 
 %************************************************************************
@@ -354,22 +354,24 @@ regUsage instr = case instr of
 #if i386_TARGET_ARCH
 
 regUsage instr = case instr of
-    MOV  sz src dst	-> usage2 src dst
-    MOVZxL sz src dst	-> usage2 src dst
-    MOVSxL sz src dst	-> usage2 src dst
-    LEA  sz src dst	-> usage2 src dst
-    ADD  sz src dst	-> usage2 src dst
-    SUB  sz src dst	-> usage2 src dst
-    IMUL sz src dst	-> usage2 src dst
+    MOV  sz src dst	-> usage2  src dst
+    MOVZxL sz src dst	-> usage2  src dst
+    MOVSxL sz src dst	-> usage2  src dst
+    LEA  sz src dst	-> usage2  src dst
+    ADD  sz src dst	-> usage2s src dst
+    SUB  sz src dst	-> usage2s src dst
+    IMUL sz src dst	-> usage2s src dst
     IDIV sz src		-> usage (eax:edx:opToReg src) [eax,edx]
-    AND  sz src dst	-> usage2 src dst
-    OR   sz src dst	-> usage2 src dst
-    XOR  sz src dst	-> usage2 src dst
+    AND  sz src dst	-> usage2s src dst
+    OR   sz src dst	-> usage2s src dst
+    XOR  sz src dst	-> usage2s src dst
     NOT  sz op		-> usage1 op
     NEGI sz op		-> usage1 op
-    SHL  sz dst len	-> usage2 dst len -- len is either an Imm or ecx.
-    SAR  sz dst len	-> usage2 dst len -- len is either an Imm or ecx.
-    SHR  sz len dst	-> usage2 dst len -- len is either an Imm or ecx.
+    SHL  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
+    SAR  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
+    SHR  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
+    BT   sz imm src	-> usage (opToReg src) []
+
     PUSH sz op		-> usage (opToReg op) []
     POP  sz op		-> usage [] (opToReg op)
     TEST sz src dst	-> usage (opToReg src ++ opToReg dst) []
@@ -403,21 +405,35 @@ regUsage instr = case instr of
     GABS sz src dst	-> usage [src] [dst]
     GNEG sz src dst	-> usage [src] [dst]
     GSQRT sz src dst	-> usage [src] [dst]
+    GSIN sz src dst	-> usage [src] [dst]
+    GCOS sz src dst	-> usage [src] [dst]
+    GTAN sz src dst	-> usage [src] [dst]
 
     COMMENT _		-> noUsage
     SEGMENT _ 		-> noUsage
     LABEL _		-> noUsage
     ASCII _ _		-> noUsage
     DATA _ _		-> noUsage
-    _			-> error ("regUsage(x86): " ++ showSDoc (pprInstr instr))
+    _			-> pprPanic "regUsage(x86) " empty
+
  where
+    -- 2 operand form in which the second operand is purely a destination
     usage2 :: Operand -> Operand -> RegUsage
     usage2 op (OpReg reg) = usage (opToReg op) [reg]
     usage2 op (OpAddr ea) = usage (opToReg op ++ addrToRegs ea) []
     usage2 op (OpImm imm) = usage (opToReg op) []
+
+    -- 2 operand form in which the second operand is also an input
+    usage2s :: Operand -> Operand -> RegUsage
+    usage2s op (OpReg reg) = usage (opToReg op ++ [reg]) [reg]
+    usage2s op (OpAddr ea) = usage (opToReg op ++ addrToRegs ea) []
+    usage2s op (OpImm imm) = usage (opToReg op) []
+
+    -- 1 operand form in which the operand is both used and written
     usage1 :: Operand -> RegUsage
     usage1 (OpReg reg)    = usage [reg] [reg]
     usage1 (OpAddr ea)    = usage (addrToRegs ea) []
+
     allFPRegs = [fake0,fake1,fake2,fake3,fake4,fake5]
 
     --callClobberedRegs = [ eax, ecx, edx ] -- according to gcc, anyway.
@@ -441,6 +457,14 @@ regUsage instr = case instr of
 
     interesting (FixedReg _) = False
     interesting _ = True
+
+
+-- Allow the spiller to decide whether or not it can use 
+-- %eax and %edx as spill temporaries.
+hasFixedEAXorEDX instr = case instr of
+    IDIV _ _ -> True
+    CLTD     -> True
+    other    -> False
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -493,6 +517,71 @@ regUsage instr = case instr of
     regRI  _	= []
 
 #endif {- sparc_TARGET_ARCH -}
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Free, reserved, call-clobbered, and argument registers}
+%*									*
+%************************************************************************
+
+@freeRegs@ is the list of registers we can use in register allocation.
+@freeReg@ (below) says if a particular register is free.
+
+With a per-instruction clobber list, we might be able to get some of
+these back, but it's probably not worth the hassle.
+
+@callClobberedRegs@ ... the obvious.
+
+@argRegs@: assuming a call with N arguments, what registers will be
+used to hold arguments?  (NB: it doesn't know whether the arguments
+are integer or floating-point...)
+
+findReservedRegs tells us which regs can be used as spill temporaries.
+The list of instructions for which we are attempting allocation is
+supplied.  This is so that we can (at least for x86) examine it to
+discover which registers are being used in a fixed way -- for example,
+%eax and %edx are used by integer division, so they can't be used as
+spill temporaries.  However, most instruction lists don't do integer
+division, so we don't want to rule them out altogether.
+
+findReservedRegs returns not a list of spill temporaries, but a list
+of list of them.  This is so that the allocator can attempt allocating
+with at first no spill temps, then if that fails, increasing numbers.
+For x86 it is important that we minimise the number of regs reserved
+as spill temporaries, since there are so few.  For Alpha and Sparc
+this isn't a concern; we just ignore the supplied code list and return
+a singleton list which we know will satisfy all spill demands.
+
+\begin{code}
+findReservedRegs :: [Instr] -> [[RegNo]]
+findReservedRegs instrs
+#if alpha_TARGET_ARCH
+  = [[NCG_Reserved_I1, NCG_Reserved_I2,
+      NCG_Reserved_F1, NCG_Reserved_F2]]
+#endif
+#if sparc_TARGET_ARCH
+  = [[NCG_Reserved_I1, NCG_Reserved_I2,
+      NCG_Reserved_F1, NCG_Reserved_F2,
+      NCG_Reserved_D1, NCG_Reserved_D2]]
+#endif
+#if i386_TARGET_ARCH
+    -- Sigh.  This is where it gets complicated.
+  = -- first of all, try without any at all.
+    map (map mappedRegNo) (
+    [ [],
+    -- if that doesn't work, try one integer reg (which might fail)
+    -- and two float regs (which will always fix any float insns)
+      [ecx, fake4,fake5]
+    ]
+    -- dire straits (but still correct): see if we can bag %eax and %edx
+    ++ if   any hasFixedEAXorEDX instrs
+       then []  -- bummer
+       else [ [ecx,edx,fake4,fake5],
+              [ecx,edx,eax,fake4,fake5] ]
+    )
+#endif
 \end{code}
 
 %************************************************************************
@@ -655,6 +744,7 @@ patchRegs instr env = case instr of
     SHL  sz imm dst 	-> patch2 (SHL  sz) imm dst
     SAR  sz imm dst 	-> patch2 (SAR  sz) imm dst
     SHR  sz imm dst 	-> patch2 (SHR  sz) imm dst
+    BT   sz imm src     -> patch1 (BT sz imm) src
     TEST sz src dst	-> patch2 (TEST sz) src dst
     CMP  sz src dst	-> patch2 (CMP  sz) src dst
     PUSH sz op		-> patch1 (PUSH sz) op
@@ -684,6 +774,9 @@ patchRegs instr env = case instr of
     GABS sz src dst	-> GABS sz (env src) (env dst)
     GNEG sz src dst	-> GNEG sz (env src) (env dst)
     GSQRT sz src dst	-> GSQRT sz (env src) (env dst)
+    GSIN sz src dst	-> GSIN sz (env src) (env dst)
+    GCOS sz src dst	-> GCOS sz (env src) (env dst)
+    GTAN sz src dst	-> GTAN sz (env src) (env dst)
 
     COMMENT _		-> instr
     SEGMENT _ 		-> instr
@@ -693,7 +786,8 @@ patchRegs instr env = case instr of
     JXX _ _		-> instr
     CALL _		-> instr
     CLTD		-> instr
-    _			-> error ("patchInstr: " ++ showSDoc (pprInstr instr)) --instr
+    _			-> pprPanic "patchInstr(x86)" empty
+
   where
     patch1 insn op      = insn (patchOp op)
     patch2 insn src dst = insn (patchOp src) (patchOp dst)
@@ -761,7 +855,7 @@ patchRegs instr env = case instr of
 
 Spill to memory, and load it back...
 
-JRS, 000122: on x86, don't spill directly below the stack pointer, since 
+JRS, 000122: on x86, don't spill directly above the stack pointer, since 
 some insn sequences (int <-> conversions) use this as a temp location.
 Leave 16 bytes of slop.
 
@@ -769,36 +863,44 @@ Leave 16 bytes of slop.
 spillReg, loadReg :: Reg -> Reg -> InstrList
 
 spillReg dyn (MemoryReg i pk)
-  | i >= 0  -- JRS paranoia
-  = let
-	sz = primRepToSize pk
+  | i >= 0 -- JRS paranoia
+  = let	sz = primRepToSize pk
     in
     mkUnitList (
 	{-Alpha: spill below the stack pointer (?)-}
 	 IF_ARCH_alpha( ST sz dyn (spRel i)
 
 	{-I386: spill above stack pointer leaving 2 words/spill-}
-	,IF_ARCH_i386 ( if pk == FloatRep || pk == DoubleRep
-                        then GST DF dyn (spRel (16 + 2 * i))
-                        else MOV sz (OpReg dyn) (OpAddr (spRel (16 + 2 * i)))
+	,IF_ARCH_i386 ( let loc | i < 60    = 4 + 2 * i
+                                | otherwise = -2000 - 2 * i
+                        in
+                        if pk == FloatRep || pk == DoubleRep
+                        then GST DF dyn (spRel loc)
+                        else MOV sz (OpReg dyn) (OpAddr (spRel loc))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( ST sz dyn (fpRel (-2 * i))
         ,)))
     )
-
+  | otherwise
+  = pprPanic "spillReg:" (text "invalid spill location: " <> int i)
+   
 ----------------------------
 loadReg (MemoryReg i pk) dyn
-  | i >= 0  -- JRS paranoia
-  = let
-	sz = primRepToSize pk
+  | i >= 0 -- JRS paranoia
+  = let	sz = primRepToSize pk
     in
     mkUnitList (
 	 IF_ARCH_alpha( LD  sz dyn (spRel i)
-	,IF_ARCH_i386 ( if   pk == FloatRep || pk == DoubleRep
-                        then GLD DF (spRel (16 + 2 * i)) dyn
-                        else MOV sz (OpAddr (spRel (16 + 2 * i))) (OpReg dyn)
+	,IF_ARCH_i386 ( let loc | i < 60    = 4 + 2 * i
+                                | otherwise = -2000 - 2 * i
+                        in
+                        if   pk == FloatRep || pk == DoubleRep
+                        then GLD DF (spRel loc) dyn
+                        else MOV sz (OpAddr (spRel loc)) (OpReg dyn)
 	,IF_ARCH_sparc( LD  sz (fpRel (-2 * i)) dyn
 	,)))
     )
+  | otherwise
+  = pprPanic "loadReg:" (text "invalid spill location: " <> int i)
 \end{code}

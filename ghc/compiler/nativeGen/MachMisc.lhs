@@ -507,6 +507,7 @@ current translation.
 	      | SAR	      Size Operand Operand -- 1st operand must be an Imm or CL
 	      | SHR	      Size Operand Operand -- 1st operand must be an Imm or CL
 	      | NOP
+              | BT            Size Imm Operand
 
 -- Float Arithmetic. -- ToDo for 386
 
@@ -539,6 +540,9 @@ current translation.
      	      | GABS	      Size Reg Reg -- src, dst
     	      | GNEG	      Size Reg Reg -- src, dst
     	      | GSQRT	      Size Reg Reg -- src, dst
+    	      | GSIN	      Size Reg Reg -- src, dst
+    	      | GCOS	      Size Reg Reg -- src, dst
+    	      | GTAN	      Size Reg Reg -- src, dst
 
               | GFREE         -- do ffree on all x86 regs; an ugly hack
 -- Comparison
@@ -598,6 +602,7 @@ is_G_instr instr
 	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True
     	GCMP _ _ _ -> True; GABS _ _ _ -> True
     	GNEG _ _ _ -> True; GSQRT _ _ _ -> True
+        GSIN _ _ _ -> True; GCOS _ _ _ -> True; GTAN _ _ _ -> True;
         GFREE -> panic "is_G_instr: GFREE (!)"
         other -> False
 

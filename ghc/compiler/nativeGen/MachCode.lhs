@@ -34,7 +34,6 @@ import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, UniqSM
 			)
 import Outputable
-import PprMach 		( pprSize )
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -499,6 +498,15 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       FloatSqrtOp  -> trivialUFCode FloatRep  (GSQRT F) x
       DoubleSqrtOp -> trivialUFCode DoubleRep (GSQRT DF) x
 
+      FloatSinOp  -> trivialUFCode FloatRep  (GSIN F) x
+      DoubleSinOp -> trivialUFCode DoubleRep (GSIN DF) x
+
+      FloatCosOp  -> trivialUFCode FloatRep  (GCOS F) x
+      DoubleCosOp -> trivialUFCode DoubleRep (GCOS DF) x
+
+      FloatTanOp  -> trivialUFCode FloatRep  (GTAN F) x
+      DoubleTanOp -> trivialUFCode DoubleRep (GTAN DF) x
+
       Double2FloatOp -> trivialUFCode FloatRep  GDTOF x
       Float2DoubleOp -> trivialUFCode DoubleRep GFTOD x
 
@@ -523,9 +531,9 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      FloatExpOp    -> (True,  SLIT("exp"))
 	      FloatLogOp    -> (True,  SLIT("log"))
 
-	      FloatSinOp    -> (True,  SLIT("sin"))
-	      FloatCosOp    -> (True,  SLIT("cos"))
-	      FloatTanOp    -> (True,  SLIT("tan"))
+	      --FloatSinOp    -> (True,  SLIT("sin"))
+	      --FloatCosOp    -> (True,  SLIT("cos"))
+	      --FloatTanOp    -> (True,  SLIT("tan"))
 
 	      FloatAsinOp   -> (True,  SLIT("asin"))
 	      FloatAcosOp   -> (True,  SLIT("acos"))
@@ -538,9 +546,9 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleExpOp   -> (False, SLIT("exp"))
 	      DoubleLogOp   -> (False, SLIT("log"))
 
-	      DoubleSinOp   -> (False, SLIT("sin"))
-	      DoubleCosOp   -> (False, SLIT("cos"))
-	      DoubleTanOp   -> (False, SLIT("tan"))
+	      --DoubleSinOp   -> (False, SLIT("sin"))
+	      --DoubleCosOp   -> (False, SLIT("cos"))
+	      --DoubleTanOp   -> (False, SLIT("tan"))
 
 	      DoubleAsinOp  -> (False, SLIT("asin"))
 	      DoubleAcosOp  -> (False, SLIT("acos"))
@@ -674,6 +682,65 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
       {- Case2: shift length is complex (non-immediate) -}
     shift_code instr x y{-amount-}
+     = getRegister x   `thenUs` \ register1 ->
+       getRegister y   `thenUs` \ register2 ->
+       getUniqLabelNCG `thenUs` \ lbl_test3 ->
+       getUniqLabelNCG `thenUs` \ lbl_test2 ->
+       getUniqLabelNCG `thenUs` \ lbl_test1 ->
+       getUniqLabelNCG `thenUs` \ lbl_test0 ->
+       getUniqLabelNCG `thenUs` \ lbl_after ->
+       getNewRegNCG IntRep   `thenUs` \ tmp ->
+       let code__2 dst
+              = let src_val  = registerName register1 dst
+                    code_val = registerCode register1 dst
+                    src_amt  = registerName register2 tmp
+                    code_amt = registerCode register2 tmp
+                    r_dst    = OpReg dst
+                    r_tmp    = OpReg tmp
+                in
+                    code_val .
+                    code_amt .
+                    mkSeqInstrs [
+                       COMMENT (_PK_ "begin shift sequence"),
+                       MOV L (OpReg src_val) r_dst,
+                       MOV L (OpReg src_amt) r_tmp,
+
+                       BT L (ImmInt 4) r_tmp,
+                       JXX GEU lbl_test3,
+                       instr (OpImm (ImmInt 16)) r_dst,
+
+                       LABEL lbl_test3,
+                       BT L (ImmInt 3) r_tmp,
+                       JXX GEU lbl_test2,
+                       instr (OpImm (ImmInt 8)) r_dst,
+
+                       LABEL lbl_test2,
+                       BT L (ImmInt 2) r_tmp,
+                       JXX GEU lbl_test1,
+                       instr (OpImm (ImmInt 4)) r_dst,
+
+                       LABEL lbl_test1,
+                       BT L (ImmInt 1) r_tmp,
+                       JXX GEU lbl_test0,
+                       instr (OpImm (ImmInt 2)) r_dst,
+
+                       LABEL lbl_test0,
+                       BT L (ImmInt 0) r_tmp,
+                       JXX GEU lbl_after,
+                       instr (OpImm (ImmInt 1)) r_dst,
+                       LABEL lbl_after,
+                                           
+                       COMMENT (_PK_ "end shift sequence")
+                    ]
+       in
+       returnUs (Any IntRep code__2)
+
+{-
+     -- since ECX is always used as a spill temporary, we can't
+     -- use it here to do non-immediate shifts.  No big deal --
+     -- they are only very rare, and we can give an equivalent
+     -- insn sequence which doesn't use ECX.
+     -- DO NOT USE THIS CODE, SINCE IT IS INCOMPATIBLE WITH THE SPILLER
      = getRegister y		`thenUs` \ register1 ->  
        getRegister x		`thenUs` \ register2 ->
        let
@@ -699,6 +766,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 		      mkSeqInstr (instr (OpReg ecx) (OpReg eax))
        in
        returnUs (Fixed IntRep eax code__2)
+-}
 
     --------------------
     add_code :: Size -> StixTree -> StixTree -> UniqSM Register
@@ -2441,10 +2509,10 @@ condIntReg cond x y
 	code = condCode condition
 	cond = condName condition
 	-- ToDo: if dst is eax, ebx, ecx, or edx we would not need the move.
-	code__2 dst = code . mkSeqInstrs [
+	code__2 dst = code . mkSeqInstrs [COMMENT (_PK_ "aaaaa"),
 	    SETCC cond (OpReg tmp),
 	    AND L (OpImm (ImmInt 1)) (OpReg tmp),
-	    MOV L (OpReg tmp) (OpReg dst)]
+	    MOV L (OpReg tmp) (OpReg dst) ,COMMENT (_PK_ "bbbbb")]
     in
     returnUs (Any IntRep code__2)
 

@@ -31,24 +31,38 @@ things the hard way.
 \begin{code}
 runRegAllocate
     :: MRegsState
-    -> [RegNo]
+    -> ([Instr] -> [[RegNo]])
     -> InstrList
     -> [Instr]
 
-runRegAllocate regs reserve_regs instrs
+runRegAllocate regs find_reserve_regs instrs
   = case simpleAlloc of
-	Just x  -> x
-	Nothing -> hairyAlloc
+	Just simple -> simple
+	Nothing     -> tryHairy reserves
   where
-    flatInstrs	= flattenOrdList instrs
-    simpleAlloc = simpleRegAlloc regs [] emptyFM   flatInstrs
-    hairyAlloc	= hairyRegAlloc  regs reserve_regs flatInstrs
+    tryHairy [] 
+       = error "nativeGen: register allocator: too difficult!  Try -fvia-C.\n"
+    tryHairy (resv:resvs)
+       = case hairyAlloc resv of
+            Just success -> success
+            Nothing      -> fooble resvs (tryHairy resvs)
 
-runHairyRegAllocate		-- use only hairy for i386!
+    fooble [] x = x
+    fooble (resvs:_) x = trace ("nativeGen: spilling with " 
+                                ++ show (length resvs - 2) ++ 
+                                " int temporaries") x
+
+    reserves         = find_reserve_regs flatInstrs
+    flatInstrs       = flattenOrdList instrs
+    simpleAlloc      = simpleRegAlloc regs [] emptyFM   flatInstrs
+    hairyAlloc resvd = hairyRegAlloc  regs resvd flatInstrs
+
+
+runHairyRegAllocate
     :: MRegsState
     -> [RegNo]
     -> InstrList
-    -> [Instr]
+    -> Maybe [Instr]
 
 runHairyRegAllocate regs reserve_regs instrs
   = hairyRegAlloc regs reserve_regs flatInstrs
@@ -83,7 +97,8 @@ simpleRegAlloc free live env (instr:instrs)
   where
     instr3 = patchRegs instr (lookup env2)
 
-    (srcs, dsts) = case regUsage instr of (RU s d) -> (regSetToList s, regSetToList d)
+    (srcs, dsts) = case regUsage instr of 
+                      (RU s d) -> (regSetToList s, regSetToList d)
 
     lookup env x = case lookupFM env x of Just y -> y; Nothing -> x
 
@@ -121,40 +136,49 @@ Here is the ``clever'' bit. First go backward (i.e. left), looking for
 the last use of dynamic registers. Then go forward (i.e. right), filling
 registers with static placements.
 
+hairyRegAlloc takes reserve_regs as the regs to use as spill
+temporaries.  First it tries to allocate using all regs except
+reserve_regs.  If that fails, it inserts spill code and tries again to
+allocate regs, but this time with the spill temporaries available.
+Even this might not work if there are insufficient spill temporaries:
+in the worst case on x86, we'd need 3 of them, for insns like
+addl (reg1,reg2,4) reg3, since this insn uses all 3 regs as input.
+
 \begin{code}
 hairyRegAlloc
     :: MRegsState
     -> [RegNo]
     -> [Instr]
-    -> [Instr]
+    -> Maybe [Instr]
 
 hairyRegAlloc regs reserve_regs instrs =
-  case mapAccumB (doRegAlloc reserve_regs) (RH regs' 1 emptyFM) noFuture instrs of 
-   (RH _ mloc1 _, _, instrs')
-     | mloc1 == 1 -> instrs'
-     | otherwise  ->
-      let
-       instrs_patched' = patchMem instrs'
-       instrs_patched  = flattenOrdList instrs_patched'
-      in
-      case mapAccumB do_RegAlloc_Nil (RH regs'' mloc1 emptyFM) noFuture instrs_patched of
-	 ((RH _ mloc2 _),_,instrs'') 
-	    | mloc2 == mloc1 -> instrs'' 
-            | otherwise      -> instrs''
-	       --pprPanic "runRegAllocate" (ppr mloc2 <+> ppr mloc1)
+  case mapAccumB (doRegAlloc reserve_regs) 
+                 (RH regs' 1 emptyFM) noFuture instrs of 
+     (RH _ mloc1 _, _, instrs')
+        -- succeeded w/out using reserves
+        | mloc1 == 1 -> Just instrs'
+        -- failed, and no reserves avail, so pointless to attempt spilling 
+        | null reserve_regs -> Nothing
+        -- failed, but we have reserves, so attempt to do spilling
+        | otherwise  
+        -> let instrs_patched' = patchMem instrs'
+               instrs_patched  = flattenOrdList instrs_patched'
+           in
+               case mapAccumB (doRegAlloc []) (RH regs'' mloc1 emptyFM) 
+                    noFuture instrs_patched of
+                  ((RH _ mloc2 _),_,instrs'') 
+                     -- successfully allocated the patched code
+        	     | mloc2 == mloc1 -> Just instrs''
+                     -- no; we have to give up
+                     | otherwise      -> Nothing 
+                       -- instrs''
+	               -- pprPanic "runRegAllocate" (ppr mloc2 <+> ppr mloc1)
   where
     regs'  = regs `useMRegs` reserve_regs
     regs'' = mkMRegsState reserve_regs
 
-do_RegAlloc_Nil = doRegAlloc [] -- out here to avoid CAF (sigh)
-do_RegAlloc_Nil
-    :: RegHistory MRegsState
-    -> RegFuture
-    -> Instr
-    -> (RegHistory MRegsState, RegFuture, Instr)
-
-noFuture :: RegFuture
-noFuture = RF emptyRegSet (FL emptyRegSet emptyFM) emptyFM
+    noFuture :: RegFuture
+    noFuture = RF emptyRegSet (FL emptyRegSet emptyFM) emptyFM
 \end{code}
 
 Here we patch instructions that reference ``registers'' which are really in
@@ -225,7 +249,8 @@ getUsage (RF next_in_use future reg_conflicts) instr
 	       (RL in_use future') = regLiveness instr (RL next_in_use future)
 	       live_through = in_use `minusRegSet` dsts
 	       last_used = [ r | r <- regSetToList srcs,
-			     not (r `elementOfRegSet` (fstFL future) || r `elementOfRegSet` in_use)]
+			     not (r `elementOfRegSet` (fstFL future) 
+                                  || r `elementOfRegSet` in_use)]
 
 	       in_use' = srcs `unionRegSets` live_through
 
@@ -245,7 +270,9 @@ getUsage (RF next_in_use future reg_conflicts) instr
 		  Nothing        -> live_dynamics
 		  Just conflicts -> conflicts `unionRegSets` live_dynamics
 
-	       live_dynamics = mkRegSet [ r | r@(UnmappedReg _ _) <- regSetToList live_through ]
+	       live_dynamics 
+                  = mkRegSet [ r | r@(UnmappedReg _ _) 
+                                      <- regSetToList live_through ]
 
 doRegAlloc'
     :: [RegNo]
@@ -254,7 +281,8 @@ doRegAlloc'
     -> Instr
     -> (RegHistory MRegsState, Instr)
 
-doRegAlloc' reserved (RH frs loc env) (RI in_use srcs dsts lastu conflicts) instr =
+doRegAlloc' reserved (RH frs loc env) 
+                     (RI in_use srcs dsts lastu conflicts) instr =
 
     (RH frs'' loc' env'', patchRegs instr dynToStatic)
 
@@ -264,14 +292,17 @@ doRegAlloc' reserved (RH frs loc env) (RI in_use srcs dsts lastu conflicts) inst
       free :: [RegNo]
       free = extractMappedRegNos (map dynToStatic lastu)
 
-      -- (1) free registers that are used last as source operands in this instruction
-      frs_not_in_use = frs `useMRegs` (extractMappedRegNos (regSetToList in_use))
+      -- (1) free registers that are used last as 
+      --     source operands in this instruction
+      frs_not_in_use = frs `useMRegs` 
+                       (extractMappedRegNos (regSetToList in_use))
       frs' = (frs_not_in_use `freeMRegs` free) `useMRegs` reserved
 
       -- (2) allocate new registers for the destination operands
       -- allocate registers for new dynamics
 
-      new_dynamix = [ r | r@(UnmappedReg _ _) <- regSetToList dsts, r `not_elem` keysFM env ]
+      new_dynamix = [ r | r@(UnmappedReg _ _) <- regSetToList dsts, 
+                          r `not_elem` keysFM env ]
 
       (frs'', loc', new) = foldr allocateNewRegs (frs', loc, []) new_dynamix
 
@@ -283,14 +314,16 @@ doRegAlloc' reserved (RH frs loc env) (RI in_use srcs dsts lastu conflicts) inst
       dynToStatic dyn@(UnmappedReg _ _) =
 	case lookupFM env' dyn of
 	    Just r -> r
-	    Nothing -> trace "Lost register; possibly a floating point type error in a _ccall_?" dyn
+	    Nothing -> trace ("Lost register; possibly a floating point"
+                              ++" type error in a _ccall_?") dyn
       dynToStatic other = other
 
       allocateNewRegs :: Reg 
                       -> (MRegsState, Int, [(Reg, Reg)]) 
 		      -> (MRegsState, Int, [(Reg, Reg)])
 
-      allocateNewRegs d@(UnmappedReg _ pk) (fs, mem, lst) = (fs', mem', (d, f) : lst)
+      allocateNewRegs d@(UnmappedReg _ pk) (fs, mem, lst) 
+         = (fs', mem', (d, f) : lst)
 	where 
 	 (fs', f, mem') = 
 	   case acceptable fs of

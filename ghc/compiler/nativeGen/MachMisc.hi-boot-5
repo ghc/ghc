@@ -1,5 +1,6 @@
 __interface MachMisc 1 0 where
-__export MachMisc fixedHdrSize fmtAsmLbl underscorePrefix;
+__export MachMisc Instr fixedHdrSize fmtAsmLbl underscorePrefix;
 1 fixedHdrSize :: PrelBase.Int ;
 2 fmtAsmLbl :: PrelBase.String -> PrelBase.String ;
 1 underscorePrefix :: PrelBase.Bool ;
+1 data Instr ;
