@@ -100,7 +100,8 @@ These two check for holes
 
 \begin{code}
 tcSubExp expected_ty offered_ty
-  = checkHole expected_ty offered_ty tcSub
+  = traceTc (text "tcSubExp" <+> (ppr expected_ty $$ ppr offered_ty)) 	`thenM_`
+    checkHole expected_ty offered_ty tcSub
 
 tcSubOff expected_ty offered_ty
   = checkHole offered_ty expected_ty (\ off exp -> tcSub exp off)
@@ -116,7 +117,8 @@ checkHole (TyVarTy tv) other_ty thing_inside
   = getTcTyVar tv	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> thing_inside ty other_ty
-	Nothing -> putTcTyVar tv other_ty	`thenM_`
+	Nothing -> traceTc (text "checkHole" <+> ppr tv)	`thenM_`
+		   putTcTyVar tv other_ty	`thenM_`
 		   returnM idCoercion
 
 checkHole ty other_ty thing_inside 
@@ -129,7 +131,7 @@ No holes expected now.  Add some error-check context info.
 tcSub expected_ty actual_ty
   = traceTc (text "tcSub" <+> details)		`thenM_`
     addErrCtxtM (unifyCtxt "type" expected_ty actual_ty)
-		  (tc_sub expected_ty expected_ty actual_ty actual_ty)
+		(tc_sub expected_ty expected_ty actual_ty actual_ty)
   where
     details = vcat [text "Expected:" <+> ppr expected_ty,
 		    text "Actual:  " <+> ppr actual_ty]
@@ -199,7 +201,19 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 --	 when the arg/res is not a tau-type?
 -- NO!  e.g.   f :: ((forall a. a->a) -> Int) -> Int
 --	then   x = (f,f)
---	is perfectly fine!
+--	is perfectly fine, because we can instantiat f's type to a monotype
+--
+-- However, we get can get jolly unhelpful error messages.  
+--	e.g.	foo = id runST
+--
+--    Inferred type is less polymorphic than expected
+--	Quantified type variable `s' escapes
+--	Expected type: ST s a -> t
+--	Inferred type: (forall s1. ST s1 a) -> a
+--    In the first argument of `id', namely `runST'
+--    In a right-hand side of function `foo': id runST
+--
+-- I'm not quite sure what to do about this!
 
 tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ (TyVarTy tv)
   = ASSERT( not (isHoleTyVar tv) )
