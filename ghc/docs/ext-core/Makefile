@@ -6,8 +6,10 @@ core.dvi:	core.tex prims.tex
 		latex core.tex
 		latex core.tex
 
-prims.tex:	../../compiler/prelude/primops.txt.pp
+../../compiler/prelude/primops.txt: ../../compiler/prelude/primops.txt.pp
 		(cd ../../compiler/prelude; gcc -E -I../../includes -traditional -x c primops.txt.pp | /bin/sed -e '/^#/d' > primops.txt)
+
+prims.tex:	../../compiler/prelude/primops.txt
 		../../utils/genprimopcode/genprimopcode --make-latex-doc < ../../compiler/prelude/primops.txt > prims.tex
 
 
