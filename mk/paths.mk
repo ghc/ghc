@@ -217,7 +217,7 @@ C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 SCRIPT_SRCS = $(filter %.lprl,$(SRCS))
 SCRIPT_OBJS = $(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
 
-OBJS        = $(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS) $(GC_C_OBJS) 
+OBJS        = $(HS_OBJS) $(C_OBJS) $(GC_C_OBJS) 
 
 # The default is for $(LIBOBJS) to be the same as $(OBJS)
 LIBOBJS	    = $(OBJS)
@@ -270,7 +270,7 @@ TAGS_C_SRCS=$(C_SRCS)
 #                        that may require extra tools to create.
 #
 #
-MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS) $(GC_C_OBJS)
+MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS) $(GC_C_OBJS) $(SCRIPT_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) a.out \
 		      $(DERIVED_HSC_SRCS) \
