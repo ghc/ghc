@@ -171,6 +171,9 @@
 /* Define if you have the <memory.h> header file.  */
 #undef HAVE_MEMORY_H
 
+/* Define if you have the <netinet/tcp.h> header file.  */
+#undef HAVE_NETINET_TCP_H
+
 /* Define if you have the <nlist.h> header file.  */
 #undef HAVE_NLIST_H
 
