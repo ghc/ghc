@@ -1,6 +1,5 @@
 /* --------------------------------------------------------------------------
    Time-stamp: <Sun Mar 18 2001 21:23:50 Stardate: [-30]6349.45 hwloidl>
-   $Id: LLC.h,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    Low Level Communications Header (LLC.h)
 

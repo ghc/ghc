@@ -1,6 +1,5 @@
 /* --------------------------------------------------------------------------
    Time-stamp: <Tue Mar 06 2001 00:25:50 Stardate: [-30]6285.08 hwloidl>
-   $Id: ParallelRts.h,v 1.4 2001/03/22 03:51:12 hwloidl Exp $
 
    Variables and functions specific to the parallel RTS (i.e. GUM or GranSim)
    ----------------------------------------------------------------------- */

@@ -1,6 +1,5 @@
 /* ----------------------------------------------------------------------------
  * Time-stamp: <Mon Mar 19 2001 22:10:38 Stardate: [-30]6354.62 hwloidl>
- * $Id: LLComms.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
  *
  * GUM Low-Level Inter-Task Communication
  *

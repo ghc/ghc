@@ -1,6 +1,5 @@
 /* --------------------------------------------------------------------------
    Time-stamp: <Wed Mar 21 2001 16:37:16 Stardate: [-30]6363.46 hwloidl>
-   $Id: ParInit.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
 
    Initialising the parallel RTS
 

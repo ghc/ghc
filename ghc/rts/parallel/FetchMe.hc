@@ -1,6 +1,5 @@
 /* ----------------------------------------------------------------------------
  Time-stamp: <Tue Mar 06 2001 17:01:46 Stardate: [-30]6288.54 hwloidl>
- $Id: FetchMe.hc,v 1.7 2001/03/23 16:36:21 simonmar Exp $
 
  Entry code for a FETCH_ME closure
 

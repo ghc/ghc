@@ -1,6 +1,5 @@
 /* --------------------------------------------------------------------------
    Time-stamp: <Sun Mar 18 2001 20:16:14 Stardate: [-30]6349.22 hwloidl>
-   $Id: HLC.h,v 1.3 2001/03/22 03:51:11 hwloidl Exp $
 
    High Level Communications Header (HLC.h)
 

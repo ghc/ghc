@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: ShutdownEachPEHook.c,v 1.1 2001/03/22 03:51:11 hwloidl Exp $
  *
  * User-overridable RTS hooks.
  *

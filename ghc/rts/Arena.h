@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.h,v 1.2 2003/07/28 16:16:07 moran Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation interface.

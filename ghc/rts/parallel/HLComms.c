@@ -1,6 +1,5 @@
 /* ----------------------------------------------------------------------------
  * Time-stamp: <Wed Mar 21 2001 16:34:41 Stardate: [-30]6363.45 hwloidl>
- * $Id: HLComms.c,v 1.6 2001/08/14 13:40:10 sewardj Exp $
  *
  * High Level Communications Routines (HLComms.lc)
  *

@@ -1,6 +1,5 @@
 /* ---------------------------------------------------------------------------
    Time-stamp: <Wed Mar 21 2001 16:32:23 Stardate: [-30]6363.44 hwloidl>
-   $Id: Global.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    (c) The AQUA/Parade Projects, Glasgow University, 1995
        The GdH/APART 624 Projects, Heriot-Watt University, Edinburgh, 1999

@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.76 2004/09/03 15:28:40 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999

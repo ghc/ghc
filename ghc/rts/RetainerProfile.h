@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.h,v 1.4 2004/08/13 13:10:29 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park

@@ -1,6 +1,5 @@
 /* 
    Time-stamp: <Tue Mar 06 2001 00:17:42 Stardate: [-30]6285.06 hwloidl>
-   $Id: GranSim.c,v 1.5 2001/07/23 17:23:20 simonmar Exp $
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.

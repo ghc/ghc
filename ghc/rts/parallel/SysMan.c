@@ -1,6 +1,5 @@
 /* ----------------------------------------------------------------------------
    Time-stamp: <Wed Mar 21 2001 17:16:28 Stardate: [-30]6363.59 hwloidl>
-   $Id: SysMan.c,v 1.5 2001/08/14 13:40:10 sewardj Exp $
 
    GUM System Manager Program
    Handles startup, shutdown and global synchronisation of the parallel system.
@@ -295,7 +294,7 @@ main (int argc, char **argv) {
 
   IF_PAR_DEBUG(verbose,
 	       fprintf(stderr,
-	               "==== RFP: GdH enabled SysMan reporting for duty ($Revision: 1.5 $)\n"));
+	               "==== RFP: GdH enabled SysMan reporting for duty ($Revision: 1.6 $)\n"));
   
   if (argc > 1) {
     if (*argv[1] == '-') {

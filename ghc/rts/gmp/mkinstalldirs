@@ -12,15 +12,21 @@ do
    shift
 
    pathcomp=
-   for d in ${1+"$@"} ; do
+   for d
+   do
      pathcomp="$pathcomp$d"
      case "$pathcomp" in
        -* ) pathcomp=./$pathcomp ;;
      esac
 
      if test ! -d "$pathcomp"; then
-        echo "mkdir $pathcomp" 1>&2
-        mkdir "$pathcomp" || errstatus=$?
+        echo "mkdir $pathcomp"
+
+        mkdir "$pathcomp" || lasterr=$?
+
+        if test ! -d "$pathcomp"; then
+  	  errstatus=$lasterr
+        fi
      fi
 
      pathcomp="$pathcomp/"

@@ -1,6 +1,5 @@
 /* ---------------------------------------------------------------------------
  * Time-stamp: <Tue Nov 09 1999 16:31:38 Stardate: [-30]3873.44 hwloidl>
- * $Id: ParTypes.h,v 1.2 2000/01/13 14:34:08 hwloidl Exp $  
  *
  * Runtime system types for GUM
  *

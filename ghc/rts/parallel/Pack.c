@@ -1,6 +1,5 @@
 /* 
    Time-stamp: <Wed Mar 21 2001 16:32:47 Stardate: [-30]6363.44 hwloidl>
-   $Id: Pack.c,v 1.8 2001/07/24 05:04:59 ken Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
