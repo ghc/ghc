@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.61 2004/03/08 10:27:22 stolz Exp $
+ * $Id: Stg.h,v 1.62 2004/03/23 10:03:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -86,6 +86,12 @@
 #define GNU_ATTRIBUTE(at) __attribute__((at))
 #else
 #define GNU_ATTRIBUTE(at)
+#endif
+
+#if __GNUC__ >= 3 
+#define GNUC3_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNUC3_ATTRIBUTE(at)
 #endif
 
 /* 
