@@ -55,7 +55,7 @@ should all be ok).
 %setup -n haddock-%{version}
 
 %build
-test -f configure || autoconf
+test -f configure || autoreconf
 ./configure --prefix=%{prefix}
 make
 (cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
@@ -79,6 +79,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %{prefix}/bin/haddock-%{version}
 
 %changelog
+
+* Tue Aug 26 2003 Sven Panne <sven_panne@yahoo.com>
+- Use autoreconf instead of autoconf
 
 * Mon Jul 28 2003 Sven Panne <sven_panne@yahoo.com>
 - Updated to version 0.5
