@@ -34,6 +34,7 @@ module Data.Generics.Reify (
 
 	-- * Generic operations to reify terms
 	glength,
+	gdepth,
 	gcount,
 	gnodecount,
 	gtypecount,
@@ -154,6 +155,11 @@ extType f = maybe f id . cast
 -- | Count the number of immediate subterms of the given term
 glength :: GenericQ Int
 glength = length . gmapQ (const ())
+
+
+-- | Determine depth of the given term
+gdepth :: GenericQ Int
+gdepth = (+) 1 . foldr max 0 . gmapQ gdepth
 
 
 -- | Determine the number of all suitable nodes in a given term
