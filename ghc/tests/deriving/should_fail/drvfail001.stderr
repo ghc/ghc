@@ -1,3 +1,4 @@
 
-No instance for `Show (f a)'
-When deriving classes for `Cons'
+drvfail001.hs:21:
+    No instance for `Show (f a)'
+    When deriving classes for `Cons'
