@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.20 1998/12/22 12:55:54 simonm Exp $
+% $Id: CgCase.lhs,v 1.21 1998/12/22 18:03:27 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -59,7 +59,7 @@ import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
-			  isNewTyCon, isAlgTyCon,
+			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
 			  tyConDataCons, tyConFamilySize )
 import Type		( Type, typePrimRep, splitAlgTyConApp, splitTyConApp_maybe,
 			  splitFunTys, applyTys )
@@ -1013,8 +1013,9 @@ getScrutineeTyCon ty =
    case (splitTyConAppThroughNewTypes ty) of
 	Nothing -> Nothing
 	Just (tc,_) -> 
-		if not (isAlgTyCon tc) then Just tc else
-			-- works for primitive TyCons too
+		if isFunTyCon tc  then Nothing else     -- not interested in funs
+		if isPrimTyCon tc then Just tc else	-- return primitive tycons
+			-- otherwise (algebraic tycons) check the no. of constructors
 		case (tyConFamilySize tc) of
 			0 -> pprTrace "Warning" (hcat [
 				text "constructors for ",
