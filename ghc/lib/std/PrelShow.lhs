@@ -245,8 +245,6 @@ itos n r
 		         (C# (chr# (x `remInt#` 10# +# ord# '0'#)) : cs)
 \end{code}
 
-
-
 %*********************************************************
 %*							*
 \subsection{Character stuff}

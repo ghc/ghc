@@ -59,10 +59,7 @@ data Ix ix => MutableArray     s ix elt = MutableArray     ix ix (MutableArray# 
 data Ix ix => MutableByteArray s ix     = MutableByteArray ix ix (MutableByteArray# s)
 
 instance CCallable (MutableByteArray s ix)
-instance CCallable (MutableByteArray# s)
-
 instance CCallable (ByteArray ix)
-instance CCallable ByteArray#
 
 data MutableVar s a = MutableVar (MutVar# s a)
 

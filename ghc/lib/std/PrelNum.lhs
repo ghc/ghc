@@ -205,47 +205,6 @@ instance  Integral Int	where
 %*********************************************************
 
 \begin{code}
-instance  Ord Integer  where
-    (S# i)     <=  (S# j)     = i <=# j
-    (J# s d)   <=  (S# i)     = cmpIntegerInt# s d i <=# 0#
-    (S# i)     <=  (J# s d)   = cmpIntegerInt# s d i >=# 0#
-    (J# s1 d1) <=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
-
-    (S# i)     >   (S# j)     = i ># j
-    (J# s d)   >   (S# i)     = cmpIntegerInt# s d i ># 0#
-    (S# i)     >   (J# s d)   = cmpIntegerInt# s d i <# 0#
-    (J# s1 d1) >   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
-
-    (S# i)     <   (S# j)     = i <# j
-    (J# s d)   <   (S# i)     = cmpIntegerInt# s d i <# 0#
-    (S# i)     <   (J# s d)   = cmpIntegerInt# s d i ># 0#
-    (J# s1 d1) <   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
-
-    (S# i)     >=  (S# j)     = i >=# j
-    (J# s d)   >=  (S# i)     = cmpIntegerInt# s d i >=# 0#
-    (S# i)     >=  (J# s d)   = cmpIntegerInt# s d i <=# 0#
-    (J# s1 d1) >=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
-
-    compare (S# i)  (S# j)
-       | i ==# j = EQ
-       | i <=# j = LT
-       | otherwise = GT
-    compare (J# s d) (S# i)
-       = case cmpIntegerInt# s d i of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
-    compare (S# i) (J# s d)
-       = case cmpIntegerInt# s d i of { res# ->
-	 if res# ># 0# then LT else 
-	 if res# <# 0# then GT else EQ
-	 }
-    compare (J# s1 d1) (J# s2 d2)
-       = case cmpInteger# s1 d1 s2 d2 of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
-
 toBig (S# i) = case int2Integer# i of { (# s, d #) -> J# s d }
 toBig i@(J# _ _) = i
 
@@ -405,13 +364,18 @@ dn_list x delta lim = go (x::Integer)
 "enumDeltaInteger" 	enumDeltaIntegerFB   (:)    = enumDeltaIntegerList
 "enumDeltaToInteger" 	enumDeltaToIntegerFB (:) [] = enumDeltaToIntegerList
  #-}
+\end{code}
 
-------------------------------------------------------------------------
+%*********************************************************
+%*							*
+\subsection{Show code for Integers}
+%*							*
+%*********************************************************
 
+\begin{code}
 instance  Show Integer  where
     showsPrec   x = showSignedInteger x
     showList = showList__ (showsPrec 0) 
-
 
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r

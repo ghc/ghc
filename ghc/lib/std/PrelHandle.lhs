@@ -177,9 +177,9 @@ mkErrorHandle__ ioe =
 %*********************************************************
 
 \begin{code}
-foreign import "libHS_cbits" "freeStdFileObject"
+foreign import "libHS_cbits" "freeStdFileObject" unsafe
         freeStdFileObject :: FILE_OBJECT -> IO ()
-foreign import "libHS_cbits" "freeFileObject"
+foreign import "libHS_cbits" "freeFileObject" unsafe
         freeFileObject :: FILE_OBJECT -> IO ()
 
 \end{code}
@@ -553,6 +553,9 @@ data HandlePosn
 	Handle   -- Q: should this be a weak or strong ref. to the handle?
 	         --    [what's the winning argument for it not being strong? --sof]
 	HandlePosition
+
+instance Eq HandlePosn where
+    (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
 
   -- HandlePosition is the Haskell equivalent of POSIX' off_t.
   -- We represent it as an Integer on the Haskell side, but

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.13 1999/09/19 19:12:41 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.14 1999/11/22 15:55:51 simonmar Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -146,6 +146,9 @@ data IOError
      String	     -- location
      String          -- error type specific information.
 
+instance Eq IOError where
+  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
+    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
 
 data IOErrorType
   = AlreadyExists        | HardwareFault
@@ -367,12 +370,25 @@ a handles reside in @IOHandle@.
 -}
 data MVar a = MVar (MVar# RealWorld a)
 
+-- pull in Eq (Mvar a) too, to avoid PrelConc being an orphan-instance module
+instance Eq (MVar a) where
+	(MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
+
 {-
   Double sigh - ForeignObj is needed here too to break a cycle.
 -}
 data ForeignObj = ForeignObj ForeignObj#   -- another one
 instance CCallable ForeignObj
-instance CCallable ForeignObj#
+
+eqForeignObj :: ForeignObj  -> ForeignObj -> Bool
+eqForeignObj mp1 mp2
+  = unsafePerformIO (primEqForeignObj mp1 mp2) /= (0::Int)
+
+foreign import "eqForeignObj" unsafe primEqForeignObj :: ForeignObj -> ForeignObj -> IO Int
+
+instance Eq ForeignObj where 
+    p == q = eqForeignObj p q
+    p /= q = not (eqForeignObj p q)
 #endif /* ndef __HUGS__ */
 
 #if defined(__CONCURRENT_HASKELL__)
@@ -380,6 +396,9 @@ newtype Handle = Handle (MVar Handle__)
 #else
 newtype Handle = Handle (MutableVar RealWorld Handle__)
 #endif
+
+instance Eq Handle where
+ (Handle h1) == (Handle h2) = h1 == h2
 
 {-
   A Handle is represented by (a reference to) a record 

@@ -22,8 +22,8 @@ import PrelShow		-- isAlpha etc
 import PrelBase
 import Monad
 
--- needed for readIO.
-import PrelIOBase ( IO, userError )
+-- needed for readIO and instance Read Buffermode
+import PrelIOBase ( IO, userError, BufferMode(..) )
 import PrelException ( ioError )
 \end{code}
 
@@ -602,5 +602,28 @@ readRational__ top_s
 	  Just x  -> x
 	  Nothing -> error ("readRational__: no parse:"        ++ top_s)
 #endif
+
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Reading BufferMode}
+%*							*
+%*********************************************************
+
+This instance decl is here rather than somewhere more appropriate in
+order that we can avoid both orphan-instance modules and recursive
+dependencies.
+
+\begin{code}
+instance Read BufferMode where
+    readsPrec _ = 
+      readParen False
+	(\r ->	let lr = lex r
+		in
+		[(NoBuffering, rest)       | ("NoBuffering", rest) <- lr] ++
+		[(LineBuffering,rest)      | ("LineBuffering",rest) <- lr] ++
+		[(BlockBuffering mb,rest2) | ("BlockBuffering",rest1) <- lr,
+		                             (mb, rest2) <- reads rest1])
 
 \end{code}

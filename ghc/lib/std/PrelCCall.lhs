@@ -24,22 +24,18 @@ import PrelGHC
 
 \begin{code}
 instance CCallable Char
-instance CCallable   Char#
 instance CReturnable Char
 
 instance CCallable   Int
-instance CCallable   Int#
 instance CReturnable Int
 
 -- DsCCall knows how to pass strings...
 instance CCallable   [Char]
 
 instance CCallable   Float
-instance CCallable   Float#
 instance CReturnable Float
 
 instance CCallable   Double
-instance CCallable   Double#
 instance CReturnable Double
 
 instance CReturnable () -- Why, exactly?

@@ -41,21 +41,11 @@ makeForeignObj (A# obj) = IO ( \ s# ->
     case makeForeignObj# obj s# of
       (# s1#, fo# #) -> (# s1#,  ForeignObj fo# #) )
 
-eqForeignObj    :: ForeignObj  -> ForeignObj -> Bool
 --makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
 writeForeignObj :: ForeignObj  -> Addr       -> IO ()
 
 writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
     case writeForeignObj# fo# datum# s# of { s1# -> (# s1#, () #) } )
-
-eqForeignObj mp1 mp2
-  = unsafePerformIO (primEqForeignObj mp1 mp2) /= (0::Int)
-
-foreign import "eqForeignObj" unsafe primEqForeignObj :: ForeignObj -> ForeignObj -> IO Int
-
-instance Eq ForeignObj where 
-    p == q = eqForeignObj p q
-    p /= q = not (eqForeignObj p q)
 #endif /* !__PARALLEL_HASKELL__ */
 \end{code}
 

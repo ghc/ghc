@@ -121,35 +121,6 @@ import Char		( ord, chr )
 \end{code}
 
 #ifndef __HUGS__
-
-Standard instances for @Handle@:
-
-\begin{code}
-instance Eq IOError where
-  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
-    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
-
-instance Eq Handle where
- (Handle h1) == (Handle h2) = h1 == h2
-
---Type declared in IOHandle, instance here because it depends on Eq.Handle
-instance Eq HandlePosn where
-    (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
-
--- Type declared in IOBase, instance here because it
--- depends on PrelRead.(Read Maybe) instance.
-instance Read BufferMode where
-    readsPrec _ = 
-      readParen False
-	(\r ->	let lr = lex r
-		in
-		[(NoBuffering, rest)       | ("NoBuffering", rest) <- lr] ++
-		[(LineBuffering,rest)      | ("LineBuffering",rest) <- lr] ++
-		[(BlockBuffering mb,rest2) | ("BlockBuffering",rest1) <- lr,
-		                             (mb, rest2) <- reads rest1])
-
-\end{code}
-
 %*********************************************************
 %*							*
 \subsection{Simple input operations}
