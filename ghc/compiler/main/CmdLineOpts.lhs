@@ -71,6 +71,7 @@ module CmdLineOpts (
 	opt_PprStyle_All,
 	opt_PprStyle_Debug,
 	opt_PprStyle_User,
+	opt_PprUserLength,
 	opt_ProduceC,
 	opt_ProduceHi,
 	opt_ProduceS,
@@ -98,7 +99,9 @@ module CmdLineOpts (
 	opt_WarnNameShadowing,
 	opt_WarnUnusedNames,
 	opt_WarnIncompletePatterns,
-	opt_TyConPruning
+	opt_PruneTyDecls, opt_PruneInstDecls,
+	opt_D_show_unused_imports,
+	opt_D_show_rn_stats
     ) where
 
 IMPORT_1_3(Array(array, (//)))
@@ -107,7 +110,10 @@ import PreludeGlaST	-- bad bad bad boy, Will (_Array internals)
 #else
 import GlaExts
 import ArrBase
+-- 2.04 and later exports Lift from GlaExts
+#if __GLASGOW_HASKELL__ < 204
 import PrelBase (Lift(..))
+#endif
 #endif
 import Argv
 
@@ -318,6 +324,7 @@ opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_PprStyle_All		= lookUp  SLIT("-dppr-all")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
 opt_PprStyle_User		= lookUp  SLIT("-dppr-user")
+opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
 opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
@@ -346,9 +353,11 @@ opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERA
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
 opt_WarnIncompletePatterns	= not (lookUp  SLIT("-fno-warn-incomplete-patterns"))
 opt_WarnUnusedNames		= lookUp  SLIT("-fwarn-unused-names")
-opt_TyConPruning		= not (lookUp SLIT("-fno-tycon-pruning"))
+opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
+opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
+opt_D_show_unused_imports	= lookUp SLIT("-dshow-unused-imports")
+opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
 
--- opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}
 
