@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.139 2003/11/02 06:55:24 dons Exp $
+ * $Id: Linker.c,v 1.140 2003/11/12 15:45:49 sof Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -1910,11 +1910,16 @@ ocResolve_PEi386 ( ObjectCode* oc )
 	 * real count can be found in the first reloc entry.
          *
 	 * See Section 4.1 (last para) of the PE spec (rev6.0).
+	 *
+	 * Nov2003 update: the GNU linker still doesn't correctly 
+	 * handle the generation of relocatable object files with 
+	 * overflown relocations. Hence the output to warn of potential 
+	 * troubles.
 	 */
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
 	noRelocs = rel->VirtualAddress;
-	fprintf(stderr, "Overflown relocs: %u\n", noRelocs);
+	fprintf(stderr, "WARNING: Overflown relocation field (# relocs found: %u)\n", noRelocs); fflush(stderr);
 	j = 1;
       } else {
 	noRelocs = sectab_i->NumberOfRelocations;
