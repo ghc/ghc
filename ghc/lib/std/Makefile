@@ -27,6 +27,9 @@ MKDEPENDHS = $(GHC_INPLACE)
 
 LIBRARY = libHS$(_way).a
 LIBOBJS = $(HS_OBJS)
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+LIBOBJS = $(filter-out PrelHugs.o,$(HS_OBJS))
+endif
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
@@ -87,7 +90,7 @@ SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
 
 ifeq "$(way)" "dll"
-HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
+HS_SRCS := $(filter-out PrelMain.lhs PrelHugs.lhs, $(HS_SRCS))
 endif
 
 # PrelMain.dll_o isn't to be included in the final .a, 
@@ -114,10 +117,11 @@ CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 # odir for details)
 # 
 ifeq "$(way)" "dll"
+GhcLibHcOpts = -O
 PrelMain.dll_o : PrelMain.lhs
 	$(RM) ../PrelMain.lhs
 	$(CP) PrelMain.lhs ../
-	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude -split-objs, $(patsubst -odir,,$(HC_OPTS)))"
+	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude, $(patsubst -odir,,$(HC_OPTS)))"
 	$(MV) ../PrelMain.dll_o .
 	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
 endif
