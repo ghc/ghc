@@ -629,6 +629,18 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	--
 	-- Solution: make meth_insts available, so that 'then' refers directly
 	-- 	     to the local 'bind' rather than going via the dictionary.
+	--
+	-- BUT WATCH OUT!  If the method type mentions the class variable, then
+	-- this optimisation is not right.  Consider
+	--	class C a where
+	--	  op :: Eq a => a
+	--
+	--	instance C Int where
+	--	  op = op
+	-- The occurrence of 'op' on the rhs gives rise to a constraint
+	--	op at Int
+	-- The trouble is that the 'meth_inst' for op, which is 'available', also
+	-- looks like 'op at Int'.  But they are not the same.
     let
 	all_insts      = avail_insts ++ catMaybes meth_insts
 	xtve	       = inst_tyvars `zip` inst_tyvars'
