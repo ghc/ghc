@@ -108,7 +108,8 @@ $white_no_nl+ 				;
 -- have to exclude those.
 -- The regex says: "munch all the characters after the dashes, as long as
 -- the first one is not a symbol".
-"--"\-* ([^$symbol] .*)?		;
+"--"\-* [^$symbol] .*			;
+"--"\-* / { atEOL }			;
 
 -- 'bol' state: beginning of a line.  Slurp up all the whitespace (including
 -- blank lines) until we find a non-whitespace character, then do layout
@@ -581,6 +582,8 @@ notFollowedBy char _ _ _ (_,buf) = atEnd buf || currentChar buf /= char
 
 notFollowedBySymbol _ _ _ (_,buf)
   = atEnd buf || currentChar buf `notElem` "!#$%&*+./<=>?@\\^|-~"
+
+atEOL _ _ _ (_,buf) = atEnd buf || currentChar buf == '\n'
 
 ifExtension pred bits _ _ _ = pred bits
 
