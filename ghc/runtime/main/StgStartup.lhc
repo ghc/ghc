@@ -355,10 +355,13 @@ STGFUN(ErrorIO_innards)
 
     /* Finish stack setup as if for a top-level task and enter the error node */
 
+    /* Put an IoWorld token on the B stack */
+    SpB -= BREL(1);
+    *SpB = (P_) realWorldZh_closure;
+/*
     SpA = SuA - AREL(1);
-
     *SpA = (P_) realWorldZh_closure;
-
+*/
     STKO_LINK(StkOReg) = PrelBase_Z91Z93_closure;
     STKO_RETURN(StkOReg) = NULL;
 
