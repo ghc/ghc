@@ -30,7 +30,7 @@ Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
-BuildRequires:  alex, happy, ghc, docbk31
+BuildRequires:  alex, happy, ghc, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips
 Summary:        A documentation tool for annotated Haskell source code
 
 %description
