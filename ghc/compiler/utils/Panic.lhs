@@ -160,8 +160,8 @@ Compatibility stuff:
 
 \begin{code}
 #if __GLASGOW_HASKELL__ <= 408
-catchJust = catchIO
-ioErrors  = justIoErrors
-throwTo   = raiseInThread
+catchJust = Exception.catchIO
+ioErrors  = Exception.justIoErrors
+throwTo   = Exception.raiseInThread
 #endif
 \end{code}
