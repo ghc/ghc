@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsExternal.h,v 1.4 2004/09/09 11:38:09 stolz Exp $
+ * $Id: RtsExternal.h,v 1.5 2004/10/04 05:54:04 dons Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -29,6 +29,9 @@ extern void newCAF(StgClosure*);
 /* ToDo: remove? */
 extern I_ genSymZh(void);
 extern I_ resetGenSymZh(void);
+
+/* Alternate to raise(3) for threaded rts, for OpenBSD */
+extern int genericRaise(int sig);
 
 /* Concurrency/Exception PrimOps. */
 extern int cmp_thread(StgPtr tso1, StgPtr tso2);
