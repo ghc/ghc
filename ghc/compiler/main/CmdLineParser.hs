@@ -16,8 +16,10 @@ module CmdLineParser (
 
 #include "HsVersions.h"
 
-import Util		( maybePrefixMatch, notNull, removeSpaces )
--- import Panic
+import Util	( maybePrefixMatch, notNull, removeSpaces )
+#ifdef DEBUG
+import Panic	( assertPanic )
+#endif
 
 data OptKind m
 	= NoArg (m ())  -- flag with no argument
