@@ -40,7 +40,7 @@ testIntlike name zero = do
 testInteger  = do
   let zero = 0 :: Integer
   putStrLn $ "--------------------------------"
-  putStrLn $ "--Testing Integer
+  putStrLn $ "--Testing Integer"
   putStrLn $ "--------------------------------"
   testEnum     zero
   testReadShow zero
