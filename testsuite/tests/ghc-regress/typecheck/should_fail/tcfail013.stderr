@@ -1,7 +1,7 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail013.hs:4:
-    Couldn't match `[t]' against `Bool'
-	Expected type: [t]
+tcfail013.hs:4:
+    Couldn't match `[a]' against `Bool'
+	Expected type: [a]
 	Inferred type: Bool
     In the pattern: True
     In the definition of `f': f True = 2

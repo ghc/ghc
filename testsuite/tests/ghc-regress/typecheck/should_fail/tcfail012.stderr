@@ -1,6 +1,6 @@
 
 tcfail012.hs:3:
-    Couldn't match `Bool' against `[t]'
+    Couldn't match `Bool' against `[a]'
 	Expected type: Bool
-	Inferred type: [t]
-    in a pattern binding: []
+	Inferred type: [a]
+    In a pattern binding: []
