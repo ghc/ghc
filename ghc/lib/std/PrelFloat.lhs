@@ -163,10 +163,10 @@ instance  Fractional Float  where
     fromRational x	=  fromRat x
     recip x		=  1.0 / x
 
+{-# RULES "truncate/Float->Int" truncate = float2Int #-}
 instance  RealFrac Float  where
 
     {-# SPECIALIZE properFraction :: Float -> (Int, Float) #-}
-    {-# SPECIALIZE truncate :: Float -> Int #-}
     {-# SPECIALIZE round    :: Float -> Int #-}
     {-# SPECIALIZE ceiling  :: Float -> Int #-}
     {-# SPECIALIZE floor    :: Float -> Int #-}
@@ -326,10 +326,10 @@ instance  Floating Double  where
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = log ((x+1.0) / sqrt (1.0-x*x))
 
+{-# RULES "truncate/Double->Int" truncate = double2Int #-}
 instance  RealFrac Double  where
 
     {-# SPECIALIZE properFraction :: Double -> (Int, Double) #-}
-    {-# SPECIALIZE truncate :: Double -> Int #-}
     {-# SPECIALIZE round    :: Double -> Int #-}
     {-# SPECIALIZE ceiling  :: Double -> Int #-}
     {-# SPECIALIZE floor    :: Double -> Int #-}
@@ -827,6 +827,7 @@ int2Double   (I# x) = D# (int2Double#   x)
 
 double2Float :: Double -> Float
 double2Float (D# x) = F# (double2Float# x)
+
 float2Double :: Float -> Double
 float2Double (F# x) = D# (float2Double# x)
 
