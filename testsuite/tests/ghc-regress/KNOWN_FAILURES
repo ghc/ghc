@@ -1,0 +1,57 @@
+
+----------------------------- typecheck ----------------------------
+
+SHOULD_COMPILE:
+
+tc126           fails to compile.  Should it?
+
+tc056           expected output contains a warning about duplicated
+                class assertion; is missing in actual output.
+
+
+SHOULD_FAIL:
+
+tcfail092       expected .stderr is missing
+
+tcfail082       framework failure -- missing other modules.  My problem.
+
+tcfail088       actual/expected error msgs differ significantly
+tcfail075       ditto
+tcfail073       ditto
+tcfail068       ditto
+tcfail067       ditto
+tcfail062       ditto
+tcfail023       ditto
+tcfail019       ditto
+
+tcfail080       expected an error message, but none appeared
+
+
+SHOULD_RUN:
+
+tcrun007        won't compile: link failure due to Z1T et al?
+tcrun009        won't compile: type error reported
+
+
+
+----------------------------- rename ----------------------------
+
+should_compile/rn009
+should_compile/rn010
+should_compile/rn011
+should_compile/rn012
+should_compile/rn017
+should_compile/rn037
+	framework -- missing supporting modules
+
+
+should_fail/rnfail014
+should_fail/rnfail020
+	sig diffs between exp and act err msgs
+
+
+----------------------------- deSugar ----------------------------
+
+should_run/dsrun005
+	filename match problems in failure msgs -- My problem
+
