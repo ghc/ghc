@@ -392,11 +392,16 @@ hClose handle =
              is finalized. (we overwrite the file ptr in the underlying
 	     FileObject with a NULL as part of closeFile())
 	  -}
-          if rc == (0::Int)
-	   then return (handle_{ haType__   = ClosedHandle,
-			         haFO__     = nullFile__ })
-           else constructErrorAndFail "hClose"
 
+          if (rc /= 0)
+           then constructErrorAndFail "hClose"
+
+		  -- free the spare buffers (except the handle buffer)
+		  -- associated with this handle.
+	   else do freeBuffers (haBuffers__ handle_)
+		   return (handle_{ haType__    = ClosedHandle,
+			            haFO__      = nullFile__,
+				    haBuffers__ = [] })
 \end{code}
 
 Computation $hClose hdl$ makes handle {\em hdl} closed.  Before the
