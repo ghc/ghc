@@ -348,6 +348,9 @@ data HscLang
   = HscC
   | HscAsm
   | HscJava
+#ifdef ILX
+  | HscILX
+#endif
   | HscInterpreted
     deriving (Eq, Show)
 
@@ -478,7 +481,7 @@ opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
-opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
+opt_UnfoldCasms		        = lookUp  SLIT("-funfold-casms-in-hi-file")
 opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 
@@ -504,13 +507,13 @@ opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_KeepStgTypes		= lookUp  SLIT("-fkeep-stg-types")
 
 -- Simplifier switches
-opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
+opt_SimplNoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
-opt_SimplDoEtaReduction		= lookUp SLIT("-fdo-eta-reduction")
-opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
-opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
-opt_SimplExcessPrecision	= lookUp SLIT("-fexcess-precision")
+opt_SimplDoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
+opt_SimplDoLambdaEtaExpansion	= lookUp  SLIT("-fdo-lambda-eta-expansion")
+opt_SimplCaseMerge		= lookUp  SLIT("-fcase-merge")
+opt_SimplExcessPrecision	= lookUp  SLIT("-fexcess-precision")
 
 -- Unfolding control
 opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (45::Int)
@@ -523,10 +526,10 @@ opt_UF_UpdateInPlace		= lookUp  SLIT("-funfolding-update-in-place")
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
 			
-opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
-opt_NoPruneTyDecls		= lookUp SLIT("-fno-prune-tydecls")
-opt_Static			= lookUp SLIT("-static")
-opt_Unregisterised		= lookUp SLIT("-funregisterised")
+opt_NoPruneDecls		= lookUp  SLIT("-fno-prune-decls")
+opt_NoPruneTyDecls		= lookUp  SLIT("-fno-prune-tydecls")
+opt_Static			= lookUp  SLIT("-static")
+opt_Unregisterised		= lookUp  SLIT("-funregisterised")
 \end{code}
 
 %************************************************************************

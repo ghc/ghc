@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.54 2001/02/20 11:04:42 simonmar Exp $
+-- $Id: Main.hs,v 1.55 2001/02/27 12:36:37 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -67,7 +67,6 @@ import Maybe
 -- new mkdependHS doesn't support all the options that the old one did (-X et al.)
 -- time commands when run with -v
 -- split marker
--- mkDLL
 -- java generation
 -- user ways
 -- Win32 support: proper signal handling

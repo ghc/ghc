@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.51 2001/02/26 15:50:21 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.52 2001/02/27 12:36:37 rrt Exp $
 --
 -- GHC Driver
 --
@@ -185,6 +185,10 @@ genPipeline todo stop_flag persistent_output lang filename
 
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
+#ifdef ILX
+	HscILX  | split           -> not_valid
+		| otherwise       -> [ Unlit, Cpp, Hsc ]
+#endif
 
       | cish      = [ Cc, As ]
 
@@ -879,6 +883,9 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
         	    HscJava        -> newTempName "java" -- ToDo
+#ifdef ILX
+		    HscILX         -> newTempName (phaseInputExt Ilx)
+#endif
 		    HscInterpreted -> return (error "no output file")
 
    -- run the compiler

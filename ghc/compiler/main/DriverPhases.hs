@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.4 2001/01/03 11:13:43 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.5 2001/02/27 12:36:37 rrt Exp $
 --
 -- GHC Driver
 --
@@ -42,6 +42,9 @@ data Phase
 	| Hsc
 	| Cc
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
+#ifdef ILX
+	| Ilx           -- .NET extended IL
+#endif
 	| Mangle	-- assembly mangling, now done by a separate script.
 	| SplitMangle	-- after mangler if splitting
 	| SplitAs
@@ -69,6 +72,9 @@ phaseInputExt Cpp         = "lpp"	-- intermediate only
 phaseInputExt Hsc         = "hspp"
 phaseInputExt HCc         = "hc"
 phaseInputExt Cc          = "c"
+#ifdef ILX
+phaseInputExt Ilx         = "ilx"
+#endif
 phaseInputExt Mangle      = "raw_s"
 phaseInputExt SplitMangle = "split_s"	-- not really generated
 phaseInputExt As          = "s"

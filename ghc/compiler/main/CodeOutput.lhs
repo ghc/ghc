@@ -73,6 +73,9 @@ codeOutput dflags mod_name tycons core_binds stg_binds
           		       >> return stub_names
              HscJava        -> outputJava dflags filenm mod_name tycons core_binds
           		       >> return stub_names
+#ifdef ILX
+	     HscILX         -> outputIlx mod_name tycons stg_binds
+#endif
 	}
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
@@ -141,6 +144,22 @@ outputJava dflags filenm mod tycons core_binds
 	-- Make sure we have up to date dead-var information
     java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
     pp_java   = PrintJava.compilationUnit java_code
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Ilx}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef ILX
+outputIlx mod tycons stg_binds
+  =  doOutput (\ f -> printForC f pp_ilx)
+  where
+    pp_ilx = ilxGen mod tycons stg_binds
+#endif
 \end{code}
 
 
