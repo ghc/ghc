@@ -143,7 +143,7 @@ done (l,u) marr = \s1 ->
 
 arrEleBottom :: a
 arrEleBottom = error "(Array.!): undefined array element"
-
+-- ToDo: arrEleBottom = throw (ArrayException (UndefinedElement "Array.!"))
 
 -----------------------------------------------------------------------
 -- These also go better with magic: (//), accum, accumArray

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.8 1999/07/14 08:33:38 simonmar Exp $
+% $Id: PrelException.lhs,v 1.9 1999/11/11 15:18:00 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -38,6 +38,7 @@ data Exception
   | AssertionFailed	String		-- Assertions
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
+  | ArrayException	ArrayException  -- Array-related exceptions
   | NonTermination
 
 data ArithException
@@ -52,6 +53,11 @@ data AsyncException
   = StackOverflow
   | HeapOverflow
   | ThreadKilled
+  deriving (Eq, Ord)
+
+data ArrayException
+  = IndexOutOfBounds String
+  | UndefinedElement String
   deriving (Eq, Ord)
 
 stackOverflow, heapOverflow :: Exception -- for the RTS
@@ -69,6 +75,12 @@ instance Show AsyncException where
   showsPrec _ StackOverflow   = showString "stack overflow"
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"
+
+instance Show ArrayException where
+  showsPrec _ (IndexOutOfBounds s) = showString "array index out of bounds: "
+				   . showString s
+  showsPrec _ (UndefinedElement s) = showString "undefined array element: "
+				   . showString s
 
 instance Show Exception where
   showsPrec _ (IOException err)	         = shows err

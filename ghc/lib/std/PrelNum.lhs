@@ -344,9 +344,14 @@ instance  Integral Integer where
     n `div` d	=  q  where (q,_) = divMod n d
     n `mod` d	=  r  where (_,r) = divMod n d
 
-    divMod n d 	=  case (quotRem n d) of { qr@(q,r) ->
-		   if signum r == negate (signum d) then (q - 1, r+d) else qr }
-		   -- Case-ified by WDP 94/10
+    divMod (S# i) (S# j)         
+      = case divMod (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
+    divMod i1@(J# _ _) i2@(S# _) = divMod i1 (toBig i2)
+    divMod i1@(S# _) i2@(J# _ _) = divMod (toBig i1) i2
+    divMod (J# s1 d1) (J# s2 d2)
+      = case (divModInteger# s1 d1 s2 d2) of
+	  (# s3, d3, s4, d4 #)
+	    -> (J# s3 d3, J# s4 d4)
 
 ------------------------------------------------------------------------
 instance  Enum Integer  where

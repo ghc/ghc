@@ -54,6 +54,7 @@ class  (Ord a) => Ix a  where
 	-- Must specify one of index, unsafeIndex
     index b i | inRange b i = unsafeIndex b i
 	      | otherwise   = error "Error in array index"
+				-- ToDo: raise (ArrayException IndexOutOfRange)
     unsafeIndex b i = index b i
 \end{code}
 
