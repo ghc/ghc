@@ -24,14 +24,14 @@ import Id		( Id, idType, idInfo, idUnique,
 			  getIdUnfolding, setIdUnfolding, isExportedId, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  getIdDemandInfo, setIdDemandInfo,
-			  getIdArity, setIdArity, 
+			  getIdArity, setIdArity, setIdInfo,
 			  getIdStrictness, 
 			  setInlinePragma, getInlinePragma, idMustBeINLINEd,
 			  setOneShotLambda
 			)
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
 		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
-			  specInfo, inlinePragInfo, zapLamIdInfo
+			  specInfo, inlinePragInfo, zapLamIdInfo, setArityInfo, setInlinePragInfo, setUnfoldingInfo
 			)
 import Demand		( Demand, isStrict, wwLazy )
 import Const		( isWHNFCon, conOkForAlt )
@@ -43,7 +43,7 @@ import Name		( isLocallyDefined )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons,
-			  callSiteInline, blackListed
+			  callSiteInline, blackListed, hasSomeUnfolding
 			)
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial,
 			  coreExprType, coreAltsType, exprArity, exprIsValue,
@@ -56,7 +56,7 @@ import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType,
 			  funResultTy, isDictTy, isDataType, applyTy, applyTys, mkFunTys
 			)
 import Subst		( Subst, mkSubst, emptySubst, substExpr, substTy, 
-			  substEnv, lookupInScope, lookupSubst, substRules
+			  substEnv, lookupInScope, lookupSubst, substIdInfo
 			)
 import TyCon		( isDataTyCon, tyConDataCons, tyConClass_maybe, tyConArity, isDataTyCon )
 import TysPrim		( realWorldStatePrimTy )
@@ -531,25 +531,23 @@ completeBinding old_bndr new_bndr new_rhs thing_inside
   |  otherwise
   =  getSubst			`thenSmpl` \ subst ->
      let
-	bndr_info = idInfo old_bndr
-	old_rules = specInfo bndr_info
-	new_rules = substRules subst old_rules
+	-- We make new IdInfo for the new binder by starting from the old binder, 
+	-- doing appropriate substitutions, 
+	old_bndr_info = idInfo old_bndr
+	new_bndr_info = substIdInfo subst old_bndr_info
+		        `setArityInfo` ArityAtLeast (exprArity new_rhs)
 
-	-- The new binding site Id needs its specialisations re-attached
-	bndr_w_arity = new_bndr `setIdArity` ArityAtLeast (exprArity new_rhs)
-
-	binding_site_id
-	  | isEmptyCoreRules old_rules = bndr_w_arity 
-	  | otherwise		       = bndr_w_arity `setIdSpecialisation` new_rules
-
+	-- At the *binding* site we want to zap the now-out-of-date inline
+	-- pragma, in case the expression is simplified a second time.  
+	-- This has already been done in new_bndr, so we get it from there
+	binding_site_id = new_bndr `setIdInfo` 
+			  (new_bndr_info `setInlinePragInfo` getInlinePragma new_bndr)
+	
 	-- At the occurrence sites we want to know the unfolding,
-	-- and the occurrence info of the original
-	-- (simplBinder cleaned up the inline prag of the original
-	--  to eliminate un-stable info, in case this expression is
-	--  simplified a second time; hence the need to reattach it)
-	occ_site_id = binding_site_id
-		      `setIdUnfolding` mkUnfolding new_rhs
-		      `setInlinePragma` inlinePragInfo bndr_info
+	-- We want the occurrence info of the *original*, which is already 
+	-- in new_bndr_info
+	occ_site_id = new_bndr `setIdInfo`
+		      (new_bndr_info `setUnfoldingInfo` mkUnfolding new_rhs)
      in
      modifyInScope occ_site_id thing_inside	`thenSmpl` \ stuff ->
      returnSmpl (addBind (NonRec binding_site_id new_rhs) stuff)
@@ -741,6 +739,8 @@ completeCall black_list_fn in_scope var cont
 
   
     (args', result_cont) = contArgs in_scope cont
+    val_args    	 = filter isValArg args'
+    arg_infos  		 = map (interestingArg in_scope) val_args
     inline_call	         = contIsInline result_cont
     interesting_cont     = contIsInteresting result_cont
     discard_inline_cont  | inline_call = discardInline cont
@@ -748,13 +748,29 @@ completeCall black_list_fn in_scope var cont
 
 	---------- Unfolding stuff
     maybe_inline  = callSiteInline black_listed inline_call 
-				   var args' interesting_cont
+				   var arg_infos interesting_cont
     Just unf_template = maybe_inline
     black_listed      = black_list_fn var
 
     	---------- Specialisation stuff
     maybe_rule_match           = lookupRule in_scope var args'
     Just (rule_name, rule_rhs, rule_args) = maybe_rule_match
+
+
+
+-- An argument is interesting if it has *some* structure
+-- We are here trying to avoid unfolding a function that
+-- is applied only to variables that have no unfolding
+-- (i.e. they are probably lambda bound): f x y z
+-- There is little point in inlining f here.
+interestingArg in_scope (Type _)	  = False
+interestingArg in_scope (App fn (Type _)) = interestingArg in_scope fn
+interestingArg in_scope (Var v)	          = hasSomeUnfolding (getIdUnfolding v')
+					  where
+					    v' = case lookupVarSet in_scope v of
+							Just v' -> v'
+							other   -> v
+interestingArg in_scope other	          = True
 
 
 -- First a special case
@@ -976,8 +992,15 @@ rebuild scrut (Select _ bndr alts se cont)
     all (cheapEqExpr rhs1) other_rhss && all binders_unused alts
 
 	-- Check that the scrutinee can be let-bound instead of case-bound
-    && (   (isUnLiftedType (idType bndr) && 	-- It's unlifted and floatable
-	    exprOkForSpeculation scrut)		-- NB: scrut = an unboxed variable satisfies 
+    && (   exprOkForSpeculation scrut
+		-- OK not to evaluate it
+		-- This includes things like (==# a# b#)::Bool
+		-- so that we simplify 
+		-- 	case ==# a# b# of { True -> x; False -> x }
+		-- to just
+		--	x
+		-- This particular example shows up in default methods for
+		-- comparision operations (e.g. in (>=) for Int.Int32)
 	|| exprIsValue scrut			-- It's already evaluated
 	|| var_demanded_later scrut		-- It'll be demanded later
 
@@ -1349,7 +1372,7 @@ mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
     newId join_arg_ty'					( \ arg_id ->
     	getSwitchChecker				`thenSmpl` \ chkr ->
 	cont_fn (Var arg_id)				`thenSmpl` \ (binds, (_, rhs)) ->
-	returnSmpl (Lam arg_id (mkLets binds rhs))
+	returnSmpl (Lam (setOneShotLambda arg_id) (mkLets binds rhs))
     )							`thenSmpl` \ join_rhs ->
    
 	-- Build the join Id and continuation
@@ -1397,7 +1420,22 @@ mkDupableCont ty (Select _ case_bndr alts se cont) thing_inside
 
 
 mkDupableAlt :: InId -> OutId -> SimplCont -> InAlt -> SimplM (OutStuff InAlt)
+mkDupableAlt case_bndr case_bndr' (Stop _) alt@(con, bndrs, rhs)
+  | exprIsDupable rhs
+  = 	-- It is worth checking for a small RHS because otherwise we
+	-- get extra let bindings that may cause an extra iteration of the simplifier to
+	-- inline back in place.  Quite often the rhs is just a variable or constructor.
+	-- The Ord instance of Maybe in PrelMaybe.lhs, for example, took several extra
+	-- iterations because the version with the let bindings looked big, and so wasn't
+	-- inlined, but after the join points had been inlined it looked smaller, and so
+	-- was inlined.
+	--
+	-- But since the continuation is absorbed into the rhs, we only do this
+	-- for a Stop continuation.
+    returnSmpl ([], alt)
+
 mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
+  | otherwise
   =	-- Not worth checking whether the rhs is small; the
 	-- inliner will inline it if so.
     simplBinders bndrs					$ \ bndrs' ->

@@ -181,7 +181,7 @@ scanr1 _ []             =  errorEmptyList "scanr1"
 -- iterate f x == [x, f x, f (f x), ...]
 iterate :: (a -> a) -> a -> [a]
 {-# INLINE iterate #-}
-iterate f x = build (\c n -> iterateFB c f x)
+iterate f x = build (\c _n -> iterateFB c f x)
 
 iterateFB c f x = x `c` iterateFB c f (f x)
 
@@ -195,7 +195,7 @@ iterateList f x =  x : iterateList f (f x)
 -- repeat x is an infinite list, with x the value of every element.
 repeat :: a -> [a]
 {-# INLINE repeat #-}
-repeat x = build (\c n -> repeatFB c x)
+repeat x = build (\c _n -> repeatFB c x)
 
 repeatFB c x = xs where xs = x `c` xs
 repeatList x = xs where xs = x :   xs
@@ -456,15 +456,15 @@ xs !! (I# n) | n <# 0#   =  error "Prelude.(!!): negative index\n"
 %*********************************************************
 
 \begin{code}
-foldr2 k z [] 	  ys	 = z
-foldr2 k z xs 	  []	 = z
+foldr2 _k z [] 	  _ys	 = z
+foldr2 _k z _xs   []	 = z
 foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
 
-foldr2_left k z x r []     = z
-foldr2_left k z x r (y:ys) = k x y (r ys)
+foldr2_left _k  z _x _r []     = z
+foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 
-foldr2_right k z y r []     = z
-foldr2_right k z y r (x:xs) = k x y (r xs)
+foldr2_right _k z  _y _r []     = z
+foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
 -- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
@@ -526,7 +526,7 @@ zipWithFB c f x y r = (x `f` y) `c` r
 
 zipWithList                 :: (a->b->c) -> [a] -> [b] -> [c]
 zipWithList f (a:as) (b:bs) = f a b : zipWithList f as bs
-zipWithList f _      _      = []
+zipWithList _ _      _      = []
 
 {-# RULES
 "zipWithList"	forall f. foldr2 (zipWithFB (:) f) [] = zipWithList f
@@ -541,9 +541,11 @@ zipWith3 _ _ _ _        =  []
 
 -- unzip transforms a list of pairs into a pair of lists.  
 unzip    :: [(a,b)] -> ([a],[b])
+{-# INLINE unzip #-}
 unzip    =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
 unzip3   :: [(a,b,c)] -> ([a],[b],[c])
+{-# INLINE unzip3 #-}
 unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                   ([],[],[])
 \end{code}

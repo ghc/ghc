@@ -245,10 +245,10 @@ getTerminalName fd = do
     if str == nullAddr
        then do
         err <- try (queryTerminal fd)
-        either (\err -> syserr "getTerminalName")
-               (\succ -> if succ then ioError (IOError Nothing NoSuchThing
+        either (\ _err -> syserr "getTerminalName")
+               (\ succ -> if succ then ioError (IOError Nothing NoSuchThing
 						"getTerminalName" "no name")
-                         else ioError (IOError Nothing InappropriateType
+                          else ioError (IOError Nothing InappropriateType
 						"getTerminalName" "not a terminal"))
            err
        else strcpy str

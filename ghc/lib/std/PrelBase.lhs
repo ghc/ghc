@@ -55,10 +55,10 @@ class  (Eq a) => Ord a  where
 				-- be defined for an instance of Ord
 	    | otherwise = GT
 
-    x <= y  = case compare x y of { GT -> False; other -> True }
-    x <	 y  = case compare x y of { LT -> True;  other -> False }
-    x >= y  = case compare x y of { LT -> False; other -> True }
-    x >	 y  = case compare x y of { GT -> True;  other -> False }
+    x <= y  = case compare x y of { GT -> False; _other -> True }
+    x <	 y  = case compare x y of { LT -> True;  _other -> False }
+    x >= y  = case compare x y of { LT -> False; _other -> True }
+    x >	 y  = case compare x y of { GT -> True;  _other -> False }
 
 	-- These two default methods use '>' rather than compare
 	-- because the latter is often more expensive
@@ -99,6 +99,7 @@ data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 			  -- to avoid weird names like con2tag_[]#
 
 instance (Eq a) => Eq [a]  where
+    {-# SPECIALISE instance Eq [Char] #-}
     []     == []     = True	
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False			
@@ -106,6 +107,7 @@ instance (Eq a) => Eq [a]  where
     xs     /= ys     = if (xs == ys) then False else True
 
 instance (Ord a) => Ord [a] where
+    {-# SPECIALISE instance Ord [Char] #-}
     a <  b  = case compare a b of { LT -> True;  EQ -> False; GT -> False }
     a <= b  = case compare a b of { LT -> True;  EQ -> True;  GT -> False }
     a >= b  = case compare a b of { LT -> False; EQ -> True;  GT -> True  }

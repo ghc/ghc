@@ -27,7 +27,8 @@ import Id		( idType, idInfo, idName,
 			) 
 import IdInfo		( specInfo, setSpecInfo, 
 			  inlinePragInfo, setInlinePragInfo, InlinePragInfo(..),
-			  setUnfoldingInfo, setDemandInfo
+			  setUnfoldingInfo, setDemandInfo,
+			  workerInfo, setWorkerInfo
 			)
 import Demand		( wwLazy )
 import Name		( getOccName, tidyTopName, mkLocalName, isLocallyDefined )
@@ -101,7 +102,7 @@ tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> (TidyEnv, CoreBind)
 tidyBind maybe_mod env (NonRec bndr rhs)
   = let
-	(env', bndr') = tidy_bndr maybe_mod env bndr
+	(env', bndr') = tidy_bndr maybe_mod env env bndr
 	rhs'	      = tidyExpr env rhs
     in
     (env', NonRec bndr' rhs')
@@ -116,7 +117,7 @@ tidyBind maybe_mod env (Rec pairs)
 	-- So I left it out for now
 
 	(bndrs, rhss)  = unzip pairs
-	(env', bndrs') = mapAccumL (tidy_bndr maybe_mod) env bndrs
+	(env', bndrs') = mapAccumL (tidy_bndr maybe_mod env') env bndrs
 	rhss'	       = map (tidyExpr env') rhss
   in
   (env', Rec (zip bndrs' rhss'))
@@ -154,8 +155,8 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 \end{code}
 
 \begin{code}
-tidy_bndr (Just mod) env id  = tidyTopId mod env id
-tidy_bndr Nothing    env var = tidyBndr  env var
+tidy_bndr (Just mod) env_idinfo env var = tidyTopId mod env env_idinfo var
+tidy_bndr Nothing    env_idinfo env var = tidyBndr      env            var
 \end{code}
 
 
@@ -198,14 +199,18 @@ tidyId env@(tidy_env, var_env) id
     in
     ((tidy_env', var_env'), id')
 
-tidyTopId :: Module -> TidyEnv -> Id -> (TidyEnv, Id)
-tidyTopId mod env@(tidy_env, var_env) id
+tidyTopId :: Module -> TidyEnv -> TidyEnv -> Id -> (TidyEnv, Id)
+	-- The second env is the one to use for the IdInfo
+	-- It's necessary because when we are dealing with a recursive
+	-- group, a variable late in the group might be mentioned
+	-- in the IdInfo of one early in the group
+tidyTopId mod env@(tidy_env, var_env) env_idinfo id
   =	-- Top level variables
     let
 	(tidy_env', name') | isUserExportedId id = (tidy_env, idName id)
 			   | otherwise	         = tidyTopName mod tidy_env (idName id)
 	ty'	           = tidyTopType (idType id)
-	idinfo'		   = tidyIdInfo env (idInfo id)
+	idinfo'		   = tidyIdInfo env_idinfo (idInfo id)
 	id'		   = mkId name' ty' idinfo'
 	var_env'	   = extendVarEnv var_env id id'
     in
@@ -220,7 +225,7 @@ tidyTopId mod env@(tidy_env, var_env) id
 -- The latter two are to avoid space leaks
 
 tidyIdInfo env info
-  = info4
+  = info5
   where
     rules = specInfo info
 
@@ -233,6 +238,10 @@ tidyIdInfo env info
 
     info3 = info2 `setUnfoldingInfo` noUnfolding 
     info4 = info3 `setDemandInfo`    wwLazy		-- I don't understand why...
+
+    info5 = case workerInfo info of
+		Nothing -> info4
+		Just w  -> info4 `setWorkerInfo` Just (tidyVarOcc env w)
 
 tidyProtoRules :: TidyEnv -> [ProtoCoreRule] -> [ProtoCoreRule]
 tidyProtoRules env rules

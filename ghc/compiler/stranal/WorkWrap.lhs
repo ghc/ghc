@@ -4,7 +4,7 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
 \begin{code}
-module WorkWrap ( wwTopBinds, getWorkerId ) where
+module WorkWrap ( wwTopBinds ) where
 
 #include "HsVersions.h"
 
@@ -22,7 +22,7 @@ import Id		( Id, getIdStrictness, setIdArity,
 			  setIdStrictness, 
 			  setIdWorkerInfo, getIdCprInfo )
 import VarSet
-import Type		( splitAlgTyConApp_maybe )
+import Type		( isNewType )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), exactArity
 			)
@@ -205,20 +205,40 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  | (non_rec &&	-- Don't split if its non-recursive and small
-      certainlySmallEnoughToInline unfold_guidance
-     )
-	    -- No point in worker/wrappering something that is going to be
-	    -- INLINEd wholesale anyway.  If the strictness analyser is run
-	    -- twice, this test also prevents wrappers (which are INLINEd)
-	    -- from being re-done.
+  | (non_rec &&		-- Don't split if its non-recursive and small
+     certainlySmallEnoughToInline (calcUnfoldingGuidance opt_UF_CreationThreshold rhs) &&
+	-- No point in worker/wrappering something that is going to be
+	-- INLINEd wholesale anyway.  If the strictness analyser is run
+	-- twice, this test also prevents wrappers (which are INLINEd)
+	-- from being re-done.
 
-  || not (do_strict_ww || do_cpr_ww) 
+     not (null wrap_args && do_coerce_ww)
+	-- However, if we have	f = coerce T E
+	-- then we want to w/w anyway, to get
+	-- 			fw = E
+	--			f  = coerce T fw
+	-- We want to do this even if the binding is small and non-rec.
+	-- Reason: I've seen this situation:
+	--	let f = coerce T (\s -> E)
+	--	in \x -> case x of
+	--	   	    p -> coerce T' f
+	--		    q -> \s -> E2
+	-- If only we w/w'd f, we'd inline the coerce (because it's trivial)
+	-- to get
+	--	let fw = \s -> E
+	--	in \x -> case x of
+	--	   	    p -> fw
+	--		    q -> \s -> E2
+	-- Now we'll see that fw has arity 1, and will arity expand
+	-- the \x to get what we want.
+     )
+
+  || not (do_strict_ww || do_cpr_ww || do_coerce_ww) 
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
   = mkWwBodies tyvars wrap_args 
-	       (coreExprType body)
+	       body_ty 
 	       wrap_demands
 	       cpr_info
                                                 `thenUs` \ (wrap_fn, work_fn, work_demands) ->
@@ -245,7 +265,7 @@ tryWW non_rec fn_id rhs
   where
     (tyvars, wrap_args, body) = collectTyAndValBinders rhs
     n_wrap_args		      = length wrap_args
-
+    body_ty		      = coreExprType body
     strictness_info     = getIdStrictness fn_id
     has_strictness_info = case strictness_info of
 				StrictnessInfo _ _ -> True
@@ -264,13 +284,20 @@ tryWW non_rec fn_id rhs
 
     do_strict_ww = has_strictness_info && worthSplitting wrap_demands result_bot
 
+	-------------------------------------------------------------
     cpr_info     = getIdCprInfo fn_id
     has_cpr_info = case cpr_info of
 			CPRInfo _ -> True
 			other	  -> False
 
     do_cpr_ww = has_cpr_info
-    unfold_guidance = calcUnfoldingGuidance opt_UF_CreationThreshold rhs
+
+	-------------------------------------------------------------
+	-- Do the coercion thing if the body is of a newtype
+    do_coerce_ww = isNewType body_ty
+
+
+{-	July 99: removed again by Simon
 
 -- This rather (nay! extremely!) crude function looks at a wrapper function, and
 -- snaffles out the worker Id from the wrapper.
@@ -313,4 +340,5 @@ getWorkerId wrap_id wrapper_fn
     work_id_try2 (App fn _)   			 = work_id_try2 fn
     work_id_try2 (Var work_id)			 = [work_id]
     work_id_try2 other	   			 = [] 
+-}
 \end{code}

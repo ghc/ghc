@@ -19,7 +19,6 @@ import RnMonad
 import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
-import WorkWrap		( getWorkerId )
 
 import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId,
@@ -30,10 +29,10 @@ import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePragInfo,
 			  arityInfo, ppArityInfo, 
-			  strictnessInfo, ppStrictnessInfo, 
+			  strictnessInfo, ppStrictnessInfo, isBottomingStrictness,
 			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo,
-			  workerExists, workerInfo, isBottomingStrictness
+			  workerExists, workerInfo, ppWorkerInfo
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
@@ -304,7 +303,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					arity_pretty, 
 					caf_pretty,
 					cpr_pretty,
-					strict_pretty, 
+					strict_pretty,
+					wrkr_pretty,
 					unfold_pretty, 
 					ptext SLIT("##-}")]
 
@@ -317,21 +317,17 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------ CPR Info --------------
     cpr_pretty = ppCprInfo (cprInfo idinfo)
 
-    ------------  Strictness and Worker  --------------
+    ------------  Strictness  --------------
     strict_info   = strictnessInfo idinfo
+    bottoming_fn  = isBottomingStrictness strict_info
+    strict_pretty = ppStrictnessInfo strict_info
+
+    ------------  Worker  --------------
     work_info     = workerInfo idinfo
     has_worker    = workerExists work_info
-    bottoming_fn  = isBottomingStrictness strict_info
-    strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
+    wrkr_pretty   = ppWorkerInfo work_info
+    Just work_id  = work_info
 
-    wrkr_pretty | not has_worker = empty
-		| otherwise      = ppr work_id
-
---    (Just work_id) = work_info
--- Temporary fix.  We can't use the worker id saved by the w/w
--- pass because later optimisations may have changed it.  So try
--- to snaffle from the wrapper code again ...
-    work_id    = getWorkerId id rhs
 
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo idinfo

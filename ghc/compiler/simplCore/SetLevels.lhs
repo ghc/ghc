@@ -663,7 +663,7 @@ cloneVar NotTopLevel (lvl_env, subst_env) v lvl
     let
       subst	 = mkSubst emptyVarSet subst_env
       v'	 = setVarUnique v uniq
-      v''	 = apply_to_rules subst v'
+      v''	 = modifyIdInfo (substIdInfo subst) v'
       subst_env' = extendSubstEnv subst_env v (DoneEx (Var v''))
       lvl_env'   = extendVarEnv lvl_env v lvl
     in
@@ -672,20 +672,14 @@ cloneVar NotTopLevel (lvl_env, subst_env) v lvl
 cloneVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> LvlM (LevelEnv, [Id])
 cloneVars TopLevel env vs lvl 
   = returnUs (env, vs)	-- Don't clone top level things
-cloneVars NotTopLevel   (lvl_env, subst_env) vs lvl
+cloneVars NotTopLevel (lvl_env, subst_env) vs lvl
   = getUniquesUs (length vs)	`thenLvl` \ uniqs ->
     let
       subst	 = mkSubst emptyVarSet subst_env'
       vs'	 = zipWith setVarUnique vs uniqs
-      vs''	 = map (apply_to_rules subst) vs'
+      vs''	 = map (modifyIdInfo (substIdInfo subst)) vs'
       subst_env' = extendSubstEnvList subst_env vs [DoneEx (Var v'') | v'' <- vs'']
       lvl_env'   = extendVarEnvList lvl_env (vs `zip` repeat lvl)
     in
     returnUs ((lvl_env', subst_env'), vs'')
-
--- Apply the substitution to the rules
-apply_to_rules subst id
-  = modifyIdInfo go_spec id
-  where
-    go_spec info = info `setSpecInfo` substRules subst (specInfo info)
 \end{code}

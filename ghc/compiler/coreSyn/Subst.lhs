@@ -26,11 +26,10 @@ module Subst (
 	substTy, substTheta,
 
 	-- Expression stuff
-	substExpr, substRules
+	substExpr, substIdInfo
     ) where
 
 #include "HsVersions.h"
-
 
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
 			  CoreRules(..), CoreRule(..), emptyCoreRules, isEmptyCoreRules
@@ -43,7 +42,10 @@ import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
 import Id		( idType, setIdType )
-import IdInfo		( zapFragileIdInfo )
+import IdInfo		( IdInfo, zapFragileIdInfo,
+			  specInfo, setSpecInfo, 
+			  workerExists, workerInfo, setWorkerInfo, WorkerInfo
+			)
 import UniqSupply	( UniqSupply, uniqFromSupply, splitUniqSupply )
 import Var		( Var, IdOrTyVar, Id, TyVar, isTyVar, maybeModifyIdInfo )
 import Outputable
@@ -400,11 +402,36 @@ substAndCloneId subst@(Subst in_scope env) us old_id
 
 %************************************************************************
 %*									*
-\section{Rule substitution}
+\section{IdInfo substitution}
 %*									*
 %************************************************************************
 
 \begin{code}
+substIdInfo :: Subst -> IdInfo -> IdInfo
+substIdInfo subst info
+  = info2
+  where 
+    info1 | isEmptyCoreRules old_rules = info
+	  | otherwise		       = info `setSpecInfo` substRules subst old_rules
+ 
+    info2 | not (workerExists old_wrkr) = info1
+	  | otherwise			= info1 `setWorkerInfo` substWorker subst old_wrkr
+
+    old_rules = specInfo   info
+    old_wrkr  = workerInfo info
+
+substWorker :: Subst -> WorkerInfo -> WorkerInfo
+substWorker subst Nothing
+  = Nothing
+substWorker subst (Just w)
+  = case lookupSubst subst w of
+	Nothing -> Just w
+	Just (DoneEx (Var w1)) -> Just w1
+	Just (DoneEx other)    -> WARN( True, text "substWorker: DoneEx" <+> ppr w )
+				  Nothing	-- Worker has got substituted away altogether
+	Just (ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w )
+				  Nothing	-- Ditto
+			
 substRules :: Subst -> CoreRules -> CoreRules
 substRules subst (Rules rules rhs_fvs)
   = Rules (map do_subst rules)

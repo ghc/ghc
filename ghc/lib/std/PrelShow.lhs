@@ -99,13 +99,13 @@ instance  Show Int  where
     showsPrec p n = showSignedInt p n
 
 instance Show a => Show (Maybe a) where
-    showsPrec p Nothing  = showString "Nothing"
-    showsPrec p (Just x) = showString "Just " . shows x
+    showsPrec _p Nothing  = showString "Nothing"
+    showsPrec _p (Just x) = showString "Just " . shows x
 	-- Not sure I have the priorities right here
 
 instance (Show a, Show b) => Show (Either a b) where
-    showsPrec p (Left a)  = showString "Left "  . shows a
-    showsPrec p (Right b) = showString "Right " . shows b
+    showsPrec _p (Left a)  = showString "Left "  . shows a
+    showsPrec _p (Right b) = showString "Right " . shows b
 	-- Not sure I have the priorities right here
 \end{code}
 

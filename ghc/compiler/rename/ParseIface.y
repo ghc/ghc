@@ -576,31 +576,15 @@ akind		:: { Kind }
 id_info		:: { [HsIdInfo RdrName] }
 		: 	 			{ [] }
 		| id_info_item id_info		{ $1 : $2 }
-                | strict_info id_info		{ $1 ++ $2 }
 
 id_info_item	:: { HsIdInfo RdrName }
-		: '__A' arity_info		{ HsArity $2 }
+		: '__A' INTEGER			{ HsArity (exactArity (fromInteger $2)) }
 		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
                 | '__U' 		 	{ HsUnfold $1 Nothing }
+		| '__M'				{ HsCprInfo $1 }
+		| '__S'				{ HsStrictness (HsStrictnessInfo $1) }
 		| '__C'                         { HsNoCafRefs }
-
-strict_info     :: { [HsIdInfo RdrName] }
-		: cpr worker			{ ($1:$2) }
-		| strict worker			{ ($1:$2) }
-		| cpr strict worker		{ ($1:$2:$3) }
-
-cpr		:: { HsIdInfo RdrName }
-		: '__M'				{ HsCprInfo $1 }
-
-strict		:: { HsIdInfo RdrName }
-		: '__S'				{ HsStrictness (HsStrictnessInfo $1) }
-
-worker		:: { [HsIdInfo RdrName] }
-		: qvar_name 			{ [HsWorker $1] }
-		| {- nothing -}			{ [] }
-
-arity_info	:: { ArityInfo }
-		: INTEGER			{ exactArity (fromInteger $1) }
+		| '__P' qvar_name 		{ HsWorker $2 }
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }

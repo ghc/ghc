@@ -128,8 +128,8 @@ fdToHandle fd@(FD# fd#) = do
    fd_str = "<file descriptor: " ++ show (I# fd#) ++ ">"
 
 fdRead :: Fd -> ByteCount -> IO (String, ByteCount)
-fdRead fd 0 = return ("", 0)
-fdRead fd nbytes = do
+fdRead _fd 0 = return ("", 0)
+fdRead fd  nbytes = do
     bytes <-  allocChars nbytes
     rc    <-  _ccall_ read fd bytes nbytes
     case rc of

@@ -247,15 +247,15 @@ instance  Ord Integer  where
 	 }
 
 toBig (S# i) = case int2Integer# i of { (# s, d #) -> J# s d }
-toBig i@(J# s d) = i
+toBig i@(J# _ _) = i
 
 instance  Num Integer  where
     (+) i1@(S# i) i2@(S# j)
 	= case addIntC# i j of { (# r, c #) ->
 	  if c ==# 0# then S# r
 	  else toBig i1 + toBig i2 }
-    (+) i1@(J# s d) i2@(S# i)	= i1 + toBig i2
-    (+) i1@(S# i) i2@(J# s d)	= toBig i1 + i2
+    (+) i1@(J# _ _) i2@(S# _)	= i1 + toBig i2
+    (+) i1@(S# _) i2@(J# _ _)	= toBig i1 + i2
     (+) (J# s1 d1) (J# s2 d2)
       = case plusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
@@ -263,8 +263,8 @@ instance  Num Integer  where
 	= case subIntC# i j of { (# r, c #) ->
 	  if c ==# 0# then S# r
 	  else toBig i1 - toBig i2 }
-    (-) i1@(J# s d) i2@(S# i)	= i1 - toBig i2
-    (-) i1@(S# i) i2@(J# s d)	= toBig i1 - i2
+    (-) i1@(J# _ _) i2@(S# _)	= i1 - toBig i2
+    (-) i1@(S# _) i2@(J# _ _)	= toBig i1 - i2
     (-) (J# s1 d1) (J# s2 d2)
       = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
@@ -272,12 +272,12 @@ instance  Num Integer  where
 	= case mulIntC# i j of { (# r, c #) ->
 	  if c ==# 0# then S# r
 	  else toBig i1 * toBig i2 }
-    (*) i1@(J# s d) i2@(S# i)	= i1 * toBig i2
-    (*) i1@(S# i) i2@(J# s d)	= toBig i1 * i2
+    (*) i1@(J# _ _) i2@(S# _)	= i1 * toBig i2
+    (*) i1@(S# _) i2@(J# _ _)	= toBig i1 * i2
     (*) (J# s1 d1) (J# s2 d2)
       = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-    negate i@(S# (-2147483648#)) = 2147483648
+    negate (S# (-2147483648#)) = 2147483648
     negate (S# i) = S# (negateInt# i)
     negate (J# s d) = J# (negateInt# s) d
 
@@ -310,8 +310,8 @@ instance  Integral Integer where
 	--	  a `quot` b returns a small integer if a is small.
     quotRem (S# i) (S# j)         
       = case quotRem (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
-    quotRem i1@(J# s d) i2@(S# i) = quotRem i1 (toBig i2)
-    quotRem i1@(S# i) i2@(J# s d) = quotRem (toBig i1) i2
+    quotRem i1@(J# _ _) i2@(S# _) = quotRem i1 (toBig i2)
+    quotRem i1@(S# _) i2@(J# _ _) = quotRem (toBig i1) i2
     quotRem (J# s1 d1) (J# s2 d2)
       = case (quotRemInteger# s1 d1 s2 d2) of
 	  (# s3, d3, s4, d4 #)
@@ -359,8 +359,8 @@ instance  Enum Integer  where
     {-# INLINE enumFromThen #-}
     {-# INLINE enumFromTo #-}
     {-# INLINE enumFromThenTo #-}
-    enumFrom x             = build (\c n -> enumDeltaIntegerFB 	 c   x 1)
-    enumFromThen x y       = build (\c n -> enumDeltaIntegerFB 	 c   x (y-x))
+    enumFrom x             = build (\c _ -> enumDeltaIntegerFB 	 c   x 1)
+    enumFromThen x y       = build (\c _ -> enumDeltaIntegerFB 	 c   x (y-x))
     enumFromTo x lim	   = build (\c n -> enumDeltaToIntegerFB c n x 1     lim)
     enumFromThenTo x y lim = build (\c n -> enumDeltaToIntegerFB c n x (y-x) lim)
 

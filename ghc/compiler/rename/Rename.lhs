@@ -240,47 +240,69 @@ slurpImpDecls source_fvs
 
 	-- The current slurped-set records all local things
     getSlurped					`thenRn` \ source_binders ->
-    slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls1, needed1, inst_gates) ->
-
-	-- Now we can get the instance decls
-    slurpInstDecls decls1 needed1 inst_gates	`thenRn` \ (decls2, needed2) ->
+    slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls, needed) ->
 
 	-- And finally get everything else
-    closeDecls	 decls2 needed2
+    closeDecls decls needed
 
 -------------------------------------------------------
 slurpSourceRefs :: NameSet			-- Variables defined in source
 		-> FreeVars			-- Variables referenced in source
 		-> RnMG ([RenamedHsDecl],
-			 FreeVars,		-- Un-satisfied needs
-			 FreeVars)		-- "Gates"
+			 FreeVars)		-- Un-satisfied needs
 -- The declaration (and hence home module) of each gate has
 -- already been loaded
 
 slurpSourceRefs source_binders source_fvs
-  = go [] 				-- Accumulating decls
-       emptyFVs 			-- Unsatisfied needs
-       source_fvs			-- Accumulating gates
-       (nameSetToList source_fvs)	-- Gates whose defn hasn't been loaded yet
+  = go_outer [] 			-- Accumulating decls
+	     emptyFVs 			-- Unsatisfied needs
+	     emptyFVs			-- Accumulating gates
+  	     (nameSetToList source_fvs)	-- Things whose defn hasn't been loaded yet
   where
-    go decls fvs gates []
+	-- The outer loop repeatedly slurps the decls for the current gates
+	-- and the instance decls 
+
+	-- The outer loop is needed because consider
+	--	instance Foo a => Baz (Maybe a) where ...
+	-- It may be that @Baz@ and @Maybe@ are used in the source module,
+	-- but not @Foo@; so we need to chase @Foo@ too.
+	--
+	-- We also need to follow superclass refs.  In particular, 'chasing @Foo@' must
+	-- include actually getting in Foo's class decl
+	--	class Wib a => Foo a where ..
+	-- so that its superclasses are discovered.  The point is that Wib is a gate too.
+	-- We do this for tycons too, so that we look through type synonyms.
+
+    go_outer decls fvs all_gates []	
+	= returnRn (decls, fvs)
+
+    go_outer decls fvs all_gates refs	-- refs are not necessarily slurped yet
+	= traceRn (text "go_outer" <+> ppr refs)		`thenRn_`
+	  go_inner decls fvs emptyFVs refs			`thenRn` \ (decls1, fvs1, gates1) ->
+	  getImportedInstDecls (all_gates `plusFV` gates1)	`thenRn` \ inst_decls ->
+	  rnInstDecls decls1 fvs1 gates1 inst_decls		`thenRn` \ (decls2, fvs2, gates2) ->
+	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
+			       (nameSetToList (gates2 `minusNameSet` all_gates))
+		-- Knock out the all_gates because even ifwe don't slurp any new
+		-- decls we can get some apparently-new gates from wired-in names
+
+    go_inner decls fvs gates []
 	= returnRn (decls, fvs, gates)
 
-    go decls fvs gates (wanted_name:refs) 
+    go_inner decls fvs gates (wanted_name:refs) 
 	| isWiredInName wanted_name
  	= load_home wanted_name		`thenRn_`
-	  go decls fvs (gates `plusFV` getWiredInGates wanted_name) refs
+	  go_inner decls fvs (gates `plusFV` getWiredInGates wanted_name) refs
 
 	| otherwise
 	= importDecl wanted_name 		`thenRn` \ maybe_decl ->
 	  case maybe_decl of
-		-- No declaration... (already slurped, or local)
-	    Nothing   -> go decls fvs gates refs
+	    Nothing   -> go_inner decls fvs gates refs	-- No declaration... (already slurped, or local)
 	    Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 go (new_decl : decls)
-			    (fvs1 `plusFV` fvs)
-			    (gates `plusFV` getGates source_fvs new_decl)
-			    refs
+			 go_inner (new_decl : decls)
+			          (fvs1 `plusFV` fvs)
+			   	  (gates `plusFV` getGates source_fvs new_decl)
+			   	  refs
 
 	-- When we find a wired-in name we must load its
 	-- home module so that we find any instance decls therein
@@ -297,39 +319,19 @@ slurpSourceRefs source_binders source_fvs
 						returnRn ()
         where
 	  doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+
+rnInstDecls decls fvs gates []
+  = returnRn (decls, fvs, gates)
+rnInstDecls decls fvs gates (d:ds) 
+  = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
+    rnInstDecls (new_decl:decls) 
+	        (fvs1 `plusFV` fvs)
+		(gates `plusFV` getInstDeclGates new_decl)
+		ds
 \end{code}
-%
-@slurpInstDecls@ imports appropriate instance decls.
-It has to incorporate a loop, because consider
-\begin{verbatim}
-	instance Foo a => Baz (Maybe a) where ...
-\end{verbatim}
-It may be that @Baz@ and @Maybe@ are used in the source module,
-but not @Foo@; so we need to chase @Foo@ too.
+
 
 \begin{code}
-slurpInstDecls decls needed gates
-  = go decls needed gates gates
-  where
-    go decls needed all_gates new_gates
-	| isEmptyFVs new_gates
-	= returnRn (decls, needed)
-
-	| otherwise
-	= getImportedInstDecls all_gates		`thenRn` \ inst_decls ->
-	  rnInstDecls decls needed emptyFVs inst_decls	`thenRn` \ (decls1, needed1, new_gates) ->
-	  go decls1 needed1 (all_gates `plusFV` new_gates) new_gates
-
-    rnInstDecls decls fvs gates []
-	= returnRn (decls, fvs, gates)
-    rnInstDecls decls fvs gates (d:ds) 
-	= rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-	  rnInstDecls (new_decl:decls) 
-		      (fvs1 `plusFV` fvs)
-		      (gates `plusFV` getInstDeclGates new_decl)
-		      ds
-    
-
 -------------------------------------------------------
 -- closeDecls keeps going until the free-var set is empty
 closeDecls decls needed

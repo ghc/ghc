@@ -61,7 +61,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem, assocDefault )
 import Panic		( panic, assertPanic )
-import Maybes		( maybeToBool, assocMaybe )
+import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
 import Char		( isAlpha )
@@ -1067,6 +1067,12 @@ isLRAssoc fixs_assoc nm =
 
 lookupFixity :: Fixities -> Name -> Fixity
 lookupFixity fixs_assoc nm = assocDefault defaultFixity fixs_assoc nm
+
+isInfixOccName :: String -> Bool
+isInfixOccName str = 
+   case str of
+     (':':_) -> True
+     _       -> False
 
 \end{code}
 

@@ -1123,10 +1123,6 @@ wantRWHandle fun handle act =
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_
-  where
-   not_rw_error = 
-	   IOError (Just handle) IllegalOperation fun
-		   ("handle is not open for reading or writing")
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =

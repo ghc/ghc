@@ -83,6 +83,7 @@ import Name	 	( Name, OccName,
 import Const		( Con(..) )
 import PrimRep		( PrimRep )
 import PrimOp		( PrimOp )
+import TysPrim		( realWorldStatePrimTy )
 import FieldLabel	( FieldLabel(..) )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques )
@@ -371,7 +372,21 @@ idMustBeINLINEd id =  case getInlinePragma id of
 isOneShotLambda :: Id -> Bool
 isOneShotLambda id = case lbvarInfo (idInfo id) of
 			IsOneShotLambda -> True
-			NoLBVarInfo	-> False
+			NoLBVarInfo	-> idType id == realWorldStatePrimTy
+	-- The last clause is a gross hack.  It claims that 
+	-- every function over realWorldStatePrimTy is a one-shot
+	-- function.  This is pretty true in practice, and makes a big
+	-- difference.  For example, consider
+	--	a `thenST` \ r -> ...E...
+	-- The early full laziness pass, if it doesn't know that r is one-shot
+	-- will pull out E (let's say it doesn't mention r) to give
+	--	let lvl = E in a `thenST` \ r -> ...lvl...
+	-- When `thenST` gets inlined, we end up with
+	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
+	-- and we don't re-inline E.
+	--	
+	-- It would be better to spot that r was one-shot to start with, but
+	-- I don't want to rely on that.
 
 setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id

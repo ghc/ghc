@@ -178,7 +178,7 @@ getGroupProcessStatus block stopped pgid = do
 getAnyProcessStatus :: Bool -> Bool -> IO (Maybe (ProcessID, ProcessStatus))
 getAnyProcessStatus block stopped =
     getGroupProcessStatus block stopped 1	    `catch`
-    \ err -> syserr "getAnyProcessStatus"
+    \ _err -> syserr "getAnyProcessStatus"
 
 exitImmediately :: ExitCode -> IO ()
 exitImmediately exitcode = do

@@ -145,8 +145,10 @@ arrEleBottom = error "(Array.!): undefined array element"
 
 
 -----------------------------------------------------------------------
--- these also go better with magic: (//), accum, accumArray
+-- These also go better with magic: (//), accum, accumArray
+-- *** NB *** We INLINE them all so that their foldr's get to the call site
 
+{-# INLINE (//) #-}
 old_array // ivs
   = runST (do
 	-- copy the old array:
@@ -157,23 +159,25 @@ old_array // ivs
     )
 
 fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
-fill_it_in arr lst
-  = foldr fill_one_in (return ()) lst
-  where  -- **** STRICT **** (but that's OK...)
-    fill_one_in (i, v) rst
-      = writeArray arr i v >> rst
+{-# INLINE fill_it_in #-}
+fill_it_in arr lst = foldr (fill_one_in arr) (return ()) lst
+	 -- **** STRICT **** (but that's OK...)
+
+fill_one_in arr (i, v) rst = writeArray arr i v >> rst
 
 zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> MutableArray s ix elt -> [(ix,elt2)] -> ST s ()
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value
+{-# INLINE zap_with_f #-}
 
 zap_with_f f arr lst
-  = foldr zap_one (return ()) lst
-  where
-    zap_one (i, new_v) rst = do
-        old_v <- readArray  arr i
+  = foldr (zap_one f arr) (return ()) lst
+
+zap_one f arr (i, new_v) rst = do
+        old_v <- readArray arr i
 	writeArray arr i (f old_v new_v)
 	rst
 
+{-# INLINE accum #-}
 accum f old_array ivs
   = runST (do
 	-- copy the old array:
@@ -183,11 +187,12 @@ accum f old_array ivs
 	freezeArray arr
     )
 
+{-# INLINE accumArray #-}
 accumArray f zero ixs ivs
   = runST (do
-	arr# <- newArray ixs zero
-	zap_with_f f  arr# ivs
-	freezeArray arr#
+	arr <- newArray ixs zero
+	zap_with_f f arr ivs
+	freezeArray arr
     )
 \end{code}
 

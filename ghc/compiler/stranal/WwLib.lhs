@@ -26,7 +26,8 @@ import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
 			  splitForAllTys, splitFunTys, splitFunTysN,
-			  splitAlgTyConApp_maybe, mkTyConApp,
+			  splitAlgTyConApp_maybe, splitAlgTyConApp,
+			  mkTyConApp, newTypeRep, isNewType,
 			  Type
 			)
 import TyCon            ( isNewTyCon,
@@ -270,10 +271,85 @@ mkWwBodies :: [TyVar] -> [Id] -> Type		-- Original fn args and body type
 		      CoreExpr -> CoreExpr,	-- Worker body, lacking the original function body
 		      [Demand])			-- Strictness info for worker
 
-mkWwBodies tyvars args body_ty demands cpr_info
-  | allAbsent demands &&
-    isUnLiftedType body_ty
-  = 	-- Horrid special case.  If the worker would have no arguments, and the
+mkWwBodies tyvars wrap_args body_ty demands cpr_info
+  = let
+        -- demands may be longer than number of args.  If we aren't doing w/w
+        -- for strictness then demands is an infinite list of 'lazy' args.
+	wrap_args_w_demands = zipWith setIdDemandInfo wrap_args demands
+	(wrap_fn_coerce, work_fn_coerce) = mkWWcoerce body_ty
+    in
+    mkWWstr body_ty wrap_args_w_demands	`thenUs` \ (work_args_w_demands, wrap_fn_str, work_fn_str) ->
+
+    mkWWcpr body_ty cpr_info            `thenUs` \ (wrap_fn_cpr, work_fn_cpr) ->
+
+    returnUs (\ work_id -> Note InlineMe $
+			   mkLams tyvars $ mkLams wrap_args_w_demands $
+			   (wrap_fn_coerce . wrap_fn_str . wrap_fn_cpr) $
+			   mkVarApps (Var work_id) (tyvars ++ work_args_w_demands),
+
+	      \ work_body  -> mkLams tyvars $ mkLams work_args_w_demands $
+			      (work_fn_coerce . work_fn_str . work_fn_cpr) 
+			      work_body,
+
+	      map getIdDemandInfo work_args_w_demands)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Coercion stuff}
+%*									*
+%************************************************************************
+
+The "coerce" transformation is
+	f :: T1 -> T2 -> R
+	f = \xy -> e
+===>
+	f = \xy -> coerce R R' (fw x y)
+	fw = \xy -> coerce R' R e
+
+where R' is the representation type for R.
+
+\begin{code}
+mkWWcoerce body_ty 
+  | not (isNewType body_ty)
+  = (id, id)
+
+  | otherwise
+  = (wrap_fn . mkNote (Coerce body_ty rep_ty),
+     mkNote (Coerce rep_ty body_ty) . work_fn)
+  where
+    (tycon, args, _)   = splitAlgTyConApp body_ty
+    rep_ty 	       = newTypeRep tycon args
+    (wrap_fn, work_fn) = mkWWcoerce rep_ty
+\end{code}    
+
+
+
+%************************************************************************
+%*									*
+\subsection{Strictness stuff}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+mkWWstr :: Type					-- Body type
+        -> [Id]					-- Wrapper args; have their demand info on them
+        -> UniqSM ([Id],			-- Worker args; have their demand info on them
+
+		   CoreExpr -> CoreExpr,	-- Wrapper body, lacking the inner call to the worker
+						-- and without its lambdas 
+						-- At the call site, the worker args are bound
+				
+		   CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function,
+						-- and without its lambdas
+
+mkWWstr body_ty wrap_args
+  = mk_ww wrap_args		`thenUs` \ (work_args, wrap_fn, work_fn) ->
+
+    if null work_args && isUnLiftedType body_ty then
+ 	-- Horrid special case.  If the worker would have no arguments, and the
 	-- function returns a primitive type value, that would make the worker into
 	-- an unboxed value.  We box it by passing a dummy void argument, thus:
 	--
@@ -281,78 +357,44 @@ mkWwBodies tyvars args body_ty demands cpr_info
 	-- 	fw = /\abc. \v. body
 	--
 	-- We use the state-token type which generates no code
-    getUniqueUs 		`thenUs` \ void_arg_uniq ->
-    let
-	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
-    in
-    returnUs (\ work_id -> Note InlineMe $		-- Inline the wrapper
-			   mkLams tyvars $ mkLams args $
-			   mkApps (Var work_id) 
-				  (map (Type . mkTyVarTy) tyvars ++ [Var realWorldPrimId]),
-	      \ body    -> mkLams (tyvars ++ [void_arg]) body,
-	      [WwLazy True])
-
-mkWwBodies tyvars wrap_args body_ty demands cpr_info
-  | otherwise
-  = let
-        -- demands may be longer than number of args.  If we aren't doing w/w
-        -- for strictness then demands is an infinite list of 'lazy' args.
-	wrap_args_w_demands = zipWith setIdDemandInfo wrap_args demands
-    in
-    mkWW wrap_args_w_demands 		`thenUs` \ (wrap_fn, work_args_w_demands, work_fn) ->
-
-    mkWWcpr body_ty cpr_info            `thenUs` \ (wrap_fn_w_cpr, work_fn_w_cpr) ->
-
-    returnUs (\ work_id -> Note InlineMe $
-			   mkLams tyvars $ mkLams wrap_args_w_demands $
-			   (wrap_fn_w_cpr . wrap_fn) (mkTyApps (Var work_id) (mkTyVarTys tyvars)),
-
-	      \ body    -> mkLams tyvars $ mkLams work_args_w_demands $
-			   (work_fn_w_cpr . work_fn) body,
-
-	      map getIdDemandInfo work_args_w_demands)
-\end{code}    
-
-
-\begin{code}
-mkWW :: [Id]				-- Wrapper args; have their demand info on them
-     -> UniqSM (CoreExpr -> CoreExpr,	-- Wrapper body, lacking the inner call to the worker
-					-- and without its lambdas
-		[Id],			-- Worker args; have their demand info on them
-		CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function
+	getUniqueUs 		`thenUs` \ void_arg_uniq ->
+	let
+	    void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
+	in
+	returnUs ([void_arg],
+		  wrap_fn . Let (NonRec void_arg (Var realWorldPrimId)),
+		  work_fn)
+    else
+	returnUs (work_args, wrap_fn, work_fn)
+    
 
 
 	-- Empty case
-mkWW []
-  = returnUs (\ wrapper_body -> wrapper_body,
-	      [],
+mk_ww []
+  = returnUs ([],
+	      \ wrapper_body -> wrapper_body,
 	      \ worker_body  -> worker_body)
 
 
-mkWW (arg : ds)
+mk_ww (arg : ds)
   = case getIdDemandInfo arg of
 
 	-- Absent case
       WwLazy True ->
-	mkWW ds 		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-	returnUs (\ wrapper_body -> wrap_fn wrapper_body,
-		  worker_args,
-	      	  \ worker_body  -> mk_absent_let arg (work_fn worker_body))
-
+	mk_ww ds 		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	returnUs (worker_args, wrap_fn, mk_absent_let arg . work_fn)
 
 	-- Unpack case
       WwUnpack new_or_data True cs ->
 	getUniquesUs (length inst_con_arg_tys)		`thenUs` \ uniqs ->
 	let
 	  unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
-	  unpk_args_w_ds = zipWithEqual "mkWW" setIdDemandInfo unpk_args cs
+	  unpk_args_w_ds = zipWithEqual "mk_ww" setIdDemandInfo unpk_args cs
 	in
-	mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-	returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon
-					         (wrap_fn wrapper_body),
-		  worker_args,
-	          \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con 
-						       tycon_arg_tys unpk_args worker_body))
+	mk_ww (unpk_args_w_ds ++ ds)		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	returnUs (worker_args,
+	          mk_unpk_case new_or_data arg unpk_args data_con arg_tycon . wrap_fn,
+		  work_fn . mk_pk_let new_or_data arg data_con tycon_arg_tys unpk_args)
 	where
     	  inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
 	  (arg_tycon, tycon_arg_tys, data_con)
@@ -370,14 +412,19 @@ mkWW (arg : ds)
 	         Nothing		->
 			panic "mk_ww_arg_processing: not datatype"
 
-
 	-- Other cases
       other_demand ->
-	mkWW ds		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-	returnUs (\ wrapper_body -> wrap_fn (App wrapper_body (Var arg)),
-	    	  arg : worker_args, 
-		  work_fn)
+	mk_ww ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	returnUs (arg : worker_args, wrap_fn, work_fn)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{CPR stuff}
+%*									*
+%************************************************************************
+
 
 @mkWWcpr@ takes the worker/wrapper pair produced from the strictness
 info and adds in the CPR transformation.  The worker returns an
@@ -613,6 +660,4 @@ mk_unboxed_tuple contents
                  map fst contents),
        mkTyConApp (unboxedTupleTyCon (length contents)) 
                   (map snd contents))
-
-
 \end{code}

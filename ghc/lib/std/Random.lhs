@@ -63,7 +63,7 @@ instance Show StdGen where
      showSignedInt p s2
 
 instance Read StdGen where
-  readsPrec p = \ r ->
+  readsPrec _p = \ r ->
      case try_read r of
        r@[_] -> r
        _   -> [stdFromString r] -- because it shouldn't ever fail.
@@ -220,7 +220,7 @@ stdNext (StdGen s1 s2) = (z', StdGen s1'' s2'')
 		s2'' = if s2' < 0 then s2' + 2147483399 else s2'
 
 stdSplit :: StdGen -> (StdGen, StdGen)
-stdSplit std@(StdGen s1 s2) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
+stdSplit std@(StdGen s1 _) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
 	
 \end{code}
 

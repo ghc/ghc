@@ -18,7 +18,7 @@ import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap	)
+import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprGenerousArity )
 import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
@@ -287,7 +287,7 @@ where (in both cases) N is a NORMAL FORM (i.e. no redexes anywhere)
 wanting a suitable number of extra args.
 
 NB: the Ei may have unlifted type, but the simplifier (which is applied
-to the result) deals OK with this).
+to the result) deals OK with this.
 
 There is no point in looking for a combination of the two, 
 because that would leave use with some lets sandwiched between lambdas;
@@ -314,9 +314,7 @@ tryEtaExpansion rhs
     (x_bndrs, body) = collectValBinders rhs
     (fun, args)	    = collectArgs body
     trivial_args    = map exprIsTrivial args
-    fun_arity	    = case fun of
-			Var v -> arityLowerBound (getIdArity v)
-			other -> 0
+    fun_arity	    = exprGenerousArity fun
 
     bind_z_arg (arg, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
@@ -335,7 +333,7 @@ tryEtaExpansion rhs
     y_tys  = take no_extras_wanted potential_extra_arg_tys
 	
     no_extras_wanted :: Int
-    no_extras_wanted = 
+    no_extras_wanted = 0 `max`
 
 	-- We used to expand the arity to the previous arity fo the
 	-- function; but this is pretty dangerous.  Consdier
@@ -349,8 +347,9 @@ tryEtaExpansion rhs
 	-- (bndr_arity - no_of_xs)		`max`
 
 	-- See if the body could obviously do with more args
-	(fun_arity - valArgCount args)	`max`
+	(fun_arity - valArgCount args)
 
+-- This case is now deal with by exprGenerousArity
 	-- Finally, see if it's a state transformer, and xs is non-null
 	-- (so it's also a function not a thunk) in which
 	-- case we eta-expand on principle! This can waste work,
@@ -360,11 +359,11 @@ tryEtaExpansion rhs
 	--	\ x -> let {..} in \ s -> f (...) s
 	-- AND f RETURNED A FUNCTION.  That is, 's' wasn't the only
 	-- potential extra arg.
-	case (x_bndrs, potential_extra_arg_tys) of
-	    (_:_, ty:_)  -> case splitTyConApp_maybe ty of
-				  Just (tycon,_) | tycon == statePrimTyCon -> 1
-				  other					   -> 0
-	    other -> 0
+--	case (x_bndrs, potential_extra_arg_tys) of
+--	    (_:_, ty:_)  -> case splitTyConApp_maybe ty of
+--				  Just (tycon,_) | tycon == statePrimTyCon -> 1
+--				  other					   -> 0
+--	    other -> 0
 \end{code}
 
 

@@ -537,10 +537,7 @@ getInterfaceExports mod_name from
 \begin{code}
 getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameHsDecl)]
 getImportedInstDecls gates
-  = 	-- First, ensure that the home module of each gate is loaded
-    mapRn_ load_home gate_list				`thenRn_`	
-
-   	-- Next, load any orphan-instance modules that aren't aready loaded
+  =    	-- First, load any orphan-instance modules that aren't aready loaded
 	-- Orphan-instance modules are recorded in the module dependecnies
     getIfacesRn 					`thenRn` \ ifaces ->
     let
@@ -560,8 +557,8 @@ getImportedInstDecls gates
 
     traceRn (sep [text "getImportedInstDecls:", 
 		  nest 4 (fsep (map ppr gate_list)),
-		  text "Slurped" <+> int (length decls)
-			         <+> text "instance declarations"]) `thenRn_`
+		  text "Slurped" <+> int (length decls) <+> text "instance declarations",
+		  nest 4 (vcat (map ppr_brief_inst_decl decls))])	`thenRn_`
     returnRn decls
   where
     gate_list      = nameSetToList gates
@@ -571,6 +568,11 @@ getImportedInstDecls gates
 		   | otherwise
 		   = loadHomeInterface (ppr gate <+> text "is an instance gate") gate	`thenRn_`
 		     returnRn ()
+
+ppr_brief_inst_decl (mod, InstD (InstDecl inst_ty _ _ _ _))
+  = case inst_ty of
+	HsForAllTy _ _ tau -> ppr tau
+	other		   -> ppr inst_ty
 
 getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
 getImportedRules

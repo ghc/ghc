@@ -19,7 +19,7 @@ module IdInfo (
 
 	-- Arity
 	ArityInfo(..),
-	exactArity, atLeastArity, unknownArity,
+	exactArity, atLeastArity, unknownArity, hasArity,
 	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
 	-- Strictness
@@ -31,7 +31,7 @@ module IdInfo (
 
         -- Worker
         WorkerInfo, workerExists, 
-        workerInfo, setWorkerInfo,
+        workerInfo, setWorkerInfo, ppWorkerInfo,
 
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
@@ -267,6 +267,9 @@ arityLowerBound UnknownArity     = 0
 arityLowerBound (ArityAtLeast n) = n
 arityLowerBound (ArityExactly n) = n
 
+hasArity :: ArityInfo -> Bool
+hasArity UnknownArity = False
+hasArity other	      = True
 
 ppArityInfo UnknownArity	 = empty
 ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("__A"), int arity]
@@ -409,10 +412,10 @@ type WorkerInfo = Maybe Id
 {- UNUSED:
 mkWorkerInfo :: Id -> WorkerInfo
 mkWorkerInfo wk_id = Just wk_id
+-}
 
 ppWorkerInfo Nothing      = empty
-ppWorkerInfo (Just wk_id) = ppr wk_id
--}
+ppWorkerInfo (Just wk_id) = ptext SLIT("__P") <+> ppr wk_id
 
 noWorkerInfo = Nothing
 
@@ -497,6 +500,7 @@ substitution to be correct.  (They get pinned back on separately.)
 \begin{code}
 zapFragileIdInfo :: IdInfo -> Maybe IdInfo
 zapFragileIdInfo info@(IdInfo {inlinePragInfo	= inline_prag, 
+			       workerInfo	= wrkr,
 			       specInfo		= rules, 
 			       unfoldingInfo	= unfolding})
   |  not is_fragile_inline_prag 
@@ -508,6 +512,8 @@ zapFragileIdInfo info@(IdInfo {inlinePragInfo	= inline_prag,
 	-- Specialisations would need substituting.  They get pinned
 	-- back on separately.
 
+  && not (workerExists wrkr)
+
   && not (hasUnfolding unfolding)
 	-- This is very important; occasionally a let-bound binder is used
 	-- as a binder in some lambda, in which case its unfolding is utterly
@@ -518,6 +524,7 @@ zapFragileIdInfo info@(IdInfo {inlinePragInfo	= inline_prag,
 
   | otherwise
   = Just (info {inlinePragInfo	= safe_inline_prag, 
+		workerInfo	= noWorkerInfo,
 		specInfo	= emptyCoreRules,
 		unfoldingInfo	= noUnfolding})
 

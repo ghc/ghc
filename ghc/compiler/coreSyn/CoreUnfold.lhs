@@ -20,7 +20,7 @@ module CoreUnfold (
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
 	isEvaldUnfolding, isCheapUnfolding,
-	hasUnfolding,
+	hasUnfolding, hasSomeUnfolding,
 
 	couldBeSmallEnoughToInline, 
 	certainlySmallEnoughToInline, 
@@ -471,12 +471,12 @@ so we can inline if it occurs once, or is small
 callSiteInline :: Bool			-- True <=> the Id is black listed
 	       -> Bool			-- 'inline' note at call site
 	       -> Id			-- The Id
-	       -> [CoreExpr]		-- Arguments
+	       -> [Bool]		-- One for each value arg; True if it is interesting
 	       -> Bool			-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline black_listed inline_call id args interesting_cont
+callSiteInline black_listed inline_call id arg_infos interesting_cont
   = case getIdUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
@@ -487,8 +487,7 @@ callSiteInline black_listed inline_call id args interesting_cont
 	       | otherwise = Nothing
 
 	inline_prag = getInlinePragma id
-	arg_infos   = map interestingArg val_args
-	val_args    = filter isValArg args
+	n_val_args  = length arg_infos
 
 	yes_or_no =
 	    case inline_prag of
@@ -511,7 +510,7 @@ callSiteInline black_listed inline_call id args interesting_cont
 		  text "callSiteInline:oneOcc" <+> ppr id )
 		-- If it has one occurrence, not inside a lambda, PreInlineUnconditionally
 		-- should have zapped it already
-	    is_cheap && (not (null args) || interesting_cont)
+	    is_cheap && (not (null arg_infos) || interesting_cont)
 
 	  | otherwise	-- Occurs (textually) more than once, so look at its size
 	  = case guidance of
@@ -539,11 +538,10 @@ callSiteInline black_listed inline_call id args interesting_cont
 			InsideLam    -> is_cheap && small_enough
 
 		where
-		  n_args		  = length arg_infos
-		  enough_args		  = n_args >= n_vals_wanted
-		  really_interesting_cont | n_args <  n_vals_wanted = False	-- Too few args
-					  | n_args == n_vals_wanted = interesting_cont
-					  | otherwise		    = True	-- Extra args
+		  enough_args		  = n_val_args >= n_vals_wanted
+		  really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
+					  | n_val_args == n_vals_wanted = interesting_cont
+					  | otherwise		        = True	-- Extra args
 			-- This rather elaborate defn for really_interesting_cont is important
 			-- Consider an I# = INLINE (\x -> I# {x})
 			-- The unfolding guidance deems it to have size 2, and no arguments.
@@ -574,17 +572,6 @@ callSiteInline black_listed inline_call id args interesting_cont
 #endif
     result
     }
-
--- An argument is interesting if it has *some* structure
--- We are here trying to avoid unfolding a function that
--- is applied only to variables that have no unfolding
--- (i.e. they are probably lambda bound): f x y z
--- There is little point in inlining f here.
-interestingArg (Type _)	         = False
-interestingArg (App fn (Type _)) = interestingArg fn
-interestingArg (Var v)	         = hasSomeUnfolding (getIdUnfolding v)
-interestingArg other	         = True
-
 
 computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Bool -> Int
 computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used

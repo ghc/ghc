@@ -114,7 +114,7 @@ tcIdInfo unf_env name ty info info_ins
 
 \begin{code}
 tcWorkerInfo unf_env ty info worker_name
-  | arity == 0
+  | not (hasArity arity_info)
   = pprPanic "Worker with no arity info" (ppr worker_name)
  
   | otherwise
@@ -131,9 +131,10 @@ tcWorkerInfo unf_env ty info worker_name
   where
 	-- We are relying here on arity, cpr and strictness info always appearing 
 	-- before worker info,  fingers crossed ....
-      arity    = arityLowerBound (arityInfo info)
-      cpr_info = cprInfo info
-      demands  = case strictnessInfo info of
+      arity_info = arityInfo info
+      arity      = arityLowerBound arity_info
+      cpr_info   = cprInfo info
+      demands    = case strictnessInfo info of
 			StrictnessInfo d _ -> d
 			_                  -> repeat wwLazy	-- Noncommittal
 \end{code}

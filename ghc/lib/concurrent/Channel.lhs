@@ -70,14 +70,14 @@ new hole.
 
 \begin{code}
 writeChan :: Chan a -> a -> IO ()
-writeChan (Chan read write) val = do
+writeChan (Chan _read write) val = do
    new_hole <- newEmptyMVar
    old_hole <- takeMVar write
    putMVar write new_hole
    putMVar old_hole (ChItem val new_hole)
 
 readChan :: Chan a -> IO a
-readChan (Chan read write) = do
+readChan (Chan read _write) = do
   read_end		    <- takeMVar read
   (ChItem val new_read_end) <- takeMVar read_end
   putMVar read new_read_end
@@ -85,14 +85,14 @@ readChan (Chan read write) = do
 
 
 dupChan :: Chan a -> IO (Chan a)
-dupChan (Chan read write) = do
+dupChan (Chan _read write) = do
    new_read <- newEmptyMVar
    hole     <- readMVar write
    putMVar new_read hole
    return (Chan new_read write)
 
 unGetChan :: Chan a -> a -> IO ()
-unGetChan (Chan read write) val = do
+unGetChan (Chan read _write) val = do
    new_read_end <- newEmptyMVar
    read_end     <- takeMVar read
    putMVar new_read_end (ChItem val read_end)

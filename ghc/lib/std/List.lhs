@@ -253,9 +253,11 @@ transpose ((x:xs) : xss) = (x : [h | (h:t) <- xss]) : transpose (xs : [ t | (h:t
 -- predicate, respectively; i,e,,
 -- partition p xs == (filter p xs, filter (not . p) xs).
 partition		:: (a -> Bool) -> [a] -> ([a],[a])
-partition p xs		=  foldr select ([],[]) xs
-			   where select x (ts,fs) | p x       = (x:ts,fs)
-                                                  | otherwise = (ts, x:fs)
+{-# INLINE partition #-}
+partition p xs = foldr (select p) ([],[]) xs
+
+select p x (ts,fs) | p x       = (x:ts,fs)
+                   | otherwise = (ts, x:fs)
 \end{code}
 
 @mapAccumL@ behaves like a combination

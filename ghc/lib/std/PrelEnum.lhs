@@ -72,8 +72,8 @@ instance Bounded () where
     maxBound = ()
 
 instance Enum () where
-    succ x      = error "Prelude.Enum.().succ: bad argment"
-    pred x      = error "Prelude.Enum.().pred: bad argument"
+    succ _      = error "Prelude.Enum.().succ: bad argment"
+    pred _      = error "Prelude.Enum.().pred: bad argument"
 
     toEnum x | x == zeroInt = ()
              | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
@@ -153,7 +153,7 @@ instance Enum Ordering where
   toEnum n | n == zeroInt = LT
 	   | n == oneInt  = EQ
 	   | n == twoInt  = GT
-  toEnum n = error "Prelude.Enum.Ordering.toEnum: bad argment"
+  toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argment"
 
   fromEnum LT = zeroInt
   fromEnum EQ = oneInt
@@ -176,10 +176,10 @@ instance  Bounded Char  where
     maxBound =  '\255'
 
 instance  Enum Char  where
-    succ     c@(C# c#)
+    succ (C# c#)
        | not (ord# c# ==# 255#) = C# (chr# (ord# c# +# 1#))
        | otherwise	        = error ("Prelude.Enum.Char.succ: bad argument")
-    pred     c@(C# c#)
+    pred (C# c#)
        | not (ord# c# ==# 0#)   = C# (chr# (ord# c# -# 1#))
        | otherwise	        = error ("Prelude.Enum.Char.pred: bad argument")
 

@@ -25,7 +25,7 @@ import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Const		( Con(..), Literal(..) )
-import Id		( isSpecPragmaId,
+import Id		( isSpecPragmaId, isOneShotLambda,
 			  getInlinePragma, setInlinePragma,
 			  isExportedId, modifyIdInfo, idInfo,
 			  getIdSpecialisation, 
@@ -635,7 +635,7 @@ occAnal env expr@(Lam _ _)
      mkLams tagged_binders body') }
   where
     (binders, body)    = collectBinders expr
-    (linear, env_body) = getCtxt env (count isId binders)
+    (linear, env_body) = oneShotGroup env (filter isId binders)
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 
@@ -764,11 +764,15 @@ addNewCand (OccEnv ifun cands ctxt) id
 setCtxt :: OccEnv -> CtxtTy -> OccEnv
 setCtxt (OccEnv ifun cands _) ctxt = OccEnv ifun cands ctxt
 
-getCtxt :: OccEnv -> Int -> (Bool, OccEnv)	-- True <=> this is a linear lambda
-						-- The Int is the number of lambdas
-getCtxt env@(OccEnv ifun cands []) n = (False, env)
-getCtxt (OccEnv ifun cands ctxt)   n = (and (take n ctxt), OccEnv ifun cands (drop n ctxt))
-		-- Only return True if *all* the lambdas are linear
+oneShotGroup :: OccEnv -> [Id] -> (Bool, OccEnv)	-- True <=> this is a one-shot linear lambda group
+							-- The [Id] are the binders
+oneShotGroup (OccEnv ifun cands ctxt) bndrs 
+  = (go bndrs ctxt, OccEnv ifun cands (drop (length bndrs) ctxt))
+  where
+	-- Only return True if *all* the lambdas are linear
+    go (bndr:bndrs) (lin:ctxt) 	= (lin || isOneShotLambda bndr) && go bndrs ctxt
+    go []	    ctxt       	= True
+    go bndrs	    []         	= all isOneShotLambda bndrs
 
 zapCtxt env@(OccEnv ifun cands []) = env
 zapCtxt     (OccEnv ifun cands _ ) = OccEnv ifun cands []

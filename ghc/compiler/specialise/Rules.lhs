@@ -159,7 +159,17 @@ matchRule in_scope (Rule rn tpl_vars tpl_args rhs) args
 
 	-- One tiresome way to terminate: check for excess unmatched
 	-- template arguments
-   go tpl_args		 []	    subst 
+   go tpl_args		 []	    subst = Nothing	-- Failure
+
+
+{-	The code below tries to match even if there are more 
+	template args than real args.
+
+	I now think this is probably a bad idea.
+	Should the template (map f xs) match (map g)?  I think not.
+	For a start, in general eta expansion wastes work.
+	SLPJ July 99
+
       = case eta_complete tpl_args (mkVarSet leftovers) of
 	    Just leftovers' -> Just (rn, mkLams done (mkLams leftovers' rhs), 
 				     mk_result_args subst done)
@@ -188,6 +198,7 @@ matchRule in_scope (Rule rn tpl_vars tpl_args rhs) args
 		Nothing    -> Nothing
 
    eta_complete other vars = Nothing
+-}
 
    -----------------------
    mk_result_args subst vs = map go vs
@@ -197,6 +208,7 @@ matchRule in_scope (Rule rn tpl_vars tpl_args rhs) args
 			Just (DoneEx ex) -> ex
 			Just (DoneTy ty) -> Type ty
 			-- Substitution should bind them all!
+
 
 zapOccInfo bndr | isTyVar bndr = bndr
 		| otherwise    = maybeModifyIdInfo zapLamIdInfo bndr

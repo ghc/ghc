@@ -25,14 +25,15 @@ module Type (
 
 	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
-	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, splitFunTysN, funResultTy,
+	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, splitFunTysN,
+	funResultTy, funArgTy,
 	zipFunTys,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
-	mkSynTy, isSynTy, deNoteType, repType,
+	mkSynTy, isSynTy, deNoteType, repType, newTypeRep,
 
         mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
 
@@ -45,7 +46,7 @@ module Type (
 	mkSigmaTy, splitSigmaTy,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType,
+	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
 	typePrimRep,
 
 	-- Free variables
@@ -450,6 +451,11 @@ funResultTy :: Type -> Type
 funResultTy (FunTy arg res) = res
 funResultTy (NoteTy _ ty)   = funResultTy ty
 funResultTy ty		    = pprPanic "funResultTy" (pprType ty)
+
+funArgTy :: Type -> Type
+funArgTy (FunTy arg res) = arg
+funArgTy (NoteTy _ ty)   = funArgTy ty
+funArgTy ty		 = pprPanic "funArgTy" (pprType ty)
 \end{code}
 
 
@@ -579,12 +585,18 @@ interested in newtypes anymore.
 
 \begin{code}
 repType :: Type -> Type
-repType (NoteTy _ ty)     = repType ty
-repType (ForAllTy _ ty)   = repType ty
-repType (TyConApp tc tys) | isNewTyCon tc	
-			  = case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
-				Just (rep_ty, _) -> repType rep_ty
-repType other_ty	  = other_ty
+repType (NoteTy _ ty)     		  = repType ty
+repType (ForAllTy _ ty)   		  = repType ty
+repType (TyConApp tc tys) | isNewTyCon tc = repType (newTypeRep tc tys)
+repType other_ty	  		  = other_ty
+
+newTypeRep :: TyCon -> [Type] -> Type
+-- The representation type for (T t1 .. tn), where T is a newtype 
+-- Looks through one layer only
+newTypeRep tc tys 
+  = ASSERT( isNewTyCon tc )
+    case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
+	Just (rep_ty, _) -> rep_ty
 \end{code}
 
 
@@ -983,6 +995,12 @@ isDataType :: Type -> Bool
 isDataType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
 					      isDataTyCon tc
+			other		   -> False
+
+isNewType :: Type -> Bool
+isNewType ty = case splitTyConApp_maybe ty of
+			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+					      isNewTyCon tc
 			other		   -> False
 
 typePrimRep :: Type -> PrimRep

@@ -128,15 +128,11 @@ floatBind :: IdEnv Level
 	  -> (FloatStats, FloatBinds, CoreBind, IdEnv Level)
 
 floatBind env lvl (NonRec (name,level) rhs)
-  = case (floatExpr env level rhs) of { (fs, rhs_floats, rhs') ->
-
-	-- A good dumping point
-    case (partitionByMajorLevel level rhs_floats) of { (rhs_floats', heres) ->
-
-    (fs, rhs_floats',
-     NonRec name (install heres rhs'),
+  = case (floatRhs env level rhs) of { (fs, rhs_floats, rhs') ->
+    (fs, rhs_floats,
+     NonRec name rhs',
      extendVarEnv env name level)
-    }}
+    }
 
 floatBind env lvl bind@(Rec pairs)
   = case (unzip3 (map do_pair pairs)) of { (fss, rhss_floats, new_pairs) ->
@@ -172,13 +168,9 @@ floatBind env lvl bind@(Rec pairs)
     bind_level = getBindLevel bind
 
     do_pair ((name, level), rhs)
-      = case (floatExpr new_env level rhs) of { (fs, rhs_floats, rhs') ->
-
-		-- A good dumping point
-	case (partitionByMajorLevel level rhs_floats) of { (rhs_floats', heres) ->
-
-	(fs, rhs_floats', (name, install heres rhs'))
-	}}
+      = case (floatRhs new_env level rhs) of { (fs, rhs_floats, rhs') ->
+	(fs, rhs_floats, (name, rhs'))
+	}
 \end{code}
 
 %************************************************************************
@@ -188,20 +180,32 @@ floatBind env lvl bind@(Rec pairs)
 %************************************************************************
 
 \begin{code}
-floatExpr :: IdEnv Level
-	  -> Level
-	  -> LevelledExpr
-	  -> (FloatStats, FloatBinds, CoreExpr)
+floatExpr, floatRhs
+	 :: IdEnv Level
+	 -> Level
+	 -> LevelledExpr
+	 -> (FloatStats, FloatBinds, CoreExpr)
+
+floatRhs env lvl arg
+  = case (floatExpr env lvl arg) of { (fsa, floats, arg') ->
+    case (partitionByMajorLevel lvl floats) of { (floats', heres) ->
+	-- Dump bindings that aren't going to escape from a lambda
+	-- This is to avoid floating the x binding out of
+	--	f (let x = e in b)
+	-- unnecessarily.  It even causes a bug to do so if we have
+	--	y = writeArr# a n (let x = e in b)
+	-- because the y binding is an expr-ok-for-speculation one.
+    (fsa, floats', install heres arg') }}
 
 floatExpr env _ (Var v)	     = (zeroStats, [], Var v)
 floatExpr env _ (Type ty)    = (zeroStats, [], Type ty)
 floatExpr env lvl (Con con as) 
-  = case floatList (floatExpr env lvl) as of { (stats, floats, as') ->
+  = case floatList (floatRhs env lvl) as of { (stats, floats, as') ->
     (stats, floats, Con con as') }
 	  
 floatExpr env lvl (App e a)
   = case (floatExpr env lvl e) of { (fse, floats_e, e') ->
-    case (floatExpr env lvl a) of { (fsa, floats_a, a') ->
+    case (floatRhs env lvl a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e ++ floats_a, App e' a') }}
 
 floatExpr env lvl (Lam (tv,incd_lvl) e)
@@ -355,8 +359,10 @@ partitionByMajorLevel, partitionByLevel
 partitionByMajorLevel ctxt_lvl defns
   = partition float_further defns
   where
-    float_further (my_lvl, _) = my_lvl `ltMajLvl` ctxt_lvl ||
-				isTopLvl my_lvl
+    float_further (my_lvl, _) = my_lvl `lt_major` ctxt_lvl
+
+my_lvl `lt_major`  ctxt_lvl = my_lvl `ltMajLvl` ctxt_lvl ||
+			      isTopLvl my_lvl
 
 partitionByLevel ctxt_lvl defns
   = partition float_further defns

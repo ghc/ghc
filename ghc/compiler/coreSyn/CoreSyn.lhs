@@ -10,7 +10,7 @@ module CoreSyn (
 	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
 
 	mkLets, mkLams,
-	mkApps, mkTyApps, mkValApps,
+	mkApps, mkTyApps, mkValApps, mkVarApps,
 	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote,
 	bindNonRec, mkIfThenElse, varToCoreExpr,
 
@@ -171,10 +171,12 @@ type TaggedAlt  t = Alt  (Tagged t)
 mkApps    :: Expr b -> [Arg b]  -> Expr b
 mkTyApps  :: Expr b -> [Type]   -> Expr b
 mkValApps :: Expr b -> [Expr b] -> Expr b
+mkVarApps :: CoreExpr -> [IdOrTyVar] -> CoreExpr
 
 mkApps    f args = foldl App		  	   f args
 mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
 mkValApps f args = foldl (\ e a -> App e a)	   f args
+mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 
 mkLit       :: Literal -> Expr b
 mkStringLit :: String  -> Expr b

@@ -327,7 +327,7 @@ writeInt16Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
            (# s2# , v# #) ->
 	      let w' = word2Int# (int2Word# i# `or#` (int2Word# v# `and#` mask))
 	      in
-              case writeIntArray# arr# (n# `quotInt#` 2#) w' s#  of
+              case writeIntArray# arr# (n# `quotInt#` 2#) w' s2#  of
                 s2# -> (# s2# , () #) 
 
 writeInt32Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->

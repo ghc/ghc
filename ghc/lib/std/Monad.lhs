@@ -83,12 +83,15 @@ sequence []     = return []
 sequence (m:ms) = do { x <- m; xs <- sequence ms; return (x:xs) }
 
 sequence_        :: Monad m => [m a] -> m () 
+{-# INLINE sequence_ #-}
 sequence_        =  foldr (>>) (return ())
 
 mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
+{-# INLINE mapM #-}
 mapM f as       =  sequence (map f as)
 
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
+{-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
 
 guard           :: MonadPlus m => Bool -> m ()
@@ -108,6 +111,7 @@ filterM  predM (x:xs) = do
 -- This subsumes the list-based concat function.
 
 msum        :: MonadPlus m => [m a] -> m a
+{-# INLINE msum #-}
 msum        =  foldr mplus mzero
  
 {-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}

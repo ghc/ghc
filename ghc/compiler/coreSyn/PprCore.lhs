@@ -24,7 +24,8 @@ import IdInfo		( IdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
-			  cprInfo, ppCprInfo, lbvarInfo
+			  cprInfo, ppCprInfo, lbvarInfo,
+			  workerInfo, ppWorkerInfo
 			)
 import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
@@ -344,6 +345,7 @@ ppIdInfo info
 	    ppFlavourInfo (flavourInfo info),
 	    ppArityInfo a,
 	    ppUpdateInfo u,
+	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
 	    ppr d,
 	    ppCafInfo c,

@@ -775,6 +775,11 @@ sub setupOptimiseFlags {
 	'-fcse',	# CSE must immediately follow a simplification pass, because it relies
 			# on the no-shadowing invariant.  See comments at the top of CSE.lhs
 		 
+	'-ffull-laziness',	# nofib/spectral/hartel/wang doubles in speed if you
+				# do full laziness late in the day.  It only happens
+				# after fusion and other stuff, so the early pass doesn't
+				# catch it.  For the record, the redex is 
+				#	f_el22 (f_el21 r_midblock)
 	'-ffloat-inwards',
 
 # Case-liberation for -O2.  This should be after

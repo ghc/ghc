@@ -84,7 +84,7 @@ runProcess path args env dir stdin stdout stderr = do
     pid <- forkProcess
     case pid of
       Nothing -> doTheBusiness
-      Just x  -> return ()
+      Just _  -> return ()
   where
     doTheBusiness :: IO ()
     doTheBusiness = do

@@ -80,7 +80,7 @@ instance  Ix Char  where
     range (m,n) = [m..n]
 
     {-# INLINE unsafeIndex #-}
-    unsafeIndex (m,n) i = fromEnum i - fromEnum m
+    unsafeIndex (m,_n) i = fromEnum i - fromEnum m
 
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Char"
@@ -95,7 +95,7 @@ instance  Ix Int  where
     range (m,n) = [m..n]
 
     {-# INLINE unsafeIndex #-}
-    unsafeIndex (m,n) i = i - m
+    unsafeIndex (m,_n) i = i - m
 
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Int"
@@ -109,7 +109,7 @@ instance  Ix Integer  where
     range (m,n) = [m..n]
 
     {-# INLINE unsafeIndex #-}
-    unsafeIndex (m,n) i   = fromInteger (i - m)
+    unsafeIndex (m,_n) i   = fromInteger (i - m)
 
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Integer"
@@ -249,13 +249,13 @@ in the range for an @Ix@ pair.
 {-# SPECIALISE unsafeRangeSize :: (Int,Int) -> Int #-}
 {-# SPECIALISE unsafeRangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
 unsafeRangeSize :: (Ix a) => (a,a) -> Int
-unsafeRangeSize b@(l,h) = unsafeIndex b h + 1
+unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 {-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
 {-# SPECIALISE rangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
 rangeSize :: (Ix a) => (a,a) -> Int
-rangeSize b@(l,h) | inRange b h = unsafeIndex b h + 1
-		  | otherwise   = 0
+rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
+		   | otherwise   = 0
 
 -- Note that the following is NOT right
 --	rangeSize (l,h) | l <= h    = index b h + 1

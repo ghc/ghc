@@ -7,9 +7,10 @@
 module CoreUtils (
 	coreExprType, coreAltsType,
 
-	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, exprIsValue,
+	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
+	exprIsValue,
 	exprOkForSpeculation, exprIsBig, hashExpr,
-	exprArity,
+	exprArity, exprGenerousArity,
 	cheapEqExpr, eqExpr, applyTypeToArgs
     ) where
 
@@ -192,13 +193,6 @@ exprIsCheap (Var _)         	= True
 exprIsCheap (Con con args)  	= conIsCheap con && all exprIsCheap args
 exprIsCheap (Note _ e)      	= exprIsCheap e
 exprIsCheap (Lam x e)       	= if isId x then True else exprIsCheap e
-
---	I'm not at all convinced about these two!!
---	[SLPJ June 99]
--- exprIsCheap (Let bind body) 	= all exprIsCheap (rhssOfBind bind) && exprIsCheap body
--- exprIsCheap (Case scrut _ alts) = exprIsCheap scrut && 
---		  		     all (\(_,_,rhs) -> exprIsCheap rhs) alts
-
 exprIsCheap other_expr   -- look for manifest partial application
   = case collectArgs other_expr of
 	(f, args) -> isPap f (valArgCount args) && all exprIsCheap args
@@ -224,9 +218,20 @@ isPap (Var f) n_val_args
 isPap fun n_val_args = False
 \end{code}
 
-exprOkForSpeculation returns True of an UNLIFTED-TYPE expression that it is safe
-to evaluate even if normal order eval might not evaluate the expression 
-at all.  E.G.
+exprOkForSpeculation returns True of an expression that it is
+
+	* safe to evaluate even if normal order eval might not 
+	  evaluate the expression at all, or
+
+	* safe *not* to evaluate even if normal order would do so
+
+It returns True iff
+
+	the expression guarantees to terminate, 
+	soon, 
+	without raising an exceptoin
+
+E.G.
 	let x = case y# +# 1# of { r# -> I# r# }
 	in E
 ==>
@@ -240,26 +245,17 @@ side effects, and can't diverge or raise an exception.
 
 \begin{code}
 exprOkForSpeculation :: CoreExpr -> Bool
-exprOkForSpeculation (Var v)        = True	-- Unlifted type => already evaluated
-
+exprOkForSpeculation (Var v)        	  = isUnLiftedType (idType v)
 exprOkForSpeculation (Note _ e)     	  = exprOkForSpeculation e
-exprOkForSpeculation (Let (NonRec b r) e) = isUnLiftedType (idType b) && 
-					    exprOkForSpeculation r && 
-					    exprOkForSpeculation e
-exprOkForSpeculation (Let (Rec _) _) = False
-exprOkForSpeculation (Case _ _ _)    = False	-- Conservative
-exprOkForSpeculation (App _ _)       = False
 
 exprOkForSpeculation (Con con args)
   = conOkForSpeculation con &&
     and (zipWith ok (filter isValArg args) (fst (conStrictness con)))
   where
     ok arg demand | isLazy demand = True
-		  | isPrim demand = exprOkForSpeculation arg
-		  | otherwise	  = False
+		  | otherwise	  = exprOkForSpeculation arg
 
-exprOkForSpeculation other = panic "exprOkForSpeculation"
-	-- Lam, Type
+exprOkForSpeculation other = False	-- Conservative
 \end{code}
 
 
@@ -304,9 +300,63 @@ exprIsValue e@(App _ _)   = case collectArgs e of
 
 \begin{code}
 exprArity :: CoreExpr -> Int	-- How many value lambdas are at the top
-exprArity (Lam b e) | isTyVar b = exprArity e
-		    | otherwise = 1 + exprArity e
-exprArity other			= 0
+exprArity (Lam b e)     | isTyVar b	= exprArity e
+		        | otherwise	= 1 + exprArity e
+exprArity (Note note e) | ok_note note	= exprArity e
+exprArity other				= 0
+\end{code}
+
+
+\begin{code}
+exprGenerousArity :: CoreExpr -> Int 	-- The number of args the thing can be applied to
+					-- without doing much work
+-- This is used when eta expanding
+--	e  ==>  \xy -> e x y
+--
+-- It returns 1 (or more) to:
+--	case x of p -> \s -> ...
+-- because for I/O ish things we really want to get that \s to the top.
+-- We are prepared to evaluate x each time round the loop in order to get that
+-- Hence "generous" arity
+
+exprGenerousArity (Var v)         	= arityLowerBound (getIdArity v)
+exprGenerousArity (Note note e)	
+  | ok_note note			= exprGenerousArity e
+exprGenerousArity (Lam x e) 
+  | isId x    				= 1 + exprGenerousArity e
+  | otherwise 				= exprGenerousArity e
+exprGenerousArity (Let bind body) 	
+  | all exprIsCheap (rhssOfBind bind)	= exprGenerousArity body
+exprGenerousArity (Case scrut _ alts)
+  | exprIsCheap scrut			= min_zero [exprGenerousArity rhs | (_,_,rhs) <- alts]
+exprGenerousArity other 		= 0	-- Could do better for applications
+
+min_zero :: [Int] -> Int	-- Find the minimum, but zero is the smallest
+min_zero (x:xs) = go x xs
+		where
+		  go 0   xs		    = 0		-- Nothing beats zero
+		  go min []	  	    = min
+		  go min (x:xs) | x < min   = go x xs
+				| otherwise = go min xs 
+
+ok_note (SCC _)	     = False	-- (Over?) conservative
+ok_note (TermUsg _)  = False	-- Doesn't matter much
+
+ok_note (Coerce _ _) = True
+	-- We *do* look through coerces when getting arities.
+	-- Reason: arities are to do with *representation* and
+	-- work duplication. 
+
+ok_note InlineCall   = True
+ok_note InlineMe     = False
+	-- This one is a bit more surprising, but consider
+	--	f = _inline_me (\x -> e)
+	-- We DO NOT want to eta expand this to
+	--	f = \x -> (_inline_me (\x -> e)) x
+	-- because the _inline_me gets dropped now it is applied, 
+	-- giving just
+	--	f = \x -> e
+	-- A Bad Idea
 \end{code}
 
 
