@@ -762,7 +762,7 @@ Windows and Unix, as follows: layout:</para>
 <itemizedlist>
 <listitem>
 <para>On Win32, the <filename>$(libdir)/bin</filename> directory contains user-visible binaries; 
-add it to you <filename>PATH</filename>.  The <filename>ghci</filename> executable is a <filename>.bat</filename>
+add it to your <filename>PATH</filename>.  The <filename>ghci</filename> executable is a <filename>.bat</filename>
 file which invokes <filename>ghc</filename>.   </para>
 
 <para>The GHC executable is the Real Thing (no intervening
