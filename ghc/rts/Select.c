@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.19 2001/11/13 13:38:02 simonmar Exp $
+ * $Id: Select.c,v 1.20 2002/07/09 20:44:24 sof Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -86,12 +86,14 @@ awaitEvent(rtsBool wait)
     int maxfd = -1;
 #endif
     rtsBool select_succeeded = rtsTrue;
+    rtsBool unblock_all = rtsFalse;
+    static rtsBool prev_unblocked_all = rtsFalse;
     struct timeval tv;
     lnat min, ticks;
 
     tv.tv_sec  = 0;
     tv.tv_usec = 0;
-
+    
     IF_DEBUG(scheduler,
 	     belch("scheduler: checking for threads blocked on I/O");
 	     if (wait) {
@@ -174,17 +176,36 @@ awaitEvent(rtsBool wait)
 
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
 	  if (errno != EINTR) {
-
-	      printf("%d\n", errno);
-	      fflush(stdout);
-	      perror("select");
+	    /* Handle bad file descriptors by unblocking all the
+	       waiting threads. Why? Because a thread might have been
+	       a bit naughty and closed a file descriptor while another
+	       was blocked waiting. This is less-than-good programming
+	       practice, but having the RTS as a result fall over isn't
+	       acceptable, so we simply unblock all the waiting threads
+	       should we see a bad file descriptor & give the threads
+	       a chance to clean up their act. 
+	       
+	       To avoid getting stuck in a loop, repeated EBADF failures
+	       are 'handled' through barfing.
+	    */
+	    if ( errno == EBADF && !prev_unblocked_all) {
+	      unblock_all = rtsTrue;
+	      prev_unblocked_all = rtsTrue;
+	      break;
+	    } else {
+ 	      fprintf(stderr,"%d\n", errno);
+ 	      fflush(stderr);
+ 	      perror("select");
 	      barf("select failed");
+	    }
 	  }
 #else /* on mingwin */
       while (1) {
 	  Sleep(0); /* don't busy wait */
 #endif /* mingw32_TARGET_OS */
 	  ACQUIRE_LOCK(&sched_mutex);
+
+	  prev_unblocked_all = rtsFalse;
 
 #ifndef mingw32_TARGET_OS
 	  /* We got a signal; could be one of ours.  If so, we need
@@ -227,15 +248,15 @@ awaitEvent(rtsBool wait)
        */
 
       prev = NULL;
-      if (select_succeeded) {
+      if (select_succeeded || unblock_all) {
 	  for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
 	      next = tso->link;
 	      switch (tso->why_blocked) {
 	      case BlockedOnRead:
-		  ready = FD_ISSET(tso->block_info.fd, &rfd);
+		  ready = unblock_all || FD_ISSET(tso->block_info.fd, &rfd);
 		  break;
 	      case BlockedOnWrite:
-		  ready = FD_ISSET(tso->block_info.fd, &wfd);
+		  ready = unblock_all || FD_ISSET(tso->block_info.fd, &wfd);
 		  break;
 	      default:
 		  barf("awaitEvent");
