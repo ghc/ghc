@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.64 2001/01/10 16:28:15 qrczak Exp $
+% $Id: PrelHandle.lhs,v 1.65 2001/01/11 07:04:16 qrczak Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -64,7 +64,8 @@ mkBuffer__ fo sz_in_bytes = do
     _ -> do
      chunk <- malloc sz_in_bytes
      if chunk == nullAddr
-      then ioException (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
+      then ioException (IOError Nothing ResourceExhausted
+	  "mkBuffer__" "not enough virtual memory" Nothing)
       else return chunk
  setBuf fo chunk sz_in_bytes
 \end{code}
@@ -520,8 +521,9 @@ hSetBuffering handle mode =
 		         (IOError (Just handle)
 				  InvalidArgument
 			          "hSetBuffering"
-				  ("illegal buffer size " ++ showsPrec 9 n []))  
+				  ("illegal buffer size " ++ showsPrec 9 n [])
 					-- 9 => should be parens'ified.
+				  Nothing)
       _ ->
           withHandle__ handle $ \ handle_ -> do
           case haType__ handle_ of
@@ -937,21 +939,18 @@ ioeGetFileName        :: IOError -> Maybe FilePath
 ioeGetErrorString     :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
 
-ioeGetHandle (IOException (IOError h _ _ _))   = h
+ioeGetHandle (IOException (IOError h _ _ _ _)) = h
 ioeGetHandle (UserError _) = Nothing
 ioeGetHandle _ = error "IO.ioeGetHandle: not an IO error"
 
-ioeGetErrorString (IOException (IOError _ iot _ str)) =
+ioeGetErrorString (IOException (IOError _ iot _ str _)) =
   case iot of
     EOF -> "end of file"
     _   -> str
 ioeGetErrorString (UserError str) = str
 ioeGetErrorString _ = error "IO.ioeGetErrorString: not an IO error"
 
-ioeGetFileName (IOException (IOError _ _  _ str)) = 
-  case break (== ':') str of
-    (_, [])      -> Nothing
-    (_, _:' ':fs)-> Just fs
+ioeGetFileName (IOException (IOError _ _ _ _ fn)) = fn
 ioeGetFileName (UserError _) = Nothing
 ioeGetFileName _ = error "IO.ioeGetFileName: not an IO error"
 \end{code}
@@ -1023,8 +1022,8 @@ wantReadableHandle fun handle act =
       _ 		   -> act handle_
   where
    not_readable_error = 
-	   IOError (Just handle) IllegalOperation fun	
-		   ("handle is not open for reading")
+	IOError (Just handle) IllegalOperation fun	
+		"handle is not open for reading" Nothing
 
 wantWriteableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWriteableHandle fun handle act = 
@@ -1040,12 +1039,12 @@ checkWriteableHandle fun handle handle_ act
   = case haType__ handle_ of 
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
-      ReadHandle 	   -> ioError not_writeable_error
+      ReadHandle 	   -> ioException not_writeable_error
       _ 		   -> act
   where
    not_writeable_error = 
-	   IOException (IOError (Just handle) IllegalOperation fun
-		   			("handle is not open for writing"))
+	IOError (Just handle) IllegalOperation fun
+		"handle is not open for writing" Nothing
 
 wantRWHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantRWHandle fun handle act = 
@@ -1069,8 +1068,8 @@ access to a closed file.
 
 \begin{code}
 ioe_closedHandle :: String -> Handle -> IO a
-ioe_closedHandle fun h = ioError (IOException (IOError (Just h) IllegalOperation fun 
-					"handle is closed"))
+ioe_closedHandle fun h = ioException (IOError (Just h) IllegalOperation fun
+			     "handle is closed" Nothing)
 \end{code}
 
 Internal helper functions for Concurrent Haskell implementation

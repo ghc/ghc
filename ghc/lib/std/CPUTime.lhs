@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: CPUTime.lhs,v 1.25 2000/09/14 13:46:42 simonpj Exp $
+% $Id: CPUTime.lhs,v 1.26 2001/01/11 07:04:16 qrczak Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -55,7 +55,8 @@ getCPUTime = do
      else
 	ioException (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
-		         "can't get CPU time")
+		         "can't get CPU time"
+			 Nothing)
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % 

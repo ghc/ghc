@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.30 2001/01/10 16:28:15 qrczak Exp $
+% $Id: PrelIOBase.lhs,v 1.31 2001/01/11 07:04:16 qrczak Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -362,7 +362,8 @@ malloc :: Int -> IO Addr
 malloc sz = do
   a <- _malloc sz
   if (a == nullAddr)
-	then ioException (IOError Nothing ResourceExhausted "malloc" "")
+	then ioException (IOError Nothing ResourceExhausted
+	    "malloc" "out of memory" Nothing)
 	else return a
 
 foreign import "malloc" unsafe _malloc :: Int -> IO Addr
@@ -496,15 +497,16 @@ type IOError = Exception
 
 data IOException
  = IOError
-     (Maybe Handle)  -- the handle used by the action flagging the
-		     -- the error.
-     IOErrorType     -- what it was.
-     String	     -- location
-     String          -- error type specific information.
+     (Maybe Handle)   -- the handle used by the action flagging the
+		      --   the error.
+     IOErrorType      -- what it was.
+     String	      -- location.
+     String           -- error type specific information.
+     (Maybe FilePath) -- filename the error is related to.
 
 instance Eq IOException where
-  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
-    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
+  (IOError h1 e1 loc1 str1 fn1) == (IOError h2 e2 loc2 str2 fn2) = 
+    e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && fn1==fn2
 
 data IOErrorType
   = AlreadyExists        | HardwareFault
@@ -559,36 +561,36 @@ Predicates on IOError; little effort made on these so far...
 \begin{code}
 
 isAlreadyExistsError :: IOError -> Bool
-isAlreadyExistsError (IOException (IOError _ AlreadyExists _ _)) = True
-isAlreadyExistsError _		                   		 = False
+isAlreadyExistsError (IOException (IOError _ AlreadyExists _ _ _)) = True
+isAlreadyExistsError _                                             = False
 
 isAlreadyInUseError :: IOError -> Bool
-isAlreadyInUseError (IOException (IOError _ ResourceBusy _ _)) = True
-isAlreadyInUseError _		                 	       = False
+isAlreadyInUseError (IOException (IOError _ ResourceBusy _ _ _)) = True
+isAlreadyInUseError _                                            = False
 
 isFullError :: IOError -> Bool
-isFullError (IOException (IOError _ ResourceExhausted _ _)) = True
-isFullError _			             		    = False
+isFullError (IOException (IOError _ ResourceExhausted _ _ _)) = True
+isFullError _                                                 = False
 
 isEOFError :: IOError -> Bool
-isEOFError (IOException (IOError _ EOF _ _)) = True
-isEOFError _                   		     = False
+isEOFError (IOException (IOError _ EOF _ _ _)) = True
+isEOFError _                                   = False
 
 isIllegalOperation :: IOError -> Bool
-isIllegalOperation (IOException (IOError _ IllegalOperation _ _)) = True
-isIllegalOperation _			            		  = False
+isIllegalOperation (IOException (IOError _ IllegalOperation _ _ _)) = True
+isIllegalOperation _                                                = False
 
 isPermissionError :: IOError -> Bool
-isPermissionError (IOException (IOError _ PermissionDenied _ _)) = True
-isPermissionError _			          		 = False
+isPermissionError (IOException (IOError _ PermissionDenied _ _ _)) = True
+isPermissionError _                                                = False
 
 isDoesNotExistError :: IOError -> Bool
-isDoesNotExistError (IOException (IOError _ NoSuchThing _ _)) = True
-isDoesNotExistError _                           	      = False
+isDoesNotExistError (IOException (IOError _ NoSuchThing _ _ _)) = True
+isDoesNotExistError _                                           = False
 
 isUserError :: IOError -> Bool
 isUserError (UserError _) = True
-isUserError _		  = False
+isUserError _             = False
 \end{code}
 
 Showing @IOError@s
@@ -598,24 +600,26 @@ Showing @IOError@s
 -- For now we give a fairly uninformative error message which just happens to
 -- be like the ones that Hugs used to give.
 instance Show IOException where
-    showsPrec p (IOError hdl iot loc s) = showString s . showChar '\n'
+    showsPrec p (IOError _ _ _ s _) = showString s . showChar '\n'
 #else
 instance Show IOException where
-    showsPrec p (IOError hdl iot loc s) =
+    showsPrec p (IOError hdl iot loc s fn) =
       showsPrec p iot .
-      showChar '\n' .
       (case loc of
          "" -> id
-	 _  -> showString "Action: " . showString loc . showChar '\n') .
+	 _  -> showString "\nAction: " . showString loc) .
       showHdl .
       (case s of
 	 "" -> id
-	 _  -> showString "Reason: " . showString s)
+	 _  -> showString "\nReason: " . showString s) .
+      (case fn of
+	 Nothing -> id
+	 Just name -> showString "\nFile: " . showString name)
      where
       showHdl = 
        case hdl of
         Nothing -> id
-	Just h  -> showString "Handle: " . showsPrec p h
+	Just h  -> showString "\nHandle: " . showsPrec p h
 
 #endif
 \end{code}
@@ -634,8 +638,8 @@ constructErrorAndFail call_site
     ioError (IOException io_error)
 
 constructErrorAndFailWithInfo :: String -> String -> IO a
-constructErrorAndFailWithInfo call_site reason
-  = constructErrorMsg call_site (Just reason) >>= \ io_error ->
+constructErrorAndFailWithInfo call_site fn
+  = constructErrorMsg call_site (Just fn) >>= \ io_error ->
     ioError (IOException io_error)
 
 \end{code}
@@ -658,7 +662,7 @@ constructError	      :: String -> IO IOException
 constructError call_site = constructErrorMsg call_site Nothing
 
 constructErrorMsg	      :: String -> Maybe String -> IO IOException
-constructErrorMsg call_site reason =
+constructErrorMsg call_site fn =
  getErrType__            >>= \ errtype ->
  getErrStr__             >>= \ str ->
  let
@@ -688,10 +692,7 @@ constructErrorMsg call_site reason =
    unpackCString str ++
    (case iot of
      OtherError -> "(error code: " ++ show errtype ++ ")"
-     _ -> "") ++
-   (case reason of
-      Nothing -> ""
-      Just m  -> ": "++m)
+     _ -> "")
  in
- return (IOError Nothing iot call_site msg)
+ return (IOError Nothing iot call_site msg fn)
 \end{code}

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: System.lhs,v 1.26 2000/07/07 11:03:58 simonmar Exp $
+% $Id: System.lhs,v 1.27 2001/01/11 07:04:16 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -94,7 +94,7 @@ getEnv name = do
     if litstring /= nullAddr
 	then primUnpackCString litstring
         else ioException (IOError Nothing NoSuchThing "getEnv"
-			    ("environment variable: " ++ name))
+			  "no environment variable" (Just name))
 
 foreign import ccall "libHS_cbits.so" "getenv" unsafe primGetEnv :: PrimByteArray -> IO Addr
 \end{code}
@@ -114,7 +114,7 @@ The implementation does not support system calls.
 
 \begin{code}
 system        		:: String -> IO ExitCode
-system "" = ioException (IOError Nothing InvalidArgument "system" "null command")
+system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
 system cmd = do
     status <- primSystem (primPackString cmd)
     case status of
@@ -132,13 +132,13 @@ Before it terminates, any open or semi-closed handles are first closed.
 exitWith   		:: ExitCode -> IO a
 exitWith ExitSuccess = do
     primExit 0
-    ioException (IOError Nothing OtherError "exitWith" "exit should not return")
+    ioException (IOError Nothing OtherError "exitWith" "exit should not return" Nothing)
 
 exitWith (ExitFailure n) 
-  | n == 0 = ioException (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0")
+  | n == 0 = ioException (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
   | otherwise = do
     primExit n
-    ioException (IOError Nothing OtherError "exitWith" "exit should not return")
+    ioException (IOError Nothing OtherError "exitWith" "exit should not return" Nothing)
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.

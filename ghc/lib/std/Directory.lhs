@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Directory.lhs,v 1.20 2000/08/24 10:27:01 simonmar Exp $
+% $Id: Directory.lhs,v 1.21 2001/01/11 07:04:16 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -482,7 +482,8 @@ setPermissions name (Permissions r w e s) = do
     rc <- primChmod (primPackString name) mode
     if rc == 0
 	then return ()
-	else ioException (IOError Nothing SystemError "setPermissions" "insufficient permissions")
+	else ioException (IOError Nothing SystemError
+	    "setPermissions" "insufficient permissions" (Just name))
 \end{code}
 
 (Sigh)..copied from Posix.Files to avoid dep. on posix library
@@ -500,7 +501,8 @@ getFileStatus name = do
 #else
 	then stToIO (unsafeFreezeByteArray bytes)
 #endif
-     	else ioException (IOError Nothing SystemError "getFileStatus" "")
+     	else ioException (IOError Nothing SystemError
+	    "getFileStatus" "" (Just name))
 
 #ifndef __HUGS__
 modificationTime :: FileStatus -> IO ClockTime

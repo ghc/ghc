@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIO.lhs,v 1.16 2000/11/07 10:42:56 simonmar Exp $
+% $Id: PrelIO.lhs,v 1.17 2001/01/11 07:04:16 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -252,8 +252,8 @@ hGetContents handle =
     	    return (handle_', str)
   where
    not_readable_error = 
-	   IOError (Just handle) IllegalOperation "hGetContents"
-		   ("handle is not open for reading")
+	IOError (Just handle) IllegalOperation "hGetContents"
+		"handle is not open for reading" Nothing
 \end{code}
 
 Note that someone may close the semi-closed handle (or change its buffering), 
