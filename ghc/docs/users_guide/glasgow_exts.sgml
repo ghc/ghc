@@ -4484,7 +4484,7 @@ inside a list.
 This restriction is an implementation restriction: we just havn't got around to
 implementing the necessary bidirectional maps over arbitrary type constructors.
 It would be relatively easy to add specific type constructors, such as Maybe and list,
-to the ones that are allowed.
+to the ones that are allowed.</para>
 </ListItem>
 
 <ListItem>
