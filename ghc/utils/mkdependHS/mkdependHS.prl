@@ -345,12 +345,15 @@ sub gather_import_dirs {
            # Yuck ^ 3
            if ( $lib eq 'win32' && ! $INSTALLING ) {
               $dir = "${TopPwd}/hslibs/${lib}/src";
+           } elsif ( $lib eq 'greencard' && ! $INSTALLING ) {
+              $dir = "${TopPwd}/green-card/lib/ghc";
            } elsif ( $lib eq 'com' && ! $INSTALLING ) {
               $dir = "${TopPwd}/hdirect/lib";
            } else {
               $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
 	                           : "${TopPwd}/hslibs/${lib}";
            }
+
     	   if (!$Include_prelude) {
               push(@Ignore_dirs,$dir);
            } else {
