@@ -857,18 +857,24 @@ emptyGlobalRdrEnv = emptyRdrEnv
 
 data GlobalRdrElt 
   = GRE { gre_name   :: Name,
-	  gre_parent :: Name,	-- Name of the "parent" structure
-				-- 	* the tycon of a data con
-				--	* the class of a class op
-				-- For others it's just the same as gre_name
-	  gre_prov   :: Provenance,		-- Why it's in scope
-	  gre_deprec :: Maybe DeprecTxt		-- Whether this name is deprecated
+	  gre_parent :: Maybe Name,	-- Name of the "parent" structure, for
+					-- 	* the tycon of a data con
+					--	* the class of a class op
+					-- For others it's Nothing
+		-- Invariant: gre_name g /= gre_parent g
+		--	when the latter is a Just
+
+	  gre_prov   :: Provenance,	-- Why it's in scope
+	  gre_deprec :: Maybe DeprecTxt	-- Whether this name is deprecated
     }
 
 instance Outputable GlobalRdrElt where
   ppr gre = ppr (gre_name gre) <+> 
-	    parens (hsep [text "parent:" <+> ppr (gre_parent gre) <> comma,
-			  pprNameProvenance gre])
+	    parens (pp_parent (gre_parent gre) <+> pprNameProvenance gre)
+	  where
+	    pp_parent (Just p) = text "parent:" <+> ppr p <> comma
+	    pp_parent Nothing  = empty
+
 pprGlobalRdrEnv env
   = vcat (map pp (rdrEnvToList env))
   where

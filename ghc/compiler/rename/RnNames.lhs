@@ -40,10 +40,11 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  Deprecations(..), ModIface(..), Dependencies(..),
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE, pprNameProvenance
 			)
-import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv,
+import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv, rdrEnvToList,
 			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual )
 import Outputable
-import Maybe		( isJust, isNothing, catMaybes )
+import Maybe		( isJust, isNothing, catMaybes, fromMaybe )
+import Maybes		( orElse, expectJust )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -531,21 +532,36 @@ exportsFromAvail :: Maybe [RdrNameIE] -> TcRn m Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
-exportsFromAvail Nothing 
+
+exportsFromAvail exports
+ = do { TcGblEnv { tcg_rdr_env = rdr_env, 
+		   tcg_imports = imports } <- getGblEnv ;
+	exports_from_avail exports rdr_env imports }
+
+exports_from_avail Nothing rdr_env
+		   (ImportAvails { imp_env = entity_avail_env })
  = do { this_mod <- getModule ;
 	if moduleName this_mod == mAIN_Name then
 	   return []
-              -- Export nothing; Main.$main is automatically exported
-	else
-	  exportsFromAvail (Just [IEModuleContents (moduleName this_mod)])
-              -- but for all other modules export everything.
+		-- Export nothing; Main.$main is automatically exported
+	else 
+		-- Export all locally-defined things
+		-- We do this by filtering the global RdrEnv,
+		-- keeping only things that are (a) qualified,
+		-- (b) locally defined, (c) a 'main' name
+		-- Then we look up in the entity-avail-env
+	return [ avail
+	       | (rdr_name, gres) <- rdrEnvToList rdr_env,
+		 isQual rdr_name,	-- Avoid duplicates
+		 GRE { gre_name   = name, 
+		       gre_parent = Nothing,	-- Main things only
+		       gre_prov   = LocalDef } <- gres,
+		 let avail = expectJust "exportsFromAvail" 
+				 (lookupAvailEnv entity_avail_env name)
+	       ]
     }
 
-exportsFromAvail (Just exports)
- = do { TcGblEnv { tcg_imports = imports } <- getGblEnv ;
-	exports_from_avail exports imports }
-
-exports_from_avail export_items 
+exports_from_avail (Just export_items) rdr_env
 		   (ImportAvails { imp_qual = mod_avail_env, 
 				   imp_env  = entity_avail_env }) 
   = foldlM exports_from_item emptyExportAccum
@@ -567,11 +583,10 @@ exports_from_avail export_items
 		       returnM acc
 
 	    Just avail_env
-		-> getGlobalRdrEnv		`thenM` \ global_env ->
-  		   let
+		-> let
 			mod_avails = [ filtered_avail
 				     | avail <- availEnvElts avail_env,
-				       let mb_avail = filter_unqual global_env avail,
+				       let mb_avail = filter_unqual rdr_env avail,
 				       isJust mb_avail,
 				       let Just filtered_avail = mb_avail]
 						
@@ -588,16 +603,16 @@ exports_from_avail export_items
     exports_from_item acc@(mods, occs, avails) ie
 	= lookupGRE (ieName ie)	 		`thenM` \ mb_gre -> 
 	  case mb_gre of {
-		Nothing -> addErr (unknownNameErr (ieName ie))	`thenM_`
-			   returnM acc ;
-		Just gre ->		
+	    Nothing  -> addErr (unknownNameErr (ieName ie))	`thenM_`
+			returnM acc ;
+	    Just gre ->		
 
 		-- Get the AvailInfo for the parent of the specified name
-	  case lookupAvailEnv entity_avail_env (gre_parent gre) of {
-	     Nothing -> pprPanic "exportsFromAvail" 
-				((ppr (ieName ie)) <+> ppr gre) ;
-	     Just avail ->
-
+	  let
+	    parent = gre_parent gre `orElse` gre_name gre
+	    avail  = expectJust "exportsFromAvail2" 
+			(lookupAvailEnv entity_avail_env parent)
+	  in
 		-- Filter out the bits we want
 	  case filterAvail ie avail of {
 	    Nothing -> 	-- Not enough availability
@@ -610,7 +625,7 @@ exports_from_avail export_items
 	  warnIf (not (ok_item ie avail)) (dodgyExportWarn ie)	`thenM_`
           check_occs ie occs export_avail			`thenM` \ occs' ->
 	  returnM (mods, occs', addAvail avails export_avail)
-	  }}}
+	  }}
 
 
 -------------------------------
@@ -688,9 +703,11 @@ reportUnusedNames gbl_env used_names
     -- if C was brought into scope by T(..) or T(C)
     really_used_names :: NameSet
     really_used_names = used_names `unionNameSets`
-		        mkNameSet [ gre_parent gre
-				  | gre <- defined_names,
-				    gre_name gre `elemNameSet` used_names]
+		        mkNameSet [ parent
+				  | GRE{ gre_name   = name, 
+					 gre_parent = Just parent } 
+				      <- defined_names,
+				    name `elemNameSet` used_names]
 
 	-- Collect the defined names from the in-scope environment
 	-- Look for the qualified ones only, else get duplicates
@@ -752,9 +769,9 @@ reportUnusedNames gbl_env used_names
 	= acc
 
 	-- n is the name of the thing, p is the name of its parent
-    mk_avail n p | n/=p			   = AvailTC p [p,n]
-		 | isTcOcc (nameOccName p) = AvailTC n [n]
-		 | otherwise		   = Avail n
+    mk_avail n (Just p)			 	 = AvailTC p [p,n]
+    mk_avail n Nothing | isTcOcc (nameOccName n) = AvailTC n [n]
+		       | otherwise		 = Avail n
     
     add_inst_mod m acc 
       | m `elemFM` acc = acc	-- We import something already

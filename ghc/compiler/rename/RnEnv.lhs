@@ -890,7 +890,9 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails deprecs
 	where
 	  occ  = nameOccName name
 	  elt  = GRE {gre_name   = name,
-		      gre_parent = parent, 
+		      gre_parent = if name == parent 
+				   then Nothing 
+				   else Just parent, 
 		      gre_prov   = mk_provenance name, 
 		      gre_deprec = lookupDeprec deprecs name}
 		      
@@ -986,44 +988,41 @@ warnUnusedLocals names = warnUnusedBinds [(n,LocalDef) | n<-names]
 
 warnUnusedBinds :: [(Name,Provenance)] -> TcRn m ()
 warnUnusedBinds names
-  = mappM_ warnUnusedGroup  groups
+  = mappM_ warnUnusedGroup groups
   where
 	-- Group by provenance
-   groups = equivClasses cmp names
+   groups = equivClasses cmp (filter reportable names)
    (_,prov1) `cmp` (_,prov2) = prov1 `compare` prov2
  
+
+   reportable (name,_) = case occNameUserString (nameOccName name) of
+				('_' : _) -> False
+				zz_other  -> True
+	-- Haskell 98 encourages compilers to suppress warnings about
+	-- unused names in a pattern if they start with "_".
 
 -------------------------
 
 warnUnusedGroup :: [(Name,Provenance)] -> TcRn m ()
 warnUnusedGroup names
-  | null filtered_names  = returnM ()
-  | not is_local	 = returnM ()
-  | otherwise
   = addSrcLoc def_loc	$
-    addWarn			$
-    sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) filtered_names)))]
+    addWarn		$
+    sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) names)))]
   where
-    filtered_names = filter reportable names
-    (name1, prov1) = head filtered_names
-    (is_local, def_loc, msg)
-	= case prov1 of
-		LocalDef -> (True, getSrcLoc name1, text "Defined but not used")
+    (name1, prov1) = head names
+    loc1  	   = getSrcLoc name1
+    (def_loc, msg) = case prov1 of
+			LocalDef 			   -> (loc1, unused_msg)
+			NonLocalDef (UserImport mod loc _) -> (loc,  imp_from mod)
 
-		NonLocalDef (UserImport mod loc _)
-			-> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> text "but not used")
-
-    reportable (name,_) = case occNameUserString (nameOccName name) of
-				('_' : _) -> False
-				zz_other  -> True
-	-- Haskell 98 encourages compilers to suppress warnings about
-	-- unused names in a pattern if they start with "_".
+    unused_msg   = text "Defined but not used"
+    imp_from mod = text "Imported from" <+> quotes (ppr mod) <+> text "but not used"
 \end{code}
 
 \begin{code}
 addNameClashErrRn rdr_name (np1:nps)
   = addErr (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
-		    ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
+		  ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
   where
     msg1 = ptext  SLIT("either") <+> mk_ref np1
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
