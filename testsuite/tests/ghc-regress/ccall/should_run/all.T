@@ -51,3 +51,4 @@ test('ffi009', ways ,compile_and_run, [''])
 test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 test('ffi011', normal, compile_and_run, [''])
+test('ffi012', normal, compile_and_run, [''])
