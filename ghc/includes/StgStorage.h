@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.11 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: StgStorage.h,v 1.12 2003/03/26 17:40:58 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,10 +96,6 @@ typedef struct _generation {
 
    CloseNursery(hp)		Closes the allocation area.
 
-   PleaseStopAllocating(void)   Arranges that the next call to
-   				ExtendNursery() will fail, triggering
-				a return to the scheduler.  This is
-				useful for asynchronous interupts etc.
    -------------------------------------------------------------------------- */
 
 #define OpenNursery(hp,hplim)				\

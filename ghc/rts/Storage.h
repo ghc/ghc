@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.49 2003/03/24 14:46:57 simonmar Exp $
+ * $Id: Storage.h,v 1.50 2003/03/26 17:40:57 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -78,13 +78,11 @@ doYouWantToGC( void )
   -------------------------------------------------------------------------- */
 
 #define ExtendNursery(hp,hplim)			\
-  (CurrentNursery->free = (P_)(hp)+1,		\
+  (CloseNursery(hp),                            \
    CurrentNursery->link == NULL ? rtsFalse :	\
    (CurrentNursery = CurrentNursery->link,	\
     OpenNursery(hp,hplim),			\
     rtsTrue))
-
-extern void PleaseStopAllocating(void);
 
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
