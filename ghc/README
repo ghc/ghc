@@ -1,10 +1,10 @@
-This is version 3.01 of the Glorious Glasgow Haskell compilation
-system (GHC).  GHC 3.01 is a compiler for Haskell 1.4.
+This is version 3.02 of the Glorious Glasgow Haskell compilation
+system (GHC).  GHC 3.02 is a compiler for Haskell 1.4.
 
 Haskell is "the" standard lazy functional programming language.
-Haskell 1.4 is the current version of the language, released in
-May. 1996.  The language definition is on the Web at
-http://haskell.cs.yale.edu/haskell-report/haskell-report.html
+Haskell 1.4 is the current version of the language, released in 
+April 1997.  The language definition is on the Web at
+http://www.haskell.org/report/index.html.
 
 GHC documentation of interest:
 
@@ -19,11 +19,6 @@ GHC documentation of interest:
   options are available, how to cope with common problems, how to use
   the profiling facilities, etc.
 
-* ghc/docs/users_guide/release.{dvi,info,html}: Release notes for this
-  release (and earlier releases).
-
-* ghc/docs/README: About the other documentation in this release.
-
 We welcome your comments and suggestions about this software!  Please
 do not suffer or grumble in silence.  The "bug reports" section of the
 User's Guide (docs/users_guide/user.{dvi,info,html}) says what we
@@ -31,7 +26,7 @@ would like to know when you report a problem.
 
 Current AQUA team (all @dcs.gla.ac.uk):
 
-    Sigbjorn Finne	(sof)	    [PhD student]
+    Sigbjorn Finne	(sof)	    [hired hand]
     Hans Wolfgang Loidl (hwloidl)   [PhD student]
     Simon Marlow	(simonm)    [hired hand]
     Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
@@ -70,20 +65,16 @@ Simon's projects' acronyms:
     GRASP ('90-'92): Graph reduction applications support project
     AQUA  ('93-   ): Declarative systems architecture: a quantitative approach
 
-Dated: 97/03
-
 GHC WWW page: http://www.dcs.gla.ac.uk/fp/software/ghc/
 
 E-mail contacts:
-    glasgow-haskell-request@dcs.gla.ac.uk   (admin & general queries)
-
     glasgow-haskell-bugs@dcs.gla.ac.uk	    (bug reports mailing list)
     glasgow-haskell-users@dcs.gla.ac.uk	    (users' mailing list)
 
-    glasgow-haskell-bugs-request@...	    to join, send mail *here*
-    glasgow-haskell-users-request@...	    to join, send mail *here*
+Send mail to majordomo@dcs.gla.ac.uk with 'help' in the body of the
+message for information on joining either of these mailing lists.
 
-Anonymous FTP site: ftp.dcs.gla.ac.uk:pub/haskell/glasgow.  Mostly
-mirrored by ftp.cs.chalmers.se and haskell.cs.yale.edu (same
-directory).  Also: src.doc.ic.ac.uk, in
+Anonymous FTP site: ftp://ftp.dcs.gla.ac.uk:pub/haskell/glasgow.
+Mostly mirrored by ftp.cs.chalmers.se and haskell.org (same
+directory).  Also: sunsite.doc.ic.ac.uk, in
 computing/programming/languages/haskell/glasgow/.
