@@ -14,7 +14,9 @@ module PrefixToHs (
 	cvBinds,
 	cvMonoBindsAndSigs,
 	cvMatches,
-	cvOtherDecls
+	cvOtherDecls,
+	cvForeignDecls -- HACK
+
     ) where
 
 #include "HsVersions.h"
@@ -195,6 +197,15 @@ cvOtherDecls b
     go acc (RdrClassDecl d)	  = ClD d   : acc
     go acc (RdrInstDecl d)	  = InstD d : acc 
     go acc (RdrDefaultDecl d)     = DefD d  : acc
+--    go acc (RdrForeignDecl d)     = ForD d  : acc
     go acc other		  = acc
 	-- Ignore value bindings
+
+cvForeignDecls :: RdrBinding -> [RdrNameHsDecl]
+cvForeignDecls b = go [] b
+ where
+    go acc (RdrAndBindings b1 b2) = go (go acc b1) b2
+    go acc (RdrForeignDecl d)     = ForD d  : acc
+    go acc other		  = acc
+ 
 \end{code}

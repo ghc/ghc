@@ -16,6 +16,7 @@ module RdrHsSyn (
 	RdrNameContext,
 	RdrNameSpecDataSig,
 	RdrNameDefaultDecl,
+	RdrNameForeignDecl,
 	RdrNameFixityDecl,
 	RdrNameGRHS,
 	RdrNameGRHSsAndBinds,
@@ -76,6 +77,7 @@ type RdrNameContext		= Context 		RdrName
 type RdrNameHsDecl		= HsDecl		Unused RdrName RdrNamePat
 type RdrNameSpecDataSig		= SpecDataSig		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
+type RdrNameForeignDecl		= ForeignDecl		RdrName
 type RdrNameFixityDecl		= FixityDecl		RdrName
 type RdrNameGRHS		= GRHS			Unused RdrName RdrNamePat
 type RdrNameGRHSsAndBinds	= GRHSsAndBinds		Unused RdrName RdrNamePat

@@ -38,14 +38,14 @@ import List             ( isSuffixOf )
 
 import {-# SOURCE #-} CostCentre
 
-import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_NoHiCheck )
+import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
 import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile )
 
 import Maybes		( MaybeErr(..) )
-import ErrUtils		( ErrMsg(..) )
+import ErrUtils		( ErrMsg )
 import Outputable
 import Util		( nOfThem, panic )
 
@@ -865,7 +865,7 @@ happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
 -}
 checkVersion :: Maybe Integer -> IfM ()
 checkVersion mb@(Just v) s l
- | (v==0) || (v == PROJECTVERSION) || opt_NoHiCheck = Succeeded ()
+ | (v==0) || (v == fromInt opt_HiVersion) || opt_NoHiCheck = Succeeded ()
  | otherwise = Failed (ifaceVersionErr mb l ([]::[IfaceToken]){-Todo-})
 checkVersion mb@Nothing  s l 
  | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile l)) = Succeeded ()
@@ -879,7 +879,7 @@ ifaceParseErr l toks
 
 ifaceVersionErr hi_vers l toks
   = hsep [ppr l, ptext SLIT("Interface file version error;"),
-          ptext SLIT("Expected"), int PROJECTVERSION, 
+          ptext SLIT("Expected"), int opt_HiVersion, 
 	  ptext SLIT(" found "), pp_version]
     where
      pp_version =

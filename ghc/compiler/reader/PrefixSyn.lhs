@@ -10,7 +10,6 @@ order that follows the \tr{Prefix_Form} document.
 \begin{code}
 module PrefixSyn (
 	RdrBinding(..),
-	RdrId,
 	RdrMatch(..),
 	SigConverter,
 	SrcFile,
@@ -29,7 +28,8 @@ import Util		( panic )
 import SrcLoc           ( SrcLoc )
 import Char		( isDigit, ord )
 
-type RdrId   = RdrName
+
+--UNUSED: type RdrId   = RdrName
 type SrcLine = Int
 type SrcFile = FAST_STRING
 type SrcFun  = RdrName
@@ -46,6 +46,7 @@ data RdrBinding
   | RdrClassDecl 	RdrNameClassDecl
   | RdrInstDecl 	RdrNameInstDecl
   | RdrDefaultDecl	RdrNameDefaultDecl
+  | RdrForeignDecl      RdrNameForeignDecl
 
 			-- signatures are mysterious; we can't
 			-- tell if its a Sig or a ClassOpSig,

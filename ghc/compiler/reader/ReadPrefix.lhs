@@ -16,6 +16,7 @@ import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragma
 import RdrHsSyn         
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
 import PrefixToHs
+import CallConv
 
 import CmdLineOpts      ( opt_NoImplicitPrelude )
 import FiniteMap	( elemFM, FiniteMap )
@@ -126,6 +127,7 @@ rdModule
 
     let
 	val_decl    = ValD (cvBinds srcfile cvValSig binding)
+	for_decls   = cvForeignDecls binding
 	other_decls = cvOtherDecls binding
     in
     returnUgn (modname,
@@ -134,7 +136,7 @@ rdModule
 	      		  exports
 	      		  imports
 	      		  fixities
-			  (val_decl: other_decls)
+			  (for_decls ++ val_decl: other_decls)
 	      		  src_loc
        		)
 \end{code}
@@ -599,6 +601,16 @@ wlkBinding binding
 	wlkList rdMonoType dbindts  `thenUgn` \ tys ->
 	returnUgn (RdrDefaultDecl (DefaultDecl tys src_loc))
 
+        -- "foreign" declaration
+      U_fobind id ty ext_name unsafe_flag cconv imp_exp srcline ->
+	  mkSrcLocUgn        srcline		   $ \ src_loc ->
+	  wlkVarId id				   `thenUgn` \ h_id ->
+	  wlkHsType ty				   `thenUgn` \ h_ty ->
+	  wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
+	  rdCallConv cconv		           `thenUgn` \ h_cconv ->
+	  rdImpExp imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
+ 	  returnUgn (RdrForeignDecl (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc))
+
       a_sig_we_hope ->
 	-- signature(-like) things, including user pragmas
 	wlk_sig_thing a_sig_we_hope
@@ -932,3 +944,29 @@ rdEntity pt
 	returnUgn (IEModuleContents mod)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection[rdExtName]{Read an external name}
+%*									*
+%************************************************************************
+
+\begin{code}
+wlkExtName :: U_maybe -> UgnM ExtName
+wlkExtName (U_nothing) = returnUgn Dynamic
+wlkExtName (U_just pt)
+  = rdU_list pt		    `thenUgn` \ ds ->
+    wlkList rdU_hstring ds  `thenUgn` \ ss ->
+    case ss of
+      [nm]     -> returnUgn (ExtName nm Nothing)
+      [mod,nm] -> returnUgn (ExtName nm (Just mod))
+
+rdCallConv :: Int -> UgnM CallConv
+rdCallConv x = returnUgn x
+
+rdImpExp :: Int -> Bool -> UgnM (Maybe Bool)
+rdImpExp 0 isUnsafe = -- foreign import
+  returnUgn (Just isUnsafe)
+rdImpExp 1 _ = -- foreign export
+  returnUgn Nothing
+\end{code}
