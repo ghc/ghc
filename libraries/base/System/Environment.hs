@@ -48,9 +48,16 @@ getArgs =
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
--- Computation `getProgName' returns the name of the program
--- as it was invoked.
+{-|
+Computation 'getProgName' returns the name of the program as it was
+invoked.
 
+However, this is hard-to-impossible to implement on some non-Unix
+OSes, so instead, for maximum portability, we just return the leafname
+of the program as invoked. Even then there are some differences
+between platforms: on Windows, for example, a program invoked as foo
+is probably really @FOO.EXE@, and that is what 'getProgName' will return.
+-}
 getProgName :: IO String
 getProgName = 
   alloca $ \ p_argc ->
