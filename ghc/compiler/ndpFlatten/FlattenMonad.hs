@@ -267,7 +267,7 @@ packContext perm m  = Flatten $ \state ->
     (r, packedState') = unFlatten m packedState
     resState	      = state {    -- revert to the unpacked context
 			  ctxtVar  = ctxtVar state,
-			  ctxtEnv  = ctxtEnv state,
+			  ctxtEnv  = ctxtEnv state
 		        }
     bndrs	      = map mkCoreBind . varSetElems . usedVars $ packedState'
 
