@@ -31,7 +31,7 @@ module Subst (
 	substTyWith, substTy, substTheta, deShadowTy,
 
 	-- Expression stuff
-	substExpr
+	substExpr, substRules
     ) where
 
 #include "HsVersions.h"

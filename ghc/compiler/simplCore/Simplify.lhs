@@ -24,6 +24,7 @@ import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
+			  idSpecialisation, setIdSpecialisation,
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
 import OccName		( encodeFS )
@@ -49,7 +50,7 @@ import CostCentre	( currentCCS )
 import Type		( isUnLiftedType, seqType, tyConAppArgs, funArgTy,
 			  splitFunTy_maybe, splitFunTy, eqType
 			)
-import Subst		( mkSubst, substTy, substExpr,
+import Subst		( mkSubst, substTy, substExpr, substRules,
 			  isInScope, lookupIdSubst, simplIdInfo
 			)
 import TysPrim		( realWorldStatePrimTy )
@@ -451,24 +452,34 @@ simplLazyBind :: SimplEnv
 	      -> InExpr -> SimplEnv 	-- The RHS and its environment
 	      -> SimplM (FloatsWith SimplEnv)
 
-simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
-  =	-- Substitute IdInfo on binder, in the light of earlier
-	-- substitutions in this very letrec, and extend the 
-	-- in-scope env, so that the IdInfo for this binder extends 
-	-- over the RHS for the binder itself.
+simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
+  =	-- Substitute the rules for this binder in the light
+	-- of earlier substitutions in this very letrec group,
+	-- add the substituted rules to the IdInfo, and 
+	-- extend the in-scope env, so that the IdInfo for this 
+	-- binder extends  over the RHS for the binder itself.
 	--
 	-- This is important.  Manuel found cases where he really, really
 	-- wanted a RULE for a recursive function to apply in that function's
-	-- own right-hand side.
+ 	-- own right-hand side.
 	--
 	-- NB: does no harm for non-recursive bindings
+	--
+	-- NB2: just rules!  In particular, the arity of an Id is not visible
+	-- in its own RHS, else we eta-reduce
+	--	f = \x -> f x
+	-- to
+	--	f = f
+	-- which isn't sound.  And it makes the arity in f's IdInfo greater than
+	-- the manifest arity, which isn't good.
     let
-	bndr''  	  = bndr' `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
-	env1	     	  = modifyInScope env bndr'' bndr''
+	rules		  = idSpecialisation bndr
+	bndr2  	 	  = bndr1 `setIdSpecialisation` substRules (getSubst env) rules
+	env1	     	  = modifyInScope env bndr2 bndr2
 	rhs_env      	  = setInScope rhs_se env1
  	is_top_level	  = isTopLevel top_lvl
 	ok_float_unlifted = not is_top_level && isNonRec is_rec
-	rhs_cont	  = mkStop (idType bndr') AnRhs
+	rhs_cont	  = mkStop (idType bndr1) AnRhs
     in
   	-- Simplify the RHS; note the mkStop, which tells 
 	-- the simplifier that this is the RHS of a let.
@@ -477,7 +488,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	-- If any of the floats can't be floated, give up now
 	-- (The allLifted predicate says True for empty floats.)
     if (not ok_float_unlifted && not (allLifted floats)) then
-	completeLazyBind env1 top_lvl bndr bndr''
+	completeLazyBind env1 top_lvl bndr bndr2
 			 (wrapFloats floats rhs1)
     else	
 
@@ -488,7 +499,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	-- If the result is a PAP, float the floats out, else wrap them
 	-- By this time it's already been ANF-ised (if necessary)
     if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
-	completeLazyBind env1 top_lvl bndr bndr'' rhs2
+	completeLazyBind env1 top_lvl bndr bndr2 rhs2
 
 	-- We use exprIsTrivial here because we want to reveal lone variables.  
 	-- E.g.  let { x = letrec { y = E } in y } in ...
@@ -516,10 +527,10 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	tick LetFloatFromLet			`thenSmpl_` (
 	addFloats env1 floats			$ \ env2 ->
 	addAtomicBinds env2 (fromOL aux_binds)	$ \ env3 ->
-	completeLazyBind env3 top_lvl bndr bndr'' rhs2)
+	completeLazyBind env3 top_lvl bndr bndr2 rhs2)
 
     else
-	completeLazyBind env1 top_lvl bndr bndr'' (wrapFloats floats rhs1)
+	completeLazyBind env1 top_lvl bndr bndr2 (wrapFloats floats rhs1)
 
 #ifdef DEBUG
 demanded_float (NonRec b r) = isStrictDmd (idNewDemandInfo b) && not (isUnLiftedType (idType b))
@@ -692,8 +703,8 @@ simplExprF env (Case scrut bndr alts) cont
 
 simplExprF env (Let (Rec pairs) body) cont
   = simplRecBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
-	-- NB: bndrs' don't have unfoldings or spec-envs
-	-- We add them as we go down, using simplPrags
+	-- NB: bndrs' don't have unfoldings or rules
+	-- We add them as we go down
 
     simplRecBind env NotTopLevel pairs bndrs' 	`thenSmpl` \ (floats, env) ->
     addFloats env floats 			$ \ env ->
