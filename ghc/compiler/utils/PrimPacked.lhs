@@ -31,7 +31,7 @@ module PrimPacked
 #include "HsVersions.h"
 
 import GlaExts
-import Addr	( Addr(..) )
+import PrelAddr	( Addr(..) )
 import ST
 import Foreign
 -- ForeignObj is now exported abstractly.

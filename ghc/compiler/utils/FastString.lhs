@@ -86,7 +86,7 @@ import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
 
 import PrimPacked
 import GlaExts
-import Addr		( Addr(..) )
+import PrelAddr		( Addr(..) )
 #if __GLASGOW_HASKELL__ < 407
 import MutableArray	( MutableArray(..) )
 #else
@@ -640,6 +640,7 @@ hPutFS handle (FastString _ l# ba#)
 #else
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
                     hPutBufBA  handle mba (I# l#)
+                    return ()
 #endif
  where
   bot = error "hPutFS.ba"
@@ -648,7 +649,7 @@ hPutFS handle (FastString _ l# ba#)
 
 hPutFS handle (CharStr a# l#)
   | l# ==# 0#  = return ()
-  | otherwise  = hPutBuf handle (A# a#) (I# l#)
+  | otherwise  = do hPutBuf handle (A# a#) (I# l#) ; return ()
 
 
 #endif
