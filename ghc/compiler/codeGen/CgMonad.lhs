@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.16 1998/12/18 17:40:52 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.17 1999/01/06 11:35:27 simonm Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -54,7 +54,7 @@ import OccName		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
 import VarEnv
-import PrimRep		( getPrimRepSize, PrimRep(..) )
+import PrimRep		( PrimRep(..) )
 import StgSyn		( StgLiveVars )
 import Outputable
 
