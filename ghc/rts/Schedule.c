@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.95 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: Schedule.c,v 1.96 2001/06/04 16:26:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -562,41 +562,42 @@ schedule( void )
      * If no threads are black holed, we have a deadlock situation, so
      * inform all the main threads.
      */
-#ifdef SMP
+#ifndef PAR
     if (blocked_queue_hd == END_TSO_QUEUE
 	&& run_queue_hd == END_TSO_QUEUE
 	&& sleeping_queue == END_TSO_QUEUE
-	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes))
+#ifdef SMP
+	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes)
+#endif
+	)
     {
-	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
-	detectBlackHoles();
-	if (run_queue_hd == END_TSO_QUEUE) {
-	    StgMainThread *m;
-	    for (m = main_threads; m != NULL; m = m->link) {
+	IF_DEBUG(scheduler, sched_belch("deadlocked, forcing major GC..."));
+	GarbageCollect(GetRoots,rtsTrue);
+	if (blocked_queue_hd == END_TSO_QUEUE
+	    && run_queue_hd == END_TSO_QUEUE
+	    && sleeping_queue == END_TSO_QUEUE) {
+	    IF_DEBUG(scheduler, sched_belch("still deadlocked, checking for black holes..."));
+	    detectBlackHoles();
+	    if (run_queue_hd == END_TSO_QUEUE) {
+		StgMainThread *m = main_threads;
+#ifdef SMP
+		for (; m != NULL; m = m->link) {
+		    m->ret = NULL;
+		    m->stat = Deadlock;
+		    pthread_cond_broadcast(&m->wakeup);
+		}
+		main_threads = NULL;
+#else
 		m->ret = NULL;
 		m->stat = Deadlock;
-		pthread_cond_broadcast(&m->wakeup);
+		main_threads = m->link;
+		return;
+#endif
 	    }
-	    main_threads = NULL;
 	}
     }
 #elif defined(PAR)
     /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
-#else /* ! SMP */
-    if (blocked_queue_hd == END_TSO_QUEUE
-	&& run_queue_hd == END_TSO_QUEUE
-	&& sleeping_queue == END_TSO_QUEUE)
-    {
-	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
-	detectBlackHoles();
-	if (run_queue_hd == END_TSO_QUEUE) {
-	    StgMainThread *m = main_threads;
-	    m->ret = NULL;
-	    m->stat = Deadlock;
-	    main_threads = m->link;
-	    return;
-	}
-    }
 #endif
 
 #ifdef SMP
