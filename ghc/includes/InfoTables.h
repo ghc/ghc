@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.26 2002/05/01 13:12:11 simonmar Exp $
+ * $Id: InfoTables.h,v 1.27 2002/05/14 08:15:49 matthewc Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -248,7 +248,12 @@ typedef struct _StgInfoTable {
  * stack.  We distinguish the two by checking whether the pointer is
  * into text-space or not.
  */
- 
+
+#if ia64_TARGET_ARCH
+/* We need to give the compiler a gentle hint to put it in text-space */
+#define INFO_TBL_CONST  const __attribute__((section (".text")))
+#else
 #define INFO_TBL_CONST  const
+#endif
 
 #endif /* INFOTABLES_H */

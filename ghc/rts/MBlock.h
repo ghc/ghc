@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.13 2002/02/14 17:21:50 sof Exp $
+ * $Id: MBlock.h,v 1.14 2002/05/14 08:15:49 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,10 +31,18 @@ extern void * getMBlocks(nat n);
 #define HEAP_BASE 0x50000000
 #elif openbsd_TARGET_OS
 #define HEAP_BASE 0x50000000
+
 #elif linux_TARGET_OS
+#if ia64_TARGET_ARCH
+/* Shared libraries are in region 1, text in region 2, data in region 3.
+ * Stack is at the top of region 4.  We use the bottom.
+ */
+#define HEAP_BASE (4L<<61)
+#else
 /* Any ideas?
  */
 #define HEAP_BASE 0x50000000
+#endif
 
 #elif solaris2_TARGET_OS
 /* guess */
