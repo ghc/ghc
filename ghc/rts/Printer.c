@@ -1,6 +1,6 @@
 /* -*- mode: hugs-c; -*- */
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.4 1999/01/18 15:21:38 simonm Exp $
+ * $Id: Printer.c,v 1.5 1999/02/05 14:44:43 simonm Exp $
  *
  * Copyright (c) 1994-1998.
  *
@@ -64,7 +64,7 @@ static void printStdObject( StgClosure *obj, char* tag )
     StgWord i, j;
     const StgInfoTable* info = get_itbl(obj);
     fprintf(stderr,"%s(",tag);
-    printPtr((StgPtr)info);
+    printPtr((StgPtr)obj->header.info);
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
         fprintf(stderr,", ");
         printPtr(payloadPtr(obj,i));
@@ -86,6 +86,7 @@ void printClosure( StgClosure *obj )
             disassemble(stgCast(StgBCO*,obj),"\t");
             break;
 #endif
+
     case AP_UPD:
         {
 	    StgAP_UPD* ap = stgCast(StgAP_UPD*,obj);
@@ -98,11 +99,12 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n");
             break;
         }
+
     case PAP:
         {
 	    StgPAP* pap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stderr,"AP_NUPD("); printPtr((StgPtr)pap->fun);
+            fprintf(stderr,"PAP("); printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
                 fprintf(stderr,", ");
                 printPtr(payloadPtr(pap,i));
@@ -110,11 +112,25 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n");
             break;
         }
+
     case IND:
             fprintf(stderr,"IND("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
             fprintf(stderr,")\n"); 
             break;
+
+    case IND_STATIC:
+            fprintf(stderr,"IND_STATIC("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_OLDGEN:
+            fprintf(stderr,"IND_OLDGEN("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
     case CAF_UNENTERED:
         {
 	    StgCAF* caf = stgCast(StgCAF*,obj);
@@ -127,6 +143,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
     case CAF_ENTERED:
         {
 	    StgCAF* caf = stgCast(StgCAF*,obj);
@@ -139,20 +156,26 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
     case CAF_BLACKHOLE:
             fprintf(stderr,"CAF_BH("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
             break;
+
     case BLACKHOLE:
             fprintf(stderr,"BH\n"); 
             break;
+
     case BLACKHOLE_BQ:
             fprintf(stderr,"BQ("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
             break;
+
     case CONSTR:
+    case CONSTR_1_0: case CONSTR_0_1:
+    case CONSTR_1_1: case CONSTR_0_2: case CONSTR_2_0:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
@@ -164,7 +187,7 @@ void printClosure( StgClosure *obj )
             StgWord i, j;
             const StgInfoTable* info = get_itbl(obj);
             fprintf(stderr,"PACK(");
-            printPtr((StgPtr)info);
+            printPtr((StgPtr)obj->header.info);
             fprintf(stderr,"(tag=%d)",info->srt_len);
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
                 fprintf(stderr,", ");
@@ -176,11 +199,17 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n");
             break;
         }
+
     case FUN:
+    case FUN_1_0: case FUN_0_1: 
+    case FUN_1_1: case FUN_0_2: case FUN_2_0:
     case FUN_STATIC:
             printStdObject(obj,"FUN");
             break;
+
     case THUNK:
+    case THUNK_1_0: case THUNK_0_1:
+    case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
             printStdObject(obj,"THUNK");
@@ -210,6 +239,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
     case CATCH_FRAME:
         {
             StgCatchFrame* u = stgCast(StgCatchFrame*,obj);
@@ -222,6 +252,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
     case SEQ_FRAME:
         {
             StgSeqFrame* u = stgCast(StgSeqFrame*,obj);
@@ -232,6 +263,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
     case STOP_FRAME:
         {
             StgStopFrame* u = stgCast(StgStopFrame*,obj);
