@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.90 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: Schedule.c,v 1.91 2001/02/12 13:14:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2490,6 +2490,12 @@ unblockThread(StgTSO *tso)
       StgTSO *target  = tso->block_info.tso;
 
       ASSERT(get_itbl(target)->type == TSO);
+
+      if (target->what_next == ThreadRelocated) {
+	  target = target->link;
+	  ASSERT(get_itbl(target)->type == TSO);
+      }
+
       ASSERT(target->blocked_exceptions != NULL);
 
       last = (StgBlockingQueueElement **)&target->blocked_exceptions;
@@ -2610,6 +2616,12 @@ unblockThread(StgTSO *tso)
       StgTSO *target  = tso->block_info.tso;
 
       ASSERT(get_itbl(target)->type == TSO);
+
+      while (target->what_next == ThreadRelocated) {
+	  target = target->link;
+	  ASSERT(get_itbl(target)->type == TSO);
+      }
+      
       ASSERT(target->blocked_exceptions != NULL);
 
       last = &target->blocked_exceptions;
