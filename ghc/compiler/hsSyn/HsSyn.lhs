@@ -45,7 +45,7 @@ import BasicTypes	( Fixity, Version, NewOrData )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
-import OccName		( Module, pprModule )
+import Module		( Module, pprModule )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.

@@ -33,7 +33,7 @@ import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Const		( Con(..) )
 import Id		( Id, mkSysLocal )
-import OccName		( Module )
+import Module		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
 import Util		( removeDups )

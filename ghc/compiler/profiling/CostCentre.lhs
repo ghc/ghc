@@ -29,8 +29,9 @@ module CostCentre (
 
 import Var		( Id )
 import Name		( UserFS, EncodedFS, encodeFS, decode,
-			  Module, getOccName, occNameFS, pprModule, moduleUserString
+			  getOccName, occNameFS
 			)
+import Module		( Module, pprModule, moduleUserString )
 import Outputable	
 import Util	        ( thenCmp )
 \end{code}

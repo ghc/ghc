@@ -37,7 +37,7 @@ import List             ( isSuffixOf )
 
 import IdInfo		( InlinePragInfo(..) )
 import Name		( isLowerISO, isUpperISO )
-import OccName		( IfaceFlavour, hiFile, hiBootFile )
+import Module		( IfaceFlavour, hiFile, hiBootFile )
 import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
@@ -60,7 +60,6 @@ import Word
 #endif
 
 import Addr
-
 import PrelRead 		( readRational__ ) -- Glasgow non-std
 \end{code}
 

@@ -8,7 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import OccName		( Module, pprModule, moduleIfaceFlavour, bootFlavour )
+import Module		( Module, pprModule, moduleIfaceFlavour, bootFlavour )
 import Outputable
 import SrcLoc		( SrcLoc )
 \end{code}

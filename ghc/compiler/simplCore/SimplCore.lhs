@@ -39,8 +39,9 @@ import IdInfo		( InlinePragInfo(..), specInfo, setSpecInfo,
 			)
 import VarEnv
 import VarSet
+import Module		( Module )
 import Name		( mkLocalName, tidyOccName, tidyTopName, initTidyOccEnv, isExported,
-			  Module, NamedThing(..), OccName
+			  NamedThing(..), OccName
 			)
 import TyCon		( TyCon, isDataTyCon )
 import PrimOp		( PrimOp(..) )

@@ -20,9 +20,10 @@ import PrefixToHs
 import CallConv
 
 import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
-import OccName		( Module, mkSrcModuleFS, mkImportModuleFS,
-			  hiFile, hiBootFile,
-			  NameSpace, tcName, clsName, tcClsName, varName, dataName, tvName,
+import Module		( Module, mkSrcModuleFS, mkImportModuleFS,
+			  hiFile, hiBootFile
+			)
+import OccName		( NameSpace, tcName, clsName, tcClsName, varName, dataName, tvName,
 			  isLexCon
 			)
 import RdrName		( RdrName, isRdrDataCon, mkSrcQual, mkSrcUnqual, mkPreludeQual,	

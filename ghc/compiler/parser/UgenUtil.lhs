@@ -11,7 +11,7 @@ module UgenUtil (
 #include "HsVersions.h"
 
 import GlaExts
-import Name
+import Module		( Module, mkSrcModule )
 import SrcLoc		( mkSrcLoc, noSrcLoc, SrcLoc )
 import FastString	( FastString, mkFastCharString, mkFastCharString2 )
 \end{code}
