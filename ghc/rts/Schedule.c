@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.133 2002/03/12 11:51:06 simonmar Exp $
+ * $Id: Schedule.c,v 1.134 2002/03/12 13:57:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -554,9 +554,7 @@ schedule( void )
      * inform all the main threads.
      */
 #ifndef PAR
-    if (   EMPTY_RUN_QUEUE()
-	&& EMPTY_QUEUE(blocked_queue_hd)
-	&& EMPTY_QUEUE(sleeping_queue)
+    if (   EMPTY_THREAD_QUEUES()
 #if defined(RTS_SUPPORTS_THREADS)
 	&& EMPTY_QUEUE(suspended_ccalling_threads)
 #endif
@@ -570,37 +568,51 @@ schedule( void )
 	/* and SMP mode ..? */
 	releaseCapability(cap);
 #endif
+	// Garbage collection can release some new threads due to
+	// either (a) finalizers or (b) threads resurrected because
+	// they are about to be send BlockedOnDeadMVar.  Any threads
+	// thus released will be immediately runnable.
 	GarbageCollect(GetRoots,rtsTrue);
-	if (   EMPTY_QUEUE(blocked_queue_hd)
-	    && EMPTY_RUN_QUEUE()
-	    && EMPTY_QUEUE(sleeping_queue) ) {
 
-	    IF_DEBUG(scheduler, sched_belch("still deadlocked, checking for black holes..."));
-	    detectBlackHoles();
+	if ( !EMPTY_RUN_QUEUE() ) { goto not_deadlocked; }
 
-	    /* No black holes, so probably a real deadlock.  Send the
-	     * current main thread the Deadlock exception (or in the SMP
-	     * build, send *all* main threads the deadlock exception,
-	     * since none of them can make progress).
-	     */
-	    if ( EMPTY_RUN_QUEUE() ) {
-		StgMainThread *m;
+	IF_DEBUG(scheduler, 
+		 sched_belch("still deadlocked, checking for black holes..."));
+	detectBlackHoles();
+
+	if ( !EMPTY_RUN_QUEUE() ) { goto not_deadlocked; }
+
+#ifndef mingw32_TARGET_OS
+	/* If we have user-installed signal handlers, then wait
+	 * for signals to arrive rather then bombing out with a
+	 * deadlock.
+	 */
+	if ( anyUserHandlers() ) {
+	    IF_DEBUG(scheduler, 
+		     sched_belch("still deadlocked, waiting for signals..."));
+
+	    awaitUserSignals();
+
+	    // we might be interrupted...
+	    if (interrupted) { continue; }
+
+	    if (signals_pending()) {
+		startSignalHandlers();
+	    }
+	    ASSERT(!EMPTY_RUN_QUEUE());
+	    goto not_deadlocked;
+	}
+#endif
+
+	/* Probably a real deadlock.  Send the current main thread the
+	 * Deadlock exception (or in the SMP build, send *all* main
+	 * threads the deadlock exception, since none of them can make
+	 * progress).
+	 */
+	{
+	    StgMainThread *m;
 #if defined(RTS_SUPPORTS_THREADS)
-		for (m = main_threads; m != NULL; m = m->link) {
-		    switch (m->tso->why_blocked) {
-		    case BlockedOnBlackHole:
-			raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
-			break;
-		    case BlockedOnException:
-		    case BlockedOnMVar:
-			raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
-			break;
-		    default:
-			barf("deadlock: main thread blocked in a strange way");
-		    }
-		}
-#else
-		m = main_threads;
+	    for (m = main_threads; m != NULL; m = m->link) {
 		switch (m->tso->why_blocked) {
 		case BlockedOnBlackHole:
 		    raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
@@ -612,19 +624,32 @@ schedule( void )
 		default:
 		    barf("deadlock: main thread blocked in a strange way");
 		}
-#endif
 	    }
-#if defined(RTS_SUPPORTS_THREADS)
-	    /* ToDo: revisit conditions (and mechanism) for shutting
-	       down a multi-threaded world  */
-	    if ( EMPTY_RUN_QUEUE() ) {
-	      IF_DEBUG(scheduler, sched_belch("all done, i think...shutting down."));
-	      shutdownHaskellAndExit(0);
+#else
+	    m = main_threads;
+	    switch (m->tso->why_blocked) {
+	    case BlockedOnBlackHole:
+		raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
+		break;
+	    case BlockedOnException:
+	    case BlockedOnMVar:
+		raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
+		break;
+	    default:
+		barf("deadlock: main thread blocked in a strange way");
 	    }
 #endif
-	    ASSERT( !EMPTY_RUN_QUEUE() );
 	}
+
+#if defined(RTS_SUPPORTS_THREADS)
+	/* ToDo: revisit conditions (and mechanism) for shutting
+	   down a multi-threaded world  */
+	IF_DEBUG(scheduler, sched_belch("all done, i think...shutting down."));
+	shutdownHaskellAndExit(0);
+#endif
     }
+  not_deadlocked:
+
 #elif defined(PAR)
     /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
 #endif
@@ -1362,18 +1387,10 @@ void deleteAllThreads ( void )
 {
   StgTSO* t, *next;
   IF_DEBUG(scheduler,sched_belch("deleting all threads"));
-  for (t = run_queue_hd; t != END_TSO_QUEUE; t = next) {
-      next = t->link;
+  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+      next = t->global_link;
       deleteThread(t);
-  }
-  for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = next) {
-      next = t->link;
-      deleteThread(t);
-  }
-  for (t = sleeping_queue; t != END_TSO_QUEUE; t = next) {
-      next = t->link;
-      deleteThread(t);
-  }
+  }      
   run_queue_hd = run_queue_tl = END_TSO_QUEUE;
   blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
   sleeping_queue = END_TSO_QUEUE;

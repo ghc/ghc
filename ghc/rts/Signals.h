@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.6 2001/10/31 10:34:29 simonmar Exp $
+ * $Id: Signals.h,v 1.7 2002/03/12 13:57:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,9 +14,12 @@ extern StgPtr *next_pending_handler;
 
 #define signals_pending() (next_pending_handler != pending_handler_buf)
 
-extern void initUserSignals(void);
-extern void blockUserSignals(void);
-extern void unblockUserSignals(void);
+extern void    initUserSignals(void);
+extern void    blockUserSignals(void);
+extern void    unblockUserSignals(void);
+
+extern rtsBool anyUserHandlers(void);
+extern void    awaitUserSignals(void);
 
 /* sig_install declared in PrimOps.h */
 

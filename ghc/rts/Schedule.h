@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.30 2002/03/12 11:51:07 simonmar Exp $
+ * $Id: Schedule.h,v 1.31 2002/03/12 13:57:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -267,9 +267,16 @@ void print_bqe (StgBlockingQueueElement *bqe);
 #define THREAD_RUNNABLE()  /* nothing */
 #endif
 
-/* Check whether the run queue is empty i.e. the PE is idle
+/* Check whether various thread queues are empty
  */
-#define EMPTY_RUN_QUEUE()     (run_queue_hd == END_TSO_QUEUE)
-#define EMPTY_QUEUE(q)        (q == END_TSO_QUEUE)
+#define EMPTY_QUEUE(q)         (q == END_TSO_QUEUE)
+
+#define EMPTY_RUN_QUEUE()      (EMPTY_QUEUE(run_queue_hd))
+#define EMPTY_BLOCKED_QUEUE()  (EMPTY_QUEUE(blocked_queue_hd))
+#define EMPTY_SLEEPING_QUEUE() (EMPTY_QUEUE(sleeping_queue))
+
+#define EMPTY_THREAD_QUEUES()  (EMPTY_RUN_QUEUE() && \
+				EMPTY_BLOCKED_QUEUE() && \
+				EMPTY_SLEEPING_QUEUE())
 
 #endif /* __SCHEDULE_H__ */

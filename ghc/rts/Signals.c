@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.22 2001/10/31 10:34:29 simonmar Exp $
+ * $Id: Signals.c,v 1.23 2002/03/12 13:57:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,6 +29,8 @@
 /* SUP: The type of handlers is a little bit, well, doubtful... */
 static StgInt *handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
+
+static nat n_haskell_handlers = 0;
 
 #define N_PENDING_HANDLERS 16
 
@@ -166,6 +168,19 @@ unblockUserSignals(void)
     sigprocmask(SIG_SETMASK, &savedSignals, NULL);
 }
 
+rtsBool
+anyUserHandlers(void)
+{
+    return n_haskell_handlers != 0;
+}
+
+void
+awaitUserSignals(void)
+{
+    while (!signals_pending() && !interrupted) {
+	pause();
+    }
+}
 
 /* -----------------------------------------------------------------------------
  * Install a Haskell signal handler.
@@ -206,6 +221,7 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
     	handlers[sig] = (StgInt)handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
+	n_haskell_handlers++;
     	break;
 
     default:
@@ -226,6 +242,7 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 	// by freeing the previous handler if there was one.
 	if (previous_spi >= 0) {
 	    freeStablePtr(stgCast(StgStablePtr,handlers[sig]));
+	    n_haskell_handlers--;
 	}
 	return STG_SIG_ERR;
     }
