@@ -90,7 +90,8 @@ They should be installed when GHC's profiling subsystem is needed.
 #
 cat >mk/build.mk <<END
 GhcLibWays = p
-SRC_HAPPY_OPTS += -agc
+#SRC_HAPPY_OPTS += -agc # useful from Happy 1.7 onwards
+SRC_HAPPY_OPTS += -c
 END
 
 
@@ -121,8 +122,8 @@ make prefix=$RPM_BUILD_ROOT%{prefix}\
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
 #
-ls -R %{prefix}/lib/* | grep -v -e ":$" -e "^$" -e ".p_hi" -e "_p.a"\
-  >rpm-noprof-lib-files
+find $RPM_BUILD_ROOT%{prefix}/lib\
+  ! -type d ! -name '*.p_hi' ! -name '*_p.a' -print >rpm-noprof-lib-files
 
 %clean
 rm -rf $RPM_BUILD_ROOT
