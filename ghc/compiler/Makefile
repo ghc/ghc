@@ -182,13 +182,10 @@ parser/U_tree_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 prelude/PrimOp_HC_OPTS 		= -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
-ifeq "$(Ghc2_0)" "NO"
-reader/Lex_HC_OPTS		+= -fomit-derived-read
-endif
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 rename/ParseIface_HC_OPTS 	+= -Onot -H16m
 rename/ParseType_HC_OPTS 	+= -Onot -H16m
-rename/ParseUnfolding_HC_OPTS 	+= -Onot -H16m
+rename/ParseUnfolding_HC_OPTS 	+= -Onot -H30m
 ifeq "$(Ghc2_0)" "YES"
 rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
 rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
@@ -249,6 +246,10 @@ parser/hschooks.o : parser/hschooks.c
 
 # Interface-file parser uses Happy
 SRC_HAPPY_OPTS += +RTS -K2m -H10m -RTS
+
+ifeq ($(Ghc2_0),NO)
+SRC_HAPPY_OPTS+= -1.2
+endif
 
 rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
