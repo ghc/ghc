@@ -319,55 +319,39 @@ gen_Ord_binds tycon
     tycon_loc = getSrcLoc tycon
     --------------------------------------------------------------------
     compare = mk_easy_FunMonoBind tycon_loc compare_RDR
-		[a_Pat, b_Pat]
-		[cmp_eq]
-	    (if maybeToBool (maybeTyConSingleCon tycon) then
-
---		cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
--- Weird.  Was: case (cmp a b) of { LT -> LT; EQ -> EQ; GT -> GT }
-
-		cmp_eq_Expr a_Expr b_Expr
-	     else
-		untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)]
+				  [a_Pat, b_Pat] [cmp_eq] compare_rhs
+    compare_rhs
+	| single_con_type = cmp_eq_Expr a_Expr b_Expr
+ 	| otherwise
+	= untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)]
 		  (cmp_tags_Expr eqInt_RDR ah_RDR bh_RDR
-			-- True case; they are equal
-			-- If an enumeration type we are done; else
-			-- recursively compare their components
-		    (if isEnumerationTyCon tycon then
-			eqTag_Expr
-		     else
---			cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
--- Ditto
-			cmp_eq_Expr a_Expr b_Expr
-		    )
+			(cmp_eq_Expr a_Expr b_Expr)	-- True case
 			-- False case; they aren't equal
 			-- So we need to do a less-than comparison on the tags
-		    (cmp_tags_Expr ltInt_RDR ah_RDR bh_RDR ltTag_Expr gtTag_Expr)))
+		  	(cmp_tags_Expr ltInt_RDR ah_RDR bh_RDR ltTag_Expr gtTag_Expr))
 
     tycon_data_cons = tyConDataCons tycon
+    single_con_type = isSingleton tycon_data_cons
     (nullary_cons, nonnullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
        | otherwise	  = partition isNullaryDataCon tycon_data_cons
 
-    cmp_eq =
-       mk_FunMonoBind tycon_loc 
-                      cmp_eq_RDR 
-                      (if null nonnullary_cons && isSingleton nullary_cons then
-			   -- catch this specially to avoid warnings
-			   -- about overlapping patterns from the desugarer.
-		          let 
-			   data_con     = head nullary_cons
-			   data_con_RDR = getRdrName data_con
-                           pat          = mkNullaryConPat data_con_RDR
-                          in
-		          [([pat,pat], eqTag_Expr)]
-		       else
-		          map pats_etc nonnullary_cons ++
-			  -- leave out wildcards to silence desugarer.
-		          (if isSingleton tycon_data_cons then
-			      []
-			   else
-                              [([wildPat, wildPat], default_rhs)]))
+    cmp_eq = mk_FunMonoBind tycon_loc cmp_eq_RDR cmp_eq_match
+    cmp_eq_match
+      | isEnumerationTyCon tycon
+			   -- We know the tags are equal, so if it's an enumeration TyCon,
+			   -- then there is nothing left to do
+			   -- Catch this specially to avoid warnings
+			   -- about overlapping patterns from the desugarer,
+			   -- and to avoid unnecessary pattern-matching
+      = [([wildPat,wildPat], eqTag_Expr)]
+      | otherwise
+      = map pats_etc nonnullary_cons ++
+	(if single_con_type then	-- Omit wildcards when there's just one 
+	      []			-- constructor, to silence desugarer
+	else
+              [([wildPat, wildPat], default_rhs)])
+
       where
 	pats_etc data_con
 	  = ([con1_pat, con2_pat],
@@ -383,11 +367,11 @@ gen_Ord_binds tycon
 	    tys_needed  = dataConOrigArgTys data_con
 
 	    nested_compare_expr [ty] [a] [b]
-	      = careful_compare_Case ty ltTag_Expr eqTag_Expr gtTag_Expr (HsVar a) (HsVar b)
+	      = careful_compare_Case ty eqTag_Expr (HsVar a) (HsVar b)
 
 	    nested_compare_expr (ty:tys) (a:as) (b:bs)
 	      = let eq_expr = nested_compare_expr tys as bs
-		in  careful_compare_Case ty ltTag_Expr eq_expr gtTag_Expr (HsVar a) (HsVar b)
+		in  careful_compare_Case ty eq_expr (HsVar a) (HsVar b)
 
 	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
 								-- inexhaustive patterns
@@ -1145,34 +1129,35 @@ ToDo: Better SrcLocs.
 
 \begin{code}
 compare_gen_Case ::
-	  RdrName
-	  -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	  RdrNameHsExpr	-- What to do for equality
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
 careful_compare_Case :: -- checks for primitive types...
 	  Type
-	  -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr	-- What to do for equality
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
 
 cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
 	-- Was: compare_gen_Case cmp_eq_RDR
 
-compare_gen_Case fun lt eq gt a b
-  = HsCase (HsPar (HsApp (HsApp (HsVar fun) a) b)) {-of-}
-      [mkSimpleMatch [mkNullaryConPat ltTag_RDR] lt placeHolderType generatedSrcLoc,
+compare_gen_Case (HsVar eq_tag) a b | eq_tag == eqTag_RDR
+  = HsApp (HsApp (HsVar compare_RDR) a) b	-- Simple case 
+compare_gen_Case eq a b				-- General case
+  = HsCase (HsPar (HsApp (HsApp (HsVar compare_RDR) a) b)) {-of-}
+      [mkSimpleMatch [mkNullaryConPat ltTag_RDR] ltTag_Expr placeHolderType generatedSrcLoc,
        mkSimpleMatch [mkNullaryConPat eqTag_RDR] eq placeHolderType generatedSrcLoc,
-       mkSimpleMatch [mkNullaryConPat gtTag_RDR] gt placeHolderType generatedSrcLoc]
+       mkSimpleMatch [mkNullaryConPat gtTag_RDR] gtTag_Expr placeHolderType generatedSrcLoc]
       generatedSrcLoc
 
-careful_compare_Case ty lt eq gt a b
+careful_compare_Case ty eq a b
   | not (isUnLiftedType ty) =
-       compare_gen_Case compare_RDR lt eq gt a b
+       compare_gen_Case eq a b
   | otherwise               =
          -- we have to do something special for primitive things...
        HsIf (genOpApp a relevant_eq_op b)
 	    eq
-	    (HsIf (genOpApp a relevant_lt_op b) lt gt generatedSrcLoc)
+	    (HsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr generatedSrcLoc)
 	    generatedSrcLoc
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
