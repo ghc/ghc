@@ -1,28 +1,31 @@
---------------------------------------------------------------------------------
-{-| Module      :  Data.Map
-    Copyright   :  (c) Daan Leijen 2002
-    License     :  BSD-style
-    Maintainer  :  libraries@haskell.org
-    Stability   :  provisional
-    Portability :  portable
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Map
+-- Copyright   :  (c) Daan Leijen 2002
+-- License     :  BSD-style
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- An efficient implementation of maps from keys to values (dictionaries).
+--
+-- This module is intended to be imported @qualified@, to avoid name
+-- clashes with Prelude functions.  eg.
+--
+-- >  import Data.Map as Map
+--
+-- The implementation of 'Map' is based on /size balanced/ binary trees (or
+-- trees of /bounded balance/) as described by:
+--
+--    * Stephen Adams, \"/Efficient sets: a balancing act/\",
+--	Journal of Functional Programming 3(4):553-562, October 1993,
+--	<http://www.swiss.ai.mit.edu/~adams/BB>.
+--
+--    * J. Nievergelt and E.M. Reingold,
+--	\"/Binary search trees of bounded balance/\",
+--	SIAM journal of computing 2(1), March 1973.
+-----------------------------------------------------------------------------
 
-  An efficient implementation of maps from keys to values (dictionaries). 
-
-  This module is intended to be imported @qualified@, to avoid name
-  clashes with Prelude functions.  eg.
-
-  >  import Data.Map as Map
-
-  The implementation of "Map" is based on /size balanced/ binary trees (or
-  trees of /bounded balance/) as described by:
-
-     * Stephen Adams, \"/Efficient sets: a balancing act/\", Journal of Functional
-       Programming 3(4):553-562, October 1993, <http://www.swiss.ai.mit.edu/~adams/BB>.
-
-     * J. Nievergelt and E.M. Reingold, \"/Binary search trees of bounded balance/\",
-       SIAM journal of computing 2(1), March 1973.
--}
-----------------------------------------------------------------------------------
 module Data.Map  ( 
             -- * Map type
               Map          -- instance Eq,Show

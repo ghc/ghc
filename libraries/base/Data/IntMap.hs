@@ -1,35 +1,39 @@
 {-# OPTIONS -cpp -fglasgow-exts #-} 
--------------------------------------------------------------------------------- 
-{-| Module      :  Data.IntMap
-    Copyright   :  (c) Daan Leijen 2002
-    License     :  BSD-style
-    Maintainer  :  libraries@haskell.org
-    Stability   :  provisional
-    Portability :  portable
+-----------------------------------------------------------------------------
+-- Module      :  Data.IntMap
+-- Copyright   :  (c) Daan Leijen 2002
+-- License     :  BSD-style
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- An efficient implementation of maps from integer keys to values.
+--
+-- This module is intended to be imported @qualified@, to avoid name
+-- clashes with "Prelude" functions.  eg.
+--
+-- >  import Data.IntMap as Map
+--
+-- The implementation is based on /big-endian patricia trees/.  This data
+-- structure performs especially well on binary operations like 'union'
+-- and 'intersection'.  However, my benchmarks show that it is also
+-- (much) faster on insertions and deletions when compared to a generic
+-- size-balanced map implementation (see "Data.Map" and "Data.FiniteMap").
+--
+--    * Chris Okasaki and Andy Gill,  \"/Fast Mergeable Integer Maps/\",
+--	Workshop on ML, September 1998, pages 77-86,
+--	<http://www.cse.ogi.edu/~andy/pub/finite.htm>
+--
+--    * D.R. Morrison, \"/PATRICIA -- Practical Algorithm To Retrieve
+--	Information Coded In Alphanumeric/\", Journal of the ACM, 15(4),
+--	October 1968, pages 514-534.
+--
+-- Many operations have a worst-case complexity of /O(min(n,W))/.
+-- This means that the operation can become linear in the number of
+-- elements with a maximum of /W/ -- the number of bits in an 'Int'
+-- (32 or 64).
+-----------------------------------------------------------------------------
 
-  An efficient implementation of maps from integer keys to values. 
-  
-  This module is intended to be imported @qualified@, to avoid name
-  clashes with Prelude functions.  eg.
-
-  >  import Data.IntMap as Map
-
-  The implementation is based on /big-endian patricia trees/. This data structure 
-  performs especially well on binary operations like 'union' and 'intersection'. However,
-  my benchmarks show that it is also (much) faster on insertions and deletions when 
-  compared to a generic size-balanced map implementation (see "Map" and "Data.FiniteMap").
-   
-  *  Chris Okasaki and Andy Gill,  \"/Fast Mergeable Integer Maps/\",
-     Workshop on ML, September 1998, pages 77--86, <http://www.cse.ogi.edu/~andy/pub/finite.htm>
-
-  *  D.R. Morrison, \"/PATRICIA -- Practical Algorithm To Retrieve Information
-     Coded In Alphanumeric/\", Journal of the ACM, 15(4), October 1968, pages 514--534.
-
-  Many operations have a worst-case complexity of /O(min(n,W))/. This means that the
-  operation can become linear in the number of elements 
-  with a maximum of /W/ -- the number of bits in an 'Int' (32 or 64). 
--}
---------------------------------------------------------------------------------- 
 module Data.IntMap  ( 
             -- * Map type
               IntMap, Key          -- instance Eq,Show

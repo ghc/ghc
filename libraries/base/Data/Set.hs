@@ -1,33 +1,37 @@
-{-| Module      :  Data.Set
-    Copyright   :  (c) Daan Leijen 2002
-    License     :  BSD-style
-    Maintainer  :  libraries@haskell.org
-    Stability   :  provisional
-    Portability :  portable
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Set
+-- Copyright   :  (c) Daan Leijen 2002
+-- License     :  BSD-style
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- An efficient implementation of sets.
+--
+-- This module is intended to be imported @qualified@, to avoid name
+-- clashes with "Prelude" functions.  eg.
+--
+-- >  import Data.Set as Set
+--
+-- The implementation of 'Set' is based on /size balanced/ binary trees (or
+-- trees of /bounded balance/) as described by:
+--
+--    * Stephen Adams, \"/Efficient sets: a balancing act/\",
+--	Journal of Functional Programming 3(4):553-562, October 1993,
+--	<http://www.swiss.ai.mit.edu/~adams/BB>.
+--
+--    * J. Nievergelt and E.M. Reingold,
+--	\"/Binary search trees of bounded balance/\",
+--	SIAM journal of computing 2(1), March 1973.
+--
+-- Note that the implementation is /left-biased/ -- the elements of a
+-- first argument are always perferred to the second, for example in
+-- 'union' or 'insert'.  Of course, left-biasing can only be observed
+-- when equality is an equivalence relation instead of structural
+-- equality.
+-----------------------------------------------------------------------------
 
-  An efficient implementation of sets. 
-
-  This module is intended to be imported @qualified@, to avoid name
-  clashes with Prelude functions.  eg.
-
-  >  import Data.Set as Set
-
-  The implementation of "Set" is based on /size balanced/ binary trees (or
-  trees of /bounded balance/) as described by:
-
-     * Stephen Adams, \"/Efficient sets: a balancing act/\", Journal of Functional
-       Programming 3(4):553-562, October 1993, <http://www.swiss.ai.mit.edu/~adams/BB>.
-
-     * J. Nievergelt and E.M. Reingold, \"/Binary search trees of bounded balance/\",
-       SIAM journal of computing 2(1), March 1973.
-
-  Note that the implementation is /left-biased/ -- the elements of a
-  first argument are always perferred to the second, for example in
-  'union' or 'insert'.  Of course, left-biasing can only be observed
-  when equality an equivalence relation instead of structural
-  equality.
--}
----------------------------------------------------------------------------------
 module Data.Set  ( 
             -- * Set type
               Set          -- instance Eq,Show
