@@ -716,7 +716,7 @@ The datatypes and functions that @RegexString@ provides are:
 <tscreen><verb>
 data Regex              -- a compiled regular expression
 
-mkRegEx
+mkRegex
         :: String       -- regexp to compile
         -> Regex        -- compiled regexp
 
