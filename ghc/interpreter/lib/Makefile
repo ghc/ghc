@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.1 1999/11/19 15:33:34 andy Exp $ 
+# $Id: Makefile,v 1.2 1999/11/22 16:02:53 sewardj Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -16,9 +16,9 @@ hugslib :: $(LIBS)
 HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
 
 %.lhs :: $(GHC_LIB_DIR)/std/%.lhs
-	$(HUGSCPP) -I../includes $< > $*.lhs
+	$(HUGSCPP) -I../../includes $< > $*.lhs
 
 %.lhs :: $(GHC_LIB_DIR)/exts/%.lhs
-	$(HUGSCPP) -I../includes $< > $*.lhs
+	$(HUGSCPP) -I../../includes $< > $*.lhs
 
 include $(TOP)/mk/target.mk
