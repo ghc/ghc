@@ -52,8 +52,10 @@ test('conc032', normal, compile_and_run, [''])
 test('conc033', skip, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-test('conc034', compose(omit_ways(['ghci']), extra_run_opts('+RTS -C0 -RTS')),
-	compile_and_run, [''])
+# Now skipped altogether, hangs with the threaded RTS
+# test('conc034', compose(omit_ways(['ghci']), extra_run_opts('+RTS -C0 -RTS')),
+# 	compile_and_run, [''])
+test('conc034', skip, compile_and_run, [''])
 
 test('conc035', normal, compile_and_run, [''])
 test('conc036', normal, compile_and_run, [''])
