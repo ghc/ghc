@@ -26,7 +26,7 @@ import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, 
-			  getEnvTyCons, getEnvClasses, tcLookupValueByKeyMaybe,
+			  tcEnvTyCons, tcEnvClasses, 
 			  tcSetValueEnv, tcSetInstEnv, initEnv, 
 			  ValueEnv, 
 			)
@@ -109,7 +109,7 @@ The internal monster:
 tcModule :: RnNameSupply	-- for renaming derivings
 	 -> FixityEnv		-- needed for Show/Read derivings.
 	 -> RenamedHsModule	-- input
-	 -> TcM s TcResults	-- output
+	 -> TcM TcResults	-- output
 
 tcModule rn_name_supply fixities
 	(HsModule mod_name _ _ _ decls _ src_loc)
@@ -136,8 +136,8 @@ tcModule rn_name_supply fixities
 
 	tcSetInstEnv inst_env $
     	let
-    	    classes      = getEnvClasses env
-    	    tycons       = getEnvTyCons env	-- INCLUDES tycons derived from classes
+    	    classes      = tcEnvClasses env
+    	    tycons       = tcEnvTyCons env	-- INCLUDES tycons derived from classes
 	    local_classes = filter isLocallyDefined classes
 	    local_tycons  = [ tc | tc <- tycons,
 				   isLocallyDefined tc,
@@ -223,8 +223,10 @@ tcModule rn_name_supply fixities
 
 		-- Check that Main defines main
 	(if mod_name == mAIN_Name then
-		tcLookupValueByKeyMaybe mainKey		`thenNF_Tc` \ maybe_main ->
-		checkTc (maybeToBool maybe_main) noMainErr
+		tcLookupGlobal_maybe mainName		`thenNF_Tc` \ maybe_main ->
+		case maybe_main of
+		   Just (AnId _) -> returnTc ()
+		   other	 -> addErrTc noMainErr
 	 else
 		returnTc ()
 	)					`thenTc_`

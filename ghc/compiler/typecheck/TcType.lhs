@@ -9,8 +9,8 @@ module TcType (
   TcTyVar,
   TcTyVarSet,
   newTyVar,
-  newTyVarTy,		-- Kind -> NF_TcM s TcType
-  newTyVarTys,		-- Int -> Kind -> NF_TcM s [TcType]
+  newTyVarTy,		-- Kind -> NF_TcM TcType
+  newTyVarTys,		-- Int -> Kind -> NF_TcM [TcType]
 
   -----------------------------------------
   TcType, TcTauType, TcThetaType, TcRhoType,
@@ -78,7 +78,7 @@ No need for tcSplitForAllTy because a type variable can't be instantiated
 to a for-all type.
 
 \begin{code}
-tcSplitRhoTy :: TcType -> NF_TcM s (TcThetaType, TcType)
+tcSplitRhoTy :: TcType -> NF_TcM (TcThetaType, TcType)
 tcSplitRhoTy t
   = go t t []
  where
@@ -103,29 +103,29 @@ tcSplitRhoTy t
 %************************************************************************
 
 \begin{code}
-newTyVar :: Kind -> NF_TcM s TcTyVar
+newTyVar :: Kind -> NF_TcM TcTyVar
 newTyVar kind
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
     tcNewMutTyVar (mkSysLocalName uniq SLIT("t")) kind
 
-newTyVarTy  :: Kind -> NF_TcM s TcType
+newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
   = newTyVar kind	`thenNF_Tc` \ tc_tyvar ->
     returnNF_Tc (TyVarTy tc_tyvar)
 
-newTyVarTys :: Int -> Kind -> NF_TcM s [TcType]
+newTyVarTys :: Int -> Kind -> NF_TcM [TcType]
 newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 
-newKindVar :: NF_TcM s TcKind
+newKindVar :: NF_TcM TcKind
 newKindVar
   = tcGetUnique 						`thenNF_Tc` \ uniq ->
     tcNewMutTyVar (mkSysLocalName uniq SLIT("k")) superKind	`thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 
-newKindVars :: Int -> NF_TcM s [TcKind]
+newKindVars :: Int -> NF_TcM [TcKind]
 newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 
-newBoxityVar :: NF_TcM s TcKind
+newBoxityVar :: NF_TcM TcKind
 newBoxityVar
   = tcGetUnique 						`thenNF_Tc` \ uniq ->
     tcNewMutTyVar (mkSysLocalName uniq SLIT("bx")) superBoxity	`thenNF_Tc` \ kv ->
@@ -143,7 +143,7 @@ Instantiating a bunch of type variables
 
 \begin{code}
 tcInstTyVars :: [TyVar] 
-	     -> NF_TcM s ([TcTyVar], [TcType], Subst)
+	     -> NF_TcM ([TcTyVar], [TcType], Subst)
 
 tcInstTyVars tyvars
   = mapNF_Tc tcInstTyVar tyvars	`thenNF_Tc` \ tc_tyvars ->
@@ -182,7 +182,7 @@ tcInstSigVar tyvar	-- Very similar to tcInstTyVar
 fresh type variables, returning them and the instantiated body of the for-all.
 
 \begin{code}
-tcInstTcType :: TcType -> NF_TcM s ([TcTyVar], TcType)
+tcInstTcType :: TcType -> NF_TcM ([TcTyVar], TcType)
 tcInstTcType ty
   = case splitForAllTys ty of
 	([], _)       -> returnNF_Tc ([], ty)	-- Nothing to do
@@ -199,8 +199,8 @@ tcInstTcType ty
 %************************************************************************
 
 \begin{code}
-tcPutTyVar :: TcTyVar -> TcType -> NF_TcM s TcType
-tcGetTyVar :: TcTyVar -> NF_TcM s (Maybe TcType)
+tcPutTyVar :: TcTyVar -> TcType -> NF_TcM TcType
+tcGetTyVar :: TcTyVar -> NF_TcM (Maybe TcType)
 \end{code}
 
 Putting is easy:
@@ -233,7 +233,7 @@ tcGetTyVar tyvar
 
 	Nothing	   -> returnNF_Tc Nothing
 
-short_out :: TcType -> NF_TcM s TcType
+short_out :: TcType -> NF_TcM TcType
 short_out ty@(TyVarTy tyvar)
   | not (isMutTyVar tyvar)
   = returnNF_Tc ty
@@ -260,13 +260,13 @@ short_out other_ty = returnNF_Tc other_ty
 -----------------  Type variables
 
 \begin{code}
-zonkTcTyVars :: [TcTyVar] -> NF_TcM s [TcType]
+zonkTcTyVars :: [TcTyVar] -> NF_TcM [TcType]
 zonkTcTyVars tyvars = mapNF_Tc zonkTcTyVar tyvars
 
-zonkTcTyVar :: TcTyVar -> NF_TcM s TcType
+zonkTcTyVar :: TcTyVar -> NF_TcM TcType
 zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnNF_Tc (TyVarTy tv)) tyvar
 
-zonkTcSigTyVars :: [TcTyVar] -> NF_TcM s [TcTyVar]
+zonkTcSigTyVars :: [TcTyVar] -> NF_TcM [TcTyVar]
 -- This guy is to zonk the tyvars we're about to feed into tcSimplify
 -- Usually this job is done by checkSigTyVars, but in a couple of places
 -- that is overkill, so we use this simpler chap
@@ -278,10 +278,10 @@ zonkTcSigTyVars tyvars
 -----------------  Types
 
 \begin{code}
-zonkTcType :: TcType -> NF_TcM s TcType
+zonkTcType :: TcType -> NF_TcM TcType
 zonkTcType ty = zonkType (\ tv -> returnNF_Tc (TyVarTy tv)) ty
 
-zonkTcTypes :: [TcType] -> NF_TcM s [TcType]
+zonkTcTypes :: [TcType] -> NF_TcM [TcType]
 zonkTcTypes tys = mapNF_Tc zonkTcType tys
 
 zonkTcClassConstraints cts = mapNF_Tc zonk cts
@@ -289,10 +289,10 @@ zonkTcClassConstraints cts = mapNF_Tc zonk cts
 	    = zonkTcTypes tys	`thenNF_Tc` \ new_tys ->
 	      returnNF_Tc (clas, new_tys)
 
-zonkTcThetaType :: TcThetaType -> NF_TcM s TcThetaType
+zonkTcThetaType :: TcThetaType -> NF_TcM TcThetaType
 zonkTcThetaType theta = mapNF_Tc zonkTcPredType theta
 
-zonkTcPredType :: TcPredType -> NF_TcM s TcPredType
+zonkTcPredType :: TcPredType -> NF_TcM TcPredType
 zonkTcPredType (Class c ts) =
     zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
     returnNF_Tc (Class c new_ts)
@@ -305,7 +305,7 @@ zonkTcPredType (IParam n t) =
 		     are used at the end of type checking
 
 \begin{code}
-zonkKindEnv :: [(Name, TcKind)] -> NF_TcM s [(Name, Kind)]
+zonkKindEnv :: [(Name, TcKind)] -> NF_TcM [(Name, Kind)]
 zonkKindEnv pairs 
   = mapNF_Tc zonk_it pairs
  where
@@ -319,7 +319,7 @@ zonkKindEnv pairs
 			     | tyVarKind kv == superBoxity = tcPutTyVar kv boxedBoxity
 			     | otherwise		   = pprPanic "zonkKindEnv" (ppr kv)
 			
-zonkTcTypeToType :: TcType -> NF_TcM s Type
+zonkTcTypeToType :: TcType -> NF_TcM Type
 zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
   where
 	-- Zonk a mutable but unbound type variable to
@@ -349,7 +349,7 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 -- Now any bound occurences of the original type variable will get 
 -- zonked to the immutable version.
 
-zonkTcTyVarToTyVar :: TcTyVar -> NF_TcM s TyVar
+zonkTcTyVarToTyVar :: TcTyVar -> NF_TcM TyVar
 zonkTcTyVarToTyVar tv
   = let
 		-- Make an immutable version, defaulting 
@@ -385,10 +385,10 @@ zonkTcTyVarToTyVar tv
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --	type variable and zonks the kind too
 
-zonkType :: (TcTyVar -> NF_TcM s Type) 	-- What to do with unbound mutable type variables
+zonkType :: (TcTyVar -> NF_TcM Type) 	-- What to do with unbound mutable type variables
 					-- see zonkTcType, and zonkTcTypeToType
 	 -> TcType
-	 -> NF_TcM s Type
+	 -> NF_TcM Type
 zonkType unbound_var_fn ty
   = go ty
   where
@@ -430,8 +430,8 @@ zonkType unbound_var_fn ty
     go_pred (IParam n ty) = go ty		`thenNF_Tc` \ ty' ->
 			    returnNF_Tc (IParam n ty')
 
-zonkTyVar :: (TcTyVar -> NF_TcM s Type)		-- What to do for an unbound mutable variable
-	  -> TcTyVar -> NF_TcM s TcType
+zonkTyVar :: (TcTyVar -> NF_TcM Type)		-- What to do for an unbound mutable variable
+	  -> TcTyVar -> NF_TcM TcType
 zonkTyVar unbound_var_fn tyvar 
   | not (isMutTyVar tyvar)	-- Not a mutable tyvar.  This can happen when
 				-- zonking a forall type, when the bound type variable

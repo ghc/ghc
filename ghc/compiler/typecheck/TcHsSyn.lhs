@@ -150,19 +150,19 @@ the environment manipulation is tiresome.
 
 \begin{code}
 -- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> NF_TcM s TcId
+zonkId :: TcId -> NF_TcM TcId
 zonkId id
   = zonkTcType (idType id) `thenNF_Tc` \ ty' ->
     returnNF_Tc (setIdType id ty')
 
 -- zonkIdBndr is used *after* typechecking to get the Id's type
 -- to its final form.  The TyVarEnv give 
-zonkIdBndr :: TcId -> NF_TcM s Id
+zonkIdBndr :: TcId -> NF_TcM Id
 zonkIdBndr id
   = zonkTcTypeToType (idType id)	`thenNF_Tc` \ ty' ->
     returnNF_Tc (setIdType id ty')
 
-zonkIdOcc :: TcId -> NF_TcM s Id
+zonkIdOcc :: TcId -> NF_TcM Id
 zonkIdOcc id 
   | not (isLocallyDefined id) || omitIfaceSigForId id || isIP id
 	-- The omitIfaceSigForId thing may look wierd but it's quite
@@ -171,18 +171,18 @@ zonkIdOcc id
 	-- superclass selectors aren't in the environment anyway.
   = returnNF_Tc id
   | otherwise 
-  = tcLookupValueMaybe (idName id)	`thenNF_Tc` \ maybe_id' ->
+  = tcLookupGlobal_maybe (idName id)	`thenNF_Tc` \ maybe_id' ->
     let
 	new_id = case maybe_id' of
-		    Just id' -> id'
-		    Nothing  -> pprTrace "zonkIdOcc: " (ppr id) id
+		    Just (AnId id') -> id'
+		    other  -> pprTrace "zonkIdOcc: " (ppr id) id
     in
     returnNF_Tc new_id
 \end{code}
 
 
 \begin{code}
-zonkTopBinds :: TcMonoBinds -> NF_TcM s (TypecheckedMonoBinds, ValueEnv)
+zonkTopBinds :: TcMonoBinds -> NF_TcM (TypecheckedMonoBinds, ValueEnv)
 zonkTopBinds binds	-- Top level is implicitly recursive
   = fixNF_Tc (\ ~(_, new_ids) ->
 	tcExtendGlobalValEnv (bagToList new_ids)	$
@@ -192,7 +192,7 @@ zonkTopBinds binds	-- Top level is implicitly recursive
     )					`thenNF_Tc` \ (stuff, _) ->
     returnNF_Tc stuff
 
-zonkBinds :: TcHsBinds -> NF_TcM s (TypecheckedHsBinds, TcEnv)
+zonkBinds :: TcHsBinds -> NF_TcM (TypecheckedHsBinds, TcEnv)
 
 zonkBinds binds 
   = go binds (\ binds' -> tcGetEnv `thenNF_Tc` \ env -> 
@@ -200,9 +200,9 @@ zonkBinds binds
   where
     -- go :: TcHsBinds
     --    -> (TypecheckedHsBinds
-    --	      -> NF_TcM s (TypecheckedHsBinds, TcEnv)
+    --	      -> NF_TcM (TypecheckedHsBinds, TcEnv)
     --       ) 
-    --	  -> NF_TcM s (TypecheckedHsBinds, TcEnv)
+    --	  -> NF_TcM (TypecheckedHsBinds, TcEnv)
 
     go (ThenBinds b1 b2) thing_inside = go b1 	$ \ b1' -> 
 					go b2 	$ \ b2' ->
@@ -224,7 +224,7 @@ zonkBinds binds
 \begin{code}
 -------------------------------------------------------------------------
 zonkMonoBinds :: TcMonoBinds
-	      -> NF_TcM s (TypecheckedMonoBinds, Bag Id)
+	      -> NF_TcM (TypecheckedMonoBinds, Bag Id)
 
 zonkMonoBinds EmptyMonoBinds = returnNF_Tc (EmptyMonoBinds, emptyBag)
 
@@ -290,7 +290,7 @@ zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
 %************************************************************************
 
 \begin{code}
-zonkMatch :: TcMatch -> NF_TcM s TypecheckedMatch
+zonkMatch :: TcMatch -> NF_TcM TypecheckedMatch
 
 zonkMatch (Match _ pats _ grhss)
   = zonkPats pats				`thenNF_Tc` \ (new_pats, new_ids) ->
@@ -300,7 +300,7 @@ zonkMatch (Match _ pats _ grhss)
 
 -------------------------------------------------------------------------
 zonkGRHSs :: TcGRHSs
-	  -> NF_TcM s TypecheckedGRHSs
+	  -> NF_TcM TypecheckedGRHSs
 
 zonkGRHSs (GRHSs grhss binds (Just ty))
   = zonkBinds binds   		`thenNF_Tc` \ (new_binds, new_env) ->
@@ -322,7 +322,7 @@ zonkGRHSs (GRHSs grhss binds (Just ty))
 %************************************************************************
 
 \begin{code}
-zonkExpr :: TcExpr -> NF_TcM s TypecheckedHsExpr
+zonkExpr :: TcExpr -> NF_TcM TypecheckedHsExpr
 
 zonkExpr (HsVar id)
   = zonkIdOcc id	`thenNF_Tc` \ id' ->
@@ -481,7 +481,7 @@ zonkExpr (DictApp expr dicts)
 
 
 -------------------------------------------------------------------------
-zonkArithSeq :: TcArithSeqInfo -> NF_TcM s TypecheckedArithSeqInfo
+zonkArithSeq :: TcArithSeqInfo -> NF_TcM TypecheckedArithSeqInfo
 
 zonkArithSeq (From e)
   = zonkExpr e		`thenNF_Tc` \ new_e ->
@@ -505,7 +505,7 @@ zonkArithSeq (FromThenTo e1 e2 e3)
 
 -------------------------------------------------------------------------
 zonkStmts :: [TcStmt]
-	  -> NF_TcM s [TypecheckedStmt]
+	  -> NF_TcM [TypecheckedStmt]
 
 zonkStmts [] = returnNF_Tc []
 
@@ -539,7 +539,7 @@ zonkStmts (BindStmt pat expr locn : stmts)
 
 
 -------------------------------------------------------------------------
-zonkRbinds :: TcRecordBinds -> NF_TcM s TypecheckedRecordBinds
+zonkRbinds :: TcRecordBinds -> NF_TcM TypecheckedRecordBinds
 
 zonkRbinds rbinds
   = mapNF_Tc zonk_rbind rbinds
@@ -557,7 +557,7 @@ zonkRbinds rbinds
 %************************************************************************
 
 \begin{code}
-zonkPat :: TcPat -> NF_TcM s (TypecheckedPat, Bag Id)
+zonkPat :: TcPat -> NF_TcM (TypecheckedPat, Bag Id)
 
 zonkPat (WildPat ty)
   = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty ->
@@ -647,17 +647,17 @@ zonkPats (pat:pats)
 
 
 \begin{code}
-zonkForeignExports :: [TcForeignExportDecl] -> NF_TcM s [TypecheckedForeignDecl]
+zonkForeignExports :: [TcForeignExportDecl] -> NF_TcM [TypecheckedForeignDecl]
 zonkForeignExports ls = mapNF_Tc zonkForeignExport ls
 
-zonkForeignExport :: TcForeignExportDecl -> NF_TcM s (TypecheckedForeignDecl)
+zonkForeignExport :: TcForeignExportDecl -> NF_TcM (TypecheckedForeignDecl)
 zonkForeignExport (ForeignDecl i imp_exp hs_ty ext_nm cconv src_loc) =
    zonkIdOcc i	`thenNF_Tc` \ i' ->
    returnNF_Tc (ForeignDecl i' imp_exp undefined ext_nm cconv src_loc)
 \end{code}
 
 \begin{code}
-zonkRules :: [TcRuleDecl] -> NF_TcM s [TypecheckedRuleDecl]
+zonkRules :: [TcRuleDecl] -> NF_TcM [TypecheckedRuleDecl]
 zonkRules rs = mapNF_Tc zonkRule rs
 
 zonkRule (HsRule name tyvars vars lhs rhs loc)

@@ -51,11 +51,11 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcForeignImports :: [RenamedHsDecl] -> TcM s ([Id], [TypecheckedForeignDecl])
+tcForeignImports :: [RenamedHsDecl] -> TcM ([Id], [TypecheckedForeignDecl])
 tcForeignImports decls = 
    mapAndUnzipTc tcFImport [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
 
-tcForeignExports :: [RenamedHsDecl] -> TcM s (LIE, TcMonoBinds, [TcForeignExportDecl])
+tcForeignExports :: [RenamedHsDecl] -> TcM (LIE, TcMonoBinds, [TcForeignExportDecl])
 tcForeignExports decls = 
    foldlTc combine (emptyLIE, EmptyMonoBinds, [])
 		   [ foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
@@ -80,7 +80,7 @@ isForeignExport _				      = False
 \end{code}
 
 \begin{code}
-tcFImport :: RenamedForeignDecl -> TcM s (Id, TypecheckedForeignDecl)
+tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
@@ -128,7 +128,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
 	let i = (mkVanillaId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 
-tcFExport :: RenamedForeignDecl -> TcM s (LIE, TcMonoBinds, TcForeignExportDecl)
+tcFExport :: RenamedForeignDecl -> TcM (LIE, TcMonoBinds, TcForeignExportDecl)
 tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
@@ -160,7 +160,7 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 
 
 \begin{code}
-checkForeignImport :: Bool -> Bool -> Type -> [Type] -> Type -> TcM s ()
+checkForeignImport :: Bool -> Bool -> Type -> [Type] -> Type -> TcM ()
 checkForeignImport is_dynamic is_safe ty args res
  | is_dynamic =
     -- * first arg has got to be an Addr
@@ -174,7 +174,7 @@ checkForeignImport is_dynamic is_safe ty args res
      mapTc (checkForeignArg (isFFIArgumentTy is_safe)) args     `thenTc_`
      checkForeignRes True {-NonIO ok-} isFFIResultTy res
 
-checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM s ()
+checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM ()
 checkForeignExport is_dynamic ty args res
  | is_dynamic = 
     -- * the first (and only!) arg has got to be a function type
@@ -192,13 +192,13 @@ checkForeignExport is_dynamic ty args res
      mapTc (checkForeignArg isFFIExternalTy) args  	        `thenTc_`
      checkForeignRes True {-NonIO ok-} isFFIResultTy res
  
-checkForeignArg :: (Type -> Bool) -> Type -> TcM s ()
+checkForeignArg :: (Type -> Bool) -> Type -> TcM ()
 checkForeignArg pred ty = check (pred ty) (illegalForeignTyErr True{-Arg-} ty)
 
 -- Check that the type has the form 
 --    (IO t) or (t) , and that t satisfies the given predicate.
 --
-checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM s ()
+checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM ()
 checkForeignRes non_io_result_ok pred_res_ty ty =
  case (splitTyConApp_maybe ty) of
     Just (io, [res_ty]) 
@@ -212,7 +212,7 @@ checkForeignRes non_io_result_ok pred_res_ty ty =
 Warnings
 
 \begin{code}
-check :: Bool -> Message -> TcM s ()
+check :: Bool -> Message -> TcM ()
 check True _	   = returnTc ()
 check _    the_err = addErrTc the_err `thenNF_Tc_` returnTc ()
 

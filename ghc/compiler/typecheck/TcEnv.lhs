@@ -1,33 +1,33 @@
 \begin{code}
 module TcEnv(
 	TcId, TcIdSet, tcInstId,
-	tcLookupDataCon,
 
-	TcEnv, ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind, 
+	TcEnv, TyThing(..), TyThingDetails(..),
 
-	initEnv, getEnvTyCons, getEnvClasses, 
+	initEnv, 
+
+	-- Getting stuff from the environment
+	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds,
 	
-        tcExtendUVarEnv, tcLookupUVar,
+	-- Global environment
+	tcLookupTy, tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
 
+	-- Local environment
 	tcExtendKindEnv, tcExtendTyVarEnv, 
 	tcExtendTyVarEnvForMeths, tcExtendTypeEnv, tcGetInScopeTyVars,
 
-	tcLookupTy,
-	tcLookupTyConByKey, 
-	tcLookupClassByKey, tcLookupClassByKey_maybe,
+	-- Global type variables
+	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcGetValueEnv,        tcSetValueEnv, 
 	tcAddImportedIdInfo,
 
 	tcLookupValue,      tcLookupValueMaybe, 
-	tcLookupValueByKey, tcLookupValueByKeyMaybe,
-	explicitLookupValueByKey, explicitLookupValue,
-	valueEnvIds,
+	explicitLookupValue,
 
 	newLocalId, newSpecPragmaId,
 	newDefaultMethodName, newDFunName,
-	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	InstEnv, emptyInstEnv, addToInstEnv, 
 	lookupInstEnv, InstLookupResult(..),
@@ -84,6 +84,122 @@ import Outputable
 
 %************************************************************************
 %*									*
+\subsection{TcEnv}
+%*									*
+%************************************************************************
+
+\begin{code}
+data TcEnv
+  = TcEnv {
+	tcGST  	 :: GlobalSymbolTable,	-- The symbol table at the moment we began this compilation
+
+	tcInst 	 :: InstEnv,		-- All instances (both imported and in this module)
+
+	tcGEnv	 :: NameEnv TyThing	-- The global type environment we've accumulated while
+					-- compiling this module:
+					--	types and classes (both imported and local)
+					-- 	imported Ids
+					-- (Ids defined in this module are in the local envt)
+
+	tcLEnv 	 :: NameEnv TcTyThing,	-- The local type environment: Ids and TyVars
+					-- defined in this module
+
+	tcTyVars :: TcRef TcTyVarSet	-- The "global tyvars"
+					-- Namely, the in-scope TyVars bound in tcLEnv, plus the tyvars
+					-- mentioned in the types of Ids bound in tcLEnv
+					-- Why mutable? see notes with tcGetGlobalTyVars
+    }
+
+\end{code}
+
+The Global-Env/Local-Env story
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During type checking, we keep in the GlobalEnv
+	* All types and classes
+	* All Ids derived from types and classes (constructors, selectors)
+	* Imported Ids
+
+At the end of type checking, we zonk the local bindings,
+and as we do so we add to the GlobalEnv
+	* Locally defined top-level Ids
+
+Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
+used thus:
+	a) fed back (via the knot) to typechecking the 
+	   unfoldings of interface signatures
+
+	b) used to augment the GlobalSymbolTable
+
+
+\begin{code}
+data TcTyThing
+  = AGlobal TyThing	-- Used only in the return type of a lookup
+  | ATcId  TcId		-- Ids defined in this module
+  | ATyVar TyVar	-- Type variables
+  | AThing TcKind	-- Used temporarily, during kind checking
+-- Here's an example of how the AThing guy is used
+-- Suppose we are checking (forall a. T a Int):
+--	1. We first bind (a -> AThink kv), where kv is a kind variable. 
+--	2. Then we kind-check the (T a Int) part.
+--	3. Then we zonk the kind variable.
+--	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
+
+initEnv :: GlobalSymbolTable -> InstEnv -> NF_TcM TcEnv
+initEnv gst inst_env
+  = tcNewMutVar emptyVarSet	`thenNF_Tc` \ gtv_var ->
+    returnTc (TcEnv { tcGST = gst,
+		      tcGEnv = emptyNameEnv, 
+		      tcInst = inst_env,
+		      tcLEnv = emptyNameEnv,
+		      tcTyVars = gtv_var
+	     })
+
+tcEnvClasses env = [cl | AClass cl <- nameEnvElts (tcGEnv env)]
+tcEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts (tcGEnv env)] 
+tcEnvIds     env = [id | AnId   id <- nameEnvElts (tcGEnv env)] 
+tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
+tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
+
+-- This data type is used to help tie the knot
+-- when type checking type and class declarations
+data TyThingDetails = SynTyDetails Type
+		    | DataTyDetails ClassContext [DataCon] [Class]
+		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Basic lookups}
+%*									*
+%************************************************************************
+
+\begin{code}
+lookup_global :: TcEnv -> Name -> Maybe TyThing
+lookup_global env name 
+  = 	-- Try the global envt
+    case lookupNameEnv (tcGEnv env) name of {
+	Just thing -> Just thing ;
+	Nothing    ->
+
+	-- Try the global symbol table
+    case lookupModuleEnv (tcGST env) of {
+	Nothing   -> Nothing ;
+	Just genv -> lookupNameEnv genv name
+    }}
+
+lookup_local :: TcEnv -> Name -> Maybe TcTyThing
+lookup_local env name
+ = case lookupNameEnv (tcLEnv env) name of
+	Just thing -> Just thing ;
+	Nothing    -> case lookup_global env name of
+			Just thing -> AGlobal thing
+			Nothing	   -> Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{TcId}
 %*									*
 %************************************************************************
@@ -93,32 +209,15 @@ import Outputable
 type TcId    = Id 			-- Type may be a TcType
 type TcIdSet = IdSet
 
-tcLookupDataCon :: Name -> TcM s (DataCon, [TcType], TcType)
-tcLookupDataCon con_name
-  = tcLookupValue con_name		`thenNF_Tc` \ con_id ->
-    case isDataConWrapId_maybe con_id of {
-	Nothing -> failWithTc (badCon con_id);
- 	Just data_con ->
-
-    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
-	     -- Ignore the con_theta; overloaded constructors only
-	     -- behave differently when called, not when used for
-	     -- matching.
-    let
-	(arg_tys, result_ty) = splitFunTys con_tau
-    in
-    ASSERT( maybeToBool (splitAlgTyConApp_maybe result_ty) )
-    returnTc (data_con, arg_tys, result_ty) }
-
 -- A useful function that takes an occurrence of a global thing
 -- and instantiates its type with fresh type variables
 tcInstId :: Id
-	 -> NF_TcM s ([TcTyVar], 	-- It's instantiated type
+	 -> NF_TcM ([TcTyVar], 	-- It's instantiated type
 		      TcThetaType,	--
 		      TcType)		--
 tcInstId id
   = let
-      (tyvars, rho) = splitForAllTys (unannotTy (idType id))
+      (tyvars, rho) = splitForAllTys (idType id)
     in
     tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
     let
@@ -128,128 +227,97 @@ tcInstId id
     returnNF_Tc (tyvars', theta', tau')
 \end{code}
 
-Between the renamer and the first invocation of the UsageSP inference,
-identifiers read from interface files will have usage information in
-their types, whereas other identifiers will not.  The unannotTy here
-in @tcInstId@ prevents this information from pointlessly propagating
-further prior to the first usage inference.
-
 
 %************************************************************************
 %*									*
-\subsection{TcEnv}
-%*									*
-%************************************************************************
-
-Data type declarations
-~~~~~~~~~~~~~~~~~~~~~
-
-\begin{code}
-data TcEnv
-  = TcEnv {
-	tcGST  	 :: GlobalSymbolTable,	-- The symbol table at the moment we began this compilation
-
-	tcGEnv	 :: NameEnv TyThing	-- The global type environment we've accumulated while
-					-- compiling this module:
-					--	types and classes (both imported and local)
-					-- 	imported Ids
-					-- (Ids defined in this module are in the local envt)
-		-- When type checking is over we'll augment the
-		-- global symbol table with everything in tcGEnv
-		
-	tcInst 	 :: InstEnv,		-- All instances (both imported and in this module)
-
-	tcLEnv 	 :: NameEnv TcTyThing,	-- The local type environment: Ids and TyVars
-					-- defined in this module
-
-	tcTyVars :: FreeTyVars		-- Type variables free in tcLST
-    }
-
-
-type InScopeTyVars = (TcTyVarSet,	-- The in-scope TyVars
-		      TcRef TcTyVarSet)	-- Free type variables of the value env
-					-- ...why mutable? see notes with tcGetGlobalTyVars
-
-valueEnvIds :: ValueEnv -> [Id]
-valueEnvIds ve = nameEnvElts ve
-
-data TcTyThing = ATyVar TyVar
-	       | ATcId  TcId
-	       | AThing TcKind	-- Used temporarily, during kind checking
--- For example, when checking (forall a. T a Int):
---	1. We first bind (a -> AThink kv), where kv is a kind variable. 
---	2. Then we kind-check the (T a Int) part.
---	3. Then we zonk the kind variable.
---	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
-
-tyThingKind :: TyThing -> TcKind
-tyThingKind (ATyVar tv) = tyVarKind tv
-tyThingKind (ATyCon tc) = tyConKind tc
-tyThingKind (AClass cl) = tyConKind (classTyCon cl)	-- For some odd reason, 
-							-- a class doesn't include its kind
-tyThingKind (AThing k)  = k
-
-data TyThingDetails = SynTyDetails Type
-		    | DataTyDetails ClassContext [DataCon] [Class]
-		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
-
-initEnv :: TcRef TcTyVarSet -> TcEnv
-initEnv mut = TcEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyInstEnv (emptyVarSet, mut)
-
-getEnvClasses (TcEnv _ te _ _ _) = [cl | AClass cl <- nameEnvElts te]
-getEnvTyCons  (TcEnv _ te _ _ _) = [tc | ATyCon tc <- nameEnvElts te]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{The usage environment}
-%*									*
-%************************************************************************
-
-Extending the usage environment
-
-\begin{code}
-tcExtendUVarEnv :: Name -> UVar -> TcM s r -> TcM s r
-tcExtendUVarEnv uv_name uv scope
-  = tcGetEnv                 `thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    tcSetEnv (TcEnv (extendNameEnv ue uv_name uv) te ve ie gtvs) scope
-\end{code}
-
-Looking up in the environments.
-
-\begin{code}
-tcLookupUVar :: Name -> NF_TcM s UVar
-tcLookupUVar uv_name
-  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve _ gtvs) ->
-    case lookupNameEnv ue uv_name of
-      Just uv -> returnNF_Tc uv
-      Nothing -> failWithTc (uvNameOutOfScope uv_name)
-\end{code}	
-
-
-%************************************************************************
-%*									*
-\subsection{The type environment}
+\subsection{The global environment}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcExtendKindEnv :: [(Name,TcKind)] -> TcM s r -> TcM s r
-tcExtendKindEnv pairs scope
-  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
+tcExtendGlobalEnv :: [(Name, TyThing)] -> TcM r -> TcM r
+tcExtendGlobalEnv bindings thing_inside
+  = tcGetEnv				`thenNF_Tc` \ env ->
     let
- 	te' = extendNameEnvList te [(n, AThing k) | (n,k) <- pairs]
+	ge' = extendNameEnvList (tcGEnv env) bindings
+    in
+    tcSetEnv (env {tcGEnv = ge'}) thing_inside
+
+tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
+tcExtendGlobalValEnv ids thing_inside
+  = tcExtendGlobalEnv [(getName id, AnId id) | id <- ids] thing_inside
+\end{code}
+
+
+\begin{code}
+tcLookupGlobal_maybe :: Name -> NF_TcM (Maybe TyThing)
+tcLookupGlobal_maybe name
+  = tcGetEnv		`thenNF_Tc` \ env ->
+    returnNF_Tc (lookup_global env name)
+\end{code}
+
+A variety of global lookups, when we know what we are looking for.
+
+\begin{code}
+tcLookupGlobal :: Name -> NF_TcM TyThing
+  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_thing ->
+    case maybe_thing of
+	Just thing -> returnNF_Tc thing
+	other	   -> notFound "tcLookupGlobal:" name
+
+tcLookupGlobalId :: Name -> NF_TcM Id
+tcLookupGlobalId name
+  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
+    case maybe_id of
+	Just (AnId clas) -> returnNF_Tc id
+	other		 -> notFound "tcLookupGlobalId:" name
+	
+tcLookupDataCon :: Name -> TcM DataCon
+tcLookupDataCon con_name
+  = tcLookupGlobalId con_name		`thenNF_Tc` \ con_id ->
+    case isDataConWrapId_maybe con_id of {
+ 	Just data_con -> returnTc data_con
+	Nothing	      -> failWithTc (badCon con_id);
+
+
+tcLookupClass :: Name -> NF_TcM Class
+tcLookupClass name
+  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_clas ->
+    case maybe_clas of
+	Just (AClass clas) -> returnNF_Tc clas
+	other		   -> notFound "tcLookupClass:" name
+	
+tcLookupTyCon :: Name -> NF_TcM TyCon
+tcLookupTyCon name
+  = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_tc ->
+    case maybe_tc of
+	Just (ATyCon tc) -> returnNF_Tc tc
+	other		 -> notFound "tcLookupTyCon:" name
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The local environment}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcExtendKindEnv :: [(Name,TcKind)] -> TcM r -> TcM r
+tcExtendKindEnv pairs thing_inside
+  = tcGetEnv				`thenNF_Tc` \ env ->
+    let
+ 	le' = extendNameEnvList (tcLEnv env) [(n, AThing k) | (n,k) <- pairs]
 	-- No need to extend global tyvars for kind checking
     in
-    tcSetEnv (TcEnv ue te' ve ie gtvs) scope
+    tcSetEnv (env {tcLEnv = le'}) thing_inside
     
-tcExtendTyVarEnv :: [TyVar] -> TcM s r -> TcM s r
-tcExtendTyVarEnv tyvars scope
-  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs, gtvs)) ->
+tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
+tcExtendTyVarEnv tyvars thing_inside
+  = tcGetEnv			`thenNF_Tc` \ env@(TcEnv {tcLEnv = le, tcTyVars = (in_scope_tvs, gtvs)}) ->
     let
- 	te'           = extendNameEnvList te [ (getName tv, ATyVar tv) | tv <- tyvars]
+ 	le'           = extendNameEnvList le [ (getName tv, ATyVar tv) | tv <- tyvars]
 	new_tv_set    = mkVarSet tyvars
-	in_scope_tvs' = in_scope_tvs `unionVarSet` new_tv_set
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
 	-- as well.  Consider
@@ -258,7 +326,7 @@ tcExtendTyVarEnv tyvars scope
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te' ve ie (in_scope_tvs', gtvs')) scope
+    tcSetEnv (env {tcLEnv = le', tcTyVars = gtvs'}) thing_inside
 
 -- This variant, tcExtendTyVarEnvForMeths, takes *two* bunches of tyvars:
 --	the signature tyvars contain the original names
@@ -266,29 +334,48 @@ tcExtendTyVarEnv tyvars scope
 -- It's needed when typechecking the method bindings of class and instance decls
 -- It does *not* extend the global tyvars; tcMethodBind does that for itself
 
-tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM s r -> TcM s r
+tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM r -> TcM r
 tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
+  = tcGetEnv					`thenNF_Tc` \ env ->
     let
-	te' = extendNameEnvList te stuff
+	le'   = extendNameEnvList (tcLEnv env) stuff
+	stuff = [ (getName sig_tv, ATyVar inst_tv)
+		| (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
+		]
     in
-    tcSetEnv (TcEnv ue te' ve ie gtvs) thing_inside
-  where
-    stuff = [ (getName sig_tv, ATyVar inst_tv)
-	    | (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
-	    ]
+    tcSetEnv (env {tcLEnv = le'}) thing_inside
+\end{code}
 
-tcExtendGlobalTyVars extra_global_tvs scope
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope,gtvs)) ->
-    tc_extend_gtvs gtvs	extra_global_tvs	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te ve ie (in_scope,gtvs')) scope
+
+\begin{code}
+tcExtendLocalValEnv :: [(Name,TcId)] -> TcM a -> TcM a
+tcExtendLocalValEnv names_w_ids thing_inside
+  = tcGetEnv		`thenNF_Tc` \ env ->
+    let
+	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
+	extra_env	    = [(name, ATcId id) | (name,id) <- names_w_ids]
+	le'		    = extendNameEnvList (tcLEnv env) extra_env
+    in
+    tc_extend_gtvs (tcTyVars env) extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
+    tcSetEnv (env {tcLEnv = le', tcTyVars = gtvs'}) thing_inside
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The global tyvars}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcExtendGlobalTyVars extra_global_tvs thing_inside
+  = tcGetEnv						`thenNF_Tc` \ env ->
+    tc_extend_gtvs (tcTyVars env) extra_global_tvs	`thenNF_Tc` \ gtvs' ->
+    tcSetEnv (env {tcTyVars = gtvs') thing_inside
 
 tc_extend_gtvs gtvs extra_global_tvs
   = tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
-    let
-	new_global_tyvars = global_tvs `unionVarSet` extra_global_tvs
-    in
-    tcNewMutVar new_global_tyvars
+    tcNewMutVar (global_tvs `unionVarSet` extra_global_tvs)
 \end{code}
 
 @tcGetGlobalTyVars@ returns a fully-zonked set of tyvars free in the environment.
@@ -296,157 +383,50 @@ To improve subsequent calls to the same function it writes the zonked set back i
 the environment.
 
 \begin{code}
-tcGetGlobalTyVars :: NF_TcM s TcTyVarSet
+tcGetGlobalTyVars :: NF_TcM TcTyVarSet
 tcGetGlobalTyVars
-  = tcGetEnv 						`thenNF_Tc` \ (TcEnv ue te ve ie (_,gtvs)) ->
-    tcReadMutVar gtvs					`thenNF_Tc` \ global_tvs ->
-    zonkTcTyVars (varSetElems global_tvs)		`thenNF_Tc` \ global_tys' ->
+  = tcGetEnv 					`thenNF_Tc` \ (TcEnv {tcTyVars = gtv_var}) ->
+    tcReadMutVar gtv_var			`thenNF_Tc` \ global_tvs ->
+    zonkTcTyVars (varSetElems global_tvs)	`thenNF_Tc` \ global_tys' ->
     let
 	global_tvs' = (tyVarsOfTypes global_tys')
     in
-    tcWriteMutVar gtvs global_tvs'			`thenNF_Tc_` 
+    tcWriteMutVar gtv_var global_tvs'		`thenNF_Tc_` 
     returnNF_Tc global_tvs'
-
-tcGetInScopeTyVars :: NF_TcM s [TcTyVar]
-tcGetInScopeTyVars
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs, gtvs)) ->
-    returnNF_Tc (varSetElems in_scope_tvs)
 \end{code}
-
-
-Type constructors and classes
-
-\begin{code}
-tcExtendTypeEnv :: [(Name, TyThing)] -> TcM s r -> TcM s r
-tcExtendTypeEnv bindings scope
-  = ASSERT( null [tv | (_, ATyVar tv) <- bindings] )
-	-- Not for tyvars; use tcExtendTyVarEnv
-    tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    let
-	te' = extendNameEnvList te bindings
-    in
-    tcSetEnv (TcEnv ue te' ve ie gtvs) scope
-\end{code}
-
-
-Looking up in the environments.
-
-\begin{code}
-tcLookupTy :: Name ->  NF_TcM s TyThing
-tcLookupTy name
-  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    case lookupNameEnv te name of {
-	Just thing -> returnNF_Tc thing ;
- 	Nothing    -> 
-
-    case maybeWiredInTyConName name of
-	Just tc -> returnNF_Tc (ATyCon tc)
-
-	Nothing -> 	-- This can happen if an interface-file
-			-- unfolding is screwed up
-		   failWithTc (tyNameOutOfScope name)
-    }
-	
-tcLookupClassByKey :: Unique -> NF_TcM s Class
-tcLookupClassByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    case lookupUFM_Directly te key of
-	Just (AClass cl) -> returnNF_Tc cl
-	other		 -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
-
-tcLookupClassByKey_maybe :: Unique -> NF_TcM s (Maybe Class)
-tcLookupClassByKey_maybe key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    case lookupUFM_Directly te key of
-	Just (AClass cl) -> returnNF_Tc (Just cl)
-	other		 -> returnNF_Tc Nothing
-
-tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
-tcLookupTyConByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    case lookupUFM_Directly te key of
-	Just (ATyCon tc)  -> returnNF_Tc tc
-	other		  -> pprPanic "tcLookupTyConByKey:" (pprUnique10 key)
-\end{code}
-
-
 
 
 %************************************************************************
 %*									*
-\subsection{The value environment}
+\subsection{The local environment}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcExtendGlobalValEnv :: [Id] -> TcM s a -> TcM s a
-tcExtendGlobalValEnv ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    let
-	ve' = addListToUFM_Directly ve [(getUnique id, id) | id <- ids]
-    in
-    tcSetEnv (TcEnv ue te ve' ie gtvs) scope
+tcLookup_maybe :: Name -> NF_TcM (Maybe TcTyThing)
+tcLookup_maybe name
+  = tcGetEnv 		`thenNF_Tc` \ env ->
+    returnNF_Tc (lookup_local env name)
 
-tcExtendLocalValEnv :: [(Name,TcId)] -> TcM s a -> TcM s a
-tcExtendLocalValEnv names_w_ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs,gtvs)) ->
-    tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
-    let
-	ve'		    = extendNameEnvList ve names_w_ids
-	extra_global_tyvars = tyVarsOfTypes (map (idType . snd) names_w_ids)
-    in
-    tc_extend_gtvs gtvs extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te ve' ie (in_scope_tvs,gtvs')) scope
-\end{code}
+tcLookup :: Name -> NF_TcM TcTyThing
+tcLookup name
+  = tcLookup_maybe name		`thenNF_Tc` \ maybe_thing ->
+    case maybe_thing of
+	Just thing -> returnNF_Tc thing
+	other	   -> notFound "tcLookup:" name
 
 
-\begin{code}
-tcLookupValue :: Name -> NF_TcM s Id	-- Panics if not found
-tcLookupValue name
-  = case maybeWiredInIdName name of
-	Just id -> returnNF_Tc id
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-		   returnNF_Tc (lookupWithDefaultUFM ve def name)
-  where
-    wired_in = case maybeWiredInIdName name of
-	Just id -> True
-	Nothing -> False
-    def = pprPanic "tcLookupValue:" (ppr name <+> ppr wired_in)
 
-tcLookupValueMaybe :: Name -> NF_TcM s (Maybe Id)
-tcLookupValueMaybe name
-  = case maybeWiredInIdName name of
-	Just id -> returnNF_Tc (Just id)
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-		   returnNF_Tc (lookupNameEnv ve name)
-
-tcLookupValueByKey :: Unique -> NF_TcM s Id	-- Panics if not found
-tcLookupValueByKey key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    returnNF_Tc (explicitLookupValueByKey ve key)
-
-tcLookupValueByKeyMaybe :: Unique -> NF_TcM s (Maybe Id)
-tcLookupValueByKeyMaybe key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
-    returnNF_Tc (lookupUFM_Directly ve key)
-
-tcGetValueEnv :: NF_TcM s ValueEnv
+tcGetValueEnv :: NF_TcM ValueEnv
 tcGetValueEnv
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     returnNF_Tc ve
 
 
-tcSetValueEnv :: ValueEnv -> TcM s a -> TcM s a
-tcSetValueEnv ve scope
+tcSetValueEnv :: ValueEnv -> TcM a -> TcM a
+tcSetValueEnv ve thing_inside
   = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te _ ie gtvs) ->
-    tcSetEnv (TcEnv ue te ve ie gtvs) scope
-
--- Non-monadic version, environment given explicitly
-explicitLookupValueByKey :: ValueEnv -> Unique -> Id
-explicitLookupValueByKey ve key
-  = lookupWithDefaultUFM_Directly ve def key
-  where
-    def = pprPanic "lookupValueByKey:" (pprUnique10 key)
+    tcSetEnv (TcEnv ue te ve ie gtvs) thing_inside
 
 explicitLookupValue :: ValueEnv -> Name -> Maybe Id
 explicitLookupValue ve name
@@ -470,18 +450,47 @@ tcAddImportedIdInfo unf_env id
 		-- ToDo: could check that types are the same
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{The instance environment}
+%*									*
+%************************************************************************
+
 Constructing new Ids
 
 \begin{code}
-newLocalId :: OccName -> TcType -> SrcLoc -> NF_TcM s TcId
+newLocalId :: OccName -> TcType -> SrcLoc -> NF_TcM TcId
 newLocalId name ty loc
   = tcGetUnique		`thenNF_Tc` \ uniq ->
     returnNF_Tc (mkUserLocal name uniq ty loc)
 
-newSpecPragmaId :: Name -> TcType -> NF_TcM s TcId
+newSpecPragmaId :: Name -> TcType -> NF_TcM TcId
 newSpecPragmaId name ty 
   = tcGetUnique		`thenNF_Tc` \ uniq ->
     returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty (getSrcLoc name))
+\end{code}
+
+Make a name for the dict fun for an instance decl
+
+\begin{code}
+newDFunName :: Module -> Class -> [Type] -> SrcLoc -> NF_TcM Name
+newDFunName mod clas (ty:_) loc
+  = tcGetDFunUniq dfun_string	`thenNF_Tc` \ inst_uniq ->
+    tcGetUnique			`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkGlobalName uniq mod
+			      (mkDFunOcc dfun_string inst_uniq) 
+			      (LocalDef loc Exported))
+  where
+	-- Any string that is somewhat unique will do
+    dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
+
+newDefaultMethodName :: Name -> SrcLoc -> NF_TcM Name
+newDefaultMethodName op_name loc
+  = tcGetUnique			`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkGlobalName uniq (nameModule op_name)
+			      (mkDefaultMethodOcc (getOccName op_name))
+			      (LocalDef loc Exported))
 \end{code}
 
 
@@ -492,14 +501,14 @@ newSpecPragmaId name ty
 %************************************************************************
 
 \begin{code}
-tcGetInstEnv :: NF_TcM s InstEnv
+tcGetInstEnv :: NF_TcM InstEnv
 tcGetInstEnv = tcGetEnv 	`thenNF_Tc` \ (TcEnv ue te ve ie (_,gtvs)) ->
 	       returnNF_Tc ie
 
-tcSetInstEnv :: InstEnv -> TcM s a -> TcM s a
-tcSetInstEnv ie scope
+tcSetInstEnv :: InstEnv -> TcM a -> TcM a
+tcSetInstEnv ie thing_inside
   = tcGetEnv 	`thenNF_Tc` \ (TcEnv ue te ve _ gtvs) ->
-    tcSetEnv (TcEnv ue te ve ie gtvs) scope
+    tcSetEnv (TcEnv ue te ve ie gtvs) thing_inside
 \end{code}    
 
 
@@ -751,28 +760,6 @@ addToInstEnv overlap_ok inst_env clas ins_tvs ins_tys value
 	identical = ins_item_more_specific && cur_item_more_specific
 \end{code}
 
-Make a name for the dict fun for an instance decl
-
-\begin{code}
-newDFunName :: Module -> Class -> [Type] -> SrcLoc -> NF_TcM s Name
-newDFunName mod clas (ty:_) loc
-  = tcGetDFunUniq dfun_string	`thenNF_Tc` \ inst_uniq ->
-    tcGetUnique			`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkGlobalName uniq mod
-			      (mkDFunOcc dfun_string inst_uniq) 
-			      (LocalDef loc Exported))
-  where
-	-- Any string that is somewhat unique will do
-    dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
-
-newDefaultMethodName :: Name -> SrcLoc -> NF_TcM s Name
-newDefaultMethodName op_name loc
-  = tcGetUnique			`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkGlobalName uniq (nameModule op_name)
-			      (mkDefaultMethodOcc (getOccName op_name))
-			      (LocalDef loc Exported))
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -781,14 +768,9 @@ newDefaultMethodName op_name loc
 %************************************************************************
 
 \begin{code}
-badCon con_id
-  = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
-badPrimOp op
-  = quotes (ppr op) <+> ptext SLIT("is not a primop")
+badCon con_id = quotes (ppr con_id) <+> ptext SLIT("is not a data constructor")
+badPrimOp op  = quotes (ppr op) <+> ptext SLIT("is not a primop")
 
-uvNameOutOfScope name
-  = ptext SLIT("UVar") <+> quotes (ppr name) <+> ptext SLIT("is not in scope")
-
-tyNameOutOfScope name
-  = quotes (ppr name) <+> ptext SLIT("is not in scope")
+notFound where name
+  = failWithTc (text where <> colon <+> quotes (ppr name) <+> ptext SLIT("is not in scope"))
 \end{code}

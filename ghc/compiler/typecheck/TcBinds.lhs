@@ -25,7 +25,7 @@ import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId,
-			  tcLookupTyConByKey, 
+			  tcLookupTyCon, 
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts )
@@ -98,8 +98,8 @@ dictionaries, which we resolve at the module level.
 tcTopBindsAndThen, tcBindsAndThen
 	:: (RecFlag -> TcMonoBinds -> thing -> thing)		-- Combinator
 	-> RenamedHsBinds
-	-> TcM s (thing, LIE)
-	-> TcM s (thing, LIE)
+	-> TcM (thing, LIE)
+	-> TcM (thing, LIE)
 
 tcTopBindsAndThen = tc_binds_and_then TopLevel
 tcBindsAndThen    = tc_binds_and_then NotTopLevel
@@ -182,8 +182,8 @@ examples of this, which is why I thought it worth preserving! [SLPJ]
 \begin{pseudocode}
 % tcBindsAndThen
 % 	:: RenamedHsBinds
-% 	-> TcM s (thing, LIE, thing_ty))
-% 	-> TcM s ((TcHsBinds, thing), LIE, thing_ty)
+% 	-> TcM (thing, LIE, thing_ty))
+% 	-> TcM ((TcHsBinds, thing), LIE, thing_ty)
 % 
 % tcBindsAndThen EmptyBinds do_next
 %   = do_next 		`thenTc` \ (thing, lie, thing_ty) ->
@@ -223,7 +223,7 @@ tcBindWithSigs
 	-> [TcSigInfo]
 	-> [RenamedSig]		-- Used solely to get INLINE, NOINLINE sigs
 	-> RecFlag
-	-> TcM s (TcMonoBinds, LIE, [TcId])
+	-> TcM (TcMonoBinds, LIE, [TcId])
 
 tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
   = recoverTc (
@@ -601,7 +601,7 @@ The signatures have been dealt with already.
 tcMonoBinds :: RenamedMonoBinds 
 	    -> [TcSigInfo]
 	    -> RecFlag
-	    -> TcM s (TcMonoBinds, 
+	    -> TcM (TcMonoBinds, 
 		      LIE,		-- LIE required
 		      [Name],		-- Bound names
 		      [TcId])	-- Corresponding monomorphic bound things
@@ -731,12 +731,12 @@ The error message here is somewhat unsatisfactory, but it'll do for
 now (ToDo).
 
 \begin{code}
-checkSigMatch :: TopLevelFlag -> [Name] -> [TcId] -> [TcSigInfo] -> TcM s (Maybe (TcThetaType, LIE))
+checkSigMatch :: TopLevelFlag -> [Name] -> [TcId] -> [TcSigInfo] -> TcM (Maybe (TcThetaType, LIE))
 checkSigMatch top_lvl binder_names mono_ids sigs
   | main_bound_here
   =	-- First unify the main_id with IO t, for any old t
     tcSetErrCtxt mainTyCheckCtxt (
-	tcLookupTyConByKey ioTyConKey		`thenTc`    \ ioTyCon ->
+	tcLookupTyCon ioTyConName		`thenTc`    \ ioTyCon ->
 	newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
 	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
 		   (idType main_mono_id)
@@ -857,7 +857,7 @@ a RULE now:
 	{-# SPECIALISE (f::<type) = g #-}
 
 \begin{code}
-tcSpecSigs :: [RenamedSig] -> TcM s (TcMonoBinds, LIE)
+tcSpecSigs :: [RenamedSig] -> TcM (TcMonoBinds, LIE)
 tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
   = 	-- SPECIALISE f :: forall b. theta => tau  =  g
     tcAddSrcLoc src_loc		 		$

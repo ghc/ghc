@@ -23,7 +23,7 @@ import BasicTypes	( NewOrData(..) )
 import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, tcHsTyVars, tcClassContext,
 			  kcHsContext, kcHsSigType
 			)
-import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
+import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupGlobalId, TyThing(..), TyThingDetails(..) )
 import TcMonad
 
 import Class		( ClassContext )
@@ -56,7 +56,7 @@ import ListSetOps	( equivClasses )
 %************************************************************************
 
 \begin{code}
-tcTyDecl1 :: RenamedTyClDecl -> TcM s (Name, TyThingDetails)
+tcTyDecl1 :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
@@ -125,7 +125,7 @@ mkNewTyConRep tc
 %************************************************************************
 
 \begin{code}
-kcConDetails :: RenamedContext -> ConDetails Name -> TcM s ()
+kcConDetails :: RenamedContext -> ConDetails Name -> TcM ()
 kcConDetails ex_ctxt details
   = kcHsContext ex_ctxt		`thenTc_`
     kc_con_details details
@@ -138,7 +138,7 @@ kcConDetails ex_ctxt details
 
     kc_bty bty = kcHsSigType (getBangType bty)
 
-tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM s DataCon
+tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM DataCon
 
 tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc					$
@@ -216,7 +216,7 @@ getBangStrictness (Unpacked _) = markedUnboxed
 %************************************************************************
 
 \begin{code}
-mkImplicitDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds)
+mkImplicitDataBinds :: [TyCon] -> TcM ([Id], TcMonoBinds)
 mkImplicitDataBinds [] = returnTc ([], EmptyMonoBinds)
 mkImplicitDataBinds (tycon : tycons) 
   | isSynTyCon tycon = mkImplicitDataBinds tycons
@@ -263,8 +263,8 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- data type use the same type variables
   = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
-    tcLookupValueByKey unpackCStringIdKey	`thenTc` \ unpack_id ->
-    tcLookupValueByKey unpackCStringUtf8IdKey	`thenTc` \ unpackUtf8_id ->
+    tcLookupGlobalId unpackCStringIdName	`thenTc` \ unpack_id ->
+    tcLookupGlobalId unpackCStringUtf8IdName	`thenTc` \ unpackUtf8_id ->
     returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
   where
     field_ty   = fieldLabelType first_field_label

@@ -99,7 +99,7 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 :: ValueEnv -> RenamedTyClDecl -> TcM s (Name, TyThingDetails)
+tcClassDecl1 :: ValueEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcClassDecl1 rec_env
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas 
@@ -109,7 +109,7 @@ tcClassDecl1 rec_env
 	    (classArityErr class_name)			`thenTc_`
 
 	-- LOOK THINGS UP IN THE ENVIRONMENT
-    tcLookupTy class_name				`thenTc` \ (AClass clas) ->
+    tcLookupClass class_name				`thenTc` \ clas ->
     let
 	tyvars   = classTyVars clas
 	op_sigs  = filter isClassOpSig class_sigs
@@ -151,7 +151,7 @@ tcClassDecl1 rec_env
 \end{code}
 
 \begin{code}
-checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds -> TcM s (NameEnv (DefMeth Name))
+checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds -> TcM (NameEnv (DefMeth Name))
   -- Check default bindings
   -- 	a) must be for a class op for this class
   --	b) must be all generic or all non-generic
@@ -201,7 +201,7 @@ checkGenericClassIsUnary clas dm_info
 tcSuperClasses :: Class
 	       -> RenamedContext 	-- class context
 	       -> [Name]		-- Names for superclass selectors
-	       -> TcM s (ClassContext,	-- the superclass context
+	       -> TcM (ClassContext,	-- the superclass context
 		         [Id])  	-- superclass selector Ids
 
 tcSuperClasses clas context sc_sel_names
@@ -237,7 +237,7 @@ tcClassSig :: ValueEnv			-- Knot tying only!
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> NameEnv (DefMeth Name)	-- Info about default methods
 	   -> RenamedClassOpSig
-	   -> TcM s (Type,		-- Type of the method
+	   -> TcM (Type,		-- Type of the method
 		     ClassOpItem)	-- Selector Id, default-method Id, True if explicit default binding
 
 -- This warrants an explanation: we need to separate generic
@@ -291,7 +291,7 @@ tcClassSig rec_env clas clas_tyvars dm_info
 and superclass dictionary.
 
 \begin{code}
-mkImplicitClassBinds :: [Class] -> NF_TcM s ([Id], TcMonoBinds)
+mkImplicitClassBinds :: [Class] -> NF_TcM ([Id], TcMonoBinds)
 mkImplicitClassBinds classes
   = returnNF_Tc (concat cls_ids_s, andMonoBindList binds_s)
 	-- The selector binds are already in the selector Id's unfoldings
@@ -374,7 +374,7 @@ The function @tcClassDecls2@ just arranges to apply @tcClassDecl2@ to
 each local class decl.
 
 \begin{code}
-tcClassDecls2 :: [RenamedHsDecl] -> NF_TcM s (LIE, TcMonoBinds)
+tcClassDecls2 :: [RenamedHsDecl] -> NF_TcM (LIE, TcMonoBinds)
 
 tcClassDecls2 decls
   = foldr combine
@@ -394,14 +394,14 @@ tcClassDecls2 decls
 
 \begin{code}
 tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
-	     -> NF_TcM s (LIE, TcMonoBinds)
+	     -> NF_TcM (LIE, TcMonoBinds)
 
 tcClassDecl2 (ClassDecl context class_name
 			tyvar_names _ sigs default_binds pragmas _ src_loc)
   = 	-- A locally defined class
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
     tcAddSrcLoc src_loc		     		          $
-    tcLookupTy class_name				  `thenNF_Tc` \ (AClass clas) ->
+    tcLookupClass class_name				  `thenNF_Tc` \ clas ->
 
 	-- We make a separate binding for each default method.
 	-- At one time I used a single AbsBinds for all of them, thus
@@ -498,7 +498,7 @@ tcMethodBind
 	-> [RenamedSig]		-- Pramgas (just for this one)
 	-> Bool			-- True <=> This method is from an instance declaration
 	-> ClassOpItem		-- The method selector and default-method Id
-	-> TcM s (TcMonoBinds, LIE, (LIE, TcId))
+	-> TcM (TcMonoBinds, LIE, (LIE, TcId))
 
 tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	     meth_binds prags is_inst_decl (sel_id, dm_info)
@@ -540,6 +540,8 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      -- have not been unified with anything in the environment
      --	
      -- We do this for each method independently to localise error messages
+     -- ...and this is why the call to tcExtendGlobalTyVars must be here
+     --    rather than in the caller
      tcAddErrCtxtM (sigCtxt sig_msg inst_tyvars inst_theta (idType meth_id))	$
      checkSigTyVars inst_tyvars emptyVarSet					`thenTc_` 
 

@@ -44,7 +44,7 @@ import TcHsSyn	( TcExpr, TcId,
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
-		  tcLookupValue, tcLookupValueByKey
+		  tcLookupValue, tcLookupGlobalValue
 		)
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
@@ -100,7 +100,7 @@ plusLIEs lies	  = unionManyBags lies
 lieToList	  = bagToList
 listToLIE	  = listToBag
 
-zonkLIE :: LIE -> NF_TcM s LIE
+zonkLIE :: LIE -> NF_TcM LIE
 zonkLIE lie = mapBagNF_Tc zonkInst lie
 
 pprInsts :: [Inst] -> SDoc
@@ -315,7 +315,7 @@ Construction
 \begin{code}
 newDicts :: InstOrigin
 	 -> TcThetaType
-	 -> NF_TcM s (LIE, [TcId])
+	 -> NF_TcM (LIE, [TcId])
 newDicts orig theta
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     newDictsAtLoc loc theta	`thenNF_Tc` \ (dicts, ids) ->
@@ -323,7 +323,7 @@ newDicts orig theta
 
 newClassDicts :: InstOrigin
 	      -> [(Class,[TcType])]
-	      -> NF_TcM s (LIE, [TcId])
+	      -> NF_TcM (LIE, [TcId])
 newClassDicts orig theta
   = newDicts orig (map (uncurry Class) theta)
 
@@ -331,7 +331,7 @@ newClassDicts orig theta
 -- but with slightly different interface
 newDictsAtLoc :: InstLoc
  	      -> TcThetaType
-	      -> NF_TcM s ([Inst], [TcId])
+	      -> NF_TcM ([Inst], [TcId])
 newDictsAtLoc loc theta =
  tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
  let
@@ -340,7 +340,7 @@ newDictsAtLoc loc theta =
  in
  returnNF_Tc (dicts, map instToId dicts)
 
-newDictFromOld :: Inst -> Class -> [TcType] -> NF_TcM s Inst
+newDictFromOld :: Inst -> Class -> [TcType] -> NF_TcM Inst
 newDictFromOld (Dict _ _ loc) clas tys
   = tcGetUnique	      `thenNF_Tc` \ uniq ->
     returnNF_Tc (Dict uniq (Class clas tys) loc)
@@ -349,7 +349,7 @@ newDictFromOld (Dict _ _ loc) clas tys
 newMethod :: InstOrigin
 	  -> TcId
 	  -> [TcType]
-	  -> NF_TcM s (LIE, TcId)
+	  -> NF_TcM (LIE, TcId)
 newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
@@ -390,7 +390,7 @@ newMethodWith id tys theta tau loc
 
 newMethodAtLoc :: InstLoc
 	       -> Id -> [TcType]
-	       -> NF_TcM s (Inst, TcId)
+	       -> NF_TcM (Inst, TcId)
 newMethodAtLoc loc real_id tys		-- Local function, similar to newMethod but with 
 					-- slightly different interface
   =   	-- Get the Id type and instantiate it at the specified types
@@ -414,7 +414,7 @@ cases (the rest are caught in lookupInst).
 newOverloadedLit :: InstOrigin
 		 -> RenamedHsOverLit
 		 -> TcType
-		 -> NF_TcM s (TcExpr, LIE)
+		 -> NF_TcM (TcExpr, LIE)
 newOverloadedLit orig (HsIntegral i _) ty
   | isIntTy ty && inIntRange i		-- Short cut for Int
   = returnNF_Tc (int_lit, emptyLIE)
@@ -486,7 +486,7 @@ but doesn't do the same for the Id in a Method.  There's no
 need, and it's a lot of extra work.
 
 \begin{code}
-zonkPred :: TcPredType -> NF_TcM s TcPredType
+zonkPred :: TcPredType -> NF_TcM TcPredType
 zonkPred (Class clas tys)
   = zonkTcTypes tys			`thenNF_Tc` \ new_tys ->
     returnNF_Tc (Class clas new_tys)
@@ -494,7 +494,7 @@ zonkPred (IParam n ty)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
     returnNF_Tc (IParam n new_ty)
 
-zonkInst :: Inst -> NF_TcM s Inst
+zonkInst :: Inst -> NF_TcM Inst
 zonkInst (Dict u pred loc)
   = zonkPred pred			`thenNF_Tc` \ new_pred ->
     returnNF_Tc (Dict u new_pred loc)
@@ -610,7 +610,7 @@ data LookupInstResult s
   | GenInst    [Inst] TcExpr	-- The expression and its needed insts
 
 lookupInst :: Inst 
-	   -> NF_TcM s (LookupInstResult s)
+	   -> NF_TcM (LookupInstResult s)
 
 -- Dictionaries
 
@@ -663,12 +663,12 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
 							-- (i.e. no funny business with user-defined
 							--  packages of numeric classes)
   =	-- So we can use the Prelude fromInt 
-    tcLookupValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
+    tcLookupGlobalId fromIntClassOpName	`thenNF_Tc` \ from_int ->
     newMethodAtLoc loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) int_lit))
 
   | otherwise   				-- Alas, it is overloaded and a big literal!
-  = tcLookupValue from_integer_name		`thenNF_Tc` \ from_integer ->
+  = tcLookupGlobalId from_integer_name		`thenNF_Tc` \ from_integer ->
     newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) integer_lit))
   where
@@ -685,7 +685,7 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
 
   | otherwise 
-  = tcLookupValue from_rat_name			`thenNF_Tc` \ from_rational ->
+  = tcLookupGlobalValue from_rat_name		`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
 	rational_ty  = funArgTy (idType method_id)
@@ -713,7 +713,7 @@ ambiguous dictionaries.
 \begin{code}
 lookupSimpleInst :: Class
 		 -> [Type]				-- Look up (c,t)
-	         -> NF_TcM s (Maybe [(Class,[Type])])	-- Here are the needed (c,t)s
+	         -> NF_TcM (Maybe [(Class,[Type])])	-- Here are the needed (c,t)s
 
 lookupSimpleInst clas tys
   = tcGetInstEnv		`thenNF_Tc` \ inst_env -> 

@@ -187,7 +187,7 @@ tcDeriving  :: Module			-- name of module under scrutiny
 	    -> FixityEnv		-- for the deriving code (Show/Read.)
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
-	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
+	    -> TcM (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds)	-- Extra generated bindings
 
 tcDeriving mod fixs rn_name_supply inst_decl_infos_in
@@ -279,7 +279,7 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: TcM s [DerivEqn]
+makeDerivEqns :: TcM [DerivEqn]
 
 makeDerivEqns
   = tcGetEnv			    `thenNF_Tc` \ env ->
@@ -311,7 +311,7 @@ makeDerivEqns
       = (c1 `compare` c2) `thenCmp` (t1 `compare` t2)
 
     ------------------------------------------------------------------
-    mk_eqn :: (Class, TyCon) -> NF_TcM s (Maybe DerivEqn)
+    mk_eqn :: (Class, TyCon) -> NF_TcM (Maybe DerivEqn)
 	-- we swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
@@ -385,7 +385,7 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \begin{code}
 solveDerivEqns :: Bag InstInfo
 	       -> [DerivEqn]
-	       -> TcM s [InstInfo]	-- Solns in same order as eqns.
+	       -> TcM [InstInfo]	-- Solns in same order as eqns.
 				  	-- This bunch is Absolutely minimal...
 
 solveDerivEqns inst_decl_infos_in orig_eqns
@@ -402,7 +402,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	-- compares it with the current one; finishes if they are the
 	-- same, otherwise recurses with the new solutions.
 	-- It fails if any iteration fails
-    iterateDeriv :: [DerivSoln] ->TcM s [InstInfo]
+    iterateDeriv :: [DerivSoln] ->TcM [InstInfo]
     iterateDeriv current_solns
       = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_inst_infos, new_solns) ->
 	if (current_solns == new_solns) then
@@ -436,7 +436,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 \begin{code}
 add_solns :: Bag InstInfo			-- The global, non-derived ones
 	  -> [DerivEqn] -> [DerivSoln]
-	  -> NF_TcM s ([InstInfo], 		-- The new, derived ones
+	  -> NF_TcM ([InstInfo], 		-- The new, derived ones
 		       InstEnv)
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
@@ -602,7 +602,7 @@ If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
 gen_taggery_Names :: [InstInfo]
-		  -> TcM s [(RdrName,	-- for an assoc list
+		  -> TcM [(RdrName,	-- for an assoc list
 		  	     TyCon,	-- related tycon
 			     TagThingWanted)]
 

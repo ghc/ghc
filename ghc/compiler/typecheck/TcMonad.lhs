@@ -101,13 +101,13 @@ type TcKind      = TcType
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-type NF_TcM s r =  TcDown -> TcEnv -> IO r	-- Can't raise UserError
+type NF_TcM r =  TcDown -> TcEnv -> IO r	-- Can't raise UserError
 type TcM    s r =  TcDown -> TcEnv -> IO r	-- Can raise UserError
 	-- ToDo: nuke the 's' part
 	-- The difference between the two is
 	-- now for documentation purposes only
 
-type Either_TcM s r =  TcDown -> TcEnv -> IO r	-- Either NF_TcM or TcM
+type Either_TcM r =  TcDown -> TcEnv -> IO r	-- Either NF_TcM or TcM
 	-- Used only in this file for type signatures which
 	-- have a part that's polymorphic in whether it's NF_TcM or TcM
 	-- E.g. thenNF_Tc
@@ -120,7 +120,7 @@ type TcRef a = IORef a
 
 initTc :: UniqSupply
        -> (TcRef (UniqFM a) -> TcEnv)
-       -> TcM s r
+       -> TcM r
        -> IO (Maybe r, Bag WarnMsg, Bag ErrMsg)
 
 initTc us initenv do_this
@@ -147,28 +147,28 @@ initTc us initenv do_this
 
 -- Monadic operations
 
-returnNF_Tc :: a -> NF_TcM s a
-returnTc    :: a -> TcM s a
+returnNF_Tc :: a -> NF_TcM a
+returnTc    :: a -> TcM a
 returnTc v down env = return v
 
-thenTc    :: TcM s a ->    (a -> TcM s b)        -> TcM s b
-thenNF_Tc :: NF_TcM s a -> (a -> Either_TcM s b) -> Either_TcM s b
+thenTc    :: TcM a ->    (a -> TcM b)        -> TcM b
+thenNF_Tc :: NF_TcM a -> (a -> Either_TcM b) -> Either_TcM b
 thenTc m k down env = do { r <- m down env; k r down env }
 
-thenTc_    :: TcM s a    -> TcM s b        -> TcM s b
-thenNF_Tc_ :: NF_TcM s a -> Either_TcM s b -> Either_TcM s b
+thenTc_    :: TcM a    -> TcM b        -> TcM b
+thenNF_Tc_ :: NF_TcM a -> Either_TcM b -> Either_TcM b
 thenTc_ m k down env = do { m down env; k down env }
 
-listTc    :: [TcM s a]    -> TcM s [a]
-listNF_Tc :: [NF_TcM s a] -> NF_TcM s [a]
+listTc    :: [TcM a]    -> TcM [a]
+listNF_Tc :: [NF_TcM a] -> NF_TcM [a]
 listTc []     = returnTc []
 listTc (x:xs) = x			`thenTc` \ r ->
 		listTc xs		`thenTc` \ rs ->
 		returnTc (r:rs)
 
-mapTc    :: (a -> TcM s b)    -> [a] -> TcM s [b]
-mapTc_   :: (a -> TcM s b)    -> [a] -> TcM s ()
-mapNF_Tc :: (a -> NF_TcM s b) -> [a] -> NF_TcM s [b]
+mapTc    :: (a -> TcM b)    -> [a] -> TcM [b]
+mapTc_   :: (a -> TcM b)    -> [a] -> TcM ()
+mapNF_Tc :: (a -> NF_TcM b) -> [a] -> NF_TcM [b]
 mapTc f []     = returnTc []
 mapTc f (x:xs) = f x		`thenTc` \ r ->
 		 mapTc f xs	`thenTc` \ rs ->
@@ -176,33 +176,33 @@ mapTc f (x:xs) = f x		`thenTc` \ r ->
 mapTc_ f xs = mapTc f xs  `thenTc_` returnTc ()
 
 
-foldrTc    :: (a -> b -> TcM s b)    -> b -> [a] -> TcM s b
-foldrNF_Tc :: (a -> b -> NF_TcM s b) -> b -> [a] -> NF_TcM s b
+foldrTc    :: (a -> b -> TcM b)    -> b -> [a] -> TcM b
+foldrNF_Tc :: (a -> b -> NF_TcM b) -> b -> [a] -> NF_TcM b
 foldrTc k z []     = returnTc z
 foldrTc k z (x:xs) = foldrTc k z xs	`thenTc` \r ->
 		     k x r
 
-foldlTc    :: (a -> b -> TcM s a)    -> a -> [b] -> TcM s a
-foldlNF_Tc :: (a -> b -> NF_TcM s a) -> a -> [b] -> NF_TcM s a
+foldlTc    :: (a -> b -> TcM a)    -> a -> [b] -> TcM a
+foldlNF_Tc :: (a -> b -> NF_TcM a) -> a -> [b] -> NF_TcM a
 foldlTc k z []     = returnTc z
 foldlTc k z (x:xs) = k z x		`thenTc` \r ->
 		     foldlTc k r xs
 
-mapAndUnzipTc    :: (a -> TcM s (b,c))    -> [a]   -> TcM s ([b],[c])
-mapAndUnzipNF_Tc :: (a -> NF_TcM s (b,c)) -> [a]   -> NF_TcM s ([b],[c])
+mapAndUnzipTc    :: (a -> TcM (b,c))    -> [a]   -> TcM ([b],[c])
+mapAndUnzipNF_Tc :: (a -> NF_TcM (b,c)) -> [a]   -> NF_TcM ([b],[c])
 mapAndUnzipTc f []     = returnTc ([],[])
 mapAndUnzipTc f (x:xs) = f x			`thenTc` \ (r1,r2) ->
 			 mapAndUnzipTc f xs	`thenTc` \ (rs1,rs2) ->
 			 returnTc (r1:rs1, r2:rs2)
 
-mapAndUnzip3Tc    :: (a -> TcM s (b,c,d)) -> [a] -> TcM s ([b],[c],[d])
+mapAndUnzip3Tc    :: (a -> TcM (b,c,d)) -> [a] -> TcM ([b],[c],[d])
 mapAndUnzip3Tc f []     = returnTc ([],[],[])
 mapAndUnzip3Tc f (x:xs) = f x			`thenTc` \ (r1,r2,r3) ->
 			  mapAndUnzip3Tc f xs	`thenTc` \ (rs1,rs2,rs3) ->
 			  returnTc (r1:rs1, r2:rs2, r3:rs3)
 
-mapBagTc    :: (a -> TcM s b)    -> Bag a -> TcM s (Bag b)
-mapBagNF_Tc :: (a -> NF_TcM s b) -> Bag a -> NF_TcM s (Bag b)
+mapBagTc    :: (a -> TcM b)    -> Bag a -> TcM (Bag b)
+mapBagNF_Tc :: (a -> NF_TcM b) -> Bag a -> NF_TcM (Bag b)
 mapBagTc f bag
   = foldBag (\ b1 b2 -> b1 `thenTc` \ r1 -> 
 		        b2 `thenTc` \ r2 -> 
@@ -211,12 +211,12 @@ mapBagTc f bag
 	    (returnTc emptyBag)
 	    bag
 
-fixTc    :: (a -> TcM s a)    -> TcM s a
-fixNF_Tc :: (a -> NF_TcM s a) -> NF_TcM s a
+fixTc    :: (a -> TcM a)    -> TcM a
+fixNF_Tc :: (a -> NF_TcM a) -> NF_TcM a
 fixTc m env down = fixIO (\ loop -> m loop env down)
 
-recoverTc    :: TcM s r -> TcM s r -> TcM s r
-recoverNF_Tc :: NF_TcM s r -> TcM s r -> NF_TcM s r
+recoverTc    :: TcM r -> TcM r -> TcM r
+recoverNF_Tc :: NF_TcM r -> TcM r -> NF_TcM r
 recoverTc recover m down env
   = catch (m down env) (\ _ -> recover down env)
 
@@ -246,7 +246,7 @@ So we compromise and use unsafeInterleaveSST.
 We throw away any error messages!
 
 \begin{code}
-forkNF_Tc :: NF_TcM s r -> NF_TcM s r
+forkNF_Tc :: NF_TcM r -> NF_TcM r
 forkNF_Tc m (TcDown deflts u_var df_var src_loc err_cxt err_var) env
   = do
 	-- Get a fresh unique supply
@@ -265,10 +265,10 @@ forkNF_Tc m (TcDown deflts u_var df_var src_loc err_cxt err_var) env
 \end{code}
 
 \begin{code}
-traceTc :: SDoc -> NF_TcM s ()
+traceTc :: SDoc -> NF_TcM ()
 traceTc doc down env = printErrs doc
 
-ioToTc :: IO a -> NF_TcM s a
+ioToTc :: IO a -> NF_TcM a
 ioToTc io down env = io
 \end{code}
 
@@ -280,52 +280,52 @@ ioToTc io down env = io
 %************************************************************************
 
 \begin{code}
-getErrsTc :: NF_TcM s (Bag WarnMsg, Bag ErrMsg)
+getErrsTc :: NF_TcM (Bag WarnMsg, Bag ErrMsg)
 getErrsTc down env
   = readIORef (getTcErrs down)
 
-failTc :: TcM s a
+failTc :: TcM a
 failTc down env = give_up
 
 give_up :: IO a
 give_up = IOERROR (userError "Typecheck failed")
 
-failWithTc :: Message -> TcM s a			-- Add an error message and fail
+failWithTc :: Message -> TcM a			-- Add an error message and fail
 failWithTc err_msg = failWithTcM (emptyTidyEnv, err_msg)
 
-addErrTc :: Message -> NF_TcM s ()
+addErrTc :: Message -> NF_TcM ()
 addErrTc err_msg = addErrTcM (emptyTidyEnv, err_msg)
 
 -- The 'M' variants do the TidyEnv bit
-failWithTcM :: (TidyEnv, Message) -> TcM s a	-- Add an error message and fail
+failWithTcM :: (TidyEnv, Message) -> TcM a	-- Add an error message and fail
 failWithTcM env_and_msg
   = addErrTcM env_and_msg	`thenNF_Tc_`
     failTc
 
-checkTc :: Bool -> Message -> TcM s ()		-- Check that the boolean is true
+checkTc :: Bool -> Message -> TcM ()		-- Check that the boolean is true
 checkTc True  err = returnTc ()
 checkTc False err = failWithTc err
 
-checkTcM :: Bool -> TcM s () -> TcM s ()	-- Check that the boolean is true
+checkTcM :: Bool -> TcM () -> TcM ()	-- Check that the boolean is true
 checkTcM True  err = returnTc ()
 checkTcM False err = err
 
-checkMaybeTc :: Maybe val -> Message -> TcM s val
+checkMaybeTc :: Maybe val -> Message -> TcM val
 checkMaybeTc (Just val) err = returnTc val
 checkMaybeTc Nothing    err = failWithTc err
 
-checkMaybeTcM :: Maybe val -> TcM s val -> TcM s val
+checkMaybeTcM :: Maybe val -> TcM val -> TcM val
 checkMaybeTcM (Just val) err = returnTc val
 checkMaybeTcM Nothing    err = err
 
-addErrTcM :: (TidyEnv, Message) -> NF_TcM s ()	-- Add an error message but don't fail
+addErrTcM :: (TidyEnv, Message) -> NF_TcM ()	-- Add an error message but don't fail
 addErrTcM (tidy_env, err_msg) down env
   = add_err_tcm tidy_env err_msg ctxt loc down env
   where
     ctxt     = getErrCtxt down
     loc      = getLoc down
 
-addInstErrTcM :: InstLoc -> (TidyEnv, Message) -> NF_TcM s ()	-- Add an error message but don't fail
+addInstErrTcM :: InstLoc -> (TidyEnv, Message) -> NF_TcM ()	-- Add an error message but don't fail
 addInstErrTcM inst_loc@(_, loc, ctxt) (tidy_env, err_msg) down env
   = add_err_tcm tidy_env err_msg full_ctxt loc down env
   where
@@ -350,7 +350,7 @@ do_ctxt tidy_env (c:cs) down env
 	return (m:ms)
 
 -- warnings don't have an 'M' variant
-warnTc :: Bool -> Message -> NF_TcM s ()
+warnTc :: Bool -> Message -> NF_TcM ()
 warnTc warn_if_true warn_msg down env
   | warn_if_true 
   = do
@@ -372,9 +372,9 @@ warnTc warn_if_true warn_msg down env
 --	(it might have recovered internally)
 -- 	If so, then r is invoked, passing the warnings and errors from m
 
-tryTc :: ((Bag WarnMsg, Bag ErrMsg) -> TcM s r)	-- Recovery action
-      -> TcM s r				-- Thing to try
-      -> TcM s r
+tryTc :: ((Bag WarnMsg, Bag ErrMsg) -> TcM r)	-- Recovery action
+      -> TcM r				-- Thing to try
+      -> TcM r
 tryTc recover main down env
   = do 
 	m_errs_var <- newIORef (emptyBag,emptyBag)
@@ -403,7 +403,7 @@ tryTc recover main down env
 --	(it might have recovered internally)
 -- 	If so, it fails too.
 -- Regardless, any errors generated by m are propagated to the enclosing context.
-checkNoErrsTc :: TcM s r -> TcM s r
+checkNoErrsTc :: TcM r -> TcM r
 checkNoErrsTc main
   = tryTc my_recover main
   where
@@ -419,14 +419,14 @@ checkNoErrsTc main
 -- (tryTc_ r m) tries m; if it succeeds it returns it,
 -- otherwise it returns r.  Any error messages added by m are discarded,
 -- whether or not m succeeds.
-tryTc_ :: TcM s r -> TcM s r -> TcM s r
+tryTc_ :: TcM r -> TcM r -> TcM r
 tryTc_ recover main
   = tryTc my_recover main
   where
     my_recover warns_and_errs = recover
 
 -- (discardErrsTc m) runs m, but throw away all its error messages.
-discardErrsTc :: Either_TcM s r -> Either_TcM s r
+discardErrsTc :: Either_TcM r -> Either_TcM r
 discardErrsTc main down env
   = do new_errs_var <- newIORef (emptyBag,emptyBag)
        main (setTcErrs down new_errs_var) env
@@ -435,25 +435,25 @@ discardErrsTc main down env
 Mutable variables
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcNewMutVar :: a -> NF_TcM s (TcRef a)
+tcNewMutVar :: a -> NF_TcM (TcRef a)
 tcNewMutVar val down env = newIORef val
 
-tcWriteMutVar :: TcRef a -> a -> NF_TcM s ()
+tcWriteMutVar :: TcRef a -> a -> NF_TcM ()
 tcWriteMutVar var val down env = writeIORef var val
 
-tcReadMutVar :: TcRef a -> NF_TcM s a
+tcReadMutVar :: TcRef a -> NF_TcM a
 tcReadMutVar var down env = readIORef var
 
-tcNewMutTyVar :: Name -> Kind -> NF_TcM s TyVar
+tcNewMutTyVar :: Name -> Kind -> NF_TcM TyVar
 tcNewMutTyVar name kind down env = newMutTyVar name kind
 
-tcNewSigTyVar :: Name -> Kind -> NF_TcM s TyVar
+tcNewSigTyVar :: Name -> Kind -> NF_TcM TyVar
 tcNewSigTyVar name kind down env = newSigTyVar name kind
 
-tcReadMutTyVar :: TyVar -> NF_TcM s (Maybe Type)
+tcReadMutTyVar :: TyVar -> NF_TcM (Maybe Type)
 tcReadMutTyVar tyvar down env = readMutTyVar tyvar
 
-tcWriteMutTyVar :: TyVar -> Maybe Type -> NF_TcM s ()
+tcWriteMutTyVar :: TyVar -> Maybe Type -> NF_TcM ()
 tcWriteMutTyVar tyvar val down env = writeMutTyVar tyvar val
 \end{code}
 
@@ -461,10 +461,10 @@ tcWriteMutTyVar tyvar val down env = writeMutTyVar tyvar val
 Environment
 ~~~~~~~~~~~
 \begin{code}
-tcGetEnv :: NF_TcM s TcEnv
+tcGetEnv :: NF_TcM TcEnv
 tcGetEnv down env = return env
 
-tcSetEnv :: TcEnv -> Either_TcM s a -> Either_TcM s a
+tcSetEnv :: TcEnv -> Either_TcM a -> Either_TcM a
 tcSetEnv new_env m down old_env = m down new_env
 \end{code}
 
@@ -472,27 +472,27 @@ tcSetEnv new_env m down old_env = m down new_env
 Source location
 ~~~~~~~~~~~~~~~
 \begin{code}
-tcGetDefaultTys :: NF_TcM s [Type]
+tcGetDefaultTys :: NF_TcM [Type]
 tcGetDefaultTys down env = return (getDefaultTys down)
 
-tcSetDefaultTys :: [Type] -> TcM s r -> TcM s r
+tcSetDefaultTys :: [Type] -> TcM r -> TcM r
 tcSetDefaultTys tys m down env = m (setDefaultTys down tys) env
 
-tcAddSrcLoc :: SrcLoc -> Either_TcM s a -> Either_TcM s a
+tcAddSrcLoc :: SrcLoc -> Either_TcM a -> Either_TcM a
 tcAddSrcLoc loc m down env = m (setLoc down loc) env
 
-tcGetSrcLoc :: NF_TcM s SrcLoc
+tcGetSrcLoc :: NF_TcM SrcLoc
 tcGetSrcLoc down env = return (getLoc down)
 
-tcGetInstLoc :: InstOrigin -> NF_TcM s InstLoc
+tcGetInstLoc :: InstOrigin -> NF_TcM InstLoc
 tcGetInstLoc origin down env = return (origin, getLoc down, getErrCtxt down)
 
-tcSetErrCtxtM, tcAddErrCtxtM :: (TidyEnv -> NF_TcM s (TidyEnv, Message))
-			     -> TcM s a -> TcM s a
+tcSetErrCtxtM, tcAddErrCtxtM :: (TidyEnv -> NF_TcM (TidyEnv, Message))
+			     -> TcM a -> TcM a
 tcSetErrCtxtM msg m down env = m (setErrCtxt down msg) env
 tcAddErrCtxtM msg m down env = m (addErrCtxt down msg) env
 
-tcSetErrCtxt, tcAddErrCtxt :: Message -> Either_TcM s r -> Either_TcM s r
+tcSetErrCtxt, tcAddErrCtxt :: Message -> Either_TcM r -> Either_TcM r
 -- Usual thing
 tcSetErrCtxt msg m down env = m (setErrCtxt down (\env -> returnNF_Tc (env, msg))) env
 tcAddErrCtxt msg m down env = m (addErrCtxt down (\env -> returnNF_Tc (env, msg))) env
@@ -502,7 +502,7 @@ tcAddErrCtxt msg m down env = m (addErrCtxt down (\env -> returnNF_Tc (env, msg)
 Unique supply
 ~~~~~~~~~~~~~
 \begin{code}
-tcGetUnique :: NF_TcM s Unique
+tcGetUnique :: NF_TcM Unique
 tcGetUnique down env
   = do  uniq_supply <- readIORef u_var
     	let (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
@@ -512,7 +512,7 @@ tcGetUnique down env
   where
     u_var = getUniqSupplyVar down
 
-tcGetUniques :: Int -> NF_TcM s [Unique]
+tcGetUniques :: Int -> NF_TcM [Unique]
 tcGetUniques n down env
   = do	uniq_supply <- readIORef u_var
 	let (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
@@ -522,7 +522,7 @@ tcGetUniques n down env
   where
     u_var = getUniqSupplyVar down
 
-uniqSMToTcM :: UniqSM a -> NF_TcM s a
+uniqSMToTcM :: UniqSM a -> NF_TcM a
 uniqSMToTcM m down env
   = do	uniq_supply <- readIORef u_var
 	let (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
@@ -536,7 +536,7 @@ uniqSMToTcM m down env
 \section{Dictionary function name supply
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcGetDFunUniq :: String -> NF_TcM s Int
+tcGetDFunUniq :: String -> NF_TcM Int
 tcGetDFunUniq key down env
   = do dfun_supply <- readIORef d_var
        let uniq = case lookupFM dfun_supply key of

@@ -26,10 +26,9 @@ import Inst		( InstOrigin(..),
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
-			  tcLookupValue, tcLookupClassByKey,
-			  tcLookupValueByKey,
+			  tcLookupValue, tcLookupClass, tcLookupGlobalId,
+			  tcLookupTyCon, tcLookupDataCon,
 			  tcExtendGlobalTyVars, tcLookupValueMaybe,
-			  tcLookupTyConByKey, tcLookupDataCon
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
@@ -84,7 +83,7 @@ import CmdLineOpts      ( opt_WarnMissingFields )
 \begin{code}
 tcExpr :: RenamedHsExpr			-- Expession to type check
 	-> TcType 			-- Expected type (could be a polytpye)
-	-> TcM s (TcExpr, LIE)
+	-> TcM (TcExpr, LIE)
 
 tcExpr expr ty | isSigmaTy ty = -- Polymorphic case
 				tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
@@ -106,7 +105,7 @@ tcExpr expr ty | isSigmaTy ty = -- Polymorphic case
 -- can be a polymorphic one.
 tcPolyExpr :: RenamedHsExpr
 	   -> TcType				-- Expected type
-	   -> TcM s (TcExpr, LIE,		-- Generalised expr with expected type, and LIE
+	   -> TcM (TcExpr, LIE,		-- Generalised expr with expected type, and LIE
 		     TcExpr, TcTauType, LIE)	-- Same thing, but instantiated; tau-type returned
 
 tcPolyExpr arg expected_arg_ty
@@ -171,7 +170,7 @@ tcPolyExpr arg expected_arg_ty
 \begin{code}
 tcMonoExpr :: RenamedHsExpr		-- Expession to type check
 	   -> TcTauType 		-- Expected type (could be a type variable)
-	   -> TcM s (TcExpr, LIE)
+	   -> TcM (TcExpr, LIE)
 
 tcMonoExpr (HsVar name) res_ty
   = tcId name			`thenNF_Tc` \ (expr', lie, id_ty) ->
@@ -273,9 +272,9 @@ later use.
 \begin{code}
 tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
   = 	-- Get the callable and returnable classes.
-    tcLookupClassByKey cCallableClassKey	`thenNF_Tc` \ cCallableClass ->
-    tcLookupClassByKey cReturnableClassKey	`thenNF_Tc` \ cReturnableClass ->
-    tcLookupTyConByKey ioTyConKey		`thenNF_Tc` \ ioTyCon ->
+    tcLookupClass cCallableClassName	`thenNF_Tc` \ cCallableClass ->
+    tcLookupClass cReturnableClassName	`thenNF_Tc` \ cReturnableClass ->
+    tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
     let
 	new_arg_dict (arg, arg_ty)
 	  = newClassDicts (CCallOrigin (_UNPK_ lbl) (Just arg))
@@ -459,18 +458,16 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let 
 	field_names = [field_name | (field_name, _, _) <- rbinds]
     in
-    mapNF_Tc tcLookupValueMaybe field_names		`thenNF_Tc` \ maybe_sel_ids ->
+    mapNF_Tc tcLookupGlobal_maybe field_names		`thenNF_Tc` \ maybe_sel_ids ->
     let
-	bad_guys = [field_name | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
-				 case maybe_sel_id of
-					Nothing -> True
-					Just sel_id -> not (isRecordSelector sel_id)
+	bad_guys = [ addErrTc (notSelector field_name) 
+		   | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
+		      case maybe_sel_id of
+			Just (AnId sel_id) -> not (isRecordSelector sel_id)
+			other		   -> True
 		   ]
     in
-    mapNF_Tc (addErrTc . notSelector) bad_guys	`thenTc_`
-    if not (null bad_guys) then
-	failTc
-    else
+    checkTcM (null bad_guys) (listNF_Tc bad_guys `thenNF_Tc_` failTc)	`thenTc_`
     
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
@@ -556,7 +553,7 @@ tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
   = unifyListTy res_ty 				`thenTc` \ elt_ty ->  
     tcMonoExpr expr elt_ty		 	`thenTc` \ (expr', lie1) ->
 
-    tcLookupValueByKey enumFromClassOpKey	`thenNF_Tc` \ sel_id ->
+    tcLookupGlobalId enumFromClassOpName	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
 	      sel_id [elt_ty]			`thenNF_Tc` \ (lie2, enum_from_id) ->
 
@@ -565,12 +562,11 @@ tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
   = tcAddErrCtxt (arithSeqCtxt in_expr) $ 
-    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty	`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty	`thenTc`    \ (expr2',lie2) ->
-    tcLookupValueByKey enumFromThenClassOpKey		`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq)
-	      sel_id [elt_ty]				`thenNF_Tc` \ (lie3, enum_from_then_id) ->
+    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
+    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+    tcLookupGlobalId enumFromThenClassOpName		`thenNF_Tc` \ sel_id ->
+    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie3, enum_from_then_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_then_id)
 			   (FromThen expr1' expr2'),
@@ -578,12 +574,11 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
   = tcAddErrCtxt (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty	`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty	`thenTc`    \ (expr2',lie2) ->
-    tcLookupValueByKey enumFromToClassOpKey	`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq)
-	      sel_id [elt_ty] 				`thenNF_Tc` \ (lie3, enum_from_to_id) ->
+    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
+    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+    tcLookupGlobalId enumFromToClassOpName		`thenNF_Tc` \ sel_id ->
+    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie3, enum_from_to_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_to_id)
 			  (FromTo expr1' expr2'),
@@ -591,13 +586,12 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
 
 tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = tcAddErrCtxt  (arithSeqCtxt in_expr) $
-    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
-    tcMonoExpr expr1 elt_ty	`thenTc`    \ (expr1',lie1) ->
-    tcMonoExpr expr2 elt_ty	`thenTc`    \ (expr2',lie2) ->
-    tcMonoExpr expr3 elt_ty	`thenTc`    \ (expr3',lie3) ->
-    tcLookupValueByKey enumFromThenToClassOpKey	`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq)
-	      sel_id [elt_ty]				`thenNF_Tc` \ (lie4, eft_id) ->
+    unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
+    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+    tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
+    tcLookupGlobalId enumFromThenToClassOpName		`thenNF_Tc` \ sel_id ->
+    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie4, eft_id) ->
 
     returnTc (ArithSeqOut (HsVar eft_id)
 			   (FromThenTo expr1' expr2' expr3'),
@@ -694,7 +688,7 @@ Typecheck expression which in most cases will be an Id.
 
 \begin{code}
 tcExpr_id :: RenamedHsExpr
-           -> TcM s (TcExpr,
+           -> TcM (TcExpr,
  	       	     LIE,
 	             TcType)
 tcExpr_id id_expr
@@ -716,7 +710,7 @@ tcExpr_id id_expr
 
 tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
       -> TcType			    		-- Expected result type of application
-      -> TcM s (TcExpr, [TcExpr],	    	-- Translated fun and args
+      -> TcM (TcExpr, [TcExpr],	    	-- Translated fun and args
 		LIE)
 
 tcApp fun args res_ty
@@ -766,7 +760,7 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
 
 split_fun_ty :: TcType		-- The type of the function
 	     -> Int			-- Number of arguments
-	     -> TcM s ([TcType],	-- Function argument types
+	     -> TcM ([TcType],	-- Function argument types
 		       TcType)	-- Function result types
 
 split_fun_ty fun_ty 0 
@@ -782,7 +776,7 @@ split_fun_ty fun_ty n
 \begin{code}
 tcArg :: RenamedHsExpr			-- The function (for error messages)
       -> (RenamedHsExpr, TcType, Int)	-- Actual argument and expected arg type
-      -> TcM s (TcExpr, LIE)	-- Resulting argument and LIE
+      -> TcM (TcExpr, LIE)	-- Resulting argument and LIE
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
   = tcAddErrCtxt (funAppCtxt the_fun arg arg_no) $
@@ -803,18 +797,15 @@ in @tcId@ prevents this information from pointlessly propagating
 further prior to the first usage inference.
 
 \begin{code}
-tcId :: Name -> NF_TcM s (TcExpr, LIE, TcType)
+tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
 
 tcId name
   = 	-- Look up the Id and instantiate its type
-    tcLookupValueMaybe name	`thenNF_Tc` \ maybe_local ->
-
-    case maybe_local of
-      Just tc_id -> instantiate_it (OccurrenceOf tc_id) tc_id (unannotTy (idType tc_id))
-
-      Nothing ->    tcLookupValue name		`thenNF_Tc` \ id ->
-		    tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
-		    instantiate_it2 (OccurrenceOf id) id tyvars theta tau
+    tcLookup name			`thenNF_Tc` \ thing ->
+    case thing of
+      ATcId tc_id	-> instantiate_it (OccurrenceOf tc_id) tc_id (idType tc_id)
+      AGlobal (AnId id) -> tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
+			   instantiate_it2 (OccurrenceOf id) id tyvars theta tau
 
   where
 	-- The instantiate_it loop runs round instantiating the Id.
@@ -875,9 +866,9 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	--	then = then
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
-    tcLookupValueByKey returnMClassOpKey	`thenNF_Tc` \ return_sel_id ->
-    tcLookupValueByKey thenMClassOpKey		`thenNF_Tc` \ then_sel_id ->
-    tcLookupValueByKey failMClassOpKey		`thenNF_Tc` \ fail_sel_id ->
+    tcLookupGlobalId returnMClassOpName		`thenNF_Tc` \ return_sel_id ->
+    tcLookupGlobalId thenMClassOpName		`thenNF_Tc` \ then_sel_id ->
+    tcLookupGlobalId failMClassOpName		`thenNF_Tc` \ fail_sel_id ->
     newMethod DoOrigin return_sel_id [m]	`thenNF_Tc` \ (return_lie, return_id) ->
     newMethod DoOrigin then_sel_id [m]		`thenNF_Tc` \ (then_lie, then_id) ->
     newMethod DoOrigin fail_sel_id [m]		`thenNF_Tc` \ (fail_lie, fail_id) ->
@@ -917,7 +908,7 @@ tcRecordBinds
 	:: TyCon		-- Type constructor for the record
 	-> [TcType]		-- Args of this type constructor
 	-> RenamedRecordBinds
-	-> TcM s (TcRecordBinds, LIE)
+	-> TcM (TcRecordBinds, LIE)
 
 tcRecordBinds tycon ty_args rbinds
   = mapAndUnzipTc do_bind rbinds	`thenTc` \ (rbinds', lies) ->
@@ -926,7 +917,7 @@ tcRecordBinds tycon ty_args rbinds
     tenv = mkTopTyVarSubst (tyConTyVars tycon) ty_args
 
     do_bind (field_lbl_name, rhs, pun_flag)
-      = tcLookupValue field_lbl_name	`thenNF_Tc` \ sel_id ->
+      = tcLookupGlobalId field_lbl_name		`thenNF_Tc` \ sel_id ->
 	let
 	    field_lbl = recordSelectorFieldLabel sel_id
 	    field_ty  = substTy tenv (fieldLabelType field_lbl)
@@ -988,7 +979,7 @@ missingFields rbinds data_con
 %************************************************************************
 
 \begin{code}
-tcMonoExprs :: [RenamedHsExpr] -> [TcType] -> TcM s ([TcExpr], LIE)
+tcMonoExprs :: [RenamedHsExpr] -> [TcType] -> TcM ([TcExpr], LIE)
 
 tcMonoExprs [] [] = returnTc ([], emptyLIE)
 tcMonoExprs (expr:exprs) (ty:tys)
@@ -1007,9 +998,9 @@ tcMonoExprs (expr:exprs) (ty:tys)
 Overloaded literals.
 
 \begin{code}
-tcLit :: HsLit -> TcType -> TcM s (TcExpr, LIE)
+tcLit :: HsLit -> TcType -> TcM (TcExpr, LIE)
 tcLit (HsLitLit s _) res_ty
-  = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
+  = tcLookupClass cCallableClassName			`thenNF_Tc` \ cCallableClass ->
     newClassDicts (LitLitOrigin (_UNPK_ s))
 	          [(cCallableClass,[res_ty])]		`thenNF_Tc` \ (dicts, _) ->
     returnTc (HsLit (HsLitLit s res_ty), dicts)

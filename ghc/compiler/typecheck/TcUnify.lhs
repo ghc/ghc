@@ -48,12 +48,12 @@ import Outputable
 \begin{code}
 unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
-	  -> TcM s ()
+	  -> TcM ()
 unifyKind k1 k2 
   = tcAddErrCtxtM (unifyCtxt "kind" k1 k2) $
     uTys k1 k1 k2 k2
 
-unifyKinds :: [TcKind] -> [TcKind] -> TcM s ()
+unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
 unifyKinds []       []       = returnTc ()
 unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenTc_`
 			       unifyKinds ks1 ks2
@@ -61,7 +61,7 @@ unifyKinds _ _ = panic "unifyKinds: length mis-match"
 \end{code}
 
 \begin{code}
-unifyOpenTypeKind :: TcKind -> TcM s ()	
+unifyOpenTypeKind :: TcKind -> TcM ()	
 -- Ensures that the argument kind is of the form (Type bx)
 -- for some boxity bx
 
@@ -94,7 +94,7 @@ non-exported generic functions.
 Unify two @TauType@s.  Dead straightforward.
 
 \begin{code}
-unifyTauTy :: TcTauType -> TcTauType -> TcM s ()
+unifyTauTy :: TcTauType -> TcTauType -> TcM ()
 unifyTauTy ty1 ty2 	-- ty1 expected, ty2 inferred
   = tcAddErrCtxtM (unifyCtxt "type" ty1 ty2) $
     uTys ty1 ty1 ty2 ty2
@@ -106,7 +106,7 @@ of equal length.  We charge down the list explicitly so that we can
 complain if their lengths differ.
 
 \begin{code}
-unifyTauTyLists :: [TcTauType] -> [TcTauType] ->  TcM s ()
+unifyTauTyLists :: [TcTauType] -> [TcTauType] ->  TcM ()
 unifyTauTyLists [] 	     []	        = returnTc ()
 unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenTc_`
 					unifyTauTyLists tys1 tys2
@@ -118,7 +118,7 @@ all together.  It is used, for example, when typechecking explicit
 lists, when all the elts should be of the same type.
 
 \begin{code}
-unifyTauTyList :: [TcTauType] -> TcM s ()
+unifyTauTyList :: [TcTauType] -> TcM ()
 unifyTauTyList []		 = returnTc ()
 unifyTauTyList [ty]		 = returnTc ()
 unifyTauTyList (ty1:tys@(ty2:_)) = unifyTauTy ty1 ty2	`thenTc_`
@@ -145,7 +145,7 @@ uTys :: TcTauType -> TcTauType	-- Error reporting ty1 and real ty1
 
      -> TcTauType -> TcTauType	-- Error reporting ty2 and real ty2
 				-- ty2 is the *actual* type
-     -> TcM s ()
+     -> TcM ()
 
 	-- Always expand synonyms (see notes at end)
         -- (this also throws away FTVs and usage annots)
@@ -270,7 +270,7 @@ uVar :: Bool		-- False => tyvar is the "expected"
 			-- True  => ty    is the "expected" thing
      -> TcTyVar
      -> TcTauType -> TcTauType	-- printing and real versions
-     -> TcM s ()
+     -> TcM ()
 
 uVar swapped tv1 ps_ty2 ty2
   = tcGetTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
@@ -393,7 +393,7 @@ checkKinds swapped tv1 ty2
 
 \begin{code}
 unifyFunTy :: TcType	 			-- Fail if ty isn't a function type
-	   -> TcM s (TcType, TcType)	-- otherwise return arg and result types
+	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
 
 unifyFunTy ty@(TyVarTy tyvar)
   = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
@@ -415,7 +415,7 @@ unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
 
 \begin{code}
 unifyListTy :: TcType              -- expected list type
-	    -> TcM s TcType      -- list element type
+	    -> TcM TcType      -- list element type
 
 unifyListTy ty@(TyVarTy tyvar)
   = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
@@ -435,7 +435,7 @@ unify_list_ty_help ty	-- Revert to ordinary unification
 \end{code}
 
 \begin{code}
-unifyTupleTy :: Boxity -> Arity -> TcType -> TcM s [TcType]
+unifyTupleTy :: Boxity -> Arity -> TcType -> TcM [TcType]
 unifyTupleTy boxity arity ty@(TyVarTy tyvar)
   = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of

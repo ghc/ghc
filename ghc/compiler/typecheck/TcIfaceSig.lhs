@@ -55,7 +55,7 @@ signatures.
 \begin{code}
 tcInterfaceSigs :: ValueEnv		-- Envt to use when checking unfoldings
 		-> [RenamedHsDecl]	-- Ignore non-sig-decls in these decls
-		-> TcM s [Id]
+		-> TcM [Id]
 		
 
 tcInterfaceSigs unf_env decls
@@ -144,7 +144,7 @@ tcPragExpr unf_env name in_scope_vars expr
   where
     doc = text "unfolding of" <+> ppr name
 
-tcDelay :: ValueEnv -> SDoc -> TcM s a -> NF_TcM s (Maybe a)
+tcDelay :: ValueEnv -> SDoc -> TcM a -> NF_TcM (Maybe a)
 tcDelay unf_env doc thing_inside
   = forkNF_Tc (
 	recoverNF_Tc bad_value (
@@ -167,12 +167,12 @@ Variables in unfoldings
 ****** Why? Because we know all the types and want to bind them to real Ids.
 
 \begin{code}
-tcVar :: Name -> TcM s Id
+tcVar :: Name -> TcM Id
 tcVar name
-  = tcLookupValueMaybe name	`thenNF_Tc` \ maybe_id ->
+  = tcLookupGlobalMaybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of {
-	Just id -> returnTc id;
-	Nothing -> failWithTc (noDecl name)
+	Just (AnId id)	-> returnTc id;
+	Nothing		-> failWithTc (noDecl name)
     }
 
 noDecl name = hsep [ptext SLIT("Warning: no binding for"), ppr name]
@@ -181,7 +181,7 @@ noDecl name = hsep [ptext SLIT("Warning: no binding for"), ppr name]
 UfCore expressions.
 
 \begin{code}
-tcCoreExpr :: UfExpr Name -> TcM s CoreExpr
+tcCoreExpr :: UfExpr Name -> TcM CoreExpr
 
 tcCoreExpr (UfType ty)
   = tcHsType ty		`thenTc` \ ty' ->

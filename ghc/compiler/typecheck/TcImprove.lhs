@@ -18,7 +18,7 @@ import List		( nub )
 \end{code}
 
 \begin{code}
-tcImprove :: LIE -> TcM s ()
+tcImprove :: LIE -> TcM ()
 -- Do unifications based on functional dependencies in the LIE
 tcImprove lie 
   = tcGetInstEnv 	`thenNF_Tc` \ inst_env ->
@@ -57,7 +57,7 @@ tcImprove lie
     iterImprove nfdss
 
 
-iterImprove :: [(VarSet, Name, [FunDep TcType])] -> TcM s ()
+iterImprove :: [(VarSet, Name, [FunDep TcType])] -> TcM ()
 iterImprove [] = returnTc ()
 iterImprove cfdss
   = selfImprove pairImprove cfdss	`thenTc` \ change2 ->

@@ -168,7 +168,7 @@ tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> Module			-- Module for deriving
 	     -> FixityEnv		-- For derivings
 	     -> RnNameSupply		-- For renaming derivings
-	     -> TcM s (Bag InstInfo,
+	     -> TcM (Bag InstInfo,
 		       RenamedHsBinds)
 
 tcInstDecls1 unf_env decls mod fixs rn_name_supply
@@ -200,7 +200,7 @@ tcInstDecls1 unf_env decls mod fixs rn_name_supply
 \end{code} 
 
 \begin{code}
-tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM (Bag InstInfo)
 -- Deal with a single instance declaration
 tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
@@ -274,7 +274,7 @@ gives rise to the instance declarations
 
 
 \begin{code}
-getGenericInstances :: Module -> RenamedTyClDecl -> TcM s [InstInfo] 
+getGenericInstances :: Module -> RenamedTyClDecl -> TcM [InstInfo] 
 getGenericInstances mod decl@(ClassDecl context class_name tyvar_names 
 	 			        fundeps class_sigs def_methods pragmas 
 				        name_list loc)
@@ -284,7 +284,7 @@ getGenericInstances mod decl@(ClassDecl context class_name tyvar_names
   | otherwise
   = recoverNF_Tc (returnNF_Tc [])				$
     tcAddDeclCtxt decl						$
-    tcLookupTy class_name					`thenTc` \ (AClass clas) ->
+    tcLookupClass class_name					`thenTc` \ clas ->
 
 	-- Make an InstInfo out of each group
     mapTc (mkGenericInstance mod clas loc) groups		`thenTc` \ inst_infos ->
@@ -336,7 +336,7 @@ getGenericBinds (FunMonoBind id infixop matches loc)
 ---------------------------------
 mkGenericInstance :: Module -> Class -> SrcLoc
 		  -> (RenamedHsType, RenamedMonoBinds)
-		  -> TcM s InstInfo
+		  -> TcM InstInfo
 
 mkGenericInstance mod clas loc (hs_ty, binds)
   -- Make a generic instance declaration
@@ -373,7 +373,7 @@ mkGenericInstance mod clas loc (hs_ty, binds)
 
 \begin{code}
 tcInstDecls2 :: Bag InstInfo
-	     -> NF_TcM s (LIE, TcMonoBinds)
+	     -> NF_TcM (LIE, TcMonoBinds)
 
 tcInstDecls2 inst_decls
   = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
@@ -451,7 +451,7 @@ is the @dfun_theta@ below.
 First comes the easy case of a non-local instance decl.
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> NF_TcM s (LIE, TcMonoBinds)
+tcInstDecl2 :: InstInfo -> NF_TcM (LIE, TcMonoBinds)
 
 tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		      inst_decl_theta

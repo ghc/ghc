@@ -24,10 +24,10 @@ import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
 
 import TcMonad
-import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
-                          tcExtendUVarEnv, tcLookupUVar,
-			  tcGetGlobalTyVars, valueEnvIds, 
-		 	  TyThing(..), tcExtendKindEnv
+import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, tcLookupTy, 
+			  tcGetEnv, tcEnvTyVars, tcEnvTcIds,
+			  tcGetGlobalTyVars, 
+		 	  TyThing(..)
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  newKindVar, tcInstSigVar,
@@ -51,7 +51,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar, tyVarKind, mkNamedUVar )
+import Var		( TyVar, mkTyVar, tyVarKind )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
@@ -118,9 +118,9 @@ But equally valid would be
 
 \begin{code}
 tcHsTyVars :: [HsTyVarBndr Name] 
-	   -> TcM s a				-- The kind checker
-	   -> ([TyVar] -> TcM s b)
-	   -> TcM s b
+	   -> TcM a				-- The kind checker
+	   -> ([TyVar] -> TcM b)
+	   -> TcM b
 
 tcHsTyVars [] kind_check thing_inside = thing_inside []
 	-- A useful short cut for a common case!
@@ -135,8 +135,8 @@ tcHsTyVars tv_names kind_check thing_inside
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
 
 tcTyVars :: [Name] 
-	     -> TcM s a				-- The kind checker
-	     -> TcM s [TyVar]
+	     -> TcM a				-- The kind checker
+	     -> TcM [TyVar]
 tcTyVars [] kind_check = returnTc []
 
 tcTyVars tv_names kind_check
@@ -148,8 +148,8 @@ tcTyVars tv_names kind_check
     
 
 \begin{code}
-kcHsTyVar  :: HsTyVarBndr name   -> NF_TcM s (name, TcKind)
-kcHsTyVars :: [HsTyVarBndr name] -> NF_TcM s [(name, TcKind)]
+kcHsTyVar  :: HsTyVarBndr name   -> NF_TcM (name, TcKind)
+kcHsTyVars :: [HsTyVarBndr name] -> NF_TcM [(name, TcKind)]
 
 kcHsTyVar (UserTyVar name)       = newNamedKindVar name
 kcHsTyVar (IfaceTyVar name kind) = returnNF_Tc (name, kind)
@@ -160,7 +160,7 @@ newNamedKindVar name = newKindVar	`thenNF_Tc` \ kind ->
 		       returnNF_Tc (name, kind)
 
 ---------------------------
-kcBoxedType :: RenamedHsType -> TcM s ()
+kcBoxedType :: RenamedHsType -> TcM ()
 	-- The type ty must be a *boxed* *type*
 kcBoxedType ty
   = kcHsType ty				`thenTc` \ kind ->
@@ -168,7 +168,7 @@ kcBoxedType ty
     unifyKind boxedTypeKind kind
     
 ---------------------------
-kcTypeType :: RenamedHsType -> TcM s ()
+kcTypeType :: RenamedHsType -> TcM ()
 	-- The type ty must be a *type*, but it can be boxed or unboxed.
 kcTypeType ty
   = kcHsType ty				`thenTc` \ kind ->
@@ -176,13 +176,13 @@ kcTypeType ty
     unifyOpenTypeKind kind
 
 ---------------------------
-kcHsSigType, kcHsBoxedSigType :: RenamedHsType -> TcM s ()
+kcHsSigType, kcHsBoxedSigType :: RenamedHsType -> TcM ()
 	-- Used for type signatures
 kcHsSigType  	 = kcTypeType
 kcHsBoxedSigType = kcBoxedType
 
 ---------------------------
-kcHsType :: RenamedHsType -> TcM s TcKind
+kcHsType :: RenamedHsType -> TcM TcKind
 kcHsType (HsTyVar name)	      = kcTyVar name
 kcHsType (HsUsgTy _ ty)       = kcHsType ty
 kcHsType (HsUsgForAllTy _ ty) = kcHsType ty
@@ -240,16 +240,19 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
 	returnTc boxedTypeKind
 
 ---------------------------
-kcTyVar name
-  = tcLookupTy name	`thenTc` \ thing ->
-    case thing of
-	ATyVar tv -> returnTc (tyVarKind tv)
-	ATyCon tc -> returnTc (tyConKind tc)
-	AThing k  -> returnTc k
-	other	  -> failWithTc (wrongThingErr "type" thing name)
+kcTyVar name	-- Could be a tyvar or a tycon
+  = tcLookup name	`thenTc` \ thing ->
+    case thing of {
+	ATyVar tv -> returnTc (tyVarKind tv) ;
+	AThing k  -> returnTc k ;
+	AGlobal (ATyCon tc) -> returnTc (tyConKind tc) ;
+	other	  -> 
+
+    failWithTc (wrongThingErr "type" thing name)
+    }}
 
 ---------------------------
-kcFunResType :: RenamedHsType -> TcM s TcKind
+kcFunResType :: RenamedHsType -> TcM TcKind
 -- The only place an unboxed tuple type is allowed
 -- is at the right hand end of an arrow
 kcFunResType (HsTupleTy (HsTupCon _ Unboxed) tys)
@@ -273,7 +276,7 @@ kcAppKind fun_kind arg_kind
 ---------------------------
 kcHsContext ctxt = mapTc_ kcHsPred ctxt
 
-kcHsPred :: RenamedHsPred -> TcM s ()
+kcHsPred :: RenamedHsPred -> TcM ()
 kcHsPred pred@(HsPIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
     kcBoxedType ty
@@ -284,8 +287,8 @@ kcHsPred pred@(HsPClass cls tys)
     (case thing of
 	AClass cls  -> returnTc (tyConKind (classTyCon cls))
 	AThing kind -> returnTc kind
-	other -> failWithTc (wrongThingErr "class" thing cls))	`thenTc` \ kind ->
-    mapTc kcHsType tys						`thenTc` \ arg_kinds ->
+	other -> failWithTc (wrongThingErr "class" (pp_thing thing) cls))	`thenTc` \ kind ->
+    mapTc kcHsType tys							`thenTc` \ arg_kinds ->
     unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)
 \end{code}
 
@@ -309,13 +312,13 @@ tcHsSigType and tcHsBoxedSigType are used for type signatures written by the pro
   	so the kind returned is indeed a Kind not a TcKind
 
 \begin{code}
-tcHsSigType :: RenamedHsType -> TcM s TcType
+tcHsSigType :: RenamedHsType -> TcM TcType
 tcHsSigType ty
   = kcTypeType ty	`thenTc_`
     tcHsType ty		`thenTc` \ ty' ->
     returnTc (hoistForAllTys ty')
 
-tcHsBoxedSigType :: RenamedHsType -> TcM s Type
+tcHsBoxedSigType :: RenamedHsType -> TcM Type
 tcHsBoxedSigType ty
   = kcBoxedType ty	`thenTc_`
     tcHsType ty		`thenTc` \ ty' ->
@@ -327,7 +330,7 @@ tcHsType, the main work horse
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcHsType :: RenamedHsType -> TcM s Type
+tcHsType :: RenamedHsType -> TcM Type
 tcHsType ty@(HsTyVar name)
   = tc_app ty []
 
@@ -359,25 +362,6 @@ tcHsType (HsAppTy ty1 ty2)
 tcHsType (HsPredTy pred)
   = tcClassAssertion True pred	`thenTc` \ pred' ->
     returnTc (mkPredTy pred')
-
-tcHsType (HsUsgTy usg ty)
-  = newUsg usg			`thenTc` \ usg' ->
-    tcHsType ty			`thenTc` \ tc_ty ->
-    returnTc (mkUsgTy usg' tc_ty)
-  where
-    newUsg usg = case usg of
-                   HsUsOnce        -> returnTc UsOnce
-                   HsUsMany        -> returnTc UsMany
-                   HsUsVar uv_name -> tcLookupUVar uv_name `thenTc` \ uv ->
-                                      returnTc (UsVar uv)
-
-tcHsType (HsUsgForAllTy uv_name ty)
-  = let
-        uv = mkNamedUVar uv_name
-    in
-    tcExtendUVarEnv uv_name uv $
-    tcHsType ty                     `thenTc` \ tc_ty ->
-    returnTc (mkUsForAllTy uv tc_ty)
 
 tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
   = let
@@ -451,7 +435,7 @@ Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tc_app :: RenamedHsType -> [RenamedHsType] -> TcM s Type
+tc_app :: RenamedHsType -> [RenamedHsType] -> TcM Type
 tc_app (HsAppTy ty1 ty2) tys
   = tc_app ty1 (ty2:tys)
 
@@ -470,7 +454,7 @@ tc_app ty tys
 -- 	hence the rather strange functionality.
 
 tc_fun_type name arg_tys
-  = tcLookupTy name			`thenTc` \ thing ->
+  = tcLookupGlobal name			`thenTc` \ thing ->
     case thing of
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
@@ -490,20 +474,20 @@ tc_fun_type name arg_tys
 		    err_msg = arityErr "Type synonym" name arity n_args
 		    n_args  = length arg_tys
 
-	other -> failWithTc (wrongThingErr "type constructor" thing name)
+	other -> failWithTc (wrongThingErr "type constructor" (pp_thing thing) name)
 \end{code}
 
 
 Contexts
 ~~~~~~~~
 \begin{code}
-tcClassContext :: RenamedContext -> TcM s ClassContext
+tcClassContext :: RenamedContext -> TcM ClassContext
 	-- Used when we are expecting a ClassContext (i.e. no implicit params)
 tcClassContext context
   = tcContext context 	`thenTc` \ theta ->
     returnTc (classesOfPreds theta)
 
-tcContext :: RenamedContext -> TcM s ThetaType
+tcContext :: RenamedContext -> TcM ThetaType
 tcContext context = mapTc (tcClassAssertion False) context
 
 tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
@@ -518,7 +502,7 @@ tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
 		n_tys = length tys
 		err   = arityErr "Class" class_name arity n_tys
 
-	other -> failWithTc (wrongThingErr "class" thing class_name)
+	other -> failWithTc (wrongThingErr "class" (ppr_thing thing) class_name)
 
 tcClassAssertion ccall_ok assn@(HsPIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
@@ -597,7 +581,7 @@ maybeSig (sig@(TySigInfo sig_name _ _ _ _ _ _ _) : sigs) name
 
 
 \begin{code}
-tcTySig :: RenamedSig -> TcM s TcSigInfo
+tcTySig :: RenamedSig -> TcM TcSigInfo
 
 tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc				$ 
@@ -606,7 +590,7 @@ tcTySig (Sig v ty src_loc)
    mkTcSig (mkVanillaId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
 
-mkTcSig :: TcId -> SrcLoc -> NF_TcM s TcSigInfo
+mkTcSig :: TcId -> SrcLoc -> NF_TcM TcSigInfo
 mkTcSig poly_id src_loc
   = 	-- Instantiate this type
 	-- It's important to do this even though in the error-free case
@@ -710,7 +694,7 @@ checkSigTyVars :: [TcTyVar]		-- Universally-quantified type variables in the sig
 	       -> TcTyVarSet		-- Tyvars that are free in the type signature
 					-- These should *already* be in the global-var set, and are
 					-- used here only to improve the error message
-	       -> TcM s [TcTyVar]	-- Zonked signature type variables
+	       -> TcM [TcTyVar]	-- Zonked signature type variables
 
 checkSigTyVars [] free = returnTc []
 
@@ -736,7 +720,10 @@ checkSigTyVars sig_tyvars free_tyvars
 	-- from the zonked tyvar to the in-scope one
 	-- If any of the in-scope tyvars zonk to a type, then ignore them;
 	-- that'll be caught later when we back up to their type sig
-	tcGetInScopeTyVars			`thenNF_Tc` \ in_scope_tvs ->
+	tcGetEnv				`thenNF_Tc` \ env ->
+	let
+	   in_scope_tvs = tcEnvTyVars env
+	in
 	zonkTcTyVars in_scope_tvs		`thenNF_Tc` \ in_scope_tys ->
 	let
 	    in_scope_assoc = [ (zonked_tv, in_scope_tv) 
@@ -777,8 +764,8 @@ checkSigTyVars sig_tyvars free_tyvars
 
 	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
 					-- The least comprehensible, so put it last
-	    then   tcGetValueEnv 					`thenNF_Tc` \ ve ->
-        	   find_globals tv env  [] (valueEnvIds ve)		`thenNF_Tc` \ (env1, globs) ->
+	    then   tcGetEnv 						`thenNF_Tc` \ env ->
+        	   find_globals tv env  [] (tcEnvTcIds)			`thenNF_Tc` \ (env1, globs) ->
         	   find_frees   tv env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (env2, frees) ->
 		   returnNF_Tc (env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
 
@@ -855,7 +842,7 @@ These two context are used with checkSigTyVars
     
 \begin{code}
 sigCtxt :: Message -> [TcTyVar] -> TcThetaType -> TcTauType
-	-> TidyEnv -> NF_TcM s (TidyEnv, Message)
+	-> TidyEnv -> NF_TcM (TidyEnv, Message)
 sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
   = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
     let
@@ -900,13 +887,16 @@ typeKindCtxt ty = sep [ptext SLIT("When checking that"),
 appKindCtxt :: SDoc -> Message
 appKindCtxt pp = ptext SLIT("When checking kinds in") <+> quotes pp
 
-wrongThingErr expected actual name
-  = pp_actual actual <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
-  where
-    pp_actual (ATyCon _) = ptext SLIT("Type constructor")
-    pp_actual (AClass _) = ptext SLIT("Class")
-    pp_actual (ATyVar _) = ptext SLIT("Type variable")
-    pp_actual (AThing _) = ptext SLIT("Utterly bogus")
+wrongThingErr expected thing name
+  = thing <+> quotes (ppr name) <+> ptext SLIT("used as a") <+> text expected
+
+pp_ty_thing (ATyCon _) = ptext SLIT("Type constructor")
+pp_ty_thing (AClass _) = ptext SLIT("Class")
+pp_ty_thing (AnId   _) = ptext SLIT("Identifier")
+
+pp_tc_ty_thing (ATyVar _) = ptext SLIT("Type variable")
+pp_tc_ty_thing (ATcId _)  = ptext SLIT("Local identifier")
+pp_tc_ty_thing (AThing _) = ptext SLIT("Utterly bogus")
 
 ambigErr pred ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),

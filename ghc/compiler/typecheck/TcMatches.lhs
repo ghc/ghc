@@ -55,7 +55,7 @@ tcMatchesFun :: [(Name,Id)]	-- Bindings for the variables bound in this group
 	     -> Name
 	     -> TcType 		-- Expected type
 	     -> [RenamedMatch]
-	     -> TcM s ([TcMatch], LIE)
+	     -> TcM ([TcMatch], LIE)
 
 tcMatchesFun xve fun_name expected_ty matches@(first_match:_)
   =	 -- Check that they all have the same no of arguments
@@ -83,7 +83,7 @@ parser guarantees that each equation has exactly one argument.
 \begin{code}
 tcMatchesCase :: [RenamedMatch]		-- The case alternatives
 	      -> TcType 		-- Type of whole case expressions
-	      -> TcM s (TcType,		-- Inferred type of the scrutinee
+	      -> TcM (TcType,		-- Inferred type of the scrutinee
 			[TcMatch], 	-- Translated alternatives
 			LIE)
 
@@ -92,7 +92,7 @@ tcMatchesCase matches expr_ty
     tcMatches [] matches (mkFunTy scrut_ty expr_ty) CaseAlt	`thenTc` \ (matches', lie) ->
     returnTc (scrut_ty, matches', lie)
 
-tcMatchLambda :: RenamedMatch -> TcType -> TcM s (TcMatch, LIE)
+tcMatchLambda :: RenamedMatch -> TcType -> TcM (TcMatch, LIE)
 tcMatchLambda match res_ty = tcMatch [] match res_ty LambdaBody
 \end{code}
 
@@ -102,7 +102,7 @@ tcMatches :: [(Name,Id)]
 	  -> [RenamedMatch]
 	  -> TcType
 	  -> StmtCtxt
-	  -> TcM s ([TcMatch], LIE)
+	  -> TcM ([TcMatch], LIE)
 
 tcMatches xve matches expected_ty fun_or_case
   = mapAndUnzipTc tc_match matches	`thenTc` \ (matches, lies) ->
@@ -124,7 +124,7 @@ tcMatch :: [(Name,Id)]
 	-> TcType 		-- Expected result-type of the Match.
 				-- Early unification with this guy gives better error messages
 	-> StmtCtxt
-	-> TcM s (TcMatch, LIE)
+	-> TcM (TcMatch, LIE)
 
 tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
   = tcAddSrcLoc (getMatchLoc match)		$
@@ -217,7 +217,7 @@ glue_on is_rec mbinds (GRHSs grhss binds ty)
 
 tcGRHSs :: RenamedGRHSs
 	-> TcType -> StmtCtxt
-	-> TcM s (TcGRHSs, LIE)
+	-> TcM (TcGRHSs, LIE)
 
 tcGRHSs (GRHSs grhss binds _) expected_ty ctxt
   = tcBindsAndThen glue_on binds (tc_grhss grhss)
@@ -269,7 +269,7 @@ tcStmts :: StmtCtxt
         -> (TcType -> TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
         -> [RenamedStmt]
 	-> TcType			-- elt_ty, where type of the comprehension is (m elt_ty)
-        -> TcM s ([TcStmt], LIE)
+        -> TcM ([TcStmt], LIE)
 
 tcStmts do_or_lc m (stmt@(ReturnStmt exp) : stmts) elt_ty
   = ASSERT( null stmts )

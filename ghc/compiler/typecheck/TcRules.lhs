@@ -28,7 +28,7 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcRules :: [RenamedHsDecl] -> TcM s (LIE, [TypecheckedRuleDecl])
+tcRules :: [RenamedHsDecl] -> TcM (LIE, [TypecheckedRuleDecl])
 tcRules decls = mapAndUnzipTc tcRule [rule | RuleD rule <- decls]	`thenTc` \ (lies, rules) ->
 		returnTc (plusLIEs lies, rules)
 

@@ -19,9 +19,7 @@ import Inst		( InstOrigin(..),
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( tcLookupValue, tcLookupClassByKey,
-			  tcLookupValueByKey, newLocalId, badCon
-			)
+import TcEnv		( tcLookupClass, tcLookupGlobalId, newLocalId, badCon )
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
 import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
@@ -71,7 +69,7 @@ tcPatBndr_NoSigs binder_name pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat :: (Name -> TcType -> TcM s TcId)	-- How to construct a suitable (monomorphic)
+tcPat :: (Name -> TcType -> TcM TcId)	-- How to construct a suitable (monomorphic)
 					-- Id for variables found in the pattern
 			         	-- The TcType is the expected type, see note below
       -> RenamedPat
@@ -82,7 +80,7 @@ tcPat :: (Name -> TcType -> TcM s TcId)	-- How to construct a suitable (monomorp
 			--	INVARIANT: if it is, the foralls will always be visible,
 			--	not hidden inside a mutable type variable
 
-      -> TcM s (TcPat, 
+      -> TcM (TcPat, 
 		LIE,			-- Required by n+k and literal pats
 		Bag TcTyVar,	-- TyVars bound by the pattern
 					-- 	These are just the existentially-bound ones.
@@ -245,7 +243,7 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 		-- The normal case, when the field comes from the right constructor
 	   (pat_ty : extras) -> 
 		ASSERT( null extras )
-		tcLookupValue field_label			`thenNF_Tc` \ sel_id ->
+		tcLookupGlobalId field_label			`thenNF_Tc` \ sel_id ->
 		returnTc (sel_id, pat_ty)
 	)							`thenTc` \ (sel_id, pat_ty) ->
 
@@ -267,14 +265,14 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 \begin{code}
 tcPat tc_bndr (LitPatIn lit@(HsLitLit s _)) pat_ty 
 	-- cf tcExpr on LitLits
-  = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
+  = tcLookupClass cCallableClassName		`thenNF_Tc` \ cCallableClass ->
     newDicts (LitLitOrigin (_UNPK_ s))
 	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ (dicts, _) ->
     returnTc (LitPat (HsLitLit s pat_ty) pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
 
 tcPat tc_bndr pat@(LitPatIn lit@(HsString _)) pat_ty
   = unifyTauTy pat_ty stringTy			`thenTc_` 
-    tcLookupValueByKey eqStringIdKey		`thenNF_Tc` \ eq_id ->
+    tcLookupGlobalId eqStringIdName		`thenNF_Tc` \ eq_id ->
     returnTc (NPat lit stringTy (HsVar eq_id `HsApp` HsLit lit), 
 	      emptyLIE, emptyBag, emptyBag, emptyLIE)
 
@@ -284,7 +282,7 @@ tcPat tc_bndr (LitPatIn simple_lit) pat_ty
 
 tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
   = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    tcLookupValueByKey eqClassOpKey			`thenNF_Tc` \ eq_sel_id ->
+    tcLookupGlobalId eqClassOpName			`thenNF_Tc` \ eq_sel_id ->
     newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
 
     returnTc (NPat lit' pat_ty (HsApp (HsVar eq_id) over_lit_expr),
@@ -306,8 +304,8 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
 \begin{code}
 tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
   = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
-    tcLookupValue minus				`thenNF_Tc` \ minus_sel_id ->
-    tcLookupValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
+    tcLookupGlobalId minus				`thenNF_Tc` \ minus_sel_id ->
+    tcLookupGlobalId geClassOpName		`thenNF_Tc` \ ge_sel_id ->
     newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
     newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
     newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
@@ -330,9 +328,9 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
 Helper functions
 
 \begin{code}
-tcPats :: (Name -> TcType -> TcM s TcId)	-- How to deal with variables
+tcPats :: (Name -> TcType -> TcM TcId)	-- How to deal with variables
        -> [RenamedPat] -> [TcType]		-- Excess 'expected types' discarded
-       -> TcM s ([TcPat], 
+       -> TcM ([TcPat], 
 		 LIE,				-- Required by n+k and literal pats
 		 Bag TcTyVar,
 		 Bag (Name, TcId),	-- Ids bound by the pattern
@@ -368,10 +366,7 @@ simpleHsLitTy (HsString str)   = stringTy
 \begin{code}
 tcConstructor pat con_name pat_ty
   = 	-- Check that it's a constructor
-    tcLookupValue con_name		`thenNF_Tc` \ con_id ->
-    case isDataConWrapId_maybe con_id of {
-	Nothing -> failWithTc (badCon con_id);
- 	Just data_con ->
+    tcLookupDataCon 		`thenNF_Tc` \ data_con ->
 
 	-- Instantiate it
     let 

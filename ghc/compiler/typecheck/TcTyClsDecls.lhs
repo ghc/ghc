@@ -63,7 +63,7 @@ The main function
 \begin{code}
 tcTyAndClassDecls :: ValueEnv		-- Knot tying stuff
 		  -> [RenamedHsDecl]
-		  -> TcM s TcEnv
+		  -> TcM TcEnv
 
 tcTyAndClassDecls unf_env decls
   = sortByDependency decls 		`thenTc` \ groups ->
@@ -111,7 +111,7 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: ValueEnv -> SCC RenamedTyClDecl -> TcM s TcEnv
+tcGroup :: ValueEnv -> SCC RenamedTyClDecl -> TcM TcEnv
 tcGroup unf_env scc
   = 	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
@@ -143,7 +143,7 @@ tcGroup unf_env scc
             rec_vrcs    = calcTyConArgVrcs [tc | (_, ATyCon tc) <- all_tyclss]
 	in
 		-- Step 5
-	tcExtendTypeEnv all_tyclss		$
+	tcExtendGlobalEnv all_tyclss		$
 	mapTc (tcTyClDecl1 unf_env) decls	`thenTc` \ tycls_details ->
 	tcGetEnv				`thenNF_Tc` \ env -> 
 	returnTc (tycls_details, env)
@@ -174,7 +174,7 @@ tcTyClDecl1 unf_env decl
 %************************************************************************
 
 \begin{code}
-getInitialKind :: RenamedTyClDecl -> NF_TcM s (Name, TcKind)
+getInitialKind :: RenamedTyClDecl -> NF_TcM (Name, TcKind)
 getInitialKind (TySynonym name tyvars _ _)
  = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
    newKindVar		`thenNF_Tc` \ result_kind  ->
@@ -212,7 +212,7 @@ depends on *all the uses of class D*.  For example, the use of
 Monad c in bop's type signature means that D must have kind Type->Type.
 
 \begin{code}
-kcTyClDecl :: RenamedTyClDecl -> TcM s ()
+kcTyClDecl :: RenamedTyClDecl -> TcM ()
 
 kcTyClDecl decl@(TySynonym tycon_name hs_tyvars rhs loc)
   = tcAddDeclCtxt decl			$
@@ -243,15 +243,20 @@ kcTyClDecl decl@(ClassDecl context class_name
     kc_sig (ClassOpSig _ _ op_ty loc) = tcAddSrcLoc loc (kcHsBoxedSigType op_ty)
 
 kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its tyvars
-	       -> (Kind -> TcM s a)		-- Thing inside
-	       -> TcM s a
+	       -> (Kind -> TcM a)		-- Thing inside
+	       -> TcM a
 -- Extend the env with bindings for the tyvars, taken from
 -- the kind of the tycon/class.  Give it to the thing inside, and 
 -- check the result kind matches
 kcTyClDeclBody tc_name hs_tyvars thing_inside
   = tcLookupTy tc_name		`thenNF_Tc` \ tc ->
     let
-	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames hs_tyvars) (tyThingKind tc)
+	kind = case tc of
+		  ATyCon tc -> tyConKind tc
+		  AClass cl -> tyConKind (classTyCon cl)
+		-- For some odd reason, a class doesn't include its kind
+
+	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames hs_tyvars) kind
     in
     tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
 \end{code}
@@ -350,7 +355,7 @@ bogusVrcs = panic "Bogus tycon arg variances"
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-sortByDependency :: [RenamedHsDecl] -> TcM s [SCC RenamedTyClDecl]
+sortByDependency :: [RenamedHsDecl] -> TcM [SCC RenamedTyClDecl]
 sortByDependency decls
   = let		-- CHECK FOR CLASS CYCLES
 	cls_sccs   = stronglyConnComp (mapMaybe mk_cls_edges tycl_decls)

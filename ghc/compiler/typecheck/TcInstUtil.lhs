@@ -92,7 +92,7 @@ classDataCon clas = case tyConDataCons (classTyCon clas) of
 %************************************************************************
 
 \begin{code}
-buildInstanceEnv :: Bag InstInfo -> NF_TcM s InstEnv
+buildInstanceEnv :: Bag InstInfo -> NF_TcM InstEnv
 
 buildInstanceEnv info = --pprTrace "BuildInstanceEnv" (ppr info)
 			foldrNF_Tc addClassInstance emptyInstEnv (bagToList info)
@@ -106,7 +106,7 @@ about any overlap with an existing instance.
 addClassInstance
     :: InstInfo
     -> InstEnv
-    -> NF_TcM s InstEnv
+    -> NF_TcM InstEnv
 
 addClassInstance 
     (InstInfo clas inst_tyvars inst_tys _
