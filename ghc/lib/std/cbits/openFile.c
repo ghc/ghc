@@ -1,10 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.3 1998/12/02 13:27:44 simonm Exp $
+ * $Id: openFile.c,v 1.4 1999/01/07 15:48:40 simonm Exp $
  *
  * openFile Runtime Support
  */
+
+/* We use lstat, which is sadly not POSIX */
+#define NON_POSIX_SOURCE
 
 #include "Rts.h"
 #include "stgio.h"
