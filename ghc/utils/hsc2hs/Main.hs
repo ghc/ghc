@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.30 2001/04/02 16:10:05 rrt Exp $
+-- $Id: Main.hs,v 1.31 2001/07/23 23:08:04 ken Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -52,12 +52,12 @@ options = [
     Option "I" []             (ReqArg (CompFlag . ("-I"++))
                                                  "DIR")  "passed to the C compiler",
     Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c",
     Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
     Option "D" ["define"]     (ReqArg define "NAME[=VALUE]") "as if placed in the source",
     Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
-    Option ""  ["version"]    (NoArg  Version)           "output version information and exit"]
+    Option ""  ["version"]    (NoArg  Version)           "output version information and exit",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c",
 
 main :: IO ()
 main = do
@@ -433,7 +433,7 @@ output flags name toks = do
         progName     = outDir++outBase++"_hsc_make" ++ progNameSuffix
         outHName     = outDir++outBase++"_hsc.h"
         outCName     = outDir++outBase++"_hsc.c"
-    
+
     let execProgName
             | null outDir = "./"++progName
             | otherwise   = progName
@@ -649,19 +649,20 @@ outTokenC (pos, key, arg) =
         "def" -> case arg of
             's':'t':'r':'u':'c':'t':' ':_ -> ""
             't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
-            'i':'n':'l':'i':'n':'e':' ':_ ->
-                outCLine pos++
-                "#ifndef __GNUC__\n\
-                \extern\n\
-                \#endif\n"++
-                header++
-                "\n#ifndef __GNUC__\n\
-                \;\n\
-                \#else\n"++
-                body++
-                "\n#endif\n"
+            'i':'n':'l':'i':'n':'e':' ':arg' ->
+		case span (\c -> c /= '{' && c /= '=') arg' of
+		(header, body) ->
+		    outCLine pos++
+		    "#ifndef __GNUC__\n\
+		    \extern inline\n\
+		    \#endif\n"++
+		    header++
+		    "\n#ifndef __GNUC__\n\
+		    \;\n\
+		    \#else\n"++
+		    body++
+		    "\n#endif\n"
             _ -> outCLine pos++arg++"\n"
-            where (header, body) = span (\c -> c /= '{' && c /= '=') arg
         _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 
