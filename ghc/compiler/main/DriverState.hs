@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.20 2000/12/12 14:35:08 simonmar Exp $
+-- $Id: DriverState.hs,v 1.21 2001/01/08 12:31:34 rrt Exp $
 --
 -- Settings for the driver
 --
@@ -125,11 +125,7 @@ GLOBAL_VAR(v_Keep_tmp_files, 		False, 		Bool)
 -- Misc
 GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
 GLOBAL_VAR(v_Dry_run, 			False,		Bool)
-#if !defined(HAVE_WIN32_DLL_SUPPORT) || defined(DONT_WANT_WIN32_DLL_SUPPORT)
 GLOBAL_VAR(v_Static, 			True,		Bool)
-#else
-GLOBAL_VAR(v_Static,            	False,          Bool)
-#endif
 GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
 GLOBAL_VAR(v_Recomp,  			True,		Bool)
 GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.37 2000/12/19 13:06:50 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.38 2001/01/08 12:31:34 rrt Exp $
 --
 -- Driver flags
 --
@@ -265,6 +265,7 @@ static_flags =
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
+  ,  ( "dynamic"        , NoArg (writeIORef v_Static False) )
   ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc
 
 	----- RTS opts ------------------------------------------------------
