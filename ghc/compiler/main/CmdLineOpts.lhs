@@ -233,7 +233,7 @@ data DynFlag
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
-   | Opt_D_dump_sat
+   | Opt_D_dump_prep
    | Opt_D_dump_stg
    | Opt_D_dump_stranal
    | Opt_D_dump_tc

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.75 2001/10/10 17:17:44 ken Exp $
+-- $Id: DriverFlags.hs,v 1.76 2001/10/17 15:44:40 simonpj Exp $
 --
 -- Driver flags
 --
@@ -347,7 +347,7 @@ dynamic_flags = [
   ,  ( "ddump-simpl",        	 NoArg (setDynFlag Opt_D_dump_simpl) )
   ,  ( "ddump-simpl-iterations", NoArg (setDynFlag Opt_D_dump_simpl_iterations) )
   ,  ( "ddump-spec",         	 NoArg (setDynFlag Opt_D_dump_spec) )
-  ,  ( "ddump-sat",          	 NoArg (setDynFlag Opt_D_dump_sat) )
+  ,  ( "ddump-prep",          	 NoArg (setDynFlag Opt_D_dump_prep) )
   ,  ( "ddump-stg",          	 NoArg (setDynFlag Opt_D_dump_stg) )
   ,  ( "ddump-stranal",      	 NoArg (setDynFlag Opt_D_dump_stranal) )
   ,  ( "ddump-tc",           	 NoArg (setDynFlag Opt_D_dump_tc) )
