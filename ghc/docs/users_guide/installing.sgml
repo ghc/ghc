@@ -548,23 +548,28 @@ URL="http://www.haskell.org/ghc">haskell.org</ULink>.
 </para></listitem>
 
 <listitem><para>Run <Filename>setup.exe</Filename>.
-(If you have a previous version of GHC, Installshield will offer to "modify", 
+On Windows, all of GHC's files are installed in a single directory.
+If you choose ``Custom'' from the list of install options, you will be given a 
+choice about where this directory is; otherwise it will be installed 
+in <filename>c:/ghc/<emphasis>ghc-version</emphasis></filename>.
+The executable binary for GHC will be installed in the <filename>bin/</filename> sub-directory
+of the installation directory you choose.
+</para>
+<para>(If you have already installed the same version of GHC, Installshield will offer to "modify", 
 or "remove" GHC.  Choose "remove"; then run <Filename>setup.exe</Filename> a
 second time.  This time it should offer to install.)
 </para>
 <para>
-At this point you should find GHCi and the GHC documentation are 
+When installation is complete, you should find GHCi and the GHC documentation are 
 available in your Start menu under "Start/Programs/Glasgow Haskell Compiler".
 </para>
 </listitem>
 
 <listitem><para>
-The final dialogue box from the install process tells you where GHC has
-been installed.  If you want to invoke GHC from a command line, add this 
-to your PATH environment variable.  Usually, GHC installs into
-<Filename>c:/ghc/ghc-5.02</Filename>, though the last part of this path
-depends on which version of GHC you are installing, of course. 
-You need to add <Filename>c:/ghc/ghc-5.02/bin</Filename> to your path if yo
+The final dialogue box from the install process reminds you where the GHC binary 
+has been installed (usually <filename>c:/ghc/<emphasis>ghc-version</emphasis>/bin/</filename>.  
+If you want to invoke GHC from a command line, add this 
+to your PATH environment variable.  
 </para></listitem>
 
 <listitem><para>
