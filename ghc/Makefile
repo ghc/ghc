@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 1998/12/02 13:17:13 simonm Exp $
+# $Id: Makefile,v 1.9 1999/12/07 11:19:35 simonmar Exp $
 #
 
 TOP=.
@@ -29,6 +29,10 @@ endif
 # Easier to copy
 ifeq "$(BIN_DIST)" "1"
 SUBDIRS := $(filter-out docs,$(SUBDIRS))
+endif
+
+ifeq ($(IncludeTestDirsInBuild),YES)
+SUBDIRS += tests
 endif
 
 include $(TOP)/mk/target.mk
