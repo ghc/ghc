@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.24 1999/12/20 16:55:26 sewardj Exp $                      #
+# $Id: Makefile,v 1.25 2000/02/14 11:15:09 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -47,9 +47,14 @@ all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) hugs
 ### EXTREMELY hacky
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
-      ../rts/StgCRun.o
+      ../rts/StgCRun.o ../rts/PrimOps.o
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
 		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lgmp -lm
+
+foobar:
+	rm -f ../rts/libHSrts.a  ../rts/libHSrts_u.a
+	rm -f ../rts/StgCRun.o ../rts/StgCRun.u_o
+	make all
 
 nHandle$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
