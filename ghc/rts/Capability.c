@@ -69,6 +69,9 @@ Condition thread_ready_cond = INIT_COND_VAR;
  * Task.startTask() uses its current value.
  */
 nat rts_n_waiting_tasks = 0;
+
+static Condition *passTarget = NULL;
+static rtsBool passingCapability = rtsFalse;
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -245,7 +248,7 @@ grabReturnCapability(Mutex* pMutex, Capability** pCap)
   IF_DEBUG(scheduler, 
 	   sched_belch("worker: returning; workers waiting: %d",
 		       rts_n_waiting_workers));
-  if ( noCapabilities() ) {
+  if ( noCapabilities() || passingCapability ) {
     rts_n_waiting_workers++;
     wakeBlockedWorkerThread();
     context_switch = 1;	// make sure it's our turn soon
@@ -315,9 +318,6 @@ yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
  * Pre-condition: pMutex is held.
  * Post-condition: pMutex is held and *pCap is held by the current thread
  */
- 
-static Condition *passTarget = NULL;
-static rtsBool passingCapability = rtsFalse;
  
 void 
 waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
