@@ -85,23 +85,38 @@ dsLet (ThenBinds b1 b2) body
     dsLet b1 body'
   
 -- Special case for bindings which bind unlifted variables
+-- We need to do a case right away, rather than building
+-- a tuple and doing selections.
 -- Silently ignore INLINE pragmas...
-dsLet (MonoBind (AbsBinds [] [] binder_triples inlines
-                          (PatMonoBind pat grhss loc)) sigs is_rec) body
-  | or [isUnLiftedType (idType g) | (_, g, l) <- binder_triples]
+dsLet (MonoBind (AbsBinds [] [] exports inlines binds) sigs is_rec) body
+  | or [isUnLiftedType (idType g) | (_, g, l) <- exports]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
-    putSrcLocDs loc			$
-    dsGuarded grhss 			`thenDs` \ rhs ->
-    let
-	body' = foldr bind body binder_triples
-	bind (tyvars, g, l) body = ASSERT( null tyvars )
-				   bindNonRec g (Var l) body
-    in
-    mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))
-    `thenDs` \ error_expr ->
-    matchSimply rhs PatBindRhs pat body' error_expr
+	-- Unlifted bindings are always non-recursive
+	-- and are always a Fun or Pat monobind
+	--
+	-- ToDo: in some bizarre case it's conceivable that there
+	--       could be dict binds in the 'binds'.  (See the notes
+	--	 below.  Then pattern-match would fail.  Urk.)
+    case binds of
+      FunMonoBind fun _ matches loc
+	-> putSrcLocDs loc			$
+	   matchWrapper (FunRhs fun) matches 	`thenDs` \ (args, rhs) ->
+	   ASSERT( null args )	-- Functions aren't lifted
+	   returnDs (bindNonRec fun rhs body_w_exports)
+
+      PatMonoBind pat grhss loc
+	-> putSrcLocDs loc			$
+	   dsGuarded grhss 			`thenDs` \ rhs ->
+	   mk_error_app pat			`thenDs` \ error_expr ->
+	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
   where
-    result_ty = exprType body
+    body_w_exports		 = foldr bind_export body exports
+    bind_export (tvs, g, l) body = ASSERT( null tvs )
+				   bindNonRec g (Var l) body
+
+    mk_error_app pat = mkErrorAppDs iRREFUT_PAT_ERROR_ID
+				    (exprType body)
+				    (showSDoc (ppr pat))
 
 -- Ordinary case for bindings
 dsLet (MonoBind binds sigs is_rec) body
@@ -114,7 +129,10 @@ dsLet (MonoBind binds sigs is_rec) body
 	-- 	   but which does have dictionary bindings.
 	-- See notes with TcSimplify.inferLoop [NO TYVARS]
 	-- It turned out that wrapping a Rec here was the easiest solution
-\end{code}
+	--
+	-- NB The previous case dealt with unlifted bindings, so we
+	--    only have to deal with lifted ones now; so Rec is ok
+\end{code}	
 
 %************************************************************************
 %*									*
@@ -625,6 +643,3 @@ dsLit (HsRat r ty)
 		(tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
 				   (head (tyConDataCons tycon), i_ty)
 \end{code}
-
-
-
