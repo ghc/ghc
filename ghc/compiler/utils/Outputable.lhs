@@ -414,10 +414,10 @@ pprWithCommas :: (a -> SDoc) -> [a] -> SDoc
 pprWithCommas pp xs = fsep (punctuate comma (map pp xs))
 
 interppSP  :: Outputable a => [a] -> SDoc
-interppSP  xs = hsep (map ppr xs)
+interppSP  xs = sep (map ppr xs)
 
 interpp'SP :: Outputable a => [a] -> SDoc
-interpp'SP xs = hsep (punctuate comma (map ppr xs))
+interpp'SP xs = sep (punctuate comma (map ppr xs))
 
 pprQuotedList :: Outputable a => [a] -> SDoc
 -- [x,y,z]  ==>  `x', `y', `z'
