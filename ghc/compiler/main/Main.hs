@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.29 2000/11/21 14:35:52 simonmar Exp $
+-- $Id: Main.hs,v 1.30 2000/11/21 16:18:17 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -237,14 +237,15 @@ main =
 	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
 	-- initialise the finder
-   initFinder pkg_details
+   pkg_avails <- getPackageInfo
+   initFinder pkg_avails
 
 	-- mkdependHS is special
    when (mode == DoMkDependHS) beginMkDependHS
 
 	-- make/interactive require invoking the compilation manager
-   if (mode == DoMake)        then beginMake pkg_details srcs        else do
-   if (mode == DoInteractive) then beginInteractive pkg_details srcs else do
+   if (mode == DoMake)        then beginMake pkg_avails srcs        else do
+   if (mode == DoInteractive) then beginInteractive pkg_avails srcs else do
 
 	-- for each source file, find which phases to run
    let lang = hscLang init_dyn_flags
