@@ -14,14 +14,40 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.IOBase where
+module GHC.IOBase(
+    IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO, 
+    unsafePerformIO, unsafeInterleaveIO,
+  
+	-- To and from from ST
+    stToIO, ioToST, unsafeIOToST,
 
+	-- References
+    IORef(..), newIORef, readIORef, writeIORef, 
+    IOArray(..), newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
+    MVar(..),
+
+    	-- Handles, file descriptors,
+    FilePath,  
+    Handle(..), Handle__(..), HandleType(..), IOMode(..), FD, 
+    isReadableHandleType, isWritableHandleType, showHandle,
+  
+    	-- Buffers
+    Buffer(..), RawBuffer, BufferState(..), BufferList(..), BufferMode(..),
+    bufferIsWritable, bufferEmpty, bufferFull, 
+
+    	-- Exceptions
+    Exception(..), ArithException(..), AsyncException(..), ArrayException(..),
+    stackOverflow, heapOverflow, throw, throwIO, ioException, 
+    IOError, IOException(..), IOErrorType(..), ioError, userError,
+    ExitCode(..) 
+  ) where
+	
 import GHC.ST
 import GHC.Arr	-- to derive Ix class
 import GHC.Enum -- to derive Enum class
 import GHC.STRef
 import GHC.Base
-import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
+--  import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
 import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List

@@ -73,22 +73,6 @@ import Array		-- Haskell'98 arrays
 #endif
 
 import Data.Typeable
-#include "Typeable.h"
-INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
-
-#ifdef __GLASGOW_HASKELL__
-
--- This instance preserves data abstraction at the cost of inefficiency.
--- We omit reflection services for the sake of data abstraction.
-
-instance (Typeable a, Data b, Ix a) => Data (Array a b)
- where
-  gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
-  toConstr _   = error "toConstr"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNorepType "Data.Array.Array"
-
-#endif
 
 {- $intro
 Haskell provides indexable /arrays/, which may be thought of as functions

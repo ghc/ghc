@@ -38,6 +38,7 @@ import GHC.ForeignPtr	     -- So we can give Data instance for ForeignPtr
 import GHC.Stable	     -- So we can give Data instance for StablePtr
 import GHC.ST	     	     -- So we can give Data instance for ST
 import GHC.Conc		     -- So we can give Data instance for MVar & Co.
+import GHC.Arr		     -- So we can give Data instance for Array
 
 #include "Typeable.h"
 
@@ -605,3 +606,12 @@ instance Typeable a => Data (STM a) where
 
 
 ------------------------------------------------------------------------------
+-- The Data instance for Array preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+instance (Typeable a, Data b, Ix a) => Data (Array a b)
+ where
+  gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "Data.Array.Array"
+

@@ -96,7 +96,7 @@ import GHC.Conc		( ThreadId(..), myThreadId, killThread, yield,
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
 import GHC.IOBase	( unsafeInterleaveIO )
-import GHC.IOBase   ( newIORef, readIORef, writeIORef )
+import GHC.IOBase	( newIORef, readIORef, writeIORef )
 import GHC.Base
 
 import Foreign.StablePtr

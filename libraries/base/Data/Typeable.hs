@@ -94,12 +94,21 @@ import GHC.Show
 import GHC.Err
 import GHC.Num
 import GHC.Float
-import GHC.Real( rem, Ratio )
-import GHC.IOBase
-import GHC.ST		-- So we can give Typeable instance for ST
-import GHC.Ptr          -- So we can give Typeable instance for Ptr
-import GHC.ForeignPtr   -- So we can give Typeable instance for ForeignPtr
-import GHC.Stable       -- So we can give Typeable instance for StablePtr
+import GHC.Real		( rem, Ratio )
+import GHC.IOBase	(IORef,newIORef,unsafePerformIO)
+
+-- These imports are so we can define Typeable instances
+-- It'd be better to give Typeable instances in the modules themselves
+-- but they all have to be compiled before Typeable
+import GHC.IOBase	( IO, MVar, Exception, ArithException, IOException, 
+			  ArrayException, AsyncException, Handle )
+import GHC.ST		( ST )
+import GHC.STRef	( STRef )
+import GHC.Ptr          ( Ptr )
+import GHC.ForeignPtr   ( ForeignPtr )
+import GHC.Stable       ( StablePtr )
+import GHC.Arr		( Array, STArray )
+
 #endif
 
 #ifdef __HUGS__
@@ -107,6 +116,11 @@ import Hugs.Prelude
 import Hugs.IO
 import Hugs.IORef
 import Hugs.IOExts
+	-- For the Typeable instance
+import Hugs.Array	 ( Array )
+import Hugs.ST		 ( ST, STRef, STArray )
+import Hugs.ForeignPtr	 ( ForeignPtr )
+imprt 
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -119,8 +133,9 @@ import NonStdUnsafeCoerce (unsafeCoerce)
 import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 import IO (Handle)
 import Ratio (Ratio)
-import NHC.FFI (Ptr,StablePtr)
-#else
+	-- For the Typeable instance
+import NHC.FFI	( Ptr,StablePtr )
+import Array	( Array )
 #endif
 
 #include "Typeable.h"
@@ -459,20 +474,41 @@ gcast2 x = r
 --
 -------------------------------------------------------------
 
+INSTANCE_TYPEABLE0((),unitTc,"()")
 INSTANCE_TYPEABLE1([],listTc,"[]")
 INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
 INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
+
 #ifdef __GLASGOW_HASKELL__
-INSTANCE_TYPEABLE2(ST,stTc,"ST")
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
+
+
+-- Types defined in GHC.IOBase
+INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
+INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
+INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
+INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
+INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
+INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
+
+-- Types defined in GHC.Arr
+INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
 #endif
-INSTANCE_TYPEABLE0((),unitTc,"()")
+
+
 #ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,",")
 INSTANCE_TYPEABLE3((,,),tup3Tc,",,")
+
+-- I don't think NHC has ST, STRef, STArray, ForeignPtr
+-- but GHC and Hugs do
+INSTANCE_TYPEABLE2(ST,stTc,"ST")
+INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
+INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
+INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
+
 
 tup4Tc :: TyCon
 tup4Tc = mkTyCon ",,,"
@@ -553,7 +589,7 @@ data KeyPr = KeyPr !Key !Key deriving( Eq )
 hashKP :: KeyPr -> Int32
 hashKP (KeyPr (Key k1) (Key k2)) = (HT.hashInt k1 + HT.hashInt k2) `rem` HT.prime
 
-data Cache = Cache { next_key :: !(IORef Key),
+data Cache = Cache { next_key :: !(IORef Key),	-- Not used by GHC (calls genSym instead)
 		     tc_tbl   :: !(HT.HashTable String Key),
 		     ap_tbl   :: !(HT.HashTable KeyPr Key) }
 

@@ -81,7 +81,6 @@ import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
 import Data.Typeable
-#include "Typeable.h"
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -93,7 +92,7 @@ infixr 0 `par`, `pseq`
 %************************************************************************
 
 \begin{code}
-data ThreadId = ThreadId ThreadId#
+data ThreadId = ThreadId ThreadId# deriving( Typeable )
 -- ToDo: data ThreadId = ThreadId (Weak ThreadId#)
 -- But since ThreadId# is unlifted, the Weak type must use open
 -- type variables.
@@ -114,9 +113,6 @@ This misfeature will hopefully be corrected at a later date.
 /Note/: Hugs does not provide any operations on other threads;
 it defines 'ThreadId' as a synonym for ().
 -}
-
-INSTANCE_TYPEABLE0(ThreadId,threadIdTc,"ThreadId")
-
 
 --forkIO has now been hoisted out into the Concurrent library.
 
@@ -206,9 +202,7 @@ TVars are shared memory locations which support atomic memory
 transactions.
 
 \begin{code}
-newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
-
-INSTANCE_TYPEABLE1(STM,stmTc,"STM" )
+newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #)) deriving( Typeable )
 
 unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unSTM (STM a) = a
@@ -266,9 +260,7 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 catchSTM :: STM a -> (Exception -> STM a) -> STM a
 catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
 
-data TVar a = TVar (TVar# RealWorld a)
-
-INSTANCE_TYPEABLE1(TVar,tvarTc,"TVar" )
+data TVar a = TVar (TVar# RealWorld a) deriving( Typeable )
 
 instance Eq (TVar a) where
 	(TVar tvar1#) == (TVar tvar2#) = sameTVar# tvar1# tvar2#
@@ -307,8 +299,6 @@ writes.
 
 \begin{code}
 --Defined in IOBase to avoid cycle: data MVar a = MVar (SynchVar# RealWorld a)
-
-INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 
 -- |Create an 'MVar' which is initially empty.
 newEmptyMVar  :: IO (MVar a)

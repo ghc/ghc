@@ -1072,11 +1072,6 @@ instance MArray (STArray s) e (ST s) where
     unsafeWrite = ArrST.unsafeWriteSTArray
 
 -----------------------------------------------------------------------------
--- Typeable instance for STArray
-
-INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
-
------------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (ST monad)
 
 -- | A mutable array with unboxed elements, that can be manipulated in

@@ -120,10 +120,8 @@ phase (x:+y)	 = atan2 y x
 -- -----------------------------------------------------------------------------
 -- Instances of Complex
 
-#ifndef __NHC__
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(Complex,complexTc,"Complex")
-#endif
 
 instance  (RealFloat a) => Num (Complex a)  where
     {-# SPECIALISE instance Num (Complex Float) #-}
