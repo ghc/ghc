@@ -191,7 +191,7 @@ libCaseBind env (Rec pairs)
 	-- processing the rhs with an *un-extended* environment, so
 	-- that the same process doesn't occur for ever!
 	--
-    extended_env = addRecBinds env [ (setIdNotExported binder, libCase env_body rhs)
+    extended_env = addRecBinds env [ (adjust binder, libCase env_body rhs)
 				   | (binder, rhs) <- pairs ]
 
 	-- Two subtle things: 
