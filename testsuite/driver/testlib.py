@@ -654,6 +654,7 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
     out2 = open(out2_fn, 'w')
 
     line = infile.readline()
+    line = re.sub('\r', '', line) # ignore Windows EOL
     while (line != delimiter and line != ''):
         out1.write(line)
         line = infile.readline()
