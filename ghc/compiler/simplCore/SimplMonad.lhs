@@ -899,22 +899,13 @@ postInlineUnconditionally env bndr occ_info rhs
 		   SimplGently  -> isAlwaysActive prag
 		   SimplPhase n -> isActive n prag
     prag = idInlinePragma bndr
-\end{code}
 
-blackListInline tells if we must not inline at a call site because the
-Id's inline pragma says not to do so.
-
-However, blackListInline is ignored for things with with Compulsory inlinings,
-because they don't have bindings, so we must inline them no matter how
-gentle we are being.
-
-\begin{code}
 activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
 activeInline env id occ
   = case getMode env of
-      SimplGently -> isAlwaysActive prag && isOneOcc occ 
+      SimplGently -> isOneOcc occ && isAlwaysActive prag
 	-- No inlining at all when doing gentle stuff,
-	-- except for things that occur once
+	-- except for local things that occur once
 	-- The reason is that too little clean-up happens if you 
 	-- don't inline use-once things.   Also a bit of inlining is *good* for
 	-- full laziness; it can expose constant sub-expressions.
@@ -936,7 +927,12 @@ activeRule :: SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all
 activeRule env
   = case getMode env of
-	SimplGently  -> Nothing		-- No rules in gentle mode
+	SimplGently  -> Just isAlwaysActive
+			-- Used to be Nothing (no rules in gentle mode)
+			-- Main motivation for changing is that I wanted
+			-- 	lift String ===> ...
+			-- to work in Template Haskell when simplifying
+			-- splices, so we get simpler code for literal strings
 	SimplPhase n -> Just (isActive n)
 \end{code}	
 
