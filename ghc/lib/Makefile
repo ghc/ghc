@@ -4,8 +4,6 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.13 1997/07/07 17:08:21 andre Exp $
-#
 #	
 #################################################################################
 
@@ -60,6 +58,13 @@ required/Time_HC_OPTS        += -monly-3-regs -H10m
 # Far too much heap is needed to compile PrelNum with -O at the
 # moment, but there you go..
 ghc/PrelNum_HC_OPTS          += -H30m
+# Note: this option has to go in the Makefile rather than in an
+# OPTIONS line in the source file. The reason being that we want
+# to override the SRC_HC_OPTS of -O, and anything option coming
+# from the Makefile overrides what's in OPTIONS lines. (mumble_HC_OPTS
+# does override SRC_HC_OPTS settings)
+ghc/UnsafeST_HC_OPTS         += -Onot
+
 ghc/PrelBase_HC_OPTS         += -H8m
 ghc/PrelRead_HC_OPTS         += -H8m
 ghc/IOHandle_HC_OPTS         += -H8m
@@ -72,57 +77,10 @@ SRC_MKDEPENDHS_OPTS += -ighc:required:glaExts:concurrent -I$(GHC_INCLUDE_DIR)
 #-----------------------------------------------------------------------------
 # 	Rules
 
-## 6/97 - the manual copying of .hi-boot files to .hi is not used
-## anymore, renamer will look for a .hi-boot directly.
-## ToDo: remove old setup.
+GHC.$(way_)hi	: GHC.hi-boot
+	cp GHC.hi-boot GHC.$(way_)hi
 
-ifeq "1" "0"
 
-# In preparation for building the various libHS* libraries,
-# we create the interface files needed to boot their build.
-#
-# Note that the creation of IOBase, Main and GHC interface
-# files for umpteen ways is strictly not necessary, they're
-# all the same, but having the redundant files prevents us
-# from having to treat the said interface files specially
-# when creating the dependencies. 
-#
-# Note: if you change the *.hi-boot files, this will not be
-# picked up by the Makefile, you'll have to `make hi-boot'
-#
-# Note2: hsc will only read from ghc/GHC.hi regardless of 
-# which `way' you're compiling, so the copies of the GHC
-# interface file for the different ways are only there
-# to pacify `make'
-
-HIBOOTS=GHC Main IOBase
-
-# Use variable to control this, so that we can generate
-# new boot interface files for new ways without having
-# to re-generate the old lot (followed by complete recompile).
-#
-HIBOOT_WAYS = norm $(WAYS)
-
-hi-boot :
-	@for i in $(HIBOOT_WAYS); do \
-		echo "Booting interface files for way $$i "; \
-		if [ "$$i" != "norm" ]; then \
-		   j="$${i}_hi"; \
-		else \
-		   j='hi'; \
-		fi; \
-		for ifile in $(HIBOOTS); do \
-			echo ".. ghc/$${ifile}.$$j "; \
-			cp ghc/$${ifile}.hi-boot ghc/$${ifile}.$${j}; \
-		done; \
-	done
-	@touch ghc/IOBase.lhs
-else
-hi-boot :
-	@echo "Done."
-endif
-
-boot :: hi-boot
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
