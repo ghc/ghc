@@ -1098,14 +1098,22 @@ the usual C way.
 
 The @ghc@ driver pre-defines several macros:
 <descrip>
+<tag>@__HASKELL98__@:</tag>
+<nidx>__HASKELL98__</nidx>
+If defined, this means that GHC supports the language
+defined by the Haskell 98 report.
+
+NB. This macro is <em/only/ set when pre-processing Haskell source
+(ie. @.hs@ or @.lhs@ files).
+
 <tag>@__HASKELL1__@:</tag>
 <nidx>__HASKELL1__ macro</nidx>
 If defined to <em/n/, that means GHC supports the
 Haskell language defined in the Haskell report version <em/1.n/.
-Currently 4.
+Currently 5.
 
-NB. This macro is <em/only/ set when pre-processing Haskell source
-(ie. @.hs@ or @.lhs@ files).
+NB. As with <tt/__HASKELL98__/, this macro is <em/only/ set when
+pre-processing Haskell source (ie. @.hs@ or @.lhs@ files).
 
 <tag>@__GLASGOW_HASKELL__@:</tag>
 <nidx>__GLASGOW_HASKELL__ macro</nidx>
