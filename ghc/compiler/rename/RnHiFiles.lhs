@@ -37,7 +37,7 @@ import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
 import BasicTypes	( Version, defaultFixity )
 import RnEnv
 import RnMonad
-import ParseIface	( parseIface, IfaceStuff(..) )
+import ParseIface	( parseIface )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, nameIsLocalOrFrom,
@@ -527,7 +527,7 @@ readIface file_path
 	Right contents -> 
 
     case parseIface contents init_parser_state of
-	POk _ (PIface iface) -> returnRn (Right iface)
+	POk _ iface          -> returnRn (Right iface)
 	PFailed err 	     -> bale_out err
 	parse_result 	     -> bale_out empty
 	 	-- This last case can happen if the interface file is (say) empty

@@ -28,7 +28,7 @@ Import declarations
 
 
 {
-module ParseIface ( parseIface, IfaceStuff(..) ) where
+module ParseIface ( parseIface, parseType, parseRules, parseIdInfo ) where
 
 #include "HsVersions.h"
 
@@ -69,7 +69,11 @@ import GlaExts
 import FastString	( tailFS )
 }
 
-%name	    parseIface
+%name	    parseIface      iface
+%name	    parseType       type
+%name	    parseIdInfo     id_info
+%name	    parseRules      rules_and_deprecs
+
 %tokentype  { Token }
 %monad	    { P }{ thenP }{ returnP }
 %lexer      { lexer } { ITeof }
@@ -192,17 +196,6 @@ import FastString	( tailFS )
 
  UNKNOWN	{ ITunknown  $$ }
 %%
-
--- iface_stuff is the main production.
--- It recognises (a) a whole interface file
---		 (b) a type (so that type sigs can be parsed lazily)
---		 (c) the IdInfo part of a signature (same reason)
-
-iface_stuff :: { IfaceStuff }
-iface_stuff : iface		{ PIface   $1 }
-      	    | type		{ PType    $1 }
-      	    | id_info		{ PIdInfo  $1 }
-	    | rules_and_deprecs	{ PRulesAndDeprecs $1 }
 
 iface		:: { ParsedIface }
 iface		: '__interface' package mod_name 
@@ -369,7 +362,7 @@ maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
 	      | pragma		{ \x -> if opt_IgnoreIfacePragmas then [] 
 					else case $1 of
-						POk _ (PIdInfo id_info) -> id_info
+						POk _ id_info -> id_info
 						PFailed err -> pprPanic "IdInfo parse failed" 
 								        (vcat [ppr x, err])
 				}
@@ -390,8 +383,15 @@ maybe_idinfo  : {- empty -} 	{ \_ -> [] }
        dates from a time where we picked up a .hi file first if it existed.]
     -}
 
-pragma	:: { ParseResult IfaceStuff }
-pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,
+pragma	:: { ParseResult [HsIdInfo RdrName] }
+pragma	: src_loc PRAGMA	{ parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
+							context = [],
+							glasgow_exts = 1#,
+							loc = $1 }
+				}
+
+rules_prag :: { ParseResult ([RdrNameRuleDecl], IfaceDeprecs) }
+rules_prag : src_loc PRAGMA	{ parseRules $2 PState{ bol = 0#, atbol = 1#,
 							context = [],
 							glasgow_exts = 1#,
 							loc = $1 }
@@ -401,8 +401,8 @@ pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,
 
 rules_and_deprecs_part :: { ([RdrNameRuleDecl], IfaceDeprecs) }
 rules_and_deprecs_part : {- empty -}	{ ([], Nothing) }
-		       | pragma		{ case $1 of
-					     POk _ (PRulesAndDeprecs rds) -> rds
+		       | rules_prag	{ case $1 of
+					     POk _ rds -> rds
 					     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
 					}
 
@@ -940,11 +940,6 @@ checkVersion :: { () }
 {
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (ifaceParseErr buf loc)
-
-data IfaceStuff = PIface 	   ParsedIface
-		| PIdInfo	   [HsIdInfo RdrName]
-		| PType		   RdrNameHsType
-		| PRulesAndDeprecs ([RdrNameRuleDecl], IfaceDeprecs)
 
 mk_con_decl name (ex_tvs, ex_ctxt) details loc = mkConDecl name ex_tvs ex_ctxt details loc
 }

@@ -280,14 +280,14 @@ myParseModule dflags src_filename
       let glaexts | dopt Opt_GlasgowExts dflags = 1#
 	          | otherwise 		        = 0#
 
-      case parse buf PState{ bol = 0#, atbol = 1#,
-	 		     context = [], glasgow_exts = glaexts,
-			     loc = mkSrcLoc (_PK_ src_filename) 1 } of {
+      case parseModule buf PState{ bol = 0#, atbol = 1#,
+	 		           context = [], glasgow_exts = glaexts,
+  			           loc = mkSrcLoc (_PK_ src_filename) 1 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
                             return Nothing };
 
-	POk _ (PModule rdr_module@(HsModule mod_name _ _ _ _ _ _)) -> do {
+	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) -> do {
 
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
       
@@ -433,7 +433,7 @@ hscExpr dflags hst hit pcs0 this_module expr wrap_print
         if (wrap_print && not is_IO_type)
 		then do (new_pcs, maybe_stuff)
 			  <- hscExpr dflags hst hit pcs2 this_module
-				("print (" ++ expr ++ ")") False
+				("putStr (show (" ++ expr ++ "))") False
 		        case maybe_stuff of
 			   Nothing -> return (new_pcs, maybe_stuff)
 			   Just (bcos, _, _) ->
@@ -464,23 +464,20 @@ hscParseExpr dflags str
       showPass dflags "Parser"
       -- _scc_     "Parser"
 
-      buf <- stringToStringBuffer ("__expr " ++ str)
+      buf <- stringToStringBuffer str
 
-      -- glaexts is True for now (because of the daft __expr at the front
-      -- of the string...)
-      let glaexts = 1#
-      --let glaexts | dopt Opt_GlasgowExts dflags = 1#
-      --	    | otherwise  	          = 0#
+      let glaexts | dopt Opt_GlasgowExts dflags = 1#
+       	          | otherwise  	          = 0#
 
-      case parse buf PState{ bol = 0#, atbol = 1#,
-	 		     context = [], glasgow_exts = glaexts,
-			     loc = mkSrcLoc SLIT("<no file>") 0 } of {
+      case parseExpr buf PState{ bol = 0#, atbol = 1#,
+	 		         context = [], glasgow_exts = glaexts,
+			         loc = mkSrcLoc SLIT("<no file>") 0 } of {
 
-	PFailed err -> do { freeStringBuffer buf;
-			    hPutStrLn stderr (showSDoc err);
+	PFailed err -> do { hPutStrLn stderr (showSDoc err);
+			    freeStringBuffer buf;
                             return Nothing };
 
-	POk _ (PExpr rdr_expr) -> do {
+	POk _ rdr_expr -> do {
 
       --ToDo: can't free the string buffer until we've finished this
       -- compilation sweep and all the identifiers have gone away.
