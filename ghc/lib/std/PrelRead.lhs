@@ -269,8 +269,8 @@ lexLitChar ('\\':s)     =  do
 	      mzero
 	    else
 	      case base of
-	         8  -> return ('o':num', res)
-	         16 -> return ('x':num', res)
+	         8  -> return ('o':num, res)
+	         16 -> return ('x':num, res)
 		 _  -> return (num, res)
 
 	toAnInt base xs = foldl (\ acc n -> acc*base + n) 0 (map digitToInt xs)
