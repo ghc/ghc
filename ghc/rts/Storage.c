@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.26 2000/07/14 13:28:35 simonmar Exp $
+ * $Id: Storage.c,v 1.27 2000/11/01 11:41:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,6 +39,8 @@ generation *generations;	/* all the generations */
 generation *g0;			/* generation 0, for convenience */
 generation *oldest_gen;		/* oldest generation, for convenience */
 step *g0s0;			/* generation 0, step 0, for convenience */
+
+lnat total_allocated = 0;	/* total memory allocated during run */
 
 /*
  * Storage manager mutex:  protects all the above state from
@@ -191,7 +193,7 @@ initStorage (void)
 void
 exitStorage (void)
 {
-  stat_exit(calcAllocated());
+    stat_exit(calcAllocated());
 }
 
 
@@ -578,6 +580,7 @@ calcAllocated( void )
   }
 #endif
 
+  total_allocated += allocated;
   return allocated;
 }  
 

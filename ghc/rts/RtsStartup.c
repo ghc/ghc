@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.43 2000/10/06 15:35:47 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.44 2000/11/01 11:41:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -26,6 +26,10 @@
 #ifdef GHCI
 #include "HsFFI.h"
 #include "Linker.h"
+#endif
+
+#if defined(RTS_GTK_FRONTPANEL)
+#include "FrontPanel.h"
 #endif
 
 #if defined(PROFILING) || defined(DEBUG)
@@ -196,6 +200,12 @@ startupHaskell(int argc, char *argv[], void *init_root)
     fixupRTStoPreludeRefs(NULL);
 #endif
 
+#ifdef RTS_GTK_FRONTPANEL
+    if (RtsFlags.GcFlags.frontpanel) {
+	initFrontPanel();
+    }
+#endif
+
     /* Record initialization times */
     end_init();
 }
@@ -312,6 +322,12 @@ shutdownHaskell(void)
    * also outputs the stats (+RTS -s) info.
    */
   exitStorage();
+
+#ifdef RTS_GTK_FRONTPANEL
+    if (RtsFlags.GcFlags.frontpanel) {
+	stopFrontPanel();
+    }
+#endif
 
 #if defined(PROFILING) || defined(DEBUG)
   endProfiling();

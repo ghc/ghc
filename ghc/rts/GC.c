@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.85 2000/10/06 15:38:06 simonmar Exp $
+ * $Id: GC.c,v 1.86 2000/11/01 11:41:47 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -55,6 +55,9 @@
 #if defined(GHCI)
 # include "HsFFI.h"
 # include "Linker.h"
+#endif
+#if defined(RTS_GTK_FRONTPANEL)
+#include "FrontPanel.h"
 #endif
 
 //@node STATIC OBJECT LIST, Static function declarations, Includes
@@ -129,7 +132,6 @@ static rtsBool failed_to_evac;
 /* Old to-space (used for two-space collector only)
  */
 bdescr *old_to_space;
-
 
 /* Data used for allocation area sizing.
  */
@@ -213,7 +215,9 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
   CCCS = CCS_GC;
 #endif
 
-  /* Approximate how much we allocated */
+  /* Approximate how much we allocated.  
+   * Todo: only when generating stats? 
+   */
   allocated = calcAllocated();
 
   /* Figure out which generation to collect
@@ -230,6 +234,12 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
     }
     major_gc = (N == RtsFlags.GcFlags.generations-1);
   }
+
+#ifdef RTS_GTK_FRONTPANEL
+  if (RtsFlags.GcFlags.frontpanel) {
+      updateFrontPanelBeforeGC(N);
+  }
+#endif
 
   /* check stack sanity *before* GC (ToDo: check all threads) */
 #if defined(GRAN)
@@ -761,6 +771,12 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 
   /* check for memory leaks if sanity checking is on */
   IF_DEBUG(sanity, memInventory());
+
+#ifdef RTS_GTK_VISUALS
+  if (RtsFlags.GcFlags.visuals) {
+      updateFrontPanelAfterGC( N, live );
+  }
+#endif
 
   /* ok, GC over: tell the stats department what happened. */
   stat_endGC(allocated, collected, live, copied, N);

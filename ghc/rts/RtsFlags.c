@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.32 2000/10/06 15:35:09 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.33 2000/11/01 11:41:47 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -229,6 +229,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.steps              = 2;
 
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
+#ifdef RTS_GTK_FRONTPANEL
+    RtsFlags.GcFlags.frontpanel         = rtsFalse;
+#endif
 
 #if defined(PROFILING) || defined(PAR)
     RtsFlags.CcFlags.doCostCentres	= 0;
@@ -353,7 +356,7 @@ usage_text[] = {
 "",
 "The following run time system options are available:",
 "",
-"  -? -f    Prints this message and exits; the program is not executed",
+"  -?       Prints this message and exits; the program is not executed",
 "",
 "  -K<size> Sets the maximum stack size (default 1M)  Egs: -K32k   -K512k",
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -K4k   -K2m",
@@ -366,6 +369,9 @@ usage_text[] = {
 "  -T<n>    Number of steps in younger generations (default: 2)",
 "  -s<file> Summary GC statistics   (default file: <program>.stat)",
 "  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
+#ifdef RTS_GTK_FRONTPANEL
+"  -f       Display front panel (requires X11 & GTK+)",
+#endif
 "",
 "",
 "  -Z       Don't squeeze out update frames on stack overflow",
@@ -566,7 +572,6 @@ error = rtsTrue;
 
 	      /* =========== GENERAL ========================== */
 	      case '?':
-	      case 'f':
 		error = rtsTrue;
 		break;
 
@@ -655,6 +660,12 @@ error = rtsTrue;
 		  bad_option(rts_argv[arg]);
 		}
 		break;
+
+#ifdef RTS_GTK_FRONTPANEL
+	      case 'f':
+		  RtsFlags.GcFlags.frontpanel = rtsTrue;
+		  break;
+#endif
 
 	      case 'S':
 		RtsFlags.GcFlags.giveStats ++;

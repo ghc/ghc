@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.27 2000/10/06 15:35:09 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.28 2000/11/01 11:41:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,10 @@ struct GC_FLAGS {
     rtsBool ringBell;
 
     rtsBool squeezeUpdFrames;
+
+#ifdef RTS_GTK_FRONTPANEL
+    rtsBool frontpanel;
+#endif
 };
 
 /* Hack: this struct uses bitfields so that we can use a binary arg
