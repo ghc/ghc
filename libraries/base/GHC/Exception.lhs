@@ -14,7 +14,6 @@
 -- 
 -----------------------------------------------------------------------------
 
-#ifndef __HUGS__
 module GHC.Exception 
 	( module GHC.Exception, 
 	  Exception(..), AsyncException(..), 
@@ -24,8 +23,6 @@ module GHC.Exception
 
 import GHC.Base
 import GHC.IOBase
-
-#endif
 \end{code}
 
 %*********************************************************
@@ -48,11 +45,7 @@ have to work around that in the definition of catchException below).
 
 \begin{code}
 catchException :: IO a -> (Exception -> IO a) -> IO a
-#ifdef __HUGS__
-catchException m k =  ST (\s -> unST m s `primCatch'` \ err -> unST (k err) s)
-#else
 catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
-#endif
 
 catch           :: IO a -> (IOError -> IO a) -> IO a 
 catch m k	=  catchException m handler
@@ -85,13 +78,8 @@ block :: IO a -> IO a
 -- be disabled again.
 unblock :: IO a -> IO a
 
-#ifndef __HUGS__
 block (IO io) = IO $ blockAsyncExceptions# io
 unblock (IO io) = IO $ unblockAsyncExceptions# io
-#else
-unblock :: IO a -> IO a
-unblock (IO io) = IO io
-#endif
 \end{code}
 
 
