@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.26 1998/08/16 16:25:21 sof Exp $
+dnl $Id: aclocal.m4,v 1.27 1998/08/16 16:45:37 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -280,7 +280,7 @@ AC_DEFUN(FPTOOLS_PROG_GNUCPP,
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
 	# \x5c = backslash
-	echo 'tr/\x5c/\//; /(\S+\/cpp)/ && print "[$]1";' > conftest.pl
+	echo 'tr/\x5c/\//; /(\S+\/)cpp/ && print "[$]{1}cpp -iprefix [$]1";' > conftest.pl
 	fptools_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
 	rm -fr conftest*
  else
@@ -407,8 +407,11 @@ AC_CACHE_VAL(fptools_cv_have_o_binary,
 [
 AC_LANG_SAVE
 AC_LANG_C
-AC_TRY_COMPILE(,[#include <fcntl.h>
-x = O_BINARY;],
+AC_TRY_COMPILE(,
+[#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+int x = O_BINARY;],
 fptools_cv_have_o_binary=yes,
 fptools_cv_have_o_binary=no)
 AC_LANG_RESTORE
@@ -418,3 +421,4 @@ if test "$fptools_cv_have_o_binary" = yes; then
 AC_DEFINE(HAVE_O_BINARY)
 fi
 ])
+
