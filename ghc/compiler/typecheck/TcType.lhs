@@ -61,9 +61,10 @@ import TcMonad          -- TcType, amongst others
 import TysWiredIn	( voidTy )
 
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
-			  mkDerivedName, mkDerivedTyConOcc
+			  mkLocalName, mkDerivedTyConOcc
 			)
 import Unique		( Uniquable(..) )
+import SrcLoc		( noSrcLoc )
 import Util		( nOfThem )
 import Outputable
 \end{code}
@@ -339,9 +340,12 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
     mk_void_tycon tv kind	-- Make a new TyCon with the same kind as the 
 				-- type variable tv.  Same name too, apart from
 				-- making it start with a colon (sigh)
-	= mkPrimTyCon tc_name kind 0 [] VoidRep
+		-- I dread to think what will happen if this gets out into an 
+		-- interface file.  Catastrophe likely.  Major sigh.
+	= pprTrace "Urk! Inventing strangely-kinded void TyCon" (ppr tc_name) $
+	  mkPrimTyCon tc_name kind 0 [] VoidRep
 	where
-	  tc_name = mkDerivedName mkDerivedTyConOcc (getName tv) (getUnique tv)
+	  tc_name = mkLocalName (getUnique tv) (mkDerivedTyConOcc (getOccName tv)) noSrcLoc
 
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.  It changes

@@ -12,7 +12,7 @@ module Name (
 	Name,					-- Abstract
 	mkLocalName, mkSysLocalName, mkCCallName,
 	mkIPName,
-	mkDerivedName, mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
+	mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
@@ -198,14 +198,6 @@ mkIPName uniq occ
 	   n_sort = Local,
 	   n_occ  = occ,
 	   n_loc = noSrcLoc }
-
----------------------------------------------------------------------
-mkDerivedName :: (OccName -> OccName)
-	      -> Name		-- Base name
-	      -> Unique		-- New unique
-	      -> Name		-- Result is always a value name
-
-mkDerivedName f name uniq = name {n_uniq = uniq, n_occ = f (n_occ name)}
 \end{code}
 
 \begin{code}

@@ -54,9 +54,9 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
-import Name		( mkDerivedName, mkWiredInName, mkLocalName, 
+import Name		( mkWiredInName, mkLocalName, 
 			  mkWorkerOcc, mkCCallName,
-			  Name, NamedThing(..),
+			  Name, NamedThing(..), getSrcLoc
 			)
 import OccName		( mkVarOcc )
 import PrimOp		( PrimOp(DataToTagOp, CCallOp), 
@@ -148,8 +148,12 @@ mkDefaultMethodId dm_name rec_c ty
              -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
              -- do not generalise it
 
+mkWorkerId :: Unique -> Id -> Type -> Id
+-- A worker gets a local name.  CoreTidy will globalise it if necessary.
 mkWorkerId uniq unwrkr ty
-  = mkVanillaId (mkDerivedName mkWorkerOcc (getName unwrkr) uniq) ty
+  = mkVanillaId wkr_name ty
+  where
+    wkr_name = mkLocalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
 \end{code}
 
 %************************************************************************

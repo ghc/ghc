@@ -100,7 +100,7 @@ mkIfaceOrig ns (m,n) = RdrName (Orig (mkSysModuleNameFS m)) (mkSysOccFS ns n)
 
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
-mkUnqual :: NameSpace -> FAST_STRING -> RdrName
+mkUnqual :: NameSpace -> UserFS -> RdrName
 mkUnqual sp n = RdrName Unqual (mkOccFS sp n)
 
 mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
