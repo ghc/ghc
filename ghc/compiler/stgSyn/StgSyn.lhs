@@ -175,7 +175,7 @@ it encodes (\x -> e) as (let f = \x -> e in f)
 \begin{code}
   | StgLam
 	Type		-- Type of whole lambda (useful when making a binder for it)
-	[Id]
+	[bndr]
 	StgExpr		-- Body of lambda
 \end{code}
 
