@@ -5,7 +5,8 @@
 
 \begin{code}
 module CmLink ( Linkable(..), 
-		filterModuleLinkables, modname_of_linkable,
+		filterModuleLinkables, 
+		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
                 HValue,
                 link, 
@@ -57,6 +58,9 @@ data Linkable
 
 modname_of_linkable (LM nm _) = nm
 modname_of_linkable (LP _)    = panic "modname_of_linkable: package"
+
+is_package_linkable (LP _)   = True
+is_package_linkable (LM _ _) = False
 
 filterModuleLinkables :: (String{- ==ModName-} -> Bool) 
                       -> [Linkable] 

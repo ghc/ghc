@@ -27,7 +27,8 @@ import CmSummarise 	( summarise, ModSummary(..),
 import CmCompile 	( PCS, emptyPCS, HST, HIT, CompResult(..) )
 import CmLink 		( PLS, emptyPLS, HValue, Linkable, 
 			  link, LinkResult(..), 
-			  filterModuleLinkables, modname_of_linkable )
+			  filterModuleLinkables, modname_of_linkable,
+			  is_package_linkable )
 
 
 
@@ -213,18 +214,101 @@ flattenMG = concatMap flatten
 flatten (AcyclicSCC v) = [v]
 flatten (CyclicSCC vs) = vs
 
+-- For each module in mods_to_group, extract the relevant linkable
+-- out of UI, and arrange these linkables in SCCs as defined by modGraph.
+-- All this is so that we can pass SCCified Linkable groups to the
+-- linker.  A constraint that should be recorded somewhere is that
+-- all sccs should either be all-interpreted or all-object, not a mixture.
 group_uis :: UI -> [SCC ModSummary] -> [ModName] -> [SCC Linkable]
 group_uis ui modGraph mods_to_group
-   = error "group_uis"
+   = map extract (cleanup (fishOut modGraph mods_to_group))
+     where
+        fishOut :: [SCC ModSummary] -> [ModName] -> [(Bool,[ModName])]
+        fishOut [] unused
+           | null unused = []
+           | otherwise   = panic "group_uis: modnames not in modgraph"
+        fishOut ((AcyclicSCC ms):sccs) unused
+           = case split (== (name_of_summary ms)) unused of
+                (eq, not_eq) -> (False, eq) : fishOut sccs not_eq
+        fishOut ((CyclicSCC mss):sccs) unused
+           = case split (`elem` (map name_of_summary mss)) unused of
+                (eq, not_eq) -> (True, eq) : fishOut sccs not_eq
 
+        cleanup :: [(Bool,[ModName])] -> [SCC ModName]
+        cleanup [] = []
+        cleanup ((isRec,names):rest)
+           | null names = cleanup rest
+           | isRec      = CyclicSCC names : cleanup rest
+           | not isRec  = case names of [name] -> AcyclicSCC name : cleanup rest
+                                        other  -> panic "group_uis(cleanup)"
+
+        extract :: SCC ModName -> SCC Linkable
+        extract (AcyclicSCC nm) = AcyclicSCC (getLi nm)
+        extract (CyclicSCC nms) = CyclicSCC (map getLi nms)
+
+        getLi nm = case [li | li <- ui, not (is_package_linkable li),
+                                        nm == modname_of_linkable li] of
+                      [li]  -> li
+                      other -> panic "group_uis:getLi"
+
+        split f xs = (filter f xs, filter (not.f) xs)
+
+
+-- Add the given (LM-form) Linkables to the UI, overwriting previous
+-- versions if they exist.
 add_to_ui :: UI -> [Linkable] -> UI
-add_to_ui = error "add_to_ui"
+add_to_ui ui lis 
+   = foldr add1 ui lis
+     where
+        add1 :: Linkable -> UI -> UI
+        add1 li ui
+           = li : filter (\li2 -> not (for_same_module li li2)) ui
 
+        for_same_module :: Linkable -> Linkable -> Bool
+        for_same_module li1 li2 
+           = not (is_package_linkable li1)
+             && not (is_package_linkable li2)
+             && modname_of_linkable li1 == modname_of_linkable li2
+                                  
+
+-- Compute upwards and downwards closures in the (home-) module graph.
 downwards_closure,
  upwards_closure :: [SCC ModSummary] -> [ModName] -> [ModName]
 
-upwards_closure = error "upwards_closure"
-downwards_closure = error "downwards_closure"
+upwards_closure   = up_down_closure True
+downwards_closure = up_down_closure False
+
+up_down_closure :: Bool -> [SCC ModSummary] -> [ModName] -> [ModName]
+up_down_closure up modGraph roots
+   = let mgFlat = flattenMG modGraph
+         nodes  = map name_of_summary mgFlat
+
+         fwdEdges, backEdges  :: [(ModName, [ModName])] 
+                   -- have an entry for each mod in mgFlat, and do not
+                   -- mention edges leading out of the home package
+         fwdEdges 
+            = map mkEdge mgFlat
+         backEdges -- Only calculated if needed, which is just as well!
+            = [(n, [m | (m, m_imports) <- fwdEdges, n `elem` m_imports])
+               | (n, n_imports) <- fwdEdges]
+
+         iterate :: [(ModName,[ModName])] -> [ModName] -> [ModName]
+         iterate graph set
+            = let set2 = nub (concatMap dsts set)
+                  dsts :: ModName -> [ModName]
+                  dsts node = case lookup node graph of
+                                 Just ds -> ds
+                                 Nothing -> panic "up_down_closure"
+              in
+                  if length set == length set2 then set else iterate graph set2
+
+         mkEdge summ
+            = (name_of_summary summ, 
+               -- ignore imports not from the home package
+               filter (`elem` nodes) (deps_of_summary summ))
+     in
+         (if up then iterate backEdges else iterate fwdEdges) (nub roots)
+
 
 data ModThreaded  -- stuff threaded through individual module compilations
    = ModThreaded PCS HST HIT
