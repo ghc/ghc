@@ -44,7 +44,8 @@ import CgCallConv	( isBigLiveness, mkLivenessCLit, buildContLiveness,
 			  CtrlReturnConvention(..) )
 import CgUtils		( mkStringCLit, packHalfWordsCLit, mkWordCLit, 
 			  cmmOffsetB, cmmOffsetExprW, cmmLabelOffW, cmmOffsetW,
-			  emitDataLits, emitRODataLits, emitSwitch, cmmNegate )
+			  emitDataLits, emitRODataLits, emitSwitch, cmmNegate,
+			  newTemp )
 import CgMonad
 
 import CmmUtils		( mkIntCLit, zeroCLit )
@@ -348,7 +349,11 @@ emitVectoredReturnInstr :: CmmExpr	-- *Zero-indexed* constructor tag
 			-> Code
 emitVectoredReturnInstr zero_indexed_tag
   = do	{ info_amode <- getSequelAmode
-	; let target = retVec info_amode zero_indexed_tag
+		-- HACK! assign info_amode to a temp, because retVec
+		-- uses it twice and the NCG doesn't have any CSE yet.
+	; x <- newTemp wordRep
+	; stmtC (CmmAssign x info_amode)
+	; let target = retVec (CmmReg x) zero_indexed_tag
 	; stmtC (CmmJump target []) }
 
 
