@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.24 2001/07/24 06:02:21 ken Exp $
+ * $Id: StgCRun.c,v 1.25 2001/08/07 20:06:41 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -32,6 +32,32 @@
  * variables.  
  *
  * -------------------------------------------------------------------------- */
+
+
+/*
+ * We define the following (unused) global register variables, because for
+ * some reason gcc generates sub-optimal code for StgRun() on the Alpha
+ * (unnecessarily saving extra registers on the stack) if we don't.
+ *
+ * Why do it at the top of this file, rather than near StgRun() below?  Because
+ * gcc doesn't let us define global register variables after any function
+ * definition has been read.  Any point after #include "Stg.h" would be too
+ * late.
+ *
+ * You can define alpha_EXTRA_CAREFUL here to save $s6, $f8 and $f9 -- registers
+ * that we don't use but which are callee-save registers.  It shouldn't be
+ * necessary.
+ */
+#include "config.h"
+#ifdef alpha_TARGET_ARCH
+#undef alpha_EXTRA_CAREFUL
+register long   fake_ra __asm__("$26");
+#ifdef alpha_EXTRA_CAREFUL
+register long   fake_s6 __asm__("$15");
+register double fake_f8 __asm__("$f8");
+register double fake_f9 __asm__("$f9");
+#endif
+#endif
 
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
@@ -359,6 +385,30 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 /* -----------------------------------------------------------------------------
    alpha architecture
+
+   "The stack pointer (SP) must at all times denote an address that has octaword
+    alignment. (This restriction has the side effect that the in-memory portion
+    of the argument list, if any, will start on an octaword boundary.) Note that
+    the stack grows toward lower addresses. During a procedure invocation, SP
+    can never be set to a value that is higher than the value of SP at entry to
+    that procedure invocation.
+
+   "The contents of the stack, located above the portion of the argument list
+    (if any) that is passed in memory, belong to the calling procedure. Because
+    they are part of the calling procedure, they should not be read or written
+    by the called procedure, except as specified by indirect arguments or
+    language-controlled up-level references.
+
+   "The SP value might be used by the hardware when raising exceptions and
+    asynchronous interrupts. It must be assumed that the contents of the stack
+    below the current SP value and within the stack for the current thread are
+    continually and unpredictably modified, as specified in the _Alpha
+    Architecture Reference Manual_, and as a result of asynchronous software
+    actions."
+
+   -- Compaq Computer Corporation, Houston. Tru64 UNIX Calling Standard for   
+      Alpha Systems, 5.1 edition, August 2000, section 3.2.1.  http://www.
+      tru64unix.compaq.com/docs/base_doc/DOCUMENTATION/V51_PDF/ARH9MBTE.PDF
    -------------------------------------------------------------------------- */
 
 #ifdef alpha_TARGET_ARCH
@@ -366,52 +416,90 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) 
 {
+    register long   real_ra __asm__("$26"); volatile long   save_ra;
+
+    register long   real_s0 __asm__("$9" ); volatile long   save_s0;
+    register long   real_s1 __asm__("$10"); volatile long   save_s1;
+    register long   real_s2 __asm__("$11"); volatile long   save_s2;
+    register long   real_s3 __asm__("$12"); volatile long   save_s3;
+    register long   real_s4 __asm__("$13"); volatile long   save_s4;
+    register long   real_s5 __asm__("$14"); volatile long   save_s5;
+#ifdef alpha_EXTRA_CAREFUL
+    register long   real_s6 __asm__("$15"); volatile long   save_s6;
+#endif
+                                                                                  
+    register double real_f2 __asm__("$f2"); volatile double save_f2;
+    register double real_f3 __asm__("$f3"); volatile double save_f3;
+    register double real_f4 __asm__("$f4"); volatile double save_f4;
+    register double real_f5 __asm__("$f5"); volatile double save_f5;
+    register double real_f6 __asm__("$f6"); volatile double save_f6;
+    register double real_f7 __asm__("$f7"); volatile double save_f7;
+#ifdef alpha_EXTRA_CAREFUL
+    register double real_f8 __asm__("$f8"); volatile double save_f8;
+    register double real_f9 __asm__("$f9"); volatile double save_f9;
+#endif
+
+    register StgFunPtr real_pv __asm__("$27");
+
     StgThreadReturnCode ret;
 
-    __asm__ volatile ("stq $9,-8($30)\n\t"
-                      "stq $10,-16($30)\n\t"
-                      "stq $11,-24($30)\n\t"
-                      "stq $12,-32($30)\n\t"
-                      "stq $13,-40($30)\n\t"
-                      "stq $14,-48($30)\n\t"
-                      "stq $15,-56($30)\n\t"
-                      "stt $f2,-64($30)\n\t"
-                      "stt $f3,-72($30)\n\t"
-                      "stt $f4,-80($30)\n\t"
-                      "stt $f5,-88($30)\n\t"
-                      "stt $f6,-96($30)\n\t"
-                      "stt $f7,-104($30)\n\t"
-                      "stt $f8,-112($30)\n\t"
-                      "stt $f9,-120($30)\n\t"
-    	    	      "lda $30,-%0($30)" : :
-                      "K" (RESERVED_C_STACK_BYTES+
-			   8*sizeof(double)+8*sizeof(long)));
+    save_ra = real_ra;
 
-    f();
+    save_s0 = real_s0;
+    save_s1 = real_s1;
+    save_s2 = real_s2;
+    save_s3 = real_s3;
+    save_s4 = real_s4;
+    save_s5 = real_s5;
+#ifdef alpha_EXTRA_CAREFUL
+    save_s6 = real_s6;
+#endif
 
-    __asm__ volatile (".align 3\n"
-               	      ".globl " STG_RETURN "\n"
-                      STG_RETURN ":\n\t"
-		      "lda %0,($14)\n\t"  /* save R1 */
-               	      "lda $30,%1($30)\n\t"
-               	      "ldq $9,-8($30)\n\t"
-               	      "ldq $10,-16($30)\n\t"
-               	      "ldq $11,-24($30)\n\t"
-               	      "ldq $12,-32($30)\n\t"
-               	      "ldq $13,-40($30)\n\t"
-               	      "ldq $14,-48($30)\n\t"
-               	      "ldq $15,-56($30)\n\t"
-               	      "ldt $f2,-64($30)\n\t"
-               	      "ldt $f3,-72($30)\n\t"
-               	      "ldt $f4,-80($30)\n\t"
-               	      "ldt $f5,-88($30)\n\t"
-               	      "ldt $f6,-96($30)\n\t"
-    	    	      "ldt $f7,-104($30)\n\t"
-    	    	      "ldt $f8,-112($30)\n\t" 
-    	    	      "ldt $f9,-120($30)" 
-		      : "=r" (ret)
-		      : "K" (RESERVED_C_STACK_BYTES+
-			   8*sizeof(double)+8*sizeof(long)));
+    save_f2 = real_f2;
+    save_f3 = real_f3;
+    save_f4 = real_f4;
+    save_f5 = real_f5;
+    save_f6 = real_f6;
+    save_f7 = real_f7;
+#ifdef alpha_EXTRA_CAREFUL
+    save_f8 = real_f8;
+    save_f9 = real_f9;
+#endif
+
+    real_pv = f;
+
+    __asm__ volatile(	"lda $30,-%0($30)"	"\n"
+		"\t"	"jmp ($27)"		"\n"
+		"\t"	".align 3"		"\n"
+		".globl " STG_RETURN		"\n"
+		STG_RETURN ":"			"\n"
+		"\t"	"lda $30,%0($30)"	"\n"
+		: : "K" (RESERVED_C_STACK_BYTES));
+
+    ret = real_s5;
+
+    real_s0 = save_s0;
+    real_s1 = save_s1;
+    real_s2 = save_s2;
+    real_s3 = save_s3;
+    real_s4 = save_s4;
+    real_s5 = save_s5;
+#ifdef alpha_EXTRA_CAREFUL
+    real_s6 = save_s6;
+#endif
+
+    real_f2 = save_f2;
+    real_f3 = save_f3;
+    real_f4 = save_f4;
+    real_f5 = save_f5;
+    real_f6 = save_f6;
+    real_f7 = save_f7;
+#ifdef alpha_EXTRA_CAREFUL
+    real_f8 = save_f8;
+    real_f9 = save_f9;
+#endif
+
+    real_ra = save_ra;
 
     return ret;
 }
