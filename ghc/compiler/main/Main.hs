@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.128 2003/06/27 18:28:33 sof Exp $
+-- $Id: Main.hs,v 1.129 2003/07/16 13:33:55 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -97,7 +97,7 @@ main =
   	   hFlush stdout
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->  hPutStr stderr (show exception)
+		IOException _ ->  hPutStrLn stderr (show exception)
 		AsyncException StackOverflow ->
 			hPutStrLn stderr "stack overflow: use +RTS -K<size> \ 
 					 \to increase it"
