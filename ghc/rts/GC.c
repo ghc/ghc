@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.91 2000/12/11 12:36:59 simonmar Exp $
+ * $Id: GC.c,v 1.92 2001/01/16 11:50:30 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -154,8 +154,8 @@ static rtsBool      traverse_weak_ptr_list  ( void );
 static void         cleanup_weak_ptr_list   ( StgWeak **list );
 
 static void         scavenge_stack          ( StgPtr p, StgPtr stack_end );
-static void         scavenge_large          ( step *step );
-static void         scavenge                ( step *step );
+static void         scavenge_large          ( step * );
+static void         scavenge                ( step * );
 static void         scavenge_static         ( void );
 static void         scavenge_mutable_list   ( generation *g );
 static void         scavenge_mut_once_list  ( generation *g );
@@ -194,7 +194,7 @@ static void         gcCAFs                  ( void );
 void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 {
   bdescr *bd;
-  step *step;
+  step *stp;
   lnat live, allocated, collected = 0, copied = 0;
   nat g, s;
 
@@ -290,25 +290,25 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
        * as necessary.
        */
       bd = allocBlock();
-      step = &generations[g].steps[s];
-      ASSERT(step->gen->no == g);
-      ASSERT(step->hp ? Bdescr(step->hp)->step == step : rtsTrue);
+      stp = &generations[g].steps[s];
+      ASSERT(stp->gen->no == g);
+      ASSERT(stp->hp ? Bdescr(stp->hp)->step == stp : rtsTrue);
       bd->gen  = &generations[g];
-      bd->step = step;
+      bd->step = stp;
       bd->link = NULL;
       bd->evacuated = 1;	/* it's a to-space block */
-      step->hp        = bd->start;
-      step->hpLim     = step->hp + BLOCK_SIZE_W;
-      step->hp_bd     = bd;
-      step->to_space  = bd;
-      step->to_blocks = 1;
-      step->scan      = bd->start;
-      step->scan_bd   = bd;
-      step->new_large_objects = NULL;
-      step->scavenged_large_objects = NULL;
+      stp->hp        = bd->start;
+      stp->hpLim     = stp->hp + BLOCK_SIZE_W;
+      stp->hp_bd     = bd;
+      stp->to_space  = bd;
+      stp->to_blocks = 1;
+      stp->scan      = bd->start;
+      stp->scan_bd   = bd;
+      stp->new_large_objects = NULL;
+      stp->scavenged_large_objects = NULL;
       new_blocks++;
       /* mark the large objects as not evacuated yet */
-      for (bd = step->large_objects; bd; bd = bd->link) {
+      for (bd = stp->large_objects; bd; bd = bd->link) {
 	bd->evacuated = 0;
       }
     }
@@ -319,28 +319,28 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
    */
   for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
-      step = &generations[g].steps[s];
-      if (step->hp_bd == NULL) {
+      stp = &generations[g].steps[s];
+      if (stp->hp_bd == NULL) {
 	bd = allocBlock();
 	bd->gen = &generations[g];
-	bd->step = step;
+	bd->step = stp;
 	bd->link = NULL;
 	bd->evacuated = 0;	/* *not* a to-space block */
-	step->hp = bd->start;
-	step->hpLim = step->hp + BLOCK_SIZE_W;
-	step->hp_bd = bd;
-	step->blocks = bd;
-	step->n_blocks = 1;
+	stp->hp = bd->start;
+	stp->hpLim = stp->hp + BLOCK_SIZE_W;
+	stp->hp_bd = bd;
+	stp->blocks = bd;
+	stp->n_blocks = 1;
 	new_blocks++;
       }
       /* Set the scan pointer for older generations: remember we
        * still have to scavenge objects that have been promoted. */
-      step->scan = step->hp;
-      step->scan_bd = step->hp_bd;
-      step->to_space = NULL;
-      step->to_blocks = 0;
-      step->new_large_objects = NULL;
-      step->scavenged_large_objects = NULL;
+      stp->scan = stp->hp;
+      stp->scan_bd = stp->hp_bd;
+      stp->to_space = NULL;
+      stp->to_blocks = 0;
+      stp->new_large_objects = NULL;
+      stp->scavenged_large_objects = NULL;
     }
   }
 
@@ -466,15 +466,15 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 	  if (gen == 0 && st == 0 && RtsFlags.GcFlags.generations > 1) { 
 	    continue; 
 	  }
-	  step = &generations[gen].steps[st];
+	  stp = &generations[gen].steps[st];
 	  evac_gen = gen;
-	  if (step->hp_bd != step->scan_bd || step->scan < step->hp) {
-	    scavenge(step);
+	  if (stp->hp_bd != stp->scan_bd || stp->scan < stp->hp) {
+	    scavenge(stp);
 	    flag = rtsTrue;
 	    goto loop2;
 	  }
-	  if (step->new_large_objects != NULL) {
-	    scavenge_large(step);
+	  if (stp->new_large_objects != NULL) {
+	    scavenge_large(stp);
 	    flag = rtsTrue;
 	    goto loop2;
 	  }
@@ -541,35 +541,35 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 
     for (s = 0; s < generations[g].n_steps; s++) {
       bdescr *next;
-      step = &generations[g].steps[s];
+      stp = &generations[g].steps[s];
 
       if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
 	/* Tidy the end of the to-space chains */
-	step->hp_bd->free = step->hp;
-	step->hp_bd->link = NULL;
+	stp->hp_bd->free = stp->hp;
+	stp->hp_bd->link = NULL;
 	/* stats information: how much we copied */
 	if (g <= N) {
-	  copied -= step->hp_bd->start + BLOCK_SIZE_W -
-	    step->hp_bd->free;
+	  copied -= stp->hp_bd->start + BLOCK_SIZE_W -
+	    stp->hp_bd->free;
 	}
       }
 
       /* for generations we collected... */
       if (g <= N) {
 
-	collected += step->n_blocks * BLOCK_SIZE_W; /* for stats */
+	collected += stp->n_blocks * BLOCK_SIZE_W; /* for stats */
 
 	/* free old memory and shift to-space into from-space for all
 	 * the collected steps (except the allocation area).  These
 	 * freed blocks will probaby be quickly recycled.
 	 */
 	if (!(g == 0 && s == 0)) {
-	  freeChain(step->blocks);
-	  step->blocks = step->to_space;
-	  step->n_blocks = step->to_blocks;
-	  step->to_space = NULL;
-	  step->to_blocks = 0;
-	  for (bd = step->blocks; bd != NULL; bd = bd->link) {
+	  freeChain(stp->blocks);
+	  stp->blocks = stp->to_space;
+	  stp->n_blocks = stp->to_blocks;
+	  stp->to_space = NULL;
+	  stp->to_blocks = 0;
+	  for (bd = stp->blocks; bd != NULL; bd = bd->link) {
 	    bd->evacuated = 0;	/* now from-space */
 	  }
 	}
@@ -579,15 +579,15 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 	 * collection from large_objects.  Any objects left on
 	 * large_objects list are therefore dead, so we free them here.
 	 */
-	for (bd = step->large_objects; bd != NULL; bd = next) {
+	for (bd = stp->large_objects; bd != NULL; bd = next) {
 	  next = bd->link;
 	  freeGroup(bd);
 	  bd = next;
 	}
-	for (bd = step->scavenged_large_objects; bd != NULL; bd = bd->link) {
+	for (bd = stp->scavenged_large_objects; bd != NULL; bd = bd->link) {
 	  bd->evacuated = 0;
 	}
-	step->large_objects = step->scavenged_large_objects;
+	stp->large_objects = stp->scavenged_large_objects;
 
 	/* Set the maximum blocks for this generation, interpolating
 	 * between the maximum size of the oldest and youngest
@@ -612,14 +612,14 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 	 * scavenged_large_object list (i.e. large objects that have been
 	 * promoted during this GC) to the large_object list for that step.
 	 */
-	for (bd = step->scavenged_large_objects; bd; bd = next) {
+	for (bd = stp->scavenged_large_objects; bd; bd = next) {
 	  next = bd->link;
 	  bd->evacuated = 0;
-	  dbl_link_onto(bd, &step->large_objects);
+	  dbl_link_onto(bd, &stp->large_objects);
 	}
 
 	/* add the new blocks we promoted during this GC */
-	step->n_blocks += step->to_blocks;
+	stp->n_blocks += stp->to_blocks;
       }
     }
   }
@@ -1060,24 +1060,24 @@ MarkRoot(StgClosure *root)
 }
 
 //@cindex addBlock
-static void addBlock(step *step)
+static void addBlock(step *stp)
 {
   bdescr *bd = allocBlock();
-  bd->gen = step->gen;
-  bd->step = step;
+  bd->gen = stp->gen;
+  bd->step = stp;
 
-  if (step->gen->no <= N) {
+  if (stp->gen->no <= N) {
     bd->evacuated = 1;
   } else {
     bd->evacuated = 0;
   }
 
-  step->hp_bd->free = step->hp;
-  step->hp_bd->link = bd;
-  step->hp = bd->start;
-  step->hpLim = step->hp + BLOCK_SIZE_W;
-  step->hp_bd = bd;
-  step->to_blocks++;
+  stp->hp_bd->free = stp->hp;
+  stp->hp_bd->link = bd;
+  stp->hp = bd->start;
+  stp->hpLim = stp->hp + BLOCK_SIZE_W;
+  stp->hp_bd = bd;
+  stp->to_blocks++;
   new_blocks++;
 }
 
@@ -1093,7 +1093,7 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
 //@cindex copy
 
 static __inline__ StgClosure *
-copy(StgClosure *src, nat size, step *step)
+copy(StgClosure *src, nat size, step *stp)
 {
   P_ to, from, dest;
 
@@ -1103,27 +1103,27 @@ copy(StgClosure *src, nat size, step *step)
    * evacuate to an older generation, adjust it here (see comment
    * by evacuate()).
    */
-  if (step->gen->no < evac_gen) {
+  if (stp->gen->no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
-    step = &generations[evac_gen].steps[0];
+    stp = &generations[evac_gen].steps[0];
 #endif
   }
 
   /* chain a new block onto the to-space for the destination step if
    * necessary.
    */
-  if (step->hp + size >= step->hpLim) {
-    addBlock(step);
+  if (stp->hp + size >= stp->hpLim) {
+    addBlock(stp);
   }
 
-  for(to = step->hp, from = (P_)src; size>0; --size) {
+  for(to = stp->hp, from = (P_)src; size>0; --size) {
     *to++ = *from++;
   }
 
-  dest = step->hp;
-  step->hp = to;
+  dest = stp->hp;
+  stp->hp = to;
   upd_evacuee(src,(StgClosure *)dest);
   return (StgClosure *)dest;
 }
@@ -1136,29 +1136,29 @@ copy(StgClosure *src, nat size, step *step)
 //@cindex copyPart
 
 static __inline__ StgClosure *
-copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
+copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
   P_ dest, to, from;
 
   TICK_GC_WORDS_COPIED(size_to_copy);
-  if (step->gen->no < evac_gen) {
+  if (stp->gen->no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
-    step = &generations[evac_gen].steps[0];
+    stp = &generations[evac_gen].steps[0];
 #endif
   }
 
-  if (step->hp + size_to_reserve >= step->hpLim) {
-    addBlock(step);
+  if (stp->hp + size_to_reserve >= stp->hpLim) {
+    addBlock(stp);
   }
 
-  for(to = step->hp, from = (P_)src; size_to_copy>0; --size_to_copy) {
+  for(to = stp->hp, from = (P_)src; size_to_copy>0; --size_to_copy) {
     *to++ = *from++;
   }
   
-  dest = step->hp;
-  step->hp += size_to_reserve;
+  dest = stp->hp;
+  stp->hp += size_to_reserve;
   upd_evacuee(src,(StgClosure *)dest);
   return (StgClosure *)dest;
 }
@@ -1183,7 +1183,7 @@ static inline void
 evacuate_large(StgPtr p, rtsBool mutable)
 {
   bdescr *bd = Bdescr(p);
-  step *step;
+  step *stp;
 
   /* should point to the beginning of the block */
   ASSERT(((W_)p & BLOCK_MASK) == 0);
@@ -1200,12 +1200,12 @@ evacuate_large(StgPtr p, rtsBool mutable)
     return;
   }
 
-  step = bd->step;
+  stp = bd->step;
   /* remove from large_object list */
   if (bd->back) {
     bd->back->link = bd->link;
   } else { /* first object in the list */
-    step->large_objects = bd->link;
+    stp->large_objects = bd->link;
   }
   if (bd->link) {
     bd->link->back = bd->back;
@@ -1213,19 +1213,19 @@ evacuate_large(StgPtr p, rtsBool mutable)
   
   /* link it on to the evacuated large object list of the destination step
    */
-  step = bd->step->to;
-  if (step->gen->no < evac_gen) {
+  stp = bd->step->to;
+  if (stp->gen->no < evac_gen) {
 #ifdef NO_EAGER_PROMOTION    
     failed_to_evac = rtsTrue;
 #else
-    step = &generations[evac_gen].steps[0];
+    stp = &generations[evac_gen].steps[0];
 #endif
   }
 
-  bd->step = step;
-  bd->gen = step->gen;
-  bd->link = step->new_large_objects;
-  step->new_large_objects = bd;
+  bd->step = stp;
+  bd->gen = stp->gen;
+  bd->link = stp->new_large_objects;
+  stp->new_large_objects = bd;
   bd->evacuated = 1;
 
   if (mutable) {
@@ -1247,19 +1247,19 @@ static StgClosure *
 mkMutCons(StgClosure *ptr, generation *gen)
 {
   StgMutVar *q;
-  step *step;
+  step *stp;
 
-  step = &gen->steps[0];
+  stp = &gen->steps[0];
 
   /* chain a new block onto the to-space for the destination step if
    * necessary.
    */
-  if (step->hp + sizeofW(StgIndOldGen) >= step->hpLim) {
-    addBlock(step);
+  if (stp->hp + sizeofW(StgIndOldGen) >= stp->hpLim) {
+    addBlock(stp);
   }
 
-  q = (StgMutVar *)step->hp;
-  step->hp += sizeofW(StgMutVar);
+  q = (StgMutVar *)stp->hp;
+  stp->hp += sizeofW(StgMutVar);
 
   SET_HDR(q,&stg_MUT_CONS_info,CCS_GC);
   q->var = ptr;
@@ -1299,7 +1299,7 @@ evacuate(StgClosure *q)
 {
   StgClosure *to;
   bdescr *bd = NULL;
-  step *step;
+  step *stp;
   const StgInfoTable *info;
 
 loop:
@@ -1317,10 +1317,10 @@ loop:
       }
       return q;
     }
-    step = bd->step->to;
+    stp = bd->step->to;
   }
 #ifdef DEBUG
-  else step = NULL; /* make sure copy() will crash if HEAP_ALLOCED is wrong */
+  else stp = NULL; /* make sure copy() will crash if HEAP_ALLOCED is wrong */
 #endif
 
   /* make sure the info pointer is into text space */
@@ -1341,7 +1341,7 @@ loop:
   case MUT_VAR:
     ASSERT(q->header.info != &stg_MUT_CONS_info);
   case MVAR:
-    to = copy(q,sizeW_fromITBL(info),step);
+    to = copy(q,sizeW_fromITBL(info),stp);
     recordMutable((StgMutClosure *)to);
     return to;
 
@@ -1363,7 +1363,7 @@ loop:
   case FUN_1_0:
   case FUN_0_1:
   case CONSTR_1_0:
-    return copy(q,sizeofW(StgHeader)+1,step);
+    return copy(q,sizeofW(StgHeader)+1,stp);
 
   case THUNK_1_0:		/* here because of MIN_UPD_SIZE */
   case THUNK_0_1:
@@ -1374,10 +1374,10 @@ loop:
     if (bd->gen->no == 0 && 
 	bd->step->no != 0 &&
 	bd->step->no == bd->gen->n_steps-1) {
-      step = bd->step;
+      stp = bd->step;
     }
 #endif
-    return copy(q,sizeofW(StgHeader)+2,step);
+    return copy(q,sizeofW(StgHeader)+2,stp);
 
   case FUN_1_1:
   case FUN_0_2:
@@ -1385,7 +1385,7 @@ loop:
   case CONSTR_1_1:
   case CONSTR_0_2:
   case CONSTR_2_0:
-    return copy(q,sizeofW(StgHeader)+2,step);
+    return copy(q,sizeofW(StgHeader)+2,stp);
 
   case FUN:
   case THUNK:
@@ -1398,16 +1398,16 @@ loop:
   case FOREIGN:
   case STABLE_NAME:
   case BCO:
-    return copy(q,sizeW_fromITBL(info),step);
+    return copy(q,sizeW_fromITBL(info),stp);
 
   case CAF_BLACKHOLE:
   case SE_CAF_BLACKHOLE:
   case SE_BLACKHOLE:
   case BLACKHOLE:
-    return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),step);
+    return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
 
   case BLACKHOLE_BQ:
-    to = copy(q,BLACKHOLE_sizeW(),step); 
+    to = copy(q,BLACKHOLE_sizeW(),stp); 
     recordMutable((StgMutClosure *)to);
     return to;
 
@@ -1498,7 +1498,7 @@ loop:
 	     (int)(selectee_info->type));
       }
     }
-    return copy(q,THUNK_SELECTOR_sizeW(),step);
+    return copy(q,THUNK_SELECTOR_sizeW(),stp);
 
   case IND:
   case IND_OLDGEN:
@@ -1572,7 +1572,7 @@ loop:
 	evacuate_large((P_)q, rtsFalse);
 	return q;
       } else {
-	return copy(q,size,step);
+	return copy(q,size,stp);
       }
     }
 
@@ -1603,7 +1603,7 @@ loop:
 	return q;
       } else {
 	/* just copy the block */
-	return copy(q,size,step);
+	return copy(q,size,stp);
       }
     }
 
@@ -1617,7 +1617,7 @@ loop:
 	to = q;
       } else {
 	/* just copy the block */
-	to = copy(q,size,step);
+	to = copy(q,size,stp);
 	if (info->type == MUT_ARR_PTRS) {
 	  recordMutable((StgMutClosure *)to);
 	}
@@ -1648,7 +1648,7 @@ loop:
        * list it contains.  
        */
       } else {
-	StgTSO *new_tso = (StgTSO *)copy((StgClosure *)tso,tso_sizeW(tso),step);
+	StgTSO *new_tso = (StgTSO *)copy((StgClosure *)tso,tso_sizeW(tso),stp);
 
 	diff = (StgPtr)new_tso - (StgPtr)tso; /* In *words* */
 
@@ -1667,9 +1667,9 @@ loop:
   case RBH: // cf. BLACKHOLE_BQ
     {
       //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
-      to = copy(q,BLACKHOLE_sizeW(),step); 
+      to = copy(q,BLACKHOLE_sizeW(),stp); 
       //ToDo: derive size etc from reverted IP
-      //to = copy(q,size,step);
+      //to = copy(q,size,stp);
       recordMutable((StgMutClosure *)to);
       IF_DEBUG(gc,
 	       belch("@@ evacuate: RBH %p (%s) to %p (%s)",
@@ -1679,7 +1679,7 @@ loop:
 
   case BLOCKED_FETCH:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
-    to = copy(q,sizeofW(StgBlockedFetch),step);
+    to = copy(q,sizeofW(StgBlockedFetch),stp);
     IF_DEBUG(gc,
 	     belch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
@@ -1687,7 +1687,7 @@ loop:
 
   case FETCH_ME:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
-    to = copy(q,sizeofW(StgFetchMe),step);
+    to = copy(q,sizeofW(StgFetchMe),stp);
     IF_DEBUG(gc,
 	     belch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
@@ -1695,7 +1695,7 @@ loop:
 
   case FETCH_ME_BQ:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
-    to = copy(q,sizeofW(StgFetchMeBlockingQueue),step);
+    to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
     IF_DEBUG(gc,
 	     belch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
@@ -1842,15 +1842,15 @@ scavengeTSO (StgTSO *tso)
 //@cindex scavenge
 
 static void
-scavenge(step *step)
+scavenge(step *stp)
 {
   StgPtr p, q;
   const StgInfoTable *info;
   bdescr *bd;
   nat saved_evac_gen = evac_gen; /* used for temporarily changing evac_gen */
 
-  p = step->scan;
-  bd = step->scan_bd;
+  p = stp->scan;
+  bd = stp->scan_bd;
 
   failed_to_evac = rtsFalse;
 
@@ -1858,10 +1858,10 @@ scavenge(step *step)
    * evacuated objects 
    */
 
-  while (bd != step->hp_bd || p < step->hp) {
+  while (bd != stp->hp_bd || p < stp->hp) {
 
     /* If we're at the end of this block, move on to the next block */
-    if (bd != step->hp_bd && p == bd->free) {
+    if (bd != stp->hp_bd && p == bd->free) {
       bd = bd->link;
       p = bd->start;
       continue;
@@ -1965,7 +1965,7 @@ scavenge(step *step)
       }
 
     case IND_PERM:
-      if (step->gen->no != 0) {
+      if (stp->gen->no != 0) {
 	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
       }
       /* fall through */
@@ -2220,8 +2220,8 @@ scavenge(step *step)
     }
   }
 
-  step->scan_bd = bd;
-  step->scan = p;
+  stp->scan_bd = bd;
+  stp->scan = p;
 }    
 
 /* -----------------------------------------------------------------------------
@@ -2842,7 +2842,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	  continue;
 	} else {
 	  bdescr *bd = Bdescr((P_)frame->updatee);
-	  step *step;
+	  step *stp;
 	  if (bd->gen->no > N) { 
 	    if (bd->gen->no < evac_gen) {
 	      failed_to_evac = rtsTrue;
@@ -2851,22 +2851,22 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	  }
 
 	  /* Don't promote blackholes */
-	  step = bd->step;
-	  if (!(step->gen->no == 0 && 
-		step->no != 0 &&
-		step->no == step->gen->n_steps-1)) {
-	    step = step->to;
+	  stp = bd->step;
+	  if (!(stp->gen->no == 0 && 
+		stp->no != 0 &&
+		stp->no == stp->gen->n_steps-1)) {
+	    stp = stp->to;
 	  }
 
 	  switch (type) {
 	  case BLACKHOLE:
 	  case CAF_BLACKHOLE:
 	    to = copyPart(frame->updatee, BLACKHOLE_sizeW(), 
-			  sizeofW(StgHeader), step);
+			  sizeofW(StgHeader), stp);
 	    frame->updatee = to;
 	    continue;
 	  case BLACKHOLE_BQ:
-	    to = copy(frame->updatee, BLACKHOLE_sizeW(), step);
+	    to = copy(frame->updatee, BLACKHOLE_sizeW(), stp);
 	    frame->updatee = to;
 	    recordMutable((StgMutClosure *)to);
 	    continue;
@@ -2951,7 +2951,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 //@cindex scavenge_large
 
 static void
-scavenge_large(step *step)
+scavenge_large(step *stp)
 {
   bdescr *bd;
   StgPtr p;
@@ -2959,17 +2959,17 @@ scavenge_large(step *step)
   nat saved_evac_gen = evac_gen; /* used for temporarily changing evac_gen */
 
   evac_gen = 0;			/* most objects are mutable */
-  bd = step->new_large_objects;
+  bd = stp->new_large_objects;
 
-  for (; bd != NULL; bd = step->new_large_objects) {
+  for (; bd != NULL; bd = stp->new_large_objects) {
 
     /* take this object *off* the large objects list and put it on
      * the scavenged large objects list.  This is so that we can
      * treat new_large_objects as a stack and push new objects on
      * the front when evacuating.
      */
-    step->new_large_objects = bd->link;
-    dbl_link_onto(bd, &step->scavenged_large_objects);
+    stp->new_large_objects = bd->link;
+    dbl_link_onto(bd, &stp->scavenged_large_objects);
 
     p = bd->start;
     info  = get_itbl((StgClosure *)p);
