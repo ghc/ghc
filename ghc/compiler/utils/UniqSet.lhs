@@ -27,7 +27,7 @@ import UniqFM
 import Unique		( Unique )
 import SrcLoc		( SrcLoc )
 import Outputable	( Outputable(..) )
-import Pretty		( SYN_IE(Pretty), PrettyRep )
+import Pretty		( Doc )
 import PprStyle		( PprStyle )
 import Util		( Ord3(..) )
 
