@@ -1252,7 +1252,6 @@ simplRecursiveGroup env new_ids []
   = returnSmpl ([], env)
 
 simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
-{-
   | inlineUnconditionally binder
   = 	-- Single occurrence, so drop binding and extend env with the inlining
 	-- This is a little delicate, because what if the unique occurrence
@@ -1266,7 +1265,6 @@ simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
 	new_env = bindIdToExpr env binder rhs
     in
     simplRecursiveGroup new_env new_ids pairs
--}
   | otherwise
   = simplRhsExpr env binder rhs new_id		`thenSmpl` \ (new_rhs, arity) ->
     let
