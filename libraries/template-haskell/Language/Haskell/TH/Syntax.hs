@@ -26,7 +26,7 @@ module Language.Haskell.TH.Syntax(
 
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
-	Clause(..), Body(..), Stmt(..), Range(..),
+	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
 	StrictType, VarStrictType, 
@@ -47,6 +47,7 @@ import GHC.Base		( Int(..), Int#, (<#), (==#) )
 import IO		( hPutStrLn, stderr )
 import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
+import Control.Monad (liftM)
 
 -----------------------------------------------------
 --
@@ -191,6 +192,33 @@ instance Lift Bool where
 
 instance Lift a => Lift [a] where
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
+
+instance (Lift a, Lift b) => Lift (a, b) where
+  lift (a, b)
+    = liftM TupE $ sequence [lift a, lift b]
+
+instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
+  lift (a, b, c)
+    = liftM TupE $ sequence [lift a, lift b, lift c]
+
+instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
+  lift (a, b, c, d)
+    = liftM TupE $ sequence [lift a, lift b, lift c, lift d]
+
+instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (a, b, c, d, e) where
+  lift (a, b, c, d, e)
+    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e]
+
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (a, b, c, d, e, f) where
+  lift (a, b, c, d, e, f)
+    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
+
+instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (a, b, c, d, e, f, g) where
+  lift (a, b, c, d, e, f, g)
+    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
 
 -- TH has a special form for literal strings,
 -- which we should take advantage of.
@@ -380,11 +408,13 @@ data Pat
   | VarP Name                   -- { x }
   | TupP [Pat]                    -- { (p1,p2) }
   | ConP Name [Pat]             -- data T1 = C1 t1 t2; {C1 p1 p1} = e 
+  | InfixP Pat Name Pat           -- foo ({x :+ y}) = e 
   | TildeP Pat                    -- { ~p }
   | AsP Name Pat                -- { x @ p }
   | WildP                         -- { _ }
   | RecP Name [FieldPat]        -- f (Pt { pointx = x }) = g x
   | ListP [ Pat ]                 -- { [1,2,3] }
+  | SigP Pat Type                 -- p :: t
   deriving( Show, Eq )
 
 type FieldPat = (Name,Pat)
@@ -428,8 +458,13 @@ type FieldExp = (Name,Exp)
 -- Omitted: implicit parameters
 
 data Body
-  = GuardedB [(Exp,Exp)]     -- f p { | e1 = e2 | e3 = e4 } where ds
+  = GuardedB [(Guard,Exp)]   -- f p { | e1 = e2 | e3 = e4 } where ds
   | NormalB Exp              -- f p { = e } where ds
+  deriving( Show, Eq )
+
+data Guard
+  = NormalG Exp
+  | PatG [Stmt]
   deriving( Show, Eq )
 
 data Stmt

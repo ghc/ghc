@@ -136,7 +136,9 @@ instance Ppr Match where
 pprBody :: Bool -> Body -> Doc
 pprBody eq (GuardedB xs) = nest nestDepth $ vcat $ map do_guard xs
   where eqd = if eq then text "=" else text "->"
-        do_guard (lhs, rhs) = text "|" <+> ppr lhs <+> eqd <+> ppr rhs
+        do_guard (NormalG g, e) = text "|" <+> ppr g <+> eqd <+> ppr e
+        do_guard (PatG ss, e) = text "|" <+> vcat (map ppr ss)
+                             $$ nest nestDepth (eqd <+> ppr e)
 pprBody eq (NormalB e) = (if eq then text "=" else text "->") <+> ppr e
 
 ------------------------------
@@ -162,6 +164,9 @@ pprPat _ (VarP v)     = ppr v
 pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
 pprPat i (ConP s ps)  = parensIf (i > noPrec) $ ppr s
                                             <+> sep (map (pprPat appPrec) ps)
+pprPat i (InfixP p1 n p2)
+                      = parensIf (i > noPrec)
+                      $ pprPat opPrec p1 <+> ppr n <+> pprPat opPrec p2
 pprPat i (TildeP p)   = parensIf (i > noPrec) $ pprPat appPrec p
 pprPat i (AsP v p)    = parensIf (i > noPrec) $ ppr v <> text "@"
                                                       <> pprPat appPrec p
@@ -171,6 +176,7 @@ pprPat _ (RecP nm fs)
             <+> braces (sep $ punctuate comma $
                         map (\(s,p) -> ppr s <+> equals <+> ppr p) fs)
 pprPat _ (ListP ps) = brackets $ sep $ punctuate comma $ map ppr ps
+pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> text "::" <+> ppr t
 
 ------------------------------
 instance Ppr Dec where

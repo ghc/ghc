@@ -17,26 +17,29 @@ module Language.Haskell.TH(
 	
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
-	Clause(..), Body(..), Stmt(..), Range(..),
+	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
 	Info(..), 
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions
-	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, MatchQ, ClauseQ, BodyQ,
-	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ,
+	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, MatchQ, ClauseQ, BodyQ, GuardQ,
+	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
 	intPrimL, floatPrimL, doublePrimL, integerL, charL, stringL, rationalL, 
-	litP, varP, tupP, conP, tildeP, asP, wildP, recP, listP, fieldPat, 
+	litP, varP, tupP, conP, infixP, tildeP, asP, wildP, recP, listP, sigP,
+    fieldPat,
 	bindS, letS, noBindS, parS, 
 	fromR, fromThenR, fromToR, fromThenToR, 
-	normalB, guardedB, match, clause, 
+	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
 	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
 	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, 
-	fromE, fromThenE, fromThenToE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
+	fromE, fromThenE, fromToE, fromThenToE,
+    listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
-	normalC, recC, 
-	cxt, varT, conT, appT, arrowT, tupleT, isStrict, notStrict, strictType, varStrictType,
+	cxt, normalC, recC, infixC,
+    forallT, varT, conT, appT, arrowT, listT, tupleT,
+    isStrict, notStrict, strictType, varStrictType,
 	cCall, stdCall, unsafe, safe, threadsafe,
 
 	-- Pretty-printer

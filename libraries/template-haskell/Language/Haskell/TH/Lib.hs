@@ -14,6 +14,8 @@ import Control.Monad( liftM, liftM2 )
 ----------------------------------------------------------
 
 type InfoQ          = Q Info
+type PatQ           = Q Pat
+type FieldPatQ      = Q FieldPat
 type ExpQ           = Q Exp
 type DecQ           = Q Dec
 type ConQ           = Q Con
@@ -22,6 +24,7 @@ type CxtQ           = Q Cxt
 type MatchQ         = Q Match
 type ClauseQ        = Q Clause
 type BodyQ          = Q Body
+type GuardQ         = Q Guard
 type StmtQ          = Q Stmt
 type RangeQ         = Q Range
 type StrictTypeQ    = Q StrictType
@@ -46,34 +49,48 @@ stringL     = StringL
 rationalL   :: Rational -> Lit
 rationalL   = RationalL
 
-litP :: Lit -> Pat
-litP = LitP
-varP :: Name -> Pat
-varP = VarP
-tupP :: [Pat] -> Pat
-tupP = TupP
-conP :: Name -> [Pat] -> Pat
-conP = ConP
-tildeP :: Pat -> Pat
-tildeP = TildeP
-asP :: Name -> Pat -> Pat
-asP = AsP
-wildP :: Pat
-wildP = WildP
-recP :: Name -> [FieldPat] -> Pat
-recP = RecP
-listP :: [Pat] -> Pat
-listP = ListP
+litP :: Lit -> PatQ
+litP l = return (LitP l)
+varP :: Name -> PatQ
+varP v = return (VarP v)
+tupP :: [PatQ] -> PatQ
+tupP ps = do { ps1 <- sequence ps; return (TupP ps1)}
+conP :: Name -> [PatQ] -> PatQ
+conP n ps = do ps' <- sequence ps
+               return (ConP n ps')
+infixP :: PatQ -> Name -> PatQ -> PatQ
+infixP p1 n p2 = do p1' <- p1
+                    p2' <- p2
+                    return (InfixP p1' n p2')
+tildeP :: PatQ -> PatQ
+tildeP p = do p' <- p
+              return (TildeP p')
+asP :: Name -> PatQ -> PatQ
+asP n p = do p' <- p
+             return (AsP n p')
+wildP :: PatQ
+wildP = return WildP
+recP :: Name -> [FieldPatQ] -> PatQ
+recP n fps = do fps' <- sequence fps
+                return (RecP n fps')
+listP :: [PatQ] -> PatQ
+listP ps = do ps' <- sequence ps
+              return (ListP ps')
+sigP :: PatQ -> TypeQ -> PatQ
+sigP p t = do p' <- p
+              t' <- t
+              return (SigP p' t')
 
-fieldPat :: Name -> Pat -> (Name, Pat)
-fieldPat = (,)
+fieldPat :: Name -> PatQ -> FieldPatQ
+fieldPat n p = do p' <- p
+                  return (n, p')
 
 
 -------------------------------------------------------------------------------
 --     Stmt
 
-bindS :: Pat -> ExpQ -> StmtQ
-bindS p e = liftM (BindS p) e
+bindS :: PatQ -> ExpQ -> StmtQ
+bindS p e = liftM2 BindS p e
 
 letS :: [DecQ] -> StmtQ
 letS ds = do { ds1 <- sequence ds; return (LetS ds1) }
@@ -105,22 +122,40 @@ fromThenToR x y z = do { a <- x; b <- y; c <- z;
 normalB :: ExpQ -> BodyQ
 normalB e = do { e1 <- e; return (NormalB e1) }
 
-guardedB :: [(ExpQ,ExpQ)] -> BodyQ
-guardedB ges = do { ges' <- mapM f ges; return (GuardedB ges') }
-    where f (g, e) = do { g' <- g; e' <- e; return (g', e') }
+guardedB :: [Q (Guard,Exp)] -> BodyQ
+guardedB ges = do { ges' <- sequence ges; return (GuardedB ges') }
+
+-------------------------------------------------------------------------------
+--     Guard
+
+normalG :: ExpQ -> GuardQ
+normalG e = do { e1 <- e; return (NormalG e1) }
+
+normalGE :: ExpQ -> ExpQ -> Q (Guard, Exp)
+normalGE g e = do { g1 <- g; e1 <- e; return (NormalG g1, e1) }
+
+patG :: [StmtQ] -> GuardQ
+patG ss = do { ss' <- sequence ss; return (PatG ss') }
+
+patGE :: [StmtQ] -> Q (Guard, Exp)
+patGE ss = do { ss' <- sequence ss;
+                let {NoBindS e = last ss'};
+                return (PatG (init ss'), e) }
 
 -------------------------------------------------------------------------------
 --     Match and Clause
 
-match :: Pat -> BodyQ -> [DecQ] -> MatchQ
-match p rhs ds = do { r' <- rhs;
+match :: PatQ -> BodyQ -> [DecQ] -> MatchQ
+match p rhs ds = do { p' <- p;
+                      r' <- rhs;
                       ds' <- sequence ds;
-                      return (Match p r' ds') }
+                      return (Match p' r' ds') }
 
-clause :: [Pat] -> BodyQ -> [DecQ] -> ClauseQ
-clause ps r ds = do { r' <- r;
+clause :: [PatQ] -> BodyQ -> [DecQ] -> ClauseQ
+clause ps r ds = do { ps' <- sequence ps;
+                      r' <- r;
                       ds' <- sequence ds;
-                      return (Clause ps r' ds') }
+                      return (Clause ps' r' ds') }
 
 
 ---------------------------------------------------------------------------
@@ -160,10 +195,12 @@ sectionL x y = infixE (Just x) y Nothing
 sectionR :: ExpQ -> ExpQ -> ExpQ
 sectionR x y = infixE Nothing x (Just y)
 
-lamE :: [Pat] -> ExpQ -> ExpQ
-lamE ps e = liftM (LamE ps) e
+lamE :: [PatQ] -> ExpQ -> ExpQ
+lamE ps e = do ps' <- sequence ps
+               e' <- e
+               return (LamE ps' e')
 
-lam1E :: Pat -> ExpQ -> ExpQ    -- Single-arg lambda
+lam1E :: PatQ -> ExpQ -> ExpQ    -- Single-arg lambda
 lam1E p e = lamE [p] e
 
 tupE :: [ExpQ] -> ExpQ
@@ -223,11 +260,12 @@ fieldExp s e = do { e' <- e; return (s,e') }
 -------------------------------------------------------------------------------
 --     Dec
 
-valD :: Pat -> BodyQ -> [DecQ] -> DecQ
+valD :: PatQ -> BodyQ -> [DecQ] -> DecQ
 valD p b ds = 
-  do { ds' <- sequence ds
+  do { p' <- p
+     ; ds' <- sequence ds
      ; b' <- b
-     ; return (ValD p b' ds')
+     ; return (ValD p' b' ds')
      }
 
 funD :: Name -> [ClauseQ] -> DecQ
@@ -361,6 +399,10 @@ rename (TupP pats) = do { pairs <- mapM rename pats; g(combine pairs) }
    where g (es,ps) = return (es,TupP ps)
 rename (ConP nm pats) = do { pairs <- mapM rename pats; g(combine pairs) }
    where g (es,ps) = return (es,ConP nm ps)
+rename (InfixP p1 n p2) = do { r1 <- rename p1;
+                               r2 <- rename p2;
+                               let {(env, [p1', p2']) = combine [r1, r2]};
+                               return (env, InfixP p1' n p2') }
 rename (TildeP p) = do { (env,p2) <- rename p; return(env,TildeP p2) }   
 rename (AsP s p) = 
    do { s1 <- newName (nameBase s); (env,p2) <- rename p; return((s,s1):env,AsP s1 p2) }
