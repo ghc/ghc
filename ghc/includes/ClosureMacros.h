@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.5 1999/03/02 19:44:08 sof Exp $
+ * $Id: ClosureMacros.h,v 1.6 1999/03/03 18:16:15 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -106,24 +106,36 @@ extern StgFun DATA_SECTION_END_MARKER_DECL;
 #define IS_USER_PTR(p) ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER)
 
 #ifdef HAVE_WIN32_DLL_SUPPORT
-/* ToDo: clean up */
-extern char* base_non_committed;
-#define HEAP_ALLOCED(x)  (((char*)(x) >= base_non_committed) && ((char*)(x) <= (base_non_committed + 128 * 1024 * 1024)))
+extern int is_heap_alloced(const void* x);
+#define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #endif
 
-#ifndef HAVE_WIN32_DLL_SUPPORT
-#define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
-#else
-/* Static closures are 'identified' by being prefixed with a zero. This is
-   so that they can be distinguished from pointers to info tables. Relies
-   on the fact that info tables are reversed.
+/* When working with Win32 DLLs, static closures are identified by
+   being prefixed with a zero word. This is needed so that we can
+   distinguish between pointers to static closures and (reversed!)
+   info tables.
+
+   This 'scheme' breaks down for closure tables such as CHARLIKE,
+   so we catch these separately.
    
-   LOOKS_LIKE_STATIC_CLOSURE() - discriminates between static closures and info tbls
-                                 (needed by LOOKS_LIKE_GHC_INFO() below - [Win32 DLLs only.])
-   LOOKS_LIKE_STATIC() - distinguishes between static and heap allocated data.
+   LOOKS_LIKE_STATIC_CLOSURE() 
+       - discriminates between static closures and info tbls
+         (needed by LOOKS_LIKE_GHC_INFO() below - [Win32 DLLs only.])
+   LOOKS_LIKE_STATIC() 
+       - distinguishes between static and heap allocated data.
  */
+#ifdef HAVE_WIN32_DLL_SUPPORT
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
-#define LOOKS_LIKE_STATIC_CLOSURE(r) ((*(((unsigned long *)(r))-1)) == 0)
+
+/* Tiresome predicates needed to check for pointers into the closure tables */
+#define IS_BOOL_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,PrelBase_Bool_closure_tbl) && stgCast(char*,p) <= (stgCast(char*,PrelBase_Bool_closure_tbl) + 2 * sizeof(StgClosure)))
+#define IS_CHARLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,CHARLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,CHARLIKE_closure) + 255 * sizeof(StgIntCharlikeClosure)))
+#define IS_INTLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,INTLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,INTLIKE_closure) + 32 * sizeof(StgIntCharlikeClosure)))
+
+#define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r) || IS_BOOL_CLOSURE(r))
+#else
+#define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
+#define LOOKS_LIKE_STATIC_CLOSURE(r) IS_DATA_PTR(r)
 #endif
 
 
