@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.74 2003/01/23 12:13:12 simonmar Exp $
+ * $Id: Storage.c,v 1.75 2003/01/29 10:28:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,10 +39,10 @@ nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
 StgPtr alloc_Hp    = NULL;	/* next free byte in small_alloc_list */
 StgPtr alloc_HpLim = NULL;	/* end of block at small_alloc_list   */
 
-generation *generations;	/* all the generations */
-generation *g0;			/* generation 0, for convenience */
-generation *oldest_gen;		/* oldest generation, for convenience */
-step *g0s0;			/* generation 0, step 0, for convenience */
+generation *generations = NULL;	/* all the generations */
+generation *g0		= NULL; /* generation 0, for convenience */
+generation *oldest_gen  = NULL; /* oldest generation, for convenience */
+step *g0s0 		= NULL; /* generation 0, step 0, for convenience */
 
 lnat total_allocated = 0;	/* total memory allocated during run */
 
@@ -67,6 +67,11 @@ initStorage( void )
   nat g, s;
   step *stp;
   generation *gen;
+
+  if (generations != NULL) {
+      // multi-init protection
+      return;
+  }
 
     /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
      * doing something reasonable.
