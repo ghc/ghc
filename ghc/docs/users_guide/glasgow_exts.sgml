@@ -1506,109 +1506,26 @@ For example,
 <Para>
 
 <ProgramListing>
-typedef unsigned long *StgForeignObj;
-typedef long StgInt;
+#include "HsFFI.h"
 
-void          initialiseEFS (StgInt size);
-StgInt        terminateEFS (void);
-StgForeignObj emptyEFS(void);
-StgForeignObj updateEFS (StgForeignObj a, StgInt i, StgInt x);
-StgInt        lookupEFS (StgForeignObj a, StgInt i);
+void         initialiseEFS (HsInt size);
+HsInt        terminateEFS (void);
+HsForeignObj emptyEFS(void);
+HsForeignObj updateEFS (HsForeignObj a, HsInt i, HsInt x);
+HsInt        lookupEFS (HsForeignObj a, HsInt i);
 </ProgramListing>
-
 </Para>
 
-<Para>
-You can find appropriate definitions for <Literal>StgInt</Literal>, <Literal>StgForeignObj</Literal>,
-etc using <Command>gcc</Command> on your architecture by consulting
-<Filename>ghc/includes/StgTypes.h</Filename>.  The following table summarises the
-relationship between Haskell types and C types.
-</Para>
+      <para>The types <literal>HsInt</literal>,
+      <literal>HsForeignObj</literal> etc. are described in <xref
+      linkend="sec-mapping-table">.</Para>
 
-<Para>
-
-<InformalTable>
-<TGroup Cols="2">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<TBody>
-<Row>
-<Entry><Emphasis>C type name</Emphasis> </Entry>
-<Entry> <Emphasis>Haskell Type</Emphasis> </Entry>
-</Row>
-
-<Row>
-<Entry>
-<Literal>StgChar</Literal> </Entry>
-<Entry> <Literal>Char&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgInt</Literal> </Entry>
-<Entry> <Literal>Int&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgWord</Literal> </Entry>
-<Entry> <Literal>Word&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgAddr</Literal> </Entry>
-<Entry> <Literal>Addr&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgFloat</Literal> </Entry>
-<Entry> <Literal>Float&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgDouble</Literal> </Entry>
-<Entry> <Literal>Double&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgArray</Literal> </Entry>
-<Entry> <Literal>Array&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgByteArray</Literal> </Entry>
-<Entry> <Literal>ByteArray&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgArray</Literal> </Entry>
-<Entry> <Literal>MutableArray&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgByteArray</Literal> </Entry>
-<Entry> <Literal>MutableByteArray&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgStablePtr</Literal> </Entry>
-<Entry> <Literal>StablePtr&num;</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StgForeignObj</Literal> </Entry>
-<Entry> <Literal>ForeignObj&num;</Literal></Entry>
-</Row>
-</TBody>
-
-</TGroup>
-</InformalTable>
-</Para>
-
-<Para>
-Note that this approach is only <Emphasis>essential</Emphasis> for returning
-<Literal>float</Literal>s (or if <Literal>sizeof(int) != sizeof(int *)</Literal> on your
-architecture) but is a Good Thing for anyone who cares about writing
-solid code.  You're crazy not to do it.
-</Para>
+      <Para>Note that this approach is only
+      <Emphasis>essential</Emphasis> for returning
+      <Literal>float</Literal>s (or if <Literal>sizeof(int) !=
+      sizeof(int *)</Literal> on your architecture) but is a Good
+      Thing for anyone who cares about writing solid code.  You're
+      crazy not to do it.</Para>
 
 </Sect2>
 
