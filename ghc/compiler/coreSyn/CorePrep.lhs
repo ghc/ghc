@@ -160,9 +160,11 @@ corePrepRecPairs env pairs
     bndrs = map fst pairs
 
 corePrepRhs :: CloneEnv -> (Id, CoreExpr) -> UniqSM CoreExpr
+	-- Used for top-level bindings, and local recursive bindings
+	-- c.f. mkLocalNonRec, which does the other case
+	-- No nonsense about floating.
+	-- Prepare the RHS and eta expand it. 
 corePrepRhs env (bndr, rhs)
--- Prepare the RHS and eta expand it. 
--- No nonsense about floating
   = corePrepAnExpr env rhs	`thenUs` \ rhs' ->
     getUniquesUs		`thenUs` \ us ->
     returnUs (etaExpand (exprArity rhs') us rhs' (idType bndr))
@@ -416,6 +418,9 @@ mkLocalNonRec bndr dem floats rhs
 	-- because floating the case would make it evaluated too early
 	--
 	-- Finally, eta-expand the RHS, for the benefit of the code gen
+	-- This might not have happened already, because eta expansion
+	-- is done by the simplifier only when there at least one lambda already.
+	--
 	-- NB: we could refrain when the RHS is trivial (which can happen
 	--     for exported things.  This would reduce the amount of code
 	--     generated (a little) and make things a little words for
