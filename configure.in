@@ -432,6 +432,10 @@ AC_ARG_WITH(gcc,
         Use a different command instead of 'gcc' for the GNU C compiler.
 ],
 [WhatGccIsCalled="$withval"
+ if test "x$HostPlatform" = "xi386-unknown-mingw32"; then
+    # Canonicalise to <drive>:/path/to/gcc
+    withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+ fi;
  CC="$withval"],
 [WhatGccIsCalled="gcc"]
 )
