@@ -106,7 +106,6 @@ exeext=@exeext@
 # projects use others you must list them in the correct order.
 #
 # Generally: 	* glafp-utils should be first
-#		* literate next
 #		* happy next
 #		* ghc next
 #		then it's up to you
@@ -145,7 +144,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 # 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.00
+GhcProjectVersion      = 3.01
 GhcProjectPatchLevel   = 0
 
 #---------------------------------------------------------------
