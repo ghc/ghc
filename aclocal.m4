@@ -24,6 +24,40 @@ AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
 ])# FP_ALTZONE
 
 
+# FP_COMPUTE_INT(EXPRESSION, VARIABLE, INCLUDES, IF-FAILS)
+# ---------------------------------------------------------
+# Assign VARIABLE the value of the compile-time EXPRESSION using INCLUDES for
+# compilation. Execute IF-FAILS when unable to determine the value. Works for
+# cross-compilation, too.
+# Note: We are lazy and use an internal autoconf macro, but it is supported in
+# autoconf versions 2.50 up to the actual 2.57, so there is little risk.
+AC_DEFUN([FP_COMPUTE_INT],
+[_AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
+])# FP_COMPUTE_INT
+
+
+# FP_CHECK_ALIGNMENT(TYPE, [IGNORED], [INCLUDES = DEFAULT-INCLUDES])
+# ------------------------------------------------------------------
+# A variation of AC_CHECK_SIZEOF for computing the alignment restrictions of a
+# given type. Defines ALIGNMENT_TYPE.
+AC_DEFUN([FP_CHECK_ALIGNMENT],
+[AS_LITERAL_IF([$1], [],
+               [AC_FATAL([$0: requires literal arguments])])dnl
+AC_CHECK_TYPE([$1], [], [], [$3])
+AC_CACHE_CHECK([alignment of $1], AS_TR_SH([fp_cv_alignment_$1]),
+[if test "$AS_TR_SH([ac_cv_type_$1])" = yes; then
+  FP_COMPUTE_INT([(long) (&((struct { char c; $1 ty; } *)0)->ty)],
+                 [AS_TR_SH([fp_cv_alignment_$1])],
+                 [AC_INCLUDES_DEFAULT([$3])],
+                 [AC_MSG_FAILURE([cannot compute alignment ($1), 77])])
+else
+  AS_TR_SH([fp_cv_alignment_$1])=0
+fi])dnl
+AC_DEFINE_UNQUOTED(AS_TR_CPP(alignment_$1), $AS_TR_SH([fp_cv_alignment_$1]),
+                   [The alignment of a `$1'.])
+])# FP_CHECK_ALIGNMENT
+
+
 dnl ** check for leading underscores in symbol names
 dnl 
 dnl Test for determining whether symbol names have a leading
@@ -530,49 +564,6 @@ ifelse($#, [1], [dnl
 ])
 ])dnl
 
-
-dnl ** figure out the alignment restriction of a type
-dnl    (required SIZEOF test but AC_CHECK_SIZEOF doesn't call PROVIDE
-dnl     so we can't call REQUIRE)
-
-dnl FPTOOLS_CHECK_ALIGNMENT(TYPE)
-AC_DEFUN(FPTOOLS_CHECK_ALIGNMENT,
-[changequote(<<, >>)dnl
-dnl The name to #define.
-define(<<AC_TYPE_NAME>>, translit(alignment_$1, [a-z *], [A-Z_P]))dnl
-dnl The cache variable name.
-define(<<AC_CV_NAME>>, translit(ac_cv_alignment_$1, [ *], [_p]))dnl
-dnl The name of the corresponding size.
-define(<<AC_CV_SIZEOF_NAME>>, translit(ac_cv_sizeof_$1, [ *], [_p]))dnl
-changequote([, ])dnl
-AC_MSG_CHECKING(alignment of $1)
-AC_CACHE_VAL(AC_CV_NAME,
-[AC_TRY_RUN([
-#include <stdio.h>
-#if HAVE_STDDEF_H
-#include <stddef.h>
-#endif
-#ifndef offsetof
-#define offsetof(ty,field) ((size_t)((char *)&((ty *)0)->field - (char *)(ty *)0))
-#endif
-int
-main()
-{
-  FILE *f=fopen("conftestval", "w");
-  if (!f) exit(1);
-  fprintf(f, "%d", offsetof(struct { char c; $1 ty;},ty));
-  exit(0);
-}],
-AC_CV_NAME=`cat conftestval`,
-AC_CV_NAME=$AC_CV_SIZEOF_NAME,
-AC_CV_NAME=$AC_CV_SIZEOF_NAME)])
-AC_MSG_RESULT($AC_CV_NAME)
-AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
-AC_PROVIDE($AC_TYPE_NAME)
-undefine([AC_TYPE_NAME])dnl
-undefine([AC_CV_NAME])dnl
-undefine([AC_CV_SIZEOF_NAME])dnl
-])
 
 dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.

@@ -851,43 +851,42 @@ FPTOOLS_MSGHDR_MSG_ACCRIGHTS
 FPTOOLS_MSGHDR_MSG_CONTROL
 
 dnl ** what are the sizes of various types
-dnl    (these must come before GHC_CHECK_ALIGNMENT)
 AC_CHECK_SIZEOF(char,               1)
 AC_CHECK_SIZEOF(double,             8)
 AC_CHECK_SIZEOF(float,              4)
 AC_CHECK_SIZEOF(int,                4)
 AC_CHECK_SIZEOF(long,               4)
-if test "$fptools_cv_have_long_long" = yes; then
+if test "$ac_cv_type_long_long" = yes; then
 AC_CHECK_SIZEOF(long long,          8)
 fi
 AC_CHECK_SIZEOF(short,              2)
 AC_CHECK_SIZEOF(unsigned char,      1)
 AC_CHECK_SIZEOF(unsigned int,       4)
 AC_CHECK_SIZEOF(unsigned long,      4)
-if test "$fptools_cv_have_long_long" = yes; then
+if test "$ac_cv_type_long_long" = yes; then
 AC_CHECK_SIZEOF(unsigned long long, 8)
 fi
 AC_CHECK_SIZEOF(unsigned short,     2)
 AC_CHECK_SIZEOF(void *,             4)
 
 dnl ** what are alignment constraints on various types
-FPTOOLS_CHECK_ALIGNMENT(char)
-FPTOOLS_CHECK_ALIGNMENT(double)
-FPTOOLS_CHECK_ALIGNMENT(float)
-FPTOOLS_CHECK_ALIGNMENT(int)
-FPTOOLS_CHECK_ALIGNMENT(long)
-if test "$fptools_cv_have_long_long" = yes; then
-FPTOOLS_CHECK_ALIGNMENT(long long)
+FP_CHECK_ALIGNMENT(char)
+FP_CHECK_ALIGNMENT(double)
+FP_CHECK_ALIGNMENT(float)
+FP_CHECK_ALIGNMENT(int)
+FP_CHECK_ALIGNMENT(long)
+if test "$ac_cv_type_long_long" = yes; then
+FP_CHECK_ALIGNMENT(long long)
 fi
-FPTOOLS_CHECK_ALIGNMENT(short)
-FPTOOLS_CHECK_ALIGNMENT(unsigned char)
-FPTOOLS_CHECK_ALIGNMENT(unsigned int)
-FPTOOLS_CHECK_ALIGNMENT(unsigned long)
-if test "$fptools_cv_have_long_long" = yes; then
-FPTOOLS_CHECK_ALIGNMENT(unsigned long long)
+FP_CHECK_ALIGNMENT(short)
+FP_CHECK_ALIGNMENT(unsigned char)
+FP_CHECK_ALIGNMENT(unsigned int)
+FP_CHECK_ALIGNMENT(unsigned long)
+if test "$ac_cv_type_long_long" = yes; then
+FP_CHECK_ALIGNMENT(unsigned long long)
 fi
-FPTOOLS_CHECK_ALIGNMENT(unsigned short)
-FPTOOLS_CHECK_ALIGNMENT(void *)
+FP_CHECK_ALIGNMENT(unsigned short)
+FP_CHECK_ALIGNMENT(void *)
 
 dnl ** map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
@@ -899,7 +898,7 @@ FPTOOLS_CHECK_HTYPE(int)
 FPTOOLS_CHECK_HTYPE(unsigned int)
 FPTOOLS_CHECK_HTYPE(long)
 FPTOOLS_CHECK_HTYPE(unsigned long)
-if test "$fptools_cv_have_long_long" = yes; then
+if test "$ac_cv_type_long_long" = yes; then
 FPTOOLS_CHECK_HTYPE(long long)
 FPTOOLS_CHECK_HTYPE(unsigned long long)
 fi
