@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.32 2003/07/18 14:39:05 simonmar Exp $
+ * $Id: Updates.h,v 1.33 2003/07/28 16:05:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,13 +132,6 @@
 /* -----------------------------------------------------------------------------
    Awaken any threads waiting on this computation
    -------------------------------------------------------------------------- */
-
-#define AWAKEN_BQ_CLOSURE(closure)			\
-  {							\
-      const StgInfoTable *info;				\
-      info = ((StgClosure *)closure)->header.info;	\
-      AWAKEN_BQ(info,closure);				\
-  }
 
 #if defined(PAR) 
 

@@ -36,7 +36,7 @@
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
-ProjectVersion    = 6.1
+ProjectVersion = 6.1.20030727
 ProjectVersionInt = 601
 ProjectPatchLevel = 0
 

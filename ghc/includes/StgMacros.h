@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.53 2003/04/28 10:02:15 simonmar Exp $
+ * $Id: StgMacros.h,v 1.54 2003/07/28 16:05:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -463,8 +463,6 @@ EXTFUN_RTS(stg_gen_block);
 #  define UPD_BH_UPDATABLE(thunk)    /* nothing */
 #  define UPD_BH_SINGLE_ENTRY(thunk) /* nothing */
 #endif /* EAGER_BLACKHOLING */
-
-#define UPD_FRAME_UPDATEE(p)  ((P_)(((StgUpdateFrame *)(p))->updatee))
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles

@@ -1,14 +1,14 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.38 2003/07/18 14:39:06 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.39 2003/07/28 16:05:35 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
 module CgHeapery (
 	funEntryChecks, altHeapCheck, unbxTupleHeapCheck, thunkChecks,
-	allocDynClosure, inPlaceAllocDynClosure
+	allocDynClosure,
 
         -- new functions, basically inserting macro calls into Code -- HWL
         ,fetchAndReschedule, yield
@@ -367,39 +367,4 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
   where
     closure_size = closureSize closure_info
     slop_size    = slopSize closure_info
-\end{code}
-
-Occasionally we can update a closure in place instead of allocating
-new space for it.  This is the function that does the business, assuming:
-
-	- the new closure doesn't contain any pointers if we're
-	  using a generational collector.
-
-\begin{code}
-inPlaceAllocDynClosure
-	:: ClosureInfo
-	-> CAddrMode		-- Pointer to beginning of closure
-	-> CAddrMode		-- Cost Centre to stick in the object
-
-	-> [(CAddrMode, VirtualHeapOffset)]	-- Offsets from start of the object
-						-- ie Info ptr has offset zero.
-	-> Code
-
-inPlaceAllocDynClosure closure_info head use_cc amodes_with_offsets
-  = let	-- do_move IS THE ASSIGNMENT FUNCTION
-	 do_move (amode, offset_from_start)
-	   = CAssign (CVal (CIndex head (mkIntCLit offset_from_start) WordRep)
-		     	(getAmodeRep amode))
-		     amode
-    in
-	-- GENERATE THE CODE
-    absC ( mkAbstractCs (
-	   [ 
-		-- don't forget to AWAKEN_BQ_CLOSURE: even though we're
-		-- doing update-in-place, the thunk might still have been
-		-- blackholed and another thread might be waiting on it.
-		CMacroStmt AWAKEN_BQ_CLOSURE [head],
-	        CInitHdr closure_info head use_cc 0{-no alloc-}
- 	   ]
-	   ++ (map do_move amodes_with_offsets)))
 \end{code}

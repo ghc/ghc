@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.32 2002/12/11 15:36:22 simonmar Exp $
+% $Id: Costs.lhs,v 1.33 2003/07/28 16:05:30 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -301,7 +301,6 @@ exprMacroCosts side macro mode_list =
     ENTRY_CODE -> nullCosts -- nothing 
     ARG_TAG -> nullCosts -- nothing
     GET_TAG -> Cost (0, 0, 1, 0, 0)  -- indirect load
-    UPD_FRAME_UPDATEE -> Cost (0, 0, 1, 0, 0)  -- indirect load
 
 -- ---------------------------------------------------------------------------
 

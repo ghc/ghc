@@ -214,10 +214,6 @@ amodeToStix (CMacroExpr _ macro [arg])
                                                 (StInt (toInteger (-1)))),
 			 StInt 16]
 #endif
-      UPD_FRAME_UPDATEE
-         -> StInd PtrRep (StIndex PtrRep arg_amode 
-                                         (StInt (toInteger uF_UPDATEE)))
-
       BYTE_ARR_CTS -> StIndex IntRep arg_amode arrWordsHS
       PTRS_ARR_CTS -> StIndex PtrRep arg_amode arrPtrsHS
       ForeignObj_CLOSURE_DATA -> StInd PtrRep (StIndex PtrRep arg_amode fixedHS)

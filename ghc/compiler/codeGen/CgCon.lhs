@@ -32,7 +32,7 @@ import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
 import CgRetConv	( assignRegs )
 import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE,
 			  mIN_UPD_SIZE )
-import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
+import CgHeapery	( allocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode,
 			  returnUnboxedTuple )
 import CLabel		( mkClosureLabel )
@@ -315,47 +315,6 @@ cgReturnDataCon con amodes
 	  is_elem = isIn "cgReturnDataCon"
 	  jump_to_join_point sequel = absC (CJump (CLbl deflt_lbl CodePtrRep))
 		-- Ignore the sequel: we've already looked at it above
-
-	-- If the sequel is an update frame, we might be able to
-	-- do update in place...
-      UpdateCode
-	|  not (isNullaryDataCon con)  -- no nullary constructors, please
-	&& not (any isFollowableRep (map getAmodeRep amodes))
-					-- no ptrs please (generational gc...)
-	&& closureSize closure_info <= mIN_UPD_SIZE
-					-- don't know the real size of the
-					-- thunk, so assume mIN_UPD_SIZE
-
-	-> 	-- get a new temporary and make it point to the updatee
-	   let 
-		uniq = getUnique con
-	       	temp = CTemp uniq PtrRep 
-	   in
-
-	   profCtrC FSLIT("TICK_UPD_CON_IN_PLACE") 
-			[mkIntCLit (length amodes)] `thenC`
-
-	   getSpRelOffset args_sp			`thenFC` \ sp_rel ->
-	   absC (CAssign temp 
-		    (CMacroExpr PtrRep UPD_FRAME_UPDATEE [CAddr sp_rel])) 
-		`thenC`
-
-	   	-- stomp all over it with the new constructor
-	   inPlaceAllocDynClosure closure_info temp (CReg CurCostCentre) stuff 
-		`thenC`
-
-		-- set Node to point to the closure being returned
-		-- (can't be done earlier: node might conflict with amodes)
-	   absC (CAssign (CReg node) temp) `thenC`
-
-	   	-- pop the update frame off the stack, and do the proper
-	   	-- return.
-	   let new_sp = args_sp - updateFrameSize in
-	   setEndOfBlockInfo (EndOfBlockInfo new_sp (OnStack new_sp)) $
-	   performReturn (AbsCNop) (mkStaticAlgReturnCode con)
-
-	where
-	   (closure_info, stuff) = layOutDynConstr con getAmodeRep amodes
 
       other_sequel	-- The usual case
 	  | isUnboxedTupleCon con -> returnUnboxedTuple amodes

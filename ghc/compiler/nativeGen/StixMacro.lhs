@@ -116,23 +116,6 @@ macroCode SET_TAG [tag]
 -----------------------------------------------------------------------------
 
 \begin{code}
-macroCode AWAKEN_BQ_CLOSURE [arg]
-  =  getUniqLabelNCG		`thenUs` \ label ->
-     let
-	info = StInd AddrRep arg
-	cond = StMachOp MO_Nat_Ne [info, bq_info ]
-	jump = StCondJump label cond
-	blocking_queue = StInd PtrRep 
-			  (StIndex PtrRep arg (StInt (toInteger fixedHdrSize)))
-        call = StVoidable (StCall (Left FSLIT("awakenBlockedQueue")) 
-		 		CCallConv VoidRep [blocking_queue])
-     in
-     returnUs ( \xs -> jump : call : StLabel label : xs )
-\end{code}
-
------------------------------------------------------------------------------
-
-\begin{code}
 macroCode REGISTER_IMPORT [arg]
    = returnUs (
 	\xs -> StAssignMem WordRep (StReg stgSp) arg

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.54 2003/07/18 14:39:06 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.55 2003/07/28 16:05:30 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -251,8 +251,6 @@ data CStmtMacro
       -- dataToTag# primop -- *only* used in unregisterised builds.
       -- (see AbsCUtils.dsCOpStmt)
   | DATA_TO_TAGZH
-  | AWAKEN_BQ_CLOSURE			-- possibly awaken a blocking quuee
-					-- (used for in-place updates)
 
   | REGISTER_FOREIGN_EXPORT		-- register a foreign exported fun
   | REGISTER_IMPORT			-- register an imported module
@@ -365,7 +363,6 @@ data CExprMacro
   = ENTRY_CODE
   | ARG_TAG				-- stack argument tagging
   | GET_TAG				-- get current constructor tag
-  | UPD_FRAME_UPDATEE
   | CCS_HDR
   | BYTE_ARR_CTS		-- used when passing a ByteArray# to a ccall
   | PTRS_ARR_CTS		-- similarly for an Array#
