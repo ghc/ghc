@@ -23,6 +23,7 @@
 #include "Capability.h"
 
 
+static
 void
 initCapability( Capability *cap )
 {
@@ -32,31 +33,56 @@ initCapability( Capability *cap )
     cap->f.stgUpdatePAP    = (F_)__stg_update_PAP;
 }
 
+#ifdef SMP
+static void initCapabilities_(nat n);
+#endif
+
+/* 
+ */
+void
+initCapabilities()
+{
+#if defined(SMP)
+  initCapabilities_(RtsFlags.ParFlags.nNodes);
+#else
+  initCapability(&MainCapability);
+#endif
+
+  return;
+}
+
 /* Free capability list.
  * Locks required: sched_mutex.
  */
 #if defined(SMP)
 static Capability *free_capabilities; /* Available capabilities for running threads */
-
+#endif
 
 void grabCapability(Capability** cap)
 {
+#if !defined(SMP)
+  *cap = &MainCapability;
+#else
   *cap = free_capabilities;
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
+#endif
 }
 
 void releaseCapability(Capability** cap)
 {
+#if defined(SMP)
   (*cap)->link = free_capabilities;
   free_capabilities = *cap;
   rts_n_free_capabilities++;
+#endif
   return;
 }
 
+#if defined(SMP)
 /* Allocate 'n' capabilities */
-void
-initCapabilities(nat n)
+static void
+initCapabilities_(nat n)
 {
   nat i;
   Capability *cap, *prev;

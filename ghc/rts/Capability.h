@@ -24,7 +24,14 @@
 #include "RtsFlags.h"
 /* ToDo: assume that RtsFlags.h has been included at usage sites of Capability.h? */
 
-extern void initCapability(Capability* cap);
+#if !defined(SMP)
+Capability MainCapability;
+#endif
+
+extern void initCapabilities(void);
+extern void grabCapability(Capability** cap);
+extern void releaseCapability(Capability** cap);
+
 #if defined(SMP)
 extern nat rts_n_free_capabilities;  /* total number of available capabilities */
 
@@ -43,9 +50,6 @@ static inline rtsBool allFreeCapabilities()
   return (rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);
 }
 
-extern void initCapabilities(nat n);
-extern void grabCapability(Capability** cap);
-extern void releaseCapability(Capability** cap);
 #endif /* SMP */
 
 #endif /* __CAPABILITY_H__ */
