@@ -1,3 +1,29 @@
+-----------------------------------------------------------------------
+-- $Id: primops.txt,v 1.2 2000/08/21 13:34:06 simonmar Exp $
+--
+-- Primitive Operations
+--
+-----------------------------------------------------------------------
+
+-- To add a new primop, you currently need to update the following files:
+--
+--	- this file (ghc/compiler/prelude/primops.txt), which includes
+--	  the type of the primop, and various other properties (its
+--	  strictness attributes, whether it is defined as a macro
+--	  or as out-of-line code, etc.)
+--
+--	- ghc/lib/std/PrelGHC.hi-boot, to declare the primop
+--
+--	- if the primop is inline (i.e. a macro), then:
+--		ghc/includes/PrimOps.h
+--		ghc/compiler/nativeGen/StixPrim.lhs
+--
+--	- or, for an out-of-line primop:
+--	        ghc/includes/PrimOps.h (just add the declaration)
+--		ghc/rts/PrimOps.hc     (define it here)
+--
+--	- the User's Guide
+--
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
@@ -14,7 +40,6 @@ defaults
    can_fail         = False
    strictness       = { \ arity -> StrictnessInfo (replicate arity wwPrim) False }
    usage            = { nomangle other }
-
 
 ------------------------------------------------------------------------
 --- Addr#                                                            ---
@@ -929,6 +954,14 @@ primop  WriteForeignObjOp "writeForeignObj#" GenPrimOp
    ForeignObj# -> Addr# -> State# s -> State# s
    with
    has_side_effects = True
+
+primop ForeignObjToAddrOp "foreignObjToAddr#" GenPrimOp
+   ForeignObj# -> Addr#
+
+primop TouchOp "touch#" GenPrimOp
+   o -> State# RealWorld -> State# RealWorld
+   with
+   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
 
 ------------------------------------------------------------------------
 --- Bytecode objects                                                 ---
