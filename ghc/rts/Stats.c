@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.26 2001/07/02 13:02:29 rrt Exp $
+ * $Id: Stats.c,v 1.27 2001/07/02 13:52:10 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -56,7 +56,7 @@
 #include <windows.h>
 #endif
 
-#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(_WIN32))
+#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS))
 #include <sys/resource.h>
 #endif
 
@@ -117,7 +117,7 @@ static nat   pageFaults(void);
     (ll) /= (unsigned long long) (NS_PER_SEC / CLOCKS_PER_SEC)
 #endif
 
-#ifdef defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 /* cygwin32 or mingw32 version */
 static void
 getTimes(void)
@@ -131,7 +131,7 @@ getTimes(void)
     if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
 		          &exitTime, &kernelTime, &userTime)) {
 	/* Probably on a Win95 box..*/
-	return 0;
+	return;
     }
 
     FT2longlong(kT,kernelTime);
@@ -162,7 +162,7 @@ getTimes(void)
 #endif
 
 }
-#endif /* !_WIN32 */
+#endif /* !win32 */
 
 /* mut_user_time_during_GC() and mut_user_time()
  *
@@ -194,7 +194,7 @@ pageFaults(void)
 {
   /* ToDo (on NT): better, get this via the performance data
      that's stored in the registry. */
-# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(_WIN32)
+# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
     return 0;
 # else
     struct rusage t;
