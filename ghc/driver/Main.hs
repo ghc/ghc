@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.57 2000/09/07 16:31:45 simonpj Exp $
+-- $Id: Main.hs,v 1.58 2000/09/12 13:19:20 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -325,6 +325,7 @@ data HscLang
   = HscC
   | HscAsm
   | HscJava
+  deriving Eq
 
 GLOBAL_VAR(hsc_lang, if cGhcWithNativeCodeGen == "YES" && 
 			 (prefixMatch "i386" cTARGETPLATFORM ||
@@ -1134,6 +1135,7 @@ main =
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, todo, stop_flag) <- getToDo argv'
+   writeIORef v_todo todo
 
 	-- process all the other arguments, and get the source files
    srcs <- processArgs driver_opts flags2 []
@@ -1184,6 +1186,8 @@ main =
 
 data ToDo = DoMkDependHS | DoMkDLL | StopBefore Phase | DoLink
   deriving (Eq)
+
+GLOBAL_VAR(v_todo, error "todo", ToDo)
 
 todoFlag :: String -> Maybe ToDo
 todoFlag "-M" = Just $ DoMkDependHS
@@ -1270,17 +1274,21 @@ genPipeline todo stop_flag filename
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
-    start_phase = startPhase suffix
-
     (_basename, suffix) = splitFilename filename
+
+    start_phase = startPhase suffix
 
     haskell_ish_file = suffix `elem` [ "hs", "lhs", "hc" ]
     c_ish_file       = suffix `elem` [ "c", "s", "S" ]  -- maybe .cc et al.??
 
-	-- hack for .hc files
-    real_lang | suffix == "hc" = HscC
-	      | otherwise      = lang
+   -- for a .hc file, or if the -C flag is given, we need to force lang to HscC
+    real_lang 
+	| suffix == "hc"  = HscC
+	| todo == StopBefore HCc && lang /= HscC && haskell_ish_file = HscC
+	| otherwise = lang
 
+   let
+   ----------- -----  ----   ---   --   --  -  -  -
     pipeline
       | todo == DoMkDependHS = [ Unlit, Cpp, MkDependHS ]
 
@@ -1718,7 +1726,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 -----------------------------------------------------------------------------
 -- Hsc phase
 
-run_phase Hsc	basename _suff input_fn output_fn
+run_phase Hsc	basename suff input_fn output_fn
   = do  hsc <- readIORef pgm_C
 	
   -- we add the current directory (i.e. the directory in which
@@ -1759,12 +1767,28 @@ run_phase Hsc	basename _suff input_fn output_fn
 			   Nothing -> [ "-hidir="++current_dir, "-hisuf="++hisuf ]
 			   Just fn -> [ "-hifile="++fn ]
 
+  -- figure out if the source has changed, for recompilation avoidance.
+  -- only do this if we're eventually going to generate a .o file.
+  -- (ToDo: do when generating .hc files too?)
+	do_recomp <- readIORef recomp
+	todo <- readIORef v_todo
+	source_unchanged <- 
+          if do_recomp && ( todo == DoLink || todo == StopBefore Ln )
+	     then do t1 <- getModificationTime (basename ++ '.':suff)
+		     o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
+		     t2 <- getModificationTime o_file
+		     if t2 > t1
+			then return "-fsource-unchanged"
+			else return ""
+	     else return ""
+
   -- run the compiler!
 	run_something "Haskell Compiler" 
 		 (unwords (hsc : input_fn : (
 		    hsc_opts
 		    ++ hi_flags
 		    ++ [ 
+			  source_unchanged,
 			  "-ofile="++output_fn, 
 			  "-F="++tmp_stub_c, 
 			  "-FH="++tmp_stub_h 
