@@ -5,14 +5,11 @@ ifneq "$(BIN_DIST_NAME)" ""
 # We're doing a binary-dist, descend into a subset of the dirs.
 SUBDIRS = hp2ps stat2resid unlit
 else
-SUBDIRS = ghc-pkg	\
-	  hp2ps		\
-	  hsc2hs	\
-	  parallel      \
-	  stat2resid	\
-	  prof          \
-	  unlit         \
-	  genprimopcode
+ifeq "$(BootingFromHc)" "YES"
+SUBDIRS = hp2ps parallel stat2resid prof unlit
+else
+SUBDIRS = ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode
+endif
 endif
 
 # hstags died when the new parser was introduced.
