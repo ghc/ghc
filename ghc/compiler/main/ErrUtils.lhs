@@ -8,8 +8,9 @@ module ErrUtils (
 	Message, mkLocMessage, printError,
 
 	ErrMsg, WarnMsg,
+	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
-	mkErrMsg, mkWarnMsg,
+	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
 	ghcExit,
@@ -32,11 +33,11 @@ import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt,
 import List             ( replicate )
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr, stdout )
-\end{code}
 
-Basic error messages: just render a message with a source location.
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Basic error messages: just render a message with a source location.
+
 type Message = SDoc
 
 mkLocMessage :: SrcSpan -> Message -> Message
@@ -49,26 +50,51 @@ mkLocMessage locn msg
 
 printError :: SrcSpan -> Message -> IO ()
 printError span msg = printErrs (mkLocMessage span msg $ defaultErrStyle)
-\end{code}
 
-Collecting up messages for later ordering and printing.
 
-\begin{code}
-data ErrMsg = ErrMsg SrcSpan Pretty.Doc
+-- -----------------------------------------------------------------------------
+-- Collecting up messages for later ordering and printing.
+
+data ErrMsg = ErrMsg { 
+	errMsgSpans     :: [SrcSpan],
+	errMsgContext   :: PrintUnqualified,
+	errMsgShortDoc  :: Message,
+	errMsgExtraInfo :: Message
+	}
 	-- The SrcSpan is used for sorting errors into line-number order
 	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
 	-- whether to qualify an External Name) at the error occurrence
 
 type WarnMsg = ErrMsg
 
--- These two are used heavily by renamer/typechecker.
---  Be refined about qualification, return an ErrMsg
+-- A short (one-line) error message, with context to tell us whether
+-- to qualify names in the message or not.
 mkErrMsg :: SrcSpan -> PrintUnqualified -> Message -> ErrMsg
 mkErrMsg locn print_unqual msg
-  = ErrMsg locn (mkLocMessage locn msg $ mkErrStyle print_unqual)
+  = ErrMsg [locn] print_unqual msg empty
+
+-- Variant that doesn't care about qualified/unqualified names
+mkPlainErrMsg :: SrcSpan -> Message -> ErrMsg
+mkPlainErrMsg locn msg
+  = ErrMsg [locn] alwaysQualify msg empty
+
+-- A long (multi-line) error message, with context to tell us whether
+-- to qualify names in the message or not.
+mkLongErrMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> ErrMsg
+mkLongErrMsg locn print_unqual msg extra 
+ = ErrMsg [locn] print_unqual msg extra
+
+-- A long (multi-line) error message, with context to tell us whether
+-- to qualify names in the message or not.
+mkLongMultiLocErrMsg :: [SrcSpan] -> PrintUnqualified -> Message -> Message -> ErrMsg
+mkLongMultiLocErrMsg locns print_unqual msg extra
+  = ErrMsg locns print_unqual msg extra
 
 mkWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> WarnMsg
 mkWarnMsg = mkErrMsg
+
+mkLongWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> WarnMsg
+mkLongWarnMsg = mkLongErrMsg
 
 type Messages = (Bag WarnMsg, Bag ErrMsg)
 
@@ -83,10 +109,10 @@ errorsFound dflags (warns, errs)
   | otherwise  		        = not (isEmptyBag errs)
 
 printErrorsAndWarnings :: Messages -> IO ()
-	-- Don't print any warnings if there are errors
 printErrorsAndWarnings (warns, errs)
   | no_errs && no_warns  = return ()
   | no_errs		 = printErrs (pprBagOfWarnings warns)
+			    -- Don't print any warnings if there are errors
   | otherwise		 = printErrs (pprBagOfErrors   errs)
   where
     no_warns = isEmptyBag warns
@@ -94,12 +120,17 @@ printErrorsAndWarnings (warns, errs)
 
 pprBagOfErrors :: Bag ErrMsg -> Pretty.Doc
 pprBagOfErrors bag_of_errors
-  = Pretty.vcat [Pretty.text "" Pretty.$$ e | ErrMsg _ e <- sorted_errs ]
+  = Pretty.vcat [ let style = mkErrStyle unqual in
+		  Pretty.text "" Pretty.$$ d style Pretty.$$ e style
+		| ErrMsg { errMsgShortDoc = d,
+			   errMsgExtraInfo = e,
+			   errMsgContext = unqual } <- sorted_errs ]
     where
       bag_ls	  = bagToList bag_of_errors
       sorted_errs = sortLt occ'ed_before bag_ls
 
-      occ'ed_before (ErrMsg l1 _) (ErrMsg l2 _) = LT == compare l1 l2
+      occ'ed_before err1 err2 = 
+         LT == compare (head (errMsgSpans err1)) (head (errMsgSpans err1))
 
 pprBagOfWarnings :: Bag WarnMsg -> Pretty.Doc
 pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns

@@ -43,6 +43,8 @@ import Bag
 import Outputable
 
 import Monad		( foldM )
+
+import SrcLoc (getLoc) -- tmp
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper

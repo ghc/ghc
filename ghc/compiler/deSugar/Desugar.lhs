@@ -33,7 +33,7 @@ import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarEnv
 import VarSet
-import Bag		( isEmptyBag, mapBag, emptyBag, bagToList )
+import Bag		( Bag, isEmptyBag, mapBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
@@ -52,7 +52,7 @@ import FastString
 %************************************************************************
 
 \begin{code}
-deSugar :: HscEnv -> TcGblEnv -> IO (Maybe ModGuts)
+deSugar :: HscEnv -> TcGblEnv -> IO (Bag WarnMsg, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env 
@@ -75,15 +75,11 @@ deSugar hsc_env
 
 	; let { (ds_binds, ds_rules, ds_fords) = results
 	      ; warns    = mapBag mk_warn warnings
-	      ; warn_doc = pprBagOfWarnings warns }
-
-	-- Display any warnings
-        ; doIfSet (not (isEmptyBag warnings))
-		  (printErrs warn_doc)
+	      }
 
 	-- If warnings are considered errors, leave.
 	; if errorsFound dflags (warns, emptyBag)
-	   then return Nothing
+	   then return (warns, Nothing)
 	   else do
 
 	-- Lint result if necessary
@@ -115,7 +111,7 @@ deSugar hsc_env
 		mg_binds    = ds_binds,
 		mg_foreign  = ds_fords }
 	
-        ; return (Just mod_guts)
+        ; return (warns, Just mod_guts)
 	}}
 
   where

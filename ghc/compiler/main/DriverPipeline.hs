@@ -158,7 +158,7 @@ compile hsc_env this_mod location
        hsc_env' = hsc_env { hsc_dflags = dyn_flags' }
 
    -- run the compiler
-   hsc_result <- hscMain hsc_env' this_mod location
+   hsc_result <- hscMain hsc_env' printErrorsAndWarnings this_mod location
 			 source_unchanged' have_object old_iface
 
    case hsc_result of
@@ -630,7 +630,7 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 	hsc_env <- newHscEnv OneShot dyn_flags'
 
   -- run the compiler!
-	result <- hscMain hsc_env mod
+	result <- hscMain hsc_env printErrorsAndWarnings mod
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
 			  False

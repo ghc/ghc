@@ -139,7 +139,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 The GhciMode is self-explanatory:
 
 \begin{code}
-data GhciMode = Batch | Interactive | OneShot 
+data GhciMode = Batch | Interactive | OneShot | IDE
 	      deriving Eq
 \end{code}
 

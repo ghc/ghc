@@ -27,7 +27,8 @@ import InstEnv		( InstEnv, emptyInstEnv, extendInstEnv )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings, mkLocMessage )
+			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings,
+			  mkLocMessage, mkLongErrMsg )
 import SrcLoc		( mkGeneralSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( emptyDUs, emptyNameSet )
@@ -64,7 +65,7 @@ ioToTcRn = ioToIOEnv
 initTc :: HscEnv
        -> Module 
        -> TcM r
-       -> IO (Maybe r)
+       -> IO (Messages, Maybe r)
 		-- Nothing => error thrown by the thing inside
 		-- (error messages should have been printed already)
 
@@ -114,15 +115,14 @@ initTc hsc_env mod do_this
 				    Right res -> return (Just res)
 				    Left _    -> return Nothing } ;
 
-	-- Print any error messages
+	-- Collect any error messages
 	msgs <- readIORef errs_var ;
-	printErrorsAndWarnings msgs ;
 
 	let { dflags = hsc_dflags hsc_env
 	    ; final_res | errorsFound dflags msgs = Nothing
 			| otherwise	   	  = maybe_res } ;
 
-	return final_res
+	return (msgs, final_res)
     }
   where
     init_imports = emptyImportAvails { imp_qual = unitModuleEnv mod emptyAvailEnv }
@@ -398,10 +398,13 @@ addLocErr :: Located e -> (e -> Message) -> TcRn ()
 addLocErr (L loc e) fn = addErrAt loc (fn e)
 
 addErrAt :: SrcSpan -> Message -> TcRn ()
-addErrAt loc msg
+addErrAt loc msg = addLongErrAt loc msg empty
+
+addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
+addLongErrAt loc msg extra
  = do {  errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
-	 let { err = mkErrMsg loc (unQualInScope rdr_env) msg } ;
+	 let { err = mkLongErrMsg loc (unQualInScope rdr_env) msg extra } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
@@ -651,7 +654,7 @@ warnTc warn_if_true warn_msg
 \begin{code}
 add_err_tcm tidy_env err_msg loc ctxt
  = do { ctxt_msgs <- do_ctxt tidy_env ctxt ;
-	addErrAt loc (vcat (err_msg : ctxt_to_use ctxt_msgs)) }
+	addLongErrAt loc err_msg (vcat (ctxt_to_use ctxt_msgs)) }
 
 do_ctxt tidy_env []
  = return []

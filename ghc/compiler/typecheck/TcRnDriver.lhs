@@ -49,7 +49,7 @@ import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
 import PprCore		( pprIdRules, pprCoreBindings )
 import CoreSyn		( IdCoreRule, bindersOfBinds )
-import ErrUtils		( mkDumpDoc, showPass )
+import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts )
@@ -128,7 +128,7 @@ import Maybe		( isJust )
 \begin{code}
 tcRnModule :: HscEnv 
 	   -> Located (HsModule RdrName)
-	   -> IO (Maybe TcGblEnv)
+	   -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env (L loc (HsModule maybe_mod exports 
 				import_decls local_decls mod_deprec))
@@ -499,7 +499,7 @@ setInteractiveContext icxt thing_inside
 \begin{code}
 tcRnExtCore :: HscEnv 
 	    -> HsExtCore RdrName
-	    -> IO (Maybe ModGuts)
+	    -> IO (Messages, Maybe ModGuts)
 	-- Nothing => some error occurred 
 
 tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)

@@ -6,7 +6,7 @@
 
 \begin{code}
 module HscMain ( 
-	HscResult(..), hscMain, newHscEnv
+	HscResult(..), hscMain, newHscEnv, hscBufferFrontEnd
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscThing, 
 	, compileExpr
@@ -61,7 +61,7 @@ import CodeOutput	( codeOutput )
 
 import CmdLineOpts
 import DriverPhases     ( isExtCoreFilename )
-import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, printError )
+import ErrUtils
 import UniqSupply	( mkSplitUniqSupply )
 
 import Outputable
@@ -73,6 +73,8 @@ import ParserCoreUtils
 import Module		( Module, ModLocation(..), showModMsg )
 import FastString
 import Maybes		( expectJust )
+import StringBuffer	( StringBuffer )
+import Bag		( unitBag, emptyBag )
 
 import Monad		( when )
 import Maybe		( isJust, fromJust )
@@ -119,7 +121,10 @@ knownKeyNames = map getName wiredInThings
 \begin{code}
 data HscResult
    -- Compilation failed
-   = HscFail     
+   = HscFail
+
+   -- In IDE mode: we just do the static/dynamic checks
+   | HscChecked
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -133,11 +138,16 @@ data HscResult
 	         Bool  		 	-- stub_c exists
 	         (Maybe CompiledByteCode)
 
+
+-- What to do when we have compiler error or warning messages
+type MessageAction = Messages -> IO ()
+
 	-- no errors or warnings; the individual passes
 	-- (parse/rename/typecheck) print messages themselves
 
 hscMain
   :: HscEnv
+  -> MessageAction		-- what to do with errors/warnings
   -> Module
   -> ModLocation		-- location info
   -> Bool			-- True <=> source unchanged
@@ -145,7 +155,7 @@ hscMain
   -> Maybe ModIface		-- old interface, if available
   -> IO HscResult
 
-hscMain hsc_env mod location 
+hscMain hsc_env msg_act mod location 
 	source_unchanged have_object maybe_old_iface
  = do {
       (recomp_reqd, maybe_checked_iface) <- 
@@ -158,13 +168,13 @@ hscMain hsc_env mod location
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
 
-      ; what_next hsc_env have_object 
+      ; what_next hsc_env msg_act have_object 
 		  mod location maybe_checked_iface
       }
 
 
 -- hscNoRecomp definitely expects to have the old interface available
-hscNoRecomp hsc_env have_object 
+hscNoRecomp hsc_env msg_act have_object 
 	    mod location (Just old_iface)
  | hsc_mode hsc_env == OneShot
  = do {
@@ -188,7 +198,7 @@ hscNoRecomp hsc_env have_object
       return (HscNoRecomp new_details old_iface)
       }
 
-hscRecomp hsc_env have_object 
+hscRecomp hsc_env msg_act have_object 
 	  mod location maybe_checked_iface
  = do	{
       	  -- what target are we shooting for?
@@ -203,9 +213,9 @@ hscRecomp hsc_env have_object
 			showModMsg (not toInterp) mod location);
 			
 	; front_res <- if toCore then 
-			  hscCoreFrontEnd hsc_env location
+			  hscCoreFrontEnd hsc_env msg_act location
 		       else 
-			  hscFrontEnd hsc_env location
+			  hscFileFrontEnd hsc_env msg_act location
 
 	; case front_res of
 	    Left flure -> return flure;
@@ -309,20 +319,21 @@ hscRecomp hsc_env have_object
       			    maybe_bcos)
       	 }}
 
-hscCoreFrontEnd hsc_env location = do {
+hscCoreFrontEnd hsc_env msg_act location = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
 	; inp <- readFile (expectJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
 	; case parseCore inp 1 of
-	    FailP s        -> hPutStrLn stderr s >> return (Left HscFail);
+	    FailP s        -> hPutStrLn stderr s >> return (Left HscFail)
 	    OkP rdr_module -> do {
     
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; maybe_tc_result <- _scc_ "TypeCheck" 
+	; (tc_msgs, maybe_tc_result) <- _scc_ "TypeCheck" 
 			      tcRnExtCore hsc_env rdr_module
+	; msg_act tc_msgs
 	; case maybe_tc_result of {
       	     Nothing       -> return (Left  HscFail);
       	     Just mod_guts -> return (Right mod_guts)
@@ -330,7 +341,7 @@ hscCoreFrontEnd hsc_env location = do {
 	}}}
 	 
 
-hscFrontEnd hsc_env location = do {
+hscFileFrontEnd hsc_env msg_act location = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
@@ -338,14 +349,38 @@ hscFrontEnd hsc_env location = do {
                              (expectJust "hscFrontEnd:hspp" (ml_hspp_file location))
 
 	; case maybe_parsed of {
-      	     Nothing -> return (Left HscFail);
-      	     Just rdr_module -> do {
-    
+      	     Left err -> do { msg_act (unitBag err, emptyBag) ;
+			    ; return (Left HscFail) ;
+			    };
+      	     Right rdr_module -> hscFrontEnd hsc_env msg_act rdr_module
+    }}
+
+-- Perform static/dynamic checks on the source code in a StringBuffer
+-- This is a temporary solution: it'll read in interface files lazilly, whereas
+-- we probably want to use the compilation manager to load in all the modules
+-- in a project.
+hscBufferFrontEnd :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
+hscBufferFrontEnd hsc_env buffer msg_act = do
+	let loc  = mkSrcLoc (mkFastString "*edit*") 1 0
+	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
+		PFailed span err -> do
+			msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
+			return HscFail
+		POk _ rdr_module -> do 
+			r <- hscFrontEnd hsc_env msg_act rdr_module
+			case r of
+			   Left r -> return r
+			   Right _ -> return HscChecked
+		
+
+
+hscFrontEnd hsc_env msg_act rdr_module  = do {
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; maybe_tc_result <- _scc_ "Typecheck-Rename" 
+	; (tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
 				        tcRnModule hsc_env rdr_module
+	; msg_act tc_msgs
 	; case maybe_tc_result of {
       	     Nothing -> return (Left HscFail);
       	     Just tc_result -> do {
@@ -353,13 +388,13 @@ hscFrontEnd hsc_env location = do {
  	    -------------------
  	    -- DESUGAR
  	    -------------------
-	; maybe_ds_result <- _scc_ "DeSugar" 
+	; (warns, maybe_ds_result) <- _scc_ "DeSugar" 
 		 	     deSugar hsc_env tc_result
+	; msg_act (warns, emptyBag)
 	; case maybe_ds_result of
 	    Nothing        -> return (Left HscFail);
 	    Just ds_result -> return (Right ds_result);
-	}}}}}
-
+	}}}
 
 hscBackEnd dflags 
     ModGuts{  -- This is the last use of the ModGuts in a compilation.
@@ -424,8 +459,7 @@ myParseModule dflags src_filename
 
       case unP parseModule (mkPState buf loc dflags) of {
 
-	PFailed span err -> do { printError span err ;
-                            	 return Nothing };
+	PFailed span err -> return (Left (mkPlainErrMsg span err));
 
 	POk _ rdr_module -> do {
 
@@ -434,7 +468,7 @@ myParseModule dflags src_filename
       dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
 			   (ppSourceStats False rdr_module) ;
       
-      return (Just rdr_module)
+      return (Right rdr_module)
 	-- ToDo: free the string buffer later.
       }}
 

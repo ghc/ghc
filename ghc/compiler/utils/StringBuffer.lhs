@@ -8,7 +8,8 @@ Buffers for scanning string input stored in external arrays.
 \begin{code}
 module StringBuffer
        (
-        StringBuffer,
+        StringBuffer(..),
+	-- non-abstract for vs/HaskellService
 
 	 -- * Creation/destruction
         hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
