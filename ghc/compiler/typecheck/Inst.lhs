@@ -57,7 +57,6 @@ import Name	( OccName(..), Name, mkLocalName,
 		  mkSysLocalName, occNameString, getOccName )
 import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar, pprParendGenType )	
-import PprStyle	( PprStyle(..) )
 import Pretty
 import SpecEnv	( SpecEnv )
 import SrcLoc	( SrcLoc, noSrcLoc )
@@ -366,11 +365,11 @@ relevant in error messages.
 
 \begin{code}
 instance Outputable (Inst s) where
-    ppr sty inst = ppr_inst sty empty (\ o l -> empty) inst
+    ppr sty inst = pprQuote sty (\ sty -> ppr_inst sty (\ o l -> empty) inst)
 
-pprInst sty hdr inst = ppr_inst sty hdr (\ o l -> pprOrigin hdr o l sty) inst
+pprInst sty inst = ppr_inst sty (\ o l -> pprOrigin o l sty) inst
 
-ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
+ppr_inst sty ppr_orig (LitInst u lit ty orig loc)
   = hang (ppr_orig orig loc)
 	 4 (hsep [case lit of
 		      OverloadedIntegral   i -> integer i
@@ -379,11 +378,11 @@ ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
 		   ppr sty ty,
 		   show_uniq sty u])
 
-ppr_inst sty hdr ppr_orig (Dict u clas ty orig loc)
+ppr_inst sty ppr_orig (Dict u clas ty orig loc)
   = hang (ppr_orig orig loc)
 	 4 (hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
 
-ppr_inst sty hdr ppr_orig (Method u id tys rho orig loc)
+ppr_inst sty ppr_orig (Method u id tys rho orig loc)
   = hang (ppr_orig orig loc)
 	 4 (hsep [ppr sty id, ptext SLIT("at"), interppSP sty tys, show_uniq sty u])
 
@@ -432,7 +431,7 @@ lookupInst :: Inst s
 lookupInst dict@(Dict _ clas ty orig loc)
   = case lookupMEnv matchTy (get_inst_env clas orig) ty of
       Nothing	-> tcAddSrcLoc loc		 $
-		   tcAddErrCtxt (pprOrigin ""{-hdr-} orig loc) $
+		   tcAddErrCtxt (pprOrigin orig loc) $
 		   failTc (noInstanceErr dict)
 
       Just (dfun_id, tenv) 
@@ -637,38 +636,40 @@ get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
 get_inst_env clas other_orig = classInstEnv clas
 
 
-pprOrigin :: String -> InstOrigin s -> SrcLoc -> Error
+pprOrigin :: InstOrigin s -> SrcLoc -> Error
 
-pprOrigin hdr orig locn
-  = addErrLoc locn hdr $ \ sty ->
-    case orig of
-      OccurrenceOf id ->
-        hsep [ptext SLIT("at a use of an overloaded identifier:"), ppr sty id]
-      OccurrenceOfCon id ->
-        hsep [ptext SLIT("at a use of an overloaded constructor:"), ppr sty id]
-      InstanceDeclOrigin ->
-	ptext SLIT("in an instance declaration")
-      LiteralOrigin lit ->
-	hsep [ptext SLIT("at an overloaded literal:"), ppr sty lit]
-      ArithSeqOrigin seq ->
-	hsep [ptext SLIT("at an arithmetic sequence:"), ppr sty seq]
-      SignatureOrigin ->
-	ptext SLIT("in a type signature")
-      DoOrigin ->
-	ptext SLIT("in a do statement")
-      ClassDeclOrigin ->
-	ptext SLIT("in a class declaration")
-      InstanceSpecOrigin _ clas ty ->
-	hsep [text "in a SPECIALIZE instance pragma; class",
-	 	   ppr sty clas, text "type:", ppr sty ty]
-      ValSpecOrigin name ->
-	hsep [ptext SLIT("in a SPECIALIZE user-pragma for"), ppr sty name]
-      CCallOrigin clabel Nothing{-ccall result-} ->
-	hsep [ptext SLIT("in the result of the _ccall_ to"), text clabel]
-      CCallOrigin clabel (Just arg_expr) ->
-	hsep [ptext SLIT("in an argument in the _ccall_ to"), text clabel <> comma, text "namely:", ppr sty arg_expr]
-      LitLitOrigin s ->
-	hcat [ptext SLIT("in this ``literal-literal'': "), text s]
-      UnknownOrigin ->
-	ptext SLIT("in... oops -- I don't know where the overloading came from!")
+pprOrigin orig locn sty
+  = hsep [text "arising from", pp_orig, text "at", ppr sty locn]
+  where
+    pp_orig 
+      = case orig of
+      	  OccurrenceOf id ->
+      	    hsep [ptext SLIT("use of"), ppr sty id]
+      	  OccurrenceOfCon id ->
+      	    hsep [ptext SLIT("use of"), ppr sty id]
+      	  LiteralOrigin lit ->
+	    hsep [ptext SLIT("the literal"), ppr sty lit]
+      	  InstanceDeclOrigin ->
+	    ptext SLIT("an instance declaration")
+      	  ArithSeqOrigin seq ->
+	    hsep [ptext SLIT("the arithmetic sequence:"), ppr sty seq]
+      	  SignatureOrigin ->
+	    ptext SLIT("a type signature")
+      	  DoOrigin ->
+	    ptext SLIT("a do statement")
+      	  ClassDeclOrigin ->
+	    ptext SLIT("a class declaration")
+      	  InstanceSpecOrigin _ clas ty ->
+	    hsep [text "a SPECIALIZE instance pragma; class",
+		       ppr sty clas, text "type:", ppr sty ty]
+      	  ValSpecOrigin name ->
+	    hsep [ptext SLIT("a SPECIALIZE user-pragma for"), ppr sty name]
+      	  CCallOrigin clabel Nothing{-ccall result-} ->
+	    hsep [ptext SLIT("the result of the _ccall_ to"), text clabel]
+      	  CCallOrigin clabel (Just arg_expr) ->
+	    hsep [ptext SLIT("an argument in the _ccall_ to"), text clabel <> comma, text "namely", ppr sty arg_expr]
+      	  LitLitOrigin s ->
+	    hcat [ptext SLIT("the ``literal-literal''"), text s]
+      	  UnknownOrigin ->
+	    ptext SLIT("...oops -- I don't know where the overloading came from!")
 \end{code}
