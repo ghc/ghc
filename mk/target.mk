@@ -35,6 +35,144 @@
 
 
 ##################################################################
+#
+# 		Recursive stuff
+#
+# At the top of the file so that recursive makes happen before
+# makes in the main directory. This is needed for some targets,
+# e.g. when building DLLs in hslibs.
+#
+##################################################################
+
+# Here are the diabolically clever rules that
+# 
+# (a) for each "recursive target" <t>
+#     propagates "make <t>" to directories in SUBDIRS
+#
+# (b) when SUBDIRS is empty,
+#     for each "multi-way-target" <t>
+#     calls "make -way=w <t>" for each w in $(WAYS)
+#
+#     This has the effect of making the standard target
+#     in each of the specified ways (as well as in the normal way
+
+# Controlling variables
+#	WAYS    = extra (beyond the normal way) ways to build things in
+# 	SUBDIRS = subdirectories to recurse into
+
+# No ways, so iterate over the SUBDIRS
+
+# note about recursively invoking make: we'd like make to drop all the
+# way back to the top level if it fails in any of the
+# sub(sub-...)directories.  This is done by setting the -e flag to the
+# shell during the loop, which causes an immediate failure if any of
+# the shell commands fail.
+
+# One exception: if the user gave the -i or -k flag to make in the
+# first place, we'd like to reverse this behaviour.  So we check for
+# these flags, and set the -e flag appropriately.  NOTE: watch out for
+# the --no-print-directory flag which is passed to recursive
+# invocations of make.
+#
+# NOTE: Truly weird use of exit below to stop the for loop dead in
+# its tracks should any of the sub-makes fail. By my reckoning, 
+#  "cmd || exit $?" should be equivalent to "cmd"
+
+ifneq "$(SUBDIRS)" ""
+
+all docs runtests boot TAGS clean veryclean maintainer-clean install info html ps dvi txt::
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(SUBDIRS); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+
+dist ::
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(SUBDIRS) ; do \
+	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
+	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
+	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
+	done
+endif
+
+# The default dist rule:
+#
+# copy/link the contents of $(SRC_DIST_FILES) into the
+# shadow distribution tree. SRC_DIST_FILES contain the
+# build-generated files that you want to include in
+# a source distribution.
+#
+#
+ifneq "$(SRC_DIST_FILES)" ""
+dist::
+	@for i in $(SRC_DIST_FILES); do 		 \
+	  if ( echo "$$i" | grep "~" >/dev/null 2>&1 ); then	 \
+	    echo $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
+	    $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
+	  else \
+	    if (test -f "$$i"); then 			   \
+	      echo $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ; \
+	      $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ;	   \
+	     fi;					   \
+	  fi; \
+	done;
+endif
+
+
+#
+# Selectively building subdirectories.
+#
+#
+ifneq "$(SUBDIRS)" ""
+$(SUBDIRS) ::
+	  $(MAKE) -C $@ $(MFLAGS)
+endif
+
+ifneq "$(WAYS)" ""
+ifeq "$(way)" ""
+
+# NB: the targets exclude 
+#	boot info TAGS runtests
+# since these are way-independent
+all docs TAGS clean veryclean maintainer-clean install ::
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(WAYS) ; do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) way=$$i $@;"; \
+	  echo "PWD = $(shell pwd)"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
+	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
+	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+
+endif
+endif
+
+##################################################################
 # 		FPtools standard targets
 #
 # depend:
@@ -72,13 +210,9 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(patsubst -odir,,$(HC_OPTS)) $(MKDEPENDHS_SRCS)
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(MKDEPENDHS_SRCS)
 endif
 
-# the above patsubst is a hack to remove the '-odir $*' from HC_OPTS
-# which is present when we're splitting objects.  The $* maps to
-# nothing, since this isn't a pattern rule, so we have to get rid of
-# the -odir too to avoid problems.
 
 ##################################################################
 # 			boot
@@ -1008,139 +1142,3 @@ $(LIB_WAY_TARGETS) :
 	$(MAKE) $(MFLAGS) $@ way=$(subst .,,$(suffix $(subst _,.,$(basename $@))))
 
 endif	# if way
-
-
-##################################################################
-#
-# 		Recursive stuff
-#
-##################################################################
-
-# Here are the diabolically clever rules that
-# 
-# (a) for each "recursive target" <t>
-#     propagates "make <t>" to directories in SUBDIRS
-#
-# (b) when SUBDIRS is empty,
-#     for each "multi-way-target" <t>
-#     calls "make -way=w <t>" for each w in $(WAYS)
-#
-#     This has the effect of making the standard target
-#     in each of the specified ways (as well as in the normal way
-
-# Controlling variables
-#	WAYS    = extra (beyond the normal way) ways to build things in
-# 	SUBDIRS = subdirectories to recurse into
-
-# No ways, so iterate over the SUBDIRS
-
-# note about recursively invoking make: we'd like make to drop all the
-# way back to the top level if it fails in any of the
-# sub(sub-...)directories.  This is done by setting the -e flag to the
-# shell during the loop, which causes an immediate failure if any of
-# the shell commands fail.
-
-# One exception: if the user gave the -i or -k flag to make in the
-# first place, we'd like to reverse this behaviour.  So we check for
-# these flags, and set the -e flag appropriately.  NOTE: watch out for
-# the --no-print-directory flag which is passed to recursive
-# invocations of make.
-#
-# NOTE: Truly weird use of exit below to stop the for loop dead in
-# its tracks should any of the sub-makes fail. By my reckoning, 
-#  "cmd || exit $?" should be equivalent to "cmd"
-
-ifneq "$(SUBDIRS)" ""
-
-all docs runtests boot TAGS clean veryclean maintainer-clean install info html ps dvi txt::
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS); do \
-	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
-	  echo " in $(shell pwd)/$$i"; \
-	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
-	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	done
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-
-dist ::
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS) ; do \
-	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
-	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
-	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
-	done
-endif
-
-# The default dist rule:
-#
-# copy/link the contents of $(SRC_DIST_FILES) into the
-# shadow distribution tree. SRC_DIST_FILES contain the
-# build-generated files that you want to include in
-# a source distribution.
-#
-#
-ifneq "$(SRC_DIST_FILES)" ""
-dist::
-	@for i in $(SRC_DIST_FILES); do 		 \
-	  if ( echo "$$i" | grep "~" >/dev/null 2>&1 ); then	 \
-	    echo $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
-	    $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
-	  else \
-	    if (test -f "$$i"); then 			   \
-	      echo $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ; \
-	      $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ;	   \
-	     fi;					   \
-	  fi; \
-	done;
-endif
-
-
-#
-# Selectively building subdirectories.
-#
-#
-ifneq "$(SUBDIRS)" ""
-$(SUBDIRS) ::
-	  $(MAKE) -C $@ $(MFLAGS)
-endif
-
-ifneq "$(WAYS)" ""
-ifeq "$(way)" ""
-
-# NB: the targets exclude 
-#	boot info TAGS runtests
-# since these are way-independent
-all docs TAGS clean veryclean maintainer-clean install ::
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(WAYS) ; do \
-	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) way=$$i $@;"; \
-	  echo "PWD = $(shell pwd)"; \
-	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
-	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
-	done
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-
-endif
-endif
-

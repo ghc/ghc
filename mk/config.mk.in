@@ -215,11 +215,8 @@ endif
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
 GhcLibHcOpts=-O
-else
-GhcLibHcOpts=-O -split-objs -odir $*
-endif
+SplitObjs = YES
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 #
