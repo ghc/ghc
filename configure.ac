@@ -1059,9 +1059,6 @@ FPTOOLS_CHECK_HTYPE(GLdouble)
 FPTOOLS_CHECK_HTYPE(GLclampd)
 fi
 
-dnl ** can we open files in binary mode?
-FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
-
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
