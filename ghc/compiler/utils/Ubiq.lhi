@@ -43,9 +43,9 @@ import TcType		( TcMaybe )
 import TyCon		( TyCon )
 import TyVar		( GenTyVar, TyVar(..) )
 import Type		( GenType, Type(..) )
-import UniqFM		( UniqFM, Uniquable(..) )
+import UniqFM		( UniqFM )
 import UniqSupply	( UniqSupply )
-import Unique		( Unique )
+import Unique		( Unique, Uniquable(..) )
 import Usage		( GenUsage, Usage(..) )
 import Util		( Ord3(..) )
 
@@ -116,7 +116,7 @@ data PrimRep	-- NB: an enumeration
 data SimplifierSwitch
 data SMRep
 data SrcLoc
-data StrictnessInfo bdee
+data StrictnessInfo
 data StrictnessMark
 data SwitchResult
 data TcMaybe s
