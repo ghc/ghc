@@ -56,7 +56,7 @@ where
 
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
-import DriverState	( v_Output_file, v_NoHsMain )
+import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
 import DriverPhases
 import Finder
 import HscTypes
@@ -443,8 +443,11 @@ cmLoadModules cmstate1 mg2unsorted
         let verb = verbosity dflags
 
 	-- Find out if we have a Main module
-        let a_root_is_Main 
-               = any ((=="Main").moduleNameUserString.modSummaryName) 
+	mb_main_mod <- readIORef v_MainModIs
+        let 
+	    main_mod = mb_main_mod `orElse` "Main"
+	    a_root_is_Main 
+               = any ((==main_mod).moduleNameUserString.modSummaryName) 
                      mg2unsorted
 
         let mg2unsorted_names = map modSummaryName mg2unsorted
