@@ -675,7 +675,7 @@ INLINE int __hsposix_SIG_UNBLOCK() { return SIG_UNBLOCK; }
 INLINE int __hsposix_SIG_SETMASK() { return SIG_SETMASK; }
 #endif /* mingw32_TARGET_OS */
 
-// These three are wrapped because on some OSs (eg. Linux) they are
+// These are wrapped because on some OSs (eg. Linux) they are
 // macros which redirect to the 64-bit-off_t versions when large file
 // support is enabled.
 //
@@ -685,6 +685,10 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 
 INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
 	return (lseek(fd,off,whence));
+}
+
+INLINE int __hscore_stat(char *file, struct stat *buf) {
+	return (stat(file,buf));
 }
 
 INLINE int __hscore_fstat(int fd, struct stat *buf) {

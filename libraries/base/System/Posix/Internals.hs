@@ -377,7 +377,7 @@ foreign import ccall unsafe "HsBase.h rewinddir"
 foreign import ccall unsafe "HsBase.h rmdir"
    c_rmdir :: CString -> IO CInt
 
-foreign import ccall unsafe "HsBase.h stat"
+foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CString -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h umask"
