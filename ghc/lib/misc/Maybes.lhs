@@ -57,7 +57,7 @@ import Maybe -- renamer will tell us if there are any conflicts
 \begin{code}
 maybeToBool :: Maybe a -> Bool
 maybeToBool Nothing  = False
-maybeToBool (Just x) = True
+maybeToBool (Just _) = True
 \end{code}
 
 @catMaybes@ takes a list of @Maybe@s and returns a list of
@@ -75,7 +75,7 @@ catMaybes (Just x : xs)	   = (x : catMaybes xs)
 
 allMaybes :: [Maybe a] -> Maybe [a]
 allMaybes [] = Just []
-allMaybes (Nothing : ms) = Nothing
+allMaybes (Nothing : _)  = Nothing
 allMaybes (Just x  : ms) = case (allMaybes ms) of
 			     Nothing -> Nothing
 			     Just xs -> Just (x:xs)
@@ -87,13 +87,13 @@ first @Just@ if there is one, or @Nothing@ otherwise.
 \begin{code}
 firstJust :: [Maybe a] -> Maybe a
 firstJust [] = Nothing
-firstJust (Just x  : ms) = Just x
+firstJust (Just x  : _) = Just x
 firstJust (Nothing : ms) = firstJust ms
 \end{code}
 
 \begin{code}
 findJust :: (a -> Maybe b) -> [a] -> Maybe b
-findJust f []	  = Nothing
+findJust _ []	  = Nothing
 findJust f (a:as) = case f a of
 		      Nothing -> findJust f as
 		      b	 -> b
@@ -102,7 +102,7 @@ findJust f (a:as) = case f a of
 \begin{code}
 expectJust :: String -> Maybe a -> a
 {-# INLINE expectJust #-}
-expectJust err (Just x) = x
+expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
 \end{code}
 
@@ -110,8 +110,8 @@ The Maybe monad
 ~~~~~~~~~~~~~~~
 \begin{code}
 seqMaybe :: Maybe a -> Maybe a -> Maybe a
-seqMaybe (Just x) _  = Just x
-seqMaybe Nothing  my = my
+seqMaybe v@(Just _) _  = v
+seqMaybe Nothing    my = my
 
 returnMaybe :: a -> Maybe a
 returnMaybe = Just
@@ -209,7 +209,7 @@ listMaybeErrs
   where
     combine (Succeeded v) (Succeeded vs) = Succeeded (v:vs)
     combine (Failed err)  (Succeeded _)	 = Failed [err]
-    combine (Succeeded v) (Failed errs)	 = Failed errs
+    combine (Succeeded _) (Failed errs)	 = Failed errs
     combine (Failed err)  (Failed errs)	 = Failed (err:errs)
 \end{code}
 
@@ -226,7 +226,7 @@ foldlMaybeErrs :: (acc -> input -> MaybeErr acc err)
 foldlMaybeErrs k accum ins = do_it [] accum ins
   where
     do_it []   acc []	  = Succeeded acc
-    do_it errs acc []	  = Failed errs
+    do_it errs _   []	  = Failed errs
     do_it errs acc (v:vs) = case (k acc v) of
 			      Succeeded acc' -> do_it errs	 acc' vs
 			      Failed err     -> do_it (err:errs) acc  vs

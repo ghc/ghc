@@ -26,22 +26,26 @@ data Bag a
   | ListBag	[a]		-- The list is non-empty
   | ListOfBags	[Bag a]		-- The list is non-empty
 
+emptyBag :: Bag a
 emptyBag = EmptyBag
+
+unitBag :: a -> Bag a
 unitBag  = UnitBag
 
 elemBag :: Eq a => a -> Bag a -> Bool
-
-elemBag x EmptyBag        = False
+elemBag _ EmptyBag        = False
 elemBag x (UnitBag y)     = x==y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
 elemBag x (ListBag ys)    = any (x ==) ys
 elemBag x (ListOfBags bs) = any (x `elemBag`) bs
 
+unionManyBags :: [Bag a] -> Bag a
 unionManyBags [] = EmptyBag
 unionManyBags xs = ListOfBags xs
 
 -- This one is a bit stricter! The bag will get completely evaluated.
 
+unionBags :: Bag a -> Bag a -> Bag a
 unionBags EmptyBag b = b
 unionBags b EmptyBag = b
 unionBags b1 b2      = TwoBags b1 b2
@@ -52,14 +56,15 @@ snocBag :: Bag a -> a -> Bag a
 consBag elt bag = (unitBag elt) `unionBags` bag
 snocBag bag elt = bag `unionBags` (unitBag elt)
 
+isEmptyBag :: Bag a -> Bool
 isEmptyBag EmptyBag	    = True
-isEmptyBag (UnitBag x)	    = False
+isEmptyBag (UnitBag _)	    = False
 isEmptyBag (TwoBags b1 b2)  = isEmptyBag b1 && isEmptyBag b2	-- Paranoid, but safe
 isEmptyBag (ListBag xs)     = null xs				-- Paranoid, but safe
 isEmptyBag (ListOfBags bs)  = all isEmptyBag bs
 
 filterBag :: (a -> Bool) -> Bag a -> Bag a
-filterBag pred EmptyBag = EmptyBag
+filterBag _ EmptyBag	       = EmptyBag
 filterBag pred b@(UnitBag val) = if pred val then b else EmptyBag
 filterBag pred (TwoBags b1 b2) = sat1 `unionBags` sat2
 			       where
@@ -80,7 +85,7 @@ concatBag (ListOfBags bbs)  = ListOfBags (map concatBag bbs)
 
 partitionBag :: (a -> Bool) -> Bag a -> (Bag a {- Satisfy predictate -},
 					 Bag a {- Don't -})
-partitionBag pred EmptyBag = (EmptyBag, EmptyBag)
+partitionBag _    EmptyBag = (EmptyBag, EmptyBag)
 partitionBag pred b@(UnitBag val) = if pred val then (b, EmptyBag) else (EmptyBag, b)
 partitionBag pred (TwoBags b1 b2) = (sat1 `unionBags` sat2, fail1 `unionBags` fail2)
 				  where
@@ -101,7 +106,7 @@ foldBag :: (r -> r -> r)	-- Replace TwoBags with this; should be associative
 	-> r
 
 {- Standard definition
-foldBag t u e EmptyBag        = e
+foldBag _ _ e EmptyBag        = e
 foldBag t u e (UnitBag x)     = u x
 foldBag t u e (TwoBags b1 b2) = (foldBag t u e b1) `t` (foldBag t u e b2)
 foldBag t u e (ListBag xs)    = foldr (t.u) e xs
@@ -109,7 +114,7 @@ foldBag t u e (ListOfBags bs) = foldr (\b r -> foldBag e u t b `t` r) e bs
 -}
 
 -- More tail-recursive definition, exploiting associativity of "t"
-foldBag t u e EmptyBag        = e
+foldBag _ _ e EmptyBag        = e
 foldBag t u e (UnitBag x)     = u x `t` e
 foldBag t u e (TwoBags b1 b2) = foldBag t u (foldBag t u e b2) b1
 foldBag t u e (ListBag xs)    = foldr (t.u) e xs
@@ -117,7 +122,7 @@ foldBag t u e (ListOfBags bs) = foldr (\b r -> foldBag t u r b) e bs
 
 
 mapBag :: (a -> b) -> Bag a -> Bag b
-mapBag f EmptyBag 	 = EmptyBag
+mapBag _ EmptyBag 	 = EmptyBag
 mapBag f (UnitBag x)     = UnitBag (f x)
 mapBag f (TwoBags b1 b2) = TwoBags (mapBag f b1) (mapBag f b2) 
 mapBag f (ListBag xs)    = ListBag (map f xs)
@@ -135,6 +140,7 @@ bagToList b = bagToList_append b []
 
     -- (bagToList_append b xs) flattens b and puts xs on the end.
     -- (not exported)
+bagToList_append :: Bag a -> [a] -> [a]
 bagToList_append EmptyBag 	 xs = xs
 bagToList_append (UnitBag x)	 xs = x:xs
 bagToList_append (TwoBags b1 b2) xs = bagToList_append b1 (bagToList_append b2 xs)

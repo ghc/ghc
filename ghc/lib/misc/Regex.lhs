@@ -62,7 +62,7 @@ createPatBuffer :: Bool -> IO PatBuffer
 
 createPatBuffer insensitive
  =  _casm_ ``%r = (int)sizeof(struct re_pattern_buffer);'' >>= \ sz ->
-    stToIO (newCharArray (0,sz))	>>= \ (MutableByteArray _ pbuf#) ->
+    stToIO (newCharArray (0::Int,sz))	>>= \ (MutableByteArray _ pbuf#) ->
     let
 	 pbuf = PatBuffer# pbuf#
     in
@@ -161,7 +161,7 @@ re_match pbuf str start reg
 							     (lengthPS str)
 							     start
 							     regs	>>= \ match_res ->
-  if match_res == (-2) then
+  if match_res == ((-2)::Int) then
 	error "re_match: Internal error"
   else if match_res < 0 then
      _casm_ ``free((struct re_registers *)%0); '' regs >>
@@ -208,7 +208,7 @@ re_match2 pbuf str1 str2 start stop reg
 					     start
 					     regs
 					     stop    >>= \ match_res ->
-  if match_res == (-2) then
+  if match_res == ((-2)::Int) then
 	error "re_match2: Internal error"
   else if match_res < 0 then
      _casm_ ``free((struct re_registers *)%0); '' regs >>
@@ -244,7 +244,7 @@ re_search pbuf str start range reg
 							     start
 							     range
 							     regs	>>= \ match_res ->
-  if match_res== (-1) then
+  if match_res== ((-1)::Int) then
      _casm_ `` free((struct re_registers *)%0); '' regs >>
      return Nothing
   else
@@ -293,7 +293,7 @@ re_search2 pbuf str1 str2 start range stop reg
 					      range
 					      regs
 					      stop    >>= \ match_res ->
-  if match_res== (-1) then
+  if match_res== ((-1)::Int) then
      _casm_ `` free((struct re_registers *)%0); '' regs >>
      return Nothing
   else
@@ -331,8 +331,8 @@ build_re_match str_start str_end regs
 			  aft
 			  lst)
    where
-    match_reg_to_array regs len
-     = trundleIO regs (0,[]) len  >>= \ (no,ls) ->
+    match_reg_to_array rs len
+     = trundleIO rs (0,[]) len  >>= \ (no,ls) ->
        let
         (st,end,ls')
          = case ls of
@@ -351,17 +351,17 @@ build_re_match str_start str_end regs
 	     -> Int 
 	     -> IO (Int,[(Int,Int)])
 
-    trundleIO regs (i,acc) len
+    trundleIO rs (i,acc) len
      | i==len = return (i,reverse acc)
      | otherwise	  
-       = _casm_ ``%r = (int)(((struct re_registers *)%0)->start)[(int)%1];'' regs i >>= \ start ->
-         _casm_ ``%r = (int)(((struct re_registers *)%0)->end)[(int)%1];''   regs i >>= \ end ->
+       = _casm_ ``%r = (int)(((struct re_registers *)%0)->start)[(int)%1];'' rs i >>= \ start ->
+         _casm_ ``%r = (int)(((struct re_registers *)%0)->end)[(int)%1];''   rs i >>= \ end ->
 	 let
 	  acc' = (start,end):acc
 	 in
 	  if (start == (-1)) && (end == (-1)) then
 	     return (i,reverse acc)
 	  else
-	     trundleIO regs (i+1,acc') len
+	     trundleIO rs (i+1,acc') len
 \end{code}
 

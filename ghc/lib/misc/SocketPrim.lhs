@@ -238,7 +238,7 @@ socket family stype protocol = do
     status <- _ccall_ createSocket (packFamily family) 
 				   (packSocketType stype) 
 				   protocol
-    case status of
+    case (status::Int) of
       -1 -> constructErrorAndFail "socket"
       n  -> do
 	socket_status <- newIORef NotConnected
@@ -265,7 +265,7 @@ bindSocket :: Socket	-- Unconnected Socket
 	   -> SockAddr	-- Address to Bind to
 	   -> IO ()
 
-bindSocket (MkSocket s family stype protocol socketStatus) addr = do
+bindSocket (MkSocket s _family _stype _protocol socketStatus) addr = do
 #ifndef cygwin32_TARGET_OS
  let isDomainSocket = if family == AF_UNIX then 1 else (0::Int)
 #else
@@ -274,20 +274,20 @@ bindSocket (MkSocket s family stype protocol socketStatus) addr = do
  currentStatus <- readIORef socketStatus
  if currentStatus /= NotConnected 
   then
-   fail (userError ("bindSocket: can't peform bind on socket in status " ++
+   ioError (userError ("bindSocket: can't peform bind on socket in status " ++
 	 show currentStatus))
   else do
    addr' <- packSockAddr addr
    let (_,sz) = boundsOfByteArray addr'
-   status <- _ccall_ bindSocket s addr' sz isDomainSocket
-   case status of
+   status <- _ccall_ bindSocket s addr' sz (isDomainSocket::Int)
+   case (status::Int) of
      -1 -> constructErrorAndFail "bindSocket"
-     0  -> writeIORef socketStatus (Bound)
+     _  -> writeIORef socketStatus (Bound)
 \end{code}
 	
 
 Make a connection to an already opened socket on a given machine and port.
-assumes that we have already called createSocket, othewise it will fail.
+assumes that we have already called createSocket, otherwise it will fail.
 			
 This is the dual to $bindSocket$.  The {\em server} process will
 usually bind to a port number, the {\em client} will then connect to 
@@ -300,7 +300,7 @@ connect :: Socket	-- Unconnected Socket
 	-> SockAddr 	-- Socket address stuff
 	-> IO ()
 
-connect (MkSocket s family stype protocol socketStatus) addr = do
+connect (MkSocket s _family _stype _protocol socketStatus) addr = do
 #ifndef cygwin32_TARGET_OS
  let isDomainSocket = if family == AF_UNIX then 1 else (0::Int)
 #else
@@ -309,15 +309,15 @@ connect (MkSocket s family stype protocol socketStatus) addr = do
  currentStatus <- readIORef socketStatus
  if currentStatus /= NotConnected 
   then
-   fail (userError ("connect: can't peform connect on socket in status " ++
+   ioError (userError ("connect: can't peform connect on socket in status " ++
          show currentStatus))
   else do
    addr' <- packSockAddr addr
    let (_,sz) = boundsOfByteArray addr'
-   status <- _ccall_ connectSocket s addr' sz isDomainSocket
-   case status of
+   status <- _ccall_ connectSocket s addr' sz (isDomainSocket::Int)
+   case (status::Int) of
      -1 -> constructErrorAndFail "connect"
-     0 -> writeIORef socketStatus Connected
+     _  -> writeIORef socketStatus Connected
 \end{code}
        
 The programmer must call $listen$ to tell the system software
@@ -335,17 +335,17 @@ listen :: Socket  -- Connected & Bound Socket
        -> Int 	  -- Queue Length
        -> IO ()
 
-listen (MkSocket s family stype protocol socketStatus) backlog = do
+listen (MkSocket s _family _stype _protocol socketStatus) backlog = do
  currentStatus <- readIORef socketStatus
  if currentStatus /= Bound 
    then
-    fail (userError ("listen: can't peform listen on socket in status " ++
+    ioError (userError ("listen: can't peform listen on socket in status " ++
           show currentStatus))
    else do
     status <- _ccall_ listenSocket s backlog
-    case status of
+    case (status::Int) of
       -1 -> constructErrorAndFail "listen"
-      0  -> writeIORef socketStatus Listening
+      _  -> writeIORef socketStatus Listening
 \end{code}
 
 A call to $accept$ only returns when data is available on the given
@@ -364,20 +364,20 @@ accept sock@(MkSocket s family stype protocol status) = do
  okay <- sIsAcceptable sock
  if not okay
    then
-     fail (userError ("accept: can't peform accept on socket in status " ++
+     ioError (userError ("accept: can't peform accept on socket in status " ++
 	 show currentStatus))
    else do
      (ptr, sz) <- allocSockAddr family
      int_star <- stToIO (newIntArray (0,1))
      stToIO (writeIntArray int_star 0 sz)
-     sock <- _ccall_ acceptSocket s ptr int_star
-     case sock of
+     new_sock <- _ccall_ acceptSocket s ptr int_star
+     case (new_sock::Int) of
 	  -1 -> constructErrorAndFail "accept"
 	  _  -> do
-		sz <- stToIO (readIntArray int_star 0)
-		addr <- unpackSockAddr ptr sz
-		status <- newIORef Connected
-		return ((MkSocket sock family stype protocol status), addr)
+		a_sz <- stToIO (readIntArray int_star 0)
+		addr <- unpackSockAddr ptr a_sz
+		new_status <- newIORef Connected
+		return ((MkSocket new_sock family stype protocol new_status), addr)
 \end{code}
 
 %************************************************************************
@@ -399,15 +399,15 @@ writeSocket :: Socket	-- Connected Socket
 	    -> String	-- Data to send
 	    -> IO Int	-- Number of Bytes sent
 
-writeSocket (MkSocket s family stype protocol status) xs = do
+writeSocket (MkSocket s _family _stype _protocol status) xs = do
  currentStatus <- readIORef status
  if not ((currentStatus == Connected) || (currentStatus == Listening))
    then
-    fail (userError ("writeSocket: can't peform write on socket in status " ++
+    ioError (userError ("writeSocket: can't peform write on socket in status " ++
           show currentStatus))
    else do
     nbytes <- _ccall_ writeDescriptor s xs (length xs)
-    case nbytes of
+    case (nbytes::Int) of
       -1 -> constructErrorAndFail "writeSocket"
       _  -> return nbytes
 
@@ -417,17 +417,17 @@ sendTo :: Socket	-- Bound/Connected Socket
        -> SockAddr
        -> IO Int	-- Number of Bytes sent
 
-sendTo (MkSocket s family stype protocol status) xs addr = do
+sendTo (MkSocket s _family _stype _protocol status) xs addr = do
  currentStatus <- readIORef status
  if not ((currentStatus == Connected) || (currentStatus == Listening) || (currentStatus == Bound))
    then
-    fail (userError ("sendTo: can't peform write on socket in status " ++
+    ioError (userError ("sendTo: can't peform write on socket in status " ++
           show currentStatus))
    else do
     addr' <- packSockAddr addr
     let (_,sz) = boundsOfByteArray addr'
     nbytes <- _ccall_ sendTo__ s xs (length xs) addr' sz
-    case nbytes of
+    case (nbytes::Int) of
       -1 -> constructErrorAndFail "sendTo"
       _  -> return nbytes
 
@@ -435,21 +435,21 @@ readSocket :: Socket		-- Connected (or bound) Socket
 	   -> Int		-- Number of Bytes to Read
 	   -> IO (String, Int)	-- (Data Read, Number of Bytes)
 
-readSocket (MkSocket s family stype protocol status) nbytes = do
+readSocket (MkSocket s _family _stype _protocol status) nbytes = do
  currentStatus <- readIORef status
  if not ((currentStatus == Connected) || (currentStatus == Listening))
    then
-    fail (userError ("readSocket: can't perform read on socket in status " ++
+    ioError (userError ("readSocket: can't perform read on socket in status " ++
 	  show currentStatus))
    else do
-    ptr <- allocChars nbytes
-    nbytes <- _ccall_ readDescriptor s ptr nbytes
-    case nbytes of
+    ptr  <- allocChars nbytes
+    rlen <- _ccall_ readDescriptor s ptr nbytes
+    case (rlen::Int) of
       -1 -> constructErrorAndFail "readSocket"
       n  -> do
 	    barr <- stToIO (unsafeFreezeByteArray ptr)
-	    s    <- unpackNBytesBAIO barr n
-            return (s,n)
+	    str  <- unpackNBytesBAIO barr n
+            return (str, n)
 
 readSocketAll :: Socket -> IO String
 readSocketAll s =
@@ -466,23 +466,23 @@ readSocketAll s =
     	loop ""
 
 recvFrom :: Socket -> Int -> IO (String, Int, SockAddr)
-recvFrom (MkSocket s family stype protocol status) nbytes = do
+recvFrom (MkSocket s _family _stype _protocol status) nbytes = do
  currentStatus <- readIORef status
  if not ((currentStatus == Connected) || (currentStatus == Listening) || (currentStatus == Bound))
    then
-    fail (userError ("recvFrom: can't perform read on socket in status " ++
+    ioError (userError ("recvFrom: can't perform read on socket in status " ++
 	  show currentStatus))
    else do
-    ptr      <- allocChars nbytes 
+    ptr    <- allocChars nbytes 
     (ptr_addr,_) <- allocSockAddr AF_INET
-    nbytes   <- _ccall_ recvFrom__ s ptr nbytes ptr_addr
-    case nbytes of
+    rlen   <- _ccall_ recvFrom__ s ptr nbytes ptr_addr
+    case (rlen::Int) of
       -1 -> constructErrorAndFail "recvFrom"
       n  -> do
 	    barr <- stToIO (unsafeFreezeByteArray ptr)
 	    addr <- unpackSockAddrInet ptr_addr
-	    s    <- unpackNBytesBAIO barr n
-            return (s, n, addr)
+	    str  <- unpackNBytesBAIO barr n
+            return (str, n, addr)
 
 \end{code}
 
@@ -493,11 +493,11 @@ was given $aNY\_PORT$.
 \begin{code}
 socketPort :: Socket		-- Connected & Bound Socket
 	   -> IO PortNumber	-- Port Number of Socket
-socketPort sock@(MkSocket s AF_INET stype protocol status) =
+socketPort sock@(MkSocket _ AF_INET _ _ _) =
     getSocketName sock >>= \(SockAddrInet port _) ->
     return port
-socketPort (MkSocket s family stype protocol status) =
-    fail (userError ("socketPort: not supported for Family " ++ show family))
+socketPort (MkSocket _ family _ _ _) =
+    ioError (userError ("socketPort: not supported for Family " ++ show family))
 \end{code}
 
 Calling $getPeerName$ returns the address details of the machine,
@@ -509,12 +509,12 @@ is $getSocketName$.
 \begin{code}
 getPeerName   :: Socket -> IO SockAddr
 
-getPeerName (MkSocket s family stype protocol status) = do
- (ptr, sz) <- allocSockAddr family
+getPeerName (MkSocket s family _ _ _) = do
+ (ptr, a_sz) <- allocSockAddr family
  int_star <- stToIO (newIntArray (0,1))
- stToIO (writeIntArray int_star 0 sz)
+ stToIO (writeIntArray int_star 0 a_sz)
  status <- _ccall_ getPeerName s ptr int_star
- case status of
+ case (status::Int) of
    -1 -> constructErrorAndFail "getPeerName"
    _  -> do
 	  sz <- stToIO (readIntArray int_star 0)
@@ -522,12 +522,12 @@ getPeerName (MkSocket s family stype protocol status) = do
     
 getSocketName :: Socket -> IO SockAddr
 
-getSocketName (MkSocket s family stype protocol status) = do
- (ptr, sz) <- allocSockAddr family
+getSocketName (MkSocket s family _ _ _) = do
+ (ptr, a_sz) <- allocSockAddr family
  int_star <- stToIO (newIntArray (0,1))
- stToIO (writeIntArray int_star 0 sz)
- status <- _ccall_ getSockName s ptr int_star
- case status of
+ stToIO (writeIntArray int_star 0 a_sz)
+ rc <- _ccall_ getSockName s ptr int_star
+ case (rc::Int) of
    -1 -> constructErrorAndFail "getSocketName"
    _  -> do
          sz <- stToIO (readIntArray int_star 0)
@@ -595,16 +595,16 @@ setSocketOption :: Socket
 		-> SocketOption -- Option Name
 		-> Int		 -- Option Value
 		-> IO ()
-setSocketOption (MkSocket s family stype protocol status) so v = do
+setSocketOption (MkSocket s _ _ _ _) so v = do
    rc <- _ccall_ setSocketOption__ s (packSocketOption so) v
-   if rc /= 0
+   if rc /= (0::Int)
     then constructErrorAndFail "setSocketOption"
     else return ()
 
 getSocketOption :: Socket
 		-> SocketOption  -- Option Name
 		-> IO Int	  -- Option Value
-getSocketOption (MkSocket s family stype protocol status) so = do
+getSocketOption (MkSocket s _ _ _ _) so = do
    rc <- _ccall_ getSocketOption__ s (packSocketOption so)
    if rc == -1 -- let's just hope that value isn't taken..
     then constructErrorAndFail "getSocketOption"
@@ -1015,7 +1015,10 @@ aNY_PORT = mkPortNumber 0
 iNADDR_ANY :: HostAddress
 iNADDR_ANY = unsafePerformIO (_casm_ `` %r = htonl(INADDR_ANY); '')
 
-sOMAXCONN = ``SOMAXCONN''::Int
+sOMAXCONN :: Int
+sOMAXCONN = ``SOMAXCONN''
+
+maxListenQueue :: Int
 maxListenQueue = sOMAXCONN
 
 -------------------------------------------------------------------------------
@@ -1033,59 +1036,58 @@ shutdown :: Socket -> ShutdownCmd -> IO ()
 shutdown (MkSocket s _ _ _ _) stype = do
   let t = sdownCmdToInt stype
   status <- _ccall_ shutdownSocket s t
-  case status of
+  case (status::Int) of
     -1 -> constructErrorAndFail "shutdown"
     _  -> return ()
 
 -------------------------------------------------------------------------------
 
 sClose	 :: Socket -> IO ()
-sClose (MkSocket s family stype protocol status) = _ccall_ close s
+sClose (MkSocket s _ _ _ _) = _ccall_ close s
 
 -------------------------------------------------------------------------------
 
 sIsConnected :: Socket -> IO Bool
-sIsConnected (MkSocket s family stype protocol status) = do
+sIsConnected (MkSocket _ _ _ _ status) = do
     value <- readIORef status
     return (value == Connected)	
 
 -------------------------------------------------------------------------------
 
 sIsBound :: Socket -> IO Bool
-sIsBound (MkSocket s family stype protocol status) = do
+sIsBound (MkSocket _ _ _ _ status) = do
     value <- readIORef status
     return (value == Bound)	
 
 -------------------------------------------------------------------------------
 
 sIsListening :: Socket -> IO Bool
-sIsListening (MkSocket s family stype protocol status) = do
+sIsListening (MkSocket _ _ _  _ status) = do
     value <- readIORef status
     return (value == Listening)	
 
 -------------------------------------------------------------------------------
 
 sIsReadable  :: Socket -> IO Bool
-sIsReadable (MkSocket s family stype protocol status) = do
+sIsReadable (MkSocket _ _ _ _ status) = do
     value <- readIORef status
     return (value == Listening || value == Connected)
 
 -------------------------------------------------------------------------------
 
 sIsWritable  :: Socket -> IO Bool
-sIsWritable = sIsReadable
+sIsWritable = sIsReadable -- sort of.
 
 -------------------------------------------------------------------------------
 
 sIsAcceptable :: Socket -> IO Bool
 #ifndef cygwin32_TARGET_OS
-sIsAcceptable (MkSocket s AF_UNIX Stream protocol status) = do
+sIsAcceptable (MkSocket _ AF_UNIX Stream _ _) = do
     value <- readIORef status
     return (value == Connected || value == Bound || value == Listening)
-sIsAcceptable (MkSocket s AF_UNIX _ protocol status) = 
-    return False
+sIsAcceptable (MkSocket _ AF_UNIX _ _ _) = return False
 #endif
-sIsAcceptable (MkSocket s _ stype protocol status) = do
+sIsAcceptable (MkSocket _ _ _ _ status) = do
     value <- readIORef status
     return (value == Connected || value == Listening)
     
@@ -1105,7 +1107,7 @@ inet_addr :: String -> IO HostAddress
 inet_addr ipstr = do
    had <- _ccall_ inet_addr ipstr
    if had == (W# (int2Word# (negateInt# 1#))) -- hack to avoid depending on Int.intToWord here.
-    then fail (userError ("inet_addr: Malformed address: " ++ ipstr))
+    then ioError (userError ("inet_addr: Malformed address: " ++ ipstr))
     else return had  -- network byte order
 
 inet_ntoa :: HostAddress -> IO String
@@ -1201,9 +1203,9 @@ it subsequently.
 #ifndef __PARALLEL_HASKELL__
 socketToHandle :: Socket -> IOMode -> IO Handle
 
-socketToHandle (MkSocket fd family stype protocol status) m = do
-    fo <- _ccall_ openFd fd file_mode flush_on_close
-    fo <- makeForeignObj fo
+socketToHandle (MkSocket fd _ _ _ _) m = do
+    fileobj <- _ccall_ openFd fd (file_mode::Int) (flush_on_close::Int)
+    fo <- makeForeignObj fileobj
     addForeignFinaliser fo (freeFileObject fo)
     mkBuffer__ fo 0  -- not buffered
     hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)

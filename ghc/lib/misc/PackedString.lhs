@@ -152,7 +152,7 @@ comparePS (PS  bs1 len1 has_null1) (PS  bs2 len2 has_null2)
     ba1 = ByteArray (0, I# (len1 -# 1#)) bs1
     ba2 = ByteArray (0, I# (len2 -# 1#)) bs2
 
-comparePS (PS  bs1 len1 has_null1) (CPS bs2 len2)
+comparePS (PS  bs1 len1 has_null1) (CPS bs2 _)
   | not has_null1
   = unsafePerformIO (
     _ccall_ strcmp ba1 ba2  >>= \ (I# res) ->
@@ -165,7 +165,7 @@ comparePS (PS  bs1 len1 has_null1) (CPS bs2 len2)
     ba1 = ByteArray (0, I# (len1 -# 1#)) bs1
     ba2 = A# bs2
 
-comparePS (CPS bs1 len1) (CPS bs2 len2)
+comparePS (CPS bs1 len1) (CPS bs2 _)
   = unsafePerformIO (
     _ccall_ strcmp ba1 ba2  >>= \ (I# res) ->
     return (
@@ -233,7 +233,7 @@ packStringST str =
   packNCharsST len str
 
 packNCharsST :: Int -> [Char] -> ST s PackedString
-packNCharsST len@(I# length#) str =
+packNCharsST (I# length#) str =
   {- 
    allocate an array that will hold the string
    (not forgetting the NUL byte at the end)
@@ -294,8 +294,7 @@ unsafeByteArrayToPS (ByteArray _ frozen#) (I# n#)
   = PS frozen# n# (byteArrayHasNUL# frozen# n#)
 
 psToByteArray	 :: PackedString -> ByteArray Int
-psToByteArray (PS bytes n has_null)
-  = ByteArray (0, I# (n -# 1#)) bytes
+psToByteArray (PS bytes n _) = ByteArray (0, I# (n -# 1#)) bytes
 
 psToByteArray (CPS addr len#)
   = let
@@ -314,10 +313,10 @@ isCString (CPS _ _ ) = True
 isCString _	     = False
 
 psToCString :: PackedString -> Addr
-psToCString (CPS addr _) = (A# addr)
-psToCString (PS bytes n# has_null) = 
+psToCString (CPS addr _)    = (A# addr)
+psToCString (PS bytes l# _) = 
   unsafePerformIO $ do
-    stuff <- _ccall_ malloc ((I# n#) * (``sizeof(char)''))
+    stuff <- _ccall_ malloc ((I# l#) * (``sizeof(char)''))
     let
      fill_in n# i#
       | n# ==# 0# = return ()
@@ -325,7 +324,7 @@ psToCString (PS bytes n# has_null) =
          let ch#  = indexCharArray# bytes i#
          writeCharOffAddr stuff (I# i#) (C# ch#)
          fill_in (n# -# 1#) (i# +# 1#)
-    fill_in n# 0#
+    fill_in l# 0#
     return stuff    
 
 \end{code}
@@ -342,8 +341,7 @@ psToCString (PS bytes n# has_null) =
 --   = [ indexPS ps n | n <- [ 0::Int .. lengthPS ps - 1 ] ]
 
 unpackPS :: PackedString -> [Char]
-unpackPS (PS bytes len has_null)
- = unpack 0#
+unpackPS (PS bytes len _) = unpack 0#
  where
     unpack nh
       | nh >=# len  = []
@@ -351,8 +349,7 @@ unpackPS (PS bytes len has_null)
       where
 	ch = indexCharArray# bytes nh
 
-unpackPS (CPS addr len)
-  = unpack 0#
+unpackPS (CPS addr _) = unpack 0#
   where
     unpack nh
       | ch `eqChar#` '\0'# = []
@@ -374,9 +371,8 @@ unpackNBytesPS ps len@(I# l#)
     | otherwise = y#
 
 unpackPSIO :: PackedString -> IO String
-unpackPSIO ps@(PS bytes len has_null) = return (unpackPS ps)
-unpackPSIO (CPS addr len)
-  = unpack 0#
+unpackPSIO ps@(PS bytes _ _) = return (unpackPS ps)
+unpackPSIO (CPS addr _)      = unpack 0#
   where
     unpack nh = do
        ch <- readCharOffAddr (A# addr) (I# nh)
@@ -414,7 +410,7 @@ hGetPS hdl len@(I# len#)
    in
    hFillBufBA hdl byte_array len >>= \  (I# read#) ->
    if read# ==# 0# then -- EOF or other error
-      fail (userError "hGetPS: EOF reached or other error")
+      ioError (userError "hGetPS: EOF reached or other error")
    else
      {-
        The system call may not return the number of
@@ -445,6 +441,7 @@ lengthPS ps = I# (lengthPS# ps)
 
 {-# INLINE lengthPS# #-}
 
+lengthPS# :: PackedString -> Int#
 lengthPS# (PS  _ i _) = i
 lengthPS# (CPS _ i)   = i
 
@@ -474,6 +471,7 @@ indexPS ps (I# n) = C# (indexPS# ps n)
 
 {-# INLINE indexPS# #-}
 
+indexPS# :: PackedString -> Int# -> Char#
 indexPS# (PS bs i _) n
   = --ASSERT (n >=# 0# && n <# i)	-- error checking: my eye!  (WDP 94/10)
     indexCharArray# bs n
@@ -591,7 +589,7 @@ filterPS pred ps =
        (I# off', cs)
 
    copy_arr :: MutableByteArray s Int -> [Char] -> Int# -> Int# -> ST s ()
-   copy_arr arr# [_] _ _ = return ()
+   copy_arr _    [_] _ _ = return ()
    copy_arr arr# ls  n i =
      let
       (x,ls') = matchOffset 0# ls
@@ -645,11 +643,9 @@ foldlPS f b ps
  
 
 foldrPS :: (Char -> a -> a) -> a -> PackedString -> a
-foldrPS f b ps  
- = if nullPS ps then
-      b
-   else
-      whizzRL b len
+foldrPS f v ps
+  | nullPS ps = v
+  | otherwise = whizzRL v len
    where
     len = lengthPS# ps
 
@@ -772,7 +768,6 @@ concatPS [] = nilPS
 concatPS pss
   = let
 	tot_len# = case (foldr ((+) . lengthPS) 0 pss) of { I# x -> x }
-	tot_len	 = I# tot_len#
     in
     runST (
     new_ps_array (tot_len# +# 1#)   >>= \ arr# -> -- incl NUL byte!
@@ -868,6 +863,7 @@ The definition of @_substrPS@ is essentially:
 substrPS :: PackedString -> Int -> Int -> PackedString
 substrPS ps (I# begin) (I# end) = substrPS# ps begin end
 
+substrPS# :: PackedString -> Int# -> Int# -> PackedString
 substrPS# ps s e
   | s <# 0# || e <# s
   = error "substrPS: bounds out of range"
@@ -889,7 +885,6 @@ substrPS# ps s e
     len = lengthPS# ps
 
     result_len# = (if e <# len then (e +# 1#) else len) -# s
-    result_len  = I# result_len#
 
     -----------------------
     fill_in :: MutableByteArray s Int -> Int# -> ST s ()
@@ -923,7 +918,7 @@ packCBytes :: Int -> Addr -> PackedString
 packCBytes len addr = runST (packCBytesST len addr)
 
 packCBytesST :: Int -> Addr -> ST s PackedString
-packCBytesST len@(I# length#) (A# addr) =
+packCBytesST (I# length#) (A# addr) =
   {- 
     allocate an array that will hold the string
     (not forgetting the NUL byte at the end)

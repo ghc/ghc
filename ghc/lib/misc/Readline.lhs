@@ -53,8 +53,8 @@ type RlCallbackFunction =
 %***************************************************************************
 \begin{code}
 
-readline :: String ->			-- Prompt String
-	    IO String			-- Returned line
+readline :: String			-- Prompt String
+	 -> IO String			-- Returned line
 readline prompt =  do
 --ToDo: Get the "Live register in _casm_GC_ " bug fixed
 --      this stops us passing the prompt string to readline directly :-(

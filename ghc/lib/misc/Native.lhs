@@ -127,6 +127,7 @@ hasNElems 4 (_:_:_:_:_)  = True		-- speedup
 hasNElems _ []     = False
 hasNElems n (_:xs) = hasNElems (n-1) xs
 
+lenLong, lenInt, lenShort, lenFloat, lenDouble :: Int
 lenLong   = length (longToBytes   0 [])
 lenInt    = length (intToBytes    0 [])
 lenShort  = length (shortToBytes  0 [])

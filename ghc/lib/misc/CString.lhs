@@ -80,7 +80,7 @@ unpackCStringIO addr
 -- unpack 'len' chars
 unpackCStringLenIO :: Addr -> Int -> IO String
 unpackCStringLenIO addr l@(I# len#)
- | len# <# 0#  = fail (userError ("CString.unpackCStringLenIO: negative length (" ++ show l ++ ")"))
+ | len# <# 0#  = ioError (userError ("CString.unpackCStringLenIO: negative length (" ++ show l ++ ")"))
  | len# ==# 0# = return ""
  | otherwise   = unpack [] (len# -# 1#)
   where
@@ -102,8 +102,8 @@ unpackNBytesBAIO ba l = unpackNBytesAccBAIO ba l []
 
 -- note: no bounds checking!
 unpackNBytesAccBAIO :: ByteArray Int -> Int -> [Char] -> IO [Char]
-unpackNBytesAccBAIO ba 0  rest = return rest
-unpackNBytesAccBAIO  (ByteArray _ ba) (I# len#) rest = unpack rest (len# -# 1#)
+unpackNBytesAccBAIO _ 0  rest = return rest
+unpackNBytesAccBAIO (ByteArray _ ba) (I# len#) rest = unpack rest (len# -# 1#)
   where
     unpack acc i# 
       | i# <# 0#   = return acc
@@ -134,13 +134,13 @@ strings No indices...I hate indices.  Death to Ix.
 
 \begin{code}
 vectorize :: [String] -> IO (ByteArray Int)
-vectorize xs = do
+vectorize vs = do
   arr <- allocWords (len + 1)
-  fill arr 0 xs
+  fill arr 0 vs
   freeze arr
  where
     len :: Int
-    len = length xs
+    len = length vs
 
     fill :: MutableByteArray RealWorld Int -> Int -> [String] -> IO ()
     fill arr n [] =

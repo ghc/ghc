@@ -41,8 +41,8 @@ unionLists (a:as) b
 
 intersectLists :: (Eq a) => [a] -> [a] -> [a]
 intersectLists []     []		= []
-intersectLists []     b			= []
-intersectLists a      []		= []
+intersectLists []     _			= []
+intersectLists _      []		= []
 intersectLists (a:as) b
   | a `is_elem` b = a : intersectLists as b
   | otherwise	  = intersectLists as b
@@ -71,7 +71,7 @@ minusList xs ys = [ x | x <- xs, x `not_elem` ys]
 
 disjointLists, intersectingLists :: Eq a => [a] -> [a] -> Bool
 
-disjointLists []     bs = True
+disjointLists []     _  = True
 disjointLists (a:as) bs
   | a `elem` bs = False
   | otherwise   = disjointLists as bs

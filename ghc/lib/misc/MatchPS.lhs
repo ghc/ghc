@@ -194,11 +194,7 @@ substPS :: PackedString   -- reg. exp
 	-> [Char]	   -- flags
 	-> PackedString   -- string
 	-> PackedString
-substPS rexp
-	repl
-	flags
-	str
- = search str 
+substPS rexp repl flags	pstr = search pstr
    where
     global = 'g' `elem` flags
     case_insensitive = 'i' `elem` flags
@@ -213,15 +209,13 @@ substPS rexp
        in
         case search_res of
           Nothing  -> str
-          Just matcher@(REmatch arr before match after lst) ->
+          Just matcher@(REmatch _ before match after _) ->
 	    let
 	     (st,en) = match
-             prefix = chunkPS str before
+             prefix  = chunkPS str before
              suffix 
-              = if global && (st /= en) then
-	           search (dropPS en str)
-	        else
-	           chunkPS str after
+              | global && (st /= en) = search (dropPS en str)
+	      | otherwise	     = chunkPS str after
 	    in	
 	     concatPS [prefix,
 	                replace matcher repl str,
@@ -232,7 +226,7 @@ replace :: REmatch
 	-> PackedString
         -> PackedString
         -> PackedString
-replace (REmatch arr before@(_,b_end) match after lst)
+replace (REmatch arr (_,b_end) match after lst)
 	replacement
         str
  = concatPS (reverse acc) -- ToDo: write a `reversed' version of concatPS
@@ -249,9 +243,8 @@ replace (REmatch arr before@(_,b_end) match after lst)
 	     -> Bool 
 	     -> [PackedString]
     replace' acc repl escaped
-     = if (nullPS repl) then
-         acc
-       else
+      | nullPS repl = acc
+      | otherwise   =
          let
           x  = headPS repl
 	  x# = case x of { C# c -> c }
@@ -339,7 +332,6 @@ replacePS rexp
 	  str
  = search str 
    where
-    global = 'g' `elem` flags
     case_insensitive = 'i' `elem` flags
     mode = 's' `elem` flags	-- single-line mode
     pat  = unsafePerformIO (
@@ -352,7 +344,7 @@ replacePS rexp
        in
         case search_res of
           Nothing  -> str
-          Just matcher@(REmatch arr before match after lst) ->
+          Just matcher@(REmatch arr _ match _ lst) ->
 	     replace matcher repl str
 
 \end{code}
@@ -370,18 +362,13 @@ getMatchedGroup :: REmatch
 	        -> Int 
 	        -> PackedString 
 	        -> PackedString
-getMatchedGroup (REmatch arr bef mtch after lst) nth str
- = let
+getMatchedGroup (REmatch arr bef mtch _ lst) nth str
+ | (nth >= 1) && (nth <= grps) = chunkPS str (arr!nth)
+ | otherwise		       = error "getMatchedGroup: group out of range"
+  where
     (1,grps) = bounds arr
-   in
-    if (nth >= 1) && (nth <= grps) then
-       chunkPS str (arr!nth)
-    else
-       error "getMatchedGroup: group out of range"
 
-getWholeMatch :: REmatch 
-	      -> PackedString 
-	      -> PackedString
+getWholeMatch :: REmatch -> PackedString -> PackedString
 getWholeMatch (REmatch _ _  mtch _ _) str
  = chunkPS str mtch
 

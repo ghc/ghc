@@ -139,17 +139,17 @@ flatten :: FAST_INT	-- Indentation
 	-> [WorkItem]	-- Work list with indentation
 	-> String
 
-flatten n nlp CNil seqs = flattenS nlp seqs
+flatten _ nlp CNil seqs = flattenS nlp seqs
 
 flatten n nlp (CAppend seq1 seq2) seqs = flatten n nlp seq1 ((WI n seq2) : seqs)
 flatten n nlp (CIndent IBOX(n2) seq) seqs = flatten (n2 _ADD_ n) nlp seq seqs
 
-flatten n _FALSE_ CNewline seqs = '\n' : flattenS _TRUE_ seqs
-flatten n _TRUE_  CNewline seqs = flattenS _TRUE_ seqs	-- Already at start of line
+flatten _ _FALSE_ CNewline seqs = '\n' : flattenS _TRUE_ seqs
+flatten _ _TRUE_  CNewline seqs = flattenS _TRUE_ seqs	-- Already at start of line
 
-flatten n _FALSE_ (CStr s) seqs = s ++ flattenS _FALSE_ seqs
-flatten n _FALSE_ (CCh  c) seqs = c :  flattenS _FALSE_ seqs
-flatten n _FALSE_ (CInt i) seqs = show i ++ flattenS _FALSE_ seqs
+flatten _ _FALSE_ (CStr s) seqs = s ++ flattenS _FALSE_ seqs
+flatten _ _FALSE_ (CCh  c) seqs = c :  flattenS _FALSE_ seqs
+flatten _ _FALSE_ (CInt i) seqs = show i ++ flattenS _FALSE_ seqs
 #if defined(COMPILING_GHC)
 flatten n _FALSE_ (CPStr s) seqs = _UNPK_ s ++ flattenS _FALSE_ seqs
 #endif
@@ -164,7 +164,7 @@ flatten n _TRUE_ (CPStr s) seqs = mkIndent n ( _UNPK_ s ++ flattenS _FALSE_ seqs
 
 \begin{code}
 flattenS :: FAST_BOOL -> [WorkItem] -> String
-flattenS nlp [] = ""
+flattenS _   [] = ""
 flattenS nlp ((WI col seq):seqs) = flatten col nlp seq seqs
 \end{code}
 
