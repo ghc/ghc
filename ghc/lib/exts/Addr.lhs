@@ -35,6 +35,7 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 		, writeInt8OffAddr,  writeInt16OffAddr
 		, writeInt32OffAddr, writeInt64OffAddr
 		)
+import PrelIOBase ( IO(..), IOResult(..) )
 
 \end{code}
 
@@ -109,20 +110,27 @@ readDoubleOffAddr a i = _casm_ `` %r=(StgDouble)(((StgDouble*)%0)[(StgInt)%1]); 
 
 \begin{code}
 writeCharOffAddr   :: Addr -> Int -> Char   -> IO ()
-writeCharOffAddr a i e = _casm_ `` (((StgChar*)%0)[(StgInt)%1])=(StgChar)%2; '' a i e
+writeCharOffAddr (A# a#) (I# i#) (C# c#) = IO $ \ s# ->
+      case (writeCharOffAddr#  a# i# c# s#) of s2# -> IOok s2# () 
 
 writeIntOffAddr    :: Addr -> Int -> Int    -> IO ()
-writeIntOffAddr a i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' a i e
+writeIntOffAddr (A# a#) (I# i#) (I# e#) = IO $ \ s# ->
+      case (writeIntOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
 writeWordOffAddr    :: Addr -> Int -> Word  -> IO ()
-writeWordOffAddr a i e = _casm_ `` (((StgWord*)%0)[(StgInt)%1])=(StgWord)%2; '' a i e
+writeWordOffAddr (A# a#) (I# i#) (W# e#) = IO $ \ s# ->
+      case (writeWordOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
 writeAddrOffAddr   :: Addr -> Int -> Addr   -> IO ()
-writeAddrOffAddr a i e = _casm_ `` (((StgAddr*)%0)[(StgInt)%1])=(StgAddr)%2; '' a i e
+writeAddrOffAddr (A# a#) (I# i#) (A# e#) = IO $ \ s# ->
+      case (writeAddrOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
 writeFloatOffAddr  :: Addr -> Int -> Float  -> IO ()
-writeFloatOffAddr a i e = _casm_ `` (((StgFloat*)%0)[(StgInt)%1])=(StgFloat)%2; '' a i e
+writeFloatOffAddr (A# a#) (I# i#) (F# e#) = IO $ \ s# ->
+      case (writeFloatOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
 writeDoubleOffAddr :: Addr -> Int -> Double -> IO ()
-writeDoubleOffAddr a i e = _casm_ `` (((StgDouble*)%0)[(StgInt)%1])=(StgDouble)%2; '' a i e
+writeDoubleOffAddr (A# a#) (I# i#) (D# e#) = IO $ \ s# ->
+      case (writeDoubleOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
+
 \end{code}
