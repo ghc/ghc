@@ -406,9 +406,6 @@
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY
 
-/* Define if compiler supports prototypes. */
-#undef HAVE_PROTOTYPES
-
 /* Define if readline/readline.h and readline/history.h exist */
 #undef HAVE_READLINE_HEADERS
 

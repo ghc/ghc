@@ -1317,9 +1317,6 @@ AC_FUNC_VFORK
 dnl ** determine whether or not const works
 AC_C_CONST
 
-dnl ** determine whether ANSI-function prototypes work?
-AC_C_PROTOTYPES          
-
 dnl ** are we big endian?
 AC_C_BIGENDIAN
 
