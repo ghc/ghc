@@ -28,10 +28,10 @@ SRCS	= \
 	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
 	Text/Html/BlockTable.hs Text/Html.hs Text/Printf.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
+	Text/ParserCombinators/ReadP.hs Data/Version.hs
 
 
-#	Text/ParserCombinators/ReadP.hs Text/ParserCombinators/ReadPrec.hs
-#	Data/Version.hs \
+#	Text/ParserCombinators/ReadPrec.hs
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc

@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  portable
+-- Portability :  non-portable (local universal quantification in ReadP)
 --
 -- A general library for representation and manipulation of versions.
 -- 
@@ -37,7 +37,7 @@ import Prelude -- necessary to get dependencies right
 -- of GHC.  In which case, we might need to pick up ReadP from 
 -- Distribution.Compat.ReadP, because the version in 
 -- Text.ParserCombinators.ReadP doesn't have all the combinators we need.
-#if __GLASGOW_HASKELL__ >= 603 || __HUGS__
+#if __GLASGOW_HASKELL__ >= 603 || __HUGS__ || __NHC__
 import Text.ParserCombinators.ReadP
 #else
 import Distribution.Compat.ReadP
@@ -140,8 +140,10 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ <= 602 && !__HUGS__
+#if __GLASGOW_HASKELL__ <= 602 && !__HUGS__ && !__NHC__
 parseVersion :: ReadP r Version
+#elif __NHC__
+parseVersion :: ReadPN r Version
 #else
 parseVersion :: ReadP Version
 #endif
