@@ -73,7 +73,7 @@ maybeHomeModule mod_name is_source = do
 	-- package because we can compile these automatically.  In one-shot
 	-- compilation mode we look for .hi files only.
        std_exts
-         | isCompManagerMode mode =
+         | isCompManagerMode mode || mode == DoMkDependHS =
         	[ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
 		, ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
 	        ]
