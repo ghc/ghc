@@ -3722,6 +3722,7 @@ $ ./configure</screen>
 
 <programlisting>GhcUnregisterised = YES
 GhcLibHcOpts = -O -fvia-C -keep-hc-files
+GhcRtsHcOpts = -keep-hc-files
 GhcLibWays =
 SplitObjs = NO
 GhcWithNativeCodeGen = NO
