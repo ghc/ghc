@@ -27,7 +27,7 @@ import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
-import Rename
+import Rename		( checkOldIface, renameModule, renameExpr, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
@@ -525,12 +525,12 @@ initPersistentCompilerState
 initPersistentRenamerState :: IO PersistentRenamerState
   = do ns <- mkSplitUniqSupply 'r'
        return (
-        PRS { prsOrig  = Orig { origNames  = initOrigNames,
+        PRS { prsOrig  = Orig { origNS	   = ns,
+				origNames  = initOrigNames,
 			        origIParam = emptyFM },
 	      prsDecls = (emptyNameEnv, 0),
 	      prsInsts = (emptyBag, 0),
-	      prsRules = (emptyBag, 0),
-	      prsNS    = ns
+	      prsRules = (emptyBag, 0)
             }
         )
 

@@ -460,8 +460,7 @@ data PersistentRenamerState
   = PRS { prsOrig  :: OrigNameEnv,
 	  prsDecls :: DeclsMap,
 	  prsInsts :: IfaceInsts,
-	  prsRules :: IfaceRules,
-	  prsNS    :: UniqSupply
+	  prsRules :: IfaceRules
     }
 \end{code}
 
@@ -479,7 +478,9 @@ we just store junk.  Then when we find the binding site, we fix it up.
 
 \begin{code}
 data OrigNameEnv
- = Orig { origNames  :: OrigNameNameEnv,
+ = Orig { origNS     :: UniqSupply,
+		-- Supply of uniques
+	  origNames  :: OrigNameNameEnv,
 		-- Ensures that one original name gets one unique
 	  origIParam :: OrigNameIParamEnv
 		-- Ensures that one implicit parameter name gets one unique

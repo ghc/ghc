@@ -37,7 +37,7 @@ import HsSyn
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
 import HscTypes		( AvailEnv, lookupType,
-			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
+			  OrigNameEnv(..), 
 			  WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
@@ -141,9 +141,7 @@ data RnDown
 			-- so it has a Module, so it can be looked up
 
 	rn_errs    :: IORef Messages,
-
-	-- The second and third components are a flattened-out OrigNameEnv
-	rn_ns      :: IORef (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv),
+	rn_ns      :: IORef OrigNameEnv,
 	rn_ifaces  :: IORef Ifaces
     }
 
@@ -333,10 +331,7 @@ initRn dflags hit hst pcs mod do_rn
 				-- and we don't want thereby to try to suck it in!
 			      iVSlurp = (emptyModuleSet, emptyNameSet)
 		      }
-        let uniqs = prsNS prs
-
-	names_var <- newIORef (uniqs, origNames (prsOrig prs), 
-				      origIParam (prsOrig prs))
+	names_var <- newIORef (prsOrig prs)
 	errs_var  <- newIORef (emptyBag,emptyBag)
 	iface_var <- newIORef ifaces
 	let rn_down = RnDown { rn_mod = mod,
@@ -355,15 +350,13 @@ initRn dflags hit hst pcs mod do_rn
 	res <- do_rn rn_down ()
 	
 	-- Grab state and record it
-	(warns, errs) 			<- readIORef errs_var
-	new_ifaces    			<- readIORef iface_var
-	(new_NS, new_origN, new_origIP) <- readIORef names_var
-	let new_orig = Orig { origNames = new_origN, origIParam = new_origIP }
+	(warns, errs) 	<- readIORef errs_var
+	new_ifaces    	<- readIORef iface_var
+	new_orig	<- readIORef names_var
 	let new_prs = prs { prsOrig = new_orig,
 			    prsDecls = iDecls new_ifaces,
 			    prsInsts = iInsts new_ifaces,
-			    prsRules = iRules new_ifaces,
-			    prsNS    = new_NS }
+			    prsRules = iRules new_ifaces }
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
@@ -409,8 +402,7 @@ renameDerivedCode dflags mod prs thing_inside
 	-- and that doesn't happen in pragmas etc
 
     do	{ us <- mkSplitUniqSupply 'r'
-	; names_var <- newIORef (us, origNames (prsOrig prs), 
-				 origIParam (prsOrig prs))
+	; names_var <- newIORef ((prsOrig prs) { origNS = us })
 	; errs_var <- newIORef (emptyBag,emptyBag)
 
     	; let rn_down = RnDown { rn_dflags = dflags,
@@ -613,21 +605,21 @@ getTypeEnvRn down l_down = return (rn_done down)
 %=====================
 
 \begin{code}
-getNameSupplyRn :: RnM d (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv)
+getNameSupplyRn :: RnM d OrigNameEnv
 getNameSupplyRn rn_down l_down
   = readIORef (rn_ns rn_down)
 
-setNameSupplyRn :: (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv) -> RnM d ()
+setNameSupplyRn :: OrigNameEnv -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
 getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
- = readIORef names_var >>= \ (us, cache, ipcache) ->
+ = readIORef names_var >>= \ ns ->
    let
-     (us1,us') = splitUniqSupply us
+     (us1,us') = splitUniqSupply (origNS ns)
    in
-   writeIORef names_var (us', cache, ipcache)  >>
+   writeIORef names_var (ns {origNS = us'})	>>
    return (uniqFromSupply us1)
 \end{code}
 
