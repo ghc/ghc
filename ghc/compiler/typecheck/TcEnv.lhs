@@ -282,17 +282,12 @@ tcLookupGlobal name
 	other	   -> notFound "tcLookupGlobal" name
 
 tcLookupGlobalId :: Name -> TcM Id
+-- Never used for Haskell-source DataCons, hence no ADataCon case
 tcLookupGlobalId name
   = tcLookupGlobal_maybe name	`thenM` \ maybe_thing ->
     case maybe_thing of
-	Just (AnId id)     -> returnM id
-
-	-- When typechecking Haskell source, occurrences of
-	-- data constructors use the "source name", which maps
-	-- to ADataCon; we want the wrapper instead
-	Just (ADataCon dc) -> returnM (dataConWrapId dc)
-
-	other	           -> notFound "tcLookupGlobal (id)" name
+	Just (AnId id) -> returnM id
+	other	       -> notFound "tcLookupGlobal (id)" name
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon con_name
@@ -356,22 +351,21 @@ tcLookup name
 
 tcLookupId :: Name -> TcM Id
 -- Used when we aren't interested in the binding level
+-- Never a DataCon. (Why does that matter? see TcExpr.tcId)
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id lvl	      -> returnM tc_id
-	AGlobal (AnId id)     -> returnM id
-	AGlobal (ADataCon dc) -> returnM (dataConWrapId dc)
-		-- C.f. tcLookupGlobalId
-	other		      -> pprPanic "tcLookupId" (ppr name)
+	ATcId tc_id lvl	  -> returnM tc_id
+	AGlobal (AnId id) -> returnM id
+	other		  -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupIdLvl :: Name -> TcM (Id, Level)
+-- DataCons dealt with separately
 tcLookupIdLvl name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id lvl	      -> returnM (tc_id, lvl)
-	AGlobal (AnId id)     -> returnM (id, topIdLvl id)
-	AGlobal (ADataCon dc) -> returnM (dataConWrapId dc, impLevel)
+	ATcId tc_id lvl	  -> returnM (tc_id, lvl)
+	AGlobal (AnId id) -> returnM (id, topIdLvl id)
 	other		  -> pprPanic "tcLookupIdLvl" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]

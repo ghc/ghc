@@ -50,10 +50,10 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
-import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks )
+import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector )
+import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks, dataConWrapId )
 import Name		( Name )
-import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
+import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons, isClassTyCon )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy )
@@ -443,10 +443,14 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 	bad_guys = [ addErrTc (notSelector field_name) 
 		   | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
-		      case maybe_sel_id of
-			Just (AnId sel_id) -> not (isRecordSelector sel_id)
-			other		   -> True
+		     not (is_selector maybe_sel_id)
 		   ]
+	is_selector (Just (AnId sel_id))
+	   = isRecordSelector sel_id && 	-- At the moment, class ops are
+						-- treated as record selectors, but
+						-- we want to exclude that case here
+	     not (isClassTyCon (fieldLabelTyCon (recordSelectorFieldLabel sel_id)))
+	is_selector other = False
     in
     checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
     
@@ -455,11 +459,8 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
 	(Just (AnId sel_id) : _) = maybe_sel_ids
-
-	(_, _, tau)  = tcSplitSigmaTy (idType sel_id)	-- Selectors can be overloaded
-		     					-- when the data type has a context
-	data_ty	     = tcFunArgTy tau			-- Must succeed since sel_id is a selector
-	tycon	     = tcTyConAppTyCon data_ty
+	field_lbl    = recordSelectorFieldLabel sel_id	-- We've failed already if
+	tycon	     = fieldLabelTyCon field_lbl	-- it's not a field label
 	data_cons    = tyConDataCons tycon
 	tycon_tyvars = tyConTyVars tycon		-- The data cons use the same type vars
     in
@@ -788,10 +789,22 @@ This gets a bit less sharing, but
 \begin{code}
 tcId :: Name -> TcM (TcExpr, TcType)
 tcId name	-- Look up the Id and instantiate its type
-  = tcLookupIdLvl name			`thenM` \ (id, bind_lvl) ->
+  = 	-- First check whether it's a DataCon
+	-- Reason: we must not forget to chuck in the
+	--	   constraints from their "silly context"
+    tcLookupGlobal_maybe name		`thenM` \ maybe_thing ->
+    case maybe_thing of {
+	Just (ADataCon data_con) -> inst_data_con data_con ;
+	other			 ->
 
+	-- OK, so now look for ordinary Ids
+    tcLookupIdLvl name			`thenM` \ (id, bind_lvl) ->
+
+#ifndef GHCI
+    loop (HsVar id) (idType id)		-- Non-TH case
+
+#else /* GHCI is on */
 	-- Check for cross-stage lifting
-#ifdef GHCI
     getStage				`thenM` \ use_stage -> 
     case use_stage of
       Brack use_lvl ps_var lie_var
@@ -831,11 +844,9 @@ tcId name	-- Look up the Id and instantiate its type
 
       other -> 
 	checkWellStaged (quotes (ppr id)) bind_lvl use_stage	`thenM_`
+	loop (HsVar id) (idType id)
 #endif
-	-- This is the bit that handles the no-Template-Haskell case
-	case isDataConWrapId_maybe id of
-		Nothing       -> loop (HsVar id) (idType id)
-		Just data_con -> inst_data_con id data_con
+    }
 
   where
     orig = OccurrenceOf name
@@ -855,12 +866,7 @@ tcId name	-- Look up the Id and instantiate its type
 	| otherwise
 	= returnM (fun, fun_ty)
 
-    want_method_inst fun_ty 
-	| opt_NoMethodSharing = False	
-	| otherwise	      = case tcSplitSigmaTy fun_ty of
-				  (_,[],_)    -> False 	-- Not overloaded
-				  (_,theta,_) -> not (any isLinearPred theta)
-	-- This is a slight hack.
+	-- 	Hack Alert (want_method_inst)!
 	-- If 	f :: (%x :: T) => Int -> Int
 	-- Then if we have two separate calls, (f 3, f 4), we cannot
 	-- make a method constraint that then gets shared, thus:
@@ -868,14 +874,21 @@ tcId name	-- Look up the Id and instantiate its type
 	-- because that loses the linearity of the constraint.
 	-- The simplest thing to do is never to construct a method constraint
 	-- in the first place that has a linear implicit parameter in it.
+    want_method_inst fun_ty 
+	| opt_NoMethodSharing = False	
+	| otherwise	      = case tcSplitSigmaTy fun_ty of
+				  (_,[],_)    -> False 	-- Not overloaded
+				  (_,theta,_) -> not (any isLinearPred theta)
+
 
 	-- We treat data constructors differently, because we have to generate
 	-- constraints for their silly theta, which no longer appears in
 	-- the type of dataConWrapId.  It's dual to TcPat.tcConstructor
-    inst_data_con id data_con
+    inst_data_con data_con
       = tcInstDataCon orig data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
 	extendLIEs ex_dicts		`thenM_`
-	returnM (mkHsDictApp (mkHsTyApp (HsVar id) ty_args) (map instToId ex_dicts), 
+	returnM (mkHsDictApp (mkHsTyApp (HsVar (dataConWrapId data_con)) ty_args) 
+			     (map instToId ex_dicts), 
 		 mkFunTys arg_tys result_ty)
 \end{code}
 
