@@ -29,6 +29,7 @@ module System.Directory
     , getHomeDirectory
     , getAppUserDataDirectory
     , getUserDocumentsDirectory
+    , getTemporaryDirectory
 
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
@@ -873,6 +874,35 @@ getUserDocumentsDirectory = do
   getEnv "HOME"
 #endif
 
+{- | Returns the current directory for temporary files.
+
+On Unix, 'getTemporaryDirectory' returns the value of the @TMPDIR@
+environment variable or \"\/tmp\" if the variable isn\'t defined.
+On Windows, the function checks for the existence of environment variables in 
+the following order and uses the first path found:
+
+* TMP environment variable. 
+* TEMP environment variable. 
+* USERPROFILE environment variable. 
+* The Windows directory
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of temporary directory.
+
+The function doesn\'t verify whether the path exists.
+-}
+getTemporaryDirectory :: IO FilePath
+getTemporaryDirectory = do
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_GetTempPath (fromIntegral long_path_size) pPath
+     peekCString pPath
+#else
+  catch (getEnv "TMPDIR") (\ex -> return "/tmp")
+#endif
+
 #if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
 foreign import stdcall unsafe "SHGetFolderPath" 
             c_SHGetFolderPath :: Ptr () 
@@ -885,4 +915,6 @@ foreign import ccall unsafe "__hscore_CSIDL_PROFILE"  csidl_PROFILE  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
+
+foreign import stdcall unsafe "GetTempPath" c_GetTempPath :: CInt -> CString -> IO CInt
 #endif
