@@ -495,6 +495,18 @@ if test x"$EnableWin32DLLs" = "xYES" ; then
  AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
 fi
 
+dnl ** Enable the building of the ObjectIO?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(objectio,
+[  --enable-objectio
+        Build ObjectIO, a portable GUI library for Haskell.
+        (This option is only relevant when libraries are built.)
+],
+[GhcLibsWithObjectIO=YES],
+[GhcLibsWithObjectIO=NO]
+)
+AC_SUBST(GhcLibsWithObjectIO)
+
 dnl ** Enable the building of the OpenGL/GLUT binding in hslibs?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hopengl,

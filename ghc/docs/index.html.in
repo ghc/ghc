@@ -70,9 +70,11 @@
             the OpenGL utility toolkit.
           </LI>
 @HOpenGLHTMLEnd@
+@ObjectIOHTMLStart@
 	  <LI>
 	    <A HREF="ObjectIO/index.html"><TT>ObjectIO</TT></a>: GUI library.
           </LI>
+@ObjectIOHTMLEnd@
         </UL>
       </LI>
 

@@ -20,6 +20,25 @@ dnl These are needed by the .spec file.
 AC_SUBST(version)
 AC_SUBST(patchlevel)
 
+dnl Uncomment links to ObjectIO docs if necessary
+AC_ARG_ENABLE(objectio,
+[  --enable-objectio
+        Build ObjectIO, a portable GUI library for Haskell.
+        (This option is only relevant when libraries are built.)
+],
+[
+ObjectIOHTMLStart=""
+ObjectIOHTMLEnd=""
+],
+[
+ObjectIOHTMLStart="<!--"
+ObjectIOHTMLEnd="-->"
+]
+)
+
+AC_SUBST(ObjectIOHTMLStart)
+AC_SUBST(ObjectIOHTMLEnd)
+
 dnl Uncomment links to HOpenGL docs if necessary
 AC_ARG_ENABLE(hopengl,
 [  --enable-hopengl
