@@ -24,13 +24,13 @@ TargetPlatform=`/bin/sh $srcdir/config.sub $target` || exit 1
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
 case $TargetPlatform in
-alpha-dec-osf[[12]]*)
+alpha*-dec-osf[[12]]*)
 	TargetPlatform=alpha-dec-osf1;;
-alpha-dec-osf[[34]]*)
+alpha*-dec-osf[[345]]*)
 	TargetPlatform=alpha-dec-osf3;;
-alpha-unknown-linux)
+alpha*-unknown-linux)
 	TargetPlatform=alpha-unknown-linux;;
-alpha-unknown-freebsd*)
+alpha*-unknown-freebsd*)
 	TargetPlatform=alpha-unknown-freebsd;;
 hppa1.1-hp-hpux*)
 	TargetPlatform=hppa1.1-hp-hpux;;
