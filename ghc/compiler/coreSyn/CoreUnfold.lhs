@@ -64,6 +64,10 @@ import Maybes		( maybeToBool )
 import Bag
 import Util		( isIn, lengthExceeds )
 import Outputable
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 %************************************************************************
