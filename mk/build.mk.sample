@@ -1,0 +1,64 @@
+# -----------------------------------------------------------------------------
+# A Sample build.mk
+#
+# Uncomment one of the following BuildFlavour settings to get the desired
+# overall build type, and then tweak the options in the relevant section
+# below.
+
+BuildFlavour = devel
+#BuildFlavour = perf
+
+# -------- Misc. settings -----------------------------------------------------
+
+# Not necessary to set this, but useful if you have other projects checked-out
+# in your source tree.
+ProjectsToBuild = glafp-utils ghc libraries hslibs
+
+# Which warnings we like to use
+MyWarningOpts   = -W -fno-warn-unused-matches -fwarn-unused-imports
+
+# -------- 1. A Development build --------------------------------------------
+
+ifeq "$(BuildFlavour)" "devel"
+
+GhcCompilerWays =
+
+FptoolsHcOpts = -H32m $(MyWarningOpts)
+GhcHcOpts     = -Rghc-timing -DDEBUG
+GhcLibHcOpts  = -dcore-lint -O -H32m  $(MyWarningOpts) -keep-hc-files 
+GhcLibWays    =
+
+# Debugging RTS
+GhcRtsHcOpts = -optc-DDEBUG
+GhcRtsCcOpts = -g
+SRC_HC_OPTS  += -lbfd -liberty
+
+# profiled RTS
+#GhcRtsCcOpts =  -pg -g
+
+# Optimised/profiled RTS
+#GhcRtsCcOpts = -O2 -pg
+
+#GhcRtsWithFrontPanel = YES
+#SRC_HC_OPTS += `gtk-config --libs`
+
+SplitObjs = NO
+
+NoFibWays =
+SRC_RUNTEST_OPTS += +RTS -H10m -RTS
+STRIP=:
+
+endif
+
+# -------- 1. A Performance/Distribution build--------------------------------
+
+ifeq "$(BuildFlavour)" "perf"
+
+FptoolsHcOpts = -H32m -O $(MyWarningOpts)
+GhcHcOpts     = -Rghc-timing
+GhcLibHcOpts  = -H32m -O $(MyWarningOpts)
+
+GhcLibWays    = p
+
+#GhcRtsCcOpts = -O2 -fomit-frame-pointer -mpreferred-stack-boundary=2 -march=pentiumpro
+endif
