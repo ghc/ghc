@@ -84,7 +84,7 @@ mkSplitUniqSupply (C# c#)
     in
     mk_supply#
 
-foreign import ccall "genSymZh" unsafe genSymZh :: IO Word
+foreign import ccall unsafe "genSymZh" genSymZh :: IO Word
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
