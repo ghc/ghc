@@ -47,7 +47,7 @@ import ByteArray(ByteArray)
 import Char(ord, chr)
 import CString(packString, unpackCStringIO)
 import IO(Handle)
-import IOExts(IORef, newIORef, readIORef, writeIORef, unsafePerformIO)
+import IOExts(IORef, newIORef, readIORef, writeIORef, unsafePerformIO, freeHaskellFunctionPtr)
 import Maybe(fromMaybe)
 import Monad(when)
 import Posix(intToFd, fdToHandle)
@@ -75,8 +75,8 @@ type RlCallbackFunction =
 rlInitialize :: IO ()
 rlInitialize = rlSetReadlineName =<< getProgName
 
-foreign import ccall "free"     free        :: Addr -> IO ()
-foreign import ccall "readline" readlineAux :: ByteArray Int -> IO Addr
+foreign import "free"     unsafe free        :: Addr -> IO ()
+foreign import "readline" unsafe readlineAux :: ByteArray Int -> IO Addr
 
 readline :: String		-- Prompt String
 	 -> IO (Maybe String)	-- Just returned line or Nothing if EOF
@@ -88,15 +88,15 @@ readline prompt =  do
               free cstr
               return (Just str)
 
-foreign import ccall "add_history" add_history :: ByteArray Int -> IO ()
+foreign import "add_history" unsafe add_history :: ByteArray Int -> IO ()
 
 addHistory :: String		-- String to enter in history
            -> IO ()
 addHistory = add_history . packString
 
 
-foreign export ccall dynamic mkRlCallback :: (Int -> Int -> IO Int) -> IO Addr
-foreign import ccall "rl_bind_key" rl_bind_key :: Int -> Addr -> IO Int
+foreign export dynamic mkRlCallback :: (Int -> Int -> IO Int) -> IO Addr
+foreign import "rl_bind_key" rl_bind_key :: Int -> Addr -> IO Int
 
 rlBindKey :: KeyCode		    -- Key to Bind to
 	  -> RlCallbackFunction	    -- Function to exec on execution
@@ -106,7 +106,7 @@ rlBindKey key cback = do
    ok     <- rl_bind_key (ord key) cbAddr
    if ok /= 0 then wrongKeyCode else addCbackEntry key cbAddr
 
-foreign import ccall "rl_add_defun" rl_add_defun :: ByteArray Int -> Addr -> Int -> IO Int
+foreign import "rl_add_defun" unsafe rl_add_defun :: ByteArray Int -> Addr -> Int -> IO Int
 
 rlAddDefun :: String ->			-- Function Name
 	      RlCallbackFunction ->	-- Function to call
@@ -125,8 +125,6 @@ wrongKeyCode = ioError (userError "Invalid ASCII Key Code, must be in range 0..2
 
 theCbackTable :: IORef [(KeyCode,Addr)]
 theCbackTable = unsafePerformIO (newIORef [])
-
-foreign import ccall "freeHaskellFunctionPtr" freeHaskellFunctionPtr :: Addr -> IO ()
 
 addCbackEntry :: KeyCode -> Addr -> IO ()
 addCbackEntry key cbAddr = do

@@ -26,7 +26,6 @@ import Monad
 import Maybe
 import PrelIOBase
 import PosixUtil (fdToInt)
-
 \end{code}
 
 This stuff should really be done using HDirect.
@@ -75,7 +74,7 @@ getFd h = do
   f <- handleToFd h
   return (f,h)
 
-foreign import "selectFrom__" 
+foreign import "selectFrom__" unsafe
 		selectFrom__ :: ByteArray Int
 			     -> ByteArray Int
 			     -> ByteArray Int
@@ -113,16 +112,16 @@ marshallFDs ls = do
   ba <- stToIO (unsafeFreezeByteArray ba)
   return (x, ba)
 
-foreign import "is_fd_set__"
+foreign import "is_fd_set__" unsafe
 	       is_fd_set :: ByteArray Int -> Int -> IO Int
 
-foreign import "fd_zero__"
+foreign import "fd_zero__" unsafe
 	       fd_zero :: MutableByteArray RealWorld Int -> IO ()
 
-foreign import "fd_set__"
+foreign import "fd_set__" unsafe
 	       fd_set :: MutableByteArray RealWorld Int -> Int -> IO ()
 
-foreign import "sizeof_fd_set__"
+foreign import "sizeof_fd_set__" unsafe
 	       sizeof_fd_set :: Int
 
 \end{code}
