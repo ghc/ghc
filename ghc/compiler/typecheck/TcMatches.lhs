@@ -6,7 +6,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatch ) where
+module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchExpected ) where
 
 IMP_Ubiq()
 
@@ -21,15 +21,15 @@ import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 			  Sig, HsLit, DoOrListComp, Fixity, HsType, ArithSeqInfo, 
 			  collectPatBinders, pprMatch )
 import RnHsSyn		( SYN_IE(RenamedMatch) )
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
+import TcHsSyn		( SYN_IE(TcMatch) )
 
 import TcMonad
 import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcEnv		( newMonoIds )
 import TcPat		( tcPat )
-import TcType		( SYN_IE(TcType), TcMaybe, zonkTcType )
+import TcType		( TcIdOcc(..), SYN_IE(TcType), TcMaybe, zonkTcType )
 import TcSimplify	( bindInstsOfLocalFuns )
-import Unify		( unifyTauTy, unifyTauTyList )
+import Unify		( unifyTauTy, unifyTauTyList, unifyFunTy )
 import Name		( Name {- instance Outputable -} )
 
 import Kind		( Kind, mkTypeKind )
@@ -114,20 +114,6 @@ tcMatchesExpected expected_ty fun_or_case (match1 : matches)
     )						    	`thenTc` \ (match1',  lie1) ->
     tcMatchesExpected expected_ty fun_or_case matches	`thenTc` \ (matches', lie2) ->
     returnTc (match1' : matches', plusLIE lie1 lie2)
-
-tcMatches :: [RenamedMatch] -> TcM s ([TcMatch s], LIE s, [TcType s])
-
-tcMatches [match]
-  = tcAddSrcLoc (get_Match_loc match) $
-    tcMatch match		`thenTc` \ (match', lie, ty) ->
-    returnTc ([match'], lie, [ty])
-
-tcMatches (match1 : matches)
-  = tcAddSrcLoc (get_Match_loc match1) (
-	tcMatch match1
-    )				`thenTc` \ (match1',  lie1, match1_ty) ->
-    tcMatches matches		`thenTc` \ (matches', lie2, matches_ty) ->
-    returnTc (match1' : matches', plusLIE lie1 lie2, match1_ty : matches_ty)
 \end{code}
 
 \begin{code}
@@ -140,71 +126,42 @@ tcMatchExpected
 					-- in instead!
 
 tcMatchExpected expected_ty the_match@(PatMatch pat match)
-  = case getFunTy_maybe expected_ty of
+  = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
 
-	Nothing ->			-- Not a function type (eg type variable)
-					-- So use tcMatch instead
-	    tcMatch the_match			`thenTc`   \ (match', lie_match, match_ty) ->
-	    unifyTauTy expected_ty match_ty 	`thenTc_`
-	    returnTc (match', lie_match)
-
-	Just (arg_ty,rest_ty) ->	-- It's a function type!
-	    let binders = collectPatBinders pat
-	    in
-	    newMonoIds binders mkTypeKind (\ mono_ids ->
-		tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
-		unifyTauTy pat_ty arg_ty	`thenTc_`
-		tcMatchExpected rest_ty  match	`thenTc` \ (match', lie_match) ->
-
-			-- In case there are any polymorpic, overloaded binders in the pattern
-			-- (which can happen in the case of rank-2 type signatures, or data constructors
-			-- with polymorphic arguments), we must dd a bindInstsOfLocalFns here
-			--
-			-- 99% of the time there are no bindings.  In the unusual case we
-			-- march down the match to dump them in the right place (boring but easy).
-	        bindInstsOfLocalFuns lie_match mono_ids 	`thenTc` \ (lie_match', inst_mbinds) ->
-		let
-		   inst_binds = MonoBind inst_mbinds [] False
-		   match'' = case inst_mbinds of
-				EmptyMonoBinds -> match'
-				other          -> glue_on match'
-		   glue_on (PatMatch p m) = PatMatch p (glue_on m)
-		   glue_on (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-			= (GRHSMatch (GRHSsAndBindsOut grhss 
-						       (inst_binds `ThenBinds` binds)
-						       ty))
-		   glue_on (SimpleMatch expr) = SimpleMatch (HsLet inst_binds expr)
-		in		
-		returnTc (PatMatch pat' match'',
-			  plusLIE lie_pat lie_match')
-	    )
-
-tcMatchExpected expected_ty (GRHSMatch grhss_and_binds)
-  = tcGRHSsAndBinds grhss_and_binds   	`thenTc` \ (grhss_and_binds', lie, grhss_ty) ->
-    checkTc (isTauTy expected_ty)
-	    lurkingRank2SigErr 		`thenTc_`
-    unifyTauTy expected_ty grhss_ty 	`thenTc_`
-    returnTc (GRHSMatch grhss_and_binds', lie)
-
-tcMatch	:: RenamedMatch -> TcM s (TcMatch s, LIE s, TcType s)
-
-tcMatch (PatMatch pat match)
-  = let binders = collectPatBinders pat
+    let binders = collectPatBinders pat
     in
-    newMonoIds binders mkTypeKind (\ _ -> 
-	-- NB TypeKind; lambda-bound variables are allowed 
-	-- to unify with unboxed types.
-
-	tcPat pat		`thenTc`   \ (pat',   lie_pat,   pat_ty) ->
-	tcMatch match		`thenTc`   \ (match', lie_match, match_ty) ->
-	returnTc (PatMatch pat' match',
-		  plusLIE lie_pat lie_match,
-		  mkFunTy pat_ty match_ty)
+    newMonoIds binders mkTypeKind (\ mono_ids ->
+	tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
+	unifyTauTy pat_ty arg_ty	`thenTc_`
+	tcMatchExpected rest_ty  match	`thenTc` \ (match', lie_match) ->
+		-- In case there are any polymorpic, overloaded binders in the pattern
+		-- (which can happen in the case of rank-2 type signatures, or data constructors
+		-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
+		--
+		-- 99% of the time there are no bindings.  In the unusual case we
+		-- march down the match to dump them in the right place (boring but easy).
+        bindInstsOfLocalFuns lie_match mono_ids 	`thenTc` \ (lie_match', inst_mbinds) ->
+	let
+	   inst_binds = MonoBind inst_mbinds [] False
+	   match'' = case inst_mbinds of
+			EmptyMonoBinds -> match'
+			other          -> glue_on match'
+	   glue_on (PatMatch p m) = PatMatch p (glue_on m)
+	   glue_on (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
+		= (GRHSMatch (GRHSsAndBindsOut grhss 
+					       (inst_binds `ThenBinds` binds)
+					       ty))
+	   glue_on (SimpleMatch expr) = SimpleMatch (HsLet inst_binds expr)
+	in		
+	returnTc (PatMatch pat' match'',
+		  plusLIE lie_pat lie_match')
     )
 
-tcMatch (GRHSMatch grhss_and_binds)
-  = tcGRHSsAndBinds grhss_and_binds   `thenTc` \ (grhss_and_binds', lie, grhss_ty) ->
-    returnTc (GRHSMatch grhss_and_binds', lie, grhss_ty)
+tcMatchExpected expected_ty (GRHSMatch grhss_and_binds)
+  = tcGRHSsAndBinds expected_ty grhss_and_binds   	`thenTc` \ (grhss_and_binds', lie) ->
+    checkTc (isTauTy expected_ty)
+	    lurkingRank2SigErr 		`thenTc_`
+    returnTc (GRHSMatch grhss_and_binds', lie)
 \end{code}
 
 
