@@ -199,9 +199,7 @@ data CaseLabelInfo
 
 
 data RtsLabelInfo
-  = RtsShouldNeverHappenCode
-
-  | RtsSelectorInfoTbl Bool{-updatable-} Int{-offset-}	-- Selector thunks
+  = RtsSelectorInfoTbl Bool{-updatable-} Int{-offset-}	-- Selector thunks
   | RtsSelectorEntry   Bool{-updatable-} Int{-offset-}
 
   | RtsApInfoTbl Bool{-updatable-} Int{-arity-}	        -- AP thunks
@@ -261,7 +259,6 @@ mkPlainModuleInitLabel		= PlainModuleInitLabel
 
 	-- Some fixed runtime system labels
 
-mkErrorStdEntryLabel 		= RtsLabel RtsShouldNeverHappenCode
 mkSplitMarkerLabel		= RtsLabel (RtsCode SLIT("__stg_split_marker"))
 mkUpdInfoLabel			= RtsLabel (RtsInfo SLIT("stg_upd_frame"))
 mkSeqInfoLabel			= RtsLabel (RtsInfo SLIT("stg_seq_frame"))
@@ -443,9 +440,6 @@ labelType _        = DataLabel
 labelDynamic :: CLabel -> Bool
 labelDynamic lbl = 
   case lbl of
-   -- The special case for RtsShouldNeverHappenCode is because the associated address is
-   -- NULL, i.e. not a DLL entry point
-   RtsLabel RtsShouldNeverHappenCode -> False
    RtsLabel _  	     -> not opt_Static  -- i.e., is the RTS in a DLL or not?
    IdLabel n k       -> isDllName n
    ForeignLabel _ _ d  -> d
@@ -554,10 +548,6 @@ pprCLbl (CaseLabel u (CaseAlt tag))
   = hcat [pprUnique u, pp_cSEP, int tag, ptext SLIT("_alt")]
 pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, ptext SLIT("_dflt")]
-
-pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("0")
--- used to be stg_error_entry but Windows can't have DLL entry points as static
--- initialisers, and besides, this ShouldNeverHappen, right?
 
 pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str
