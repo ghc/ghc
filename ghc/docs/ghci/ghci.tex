@@ -57,13 +57,6 @@
 %%%\newpage
 
 %%-----------------------------------------------------------------%%
-\section*{Misc text looking for a home}
-
-@compile@ is supplied with, and checks PIT (inside PCS) before
-reading package interfaces, so it doesn't read and add duplicate
-@ModIFace@s to PIT.
-
-
 \section{Details}
 
 \subsection{Outline of the design}
@@ -317,10 +310,10 @@ inspecting them.
 
    CM passes @compile@ a module's old @ModIFace@, if it has one, in
    the hope that the module won't need recompiling.  If so, @compile@
-   can just return the @ModIFace@ along with a new @ModDetails@
-   created from it.  Similarly, CM passes in a module's old
-   @Linkable@, if it has one, and that's returned unchanged if the
-   module isn't recompiled.
+   can just return the new @ModDetails@ created from it, and CM will
+   re-use the old @ModIFace@.  If the module {\em is} recompiled (or 
+   scheduled to be loaded from disk), @compile@ returns both the 
+   new @ModIFace@ and new @Linkable@.
 
 \item 
    {\bf Module Graph (MG)} @:: known-only-to-CM@
@@ -453,19 +446,14 @@ date.  There are three parts to it:
    caches them in the PIT.  Subsequent imports of the same module get
    them directly out of the PIT, avoiding slow lexing/parsing phases.
    Because foreign packages are assumed never to become out of date,
-   all contents of PIT remain valid forever.
+   all contents of PIT remain valid forever.  @compile@ of course
+   tries to find package interfaces in PIT in preference to reading
+   them from files.  
 
-   Successful runs of @compile@ can add arbitrary numbers of new
-   interfaces to the PIT.  Failed runs could also contribute any new
-   interfaces read, but this could create inconsistencies between the
-   PIT and the unlinked images (UI).  Specifically, we don't want the
-   PIT to acquire interfaces for which UI hasn't got a corresponding
-   @Linkable@, and we don't want @Linkable@s from failed compilation
-   runs to enter UI, because we can't be sure that they are actually
-   necessary for a successful link.  So it seems simplest, albeit at a
-   small compilation speed loss, for @compile@ not to update PCS at
-   all following a failed compile.  We may revisit this
-   decision later.
+   Both successful and failed runs of @compile@ can add arbitrary
+   numbers of new interfaces to the PIT.  The failed runs don't matter
+   because we assume that packages are static, so the data cached even
+   by a failed run is valid forever (ie for the rest of the session).
 
    \item
       {\bf Package Symbol Table (PST)} @:: FiniteMap Module ModDetails@
@@ -479,10 +467,12 @@ date.  There are three parts to it:
    interfaces, and we don't want to do that unnecessarily.
 
    The PST avoids these problems by allowing incremental wiring-in to
-   happen.  Pieces of foreign interfaces are renamed and placed in the
-   PST, but only as @compile@ discovers it needs them.  In the process
-   of incremental renaming, @compile@ may need to read more package
-   interfaces, which are returned to CM to add to the PIT.
+   happen.  Pieces of foreign interfaces are copied out of the holding
+   pen (HP), renamed, typechecked, and placed in the PST, but only as
+   @compile@ discovers it needs them.  In the process of incremental
+   renaming/typechecking, @compile@ may need to read more package
+   interfaces, which are added to the PIT and hence to 
+   HP.~\ToDo{How? When?}
 
    CM passes the PST to @compile@ and is returned an updated version
    on both success and failure.
