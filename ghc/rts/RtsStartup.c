@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.60 2001/12/12 14:31:43 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.61 2002/02/04 20:25:39 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -169,11 +169,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
     /* start the virtual timer 'subsystem'. */
     startVirtTimer(TICK_MILLISECS);
-
-    /* start our haskell execution tasks */
-#ifdef SMP
-    startTasks();
-#endif
 
     /* Initialise the stats department */
     initStats();
