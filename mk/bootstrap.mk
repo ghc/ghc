@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.29 2004/01/15 18:04:45 ross Exp $
+# $Id: bootstrap.mk,v 1.30 2004/02/04 10:00:43 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -68,7 +68,7 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include -I$(FPTOOLS_TOP_ABS)/libraries/parsec/include
 
 ifeq "$(GhcWithInterpreter)" "YES"
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/libraries/readline/include
@@ -98,6 +98,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 HC_BOOT_LD_OPTS += \
    -L$(FPTOOLS_TOP_ABS)/libraries/template-haskell	\
    -L$(FPTOOLS_TOP_ABS)/libraries/readline	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/parsec        \
    -L$(FPTOOLS_TOP_ABS)/libraries/unix          \
    -L$(FPTOOLS_TOP_ABS)/libraries/unix/cbits
 endif
@@ -142,7 +143,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 HC_BOOT_LIBS += -lHSreadline -lHStemplate-haskell -lHSunix -lHSunix_cbits
 endif
 
-HC_BOOT_LIBS += -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS += -lHShaskell98 -lHSbase -lHSbase_cbits -lHSparsec -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
