@@ -2420,6 +2420,25 @@ sub add_Hsc_flags {
 }
 \end{code}
 
+\begin{code}
+sub add_syslib {
+    local($syslib) = @_;
+    
+    unshift(@SysImport_dir,
+	    ${INSTALLING} ? "$InstSysLibDir/$syslib/imports"
+		          : "$TopPwd/hslibs/$syslib/src");
+
+    push(@SysLibrary_dir,
+	 ${INSTALLING} ? ("$InstSysLibDir")
+                       : ("$TopPwd/hslibs/$syslib",
+			  "$TopPwd/hslibs/$syslib/cbits"));
+
+    push(@SysLibrary, "-lHS$syslib");
+    push(@SysLibrary, "-lHS${syslib}_cbits")
+          unless $syslib eq 'contrib'; #HACK! it has no cbits
+}
+\end{code}
+
 Source files may have {-# OPTIONS ... #-} pragmas at the top, containing
 command line options we want to append to collection of commands specified
 directly. @check_for_source_options@ looks at the top of a de-lit'ified Haskell
@@ -2763,7 +2782,6 @@ arg: while($_ = $Args[0]) {
 			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
 			      $Status++ unless $syslib =~ /^(hbc|ghc|posix|contrib)$/;
 
-			    again:
 			    #
 			    # The posix library is a `special' in that it relies on
 			    # the ghc system library (packed strings). Wielding our
@@ -2771,25 +2789,11 @@ arg: while($_ = $Args[0]) {
 			    # the ghc system library as well.
 			    # (ToDo: `nub' -syslib list)
 			    #
-			    unshift(@SysImport_dir,
-				${INSTALLING}
-				? "$InstSysLibDir/$syslib/imports"
-				: "$TopPwd/hslibs/$syslib/src");
-			
-			    push(@SysLibrary_dir,
-			    	 ${INSTALLING}
-				 ? ("$InstSysLibDir")
-			         : ("$TopPwd/hslibs/$syslib"
-				   ,"$TopPwd/hslibs/$syslib/cbits"));
-
-			    push(@SysLibrary, "-lHS$syslib");
-			    push(@SysLibrary, "-lHS${syslib}_cbits")
-			      unless $syslib eq 'contrib'; #HACK! it has no cbits
-
-			    if ( $syslib eq 'posix') {
-				$syslib='ghc';
-				goto again;
-			    } elsif ( $syslib eq 'ghc' && $TargetName =~ /-solaris2$/ ) {
+			    &add_syslib($syslib);
+			    if ( $syslib eq 'posix' ) {
+				&add_syslib('ghc');
+			    } elsif ( $syslib eq 'ghc' && 
+				      $TargetName =~ /-solaris2$/ ) {
 				# needed for Berkeley socket/nwork stuff.
 				push(@SysLibrary, '-lnsl');
 			    }
