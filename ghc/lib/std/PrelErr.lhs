@@ -163,7 +163,7 @@ recUpdError 		 s = throw (RecUpdError (untangle s "Record doesn't contain field(
 assertError :: String -> Bool -> a -> a
 assertError str pred v 
   | pred      = v
-  | otherwise = error (untangle str "Assertion failed")
+  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
 
 \end{code}
 
