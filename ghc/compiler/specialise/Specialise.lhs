@@ -11,7 +11,7 @@ module Specialise ( specProgram ) where
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal, idSpecialisation, isDataConWrapId )
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
-			  tyVarsOfTypes, tyVarsOfTheta, 
+			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  mkForAllTys, tcCmpType
 			)
 import Subst		( Subst, mkSubst, substTy, mkSubst, extendSubstList, mkInScopeSet,
@@ -1003,6 +1003,10 @@ callDetailsToList calls = [ (id,tys,dicts)
 
 mkCallUDs subst f args 
   | null theta
+  || not (all isClassPred theta)	
+	-- Only specialise if all overloading is on class params. 
+	-- In ptic, with implicit params, the type args
+	-- *don't* say what the value of the implicit param is!
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
   || maybeToBool (lookupRule (\act -> True) (substInScope subst) f args)
