@@ -746,7 +746,7 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
  	-- Float lets if (a) we're at the top level
 	-- or 		 (b) the resulting RHS is one we'd like to expose
 	--
-	-- NB: the test used to say "exprIsValue", but that caused a strictness bug.
+	-- NB: the test used to say "exprIsCheap", but that caused a strictness bug.
 	--     	   x = let y* = E in case (scc y) of { T -> F; F -> T}
 	-- The case expression is 'cheap', but it's wrong to transform to
 	-- 	   y* = E; x = case (scc y) of {...}
