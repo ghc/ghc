@@ -27,8 +27,6 @@ Options recognised wherever they occur (mkdependHS or GHC):
     -syslib <blah> This program uses this GHC system library; take
 		appropriate action (e.g., recognise when they are
 		"import"ing a module from that library).
-    -fhaskell1.[2-9] Deal with the oddities associated with a
-		particular version of Haskell 1.
 
 mkdependHS-specific options (not between --'s):
 
@@ -36,10 +34,10 @@ mkdependHS-specific options (not between --'s):
     -v -v	Be very verbose.
     -f blah	Use "blah" as the makefile, rather than "makefile"
 		or "Makefile".
-    -o <osuf>	Use <osuf> as the "object file" suffix ( default: .o)
+    -o <osuf>	Use <osuf> as the "object file" suffix ( default: o)
     -s <suf>	Make extra dependencies for files with
-		suffix <suf><osuf>; thus, "-o .hc -s _a" will
-		make dependencies both for .hc files and for _a.hc
+		suffix <suf><osuf>; thus, "-o hc -s _a" will
+		make dependencies both for .hc files and for .a_hc
 		files.  (Useful in conjunction with NoFib "ways".)
     --exclude-module=<file> 
                 Regard <file> as "stable"; i.e., eXclude it from having
@@ -98,7 +96,8 @@ $Unlit = ($INSTALLING) ? "${InstLibExecDirGhc}/unlit"
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
-$Obj_suffix = 'o';
+@Obj_suffix =  ("o");
+@File_suffix = ();
 $ghc_version_info = int ( ${PROJECTVERSION} * 100 );
 
 $Import_dirs = '.';
@@ -114,7 +113,6 @@ $Import_dirs = '.';
 		    "$TopPwd/ghc/lib/glaExts",
 		    "$TopPwd/ghc/lib/concurrent");
 
-$Haskell_1 = 3; # assume Haskell 1.3. Changed by -fhaskell-1.?
 $Include_dirs = '-I.';
 $Makefile = '';
 @Src_files = ();
@@ -135,7 +133,7 @@ if ( $Status ) {
 }
 
 push(@Defines,
-     ("-D__HASKELL1__=$Haskell_1",
+     ( #OLD: "-D__HASKELL1__=$Haskell_1",
       "-D__GLASGOW_HASKELL__=$ghc_version_info"));
 
 @Import_dirs  = split(/:/,$Import_dirs);
@@ -166,11 +164,15 @@ foreach $sf (@Src_files) {
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
     ($bf = $sf) =~ s/\.l?(hs|y)$//;
     #push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
-    push(@Depend_lines, "$bf.$Obj_suffix : $sf\n");
-    foreach $suff (@File_suffix) {
-        push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $sf\n");
+    #push(@Depend_lines, "$bf.$Obj_suffix : $sf\n");
+    local($str)="";
+    foreach $obj  (@Obj_suffix) {
+  	$str .= "$bf.$obj ";
+        foreach $suff (@File_suffix) {
+	   $str .= "$bf.${suff}_$obj ";
+        }
     }
-
+    push(@Depend_lines, "$str: $sf\n");
     # if it's a literate file, .lhs or .ly? (happy specs), then we de-literatize it: 
     if ( $sf !~ /\.l(hs|y)$/ ) {
 	$file_to_read = $sf;
@@ -237,15 +239,17 @@ sub mangle_command_line_args {
 	    $Include_dirs .= " $_";
 	} elsif ( /^-syslib$/ ) {
 	    push(@Syslibs, &grab_arg_arg($_,''));
-	} elsif ( /^-fhaskell-1\.([2-9])/ ) {
-	    $Haskell_1 = $1;
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
 	    } elsif ( /^-f(.*)/ ) {
 		$Makefile	= &grab_arg_arg('-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
-		$Obj_suffix	= &grab_arg_arg('-o',$1);
+		local($suff)	= &grab_arg_arg('-o',$1);
+		# Weed out existing entry .. there must be a better way of doing this
+		# with arrays (non-assoc) ! -- sof
+		@Obj_suffix	= grep(!/$suff/,@Obj_suffix);
+		push(@Obj_suffix, $suff);
             #
 	    # --exclude-module=mod => it's stable, trust me!
             
@@ -383,41 +387,47 @@ sub slurp_file_for_imports {
 		$int_file = $follow_file;
 
 		if ( $int_file !~ /\.(l?hs|hi|l?y)$/ ) {
-		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file\n");
-		    foreach $suff (@File_suffix) {
-			push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $int_file\n");
-		    }
-
+		    local($str) = "";
+		    foreach $obj  (@Obj_suffix) {
+			$str .= "$bf.$obj ";
+			foreach $suff (@File_suffix) {
+			   $str .= "$bf.${suff}_$obj ";
+		        }
+    		    }
+   	            push(@Depend_lines, "$str: $int_file\n");
 		} else {
 		    $int_file =~ s/\.l?hs$//;
 		    $int_file =~ s/\.l?y$//;
 		    $int_file =~ s/\.hi$//;
                     local($source_dep);
 
-                    if ( $source && -f "$int_file.hs" ) {
-                        $source_dep = "$int_file.hs";
- 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
-                    } elsif ( $source && -f "$int_file.lhs" ) {
-                        $source_dep = "$int_file.lhs";
- 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
-                    } elsif ( $source && ( -f "$int_file.ly" || -f "$int_file.y" ) ) {
-                        $source_dep = "$int_file.hs";
- 		        push(@Depend_lines, "$bf.$Obj_suffix : $source_dep\n");
+                    if ( $source ) {
+                        $source_dep = "$int_file.hi-boot";
                     } else {
-                        if ( $source ) {
-                           print STDERR "Warning: could not find source file dependency $int_file.(hs|lhs|y|ly)\n";
-                        }
-		        push(@Depend_lines, "$bf.$Obj_suffix : $int_file.hi\n");
+		        local($str)="";
+			foreach $obj (@Obj_suffix) {
+		           $str .= "$bf.$obj ";
+	                }
+		        push(@Depend_lines, "$str: $int_file.hi\n");
 	            }
 
                     if ( ! $source ) {
-		       foreach $suff (@File_suffix) {
-			  push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $int_file.${suff}_hi\n");
-		       }
+	               foreach $suff  (@File_suffix) {
+		  	   local($str) = "";
+			   foreach $obj (@Obj_suffix) {
+			     $str .= "$bf.${suff}_$obj ";
+		           }
+		           push(@Depend_lines, "$str: $int_file.${suff}_hi\n");
+    		       }
                     } else {
-		       foreach $suff (@File_suffix) {
-			  push(@Depend_lines, "$bf.${suff}_$Obj_suffix : $source_dep\n");
-		       }
+		       local($str) = "";
+		       foreach $obj  (@Obj_suffix) {
+			   $str .= "$bf.$obj ";
+			   foreach $suff (@File_suffix) {
+			     $str .= "$bf.${suff}_$obj ";
+		           }
+    		       }
+		       push(@Depend_lines, "$str: $source_dep\n");
                    }
 		}
 	    }
