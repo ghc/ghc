@@ -49,7 +49,10 @@
 	      <arg>-c</arg>
 	    </group>
 	  </cmdsynopsis></term>
-	<indexterm><primary><option>--make</option></primary>
+	<indexterm><primary><option>-E</option></primary>
+	<indexterm><primary><option>-C</option></primary>
+	<indexterm><primary><option>-S</option></primary>
+	<indexterm><primary><option>-c</option></primary>
 	</indexterm>
 	<listitem>
 	  <para>This is the traditional batch-compiler mode, in which
@@ -418,6 +421,13 @@ ghc --make Main.hs
     <para>If the program needs to be linked with additional objects
     (say, some auxilliary C code), these can be specified on the
     command line as usual.</para>
+
+    <para>Note that GHC can only follow dependencies if it has the
+    source file available, so if your program includes a module for
+    which there is no source file, even if you have an object and an
+    interface file for the module, then GHC will complain.  The
+    exception to this rule is for package modules, which may or may
+    not have source files.</para>
   </sect1>
   
   <Sect1 id="options-order">
