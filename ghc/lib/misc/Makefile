@@ -1,6 +1,8 @@
+# $Id: Makefile,v 1.6 1998/02/25 16:02:20 simonm Exp $
 #
-# Makefile for hslibs subdir
+# Makefile for miscellaneous libraries.
 #
+
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
