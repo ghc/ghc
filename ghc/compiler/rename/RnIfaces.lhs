@@ -144,9 +144,9 @@ mkImportInfo this_mod imports
 		-- (apart from hiding some, perhaps)
 	import_all_mods = [ m | ImportDecl m _ _ _ imp_list _ <- imports,
 			        import_all imp_list ]
-		 	where
-			  import_all (Just (False, _)) = False	-- Imports are specified explicitly
-			  import_all other	       = True	-- Everything is imported
+	  where
+	   import_all (Just (False, _)) = False -- Imports are spec'd explicitly
+	   import_all other	        = True	-- Everything is imported
 
 	-- mv_map groups together all the things imported and used
 	-- from a particular module in this package
@@ -159,33 +159,41 @@ mkImportInfo this_mod imports
 			     add_item names _ = name:names
 
 	-- In our usage list we record
-	--	a) Specifically: Detailed version info for imports from modules in this package
-	--			 Gotten from iVSlurp plus import_all_mods
 	--
-	--	b) Everything:   Just the module version for imports from modules in other packages
-	--			 Gotten from iVSlurp plus import_all_mods
+	--	a) Specifically: Detailed version info for imports
+	--         from modules in this package Gotten from iVSlurp plus
+	--         import_all_mods
 	--
-	--	c) NothingAtAll: The name only of modules, Baz, in this package that are 'below' us, 
-	--			 but which we didn't need at all (this is needed only to decide whether
-	--			 to open Baz.hi or Baz.hi-boot higher up the tree).
-	--			 This happens when a module, Foo, that we explicitly imported has 
-	--			 'import Baz' in its interface file, recording that Baz is below
-	--			 Foo in the module dependency hierarchy.  We want to propagate this info.
-	--			 These modules are in a combination of HIT/PIT and iImpModInfo
+	--	b) Everything: Just the module version for imports
+	--         from modules in other packages Gotten from iVSlurp plus
+	--         import_all_mods
 	--
-	--	d) NothingAtAll: The name only of all orphan modules we know of (this is needed
-	--	   		 so that anyone who imports us can find the orphan modules)
-	--			 These modules are in a combination of HIT/PIT and iImpModInfo
+	--	c) NothingAtAll: The name only of modules, Baz, in
+	--	   this package that are 'below' us, but which we didn't need
+	--	   at all (this is needed only to decide whether to open Baz.hi
+	--	   or Baz.hi-boot higher up the tree).  This happens when a
+	--	   module, Foo, that we explicitly imported has 'import Baz' in
+	--	   its interface file, recording that Baz is below Foo in the
+	--	   module dependency hierarchy.  We want to propagate this
+	--	   info.  These modules are in a combination of HIT/PIT and
+	--	   iImpModInfo
+	--
+	--	d) NothingAtAll: The name only of all orphan modules
+	--	   we know of (this is needed so that anyone who imports us can
+	--	   find the orphan modules) These modules are in a combination
+	--	   of HIT/PIT and iImpModInfo
 
 	import_info0 = foldModuleEnv mk_imp_info  []	       pit
 	import_info1 = foldModuleEnv mk_imp_info  import_info0 hit
 	import_info  = not_even_opened_imports ++ import_info1
 
-		-- Recall that iImpModInfo describes modules that have been mentioned
-		-- in the import lists of interfaces we have opened, but which we have
-		-- not even opened when compiling this module
-	not_even_opened_imports = [ (mod_name, orphans, is_boot, NothingAtAll) 
-				  | (mod_name, (orphans, is_boot)) <- fmToList (iImpModInfo ifaces) ]
+		-- Recall that iImpModInfo describes modules that have
+		-- been mentioned in the import lists of interfaces we
+		-- have opened, but which we have not even opened when
+		-- compiling this module
+	not_even_opened_imports =
+	  [ (mod_name, orphans, is_boot, NothingAtAll) 
+	  | (mod_name, (orphans, is_boot)) <- fmToList (iImpModInfo ifaces) ]
 
 	
 	mk_imp_info :: ModIface -> [ImportVersion Name] -> [ImportVersion Name]
