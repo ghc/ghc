@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.30 2001/02/28 11:48:34 simonpj Exp $
+-- $Id: DriverState.hs,v 1.31 2001/03/01 17:07:49 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -280,6 +280,20 @@ buildCoreToDo = do
 	   CoreLiberateCase
 	else
 	   CoreDoNothing,
+	if opt_level >= 2 then
+		CoreDoSimplify (isAmongSimpl [
+		   MaxSimplifierIterations max_iter
+		-- No -finline-phase: allow all Ids to be inlined now
+		])
+	else
+	  CoreDoNothing,
+		-- Simplify before SpecConstr, because LiberateCase leaves
+		-- case binders the wrong way round. E.g. it leaves it like
+		-- 	case x of wild { ... f x .... }
+		-- rather than
+		--	case x of wild { ... f wild ... }
+		-- The latter is better because 'wild' has the unfolding for
+		-- x inside it.
 	if opt_level >= 2 then
 	   CoreDoSpecConstr
 	else
