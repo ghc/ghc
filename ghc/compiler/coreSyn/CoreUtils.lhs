@@ -1019,7 +1019,7 @@ coreBindsSize bs = foldr ((+) . bindSize) 0 bs
 exprSize :: CoreExpr -> Int
 	-- A measure of the size of the expressions
 	-- It also forces the expression pretty drastically as a side effect
-exprSize (Var v)       = varSize v 
+exprSize (Var v)       = v `seq` 1
 exprSize (Lit lit)     = lit `seq` 1
 exprSize (App f a)     = exprSize f + exprSize a
 exprSize (Lam b e)     = varSize b + exprSize e
