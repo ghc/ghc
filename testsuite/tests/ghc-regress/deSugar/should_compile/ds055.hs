@@ -17,8 +17,7 @@ module Foo where
    instance Data Item where
        gfoldl k z (Leaf b v) = z (Leaf b) `k` v
        gfoldl k z (Branch b v a1 a2) = z (\x -> Branch b x a1 a2) `k` v
-       --gunfoldl k z c = case constrIndex c of
-       --                                    1 -> k z (Leaf undefined undefined)
+       gunfold _ _ _ = error "urk"
        toConstr (Leaf _ _) = leafConstr
        toConstr (Branch _ _ _ _) = branchConstr
        dataTypeOf _ = itemDataType
