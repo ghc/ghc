@@ -938,7 +938,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS(Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h inttypes.h limits.h locale.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stddef.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h bfd.h winsock.h pthread.h sys/uio.h)
+AC_CHECK_HEADERS([Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h limits.h locale.h malloc.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stddef.h stdarg.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h utime.h values.h bfd.h winsock.h pthread.h sys/uio.h])
 AC_CHECK_HEADER(unistd.h,[AC_CHECK_FUNCS(lchown)])
 
 AC_CHECK_HEADER(readline/readline.h, [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
@@ -1010,7 +1010,7 @@ dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
 dnl ** check what fields struct msghdr contains
-AC_CHECK_HEADERS([sys/types.h sys/socket.h sys/uio.h])
+AC_CHECK_HEADERS([sys/socket.h sys/uio.h])
 AC_CHECK_MEMBERS([struct msghdr.msg_control, struct msghdr.msg_accrights], [], [], [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
