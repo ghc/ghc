@@ -31,5 +31,5 @@ test('stableptr003', normal, compile_and_run, [''])
 test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('stableptr005', normal, compile_and_run, [''])
 
-test('text001'		normal, compile_and_run, [''])
-test('weak001',		normal, compile_and_run, ['-fglasgow-exts'])
+test('text001', normal, compile_and_run, [''])
+test('weak001', normal, compile_and_run, ['-fglasgow-exts'])
