@@ -804,14 +804,17 @@ eta_expand n us expr ty
     -- Saturated, so nothing to do
   = expr
 
-	-- Short cut for the case where there already
-	-- is a lambda; no point in gratuitously adding more
 eta_expand n us (Note note@(Coerce _ ty) e) _
   = Note note (eta_expand n us e ty)
 
+	-- Use mkNote so that _scc_s get pushed inside any lambdas that
+	-- are generated as part of the eta expansion.  We rely on this
+	-- behaviour in CorePrep, when we eta expand an already-prepped RHS.
 eta_expand n us (Note note e) ty
-  = Note note (eta_expand n us e ty)
+  = mkNote note (eta_expand n us e ty)
 
+	-- Short cut for the case where there already
+	-- is a lambda; no point in gratuitously adding more
 eta_expand n us (Lam v body) ty
   | isTyVar v
   = Lam v (eta_expand n us body (applyTy ty (mkTyVarTy v)))
