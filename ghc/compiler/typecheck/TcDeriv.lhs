@@ -458,11 +458,12 @@ makeDerivEqns tycl_decls
 	--  Figuring out whether we can only do this newtype-deriving thing
 
 	standard_instance = null tys && classKey clas `elem` derivableClassKeys
+	right_arity = length tys + 1 == classArity clas
 
 	can_derive_via_isomorphism
 	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show this way
 	   && not (clas `hasKey` showClassKey)
-	   && length tys + 1 == classArity clas	-- Well kinded;
+	   && right_arity 			-- Well kinded;
 						-- eg not: newtype T ... deriving( ST )
 						--	because ST needs *2* type params
 	   && n_tyvars_to_keep >= 0		-- Well kinded; 
@@ -483,10 +484,17 @@ makeDerivEqns tycl_decls
 	      && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
-				(vcat [ptext SLIT("too hard for cunning newtype deriving"),
-				       ptext SLIT("debug info:") <+> ppr n_tyvars_to_keep <+>
-					ppr n_args_to_keep <+> ppr eta_ok <+>
-					ppr (isRecursiveTyCon tycon)
+				(vcat [ptext SLIT("even with cunning newtype deriving:"),
+					if right_arity then empty else
+					quotes (ppr (mkClassPred clas tys)) <+> ptext SLIT("does not have arity 1"),
+					if n_tyvars_to_keep >= 0 && n_args_to_keep >= 0 then empty else
+					  ptext SLIT("the type constructor has wrong kind"),
+					if n_args_to_keep >= 0 then empty else
+					  ptext SLIT("representation type has wrong kind"),
+					if eta_ok then empty else 
+					  ptext SLIT("the eta-reduction property does not hold"),
+					if not (isRecursiveTyCon tycon) then empty else
+					  ptext SLIT("the newtype is recursive")
 				      ])
 
 	non_std_err = derivingThingErr clas tys tycon tyvars_to_keep
