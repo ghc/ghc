@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.97 2002/09/06 14:34:14 simonmar Exp $
+ * $Id: PrimOps.h,v 1.98 2002/10/18 09:51:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -218,7 +218,7 @@ extern StgInt    isFloatNegativeZero(StgFloat f);
    -------------------------------------------------------------------------- */
 
 EXTFUN_RTS(newMutVarzh_fast);
-
+EXTFUN_RTS(atomicModifyMutVarzh_fast);
 
 /* -----------------------------------------------------------------------------
    MVar PrimOps.

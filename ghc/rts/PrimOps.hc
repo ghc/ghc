@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.100 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.101 2002/10/18 09:51:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -348,6 +348,60 @@ FN_(newMutVarzh_fast)
   TICK_RET_UNBOXED_TUP(1);
   RET_P(mv);
   FE_
+}
+
+FN_(atomicModifyMutVarzh_fast)
+{
+   StgMutVar* mv;
+   StgClosure *z, *x, *y, *r;
+   FB_
+   /* Args: R1.p :: MutVar#,  R2.p :: a -> (a,b) */
+
+   /* If x is the current contents of the MutVar#, then 
+      We want to make the new contents point to
+
+         (sel_0 (f x))
+ 
+      and the return value is
+
+	 (sel_1 (f x))
+
+      obviously we can share (f x).
+
+         z = [stg_ap_2 f x]  (max (HS + 2) MIN_UPD_SIZE)
+	 y = [stg_sel_0 z]   (max (HS + 1) MIN_UPD_SIZE)
+         r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
+   */
+
+#define THUNK_SIZE(n) (sizeofW(StgHeader) + stg_max((n), MIN_UPD_SIZE))
+#define SIZE (THUNK_SIZE(2) + THUNK_SIZE(1) + THUNK_SIZE(1))
+
+   HP_CHK_GEN_TICKY(SIZE, R1_PTR|R2_PTR, atomicModifyMutVarzh_fast,);
+   CCS_ALLOC(CCCS,SIZE);
+
+   x = ((StgMutVar *)R1.cl)->var;
+
+   TICK_ALLOC_UP_THK(2,0); // XXX
+   z = (StgClosure *) Hp - THUNK_SIZE(2) + 1;
+   SET_HDR(z, &stg_ap_2_upd_info, CCCS);
+   z->payload[0] = R2.cl;
+   z->payload[1] = x;
+
+   TICK_ALLOC_UP_THK(1,1); // XXX
+   y = (StgClosure *) (StgPtr)z - THUNK_SIZE(1);
+   SET_HDR(y, &stg_sel_0_upd_info, CCCS);
+   y->payload[0] = z;
+
+   ((StgMutVar *)R1.cl)->var = y;
+
+   TICK_ALLOC_UP_THK(1,1); // XXX
+   r = (StgClosure *) (StgPtr)y - THUNK_SIZE(1);
+   SET_HDR(r, &stg_sel_1_upd_info, CCCS);
+   r->payload[0] = z;
+
+   RET_P(r);
+   JMP_(ENTRY_CODE(Sp[0]));
+   FE_
 }
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.21 2002/06/26 08:18:38 stolz Exp $
+-- $Id: primops.txt.pp,v 1.22 2002/10/18 09:51:04 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1273,6 +1273,18 @@ primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Bool
    with
    usage = { mangle SameMutVarOp [mkP, mkP] mkM }
+
+-- not really the right type, but we don't know about pairs here.  The
+-- correct type is
+--
+--   MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)
+--
+primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
+   MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
+   with
+   usage = { mangle AtomicModifyMutVarOp [mkP, mkM, mkP] mkM }
+   has_side_effects = True
+   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Exceptions"
