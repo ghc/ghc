@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.33 $
- * $Date: 2002/01/24 02:15:19 $
+ * $Revision: 1.34 $
+ * $Date: 2002/02/15 22:15:08 $
  * ---------------------------------------------------------------------------*/
 
 #if !defined(SMP)
@@ -780,9 +780,9 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int o_itbl                = BCO_NEXT;
                  void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
                  SAVE_STACK_POINTERS;
-                 tok = suspendThread(&cap->r);
+                 tok = suspendThread(&cap->r,rtsFalse);
                  marshall_fn ( (void*)(& StackWord(0) ) );
-                 cap = (Capability *)((void *)resumeThread(tok) - sizeof(StgFunTable));
+                 cap = (Capability *)((void *)resumeThread(tok,rtsFalse) - sizeof(StgFunTable));
                  LOAD_STACK_POINTERS;
                  goto nextInsn;
               }

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.128 2002/02/15 20:58:14 sof Exp $
+ * $Id: Schedule.c,v 1.129 2002/02/15 22:15:09 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1428,7 +1428,7 @@ void deleteAllThreads ( void )
  * ------------------------------------------------------------------------- */
    
 StgInt
-suspendThread( StgRegTable *reg )
+suspendThread( StgRegTable *reg, rtsBool concCall )
 {
   nat tok;
   Capability *cap;
@@ -1457,7 +1457,7 @@ suspendThread( StgRegTable *reg )
   /* Hand back capability */
   releaseCapability(cap);
   
-#if defined(RTS_SUPPORTS_THREADS) && !defined(SMP)
+#if defined(RTS_SUPPORTS_THREADS)
   /* Preparing to leave the RTS, so ensure there's a native thread/task
      waiting to take over.
      
@@ -1466,7 +1466,9 @@ suspendThread( StgRegTable *reg )
      there's no need to create a new task).
   */
   IF_DEBUG(scheduler, sched_belch("worker thread (%d): leaving RTS", tok));
-  startTask(taskStart);
+  if (concCall) {
+    startTask(taskStart);
+  }
 #endif
 
   /* Other threads _might_ be available for execution; signal this */
@@ -1476,14 +1478,18 @@ suspendThread( StgRegTable *reg )
 }
 
 StgRegTable *
-resumeThread( StgInt tok )
+resumeThread( StgInt tok, rtsBool concCall )
 {
   StgTSO *tso, **prev;
   Capability *cap;
 
 #if defined(RTS_SUPPORTS_THREADS)
   /* Wait for permission to re-enter the RTS with the result. */
-  grabReturnCapability(&sched_mutex, &cap);
+  if ( concCall ) {
+    grabReturnCapability(&sched_mutex, &cap);
+  } else {
+    grabCapability(&cap);
+  }
 #else
   grabCapability(&cap);
 #endif
