@@ -281,11 +281,12 @@ qid_to_pmod(q)
    look at qid.ugn) with a key (number) and a string.  Here's the 
    deal
 
-		key
-		-2	function arrow ->
-		-1	list type constructor [], or the empty list []
-		0	unit type constructor (), or the unity value ()
-		n	n-tuple type constructor (,,,)
+	key
+
+	ARROWCON   function arrow ->
+	LISTCON	   list type constructor [], or the empty list []
+	UNITCON	   unit type constructor (), or the unity value ()
+	n	   n-tuple type constructor (,,,)
 */
 		
 qid
@@ -293,11 +294,11 @@ creategid(i)
   long i;
 {
   switch(i) {
-    case -2:
+    case ARROWGID:
       return(mkgid(i,install_literal("->")));
-    case -1:
+    case NILGID:
       return(mkgid(i,install_literal("[]")));
-    case  0:
+    case UNITGID:
       return(mkgid(i,install_literal("()")));
     default:
       {

@@ -408,8 +408,8 @@ import	:  var					{ $$ = mkentid(mknoqual($1)); }
 	;
 
 itycon	:  tycon				{ $$ = mknoqual($1); }
-	|  OBRACK CBRACK			{ $$ = creategid(-1); }         
-	|  OPAREN CPAREN			{ $$ = creategid(0); }         
+	|  OBRACK CBRACK			{ $$ = creategid(NILGID); }
+	|  OPAREN CPAREN			{ $$ = creategid(UNITGID); }         
 	|  OPAREN commas CPAREN 		{ $$ = creategid($2); }
 	;
 
@@ -677,9 +677,9 @@ atype  	:  gtycon				{ $$ = mktname($1); }
         ;
 
 gtycon	:  qtycon
-	|  OPAREN RARROW CPAREN			{ $$ = creategid(-2); }
-	|  OBRACK CBRACK			{ $$ = creategid(-1); }         
-	|  OPAREN CPAREN			{ $$ = creategid(0); }         
+	|  OPAREN RARROW CPAREN			{ $$ = creategid(ARROWGID); }
+	|  OBRACK CBRACK			{ $$ = creategid(NILGID); }         
+	|  OPAREN CPAREN			{ $$ = creategid(UNITGID); }         
 	|  OPAREN commas CPAREN 		{ $$ = creategid($2); }
 	;
 
@@ -1314,14 +1314,14 @@ apatck	:  qvark		 		{ $$ = mkident($1); }
 
 
 gcon	:  qcon
-	|  OBRACK CBRACK			{ $$ = creategid(-1); }
-	|  OPAREN CPAREN			{ $$ = creategid(0); }
+	|  OBRACK CBRACK			{ $$ = creategid(NILGID); }
+	|  OPAREN CPAREN			{ $$ = creategid(UNITGID); }
 	|  OPAREN commas CPAREN			{ $$ = creategid($2); }
 	;
 
 gconk	:  qconk
-	|  obrackkey CBRACK			{ $$ = creategid(-1); }
-	|  oparenkey CPAREN			{ $$ = creategid(0); }
+	|  obrackkey CBRACK			{ $$ = creategid(NILGID); }
+	|  oparenkey CPAREN			{ $$ = creategid(UNITGID); }
 	|  oparenkey commas CPAREN		{ $$ = creategid($2); }
 	;
 
