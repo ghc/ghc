@@ -37,7 +37,7 @@ import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
-			  exprIsConApp_maybe, mkPiType, findAlt, 
+			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, coreAltsType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, findDefault,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
@@ -1686,8 +1686,8 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
     )							`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above
-    newId SLIT("$j") (foldr mkPiType rhs_ty' final_bndrs')	`thenSmpl` \ join_bndr ->
-	-- Notice the funky mkPiType.  If the contructor has existentials
+    newId SLIT("$j") (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
+	-- Notice the funky mkPiTypes.  If the contructor has existentials
 	-- it's possible that the join point will be abstracted over
 	-- type varaibles as well as term variables.
 	--  Example:  Suppose we have

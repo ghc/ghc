@@ -4,7 +4,7 @@
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
-module WwLib ( mkWwBodies, mkWWstr ) where
+module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs ) where
 
 #include "HsVersions.h"
 
@@ -18,7 +18,7 @@ import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
 import DmdAnal		( both )
-import PrelInfo		( realWorldPrimId, eRROR_CSTRING_ID )
+import MkId		( realWorldPrimId, voidArgId, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
@@ -125,8 +125,9 @@ mkWwBodies fun_ty demands res_info one_shots
   = mkWWargs fun_ty demands one_shots'	`thenUs` \ (wrap_args,   wrap_fn_args, work_fn_args, res_ty) ->
     mkWWcpr res_ty res_info      	`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
     mkWWstr wrap_args			`thenUs` \ (work_args,   wrap_fn_str,  work_fn_str) ->
-    hackWorkArgs work_args cpr_res_ty	`thenUs` \ (work_lam_args, work_call_args) ->
-
+    let
+	(work_lam_args, work_call_args) = mkWorkerArgs work_args cpr_res_ty
+    in
     returnUs ([idNewDemandInfo v | v <- work_args, isId v],
 	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
 	      mkLams work_lam_args . work_fn_str . work_fn_cpr . work_fn_args)
@@ -139,24 +140,36 @@ mkWwBodies fun_ty demands res_info one_shots
 	-- fw from being inlined into f's RHS
   where
     one_shots' = one_shots ++ repeat False
+\end{code}
 
-	-- Horrid special case.  If the worker would have no arguments, and the
-	-- function returns a primitive type value, that would make the worker into
-	-- an unboxed value.  We box it by passing a dummy void argument, thus:
-	--
-	--	f = /\abc. \xyz. fw abc void
-	-- 	fw = /\abc. \v. body
-	--
-	-- We use the state-token type which generates no code
-hackWorkArgs work_args res_ty
-  | any isId work_args || not (isUnLiftedType res_ty) 
-  = returnUs (work_args, work_args)
-  | otherwise
-  = getUniqueUs 		`thenUs` \ void_arg_uniq ->
-    let
-	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
-    in
-    returnUs (work_args ++ [void_arg], work_args ++ [realWorldPrimId])
+
+%************************************************************************
+%*									*
+\subsection{Making wrapper args}
+%*									*
+%************************************************************************
+
+During worker-wrapper stuff we may end up with an unlifted thing
+which we want to let-bind without losing laziness.  So we
+add a void argument.  E.g.
+
+	f = /\a -> \x y z -> E::Int#	-- E does not mentione x,y,z
+==>
+	fw = /\ a -> \void -> E
+	f  = /\ a -> \x y z -> fw realworld
+
+We use the state-token type which generates no code.
+
+\begin{code}
+mkWorkerArgs :: [Var]
+	     -> Type	-- Type of body
+	     -> ([Var],	-- Lambda bound args
+		 [Var])	-- Args at call site
+mkWorkerArgs args res_ty
+    | any isId args || not (isUnLiftedType res_ty)
+    = (args, args)
+    | otherwise	
+    = (args ++ [voidArgId], args ++ [realWorldPrimId])
 \end{code}
 
 

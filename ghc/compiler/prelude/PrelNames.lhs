@@ -847,6 +847,7 @@ printIdKey		      = mkPreludeMiscIdUnique 43
 failIOIdKey		      = mkPreludeMiscIdUnique 44
 unpackCStringListIdKey	      = mkPreludeMiscIdUnique 45
 nullAddrIdKey		      = mkPreludeMiscIdUnique 46
+voidArgIdKey		      = mkPreludeMiscIdUnique 47
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

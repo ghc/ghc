@@ -22,7 +22,7 @@ module MkId (
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds,
-	unsafeCoerceId, realWorldPrimId, nullAddrId,
+	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId,
 	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
 	rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID,
 	nO_METHOD_BINDING_ERROR_ID, aBSENT_ERROR_ID, pAR_ERROR_ID
@@ -841,6 +841,13 @@ dataToTagId = mkPrimOpId DataToTagOp
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get
 nasty as-is, change it back to a literal (@Literal@).
 
+voidArgId is a Local Id used simply as an argument in functions
+where we just want an arg to avoid having a thunk of unlifted type.
+E.g.
+	x = \ void :: State# RealWorld -> (# p, q #)
+
+This comes up in strictness analysis
+
 \begin{code}
 realWorldPrimId	-- :: State# RealWorld
   = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
@@ -850,6 +857,9 @@ realWorldPrimId	-- :: State# RealWorld
 	-- which in turn makes Simplify.interestingArg return True,
 	-- which in turn makes INLINE things applied to realWorld# likely
 	-- to be inlined
+
+voidArgId 	-- :: State# RealWorld
+  = mkSysLocal SLIT("void") voidArgIdKey realWorldStatePrimTy
 \end{code}
 
 

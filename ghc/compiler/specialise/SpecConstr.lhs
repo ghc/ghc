@@ -12,8 +12,9 @@ module SpecConstr(
 
 import CoreSyn
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, eqExpr )
+import CoreUtils	( exprType, eqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
+import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
 import PprCore		( pprCoreRules )
@@ -489,8 +490,9 @@ spec_one :: ScEnv
 	    f (b,c) ((:) (a,(b,c)) (x,v) hw) = f_spec b c v hw
 -}
 
-spec_one env fn rhs (pats, n)
-  = getUniqueUs 			`thenUs` \ spec_uniq ->
+spec_one env fn rhs (pats, rule_number)
+  = getUniqueUs 		`thenUs` \ spec_uniq ->
+    getUniqueUs 		`thenUs` \ hack_uniq ->
     let 
 	fn_name      = idName fn
 	fn_loc       = nameSrcLoc fn_name
@@ -502,12 +504,18 @@ spec_one env fn rhs (pats, n)
 		-- variable may mention a type variable
 	(tvs, ids)   = partition isTyVar vars_to_bind
 	bndrs  	     = tvs ++ ids
+	spec_body    = mkApps rhs pats
+	body_ty	     = exprType spec_body
 	
-	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int n))
-	spec_rhs  = mkLams bndrs (mkApps rhs pats)
-	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
+	(spec_lam_args, spec_call_args) = mkWorkerArgs bndrs body_ty
+		-- Usual w/w hack to avoid generating 
+		-- a spec_rhs of unlifted type and no args
+	
+	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int rule_number))
+	spec_rhs  = mkLams spec_lam_args spec_body
+	spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
 	rule      = Rule rule_name specConstrActivation
-			 bndrs pats (mkVarApps (Var spec_id) bndrs)
+			 bndrs pats (mkVarApps (Var spec_id) spec_call_args)
     in
     returnUs (rule, (spec_id, spec_rhs))
 

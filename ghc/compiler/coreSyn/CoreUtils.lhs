@@ -8,7 +8,7 @@ module CoreUtils (
 	-- Construction
 	mkNote, mkInlineMe, mkSCC, mkCoerce,
 	bindNonRec, needsCaseBinding,
-	mkIfThenElse, mkAltExpr, mkPiType,
+	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
 	-- Taking expressions apart
 	findDefault, findAlt, hasDefault,
@@ -105,12 +105,18 @@ lbvarinfo field to figure out the right annotation for the arrove in
 case of a term variable.
 
 \begin{code}
-mkPiType :: Var -> Type -> Type		-- The more polymorphic version doesn't work...
-mkPiType v ty | isId v    = (case idLBVarInfo v of
-                               LBVarInfo u -> mkUTy u
-                               otherwise   -> id) $
-                            mkFunTy (idType v) ty
-	      | isTyVar v = mkForAllTy v ty
+mkPiType  :: Var   -> Type -> Type	-- The more polymorphic version
+mkPiTypes :: [Var] -> Type -> Type	--    doesn't work...
+
+mkPiTypes vs ty = foldr mkPiType ty vs
+
+mkPiType v ty
+   | isId v    = add_usage (mkFunTy (idType v) ty)
+   | otherwise = mkForAllTy v ty
+   where	      
+     add_usage ty = case idLBVarInfo v of
+                      LBVarInfo u -> mkUTy u ty
+                      otherwise   -> ty
 \end{code}
 
 \begin{code}
@@ -914,7 +920,6 @@ exprArity e = go e
 		--		 unknown, hence arity 0
 	      go _		       	   = 0
 \end{code}
-
 
 %************************************************************************
 %*									*

@@ -54,7 +54,7 @@ module SetLevels (
 
 import CoreSyn
 
-import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiType )
+import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiTypes )
 import CoreFVs		-- all of it
 import Subst
 import Id		( Id, idType, mkSysLocal, isOneShotLambda, zapDemandIdInfo,
@@ -727,7 +727,7 @@ newPolyBndrs dest_lvl env abs_vars bndrs
     mk_poly_bndr bndr uniq = mkSysLocal (_PK_ str) uniq poly_ty
 			   where
 			     str     = "poly_" ++ occNameUserString (getOccName bndr)
-			     poly_ty = foldr mkPiType (idType bndr) abs_vars
+			     poly_ty = mkPiTypes abs_vars (idType bndr)
 	
 
 newLvlVar :: String 
@@ -735,7 +735,7 @@ newLvlVar :: String
 	  -> LvlM Id
 newLvlVar str vars body_ty 	
   = getUniqueUs	`thenLvl` \ uniq ->
-    returnUs (mkSysLocal (_PK_ str) uniq (foldr mkPiType body_ty vars))
+    returnUs (mkSysLocal (_PK_ str) uniq (mkPiTypes vars body_ty))
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.
