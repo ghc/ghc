@@ -76,41 +76,18 @@
       <title>Expressions and patterns</title>
 
 	<para>None known.</para>
-
     </sect3>
 
     <sect3 id="infelicities-decls">
       <title>Declarations and bindings</title>
 
       <para>None known.</para>
-
     </sect3>
       
       <sect3 id="infelicities-Modules">
 	<title>Module system and interface files</title>
 	
-	<variablelist>
-	  <varlistentry>
-	    <term><literal>Main</literal> module</term>
-	    <listitem>
-	      <para>GHC interprets the module header
-<programlisting>module Main where</programlisting>
-              as if it was
-<programlisting>module Main (main) where</programlisting>
-              </para>
-
-              <para>This change allows GHC to optimise slightly more
-              aggresively inside the <literal>Main</literal>
-              module.</para>
-
-              <para>You are highly unlikely to notice the difference, since
-              importing <literal>Main</literal> is very rare (it would
-              introduce a recursive module dependency, so doing it by
-              accident is unlikely too).</para>
-	    </listitem>
-	  </varlistentry>
-	</variablelist>
-
+	<para>None known.</para>
     </sect3>
 
     <sect3 id="infelicities-numbers">
