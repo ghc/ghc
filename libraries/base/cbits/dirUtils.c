@@ -63,7 +63,7 @@ __hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
 #if HAVE_READDIR_R
   struct dirent* p;
   int res;
-  static unsigned int nm_max = -1;
+  static unsigned int nm_max = (unsigned int)-1;
   
   if (pDirE == NULL) {
     return -1;
