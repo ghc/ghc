@@ -28,13 +28,9 @@ import Data.Ratio
 #include "HsBase.h"
 
 -- -----------------------------------------------------------------------------
--- Computation `getCPUTime' returns the number of picoseconds CPU time
+-- |Computation 'getCPUTime' returns the number of picoseconds CPU time
 -- used by the current program.  The precision of this result is
 -- implementation-dependent.
-
--- The `cpuTimePrecision' constant is the smallest measurable difference
--- in CPU time that the implementation can record, and is given as an
--- integral number of picoseconds.
 
 getCPUTime :: IO Integer
 getCPUTime = do
@@ -110,6 +106,10 @@ foreign import ccall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HAN
 foreign import ccall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 
 #endif /* not _WIN32 */
+
+-- |The 'cpuTimePrecision' constant is the smallest measurable difference
+-- in CPU time that the implementation can record, and is given as an
+-- integral number of picoseconds.
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % fromIntegral (clockTicks))
