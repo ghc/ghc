@@ -136,6 +136,7 @@ HAPPY_SRCS   = $(filter %.y,   $(PRE_SRCS))
 DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS)) \
+	       $(patsubst %.hsc, %.hc, $(HSC_SRCS)) \
 	       $(patsubst %.y, %.hs, $(HAPPY_SRCS)) \
 	       $(patsubst %.hs, %.hc, $(PRE_HS_SRCS)) \
 	       $(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
@@ -148,6 +149,7 @@ EXCLUDED_LHS_SRCS     = $(filter %.lhs, $(EXCLUDED_SRCS))
 EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS)) \
+			$(patsubst %.hsc, %.hc, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.y, %.hs, $(EXCLUDED_HAPPY_SRCS)) \
 			$(patsubst %.hs, %.hc, $(EXCLUDED_HS_SRCS)) \
 			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS))
@@ -229,7 +231,7 @@ CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(CLEAN_DERIVED_SRCS)
 
 # Don't clean the .hc files if we're bootstrapping
-ifneq "$(BootingFromHc)" "YES"
+ifeq "$(BootingFromHc)" "YES"
 CLEAN_DERIVED_SRCS = $(filter-out %.hc, $(DERIVED_SRCS))
 else
 CLEAN_DERIVED_SRCS = $(DERIVED_SRCS)
