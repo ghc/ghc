@@ -5,7 +5,7 @@
 \section[PrelWeak]{Module @PrelWeak@}
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelWeak where
 

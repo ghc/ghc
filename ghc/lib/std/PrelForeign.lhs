@@ -5,7 +5,7 @@
 \section[Foreign]{Module @Foreign@}
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelForeign (
 	module PrelForeign,

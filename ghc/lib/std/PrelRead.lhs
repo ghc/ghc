@@ -7,7 +7,7 @@
 Instances of the Read class.
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelRead where
 

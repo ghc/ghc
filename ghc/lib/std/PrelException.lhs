@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.18 2000/04/13 08:58:27 simonmar Exp $
+% $Id: PrelException.lhs,v 1.19 2000/04/14 15:28:24 rrt Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -7,7 +7,7 @@
 Exceptions and exception-handling functions.
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 #ifndef __HUGS__
 module PrelException where

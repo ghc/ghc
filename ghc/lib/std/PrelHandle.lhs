@@ -8,7 +8,7 @@ This module defines Haskell {\em handles} and the basic operations
 which are supported for them.
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude -#include "cbits/stgio.h" #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 #include "cbits/stgerror.h"
 
 #ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */

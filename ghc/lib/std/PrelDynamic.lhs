@@ -7,7 +7,7 @@ Dynamic visible here.  The rest of the operations on Dynamics are
 available in exts/Dynamic.lhs.
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 #ifndef __HUGS__
 module PrelDynamic where

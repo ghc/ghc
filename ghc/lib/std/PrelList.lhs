@@ -7,7 +7,7 @@
 The List data type and its operations
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelList (
    [] (..),

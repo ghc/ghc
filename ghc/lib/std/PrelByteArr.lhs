@@ -6,7 +6,7 @@
 Byte-arrays are flat arrays of non-pointers only.
 
 \begin{code}
-{-# OPTIONS -fcompiling-prelude -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelByteArr where
 
