@@ -50,6 +50,7 @@ import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
+import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitTyConApp_maybe, tyConAppArgs,
@@ -1479,11 +1480,12 @@ simplAlts zap_occ_info scrut_cons case_bndr' alts cont'
 
     cat_evals [] [] = []
     cat_evals (v:vs) (str:strs)
-	| isTyVar v       = v				        : cat_evals vs (str:strs)
-	| isStrictDmd str = (v' `setIdUnfolding` mkOtherCon []) : cat_evals vs strs
-	| otherwise       = v'				        : cat_evals vs strs
+	| isTyVar v          = v	: cat_evals vs (str:strs)
+	| isMarkedStrict str = evald_v  : cat_evals vs strs
+	| otherwise          = zapped_v : cat_evals vs strs
 	where
-	  v' = zap_occ_info v
+	  zapped_v = zap_occ_info v
+	  evald_v  = zapped_v `setIdUnfolding` mkOtherCon []
 \end{code}
 
 

@@ -37,7 +37,6 @@ import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity, StrictnessMark(..) )
-import NewDemand 	( Demand, lazyDmd, seqDmd )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
@@ -114,7 +113,7 @@ data DataCon
 	dcRepArgTys :: [Type],		-- Final, representation argument types, after unboxing and flattening,
 					-- and including existential dictionaries
 
-	dcRepStrictness :: [Demand],	-- One for each representation argument	
+	dcRepStrictness :: [StrictnessMark],	-- One for each representation argument	
 
 	dcTyCon  :: TyCon,		-- Result tycon
 
@@ -228,7 +227,7 @@ mkDataCon name arg_stricts fields
 		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
-		  dcStrictMarks = real_stricts, dcRepStrictness = rep_arg_demands,
+		  dcStrictMarks = real_stricts, dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
 		  dcId = work_id, dcWrapId = wrap_id}
 
@@ -239,13 +238,10 @@ mkDataCon name arg_stricts fields
     real_stricts = (map mk_dict_strict_mark ex_dict_tys) ++
 		   zipWithEqual "mkDataCon1" (chooseBoxingStrategy tycon) 
 				orig_arg_tys arg_stricts 
+    real_arg_tys = ex_dict_tys ++ orig_arg_tys
 
 	-- Representation arguments and demands
-    (rep_arg_demands, rep_arg_tys) 
-	= unzip $ concat $ 
-	  zipWithEqual "mkDataCon2" unbox_strict_arg_ty 
-		       real_stricts 
-		       (ex_dict_tys ++ orig_arg_tys)
+    (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys (tyvars ++ ex_tyvars)
@@ -300,7 +296,7 @@ dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
 
 isNullaryDataCon con  = dataConRepArity con == 0
 
-dataConRepStrictness :: DataCon -> [Demand]
+dataConRepStrictness :: DataCon -> [StrictnessMark]
 	-- Give the demands on the arguments of a
 	-- Core constructor application (Con dc args)
 dataConRepStrictness dc = dcRepStrictness dc
@@ -442,15 +438,18 @@ chooseBoxingStrategy tycon arg_ty strict
 		     		Nothing -> False
 		     		Just (arg_tycon, _) -> isProductTyCon arg_tycon
 
-unbox_strict_arg_ty 
-	:: StrictnessMark	-- After strategy choice; can't be MarkedUserStrict
-	-> Type			-- Source argument type
-	-> [(Demand,Type)]	-- Representation argument types and demamds
+computeRep :: [StrictnessMark]		-- Original arg strictness
+					--   [after strategy choice; can't be MarkedUserStrict]
+	   -> [Type]			-- and types
+	   -> ([StrictnessMark],	-- Representation arg strictness
+	       [Type])			-- And type
 
-unbox_strict_arg_ty NotMarkedStrict ty = [(lazyDmd, ty)]
-unbox_strict_arg_ty MarkedStrict    ty = [(seqDmd,  ty)]
-unbox_strict_arg_ty MarkedUnboxed   ty 
-  = zipEqual "unbox_strict_arg_ty" (dataConRepStrictness arg_data_con) arg_tys
+computeRep stricts tys
+  = unzip $ concat $ zipWithEqual "computeRep" unbox stricts tys
   where
-    (_, _, arg_data_con, arg_tys) = splitProductType "unbox_strict_arg_ty" (repType ty)
+    unbox NotMarkedStrict ty = [(NotMarkedStrict, ty)]
+    unbox MarkedStrict    ty = [(MarkedStrict,    ty)]
+    unbox MarkedUnboxed   ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
+			     where
+			       (_, _, arg_dc, arg_tys) = splitProductType "unbox_strict_arg_ty" (repType ty)
 \end{code}
