@@ -33,7 +33,7 @@ import Class		( className, classArity, classKey, classTyVars, classSCTheta, Clas
 import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
+import DataCon		( isNullaryDataCon, isExistentialDataCon, dataConOrigArgTys )
 import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
@@ -41,7 +41,7 @@ import NameSet		( NameSet, emptyNameSet, duDefs )
 import Unique		( Unique, getUnique )
 import Kind		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
-			  tyConTheta, isProductTyCon, isDataTyCon,
+			  tyConTheta, isProductTyCon, isDataTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
@@ -183,6 +183,20 @@ pattern matching against a constructor from a data type with a context
 gives rise to the constraints for that context -- or at least the thinned
 version.  So now all classes are "offending".
 
+[Newtype deriving]
+~~~~~~~~~~~~~~~~~~
+Consider this:
+    class C a b
+    instance C [a] Char
+    newtype T = T Char deriving( C [a] )
+
+Notice the free 'a' in the deriving.  We have to fill this out to 
+    newtype T = T Char deriving( forall a. C [a] )
+
+And then translate it to:
+    instance C [a] Char => C [a] T where ...
+    
+	
 
 
 %************************************************************************
@@ -349,16 +363,21 @@ makeDerivEqns tycl_decls
       where
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = T (t ak...an) deriving (.., C s1 .. sm, ...)
-	-- where aj...an do not occur free in t, and the (C s1 ... sm) is a 
-	-- *partial applications* of class C with the last parameter missing
+	-- where t is a type,
+	-- 	 ak...an is a suffix of a1..an
+	--	 ak...an do not occur free in t, 
+	-- 	 (C s1 ... sm) is a  *partial applications* of class C 
+	--			with the last parameter missing
 	--
 	-- We generate the instances
-	--	 instance C s1 .. sm (t ak...aj) => C s1 .. sm (T a1...aj)
-	-- where T a1...aj is the partial application of the LHS of the correct kind
+	--	 instance C s1 .. sm (t ak...ap) => C s1 .. sm (T a1...ap)
+	-- where T a1...ap is the partial application of the LHS of the correct kind
+	-- and p >= k
 	--
 	-- Running example: newtype T s a = MkT (ST s a) deriving( Monad )
 	--	instance Monad (ST s) => Monad (T s) where 
 	--	  fail = coerce ... (fail @ ST s)
+	-- (Actually we don't need the coerce, because non-rec newtypes are transparent
 
 	clas_tyvars = classTyVars clas
 	kind = tyVarKind (last clas_tyvars)
@@ -380,7 +399,7 @@ makeDerivEqns tycl_decls
 	-- We want the Num instance of B, *not* the Num instance of Int,
 	-- when making the Num instance of A!
 	tyvars 		      = tyConTyVars tycon
-        rep_ty 		      = head (dataConOrigArgTys (head (tyConDataCons tycon)))
+        rep_ty 		      = newTyConRhs tycon
 	(rep_fn, rep_ty_args) = tcSplitAppTys rep_ty
 
 	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
@@ -448,11 +467,14 @@ makeDerivEqns tycl_decls
 						--	newtype A = MkA [A]
 						-- Don't want
 						--	instance Eq [A] => Eq A !!
-
 			-- Here's a recursive newtype that's actually OK
 			--	newtype S1 = S1 [T1 ()]
 			--	newtype T1 a = T1 (StateT S1 IO a ) deriving( Monad )
 			-- It's currently rejected.  Oh well.
+			-- In fact we generate an instance decl that has method of form
+			--	meth @ instTy = meth @ repTy
+			-- (no coerce's).  We'd need a coerce if we wanted to handle
+			-- recursive newtypes too
 
 	-- Check that eta reduction is OK
 	-- 	(a) the dropped-off args are identical
@@ -552,7 +574,7 @@ checkSideConditions gla_exts clas tycon tys
 	[cond] -> cond (gla_exts, tycon)
 	other  -> pprPanic "checkSideConditions" (ppr clas)
   where
-    ty_args_why	     = quotes (ppr (mkClassPred clas tys)) <+> ptext SLIT("is not a class")
+    ty_args_why	= quotes (ppr (mkClassPred clas tys)) <+> ptext SLIT("is not a class")
 
 non_std_why clas = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
 
