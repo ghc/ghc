@@ -31,8 +31,7 @@ import RnEnv		( availName, availNames, availsToNameSet,
 import Module           ( Module, ModuleName, pprModule, mkSearchPath, mkThisModule )
 import Name		( Name, isLocallyDefined,
 			  NamedThing(..), ImportReason(..), Provenance(..),
-			  pprOccName, nameOccName,
-			  getNameProvenance, occNameUserString, 
+			  pprOccName, getNameProvenance, 
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
 import Id		( idType )
@@ -493,8 +492,7 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
 
 reportableUnusedName :: Name -> Bool
 reportableUnusedName name
-  = explicitlyImported (getNameProvenance name) &&
-    not (startsWithUnderscore (occNameUserString (nameOccName name)))
+  = explicitlyImported (getNameProvenance name)
   where
     explicitlyImported (LocalDef _ _) 		             = True
 	-- Report unused defns of local vars
@@ -503,12 +501,6 @@ reportableUnusedName name
     explicitlyImported other			             = False
 	-- Don't report others
    
-	-- Haskell 98 encourages compilers to suppress warnings about
-	-- unused names in a pattern if they start with "_".
-    startsWithUnderscore ('_' : _) = True
-	-- Suppress warnings for names starting with an underscore
-    startsWithUnderscore other     = False
-
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats imp_decls
         | opt_D_dump_rn_trace || 

@@ -24,6 +24,7 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  mkLocalName, mkImportedLocalName, mkGlobalName, isSystemName,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
+                          occNameUserString,
 			  setNameProvenance, getNameProvenance, pprNameProvenance
 			)
 import NameSet
@@ -723,24 +724,33 @@ warnUnusedBinds warn_when_local names
 -------------------------
 
 warnUnusedGroup :: (Bool -> Bool) -> [Name] -> RnM d ()
-warnUnusedGroup _ []
-  = returnRn ()
-
 warnUnusedGroup emit_warning names
   | not (emit_warning is_local) = returnRn ()
   | otherwise
-  = pushSrcLocRn def_loc	$
-    addWarnRn			$
-    sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr names)))]
+  = case filter isReportable names of
+      []       -> returnRn ()
+      repnames -> warn repnames
   where
-    name1 = head names
-    (is_local, def_loc, msg)
-	= case getNameProvenance name1 of
+  warn repnames = pushSrcLocRn def_loc	$
+                  addWarnRn		$
+                  sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr repnames)))]
+
+  name1 = head names
+
+  (is_local, def_loc, msg)
+	   = case getNameProvenance name1 of
 		LocalDef loc _ 			     -> (True, loc, text "Defined but not used")
 		NonLocalDef (UserImport mod loc _) _ ->
 		 (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
 			 			      text "but not used")
 		other -> (False, getSrcLoc name1, text "Strangely defined but not used")
+
+  isReportable = not . startsWithUnderscore . occNameUserString  . nameOccName
+    -- Haskell 98 encourages compilers to suppress warnings about
+    -- unused names in a pattern if they start with "_".
+  startsWithUnderscore ('_' : _) = True
+    -- Suppress warnings for names starting with an underscore
+  startsWithUnderscore other     = False
 \end{code}
 
 \begin{code}
