@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.23 2002/05/29 22:11:58 sof Exp $
+-- $Id: Main.hs,v 1.24 2002/06/03 10:27:11 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -48,6 +48,7 @@ isAction (Config _)     = False
 isAction (Field _)      = False
 isAction (Input _)      = False
 isAction (AutoGHCiLibs) = False
+isAction (Force)	= False
 isAction _              = True
 
 usageHeader = "ghc-pkg [OPTION...]"
