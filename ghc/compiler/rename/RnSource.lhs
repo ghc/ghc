@@ -25,7 +25,7 @@ import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, getIPName,
 			  lookupImplicitOccRn, lookupImplicitOccsRn,
 			  bindLocalsRn, bindLocalRn, bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
-			  bindCoreLocalFVRn, bindCoreLocalsFVRn,
+			  bindCoreLocalFVRn, bindCoreLocalsFVRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames,
 			  mkImportedGlobalName, mkImportedGlobalFromRdrName,
 			  newDFunName, getDFunKey, newImplicitBinder,
@@ -299,14 +299,19 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags dfun_rdr_name src_loc))
 	rnMethodBinds mbinds
     )						`thenRn` \ (mbinds', meth_fvs) ->
     let 
-	binders = mkNameSet (map fst (bagToList (collectMonoBinders mbinds')))
+	binders    = map fst (bagToList (collectMonoBinders mbinds'))
+	binder_set = mkNameSet binders
     in
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
 	-- so that	instance Eq a => Eq (T a) where
 	--			{-# SPECIALISE instance Eq a => Eq (T [a]) #-}
 	-- works OK. 
-    renameSigs (okInstDclSig binders) uprags	`thenRn` \ (new_uprags, prag_fvs) ->
+	--
+	-- But the (unqualified) method names are in scope
+    bindLocalNames binders (
+       renameSigs (okInstDclSig binder_set) uprags
+    )							`thenRn` \ (new_uprags, prag_fvs) ->
 
     getModeRn		`thenRn` \ mode ->
     (case mode of

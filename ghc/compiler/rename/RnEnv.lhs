@@ -24,7 +24,7 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
 			  mkIPName, isWiredInName, hasBetterProv,
 			  nameOccName, setNameModule, nameModule,
-			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
+			  pprOccName, isLocallyDefined, nameUnique, 
 			  setNameProvenance, getNameProvenance, pprNameProvenance,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
 			)
@@ -322,6 +322,13 @@ bindCoreLocalsFVRn (b:bs) thing_inside = bindCoreLocalFVRn b	$ \ name' ->
 					 bindCoreLocalsFVRn bs	$ \ names' ->
 					 thing_inside (name':names')
 
+bindLocalNames names enclosed_scope
+  = getLocalNameEnv 		`thenRn` \ name_env ->
+    setLocalNameEnv (addListToRdrEnv name_env pairs)
+		    enclosed_scope
+  where
+    pairs = [(mkRdrUnqual (nameOccName n), n) | n <- names]
+
 -------------------------------------
 bindLocalRn doc rdr_name enclosed_scope
   = getSrcLocRn 				`thenRn` \ loc ->
@@ -350,15 +357,10 @@ bindUVarRn = bindLocalRn
 extendTyVarEnvFVRn :: [HsTyVarBndr Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
 	-- This tiresome function is used only in rnDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope
-  = getLocalNameEnv		`thenRn` \ env ->
-    let
-	tyvar_names = hsTyVarNames tyvars
-	new_env = addListToRdrEnv env [ (mkRdrUnqual (getOccName name), name) 
-				      | name <- tyvar_names
-				      ]
-    in
-    setLocalNameEnv new_env enclosed_scope	`thenRn` \ (thing, fvs) -> 
+  = bindLocalNames tyvar_names enclosed_scope 	`thenRn` \ (thing, fvs) -> 
     returnRn (thing, delListFromNameSet fvs tyvar_names)
+  where
+    tyvar_names = hsTyVarNames tyvars
 
 bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
 	      -> ([HsTyVarBndr Name] -> RnMS a)
@@ -474,38 +476,13 @@ lookupGlobalOccRn rdr_name
 --	import M( f )
 --	f :: Int -> Int
 --	f x = x
--- In a sense, it's clear that the 'f' in the signature must refer
--- to A.f, but the Haskell98 report does not stipulate this, so
--- I treat the 'f' in the signature as a reference to an unqualified
--- 'f' and hence fail with an ambiguous reference.
+-- It's clear that the 'f' in the signature must refer to A.f
+-- The Haskell98 report does not stipulate this, but it will!
+-- So we must treat the 'f' in the signature in the same way
+-- as the binding occurrence of 'f', using lookupBndrRn
 lookupSigOccRn :: RdrName -> RnMS Name
-lookupSigOccRn = lookupOccRn
+lookupSigOccRn = lookupBndrRn
 
-{-	OLD VERSION
--- This code tries to be cleverer than the above.
--- The variable in a signature must refer to a locally-defined thing,
--- even if there's an imported thing of the same name.
--- 
--- But this doesn't work for instance decls:
---	instance Enum Int where
---	  {-# INLINE enumFrom #-}
---	  ...
--- Here the enumFrom is an imported reference!
-lookupSigOccRn rdr_name
-  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
-    case (lookupRdrEnv local_env rdr_name, lookupRdrEnv global_env rdr_name) of
-	(Just name, _) -> returnRn name
-
-	(Nothing, Just names) -> case filter isLocallyDefined names of
-				   [n] -> returnRn n
-				   ns  -> pprPanic "lookupSigOccRn" (ppr rdr_name <+> ppr names <+> ppr ns)
-					-- There can't be a local top-level name-clash
-					-- (That's dealt with elsewhere.)
-
-	(Nothing, Nothing) -> failWithRn (mkUnboundName rdr_name)
-					 (unknownNameErr rdr_name)
--}
-  
 
 -- Look in both local and global env
 lookup_occ global_env local_env rdr_name
