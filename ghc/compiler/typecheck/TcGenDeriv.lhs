@@ -750,7 +750,7 @@ Example
 
 instance Read T where
   readPrec =
-    block
+    parens
     ( prec 4 (
         do x           <- ReadP.step Read.readPrec
            Symbol "%%" <- Lex.lex
@@ -890,6 +890,29 @@ gen_Read_binds get_fixity tycon
 %*									*
 %************************************************************************
 
+Example
+
+    infixr 5 :^:
+
+    data Tree a =  Leaf a  |  Tree a :^: Tree a
+
+    instance (Show a) => Show (Tree a) where
+
+        showsPrec d (Leaf m) = showParen (d > app_prec) showStr
+          where
+             showStr = showString "Leaf " . showsPrec (app_prec+1) m
+
+        showsPrec d (u :^: v) = showParen (d > up_prec) showStr
+          where
+             showStr = showsPrec (up_prec+1) u . 
+                       showString " :^: "      .
+                       showsPrec (up_prec+1) v
+                -- Note: right-associativity of :^: ignored
+
+    up_prec  = 5    -- Precedence of :^:
+    app_prec = 10   -- Application has precedence one more than
+		    -- the most tightly-binding operator
+
 \begin{code}
 gen_Show_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
@@ -909,7 +932,7 @@ gen_Show_binds get_fixity tycon
 	     ([wildPat, con_pat], mk_showString_app con_str)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
-		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt con_prec))))
+		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt con_prec_plus_one))))
 				 (HsPar (nested_compose_Expr show_thingies)))
 	    where
 	     data_con_RDR  = qual_orig_name data_con
@@ -931,7 +954,11 @@ gen_Show_binds get_fixity tycon
 				  show_record_args ++ [mk_showString_app "}"]
 		| otherwise	= mk_showString_app (con_str ++ " ") : show_prefix_args
                 
-	     show_label l = mk_showString_app (the_name ++ "=")
+	     show_label l = mk_showString_app (the_name ++ " = ")
+			-- Note the spaces around the "=" sign.  If we don't have them
+			-- then we get Foo { x=-1 } and the "=-" parses as a single
+			-- lexeme.  Only the space after the '=' is necessary, but
+			-- it seems tidier to have them both sides.
 		 where
 		   occ_nm   = getOccName (fieldLabelName l)
 		   nm       = occNameUserString occ_nm
@@ -957,9 +984,9 @@ gen_Show_binds get_fixity tycon
 			       
 		-- Fixity stuff
 	     is_infix = isDataSymOcc dc_occ_nm
-             con_prec = 1 + getPrec is_infix get_fixity dc_nm
+             con_prec_plus_one = 1 + getPrec is_infix get_fixity dc_nm
 	     arg_prec | record_syntax = 0	-- Record fields don't need parens
-		      | otherwise     = con_prec	
+		      | otherwise     = con_prec_plus_one
 
 mk_showString_app str = HsApp (HsVar showString_RDR) (HsLit (mkHsString str))
 \end{code}
@@ -971,7 +998,9 @@ getPrec is_infix get_fixity nm
   | otherwise      = getPrecedence get_fixity nm
 		  
 appPrecedence :: Integer
-appPrecedence = fromIntegral maxPrecedence
+appPrecedence = fromIntegral maxPrecedence + 1
+  -- One more than the precedence of the most 
+  -- tightly-binding operator
 
 getPrecedence :: FixityEnv -> Name -> Integer
 getPrecedence get_fixity nm 
