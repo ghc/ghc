@@ -12,25 +12,24 @@ checker.
 module TcHsSyn (
 	SYN_IE(TcIdBndr), TcIdOcc(..),
 	
-	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcPat),
+	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcPat),
 	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
 	SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
-	SYN_IE(TcHsModule), SYN_IE(TcCoreExpr),
+	SYN_IE(TcHsModule), SYN_IE(TcCoreExpr), SYN_IE(TcDictBinds),
 	
-	SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedBind),
+	SYN_IE(TypecheckedHsBinds), 
 	SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedPat),
 	SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedArithSeqInfo),
 	SYN_IE(TypecheckedStmt),
 	SYN_IE(TypecheckedMatch), SYN_IE(TypecheckedHsModule),
 	SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
-	SYN_IE(TypecheckedRecordBinds),
+	SYN_IE(TypecheckedRecordBinds), SYN_IE(TypecheckedDictBinds),
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
 	tcIdType, tcIdTyVars,
 
-	zonkBinds,
-	zonkDictBinds
+	zonkBinds, zonkMonoBinds
   ) where
 
 IMP_Ubiq(){-uitous-}
@@ -39,21 +38,27 @@ IMP_Ubiq(){-uitous-}
 import HsSyn	-- oodles of it
 import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
 		  SYN_IE(DictVar), idType,
-		  SYN_IE(IdEnv), growIdEnvList, lookupIdEnv
+		  SYN_IE(IdEnv), growIdEnvList, lookupIdEnv,
+		  SYN_IE(Id)
 		)
 
 -- others:
-import Name	( Name{--O only-} )
+import Name	( Name{--O only-}, NamedThing(..) )
 import TcMonad
 import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
 import Usage	( SYN_IE(UVar) )
-import Util	( zipEqual, panic, pprPanic, pprTrace )
+import Util	( zipEqual, panic, 
+		  pprPanic, pprTrace
+#ifdef DEBUG
+	          , assertPanic
+#endif
+	        )
 
 import PprType  ( GenType, GenTyVar ) 	-- instances
-import Type	( mkTyVarTy, tyVarsOfType )
-import TyVar	( GenTyVar {- instances -},
+import Type	( mkTyVarTy, tyVarsOfType, SYN_IE(Type) )
+import TyVar	( GenTyVar {- instances -}, SYN_IE(TyVar),
 		  SYN_IE(TyVarEnv), growTyVarEnvList, emptyTyVarSet )
 import TysPrim	( voidTy )
 import CoreSyn  ( GenCoreExpr )
@@ -61,6 +66,10 @@ import Unique	( Unique )		-- instances
 import UniqFM
 import PprStyle
 import Pretty
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 
@@ -80,8 +89,8 @@ data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
 		| RealId Id
 
 type TcHsBinds s     	= HsBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcBind s	     	= Bind (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcMonoBinds s	= MonoBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
+type TcDictBinds s	= TcMonoBinds s
 type TcPat s	     	= OutPat (TcTyVar s) UVar (TcIdOcc s)
 type TcExpr s	     	= HsExpr (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcGRHSsAndBinds s	= GRHSsAndBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
@@ -96,8 +105,8 @@ type TcCoreExpr s	= GenCoreExpr (TcIdOcc s) (TcIdOcc s) (TcTyVar s) UVar
 
 type TypecheckedPat		= OutPat	TyVar UVar Id
 type TypecheckedMonoBinds 	= MonoBinds	TyVar UVar Id TypecheckedPat
+type TypecheckedDictBinds 	= TypecheckedMonoBinds
 type TypecheckedHsBinds		= HsBinds	TyVar UVar Id TypecheckedPat
-type TypecheckedBind		= Bind		TyVar UVar Id TypecheckedPat
 type TypecheckedHsExpr		= HsExpr	TyVar UVar Id TypecheckedPat
 type TypecheckedArithSeqInfo	= ArithSeqInfo	TyVar UVar Id TypecheckedPat
 type TypecheckedStmt		= Stmt		TyVar UVar Id TypecheckedPat
@@ -186,26 +195,6 @@ extend_ve ve ids    = growIdEnvList ve [(id,id) | id <- ids]
 extend_te te tyvars = growTyVarEnvList te [(tyvar, mkTyVarTy tyvar) | tyvar <- tyvars]
 \end{code}
 
-\begin{code}
-	-- Implicitly mutually recursive, which is overkill,
-	-- but it means that later ones see earlier ones
-zonkDictBinds te ve dbs 
-  = fixNF_Tc (\ ~(_,new_ve) ->
-	zonkDictBindsLocal te new_ve dbs	`thenNF_Tc` \ (new_binds, dict_ids) ->
-        returnNF_Tc (new_binds, extend_ve ve dict_ids)
-    )
-
-	-- The ..Local version assumes the caller has set up
-	-- a ve that contains all the things bound here
-zonkDictBindsLocal te ve [] = returnNF_Tc ([], [])
-
-zonkDictBindsLocal te ve ((dict,rhs) : binds)
-  = zonkIdBndr te dict			`thenNF_Tc` \ new_dict ->
-    zonkExpr te ve rhs			`thenNF_Tc` \ new_rhs ->
-    zonkDictBindsLocal te ve binds	`thenNF_Tc` \ (new_binds, dict_ids) ->
-    returnNF_Tc ((new_dict,new_rhs) : new_binds, 
-		 new_dict:dict_ids)
-\end{code}
 
 \begin{code}
 zonkBinds :: TyVarEnv Type -> IdEnv Id 
@@ -218,52 +207,15 @@ zonkBinds te ve (ThenBinds binds1 binds2)
     zonkBinds te ve1 binds2  `thenNF_Tc` \ (new_binds2, ve2) ->
     returnNF_Tc (ThenBinds new_binds1 new_binds2, ve2)
 
-zonkBinds te ve (SingleBind bind)
-  = fixNF_Tc (\ ~(_,new_ve) ->
-	zonkBind te new_ve bind  `thenNF_Tc` \ (new_bind, new_ids) ->
-	returnNF_Tc (SingleBind new_bind, extend_ve ve new_ids)
+zonkBinds te ve (MonoBind bind sigs is_rec)
+  = ASSERT( null sigs )
+    fixNF_Tc (\ ~(_,new_ve) ->
+	zonkMonoBinds te new_ve bind  `thenNF_Tc` \ (new_bind, new_ids) ->
+	returnNF_Tc (MonoBind new_bind [] is_rec, extend_ve ve new_ids)
     )
-
-zonkBinds te ve (AbsBinds tyvars dicts locprs dict_binds val_bind)
-  = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
-    let
-	new_te = extend_te te new_tyvars
-    in
-    mapNF_Tc (zonkIdBndr new_te) dicts		`thenNF_Tc` \ new_dicts ->
-    mapNF_Tc (zonkIdBndr new_te) globals	`thenNF_Tc` \ new_globals ->
-    let
-	ve1 = extend_ve ve  new_globals
-        ve2 = extend_ve ve1 new_dicts
-    in
-    fixNF_Tc (\ ~(_, ve3) ->
-	zonkDictBindsLocal new_te ve3 dict_binds  `thenNF_Tc` \ (new_dict_binds, ds) ->
-	zonkBind new_te ve3 val_bind		  `thenNF_Tc` \ (new_val_bind, ls) ->
-	let
-	    new_locprs = zipEqual "zonkBinds" (map (zonkIdOcc ve3) locals) new_globals
-        in
-        returnNF_Tc (AbsBinds new_tyvars new_dicts new_locprs new_dict_binds new_val_bind,
-		     extend_ve ve2 (ds++ls))
-    )						`thenNF_Tc` \ (binds, _) ->
-    returnNF_Tc (binds, ve1)	-- Yes, the "ve1" is right (SLPJ)
-  where
-    (locals, globals) = unzip locprs
 \end{code}
 
 \begin{code}
--------------------------------------------------------------------------
-zonkBind :: TyVarEnv Type -> IdEnv Id 
-	 -> TcBind s -> NF_TcM s (TypecheckedBind, [Id])
-
-zonkBind te ve EmptyBind = returnNF_Tc (EmptyBind, [])
-
-zonkBind te ve (NonRecBind mbinds)
-  = zonkMonoBinds te ve mbinds	`thenNF_Tc` \ (new_mbinds, new_ids) ->
-    returnNF_Tc (NonRecBind new_mbinds, new_ids)
-
-zonkBind te ve (RecBind mbinds)
-  = zonkMonoBinds te ve mbinds	`thenNF_Tc` \ (new_mbinds, new_ids) ->
-    returnNF_Tc (RecBind new_mbinds, new_ids)
-
 -------------------------------------------------------------------------
 zonkMonoBinds :: TyVarEnv Type -> IdEnv Id 
 	      -> TcMonoBinds s -> NF_TcM s (TypecheckedMonoBinds, [Id])
@@ -293,6 +245,35 @@ zonkMonoBinds te ve (FunMonoBind var inf ms locn)
   = zonkIdBndr te var			`thenNF_Tc` \ new_var ->
     mapNF_Tc (zonkMatch te ve) ms	`thenNF_Tc` \ new_ms ->
     returnNF_Tc (FunMonoBind new_var inf new_ms locn, [new_var])
+
+
+zonkMonoBinds te ve (AbsBinds tyvars dicts exports val_bind)
+  = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
+    let
+	new_te = extend_te te new_tyvars
+    in
+    mapNF_Tc (zonkIdBndr new_te) dicts		`thenNF_Tc` \ new_dicts ->
+
+    let
+	ve1 = extend_ve ve new_dicts
+    in
+    fixNF_Tc (\ ~(_, _, ve2) ->
+	zonkMonoBinds new_te ve2 val_bind 		`thenNF_Tc` \ (new_val_bind, new_ids) ->
+        mapNF_Tc (zonkExport new_te ve2) exports	`thenNF_Tc` \ new_exports ->
+	returnNF_Tc (new_val_bind, new_exports, extend_ve ve1 new_ids)
+    )						`thenNF_Tc ` \ (new_val_bind, new_exports, _) ->
+
+    let
+	    new_globals = [global | (_, global, local) <- new_exports]
+    in
+    returnNF_Tc (AbsBinds new_tyvars new_dicts new_exports new_val_bind,
+		 new_globals)
+
+  where
+    zonkExport te ve (tyvars, global, local)
+	= mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
+	  zonkIdBndr te global			`thenNF_Tc` \ new_global ->
+	  returnNF_Tc (new_tyvars, new_global, zonkIdOcc ve local)
 \end{code}
 
 %************************************************************************
@@ -330,8 +311,8 @@ zonkGRHSsAndBinds te ve (GRHSsAndBindsOut grhss binds ty)
   = zonkBinds te ve binds   		`thenNF_Tc` \ (new_binds, new_ve) ->
     let
 	zonk_grhs (GRHS guard expr locn)
-	  = zonkExpr te new_ve guard  `thenNF_Tc` \ new_guard ->
-	    zonkExpr te new_ve expr   `thenNF_Tc` \ new_expr  ->
+	  = zonkStmts te new_ve guard  `thenNF_Tc` \ (new_guard, new_ve2) ->
+	    zonkExpr te new_ve2 expr   `thenNF_Tc` \ new_expr  ->
 	    returnNF_Tc (GRHS new_guard new_expr locn)
 
         zonk_grhs (OtherwiseGRHS expr locn)
@@ -350,9 +331,10 @@ zonkGRHSsAndBinds te ve (GRHSsAndBindsOut grhss binds ty)
 %************************************************************************
 
 \begin{code}
+{-
 zonkExpr :: TyVarEnv Type -> IdEnv Id 
 	 -> TcExpr s -> NF_TcM s TypecheckedHsExpr
-
+-}
 zonkExpr te ve (HsVar name)
   = returnNF_Tc (HsVar (zonkIdOcc ve name))
 
@@ -409,7 +391,7 @@ zonkExpr te ve (HsLet binds expr)
 zonkExpr te ve (HsDo _ _ _) = panic "zonkExpr te ve:HsDo"
 
 zonkExpr te ve (HsDoOut do_or_lc stmts return_id then_id zero_id ty src_loc)
-  = zonkStmts te ve stmts 	`thenNF_Tc` \ new_stmts ->
+  = zonkStmts te ve stmts 	`thenNF_Tc` \ (new_stmts, _) ->
     zonkTcTypeToType te ty	`thenNF_Tc` \ new_ty   ->
     returnNF_Tc (HsDoOut do_or_lc new_stmts 
 			 (zonkIdOcc ve return_id)
@@ -435,10 +417,11 @@ zonkExpr te ve (RecordCon con rbinds)
 
 zonkExpr te ve (RecordUpd _ _) = panic "zonkExpr te ve:RecordUpd"
 
-zonkExpr te ve (RecordUpdOut expr dicts rbinds)
+zonkExpr te ve (RecordUpdOut expr ty dicts rbinds)
   = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
+    zonkTcTypeToType te ty	`thenNF_Tc` \ new_ty ->
     zonkRbinds te ve rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordUpdOut new_expr new_dicts new_rbinds)
+    returnNF_Tc (RecordUpdOut new_expr new_ty new_dicts new_rbinds)
   where
     new_dicts = map (zonkIdOcc ve) dicts
 
@@ -530,28 +513,28 @@ zonkArithSeq te ve (FromThenTo e1 e2 e3)
 
 -------------------------------------------------------------------------
 zonkStmts :: TyVarEnv Type -> IdEnv Id 
-	  -> [TcStmt s] -> NF_TcM s [TypecheckedStmt]
+	  -> [TcStmt s] -> NF_TcM s ([TypecheckedStmt], IdEnv Id)
 
-zonkStmts te ve [] = returnNF_Tc []
+zonkStmts te ve [] = returnNF_Tc ([], ve)
 
 zonkStmts te ve [ReturnStmt expr]
   = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc [ReturnStmt new_expr]
+    returnNF_Tc ([ReturnStmt new_expr], ve)
 
 zonkStmts te ve (ExprStmt expr locn : stmts)
   = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    zonkStmts te ve	stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ExprStmt new_expr locn : new_stmts)
+    zonkStmts te ve	stmts	`thenNF_Tc` \ (new_stmts, new_ve) ->
+    returnNF_Tc (ExprStmt new_expr locn : new_stmts, new_ve)
 
 zonkStmts te ve (GuardStmt expr locn : stmts)
   = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    zonkStmts te ve	stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (GuardStmt new_expr locn : new_stmts)
+    zonkStmts te ve	stmts	`thenNF_Tc` \ (new_stmts, new_ve) ->
+    returnNF_Tc (GuardStmt new_expr locn : new_stmts, new_ve)
 
 zonkStmts te ve (LetStmt binds : stmts)
   = zonkBinds te ve     binds	`thenNF_Tc` \ (new_binds, new_ve) ->
-    zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (LetStmt new_binds : new_stmts)
+    zonkStmts te new_ve stmts	`thenNF_Tc` \ (new_stmts, new_ve2) ->
+    returnNF_Tc (LetStmt new_binds : new_stmts, new_ve2)
 
 zonkStmts te ve (BindStmt pat expr locn : stmts)
   = zonkPat te ve pat		`thenNF_Tc` \ (new_pat, ids) ->
@@ -559,8 +542,8 @@ zonkStmts te ve (BindStmt pat expr locn : stmts)
     let
 	new_ve = extend_ve ve ids
     in
-    zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (BindStmt new_pat new_expr locn : new_stmts)
+    zonkStmts te new_ve stmts	`thenNF_Tc` \ (new_stmts, new_ve2) ->
+    returnNF_Tc (BindStmt new_pat new_expr locn : new_stmts, new_ve2)
 
 
 
@@ -583,9 +566,10 @@ zonkRbinds te ve rbinds
 %************************************************************************
 
 \begin{code}
+{-
 zonkPat :: TyVarEnv Type -> IdEnv Id 
 	-> TcPat s -> NF_TcM s (TypecheckedPat, [Id])
-
+-}
 zonkPat te ve (WildPat ty)
   = zonkTcTypeToType te ty	    `thenNF_Tc` \ new_ty ->
     returnNF_Tc (WildPat new_ty, [])

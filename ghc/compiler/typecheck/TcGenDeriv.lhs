@@ -30,8 +30,9 @@ module TcGenDeriv (
 IMP_Ubiq()
 IMPORT_1_3(List(partition))
 
-import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
+import HsSyn		( HsBinds(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Stmt(..), DoOrListComp(..),
+			  SYN_IE(RecFlag), recursive,
 			  ArithSeqInfo, Sig, HsType, FixityDecl, Fixity, Fake )
 import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
@@ -46,9 +47,9 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString, modAndOcc, Oc
 
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
-import SrcLoc		( mkGeneratedSrcLoc )
+import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
-import Type		( eqTy, isPrimType )
+import Type		( eqTy, isPrimType, SYN_IE(Type) )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
@@ -868,7 +869,7 @@ mk_easy_Match loc pats binds expr
   = mk_match loc pats expr (mkbind binds)
   where
     mkbind [] = EmptyBinds
-    mkbind bs = SingleBind (RecBind (foldr1 AndMonoBinds bs))
+    mkbind bs = MonoBind (foldr1 AndMonoBinds bs) [] recursive
 	-- The renamer expects everything in its input to be a
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.

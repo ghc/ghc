@@ -11,15 +11,15 @@ module TcGRHSs ( tcGRHSsAndBinds ) where
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(TcLoop) -- for paranoia checking
 
-import HsSyn		( GRHSsAndBinds(..), GRHS(..),
-			  HsExpr, HsBinds(..), InPat, OutPat, Bind, Sig, Fake )
+import HsSyn		( GRHSsAndBinds(..), GRHS(..), MonoBinds, Stmt, DoOrListComp(..),
+			  HsExpr, HsBinds(..), InPat, OutPat, Sig, Fake )
 import RnHsSyn		( SYN_IE(RenamedGRHSsAndBinds), SYN_IE(RenamedGRHS) )
 import TcHsSyn		( SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), TcIdOcc(..) )
 
 import TcMonad
 import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcBinds		( tcBindsAndThen )
-import TcExpr		( tcExpr )
+import TcExpr		( tcExpr, tcStmt )
 import TcType		( SYN_IE(TcType) ) 
 import Unify		( unifyTauTy )
 
@@ -47,10 +47,15 @@ tcGRHS (OtherwiseGRHS expr locn)
 
 tcGRHS (GRHS guard expr locn)
   = tcAddSrcLoc locn		$
-    tcExpr guard		`thenTc` \ (guard2, guard_lie, guard_ty) ->
-    unifyTauTy boolTy guard_ty	`thenTc_`
-    tcExpr expr			`thenTc` \ (expr2, expr_lie, expr_ty) ->
-    returnTc (GRHS guard2 expr2 locn, plusLIE guard_lie expr_lie, expr_ty)
+    tc_stmts  guard	`thenTc` \ ((guard', expr', ty), lie) ->
+    returnTc (GRHS guard' expr' locn, lie, ty)
+  where
+    tc_stmts []		  = tcExpr expr 	`thenTc` \ (expr2, expr_lie, expr_ty) ->
+			    returnTc (([], expr2, expr_ty), expr_lie)
+    tc_stmts (stmt:stmts) = tcStmt tcExpr ListComp (\x->x) combine stmt $
+			    tc_stmts stmts
+
+    combine stmt _ (stmts, expr, ty) = (stmt:stmts, expr, ty)
 \end{code}
 
 
@@ -65,8 +70,9 @@ tcGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
   = tcBindsAndThen
 	 combiner binds
 	 (tcGRHSs grhss		`thenTc` \ (grhss', lie, ty) ->
-	  returnTc (GRHSsAndBindsOut grhss' EmptyBinds ty, lie, ty)
-	 )
+	  returnTc (GRHSsAndBindsOut grhss' EmptyBinds ty, lie)
+	 )			`thenTc` \ (grhss_and_binds'@(GRHSsAndBindsOut _ _ result_ty), lie) ->
+    returnTc (grhss_and_binds', lie, result_ty)
   where
     combiner binds1 (GRHSsAndBindsOut grhss binds2 ty) 
  	= GRHSsAndBindsOut grhss (binds1 `ThenBinds` binds2) ty
