@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.32 1999/06/25 10:09:19 panne Exp $
+ * $Id: PrimOps.h,v 1.33 1999/07/29 10:00:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -195,15 +195,21 @@ typedef union {
 #define xorzh(r,a,b)            r=(a)^(b)
 #define notzh(r,a)		r=~(a)
 
-#define shiftLzh(r,a,b)	  	r=(a)<<(b)
-#define shiftRLzh(r,a,b)  	r=(a)>>(b)
-#define iShiftLzh(r,a,b)  	r=(a)<<(b)
+/* The extra tests below properly define the behaviour when shifting
+ * by offsets larger than the width of the value being shifted.  Doing
+ * so is undefined in C (and in fact gives different answers depending
+ * on whether the operation is constant folded or not with gcc on x86!)
+ */
+
+#define shiftLzh(r,a,b)	  	r=((b) >= BITS_IN(W_)) ? 0 : (a)<<(b)
+#define shiftRLzh(r,a,b)  	r=((b) >= BITS_IN(W_)) ? 0 : (a)>>(b)
+#define iShiftLzh(r,a,b)  	r=((b) >= BITS_IN(W_)) ? 0 : (a)<<(b)
 /* Right shifting of signed quantities is not portable in C, so
    the behaviour you'll get from using these primops depends
    on the whatever your C compiler is doing. ToDo: fix/document. -- sof 8/98
 */
-#define iShiftRAzh(r,a,b) 	r=(a)>>(b)
-#define iShiftRLzh(r,a,b) 	r=(a)>>(b)
+#define iShiftRAzh(r,a,b) 	r=((b) >= BITS_IN(I_)) ? (((a) < 0) ? -1 : 0) : (a)>>(b)
+#define iShiftRLzh(r,a,b) 	r=((b) >= BITS_IN(I_)) ? 0 : ((W_)(a))>>(b)
 
 #define int2Wordzh(r,a) 	r=(W_)(a)
 #define word2Intzh(r,a) 	r=(I_)(a)
