@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.13 2001/03/29 08:03:47 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.14 2001/08/28 15:36:52 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -226,7 +226,7 @@ instance  (Integral a)	=> Num (Ratio a)  where
 instance  (Integral a)	=> Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')	=  (x*y') % (y*x')
-    recip (x:%y)	=  if x < 0 then (-y) :% (-x) else y :% x
+    recip (x:%y)	=  y % x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
 
 instance  (Integral a)	=> Real (Ratio a)  where
