@@ -186,25 +186,18 @@ searchPathExts :: [FilePath]
 	       -> String
 	       -> [(String, FilePath -> String -> IO (Module, ModuleLocation))] 
 	       -> IO (Maybe (Module, ModuleLocation))
-searchPathExts path basename exts = search exts
+searchPathExts path basename exts = search path
   where
-    search         [] = return Nothing
-    search ((x,f):xs) = do
-        let fName = (basename ++ '.':x)
-        found <- findOnPath path fName
-        case found of
-   	    -- special case to avoid getting "./foo.<ext>" all the time
-	  Just "."  -> fmap Just (f fName basename)
-	  Just path -> fmap Just (f (path ++ '/':fName)
-	  		                  (path ++ '/':basename))
-	  Nothing   -> search xs
+    search [] = return Nothing
+    search (p:ps) = loop exts
+      where	
+	base | p == "."  = basename
+	     | otherwise = p ++ '/':basename
 
-findOnPath :: [String] -> String -> IO (Maybe FilePath)
-findOnPath path s = loop path
- where
-  loop [] = return Nothing
-  loop (d:ds) = do
-    let file = d ++ '/':s
-    b <- doesFileExist file
-    if b then return (Just d) else loop ds
+	loop [] = search ps
+	loop ((ext,fn):exts) = do
+	    let file = base ++ '.':ext
+	    b <- doesFileExist file
+	    if b then Just `liftM` fn file base
+		 else loop exts
 \end{code}
