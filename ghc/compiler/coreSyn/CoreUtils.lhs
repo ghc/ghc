@@ -38,7 +38,7 @@ module CoreUtils (
 #include "HsVersions.h"
 
 
-import GlaExts		-- For `xori` 
+import GLAEXTS		-- For `xori` 
 
 import CoreSyn
 import PprCore		( pprCoreExpr )
