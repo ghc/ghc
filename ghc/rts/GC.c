@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.27 1999/02/05 16:02:41 simonm Exp $
+ * $Id: GC.c,v 1.28 1999/02/08 10:41:17 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1935,7 +1935,7 @@ scavenge_mutable_list(generation *gen)
   StgMutClosure *p, *next, *new_list;
 
   p = gen->saved_mut_list;
-  new_list = END_MUT_LIST;
+  new_list = gen->mut_list;
   next = p->mut_link;
 
   evac_gen = 0;
