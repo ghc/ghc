@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.31 2003/11/11 11:50:55 simonmar Exp $
+# $Id: package.mk,v 1.32 2003/12/18 21:37:56 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -237,10 +237,10 @@ $(HTML_DOC) : $(HS_PPS)
 CLEAN_FILES += $(PACKAGE).haddock
 
 %.raw-hs : %.lhs
-	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 %.raw-hs : %.hs
-	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(datadir)/html/libraries/$(PACKAGE)
