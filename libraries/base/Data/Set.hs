@@ -19,7 +19,6 @@ module Data.Set (
 	mkSet,          -- :: Ord a => [a]  -> Set a
 	setToList,      -- :: Set a -> [a] 
 	unitSet,        -- :: a -> Set a
-	singletonSet,   -- :: a -> Set a
 
 	union,          -- :: Ord a => Set a -> Set a -> Set a
 	unionManySets,  -- :: Ord a => [Set a] -> Set a
@@ -48,9 +47,6 @@ emptySet = MkSet emptyFM
 
 unitSet :: a -> Set a
 unitSet x = MkSet (unitFM x ())
-
-{-# DEPRECATED singletonSet "use Set.unitSet" #-}
-singletonSet = unitSet -- old;deprecated.
 
 setToList :: Set a -> [a]
 setToList (MkSet set) = keysFM set
