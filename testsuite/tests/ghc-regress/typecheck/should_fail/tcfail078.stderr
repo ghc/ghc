@@ -1,5 +1,6 @@
 
-tcfail078.hs:5:
+./tcfail078.hs:5:
     Type constructor `Integer' used as a class
     When checking kinds in `Integer i'
-    In a type signature for `f'
+    In the type: forall i. (Integer i) => i
+    While checking the type signature for `f'

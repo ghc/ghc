@@ -1,26 +1,27 @@
 
-tcfail067.hs:60:
-    Could not deduce `Show (SubRange a1)' from the context (Num a)
+./tcfail067.hs:60:
+    Could not deduce (Show (SubRange a)) from the context (Num a)
     Probable fix:
-	Add `Show (SubRange a1)' to the instance declaration context
-	Or add an instance declaration for `Show (SubRange a1)'
-    arising from an instance declaration at tcfail067.hs:60
+	Add (Show (SubRange a)) to the instance declaration context
+	Or add an instance declaration for (Show (SubRange a))
+    arising from the instance declaration at ./tcfail067.hs:60
+    In the instance declaration for `Num (SubRange a)'
 
-tcfail067.hs:61:
-    Could not deduce `Ord a1'
+./tcfail067.hs:61:
+    Could not deduce (Ord a)
 	from the context (Num (SubRange a),
 			  Num a,
 			  Eq (SubRange a),
 			  Show (SubRange a))
     Probable fix:
-	Add `Ord a1' to the instance declaration context
-    arising from use of `numSubRangeNegate' at tcfail067.hs:61
-    in the definition of function `negate': numSubRangeNegate
+	Add (Ord a) to the instance declaration context
+    arising from use of `numSubRangeNegate' at ./tcfail067.hs:61
+    In the definition of `negate': numSubRangeNegate
 
-tcfail067.hs:74:
-    Could not deduce `Ord a' from the context (Num a)
+./tcfail067.hs:74:
+    Could not deduce (Ord a) from the context (Num a)
     Probable fix:
-	Add `Ord a' to the type signature(s) for {numSubRangeBinOp}
-    arising from use of `SubRange' at tcfail067.hs:74
-    in the definition of function `numSubRangeBinOp':
+	Add (Ord a) to the type signature(s) for numSubRangeBinOp
+    arising from use of `SubRange' at ./tcfail067.hs:74
+    In the definition of `numSubRangeBinOp':
 	SubRange (result, result) result

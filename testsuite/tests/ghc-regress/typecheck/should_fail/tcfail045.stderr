@@ -1,3 +1,4 @@
 
-tcfail045.hs:10:
+./tcfail045.hs:10:
     Unacceptable instance type for ccall-ish class CCallable Socket
+    In the instance declaration for `CCallable Socket'

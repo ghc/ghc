@@ -1,5 +1,6 @@
 
-tcfail058.hs:6:
+./tcfail058.hs:6:
     Type constructor `Array' used as a class
     When checking kinds in `Array a'
-    In a type signature for `f'
+    In the type: forall a b. (Array a) => a -> b
+    While checking the type signature for `f'

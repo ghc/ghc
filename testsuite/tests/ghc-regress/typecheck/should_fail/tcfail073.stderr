@@ -1,5 +1,5 @@
 
 Duplicate instance declarations:
-  tcfail073.hs:7: Eq (a, b)
-  /home/simonpj/builds/HEAD/ghc/driver/../lib/std/PrelTup.hi:87: Eq (a,
-								     b)
+  ./tcfail073.hs:7: Eq (a, b)
+  /home/simonmar/builds/i386-unknown-linux/ghc/driver/../lib/std/PrelTup.hi:80: Eq (a,
+										    b)

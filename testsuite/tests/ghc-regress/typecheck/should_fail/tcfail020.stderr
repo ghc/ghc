@@ -1,8 +1,8 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail020.hs:10:
-    Could not deduce `A [a]' from the context (A a)
+./tcfail020.hs:10:
+    Could not deduce (A [a]) from the context (A a)
     Probable fix:
-	Add `A [a]' to the instance declaration context
-	Or add an instance declaration for `A [a]'
-    arising from the instance declaration at tests/ghc-regress/typecheck/should_fail/tcfail020.hs:10
+	Add (A [a]) to the instance declaration context
+	Or add an instance declaration for (A [a])
+    arising from the instance declaration at ./tcfail020.hs:10
     In the instance declaration for `B [a]'

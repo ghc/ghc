@@ -1,4 +1,6 @@
 
-tcfail087.hs:8:
-    Illegal unboxed tuple type as argument: (# Int, Int #)
-    In a type signature for `f'
+./tcfail087.hs:6:
+    Illegal unboxed tuple type as function argument: (# Int, Int #)
+    In the type: (# Int, Int #) -> Ex
+    While checking the type of constructor `Ex'
+    In the data type declaration for `Ex'

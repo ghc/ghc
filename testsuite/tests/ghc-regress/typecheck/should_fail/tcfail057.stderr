@@ -1,4 +1,5 @@
 
-tcfail057.hs:5:
+./tcfail057.hs:5:
     Class `RealFrac' used as a type
-    In a type signature for `f'
+    In the type: forall a. RealFrac a -> a -> a
+    While checking the type signature for `f'

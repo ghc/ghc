@@ -1,5 +1,5 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail029.hs:6:
-    No instance for `Ord Foo'
-    arising from use of `>' at tests/ghc-regress/typecheck/should_fail/tcfail029.hs:6
+./tcfail029.hs:6:
+    No instance for (Ord Foo)
+    arising from use of `>' at ./tcfail029.hs:6
     In the definition of `f': x > Bar

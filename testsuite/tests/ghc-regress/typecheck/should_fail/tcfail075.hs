@@ -6,6 +6,8 @@ module ShouldFail where
 
 import PrelGHC
 
+x = 1#
+
 y :: Int#
 y = x +# 1#
 

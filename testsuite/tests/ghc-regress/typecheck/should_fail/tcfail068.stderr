@@ -1,5 +1,5 @@
 
-tcfail068.hs:12:
+./tcfail068.hs:12:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is reachable from the type variable(s) `a'
@@ -9,10 +9,9 @@ tcfail068.hs:12:
     When checking an expression type signature
     In the first argument of `runST', namely
 	`(newSTArray ((1, 1), n) x)'
-    in the definition of function `itgen':
-	runST (newSTArray ((1, 1), n) x)
+    In the definition of `itgen': runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:17:
+./tcfail068.hs:17:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
@@ -24,11 +23,11 @@ tcfail068.hs:17:
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
-    in the definition of function `itiap':
+    In the definition of `itiap':
 	runST ((readSTArray arr i)
 	       >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
 
-tcfail068.hs:23:
+./tcfail068.hs:23:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
@@ -40,9 +39,9 @@ tcfail068.hs:23:
     Type to generalise: ST s1 (IndTree s1 a)
     When checking an expression type signature
     In the first argument of `runST', namely `(itrap' i k)'
-    in the definition of function `itrap': runST (itrap' i k)
+    In the definition of `itrap': runST (itrap' i k)
 
-tcfail068.hs:35:
+./tcfail068.hs:35:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
@@ -54,5 +53,4 @@ tcfail068.hs:35:
     Type to generalise: ST s1 (c, IndTree s1 b)
     When checking an expression type signature
     In the first argument of `runST', namely `(itrapstate' i k s)'
-    in the definition of function `itrapstate':
-	runST (itrapstate' i k s)
+    In the definition of `itrapstate': runST (itrapstate' i k s)

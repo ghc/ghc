@@ -1,14 +1,8 @@
 
-tcfail019.hs:18:
-    Could not deduce `C [a]' from the context ()
+./tcfail019.hs:18:
+    Could not deduce (C [a], B [a]) from the context ()
     Probable fix:
-	Add `C [a]' to the instance declaration context
-	Or add an instance declaration for `C [a]'
-    arising from an instance declaration at tcfail019.hs:18
-
-tcfail019.hs:18:
-    Could not deduce `B [a]' from the context ()
-    Probable fix:
-	Add `B [a]' to the instance declaration context
-	Or add an instance declaration for `B [a]'
-    arising from an instance declaration at tcfail019.hs:18
+	Add (C [a], B [a]) to the instance declaration context
+	Or add an instance declaration for (C [a], B [a])
+    arising from the instance declaration at ./tcfail019.hs:18
+    In the instance declaration for `D [a]'
