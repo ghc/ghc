@@ -1,0 +1,35 @@
+
+
+--================================================================================
+Simplified:
+Rec {
+`s1BQ'  :: 
+    `GHC.Int# -> PrelBase.Int'
+`s1BQ' =
+    \ `ww'  :: 
+	  `GHC.Int#'
+      `ww' ->
+	case# `ww' of {
+	  0 ->
+	      `PrelBase.I#'
+		  {2};
+	  `s' ->
+	      case
+		  `s1BQ'
+		      `ww'
+	      of {
+	      `PrelBase.I#' `s1tCY'  ->
+	      case# *#! `s1tCY' `ww' of { `s1tDv' ->
+	      `PrelBase.I#'
+		  {`s1tDv'};};};
+	}
+end Rec }
+`fact'  :: 
+    `PrelBase.Int -> PrelBase.Int'
+`fact' =
+    \ `n'  :: 
+	  `PrelBase.Int'
+      `n' ->
+	case `n' of { `PrelBase.I#' `ww'  ->
+	`s1BQ'
+	    `ww';}
