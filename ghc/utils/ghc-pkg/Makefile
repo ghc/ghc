@@ -9,7 +9,7 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -DGHC_PKG_VERSION=$(ProjectVersion)
+SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -D'GHC_PKG_VERSION="$(ProjectVersion)"'
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 

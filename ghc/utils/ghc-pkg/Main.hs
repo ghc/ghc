@@ -84,8 +84,7 @@ copyright = "GHC package manager version " ++ version ++ "\n"
 
 -- hackery to convice cpp to splice GHC_PKG_VERSION into a string
 version :: String
-version = tail "\ 
-   \ GHC_PKG_VERSION"
+version = GHC_PKG_VERSION
 
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...]\n"
@@ -256,9 +255,9 @@ checkConfigAccess filename = do
 maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
 maybeRestoreOldConfig filename io
   = my_catch io (\e -> do
-        hPutStr stdout "\nWARNING: an error was encountered while the new \n\ 
-        	       \configuration was being written.  Attempting to \n\ 
-        	       \restore the old configuration... "
+        hPutStr stdout ("\nWARNING: an error was encountered while the new \n"++
+        	          "configuration was being written.  Attempting to \n"++
+        	          "restore the old configuration... ")
 	renameFile (filename ++ ".old")  filename
         hPutStrLn stdout "done."
 	my_throw e
