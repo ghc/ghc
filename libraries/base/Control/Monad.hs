@@ -72,7 +72,7 @@ import GHC.List
 import GHC.Base
 #endif
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 infixr 1 =<<
 
 -- -----------------------------------------------------------------------------
@@ -99,7 +99,7 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
-#endif  /* __HUGS__ */
+#endif  /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
 -- |The MonadPlus class definition
