@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.51 2004/03/19 23:20:20 panne Exp $
+ * $Id: ProfHeap.c,v 1.52 2004/05/11 18:36:10 panne Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -32,6 +32,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -382,6 +383,16 @@ void endProfiling( void )
 }
 #endif /* DEBUG_HEAP_PROF */
 
+static void
+printSample(rtsBool beginSample, StgDouble sampleValue)
+{
+    StgDouble fractionalPart, integralPart;
+    fractionalPart = modf(sampleValue, &integralPart);
+    fprintf(hp_file, "%s %d.%02d\n",
+            (beginSample ? "BEGIN_SAMPLE" : "END_SAMPLE"),
+            (int)integralPart, (int)(fractionalPart * 100 + 0.5));
+}
+
 /* --------------------------------------------------------------------------
  * Initialize the heap profilier
  * ----------------------------------------------------------------------- */
@@ -443,8 +454,8 @@ initHeapProfiling(void)
     fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
     fprintf(hp_file, "VALUE_UNIT \"bytes\"\n");
 
-    fprintf(hp_file, "BEGIN_SAMPLE 0.00\n");
-    fprintf(hp_file, "END_SAMPLE 0.00\n");
+    printSample(rtsTrue, 0);
+    printSample(rtsFalse, 0);
 
 #ifdef DEBUG_HEAP_PROF
     DEBUG_LoadSymbols(prog_name);
@@ -486,8 +497,8 @@ endHeapProfiling(void)
 #endif
 
     seconds = mut_user_time();
-    fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", seconds);
-    fprintf(hp_file, "END_SAMPLE %0.2f\n", seconds);
+    printSample(rtsTrue, seconds);
+    printSample(rtsFalse, seconds);
     fclose(hp_file);
 }
 
@@ -583,6 +594,7 @@ rtsBool
 closureSatisfiesConstraints( StgClosure* p )
 {
 #ifdef DEBUG_HEAP_PROF
+    (void)p;   /* keep gcc -Wall happy */
     return rtsTrue;
 #else
    rtsBool b;
@@ -729,7 +741,7 @@ dumpCensus( Census *census )
     counter *ctr;
     int count;
 
-    fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", census->time);
+    printSample(rtsTrue, census->time);
 
 #ifdef PROFILING
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -742,7 +754,7 @@ dumpCensus( Census *census )
 		census->prim * sizeof(W_));
 	fprintf(hp_file, "DRAG\t%u\n", census->drag_total *
 		sizeof(W_));
-	fprintf(hp_file, "END_SAMPLE %0.2f\n", census->time);
+	printSample(rtsFalse, census->time);
 	return;
     }
 #endif
@@ -822,7 +834,7 @@ dumpCensus( Census *census )
 	fprintf(hp_file, "\t%d\n", count * sizeof(W_));
     }
 
-    fprintf(hp_file, "END_SAMPLE %0.2f\n", census->time);
+    printSample(rtsFalse, census->time);
 }
 
 /* -----------------------------------------------------------------------------
