@@ -405,7 +405,7 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
-PKG_DEPENDS += template_haskell
+PKG_DEPENDS += template-haskell
 
 ALL_DIRS += ghci
 

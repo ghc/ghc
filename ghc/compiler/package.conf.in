@@ -137,7 +137,6 @@ exposed-modules:
 	MachInstrs
 	MachOp
 	MachRegs
-	Main
 	Match
 	MatchCon
 	MatchLit
@@ -296,6 +295,6 @@ library-dirs:		FPTOOLS_TOP_ABS"/ghc/compiler"
 
 hs-libraries: 		"HSghc"
 extra-libraries:
-package_deps: 		PKG_DEPENDS
+depends: 		PKG_DEPENDS
 haddock-interfaces:	HADDOCK_IFACE
 haddock-html:		HTML_DIR
