@@ -34,22 +34,21 @@ representing threads currently waiting. The counter is a shared
 variable, ensuring the mutual exclusion on its access.
 
 \begin{code}
-data QSem = QSem (MVar (Int, [MVar ()]))
+newtype QSem = QSem (MVar (Int, [MVar ()]))
 
 newQSem :: Int -> IO QSem
-newQSem init 
- = newMVar (init,[])	  >>= \ sem ->
+newQSem init = do
+   sem <- newMVar (init,[])
    return (QSem sem)
 
 waitQSem :: QSem -> IO ()
-waitQSem (QSem sem)
- = takeMVar sem 	>>= \ (avail,blocked) ->    -- gain ex. access
+waitQSem (QSem sem) = do
+   (avail,blocked) <- takeMVar sem  -- gain ex. access
    if avail > 0 then
-     putMVar sem (avail-1,[]) >> 
-     return ()
-   else
-     newEmptyMVar       >>= \ block ->
-     {-
+     putMVar sem (avail-1,[])
+    else do
+     block <- newEmptyMVar
+      {-
 	Stuff the reader at the back of the queue,
 	so as to preserve waiting order. A signalling
 	process then only have to pick the MVar at the
@@ -57,56 +56,56 @@ waitQSem (QSem sem)
 
 	The version of waitQSem given in the paper could
 	lead to starvation.
-     -}
-     putMVar sem (0, blocked++[block]) >> 
-     takeMVar block		       >>= \ v ->
-     return v
+      -}
+     putMVar sem (0, blocked++[block])
+     takeMVar block
 
 signalQSem :: QSem -> IO ()
-signalQSem (QSem sem)
- = takeMVar sem   >>= \ (avail,blocked) ->
+signalQSem (QSem sem) = do
+   (avail,blocked) <- takeMVar sem
    case blocked of
-     [] -> putMVar sem (avail+1,[]) >>
-	   return ()
-     (block:blocked') ->
-	   putMVar sem (0,blocked') >>
-	   putMVar block ()         >>
-	   return ()
+     [] -> putMVar sem (avail+1,[])
 
-data QSemN
- = QSemN (MVar (Int,[(Int,MVar ())]))
+     (block:blocked') -> do
+	   putMVar sem (0,blocked')
+	   putMVar block ()
+
+\end{code}
+
+
+\begin{code}
+newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())]))
 
 newQSemN :: Int -> IO QSemN 
-newQSemN init 
- = newMVar (init,[])	  >>= \ sem ->
+newQSemN init = do
+   sem <- newMVar (init,[])
    return (QSemN sem)
 
 waitQSemN :: QSemN -> Int -> IO ()
-waitQSemN (QSemN sem) sz
- = takeMVar sem >>= \ (avail,blocked) ->    -- gain ex. access
-   if avail > 0 then
-     putMVar sem (avail-1,[]) >>
-     return ()
-   else
-     newEmptyMVar 		            >>= \ block ->
-     putMVar sem (0, blocked++[(sz,block)]) >> 
-     takeMVar block			    >>
-     return ()
-
+waitQSemN (QSemN sem) sz = do
+  (avail,blocked) <- takeMVar sem   -- gain ex. access
+  if (avail - sz) > 0 then
+       -- discharging 'sz' still leaves the semaphore
+       -- in an 'unblocked' state.
+     putMVar sem (avail-sz,[])
+   else do
+     block <- newEmptyMVar
+     putMVar sem (avail, blocked++[(sz,block)])
+     takeMVar block
 
 signalQSemN :: QSemN -> Int  -> IO ()
-signalQSemN (QSemN sem) n
- = takeMVar sem   	  	 >>= \ (avail,blocked) ->
-   free (avail+n) blocked 	 >>= \ (avail',blocked') ->
-   putMVar sem (avail',blocked') >>
-   return ()
-   where
-    free avail [] = return (avail,[])
-    free avail ((req,block):blocked) =
-     if avail >= req then
-	putMVar block () >>
+signalQSemN (QSemN sem) n = do
+   (avail,blocked)   <- takeMVar sem
+   (avail',blocked') <- free (avail+n) blocked
+   putMVar sem (avail',blocked')
+ where
+   free avail []    = return (avail,[])
+   free avail ((req,block):blocked)
+     | avail >= req = do
+	putMVar block ()
 	free (avail-req) blocked
-     else
-	free avail blocked >>= \ (avail',blocked') ->
+     | otherwise    = do
+	(avail',blocked') <- free avail blocked
         return (avail',(req,block):blocked')
+
 \end{code}
