@@ -1,0 +1,208 @@
+---------------------------------------------------------------------------
+-- 				GHC.hi
+-- 
+-- 	This hand-written interface file allows you to bring into scope the 
+--	primitive operations and types that GHC knows about.
+---------------------------------------------------------------------------
+
+_interface_ GHC 2
+_exports_
+
+GHC Void
+GHC void
+
+-- I/O primitives
+GHC RealWorld
+GHC realWorld#
+GHC State#
+
+GHC fork#
+GHC delay# 
+
+GHC SynchVar#
+GHC newSynchVar#
+GHC takeMVar#
+GHC putMVar#
+GHC waitRead#
+GHC waitWrite#
+
+GHC errorIO#
+
+GHC Char# 
+GHC gtChar#
+GHC geChar#
+GHC eqChar#
+GHC neChar#
+GHC ltChar#
+GHC leChar#
+GHC ord#
+GHC chr#
+
+GHC Int#
+GHC >#
+GHC >=#
+GHC ==#
+GHC /=#
+GHC <#
+GHC <=#
+GHC +#
+GHC -#
+GHC *#
+GHC quotInt#
+GHC remInt#
+GHC negateInt#
+GHC iShiftL#
+GHC iShiftRA#
+GHC iShiftRL#
+
+GHC Word#
+GHC gtWord#
+GHC geWord#
+GHC eqWord#
+GHC neWord#
+GHC ltWord#
+GHC leWord#
+GHC and#
+GHC or#
+GHC not#
+GHC shiftL#
+GHC shiftRA#
+GHC shiftRL#
+GHC int2Word#
+GHC word2Int#
+
+GHC Addr#
+GHC gtAddr#
+GHC geAddr#
+GHC eqAddr#
+GHC neAddr#
+GHC ltAddr#
+GHC leAddr#
+GHC int2Addr#
+GHC addr2Int#
+
+GHC Float#
+GHC gtFloat#
+GHC geFloat#
+GHC eqFloat#
+GHC neFloat#
+GHC ltFloat#
+GHC leFloat#
+GHC plusFloat#
+GHC minusFloat#
+GHC timesFloat#
+GHC divideFloat#
+GHC negateFloat#
+GHC float2Int#
+GHC int2Float#
+GHC expFloat#
+GHC logFloat#
+GHC sqrtFloat#
+GHC sinFloat#
+GHC cosFloat#
+GHC tanFloat#
+GHC asinFloat#
+GHC acosFloat#
+GHC atanFloat#
+GHC sinhFloat#
+GHC coshFloat#
+GHC tanhFloat#
+GHC powerFloat#
+GHC decodeFloat#
+GHC encodeFloat#
+
+GHC Double#
+GHC >##
+GHC >=##
+GHC ==##
+GHC /=##
+GHC <##
+GHC <=##
+GHC +##
+GHC -##
+GHC *##
+GHC /##
+GHC negateDouble#
+GHC double2Int#
+GHC int2Double#
+GHC double2Float#
+GHC float2Double#
+GHC expDouble#
+GHC logDouble#
+GHC sqrtDouble#
+GHC sinDouble#
+GHC cosDouble#
+GHC tanDouble#
+GHC asinDouble#
+GHC acosDouble#
+GHC atanDouble#
+GHC sinhDouble#
+GHC coshDouble#
+GHC tanhDouble#
+GHC **##
+GHC decodeDouble#
+GHC encodeDouble#
+
+GHC cmpInteger#
+GHC negateInteger#
+GHC plusInteger#
+GHC minusInteger#
+GHC timesInteger#
+GHC quotRemInteger#
+GHC integer2Int#
+GHC int2Integer#
+
+GHC indexArray#
+
+GHC Array#
+GHC ByteArray#
+GHC MutableArray#
+GHC MutableByteArray#
+
+GHC sameMutableArray#
+
+GHC newArray#
+GHC newCharArray#
+GHC newIntArray#
+GHC newFloatArray#
+GHC newDoubleArray#
+GHC newAddrArray#
+
+GHC indexArray#
+GHC indexCharArray#
+GHC indexIntArray#
+GHC indexFloatArray#
+GHC indexDoubleArray#
+GHC indexAddrArray#
+
+GHC indexOffAddr#
+GHC indexCharOffAddr#
+GHC indexIntOffAddr#
+GHC indexFloatOffAddr#
+GHC indexDoubleOffAddr#
+GHC indexAddrOffAddr#
+
+GHC writeArray#
+GHC writeCharArray#
+GHC writeIntArray#
+GHC writeFloatArray#
+GHC writeDoubleArray#
+GHC writeAddrArray#
+
+GHC readArray#
+GHC readCharArray#
+GHC readIntArray#
+GHC readFloatArray#
+GHC readDoubleArray#
+GHC readAddrArray#
+
+GHC unsafeFreezeArray#
+GHC unsafeFreezeByteArray#
+
+GHC ForeignObj#
+GHC makeForeignObj#
+
+GHC StablePtr#
+GHC makeStablePtr#
+GHC deRefStablePtr#
+
