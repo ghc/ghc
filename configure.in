@@ -767,6 +767,19 @@ dnl Int32 is a HACK for non-ISO C compilers
 FPTOOLS_CHECK_HTYPE(sig_atomic_t, Int32)
 FPTOOLS_CHECK_HTYPE(clock_t)
 FPTOOLS_CHECK_HTYPE(time_t)
+FPTOOLS_CHECK_HTYPE(dev_t, Word32)
+FPTOOLS_CHECK_HTYPE(ino_t)
+FPTOOLS_CHECK_HTYPE(mode_t)
+FPTOOLS_CHECK_HTYPE(off_t)
+FPTOOLS_CHECK_HTYPE(pid_t)
+FPTOOLS_CHECK_HTYPE(size_t)
+FPTOOLS_CHECK_HTYPE(gid_t)
+FPTOOLS_CHECK_HTYPE(uid_t)
+FPTOOLS_CHECK_HTYPE(cc_t)
+FPTOOLS_CHECK_HTYPE(speed_t)
+FPTOOLS_CHECK_HTYPE(tcflag_t)
+FPTOOLS_CHECK_HTYPE(nlink_t)
+FPTOOLS_CHECK_HTYPE(ssize_t)
 
 dnl ** Map OpenGL data types to Haskell types
 if test $GhcLibsWithHOpenGL = YES ; then

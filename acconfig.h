@@ -399,17 +399,26 @@
 /* Define if you have the WinExec function.  */
 #undef HAVE_WINEXEC
 
+/* Define to Haskell type for cc_t */
+#undef HTYPE_CC_T
+
 /* Define to Haskell type for char */
 #undef HTYPE_CHAR
 
 /* Define to Haskell type for clock_t */
 #undef HTYPE_CLOCK_T
 
+/* Define to Haskell type for dev_t */
+#undef HTYPE_DEV_T
+
 /* Define to Haskell type for signed double */
 #undef HTYPE_DOUBLE
 
 /* Define to Haskell type for float */
 #undef HTYPE_FLOAT
+
+/* Define to Haskell type for gid_t */
+#undef HTYPE_GID_T
 
 /* Define to Haskell type for GLbitfield */
 #undef HTYPE_GLBITFIELD
@@ -456,11 +465,26 @@
 /* Define to Haskell type for int */
 #undef HTYPE_INT
 
+/* Define to Haskell type for ino_t */
+#undef HTYPE_INO_T
+
 /* Define to Haskell type for long */
 #undef HTYPE_LONG
 
 /* Define to Haskell type for long long */
 #undef HTYPE_LONG_LONG
+
+/* Define to Haskell type for mode_t */
+#undef HTYPE_MODE_T
+
+/* Define to Haskell type for nlink_t */
+#undef HTYPE_NLINK_T
+
+/* Define to Haskell type for off_t */
+#undef HTYPE_OFF_T
+
+/* Define to Haskell type for pid_t */
+#undef HTYPE_PID_T
 
 /* Define to Haskell type for ptrdiff_t */
 #undef HTYPE_PTRDIFF_T
@@ -477,8 +501,20 @@
 /* Define to Haskell type for size_t */
 #undef HTYPE_SIZE_T
 
+/* Define to Haskell type for speed_t */
+#undef HTYPE_SPEED_T
+
+/* Define to Haskell type for ssize_t */
+#undef HTYPE_SSIZE_T
+
 /* Define to Haskell type for time_t */
 #undef HTYPE_TIME_T
+
+/* Define to Haskell type for tcflag_t */
+#undef HTYPE_TCFLAG_T
+
+/* Define to Haskell type for uid_t */
+#undef HTYPE_UID_T
 
 /* Define to Haskell type for unsigned char */
 #undef HTYPE_UNSIGNED_CHAR

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.90 2001/12/13 09:23:23 sof Exp $
+dnl $Id: aclocal.m4,v 1.91 2002/01/07 20:24:23 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -592,20 +592,51 @@ AC_MSG_CHECKING(Haskell type for $1)
 AC_CACHE_VAL(AC_CV_NAME,
 [AC_TRY_RUN([#include <stdio.h>
 #include <stddef.h>
+
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+# include <fcntl.h>
+#endif
+
 #ifdef HAVE_SIGNAL_H
-#include <signal.h>
+# include <signal.h>
 #endif
+
 #ifdef HAVE_TIME_H
-#include <time.h>
+# include <time.h>
 #endif
+
+#ifdef HAVE_TERMIOS_H
+# include <termios.h>
+#endif
+
+#ifdef HAVE_STRING_H
+# include <string.h>
+#endif
+
+#ifdef HAVE_CTYPE_H
+# include <ctype.h>
+#endif
+
 #ifdef HAVE_GL_GL_H
-#include <GL/gl.h>
+# include <GL/gl.h>
 #endif
 
 typedef $1 testing;
 
 main() {
-  FILE *f=fopen("conftestval", "w");
+  FILE *f=fopen("conftestval2", "w");
   if (!f) exit(1);
   if (((testing)((int)((testing)1.4))) == ((testing)1.4)) {
     fprintf(f, "%s%d\n",
@@ -618,7 +649,8 @@ main() {
   }
   fclose(f);
   exit(0);
-}], AC_CV_NAME=`cat conftestval`,
+}], AC_CV_NAME=`cat conftestval2`,
+echo $AC_CV_NAME
 ifelse([$2], , AC_CV_NAME=NotReallyAType,      AC_CV_NAME=$2),
 ifelse([$3], , AC_CV_NAME=NotReallyATypeCross, AC_CV_NAME=$3))]) dnl
 AC_MSG_RESULT($AC_CV_NAME)
