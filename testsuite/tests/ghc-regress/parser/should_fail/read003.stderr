@@ -1,0 +1,6 @@
+
+read003.hs:4:
+    Occurs check: cannot construct the infinite type: t = (t, [a], t1)
+	Expected type: (t, [a], t1)
+	Inferred type: t
+    in a pattern binding: a
