@@ -79,7 +79,7 @@ doIt (core_cmds, stg_cmds) input_pgm
   = doIfSet opt_Verbose 
 	(hPutStr stderr ("Glasgow Haskell Compiler, version " ++ 
 			 show PROJECTVERSION ++ 
-			 ", for Haskell 1.4"))		>>
+			 ", for Haskell 1.4\n"))		>>
 
     -- ******* READER
     show_pass "Reader"	>>
