@@ -24,7 +24,7 @@ $Makefile = '';
 $baseName='';
 $ignore_output='> /dev/null';
 
-if ( ${BUILDPLATFORM} == "i386-unknown-mingw32" ) {
+if ( ${BUILDPLATFORM} eq "i386-unknown-mingw32" ) {
     # Assuming the underlying perl uses cmd to exec system() calls.
     $ignore_output = ">nul";
 }
