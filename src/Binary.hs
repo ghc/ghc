@@ -244,7 +244,7 @@ writeBinMem (BinMem _ ix_r _ arr_r0) fn = do
 
 readBinMem :: FilePath -> IO BinHandle
 readBinMem filename = do
-  h <- openFileEx filename (BinaryMode ReadMode)
+  h <- openBinaryFile filename ReadMode
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
   arr <- newArray_ (0,filesize-1)
