@@ -1600,10 +1600,10 @@ suspendThread( StgRegTable *reg )
   IF_DEBUG(scheduler, sched_belch("worker (token %d): leaving RTS", tok));
 #endif
 
+  in_haskell = rtsFalse;
   RELEASE_LOCK(&sched_mutex);
   
   errno = saved_errno;
-  in_haskell = rtsFalse;
   return tok; 
 }
 
@@ -1648,9 +1648,9 @@ resumeThread( StgInt tok )
   tso->why_blocked  = NotBlocked;
 
   cap->r.rCurrentTSO = tso;
+  in_haskell = rtsTrue;
   RELEASE_LOCK(&sched_mutex);
   errno = saved_errno;
-  in_haskell = rtsTrue;
   return &cap->r;
 }
 
