@@ -177,7 +177,7 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
   where
     eps = pcs_EPS pcs
 
-    init_imports = emptyImportAvails { imp_unqual = unitModuleEnv mod emptyAvailEnv }
+    init_imports = emptyImportAvails { imp_qual = unitModuleEnv mod emptyAvailEnv }
 	-- Initialise tcg_imports with an empty set of bindings for
 	-- this module, so that if we see 'module M' in the export
 	-- list, and there are no bindings in M, we don't bleat 

@@ -40,10 +40,10 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  Deprecations(..), ModIface(..), Dependencies(..),
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
 			)
-import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
-			  emptyRdrEnv, foldRdrEnv, isQual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv,
+			  emptyRdrEnv, foldRdrEnv, mkRdrUnqual, isQual )
 import Outputable
-import Maybes		( maybeToBool, catMaybes )
+import Maybe		( isJust, isNothing, catMaybes )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -205,19 +205,17 @@ importsFromImportDecl this_mod
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
 	avail_env = mkAvailEnv filtered_avails
-        unqual_avails | qual_only = emptyAvailEnv	-- Qualified import
-		      | otherwise = avail_env		-- Unqualified import
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
 	gbl_env      = mkGlobalRdrEnv qual_mod_name (not qual_only) 
 				      mk_prov filtered_avails deprecs
 	imports      = ImportAvails { 
-			imp_unqual = unitModuleEnvByName qual_mod_name unqual_avails,
-			imp_env    = avail_env,
-			imp_mods   = unitModuleEnv imp_mod (imp_mod, import_all),
-			imp_orphs  = orphans,
-			imp_dep_mods   = mkModDeps dependent_mods,
-			imp_dep_pkgs   = dependent_pkgs }
+			imp_qual     = unitModuleEnvByName qual_mod_name avail_env,
+			imp_env      = avail_env,
+			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all),
+			imp_orphs    = orphans,
+			imp_dep_mods = mkModDeps dependent_mods,
+			imp_dep_pkgs = dependent_pkgs }
 
     in
 	-- Complain if we import a deprecated module
@@ -313,8 +311,8 @@ importsFromLocalDecls group
 
 	avail_env = mkAvailEnv avails'
 	imports   = emptyImportAvails {
-			imp_unqual = unitModuleEnv this_mod avail_env,
-			imp_env    = avail_env
+			imp_qual = unitModuleEnv this_mod avail_env,
+			imp_env  = avail_env
 		    }
     in
     returnM (gbl_env, imports)
@@ -441,8 +439,8 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	  Just avail -> returnM [(avail, availNames avail)]
 
     check_item item
-      | not (maybeToBool maybe_in_import_avails) ||
-	not (maybeToBool maybe_filtered_avail)
+      | isNothing maybe_in_import_avails ||
+	isNothing maybe_filtered_avail
       = Nothing
 
       | otherwise    
@@ -549,8 +547,8 @@ exportsFromAvail (Just exports)
 	exports_from_avail exports warn_dup_exports imports }
 
 exports_from_avail export_items warn_dup_exports
-		   (ImportAvails { imp_unqual = mod_avail_env, 
-				   imp_env = entity_avail_env }) 
+		   (ImportAvails { imp_qual = mod_avail_env, 
+				   imp_env  = entity_avail_env }) 
   = foldlM exports_from_item emptyExportAccum
 	    export_items			`thenM` \ (_, _, export_avail_map) ->
     returnM (nameEnvElts export_avail_map)
@@ -568,10 +566,20 @@ exports_from_avail export_items warn_dup_exports
 	    Nothing	        -> addErr (modExportErr mod)	`thenM_`
 				   returnM acc
 	    Just avail_env
-		-> let
-			mod_avails = availEnvElts avail_env
+		-> getGlobalRdrEnv		`thenM` \ global_env ->
+  		   let
+			mod_avails = [ filtered_avail
+				     | avail <- availEnvElts avail_env,
+				       let mb_avail = filter_unqual global_env avail,
+				       isJust mb_avail,
+				       let Just filtered_avail = mb_avail]
+						
 			avails' = foldl addAvail avails mod_avails
 		   in
+		-- This check_occs not only finds conflicts between this item
+		-- and others, but also internally within this item.  That is,
+		-- if 'M.x' is in scope in several ways, we'll have several
+		-- members of mod_avails with the same OccName.
 		   foldlM (check_occs warn_dup_exports ie) 
 			  occs mod_avails	`thenM` \ occs' ->
 
@@ -605,13 +613,32 @@ exports_from_avail export_items warn_dup_exports
 	  }}}
 
 
+-------------------------------
+filter_unqual :: GlobalRdrEnv -> AvailInfo -> Maybe AvailInfo
+-- Filter the Avail by what's in scope unqualified
+filter_unqual env (Avail n)
+  | in_scope env n = Just (Avail n)
+  | otherwise	   = Nothing
+filter_unqual env (AvailTC n ns)
+  | not (null ns') = Just (AvailTC n ns')
+  | otherwise	   = Nothing
+  where
+    ns' = filter (in_scope env) ns
 
+in_scope :: GlobalRdrEnv -> Name -> Bool
+-- Checks whether the Name is in scope unqualified, 
+-- regardless of whether it's ambiguous or not
+in_scope env n = isJust (lookupRdrEnv env (mkRdrUnqual (nameOccName n)))
+
+
+-------------------------------
 ok_item (IEThingAll _) (AvailTC _ [n]) = False
   -- This occurs when you import T(..), but
   -- only export T abstractly.  The single [n]
   -- in the AvailTC is the type or class itself
 ok_item _ _ = True
 
+-------------------------------
 check_occs :: Bool -> RdrNameIE -> ExportOccMap -> AvailInfo -> TcRn m ExportOccMap
 check_occs warn_dup_exports ie occs avail 
   = foldlM check occs (availNames avail)
@@ -626,7 +653,7 @@ check_occs warn_dup_exports ie occs avail
 				`thenM_` returnM occs
 
 	    | otherwise	    ->	-- Same occ name but different names: an error
-				addErr (exportClashErr name_occ ie ie')	`thenM_`
+				addErr (exportClashErr name name' ie ie')	`thenM_`
 				returnM occs
       where
 	name_occ = nameOccName name
@@ -735,7 +762,7 @@ reportUnusedNames gbl_env used_names
     -- [Note: not 'minimal_imports', because that includes direcly-imported
     --	      modules even if we use nothing from them; see notes above]
     unused_imp_mods = [m | m <- direct_import_mods,
-    		       not (maybeToBool (lookupFM minimal_imports1 m)),
+    		       isNothing (lookupFM minimal_imports1 m),
     		       m /= pRELUDE_Name]
     
     module_unused :: Module -> Bool
@@ -822,10 +849,22 @@ exportItemErr export_item
   = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
 	  ptext SLIT("attempts to export constructors or class methods that are not visible here") ]
 
-exportClashErr occ_name ie1 ie2
-  = hsep [ptext SLIT("The export items"), quotes (ppr ie1)
-         ,ptext SLIT("and"), quotes (ppr ie2)
-	 ,ptext SLIT("create conflicting exports for"), quotes (ppr occ_name)]
+exportClashErr name1 name2 ie1 ie2
+  | different_items
+  = sep [ ptext SLIT("The export items") <+> quotes (ppr ie1)
+	  <+> ptext SLIT("and") <+> quotes (ppr ie2)
+	, ptext SLIT("create") <+> name_msg <+> ptext SLIT("respectively") ]
+  | otherwise
+  = sep [ ptext SLIT("The export item") <+> quotes (ppr ie1)
+	, ptext SLIT("creates") <+> name_msg ]
+  where
+    name_msg = ptext SLIT("conflicting exports for") <+> quotes (ppr name1)
+	       <+> ptext SLIT("and") <+> quotes (ppr name2)
+    different_items 	-- This only comes into play when we have a single
+			-- 'module M' export item which gives rise to conflicts
+	= case (ie1,ie2) of
+		(IEModuleContents m1, IEModuleContents m2) -> m1 /= m2
+		other -> True
 
 dupDeclErr (n:ns)
   = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),

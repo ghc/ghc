@@ -463,10 +463,18 @@ data ImportAvails
 		-- i.e. *excluding* class ops and constructors
 		--	(which appear inside their parent AvailTC)
 
-	imp_unqual :: ModuleEnv AvailEnv,
+	imp_qual :: ModuleEnv AvailEnv,
 		-- Used to figure out "module M" export specifiers
-		-- Domain is only modules with *unqualified* imports
-		-- (see 1.4 Report Section 5.1.1)
+		-- (see 1.4 Report Section 5.1.1).  Ultimately, we want to find 
+		-- everything that is unambiguously in scope as 'M.x'
+		-- and where plain 'x' is (perhaps ambiguously) in scope.
+		-- So the starting point is all things that are in scope as 'M.x',
+		-- which is what this field tells us.
+		--
+		-- Domain is the *module qualifier* for imports.
+		--   e.g.	 import List as Foo
+		-- would add a binding Foo |-> ...stuff from List...
+		-- to imp_qual.
 		-- We keep the stuff as an AvailEnv so that it's easy to 
 		-- combine stuff coming from different (unqualified) 
 		-- imports of the same module
@@ -503,7 +511,7 @@ data ImportAvails
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv, 
-				   imp_unqual 	= emptyModuleEnv, 
+				   imp_qual 	= emptyModuleEnv, 
 				   imp_mods   	= emptyModuleEnv,
 				   imp_dep_mods = emptyModuleEnv,
 				   imp_dep_pkgs = [],
@@ -511,16 +519,16 @@ emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv,
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
-  (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1,
+  (ImportAvails { imp_env = env1, imp_qual = unqual1, imp_mods = mods1,
 		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, imp_orphs = orphs1 })
-  (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2,
+  (ImportAvails { imp_env = env2, imp_qual = unqual2, imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2, imp_orphs = orphs2 })
-  = ImportAvails { imp_env    = env1 `plusAvailEnv` env2, 
-		   imp_unqual = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
-		   imp_mods   = mods1  `plusModuleEnv` mods2,	
-		   imp_dep_mods   = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
-		   imp_dep_pkgs   = dpkgs1 `unionLists` dpkgs2,
-		   imp_orphs      = orphs1 `unionLists` orphs2 }
+  = ImportAvails { imp_env      = env1 `plusAvailEnv` env2, 
+		   imp_qual     = plusModuleEnv_C plusAvailEnv unqual1 unqual2, 
+		   imp_mods     = mods1  `plusModuleEnv` mods2,	
+		   imp_dep_mods = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
+		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
+		   imp_orphs    = orphs1 `unionLists` orphs2 }
   where
     plus_mod_dep (m1, boot1) (m2, boot2) 
 	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
