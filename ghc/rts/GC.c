@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.32 1999/02/15 14:28:19 simonm Exp $
+ * $Id: GC.c,v 1.33 1999/02/16 12:49:45 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -652,8 +652,8 @@ void GarbageCollect(void (*get_roots)(void))
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
-  /* start any pending finalizers */
-  scheduleFinalizers(old_weak_ptr_list);
+  /* start any pending finalisers */
+  scheduleFinalisers(old_weak_ptr_list);
   
   /* check sanity after GC */
   IF_DEBUG(sanity, checkSanity(N));
@@ -692,7 +692,7 @@ void GarbageCollect(void (*get_roots)(void))
    new live weak pointers, then all the currently unreachable ones are
    dead.
 
-   For generational GC: we just don't try to finalize weak pointers in
+   For generational GC: we just don't try to finalise weak pointers in
    older generations than the one we're collecting.  This could
    probably be optimised by keeping per-generation lists of weak
    pointers, but for a few weak pointers this scheme will work.
@@ -707,7 +707,7 @@ traverse_weak_ptr_list(void)
 
   if (weak_done) { return rtsFalse; }
 
-  /* doesn't matter where we evacuate values/finalizers to, since
+  /* doesn't matter where we evacuate values/finalisers to, since
    * these pointers are treated as roots (iff the keys are alive).
    */
   evac_gen = 0;
@@ -717,9 +717,9 @@ traverse_weak_ptr_list(void)
 
     if ((new = isAlive(w->key))) {
       w->key = new;
-      /* evacuate the value and finalizer */
+      /* evacuate the value and finaliser */
       w->value = evacuate(w->value);
-      w->finalizer = evacuate(w->finalizer);
+      w->finaliser = evacuate(w->finaliser);
       /* remove this weak ptr from the old_weak_ptr list */
       *last_w = w->link;
       /* and put it on the new weak ptr list */
@@ -739,12 +739,12 @@ traverse_weak_ptr_list(void)
   
   /* If we didn't make any changes, then we can go round and kill all
    * the dead weak pointers.  The old_weak_ptr list is used as a list
-   * of pending finalizers later on.
+   * of pending finalisers later on.
    */
   if (flag == rtsFalse) {
     for (w = old_weak_ptr_list; w; w = w->link) {
       w->value = evacuate(w->value);
-      w->finalizer = evacuate(w->finalizer);
+      w->finaliser = evacuate(w->finaliser);
     }
     weak_done = rtsTrue;
   }
