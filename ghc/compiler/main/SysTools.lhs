@@ -48,11 +48,10 @@ module SysTools (
 	-- Temporary-file management
 	setTmpDir,
 	newTempName,
-	cleanTempFiles, cleanTempFilesExcept, removeTmpFiles,
+	cleanTempFiles, cleanTempFilesExcept,
 	addFilesToClean,
 
 	-- System interface
-	getProcessID,		-- IO Int
 	system, 		-- String -> IO ExitCode
 
 	-- Misc
