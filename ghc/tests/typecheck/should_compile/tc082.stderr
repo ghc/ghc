@@ -1,6 +1,6 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Normal{normal} f;
 instance __forall [a b] => {Normal (a -> b)} = zdfNormalZLzmzgZR;
 1 class Normal a where {normal :: a -> PrelBase.Bool} ;
 1 f :: __forall [t] => t -> PrelBase.Bool ;
+1 zddmnormal :: __forall [a] => {Normal a} -> a -> PrelBase.Bool ;
 1 zdfNormalZLzmzgZR :: __forall [a b] => {Normal (a -> b)} ;

@@ -1,3 +1,2 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed foo;
-1 foo :: __forall [t] => t -> (PrelBase.Integer, PrelBase.Integer) ;
+1 foo :: __forall [t] => t -> (PrelNum.Integer, PrelNum.Integer) ;

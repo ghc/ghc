@@ -1,10 +1,8 @@
 
 tcfail042.hs:15:
-    Could not deduce `Num a'
-	(arising from an instance declaration at tcfail042.hs:15)
-	from the context: (Eq a, Show a)
+    Could not deduce `Num a' from the context: (Eq a, Show a)
     Probable cause: missing `Num a' in instance declaration context
-    When checking the superclasses of an instance declaration
+    arising from an instance declaration at tcfail042.hs:15
 
 Compilation had errors
 

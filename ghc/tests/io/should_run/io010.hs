@@ -12,7 +12,7 @@ main = do
         removeDirectory "foo"
         putStr "Okay\n"
       else
-        fail (userError "Oops")
+        ioError (userError "Oops")
 
 dot :: String -> Bool
 dot "." = True

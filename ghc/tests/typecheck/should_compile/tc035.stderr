@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed AnnExpr Expr{Var App} g;
 1 data Expr a = Var [PrelBase.Char] |  App (AnnExpr a) (AnnExpr a) ;
 1 g :: __forall [a] => (a, Expr a) -> [[PrelBase.Char]] ;

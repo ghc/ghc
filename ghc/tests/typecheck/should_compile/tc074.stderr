@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed B{X Y} T{D C};
 instance __forall [b] => {PrelBase.Eq b} -> {PrelBase.Eq (B   b)} = zdfEqB;
 instance __forall [a] => {PrelBase.Eq a} -> {PrelBase.Eq (T   a)} = zdfEqT;

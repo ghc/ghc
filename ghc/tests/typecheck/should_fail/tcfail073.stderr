@@ -2,14 +2,13 @@
 tcfail073.hs:3:
     Duplicate or overlapping instance declarations
 	for `Eq (a, b)'
-	    imported from module `PrelTup' and defined at tcfail073.hs:7
+	    defined at tcfail073.hs:7 and imported from module `PrelTup'
 
 tcfail073.hs:8:
-    Could not deduce `Eq a'
-	(arising from use of `==' at tcfail073.hs:8)
-	from the context: (Eq (a, b))
+    Could not deduce `Eq a' from the context: (Eq (a, b))
     Probable cause: missing `Eq a' in instance declaration context
-    When checking the methods of an instance declaration
+    arising from use of `==' at tcfail073.hs:8
+    In the right-hand side of an equation for `==': m == o
 
 Compilation had errors
 

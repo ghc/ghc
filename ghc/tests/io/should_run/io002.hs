@@ -12,4 +12,4 @@ main = do
 getEnv_except :: IOError -> IO String
 getEnv_except ioe
  | isDoesNotExistError ioe = return ""
- | otherwise		   = fail ioe
+ | otherwise		   = ioError ioe

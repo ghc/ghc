@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Foo{op1 op2};
 instance {Foo PrelBase.Int} = zdfFooInt;
 instance __forall [a] => {Foo a} -> {Foo [a]} = zdfFooZMZN;

@@ -1,9 +1,9 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Foo{o_and} f g;
 instance {Foo PrelBase.Bool} = zdfFooBool;
 instance {Foo PrelBase.Int} = zdfFooInt;
 1 class Foo a where {o_and :: a -> a -> a} ;
 1 f :: __forall [t] => PrelBase.Bool -> t -> PrelBase.Bool ;
 1 g :: __forall [t a] => {PrelNum.Num a} -> {Foo a} -> a -> t -> a ;
+1 zddmo_and :: __forall [a] => {Foo a} -> a -> a -> a ;
 1 zdfFooBool :: {Foo PrelBase.Bool} ;
 1 zdfFooInt :: {Foo PrelBase.Int} ;

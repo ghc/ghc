@@ -1,4 +1,4 @@
---!!! Flushing
+-- !!! Flushing
 module Main(main) where
 
 import IO

@@ -1,5 +1,5 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed EQ{zezeze} NUM{ONE TWO} ORD;
 1 class {ORD a, PrelShow.Show a}  => EQ a where {zezeze :: a -> a -> PrelBase.Bool} ;
 1 class {PrelNum.Num a}  => ORD a ;
 1 data NUM = ONE |  TWO ;
+1 zddmzezeze :: __forall [a] => {EQ a} -> a -> a -> PrelBase.Bool ;

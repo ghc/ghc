@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Parse{parseFile parseLine parseType parse forced} charToInt lineszq seperatedBy spanzq strToInt whiteSpace;
 instance {Parse PrelBase.Char} = zdfParseChar;
 instance {Parse PrelBase.Int} = zdfParseInt;
@@ -14,6 +13,7 @@ instance __forall [a] => {Parse a} -> {Parse [a]} = zdfParseZMZN;
 1 zddmparse :: __forall [a] => {Parse a} -> PrelBase.String -> (a, PrelBase.String) ;
 1 zddmparseFile :: __forall [a] => {Parse a} -> PrelBase.String -> [a] ;
 1 zddmparseLine :: __forall [a] => {Parse a} -> PrelBase.String -> a ;
+1 zddmparseType :: __forall [a] => {Parse a} -> PrelBase.String -> (a, PrelBase.String) ;
 1 zdfParseChar :: {Parse PrelBase.Char} ;
 1 zdfParseInt :: {Parse PrelBase.Int} ;
 1 zdfParseZMZN :: __forall [a] => {Parse a} -> {Parse [a]} ;

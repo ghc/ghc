@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Boolean{FF TT} List{Nil Cons} Nat{ZZero Succ} Pair{Mkpair} Tree{Leaf Node} add app before flatten idb idl lEngth nUll neg rEverse sUm swap;
 1 add :: Nat -> Nat -> Nat ;
 1 app :: __forall [alpha] => List alpha -> List alpha -> List alpha ;

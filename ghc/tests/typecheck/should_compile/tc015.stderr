@@ -1,3 +1,2 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed u;
 1 u :: __forall [t t1 t2] => t -> (t1, t2) -> t ;

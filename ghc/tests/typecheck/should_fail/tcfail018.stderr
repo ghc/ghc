@@ -1,8 +1,8 @@
 
 tcfail018.hs:5:
-    Ambiguous type variable(s) `t'
-	in the constraint `Num [t]'
-	arising from the literal `1' at tcfail018.hs:5
+    Ambiguous type variable(s) `t' in the constraint `Num [t]'
+    arising from the literal `1' at tcfail018.hs:5
+    In the right-hand side of a pattern binding: 1
 
 Compilation had errors
 

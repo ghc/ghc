@@ -1,10 +1,10 @@
 
 tcfail034.hs:17:
-    Could not deduce `Integral a'
-	(arising from use of `mod' at tcfail034.hs:17)
-	from the context: (Num a, Eq a)
+    Could not deduce `Integral a' from the context: (Num a, Eq a)
     Probable cause: missing `Integral a' in type signature for `test'
-    When checking the type signature(s) for `test'
+    arising from use of `mod' at tcfail034.hs:17
+    In the first argument of `==', namely `(x `mod` 3)'
+    In the right-hand side of an equation for `test': (x `mod` 3) == 0
 
 Compilation had errors
 

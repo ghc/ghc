@@ -6,7 +6,9 @@ tcfail082.hs:1:
 
 tcfail082.hs:8:
     No instance for `Show FooData'
-	arising from use of `print' at tcfail082.hs:8
+    arising from use of `print' at tcfail082.hs:8
+    In the right-hand side of a pattern binding:
+	print ((read "FooData") :: FooData)
 
 Compilation had errors
 

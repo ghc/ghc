@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed main x;
 1 main :: PrelIOBase.IO PrelBase.Z0T ;
-1 x :: PrelBase.Double ;
+1 x :: PrelFloat.Double ;

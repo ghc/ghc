@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldCompile A f x;
 1 f :: __forall [a] => (A   a -> a -> PrelBase.Z0T) -> PrelBase.Z0T ;
 1 type A a = PrelBase.Z0T ;

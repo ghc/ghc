@@ -1,6 +1,8 @@
 
 tcfail029.hs:6:
-    No instance for `Ord Foo' arising from use of `>' at tcfail029.hs:6
+    No instance for `Ord Foo'
+    arising from use of `>' at tcfail029.hs:6
+    In the right-hand side of an equation for `f': x > Bar
 
 Compilation had errors
 

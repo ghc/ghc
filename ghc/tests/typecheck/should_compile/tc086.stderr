@@ -1,7 +1,10 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Group Ring;
-1 class Group a where {compare :: a -> a -> PrelBase.Ordering; fromInteger :: PrelBase.Integer -> a; zp :: a -> a -> a; zm :: a -> a -> a; zzero = :: a; one = :: a} ;
+1 class Group a where {compare :: a -> a -> PrelBase.Ordering; fromInteger :: PrelNum.Integer -> a; zp :: a -> a -> a; zm :: a -> a -> a; zzero = :: a; one = :: a} ;
 1 class {Group a}  => Ring a where {zt = :: a -> a -> a} ;
+1 zddmcompare :: __forall [a] => {Group a} -> a -> a -> PrelBase.Ordering ;
+1 zddmfromInteger :: __forall [a] => {Group a} -> PrelNum.Integer -> a ;
 1 zddmone :: __forall [a] => {Group a} -> a ;
+1 zddmzm :: __forall [a] => {Group a} -> a -> a -> a ;
+1 zddmzp :: __forall [a] => {Group a} -> a -> a -> a ;
 1 zddmzt :: __forall [a] => {Ring a} -> a -> a -> a ;
 1 zddmzzero :: __forall [a] => {Group a} -> a ;

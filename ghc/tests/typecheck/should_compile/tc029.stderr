@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed G K{H M};
 1 data K = H PrelBase.Bool |  M G ;
 1 type G = [PrelBase.Int] ;

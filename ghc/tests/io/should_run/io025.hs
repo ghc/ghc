@@ -1,4 +1,4 @@
---!!! Testing EOF (and the clearing of it)
+-- !!! Testing EOF (and the clearing of it)
 module Main(main) where
 
 import IO

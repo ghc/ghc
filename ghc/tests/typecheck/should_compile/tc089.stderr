@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed absAnd absIf bottom f f_rec f_rec0 f_rec1 f_rec2 fac fac_rec fac_rec0 fac_rec1 fac_rec2 fac_rec3 fac_rec4 g g_rec g_rec0 g_rec1 g_rec2 g_rec3 g_rec4 g_rec5 g_rec6 g_rec7 g_rec8 head one s_1_0 s_2_0 s_2_1 s_3_0 s_3_1 s_3_2;
 1 absAnd :: __forall [t] => t -> t -> t ;
 1 absIf :: __forall [t t1 t2] => t -> t1 -> t2 -> t ;

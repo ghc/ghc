@@ -2,7 +2,6 @@
 ==================== Parser ====================
 module ShouldFail where
 import qualified List as  L (intersperse)
-{- rec -}
 y = intersperse
 x = L.intersperse
 

@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed St State{State} TS{TS vs} bindState foo unState unitState;
 instance {PrelBase.Eq TS} = zdfEqTS;
 instance __forall [c] => {PrelBase.Eq c} -> {PrelBase.Monad (State c)} = zdfMonadState;

@@ -1,40 +1,28 @@
 
 tcfail067.hs:60:
-    Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
-
-tcfail067.hs:60:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail067.hs:60:
-    Could not deduce `Show (SubRange a)'
-	(arising from an instance declaration at tcfail067.hs:60)
-	from the context: (Num a)
+    Could not deduce `Show (SubRange a)' from the context: (Num a)
     Probable cause: missing `Show (SubRange a)'
 		    in instance declaration context
 		    or missing instance declaration for `Show (SubRange a)'
-    When checking the superclasses of an instance declaration
+    arising from an instance declaration at tcfail067.hs:60
 
 tcfail067.hs:61:
     Could not deduce `Ord a'
-	(arising from use of `numSubRangeNegate' at tcfail067.hs:61)
 	from the context: (Num (SubRange a),
 			   Num a,
 			   Eq (SubRange a),
-			   Show (SubRange a),
-			   Eq (SubRange a),
 			   Show (SubRange a))
     Probable cause: missing `Ord a' in instance declaration context
-    When checking the methods of an instance declaration
+    arising from use of `numSubRangeNegate' at tcfail067.hs:61
+    In the right-hand side of a pattern binding: numSubRangeNegate
 
 tcfail067.hs:74:
-    Could not deduce `Ord a'
-	(arising from use of `SubRange' at tcfail067.hs:74)
-	from the context: (Num a)
+    Could not deduce `Ord a' from the context: (Num a)
     Probable cause: missing `Ord a'
 		    in type signature for `numSubRangeBinOp'
-    When checking the type signature(s) for `numSubRangeBinOp'
+    arising from use of `SubRange' at tcfail067.hs:74
+    In the right-hand side of an equation for `numSubRangeBinOp':
+	SubRange (result, result) result
 
 Compilation had errors
 

@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Boolean{FF TT} idb;
 1 data Boolean = FF |  TT ;
 1 idb :: Boolean -> Boolean ;

@@ -1,10 +1,9 @@
 
 ==================== Parser ====================
 module ShouldFail where
-{- rec -}
 f :: {- implicit forall -} Int -> IO Int
 f x = do
-	(2 zp 2) <- 2
+	(2 + 2) <- 2
 	return x
 
 

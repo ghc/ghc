@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Empty{Empty} e0 e1 e2 q;
 1 data Empty q :: (* -> *) = Empty (__forall [a] => {PrelBase.Ord a} -> q a) ;
 1 e0 :: Empty PrelBase.ZMZN ;

@@ -1,11 +1,9 @@
 
 tcfail020.hs:10:
-    Could not deduce `A [a]'
-	(arising from an instance declaration at tcfail020.hs:10)
-	from the context: (A a)
+    Could not deduce `A [a]' from the context: (A a)
     Probable cause: missing `A [a]' in instance declaration context
 		    or missing instance declaration for `A [a]'
-    When checking the superclasses of an instance declaration
+    arising from an instance declaration at tcfail020.hs:10
 
 Compilation had errors
 

@@ -1,40 +1,4 @@
 
-tcfail036.hs:6:
-    Warning: No explicit method nor default method for `*'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:6:
-    Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:6:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:6:
-    Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:8:
-    Warning: No explicit method nor default method for `+'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:8:
-    Warning: No explicit method nor default method for `*'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:8:
-    Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:8:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail036.hs:8:
-    Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
-
 tcfail036.hs:3:
     Duplicate or overlapping instance declarations
 	for `Num NUM'
@@ -42,11 +6,11 @@ tcfail036.hs:3:
 
 tcfail036.hs:8:
     No instance for `Show NUM'
-	arising from an instance declaration at tcfail036.hs:8
+    arising from an instance declaration at tcfail036.hs:8
 
 tcfail036.hs:8:
     No instance for `Eq NUM'
-	arising from an instance declaration at tcfail036.hs:8
+    arising from an instance declaration at tcfail036.hs:8
 
 tcfail036.hs:9:
     Class used as a type constructor: Num

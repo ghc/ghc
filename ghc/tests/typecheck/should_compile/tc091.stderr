@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed init_last merge sort;
 1 init_last :: __forall [a] => [a] -> PrelBase.Int -> ([a], [a]) ;
 1 merge :: __forall [a] => {PrelBase.Ord a} -> [a] -> [a] -> [a] ;

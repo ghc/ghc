@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed AFE{MkAFE} FG{MkFG} OL{MkOL} mAp ranAFE ranOAL sNd;
 1 data AFE n a b = MkAFE (OL  (n, FG  a b)) ;
 1 data FG a b = MkFG (OL  (a, b)) ;

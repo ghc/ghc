@@ -1,10 +1,9 @@
 NOTE: Simplifier still going after 4 iterations; bailing out.
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed HappyAbsSyn{HappyTerminal HappyErrorToken HappyAbsSyn1 HappyAbsSyn2 HappyAbsSyn3} HappyState{HappyState} Token{TokenInt TokenVar TokenEq} action_0 action_1 action_2 action_3 action_4 action_5 action_6 happyAccept happyError happyFail happyGoto happyMonadReduce happyNewToken happyParse happyReduce happyReduce_1 happyReduce_2 happyReduce_3 happyReturn happyShift happySpecReduce_0 happySpecReduce_1 happySpecReduce_2 happySpecReduce_3 happyThen main myparser notHappyAtAll;
 instance {PrelShow.Show Token} = zdfShowToken;
-1 action_0 :: __forall [t t1] => {PrelNum.Num t} -> t -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn (t1 -> PrelBase.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelBase.Double) -> [HappyState Token ([HappyAbsSyn (t1 -> PrelBase.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelBase.Double)] -> [HappyAbsSyn (t1 -> PrelBase.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelBase.Double ;
+1 action_0 :: __forall [t t1] => {PrelNum.Num t} -> t -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn (t1 -> PrelFloat.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelFloat.Double) -> [HappyState Token ([HappyAbsSyn (t1 -> PrelFloat.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelFloat.Double)] -> [HappyAbsSyn (t1 -> PrelFloat.Double) [([PrelBase.Char], t1 -> PrelBase.Int)] (t1 -> PrelBase.Int)] -> [Token] -> t1 -> PrelFloat.Double ;
 1 action_1 :: __forall [t t1 t2 t3 b] => {PrelNum.Num t} -> t -> PrelBase.Int -> b -> HappyState b ([HappyAbsSyn t1 t2 t3] -> [Token] -> t1) -> [HappyState b ([HappyAbsSyn t1 t2 t3] -> [Token] -> t1)] -> [HappyAbsSyn t1 t2 t3] -> [Token] -> t1 ;
-1 action_2 :: __forall [t t1 b t2 t3 t4 t5 t31] => t -> PrelBase.Int -> b -> t2 -> [HappyState b ([HappyAbsSyn (t3 -> PrelBase.Double) [(t4, t3 -> t5)] t31] -> t1)] -> [HappyAbsSyn (t3 -> PrelBase.Double) [(t4, t3 -> t5)] t31] -> t1 ;
+1 action_2 :: __forall [t t1 b t2 t3 t4 t5 t31] => t -> PrelBase.Int -> b -> t2 -> [HappyState b ([HappyAbsSyn (t3 -> PrelFloat.Double) [(t4, t3 -> t5)] t31] -> t1)] -> [HappyAbsSyn (t3 -> PrelFloat.Double) [(t4, t3 -> t5)] t31] -> t1 ;
 1 action_3 :: __forall [t t1 t11 a] => {PrelNum.Num t} -> t -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a) -> [HappyState Token ([HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a)] -> [HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a ;
 1 action_4 :: __forall [t t1 t11 a] => {PrelNum.Num t} -> t -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a) -> [HappyState Token ([HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a)] -> [HappyAbsSyn t1 [([PrelBase.Char], t11 -> PrelBase.Int)] (t11 -> PrelBase.Int)] -> [Token] -> a ;
 1 action_5 :: __forall [t t1 b t2 t11 t3] => t -> PrelBase.Int -> b -> t2 -> [HappyState b ([HappyAbsSyn t11 [([PrelBase.Char], t3)] t3] -> t1)] -> [HappyAbsSyn t11 [([PrelBase.Char], t3)] t3] -> t1 ;
@@ -18,9 +17,9 @@ instance {PrelShow.Show Token} = zdfShowToken;
 1 happyGoto :: __forall [t b c] => (PrelBase.Int -> PrelBase.Int -> b -> HappyState b c -> [HappyState b c] -> c) -> PrelBase.Int -> b -> t -> [HappyState b c] -> c ;
 1 happyMonadReduce :: __forall [a b b1 t] => PrelBase.Int -> PrelBase.Int -> (t -> b1) -> ([b1] -> t) -> PrelBase.Int -> b -> HappyState b ([b1] -> [Token] -> a) -> [HappyState b ([b1] -> [Token] -> a)] -> [b1] -> [Token] -> a ;
 1 happyNewToken :: __forall [t t1] => (PrelBase.Int -> PrelBase.Int -> Token -> HappyState Token (t -> [Token] -> t1) -> [HappyState Token (t -> [Token] -> t1)] -> t -> [Token] -> t1) -> [HappyState Token (t -> [Token] -> t1)] -> t -> [Token] -> t1 ;
-1 happyParse :: __forall [t] => [Token] -> t -> PrelBase.Double ;
+1 happyParse :: __forall [t] => [Token] -> t -> PrelFloat.Double ;
 1 happyReduce :: __forall [t b t1] => PrelBase.Int -> PrelBase.Int -> (t1 -> t1) -> PrelBase.Int -> b -> HappyState b (t1 -> t) -> [HappyState b (t1 -> t)] -> t1 -> t ;
-1 happyReduce_1 :: __forall [t b t1 t2 t3 t4 t31] => PrelBase.Int -> b -> t1 -> [HappyState b ([HappyAbsSyn (t3 -> PrelBase.Double) [(t2, t3 -> t4)] t31] -> t)] -> [HappyAbsSyn (t3 -> PrelBase.Double) [(t2, t3 -> t4)] t31] -> t ;
+1 happyReduce_1 :: __forall [t b t1 t2 t3 t4 t31] => PrelBase.Int -> b -> t1 -> [HappyState b ([HappyAbsSyn (t3 -> PrelFloat.Double) [(t2, t3 -> t4)] t31] -> t)] -> [HappyAbsSyn (t3 -> PrelFloat.Double) [(t2, t3 -> t4)] t31] -> t ;
 1 happyReduce_2 :: __forall [t b t1 t11 t3] => PrelBase.Int -> b -> t1 -> [HappyState b ([HappyAbsSyn t11 [([PrelBase.Char], t3)] t3] -> t)] -> [HappyAbsSyn t11 [([PrelBase.Char], t3)] t3] -> t ;
 1 happyReduce_3 :: __forall [t b t1 t11 t2 t21] => PrelBase.Int -> b -> t1 -> [HappyState b ([HappyAbsSyn t11 t2 (t21 -> PrelBase.Int)] -> t)] -> [HappyAbsSyn t11 t2 (t21 -> PrelBase.Int)] -> t ;
 1 happyReturn :: __forall [t t1] => t -> t1 -> t ;
@@ -31,6 +30,6 @@ instance {PrelShow.Show Token} = zdfShowToken;
 1 happySpecReduce_3 :: __forall [t b t1 t2] => PrelBase.Int -> (t1 -> t1 -> t1 -> t1) -> PrelBase.Int -> b -> t -> [HappyState b ([t1] -> t2)] -> [t1] -> t2 ;
 1 happyThen :: __forall [t t1] => t -> (t -> t1) -> t1 ;
 1 main :: PrelIOBase.IO PrelBase.Z0T ;
-1 myparser :: __forall [t] => [Token] -> t -> PrelBase.Double ;
+1 myparser :: __forall [t] => [Token] -> t -> PrelFloat.Double ;
 1 notHappyAtAll :: __forall [t] => t ;
 1 zdfShowToken :: {PrelShow.Show Token} ;

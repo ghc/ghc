@@ -1,4 +1,4 @@
---!!! Testing IO.hFileSize
+-- !!! Testing IO.hFileSize
 module Main(main) where
 
 import IO

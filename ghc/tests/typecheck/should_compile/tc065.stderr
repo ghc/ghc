@@ -1,16 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed Cycle Digraph{MkDigraph} Edge FlattenedDependencyInfo MaybeErr{Succeeded Failed} dfs isCyclic isRecursiveCycle lookupVertex mkDigraph mkEdges mkVertices stronglyConnComp topSort;
-1 data Digraph vertex = MkDigraph [vertex] ;
-1 data MaybeErr a b = Succeeded a |  Failed b ;
-1 dfs :: __forall [a] => {PrelBase.Eq a} -> (a -> [a]) -> ([a], [a]) -> [a] -> ([a], [a]) ;
-1 isCyclic :: __forall [vertex] => {PrelBase.Eq vertex} -> [Edge vertex] -> [vertex] -> PrelBase.Bool ;
-1 isRecursiveCycle :: __forall [vertex] => {PrelBase.Eq vertex} -> Cycle vertex -> [Edge vertex] -> PrelBase.Bool ;
-1 lookupVertex :: __forall [vertex name code] => {PrelBase.Eq vertex} -> {PrelBase.Ord name} -> FlattenedDependencyInfo vertex name code -> vertex -> code ;
-1 mkDigraph :: __forall [vertex] => [vertex] -> Digraph vertex ;
-1 mkEdges :: __forall [vertex name code] => {PrelBase.Eq vertex} -> {PrelBase.Ord name} -> [vertex] -> FlattenedDependencyInfo vertex name code -> [Edge vertex] ;
-1 mkVertices :: __forall [vertex name code] => FlattenedDependencyInfo vertex name code -> [vertex] ;
-1 stronglyConnComp :: __forall [vertex] => {PrelBase.Eq vertex} -> [Edge vertex] -> [vertex] -> [[vertex]] ;
-1 topSort :: __forall [vertex] => {PrelBase.Eq vertex} -> [Edge vertex] -> [vertex] -> MaybeErr [vertex] [[vertex]] ;
-1 type Cycle vertex = [vertex] ;
-1 type Edge vertex = (vertex, vertex) ;
-1 type FlattenedDependencyInfo vertex name code = [(vertex, Set.Set name, Set.Set name, code)] ;
+
+Need to fix up -syslib flag in makefile
+

@@ -1,5 +1,4 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed c d e;
-1 c :: (PrelBase.Integer, PrelBase.Integer) ;
-1 d :: PrelBase.Integer ;
-1 e :: PrelBase.Integer ;
+1 c :: (PrelNum.Integer, PrelNum.Integer) ;
+1 d :: PrelNum.Integer ;
+1 e :: PrelNum.Integer ;

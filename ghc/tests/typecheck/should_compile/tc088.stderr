@@ -1,7 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
-instance __forall [a b] => {PrelBase.Eq b} -> {PrelBase.Eq (a -> b)} = zdfEqZLzmzgZR;
-instance __forall [a b] => {PrelNum.Num b} -> {PrelNum.Num (a -> b)} = zdfNumZLzmzgZR;
-instance __forall [a b] => {PrelShow.Show (a -> b)} = zdfShowZLzmzgZR;
-1 zdfEqZLzmzgZR :: __forall [a b] => {PrelBase.Eq b} -> {PrelBase.Eq (a -> b)} ;
-1 zdfNumZLzmzgZR :: __forall [a b] => {PrelNum.Num b} -> {PrelBase.Eq (a -> b)} -> {PrelShow.Show (a -> b)} -> {PrelNum.Num (a -> b)} ;
-1 zdfShowZLzmzgZR :: __forall [a b] => {PrelShow.Show (a -> b)} ;
+
+Need to fix up -syslib flag in makefile
+

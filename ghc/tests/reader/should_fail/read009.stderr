@@ -1,11 +1,8 @@
 
 ==================== Parser ====================
 module ShouldFail where
-{- rec -}
 h x = x
-foo = do
-	let {- rec -}
-	    foo = True
+foo = do let foo = True
 
 
 

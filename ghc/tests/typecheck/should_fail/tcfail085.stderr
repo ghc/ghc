@@ -1,6 +1,7 @@
 
 tcfail085.hs:9:
     Constructor `F' does not have the required strict field `y'
+    In the record construction: F {x = 2}
     In the right-hand side of a pattern binding: F {x = 2}
 
 Compilation had errors

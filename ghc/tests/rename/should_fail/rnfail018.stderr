@@ -1,8 +1,4 @@
 
-rnfail018.hs:12:
-    The constrained type variable `b' does not appear in the type `m a'
-    In the type signature for `setState0'
-
 rnfail018.hs:12: Type variable not in scope: `a'
 
 rnfail018.hs:12: Type variable not in scope: `m'

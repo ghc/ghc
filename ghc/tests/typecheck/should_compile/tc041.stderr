@@ -1,6 +1,6 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed H{op1} f;
 instance {H PrelBase.Bool} = zdfHBool;
 1 class H a where {op1 :: a -> a -> a} ;
 1 f :: PrelBase.Bool -> PrelBase.Int -> PrelBase.Bool ;
+1 zddmop1 :: __forall [a] => {H a} -> a -> a -> a ;
 1 zdfHBool :: {H PrelBase.Bool} ;

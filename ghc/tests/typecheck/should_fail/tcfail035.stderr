@@ -1,44 +1,4 @@
 
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `+'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `*'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `+'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `*'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
-
 tcfail035.hs:3:
     Duplicate or overlapping instance declarations
 	for `Num NUM'

@@ -1,4 +1,4 @@
---!!! file positions (hGetPosn and hSetPosn)
+-- !!! file positions (hGetPosn and hSetPosn)
 module Main(main) where
 
 import IO

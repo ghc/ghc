@@ -1,8 +1,8 @@
 
-rnfail019.hs:5:
-    The operator `:' [infixr 5] of a section
-	must have lower precedence than the operand `:' [infixr 5]
-	In the section: `((x : y) :)'
+rnfail020.hs:12:
+    All of the type variable(s) in the constraint `Eq a' are already in scope
+	At least one must be universally quantified here
+    In the type signature for `unionSets'
 
 Compilation had errors
 

@@ -1,9 +1,9 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Eqzq{deq} dand f;
 instance {Eqzq PrelBase.Int} = zdfEqzqInt;
 instance __forall [a] => {Eqzq a} -> {Eqzq [a]} = zdfEqzqZMZN;
 1 class Eqzq a where {deq :: a -> a -> PrelBase.Bool} ;
 1 dand :: PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;
 1 f :: __forall [a] => {Eqzq a} -> a -> a -> PrelBase.Bool ;
+1 zddmdeq :: __forall [a] => {Eqzq a} -> a -> a -> PrelBase.Bool ;
 1 zdfEqzqInt :: {Eqzq PrelBase.Int} ;
 1 zdfEqzqZMZN :: __forall [a] => {Eqzq a} -> {Eqzq [a]} ;

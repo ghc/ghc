@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed f g h;
 1 f :: __forall [t] => PrelBase.Bool -> t -> t ;
 1 g :: __forall [t] => t -> PrelBase.Bool -> t ;

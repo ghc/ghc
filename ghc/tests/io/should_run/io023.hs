@@ -1,4 +1,4 @@
---!!! Testing output on stdout
+-- !!! Testing output on stdout
 module Main(main) where
 
 -- stdout is buffered, so test if its buffer

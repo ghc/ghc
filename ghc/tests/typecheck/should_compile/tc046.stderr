@@ -1,4 +1,5 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed B{op2} C{op1};
 1 class {C a}  => B a where {op2 :: a -> a -> a} ;
 1 class C a where {op1 :: a -> a} ;
+1 zddmop1 :: __forall [a] => {C a} -> a -> a ;
+1 zddmop2 :: __forall [a] => {B a} -> a -> a -> a ;

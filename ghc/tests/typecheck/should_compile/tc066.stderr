@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Pair{MkPair} f;
 1 data Pair a b = MkPair a b ;
 1 f :: __forall [a b] => [Pair a b] -> [b] ;

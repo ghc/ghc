@@ -1,2 +1,1 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Point2{Point2} area2;

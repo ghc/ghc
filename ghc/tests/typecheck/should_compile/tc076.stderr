@@ -1,4 +1,3 @@
-ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed x xs;
 1 x :: [[PrelBase.Bool]] ;
 1 xs :: [PrelBase.Bool] ;
