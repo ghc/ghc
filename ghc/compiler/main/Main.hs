@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.57 2001/02/28 11:44:39 simonpj Exp $
+-- $Id: Main.hs,v 1.58 2001/03/05 12:18:21 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -139,7 +139,7 @@ main =
 	else do am_inplace <- doesFileExist inplace_pkgconfig
 	        if am_inplace
 		    then writeIORef v_Path_package_config inplace_pkgconfig
-		    else throwDyn (OtherError "can't find package.conf")
+		    else throwDyn (OtherError ("Can't find package.conf in " ++ inplace_pkgconfig))
 
 	-- set the location of our various files
    if am_installed
