@@ -277,7 +277,10 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package haskell-src
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS += -package unix -package readline 
+SRC_HC_OPTS += -package unix
+ifeq "$(GhcLibsWithReadline)" "YES"
+SRC_HC_OPTS += -package readline 
+endif
 endif
 ALL_DIRS += ghci
 else
