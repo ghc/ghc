@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.51 2001/10/25 02:13:11 sof Exp $
+% $Id: CgClosure.lhs,v 1.52 2001/11/06 11:02:05 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -474,7 +474,7 @@ enterCostCentreCode closure_info ccs is_thunk is_box
   = if not opt_SccProfilingOn then
 	nopC
     else
-	ASSERT(not (noCCSAttached ccs))
+	ASSERT2(not (noCCSAttached ccs), ppr (closureName closure_info) <+> ppr ccs)
 
 	if isSubsumedCCS ccs then
 	    ASSERT(isToplevClosure closure_info)
