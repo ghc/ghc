@@ -953,8 +953,8 @@ Word64 &  64 \\
 \end{tabular}
 
 
-For each type {\it W\/} above, we provide the following functions and
-instances.  The type {\it I\/} refers to the signed integer type of the
+For each type {\em W} above, we provide the following functions and
+instances.  The type {\em I} refers to the signed integer type of the
 same size.
 
 \begin{verbatim}
@@ -990,7 +990,7 @@ intToWord32    :: Int    -> Word32
 
 Notes: 
 \begin{itemize}
-\item All arithmetic is performed modulo 2\verb+^+n
+\item All arithmetic is performed modulo @2^n@.
 
 One non-obvious consequequence of this is that {\tt negate}
 should {\em not\/} raise an error on negative arguments.
@@ -1042,7 +1042,7 @@ Int64 &  64 \\
 \end{tabular}
 
 
-For each type {\it I\/} above, we provide the following instances.
+For each type {\em I} above, we provide the following instances.
 
 \begin{verbatim}
 data I            -- Signed Ints
