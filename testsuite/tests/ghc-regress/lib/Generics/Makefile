@@ -37,7 +37,7 @@ clean:
 	rm -f bits/bits
 	rm -f ext1/ext1
 	rm -f datatype
-	rm -f findepth/findepth
+	rm -f genUpTo/genUpTo
 	rm -f foldTree
 	rm -f geq/geq
 	rm -f gmapQ-assoc

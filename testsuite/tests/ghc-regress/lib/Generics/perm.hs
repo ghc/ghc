@@ -3,7 +3,7 @@
 {-
 
 This module illustrates permutation phrases.
-Disclaimer: this is a very simply, hardly debugged example.
+Disclaimer: this is a perhaps naive, certainly undebugged example.
 
 -}
 
