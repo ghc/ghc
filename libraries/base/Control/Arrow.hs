@@ -100,7 +100,9 @@ instance Arrow (->) where
 	f >>> g = g . f
 	first f = f *** id
 	second f = id *** f
-	(f *** g) ~(x,y) = (f x, g y)
+--	(f *** g) ~(x,y) = (f x, g y)
+--	sorry, although the above defn is fully H'98, nhc98 can't parse it.
+	(***) f g ~(x,y) = (f x, g y)
 
 -- | Kleisli arrows of a monad.
 
