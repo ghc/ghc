@@ -1277,7 +1277,7 @@ primOpInfo WriteArrayOp
 primOpInfo IndexArrayOp
   = let { elt = alphaTy; elt_tv = alphaTyVar } in
     mkGenPrimOp SLIT("indexArray#") [elt_tv] [mkArrayPrimTy elt, intPrimTy]
-	(unboxedPair [realWorldStatePrimTy, elt])
+	(mkUnboxedTupleTy 1 [elt])
 
 ---------------------------------------------------------------------------
 -- Primitive arrays full of unboxed bytes:
