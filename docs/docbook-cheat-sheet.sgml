@@ -41,6 +41,15 @@ The rest of this section outlines the use of several tags which may not be obvio
 
 <VariableList>
 
+<VarListEntry><Term>Comments</Term>
+<ListItem>
+<Para>
+Comments in SGML look like this: <SGMLTag class=SGMLComment>This is a
+comment</SGMLTag>.
+</Para>
+</ListItem>
+</VarListEntry>
+
 <VarListEntry><Term><SGMLTag class="StartTag">Command</SGMLTag></Term>
 <ListItem>
 <Para>
