@@ -11,8 +11,8 @@ test "arr003" { vtr("", "", "1") }
 test "arr004" { vtr("", "", "1") }
 test "arr005" { vtr("", "", "") }
 test "arr006" { vtr("", "", "") }
-test "arr007" { vtr("", "", "7") }
-test "arr008" { vtr("", "", "8") }
+test "arr007" { vtr("", "", "1") }
+test "arr008" { vtr("", "", "1") }
 test "arr009" { vtr("", "", "") }
 test "arr010" { vtr("", "", "") }
 test "arr011" { vtr("", "", "") }
