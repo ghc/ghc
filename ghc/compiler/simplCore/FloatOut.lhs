@@ -18,9 +18,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
 import CoreLint		( showPass, endPass )
-import SetLevels	( setLevels, isInlineCtxt,
-		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
-			)
+import SetLevels	( setLevels, Level(..), ltMajLvl, ltLvl, isTopLvl )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable

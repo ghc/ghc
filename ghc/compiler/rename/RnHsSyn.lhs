@@ -11,7 +11,7 @@ module RnHsSyn where
 import HsSyn
 import HsCore
 import Class		( FunDep, DefMeth(..) )
-import TyCon		( DataConDetails, visibleDataCons )
+import TyCon		( visibleDataCons )
 import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet

@@ -48,8 +48,7 @@ import DataCon		( DataCon, dataConName, dataConTag,
 			  isUnboxedTupleCon, isNullaryDataCon, dataConId, 
 			  dataConWrapId, dataConRepArity
 			)
-import Id		( Id, idName, idPrimRep, idCafInfo )
-import IdInfo		( mayHaveCafRefs )
+import Id		( Id, idName, idPrimRep )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )

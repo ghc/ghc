@@ -34,7 +34,6 @@ module Inst (
 
 #include "HsVersions.h"
 
-import CmdLineOpts ( opt_NoMethodSharing )
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
 import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId

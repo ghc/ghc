@@ -14,7 +14,7 @@ import CoreUtils( exprType, exprIsValue, etaExpand, exprArity, exprOkForSpeculat
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
-import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
+import Type	( Type, applyTy, splitFunTy_maybe, 
 		  isUnLiftedType, isUnboxedTupleType, repType, seqType )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import PrimOp	( PrimOp(..) )

@@ -67,7 +67,6 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..),
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Util             ( lengthIs )
 import Maybes		( expectJust )
 import Outputable
 import FastString

@@ -59,7 +59,6 @@ import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
 import Util		( lengthExceeds, listLengthCmp )
-import Maybe		( isNothing, maybeToList )
 
 import ST
 

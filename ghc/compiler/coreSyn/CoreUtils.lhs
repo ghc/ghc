@@ -48,12 +48,11 @@ import Name		( hashName )
 import Literal		( hashLiteral, literalType, litIsDupable, isZeroLit )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
-import Id		( Id, idType, globalIdDetails, idNewStrictness, idLBVarInfo, 
+import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
 			  isDataConId_maybe, mkSysLocal, isDataConId, isBottomingId
 			)
-import IdInfo		( LBVarInfo(..),  
-			  GlobalIdDetails(..),
+import IdInfo		( GlobalIdDetails(..),
 			  megaSeqIdInfo )
 import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,

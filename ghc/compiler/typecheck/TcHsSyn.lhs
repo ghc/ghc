@@ -690,7 +690,7 @@ zonkPat (TuplePat pats boxed)
     returnNF_Tc (TuplePat new_pats boxed, ids)
 
 zonkPat (ConPat n ty tvs dicts pats)
-  = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->
+  = zonkTcTypeToType ty			`thenNF_Tc` \ new_ty ->
     mapNF_Tc zonkTcTyVarToTyVar tvs	`thenNF_Tc` \ new_tvs ->
     mapNF_Tc zonkIdBndr dicts		`thenNF_Tc` \ new_dicts ->
     tcExtendGlobalValEnv new_dicts	$

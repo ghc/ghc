@@ -85,7 +85,7 @@ import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( substTyWith )
 
 -- friends:
-import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
+import Var	( TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
@@ -101,7 +101,6 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 
 -- others
 import CmdLineOpts	( opt_DictsStrict )
-import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
 import Unique		( Uniquable(..) )
