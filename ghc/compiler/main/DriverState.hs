@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.99 2004/02/25 11:24:34 simonmar Exp $
+-- $Id: DriverState.hs,v 1.100 2004/02/25 11:31:24 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -521,11 +521,15 @@ GLOBAL_VAR(v_Ways, [] ,[WayName])
 allowed_combination way = and [ x `allowedWith` y 
 			      | x <- way, y <- way, x < y ]
   where
+	-- Note ordering in these tests: the left argument is
+	-- <= the right argument, according to the Ord instance
+	-- on Way above.
+
 	-- debug is allowed with everything
 	_ `allowedWith` WayDebug		= True
 	WayDebug `allowedWith` _		= True
 
-	WayProf `allowedWith` WayThreaded	= True
+	WayThreaded `allowedWith` WayProf	= True
 	WayProf `allowedWith` WayUnreg		= True
 	WayProf `allowedWith` WaySMP		= True
 	WayProf `allowedWith` WayNDP		= True
@@ -541,14 +545,17 @@ findBuildTag = do
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b) 
       		    (map (wayName . lkupWay) ws))
-      else let stuff   = map lkupWay ws
-      	       tag     = concat [ wayTag w | w <- stuff, not (wayRTSOnly w) ]
-      	       rts_tag = concat (map wayTag stuff)
-      	       flags   = map wayOpts stuff
+      else let ways    = map lkupWay ws
+      	       tag     = mkBuildTag (filter (not.wayRTSOnly) ways)
+      	       rts_tag = mkBuildTag ways
+      	       flags   = map wayOpts ways
       	   in do
       	   writeIORef v_Build_tag tag
       	   writeIORef v_RTS_Build_tag rts_tag
       	   return (concat flags)
+
+mkBuildTag :: [Way] -> String
+mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
 
 lkupWay w = 
    case lookup w way_details of
