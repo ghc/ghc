@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.2 1998/12/02 13:28:44 simonm Exp $
+ * $Id: Schedule.c,v 1.3 1999/01/06 11:44:44 simonm Exp $
  *
  * Scheduler
  *
@@ -86,22 +86,20 @@ createThread(nat stack_size)
 {
   StgTSO *tso;
 
+  /* catch ridiculously small stack sizes */
+  if (stack_size < MIN_STACK_WORDS + TSO_STRUCT_SIZEW) {
+    stack_size = MIN_STACK_WORDS + TSO_STRUCT_SIZEW;
+  }
+
   tso = (StgTSO *)allocate(stack_size);
   
-  initThread(tso, stack_size);
+  initThread(tso, stack_size - TSO_STRUCT_SIZEW);
   return tso;
 }
 
 void
 initThread(StgTSO *tso, nat stack_size)
 {
-  stack_size -= TSO_STRUCT_SIZEW;
-
-  /* catch ridiculously small stack sizes */
-  if (stack_size < MIN_STACK_WORDS) {
-    stack_size = MIN_STACK_WORDS;
-  }
-
   SET_INFO(tso,&TSO_info);
   tso->whatNext     = ThreadEnterGHC;
   tso->state        = tso_state_runnable;
@@ -118,10 +116,8 @@ initThread(StgTSO *tso, nat stack_size)
 
   /* put a stop frame on the stack */
   tso->sp -= sizeofW(StgStopFrame);
-  SET_HDR(stgCast(StgClosure*,tso->sp),
-	  (StgInfoTable *)&stg_stop_thread_info,
-	  CCS_MAIN);
-  tso->su = stgCast(StgUpdateFrame*,tso->sp);
+  SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_MAIN);
+  tso->su = (StgUpdateFrame*)tso->sp;
 
   IF_DEBUG(scheduler,belch("Initialised thread %lld, stack size = %lx words\n", 
 			   tso->id, tso->stack_size));
@@ -547,6 +543,8 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
       if (in_ccall_gc) {
 	CurrentTSO = ccalling_threads;
 	ccalling_threads = ccalling_threads->link;
+	/* remember to stub the link field of CurrentTSO */
+	CurrentTSO->link = END_TSO_QUEUE;
       }
       if ((*MainTSO)->whatNext == ThreadComplete) {
 	/* we finished successfully, fill in the return value */
