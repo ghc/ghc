@@ -659,17 +659,12 @@ instance Enum Word32 where
       = fromEnumError "Word32" x
 
     enumFrom w           = [w .. maxBound]
-    enumFromTo   w1 w2   = eftt32 increasing w1 diff_f last
+    enumFromTo   w1 w2
+       | w1 <= w2        = eftt32 True{-increasing-} w1 diff_f last
+       | otherwise	 = []
 	where
-	 increasing = w1 <= w2
-	 
-         last
-	  | increasing = (> w2)
-	  | otherwise  = (< w2)
-
-	 diff_f 
-	  | increasing = \ x -> x + 1
-	  | otherwise  = \ x -> x - 1
+         last = (> w2)
+	 diff_f x = x + 1 
 	  
     enumFromThen w1 w2   = [w1,w2 .. last]
        where
