@@ -619,8 +619,15 @@ GhcVersion	= @GhcVersion@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 GhcPatchLevel	= @GhcPatchLevel@
-# Canonicalised ghc version number, used for easy (integer) version comparisons.
+
+# Canonicalised ghc version number, used for easy (integer) version
+# comparisons.  We must expand $(GhcMinVersion) to two digits by
+# adding a leading zero if necessary:
+ifneq "$(findstring $(GhcMinVersion), 0 1 2 3 4 5 6 7 8 9)" ""
+GhcCanonVersion = $(GhcMajVersion)0$(GhcMinVersion)
+else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
+endif
 
 HBC		= @HBC@
 NHC		= @NHC@
