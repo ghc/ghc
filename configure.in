@@ -28,10 +28,11 @@ if test x"$srcdir" != 'x.' ; then
 fi
 
 #
-# Remove some automounter nonsense (Glasgow specific gruff)
+# Remove common automounter nonsense + convert from UNC to DOS style paths
+# (cygwin32-beta18 for UNC isn't quite there yet.)
 #
 hardtop=`pwd`
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|' | sed 's|^//\(.\)/|\1:/|' `
 
 echo ''
 echo "*** The top of your build tree is: $hardtop"
