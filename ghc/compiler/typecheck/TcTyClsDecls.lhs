@@ -19,7 +19,7 @@ import HsSyn		( HsDecl(..), TyDecl(..),  ConDecl(..), ConDetails(..), BangType(.
 			)
 import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), SYN_IE(RenamedHsDecl)
 			)
-import TcHsSyn		( SYN_IE(TcHsBinds), TcIdOcc(..) )
+import TcHsSyn		( SYN_IE(TcHsBinds) )
 
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
@@ -29,6 +29,7 @@ import SpecEnv		( SpecEnv )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 import TcMonoType	( tcTyVarScope )
+import TcType		( TcIdOcc(..) )
 
 import Bag	
 import Class		( SYN_IE(Class) )

@@ -24,12 +24,12 @@ import HsSyn		( TyDecl(..), ConDecl(..), ConDetails(..), BangType(..), HsExpr(..
 import HsTypes		( getTyVarName )
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
-			  SYN_IE(TcHsBinds), TcIdOcc(..), SYN_IE(TcMonoBinds)
+			  SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
 import TcSimplify	( tcSimplifyThetas )
-import TcType		( tcInstTyVars, tcInstType, tcInstId )
+import TcType		( TcIdOcc(..), tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 			  newLocalId, newLocalIds, tcLookupClassByKey
 			)

@@ -18,8 +18,7 @@ import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit,
 			  Match, HsBinds, HsType, ArithSeqInfo, Fixity,
 			  GRHSsAndBinds, Stmt, DoOrListComp, Fake )
 import HsBinds		( andMonoBinds )
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), 
-			  SYN_IE(TcMonoBinds), SYN_IE(TcDictBinds) )
+import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcMonoBinds), SYN_IE(TcDictBinds) )
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst,
@@ -32,7 +31,9 @@ import Inst		( lookupInst, lookupSimpleInst,
 			  OverloadedLit )
 import TcEnv		( tcGetGlobalTyVars )
 import SpecEnv		( SpecEnv )
-import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), TcMaybe, tcInstType )
+import TcType		( TcIdOcc(..), SYN_IE(TcIdBndr), 
+			  SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), TcMaybe, tcInstType
+			)
 import Unify		( unifyTauTy )
 
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
