@@ -59,12 +59,10 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 	-- ToDo: do this using .byte and .word directives.
 	type_info :: Word32
 #ifdef WORDS_BIGENDIAN
-        type_info = (fromInt flags `shiftL` 24) .|.
-		    (fromInt closure_type `shiftL` 16) .|.
+        type_info = (fromInt closure_type `shiftL` 16) .|.
 		    (fromInt srt_len)
 #else 
-        type_info = (fromInt flags) .|.
-		    (fromInt closure_type `shiftL` 8) .|.
+        type_info = (fromInt closure_type) .|.
 		    (fromInt srt_len `shiftL` 16)
 #endif	     
 	srt = getSRTInfo cl_info	     
@@ -92,7 +90,6 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 
 	closure_type = getSMRepClosureTypeInt (closureSMRep cl_info)
 
-	flags = 0 -- for now
 
 
 genBitmapInfoTable
@@ -124,12 +121,10 @@ genBitmapInfoTable liveness srt closure_type include_srt
 
 	type_info :: Word32
 #ifdef WORDS_BIGENDIAN
-        type_info = (fromInt flags `shiftL` 24) .|.
-		    (fromInt closure_type `shiftL` 16) .|.
+        type_info = (fromInt closure_type `shiftL` 16) .|.
 		    (fromInt srt_len)
 #else 
-        type_info = (fromInt flags) .|.
-		    (fromInt closure_type `shiftL` 8) .|.
+        type_info = (fromInt closure_type) .|.
 		    (fromInt srt_len `shiftL` 16)
 #endif	     
 
@@ -139,6 +134,4 @@ genBitmapInfoTable liveness srt closure_type include_srt
 		(lbl, SRT off len) -> 
 			(StIndex DataPtrRep (StCLbl lbl) 
 				(StInt (toInteger off)), len)
-
-	flags = 0 -- for now
 \end{code}
