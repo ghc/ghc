@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.42 2004/11/26 16:22:13 simonmar Exp $
+# $Id: package.mk,v 1.43 2005/01/14 08:01:27 wolfgang Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -218,6 +218,52 @@ $(GHCI_LIBRARY) : $(LIBOBJS)
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
 endif # way
+
+ifeq "$(GhcBuildDylibs)" "YES"
+
+    # Build dynamic libraries.
+    # Currently, this is a hack. Anyone, PLEASE clean it up.
+
+    # For now, we pretend that there are two operating systems in the world;
+    # Darwin, and Everything Else. Furthermore, we pretend that Everything Else
+    # behaves like Linux.
+    
+ifeq "$(darwin_TARGET_OS)" "1"
+    # Darwin: Shared libraries end in .dylib
+DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
+
+    # About the options used for Darwin:
+    # -dynamiclib
+    #   Apple's way of saying -shared
+    # -flat_namespace -undefined suppress:
+    #   Without these options, we'd have to specify the correct dependencies
+    #   for each of the dylibs. Twolevel namespaces are in general a good thing
+    #   (they make things more robust), so we should fix this sooner or later.
+    # -install_name
+    #   Causes the dynamic linker to ignore the DYLD_LIBRARY_PATH when loading
+    #   this lib and instead look for it at its absolute path.
+    #   When installing the .dylibs (see target.mk), we'll change that path to
+    #   point to the place they are installed.
+    #   Note: I'm not yet sure about this, but I think it will be convenient for
+    #         users not to have to set up DYLD_LIBRARY_PATH to point to the GHC
+    #         library dir. -- Wolfgang
+    
+$(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
+	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) -flat_namespace -undefined suppress -install_name `pwd`/$@
+else
+DYLD_LIBRARY = $(patsubst %.a,%_dyn.so,$(LIBRARY))
+
+$(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
+	$(CC) -shared -o $@ $(STUBOBJS) $(LIBOBJS)
+endif
+
+INSTALL_LIBS += $(DYLD_LIBRARY)
+CLEAN_FILES += $(DYLD_LIBRARY)
+
+all :: $(DYLD_LIBRARY)
+
+
+endif
 
 # -----------------------------------------------------------------------------
 # Doc building with Haddock

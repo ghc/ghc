@@ -428,10 +428,9 @@ getPackageLinkOpts dflags pkgs = do
   rts_tag <- readIORef v_RTS_Build_tag
   static <- readIORef v_Static
   let 
-	imp        = if static then "" else "_imp"
-      	libs p     = map addSuffix (hACK (hsLibraries p)) ++ extraLibraries p
-	imp_libs p = map (++imp) (libs p)
-	all_opts p = map ("-l" ++) (imp_libs p) ++ extraLdOpts p
+	imp        = if static then "" else "_dyn"
+      	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p)) ++ extraLibraries p
+	all_opts p = map ("-l" ++) (libs p) ++ extraLdOpts p
 
 	suffix     = if null tag then "" else  '_':tag
 	rts_suffix = if null rts_tag then "" else  '_':rts_tag

@@ -770,6 +770,9 @@ install:: $(INSTALL_LIBS)
 		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(libdir) ;; \
 		  *.so) \
 		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(libdir) ;; \
+		  *.dylib) \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(libdir); \
+		    install_name_tool -id $(libdir)/`basename $$i` $(libdir)/`basename $$i` ;; \
 		  *) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
 		esac; \

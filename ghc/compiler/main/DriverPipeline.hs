@@ -1080,8 +1080,7 @@ staticLink dflags o_files dep_packages = do
 
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
-                          head (libraryDirs base_pkg) ++ "/PrelMain.dll_o" ]
+                   else []
 
     (md_c_flags, _) <- machdepCCOpts dflags
     SysTools.runLink dflags ( 

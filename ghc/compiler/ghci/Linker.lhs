@@ -822,9 +822,14 @@ locateOneObj dirs lib
   = do	{ mb_obj_path <- findFile mk_obj_path dirs 
 	; case mb_obj_path of
 	    Just obj_path -> return (Object obj_path)
-	    Nothing	  -> return (DLL lib) }		-- We assume
+	    Nothing	  -> 
+                do { mb_lib_path <- findFile mk_dyn_lib_path dirs
+                   ; case mb_lib_path of
+                       Just lib_path -> return (DLL (lib ++ "_dyn"))
+                       Nothing       -> return (DLL lib) }}		-- We assume
    where
      mk_obj_path dir = dir ++ '/':lib ++ ".o"
+     mk_dyn_lib_path dir = dir ++ '/':mkSOName (lib ++ "_dyn")
 
 
 -- ----------------------------------------------------------------------------

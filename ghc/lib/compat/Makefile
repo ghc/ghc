@@ -63,4 +63,7 @@ boot :: depend
 	$(MAKE) all
 endif
 
+# We don't ever want to build libghccompat as a shared library.
+GhcBuildDylibs=NO
+
 include $(TOP)/mk/target.mk
