@@ -84,10 +84,10 @@ $MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
 $MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
 
 # Now build a new set of libraries
-$MAKE -C libraries boot all
+$MAKE -C libraries boot all GhcBootLibs=YES
 
 # Build all of ghc/lib
-$MAKE -C ghc/lib clean && $MAKE -C ghc/utils boot all
+$MAKE -C ghc/lib clean && $MAKE -C ghc/lib boot all
 
 # Build all of ghc/utils
 $MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
