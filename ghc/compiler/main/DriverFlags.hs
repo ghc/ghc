@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.40 2001/01/19 15:26:37 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.41 2001/01/28 17:15:33 simonmar Exp $
 --
 -- Driver flags
 --
@@ -9,7 +9,14 @@
 --
 -----------------------------------------------------------------------------
 
-module DriverFlags where
+module DriverFlags ( 
+	processArgs, OptKind(..), static_flags, dynamic_flags, 
+	v_InitDynFlags, v_DynFlags, getDynFlags, dynFlag, 
+	getOpts, getVerbFlag, addCmdlineHCInclude,
+	buildStaticHscOpts, 
+	runSomething,
+	machdepCCOpts
+  ) where
 
 #include "HsVersions.h"
 
@@ -38,7 +45,7 @@ import Char
 --
 --     * parse the initial list of flags and remove any flags understood
 --	 by the driver only.  Determine whether we're in multi-compilation
---	 or single-compilation mode.
+--	 or single-compilation mode (done in Main.main).
 --
 --     * gather the list of "static" hsc flags, and assign them to the global
 --	 static hsc flags variable.
