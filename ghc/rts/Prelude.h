@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.3 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: Prelude.h,v 1.4 2000/03/14 14:34:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -78,7 +78,6 @@ extern const StgClosure *ind_stackOverflow_closure;
 extern const StgClosure *ind_heapOverflow_closure;
 extern const StgClosure *ind_PutFullMVar_static_closure;
 extern const StgClosure *ind_NonTermination_static_closure;
-extern const StgClosure *ind_mainIO_closure;
 
 extern const StgInfoTable *ind_Czh_static_info;
 extern const StgInfoTable *ind_Izh_static_info;
@@ -119,11 +118,10 @@ extern const StgInfoTable *ind_StablePtr_con_info;
 #define I64zh_con_info         ind_I64zh_con_info
 #define StablePtr_static_info  ind_StablePtr_static_info
 #define StablePtr_con_info     ind_StablePtr_con_info
-#define mainIO_closure         ind_mainIO_closure
 #define unpackCString_closure  ind_unpackCString_closure
 
 #endif
 
-void fixupPreludeRefs(void);
+void fixupRTStoPreludeRefs( void*(*)(char*) );
 
 #endif /* PRELUDE_H */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.42 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.43 $
+ * $Date: 2000/03/14 14:34:47 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -94,7 +94,6 @@ static Void   local browse	      ( Void );
  * Machine dependent code for Hugs interpreter:
  * ------------------------------------------------------------------------*/
 
-       Bool   combined      = TRUE;
 
 #include "machdep.c"
 #ifdef WANT_TIMER
@@ -112,8 +111,10 @@ static Bool   addType       = FALSE;    /* TRUE => print type with value   */
 static Bool   useDots       = RISCOS;   /* TRUE => use dots in progress    */
 static Bool   quiet         = FALSE;    /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
+
        Bool   preludeLoaded = FALSE;
        Bool   debugSC       = FALSE;
+       Bool   combined      = TRUE;
 
 typedef 
    struct { 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.33 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.34 2000/03/14 14:34:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -21,7 +21,7 @@
 #include "Ticky.h"
 #include "StgRun.h"
 #include "StgStartup.h"
-#include "Prelude.h"		/* fixupPreludeRefs */
+#include "Prelude.h"		/* fixupRTStoPreludeRefs */
 
 #if defined(PROFILING) || defined(DEBUG)
 # include "ProfRts.h"
@@ -157,8 +157,13 @@ startupHaskell(int argc, char *argv[])
     init_default_handlers();
 #endif
  
-    /* Initialise pointers from the RTS to the prelude */
-    fixupPreludeRefs();
+#if !defined(INTERPRETER)
+    /* Initialise pointers from the RTS to the prelude.  
+       Only for compiled code -- the interpreter
+       will call this itself later, so don't do so now.
+    */
+    fixupRTStoPreludeRefs(NULL);
+#endif
 
     /* Record initialization times */
     end_init();
@@ -180,7 +185,7 @@ startupHaskell(int argc, char *argv[])
       - we supply a unique integer to each statically declared cost
         centre and cost centre stack in the program.
 
-   The code generator inserts a small function "__init_<moddule>" in each
+   The code generator inserts a small function "__init_<module>" in each
    module and calls the registration functions in each of the modules
    it imports.  So, if we call "__init_Main", each reachable module in the
    program will be registered.

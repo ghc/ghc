@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/03/13 13:00:00 $
+ * $Revision: 1.40 $
+ * $Date: 2000/03/14 14:34:47 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -921,7 +921,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Izh_sizeW); LLL;
-                    SET_HDR(o,&Izh_con_info,??);
+                    SET_HDR(o,Izh_con_info,??);
                     payloadWord(o,0) = xPopTaggedInt();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
@@ -978,7 +978,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Wzh_sizeW); LLL;
-                    SET_HDR(o,&Wzh_con_info,??);
+                    SET_HDR(o,Wzh_con_info,??);
                     payloadWord(o,0) = xPopTaggedWord();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
@@ -1017,7 +1017,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Azh_sizeW); LLL;
-                    SET_HDR(o,&Azh_con_info,??);
+                    SET_HDR(o,Azh_con_info,??);
                     payloadPtr(o,0) = xPopTaggedAddr();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
@@ -1050,7 +1050,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Czh_sizeW); LLL;
-                    SET_HDR(o,&Czh_con_info,??);
+                    SET_HDR(o,Czh_con_info,??);
                     payloadWord(o,0) = xPopTaggedChar();
                     xPushPtr(stgCast(StgPtr,o));
                     IF_DEBUG(evaluator,
@@ -1083,7 +1083,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Fzh_sizeW); LLL;
-                    SET_HDR(o,&Fzh_con_info,??);
+                    SET_HDR(o,Fzh_con_info,??);
                     ASSIGN_FLT(&payloadWord(o,0),xPopTaggedFloat());
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
@@ -1122,7 +1122,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Dzh_sizeW); LLL;
-                    SET_HDR(o,&Dzh_con_info,??);
+                    SET_HDR(o,Dzh_con_info,??);
                     ASSIGN_DBL(&payloadWord(o,0),xPopTaggedDouble());
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
@@ -1148,7 +1148,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Stablezh_sizeW); LLL;
-                    SET_HDR(o,&StablePtr_con_info,??);
+                    SET_HDR(o,StablePtr_con_info,??);
                     payloadWord(o,0) = xPopTaggedStable();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.50 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.51 $
+ * $Date: 2000/03/14 14:34:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -522,6 +522,7 @@ Int what; {
            linkPreludeTC();
            linkPreludeCM();
            linkPrimNames();
+           fixupRTStoPreludeRefs ( lookupObjName );
 
            nameUnpackString = linkName("hugsprimUnpackString");
            namePMFail       = linkName("hugsprimPmFail");
@@ -663,6 +664,7 @@ assert(nonNull(namePMFail));
                setCurrModule(modulePrelude);
 
            } else {
+               fixupRTStoPreludeRefs(NULL);
 
                modulePrelude = newModule(textPrelude);
                setCurrModule(modulePrelude);

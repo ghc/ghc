@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.38 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.39 $
+ * $Date: 2000/03/14 14:34:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -163,7 +163,6 @@ static Bool  allTypesKnown         ( Type type,
 static List  ifTyvarsIn            ( Type );
 static Type  tvsToOffsets          ( Int,Type,List );
 static Type  conidcellsToTycons    ( Int,Type );
-static void* lookupObjName         ( char* );
 
 
 
@@ -2594,6 +2593,7 @@ Type type; {
       Sym(CAF_UNENTERED_entry)       \
       Sym(stg_yield_to_Hugs)         \
       Sym(StgReturn)                 \
+      Sym(init_stack)                \
                                      \
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \
@@ -2716,6 +2716,9 @@ OSym rtsTab[]
 #undef SymX
 
 
+void init_stack;
+
+
 /* A kludge to assist Win32 debugging. */
 char* nameFromStaticOPtr ( void* ptr )
 {
@@ -2727,7 +2730,7 @@ char* nameFromStaticOPtr ( void* ptr )
 }
 
 
-static void* lookupObjName ( char* nm )
+void* lookupObjName ( char* nm )
 {
    int    k;
    char*  pp;
@@ -2749,14 +2752,27 @@ static void* lookupObjName ( char* nm )
    a = lookupOExtraTabName ( nm );
    if (a) return a;
 
-   /* if not an RTS name, look in the 
-      relevant module's object symbol table
-   */
 #  if LEADING_UNDERSCORE
    first_real_char = 1;
 #  else
    first_real_char = 0;
 #  endif
+
+   /* Maybe it's an __init_Module thing? */
+   if (strlen(nm2+first_real_char) > 7
+       && strncmp(nm2+first_real_char, "__init_", 7)==0) {
+      t = unZcodeThenFindText(nm2+first_real_char+7);
+      if (t == findText("PrelGHC")) return (4+NULL); /* kludge */
+      m = findModule(t);
+      if (isNull(m)) goto not_found;
+      a = lookupOTabName ( m, nm );
+      if (a) return a;
+      goto not_found;
+   }
+
+   /* if not an RTS name, look in the 
+      relevant module's object symbol table
+   */
    pp = strchr(nm2+first_real_char, '_');
    if (!pp || !isupper(nm2[first_real_char])) goto not_found;
    *pp = 0;
@@ -2771,7 +2787,7 @@ static void* lookupObjName ( char* nm )
    fprintf ( stderr, 
              "lookupObjName: can't resolve name `%s'\n", 
              nm );
-assert(4-4);
+   assert(4-4);
    return NULL;
 }
 

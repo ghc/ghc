@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.28 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.29 $
+ * $Date: 2000/03/14 14:34:47 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -703,6 +703,8 @@ extern Bool   processInterfaces     ( Void );
 extern Void   getFileSize           ( String, Long * );
 extern Void   ifLinkConstrItbl      ( Name n );
 extern Void   hi_o_namesFromSrcName ( String,String*,String* oName );
+extern void*  lookupObjName         ( char* );
+
 extern String getExtraObjectInfo    ( String primaryObjectName,
                                       String extraFileName,
                                       Int*   extraFileSize );

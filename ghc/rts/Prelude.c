@@ -1,5 +1,6 @@
+
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.1 2000/03/14 11:11:40 simonmar Exp $
+ * $Id: Prelude.c,v 1.2 2000/03/14 14:34:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -11,7 +12,6 @@
 #include "Prelude.h"
 
 #if defined(INTERPRETER)
-
 const StgClosure *ind_True_static_closure;
 const StgClosure *ind_False_static_closure;
 const StgClosure *ind_unpackCString_closure;
@@ -38,42 +38,133 @@ const StgInfoTable *ind_W64zh_con_info;
 const StgInfoTable *ind_StablePtr_static_info;
 const StgInfoTable *ind_StablePtr_con_info;
 
+INFO_TABLE_CONSTR(hugs_standalone_Czh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgChar),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Izh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgInt),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_I64zh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgInt64),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_W64zh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgWord64),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Fzh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgFloat),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Dzh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgDouble),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Azh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgAddr),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Wzh_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgWord),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_StablePtr_con_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgStablePtr),0,CONSTR,,EF_,0,0);
+
+INFO_TABLE_CONSTR(hugs_standalone_Czh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Izh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_I64zh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Fzh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Dzh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Azh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_Wzh_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(hugs_standalone_StablePtr_static_info,Hugs_CONSTR_entry,
+                  0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 #endif
 
-void
-fixupPreludeRefs(void)
-{
-#ifdef INTERPRETER
-  ind_True_static_closure           = True_static_closure;
-  ind_False_static_closure          = False_static_closure;
-  ind_unpackCString_closure         = ind_unpackCString_closure;
-  ind_stackOverflow_closure         = stackOverflow_closure;
-  ind_heapOverflow_closure          = heapOverflow_closure;
-  ind_PutFullMVar_static_closure    = PutFullMVar_static_closure;
-  ind_NonTermination_static_closure = NonTermination_static_closure;
-  ind_mainIO_closure                = mainIO_closure;
 
-  ind_Czh_static_info               = Czh_static_info;
-  ind_Izh_static_info               = Izh_static_info;
-  ind_Fzh_static_info               = Fzh_static_info;
-  ind_Dzh_static_info               = Dzh_static_info;
-  ind_Azh_static_info               = Azh_static_info;
-  ind_Wzh_static_info               = Wzh_static_info;
-  ind_Czh_con_info                  = Czh_con_info;
-  ind_Izh_con_info                  = Izh_con_info;
-  ind_Fzh_con_info                  = Fzh_con_info;
-  ind_Dzh_con_info                  = Dzh_con_info;
-  ind_Azh_con_info                  = Azh_con_info;
-  ind_Wzh_con_info                  = Wzh_con_info;
-  ind_I64zh_con_info                = I64zh_con_info;
-  ind_W64zh_con_info                = W64zh_con_info;
-  ind_StablePtr_static_info         = StablePtr_static_info;
-  ind_StablePtr_con_info            = StablePtr_con_info;
+/* Fix up references to various Prelude symbols.  For Hugs, we
+   pass either NULL, to denote standalone mode, or the address of
+   a lookup function which finds the specified symbol in the 
+   compiled Prelude which Hugs has just loaded.
+  
+   In combined mode, call here when POSTPREL is signalled in link.c
+   (since before that point, there are no symbols to link to).
+   In standalone mode, call here at any time, preferably as early
+   as possible -- when PREPREL is signalled.
+
+   At the moment, standalone mode does not link True, False,
+   PutFullMVar or NonTermination.  That might change (if we
+   implement them in the Hugs standalone Prelude), but then
+   we (1) need a way to ask hugs the address of the BCOs, and
+   (2) this can only be done at POSTPREL time.
+*/
+void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
+{
+#if defined(INTERPRETER)
+  if (ask_hugs_dynamic_linker == NULL) {
+
+    /* Hugs standalone mode. */
+    ind_True_static_closure           = NULL; /* True_static_closure; */
+    ind_False_static_closure          = NULL; /* False_static_closure; */
+    ind_PutFullMVar_static_closure    = NULL; /* PutFullMVar_static_closure; */
+    ind_NonTermination_static_closure = NULL; /* NonTermination_static_closure; */
+    ind_unpackCString_closure         = NULL; /* unpackCString_closure; */
+
+    ind_stackOverflow_closure = stackOverflow_closure;
+    ind_heapOverflow_closure  = heapOverflow_closure;
+
+    ind_Czh_static_info       = &hugs_standalone_Czh_static_info;
+    ind_Izh_static_info       = &hugs_standalone_Izh_static_info;
+    ind_Fzh_static_info       = &hugs_standalone_Fzh_static_info;
+    ind_Dzh_static_info       = &hugs_standalone_Dzh_static_info;
+    ind_Azh_static_info       = &hugs_standalone_Azh_static_info;
+    ind_Wzh_static_info       = &hugs_standalone_Wzh_static_info;
+    ind_Czh_con_info          = &hugs_standalone_Czh_con_info;
+    ind_Izh_con_info          = &hugs_standalone_Izh_con_info;
+    ind_Fzh_con_info          = &hugs_standalone_Fzh_con_info;
+    ind_Dzh_con_info          = &hugs_standalone_Dzh_con_info;
+    ind_Azh_con_info          = &hugs_standalone_Azh_con_info;
+    ind_Wzh_con_info          = &hugs_standalone_Wzh_con_info;
+    ind_I64zh_con_info        = &hugs_standalone_I64zh_con_info;
+    ind_W64zh_con_info        = &hugs_standalone_W64zh_con_info;
+    ind_StablePtr_static_info = &hugs_standalone_StablePtr_static_info;
+    ind_StablePtr_con_info    = &hugs_standalone_StablePtr_con_info;
+
+  } else {
+
+    /* Hugs combined mode. */
+    void*(*ask)(char*) = ask_hugs_dynamic_linker;
+
+    ind_True_static_closure           
+       = ask("PrelBase_True_static_closure");
+    ind_False_static_closure          
+       = ask("PrelBase_False_static_closure");
+    ind_PutFullMVar_static_closure    
+       = ask("PrelException_PutFullMVar_static_closure");
+    ind_NonTermination_static_closure 
+       = ask("PrelException_NonTermination_static_closure");
+
+    ind_unpackCString_closure = ask("PrelPack_unpackCString_closure");
+    ind_stackOverflow_closure = ask("PrelException_stackOverflow_closure");
+    ind_heapOverflow_closure  = ask("PrelException_heapOverflow_closure");
+
+    ind_Czh_static_info       = ask("PrelBase_Czh_static_info");
+    ind_Izh_static_info       = ask("PrelBase_Izh_static_info");
+    ind_Fzh_static_info       = ask("PrelFloat_Fzh_static_info");
+    ind_Dzh_static_info       = ask("PrelFloat_Dzh_static_info");
+    ind_Azh_static_info       = ask("PrelAddr_Azh_static_info");
+    ind_Wzh_static_info       = ask("PrelAddr_Wzh_static_info");
+    ind_Czh_con_info          = ask("PrelBase_Czh_con_info");
+    ind_Izh_con_info          = ask("PrelBase_Izh_con_info");
+    ind_Fzh_con_info          = ask("PrelFloat_Fzh_con_info");
+    ind_Dzh_con_info          = ask("PrelFloat_Dzh_con_info");
+    ind_Azh_con_info          = ask("PrelAddr_Azh_con_info");
+    ind_Wzh_con_info          = ask("PrelAddr_Wzh_con_info");
+    ind_I64zh_con_info        = ask("PrelAddr_I64zh_con_info");
+    ind_W64zh_con_info        = ask("PrelAddr_W64zh_con_info");
+    ind_StablePtr_static_info = ask("PrelStable_StablePtr_static_info");
+    ind_StablePtr_con_info    = ask("PrelStable_StablePtr_con_info");
+
+  }
 #endif
 
   /* When the RTS and Prelude live in separate DLLs,
      we need to patch up the char- and int-like tables
-     that the RTS keep after both DLLs have been loaded,
+     that the RTS keeps after both DLLs have been loaded,
      filling in the tables with references to where the
      static info tables have been loaded inside the running
      process.
