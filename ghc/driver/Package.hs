@@ -15,7 +15,7 @@ data Package = Package {
       		extra_cc_opts   :: [String],
       		extra_ld_opts   :: [String]
      		}
-  deriving (Read, Show)
+  deriving Read
 
 listPkgs :: [Package] -> String
 listPkgs pkgs = render (fsep (punctuate comma (map (text . name) pkgs)))
