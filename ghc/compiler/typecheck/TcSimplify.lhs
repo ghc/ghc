@@ -551,6 +551,9 @@ inferLoop doc tau_tvs wanteds
 	--
 	-- Hence the (irreds ++ frees)
 
+	-- However, NOTICE that when we are done, we might have some bindings, but
+	-- the final qtvs might be empty.  See [NO TYVARS] below.
+				
 	inferLoop doc tau_tvs (irreds ++ frees)	`thenTc` \ (qtvs1, frees1, binds1, irreds1) ->
 	returnTc (qtvs1, frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
@@ -571,6 +574,27 @@ Then we'll reduce using the Max instance to:
 and improve by binding l->T, after which we can do some reduction
 on both the Lte and If constraints.  What we *can't* do is start again
 with (Max Z (S x) y)!
+
+[NO TYVARS]
+
+	class Y a b | a -> b where
+	    y :: a -> X b
+	
+	instance Y [[a]] a where
+	    y ((x:_):_) = X x
+	
+	k :: X a -> X a -> X a
+
+	g :: Num a => [X a] -> [X a]
+	g xs = h xs
+	    where
+	    h ys = ys ++ map (k (y [[0]])) xs
+
+The excitement comes when simplifying the bindings for h.  Initially
+try to simplify {y @ [[t1]] t2, 0 @ t1}, with initial qtvs = {t2}.
+From this we get t1:=:t2, but also various bindings.  We can't forget
+the bindings (because of [LOOP]), but in fact t1 is what g is
+polymorphic in.
 
 \begin{code}
 isFreeAndInheritable qtvs inst
