@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.48 2000/08/04 09:02:56 simonmar Exp $
+-- $Id: Main.hs,v 1.49 2000/08/04 09:45:20 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -266,30 +266,6 @@ cleanTempFiles = do
 	   (\_ -> when verb (hPutStrLn stderr 
 				("warning: can't remove tmp file" ++ f)))
   mapM_ blowAway fs
-
------------------------------------------------------------------------------
--- Which phase to stop at
-
-endPhaseFlag :: String -> Maybe Phase
-endPhaseFlag "-M" = Just MkDependHS
-endPhaseFlag "-E" = Just Cpp
-endPhaseFlag "-C" = Just Hsc
-endPhaseFlag "-S" = Just Mangle
-endPhaseFlag "-c" = Just As
-endPhaseFlag _    = Nothing
-
-getStopAfter :: [String]
-	 -> IO ( [String]   -- rest of command line
-	       , Phase	    -- stop after phase
-	       , String	    -- "stop after" flag
-	       , Bool	    -- do linking?
-	       )
-getStopAfter flags 
-  = case my_partition endPhaseFlag flags of
-	([]   , rest) -> return (rest, Ln,  "",  True) -- default is to do linking
-	([(flag,one)], rest) -> return (rest, one, flag, False)
-	(_    , _   ) -> 
-	  throwDyn (OtherError "only one of the flags -M, -E, -C, -S, -c is allowed")
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
@@ -716,7 +692,7 @@ getPackageImportPath = do
 
 getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
-  ps <- readIORef packages
+  ps <- readIORef packages 
   ps' <- getPackageDetails ps
   return (nub (filter (not.null) (concatMap include_dirs ps')))
 
@@ -1152,7 +1128,7 @@ main =
    writeIORef package_details (read contents)
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
-   (flags2, stop_phase, stop_flag, do_linking) <- getStopAfter argv'
+   (flags2, todo, stop_flag) <- getToDo argv'
 
 	-- process all the other arguments, and get the source files
    srcs <- processArgs driver_opts flags2 []
@@ -1167,14 +1143,14 @@ main =
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
 	-- mkdependHS is special
-   when (stop_phase == MkDependHS) beginMkDependHS
+   when (todo == DoMkDependHS) beginMkDependHS
 
 	-- for each source file, find which phases to run
-   pipelines <- mapM (genPipeline stop_phase stop_flag) srcs
+   pipelines <- mapM (genPipeline todo stop_flag) srcs
    let src_pipelines = zip srcs pipelines
 
    o_file <- readIORef output_file
-   if isJust o_file && not do_linking && length srcs > 1
+   if isJust o_file && todo /= DoLink && length srcs > 1
 	then throwDyn (UsageError "can't apply -o option to multiple source files")
 	else do
 
@@ -1186,16 +1162,43 @@ main =
    saved_driver_state <- readIORef driver_state
 
    let compileFile (src, phases) = do
-	  r <- run_pipeline phases src do_linking True orig_base orig_suff
+	  r <- run_pipeline phases src (todo==DoLink) True orig_base orig_suff
 	  writeIORef driver_state saved_driver_state
 	  return r
 	  where (orig_base, orig_suff) = splitFilename src
 
    o_files <- mapM compileFile src_pipelines
 
-   when (stop_phase == MkDependHS) endMkDependHS
+   when (todo == DoMkDependHS) endMkDependHS
 
-   when do_linking (do_link o_files)
+   when (todo == DoLink) (do_link o_files)
+
+
+-----------------------------------------------------------------------------
+-- Which phase to stop at
+
+data ToDo = DoMkDependHS | DoMkDLL | StopBefore Phase | DoLink
+  deriving (Eq)
+
+todoFlag :: String -> Maybe ToDo
+todoFlag "-M" = Just $ DoMkDependHS
+todoFlag "-E" = Just $ StopBefore Hsc
+todoFlag "-C" = Just $ StopBefore HCc
+todoFlag "-S" = Just $ StopBefore As
+todoFlag "-c" = Just $ StopBefore Ln
+todoFlag _    = Nothing
+
+getToDo :: [String]
+	 -> IO ( [String]   -- rest of command line
+	       , ToDo	    -- phase to stop at
+	       , String	    -- "stop at" flag
+	       )
+getToDo flags 
+  = case my_partition todoFlag flags of
+	([]   , rest) -> return (rest, DoLink,  "") -- default is to do linking
+	([(flag,one)], rest) -> return (rest, one, flag)
+	(_    , _   ) -> 
+	  throwDyn (OtherError "only one of the flags -M, -E, -C, -S, -c is allowed")
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -1242,7 +1245,7 @@ startPhase "o"     = Ln
 startPhase _       = Ln	   -- all unknown file types
 
 genPipeline
-   :: Phase		-- stop after this phase
+   :: ToDo		-- when to stop
    -> String		-- "stop after" flag (for error messages)
    -> String		-- original filename
    -> IO [ 		-- list of phases to run for this file
@@ -1251,7 +1254,7 @@ genPipeline
 	      String)   	     -- output file suffix
          ]	
 
-genPipeline stop_after stop_after_flag filename
+genPipeline todo stop_flag filename
  = do
    split      <- readIORef split_object_files
    mangle     <- readIORef do_asm_mangling
@@ -1274,7 +1277,7 @@ genPipeline stop_after stop_after_flag filename
 	      | otherwise      = lang
 
     pipeline
-      | stop_after == MkDependHS =   [ Unlit, Cpp, MkDependHS ]
+      | todo == DoMkDependHS = [ Unlit, Cpp, MkDependHS ]
 
       | haskell_ish_file = 
        case real_lang of
@@ -1304,19 +1307,23 @@ genPipeline stop_after stop_after_flag filename
 				    ++ filename))
 	else do
 
-	-- this might happen, eg.  ghc -S Foo.o
-   if stop_after /= Ln && stop_after `notElem` pipeline
-	   && (stop_after /= As || SplitAs `notElem` pipeline)
-	then throwDyn (OtherError ("flag " ++ stop_after_flag
-				   ++ " is incompatible with source file `"
-				   ++ filename ++ "'"))
-	else do
-
+	-- if we can't find the phase we're supposed to stop before,
+	-- something has gone wrong.
+   case todo of
+	StopBefore phase -> 
+	   when (phase /= Ln 
+		 && phase `notElem` pipeline
+	   	 && not (phase == As && SplitAs `elem` pipeline)) $
+	      throwDyn (OtherError 
+		("flag " ++ stop_flag
+		 ++ " is incompatible with source file `" ++ filename ++ "'"))
+	_ -> return ()
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
       annotatePipeline
-	 :: [Phase] -> Phase
+	 :: [Phase]		-- raw pipeline
+	 -> Phase		-- phase to stop before
      	 -> [(Phase, IntermediateFileType, String{-file extension-})]
       annotatePipeline []     _    = []
       annotatePipeline (Ln:_) _    = []
@@ -1325,7 +1332,7 @@ genPipeline stop_after stop_after_flag filename
 	     : annotatePipeline (next_phase:ps) stop
      	  where
      		keep_this_output
-     		     | phase == stop = Persistent
+     		     | next_phase == stop = Persistent
      		     | otherwise =
      			case next_phase of
      			     Ln -> Persistent
@@ -1338,14 +1345,16 @@ genPipeline stop_after stop_after_flag filename
 	-- the suffix on an output file is determined by the next phase
 	-- in the pipeline, so we add linking to the end of the pipeline
 	-- to force the output from the final phase to be a .o file.
-      annotated_pipeline = annotatePipeline (pipeline ++ [ Ln ]) stop_after
+      stop_phase = case todo of StopBefore phase -> phase
+				DoLink           -> Ln
+      annotated_pipeline = annotatePipeline (pipeline ++ [ Ln ]) stop_phase
 
       phase_ne p (p1,_,_) = (p1 /= p)
    ----------- -----  ----   ---   --   --  -  -  -
 
    return $
      dropWhile (phase_ne start_phase) . 
-	foldr (\p ps -> if phase_ne stop_after p then p:ps else [p])  []
+	foldr (\p ps -> if phase_ne stop_phase p then p:ps else [])  []
 		$ annotated_pipeline
 
 
@@ -1785,7 +1794,7 @@ run_phase Hsc	basename _suff input_fn output_fn
 			])
 
 			-- compile the _stub.c file w/ gcc
-		pipeline <- genPipeline As "" stub_c
+		pipeline <- genPipeline (StopBefore Ln) "" stub_c
 		run_pipeline pipeline stub_c False{-no linking-} 
 				False{-no -o option-}
 				(basename++"_stub") "c"
