@@ -161,7 +161,8 @@ checkFEDArgs arg_tys
   where
     words_of_args = sum (map (getPrimRepSize . typePrimRep) arg_tys)
     err = ptext SLIT("On SPARC, I can only handle 4 words of arguments to foreign export dynamic")
-#elsif alpha_TARGET_ARCH
+#else
+#if alpha_TARGET_ARCH
 checkFEDArgs arg_tys
   = check (integral_args <= 4) err
   where
@@ -170,6 +171,7 @@ checkFEDArgs arg_tys
     err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = returnNF_Tc ()
+#endif
 #endif
 \end{code}
 
