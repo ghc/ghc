@@ -87,7 +87,7 @@ module Util (
 	-- error handling
 #if defined(COMPILING_GHC)
 	, panic, panic#, pprPanic, pprPanic#, pprError, pprTrace
-	, assertPanic
+	, assertPanic, assertPprPanic
 #endif {- COMPILING_GHC -}
 
     ) where
@@ -96,6 +96,7 @@ module Util (
 
 CHK_Ubiq() -- debugging consistency check
 IMPORT_1_3(List(zipWith4))
+import Pretty	
 
 #else
 import List(zipWith4)
@@ -850,6 +851,13 @@ pprPanic# heading pretty_msg = panic# (heading++(show pretty_msg))
 
 assertPanic :: String -> Int -> a
 assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show line)
+
+assertPprPanic :: String -> Int -> Doc -> a
+assertPprPanic file line msg
+  = panic (show (sep [hsep[text "ASSERT failed! file", 
+		 	   text file, 
+			   text "line", int line], 
+		      msg]))
 
 #endif {- COMPILING_GHC -}
 \end{code}
