@@ -12,6 +12,7 @@ import HaddockLex
 import HaddockDB
 import HaddockHtml
 import HaddockTypes
+import HaddockUtil
 
 import HsLexer hiding (Token)
 import HsParser
@@ -47,27 +48,48 @@ data Flag
   | Flag_Html
   | Flag_Heading String
   | Flag_SourceURL String
+  | Flag_CSS String
+  | Flag_OutputDir FilePath
   deriving (Eq)
 
 options =
   [ 
-    Option ['t']  ["heading"]  (ReqArg Flag_Heading "HEADING")
-	"page heading",
-    Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
-	"be verbose",
     Option ['d']  ["docbook"]  (NoArg Flag_DocBook)
 	"output in docbook (SGML)",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
+    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
+	"directory in which to put the output files",
     Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
-	"base URL for links to source code"
+	"base URL for links to source code",
+    Option ['t']  ["heading"]  (ReqArg Flag_Heading "HEADING")
+	"page heading",
+    Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
+	"be verbose",
+    Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
+	"The CSS file to use for HTML output"
   ]
 
 saved_flags :: IORef [Flag]
 saved_flags = unsafePerformIO (newIORef (error "no flags yet"))
 
 run flags files = do
-  seq stderr $ do
+  let title = case [str | Flag_Heading str <- flags] of
+		[] -> ""
+		(t:ts) -> t
+
+      source_url = case [str | Flag_SourceURL str <- flags] of
+			[] -> Nothing
+			(t:ts) -> Just t
+
+  css_file <- case [str | Flag_CSS str <- flags] of
+		[] -> dieMsg "no --css option"
+		fs -> return (last fs)
+
+  odir <- case [str | Flag_OutputDir str <- flags] of
+		[] -> return "."
+		fs -> return (last fs)
+
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
 
@@ -77,22 +99,14 @@ run flags files = do
       mod_ifaces = [ (m,i) | (m,i,_,_) <- ifaces ]
       module_map = listToFM mod_ifaces
 
-  let title = case [str | Flag_Heading str <- flags] of
-		[] -> ""
-		(t:ts) -> t
-
-      source_url = case [str | Flag_SourceURL str <- flags] of
-			[] -> Nothing
-			(t:ts) -> Just t
-
   sequence [ reportMissingNames m ns_docs ns_decls 
 	   | (m, _, ns_docs, ns_decls) <- ifaces ]
 
   when (Flag_DocBook `elem` flags) $
-    putStr (ppDocBook mod_ifaces)
+    putStr (ppDocBook odir mod_ifaces)
 
   when (Flag_Html `elem` flags) $
-    ppHtml title source_url mod_ifaces
+    ppHtml title source_url mod_ifaces odir css_file
 
 
 parse_file file = do
@@ -512,6 +526,12 @@ strToHsQNames str
 
 -----------------------------------------------------------------------------
 -- misc.
+
+die :: String -> IO a
+die s = hPutStr stderr s >> exitWith (ExitFailure 1)
+
+dieMsg :: String -> IO a
+dieMsg s = getProgName >>= \prog -> die (prog ++ ": " ++ s)
 
 mapSnd f [] = []
 mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs

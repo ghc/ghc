@@ -7,6 +7,8 @@
 module HaddockDB (ppDocBook) where
 
 import HaddockTypes hiding (Doc)
+import HaddockUtil
+
 import HsSyn
 import Pretty
 import FiniteMap
@@ -14,8 +16,8 @@ import FiniteMap
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format
 
-ppDocBook :: [(Module, Interface)] -> String
-ppDocBook mods = render (ppIfaces mods)
+ppDocBook :: FilePath -> [(Module, Interface)] -> String
+ppDocBook odir mods = render (ppIfaces mods)
 
 ppIfaces mods
   =  text "<!DOCTYPE BOOK PUBLIC \"-//OASIS//DTD DocBook V3.1//EN\" ["

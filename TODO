@@ -3,6 +3,7 @@ For 1.0:
 * parse module headers, augment Interface with info from header
 
 * IDoc compatibility, as far as possible
+	- bird-tracks for code blocks
 
 * named chunks of documentation?
 
@@ -10,10 +11,6 @@ For 1.0:
 
 * facilities for saving interfaces so that you can run Haddock against
   something that isn't the Prelude.
-
-* copy haddock.css into the right place when run
-
-* allow the HTML/DocBook to be generated into a specified directory
 
 -----------------------------------------------------------------------------
 Post 1.0:

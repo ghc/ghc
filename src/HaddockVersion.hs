@@ -7,5 +7,8 @@
 module HaddockVersion ( projectName, projectVersion, projectUrl ) where
 
 projectName = "Haddock"
-projectVersion = "0.0"
 projectUrl = "http://www.haskell.org/haddock"
+
+-- The version comes in via CPP from mk/version.mk
+projectVersion = tail "\ 
+  \ HADDOCK_VERSION"

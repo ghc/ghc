@@ -9,6 +9,7 @@ module HaddockHtml (ppHtml) where
 import Prelude hiding (div)
 import HaddockVersion
 import HaddockTypes
+import HaddockUtil
 import HsSyn
 
 import Maybe	( fromJust, isNothing, isJust )
@@ -23,18 +24,30 @@ import qualified Html
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
-ppHtml :: String -> Maybe String -> [(Module, Interface)] -> IO ()
-ppHtml title source_url ifaces =  do
-  ppHtmlContents title source_url (map fst ifaces)
-  ppHtmlIndex title ifaces
-  mapM_ (ppHtmlModule title source_url) ifaces
+ppHtml	:: String
+	-> Maybe String
+	-> [(Module, Interface)]
+	-> FilePath			-- destination directory
+	-> String			-- CSS file
+	-> IO ()
+ppHtml title source_url ifaces odir css_file =  do
+  let 
+	(_css_dir, css_basename, css_suff) = splitFilename3 css_file
+	css_filename = css_basename ++ '.':css_suff
+	css_destination = odir ++ pathSeparator:css_filename
+
+  css_contents <- readFile css_file
+  writeFile css_destination css_contents
+
+  ppHtmlContents odir css_filename title source_url (map fst ifaces)
+  ppHtmlIndex odir css_filename title ifaces
+  mapM_ (ppHtmlModule odir css_filename title source_url) ifaces
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mod = mod ++ ".html" -- ToDo: Z-encode filename?
 
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
-styleSheetFile   = "haddock.css"
 subIndexHtmlFile k a = "doc-index-" ++ k:a:".html"
 
 footer = 
@@ -116,12 +129,13 @@ pageHeader mod iface title source_url =
 -- ---------------------------------------------------------------------------
 -- Generate the module contents
 
-ppHtmlContents :: String -> Maybe String -> [Module] -> IO ()
-ppHtmlContents title source_url mods = do
+ppHtmlContents :: FilePath -> String -> String -> Maybe String -> [Module]
+   -> IO ()
+ppHtmlContents odir css_filename title source_url mods = do
   let tree = mkModuleTree mods  
       html = 
 	header (thetitle (toHtml title) +++
-		thelink ! [href styleSheetFile, 
+		thelink ! [href css_filename, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -129,7 +143,7 @@ ppHtmlContents title source_url mods = do
 	    ppModuleTree title tree </>
 	    footer
 	  )
-  writeFile contentsHtmlFile (renderHtml html)
+  writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html)
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree title ts = 
@@ -176,11 +190,11 @@ splitModule (Module mod) = split mod
 -- ---------------------------------------------------------------------------
 -- Generate the index
 
-ppHtmlIndex :: String -> [(Module,Interface)] -> IO ()
-ppHtmlIndex title ifaces = do
+ppHtmlIndex :: FilePath -> String -> String -> [(Module,Interface)] -> IO ()
+ppHtmlIndex odir css_filename title ifaces = do
   let html = 
 	header (thetitle (toHtml (title ++ " (Index)")) +++
-		thelink ! [href styleSheetFile, 
+		thelink ! [href css_filename, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -196,7 +210,7 @@ ppHtmlIndex title ifaces = do
         mapM_ (do_sub_index "Function/Constructor" var_index 'v') ['A'..'Z'] 
     )
 
-  writeFile indexHtmlFile (renderHtml html)
+  writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html)
 
  where
   split_indices = length tycls_index > 50 || length var_index > 50
@@ -212,10 +226,11 @@ ppHtmlIndex title ifaces = do
 	  aboves (map indexElt this_ix) 
  	
   do_sub_index descr this_ix kind c
-    = writeFile (subIndexHtmlFile kind c) (renderHtml html)
+    = writeFile (odir ++ pathSeparator:subIndexHtmlFile kind c)
+	(renderHtml html)
     where 
       html = header (thetitle (toHtml (title ++ " (" ++ descr ++ "Index)")) +++
-		thelink ! [href styleSheetFile, 
+		thelink ! [href css_filename, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body <<  
 	      table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -265,11 +280,12 @@ idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
-ppHtmlModule :: String -> Maybe String -> (Module,Interface) -> IO ()
-ppHtmlModule title source_url (Module mod,iface) = do
+ppHtmlModule :: FilePath -> String -> String -> Maybe String
+	-> (Module,Interface) -> IO ()
+ppHtmlModule odir css_filename title source_url (Module mod,iface) = do
   let html = 
 	header (thetitle (toHtml mod) +++
-		thelink ! [href styleSheetFile, 
+		thelink ! [href css_filename,
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -277,7 +293,7 @@ ppHtmlModule title source_url (Module mod,iface) = do
 	    ifaceToHtml mod iface </>
 	    footer
          )
-  writeFile (moduleHtmlFile mod) (renderHtml html)
+  writeFile (odir ++ pathSeparator:moduleHtmlFile mod) (renderHtml html)
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml mod iface
