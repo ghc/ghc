@@ -240,7 +240,7 @@ AC_DEFUN(AC_HAVE_GCC,
     ac_cv_have_gcc='no'
 else
 changequote(, )dnl
-    cmd_string="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version \(egcs-\)\?\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 20 \\\< \2 \\\* 10 + \3/g' `"
+    cmd_string="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version \(egcs-\)*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 20 \\\< \2 \\\* 10 + \3/g' `"
 changequote([, ])dnl
     if test `eval $cmd_string 2>/dev/null` != "1"; then
 	echo ''
