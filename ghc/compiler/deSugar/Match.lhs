@@ -18,7 +18,7 @@ import {-# SOURCE #-} DsExpr  ( dsExpr  )
 import {-# SOURCE #-} DsBinds ( dsBinds )
 #endif
 
-import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappedPatterns,
+import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns,
 			  opt_PprUserLength,opt_WarnSimplePatterns
      			)
 import HsSyn		
@@ -90,7 +90,7 @@ matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _ _)) : _)
       match vars qs
   where (pats,indexs) = check qs
         incomplete    = opt_WarnIncompletePatterns && (length pats /= 0)
-        shadow        = opt_WarnOverlappedPatterns && sizeUniqSet indexs < no_eqns
+        shadow        = opt_WarnOverlappingPatterns && sizeUniqSet indexs < no_eqns
         no_eqns       = length qs
 	unused_eqns   = uniqSetToList (mkUniqSet [1..no_eqns] `minusUniqSet` indexs)
 	eqns_shadow   = map (\n -> qs!!(n - 1)) unused_eqns
@@ -98,6 +98,8 @@ matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _ _)) : _)
 
 This variable shows the maximun number of lines of output generated for warnings.
 It will limit the number of patterns/equations displayed to maximum_output.
+
+(ToDo: add command-line option?)
 
 \begin{code}
 maximum_output = 4
