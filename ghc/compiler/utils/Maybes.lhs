@@ -4,9 +4,7 @@
 \section[Maybes]{The `Maybe' types and associated utility functions}
 
 \begin{code}
-#if defined(COMPILING_GHC)
 #include "HsVersions.h"
-#endif
 
 module Maybes (
 --	Maybe(..), -- no, it's in 1.3
@@ -26,19 +24,17 @@ module Maybes (
 	seqMaybe,
 	returnMaB,
 	returnMaybe,
-	thenMaB
-
-#if defined(COMPILING_GHC)
-	, catMaybes
-#else
-	, findJust
-	, foldlMaybeErrs
-	, listMaybeErrs
-#endif
+	thenMaB,
+	catMaybes
     ) where
 
 CHK_Ubiq()			-- debugging consistency check
 import Unique  (Unique)		-- only for specialising
+
+#if __GLASGOW_HASKELL__ >= 204
+import Maybe( catMaybes, mapMaybe )
+#endif
+
 \end{code}
 
 
@@ -60,13 +56,6 @@ a list of @Justs@ into a single @Just@, returning @Nothing@ if there
 are any @Nothings@.
 
 \begin{code}
-#ifdef COMPILING_GHC
-catMaybes :: [Maybe a] -> [a]
-catMaybes []		    = []
-catMaybes (Nothing : xs)   = catMaybes xs
-catMaybes (Just x : xs)	   = (x : catMaybes xs)
-#endif
-
 allMaybes :: [Maybe a] -> Maybe [a]
 allMaybes [] = Just []
 allMaybes (Nothing : ms) = Nothing
@@ -74,11 +63,19 @@ allMaybes (Just x  : ms) = case (allMaybes ms) of
 			     Nothing -> Nothing
 			     Just xs -> Just (x:xs)
 
+#if __GLASGOW_HASKELL__ < 204
+	-- After 2.04 we get these from the library Maybe
+catMaybes :: [Maybe a] -> [a]
+catMaybes []		    = []
+catMaybes (Nothing : xs)   = catMaybes xs
+catMaybes (Just x : xs)	   = (x : catMaybes xs)
+
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 mapMaybe f [] = []
 mapMaybe f (x:xs) = case f x of
 			Just y  -> y : mapMaybe f xs
 			Nothing -> mapMaybe f xs
+#endif
 \end{code}
 
 @firstJust@ takes a list of @Maybes@ and returns the
@@ -135,13 +132,11 @@ assocMaybe alist key
     lookup []		  = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
 
-#if defined(COMPILING_GHC)
 {-# SPECIALIZE assocMaybe
 	:: [(FAST_STRING,   b)] -> FAST_STRING -> Maybe b
 	 , [(Int,           b)] -> Int         -> Maybe b
 	 , [(Unique,        b)] -> Unique      -> Maybe b
   #-}
-#endif
 \end{code}
 
 @mkLookupFun eq alist@ is a function which looks up
@@ -194,39 +189,4 @@ returnMaB v = Succeeded v
 
 failMaB :: err -> MaybeErr val err
 failMaB e = Failed e
-\end{code}
-
-
-@listMaybeErrs@ takes a list of @MaybeErrs@ and, if they all succeed, returns
-a @Succeeded@ of a list of their values.  If any fail, it returns a
-@Failed@ of the list of all the errors in the list.
-
-\begin{code}
-listMaybeErrs :: [MaybeErr val err] -> MaybeErr [val] [err]
-listMaybeErrs
-  = foldr combine (Succeeded [])
-  where
-    combine (Succeeded v) (Succeeded vs) = Succeeded (v:vs)
-    combine (Failed err)  (Succeeded _)	 = Failed [err]
-    combine (Succeeded v) (Failed errs)	 = Failed errs
-    combine (Failed err)  (Failed errs)	 = Failed (err:errs)
-\end{code}
-
-@foldlMaybeErrs@ works along a list, carrying an accumulator; it
-applies the given function to the accumulator and the next list item,
-accumulating any errors that occur.
-
-\begin{code}
-foldlMaybeErrs :: (acc -> input -> MaybeErr acc err)
-	       -> acc
-	       -> [input]
-	       -> MaybeErr acc [err]
-
-foldlMaybeErrs k accum ins = do_it [] accum ins
-  where
-    do_it []   acc []	  = Succeeded acc
-    do_it errs acc []	  = Failed errs
-    do_it errs acc (v:vs) = case (k acc v) of
-			      Succeeded acc' -> do_it errs	 acc' vs
-			      Failed err     -> do_it (err:errs) acc  vs
 \end{code}
