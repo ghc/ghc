@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.64 1999/07/14 20:29:34 panne Exp $
+# $Id: Makefile,v 1.65 1999/09/17 09:11:20 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -150,10 +150,10 @@ prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 
 # -dcore-lint is *temporary* to work around ghc space leak.
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns -dcore-lint
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
-parser/Parser_HC_OPTS 		+= -Onot -H80m -K2m -dcore-lint -fno-warn-incomplete-patterns -dcore-lint
+parser/Parser_HC_OPTS 		+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns
 parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"

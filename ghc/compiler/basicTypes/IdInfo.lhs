@@ -350,7 +350,8 @@ instance Outputable InlinePragInfo where
   ppr IAmALoopBreaker   	= ptext SLIT("__Ux")
   ppr IAmDead			= ptext SLIT("__Ud")
   ppr (ICanSafelyBeINLINEd InsideLam _) = ptext SLIT("__Ul")
-  ppr (ICanSafelyBeINLINEd _ _) = ptext SLIT("__Us")
+  ppr (ICanSafelyBeINLINEd NotInsideLam True)  = ptext SLIT("__Us")
+  ppr (ICanSafelyBeINLINEd NotInsideLam False) = ptext SLIT("__Us*")
 
 instance Show InlinePragInfo where
   showsPrec p prag = showsPrecSDoc p (ppr prag)
@@ -463,7 +464,7 @@ ppWorkerInfo (Just wk_id) = ptext SLIT("__P") <+> ppr wk_id
 
 noWorkerInfo = Nothing
 
-workerExists :: Maybe Id -> Bool
+workerExists :: WorkerInfo -> Bool
 workerExists = isJust
 \end{code}
 

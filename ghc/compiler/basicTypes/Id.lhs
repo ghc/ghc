@@ -36,7 +36,7 @@ module Id (
 	isExportedId, isUserExportedId,
 
 	-- One shot lambda stuff
-	isOneShotLambda, setOneShotLambda,
+	isOneShotLambda, setOneShotLambda, clearOneShotLambda,
 
 	-- IdInfo stuff
 	setIdUnfolding,
@@ -397,4 +397,13 @@ isOneShotLambda id = case lbvarInfo (idInfo id) of
 
 setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
+
+clearOneShotLambda :: Id -> Id
+clearOneShotLambda id 
+  | isOneShotLambda id = modifyIdInfo (`setLBVarInfo` NoLBVarInfo) id
+  | otherwise	       = id			
+
+-- But watch out: this may change the type of something else
+--	f = \x -> e
+-- If we change the one-shot-ness of x, f's type changes
 \end{code}

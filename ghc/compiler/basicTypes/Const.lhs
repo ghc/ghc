@@ -128,9 +128,11 @@ conIsTrivial (Literal lit) = not (isNoRepLit lit)
 conIsTrivial (PrimOp _)    = False
 conIsTrivial con	   = True
 
--- conIsCheap is true for constants whose applications we are willing
+-- conIsCheap is true for constants whose *work* we are willing
 -- to duplicate in exchange for some modest gain.  cf CoreUtils.exprIsCheap
-conIsCheap (Literal lit) = not (isNoRepLit lit)
+conIsCheap (Literal lit) = True		-- Even no-rep lits are cheap; we don't end
+					-- up duplicating their work if we push them inside
+					-- a lambda, because we float them to the top in the end
 conIsCheap (DataCon con) = True
 conIsCheap (PrimOp op)   = primOpIsCheap op
 
