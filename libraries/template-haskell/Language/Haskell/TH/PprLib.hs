@@ -38,7 +38,8 @@ module Language.Haskell.TH.PprLib (
 import Language.Haskell.TH.Syntax (Name(..), NameFlavour(..))
 import qualified Text.PrettyPrint.HughesPJ as HPJ
 import Monad (liftM, liftM2)
-import Data.FiniteMap (FiniteMap, lookupFM, emptyFM, addToFM)
+import Data.Map ( Map )
+import qualified Data.Map as Map ( lookup, insert, empty )
 import GHC.Base (Int(..))
 
 infixl 6 <> 
@@ -113,16 +114,16 @@ punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<
 -- ---------------------------------------------------------------------------
 -- The "implementation"
 
-type State = (FiniteMap Name HPJ.Doc, Int)
+type State = (Map Name HPJ.Doc, Int)
 data PprM a = PprM { runPprM :: State -> (a, State) }
 
 pprName :: Name -> Doc
 pprName n@(Name o (NameU _))
  = PprM $ \s@(fm, i@(I# i'))
-        -> case lookupFM fm n of
+        -> case Map.lookup n fm of
                Just d -> (d, s)
                Nothing -> let d = HPJ.text $ show $ Name o (NameU i')
-                          in (d, (addToFM fm n d, i + 1))
+                          in (d, (Map.insert n d fm, i + 1))
 pprName n = text $ show n
 
 {-
@@ -138,7 +139,7 @@ data NameFlavour
 -}
 
 to_HPJ_Doc :: Doc -> HPJ.Doc
-to_HPJ_Doc d = fst $ runPprM d (emptyFM, 0)
+to_HPJ_Doc d = fst $ runPprM d (Map.empty, 0)
 
 instance Monad PprM where
     return x = PprM $ \s -> (x, s)
