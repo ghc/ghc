@@ -7,6 +7,8 @@ Compact representations of character strings with
 unique identifiers.
 
 \begin{code}
+#include "HsVersions.h"
+
 module FastString
        (
 	FastString(..),     -- not abstract, for now.
@@ -39,8 +41,17 @@ module FastString
         tagCmpFS	    -- :: FastString -> FastString -> _CMP_TAG
        ) where
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
 import PreludeGlaMisc
+#else
+import GlaExts
+import Foreign
+import IOBase
+import IOHandle
+import ST
+import STBase
+#endif
 import HandleHack
 
 import PrimPacked
@@ -98,7 +109,6 @@ instance Uniquable Int where
  uniqueOf (I# i#) = mkUniqueGrimily i#
 
 instance Text FastString  where
-    readsPrec p = error "readsPrec: FastString: ToDo"
     showsPrec p ps@(FastString u# _ _) r = showsPrec p (unpackFS ps) r
     showsPrec p ps r = showsPrec p (unpackFS ps) r
 
@@ -166,17 +176,18 @@ string_table =
    newArray (0::Int,hASH_TBL_SIZE) [] `thenPrimIO` \ (_MutableArray _ arr#) ->
    newVar (FastStringTable 0# arr#))
 
-lookupTbl :: FastStringTable -> Int# -> [FastString]
+lookupTbl :: FastStringTable -> Int# -> PrimIO [FastString]
 lookupTbl (FastStringTable _ arr#) i# =
- unsafePerformPrimIO ( \ (S# s#) ->
-   case readArray# arr# i# s# of { StateAndPtr# s2# r ->
-    (r, S# s2#) } )
+  MkST ( \ (S# s#) ->
+  case readArray# arr# i# s# of { StateAndPtr# s2# r ->
+    (r, S# s2#) })
 
 updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> PrimIO ()
-updTbl (_MutableArray _ var#) (FastStringTable uid# arr#) i# ls (S# s#) =
+updTbl (_MutableArray _ var#) (FastStringTable uid# arr#) i# ls =
+ MkST ( \ (S# s#) ->
  case writeArray# arr# i# ls s# of { s2# ->
  case writeArray# var# 0# (FastStringTable (uid# +# 1#) arr#) s2# of { s3# ->
-  ((), S# s3#) }}
+  ((), S# s3#) }})
 
 mkFastString# :: Addr# -> Int# -> FastString
 mkFastString# a# len# =
@@ -186,7 +197,8 @@ mkFastString# a# len# =
    h = hashStr a# len#
   in
 --  _trace ("hashed: "++show (I# h)) $
-  case lookupTbl ft h of
+  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
@@ -222,9 +234,12 @@ mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#))
 mkFastSubStringFO# :: ForeignObj# -> Int# -> Int# -> FastString
 mkFastSubStringFO# fo# start# len# =
  unsafePerformPrimIO  (
-  readVar string_table                 `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
-  let h = hashSubStrFO fo# start# len# in
-  case lookupTbl ft h of
+  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+  let
+   h = hashSubStrFO fo# start# len#
+  in
+  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
@@ -256,10 +271,13 @@ mkFastSubStringFO# fo# start# len# =
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
  unsafePerformPrimIO  (
-  readVar string_table                   `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
-  let h = hashSubStrBA barr# start# len# in
-  -- _trace ("hashed(b): "++show (I# h)) $
-  case lookupTbl ft h of
+  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+  let
+   h = hashSubStrBA barr# start# len#
+  in
+--  _trace ("hashed(b): "++show (I# h)) $
+  lookupTbl ft h	`thenPrimIO` \ lookup_result ->
+  case lookup_result of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
@@ -401,6 +419,7 @@ tagCmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null char
     else		    _GT
     ))
   where
+   bottom :: (Int,Int)
    bottom = error "tagCmp"
 tagCmpFS (CharStr bs1 len1) (CharStr bs2 len2)
   = unsafePerformPrimIO (
@@ -422,7 +441,7 @@ tagCmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
      else		    _GT
     ))
   where
-    ba1 = _ByteArray (error "") bs1
+    ba1 = _ByteArray ((error "")::(Int,Int)) bs1
     ba2 = A# bs2
 
 tagCmpFS a@(CharStr _ _) b@(FastString _ _ _)
@@ -446,6 +465,16 @@ Outputting @FastString@s is quick, just block copying the chunk (using
 @fwrite@).
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 201
+#define _ErrorHandle IOBase.ErrorHandle
+#define _ReadHandle IOBase.ReadHandle
+#define _ClosedHandle IOBase.ClosedHandle
+#define _SemiClosedHandle IOBase.SemiClosedHandle
+#define _constructError  IOBase.constructError
+#define _filePtr IOHandle.filePtr
+#define failWith fail
+#endif
+
 hPutFS :: Handle -> FastString -> IO ()
 hPutFS handle (FastString _ l# ba#) =
  if l# ==# 0# then
@@ -458,21 +487,21 @@ hPutFS handle (FastString _ l# ba#) =
           failWith ioError
       _ClosedHandle ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
+	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
       _SemiClosedHandle _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
+	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
       _ReadHandle _ _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is not open for writing")
+	  failWith MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
           let fp = _filePtr htype in
 	   -- here we go..
-          _ccall_ writeFile (_ByteArray (error "") ba#) fp (I# l#) `thenPrimIO` \rc ->
+          _ccall_ writeFile (_ByteArray ((error "")::(Int,Int)) ba#) fp (I# l#) `CCALL_THEN` \rc ->
           if rc==0 then
               return ()
           else
-              _constructError "hPutFS"   `thenPrimIO` \ err ->
+              _constructError "hPutFS"   `CCALL_THEN` \ err ->
 	      failWith err
 hPutFS handle (CharStr a# l#) =
  if l# ==# 0# then
@@ -485,21 +514,21 @@ hPutFS handle (CharStr a# l#) =
           failWith ioError
       _ClosedHandle ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
+	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
       _SemiClosedHandle _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is closed")
+	  failWith MkIOError(handle,IllegalOperation,"handle is closed")
       _ReadHandle _ _ _ ->
 	  _writeHandle handle htype		    >>
-	  failWith (IllegalOperation "handle is not open for writing")
+	  failWith MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
           let fp = _filePtr htype in
 	   -- here we go..
-          _ccall_ writeFile (A# a#) fp (I# l#) `thenPrimIO` \rc ->
+          _ccall_ writeFile (A# a#) fp (I# l#) `CCALL_THEN` \rc ->
           if rc==0 then
               return ()
           else
-              _constructError "hPutFS"   `thenPrimIO` \ err ->
+              _constructError "hPutFS"   `CCALL_THEN` \ err ->
 	      failWith err
 
 --ToDo: avoid silly code duplic.
