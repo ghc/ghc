@@ -246,6 +246,8 @@ libish f = getFileSuffix f `elem` dynlib_suffixes
 
 #ifdef mingw32_TARGET_OS
 dynlib_suffixes = ["dll", "DLL"]
+#elif defined(darwin_TARGET_OS)
+dynlib_suffixes = ["dylib"]
 #else
 dynlib_suffixes = ["so"]
 #endif
