@@ -641,12 +641,6 @@ SGML2RTF		= $(DOCBOOK_PREFIX)db2rtf
 
 SGMLSTYLESHEET          = $(FPTOOLS_TOP_ABS)/docs/fptools-both.dsl
 
-# This may need to be changed by the user for local conditions
-SGML_TOP		= /usr/lib/sgml
-
-SGML_CATALOG_FILES	= ./catalog:$(SGML_TOP)/catalog:$(SGML_TOP)/docbook.cat:$(SGML_TOP)/stylesheets/docbook/catalog
-
-
 SRC_SGML2DVI_OPTS       = -d $(SGMLSTYLESHEET)
 SRC_SGML2HTML_OPTS      = -d $(SGMLSTYLESHEET)
 SRC_SGML2PS_OPTS      	= -d $(SGMLSTYLESHEET)
