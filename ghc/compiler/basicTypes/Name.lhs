@@ -354,12 +354,6 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       System     -> pprSysLocal sty uniq occ
       Local      -> pprLocal sty uniq occ
 
-pprLocal sty uniq occ
-  | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = pprOccName occ <> 
-		     text "{-" <> pprUnique10 uniq <> text "-}"
-  | otherwise      = pprOccName occ
-
 pprGlobal sty name uniq mod occ
   | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
 
@@ -369,11 +363,22 @@ pprGlobal sty name uniq mod occ
   | unqualStyle sty name = pprOccName occ
   | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
 
+pprLocal sty uniq occ
+  | codeStyle sty  = pprUnique uniq
+  | debugStyle sty = pprOccName occ <> 
+		     text "{-" <> pprUnique10 uniq <> text "-}"
+  | otherwise      = pprOccName occ	-- User and Iface styles
+
+-- Like Local, except that we only omit the unique in Iface style
 pprSysLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
+  | ifaceStyle sty = pprOccName occ	-- The tidy phase has ensured that OccNames
+					-- are enough
   | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
+				-- If the tidy phase hasn't run, the OccName
+				-- is unlikely to be informative (like 's'),
+				-- so print the unique
 \end{code}
-
 
 %************************************************************************
 %*									*
