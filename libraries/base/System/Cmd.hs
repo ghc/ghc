@@ -110,42 +110,23 @@ is well documented on http://msdn.microsoft/com.)
 
   - The invoked command can in turn access the entire lpCommandLine string,
 	and the C runtime does indeed do so, parsing it to generate the 
-	traditional argument vector argv[0], argv[1], etc.  Again, to
-	break it into argument items, any spaces must be quoted using
-	double quote thus
-		cmd "this is arg 1" "this is arg 2"
+	traditional argument vector argv[0], argv[1], etc.  It does this
+	using a complex and arcane set of rules which are described here:
+	
+	   http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
 
-What if an argument itself contains double-quotes? (File names can't
-can't, on Windows.)  Then the quote must be escaped with a backslash.
-If we call Create Process with this lpArgument:
-	cmd "Foo=\"baz\"" arg2
-then cmd will see argv[1] as
-	Foo="baz"
-However, experiments show that backslashes themselves must *not* be escaped.
-That is, to get a backslash in an argument, just put backslash, even inside
-quotes.  For eaxmple, this works fine to show the contents of the file
-foo\baz
-	cat "foo\baz"
-If you escape the backslash, thus
-	cat "foo\\baz"
-then @cat@ will see argument foo\\baz, and on WinME/98/95 you'll get
-"can't find file foo\\baz".  (As it happens, WinNT/XP commands don't
-mind double backslashes, but it's still a bug, given rawSystem's claim
-to pass exactly args to the command.)
+	(if this URL stops working, you might be able to find it by
+	searching for "Parsing C Command-Line Arguments" on MSDN.  Also,
+	the code in the Microsoft C runtime that does this translation
+	is shipped with VC++).
 
-BOTTOM LINE: 
-	1 We wrap the command, and each argument, in quotes
-	2 Inside the quotes, we escape any double-quote characters
-		(but nothing else)
-	3 Then concatenate all these quoted things together, separated with 
-		spaces
 
-Steps 1,2 are done by the function 'translate' below.
+Our goal in rawSystem is to take a command filename and list of
+arguments, and construct a string which inverts the translatsions
+described above, such that the program at the other end sees exactly
+the same arguments in its argv[] that we passed to rawSystem.
 
-The exact rules used by the C runtime to unscramble quoted argumets
-are quite complex.  For example, how do you get the string \" into an
-argument?  You can find the rules in MSDN, here:
-    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
+This inverse translation is implemented by 'translate' below.
 
 Here are some pages that give informations on Windows-related 
 limitations and deviations from Unix conventions:
@@ -161,7 +142,6 @@ limitations and deviations from Unix conventions:
 
     http://www.microsoft.com/windowsxp/home/using/productdoc/en/default.asp?url=/WINDOWSXP/home/using/productdoc/en/Cmd.asp
     How CMD.EXE processes command lines.
-
 
 
 Note: CreateProcess does have a separate argument (lpApplicationName)
@@ -212,11 +192,7 @@ translate str = '"' : snd (foldr escape (True,"\"") str)
         escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
         escape '\\' (False, str) = (False, '\\' : str)
 	escape c    (b,     str) = (False, c : str)
-	-- This function attempts to invert the Microsoft C runtime's
-	-- quoting rules, which can be found here:
-	--     http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
-	-- (if this URL stops working, you might be able to find it by
-	-- searching for "Parsing C Command-Line Arguments" on MSDN).
+	-- See long comment above for what this function is trying to do.
 	--
 	-- The Bool passed back along the string is True iff the
 	-- rest of the string is a sequence of backslashes followed by
