@@ -674,7 +674,10 @@ data Integer	= J# Int# Int# ByteArray#
 %*********************************************************
 
 \begin{code}
-instance Eval (a -> b) 
+-- The current implementation of seq# cannot handle function types,
+-- so we leave this instance out rather than make false promises.
+--
+-- instance Eval (a -> b) 
 
 instance  Show (a -> b)  where
     showsPrec p f  =  showString "<<function>>"
