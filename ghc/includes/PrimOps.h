@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.70 2000/12/12 12:19:57 simonmar Exp $
+ * $Id: PrimOps.h,v 1.71 2001/01/03 16:44:29 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -11,66 +11,11 @@
 #define PRIMOPS_H
 
 /* -----------------------------------------------------------------------------
-   Helpers for the metacircular interpreter.
+   Helpers for the bytecode linker.             
    -------------------------------------------------------------------------- */
 
-#ifdef GHCI
+#define addrToHValuezh(r,a) r=(P_)a
 
-#define CHASE_INDIRECTIONS(lval)                                        \
-   do {                                                                 \
-        int again;                                                      \
-        do {                                                            \
-           again = 0;                                                   \
-           if (get_itbl((StgClosure*)lval)->type == IND)                \
-              { again = 1; lval = ((StgInd*)lval)->indirectee; }        \
-           else                                                         \
-           if (get_itbl((StgClosure*)lval)->type == IND_OLDGEN)         \
-              { again = 1; lval = ((StgIndOldGen*)lval)->indirectee; }  \
-        } while (again);                                                \
-   } while (0)
-
-#define indexWordOffClosurezh(r,a,i)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        r = ((P_)tmp)[i];			\
-   } while (0)
-
-#define indexDoubleOffClosurezh(r,a,i)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        r = PK_DBL(((P_)tmp + i);		\
-   } while (0)
-
-#define indexPtrOffClosurezh(r,a,i)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        r = ((P_ *)tmp)[i];			\
-   } while (0)					\
-
-#define setWordOffClosurezh(r,a,i,b)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        ((P_)tmp)[i] = b;			\
-        r = (P_)tmp;				\
-   } while (0)
-
-#define setDoubleOffClosurezh(r,a,i,b)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        ASSIGN_DBL((P_)tmp + i, b);		\
-        r = (P_)tmp;				\
-   } while (0)
-
-#define setPtrOffClosurezh(r,a,i,b)		\
-   do { StgClosure* tmp = (StgClosure*)(a);	\
-        CHASE_INDIRECTIONS(tmp);		\
-        ((P_ *)tmp)[i] = b;			\
-        r = (P_)tmp;				\
-   } while (0)
-
-#else
-
-#endif
 
 /* -----------------------------------------------------------------------------
    Comparison PrimOps.
@@ -984,16 +929,7 @@ EXTFUN_RTS(mkForeignObjzh_fast);
    Constructor tags
    -------------------------------------------------------------------------- */
 
-#ifdef GHCI
-#define dataToTagzh(r,a)                                                \
-   do { StgClosure* tmp = (StgClosure*)(a);                             \
-        CHASE_INDIRECTIONS(tmp);                                        \
-        r = (GET_TAG(((StgClosure *)tmp)->header.info));                \
-   } while (0)
-#else
-/* Original version doesn't chase indirections. */
 #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
-#endif
 
 /*  tagToEnum# is handled directly by the code generator. */
 
@@ -1002,7 +938,6 @@ EXTFUN_RTS(mkForeignObjzh_fast);
    -------------------------------------------------------------------------- */
 
 EXTFUN_RTS(newBCOzh_fast);
-#define getBCOPtrszh(r,bco) r=((StgBCO *)bco)->ptrs
 
 /* -----------------------------------------------------------------------------
    Signal processing.  Not really primops, but called directly from

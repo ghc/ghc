@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.12 2000/12/15 17:14:39 sewardj Exp $
+-- $Id: primops.txt,v 1.13 2001/01/03 16:44:29 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -43,21 +43,13 @@ defaults
 
 
 ------------------------------------------------------------------------
---- Support for the metacircular interpreter                         ---
+--- Support for the bytecode linker                                  ---
 ------------------------------------------------------------------------
 
-primop   IndexOffClosureOp_Ptr  "indexPtrOffClosure#"  GenPrimOp
-   a -> Int# -> (# b #)
-primop   IndexOffClosureOp_Word "indexWordOffClosure#"  GenPrimOp
-   a -> Int# -> Word#
+-- Convert an Addr# to a followable type
+primop   AddrToHValueOp "addrToHValue#" GenPrimOp
+   Addr# -> (# a #)
 
-primop   SetOffClosureOp_Ptr  "setPtrOffClosure#"  GenPrimOp
-   a -> Int# -> b -> (# a #)
-   with strictness = { \ arity -> StrictnessInfo [wwStrict, wwPrim, wwLazy] False }
-
-primop   SetOffClosureOp_Word "setWordOffClosure#"  GenPrimOp
-   a -> Int# -> Word# -> (# a #)
-   with strictness = { \ arity -> StrictnessInfo [wwStrict, wwPrim, wwPrim] False }
 
 ------------------------------------------------------------------------
 --- Addr#                                                            ---

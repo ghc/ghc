@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.29 2000/12/11 12:40:24 simonmar Exp $
+ * $Id: Printer.c,v 1.30 2001/01/03 16:44:30 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -95,10 +95,9 @@ void printClosure( StgClosure *obj )
     switch ( get_itbl(obj)->type ) {
     case INVALID_OBJECT:
             barf("Invalid object");
-#ifdef INTERPRETER
+#ifdef GHCI
     case BCO:
-            fprintf(stderr,"BCO\n");
-            disassemble(stgCast(StgBCO*,obj),"\t");
+            disassemble( (StgBCO*)obj );
             break;
 #endif
 

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.16 $
- * $Date: 2000/12/20 14:47:22 $
+ * $Revision: 1.17 $
+ * $Date: 2001/01/03 16:44:30 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -58,7 +58,8 @@ int disInstr ( StgBCO *bco, int pc )
                                                             instrs[pc+2] ); 
          pc += 3; break;
       case bci_PUSH_G:
-         fprintf(stderr, "PUSH_G   " ); printPtr( ptrs[instrs[pc]] ); 
+         fprintf(stderr, "PUSH_G   " ); printPtr( ptrs[instrs[pc]] );
+         fprintf(stderr, "\n" );
          pc += 1; break;
       case bci_PUSH_AS:
          fprintf(stderr, "PUSH_AS  " ); printPtr( ptrs[instrs[pc]] );
@@ -151,17 +152,39 @@ int disInstr ( StgBCO *bco, int pc )
 */
 void disassemble( StgBCO *bco )
 {
+   nat i, j;
    StgArrWords*   instr_arr = bco->instrs;
    UShort*        instrs    = (UShort*)(&instr_arr->payload[0]);
-   int            nbcs      = (int)instrs[0];
-   int            pc        = 1;
+   StgMutArrPtrs* ptrs      = bco->ptrs;
+   nat            nbcs      = (int)instrs[0];
+   nat            pc        = 1;
 
-   fprintf(stderr, "\n\nBCO %p =\n", bco );
+   fprintf(stderr, "BCO\n" );
    pc = 1;
    while (pc <= nbcs) {
       fprintf(stderr, "\t%2d:  ", pc );
       pc = disInstr ( bco, pc );
    }
+
+   fprintf(stderr, "INSTRS:\n   " );
+   j = 16;
+   for (i = 0; i < nbcs; i++) {
+      fprintf(stderr, "%3d ", (int)instrs[i] );
+      j--; 
+      if (j == 0) { j = 16; fprintf(stderr, "\n   "); };
+   }
+   fprintf(stderr, "\n");
+
+   fprintf(stderr, "PTRS:\n   " );
+   j = 8;
+   for (i = 0; i < ptrs->ptrs; i++) {
+      fprintf(stderr, "%8p ", ptrs->payload[i] );
+      j--; 
+      if (j == 0) { j = 8; fprintf(stderr, "\n   "); };
+   }
+   fprintf(stderr, "\n");
+
+   fprintf(stderr, "\n");
    ASSERT(pc == nbcs+1);
 }
 

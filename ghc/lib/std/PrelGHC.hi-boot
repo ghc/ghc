@@ -388,6 +388,7 @@ __export PrelGHC
   BCOzh
 
   unsafeCoercezh
+  addrToHValuezh
 ;
 
 -- Export PrelErr.error, so that others don't have to import PrelErr

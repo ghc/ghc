@@ -81,6 +81,9 @@ primCode [res] Int2WordOp [arg]
 
 primCode [res] Word2IntOp [arg]
   = simpleCoercion IntRep res arg
+
+primCode [res] AddrToHValueOp [arg]
+  = simpleCoercion PtrRep res arg
 \end{code}
 
 \begin{code}
