@@ -9,13 +9,13 @@
 -- Portability :  non-portable
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
--- See <http://www.cs.vu.nl/boilerplate/>.
+-- See <http://www.cs.vu.nl/boilerplate/>. The present module provides
+-- generic operations for text serialisation of terms.
 --
 -----------------------------------------------------------------------------
 
 module Data.Generics.Text ( 
 
-	-- * Generic operations for string representations of terms
 	gshow,
 	gread
 

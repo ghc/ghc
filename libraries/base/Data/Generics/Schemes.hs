@@ -9,13 +9,13 @@
 -- Portability :  non-portable
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
--- See <http://www.cs.vu.nl/boilerplate/>.
+-- See <http://www.cs.vu.nl/boilerplate/>. The present module provides
+-- frequently used generic traversal schemes.
 --
 -----------------------------------------------------------------------------
 
 module Data.Generics.Schemes ( 
 
-	-- * Frequently used generic traversal schemes
         everywhere,
         everywhere',
         everywhereBut,

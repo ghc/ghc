@@ -9,7 +9,8 @@
 -- Portability :  non-portable
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
--- See <http://www.cs.vu.nl/boilerplate/>.
+-- See <http://www.cs.vu.nl/boilerplate/>. The present module provides
+-- the Data class with its primitives for generic programming.
 --
 -----------------------------------------------------------------------------
 

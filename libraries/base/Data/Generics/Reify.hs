@@ -9,7 +9,8 @@
 -- Portability :  non-portable
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
--- See <http://www.cs.vu.nl/boilerplate/>.
+-- See <http://www.cs.vu.nl/boilerplate/>. The present module provides
+-- some preliminary support to compute on types.
 --
 -----------------------------------------------------------------------------
 
@@ -26,6 +27,7 @@ module Data.Generics.Reify (
 	resType,		-- :: (a -> b) -> TypeVal b
 	paraType,		-- :: t a -> TypeVal a
 	TypeFun,		-- functions on types
+	GTypeFun,		-- polymorphic functions on types
 
 	-- * Generic operations to reify terms
 	glength,
@@ -122,7 +124,7 @@ type TypeFun a r = TypeVal a -> r
 -- Generic type functions,
 -- i.e., functions mapping types to values
 --
-type GTypeFun r  = forall a. Typeable a => TypeFun a r
+type GTypeFun r  = forall a. Data a => TypeFun a r
 
 
 

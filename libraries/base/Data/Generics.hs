@@ -9,22 +9,21 @@
 -- Portability :  non-portable
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
--- See <http://www.cs.vu.nl/boilerplate/>.
+-- See <http://www.cs.vu.nl/boilerplate/>. To scrap your boilerplate it
+-- is sufficient to import the present module, which simply re-exports all
+-- themes of the Data.Generics library.
 --
 -----------------------------------------------------------------------------
 
 module Data.Generics ( 
 
-  -- * To scrap your boilerplate it is sufficient to import this module.
-  --   This module does nothing more than import all themes of the
-  --   Data.Generics library.
-  --
+  -- * All Data.Generics modules
   module Data.Generics.Basics,	-- primitives
   module Data.Generics.Aliases,	-- aliases for type case, generic types
   module Data.Generics.Schemes,	-- traversal schemes (everywhere etc.)
   module Data.Generics.Text,	-- generic read and show
   module Data.Generics.Twins,	-- twin traversal, e.g., generic eq
-  module Data.Generics.Reify	-- experimental reification stuff
+  module Data.Generics.Reify	-- experimental reification theme
 
 #ifndef __HADDOCK__
 	,
