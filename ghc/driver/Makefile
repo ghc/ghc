@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------=
-# $Id: Makefile,v 1.75 2003/11/06 10:31:55 simonmar Exp $
+# $Id: Makefile,v 1.76 2005/03/02 09:49:11 simonmar Exp $
 #
 # (c) The University of Glasgow 2002
 #
@@ -23,6 +23,6 @@ INSTALL_DATAS += package.conf ghc-usage.txt ghci-usage.txt
 # Since cleaning effectively uninstalls all the packages, we must 
 # remove the stamp files that the build system uses to avoid unnecessarily
 # re-installing packages.
-CLEAN_FILES += package.conf.inplace package.conf stamp-pkg-conf*
+CLEAN_FILES += package.conf* stamp-pkg-conf*
 
 include $(TOP)/mk/target.mk
