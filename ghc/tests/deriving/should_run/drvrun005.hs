@@ -19,4 +19,6 @@ data T = T1 |  T :++ T  deriving (Eq,Show, Read)
 t :: T
 t = read "T1"
 
-main = print t
+main = do
+  print ((fst (head (reads "T1"))) :: T)
+  print t
