@@ -141,7 +141,7 @@ binary-dist ::
 	     echo Making $$way documentation in $$dir && \
 	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way >.doclog  2>&1 && \
 	     if [ "$$way" = "html" ]; then \
-		for subdir in `perl -n -e '/output will be in ([_A-Za-z0-9]*)/ && do { print $$1; };' <.doclog`; do \
+		for subdir in `perl -n -e '/output will be in ([_\-A-Za-z0-9]*)/ && do { print $$1; };' <.doclog`; do \
 		   echo Copying HTML docs from $$subdir...; \
 		   cp -Rf $$dir/$$subdir $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
 		done \
