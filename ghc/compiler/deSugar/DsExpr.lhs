@@ -30,7 +30,7 @@ import DsMonad
 import DsCCall		( dsCCall )
 import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
-import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom, mkTupleExpr,
+import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtomGivenTy, mkTupleExpr,
 			  mkErrorAppDs, showForErr, EquationInfo,
 			  MatchResult, SYN_IE(DsCoreArg)
 			)
@@ -55,7 +55,7 @@ import Type		( splitSigmaTy, splitFunTy, typePrimRep,
 			  maybeBoxedPrimType, splitAppTy, SYN_IE(Type)
 			)
 import TysPrim		( voidTy )
-import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon,
+import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon, mkListTy,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
@@ -192,8 +192,12 @@ dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
     returnDs ( mkValLam binders matching_code )
 
-dsExpr expr@(HsApp e1 e2)      = dsApp expr []
-dsExpr expr@(OpApp e1 op _ e2) = dsApp expr []
+dsExpr expr@(HsApp fun arg)      
+  = dsExpr fun		`thenDs` \ core_fun ->
+    dsExpr arg		`thenDs` \ core_arg ->
+    dsExprToAtomGivenTy core_arg (coreExprType core_arg)	$ \ atom_arg ->
+    returnDs (core_fun `App` atom_arg)
+
 \end{code}
 
 Operator sections.  At first it looks as if we can convert
@@ -218,35 +222,41 @@ If \tr{expr} is actually just a variable, say, then the simplifier
 will sort it out.
 
 \begin{code}
-dsExpr (SectionL expr op)
-  = dsExpr op			`thenDs` \ core_op ->
-    dsExpr expr			`thenDs` \ core_expr ->
-    dsExprToAtom (VarArg core_expr)	$ \ y_atom ->
-
-    -- for the type of x, we need the type of op's 2nd argument
+dsExpr (OpApp e1 op _ e2)
+  = dsExpr op						`thenDs` \ core_op ->
+    -- for the type of y, we need the type of op's 2nd argument
     let
-	x_ty  =	case (splitSigmaTy (coreExprType core_op)) of { (_, _, tau_ty) ->
-		case (splitFunTy tau_ty)		   of {
-		  ((_:arg2_ty:_), _) -> arg2_ty;
-		  _ -> panic "dsExpr:SectionL:arg 2 ty" }}
+	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
     in
-    newSysLocalDs x_ty		`thenDs` \ x_id ->
-    returnDs (mkValLam [x_id] (core_op `App` y_atom `App` VarArg x_id)) 
+    dsExpr e1				`thenDs` \ x_core ->
+    dsExpr e2				`thenDs` \ y_core ->
+    dsExprToAtomGivenTy x_core x_ty	$ \ x_atom ->
+    dsExprToAtomGivenTy y_core y_ty	$ \ y_atom ->
+    returnDs (core_op `App` x_atom `App` y_atom)
+    
+dsExpr (SectionL expr op)
+  = dsExpr op						`thenDs` \ core_op ->
+    -- for the type of y, we need the type of op's 2nd argument
+    let
+	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
+    in
+    dsExpr expr				`thenDs` \ x_core ->
+    dsExprToAtomGivenTy x_core x_ty	$ \ x_atom ->
+
+    newSysLocalDs y_ty			`thenDs` \ y_id ->
+    returnDs (mkValLam [y_id] (core_op `App` x_atom `App` VarArg y_id)) 
 
 -- dsExpr (SectionR op expr)	-- \ x -> op x expr
 dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
-    dsExpr expr			`thenDs` \ core_expr ->
-    dsExprToAtom (VarArg core_expr)	$ \ y_atom ->
-
-    -- for the type of x, we need the type of op's 1st argument
+    -- for the type of x, we need the type of op's 2nd argument
     let
-	x_ty  =	case (splitSigmaTy (coreExprType core_op)) of { (_, _, tau_ty) ->
-		case (splitFunTy tau_ty)		   of {
-		  ((arg1_ty:_), _) -> arg1_ty;
-		  _ -> panic "dsExpr:SectionR:arg 1 ty" }}
+	(x_ty:y_ty:_, _) = splitFunTy (coreExprType core_op)
     in
-    newSysLocalDs x_ty		`thenDs` \ x_id ->
+    dsExpr expr				`thenDs` \ y_expr ->
+    dsExprToAtomGivenTy y_expr y_ty	$ \ y_atom ->
+
+    newSysLocalDs x_ty			`thenDs` \ x_id ->
     returnDs (mkValLam [x_id] (core_op `App` VarArg x_id `App` y_atom))
 
 dsExpr (CCall label args may_gc is_asm result_ty)
@@ -308,7 +318,9 @@ dsExpr (TyLam tyvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
     returnDs (mkTyLam tyvars core_expr)
 
-dsExpr expr@(TyApp e tys) = dsApp expr []
+dsExpr (TyApp expr tys)
+  = dsExpr expr		`thenDs` \ core_expr ->
+    returnDs (mkTyApp core_expr tys)
 \end{code}
 
 
@@ -316,12 +328,19 @@ Various data construction things
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 dsExpr (ExplicitListOut ty xs)
-  = case xs of
-      []     -> returnDs (mk_nil_con ty)
-      (y:ys) ->
-	dsExpr y			    `thenDs` \ core_hd  ->
-	dsExpr (ExplicitListOut ty ys)  `thenDs` \ core_tl  ->
-	mkConDs consDataCon [TyArg ty, VarArg core_hd, VarArg core_tl]
+  = go xs
+  where
+    list_ty   = mkListTy ty
+
+	-- xs can ocasaionlly be huge, so don't try to take
+	-- coreExprType of core_xs, as dsArgToAtom does
+	-- (that gives a quadratic algorithm)
+    go []     = returnDs (mk_nil_con ty)
+    go (x:xs) = dsExpr x				`thenDs` \ core_x ->
+		dsExprToAtomGivenTy core_x ty		$ \ arg_x ->
+		go xs					`thenDs` \ core_xs ->
+		dsExprToAtomGivenTy core_xs list_ty	$ \ arg_xs ->
+		returnDs (Con consDataCon [TyArg ty, arg_x, arg_xs])
 
 dsExpr (ExplicitTuple expr_list)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
@@ -474,12 +493,14 @@ complicated; reminiscent of fully-applied constructors.
 \begin{code}
 dsExpr (DictLam dictvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
-    returnDs( mkValLam dictvars core_expr )
+    returnDs (mkValLam dictvars core_expr)
 
 ------------------
 
-dsExpr expr@(DictApp e dicts)	-- becomes a curried application
-  = dsApp expr []
+dsExpr (DictApp expr dicts)	-- becomes a curried application
+  = mapDs lookupEnvDs dicts	`thenDs` \ core_dicts ->
+    dsExpr expr			`thenDs` \ core_expr ->
+    returnDs (foldl (\f d -> f `App` (VarArg d)) core_expr core_dicts)
 \end{code}
 
 @SingleDicts@ become @Locals@; @Dicts@ turn into tuples, unless
@@ -535,44 +556,10 @@ out_of_range_msg			   -- ditto
   = " out of range: [" ++ show minInt ++ ", " ++ show maxInt ++ "]\n"
 \end{code}
 
+
 %--------------------------------------------------------------------
 
-@(dsApp e [t_1,..,t_n, e_1,..,e_n])@ returns something with the same
-value as:
-\begin{verbatim}
-e t_1 ... t_n  e_1 .. e_n
-\end{verbatim}
-
-We're doing all this so we can saturate constructors (as painlessly as
-possible).
-
 \begin{code}
-dsApp :: TypecheckedHsExpr	-- expr to desugar
-      -> [DsCoreArg]		-- accumulated ty/val args: NB:
-      -> DsM CoreExpr	-- final result
-
-dsApp (HsApp e1 e2) args
-  = dsExpr e2			`thenDs` \ core_e2 ->
-    dsApp  e1 (VarArg core_e2 : args)
-
-dsApp (OpApp e1 op _ e2) args
-  = dsExpr e1			`thenDs` \ core_e1 ->
-    dsExpr e2			`thenDs` \ core_e2 ->
-    dsApp  op (VarArg core_e1 : VarArg core_e2 : args)
-
-dsApp (DictApp expr dicts) args
-  = mapDs lookupEnvDs dicts	`thenDs` \ core_dicts ->
-    dsApp expr (map (VarArg . Var) core_dicts ++ args)
-
-dsApp (TyApp expr tys) args
-  = dsApp expr (map TyArg tys ++ args)
-
--- we might should look out for SectionLs, etc., here, but we don't
-
-dsApp anything_else args
-  = dsExpr anything_else	`thenDs` \ core_expr ->
-    mkAppDs core_expr args
-
 dsId v
   = lookupEnvDs v	`thenDs` \ v' ->
     returnDs (Var v')
@@ -589,9 +576,9 @@ dsRbinds [] continue_with
   = continue_with []
 
 dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
-  = dsExpr rhs		 `thenDs` \ rhs' ->
-    dsExprToAtom (VarArg rhs')	$ \ rhs_atom ->
-    dsRbinds rbinds		$ \ rbinds' ->
+  = dsExpr rhs		 				`thenDs` \ rhs' ->
+    dsExprToAtomGivenTy rhs' (coreExprType rhs')	$ \ rhs_atom ->
+    dsRbinds rbinds					$ \ rbinds' ->
     continue_with ((sel_id, rhs_atom) : rbinds')
 \end{code}	
 
