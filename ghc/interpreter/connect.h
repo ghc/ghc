@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.25 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.26 $
+ * $Date: 2000/03/10 17:30:36 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -274,10 +274,6 @@ extern  Int    discrArity       Args((Cell));
 
 extern  Addr   codeGen          Args((Name,Int,Cell));
 extern  Void   implementCfun    Args((Name,List));
-#if TREX
-extern  Name   implementRecShw  Args((Text,Cell));
-extern  Name   implementRecEq   Args((Text,Cell));
-#endif
 extern  Void   addCfunTable     Args((Tycon));
 extern  Name   succCfun         Args((Name));
 extern  Name   nextCfun         Args((Name,Name));

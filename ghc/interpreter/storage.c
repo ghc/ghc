@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.48 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.49 $
+ * $Date: 2000/03/10 17:30:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -413,6 +413,8 @@ Text textOf ( Cell c )
            || whatIs(c)==CONOPCELL
            || whatIs(c)==STRCELL
            || whatIs(c)==DICTVAR
+           || whatIs(c)==IPCELL
+           || whatIs(c)==IPVAR
           );
    if (!ok) {
       fprintf(stderr, "\ntextOf: bad tag %d\n",whatIs(c) );

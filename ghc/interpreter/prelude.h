@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/20 02:16:04 $
+ * $Revision: 1.7 $
+ * $Date: 2000/03/10 17:30:36 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -338,16 +338,3 @@ extern Void   hugsPutc              Args((int, FILE*));
 #define Putc                 putc
 
 #endif
-
-/*-------------------------------------------------------------------------*/
-/* AJG: This needs moved to a more appropreate location
- *
- *   TREX	    to include support for Typed Rows and EXtensions.
- *   IPARAM	    to include support for Implicit Parameters.
- *   MULTI_INST	    to include support for Multi-Instance Resolution.
- */
-#define TREX		0
-#define IPARAM		0
-#define MULTI_INST	0
-
-/*-------------------------------------------------------------------------*/

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.7 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.8 $
+ * $Date: 2000/03/10 17:30:36 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -151,8 +151,8 @@ extern  Void   implementTagToCon Args((Tycon));
 extern  Void   implementPrim     Args((Name));
 extern  Void   implementTuple    Args((Int));
 #if TREX                         
-extern  Name   implementRecShw   Args((Text));
-extern  Name   implementRecEq    Args((Text));
+extern  Name   implementRecShw   Args((Text,Cell));
+extern  Name   implementRecEq    Args((Text,Cell));
 #endif
 
 /* Association list storing globals assigned to dictionaries, tuples, etc */

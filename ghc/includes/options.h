@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.20 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.21 $
+ * $Date: 2000/03/10 17:30:36 $
  * ------------------------------------------------------------------------*/
 
 
@@ -76,6 +76,21 @@
  * Netscape plugin and the standalone evaluator "runhugs"). 
  */
 #define REDIRECT_OUTPUT (!HUGS_FOR_WINDOWS)
+
+
+/* --------------------------------------------------------------------------
+ * Language extensions
+ * ------------------------------------------------------------------------*/
+
+/* Define if T-REX; Typed Rows and EXtension should be enabled             */
+/* Doesn't work in current system - I don't know what the primops do       */
+#define TREX		0
+
+/* Implicit Parameters							   */
+#define IPARAM		1
+
+/* Multi-instance resolution						   */
+#define MULTI_INST	0
 
 
 /* --------------------------------------------------------------------------
@@ -201,10 +216,6 @@
 /* --------------------------------------------------------------------------
  * Fancy features
  * ------------------------------------------------------------------------*/
-
-/* Define if T-REX; Typed Rows and EXtension should be enabled             */
-/* Doesn't work in current system - I don't know what the primops do       */
-#define TREX 0
 
 /* Define if :xplain should be enabled					   */
 #define EXPLAIN_INSTANCE_RESOLUTION 0
