@@ -372,7 +372,7 @@ myCoreToStg dflags this_mod tidy_binds env_tc
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      let bcos = byteCodeGen dflags tidy_binds local_tycons local_classes
+      --let bcos = byteCodeGen dflags tidy_binds local_tycons local_classes
 
       -- _scc_     "Core2Stg"
       stg_binds <- coreToStg dflags this_mod tidy_binds
