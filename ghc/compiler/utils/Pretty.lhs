@@ -189,7 +189,20 @@ import IOExts		( hPutBufFull )
 import System.IO	( hPutBuf )
 #endif
 
+#if __GLASGOW_HASKELL__ < 503
+import PrelBase		( unpackCString# )
+#else
+import GHC.Base		( unpackCString# )
+#endif
+
 import PrimPacked 	( strLength )
+
+#if __GLASGOW_HASKELL__ < 411
+import PrelAddr		( Addr(..) )
+#else
+import Addr		( Addr(..) )
+import Ptr		( Ptr(..) )
+#endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -594,6 +607,12 @@ char  c = textBeside_ (Chr c) 1# Empty
 text  s = case length   s of {IBOX(sl) -> textBeside_ (Str s)  sl Empty}
 ftext s = case lengthFS s of {IBOX(sl) -> textBeside_ (PStr s) sl Empty}
 ptext (A# s) = case strLength (A# s) of {IBOX(sl) -> textBeside_ (LStr s sl) sl Empty}
+
+-- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
+-- intermediate packing/unpacking of the string.
+{-# RULES 
+  "text/str" forall a. text (unpackCString# a) = ptext (A# a)
+ #-}
 
 nest IBOX(k)  p = mkNest k (reduceDoc p)        -- Externally callable version
 
