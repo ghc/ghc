@@ -69,7 +69,7 @@ elem1	:: { Doc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
-	| squo STRING squo	{ DocIdentifier (strToHsQNames $2) }
+	| squo STRING squo	{ strToHsQNames $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
 
 squo :: { () }
@@ -89,28 +89,29 @@ instance Monad (Either String) where
 	Right r >>= k = k r
 	fail msg      = Left msg
 
-strToHsQNames :: String -> [ HsQName ]
+strToHsQNames :: String -> Doc
 strToHsQNames str
  = case lexer (\t -> returnP t) str (SrcLoc 1 1) 1 1 [] of
 	Ok _ (VarId str)
-		-> [ UnQual (HsVarName (HsIdent str)) ]
+	   -> DocIdentifier [ UnQual (HsVarName (HsIdent str)) ]
         Ok _ (QVarId (mod,str))
-		-> [ Qual (Module mod) (HsVarName (HsIdent str)) ]
+ 	   -> DocIdentifier [ Qual (Module mod) (HsVarName (HsIdent str)) ]
 	Ok _ (ConId str)
-		-> [ UnQual (HsTyClsName (HsIdent str)),
-		     UnQual (HsVarName (HsIdent str)) ]
+	   -> DocIdentifier [ UnQual (HsTyClsName (HsIdent str)),
+			      UnQual (HsVarName (HsIdent str)) ]
         Ok _ (QConId (mod,str))
-		-> [ Qual (Module mod) (HsTyClsName (HsIdent str)),
-		     Qual (Module mod) (HsVarName (HsIdent str)) ]
+	   -> DocIdentifier [ Qual (Module mod) (HsTyClsName (HsIdent str)),
+			      Qual (Module mod) (HsVarName (HsIdent str)) ]
         Ok _ (VarSym str)
-		-> [ UnQual (HsVarName (HsSymbol str)) ]
+	   -> DocIdentifier [ UnQual (HsVarName (HsSymbol str)) ]
         Ok _ (ConSym str)
-		-> [ UnQual (HsTyClsName (HsSymbol str)),
-		     UnQual (HsVarName (HsSymbol str)) ]
+	   -> DocIdentifier [ UnQual (HsTyClsName (HsSymbol str)),
+		     	      UnQual (HsVarName (HsSymbol str)) ]
         Ok _ (QVarSym (mod,str))
-		-> [ Qual (Module mod) (HsVarName (HsSymbol str)) ]
+	   -> DocIdentifier [ Qual (Module mod) (HsVarName (HsSymbol str)) ]
         Ok _ (QConSym (mod,str))
-		-> [ Qual (Module mod) (HsTyClsName (HsSymbol str)),
-		     Qual (Module mod) (HsVarName (HsSymbol str)) ]
-	other -> []
+	   -> DocIdentifier [ Qual (Module mod) (HsTyClsName (HsSymbol str)),
+		     	      Qual (Module mod) (HsVarName (HsSymbol str)) ]
+	other
+	   -> DocString str
 }
