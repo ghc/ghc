@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.12 2001/09/14 14:51:06 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.13 2001/09/17 14:58:09 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -14,7 +14,12 @@
 -- but as it happens they also do everything required by library
 -- module IO.
 
-module PrelIO where
+module PrelIO ( 
+   putChar, putStr, putStrLn, print, getChar, getLine, getContents,
+   interact, readFile, writeFile, appendFile, readLn, readIO, hReady,
+   hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
+   hPutStrLn, hPrint
+ ) where
 
 #include "HsStd.h"
 #include "PrelHandle_hsc.h"
@@ -491,7 +496,7 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	-- check n == len first, to ensure that shoveString is strict in n.
    shoveString n cs | n == len = do
 	new_buf <- commitBuffer hdl raw len n True{-needs flush-} False
-	writeBlocks hdl new_buf cs
+	writeLines hdl new_buf cs
    shoveString n [] = do
 	commitBuffer hdl raw len n False{-no flush-} True{-release-}
 	return ()
@@ -500,7 +505,7 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	if (c == '\n') 
 	   then do 
 		new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
-		writeBlocks hdl new_buf cs
+		writeLines hdl new_buf cs
 	   else	
 		shoveString n' cs
   in
