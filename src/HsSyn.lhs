@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.20 2004/07/27 22:58:24 krasimir Exp $
+% $Id: HsSyn.lhs,v 1.21 2004/08/02 20:31:13 panne Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -460,6 +460,7 @@ markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
 markup m (DocURL url)		= markupURL m url
 markup m (DocAName ref)		= markupAName m ref
 
+markupPair :: DocMarkup id a -> (GenDoc id, GenDoc id) -> (a, a)
 markupPair m (a,b) = (markup m a, markup m b)
 
 -- | The identity markup
