@@ -738,20 +738,6 @@ Sadly, the @gr2ps@ script, used to convert ``parallelism profiles''
 to PostScript, is written in Bash (GNU's Bourne Again shell).
 This bug will be fixed (someday).
 
-<tag>Makeindex:</tag>
-<nidx>pre-supposed: makeindex</nidx>
-<nidx>makeindex, pre-supposed</nidx>
-You won't need this unless you are re-making our documents.  Makeindex
-normally comes with a TeX distribution, but if not, we can provide
-the latest and greatest.
-
-<tag>Tgrind:</tag>
-<nidx>pre-supposed: tgrind</nidx>
-<nidx>tgrind, pre-supposed</nidx>
-This is required only if you remake lots of our documents <em/and/
-you use the @-t tgrind@ option with @lit2latex@ (also literate
-programming), to do ``fancy'' typesetting of your code.  <em/Unlikely./
-
 <tag>Flex:</tag>
 <nidx>pre-supposed: flex</nidx>
 <nidx>flex, pre-supposed</nidx>
@@ -780,20 +766,41 @@ by the build-configuration.  2.0.5 is ok. Others are probably ok too
 (assuming we don't create too elaborate configure scripts..)
 </descrip>
 
-Two @fptools@ projects are worth a quick note at this point, because
-they are useful for all the others:
+One @fptools@ projects is worth a quick note at this point, because
+it is useful for all the others:
 <itemize>
 <item> @glafp-utils@ contains several utilities which aren't
 particularly Glasgow-ish, but Occasionally Indispensable. Like
 @lndir@ for creating symbolic link trees.
-
-<item> @literate@ contains the Glasgow-built tools for generating
-documentation.  (The unoriginal idea is to be able to generate @latex@, @info@,
-and program code from a single source file.) To get anywhere you'll
-need at least @lit2pgm@, either from the @literate@ project, or
-because it's already installed on your system. 
 </itemize>
 
+<sect1> Tools for building the Documentation
+<label id="pre-supposed-doc-tools">
+<p>
+
+The following additional tools are required if you want to format the
+documentation that comes with the @fptools@ projects:
+
+<descrip>
+<tag>SGML-Tools:</tag>
+<nidx>pre-supposed: SGML-Tools</nidx>
+<nidx>SGML-Tools, pre-supposed</nidx>
+All our documentation is written in SGML, using the LinuxDoc DTD that
+comes with the SGML-Tools, which is the most shrink-wrapped SGML suite
+that we could find.  Should unpack and build painlessly on most
+architectures, and you can use it to generate HTML, Info, LaTeX (and
+hence DVI and Postscript), Groff, and plain text output from any
+LinuxDoc source file (including this manual).  Sources are available
+from <url name="The SGML-Tools Web Page"
+url="http://www.xs4all.nl/~cg/sgmltools/">.
+
+<tag>TeX:</tag>
+<nidx>pre-supposed: TeX</nidx>
+<nidx>TeX, pre-supposed</nidx>
+A decent TeX distribution is required if you want to produce printable
+documentation.  We recomment teTeX, which includes just about
+everything you need.
+</descrip>
 
 
 <sect>Building from source
@@ -1200,6 +1207,32 @@ linked buid tree to make this target.
 
 Most @Makefiles@ have targets other than these.  You can find
 this out by looking in the @Makefile@ itself.
+
+<sect1>Fast Making
+<ncdx/fastmake/
+<nidx/dependencies, omitting/
+<nidx/FAST, makefile variable/
+<p>
+
+Sometimes the dependencies get in the way: if you've made a small
+change to one file, and you're absolutely sure that it won't affect
+anything else, but you know that @make@ is going to rebuid everything
+anyway, the following hack may be useful:
+
+<tscreen> <verb>
+gmake FAST=YES
+</verb> </tscreen>
+
+This tells the make system to ignore dependencies and just build what
+you tell it to.  In other words, it's equivalent to temporarily
+removing the @.depend@ file in the current directory (where
+@mkdependHS@ and friends store their dependency information).
+
+A bit of history: GHC used to come with a @fastmake@ script that did
+the above job, but GNU make provides the features we need to do it
+without resorting to a script.  Also, we've found that fastmaking is
+less useful since the advent of GHC's recompilation checker (see the
+User's Guide section on "Separate Compilation").
 
 <sect>The @Makefile@ architecture
 <nidx/makefile architecture/
