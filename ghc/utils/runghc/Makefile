@@ -39,7 +39,7 @@ runhaskell : $(HS_PROG)
 # Only install runhaskell if there isn't already one installed
 ifneq "$(findstring install, $(MAKECMDGOALS))" ""
 ifeq "$(wildcard $(bindir)/runhaskell)" ""
-INSTALL_PROGS += runhaskell
+INSTALL_PROGS += runhaskell$(exeext)
 endif
 endif
 
