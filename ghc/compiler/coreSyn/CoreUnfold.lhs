@@ -24,7 +24,7 @@ module CoreUnfold (
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
 
 	smallEnoughToInline, couldBeSmallEnoughToInline, certainlySmallEnoughToInline,
-	okToInline,
+	inlineUnconditionally,
 
 	calcUnfoldingGuidance,
 
@@ -51,7 +51,8 @@ import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
-import BinderInfo	( BinderInfo(..), FunOrArg, DuplicationDanger, InsideSCC, isDupDanger )
+import BinderInfo	( BinderInfo, isOneFunOcc, isOneSafeFunOcc
+			)
 import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn
 import CoreUtils	( unTagBinders )
@@ -60,7 +61,8 @@ import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
 --import CostCentre	( ccMentionsId )
-import Id		( SYN_IE(Id), idType, getIdArity,  isBottomingId, isDataCon, --rm: isPrimitiveId_maybe,
+import Id		( SYN_IE(Id), idType, getIdArity,  isBottomingId, isDataCon,
+			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
 			  SYN_IE(IdSet), GenId{-instances-} )
 import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
 import IdInfo		( ArityInfo(..), bottomIsGuaranteed )
@@ -213,12 +215,11 @@ mkFormSummary expr
 					  ArityAtLeast a | n < a -> ValueForm
 					  other			 -> OtherForm
 
-whnfOrBottom :: GenCoreExpr bndr Id tyvar uvar -> Bool
-whnfOrBottom e = case mkFormSummary e of 
-			VarForm    -> True
-			ValueForm  -> True
-			BottomForm -> True
-			OtherForm  -> False
+whnfOrBottom :: FormSummary -> Bool
+whnfOrBottom VarForm    = True
+whnfOrBottom ValueForm  = True
+whnfOrBottom BottomForm = True
+whnfOrBottom OtherForm  = False
 \end{code}
 
 @exprIsTrivial@ is true of expressions we are unconditionally happy to duplicate;
@@ -514,33 +515,24 @@ certainlySmallEnoughToInline guidance = smallEnoughToInline (repeat False) False
 Predicates
 ~~~~~~~~~~
 
+@inlineUnconditionally@ decides whether a let-bound thing can
+*definitely* be inlined at each of its call sites.  If so, then
+we can drop the binding right away.  But remember, you have to be 
+certain that every use can be inlined.  So, notably, any ArgOccs 
+rule this out.  Since ManyOcc doesn't record FunOcc/ArgOcc 
+
 \begin{code}
-okToInline
-	:: FormSummary	-- What the thing to be inlined is like
-	-> BinderInfo 	-- How the thing to be inlined occurs
-	-> Bool		-- True => it's small enough to inline
-	-> Bool		-- True => yes, inline it
+inlineUnconditionally :: Bool -> Id -> BinderInfo -> Bool
 
--- If there's no danger of duplicating work, we can inline if it occurs once, or is small
-okToInline form occ_info small_enough
- | no_dup_danger form
- = small_enough || one_occ
- where
-   one_occ = case occ_info of
-		OneOcc _ _ _ n_alts _ -> n_alts <= 1
-		other		      -> False
-   	
-   no_dup_danger VarForm    = True
-   no_dup_danger ValueForm  = True
-   no_dup_danger BottomForm = True
-   no_dup_danger other      = False
-    
--- A non-WHNF can be inlined if it doesn't occur inside a lambda,
--- and occurs exactly once or 
---     occurs once in each branch of a case and is small
-okToInline OtherForm (OneOcc _ dup_danger _ n_alts _) small_enough 
-  = not (isDupDanger dup_danger) && (n_alts <= 1 || small_enough)
+inlineUnconditionally ok_to_dup id occ_info
+  |  idMustNotBeINLINEd id = False
 
-okToInline form any_occ small_enough = False
+  |  isOneFunOcc occ_info
+  && idMustBeINLINEd id = True
+
+  |  isOneSafeFunOcc (ok_to_dup || idWantsToBeINLINEd id) occ_info
+  =  True
+
+  |  otherwise
+  = False
 \end{code}
-
