@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.33 2000/06/14 10:27:07 simonmar Exp $
+# $Id: Makefile,v 1.34 2000/06/14 11:07:47 simonmar Exp $
 #
 
 TOP=..
@@ -20,9 +20,6 @@ MKDEPENDHS_SRCS = Config.hs Main.hs PackageSrc.hs
 LINK = ghc
 
 SUBDIRS = mangler split stats
-
-# we need the driver for generating dependencies...
-boot :: all
 
 # -----------------------------------------------------------------------------
 # Create driver configuration
@@ -85,6 +82,8 @@ ghc-inplace : ghc
 	echo exec $(FPTOOLS_TOP_ABS)/ghc/driver/ghc -B$(FPTOOLS_TOP_ABS) $$\* >>$@
 	chmod 755 $@
 
+CLEAN_FILES += ghc-inplace
+
 # -----------------------------------------------------------------------------
 # package configuration files...
 
@@ -115,6 +114,9 @@ INSTALL_DATAS += ghc-usage.txt
 
 include $(TOP)/mk/target.mk
 
+# we need the driver for generating dependencies...
+boot :: all
+
 # -----------------------------------------------------------------------------
 # Create link to from ghc-x.xx to ghc...
 
@@ -130,6 +132,8 @@ $(LINK) : $(HS_PROG)
 	   echo "Perhaps remove \`$(LINK)' manually?"; \
 	   exit 1; \
 	 fi;
+
+CLEAN_FILES += $(LINK)
 
 install ::
 	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
