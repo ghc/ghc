@@ -206,7 +206,9 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 	rts_n_free_capabilities = 1;
 #endif
 	// Signal that a capability is available
-	signalCondition(&thread_ready_cond);
+	if (rts_n_waiting_tasks > 0) {
+	    signalCondition(&thread_ready_cond);
+	}
 	startSchedulerTaskIfNecessary();
 	IF_DEBUG(scheduler, sched_belch("worker: released capability"));
     }
