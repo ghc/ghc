@@ -69,6 +69,9 @@ import Ratio ( (%) )
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
+ 'as' 		{ ITas }
+ 'qualified' 	{ ITqualified }
+ 'hiding' 	{ IThiding }
 
  'forall'	{ ITforall }			-- GHC extension keywords
  'foreign'	{ ITforeign }
@@ -456,6 +459,9 @@ var_fs		:: { EncodedFS }
 		: VARID			{ $1 }
 		| VARSYM		{ $1 }
 		| '!'	  		{ SLIT("!") }
+		| 'as'			{ SLIT("as") }
+		| 'qualified'		{ SLIT("qualified") }
+		| 'hiding'		{ SLIT("hiding") }
 		| 'forall'		{ SLIT("forall") }
 		| 'foreign'		{ SLIT("foreign") }
 		| 'export'		{ SLIT("export") }
