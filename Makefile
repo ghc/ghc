@@ -302,7 +302,6 @@ hc-file-bundle : project-check
 	  -name "*.hsc" -print | sed 's/hsc$$/hs/g' >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/*.hs-incl >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/rename/ParseIface.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/main/ParsePkgConf.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/hslibs/hssource/HsParser.hs >> hc-files-to-go
