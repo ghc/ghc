@@ -10,16 +10,13 @@ Testing puts (and withString)
 Testing peekArray0
 Test successful
 Testing open, read and close
+-- !!! test for foreign import dynamic/wrapper, orignally by Alastair Reid,
+-- with a few changes to get it to run on GHC by Simon Marlow.
+
 import Foreign
 import Foreign.C
 import Control.Exception
-import System.IO.Unsafe
-import Prelude hiding (read)
-import System.IO hiding (bracket)
-
-main = do
-
-  putStrLn "\nTesting sin==mysin (should ret
+imp
 
 Testing open, write and close
 
