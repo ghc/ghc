@@ -6,4 +6,4 @@
 # This script is run just after installing a binary distribution, to
 # generate a correct package.conf for the new installation.
 
-bin/$1/pkgconf install "$1" "" "NO" "???readline???" "$2" "" "" "" "" "" > $2/package.conf
+bin/$1/pkgconf install "$1" "" "NO" "-lreadline" "$2" "" "" "" "" "" > $2/package.conf
