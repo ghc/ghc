@@ -24,8 +24,7 @@ module Prelude (
     Ordering(LT, EQ, GT),
     Char, String, Int, Integer, Float, Double, IO,
     Rational,
-#if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
-	-- Restore export of (:) until we get to 5.05
+#if defined(__NHC__)
     []((:), []),	-- Not legal Haskell 98;
 			-- ... available through built-in syntax
     module Data.Tuple,	-- Includes tuple types
