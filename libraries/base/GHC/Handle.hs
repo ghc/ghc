@@ -320,23 +320,8 @@ stdHandleFinalizer m = do
 handleFinalizer :: MVar Handle__ -> IO ()
 handleFinalizer m = do
   h_ <- takeMVar m
-  let
-    -- hClose puts both the fd and the handle's type
-    -- into a closed state, so it's a bit excessive
-    -- to test for both here, but caution sometimes
-    -- pays off..
-   alreadyClosed = 
-     case haType h_ of { ClosedHandle{} -> True; _ -> False }
-   fd = fromIntegral (haFD h_)
-
-  when (not alreadyClosed && fd /= -1) $ do
-       flushWriteBufferOnly h_
-       unlockFile fd
-#ifdef mingw32_TARGET_OS
-       (closeFd (haIsStream h_) fd >> return ())
-#else
-       (c_close fd >> return ())
-#endif
+  hClose_help h_
+  return ()
 
 -- ---------------------------------------------------------------------------
 -- Grimy buffer operations
@@ -839,7 +824,7 @@ mkDuplexHandle fd is_stream filepath binary = do
 		      }
   read_side <- newMVar r_handle_
 
-  addMVarFinalizer read_side (handleFinalizer read_side)
+  addMVarFinalizer write_side (handleFinalizer write_side)
   return (DuplexHandle read_side write_side)
    
 
