@@ -57,6 +57,7 @@ endif
 
 # Special options
 PrelStorable_HC_OPTS = -monly-3-regs
+PrelCError_HC_OPTS = +RTS -K4m -RTS
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
