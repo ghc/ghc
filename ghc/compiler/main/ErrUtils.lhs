@@ -8,7 +8,7 @@ module ErrUtils (
 	ErrMsg, WarnMsg, Message, Messages, errorsFound, warningsFound,
 
 	addShortErrLocLine, addShortWarnLocLine,
-	addErrLocHdrLine, dontAddErrLoc,
+	addErrLocHdrLine, addWarnLocHdrLine, dontAddErrLoc,
 
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
@@ -37,6 +37,7 @@ type Message = SDoc
 
 addShortErrLocLine  :: SrcLoc -> Message -> ErrMsg
 addErrLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
+addWarnLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
 addShortWarnLocLine :: SrcLoc -> Message -> WarnMsg
 
 addShortErrLocLine locn rest_of_err_msg
@@ -48,6 +49,12 @@ addErrLocHdrLine locn hdr rest_of_err_msg
   = ( locn
     , hang (ppr locn <> colon<+> hdr) 
          4 rest_of_err_msg
+    )
+
+addWarnLocHdrLine locn hdr rest_of_err_msg
+  = ( locn
+    , hang (ppr locn <> colon <+> ptext SLIT("Warning:") <+> hdr) 
+         4 (rest_of_err_msg)
     )
 
 addShortWarnLocLine locn rest_of_err_msg

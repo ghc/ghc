@@ -27,7 +27,7 @@ import Type		( splitAlgTyConApp, mkTyVarTys, Type )
 import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy, tupleCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet
-import ErrUtils		( addErrLocHdrLine, dontAddErrLoc )
+import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
 import Outputable
 \end{code}
 
@@ -113,7 +113,7 @@ pp_context NoMatchContext msg rest_of_msg_fun
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
   = case pp_match kind pats of
       (ppr_match, pref) ->
-          addErrLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
+          addWarnLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
 	where
 	  message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
  where
