@@ -485,6 +485,21 @@ endif
 #
 #	SRC_HC_OPTS += -O
 
+# These flags make flex 8-bit
+SRC_FLEX_OPTS	+= -8
+
+SRC_INSTALL_BIN_OPTS	+= -s
+
+# lint gets all CPP's flags too
+SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
+WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
+
+# Default fptools options for dllwrap.
+SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32
+
+# Flags for CPP when running GreenCard on .pgc files
+GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
+
 
 ################################################################################
 #
