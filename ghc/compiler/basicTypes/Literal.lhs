@@ -289,8 +289,11 @@ litIsDupable (MachStr _) = False
 litIsDupable other	 = True
 
 litSize :: Literal -> Int
-	-- used by CoreUnfold.sizeExpr
-litSize (MachStr str) = lengthFS str `div` 4
+-- Used by CoreUnfold.sizeExpr
+litSize (MachStr str) = 1 + (lengthFS str `div` 4)
+	-- Every literal has size at least 1, otherwise
+	-- 	f "x" 
+	-- might be too small
 litSize _other	      = 1
 \end{code}
 
