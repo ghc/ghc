@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.2 1998/12/02 13:27:01 simonm Exp $
+% $Id: PrelException.lhs,v 1.3 1999/01/07 16:39:06 simonm Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -26,7 +26,7 @@ Exception datatype and operations.
 \begin{code}
 data Exception
   = IOException 	IOError		-- IO exceptions (from 'fail')
-  | ArithException  	ArithError	-- Arithmetic exceptions
+  | ArithException  	ArithException	-- Arithmetic exceptions
   | ErrorCall		String		-- Calls to 'error'
   | NoMethodError       String		-- A non-existent method was invoked
   | PatternMatchFail	String		-- A pattern match failed
@@ -36,9 +36,9 @@ data Exception
   | RecUpdError		String		-- Record doesn't contain updated field
   | AssertionFailed	String		-- Assertions
   | DynException	Dynamic		-- Dynamic exceptions
-  | ExternalException   ExtError        -- External exceptions
+  | AsyncException	AsyncException	-- Externally generated errors
 
-data ArithError
+data ArithException
   = Overflow
   | Underflow
   | LossOfPrecision
@@ -46,20 +46,20 @@ data ArithError
   | Denormal
   deriving (Eq, Ord)
 
-data ExtError
+data AsyncException
   = StackOverflow
   | HeapOverflow
   | ThreadKilled
   deriving (Eq, Ord)
 
-instance Show ArithError where
+instance Show ArithException where
   showsPrec _ Overflow        = showString "arithmetic overflow"
   showsPrec _ Underflow       = showString "arithmetic underflow"
   showsPrec _ LossOfPrecision = showString "loss of precision"
   showsPrec _ DivideByZero    = showString "divide by zero"
   showsPrec _ Denormal        = showString "denormal"
 
-instance Show ExtError where
+instance Show AsyncException where
   showsPrec _ StackOverflow   = showString "stack overflow"
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"

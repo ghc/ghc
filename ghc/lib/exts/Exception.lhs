@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.2 1998/12/02 13:26:30 simonm Exp $
+% $Id: Exception.lhs,v 1.3 1999/01/07 16:39:07 simonm Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -11,26 +11,43 @@ module allow catching of exceptions in the IO monad.
 module Exception (
 
 	Exception(..),		-- instance Show
-	ArithError(..),		-- instance Show
+	ArithException(..),	-- instance Show
+	AsyncException(..),	-- instance Show
+
+	tryAll,    -- :: a    -> IO (Either Exception a)
+	tryAllIO,  -- :: IO a -> IO (Either Exception a)
+	try,	   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
+	tryIO,	   -- :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
+
+	catchAll,  -- :: a    -> (Exception -> IO a) -> IO a
+	catchAllIO,-- :: IO a -> (Exception -> IO a) -> IO a
+	catch,     -- :: (Exception -> Maybe b) -> a    -> (b -> IO a) -> IO a
+	catchIO,   -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
+
+	-- Exception predicates
+
+	justIoErrors,		-- :: Exception -> Maybe IOError
+	justArithExceptions, 	-- :: Exception -> Maybe ArithException
+	justErrors,		-- :: Exception -> Maybe String
+	justDynExceptions,	-- :: Exception -> Maybe Dynamic
+	justAssertions,		-- :: Exception -> Maybe String
+	justAsyncExceptions, 	-- :: Exception -> Maybe AsyncException
 
 	-- Throwing exceptions
 
-	throw,			-- :: Exception -> a
+	throw,		-- :: Exception -> a
 
-	-- Catching exceptions: The IO interface
+	-- Dynamic exceptions
 
-	catchException,		-- :: IO a -> (Exception       -> IO a) -> IO a
-	catch,         		-- :: IO a -> (IOError         -> IO a) -> IO a
+	throwDyn, 	-- :: Typeable ex => ex -> b
+	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
 
-	catchArith,		-- :: IO a -> (ArithError      -> IO a) -> IO a
-	catchError,		-- :: IO a -> (String          -> IO a) -> IO a
+	-- Utilities
+		
+	finally, 	-- :: IO a -> IO b -> IO b
 
-	getException,		-- :: a    -> IO (Maybe Exception)
-	getExceptionIO,		-- :: IO a -> IO (Either Exception a)
-
-	throwDyn, 		-- :: Typeable exception => exception -> b
-	catchDyn, 		-- :: Typeable exception => 
-				--    IO a -> (exception -> IO a) -> IO a
+	bracket,  	-- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
+	bracket_, 	-- :: IO a -> IO b -> IO c -> IO ()
 
   ) where
 
@@ -47,29 +64,67 @@ import Dynamic
 \end{code}
 
 -----------------------------------------------------------------------------
-Catch certain types of exception.
+Catching exceptions
 
-The following family of functions provide exception handling functions
-for particular kinds of exceptions; all non-matching exceptions being
-re-raised.
+PrelException defines 'catchException' for us.
 
 \begin{code}
-catchIO = Prelude.catch
+catchAll  :: a    -> (Exception -> IO a) -> IO a
 #ifdef __HUGS__
-catch   = PreludeBuiltin.catchException
+catchAll a handler = primCatch' (case primForce a of () -> return a) handler
 #else
-catch   = PrelException.catchException
+catchAll a handler = catch# (a `seq` return a) handler
 #endif
 
-catchArith	:: IO a -> (ArithError -> IO a) -> IO a
-catchArith m k	= catch m handler
-  where handler (ArithException err) = k err
-	handler other                = throw other
+catchAllIO :: IO a -> (Exception -> IO a) -> IO a
+catchAllIO =  catchException
 
-catchError	:: IO a -> (String -> IO a) -> IO a
-catchError m k  = catch m handler
-  where handler (ErrorCall err) = k err
-	handler other           = throw other
+catch :: (Exception -> Maybe b) -> a -> (b -> IO a) -> IO a
+catch p a handler = catchAll a handler'
+  where handler' e = case p e of 
+			Nothing -> throw e
+			Just b  -> handler b
+
+catchIO :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
+catchIO p a handler = catchAllIO a handler'
+  where handler' e = case p e of 
+			Nothing -> throw e
+			Just b  -> handler b
+\end{code}
+
+-----------------------------------------------------------------------------
+'try' and variations.
+
+\begin{code}
+tryAll :: a    -> IO (Either Exception a)
+#ifdef __HUGS__
+tryAll a = primCatch' (case primForce a of { () -> return Nothing}) 
+			    (\e -> return (Just e))
+#else
+tryAll a = catch# (a `seq` return (Right a)) (\e -> return (Left e))
+#endif
+
+tryAllIO :: IO a -> IO (Either Exception a)
+tryAllIO a = catchAllIO (a >>= \a -> return (Right a))
+			(\e -> return (Left e))
+
+try :: (Exception -> Maybe b) -> a -> IO (Either b a)
+try p a = do
+  r <- tryAll a
+  case r of
+	Right a -> return (Right a)
+	Left  e -> case p e of
+			Nothing -> throw e
+			Just b  -> return (Left b)
+
+tryIO :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
+tryIO p a = do
+  r <- tryAllIO a
+  case r of
+	Right a -> return (Right a)
+	Left  e -> case p e of
+			Nothing -> throw e
+			Just b  -> return (Left b)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -99,18 +154,55 @@ catchDyn m k = catchException m handle
 \end{code}
 
 -----------------------------------------------------------------------------
+Exception Predicates
+
+\begin{code}
+justIoErrors		:: Exception -> Maybe IOError
+justArithExceptions 	:: Exception -> Maybe ArithException
+justErrors		:: Exception -> Maybe String
+justDynExceptions	:: Exception -> Maybe Dynamic
+justAssertions		:: Exception -> Maybe String
+justAsyncExceptions 	:: Exception -> Maybe AsyncException
+
+justIoErrors (IOException e) = Just e
+justIoErrors _ = Nothing
+
+justArithExceptions (ArithException e) = Just e
+justArithExceptions _ = Nothing
+
+justErrors (ErrorCall e) = Just e
+justErrors _ = Nothing
+
+justAssertions (AssertionFailed e) = Just e
+justAssertions _ = Nothing
+
+justDynExceptions (DynException e) = Just e
+justDynExceptions _ = Nothing
+
+justAsyncExceptions (AsyncException e) = Just e
+justAsyncExceptions _ = Nothing
+\end{code}
+
+-----------------------------------------------------------------------------
 Some Useful Functions
 
 \begin{code}
-#ifdef __HUGS__
-getException :: a -> IO (Maybe Exception)
-getException a = primCatch' (case primForce a of { () -> return Nothing}) (\e -> return (Just e))
-#else
-getException :: a -> IO (Maybe Exception)
-getException a = catch# (a `seq` return Nothing) (\e -> return (Just e))
-#endif
+finally :: IO a -> IO b -> IO b
+a `finally` sequel = do
+   tryAllIO a
+   sequel
 
-getExceptionIO :: IO a -> IO (Either Exception a)
-getExceptionIO m = catchException (m >>= \ r -> return (Right r)) 
-			                (\ e -> return (Left  e))
+bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
+bracket before after thing = do
+  a <- before 
+  c <- tryAllIO (thing a)
+  after a
+  return ()
+
+bracket_ :: IO a -> IO b -> IO c -> IO ()
+bracket_ before after thing = do
+  before 
+  c <- tryAllIO thing
+  after
+  return ()
 \end{code}
