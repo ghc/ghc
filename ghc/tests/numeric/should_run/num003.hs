@@ -8,7 +8,7 @@ import Char
 main = 
   let 
    rd :: ReadS Integer 
-   rd = readInt 10 (isDigit) (digitToInt)
+   rd = readSigned (readInt 10 (isDigit) (digitToInt))
   in
   do
    print (rd (show (343023920121::Integer)))
