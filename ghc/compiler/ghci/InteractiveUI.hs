@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.67 2001/05/21 13:57:49 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.68 2001/05/23 10:26:14 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -28,6 +28,9 @@ import CmdLineOpts	( DynFlag(..), dopt_unset )
 import Panic		( GhcException(..) )
 import Config
 
+import CForeign
+import Foreign
+
 import Posix
 import Exception
 import Dynamic
@@ -46,8 +49,6 @@ import Char
 import Monad 		( when )
 
 import PrelGHC 		( unsafeCoerce# )
-import Foreign		( nullPtr )
-import CString		( peekCString )
 
 -----------------------------------------------------------------------------
 
@@ -131,22 +132,30 @@ interactiveUI cmstate mod cmdline_libs = do
    dflags <- getDynFlags
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stderr"
+	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stderr"
    case maybe_hval of
 	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stderr"
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stdout"
+	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stdout"
    case maybe_hval of
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
+
+   -- replace the current argv/argc with ["<interactive>"].
+   interactive_str <- newCString "<interactive>"
+   poke prog_argc_label 1	-- sets argc to 1
+   argv <- peek prog_argv_label
+   poke argv interactive_str 	-- sets argv[0] to point to "<interactive>"
 
    (unGHCi runGHCi) GHCiState{ target = mod,
 			       cmstate = cmstate,
 			       options = [] }
    return ()
 
+foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
+foreign label "prog_argc" prog_argc_label :: Ptr CInt
 
 runGHCi :: GHCi ()
 runGHCi = do
