@@ -45,6 +45,7 @@ name = global (value) :: IORef (ty); \
 -----------------------------------------------------------------------------
 -- Differences vs. old driver:
 
+-- No more "Enter your Haskell program, end with ^D (on a line of its own):"
 -- consistency checking removed (may do this properly later)
 -- removed -noC
 -- no hi diffs (could be added later)
@@ -114,6 +115,7 @@ data BarfKind
   | WayCombinationNotSupported [WayName]
   | PhaseFailed String ExitCode
   | Interrupted
+  | NoInputFiles
   deriving Eq
 
 GLOBAL_VAR(prog_name, "ghc", String)
@@ -138,6 +140,8 @@ showBarf (WayCombinationNotSupported ws)
    = showString "combination not supported: " 
    . foldr1 (\a b -> a . showChar '/' . b) 
 	(map (showString . wayName . lkupWay) ws)
+showBarf (NoInputFiles)
+   = showString "no input files"
 
 barfKindTc = mkTyCon "BarfKind"
 
@@ -1041,12 +1045,15 @@ main =
 	then throwDyn MultipleSrcsOneOutput
 	else do
 
+   if null unknown_srcs && null phase_srcs
+	then throwDyn NoInputFiles
+	else do
+
    -- if we have unknown files, and we're not doing linking, complain
    -- (otherwise pass them through to the linker).
    if not (null unknown_srcs) && not do_linking
 	then throwDyn (UnknownFileType (head unknown_srcs))
 	else do
-
 
    let  compileFile :: (Phase, String) -> IO String
 	compileFile (phase, src) = do
