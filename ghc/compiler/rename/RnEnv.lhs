@@ -149,15 +149,33 @@ mkImportedGlobalName mod_name occ
 		     new_cache  = addToFM cache key name
 
 updateProvenances :: [Name] -> RnM d ()
+-- Update the provenances of everything that is in scope.
+-- We must be careful not to disturb the Module package info
+-- already in the cache.  Why not?  Consider
+--   module A		module M( f )
+--	import M( f )	  import N( f)
+--	import N
+-- So f is defined in N, and M re-exports it.
+-- When processing module A:
+--	1. We read M.hi first, and make a vanilla name N.f 
+--	   (without reading N.hi). The package info says <THIS> 
+--	   for lack of anything better.  
+--	2. Now we read N, which update the cache to record 
+--	   the correct package for N.f.
+--	3. Finally we update provenances (once we've read all imports).
+-- Step 3 must not destroy package info recorded in Step 2.
+
 updateProvenances names
   = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
-    setNameSupplyRn (us, inst_ns, update cache names, ipcache)
+    setNameSupplyRn (us, inst_ns, foldr update cache names, ipcache)
   where
-    update cache [] 	      = cache
-    update cache (name:names) = WARN( not (key `elemFM` cache), ppr name )
-				update (addToFM cache key name) names
- 			      where
-				key = (moduleName (nameModule name), nameOccName name)
+    update name cache = addToFM_C update_prov cache key name
+		      where
+		   	key = (moduleName (nameModule name), nameOccName name)
+
+    update_prov name_in_cache name_with_prov
+	= setNameProvenance name_in_cache (getNameProvenance name_with_prov)
+			
 
 
 mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
