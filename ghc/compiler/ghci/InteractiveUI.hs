@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.186 2005/01/28 17:44:56 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.187 2005/02/04 13:32:28 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -445,9 +445,9 @@ noArgs c = throwDyn (CmdLineError ("command '" ++ c ++ "' takes no arguments"))
 GLOBAL_VAR(flush_interp,       error "no flush_interp", IO ())
 GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
 
-no_buf_cmd = "IO.hSetBuffering IO.stdout IO.NoBuffering" ++
-	     " Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
-flush_cmd  = "IO.hFlush IO.stdout Prelude.>> IO.hFlush IO.stderr"
+no_buf_cmd = "System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
+	     " Prelude.>> System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
+flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush IO.stderr"
 
 initInterpBuffering :: CmState -> IO ()
 initInterpBuffering cmstate
