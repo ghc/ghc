@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.28 1999/11/02 15:06:01 simonmar Exp $
+ * $Id: Schedule.c,v 1.29 1999/11/02 17:19:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -256,6 +256,12 @@ schedule( void )
     
     RELEASE_LOCK(&sched_mutex);
     
+#ifdef SMP
+    IF_DEBUG(scheduler,fprintf(stderr,"schedule (task %ld): running thread %d\n", pthread_self(),t->id));
+#else
+    IF_DEBUG(scheduler,fprintf(stderr,"schedule: running thread %d\n",t->id));
+#endif
+
     /* Run the current thread 
      */
     switch (cap->rCurrentTSO->whatNext) {

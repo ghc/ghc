@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.15 1999/11/02 15:06:03 simonmar Exp $
+ * $Id: Stats.c,v 1.16 1999/11/02 17:19:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,6 +63,12 @@ static double TicksPerSecond   = 0.0;
 
 static double InitUserTime = 0.0;
 static double InitElapsedTime = 0.0;
+
+static double MutUserTime = 0.0;
+static double MutElapsedTime = 0.0;
+
+static double ExitUserTime = 0.0;
+static double ExitElapsedTime = 0.0;
 
 static ullong GC_tot_alloc = 0;
 static ullong GC_tot_copied = 0;
@@ -294,6 +300,42 @@ end_init(void)
   }
 }
 
+void
+stat_startExit(void)
+{
+  MutElapsedTime = elapsedtime() - GCe_tot_time - InitElapsedTime;
+  if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
+
+  /* for SMP, we don't know the mutator time yet, we have to inspect
+   * all the running threads to find out, and they haven't stopped
+   * yet.  So we just timestamp MutUserTime at this point so we can
+   * calculate the EXIT time.  The real MutUserTime is calculated
+   * in stat_exit below.
+   */
+#ifdef SMP
+  MutUserTime = usertime();
+#else
+  MutUserTime = usertime() - GC_tot_time - InitUserTime;
+#endif
+}
+
+void
+stat_endExit(void)
+{
+#ifdef SMP
+  ExitUserTime = usertime() - MutUserTime;
+#else
+  ExitUserTime = usertime() - MutUserTime - GC_tot_time - InitUserTime;
+#endif
+  ExitElapsedTime = elapsedtime() - MutElapsedTime;
+  if (ExitUserTime < 0.0) {
+    ExitUserTime = 0.0;
+  }
+  if (ExitElapsedTime < 0.0) {
+    ExitElapsedTime = 0.0;
+  }
+}
+
 /* -----------------------------------------------------------------------------
    Called at the beginning of each GC
    -------------------------------------------------------------------------- */
@@ -411,7 +453,6 @@ stat_exit(int alloc)
 	char temp[BIG_STRING_LEN];
 	double time = usertime();
 	double etime = elapsedtime();
-	double MutTime, MutElapsedTime;
 
 	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
 	if (time  == 0.0)  time = 0.0001;
@@ -448,36 +489,32 @@ stat_exit(int alloc)
 	fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
 		mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
-	MutElapsedTime = etime - GCe_tot_time - InitElapsedTime;
-	if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
-
-#ifndef SMP
-	MutTime = time - GC_tot_time - InitUserTime;
-	if (MutTime < 0) { MutTime = 0; }
-
-#else /* SMP */
 	/* For SMP, we have to get the user time from each thread
 	 * and try to work out the total time.
 	 */
+#ifdef SMP
 	{
 	  nat i;
-	  MutTime = 0.0;
+	  MutUserTime = 0.0;
 	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+	    MutUserTime += task_ids[i].mut_time;
 	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs,  GC time: %6.2fs\n", 
 		    i, task_ids[i].mut_time, task_ids[i].gc_time);
-	    MutTime += task_ids[i].mut_time;
 	  }
 	}
-	time = MutTime + GC_tot_time + InitUserTime;
+	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
+	if (MutUserTime < 0) { MutUserTime = 0; }
 	fprintf(sf,"\n");
 #endif
 
 	fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
 		InitUserTime, InitElapsedTime);
 	fprintf(sf, "  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
-		MutTime, MutElapsedTime);
+		MutUserTime, MutElapsedTime);
 	fprintf(sf, "  GC    time  %6.2fs  (%6.2fs elapsed)\n",
 		GC_tot_time, GCe_tot_time);
+	fprintf(sf, "  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
+		ExitUserTime, ExitElapsedTime);
 	fprintf(sf, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
 		time, etime);
 

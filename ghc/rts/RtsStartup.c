@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.22 1999/11/02 15:06:01 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.23 1999/11/02 17:19:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -174,6 +174,9 @@ shutdownHaskell(void)
   if (!rts_has_started_up)
      return;
 
+  /* start timing the shutdown */
+  stat_startExit();
+
   /* Finalize any remaining weak pointers */
   finalizeWeakPointersNow();
 
@@ -186,12 +189,17 @@ shutdownHaskell(void)
   /* stop all running tasks */
   exitScheduler();
 
-  /* clean up things from the storage manager's point of view */
-  exitStorage();
-
   /* stop the ticker */
   initialize_virtual_timer(0);
   
+  /* stop timing the shutdown, we're about to print stats */
+  stat_endExit();
+
+  /* clean up things from the storage manager's point of view.
+   * also outputs the stats (+RTS -s) info.
+   */
+  exitStorage();
+
 #if defined(PROFILING) || defined(DEBUG)
   endProfiling();
 #endif
