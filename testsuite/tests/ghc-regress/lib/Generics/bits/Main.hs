@@ -166,7 +166,7 @@ readBin = result
   result = if not (max == 0)
 
              then do bin <- readB (lengthNat (max - 1))
-                     gunfoldM (bin2con bin) readBin
+                     gunfoldR (bin2con bin) readBin
 
              else do str <- readBin
                      con <- str2con (map (chr . bin2nat) str)

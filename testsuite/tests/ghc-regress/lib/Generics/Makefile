@@ -41,11 +41,11 @@ clean:
 	rm -f gmapQ-assoc
 	rm -f gread
 	rm -f gshow/gshow
-	rm -f gsize
 	rm -f gzip/gzip
 	rm -f local-quantors
 	rm -f newtype
 	rm -f paradise/paradise
+	rm -f reify/reify
 	rm -f shortcut
 	rm -f strings/strings
 	rm -f where

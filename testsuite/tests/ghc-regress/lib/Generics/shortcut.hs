@@ -26,7 +26,7 @@ import Data.Generics.Reify
 
 everywhere1RT' :: (Data a, Data b) => (a -> a) -> b -> b
 everywhere1RT' f t =
-  if not $ typeReachableFrom (argType f) (typeValOf t)
+  if not $ reachableType (argType f) (val2type t)
    then t
    else gmapT (everywhere1RT' f) (mkT f t)
 
