@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.167 2003/04/02 00:28:59 sof Exp $
+ * $Id: Schedule.c,v 1.168 2003/04/08 15:53:51 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1669,11 +1669,7 @@ suspendThread( StgRegTable *reg,
 
 StgRegTable *
 resumeThread( StgInt tok,
-	      rtsBool concCall
-#if !defined(RTS_SUPPORTS_THREADS)
-	       STG_UNUSED
-#endif
-	      )
+	      rtsBool concCall STG_UNUSED )
 {
   StgTSO *tso, **prev;
   Capability *cap;
