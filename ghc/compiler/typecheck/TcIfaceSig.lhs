@@ -10,11 +10,7 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 import HsSyn		( TyClDecl(..), HsTupCon(..) )
 import TcMonad
-import TcMonoType	( tcHsType )
-				-- NB: all the tyars in interface files are kinded,
-				-- so tcHsType will do the Right Thing without
-				-- having to mess about with zonking
-
+import TcMonoType	( tcIfaceType )
 import TcEnv		( TcEnv, RecTcEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetEnv,
 			  tcLookupGlobal_maybe, tcLookupRecId_maybe
@@ -66,7 +62,7 @@ tcInterfaceSigs unf_env decls
     do_one name ty id_infos src_loc
       = tcAddSrcLoc src_loc 		 		$	
 	tcAddErrCtxt (ifaceSigCtxt name)		$
-	tcHsType ty					`thenTc` \ sigma_ty ->
+	tcIfaceType ty					`thenTc` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
 		 sigma_ty id_infos			`thenTc` \ id_info ->
 	returnTc (mkId name sigma_ty id_info)
@@ -184,7 +180,7 @@ UfCore expressions.
 tcCoreExpr :: UfExpr Name -> TcM CoreExpr
 
 tcCoreExpr (UfType ty)
-  = tcHsType ty		`thenTc` \ ty' ->
+  = tcIfaceType ty		`thenTc` \ ty' ->
 	-- It might not be of kind type
     returnTc (Type ty')
 
@@ -198,11 +194,11 @@ tcCoreExpr (UfLit lit)
 -- The dreaded lit-lits are also similar, except here the type
 -- is read in explicitly rather than being implicit
 tcCoreExpr (UfLitLit lit ty)
-  = tcHsType ty		`thenTc` \ ty' ->
+  = tcIfaceType ty		`thenTc` \ ty' ->
     returnTc (Lit (MachLitLit lit ty'))
 
 tcCoreExpr (UfCCall cc ty)
-  = tcHsType ty 	`thenTc` \ ty' ->
+  = tcIfaceType ty 	`thenTc` \ ty' ->
     tcGetUnique		`thenNF_Tc` \ u ->
     returnTc (Var (mkCCallOpId u cc ty'))
 
@@ -254,7 +250,7 @@ tcCoreExpr (UfLet (UfRec pairs) body)
 tcCoreExpr (UfNote note expr) 
   = tcCoreExpr expr		`thenTc` \ expr' ->
     case note of
-	UfCoerce to_ty -> tcHsType to_ty	`thenTc` \ to_ty' ->
+	UfCoerce to_ty -> tcIfaceType to_ty	`thenTc` \ to_ty' ->
 			  returnTc (Note (Coerce to_ty'
                                                  (exprType expr')) expr')
 	UfInlineCall   -> returnTc (Note InlineCall expr')
@@ -264,7 +260,7 @@ tcCoreExpr (UfNote note expr)
 
 \begin{code}
 tcCoreLamBndr (UfValBinder name ty) thing_inside
-  = tcHsType ty			`thenTc` \ ty' ->
+  = tcIfaceType ty		`thenTc` \ ty' ->
     let
 	id = mkVanillaId name ty'
     in
@@ -284,7 +280,7 @@ tcCoreLamBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 tcCoreValBndr (UfValBinder name ty) thing_inside
-  = tcHsType ty			`thenTc` \ ty' ->
+  = tcIfaceType ty			`thenTc` \ ty' ->
     let
 	id = mkVanillaId name ty'
     in
@@ -292,7 +288,7 @@ tcCoreValBndr (UfValBinder name ty) thing_inside
     thing_inside id
     
 tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
-  = mapTc tcHsType tys			`thenTc` \ tys' ->
+  = mapTc tcIfaceType tys		`thenTc` \ tys' ->
     let
 	ids = zipWithEqual "tcCoreValBndr" mkVanillaId names tys'
     in
@@ -317,7 +313,7 @@ tcCoreAlt scrut_ty (UfLitAlt lit, names, rhs)
 tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
   = ASSERT( null names )
     tcCoreExpr rhs		`thenTc` \ rhs' ->
-    tcHsType ty			`thenTc` \ ty' ->
+    tcIfaceType ty		`thenTc` \ ty' ->
     returnTc (LitAlt (MachLitLit str ty'), [], rhs')
 
 -- A case alternative is made quite a bit more complicated

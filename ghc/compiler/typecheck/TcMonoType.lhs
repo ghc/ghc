@@ -4,7 +4,7 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsType, tcHsRecType, 
+module TcMonoType ( tcHsType, tcHsRecType, tcIfaceType,
 		    tcHsSigType, tcHsLiftedSigType, 
 		    tcRecClassContext, checkAmbiguity,
 
@@ -290,14 +290,25 @@ tcHsSigType and tcHsLiftedSigType are used for type signatures written by the pr
 \begin{code}
 tcHsSigType, tcHsLiftedSigType :: RenamedHsType -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
-tcHsSigType      ty = kcTypeType ty  `thenTc_`  tcHsType ty	
-tcHsLiftedSigType ty = kcLiftedType ty `thenTc_`  tcHsType ty
+tcHsSigType       ty = kcTypeType   ty `thenTc_` tcHsType ty	
+tcHsLiftedSigType ty = kcLiftedType ty `thenTc_` tcHsType ty
 
 tcHsType    ::            RenamedHsType -> TcM Type
 tcHsRecType :: RecFlag -> RenamedHsType -> TcM Type
   -- Don't do kind checking, but do hoist for-alls to the top
+  -- These are used in type and class decls, where kinding is
+  -- done in advance
 tcHsType             ty = tc_type NonRecursive ty  `thenTc` \ ty' ->  returnTc (hoistForAllTys ty')
 tcHsRecType wimp_out ty = tc_type wimp_out     ty  `thenTc` \ ty' ->  returnTc (hoistForAllTys ty')
+
+-- In interface files the type is already kinded,
+-- and we definitely don't want to hoist for-alls.
+-- Otherwise we'll change
+--  	dmfail :: forall m:(*->*) Monad m => forall a:* => String -> m a
+-- into 
+-- 	dmfail :: forall m:(*->*) a:* Monad m => String -> m a
+-- which definitely isn't right!
+tcIfaceType ty = tc_type NonRecursive ty
 \end{code}
 
 
