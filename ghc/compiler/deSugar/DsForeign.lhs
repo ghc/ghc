@@ -20,9 +20,10 @@ import HsDecls		( extNameStatic )
 import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
-import Id		( Id, idType, idName, mkVanillaId, mkSysLocal,
+import Id		( Id, idType, idName, mkId, mkSysLocal,
 			  setInlinePragma )
-import IdInfo		( neverInlinePrag )
+import IdInfo		( neverInlinePrag, vanillaIdInfo, IdFlavour(..),
+			  setFlavourInfo )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
@@ -259,7 +260,8 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
 	helper_ty =  mkForAllTys tvs $
 		     mkFunTys wrapper_arg_tys io_res_ty
 
-	f_helper_glob = mkVanillaId helper_name helper_ty
+	f_helper_glob = mkId helper_name helper_ty
+				(vanillaIdInfo `setFlavourInfo` ExportedId)
 		      where
 			name	            = idName fn_id
 			mod	
