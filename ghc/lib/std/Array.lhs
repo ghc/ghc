@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Array.lhs,v 1.15 2000/11/08 15:54:05 simonpj Exp $
+% $Id: Array.lhs,v 1.16 2001/04/14 22:27:00 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -38,18 +38,21 @@ module  Array
     -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
     ) where
+\end{code}
 
 #ifndef __HUGS__
+
+\begin{code}
 	------------ GHC --------------------
 import Ix
-import PrelList
 import PrelArr		-- Most of the hard work is done here
-import PrelBase
 	------------ End of GHC --------------------
-
+\end{code}
 
 #else
-	------------ HUGS --------------------
+
+\begin{code}
+	------------ HUGS (rest of file) --------------------
 import PrelPrim ( PrimArray
 		, runST
 		, primNewArray
@@ -62,46 +65,15 @@ import Ix
 import List( (\\) )
 
 infixl 9  !, //
-	------------ End of HUGS --------------------
-#endif
-
 \end{code}
 
 
-
 %*********************************************************
 %*							*
-\subsection{Definitions of array, !, bounds}
-%*							*
-%*********************************************************
-
-#ifndef __HUGS__
-	------------ GHC --------------------
-
-\begin{code}
-{-# SPECIALISE listArray :: (Int,Int) -> [b] -> Array Int b #-}
-listArray	      :: (Ix a) => (a,a) -> [b] -> Array a b
-listArray b vs	      =  array b (zip (range b) vs)
-
-{-# INLINE elems #-}
-elems		      :: (Ix a) => Array a b -> [b]
-elems a               =  [a!i | i <- indices a]
-
-ixmap		      :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c -> Array a c
-ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
-\end{code}
-
-	------------ End of GHC --------------------
-#else
-
-
-%*********************************************************
-%*							*
-\subsection{Instance declarations for Array type}
+\subsection{The Array type}
 %*							*
 %*********************************************************
 
-	------------ HUGS (rest of file) --------------------
 
 \begin{code}
 data Array ix elt = Array (ix,ix) (PrimArray elt)
