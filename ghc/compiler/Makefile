@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.207 2002/02/06 11:41:01 simonmar Exp $
+# $Id: Makefile,v 1.208 2002/02/08 15:02:30 simonmar Exp $
 
 TOP = ..
 
@@ -208,9 +208,9 @@ SRC_HC_OPTS += \
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 ifneq "$(mingw32_TARGET_OS)" "1"
-SRC_HC_OPTS += -package concurrent -package posix -package text -package util
+SRC_HC_OPTS += -package concurrent -package posix -package util
 else
-SRC_HC_OPTS += -package concurrent -package text -package util
+SRC_HC_OPTS += -package concurrent -package util
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
