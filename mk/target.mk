@@ -806,6 +806,14 @@ install:: $(INSTALL_DATAS)
 	done
 endif
 
+ifneq "$(INSTALL_INCLUDES)" ""
+install:: $(INSTALL_INCLUDES)
+	@$(INSTALL_DIR) $(includedir)
+	for i in $(INSTALL_INCLUDES); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(includedir); \
+	done
+endif
+
 #
 # Use with care..
 #
