@@ -1,7 +1,13 @@
+#-----------------------------------------------------------------------------
+# $Id: Makefile,v 1.6 2000/04/11 11:48:13 simonmar Exp $
+#
+# (c) The GHC Team, 1999-2000
+#
+
 TOP = .
 include $(TOP)/mk/boilerplate.mk
 
-NOT_THESE = CVS mk Makefile make.log
+NOT_THESE = CVS mk
 
 NOT_THESE += hill_stk_oflow
 #	Correctly fails to terminate
@@ -22,7 +28,7 @@ NOT_THESE += andy_cherry barton-mangler-bug callback cvh_unboxing dmgob_native1 
 NOT_THESE += jeff-bug lennart_array
 #       compiles but doesn't run
 
-SUBDIRS = $(filter-out $(NOT_THESE), $(wildcard *))
+SUBDIRS = $(filter-out $(patsubst %, %/, $(NOT_THESE)), $(wildcard */))
 
 include $(TOP)/mk/target.mk
 
