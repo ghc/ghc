@@ -54,7 +54,7 @@ import GHC.Num
 import GHC.IOBase
 import GHC.Base
 #else
-import Char ( chr, ord )
+import Data.Char ( chr, ord )
 #define unsafeChr chr
 #endif
 
