@@ -10,7 +10,7 @@ module HsPat (
 
 	irrefutablePat, irrefutablePats,
 	failureFreePat, isWildPat, 
-	patsAreAllCons, isConPat, 
+	patsAreAllCons, isConPat, isSigPat,
 	patsAreAllLits,	isLitPat,
 	collectPatBinders, collectOutPatBinders, collectPatsBinders,
 	collectSigTysFromPat, collectSigTysFromPats
@@ -317,6 +317,9 @@ isConPat (TuplePat _ _)		= True
 isConPat (RecPat _ _ _ _ _)	= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
 isConPat other			= False
+
+isSigPat (SigPat _ _ _) = True
+isSigPat other		= False
 
 patsAreAllLits :: [OutPat id] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list

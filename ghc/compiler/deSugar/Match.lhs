@@ -29,7 +29,7 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
-import Util             ( lengthExceeds, notNull )
+import Util             ( lengthExceeds, isSingleton, notNull )
 import Outputable
 \end{code}
 
@@ -351,6 +351,7 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	--	NPat
 	--	LitPat
 	--	NPlusKPat
+	--	SigPat
 	-- but no other
 
 tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
@@ -376,16 +377,6 @@ tidy1 v (AsPat var pat) match_result
   where
     match_result' | v == var  = match_result
 		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
-
-tidy1 v (SigPat pat ty fn) match_result
-  = selectMatchVar pat		`thenDs` \ v' ->
-    tidy1 v' pat match_result	`thenDs` \ (WildPat _, match_result') ->
-	-- The ice is a little thin here
-	-- We only expect a SigPat (with a non-trivial coercion) wrapping
-	-- a variable pattern. If it was a constructor or literal pattern
-	-- there would be no interesting polymorphism, and hence no coercion.
-    dsExpr (HsApp fn (HsVar v))	`thenDs` \ e ->
-    returnDs (WildPat ty, adjustMatchResult (bindNonRec v' e) match_result')
 
 tidy1 v (WildPat ty) match_result
   = returnDs (WildPat ty, match_result)
@@ -585,11 +576,54 @@ matchUnmixedEqns all_vars@(var:vars) eqns_info
 	-- (ToDo: sort this out later)
     matchLiterals all_vars eqns_info
 
+  | isSigPat first_pat
+  = ASSERT( isSingleton eqns_info )
+    matchSigPat all_vars (head eqns_info)
   where
     first_pat		= head column_1_pats
     column_1_pats 	= [pat		                   | EqnInfo _ _   (pat:_)  _            <- eqns_info]
     remaining_eqns_info = [EqnInfo n ctx pats match_result | EqnInfo n ctx (_:pats) match_result <- eqns_info]
 \end{code}
+
+A SigPat is a type coercion and must be handled one at at time.  We can't
+combine them unless the type of the pattern inside is identical, and we don't
+bother to check for that.  For example:
+
+	data T = T1 Int | T2 Bool
+	f :: (forall a. a -> a) -> T -> t
+	f (g::Int->Int)   (T1 i) = T1 (g i)
+	f (g::Bool->Bool) (T2 b) = T2 (g b)
+
+We desugar this as follows:
+
+	f = \ g::(forall a. a->a) t::T ->
+	    let gi = g Int
+	    in case t of { T1 i -> T1 (gi i)
+			   other ->
+	    let	gb = g Bool
+	    in case t of { T2 b -> T2 (gb b)
+			   other -> fail }}
+
+Note that we do not treat the first column of patterns as a
+column of variables, because the coerced variables (gi, gb)
+would be of different types.  So we get rather grotty code.
+But I don't think this is a common case, and if it was we could
+doubtless improve it.
+
+Meanwhile, the strategy is:
+	* treat each SigPat coercion (always non-identity coercions)
+		as a separate block
+	* deal with the stuff inside, and then wrap a binding round
+		the result to bind the new variable (gi, gb, etc)
+
+\begin{code}
+matchSigPat :: [Id] -> EquationInfo -> DsM MatchResult
+matchSigPat (var:vars) (EqnInfo n ctx (SigPat pat ty co_fn : pats) result)
+  = selectMatchVar pat						`thenDs` \ new_var ->
+    dsExpr (HsApp co_fn (HsVar var))				`thenDs` \ rhs ->
+    match (new_var:vars) [EqnInfo n ctx (pat:pats) result]	`thenDs` \ result' ->
+    returnDs (adjustMatchResult (bindNonRec new_var rhs) result')
+\end{code}	
 
 %************************************************************************
 %*									*
