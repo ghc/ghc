@@ -45,7 +45,7 @@ import PrelShow
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 #else
-import PrimPrel ( PrimArray
+import PrelPrim ( PrimArray
 		, runST
 		, primNewArray
 	        , primWriteArray

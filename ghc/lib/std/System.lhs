@@ -188,7 +188,7 @@ unpackProgName argv
 --
 -- Suitable for use with Hugs 98
 -----------------------------------------------------------------------------
-import PrimPrel ( primGetRawArgs
+import PrelPrim ( primGetRawArgs
 		, primGetEnv
 		, prelCleanupAfterRunAction
 		, copy_String_to_cstring

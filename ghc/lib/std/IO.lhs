@@ -87,7 +87,7 @@ module IO (
 
 #ifdef __HUGS__
 import Ix(Ix)
-import PrimPrel ( IORef
+import PrelPrim ( IORef
 		, unsafePerformIO
 		, prelCleanupAfterRunAction
 		, copy_String_to_cstring
