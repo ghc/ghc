@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.31 2002/07/04 07:09:47 mthomas Exp $
+ * $Id: Profiling.c,v 1.32 2002/07/05 01:23:45 mthomas Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -643,7 +643,7 @@ report_per_cc_costs( void )
     }
   }
   
-  fprintf(prof_file, "%-20s %-10s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%-30s %-20s", "COST CENTRE", "MODULE");  
   fprintf(prof_file, "%6s %6s", "%time", "%alloc");
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
     fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -654,7 +654,7 @@ report_per_cc_costs( void )
       if (cc_to_ignore(cc)) {
 	  continue;
       }
-      fprintf(prof_file, "%-20s %-10s", cc->label, cc->module);
+      fprintf(prof_file, "%-30s %-20s", cc->label, cc->module);
       fprintf(prof_file, "%6.1f %6.1f",
 	      total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
 	      total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
@@ -677,10 +677,10 @@ report_per_cc_costs( void )
 static void 
 fprint_header( void )
 {
-  fprintf(prof_file, "%-24s %-10s                 individual     inherited\n", "", "");
+  fprintf(prof_file, "%-24s %-10s                                                            individual    inherited\n", "", "");
 
-  fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
-  fprintf(prof_file, "%6s %8s  %5s %5s   %5s %5s", "no.", "entries", "%time", "%alloc", "%time", "%alloc");
+  fprintf(prof_file, "%-24s %-50s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%6s %10s  %5s %5s   %5s %5s", "no.", "entries", "%time", "%alloc", "%time", "%alloc");
 
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
     fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -764,15 +764,15 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	/* force printing of *all* cost centres if -P -P */ 
     {
 
-    fprintf(prof_file, "%-*s%-*s %-10s", 
+    fprintf(prof_file, "%-*s%-*s %-50s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%6d %9.1f %5.1f  %5.1f   %5.1f  %5.1f",
-	    ccs->ccsID, (float) ccs->scc_count, 
-	    total_prof_ticks == 0 ? 0.0 : ((float)ccs->time_ticks / (float)total_prof_ticks * 100.0),
-	    total_alloc == 0 ? 0.0 : ((float)ccs->mem_alloc / (float)total_alloc * 100.0),
-	    total_prof_ticks == 0 ? 0.0 : ((float)ccs->inherited_ticks / (float)total_prof_ticks * 100.0),
-	    total_alloc == 0 ? 0.0 : ((float)ccs->inherited_alloc / (float)total_alloc * 100.0)
+    fprintf(prof_file, "%6d %11.0f %5.1f  %5.1f   %5.1f  %5.1f",
+	    ccs->ccsID, (double) ccs->scc_count, 
+	    total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)total_prof_ticks * 100.0),
+	    total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)total_alloc * 100.0),
+	    total_prof_ticks == 0 ? 0.0 : ((double)ccs->inherited_ticks / (double)total_prof_ticks * 100.0),
+	    total_alloc == 0 ? 0.0 : ((double)ccs->inherited_alloc / (double)total_alloc * 100.0)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
