@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.23 $
- * $Date: 2001/05/25 18:32:51 $
+ * $Revision: 1.24 $
+ * $Date: 2001/05/27 06:08:24 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -115,7 +115,7 @@ void interp_startup ( void )
 void interp_shutdown ( void )
 {
    int i, j, k, o_max, i_max, j_max;
-   fprintf(stderr, "%d constrs entered -> (%d BCO, %d UPD, %d ??)\n",
+   fprintf(stderr, "%d constrs entered -> (%d BCO, %d UPD, %d ??? )\n",
                    it_retto_BCO + it_retto_UPDATE + it_retto_other,
                    it_retto_BCO, it_retto_UPDATE, it_retto_other );
    fprintf(stderr, "%d total entries, %d unknown entries \n", 
