@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-implicit-prelude #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Pool
@@ -44,18 +45,29 @@ module Foreign.Marshal.Pool (
 ) where
 
 #if defined(__NHC__)
-import IO                       ( bracket )
-#else
-import Control.Exception        ( bracket )
+import IO                    ( bracket )
+#elif defined(__HUGS__)
+import Control.Exception     ( bracket )
 #endif
-import Control.Monad            ( liftM )
-import Data.IORef               ( IORef, newIORef, readIORef, modifyIORef )
-import Data.List                ( delete )
-import Foreign.Marshal.Alloc    ( mallocBytes, reallocBytes, free )
-import Foreign.Marshal.Array    ( pokeArray, pokeArray0 )
-import Foreign.Marshal.Error    ( throwIf )
-import Foreign.Ptr              ( Ptr, castPtr )
-import Foreign.Storable         ( Storable(sizeOf, poke) )
+
+#ifdef __GLASGOW_HASKELL__
+import GHC.Base              ( Int, Monad(..), (.), not, map )
+import GHC.Err               ( undefined )
+import GHC.Exception         ( block, unblock, throw, catchException )
+import GHC.IOBase            ( IO, IORef, newIORef, readIORef, writeIORef, )
+import GHC.List              ( elem, length )
+import GHC.Num               ( Num(..) )
+#else
+import Data.IORef            ( IORef, newIORef, readIORef, modifyIORef )
+#endif
+
+import Control.Monad         ( liftM )
+import Data.List             ( delete )
+import Foreign.Marshal.Alloc ( mallocBytes, reallocBytes, free )
+import Foreign.Marshal.Array ( pokeArray, pokeArray0 )
+import Foreign.Marshal.Error ( throwIf )
+import Foreign.Ptr           ( Ptr, castPtr )
+import Foreign.Storable      ( Storable(sizeOf, poke) )
 
 --------------------------------------------------------------------------------
 
@@ -69,19 +81,28 @@ newtype Pool = Pool (IORef [Ptr ()])
 -- | Allocate a fresh memory pool.
 
 newPool :: IO Pool
-newPool = liftM Pool $ newIORef []
+newPool = liftM Pool (newIORef [])
 
 -- | Deallocate a memory pool and everything which has been allocated in the
 -- pool itself.
 
 freePool :: Pool -> IO ()
-freePool (Pool ps) = readIORef ps >>= mapM_ free
+freePool (Pool pool) = readIORef pool >>= freeAll
+   where freeAll []     = return ()
+         freeAll (p:ps) = free p >> freeAll ps
 
 -- | Execute an action with a fresh memory pool, which gets automatically
 -- deallocated (including its contents) after the action has finished.
 
 withPool :: (Pool -> IO b) -> IO b
-withPool = bracket newPool freePool
+withPool act =   -- ATTENTION: cut-n-paste from Control.Exception below!
+   block (do
+      pool <- newPool
+      val <- catchException
+                (unblock (act pool))
+                (\e -> do freePool pool; throw e)
+      freePool pool
+      return val)
 
 --------------------------------------------------------------------------------
 
@@ -100,7 +121,8 @@ pooledMalloc = pm undefined
 pooledMallocBytes :: Pool -> Int -> IO (Ptr a)
 pooledMallocBytes (Pool pool) size = do
    ptr <- mallocBytes size
-   modifyIORef pool (ptr:)
+   ptrs <- readIORef pool
+   writeIORef pool (ptr:ptrs)
    return (castPtr ptr)
 
 -- | Adjust the storage area for an element in the pool to the given size of
@@ -117,9 +139,10 @@ pooledRealloc = pr undefined
 pooledReallocBytes :: Pool -> Ptr a -> Int -> IO (Ptr a)
 pooledReallocBytes (Pool pool) ptr size = do
    let cPtr = castPtr ptr
-   throwIf (not . (cPtr `elem`)) (const "pointer not in pool") (readIORef pool)
+   throwIf (not . (cPtr `elem`)) (\_ -> "pointer not in pool") (readIORef pool)
    newPtr <- reallocBytes cPtr size
-   modifyIORef pool ((newPtr :) . delete cPtr)
+   ptrs <- readIORef pool
+   writeIORef pool (newPtr : delete cPtr ptrs)
    return (castPtr newPtr)
 
 -- | Allocate storage for the given number of elements of a storable type in the
