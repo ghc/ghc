@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.38 2000/04/03 15:54:50 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.39 2000/04/03 16:28:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -207,16 +207,18 @@ nat init_sp = 0;
 static void
 initModules ( void *init_root )
 {
-  init_sp = 0;
-  init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
-  init_stack[init_sp++] = (F_)stg_init_ret;
-  init_stack[init_sp++] = (F_)__init_Prelude;
-  if (init_root != NULL) {
-    init_stack[init_sp++] = (F_)init_root;
-  }
+    Capability cap;
 
-  MainRegTable.rSp = (P_)(init_stack + init_sp);
-  StgRun((StgFunPtr)stg_init, NULL/* no reg table */);
+    init_sp = 0;
+    init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
+    init_stack[init_sp++] = (F_)stg_init_ret;
+    init_stack[init_sp++] = (F_)__init_Prelude;
+    if (init_root != NULL) {
+	init_stack[init_sp++] = (F_)init_root;
+    }
+    
+    cap.rSp = (P_)(init_stack + init_sp);
+    StgRun((StgFunPtr)stg_init, &cap);
 }
 
 #endif /* !INTERPRETER */

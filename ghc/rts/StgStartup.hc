@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.10 2000/03/30 12:03:30 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.11 2000/04/03 16:28:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -153,7 +153,7 @@ STGFUN(stg_init_ret)
 STGFUN(stg_init)
 {
   FB_
-  Sp = MainRegTable.rSp;
+  Sp = BaseReg->rSp;
   JMP_(POP_INIT_STACK());
   FE_
 }
