@@ -211,9 +211,12 @@ resTypeArgDmd :: DmdResult -> Demand
 --	BotRes = Bot -> BotRes
 --	TopRes = Top -> TopRes
 -- This function makes that concrete
+-- We can get a RetCPR, because of the way in which we are (now)
+-- giving CPR info to strict arguments.  On the first pass, when
+-- nothing has demand info, we optimistically give CPR info or RetCPR to all args
 resTypeArgDmd TopRes = Top
+resTypeArgDmd RetCPR = Top
 resTypeArgDmd BotRes = Bot
-resTypeArgDmd RetCPR = panic "resTypeArgDmd: RetCPR"
 
 returnsCPR :: DmdResult -> Bool
 returnsCPR RetCPR = True

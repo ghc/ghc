@@ -713,17 +713,22 @@ extendSigEnvList = extendVarEnvList
 
 extendSigsWithLam :: SigEnv -> Id -> SigEnv
 -- Extend the SigEnv when we meet a lambda binder
--- If the binder is marked demanded with a product demand, 
--- then give it a CPR signature, because in the likely event
--- that this is a lambda on a fn defn [we only use this when
--- the lambda is being consumed with a call demand],
--- it'll be w/w'd and so it will be CPR-ish
--- NOTE: see notes [CPR-AND-STRICTNESS]
+--  If the binder is marked demanded with a product demand, then give it a CPR 
+-- signature, because in the likely event that this is a lambda on a fn defn 
+-- [we only use this when the lambda is being consumed with a call demand],
+-- it'll be w/w'd and so it will be CPR-ish.
+--
+-- 	NOTE: see notes [CPR-AND-STRICTNESS]
+--
+-- Also note that we only want to do this for something that
+-- definitely has product type, else we may get over-optimistic 
+-- CPR results (e.g. from \x -> x!).
+
 extendSigsWithLam sigs id
   = case idNewDemandInfo_maybe id of
-	Nothing	       -> pprTrace "Yes (bot)" (ppr id) $ extendVarEnv sigs id (cprSig, NotTopLevel)
-	Just (Eval ds) -> pprTrace "Yes" (ppr id) $ extendVarEnv sigs id (cprSig, NotTopLevel)
-	other          -> pprTrace "No" (ppr id $$ ppr (idNewDemandInfo id)) $ sigs
+	Nothing	              -> extendVarEnv sigs id (cprSig, NotTopLevel)
+	Just (Eval (Prod ds)) -> extendVarEnv sigs id (cprSig, NotTopLevel)
+	other                 -> sigs
 
 cprSig :: StrictSig
 cprSig = StrictSig (mkDmdType emptyVarEnv [] RetCPR)
