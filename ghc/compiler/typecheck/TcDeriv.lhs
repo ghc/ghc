@@ -193,7 +193,7 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns mod tycl_decls	    	`thenTc` \ eqns ->
+    makeDerivEqns tycl_decls	    	`thenTc` \ eqns ->
     if null eqns then
 	returnTc ([], EmptyBinds)
     else
@@ -276,9 +276,9 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: Module -> [RenamedTyClDecl] -> TcM [DerivEqn]
+makeDerivEqns :: [RenamedTyClDecl] -> TcM [DerivEqn]
 
-makeDerivEqns this_mod tycl_decls
+makeDerivEqns tycl_decls
   = mapTc mk_eqn derive_these	 	`thenTc` \ maybe_eqns ->
     returnTc (catMaybes maybe_eqns)
   where
@@ -287,7 +287,7 @@ makeDerivEqns this_mod tycl_decls
 	-- Find the (Class,TyCon) pairs that must be `derived'
 	-- NB: only source-language decls have deriving, no imported ones do
     derive_these = [ (clas,tycon) 
-		   | TyData _ _ tycon _ _ _ (Just classes) _ _ _ <- tycl_decls,
+		   | TyData {tcdName = tycon, tcdDerivs = Just classes} <- tycl_decls,
 		     clas <- nub classes ]
 
     ------------------------------------------------------------------
@@ -323,7 +323,7 @@ makeDerivEqns this_mod tycl_decls
 	case chk_out clas tycon of
 	   Just err ->  addErrTc err				`thenNF_Tc_` 
 			returnNF_Tc Nothing
-	   Nothing  ->  newDFunName this_mod clas [ty] locn `thenNF_Tc` \ dfun_name ->
+	   Nothing  ->  newDFunName clas [ty] locn `thenNF_Tc` \ dfun_name ->
 			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
 
 

@@ -240,9 +240,12 @@ data Sig name
 		(HsType name)
 		SrcLoc
 
-  | ClassOpSig	name			-- Selector name
-                (Maybe (DefMeth name))	-- Nothing for source-file class signatures
-					-- Gives DefMeth info for interface files sigs
+  | ClassOpSig	name		-- Selector name
+                (DefMeth name)	-- (Just dm_name) for source-file class signatures
+				-- 	The name may not be used, if there isn't a
+				--	generic default method, but it's there if we
+				--	need it
+				-- Gives DefMeth info for interface files sigs
 		(HsType name)
 		SrcLoc
 
@@ -340,15 +343,9 @@ ppr_sig (ClassOpSig var dm ty _)
       = sep [ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty)]
       where
 	pp_dm = case dm of 
-		  Just (DefMeth _) -> equals 	-- Default method indicator
-		  Just GenDefMeth  -> semi      -- Generic method indicator
-		  Just NoDefMeth   -> empty     -- No Method at all
-		  -- Not convinced this is right...
-		  -- Not used in interface file output hopefully
-		  -- but needed for ddump-rn ??
-		  other		   -> dot
-				   -- empty     -- No method at all
-
+		  DefMeth _  -> equals 	-- Default method indicator
+		  GenDefMeth -> semi    -- Generic method indicator
+		  NoDefMeth  -> empty   -- No Method at all
 
 ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],

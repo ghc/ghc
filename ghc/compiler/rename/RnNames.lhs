@@ -174,7 +174,7 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 \begin{code}
 importsFromLocalDecls this_mod decls
   = mapRn (getLocalDeclBinders this_mod) decls	`thenRn` \ avails_s ->
-
+	-- The avails that are returned don't include the "system" names
     let
 	avails = concat avails_s
 
@@ -187,9 +187,9 @@ importsFromLocalDecls this_mod decls
 	-- Check for duplicate definitions
     mapRn_ (addErrRn . dupDeclErr) dups			`thenRn_` 
 
+
 	-- Record that locally-defined things are available
     recordLocalSlurps (availsToNameSet avails)		`thenRn_`
-
     let
 	mod_name   = moduleName this_mod
 	unqual_imp = True	-- Want unqualified names
@@ -201,18 +201,21 @@ importsFromLocalDecls this_mod decls
     returnRn (gbl_env, exports)
 
 ---------------------------
-getLocalDeclBinders :: Module 
-		    -> RdrNameHsDecl -> RnMG Avails
+getLocalDeclBinders :: Module -> RdrNameHsDecl -> RnMG [AvailInfo]
 getLocalDeclBinders mod (TyClD tycl_decl)
   =	-- For type and class decls, we generate Global names, with
 	-- no export indicator.  They need to be global because they get
 	-- permanently bound into the TyCons and Classes.  They don't need
 	-- an export indicator because they are all implicitly exported.
-    getTyClDeclBinders mod tycl_decl	`thenRn` \ avail ->
+    getTyClDeclBinders mod tycl_decl	`thenRn` \ (avail, sys_names) ->
+
+	-- Record that the system names are available
+    recordLocalSlurps (mkNameSet sys_names)	`thenRn_`
     returnRn [avail]
 
 getLocalDeclBinders mod (ValD binds)
-  = mapRn new (bagToList (collectTopBinders binds))
+  = mapRn new (bagToList (collectTopBinders binds))	`thenRn` \ avails ->
+    returnRn avails
   where
     new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenRn` \ name ->
 			  returnRn (Avail name)

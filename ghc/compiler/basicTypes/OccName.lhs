@@ -326,17 +326,9 @@ mkSuperDictSelOcc index cls_occ
 
 \begin{code}
 mkDFunOcc :: EncodedString	-- Typically the class and type glommed together e.g. "OrdMaybe"
-	  -> Int		-- Unique to distinguish dfuns which share the previous two
-				--	eg 3
-	  -- The requirement is that the (string,index) pair be unique in this module
+	  -> OccName		-- "$fOrdMaybe"
 
-	  -> OccName	-- "$fOrdMaybe3"
-
-mkDFunOcc string index
-  = mk_deriv VarName "$f" (show_index ++ string)
-  where
-    show_index | index == 0 = ""
-   	       | otherwise  = show index
+mkDFunOcc string = mk_deriv VarName "$f" string
 \end{code}
 
 We used to add a '$m' to indicate a method, but that gives rise to bad

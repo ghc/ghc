@@ -104,6 +104,9 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     count_monobinds (PatMonoBind p r _)            = (0,1)
     count_monobinds (FunMonoBind f _ m _)          = (0,1)
 
+    count_mb_monobinds (Just mbs) = count_monobinds mbs
+    count_mb_monobinds Nothing	  = (0,0)
+
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
     sig_info (Sig _ _ _)            = (1,0,0,0)
@@ -123,14 +126,14 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData _ _ _ _ _ nconstrs derivs _ _ _)
+    data_info (TyData {tcdNCons = nconstrs, tcdDerivs = derivs})
 	= (nconstrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ )
-	= case count_sigs meth_sigs of
+    class_info decl@(ClassDecl {})
+	= case count_sigs (tcdSigs decl) of
 	    (_,classops,_,_) ->
-	       (classops, addpr (count_monobinds def_meths))
+	       (classops, addpr (count_mb_monobinds (tcdMeths decl)))
     class_info other = (0,0)
 
     inst_info (InstDecl _ inst_meths inst_sigs _ _)

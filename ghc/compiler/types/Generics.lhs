@@ -225,7 +225,7 @@ validGenericMethodType ty
 %************************************************************************
 
 \begin{code}
-mkTyConGenInfo :: TyCon -> Name -> Name -> Maybe (EP Id)
+mkTyConGenInfo :: TyCon -> [Name] -> Maybe (EP Id)
 -- mkTyConGenInfo is called twice
 --	once from TysWiredIn for Tuples
 --	once the typechecker TcTyDecls 
@@ -236,7 +236,7 @@ mkTyConGenInfo :: TyCon -> Name -> Name -> Maybe (EP Id)
 -- The two names are the names constructed by the renamer
 -- for the fromT and toT conversion functions.
 
-mkTyConGenInfo tycon from_name to_name
+mkTyConGenInfo tycon [from_name, to_name]
   | null datacons 	-- Abstractly imported types don't have
   = Nothing		-- to/from operations, (and should not need them)
 

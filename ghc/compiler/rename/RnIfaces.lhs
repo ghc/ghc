@@ -418,10 +418,9 @@ getGates :: FreeVars		-- Things mentioned in the source program
 getGates source_fvs decl 
   = get_gates (\n -> n `elemNameSet` source_fvs) decl
 
-get_gates is_used (IfaceSig _ ty _ _)
-  = extractHsTyNames ty
+get_gates is_used (IfaceSig {tcdType = ty}) = extractHsTyNames ty
 
-get_gates is_used (ClassDecl ctxt cls tvs _ sigs _ _ _ )
+get_gates is_used (ClassDecl { tcdCtxt = ctxt, tcdName = cls, tcdTyVars = tvs, tcdSigs = sigs})
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
@@ -441,11 +440,11 @@ get_gates is_used (ClassDecl ctxt cls tvs _ sigs _ _ _ )
 		 | otherwise
 		 = emptyFVs
 
-get_gates is_used (TySynonym tycon tvs ty _)
+get_gates is_used (TySynonym {tcdTyVars = tvs, tcdSynRhs = ty})
   = delListFromNameSet (extractHsTyNames ty) (hsTyVarNames tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
-get_gates is_used (TyData _ ctxt tycon tvs cons _ _ _ _ _)
+get_gates is_used (TyData {tcdCtxt = ctxt, tcdName = tycon, tcdTyVars = tvs, tcdCons = cons})
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
 		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon

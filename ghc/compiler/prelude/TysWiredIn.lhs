@@ -182,7 +182,7 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
 -- the TyCon unique.  So each Prelude tycon needs 3 slots, one
 -- for itself and two more for the generic Ids.
 mk_tc_gen_info mod tc_uniq tc_name tycon
-  = mkTyConGenInfo tycon name1 name2
+  = mkTyConGenInfo tycon [name1, name2]
   where
 	tc_occ_name = nameOccName tc_name
 	occ_name1   = mkGenOcc1 tc_occ_name

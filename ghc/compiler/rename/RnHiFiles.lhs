@@ -294,8 +294,11 @@ loadDecls mod (decls_map, n_slurped) decls
     returnRn (vers, (decls_map', n_slurped))
 
 loadDecl mod (version_map, decls_map) (version, decl)
-  = getIfaceDeclBinders mod decl	`thenRn` \ full_avail ->
+  = getTyClDeclBinders mod decl	`thenRn` \ (avail, sys_names) ->
     let
+	full_avail    = case avail of
+			  Avail n -> avail
+			  AvailTC n ns -> AvailTC n (sys_names ++ ns)
 	main_name     = availName full_avail
 	new_decls_map = extendNameEnvList decls_map stuff
 	stuff  	      = [ (name, (full_avail, name==main_name, (mod, decl))) 
@@ -417,29 +420,20 @@ It doesn't deal with source-code specific things: @ValD@, @DefD@.  They
 are handled by the sourc-code specific stuff in @RnNames@.
 
 \begin{code}
-getIfaceDeclBinders, getTyClDeclBinders
+getTyClDeclBinders
 	:: Module
 	-> RdrNameTyClDecl
-	-> RnM d AvailInfo
+	-> RnM d (AvailInfo, [Name])	-- The [Name] are the system names
 
 -----------------
-getTyClDeclBinders mod (IfaceSig var ty prags src_loc)
+getTyClDeclBinders mod (IfaceSig {tcdName = var, tcdLoc = src_loc})
   = newTopBinder mod var src_loc			`thenRn` \ var_name ->
-    returnRn (Avail var_name)
+    returnRn (Avail var_name, [])
 
 getTyClDeclBinders mod tycl_decl
-  = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ (main_name:sub_names) ->
-    returnRn (AvailTC main_name (main_name : sub_names))
-
------------------
-getIfaceDeclBinders mod (IfaceSig var ty prags src_loc)
-  = newTopBinder mod var src_loc			`thenRn` \ var_name ->
-    returnRn (Avail var_name)
-
-getIfaceDeclBinders mod tycl_decl
-  = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ (main_name:sub_names) ->
+  = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ names@(main_name:_) ->
     new_top_bndrs mod (tyClDeclSysNames tycl_decl)	`thenRn` \ sys_names ->
-    returnRn (AvailTC main_name (main_name : (sys_names ++ sub_names)))
+    returnRn (AvailTC main_name names, sys_names)
 
 -----------------
 new_top_bndrs mod names_w_locs

@@ -33,7 +33,6 @@ import Outputable
 \begin{code}
 stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
 	-> Module		-- module name (profiling only)
-	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
 	-> IO
 	    ([(StgBinding,[Id])],  -- output program...
@@ -41,7 +40,7 @@ stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
 	      [CostCentre],	   -- "extern" cost-centres
 	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
 
-stg2stg dflags module_name us binds
+stg2stg dflags module_name binds
   = do	{ showPass dflags "Stg2Stg"
 	; us <- mkSplitUniqSupply 'g'
 

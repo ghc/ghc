@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.33 2000/11/24 09:51:39 simonpj Exp $
+-- $Id: Main.hs,v 1.34 2000/11/24 17:02:02 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -19,7 +19,11 @@ module Main (main) where
 #ifdef GHCI
 import Interpreter
 import InteractiveUI
+#endif
+
+#ifndef mingw32_TARGET_OS
 import Dynamic
+import Posix
 #endif
 
 import CompManager
@@ -40,9 +44,6 @@ import Util
 
 
 import Concurrent
-#ifndef mingw32_TARGET_OS
-import Posix
-#endif
 import Directory
 import IOExts
 import Exception

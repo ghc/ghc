@@ -22,15 +22,15 @@ import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
+			  TyThing(..), DFunId, TypeEnv, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
 			  extendTypeEnvList
 			)
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId, 
-			  idSpecialisation, setIdInfo, isLocalId
+import Id		( Id, idType, idInfo, omitIfaceSigForId, isDictFunId,
+			  idSpecialisation, setIdInfo, isLocalId, idName, hasNoBinding
 			)
 import Var		( isId )
 import VarSet
@@ -40,7 +40,7 @@ import CoreSyn		( CoreBind, CoreRule(..), IdCoreRule,
 			  isBuiltinRule, rulesRules, 
 			  bindersOf, bindersOfBinds
 			)
-import CoreFVs		( ruleSomeLhsFreeVars, ruleSomeFreeVars )
+import CoreFVs		( ruleSomeLhsFreeVars )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import Name		( getName, nameModule, Name, NamedThing(..) )
 import Name 	-- Env
@@ -66,37 +66,43 @@ import IO		( IOMode(..), openFile, hClose )
 %************************************************************************
 
 \begin{code}
-mkModDetails :: TypeEnv -> [DFunId]	-- From typechecker
-	     -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
-					-- code generator; they have authoritative arity info
-	     -> [IdCoreRule]		-- Tidy orphan rules
+mkModDetails :: TypeEnv		-- From typechecker
+	     -> [CoreBind]	-- Final bindings
+	     -> [Id]		-- Top-level Ids from the code generator; 
+				-- they have authoritative arity info
+	     -> [IdCoreRule]	-- Tidy orphan rules
 	     -> ModDetails
-mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
+mkModDetails type_env tidy_binds stg_ids orphan_rules
   = ModDetails { md_types = new_type_env,
 		 md_rules = rule_dcls,
-		 md_insts = dfun_ids }
+		 md_insts = filter isDictFunId final_ids }
   where
 	-- The competed type environment is gotten from
 	-- 	a) keeping the types and classes
 	--	b) removing all Ids, 
 	--	c) adding Ids with correct IdInfo, including unfoldings,
 	--		gotten from the bindings
-	-- From (c) we keep only those Ids with Global names, plus Ids
-	--	    accessible from them (notably via unfoldings)
+	-- From (c) we keep only those Ids with Global names;
+	--	    the CoreTidy pass makes sure these are all and only
+	--	    the externally-accessible ones
 	-- This truncates the type environment to include only the 
 	-- exported Ids and things needed from them, which saves space
 	--
 	-- However, we do keep things like constructors, which should not appear 
 	-- in interface files, because they are needed by importing modules when
 	-- using the compilation manager
-    new_type_env = extendTypeEnvList (filterNameEnv isTyClThing type_env)
+    new_type_env = extendTypeEnvList (filterNameEnv keep_it type_env)
 				     (map AnId final_ids)
+
+	-- We keep constructor workers, because they won't appear
+	-- in the bindings from which final_ids are derived!
+    keep_it (AnId id) = hasNoBinding id
+    keep_it other     = True
 
     stg_id_set = mkVarSet stg_ids
     final_ids  = [addStgInfo stg_id_set id | bind <- tidy_binds
 					   , id <- bindersOf bind
 					   , isGlobalName (idName id)]
-
 
 	-- The complete rules are gotten by combining
 	--	a) the orphan rules
@@ -106,14 +112,15 @@ mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
 
 -- This version is used when we are re-linking a module
 -- so we've only run the type checker on its previous interface 
-mkModDetailsFromIface :: TypeEnv -> [DFunId]	-- From typechecker
+mkModDetailsFromIface :: TypeEnv 
 		      -> [TypecheckedRuleDecl]
 		      -> ModDetails
-mkModDetailsFromIface type_env dfun_ids rules
+mkModDetailsFromIface type_env rules
   = ModDetails { md_types = type_env,
 		 md_rules = rule_dcls,
 		 md_insts = dfun_ids }
   where
+    dfun_ids  = [dfun_id | AnId dfun_id <- nameEnvElts type_env, isDictFunId dfun_id]
     rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
 	-- All the rules from an interface are of the IfaceRuleOut form
 \end{code}
@@ -231,19 +238,20 @@ ifaceTyCls :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
 ifaceTyCls (AClass clas) so_far
   = cls_decl : so_far
   where
-    cls_decl = ClassDecl (toHsContext sc_theta)
-			 (getName clas)		 
-			 (toHsTyVars clas_tyvars)
-			 (toHsFDs clas_fds)
-			 (map toClassOpSig op_stuff)
-			 EmptyMonoBinds
-			 [] noSrcLoc
+    cls_decl = ClassDecl { tcdCtxt	= toHsContext sc_theta,
+			   tcdName	= getName clas,
+			   tcdTyVars	= toHsTyVars clas_tyvars,
+			   tcdFDs 	= toHsFDs clas_fds,
+			   tcdSigs	= map toClassOpSig op_stuff,
+			   tcdMeths	= Nothing, 
+			   tcdSysNames  = bogus_sysnames,
+			   tcdLoc	= noSrcLoc }
 
     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
 
     toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
-	  ClassOpSig (getName sel_id) (Just def_meth') (toHsType op_ty) noSrcLoc
+	  ClassOpSig (getName sel_id) def_meth' (toHsType op_ty) noSrcLoc
 	where
 	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
 	  def_meth' = case def_meth of
@@ -256,16 +264,21 @@ ifaceTyCls (ATyCon tycon) so_far
   | otherwise	       = ty_decl : so_far
   where
     ty_decl | isSynTyCon tycon
-	    = TySynonym (getName tycon)(toHsTyVars tyvars) 
-			(toHsType syn_ty) noSrcLoc
+	    = TySynonym { tcdName   = getName tycon,
+		 	  tcdTyVars = toHsTyVars tyvars,
+			  tcdSynRhs = toHsType syn_ty,
+			  tcdLoc    = noSrcLoc }
 
 	    | isAlgTyCon tycon
-	    = TyData new_or_data (toHsContext (tyConTheta tycon))
-		     (getName tycon)      
-		     (toHsTyVars tyvars)
-		     (map ifaceConDecl (tyConDataCons tycon))
-		     (tyConFamilySize tycon)
-		     Nothing noSrcLoc (panic "gen1") (panic "gen2")
+	    = TyData {	tcdND	  = new_or_data,
+			tcdCtxt   = toHsContext (tyConTheta tycon),
+			tcdName   = getName tycon,
+		 	tcdTyVars = toHsTyVars tyvars,
+			tcdCons   = map ifaceConDecl (tyConDataCons tycon),
+			tcdNCons  = tyConFamilySize tycon,
+			tcdDerivs = Nothing,
+		        tcdSysNames  = bogus_sysnames,
+			tcdLoc	  = noSrcLoc }
 
 	    | otherwise = pprPanic "ifaceTyCls" (ppr tycon)
 
@@ -301,7 +314,10 @@ ifaceTyCls (AnId id) so_far
   | omitIfaceSigForId id = so_far
   | otherwise 		 = iface_sig : so_far
   where
-    iface_sig = IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc
+    iface_sig = IfaceSig { tcdName   = getName id, 
+			   tcdType   = toHsType id_type,
+			   tcdIdInfo = hs_idinfo,
+			   tcdLoc    =  noSrcLoc }
 
     id_type = idType id
     id_info = idInfo id
@@ -371,6 +387,8 @@ ifaceRule (id, Rule name bndrs args rhs)
   = IfaceRule name (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
 
+bogus_sysnames = panic "Bogus sys names"
+
 bogusIfaceRule id
   = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
@@ -409,7 +427,8 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 	-- mi_globals field set to anything reasonable.
 
   | otherwise		-- Add updated version numbers
-  = (final_iface, Just pp_tc_diffs)
+  = pprTrace "completeIface" (ppr (dcl_tycl old_decls))
+    (final_iface, Just pp_tc_diffs)
 	
   where
     final_iface = new_iface { mi_version = new_version }
@@ -449,7 +468,7 @@ diffDecls old_vers old_fixities new_fixities old new
     same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
 
     diff ok_so_far pp new_vers []  []      = (ok_so_far, pp, new_vers)
-    diff ok_so_far pp new_vers old []      = (False,     pp, new_vers)
+    diff ok_so_far pp new_vers (od:ods) [] = diff False (pp $$ only_old od) new_vers ods []
     diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds
     diff ok_so_far pp new_vers (od:ods) (nd:nds)
 	= case od_name `compare` nd_name of
@@ -461,7 +480,7 @@ diffDecls old_vers old_fixities new_fixities old new
  	  od_name = tyClDeclName od
  	  nd_name = tyClDeclName nd
 	  new_vers' = extendNameEnv new_vers nd_name 
-				    (bumpVersion True (lookupNameEnv_NF old_vers od_name))
+				    (bumpVersion False (lookupNameEnv_NF old_vers od_name))
 
     only_old d   = ptext SLIT("Only in old iface:") <+> ppr d
     only_new d   = ptext SLIT("Only in new iface:") <+> ppr d

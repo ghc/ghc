@@ -49,7 +49,7 @@ module RdrHsSyn (
 	extractRuleBndrsTyVars,
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
-	mkHsOpApp, mkClassDecl, mkClassOpSig, mkConDecl,
+	mkHsOpApp, mkClassDecl, mkClassOpSigDM, mkConDecl,
 	mkHsNegApp, 
 
 	cvBinds,
@@ -211,7 +211,9 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
   
 \begin{code}
 mkClassDecl cxt cname tyvars fds sigs mbinds loc
-  = ClassDecl cxt cname tyvars fds sigs mbinds new_names loc
+  = ClassDecl { tcdCtxt = cxt, tcdName = cname, tcdTyVars = tyvars,
+		tcdFDs = fds,  tcdSigs = sigs,  tcdMeths = mbinds,
+		tcdSysNames = new_names, tcdLoc = loc }
   where
     cls_occ  = rdrNameOcc cname
     data_occ = mkClassDataConOcc cls_occ
@@ -234,15 +236,14 @@ mkTyData new_or_data context tname list_var list_con i maybe src
   = let t_occ  = rdrNameOcc tname
         name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
 	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
-    in TyData new_or_data context 
-              tname list_var list_con i maybe src name1 name2
+    in TyData { tcdND = new_or_data, tcdCtxt = context, tcdName = tname,
+		tcdTyVars = list_var, tcdCons = list_con, tcdNCons = i,
+		tcdDerivs = maybe, tcdLoc = src, tcdSysNames = [name1, name2] }
 
-mkClassOpSig (DefMeth x) op ty loc
-  = ClassOpSig op (Just (DefMeth dm_rn)) ty loc
+mkClassOpSigDM op ty loc
+  = ClassOpSig op (DefMeth dm_rn) ty loc
   where
     dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
-mkClassOpSig x op ty loc =
-    ClassOpSig op (Just x) ty loc
 
 mkConDecl cname ex_vars cxt details loc
   = ConDecl cname wkr_name ex_vars cxt details loc
@@ -331,7 +332,7 @@ cvValSig      sig = sig
 
 cvInstDeclSig sig = sig
 
-cvClassOpSig (Sig var poly_ty src_loc) = ClassOpSig var Nothing poly_ty src_loc
+cvClassOpSig (Sig var poly_ty src_loc) = mkClassOpSigDM var poly_ty src_loc
 cvClassOpSig sig 		       = sig
 \end{code}
 

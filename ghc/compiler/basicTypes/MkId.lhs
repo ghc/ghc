@@ -632,7 +632,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
   = mkId dfun_name dfun_ty info
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info = constantIdInfo `setTyGenInfo` TyGenNever
+    info = mkIdInfo DictFunId `setTyGenInfo` TyGenNever
              -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
              -- do not generalise it
 

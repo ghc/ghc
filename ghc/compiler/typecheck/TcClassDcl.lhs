@@ -13,8 +13,8 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2,
 import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..), 
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
-			  isClassDecl, isClassOpSig, isPragSig,
-			  getClassDeclSysNames, tyClDeclName
+			  isClassOpSig, isPragSig,
+			  getClassDeclSysNames, 
 			)
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, 
@@ -28,7 +28,7 @@ import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs,
 			  newDicts, newMethod )
 import TcEnv		( TcId, TcEnv, RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
-			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
+			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcMonoType	( tcHsRecType, tcRecClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
@@ -43,7 +43,7 @@ import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
 import Module		( Module )
-import Name		( Name, NamedThing(..), isFrom )
+import Name		( Name, NamedThing(..) )
 import Name		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
@@ -55,7 +55,7 @@ import VarSet		( mkVarSet, emptyVarSet )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet )
 import Util		( count )
-import Maybes		( seqMaybe, maybeToBool, orElse )
+import Maybes		( seqMaybe, maybeToBool )
 \end{code}
 
 
@@ -103,9 +103,10 @@ Death to "ExpandingDicts".
 
 tcClassDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcClassDecl1 is_rec rec_env
-      	     (ClassDecl context class_name
-			tyvar_names fundeps class_sigs def_methods
-			sys_names src_loc)
+      	     (ClassDecl {tcdCtxt = context, tcdName = class_name,
+			 tcdTyVars = tyvar_names, tcdFDs = fundeps,
+			 tcdSigs = class_sigs, tcdMeths = def_methods,
+			 tcdSysNames = sys_names, tcdLoc = src_loc})
   = 	-- CHECK ARITY 1 FOR HASKELL 1.4
     doptsTc Opt_GlasgowExts				`thenTc` \ glaExts ->
     checkTc (glaExts || length tyvar_names == 1)
@@ -121,15 +122,19 @@ tcClassDecl1 is_rec rec_env
     in
     tcExtendTyVarEnv tyvars				$ 
 
-	-- CHECK THAT THE DEFAULT BINDINGS ARE LEGAL
-    checkDefaultBinds clas op_names def_methods		`thenTc` \ dm_info ->
-    checkGenericClassIsUnary clas dm_info		`thenTc_`
+	-- SOURCE-CODE CONSISTENCY CHECKS
+    (case def_methods of
+	Nothing  -> returnTc Nothing	-- Not source
+	Just dms -> checkDefaultBinds clas op_names dms	  `thenTc` \ dm_env ->
+		    checkGenericClassIsUnary clas dm_env  `thenTc_`
+		    returnTc (Just dm_env)
+    )							   `thenTc` \ mb_dm_env ->
 	
 	-- CHECK THE CONTEXT
     tcSuperClasses is_rec clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig is_rec rec_env clas tyvars dm_info) op_sigs	`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig is_rec rec_env clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
     let
@@ -154,11 +159,19 @@ tcClassDecl1 is_rec rec_env
 \end{code}
 
 \begin{code}
-checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds -> TcM (NameEnv (DefMeth Name))
+checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds
+		  -> TcM (NameEnv Bool)
+	-- The returned environment says
+	--	x not in env => no default method
+	--	x -> True    => generic default method
+	--	x -> False   => polymorphic default method
+
   -- Check default bindings
   -- 	a) must be for a class op for this class
   --	b) must be all generic or all non-generic
   -- and return a mapping from class-op to DefMeth info
+
+  -- But do all this only for source binds
 
 checkDefaultBinds clas ops EmptyMonoBinds = returnTc emptyNameEnv
 
@@ -176,27 +189,20 @@ checkDefaultBinds clas ops (FunMonoBind op _ matches loc)
    	-- Check that all the defns ar generic, or none are
     checkTc (all_generic || none_generic) (mixedGenericErr op)	`thenTc_`
 
-	-- Make up the right dm_info
-    if all_generic then
-	returnTc (unitNameEnv op GenDefMeth)
-    else
-	-- An explicit non-generic default method
-	newDefaultMethodName op loc	`thenNF_Tc` \ dm_name ->
-	returnTc (unitNameEnv op (DefMeth dm_name))
-
+    returnTc (unitNameEnv op all_generic)
   where
     n_generic    = count (maybeToBool . maybeGenericMatch) matches
     none_generic = n_generic == 0
     all_generic  = n_generic == length matches
 
-checkGenericClassIsUnary clas dm_info
+checkGenericClassIsUnary clas dm_env
   = -- Check that if the class has generic methods, then the
     -- class has only one parameter.  We can't do generic
     -- multi-parameter type classes!
     checkTc (unary || no_generics) (genericMultiParamErr clas)
   where
     unary 	= length (classTyVars clas) == 1
-    no_generics = null [() | GenDefMeth <- nameEnvElts dm_info]
+    no_generics = not (or (nameEnvElts dm_env))
 \end{code}
 
 
@@ -239,7 +245,7 @@ tcSuperClasses is_rec clas context sc_sel_names
 tcClassSig :: RecFlag -> RecTcEnv	-- Knot tying only!
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
-	   -> NameEnv (DefMeth Name)	-- Info about default methods
+	   -> Maybe (NameEnv Bool)	-- Info about default methods
 	   -> RenamedClassOpSig
 	   -> TcM (Type,		-- Type of the method
 		     ClassOpItem)	-- Selector Id, default-method Id, True if explicit default binding
@@ -249,8 +255,8 @@ tcClassSig :: RecFlag -> RecTcEnv	-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig is_rec unf_env clas clas_tyvars dm_info
-	   (ClassOpSig op_name maybe_dm op_ty src_loc)
+tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
+	   (ClassOpSig op_name sig_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
@@ -272,23 +278,30 @@ tcClassSig is_rec unf_env clas clas_tyvars dm_info
 
     let
 	-- Build the selector id and default method id
-	sel_id      = mkDictSelId op_name clas
+	sel_id = mkDictSelId op_name clas
+ 	dm_id  = mkDefaultMethodId dm_name clas global_ty
+	DefMeth dm_name = sig_dm
 
-	dm_info_name = maybe_dm `orElse` lookupNameEnv dm_info op_name `orElse` NoDefMeth
+	dm_info = case maybe_dm_env of
+		    Nothing      -> iface_dm_info
+		    Just dm_env -> mk_src_dm_info dm_env
 
-	dm_info_id = case dm_info_name of 
-			NoDefMeth       -> NoDefMeth
-			GenDefMeth      -> GenDefMeth
-			DefMeth dm_name -> DefMeth (tcAddImportedIdInfo unf_env dm_id)
-				        where
-					   dm_id = mkDefaultMethodId dm_name clas global_ty
+	iface_dm_info = case sig_dm of 
+			  NoDefMeth       -> NoDefMeth
+			  GenDefMeth      -> GenDefMeth
+			  DefMeth dm_name -> DefMeth (tcAddImportedIdInfo unf_env dm_id)
+
+	mk_src_dm_info dm_env = case lookupNameEnv dm_env op_name of
+				   Nothing    -> NoDefMeth
+				   Just True  -> GenDefMeth
+				   Just False -> DefMeth dm_id
     in
 	-- Check that for a generic method, the type of 
 	-- the method is sufficiently simple
-    checkTc (dm_info_name /= GenDefMeth || validGenericMethodType local_ty)
+    checkTc (dm_info /= GenDefMeth || validGenericMethodType local_ty)
 	    (badGenericMethodType op_name op_ty)		`thenTc_`
 
-    returnTc (local_ty, (sel_id, dm_info_id))
+    returnTc (local_ty, (sel_id, dm_info))
 \end{code}
 
 
@@ -362,9 +375,8 @@ tcClassDecls2 :: Module -> [RenamedTyClDecl] -> NF_TcM (LIE, TcMonoBinds)
 tcClassDecls2 this_mod decls
   = foldr combine
 	  (returnNF_Tc (emptyLIE, EmptyMonoBinds))
-	  [tcClassDecl2 cls_decl | cls_decl <- decls, 
-				   isClassDecl cls_decl,
-				   isFrom this_mod (tyClDeclName cls_decl)]
+	  [tcClassDecl2 cls_decl | cls_decl@(ClassDecl {tcdMeths = Just _}) <- decls] 
+		-- The 'Just' picks out source ClassDecls
   where
     combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1) ->
 		      tc2 `thenNF_Tc` \ (lie2, binds2) ->
@@ -379,9 +391,9 @@ tcClassDecls2 this_mod decls
 tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
 	     -> NF_TcM (LIE, TcMonoBinds)
 
-tcClassDecl2 (ClassDecl context class_name
-			tyvar_names _ sigs default_binds _ src_loc)
-  = 	-- A locally defined class
+tcClassDecl2 (ClassDecl {tcdName = class_name, tcdSigs = sigs, 
+			 tcdMeths = Just default_binds, tcdLoc = src_loc})
+  = 	-- The 'Just' picks out source ClassDecls
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
     tcAddSrcLoc src_loc		     		          $
     tcLookupClass class_name				  `thenNF_Tc` \ clas ->

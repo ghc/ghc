@@ -20,7 +20,7 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  mkVanillaId, mkId, isLocalId,
+			  mkVanillaId, mkId, isLocalId, omitIfaceSigForId,
 			  setIdStrictness, setIdDemandInfo,
 			) 
 import IdInfo		( constantIdInfo,
@@ -293,7 +293,11 @@ tidyTopRhs (_, occ_env, subst_env) rhs = tidyExpr (occ_env, subst_env) rhs
 tidyTopBinder :: Module -> IdEnv Bool
 	      -> TopTidyEnv -> CoreExpr
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
-tidyTopBinder mod ext_ids env_idinfo rhs (orig_env, occ_env, subst_env) id
+tidyTopBinder mod ext_ids env_idinfo rhs env@(orig_env, occ_env, subst_env) id
+  | omitIfaceSigForId id	-- Don't mess with constructors, 
+  = (env, id)			-- record selectors, and the like
+
+  | otherwise
 	-- This function is the heart of Step 2
 	-- The second env is the one to use for the IdInfo
 	-- It's necessary because when we are dealing with a recursive
@@ -321,7 +325,6 @@ tidyTopBinder mod ext_ids env_idinfo rhs (orig_env, occ_env, subst_env) id
 		| otherwise   = noUnfolding
 
 tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
-
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't 
   = constantIdInfo

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.48 2000/11/16 11:39:37 simonmar Exp $
+$Id: Parser.y,v 1.49 2000/11/24 17:02:03 simonpj Exp $
 
 Haskell grammar.
 
@@ -353,7 +353,7 @@ topdecl :: { RdrBinding }
 			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig (groupBindings $5) 
 		   in
 	 	   returnP (RdrHsDecl (TyClD
-		      (mkClassDecl cs c ts $4 sigs binds $1))) }
+		      (mkClassDecl cs c ts $4 sigs (Just binds) $1))) }
 
 	| srcloc 'instance' inst_type where
 		{ let (binds,sigs) 

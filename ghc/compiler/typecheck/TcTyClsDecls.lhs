@@ -11,7 +11,7 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
-import HsSyn		( TyClDecl(..),  HsTyVarBndr,
+import HsSyn		( TyClDecl(..),  
 			  ConDecl(..),   Sig(..), HsPred(..), 
 			  tyClDeclName, hsTyVarNames, 
 			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
@@ -30,7 +30,7 @@ import TcType		( TcKind, newKindVar, zonkKindEnv )
 
 import TcUnify		( unifyKind )
 import TcInstDcls	( tcAddDeclCtxt )
-import Type		( Kind, mkArrowKind, boxedTypeKind, zipFunTys )
+import Type		( Kind, mkArrowKind, zipFunTys )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, tyConKind, ArgVrcs, AlgTyConFlavour(..), 
@@ -201,18 +201,10 @@ tcTyClDecl1 is_rec unf_env decl
 
 \begin{code}
 getInitialKind :: RenamedTyClDecl -> NF_TcM (Name, TcKind)
-getInitialKind (TySynonym name tyvars _ _)
- = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
-   newKindVar		`thenNF_Tc` \ result_kind  ->
-   returnNF_Tc (name, mk_kind arg_kinds result_kind)
-
-getInitialKind (TyData _ _ name tyvars _ _ _ _ _ _)
- = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
-   returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
-
-getInitialKind (ClassDecl _ name tyvars _ _ _ _ _ )
- = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
-   returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
+getInitialKind decl
+ = kcHsTyVars (tcdTyVars decl)	`thenNF_Tc` \ arg_kinds ->
+   newKindVar			`thenNF_Tc` \ result_kind  ->
+   returnNF_Tc (tcdName decl, mk_kind arg_kinds result_kind)
 
 mk_kind tvs_w_kinds res_kind = foldr (mkArrowKind . snd) res_kind tvs_w_kinds
 \end{code}
@@ -240,42 +232,35 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 \begin{code}
 kcTyClDecl :: RenamedTyClDecl -> TcM ()
 
-kcTyClDecl decl@(TySynonym tycon_name hs_tyvars rhs loc)
-  = tcAddDeclCtxt decl			$
-    kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
-    kcHsType rhs			`thenTc` \ rhs_kind ->
+kcTyClDecl decl@(TySynonym {tcdSynRhs = rhs})
+  = kcTyClDeclBody decl		$ \ result_kind ->
+    kcHsType rhs		`thenTc` \ rhs_kind ->
     unifyKind result_kind rhs_kind
 
-kcTyClDecl decl@(TyData new_or_data context tycon_name hs_tyvars con_decls _ _ loc _ _)
-  = tcAddDeclCtxt decl			$
-    kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
+kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = context, tcdCons = con_decls})
+  = kcTyClDeclBody decl			$ \ result_kind ->
     kcHsContext context			`thenTc_` 
     mapTc_ kc_con_decl con_decls
   where
     kc_con_decl (ConDecl _ _ ex_tvs ex_ctxt details loc)
-      = tcAddSrcLoc loc			$
-	kcHsTyVars ex_tvs		`thenNF_Tc` \ kind_env ->
+      = kcHsTyVars ex_tvs		`thenNF_Tc` \ kind_env ->
 	tcExtendKindEnv kind_env	$
 	kcConDetails new_or_data ex_ctxt details
 
-kcTyClDecl decl@(ClassDecl context class_name
-			   hs_tyvars fundeps class_sigs
-		      	   _ _ loc)
-  = tcAddDeclCtxt decl			$
-    kcTyClDeclBody class_name hs_tyvars	$ \ result_kind ->
-    kcHsContext context			`thenTc_`
+kcTyClDecl decl@(ClassDecl {tcdCtxt = context,  tcdSigs = class_sigs})
+  = kcTyClDeclBody decl		$ \ result_kind ->
+    kcHsContext context		`thenTc_`
     mapTc_ kc_sig (filter isClassOpSig class_sigs)
   where
-    kc_sig (ClassOpSig _ _ op_ty loc) = tcAddSrcLoc loc (kcHsBoxedSigType op_ty)
+    kc_sig (ClassOpSig _ _ op_ty loc) = kcHsBoxedSigType op_ty
 
-kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its tyvars
-	       -> (Kind -> TcM a)		-- Thing inside
-	       -> TcM a
+kcTyClDeclBody :: RenamedTyClDecl -> (Kind -> TcM a) -> TcM a
 -- Extend the env with bindings for the tyvars, taken from
 -- the kind of the tycon/class.  Give it to the thing inside, and 
 -- check the result kind matches
-kcTyClDeclBody tc_name hs_tyvars thing_inside
-  = tcLookup tc_name		`thenNF_Tc` \ thing ->
+kcTyClDeclBody decl thing_inside
+  = tcAddDeclCtxt decl		$
+    tcLookup (tcdName decl)	`thenNF_Tc` \ thing ->
     let
 	kind = case thing of
 		  AGlobal (ATyCon tc) -> tyConKind tc
@@ -283,7 +268,7 @@ kcTyClDeclBody tc_name hs_tyvars thing_inside
 		  AThing kind	      -> kind
 		-- For some odd reason, a class doesn't include its kind
 
-	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames hs_tyvars) kind
+	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames (tcdTyVars decl)) kind
     in
     tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
 \end{code}
@@ -303,7 +288,7 @@ buildTyConOrClass
 	-> RenamedTyClDecl -> TyThing
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
-	          (TySynonym tycon_name tyvar_names rhs src_loc)
+	          (TySynonym {tcdName = tycon_name, tcdTyVars = tyvar_names})
   = ATyCon tycon
   where
 	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
@@ -314,7 +299,8 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
         argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
-	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ src_loc name1 name2)
+	          (TyData {tcdND = data_or_new, tcdName = tycon_name, tcdTyVars = tyvar_names,
+			   tcdNCons = nconstrs, tcdSysNames = sys_names})
   = ATyCon tycon
   where
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
@@ -322,7 +308,7 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 			   flavour is_rec gen_info
 
 	gen_info | not (dopt Opt_Generics dflags) = Nothing
-		 | otherwise = mkTyConGenInfo tycon name1 name2
+		 | otherwise = mkTyConGenInfo tycon sys_names
 
 	DataTyDetails ctxt data_cons sel_ids = lookupNameEnv_NF rec_details tycon_name
 
@@ -336,9 +322,8 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 				 | otherwise			  -> DataTyCon
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
-                  (ClassDecl context class_name
-		             tyvar_names fundeps class_sigs def_methods
-		             name_list src_loc)
+                  (ClassDecl {tcdName = class_name, tcdTyVars = tyvar_names,
+			      tcdFDs = fundeps, tcdSysNames = name_list} )
   = AClass clas
   where
         (tycon_name, _, _, _) = getClassDeclSysNames name_list
@@ -427,8 +412,8 @@ tyClDeclFTVs d = foldNameSet add [] (tyClDeclFVs d)
 
 mkClassEdges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Name, [Name])
 
-mkClassEdges decl@(ClassDecl ctxt name _ _ _ _ _ _) = Just (decl, name, [c | HsPClass c _ <- ctxt])
-mkClassEdges other_decl				    = Nothing
+mkClassEdges decl@(ClassDecl {tcdCtxt = ctxt, tcdName = name}) = Just (decl, name, [c | HsPClass c _ <- ctxt])
+mkClassEdges other_decl				   	       = Nothing
 
 mkEdges :: RenamedTyClDecl -> (RenamedTyClDecl, Name, [Name])
 mkEdges decl = (decl, tyClDeclName decl, tyClDeclFTVs decl)

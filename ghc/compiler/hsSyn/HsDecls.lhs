@@ -160,38 +160,43 @@ Plan of attack:
 
 \begin{code}
 data TyClDecl name pat
-  = IfaceSig	name			-- It may seem odd to classify an interface-file signature
-		(HsType name)		-- as a 'TyClDecl', but it's very convenient.  These three
-		[HsIdInfo name]		-- are the kind that appear in interface files.
-		SrcLoc
+  = IfaceSig {	tcdName :: name,		-- It may seem odd to classify an interface-file signature
+		tcdType :: HsType name,		-- as a 'TyClDecl', but it's very convenient.  These three
+		tcdIdInfo :: [HsIdInfo name],	-- are the kind that appear in interface files.
+		tcdLoc :: SrcLoc
+    }
 
-  | TyData	NewOrData
-		(HsContext name) -- context
-		name		 -- type constructor
-		[HsTyVarBndr name]	 -- type variables
-		[ConDecl name]	 -- data constructors (empty if abstract)
-		Int		 -- Number of data constructors (valid even if type is abstract)
-		(Maybe [name])	 -- derivings; Nothing => not specified
+  | TyData {	tcdND     :: NewOrData,
+		tcdCtxt   :: HsContext name,	 -- context
+		tcdName   :: name,		 -- type constructor
+		tcdTyVars :: [HsTyVarBndr name], -- type variables
+		tcdCons	  :: [ConDecl name],	 -- data constructors (empty if abstract)
+		tcdNCons  :: Int,		 -- Number of data constructors (valid even if type is abstract)
+		tcdDerivs :: Maybe [name],	 -- derivings; Nothing => not specified
 				 -- (i.e., derive default); Just [] => derive
 				 -- *nothing*; Just <list> => as you would
 				 -- expect...
-		SrcLoc
-		name             -- generic converter functions
-		name             -- generic converter functions
+		tcdSysNames :: DataSysNames name,	-- Generic converter functions
+		tcdLoc	    :: SrcLoc
+    }
 
-  | TySynonym	name		        -- type constructor
-                [HsTyVarBndr name]	-- type variables
-		(HsType name)	        -- synonym expansion
-		SrcLoc
+  | TySynonym {	tcdName :: name,		        -- type constructor
+		tcdTyVars :: [HsTyVarBndr name],	-- type variables
+		tcdSynRhs :: HsType name,	        -- synonym expansion
+		tcdLoc    :: SrcLoc
+    }
 
-  | ClassDecl	(HsContext name)    	-- context...
-		name		    	-- name of the class
-		[HsTyVarBndr name]	-- the class type variables
-		[FunDep name]		-- functional dependencies
-		[Sig name]		-- methods' signatures
-		(MonoBinds name pat)	-- default methods
-		(ClassDeclSysNames name)
-		SrcLoc
+  | ClassDecl {	tcdCtxt    :: HsContext name, 	 	-- Context...
+		tcdName    :: name,		    	-- Name of the class
+		tcdTyVars  :: [HsTyVarBndr name],	-- The class type variables
+		tcdFDs     :: [FunDep name],		-- Functional dependencies
+		tcdSigs    :: [Sig name],		-- Methods' signatures
+		tcdMeths   :: Maybe (MonoBinds name pat),	-- Default methods
+								-- Nothing for imported class decls
+								-- Just bs for source   class decls
+		tcdSysNames :: ClassSysNames name,
+		tcdLoc      :: SrcLoc
+    }
 \end{code}
 
 Simple classifiers
@@ -199,17 +204,17 @@ Simple classifiers
 \begin{code}
 isIfaceSigDecl, isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
 
-isIfaceSigDecl (IfaceSig _ _ _ _) = True
-isIfaceSigDecl other		  = False
+isIfaceSigDecl (IfaceSig {}) = True
+isIfaceSigDecl other	     = False
 
-isSynDecl (TySynonym _ _ _ _) = True
-isSynDecl other		      = False
+isSynDecl (TySynonym {}) = True
+isSynDecl other		 = False
 
-isDataDecl (TyData _ _ _ _ _ _ _ _ _ _) = True
-isDataDecl other		        = False
+isDataDecl (TyData {}) = True
+isDataDecl other       = False
 
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ ) = True
-isClassDecl other		 	 = False
+isClassDecl (ClassDecl {}) = True
+isClassDecl other	   = False
 \end{code}
 
 Dealing with names
@@ -217,11 +222,7 @@ Dealing with names
 \begin{code}
 --------------------------------
 tyClDeclName :: TyClDecl name pat -> name
-tyClDeclName (IfaceSig name _ _ _)	     = name
-tyClDeclName (TyData _ _ name _ _ _ _ _ _ _) = name
-tyClDeclName (TySynonym name _ _ _)          = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _)  = name
-
+tyClDeclName tycl_decl = tcdName tycl_decl
 
 --------------------------------
 tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
@@ -230,33 +231,43 @@ tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
 
-tyClDeclNames (TySynonym name _ _ loc)
-  = [(name,loc)]
+tyClDeclNames (TySynonym {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (IfaceSig  {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 
-tyClDeclNames (ClassDecl _ cls_name _ _ sigs _ _ loc)
+tyClDeclNames (ClassDecl {tcdName = cls_name, tcdSigs = sigs, tcdLoc = loc})
   = (cls_name,loc) : [(n,loc) | ClassOpSig n _ _ loc <- sigs]
 
-tyClDeclNames (TyData _ _ tc_name _ cons _ _ loc _ _)
+tyClDeclNames (TyData {tcdName = tc_name, tcdCons = cons, tcdLoc = loc})
   = (tc_name,loc) : conDeclsNames cons
 
-tyClDeclNames (IfaceSig name _ _ loc) = [(name,loc)]
 
 --------------------------------
+-- The "system names" are extra implicit names.
+-- They are kept in a list rather than a tuple 
+-- to make the renamer easier.
+
+type ClassSysNames name = [name]
+-- For class decls they are:
+-- 	[tycon, datacon wrapper, datacon worker, 
+--	 superclass selector 1, ..., superclass selector n]
+
+type DataSysNames name =  [name]
+-- For data decls they are
+--	[from, to]
+-- where from :: T -> Tring
+--	 to   :: Tring -> T
+
 tyClDeclSysNames :: TyClDecl name pat -> [(name, SrcLoc)]
 -- Similar to tyClDeclNames, but returns the "implicit" 
 -- or "system" names of the declaration
 
-tyClDeclSysNames (ClassDecl _ _ _ _ _ _ names loc) = [(n,loc)        | n <- names]
-tyClDeclSysNames (TyData _ _ _ _ cons _ _ _ _ _)   = [(wkr_name,loc) | ConDecl _ wkr_name _ _ _ loc <- cons]
-tyClDeclSysNames decl				   = []
+tyClDeclSysNames (ClassDecl {tcdSysNames = names, tcdLoc = loc})
+  = [(n,loc) | n <- names]
+tyClDeclSysNames (TyData {tcdCons = cons, tcdSysNames = names, tcdLoc = loc})
+  = [(n,loc) | n <- names] ++ 
+    [(wkr_name,loc) | ConDecl _ wkr_name _ _ _ loc <- cons]
+tyClDeclSysNames decl = []
 
-
---------------------------------
-type ClassDeclSysNames name = [name]
-	-- 	[tycon, datacon wrapper, datacon worker, 
-	--	 superclass selector 1, ..., superclass selector n]
-	-- They are kept in a list rather than a tuple to make the
-	-- renamer easier.
 
 mkClassDeclSysNames  :: (name, name, name, [name]) -> [name]
 getClassDeclSysNames :: [name] -> (name, name, name, [name])
@@ -267,30 +278,31 @@ getClassDeclSysNames (a:b:c:ds) = (a,b,c,ds)
 \begin{code}
 instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
 	-- Used only when building interface files
-  (==) (IfaceSig n1 t1 i1 _)
-       (IfaceSig n2 t2 i2 _) = n1==n2 && t1==t2 && i1==i2
+  (==) d1@(IfaceSig {}) d2@(IfaceSig {})
+      = tcdName d1 == tcdName d2 && 
+	tcdType d1 == tcdType d2 && 
+	tcdIdInfo d1 == tcdIdInfo d2
 
-  (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _ _)
-       (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _ _)
-    = n1 == n2 &&
-      nd1 == nd2 &&
-      eqWithHsTyVars tvs1 tvs2 (\ env -> 
-   	  eq_hsContext env cxt1 cxt2  &&
-	  eqListBy (eq_ConDecl env) cons1 cons2
-      )
+  (==) d1@(TyData {}) d2@(TyData {})
+      = tcdName d1 == tcdName d2 && 
+	tcdND d1   == tcdND   d2 && 
+	eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
+   	  eq_hsContext env (tcdCtxt d1) (tcdCtxt d2)  &&
+	  eqListBy (eq_ConDecl env) (tcdCons d1) (tcdCons d2)
+	)
 
-  (==) (TySynonym n1 tvs1 ty1 _)
-       (TySynonym n2 tvs2 ty2 _)
-    =  n1 == n2 &&
-       eqWithHsTyVars tvs1 tvs2 (\ env -> eq_hsType env ty1 ty2)
+  (==) d1@(TySynonym {}) d2@(TySynonym {})
+      = tcdName d1 == tcdName d2 && 
+	eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
+          eq_hsType env (tcdSynRhs d1) (tcdSynRhs d2)
+        )
 
-  (==) (ClassDecl cxt1 n1 tvs1 fds1 sigs1 _ _ _ )
-       (ClassDecl cxt2 n2 tvs2 fds2 sigs2 _ _ _ )
-    =  n1 == n2 &&
-       eqWithHsTyVars tvs1 tvs2 (\ env -> 
-	  eq_hsContext env cxt1 cxt2 &&
-	  eqListBy (eq_hsFD env) fds1 fds2 &&
-	  eqListBy (eq_cls_sig env) sigs1 sigs2
+  (==) d1@(ClassDecl {}) d2@(ClassDecl {})
+    = tcdName d1 == tcdName d2 && 
+      eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
+   	  eq_hsContext env (tcdCtxt d1) (tcdCtxt d2)  &&
+	  eqListBy (eq_hsFD env) (tcdFDs d1) (tcdFDs d2) &&
+	  eqListBy (eq_cls_sig env) (tcdSigs d1) (tcdSigs d2)
        )
 
   (==) _ _ = False	-- default case
@@ -305,11 +317,10 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 	-- This is used for comparing declarations before putting
 	-- them into interface files, and the name of the default 
 	-- method isn't relevant
-    Nothing	       `eq_dm` Nothing		  = True
-    (Just NoDefMeth)   `eq_dm` (Just NoDefMeth)   = True
-    (Just GenDefMeth)  `eq_dm` (Just GenDefMeth)  = True
-    (Just (DefMeth _)) `eq_dm` (Just (DefMeth _)) = True
-    dm1		       `eq_dm` dm2		  = False
+    NoDefMeth  `eq_dm` NoDefMeth  = True
+    GenDefMeth `eq_dm` GenDefMeth = True
+    DefMeth _  `eq_dm` DefMeth _  = True
+    dm1	       `eq_dm` dm2	  = False
 
     
 \end{code}
@@ -318,27 +329,28 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _	   <- decls],
-    length [() | TyData DataType _ _ _ _ _ _ _ _ _ <- decls],
-    length [() | TyData NewType  _ _ _ _ _ _ _ _ _ <- decls],
-    length [() | TySynonym _ _ _ _	           <- decls],
-    length [() | IfaceSig _ _ _ _	           <- decls])
+ = (length [() | ClassDecl {} <- decls],
+    length [() | TySynonym {} <- decls],
+    length [() | IfaceSig  {} <- decls],
+    length [() | TyData {tcdND = DataType} <- decls],
+    length [() | TyData {tcdND = NewType} <- decls])
 \end{code}
 
 \begin{code}
 instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (TyClDecl name pat) where
 
-    ppr (IfaceSig var ty info _) = hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
+    ppr (IfaceSig {tcdName = var, tcdType = ty, tcdIdInfo = info})
+	= hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
 
-    ppr (TySynonym tycon tyvars mono_ty src_loc)
+    ppr (TySynonym {tcdName = tycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
       = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
 	     4 (ppr mono_ty)
 
-    ppr (TyData new_or_data context tycon tyvars condecls ncons 
-		derivings src_loc gen_conv1 gen_conv2) -- The generic names are not printed out ATM
-      = pp_tydecl
-		  (ptext keyword <+> pp_decl_head context tycon tyvars <+> equals)
+    ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
+		 tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = ncons,
+		 tcdDerivs = derivings})
+      = pp_tydecl (ptext keyword <+> pp_decl_head context tycon tyvars <+> equals)
 		  (pp_condecls condecls ncons)
 		  derivings
       where
@@ -346,7 +358,8 @@ instance (NamedThing name, Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars fds sigs methods _ src_loc)
+    ppr (ClassDecl {tcdCtxt = context, tcdName = clas, tcdTyVars = tyvars, tcdFDs = fds,
+		    tcdSigs = sigs, tcdMeths = methods})
       | null sigs	-- No "where" part
       = top_matter
 

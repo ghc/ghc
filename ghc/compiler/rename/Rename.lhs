@@ -334,9 +334,8 @@ implicitFVs mod_name decls
     implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
 
 
-    get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _ _))
-       = concat (map get_deriv deriv_classes)
-    get other = []
+    get (TyClD (TyData {tcdDerivs = Just deriv_classes})) = concat (map get_deriv deriv_classes)
+    get other						  = []
 
     get_deriv cls = case lookupUFM derivingOccurrences cls of
 			Nothing   -> []
@@ -395,7 +394,7 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
-    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ ))
+    getFixities acc (TyClD (ClassDecl { tcdSigs = sigs}))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
     getFixities acc other_decl

@@ -282,38 +282,40 @@ and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
 \begin{code}
-rnTyClDecl (IfaceSig name ty id_infos loc)
+rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc = loc})
   = pushSrcLocRn loc $
     lookupTopBndrRn name		`thenRn` \ name' ->
     rnHsType doc_str ty			`thenRn` \ ty' ->
     mapRn rnIdInfo id_infos		`thenRn` \ id_infos' -> 
-    returnRn (IfaceSig name' ty' id_infos' loc)
+    returnRn (IfaceSig {tcdName = name', tcdType = ty', tcdIdInfo = id_infos', tcdLoc = loc})
   where
     doc_str = text "the interface signature for" <+> quotes (ppr name)
 
-rnTyClDecl (TyData new_or_data context tycon tyvars condecls nconstrs derivings src_loc gen_name1 gen_name2)
+rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
+		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
+		    tcdDerivs = derivings, tcdLoc = src_loc, tcdSysNames = sys_names})
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
     rnContext data_doc context 			`thenRn` \ context' ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
     mapRn rnConDecl condecls			`thenRn` \ condecls' ->
-    lookupSysBinder gen_name1	                `thenRn` \ name1' ->
-    lookupSysBinder gen_name2		        `thenRn` \ name2' ->
+    mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
     rnDerivs derivings				`thenRn` \ derivings' ->
-    returnRn (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
-                     derivings' src_loc name1' name2')
+    returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
+		      tcdTyVars = tyvars', tcdCons = condecls', tcdNCons = nconstrs,
+		      tcdDerivs = derivings', tcdLoc = src_loc, tcdSysNames = sys_names'})
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
 
-rnTyClDecl (TySynonym name tyvars ty src_loc)
+rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLoc = src_loc})
   = pushSrcLocRn src_loc $
     doptRn Opt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
     rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ ty' ->
-    returnRn (TySynonym name' tyvars' ty' src_loc)
+    returnRn (TySynonym {tcdName = name', tcdTyVars = tyvars', tcdSynRhs = ty', tcdLoc = src_loc})
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
@@ -322,7 +324,9 @@ rnTyClDecl (TySynonym name tyvars ty src_loc)
     unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
     unquantify glaExys ty			     	      = ty
 
-rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
+rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname, 
+		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
+		       tcdSysNames = names, tcdLoc = src_loc})
   = pushSrcLocRn src_loc $
 
     lookupTopBndrRn cname			`thenRn` \ cname' ->
@@ -360,12 +364,14 @@ rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
 	-- The renamer *could* check this for class decls, but can't
 	-- for instance decls.
 
-    returnRn (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') EmptyMonoBinds names' src_loc)
+    returnRn (ClassDecl { tcdCtxt = context', tcdName = cname', tcdTyVars = tyvars',
+			  tcdFDs = fds', tcdSigs = non_ops' ++ sigs', tcdMeths = Nothing, 
+			  tcdSysNames = names', tcdLoc = src_loc})
   where
     cls_doc  = text "the declaration for class" 	<+> ppr cname
     sig_doc  = text "the signatures for class"  	<+> ppr cname
 
-rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
+rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
   = pushSrcLocRn locn $
     lookupTopBndrRn op			`thenRn` \ op_name ->
     
@@ -373,28 +379,29 @@ rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
     rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty ->
     
     	-- Make the default-method name
-    (case maybe_dm_stuff of 
-        Nothing -> returnRn Nothing			-- Source-file class decl
-    
-        Just (DefMeth dm_rdr_name)
+    (case dm_stuff of 
+        DefMeth dm_rdr_name
     	    -> 	-- Imported class that has a default method decl
     		-- See comments with tname, snames, above
     	    	lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
-		returnRn (Just (DefMeth dm_name))
+		returnRn (DefMeth dm_name)
 	    		-- An imported class decl for a class decl that had an explicit default
 	    		-- method, mentions, rather than defines,
 	    		-- the default method, so we must arrange to pull it in
 
-        Just GenDefMeth	-> returnRn (Just GenDefMeth)
-        Just NoDefMeth 	-> returnRn (Just NoDefMeth)
-    )						`thenRn` \ maybe_dm_stuff' ->
+        GenDefMeth -> returnRn GenDefMeth
+        NoDefMeth  -> returnRn NoDefMeth
+    )						`thenRn` \ dm_stuff' ->
     
-    returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn)
+    returnRn (ClassOpSig op_name dm_stuff' new_ty locn)
 
 rnClassBinds :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
   -- Rename the mbinds only; the rest is done already
-rnClassBinds (ClassDecl _       _     _      _   _    mbinds _     _      )	-- Get mbinds from here
-	     (ClassDecl context cname tyvars fds sigs _      names src_loc)	-- Everything else is here
+rnClassBinds (ClassDecl {tcdMeths = Nothing}) rn_cls_decl
+  = returnRn (rn_cls_decl, emptyFVs)	-- No meth binds; decl came from interface file
+
+rnClassBinds (ClassDecl {tcdMeths = Just mbinds})				-- Get mbinds from here
+	     rn_cls_decl@(ClassDecl {tcdTyVars = tyvars, tcdLoc = src_loc})	-- Everything else is here
   = 	-- The newLocals call is tiresome: given a generic class decl
 	--	class C a where
 	--	  op :: a -> a
@@ -414,9 +421,9 @@ rnClassBinds (ClassDecl _       _     _      _   _    mbinds _     _      )	-- G
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
     newLocalsRn gen_rdr_tyvars_w_locs			`thenRn` \ gen_tyvars ->
     rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
-    returnRn (ClassDecl context cname tyvars fds sigs mbinds' names src_loc, meth_fvs)
+    returnRn (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
   where
-    meth_doc = text "the default-methods for class"	<+> ppr cname
+    meth_doc = text "the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
 rnClassBinds _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 	-- Not a class declaration

@@ -326,10 +326,9 @@ csigs1		: 				{ [] }
 		| csig ';' csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  src_loc qvar_name '::' type		{ mkClassOpSig NoDefMeth $2 $4 $1 }
-	        |  src_loc qvar_name '=' '::' type	{ mkClassOpSig (DefMeth (error "DefMeth") )
-								$2 $5 $1 }
-	        |  src_loc qvar_name ';' '::' type	{ mkClassOpSig GenDefMeth  $2 $5 $1 }		
+csig		:  src_loc qvar_name '::' type		{ ClassOpSig $2 NoDefMeth $4 $1 }
+	        |  src_loc qvar_name ';' '::' type	{ ClassOpSig $2 GenDefMeth $5 $1 }		
+	        |  src_loc qvar_name '=' '::' type	{ mkClassOpSigDM $2 $5 $1 }
 
 --------------------------------------------------------------------------
 
@@ -363,7 +362,7 @@ decl    : src_loc qvar_name '::' type maybe_idinfo
 	| src_loc 'newtype' opt_decl_context qtc_name tv_bndrs newtype_constr
 			{ mkTyData NewType $3 $4 $5 $6 1 Nothing $1 }
 	| src_loc 'class' opt_decl_context qtc_name tv_bndrs fds csigs
-			{ mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds $1 }
+			{ mkClassDecl $3 $4 $5 $6 $7 Nothing $1 }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }

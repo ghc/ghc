@@ -26,9 +26,9 @@ module Id (
 	externallyVisibleId,
 	isIP,
 	isSpecPragmaId,	isRecordSelector,
-	isPrimOpId, isPrimOpId_maybe, 
-	isDataConId, isDataConId_maybe, isDataConWrapId, 
-		isDataConWrapId_maybe,
+	isPrimOpId, isPrimOpId_maybe, isDictFunId,
+	isDataConId, isDataConId_maybe, 
+	isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
 	isExportedId, isLocalId, 
 	hasNoBinding,
@@ -244,6 +244,10 @@ hasNoBinding id = case idFlavour id of
 	-- binding, even though it is defined in this module.  Notably,
 	-- the constructors of a dictionary are in this situation.
 
+isDictFunId id = case idFlavour id of
+		   DictFunId -> True
+		   other     -> False
+
 -- Don't drop a binding for an exported Id,
 -- if it otherwise looks dead.  
 -- Perhaps a better name would be isDiscardableId
@@ -295,7 +299,12 @@ omitIfaceSigForId' id
 		-- The dfun id must *not* be omitted, because it carries version info for
 		-- the instance decl
 
-	other	       -> False	-- Don't omit!
+	ConstantId -> False	-- Ordinary Ids
+	DictFunId  -> False
+	
+	ExportedId   -> False	-- I don't think these happen
+	VanillaId    -> False	-- ditto
+	SpecPragmaId -> False 	-- ditto
 \end{code}
 
 \begin{code}

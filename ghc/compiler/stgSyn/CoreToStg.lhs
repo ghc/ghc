@@ -24,11 +24,12 @@ import Id		( Id, mkSysLocal, idType, idStrictness, isExportedId,
 			  mkVanillaId, idName, idDemandInfo, idArity, setIdType,
 			  idFlavour
 			)
+import Module		( Module )
 import IdInfo		( StrictnessInfo(..), IdFlavour(..) )
 import DataCon		( dataConWrapId, dataConTyCon )
 import TyCon		( isAlgTyCon )
 import Demand		( Demand, isStrict, wwLazy )
-import Name	        ( setNameUnique )
+import Name	        ( setNameUnique, globaliseName, isLocalName )
 import VarEnv
 import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
@@ -37,7 +38,6 @@ import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
                           uaUTy, usOnce, usMany, isTyVarTy
 			)
 import UniqSupply	-- all of it, really
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
 import UniqSet		( emptyUniqSet )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
@@ -89,15 +89,15 @@ does some important transformations:
     in.  (Pulling in a piece you don't need can be v bad, because it may
     mention other pieces you don't need either, and so on.)
     
-   Sadly, splitting up .hc files means that local names (like s234) are
-   now globally visible, which can lead to clashes between two .hc
-   files. So we make them all Global, so they are printed complete
-   with their module name.
-
-   We don't want to do this in CoreTidy, because at that stage we use
-   Global to mean "external" and hence "should appear in interface files".
-   This object-file splitting thing is a code generator matter that we
-   don't want to pollute earlier phases.
+    Sadly, splitting up .hc files means that local names (like s234) are
+    now globally visible, which can lead to clashes between two .hc
+    files. So we make them all Global, so they are printed complete
+    with their module name.
+ 
+    We don't want to do this in CoreTidy, because at that stage we use
+    Global to mean "external" and hence "should appear in interface files".
+    This object-file splitting thing is a code generator matter that we
+    don't want to pollute earlier phases.
 
 NOTE THAT:
 
@@ -198,17 +198,19 @@ bOGUS_FVs = []
 \end{code}
 
 \begin{code}
-topCoreBindsToStg :: DynFlags -> [CoreBind] -> IO [StgBinding]
-topCoreBindsToStg dflags core_binds
+topCoreBindsToStg :: DynFlags -> Module -> [CoreBind] -> IO [StgBinding]
+topCoreBindsToStg dflags mod core_binds
   = do showPass dflags "Core2Stg"
        us <- mkSplitUniqSupply 'c'
        return (initUs_ us (coreBindsToStg emptyVarEnv core_binds))
   where
+    top_flag = Top mod
+
     coreBindsToStg :: StgEnv -> [CoreBind] -> UniqSM [StgBinding]
 
     coreBindsToStg env [] = returnUs []
     coreBindsToStg env (b:bs)
-      = coreBindToStg  TopLevel env b	`thenUs` \ (bind_spec, new_env) ->
+      = coreBindToStg  top_flag env b	`thenUs` \ (bind_spec, new_env) ->
     	coreBindsToStg new_env bs 	`thenUs` \ new_bs ->
 	case bind_spec of
 	  NonRecF bndr rhs dem floats 
@@ -217,7 +219,7 @@ topCoreBindsToStg dflags core_binds
 			    ppr b )		-- No top-level cases!
 
 		   mkStgBinds floats rhs	`thenUs` \ new_rhs ->
-		   returnUs (StgNonRec bndr (exprToRhs dem TopLevel new_rhs)
+		   returnUs (StgNonRec bndr (exprToRhs dem top_flag new_rhs)
 			     : new_bs)
 					-- Keep all the floats inside...
 					-- Some might be cases etc
@@ -251,7 +253,7 @@ coreToStgExpr dflags core_expr
 %************************************************************************
 
 \begin{code}
-coreBindToStg :: TopLevelFlag -> StgEnv -> CoreBind -> UniqSM (StgFloatBind, StgEnv)
+coreBindToStg :: TopLvl -> StgEnv -> CoreBind -> UniqSM (StgFloatBind, StgEnv)
 
 coreBindToStg top_lev env (NonRec binder rhs)
   = coreExprToStgFloat env rhs			`thenUs` \ (floats, stg_rhs) ->
@@ -264,14 +266,14 @@ coreBindToStg top_lev env (NonRec binder rhs)
 		-- But we don't want to discard exported things.  They can
 		-- occur; e.g. an exported user binding f = g
 
-	other -> newLocalId top_lev env binder		`thenUs` \ (new_env, new_binder) ->
+	other -> newBinder top_lev env binder		`thenUs` \ (new_env, new_binder) ->
 		 returnUs (NonRecF new_binder stg_rhs dem floats, new_env)
   where
     dem = bdrDem binder
 
 
 coreBindToStg top_lev env (Rec pairs)
-  = newLocalIds top_lev env binders	`thenUs` \ (env', binders') ->
+  = newBinders top_lev env binders	`thenUs` \ (env', binders') ->
     mapUs (do_rhs env') pairs		`thenUs` \ stg_rhss ->
     returnUs (RecF (binders' `zip` stg_rhss), env')
   where
@@ -290,7 +292,7 @@ coreBindToStg top_lev env (Rec pairs)
 %************************************************************************
 
 \begin{code}
-exprToRhs :: RhsDemand -> TopLevelFlag -> StgExpr -> StgRhs
+exprToRhs :: RhsDemand -> TopLvl -> StgExpr -> StgRhs
 exprToRhs dem _ (StgLam _ bndrs body)
   = ASSERT( not (null bndrs) )
     StgRhsClosure noCCS
@@ -332,7 +334,7 @@ exprToRhs dem _ (StgLam _ bndrs body)
   then be run at load time to fix up static closures.
 -}
 exprToRhs dem toplev (StgConApp con args)
-  | isNotTopLevel toplev || not (isDllConApp con args)
+  | isNotTop toplev || not (isDllConApp con args)
 	-- isDllConApp checks for LitLit args too
   = StgRhsCon noCCS con args
 
@@ -347,7 +349,7 @@ exprToRhs dem toplev expr
 			expr
   where
     upd = if isOnceDem dem
-          then (if isNotTopLevel toplev 
+          then (if isNotTop toplev 
                 then SingleEntry              -- HA!  Paydirt for "dem"
                 else 
 #ifdef DEBUG
@@ -442,7 +444,7 @@ coreExprToStgFloat env (Lit lit)
   = returnUs ([], StgLit lit)
 
 coreExprToStgFloat env (Let bind body)
-  = coreBindToStg NotTopLevel env bind	`thenUs` \ (new_bind, new_env) ->
+  = coreBindToStg NotTop env bind	`thenUs` \ (new_bind, new_env) ->
     coreExprToStgFloat new_env body	`thenUs` \ (floats, stg_body) ->
     returnUs (new_bind:floats, stg_body)
 \end{code}
@@ -481,9 +483,9 @@ coreExprToStgFloat env expr@(Lam _ _)
 	coreExprToStgFloat env body
     else
 	-- At least some value binders
-    newLocalIds NotTopLevel env id_binders	`thenUs` \ (env', binders') ->
-    coreExprToStgFloat env' body		`thenUs` \ (floats, stg_body) ->
-    mkStgBinds floats stg_body			`thenUs` \ stg_body' ->
+    newLocalBinders env id_binders	`thenUs` \ (env', binders') ->
+    coreExprToStgFloat env' body	`thenUs` \ (floats, stg_body) ->
+    mkStgBinds floats stg_body		`thenUs` \ stg_body' ->
 
     case stg_body' of
       StgLam ty lam_bndrs lam_body ->
@@ -584,7 +586,7 @@ coreExprToStgFloat env expr@(App _ _)
 \begin{code}
 coreExprToStgFloat env (Case scrut bndr alts)
   = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
-    newLocalId NotTopLevel env bndr		`thenUs` \ (env', bndr') ->
+    newLocalBinder env bndr			`thenUs` \ (env', bndr') ->
     alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
     mkStgCase scrut' bndr' alts'		`thenUs` \ expr' ->
     returnUs (binds, expr')
@@ -604,8 +606,8 @@ coreExprToStgFloat env (Case scrut bndr alts)
 	returnUs (mkStgAlgAlts scrut_ty alts' deflt')
 
     alg_alt_to_stg env (DataAlt con, bs, rhs)
-	  = newLocalIds NotTopLevel env (filter isId bs)	`thenUs` \ (env', stg_bs) -> 
-	    coreExprToStg env' rhs	  		 	`thenUs` \ stg_rhs ->
+	  = newLocalBinders env (filter isId bs)	`thenUs` \ (env', stg_bs) -> 
+	    coreExprToStg env' rhs	  	 	`thenUs` \ stg_rhs ->
 	    returnUs (con, stg_bs, [ True | b <- stg_bs ]{-bogus use mask-}, stg_rhs)
 		-- NB the filter isId.  Some of the binders may be
 		-- existential type variables, which STG doesn't care about
@@ -643,20 +645,38 @@ newStgVar ty
 \end{code}
 
 \begin{code}
-newLocalId TopLevel env id
+----------------------------
+data TopLvl = Top Module | NotTop
+
+isNotTop NotTop  = True
+isNotTop (Top _) = False
+
+----------------------------
+newBinder :: TopLvl -> StgEnv -> Id -> UniqSM (StgEnv, Id)
+newBinder (Top mod) env id = returnUs (env, newTopBinder mod id)
+newBinder NotTop    env id = newLocalBinder env id
+
+newBinders (Top mod) env ids = returnUs (env, map (newTopBinder mod) ids)
+newBinders NotTop    env ids = newLocalBinders env ids
+
+
+----------------------------
+newTopBinder mod id
   -- Don't clone top-level binders.  MkIface relies on their
   -- uniques staying the same, so it can snaffle IdInfo off the
   -- STG ids to put in interface files.	
-  = let
-      name = idName id
-      ty   = idType id
-    in
-    name		`seq`
+  = name'		`seq`
     seqType ty		`seq`
-    returnUs (env, mkVanillaId name ty)
+    mkVanillaId name' ty
+  where
+      name  = idName id
+      name' | isLocalName name = globaliseName name mod
+	    | otherwise	       = name
+      ty    = idType id
 
-
-newLocalId NotTopLevel env id
+----------------------------
+newLocalBinder :: StgEnv -> Id -> UniqSM (StgEnv, Id)
+newLocalBinder env id
   =	-- Local binder, give it a new unique Id.
     getUniqueUs			`thenUs` \ uniq ->
     let
@@ -669,13 +689,14 @@ newLocalId NotTopLevel env id
     seqType ty		`seq`
     returnUs (new_env, new_id)
 
-newLocalIds :: TopLevelFlag -> StgEnv -> [Id] -> UniqSM (StgEnv, [Id])
-newLocalIds top_lev env []
+----------------------------
+newLocalBinders :: StgEnv -> [Id] -> UniqSM (StgEnv, [Id])
+newLocalBinders env []
   = returnUs (env, [])
 
-newLocalIds top_lev env (b:bs)
-  = newLocalId top_lev env b	`thenUs` \ (env', b') ->
-    newLocalIds top_lev env' bs	`thenUs` \ (env'', bs') ->
+newLocalBinders env (b:bs)
+  = newLocalBinder  env b	`thenUs` \ (env', b') ->
+    newLocalBinders env' bs	`thenUs` \ (env'', bs') ->
     returnUs (env'', b':bs')
 \end{code}
 
@@ -859,7 +880,7 @@ mk_stg_let bndr rhs dem floats body
   = if is_strict then
 	-- Strict let with WHNF rhs
 	mkStgBinds floats $
-	StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel rhs)) body
+	StgLet (StgNonRec bndr (exprToRhs dem NotTop rhs)) body
     else
 	-- Lazy let with WHNF rhs; float until we find a strict binding
 	let
@@ -867,7 +888,7 @@ mk_stg_let bndr rhs dem floats body
 	in
 	mkStgBinds floats_in rhs	`thenUs` \ new_rhs ->
 	mkStgBinds floats_out $
-	StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel new_rhs)) body
+	StgLet (StgNonRec bndr (exprToRhs dem NotTop new_rhs)) body
 
   | otherwise 	-- Not WHNF
   = if is_strict then
@@ -877,7 +898,7 @@ mk_stg_let bndr rhs dem floats body
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
 	mkStgBinds floats rhs		`thenUs` \ new_rhs ->
-	returnUs (StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel new_rhs)) body)
+	returnUs (StgLet (StgNonRec bndr (exprToRhs dem NotTop new_rhs)) body)
 	
   where
     bndr_rep_ty = repType (idType bndr)

@@ -120,20 +120,20 @@ In all cases this is set up for interface-file declarations:
 
 \begin{code}
 tyClDeclFVs :: RenamedTyClDecl -> NameSet
-tyClDeclFVs (IfaceSig name ty id_infos loc)
+tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
   = extractHsTyNames ty			`plusFV` 
     plusFVs (map hsIdInfoFVs id_infos)
 
-tyClDeclFVs (TyData _ context _ tyvars condecls _ derivings _ _ _)
+tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls, tcdDerivs = derivings})
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	`plusFV`
     plusFVs (map conDeclFVs condecls)	`plusFV`
     mkNameSet (derivings `orElse` [])
 
-tyClDeclFVs (TySynonym _ tyvars ty _)
+tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})
   = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)
 
-tyClDeclFVs (ClassDecl context _ tyvars fds sigs _ _ src_loc)
+tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs})
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     plusFVs (map extractFunDepNames fds)  `plusFV`
@@ -150,8 +150,8 @@ hsSigFVs (InlineSig v p _) 	    = unitFV v
 hsSigFVs (NoInlineSig v p _)	    = unitFV v
 hsSigFVs (ClassOpSig v dm ty _)	    = dmFVs dm `plusFV` extractHsTyNames ty `addOneFV` v
 
-dmFVs (Just (DefMeth v)) = unitFV v
-dmFVs other		 = emptyFVs
+dmFVs (DefMeth v) = unitFV v
+dmFVs other	  = emptyFVs
 
 ----------------
 instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)

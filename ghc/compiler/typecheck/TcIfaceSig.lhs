@@ -58,7 +58,7 @@ tcInterfaceSigs :: RecTcEnv		-- Envt to use when checking unfoldings
 
 tcInterfaceSigs unf_env decls
   = listTc [ do_one name ty id_infos src_loc
-	   | IfaceSig name ty id_infos src_loc <- decls]
+	   | IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
   where
     in_scope_vars = []	-- I think this will be OK
 

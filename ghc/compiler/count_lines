@@ -1,4 +1,4 @@
-#! /usr/local/bin/perl
+#! /usr/bin/perl
 #
 %DirCount = ();
 %ModCount = ();
@@ -8,7 +8,7 @@
 foreach $f ( @ARGV ) {
 
     if ( $f =~ /\.lhs$/ ) {
-	open(INF, "unlit $f - |") || die "Couldn't unlit $f!\n";
+	open(INF, "/home/simonpj/builds/slpj/ghc/utils/unlit/unlit $f - |") || die "Couldn't unlit $f!\n";
     } else {
 	open(INF, "< $f") || die "Couldn't open $f!\n";
     }

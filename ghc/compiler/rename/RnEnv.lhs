@@ -86,7 +86,7 @@ newTopBinder mod rdr_name loc
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, new_cache, ipcache)	`thenRn_`
-		     -- traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
+		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
 		     returnRn new_name
 		     
 	-- Miss in the cache!
@@ -100,7 +100,7 @@ newTopBinder mod rdr_name loc
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (us', new_cache, ipcache)	`thenRn_`
-		   -- traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
+		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
 		   returnRn new_name
 
 

@@ -177,10 +177,10 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 	clas_decls = filter isClassDecl tycl_decls
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 mod unf_env) inst_decls    	`thenNF_Tc` \ inst_infos ->
+    mapNF_Tc (tcInstDecl1 unf_env) inst_decls    	`thenNF_Tc` \ inst_infos ->
 
 	-- (2) Instances from generic class declarations
-    getGenericInstances mod clas_decls		`thenTc` \ generic_inst_info -> 
+    getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
 	--	a) cached non-home-package InstEnv (gotten from pcs)	pcs_insts pcs
@@ -228,9 +228,9 @@ addInstDFuns dfuns infos
 \end{code} 
 
 \begin{code}
-tcInstDecl1 :: Module -> TcEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
+tcInstDecl1 :: TcEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
 -- Deal with a single instance declaration
-tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
+tcInstDecl1 unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc [])	$
     tcAddSrcLoc src_loc			$
@@ -253,7 +253,7 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 	    mapNF_Tc scrutiniseInstanceConstraint theta		`thenNF_Tc_`
 
 		-- Make the dfun id and return it
-	    newDFunName mod clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
+	    newDFunName clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
 	    returnNF_Tc (True, dfun_name)
 
 	Just dfun_name -> 	-- An interface-file instance declaration
@@ -300,9 +300,9 @@ gives rise to the instance declarations
 
 
 \begin{code}
-getGenericInstances :: Module -> [RenamedTyClDecl] -> TcM [InstInfo] 
-getGenericInstances mod class_decls
-  = mapTc (get_generics mod) class_decls		`thenTc` \ gen_inst_infos ->
+getGenericInstances :: [RenamedTyClDecl] -> TcM [InstInfo] 
+getGenericInstances class_decls
+  = mapTc get_generics class_decls		`thenTc` \ gen_inst_infos ->
     let
 	gen_inst_info = concat gen_inst_infos
     in
@@ -312,13 +312,12 @@ getGenericInstances mod class_decls
 							`thenNF_Tc_`
     returnTc gen_inst_info
 
-get_generics mod decl@(ClassDecl context class_name tyvar_names 
-	 			 fundeps class_sigs def_methods
-				 name_list loc)
+get_generics decl@(ClassDecl {tcdMeths = Nothing})
+  = returnTc []	-- Imported class decls
+
+get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods, tcdLoc = loc})
   | null groups		
-  = returnTc [] -- The comon case: 
-		--	no generic default methods, or
-		-- 	its an imported class decl (=> has no methods at all)
+  = returnTc [] -- The comon case: no generic default methods
 
   | otherwise	-- A local class decl with generic default methods
   = recoverNF_Tc (returnNF_Tc [])				$
@@ -326,7 +325,7 @@ get_generics mod decl@(ClassDecl context class_name tyvar_names
     tcLookupClass class_name					`thenTc` \ clas ->
 
 	-- Make an InstInfo out of each group
-    mapTc (mkGenericInstance mod clas loc) groups		`thenTc` \ inst_infos ->
+    mapTc (mkGenericInstance clas loc) groups		`thenTc` \ inst_infos ->
 
 	-- Check that there is only one InstInfo for each type constructor
   	-- The main way this can fail is if you write
@@ -378,11 +377,11 @@ getGenericBinds (FunMonoBind id infixop matches loc)
     wrap ms = FunMonoBind id infixop ms loc
 
 ---------------------------------
-mkGenericInstance :: Module -> Class -> SrcLoc
+mkGenericInstance :: Class -> SrcLoc
 		  -> (RenamedHsType, RenamedMonoBinds)
 		  -> TcM InstInfo
 
-mkGenericInstance mod clas loc (hs_ty, binds)
+mkGenericInstance clas loc (hs_ty, binds)
   -- Make a generic instance declaration
   -- For example:	instance (C a, C b) => C (a+b) where { binds }
 
@@ -397,7 +396,7 @@ mkGenericInstance mod clas loc (hs_ty, binds)
 	    (badGenericInstanceType binds)	`thenTc_`
 
 	-- Make the dictionary function.
-    newDFunName mod clas [inst_ty] loc		`thenNF_Tc` \ dfun_name ->
+    newDFunName clas [inst_ty] loc		`thenNF_Tc` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
 	inst_tys   = [inst_ty]
@@ -734,19 +733,18 @@ scrutiniseInstanceHead clas inst_taus
 
 \begin{code}
 tcAddDeclCtxt decl thing_inside
-  = tcAddSrcLoc loc 	$
+  = tcAddSrcLoc (tcdLoc decl) 	$
     tcAddErrCtxt ctxt 	$
     thing_inside
   where
-     (name, loc, thing)
-	= case decl of
-	    (ClassDecl _ name _ _ _ _ _ loc)	     -> (name, loc, "class")
-	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
-	    (TyData NewType  _ name _ _ _ _ loc _ _) -> (name, loc, "newtype")
-	    (TyData DataType _ name _ _ _ _ loc _ _) -> (name, loc, "data type")
+     thing = case decl of
+	   	ClassDecl {}		  -> "class"
+		TySynonym {}		  -> "type synonym"
+		TyData {tcdND = NewType}  -> "newtype"
+		TyData {tcdND = DataType} -> "data type"
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
-		  ptext SLIT("declaration for"), quotes (ppr name)]
+		  ptext SLIT("declaration for"), quotes (ppr (tcdName decl))]
 \end{code}
 
 \begin{code}

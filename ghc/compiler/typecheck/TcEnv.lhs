@@ -31,7 +31,7 @@ module TcEnv(
 
 	-- New Ids
 	newLocalId, newSpecPragmaId,
-	newDefaultMethodName, newDFunName,
+	newDFunName,
 
 	-- Misc
 	isLocalThing, tcSetEnv
@@ -59,11 +59,11 @@ import TyCon		( TyCon )
 import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
-			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
+			  nameOccName, getSrcLoc, mkLocalName,
 			  isLocalName, nameModule_maybe
 			)
 import Name		( NameEnv, lookupNameEnv, nameEnvElts, extendNameEnvList, emptyNameEnv )
-import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
+import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv )
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
@@ -268,28 +268,20 @@ newSpecPragmaId name ty
     returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty (getSrcLoc name))
 \end{code}
 
-Make a name for the dict fun for an instance decl
+Make a name for the dict fun for an instance decl.
+It's a *local* name for the moment.  The CoreTidy pass
+will globalise it.
 
 \begin{code}
-newDFunName :: Module -> Class -> [Type] -> SrcLoc -> NF_TcM Name
-newDFunName mod clas (ty:_) loc
-  = tcGetDFunUniq dfun_string	`thenNF_Tc` \ inst_uniq ->
-    tcGetUnique			`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkGlobalName uniq mod
-			      (mkDFunOcc dfun_string inst_uniq) 
-			      loc)
+newDFunName :: Class -> [Type] -> SrcLoc -> NF_TcM Name
+newDFunName clas (ty:_) loc
+  = tcGetUnique			`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkLocalName uniq (mkDFunOcc dfun_string) loc)
   where
 	-- Any string that is somewhat unique will do
     dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
 
-newDFunName mod clas [] loc = pprPanic "newDFunName" (ppr mod <+> ppr clas <+> ppr loc)
-
-newDefaultMethodName :: Name -> SrcLoc -> NF_TcM Name
-newDefaultMethodName op_name loc
-  = tcGetUnique			`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkGlobalName uniq (nameModule op_name)
-			      (mkDefaultMethodOcc (getOccName op_name))
-			      loc)
+newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
 
 \begin{code}

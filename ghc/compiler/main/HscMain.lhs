@@ -16,6 +16,9 @@ module HscMain ( HscResult(..), hscMain,
 import RdrHsSyn		( RdrNameHsExpr )
 import CoreToStg	( coreToStgExpr )
 import StringBuffer	( stringToStringBuffer, freeStringBuffer )
+import Unique		( Uniquable(..) )
+import Type		( splitTyConApp_maybe )
+import PrelNames	( ioTyConKey )
 #endif
 
 import HsSyn
@@ -32,7 +35,6 @@ import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
 import TcModule
 import Type
-import TcHsSyn
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
@@ -48,8 +50,6 @@ import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Util		( unJust )
-import Unique		( Uniquable(..) )
-import PrelNames	( ioTyConKey )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
@@ -62,7 +62,6 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  HomeSymbolTable, 
 			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
-import Type		( splitTyConApp_maybe )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName  )
@@ -160,11 +159,10 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
          Just (pcs_tc, tc_result) -> do {
 
       let env_tc      = tc_env tc_result
-          local_insts = tc_insts tc_result
           local_rules = tc_rules tc_result
       ;
       -- create a new details from the closed, typechecked, old iface
-      let new_details = mkModDetailsFromIface env_tc local_insts local_rules
+      let new_details = mkModDetailsFromIface env_tc local_rules
       ;
       return (HscNoRecomp pcs_tc new_details old_iface)
       }}}}
@@ -206,8 +204,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       	     Nothing -> return (HscFail pcs_rn);
       	     Just (pcs_tc, tc_result) -> do {
     
-	; let env_tc        = tc_env tc_result
-      	      local_insts   = tc_insts tc_result
+	; let env_tc = tc_env tc_result
 
  	    -------------------
  	    -- DESUGAR, SIMPLIFY, TIDY-CORE
@@ -227,7 +224,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
-	; let new_details = mkModDetails env_tc local_insts tidy_binds 
+	; let new_details = mkModDetails env_tc tidy_binds 
  					 top_level_ids orphan_rules
 	; final_iface <- mkFinalIface ghci_mode dflags location 
                                       maybe_checked_iface new_iface new_details
@@ -359,16 +356,16 @@ dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
 
 myCoreToStg dflags this_mod tidy_binds
  = do 
-      () <- coreBindsSize occ_anal_tidy_binds `seq` return ()
+      () <- coreBindsSize tidy_binds `seq` return ()
       -- TEMP: the above call zaps some space usage allocated by the
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
       -- _scc_     "Core2Stg"
-      stg_binds <- topCoreBindsToStg dflags occ_anal_tidy_binds
+      stg_binds <- topCoreBindsToStg dflags this_mod tidy_binds
 
       -- _scc_     "Stg2Stg"
-      (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod st_uniqs stg_binds
+      (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod stg_binds
       let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
       return (stg_binds2, cost_centre_info, final_ids)

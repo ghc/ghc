@@ -27,7 +27,7 @@ module TcMonad(
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
-	tcGetUnique, tcGetUniques, tcGetDFunUniq,
+	tcGetUnique, tcGetUniques, 
 	doptsTc, getDOptsTc,
 
 	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
@@ -63,7 +63,6 @@ import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply,
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
-import FiniteMap	( FiniteMap, lookupFM, addToFM, emptyFM )
 import UniqFM		( emptyUFM )
 import Unique		( Unique )
 import CmdLineOpts
@@ -131,14 +130,13 @@ initTc dflags tc_env do_this
   = do {
       us       <- mkSplitUniqSupply 'a' ;
       us_var   <- newIORef us ;
-      dfun_var <- newIORef emptyFM ;
       errs_var <- newIORef (emptyBag,emptyBag) ;
       tvs_var  <- newIORef emptyUFM ;
 
       let
-          init_down = TcDown dflags [] us_var dfun_var
-			     noSrcLoc
-			     [] errs_var
+          init_down = TcDown { tc_dflags = dflags, tc_def = [],
+			       tc_us = us_var, tc_loc = noSrcLoc,
+			       tc_ctxt = [], tc_errs = errs_var }
       ;
 
       maybe_res <- catch (do {  res <- do_this init_down tc_env ;
@@ -251,7 +249,7 @@ We throw away any error messages!
 
 \begin{code}
 forkNF_Tc :: NF_TcM r -> NF_TcM r
-forkNF_Tc m (TcDown dflags deflts u_var df_var src_loc err_cxt err_var) env
+forkNF_Tc m down@(TcDown { tc_us = u_var }) env
   = do
 	-- Get a fresh unique supply
     	us <- readIORef u_var
@@ -261,8 +259,7 @@ forkNF_Tc m (TcDown dflags deflts u_var df_var src_loc err_cxt err_var) env
 	unsafeInterleaveIO (do {
 		us_var'  <- newIORef us2 ;
 	      	err_var' <- newIORef (emptyBag,emptyBag) ;
-      		tv_var'  <- newIORef emptyUFM ;
-		let { down' = TcDown dflags deflts us_var' df_var src_loc err_cxt err_var' } ;
+		let { down' = down { tc_us = us_var', tc_errs = err_var' } };
 		m down' env
 			-- ToDo: optionally dump any error messages
 		})
@@ -559,20 +556,6 @@ uniqSMToTcM m down env
 \end{code}
 
 
-\begin{code}
-tcGetDFunUniq :: String -> NF_TcM Int
-tcGetDFunUniq key down env
-  = do dfun_supply <- readIORef d_var
-       let uniq = case lookupFM dfun_supply key of
-		      Just x  -> x+1
-		      Nothing -> 0
-       let dfun_supply' = addToFM dfun_supply key uniq
-       writeIORef d_var dfun_supply'
-       return uniq
-  where
-    d_var = getDFunSupplyVar down
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -585,11 +568,7 @@ data TcDown
    = TcDown {
         tc_dflags :: DynFlags,
 	tc_def    :: [Type],			-- Types used for defaulting
-
 	tc_us     :: (TcRef UniqSupply),	-- Unique supply
-	tc_ds	  :: (TcRef DFunNameSupply),	-- Name supply for 
-						-- dictionary function names
-
 	tc_loc    :: SrcLoc,			-- Source location
 	tc_ctxt   :: ErrCtxt,			-- Error context
 	tc_errs   :: (TcRef (Bag WarnMsg, Bag ErrMsg))
@@ -599,19 +578,6 @@ type ErrCtxt = [TidyEnv -> NF_TcM (TidyEnv, Message)]
 			-- Innermost first.  Monadic so that we have a chance
 			-- to deal with bound type variables just before error
 			-- message construction
-
-type DFunNameSupply = FiniteMap String Int
-	-- This is used as a name supply for dictionary functions
-	-- From the inst decl we derive a string, usually by glomming together
-	-- the class and tycon name -- but it doesn't matter exactly how;
-	-- this map then gives a unique int for each inst decl with that
-	-- string.  (In Haskell 98 there can only be one,
-	-- but not so in more extended versions; also class CC type T
-	-- and class C type TT might both give the string CCT
-	--	
-	-- We could just use one Int for all the instance decls, but this
-	-- way the uniques change less when you add an instance decl,	
-	-- hence less recompilation
 \end{code}
 
 -- These selectors are *local* to TcMonad.lhs
@@ -627,7 +593,6 @@ getLoc (TcDown{tc_loc=loc}) = loc
 setLoc down loc = down{tc_loc=loc}
 
 getUniqSupplyVar (TcDown{tc_us=us}) = us
-getDFunSupplyVar (TcDown{tc_ds=ds}) = ds
 
 getErrCtxt (TcDown{tc_ctxt=ctxt}) = ctxt
 setErrCtxt down msg = down{tc_ctxt=[msg]}

@@ -244,8 +244,11 @@ data IdFlavour
   | ExportedId			-- Locally defined, exported
   | SpecPragmaId		-- Locally defined, RHS holds specialised call
 
-  | ConstantId 			-- Imported from elsewhere, or a dictionary function,
-				-- default method Id.
+  | ConstantId 			-- Imported from elsewhere, or a default method Id.
+
+  | DictFunId			-- We flag dictionary functions so that we can
+				-- conveniently extract the DictFuns from a set of
+				-- bindings when building a module's interface
 
   | DataConId DataCon		-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
@@ -262,6 +265,7 @@ ppFlavourInfo VanillaId         = empty
 ppFlavourInfo ExportedId        = ptext SLIT("[Exported]")
 ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
 ppFlavourInfo ConstantId        = ptext SLIT("[Constant]")
+ppFlavourInfo DictFunId         = ptext SLIT("[DictFun]")
 ppFlavourInfo (DataConId _)     = ptext SLIT("[DataCon]")
 ppFlavourInfo (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
 ppFlavourInfo (PrimOpId _)    	= ptext SLIT("[PrimOp]")

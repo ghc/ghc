@@ -30,7 +30,7 @@ import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
+import TcEnv		( TcEnv, InstInfo, tcExtendGlobalValEnv, 
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
@@ -54,7 +54,7 @@ import BasicTypes       ( EP(..), Fixity )
 import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
-			  PackageTypeEnv, DFunId, ModIface(..),
+			  PackageTypeEnv, ModIface(..),
 			  TypeEnv, extendTypeEnvList, 
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
@@ -69,7 +69,6 @@ data TcResults
   = TcResults {
 	-- All these fields have info *just for this module*
 	tc_env	   :: TypeEnv,			-- The top level TypeEnv
-	tc_insts   :: [DFunId],			-- Instances
 	tc_binds   :: TypecheckedMonoBinds,	-- Bindings
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
 	tc_rules   :: [TypecheckedRuleDecl]	-- Transformation rules
@@ -246,7 +245,6 @@ tcModule pcs hst get_fixity this_mod decls
     returnTc (new_pcs,
 	      TcResults { tc_env     = local_type_env,
 			  tc_binds   = implicit_binds `AndMonoBinds` all_binds', 
-			  tc_insts   = map iDFunId local_inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
 			  tc_rules   = all_local_rules
                         }

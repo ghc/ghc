@@ -53,7 +53,7 @@ import ListSetOps	( equivClasses )
 
 \begin{code}
 tcTyDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl1 is_rec unf_env (TySynonym tycon_name tyvar_names rhs src_loc)
+tcTyDecl1 is_rec unf_env (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
     tcHsRecType is_rec rhs			`thenTc` \ rhs_ty ->
@@ -71,7 +71,8 @@ tcTyDecl1 is_rec unf_env (TySynonym tycon_name tyvar_names rhs src_loc)
 
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 is_rec unf_env (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
+tcTyDecl1 is_rec unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
+			  	  tcdName = tycon_name, tcdCons = con_decls})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
