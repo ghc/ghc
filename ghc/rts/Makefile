@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.46 2001/04/04 14:31:30 rrt Exp $
+# $Id: Makefile,v 1.47 2001/04/24 15:03:37 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -104,8 +104,7 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 ifeq "$(BootingFromHc)" "YES"
 # use the normal $(CC) when booting from .hc files
-SRC_CC_OPTS := $(SRC_CC_OPTS)
-SRC_CC_OPTS += $(PLATFORM_CC_OPTS) $(HC_OPTS)
+SRC_CC_OPTS += $(HC_OPTS)
 else
 # otherwise, use $(GHC_INPLACE) as the C compiler.
 CC=$(GHC_INPLACE)
@@ -173,8 +172,8 @@ endif
 
 install :: gmp/libgmp.a
 
-clean ::
-	$(MAKE) -C gmp MAKEFLAGS= clean
+clean distclean maintainer-clean ::
+	$(MAKE) -C gmp MAKEFLAGS= $@
 
 ifeq "$(way)" ""
 INSTALL_LIBS += gmp/libgmp.a
