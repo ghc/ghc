@@ -42,3 +42,5 @@ test('ffi009', expect_fail_for(['optasm','extcore', 'optextcore']), compile_and_
 
 # Doesn't work with External Core due to __labels
 test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+
+test('ffi011', normal, compile_and_run, [''])
