@@ -8,10 +8,9 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.3 2001/09/13 11:39:58 simonmar Exp $
+-- $Id: Posix.hsc,v 1.4 2002/02/13 11:52:42 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
--- ToDo: detect regex library with configure.
 -- ToDo: should have an interface using PackedStrings.
 --
 -----------------------------------------------------------------------------
