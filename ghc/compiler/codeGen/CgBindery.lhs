@@ -44,7 +44,9 @@ import Literal		( Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, isWiredInName,
 			  Name{-instance NamedThing-}, NamedThing(..) )
+#ifdef DEBUG
 import PprAbsC		( pprAmode )
+#endif
 import PrimRep          ( PrimRep )
 import StgSyn		( StgArg, StgLiveVars, GenStgArg(..) )
 import Unique           ( Unique, Uniquable(..) )
