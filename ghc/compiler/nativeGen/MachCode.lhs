@@ -1565,7 +1565,6 @@ getRegister (StMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_NatS_Neg  -> trivialUCode NEG x
       MO_Nat_Not   -> trivialUCode NOT x
-      -- MO_32U_to_8U -> trivialUCode (AND (RIImm (ImmInt 255))) x
       MO_32U_to_8U     -> trivialCode AND x (StInt 255)
 
       MO_Flt_to_NatS -> coerceFP2Int FloatRep x
@@ -1573,7 +1572,7 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_Dbl_to_NatS -> coerceFP2Int DoubleRep x
       MO_NatS_to_Dbl -> coerceInt2FP DoubleRep x
 
-      -- Conversions which are a nop on x86
+      -- Conversions which are a nop on PPC
       MO_NatS_to_32U  -> conversionNop WordRep   x
       MO_32U_to_NatS  -> conversionNop IntRep    x
       MO_32U_to_NatU  -> conversionNop WordRep   x
@@ -4214,7 +4213,7 @@ trivialFCode pk instr x y
     	code__2 dst =
     	    	if pk1 == pk2 then
     	            code1 `appOL` code2 `snocOL`
-    	    	    instr (primRepToSize pk) src1 src2 dst
+    	    	    instr (primRepToSize pk) dst src1 src2
     	    	else panic "###PPC MachCode.trivialFCode: type mismatch"
     in
     returnNat (Any (if pk1 == pk2 then pk1 else DoubleRep) code__2)
