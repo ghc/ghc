@@ -227,7 +227,7 @@ BuildingProfilingConcurrent=$(subst mr,YES,$(filter mr,$(WAYS)))
 # profiled prelude libraries.
 # When booting from .hc files, turn this off.
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
-GhcLibWays
+GhcLibWays=
 else
 GhcLibWays=p
 endif
