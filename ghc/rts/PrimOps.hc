@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.14 1999/02/11 14:22:53 simonm Exp $
+ * $Id: PrimOps.hc,v 1.15 1999/02/11 17:15:22 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -330,7 +330,7 @@ FN_(mkWeakzh_fast)
   FE_
 }
 
-FN_(finalizeWeakzh_fast)
+FN_(finalizzeWeakzh_fast)
 {
   /* R1.p = weak ptr
    */

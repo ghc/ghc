@@ -291,7 +291,7 @@ __export PrelGHC
   Weakzh
   mkWeakzh
   deRefWeakzh
-  finalizeWeakzh
+  finalizzeWeakzh
 
   ForeignObjzh
   makeForeignObjzh

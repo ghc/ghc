@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.17 1999/02/11 14:22:57 simonm Exp $
+ * $Id: PrimOps.h,v 1.18 1999/02/11 17:15:20 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -686,7 +686,7 @@ EF_(seqzh_fast);
 #ifndef PAR
 
 EF_(mkWeakzh_fast);
-EF_(finalizeWeakzh_fast);
+EF_(finalizzeWeakzh_fast);
 
 #define deRefWeakzh(code,val,w)				\
   if (((StgWeak *)w)->header.info == &WEAK_info) {	\
