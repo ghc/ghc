@@ -346,7 +346,8 @@ STUBOBJS += $(HSC_C_OBJS)
 # Add _hsc.c files to the cbits library
 C_SRCS += $(wildcard ../*_hsc.c)
 # Make .hsc.h include files from the directory above visible
-SRC_CC_OPTS += -I..
+# (and the cbits/ library too).
+SRC_CC_OPTS += -I.. -I.
 endif
 
 LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
