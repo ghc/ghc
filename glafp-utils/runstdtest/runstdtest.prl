@@ -158,7 +158,7 @@ if ( $SpixTiming eq 'yes' ) {
 
     open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
     spix: while (<SPIXNM>) {
-	if ( / T +(_freeForeignObj|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
+	if ( / T +(_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
 	    $LastSpix = $1;
 	    last spix;
 	}
