@@ -538,9 +538,6 @@ instance CReturnable Char
 instance CCallable   Int
 instance CReturnable Int
 
--- DsCCall knows how to pass strings...
-instance CCallable   [Char]
-
 instance CReturnable () -- Why, exactly?
 \end{code}
 
