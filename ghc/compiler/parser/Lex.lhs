@@ -62,6 +62,7 @@ import GHC.Read 	( readRational__ ) -- Glasgow non-std
 #else
 import PrelRead 	( readRational__ ) -- Glasgow non-std
 #endif
+import Int		( Int32 )
 \end{code}
 
 %************************************************************************
@@ -1389,9 +1390,12 @@ ffiBit	   = 1	-- FIXME: not used yet; still part of `glaExtsBit'
 parrBit	   = 2
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int# -> Bool
-glaExtsEnabled flags = testBit (I# flags) glaExtsBit
-ffiEnabled     flags = testBit (I# flags) ffiBit
-parrEnabled    flags = testBit (I# flags) parrBit
+glaExtsEnabled flags = testBit (toInt32 flags) glaExtsBit
+ffiEnabled     flags = testBit (toInt32 flags) ffiBit
+parrEnabled    flags = testBit (toInt32 flags) parrBit
+
+toInt32 :: Int# -> Int32
+toInt32 x# = fromIntegral (I# x#)
 
 -- convenient record-based bitmap for the interface to the rest of the world
 --
@@ -1406,7 +1410,7 @@ data ExtFlags = ExtFlags {
 mkPState          :: SrcLoc -> ExtFlags -> PState
 mkPState loc exts  = PState {
 		       loc        = loc,
-		       extsBitmap = case bitmap of {I# bits -> bits},
+		       extsBitmap = case (fromIntegral bitmap) of {I# bits -> bits},
 		       bol	  = 0#,
 		       atbol      = 1#,
 		       context    = []
@@ -1416,6 +1420,7 @@ mkPState loc exts  = PState {
 --			        .|. ffiBit     `setBitIf` ffiEF		exts
 				.|. parrBit    `setBitIf` parrEF	exts
                        --
+		       setBitIf :: Int -> Bool -> Int32
 		       b `setBitIf` cond | cond      = bit b
 					 | otherwise = 0
 
