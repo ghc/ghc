@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/bin/sh -e
 
 # Manuel M. T. Chakravarty <chak@acm.org>, June 2000
+# Updated for GHC 5.00, Simon Marlow, March 2001
 #
 # Script to build GHC from .hc files (must be run in the fptools/ root
 # directory into which the source and .hc files must already have been
@@ -24,10 +25,7 @@ fi
 # build configuration
 #
 cat >mk/build.mk <<END
-ProjectsToBuild = glafp-utils hslibs ghc
-GhcLibHcOpts = -O
-SRC_HAPPY_OPTS += -c
-GhcLibWays=
+# nothing!
 END
 
 # touch happy generated files; so that in non-bootstrapping mode for
@@ -35,12 +33,20 @@ END
 #
 touch ghc/compiler/rename/ParseIface.hs
 touch ghc/compiler/parser/Parser.hs
+touch ghc/compiler/main/ParsePkgConf.hs
 
 echo "*** Building hsc..."
-./configure --enable-hc-boot $configopts        || exit 1
-$MAKE boot all                                  || exit 1
+./configure --enable-hc-boot $configopts
+$MAKE -C ghc boot
+$MAKE -C hslibs boot all
+$MAKE -C ghc all
 
-echo "*** Building library..."
-echo "GhcWithHscBuiltViaC=NO" >>mk/build.mk
-$MAKE -C ghc/lib clean boot all			|| exit 1
-$MAKE -C hslibs  clean boot all
+echo "*** Building libraries..."
+./configure
+
+# clean in ghc/lib, but avoid removing hsc2hs-generated .hs files
+$MAKE -C ghc/lib   clean HSC_SRCS=""
+$MAKE -C ghc/lib   boot all
+
+$MAKE -C hslibs    clean boot all
+$MAKE -C ghc/utils clean boot all
