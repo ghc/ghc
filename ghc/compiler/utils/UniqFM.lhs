@@ -799,7 +799,7 @@ shiftR_ :: FAST_INT -> FAST_INT -> FAST_INT
 shiftL_ n p = word2Int#((int2Word# n) `shiftL#` p)
 shiftR_ n p = word2Int#((int2Word# n) `shiftr` p)
   where
-    shiftr x y = shiftRA# x y
+    shiftr x y = shiftRL# x y
 
 #else {- not GHC -}
 shiftL_ n p = n * (2 ^ p)

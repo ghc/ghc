@@ -313,7 +313,7 @@ unpkUnique (MkUnique u)
     in
     (tag, i)
   where
-    shiftr x y = shiftRA# x y
+    shiftr x y = shiftRL# x y
 \end{code}
 
 
