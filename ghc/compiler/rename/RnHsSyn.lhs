@@ -16,9 +16,9 @@ import HsPragmas
 #endif
 
 import Id		( GenId, SYN_IE(Id) )
+import BasicTypes	( NewOrData )
 import Name		( Name )
-import Outputable	( Outputable(..){-instance * []-} )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..){-instance * []-} )
 import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
 import Name		( SYN_IE(NameSet), unitNameSet, mkNameSet, minusNameSet, unionNameSets, emptyNameSet )
