@@ -79,7 +79,7 @@ getEnv name = do
     litstring <- _ccall_ getenv name
     if litstring /= ``NULL'' 
 	then return (unpackCString litstring)
-        else fail (IOError Nothing NoSuchThing 
+        else fail (IOError Nothing NoSuchThing "getEnv"
 			("environment variable: " ++ name))
 \end{code}
 
@@ -97,7 +97,7 @@ The implementation does not support system calls.
 \end{itemize}
 
 \begin{code}
-system "" = fail (IOError Nothing InvalidArgument "null command")
+system "" = fail (IOError Nothing InvalidArgument "system" "null command")
 system cmd = do
     status <- _ccall_ systemCmd cmd
     case status of
@@ -114,13 +114,13 @@ Before it terminates, any open or semi-closed handles are first closed.
 \begin{code}
 exitWith ExitSuccess = do
     _ccall_ EXIT (0::Int)
-    fail (IOError Nothing OtherError "exit should not return")
+    fail (IOError Nothing OtherError "exitWith" "exit should not return")
 
 exitWith (ExitFailure n) 
-  | n == 0 = fail (IOError Nothing InvalidArgument "ExitFailure 0")
+  | n == 0 = fail (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0")
   | otherwise = do
     _ccall_ EXIT n
-    fail (IOError Nothing OtherError "exit should not return")
+    fail (IOError Nothing OtherError "exitWith" "exit should not return")
 \end{code}
 
 

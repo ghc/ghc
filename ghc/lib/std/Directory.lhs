@@ -44,7 +44,7 @@ import PrelIOBase
 import PrelST
 import PrelArr
 import PrelPack		( unpackNBytesST )
-import PrelForeign	( Word(..) )
+import PrelCCall	( Word(..) )
 import PrelAddr
 import Time             ( ClockTime(..) )
 
@@ -259,7 +259,7 @@ renameDirectory opath npath = do
     if rc == 0 then
         return ()
      else
-        constructErrorAndFailWithInfo "renameDirectory" opath
+        constructErrorAndFailWithInfo "renameDirectory" ("old: " ++ opath ++ ",new: " ++ npath)
 \end{code}
 
 @renameFile old@ {\em new} changes the name of an existing file system
@@ -473,7 +473,7 @@ setPermissions name (Permissions r w e s) = do
     rc <- _ccall_ chmod name mode
     if rc == 0
 	then return ()
-	else fail (IOError Nothing SystemError "Directory.setPermissions")
+	else fail (IOError Nothing SystemError "setPermissions" "insufficient permissions")
 
 \end{code}
 
@@ -489,7 +489,7 @@ getFileStatus name = do
     rc <- _casm_ ``%r = stat(%0,(struct stat *)%1);'' name bytes
     if rc == 0 
 	then stToIO (unsafeFreezeByteArray bytes)
-     	else fail (IOError Nothing SystemError "Directory.getFileStatus")
+     	else fail (IOError Nothing SystemError "getFileStatus" "")
 
 modificationTime :: FileStatus -> IO ClockTime
 modificationTime stat = do

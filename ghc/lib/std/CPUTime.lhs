@@ -43,8 +43,8 @@ getCPUTime =
 		fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
                 fromIntegral (I# (indexIntArray# frozen# 3#))) * 1000)
     else
-	fail (IOError Nothing UnsupportedOperation 
-		"getCPUTime: can't get CPU time")
+	fail (IOError Nothing UnsupportedOperation "getCPUTime"
+		"can't get CPU time")
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % 
