@@ -15,8 +15,11 @@ module PrelRules ( primOpRule, builtinRules ) where
 import CoreSyn
 import Rules		( ProtoCoreRule(..) )
 import Id		( idUnfolding, mkWildId, isDataConId_maybe )
-import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord, inIntRange, literalType,
-			  word2IntLit, int2WordLit, int2CharLit, char2IntLit, int2FloatLit, int2DoubleLit
+import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
+			, inIntRange, inWordRange, literalType
+			, word2IntLit, int2WordLit, char2IntLit, int2CharLit
+			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
+			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
@@ -29,6 +32,9 @@ import OccName		( occNameUserString)
 import ThinAir		( unpackCStringFoldrId )
 import Maybes		( maybeToBool )
 import Char		( ord, chr )
+import Bits		( Bits(..) )
+import PrelAddr		( intToWord, wordToInt )
+import Word		( Word64 )
 import Outputable
 \end{code}
 
@@ -44,29 +50,40 @@ primOpRule op
 
     -- ToDo:	something for integer-shift ops?
     --		NotOp
-    --		Int2WordOp	-- SIGH: these two cause trouble in unfoldery
-    --		Int2AddrOp	-- as we can't distinguish unsigned literals in interfaces (ToDo?)
 
     primop_rule SeqOp	    = seqRule
     primop_rule TagToEnumOp = tagToEnumRule
     primop_rule DataToTagOp = dataToTagRule
 
-	-- Char operations
-    primop_rule OrdOp   	= oneLit (litCoerce char2IntLit op_name)
- 
-	-- Int/Word operations
-    primop_rule IntAddOp    = twoLits (intOp2 (+) op_name)
-    primop_rule IntSubOp    = twoLits (intOp2 (-) op_name)
-    primop_rule IntMulOp    = twoLits (intOp2 (*) op_name)
+	-- Int operations
+    primop_rule IntAddOp    = twoLits (intOp2  (+)  op_name)
+    primop_rule IntSubOp    = twoLits (intOp2  (-)  op_name)
+    primop_rule IntMulOp    = twoLits (intOp2  (*)  op_name)
     primop_rule IntQuotOp   = twoLits (intOp2Z quot op_name)
     primop_rule IntRemOp    = twoLits (intOp2Z rem  op_name)
-    primop_rule IntNegOp    = oneLit  (negOp op_name)
+    primop_rule IntNegOp    = oneLit  (negOp        op_name)
 
-    primop_rule ChrOp    	= oneLit (litCoerce int2CharLit	  op_name)
-    primop_rule Int2FloatOp	= oneLit (litCoerce int2FloatLit  op_name)
-    primop_rule Int2DoubleOp	= oneLit (litCoerce int2DoubleLit op_name)
-    primop_rule Word2IntOp 	= oneLit (litCoerce word2IntLit   op_name)
-    primop_rule Int2WordOp 	= oneLit (litCoerce int2WordLit   op_name)
+	-- Word operations
+    primop_rule WordQuotOp  = twoLits (wordOp2Z   quot  op_name)
+    primop_rule WordRemOp   = twoLits (wordOp2Z   rem   op_name)
+    primop_rule AndOp       = twoLits (wordBitOp2 (.&.) op_name)
+    primop_rule OrOp        = twoLits (wordBitOp2 (.|.) op_name)
+    primop_rule XorOp       = twoLits (wordBitOp2 xor   op_name)
+
+	-- coercions
+    primop_rule Word2IntOp 	= oneLit (litCoerce word2IntLit     op_name)
+    primop_rule Int2WordOp 	= oneLit (litCoerce int2WordLit     op_name)
+    primop_rule OrdOp   	= oneLit (litCoerce char2IntLit     op_name)
+    primop_rule ChrOp    	= oneLit (litCoerce int2CharLit	    op_name)
+    primop_rule Float2IntOp	= oneLit (litCoerce float2IntLit    op_name)
+    primop_rule Int2FloatOp	= oneLit (litCoerce int2FloatLit    op_name)
+    primop_rule Double2IntOp	= oneLit (litCoerce double2IntLit   op_name)
+    primop_rule Int2DoubleOp	= oneLit (litCoerce int2DoubleLit   op_name)
+    primop_rule Addr2IntOp 	= oneLit (litCoerce addr2IntLit     op_name)
+    primop_rule Int2AddrOp 	= oneLit (litCoerce int2AddrLit     op_name)
+	-- SUP: Not sure what the standard says about precision in the following 2 cases
+    primop_rule Float2DoubleOp 	= oneLit (litCoerce float2DoubleLit op_name)
+    primop_rule Double2FloatOp 	= oneLit (litCoerce double2FloatLit op_name)
 
 	-- Float
     primop_rule FloatAddOp   = twoLits (floatOp2 (+) op_name)
@@ -80,6 +97,7 @@ primOpRule op
     primop_rule DoubleSubOp   = twoLits (doubleOp2 (-) op_name)
     primop_rule DoubleMulOp   = twoLits (doubleOp2 (*) op_name)
     primop_rule DoubleDivOp   = twoLits (doubleOp2Z (/) op_name)
+    primop_rule DoubleNegOp   = oneLit  (negOp op_name)
 
 	-- Relational operators
     primop_rule IntEqOp  = relop (==) `or_rule` litEq True  op_name_case
@@ -178,6 +196,16 @@ intOp2Z op name (MachInt i1) (MachInt i2)
   | i2 /= 0 = Just (name, mkIntVal (i1 `op` i2))
 intOp2Z op name l1 l2 = Nothing		-- LitLit or zero dividend
 
+--------------------------
+-- Integer is not an instance of Bits, so we operate on Word64
+wordBitOp2 op name l1@(MachWord w1) l2@(MachWord w2)
+  = wordResult name (ppr l1 <+> ppr l2)
+                    ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2))
+wordBitOp2 op name l1 l2 = Nothing		-- Could find LitLit
+
+wordOp2Z op name (MachWord w1) (MachWord w2)
+  | w2 /= 0 = Just (name, mkWordVal (w1 `op` w2))
+wordOp2Z op name l1 l2 = Nothing	-- LitLit or zero dividend
 
 --------------------------
 floatOp2  op name (MachFloat f1) (MachFloat f2)
@@ -187,8 +215,6 @@ floatOp2  op name l1 l2 = Nothing
 floatOp2Z op name (MachFloat f1) (MachFloat f2)
   | f1 /= 0   = Just (name, mkFloatVal (f1 `op` f2))
 floatOp2Z op name l1 l2 = Nothing
-
-
 
 --------------------------
 doubleOp2  op name (MachDouble f1) (MachDouble f2)
@@ -237,19 +263,31 @@ do_lit_eq is_eq name lit expr
     val_if_neq | is_eq     = falseVal
 	       | otherwise = trueVal
 
+-- TODO: Merge intResult/wordResult
 intResult name pp_args result
   | not (inIntRange result)
 	-- Better tell the user that we've overflowed...
 	-- ..not that it stops us from actually folding!
   
   = pprTrace "Warning:" (text "Integer overflow in:" <+> ppr name <+> pp_args)
-    Just (name, mkIntVal (squash result))
+    Just (name, mkIntVal (squashInt result))
 
   | otherwise
   = Just (name, mkIntVal result)
 
-squash :: Integer -> Integer	-- Squash into Int range
-squash i = toInteger ((fromInteger i)::Int)
+wordResult name pp_args result
+  | not (inWordRange result)
+	-- Better tell the user that we've overflowed...
+	-- ..not that it stops us from actually folding!
+  
+  = pprTrace "Warning:" (text "Word overflow in:" <+> ppr name <+> pp_args)
+    Just (name, mkWordVal (squashInt result))
+
+  | otherwise
+  = Just (name, mkWordVal result)
+
+squashInt :: Integer -> Integer	-- Squash into Int range
+squashInt i = toInteger ((fromInteger i)::Int)
 \end{code}
 
 
@@ -278,9 +316,10 @@ oneLit rule other    = Nothing
 
 trueVal       = Var trueDataConId
 falseVal      = Var falseDataConId
-mkIntVal i    = Lit (mkMachInt i)
-mkCharVal c   = Lit (MachChar   c)
-mkFloatVal f  = Lit (MachFloat  f)
+mkIntVal    i = Lit (mkMachInt  i)
+mkWordVal   w = Lit (mkMachWord w)
+mkCharVal   c = Lit (MachChar   c)
+mkFloatVal  f = Lit (MachFloat  f)
 mkDoubleVal d = Lit (MachDouble d)
 \end{code}
 

@@ -4,19 +4,20 @@
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
 
 \begin{code}
-module Literal (
-	Literal(..),		-- Exported to ParseIface
-	mkMachInt, mkMachWord,
-	mkMachInt64, mkMachWord64,
-	isLitLitLit,
-	literalType, literalPrimRep,
-	hashLiteral,
+module Literal
+	( Literal(..)		-- Exported to ParseIface
+	, mkMachInt, mkMachWord
+	, mkMachInt64, mkMachWord64
+	, isLitLitLit
+	, literalType, literalPrimRep
+	, hashLiteral
 
-	inIntRange, inWordRange,
+	, inIntRange, inWordRange
 
-	word2IntLit, int2WordLit, int2CharLit, 
- 	int2FloatLit, int2DoubleLit, char2IntLit
-    ) where
+	, word2IntLit, int2WordLit, char2IntLit, int2CharLit
+	, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
+	, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
+	) where
 
 #include "HsVersions.h"
 
@@ -145,8 +146,9 @@ inWordRange x = x >= 0		    && x <= tARGET_MAX_WORD
 	Coercions
 	~~~~~~~~~
 \begin{code}
-word2IntLit, int2WordLit, int2CharLit, char2IntLit :: Literal -> Literal
-int2FloatLit, int2DoubleLit :: Literal -> Literal
+word2IntLit, int2WordLit, char2IntLit, int2CharLit,
+ float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
+ addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit :: Literal -> Literal
 
 word2IntLit (MachWord w) 
   | w > tARGET_MAX_INT = MachInt ((-1) + tARGET_MAX_WORD - w)
@@ -156,11 +158,20 @@ int2WordLit (MachInt i)
   | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)	-- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
 
-int2CharLit (MachInt i)  = MachChar (chr (fromInteger i))
 char2IntLit (MachChar c) = MachInt  (toInteger (ord c))
+int2CharLit (MachInt  i) = MachChar (chr (fromInteger i))
 
-int2FloatLit  (MachInt i) = MachFloat  (fromInteger i)
-int2DoubleLit (MachInt i) = MachDouble (fromInteger i)
+float2IntLit (MachFloat f) = MachInt   (truncate    f)
+int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
+
+double2IntLit (MachFloat f) = MachInt    (truncate    f)
+int2DoubleLit (MachInt   i) = MachDouble (fromInteger i)
+
+addr2IntLit (MachAddr a) = MachInt  a
+int2AddrLit (MachInt  i) = MachAddr i
+
+float2DoubleLit (MachFloat  f) = MachDouble f
+double2FloatLit (MachDouble d) = MachFloat  d
 \end{code}
 
 	Predicates
