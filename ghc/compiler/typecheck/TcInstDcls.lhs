@@ -312,6 +312,9 @@ getGenericInstances class_decls
     let
 	gen_inst_info = concat gen_inst_infos
     in
+    if null gen_inst_info then
+	returnTc []
+    else
     getDOptsTc						`thenTc`  \ dflags ->
     ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
 		      (vcat (map pprInstInfo gen_inst_info)))	
