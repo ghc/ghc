@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.79 2002/01/29 02:41:21 sof Exp $
+ * $Id: Linker.c,v 1.80 2002/01/29 06:15:03 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1215,9 +1215,8 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
 	/* If the relocation field (a short) has overflowed, the
 	 * real count can be found in the first reloc entry.
-	 * The PE spec (Rev 6.0) doesn't really cover this,
-	 * but as always header files provide the final word on
-	 * details like this (cf. WinNT.h).
+	 * 
+	 * See Section 4.1 (last para) of the PE spec (rev6.0).
 	 */
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
@@ -1526,9 +1525,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
 	/* If the relocation field (a short) has overflowed, the
 	 * real count can be found in the first reloc entry.
-	 * The PE spec (Feb 99 version) doesn't really cover this,
-	 * but as always header files provide the final word on
-	 * details like this (cf. WinNT.h).
+         *
+	 * See Section 4.1 (last para) of the PE spec (rev6.0).
 	 */
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
