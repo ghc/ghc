@@ -35,6 +35,7 @@ import Module		( Module, ModuleName, moduleName,
 			  pprModuleName, moduleNameUserString
 			)
 import Outputable	
+import CStrings		( pprStringInCStyle )
 import Util	        ( thenCmp )
 \end{code}
 
@@ -358,7 +359,7 @@ ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf})
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration
 costCentreUserName (NoCostCentre)  = "NO_CC"
-costCentreUserName (AllCafsCC {})  = "CAFs_in_..."
+costCentreUserName (AllCafsCC {})  = "CAF"
 costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
   =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (_UNPK_ name)
 \end{code}
@@ -375,8 +376,8 @@ pprCostCentreDecl is_local cc
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
 	    cc_ident, 		  					comma,
-	    doubleQuotes (text (costCentreUserName cc)),		comma,
-	    doubleQuotes (text (moduleNameUserString mod_name)),	comma,
+	    pprStringInCStyle (costCentreUserName cc),			comma,
+	    pprStringInCStyle (moduleNameUserString mod_name),		comma,
 	    ptext is_subsumed,						comma,
 	    empty,	-- Now always externally visible
 	    text ");"]
