@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 2004/02/20 21:21:27 panne Exp $
+# $Id: Makefile,v 1.26 2004/11/11 09:36:55 simonmar Exp $
 #
 
 TOP=.
@@ -8,6 +8,7 @@ include $(TOP)/mk/boilerplate.mk
 #
 # subdir dependencies:
 #	everything needs utils
+#	utils needs lib
 #	includes/ needs driver (to easily c.pile mkNativeGen.c)
 #	make depend except in {utils,driver} needs includes	
 #	RTS and compiler need includes
@@ -21,13 +22,13 @@ include $(TOP)/mk/boilerplate.mk
 # we descend into subdirs - to boot utils must be before driver.
 #
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS = includes rts docs compiler utils driver
+SUBDIRS = includes rts docs compiler lib utils driver
 else
 ifneq "$(ILXized)" "YES"
-SUBDIRS = includes utils driver docs compiler rts
+SUBDIRS = includes lib utils driver docs compiler rts
 else
 # No RTS for ILX
-SUBDIRS = includes utils driver docs compiler
+SUBDIRS = includes lib utils driver docs compiler
 endif
 endif
 
