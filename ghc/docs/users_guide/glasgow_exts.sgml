@@ -275,8 +275,9 @@ program), you may wish to check if there are libraries that provide a
              slightly-non-standard reading is that there is no difficulty with
              the literal <literal>-2147483648</literal> at type <literal>Int</literal>;
              it means <literal>fromInteger (-2147483648)</literal>.  The strict interpretation
-             would be <literal>negate (fromInteger 21474836483)</literal>, 
-             and the call to <literal>fromInteger</literal> would overflow (at type <literal>Int</literal>, remember).
+             would be <literal>negate (fromInteger 2147483648)</literal>,
+             and the call to <literal>fromInteger</literal> would overflow
+             (at type <literal>Int</literal>, remember).
              </para>
 
 	  </listitem>
