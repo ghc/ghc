@@ -58,7 +58,7 @@ import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMark
 			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
 import OccName		( OccName, OccEnv, emptyOccEnv, 
-			  lookupOccEnv, extendOccEnv, 
+			  lookupOccEnv, extendOccEnv, parenSymOcc,
 			  OccSet, unionOccSets, unitOccSet )
 import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import NameSet		( NameSet, elemNameSet )
@@ -290,7 +290,7 @@ instance Outputable IfaceClassOp where
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars 
-  = hsep [pprIfaceContext context, ppr thing, pprIfaceTvBndrs tyvars]
+  = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), pprIfaceTvBndrs tyvars]
 
 pp_condecls tc IfAbstractTyCon    = ptext SLIT("{- abstract -}")
 pp_condecls tc (IfNewTyCon c)     = equals <+> pprIfaceConDecl tc c

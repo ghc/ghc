@@ -30,7 +30,7 @@ import TypeRep		( Type(..), TyNote(..), PredType(..), ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
-import OccName		( OccName )
+import OccName		( OccName, parenSymOcc )
 import Name		( Name, getName, getOccName, nameModule, nameOccName )
 import Module		( Module )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
@@ -71,6 +71,12 @@ isLocalIfaceExtName other	      = False
 
 mkIfaceExtName name = ExtPkg (nameModule name) (nameOccName name)
 	-- Local helper for wired-in names
+
+ifaceExtOcc :: IfaceExtName -> OccName
+ifaceExtOcc (ExtPkg _ occ)    	= occ
+ifaceExtOcc (HomePkg _ occ _) 	= occ
+ifaceExtOcc (LocalTop occ)    	= occ
+ifaceExtOcc (LocalTopSub occ _) = occ
 
 interactiveExtNameFun :: PrintUnqualified -> Name-> IfaceExtName
 interactiveExtNameFun print_unqual name
@@ -272,7 +278,7 @@ pprIfaceForAllPart tvs ctxt doc
 	    | otherwise = ptext SLIT("forall") <+> pprIfaceTvBndrs tvs <> dot
 
 -------------------
-ppr_tc_app ctxt_prec tc 	 []   = ppr tc
+ppr_tc_app ctxt_prec tc 	 []   = ppr_tc tc
 ppr_tc_app ctxt_prec IfaceListTc [ty] = brackets   (pprIfaceType ty)
 ppr_tc_app ctxt_prec IfacePArrTc [ty] = pabrackets (pprIfaceType ty)
 ppr_tc_app ctxt_prec (IfaceTupTc bx arity) tys
@@ -280,13 +286,19 @@ ppr_tc_app ctxt_prec (IfaceTupTc bx arity) tys
   = tupleParens bx (sep (punctuate comma (map pprIfaceType tys)))
 ppr_tc_app ctxt_prec tc tys 
   = maybeParen ctxt_prec tYCON_PREC 
-	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
+	       (sep [ppr_tc tc, nest 4 (sep (map pprParendIfaceType tys))])
+
+ppr_tc :: IfaceTyCon -> SDoc
+-- Wrap infix type constructors in parens
+ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (ifaceExtOcc ext_nm) (ppr tc)
+ppr_tc tc		   = ppr tc
 
 -------------------
 instance Outputable IfacePredType where
 	-- Print without parens
   ppr (IfaceIParam ip ty)  = hsep [ppr ip, dcolon, ppr ty]
-  ppr (IfaceClassP cls ts) = ppr cls <+> sep (map pprParendIfaceType ts)
+  ppr (IfaceClassP cls ts) = parenSymOcc (ifaceExtOcc cls) (ppr cls)
+			     <+> sep (map pprParendIfaceType ts)
 
 instance Outputable IfaceTyCon where
   ppr (IfaceTc ext) = ppr ext

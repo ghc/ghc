@@ -21,7 +21,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars, tcInstType, 
-  tcSkolType, tcSkolTyVars,
+  tcSkolType, tcSkolTyVars, tcInstSigType,
   tcSkolSigType, tcSkolSigTyVars,
 
   --------------------------------
@@ -77,7 +77,7 @@ import Var		( TyVar, tyVarKind, tyVarName,
 -- others:
 import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow )
-import Name		( Name, setNameUnique, mkSysTvName )
+import Name		( Name, setNameUnique, mkSysTvName, mkSystemName, getOccName )
 import VarSet
 import VarEnv
 import CmdLineOpts	( dopt, DynFlag(..) )
@@ -177,11 +177,12 @@ tcInstTyVars tyvars
 		-- they cannot possibly be captured by
 		-- any existing for-alls.  Hence zipTopTvSubst
 
-tcInstTyVar tyvar
+tcInstTyVar tyvar	-- Use the OccName of the tyvar we are instantiating
+			-- but make a System Name, so that it's updated in 
+			-- preference to a tcInstSigTyVar
   = do	{ uniq <- newUnique
-	; let name = setNameUnique (tyVarName tyvar) uniq
-		-- See Note [TyVarName]
-	; newMetaTyVar name (tyVarKind tyvar) Flexi }
+        ; newMetaTyVar (mkSystemName uniq (getOccName tyvar)) 
+		       (tyVarKind tyvar) Flexi }
 
 tcInstType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- tcInstType instantiates the outer-level for-alls of a TcType with
@@ -189,6 +190,28 @@ tcInstType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- and returns the pieces.
 tcInstType ty = tc_inst_type (mappM tcInstTyVar) ty
 
+
+---------------------------------------------
+tcInstSigType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type with fresh meta type variables, but
+-- ones which have the same Name as the original type 
+-- variable.  This is used for type signatures, where we must
+-- instantiate with meta type variables, but we'd like to avoid
+-- instantiating them were possible; and the unifier unifies
+-- tyvars with System Names by preference
+-- 
+-- We don't need a fresh unique, because the renamer has made them
+-- unique, and it's better not to do so because we extend the envt
+-- with them as scoped type variables, and we'd like to avoid spurious
+-- 's = s' bindings in error messages
+tcInstSigType ty = tc_inst_type tcInstSigTyVars ty
+
+tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSigTyVars tyvars
+  = mapM new_tv tyvars
+  where
+    new_tv tv = newMetaTyVar (tyVarName tv) (tyVarKind tv) Flexi
+			    
 
 ---------------------------------------------
 tcSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
@@ -410,7 +433,7 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TyVar
 -- bound occurences of the original type variable will get zonked to 
 -- the immutable version.
 --
--- We leave skolem TyVars alone; they are imutable.
+-- We leave skolem TyVars alone; they are immutable.
 zonkQuantifiedTyVar tv
   | isSkolemTyVar tv = return tv
 	-- It might be a skolem type variable, 
@@ -533,7 +556,7 @@ zonkTyVar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variabl
  	  -> TcTyVar -> TcM TcType
 zonkTyVar unbound_var_fn rflag tyvar 
   | not (isTcTyVar tyvar)	-- When zonking (forall a.  ...a...), the occurrences of 
-				-- the quantified variable a are TyVars not TcTyVars
+				-- the quantified variable 'a' are TyVars not TcTyVars
   = returnM (TyVarTy tyvar)
 
   | otherwise

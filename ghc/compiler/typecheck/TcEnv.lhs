@@ -345,13 +345,13 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
     else let
 	-- The name tv is scoped, so we don't need to tidy it
 	(tidy_env1, tidy_ty) = tidyOpenType  tidy_env tv_ty
-	msg = sep [ppr tv <+> eq_stuff, nest 2 bound_at]
+	msg = sep [ptext SLIT("Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff, nest 2 bound_at]
 
 	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, 
-		   tv == tyVarName tv' = empty
+		   getOccName tv == getOccName tv' = empty
 		 | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	bound_at = ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
+	bound_at = parens $ ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
     in
     returnM (tidy_env1, Just msg)
 \end{code}

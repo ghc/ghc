@@ -1984,8 +1984,17 @@ tc_simplify_top is_interactive wanteds
     strangeTopIPErrs bad_ips				`thenM_`
 
 	-- Deal with ambiguity errors, but only if
-	-- if there has not been an error so far; errors often
-	-- give rise to spurious ambiguous Insts
+	-- if there has not been an error so far:
+	-- errors often give rise to spurious ambiguous Insts.
+	-- For example:
+	--   f = (*)	-- Monomorphic
+	--   g :: Num a => a -> a
+	--   g x = f x x
+	-- Here, we get a complaint when checking the type signature for g,
+	-- that g isn't polymorphic enough; but then we get another one when
+	-- dealing with the (Num a) context arising from f's definition;
+	-- we try to unify a with Int (to default it), but find that it's
+	-- already been unified with the rigid variable from g's type sig
     ifErrsM (returnM []) (
 	
 	-- Complain about the ones that don't fall under

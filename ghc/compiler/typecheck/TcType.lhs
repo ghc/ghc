@@ -104,7 +104,7 @@ module TcType (
   isPrimitiveType, 
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
-  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
+  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, tidySkolemTyVar,
   typeKind, 
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -159,7 +159,7 @@ import Type		(	-- Re-exports
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
 import DataCon		( DataCon )
 import Class		( Class )
-import Var		( TyVar, Id, isTcTyVar, tcTyVarDetails )
+import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
 import ForeignCall	( Safety, playSafe, DNType(..) )
 import VarSet
 
@@ -167,6 +167,7 @@ import VarSet
 import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
 import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
 import NameSet
+import VarEnv		( TidyEnv )
 import OccName		( OccName, mkDictOcc )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
@@ -266,7 +267,8 @@ data SkolemInfo
 			-- variable for 'a'.  
   | ArrowSkol SrcSpan	-- An arrow form (see TcArrows)
 
-  | GenSkol TcType	-- Bound when doing a subsumption check for this type
+  | GenSkol [TcTyVar]	-- Bound when doing a subsumption check for 
+	    TcType	-- 	(forall tvs. ty)
 	    SrcSpan
 
 data MetaDetails
@@ -276,6 +278,19 @@ data MetaDetails
   | Indirect TcType  -- Type indirections, treated as wobbly 
                      -- for the purpose of GADT unification.
 
+tidySkolemTyVar :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
+-- Tidy the type inside a GenSkol, preparatory to printing it
+tidySkolemTyVar env tv
+  = ASSERT( isSkolemTyVar tv )
+    (env1, mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv info1))
+  where
+    (env1, info1) = case skolemTvInfo tv of
+		      GenSkol tvs ty loc -> (env2, GenSkol tvs1 ty1 loc)
+			    where
+			      (env1, tvs1) = tidyOpenTyVars env tvs
+			      (env2, ty1)  = tidyOpenType env1 ty
+		      info -> (env, info)
+		     
 pprSkolemTyVar :: TcTyVar -> SDoc
 pprSkolemTyVar tv
   = ASSERT( isSkolemTyVar tv )
@@ -288,8 +303,9 @@ instance Outputable SkolemInfo where
   ppr (ArrowSkol loc)  = ptext SLIT("the arrow form at") <+> ppr loc
   ppr (PatSkol dc loc) = sep [ptext SLIT("the pattern for") <+> quotes (ppr dc),
 	       		    nest 2 (ptext SLIT("at") <+> ppr loc)]
-  ppr (GenSkol ty loc) = sep [ptext SLIT("the polymorphic type") <+> quotes (ppr ty),
-			    nest 2 (ptext SLIT("at") <+> ppr loc)]
+  ppr (GenSkol tvs ty loc) = sep [ptext SLIT("the polymorphic type") 
+			   	  <+> quotes (ppr (mkForAllTys tvs ty)),
+			          nest 2 (ptext SLIT("at") <+> ppr loc)]
 
 instance Outputable MetaDetails where
   ppr Flexi 	    = ptext SLIT("Flexi")

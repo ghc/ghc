@@ -50,11 +50,11 @@ import TcRnMonad
 import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
 import InstEnv	( DFunId, InstEnv, lookupInstEnv, checkFunDeps, extendInstEnv )
 import TcIface	( loadImportedInsts )
-import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, 
-		  zonkTcThetaType, tcInstTyVar, tcInstType
+import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zonkTcThetaType, 
+		  tcInstTyVar, tcInstType, tcSkolType
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar, TcPredType,
-		  PredType(..), typeKind, mkSigmaTy,
+		  PredType(..), SkolemInfo(..), typeKind, mkSigmaTy,
 		  tcSplitForAllTys, tcSplitForAllTys, 
 		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy, tcSplitDFunHead,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
@@ -71,27 +71,25 @@ import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSub
 import Unify	( tcMatchTys )
 import Kind	( isSubKind )
 import Packages	( isHomeModule )
-import HscTypes	( HscEnv( hsc_HPT ), ExternalPackageState(..), 
-		  ModDetails( md_insts ), HomeModInfo( hm_details )  )
+import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
-		  isInternalName, setNameUnique, mkSystemNameEncoded )
+		  isInternalName, setNameUnique, mkSystemVarNameEncoded )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind, setIdType )
 import VarEnv	( TidyEnv, emptyTidyEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
-import Module	( moduleEnvElts, elemModuleEnv, lookupModuleEnv )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
 import CmdLineOpts( DynFlags )
-import Maybes	( isJust, fromJust )
+import Maybes	( isJust )
 import Outputable
 \end{code}
 
@@ -402,7 +400,7 @@ newLitInst orig lit expected_ty
   = getInstLoc orig		`thenM` \ loc ->
     newUnique			`thenM` \ new_uniq ->
     let
-	lit_nm   = mkSystemNameEncoded new_uniq FSLIT("lit")
+	lit_nm   = mkSystemVarNameEncoded new_uniq FSLIT("lit")
 		-- The "encoded" bit means that we don't need to z-encode
 		-- the string every time we call this!
 	lit_inst = LitInst lit_nm lit expected_ty loc
@@ -571,7 +569,12 @@ addInst :: DynFlags -> InstEnv -> DFunId -> TcM InstEnv
 addInst dflags home_ie dfun
   = do	{ 	-- Instantiate the dfun type so that we extend the instance
 		-- envt with completely fresh template variables
-	  (tvs', theta', tau') <- tcInstType (idType dfun)
+		-- This is important because the template variables must
+		-- not overlap with anything in the things being looked up
+		-- (since we do unification).  
+		-- We use tcSkolType because we don't want to allocate fresh
+		-- *meta* type variables.  
+	  (tvs', theta', tau') <- tcSkolType (InstSkol dfun) (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
 
@@ -704,8 +707,13 @@ lookupInst (Dict _ _ _) = returnM NoInstance
 instantiate_dfun :: TvSubst -> DFunId -> TcPredType -> InstLoc -> TcM LookupInstResult
 instantiate_dfun tenv dfun_id pred loc
   = -- tenv is a substitution that instantiates the dfun_id 
-    -- to match the requested result type.   However, the dfun
-    -- might have some tyvars that only appear in arguments
+    -- to match the requested result type.   
+    -- 
+    -- We ASSUME that the dfun is quantified over the very same tyvars 
+    -- that are bound by the tenv.
+    -- 
+    -- However, the dfun
+    -- might have some tyvars that *only* appear in arguments
     --	dfun :: forall a b. C a b, Ord b => D [a]
     -- We instantiate b to a flexi type variable -- it'll presumably
     -- become fixed later via functional dependencies
@@ -731,7 +739,7 @@ instantiate_dfun tenv dfun_id pred loc
     mappM tcInstTyVar open_tvs	`thenM` \ open_tvs' ->
     let
  	tenv' = extendTvSubstList tenv open_tvs (mkTyVarTys open_tvs')
-		-- Since the tyvars are freshly made, they cannot possibly be captured by
+		-- Since the open_tvs' are freshly made, they cannot possibly be captured by
 		-- any nested for-alls in rho.  So the in-scope set is unchanged
     	dfun_rho   = substTy tenv' rho
     	(theta, _) = tcSplitPhiTy dfun_rho

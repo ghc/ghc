@@ -36,11 +36,10 @@ import Id	( idType, setIdType, Id )
 
 import TcRnMonad
 import Type	  ( Type )
-import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar )
+import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar, tcGetTyVar )
 import Kind	  ( isLiftedTypeKind, liftedTypeKind, isSubKind )
 import qualified  Type
-import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, 
-		    putMetaTyVar )
+import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, zonkTcTyVars, putMetaTyVar )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy
 		  )
@@ -318,9 +317,14 @@ zonk_bind env (AbsBinds tyvars dicts exports inlines val_binds)
     returnM (AbsBinds tyvars new_dicts new_exports inlines new_val_bind)
   where
     zonkExport env (tyvars, global, local)
-	= ASSERT( all isImmutableTyVar tyvars )
+	= zonkTcTyVars tyvars		`thenM` \ tys ->
+	  let
+		new_tyvars = map (tcGetTyVar "zonkExport") tys
+		-- This isn't the binding occurrence of these tyvars
+		-- but they should *be* tyvars.  Hence tcGetTyVar.
+	  in
 	  zonkIdBndr env global		`thenM` \ new_global ->
-	  returnM (tyvars, new_global, zonkIdOcc env local)
+	  returnM (new_tyvars, new_global, zonkIdOcc env local)
 \end{code}
 
 %************************************************************************

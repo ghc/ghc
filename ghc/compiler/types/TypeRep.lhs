@@ -33,7 +33,7 @@ import Kind
 import Var	  ( Var, Id, TyVar, tyVarKind )
 import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
-import OccName	  ( mkOccFS, tcName )
+import OccName	  ( mkOccFS, tcName, parenSymOcc )
 import BasicTypes ( IPName, tupleParens )
 import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon )
 import Class	  ( Class )
@@ -317,7 +317,8 @@ pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
 
 pprClassPred :: Class -> [Type] -> SDoc
-pprClassPred clas tys = ppr clas <+> sep (map pprParendType tys)
+pprClassPred clas tys = parenSymOcc (getOccName clas) (ppr clas) 
+			<+> sep (map pprParendType tys)
 
 pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
@@ -394,13 +395,13 @@ ppr_tc_app p tc tys
     ppr_tc tc <+> sep (map (ppr_type TyConPrec) tys)
 
 ppr_tc :: TyCon -> SDoc
-ppr_tc tc
-  | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
-			     	then ptext SLIT("<recnt>")
-			     	else ptext SLIT("<nt>")
-		    ) <> ppr tc
-  | otherwise = ppr tc
-			       
+ppr_tc tc = parenSymOcc (getOccName tc) (pp_nt_debug <> ppr tc)
+  where
+   pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
+				             then ptext SLIT("<recnt>")
+					     else ptext SLIT("<nt>"))
+	       | otherwise     = empty
+
 -------------------
 pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot

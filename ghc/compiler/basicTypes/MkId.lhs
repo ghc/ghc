@@ -51,7 +51,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy,
 			  tcSplitFunTys, tcSplitForAllTys
 			)
 import CoreUtils	( exprType )
-import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
+import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
@@ -85,7 +85,6 @@ import CoreSyn
 import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
 import Maybes
 import PrelNames
-import Maybe            ( isJust )
 import Util             ( dropList, isSingleton )
 import Outputable
 import FastString

@@ -35,7 +35,7 @@ module OccName (
 	mkDataConWrapperOcc, mkDataConWorkerOcc,
 	
 	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	reportIfUnused,
+	parenSymOcc, reportIfUnused,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, 
 	occNameFlavour, briefOccNameFlavour,
@@ -402,9 +402,15 @@ isDataOcc other		       = False
 
 -- Any operator (data constructor or variable)
 -- Pretty inefficient!
-isSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
-isSymOcc (OccName VarName s)  = isLexSym (decodeFS s)
-isSymOcc other		      = False
+isSymOcc (OccName DataName s)  = isLexConSym (decodeFS s)
+isSymOcc (OccName TcClsName s) = isLexConSym (decodeFS s)
+isSymOcc (OccName VarName s)   = isLexSym (decodeFS s)
+isSymOcc other		       = False
+
+parenSymOcc :: OccName -> SDoc -> SDoc
+-- Wrap parens around an operator
+parenSymOcc occ doc | isSymOcc occ = parens doc
+		    | otherwise    = doc
 \end{code}
 
 

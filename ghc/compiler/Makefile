@@ -515,6 +515,11 @@ utils/Binary_HC_OPTS		+= -O
 utils/FastMutInt_HC_OPTS	+= -O
 
 
+# ---- Profiling ----
+#simplCore/Simplify_HC_OPTS = -auto-all
+#simplCore/SimplEnv_HC_OPTS = -auto-all
+#simplCore/SimplUtils_HC_OPTS = -auto-all
+
 # CSE interacts badly with top-level IORefs (reportedly in DriverState and
 # DriverMkDepend), causing some of them to be commoned up.  We have a fix for
 # this in 5.00+, but earlier versions of the compiler will need CSE turned off.

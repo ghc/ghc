@@ -7,10 +7,10 @@
 module TcUnify (
 	-- Full-blown subsumption
   tcSubPat, tcSubExp, tcGen, 
-  checkSigTyVars, checkSigTyVarsWrt, sigCtxt, findGlobals,
+  checkSigTyVars, checkSigTyVarsWrt, bleatEscapedTvs, sigCtxt, 
 
 	-- Various unifications
-  unifyTauTy, unifyTauTyList, 
+  unifyTauTy, unifyTauTyList, unifyTheta,
   unifyKind, unifyKinds, unifyFunKind, 
   checkExpectedKind,
 
@@ -38,10 +38,10 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
 			  pprSkolemTyVar, isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
-			  tyVarsOfType, mkPhiTy, mkTyVarTy, 
+			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  pprType, isSkolemTyVar )
+			  pprType, tidySkolemTyVar, isSkolemTyVar )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 			  openTypeKind, liftedTypeKind, mkArrowKind, kindFunResult,
 			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
@@ -49,8 +49,7 @@ import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( condLookupTcTyVar, LookupTyVarResult(..),
                           putMetaTyVar, tcSkolType, newKindVar, tcInstTyVars, newMetaTyVar,
-			  newTyFlexiVarTy, zonkTcKind, 
-                          zonkType, zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, 
+			  newTyFlexiVarTy, zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
 			  readKindVar, writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
@@ -58,14 +57,13 @@ import TyCon		( TyCon, tyConArity, tyConTyVars )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
-import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, 
-                          varSetElems, intersectsVarSet, mkVarSet )
+import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
 import Name		( isSystemName, mkSysTvName )
 import ErrUtils		( Message )
 import SrcLoc		( noLoc )
 import BasicTypes	( Arity )
-import Util		( notNull )
+import Util		( notNull, equalLength )
 import Outputable
 \end{code}
 
@@ -556,12 +554,26 @@ tcGen :: TcSigmaType				-- expected_ty
 
 tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall-type
 						-- If not, the call is a no-op
-  = do	{ span <- getSrcSpanM
-	; let rigid_info = GenSkol expected_ty span
-	; (forall_tvs, theta, phi_ty) <- tcSkolType rigid_info expected_ty
+  = do	{	-- We want the GenSkol info in the skolemised type variables to 
+		-- mention the *instantiated* tyvar names, so that we get a
+		-- good error message "Rigid variable 'a' is bound by (forall a. a->a)"
+		-- Hence the tiresome but innocuous fixM
+	  ((forall_tvs, theta, rho_ty), skol_info) <- fixM (\ ~(_, skol_info) ->
+		do { (forall_tvs, theta, rho_ty) <- tcSkolType skol_info expected_ty
+		   ; span <- getSrcSpanM
+		   ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty) span
+		   ; return ((forall_tvs, theta, rho_ty), skol_info) })
+
+#ifdef DEBUG
+	; traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
+				    text "expected_ty" <+> ppr expected_ty,
+				    text "inst ty" <+> ppr forall_tvs <+> ppr theta <+> ppr rho_ty,
+				    text "free_tvs" <+> ppr free_tvs,
+				    text "forall_tvs" <+> ppr forall_tvs])
+#endif
 
 	-- Type-check the arg and unify with poly type
-	; (result, lie) <- getLIE (thing_inside phi_ty)
+	; (result, lie) <- getLIE (thing_inside rho_ty)
 
 	-- Check that the "forall_tvs" havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -574,17 +586,8 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- Conclusion: include the free vars of the expected_ty in the
 	-- list of "free vars" for the signature check.
 
-	; dicts <- newDicts (SigOrigin rigid_info) theta
+	; dicts <- newDicts (SigOrigin skol_info) theta
 	; inst_binds <- tcSimplifyCheck sig_msg forall_tvs dicts lie
-
-#ifdef DEBUG
-	; forall_tys <- zonkTcTyVars forall_tvs
-	; traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
-				    text "expected_ty" <+> ppr expected_ty,
-				    text "inst ty" <+> ppr forall_tvs <+> ppr theta <+> ppr phi_ty,
-				    text "free_tvs" <+> ppr free_tvs,
-				    text "forall_tys" <+> ppr forall_tys])
-#endif
 
 	; checkSigTyVarsWrt free_tvs forall_tvs
 	; traceTc (text "tcGen:done")
@@ -623,6 +626,12 @@ unifyTauTy ty1 ty2 	-- ty1 expected, ty2 inferred
     ASSERT2( isTauTy ty2, ppr ty2 )
     addErrCtxtM (unifyCtxt "type" ty1 ty2) $
     uTys True ty1 ty1 True ty2 ty2
+
+unifyTheta :: TcThetaType -> TcThetaType -> TcM ()
+unifyTheta theta1 theta2
+  = do { checkTc (equalLength theta1 theta2)
+		 (ptext SLIT("Contexts differ in length"))
+       ; unifyTauTyLists True (map mkPredTy theta1) True (map mkPredTy theta2) }
 \end{code}
 
 @unifyTauTyList@ unifies corresponding elements of two lists of
@@ -1176,9 +1185,11 @@ ppr_ty env ty
 	     simple_result  = (env1, quotes (ppr tidy_ty), empty)
        ; case tidy_ty of
 	   TyVarTy tv 
-		| isSkolemTyVar tv -> return (env1, pp_rigid tv,
-					      pprSkolemTyVar tv)
+		| isSkolemTyVar tv -> return (env2, pp_rigid tv',
+					      pprSkolemTyVar tv')
 		| otherwise -> return simple_result
+		where
+		  (env2, tv') = tidySkolemTyVar env1 tv
 	   other -> return simple_result }
   where
     pp_rigid tv = ptext SLIT("the rigid variable") <+> quotes (ppr tv)
@@ -1261,18 +1272,10 @@ checkExpectedKind ty act_kind exp_kind
 %*									*
 %************************************************************************
 
-@checkSigTyVars@ is used after the type in a type signature has been unified with
-the actual type found.  It then checks that the type variables of the type signature
-are
-	(a) Still all type variables
-		eg matching signature [a] against inferred type [(p,q)]
-		[then a will be unified to a non-type variable]
+@checkSigTyVars@ checks that a set of universally quantified type varaibles
+are not mentioned in the environment.  In particular:
 
-	(b) Still all distinct
-		eg matching signature [(a,b)] against inferred type [(p,p)]
-		[then a and b will be unified together]
-
-	(c) Not mentioned in the environment
+	(a) Not mentioned in the type of a variable in the envt
 		eg the signature for f in this:
 
 			g x = ... where
@@ -1295,28 +1298,6 @@ are
 
 Before doing this, the substitution is applied to the signature type variable.
 
-We used to have the notion of a "DontBind" type variable, which would
-only be bound to itself or nothing.  Then points (a) and (b) were 
-self-checking.  But it gave rise to bogus consequential error messages.
-For example:
-
-   f = (*)	-- Monomorphic
-
-   g :: Num a => a -> a
-   g x = f x x
-
-Here, we get a complaint when checking the type signature for g,
-that g isn't polymorphic enough; but then we get another one when
-dealing with the (Num x) context arising from f's definition;
-we try to unify x with Int (to default it), but find that x has already
-been unified with the DontBind variable "a" from g's signature.
-This is really a problem with side-effecting unification; we'd like to
-undo g's effects when its type signature fails, but unification is done
-by side effect, so we can't (easily).
-
-So we revert to ordinary type variables for signatures, and try to
-give a helpful message in checkSigTyVars.
-
 \begin{code}
 checkSigTyVars :: [TcTyVar] -> TcM ()
 checkSigTyVars sig_tvs = check_sig_tyvars emptyVarSet sig_tvs
@@ -1331,82 +1312,60 @@ check_sig_tyvars
 			-- 	tyvars should not mention any of these
 			--	Guaranteed already zonked.
 	-> [TcTyVar]	-- Universally-quantified type variables in the signature
-			--	Not guaranteed zonked.
+			--	Guaranteed to be skolems
 	-> TcM ()
-
 check_sig_tyvars extra_tvs []
   = returnM ()
 check_sig_tyvars extra_tvs sig_tvs 
-  = do	{ gbl_tvs <- tcGetGlobalTyVars
+  = ASSERT( all isSkolemTyVar sig_tvs )
+    do	{ gbl_tvs <- tcGetGlobalTyVars
 	; traceTc (text "check_sig_tyvars" <+> (vcat [text "sig_tys" <+> ppr sig_tvs,
 				      text "gbl_tvs" <+> ppr gbl_tvs,
 				      text "extra_tvs" <+> ppr extra_tvs]))
 
-	-- Check that that the signature type vars are not free in the envt
 	; let env_tvs = gbl_tvs `unionVarSet` extra_tvs
-	; checkM (not (mkVarSet sig_tvs `intersectsVarSet` env_tvs))
-	  	 (complain sig_tvs env_tvs)
+	; ifM (any (`elemVarSet` env_tvs) sig_tvs)
+	      (bleatEscapedTvs env_tvs sig_tvs sig_tvs)
+	}
 
-	; ASSERT( all isSkolemTyVar sig_tvs )
-	  return () }
+bleatEscapedTvs :: TcTyVarSet	-- The global tvs
+	        -> [TcTyVar]	-- The possibly-escaping type variables
+		-> [TcTyVar]	-- The zonked versions thereof
+		-> TcM ()
+-- Complain about escaping type variables
+-- We pass a list of type variables, at least one of which
+-- escapes.  The first list contains the original signature type variable,
+-- while the second  contains the type variable it is unified to (usually itself)
+bleatEscapedTvs globals sig_tvs zonked_tvs
+  = do	{ (env3, msgs) <- foldlM check (env2, []) (tidy_tvs `zip` tidy_zonked_tvs)
+	; failWithTcM (env3, main_msg $$ nest 2 (vcat msgs)) }
   where
-    complain sig_tvs globals
-      = -- "check" checks each sig tyvar in turn
-        foldlM check
-	       (env, emptyVarEnv, [])
-	       tidy_tvs	`thenM` \ (env2, _, msgs) ->
+    (env1, tidy_tvs)         = tidyOpenTyVars emptyTidyEnv sig_tvs
+    (env2, tidy_zonked_tvs) = tidyOpenTyVars env1 	  zonked_tvs
 
-        failWithTcM (env2, main_msg $$ nest 2 (vcat msgs))
-      where
-	(env, tidy_tvs) = tidyOpenTyVars emptyTidyEnv sig_tvs
+    main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
 
-	main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
+    check (tidy_env, msgs) (sig_tv, zonked_tv)
+      | not (zonked_tv `elemVarSet` globals) = return (tidy_env, msgs)
+      | otherwise
+      = do { (tidy_env1, globs) <- findGlobals (unitVarSet zonked_tv) tidy_env
+	   ; returnM (tidy_env1, escape_msg sig_tv zonked_tv globs : msgs) }
 
-	check (tidy_env, acc, msgs) tv
-		-- sig_tyvar is from the signature;
-		-- ty is what you get if you zonk sig_tyvar and then tidy it
-		--
-		-- acc maps a zonked type variable back to a signature type variable
-	  = case lookupVarEnv acc tv of {
-		Just sig_tyvar' -> 	-- Error (b)!
-			returnM (tidy_env, acc, unify_msg tv thing : msgs)
-		    where
-			thing = ptext SLIT("another quantified type variable") <+> quotes (ppr sig_tyvar')
-
-	      ; Nothing ->
-
-	    if tv `elemVarSet` globals	-- Error (c) or (d)! Type variable escapes
-					-- The least comprehensible, so put it last
-			-- Game plan: 
-			--       get the local TcIds and TyVars from the environment,
-			-- 	 and pass them to find_globals (they might have tv free)
-	    then   
-                   findGlobals (unitVarSet tv) tidy_env 	`thenM` \ (tidy_env1, globs) ->
-			-- This rigid type variable has escaped into the envt
-			-- We make it flexi so that subequent uses of these 
-			-- variables don't give rise to a cascade of further errors
-		   returnM (tidy_env1, acc, escape_msg tv globs : msgs)
-
-	    else 	-- All OK
-	    returnM (tidy_env, extendVarEnv acc tv tv, msgs)
-	    }
-\end{code}
-
-
-\begin{code}
 -----------------------
-escape_msg sig_tv globs
-  = mk_msg sig_tv <+> ptext SLIT("escapes") $$
-    if notNull globs then
-	vcat [ptext SLIT("It is mentioned in the environment:"), 
-	      nest 2 (vcat globs)]
-     else
-	empty	-- Sigh.  It's really hard to give a good error message
-		-- all the time.   One bad case is an existential pattern match.
-		-- We rely on the "When..." context to help.
-
-unify_msg tv thing = mk_msg tv <+> ptext SLIT("is unified with") <+> thing
-mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)
+escape_msg sig_tv zonked_tv globs
+  | notNull globs 
+  = vcat [sep [msg, ptext SLIT("is mentioned in the environment:")], 
+	  nest 2 (vcat globs)]
+  | otherwise
+  = msg <+> ptext SLIT("escapes")
+	-- Sigh.  It's really hard to give a good error message
+	-- all the time.   One bad case is an existential pattern match.
+	-- We rely on the "When..." context to help.
+  where
+    msg = ptext SLIT("Quantified type variable") <+> quotes (ppr sig_tv) <+> is_bound_to
+    is_bound_to 
+	| sig_tv == zonked_tv = empty
+	| otherwise = ptext SLIT("is unified with") <+> quotes (ppr zonked_tv) <+> ptext SLIT("which")
 \end{code}
 
 These two context are used with checkSigTyVars

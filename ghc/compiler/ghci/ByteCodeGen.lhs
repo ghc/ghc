@@ -15,7 +15,7 @@ import ByteCodeAsm	( CompiledByteCode(..), UnlinkedBCO,
 import ByteCodeLink	( lookupStaticPtr )
 
 import Outputable
-import Name		( Name, getName, mkSystemName )
+import Name		( Name, getName, mkSystemVarName )
 import Id
 import FiniteMap
 import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
@@ -102,7 +102,7 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_name  = mkSystemName (mkPseudoUniqueE 0) FSLIT("ExprTopLevel")
+      let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) FSLIT("ExprTopLevel")
           invented_id    = mkLocalId invented_name (panic "invented_id's type")
 	  
       (BcM_State final_ctr mallocd, proto_bco) 

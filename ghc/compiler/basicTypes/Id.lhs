@@ -103,7 +103,7 @@ import qualified Demand	( Demand )
 import DataCon		( isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName, nameIsLocalOrFrom, 
-			  mkSystemName, mkSystemNameEncoded, mkInternalName,
+			  mkSystemVarName, mkSystemVarNameEncoded, mkInternalName,
 			  getOccName, getSrcLoc
 			) 
 import Module		( Module )
@@ -168,10 +168,10 @@ mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
 -- for SysLocal, we assume the base name is already encoded, to avoid
 -- re-encoding the same string over and over again.
-mkSysLocal          fs uniq ty = mkLocalId (mkSystemNameEncoded uniq fs) ty
+mkSysLocal fs uniq ty = mkLocalId (mkSystemVarNameEncoded uniq fs) ty
 
 -- version to use when the faststring needs to be encoded
-mkSysLocalUnencoded fs uniq ty = mkLocalId (mkSystemName uniq fs)        ty
+mkSysLocalUnencoded fs uniq ty = mkLocalId (mkSystemVarName uniq fs)  ty
 
 mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal

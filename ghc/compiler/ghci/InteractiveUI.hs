@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.190 2005/02/23 15:38:52 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.191 2005/02/25 13:07:10 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -27,7 +27,7 @@ import DriverUtil	( remove_spaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
 import Name		( Name, NamedThing(..) )
-import OccName		( OccName, isSymOcc, occNameUserString )
+import OccName		( OccName, parenSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
 import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
@@ -622,8 +622,7 @@ ppr_trim show xs
 
 ppr_bndr :: OccName -> SDoc
 -- Wrap operators in ()
-ppr_bndr occ | isSymOcc occ = parens (ppr occ)
-	     | otherwise    = ppr occ
+ppr_bndr occ = parenSymOcc occ (ppr occ)
 
 
 -----------------------------------------------------------------------------

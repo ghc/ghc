@@ -61,8 +61,7 @@ import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, isHaskellSrcFilename )
 import Finder		( findModule, findLinkable, addHomeModuleToFinder,
-			  flushFinderCache, findPackageModule,
-			  mkHomeModLocation, FindResult(..), cantFindError )
+			  flushFinderCache, mkHomeModLocation, FindResult(..), cantFindError )
 import HscTypes		( ModSummary(..), HomeModInfo(..), ModIface(..), msHsFilePath,
 			  HscEnv(..), GhciMode(..), 
 			  InteractiveContext(..), emptyInteractiveContext, 
@@ -78,17 +77,17 @@ import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded )
 import StringBuffer	( hGetStringBuffer )
-import Type		( dropForAlls )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..), dopt )
+import CmdLineOpts	( DynFlags(..) )
 import Maybes		( expectJust, orElse, mapCatMaybes )
 import FiniteMap
 
 import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
+import Finder 		( findPackageModule )
 import HscMain		( hscGetInfo, GetInfoResult, hscStmt, hscTcExpr, hscKcType )
 import HscTypes		( TyThing(..), icPrintUnqual, showModMsg )
 import TcRnDriver	( mkExportEnv, getModuleContents )
@@ -97,13 +96,13 @@ import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import Name		( Name )
 import NameEnv
 import Id		( idType )
-import Type		( tidyType )
+import Type		( tidyType, dropForAlls )
 import VarEnv		( emptyTidyEnv )
 import Linker		( HValue, unload, extendLinkEnv )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
 import Control.Exception as Exception ( Exception, try )
-import CmdLineOpts	( DynFlag(..), dopt_unset )
+import CmdLineOpts	( DynFlag(..), dopt_unset, dopt )
 #endif
 
 import EXCEPTION	( throwDyn )

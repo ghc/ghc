@@ -11,8 +11,8 @@ module Name (
 	-- The Name type
 	Name,					-- Abstract
 	BuiltInSyntax(..), 
-	mkInternalName, mkSystemName, 
-	mkSystemNameEncoded, mkSysTvName, 
+	mkInternalName, mkSystemName,
+	mkSystemVarName, mkSystemVarNameEncoded, mkSysTvName, 
 	mkFCallName, mkIPName,
 	mkExternalName, mkWiredInName,
 
@@ -206,21 +206,20 @@ mkWiredInName mod occ uniq mb_parent thing built_in
 	   n_sort = WiredIn mod mb_parent thing built_in,
 	   n_occ = occ, n_loc = wiredInSrcLoc }
 
-mkSystemName :: Unique -> UserFS -> Name
-mkSystemName uniq fs = Name { n_uniq = uniq, n_sort = System, 
-			      n_occ = mkVarOcc fs, n_loc = noSrcLoc }
+mkSystemName :: Unique -> OccName -> Name
+mkSystemName uniq occ = Name { n_uniq = uniq, n_sort = System, 
+			       n_occ = occ, n_loc = noSrcLoc }
+
+mkSystemVarName :: Unique -> UserFS -> Name
+mkSystemVarName uniq fs = mkSystemName uniq (mkVarOcc fs)
 
 -- Use this version when the string is already encoded.  Avoids duplicating
 -- the string each time a new name is created.
-mkSystemNameEncoded :: Unique -> EncodedFS -> Name
-mkSystemNameEncoded uniq fs = Name { n_uniq = uniq, n_sort = System, 
-			             n_occ = mkSysOccFS varName fs, 
-				     n_loc = noSrcLoc }
+mkSystemVarNameEncoded :: Unique -> EncodedFS -> Name
+mkSystemVarNameEncoded uniq fs = mkSystemName uniq (mkSysOccFS varName fs) 
 
 mkSysTvName :: Unique -> EncodedFS -> Name
-mkSysTvName uniq fs = Name { n_uniq = uniq, n_sort = System, 
-		             n_occ = mkSysOccFS tvName fs, 
-			     n_loc = noSrcLoc }
+mkSysTvName uniq fs = mkSystemName uniq (mkSysOccFS tvName fs) 
 
 mkFCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall
@@ -299,7 +298,6 @@ instance NamedThing Name where
 
 \begin{code}
 instance Outputable Name where
-	-- When printing interfaces, all Internals have been given nice print-names
     ppr name = pprName name
 
 instance OutputableBndr Name where
