@@ -17,20 +17,16 @@ module Control.Exception (
 
 	-- * The Exception type
 	Exception(..),		-- instance Eq, Ord, Show, Typeable
-#ifdef __GLASGOW_HASKELL__
 	IOException,		-- instance Eq, Ord, Show, Typeable
 	ArithException(..),	-- instance Eq, Ord, Show, Typeable
 	ArrayException(..),	-- instance Eq, Ord, Show, Typeable
 	AsyncException(..),	-- instance Eq, Ord, Show, Typeable
-#endif
 
 	-- * Throwing exceptions
 	throwIO,	-- :: Exception -> IO a
-#ifndef __HUGS__
 	throw,		-- :: Exception -> a
-#endif
 	ioError,	-- :: IOError -> IO a
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 	throwTo,	-- :: ThreadId -> Exception -> a
 #endif
 
@@ -63,23 +59,21 @@ module Control.Exception (
 	-- $preds
 
 	ioErrors,		-- :: Exception -> Maybe IOError
-#ifndef __HUGS__
 	arithExceptions, 	-- :: Exception -> Maybe ArithException
 	errorCalls,		-- :: Exception -> Maybe String
 	dynExceptions,		-- :: Exception -> Maybe Dynamic
 	assertions,		-- :: Exception -> Maybe String
 	asyncExceptions, 	-- :: Exception -> Maybe AsyncException
-#endif /* __HUGS__ */
 	userErrors,		-- :: Exception -> Maybe String
 
-#ifdef __GLASGOW_HASKELL__
 	-- * Dynamic exceptions
 
 	-- $dynamic
 	throwDyn, 	-- :: Typeable ex => ex -> b
+#ifdef __GLASGOW_HASKELL__
 	throwDynTo, 	-- :: Typeable ex => ThreadId -> ex -> b
-	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
 #endif
+	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
 	
 	-- * Asynchronous Exceptions
 
@@ -132,18 +126,10 @@ import Data.Dynamic
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
-#ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
 INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
 INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
 INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
-#endif
-
-#ifdef __HUGS__
--- This is as close as Hugs gets to providing throw
-throw :: Exception -> IO a
-throw = throwIO
-#endif
 
 -----------------------------------------------------------------------------
 -- Catching exceptions
@@ -286,7 +272,6 @@ tryJust p a = do
 			Nothing -> throw e
 			Just b  -> return (Left b)
 
-#ifdef __GLASGOW_HASKELL__
 -----------------------------------------------------------------------------
 -- Dynamic exceptions
 
@@ -301,10 +286,12 @@ tryJust p a = do
 throwDyn :: Typeable exception => exception -> b
 throwDyn exception = throw (DynException (toDyn exception))
 
+#ifdef __GLASGOW_HASKELL__
 -- | A variant of 'throwDyn' that throws the dynamic exception to an
 -- arbitrary thread (c.f. 'throwTo').
 throwDynTo :: Typeable exception => ThreadId -> exception -> IO ()
 throwDynTo t exception = throwTo t (DynException (toDyn exception))
+#endif /* __GLASGOW_HASKELL__ */
 
 -- | Catch dynamic exceptions of the required type.  All other
 -- exceptions are re-thrown, including dynamic exceptions of the wrong
@@ -322,7 +309,6 @@ catchDyn m k = catchException m handle
 				    Just exception  -> k exception
 				    Nothing -> throw ex
 			   _ -> throw ex
-#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Exception Predicates
@@ -332,17 +318,14 @@ catchDyn m k = catchException m handle
 -- 'catchJust', 'tryJust', or 'handleJust' to select certain common
 -- classes of exceptions.
 
-#ifdef __GLASGOW_HASKELL__
 ioErrors		:: Exception -> Maybe IOError
 arithExceptions 	:: Exception -> Maybe ArithException
 errorCalls		:: Exception -> Maybe String
-dynExceptions		:: Exception -> Maybe Dynamic
 assertions		:: Exception -> Maybe String
+dynExceptions		:: Exception -> Maybe Dynamic
 asyncExceptions 	:: Exception -> Maybe AsyncException
 userErrors		:: Exception -> Maybe String
-#endif /* __GLASGOW_HASKELL__ */
 
-#ifdef __GLASGOW_HASKELL__
 ioErrors (IOException e) = Just e
 ioErrors _ = Nothing
 
@@ -363,7 +346,6 @@ asyncExceptions _ = Nothing
 
 userErrors (IOException e) | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
-#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
@@ -518,5 +500,5 @@ assert :: Bool -> a -> a
 #ifndef __GLASGOW_HASKELL__
 assert :: Bool -> a -> a
 assert True x = x
-assert False _ = error "Assertion failure"
+assert False _ = throw (AssertionFailed "")
 #endif

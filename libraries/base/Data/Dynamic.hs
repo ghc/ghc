@@ -79,6 +79,7 @@ import GHC.IOBase
 #endif
 
 #ifdef __HUGS__
+import Hugs.Prelude
 import Hugs.IO
 import Hugs.IORef
 import Hugs.IOExts
@@ -106,7 +107,9 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
   'Show'ing a value of type 'Dynamic' returns a pretty-printed representation
   of the object\'s type; useful for debugging.
 -}
+#ifndef __HUGS__
 data Dynamic = Dynamic TypeRep Obj
+#endif
 
 instance Show Dynamic where
    -- the instance just prints the type representation.
@@ -126,16 +129,18 @@ type Obj = forall a . a
  -- the other hand, if we use a polymorphic type, GHC will use
  -- a fallback convention for evaluating it that works for all types.
  -- (using a function type here would also work).
-#else
+#elif !defined(__HUGS__)
 data Obj = Obj
 #endif
 
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
+#ifndef __HUGS__
 data TypeRep
  = App TyCon   [TypeRep] 
  | Fun TypeRep TypeRep
    deriving ( Eq )
+#endif
 
 instance Show TypeRep where
   showsPrec p (App tycon tys) =
@@ -156,10 +161,12 @@ instance Show TypeRep where
 
 -- | An abstract representation of a type constructor.  'TyCon' objects can
 -- be built using 'mkTyCon'.
+#ifndef __HUGS__
 data TyCon = TyCon Int String
 
 instance Eq TyCon where
   (TyCon t1 _) == (TyCon t2 _) = t1 == t2
+#endif
 
 instance Show TyCon where
   showsPrec _ (TyCon _ s) = showString s

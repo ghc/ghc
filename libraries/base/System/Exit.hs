@@ -26,7 +26,7 @@ import GHC.IOBase
 #endif
 
 #ifdef __HUGS__
-import Hugs.System
+import Hugs.Prelude
 #endif
 
 #ifdef __NHC__
@@ -43,13 +43,15 @@ import System
 -- program's caller.  Before it terminates, any open or semi-closed
 -- handles are first closed.
 
-#ifdef __GLASGOW_HASKELL__
+#ifndef __NHC__
 exitWith :: ExitCode -> IO a
 exitWith ExitSuccess = throw (ExitException ExitSuccess)
-exitWith code@(ExitFailure n) 
-  | n == 0 = ioException (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
-  | otherwise = throw (ExitException code)
-#endif  /* __GLASGOW_HASKELL__ */
+exitWith code@(ExitFailure n)
+  | n /= 0 = throw (ExitException code)
+#ifdef __GLASGOW_HASKELL__
+  | otherwise = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
+#endif
+#endif  /* ! __NHC__ */
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)

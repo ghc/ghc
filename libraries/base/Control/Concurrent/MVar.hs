@@ -37,7 +37,6 @@ module Control.Concurrent.MVar
 import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		  tryTakeMVar, tryPutMVar, isEmptyMVar,
 		)
-import Hugs.Exception ( throwIO )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -48,12 +47,6 @@ import GHC.Conc	( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 
 import Prelude
 import Control.Exception as Exception
-
-#ifdef __HUGS__
--- This is as close as Hugs gets to providing throw
-throw :: Exception -> IO a
-throw = throwIO
-#endif
 
 {-|
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
