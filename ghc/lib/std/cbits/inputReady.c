@@ -61,6 +61,5 @@ inputReady(int fd, int msecs, int isSock)
        case WAIT_OBJECT_0: return 1;
        default: return -1;
       }
-    }
 #endif
   }}
