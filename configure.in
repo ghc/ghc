@@ -339,13 +339,10 @@ AC_SUBST(exeext)
 
 #
 # The native format for 'hardtop' (i.e., right kind of slashes on a Win32 box).
-#
+# (but with b-slashes being escaped).
 case $HostPlatform in
-  i386-unknown-mingw32)
-  	hardtop_plat=`cygpath -w ${hardtop}`
-	;;
-  i386-unknown-cygwin32)
-  	hardtop_plat=`cygpath -w ${hardtop}`
+  i386-unknown-mingw32 | i386-unknown-cygwin32)
+  	hardtop_plat=`cygpath -w ${hardtop} | sed -e 's@\\\\@\\\\\\\\@g' `
 	;;
   *)
   	hardtop_plat=${hardtop}
