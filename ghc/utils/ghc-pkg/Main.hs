@@ -1,5 +1,7 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.27 2002/09/09 11:32:37 simonmar Exp $
+-- $Id: Main.hs,v 1.28 2002/09/13 15:01:40 simonpj Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -32,7 +34,8 @@ import ParsePkgConfLite
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
-import Win32DLL
+import CString
+import Foreign
 #endif
 
 main = do
@@ -90,15 +93,17 @@ unDosifyPath xs = subst '\\' '/' xs
 #endif
 
 runit clis = do
+  let err_msg = "missing -f option, location of package.conf unknown"
   conf_file <- 
      case [ f | Config f <- clis ] of
         fs@(_:_)  -> return (last fs)
 #ifndef mingw32_HOST_OS
-	[] -> die "missing -f option, location of package.conf unknown"
+	[] -> die err_msg
 #else
-	[] -> do h <- getModuleHandle Nothing
-	  	 n <- getModuleFileName h
-		 return (reverse (drop (length "/bin/ghc-pkg.exe") (reverse (unDosifyPath n))) ++ "/package.conf")
+	[] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
+		 case mb_dir of
+			Nothing  -> die err_msg
+			Just dir -> return (dir ++ "/package.conf")
 #endif
 
   let toField "import_dirs"     = return import_dirs
@@ -150,7 +155,7 @@ showPackage packages pkgconf pkg_name fields =
     []    -> die ("can't find package `" ++ pkg_name ++ "'")
     [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
 	  | otherwise   -> hPutStrLn stdout (render (vcat 
-				(map (vcat . map text) (map ($pkg) fields))))
+				(map (vcat . map text) (map ($ pkg) fields))))
     _     -> die "showPackage: internal error"
 
 addPackage :: [PackageConfig] -> FilePath -> FilePath
@@ -398,4 +403,30 @@ eval_catch = Exception.catchAll
 my_catch = Exception.catchAllIO
 #endif
 
+#endif
+
+-----------------------------------------
+--	Cut and pasted from ghc/compiler/SysTools
+
+#if defined(mingw32_HOST_OS)
+getExecDir :: String -> IO (Maybe String)
+-- (getExecDir cmd) returns the directory in which the current
+--	  	    executable, which should be called 'cmd', is running
+-- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
+-- you'll get "/a/b/c" back as the result
+getExecDir cmd
+  = allocaArray len $ \buf -> do
+	ret <- getModuleFileName nullPtr buf len
+	if ret == 0 then return Nothing
+	            else do s <- peekCString buf
+			    return (Just (reverse (drop (length cmd) 
+							(reverse (unDosifyPath s)))))
+  where
+    len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
+
+foreign import stdcall "GetModuleFileNameA" unsafe 
+  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+#else
+getExecDir :: String -> IO (Maybe String) 
+getExecDir s = do return Nothing
 #endif
