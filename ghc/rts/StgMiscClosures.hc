@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.43 2000/04/19 10:51:59 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.44 2000/04/27 16:29:55 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -46,8 +46,6 @@ STGFUN(type##_entry)							\
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.
-
-   This code assumes R1 is in a register for now.
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(IND_info,IND_entry,1,0,IND,,EF_,0,0);
@@ -67,7 +65,6 @@ STGFUN(IND_STATIC_entry)
 {
     FB_
     TICK_ENT_IND(Node);	/* tick */
-  
     R1.p = (P_) ((StgIndStatic*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));
