@@ -36,7 +36,7 @@ test('conc016', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc017', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc018', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc019', compose(only_compiler_types(['ghc']),
-			extra_run_opts('+RTS -K4m -RTS')),
+			extra_run_opts('+RTS -K16m -RTS')),
 		compile_and_run, [''])
 test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
