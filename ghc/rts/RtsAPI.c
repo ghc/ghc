@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.32 2002/02/13 08:48:06 sof Exp $
+ * $Id: RtsAPI.c,v 1.33 2002/02/15 07:40:10 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -19,10 +19,8 @@
 #include "Schedule.h"
 
 #if defined(THREADED_RTS)
-#define SCHEDULE_MAIN_THREAD(tso) scheduleThread_(tso,rtsFalse)
 #define WAIT_MAIN_THREAD(tso,ret) waitThread_(tso,ret,rtsFalse)
 #else
-#define SCHEDULE_MAIN_THREAD(tso) scheduleThread(tso)
 #define WAIT_MAIN_THREAD(tso,ret) waitThread(tso,ret)
 #endif
 
@@ -455,7 +453,7 @@ rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
 
     tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleThread(tso);
+    scheduleExtThread(tso);
     return waitThread(tso, ret);
 }
 
@@ -466,7 +464,7 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
     
     tso = createGenThread(stack_size, p);
     releaseAllocLock();
-    scheduleThread(tso);
+    scheduleExtThread(tso);
     return waitThread(tso, ret);
 }
 
@@ -481,7 +479,7 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleThread(tso);
+    scheduleExtThread(tso);
     return waitThread(tso, ret);
 }
 
@@ -496,7 +494,7 @@ rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret)
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    SCHEDULE_MAIN_THREAD(tso);
+    scheduleThread(tso);
     return WAIT_MAIN_THREAD(tso, ret);
 }
 
@@ -516,7 +514,7 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleThread(tso);
+    scheduleExtThread(tso);
     stat = waitThread(tso, &r);
 
     if (stat == Success) {
@@ -537,7 +535,7 @@ rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 
     tso = createIOThread(stack_size, p);
     releaseAllocLock();
-    scheduleThread(tso);
+    scheduleExtThread(tso);
     return waitThread(tso, ret);
 }
 
