@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.29 2000/12/08 10:26:41 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.30 2000/12/11 11:41:08 simonmar Exp $
 --
 -- Driver flags
 --
@@ -281,8 +281,14 @@ static_flags =
   ,  ( "fexcess-precision" , NoArg (do writeIORef v_Excess_precision True
 				       add v_Opt_C "-fexcess-precision"))
 
+	-- Optimisation flags are treated specially, so the normal
+	-- -fno-* pattern below doesn't work.  We therefore allow
+	-- certain optimisation passes to be turned off explicitly:
+  ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
+  ,  ( "fno-cpr"	   , NoArg (writeIORef v_CPR False) )
+  ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
+
 	-- flags that are "active negatives"
-  ,  ( "fno-implicit-prelude"	, PassFlag (add v_Opt_C) )
   ,  ( "fno-prune-tydecls"	, PassFlag (add v_Opt_C) )
   ,  ( "fno-prune-instdecls"	, PassFlag (add v_Opt_C) )
   ,  ( "fno-pre-inlining"	, PassFlag (add v_Opt_C) )
@@ -438,13 +444,6 @@ dynamic_flags = [
 
   ,  ( "fglasgow-exts", NoArg (setDynFlag Opt_GlasgowExts) )
   ,  ( "fno-implicit-prelude", NoArg (setDynFlag Opt_NoImplicitPrelude) )
-
-	-- Optimisation flags are treated specially, so the normal
-	-- -fno-* pattern below doesn't work.  We therefore allow
-	-- certain optimisation passes to be turned off explicitly:
-  ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
-  ,  ( "fno-cpr"	   , NoArg (writeIORef v_CPR False) )
-  ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
 
   ,  ( "fallow-overlapping-instances",	
 		NoArg (setDynFlag Opt_AllowOverlappingInstances) )
