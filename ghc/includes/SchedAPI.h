@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.13 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: SchedAPI.h,v 1.14 2002/02/15 07:37:55 sof Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -16,26 +16,21 @@
 #define NO_PRI  0
 #endif
 
-/* 
- * schedule() plus the thread creation functions are not part
- * part of the external RTS API, so leave them out if we're
- * not compiling rts/ bits.   -- sof 7/99
- * 
- */
-SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
+extern SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
 
 /* 
  * Creating threads
  */
 #if defined(GRAN)
-StgTSO *createThread(nat stack_size, StgInt pri);
+extern StgTSO *createThread(nat stack_size, StgInt pri);
 #else
-StgTSO *createThread(nat stack_size);
+extern StgTSO *createThread(nat stack_size);
 #endif
 #if defined(PAR) || defined(SMP)
-void taskStart(void);
+extern void taskStart(void);
 #endif
-void scheduleThread(StgTSO *tso);
+extern void scheduleThread(StgTSO *tso);
+extern void scheduleExtThread(StgTSO *tso);
 
 static inline void pushClosure   (StgTSO *tso, StgClosure *c) {
   tso->sp--;
