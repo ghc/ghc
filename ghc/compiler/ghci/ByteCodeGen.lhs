@@ -27,7 +27,8 @@ import PrimRep		( PrimRep(..) )
 import PrimOp		( PrimOp(..)  )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
-import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, dataConWrapId )
+import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
+                          dataConWrapId, isUnboxedTupleCon )
 import TyCon		( TyCon, tyConFamilySize )
 import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
@@ -440,7 +441,10 @@ schemeT d s p app
 
    -- Cases 2 and 3
    | otherwise
-   = code
+   = if   is_con_call && isUnboxedTupleCon con
+     then pprPanic "Bytecode generator can't handle unboxed tuple constructor"
+                   (ppr con)
+     else code
 
      where
          -- Extract the args (R->L) and fn
