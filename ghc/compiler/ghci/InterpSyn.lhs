@@ -15,6 +15,7 @@ import Outputable
 
 import PrelAddr -- tmp
 import PrelGHC  -- tmp
+import GlaExts ( Int(..) )
 
 -----------------------------------------------------------------------------
 -- The interpretable expression type

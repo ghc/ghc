@@ -23,7 +23,7 @@ import HsTypes		( toHsType )
 
 import CmdLineOpts	( opt_AllowOverlappingInstances )
 import TcMonad
-import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
+--import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )

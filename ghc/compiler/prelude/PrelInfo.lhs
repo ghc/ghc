@@ -38,7 +38,7 @@ import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes		( TyThing(..) )
+import HscTypes 	( TyThing(..) )
 
 -- others:
 import RdrName		( RdrName )

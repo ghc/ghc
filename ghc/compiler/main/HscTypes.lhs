@@ -9,18 +9,21 @@ where
 
 #include "HsVersions.h"
 
-import Name		( Name, NameEnv )
-import Module		( Module, ModuleName )
+import Name		( Name, NameEnv, NamedThing,
+			  unitNameEnv, extendNameEnv, plusNameEnv, 
+			  lookupNameEnv, emptyNameEnv, getName, nameModule )
+import Module		( Module, ModuleName,
+			  extendModuleEnv, lookupModuleEnv )
 import Class		( Class )
 import OccName		( OccName )
-import RdrName		( RdrNameEnv )
+import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Outputable	( SDoc )
 import UniqFM 		( UniqFM )
-import FiniteMap	( FiniteMap )
+import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
 import Bag		( Bag )
 import Id		( Id )
 import VarEnv		( IdEnv )
-import BasicTypes	( Version, Fixity )
+import BasicTypes	( Version, Fixity, defaultFixity )
 import TyCon		( TyCon )
 import ErrUtils		( ErrMsg, WarnMsg )
 import CmLink		( Linkable )
@@ -29,9 +32,11 @@ import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameHsDecl,
 import UniqSupply	( UniqSupply )
 import HsDecls		( DeprecTxt )
 import CoreSyn		( CoreRule )
-import RnMonad		( ImportVersion, ExportItem, WhetherHasOrphans )
 import NameSet		( NameSet )
-
+import Type		( Type )
+import VarSet		( TyVarSet )
+import {-# SOURCE #-} TcInstUtil ( emptyInstEnv )
+import Panic		( panic )
 \end{code}
 
 %************************************************************************
@@ -57,7 +62,7 @@ data ModDetails
         ruleEnv       :: RuleEnv		-- Domain may include Id from other modules
      }
 
-emptyModDetails :: Module -> ModuleDetails
+emptyModDetails :: Module -> ModDetails
 emptyModDetails mod
   = ModDetails { moduleId      = mod,
 		 moduleExports = [],
@@ -68,6 +73,7 @@ emptyModDetails mod
 		 instEnv       = emptyInstEnv,
     		 ruleEnv       = emptyRuleEnv
     }		
+emptyRuleEnv = panic "emptyRuleEnv"
 \end{code}
 
 Symbol tables map modules to ModDetails:
@@ -140,11 +146,13 @@ extendTypeEnv tbl things
   = foldFM add tbl things
   where
     add mod type_env tbl
-	= extendModuleEnv mod new_details
+	= panic "extendTypeEnv" --extendModuleEnv mod new_details
 	where
-	  new_details = case lookupModuleEnv tbl mod of
-			    Nothing      -> emptyModDetails mod {typeEnv = type_env}
-			    Just details -> details {typeEnv = typeEnv details `plusNameEnv` type_env})
+	  new_details 
+             = case lookupModuleEnv tbl mod of
+                  Nothing      -> (emptyModDetails mod) {typeEnv = type_env}
+                  Just details -> details {typeEnv = typeEnv details 
+                                                     `plusNameEnv` type_env}
 \end{code}
 
 
@@ -212,6 +220,44 @@ data ModIFace
         mi_rules     :: (Version, [RdrNameRuleDecl]),  -- Rules, with their version
         mi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
      }
+
+type ExportItem		 = (ModuleName, [RdrAvailInfo])
+
+type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
+
+type ModVersionInfo	= (Version,		-- Version of the whole module
+			   Version,		-- Version number for all fixity decls together
+			   Version)		-- ...ditto all rules together
+
+type WhetherHasOrphans   = Bool
+	-- An "orphan" is 
+	-- 	* an instance decl in a module other than the defn module for 
+	--		one of the tycons or classes in the instance head
+	--	* a transformation rule in a module other than the one defining
+	--		the function in the head of the rule.
+
+type IsBootInterface     = Bool
+
+data WhatsImported name  = NothingAtAll				-- The module is below us in the
+								-- hierarchy, but we import nothing
+
+			 | Everything Version			-- The module version
+
+			 | Specifically Version			-- Module version
+					Version			-- Fixity version
+					Version			-- Rules version
+					[(name,Version)]	-- List guaranteed non-empty
+			 deriving( Eq )
+	-- 'Specifically' doesn't let you say "I imported f but none of the fixities in
+	-- the module". If you use anything in the module you get its fixity and rule version
+	-- So if the fixities or rules change, you'll recompile, even if you don't use either.
+	-- This is easy to implement, and it's safer: you might not have used the rules last
+	-- time round, but if someone has added a new rule you might need it this time
+
+	-- 'Everything' means there was a "module M" in 
+	-- this module's export list, so we just have to go by M's version,
+	-- not the list of (name,version) pairs
+
 \end{code}
 
 
@@ -226,9 +272,9 @@ data PersistentCompilerState
    = PCS {
         pcsPST :: PackageSymbolTable,		-- Domain = non-home-package modules
 						--   except that the InstEnv components is empty
-	pcsInsts :: InstEnv			-- The total InstEnv accumulated from all
+	pcsInsts :: InstEnv,			-- The total InstEnv accumulated from all
 						--   the non-home-package modules
-	pcsRules :: RuleEnv			-- Ditto RuleEnv
+	pcsRules :: RuleEnv,			-- Ditto RuleEnv
 
         pcsPRS :: PersistentRenamerState
      }
@@ -261,16 +307,9 @@ data PersistentRenamerState
 	  prsRules :: IfaceRules
     }
 
-<<<<<<< HscTypes.lhs
-data NameSupply
- = NS { nsUniqs  :: UniqSupply,
-	nsNames  :: FiniteMap (Module,OccName) Name,	-- Ensures that one original name gets one unique
-	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
-=======
 data OrigNameEnv
- = Orig { origNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
-	  origIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
->>>>>>> 1.6
+ = Orig { origNames  :: FiniteMap (Module,OccName) Name, -- Ensures that one original name gets one unique
+	  origIParam :: FiniteMap OccName Name		 -- Ensures that one implicit parameter name gets one unique
    }
 
 type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
@@ -313,9 +352,9 @@ data CompResult
 
 data HscResult
    = HscOK   ModDetails  		-- new details (HomeSymbolTable additions)
-	     Maybe ModIFace		-- new iface (if any compilation was done)
-	     Maybe String  		-- generated stub_h
-	     Maybe String  		-- generated stub_c
+	     (Maybe ModIFace)		-- new iface (if any compilation was done)
+	     (Maybe String)  		-- generated stub_h
+	     (Maybe String)  		-- generated stub_c
              PersistentCompilerState 	-- updated PCS
              [SDoc]                  	-- warnings
 
