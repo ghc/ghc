@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.44 1999/08/02 13:11:02 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.45 1999/11/04 15:09:09 sewardj Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -137,7 +137,7 @@ dnl
 dnl Check for Happy and version.
 dnl
 AC_DEFUN(FPTOOLS_HAPPY,
-[AC_PATH_PROG(HappyCmd,happy,,$PATH ${hardtop}/happy/src)
+[AC_PATH_PROG(HappyCmd,happy,,$PATH:${hardtop}/happy/src)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 [if test x"$HappyCmd" != x; then
    fptools_cv_happy_version="`$HappyCmd -v |
