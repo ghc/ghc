@@ -1,6 +1,6 @@
 __interface Type 1 0 where
-__export Type Type GenType Kind ;
-1 type Type = GenType BasicTypes.Unused ;
+__export Type Type Kind SuperKind ;
+1 data Type ;
 1 type Kind = Type ;
-1 data GenType a ;
+1 type SuperKind = Type ;
 
