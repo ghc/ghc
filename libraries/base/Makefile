@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.33 2002/06/20 16:12:58 simonmar Exp $
+# $Id: Makefile,v 1.34 2002/06/21 14:00:32 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -105,7 +105,7 @@ EXCLUDED_HADDOCK_SRCS = \
 	Data/Generics.hs \
 	GHC/PArr.hs
 
-SRC_HADDOCK_OPTS += -t "Haskell Core Libraries"
+SRC_HADDOCK_OPTS += -t "Haskell Core Libraries (base package)"
 
 # -----------------------------------------------------------------------------
 
