@@ -113,9 +113,12 @@ data HsExpr tyvar uvar id pat
 				-- direct from the components
 
 	-- Record construction
-  | RecordCon	(HsExpr tyvar uvar id pat)	-- Always (HsVar id) until type checker,
-						-- but the latter adds its type args too
+  | RecordCon	id
 		(HsRecordBinds tyvar uvar id pat)
+
+  | RecordConOut id				-- The constructor
+		 (HsExpr tyvar uvar id pat)	-- The constructor applied to type/dict args
+		 (HsRecordBinds tyvar uvar id pat)
 
 	-- Record update
   | RecordUpd	(HsExpr tyvar uvar id pat)
@@ -296,8 +299,10 @@ pprExpr sty (ExplicitListOut ty exprs)
 pprExpr sty (ExplicitTuple exprs)
   = parens (sep (punctuate comma (map (pprExpr sty) exprs)))
 
-pprExpr sty (RecordCon con  rbinds)
+pprExpr sty (RecordCon con rbinds)
   = pp_rbinds sty (ppr sty con) rbinds
+pprExpr sty (RecordConOut con_id con_expr rbinds)
+  = pp_rbinds sty (ppr sty con_expr) rbinds
 
 pprExpr sty (RecordUpd aexp rbinds)
   = pp_rbinds sty (pprParendExpr sty aexp) rbinds
@@ -413,13 +418,14 @@ pp_rbinds sty thing rbinds
 %************************************************************************
 
 \begin{code}
-data DoOrListComp = DoStmt | ListComp
+data DoOrListComp = DoStmt | ListComp | Guard
 
 pprDo DoStmt sty stmts
   = hang (ptext SLIT("do")) 2 (vcat (map (ppr sty) stmts))
 pprDo ListComp sty stmts
-  = hang (hsep [lbrack, pprExpr sty expr, char '|'])
-	 4 (sep [interpp'SP sty quals, rbrack])
+  = brackets $
+    hang (pprExpr sty expr <+> char '|')
+       4 (interpp'SP sty quals)
   where
     ReturnStmt expr = last stmts	-- Last stmt should be a ReturnStmt for list comps
     quals	    = init stmts
