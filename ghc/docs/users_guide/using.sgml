@@ -827,12 +827,12 @@ country.
 </VarListEntry>
 
 <VarListEntry>
-<Term><Option>-syslib &lt;lib&gt;</Option></Term>
+<Term><Option>-package &lt;lib&gt;</Option></Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>-syslib &lt;lib&gt; option</Primary></IndexTerm>
+<IndexTerm><Primary>-package &lt;lib&gt; option</Primary></IndexTerm>
 If you are using a system-supplied non-Prelude library (e.g., the
-POSIX library), just use a <Option>-syslib posix</Option> option (for
+POSIX library), just use a <Option>-package posix</Option> option (for
 example).  The right interface files should then be available.  The
 accompanying HsLibs document lists the libraries available by this
 mechanism.
@@ -1167,7 +1167,7 @@ depend :
       <para>Now, before you start compiling, and any time you change
       the <Literal>imports</Literal> in your program, do <Command>make
       depend</Command> before you do <Command>make
-      cool&lowbar;pgm</Command>.  <Command>GHC</Command> will append
+      cool&lowbar;pgm</Command>.  <Command>ghc -M</Command> will append
       the needed dependencies to your
       <Filename>Makefile</Filename>.</Para>
 
@@ -1178,7 +1178,7 @@ depend :
 import B ...blah...
 </programlisting>
 
-       then <command>mkdependHS</command> will generate a dependency
+       then <command>ghc -M</command> will generate a dependency
        line of the form:
 
 <programlisting>
@@ -1191,7 +1191,7 @@ A.o : B.hi
 import {-# SOURCE #-} B ...blah...
 </programlisting>
 
-       then <command>mkdependHS</command> will generate a dependency
+       then <command>ghc -M</command> will generate a dependency
        line of the form:
 
 <programlisting>
@@ -1203,7 +1203,7 @@ A.o : B.hi-boot
        will be multiple lines with <filename>A.o</filename> as the
        target.</para>
 
-      <para>By default, <Command>GHC</Command> generates all the
+      <para>By default, <Command>ghc -M</Command> generates all the
       dependencies, and then concatenates them onto the end of
       <Filename>makefile</Filename> (or <Filename>Makefile</Filename>
       if <Filename>makefile</Filename> doesn't exist) bracketed by the
@@ -1336,7 +1336,7 @@ ghc -M -optdep-f optdep.depend ...
             dependencies on the prelude modules used (including
             <Literal>Prelude</Literal>).  This option is normally only
             used by the various system libraries. If a
-            <Option>-syslib</Option> option is used, dependencies will
+            <Option>-package</Option> option is used, dependencies will
             also be generated on the library's interfaces.</para>
 	  </listitem>
 	</varlistentry>
@@ -2310,15 +2310,15 @@ libraries automatically; these are:
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Option>-syslib &lt;name&gt;</Option>:</Term>
+<Term><Option>-package &lt;name&gt;</Option>:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>-syslib &lt;name&gt; option</Primary></IndexTerm>
+<IndexTerm><Primary>-package &lt;name&gt; option</Primary></IndexTerm>
 </Para>
 
 <Para>
 If you are using a Haskell &ldquo;system library&rdquo; (e.g., the POSIX
-library), just use the <Option>-syslib posix</Option> option, and the correct code
+library), just use the <Option>-package posix</Option> option, and the correct code
 should be linked in.
 </Para>
 </ListItem>
@@ -2403,7 +2403,7 @@ GHC (as of version 4.00) supports Concurrent Haskell by default,
 without requiring a special option or libraries compiled in a certain
 way.  To get access to the support libraries for Concurrent Haskell
 (i.e. <Literal>Concurrent</Literal> and friends), use the
-<Option>-syslib concurrent</Option> option.
+<Option>-package concurrent</Option> option.
 </Para>
 
 <Para>
