@@ -711,9 +711,6 @@ AC_C_BIGENDIAN
 errprint((fptools configure script wizard sez: "don't worry, the above warning is harmless (to us.)")
 )
 
-dnl ** determine the return type of signal()
-AC_TYPE_SIGNAL
-
 dnl ** check for leading underscores in symbol names
 FPTOOLS_UNDERSCORE
 
