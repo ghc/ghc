@@ -26,7 +26,7 @@ import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
 
-import Char	       	( ord, isAlphaNum )
+import Char	       	( ord, isAlpha, isDigit )
 
 #include "NCG.h"
 \end{code}
@@ -470,7 +470,7 @@ litLitToStix nm
   | otherwise    = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
                            ++ "suggested workaround: use flag -fvia-C\n")
 
-  where is_id c = isAlphaNum c || c == '_'
+  where is_id c = isAlpha c || isDigit c || c == '_'
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays

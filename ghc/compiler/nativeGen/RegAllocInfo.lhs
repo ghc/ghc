@@ -148,6 +148,10 @@ noUsage  = RU emptyRegSet emptyRegSet
 
 regUsage :: Instr -> RegUsage
 
+interesting (VirtualRegI _)  = True
+interesting (VirtualRegF _)  = True
+interesting (RealReg (I# i)) = _IS_TRUE_(freeReg i)
+
 #if alpha_TARGET_ARCH
 
 regUsage instr = case instr of
@@ -331,11 +335,6 @@ regUsage instr = case instr of
     mkRU src dst = RU (regSetFromList (filter interesting src))
   	    	      (regSetFromList (filter interesting dst))
 
-    interesting (VirtualRegI _)  = True
-    interesting (VirtualRegF _)  = True
-    interesting (RealReg (I# i)) = _IS_TRUE_(freeReg i)
-
-
 -- Allow the spiller to de\cide whether or not it can use 
 -- %edx as a spill temporary.
 hasFixedEDX instr
@@ -375,18 +374,17 @@ regUsage instr = case instr of
     FxTOy s1 s2 r1 r2 	-> usage ([r1], [r2])
 
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
-    JMP addr 	    	-> RU (mkRegSet (filter interesting (regAddr addr))) freeRegSet
+    JMP addr 	    	-> noUsage
 
-    CALL _ n True   	-> endUsage
-    CALL _ n False  	-> RU (argRegSet n) callClobberedRegSet
+    -- I don't understand this terminal vs non-terminal distinction for
+    -- CALLs is.  Fix.  JRS, 000616.
+    CALL _ n True   	-> error "nativeGen(sparc): unimp regUsage CALL"
+    CALL _ n False  	-> error "nativeGen(sparc): unimp regUsage CALL"
 
     _ 	    	    	-> noUsage
   where
-    usage (src, dst) = RU (mkRegSet (filter interesting src))
-    	    	    	  (mkRegSet (filter interesting dst))
-
-    interesting (FixedReg _) = False
-    interesting _ = True
+    usage (src, dst) = RU (regSetFromList (filter interesting src))
+    	    	    	  (regSetFromList (filter interesting dst))
 
     regAddr (AddrRegReg r1 r2) = [r1, r2]
     regAddr (AddrRegImm r1 _)  = [r1]
@@ -484,7 +482,7 @@ findReservedRegs instrs
 
 @insnFuture@ indicates the places we could get to following the
 current instruction.  This is used by the register allocator to
-compute the flow edges for a bunch of instructions.
+compute the flow edges between instructions.
 
 \begin{code}
 data InsnFuture 
@@ -539,15 +537,7 @@ insnFuture insn
 
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
 
-    BI ALWAYS _ (ImmCLbl lbl)	-> RL (lookup lbl) future
-    BI _ _ (ImmCLbl lbl)	-> RL (lookup lbl `unionRegSets` live) future
-    BF ALWAYS _ (ImmCLbl lbl)	-> RL (lookup lbl) future
-    BF _ _ (ImmCLbl lbl)	-> RL (lookup lbl `unionRegSets` live) future
-    JMP _			-> RL emptyRegSet future
-    CALL _ i True   -> RL emptyRegSet future
-    CALL _ i False  -> RL live future
-    LABEL lbl	    -> RL live (FL (all `unionRegSets` live) (addToFM env lbl live))
-    _		    -> info
+    boring -> error "nativeGen(sparc): unimp insnFuture"
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -801,7 +791,8 @@ spillReg vreg_to_slot_map delta dyn vreg
                         else MOV L (OpReg dyn) (OpAddr (spRel off_w))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
-	,IF_ARCH_sparc( ST sz dyn (fpRel (- (off `div` 4)))
+	,IF_ARCH_sparc( ST (error "get sz from regClass vreg") 
+                           dyn (fpRel (- (off `div` 4)))
         ,)))
 
    
@@ -816,6 +807,7 @@ loadReg vreg_to_slot_map delta vreg dyn
                         if   regClass vreg == RcFloating
                         then GLD F80 (spRel off_w) dyn
                         else MOV L (OpAddr (spRel off_w)) (OpReg dyn)
-	,IF_ARCH_sparc( LD  sz (fpRel (- (off `div` 4))) dyn
+	,IF_ARCH_sparc( LD  (error "get sz from regClass vreg")
+                            (fpRel (- (off `div` 4))) dyn
 	,)))
 \end{code}

@@ -332,7 +332,7 @@ pprAddr (AddrBaseIndex base index displacement)
 -------------------
 
 #if sparc_TARGET_ARCH
-pprAddr (AddrRegReg r1 (FixedReg ILIT(0))) = pprReg r1
+pprAddr (AddrRegReg r1 (RealReg 0)) = pprReg r1
 
 pprAddr (AddrRegReg r1 r2)
   = hcat [ pprReg r1, char '+', pprReg r2 ]
@@ -1344,6 +1344,7 @@ pprCondInstr name cond arg
 -- even clumsier, to allow for RegReg regs that show when doing indexed
 -- reads (bytearrays).
 --
+
 pprInstr (LD DF (AddrRegReg g1 g2) reg)
   = hcat [
 	ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1, char '\n',
@@ -1535,6 +1536,11 @@ pprInstr (CALL imm n _)
 
 Continue with SPARC-only printing bits and bobs:
 \begin{code}
+-- Get rid of this fPair nonsense, don't reimplement it.  It's an
+-- entirely unnecessary complication.  I just put this here so it will 
+-- at least compile on Sparcs.  JRS, 000616.
+fPair = error "nativeGen(sparc): unimp fPair"
+
 pprRI :: RI -> SDoc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r

@@ -636,7 +636,7 @@ riZero :: RI -> Bool
 
 riZero (RIImm (ImmInt 0))	    = True
 riZero (RIImm (ImmInteger 0))	    = True
-riZero (RIReg (FixedReg ILIT(0)))   = True
+riZero (RIReg (RealReg 0))          = True
 riZero _			    = False
 
 #endif {- sparc_TARGET_ARCH -}

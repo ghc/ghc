@@ -2395,10 +2395,15 @@ genCCall fn cconv kind args
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
+-- Implement this!  It should be im MachRegs.lhs, not here.
+allArgRegs :: [Reg]
+allArgRegs = error "nativeGen(sparc): allArgRegs"
+
 genCCall fn cconv kind args
   = mapAccumLNat get_arg (allArgRegs, eXTRA_STK_ARGS_HERE) args
     	    	    	  `thenNat` \ ((unused,_), argCode) ->
     let
+
     	nRegs = length allArgRegs - length unused
     	call = CALL fn__2 nRegs False
     	code = concatOL argCode

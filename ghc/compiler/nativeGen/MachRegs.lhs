@@ -45,9 +45,8 @@ module MachRegs (
 	, fake0, fake1, fake2, fake3, fake4, fake5
 #endif
 #if sparc_TARGET_ARCH
-	, allArgRegs
 	, fits13Bits
-	, fPair, fpRel, gReg, iReg, lReg, oReg, largeOffsetError
+	, fpRel, gReg, iReg, lReg, oReg, largeOffsetError
 	, fp, g0, o0, f0
 	
 #endif
@@ -134,7 +133,7 @@ addrOffset addr off
        | otherwise     -> Nothing
        where n2 = n + toInteger off
 
-      AddrRegReg r (FixedReg ILIT(0))
+      AddrRegReg r (RealReg 0)
        | fits13Bits off -> Just (AddrRegImm r (ImmInt off))
        | otherwise     -> Nothing
        
@@ -379,6 +378,8 @@ regClass (VirtualRegF u) = RcFloating
 regNames 
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
       "%fake0", "%fake1", "%fake2", "%fake3", "%fake4", "%fake5", "%fake6"]
+
+showReg :: Int -> String
 showReg n
    = if   n >= 0 && n < 14
      then regNames !! n
@@ -390,7 +391,9 @@ showReg n
 The SPARC has 64 registers of interest; 32 integer registers and 32
 floating point registers.  The mapping of STG registers to SPARC
 machine registers is defined in StgRegs.h.  We are, of course,
-prepared for any eventuality.
+prepared for any eventuality.  When (if?) the sparc nativegen is 
+ever revived, we should just treat it as if it has 16 floating
+regs, and use them in pairs.  
 
 \begin{code}
 #if sparc_TARGET_ARCH
@@ -402,16 +405,24 @@ lReg x = (16 + x)
 iReg x = (24 + x)
 fReg x = (32 + x)
 
-fPair :: Reg -> Reg
-fPair (FixedReg i) = FixedReg (i _ADD_ ILIT(1))
-fPair (MappedReg i) = MappedReg (i _ADD_ ILIT(1))
+-- CHECK THIS
+regClass (RealReg i)     = if i < 32 then RcInteger else RcFloating
+regClass (VirtualRegI u) = RcInteger
+regClass (VirtualRegF u) = RcFloating
+
+-- FIX THIS
+showReg :: Int -> String
+showReg n
+   = if   n >= 0 && n < 64
+     then "%sparc_real_reg_" ++ show n
+     else "%unknown_sparc_real_reg_" ++ show n
 
 g0, fp, sp, o0, f0 :: Reg
-g0 = case (gReg 0) of { IBOX(g0) -> FixedReg g0 }
-fp = case (iReg 6) of { IBOX(i6) -> FixedReg i6 }
-sp = case (oReg 6) of { IBOX(o6) -> FixedReg o6 }
-o0 = realReg  (oReg 0)
-f0 = realReg  (fReg 0)
+g0 = RealReg (gReg 0)
+fp = RealReg (iReg 6)
+sp = RealReg (oReg 6)
+o0 = RealReg (oReg 0)
+f0 = RealReg (fReg 0)
 
 #endif
 \end{code}
