@@ -2386,60 +2386,51 @@ the canned rules being included, and conflicting with yours.
 <IndexTerm><Primary>porting GHC</Primary></IndexTerm></Title>
 
 <Para>
-This section is for people trying to get GHC going by using the
-supplied intermediate C (<Filename>.hc</Filename>) files.  This would probably be because
-no binaries have been provided, or because the machine is not ``fully
+This section is for people trying to get GHC going by using the supplied
+intermediate C (<Filename>.hc</Filename>) files.  This would probably be
+because no binaries have been provided, or because the machine is not ``fully
 supported''.
 </Para>
 
 <Para>
-The intermediate C files are normally made available together with a
-source release, please check the announce message for exact directions
-of where to find them. If we haven't made them available or you
-can't find them, please ask.
+The intermediate C files are normally made available together with a source
+release, please check the announce message for exact directions of where to
+find them. If we haven't made them available or you can't find them, please
+ask.
 </Para>
 
 <Para>
-Assuming you've got them, unpack them on top of a fresh source tree.
-Then follow the `normal' instructions in <Xref LinkEnd="sec-building-from-source"> for setting
-up a build tree. When you invoke the configure script, you'll have
-to tell the script about your intentions:
+Assuming you've got them, unpack them on top of a fresh source tree.  This
+will place matching <Filename>.hc</Filename> files next to the corresponding
+Haskell source in the compiler subdirectory <Filename>ghc</Filename> and in
+the language package of hslibs (i.e., in <Filename>hslibs/lang</Filename>).
+Then follow the `normal' instructions in <Xref
+LinkEnd="sec-building-from-source"> for setting up a build tree.
 </Para>
 
 <Para>
-
+The actual build process is fully automated by the
+<Filename>hc-build</Filename> script located in the
+<Filename>distrib</Filename> directory.  If you eventually want to install GHC
+into the directory <Filename>INSTALL_DIRECTORY</Filename>, the following
+command will execute the whole build process (it won't install yet):
+</Para>
 <Screen>
-foo% ./configure --enable-hc-boot
+foo% distrib/hc-build --prefix=INSTALL_DIRECTORY
 </Screen>
-
-<IndexTerm><Primary>--enable-hc-boot</Primary></IndexTerm>
-<IndexTerm><Primary>--disable-hc-boot</Primary></IndexTerm>
-</Para>
-
+<IndexTerm><Primary>--hc-build</Primary></IndexTerm>
 <Para>
-Assuming it configures OK and you don't need to create <Filename>mk/build.mk</Filename>
-for any other purposes, the next step is to proceed with a <Command>make boot</Command>
-followed by <Command>make all</Command>. At the successful completion of <Command>make all</Command>,
-you should end up with a binary of the compiler proper,
-<Filename>ghc/compiler/hsc</Filename>, plus archives (but no <Filename>.hi</Filename> files!) of the prelude
-libraries. To generate the Prelude interface files (and test drive the
-bootstrapped compiler), re-run the <Command>configure</Command> script, but this time
-without the <Option>--enable-hc-boot</Option> option. After that re-create the
-contents of <Filename>ghc/lib</Filename>:
+By default, the installation directory is <Filename>/usr/local</Filename>.  If
+that is what you want, you may omit the argument to
+<Filename>hc-build</Filename>.  Generally, any option given to
+<Filename>hc-build</Filename> is passed through to the configuration script
+<Filename>configure</Filename>.  If <Filename>hc-build</Filename>
+successfully completes the build process, you can install the resulting
+system, as normal, with
 </Para>
-
-<Para>
-
 <Screen>
-foo% ./configure
- ....
-foo% cd ghc/lib
-foo% make clean
-foo% make boot
-foo% make all
+foo% make install
 </Screen>
-
-</Para>
 
 <Para>
 That's the mechanics of the boot process, but, of course, if you're
