@@ -44,7 +44,7 @@ import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
 import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
-			  reportUnusedNames )
+			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
 import PprCore		( pprIdRules, pprCoreBindings )
@@ -163,6 +163,13 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 	setGblEnv tcg_env		$ do {
 
 	traceRn (text "rn3") ;
+
+		-- Report the use of any deprecated things
+		-- We do this before processsing the export list so
+		-- that we don't bleat about re-exporting a deprecated
+		-- thing (especially via 'module Foo' export item)
+		-- Only uses in the body of the module are complained about
+	reportDeprecations tcg_env ;
 
 		-- Process the export list
 	export_avails <- exportsFromAvail (isJust maybe_mod) exports ;

@@ -6,7 +6,8 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, exportsFromAvail,
-	reportUnusedNames, mkModDeps, exportsToAvails
+	reportUnusedNames, reportDeprecations, 
+	mkModDeps, exportsToAvails
     ) where
 
 #include "HsVersions.h"
@@ -730,15 +731,68 @@ check_occs ie occs avail
 
 %*********************************************************
 %*						 	 *
-\subsection{Unused names}
+		Deprecations
+%*							 *
+%*********************************************************
+
+\begin{code}
+reportDeprecations :: TcGblEnv -> RnM ()
+reportDeprecations tcg_env
+  = ifOptM Opt_WarnDeprecations	$
+    do	{ hpt <- getHpt
+	; eps <- getEps
+	; mapM_ (check hpt (eps_PIT eps)) all_gres }
+  where
+    used_names = findUses (tcg_dus tcg_env) emptyNameSet
+    all_gres   = globalRdrEnvElts (tcg_rdr_env tcg_env)
+
+    check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_) _})
+      | name `elemNameSet` used_names
+      ,	Just deprec_txt <- lookupDeprec hpt pit name
+      = addSrcSpan (is_loc imp_spec) $
+	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
+			text (occNameFlavour (nameOccName name)) <+> 
+		 	quotes (ppr name),
+		      (parens imp_msg),
+		      (ppr deprec_txt) ])
+	where
+	  name_mod = nameModuleName name
+	  imp_mod  = is_mod imp_spec
+	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
+	  extra | imp_mod == name_mod = empty
+		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
+
+    check hpt pit ok_gre = returnM ()	-- Local, or not used, or not deprectated
+	    -- The Imported pattern-match: don't deprecate locally defined names
+	    -- For a start, we may be exporting a deprecated thing
+	    -- Also we may use a deprecated thing in the defn of another
+	    -- deprecated things.  We may even use a deprecated thing in
+	    -- the defn of a non-deprecated thing, when changing a module's 
+	    -- interface
+
+lookupDeprec :: HomePackageTable -> PackageIfaceTable 
+	     -> Name -> Maybe DeprecTxt
+lookupDeprec hpt pit n 
+  = case lookupIface hpt pit (nameModule n) of
+	Just iface -> mi_dep_fn iface n `seqMaybe` 	-- Bleat if the thing, *or
+		      mi_dep_fn iface (nameParent n)	-- its parent*, is deprec'd
+	Nothing    -> pprPanic "lookupDeprec" (ppr n)	
+		-- By now all the interfaces should have been loaded
+
+gre_is_used :: NameSet -> GlobalRdrElt -> Bool
+gre_is_used used_names gre = gre_name gre `elemNameSet` used_names
+\end{code}
+
+%*********************************************************
+%*						 	 *
+		Unused names
 %*							 *
 %*********************************************************
 
 \begin{code}
 reportUnusedNames :: TcGblEnv -> RnM ()
 reportUnusedNames gbl_env 
-  = do	{ warnDeprecations     defined_and_used
-	; warnUnusedTopBinds   unused_locals
+  = do	{ warnUnusedTopBinds   unused_locals
 	; warnUnusedModules    unused_imp_mods
 	; warnUnusedImports    unused_imports	
 	; warnDuplicateImports dup_imps
@@ -759,8 +813,8 @@ reportUnusedNames gbl_env
 	-- are both [GRE]; that's why we need defined_and_used
 	-- rather than just all_used_names
     defined_and_used, defined_but_not_used :: [GlobalRdrElt]
-    (defined_and_used, defined_but_not_used) = partition is_used defined_names
-    is_used gre = gre_name gre `elemNameSet` all_used_names
+    (defined_and_used, defined_but_not_used) 
+	= partition (gre_is_used all_used_names) defined_names
     
 	-- Find the duplicate imports
     dup_imps = filter is_dup defined_and_used
@@ -853,47 +907,6 @@ reportUnusedNames gbl_env
     
     module_unused :: ModuleName -> Bool
     module_unused mod = mod `elem` unused_imp_mods
-
-		      
----------------------
-warnDeprecations :: [GlobalRdrElt] -> RnM ()
-warnDeprecations used_gres
-  = ifOptM Opt_WarnDeprecations	$
-    do	{ hpt <- getHpt
-	; eps <- getEps
-	; mapM_ (check hpt (eps_PIT eps)) used_gres }
-  where
-    check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_) _})
-      | Just deprec_txt <- lookupDeprec hpt pit name
-      = addSrcSpan (is_loc imp_spec) $
-	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
-			text (occNameFlavour (nameOccName name)) <+> 
-		 	quotes (ppr name),
-		      (parens imp_msg),
-		      (ppr deprec_txt) ])
-	where
-	  name_mod = nameModuleName name
-	  imp_mod  = is_mod imp_spec
-	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
-	  extra | imp_mod == name_mod = empty
-		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
-
-    check hpt pit ok_gre = returnM ()	-- Local, or not deprectated
-	    -- The Imported pattern-match: don't deprecate locally defined names
-	    -- For a start, we may be exporting a deprecated thing
-	    -- Also we may use a deprecated thing in the defn of another
-	    -- deprecated things.  We may even use a deprecated thing in
-	    -- the defn of a non-deprecated thing, when changing a module's 
-	    -- interface
-
-lookupDeprec :: HomePackageTable -> PackageIfaceTable 
-	     -> Name -> Maybe DeprecTxt
-lookupDeprec hpt pit n 
-  = case lookupIface hpt pit (nameModule n) of
-	Just iface -> mi_dep_fn iface n `seqMaybe` 	-- Bleat if the thing, *or
-		      mi_dep_fn iface (nameParent n)	-- its parent*, is deprec'd
-	Nothing    -> pprPanic "lookupDeprec" (ppr n)	
-		-- By now all the interfaces should have been loaded
 
 ---------------------
 warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
