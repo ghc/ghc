@@ -247,7 +247,7 @@ howToAccessLabel isJump lbl
 	-- NOTE: It would be OK to jump to foreign code via a PLT stub.
     | labelDynamic lbl = AccessViaSymbolPtr
     
-#if powerpc_ARGET_ARCH
+#if powerpc_TARGET_ARCH
  	-- For PowerPC32 -fPIC, we have to access even static data
 	-- via a symbol pointer (see below for an explanation why
 	-- PowerPC32 Linux is especially broken).
