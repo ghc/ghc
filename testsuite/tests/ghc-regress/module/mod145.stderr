@@ -3,3 +3,4 @@ mod145.hs:2:14:
     Conflicting exports for `m1':
       `module Mod145' exports `Mod145.m1' defined at mod145.hs:7:2
       `module Mod145_A' exports `Mod145_A.m1' imported from Mod145_A at mod145.hs:4:0-14
+						(defined at ./Mod145_A.hs:4:2)
