@@ -6,13 +6,35 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module ST where
+module ST (
+
+	-- ToDo: review this interface; I'm avoiding gratuitous changes for now
+	--			SLPJ Jan 97
+
+
+	ST,
+
+        -- ST is one, so you'll likely need some Monad bits
+        module Monad,
+
+	thenST, seqST, returnST, listST, fixST, runST, unsafeInterleaveST,
+        mapST, mapAndUnzipST,
+
+	MutableVar,
+	newVar, readVar, writeVar, sameVar,
+
+	MutableArray,
+	newArray, readArray, writeArray, sameMutableArray
+
+    ) where
 
 import IOBase	( error )	-- [Source not needed]
 import ArrBase
 import STBase
 import PrelBase	( Int, Bool, ($), ()(..) )
-import GHC	( newArray#, readArray#, writeArray#, sameMutableArray# )
+import GHC	( newArray#, readArray#, writeArray#, sameMutableArray#, sameMutableByteArray# )
+import Monad
+
 \end{code}
 
 %*********************************************************
@@ -22,7 +44,7 @@ import GHC	( newArray#, readArray#, writeArray#, sameMutableArray# )
 %*********************************************************
 
 \begin{code}
-type MutableVar s a = MutableArray s Int a
+-- in ArrBase: type MutableVar s a = MutableArray s Int a
 
 newVar   :: a -> ST s (MutableVar s a)
 readVar  :: MutableVar s a -> ST s a
@@ -48,7 +70,7 @@ sameVar (MutableArray _ var1#) (MutableArray _ var2#)
 \end{code}
 
 
-
+\begin{code}
 sameMutableArray     :: MutableArray s ix elt -> MutableArray s ix elt -> Bool
 sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
 

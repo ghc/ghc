@@ -9,6 +9,7 @@
 
 module Foreign (
 	module Foreign,
+	ForeignObj(..),
 	Addr, Word
    ) where
 
@@ -74,7 +75,7 @@ instance CReturnable () -- Why, exactly?
 %*********************************************************
 
 \begin{code}
-data ForeignObj = ForeignObj ForeignObj#
+--Defined in PrelBase: data ForeignObj = ForeignObj ForeignObj#
 instance CCallable ForeignObj
 instance CCallable ForeignObj#
 

@@ -11,15 +11,17 @@ Glorious hacking (all the hard work) by Bryan O'Sullivan.
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module PackedString (
+        PackedString,      -- abstract
 
-	packString,        -- :: [Char] -> PackedString
-	packStringST,      -- :: [Char] -> ST s PackedString
-	nilPS,             -- :: PackedString
-	consPS,            -- :: Char -> PackedString -> PackedString
+         -- Creating the beasts
+	packString,          -- :: [Char] -> PackedString
+	packStringST,        -- :: [Char] -> ST s PackedString
 
 	byteArrayToPS,       -- :: ByteArray Int -> PackedString
 	unsafeByteArrayToPS, -- :: ByteArray a   -> Int -> PackedString
+
 	psToByteArray,       -- :: PackedString  -> ByteArray Int
+	psToByteArrayST,     -- :: PackedString  -> ST s (ByteArray Int)
 
 	unpackPS,    -- :: PackedString -> [Char]
 {-LATER:
@@ -27,6 +29,8 @@ module PackedString (
         putPS,       -- :: FILE -> PackedString -> PrimIO () -- ToDo: more sensible type
 	getPS,       -- :: FILE -> Int -> PrimIO PackedString
 -}
+	nilPS,       -- :: PackedString
+	consPS,      -- :: Char -> PackedString -> PackedString
 	headPS,      -- :: PackedString -> Char
 	tailPS,      -- :: PackedString -> PackedString
 	nullPS,      -- :: PackedString -> Bool
@@ -63,7 +67,7 @@ module PackedString (
 
 	comparePS,
 
-		-- Converting to C strings
+ 	  -- Converting to C strings
 	packCString#, 
 	unpackCString#, unpackCString2#, unpackAppendCString#, unpackFoldrCString#,
 	packCBytesST, unpackCString
@@ -76,6 +80,7 @@ import STBase
 import ArrBase
 import PrelBase
 import GHC
+
 \end{code}
 
 %************************************************************************
@@ -763,9 +768,6 @@ char_pos_that_dissatisfies p ps len pos
 			  char_pos_that_dissatisfies p ps len (pos +# 1#)
   | otherwise		= pos -- predicate not satisfied
 
-char_pos_that_dissatisfies p ps len pos -- dead code: HACK to avoid badly-typed error msg
-  = 0#
-
 first_char_pos_that_satisfies :: (Char# -> Bool) -> PackedString -> Int# -> Int# -> Int#
 first_char_pos_that_satisfies p ps len pos
   | pos >=# len		= pos -- end
@@ -987,7 +989,7 @@ unpackCString :: Addr -> [Char]
 -- to deal with literal strings
 packCString#	     :: [Char]          -> ByteArray#
 unpackCString#       :: Addr#           -> [Char]
-unpackCString2#      :: Addr# -> Int   -> [Char]
+unpackCString2#      :: Addr# -> Int#   -> [Char]
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
 
@@ -1000,20 +1002,20 @@ unpackCString# addr
   where
     unpack nh
       | ch `eqChar#` '\0'# = []
-      | True		   = C# ch : unpack (nh +# 1#)
+      | otherwise	   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
 
 unpackCString2# addr len
   -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-  = unpackPS (packCBytes len (A# addr))
+  = unpackPS (packCBytes (I# len) (A# addr))
 
 unpackAppendCString# addr rest
   = unpack 0#
   where
     unpack nh
       | ch `eqChar#` '\0'# = rest
-      | True		   = C# ch : unpack (nh +# 1#)
+      | otherwise	   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
 
@@ -1022,7 +1024,7 @@ unpackFoldrCString# addr f z
   where
     unpack nh
       | ch `eqChar#` '\0'# = z
-      | True		   = C# ch `f` unpack (nh +# 1#)
+      | otherwise	   = C# ch `f` unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
 
@@ -1036,8 +1038,8 @@ cStringToPS (A# a#) =	-- the easy one; we just believe the caller
 packBytesForC :: [Char] -> ByteArray Int
 packBytesForC str = psToByteArray (packString str)
 
-packBytesForCST :: [Char] -> ST s (ByteArray Int)
-packBytesForCST str =
+psToByteArrayST :: [Char] -> ST s (ByteArray Int)
+psToByteArrayST str =
   packStringST str	>>= \ (PS bytes n has_null) -> 
    --later? ASSERT(not has_null)
   return (ByteArray (0, I# (n -# 1#)) bytes)
@@ -1074,6 +1076,5 @@ packCBytesST len@(I# length#) (A# addr) =
       = case (indexCharOffAddr# addr idx) of { ch ->
 	write_ps_array arr_in# idx ch >>
 	fill_in arr_in# (idx +# 1#) }
+
 \end{code}
-
-
