@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.46 2005/02/08 10:21:36 simonmar Exp $
+# $Id: package.mk,v 1.47 2005/02/09 10:11:36 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -244,6 +244,8 @@ ifeq "$(STANDALONE_PACKAGE)" "NO"
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 endif
 
+endif # $(PACKAGE) != ""
+
 #--------------------------------------------------------------
 # Building dynamically-linkable libraries for GHCi
 #
@@ -261,7 +263,10 @@ ifeq "$(way)" ""
 ifeq "$(GhcWithInterpreter)" "YES"
 
 GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
+
+ifneq "$(PACKAGE)" ""
 INSTALL_LIBS += $(GHCI_LIBRARY)
+endif
 
 CLEAN_FILES  += $(GHCI_LIBRARY)
 
@@ -308,7 +313,7 @@ DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
     #   Note: I'm not yet sure about this, but I think it will be convenient for
     #         users not to have to set up DYLD_LIBRARY_PATH to point to the GHC
     #         library dir. -- Wolfgang
-    
+
 $(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
 	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) -flat_namespace -undefined suppress -install_name `pwd`/$@
 else
@@ -318,17 +323,22 @@ $(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
 	$(CC) -shared -o $@ $(STUBOBJS) $(LIBOBJS)
 endif
 
+ifneq "$(PACKAGE)" ""
 INSTALL_LIBS += $(DYLD_LIBRARY)
+endif
+
 CLEAN_FILES += $(DYLD_LIBRARY)
 
 all :: $(DYLD_LIBRARY)
 
+endif # $(GhcBuildDylibs) == "YES"
 
-endif
+endif # $(LIBRARY) /= ""
 
 # -----------------------------------------------------------------------------
 # Doc building with Haddock
 
+ifneq "$(PACKAGE)" ""
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
 
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
@@ -382,9 +392,7 @@ install-docs :: $(HTML_DOC)
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS
+endif # $(PACKAGE) /= ""
 
 # -----------------------------------------------------------------------------
-
-endif # $(LIBRARY) /= ""
-endif # $(PACKAGE) /= ""
 
