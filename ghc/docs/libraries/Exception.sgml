@@ -9,24 +9,24 @@ Exceptions are defined by the following (non-abstract) datatype:
 
 <tscreen><verb>
 data Exception
-  = IOException 	IOError	   -- IO exceptions (from 'fail')
-  | ArithException  	ArithError -- Arithmetic exceptions
-  | ErrorCall		String	   -- Calls to 'error'
-  | NoMethodError       String	   -- A non-existent method was invoked
-  | PatternMatchFail	String	   -- A pattern match failed
-  | NonExhaustiveGuards String	   -- A guard match failed
-  | RecSelError		String	   -- Selecting a non-existent field
-  | RecConError		String	   -- Field missing in record construction
-  | RecUpdError		String	   -- Record doesn't contain updated field
-  | AssertionFailed	String	   -- Assertions
-  | DynException	Dynamic	   -- Dynamic exceptions
-  | ExternalException   ExtError   -- External exceptions
+  = IOException 	IOError		-- IO exceptions (from 'fail')
+  | ArithException  	ArithException	-- Arithmetic exceptions
+  | ErrorCall		String		-- Calls to 'error'
+  | NoMethodError       String		-- A non-existent method was invoked
+  | PatternMatchFail	String		-- A pattern match failed
+  | NonExhaustiveGuards String		-- A guard match failed
+  | RecSelError		String		-- Selecting a non-existent field
+  | RecConError		String		-- Field missing in record construction
+  | RecUpdError		String		-- Record doesn't contain updated field
+  | AssertionFailed	String		-- Assertions
+  | DynException	Dynamic		-- Dynamic exceptions
+  | AsyncException	AsyncException	-- Externally generated errors
 
 instance Eq   Exception
 instance Ord  Exception
 instance Show Exception
 
-data ArithError
+data ArithException
   = Overflow
   | Underflow
   | LossOfPrecision
@@ -37,19 +37,20 @@ instance Eq   ArithError
 instance Ord  ArithError
 instance Show ArithError
 
-data ExtError
+data AsyncException
   = StackOverflow
   | HeapOverflow
   | ThreadKilled
+  deriving (Eq, Ord)
 
-instance Eq   ExtError
-instance Ord  ExtError
-instance Show ExtError
+instance Eq   AsyncException
+instance Ord  AsyncException
+instance Show AsyncException
 </verb></tscreen>
 
 An implementation should raise the appropriate exception when one of
 the above conditions arises.  <em>Note: GHC currently doesn't generate
-the arithmetic or the external exceptions.</em>
+the arithmetic or the async exceptions.</em>
 
 Exceptions may be thrown explicitly from anywhere:
 
@@ -57,52 +58,91 @@ Exceptions may be thrown explicitly from anywhere:
 throw :: Exception -> a
 </verb></tscreen>
 
-Exceptions may be caught and examined in the <tt/IO/ monad:
+<sect1> The <tt/try/ functions
+<p>
+
+There are several functions for catching and examining exceptions; all
+of them may only be used from within the <tt/IO/ monad.  Firstly the
+<tt/try/ family of functions:
 
 <tscreen><verb>
-catch       :: IO a -> (Exception  -> IO a) -> IO a
-catchIO     :: IO a -> (IOError    -> IO a) -> IO a
-catchArith  :: IO a -> (ArithError -> IO a) -> IO a
-catchError  :: IO a -> (String     -> IO a) -> IO a
-
-getException   :: a -> IO (Maybe Exception)
-getExceptionIO :: IO a -> IO (Either Exception a)
+tryAll    :: a    -> IO (Either Exception a)
+tryAllIO  :: IO a -> IO (Either Exception a)
+try	  :: (Exception -> Maybe b) -> a    -> IO (Either b a)
+tryIO	  :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
 </verb></tscreen>
 
-Each of the functions <tt/catchIO/, <tt/catchArith/, and
-<tt/catchError/ only catch a specific type of exception.  All other
-exceptions are effectively re-thrown.  An uncaught exception will
-normally cause the program to terminate, with the offending exception
-displayed.
+The simplest version is <tt/tryAll/.  It takes a single argument,
+evaluates it (as if you'd applied <tt/seq/ to it), and returns either
+<tt/Right a/ if the evaluation succeeded with result <tt/a/, or
+<tt/Left e/ if an exception was raised, where <tt/e/ is the exception.
+Note that due to Haskell's unspecified evaluation order, an expression
+may return one of several possible exceptions: consider the expression
+<tt/error "urk" + 1 `div` 0/.  Does <tt/tryAll/ return <tt/Just
+(ErrorCall "urk")/ or <tt/Just (ArithError DivideByZero)/?  The answer
+is "either": <tt/tryAll/ makes a non-deterministic choice about which
+exception to return.  If you call it again, you might get a different
+exception back.  This is ok, because <tt/tryAll/ is an IO
+computation.
 
-Note that <tt/catchIO/ is identical to <tt/IO.catch/.  The
-implementation of <tt/IO/ errors in GHC and Hugs uses exceptions for
-speed.
+<tt/tryAllIO/ is the same as <tt/tryAll/ except that the argument to
+evaluate is an <tt/IO/ computation.  Don't try to use <tt/tryAll/ to
+catch exceptions in <tt/IO/ computations: in GHC an expression of type
+<tt/IO a/ is in fact a function, so evaluating it does nothing at all
+(and therefore raises no exceptions).  Hence the need for
+<tt/tryAllIO/, which runs <tt/IO/ computations properly.
+
+The functions <tt/try/ and <tt/tryIO/ take an extra argument which is
+an <em/exception predicate/, a function which selects which type of
+exceptions we're interested in.  The full set of exception predicates
+is given below:
+
+<tscreen><verb>
+justIoErrors		:: Exception -> Maybe IOError
+justArithExceptions 	:: Exception -> Maybe ArithException
+justErrors		:: Exception -> Maybe String
+justDynExceptions	:: Exception -> Maybe Dynamic
+justAssertions		:: Exception -> Maybe String
+justAsyncExceptions 	:: Exception -> Maybe AsyncException
+</verb></tscreen>
+
+For example, to catch just calls to 'error' we could use something
+like
+
+<tscreen><verb>
+    result <- try justErrors thing_to_try
+</verb></tscreen>
+
+Any other exceptions which aren't matched by the predicate are
+re-raised, and may be caught by an enclosing <tt/try/ or <tt/catch/.
+
+<sect1> The <tt/catch/ functions
+<p>
+
+The <tt/catch/ family is similar to the <tt/try/ family:
+
+<tscreen><verb>
+catchAll   :: a    -> (Exception -> IO a) -> IO a
+catchAllIO :: IO a -> (Exception -> IO a) -> IO a
+catch      :: (Exception -> Maybe b) -> a    -> (b -> IO a) -> IO a
+catchIO    :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
+</verb></tscreen>
+
+The difference is that instead of returning an <tt/Either/ type as the
+result, the <tt/catch/ functions take a <em/handler/ argument which is
+invoked in the case that an exception was raised while evaluating the
+first argument.
+
+<tt/catch/ and <tt/catchIO/ take exception predicate arguments in the
+same way as <tt/try/ and <tt/tryIO/.
+
+Note that <tt/catchIO justIoErrors/ is identical to <tt/IO.catch/.  In
+fact, the implementation of <tt/IO/ errors in GHC uses exceptions
+"under the hood".
 
 Also, don't forget to <tt/import Prelude hidiing (catch)/ when using
 this library, to avoid the name clash between <tt/Exception.catch/ and
 <tt/IO.catch/.
-
-The <tt/getException/ function is useful for evaluating a non-IO typed
-value and testing for exceptions.  <tt/getException/ evaluates its
-first argument (as if you'd applied <tt/seq/ to it), returning
-<tt/Just &lt;exception&gt;/ if an exception was raised, or
-<tt/Nothing/ otherwise.  Note that due to Haskell's unspecified
-evaluation order, an expression may return one of several possible
-exceptions: consider the expression <tt/error "urk" + 1 `div` 0/.  Does
-<tt/getException/ return <tt/Just (ErrorCall "urk")/ or <tt/Just
-(ArithError DivideByZero)/?  The answer is "either": getException
-makes a non-deterministic choice about which exception to return.  If
-you call it again, you might get a different exception back.  This is
-ok, because <tt/getException/ is an IO computation.
-
-<tt/getExceptionIO/ is the equivalent function for <tt/IO/ computations
---- it runs its first argument, and returns either the return value or
-the exception if one was raised.  Passing a value of type <tt/IO a/ to
-<tt/getException/ won't work, because the <tt/IO/ type is represented
-by a function, and <tt/getException/ will only evaluate its argument
-to head normal form, hence the <tt/IO/ computation won't be
-performed.  Use <tt/getExceptionIO/ instead.
 
 <sect1> <idx/Dynamic Exceptions/ 
 <label id="sec:Dynamic-Exceptions">
@@ -123,3 +163,43 @@ The <tt/catchDyn/ function only catches exceptions of the required
 type; all other exceptions are re-thrown as with <tt/catchIO/ and
 friends above.
 
+<sect1> Other Utilities
+
+The <tt/bracket/ functions are useful for making sure that resources are
+released properly by code that may raise exceptions:
+
+<tscreen><verb>
+	bracket  	:: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+	bracket_ 	:: IO a -> IO b -> IO c -> IO c
+	finally		:: IO a -> IO b -> IO b
+</verb></tscreen>
+
+For example, to open a file, do some work on it and then close it
+again, we might use something like:
+
+<tscreen><verb>
+process_file = bracket (openFile "filename") closeFile 
+               (do 
+	         ...
+                )
+</verb></tscreen>
+
+<tt/bracket/ works as follows: it executes its first argument
+("open"), then its third argument, followed finally by its second
+argument ("close").  If the third argument happened to raise an
+exception, then the close operation will still be performed, and the
+exception will be re-raised.  
+
+This means that in the example above the file will always be closed,
+even if an error occurs during processing.
+
+The arguments to <tt/bracket/ are in this order so that we can
+partially apply it, like:
+
+<tscreen><verb>
+withFile name = bracket (openFile name) closeFile
+</verb></tscreen>
+
+The <tt/bracket_/ function is a variant of <tt/bracket/ that throws
+away the result of the open, and <tt/finally/ is an even simpler
+version where we just want some closing code.
