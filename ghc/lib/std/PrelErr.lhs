@@ -96,7 +96,7 @@ error__ msg_hdr s
   = errorIO (do
      (hFlush stdout) `catch` (\ _ -> return ())
      let bs@(ByteArray (_,len) _) = packString s
-     _ccall_ __writeErrString__ msg_hdr bs len
+     _ccall_ writeErrString__ msg_hdr bs len
      _ccall_ stg_exit (1::Int)
     )
 #else
