@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.25 2003/03/31 19:19:34 sof Exp $
+ * $Id: Stable.c,v 1.26 2003/06/24 13:45:49 stolz Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -73,21 +73,6 @@
   There may be additional functions on the C side to allow evaluation,
   application, etc of a stable pointer.
 
-  When Haskell calls C, it normally just passes over primitive integers,
-  floats, bools, strings, etc.  This doesn't cause any problems at all
-  for garbage collection because the act of passing them makes a copy
-  from the heap, stack or wherever they are onto the C-world stack.
-  However, if we were to pass a heap object such as a (Haskell) @String@
-  and a garbage collection occured before we finished using it, we'd run
-  into problems since the heap object might have been moved or even
-  deleted.
-
-  So, if a C call is able to cause a garbage collection or we want to
-  store a pointer to a heap object between C calls, we must be careful
-  when passing heap objects. Our solution is to keep a table of all
-  objects we've given to the C-world and to make sure that the garbage
-  collector collects these objects --- updating the table as required to
-  make sure we can still find the object.
 */
 
 snEntry *stable_ptr_table = NULL;
