@@ -1,0 +1,75 @@
+/* 
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-
+ *
+ * IO / Handle support.
+ */
+#include "HsStd.h"
+#include "PrelIOUtils.h"
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif
+
+HsBool prel_supportsTextMode()
+{
+#if defined(mingw32_TARGET_OS)
+  return HS_BOOL_FALSE;
+#else
+  return HS_BOOL_TRUE;
+#endif
+}
+
+HsInt prel_bufsiz()
+{
+  return BUFSIZ;
+}
+
+HsInt prel_seek_cur()
+{
+  return SEEK_CUR;
+}
+
+HsInt prel_o_binary()
+{
+#ifdef HAVE_O_BINARY
+  return O_BINARY;
+#else
+  return 0;
+#endif
+}
+
+HsInt prel_seek_set()
+{
+  return SEEK_SET;
+}
+
+HsInt prel_seek_end()
+{
+  return SEEK_END;
+}
+
+HsInt prel_setmode(HsInt fd, HsBool toBin)
+{
+#ifdef _WIN32
+  return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
+#else
+  return EOK;
+#endif  
+}
+
+HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
+{
+  return write(fd,ptr + off, sz);
+}
+
+HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
+{
+  return write(fd,ptr + off, sz);
+}
+
+void *prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_t sz)
+{ 
+  return memcpy(dst+dst_off, src, sz);
+}
+
