@@ -8,8 +8,8 @@ SRCS	= \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
-	Data/HashTable.hs Data/Dynamic.hs Data/Monoid.hs Data/Tree.hs \
-	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
+	Control/Monad.hs Data/HashTable.hs Data/Dynamic.hs Data/Monoid.hs \
+	Data/Tree.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	NHC/SizedTypes.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
