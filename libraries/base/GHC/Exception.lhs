@@ -109,17 +109,27 @@ bracket_ before after m = do
 %*********************************************************
 
 \begin{code}
-#ifndef __HUGS__
+-- | Applying 'block' to a computation will
+-- execute that computation with asynchronous exceptions
+-- /blocked/.  That is, any thread which
+-- attempts to raise an exception in the current thread will be
+-- blocked until asynchronous exceptions are enabled again.  There\'s
+-- no need to worry about re-enabling asynchronous exceptions; that is
+-- done automatically on exiting the scope of
+-- 'block'.
 block :: IO a -> IO a
-block (IO io) = IO $ blockAsyncExceptions# io
 
+-- | To re-enable asynchronous exceptions inside the scope of
+-- 'block', 'unblock' can be
+-- used.  It scopes in exactly the same way, so on exit from
+-- 'unblock' asynchronous exception delivery will
+-- be disabled again.
 unblock :: IO a -> IO a
+
+#ifndef __HUGS__
+block (IO io) = IO $ blockAsyncExceptions# io
 unblock (IO io) = IO $ unblockAsyncExceptions# io
 #else
--- Not implemented yet in Hugs.
-block :: IO a -> IO a
-block (IO io) = IO io
-
 unblock :: IO a -> IO a
 unblock (IO io) = IO io
 #endif

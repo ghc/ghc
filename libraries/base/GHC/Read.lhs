@@ -120,6 +120,8 @@ readList__ readx
 ------------------------------------------------------------------------
 -- ReadS
 
+-- | A parser for a type @a@, represented as a function that takes a
+-- 'String' and returns a list of possible parses @(a,'String')@ pairs.
 type ReadS a = String -> [(a,String)]
 
 ------------------------------------------------------------------------

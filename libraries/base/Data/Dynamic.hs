@@ -16,38 +16,34 @@
 -- with operations for converting dynamic values into a concrete
 -- (monomorphic) type.
 -- 
--- The Dynamic implementation provided is closely based on code
--- contained in Hugs library of the same name.
--- 
 -----------------------------------------------------------------------------
 
 module Data.Dynamic
-	(
-	-- dynamic type
-	  Dynamic	-- abstract, instance of: Show, Typeable
-	, toDyn		-- :: Typeable a => a -> Dynamic
-	, fromDyn	-- :: Typeable a => Dynamic -> a -> a
-	, fromDynamic	-- :: Typeable a => Dynamic -> Maybe a
+  (
+	-- * The @Dynamic@ type
+	Dynamic,	-- abstract, instance of: Show, Typeable
+
+	-- * Converting to and from @Dynamic@
+	toDyn,		-- :: Typeable a => a -> Dynamic
+	fromDyn,	-- :: Typeable a => Dynamic -> a -> a
+	fromDynamic,	-- :: Typeable a => Dynamic -> Maybe a
 	
-	-- type representation
+	-- * Concrete Type Representations
+	
+	-- | This section is useful if you need to define your own
+	-- instances of 'Typeable'.
 
-	, Typeable(
-	     typeOf)	-- :: a -> TypeRep
+	Typeable(
+	     typeOf),	-- :: a -> TypeRep
 
-	  -- Dynamic defines Typeable instances for the following
-	-- Prelude types: [a], (), (a,b), (a,b,c), (a,b,c,d),
-	-- (a,b,c,d,e), (a->b), (Array a b), Bool, Char,
-	-- (Complex a), Double, (Either a b), Float, Handle,
-	-- Int, Integer, (IO a), (Maybe a), Ordering
+	-- ** Building concrete type representations
+	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
+	TyCon,		-- abstract, instance of: Eq, Show, Typeable
 
-	, TypeRep	-- abstract, instance of: Eq, Show, Typeable
-	, TyCon		-- abstract, instance of: Eq, Show, Typeable
-
-	-- type representation constructors/operators:
-	, mkTyCon	-- :: String  -> TyCon
-	, mkAppTy	-- :: TyCon   -> [TypeRep] -> TypeRep
-	, mkFunTy	-- :: TypeRep -> TypeRep   -> TypeRep
-	, applyTy	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
+	mkTyCon,	-- :: String  -> TyCon
+	mkAppTy,	-- :: TyCon   -> [TypeRep] -> TypeRep
+	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
+	applyTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
 
 	-- 
 	-- let fTy = mkTyCon "Foo" in show (mkAppTy (mkTyCon ",,")
@@ -85,9 +81,16 @@ unsafeCoerce = unsafeCoerce#
 
 #include "Dynamic.h"
 
--- The dynamic type is represented by Dynamic, carrying
--- the dynamic value along with its type representation:
+{-|
+  A value of type 'Dynamic' is an object encapsulated together with its type.
 
+  A 'Dynamic' may only represent a monomorphic value; an attempt to
+  create a value of type 'Dynamic' from a polymorphically-typed
+  expression will result in an ambiguity error (see 'toDyn').
+
+  'Show'ing a value of type 'Dynamic' returns a pretty-printed representation
+  of the object\'s type; useful for debugging.
+-}
 data Dynamic = Dynamic TypeRep Obj
 
 instance Show Dynamic where
@@ -100,8 +103,10 @@ instance Show Dynamic where
 data Obj = Obj  
  -- dummy type to hold the dynamically typed value.
 
+-- | A concrete representation of a (monomorphic) type.  'TypeRep'
+-- supports reasonably efficient equality.
 data TypeRep
- = App TyCon   [TypeRep]
+ = App TyCon   [TypeRep] 
  | Fun TypeRep TypeRep
    deriving ( Eq )
 
@@ -122,7 +127,8 @@ instance Show TypeRep where
      showParen (p > 8) $
      showsPrec 9 f . showString " -> " . showsPrec 8 a
 
--- type constructors are 
+-- | An abstract representation of a type constructor.  'TyCon' objects can
+-- be built using 'mkTyCon'.
 data TyCon = TyCon Int String
 
 instance Eq TyCon where
@@ -131,33 +137,52 @@ instance Eq TyCon where
 instance Show TyCon where
   showsPrec _ (TyCon _ s) = showString s
 
--- Operations for going to and from Dynamic:
 
+-- | Converts an arbitrary value into an object of type 'Dynamic'.  
+--
+-- The type of the object must be an instance of 'Typeable', which
+-- ensures that only monomorphically-typed objects may be converted to
+-- 'Dynamic'.  To convert a polymorphic object into 'Dynamic', give it
+-- a monomorphic type signature.  For example:
+--
+-- >    toDyn (id :: Int -> Int)
+--
 toDyn :: Typeable a => a -> Dynamic
 toDyn v = Dynamic (typeOf v) (unsafeCoerce v)
 
-fromDyn :: Typeable a => Dynamic -> a -> a
+-- | Converts a 'Dynamic' object back into an ordinary Haskell value of
+-- the correct type.  See also 'fromDynamic'.
+fromDyn :: Typeable a
+ 	=> Dynamic 	-- ^ the dynamically-typed object
+	-> a		-- ^ a default value 
+	-> a		-- ^ returns: the value of the first argument, if
+			-- it has the correct type, otherwise the value of
+			-- the second argument.
 fromDyn (Dynamic t v) def
   | typeOf def == t = unsafeCoerce v
   | otherwise       = def
 
-fromDynamic :: Typeable a => Dynamic -> Maybe a
+-- | Converts a 'Dynamic' object back into an ordinary Haskell value of
+-- the correct type.  See also 'fromDyn'.
+fromDynamic
+	:: Typeable a
+	=> Dynamic	-- ^ the dynamically-typed object
+	-> Maybe a	-- ^ returns: @'Just' a@, if the dyanmically-typed
+			-- object has the correct type (and @a@ is its value), 
+			-- or 'Nothing' otherwise.
 fromDynamic (Dynamic t v) =
   case unsafeCoerce v of 
     r | t == typeOf r -> Just r
       | otherwise     -> Nothing
 
--- To make it possible to convert values with user-defined types
--- into type Dynamic, we need a systematic way of getting
--- the type representation of an arbitrary type. A type
--- class provides just the ticket,
-
+-- | The class 'Typeable' allows a concrete representation of a type to
+-- be calculated.
 class Typeable a where
   typeOf :: a -> TypeRep
-
--- NOTE: The argument to the overloaded `typeOf' is only
--- used to carry type information, and Typeable instances
--- should *never* *ever* look at its value.
+  -- ^ Takes a value of type @a@ and returns a concrete representation
+  -- of that type.  The /value/ of the argument should be ignored by
+  -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
+  -- the argument.
 
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TyCon _ (',':_)) = True
@@ -175,7 +200,21 @@ isTupleTyCon _		       = False
 -- If this constraint does turn out to be a sore thumb, changing
 -- the Eq instance for TyCons is trivial.
 
-mkTyCon :: String -> TyCon
+-- | Builds a 'TyCon' object representing a type constructor.  An
+-- implementation of "Data.Dynamic" should ensure that the following holds:
+--
+-- >  mkTyCon "a" == mkTyCon "a"
+--
+-- NOTE: GHC\'s implementation is quite hacky, and the above equation
+-- does not necessarily hold.  For defining your own instances of
+-- 'Typeable', try to ensure that only one call to 'mkTyCon' exists
+-- for each type constructor (put it at the top level, and annotate the
+-- corresponding definition with a @NOINLINE@ pragma).
+mkTyCon
+	:: String	-- ^ the name of the type constructor (should be unique
+			-- in the program, so it might be wise to use the
+			-- fully qualified name).
+	-> TyCon	-- ^ A unique 'TyCon' object
 mkTyCon str = unsafePerformIO $ do
    v <- readIORef uni
    writeIORef uni (v+1)
@@ -201,9 +240,12 @@ showTuple (TyCon _ str) args = showChar '(' . go str args
   go _ _   = showChar ')'
 
 
+-- | Applies a type constructor to a sequence of types
 mkAppTy  :: TyCon   -> [TypeRep] -> TypeRep
 mkAppTy tyc args = App tyc args
 
+-- | A special case of 'mkAppTy', which applies the function type constructor to
+-- a pair of types.
 mkFunTy  :: TypeRep -> TypeRep   -> TypeRep
 mkFunTy f a = Fun f a
 
@@ -223,6 +265,10 @@ dynApp f x = case dynApply f x of
                                "Can't apply function " ++ show f ++
                                " to argument " ++ show x)
 
+-- | Applies a type to a function type.  Returns: @'Just' u@ if the
+-- first argument represents a function of type @t -> u@ and the
+-- second argument represents a function of type @t@.  Otherwise,
+-- returns 'Nothing'.
 applyTy :: TypeRep -> TypeRep -> Maybe TypeRep
 applyTy (Fun t1 t2) t3
   | t1 == t3    = Just t2
